@@ -1,0 +1,60 @@
+{
+  "enabledPlugins": {
+    "csharp-lsp@claude-plugins-official": true,
+    "playwright@claude-plugins-official": false,
+    "typescript-lsp@claude-plugins-official": false,
+    "security-guidance@claude-plugins-official": false,
+    "superdesign@superdesign": false,
+    "yapui@local-desktop-app-uploads": false,
+    "brightdata-plugin@synced": false,
+    "data@synced": false,
+    "design@synced": false,
+    "engineering@synced": false,
+    "cowork-plugin-management@synced": false,
+    "pdf-viewer@synced": false,
+    "unity@claude-plugins-official": true
+  },
+  "deniedMcpServers": [
+    { "serverName": "nvidia-app" },
+    { "serverName": "blender" },
+    { "serverName": "Blender" },
+    { "serverName": "Shadcn_UI" },
+    { "serverName": "claude-in-chrome" },
+    { "serverName": "UnityMCP" }
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/cloud-session-start.sh\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "mcp__claude-code-remote__send_message",
+      "mcp__claude-code-remote__send_later",
+      "mcp__claude-code-remote__get_session",
+      "mcp__claude-code-remote__list_events",
+      "mcp__claude-code-remote__list_triggers",
+      "mcp__claude-code-remote__create_session",
+      "mcp__claude-code-remote__archive_session"
+    ]
+  }
+}

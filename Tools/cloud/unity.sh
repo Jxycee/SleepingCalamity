@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# Tools/cloud/unity.sh - SleepingCalamity wrapper for Unity batchmode runs on LINUX (cloud sessions). The same interface and checks as Tools/unity.ps1 (Windows).
+#
+#   bash Tools/cloud/unity.sh <compile|build|test-edit|test-play|check|exec> [--out DIR] [--filter REGEX] [--timeout MIN] [--project DIR] [--method Class.Method] [--graphics]
+#
+# --out defaults to $SC_OUT; it must be absolute, contain no '..' and sit outside the project (use the session scratchpad).
+# --project defaults to the repo this script is in. --graphics drops -nographics (renders need a graphics device; runs under xvfb-run).
+# Editor: ~/unity/ed/Editor/Unity (Tools/cloud/setup.sh / sc_cloud_compile.py --setup put it there; the download needs no licence, but launching it does: 2026-10-29 first Linux run exited 198, 'No valid Unity Editor license found'). Override with SC_UNITY.
+# Exit codes: 0 PASS, 1 FAIL, 2 LOCKED (another Unity has this project open), 3 TIMEOUT, 4 usage error.
+# Prints `SC RESULT <command> PASS|FAIL|...` lines like unity.ps1, and after a `check` PASS records the commit for the merge gate (<git-common-dir>/sc-check-pass/<sha>).
+# First Linux run 2026-10-29: the editor exited 198 (no valid licence) before any project work; the script itself has not been tested past launch.
+set -u
+USAGE='usage: unity.sh <compile|build|test-edit|test-play|check|exec> --out <absolute scratch dir outside the project> (or set SC_OUT) [--project DIR] [--filter REGEX] [--timeout MIN] [--method Class.Method] [--graphics]'
+say() { printf '%s\n' "$*"; }
+usage() { say "$USAGE"; [ -n "${1:-}" ] && say "usage: $1"; exit 4; }
+
+COMMAND="${1:-}"; [ $# -gt 0 ] && shift
+OUT="${SC_OUT:-}"; FILTER=""; TIMEOUT_MIN=5; METHOD=""; GRAPHICS=0
+PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --out) OUT="${2:-}"; shift 2 ;;
+        --filter) FILTER="${2:-}"; shift 2 ;;
+        --timeout) TIMEOUT_MIN="${2:-5}"; shift 2 ;;
+        --project) PROJECT="${2:-}"; shift 2 ;;
+        --method) METHOD="${2:-}"; shift 2 ;;
+        --graphics) GRAPHICS=1; shift ;;
+        *) usage "unknown argument $1" ;;
+    esac
+done
+case "$COMMAND" in compile|build|test-edit|test-play|check|exec) ;; *) usage "unknown or missing command '$COMMAND'" ;; esac
+UNITY="${SC_UNITY:-$HOME/unity/ed/Editor/Unity}"
+[ -d "$PROJECT/ProjectSettings" ] || usage "project must be an absolute Unity project path: $PROJECT"
+PROJECT="$(cd "$PROJECT" && pwd)"
+[ "$COMMAND" = exec ] && { printf '%s' "$METHOD" | grep -Eq '^[A-Za-z_][A-Za-z0-9_.]*$' || usage 'exec needs --method <Namespace.Class.Method>'; }
+[ -n "$OUT" ] || usage 'no --out given and SC_OUT is not set'
+case "$OUT" in /*) ;; *) usage "out must be absolute: $OUT" ;; esac
+case "$OUT" in *..*) usage "out must not contain ..: $OUT" ;; esac
+case "$OUT/" in "$PROJECT"/*) usage "out must be outside the project: $OUT" ;; esac
+[ -x "$UNITY" ] || usage "Unity editor not found at $UNITY (run: bash Tools/cloud/setup.sh, or python3 Tools/cloud/sc_cloud_compile.py --setup)"
+mkdir -p "$OUT"
+
+ERR_PATTERN='error CS|Exception|Scripts have compiler errors|Compilation failed'
+locked() { pgrep -f -- "-projectPath[ =]\"?$PROJECT\"?( |$)" >/dev/null 2>&1; }
+
+excerpt() { [ -f "$1" ] && grep -E "$2" "$1" | head -40 | sed 's/^/SC LOG /' || say "SC LOG no log file at $1"; }
+compile_clean() { [ -f "$1" ] && grep -q 'Exiting batchmode successfully' "$1" && ! grep -q 'error CS' "$1"; }
+
+# run NAME EXTRA...   sets RUN_STATUS (DONE|LOCKED|TIMEOUT), RUN_EXIT, RUN_LOG
+run_unity() {
+    local name="$1"; shift
+    RUN_LOG="$OUT/$name.log"; RUN_EXIT=-1
+    if locked; then RUN_STATUS=LOCKED; return; fi
+    rm -f "$RUN_LOG"
+    local gfx=(-nographics) pre=()
+    if [ "$GRAPHICS" = 1 ]; then gfx=(); command -v xvfb-run >/dev/null 2>&1 && pre=(xvfb-run -a); fi
+    "${pre[@]}" timeout --signal=TERM --kill-after=30 "$((TIMEOUT_MIN * 60))" "$UNITY" -batchmode "${gfx[@]}" -projectPath "$PROJECT" -logFile "$RUN_LOG" "$@" >/dev/null 2>&1
+    RUN_EXIT=$?
+    if [ "$RUN_EXIT" = 124 ] || [ "$RUN_EXIT" = 137 ]; then RUN_STATUS=TIMEOUT; else RUN_STATUS=DONE; fi
+}
+gate() { # NAME  -> returns 2/3 for LOCKED/TIMEOUT after printing, 0 otherwise
+    case "$RUN_STATUS" in
+        LOCKED) say "SC RESULT $1 LOCKED (another Unity has this project open)"; return 2 ;;
+        TIMEOUT) say "SC RESULT $1 TIMEOUT log=$RUN_LOG"; return 3 ;;
+    esac
+    return 0
+}
+
+do_compile() {
+    run_unity compile -quit; gate compile || return $?
+    if [ "$RUN_EXIT" = 0 ] && compile_clean "$RUN_LOG"; then say "SC RESULT compile PASS log=$RUN_LOG"; return 0; fi
+    excerpt "$RUN_LOG" "$ERR_PATTERN"; say "SC RESULT compile FAIL log=$RUN_LOG"; return 1
+}
+do_build() {
+    run_unity build -quit -executeMethod SleepingCalamity.EditorTools.ProjectBuilder.BuildAll; gate build || return $?
+    if grep -q 'SC BUILDALL FAIL' "$RUN_LOG" 2>/dev/null; then
+        grep '^SC BUILDALL ERROR ' "$RUN_LOG"; excerpt "$RUN_LOG" "$ERR_PATTERN"; say "SC RESULT build FAIL log=$RUN_LOG"; return 1
+    fi
+    if [ "$RUN_EXIT" = 0 ] && compile_clean "$RUN_LOG" && grep -q 'SC BUILDALL PASS' "$RUN_LOG"; then say "SC RESULT build PASS log=$RUN_LOG"; return 0; fi
+    excerpt "$RUN_LOG" "$ERR_PATTERN"; say "SC RESULT build FAIL log=$RUN_LOG"; return 1
+}
+do_exec() {
+    run_unity exec -quit -executeMethod "$METHOD"; gate exec || return $?
+    if [ "$RUN_EXIT" = 0 ] && compile_clean "$RUN_LOG"; then say "SC RESULT exec PASS method=$METHOD log=$RUN_LOG"; return 0; fi
+    excerpt "$RUN_LOG" "$ERR_PATTERN"; say "SC RESULT exec FAIL method=$METHOD exit=$RUN_EXIT log=$RUN_LOG"; return 1
+}
+do_tests() { # NAME PLATFORM XML
+    local name="$1" platform="$2" xml="$OUT/$3"
+    rm -f "$xml"
+    local extra=(-runTests -testPlatform "$platform" -testResults "$xml" -dev-profile sctest)   # never -quit with -runTests
+    [ -n "$FILTER" ] && extra+=(-testFilter "$FILTER")
+    run_unity "$name" "${extra[@]}"; gate "$name" || return $?
+    local total=0 passed=0 failed=0 skipped=0 faillines=""
+    if [ -f "$xml" ]; then
+        read -r total passed failed skipped < <(python3 - "$xml" <<'PY'
+import sys, xml.etree.ElementTree as ET
+try:
+    r = ET.parse(sys.argv[1]).getroot()
+    print(r.get('total', 0), r.get('passed', 0), r.get('failed', 0), r.get('skipped', 0))
+except Exception:
+    print(0, 0, 0, 0)
+PY
+)
+        faillines="$(python3 - "$xml" <<'PY'
+import sys, re, xml.etree.ElementTree as ET
+try:
+    for c in ET.parse(sys.argv[1]).getroot().iter('test-case'):
+        if c.get('result') == 'Failed':
+            m = c.find('failure/message'); t = re.sub(r'\s+', ' ', (m.text or '') if m is not None else '').strip()[:200]
+            print('SC FAIL %s :: %s' % (c.get('fullname'), t))
+except Exception:
+    pass
+PY
+)"
+    fi
+    local completed=0 completed_any=0
+    grep -q 'Test run completed\. Exiting with code 0' "$RUN_LOG" 2>/dev/null && completed=1
+    grep -q 'Test run completed\. Exiting with code' "$RUN_LOG" 2>/dev/null && completed_any=1
+    if [ "${total:-0}" -gt 0 ] && [ "${failed:-0}" = 0 ] && [ "$completed" = 1 ]; then
+        say "SC RESULT $name PASS total=$total passed=$passed failed=0 skipped=$skipped log=$RUN_LOG"; return 0
+    fi
+    if [ "${total:-0}" = 0 ]; then
+        excerpt "$RUN_LOG" "$ERR_PATTERN"; say "SC RESULT $name FAIL total=0 (no tests matched or compile errors) log=$RUN_LOG"; return 1
+    fi
+    local reason=""; [ "$completed_any" = 0 ] && reason=' (no completion line in log)'
+    say "SC RESULT $name FAIL total=$total passed=$passed failed=$failed skipped=$skipped log=$RUN_LOG$reason"
+    [ -n "$faillines" ] && say "$faillines"
+    return 1
+}
+write_marker() {
+    local sha common dir
+    sha="$(git -C "$PROJECT" rev-parse HEAD 2>/dev/null)"; common="$(git -C "$PROJECT" rev-parse --git-common-dir 2>/dev/null)"
+    [ -n "$sha" ] && [ -n "$common" ] || { say 'SC MARKER skipped (git rev-parse failed)'; return; }
+    case "$common" in /*) ;; *) common="$PROJECT/$common" ;; esac
+    dir="$common/sc-check-pass"; mkdir -p "$dir" && date -Iseconds > "$dir/$sha"
+    if [ -n "$(git -C "$PROJECT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+        say "SC MARKER $sha (uncommitted changes were present; the marker covers the commit only)"
+    else
+        say "SC MARKER $sha"
+    fi
+}
+
+code=1
+case "$COMMAND" in
+    compile) do_compile; code=$? ;;
+    build) do_build; code=$? ;;
+    test-edit) do_tests test-edit EditMode editmode.xml; code=$? ;;
+    test-play) do_tests test-play PlayMode playmode.xml; code=$? ;;
+    exec) do_exec; code=$? ;;
+    check)
+        do_build; code=$?
+        [ "$code" = 0 ] && { do_tests test-edit EditMode editmode.xml; code=$?; }
+        [ "$code" = 0 ] && { do_tests test-play PlayMode playmode.xml; code=$?; }
+        case "$code" in
+            0) say 'SC RESULT check PASS'; write_marker ;;
+            2) say 'SC RESULT check LOCKED' ;;
+            3) say 'SC RESULT check TIMEOUT' ;;
+            *) say 'SC RESULT check FAIL' ;;
+        esac ;;
+esac
+exit "$code"

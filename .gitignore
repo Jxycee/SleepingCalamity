@@ -107,3 +107,17 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# EditMode test scratch content; never committed
+/Assets/_Project/Tests/__Temp*
+
+# Claude Code: agent worktrees and personal settings
+.claude/worktrees/
+.claude/settings.local.json
+
+# Copyrighted style frames and game captures: study only, never committed
+Reference/private/
+
+# Python bytecode (the Blender scripts import each other)
+__pycache__/
+*.pyc
