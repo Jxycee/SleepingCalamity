@@ -1,6 +1,6 @@
 # Sleeping Calamity: story
 
-**Status: DRAFT 2 (2026-10-29), not locked.** Written by Claude from the user's answers. Anything marked *(draft)* is Claude's proposal for the user to change. "Locked" means the user signs off and any later change is deliberate.
+**Status: DRAFT 3 (2026-10-29), not locked.** Written by Claude from the user's answers. Anything marked *(draft)* is Claude's proposal for the user to change. "Locked" means the user signs off and any later change is deliberate.
 
 User decisions behind this draft (2026-10-29):
 - **The Sleeper is an evil demon.** It rose up and struck a deal with the townspeople for their crops. The deal went bad because the people couldn't feed it enough to make it fall asleep, so it took the town and its people instead.
@@ -11,6 +11,8 @@ User decisions behind this draft (2026-10-29):
 - **Six towns and six dungeon sets,** in the order of section 6 (user: "Yes").
 - **The feelings that must work:** rebuilding home, the weapon bond, and the tension of a dungeon dive. The pitfalls to avoid are in `docs/design/dark-cloud-lessons.md`.
 - **Players:** solo, or 2 to 4 players. A multiplayer world records at most 4 unique players.
+- **Answers to draft 2 (user):** the four survived because they skipped the Tithe Feast (yes); Hollowmere fell first and the other towns after; keep the names Mawrrow and Elder Corwin Vane.
+- **Weapons (user):** any hero can use any weapon. Each starts with a default heirloom: Wren a staff, Tobin a beefy logging axe, Pip a dagger and shield, Ash a bow and sword. Upgrading the heirloom to its final form makes it a legendary with slightly better stats than every other legendary in the game, and only its own hero can wield it.
 
 ---
 
@@ -37,7 +39,7 @@ For a generation the deal worked, and the Vale grew rich and proud. But Mawrrow'
 
 **The Long Night** (ten years before the game). One autumn the towns couldn't bring enough, and the tithe fell short. Mawrrow woke hungry and took what it was owed in another coin: the town of Hollowmere itself. In one night everything was dragged down into the deep: the houses, the animals, the bells, the colour, and every person bound by the pact.
 
-Then, gorged for the first time, it fell into a deep, heavy, glutted sleep. That sleep is the **Sleeping Calamity**. The other five towns were taken on the same night, or in the weeks after as it turned over in its sleep *(draft: one night for all six, or Hollowmere first and the others after?)*.
+Then, gorged for the first time, it fell into a deep, heavy, glutted sleep. That sleep is the **Sleeping Calamity**. But a gorged demon still dreams of eating. Over the weeks that followed, as it turned over in its sleep, the other five towns fell one by one, each to its own tithe debt (user: Hollowmere first). *(draft)* Word travelled slower than the hunger: a few people outside the towns may have escaped, and the heroes can meet the odd survivor on the road (a hermit, a trader, a shepherd), each with their own piece of the story.
 
 **The Hearthdeep.** Mawrrow's lair is a great hollow under the mountain where it digests what it has taken. It holds what it eats inside its dream, so the taken aren't dead. They sleep inside it:
 - Houses are folded into monstrous mazes.
@@ -61,18 +63,18 @@ Four friends who survived the Long Night as children. They grew up together in e
 
 **Customisation (user):** the player can rename any hero, and all text, dialogue and the journal use that name. Outfits can be customised: the heroes find, craft and dye them, and each shows on the hero in cutscenes. Faces, bodies and hair stay fixed.
 
-**Heirloom weapons.** Each hero carries an heirloom from someone who was taken. The weapon bond is also their bond with that person:
-- Growing the weapon uncovers memories of its owner.
-- Its final build-up form is earned in the chapter where that person comes home.
+**Weapons (user).** Any hero can use any weapon the player finds or builds. Each hero starts with a default **heirloom** from someone who was taken, and the weapon bond is also their bond with that person:
+- Growing the heirloom uncovers memories of its owner.
+- Its final build-up form is a **legendary** with slightly better stats than every other legendary in the game, and only its own hero can wield it. *(draft)* That form is earned in the chapter where the heirloom's owner comes home.
 
 | Hero (default name) | Age | Who | Heirloom | Wants |
 |---|---|---|---|---|
-| **Wren Hale** | 18 | The planner. For ten years she has kept a painted list of every resident's name. Steady and stubborn, and secretly sure she has forgotten her mother's face. | Her mother's surveyor's staff | To bring everyone back, exactly as they were |
-| **Tobin Marsh** | 20 | The eldest. He became the others' parent too young. Big, gentle, a builder, and tired. | His father's mason's hammer | Permission to stop being the grown-up |
-| **Pip Ostrander** | 17 | The youngest and loudest. She found the tunnels, so she's the reason they're alive. Her jokes are armour. | Her grandmother's bell-ringer's mallet | To prove she isn't just the kid |
-| **Ash Calder** | 19 | The scavenger who goes furthest out alone. Curious about the demon, not just angry at it. | An older brother's hunting bow | To find out who made the Bargain, and why |
+| **Wren Hale** | 18 | The planner. For ten years she has kept a painted list of every resident's name. Steady and stubborn, and secretly sure she has forgotten her mother's face. | A staff: her mother's surveyor's staff | To bring everyone back, exactly as they were |
+| **Tobin Marsh** | 20 | The eldest. He became the others' parent too young. Big, gentle, a builder, and tired. | A beefy logging axe: his father's, from the timber yard | Permission to stop being the grown-up |
+| **Pip Ostrander** | 17 | The youngest and loudest. She found the tunnels, so she's the reason they're alive. Her jokes are armour. | A dagger and shield: her grandmother's, from her years in the town watch | To prove she isn't just the kid |
+| **Ash Calder** | 19 | The scavenger who goes furthest out alone. Curious about the demon, not just angry at it. | A bow and sword: an older brother's hunting kit | To find out who made the Bargain, and why |
 
-*(draft)* Names, genders and roles are placeholders to react to. The weapon types are hooks for combat design, not decisions: the staff, hammer, mallet and bow cover reach, weight, speed and range.
+The four default heirlooms cover reach (staff), weight (axe), speed and guard (dagger and shield) and range with a melee fallback (bow and sword).
 
 ## 4. Antagonists
 - **Mawrrow, the Hungering** *(draft name)*. The demon itself, and plainly evil: it made the deal knowing its hunger would outgrow any harvest, because the deal was always a trap. Asleep for most of the game, it is felt through tremors, its voice in dreams and its nightmares. It wakes for the final chapter and the final boss.
@@ -177,7 +179,5 @@ It has three floor bands, about 12 floors in all, plus a boss floor.
 - **After the boss:** the bell comes home. When it rings over Hollowmere, the whole Vale shakes as Mawrrow stirs for the first time in ten years, and somewhere a man who should be dead opens his eyes.
 
 ## 9. Open questions for the user
-- **The demon:** do the names Mawrrow and Elder Corwin Vane work?
-- **The Long Night:** were all six towns taken on the same night, or Hollowmere first and the others later?
-- **How the heroes survived:** they skipped the Tithe Feast while exploring the tunnels, so the pact never counted them. Does that work for you?
-- **The heroes:** keep the four as drafted (names, ages, roles, heirlooms), or change them?
+- Read the whole draft for anything that feels off. When it reads right, say "lock it" and the status becomes LOCKED.
+- *(draft)* Survivors on the road between towns: keep, or should the four be the only people left?
