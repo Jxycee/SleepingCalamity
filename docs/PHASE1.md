@@ -1,6 +1,6 @@
 # Sleeping Calamity: Phase 1 plan
 
-**Status: draft for review (Claude, 2026-10-29).** Written overnight while the user slept. Every call Claude made is tagged `[Pn]` in the text and listed at the end: **Call** means a design choice to confirm, **Placeholder** means a simple swap (a name or a number). Mark each line OK or change it in place.
+**Status: APPROVED (user, 2026-10-30).** The decisions P1-P51 were accepted with the plan; any later change is deliberate and goes in a change log at the end with the date and who asked. Every call is still tagged `[Pn]` in the text and listed in section 11.
 
 Sources: `CLAUDE.md`, the handoff (`docs/superpowers/handoff/2026-10-29-new-project-handoff.md`; its "User decisions" are settled), `docs/STORY.md` (locked), `docs/design/dark-cloud-lessons.md`, `docs/research/*.md`, `docs/superpowers/handoff/decisions-for-review.md`. Numbers marked "DC1", "DC2" or "KH" come from those research notes; everything else is ours, as a starting point for tuning.
 
