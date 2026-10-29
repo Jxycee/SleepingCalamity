@@ -1,0 +1,148 @@
+// Tests/EditMode/WorldSaveRulesTests.cs: what a loaded world save may hold (Core/Save/WorldSaveRules). Pure Core.
+// Ported from FishGame's R89 tests (seed, clean-per-section); its fishing sections are gone, the players section is new.
+using System.Collections.Generic;
+using NUnit.Framework;
+using SleepingCalamity.Core;
+
+namespace SleepingCalamity.Tests.EditMode
+{
+    public class WorldSaveRulesTests
+    {
+        const ulong DefaultSeed = 0xF15F15F1UL;
+
+        static WorldPlayerSave P(string id, int identity = 0) => new WorldPlayerSave { Identity = identity, Id = id };
+
+        static WorldSave Good()
+        {
+            return new WorldSave
+            {
+                WorldSeed = "00000000DEADBEEF",
+                Players = new WorldPlayersSave { Kind = (int)WorldKind.Multiplayer, Recorded = new List<WorldPlayerSave> { P("a"), P("b"), P("c", 1) } },
+            };
+        }
+
+        // Catches: a 64-bit seed losing its top bits through the hex form, a short, long or non-hex seed accepted, or lower case refused.
+        [Test]
+        public void Seed_RoundTripsAllSixtyFourBits_OnlyExactHex()
+        {
+            Assert.That(WorldSaveRules.SeedToHex(0xFEDCBA9876543210UL), Is.EqualTo("FEDCBA9876543210"));
+            Assert.That(WorldSaveRules.TryParseSeed("FEDCBA9876543210", out ulong s) && s == 0xFEDCBA9876543210UL, Is.True);
+            Assert.That(WorldSaveRules.TryParseSeed("fedcba9876543210", out ulong lower) && lower == 0xFEDCBA9876543210UL, Is.True, "either case");
+            Assert.That(WorldSaveRules.TryParseSeed(WorldSaveRules.SeedToHex(0UL), out ulong zero) && zero == 0UL, Is.True);
+            foreach (string bad in new[] { null, "", "F15F15F1", "00000000F15F15F1A", "00000000F15F15G1", " 0000000F15F15F1", "-000000000000001" })
+                Assert.That(WorldSaveRules.TryParseSeed(bad, out _), Is.False, "'" + bad + "'");
+        }
+
+        // Catches: a good save altered on load (a section reset, a value changed, the schema version or the saved time dropped), or a rejection
+        // reported for it.
+        [Test]
+        public void Clean_KeepsAGoodSaveAsItIs()
+        {
+            var rejected = new List<string> { "stale" };
+            WorldSave good = Good();
+            good.SchemaVersion = 1;
+            good.SavedAtUtc = "2026-10-29T19:40:00Z";
+            WorldSave clean = WorldSaveRules.Clean(good, DefaultSeed, rejected);
+            Assert.That(rejected, Is.Empty, "the list is cleared and nothing is rejected");
+            Assert.That(clean.SchemaVersion, Is.EqualTo(1));
+            Assert.That(clean.SavedAtUtc, Is.EqualTo("2026-10-29T19:40:00Z"));
+            Assert.That(clean.WorldSeed, Is.EqualTo("00000000DEADBEEF"));
+            Assert.That(clean.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer));
+            Assert.That(clean.Players.Recorded.Count, Is.EqualTo(3));
+            Assert.That(clean.Players.Recorded[2].Identity, Is.EqualTo(1));
+            Assert.That(clean.Players.Recorded[2].Id, Is.EqualTo("c"));
+        }
+
+        // Catches: a bad seed taking the players with it (or the other way round): each section costs only itself.
+        [Test]
+        public void Clean_ABadSectionCostsOnlyItself()
+        {
+            var rejected = new List<string>();
+
+            WorldSave badSeed = Good();
+            badSeed.WorldSeed = "nope";
+            WorldSave clean = WorldSaveRules.Clean(badSeed, DefaultSeed, rejected);
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionSeed }));
+            Assert.That(clean.WorldSeed, Is.EqualTo(WorldSaveRules.SeedToHex(DefaultSeed)), "the default seed");
+            Assert.That(clean.Players.Recorded.Count, Is.EqualTo(3), "players untouched");
+
+            WorldSave badPlayers = Good();
+            badPlayers.Players.Kind = 9;
+            clean = WorldSaveRules.Clean(badPlayers, DefaultSeed, rejected);
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+            Assert.That(clean.Players, Is.Null, "the players section resets to 'none recorded'");
+            Assert.That(clean.WorldSeed, Is.EqualTo("00000000DEADBEEF"), "seed untouched");
+
+            WorldSave both = Good();
+            both.WorldSeed = "";
+            both.Players.Recorded.Clear();
+            clean = WorldSaveRules.Clean(both, DefaultSeed, rejected);
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionSeed, WorldSaveRules.SectionPlayers }));
+            Assert.That(clean.Players, Is.Null);
+        }
+
+        [Test]
+        public void Clean_NullIsANewWorld_MissingPlayersIsNotAnError()
+        {
+            var rejected = new List<string> { "stale" };
+            WorldSave fresh = WorldSaveRules.Clean(null, DefaultSeed, rejected);
+            Assert.That(rejected, Is.Empty);
+            Assert.That(fresh.WorldSeed, Is.EqualTo(WorldSaveRules.SeedToHex(DefaultSeed)));
+            Assert.That(fresh.Players, Is.Null);
+            Assert.That(fresh.SchemaVersion, Is.EqualTo(WorldSave.CurrentSchemaVersion));
+
+            WorldSave noPlayers = new WorldSave { WorldSeed = "00000000DEADBEEF" };
+            WorldSave clean = WorldSaveRules.Clean(noPlayers, DefaultSeed, rejected);
+            Assert.That(rejected, Is.Empty, "a world with no players recorded yet is fine");
+            Assert.That(clean.Players, Is.Null);
+        }
+
+        // Catches: a hand-edited save recording five players (the 4-player cap bypassed), or one bad entry costing the good ones.
+        [Test]
+        public void Players_DropOnlyTheBadEntries_AndNeverKeepMoreThanFour()
+        {
+            var rejected = new List<string>();
+
+            WorldSave oneBad = Good();
+            oneBad.Players.Recorded.Insert(1, P(""));
+            oneBad.Players.Recorded.Insert(1, null);
+            oneBad.Players.Recorded.Insert(1, P("a"));          // a repeat of the first
+            oneBad.Players.Recorded.Insert(1, P("x", 77));      // an identity kind that does not exist
+            WorldSave clean = WorldSaveRules.Clean(oneBad, DefaultSeed, rejected);
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }), "named, so the store keeps the original as .corrupt");
+            Assert.That(clean.Players.Recorded.ConvertAll(p => p.Id), Is.EqualTo(new[] { "a", "b", "c" }), "the good players kept, in order");
+
+            WorldSave five = Good();
+            five.Players.Recorded.Add(P("d"));
+            five.Players.Recorded.Add(P("e"));
+            clean = WorldSaveRules.Clean(five, DefaultSeed, rejected);
+            Assert.That(clean.Players.Recorded.Count, Is.EqualTo(WorldPlayers.MaxRecorded), "the fifth is cut");
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+        }
+
+        // Catches: a cleaned world that WorldPlayers could not have created (a one-player multiplayer world, a two-player solo world).
+        [Test]
+        public void Players_MustFormAWorldTheRulesCouldHold()
+        {
+            var rejected = new List<string>();
+
+            WorldSave multiOfOne = Good();
+            multiOfOne.Players.Recorded = new List<WorldPlayerSave> { P("a") };
+            Assert.That(WorldSaveRules.Clean(multiOfOne, DefaultSeed, rejected).Players, Is.Null);
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+
+            WorldSave soloOfTwo = Good();
+            soloOfTwo.Players.Kind = (int)WorldKind.Solo;
+            Assert.That(WorldSaveRules.Clean(soloOfTwo, DefaultSeed, rejected).Players, Is.Null);
+
+            WorldSave solo = Good();
+            solo.Players = new WorldPlayersSave { Kind = (int)WorldKind.Solo, Recorded = new List<WorldPlayerSave> { P("owner") } };
+            Assert.That(WorldSaveRules.Clean(solo, DefaultSeed, rejected).Players.Kind, Is.EqualTo((int)WorldKind.Solo));
+            Assert.That(rejected, Is.Empty);
+
+            WorldSave nullList = Good();
+            nullList.Players.Recorded = null;
+            Assert.That(WorldSaveRules.Clean(nullList, DefaultSeed, rejected).Players, Is.Null);
+        }
+    }
+}
