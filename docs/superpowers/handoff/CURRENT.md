@@ -18,7 +18,12 @@
 
 ## Next
 1. Lock `docs/STORY.md` with the user (section 9 holds its open questions).
-2. Plan REA: get the DC1, KH1 and KH2 ISOs and the PS2 BIOS from the user into `C:\Dev\_private\ps2\` (outside the repo, survives sessions); download ghidra-emotionengine-reloaded and ghidra-ps2sdk matched to Ghidra 12.1.4; check each ELF for STABS or .mdebug symbols. Begin with DC1, since no decomp covers it. Fill the gaps listed at the end of each research note.
+2. REA on DC1 is in progress (a subagent writes `docs/research/dc1-rea.md`). Setup is done (2026-10-29):
+   - ISOs are in `C:\Users\jayce\Desktop\Games\ps2\`.
+   - ELFs are extracted to `C:\Dev\_private\ps2\{dc1,kh1,kh2fm}\`.
+   - ghidra-emotionengine-reloaded v2.1.38 is installed in Ghidra 12.1.4. There is no ps2sdk extension to install.
+   - **DC1's ELF keeps 4,181 named functions.** KH1 and KH2FM are stripped.
+   - Once DC1 is done: KH1/KH2 lock-on and combat feel (stripped, so slower), then the gaps listed at the end of each DC2 note.
 3. Build the reference library for Hollowmere and the Undercroft (handoff 3.2). First rewrite `sc-reference` for the new style.
 4. Then write the Phase 1 plan, `docs/PHASE1.md` (handoff 3.4 and 3.5).
 
