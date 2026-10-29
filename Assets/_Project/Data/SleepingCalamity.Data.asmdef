@@ -1,0 +1,16 @@
+{
+    "name": "SleepingCalamity.Data",
+    "rootNamespace": "SleepingCalamity.Data",
+    "references": [
+        "SleepingCalamity.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

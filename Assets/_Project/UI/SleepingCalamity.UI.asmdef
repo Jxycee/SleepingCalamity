@@ -1,0 +1,23 @@
+{
+    "name": "SleepingCalamity.UI",
+    "rootNamespace": "SleepingCalamity.UI",
+    "references": [
+        "SleepingCalamity.Core",
+        "SleepingCalamity.Data",
+        "SleepingCalamity.Runtime",
+        "SleepingCalamity.Gameplay",
+        "SleepingCalamity.Presentation",
+        "Unity.InputSystem",
+        "Unity.Netcode.Runtime",
+        "Unity.Collections"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

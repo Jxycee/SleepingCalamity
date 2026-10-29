@@ -120,7 +120,7 @@ Each chapter has a town to rebuild, a dungeon to dive, a boss, a hero's arc, and
 4. **Thistledown**: an orchard village and bee-keeping abbey on high meadows.
    - Dungeon: **the Hive Choir**, wax halls and orchard roots, sweet and golden and wrong.
    - Boss: the abbey's hive queen and choir.
-   - Arc: Wren, who learns her mother was one of the elders who signed, and that "exactly as they were" isn't possible.
+   - Arc: Wren, who learns her mother kept Hollowmere's tithe ledgers and voted to water the grain, and that "exactly as they were" isn't possible.
    - Truth: Elder Vane is alive and made the deal.
 5. **Stillhollow**: a frozen observatory town on the mountain's shoulder.
    - Dungeon: **the Orrery**, a clockwork star-chart and the elders' sealed records of the Bargain.

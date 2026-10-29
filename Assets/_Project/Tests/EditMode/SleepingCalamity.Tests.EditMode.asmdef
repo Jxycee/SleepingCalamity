@@ -1,0 +1,34 @@
+{
+    "name": "SleepingCalamity.Tests.EditMode",
+    "rootNamespace": "SleepingCalamity.Tests.EditMode",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "SleepingCalamity.Core",
+        "SleepingCalamity.Data",
+        "SleepingCalamity.Runtime",
+        "SleepingCalamity.Editor",
+        "SleepingCalamity.Presentation",
+        "SleepingCalamity.UI",
+        "Unity.InputSystem",
+        "Unity.Netcode.Runtime",
+        "SleepingCalamity.Gameplay",
+        "SleepingCalamity.Networking",
+        "Unity.Collections"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

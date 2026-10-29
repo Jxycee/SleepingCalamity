@@ -1,0 +1,23 @@
+{
+    "name": "SleepingCalamity.Presentation",
+    "rootNamespace": "SleepingCalamity.Presentation",
+    "references": [
+        "SleepingCalamity.Core",
+        "SleepingCalamity.Data",
+        "SleepingCalamity.Runtime",
+        "SleepingCalamity.Gameplay",
+        "Unity.Netcode.Runtime",
+        "Unity.Collections",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,33 @@
+{
+    "name": "SleepingCalamity.Tests.PlayMode",
+    "rootNamespace": "SleepingCalamity.Tests.PlayMode",
+    "references": [
+        "UnityEngine.TestRunner",
+        "SleepingCalamity.Core",
+        "SleepingCalamity.Data",
+        "SleepingCalamity.Runtime",
+        "SleepingCalamity.Networking",
+        "SleepingCalamity.Gameplay",
+        "SleepingCalamity.App",
+        "SleepingCalamity.UI",
+        "SleepingCalamity.Presentation",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.Netcode.Runtime",
+        "Unity.Collections",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

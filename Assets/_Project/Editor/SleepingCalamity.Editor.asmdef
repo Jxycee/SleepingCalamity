@@ -1,0 +1,32 @@
+{
+    "name": "SleepingCalamity.Editor",
+    "rootNamespace": "SleepingCalamity.EditorTools",
+    "references": [
+        "SleepingCalamity.Core",
+        "SleepingCalamity.Data",
+        "SleepingCalamity.Runtime",
+        "SleepingCalamity.Networking",
+        "SleepingCalamity.Gameplay",
+        "SleepingCalamity.Presentation",
+        "SleepingCalamity.UI",
+        "SleepingCalamity.App",
+        "Unity.Netcode.Runtime",
+        "Unity.Netcode.Editor",
+        "Unity.Collections",
+        "Unity.InputSystem",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
