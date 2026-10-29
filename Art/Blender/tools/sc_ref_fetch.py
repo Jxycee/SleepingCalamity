@@ -159,5 +159,6 @@ def main():
         cs.save(sheet); print('sheet ->', sheet)
 
 if __name__ == '__main__':
-    signal.signal(signal.SIGPIPE, signal.SIG_DFL)   # quiet under | head
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)   # quiet under | head
     main()

@@ -1,62 +1,65 @@
 ---
 name: sc-reference
-description: Find, licence-check, store and measure reference images for a SleepingCalamity asset or surface the Riverlight concept paintings don't show (a willow, a dry-stone wall, a clinker boat, a mill wheel) - real photos for form, proportion and wear, public-domain landscape paintings for painterly colour and value - and turn them into the targets the asset skills grade against. Use before building anything absent from the concepts, when a review's colour line has no target, or when a card says "find reference".
+description: Find, licence-check, store and measure reference images for Sleeping Calamity art (towns, dungeons, materials, props, plants) - free-licence photos for form, materials and wear, public-domain storybook and Romantic paintings for colour and value - and turn them into the measured targets the style bible and asset skills grade against. Use before building anything the style bible doesn't cover, when a review's colour line has no target, or when a card says "find reference".
 ---
 
-# Reference images for SleepingCalamity
+# Reference images for Sleeping Calamity
 
-The concept paintings (`Art/Design/Concepts/Millpond/*_concept_1.jpg` and their README) are the source of truth. When they don't show the asset, use references, but keep **the concepts' style**: references tell you *what the thing is* (form, construction, proportion, wear, the colour relations between its parts), and the concepts tell you *how Riverlight paints it*.
+**Target look:** Dark Cloud's whimsical town and dungeon themes rendered with the stylised realism of the 2026 Ocarina of Time Switch 2 remake (handoff section 2): real PBR materials at high detail (cobble, half-timber and plaster, dressed stone, woven cloth, leather, bark, moss), chunky readable storybook shapes, saturated clean daytime colour, rich teal and gold dark scenes, heavy atmosphere (haze, light shafts, drifting motes).
 
-## 1. What to look for (3-6 images, two kinds)
-- **Photos, for form:** the asset in its real setting, ideally the English/Northern-European lowland river country of the concepts. Get it from three angles if possible: a full view for proportion, a close view for construction (how the stones lap, how the strakes overlap, where the whips leave the bole), and one of it worn or broken for the wear beats.
-- **Plants:** search by botanical name plus "clump" or "habitat" ("Iris pseudacorus clump"). Common names return lookalikes (sweet flag, flax), and sky and mud become the biggest masses, so crop hard and take targets from the subject masses only.
-- **Animals:** photos only. The painting search returns still lifes, prints and frames for fauna (blind test #10), so skip it. Use 3-4 field-guide-quality photos of the exact pose and plumage, and drop juveniles, flight shots and backlit frames.
-- **Paintings, for the look:** public-domain landscape painters whose world is Millpond's, such as Constable (mills, locks, willows, boats), Corot and Daubigny (river banks, willows), Van Gogh's Dutch drawings (pollard willows) and Cotman (watercolour stonework). They show how a painter simplifies the subject into masses, which is exactly what the model and the atlas must do. Use them for value masses, colour relations and edge treatment, never for proportion.
-- Skip renders, game screenshots, stock-photo composites, and anything stylised (cartoon, low-poly): they teach another game's look.
+References tell you *what the thing is* (form, construction, proportion, wear, the colour relations between its parts). The style bible (`docs/research/style-targets.md`, later the Phase 1 style bible) tells you *how this game renders it*: cleaner, more saturated, tidier wear, chunkier forms than any photo.
+
+## 1. What to look for (3-6 images per subject, two kinds)
+- **Photos, for form and materials.** The subject in its real setting: a full view for proportion, a close view for construction (how the timbers meet, how tiles lap, how brick vaults spring), and a worn one for the wear beats. Material close-ups should be flat-on and evenly lit.
+  - Town: half-timbered Central-European towns (Rothenburg ob der Tauber, Colmar, Bernkastel-Kues), Cotswold stone villages.
+  - Dungeon: brick cisterns, barrel-vaulted cellars, crypts, root-choked ruins (Ta Prohm), coal cellars.
+- **Paintings, for colour and value.** Public-domain storybook and Romantic landscape and village painters: Carl Spitzweg, Ludwig Richter, Caspar David Friedrich (atmosphere and value layering), Romantic-era German village painters. They show how a painter simplifies a scene into 3-4 value masses and where the light sits. Use them for value masses, colour relations and atmosphere, never for proportion or detail.
+- **Plants:** search by botanical name plus "habitat". Sky and ground become the biggest masses, so crop hard.
+- **Animals:** photos only (the painting search returns prints and frames for fauna).
+- **Skip** renders, game screenshots, stock composites, anything stylised (cartoon, low-poly) and anything graded (HDR, black and white, infrared, heavy filters, orange-teal): they have no true colour and teach another look.
+- **Copyrighted style frames** (official OoT 2026 screens, Dark Cloud captures from the user's own play) are study-only and live only in the gitignored `Reference/private/`. They are never committed, shipped, traced or projected. Measure them locally if useful, but record only numbers in docs.
 
 ## 2. Fetch and record (licence gate)
 ```
-python3 Art/Blender/tools/sc_ref_fetch.py "<phrasing 1>|<phrasing 2>|<phrasing 3>" <scratch>/refs/<asset> --n 8 --dedupe --sheet <scratch>/refs/<asset>/sheet.png
-python3 Art/Blender/tools/sc_ref_fetch.py "<subject>" <scratch>/refs/<asset>_paint --paintings   # museum + Wikimedia paintings
+python -I Art/Blender/tools/sc_ref_fetch.py "<phrasing 1>|<phrasing 2>|<phrasing 3>" <scratch>/refs/<set> --n 8 --dedupe --sheet <scratch>/refs/<set>/sheet.png
+python -I Art/Blender/tools/sc_ref_fetch.py "<subject>" <scratch>/refs/<set>_paint --paintings
 ```
-- It searches Openverse (Flickr, Wikimedia Commons, museum collections), with **CC0, public domain or CC BY only** (never ND or NC). Each image is resized to 1024 px on its long side. It writes `REFS.md` and `refs.json` with the title, creator, licence and landing page per image.
-- It works in cloud and local sessions alike, sends a project User-Agent and backs off on HTTP 429. Openverse can take about 15 s to answer: if a run times out with 0 images, run it again.
-- The anonymous API returns at most 20 results a query, and dead links are common. Rephrase rather than raising `--n`: try "knotwilg" (Dutch), "Kopfweide" (German), or "dry stone wall Yorkshire".
-- **Reference images are study material.** Look at them, crop them and measure them. Never ship them, never project or trace them onto a texture or model, and never put them under `Assets/`.
-- Keep them in the scratchpad while working. To keep a set for later sessions, commit the 1024 px JPGs plus `REFS.md` under `Art/Design/References/<topic>/` (Git LFS, like other images), with the licence rows kept. A CC BY image's credit lives in its REFS.md row.
-- Check one or two licences by hand on the landing page: the index is usually right, not always.
-- **Run 3-4 phrasings by default** (`"q1|q2|q3"`; `--dedupe` takes one image per creator first), not as a fallback ("clinker rowing boat", "wooden rowing boat beach", "rowing boat painted old", "clinker dinghy"). Drop near-duplicates from one creator or set: one search returned 4 shots of a single replica plus 2 interpretive signs.
-- **The licence filter is not a subject filter.** Signs, kayaks, gondolas, engravings and sepia scans all pass it. Choose from the contact sheet (`--sheet`: index, licence, creator, query), not from the file list.
-- **Look before you measure.** Make the palette sheet (below) first and drop graded photos: infrared, sunset or golden-hour grades, HDR, black and white, heavy filters. They have no true colour. In the first willow set, 1 of 4 was infrared, with white foliage, and another was a sunset silhouette.
+(The tools need Pillow and numpy. `-I` ignores the user site-packages, so use an interpreter that has them in its own site-packages, e.g. a venv in the scratchpad.)
+- It searches Openverse (Flickr, Wikimedia Commons, museum collections) with **CC0, public domain or CC BY only** (never ND or NC). Each image is resized to 1024 px on its long side. It writes `REFS.md` and `refs.json` with title, creator, licence and landing page per image.
+- Openverse can take about 15 s to answer: if a run returns 0 images, run it again. The anonymous API returns at most 20 results a query and dead links are common. Rephrase instead of raising `--n` (try the local-language term: "Fachwerk", "Wassermühle", "colombage").
+- **Run 3-4 phrasings by default** (`"q1|q2|q3"`); `--dedupe` takes one image per creator first. Drop near-duplicates from one creator.
+- **The licence filter is not a subject filter.** Signs, models, engravings and sepia scans pass it. Choose from the contact sheet, not the file list.
+- **Look before you measure.** Make the contact and palette sheets first and drop graded photos (HDR, B&W, sunset grades, filters).
+- Spot-check one or two licences by hand on the landing page: the index is usually right, not always.
+- **Reference images are study material.** Look at them, crop them, measure them. Never ship them, never project or trace them onto a texture or model, never put them under `Assets/`.
 
-## 3. Measure (turn pictures into targets)
+## 3. Store
+- **Free-licence sets** that survive the session go in `Reference/<area>/<subject>/` (e.g. `Reference/hollowmere/architecture/`, `Reference/undercroft/cisterns/`), as the 1024 px JPGs the fetch tool wrote (Git LFS via `.gitattributes`; verify with `git check-attr filter <file>`), with a `REFS.md` in each folder: per image the file, source URL, creator, licence, and what it is for (form / material / colour / atmosphere). A CC BY image's credit lives in its REFS.md row.
+- **Copyrighted style frames:** only in `Reference/private/` (gitignored).
+- Contact sheets, palette sheets and logs stay in the scratchpad.
+
+## 4. Measure (turn pictures into targets)
 ```
-python3 Art/Blender/tools/sc_ref_palette.py <scratch>/refs/<asset>/*.jpg [--crops crops.json] [--exclude '#hex,...'] --sheet <scratch>/palette.png
+python -I Art/Blender/tools/sc_ref_palette.py <set>/*.jpg [--crops crops.json] [--exclude '#hex,...'] --sheet <scratch>/palette.png
 ```
-- **Masses** (k-means hexes with their share), **value** (p10 / p50 / p90 and the spread), light warmth (are the lights warmer than the darks?), and a `--targets` string of the masses at 5% or more. Run it per image and pooled.
-- **Pool only one variant.** References of different finishes or seasons (varnished vs painted boats, summer vs winter trees) average into a target nobody should hit. Pool the ones that match the brief and keep separate pools otherwise.
-- **Drop non-subject masses** with `--exclude '#hex'`. Careful: it drops *every* mass within dE 30, so a dark background excluded also strikes the subject's own blacks (the heron lost its black targets that way). Exclude one background colour at a time and check the `x` marks. `--exclude-de <n>` narrows the radius, and a guard keeps a mass that sits nearer another kept mass, but that only helps when the background forms its own mass. Read dark subject masses off the masses line by hand. `sc_ref_fetch` takes `--timeout` (30 s) and `--retries` (2). Typical exclusions: grass under a boat, the carpet in a museum shot. `--crops crops.json` holds one box per image (`{"03_x.jpg": "10,20,90,85"}`).
-- **Crop to the subject** (`--crop` in percent), one image at a time when the framing differs. Sky, water and people otherwise become the biggest masses: the uncropped willow pool's largest masses were sky blue and path gravel. Look at the sheet: a stray bar means a crop is needed.
-- **Photo-to-Riverlight correction.** Photos are brighter, more saturated and noisier than the paintings.
-  - Keep the **relations**: the moss darker and greener than the stone, the lit leaves warmer than the shade, the tarred bottom darker than the topsides.
-  - Pull saturation and value toward the concept README palette before tinting (`sc_tint.py tint '<#hex>' --ao 0.8 --lit`).
-  - Measure a concept crop with the same tool for comparison. The rundown landing reads p10 0.23 / p50 0.41 / p90 0.80, spread 57, with cool lights.
-- **The concepts sit close to Constable.** Measured with `sc_ref_palette.py` (2026-10-25):
+- **Masses** (k-means hexes with share), **value** (p10 / p50 / p90 and spread), **light warmth** (are the lights warmer than the darks?), and a `--targets` string of masses at 5% or more. Run per image and pooled.
+- **Pool one variant only.** Summer and winter, day and lamplit, wet and dry brick average into a target nobody should hit.
+- **Crop to the subject** (`--crop x0%,y0%,x1%,y1%`, or `--crops crops.json` with one box per image). Sky, water, people and signs otherwise become the biggest masses.
+- **`--exclude '#hex'`** drops every mass within dE 30 of the colour, including the subject's own darks if they are close: exclude one colour at a time, check the `x` marks, and read dark subject masses off the masses line by hand.
+- **Photo-to-game correction (the OoT-2026 shift).** Photos are noisy, dusty and desaturated by haze and weathering; the target is cleaner and bolder.
+  - Keep the **relations**: moss darker and greener than the stone, lit plaster warmer than shaded plaster, timber darker than plaster, wet brick darker and cooler than dry.
+  - Day scenes: raise saturation (roughly +15-25% on plaster tints, roofs, foliage), keep plaster clean near-white and roofs a confident red; keep shadows cool and readable, never crushed.
+  - Dark scenes: push to rich teal shadows and gold lamplight, with a clear warm/cool split; keep the darkest masses lifted enough to read shape.
+  - Wear is tidy and placed (a few chips, streaks, moss patches) rather than uniform grime.
+  - The numbers for the first area are in `docs/research/style-targets.md`.
+- **Paintings give the value structure.** Count the masses the painter used (usually 3-4) and where the darkest dark and the lightest light sit. That is the target for the value read of a scene or prop at thumbnail size.
 
-  | | darkest mass | p10 / p50 / p90 | spread | lights vs darks |
-  |---|---|---|---|---|
-  | Constable, *Flatford Mill* (CC0, Wikimedia) | dark green-brown, 26% | 0.21 / 0.39 / 0.75 | 54 | cooler |
-  | `mill_weir` concept | dark green-brown, 33% | 0.18 / 0.44 / 0.88 | 70 | warmer |
+## 5. Use them while building
+- **Header.** Name the reference set in the generator or prefab note (`refs: Reference/<area>/<subject>/REFS.md`) with the 2-3 facts taken from it ("timber posts ~15 cm, plaster panels 1.2 m wide, jettied upper floor overhangs ~40 cm").
+- **Proportion and construction from photos.** Measure against a known size in the frame (a door, a person, a brick) and write the dimensions down before modelling, then exaggerate toward chunky storybook proportion on purpose.
+- **Wear beats** from photos of the old or broken thing: pick the 2-3 that change the value pattern at thumbnail size.
+- **Reference colour scores are advisory.** Grade the *relations* `sc_ref_palette.py` prints, not an exact hex match, and say in the review that targets come from references.
+- **Materials:** use close-ups for the pattern and scale (cobble size, tile course height, plank width) and the style bible for the cleaned-up colour.
 
-  So a public-domain English landscape is a fair stand-in when no concept shows a subject. Riverlight has brighter, warmer lights than Constable's.
-- **Paintings give the value structure.** Count how many masses the painter used (usually 3-4) and where the darkest dark sits. That is the target for rule 5 (three value masses and a contrast pair) and for the foliage clump cells.
-
-## 4. Use them while building
-- **Header.** Name the reference set in the generator header (`refs: Art/Design/References/<topic>/REFS.md`, or "scratch refs: <query>") with the 2-3 facts you took from it ("strakes overlap 20-25 mm; 7 strakes a side on a 4 m boat").
-- **Proportion and construction from photos.** Measure against a known size in the frame (a person, a door, a brick) and write the dimensions down before modelling. That is rubric line 2.
-- **Wear beats from photos of the broken or old thing** (rule 11): pick the 2-3 that change the value pattern at 48 px.
-- **Reference colour scores are advisory.** `sc_concept_match.py --targets` against reference masses scores the subject *variant* as much as the model. The blind boat got 28 and the shipped one 44 against a pool that was mostly varnished boats. Grade the **relations** instead, which `sc_ref_palette.py` prints: the darks vs the lights (a tarred bottom much darker than the topsides), lights warmer than darks, and p90 (references 0.78). State in the review that the targets come from references.
-- **Foliage and textures:** the painting references show what a crown or a surface reduces to at the painted scale. Paint atlas cells and `proc_*` textures toward that reduction, not toward the photo's leaf-level detail (sc-foliage, sc-texture-paint).
-
-## 5. When the subject is in neither
-Some things have no good free reference: a fictional machine, or a regional variant. Then build from first principles (real dimensions, how it would be made and how it would fail), name the closest real analogue in the header, and say on the board card or in the report that the asset has no reference, so a local session or the user can supply one.
+## 6. When the subject has no good free reference
+Some things don't exist (a jam-jar slime, a sentient broom, a root wall) or have no free photo. Build from first principles (real dimensions, how it would be made and how it would fail), name the closest real analogue in the header, and note on the board card or report that there is no reference, so the user can supply one.
