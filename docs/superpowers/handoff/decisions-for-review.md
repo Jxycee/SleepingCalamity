@@ -30,5 +30,8 @@ Change a line in place, or mark it OK.
 
 ## Autonomous run (night of 2026-10-29)
 Claude adds lines here as it works.
+
+| # | Kind | Decision |
+|---|---|---|
 | A1 | Call | Proposed URP starting stack:<br>• Forward+ with the GPU Resident Drawer.<br>• 4 shadow cascades, about 100 m.<br>• Adaptive Probe Volumes for the towns. The dungeons are generated at runtime, so they can't use baked GI.<br>• SSAO.<br>• The Neutral tonemapper plus a grade (compare ACES before locking).<br>• The free MIT CristianQiu volumetric-light package for god rays.<br>To be tested on the beauty corner. Source: `docs/research/urp-stylised-realism.md`. |
 | A2 | Flag | Early press describes the OoT 2026 remake's mood as darker and more grounded than our brief, which reads it as saturated daylight. The brief stays as the user's picture; worth checking against the official screens once it launches (5 Nov 2026). |
