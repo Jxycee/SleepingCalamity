@@ -1,103 +1,183 @@
 # Sleeping Calamity: story
 
-**Status: DRAFT 1 (2026-10-29), not locked.** Written by Claude from the handoff premise and the user's answers. Everything marked *(draft)* is Claude's proposal for the user to change. "Locked" means the user signs off and later changes are deliberate.
+**Status: DRAFT 2 (2026-10-29), not locked.** Written by Claude from the user's answers. Anything marked *(draft)* is Claude's proposal for the user to change. "Locked" means the user signs off and any later change is deliberate.
 
 User decisions behind this draft (2026-10-29):
-- The heroes are young adults, 17 to 20, who grew up in the town and knew all its secrets, which is why they weren't taken with everybody else. Now they must venture out of their area to find resources and a way to bring things and people back.
-- Six towns and six dungeon sets.
-- The feelings that must work: rebuilding home, the weapon bond, dungeon dive tension. The pitfalls to avoid: `docs/design/dark-cloud-lessons.md`.
-- Solo, or 2-4 players; a multiplayer world records at most 4 unique players.
+- **The Sleeper is an evil demon.** It rose up and struck a deal with the townspeople for their crops. The deal went bad because the people couldn't feed it enough to make it fall asleep, so it took the town and its people instead.
+- **One true ending,** building up to a big boss fight.
+- **The heroes are a fixed cast of four:** young adults, 17 to 20, who grew up in the town and knew all its secrets, which is why they weren't taken with everybody else. Now they must leave their area to find resources and a way to bring things and people back.
+  - The player can rename a hero, and all in-game text uses the new name.
+  - Outfits can be customised. Looks can't.
+- **Six towns and six dungeon sets,** in the order of section 6 (user: "Yes").
+- **The feelings that must work:** rebuilding home, the weapon bond, and the tension of a dungeon dive. The pitfalls to avoid are in `docs/design/dark-cloud-lessons.md`.
+- **Players:** solo, or 2 to 4 players. A multiplayer world records at most 4 unique players.
 
 ---
 
 ## 1. Tone
-Whimsical on the surface with a dark undertow, like Dark Cloud. Sunlit storybook towns, warm residents, jokes, and under them, real grief: the heroes have spent years in an empty town, and the thing that emptied it is breathing beneath their feet. The story never mocks that grief, and the whimsy is how the characters cope with it.
+Whimsical on the surface with a dark undertow, like Dark Cloud.
+- **The surface:** sunlit storybook towns, warm residents, jokes.
+- **The undertow:** real grief and real dread. The heroes have spent years in an empty town, and the thing that emptied it is asleep under their feet, full.
 
-## 2. The world and the calamity *(draft)*
+The whimsy is how the characters cope, never a way to dodge the grief.
 
-**The Vale of Ember.** A ring of valleys around an old mountain. Its towns are warm, rich and green, and nobody remembers why: the soil never freezes, hearth fires never quite die, and the springs run warm.
+## 2. The world and the calamity
 
-**The Sleeper.** Beneath the Vale lies the Hearthdeep, and at its bottom sleeps something vast and very old: the calamity. The founders of the towns found it asleep, learned that its slow breath warmed the earth, and built on top of it. They called it the Sleeper and made a quiet custom of keeping it asleep: lullaby bells, banked hearths, the old rules children still chant without knowing why. Over generations the custom became superstition, then a festival, then nothing.
+**The Vale.** A ring of valleys around an old mountain, with six towns linked by one road. Before the calamity it was a hard place: thin soil, short summers, and hungry winters every few years.
 
-**The Long Breath** (ten years before the game). The rules lapsed and the Sleeper stirred in its sleep and drew one long breath. Everything it breathed in was pulled down into the Hearthdeep: people, houses, animals, colour, even names on signs. It didn't destroy them. It took them into its dream, where they sleep too, scattered through the deep and twisted by the dream into the dungeons' floors. Then it settled again, deeper asleep than before, and the towns above were left as hollow shells.
+**The Bargain** (about sixty years before the game) *(draft)*. After the worst famine anyone remembered, something answered the prayers of a desperate harvest festival. It rose out of the earth under the mountain: a demon of appetite that the old tales only half name, called **Mawrrow, the Hungering** *(draft name)*.
 
-**Why the heroes were spared.** The breath took everything it could reach. A handful of children were down in places only children knew: a sealed bell-loft, the dry cistern, a smugglers' crawlway under the mill. Those hidden spaces were the old founders' "quiet rooms", built to be sheltered from the Sleeper, and the children didn't know that. They climbed out the next morning into silence.
+It offered a deal:
+- It would make the Vale's fields rich: the soil never failing, the harvest always full.
+- In return, each autumn the towns would bring it a tithe of the harvest down into the deep. Once fed, it would sleep through the year.
 
-**What the dream does.** Inside the Hearthdeep, taken things become **dream-wrought**: a bakery turns into a maze of ovens, a person becomes a sleeper wrapped in roots and light, a dog becomes the guardian of a floor. The monsters are the Sleeper's nightmares, given shape by what it swallowed. Bringing something back up means carrying it out of the dream; once it's back under the sky it wakes and becomes itself again.
+The towns agreed and signed through their elders. Every person who ate at the yearly **Tithe Feast** was counted as party to the pact.
 
-**The catch: stirring.** Every piece carried out thins the Sleeper's sleep. The deeper the heroes dive and the more they take back, the more it stirs: tremors in town, new monsters, floors that rearrange themselves. Restoring the Vale and waking the Sleeper are the same act. The heroes can't save their families without, in the end, waking it.
+For a generation the deal worked, and the Vale grew rich and proud. But Mawrrow's hunger grew with every year it was fed. Each autumn the tithe had to be bigger before it would sleep: a tenth of the harvest, then a quarter, then half. The towns cheated where they could, by watering grain and hiding stores, and the elders kept the truth quiet.
 
-**The truth underneath** *(draft, revealed across chapters 4 and 5)*. The founders didn't find the Sleeper asleep. They *put it* to sleep: it was a living hearth, a guardian of the mountain's heat, and they sang it down so they could take its warmth for their fields. Its "calamity" was the first time in centuries it turned over in a bad dream. The heroes have to decide what their towns owe it.
+**The Long Night** (ten years before the game). One autumn the towns couldn't bring enough, and the tithe fell short. Mawrrow woke hungry and took what it was owed in another coin: the town of Hollowmere itself. In one night everything was dragged down into the deep: the houses, the animals, the bells, the colour, and every person bound by the pact.
 
-## 3. The heroes *(draft)*
-Four friends who survived the Long Breath as children and grew up together in the empty town of Hollowmere, raising each other, scavenging, and keeping the place alive. In co-op each player is one of them; solo, the player picks one before each dive and the others hold town jobs (the forge, the stores, the workshop, the lookout), which give real services. Each starts with an **heirloom weapon** that belonged to someone taken, so the weapon bond is also their bond with that person: growing it uncovers a memory of them, and its final build-up form is tied to bringing them home.
+Then, gorged for the first time, it fell into a deep, heavy, glutted sleep. That sleep is the **Sleeping Calamity**. The other five towns were taken on the same night, or in the weeks after as it turned over in its sleep *(draft: one night for all six, or Hollowmere first and the others after?)*.
 
-| Hero | Age | Who | Heirloom | Wants |
+**The Hearthdeep.** Mawrrow's lair is a great hollow under the mountain where it digests what it has taken. It holds what it eats inside its dream, so the taken aren't dead. They sleep inside it:
+- Houses are folded into monstrous mazes.
+- People are wrapped in roots, wax or stone, dreaming.
+- Its digestion gives shape to nightmare-creatures that guard the hoard.
+
+The dungeons are the Hearthdeep's regions, one beneath each town.
+
+**Why the four were spared.** The pact bound everyone who ate at the Tithe Feast, and that year four children skipped it. They had found a way into the founders' old tunnels under the town and were exploring when the feast began. They never ate, so they were never counted, and the Long Night passed over them. They climbed out at dawn into silence. *(draft)* Nobody else can explain why they're unclaimed: the answer is found on floor 8 of the Undercroft (section 8.4), and it is why Mawrrow's servants want them most of all.
+
+**Starving the demon: stirring.** Every piece carried out of the Hearthdeep is food taken back from Mawrrow, and the less it holds, the lighter it sleeps.
+- **During a dive:** the deeper the heroes go and the more they carry, the more it stirs. Floors shift, nightmares hunt, the deep starts to close.
+- **Over the game:** each region restored leaves it hungrier.
+
+Bringing everyone home and waking the demon are the same road. The heroes know it, and they go anyway, because the only way to end the Bargain is to face Mawrrow awake and beat it.
+
+## 3. The heroes
+Four friends who survived the Long Night as children. They grew up together in empty Hollowmere: raising each other, scavenging, and keeping the place alive.
+- **Co-op:** each player is one of the four.
+- **Solo:** the player picks one hero before each dive. The other three hold town jobs (the forge, the stores, the workshop, the lookout), and each job gives a real service.
+
+**Customisation (user):** the player can rename any hero, and all text, dialogue and the journal use that name. Outfits can be customised: the heroes find, craft and dye them, and each shows on the hero in cutscenes. Faces, bodies and hair stay fixed.
+
+**Heirloom weapons.** Each hero carries an heirloom from someone who was taken. The weapon bond is also their bond with that person:
+- Growing the weapon uncovers memories of its owner.
+- Its final build-up form is earned in the chapter where that person comes home.
+
+| Hero (default name) | Age | Who | Heirloom | Wants |
 |---|---|---|---|---|
-| **Wren Hale** | 18 | The planner. Kept the list of every resident's name for ten years. Steady and stubborn, secretly sure she's forgotten her mother's face. | Her mother's surveyor's staff | To bring everyone back, exactly as they were |
-| **Tobin Marsh** | 20 | The eldest, who became the others' parent too young. Big, gentle, a builder. Tired. | His father's mason's hammer | Permission to stop being the grown-up |
-| **Pip Ostrander** | 17 | The youngest and loudest; the one who found the quiet rooms. Funny as armour. | Her grandmother's bell-ringer's mallet | To prove she isn't just the kid |
-| **Ash Calder** | 19 | The scavenger who goes furthest out alone. Curious about the Sleeper, not just angry at it. | An older brother's hunting bow | To understand what happened, even if the answer is ugly |
+| **Wren Hale** | 18 | The planner. For ten years she has kept a painted list of every resident's name. Steady and stubborn, and secretly sure she has forgotten her mother's face. | Her mother's surveyor's staff | To bring everyone back, exactly as they were |
+| **Tobin Marsh** | 20 | The eldest. He became the others' parent too young. Big, gentle, a builder, and tired. | His father's mason's hammer | Permission to stop being the grown-up |
+| **Pip Ostrander** | 17 | The youngest and loudest. She found the tunnels, so she's the reason they're alive. Her jokes are armour. | Her grandmother's bell-ringer's mallet | To prove she isn't just the kid |
+| **Ash Calder** | 19 | The scavenger who goes furthest out alone. Curious about the demon, not just angry at it. | An older brother's hunting bow | To find out who made the Bargain, and why |
 
-*(draft)* Names, genders and roles are placeholders to react to. The weapon types are combat-design hooks, not decisions (staff, hammer, mallet, bow = reach, weight, speed, range).
+*(draft)* Names, genders and roles are placeholders to react to. The weapon types are hooks for combat design, not decisions: the staff, hammer, mallet and bow cover reach, weight, speed and range.
 
-## 4. Antagonists *(draft)*
-- **The Sleeper**: not evil. The final "boss" is waking it and facing it, and the ending turns on what the heroes choose then (section 7).
-- **Warden Ilse Varrow**: the last keeper of the founders' custom, taken by the Long Breath but too stubborn to fully sleep. Inside the dream she leads the **Lullers**, sleepers turned into the Sleeper's nightmare-keepers, who undo the heroes' work and try to sing the dream deeper. She believes that keeping the Sleeper asleep forever is the only safe choice, even if the taken never come back. She is right about the danger and wrong about the cost: an antagonist the heroes slowly understand.
-- **The nightmares**: each dungeon's monsters come from what that region lost (section 6).
+## 4. Antagonists
+- **Mawrrow, the Hungering** *(draft name)*. The demon itself, and plainly evil: it made the deal knowing its hunger would outgrow any harvest, because the deal was always a trap. Asleep for most of the game, it is felt through tremors, its voice in dreams and its nightmares. It wakes for the final chapter and the final boss.
+- **The Tithe-Keeper, Elder Corwin Vane** *(draft)*. The elder of Hollowmere who made the Bargain sixty years ago.
+  - **Then:** Mawrrow kept him alive and unsleeping as its steward. The demon took his heart as surety, and he can't die while the pact stands.
+  - **Now:** he leads the **Gleaners**, the taken who were turned to its service. They gather what the heroes miss, undo the heroes' work, and hunt the four "uncounted" children so the debt can be paid in full.
+  - **Story role:** the human villain who lets the story ask what people do when they're desperate. He's revealed across chapters 2 to 5 and fought in chapter 5.
+- **The nightmares.** Each dungeon's monsters grow from what that region lost (section 6).
 
 ## 5. How the story drives the loop
-- **Why dive:** the taken are down there, asleep. Every person you carry home is someone the heroes knew, and Wren's list gets a name ticked.
-- **Why rebuild:** carried-out pieces (a well, a doorframe, a bakery oven, a resident) need placing back in town. Residents remember where they lived and what they want nearby, and they say it plainly. A rebuilt town gives services, side activities and story, and pulls the next region's road open.
-- **Why the weapon matters:** heirlooms grow by use and unlock memories of their owners; build-up forms are named for moments in that person's life.
-- **Why deeper floors are tense:** loot carried out is only safe once banked at a checkpoint or in town. The deeper you go, the more the Sleeper stirs during the dive: a stir meter rises with floors and carried pieces, and as it climbs floors get harder, nightmares hunt you, and the dream starts to close. Bank and go home, or push one more floor.
-- **Scaling with friends:** more players, more stir per floor and tougher nightmares; any subset of a world's four recorded players can dive and the difficulty follows the players present.
+- **Why dive.** The taken are down there, asleep. Every person carried home is someone the heroes knew, and Wren's list gets a name ticked.
+- **Why rebuild.** Carried-out pieces need placing back in town: a well, a doorframe, a bakery oven, a resident. Residents remember where they lived and what they want nearby, and they say it plainly. A rebuilt town opens services, side activities and story, and it opens the road to the next region.
+- **Why the weapon matters.** Heirlooms grow by use and unlock memories of their owners. Build-up forms are named for moments in that person's life.
+- **Why deeper floors are tense.** Loot carried out is only safe once it's banked at a checkpoint or in town. The deeper the heroes go, the more Mawrrow stirs during the dive. A stir meter rises with floors cleared and pieces carried, and as it climbs:
+  - floors get harder;
+  - Gleaners come hunting;
+  - the deep begins to close.
 
-## 6. The arc: six towns, six dungeon sets *(draft)*
-One paragraph each. Each chapter: a town (rebuild), a dungeon (dive), a boss, a hero arc, and one truth about the Sleeper.
+  So at each checkpoint the choice is: bank and go home, or push one more floor.
+- **Scaling with friends.** More players means more stir per floor and tougher nightmares. Any subset of a world's four recorded players can dive, and the difficulty follows the players present.
 
-1. **Hollowmere** (home). The heroes' own hill town of half-timbered houses, a market square and a dry fountain, above a cold lake. Dungeon: **the Undercroft**, the cellars, cisterns and root-choked vaults beneath the town where the Long Breath pulled everything through. Boss: the **Bell-Warden**, the town's great bell turned nightmare, wrapped in the roots of a sleeping tree. Hero arc: Tobin. Truth: the "quiet rooms" were built on purpose. *(Detail in section 8.)*
-2. **Saltwake** (a fishing harbour on a grey-green estuary, half under the tide). Dungeon: **the Drowned Arcade**, flooded streets, sunken warehouses and kelp-hung piers inside the dream. Boss: a lighthouse keeper's lamp grown into a deep-sea lure. Hero arc: Pip. Truth: Saltwake's tide charts record the Sleeper's breathing for three hundred years. Fishing opens here.
-3. **Cinderholt** (a mining town in red cliffs, its furnaces cold for the first time ever). Dungeon: **the Glow Seams**, mines and foundries where the Sleeper's heat is close, magma lit, with collapsing galleries. Boss: the Foreman's ore-cart engine. Hero arc: Ash. Truth: the mines were dug to tap the Sleeper's heat, and the miners knew. The forge's best upgrades open here.
-4. **Thistledown** (an orchard village and bee-keeping abbey on high meadows). Dungeon: **the Hive Choir**, wax halls and orchard roots, sweet, golden and wrong. Warden Varrow first speaks to the heroes here. Boss: the abbey's hive queen and choir. Hero arc: Wren, who starts to see that "exactly as they were" isn't possible. Truth: the lullaby the abbey sang every evening was the founders' song to keep the Sleeper down.
-5. **Stillhollow** (a frozen observatory town on the mountain's shoulder, the only cold place in the Vale). Dungeon: **the Orrery**, a clockwork star-chart and the founders' records. Boss: Warden Ilse Varrow herself, who can be defeated or persuaded. Hero arc: all four, as the founders' truth comes out. Truth: the founders sang the Sleeper to sleep to take its warmth.
-6. **The Hearth** (the founders' first village, at the mountain's heart, swallowed whole). Dungeon: **the Hearthdeep proper**, the Sleeper's own dream, built from every town's memories. No filler floors; it's the shortest dungeon, and the most authored. Finale: the Sleeper wakes.
+## 6. The arc: six towns, six dungeon sets
+Each chapter has a town to rebuild, a dungeon to dive, a boss, a hero's arc, and one piece of the Bargain's truth.
 
-## 7. The ending *(draft)*
-When the Sleeper wakes it is in pain and afraid, and the fight is about calming it as much as surviving it. At the end the heroes choose:
-- **Sing it back down** (Varrow's way): the Vale stays warm, the taken stay home, and the debt goes on.
-- **Let it wake**: it rises, the Vale cools to a real climate with real winters, and the towns live honestly. The rebuilt towns change to match (snow, new crops, new jobs).
+1. **Hollowmere** (home): the heroes' own hill town of half-timbered houses, a market square and a dry fountain, above a cold lake.
+   - Dungeon: **the Undercroft**, the cellars, cisterns and root-choked vaults where the town was dragged down.
+   - Boss: the **Bell-Warden**, the town's great bell, digested into a nightmare.
+   - Arc: Tobin.
+   - Truth: the feast was a contract, and the four are "uncounted".
+   - *Detail in section 8.*
+2. **Saltwake**: a fishing harbour on a grey-green estuary.
+   - Dungeon: **the Drowned Arcade**, flooded streets, sunken warehouses and kelp-hung piers.
+   - Boss: the lighthouse keeper's lamp, grown into a deep-sea lure.
+   - Arc: Pip.
+   - Truth: Saltwake's ledgers show the tithe growing year by year, and the elders' cheating. The Gleaners first appear here.
+   - Fishing opens here.
+3. **Cinderholt**: a mining town in red cliffs, its furnaces cold.
+   - Dungeon: **the Glow Seams**, mines and foundries near the demon's heat.
+   - Boss: the Foreman's ore-cart engine.
+   - Arc: Ash.
+   - Truth: the miners dug toward Mawrrow on purpose, to steal back some of its power, and that theft is what made the last tithe fall short.
+   - The forge's best upgrades open here.
+4. **Thistledown**: an orchard village and bee-keeping abbey on high meadows.
+   - Dungeon: **the Hive Choir**, wax halls and orchard roots, sweet and golden and wrong.
+   - Boss: the abbey's hive queen and choir.
+   - Arc: Wren, who learns her mother was one of the elders who signed, and that "exactly as they were" isn't possible.
+   - Truth: Elder Vane is alive and made the deal.
+5. **Stillhollow**: a frozen observatory town on the mountain's shoulder.
+   - Dungeon: **the Orrery**, a clockwork star-chart and the elders' sealed records of the Bargain.
+   - Boss: **Elder Corwin Vane** and the Gleaners. Beating him breaks the steward's hold, and the pact's terms become visible: whoever stands before Mawrrow awake, unbound, can end it.
+   - Arc: all four.
+6. **The Hearth**: the demon's lair under the mountain, built from everything it swallowed.
+   - Dungeon: **the Hearthdeep**, the shortest and most authored dungeon, with no filler floors.
+   - Finale: carrying the last of the taken out leaves Mawrrow starving, and it wakes (section 7).
 
-Neither is "bad"; both end with everyone home. *(draft)* The choice could be made per world, so co-op groups argue about it.
+## 7. The ending (one true ending)
+The final chapter builds to a big boss fight in stages *(draft)*:
+1. **The waking.** The last sleepers are carried out and Mawrrow wakes, starving. The whole Vale shakes. The Hearthdeep starts collapsing upward, and the heroes ride the collapse to the surface.
+2. **The fight in the open.** Mawrrow rises out of the mountain into the sky above the six rebuilt towns. The residents fight alongside the heroes: the bell of Hollowmere rings, Saltwake's lighthouse, Cinderholt's cannons, Thistledown's swarm, Stillhollow's lens. Everything the player rebuilt joins the fight.
+3. **Inside the maw.** The heroes are swallowed and fight its heart, where the original contract is held. Each heirloom in its final form strikes once; this is where the weapon bond pays off.
+4. **The end of the Bargain.** Mawrrow is destroyed. The fields go back to being ordinary fields: the Vale will have to farm honestly now. The epilogue is the first real harvest, earned by the people, with every resident home.
 
-## 8. The first area in detail: Hollowmere and the Undercroft *(draft)*
+The more of the Vale that is rebuilt, the more help the player gets in stage 2. The ending stays the same, but a fuller town makes the fight feel earned.
 
-### 8.1 Hollowmere before the Long Breath
-A hill town of about forty buildings in rings around a market square: half-timbered houses with plaster and red-tile roofs, a stone fountain fed by the warm spring, the bell tower, a mill on the lake stream, an inn, a bakery, a smithy, a schoolhouse, allotments and an orchard on the south slope. Festival banners every autumn for the Banking of the Hearths. About a hundred and twenty people.
+## 8. The first area in detail: Hollowmere and the Undercroft
+
+### 8.1 Hollowmere before the Long Night
+- **The town:** a hill town of about forty buildings in rings around a market square, home to about a hundred and twenty people.
+- **The buildings:** half-timbered houses with plaster walls and red-tile roofs, a stone fountain, the bell tower, a mill on the lake stream, an inn, a bakery, a smithy, a schoolhouse, allotments, and an orchard on the south slope.
+- **The feast:** every autumn the Tithe Feast filled the square with long tables, lanterns and harvest banners. The tithe-carts rolled down a stone ramp into the old mine-mouth under the bell tower.
 
 ### 8.2 Hollowmere at the start of the game
-Ten years empty. Bare plots with only foundations and doorsteps where houses were pulled away, the fountain dry, banners bleached, the bell missing from its tower. The heroes live in the three buildings the breath missed (the bell-loft annex, the cistern house, the mill's undercroft) and have patched them into a home. Wren's list of names is painted on the wall of the cistern house.
+Ten years empty.
+- **The town:** bare plots where houses were pulled away, with only foundations and doorsteps left. The fountain is dry, the banners are bleached, and the bell is gone from its tower. The tithe ramp is sealed with a cracked iron gate that breathes warm air.
+- **The heroes' home:** the three buildings the night missed, all old stone from before the Bargain: the bell-loft annex, the cistern house, and the mill's undercroft. The four have patched them into a home.
+- **Wren's list:** every resident's name, painted on the cistern-house wall.
 
 ### 8.3 What the player rebuilds
-Rebuilding goes in three rings, each opened by Undercroft progress:
-1. **The square**: fountain (starts the warm spring again), market stalls, the bakery and its baker, the inn. First residents.
-2. **The lanes**: houses with their families, the smithy (weapon services), the schoolhouse, the gardens. Residents' wishes start to interact ("next to my sister", "where I can see the lake", "not by the smithy's noise").
-3. **The tower and the mill**: the bell (after the boss), the mill and the road out to Saltwake.
-Each resident states their wishes plainly; meeting them gives that resident's service, story and gifts.
+Rebuilding happens in three rings, and Undercroft progress opens each one.
+1. **The square:** the fountain, the market stalls, the bakery and its baker, the inn. The first residents come home.
+2. **The lanes:** houses with their families, the smithy (weapon services), the schoolhouse, the gardens. Residents' wishes start to interact: "next to my sister", "where I can see the lake", "not by the smithy's noise".
+3. **The tower and the mill:** the bell (after the boss), the mill, and the road out to Saltwake.
 
-### 8.4 The Undercroft *(draft, floor counts to fit the Phase 1 plan)*
-The cellars and roots beneath Hollowmere, in the dream: wine vaults, cisterns, bakers' cold rooms and coal cellars knotted together by the roots of the town's sleeping oak, lit by the warm glow of the dream. Three floor bands, about 12 floors in all plus a boss floor:
+Each resident states their wishes plainly. Meeting a resident's wishes opens their service, their story and their gifts.
+
+### 8.4 The Undercroft *(draft: floor counts to fit the Phase 1 plan)*
+The cellars and roots beneath Hollowmere, half digested by the demon's dream: wine vaults, cisterns, bakers' cold rooms and coal cellars, knotted together and lit by the warm red glow of Mawrrow's breath coming up from below.
+
+It has three floor bands, about 12 floors in all, plus a boss floor.
+
 | Band | Floors | Theme | Enemies | Set-piece |
 |---|---|---|---|---|
-| The Cellars | 1-4 | Barrel vaults, larders, coal chutes; warm lamplight | Pantry nightmares: jam-jar slimes, rat-kings, a broom that sweeps | Floor 4: the taken bakery, dream-wrought into a maze of ovens; the baker sleeps at its heart |
-| The Cisterns | 5-8 | Flooded brick channels, sluices, echoing domes; teal light | Drip-spirits, eels in the dark water, lantern-moths | Floor 8: the drained cistern where the town's names are written on the walls |
-| The Root Vaults | 9-12 | The oak's roots grown through crypts and old foundations; amber glow | Root-crawlers, the Lullers' first keepers, nightmare hounds | Floor 12: the root wall the heroes must cut through, opening the boss |
-| Boss | 13 | The bell chamber beneath the tower | **The Bell-Warden** | Its tolling slows time; you fight between rings |
+| The Cellars | 1-4 | Barrel vaults, larders, coal chutes; warm lamplight | Pantry nightmares: jam-jar slimes, rat-kings, a broom that sweeps | Floor 4: the taken bakery, a maze of ovens; the baker sleeps at its heart |
+| The Cisterns | 5-8 | Flooded brick channels, sluices, echoing domes; teal light | Drip-spirits, eels in the dark water, lantern-moths | Floor 8: the feast tables, sunk and laid for the dead; the tally of who ate |
+| The Tithe Roots | 9-12 | The old tithe ramp; roots and grain-ropes grown through crypts and foundations; amber glow | Root-crawlers, the first Gleaners, nightmare hounds | Floor 12: the root wall the heroes must cut through to reach the boss |
+| Boss | 13 | The bell chamber beneath the tower | **The Bell-Warden** | Its tolling slows time; the heroes fight between the rings |
 
-Story beats: the first person carried home (the baker, floor 4); the town's names on the cistern walls tell Wren her list was incomplete (floor 8); Tobin's father is the first sleeper the heroes can't yet carry out (floor 12, rescued after the boss); defeating the Bell-Warden returns the bell, and when it rings over Hollowmere the first tremor of the Sleeper stirring shakes the whole Vale.
+**Story beats**
+- **Floor 4:** the first person carried home, the baker.
+- **Floor 8:** the feast tally lists every name in Hollowmere, with four names left blank. The heroes learn they were never counted, and that this is why Mawrrow couldn't take them.
+- **Floor 12:** Tobin's father is the first sleeper the heroes can't yet carry out. He is rescued after the boss.
+- **After the boss:** the bell comes home. When it rings over Hollowmere, the whole Vale shakes as Mawrrow stirs for the first time in ten years, and somewhere a man who should be dead opens his eyes.
 
 ## 9. Open questions for the user
-- Do the four heroes, their names and their heirlooms work? Fixed cast, or player-made characters?
-- The Sleeper as a wronged guardian, the founders' guilt, and an ending choice: right undertow, or too heavy?
-- Warden Varrow as the sympathetic antagonist: keep, change, or add a clearer villain?
-- The six regions and their order.
+- **The demon:** do the names Mawrrow and Elder Corwin Vane work?
+- **The Long Night:** were all six towns taken on the same night, or Hollowmere first and the others later?
+- **How the heroes survived:** they skipped the Tithe Feast while exploring the tunnels, so the pact never counted them. Does that work for you?
+- **The heroes:** keep the four as drafted (names, ages, roles, heirlooms), or change them?
