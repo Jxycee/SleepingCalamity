@@ -1,42 +1,41 @@
 ---
 name: sc-water-look
-description: Tune or extend SleepingCalamity's water (SleepingCalamity/Water) toward the Riverlight concepts - depth colour, reflections, foam, glints, flow - without breaking the other maps' water. Use for any water colour/reflection/foam card, "the water looks cyan/plastic/flat", shoreline or weir white-water work, or adding a water feature.
+description: Build or tune Sleeping Calamity's water in the locked stylised-real look - cistern pools, flooded cellar floors, the town fountain once it flows, the lake below Hollowmere, liquids in props - with depth colour, reflection, refraction, foam and the generic one-knob capture-and-measure tuning method. Use for any water or liquid shader work, "the water looks cyan/plastic/flat", or adding a water feature.
 ---
 
 # Water look
 
-**The water is the hero and the most realistic thing on screen** (concept README rule 3). Players stare at it all game. Every water change is judged from the concept cameras and the stands.
+**Status: dormant in Phase 1.** Phase 1 has no water surface: the fountain is dry, the Cisterns band (teal water) comes later, and the lake shows only as a distant backdrop from the hilltop square. Small liquids in props (a puddle, a crock's contents, a potion) use the fake-refraction method in sc-asset-craft section 1. Use this skill when a water feature is planned; no water shader exists in the repo yet.
 
-Design and history: `docs/superpowers/design/2026-10-24-millpond-water-look.md` (target, diagnosis, the three phases, what is built, the tune log). Shader: `Assets/_Project/Shaders/Water.shader` (header items 1-18 explain every technique). Read both before changing anything.
+## The target
+- **Dark scenes in rich teal and gold** (handoff 2.1, the remake's Water Temple): the Cisterns' water is teal in shadow and gold where lamplight hits it. The Cellars stay warm (PHASE1 3.1, [P34]): any cellar puddle or flooded floor reflects gold lamps, with teal only from the grade.
+- **Depth reads in colour:** clear and warm over shallow stone or brick, deeper teal over depth, near-black teal only where it is really deep, never pure black.
+- **Still water mirrors its surroundings:** vaults, lamps and columns in a cistern; the town and sky in the lake and fountain.
+- **Movement where water moves:** foam and white water only at spouts, falls and inflows, not as a ring round still water.
+- **Stylised-real, not toon:** glints are real specular that break up with distance; no hard white sticker shapes.
 
-## The target (concepts)
-- **Depth reads in colour:** amber-olive over stones in the clear shallows (stones and fish shadows visible), teal over the open lake, near-black teal over the Deep Hole (`_AbyssColor` / `_AbyssDepth`).
-- **Calm water mirrors the shore** (treeline, cottages): reflection probe (`_ProbeReflect`) plus a planar reflection on the High preset (`PlanarWaterReflection`).
-- **White water only where it moves** (the weir lip, the rapids): `_FoamFlow` and `_RapidFoam` from the bed map's b channel (flow). No white band round the still lake.
-- **Soft, not toon:** glints are sparkles that break up with distance. No hard white "sticker" ellipses (harbour round 4).
+## How to build it
+- **Research the common URP practice first** (depth-based colour, screen-space or probe reflection, refraction from the opaque texture, flow maps for foam) and adopt a proven approach before writing a custom shader.
+- **Fake refraction and reflection are acceptable and often better:** refract or reflect the view ray into a procedural room or a probe, with Schlick Fresnel, as the stand's glass and liquids did (handoff 4.3).
+- **Reflection probes** over every body of water; a planar reflection only where a capture shows the probe isn't enough.
+- **Wave height from one shared function** if anything on the CPU depends on it (buoyancy, fishing later), so CPU and GPU agree.
+- **A shared water shader:** each new property defaults to off, so existing water materials draw exactly as before, guarded by an EditMode test of their values.
+- **Per-pixel cost:** list it in the shader header when adding work. Quality comes first (CLAUDE.md), but four co-op cameras share the frame.
 
-## Rules
-1. **`SleepingCalamity/Water` is shared** (M_Water, M_Water_Harbour, M_Water_Surface, M_Water_Creek, M_Water_Millpond). Every new property defaults to **off**, so the other maps draw exactly as before. `WaterLookTests` guards that the non-Millpond materials keep their values. Keep that test green and extend it.
-2. **Wave height only from `SleepingCalamityCommon.hlsl`** (`SC_WaveHeight`, with the non-finite guard): CPU and GPU parity (fishing, buoyancy). Never re-implement waves in the shader.
-3. **Per-map look lives in `RenderMaterialLibrary`'s material block** (`M_Water_Millpond`). Bed data lives in the bed map (`MillpondBedMap`: r height, g zone tint, b flow).
-4. **Performance:** target 60 fps on most platforms (user, 2026-10-24). The planar reflection runs on the High preset only, at half resolution. Count the shader's per-pixel cost in the header when adding work (it lists the current cost).
-5. Change one thing per capture; log it in the design doc's **Tune log** with the measured numbers.
-
-## Tuning loop
-1. Capture (local, Unity): `MillpondCapture` concept views + `tug_deck`, `landing`, `mill_weir`, `island`, `dusk_tug_deck`.
-2. Measure the water regions with `Art/Blender/tools/sc_concept_match.py` (crop the same water area in the concept and the capture: value, saturation, warm/cool). The design doc's tune 1 used concept-camera medians the same way.
+## Tuning loop (generic)
+1. Capture the water from fixed views at play positions (the PHASE1 3.7 capture builder once it exists).
+2. Measure the water region with `python -I Art/Blender/tools/sc_ref_palette.py <capture.png> --crop <box> --k 7`: value, warmth and masses, against the reference row (photos of cisterns, flooded cellars, fountains, lakes) and the scene's PHASE1 3.1 band.
 3. Diagnose:
 
-| Seen | Knob |
+| Seen | Usual knob |
 |---|---|
-| cyan, saturated, plastic | `_ShallowColor` / `_DeepColor` toward the measured teal/olive; `_Saturation` down; `_LightTint` |
-| no depth read | `_DepthRange`, the abyss stop, `_BedCover` (lets the stones show in the first metre) |
-| flat, no shore in it | `_ProbeReflect`, `_ReflectStrength`, `_ReflectFloor`; the probe box over the water |
-| white rings round the lake | `_FoamFlow` on (foam only where the bed map says it flows) |
-| stickers / sparkle noise far away | glint softening past 18-60 m, `_GlintRipple`, `_GlintFlatten` |
-| blotchy far water seen from above | `_FarCalm`, `_CalmDistance` |
+| cyan, saturated, plastic | shallow and deep colours toward the measured teal or gold; saturation down |
+| no depth read | depth range, the deep colour stop, how far the bed shows through |
+| flat, nothing reflected | reflection strength and floor, the probe's box over the water |
+| white rings round still water | foam only where flow says it moves |
+| sparkle noise far away | glint softening with distance |
 
-4. Post the before/after captures and numbers on the board card.
+4. Change one knob per capture, and log before -> after with the measured numbers in the report.
 
 ## In the cloud
-No Unity: you can read and reason, edit material values and the shader with tests, and prototype colour with `sc_concept_match.py` on existing captures under `Art/Previews/`. Every water change needs a local compile and capture before it merges: board card, owner Local PC, alert.
+No Unity: edit material values and the shader with tests and prototype colour on existing captures. Every water change needs a PC compile and capture before it merges.

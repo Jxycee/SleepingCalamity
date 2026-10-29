@@ -1,15 +1,15 @@
 {
-  "about": "Behavioural evals for the sc-asset-* skills (Anthropic skill-authoring practice: at least 3 scenarios, measured against a no-skill baseline). Run each scenario twice with fresh agents, once in a worktree with the asset skills and Art/Blender/tools removed (baseline) and once on main, then grade every output with the CURRENT tools and a blind grader that sees randomly labelled sheets. Record results in docs/superpowers/handoff/ (the duo log has the first run). Re-run after any big skill change; a skill edit that loses to its previous version is reverted.",
-  "measures": ["audit gates (pass, loose verts, headroom, class budget)", "sc_asset_score objective percentiles (silhouette, value, painterly, efficiency)", "blind eye grade: rubric lines 2/4/6/7 plus a per-brief preference", "wall time and tool calls"],
+  "about": "Behavioural evals for the sc-asset-* skills (Anthropic skill-authoring practice: at least 3 scenarios, measured against a no-skill baseline). Run each scenario twice with fresh agents, once in a worktree with the asset skills removed (baseline) and once on main, then grade every output blind: two fresh reviewers see one sheet with the reference row on top and the shuffled, unlabelled renders below (imgdiff first). Record results in docs/superpowers/handoff/. Re-run after any big skill change; a skill edit that loses to its previous version is reverted. Needs the fg-aaa-prop tools ported (M8).",
+  "measures": ["audit hygiene and tris against docs/PHASE1.md 3.3", "blind reviewer lines: silhouette, proportion, edges, micro-detail, roughness, colour, story, read", "colour and value of the render measured with sc_ref_palette.py --k 7 against PHASE1 3.1", "wall time and tool calls"],
   "scenarios": [
-    {"id": "prop-toolchest", "class": "prop",
-     "query": "Build Millpond_Prop_ToolChest: a lock-keeper's wooden tool chest, about 0.9 m long, iron straps and corners, lid propped open showing tools inside, rundown (faded paint, one replaced plank).",
-     "expected_behavior": ["real size and chunky sections", "an open lid with a dark interior and tools giving outline breaks", "iron straps as a dark contrast against faded paint", "one replaced plank lighter in value", "audit PASS with headroom", "deterministic exports"]},
-    {"id": "outbuilding-pumphouse", "class": "outbuilding",
-     "query": "Build Millpond_Bldg_PumpHouse: a small timber pump house about 2 m square over a well, a cast-iron hand pump beside the door, a tin roof, rundown.",
-     "expected_behavior": ["Bldg naming and Buildings folder", "tin roof with a seated cap and rust that reads as tin, not terracotta", "openness from an ajar door or the pump standing off the wall", "audit PASS at outbuilding budget"]},
-    {"id": "creature-moorhen", "class": "creature",
-     "query": "Build Millpond_Life_Moorhen: a moorhen swimming (about 0.35 m long), black-brown with the red-and-yellow bill shield and white undertail flash.",
-     "expected_behavior": ["origin at the waterline, facing +z", "the bill shield and undertail flash readable at 48 px", "no loose verts", "within the creature class budget"]}
+    {"id": "b7-cellar-barrel", "tier": "T2/T3",
+     "query": "Build the Cellars oak barrel for batch B7: a coopered wine barrel about 0.9 m tall on a wooden cradle, iron hoops, one head stained by a drip from its tap, warm lamplit cellar.",
+     "expected_behavior": ["coopered staves and hoops standing proud, not a smooth cylinder", "about 10% oversized, chunky hoops and chimes", "the drip stain as a placed wear beat readable at thumbnail size", "barrel oak from the shared B2 tileable or one family bake", "within the PHASE1 3.3 budget", "deterministic audits"]},
+    {"id": "b4-facade-panel", "tier": "T2",
+     "query": "Build one half-timber facade wall panel with a window for batch B4: oak posts and a brace on lime plaster, about 1.2 m wide and 3 m tall, slightly out of true.",
+     "expected_behavior": ["timber sections about 1.4x real, 1-3 deg off true", "chamfers of at least 1.5 cm on edges seen at play distance", "plaster and oak from the shared B1 tileables and trim sheet, no unique bake", "joins its neighbours on the kit grid", "kit-piece tris 0.5-5k"]},
+    {"id": "b11-cellar-lantern", "tier": "T4",
+     "query": "Build the B11 hero cellar lantern: a wrought-iron lantern with horn or glass panes and a candle, hung from a bracket, the light source of the dungeon corner.",
+     "expected_behavior": ["dense damaged high baked to a clean low with a unique set", "glass as fake refraction, emission kept at or below 1 in the bake", "iron reads black and worn with something to reflect", "blind A/B against the reference row with imgdiff run first", "hero budget per PHASE1 3.3"]}
   ]
 }
