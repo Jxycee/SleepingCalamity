@@ -1,6 +1,6 @@
 # Sleeping Calamity: story
 
-**Status: DRAFT 3 (2026-10-29), not locked.** Written by Claude from the user's answers. Anything marked *(draft)* is Claude's proposal for the user to change. "Locked" means the user signs off and any later change is deliberate.
+**Status: LOCKED (user, 2026-10-29).** Any later change is deliberate: note it in the change log at the end with the date and who asked. Items still marked *(draft)* were Claude's proposals; the user locked the story with them in, and they are listed for review in `docs/superpowers/handoff/decisions-for-review.md`.
 
 User decisions behind this draft (2026-10-29):
 - **The Sleeper is an evil demon.** It rose up and struck a deal with the townspeople for their crops. The deal went bad because the people couldn't feed it enough to make it fall asleep, so it took the town and its people instead.
@@ -178,6 +178,5 @@ It has three floor bands, about 12 floors in all, plus a boss floor.
 - **Floor 12:** Tobin's father is the first sleeper the heroes can't yet carry out. He is rescued after the boss.
 - **After the boss:** the bell comes home. When it rings over Hollowmere, the whole Vale shakes as Mawrrow stirs for the first time in ten years, and somewhere a man who should be dead opens his eyes.
 
-## 9. Open questions for the user
-- Read the whole draft for anything that feels off. When it reads right, say "lock it" and the status becomes LOCKED.
-- *(draft)* Survivors on the road between towns: keep, or should the four be the only people left?
+## 9. Change log
+- 2026-10-29: locked (user). Claude kept the survivors on the road between towns (2.); see decisions-for-review.
