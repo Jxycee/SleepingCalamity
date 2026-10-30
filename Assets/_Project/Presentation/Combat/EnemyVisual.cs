@@ -79,7 +79,7 @@ namespace SleepingCalamity.Presentation
             else if (rage == RageState.Raging) tint = Color.Lerp(tint, new Color(1f, 0.15f, 0.1f), 0.35f + 0.15f * Mathf.Sin(t * 6f));
 
             AttackData a = _enemy.CurrentAttack;
-            bool telegraphing = a != null && _enemy.Attacking && Telegraph.Visible(a, _enemy.AttackFrame) && !_enemy.Phase.Equals(EnemyPhase.Dead);
+            bool telegraphing = a != null && _enemy.Attacking && Telegraph.Visible(a, _enemy.AttackFrame) && _enemy.Phase != EnemyPhase.Dead;
             if (telegraphing)
             {
                 float f = _enemy.AttackFrame;
@@ -201,17 +201,20 @@ namespace SleepingCalamity.Presentation
             _outline.Go.SetActive(true);
             _outline.Go.transform.SetPositionAndRotation(new Vector3(c.x, c.y + FootprintY, c.z), rot);
             _outline.Go.transform.localScale = Vector3.one;
-            Paint(_outline, live ? new Color(1f, 0.05f, 0.02f, 0.55f) : new Color(1f, 0.55f, 0.1f, 0.16f));
+            // After the strike the footprint fades out in the same red (never back to the orange of a wind-up, which would read as a second attack coming).
+            bool after = frame >= a.HitOn.End;
+            float fade = after ? Mathf.Clamp01(1f - (frame - a.HitOn.End) / Telegraph.AfterglowFrames) : 1f;
+            Paint(_outline, live ? new Color(1f, 0.05f, 0.02f, 0.55f) : after ? new Color(0.9f, 0.1f, 0.08f, 0.45f * fade) : new Color(1f, 0.55f, 0.1f, 0.16f));
 
             // Fills from the centre out to the full footprint at the strike frame; while the hitbox is live it is solid red.
             _fill.Go.SetActive(true);
             _fill.Go.transform.SetPositionAndRotation(new Vector3(c.x, c.y + FootprintY + 0.015f, c.z), rot);
             float s = live ? 1f : Mathf.Max(0.02f, pre);
             _fill.Go.transform.localScale = new Vector3(s, 1f, s);
-            Paint(_fill, live ? new Color(1f, 0.05f, 0.02f, 0.75f) : Color.Lerp(new Color(1f, 0.8f, 0.15f, 0.30f), new Color(1f, 0.3f, 0.05f, 0.5f), pre));
+            Paint(_fill, live ? new Color(1f, 0.05f, 0.02f, 0.75f) : after ? new Color(0.9f, 0.1f, 0.08f, 0.55f * fade) : Color.Lerp(new Color(1f, 0.8f, 0.15f, 0.30f), new Color(1f, 0.3f, 0.05f, 0.5f), pre));
 
             // The lane a lunge or hop travels along.
-            bool lane = remaining > 0.15f && !lob;
+            bool lane = remaining > 0.15f && !lob && !after;
             _lane.Go.SetActive(lane);
             if (lane)
             {

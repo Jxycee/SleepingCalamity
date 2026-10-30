@@ -455,7 +455,7 @@ namespace SleepingCalamity.Gameplay
             bool landed = false;
             foreach (RaycastHit h in hits)
             {
-                if (h.collider.gameObject.layer != Layers.Enemy) { end = h.point; break; }   // a wall stops the arrow
+                if (h.collider.gameObject.layer != Layers.Enemy) { end = h.distance > 0.001f ? h.point : origin; break; }   // a wall stops the arrow
                 Enemy e = h.collider.GetComponentInParent<Enemy>();
                 if (e == null || e.NetworkManager != NetworkManager || !e.Alive) continue;
                 int part = -1;

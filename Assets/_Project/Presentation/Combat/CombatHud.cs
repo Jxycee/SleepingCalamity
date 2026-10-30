@@ -22,6 +22,7 @@ namespace SleepingCalamity.Presentation
         private Vector3 _hurtDir;   // world, flat: from the local hero toward what hurt it
 
         public const float HurtFlashSeconds = 0.55f, HitMarkerSeconds = 0.18f;
+        private static readonly float[] MarkerAngles = { 45f, -45f };
 
         private void OnEnable()
         {
@@ -190,7 +191,7 @@ namespace SleepingCalamity.Presentation
             GUI.color = c;
             Vector2 centre = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
             Matrix4x4 saved = GUI.matrix;
-            foreach (float angle in new[] { 45f, -45f })
+            foreach (float angle in MarkerAngles)
             {
                 GUIUtility.RotateAroundPivot(angle, centre);
                 GUI.DrawTexture(new Rect(centre.x - size * 0.5f, centre.y - thick * 0.5f, size, thick), _white);
