@@ -3,7 +3,11 @@
 // from the scene hierarchy (SceneRoots order, then each object's component order, then its children), renames every {fileID: n} reference
 // to match, and writes the documents back in new-id order. The settings documents (fixed small ids and SceneRoots) are left alone, and so is
 // any reference that carries a guid (an asset). Pure string code; ProjectBuilder's scene saves call it through BuilderUtil.SaveScene.
-// A NetworkObject in a scene hashes its own path, not its fileID, and host and client load the same file, so renumbering is safe for NGO.
+// A scene file with a PrefabInstance (class 1001), a stripped document or a negative id is returned unchanged with a warning (those ids are
+// derived from other assets and are not ours to renumber).
+// NGO derives an in-scene NetworkObject's GlobalObjectIdHash from its fileID (NetworkObject.OnValidate) and serializes it in the scene, so
+// renumbering invalidates the stored hash: BuilderUtil.SaveScene reopens a scene that has a NetworkObject, runs OnValidate and saves again
+// (a resave keeps the fileIDs), and Validators.SceneNetworkObjectHashes proves no hash would change.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -17,11 +21,11 @@ namespace SleepingCalamity.EditorTools
         const long FirstId = 1000;
         const string SceneRootsClass = "1660057539";
         static readonly HashSet<string> FixedClasses = new HashSet<string> { "29", "104", "157", "196", SceneRootsClass };
-        static readonly Regex Header = new Regex(@"^--- !u!(\d+) &(\d+)( stripped)?\s*$");
-        static readonly Regex LocalRef = new Regex(@"\{fileID: (\d+)\}");
-        static readonly Regex GameObjectRef = new Regex(@"^\s*m_GameObject: \{fileID: (\d+)\}");
-        static readonly Regex ComponentRef = new Regex(@"^\s*- component: \{fileID: (\d+)\}");
-        static readonly Regex ListRef = new Regex(@"^\s*- \{fileID: (\d+)\}");
+        static readonly Regex Header = new Regex(@"^--- !u!(\d+) &(-?\d+)( stripped)?\s*$");
+        static readonly Regex LocalRef = new Regex(@"\{fileID: (-?\d+)\}");
+        static readonly Regex GameObjectRef = new Regex(@"^\s*m_GameObject: \{fileID: (-?\d+)\}");
+        static readonly Regex ComponentRef = new Regex(@"^\s*- component: \{fileID: (-?\d+)\}");
+        static readonly Regex ListRef = new Regex(@"^\s*- \{fileID: (-?\d+)\}");
 
         sealed class Doc
         {
@@ -54,6 +58,15 @@ namespace SleepingCalamity.EditorTools
                 }
                 else if (cur == null) preamble.Add(line);
                 else cur.Lines.Add(line);
+            }
+
+            foreach (Doc d in docs)
+            {
+                if (d.Class == "1001" || d.Suffix.Length > 0 || d.Id.StartsWith("-", StringComparison.Ordinal))
+                {
+                    UnityEngine.Debug.LogWarning("SceneFileNormalizer: left the scene as Unity saved it (PrefabInstance, stripped or negative-id document " + d.Class + " &" + d.Id + ")");
+                    return yaml;
+                }
             }
 
             // New ids: walk the hierarchy from the scene roots, then sweep up anything not reached in old-id order.

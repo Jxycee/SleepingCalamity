@@ -37,8 +37,14 @@ namespace SleepingCalamity.Core.Weapons
         public readonly WeaponStats RestoredStats;
         public readonly WeaponStats AbsorbedSinceBuildUp;   // attachment bonuses absorbed after the build-up: gone with the re-route
         public readonly WeaponStats StatsLost;              // everything the weapon has now beyond the restored stats (>= the absorbed part)
-        public ReroutePreview(bool possible, string id, WeaponStats restored, WeaponStats absorbed, WeaponStats lost)
-        { Possible = possible; RestoredDefinitionId = id; RestoredStats = restored; AbsorbedSinceBuildUp = absorbed; StatsLost = lost; }
+        // The drops the re-route hands back: those absorbed since the build-up (their stats are lost, so nothing is lost for good) and those
+        // fitted now that the restored weapon has no slot for. The caller bags them.
+        public readonly IReadOnlyList<AttachmentKind> AttachmentsReturned;
+        public ReroutePreview(bool possible, string id, WeaponStats restored, WeaponStats absorbed, WeaponStats lost, IReadOnlyList<AttachmentKind> returned)
+        {
+            Possible = possible; RestoredDefinitionId = id; RestoredStats = restored; AbsorbedSinceBuildUp = absorbed; StatsLost = lost;
+            AttachmentsReturned = returned ?? Array.Empty<AttachmentKind>();
+        }
     }
 
     // What re-route restores.
@@ -50,6 +56,7 @@ namespace SleepingCalamity.Core.Weapons
         public WeaponStats Stats;
         public AttachmentKind[] Fitted;              // the fitted set at build-up time (kept for the record; re-route does not restore it)
         public WeaponStats AbsorbedSince;            // attachment bonuses absorbed after this build-up
+        public List<AttachmentKind> AbsorbedKinds = new List<AttachmentKind>();   // which attachments those were; re-route refunds them
     }
 
     public sealed class WeaponState
@@ -126,7 +133,12 @@ namespace SleepingCalamity.Core.Weapons
             var absorbed = default(WeaponStats);
             foreach (var a in _fitted) absorbed += Attachments.Bonus(a);
             Stats += absorbed;
-            if (_history.Count > 0) _history[_history.Count - 1].AbsorbedSince += absorbed;
+            if (_history.Count > 0)
+            {
+                var top = _history[_history.Count - 1];
+                top.AbsorbedSince += absorbed;
+                top.AbsorbedKinds.AddRange(_fitted);
+            }
             _fitted.Clear();
             int from = Level;
             int two = Math.Max(0, Math.Min(from + n, WeaponGrowth.FlatAtkFromLevel) - from);   // levels gaining +2
@@ -218,16 +230,20 @@ namespace SleepingCalamity.Core.Weapons
 
         public ReroutePreview GetReroutePreview()
         {
-            if (_history.Count == 0) return new ReroutePreview(false, null, default, default, default);
+            if (_history.Count == 0) return new ReroutePreview(false, null, default, default, default, null);
             var s = _history[_history.Count - 1];
+            var returned = new List<AttachmentKind>(s.AbsorbedKinds);
+            int slots = _catalog.TryGet(s.DefinitionId, out var restoredDef) ? restoredDef.SlotCount : 0;
+            for (int i = slots; i < _fitted.Count; i++) returned.Add(_fitted[i]);
             return new ReroutePreview(true, s.DefinitionId, s.Stats, s.AbsorbedSince, new WeaponStats(
-                Math.Max(0f, Stats.Atk - s.Stats.Atk), Math.Max(0f, Stats.Fire - s.Stats.Fire), Math.Max(0f, Stats.Pest - s.Stats.Pest)));
+                Math.Max(0f, Stats.Atk - s.Stats.Atk), Math.Max(0f, Stats.Fire - s.Stats.Fire), Math.Max(0f, Stats.Pest - s.Stats.Pest)), returned);
         }
 
         public bool TryReroute() => TryReroute(out _);
 
         // Undo the latest build-up: level, ABS, stats and definition return exactly as they were (progress made since is not kept). The
-        // attachments fitted now stay fitted, trimmed to the restored weapon's slots; the trimmed ones are returned in `dropped`.
+        // attachments fitted now stay fitted, trimmed to the restored weapon's slots. `dropped` is the refund for the caller to bag: first the
+        // attachments absorbed since the build-up (their bonus goes with the re-route, so the drops come back), then the trimmed ones.
         public bool TryReroute(out List<AttachmentKind> dropped)
         {
             dropped = new List<AttachmentKind>();
@@ -235,6 +251,7 @@ namespace SleepingCalamity.Core.Weapons
             var s = _history[_history.Count - 1];
             _history.RemoveAt(_history.Count - 1);
             DefinitionId = s.DefinitionId; Level = s.Level; Abs = s.Abs; Stats = s.Stats;
+            dropped.AddRange(s.AbsorbedKinds);
             Trim(SlotCount, dropped);
             return true;
         }
@@ -257,6 +274,7 @@ namespace SleepingCalamity.Core.Weapons
                     AbsorbedAtk = h.AbsorbedSince.Atk, AbsorbedFire = h.AbsorbedSince.Fire, AbsorbedPest = h.AbsorbedSince.Pest,
                 };
                 foreach (var a in h.Fitted) hs.Fitted.Add((int)a);
+                foreach (var a in h.AbsorbedKinds) hs.AbsorbedKinds.Add((int)a);
                 s.History.Add(hs);
             }
             return s;
@@ -282,6 +300,7 @@ namespace SleepingCalamity.Core.Weapons
                         Fitted = new AttachmentKind[h.Fitted?.Count ?? 0],
                     };
                     for (int i = 0; i < snap.Fitted.Length; i++) snap.Fitted[i] = (AttachmentKind)h.Fitted[i];
+                    if (h.AbsorbedKinds != null) foreach (int a in h.AbsorbedKinds) snap.AbsorbedKinds.Add((AttachmentKind)a);
                     w._history.Add(snap);
                 }
             state = w;
