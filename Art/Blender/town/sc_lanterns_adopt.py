@@ -271,7 +271,7 @@ def finish(ob, name, glass_slots):
     # final: keep only UVBake (as UVMap), two materials
     me = ob.data
     me.uv_layers.remove(me.uv_layers['UVMap']); me.uv_layers['UVBake'].name = 'UVMap'
-    opaque = L.pbr_material(f'M_{name}', prefix, clip=True, two_sided=False)
+    opaque = L.pbr_material(f'M_{name}', prefix, clip=False, two_sided=False)   # opaque: the alpha is the glass's, never clip it
     glass = L.pbr_material(f'M_{name}_Glass', prefix, clip=False, two_sided=True, alpha_blend=True)
     gi = [i for i, s in enumerate(ob.material_slots) if s.material.name in glass_slots]
     idx = np.array([1 if p.material_index in gi else 0 for p in me.polygons], np.int32)

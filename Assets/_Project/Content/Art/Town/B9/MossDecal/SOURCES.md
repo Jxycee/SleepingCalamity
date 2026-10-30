@@ -6,7 +6,7 @@ Generator: `Art/Blender/town/sc_foliage_town.py` (build_decal_tex, moss_decal).
 |---|---|---|---|
 | moss | ambientCG Moss002 https://ambientcg.com/view?id=Moss002 | CC0 1.0 | graded to #616e2e / #b6ab28, procedural climb mask (alpha) rising from the basin foot |
 
-`SC_B9_MossDecal` (72 tris) is a mesh decal: a 70 deg band on the basin wall (radius 1.705 m, 0-0.38 m high) plus a 7 cm ground lip. Origin = the basin centre; the band is centred on local -Y (Unity +z). Rotate it about Y to the side you want, where a camera sees it (all three capture cameras look at the basin's south face).
+`SC_B9_MossDecal` (72 tris) is a mesh decal: a 70 deg band on the basin wall (radius 1.705 m, 0-0.38 m high) plus a 7 cm ground lip. Origin = the basin centre; the band is centred on local -Y (Unity +z). Default Unity rotation: Y 180 (+-20 deg), which turns the band to the south face that all three capture cameras see; unrotated it faces north, away from them.
 
 ## Unity import (controller)
 - Model: Normals = Import (bent card normals are authored), Scale 1.

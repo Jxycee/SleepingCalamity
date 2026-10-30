@@ -12,4 +12,4 @@ Generator: `Art/Blender/town/sc_lanterns_adopt.py` (`--res 2048 --export`).
 ## Unity import (controller)
 - Model: Normals = Import (bent card normals are authored), Scale 1.
 - Material: URP Lit. `_BaseColor` (sRGB, alpha), `_Normal` (Normal map, OpenGL / Y+), `_ORM` (linear: R occlusion, G roughness, B metallic; smoothness = 1 - G, or pack with `Art/Blender/tools/sc_pack_unity.py --orm`).
-- Two slots share the set: `M_SC_B8_MarketLantern` (opaque, Alpha Clipping 0.5) and `M_SC_B8_MarketLantern_Glass` (Surface Transparent, alpha from `_BaseColor`, smoothness about 0.9).
+- Two slots share the set: `M_SC_B8_MarketLantern` (Opaque, no alpha clipping: the _BaseColor alpha is the glass opacity and would punch holes along UV seams at distance) and `M_SC_B8_MarketLantern_Glass` (Surface Transparent, alpha from `_BaseColor`, smoothness about 0.9).

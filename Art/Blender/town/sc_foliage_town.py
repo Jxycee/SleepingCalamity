@@ -414,6 +414,7 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             for rep in range(1 + int(dn > 0.4)):
                 off = rr.uniform(0.02, 0.05) + 0.14 * dn * rr.random()           # thick lobes stand off the wall
                 jx, jw = x + rr.gauss(0, 0.07), w + rr.gauss(0, 0.07)
+                jx = max(jx, 0.16 * card_scale)                                   # no leaves in the air past the building corner
                 p, nn, upv = wall.at(jx, jw, off=off)
                 lx, lw, lr = min(lobes, key=lambda l: ((jx - l[0]) ** 2 + (jw - l[1]) ** 2) / (l[2] * l[2]))
                 bulge = (Vector((jx - lx, 0, 0)) + upv * (jw - lw)) / lr
