@@ -85,7 +85,7 @@ namespace SleepingCalamity.Presentation
         private static GameObject Prim(GameObject parent, PrimitiveType type, Vector3 pos, Vector3 scale, Material material)
         {
             GameObject p = GameObject.CreatePrimitive(type);
-            Object.Destroy(p.GetComponent<Collider>());
+            Object.DestroyImmediate(p.GetComponent<Collider>());   // not Destroy: a collider that lives to the end of the frame can shove a character controller
             p.transform.SetParent(parent.transform, false);
             p.transform.localPosition = pos;
             p.transform.localScale = scale;

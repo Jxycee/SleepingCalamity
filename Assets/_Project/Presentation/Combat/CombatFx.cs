@@ -109,7 +109,7 @@ namespace SleepingCalamity.Presentation
             if (sparkMaterial == null) return;
             if (_sparkRoot == null) _sparkRoot = new GameObject("Sparks").transform;
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            Destroy(go.GetComponent<Collider>());
+            DestroyImmediate(go.GetComponent<Collider>());   // not Destroy: a collider that lives to the end of the frame can shove a character controller
             go.transform.SetParent(_sparkRoot, false);
             go.transform.position = at;
             go.GetComponent<Renderer>().sharedMaterial = sparkMaterial;
