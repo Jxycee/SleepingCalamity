@@ -1,8 +1,6 @@
 // Shared helpers for the builders and validators.
 // Get-or-add keeps components, children and the root NetworkObject (and so its GlobalObjectIdHash) stable across rebuilds.
-using System.Collections.Generic;
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Reflection;
 using Unity.Netcode;
 using UnityEditor;
@@ -143,11 +141,25 @@ namespace SleepingCalamity.EditorTools
         public static void RefreshNetworkObjectHash(string prefabPath)
         {
             NetworkObject networkObject = LoadNetworkPrefab(prefabPath);
+            RunNetworkObjectOnValidate(networkObject);
+            EditorUtility.SetDirty(networkObject); // OnValidate only dirties the asset when the value changed in memory; the file may still hold 0
+            AssetDatabase.SaveAssets();
+        }
+
+        // The serialized GlobalObjectIdHash (the property is internal in NGO 2.13, so read it through SerializedObject, as it is on disk).
+        public static uint NetworkObjectHash(NetworkObject networkObject)
+        {
+            using var so = new SerializedObject(networkObject);
+            SerializedProperty p = so.FindProperty("GlobalObjectIdHash");
+            if (p == null) throw new System.MissingFieldException("NetworkObject.GlobalObjectIdHash serialized field not found");
+            return p.uintValue;
+        }
+
+        public static void RunNetworkObjectOnValidate(NetworkObject networkObject)
+        {
             if (NetworkObjectOnValidate == null)
                 throw new System.MissingMethodException("NetworkObject.OnValidate not found (expected internal in NGO 2.13.3)");
             NetworkObjectOnValidate.Invoke(networkObject, null);
-            EditorUtility.SetDirty(networkObject); // OnValidate only dirties the asset when the value changed in memory; the file may still hold 0
-            AssetDatabase.SaveAssets();
         }
 
         public static NetworkObject LoadNetworkPrefab(string prefabPath)
@@ -160,36 +172,42 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Scenes are rebuilt from an empty scene and saved to the same path (same .meta, same GUID).
-        // Unity gives every scene object a fresh random file id on each rebuild and writes the objects sorted by it, so a rebuild with no real
-        // change would still rewrite the whole file. When the saved scene has the same objects with the same values as the one on disk before
-        // (same multiset of YAML documents once the ids are blanked), the old bytes are put back so git sees nothing.
         public static void SaveScene(Scene scene, string assetPath)
         {
             EnsureFolder(Folder(assetPath));
-            string absolute = Abs(assetPath);
-            byte[] before = File.Exists(absolute) ? File.ReadAllBytes(absolute) : null;
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene, assetPath))
                 throw new System.InvalidOperationException("Could not save scene " + assetPath);
-            if (before == null) return;
-            string oldText = System.Text.Encoding.UTF8.GetString(before);
-            string newText = File.ReadAllText(absolute);
-            if (SceneFingerprint(oldText) == SceneFingerprint(newText)) File.WriteAllBytes(absolute, before);
+            NormalizeSceneFile(assetPath);
         }
 
-        internal static string SceneFingerprint(string yaml)
+        // Unity numbers new objects at random on every save, so an unchanged scene would differ in git after each build. Renumber the saved
+        // file from the hierarchy (SceneFileNormalizer) so a second build on a clean tree changes nothing.
+        static void NormalizeSceneFile(string assetPath)
         {
-            string[] documents = Regex.Split(yaml.Replace("\r\n", "\n"), @"(?m)^(?=--- !u!)");
-            var blanked = new List<string>();
-            foreach (string document in documents)
-            {
-                if (!document.StartsWith("--- !u!")) continue;
-                string text = Regex.Replace(document, @"&-?\d+", "&_");
-                text = Regex.Replace(text, @"fileID: -?\d+(?!\d)(?!, guid)", "fileID: _");
-                blanked.Add(text);
-            }
-            blanked.Sort(System.StringComparer.Ordinal);
-            return string.Join("\n@@\n", blanked);
+            string full = System.IO.Path.GetFullPath(assetPath);
+            string text = System.IO.File.ReadAllText(full);
+            string normal = SceneFileNormalizer.Normalize(text);
+            if (normal == text) return;
+            System.IO.File.WriteAllText(full, normal, new System.Text.UTF8Encoding(false));
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            if (normal.Contains("GlobalObjectIdHash:")) RefreshSceneNetworkObjectHashes(assetPath);
+        }
+
+        // An in-scene NetworkObject stores a GlobalObjectIdHash derived from its fileID, which the renumbering just changed. Reopen the scene,
+        // run NetworkObject.OnValidate on each one, and save again; a resave of a loaded scene keeps the fileIDs, so the file stays normalized.
+        static void RefreshSceneNetworkObjectHashes(string assetPath)
+        {
+            Scene scene = EditorSceneManager.OpenScene(assetPath, OpenSceneMode.Single);
+            foreach (GameObject root in scene.GetRootGameObjects())
+                foreach (NetworkObject networkObject in root.GetComponentsInChildren<NetworkObject>(true))
+                {
+                    RunNetworkObjectOnValidate(networkObject);
+                    EditorUtility.SetDirty(networkObject);
+                }
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!EditorSceneManager.SaveScene(scene, assetPath))
+                throw new System.InvalidOperationException("Could not resave scene " + assetPath);
         }
     }
 }

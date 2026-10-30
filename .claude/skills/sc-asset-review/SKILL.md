@@ -10,9 +10,9 @@ A review is evidence first: numbers from the audit, pixels from the review rende
 **Sign-off:** the scores rank items and compare rounds; they are not a pass gate. The art track's only sign-off is the user's approval on captures (PHASE1 3.7). Before the corners are shown, the captures must fall inside the PHASE1 3.1 bands and a reviewer must have scored them with this rubric.
 
 ## 1. Gather the evidence
-Tool status is in sc-asset-craft 0b. In short: `sc_asset_audit.py` for numbers; the fg-aaa-prop render scripts (port in M8) for the look; `sc_ref_palette.py` for colour and value. `sc_asset_preview.py`, `sc_asset_score.py`, `sc_asset_census.py` and `sc_concept_match.py` are FishGame legacy and don't apply.
+Tool status is in sc-asset-craft 0b. In short: `sc_asset_audit.py` for numbers; the ported fg-aaa-prop render scripts (`sc_compose.py`, `sc_review.py`, `sc_sheet.py`; see sc-aaa-prop) for the look; `sc_ref_palette.py` for colour and value. `sc_asset_preview.py`, `sc_asset_score.py`, `sc_asset_census.py` and `sc_concept_match.py` are FishGame legacy and don't apply.
 ```
-blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- <scratch>/audit.json --class prop <fbx...>
+blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- <scratch>/audit.json --class kit <fbx...>
 python -I Art/Blender/tools/sc_ref_palette.py <render.png> --k 7 --sheet <scratch>/palette.png
 ```
 - **Audit:** read tris, density, bounds, origin offset and the hygiene lines. Judge tris against PHASE1 3.3, not the audit's own Millpond `BUDGET`, and ignore its uv1/`Col`/material-count lines.

@@ -81,6 +81,7 @@ namespace SleepingCalamity.Core.Weapons
         // a finisher kill's x1.25 (WeaponGrowth.KillValue) is already inside it. No techs: the value unchanged, no pop.
         public static TechResult Apply(float value, params TechKind[] techs)
         {
+            if (float.IsNaN(value) || float.IsInfinity(value) || value < 0f) return new TechResult(0f, false);
             if (techs == null || techs.Length == 0) return new TechResult(value, false);
             return new TechResult(value * (1f + Bonus), true);
         }
@@ -141,19 +142,56 @@ namespace SleepingCalamity.Core.Weapons
             return fresh;
         }
 
+        // Ids this build does not know (a newer build's abilities): kept and written back, never usable here.
+        readonly HashSet<string> _unknown = new HashSet<string>();
+
         public void Restore(IEnumerable<string> ids)
         {
             _unlocked.Clear();
+            _unknown.Clear();
+            _extraMembers = null;
             if (ids == null) return;
-            foreach (var id in ids) foreach (var d in _defs) if (d.Id == id) _unlocked.Add(id);
+            foreach (var id in ids)
+            {
+                if (string.IsNullOrEmpty(id)) continue;
+                bool known = false;
+                foreach (var d in _defs) if (d.Id == id) { known = true; break; }
+                (known ? _unlocked : _unknown).Add(id);
+            }
         }
 
-        // The tier usable with the equipped weapon: 0 locked; MaxTier with its own family; MaxTier - 1 (at least 1) with another.
+        public HeroAbilitiesSave ToSave()
+        {
+            var s = new HeroAbilitiesSave();
+            foreach (var d in _defs) if (_unlocked.Contains(d.Id)) s.Unlocked.Add(d.Id);   // catalog order: stable output
+            var extra = new List<string>(_unknown);
+            extra.Sort(StringComparer.Ordinal);
+            s.Unlocked.AddRange(extra);
+            if (_extraMembers != null) s.Extra = new Dictionary<string, object>(_extraMembers);
+            return s;
+        }
+
+        // Unknown members of the save itself (a newer build's fields), written back by ToSave.
+        Dictionary<string, object> _extraMembers;
+
+        // Named apart from Restore(ids) so Restore(null) stays unambiguous. Keeps the save's unknown members as well as its unknown ids.
+        public void RestoreSave(HeroAbilitiesSave save)
+        {
+            Restore(save?.Unlocked);
+            _extraMembers = save?.Extra != null ? new Dictionary<string, object>(save.Extra) : null;
+        }
+
+        // The tier usable with the equipped weapon: 0 locked; MaxTier with its own family; MaxTier - 1 (at least 1) with another. A MaxTier
+        // of 0 or less is never usable.
         public int TierWith(string abilityId, WeaponFamily equipped)
         {
             if (!Has(abilityId)) return 0;
             foreach (var d in _defs)
-                if (d.Id == abilityId) return d.Family == equipped ? d.MaxTier : Math.Max(1, d.MaxTier - 1);
+                if (d.Id == abilityId)
+                {
+                    if (d.MaxTier <= 0) return 0;
+                    return d.Family == equipped ? d.MaxTier : Math.Max(1, d.MaxTier - 1);
+                }
             return 0;
         }
     }
@@ -170,15 +208,18 @@ namespace SleepingCalamity.Core.Weapons
         public int Current { get; private set; }
         public int HitProgress { get; private set; }   // hits toward the next pip (0..HitsPerPip-1)
 
-        public SpellPips(int cap = StartCap) { Cap = Math.Max(0, cap); Current = Cap; }
+        public SpellPips(int cap = StartCap) { Cap = Math.Max(0, Math.Min(cap, MaxCap)); Current = Cap; }
 
-        // Placeholder growth: +1 cap per 3 weapon levels and +1 per build-up.
-        public static int CapFor(int level, int buildUps) => StartCap + Math.Max(0, level) / 3 + Math.Max(0, buildUps);
+        public const int MaxCap = 1000;     // hard ceiling for CapFor, SetCap and a loaded save alike
+
+        // Placeholder growth: +1 cap per 3 weapon levels and +1 per build-up, at most MaxCap (computed in long: no overflow).
+        public static int CapFor(int level, int buildUps) =>
+            (int)Math.Min(MaxCap, (long)StartCap + Math.Max(0, level) / 3 + Math.Max(0, buildUps));
 
         // Raising the cap adds the new room as empty pips; lowering clamps.
         public void SetCap(int cap)
         {
-            cap = Math.Max(0, cap);
+            cap = Math.Max(0, Math.Min(cap, MaxCap));
             Cap = cap;
             if (Current > Cap) Current = Cap;
         }
@@ -191,6 +232,15 @@ namespace SleepingCalamity.Core.Weapons
             HitProgress = 0;
             Current++;
             return 1;
+        }
+
+        public SpellPipsSave ToSave() => new SpellPipsSave { Cap = Cap, Current = Current, HitProgress = HitProgress };
+
+        // Rebuilds from a save, clamping every number into range (WeaponsSaveRules.CleanPips).
+        public static SpellPips FromSave(SpellPipsSave save)
+        {
+            var c = WeaponsSaveRules.CleanPips(save);
+            return new SpellPips(c.Cap) { Current = c.Current, HitProgress = c.HitProgress };
         }
 
         public bool TrySpend(int n = 1)

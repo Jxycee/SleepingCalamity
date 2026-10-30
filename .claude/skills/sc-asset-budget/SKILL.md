@@ -24,7 +24,7 @@ The facts behind them:
 | Whole building (kit + heroes) | at most 75k tris; 2x4K + 4x2K + 2x1K | summed over every piece that belongs to it |
 | Hero character / enemy | 60k, 4K body + 2K head / 25k, one 2K-4K set | per character |
 
-- `Art/Blender/tools/sc_asset_audit.py` reports tris, surface area, density and bounds per object. **Report its numbers, judge them against the table above.** Its own `BUDGET` table, `mats` FAIL and encoding checks are FishGame's Millpond data and toon encoding (sc-asset-craft 0b).
+- `Art/Blender/tools/sc_asset_audit.py` (rewritten M8) reports tris, surface area, density, UV texel density against these budgets, colour attributes and bounds per object, and FAILs only on triangles and material slots. Report its numbers; the table above is the judge.
 - **Over budget means cut, don't argue,** unless the extra tris are on the silhouette or a story beat the brief names: then say so in the header and the report.
 - A building's 75k includes its instanced roof tiles and stones: count the instances, not the variants.
 

@@ -190,6 +190,29 @@ namespace SleepingCalamity.EditorTools
             return errors;
         }
 
+        // No in-scene NetworkObject's stored GlobalObjectIdHash would change if NGO re-ran OnValidate on it (the hash derives from the fileID,
+        // which SceneFileNormalizer renumbers; BuilderUtil.SaveScene refreshes it). Scenes without a NetworkObject pass trivially.
+        public static List<string> SceneNetworkObjectHashes()
+        {
+            var errors = new List<string>();
+            foreach (string sceneName in SceneNames.BuildOrder)
+            {
+                string scenePath = AssetPaths.ScenesFolder + "/" + sceneName + ".unity";
+                if (!File.Exists(BuilderUtil.Abs(scenePath))) continue; // BuildScenes reports a missing file
+                ForEachSceneObject(scenePath, errors, go =>
+                {
+                    NetworkObject networkObject = go.GetComponent<NetworkObject>();
+                    if (networkObject == null) return;
+                    uint stored = BuilderUtil.NetworkObjectHash(networkObject);
+                    BuilderUtil.RunNetworkObjectOnValidate(networkObject);
+                    uint fresh = BuilderUtil.NetworkObjectHash(networkObject);
+                    if (fresh != stored)
+                        errors.Add(scenePath + ": " + HierarchyPath(go) + " NetworkObject hash is stale (" + stored + ", OnValidate gives " + fresh + ")");
+                });
+            }
+            return errors;
+        }
+
         // Bootstrap.unity has one AppBootstrap whose inputActions and playerPrefab point at the project assets; the arena has a spawn point.
         public static List<string> BootstrapReferences()
         {
