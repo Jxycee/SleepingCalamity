@@ -12,6 +12,7 @@
 - **M3 combat greybox is built but NOT reviewed or merged:** branch `m3-combat`, tip `ee915ed`. `SC RESULT check PASS` (EditMode 483, PlayMode 22), worktree `.claude/worktrees/agent-a3f4b7d611d7e2923`. The play steps are in `docs/design/m3-combat-greybox.md` and the agent's notes. Under the network simulator (148 ms RTT, 2% loss), about half the hits land within one round trip and the rest within about two.
 - **User decisions this session:** the PHASE1.md change log and `decisions-for-review.md` A1-A24.
   - A24: the user's cellar reference image is the mood target. It lives at `Reference/private/user/cellar_mood_ref_01.webp`: warm local light pools on neutral grey-brown stone, deep shadow, candle highlights. The cellar band was updated to match.
+- **Cloud parity (2026-10-30, cloud session, merged from `claude/eloquent-brown-fopwq1`):** cloud sessions may be the controller and merge on a green `Tools/cloud/unity.sh check` (CLAUDE.md "Cloud sessions" has the PC-to-cloud map). Verified in the cloud: C# compile 11/11, Core tests 194/194, shader check, csharp-ls navigation, live Blender MCP (art environment). Unity launches still need the `UNITY_LICENSE` secret. Setup: `docs/superpowers/handoff/cloud-environment.md`.
 - **The user owes:** `docs/superpowers/handoff/USER_TODO.md`.
 
 ## Next
