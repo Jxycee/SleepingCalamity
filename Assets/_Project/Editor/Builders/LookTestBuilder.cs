@@ -188,7 +188,7 @@ namespace SleepingCalamity.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        static Material Ensure(string path, Shader shader)
+        internal static Material Ensure(string path, Shader shader)
         {
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (m == null) { m = new Material(shader); AssetDatabase.CreateAsset(m, path); }
@@ -218,7 +218,7 @@ namespace SleepingCalamity.EditorTools
             return profile;
         }
 
-        static T Comp<T>(VolumeProfile p) where T : VolumeComponent
+        internal static T Comp<T>(VolumeProfile p) where T : VolumeComponent
         {
             if (p.TryGet(out T existing)) return existing;
             T c = p.Add<T>(true);
@@ -257,7 +257,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // --------------------------------------------------------------------------------------------- scene helpers
-        static GameObject Shape(Transform parent, string name, LookTestGeometry.Shape shape, Vector3 pos, Vector3 size, Material mat, Vector3 euler = default, float tile = 2f, int segments = 24, bool cast = true)
+        internal static GameObject Shape(Transform parent, string name, LookTestGeometry.Shape shape, Vector3 pos, Vector3 size, Material mat, Vector3 euler = default, float tile = 2f, int segments = 24, bool cast = true)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -268,16 +268,16 @@ namespace SleepingCalamity.EditorTools
             return go;
         }
 
-        static GameObject Box(Transform parent, string name, Vector3 pos, Vector3 size, Material mat, Vector3 euler = default, float tile = 2f) =>
+        internal static GameObject Box(Transform parent, string name, Vector3 pos, Vector3 size, Material mat, Vector3 euler = default, float tile = 2f) =>
             Shape(parent, name, LookTestGeometry.Shape.Box, pos, size, mat, euler, tile);
 
-        static GameObject Trim(Transform parent, string name, Vector3 pos, Vector3 size, Material mat) =>
+        internal static GameObject Trim(Transform parent, string name, Vector3 pos, Vector3 size, Material mat) =>
             Shape(parent, name, LookTestGeometry.Shape.TrimBox, pos, size, mat, default, 2f);
 
-        static GameObject Decal(Transform parent, string name, Vector3 pos, Vector3 size, Material mat, float tile, Vector3 euler = default) =>
+        internal static GameObject Decal(Transform parent, string name, Vector3 pos, Vector3 size, Material mat, float tile, Vector3 euler = default) =>
             Shape(parent, name, LookTestGeometry.Shape.Box, pos, size, mat, euler, tile, 24, false);
 
-        static GameObject Prim(Transform parent, string name, PrimitiveType type, Vector3 pos, Vector3 scale, Material mat)
+        internal static GameObject Prim(Transform parent, string name, PrimitiveType type, Vector3 pos, Vector3 scale, Material mat)
         {
             GameObject go = GameObject.CreatePrimitive(type);
             go.name = name; go.transform.SetParent(parent, false);
@@ -287,7 +287,7 @@ namespace SleepingCalamity.EditorTools
             return go;
         }
 
-        static Light AddLight(Transform parent, string name, LightType type, Vector3 pos, Quaternion rot, Color color, float intensity, float range, LightShadows shadows)
+        internal static Light AddLight(Transform parent, string name, LightType type, Vector3 pos, Quaternion rot, Color color, float intensity, float range, LightShadows shadows)
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false);
             go.transform.localPosition = pos; go.transform.localRotation = rot;
@@ -297,7 +297,7 @@ namespace SleepingCalamity.EditorTools
             return l;
         }
 
-        static Camera AddCapture(Transform parent, string name, Vector3 pos, Vector3 target, float fov)
+        internal static Camera AddCapture(Transform parent, string name, Vector3 pos, Vector3 target, float fov)
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false);
             go.transform.localPosition = pos; go.transform.localRotation = Quaternion.LookRotation(target - pos, Vector3.up);
@@ -310,14 +310,14 @@ namespace SleepingCalamity.EditorTools
             return cam;
         }
 
-        static void AddVolume(Transform parent, string profileName)
+        internal static void AddVolume(Transform parent, string profileName)
         {
             var go = new GameObject("PostFX"); go.transform.SetParent(parent, false);
             Volume v = go.AddComponent<Volume>(); v.isGlobal = true; v.priority = 1f;
             v.sharedProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(RenderingFolder + "/" + profileName + ".asset");
         }
 
-        static void AddProbe(Transform parent, Vector3 pos, Vector3 size)
+        internal static void AddProbe(Transform parent, Vector3 pos, Vector3 size)
         {
             var go = new GameObject("ReflectionProbe"); go.transform.SetParent(parent, false); go.transform.localPosition = pos;
             ReflectionProbe p = go.AddComponent<ReflectionProbe>();
