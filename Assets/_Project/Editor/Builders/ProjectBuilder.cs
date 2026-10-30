@@ -38,6 +38,7 @@ namespace SleepingCalamity.EditorTools
             Step(errors, "Prefabs", PrefabBuilder.Build);
             Step(errors, "NetworkPrefabs", NetworkPrefabsBuilder.Build);
             Step(errors, "Scenes", SceneBuilder.BuildAll);
+            Step(errors, "LookTest", LookTestBuilder.Build);
             Step(errors, "BuildSettings", SceneBuilder.ApplyBuildSettings);
             Step(errors, "Save", AssetDatabase.SaveAssets);
             Step(errors, "Validate", () => errors.AddRange(ValidationRunner.Run()));   // after Save: the validators read what is on disk

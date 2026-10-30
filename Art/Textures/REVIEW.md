@@ -20,3 +20,19 @@ Contact sheets: `Art/Textures/B1_town/sheet.jpg`, `B2_cellar/sheet.jpg`, `B3_tri
 - Cobble repeats at 2 m. Fix with a detail-noise or macro variation layer.
 
 **Next:** fix these, then measure in the Unity look-test scene against the 3.1 scene bands (M8 part 2).
+
+## M8 part 2: fixes and the Unity look-test (implementer's own read, 2026-10-30)
+**Fixes done** (generators `Art/Blender/textures/sc_tex_batches.py`, `sc_tex_b3.py`; sheets re-rendered and re-measured, SOURCES.md tables regenerated):
+- Canvas: a procedural plain weave (8 px thread pitch) with slubs, muted sun-faded ochre `#b08c52`, three madder bands dyed into the threads with jittered edges, broad sun fade.
+- Painted wood: chalky blue-grey `#62808c`, chroma 0.85. Roof tile: `#92503c`, chroma 0.82, per-tile value variation 0.20, fine colour noise softened.
+- Decals: crack widened and deepened (stronger normal and alpha), drip wider with a dark core, moss rebuilt as about 420 clumped cushions (olive to yellow-green tops, soft alpha edge, real height). The sheet shows decals flat and close.
+- Oak timber: warm dark brown `#3d2d22` with long grain streaks. Root bark: a real bark scan (`bark_brown_01`, fibrous ridges, damp furrows). Old brick: muted red-brown `#94654a` with soot patches. Plaster: undulation layer. Limewash: a plainer scan (`plastered_wall_03`) with two-scale domain-warped damp patches. Cobble: stone-by-stone tint plus larger variation.
+
+**New sheet scores (own read):** B1 7.5/10, B2 7.5/10, B3 7/10. Still weak: iron is dark in a flat rig (judge it in the look-test), old brick still leans warm, the trim sheets are only judged in albedo plus a lit render.
+
+**Look-test** (`LookTest_Day`, `LookTest_Cellar`, builder `LookTestBuilder`, captures `LookTestCapture`): captures in `Art/Textures/looktest/` (1024 px JPGs), measured with `sc_ref_palette.py --k 7` (pooled frames):
+| | p10 / p50 / p90 | warmth | band (PHASE1 3.1) |
+|---|---|---|---|
+| Day, 3 midday + 1 low sun | 0.16 / 0.55 / 0.70 | +0.15 (in) | 0.21-0.25 / 0.44-0.50 / 0.80-0.86, +0.12 to +0.20 |
+| Cellar, 3 views | 0.07 / 0.33 / 0.60 | +0.33 (just high) | 0.12-0.16 / 0.30-0.40 / 0.65-0.75, +0.20 to +0.30 |
+Day: warmth in, p10 low, p50 high, p90 low. Cellar: p50 in, p10 and p90 low, warmth slightly high. Volumetrics: the CristianQiu package was not tried; the shafts are additive light-cone meshes (`SC_LightCone.shader`) plus exponential fog.
