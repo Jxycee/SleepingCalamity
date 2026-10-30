@@ -15,7 +15,7 @@ particle or emissive card, with a point light at FLAME.
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/cellars/sc_cellar_lantern.py -- --out <scratch>
       [--stage look|bake]   look (default): procedural highs rendered directly, no bake; bake: low + baked maps + render
       [--res 1024]          bake resolution (the PC's final bake: --res 4096)
-      [--rres 900] [--samples 64] [--views tq,front,close,wide] [--moods cellar,studio] [--no-render]
+      [--tris 45000] [--rres 900] [--samples 64] [--views tq,front,close,wide] [--moods cellar,studio] [--no-render]
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 Optional CC0 scan layer: AAA_SCANS=<folder with rusty_metal_02_{diff,rough,disp}_2k.jpg> (sc_fetch_textures.py).
 """
@@ -203,7 +203,7 @@ def candle_wax(name, col=(0.50, 0.40, 0.22)):
     c = T.mix(T.noise(lp, scale=60, detail=4), T.hsv(col, 0.5, 1.0, 0.85), T.hsv(col, 0.5, 0.9, 1.1))
     c = T.mix(T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), 0.6), c, (0.12, 0.08, 0.03))
     r = T.mixf(T.noise(lp, scale=90, detail=3), 0.3, 0.5)
-    glow = T.math('MULTIPLY', T.smoothstep(z, 0.09, 0.131), 0.45)
+    glow = T.math('MULTIPLY', T.smoothstep(z, 0.10, 0.131), 0.07)   # x6 in the game material
     T.output(c, r, 0.0, T.bump(T.noise(lp, scale=300, detail=3), strength=0.15, distance=0.0004),
              Emission_Color=(1.0, 0.52, 0.18), Emission_Strength=glow)
     return m
@@ -458,7 +458,7 @@ highs, unbaked = build()
 print('HIGH TRIS', {h.name: K.tris(h) for h in highs}, 'total', sum(K.tris(h) for h in highs))
 if STAGE == 'bake':
     pdir = os.path.join(OUT, 'props'); os.makedirs(pdir, exist_ok=True)
-    low = K.bake_prop(NAME, highs, pdir, target=int(arg('--tris', '26000')), res=RES)
+    low = K.bake_prop(NAME, highs, pdir, target=int(arg('--tris', '45000')), res=RES)
     print('LOW TRIS', K.tris(low))
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(pdir, NAME + '.blend'))
 if '--no-render' not in argv:
