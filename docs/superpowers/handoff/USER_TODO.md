@@ -18,9 +18,17 @@ These are the steps only the user can take. Claude keeps this list current: when
 
    Tell Claude what happened.
 
+## After M3 is reviewed and merged (the next session will tell you)
+- **Play the 5-minute combat arena:**
+  1. Open the project in Unity and tick SleepingCalamity > Dev > Combat Arena (optionally also Auto Solo).
+  2. Press Play from the Bootstrap scene.
+  3. Controls: LMB attack (hold 0.6 s for a charge), RMB guard, aim or spell, Left Ctrl dodge, Tab lock-on (Q/R switch), Space jump, F5 swap heirloom, F6 clear the wave, hold E to revive an ally.
+  4. Say whether the feel is right, or what isn't.
+
 ## Soon
 4. **Pick Tobin's concept** from the options Claude generates (M10). Claude will ask you when the options are ready.
-5. **Optional: dump your PS2 BIOS** into `C:\Dev\_private\ps2\bios\`, using your own console and a BIOS dumper. It lets Claude capture real Dark Cloud town and dungeon frames in PCSX2, which are scarce online.
+5. **Delete the stray `C:\docs` folder** (three duplicate Tobin images an agent wrote by mistake).
+6. **Optional: dump your PS2 BIOS** into `C:\Dev\_private\ps2\bios\`, using your own console and a BIOS dumper. It lets Claude capture real Dark Cloud town and dungeon frames in PCSX2, which are scarce online.
 
 ## When Claude asks
 6. **Playtests at the milestone gates:**
