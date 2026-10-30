@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/_Project/Scenes/Bootstrap.unity
     guid: 549a7506910995c4fa178b466882bfc9
   - enabled: 1
+    path: Assets/_Project/Scenes/Lobby.unity
+    guid: 3c1b605dcb1012a4d8269d92d385a20b
+  - enabled: 1
     path: Assets/_Project/Scenes/Arena_Greybox.unity
     guid: d2424e2a95b397144881b71984892173
   m_configObjects: {}

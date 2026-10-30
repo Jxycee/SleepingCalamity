@@ -1,8 +1,8 @@
 // Not networked itself. The host decides when the gameplay scene loads (NetworkSceneManager); clients follow NGO scene sync.
-// The flow: Bootstrap is the lobby. A session (solo, dev-direct or online) connects while the Bootstrap scene is up. THE START GATE LIVES HERE
+// The flow: Bootstrap composes the App and hands over to the Lobby scene. A session (solo, dev-direct or online) connects while the Lobby is up. THE START GATE LIVES HERE
 // and in HostWorld: TryStartSession asks HostWorld.TryStartSession(HostRoster) (Core WorldPlayers rules) and only on Ok loads the greybox
 // arena for everyone. A Solo session starts by itself when it connects; a multiplayer host starts when its user presses Start, and the gate
-// refuses (and says so) until 2 or more recorded players are connected. When the session goes Offline the flow returns to Bootstrap.
+// refuses (and says so) until 2 or more recorded players are connected. When the session goes Offline the flow returns to the Lobby.
 // Every peer reacts to INetworkSession events. Error toasts come only from Ended, never from start-task exceptions.
 using System;
 using System.Threading.Tasks;
@@ -76,7 +76,7 @@ namespace SleepingCalamity.App
             if (disposed) return;
             if (SceneNames.IsGameplay(next.name) && session.State == ConnState.Offline)
             {
-                SceneManager.LoadScene(SceneNames.Bootstrap, LoadSceneMode.Single);
+                SceneManager.LoadScene(SceneNames.Lobby, LoadSceneMode.Single);
             }
         }
 
@@ -98,9 +98,9 @@ namespace SleepingCalamity.App
                 return;
             }
 
-            if (current == ConnState.Offline && SceneManager.GetActiveScene().name != SceneNames.Bootstrap)
+            if (current == ConnState.Offline && SceneManager.GetActiveScene().name != SceneNames.Lobby)
             {
-                SceneManager.LoadScene(SceneNames.Bootstrap, LoadSceneMode.Single);
+                SceneManager.LoadScene(SceneNames.Lobby, LoadSceneMode.Single);
             }
         }
 

@@ -12,6 +12,7 @@ namespace SleepingCalamity.EditorTools
         public const string PlayerPrefab = "Assets/_Project/Prefabs/PlayerCapsule.prefab";   // the M1 stand-in player: a capsule NetworkObject (M2 replaces the body)
         public const string ScenesFolder = "Assets/_Project/Scenes";
         public const string BootstrapScene = "Assets/_Project/Scenes/Bootstrap.unity";
+        public const string LobbyScene = "Assets/_Project/Scenes/Lobby.unity";
         public const string ArenaScene = "Assets/_Project/Scenes/Arena_Greybox.unity";
 
         // Generated project files read or written by the builders.

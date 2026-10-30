@@ -65,7 +65,7 @@ namespace SleepingCalamity.App
         {
             if (Current != null && Current != this)
             {
-                // A second Bootstrap load (the flow returns to Bootstrap). Deactivate first so this copy's NetworkManager, input and UI never wake up.
+                // A second Bootstrap load (not part of the flow, but a stray load must not make a second App). Deactivate first so this copy's NetworkManager, input and UI never wake up.
                 gameObject.SetActive(false);
                 Destroy(gameObject);
                 return;
@@ -172,11 +172,14 @@ namespace SleepingCalamity.App
             worldSaveFlow?.Tick();
         }
 
-        // Bootstrap is the lobby: nothing loads from here. A dev auto-start (command line, MPPM tag or the editor's Auto Solo) may begin a session.
+        // Hands over to the Lobby scene, then lets a dev auto-start (command line, MPPM tag or the editor's Auto Solo) begin a session.
         private IEnumerator Start()
         {
             if (!composed) yield break;
-            yield return null;   // let every OnEnable run before a session can start
+            SceneManager.LoadScene(SceneNames.Lobby, LoadSceneMode.Single);
+            // Wait until the plain Lobby load has finished, then one more frame, so a dev auto-start can never race it with an NGO scene load.
+            while (SceneManager.GetActiveScene().name != SceneNames.Lobby) yield return null;
+            yield return null;
             if (!SuppressDevAutoStart) DevStartup.TryAutoStart(session, this.DevFlags);
         }
 

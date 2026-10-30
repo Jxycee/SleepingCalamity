@@ -1,4 +1,4 @@
-// The Bootstrap scene, the greybox test arena and the build list. Each scene starts from NewScene(EmptyScene, Single) and is saved to the
+// The Bootstrap scene, the Lobby, the greybox test arena and the build list. Each scene starts from NewScene(EmptyScene, Single) and is saved to the
 // same path, so its GUID stays stable.
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
@@ -20,6 +20,7 @@ namespace SleepingCalamity.EditorTools
         public static void BuildAll()
         {
             BuildBootstrap();
+            BuildLobby();
             BuildArena();
         }
 
@@ -45,15 +46,26 @@ namespace SleepingCalamity.EditorTools
             ConfigureNetworkManager(networkManager, transport, prefabList);
             bootstrap.Configure(playerPrefab, inputActions);
 
-            // Not under App (DontDestroyOnLoad): it unloads with Bootstrap, so the lobby has a camera and each gameplay scene brings its own.
-            var cameraObject = new GameObject("BootstrapCamera");
+            BuilderUtil.SaveScene(scene, AssetPaths.BootstrapScene);
+        }
+
+        // The lobby: a plain camera and light behind the dev panel. Sessions start here and the flow comes back here when one ends.
+        public static void BuildLobby()
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var cameraObject = new GameObject("LobbyCamera");
             cameraObject.tag = "MainCamera";
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.07f, 0.10f, 0.14f);
             cameraObject.AddComponent<AudioListener>();
 
-            BuilderUtil.SaveScene(scene, AssetPaths.BootstrapScene);
+            var sun = new GameObject("Sun");
+            sun.AddComponent<Light>().type = LightType.Directional;
+            sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+            BuilderUtil.SaveScene(scene, AssetPaths.LobbyScene);
         }
 
         // The greybox test arena: ground, a light, a camera that overlooks it and the spawn point. Nothing else (M2 adds the hero and camera rig).
