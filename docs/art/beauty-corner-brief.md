@@ -68,3 +68,11 @@ The user reads our rubric scores about 8-10 points low ("your 20/40 is more like
   3. Fountain basins are low and wide, often octagonal, on one or two worn steps; the apron is darkest and mossiest at the stone-meets-ground line.
   4. Cobble wear is colour and joints: tone varies per stone, joints go dark/green, courses follow arcs, weeds grow in joints, not on stones.
   5. Props cluster to one side, in odd-numbered groups: barrels against a wall or in pairs, sacks slumped together, baskets on crates; keep a walking path.
+- **Game-study lessons (PCSX2 captures, private frames, 2026-10-30):**
+  1. The roof is a heavy cap, about 35-40% of the building's height, with a deep overhang and a rolled eave; it reads before the walls.
+  2. Break one side with an outside stair, gallery or lean-to and put 3-4 barrels on the opposite corner: plain walls read lived-in.
+  3. Windows small and deeply set (dark recesses read at distance); vary buildings by roof shape, chimney and add-ons, not new wall materials.
+  4. Water features get a chunky raised rim, taller than needed: strong outline, hides the edge seam.
+  5. Stall layers: sagging painted canvas, a hanging lantern, a sign on a post, goods on a patterned rug or cloth that frames the cluster.
+  6. Props in tight touching clusters of 3-5 with mixed heights, never evenly spaced.
+  7. Small bushes or weed clumps at wall bases break the wall-to-ground seam.
