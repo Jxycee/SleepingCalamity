@@ -18,6 +18,10 @@ particle or emissive card, with a point light at FLAME.
       [--tris 45000] [--rres 900] [--samples 64] [--views tq,front,close,wide] [--moods cellar,studio] [--no-render]
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 Optional CC0 scan layer: AAA_SCANS=<folder with rusty_metal_02_{diff,rough,disp}_2k.jpg> (sc_fetch_textures.py).
+
+Status (2026-10-30, cloud): look locked at relaxed review 28.5/40 (bake 2: 2048 px, high 1.40M tris, low 44,986 tris;
+review 1 was 23/40 before the wear/surface/proportion fixes). Next: the PC runs --stage bake --res 4096 with the scans
+and exports the FBX + maps (cloud sessions commit only this generator). Optional later passes are in docs/PARKING_LOT.md.
 """
 import sys, os, math
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
