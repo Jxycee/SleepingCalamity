@@ -132,6 +132,10 @@ The recorded Kenney clips replace the generated hit and whoosh sounds by file, b
 7. Does the dagger's parry window (the first 6 frames of a raised guard) feel learnable?
 8. When you are hurt, do you know which side it came from and how much HP you have left?
 
+**Retest result (user, 2026-10-30, on `main` after `1c44f60`): yes to all 8.** Notes: hits feel like hitting something even though the axe sits crooked in
+the hands (grip to fix). The ground footprints helped, but the real game should read enemy attacks without indicators: telegraph through the enemy's own wind-up
+(pose, anticipation, sound, a glint) and keep the footprint as an optional assist at most.
+
 ## Network simulator
 `Tests/PlayMode/CombatNetworkTests.Netsim_150msRtt_2PercentLoss_...` drives the Multiplayer Tools `NetworkSimulator` component (it works in PlayMode, in the
 editor). The simulator delays each packet at the send and the receive stage of both peers, so a per-packet 37 ms gives about 148 ms RTT (75 ms gave 300). For
