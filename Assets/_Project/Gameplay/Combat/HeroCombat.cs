@@ -92,6 +92,20 @@ namespace SleepingCalamity.Gameplay
             }
         }
         public float AttackFrame => IsOwner ? _machine.Frame : _remoteClock * AttackData.FrameRate;
+
+        // The index of the attack being shown (AttackSet index 0..7), or NoAttack: the owner's machine, or the replicated NetSwing on a remote copy.
+        public int CurrentAttackIndex
+        {
+            get
+            {
+                if (IsOwner) return _machine.Active ? _machine.CurrentIndex : NoAttack;
+                return CurrentAttack != null ? (int)((NetSwing.Value >> 16) & 0xFF) : NoAttack;
+            }
+        }
+
+        // Local, cosmetic, every peer: counts up in HurtClientRpc (SendTo.Everyone) so the animation can flinch a remote copy too. No extra traffic.
+        public int HurtSerial { get; private set; }
+        public bool HurtWasHeavy { get; private set; }
         public bool HitboxOn => CurrentAttack != null && CurrentAttack.HitOn.Contains(AttackFrame);
 
         // ---- what HeroLocomotion asks (owner) ----
@@ -597,6 +611,7 @@ namespace SleepingCalamity.Gameplay
         [Rpc(SendTo.Everyone)]
         private void HurtClientRpc(int damage, bool guarded)
         {
+            if (!guarded) { HurtSerial++; HurtWasHeavy = HeroAnimMap.IsHeavyHurt(damage, _vitals != null ? _vitals.MaxHp : 0); }
             Vector3 at = transform.position + Vector3.up * 2.1f;
             CombatEvents.RaiseNumber(new DamageNumber(at, damage, false, guarded, true, false, false));
             if (!IsOwner) CombatEvents.RaiseCue(guarded ? CombatCue.Guarded : CombatCue.PlayerHurt, transform.position);

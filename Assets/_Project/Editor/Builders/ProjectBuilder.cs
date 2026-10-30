@@ -35,6 +35,7 @@ namespace SleepingCalamity.EditorTools
         {
             if (errors == null) throw new ArgumentNullException(nameof(errors));
             Step(errors, "ProjectSettings", ProjectSettingsBuilder.Apply);
+            Step(errors, "AnimationImport", AnimationImportBuilder.Build);
             Step(errors, "Prefabs", PrefabBuilder.Build);
             Step(errors, "NetworkPrefabs", NetworkPrefabsBuilder.Build);
             Step(errors, "Scenes", SceneBuilder.BuildAll);

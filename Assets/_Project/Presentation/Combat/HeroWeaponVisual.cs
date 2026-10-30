@@ -1,6 +1,7 @@
 // Authority: none (local, cosmetic, every peer). Builds the held heirloom out of primitives at runtime (axe, staff, dagger and shield, sword and bow), swings it
 // from the hero's attack frame (the owner's AttackMachine, or the replicated NetSwing clock on a remote copy), shows the shield while guarding and the bow
-// while aiming, and lays the mannequin down while the hero is downed. Greybox: when real animation arrives this is replaced by the clips.
+// while aiming, and lays the mannequin down while the hero is downed. Greybox. With the Animator rig (the Y Bot and its clips) the weapon, shield and
+// bow are parented to the hands and the clips do the swinging and the lying down; the procedural swing below is then the fallback for the mannequin.
 using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Gameplay;
@@ -13,6 +14,19 @@ namespace SleepingCalamity.Presentation
     {
         [SerializeField] private Material weaponMaterial, accentMaterial;
         [SerializeField] private Transform visual;
+        [SerializeField] private HandGrip rightGrip, leftGrip, shieldGrip;   // set by the builder from the model's rest pose (T-pose); see PrefabBuilder
+
+        // Where a held thing sits in a bone's local space: the builder measures it from the rest pose so it does not depend on how the rig's bones are oriented.
+        [System.Serializable]
+        public struct HandGrip
+        {
+            public Quaternion rotation;
+            public Vector3 position;
+            public bool valid;
+        }
+
+        private Animator _rig;
+        private Transform _rightHand, _leftHand, _leftForearm;
 
         private HeroCombat _combat;
         private HeroVitals _vitals;
@@ -25,6 +39,13 @@ namespace SleepingCalamity.Presentation
             weaponMaterial = weapon;
             accentMaterial = accent;
             visual = visualRoot;
+        }
+
+        public void ConfigureGrips(HandGrip right, HandGrip left, HandGrip shield)
+        {
+            rightGrip = right;
+            leftGrip = left;
+            shieldGrip = shield;
         }
 
         private void Awake()
@@ -72,6 +93,32 @@ namespace SleepingCalamity.Presentation
             Prim(_bow.gameObject, PrimitiveType.Cube, new Vector3(0f, 0.5f, -0.1f), new Vector3(0.03f, 0.3f, 0.03f), weaponMaterial).transform.localRotation = Quaternion.Euler(-30f, 0f, 0f);
             Prim(_bow.gameObject, PrimitiveType.Cube, new Vector3(0f, -0.5f, -0.1f), new Vector3(0.03f, 0.3f, 0.03f), weaponMaterial).transform.localRotation = Quaternion.Euler(30f, 0f, 0f);
             _bow.gameObject.SetActive(false);
+            AttachToRig();
+        }
+
+        // With a humanoid Animator under the visual and grips from the builder, hang the pivot on the right hand, the bow on the left hand and the shield
+        // on the left forearm. The parents' own scale is cancelled so the primitives keep their metre sizes.
+        private void AttachToRig()
+        {
+            Animator rig = visual != null ? visual.GetComponentInChildren<Animator>(true) : null;
+            if (rig == null || !rig.isHuman || rig.runtimeAnimatorController == null || !rightGrip.valid) return;
+            _rightHand = rig.GetBoneTransform(HumanBodyBones.RightHand);
+            _leftHand = rig.GetBoneTransform(HumanBodyBones.LeftHand);
+            _leftForearm = rig.GetBoneTransform(HumanBodyBones.LeftLowerArm);
+            if (_rightHand == null || _leftHand == null || _leftForearm == null) return;
+            _rig = rig;
+            Hang(_pivot, _rightHand, rightGrip);
+            Hang(_bow, _leftHand, leftGrip);
+            Hang(_shield, _leftForearm, shieldGrip);
+        }
+
+        private static void Hang(Transform item, Transform bone, HandGrip grip)
+        {
+            item.SetParent(bone, false);
+            Vector3 s = bone.lossyScale;
+            item.localScale = new Vector3(s.x != 0f ? 1f / s.x : 1f, s.y != 0f ? 1f / s.y : 1f, s.z != 0f ? 1f / s.z : 1f);
+            item.localPosition = grip.position;   // measured in the bone's own local space, so its scale is already in it
+            item.localRotation = grip.rotation;
         }
 
         private GameObject Holder(string name)
@@ -108,16 +155,18 @@ namespace SleepingCalamity.Presentation
             bool aim = family == WeaponFamily.Bow && _combat.ShowAim;
             _shield.gameObject.SetActive(family == WeaponFamily.Dagger);
             _bow.gameObject.SetActive(aim);
-            if (family == WeaponFamily.Dagger)
+            if (_rig == null && family == WeaponFamily.Dagger)
             {
                 _shield.localPosition = guard ? new Vector3(0f, 1.1f, 0.5f) : new Vector3(-0.42f, 1.0f, 0.12f);
                 _shield.localRotation = guard ? Quaternion.identity : Quaternion.Euler(0f, 70f, 0f);
             }
-            if (aim)
+            if (_rig == null && aim)
             {
                 _bow.localPosition = new Vector3(-0.1f, 1.25f, 0.55f);
                 _bow.localRotation = Quaternion.identity;
             }
+
+            if (_rig != null) return;   // the clips swing the arm and lay the hero down
 
             _pivot.localRotation = PivotRotation(_combat.CurrentAttack, _combat.AttackFrame, aim);
 

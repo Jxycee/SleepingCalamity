@@ -3,6 +3,7 @@
 // transform's own motion (so a remote copy moves like the owner's); Locked and Dodging come from the owner's stance flags; Grounded is the
 // owner's CharacterController on the owner and a short ray on a remote copy.
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
 using UnityEngine;
 
 namespace SleepingCalamity.Gameplay
@@ -16,6 +17,8 @@ namespace SleepingCalamity.Gameplay
         private HeroNetState _net;
         private HeroLocomotion _locomotion;
         private TargetLockController _lockController;
+        private HeroCombat _combat;
+        private HeroVitals _vitals;
         private Vector3 _lastPosition;
         private Vector3 _velocity;
         private bool _hasLast;
@@ -28,6 +31,8 @@ namespace SleepingCalamity.Gameplay
             _net = GetComponent<HeroNetState>();
             _locomotion = GetComponent<HeroLocomotion>();
             _lockController = GetComponent<TargetLockController>();
+            _combat = GetComponent<HeroCombat>();
+            _vitals = GetComponent<HeroVitals>();
         }
 
         private void OnEnable()
@@ -66,9 +71,28 @@ namespace SleepingCalamity.Gameplay
             }
 
             HeroAnimState state = HeroAnimState.FromWorldVelocity(_velocity.x, _velocity.y, _velocity.z, transform.eulerAngles.y, grounded, locked, dodging);
+            AddCombat(ref state);
             Current = state;
             for (int i = 0; i < _drivers.Length; i++)
                 if (_drivers[i] != null) _drivers[i].Apply(in state, dt);
+        }
+
+        // The combat half of the state, from what HeroCombat and HeroVitals already replicate (NetSwing, the stance flags, the vitals state, the hurt RPC).
+        private void AddCombat(ref HeroAnimState state)
+        {
+            if (_vitals != null && _vitals.IsSpawned) state.Downed = !_vitals.IsUp;
+            if (_combat == null || !_combat.IsSpawned) return;
+            state.Weapon = (byte)Mathf.Clamp(_combat.WeaponIndex, 0, HeroAnimMap.WeaponCount - 1);
+            state.Guarding = _combat.ShowGuard;
+            state.Aiming = _combat.ShowAim;
+            state.HurtSerial = _combat.HurtSerial;
+            state.HurtHeavy = _combat.HurtWasHeavy;
+            AttackData attack = _combat.CurrentAttack;
+            if (attack != null)
+            {
+                state.AttackId = HeroAnimMap.AttackId(state.Weapon, _combat.CurrentAttackIndex);
+                state.AttackProgress = HeroAnimMap.AttackProgress(_combat.AttackFrame, attack.TotalFrames);
+            }
         }
     }
 }
