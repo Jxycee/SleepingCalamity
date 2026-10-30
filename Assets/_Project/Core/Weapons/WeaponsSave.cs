@@ -19,12 +19,13 @@ namespace SleepingCalamity.Core.Weapons
     [Serializable]
     public sealed class WeaponSave
     {
-        public string Key = "";            // the weapon's stable id in the world
+        public string Key = "";            // the weapon's stable id in the world (never empty in a valid save)
         public string OwnerId = "";        // PlayerKey.Id of the player whose weapon it is
         public string DefinitionId = "";
         public int Level;
         public float Abs;
         public float Atk, Fire, Pest;
+        public int LifetimeLevels, BuildUpsEver;                         // spell pip cap inputs; never lowered
         public List<int> Fitted = new List<int>();                       // AttachmentKind numbers
         public List<BuildUpSnapshotSave> History = new List<BuildUpSnapshotSave>();   // oldest first; re-route pops the last
 
@@ -38,19 +39,41 @@ namespace SleepingCalamity.Core.Weapons
         public int Level;
         public float Abs;
         public float Atk, Fire, Pest;
+        public float AbsorbedAtk, AbsorbedFire, AbsorbedPest;   // bonuses absorbed since this build-up
         public List<int> Fitted = new List<int>();
+
+        [JsonExtensionData] public Dictionary<string, object> Extra;
+    }
+
+    // The hero's unlocked ability ids (known and unknown alike, so a newer build's abilities survive an older build's save).
+    [Serializable]
+    public sealed class HeroAbilitiesSave
+    {
+        public List<string> Unlocked = new List<string>();
+
+        [JsonExtensionData] public Dictionary<string, object> Extra;
+    }
+
+    [Serializable]
+    public sealed class SpellPipsSave
+    {
+        public int Cap = SpellPips.StartCap, Current = SpellPips.StartCap, HitProgress;
 
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }
 
     public static class WeaponsSaveRules
     {
-        // A valid copy of the section (an empty one for null). A weapon with an unknown definition, a bad number or a repeated key is dropped
-        // alone and its key named in rejected (cleared first; may be null). Fitted attachments that are unknown or exceed the slots are
-        // dropped from that weapon; a weapon whose history entry is bad loses that entry's whole history (older ones cannot be reached).
-        public static WeaponsSave Clean(WeaponsSave save, WeaponCatalog catalog, List<string> rejected)
+        // A valid copy of the section (an empty one for null), nothing thrown.
+        //  rejected: keys of weapons dropped whole (null, empty or repeated key, unknown definition, bad numbers); an empty key is named "".
+        //  repaired: keys of weapons kept but fixed (attachments trimmed or invalid ones dropped, a bar reset, bad history entries cut).
+        // Both lists are cleared first and may be null. Only valid weapons count toward the repeated-key rule.
+        // History is oldest first and re-route pops the newest, so a bad entry makes every OLDER entry unreachable: that entry and the older
+        // ones are dropped, the newer valid ones are kept.
+        public static WeaponsSave Clean(WeaponsSave save, WeaponCatalog catalog, List<string> rejected, List<string> repaired = null)
         {
             rejected?.Clear();
+            repaired?.Clear();
             catalog = catalog ?? WeaponCatalog.Default;
             var clean = new WeaponsSave();
             if (save == null) return clean;
@@ -58,37 +81,44 @@ namespace SleepingCalamity.Core.Weapons
             if (save.Weapons != null)
                 foreach (var w in save.Weapons)
                 {
-                    if (w == null || !seen.Add(w.Key ?? "") || !catalog.TryGet(w.DefinitionId, out var def)
-                        || !Sane(w.Level, w.Abs, w.Atk, w.Fire, w.Pest))
+                    if (w == null || string.IsNullOrEmpty(w.Key) || !catalog.TryGet(w.DefinitionId, out var def)
+                        || !Sane(w.Level, w.Abs, w.Atk, w.Fire, w.Pest) || !seen.Add(w.Key))
                     {
                         rejected?.Add(w?.Key ?? "");
                         continue;
                     }
+                    bool fixedUp = false;
                     var c = new WeaponSave
                     {
-                        Key = w.Key ?? "", OwnerId = w.OwnerId ?? "", DefinitionId = w.DefinitionId, Level = w.Level, Abs = w.Abs,
-                        Atk = w.Atk, Fire = w.Fire, Pest = w.Pest, Fitted = CleanFitted(w.Fitted, def.SlotCount),
+                        Key = w.Key, OwnerId = w.OwnerId ?? "", DefinitionId = w.DefinitionId, Level = w.Level, Abs = w.Abs,
+                        Atk = w.Atk, Fire = w.Fire, Pest = w.Pest,
+                        LifetimeLevels = Math.Max(Math.Max(0, w.LifetimeLevels), w.Level), BuildUpsEver = Math.Max(0, w.BuildUpsEver),
+                        Fitted = CleanFitted(w.Fitted, def.SlotCount, ref fixedUp),
                         Extra = w.Extra != null ? new Dictionary<string, object>(w.Extra) : null,
                     };
-                    // Abs is held inside the level: at or past the cost means the save is damaged, so the bar resets to empty.
-                    float cost = WeaponGrowth.LevelCost(c.Level);
-                    if (c.Abs >= cost) c.Abs = 0f;
+                    if (c.Abs >= WeaponGrowth.LevelCost(c.Level)) { c.Abs = 0f; fixedUp = true; }   // damaged bar: empty it
                     if (w.History != null)
                         foreach (var h in w.History)
                         {
-                            if (h == null || !catalog.TryGet(h.DefinitionId, out var hdef) || !Sane(h.Level, h.Abs, h.Atk, h.Fire, h.Pest))
+                            if (h == null || !catalog.TryGet(h.DefinitionId, out var hdef) || !Sane(h.Level, h.Abs, h.Atk, h.Fire, h.Pest)
+                                || !Finite(h.AbsorbedAtk) || !Finite(h.AbsorbedFire) || !Finite(h.AbsorbedPest))
                             {
-                                c.History.Clear();
-                                rejected?.Add(c.Key);
-                                break;
+                                c.History.Clear();   // this entry and the older ones are unreachable
+                                fixedUp = true;
+                                continue;
                             }
+                            float habs = h.Abs;
+                            if (habs >= WeaponGrowth.LevelCost(h.Level)) { habs = 0f; fixedUp = true; }
                             c.History.Add(new BuildUpSnapshotSave
                             {
-                                DefinitionId = h.DefinitionId, Level = h.Level, Abs = h.Abs, Atk = h.Atk, Fire = h.Fire, Pest = h.Pest,
-                                Fitted = CleanFitted(h.Fitted, hdef.SlotCount),
+                                DefinitionId = h.DefinitionId, Level = h.Level, Abs = habs, Atk = h.Atk, Fire = h.Fire, Pest = h.Pest,
+                                AbsorbedAtk = Math.Max(0f, h.AbsorbedAtk), AbsorbedFire = Math.Max(0f, h.AbsorbedFire), AbsorbedPest = Math.Max(0f, h.AbsorbedPest),
+                                Fitted = CleanFitted(h.Fitted, hdef.SlotCount, ref fixedUp),
                                 Extra = h.Extra != null ? new Dictionary<string, object>(h.Extra) : null,
                             });
                         }
+                    c.BuildUpsEver = Math.Max(c.BuildUpsEver, c.History.Count);
+                    if (fixedUp) repaired?.Add(c.Key);
                     clean.Weapons.Add(c);
                 }
             if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);
@@ -96,20 +126,45 @@ namespace SleepingCalamity.Core.Weapons
         }
 
         static bool Sane(int level, float abs, float atk, float fire, float pest) =>
-            level >= 0 && level < 10000 && Finite(abs) && abs >= 0f && Finite(atk) && atk >= 0f && Finite(fire) && fire >= 0f && Finite(pest) && pest >= 0f;
+            level >= 0 && level <= WeaponState.MaxLevel && Finite(abs) && abs >= 0f && Finite(atk) && atk >= 0f && Finite(fire) && fire >= 0f
+            && Finite(pest) && pest >= 0f;
 
         static bool Finite(float f) => !float.IsNaN(f) && !float.IsInfinity(f);
 
-        static List<int> CleanFitted(List<int> fitted, int slots)
+        static List<int> CleanFitted(List<int> fitted, int slots, ref bool changed)
         {
             var r = new List<int>();
             if (fitted == null) return r;
             foreach (int a in fitted)
             {
-                if (r.Count >= slots) break;
-                if (Attachments.IsValid((AttachmentKind)a)) r.Add(a);
+                if (r.Count >= slots || !Attachments.IsValid((AttachmentKind)a)) { changed = true; continue; }
+                r.Add(a);
             }
             return r;
+        }
+
+        // The hero's abilities: nulls and empty ids dropped, repeats merged. Unknown ids are kept (HeroAbilityBook carries them).
+        public static HeroAbilitiesSave CleanAbilities(HeroAbilitiesSave save)
+        {
+            var clean = new HeroAbilitiesSave();
+            if (save == null) return clean;
+            var seen = new HashSet<string>();
+            if (save.Unlocked != null)
+                foreach (var id in save.Unlocked)
+                    if (!string.IsNullOrEmpty(id) && seen.Add(id)) clean.Unlocked.Add(id);
+            if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);
+            return clean;
+        }
+
+        public static SpellPipsSave CleanPips(SpellPipsSave save)
+        {
+            if (save == null) return new SpellPipsSave();
+            int cap = Math.Max(0, Math.Min(save.Cap, 1000));
+            return new SpellPipsSave
+            {
+                Cap = cap, Current = Math.Max(0, Math.Min(save.Current, cap)), HitProgress = Math.Max(0, Math.Min(save.HitProgress, SpellPips.HitsPerPip - 1)),
+                Extra = save.Extra != null ? new Dictionary<string, object>(save.Extra) : null,
+            };
         }
     }
 }

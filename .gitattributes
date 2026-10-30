@@ -23,6 +23,7 @@
 *.shader                text
 
 # Unity JSON files
+ProjectSettings/Packages/com.unity.probuilder/Settings.json unity-json
 *.asmdef                unity-json
 *.asmref                unity-json
 *.index                 unity-json
