@@ -802,8 +802,11 @@ STALL = bake() if STAGE == 'bake' else None
 if '--export' in argv and STALL:
     for o in bpy.context.selected_objects: o.select_set(False)
     STALL.select_set(True); bpy.context.view_layer.objects.active = STALL
+    for uvl in [l for l in STALL.data.uv_layers if l.name != 'atlas']:   # Unity samples UV0: ship the atlas only
+        STALL.data.uv_layers.remove(uvl)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, NAME + '.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
-                             apply_scale_options='FBX_SCALE_ALL', mesh_smooth_type='FACE', add_leaf_bones=False)
+                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,   # identity root in Unity, like B4/B6
+                             mesh_smooth_type='FACE', add_leaf_bones=False)
 
 # ----------------------------------------------------------------------------- corner proxies, light, cameras
 if '--no-render' in argv:
