@@ -1,5 +1,5 @@
 """Fetch CC0 scans from Poly Haven (official API) into a source folder and write the source record.
-python sc_fetch_textures.py <out_dir> <asset_id> [<asset_id> ...] [--res 2k] [--record <SOURCES.md>] [--purpose id=text ...]
+python sc_fetch_textures.py <out_dir> <asset_id> [<asset_id> ...] [--res 2k] [--record <SOURCES.md>] [--maps diff,nor_gl,rough,ao,disp] [--purpose id=text ...]
 Per asset it writes <id>_<map>_<res>.<ext> for the maps that exist (diff, nor_gl, rough, ao, disp, arm), and appends a record row
 (id, URL, licence "CC0 1.0 per polyhaven.com/license", author, fetched date) to --record. Downloads only from api.polyhaven.com / dl.polyhaven.org.
 Ported from the FishGame cottage fetch_textures.py (M8): generic ids instead of a fixed list.
@@ -19,7 +19,7 @@ def get(url):
     return urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=180).read()
 
 
-def fetch(out, assets, res='2k', record=None, purpose=None):
+def fetch(out, assets, res='2k', record=None, purpose=None, maps=None):
     os.makedirs(out, exist_ok=True)
     day = datetime.date.today().isoformat()
     rows = []
@@ -29,6 +29,8 @@ def fetch(out, assets, res='2k', record=None, purpose=None):
         authors = ', '.join(info.get('authors', {}).keys())
         got = []
         for short, cands in MAPS.items():
+            if maps and short not in maps:
+                continue
             k = next((c for c in cands if c in files), None)
             if not k:
                 continue
@@ -67,7 +69,7 @@ if __name__ == '__main__':
         if skip:
             skip -= 1
             continue
-        if t in ('--res', '--record'):
+        if t in ('--res', '--record', '--maps'):
             skip = 1
         elif t == '--purpose':
             skip = 1
@@ -75,4 +77,5 @@ if __name__ == '__main__':
             purpose[k] = v
         else:
             ids.append(t)
-    fetch(args[0], ids, res, rec, purpose)
+    mp = args[args.index('--maps') + 1].split(',') if '--maps' in args else None
+    fetch(args[0], ids, res, rec, purpose, mp)
