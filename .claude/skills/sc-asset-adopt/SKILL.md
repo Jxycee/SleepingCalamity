@@ -9,8 +9,8 @@ description: Bring an external free 3D model or base mesh (CC0 or CC BY from a c
 - Allowed: CC0 (Poly Haven, Kenney, ...) and CC BY 4.0 (credit required), from a source on the trusted list in `.claude/rules/art-assets.md`. Check the licence on the asset's own page or the dataset card, not a mirror. **No** NC, ND, SA, "editorial", "personal use", or unknown licences. Never a paid asset.
 - **MPFB2 (MakeHuman's Blender extension) for the hero body** (PHASE1 section 5): PHASE1 expects its output to be CC0 and asks this skill to confirm it. Read the licence that ships with the extension and its asset packs (body, skins, clothes may differ) and record what it says before the body is used.
 - **AI-generated sets** (scenario-labs/3d-collection: dataset card CC BY 4.0, credit "Scenario") are fine under the same rule. Record the row id, the generator note ("image-to-3d from an unstated input image"), the file and its sha256.
-- Put the raw file under `Art/Source/<Provider>/<asset>/` (LFS) and add a row to `Art/Source/<Provider>/SOURCES.md` (the first row from a provider creates the file): asset, id/URL, licence, author/credit line, date, what we changed. Never put raw sources under `Assets/`. A CC BY credit also goes in the game's credits list once one exists.
-- **Finding a file in scenario-labs/3d-collection:** the listing has only opaque ids; search the metadata parquet's titles. FishGame's `fg_adopt_find.py` does this (port as `sc_adopt_find.py` before use). Use the `.glb`, not the `.blend` (newer Blender, and AI-built scenes).
+- Put the raw file under `Art/Source/<Provider>/<asset>/` (LFS) and add a row to `Art/Source/<Provider>/SOURCES.md` (the first row from a provider creates that file; texture batches use `Art/Textures/<batch>/SOURCES.md` instead, see sc-texture-paint): asset, id/URL, licence, author/credit line, date, what we changed. Never put raw sources under `Assets/`. A CC BY credit also goes in the game's credits list once one exists.
+- **Finding a file in scenario-labs/3d-collection:** the listing has only opaque ids; search the metadata parquet's titles. FishGame's `fg_adopt_find.py` did this and is not ported (sc-asset-craft 0b): read the metadata parquet directly with pandas or pyarrow and filter on the title column. Use the `.glb`, not the `.blend` (newer Blender, and AI-built scenes).
 
 ## 2. Is it worth adopting? (2 minutes)
 Adopt only if all three hold:
@@ -31,7 +31,7 @@ FishGame's test: an adopted building lost to generated ones (29/40 after 25 min 
 
 ## 4. Make it ours (the step that makes it look like the game)
 The source's own materials are someone else's look. Pick per asset, by how the result looks:
-- **Keep and grade its PBR maps** when they are good scans at the right texel density: correct the albedo toward PHASE1 3.1 (clean, +15-25% chroma, no baked light), and check roughness and normal read at review distance.
+- **Keep and grade its PBR maps** when they are good scans at the right texel density: correct the albedo toward the PHASE1 3.1 key hues (sc-asset-craft palette summary: no chroma boost on stone, plaster or roofs, no baked light), and check roughness and normal read at review distance.
 - **Rebake** when the topology changes (decimated or reshaped): bake the source high onto the new low, then grade as above.
 - **Re-texture with the area's shared tileables and trims** (sc-texture-paint) when it should sit in a kit: the pieces then match their neighbours and pick up every tileable fix.
 - Push the shape toward storybook proportion (thicker timbers, bigger hoops, chamfers on play-distance edges) and add the 2-3 wear beats the brief names (sc-asset-craft 3).

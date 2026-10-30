@@ -14,7 +14,7 @@ Evidence for every rule here: FishGame's `docs/superpowers/research/2026-10-28-a
 - **Hero proportions:** about 6.5 heads tall; hands and feet about 1.15x real with chunky boots, gauntlets and belts; eyes about 1.1x; faces realistic in material. Heights: Tobin 1.90 m, Ash 1.75 m, Wren 1.68 m, Pip 1.58 m. Each hero reads at 30 m from silhouette alone.
 - **Heroes are a hybrid** (PHASE1 5, [P29]): an MPFB2 body for topology, rig and weights (licence: sc-asset-adopt), with the **head, hair and outfit generated as separate parts** from multi-view concept images, retopologised and cleaned here and with `texture-bleed-cleanup`, then skinned by weight transfer. Outfits stay separate meshes on one skeleton. If a part fails cleanup twice, model it in Blender over the body instead.
 - **Budgets:** PHASE1 3.3 (hero 60k tris, 1 x 4K body and outfit, 1 x 2K head and hair; enemy 25k, one 2K-4K set; a whole building at most 75k).
-- **Inputs** should show the target directly: chunky storybook proportion, clean saturated colour, evenly lit with no baked shadows.
+- **Inputs** should show the target directly: chunky storybook proportion, clean colour in the PHASE1 3.1 palette, evenly lit with no baked shadows.
 
 House rules for this pipeline:
 - **Metrics serve the look.** A lower soft fraction that reads darker, busier or noisier is a break (M2: the mill's spokes). Value-match any added detail to the original paint's local mean, and cap its contrast at the part's own crisp areas.
@@ -79,7 +79,7 @@ Run in this order. Each step has a before/after in the log.
 - Leftovers no tool reaches yet: small soft parts with no sharp texels of their own (window rings, glass, rafters, a bench band). Use Magic Brush, a re-roll, or a manual per-part pick. Name them to the user rather than hiding them.
 
 ## 3. Import into Unity (URP Lit)
-- The material is URP Lit with the repaired base colour, plus normal, metallic-smoothness and occlusion when they help (packed with `pack_unity.py`, port; sc-asset-craft 0b). Tripo's metallic and roughness are guesses: check them against the material (cloth and leather aren't metallic) and the review render.
+- The material is URP Lit with the repaired base colour, plus normal, metallic-smoothness and occlusion when they help (packed with `sc_pack_unity.py`; sc-asset-craft 0b). Tripo's metallic and roughness are guesses: check them against the material (cloth and leather aren't metallic) and the review render.
 - FishGame's importer cleaned every Tripo texture (Kuwahara smoothing, dark lift, dirty-brown desaturation) for its toon look. **Don't port that cleaning:** Kuwahara blobbed planks and brick edges (P9), and the lift and desaturation hit fur hard (C1). Grade colour toward PHASE1 3.1 by hand, per asset, and compare in Unity before and after.
 - Import settings for 4K: max size 4096, high-quality compression, aniso 4. Don't change them to fix blur.
 - **Final export:** the GLB plus the repaired maps, at real size, base on z 0, moving parts separated with their pivot on the axis, GLB and FBX, no armature. Tool: `blender -b --factory-startup --python Art/Blender/tools/experimental/sc_tripo_finalize.py -- <model.glb> <basecolor.png> <out dir> <stem> --config <model.json> [--uv <rwork>/mesh.npz <dwork>/out/UV.npy]`. The JSON config names the moving parts, the pivot axis and the real-scale factor; `tripo_detail/configs/mill.json` is the worked example.
@@ -131,7 +131,7 @@ When we generate instead of adopt, copy Tripo's construction, not its primitives
 4. **Use `cut` slices only where a deform needs vertices.** Round 1 cost 2–4× tris without this rule.
 5. Let the bake and the material carry the fine detail (stone courses, shingles, planks).
 
-The helpers are in FishGame's `fg_handmade.py` (port before use); see sc-asset-craft section 5.
+FishGame's `fg_handmade.py` helpers are not ported; see sc-asset-craft section 5.
 
 ## Troubleshooting (ask the user what they see, then match)
 | Symptom | Likely cause | Check | Fix |
