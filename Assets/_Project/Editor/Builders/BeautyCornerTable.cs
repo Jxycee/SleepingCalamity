@@ -79,7 +79,7 @@ namespace SleepingCalamity.EditorTools
                     Box(0f, 7.5f, 1.025f, 8.1f, 0.25f, 4.65f, "roof_tile", -40.2f),      // roof, ridge about 9 m
                     Box(0f, 7.5f, 4.575f, 8.1f, 0.25f, 4.65f, "roof_tile", 40.2f),
                 } },
-            new Row { Brief = Stall, Id = "MarketStall", Batch = "B8", Names = new[] { "market_stall", "stall" },
+            new Row { Brief = Stall, Id = "MarketStall", Batch = "B8", Names = new[] { "market_stall" },   // no bare "stall": the contains-match would grab B8/Stall_Lantern
                 Instances = new[] { At(4.5f, 0f, 4.5f, 200f) },   // 2.6 x 1.6 m, awning top about 2.7 m, rotated 200 deg so the counter faces the fountain
                 Placeholder = new[]
                 {
@@ -124,7 +124,7 @@ namespace SleepingCalamity.EditorTools
                 Instances = new[] { At(3.58f, 0.9f, 4.3f) },  // on the stall counter
                 Placeholder = new[] { Box(0f, 0.17f, 0f, 0.2f, 0.34f, 0.2f, "warm") } },
             new Row { Brief = Lanterns, Id = "BracketLantern", Batch = "B8", Names = new[] { "bracket_lantern", "wall_lantern", "lantern_bracket" },
-                Instances = new[] { At(0.0f, 2.45f, 7.38f) }, // on the facade wall beside the door (door at x -1.25)
+                Instances = new[] { At(0.0f, 2.45f, 7.46f, 180f) }, // on the facade wall beside the door (door at x -1.25)
                 Placeholder = new[] { Box(0f, 0f, 0f, 0.22f, 0.36f, 0.22f, "warm"), Box(0f, 0.2f, 0.1f, 0.05f, 0.05f, 0.3f, "iron") } },
             // Neighbour massing (round 2): greybox buildings closing the square so Wide has no empty ground. Not brief rows; later B4 variants replace them.
             // Pivot = front face centre at ground, front facing -Z, like the facade. Names stay empty: art never replaces these by folder match.
