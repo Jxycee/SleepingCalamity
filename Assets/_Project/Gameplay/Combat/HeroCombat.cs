@@ -1,0 +1,619 @@
+// Authority: OWNER for the swing, its hit detection, guard, aim and the judging of enemy hits on this hero (docs/PHASE1.md 6.4, P10); HOST for everything
+// the intents cause (CombatHost validates them and applies damage, reactions, revenge and rewards). The owner's copy runs the Core AttackMachine and shows
+// the spark, hitstop and camera kick at once; it then sends a hit intent. Enemy hits are judged here, on the victim's client, against the enemy's replicated
+// attack clock and this hero's own dodge / guard state, so a visible dodge is never hit. Remote copies only mirror the owner's NetSwing / stance for visuals.
+// Replicated (owner writes): NetWeapon (the heirloom index) and NetSwing (swing serial + attack index, for remote visuals). Everything else rides RPCs.
+using System.Collections.Generic;
+using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Core.Weapons;
+using SleepingCalamity.Runtime;
+using Unity.Netcode;
+using UnityEngine;
+
+namespace SleepingCalamity.Gameplay
+{
+    [DefaultExecutionOrder(-20)]
+    public sealed class HeroCombat : NetworkBehaviour
+    {
+        public const byte NoAttack = 0xFF;
+        public const float KnockbackScale = 1f, HurtStagger = 0.25f;
+
+        // The owner's view of its own growth, refreshed by the host after every change (HUD, the spell gate).
+        public sealed class GrowthMirror
+        {
+            public string WeaponKey = WeaponCatalog.Axe;
+            public int Level, Pips, PipCap = SpellPips.StartCap;
+            public float Abs, LevelCost = 40f, Atk = 22f, Fire, Pest;
+        }
+
+        public static HeroCombat Local { get; private set; }   // the first local owner in this process (HUD, camera kick)
+
+        private static readonly List<HeroCombat> s_all = new List<HeroCombat>();
+        public static IReadOnlyList<HeroCombat> All => s_all;
+
+        public readonly NetworkVariable<byte> NetWeapon = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public readonly NetworkVariable<uint> NetSwing = new NetworkVariable<uint>(NoAttack << 16, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+        private AttackMachine _machine = new AttackMachine(AttackCatalog.Axe);
+        private HeroLocomotion _loco;
+        private TargetLockController _lock;
+        private HeroVitals _vitals;
+        private HeroNetState _net;
+        private IInputService _input;
+        private readonly HitstopBudget _budget = new HitstopBudget();
+        private readonly HashSet<ulong> _swingHit = new HashSet<ulong>();
+        private readonly HashSet<long> _judged = new HashSet<long>();
+        private readonly GrowthMirror _mirror = new GrowthMirror();
+        private int _hitsInSwing;
+        private bool _shotFired, _wasDodging, _guarding, _aiming, _wasGuarding;
+        private float _guardStart, _reviveReport, _hurtLock, _dodgeBuffer;
+        private int _swingSerial, _published;
+        private Vector3 _impulse;
+
+        // remote clock (every peer): when it saw the current swing begin
+        private uint _seenSwing = NoAttack << 16;
+        private float _remoteClock = 999f;
+        private bool _syncRequested;
+
+        public IInputService Input
+        {
+            get => _input ?? HeroInput.ResolveDefault();
+            set => _input = value;
+        }
+
+        public AttackMachine Machine => _machine;
+        public GrowthMirror Mirror => _mirror;
+        public int WeaponIndex => NetWeapon.Value;
+        public string WeaponKey => AttackCatalog.Heirlooms[Mathf.Clamp(NetWeapon.Value, 0, AttackCatalog.Heirlooms.Length - 1)];
+        public WeaponFamily Family => WeaponStyle.FamilyOf(WeaponKey);
+        public bool Guarding => _guarding;
+        public bool Aiming => _aiming;
+        public bool ShowGuard => IsOwner ? _guarding : _net != null && _net.StanceIsGuarding;
+        public bool ShowAim => IsOwner ? _aiming : _net != null && _net.StanceIsAiming;
+        public bool IsUp => _vitals == null || _vitals.IsUp;
+        public int ComboCount => _machine.ComboCount;
+
+        // The attack being shown (owner: the machine; remote: from NetSwing) and its frame (60 Hz), for the swing visuals on every peer.
+        public AttackData CurrentAttack
+        {
+            get
+            {
+                if (IsOwner) return _machine.Current;
+                int idx = (int)((NetSwing.Value >> 16) & 0xFF);
+                if (idx == NoAttack) return null;
+                AttackData a = AttackCatalog.ForFamily(Family).Get(idx);
+                return a != null && _remoteClock * AttackData.FrameRate < a.TotalFrames ? a : null;
+            }
+        }
+        public float AttackFrame => IsOwner ? _machine.Frame : _remoteClock * AttackData.FrameRate;
+        public bool HitboxOn => CurrentAttack != null && CurrentAttack.HitOn.Contains(AttackFrame);
+
+        // ---- what HeroLocomotion asks (owner) ----
+        public bool AllowsDodge => IsUp && _machine.CanCancel && _hurtLock <= 0f && !_guarding;
+        public float MoveScale => !IsUp ? 0f : _machine.Busy ? 0.0f : _hurtLock > 0f ? 0.2f : _guarding || _aiming ? 0.5f : 1f;
+        public float LungeSpeed => _machine.LungeSpeed;
+        public bool Frozen => !IsUp;
+
+        public bool WantsFacing(out float yawDeg, out float degPerSec)
+        {
+            yawDeg = transform.eulerAngles.y;
+            degPerSec = 0f;
+            if (!IsUp) return true;
+            if (_aiming && _loco != null)
+            {
+                yawDeg = _loco.ViewYawDeg;
+                degPerSec = 1080f;
+                return true;
+            }
+            if (!_machine.Active) return false;
+            if (_machine.Turning)
+            {
+                Targetable t = _lock != null ? (_lock.Locked != null ? _lock.Locked : _lock.Soft) : null;
+                Vector3 to = Vector3.zero;
+                if (t != null) { to = t.transform.position - transform.position; to.y = 0f; }
+                else
+                {
+                    PlayerIntent intent = Input != null ? Input.Intent : default;
+                    if (_loco != null && (Mathf.Abs(intent.MoveX) + Mathf.Abs(intent.MoveY)) > 0.2f)
+                    {
+                        float yaw = _loco.ViewYawDeg * Mathf.Deg2Rad;
+                        Vector3 fwd = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)), right = new Vector3(fwd.z, 0f, -fwd.x);
+                        to = right * intent.MoveX + fwd * intent.MoveY;
+                    }
+                }
+                if (to.sqrMagnitude > 0.04f)
+                {
+                    yawDeg = MovementMath.YawDeg(to.x, to.z);
+                    degPerSec = _machine.TurnDegPerSec;
+                }
+                return true;
+            }
+            return true;   // mid-swing, past the turn window: hold the facing
+        }
+
+        public void AddImpulse(Vector3 velocity) { _impulse += velocity; }
+        public Vector3 ConsumeImpulse(float dt)
+        {
+            Vector3 v = _impulse;
+            _impulse = Vector3.MoveTowards(_impulse, Vector3.zero, 22f * dt);
+            return v;
+        }
+
+        // =================================================================================================================================
+
+        private void Awake()
+        {
+            _loco = GetComponent<HeroLocomotion>();
+            _lock = GetComponent<TargetLockController>();
+            _vitals = GetComponent<HeroVitals>();
+            _net = GetComponent<HeroNetState>();
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { Local = null; s_all.Clear(); }
+
+        public override void OnNetworkSpawn()
+        {
+            if (!s_all.Contains(this)) s_all.Add(this);
+            NetWeapon.OnValueChanged += OnWeaponChanged;
+            NetSwing.OnValueChanged += OnSwingChanged;
+            _seenSwing = NetSwing.Value;
+            ApplyWeapon();
+            if (IsOwner)
+            {
+                if (Local == null) Local = this;
+                _mirror.WeaponKey = WeaponKey;
+                RequestSyncServerRpc();
+            }
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            NetWeapon.OnValueChanged -= OnWeaponChanged;
+            NetSwing.OnValueChanged -= OnSwingChanged;
+            s_all.Remove(this);
+            if (Local == this) Local = null;
+        }
+
+        private void OnWeaponChanged(byte previous, byte current) { ApplyWeapon(); if (IsOwner) RequestSyncServerRpc(); }
+        private void OnSwingChanged(uint previous, uint current) { _remoteClock = 0f; _seenSwing = current; }
+
+        private void ApplyWeapon()
+        {
+            _machine.SetAttackSet(AttackCatalog.ForFamily(Family));
+            _mirror.WeaponKey = WeaponKey;
+            _guarding = _aiming = false;
+        }
+
+        // The owner picks a heirloom (the arena's F5 key; a town swap later).
+        public void OwnerSetWeapon(int index)
+        {
+            if (!IsOwner) return;
+            int i = ((index % AttackCatalog.Heirlooms.Length) + AttackCatalog.Heirlooms.Length) % AttackCatalog.Heirlooms.Length;
+            if (NetWeapon.Value == i) return;
+            _machine.Interrupt();
+            NetWeapon.Value = (byte)i;
+            ApplyWeapon();
+            RequestSyncServerRpc();
+        }
+
+        // =================================================================================================================================
+        // Per frame
+        // =================================================================================================================================
+
+        private void Update()
+        {
+            float dt = Time.deltaTime;
+            if (_remoteClock < 999f) _remoteClock += dt;
+            if (!IsSpawned || !IsOwner || dt <= 0f) return;
+            OwnerUpdate(dt);
+        }
+
+        private void OwnerUpdate(float dt)
+        {
+            IInputService input = Input;
+            if (input == null || _loco == null || !_loco.enabled) return;
+            if (HeroInput.IsPaused()) return;
+            PlayerIntent intent = input.Intent;
+            if (_hurtLock > 0f) _hurtLock -= dt;
+
+            if (!IsUp)
+            {
+                if (_machine.Active) { _machine.Interrupt(); PublishSwing(NoAttack); }
+                _guarding = _aiming = false;
+                PushStance();
+                return;
+            }
+
+            if (input is IDevInput dev)
+            {
+                if (dev.WasPressed(DevKey.SwapWeapon)) OwnerSetWeapon(NetWeapon.Value + 1);
+                if (dev.WasPressed(DevKey.SkipWave)) SkipWaveServerRpc();
+            }
+
+            bool dodging = _loco.IsDodging;
+            if (dodging && !_wasDodging)
+            {
+                if (_machine.Active) PublishSwing(NoAttack);
+                _machine.Interrupt();
+            }
+            _wasDodging = dodging;
+
+            WeaponFamily family = Family;
+            bool free = !dodging && _machine.CanCancel && _hurtLock <= 0f;
+            _guarding = family == WeaponFamily.Dagger && intent.SecondaryHeld && free;
+            _aiming = family == WeaponFamily.Bow && intent.SecondaryHeld && (free || _machine.Active && _machine.Current.Kind == AttackKind.Shot);
+            if (_guarding && !_wasGuarding) _guardStart = Time.time;
+            _wasGuarding = _guarding;
+
+            var ai = new AttackInput { Pressed = intent.PrimaryPressed, Held = intent.PrimaryHeld, Released = intent.PrimaryReleased, Airborne = !_loco.IsGrounded };
+            if (_guarding) ai = default;   // a raised shield does not swing
+            bool startedSpecial = false;
+            if (!dodging && _hurtLock <= 0f)
+            {
+                if (_aiming && intent.PrimaryPressed)
+                {
+                    ai.Pressed = false;
+                    startedSpecial = _machine.TryStartSpecial();
+                }
+                else if (family == WeaponFamily.Staff && intent.SecondaryPressed && _mirror.Pips > 0 && _machine.CanCancel)
+                {
+                    startedSpecial = _machine.TryStartSpecial();
+                    if (startedSpecial) _mirror.Pips--;
+                }
+            }
+
+            bool started = startedSpecial;
+            if (!dodging && _hurtLock <= 0f)
+            {
+                AttackInput tick = _aiming ? default : ai;   // aiming: the shot above is the only attack
+                started |= _machine.Tick(dt, in tick);
+            }
+            if (started) OnSwingStarted();
+
+            if (_machine.Active)
+            {
+                AttackData a = _machine.Current;
+                if (_machine.HitboxOn) DetectHits(a);
+            }
+
+            JudgeIncoming(dt);
+            ReportReviveHold(intent, dt);
+            PushStance();
+        }
+
+        private void OnSwingStarted()
+        {
+            AttackData a = _machine.Current;
+            _swingHit.Clear();
+            _hitsInSwing = 0;
+            _shotFired = false;
+            _swingSerial++;
+            PublishSwing((byte)_machine.CurrentIndex);
+            CombatEvents.RaiseSwing(this, a);
+            CombatEvents.RaiseCue(a.Kind == AttackKind.Spell ? CombatCue.Spell : a.Kind == AttackKind.Shot ? CombatCue.Shot : CombatCue.Swing, transform.position);
+        }
+
+        private void PublishSwing(byte attackIndex)
+        {
+            _published++;   // every publish is a new value, so a remote copy restarts its clock even for the same attack twice in a row
+            NetSwing.Value = (uint)(_published & 0xFFFF) | ((uint)attackIndex << 16);
+        }
+
+        private void PushStance()
+        {
+            if (_net != null)
+            {
+                bool locked = _lock != null && _lock.IsLocked;
+                _net.OwnerSetStance(locked, _loco.IsDodging, _guarding, _aiming);
+            }
+        }
+
+        // =================================================================================================================================
+        // Player hits on enemies: detect here, tell the host
+        // =================================================================================================================================
+
+        private void DetectHits(AttackData a)
+        {
+            if (a.Shape == HitShape.Ray)
+            {
+                if (!_shotFired) { _shotFired = true; FireShot(a); }
+                return;
+            }
+            Vector3 o = transform.position;
+            float yaw = transform.eulerAngles.y;
+            IReadOnlyList<Enemy> all = Enemy.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                Enemy e = all[i];
+                if (e == null || !e.IsSpawned || e.NetworkManager != NetworkManager || !e.Alive) continue;
+                if (_swingHit.Contains(e.NetworkObjectId)) continue;
+                EnemyDefinition d = e.Def;
+                int part = -1;
+                for (int p = 0; p < d.Parts.Length; p++)
+                {
+                    if (!e.PartIntact(p)) continue;
+                    Vector3 pp = e.PartWorldPosition(p);
+                    float r = d.Parts[p].Radius;
+                    if (HitGeometry.Hits(a, o.x, o.y, o.z, yaw, pp.x, pp.y - r, pp.z, r, 2f * r)) { part = p; break; }
+                }
+                Vector3 ep = e.transform.position;
+                bool body = HitGeometry.Hits(a, o.x, o.y, o.z, yaw, ep.x, ep.y, ep.z, d.Radius, d.Height);
+                if (part < 0 && !body) continue;
+                Vector3 point = part >= 0 ? e.PartWorldPosition(part) : ep + Vector3.up * (d.Height * 0.55f);
+                RegisterHit(a, e, part, point);
+            }
+        }
+
+        private void FireShot(AttackData a)
+        {
+            Vector3 origin = transform.position + Vector3.up * 1.4f;
+            Vector3 dir = transform.forward;
+            Targetable t = _lock != null ? (_lock.Locked != null ? _lock.Locked : _lock.Soft) : null;
+            if (t != null)
+            {
+                Vector3 to = t.AimPoint - origin;
+                if (to.sqrMagnitude > 0.25f && Vector3.Angle(transform.forward, new Vector3(to.x, 0f, to.z)) < 75f) dir = to.normalized;
+            }
+            int mask = Layers.Mask(Layers.Enemy) | Layers.Mask(Layers.Structure) | Layers.Mask(Layers.Ground);
+            RaycastHit[] hits = Physics.RaycastAll(origin, dir, a.Range, mask, QueryTriggerInteraction.Ignore);
+            System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
+            foreach (RaycastHit h in hits)
+            {
+                if (h.collider.gameObject.layer != Layers.Enemy) break;   // a wall stops the arrow
+                Enemy e = h.collider.GetComponentInParent<Enemy>();
+                if (e == null || e.NetworkManager != NetworkManager || !e.Alive) continue;
+                int part = -1;
+                for (int p = 0; p < e.Def.Parts.Length; p++)
+                {
+                    if (!e.PartIntact(p)) continue;
+                    Vector3 pc = e.PartWorldPosition(p);
+                    Vector3 closest = origin + dir * Mathf.Max(0f, Vector3.Dot(pc - origin, dir));
+                    if ((closest - pc).sqrMagnitude <= e.Def.Parts[p].Radius * e.Def.Parts[p].Radius) { part = p; break; }
+                }
+                RegisterHit(a, e, part, h.point);
+                break;
+            }
+        }
+
+        private void RegisterHit(AttackData a, Enemy e, int part, Vector3 point)
+        {
+            _swingHit.Add(e.NetworkObjectId);
+            _hitsInSwing++;
+            _machine.RegisterHit();
+            int stop = _budget.Request(a.HitstopFrames, Time.time);
+            _machine.Freeze(stop);
+            CombatEvents.RaiseLocalHit(new LocalHit(point, a, part >= 0, a.CameraKick));
+            CombatEvents.RaiseKick(a.CameraKick);
+            SubmitHitServerRpc(_swingSerial, (byte)_machine.CurrentIndex, e.NetworkObjectId, (sbyte)part, transform.position, transform.eulerAngles.y);
+        }
+
+        [Rpc(SendTo.Server)]
+        private void SubmitHitServerRpc(int swingId, byte attackIndex, ulong enemyNetId, sbyte part, Vector3 attackerPos, float attackerYaw)
+        {
+            CombatHost host = CombatHost.Current;
+            if (host == null || NetworkManager == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
+            Enemy e = obj.GetComponent<Enemy>();
+            if (e != null) host.ServerPlayerHitsEnemy(this, swingId, attackIndex, e, part, attackerPos, attackerYaw);
+        }
+
+        // =================================================================================================================================
+        // Enemy hits on this hero: judged here
+        // =================================================================================================================================
+
+        private void JudgeIncoming(float dt)
+        {
+            Vector3 me = transform.position;
+            IReadOnlyList<Enemy> all = Enemy.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                Enemy e = all[i];
+                if (e == null || !e.IsSpawned || e.NetworkManager != NetworkManager || !e.Alive || !e.HitboxOn) continue;
+                long key = ((long)e.NetworkObjectId << 32) | (uint)e.Serial;
+                if (_judged.Contains(key)) continue;
+                AttackData a = e.CurrentAttack;
+                Vector3 c = e.AttackCentre;
+                if (!HitGeometry.Hits(a, c.x, c.y, c.z, e.YawDeg, me.x, me.y, me.z, MovementMath.CapsuleRadius, MovementMath.CapsuleHeight)) continue;
+                if (_judged.Count > 256) _judged.Clear();
+                _judged.Add(key);
+                ResolveEnemyHit(e, a);
+            }
+        }
+
+        private void ResolveEnemyHit(Enemy e, AttackData a)
+        {
+            Vector3 me = transform.position;
+            if (_loco.IsInvulnerable || _machine.Invulnerable)
+            {
+                CombatEvents.RaiseCue(CombatCue.Dodge, me);
+                return;   // a visible dodge is never hit
+            }
+            Vector3 toEnemy = e.transform.position - me;
+            toEnemy.y = 0f;
+            float bearing = toEnemy.sqrMagnitude > 1e-4f ? Mathf.DeltaAngle(transform.eulerAngles.y, MovementMath.YawDeg(toEnemy.x, toEnemy.z)) : 0f;
+            GuardOutcome g = GuardMath.Resolve(_guarding, Time.time - _guardStart, bearing, a.GuardBreak, a.Guardable);
+            if (g == GuardOutcome.Parried)
+            {
+                CombatEvents.RaiseCue(CombatCue.Parry, me);
+                CombatEvents.RaiseKick(0.6f);
+                ParryServerRpc(e.NetworkObjectId, e.Serial);
+                return;
+            }
+            bool guarded = g == GuardOutcome.Guarded;
+            if (guarded)
+            {
+                CombatEvents.RaiseCue(CombatCue.Guarded, me);
+                AddImpulse(-toEnemy.normalized * 3f);
+            }
+            else
+            {
+                CombatEvents.RaiseCue(CombatCue.PlayerHurt, me);
+                CombatEvents.RaiseKick(0.5f);
+                if (!_machine.SuperArmor)
+                {
+                    if (_machine.Active) { PublishSwing(NoAttack); _machine.Interrupt(); }
+                    _hurtLock = HurtStagger;
+                }
+                if (a.Knockback > 0f && toEnemy.sqrMagnitude > 1e-4f) AddImpulse(-toEnemy.normalized * Mathf.Min(8f, a.Knockback * 2.4f));
+            }
+            EnemyHitMeServerRpc(e.NetworkObjectId, e.Serial, guarded);
+        }
+
+        [Rpc(SendTo.Server)]
+        private void EnemyHitMeServerRpc(ulong enemyNetId, int serial, bool guarded)
+        {
+            CombatHost host = CombatHost.Current;
+            if (host == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
+            Enemy e = obj.GetComponent<Enemy>();
+            if (e != null) host.ServerEnemyHitsPlayer(this, e, serial, guarded);
+        }
+
+        [Rpc(SendTo.Server)]
+        private void ParryServerRpc(ulong enemyNetId, int serial)
+        {
+            CombatHost host = CombatHost.Current;
+            if (host == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
+            Enemy e = obj.GetComponent<Enemy>();
+            if (e != null) host.ServerParry(this, e, serial);
+        }
+
+        // =================================================================================================================================
+        // Revive
+        // =================================================================================================================================
+
+        private void ReportReviveHold(PlayerIntent intent, float dt)
+        {
+            _reviveReport -= dt;
+            if (!intent.InteractHeld || _reviveReport > 0f) return;
+            IReadOnlyList<HeroVitals> all = HeroVitals.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                HeroVitals v = all[i];
+                if (v == null || !v.IsSpawned || v == _vitals || v.NetworkManager != NetworkManager || !v.IsDowned) continue;
+                if ((v.transform.position - transform.position).sqrMagnitude > HeroVitals.ReviveReach * HeroVitals.ReviveReach) continue;
+                _reviveReport = 0.2f;
+                ReviveHoldServerRpc(v.NetworkObjectId);
+                return;
+            }
+        }
+
+        [Rpc(SendTo.Server)]
+        private void ReviveHoldServerRpc(ulong targetNetId)
+        {
+            if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetId, out NetworkObject obj)) return;
+            HeroVitals target = obj.GetComponent<HeroVitals>();
+            if (target != null && _vitals != null) target.ServerReviveHold(_vitals);
+        }
+
+        // =================================================================================================================================
+        // Growth mirror and results from the host
+        // =================================================================================================================================
+
+        [Rpc(SendTo.Server)]
+        private void RequestSyncServerRpc()
+        {
+            CombatHost.Current?.ServerSyncGrowth(this);
+        }
+
+        // Host -> this hero's owner.
+        public void ServerPushGrowth(string weaponKey, int level, float abs, float cost, float atk, float fire, float pest, int pips, int pipCap)
+        {
+            SyncGrowthOwnerRpc(weaponKey, level, abs, cost, atk, fire, pest, pips, pipCap);
+        }
+
+        [Rpc(SendTo.Owner)]
+        private void SyncGrowthOwnerRpc(string weaponKey, int level, float abs, float cost, float atk, float fire, float pest, int pips, int pipCap)
+        {
+            _mirror.WeaponKey = weaponKey;
+            _mirror.Level = level;
+            _mirror.Abs = abs;
+            _mirror.LevelCost = cost;
+            _mirror.Atk = atk;
+            _mirror.Fire = fire;
+            _mirror.Pest = pest;
+            _mirror.Pips = pips;
+            _mirror.PipCap = pipCap;
+        }
+
+        // Host -> everyone: a hit on an enemy resolved (the number, the sounds, the part break).
+        public const byte FlagCrit = 1, FlagBlocked = 2, FlagWeakPart = 4, FlagKilled = 8, FlagFinisher = 16, FlagPartBroken = 32, FlagGuardBreak = 64, FlagElement = 128;
+
+        public void ServerBroadcastHit(ulong enemyNetId, int damage, byte flags)
+        {
+            HitResultClientRpc(enemyNetId, damage, flags);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void HitResultClientRpc(ulong enemyNetId, int damage, byte flags)
+        {
+            if (NetworkManager == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
+            Vector3 at = obj.transform.position + Vector3.up * 1.6f;
+            CombatEvents.RaiseNumber(new DamageNumber(at, damage, (flags & FlagCrit) != 0, (flags & FlagBlocked) != 0, false, false, (flags & FlagWeakPart) != 0));
+            if (!IsOwner)   // the owner already played the hit locally, at the moment of contact
+                CombatEvents.RaiseCue((flags & FlagFinisher) != 0 ? CombatCue.HitFinisher : (flags & FlagBlocked) != 0 ? CombatCue.Blocked : CombatCue.HitNormal, at);
+            else if ((flags & FlagBlocked) != 0) CombatEvents.RaiseCue(CombatCue.Blocked, at);
+            if ((flags & FlagCrit) != 0) CombatEvents.RaiseCue(CombatCue.HitCrit, at);
+        }
+
+        // Host -> everyone: this hero was hurt (HP number over the hero, a sound).
+        public void ServerBroadcastHurt(int damage, bool guarded)
+        {
+            HurtClientRpc(damage, guarded);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void HurtClientRpc(int damage, bool guarded)
+        {
+            Vector3 at = transform.position + Vector3.up * 2.1f;
+            CombatEvents.RaiseNumber(new DamageNumber(at, damage, false, guarded, true, false, false));
+            if (!IsOwner) CombatEvents.RaiseCue(guarded ? CombatCue.Guarded : CombatCue.PlayerHurt, transform.position);
+        }
+
+        public void ServerBroadcastHeal(int amount) { HealClientRpc(amount); }
+
+        [Rpc(SendTo.Everyone)]
+        private void HealClientRpc(int amount)
+        {
+            CombatEvents.RaiseNumber(new DamageNumber(transform.position + Vector3.up * 2.1f, amount, false, false, true, true, false));
+            CombatEvents.RaiseCue(CombatCue.Heal, transform.position);
+        }
+
+        // Host -> this hero's owner: ABS earned and why (the debug HUD's "ABS gains", the tech pop).
+        public void ServerReportAbs(string weaponKey, float abs, bool techPop, int levelsGained, string why)
+        {
+            AbsOwnerRpc(weaponKey, abs, techPop, levelsGained, why);
+        }
+
+        [Rpc(SendTo.Owner)]
+        private void AbsOwnerRpc(string weaponKey, float abs, bool techPop, int levelsGained, string why)
+        {
+            CombatEvents.RaiseAbs(new AbsReport(weaponKey, abs, techPop, levelsGained, why));
+            if (techPop) CombatEvents.RaiseCue(CombatCue.Pop, transform.position);
+        }
+
+        // Host -> everyone: the arena's wave, for the HUD (sent twice a second through whichever hero the host picks).
+        public void ServerBroadcastWave(int wave, byte state, int left, int tier) { WaveClientRpc(wave, state, left, tier); }
+
+        [Rpc(SendTo.Everyone)]
+        private void WaveClientRpc(int wave, byte state, int left, int tier)
+        {
+            ArenaStatus.Wave = wave;
+            ArenaStatus.State = (WaveState)state;
+            ArenaStatus.EnemiesLeft = left;
+            ArenaStatus.Tier = tier;
+        }
+
+        [Rpc(SendTo.Server)]
+        private void SkipWaveServerRpc() { CombatHost.Current?.ServerSkipWave(); }
+
+        // Host -> everyone: the parry flash.
+        public void ServerBroadcastParry() { ParryClientRpc(); }
+
+        [Rpc(SendTo.Everyone)]
+        private void ParryClientRpc()
+        {
+            if (!IsOwner) CombatEvents.RaiseCue(CombatCue.Parry, transform.position);
+        }
+    }
+}

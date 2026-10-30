@@ -9,7 +9,11 @@ namespace SleepingCalamity.EditorTools
     public static class NetworkPrefabsBuilder
     {
         // Every networked prefab, in one place. A prefab with a root NetworkObject that is missing here fails Validators.NetworkPrefabs.
-        public static readonly string[] Prefabs = { AssetPaths.PlayerPrefab, AssetPaths.DummyPrefab };
+        public static readonly string[] Prefabs =
+        {
+            AssetPaths.PlayerPrefab, AssetPaths.DummyPrefab,
+            AssetPaths.SlimePrefab, AssetPaths.RatPrefab, AssetPaths.BroomPrefab, AssetPaths.WardenPrefab, AssetPaths.HealPrefab,
+        };
 
         public static void Build()
         {

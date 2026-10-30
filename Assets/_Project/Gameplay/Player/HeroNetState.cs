@@ -10,7 +10,7 @@ namespace SleepingCalamity.Gameplay
 {
     public sealed class HeroNetState : NetworkBehaviour
     {
-        public const byte StanceLocked = 1, StanceDodging = 2;
+        public const byte StanceLocked = 1, StanceDodging = 2, StanceGuarding = 4, StanceAiming = 8;   // M3: the dagger guard and the bow aim
 
         // Owner writes, everyone reads: whether the hero is hard-locked and whether it is dodging, as bit flags. Only the animation reads it (a
         // remote copy cannot tell a strafe from a walk, or a dodge from a run, by its transform alone). Nothing the host rules on.
@@ -24,6 +24,8 @@ namespace SleepingCalamity.Gameplay
         public bool OwnerRigActive { get; private set; }
         public bool StanceIsLocked => (NetStance.Value & StanceLocked) != 0;
         public bool StanceIsDodging => (NetStance.Value & StanceDodging) != 0;
+        public bool StanceIsGuarding => (NetStance.Value & StanceGuarding) != 0;
+        public bool StanceIsAiming => (NetStance.Value & StanceAiming) != 0;
         public HeroLocomotion Locomotion => _locomotion;
         public TargetLockController LockController => _lockController;
 
@@ -60,10 +62,10 @@ namespace SleepingCalamity.Gameplay
         }
 
         // Owner only; writes only on a change.
-        public void OwnerSetStance(bool locked, bool dodging)
+        public void OwnerSetStance(bool locked, bool dodging, bool guarding = false, bool aiming = false)
         {
             if (!IsSpawned || !IsOwner) return;
-            byte flags = (byte)((locked ? StanceLocked : 0) | (dodging ? StanceDodging : 0));
+            byte flags = (byte)((locked ? StanceLocked : 0) | (dodging ? StanceDodging : 0) | (guarding ? StanceGuarding : 0) | (aiming ? StanceAiming : 0));
             if (NetStance.Value != flags) NetStance.Value = flags;
         }
 

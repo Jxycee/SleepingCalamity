@@ -10,8 +10,9 @@ namespace SleepingCalamity.Core
         public const string Bootstrap = "Bootstrap";
         public const string Lobby = "Lobby";
         public const string ArenaGreybox = "Arena_Greybox";
+        public const string ArenaCombat = "Arena_Combat";   // M3: the combat test arena (waves of the three enemies and the elite)
         public const string ArenaPrefix = "Arena_";
-        public static readonly string[] BuildOrder = { Bootstrap, Lobby, ArenaGreybox };
+        public static readonly string[] BuildOrder = { Bootstrap, Lobby, ArenaGreybox, ArenaCombat };
 
         // True when sceneName starts with ArenaPrefix (ordinal, case-sensitive). Null -> false. Later milestones add their own gameplay prefixes here.
         public static bool IsGameplay(string sceneName)

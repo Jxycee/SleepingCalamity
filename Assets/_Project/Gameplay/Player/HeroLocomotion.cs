@@ -19,6 +19,8 @@ namespace SleepingCalamity.Gameplay
 
         private CharacterController _cc;
         private TargetLockController _lockController;
+        private HeroCombat _combat;          // M3: gates the dodge, scales the speed, supplies lunges, facing and knockback; null-safe
+        private float _dodgeBuffer;
         private IInputService _input;
         private JumpAssist _jump;
         private DodgeState _dodge;
@@ -37,6 +39,8 @@ namespace SleepingCalamity.Gameplay
         public bool IsGrounded { get; private set; }
         public bool IsSprinting { get; private set; }
         public bool IsDodging => _dodge.Active;
+        public bool IsInvulnerable => _dodge.Invulnerable;   // M3: dodge i-frames (frames 5-18 of 30, plus the owner's 100 ms leniency)
+        public float DodgeElapsed => _dodge.Active ? _dodge.Elapsed : 0f;
         public Vector3 DodgeDirection => new Vector3(_dodge.DirX, 0f, _dodge.DirZ);
         public Vector3 Velocity { get; private set; }         // world velocity of the last frame (measured from the position)
 
@@ -44,6 +48,7 @@ namespace SleepingCalamity.Gameplay
         {
             _cc = GetComponent<CharacterController>();
             _lockController = GetComponent<TargetLockController>();
+            _combat = GetComponent<HeroCombat>();
         }
 
         private void OnEnable()
@@ -112,18 +117,23 @@ namespace SleepingCalamity.Gameplay
 
             // ---- dodge stub: a direction and a duration (i-frames arrive with M3) ----
             _dodge.Tick(dt);
-            if (intent.DodgePressed && grounded && _dodge.CanStart)
+            // A press the attack is not ready to give way to yet (mid-swing, before its cancel frame) waits 0.2 s for it.
+            if (intent.DodgePressed) _dodgeBuffer = 0.2f;
+            else if (_dodgeBuffer > 0f) _dodgeBuffer -= dt;
+            if (_dodgeBuffer > 0f && grounded && _dodge.CanStart && (_combat == null || _combat.AllowsDodge))
             {
                 Vector3 dir = stick > MovementMath.MoveDeadZone ? wish : -transform.forward;   // no input: a back-step
                 dir.y = 0f;
-                _dodge.TryStart(dir.x, dir.z);
+                if (_dodge.TryStart(dir.x, dir.z)) _dodgeBuffer = 0f;
             }
             bool dodging = _dodge.Active;
+            float moveScale = _combat != null ? _combat.MoveScale : 1f;
 
             // ---- horizontal velocity ----
             bool sprint = grounded && intent.SprintHeld && !dodging;
             IsSprinting = sprint && stick > MovementMath.MoveDeadZone;
-            float speed = MovementMath.TargetSpeed(stick, sprint);
+            float speed = MovementMath.TargetSpeed(stick, sprint) * moveScale;
+            float lunge = _combat != null && !dodging ? _combat.LungeSpeed : 0f;
             float targetX, targetZ;
             if (dodging)
             {
@@ -131,6 +141,11 @@ namespace SleepingCalamity.Gameplay
                 targetZ = _dodge.DirZ * MovementMath.DodgeSpeed;
                 _vx = targetX;   // a roll is instant, not accelerated
                 _vz = targetZ;
+            }
+            else if (lunge > 0f)
+            {
+                _vx = transform.forward.x * lunge;   // an attack's lunge is a slide along the swing's facing, not accelerated
+                _vz = transform.forward.z * lunge;
             }
             else
             {
@@ -142,7 +157,11 @@ namespace SleepingCalamity.Gameplay
 
             // ---- facing ----
             float yaw = transform.eulerAngles.y;
-            if (dodging)
+            if (!dodging && _combat != null && _combat.WantsFacing(out float combatYaw, out float combatRate))
+            {
+                yaw = combatRate > 0f ? MovementMath.TurnToward(yaw, combatYaw, combatRate * dt) : yaw;   // a swing owns the facing (rate 0 holds it)
+            }
+            else if (dodging)
             {
                 yaw = MovementMath.TurnToward(yaw, MovementMath.YawDeg(_dodge.DirX, _dodge.DirZ), MovementMath.LockedTurnRateDegPerSec * dt);
             }
@@ -162,7 +181,8 @@ namespace SleepingCalamity.Gameplay
                 _vy = MovementMath.JumpVelocity(MovementMath.JumpHeight, MovementMath.Gravity);
             float dy = MovementMath.VerticalStep(ref _vy, MovementMath.Gravity, MovementMath.TerminalVelocity, dt);
 
-            CollisionFlags flags = _cc.Move(new Vector3(_vx * dt, dy, _vz * dt));
+            Vector3 push = _combat != null ? _combat.ConsumeImpulse(dt) : Vector3.zero;   // knockback and guard pushback
+            CollisionFlags flags = _cc.Move(new Vector3((_vx + push.x) * dt, dy, (_vz + push.z) * dt));
             if ((flags & CollisionFlags.Above) != 0 && _vy > 0f) _vy = 0f;
             Velocity = (transform.position - pos) / dt;
         }

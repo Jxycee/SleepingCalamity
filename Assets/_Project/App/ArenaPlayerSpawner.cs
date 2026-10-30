@@ -49,6 +49,15 @@ namespace SleepingCalamity.App
             if (!SceneNames.IsGameplay(sceneName)) return;
             foreach (ulong clientId in clientsCompleted) SpawnFor(clientId);
             SpawnTargetDummies();
+            BeginCombat();
+        }
+
+        // M3: the combat arena's host-side rules and wave director start once the players exist (idempotent; nothing in the greybox arena).
+        public bool BeginCombat()
+        {
+            if (!_nm.IsServer) return false;
+            CombatHost combat = UnityEngine.Object.FindFirstObjectByType<CombatHost>();
+            return combat != null && combat.ServerBegin(_nm);
         }
 
         // A client that joins while a gameplay scene is up: NGO has synchronized the scene to it, now it gets its player.

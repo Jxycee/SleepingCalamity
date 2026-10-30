@@ -3,6 +3,7 @@
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
+using SleepingCalamity.Presentation;
 using SleepingCalamity.Runtime;
 using Unity.Cinemachine;
 using Unity.Netcode;
@@ -23,6 +24,7 @@ namespace SleepingCalamity.EditorTools
             BuildBootstrap();
             BuildLobby();
             BuildArena();
+            BuildCombatArena();
         }
 
         public static void BuildBootstrap()
@@ -101,6 +103,57 @@ namespace SleepingCalamity.EditorTools
             BuildTargetDummies();
 
             BuilderUtil.SaveScene(scene, AssetPaths.ArenaScene);
+        }
+
+        // M3: the combat arena. A flat 44 m square with a ring of pillars (cover to dodge around, line-of-sight breakers) inside four boundary walls, the
+        // spawn point at the centre, and the CombatHost (waves of the three enemies, then the elite, then tier 2) with its feedback and debug HUD.
+        public static void BuildCombatArena()
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            Material groundMaterial = MaterialLibrary.Get("M_GreyboxGround");
+            Material wall = MaterialLibrary.Get("M_GreyboxWall");
+            Material step = MaterialLibrary.Get("M_GreyboxStep");
+
+            var cameraObject = new GameObject("ArenaCamera");
+            cameraObject.tag = "MainCamera";
+            cameraObject.AddComponent<Camera>();
+            cameraObject.AddComponent<AudioListener>();
+            cameraObject.transform.SetPositionAndRotation(new Vector3(0f, 22f, -22f), Quaternion.Euler(45f, 0f, 0f));
+            CinemachineBrain brain = cameraObject.AddComponent<CinemachineBrain>();
+            brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.35f);
+
+            var sun = new GameObject("Sun");
+            sun.AddComponent<Light>().type = LightType.Directional;
+            sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+            GameObject ground = BuilderUtil.EnsurePrimitive(new GameObject("Ground").transform, "Slab", PrimitiveType.Cube,
+                new Vector3(0f, -0.5f, 0f), Quaternion.identity, new Vector3(44f, 1f, 44f), groundMaterial, keepCollider: true);
+            BuilderUtil.SetLayerRecursive(ground.transform.parent.gameObject, Layers.Ground);
+
+            var spawn = new GameObject("SpawnPoint");
+            spawn.AddComponent<SpawnPoint>();
+            spawn.transform.position = Vector3.zero;
+
+            Transform structures = new GameObject("Structures").transform;
+            for (int i = 0; i < 6; i++)
+            {
+                float angle = i * 60f + 30f;
+                Vector3 p = Quaternion.Euler(0f, angle, 0f) * new Vector3(0f, 1.5f, 8.5f);
+                Block(structures, "Pillar_" + (i + 1), p, new Vector3(1.4f, 3f, 1.4f), step);
+            }
+            Block(structures, "Wall_N", new Vector3(0f, 1.5f, 22.25f), new Vector3(45f, 3f, 0.5f), wall);
+            Block(structures, "Wall_S", new Vector3(0f, 1.5f, -22.25f), new Vector3(45f, 3f, 0.5f), wall);
+            Block(structures, "Wall_E", new Vector3(22.25f, 1.5f, 0f), new Vector3(0.5f, 3f, 45f), wall);
+            Block(structures, "Wall_W", new Vector3(-22.25f, 1.5f, 0f), new Vector3(0.5f, 3f, 45f), wall);
+
+            var combat = new GameObject("Combat");
+            CombatHost host = combat.AddComponent<CombatHost>();
+            host.Configure(BuilderUtil.LoadNetworkPrefab(AssetPaths.SlimePrefab), BuilderUtil.LoadNetworkPrefab(AssetPaths.RatPrefab),
+                BuilderUtil.LoadNetworkPrefab(AssetPaths.BroomPrefab), BuilderUtil.LoadNetworkPrefab(AssetPaths.WardenPrefab), BuilderUtil.LoadNetworkPrefab(AssetPaths.HealPrefab));
+            combat.AddComponent<CombatFx>().Configure(MaterialLibrary.Get("M_Spark"), MaterialLibrary.Get("M_SwingArc"));
+            combat.AddComponent<CombatHud>();
+
+            BuilderUtil.SaveScene(scene, AssetPaths.CombatArenaScene);
         }
 
         // Walls and steps, all on the Structure layer (line-of-sight and camera rays hit them; the player walks on them).

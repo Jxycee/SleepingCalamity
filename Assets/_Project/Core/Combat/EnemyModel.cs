@@ -58,8 +58,8 @@ namespace SleepingCalamity.Core.Combat
             new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f,
             parts: new[]
             {
-                new PartDefinition("rolling_pin", 70, 1.5f, 2.0f, 0.5f, 0.9f, 0.9f),    // the arm that slams
-                new PartDefinition("dough_crown", 70, 1.5f, 2.9f, 0.5f, 0.0f, 0.0f),    // the head
+                new PartDefinition("rolling_pin", 70, 1.5f, 1.4f, 0.5f, 0.2f, 1.3f),    // the arm that slams: reached from its right flank
+                new PartDefinition("dough_crown", 70, 1.5f, 2.9f, 0.5f, 0.0f, 0.0f),    // the head, above the ground swings: air attacks and arrows
             });
 
         public static readonly EnemyDefinition[] All = { Slime, RatKing, Broom, DoughWarden };

@@ -232,14 +232,15 @@ namespace SleepingCalamity.EditorTools
             if (count == 0 && errors.Count > 0) return errors; // the play-mode guard fired; nothing was visited
             if (count != 1) errors.Add("Bootstrap has " + count + " AppBootstrap components, expected 1");
 
-            if (File.Exists(BuilderUtil.Abs(AssetPaths.ArenaScene)))
+            foreach (string arenaPath in new[] { AssetPaths.ArenaScene, AssetPaths.CombatArenaScene })
             {
+                if (!File.Exists(BuilderUtil.Abs(arenaPath))) continue;
                 int spawnPoints = 0;
-                ForEachSceneObject(AssetPaths.ArenaScene, errors, go =>
+                ForEachSceneObject(arenaPath, errors, go =>
                 {
                     if (go.GetComponent<Gameplay.SpawnPoint>() != null) spawnPoints++;
                 });
-                if (spawnPoints != 1 && errors.Count == 0) errors.Add("the arena has " + spawnPoints + " SpawnPoint components, expected 1");
+                if (spawnPoints != 1 && errors.Count == 0) errors.Add(arenaPath + " has " + spawnPoints + " SpawnPoint components, expected 1");
             }
             return errors;
         }

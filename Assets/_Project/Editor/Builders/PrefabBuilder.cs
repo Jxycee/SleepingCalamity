@@ -4,6 +4,7 @@
 //   TargetDummy    a host-spawned target for the lock-on (M2). NetworkObject, no movement, no life yet.
 //   HeroCameraRig  the owner's Cinemachine 3 rig (not networked): FreeCam, LockCam, a target group and the debug lock indicator.
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Presentation;
 using Unity.Cinemachine;
@@ -24,8 +25,9 @@ namespace SleepingCalamity.EditorTools
             BuildCameraRig();
             BuildDummy();
             BuildPlayer();
-            BuilderUtil.RefreshNetworkObjectHash(AssetPaths.PlayerPrefab);
-            BuilderUtil.RefreshNetworkObjectHash(AssetPaths.DummyPrefab);
+            BuildEnemies();
+            BuildHealingDrop();
+            foreach (string path in NetworkPrefabsBuilder.Prefabs) BuilderUtil.RefreshNetworkObjectHash(path);
         }
 
         static void BuildPlayer()
@@ -60,6 +62,8 @@ namespace SleepingCalamity.EditorTools
                 remote.enabled = false;
 
                 BuilderUtil.GetOrAdd<HeroNetState>(root);
+                BuilderUtil.GetOrAdd<HeroVitals>(root);      // M3: host-held HP and the downed state
+                BuilderUtil.GetOrAdd<HeroCombat>(root);      // M3: the owner's attack controller and the hit flow (on every peer, acts on the owner)
                 BuilderUtil.GetOrAdd<HeroLocomotion>(root).enabled = false;
                 BuilderUtil.GetOrAdd<TargetLockController>(root).enabled = false;
                 BuilderUtil.GetOrAdd<HeroAnimationFeeder>(root);
@@ -71,6 +75,7 @@ namespace SleepingCalamity.EditorTools
 
                 Transform visual = BuilderUtil.EnsurePath(root.transform, "Visual");
                 BuilderUtil.GetOrAdd<MannequinAnimDriver>(visual.gameObject);
+                BuilderUtil.GetOrAdd<HeroWeaponVisual>(root).Configure(MaterialLibrary.Get("M_WeaponWood"), MaterialLibrary.Get("M_WeaponSteel"), visual);
                 // A 1.8 m mannequin on the root's origin: a capsule body, a round head and a nose block that shows which way it faces.
                 BuilderUtil.EnsurePrimitive(visual, "Body", PrimitiveType.Capsule, new Vector3(0f, 0.9f, 0f), Quaternion.identity,
                     new Vector3(0.7f, 0.82f, 0.7f), material, keepCollider: false);
@@ -108,6 +113,94 @@ namespace SleepingCalamity.EditorTools
                     new[] { torso.GetComponent<Renderer>(), head.GetComponent<Renderer>() }, body, MaterialLibrary.Get("M_GreyboxElite"), visual);
 
                 BuilderUtil.SetLayerRecursive(root, Layers.Enemy);
+            });
+        }
+
+        // ---- M3 enemies: one prefab per species, greybox primitives. Authority: the host spawns and moves them (NetworkTransform in Server mode). ----
+
+        static void BuildEnemies()
+        {
+            Material marker = MaterialLibrary.Get("M_Telegraph");
+            Material steel = MaterialLibrary.Get("M_WeaponSteel");
+            Material wood = MaterialLibrary.Get("M_WeaponWood");
+            BuildEnemy(AssetPaths.SlimePrefab, EnemyKind.Slime, "M_EnemySlime", marker, visual =>
+            {
+                Material body = MaterialLibrary.Get("M_EnemySlime");
+                BuilderUtil.EnsurePrimitive(visual, "Jar", PrimitiveType.Cylinder, new Vector3(0f, 0.5f, 0f), Quaternion.identity, new Vector3(1.0f, 0.5f, 1.0f), body, false);
+                BuilderUtil.EnsurePrimitive(visual, "Lid", PrimitiveType.Cylinder, new Vector3(0f, 1.05f, 0f), Quaternion.identity, new Vector3(0.7f, 0.05f, 0.7f), steel, false);
+                BuilderUtil.EnsurePrimitive(visual, "EyeL", PrimitiveType.Cube, new Vector3(-0.2f, 0.65f, 0.45f), Quaternion.identity, new Vector3(0.12f, 0.12f, 0.05f), steel, false);
+                BuilderUtil.EnsurePrimitive(visual, "EyeR", PrimitiveType.Cube, new Vector3(0.2f, 0.65f, 0.45f), Quaternion.identity, new Vector3(0.12f, 0.12f, 0.05f), steel, false);
+                return new Transform[0];
+            });
+            BuildEnemy(AssetPaths.RatPrefab, EnemyKind.RatKing, "M_EnemyRat", marker, visual =>
+            {
+                Material body = MaterialLibrary.Get("M_EnemyRat");
+                BuilderUtil.EnsurePrimitive(visual, "Body", PrimitiveType.Sphere, new Vector3(0f, 0.55f, 0f), Quaternion.identity, new Vector3(0.7f, 0.65f, 1.1f), body, false);
+                BuilderUtil.EnsurePrimitive(visual, "Head", PrimitiveType.Sphere, new Vector3(0f, 0.7f, 0.6f), Quaternion.identity, new Vector3(0.4f, 0.4f, 0.45f), body, false);
+                BuilderUtil.EnsurePrimitive(visual, "Crown", PrimitiveType.Cube, new Vector3(0f, 1.0f, 0.6f), Quaternion.identity, new Vector3(0.3f, 0.12f, 0.3f), MaterialLibrary.Get("M_GreyboxPlayer"), false);
+                BuilderUtil.EnsurePrimitive(visual, "Tail", PrimitiveType.Cube, new Vector3(0f, 0.4f, -0.8f), Quaternion.Euler(-25f, 0f, 0f), new Vector3(0.08f, 0.08f, 0.9f), body, false);
+                return new Transform[0];
+            });
+            BuildEnemy(AssetPaths.BroomPrefab, EnemyKind.Broom, "M_EnemyBroom", marker, visual =>
+            {
+                BuilderUtil.EnsurePrimitive(visual, "Bristles", PrimitiveType.Cube, new Vector3(0f, 0.55f, 0.3f), Quaternion.identity, new Vector3(0.95f, 1.1f, 0.5f), MaterialLibrary.Get("M_EnemyBroom"), false);
+                BuilderUtil.EnsurePrimitive(visual, "Handle", PrimitiveType.Cylinder, new Vector3(0f, 1.45f, -0.05f), Quaternion.Euler(-8f, 0f, 0f), new Vector3(0.1f, 0.6f, 0.1f), wood, false);
+                BuilderUtil.EnsurePrimitive(visual, "Band", PrimitiveType.Cube, new Vector3(0f, 1.05f, 0.3f), Quaternion.identity, new Vector3(1.0f, 0.1f, 0.55f), wood, false);
+                return new Transform[0];
+            });
+            BuildEnemy(AssetPaths.WardenPrefab, EnemyKind.DoughWarden, "M_EnemyWarden", marker, visual =>
+            {
+                Material body = MaterialLibrary.Get("M_EnemyWarden");
+                BuilderUtil.EnsurePrimitive(visual, "Torso", PrimitiveType.Cylinder, new Vector3(0f, 0.95f, 0f), Quaternion.identity, new Vector3(1.7f, 0.95f, 1.7f), body, false);
+                BuilderUtil.EnsurePrimitive(visual, "Apron", PrimitiveType.Cube, new Vector3(0f, 0.9f, 0.82f), Quaternion.identity, new Vector3(1.1f, 1.3f, 0.12f), MaterialLibrary.Get("M_GreyboxElite"), false);
+                BuilderUtil.EnsurePrimitive(visual, "Head", PrimitiveType.Sphere, new Vector3(0f, 2.15f, 0.1f), Quaternion.identity, new Vector3(0.9f, 0.8f, 0.9f), body, false);
+                // The breakable parts, in PartDefinition order: the rolling-pin arm on its right, and the dough crown on top.
+                GameObject pin = BuilderUtil.EnsurePrimitive(visual, "Part_RollingPin", PrimitiveType.Cylinder, new Vector3(1.3f, 1.4f, 0.2f), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.45f, 0.9f, 0.45f), MaterialLibrary.Get("M_EnemyPart"), false);
+                GameObject crown = BuilderUtil.EnsurePrimitive(visual, "Part_DoughCrown", PrimitiveType.Sphere, new Vector3(0f, 2.9f, 0f), Quaternion.identity, new Vector3(0.9f, 0.55f, 0.9f), MaterialLibrary.Get("M_EnemyPart"), false);
+                return new[] { pin.transform, crown.transform };
+            });
+        }
+
+        static void BuildEnemy(string path, EnemyKind kind, string materialName, Material marker, System.Func<Transform, Transform[]> buildVisual)
+        {
+            EnemyDefinition def = EnemyCatalog.Get(kind);
+            Color color = MaterialLibrary.Get(materialName).GetColor("_BaseColor");
+            BuilderUtil.WritePrefab(path, root =>
+            {
+                BuilderUtil.GetOrAdd<NetworkObject>(root);
+                NetworkTransform nt = BuilderUtil.GetOrAdd<NetworkTransform>(root);
+                nt.AuthorityMode = NetworkTransform.AuthorityModes.Server;   // the host moves enemies
+                nt.SyncRotAngleX = false;
+                nt.SyncRotAngleZ = false;
+                nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+                BuilderUtil.GetOrAdd<Targetable>(root);
+                BuilderUtil.GetOrAdd<Enemy>(root);
+                CapsuleCollider capsule = BuilderUtil.GetOrAdd<CapsuleCollider>(root);
+                capsule.height = def.Height;
+                capsule.radius = def.Radius;
+                capsule.center = new Vector3(0f, def.Height * 0.5f, 0f);
+                Transform visual = BuilderUtil.EnsurePath(root.transform, "Visual");
+                Transform[] parts = buildVisual(visual);
+                Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(true);
+                BuilderUtil.GetOrAdd<EnemyVisual>(root).Configure(renderers, visual, marker, color, parts);
+                BuilderUtil.SetLayerRecursive(root, Layers.Enemy);
+            });
+        }
+
+        static void BuildHealingDrop()
+        {
+            Material material = MaterialLibrary.Get("M_HealDrop");
+            BuilderUtil.WritePrefab(AssetPaths.HealPrefab, root =>
+            {
+                BuilderUtil.GetOrAdd<NetworkObject>(root);
+                NetworkTransform nt = BuilderUtil.GetOrAdd<NetworkTransform>(root);
+                nt.AuthorityMode = NetworkTransform.AuthorityModes.Server;
+                nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+                BuilderUtil.GetOrAdd<HealingDrop>(root);
+                Transform visual = BuilderUtil.EnsurePath(root.transform, "Visual");
+                BuilderUtil.EnsurePrimitive(visual, "Orb", PrimitiveType.Sphere, Vector3.zero, Quaternion.identity, new Vector3(0.5f, 0.5f, 0.5f), material, false);
+                BuilderUtil.EnsurePrimitive(visual, "Cross", PrimitiveType.Cube, Vector3.zero, Quaternion.identity, new Vector3(0.7f, 0.14f, 0.14f), material, false);
+                BuilderUtil.EnsurePrimitive(visual, "Cross2", PrimitiveType.Cube, Vector3.zero, Quaternion.identity, new Vector3(0.14f, 0.7f, 0.14f), material, false);
             });
         }
 

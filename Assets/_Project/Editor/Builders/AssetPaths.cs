@@ -16,6 +16,12 @@ namespace SleepingCalamity.EditorTools
         public const string BootstrapScene = "Assets/_Project/Scenes/Bootstrap.unity";
         public const string LobbyScene = "Assets/_Project/Scenes/Lobby.unity";
         public const string ArenaScene = "Assets/_Project/Scenes/Arena_Greybox.unity";
+        public const string CombatArenaScene = "Assets/_Project/Scenes/Arena_Combat.unity";   // M3: the combat arena
+        public const string SlimePrefab = "Assets/_Project/Prefabs/EnemySlime.prefab";       // M3: host-spawned enemies (NetworkObject)
+        public const string RatPrefab = "Assets/_Project/Prefabs/EnemyRatKing.prefab";
+        public const string BroomPrefab = "Assets/_Project/Prefabs/EnemyBroom.prefab";
+        public const string WardenPrefab = "Assets/_Project/Prefabs/EnemyDoughWarden.prefab";
+        public const string HealPrefab = "Assets/_Project/Prefabs/HealingDrop.prefab";
 
         // Generated project files read or written by the builders.
         public const string TemplateInputActions = "Assets/InputSystem_Actions.inputactions";

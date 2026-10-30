@@ -14,4 +14,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/Arena_Greybox.unity
     guid: d2424e2a95b397144881b71984892173
+  - enabled: 1
+    path: Assets/_Project/Scenes/Arena_Combat.unity
+    guid: e0a734823208dc14f992d9133200376f
   m_configObjects: {}

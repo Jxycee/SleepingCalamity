@@ -36,7 +36,14 @@ namespace SleepingCalamity.App
         }
 
         // The scene the first start loads.
-        public string FirstGameplayScene => SceneNames.ArenaGreybox;
+        public string FirstGameplayScene => DevCombatArena ? SceneNames.ArenaCombat : SceneNames.ArenaGreybox;
+
+        // Dev only (-dev-combat, the editor menu, the dev panel toggle): start in the M3 combat arena. Off by default, so every test and normal start
+        // still lands in the greybox arena.
+        public static bool DevCombatArena { get; set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { DevCombatArena = false; }
 
         // The verdict of the last start attempt (Ok after a start); read by the dev panel to say why a start was refused.
         public WorldPlayerVerdict LastStartVerdict { get; private set; } = WorldPlayerVerdict.Ok;

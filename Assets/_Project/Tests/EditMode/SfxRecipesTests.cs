@@ -29,7 +29,8 @@ namespace SleepingCalamity.Tests.EditMode
                 SfxIds.UiClick, SfxIds.UiConfirm, SfxIds.UiError,
                 SfxIds.WindAmbient, SfxIds.WaterLap, SfxIds.BellRing,
             };
-            Assert.AreEqual(ids.Length, SfxRecipes.All.Count);
+            Assert.AreEqual(ids.Length + CombatSfx.Recipes.Length, SfxRecipes.All.Count, "the M1 set then the M3 combat cues");
+            for (int i = 0; i < CombatSfx.Recipes.Length; i++) Assert.AreEqual(CombatSfx.Recipes[i].Id, SfxRecipes.All[ids.Length + i].Id, "combat cue " + i);
             for (int i = 0; i < ids.Length; i++)
             {
                 Assert.AreEqual(ids[i], SfxRecipes.All[i].Id, "order at index " + i);
