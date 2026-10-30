@@ -44,7 +44,7 @@ if [ ! -x "$UNITY" ]; then
     [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && usage "Unity editor still downloading in the background (bash Tools/cloud/setup.sh --wait)"
     usage "Unity editor not found at $UNITY (run: bash Tools/cloud/setup.sh --wait)"
 fi
-# licence from the environment's secrets (UNITY_LICENSE, or UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD); without one the editor exits 198
+# licence from the environment's secrets (UNITY_EMAIL + UNITY_PASSWORD, activated by sc_unity_license.sh); without one the editor exits 198
 SC_UNITY="$UNITY" bash "$(dirname "${BASH_SOURCE[0]:-$0}")/sc_unity_license.sh" || say "SC WARN no Unity licence installed; the launch will likely exit 198"
 mkdir -p "$OUT"
 
