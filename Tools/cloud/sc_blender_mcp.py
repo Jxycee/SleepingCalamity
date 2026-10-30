@@ -62,9 +62,19 @@ def first_run_prefs():
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def our_blender_running():
+    try:
+        os.kill(int(open(PIDFILE).read()), 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def start(wait=120):
     if alive():
         return "already running"
+    if our_blender_running():  # alive but not answering the 5 s ping: busy (a long render); never start a second one
+        return "running (busy)"
     os.makedirs(STATE, exist_ok=True)
     first_run_prefs()
     cmd = [BLENDER, "--python", LIVE, "--", "--port", str(PORT)]

@@ -89,7 +89,7 @@ def _pump():
             return 0.05
         try:
             box["reply"] = _run(req)
-        except Exception as e:
+        except BaseException as e:  # SystemExit from sys.exit() in exec'd code too, or the caller would wait forever
             box["reply"] = {"ok": False, "error": f"{type(e).__name__}: {e}", "traceback": traceback.format_exc()[-8000:]}
         done.set()
 

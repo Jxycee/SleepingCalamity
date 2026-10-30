@@ -102,7 +102,7 @@ do_check() {
     row gl/vulkan    "$(ls /usr/lib/x86_64-linux-gnu/dri/swrast_dri.so >/dev/null 2>&1 && echo -n 'llvmpipe ' || echo -n 'NO-llvmpipe '; ls /usr/share/vulkan/icd.d/lvp_icd*.json >/dev/null 2>&1 && echo lavapipe || echo NO-lavapipe)"
     row xvfb-run     "$(have xvfb-run && echo present || echo MISSING)"
     local ust; ust="$(unity_status)"
-    row unity-editor "$([ -x "$HOME/unity/ed/Editor/Unity" ] && echo "$HOME/unity/ed/Editor/Unity present" || echo "MISSING (background setup: $ust; log $STATE/unity.log)")"
+    row unity-editor "$([ -f "$HOME/unity/ed/.extracted" ] && echo "$HOME/unity/ed/Editor/Unity present" || echo "MISSING (background setup: $ust; log $STATE/unity.log)")"
     row unity-pkgs   "$(ls -d "$HOME/unity/pkgs/"*/ 2>/dev/null | wc -l) registry packages in ~/unity/pkgs"
     row unity-lic    "$(ls "$HOME/.local/share/unity3d/Unity/Unity_lic.ulf" >/dev/null 2>&1 && echo 'licence file present' || echo 'none (needed only to launch Unity; see the doc)')"
     row dxc          "$([ -x "$HOME/dxc/bin/dxc" ] && echo "$HOME/dxc/bin/dxc present" || echo 'MISSING (python3 Tools/cloud/sc_shader_check.py --setup)')"
@@ -228,7 +228,8 @@ register_blender_mcp() { # user scope, added from $HOME: inside the repo the pro
     (cd "$HOME" && claude mcp add -s user blender -- python3 "$REPO/Tools/cloud/sc_blender_mcp.py" >/dev/null)
 }
 step "register blender MCP (user scope)" register_blender_mcp
-art_profile() { # lift the blender deny in this checkout only; skip-worktree keeps the edit out of commits (CLAUDE.md: never commit it)
+art_profile() { # lift the blender deny in this checkout only; skip-worktree keeps the edit out of commits (CLAUDE.md: never commit it).
+    # Same edit as Tools/cloud/sc_art_profile.sh on (inlined: this script must run pasted); merges and pulls run sc_art_profile.sh off/on around them
     local f="$REPO/.claude/settings.json"
     [ -f "$f" ] || return 1
     python3 - "$f" <<'PY' || return 1
@@ -241,27 +242,32 @@ open(p, "a").write("\n")
 PY
     git -C "$REPO" update-index --skip-worktree .claude/settings.json
 }
-[ "$SC_PROFILE" = art ] && step "art profile: blender MCP allowed in this checkout" art_profile
+echo "$SC_PROFILE" > "$STATE/profile"   # the SessionStart hook re-applies the art profile after a fresh checkout
+if [ "$SC_PROFILE" = art ] && ! git -C "$REPO" ls-files -v .claude/settings.json 2>/dev/null | grep -q '^S'; then
+    step "art profile: blender MCP allowed in this checkout" art_profile
+fi
 
 # ------------------------------------------------------------------------------------------------ unity editor + packages + dxc
 # The same layout sc_cloud_compile.py --setup and sc_shader_check.py --setup produce (~/unity/ed/Editor, ~/unity/pkgs/<name>/package + .version, ~/dxc),
 # so those scripts see it as done. Written to a file so it can run detached from this script.
-write_unity_job() {
-    cat > "$STATE/unity-job.sh" <<JOB
+write_unity_job() { # to a temp file, then mv: bash reads a running job's script as it goes, so it is never rewritten in place
+    cat > "$STATE/unity-job.sh.new" <<JOB
 #!/usr/bin/env bash
 set -euo pipefail
 echo RUNNING > "$STATE/unity.status"
 trap 'echo FAILED > "$STATE/unity.status"' ERR
 mkdir -p "\$HOME/unity/ed" "\$HOME/dxc"
-if [ ! -x "\$HOME/unity/ed/Editor/Unity" ]; then
+if [ ! -f "\$HOME/unity/ed/.extracted" ]; then   # not Editor/Unity: tar writes that binary long before the rest
     tarball="\$HOME/unity/Unity-$UNITY_VERSION.tar.xz"
     if [ ! -f "\$tarball" ]; then
         echo "downloading $UNITY_URL"
-        curl -fL --retry 4 -C - --no-progress-meter -o "\$tarball.part" "$UNITY_URL"
+        curl -fL --retry 4 -C - --no-progress-meter -o "\$tarball.part" "$UNITY_URL" \
+            || { rm -f "\$tarball.part"; curl -fL --retry 4 --no-progress-meter -o "\$tarball.part" "$UNITY_URL"; }   # a finished .part answers 416
         mv "\$tarball.part" "\$tarball"
     fi
     echo "extracting the editor (about 10 minutes)"
     tar -xJf "\$tarball" -C "\$HOME/unity/ed" --exclude='*/Documentation/*'
+    touch "\$HOME/unity/ed/.extracted"
     rm -f "\$tarball"   # 4.2 GB the session's disk allowance needs back
 fi
 if [ ! -x "\$HOME/dxc/bin/dxc" ]; then
@@ -298,11 +304,12 @@ fi
 echo "unity setup done"
 echo DONE > "$STATE/unity.status"
 JOB
+    mv "$STATE/unity-job.sh.new" "$STATE/unity-job.sh"
 }
 if [ "$MODE" = full ] || [ "$MODE" = wait ]; then
     say "Unity $UNITY_VERSION editor, registry packages and DXC (4.2 GB download, ~9 GB unpacked)"
-    write_unity_job
-    if [ -x "$HOME/unity/ed/Editor/Unity" ] && [ -x "$HOME/dxc/bin/dxc" ] && [ "$(unity_status)" = DONE ]; then
+    unity_running || write_unity_job
+    if [ -f "$HOME/unity/ed/.extracted" ] && [ -x "$HOME/dxc/bin/dxc" ] && [ "$(unity_status)" = DONE ]; then
         echo "ok: already installed"
     elif unity_running; then
         if [ "$MODE" = wait ]; then
@@ -315,6 +322,7 @@ if [ "$MODE" = full ] || [ "$MODE" = wait ]; then
     elif [ "$MODE" = wait ]; then
         step "unity editor + packages + dxc" bash -c "bash '$STATE/unity-job.sh' > '$STATE/unity.log' 2>&1"
     else
+        echo RUNNING > "$STATE/unity.status"   # before launch, so a second run in the gap sees it
         setsid nohup bash "$STATE/unity-job.sh" > "$STATE/unity.log" 2>&1 < /dev/null &
         echo $! > "$STATE/unity.pid"
         echo "started in the background (pid $!): 'bash Tools/cloud/setup.sh --wait' blocks until it is done; progress in $STATE/unity.log"

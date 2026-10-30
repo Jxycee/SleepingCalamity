@@ -37,6 +37,9 @@ PROJECT="$(cd "$PROJECT" && pwd)"
 case "$OUT" in /*) ;; *) usage "out must be absolute: $OUT" ;; esac
 case "$OUT" in *..*) usage "out must not contain ..: $OUT" ;; esac
 case "$OUT/" in "$PROJECT"/*) usage "out must be outside the project: $OUT" ;; esac
+if [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && [ -z "${SC_UNITY:-}" ]; then
+    usage "Unity editor still downloading or extracting in the background (bash Tools/cloud/setup.sh --wait)"
+fi
 if [ ! -x "$UNITY" ]; then
     [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && usage "Unity editor still downloading in the background (bash Tools/cloud/setup.sh --wait)"
     usage "Unity editor not found at $UNITY (run: bash Tools/cloud/setup.sh --wait)"

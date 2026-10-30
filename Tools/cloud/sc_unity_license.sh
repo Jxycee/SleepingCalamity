@@ -15,6 +15,7 @@
 #                   so return it (`--return`) before a session ends or free seats at id.unity.com.
 # Exit codes: 0 licence present (or installed), 1 activation failed, 2 nothing configured (not an error for --file-only callers).
 set -u
+umask 077   # the licence file is never readable by others, even before chmod
 MODE="${1:-}"
 LIC_DIR="$HOME/.local/share/unity3d/Unity"
 LIC="$LIC_DIR/Unity_lic.ulf"
