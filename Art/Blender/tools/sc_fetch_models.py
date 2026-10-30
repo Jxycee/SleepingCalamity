@@ -61,6 +61,8 @@ def record(provider, row):
     if not os.path.exists(path):
         title = f'# {PROVIDER_DIR[provider]} sources\n\nRaw downloads for adoption (sc-asset-adopt). Written by `Art/Blender/tools/sc_fetch_models.py`; one row per asset.\n\n'
         write(path, (title + HEADER).encode())
+    if f'| {row[0]} |' in open(path, encoding='utf-8').read():
+        return                                          # one row per asset (a re-run re-checks over-budget entries)
     with open(path, 'a', encoding='utf-8') as f:
         f.write('| ' + ' | '.join(str(c).replace('|', '/') for c in row) + ' |\n')
 
