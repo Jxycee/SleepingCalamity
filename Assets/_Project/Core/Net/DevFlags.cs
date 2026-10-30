@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace SleepingCalamity.Core
 {
-    // Dev-only command-line flags (spec 17.1 criteria 3-6; contract 7.3). AppBootstrap (T13) parses
+    // Dev-only command-line flags. AppBootstrap parses
     // DevStartup.CollectArgs() (command line plus MPPM tags split on whitespace) and applies them only in dev builds.
     // Flag names are case-insensitive. Unknown tokens are ignored. A flag whose value is missing or malformed is
     // ignored (left at its default) and its value token is not consumed, so a following flag is still read.

@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.ConnectPayload / ConnectPayloadCodec (contract 7.3, D3).
+// Tests for SleepingCalamity.Core.ConnectPayload / ConnectPayloadCodec.
 using System;
 using SleepingCalamity.Core;
 using NUnit.Framework;

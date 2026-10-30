@@ -2,7 +2,7 @@ using System;
 
 namespace SleepingCalamity.Core
 {
-    // Turns an NGO client stop into an EndReason (spec 6.9, contract 7.3). Called by LocalNetworkSession (T8) and UgsNetworkSession (T9).
+    // Turns an NGO client stop into an EndReason. Called by LocalNetworkSession and UgsNetworkSession.
     // The host's approver sends EndReason.ToString() as the disconnect reason; NGO's own reason text (for example
     // "[Disconnect Event] ...") is not an EndReason name and falls through to the timing rules.
     public static class DisconnectClassifier

@@ -2,7 +2,7 @@ using System.Text;
 
 namespace SleepingCalamity.Core
 {
-    // Display-name rules shared by the settings store (T5), the connection approver (T8) and SubmitNameRpc (T11).
+    // Display-name rules shared by the settings store, the connection approver and SubmitNameRpc.
     public static class DisplayNameRules
     {
         public const int MaxLength = 16;
@@ -25,9 +25,9 @@ namespace SleepingCalamity.Core
             return s.Length == 0 ? Fallback(slot) : s;
         }
 
-        // The single truncation primitive (M3 T2): cut to at most maxChars UTF-16 chars, never between a high and a low surrogate
+        // The single truncation primitive : cut to at most maxChars UTF-16 chars, never between a high and a low surrogate
         // (the cut moves one char left instead). Does not clean: callers pass text that already went through their own cleaning.
-        // Sanitize uses it directly; SessionText.FitBytes (and through SessionText.Name, NameWire) calls it once per byte-budget step.
+        // Sanitize uses it directly; a byte-budget caller (a wire name field) calls it once per budget step.
         public static string Truncate(string clean, int maxChars)
         {
             if (maxChars < 0) throw new System.ArgumentOutOfRangeException(nameof(maxChars));

@@ -1,6 +1,6 @@
 // Authority: local client only. Reads hardware input once per frame; nothing here is networked.
-// The only reader of InputActions (spec 8.1). Single owner of the cursor lock policy (contract D28) and of binding overrides.
-// Works on a runtime Instantiate copy of the serialized asset, so rebinding never dirties the asset (contract D15).
+// The only reader of InputActions. Single owner of the cursor lock policy and of binding overrides.
+// Works on a runtime Instantiate copy of the serialized asset, so rebinding never dirties the asset.
 // Dev keys (F3 and up) are read directly from Keyboard.current (not part of the rebindable asset); dev builds only.
 using System;
 using SleepingCalamity.Core;
@@ -125,7 +125,7 @@ namespace SleepingCalamity.Runtime
         {
             if (_actions == null || !_hasFocus)
             {
-                ClearOutputs(); // spec 8.1: unfocused window -> neutral input
+                ClearOutputs(); // an unfocused window gives neutral input
                 return;
             }
 

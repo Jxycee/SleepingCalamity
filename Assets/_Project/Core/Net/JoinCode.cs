@@ -1,5 +1,5 @@
 // Core/Net/JoinCode.cs: join-code normalisation and plausibility. Pure logic, no network calls.
-// If runtime check V3 shows Sessions codes are case-sensitive, change only Normalize (contract D20).
+// If runtime check V3 shows Sessions codes are case-sensitive, change only Normalize.
 namespace SleepingCalamity.Core
 {
     public static class JoinCode

@@ -1,7 +1,7 @@
 // Core/Save/WorldSaveRules.cs: what a loaded world save may hold. Pure: the Runtime store hands every parsed WorldSave through Clean, so gameplay
 // only ever receives a valid one. Each section is checked on its own and a bad one costs only itself: it falls back to its default (the default
 // seed, no players recorded) and is named in the rejected list, which the store logs once and uses to keep the original file as .corrupt.
-// Nothing here throws, whatever the input. Ported from FishGame's R89 framework.
+// Nothing here throws, whatever the input. Ported from FishGame's world save framework.
 // Authority: host only (the hosting peer's world).
 using System;
 using System.Collections.Generic;
@@ -52,31 +52,18 @@ namespace SleepingCalamity.Core
                 }
                 else rejected?.Add(SectionPlayers);
             }
+            if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);   // a newer build's members, written back as read
             return clean;
         }
 
-        // The world's players: bad, null or repeated entries are dropped alone (droppedEntry), entries past WorldPlayers.MaxRecorded too; what is
-        // left must be a world WorldPlayers could hold (a Solo world with exactly one player, a Multiplayer world with 2 to 4), else the whole
-        // section is rejected and the world records no players.
+        // The world's players: bad, null or repeated records, records of another identity kind and records past WorldPlayers.MaxRecorded
+        // (a Solo world keeps one) are dropped alone (droppedEntry); the world KEEPS its kind however many records survive (a Multiplayer world
+        // with fewer than two still needs two to start and takes new players; WorldPlayers.TryRestore). Only an unknown kind rejects the section
+        // (clean is then null and the world records no players).
         public static bool TryCleanPlayers(WorldPlayersSave players, out WorldPlayersSave clean, out bool droppedEntry)
         {
             clean = null;
-            droppedEntry = false;
-            if (players == null || players.Recorded == null || players.Kind < 0 || players.Kind > (int)WorldKind.Multiplayer) return false;
-
-            var keys = new List<PlayerKey>(WorldPlayers.MaxRecorded);
-            foreach (WorldPlayerSave p in players.Recorded)
-            {
-                PlayerKey key = p != null && p.Identity >= 0 && p.Identity <= byte.MaxValue ? new PlayerKey((IdentityKind)p.Identity, p.Id) : default;
-                if (p == null || !WorldPlayers.IsValidKey(key) || keys.Contains(key) || keys.Count >= WorldPlayers.MaxRecorded)
-                {
-                    droppedEntry = true;
-                    continue;
-                }
-                keys.Add(key);
-            }
-
-            if (WorldPlayers.TryCreate((WorldKind)players.Kind, keys, out WorldPlayers world) != WorldPlayerVerdict.Ok) return false;
+            if (!WorldPlayers.TryRestore(players, out WorldPlayers world, out droppedEntry)) return false;
             clean = world.ToSave();
             return true;
         }

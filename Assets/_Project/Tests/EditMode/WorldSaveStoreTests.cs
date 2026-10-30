@@ -1,5 +1,5 @@
 // Tests/EditMode/WorldSaveStoreTests.cs: the host's world file (Runtime/Save/WorldSaveStore): the pinned v1 format, the round trip, a first run,
-// a bad section and a newer file. Ported from FishGame's R89 tests (its fishing sections gone, the players section new).
+// a bad section and a newer file. Ported from FishGame's world save tests (its fishing sections gone, the players section new).
 // Every test works under its own directory below the OS temp path.
 using System;
 using System.Collections.Generic;
@@ -19,7 +19,7 @@ namespace SleepingCalamity.Tests.EditMode
  ""schemaVersion"": 1,
  ""savedAtUtc"": ""2026-10-29T19:40:00Z"",
  ""worldSeed"": ""00000000F15F15F1"",
- ""players"": { ""kind"": 1, ""recorded"": [ { ""identity"": 0, ""id"": ""aaa"" }, { ""identity"": 1, ""id"": ""bbb"" } ] }
+ ""players"": { ""kind"": 1, ""identity"": 1, ""recorded"": [ { ""identity"": 1, ""id"": ""aaa"" }, { ""identity"": 1, ""id"": ""bbb"" } ] }
 }";
 
         private string _dir, _path;
@@ -72,8 +72,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Defaults), "a first run");
             WorldSave w = WorldSaveRules.New(0xFEDCBA9876543210UL);
             Assert.That(WorldPlayers.TryCreate(WorldKind.Multiplayer,
-                new[] { new PlayerKey(IdentityKind.Local, "host"), new PlayerKey(IdentityKind.Ugs, "friend") }, out WorldPlayers players), Is.EqualTo(WorldPlayerVerdict.Ok));
-            players.TryJoin(new PlayerKey(IdentityKind.Ugs, "third"));
+                new[] { new PlayerKey(IdentityKind.Ugs, "host"), new PlayerKey(IdentityKind.Ugs, "friend") }, out WorldPlayers players), Is.EqualTo(WorldPlayerVerdict.Ok));
+            players.Record(new PlayerKey(IdentityKind.Ugs, "third"));
             w.Players = players.ToSave();
             store.Replace(w);
             Assert.That(store.FlushIfDirty(), Is.True);
@@ -100,7 +100,7 @@ namespace SleepingCalamity.Tests.EditMode
             WorldSaveStore again = Load();
             Assert.That(WorldPlayers.TryFromSave(again.Current.Players, out WorldPlayers back), Is.True);
             Assert.That(back.Kind, Is.EqualTo(WorldKind.Solo));
-            Assert.That(back.TryJoin(new PlayerKey(IdentityKind.Local, "other")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed));
+            Assert.That(back.CanJoin(new PlayerKey(IdentityKind.Local, "other")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed));
         }
 
         // Catches: a first run (no file) warned about or not given the default seed, or a missing file reported as corrupt.
@@ -118,8 +118,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void ABadSection_ResetsOnlyItself_AndTheOriginalIsKept()
         {
-            // A multiplayer world with a single recorded player is not a world the rules could hold.
-            File.WriteAllText(_path, GoldenV1.Replace(", { \"identity\": 1, \"id\": \"bbb\" }", ""));
+            File.WriteAllText(_path, GoldenV1.Replace("\"kind\": 1", "\"kind\": 9"));   // a kind no build knows
             WorldSaveStore store = Load();
             Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
             Assert.That(store.Current.Players, Is.Null);
@@ -128,6 +127,70 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(store.FlushIfDirty(), Is.True);
             Assert.That(File.ReadAllText(_path + JsonSaveFile<WorldSave>.CorruptSuffix), Does.Contain("aaa"), "the original kept");
             Assert.That(Load().Rejected, Is.Empty, "the rewritten file is clean");
+        }
+
+        // Catches (risk review): a record the file load cannot read ("identity": "x") rejecting the whole section, so a Multiplayer world
+        // comes back as "no world yet". Only that one record goes; the kind and the other player stay.
+        [Test]
+        public void OneMistypedPlayerRecord_CostsOnlyThatRecord()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("{ \"identity\": 1, \"id\": \"aaa\" }", "{ \"identity\": \"x\", \"id\": \"aaa\" }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+            Assert.That(store.Current.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer), "still a Multiplayer world");
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(1));
+            Assert.That(store.Current.Players.Recorded[0].Id, Is.EqualTo("bbb"));
+            Assert.That(WorldPlayers.TryRestore(store.Current.Players, out WorldPlayers w, out _), Is.True);
+            Assert.That(w.CanStart(new[] { new PlayerKey(IdentityKind.Ugs, "bbb") }), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers), "it still needs two to start");
+        }
+
+        // Catches (risk review): 1.5 in an int field passing the section check (JToken.ToObject rounds it) and then failing the real file load,
+        // so one bad number cost the whole file (the .bak or a new world) instead of the one section.
+        [Test]
+        public void AFractionInAnIntField_CostsOnlyThatSection_NotTheFile()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("\"kind\": 1", "\"kind\": 1.5"));
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main), "the file still loads");
+            Assert.That(store.Rejected, Does.Contain(WorldSaveRules.SectionPlayers));
+            Assert.That(store.Current.Players, Is.Null);
+            Assert.That(store.Current.WorldSeed, Is.EqualTo("00000000F15F15F1"));
+
+            File.WriteAllText(_path, GoldenV1.Replace("\"identity\": 1, \"id\": \"bbb\"", "\"identity\": 1.5, \"id\": \"bbb\""));
+            store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(1), "only the record with the fraction goes");
+        }
+
+        // Catches (risk review): a member this build does not know (a newer build's section, or a field inside the players section) being
+        // dropped when this build loads and saves the file, in the main file and in the .bak the next save rotates it into.
+        [Test]
+        public void UnknownMembers_SurviveLoadAndSave_InMainAndBak()
+        {
+            string withFuture = GoldenV1
+                .Replace("\"worldSeed\"", "\"futureThing\": { \"coins\": 9 }, \"worldSeed\"")
+                .Replace("\"recorded\"", "\"colourScheme\": \"red\", \"recorded\"")
+                .Replace("\"id\": \"aaa\"", "\"id\": \"aaa\", \"favourite\": 3");
+            File.WriteAllText(_path, withFuture);
+            WorldSaveStore store = Load();
+            store.MarkDirty();
+            Assert.That(store.FlushIfDirty(), Is.True);
+            string main = File.ReadAllText(_path);
+            Assert.That(main, Does.Contain("futureThing").And.Contain("\"coins\": 9").And.Contain("colourScheme").And.Contain("favourite"));
+
+            store.MarkDirty();
+            store.FlushIfDirty();   // the second write rotates the first into the .bak
+            Assert.That(File.ReadAllText(_path + ".bak"), Does.Contain("futureThing").And.Contain("colourScheme").And.Contain("favourite"));
+            Assert.That(File.ReadAllText(_path), Does.Contain("futureThing"));
+
+            // The .bak alone (main unreadable) loads and keeps them too.
+            File.WriteAllText(_path, "{ \"schemaVersion\": 1, \"wor");
+            WorldSaveStore fromBak = Load();
+            Assert.That(fromBak.LoadedFrom, Is.EqualTo(MetaLoadSource.Backup));
+            fromBak.MarkDirty();
+            fromBak.FlushIfDirty();
+            Assert.That(File.ReadAllText(_path), Does.Contain("futureThing").And.Contain("favourite"));
         }
 
         // Catches: a newer build's world opened and written by this one (its new fields lost), or treated as corrupt; unknown fields making a
@@ -190,7 +253,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void AResetLoadedFromTheBak_KeepsTheBak()
         {
             File.WriteAllText(_path, "{ \"schemaVersion\": 1, \"worl");                                                                   // main truncated
-            File.WriteAllText(_path + ".bak", GoldenV1.Replace(", { \"identity\": 1, \"id\": \"bbb\" }", ""));                          // the .bak, its players unusable
+            File.WriteAllText(_path + ".bak", GoldenV1.Replace("\"kind\": 1", "\"kind\": 9"));                                                   // the .bak, its players unusable
             WorldSaveStore store = Load();
             Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Backup));
             Assert.That(store.Rejected, Does.Contain(WorldSaveRules.SectionPlayers));
@@ -258,6 +321,7 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (var f in typeof(WorldSave).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
             {
                 if (f.Name == nameof(WorldSave.SchemaVersion)) continue;   // JsonSaveFile reads it first
+                if (f.Name == nameof(WorldSave.Extra)) continue;           // the extension data, not a section
                 Assert.That(rows.TryGetValue(f.Name, out Type rowType), Is.True, "WorldSave." + f.Name + " has no row in WorldSaveStore's Sections");
                 Assert.That(rowType, Is.EqualTo(f.FieldType), "WorldSave." + f.Name + "'s row parses it as its own type");
             }

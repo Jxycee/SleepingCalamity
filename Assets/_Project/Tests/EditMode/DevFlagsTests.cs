@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.DevFlags (contract 7.3).
+// Tests for SleepingCalamity.Core.DevFlags.
 using SleepingCalamity.Core;
 using NUnit.Framework;
 

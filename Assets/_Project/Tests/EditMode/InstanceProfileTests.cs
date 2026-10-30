@@ -35,9 +35,9 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void InstanceProfile_DevProfile_Wins()
         {
-            InstanceProfile profile = InstanceProfile.FromArgs(new[] { "-editor-mode", "-name", "p2", "-dev-profile", "fgtest" });
-            Assert.AreEqual("fgtest", profile.Name);
-            Assert.AreEqual("_fgtest", profile.Suffix);
+            InstanceProfile profile = InstanceProfile.FromArgs(new[] { "-editor-mode", "-name", "p2", "-dev-profile", "sctest" });
+            Assert.AreEqual("sctest", profile.Name);
+            Assert.AreEqual("_sctest", profile.Suffix);
             Assert.IsFalse(profile.IsMppmClone);
         }
 

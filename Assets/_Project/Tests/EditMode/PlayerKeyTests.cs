@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.PlayerKey (contract 7.3).
+// Tests for SleepingCalamity.Core.PlayerKey.
 using SleepingCalamity.Core;
 using NUnit.Framework;
 
@@ -53,6 +53,30 @@ namespace SleepingCalamity.Tests.EditMode
             var key = new PlayerKey(IdentityKind.Ugs, new string('k', PlayerKey.MaxIdLength));
             Assert.IsTrue(key.IsValid);
             Assert.IsFalse(new PlayerKey(IdentityKind.Ugs, new string('k', 62)).IsValid, "62 chars no longer fit the roster id");
+        }
+
+        // Catches: the id limit counted in chars while the roster field holds bytes (31 two-byte chars are 62 bytes, one too many).
+        [Test]
+        public void PlayerKey_IsValid_CountsUtf8BytesNotChars()
+        {
+            string twoByte = ((char)0x00E9).ToString();                 // 2 UTF-8 bytes
+            Assert.IsTrue(new PlayerKey(IdentityKind.Ugs, string.Concat(System.Linq.Enumerable.Repeat(twoByte, 30))).IsValid, "60 bytes");
+            Assert.IsFalse(new PlayerKey(IdentityKind.Ugs, string.Concat(System.Linq.Enumerable.Repeat(twoByte, 31))).IsValid, "62 bytes in 31 chars");
+        }
+
+        [Test]
+        public void PlayerKey_NormalizeLocalId_IsLowercaseGuidN()
+        {
+            string n = System.Guid.NewGuid().ToString("N");
+            Assert.AreEqual(n, PlayerKey.NormalizeLocalId(n));
+            Assert.AreEqual(n, PlayerKey.NormalizeLocalId(n.ToUpperInvariant()), "case folded");
+            Assert.AreEqual("", PlayerKey.NormalizeLocalId(System.Guid.NewGuid().ToString("D")), "dashes are not the N format");
+            Assert.AreEqual("", PlayerKey.NormalizeLocalId(n.Substring(1)));
+            Assert.AreEqual("", PlayerKey.NormalizeLocalId("g" + n.Substring(1)));
+            Assert.AreEqual("", PlayerKey.NormalizeLocalId(null));
+            Assert.IsTrue(PlayerKey.Local(n.ToUpperInvariant()).IsValid);
+            Assert.AreEqual(n, PlayerKey.Local(n.ToUpperInvariant()).Id);
+            Assert.IsFalse(PlayerKey.Local("not a guid").IsValid);
         }
 
         [Test]

@@ -324,7 +324,7 @@ namespace SleepingCalamity.Runtime
             return Resolve(sfxId, out recipe, out clip) && AllowPlay(recipe, spatial, position);
         }
 
-        // Play2D: keyed by id. PlayAt: keyed by id + the 2 m cell, so two bobbers are not merged into one cue (spec 11.7, C-Q6).
+        // Play2D: keyed by id. PlayAt: keyed by id + the 2 m cell, so two bobbers are not merged into one cue.
         private bool AllowPlay(SfxRecipe recipe, bool spatial, Vector3 position)
         {
             float now = Time.unscaledTime;

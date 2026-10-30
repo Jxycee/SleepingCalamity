@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace SleepingCalamity.Core
 {
-    // One connection approval request, decoded from the client's ConnectPayload by ConnectionApprover (T8).
+    // One connection approval request, decoded from the client's ConnectPayload by ConnectionApprover.
     public readonly struct JoinRequest
     {
         public readonly ulong ClientId;
@@ -82,11 +82,11 @@ namespace SleepingCalamity.Core
         public static JoinVerdict Reject(EndReason reason) => new JoinVerdict(false, reason, NoSlot, false);
     }
 
-    // Pure connection-approval rules (spec 6.6, contract 7.3). Host-only caller: ConnectionApprover (T8),
+    // Pure connection-approval rules. Host-only caller: ConnectionApprover,
     // which rejects undecodable payloads and invalid keys before calling Evaluate.
     public static class JoinRules
     {
-        // In order (spec 6.6):
+        // In order:
         // 1 IsServerSelf -> Approve(ChooseSlot)               (skips 2-7; NGO auto-approves a declined host anyway)
         // 2 Mode == Solo -> Reject(JoinsClosed)
         // 3 ProtocolVersion differs -> Reject(VersionMismatch)

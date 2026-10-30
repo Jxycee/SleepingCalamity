@@ -3,7 +3,7 @@ using System;
 namespace SleepingCalamity.Core
 {
     // Maps a Multiplayer Services session error (numeric SessionError + message) to an EndReason.
-    // Pure logic, EditMode-tested (T9). The SDK turns Lobby "full" (16004) and "invalid join code" (16010) into
+    // Pure logic, EditMode-tested. The SDK turns Lobby "full" (16004) and "invalid join code" (16010) into
     // SessionError.Unknown and keeps only the message text (F3), so those cases are decided from the message.
     public static class UgsErrorMap
     {

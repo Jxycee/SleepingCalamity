@@ -72,7 +72,7 @@ namespace SleepingCalamity.Runtime
 
         public string EnsureLocalPlayerId()
         {
-            if (string.IsNullOrEmpty(_current.localPlayerId))
+            if (string.IsNullOrEmpty(_current.localPlayerId))   // Clamp keeps only a valid lowercase GUID "N" id (PlayerKey.NormalizeLocalId)
             {
                 _current.localPlayerId = Guid.NewGuid().ToString("N");
                 Save();

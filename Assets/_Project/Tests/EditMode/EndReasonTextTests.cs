@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.EndReasonText (spec 11.2 table, contract 7.3).
+// Tests for SleepingCalamity.Core.EndReasonText.
 using System;
 using SleepingCalamity.Core;
 using NUnit.Framework;

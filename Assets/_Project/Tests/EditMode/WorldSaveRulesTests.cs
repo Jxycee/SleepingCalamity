@@ -1,5 +1,5 @@
 // Tests/EditMode/WorldSaveRulesTests.cs: what a loaded world save may hold (Core/Save/WorldSaveRules). Pure Core.
-// Ported from FishGame's R89 tests (seed, clean-per-section); its fishing sections are gone, the players section is new.
+// Ported from FishGame's world save tests (seed, clean-per-section); its fishing sections are gone, the players section is new.
 using System.Collections.Generic;
 using NUnit.Framework;
 using SleepingCalamity.Core;
@@ -17,7 +17,7 @@ namespace SleepingCalamity.Tests.EditMode
             return new WorldSave
             {
                 WorldSeed = "00000000DEADBEEF",
-                Players = new WorldPlayersSave { Kind = (int)WorldKind.Multiplayer, Recorded = new List<WorldPlayerSave> { P("a"), P("b"), P("c", 1) } },
+                Players = new WorldPlayersSave { Kind = (int)WorldKind.Multiplayer, Recorded = new List<WorldPlayerSave> { P("a"), P("b"), P("c") } },
             };
         }
 
@@ -49,7 +49,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(clean.WorldSeed, Is.EqualTo("00000000DEADBEEF"));
             Assert.That(clean.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer));
             Assert.That(clean.Players.Recorded.Count, Is.EqualTo(3));
-            Assert.That(clean.Players.Recorded[2].Identity, Is.EqualTo(1));
+            Assert.That(clean.Players.Recorded[2].Identity, Is.EqualTo(0));
+            Assert.That(clean.Players.Identity, Is.EqualTo(0), "the world's identity kind is stored");
             Assert.That(clean.Players.Recorded[2].Id, Is.EqualTo("c"));
         }
 
@@ -67,7 +68,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(clean.Players.Recorded.Count, Is.EqualTo(3), "players untouched");
 
             WorldSave badPlayers = Good();
-            badPlayers.Players.Kind = 9;
+            badPlayers.Players.Kind = 9;   // an unknown kind: the one thing that rejects the whole section
             clean = WorldSaveRules.Clean(badPlayers, DefaultSeed, rejected);
             Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
             Assert.That(clean.Players, Is.Null, "the players section resets to 'none recorded'");
@@ -75,7 +76,7 @@ namespace SleepingCalamity.Tests.EditMode
 
             WorldSave both = Good();
             both.WorldSeed = "";
-            both.Players.Recorded.Clear();
+            both.Players.Kind = -1;
             clean = WorldSaveRules.Clean(both, DefaultSeed, rejected);
             Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionSeed, WorldSaveRules.SectionPlayers }));
             Assert.That(clean.Players, Is.Null);
@@ -108,6 +109,7 @@ namespace SleepingCalamity.Tests.EditMode
             oneBad.Players.Recorded.Insert(1, null);
             oneBad.Players.Recorded.Insert(1, P("a"));          // a repeat of the first
             oneBad.Players.Recorded.Insert(1, P("x", 77));      // an identity kind that does not exist
+            oneBad.Players.Recorded.Insert(1, P("u", 1));       // another identity kind than the world's
             WorldSave clean = WorldSaveRules.Clean(oneBad, DefaultSeed, rejected);
             Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }), "named, so the store keeps the original as .corrupt");
             Assert.That(clean.Players.Recorded.ConvertAll(p => p.Id), Is.EqualTo(new[] { "a", "b", "c" }), "the good players kept, in order");
@@ -120,20 +122,32 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
         }
 
-        // Catches: a cleaned world that WorldPlayers could not have created (a one-player multiplayer world, a two-player solo world).
+        // Catches (risk review): damage to the list turning the world into "no world yet", so the next start creates a new one (and a
+        // Multiplayer world could come back as a Solo one). The kind is stored apart and survives however many records do.
         [Test]
-        public void Players_MustFormAWorldTheRulesCouldHold()
+        public void Players_TheKindSurvivesLostRecords()
         {
             var rejected = new List<string>();
 
             WorldSave multiOfOne = Good();
             multiOfOne.Players.Recorded = new List<WorldPlayerSave> { P("a") };
-            Assert.That(WorldSaveRules.Clean(multiOfOne, DefaultSeed, rejected).Players, Is.Null);
-            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+            WorldSave clean = WorldSaveRules.Clean(multiOfOne, DefaultSeed, rejected);
+            Assert.That(rejected, Is.Empty, "nothing was damaged: one record is a legal state for a world that lost players");
+            Assert.That(clean.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer));
+            Assert.That(clean.Players.Recorded.Count, Is.EqualTo(1));
+
+            WorldSave noRecords = Good();
+            noRecords.Players.Recorded.Clear();
+            clean = WorldSaveRules.Clean(noRecords, DefaultSeed, rejected);
+            Assert.That(clean.Players, Is.Not.Null, "the world is still there");
+            Assert.That(clean.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer));
 
             WorldSave soloOfTwo = Good();
             soloOfTwo.Players.Kind = (int)WorldKind.Solo;
-            Assert.That(WorldSaveRules.Clean(soloOfTwo, DefaultSeed, rejected).Players, Is.Null);
+            clean = WorldSaveRules.Clean(soloOfTwo, DefaultSeed, rejected);
+            Assert.That(clean.Players.Kind, Is.EqualTo((int)WorldKind.Solo));
+            Assert.That(clean.Players.Recorded.ConvertAll(p => p.Id), Is.EqualTo(new[] { "a" }), "a Solo world keeps its first record only");
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
 
             WorldSave solo = Good();
             solo.Players = new WorldPlayersSave { Kind = (int)WorldKind.Solo, Recorded = new List<WorldPlayerSave> { P("owner") } };
@@ -142,7 +156,23 @@ namespace SleepingCalamity.Tests.EditMode
 
             WorldSave nullList = Good();
             nullList.Players.Recorded = null;
-            Assert.That(WorldSaveRules.Clean(nullList, DefaultSeed, rejected).Players, Is.Null);
+            clean = WorldSaveRules.Clean(nullList, DefaultSeed, rejected);
+            Assert.That(clean.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer), "a null list is a list with nothing in it");
+            Assert.That(clean.Players.Recorded.Count, Is.EqualTo(0));
+        }
+
+        // Catches: unknown members of a newer build's file lost when this build cleans and writes the save back.
+        [Test]
+        public void Clean_KeepsUnknownMembers()
+        {
+            WorldSave good = Good();
+            good.Extra = new Dictionary<string, object> { { "futureThing", 5 } };
+            good.Players.Extra = new Dictionary<string, object> { { "futureField", "x" } };
+            good.Players.Recorded[0].Extra = new Dictionary<string, object> { { "colour", "red" } };
+            WorldSave clean = WorldSaveRules.Clean(good, DefaultSeed, new List<string>());
+            Assert.That(clean.Extra["futureThing"], Is.EqualTo(5));
+            Assert.That(clean.Players.Extra["futureField"], Is.EqualTo("x"));
+            Assert.That(clean.Players.Recorded[0].Extra["colour"], Is.EqualTo("red"));
         }
     }
 }

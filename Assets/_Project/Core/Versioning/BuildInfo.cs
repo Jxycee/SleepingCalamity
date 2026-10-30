@@ -1,6 +1,6 @@
-// Core/Versioning/BuildInfo.cs: wire-protocol and game version constants (spec 4.5).
+// Core/Versioning/BuildInfo.cs: wire-protocol and game version constants.
 // ProtocolVersion is bumped by hand on any wire, RPC or networked-prefab change. It goes only into the connection payload;
-// NetworkConfig.ProtocolVersion stays 0 (see NetworkConstants.NgoProtocolVersion, T3).
+// NetworkConfig.ProtocolVersion stays 0 (see NetworkConstants.NgoProtocolVersion).
 // History: 1 = Phase 1 M1 (the foundation port; no networked gameplay yet).
 namespace SleepingCalamity.Core
 {

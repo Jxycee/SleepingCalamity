@@ -2,7 +2,7 @@ using System;
 
 namespace SleepingCalamity.Core
 {
-    // Spec 11.7: effective volume = cueBase * category^2 * master^2, settings are 0..100.
+    // Effective volume = cueBase * category^2 * master^2, settings are 0..100.
     public static class AudioMath
     {
         public const float PitchJitter = 0.07f, VolumeJitterDb = 1.5f;

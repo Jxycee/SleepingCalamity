@@ -15,7 +15,7 @@ namespace SleepingCalamity.Tests.EditMode
         [SetUp]
         public void SetUp()
         {
-            _dir = Path.Combine(Path.GetTempPath(), "fgtests-settings-" + Guid.NewGuid().ToString("N"));
+            _dir = Path.Combine(Path.GetTempPath(), "sctests-settings-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_dir);
         }
 
@@ -232,6 +232,23 @@ namespace SleepingCalamity.Tests.EditMode
             var reloaded = new SettingsStore(path);
             reloaded.Load();
             Assert.AreEqual(first, reloaded.EnsureLocalPlayerId());
+        }
+
+        // Catches: a hand-edited or old Local id (upper case, dashes, junk) becoming a player key, so the same machine would be two players.
+        [Test]
+        public void SettingsStore_LocalPlayerId_IsKeptAsLowercaseGuidN()
+        {
+            string path = Path.Combine(_dir, "settings.json");
+            File.WriteAllText(path, "{\"version\":1,\"localPlayerId\":\"0123456789ABCDEF0123456789ABCDEF\"}");
+            var upper = new SettingsStore(path);
+            upper.Load();
+            Assert.AreEqual("0123456789abcdef0123456789abcdef", upper.EnsureLocalPlayerId(), "case folded, not replaced");
+
+            File.WriteAllText(path, "{\"version\":1,\"localPlayerId\":\"01234567-89ab-cdef-0123-456789abcdef\"}");
+            var dashed = new SettingsStore(path);
+            dashed.Load();
+            string fresh = dashed.EnsureLocalPlayerId();
+            Assert.IsTrue(Regex.IsMatch(fresh, "^[0-9a-f]{32}$"), "a non-N id is replaced by a fresh N id: " + fresh);
         }
 
         [Test]

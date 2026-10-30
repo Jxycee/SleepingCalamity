@@ -17,7 +17,7 @@ namespace SleepingCalamity.Tests.EditMode
         [SetUp]
         public void SetUp()
         {
-            _dir = Path.Combine(Path.GetTempPath(), "fgtests-graphics-" + Guid.NewGuid().ToString("N"));
+            _dir = Path.Combine(Path.GetTempPath(), "sctests-graphics-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_dir);
         }
 
@@ -27,7 +27,7 @@ namespace SleepingCalamity.Tests.EditMode
             if (Directory.Exists(_dir)) Directory.Delete(_dir, true);
         }
 
-        // The main instance defaults to the project's full-screen window; a second local instance (a -dev-profile such as the test runs' fgtest,
+        // The main instance defaults to the project's full-screen window; a second local instance (a -dev-profile such as the test runs' sctest,
         // or an MPPM clone) defaults to Windowed so two built instances do not cover each other.
         private static int ExpectedDefaultWindowMode()
         {

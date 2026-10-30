@@ -2,7 +2,7 @@ using System;
 
 namespace SleepingCalamity.Core
 {
-    // Connection state machine (spec 6.4, contract 7.3 and D9). Pure logic: no Unity or NGO references.
+    // Connection state machine. Pure logic: no Unity or NGO references.
     // Exactly 8 legal transitions; every other (state, event) pair throws InvalidTransitionException.
     public sealed class ConnectionStateMachine
     {

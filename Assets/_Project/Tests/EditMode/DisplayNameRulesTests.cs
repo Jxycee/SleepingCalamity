@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.DisplayNameRules (contract 7.3).
+// Tests for SleepingCalamity.Core.DisplayNameRules.
 using SleepingCalamity.Core;
 using NUnit.Framework;
 

@@ -25,7 +25,7 @@ namespace SleepingCalamity.Runtime
         public string bindingOverridesJson = "";   // InputActionAsset.SaveBindingOverridesAsJson output
         public string localPlayerId = "";          // GUID "N" format, created once per instance file
 
-        // Graphics tab (playtest S6/S3, 2026-10-13). Added without a version bump (C-Q10): an older settings.json simply lacks these keys and
+        // Graphics tab (playtest S6/S3, 2026-10-13). Added without a version bump: an older settings.json simply lacks these keys and
         // JsonUtility.FromJsonOverwrite leaves the defaults below (the High preset), so every other saved setting survives. Pure tables:
         // SleepingCalamity.Core.GraphicsPresets; applied by SleepingCalamity.Presentation.GraphicsApplier.
         public int graphicsPreset = (int)SleepingCalamity.Core.QualityPreset.High;   // 0..3 = QualityPreset (Low, Medium, High, Custom)
@@ -62,7 +62,7 @@ namespace SleepingCalamity.Runtime
             uiScalePercent = ClampInt(uiScalePercent, 80, 150);
             ClampGraphics();
             if (bindingOverridesJson == null) bindingOverridesJson = "";
-            if (localPlayerId == null) localPlayerId = "";
+            localPlayerId = SleepingCalamity.Core.PlayerKey.NormalizeLocalId(localPlayerId);   // a lowercase GUID "N" id, else "" (a fresh one is made)
         }
 
         // Clamps the Graphics rows. A named preset (Low, Medium, High) whose three rows no longer match its table entry becomes Custom: that is

@@ -12,7 +12,7 @@ namespace SleepingCalamity.Tests.EditMode
         [SetUp]
         public void SetUp()
         {
-            _dir = Path.Combine(Path.GetTempPath(), "fgtests-atomic-" + Guid.NewGuid().ToString("N"));
+            _dir = Path.Combine(Path.GetTempPath(), "sctests-atomic-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_dir);
         }
 

@@ -1,4 +1,4 @@
-// Runtime. Authority: local client only. Rebinding seam used by the settings UI (spec 8.3 rebinding).
+// Runtime. Authority: local client only. Rebinding seam used by the settings UI.
 using UnityEngine.InputSystem;
 
 namespace SleepingCalamity.Runtime

@@ -1,4 +1,4 @@
-// Runtime/Save/WorldSaveStore.cs: the host's world save file, world{suffix}.json (ported from FishGame's R89 framework with its fishing sections
+// Runtime/Save/WorldSaveStore.cs: the host's world save file, world{suffix}.json (ported from FishGame with its fishing sections
 // removed). One world per machine profile in v1. The file rules are JsonSaveFile's (main, .bak, defaults; schemaVersion first, a
 // newer file read-only and never written; .corrupt; atomic writes; nothing thrown). On top of them: an older file goes through the migration
 // chain (Upgrade) before it is read; each section is then tried on its own (Prepare: a section whose JSON doesn't fit its type, "bits": -1 or
@@ -39,7 +39,11 @@ namespace SleepingCalamity.Runtime
         {
             foreach ((string key, Type type, string _) in Sections) yield return (key, type);
         }
-        static readonly JsonSerializer Serializer = JsonSerializer.Create(JsonSaveFile<WorldSave>.JsonSettings);
+        // Sections that hold an array of records: a record that does not fit is dropped alone (section key, array key, element type).
+        static readonly (string section, string array, Type element)[] ArraySections =
+        {
+            ("players", "recorded", typeof(WorldPlayerSave)),
+        };
 
         public WorldSaveStore(string filePath, ulong defaultSeed)
         {
@@ -52,7 +56,7 @@ namespace SleepingCalamity.Runtime
         public static string PathForThisInstance() =>
             PathOverrideForTests ?? Path.Combine(Application.persistentDataPath, WorldBaseName + InstanceProfile.Current.Suffix + ".json");
 
-        // PlayMode tests point the host flow at a temp file, so a run from the Test Runner window (no -dev-profile fgtest: the suffix is "")
+        // PlayMode tests point the host flow at a temp file, so a run from the Test Runner window (no -dev-profile sctest: the suffix is "")
         // never reads, deletes or overwrites the user's real world. Null outside tests; reset for every play session.
         public static string PathOverrideForTests { get; set; }
 
@@ -156,11 +160,15 @@ namespace SleepingCalamity.Runtime
                 if (p == null || p.Value.Type == JTokenType.Null) continue;
                 if (type == typeof(Dictionary<string, int>) && p.Value is JObject map && DropMisfitEntries(map, key, _droppedEntries))
                 {
-                    _parseRejected.Add(section);   // a map's bad entry goes alone (a mistyped wish keeps the others), named like a dropped section
+                    _parseRejected.Add(section);   // a map's bad entry goes alone, named like a dropped section
                     dropped = true;
                 }
-                try { p.Value.ToObject(type, Serializer); }
-                catch (Exception)
+                if (p.Value is JObject obj && DropMisfitRecords(obj, key, _droppedEntries))
+                {
+                    _parseRejected.Add(section);   // a record array's bad element goes alone (one mistyped player keeps the others)
+                    dropped = true;
+                }
+                if (!Fits(p.Value, type))
                 {
                     p.Remove();
                     _parseRejected.Add(section);
@@ -170,14 +178,47 @@ namespace SleepingCalamity.Runtime
             return dropped ? root.ToString() : upgraded;
         }
 
+        // The same text path the real load takes (JsonConvert on the token's JSON with the store's settings), so what passes here also loads:
+        // JToken.ToObject would round 1.5 into an int field where the file load throws, and the whole file would then be unreadable.
+        private static bool Fits(JToken token, Type type)
+        {
+            try
+            {
+                JsonConvert.DeserializeObject(token.ToString(Formatting.None), type, JsonSaveFile<WorldSave>.JsonSettings);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        // Removes the array elements of a registered record array whose JSON does not fit the element type. True when any went.
+        private static bool DropMisfitRecords(JObject section, string sectionKey, List<string> droppedInto)
+        {
+            bool any = false;
+            foreach ((string sectionName, string arrayKey, Type element) in ArraySections)
+            {
+                if (!string.Equals(sectionName, sectionKey, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!(section.Property(arrayKey, StringComparison.OrdinalIgnoreCase)?.Value is JArray array)) continue;
+                for (int i = array.Count - 1; i >= 0; i--)
+                {
+                    if (Fits(array[i], element)) continue;
+                    array.RemoveAt(i);
+                    droppedInto.Add(sectionKey + "." + arrayKey + "[" + i + "]");
+                    any = true;
+                }
+            }
+            return any;
+        }
+
         // Removes the entries of a string -> int map whose value isn't an int (1.5, "1", 3000000000, [ ]). True when any went.
         private static bool DropMisfitEntries(JObject map, string section, List<string> droppedInto)
         {
             var bad = new List<string>();
             foreach (JProperty entry in map.Properties())
             {
-                try { entry.Value.ToObject<int>(Serializer); if (entry.Value.Type != JTokenType.Integer) bad.Add(entry.Name); }
-                catch (Exception) { bad.Add(entry.Name); }
+                if (entry.Value.Type != JTokenType.Integer || !Fits(entry.Value, typeof(int))) bad.Add(entry.Name);
             }
             foreach (string name in bad)
             {

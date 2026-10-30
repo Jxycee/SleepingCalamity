@@ -23,6 +23,13 @@ namespace SleepingCalamity.Tests.EditMode
             return w;
         }
 
+        // Joining as the approver does it (CanJoin) and as the session does it once the client is in (Record).
+        static WorldPlayerVerdict Join(WorldPlayers w, PlayerKey key)
+        {
+            WorldPlayerVerdict can = w.CanJoin(key);
+            return can != WorldPlayerVerdict.Ok ? can : w.Record(key);
+        }
+
         // Catches: a multiplayer world created with one player (solo play has its own Solo world), or created with nobody.
         [Test]
         public void Multiplayer_CreatedWithOnePlayer_IsRefused()
@@ -71,13 +78,28 @@ namespace SleepingCalamity.Tests.EditMode
         public void FifthUniquePlayer_IsRefused_AndNotRecorded()
         {
             WorldPlayers w = Multi("a", "b");
-            Assert.That(w.TryJoin(K("c")), Is.EqualTo(WorldPlayerVerdict.Ok));
-            Assert.That(w.TryJoin(K("d")), Is.EqualTo(WorldPlayerVerdict.Ok), "the 4th is welcome");
+            Assert.That(Join(w, K("c")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(Join(w, K("d")), Is.EqualTo(WorldPlayerVerdict.Ok), "the 4th is welcome");
             Assert.That(w.Recorded.Count, Is.EqualTo(4));
 
-            Assert.That(w.TryJoin(K("e")), Is.EqualTo(WorldPlayerVerdict.WorldFull));
+            Assert.That(w.CanJoin(K("e")), Is.EqualTo(WorldPlayerVerdict.WorldFull));
+            Assert.That(w.Record(K("e")), Is.EqualTo(WorldPlayerVerdict.WorldFull));
             Assert.That(w.Recorded.Count, Is.EqualTo(4));
             Assert.That(w.IsRecorded(K("e")), Is.False);
+        }
+
+        // Catches: CanJoin writing the key down (an approved client that never arrives would hold a place for good).
+        [Test]
+        public void CanJoin_IsPure_RecordIsTheWrite()
+        {
+            WorldPlayers w = Multi("a", "b");
+            Assert.That(w.CanJoin(K("c")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(w.CanJoin(K("c")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(w.Recorded.Count, Is.EqualTo(2), "CanJoin recorded nothing");
+            Assert.That(w.Record(K("c")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(w.Recorded.Count, Is.EqualTo(3));
+            Assert.That(w.Record(K("c")), Is.EqualTo(WorldPlayerVerdict.Ok), "recording twice is a no-op");
+            Assert.That(w.Recorded.Count, Is.EqualTo(3));
         }
 
         // Catches: a recorded player counted as "new" (refused at 4) or recorded twice.
@@ -85,28 +107,38 @@ namespace SleepingCalamity.Tests.EditMode
         public void RecordedPlayer_CanRejoin_AtAnyTime()
         {
             WorldPlayers w = Multi("a", "b", "c", "d");
-            Assert.That(w.TryJoin(K("b")), Is.EqualTo(WorldPlayerVerdict.Ok), "full world, recorded player");
+            Assert.That(Join(w, K("b")), Is.EqualTo(WorldPlayerVerdict.Ok), "full world, recorded player");
             Assert.That(w.Recorded.Count, Is.EqualTo(4), "not recorded twice");
 
             WorldPlayers two = Multi("a", "b");
-            Assert.That(two.TryJoin(K("a")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(Join(two, K("a")), Is.EqualTo(WorldPlayerVerdict.Ok));
             Assert.That(two.Recorded.Count, Is.EqualTo(2));
         }
 
+        // One identity kind per world: a Local world takes no Ugs keys and an Ugs world no Local ones, even for a recorded id.
         [Test]
-        public void Join_SameIdUnderAnotherIdentityKind_IsADifferentPlayer()
+        public void OneIdentityKindPerWorld()
         {
-            WorldPlayers w = Multi("a", "b");
-            Assert.That(w.TryJoin(new PlayerKey(IdentityKind.Ugs, "a")), Is.EqualTo(WorldPlayerVerdict.Ok));
-            Assert.That(w.Recorded.Count, Is.EqualTo(3));
+            WorldPlayers local = Multi("a", "b");
+            Assert.That(local.Identity, Is.EqualTo(IdentityKind.Local));
+            Assert.That(local.CanJoin(new PlayerKey(IdentityKind.Ugs, "a")), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind));
+            Assert.That(local.Record(new PlayerKey(IdentityKind.Ugs, "z")), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind));
+            Assert.That(local.Recorded.Count, Is.EqualTo(2));
+
+            Assert.That(WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { new PlayerKey(IdentityKind.Ugs, "a"), new PlayerKey(IdentityKind.Ugs, "b") }, out WorldPlayers online), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(online.Identity, Is.EqualTo(IdentityKind.Ugs));
+            Assert.That(online.CanJoin(K("a")), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind));
+            Assert.That(online.CanStart(new[] { new PlayerKey(IdentityKind.Ugs, "a"), K("b") }), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind));
+
+            Assert.That(WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), new PlayerKey(IdentityKind.Ugs, "b") }, out _), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind), "a mixed group cannot create a world");
         }
 
         [Test]
         public void Join_InvalidKey_IsRefused()
         {
             WorldPlayers w = Multi("a", "b");
-            Assert.That(w.TryJoin(K("")), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
-            Assert.That(w.TryJoin(default), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
+            Assert.That(w.CanJoin(K("")), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
+            Assert.That(w.CanJoin(default), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
             Assert.That(w.Recorded.Count, Is.EqualTo(2));
         }
 
@@ -123,7 +155,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(w.CanStart(null), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers));
         }
 
-        // Catches: an unrecorded player starting a session without being admitted; one person twice counting as two.
+        // Catches: an unrecorded player starting a session without being recorded; one person twice counting as two.
         [Test]
         public void Start_UnrecordedOrRepeatedPlayer_IsRefused()
         {
@@ -139,8 +171,9 @@ namespace SleepingCalamity.Tests.EditMode
         {
             WorldPlayers w = Solo("owner");
             Assert.That(w.Kind, Is.EqualTo(WorldKind.Solo));
-            Assert.That(w.TryJoin(K("friend")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed));
-            Assert.That(w.TryJoin(K("owner")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed), "even the owner does not 'join' their own solo world");
+            Assert.That(w.CanJoin(K("friend")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed));
+            Assert.That(w.CanJoin(K("owner")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed), "even the owner does not 'join' their own solo world");
+            Assert.That(w.Record(K("friend")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed));
             Assert.That(w.Recorded.Count, Is.EqualTo(1));
 
             Assert.That(w.CanStart(new[] { K("owner") }), Is.EqualTo(WorldPlayerVerdict.Ok));
@@ -156,15 +189,16 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(WorldPlayers.TryCreate(WorldKind.Solo, new[] { K("a"), K("b") }, out _), Is.EqualTo(WorldPlayerVerdict.WrongPlayerCount));
         }
 
-        // The difficulty scale input: the recorded players who are here.
+        // The difficulty scale input: the recorded players who are here, never below 1 or above 4.
         [Test]
-        public void ScalePlayers_CountsDistinctRecordedPlayersPresent()
+        public void ScalePlayers_CountsDistinctRecordedPlayersPresent_ClampedToOneToFour()
         {
             WorldPlayers w = Multi("a", "b", "c", "d");
             Assert.That(w.ScalePlayers(new[] { K("a"), K("b") }), Is.EqualTo(2));
             Assert.That(w.ScalePlayers(new[] { K("a"), K("b"), K("c"), K("d") }), Is.EqualTo(4));
             Assert.That(w.ScalePlayers(new[] { K("a"), K("a"), K("z") }), Is.EqualTo(1), "a repeat and a stranger do not count");
-            Assert.That(w.ScalePlayers(null), Is.EqualTo(0));
+            Assert.That(w.ScalePlayers(null), Is.EqualTo(1), "never 0");
+            Assert.That(w.ScalePlayers(new PlayerKey[0]), Is.EqualTo(1));
             Assert.That(Solo("o").ScalePlayers(new[] { K("o") }), Is.EqualTo(1));
         }
 
@@ -174,15 +208,44 @@ namespace SleepingCalamity.Tests.EditMode
             WorldPlayers w = Multi("a", "b", "c");
             Assert.That(WorldPlayers.TryFromSave(w.ToSave(), out WorldPlayers back), Is.True);
             Assert.That(back.Kind, Is.EqualTo(WorldKind.Multiplayer));
+            Assert.That(back.Identity, Is.EqualTo(IdentityKind.Local));
             CollectionAssert.AreEqual(w.Recorded, back.Recorded);
 
             WorldPlayers solo = Solo("owner");
             Assert.That(WorldPlayers.TryFromSave(solo.ToSave(), out WorldPlayers soloBack), Is.True);
             Assert.That(soloBack.Kind, Is.EqualTo(WorldKind.Solo));
-            Assert.That(soloBack.TryJoin(K("x")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed), "the loaded solo world still refuses joins");
+            Assert.That(soloBack.CanJoin(K("x")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed), "the loaded solo world still refuses joins");
         }
 
-        // Catches: the loader accepting a record a real world could not hold (it would bypass the creation rules).
+        // Catches: damage to the list turning the world into something else. TryRestore keeps the kind however many records survive.
+        [Test]
+        public void TryRestore_KeepsTheKind_WhateverRecordsSurvive()
+        {
+            var one = new WorldPlayersSave { Kind = 1, Identity = 0, Recorded = new List<WorldPlayerSave> { new WorldPlayerSave { Id = "a" } } };
+            Assert.That(WorldPlayers.TryRestore(one, out WorldPlayers w, out bool dropped), Is.True);
+            Assert.That(dropped, Is.False);
+            Assert.That(w.Kind, Is.EqualTo(WorldKind.Multiplayer), "one survivor is still a Multiplayer world");
+            Assert.That(w.CanStart(new[] { K("a") }), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers), "and still needs two to start");
+            Assert.That(Join(w, K("b")), Is.EqualTo(WorldPlayerVerdict.Ok), "and takes new players");
+            Assert.That(w.CanStart(new[] { K("a"), K("b") }), Is.EqualTo(WorldPlayerVerdict.Ok));
+
+            var none = new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { null, new WorldPlayerSave { Id = "" } } };
+            Assert.That(WorldPlayers.TryRestore(none, out w, out dropped), Is.True);
+            Assert.That(dropped, Is.True);
+            Assert.That(w.Kind, Is.EqualTo(WorldKind.Multiplayer));
+            Assert.That(w.Recorded.Count, Is.EqualTo(0));
+            Assert.That(Join(w, new PlayerKey(IdentityKind.Ugs, "u")), Is.EqualTo(WorldPlayerVerdict.Ok), "no identity yet: the first record sets it");
+            Assert.That(w.Identity, Is.EqualTo(IdentityKind.Ugs));
+
+            var soloLost = new WorldPlayersSave { Kind = 0, Recorded = new List<WorldPlayerSave>() };
+            Assert.That(WorldPlayers.TryRestore(soloLost, out w, out _), Is.True);
+            Assert.That(w.Kind, Is.EqualTo(WorldKind.Solo), "a Solo world stays Solo");
+            Assert.That(w.CanStart(new[] { K("claimer") }), Is.EqualTo(WorldPlayerVerdict.Ok), "the first single player can claim it");
+            Assert.That(w.ClaimSoloOwner(K("claimer")), Is.True);
+            Assert.That(w.CanStart(new[] { K("someoneElse") }), Is.EqualTo(WorldPlayerVerdict.NotRecorded));
+        }
+
+        // Catches: the strict loader accepting a record a real world could not hold.
         [Test]
         public void TryFromSave_RefusesWhatNoRealWorldCouldHold()
         {
@@ -192,6 +255,28 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { new WorldPlayerSave { Id = "a" } } }, out _), Is.False, "multiplayer with one");
             Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 0, Recorded = new List<WorldPlayerSave>() }, out _), Is.False, "solo with none");
             Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { null, new WorldPlayerSave { Id = "a" } } }, out _), Is.False, "null entry");
+        }
+
+        // Catches: a newer build's members inside the players section being dropped when this build writes the section back.
+        [Test]
+        public void UnknownMembers_SurviveTheRoundTrip()
+        {
+            var save = new WorldPlayersSave
+            {
+                Kind = 1,
+                Recorded = new List<WorldPlayerSave>
+                {
+                    new WorldPlayerSave { Id = "a", Extra = new Dictionary<string, object> { { "colour", "red" } } },
+                    new WorldPlayerSave { Id = "b" },
+                },
+                Extra = new Dictionary<string, object> { { "futureField", 7 } },
+            };
+            Assert.That(WorldPlayers.TryRestore(save, out WorldPlayers w, out _), Is.True);
+            Join(w, K("c"));
+            WorldPlayersSave back = w.ToSave();
+            Assert.That(back.Extra["futureField"], Is.EqualTo(7));
+            Assert.That(back.Recorded[0].Extra["colour"], Is.EqualTo("red"));
+            Assert.That(back.Recorded.Count, Is.EqualTo(3));
         }
     }
 }

@@ -1,11 +1,11 @@
-// Runtime/Save/JsonSaveFile.cs: one JSON save file's load and save rules, shared by the meta save (SaveService, meta.json) and the world save
-// (R89; WorldSaveStore). Extracted from SaveService (world save W2) so both files follow the same rules instead of two copies drifting:
+// Runtime/Save/JsonSaveFile.cs: one JSON save file's load and save rules, used by the world save
+// (WorldSaveStore) and by any later per-profile file, so every save file follows the same rules instead of copies drifting:
 //  - Load order main -> .bak -> defaults. The schemaVersion is probed first, so a file newer than this build loads read-only and is never written,
 //    even when this build cannot deserialize it (then it is not treated as corrupt either).
 //  - An unparsable main file is copied to path + ".corrupt" and removed before the first Save can push it into .bak and overwrite it.
 //  - Writes go through AtomicFile (tmp, flush, File.Replace with .bak). Nothing ever throws into gameplay: load and save catch everything.
 //  - Deferred writes: MarkDirty / FlushIfDirty; a failed write stays dirty for the next flush.
-// Newtonsoft as M3-D30: camelCase property names, dictionary keys unchanged, unknown members ignored. Authority: local (the caller's file).
+// Newtonsoft: camelCase property names, dictionary keys unchanged, unknown members ignored. Authority: local (the caller's file).
 using System;
 using System.Globalization;
 using System.IO;
@@ -45,7 +45,7 @@ namespace SleepingCalamity.Runtime
         private bool _keepBackupCopy;   // the loaded .bak must be kept as .bak.corrupt before the next write rotates over it
         private bool _writeWarned;
 
-        // label names the file in the logs ("meta file"); readOnlyNote says what a newer file means for the session ("journal is read-only this
+        // label names the file in the logs ("world file"); readOnlyNote says what a newer file means for the session ("the world is read-only this
         // session"). normalize runs on every loaded or default value (fill nulls a JSON file may carry; it may return a replacement). upgrade
         // (optional) rewrites an older file's text to the current schema before it is deserialized (the migration chain); it must not throw.
         public JsonSaveFile(string filePath, int currentVersion, Func<T, int> version, Func<T> createDefault, Func<T, T> normalize, string label, string readOnlyNote,
@@ -258,7 +258,7 @@ namespace SleepingCalamity.Runtime
             return read > currentVersion;
         }
 
-        // The integer schemaVersion of a JSON object, read before anything else (R89: "schemaVersion is read first").
+        // The integer schemaVersion of a JSON object, read before anything else.
         public static bool TryReadSchemaVersion(string json, out long version)
         {
             version = 0;

@@ -1,7 +1,7 @@
 namespace SleepingCalamity.Core
 {
-    // Maps an EndReason to its UI string key (spec 11.2 table). T14's UiStrings holds the texts.
-    // SceneFlow (T13) publishes a toast only when the key is not null.
+    // Maps an EndReason to its UI string key. The UI strings table holds the texts.
+    // SceneFlow publishes a toast only when the key is not null.
     public static class EndReasonText
     {
         public static string ToastKey(EndReason reason)

@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.JoinRules (spec 6.6, R13/R56 reclaim by persistent id; contract 7.3).
+// Tests for SleepingCalamity.Core.JoinRules.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using NUnit.Framework;

@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.ConnectionStateMachine (spec 6.4, contract 7.3 and D9).
+// Tests for SleepingCalamity.Core.ConnectionStateMachine.
 using System;
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -8,7 +8,7 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public class ConnectionStateMachineTests
     {
-        // The exact 8 legal transitions (contract 7.3). Every other pair of the 5 x 6 grid is illegal.
+        // The exact 8 legal transitions. Every other pair of the 5 x 6 grid is illegal.
         private static readonly (ConnState From, ConnEvent Event, ConnState To)[] LegalTable =
         {
             (ConnState.Offline, ConnEvent.Begin, ConnState.Connecting),

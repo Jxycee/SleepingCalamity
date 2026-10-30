@@ -6,7 +6,7 @@ using UnityEngine;
 namespace SleepingCalamity.Runtime
 {
     // Authority: none. Client-side presentation audio, generated locally at Bootstrap (AppBootstrap calls GenerateAll once) and cached.
-    // Never networked. A recipe that fails to generate is skipped with a warning; its cue then stays silent (spec 11.7).
+    // Never networked. A recipe that fails to generate is skipped with a warning; its cue then stays silent.
     public sealed class SfxGenerator
     {
         private readonly int _sampleRate;

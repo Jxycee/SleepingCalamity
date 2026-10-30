@@ -4,7 +4,7 @@ using System.Text;
 
 namespace SleepingCalamity.Runtime
 {
-    // Per-instance profile name: picks the settings file suffix (and the UGS auth profile in T9), so MPPM clones and
+    // Per-instance profile name: picks the settings file suffix (and the UGS auth profile), so MPPM clones and
     // several standalone builds on one machine never share settings.json.
     // Rules (flag names compared case-insensitively):
     //   1. "-dev-profile <x>" wins: Name = Sanitize(x), IsMppmClone = false.

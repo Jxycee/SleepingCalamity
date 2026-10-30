@@ -1,4 +1,4 @@
-// Tests for SleepingCalamity.Core.DisconnectClassifier (spec 6.9, contract 7.3).
+// Tests for SleepingCalamity.Core.DisconnectClassifier.
 using SleepingCalamity.Core;
 using NUnit.Framework;
 

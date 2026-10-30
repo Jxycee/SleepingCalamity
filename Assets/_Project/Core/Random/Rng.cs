@@ -1,4 +1,4 @@
-// Core/Random/Rng.cs: derives independent deterministic streams from a run seed (spec 4.5).
+// Core/Random/Rng.cs: derives independent deterministic streams from a run seed.
 // Each system uses its own constant stream id, so extra draws in one system never shift another system's rolls.
 namespace SleepingCalamity.Core
 {

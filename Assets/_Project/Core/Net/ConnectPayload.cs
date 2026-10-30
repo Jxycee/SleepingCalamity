@@ -3,7 +3,7 @@ using System.Text;
 
 namespace SleepingCalamity.Core
 {
-    // Connection payload sent in NetworkConfig.ConnectionData and decoded by the host's ConnectionApprover (contract 7.3, D3).
+    // Connection payload sent in NetworkConfig.ConnectionData and decoded by the host's ConnectionApprover.
     // Pure data; the wire form is produced by ConnectPayloadCodec.
     public readonly struct ConnectPayload
     {

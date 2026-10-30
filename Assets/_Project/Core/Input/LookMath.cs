@@ -1,4 +1,4 @@
-// Core, no engine references, unit-tested. Converts raw look input to degrees (spec 11.6: mouse deg/count, stick x 180 deg/s).
+// Core, no engine references, unit-tested. Converts raw look input to degrees.
 namespace SleepingCalamity.Core
 {
     public static class LookMath
