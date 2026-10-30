@@ -19,7 +19,7 @@ These are the steps only the user can take. Claude keeps this list current: when
    Tell Claude what happened.
 
 ## Soon
-4. **Choose Tobin's concept look** for M10, the first hero through the character pipeline. Either pick or make front, side and back concept images with any image tool you like, or tell Claude to generate options in Tripo text-to-image. *Unblocks: M10.*
+4. **Pick Tobin's concept** from the options Claude generates (M10). Claude will ask you when the options are ready.
 5. **Optional: dump your PS2 BIOS** into `C:\Dev\_private\ps2\bios\`, using your own console and a BIOS dumper. It lets Claude capture real Dark Cloud town and dungeon frames in PCSX2, which are scarce online.
 
 ## When Claude asks

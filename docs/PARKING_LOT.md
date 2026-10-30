@@ -3,6 +3,7 @@
 Ideas worth keeping that aren't in the approved Phase 1 plan. Each line gives the idea, its source, and the date. Promote an idea into a plan deliberately; never build one silently.
 
 ## From the Kingdom Hearts sweeps (2026-10-30)
+**Promoted into Phase 1 on 2026-10-30 (user):** growth verbs, tech bonus, hero abilities from weapon milestones, spell pips, and boss parts. See the PHASE1 change log. The rest stays parked.
 Sources: `docs/research/kh1-sweep.md` and `docs/research/kh2-sweep.md`.
 
 ### Weapon growth (fits M4)

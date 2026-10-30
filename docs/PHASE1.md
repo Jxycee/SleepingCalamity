@@ -350,3 +350,7 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 
 ## Change log
 - 2026-10-30 (user, decision A11): day palette moved toward the measured OoT 2026 frames, keeping as much of the OoT look as possible with slightly brighter light; moody, darker saturation stays. Day value bands, warmth, plaster hue, saturation and slate-teal shadows updated in 3.1.
+- 2026-10-30 (user): every multiplayer session needs 2+ recorded players at start (confirmed). Claude's call: if players drop mid-session the session continues and difficulty scales down.
+- 2026-10-30 (user): up to 10 worlds per player, with Solo and Multiplayer worlds in separate tabs (Claude reads this as 10 per tab; placeholder). One save file per world (M1).
+- 2026-10-30 (user): added from the Kingdom Hearts sweeps: tech bonus ABS (parry, weak-part, element-match, finisher pays extra with a pop), growth verbs per heirloom (axe finishers and guard breaks, dagger hits and parries, staff multi-hits, bow weak points), breakable boss parts on the floor-4 Dough Warden that drop healing (M3). Claude added the two that synergise: hero abilities unlocked by weapon milestones (kept one tier weaker on other weapons) and spell pips refilled by landing hits (staff). All in M4 except boss parts (M3).
+- 2026-10-30 (user): Claude generates Tobin's concept options for M10.
