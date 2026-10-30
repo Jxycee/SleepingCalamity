@@ -35,8 +35,7 @@ These are the steps only the user can take. Claude keeps this list current: when
 
 ## Soon
 4. **Pick Tobin's concept** from the options Claude generates (M10). Claude will ask you when the options are ready.
-5. **Delete the stray `C:\docs` folder** (three duplicate Tobin images an agent wrote by mistake).
-6. **Optional: dump your PS2 BIOS** into `C:\Dev\_private\ps2\bios\`, using your own console and a BIOS dumper. It lets Claude capture real Dark Cloud town and dungeon frames in PCSX2, which are scarce online.
+5. **Optional: dump your PS2 BIOS** into `C:\Dev\_private\ps2\bios\`, using your own console and a BIOS dumper. It lets Claude run Dark Cloud in PCSX2: town and dungeon frames at chosen angles (scarce online), frame-stepped combat and camera timings, and memory reads that confirm the decompile. Nothing is blocked without it.
 
 ## When Claude asks
 6. **Playtests at the milestone gates:**
