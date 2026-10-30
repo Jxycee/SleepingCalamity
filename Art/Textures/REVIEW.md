@@ -36,3 +36,14 @@ Contact sheets: `Art/Textures/B1_town/sheet.jpg`, `B2_cellar/sheet.jpg`, `B3_tri
 | Day, 3 midday + 1 low sun | 0.16 / 0.55 / 0.70 | +0.15 (in) | 0.21-0.25 / 0.44-0.50 / 0.80-0.86, +0.12 to +0.20 |
 | Cellar, 3 views | 0.07 / 0.33 / 0.60 | +0.33 (just high) | 0.12-0.16 / 0.30-0.40 / 0.65-0.75, +0.20 to +0.30 |
 Day: warmth in, p10 low, p50 high, p90 low. Cellar: p50 in, p10 and p90 low, warmth slightly high. Volumetrics: the CristianQiu package was not tried; the shafts are additive light-cone meshes (`SC_LightCone.shader`) plus exponential fog.
+
+## M8 part 3: look tune (implementer, 2026-10-30)
+Measured with `sc_ref_palette.py --k 7` on the pooled frames; the same seven captures each round.
+| Round | Change | Day p10 / p50 / p90, warmth | Cellar p10 / p50 / p90, warmth |
+|---|---|---|---|
+| start (part 2) | | 0.16 / 0.55 / 0.70, +0.15 | 0.07 / 0.33 / 0.60, +0.33 |
+| 1 | day sun 2.3 to 3.0, ambient 1.5 to 1.0, contrast +8, lift +0.07; cellar lamps 8 to 14, white balance -6, lift +0.06 | 0.34 / 0.64 / 0.82, +0.24 | 0.31 / 0.49 / 0.73, +0.27 |
+| 2 | lift cut to 0.02 (washed out in round 1) | 0.24 / 0.62 / 0.79, +0.23 | 0.22 / 0.45 / 0.70, +0.33 |
+| 3 | cobble tint 0.78, sky thickness 0.6; cellar lift 0, ambient 1.8, exposure 0, white balance -14 | **0.23 / 0.52 / 0.77, +0.07** | **0.13 / 0.35 / 0.62, +0.30** |
+| band | | 0.21-0.25 / 0.44-0.50 / 0.80-0.86, +0.12 to +0.20 | 0.12-0.16 / 0.30-0.40 / 0.65-0.75, +0.20 to +0.30 |
+Day: p10 in; p50 +0.02 high, p90 -0.03 low, warmth -0.05 low. Cellar: p10, p50, warmth in; p90 -0.03 low. Also changed: the reflection probe is baked in batch (a temporary EXR, switched to Custom for the capture, deleted afterwards), the low-sun fill is neutral-warm (the purple cobbles are gone), the ember grate emission and light are lower. What can't get there with greybox geometry: the day median is dominated by the flat pale cobble ground and sky, so p50 and p90 need real dressing and shadow shapes.

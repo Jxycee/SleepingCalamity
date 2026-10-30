@@ -170,6 +170,7 @@ namespace SleepingCalamity.EditorTools
                 if (s.Decal) MakeTransparent(m);
                 EditorUtility.SetDirty(m);
             }
+            Mat("cobble").SetColor("_BaseColor", new Color(0.78f, 0.78f, 0.78f));   // the ground fills half the frame: a darker tint keeps the day median in band
             Material cone = Ensure(MaterialsFolder + "/M_LightCone.mat", Shader.Find(ConeShaderName) ?? throw new System.InvalidOperationException("Shader not found: " + ConeShaderName));
             cone.SetColor("_Color", new Color(1.0f, 0.84f, 0.58f)); cone.SetFloat("_Intensity", 0.10f); cone.renderQueue = 3100;
             Material coneCellar = Ensure(MaterialsFolder + "/M_LightConeCellar.mat", cone.shader);
@@ -179,11 +180,11 @@ namespace SleepingCalamity.EditorTools
             lamp.SetColor("_BaseColor", new Color(0.1f, 0.08f, 0.05f)); lamp.EnableKeyword("_EMISSION"); lamp.SetColor("_EmissionColor", new Color(3.0f, 2.1f, 1.0f));
             lamp.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             Material ember = Ensure(MaterialsFolder + "/M_Ember.mat", lit);
-            ember.SetColor("_BaseColor", new Color(0.12f, 0.03f, 0.02f)); ember.EnableKeyword("_EMISSION"); ember.SetColor("_EmissionColor", new Color(1.2f, 0.2f, 0.07f));
+            ember.SetColor("_BaseColor", new Color(0.12f, 0.03f, 0.02f)); ember.EnableKeyword("_EMISSION"); ember.SetColor("_EmissionColor", new Color(0.7f, 0.12f, 0.04f));
             ember.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             Material sky = Ensure(MaterialsFolder + "/M_LookTestSky.mat", Shader.Find("Skybox/Procedural") ?? throw new System.InvalidOperationException("Skybox/Procedural not found"));
-            sky.SetFloat("_SunSize", 0.04f); sky.SetFloat("_SunSizeConvergence", 5f); sky.SetFloat("_AtmosphereThickness", 1.0f);
-            sky.SetColor("_SkyTint", new Color(0.50f, 0.56f, 0.66f)); sky.SetColor("_GroundColor", new Color(0.42f, 0.40f, 0.36f)); sky.SetFloat("_Exposure", 0.8f);
+            sky.SetFloat("_SunSize", 0.04f); sky.SetFloat("_SunSizeConvergence", 5f); sky.SetFloat("_AtmosphereThickness", 0.6f);
+            sky.SetColor("_SkyTint", new Color(0.45f, 0.55f, 0.80f)); sky.SetColor("_GroundColor", new Color(0.42f, 0.40f, 0.36f)); sky.SetFloat("_Exposure", 0.9f);
             AssetDatabase.SaveAssets();
         }
 
@@ -234,8 +235,9 @@ namespace SleepingCalamity.EditorTools
             {
                 Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
                 Bloom b = Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.25f); b.scatter.Override(0.8f); b.clamp.Override(65000f);
-                ColorAdjustments c = Comp<ColorAdjustments>(p); c.postExposure.Override(0.0f); c.contrast.Override(-5f); c.saturation.Override(-6f);
+                ColorAdjustments c = Comp<ColorAdjustments>(p); c.postExposure.Override(0.0f); c.contrast.Override(8f); c.saturation.Override(-4f);
                 ShadowsMidtonesHighlights s = Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.80f, 0.92f, 1.0f, 0f));
+                LiftGammaGain lg = Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.94f, 0.98f, 1.0f, 0.02f));
                 Vignette v = Comp<Vignette>(p); v.intensity.Override(0.18f); v.smoothness.Override(0.5f);
             });
             // Cellars: same stack, warmer white balance, the grade's shadow tint is teal and the lights stay lamp gold.
@@ -243,9 +245,10 @@ namespace SleepingCalamity.EditorTools
             {
                 Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
                 Bloom b = Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-                ColorAdjustments c = Comp<ColorAdjustments>(p); c.postExposure.Override(0.3f); c.contrast.Override(-2f); c.saturation.Override(-8f);
+                ColorAdjustments c = Comp<ColorAdjustments>(p); c.postExposure.Override(0.0f); c.contrast.Override(-2f); c.saturation.Override(-8f);
                 ShadowsMidtonesHighlights s = Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.62f, 0.86f, 0.92f, 0f));
-                WhiteBalance w = Comp<WhiteBalance>(p); w.temperature.Override(8f);
+                WhiteBalance w = Comp<WhiteBalance>(p); w.temperature.Override(-14f);
+                LiftGammaGain lg = Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.92f, 1.0f, 1.0f, 0.0f));
                 Vignette v = Comp<Vignette>(p); v.intensity.Override(0.28f); v.smoothness.Override(0.5f);
             });
             AssetDatabase.SaveAssets();
@@ -364,7 +367,7 @@ namespace SleepingCalamity.EditorTools
 
             // Light: one warm sun (about 5200 K), cool sky fill (trilight ambient), horizon-matched exponential fog, a reflection probe, light shafts.
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
-            AddLight(lighting, "Sun", LightType.Directional, new Vector3(0, 10, 0), Quaternion.Euler(54f, -32f, 0f), new Color(1.0f, 0.92f, 0.80f), 2.3f, 10f, LightShadows.Soft);
+            AddLight(lighting, "Sun", LightType.Directional, new Vector3(0, 10, 0), Quaternion.Euler(54f, -32f, 0f), new Color(1.0f, 0.92f, 0.80f), 3.0f, 10f, LightShadows.Soft);
             for (int i = 0; i < 4; i++)
             {
                 Shape(lighting, "Shaft" + i, LookTestGeometry.Shape.Cone, new Vector3(-6f + i * 3.2f, 11f, 3f + i * 2.2f), new Vector3(1.4f, 0f, 16f),
@@ -375,7 +378,7 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LookTestSky.mat");
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.46f, 0.55f, 0.70f); RenderSettings.ambientEquatorColor = new Color(0.50f, 0.50f, 0.47f);
-            RenderSettings.ambientGroundColor = new Color(0.30f, 0.27f, 0.22f); RenderSettings.ambientIntensity = 1.5f;
+            RenderSettings.ambientGroundColor = new Color(0.30f, 0.27f, 0.22f); RenderSettings.ambientIntensity = 1.0f;
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogDensity = 0.0085f; RenderSettings.fogColor = new Color(0.72f, 0.77f, 0.84f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
             RenderSettings.sun = lighting.Find("Sun").GetComponent<Light>();
@@ -430,10 +433,10 @@ namespace SleepingCalamity.EditorTools
                 Prim(spheres, "Sphere_" + names[i], PrimitiveType.Sphere, new Vector3(-1.75f + i * 0.5f, 0.25f, 1.1f), Vector3.one * 0.46f, load(names[i]));
 
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
-            Color gold = new Color(1.0f, 0.80f, 0.55f);
-            AddLight(lighting, "LampLightA", LightType.Point, new Vector3(0f, 2.8f, 2.5f), Quaternion.identity, gold, 8f, 9f, LightShadows.Soft);
-            AddLight(lighting, "LampLightB", LightType.Point, new Vector3(0f, 2.8f, 7.0f), Quaternion.identity, gold, 8f, 9f, LightShadows.Soft);
-            AddLight(lighting, "EmberLight", LightType.Point, new Vector3(-0.8f, 0.5f, 8.5f), Quaternion.identity, new Color(0.95f, 0.26f, 0.12f), 6f, 3.5f, LightShadows.None);
+            Color gold = new Color(1.0f, 0.85f, 0.68f);
+            AddLight(lighting, "LampLightA", LightType.Point, new Vector3(0f, 2.8f, 2.5f), Quaternion.identity, gold, 14f, 9f, LightShadows.Soft);
+            AddLight(lighting, "LampLightB", LightType.Point, new Vector3(0f, 2.8f, 7.0f), Quaternion.identity, gold, 14f, 9f, LightShadows.Soft);
+            AddLight(lighting, "EmberLight", LightType.Point, new Vector3(-0.8f, 0.5f, 8.5f), Quaternion.identity, new Color(0.95f, 0.26f, 0.12f), 4f, 3.5f, LightShadows.None);
             for (int i = 0; i < 2; i++)
                 Shape(lighting, "Shaft" + i, LookTestGeometry.Shape.Cone, new Vector3(0.9f - i * 1.6f, 3.95f, 4.2f + i * 2.4f), new Vector3(0.9f, 0f, 4.2f),
                     load("LightConeCellar"), new Vector3(78f, 0f, 0f), 2f, 16, false);
@@ -442,7 +445,7 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.17f, 0.20f, 0.22f); RenderSettings.ambientEquatorColor = new Color(0.16f, 0.14f, 0.12f);
-            RenderSettings.ambientGroundColor = new Color(0.09f, 0.075f, 0.06f); RenderSettings.ambientIntensity = 3.2f;
+            RenderSettings.ambientGroundColor = new Color(0.09f, 0.075f, 0.06f); RenderSettings.ambientIntensity = 1.8f;
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.035f; RenderSettings.fogColor = new Color(0.09f, 0.15f, 0.16f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
