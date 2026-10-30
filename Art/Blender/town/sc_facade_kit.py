@@ -33,7 +33,7 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_facade_kit.py -- --out <scratch>
       [--views wide,mid,close,tq] [--rres 960] [--samples 48] [--no-render] [--export] [--blend]
   --export writes <out>/FacadeKit.fbx (cloud sessions commit only this generator; the PC exports to
-  Assets/_Project/Content/Art/Town/B4/FacadeKit/). Renders go to <out>/facade_<view>.png. Review cameras are the
+  Assets/_Project/Content/Art/Town/B4/Facade/Facade.fbx, see SOURCES.md there). Renders go to <out>/facade_<view>.png. Review cameras are the
   brief's capture cameras (Unity (x,y,z) -> Blender (x,z,y)), vertical FOV 46/42/38 as LookTestBuilder.
 
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
@@ -1028,8 +1028,12 @@ def review_scene(root):
     so = bpy.data.objects.new('Sun', sun); sc.collection.objects.link(so)
     so.rotation_euler = (math.radians(38), 0, math.radians(30))
     w = bpy.data.worlds.new('W'); sc.world = w; w.use_nodes = True
-    sky = w.node_tree.nodes.new('ShaderNodeTexSky'); sky.sky_type = 'NISHITA'
-    sky.sun_disc = False; sky.sun_elevation = math.radians(52); sky.air_density = 1.4; sky.dust_density = 2.0
+    sky = w.node_tree.nodes.new('ShaderNodeTexSky')
+    try: sky.sky_type = 'NISHITA'
+    except TypeError: sky.sky_type = 'SINGLE_SCATTERING'   # Blender 5.x renamed the Nishita model
+    sky.sun_disc = False; sky.sun_elevation = math.radians(52); sky.air_density = 1.4
+    if hasattr(sky, 'dust_density'): sky.dust_density = 2.0
+    else: sky.aerosol_density = 2.0                        # 5.x name for dust
     bg = w.node_tree.nodes['Background']; bg.inputs['Strength'].default_value = 0.18
     w.node_tree.links.new(sky.outputs[0], bg.inputs[0])
     # haze-lite: a world volume would be costly; the corner's haze lives in Unity
@@ -1069,7 +1073,8 @@ if '--export' in argv:
         o.select_set(o.name.startswith('Kit_') or o == root)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'FacadeKit.fbx'), use_selection=True, axis_forward='-Z',
                              axis_up='Y', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
-                             mesh_smooth_type='FACE', add_leaf_bones=False)
+                             mesh_smooth_type='FACE', add_leaf_bones=False,
+                             colors_type='LINEAR')   # 'wear' is a linear mask; the default SRGB would gamma-encode it
 if '--no-render' not in argv:
     cam = review_scene(root)
     if '--blend' in argv:
