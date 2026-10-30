@@ -1,28 +1,25 @@
 # CURRENT: Sleeping Calamity running handoff
 
 ## Now
-2026-10-30, morning after an autonomous overnight run. All four Phase 0 outputs exist in a first version.
-- **What exists:**
-  - **Locked story:** `docs/STORY.md` (`bf518ff`).
-  - **Reference library:** Hollowmere and the Undercroft, 88 CC0/PD/CC BY images with palette targets (`eba7205`).
-  - **Research:** DC1 REA, DC2 decomp, Kingdom Hearts, URP look, genre landscape, in `docs/research/`.
-  - **Phase 1 plan:** drafted, not yet approved: `docs/PHASE1.md` (`7e1ad0a`).
-- **The user owes:** going through `docs/superpowers/handoff/decisions-for-review.md`. It has rows S1-S8, T1-T5 and A1-A6, and A6 points to PHASE1's decisions P1-P51.
-- **Last `check`:** `SC RESULT check PASS` (build PASS, test-edit 2/2, test-play 1/1) on the skeleton (`29fa5ce`). No Unity changes since.
+2026-10-30. Phase 0 is effectively done (the story is locked, PHASE1.md is approved, research and references are in). Phase 1 is underway.
+- **M1 (foundation port) and M4 (weapon growth) are merged to main** (`c7367cd`). `SC RESULT check PASS` ran on `cdc4741` (EditMode 310+, PlayMode 11/11); the merge only adds docs on top of it.
+  - M1 had two risk reviews, both applied.
+  - M4 had a review with no blockers; its should-fix items are on `m4-fixes`.
+- **Running:**
+  - `m4-fixes`: the M4 review fixes, plus making the builders idempotent (each build re-saves three scenes).
+  - `m2-hero-camera`: M2, the networked hero, camera and lock-on, on a capsule mannequin.
+- **User decisions today:** recorded in the PHASE1.md change log and `decisions-for-review.md` (A11-A19).
+- **The user owes:** the items in `docs/superpowers/handoff/USER_TODO.md`: Mixamo clips, linking UGS, the 2-player Relay walk, and an optional BIOS dump.
 
 ## Next
-1. Review the decisions with the user, apply their changes to `PHASE1.md` and the other docs, and mark Phase 1 approved.
-2. Start Phase 1 at M1 (PHASE1 section 2): port the FishGame code (Networking, App flow, Save, Core utilities) and stand up the networked greybox.
-3. Fill the reference-library gaps the next time art comes up:
-   - coal cellars, brick sewers, a market square with banners, a hill town above a lake;
-   - flat plaster and oak close-ups;
-   - a measured OoT-2026 frame (screens are out 5 Nov 2026), kept in `Reference/private/`.
+1. Land `m4-fixes` and M2 (review, then merge).
+2. M3 combat greybox; M5 room-pool authoring can start during M3.
+3. M8: the style bible into the tools (port the fg-aaa-prop tools, fix the `sc_asset_audit` crash, build the look-test scene). M10: Tobin through the pipeline in the chosen viking/timber-yard direction (concept brief in `docs/design/tobin-concepts.md`).
 
 ## Branches and worktrees
-- `main` only.
+- `main` (`c7367cd`). In progress: `m4-fixes` (worktree `agent-ad25d53219a200b3c`) and `m2-hero-camera` (worktree `agent-a3f4b7d611d7e2923`). `m1-foundation` and `m4-weapon-growth` are merged.
 
 ## Blockers and open questions
-- The Phase 1 plan isn't approved yet (user).
 - The asset skills other than `sc-reference` still carry FishGame's Riverlight style rules. Rewrite them from PHASE1 section 3 (the style bible) before the art batches.
 - `sc-walk` documents WalkDriver helpers that don't exist here yet; they arrive with the App/Dev port.
 
