@@ -112,8 +112,8 @@ The recorded Kenney clips replace the generated hit and whoosh sounds by file, b
 
   The AI's "start the attack" reach is now `Range + 0.7 x lunge + 0.2` for every shape (circles used to ignore their lunge).
 - **When the hero is hurt:** a red wash and a bright band on the screen edge on the side the hit came from (relative to the camera, 0.55 s), the hurt sound at full
-  volume, and a 0.25 s flinch (the body kicks back 18 degrees and dips 8 cm). The flinch is `HeroFlinch`, added to the hero at runtime and applied on top of whatever the
-  animation driver wrote that frame; the animation branch can delete the file or move it onto its driver.
+  volume, and a 0.25 s flinch (the body kicks back 18 degrees and dips 8 cm). With the Animator hero (Y Bot) the flinch is the clips' Hurt / HurtHeavy, driven by `HeroCombat.HurtSerial`; `HeroFlinch` (added to the hero at runtime) is only the
+  mannequin fallback and does nothing while an `AnimatorHeroDriver` is working.
 
 ### Difficulty and HUD
 - Tier 1 enemy attack x0.65 (`EnemyCatalog.Tier1Atk`): slime 12 -> 7.8, rat-king 18 -> 11.7, broom 15 -> 9.75, Warden 30 -> 19.5 (the 6.6 table values stay the base). A

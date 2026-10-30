@@ -1,7 +1,7 @@
 // Authority: none (local, cosmetic, every peer). A short flinch when a hero is hurt: the body kicks back and dips for a quarter of a second. Added to the
 // hero at runtime by CombatFx on the first hurt (no prefab edit), and applied in LateUpdate after the animation driver and HeroWeaponVisual have written
-// the visual root for the frame, as an offset on top of whatever they set. Whoever owns hero animation next: this only touches the "Visual" child's local
-// rotation and position for 0.25 s after a hit; delete this file to drop it.
+// the visual root for the frame, as an offset on top of whatever they set. It is the MANNEQUIN FALLBACK only: when the hero has a working AnimatorHeroDriver,
+// the Animator plays its own Hurt / HurtHeavy flinch (HeroCombat.HurtSerial) and this does nothing, so the two never fight.
 using UnityEngine;
 
 namespace SleepingCalamity.Presentation
@@ -14,7 +14,19 @@ namespace SleepingCalamity.Presentation
         private Transform _visual;
         private float _age = Seconds;
 
-        public void Trigger() { _age = 0f; }
+        private AnimatorHeroDriver _animator;
+
+        // True when the Animator hero is in charge of the flinch.
+        private bool AnimatorOwnsFlinch
+        {
+            get
+            {
+                if (_animator == null) _animator = GetComponentInChildren<AnimatorHeroDriver>(true);
+                return _animator != null && _animator.IsWorking;
+            }
+        }
+
+        public void Trigger() { if (!AnimatorOwnsFlinch) _age = 0f; }
 
         private void LateUpdate()
         {
