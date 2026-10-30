@@ -57,3 +57,13 @@ Claude adds lines here as it works.
 | A22 | Placeholder | M2 additions beyond PHASE1 6.5:<br>• **Hard lock:** a ±4 m height band.<br>• **Flick:** a switch threshold of 0.75/0.35 and a 60° cone.<br>• **Soft target:** a facing weight of 0.6.<br>• **Movement speeds:** walk 2.2, jog 4.8, run 7.0 m/s.<br>• **Elites:** ignore the range and line-of-sight drops; the player's own toggle, a death or a despawn still ends the lock.<br>To be tuned when we play. |
 | A23 | Call | Volumetric light in the look-test uses our own additive light-cone meshes plus exponential fog, not the CristianQiu package (A1). The package can be tried later if the cones look cheap. The look-test also turns off the GPU Resident Drawer, which picked the wrong textures in batch renders. |
 | A24 | Call | Your cellar reference image is the target for the cellar mood. It's saved privately at `Reference/private/user/cellar_mood_ref_01.webp`. Measured, it's darker than our cellar band, and its warmth comes from local light pools (candles, sconces, hearth) on neutral grey-brown stone. The PHASE1 3.1 cellar band moves toward it but stays a little brighter so fights read: value 0.06-0.10 / 0.24-0.32 / 0.55-0.68, warmth +0.25 to +0.35. Say if you want it to match the image exactly. |
+
+## Session 2 (2026-10-30)
+| # | Kind | Item |
+|---|---|---|
+| A25 | Call | Animation sources: Quaternius Universal Animation Library 1+2 free tier (CC0) first, Kevin Iglesias / Explosive free Asset Store packs second, Mixamo for the rest (combat specials no free source has). Packs live in `C:\Dev\_private\quaternius\` and `\mixamo\`. Research: `docs/research/animation-sources.md`. |
+| A26 | **Decided (user)** | Keep the Microsoft GDK packages and In-App Purchasing 5.4.4 that the editor added while linking Unity Gaming Services. |
+| A27 | Call | UGS: anonymous sign-in is built in (no dashboard switch). The extra providers you added (Unity Player Accounts, Code Linking, Custom ID) are unused but harmless, so they stay. |
+| A28 | Call | M3 merges after risk review + fix verification + branch review, but stays "not done" until your 5-minute arena verdict and the 2-player netsim walk (which waits for a second player). The netsim test now checks a deterministic 0%-loss run plus "every hit arrives" under 2% loss instead of a tail limit. |
+| A29 | Call | M3 arena: heroes who bled out come back at each wave clear, so nobody spectates the whole arena. Dives keep the PHASE1 rule. |
+| A30 | Call | PCSX2 free cam (PINE memory writes to the DC1 camera, plus savestates and cheats for unlocks) is built at M9 look work, not now (user). |
