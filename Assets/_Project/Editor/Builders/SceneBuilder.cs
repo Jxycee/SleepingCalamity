@@ -110,8 +110,8 @@ namespace SleepingCalamity.EditorTools
             Material step = MaterialLibrary.Get("M_GreyboxStep");
             Transform root = new GameObject("Structures").transform;
 
-            // Behind the spawn point: the camera boom (5 m) runs into it, so the Deoccluder has something to do.
-            Block(root, "Wall_Behind", new Vector3(0f, 1.5f, -4.5f), new Vector3(6f, 3f, 0.5f), wall);
+            // Behind the spawn point: walk back toward it and the camera boom (5 m, 6.5 m locked) runs into it, so the Deoccluder has something to do.
+            Block(root, "Wall_Behind", new Vector3(0f, 1.5f, -6.5f), new Vector3(10f, 3f, 0.5f), wall);
             // Between the spawn point and the dummy at (-6, 7): a target you can see over there but cannot see through (line of sight).
             Block(root, "Wall_Sight", new Vector3(-5f, 1.5f, 3.5f), new Vector3(8f, 3f, 0.5f), wall);
             // Four 0.35 m steps (the controller's step offset is 0.4 m) up to a 1.4 m platform that holds a dummy.

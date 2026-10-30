@@ -16,6 +16,8 @@ namespace SleepingCalamity.EditorTools
 {
     public static class PrefabBuilder
     {
+        const float ShoulderScreenX = -0.12f;
+
         public static void Build()
         {
             MaterialLibrary.BuildAll();
@@ -177,17 +179,18 @@ namespace SleepingCalamity.EditorTools
             CinemachineRotationComposer composer = BuilderUtil.GetOrAdd<CinemachineRotationComposer>(t.gameObject);
             composer.Composition = ScreenComposerSettings.Default;
             composer.Damping = new Vector2(0.25f, 0.4f);
+            composer.Composition.ScreenPosition = new Vector2(ShoulderScreenX, 0f);   // a slight over-the-shoulder offset: the hero sits a little left of centre
             composer.TargetOffset = Vector3.zero;
 
             CinemachineDeoccluder deoccluder = BuilderUtil.GetOrAdd<CinemachineDeoccluder>(t.gameObject);
             deoccluder.CollideAgainst = obstacles;
             deoccluder.TransparentLayers = seeThrough;
-            deoccluder.MinimumDistanceFromTarget = 0.3f;
+            deoccluder.MinimumDistanceFromTarget = 0.05f;   // not 0.3: a wall closer than that to the pivot was ignored and the camera ended up behind it
             CinemachineDeoccluder.ObstacleAvoidance avoid = deoccluder.AvoidObstacles;
             avoid.Enabled = true;
             avoid.DistanceLimit = 0f;
             avoid.MinimumOcclusionTime = 0f;
-            avoid.CameraRadius = 0.4f;
+            avoid.CameraRadius = 0.3f;   // below the pivot-to-wall gap a hero can reach (0.4 m), or the camera ends up behind the wall
             avoid.Strategy = CinemachineDeoccluder.ObstacleAvoidance.ResolutionStrategy.PullCameraForward;
             avoid.MaximumEffort = 4;
             avoid.SmoothingTime = 0f;
