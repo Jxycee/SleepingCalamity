@@ -27,7 +27,7 @@ posts 18-22 cm real -> 26-30 cm here, panels ~0.8-1.4 m), PHASE1 3.1 palette, 3.
 
 Axes (Blender): z up, front -Y, metres. Origin = bottom centre of the ground-storey plaster line (front face of the
 plaster at y 0, plinth stands 6 cm proud). Width x -3.75..3.75, depth y 0..7.0 (upper storey front at y -0.45),
-eave (wall plate) 6.0 m, ridge 9.0 m (sags 22 cm at mid), chimney top about 10.6 m. Unity placement (brief 1):
+eave (wall plate) 6.0 m, ridge 9.6 m (sags 22 cm at mid), chimney top about 11.1 m; lean-to on the +X end. Unity placement (brief 1):
 local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transforms applied.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_facade_kit.py -- --out <scratch>
@@ -39,11 +39,14 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
 plus the plinth and step (chosen at placement).
 
-Status (2026-10-30, cloud): review 27.5/40 at round 8 (calibrated rubric, brief 3; first review 26/40 at round 6,
-target 31 not reached: rounds 7-8 gained +1 and +0.5, so stopped per the 1.5-point rule). 28.7k tris, audit PASS.
-Next: the PC exports the FBX; in Unity the wear attribute needs the kit's vertex-mask shader; what's left (plaster
-value variation, a stronger silhouette break such as a dormer or oriel, peg heads, real foliage in the flower box,
-8 tiny degenerate faces in the hinge curls) is listed in the branch report for the controller to park.
+Status (2026-10-30, cloud): review 28.5/40 at round 10 (calibrated rubric, brief 3). First review 26/40 (round 6);
+target 31 not reached after the 4-round limit: r7 +1 (plaster, flower box), r8 +0.5 (lean, kick, edge grime), r9 +1
+(heavy roof cap with rolled eave, deep-set windows, lean-to woodshed), r10 ~0 (lime patches, paint chips, bleached
+timber tops: too subtle at camera distance). About 31k tris, audit PASS (8 tiny degenerate faces in the hinge curls).
+Next visible gains: plaster value variation that survives distance (darker lime-wash panels, not noise), a dormer
+or oriel on the front slope, proud peg heads, B9 foliage in the flower box, a door hood beside B8's lantern; and a
+layout table so width, storeys and pitch can vary for neighbour houses. In Unity the wear attribute needs the kit's
+vertex-mask shader.
 """
 import sys, os, math, random, zlib
 import bpy, bmesh
@@ -74,9 +77,10 @@ JETTY = 0.45
 JOIST0, JOIST1 = 3.06, 3.28
 BRES0, BRES1 = 3.28, 3.58        # bressumer = upper sole plate
 PLATE0, PLATE1 = 5.78, 6.04      # wall plate (eave)
-RIDGE = 9.0
+RIDGE = 9.6                      # heavy cap: roof about 38% of the height (brief 5)
 RIDGE_SAG = 0.22
-OVER_EAVE, OVER_VERGE = 0.65, 0.45
+OVER_EAVE, OVER_VERGE = 0.85, 0.55
+CHIM_TOP = 10.9
 DOOR = (-0.68, 0.42, 0.16, 2.36)   # x0, x1, z0 (threshold top), z1: 1.10 x 2.20 clear
 GWIN = (1.35, 2.65, 1.33, 2.25)    # ground window clear opening
 UWIN = [(-2.41, -1.49), (0.89, 1.81)]
@@ -550,7 +554,7 @@ def window(pc, plane, x0, x1, z0, z1, k, sill_out=0.10):
     zt = z0 + (z1 - z0) * 0.68
     member(pc, 'oak', (x0, yc + 0.02, zt), (x1, yc + 0.02, zt), 0.06, 0.09, name='wt%d' % k, cham=0.01, wob=0.002)
     # glass and lead cames (a diamond lattice of thin iron-dark bars)
-    gy = plane + 0.12
+    gy = plane + 0.24     # deep-set: the glass sits back in a dark oak reveal
     quad_grid(pc, 'glass', [(x0, gy, z0), (x1, gy, z0), (x1, gy, z1), (x0, gy, z1)], 1, 1,
               uv_fn=lambda c: (c.x, c.z))
     # reveals (plaster-free inner jamb in oak so the opening never shows the interior)
@@ -791,14 +795,91 @@ def kit_roof():
         member(pc, 'oak', a, b, 0.30, 0.08, name=nm + 'f', up=(1, 0, 0), cham=0.02)
         ba = Vector((xv, DEPTH + OVER_EAVE * 0.6, a.z)); bb = Vector((xv, y_r, b.z))
         member(pc, 'oak', ba, bb, 0.30, 0.08, name=nm + 'b', up=(1, 0, 0), cham=0.02)
-    # gable cheeks: close the verge overhang ends (roof edge seen from the mid camera)
+    # rolled eave: a fat half-round of tile along the eave edge, the storybook "lip" of the cap
+    segs = 10; rr = 0.11; ring_rows = []
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
+    for i in range(nx * 2 + 1):
+        x = X0 + (X1 - X0) * i / (nx * 2)
+        c = roof_surface(x, 0.0) + nrm_dir * 0.0 + Vector((0, 0.02, -0.02))
+        row = []
+        for k in range(segs + 1):
+            a0 = math.pi * 0.15 + math.pi * 1.25 * k / segs
+            row.append(bm.verts.new(c + Vector((0, -math.cos(a0) * rr, math.sin(a0) * rr))))
+        ring_rows.append(row)
+    for i in range(len(ring_rows) - 1):
+        for k in range(segs):
+            f = bm.faces.new((ring_rows[i][k], ring_rows[i][k + 1], ring_rows[i + 1][k + 1], ring_rows[i + 1][k]))
+            for l in f.loops:
+                l[uvl].uv = (l.vert.co.x / TILE, (k + (l.vert in ring_rows[i] and 0 or 0)) * rr / TILE)
+    bm.normal_update()
+    _merge(pc, bm, 'roof')
+    return pc
+
+def kit_leanto():
+    """Lean-to woodshed on the +X end: breaks the side, a low tiled mono-pitch over a stacked woodpile."""
+    pc = Piece('Kit_LeanTo')
+    x0, x1, y0, y1 = W + 0.02, W + 1.55, 2.75, 5.35
+    zh, zl = 2.85, 2.05
+    for i, (x, y) in enumerate(((x1 - 0.1, y0 + 0.1), (x1 - 0.1, y1 - 0.1))):
+        member(pc, 'oak', (x, y, 0.0), (x, y, zl - 0.05), 0.18, 0.18, name='lp%d' % i, up=(1, 0, 0))
+    member(pc, 'oak', (x1 - 0.1, y0 - 0.1, zl), (x1 - 0.1, y1 + 0.1, zl), 0.18, 0.18, name='lplate', up=(1, 0, 0), sag=0.03)
+    # back and outer walls in vertical boards (the outer one half-height, so the pile shows)
+    R = rng('leanto')
+    nb = int((y1 - y0) / 0.2)
+    for i in range(nb):
+        y = y0 + 0.1 + i * (y1 - y0 - 0.2) / max(1, nb - 1)
+        if i in (0, nb - 1) or R.random() < 0.85:
+            hh = 1.05 + R.uniform(-0.03, 0.03)
+            add_box(pc, 'oak', (0.035, 0.18, hh), Matrix.Translation((x1 - 0.02, y, hh / 2 + 0.04)) @
+                    Matrix.Rotation(math.radians(R.uniform(-1.5, 1.5)), 4, 'X'), cham=0.008, long_axis=2,
+                    wob=0.004, seed=R.random() * 60)
+    # mono-pitch roof: deck plus tile courses
+    def rs(y, s):
+        return Vector((x0 + (x1 + 0.35 - x0) * s, y, zh + (zl - 0.12 - zh) * s))
+    ny = int((y1 - y0 + 0.5) / 0.42)
+    for c in range(4):
+        s0, s1 = c / 4, (c + 1) / 4 + 0.05
+        bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
+        nrm = Vector((zh - zl, 0, x1 - x0)).normalized()
+        for i in range(ny):
+            ya = y0 - 0.25 + (y1 - y0 + 0.5) * i / ny; yb = y0 - 0.25 + (y1 - y0 + 0.5) * (i + 1) / ny
+            j = R.uniform(-0.01, 0.01)
+            q = [rs(ya, 1 - s0) + nrm * (0.05 + j), rs(yb, 1 - s0) + nrm * (0.05 + j), rs(yb, max(0, 1 - s1)), rs(ya, max(0, 1 - s1))]
+            v = [bm.verts.new(p) for p in q]
+            f = bm.faces.new((v[1], v[0], v[3], v[2]))
+            for l in f.loops:
+                l[uvl].uv = (l.vert.co.y / TILE, (l.vert.co.x - x0) / TILE)
+            u = [bm.verts.new(p - nrm * 0.05) for p in q[:2]]
+            f = bm.faces.new((v[0], v[1], u[1], u[0]))
+            for l in f.loops:
+                l[uvl].uv = (l.vert.co.y / TILE, l.vert.co.z / TILE)
+        bm.normal_update(); _merge(pc, bm, 'roof')
+    quad_grid(pc, 'oak', [rs(y1 + 0.25, 0) , rs(y0 - 0.25, 0), rs(y0 - 0.25, 1), rs(y1 + 0.25, 1)], ny, 3,
+              uv_fn=lambda c: (c.y / TILE, c.x / TILE))
+    # woodpile: split logs, end grain toward the plaza
+    for row in range(6):
+        n = 9 - (row % 2)
+        for i in range(n):
+            r = R.uniform(0.075, 0.1)
+            x = x0 + 0.15 + (i + 0.5 * (row % 2)) * 0.165 + R.uniform(-0.01, 0.01)
+            if x > x1 - 0.25:
+                continue
+            z = 0.1 + row * 0.155
+            bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
+            bmesh.ops.create_cone(bm, cap_ends=True, segments=7, radius1=r, radius2=r * 0.95, depth=2.2)
+            bm.transform(Matrix.Translation((x, (y0 + y1) / 2 + R.uniform(-0.06, 0.06), z)) @
+                         Matrix.Rotation(math.pi / 2, 4, 'X') @ Matrix.Rotation(R.random() * 6.3, 4, 'Z'))
+            for f in bm.faces:
+                for l in f.loops:
+                    l[uvl].uv = (l.vert.co.x / TILE * 3, l.vert.co.y / TILE)
+            bm.normal_update(); _merge(pc, bm, 'oak_lt')
     return pc
 
 def kit_chimney():
     pc = Piece('Kit_Chimney')
     cx, cy = -2.05, 2.15
     z_base = roof_surface(cx, 0).z + 1.5
-    top = 10.25
+    top = CHIM_TOP
     lean = Matrix.Rotation(math.radians(1.3), 4, 'Y') @ Matrix.Rotation(math.radians(-0.8), 4, 'X')
     base = Matrix.Translation((cx, cy, z_base))
     h = top - z_base
@@ -890,7 +971,7 @@ def write_wear(ob, chimney_top=None):
             streak = noise.noise(Vector((p.x * 5.0, p.y * 5.0, p.z * 0.7)))
             r = max(0.0, 1 - p.z / (1.35 + 0.3 * nz + 0.25 * streak)) ** 1.2 * 0.9
             # broad lime-wash mottling (every surface), so no mass reads showroom-clean
-            r = max(r, 0.13 * max(0.0, noise.noise(p * 0.55 + Vector((3.1, 0.0, 1.7)))) +
+            r = max(r, 0.22 * max(0.0, noise.noise(p * 0.45 + Vector((3.1, 0.0, 1.7)))) +
                     0.06 * max(0.0, noise.noise(p * 2.3)))
             # run-off stains on plaster just below the sill rails and the girt, streaked downward
             if ob.name == 'Kit_Panels':
@@ -935,6 +1016,19 @@ def write_wear(ob, chimney_top=None):
                 b = max(0.0, 1 - (Vector((p.x - door_h.x, 0, (p.z - door_h.z) * 0.6))).length / 0.3) * 0.6
             if ob.name == 'Kit_Plinth' and n.z > 0.5 and p.z < DOOR[2] + 0.01 and DOOR[0] < p.x < DOOR[1]:
                 b = max(0.0, 1 - abs(p.x - (DOOR[0] + DOOR[1]) / 2) / 0.5) * 0.6
+            # fresh lime patch repairs: a few lighter, ragged-edged patches on the plaster
+            if ob.name == 'Kit_Panels':
+                pn = noise.noise(p * 0.9 + Vector((11.0, 4.0, 2.0))) + 0.25 * noise.noise(p * 6.0)
+                if pn > 0.34:
+                    b = max(b, min(0.55, (pn - 0.34) * 5.0))
+                    r = r * 0.4
+            # chipped paint: dark bare wood showing along the shutter and door boards
+            if ob.name in ('Kit_Shutters', 'Kit_Door'):
+                ch = noise.noise(p * 9.0 + Vector((0.0, 7.0, 0.0)))
+                r = max(r, min(0.6, max(0.0, ch - 0.22) * 3.0))
+            # sun-bleached tops of the exposed timbers
+            if ob.name in ('Kit_Posts', 'Kit_Rails', 'Kit_Braces', 'Kit_JettyBeams') and n.z > 0.55:
+                b = max(b, 0.35)
             attr.data[li].color = (min(1, r), min(1, g), min(1, b), 1.0)
 
 chimney_top_x = -2.05
@@ -946,7 +1040,7 @@ def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     root = bpy.data.objects.new('FacadeKit', None); bpy.context.scene.collection.objects.link(root)
     pieces = [kit_plinth(), kit_posts()[0], kit_rails(), kit_braces(), kit_jetty(), kit_panels(), kit_windows(),
-              kit_shutters(), kit_door(), kit_roof(), kit_chimney(), kit_flowerbox()]
+              kit_shutters(), kit_door(), kit_roof(), kit_chimney(), kit_flowerbox(), kit_leanto()]
     obs = []
     total = 0
     TIMBERS_L = [(lean_pt(a), lean_pt(b), hw) for (a, b, hw) in TIMBERS]
@@ -958,7 +1052,7 @@ def build():
         ob = bpy.data.objects.new(pc.name, me); bpy.context.scene.collection.objects.link(ob)
         ob.parent = root
         lean(me)
-        write_wear(ob, chimney_top=10.25)
+        write_wear(ob, chimney_top=CHIM_TOP)
         for p in me.polygons:
             p.use_smooth = False
         t = sum(len(p.vertices) - 2 for p in me.polygons); total += t
