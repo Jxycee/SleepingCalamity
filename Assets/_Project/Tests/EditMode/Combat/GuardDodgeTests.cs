@@ -119,7 +119,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Hitstop_IsCappedAtTwelveFramesPerHalfSecond()
         {
             var b = new HitstopBudget();
-            Assert.That(b.Request(10, 0f), Is.EqualTo(10), "a finisher gets its 10");
+            Assert.That(b.Request(14, 0f), Is.EqualTo(14), "an axe finisher gets its 14 (cap 16 per 0.5 s; was 10 of 12)");
             Assert.That(b.Request(4, 0.1f), Is.EqualTo(2), "only 2 left in the window");
             Assert.That(b.Request(4, 0.2f), Is.EqualTo(0));
             Assert.That(b.Request(4, 0.55f), Is.EqualTo(4), "the first grants aged out of the 0.5 s window");
@@ -128,10 +128,23 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Hitstop_FourFrames_OnNormalHits_TenOnFinishers()
+        public void Hitstop_SixFrames_OnNormalAxeHits_FourteenOnFinishers()
         {
-            Assert.That(AttackCatalog.Axe.Attacks[AttackSet.Hit1].HitstopFrames, Is.EqualTo(4));
-            Assert.That(AttackCatalog.Axe.Attacks[AttackSet.Finisher].HitstopFrames, Is.EqualTo(10));
+            // Readability pass: axe normal 4 -> 6, finisher 10 -> 14 (staff 3/8 -> 5/12, dagger 3/8 -> 4/11, bow 4/9 -> 5/12, charges 14/12/11/12).
+            Assert.That(AttackCatalog.Axe.Attacks[AttackSet.Hit1].HitstopFrames, Is.EqualTo(6));
+            Assert.That(AttackCatalog.Axe.Attacks[AttackSet.Finisher].HitstopFrames, Is.EqualTo(14));
+        }
+
+        [Test]
+        public void Hitstop_HeavyHitsFreezeLongerThanNormalOnes_ForEveryWeapon_AndFitTheBudget()
+        {
+            foreach (var set in new[] { AttackCatalog.Axe, AttackCatalog.Staff, AttackCatalog.Dagger, AttackCatalog.Bow })
+            {
+                int normal = set.Attacks[AttackSet.Hit1].HitstopFrames;
+                Assert.That(set.Attacks[AttackSet.Finisher].HitstopFrames, Is.GreaterThan(normal), set.Name + " finisher");
+                Assert.That(set.Attacks[AttackSet.Charge].HitstopFrames, Is.GreaterThan(normal), set.Name + " charge");
+                foreach (var a in set.Attacks) if (a != null) Assert.That(a.HitstopFrames, Is.LessThanOrEqualTo(HitstopBudget.CapFrames), a.Id + " fits the cap, or the budget would clip it");
+            }
         }
     }
 }

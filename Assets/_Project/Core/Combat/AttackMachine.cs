@@ -26,7 +26,8 @@ namespace SleepingCalamity.Core.Combat
         public const float ChainGraceSeconds = 1.2f;    // the combo counter survives this long after the last swing ends
 
         AttackSet _set;
-        float _frame;
+        float _frame, _prevFrame;
+        float _specialBuffered;   // seconds a special (shot, spell) press stays valid
         float _frozenFrames;
         float _buffered;          // seconds a press stays valid
         float _heldFor;
@@ -53,6 +54,9 @@ namespace SleepingCalamity.Core.Combat
         public int ComboCount => _hitsThisChain;
 
         public bool HitboxOn => Active && Current.HitOn.Contains(_frame);
+        // The hitbox was live at any moment the clock passed through on the last tick, not only at its end. A window one frame wide (the bow's shot, 4-5)
+        // is stepped over by a clock that moves more than a frame per tick (under 60 fps, or a hitch); the owner tests hits with this, so it is never missed.
+        public bool HitboxSwept => Active && !Current.HitOn.IsEmpty && Current.HitOn.End > _prevFrame && Current.HitOn.Start <= _frame;
         public bool Invulnerable => Active && Current.IFrames.Contains(_frame);
         public bool SuperArmor => Active && Current.SuperArmor.Contains(_frame);
         public bool Turning => Active && Current.Turn.Contains(_frame);
@@ -95,8 +99,10 @@ namespace SleepingCalamity.Core.Combat
         {
             _index = -1;
             _frame = 0f;
+            _prevFrame = 0f;
             _chargeQueued = false;
             _frozenFrames = 0f;
+            _specialBuffered = 0f;
             _sinceEnd = 0f;
         }
 
@@ -107,6 +113,19 @@ namespace SleepingCalamity.Core.Combat
             Begin(AttackSet.Special);
             return true;
         }
+
+        // Like TryStartSpecial, but a press that arrives while the machine is busy is remembered (InputBufferSeconds plus the time to the cancel frame) and
+        // starts the special the moment it can, the way a swing press is buffered. Without it a click in the shot's recovery was simply lost.
+        public bool RequestSpecial()
+        {
+            if (_set.Attacks[AttackSet.Special] == null) return false;
+            if (TryStartSpecial()) { _specialBuffered = 0f; return true; }
+            float untilCancel = Active ? Math.Max(0f, (Current.CancelFrom - _frame) / AttackData.FrameRate) : 0f;
+            _specialBuffered = InputBufferSeconds + untilCancel;
+            return false;
+        }
+
+        public void ClearSpecialBuffer() { _specialBuffered = 0f; }
 
         // Advances by dt seconds of real time. Returns true when a new attack began this tick (read CurrentIndex / SwingId).
         public bool Tick(float dt, in AttackInput input)
@@ -121,6 +140,12 @@ namespace SleepingCalamity.Core.Combat
                 _buffered = InputBufferSeconds + untilCancel;
             }
             else if (_buffered > 0f) _buffered = Math.Max(0f, _buffered - dt);
+
+            if (_specialBuffered > 0f)
+            {
+                if (_set.Attacks[AttackSet.Special] != null && CanCancel) { _specialBuffered = 0f; Begin(AttackSet.Special); return true; }
+                _specialBuffered = Math.Max(0f, _specialBuffered - dt);
+            }
 
             if (input.Held) _heldFor += dt;
             if (input.Released)
@@ -147,6 +172,7 @@ namespace SleepingCalamity.Core.Combat
                 _frozenFrames -= eat;
                 step -= eat;
             }
+            _prevFrame = _frame;
             _frame += step;
 
             AttackData cur = Current;
@@ -177,6 +203,7 @@ namespace SleepingCalamity.Core.Combat
             PriorHits = _hitsThisChain - _chainBase;
             _index = index;
             _frame = 0f;
+            _prevFrame = 0f;
             _frozenFrames = 0f;
             _buffered = 0f;
             _chargeQueued = false;

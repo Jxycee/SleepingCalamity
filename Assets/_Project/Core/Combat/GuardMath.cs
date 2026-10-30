@@ -55,10 +55,11 @@ namespace SleepingCalamity.Core.Combat
         }
     }
 
-    // Stacked hitstop is capped so a flurry (or a teammate's hits) never stutters the view: at most 12 frames granted in any 0.5 s.
+    // Stacked hitstop is capped so a flurry (or a teammate's hits) never stutters the view: at most 16 frames granted in any 0.5 s (was 12 before the
+    // readability pass lengthened heavy hits to 14: a finisher still gets all of its frames and the hit after it gets a couple).
     public sealed class HitstopBudget
     {
-        public const int CapFrames = 12;
+        public const int CapFrames = 16;
         public const float WindowSeconds = 0.5f;
 
         readonly System.Collections.Generic.Queue<(float t, int frames)> _grants = new System.Collections.Generic.Queue<(float, int)>();

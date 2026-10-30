@@ -9,7 +9,7 @@ namespace SleepingCalamity.Gameplay
 {
     public enum CombatCue : byte
     {
-        Swing, HitNormal, HitFinisher, HitCrit, Blocked, Parry, Dodge, PlayerHurt, Guarded, EnemyTelegraph, EnemySlam, EnemyDie, Heal, Pop, Shot, Spell, Down, Revive,
+        Swing, HitNormal, HitFinisher, HitCrit, Blocked, Parry, Dodge, PlayerHurt, Guarded, EnemyTelegraph, EnemySlam, EnemyDie, Heal, Pop, Shot, Spell, Down, Revive, Whiff,
     }
 
     public readonly struct LocalHit
@@ -25,9 +25,9 @@ namespace SleepingCalamity.Gameplay
     {
         public readonly Vector3 Position;
         public readonly int Amount;
-        public readonly bool Crit, Blocked, OnPlayer, Heal, WeakPart;
-        public DamageNumber(Vector3 position, int amount, bool crit, bool blocked, bool onPlayer, bool heal, bool weakPart)
-        { Position = position; Amount = amount; Crit = crit; Blocked = blocked; OnPlayer = onPlayer; Heal = heal; WeakPart = weakPart; }
+        public readonly bool Crit, Blocked, OnPlayer, Heal, WeakPart, Heavy;   // Heavy: a finisher or charge (bigger, orange)
+        public DamageNumber(Vector3 position, int amount, bool crit, bool blocked, bool onPlayer, bool heal, bool weakPart, bool heavy = false)
+        { Position = position; Amount = amount; Crit = crit; Blocked = blocked; OnPlayer = onPlayer; Heal = heal; WeakPart = weakPart; Heavy = heavy; }
     }
 
     public readonly struct AbsReport
@@ -48,6 +48,9 @@ namespace SleepingCalamity.Gameplay
         public static event Action<DamageNumber> NumberPopped;
         public static event Action<AbsReport> AbsReported;             // owner only: ABS and tech pops (the debug HUD's "ABS gains")
         public static event Action<float> CameraKick;                  // owner only: 0..1
+        public static event Action<Vector3, Vector3, bool> ArrowFired; // an aimed shot: from, to (the hit point or the end of its range), whether it hit; every peer
+        public static event Action<HeroCombat, bool> HeroHurt;         // a hero was hurt (guarded or not): the flinch; every peer
+        public static event Action<Vector3> HurtFrom;                  // owner only: world direction (flat) from the local hero toward what hurt it (the screen-edge flash)
 
         public static void RaiseSwing(HeroCombat hero, AttackData attack) => SwingStarted?.Invoke(hero, attack);
         public static void RaiseLocalHit(in LocalHit hit) => LocalHitLanded?.Invoke(hit);
@@ -55,6 +58,9 @@ namespace SleepingCalamity.Gameplay
         public static void RaiseNumber(in DamageNumber n) => NumberPopped?.Invoke(n);
         public static void RaiseAbs(in AbsReport r) => AbsReported?.Invoke(r);
         public static void RaiseKick(float strength) => CameraKick?.Invoke(strength);
+        public static void RaiseArrow(Vector3 from, Vector3 to, bool hit) => ArrowFired?.Invoke(from, to, hit);
+        public static void RaiseHeroHurt(HeroCombat hero, bool guarded) => HeroHurt?.Invoke(hero, guarded);
+        public static void RaiseHurtFrom(Vector3 towardSource) => HurtFrom?.Invoke(towardSource);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -65,6 +71,9 @@ namespace SleepingCalamity.Gameplay
             NumberPopped = null;
             AbsReported = null;
             CameraKick = null;
+            ArrowFired = null;
+            HeroHurt = null;
+            HurtFrom = null;
         }
     }
 }

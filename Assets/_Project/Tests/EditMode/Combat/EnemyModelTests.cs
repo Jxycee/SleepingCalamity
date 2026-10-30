@@ -29,6 +29,18 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Tier1Attack_IsThirtyFivePercentDown_AndTier2IsUntouched()
+        {
+            Assert.That(EnemyCatalog.Tier1Atk, Is.EqualTo(0.65f));
+            foreach (EnemyDefinition def in EnemyCatalog.All)
+            {
+                Assert.That(new EnemyModel(def, 1, 1).Atk, Is.EqualTo(def.Atk * 0.65f).Within(1e-4f), def.Name + " tier 1");
+                Assert.That(new EnemyModel(def, 2, 1).Atk, Is.EqualTo(def.Atk * 2.3f).Within(1e-4f), def.Name + " tier 2 keeps the 6.6 table value x2.3");
+            }
+            Assert.That(new EnemyModel(EnemyCatalog.Slime, 1, 1).AttackDamage(AttackCatalog.SlimeHop, PlayerVitals.BaseDef), Is.EqualTo(8), "a slime hop: 12 x 0.65 x 1.0 x 100/110 = 7.09 -> 8 (was 11)");
+        }
+
+        [Test]
         public void StatsTable_MatchesSection66()
         {
             Assert.That(new[] { EnemyCatalog.Slime.Hp, EnemyCatalog.RatKing.Hp, EnemyCatalog.Broom.Hp, EnemyCatalog.DoughWarden.Hp }, Is.EqualTo(new[] { 40, 90, 60, 600 }));
@@ -164,8 +176,8 @@ namespace SleepingCalamity.Tests.EditMode
             for (int i = 0; i < 7; i++) e.Rage.OnHit();
             e.Rage.Tick(1f);
             int raging = e.AttackDamage(AttackCatalog.RatLunge, PlayerVitals.BaseDef);
-            Assert.That(calm, Is.EqualTo(18), "18 x 1.1 x 100/110 = 18.0");
-            Assert.That(raging, Is.EqualTo(24), "x1.3");
+            Assert.That(calm, Is.EqualTo(12), "tier 1 attack is x0.65 (readability pass): 18 x 0.65 = 11.7; 11.7 x 1.1 x 100/110 = 11.7 -> 12 (was 18)");
+            Assert.That(raging, Is.EqualTo(16), "x1.3 = 15.21 -> 16 (was 24)");
         }
 
         // ---- rewards ----

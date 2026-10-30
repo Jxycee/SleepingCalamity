@@ -57,7 +57,9 @@ namespace SleepingCalamity.Gameplay
         // ---- local on every peer ----
         private float _attackClock;                      // seconds since this peer saw the current attack begin
         private int _seenSerial;
-        private float _flash;
+        private float _flash, _flashHold, _hitReact, _hitHeavy;
+        private float _localHitAt = -10f;
+        private Vector3 _hitDir;
 
         public EnemyDefinition Def => EnemyCatalog.Get(NetKind.Value);
         public int Tier => NetTier.Value;
@@ -68,12 +70,37 @@ namespace SleepingCalamity.Gameplay
         public float AttackFrame => _attackClock * AttackData.FrameRate;
         public bool Attacking => CurrentAttack != null && AttackFrame < CurrentAttack.TotalFrames;
         public bool HitboxOn => Attacking && CurrentAttack.HitOn.Contains(AttackFrame);
-        public float Flash => _flash;     // 0..1, set when this peer sees a hit on it; presentation fades it
+        // Hit feedback for presentation (every peer): Flash is 1 (full white) for FlashHoldSeconds after a landed hit, then fades in FlashFadeSeconds.
+        // HitReact is 1 on the hit and falls to 0 over HitReactSeconds (a squash and a small shove away from the attacker, HitDirection, scaled by HitHeavy).
+        public const float FlashHoldSeconds = 0.08f, FlashFadeSeconds = 0.12f, HitReactSeconds = 0.2f;
+        public float Flash => _flashHold > 0f ? 1f : _flash;
+        public float HitReact => _hitReact;
+        public float HitHeavy => _hitHeavy;
+        public Vector3 HitDirection => _hitDir;   // world, flat, from the attacker toward this enemy (zero when unknown)
         public Targetable Target => _targetable;
 
         // The centre of the attack's hitbox: the enemy itself, or the spot a lob was aimed at.
         public Vector3 AttackCentre => CurrentAttack != null && CurrentAttack.Origin == HitOrigin.GroundAtTarget ? NetAttackOrigin.Value : transform.position;
         public float YawDeg => transform.eulerAngles.y;
+
+        // The attacker's own client calls this at the moment of contact (before the host answers), so the flash and squash are instant. The NetHp change that
+        // follows a round trip later is then ignored for a moment (OnHpChanged), so one hit never flashes twice. heavy: 0 light .. 1 finisher or charge.
+        public void ShowHit(Vector3 attackerPos, float heavy)
+        {
+            _localHitAt = Time.time;
+            Vector3 away = transform.position - attackerPos;
+            away.y = 0f;
+            StartHitFeedback(away, heavy);
+        }
+
+        private void StartHitFeedback(Vector3 awayFlat, float heavy)
+        {
+            _flashHold = FlashHoldSeconds;
+            _flash = 1f;
+            _hitReact = 1f;
+            _hitHeavy = Mathf.Clamp01(heavy);
+            _hitDir = awayFlat.sqrMagnitude > 1e-4f ? awayFlat.normalized : Vector3.zero;
+        }
 
         public Vector3 PartWorldPosition(int i)
         {
@@ -141,7 +168,7 @@ namespace SleepingCalamity.Gameplay
 
         private void OnHpChanged(int previous, int current)
         {
-            if (current < previous) _flash = 1f;
+            if (current < previous && Time.time - _localHitAt > 0.5f) StartHitFeedback(Vector3.zero, 0.3f);   // someone else's hit (or a remote client's): no direction known
         }
 
         private void OnPhaseChanged(byte previous, byte current)
@@ -154,7 +181,9 @@ namespace SleepingCalamity.Gameplay
         {
             float dt = Time.deltaTime;
             if (_attackClock < 999f) _attackClock += dt;
-            if (_flash > 0f) _flash = Mathf.Max(0f, _flash - dt * 6f);
+            if (_flashHold > 0f) _flashHold -= dt;
+            else if (_flash > 0f) _flash = Mathf.Max(0f, _flash - dt / FlashFadeSeconds);
+            if (_hitReact > 0f) _hitReact = Mathf.Max(0f, _hitReact - dt / HitReactSeconds);
             if (IsServer && IsSpawned) ServerUpdate(dt);
         }
 
@@ -232,10 +261,14 @@ namespace SleepingCalamity.Gameplay
             return best;
         }
 
+        // How far a glob can be lobbed (m). Was 8.5: the first playtest read a hit from that far as "hit from a distance" with nothing flying at you; the
+        // glob is now drawn in flight (EnemyVisual) and lobbed from at most 6.5 m.
+        public const float LobReach = 6.5f;
+
         private float Reach(AttackData a)
         {
-            if (a.Origin == HitOrigin.GroundAtTarget) return 8.5f;
-            return (a.Shape == HitShape.Circle ? a.Range : a.Range + a.LungeMeters * 0.7f) + 0.2f;
+            if (a.Origin == HitOrigin.GroundAtTarget) return LobReach;
+            return a.Range + a.LungeMeters * 0.7f + 0.2f;   // a lunge or hop lands up to LungeMeters ahead, the strike is Range around the landing spot
         }
 
         private AttackData ChooseAttack(float dist)
@@ -250,7 +283,6 @@ namespace SleepingCalamity.Gameplay
                 bool lob = a.Origin == HitOrigin.GroundAtTarget;
                 if (lob && dist < 3.2f) continue;
                 if (dist > Reach(a)) continue;
-                if (a.Shape == HitShape.Circle && !lob && dist > a.Range + Def.Radius + 0.4f) continue;
                 pick = a;
                 break;
             }

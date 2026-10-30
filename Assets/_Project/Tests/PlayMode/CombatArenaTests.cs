@@ -24,7 +24,61 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator TearDown()
         {
             SceneFlow.DevCombatArena = false;
+            Time.captureDeltaTime = 0f;
             yield return PlayModeHarness.TearDownApp();
+        }
+
+        // Catches the bow bug from the first playtest ("no arrow fires at all, sometimes"): the shot's hitbox is one 60 Hz frame, so on a slow frame rate the
+        // attack clock stepped over it. Here every frame lasts 50 ms (3 attack frames per tick), which skipped the window every time before the fix. The shot
+        // must draw an arrow and damage a (short) slime six metres away with no lock-on.
+        [UnityTest]
+        public IEnumerator Solo_Bow_FiresAndHits_EvenWhenTheFrameRateIsLow()
+        {
+            yield return StartCombatSolo();
+            AppBootstrap app = AppBootstrap.Current;
+            var heroObject = app.NetworkManager.LocalClient.PlayerObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            combat.CritChance = 0f;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            var input = new FakeInputService();
+            heroObject.GetComponent<HeroLocomotion>().Input = input;
+            heroObject.GetComponent<TargetLockController>().Input = input;
+            HeroCombat hero = heroObject.GetComponent<HeroCombat>();
+            hero.Input = input;
+            hero.OwnerSetWeapon(3);   // the bow and sword
+            yield return PlayModeHarness.WaitUntil(() => hero.WeaponKey == WeaponCatalog.BowSword, 3f, "the bow never became the held weapon");
+            yield return Seconds(0.6f);
+
+            Enemy slime = combat.SpawnEnemy(EnemyKind.Slime, 1, heroObject.transform.position + heroObject.transform.forward * 6f, ai: false);
+            int arrows = 0, landed = 0;
+            System.Action<Vector3, Vector3, bool> onArrow = (from, to, hit) => { arrows++; if (hit) landed++; };
+            CombatEvents.ArrowFired += onArrow;
+            int hp = slime.NetHp.Value;
+            Time.captureDeltaTime = 0.05f;
+            try
+            {
+                input.Frame.SecondaryHeld = true;
+                yield return Seconds(0.4f);
+                Assert.That(hero.Aiming, Is.True, "holding the secondary button aims the bow");
+                input.Frame.PrimaryPressed = true;
+                input.Frame.PrimaryHeld = true;
+                yield return null;
+                input.Frame.PrimaryPressed = false;
+                input.Frame.PrimaryHeld = false;
+                input.Frame.PrimaryReleased = true;
+                yield return null;
+                input.Frame.PrimaryReleased = false;
+                yield return PlayModeHarness.WaitUntil(() => arrows >= 1, 3f, "no arrow was fired at 20 fps");
+                yield return PlayModeHarness.WaitUntil(() => slime.NetHp.Value < hp, 3f, "the arrow flew but did not hurt the slime six metres ahead");
+            }
+            finally
+            {
+                Time.captureDeltaTime = 0f;
+                CombatEvents.ArrowFired -= onArrow;
+                input.Frame = default;
+            }
+            Assert.That(landed, Is.GreaterThanOrEqualTo(1), "the arrow reported a hit");
         }
 
         private static IEnumerator StartCombatSolo()
@@ -48,10 +102,10 @@ namespace SleepingCalamity.Tests.PlayMode
             var hero = app.NetworkManager.LocalClient.PlayerObject;
             HeroVitals vitals = hero.GetComponent<HeroVitals>();
 
-            yield return PlayModeHarness.WaitUntil(() => Enemy.All.Count >= 4, Timeout, "wave 1 never spawned its four slimes");
+            yield return PlayModeHarness.WaitUntil(() => Enemy.All.Count >= 2, Timeout, "wave 1 never spawned its two slimes");
             int slimes = 0;
             foreach (Enemy e in Enemy.All) if (e.Def.Kind == EnemyKind.Slime) slimes++;
-            Assert.That(slimes, Is.EqualTo(4), "wave 1 is four jam-jar slimes (solo)");
+            Assert.That(slimes, Is.EqualTo(2), "wave 1 is two jam-jar slimes (solo; was four before the readability pass)");
 
             int attacks = 0;
             yield return PlayModeHarness.WaitUntil(() =>
@@ -137,7 +191,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(hero.Guarding, Is.True);
             slime.ServerForceAttack(AttackCatalog.TestNova, heroObject.transform.position);
             yield return Seconds(1.3f);
-            Assert.That(vitals.Model.Hp, Is.EqualTo(97), "a held guard takes a fifth of the damage, rounded up");
+            Assert.That(vitals.Model.Hp, Is.EqualTo(98), "a held guard takes a fifth of the damage, rounded up: the nova hits for 8 (12 x 0.65 x 100/110 = 7.09 -> 8), x0.2 = 1.6 -> 2 (was 11 -> 3, hp 97)");
 
             // Parry: the shield comes up just before the hit, inside the 6-frame window: no damage, the attacker is stunned, the dagger earns its parry ABS.
             input.Frame.SecondaryHeld = false;
