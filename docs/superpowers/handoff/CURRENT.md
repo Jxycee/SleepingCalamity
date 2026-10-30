@@ -17,8 +17,9 @@
 5. Open: M2/M3/M7 2-player walks wait for a second player. M4/M6 persistence must key growth by the persistent player id, not the session client id (`CombatHost.cs:95`).
 
 ## Branches and worktrees
-- `main` at `cf6a6e5` (green). Merged this session: `m3-combat`, `m2-hero-anim`, `m3-readability`.
-- Merged: `m1-foundation`, `m2-hero-camera`, `m3-combat`, `m4-*`, `m8-*`. Worktrees `agent-a3f4b7d611d7e2923` (M3), `agent-a884291bf0ad9ef08` (M8), `agent-ad25d53219a200b3c` (M4) are finished; their imported Libraries can be reused.
+- `main` at `4a08f82` (green; last Unity check PASS on `5c4bced`, later merges are tools/docs only), local and GitHub in sync. `claude/intelligent-cray-i7vppb` (cloud unity.sh cold-Library timeout) merged 2026-10-30.
+- Open: `claude/practical-wozniak-vk1q0j` = B11 cellar lantern, in progress in a cloud session (don't touch).
+- Cleanup 2026-10-30: finished agent worktrees and all merged local branches removed. Merged remote branches still on GitHub (deletion needs the user's OK). Session worktrees `determined-boyd-9ac4b8` and `infallible-bassi-581d4e` stay until their sessions are archived.
 
 ## Blockers and open questions
 - The asset skills were rewritten on 2026-10-30. Some legacy FishGame tools still need rework before the art batches; see the tool table in `sc-asset-craft` section 0b.
