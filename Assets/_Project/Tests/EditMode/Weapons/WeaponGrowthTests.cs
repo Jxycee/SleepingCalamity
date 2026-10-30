@@ -259,7 +259,7 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
             var w = BuiltUpReady();
             w.Fit(AttachmentKind.Heartwood);
             w.AddAbs(33f);
-            var snapshot = (w.DefinitionId, w.Level, w.Abs, w.Stats, w.Fitted.Count);
+            var snapshot = (w.DefinitionId, w.Level, w.Abs, w.Stats);
 
             Assert.That(w.CanReroute, Is.False);
             Assert.That(w.TryBuildUp(), Is.True);
@@ -267,8 +267,8 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
             w.AddAbs(500f);                                  // growth after the build-up is lost by the re-route
             Assert.That(w.TryReroute(), Is.True);
 
-            Assert.That((w.DefinitionId, w.Level, w.Abs, w.Stats, w.Fitted.Count), Is.EqualTo(snapshot));
-            Assert.That(w.Fitted[0], Is.EqualTo(AttachmentKind.Heartwood));
+            Assert.That((w.DefinitionId, w.Level, w.Abs, w.Stats), Is.EqualTo(snapshot));
+            Assert.That(w.Fitted, Is.Empty, "the Heartwood was absorbed after the build-up; re-route restores stats, not attachments");
             Assert.That(w.CanReroute, Is.False);
             Assert.That(w.TryReroute(), Is.False);
             Assert.That(w.TryBuildUp(), Is.True, "and it can be built up again");

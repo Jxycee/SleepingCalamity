@@ -164,6 +164,19 @@ namespace SleepingCalamity.EditorTools
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene, assetPath))
                 throw new System.InvalidOperationException("Could not save scene " + assetPath);
+            NormalizeSceneFile(assetPath);
+        }
+
+        // Unity numbers new objects at random on every save, so an unchanged scene would differ in git after each build. Renumber the saved
+        // file from the hierarchy (SceneFileNormalizer) so a second build on a clean tree changes nothing.
+        static void NormalizeSceneFile(string assetPath)
+        {
+            string full = System.IO.Path.GetFullPath(assetPath);
+            string text = System.IO.File.ReadAllText(full);
+            string normal = SceneFileNormalizer.Normalize(text);
+            if (normal == text) return;
+            System.IO.File.WriteAllText(full, normal, new System.Text.UTF8Encoding(false));
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
         }
     }
 }

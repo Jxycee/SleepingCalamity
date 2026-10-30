@@ -57,12 +57,13 @@ namespace SleepingCalamity.Core.Weapons
         public static List<AbsCredit> Credit(IReadOnlyList<HitRecord> hits, double killTime, float killValue)
         {
             var result = new List<AbsCredit>();
-            if (hits == null) return result;
+            if (hits == null || double.IsNaN(killTime) || double.IsInfinity(killTime)) return result;
+            if (float.IsNaN(killValue) || float.IsInfinity(killValue) || killValue <= 0f) return result;
             var latest = new Dictionary<string, HitRecord>();
             var order = new List<string>();
             foreach (var h in hits)
             {
-                if (h.PlayerId == null) continue;
+                if (h.PlayerId == null || double.IsNaN(h.Time) || double.IsInfinity(h.Time)) continue;
                 if (h.Time > killTime || killTime - h.Time > CreditWindowSeconds) continue;
                 if (!latest.TryGetValue(h.PlayerId, out var prev)) order.Add(h.PlayerId);
                 if (prev.PlayerId == null || h.Time >= prev.Time) latest[h.PlayerId] = h;
