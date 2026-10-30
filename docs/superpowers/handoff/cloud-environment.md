@@ -22,6 +22,8 @@ Cloud environment menu in the session's title bar > **Edit**.
 
 If `unity.sh` logs exit 198 / "No valid Unity Editor license found", the activation didn't happen: `~/.sc-setup/unity-license.log` says why.
 
+The first Unity launch in a new container imports the whole project into an empty `Library/` (about 7 minutes on 2026-10-30; later launches take 1-2 minutes). `unity.sh` sees the missing `Library/ArtifactDB` and raises its default timeout from 5 to 20 minutes for that run; an explicit `--timeout` still wins.
+
 ## 2. What a session gets
 
 First session: about 7 minutes for everything except Unity, then the Unity editor (4.2 GB download, about 9 GB unpacked) finishes in the background about 5 minutes later. `bash Tools/cloud/setup.sh --check` shows the state; `--wait` blocks until Unity is ready, and restarts the download if the background run was cut off.
