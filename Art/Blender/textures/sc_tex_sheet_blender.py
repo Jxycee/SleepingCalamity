@@ -125,10 +125,13 @@ for name in names:
     d = os.path.join(batch_dir, name)
     decal = name in ('moss', 'grime', 'drip', 'crack'); trim = name.startswith('trim_')
     tiles = 1 if (decal or trim) else 2
-    pl = plane(tile_m * 2 if not (decal or trim) else 2.6, tiles)
+    pl = plane(tile_m * 2 if not (decal or trim) else (1.5 if decal else 2.6), tiles)
     pl.data.materials.append(material(name, d, decal=decal))
-    sp = sphere(0.62, 1 if not trim else 1)
-    sp.data.materials.append(material(name, d, decal=decal))
+    if not decal:   # decals are judged flat: the plane only, seen from above and close
+        sp = sphere(0.62, 1)
+        sp.data.materials.append(material(name, d, decal=decal))
+    co.location = (0, -5.4, 3.5) if not decal else (0, -1.1, 2.6)
+    co.rotation_euler = Vector((0, 5.4, -3.5) if not decal else (0, 1.1, -2.6)).to_track_quat('-Z', 'Y').to_euler()
     render(os.path.join(out_dir, name + '.png'))
     print('CELL', name)
     clear()

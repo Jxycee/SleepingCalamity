@@ -145,19 +145,37 @@ def window(res, margin=0.12):
     return wx[None, :] * wx[:, None]
 
 def decal_moss():
+    """Moss cushions: ~420 rounded domes of 14-60 px radius (olive #616e2e at the base to yellow-green #b6ab28 on the sunlit tops),
+    soft alpha edges, real height for the normal map. Dome centres cluster inside a low-frequency patch mask."""
     n = D
-    low = G.fbm_periodic(n, 101, beta=3.0, kmax=7)
-    mask = G.smoothstep(low * window(n, 0.3) + 0.35 * window(n, 0.3), 0.36, 0.62)
-    clump = G.fbm_periodic(n, 102, beta=1.4, kmin=24, kmax=260)
-    fine = G.fbm_periodic(n, 103, beta=1.0, kmin=60, kmax=420)
-    h = (clump * 0.7 + fine * 0.3)
-    a = np.clip(mask * (0.75 + 1.4 * (h - 0.4)), 0, 1)
-    g1, g2 = G.srgb2lin(np.array([0x61, 0x6e, 0x2e]) / 255.0), G.srgb2lin(np.array([0xb6, 0xab, 0x28]) / 255.0)
-    t = G.smoothstep(G.fbm_periodic(n, 104, beta=2.0, kmin=4, kmax=40), 0.58, 0.78)[..., None] * 0.7
-    lin = (g1[None, None] * (1 - t) + g2[None, None] * t) * (0.45 + 1.1 * (h[..., None] - 0.3).clip(0, 1) + 0.25)
+    rng = np.random.default_rng(101)
+    patch = G.smoothstep(G.fbm_periodic(n, 101, beta=3.0, kmax=6) + 0.45 * window(n, 0.35), 0.50, 0.70) * window(n, 0.12)
+    h = np.zeros((n, n), np.float32); tone = np.zeros((n, n), np.float32)
+    placed = 0
+    for _ in range(4000):
+        if placed >= 420:
+            break
+        cx, cy = rng.integers(0, n, 2)
+        if patch[cy, cx] < 0.55:
+            continue
+        r = int(rng.uniform(14, 60) * (0.6 + 0.6 * patch[cy, cx])); placed += 1
+        y0, y1, x0, x1 = max(cy - r, 0), min(cy + r + 1, n), max(cx - r, 0), min(cx + r + 1, n)
+        yy, xx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+        d = np.sqrt(((xx - cx) / (r * rng.uniform(0.8, 1.2))) ** 2 + ((yy - cy) / r) ** 2)
+        dome = np.sqrt(np.clip(1 - d * d, 0, 1)) * rng.uniform(0.6, 1.0)
+        upd = dome > h[y0:y1, x0:x1]
+        h[y0:y1, x0:x1] = np.where(upd, dome, h[y0:y1, x0:x1])
+        tone[y0:y1, x0:x1] = np.where(upd, rng.uniform(0.0, 1.0), tone[y0:y1, x0:x1])
+    fine = G.fbm_periodic(n, 103, beta=1.0, kmin=80, kmax=500)
+    hh = np.clip(h + 0.08 * (fine - 0.5), 0, 1.2)
+    a = G.smoothstep(G.blur(h, 2.0), 0.02, 0.30) * window(n, 0.06)
+    g1, g2 = G.hex2lin('#616e2e'), G.hex2lin('#b6ab28')
+    t = np.clip(tone * 0.45 + hh * 0.55 - 0.42, 0, 1)[..., None]   # mostly olive, yellow-green only on the sunlit tops
+    shade = (0.30 + 0.55 * hh)[..., None]
+    lin = (g1[None, None] * (1 - t) + g2[None, None] * t) * shade
     alb = np.dstack([G.lin2srgb(lin), a])
-    nrm = G.normal_from_height(h * 9.0, 1.0)
-    orm = np.stack([np.clip(0.4 + h * 0.8, 0, 1), np.full((n, n), 0.92, np.float32), np.zeros((n, n), np.float32)], -1)
+    nrm = G.normal_from_height(hh * 20.0, 1.0)
+    orm = np.stack([np.clip(0.35 + hh * 0.9, 0, 1), np.full((n, n), 0.92, np.float32), np.zeros((n, n), np.float32)], -1)
     return alb, nrm, orm
 
 def decal_grime():
@@ -190,13 +208,13 @@ def decal_drip():
         bulb = 5.0 * np.exp(-((yy - ln) / 14.0) ** 2) * (yy < ln + 18)
         half = np.where(yy <= ln, half + bulb, 0.0)
         m = G.smoothstep(half - np.abs(xx - cx - wob), -1.0, 1.5) * (yy <= ln + 16)
-        a = np.maximum(a, m * (0.75 - 0.35 * t))
+        a = np.maximum(a, m * (0.95 - 0.25 * t))
         core = np.maximum(core, G.smoothstep(half * 0.45 - np.abs(xx - cx - wob), -1.0, 1.0) * (yy <= ln))
     top_stain = G.smoothstep(1 - yy / n, 0.88, 1.0) * G.fbm_periodic(n, 302, beta=2.0, kmin=4, kmax=60)
     a = np.clip(np.maximum(a, top_stain * 0.5), 0, 1)
-    col = G.srgb2lin(np.array([0x3a, 0x31, 0x28]) / 255.0)[None, None] * (1 - 0.35 * core[..., None])
+    col = G.srgb2lin(np.array([0x2a, 0x22, 0x1a]) / 255.0)[None, None] * (1 - 0.35 * core[..., None])
     alb = np.dstack([G.lin2srgb(col), a * window(n, 0.04)])
-    nrm = G.normal_from_height(G.blur(a, 1.2) * 4.0, 1.0)
+    nrm = G.normal_from_height(G.blur(a, 1.2) * 12.0, 1.0)
     orm = np.stack([np.ones((n, n), np.float32), np.clip(0.8 - 0.55 * core, 0.2, 1), np.zeros((n, n), np.float32)], -1)
     return alb, nrm, orm
 
@@ -216,11 +234,11 @@ def decal_crack():
             dr.line([pts[-2], pts[-1]], fill=255, width=int(round(w * S)))
             if depth < 3 and rng.random() < 0.05 and i > 8:
                 walk(x, y, ang + rng.choice([-1, 1]) * rng.uniform(0.5, 1.0), length * rng.uniform(0.25, 0.5), width * 0.6, depth + 1)
-    walk(n * 0.5 + rng.uniform(-40, 40), 30, math.pi / 2, n * 0.95, 7.0, 0)
+    walk(n * 0.5 + rng.uniform(-40, 40), 30, math.pi / 2, n * 0.95, 11.0, 0)
     c = np.asarray(img.resize((n, n), Image.LANCZOS), np.float32) / 255.0
-    h = -(G.blur(c, 1.2)) * 8.0 + G.blur(c, 6.0) * 2.5           # groove with a slightly raised broken lip
+    h = -(G.blur(c, 1.2)) * 16.0 + G.blur(c, 6.0) * 5.0           # groove with a slightly raised broken lip
     halo = G.blur(c, 9.0)
-    a = np.clip(np.maximum(c * 0.95, halo * 0.35), 0, 1) * window(n, 0.03)
+    a = np.clip(np.maximum(c * 1.0, halo * 0.5), 0, 1) * window(n, 0.03)
     col = G.srgb2lin(np.array([0x1c, 0x18, 0x15]) / 255.0)[None, None] * (1.0 + 0.8 * (1 - c[..., None]))
     alb = np.dstack([G.lin2srgb(col), a])
     nrm = G.normal_from_height(h, 1.0)
