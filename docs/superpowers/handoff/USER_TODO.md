@@ -22,7 +22,7 @@ These are the steps only the user can take. Claude keeps this list current: when
 - **Set up the cloud environment** (title-bar environment menu > Edit; details in `docs/superpowers/handoff/cloud-environment.md`):
   1. Setup script: paste the whole of `Tools/cloud/setup.sh`.
   2. Network access: Full.
-  3. Environment variable `UNITY_LICENSE`: the contents of `C:\ProgramData\Unity\Unity_lic.ulf`. Without it the cloud can compile and test Core but can't launch Unity.
+  3. Environment variables `UNITY_EMAIL` and `UNITY_PASSWORD` (your Unity account; it must not use two-factor sign-in). The cloud activates its own Personal licence with them. Without them it can compile and test Core but can't launch Unity.
   4. Optional: a second environment, "SleepingCalamity Art", with the same settings and `SC_PROFILE="${SC_PROFILE:-art}"` in its script, for live Blender.
 
 ## After M3 is reviewed and merged (the next session will tell you)
