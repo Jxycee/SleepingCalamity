@@ -215,10 +215,11 @@ namespace SleepingCalamity.Tests.PlayMode
             host.Input.Frame.DodgePressed = true;
             yield return null;
             host.Input.Frame.DodgePressed = false;
-            yield return Seconds(0.2f);
-            Assert.That(host.Locomotion.IsDodging, Is.True, "the host is dodging");
-            Assert.That(hostProxyOnClient.GetComponent<HeroNetState>().StanceIsDodging, Is.True, "the dodge reached the client's copy");
-            yield return Seconds(0.6f);
+            string why = "grounded=" + host.Locomotion.IsGrounded + " context=" + host.Input.Context + " pos=" + host.Position;
+            yield return PlayModeHarness.WaitUntil(() => host.Locomotion.IsDodging, 1f, "the host never started dodging (" + why + ")");
+            yield return PlayModeHarness.WaitUntil(() => hostProxyOnClient.GetComponent<HeroNetState>().StanceIsDodging || !host.Locomotion.IsDodging, 1f, "the dodge flag never arrived");
+            Assert.That(hostProxyOnClient.GetComponent<HeroNetState>().StanceIsDodging, Is.True, "the dodge reached the client's copy before it ended");
+            yield return Seconds(0.7f);
             Assert.That(host.Locomotion.IsDodging, Is.False, "a dodge lasts half a second");
 
             // ---- independent movement: the host strolls right (free), the client walks toward its locked target ----

@@ -59,6 +59,21 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(peak, Is.EqualTo(MovementMath.JumpHeight).Within(0.02f));
         }
 
+        // Catches: a grounded push that shrinks with the frame rate (isGrounded flickering false on a fast machine).
+        [Test]
+        public void GroundedPush_CoversTheSnapDistanceAtAnyFrameRate()
+        {
+            Assert.That(MovementMath.GroundedPush(0.1f), Is.EqualTo(MovementMath.GroundedStickVelocity).Within(1e-4f), "very slow frames: the plain -2 m/s");
+            for (int fps = 60; fps <= 1000; fps += 140)
+            {
+                float dt = 1f / fps;
+                float moved = -MovementMath.GroundedPush(dt) * dt;
+                Assert.That(moved, Is.GreaterThanOrEqualTo(System.Math.Min(MovementMath.GroundSnapDistance, -MovementMath.TerminalVelocity * dt) - 1e-5f), fps + " fps");
+            }
+            Assert.That(MovementMath.GroundedPush(1e-5f), Is.EqualTo(MovementMath.TerminalVelocity).Within(1e-4f), "never faster than terminal velocity");
+            Assert.That(MovementMath.GroundedPush(0f), Is.EqualTo(MovementMath.GroundedStickVelocity).Within(1e-4f));
+        }
+
         [Test]
         public void JumpAssist_CoyoteAndBuffer()
         {

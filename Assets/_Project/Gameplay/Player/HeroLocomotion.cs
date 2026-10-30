@@ -157,7 +157,7 @@ namespace SleepingCalamity.Gameplay
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
             // ---- vertical ----
-            if (grounded && _vy < 0f) _vy = MovementMath.GroundedStickVelocity;
+            if (grounded && _vy < 0f) _vy = MovementMath.GroundedPush(dt);
             if (_jump.Tick(dt, grounded, intent.JumpPressed && !dodging))
                 _vy = MovementMath.JumpVelocity(MovementMath.JumpHeight, MovementMath.Gravity);
             float dy = MovementMath.VerticalStep(ref _vy, MovementMath.Gravity, MovementMath.TerminalVelocity, dt);

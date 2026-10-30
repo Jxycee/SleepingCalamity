@@ -15,6 +15,7 @@ namespace SleepingCalamity.Core
         public const float MoveDeadZone = 0.1f;
         public const float GroundAccel = 40f, AirAccel = 6f;
         public const float Gravity = -22f, TerminalVelocity = -30f, GroundedStickVelocity = -2f;
+        public const float GroundSnapDistance = 0.1f;   // the downward push per frame while grounded, whatever the frame rate (see GroundedPush)
         public const float JumpHeight = 1.2f, CoyoteTime = 0.1f, JumpBufferTime = 0.1f;
         public const float TurnRateDegPerSec = 720f, LockedTurnRateDegPerSec = 900f;
         public const float DodgeDuration = 0.5f, DodgeSpeed = 7.0f, DodgeCooldown = 0.15f;   // 0.5 s roll (6.5); i-frames arrive with M3
@@ -68,6 +69,16 @@ namespace SleepingCalamity.Core
             float dy = vy * dt + 0.5f * gravity * dt * dt;
             vy = MathF.Max(vy + gravity * dt, terminalVelocity);
             return dy;
+        }
+
+        // The downward velocity that keeps a CharacterController grounded: at least GroundedStickVelocity, and enough to cover GroundSnapDistance
+        // in one frame. A fixed -2 m/s moves a controller only a few millimetres per frame at a few hundred fps, less than its skin width, and
+        // isGrounded then flickers false (no jump, no dodge, no sprint on a fast machine).
+        public static float GroundedPush(float dt)
+        {
+            float needed = dt > 0f ? GroundSnapDistance / dt : -GroundedStickVelocity;
+            float push = needed > -GroundedStickVelocity ? needed : -GroundedStickVelocity;
+            return -(push > -TerminalVelocity ? -TerminalVelocity : push);
         }
 
         // Yaw (degrees, 0 = +Z, 90 = +X) of a flat vector; 0 for a zero vector.
