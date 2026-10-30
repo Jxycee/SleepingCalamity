@@ -27,38 +27,38 @@ RES = 2048
 # src: Poly Haven id. target: PHASE1 3.1 key hue the mean albedo is pulled to. hue_keep/delight/contrast/chroma: sc_texgrade.grade_albedo.
 # rough: (scale, offset) applied to the scan's roughness. nrm: scan normal strength. metal: 0/1 (iron). post: named procedural layer.
 B1 = {
-    'plaster':    dict(src='white_stucco', target='#cbbd9c', hue_keep=0.2, delight=0.8, contrast=1.0, rough=(0.0, 0.88), nrm=0.6, post='plaster',
+    'plaster':    dict(src='white_stucco', target='#cbbd9c', hue_keep=0.2, delight=0.8, contrast=1.0, rough=(0.0, 0.88), nrm=0.6, post='plaster', vary=0.05,
                        why='lime plaster walls: warm cream (3.1 plaster #cbbd9c), faint trowel relief; wear comes from decals'),
-    'oak_timber': dict(src='rough_wood', target='#3b322c', hue_keep=0.15, delight=0.6, contrast=1.35, rough=(0.8, 0.12), nrm=1.0,
-                       why='adzed oak timber: 3.1 timber #2e2520 to #4e4844'),
-    'cobble':     dict(src='cobblestone_floor_01', target='#9a928c', hue_keep=0.55, delight=0.7, contrast=1.15, rough=(0.9, 0.1), nrm=1.0, vary=0.12,
+    'oak_timber': dict(src='rough_wood', target='#3d2d22', hue_keep=0.0, delight=0.6, contrast=1.7, chroma=1.2, rough=(0.8, 0.12), nrm=1.1, post='oak',
+                       why='adzed oak timber: warm dark brown in the 3.1 timber range (#2e2520 to #4e4844), grain visible along the beam'),
+    'cobble':     dict(src='cobblestone_floor_01', target='#9a928c', hue_keep=0.55, delight=0.7, contrast=1.15, rough=(0.9, 0.1), nrm=1.0, vary=0.16, macro=True,
                        why='granite cobble with warm lights: 3.1 cobble #817a7b to #b7b0aa'),
     'sandstone':  dict(src='sandstone_blocks_05', target='#b9a07a', hue_keep=0.6, delight=0.7, contrast=1.1, rough=(0.8, 0.15), nrm=1.0,
                        why='dressed sandstone (the fountain): warm mid stone'),
-    'roof_tile':  dict(src='clay_roof_tiles', target='#9c4a34', hue_keep=0.5, delight=0.5, contrast=1.15, chroma=0.95, vary=0.10, rough=(0.8, 0.12), nrm=1.0,
+    'roof_tile':  dict(src='clay_roof_tiles', target='#92503c', hue_keep=0.35, delight=0.5, contrast=1.0, chroma=0.82, vary=0.20, soften=0.6, rough=(0.8, 0.12), nrm=1.0,
                        why='red clay roof tile: 3.1 roof #9c4a34'),
-    'painted_wood': dict(src='blue_painted_planks', target='#46728f', hue_keep=0.5, delight=0.7, contrast=1.15, chroma=1.15, rough=(0.7, 0.2), nrm=1.0,
-                       why='painted wood (shutters, stalls): confident blue, +15% chroma (3.1 painted wood)'),
-    'canvas':     dict(src='rough_linen', target='#c4994a', hue_keep=0.0, delight=0.9, contrast=1.6, chroma=1.1, rough=(0.5, 0.5), nrm=1.4, post='canvas',
-                       why='canvas and linen (awnings, banners): ochre, +10% chroma; stripes and madder variants are tints in the material'),
+    'painted_wood': dict(src='blue_painted_planks', target='#62808c', hue_keep=0.3, delight=0.7, contrast=1.1, chroma=0.85, rough=(0.7, 0.2), nrm=1.0,
+                       why='painted wood (shutters, stalls): faded chalky blue-grey over bare wood (review 2026-10-30: muted OoT saturation)'),
+    'canvas':     dict(src='rough_linen', target='#b08c52', hue_keep=0.0, delight=0.9, contrast=1.5, chroma=0.95, rough=(0.5, 0.5), nrm=1.6, post='canvas',
+                       why='canvas and linen (awnings, banners): muted sun-faded ochre with a procedural plain weave and slubs; stripes are dyed into the threads'),
     'iron':       dict(src='rusty_metal_02', target='#4d4a48', hue_keep=0.0, delight=0.6, contrast=1.4, rough=(0.5, 0.35), nrm=1.0, post='iron', metal=1.0, vmin=0.04,
                        why='wrought iron: dark metal, rust only in placed patches (metallic 1 on bare metal, 0 on rust)'),
 }
 B2 = {
-    'old_brick':  dict(src='brown_brick_02', target='#ab7b57', hue_keep=1.0, delight=0.6, contrast=1.1, chroma=1.05, rough=(0.8, 0.15), nrm=1.0, vary=0.10,
-                       why='old brick, tan and orange: 3.1 brick #9d7d69 / #bf7a38'),
+    'old_brick':  dict(src='brown_brick_02', target='#94654a', hue_keep=0.75, delight=0.6, contrast=1.25, chroma=0.85, rough=(0.8, 0.15), nrm=1.0, vary=0.14, post='brick',
+                       why='old brick: muted red-brown with tan and orange bricks, soot patches (3.1 brick #9d7d69 / #bf7a38)'),
     'vault_stone': dict(src='medieval_blocks_05', target='#9c8460', hue_keep=0.7, delight=0.7, contrast=1.15, rough=(0.8, 0.15), nrm=1.1,
                        why='vault rubble stone, gold-lit stone relation (lit stone #c9aa76 once lamplight hits it)'),
-    'limewash':   dict(src='worn_plaster_wall', target='#b3a588', hue_keep=0.25, delight=0.8, contrast=1.1, rough=(0.6, 0.35), nrm=0.9, post='limewash',
-                       why='damp limewash: warm cream, darker cooler damp patches placed low on the sheet'),
+    'limewash':   dict(src='plastered_wall_03', target='#b3a588', hue_keep=0.2, delight=0.85, contrast=1.4, rough=(0.6, 0.35), nrm=0.9, post='limewash', vary=0.08,
+                       why='damp limewash: warm cream with irregular multi-scale damp patches and brush marks (no repeating blotch pattern)'),
     'flagstone':  dict(src='monastery_stone_floor', target='#8b7860', hue_keep=0.4, delight=0.6, contrast=1.2, rough=(0.8, 0.15), nrm=1.0, vary=0.10,
                        why='flagstone floor: warm, worn'),
     'barrel_oak': dict(src='wooden_barrel', target='#4d3828', hue_keep=0.5, delight=0.5, contrast=1.2, rough=(0.8, 0.12), nrm=1.0,
                        why='oak barrel staves with iron hoops (the scan carries the hoops and rivets)'),
     'soot_coal':  dict(src='burned_ground_01', target='#2d2725', hue_keep=0.25, delight=0.8, contrast=1.5, rough=(0.5, 0.45), nrm=1.2, post='coal', vmin=0.03,
                        why='soot and coal: dark warm, glinting chunks; no mass is pure black (3.1)'),
-    'root_bark':  dict(src='bark_brown_02', target='#5e4731', hue_keep=0.2, delight=0.6, contrast=1.25, rough=(0.85, 0.1), nrm=1.0,
-                       why='root bark: warm brown, the scan\'s green moss is painted out (moss is a decal)'),
+    'root_bark':  dict(src='bark_brown_01', target='#5a4330', hue_keep=0.1, delight=0.6, contrast=1.6, rough=(0.8, 0.05), nrm=1.5, post='bark',
+                       why='root bark: fibrous twisting ridges, warm brown, damp sheen in the furrows (a bark scan, no planks or knots)'),
 }
 
 
@@ -67,23 +67,57 @@ def post_albedo(name, alb, ctx):
     """alb: sRGB float HxWx3. Returns (alb, rough_mod, extra_height, metal) with rough_mod an additive roughness map."""
     n = alb.shape[0]
     z = np.zeros((n, n), np.float32)
+    if name == 'oak':
+        # long grain streaks along the beam (v), warm/dark alternation, so the direction reads at gameplay distance
+        rng = np.random.default_rng(55); w = rng.standard_normal((n, n)).astype(np.float32)
+        F = np.fft.rfft2(w); fy = np.fft.fftfreq(n)[:, None]; fx = np.fft.rfftfreq(n)[None, :]
+        st = np.fft.irfft2(F * np.exp(-2 * np.pi ** 2 * ((40.0 * fy) ** 2 + (0.8 * fx) ** 2)).astype(np.float32), s=(n, n)); st = st / (st.std() + 1e-6)
+        lin = G.srgb2lin(alb) * (1 + 0.18 * np.clip(st, -2, 2)[..., None] * np.array([1.0, 0.9, 0.7], np.float32)[None, None, :])
+        return G.lin2srgb(lin), -0.05 * st, z, None
+    if name == 'bark':
+        # damp sheen in the furrows: darker, lower roughness where the scan's luminance is lowest
+        lin = G.srgb2lin(alb); L = G.luminance(lin); furrow = 1 - G.smoothstep(L / L.mean(), 0.45, 0.95)
+        lin = lin * (1 - 0.25 * furrow[..., None])
+        return G.lin2srgb(lin), -0.35 * furrow, z, None
+    if name == 'brick':
+        soot = G.smoothstep(G.fbm_periodic(n, 61, beta=2.6, kmin=2, kmax=30), 0.58, 0.8)
+        lin = G.srgb2lin(alb) * (1 - 0.40 * soot[..., None]) * np.array([1.0, 0.97, 0.94], np.float32)[None, None, :]
+        return G.lin2srgb(lin), soot * 0.1, z, None
     if name == 'plaster':
         tint = G.fbm_periodic(n, 11, beta=3.2, kmax=10)
         t = (tint - 0.5) * 2
         lin = G.srgb2lin(alb)
         lin = lin * (1 + 0.07 * t[..., None] * np.array([1.0, 0.6, 0.0], np.float32)[None, None, :] + 0.05 * t[..., None])
         trowel = G.fbm_periodic(n, 12, beta=2.6, kmin=3, kmax=48)
-        return G.lin2srgb(lin), (G.fbm_periodic(n, 13, beta=2.0, kmin=8, kmax=120) - 0.5) * 0.12, (trowel - 0.5) * 18.0, None
+        return G.lin2srgb(lin), (G.fbm_periodic(n, 13, beta=2.0, kmin=8, kmax=120) - 0.5) * 0.12, (trowel - 0.5) * 18.0 + (G.fbm_periodic(n, 14, beta=3.6, kmin=2, kmax=12) - 0.5) * 60.0, None
     if name == 'canvas':
-        # woven stripes: ochre, with a madder (red) stripe band every 256 px along u (tile repeats cleanly)
-        x = np.arange(n, dtype=np.float32)[None, :] / n
-        band = (np.sin(x * 2 * np.pi * 2 + 0.6) > 0.93).astype(np.float32) * np.ones((n, 1), np.float32)
-        band = G.blur(band, 3.0)
+        # plain weave: warp and weft threads (pitch 8 px = 8 mm), thread-thickness slubs, sun fade, stripes dyed INTO the threads
+        rng = np.random.default_rng(66); pitch = 8
+        yy, xx = np.mgrid[0:n, 0:n].astype(np.float32)
+        warp_i = (xx // pitch).astype(int); weft_i = (yy // pitch).astype(int)
+        slub_u = rng.standard_normal(n // pitch + 1).astype(np.float32); slub_v = rng.standard_normal(n // pitch + 1).astype(np.float32)
+        over = (((xx // pitch) + (yy // pitch)) % 2).astype(np.float32)
+        px = np.sin((xx % pitch) / pitch * np.pi); py = np.sin((yy % pitch) / pitch * np.pi)
+        thread = np.where(over > 0, px, py) ** 0.8
+        thick = 1 + 0.12 * np.where(over > 0, slub_u[np.clip(warp_i, 0, len(slub_u) - 1)], slub_v[np.clip(weft_i, 0, len(slub_v) - 1)])
+        weave = 0.78 + 0.22 * thread * thick
+        fade = G.fbm_periodic(n, 67, beta=3.0, kmax=8)
         lin = G.srgb2lin(alb)
-        madder = G.hex2lin('#8e3a30')
-        lum = G.luminance(lin)[..., None] / G.luminance(lin).mean()
-        lin = lin * (1 - band[..., None]) + madder[None, None, :] * lum * band[..., None]
-        return G.lin2srgb(lin), z, z, None
+        lum0 = G.luminance(lin).mean()
+        lin = lin * (weave / weave.mean())[..., None]
+        xe = np.arange(n, dtype=np.float32)
+        centre = np.array([0.18, 0.5, 0.82]) * n; halfw = np.array([40, 72, 40])
+        jit = np.repeat(rng.normal(0, 2.5, n // pitch + 1), pitch)[:n].astype(np.float32)
+        band = np.zeros(n, np.float32)
+        for c, hw in zip(centre, halfw):
+            d = np.abs(((xe + jit - c + n / 2) % n) - n / 2)
+            band = np.maximum(band, G.smoothstep(hw - d, -2.0, 4.0))
+        band = band[None, :] * np.ones((n, 1), np.float32) * (0.75 + 0.25 * thread)
+        madder = G.hex2lin('#7e4036')
+        lin = lin * (1 - band[..., None]) + madder[None, None, :] * (G.luminance(lin) / lum0)[..., None] * band[..., None] * 0.9
+        L = G.luminance(lin)[..., None]
+        lin = lin + (L + 0.02 - lin) * 0.25 * fade[..., None]
+        return G.lin2srgb(lin), (0.5 - thread) * 0.15, (thread - 0.5) * 3.0, None
     if name == 'iron':
         src = ctx['src_rgb']
         rust = G.smoothstep(src[..., 0] - src[..., 2], 0.42, 0.60)
@@ -95,14 +129,17 @@ def post_albedo(name, alb, ctx):
         metal = 1.0 - G.smoothstep(rust, 0.2, 0.6)
         return G.lin2srgb(lin), rust * 0.45, z, metal.astype(np.float32)
     if name == 'limewash':
-        damp = G.fbm_periodic(n, 21, beta=3.0, kmax=14)
-        y = np.linspace(0, 1, n, dtype=np.float32)[:, None]
-        # damp gathers toward the bottom edge of the tile; the 'y' wrap is hidden by blending with the periodic noise only
-        mask = G.smoothstep(damp + 0.0 * y, 0.55, 0.75)
+        # damp patches at two scales with ragged, domain-warped edges, so no single blotch repeats like a pattern; brush marks
+        warp = G.fbm_periodic(n, 22, beta=2.4, kmax=40)
+        big = G.fbm_periodic(n, 21, beta=3.0, kmax=6); mid = G.fbm_periodic(n, 23, beta=2.5, kmin=4, kmax=24)
+        m1 = G.smoothstep(big + (warp - 0.5) * 0.25, 0.60, 0.74) * 0.9
+        m2 = G.smoothstep(mid + (warp - 0.5) * 0.3, 0.66, 0.78) * 0.5
+        mask = np.clip(m1 + m2, 0, 1)
+        brush = (G.fbm_periodic(n, 24, beta=1.6, kmin=3, kmax=60) - 0.5)
         lin = G.srgb2lin(alb)
-        cool = np.array([0.82, 0.88, 0.95], np.float32)
-        lin = lin * (1 - 0.30 * mask[..., None]) * (1 - mask[..., None] + mask[..., None] * cool[None, None, :])
-        return G.lin2srgb(lin), -mask * 0.25 + 0.0, z, None
+        cool = np.array([0.80, 0.88, 0.96], np.float32)
+        lin = lin * (1 - 0.32 * mask[..., None]) * (1 - mask[..., None] + mask[..., None] * cool[None, None, :]) * (1 + 0.10 * brush[..., None])
+        return G.lin2srgb(lin), -mask * 0.25, brush * 6.0, None
     if name == 'coal':
         chunks = G.fbm_periodic(n, 31, beta=1.8, kmin=10, kmax=300)
         glint = G.smoothstep(chunks, 0.64, 0.7)
@@ -123,6 +160,12 @@ def build_material(name, spec, src_dir, out_dir, rows):
     ao_src = G.load_gray(P('ao'), n) if os.path.exists(P('ao')) else np.ones((n, n), np.float32)
     nor = G.load_srgb(P('nor_gl'), n)
     alb, rmod, extra_h, metal = post_albedo(spec.get('post', ''), alb, dict(src_rgb=src_rgb))
+    if spec.get('soften'):   # less high-frequency colour noise at gameplay distance (roof tiles)
+        alb = alb * (1 - spec['soften']) + G.blur(alb, 2.2) * spec['soften']
+    if spec.get('macro'):    # stone-by-stone tint (mid scale) on top of the large variation: cobbles stop repeating as identical stones
+        mm = (G.fbm_periodic(n, 88, beta=1.6, kmin=14, kmax=70) - 0.5) * 2 * 0.22
+        lin = G.srgb2lin(alb) * (1 + mm[..., None] * np.array([1.0, 0.9, 0.75], np.float32)[None, None, :])
+        alb = G.lin2srgb(lin)
     if spec.get('vary'):   # a large-scale value/hue variation layer breaks the 2 m repeat (periodic noise, so seams stay closed)
         v = (G.fbm_periodic(n, 77 + len(name), beta=3.0, kmax=8) - 0.5) * 2 * spec['vary']
         lin = G.srgb2lin(alb) * (1 + v[..., None] * np.array([1.0, 0.85, 0.6], np.float32)[None, None, :])
