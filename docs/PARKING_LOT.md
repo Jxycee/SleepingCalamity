@@ -44,4 +44,6 @@ Sources: `docs/research/kh1-sweep.md` and `docs/research/kh2-sweep.md`.
 
 ## Tooling (2026-10-30)
 - ~~Cloud `.csproj` generation~~ built 2026-10-30 (`sc_cloud_compile.py --csproj`).
+
+## Art (2026-10-30)
 - 2026-10-30: B11 cellar lantern, optional polish (relaxed review 28.5/40 said a player would notice): stronger wear from the three-quarter view (soot streaks above the vents, orange rust on the base rim), more roughness/specular variation on the iron body, and a slightly warmer iron so it catches the gold rim light. Not needed before the dungeon-corner captures.
