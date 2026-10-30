@@ -74,21 +74,76 @@ namespace SleepingCalamity.EditorTools
                 if (oldBody != null) Object.DestroyImmediate(oldBody.gameObject);
 
                 Transform visual = BuilderUtil.EnsurePath(root.transform, "Visual");
-                BuilderUtil.GetOrAdd<MannequinAnimDriver>(visual.gameObject);
-                BuilderUtil.GetOrAdd<HeroWeaponVisual>(root).Configure(MaterialLibrary.Get("M_WeaponWood"), MaterialLibrary.Get("M_WeaponSteel"), visual);
-                // A 1.8 m mannequin on the root's origin: a capsule body, a round head and a nose block that shows which way it faces.
-                BuilderUtil.EnsurePrimitive(visual, "Body", PrimitiveType.Capsule, new Vector3(0f, 0.9f, 0f), Quaternion.identity,
-                    new Vector3(0.7f, 0.82f, 0.7f), material, keepCollider: false);
-                BuilderUtil.EnsurePrimitive(visual, "Head", PrimitiveType.Sphere, new Vector3(0f, 1.62f, 0f), Quaternion.identity,
-                    new Vector3(0.36f, 0.36f, 0.36f), material, keepCollider: false);
-                BuilderUtil.EnsurePrimitive(visual, "Nose", PrimitiveType.Cube, new Vector3(0f, 1.62f, 0.22f), Quaternion.identity,
-                    new Vector3(0.1f, 0.08f, 0.2f), accent, keepCollider: false);
+                BuilderUtil.GetOrAdd<MannequinAnimDriver>(visual.gameObject);   // the fallback: it stands down while the Animator below is working
+                HeroWeaponVisual weaponVisual = BuilderUtil.GetOrAdd<HeroWeaponVisual>(root);
+                weaponVisual.Configure(MaterialLibrary.Get("M_WeaponWood"), MaterialLibrary.Get("M_WeaponSteel"), visual);
+                if (!BuildHeroModel(visual, weaponVisual, material, accent))
+                {
+                    // No Y Bot or no controller (the animation FBX are not imported yet): keep the M2 mannequin so the hero still draws.
+                    // A 1.8 m mannequin on the root's origin: a capsule body, a round head and a nose block that shows which way it faces.
+                    BuilderUtil.EnsurePrimitive(visual, "Body", PrimitiveType.Capsule, new Vector3(0f, 0.9f, 0f), Quaternion.identity,
+                        new Vector3(0.7f, 0.82f, 0.7f), material, keepCollider: false);
+                    BuilderUtil.EnsurePrimitive(visual, "Head", PrimitiveType.Sphere, new Vector3(0f, 1.62f, 0f), Quaternion.identity,
+                        new Vector3(0.36f, 0.36f, 0.36f), material, keepCollider: false);
+                    BuilderUtil.EnsurePrimitive(visual, "Nose", PrimitiveType.Cube, new Vector3(0f, 1.62f, 0.22f), Quaternion.identity,
+                        new Vector3(0.1f, 0.08f, 0.2f), accent, keepCollider: false);
+                }
 
                 Transform pivot = BuilderUtil.EnsurePath(root.transform, "CameraPivot");
                 pivot.localPosition = new Vector3(0f, MovementMath.CameraPivotHeight, 0f);
 
                 BuilderUtil.SetLayerRecursive(root, Layers.Player);
             });
+        }
+
+        // The hero's visual: the Mixamo Y Bot with the hero Animator controller. Returns false (and changes nothing) when either is missing.
+        // The held-weapon grips are measured from the model's rest pose (a T-pose facing +Z, palms down): a handle runs along the hand's forward axis, so
+        // the blade points along +Z there, and the shield sits on the left forearm facing forward. HeroWeaponVisual hangs the primitives on those bones.
+        static bool BuildHeroModel(Transform visual, HeroWeaponVisual weaponVisual, Material body, Material joints)
+        {
+            var ybot = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(AnimationImportBuilder.YBot);
+            if (ybot == null) { Debug.LogWarning("SC ANIM hero keeps the mannequin: no " + AnimationImportBuilder.YBot); return false; }
+            UnityEditor.Animations.AnimatorController controller;
+            try { controller = HeroAnimatorBuilder.Build(); }
+            catch (System.InvalidOperationException e) { Debug.LogWarning("SC ANIM hero keeps the mannequin: " + e.Message); return false; }
+
+            foreach (string old in new[] { "Body", "Head", "Nose" })
+            {
+                Transform t = visual.Find(old);
+                if (t != null) Object.DestroyImmediate(t.gameObject);
+            }
+            Transform model = visual.Find("Model");
+            if (model == null)
+            {
+                model = ((GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(ybot, visual)).transform;
+                model.name = "Model";
+            }
+            model.localPosition = Vector3.zero;
+            model.localRotation = Quaternion.identity;
+            var animator = BuilderUtil.GetOrAdd<Animator>(model.gameObject);
+            animator.runtimeAnimatorController = controller;
+            animator.applyRootMotion = false;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            if (animator.avatar == null || !animator.isHuman) throw new System.InvalidOperationException("Y Bot did not import as a Humanoid avatar");
+            foreach (Renderer r in model.GetComponentsInChildren<Renderer>(true))
+            {
+                var mats = new Material[r.sharedMaterials.Length];
+                for (int i = 0; i < mats.Length; i++) mats[i] = (i == 1 || r.name.ToLowerInvariant().Contains("joint")) ? joints : body;
+                r.sharedMaterials = mats;
+            }
+            BuilderUtil.GetOrAdd<AnimatorHeroDriver>(visual.gameObject).Configure(animator);
+
+            Transform rh = animator.GetBoneTransform(HumanBodyBones.RightHand), lh = animator.GetBoneTransform(HumanBodyBones.LeftHand), la = animator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
+            if (rh != null && lh != null && la != null)
+            {
+                Quaternion bladeForward = Quaternion.Euler(90f, 0f, 0f);   // the held primitives are built blade-up (+Y); +Z in the T-pose
+                var right = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(rh.rotation) * bladeForward, position = rh.InverseTransformPoint(rh.position + Vector3.right * 0.07f) };
+                var left = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(lh.rotation) * bladeForward, position = lh.InverseTransformPoint(lh.position + Vector3.left * 0.07f) };
+                // The shield faces away from the back of the forearm (+Y in the T-pose, palm down), so it faces outward whatever the arm does; its disc axis is local Z.
+                var shield = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(la.rotation) * Quaternion.Euler(-90f, 0f, 0f), position = la.InverseTransformPoint(la.position + Vector3.left * 0.12f + Vector3.up * 0.1f) };
+                weaponVisual.ConfigureGrips(right, left, shield);
+            }
+            return true;
         }
 
         static void BuildDummy()
