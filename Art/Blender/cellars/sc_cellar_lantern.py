@@ -16,12 +16,13 @@ particle or emissive card, with a point light at FLAME.
       [--stage look|bake]   look (default): procedural highs rendered directly, no bake; bake: low + baked maps + render
       [--res 1024]          bake resolution (the PC's final bake: --res 4096)
       [--tris 45000] [--rres 900] [--samples 64] [--views tq,front,close,wide] [--moods cellar,studio] [--no-render]
+      [--export <dir>]      bake stage only: FBX + _BaseColor/_Normal/_ORM/_Emission PNGs into <dir> (Assets/_Project/Content/Art/Cellar/B11/CellarLantern)
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 Optional CC0 scan layer: AAA_SCANS=<folder with rusty_metal_02_{diff,rough,disp}_2k.jpg> (sc_fetch_textures.py).
 
 Status (2026-10-30, cloud): look locked at relaxed review 28.5/40 (bake 2: 2048 px, high 1.40M tris, low 44,986 tris;
-review 1 was 23/40 before the wear/surface/proportion fixes). Next: the PC runs --stage bake --res 4096 with the scans
-and exports the FBX + maps (cloud sessions commit only this generator). Optional later passes are in docs/PARKING_LOT.md.
+review 1 was 23/40 before the wear/surface/proportion fixes). PC final bake done 2026-10-30 (--res 4096, rusty_metal_02 scans,
+--export to Assets/_Project/Content/Art/Cellar/B11/CellarLantern). Optional later passes are in docs/PARKING_LOT.md.
 """
 import sys, os, math
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
@@ -467,6 +468,28 @@ def render(objs_note):
             sc.camera = cam; sc.render.filepath = os.path.join(OUT, f'{NAME}_{STAGE}_{mood}_{v}.jpg')
             bpy.ops.render.render(write_still=True); print('RENDER', sc.render.filepath)
 
+# ----------------------------------------------------------------------------- export (PC, --stage bake --export <dir>)
+def export(low, tex, dst):
+    """FBX (the project's settings: -Z forward, Y up, metres, scale 1) + BaseColor, Normal, ORM (R AO, G roughness,
+    B metallic), Emission PNGs into dst. Unity writes the .meta files."""
+    import shutil
+    os.makedirs(dst, exist_ok=True)
+    for key in ('BaseColor', 'Normal', 'Emission'):
+        src = os.path.join(tex, f'{NAME}_{key}.png')
+        if os.path.exists(src): shutil.copyfile(src, os.path.join(dst, f'{NAME}_{key}.png'))
+    ch = []
+    for key in ('AO', 'Roughness', 'Metallic'):
+        im = bpy.data.images.load(os.path.join(tex, f'{NAME}_{key}.png')); im.colorspace_settings.name = 'Non-Color'
+        px = np.empty(im.size[0] * im.size[1] * 4, dtype=np.float32); im.pixels.foreach_get(px); ch.append(px[0::4]); w, h = im.size
+    orm = bpy.data.images.new(f'{NAME}_ORM', w, h, alpha=False); orm.colorspace_settings.name = 'Non-Color'
+    px = np.ones(w * h * 4, dtype=np.float32); px[0::4], px[1::4], px[2::4] = ch; orm.pixels.foreach_set(px)
+    orm.filepath_raw = os.path.join(dst, f'{NAME}_ORM.png'); orm.file_format = 'PNG'; orm.save()
+    bpy.ops.object.select_all(action='DESELECT'); low.select_set(True); bpy.context.view_layer.objects.active = low
+    bpy.ops.export_scene.fbx(filepath=os.path.join(dst, NAME + '.fbx'), use_selection=True, object_types={'MESH'}, axis_forward='-Z', axis_up='Y',
+                             global_scale=1.0, apply_unit_scale=True, apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
+                             mesh_smooth_type='FACE', add_leaf_bones=False, bake_anim=False, use_custom_props=False, path_mode='STRIP')
+    print('EXPORT', dst, sorted(os.listdir(dst)))
+
 # ----------------------------------------------------------------------------- main
 K.reset()
 highs, unbaked = build()
@@ -476,5 +499,7 @@ if STAGE == 'bake':
     low = K.bake_prop(NAME, highs, pdir, target=int(arg('--tris', '45000')), res=RES)
     print('LOW TRIS', K.tris(low))
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(pdir, NAME + '.blend'))
+    if arg('--export'):
+        export(low, os.path.join(pdir, 'tex'), os.path.abspath(arg('--export')))
 if '--no-render' not in argv:
     render(None)
