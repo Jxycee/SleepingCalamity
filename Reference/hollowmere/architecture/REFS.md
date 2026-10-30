@@ -20,3 +20,18 @@ Study material only: never shipped, traced or projected (sc-reference). Fetched 
 | c_timber_03_doolish_2013_54.jpg | Doolish 2013 54.jpg | Man vyi | Public domain | https://commons.wikimedia.org/w/index.php?curid=29922133 |
 | c_timber_06_fachwerk_hemsbach.jpg | Fachwerk-Hemsbach.jpg | Karl Döringer | CC0 | https://commons.wikimedia.org/w/index.php?curid=155469020 |
 | m_timber_04_timber_framing_niebra.jpg | Timber framing Niebra.jpg | Aschroet | CC0 | https://commons.wikimedia.org/w/index.php?curid=89568206 |
+
+## Beauty-corner batch (2026-10-30)
+
+Beauty-corner batch (2026-10-30): half-timbered facades with jetty, shutters, tile roofs, ivy, ground contact.
+
+| file | title | creator | licence | source | purpose |
+|---|---|---|---|---|---|
+| bc_005_herrlisheim_115.jpg | Herrlisheim 115.JPG | Bernard Chenal | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File%3AHerrlisheim_115.JPG | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |
+| bc_009_sthippolyte_rstfulrade_25.jpg | StHippolyte rStFulrade 25.JPG | © Ralph Hammann - Wikimedia Commons | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File%3AStHippolyte_rStFulrade_25.JPG | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |
+| bc_026_eguisheim_rrempartnord_5.jpg | Eguisheim rRempartNord 5.JPG | © Ralph Hammann - Wikimedia Commons | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File%3AEguisheim_rRempartNord_5.JPG | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |
+| bc_015_fachwerkhaus_in_osterode_panoramio.jpg | Fachwerkhaus in Osterode - panoramio.jpg | Michael Müller | CC BY 3.0 | https://commons.wikimedia.org/wiki/File%3AFachwerkhaus_in_Osterode_-_panoramio.jpg | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |
+| bc_030_rue_du_rempart_sud_eguisheim_2021_.jpg | Rue du Rempart-Sud Eguisheim 2021 (1).jpg | Benreis | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File%3ARue_du_Rempart-Sud_Eguisheim_2021_%281%29.jpg | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |
+| bc_066_bayeux_maison_pans_de_bois_2.jpg | Bayeux Maison à Pans de Bois 2.jpg | Zairon | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File%3ABayeux_Maison_%C3%A0_Pans_de_Bois_2.jpg | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |
+| bc_072_quillebeuf_maison_du_cordier.jpg | Quillebeuf - Maison du Cordier.jpg | Adsum Dixit | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File%3AQuillebeuf_-_Maison_du_Cordier.jpg | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |
+| bc_036_fachwerkhaus_in_altstadt_quedlinbu.jpg | Fachwerkhaus in Altstadt Quedlinburg. IMG 2070WI.jpg | Kora27 | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File%3AFachwerkhaus_in_Altstadt_Quedlinburg._IMG_2070WI.jpg | Half-timbered street/facade: jetty, shutters, tile roof, ivy, ground contact |

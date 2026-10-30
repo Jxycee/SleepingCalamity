@@ -3,6 +3,12 @@
 Every art session on the beauty corner reads this first, then `docs/PHASE1.md` section 3 (style bible) and section 4 (batches).
 The controller (PC session) owns this file, the Unity corner scene and all merges.
 
+## 0. User decisions (2026-10-30)
+- **Fountain spout:** a drowsy sleeping beast head, eyes closed, water once poured from its mouth (ties to the game's name and the dry fountain). Original design.
+- **Facade colours:** warm cream plaster, dark oak frame, **green** shutters and door (sage to forest green, faded).
+- **Whimsy:** medium: 1-3 deg off true, sagging ridges, chunky 1.4x timbers (style bible as written).
+- **Stall goods:** harvest produce and bread: apples, turnips, squash, loaves in baskets.
+
 ## 1. The corner (PHASE1 4)
 One half-timbered facade beside the dry fountain on cobbles, with one market stall, barrels, crates and sacks, a
 bleached banner, ivy and crack weeds, and haze with god rays. Midday capture plus one low-sun shot.
@@ -14,7 +20,7 @@ Layout (Unity metres, +Z north, origin = fountain centre). Build to these footpr
 | Plaza cobbles | B6 | 16 m x 14 m patch, slight dish toward the fountain (5 cm) | x -8..8, z -6..8 |
 | Fountain flagstone ring | B6 | 1.2 m wide ring around the basin | centred on origin |
 | Dry fountain | B10 | basin outer diameter 3.4 m, rim 0.55 m high; spout column to about 2.4 m | origin |
-| Banner pole + bleached banner | B10 | pole about 4.5 m, banner 0.7 x 2.2 m | x 2.4, z 1.2 |
+| Banner pole + bleached banner | B10 | pole about 4.5 m, banner 0.7 x 2.2 m | x -2.6, z 1.8 (moved 2026-10-30: clears the Mid frame) |
 | Facade (2 storeys + roof) | B4 | front 7.5 m wide, eave 6 m, ridge about 9 m, ground storey stone plinth 0.6 m, upper storey jettied out 0.45 m | front face on z 7.5, x -5..2.5, facing -Z |
 | Market stall | B8 | 2.6 m wide x 1.6 m deep, awning top about 2.7 m | x 4.5, z 4.5, rotated 200 deg (faces the fountain) |
 | Props cluster | B7 | 3 barrels, 3 crates, 4 sacks, 2 buckets, 3 baskets, 2 jugs | by the stall and the facade door |
@@ -34,7 +40,8 @@ Capture cameras (1920x1080, PHASE1 3.7), built by `BeautyCornerBuilder`:
 
 ## 3. Scoring (calibrated to the user, 2026-10-30)
 The user reads our rubric scores about 8-10 points low ("your 20/40 is more like a 30/40 to me"). So:
-- Score with the `sc-asset-review` rubric as written, then **stop at 25/40**. That is shippable for this corner. Don't chase past it in this round; park extra ideas in `docs/PARKING_LOT.md`.
+- **Moving target (user, 2026-10-30):** 25/40 is the floor, not the finish. If your first review already reaches 25, the target becomes **first score + 5** (so 25 on round 1 means aim for 30). Max about 4 rounds; each round needs a visible gain of at least 1.5 points or you stop and report.
+- Score with the `sc-asset-review` rubric as written; the old rule was to stop at 25/40. That is shippable for this corner. Don't chase past it in this round; park extra ideas in `docs/PARKING_LOT.md`.
 - Score only what the three cameras see (section 2). Don't deduct for hidden faces, topology, UV layout or code structure.
 - Each fix must be a change visible at the mid camera. Name it as a visible change ("roof ridge sags 4 cm/m", "darker grime band at the cobble line"), never "improve quality".
 - Below 18/40 after two rounds: stop and report to the controller with renders instead of a third variation.
@@ -43,8 +50,10 @@ The user reads our rubric scores about 8-10 points low ("your 20/40 is more like
 ## 4. Deliverables and paths (so sessions never collide)
 - Generator: `Art/Blender/town/sc_<asset>.py` (one per asset family, header docstring like `Art/Blender/cellars/sc_cellar_lantern.py`: what it is, run line, status, score).
 - Review renders and bakes: your scratchpad, never the repo.
+- **Clean up screenshots and renders (user, 2026-10-30):** delete a round's renders once it's superseded; at the end keep only the final contact sheet and the renders in your report.
 - **Cloud sessions** commit the generator only (no FBX, no textures), plus a `--stage bake --res 1024` proof render in the message. The PC runs the 2K/4K bake and exports.
 - **Local (PC) sessions** also run the final bake and write the export to `Assets/_Project/Content/Art/Town/<Batch>/<Asset>/` (FBX, `_BaseColor`, `_Normal`, `_ORM` PNG; no `.meta`: the controller's Unity import makes them). Adopted models keep a `SOURCES.md` with source and licence beside the export.
+- **Pivots (Unity builder convention):** pivot at the ground centre of the footprint; the facade's pivot at the centre of its front face at ground level, front facing -Z (Blender: front -Y, z up; export -Z forward, Y up); the stall's counter faces local +Z. Metres, scale 1.
 - Shared materials: use the graded tileables in `Art/Textures/B1_town/` and trims in `Art/Textures/B3_trims/`; don't make a new plaster or cobble unless the batch owns it.
 - Don't touch `Assets/_Project/Editor/`, scenes, prefabs, `CURRENT.md` or another batch's folder. The controller builds the corner scene.
 - Branch per session; push the branch; report the branch, the commit and three renders (wide-camera view, mid-camera view, one close) with the score. The controller reviews and merges.
@@ -53,3 +62,9 @@ The user reads our rubric scores about 8-10 points low ("your 20/40 is more like
 - Free references: `Reference/hollowmere/` (architecture, market_square, materials, paintings) with REFS.md files.
 - Study-only frames: `Reference/private/` (PC only, gitignored). The controller adds Dark Cloud town captures (PCSX2 at 1440p) under `Reference/private/dc1_town/` and posts a contact sheet.
 - Real-world: Alsace and Normandy half-timber (Colmar, Riquewihr, Eguisheim), Rothenburg ob der Tauber, sandstone market fountains (Rottweil, Rothenburg Marktplatz), French and German weekly markets.
+- **Real-world set (`1d369df`):** 45 CC images in `Reference/hollowmere/{architecture,fountain,props,ground}/`, sheet `Reference/hollowmere/CONTACT_beauty_corner.jpg`. Lessons:
+  1. The jetty reads through shadow: upper storey proud by a timber depth, dark band under it; shutters and flower boxes break the plaster.
+  2. Tile roofs vary tile to tile (orange-to-brown streaks), moss at eaves and ridge, soft wavy rooflines.
+  3. Fountain basins are low and wide, often octagonal, on one or two worn steps; the apron is darkest and mossiest at the stone-meets-ground line.
+  4. Cobble wear is colour and joints: tone varies per stone, joints go dark/green, courses follow arcs, weeds grow in joints, not on stones.
+  5. Props cluster to one side, in odd-numbered groups: barrels against a wall or in pairs, sacks slumped together, baskets on crates; keep a walking path.
