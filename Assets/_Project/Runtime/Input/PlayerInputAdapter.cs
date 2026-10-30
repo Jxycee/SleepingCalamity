@@ -186,6 +186,7 @@ namespace SleepingCalamity.Runtime
             f.SwitchX = sw.x;
             f.SwitchY = sw.y;
             f.InteractPressed = _interact.WasPressedThisFrame();
+            f.InteractHeld = _interact.IsPressed();
             f.PausePressed = Context == InputContext.Menu ?_uiCancel.WasPressedThisFrame() : _pause.WasPressedThisFrame();
             return f;
         }
@@ -330,6 +331,8 @@ namespace SleepingCalamity.Runtime
             switch (key)
             {
                 case DevKey.ToggleOverlay: k = Key.F3; return true;
+                case DevKey.SwapWeapon: k = Key.F5; return true;
+                case DevKey.SkipWave: k = Key.F6; return true;
                 default: return false;
             }
         }

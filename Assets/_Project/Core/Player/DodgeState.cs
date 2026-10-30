@@ -1,5 +1,5 @@
-// Core, no engine references, unit-tested. The dodge stub (M2): a direction and a duration only. The i-frame window (frames 5-18 of 30) and the
-// owner's leniency come with M3.
+// Core, no engine references, unit-tested. The dodge: a direction and a duration (M2), with the i-frame window (frames 5-18 of 30) and the owner's
+// leniency from DodgeTiming (M3).
 using System;
 
 namespace SleepingCalamity.Core
@@ -13,6 +13,9 @@ namespace SleepingCalamity.Core
         public float CooldownLeft { get; private set; }
 
         public bool CanStart => !Active && CooldownLeft <= 0f;
+
+        // M3: invulnerable on frames 5-18 of the 30-frame roll, plus the owner's 100 ms leniency either side (DodgeTiming).
+        public bool Invulnerable => Combat.DodgeTiming.IsInvulnerable(Active, Elapsed);
         public float Normalized => Active ? Elapsed / MovementMath.DodgeDuration : 0f;
 
         // Starts a dodge along the flat direction (normalised here). False when one is running, cooling down, or the direction is zero.

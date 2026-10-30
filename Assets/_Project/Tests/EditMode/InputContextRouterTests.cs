@@ -23,6 +23,7 @@ namespace SleepingCalamity.Tests.EditMode
                 SecondaryPressed = true,
                 SecondaryReleased = true,
                 InteractPressed = true,
+                InteractHeld = true,
                 PausePressed = true,
                 LockPressed = true,
                 DodgePressed = true,
@@ -44,6 +45,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsTrue(i.PrimaryHeld && i.PrimaryPressed && i.PrimaryReleased, "Primary");
             Assert.IsTrue(i.SecondaryHeld && i.SecondaryPressed && i.SecondaryReleased, "Secondary");
             Assert.IsTrue(i.InteractPressed, "Interact");
+            Assert.IsTrue(i.InteractHeld, "Interact held (the revive hold)");
             Assert.IsTrue(i.PausePressed, "Pause");
             Assert.IsTrue(i.LockPressed, "Lock");
             Assert.IsTrue(i.DodgePressed, "Dodge");
@@ -70,7 +72,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(0.5f, i.MoveX, 1e-6f);
             Assert.AreEqual(-1f, i.MoveY, 1e-6f);
             Assert.IsTrue(i.LockPressed, "Lock toggles it off again");
-            Assert.IsTrue(i.DodgePressed && i.JumpPressed && i.SprintHeld && i.PrimaryPressed && i.InteractPressed && i.PausePressed);
+            Assert.IsTrue(i.DodgePressed && i.JumpPressed && i.SprintHeld && i.PrimaryPressed && i.InteractPressed && i.InteractHeld && i.PausePressed);
         }
 
         // Catches: a Menu row that lets look or move through (the camera would turn behind a menu); Pause zeroed (the menu could not close).
@@ -83,7 +85,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(0f, i.MoveY);
             Assert.AreEqual(0f, i.LookYawDeg);
             Assert.AreEqual(0f, i.LookPitchDeg);
-            Assert.IsFalse(i.JumpPressed || i.SprintHeld || i.InteractPressed);
+            Assert.IsFalse(i.JumpPressed || i.SprintHeld || i.InteractPressed || i.InteractHeld);
             Assert.IsFalse(i.PrimaryHeld || i.PrimaryPressed || i.PrimaryReleased);
             Assert.IsFalse(i.SecondaryHeld || i.SecondaryPressed || i.SecondaryReleased);
             Assert.IsFalse(i.LockPressed || i.DodgePressed);

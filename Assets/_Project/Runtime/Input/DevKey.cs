@@ -4,6 +4,8 @@ namespace SleepingCalamity.Runtime
 {
     public enum DevKey : byte
     {
-        ToggleOverlay = 0           // F3
+        ToggleOverlay = 0,          // F3
+        SwapWeapon = 1,             // F5: cycle the four heirlooms (M3 arena)
+        SkipWave = 2                // F6: the host clears the arena wave (M3 arena)
     }
 }
