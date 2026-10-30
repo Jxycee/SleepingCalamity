@@ -33,7 +33,7 @@ namespace SleepingCalamity.EditorTools
             ti.filterMode = FilterMode.Trilinear;
             ti.anisoLevel = 8;
             ti.wrapMode = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
-            ti.maxTextureSize = 2048;
+            ti.maxTextureSize = assetPath.StartsWith(Root + "BeautyCorner/") ? 4096 : 2048;   // beauty-corner maps unpacked from 4K ORMs keep the source size
             ti.textureCompression = TextureImporterCompression.CompressedHQ;
             ti.isReadable = false;
             ti.npotScale = TextureImporterNPOTScale.None;

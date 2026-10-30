@@ -9,6 +9,8 @@ Shader "SleepingCalamity/LightCone"
         _Intensity ("Intensity", Range(0, 2)) = 0.12
         _EdgePower ("Edge falloff", Range(0.5, 6)) = 2.0
         _LengthFade ("Length fade", Range(0.2, 4)) = 1.2
+        _HeightFadeTop ("Height fade: world Y where alpha reaches 0 (default 1000 = off)", Float) = 1000
+        _HeightFadeRange ("Height fade range below that (m)", Float) = 1
     }
     SubShader
     {
@@ -29,10 +31,12 @@ Shader "SleepingCalamity/LightCone"
                 half _Intensity;
                 half _EdgePower;
                 half _LengthFade;
+                float _HeightFadeTop;
+                float _HeightFadeRange;
             CBUFFER_END
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; };
-            struct Varyings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 nWS : TEXCOORD1; float3 vWS : TEXCOORD2; };
+            struct Varyings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 nWS : TEXCOORD1; float3 vWS : TEXCOORD2; float worldY : TEXCOORD3; };
 
             Varyings vert(Attributes i)
             {
@@ -42,6 +46,7 @@ Shader "SleepingCalamity/LightCone"
                 o.uv = i.uv;
                 o.nWS = TransformObjectToWorldNormal(i.normalOS);
                 o.vWS = GetWorldSpaceViewDir(p.positionWS);
+                o.worldY = p.positionWS.y;
                 return o;
             }
 
@@ -50,7 +55,8 @@ Shader "SleepingCalamity/LightCone"
                 float facing = abs(dot(normalize(i.nWS), normalize(i.vWS)));
                 float edge = pow(saturate(facing), _EdgePower);
                 float along = pow(saturate(1.0 - i.uv.y), _LengthFade);
-                float a = edge * along * _Intensity;
+                float height = saturate((_HeightFadeTop - i.worldY) / max(_HeightFadeRange, 0.001));
+                float a = edge * along * height * _Intensity;
                 return half4(_Color.rgb * a, 1);
             }
             ENDHLSL
