@@ -149,6 +149,7 @@ namespace SleepingCalamity.Core.Weapons
         {
             _unlocked.Clear();
             _unknown.Clear();
+            _extraMembers = null;
             if (ids == null) return;
             foreach (var id in ids)
             {
@@ -166,10 +167,19 @@ namespace SleepingCalamity.Core.Weapons
             var extra = new List<string>(_unknown);
             extra.Sort(StringComparer.Ordinal);
             s.Unlocked.AddRange(extra);
+            if (_extraMembers != null) s.Extra = new Dictionary<string, object>(_extraMembers);
             return s;
         }
 
-        public void Restore(HeroAbilitiesSave save) => Restore(save?.Unlocked);
+        // Unknown members of the save itself (a newer build's fields), written back by ToSave.
+        Dictionary<string, object> _extraMembers;
+
+        // Named apart from Restore(ids) so Restore(null) stays unambiguous. Keeps the save's unknown members as well as its unknown ids.
+        public void RestoreSave(HeroAbilitiesSave save)
+        {
+            Restore(save?.Unlocked);
+            _extraMembers = save?.Extra != null ? new Dictionary<string, object>(save.Extra) : null;
+        }
 
         // The tier usable with the equipped weapon: 0 locked; MaxTier with its own family; MaxTier - 1 (at least 1) with another. A MaxTier
         // of 0 or less is never usable.
@@ -198,15 +208,18 @@ namespace SleepingCalamity.Core.Weapons
         public int Current { get; private set; }
         public int HitProgress { get; private set; }   // hits toward the next pip (0..HitsPerPip-1)
 
-        public SpellPips(int cap = StartCap) { Cap = Math.Max(0, cap); Current = Cap; }
+        public SpellPips(int cap = StartCap) { Cap = Math.Max(0, Math.Min(cap, MaxCap)); Current = Cap; }
 
-        // Placeholder growth: +1 cap per 3 weapon levels and +1 per build-up.
-        public static int CapFor(int level, int buildUps) => StartCap + Math.Max(0, level) / 3 + Math.Max(0, buildUps);
+        public const int MaxCap = 1000;     // hard ceiling for CapFor, SetCap and a loaded save alike
+
+        // Placeholder growth: +1 cap per 3 weapon levels and +1 per build-up, at most MaxCap (computed in long: no overflow).
+        public static int CapFor(int level, int buildUps) =>
+            (int)Math.Min(MaxCap, (long)StartCap + Math.Max(0, level) / 3 + Math.Max(0, buildUps));
 
         // Raising the cap adds the new room as empty pips; lowering clamps.
         public void SetCap(int cap)
         {
-            cap = Math.Max(0, cap);
+            cap = Math.Max(0, Math.Min(cap, MaxCap));
             Cap = cap;
             if (Current > Cap) Current = Cap;
         }

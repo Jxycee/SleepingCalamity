@@ -261,12 +261,12 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
         public void HeroAbilities_UnknownIdsAreKeptAndWrittenBack_AndSaveRoundTrips()
         {
             var book = new HeroAbilityBook();
-            book.Restore(new HeroAbilitiesSave { Unlocked = { "axe_quake", "from_the_future", "", "axe_quake" } });
+            book.RestoreSave(new HeroAbilitiesSave { Unlocked = { "axe_quake", "from_the_future", "", "axe_quake" } });
             Assert.That(book.Has("axe_quake"), Is.True);
             Assert.That(book.Has("from_the_future"), Is.False, "unknown ids are not usable");
             string json = JsonConvert.SerializeObject(book.ToSave());
             var back = new HeroAbilityBook();
-            back.Restore(JsonConvert.DeserializeObject<HeroAbilitiesSave>(json));
+            back.RestoreSave(JsonConvert.DeserializeObject<HeroAbilitiesSave>(json));
             Assert.That(back.ToSave().Unlocked, Is.EqualTo(new[] { "axe_quake", "from_the_future" }));
         }
 
@@ -278,6 +278,93 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
             Assert.That(clean.Unlocked, Is.EqualTo(new[] { "a", "b" }));
             StringAssert.Contains("newField", JsonConvert.SerializeObject(clean));
             Assert.That(WeaponsSaveRules.CleanAbilities(null).Unlocked, Is.Empty);
+        }
+
+        // ---- Follow-up: refunds, extras, bounds ------------------------------------------------------------------------------------------
+
+        [Test]
+        public void Reroute_RefundsAttachmentsAbsorbedSinceTheBuildUp_AndThePreviewListsThem()
+        {
+            var w = ReadyAxe();
+            w.TryBuildUp();
+            w.Fit(AttachmentKind.Heartwood); w.Fit(AttachmentKind.PestBane);
+            w.AddAbs(w.LevelCostNow);                           // absorbs both
+            Assert.That(w.Fitted, Is.Empty);
+            w.Fit(AttachmentKind.Ember);
+
+            var preview = w.GetReroutePreview();
+            Assert.That(preview.AttachmentsReturned, Is.EqualTo(new[] { AttachmentKind.Heartwood, AttachmentKind.PestBane }));
+
+            Assert.That(w.TryReroute(out var refund), Is.True);
+            Assert.That(refund, Is.EqualTo(preview.AttachmentsReturned), "the real refund equals the preview");
+            Assert.That(w.Fitted, Is.EqualTo(new[] { AttachmentKind.Ember }), "what is fitted now stays");
+        }
+
+        [Test]
+        public void Reroute_RefundIsOnlyForTheLatestBuildUp_AndSurvivesSave()
+        {
+            var w = ReadyAxe();
+            w.TryBuildUp();
+            w.Fit(AttachmentKind.Heartwood);
+            w.AddAbs(w.LevelCostNow);
+            WeaponState.TryFromSave(WeaponsSaveRules.Clean(new WeaponsSave { Weapons = { w.ToSave("k") } }, null, null).Weapons[0], null, out var back);
+            Assert.That(back.TryReroute(out var refund), Is.True);
+            Assert.That(refund, Is.EqualTo(new[] { AttachmentKind.Heartwood }));
+        }
+
+        [Test]
+        public void Reroute_RefundPlusTrimmedAreBothReturned()
+        {
+            var w = ReadyDagger();                              // 2 slots; Bane Dagger has 3
+            w.TryBuildUp();
+            w.Fit(AttachmentKind.Heartwood);
+            w.AddAbs(w.LevelCostNow);                           // absorbed
+            w.Fit(AttachmentKind.Ember); w.Fit(AttachmentKind.PestBane); w.Fit(AttachmentKind.Heartwood);
+            Assert.That(w.GetReroutePreview().AttachmentsReturned,
+                Is.EqualTo(new[] { AttachmentKind.Heartwood, AttachmentKind.Heartwood }), "absorbed one, then the one past 2 slots");
+            w.TryReroute(out var refund);
+            Assert.That(refund, Is.EqualTo(new[] { AttachmentKind.Heartwood, AttachmentKind.Heartwood }));
+            Assert.That(w.Fitted.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Clean_DropsInvalidAbsorbedKinds_AndBoundsTheCounters()
+        {
+            var s = WithHistory("axe");
+            s.History[0].AbsorbedKinds = new List<int> { 2, 77, 0 };
+            s.LifetimeLevels = int.MaxValue; s.BuildUpsEver = int.MaxValue;
+            var repaired = new List<string>();
+            var clean = WeaponsSaveRules.Clean(new WeaponsSave { Weapons = { s } }, null, null, repaired);
+            Assert.That(clean.Weapons[0].History[0].AbsorbedKinds, Is.EqualTo(new[] { 2, 0 }));
+            Assert.That(repaired, Is.EqualTo(new[] { "k" }));
+            Assert.That(clean.Weapons[0].LifetimeLevels, Is.EqualTo(WeaponsSaveRules.MaxCounter));
+            Assert.That(clean.Weapons[0].BuildUpsEver, Is.EqualTo(WeaponsSaveRules.MaxCounter));
+            Assert.That(SpellPips.CapFor(clean.Weapons[0].LifetimeLevels, clean.Weapons[0].BuildUpsEver), Is.EqualTo(SpellPips.MaxCap));
+        }
+
+        [Test]
+        public void PipCap_IsBoundedByMaxCap_EverywhereItIsSet()
+        {
+            Assert.That(SpellPips.CapFor(int.MaxValue, int.MaxValue), Is.EqualTo(SpellPips.MaxCap));
+            var p = new SpellPips(int.MaxValue);
+            Assert.That(p.Cap, Is.EqualTo(SpellPips.MaxCap));
+            p.SetCap(int.MaxValue);
+            Assert.That(p.Cap, Is.EqualTo(SpellPips.MaxCap));
+            Assert.That(WeaponsSaveRules.CleanPips(new SpellPipsSave { Cap = int.MaxValue }).Cap, Is.EqualTo(SpellPips.MaxCap));
+        }
+
+        [Test]
+        public void HeroAbilityBook_KeepsTheSavesUnknownMembers_AndRestoreNullIsUnambiguous()
+        {
+            var loaded = JsonConvert.DeserializeObject<HeroAbilitiesSave>("{\"Unlocked\":[\"axe_quake\"],\"futureField\":{\"x\":1}}");
+            var book = new HeroAbilityBook();
+            book.RestoreSave(loaded);
+            StringAssert.Contains("futureField", JsonConvert.SerializeObject(book.ToSave()));
+            book.Restore(null);                                 // the ids overload
+            Assert.That(book.Unlocked, Is.Empty);
+            Assert.That(book.ToSave().Extra, Is.Null, "a plain id restore drops the old extras");
+            book.RestoreSave(null);
+            Assert.That(book.Unlocked, Is.Empty);
         }
 
         [Test]

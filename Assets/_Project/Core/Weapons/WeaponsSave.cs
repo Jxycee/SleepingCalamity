@@ -41,6 +41,7 @@ namespace SleepingCalamity.Core.Weapons
         public float Atk, Fire, Pest;
         public float AbsorbedAtk, AbsorbedFire, AbsorbedPest;   // bonuses absorbed since this build-up
         public List<int> Fitted = new List<int>();
+        public List<int> AbsorbedKinds = new List<int>();       // AttachmentKind numbers absorbed since this build-up (refunded by re-route)
 
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }
@@ -64,6 +65,10 @@ namespace SleepingCalamity.Core.Weapons
 
     public static class WeaponsSaveRules
     {
+        // Upper bound for LifetimeLevels and BuildUpsEver in a loaded save; far past anything SpellPips.MaxCap can show, so a damaged number
+        // cannot overflow CapFor's arithmetic.
+        public const int MaxCounter = 1000000;
+
         // A valid copy of the section (an empty one for null), nothing thrown.
         //  rejected: keys of weapons dropped whole (null, empty or repeated key, unknown definition, bad numbers); an empty key is named "".
         //  repaired: keys of weapons kept but fixed (attachments trimmed or invalid ones dropped, a bar reset, bad history entries cut).
@@ -92,7 +97,8 @@ namespace SleepingCalamity.Core.Weapons
                     {
                         Key = w.Key, OwnerId = w.OwnerId ?? "", DefinitionId = w.DefinitionId, Level = w.Level, Abs = w.Abs,
                         Atk = w.Atk, Fire = w.Fire, Pest = w.Pest,
-                        LifetimeLevels = Math.Max(Math.Max(0, w.LifetimeLevels), w.Level), BuildUpsEver = Math.Max(0, w.BuildUpsEver),
+                        LifetimeLevels = Math.Min(MaxCounter, Math.Max(Math.Max(0, w.LifetimeLevels), w.Level)),
+                        BuildUpsEver = Math.Min(MaxCounter, Math.Max(0, w.BuildUpsEver)),
                         Fitted = CleanFitted(w.Fitted, def.SlotCount, ref fixedUp),
                         Extra = w.Extra != null ? new Dictionary<string, object>(w.Extra) : null,
                     };
@@ -114,6 +120,7 @@ namespace SleepingCalamity.Core.Weapons
                                 DefinitionId = h.DefinitionId, Level = h.Level, Abs = habs, Atk = h.Atk, Fire = h.Fire, Pest = h.Pest,
                                 AbsorbedAtk = Math.Max(0f, h.AbsorbedAtk), AbsorbedFire = Math.Max(0f, h.AbsorbedFire), AbsorbedPest = Math.Max(0f, h.AbsorbedPest),
                                 Fitted = CleanFitted(h.Fitted, hdef.SlotCount, ref fixedUp),
+                                AbsorbedKinds = CleanKinds(h.AbsorbedKinds, ref fixedUp),
                                 Extra = h.Extra != null ? new Dictionary<string, object>(h.Extra) : null,
                             });
                         }
@@ -143,6 +150,20 @@ namespace SleepingCalamity.Core.Weapons
             return r;
         }
 
+        // Valid attachment numbers only (any count up to MaxAbsorbedKinds: three slots per level-up, so this is generous).
+        const int MaxAbsorbedKinds = 3000;
+        static List<int> CleanKinds(List<int> kinds, ref bool changed)
+        {
+            var r = new List<int>();
+            if (kinds == null) return r;
+            foreach (int a in kinds)
+            {
+                if (r.Count >= MaxAbsorbedKinds || !Attachments.IsValid((AttachmentKind)a)) { changed = true; continue; }
+                r.Add(a);
+            }
+            return r;
+        }
+
         // The hero's abilities: nulls and empty ids dropped, repeats merged. Unknown ids are kept (HeroAbilityBook carries them).
         public static HeroAbilitiesSave CleanAbilities(HeroAbilitiesSave save)
         {
@@ -159,7 +180,7 @@ namespace SleepingCalamity.Core.Weapons
         public static SpellPipsSave CleanPips(SpellPipsSave save)
         {
             if (save == null) return new SpellPipsSave();
-            int cap = Math.Max(0, Math.Min(save.Cap, 1000));
+            int cap = Math.Max(0, Math.Min(save.Cap, SpellPips.MaxCap));
             return new SpellPipsSave
             {
                 Cap = cap, Current = Math.Max(0, Math.Min(save.Current, cap)), HitProgress = Math.Max(0, Math.Min(save.HitProgress, SpellPips.HitsPerPip - 1)),

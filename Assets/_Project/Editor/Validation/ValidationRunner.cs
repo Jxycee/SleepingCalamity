@@ -18,6 +18,7 @@ namespace SleepingCalamity.EditorTools
             Add(all, "MeshReferences", Validators.MeshReferences());
             Add(all, "MissingScripts", Validators.MissingScripts());
             Add(all, "BootstrapReferences", Validators.BootstrapReferences());
+            Add(all, "SceneNetworkObjectHashes", Validators.SceneNetworkObjectHashes());
             return all;
         }
 
