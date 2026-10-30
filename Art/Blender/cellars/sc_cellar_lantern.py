@@ -38,7 +38,7 @@ NAME = 'CellarLantern'
 # ----------------------------------------------------------------------------- dimensions (metres)
 Z_BODY0, Z_BODY1 = 0.048, 0.336       # posts: plinth top to roof eave
 HW0, HW1 = 0.108, 0.097               # post-line half-width at the bottom and top (the body tapers upward)
-POST = 0.017                          # square bar (about 1.4x real)
+POST = 0.020                          # square bar (about 1.6x real)
 Z_GUARD = 0.192                       # horizontal guard bars
 FLAME = Vector((0.0, 0.0, 0.147))     # candle flame centre: the point light in Unity
 VENTS = []                            # (outer point, inward axis, radius, depth): the cutters AND the glow mask
@@ -150,37 +150,38 @@ def lantern_iron(name, polish_pids, rust=0.55):
     cav = T.cavity(dist=0.012, lo=0.3, hi=0.95)
     # rust: blotches everywhere a little, strongly in crevices and in a band at the foot where damp sits
     blot = T.noise(p, scale=45.0, detail=6, rough=0.7)
-    foot = T.math('MULTIPLY', T.smoothstep(z, 0.026, 0.004), T.noise(p, scale=9.0, detail=3))   # damp creeping up from the floor
-    thr = T.math('SUBTRACT', 0.69 - 0.06 * rust, T.math('MULTIPLY', foot, 0.38))
+    foot = T.math('MULTIPLY', T.smoothstep(z, 0.034, 0.004), T.noise(p, scale=9.0, detail=3))   # damp creeping up from the floor
+    thr = T.math('SUBTRACT', 0.66 - 0.06 * rust, T.math('MULTIPLY', foot, 0.5))
     rm = T.smoothstep(T.math('SUBTRACT', blot, thr), 0.0, 0.12)
-    rm = T.math('MAXIMUM', rm, T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), rust))
+    rm = T.math('MAXIMUM', rm, T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), rust * 1.3))
     rm = T.math('MULTIPLY', rm, T.math('SUBTRACT', 1.0, T.math('MULTIPLY', edge, 0.7)))   # worn edges stay iron
-    rust_c = T.mix(T.noise(p, scale=110, detail=3), (0.10, 0.042, 0.018), (0.26, 0.10, 0.036))
-    base = T.mix(T.noise(p, scale=22, detail=4), (0.055, 0.052, 0.05), (0.12, 0.11, 0.10))
-    c = T.mix(T.math('MULTIPLY', edge, 0.75), base, (0.27, 0.26, 0.25))
+    rust_c = T.mix(T.noise(p, scale=110, detail=3), (0.13, 0.05, 0.02), (0.34, 0.13, 0.04))
+    base = T.mix(T.noise(p, scale=22, detail=4), (0.085, 0.072, 0.064), (0.17, 0.145, 0.125))   # warm charcoal, not neutral grey
+    c = T.mix(T.math('MULTIPLY', edge, 0.75), base, (0.34, 0.31, 0.28))
     c = T.mix(rm, c, rust_c)
-    r = T.mixf(T.math('MULTIPLY', edge, 0.8), 0.55, 0.3)
+    r = T.mixf(T.math('MULTIPLY', edge, 0.8), T.mixf(T.noise(p, scale=8.0, detail=3), 0.42, 0.7), 0.28)   # scale patches rougher, worn edges smoother
     r = T.mixf(rm, r, 0.88)
     metal = T.mixf(rm, 0.8, 0.0)
     # soot: faces looking down above the glass (roof underside, top rail), and smoke trails rising from the vents
     under = T.math('MULTIPLY', T.smoothstep(z, 0.29, 0.335), T.smoothstep(nz, 0.2, -0.6))
+    band = T.math('MULTIPLY', T.math('MULTIPLY', T.smoothstep(z, 0.262, 0.322), T.smoothstep(z, 0.36, 0.34)), T.smoothstep(nz, 0.8, 0.2))   # smoke over the top rail and posts
     trail = 0.0
     for (o, a, rad, dep) in VENTS:
         d = T.vmath('SUBTRACT', lp, tuple(o))
         up = T.math('MAXIMUM', T.math('SUBTRACT', (T.sep(d), 'Z'), 0.0), 0.0)
         flat = T.vmath('LENGTH', T.vmath('MULTIPLY', d, (1.0, 1.0, 0.0)), out=1)
-        s = T.math('MULTIPLY', T.smoothstep(flat, rad * 1.8, rad * 0.7), T.math('MULTIPLY', T.smoothstep(up, 0.05, 0.0), T.smoothstep((T.sep(d), 'Z'), -0.004, 0.002)))
+        s = T.math('MULTIPLY', T.smoothstep(flat, rad * 2.4, rad * 0.7), T.math('MULTIPLY', T.smoothstep(up, 0.07, 0.0), T.smoothstep((T.sep(d), 'Z'), -0.004, 0.002)))
         trail = s if trail == 0.0 else T.math('MAXIMUM', trail, s)
-    soot = T.math('MAXIMUM', under, trail)
-    soot = T.math('MULTIPLY', soot, T.smoothstep(T.noise(p, scale=30, detail=5), 0.3, 0.55))
-    c = T.mix(soot, c, (0.018, 0.016, 0.015)); r = T.mixf(soot, r, 0.95); metal = T.mixf(soot, metal, 0.0)
+    soot = T.math('MAXIMUM', T.math('MAXIMUM', under, band), trail)
+    soot = T.math('MULTIPLY', soot, T.smoothstep(T.noise(p, scale=30, detail=5), 0.25, 0.5))
+    c = T.mix(soot, c, (0.022, 0.016, 0.012)); r = T.mixf(soot, r, 0.95); metal = T.mixf(soot, metal, 0.0)
     # polish: bare metal where hands go (by part)
     pol = 0.0
     for q in polish_pids:
         e = T.math('COMPARE', pidv, q, 0.01)
         pol = e if pol == 0.0 else T.math('MAXIMUM', pol, e)
-    pol = T.math('MULTIPLY', pol, T.math('ADD', 0.45, T.math('MULTIPLY', edge, 0.55)))
-    c = T.mix(pol, c, (0.42, 0.40, 0.37)); r = T.mixf(pol, r, 0.24); metal = T.mixf(pol, metal, 1.0)
+    pol = T.math('MULTIPLY', pol, T.math('ADD', 0.75, T.math('MULTIPLY', edge, 0.25)))
+    c = T.mix(pol, c, (0.62, 0.58, 0.52)); r = T.mixf(pol, r, 0.2); metal = T.mixf(pol, metal, 1.0)
     # glow in the punched vent pockets: true distance to each hole's axis segment (same list the cutters used)
     glow = 0.0
     for (o, a, rad, dep) in VENTS:
@@ -190,9 +191,11 @@ def lantern_iron(name, polish_pids, rust=0.55):
         g = T.math('MULTIPLY', T.smoothstep(perp, rad * 1.04, rad * 0.8), T.smoothstep(t, 0.0015, dep))
         glow = g if glow == 0.0 else T.math('MAXIMUM', glow, g)
     ham = T.voronoi(p, scale=150.0, out='Distance')
-    plan = T.voronoi(p, scale=55.0, out='Distance')                       # planishing facets (centimetre scale)
-    h = T.math('ADD', T.math('ADD', T.math('MULTIPLY', ham, 0.3), T.math('MULTIPLY', plan, 0.9)), T.math('MULTIPLY', rm, 0.45))
-    T.output(c, r, metal, T.bump(h, strength=0.45, distance=0.0008), Emission_Color=(1.0, 0.42, 0.09), Emission_Strength=glow)
+    plan = T.voronoi(p, scale=30.0, out='Distance')                       # hammer dents (about 1-2 cm)
+    pits = T.smoothstep(T.voronoi(p, scale=420.0, out='Distance'), 0.22, 0.0)   # forge-scale pitting
+    h = T.math('ADD', T.math('ADD', T.math('MULTIPLY', ham, 0.25), T.math('MULTIPLY', plan, 1.0)), T.math('MULTIPLY', rm, 0.45))
+    h = T.math('SUBTRACT', h, T.math('MULTIPLY', pits, T.math('ADD', 0.15, T.math('MULTIPLY', rm, 0.3))))
+    T.output(c, r, metal, T.bump(h, strength=0.75, distance=0.0012), Emission_Color=(1.0, 0.42, 0.09), Emission_Strength=glow)
     return m
 
 def candle_wax(name, col=(0.50, 0.40, 0.22)):
@@ -254,7 +257,7 @@ def build():
     # feet and plinth: bun feet under a stepped, rounded-square plinth
     feet = []
     for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (-1, -1), (1, -1))):
-        f = K.lathe(f'foot{i}', K.smooth_profile([(0.004, 0.0), (0.016, 0.001), (0.022, 0.008), (0.019, 0.015), (0.012, 0.019), (0.004, 0.02)], 0.002), 28, close=True)
+        f = K.lathe(f'foot{i}', K.smooth_profile([(0.004, 0.0), (0.019, 0.001), (0.027, 0.009), (0.024, 0.017), (0.014, 0.021), (0.004, 0.022)], 0.002), 28, close=True)
         f.location = (sx * 0.104, sy * 0.104, 0.0); feet.append(bake_xf(f))
     plinth = sq_loft('plinth', [(0.120, 0.014, 6), (0.131, 0.017, 6), (0.134, 0.024, 6), (0.131, 0.030, 6), (0.121, 0.033, 6),
                                 (0.117, 0.037, 6), (0.116, 0.044, 6), (0.111, 0.048, 6), (0.104, 0.050, 6)], 128)
@@ -278,9 +281,9 @@ def build():
     for side, (nx, ny) in enumerate(((1, 0), (-1, 0), (0, 1))):           # the front is the door
         if nx: a, b = Vector((nx * h, -h + 0.01, Z_GUARD)), Vector((nx * h, h - 0.01, Z_GUARD))
         else: a, b = Vector((-h + 0.01, ny * h, Z_GUARD)), Vector((h - 0.01, ny * h, Z_GUARD))
-        guards.append(K.tube(f'guard{side}', [a.lerp(b, t / 8) for t in range(9)], 0.0045, 12))
+        guards.append(K.tube(f'guard{side}', [a.lerp(b, t / 8) for t in range(9)], 0.0058, 12))
         top, bot = (a + b) / 2 + Vector((0, 0, 0.122)), (a + b) / 2 - Vector((0, 0, 0.122))
-        guards.append(K.tube(f'vguard{side}', [bot.lerp(top, t / 10) for t in range(11)], 0.004, 12))
+        guards.append(K.tube(f'vguard{side}', [bot.lerp(top, t / 10) for t in range(11)], 0.0052, 12))
         nrm = Vector((nx, ny, 0))
         guards += [rivet(f'gr{side}{j}', q + nrm * 0.004, nrm) for j, q in enumerate((a, b, (a + b) / 2))]
     iron('guards', guards, 0.0009, erode=wear(0.0003, 80, seed=3.0))
@@ -290,7 +293,7 @@ def build():
     for (p0, p1) in (((-hw(zb) + 0.012, 0, zb), (hw(zb) - 0.012, 0, zb)), ((-hw(zt) + 0.012, 0, zt), (hw(zt) - 0.012, 0, zt)),
                      ((-hw(zb) + 0.014, 0, zb), (-hw(zt) + 0.014, 0, zt)), ((hw(zb) - 0.014, 0, zb), (hw(zt) - 0.014, 0, zt))):
         yb = -(hw(p0[2]) + 0.006); ye = -(hw(p1[2]) + 0.006)
-        door.append(strap(f'door{len(door)}', (p0[0], yb, p0[2]), (p1[0], ye, p1[2]), 0.012, 0.005, (0, -1, 0)))
+        door.append(strap(f'door{len(door)}', (p0[0], yb, p0[2]), (p1[0], ye, p1[2]), 0.016, 0.007, (0, -1, 0)))
     hinge = []
     for j, zk in enumerate((0.105, 0.19, 0.275)):
         x = -hw(zk) - 0.004; y = -hw(zk) - 0.008
@@ -346,7 +349,7 @@ def build():
         C.subtract(ob, [cyl_cutter(f'vent{i}', o, a, r, d) for i, (o, a, r, d) in enumerate(VENTS)])
         return None
     iron('roof', [roof, drum, cap, finial, eye] + seams, 0.0013, erode=wear(0.0004, 60, chips=10, chip_r=(0.002, 0.005), seed=5.0), fillet=3, cuts=vent_cuts)
-    ring = ring_tube('ring', (0, 0, 0.586), 0.034, 0.0062, axis='Y', n=64, sides=16)
+    ring = ring_tube('ring', (0, 0, 0.588), 0.035, 0.0078, axis='Y', n=64, sides=16)
     iron('ring', [ring], 0.0009, erode=wear(0.0003, 90, seed=6.0))
     # candle: a cup socket, a burnt-down candle with drips, the wick, wax spilt over the cup onto the plinth
     cup = K.lathe('cup', K.smooth_profile([(0.004, 0.049), (0.028, 0.049), (0.03, 0.053), (0.026, 0.062), (0.03, 0.076), (0.034, 0.079),
@@ -365,8 +368,8 @@ def build():
             pts.append((rr_ * math.cos(a + 0.025 * math.sin(t * 7 + i)), rr_ * math.sin(a + 0.025 * math.sin(t * 7 + i)), max(zz, 0.0505)))
             rad.append(0.0034 * (1 - 0.3 * t) + (0.0014 if k == n else 0))
         wax.append(K.tube(f'drip{i}', pts, 0.0034, 8, radii=rad))
-    spill = K.lathe('spill', K.smooth_profile([(0.003, 0.0495), (0.024, 0.0495), (0.022, 0.0525), (0.012, 0.0545), (0.003, 0.0548)], 0.0012), 32, close=True)
-    spill.location = (0.012, -0.03, 0.0); spill.scale = (1.4, 0.9, 1.0); bake_xf(spill)
+    spill = K.lathe('spill', K.smooth_profile([(0.003, 0.0495), (0.036, 0.0495), (0.033, 0.053), (0.018, 0.0555), (0.003, 0.056)], 0.0012), 32, close=True)
+    spill.location = (0.018, -0.036, 0.0); spill.scale = (1.35, 0.85, 1.0); bake_xf(spill)
     wax.append(spill)
     highs = []
     for name, (obs, vox, kw) in iron_parts.items():
@@ -433,16 +436,24 @@ def render(objs_note):
         ld = bpy.data.lights.new(name, 'AREA'); ld.energy = energy; ld.color = col; ld.size = size
         o = bpy.data.objects.new(name, ld); o.location = loc; sc.collection.objects.link(o)
         d = Vector((0, 0, 0.28)) - Vector(loc); o.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler(); return o
-    sc.world = bpy.data.worlds.new('W'); sc.world.use_nodes = True; bg = sc.world.node_tree.nodes['Background']
+    sc.world = bpy.data.worlds.new('W'); sc.world.use_nodes = True; wn, wl = sc.world.node_tree.nodes, sc.world.node_tree.links
+    bg = wn['Background']; env = wn.new('ShaderNodeBackground'); mixw = wn.new('ShaderNodeMixShader'); lpth = wn.new('ShaderNodeLightPath')
+    tcw = wn.new('ShaderNodeTexCoord'); sepw = wn.new('ShaderNodeSeparateXYZ'); wl.new(tcw.outputs['Generated'], sepw.inputs[0])
+    rmp = wn.new('ShaderNodeValToRGB'); wl.new(sepw.outputs['Z'], rmp.inputs[0])
+    rmp.color_ramp.elements[0].position = 0.45; rmp.color_ramp.elements[0].color = (0.02, 0.012, 0.008, 1)
+    rmp.color_ramp.elements[1].position = 0.62; rmp.color_ramp.elements[1].color = (0.9, 0.55, 0.28, 1)
+    wl.new(rmp.outputs['Color'], env.inputs['Color'])
+    wl.new(lpth.outputs['Is Camera Ray'], mixw.inputs[0]); wl.new(env.outputs[0], mixw.inputs[1]); wl.new(bg.outputs[0], mixw.inputs[2])
+    wl.new(mixw.outputs[0], wn['World Output'].inputs['Surface'])
     cams = {'tq': ((-0.62, -0.88, 0.62), (0, 0, 0.29), 50), 'front': ((0.0, -1.12, 0.33), (0, 0, 0.29), 50),
             'close': ((0.22, -0.44, 0.27), (0.04, -0.08, 0.19), 70), 'roof': ((-0.26, -0.40, 0.50), (0.0, 0.0, 0.36), 70), 'wide': ((-1.4, -3.4, 1.3), (0.35, 0, 0.6), 35)}
     for mood in MOODS:
         for o in [o for o in sc.objects if o.type == 'LIGHT' and o.name != 'candle']: bpy.data.objects.remove(o)
         if mood == 'cellar':
-            cl.energy = 55.0; bg.inputs['Color'].default_value = (0.010, 0.006, 0.005, 1); bg.inputs['Strength'].default_value = 1.0
+            cl.energy = 55.0; bg.inputs['Color'].default_value = (0.010, 0.006, 0.005, 1); bg.inputs['Strength'].default_value = 1.0; env.inputs['Strength'].default_value = 0.35
             area('goldkey', (-1.2, -0.9, 1.3), 12.0, (1.0, 0.70, 0.40), 0.9); area('bounce', (1.0, -0.6, 0.3), 3.0, (0.85, 0.45, 0.30), 1.5)
         else:
-            cl.energy = 10.0; bg.inputs['Color'].default_value = (0.22, 0.22, 0.23, 1); bg.inputs['Strength'].default_value = 0.6
+            cl.energy = 10.0; bg.inputs['Color'].default_value = (0.22, 0.22, 0.23, 1); bg.inputs['Strength'].default_value = 0.6; env.inputs['Strength'].default_value = 1.0
             area('key', (-1.0, -1.2, 1.4), 70.0, (1.0, 0.97, 0.93), 1.0); area('rim', (0.9, 0.8, 1.0), 40.0, (0.9, 0.95, 1.0), 0.8)
         for v in VIEWS:
             if fig: fig.hide_render = v != 'wide'
