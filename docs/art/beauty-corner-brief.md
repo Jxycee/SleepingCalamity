@@ -61,3 +61,9 @@ The user reads our rubric scores about 8-10 points low ("your 20/40 is more like
 - Free references: `Reference/hollowmere/` (architecture, market_square, materials, paintings) with REFS.md files.
 - Study-only frames: `Reference/private/` (PC only, gitignored). The controller adds Dark Cloud town captures (PCSX2 at 1440p) under `Reference/private/dc1_town/` and posts a contact sheet.
 - Real-world: Alsace and Normandy half-timber (Colmar, Riquewihr, Eguisheim), Rothenburg ob der Tauber, sandstone market fountains (Rottweil, Rothenburg Marktplatz), French and German weekly markets.
+- **Real-world set (`1d369df`):** 45 CC images in `Reference/hollowmere/{architecture,fountain,props,ground}/`, sheet `Reference/hollowmere/CONTACT_beauty_corner.jpg`. Lessons:
+  1. The jetty reads through shadow: upper storey proud by a timber depth, dark band under it; shutters and flower boxes break the plaster.
+  2. Tile roofs vary tile to tile (orange-to-brown streaks), moss at eaves and ridge, soft wavy rooflines.
+  3. Fountain basins are low and wide, often octagonal, on one or two worn steps; the apron is darkest and mossiest at the stone-meets-ground line.
+  4. Cobble wear is colour and joints: tone varies per stone, joints go dark/green, courses follow arcs, weeds grow in joints, not on stones.
+  5. Props cluster to one side, in odd-numbered groups: barrels against a wall or in pairs, sacks slumped together, baskets on crates; keep a walking path.
