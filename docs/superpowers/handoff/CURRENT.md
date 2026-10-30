@@ -10,14 +10,14 @@
 - **The user owes:** `docs/superpowers/handoff/USER_TODO.md` (arena playtest, remaining Mixamo clips).
 
 ## Next
-1. **M3 readability pass** (branch `m3-readability`, agent running): bow fix, hit flash and knockback, telegraphs matching real reach, directional hurt flash, gentler waves 1-2, playtest checklist. First arena play (user, 2026-10-30): couldn't read hits or enemy reach, waves too hard, bow sometimes fires nothing (A31). Retest after this and the animation branch land.
+1. **M3 retest (user):** readability pass merged (`d60b4b8`; `SC RESULT check PASS` on `1c44f60`: EditMode 519, PlayMode 31 + 2 skipped). Bow fixed (1-frame window skipped under 60 fps, dropped buffered clicks, ray over short enemies), hit flash/hitstop/whiff/X marker, Core `Telegraph` footprints matching the hit test, shorter enemy reaches, Tier1Atk x0.65, gentler waves 1-2. The user answers the 8-question checklist in `docs/design/m3-combat-greybox.md`. Known: wave 4 to 5 is a x3.5 attack step; retune after the retest. Combat timing research card (DC1/KH numbers) proposed to the user.
 2. **Hero animation merged** (`e53369b`, `SC RESULT check PASS` EditMode 502, PlayMode 30 + 2 skipped; the skips are Explicit capture tools). Y Bot plays Quaternius/Kevin Iglesias/Mixamo clips via `AnimatorHeroDriver`; owed Mixamo clips drop into `Content/Animation/Mixamo/` by name hint (`docs/animation/SOURCES.md`; build log prints `SC ANIM placeholder`). Rough: bow aim pose, guard shield placement.
 3. **M9** (up to 3 art agents, P51): beauty corner first (B4+B6, B7+B8, B10, B9), then the dungeon corner (B5, B11) with the cellar toward the user's reference image (A24).
 4. **M5** room-pool authoring alongside; **M10** Tobin after.
 5. Open: M2/M3/M7 2-player walks wait for a second player. M4/M6 persistence must key growth by the persistent player id, not the session client id (`CombatHost.cs:95`).
 
 ## Branches and worktrees
-- `main` at `e53369b` (green). `m3-readability` in progress in worktree `agent-a3f4b7d611d7e2923`.
+- `main` at `1c44f60` (green). Merged this session: `m3-combat`, `m2-hero-anim`, `m3-readability`.
 - Merged: `m1-foundation`, `m2-hero-camera`, `m3-combat`, `m4-*`, `m8-*`. Worktrees `agent-a3f4b7d611d7e2923` (M3), `agent-a884291bf0ad9ef08` (M8), `agent-ad25d53219a200b3c` (M4) are finished; their imported Libraries can be reused.
 
 ## Blockers and open questions
