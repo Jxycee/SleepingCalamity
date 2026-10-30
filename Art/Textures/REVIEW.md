@@ -47,3 +47,14 @@ Measured with `sc_ref_palette.py --k 7` on the pooled frames; the same seven cap
 | 3 | cobble tint 0.78, sky thickness 0.6; cellar lift 0, ambient 1.8, exposure 0, white balance -14 | **0.23 / 0.52 / 0.77, +0.07** | **0.13 / 0.35 / 0.62, +0.30** |
 | band | | 0.21-0.25 / 0.44-0.50 / 0.80-0.86, +0.12 to +0.20 | 0.12-0.16 / 0.30-0.40 / 0.65-0.75, +0.20 to +0.30 |
 Day: p10 in; p50 +0.02 high, p90 -0.03 low, warmth -0.05 low. Cellar: p10, p50, warmth in; p90 -0.03 low. Also changed: the reflection probe is baked in batch (a temporary EXR, switched to Custom for the capture, deleted afterwards), the low-sun fill is neutral-warm (the purple cobbles are gone), the ember grate emission and light are lower. What can't get there with greybox geometry: the day median is dominated by the flat pale cobble ground and sky, so p50 and p90 need real dressing and shadow shapes.
+
+## M8 cellar mood (implementer, 2026-10-30)
+User feedback: the Cellars were too blue-green. Retuned only the cellar (builder `LookTestBuilder`): neutral white balance, no teal in the grade, ambient or fog; shadows pulled toward warm umber to plum; saturated clean lamp gold; crisper contrast; less fog. Pooled cellar frames, `sc_ref_palette.py --k 7`:
+| Round | Change | p10 / p50 / p90, warmth |
+|---|---|---|
+| before (part 3) | teal shadow tint, white balance -14, fog `#17282a` density 0.035 | 0.13 / 0.35 / 0.62, +0.30 |
+| 1 | gold (1,0.72,0.28) x 16, ambient 1.8 warm, fog umber 0.012, contrast +14, saturation +6 | 0.24 / 0.58 / 0.78, +0.48 (neon orange, over-bright) |
+| 2 | lamps x 7, gold (1,0.78,0.42), ambient 1.2, saturation -6 | 0.18 / 0.41 / 0.62, +0.31 |
+| 3 | lamps x 10, contrast +26, exposure -0.15, ambient 0.7, fog 0.007, plum shadow (1,0.86,0.90) | 0.18 / 0.44 / 0.67, +0.35 |
+| band | | 0.12-0.16 / 0.30-0.40 / 0.65-0.75, +0.20 to +0.30 |
+Final: p90 in band; p10 +0.02, p50 +0.04 and warmth +0.05 high. Looked at every capture: no teal or green cast anywhere; the shadows read warm umber-red, a little red-muddy in the barrel and corner shadows; the ember grate is a small red-orange accent. Remaining gap is greybox: the lit vault stone and flagstone fill much of the frame.

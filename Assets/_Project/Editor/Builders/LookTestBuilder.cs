@@ -245,10 +245,12 @@ namespace SleepingCalamity.EditorTools
             {
                 Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
                 Bloom b = Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-                ColorAdjustments c = Comp<ColorAdjustments>(p); c.postExposure.Override(0.0f); c.contrast.Override(-2f); c.saturation.Override(-8f);
-                ShadowsMidtonesHighlights s = Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.62f, 0.86f, 0.92f, 0f));
-                WhiteBalance w = Comp<WhiteBalance>(p); w.temperature.Override(-14f);
-                LiftGammaGain lg = Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.92f, 1.0f, 1.0f, 0.0f));
+                // Warm firelight, no teal anywhere (PHASE1 3.1, user 2026-10-30): neutral white balance, shadows pulled toward warm umber to plum,
+                // clean saturation, crisper contrast so lit stone, brick and shadow separate.
+                ColorAdjustments c = Comp<ColorAdjustments>(p); c.postExposure.Override(-0.15f); c.contrast.Override(26f); c.saturation.Override(-6f);
+                ShadowsMidtonesHighlights s = Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(1.0f, 0.86f, 0.90f, 0f));
+                WhiteBalance w = Comp<WhiteBalance>(p); w.temperature.Override(0f);
+                LiftGammaGain lg = Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(1.0f, 0.93f, 0.95f, 0.0f));
                 Vignette v = Comp<Vignette>(p); v.intensity.Override(0.28f); v.smoothness.Override(0.5f);
             });
             AssetDatabase.SaveAssets();
@@ -433,9 +435,9 @@ namespace SleepingCalamity.EditorTools
                 Prim(spheres, "Sphere_" + names[i], PrimitiveType.Sphere, new Vector3(-1.75f + i * 0.5f, 0.25f, 1.1f), Vector3.one * 0.46f, load(names[i]));
 
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
-            Color gold = new Color(1.0f, 0.85f, 0.68f);
-            AddLight(lighting, "LampLightA", LightType.Point, new Vector3(0f, 2.8f, 2.5f), Quaternion.identity, gold, 14f, 9f, LightShadows.Soft);
-            AddLight(lighting, "LampLightB", LightType.Point, new Vector3(0f, 2.8f, 7.0f), Quaternion.identity, gold, 14f, 9f, LightShadows.Soft);
+            Color gold = new Color(1.0f, 0.78f, 0.42f);   // saturated clean lamp gold (#d6a24a family), not a brown haze
+            AddLight(lighting, "LampLightA", LightType.Point, new Vector3(0f, 2.8f, 2.5f), Quaternion.identity, gold, 10f, 9f, LightShadows.Soft);
+            AddLight(lighting, "LampLightB", LightType.Point, new Vector3(0f, 2.8f, 7.0f), Quaternion.identity, gold, 10f, 9f, LightShadows.Soft);
             AddLight(lighting, "EmberLight", LightType.Point, new Vector3(-0.8f, 0.5f, 8.5f), Quaternion.identity, new Color(0.95f, 0.26f, 0.12f), 4f, 3.5f, LightShadows.None);
             for (int i = 0; i < 2; i++)
                 Shape(lighting, "Shaft" + i, LookTestGeometry.Shape.Cone, new Vector3(0.9f - i * 1.6f, 3.95f, 4.2f + i * 2.4f), new Vector3(0.9f, 0f, 4.2f),
@@ -444,9 +446,9 @@ namespace SleepingCalamity.EditorTools
             AddVolume(lighting, "LookTest_Cellar_Profile");
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.17f, 0.20f, 0.22f); RenderSettings.ambientEquatorColor = new Color(0.16f, 0.14f, 0.12f);
-            RenderSettings.ambientGroundColor = new Color(0.09f, 0.075f, 0.06f); RenderSettings.ambientIntensity = 1.8f;
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.035f; RenderSettings.fogColor = new Color(0.09f, 0.15f, 0.16f);
+            RenderSettings.ambientSkyColor = new Color(0.20f, 0.14f, 0.13f); RenderSettings.ambientEquatorColor = new Color(0.19f, 0.13f, 0.10f);   // warm umber to plum, no blue-green
+            RenderSettings.ambientGroundColor = new Color(0.11f, 0.07f, 0.05f); RenderSettings.ambientIntensity = 0.7f;
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.15f, 0.10f, 0.08f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
 
