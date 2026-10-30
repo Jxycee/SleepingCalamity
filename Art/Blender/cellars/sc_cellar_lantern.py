@@ -116,7 +116,7 @@ def strap(name, p0, p1, width, thick, normal):
     return bake_xf(ob)
 
 def rivet(name, p, normal, r=0.0062):
-    ob = K.lathe(name, K.smooth_profile([(0.0008, -0.004), (r, -0.004), (r * 0.98, 0.0005), (r * 0.75, r * 0.45), (0.0008, r * 0.62)], 0.0012), 16)
+    ob = K.lathe(name, K.smooth_profile([(0.0008, -0.004), (r, -0.004), (r * 0.98, 0.0005), (r * 0.75, r * 0.45), (0.0008, r * 0.62)], 0.0012), 16, close=True)
     z = Vector(normal).normalized(); x = Vector((0, 0, 1)).cross(z)
     if x.length < 1e-4: x = Vector((1, 0, 0))
     x.normalize(); y = z.cross(x)
@@ -150,8 +150,8 @@ def lantern_iron(name, polish_pids, rust=0.55):
     cav = T.cavity(dist=0.012, lo=0.3, hi=0.95)
     # rust: blotches everywhere a little, strongly in crevices and in a band at the foot where damp sits
     blot = T.noise(p, scale=45.0, detail=6, rough=0.7)
-    foot = T.math('MULTIPLY', T.smoothstep(z, 0.034, 0.008), T.noise(p, scale=9.0, detail=3))   # damp creeping up from the floor
-    thr = T.math('SUBTRACT', 0.69 - 0.06 * rust, T.math('MULTIPLY', foot, 0.5))
+    foot = T.math('MULTIPLY', T.smoothstep(z, 0.026, 0.004), T.noise(p, scale=9.0, detail=3))   # damp creeping up from the floor
+    thr = T.math('SUBTRACT', 0.69 - 0.06 * rust, T.math('MULTIPLY', foot, 0.38))
     rm = T.smoothstep(T.math('SUBTRACT', blot, thr), 0.0, 0.12)
     rm = T.math('MAXIMUM', rm, T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), rust))
     rm = T.math('MULTIPLY', rm, T.math('SUBTRACT', 1.0, T.math('MULTIPLY', edge, 0.7)))   # worn edges stay iron
@@ -254,7 +254,7 @@ def build():
     # feet and plinth: bun feet under a stepped, rounded-square plinth
     feet = []
     for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (-1, -1), (1, -1))):
-        f = K.lathe(f'foot{i}', K.smooth_profile([(0.004, 0.0), (0.016, 0.001), (0.022, 0.008), (0.019, 0.015), (0.012, 0.019), (0.004, 0.02)], 0.002), 28)
+        f = K.lathe(f'foot{i}', K.smooth_profile([(0.004, 0.0), (0.016, 0.001), (0.022, 0.008), (0.019, 0.015), (0.012, 0.019), (0.004, 0.02)], 0.002), 28, close=True)
         f.location = (sx * 0.104, sy * 0.104, 0.0); feet.append(bake_xf(f))
     plinth = sq_loft('plinth', [(0.120, 0.014, 6), (0.131, 0.017, 6), (0.134, 0.024, 6), (0.131, 0.030, 6), (0.121, 0.033, 6),
                                 (0.117, 0.037, 6), (0.116, 0.044, 6), (0.111, 0.048, 6), (0.104, 0.050, 6)], 128)
@@ -294,7 +294,7 @@ def build():
     hinge = []
     for j, zk in enumerate((0.105, 0.19, 0.275)):
         x = -hw(zk) - 0.004; y = -hw(zk) - 0.008
-        k = K.lathe(f'knuckle{j}', K.smooth_profile([(0.002, -0.014), (0.0068, -0.014), (0.0072, -0.012), (0.0072, 0.012), (0.0068, 0.014), (0.002, 0.014)], 0.0015), 20)
+        k = K.lathe(f'knuckle{j}', K.smooth_profile([(0.002, -0.014), (0.0068, -0.014), (0.0072, -0.012), (0.0072, 0.012), (0.0068, 0.014), (0.002, 0.014)], 0.0015), 20, close=True)
         k.location = (x, y, zk); hinge.append(bake_xf(k))
         hinge.append(strap(f'leaf{j}', (x, y, zk), (x + 0.03, y + 0.002, zk), 0.018, 0.0035, (0, -1, 0)))
     hinge.append(K.tube('pin', [(-hw(0.09) - 0.004, -hw(0.09) - 0.008, 0.088), (-hw(0.29) - 0.004, -hw(0.29) - 0.008, 0.292)], 0.0026, 10))
@@ -327,9 +327,9 @@ def build():
         seams.append(K.tube(f'seam{k}', dense, 0.0042, 10))
     bead = [ring_pt(0.1495, 0.3425, 5.5, 2 * math.pi * i / 160 + math.pi / 4) for i in range(161)] + [ring_pt(0.1495, 0.3425, 5.5, 2 * math.pi / 160 + math.pi / 4)]
     seams.append(K.tube('eavebead', bead, 0.0048, 12))                     # rolled edge on the eave
-    drum = K.lathe('drum', K.smooth_profile([(0.004, 0.45), (0.036, 0.45), (0.037, 0.455), (0.036, 0.488), (0.040, 0.49), (0.004, 0.49)], 0.002), 48, close=False)
-    cap = K.lathe('cap', K.smooth_profile([(0.004, 0.487), (0.046, 0.489), (0.052, 0.494), (0.048, 0.499), (0.03, 0.507), (0.016, 0.512), (0.004, 0.514)], 0.0015), 56)
-    finial = K.lathe('finial', K.smooth_profile([(0.003, 0.51), (0.012, 0.512), (0.016, 0.52), (0.012, 0.528), (0.007, 0.531), (0.006, 0.536), (0.003, 0.537)], 0.0012), 32)
+    drum = K.lathe('drum', K.smooth_profile([(0.004, 0.45), (0.036, 0.45), (0.037, 0.455), (0.036, 0.488), (0.040, 0.49), (0.004, 0.49)], 0.002), 48, close=True)
+    cap = K.lathe('cap', K.smooth_profile([(0.004, 0.487), (0.046, 0.489), (0.052, 0.494), (0.048, 0.499), (0.03, 0.507), (0.016, 0.512), (0.004, 0.514)], 0.0015), 56, close=True)
+    finial = K.lathe('finial', K.smooth_profile([(0.003, 0.51), (0.012, 0.512), (0.016, 0.52), (0.012, 0.528), (0.007, 0.531), (0.006, 0.536), (0.003, 0.537)], 0.0012), 32, close=True)
     eye = ring_tube('eye', (0, 0, 0.546), 0.0085, 0.004, axis='X', n=24)
     del VENTS[:]
     for i in range(8):                                                     # cupola vents
@@ -350,12 +350,12 @@ def build():
     iron('ring', [ring], 0.0009, erode=wear(0.0003, 90, seed=6.0))
     # candle: a cup socket, a burnt-down candle with drips, the wick, wax spilt over the cup onto the plinth
     cup = K.lathe('cup', K.smooth_profile([(0.004, 0.049), (0.028, 0.049), (0.03, 0.053), (0.026, 0.062), (0.03, 0.076), (0.034, 0.079),
-                                           (0.031, 0.08), (0.024, 0.07), (0.004, 0.068)], 0.0015), 40)
+                                           (0.031, 0.08), (0.024, 0.07), (0.004, 0.068)], 0.0015), 40, close=True)
     iron('cup', [cup], 0.0009, erode=wear(0.0003, 80, seed=7.0))
     rr = K.rng('drips')
     # a fat, burnt-down stub: the rim stands higher than the tunnelled centre, drips half-sunk into the side
     cd = K.lathe('candle', K.smooth_profile([(0.004, 0.066), (0.0245, 0.066), (0.0243, 0.11), (0.0238, 0.127), (0.0222, 0.1305),
-                                             (0.019, 0.128), (0.012, 0.1225), (0.004, 0.1215)], 0.0015), 48)
+                                             (0.019, 0.128), (0.012, 0.1225), (0.004, 0.1215)], 0.0015), 48, close=True)
     wax = [cd]
     for i in range(6):
         a = i * math.pi / 3 + rr.uniform(-0.4, 0.4); L = rr.uniform(0.015, 0.05) if i else 0.072; R = 0.0236; n = 10; pts = []; rad = []
@@ -365,7 +365,7 @@ def build():
             pts.append((rr_ * math.cos(a + 0.025 * math.sin(t * 7 + i)), rr_ * math.sin(a + 0.025 * math.sin(t * 7 + i)), max(zz, 0.0505)))
             rad.append(0.0034 * (1 - 0.3 * t) + (0.0014 if k == n else 0))
         wax.append(K.tube(f'drip{i}', pts, 0.0034, 8, radii=rad))
-    spill = K.lathe('spill', K.smooth_profile([(0.003, 0.0495), (0.024, 0.0495), (0.022, 0.0525), (0.012, 0.0545), (0.003, 0.0548)], 0.0012), 32)
+    spill = K.lathe('spill', K.smooth_profile([(0.003, 0.0495), (0.024, 0.0495), (0.022, 0.0525), (0.012, 0.0545), (0.003, 0.0548)], 0.0012), 32, close=True)
     spill.location = (0.012, -0.03, 0.0); spill.scale = (1.4, 0.9, 1.0); bake_xf(spill)
     wax.append(spill)
     highs = []
@@ -401,7 +401,7 @@ def build_unbaked():
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         ob = K._obj_from_bm(f'glass{side}', bm); ob.data.materials.append(gm); out.append(ob)
     fl = K.lathe('flame', K.smooth_profile([(0.0005, FLAME.z - 0.011), (0.0045, FLAME.z - 0.007), (0.0055, FLAME.z - 0.002), (0.0035, FLAME.z + 0.008),
-                                            (0.0008, FLAME.z + 0.017)], 0.001), 16)
+                                            (0.0008, FLAME.z + 0.017)], 0.001), 16, close=True)
     fl.data.materials.append(flame_mat('M_Flame')); out.append(fl)
     for o in out: K.smooth(o)
     return out
