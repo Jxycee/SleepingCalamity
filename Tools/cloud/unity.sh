@@ -15,13 +15,13 @@ say() { printf '%s\n' "$*"; }
 usage() { say "$USAGE"; [ -n "${1:-}" ] && say "usage: $1"; exit 4; }
 
 COMMAND="${1:-}"; [ $# -gt 0 ] && shift
-OUT="${SC_OUT:-}"; FILTER=""; TIMEOUT_MIN=5; METHOD=""; GRAPHICS=0
+OUT="${SC_OUT:-}"; FILTER=""; TIMEOUT_MIN=""; METHOD=""; GRAPHICS=0
 PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)"
 while [ $# -gt 0 ]; do
     case "$1" in
         --out) OUT="${2:-}"; shift 2 ;;
         --filter) FILTER="${2:-}"; shift 2 ;;
-        --timeout) TIMEOUT_MIN="${2:-5}"; shift 2 ;;
+        --timeout) TIMEOUT_MIN="${2:-}"; shift 2 ;;
         --project) PROJECT="${2:-}"; shift 2 ;;
         --method) METHOD="${2:-}"; shift 2 ;;
         --graphics) GRAPHICS=1; shift ;;
@@ -32,6 +32,10 @@ case "$COMMAND" in compile|build|test-edit|test-play|check|exec) ;; *) usage "un
 UNITY="${SC_UNITY:-$HOME/unity/ed/Editor/Unity}"
 [ -d "$PROJECT/ProjectSettings" ] || usage "project must be an absolute Unity project path: $PROJECT"
 PROJECT="$(cd "$PROJECT" && pwd)"
+# a fresh container has no Library/: the first launch imports the whole project (~7 min measured), so the default grows
+if [ -z "$TIMEOUT_MIN" ]; then
+    if [ -f "$PROJECT/Library/ArtifactDB" ]; then TIMEOUT_MIN=5; else TIMEOUT_MIN=20; say "SC NOTE no Library/ yet: first run imports the project, timeout raised to 20 min"; fi
+fi
 [ "$COMMAND" = exec ] && { printf '%s' "$METHOD" | grep -Eq '^[A-Za-z_][A-Za-z0-9_.]*$' || usage 'exec needs --method <Namespace.Class.Method>'; }
 [ -n "$OUT" ] || usage 'no --out given and SC_OUT is not set'
 case "$OUT" in /*) ;; *) usage "out must be absolute: $OUT" ;; esac
