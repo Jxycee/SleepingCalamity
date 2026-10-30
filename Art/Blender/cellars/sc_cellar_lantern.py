@@ -151,11 +151,11 @@ def lantern_iron(name, polish_pids, rust=0.55):
     # rust: blotches everywhere a little, strongly in crevices and in a band at the foot where damp sits
     blot = T.noise(p, scale=45.0, detail=6, rough=0.7)
     foot = T.math('MULTIPLY', T.smoothstep(z, 0.034, 0.008), T.noise(p, scale=9.0, detail=3))   # damp creeping up from the floor
-    thr = T.math('SUBTRACT', 0.71 - 0.06 * rust, T.math('MULTIPLY', foot, 0.3))
+    thr = T.math('SUBTRACT', 0.69 - 0.06 * rust, T.math('MULTIPLY', foot, 0.5))
     rm = T.smoothstep(T.math('SUBTRACT', blot, thr), 0.0, 0.12)
     rm = T.math('MAXIMUM', rm, T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), rust))
     rm = T.math('MULTIPLY', rm, T.math('SUBTRACT', 1.0, T.math('MULTIPLY', edge, 0.7)))   # worn edges stay iron
-    rust_c = T.mix(T.noise(p, scale=110, detail=3), (0.085, 0.036, 0.016), (0.22, 0.085, 0.032))
+    rust_c = T.mix(T.noise(p, scale=110, detail=3), (0.10, 0.042, 0.018), (0.26, 0.10, 0.036))
     base = T.mix(T.noise(p, scale=22, detail=4), (0.055, 0.052, 0.05), (0.12, 0.11, 0.10))
     c = T.mix(T.math('MULTIPLY', edge, 0.75), base, (0.27, 0.26, 0.25))
     c = T.mix(rm, c, rust_c)
@@ -190,8 +190,9 @@ def lantern_iron(name, polish_pids, rust=0.55):
         g = T.math('MULTIPLY', T.smoothstep(perp, rad * 1.04, rad * 0.8), T.smoothstep(t, 0.0015, dep))
         glow = g if glow == 0.0 else T.math('MAXIMUM', glow, g)
     ham = T.voronoi(p, scale=150.0, out='Distance')
-    h = T.math('ADD', T.math('MULTIPLY', ham, 0.35), T.math('MULTIPLY', rm, 0.45))
-    T.output(c, r, metal, T.bump(h, strength=0.35, distance=0.0006), Emission_Color=(1.0, 0.42, 0.09), Emission_Strength=glow)
+    plan = T.voronoi(p, scale=55.0, out='Distance')                       # planishing facets (centimetre scale)
+    h = T.math('ADD', T.math('ADD', T.math('MULTIPLY', ham, 0.3), T.math('MULTIPLY', plan, 0.9)), T.math('MULTIPLY', rm, 0.45))
+    T.output(c, r, metal, T.bump(h, strength=0.45, distance=0.0008), Emission_Color=(1.0, 0.42, 0.09), Emission_Strength=glow)
     return m
 
 def lantern_glass(name):
@@ -203,7 +204,7 @@ def lantern_glass(name):
     bs = n['Principled BSDF']
     tc = n.new('ShaderNodeTexCoord'); sep = n.new('ShaderNodeSeparateXYZ'); l.new(tc.outputs['Object'], sep.inputs[0])
     sm = n.new('ShaderNodeMapRange'); sm.interpolation_type = 'SMOOTHSTEP'; l.new(sep.outputs['Z'], sm.inputs['Value'])
-    sm.inputs['From Min'].default_value = 0.215; sm.inputs['From Max'].default_value = 0.31
+    sm.inputs['From Min'].default_value = 0.17; sm.inputs['From Max'].default_value = 0.30
     nz = n.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = 22; nz.inputs['Detail'].default_value = 6
     l.new(tc.outputs['Object'], nz.inputs['Vector'])
     sw = n.new('ShaderNodeMath'); sw.operation = 'MULTIPLY_ADD'; l.new(nz.outputs['Fac'], sw.inputs[0])
@@ -211,10 +212,10 @@ def lantern_glass(name):
     soot = n.new('ShaderNodeMath'); soot.operation = 'MULTIPLY'; soot.use_clamp = True
     l.new(sm.outputs['Result'], soot.inputs[0]); l.new(sw.outputs['Value'], soot.inputs[1])
     col = n.new('ShaderNodeMix'); col.data_type = 'RGBA'; l.new(soot.outputs['Value'], col.inputs[0])
-    col.inputs[6].default_value = (0.62, 0.56, 0.40, 1); col.inputs[7].default_value = (0.025, 0.02, 0.016, 1)
+    col.inputs[6].default_value = (0.50, 0.45, 0.32, 1); col.inputs[7].default_value = (0.012, 0.010, 0.008, 1)
     l.new(col.outputs[2], bs.inputs['Base Color'])
     al = n.new('ShaderNodeMapRange'); l.new(soot.outputs['Value'], al.inputs['Value'])
-    al.inputs['To Min'].default_value = 0.16; al.inputs['To Max'].default_value = 0.88
+    al.inputs['To Min'].default_value = 0.08; al.inputs['To Max'].default_value = 0.93
     l.new(al.outputs['Result'], bs.inputs['Alpha'])
     ro = n.new('ShaderNodeMapRange'); l.new(nz.outputs['Fac'], ro.inputs['Value'])
     ro.inputs['From Min'].default_value = 0.35; ro.inputs['From Max'].default_value = 0.75
@@ -296,6 +297,23 @@ def build():
     roof = sq_loft('roof', [(0.094, 0.331, 6), (0.13, 0.334, 6), (0.146, 0.338, 6), (0.149, 0.343, 5.5), (0.141, 0.348, 5),
                             (0.123, 0.358, 4.4), (0.101, 0.378, 3.6), (0.082, 0.400, 3.0), (0.064, 0.422, 2.6),
                             (0.050, 0.438, 2.3), (0.041, 0.450, 2.0), (0.036, 0.455, 2.0)], 160, lift=eave_lift)
+    def ring_pt(hwid, z, n, a):
+        c, s_ = math.cos(a), math.sin(a)
+        r = hwid / (abs(c) ** n + abs(s_) ** n) ** (1.0 / n)
+        return Vector((r * c, r * s_, z + eave_lift(abs(math.sin(2 * a)), z)))
+    seams = []
+    rp = [(0.149, 0.343, 5.5), (0.141, 0.348, 5), (0.123, 0.358, 4.4), (0.101, 0.378, 3.6), (0.082, 0.400, 3.0),
+          (0.064, 0.422, 2.6), (0.050, 0.438, 2.3), (0.041, 0.450, 2.0)]
+    for k in range(4):                                                     # folded seams up the four corners
+        a = math.pi / 4 + k * math.pi / 2
+        pts = [ring_pt(hh + 0.0015, zz, nn, a) for hh, zz, nn in rp]
+        dense = []
+        for i in range(len(pts) - 1):
+            for t in range(4): dense.append(pts[i].lerp(pts[i + 1], t / 4))
+        dense.append(pts[-1])
+        seams.append(K.tube(f'seam{k}', dense, 0.0042, 10))
+    bead = [ring_pt(0.1495, 0.3425, 5.5, 2 * math.pi * i / 160 + math.pi / 4) for i in range(161)] + [ring_pt(0.1495, 0.3425, 5.5, 2 * math.pi / 160 + math.pi / 4)]
+    seams.append(K.tube('eavebead', bead, 0.0048, 12))                     # rolled edge on the eave
     drum = K.lathe('drum', K.smooth_profile([(0.004, 0.45), (0.036, 0.45), (0.037, 0.455), (0.036, 0.488), (0.040, 0.49), (0.004, 0.49)], 0.002), 48, close=False)
     cap = K.lathe('cap', K.smooth_profile([(0.004, 0.487), (0.046, 0.489), (0.052, 0.494), (0.048, 0.499), (0.03, 0.507), (0.016, 0.512), (0.004, 0.514)], 0.0015), 56)
     finial = K.lathe('finial', K.smooth_profile([(0.003, 0.51), (0.012, 0.512), (0.016, 0.52), (0.012, 0.528), (0.007, 0.531), (0.006, 0.536), (0.003, 0.537)], 0.0012), 32)
@@ -314,7 +332,7 @@ def build():
     def vent_cuts(ob):
         C.subtract(ob, [cyl_cutter(f'vent{i}', o, a, r, d) for i, (o, a, r, d) in enumerate(VENTS)])
         return None
-    iron('roof', [roof, drum, cap, finial, eye], 0.0013, erode=wear(0.0004, 60, chips=10, chip_r=(0.002, 0.005), seed=5.0), fillet=3, cuts=vent_cuts)
+    iron('roof', [roof, drum, cap, finial, eye] + seams, 0.0013, erode=wear(0.0004, 60, chips=10, chip_r=(0.002, 0.005), seed=5.0), fillet=3, cuts=vent_cuts)
     ring = ring_tube('ring', (0, 0, 0.586), 0.034, 0.0062, axis='Y', n=64, sides=16)
     iron('ring', [ring], 0.0009, erode=wear(0.0003, 90, seed=6.0))
     # candle: a cup socket, a burnt-down candle with drips, the wick, wax spilt over the cup onto the plinth
@@ -403,11 +421,11 @@ def render(objs_note):
         d = Vector((0, 0, 0.28)) - Vector(loc); o.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler(); return o
     sc.world = bpy.data.worlds.new('W'); sc.world.use_nodes = True; bg = sc.world.node_tree.nodes['Background']
     cams = {'tq': ((-0.62, -0.88, 0.62), (0, 0, 0.29), 50), 'front': ((0.0, -1.12, 0.33), (0, 0, 0.29), 50),
-            'close': ((-0.26, -0.40, 0.50), (0.0, 0.0, 0.36), 70), 'wide': ((-1.4, -3.4, 1.3), (0.35, 0, 0.6), 35)}
+            'close': ((0.22, -0.44, 0.27), (0.04, -0.08, 0.19), 70), 'roof': ((-0.26, -0.40, 0.50), (0.0, 0.0, 0.36), 70), 'wide': ((-1.4, -3.4, 1.3), (0.35, 0, 0.6), 35)}
     for mood in MOODS:
         for o in [o for o in sc.objects if o.type == 'LIGHT' and o.name != 'candle']: bpy.data.objects.remove(o)
         if mood == 'cellar':
-            cl.energy = 28.0; bg.inputs['Color'].default_value = (0.010, 0.006, 0.005, 1); bg.inputs['Strength'].default_value = 1.0
+            cl.energy = 55.0; bg.inputs['Color'].default_value = (0.010, 0.006, 0.005, 1); bg.inputs['Strength'].default_value = 1.0
             area('goldkey', (-1.2, -0.9, 1.3), 12.0, (1.0, 0.70, 0.40), 0.9); area('bounce', (1.0, -0.6, 0.3), 3.0, (0.85, 0.45, 0.30), 1.5)
         else:
             cl.energy = 10.0; bg.inputs['Color'].default_value = (0.22, 0.22, 0.23, 1); bg.inputs['Strength'].default_value = 0.6
