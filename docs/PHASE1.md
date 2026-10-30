@@ -51,11 +51,11 @@ The target: Dark Cloud's whimsical shapes and town and dungeon themes, rendered 
 
 | | Day (Hollowmere square) | Cellars (Undercroft floors 1-4) |
 |---|---|---|
-| Value p10 / p50 / p90 (sRGB max channel) | 0.20-0.24 / 0.48-0.55 / 0.90-0.94 | 0.12-0.16 / 0.30-0.40 / 0.65-0.75 |
-| Warmth (lights minus darks) | +0.05 to +0.15 | +0.20 to +0.30 |
+| Value p10 / p50 / p90 (sRGB max channel) | 0.21-0.25 / 0.44-0.50 / 0.80-0.86 | 0.12-0.16 / 0.30-0.40 / 0.65-0.75 |
+| Warmth (lights minus darks) | +0.12 to +0.20 | +0.20 to +0.30 |
 | Masses | 3-4 readable masses: one pale (plaster, sky), one dark (timber, shadow), one warm mid (stone, roof) | Gold lamplight dominant, deep shadow, warm brick mid |
-| Key hues | plaster warm near-white `#e4dfd3`; roof red-terracotta `#9c4a34`; timber `#2e2520` to `#4e4844`; cobble `#817a7b` to `#b7b0aa`; foliage yellow-green `#6f8a34`; moss `#616e2e` / `#b6ab28` | lamp gold `#d6a24a`; lit stone `#c9aa76`; brick `#9d7d69` / `#bf7a38`; shadow teal-tinted `#14343c` to `#1b4a52`; ember accent `#c2412a` (the demon's breath) |
-| Saturation vs photos | +15-25% chroma on plaster tints, roofs, foliage, painted wood and cloth | Clean lamp gold; no mass is pure black |
+| Key hues | plaster warm tan-cream `#cbbd9c` (OoT `#b7a680`, a little lighter); roof red-terracotta `#9c4a34`; timber `#2e2520` to `#4e4844`; cobble `#817a7b` to `#b7b0aa`; foliage yellow-green `#6f8a34`; moss `#616e2e` / `#b6ab28` | lamp gold `#d6a24a`; lit stone `#c9aa76`; brick `#9d7d69` / `#bf7a38`; shadow teal-tinted `#14343c` to `#1b4a52`; ember accent `#c2412a` (the demon's breath) |
+| Saturation vs photos | OoT-like, moody and slightly muted: no chroma boost on stone, plaster or roofs; +10-15% only on foliage, sky, painted wood, cloth and accents; shadows tinted slate-teal (`#2f3a44`) | Clean lamp gold; no mass is pure black |
 
 **The Cellars are warm.** STORY 8.4 gives them warm lamplight, and teal belongs to the Cisterns. So gold is the dominant light mass. Teal appears only as the shadow and fog tint from the grade, and the red ember glow from below is a small accent. [P34]
 
@@ -347,3 +347,6 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 49. **P49 Call:** the stir effects: one more enemy per room, then a roaming tier-2 rat-king hunter, then "the deep closes" (reach a bank point in time or the dive fails).
 50. **P50 Call:** the controller (Opus) scores the art contact sheets itself; the pinned Sonnet `reviewer` does not.
 51. **P51 Call:** at most 3 art-batch agents run at once, after the user's go-ahead.
+
+## Change log
+- 2026-10-30 (user, decision A11): day palette moved toward the measured OoT 2026 frames, keeping as much of the OoT look as possible with slightly brighter light; moody, darker saturation stays. Day value bands, warmth, plaster hue, saturation and slate-teal shadows updated in 3.1.
