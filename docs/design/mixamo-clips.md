@@ -39,5 +39,9 @@ Already downloaded (2026-10-30): Y Bot, Warrior Idle, Standing Idle To Action Id
 
 Mixamo still owed in total: about 21 clips (M2 11, M3 about 10-12) instead of about 45.
 
+## Third source: Unity Asset Store free packs (research 2026-10-30)
+Kevin Iglesias' free packs (publisher "Kevin Iglesias" on the Asset Store; Standard Asset Store EULA, commercial use fine): Human Basic Motions FREE (8-direction walk/run including back and diagonals, turn-in-place left/right, jump, fall loop), Archer FREE (bow shot, sheathe/unsheathe, strafe run), Spellcasting FREE (cast enter/idle/exit plus 5 spells), Melee FREE (one two-handed attack, a polearm attack). Also Explosive's Warrior Pack Bundle 2 FREE and RPG Character Mecanim Animation Pack FREE. The user adds them to "My Assets" with their Unity ID; Claude imports them through the Package Manager. Take the Asset Store copies, not itch (licence page empty there, and one itch FBX had a hierarchy mismatch).
+If you add these, skip from Mixamo: walk back, the 4 strafes, the 2 turns, the area cast. Mixamo then still covers: side dodges and back step, the downed loop, pick-up from the ground, the greatsword combo/overhead/charge, staff strikes, bow draw-aim loop and aim walk, the air attack and the launcher (about 12 clips). No free source has those (full notes: `docs/research/animation-sources.md`).
+
 ## Enemies
 The broom, the jam-jar slime, the rat-king and the Dough Warden are greybox shapes in Phase 1 (P5, section 5). They don't need humanoid clips.
