@@ -16,10 +16,11 @@ Cloud environment menu in the session's title bar > **Edit**.
 
 | Variable | What to put in it |
 |---|---|
-| `UNITY_LICENSE` | Personal licence: activate in Unity Hub on the PC, then paste the whole contents of `C:\ProgramData\Unity\Unity_lic.ulf` (XML, or base64 of it). |
-| `UNITY_SERIAL`, `UNITY_EMAIL`, `UNITY_PASSWORD` | Plus/Pro serial instead. Each new container takes a seat: `bash Tools/cloud/sc_unity_license.sh --return` before the session ends, or free seats at id.unity.com. |
+| `UNITY_EMAIL`, `UNITY_PASSWORD` | Your Unity account. The editor's own licensing client activates each new container headlessly (Personal works; `Tools/cloud/sc_unity_license.sh`). The account must not use two-factor sign-in. Each container counts as a new machine: `bash Tools/cloud/sc_unity_license.sh --return` before a session ends keeps the activation count down. |
+| `UNITY_SERIAL` | Only for a Plus/Pro seat, alongside the two above. |
+| `UNITY_LICENSE` | Legacy only: the contents of a `Unity_lic.ulf`. Current Hub versions don't make one; the PC's `%LocalAppData%\Unity\licenses\UnityEntitlementLicense.xml` is bound to the PC's hardware and won't work in a container, so don't use it. |
 
-A `.ulf` is tied to the machine it came from. Unity usually accepts a Personal one in a container (CI services rely on this), but if `unity.sh` logs exit 198 / "No valid Unity Editor license found", the licence was refused.
+If `unity.sh` logs exit 198 / "No valid Unity Editor license found", the activation didn't happen: `~/.sc-setup/unity-license.log` says why.
 
 ## 2. What a session gets
 
@@ -59,6 +60,6 @@ Anything a session installs is gone when the container is reclaimed. To make it 
 
 ## 4. What still needs the PC
 
-- Any Unity launch until `UNITY_LICENSE` is set and accepted: build, EditMode/PlayMode tests and `check`. With it, `unity.sh check` is a full merge gate (same marker as the PC).
+- Any Unity launch until `UNITY_EMAIL` + `UNITY_PASSWORD` are set and the activation works: build, EditMode/PlayMode tests and `check`. With it, `unity.sh check` is a full merge gate (same marker as the PC).
 - The Unity MCP and `sc-walk` (they drive a windowed editor; on CPU rendering it would be too slow to use), AssetRipper/REA, `Reference/private/` (copyrighted frames never leave the PC), a real GPU (cloud renders are CPU-only and slower).
 - Committed bakes and FBX exports: cloud Blender writes different bytes from the PC's, so art sessions commit generators and the PC rebakes (sc-asset-craft, sc-texture-paint).

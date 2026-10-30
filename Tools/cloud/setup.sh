@@ -23,7 +23,7 @@
 #   csharp-ls, pwsh    the csharp-lsp plugin's server; PowerShell to read and dry-run Tools/*.ps1
 #   uv / uvx           Python tools on demand (`uvx <tool>`, `uv tool install <tool>`)
 #   Unity 6000.6.5f1   ~/unity/ed/Editor/Unity (Linux) + the registry packages + DXC: Tools/cloud/unity.sh (batchmode twin of Tools/unity.ps1, needs a
-#                      licence: UNITY_LICENSE or UNITY_SERIAL secrets, see the doc), sc_cloud_compile.py (C# compile, no licence) and sc_shader_check.py
+#                      licence: UNITY_EMAIL + UNITY_PASSWORD secrets, see the doc), sc_cloud_compile.py (C# compile, no licence) and sc_shader_check.py
 #
 #   blender MCP        Tools/cloud/sc_blender_mcp.py (a live, windowed Blender under xvfb) registered as the user-scope `blender` MCP server. The repo's
 #                      deniedMcpServers keeps it off, as on the PC, except with SC_PROFILE=art, which lifts the deny in this checkout only
@@ -104,7 +104,7 @@ do_check() {
     local ust; ust="$(unity_status)"
     row unity-editor "$([ -f "$HOME/unity/ed/.extracted" ] && echo "$HOME/unity/ed/Editor/Unity present" || echo "MISSING (background setup: $ust; log $STATE/unity.log)")"
     row unity-pkgs   "$(ls -d "$HOME/unity/pkgs/"*/ 2>/dev/null | wc -l) registry packages in ~/unity/pkgs"
-    row unity-lic    "$(ls "$HOME/.local/share/unity3d/Unity/Unity_lic.ulf" >/dev/null 2>&1 && echo 'licence file present' || echo 'none (needed only to launch Unity; see the doc)')"
+    row unity-lic    "$(ls "$HOME/.local/share/unity3d/Unity/Unity_lic.ulf" >/dev/null 2>&1 && echo 'licence file present' || echo 'none yet (activated on the first unity.sh run from UNITY_EMAIL + UNITY_PASSWORD)')"
     row dxc          "$([ -x "$HOME/dxc/bin/dxc" ] && echo "$HOME/dxc/bin/dxc present" || echo 'MISSING (python3 Tools/cloud/sc_shader_check.py --setup)')"
     row csproj       "$(ls "$REPO"/*.csproj >/dev/null 2>&1 && echo "$(ls "$REPO"/*.csproj | wc -l) projects + $(ls "$REPO"/*.sln 2>/dev/null | wc -l) sln" || echo 'none yet (python3 Tools/cloud/sc_cloud_compile.py --csproj)')"
     row blender-mcp  "$( (cd "$HOME" && claude mcp get blender >/dev/null 2>&1) && echo -n 'registered' || echo -n 'not registered'; grep -qi '"blender"' "$REPO/.claude/settings.json" 2>/dev/null && echo ', denied in this checkout (dev profile)' || echo ', allowed in this checkout (art profile)')"
