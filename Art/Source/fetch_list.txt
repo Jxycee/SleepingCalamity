@@ -64,3 +64,14 @@ polyhaven grass_medium_01 B9 grass clump source
 # NVIDIA SimReady (CC BY 4.0: credit line goes in the game credits). Larder dressing and clay bottles.
 simready container_bottle_clay_a01 larder clay bottle
 simready misc_bottle_corked_a01 larder corked bottle
+
+# ambientCG (CC0): the texture gaps the B1-B3 batches did not cover
+ambientcg Leaking006 B3 drip and grime decal
+ambientcg Leaking012A B3 drip decal variant
+ambientcg Leaking014A B3 drip decal variant
+ambientcg Leaking016A B3 drip decal variant
+ambientcg Grate001 B11 floor grate material (breath grate)
+ambientcg Grate002 B11 floor grate variant
+ambientcg LeafSet017 B9 ivy leaf atlas
+ambientcg Moss002 B3/B9 moss source for decals and tufts
+ambientcg Metal052A B1 wrought-iron base for grading
