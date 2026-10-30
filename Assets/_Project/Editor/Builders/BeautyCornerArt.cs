@@ -44,6 +44,7 @@ namespace SleepingCalamity.EditorTools
                     }
                 }
                 if (best == null) continue;
+                if (bestScore == 1) Debug.LogWarning("SC BEAUTY row " + row.Id + ": no exact folder name match under " + batchDir + ", using the contains-match " + best);
                 Found f = Scan(best);
                 if (f != null) return f;
             }
