@@ -3,6 +3,12 @@
 Every art session on the beauty corner reads this first, then `docs/PHASE1.md` section 3 (style bible) and section 4 (batches).
 The controller (PC session) owns this file, the Unity corner scene and all merges.
 
+## 0. User decisions (2026-10-30)
+- **Fountain spout:** a drowsy sleeping beast head, eyes closed, water once poured from its mouth (ties to the game's name and the dry fountain). Original design.
+- **Facade colours:** warm cream plaster, dark oak frame, **green** shutters and door (sage to forest green, faded).
+- **Whimsy:** medium: 1-3 deg off true, sagging ridges, chunky 1.4x timbers (style bible as written).
+- **Stall goods:** harvest produce and bread: apples, turnips, squash, loaves in baskets.
+
 ## 1. The corner (PHASE1 4)
 One half-timbered facade beside the dry fountain on cobbles, with one market stall, barrels, crates and sacks, a
 bleached banner, ivy and crack weeds, and haze with god rays. Midday capture plus one low-sun shot.
