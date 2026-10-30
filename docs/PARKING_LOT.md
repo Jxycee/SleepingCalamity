@@ -47,3 +47,4 @@ Sources: `docs/research/kh1-sweep.md` and `docs/research/kh2-sweep.md`.
 
 ## Art (2026-10-30)
 - 2026-10-30: B11 cellar lantern, optional polish (relaxed review 28.5/40 said a player would notice): stronger wear from the three-quarter view (soot streaks above the vents, orange rust on the base rim), more roughness/specular variation on the iron body, and a slightly warmer iron so it catches the gold rim light. Not needed before the dungeon-corner captures.
+- 2026-10-30: B7 props, optional polish (self-review 27/40, stopped at the 25/40 calibration): a shallow water fill in BucketWell, faded stencil marks on one sack, a darker inner burlap face on SackOpen's cuff, the dirt splash a touch stronger at the cobble line, and real straw strands instead of the flat straw bed under the produce.
