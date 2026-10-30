@@ -176,3 +176,8 @@ LightingData.asset     binary
 # Terrain: TerrainData is a binary serialized asset (even with Force Text), so it must not be text-normalised; LFS keeps hand-edit churn out of the history.
 *_TerrainData.asset     filter=lfs diff=lfs merge=lfs -text
 *_SculptDelta.bytes     filter=lfs diff=lfs merge=lfs -text
+
+# Adopted model sources (Art/Source, sc_fetch_models.py): glTF buffers and USD crate files
+*.bin                   lfs
+*.usd                   lfs
+*.usdc                  lfs
