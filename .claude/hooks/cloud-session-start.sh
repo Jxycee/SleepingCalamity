@@ -16,4 +16,7 @@ if git lfs pull >/dev/null 2>&1; then
 else
     echo "git lfs pull failed; LFS files may still be pointers."
 fi
+# Unity licence from the environment's secrets (the setup script cannot read them); serial activation waits for unity.sh
+bash Tools/cloud/sc_unity_license.sh --file-only 2>/dev/null | grep -v '^$' || true
+[ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && kill -0 "$(cat "$HOME/.sc-setup/unity.pid" 2>/dev/null)" 2>/dev/null && echo "Unity editor still downloading in the background: bash Tools/cloud/setup.sh --wait"
 exit 0
