@@ -57,7 +57,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         // A solo session: host on loopback, the world created at once, the arena loaded, this peer's player spawned.
-        public static IEnumerator StartSoloAndWaitForPlayer()
+        public static IEnumerator StartSoloAndWaitForPlayer(string expectedScene = SceneNames.ArenaGreybox)
         {
             AppBootstrap app = AppBootstrap.Current;
             Assert.That(app, Is.Not.Null, "StartSolo: no App; call LoadBootstrapAndWaitForLobby first");
@@ -70,7 +70,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Await(session.StartLocalAsync(false, cts.Token), SessionTimeoutSeconds, cts);
             cts.Dispose();
             yield return WaitUntil(
-                () => SceneManager.GetActiveScene().name == SceneNames.ArenaGreybox && app.NetworkManager.LocalClient != null
+                () => SceneManager.GetActiveScene().name == expectedScene && app.NetworkManager.LocalClient != null
                       && app.NetworkManager.LocalClient.PlayerObject != null,
                 SessionTimeoutSeconds,
                 "The local player never spawned in the arena after solo start");

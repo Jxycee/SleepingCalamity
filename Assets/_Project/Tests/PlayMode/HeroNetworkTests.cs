@@ -86,9 +86,12 @@ namespace SleepingCalamity.Tests.PlayMode
             public TargetLockController Lock;
             public FakeInputService Input;
 
+            private readonly NetworkObject obj_;
+
             public HeroRig(NetworkObject obj)
             {
                 Object = obj;
+                obj_ = obj;
                 State = obj.GetComponent<HeroNetState>();
                 Locomotion = obj.GetComponent<HeroLocomotion>();
                 Lock = obj.GetComponent<TargetLockController>();
@@ -99,6 +102,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 Locomotion.Input = Input;
                 Lock.Input = Input;
+                obj_.GetComponent<HeroCombat>().Input = Input;
             }
 
             public Vector3 Position => Object.transform.position;

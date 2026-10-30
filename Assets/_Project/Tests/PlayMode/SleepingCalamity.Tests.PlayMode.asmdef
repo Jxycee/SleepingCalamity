@@ -15,6 +15,7 @@
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.Cinemachine",
         "Unity.Netcode.Runtime",
+        "Unity.Multiplayer.Tools.NetworkSimulator.Runtime",
         "Unity.Collections",
         "Unity.InputSystem"
     ],
