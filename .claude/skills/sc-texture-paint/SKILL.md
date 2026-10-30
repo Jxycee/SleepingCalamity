@@ -7,7 +7,7 @@ description: Make or tune Sleeping Calamity's PBR surface materials - tileables,
 
 The skill name is historical: nothing is hand-painted. Every surface is a real PBR set (albedo, normal, ORM) made **once per area as a smart material**: a CC0 scan plus procedural layers in the `aaa_mats2.py` style, shared by every kit piece that uses it (PHASE1 3.2, handoff 3.5). This is where most of the quality comes from, and a fix here reaches every piece.
 
-Tools (status in sc-asset-craft 0b): `aaa_mats2.py`, `aaa_scan.py`, `fetch_textures.py`, `pack_unity.py`, `ref_match.py` are **FishGame only, port before use** (M8). `sc_ref_palette.py` is current. FishGame's texture-array generator and `fg_texture_proto.py` were for the old grey-centred painted arrays and don't apply.
+Tools (status in sc-asset-craft 0b): ported in M8 as `sc_aaa_mats2.py`, `sc_aaa_scan.py`, `sc_fetch_textures.py` (Poly Haven fetch with a source record), `sc_pack_unity.py` (`--orm`). The batch pipeline is `Art/Blender/textures/sc_tex_batches.py` (grade + ORM + seam ratio + SOURCES.md), `sc_tex_b3.py` (trim sheets, decals) and `sc_tex_sheet.py` (contact sheet, calibrated so 50% grey reads 0.5, plus the `sc_ref_palette.py` measure), helper library `Art/Blender/tools/sc_texgrade.py`. Scans live in `C:\Dev\_private\textures_src\`, outside git. `sc_ref_palette.py` is current. FishGame's texture-array generator and `fg_texture_proto.py` were for the old grey-centred painted arrays and don't apply.
 
 ## 0. Who uses it? (decide first)
 A material nobody samples is the most expensive mistake (FishGame built a whole layer that no mesh read).
