@@ -38,7 +38,7 @@ First session: about 7 minutes for everything except Unity, then the Unity edito
 | Mesa llvmpipe (GL 4.5), lavapipe (Vulkan), xvfb | system | Cycles renders on CPU directly; EEVEE needs `xvfb-run -a blender -b ...` (first shader compile about 75 s); `unity.sh --graphics` runs under `xvfb-run` |
 | Unity 6000.6.5f1 Linux editor + registry packages | `~/unity/ed/Editor/Unity`, `~/unity/pkgs` | `Tools/cloud/unity.sh` (batchmode twin of `unity.ps1`, needs a licence), `sc_cloud_compile.py` (C# compile, no licence) |
 | DXC | `~/dxc/bin/dxc` | `sc_shader_check.py` (every shader pass) |
-| .NET 8 SDK, NuGet warm for NUnit 3.14 | `dotnet` | `sc_core_tests.py` (Core EditMode tests under NUnitLite) |
+| .NET 8 SDK, NuGet warm for NUnit 3.14 and Newtonsoft.Json 13.0.2 | `dotnet` | `sc_core_tests.py` (Core EditMode tests under NUnitLite) |
 | csharp-ls 0.16.0 | `csharp-ls` | the csharp-lsp plugin, once a checkout has `.csproj` files (see section 4) |
 | PowerShell 7.4 | `pwsh` | reading and dry-running `Tools/*.ps1` |
 | Python 3 + numpy, pillow, pyarrow, scipy, opencv-headless, imageio, trimesh, pygltflib, requests, pyyaml, matplotlib | system | asset finder, image diffs, palettes, glTF/FBX checks outside Blender |

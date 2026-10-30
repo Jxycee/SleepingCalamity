@@ -270,6 +270,21 @@ def engine_refs():
     return refs
 
 
+def is_managed(path):
+    """True when the PE file has a CLR header (data directory 14); native plugins (lz4, zlib, onigwrap) don't, and Unity never references them."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read(4096)
+        pe = int.from_bytes(data[0x3C:0x40], "little")
+        if data[pe:pe + 4] != b"PE\0\0":
+            return False
+        opt = pe + 24
+        dirs = opt + (96 if data[opt:opt + 2] == b"\x0b\x01" else 112)  # PE32 vs PE32+
+        return int.from_bytes(data[dirs + 14 * 8:dirs + 14 * 8 + 4], "little") != 0
+    except (OSError, ValueError):
+        return False
+
+
 def plugin_dlls(project, roots):
     """filename -> (path, explicitly referenced?) for precompiled DLLs in Assets/ and packages, editor-compatible ones only."""
     out = {}
@@ -283,7 +298,7 @@ def plugin_dlls(project, roots):
                 meta = open(p + ".meta").read()
             except OSError:
                 pass
-            if "RoslynAnalyzer" in meta:
+            if "RoslynAnalyzer" in meta or not is_managed(p):
                 continue
             # PluginImporter platformData: "first: {Editor: Editor} second: {enabled: N}", and "Exclude Editor: 1" under Any.
             editor = re.search(r"Editor: Editor\s*\n\s*second:\s*\n\s*enabled:\s*(\d)", meta)

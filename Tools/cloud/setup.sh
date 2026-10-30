@@ -175,12 +175,12 @@ dotnet_tool() { # dotnet_tool PACKAGE VERSION COMMAND   (pinned: the latest csha
 if have dotnet; then
     step "csharp-ls 0.16.0" dotnet_tool csharp-ls 0.16.0 csharp-ls
     step "pwsh 7.4.6" dotnet_tool PowerShell 7.4.6 pwsh
-    warm_nuget() { # sc_core_tests.py restores NUnit/NUnitLite 3.14 on first use; fetch them now
+    warm_nuget() { # sc_core_tests.py restores NUnit/NUnitLite 3.14 and Newtonsoft.Json 13.0.2 (what Unity's newtonsoft-json 3.2 bundles) on first use; fetch them now
         local d="$STATE/nuget-warm"; mkdir -p "$d"
-        printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include="NUnit" Version="3.14.0" /><PackageReference Include="NUnitLite" Version="3.14.0" /></ItemGroup></Project>' > "$d/warm.csproj"
+        printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include="NUnit" Version="3.14.0" /><PackageReference Include="NUnitLite" Version="3.14.0" /><PackageReference Include="Newtonsoft.Json" Version="13.0.2" /></ItemGroup></Project>' > "$d/warm.csproj"
         dotnet restore "$d/warm.csproj" >/dev/null
     }
-    step "nuget warm (NUnit 3.14)" warm_nuget
+    step "nuget warm (NUnit 3.14, Newtonsoft 13.0.2)" warm_nuget
 fi
 
 # ------------------------------------------------------------------------------------------------ links on PATH for non-login shells
