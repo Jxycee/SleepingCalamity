@@ -1,0 +1,14 @@
+// Core, no engine references. Routed input: what gameplay is allowed to act on this frame.
+namespace SleepingCalamity.Core
+{
+    public struct PlayerIntent
+    {
+        public float MoveX, MoveY, LookYawDeg, LookPitchDeg;
+        public bool JumpPressed, SprintHeld;
+        public bool PrimaryHeld, PrimaryPressed, PrimaryReleased;
+        public bool SecondaryHeld, SecondaryPressed, SecondaryReleased;
+        public bool InteractPressed, PausePressed;
+
+        public static readonly PlayerIntent None = default;
+    }
+}

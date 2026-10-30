@@ -1,5 +1,5 @@
 // The single build entry point and SleepingCalamity/Build All. Every scene and prefab comes from a builder step here;
-// add a Step per builder as they land. Tools/unity.ps1 build and check read the SC BUILDALL lines.
+// add a Step per builder as they land (steps run in order and all run even after a failure). Tools/unity.ps1 build and check read the SC BUILDALL lines.
 using System;
 using System.Collections.Generic;
 using UnityEditor;
@@ -34,7 +34,13 @@ namespace SleepingCalamity.EditorTools
         public static bool RunAll(List<string> errors)
         {
             if (errors == null) throw new ArgumentNullException(nameof(errors));
+            Step(errors, "ProjectSettings", ProjectSettingsBuilder.Apply);
+            Step(errors, "Prefabs", PrefabBuilder.Build);
+            Step(errors, "NetworkPrefabs", NetworkPrefabsBuilder.Build);
+            Step(errors, "Scenes", SceneBuilder.BuildAll);
+            Step(errors, "BuildSettings", SceneBuilder.ApplyBuildSettings);
             Step(errors, "Save", AssetDatabase.SaveAssets);
+            Step(errors, "Validate", () => errors.AddRange(ValidationRunner.Run()));   // after Save: the validators read what is on disk
             return errors.Count == 0;
         }
 
