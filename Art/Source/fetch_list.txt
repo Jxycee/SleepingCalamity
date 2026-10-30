@@ -1,0 +1,77 @@
+# Curated free sources for Phase 1 (user, 2026-10-30: curated set at 2K, each with a source + licence record).
+# python3 Art/Blender/tools/sc_fetch_models.py Art/Source/fetch_list.txt [--only id] [--dry-run]
+# <provider> <id> <batch> <purpose>. The B1-B3 tileables are already graded from Poly Haven scans (Art/Textures/*/SOURCES.md),
+# so this list is base meshes for adoption (sc-asset-adopt), bake sources and the texture gaps (decals).
+
+# B7 prop family: base meshes to restyle (chunkier, our tileables or rebaked maps)
+polyhaven wooden_barrels_01 B7 barrel family base
+polyhaven wine_barrel_01 B7 wine barrel for the cellar racks
+polyhaven Barrel_01 B7 barrel variant
+polyhaven wooden_crate_01 B7 crate
+polyhaven wooden_crate_02 B7 crate variant
+polyhaven wooden_bucket_01 B7 bucket
+polyhaven wooden_bucket_02 B7 bucket variant
+polyhaven wicker_basket_01 B7/B8 basket
+polyhaven wicker_basket_02 B7/B8 basket variant
+polyhaven ceramic_vase_01 B7 jar and crock shapes
+polyhaven ceramic_vase_02 B7 jar and crock shapes
+polyhaven ceramic_vase_03 B7 jar and crock shapes
+polyhaven ceramic_vase_04 B7 jar and crock shapes
+polyhaven jug_01 B7 jug
+polyhaven planter_pot_clay B7 crock shape
+polyhaven wooden_display_shelves_01 B7 larder shelves base
+polyhaven Shelf_01 B7 larder shelf
+polyhaven wooden_bookshelf_worn B7 cellar shelving
+
+# B8 market dressing
+polyhaven wooden_lantern_01 B8 market lantern base
+polyhaven Lantern_01 B8 lantern variant (iron)
+
+# Cellar dressing (the reference image: candles, chests, shields, tables, bottles, books)
+polyhaven treasure_chest cellar iron-banded chest
+polyhaven kite_shield cellar wall shield
+polyhaven wooden_candlestick cellar candlestick base (our drips added)
+polyhaven brass_candleholders cellar candle holders
+polyhaven vintage_oil_lamp cellar lamp variety
+polyhaven wine_bottles_01 cellar wine bottles
+polyhaven WoodenTable_01 cellar table
+polyhaven WoodenTable_02 cellar table
+polyhaven WoodenTable_03 cellar table
+polyhaven round_wooden_table_01 cellar round table
+polyhaven wooden_stool_01 cellar stool
+polyhaven wooden_stool_02 cellar stool
+# decorative_book_set_01: no glTF on Poly Haven (blend only), skipped
+polyhaven stone_fire_pit cellar fireplace hearth reference
+polyhaven wooden_bowl_01 cellar bowl
+polyhaven wooden_bowl_02 cellar bowl
+polyhaven carved_wooden_plate cellar plate
+polyhaven large_castle_door B5 cellar door
+polyhaven large_iron_gate B5 cellar gate
+
+# B6 sculpted scatter: bake sources (over --max-tris ones are recorded, fetched on demand)
+polyhaven rock_moss_set_01 B6 rubble and stone bake source
+polyhaven rock_moss_set_02 B6 rubble and stone bake source
+polyhaven root_cluster_01 B6 cellar root bake source
+polyhaven root_cluster_02 B6 cellar root bake source
+polyhaven single_root B6 cellar root bake source
+
+# B9 foliage scans (bake sources; most are over budget and only recorded)
+polyhaven moss_01 B9 moss tuft source
+polyhaven nettle_plant B9 crack weed source
+polyhaven weed_plant_02 B9 crack weed source
+polyhaven grass_medium_01 B9 grass clump source
+
+# NVIDIA SimReady (CC BY 4.0: credit line goes in the game credits). Larder dressing and clay bottles.
+simready container_bottle_clay_a01 larder clay bottle
+simready misc_bottle_corked_a01 larder corked bottle
+
+# ambientCG (CC0): the texture gaps the B1-B3 batches did not cover
+ambientcg Leaking006 B3 drip and grime decal
+ambientcg Leaking012A B3 drip decal variant
+ambientcg Leaking014A B3 drip decal variant
+ambientcg Leaking016A B3 drip decal variant
+ambientcg Grate001 B11 floor grate material (breath grate)
+ambientcg Grate002 B11 floor grate variant
+ambientcg LeafSet017 B9 ivy leaf atlas
+ambientcg Moss002 B3/B9 moss source for decals and tufts
+ambientcg Metal052A B1 wrought-iron base for grading
