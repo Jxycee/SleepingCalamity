@@ -27,6 +27,19 @@ namespace SleepingCalamity.EditorTools
             Shader unlit = Shader.Find(UnlitShaderName);
             if (unlit == null) throw new System.InvalidOperationException("Shader not found: " + UnlitShaderName);
             Ensure(unlit, "M_LockIndicator", new Color(1f, 0.85f, 0.15f));
+
+            // M3 combat greybox: enemy bodies (the per-instance tint comes from a MaterialPropertyBlock), weapons, sparks and translucent footprints.
+            Ensure(lit, "M_EnemySlime", new Color(0.80f, 0.15f, 0.30f));
+            Ensure(lit, "M_EnemyRat", new Color(0.45f, 0.36f, 0.30f));
+            Ensure(lit, "M_EnemyBroom", new Color(0.62f, 0.46f, 0.26f));
+            Ensure(lit, "M_EnemyWarden", new Color(0.90f, 0.78f, 0.52f));
+            Ensure(lit, "M_EnemyPart", new Color(0.95f, 0.55f, 0.25f));
+            Ensure(lit, "M_WeaponWood", new Color(0.45f, 0.30f, 0.16f));
+            Ensure(lit, "M_WeaponSteel", new Color(0.78f, 0.80f, 0.84f));
+            Ensure(lit, "M_HealDrop", new Color(0.35f, 1f, 0.5f));
+            Ensure(unlit, "M_Spark", new Color(1f, 1f, 1f));
+            EnsureTransparentUnlit(unlit, "M_Telegraph", new Color(1f, 0.5f, 0.1f, 0.3f));
+            EnsureTransparentUnlit(unlit, "M_SwingArc", new Color(0.9f, 0.95f, 1f, 0.3f));
         }
 
         // name without extension, e.g. "M_GreyboxGround".
@@ -35,6 +48,24 @@ namespace SleepingCalamity.EditorTools
             Material material = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/" + name + ".mat");
             if (material == null) throw new System.InvalidOperationException("Material not built: " + name + " (run MaterialLibrary.BuildAll first)");
             return material;
+        }
+
+        // URP Unlit set to the Transparent surface (alpha blend, no depth write), the way the material inspector would; the colour (and its alpha) is
+        // overridden per instance with a MaterialPropertyBlock.
+        static void EnsureTransparentUnlit(Shader shader, string name, Color color)
+        {
+            Ensure(shader, name, color);
+            Material m = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/" + name + ".mat");
+            bool changed = false;
+            if (m.GetFloat("_Surface") != 1f) { m.SetFloat("_Surface", 1f); changed = true; }
+            if (m.GetFloat("_Blend") != 0f) { m.SetFloat("_Blend", 0f); changed = true; }
+            if (m.GetFloat("_SrcBlend") != (float)UnityEngine.Rendering.BlendMode.SrcAlpha) { m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); changed = true; }
+            if (m.GetFloat("_DstBlend") != (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha) { m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha); changed = true; }
+            if (m.GetFloat("_ZWrite") != 0f) { m.SetFloat("_ZWrite", 0f); changed = true; }
+            if (!m.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT")) { m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); changed = true; }
+            if (m.renderQueue != 3000) { m.renderQueue = 3000; changed = true; }
+            if (m.GetTag("RenderType", false) != "Transparent") { m.SetOverrideTag("RenderType", "Transparent"); changed = true; }
+            if (changed) EditorUtility.SetDirty(m);
         }
 
         static void Ensure(Shader shader, string name, Color color)

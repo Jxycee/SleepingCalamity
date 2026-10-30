@@ -62,6 +62,14 @@ namespace SleepingCalamity.Core.Weapons
         }
 
         public void Forget(string enemyId) { if (enemyId != null) _paid.Remove(enemyId); }
+
+        // Style ABS already paid for this enemy (0 once forgotten). For tests and the debug HUD.
+        public float Paid(string enemyId)
+        {
+            if (enemyId == null) return 0f;
+            _paid.TryGetValue(enemyId, out float used);
+            return used;
+        }
     }
 
     public enum TechKind { Parry, WeakPart, ElementMatch, FinisherKill }

@@ -99,10 +99,42 @@ namespace SleepingCalamity.Presentation
             UpdateIndicator();
         }
 
+        // M3: a camera kick on impacts (a quick FOV punch that eases back), owner side only. 0..1; stacked kicks keep the larger.
+        private float _kick;
+        private bool _kickApplied;
+        private const float KickFovDegrees = 4.5f, KickDecayPerSecond = 4.5f;
+
+        public void Kick(float strength) { _kick = Mathf.Max(_kick, Mathf.Clamp01(strength)); }
+
+        private void OnEnable() { CombatEvents.CameraKick += OnKick; }
+        private void OnDisable() { CombatEvents.CameraKick -= OnKick; }
+        private void OnKick(float strength) { if (Local == this) Kick(strength); }
+
+        private void ApplyKick()
+        {
+            if (_kick <= 0.001f)
+            {
+                if (_kickApplied) SetFov(Fov);
+                _kick = 0f;
+                _kickApplied = false;
+                return;
+            }
+            _kick = Mathf.MoveTowards(_kick, 0f, Time.unscaledDeltaTime * KickDecayPerSecond);
+            SetFov(Fov - _kick * KickFovDegrees);
+            _kickApplied = true;
+        }
+
+        private void SetFov(float fov)
+        {
+            if (freeCam != null) { LensSettings l = freeCam.Lens; l.FieldOfView = fov; freeCam.Lens = l; }
+            if (lockCam != null) { LensSettings l = lockCam.Lens; l.FieldOfView = fov; lockCam.Lens = l; }
+        }
+
         // When a wall squeezes the boom until the camera is nearly inside the hero, the hero's own body would fill the screen (or show its inside),
         // so it is hidden locally until the camera backs off again. Hysteresis: hidden under 1.0 m, shown again over 1.4 m. Cosmetic, owner only.
         private void LateUpdate()
         {
+            ApplyKick();
             if (_hero == null) return;
             Camera cam = Camera.main;
             if (cam == null) return;

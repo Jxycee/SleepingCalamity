@@ -8,7 +8,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void SceneNames_BuildOrder_BootstrapFirst()
         {
-            Assert.That(SceneNames.BuildOrder, Is.EqualTo(new[] { "Bootstrap", "Lobby", "Arena_Greybox" }));
+            Assert.That(SceneNames.BuildOrder, Is.EqualTo(new[] { "Bootstrap", "Lobby", "Arena_Greybox", "Arena_Combat" }));
         }
 
         [Test]

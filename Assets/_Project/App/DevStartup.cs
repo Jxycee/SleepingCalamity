@@ -44,6 +44,10 @@ namespace SleepingCalamity.App
         public static void TryAutoStart(INetworkSession session, DevFlags flags)
         {
             if (!Debug.isDebugBuild) return;
+            if (flags != null && flags.CombatArena) SceneFlow.DevCombatArena = true;
+#if UNITY_EDITOR
+            if (EditorPrefs.GetBool(DevPrefKeys.CombatArena, false) && IsMainEditor()) SceneFlow.DevCombatArena = true;
+#endif
             if (session == null || flags == null) return;
 
             if (flags.Solo)

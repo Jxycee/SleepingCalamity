@@ -30,7 +30,7 @@ namespace SleepingCalamity.Core
         private static readonly float[] BellAmp = { 1f, 0.5f, 0.3f, 0.15f };
         private static readonly float[] BellDecay = { 2.5f, 4f, 6f, 9f };
 
-        private static readonly SfxRecipe[] Table =
+        private static readonly SfxRecipe[] BaseTable =
         {
             new SfxRecipe(SfxIds.UiClick, 0.08f, false, AudioCategory.Ui, 0.6f, false, 0f, 0.03f),
             new SfxRecipe(SfxIds.UiConfirm, 0.08f, false, AudioCategory.Ui, 0.6f, false, 0f, 0.03f),
@@ -39,6 +39,17 @@ namespace SleepingCalamity.Core
             new SfxRecipe(SfxIds.WaterLap, 0.4f, false, AudioCategory.Ambience, 0.5f, false, 0f, 0.3f),
             new SfxRecipe(SfxIds.BellRing, 1.0f, false, AudioCategory.Sfx, 0.9f, true, 30f, 0.25f),
         };
+
+        // The M1 set first, then the M3 combat cues (CombatSfx).
+        private static readonly SfxRecipe[] Table = BuildTable();
+
+        private static SfxRecipe[] BuildTable()
+        {
+            var all = new SfxRecipe[BaseTable.Length + CombatSfx.Recipes.Length];
+            Array.Copy(BaseTable, all, BaseTable.Length);
+            Array.Copy(CombatSfx.Recipes, 0, all, BaseTable.Length, CombatSfx.Recipes.Length);
+            return all;
+        }
 
         private static readonly IReadOnlyList<SfxRecipe> AllReadOnly = Array.AsReadOnly(Table);
 
@@ -84,7 +95,10 @@ namespace SleepingCalamity.Core
                 case SfxIds.WindAmbient: samples = WindLoop(n, sampleRate, ref rng); break;
                 case SfxIds.WaterLap: samples = LapBurst(n, ref rng); break;
                 case SfxIds.BellRing: samples = Bell(n, sampleRate); break;
-                default: throw new ArgumentException("No generator for SFX id: " + id, nameof(id));
+                default:
+                    if (!CombatSfx.TryGenerate(id, n, sampleRate, ref rng, out samples))
+                        throw new ArgumentException("No generator for SFX id: " + id, nameof(id));
+                    break;
             }
 
             NormalizePeak(samples, PeakTarget);

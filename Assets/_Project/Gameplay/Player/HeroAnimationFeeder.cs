@@ -57,7 +57,7 @@ namespace SleepingCalamity.Gameplay
             {
                 locked = _lockController != null && _lockController.IsLocked;
                 dodging = _locomotion.IsDodging;
-                if (_net != null) _net.OwnerSetStance(locked, dodging);
+                // The stance flags (lock, dodge, guard, aim) are written by HeroCombat, which knows all four.
             }
             else
             {

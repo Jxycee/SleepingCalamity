@@ -9,7 +9,7 @@ namespace SleepingCalamity.Core
         public bool SecondaryHeld, SecondaryPressed, SecondaryReleased;
         public bool LockPressed, DodgePressed;
         public float SwitchX, SwitchY;
-        public bool InteractPressed, PausePressed;
+        public bool InteractPressed, InteractHeld, PausePressed;
 
         public static readonly PlayerIntent None = default;
     }

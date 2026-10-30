@@ -25,6 +25,7 @@ namespace SleepingCalamity.Core
         public ushort JoinDirectPort { get; private set; }     // NetworkConstants.DefaultPort when omitted
         public int ProtocolOffset { get; private set; }        // -dev-protocol-offset <int>, default 0
         public bool LongTimeout { get; private set; }          // -dev-long-timeout
+        public bool CombatArena { get; private set; }          // -dev-combat: the first gameplay scene is the M3 combat arena
 
         public static DevFlags Parse(IReadOnlyList<string> args)
         {
@@ -43,6 +44,10 @@ namespace SleepingCalamity.Core
                 else if (Is(arg, "-dev-host-direct"))
                 {
                     flags.HostDirect = true;
+                }
+                else if (Is(arg, "-dev-combat"))
+                {
+                    flags.CombatArena = true;
                 }
                 else if (Is(arg, "-dev-long-timeout"))
                 {

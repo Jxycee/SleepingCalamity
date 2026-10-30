@@ -70,6 +70,7 @@ namespace SleepingCalamity.App
             {
                 DrawWorldPicker();
                 GUILayout.Space(6);
+                if (Debug.isDebugBuild) SceneFlow.DevCombatArena = GUILayout.Toggle(SceneFlow.DevCombatArena, " Start in the combat arena (M3)");
                 if (GUILayout.Button("Solo (opens the selected solo world)")) Run("Solo", () => session.StartLocalAsync(false, CancellationToken.None));
                 if (GUILayout.Button("Host online (Relay; selected online multiplayer world)")) Run("Host online", () => session.HostOnlineAsync(CancellationToken.None));
                 GUILayout.BeginHorizontal();

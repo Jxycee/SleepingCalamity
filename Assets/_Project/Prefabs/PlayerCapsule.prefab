@@ -139,6 +139,9 @@ GameObject:
   - component: {fileID: 7635280305469200194}
   - component: {fileID: 8347971700323805036}
   - component: {fileID: 8526498942120202515}
+  - component: {fileID: 8313695930635833332}
+  - component: {fileID: 2873352655021868268}
+  - component: {fileID: 8025425756674670403}
   m_Layer: 6
   m_Name: PlayerCapsule
   m_TagString: Untagged
@@ -347,6 +350,47 @@ MonoBehaviour:
   m_EditorClassIdentifier: SleepingCalamity.Presentation::SleepingCalamity.Presentation.HeroCameraRigSpawner
   ShowTopMostFoldoutHeaderGroup: 1
   rigPrefab: {fileID: 1991712327775980884, guid: 8ccf3cb22e3392944bc4075d29f6a204, type: 3}
+--- !u!114 &8313695930635833332
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2483212395992155055}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f1f5b4c725b3814e9c63774f6a8316c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SleepingCalamity.Gameplay::SleepingCalamity.Gameplay.HeroVitals
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &2873352655021868268
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2483212395992155055}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 999fe1721de4e074eacfbbaac81af89b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SleepingCalamity.Gameplay::SleepingCalamity.Gameplay.HeroCombat
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &8025425756674670403
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2483212395992155055}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c908cbdbf3bc304e8c7ecea9e664d8b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SleepingCalamity.Presentation::SleepingCalamity.Presentation.HeroWeaponVisual
+  weaponMaterial: {fileID: 2100000, guid: 070beb7931090514e93ee23ef0e43c08, type: 2}
+  accentMaterial: {fileID: 2100000, guid: 060880b5dd14436458195171ffe04b35, type: 2}
+  visual: {fileID: 1613293879341662442}
 --- !u!1 &3043797429755336607
 GameObject:
   m_ObjectHideFlags: 0

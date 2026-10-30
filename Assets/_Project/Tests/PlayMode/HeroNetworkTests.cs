@@ -86,9 +86,12 @@ namespace SleepingCalamity.Tests.PlayMode
             public TargetLockController Lock;
             public FakeInputService Input;
 
+            private readonly NetworkObject obj_;
+
             public HeroRig(NetworkObject obj)
             {
                 Object = obj;
+                obj_ = obj;
                 State = obj.GetComponent<HeroNetState>();
                 Locomotion = obj.GetComponent<HeroLocomotion>();
                 Lock = obj.GetComponent<TargetLockController>();
@@ -99,6 +102,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 Locomotion.Input = Input;
                 Lock.Input = Input;
+                obj_.GetComponent<HeroCombat>().Input = Input;
             }
 
             public Vector3 Position => Object.transform.position;
@@ -138,6 +142,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(spawner.SpawnAll(hostNm), Is.EqualTo(7), "seven dummies");
             Assert.That(spawner.SpawnAll(hostNm), Is.EqualTo(0), "spawning is idempotent");
 
+            // The client's copies of the dummies must be in place (and their colliders moved to their spots) BEFORE the heroes spawn: in one process a copy
+            // that is still being placed sits at the origin for a frame, and the host hero's CharacterController depenetrates from it (0.85 m sideways).
+            yield return PlayModeHarness.WaitUntil(() => CountDummies(clientNm, out _) == 7, Timeout, "the client never received the seven dummies");
+            yield return Frames(3);
             ulong clientId = clientNm.LocalClientId;
             NetworkObject hostOwn = hostNm.SpawnManager.InstantiateAndSpawn(app.PlayerPrefab, hostNm.LocalClientId, false, true, false, Vector3.zero, Quaternion.identity);
             NetworkObject clientProxyOnHost = hostNm.SpawnManager.InstantiateAndSpawn(app.PlayerPrefab, clientId, false, true, false, new Vector3(9f, 0f, 2f), Quaternion.identity);
@@ -232,7 +240,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
             Vector3 hostMoved = host.Position - hostStart, clientMoved = client.Position - clientStart;
             Assert.That(hostMoved.x, Is.GreaterThan(2.5f), "the host moved right");
-            Assert.That(Mathf.Abs(hostMoved.z), Is.LessThan(0.5f), "the client's input did not move the host");
+            Assert.That(Mathf.Abs(hostMoved.z), Is.LessThan(0.5f), "the client's input did not move the host (start " + hostStart + " now " + host.Position + " viewYaw " + host.Locomotion.ViewYawDeg + " locked " + host.Lock.IsLocked + " dodging " + host.Locomotion.IsDodging + ")");
             Assert.That(clientMoved.z, Is.GreaterThan(1.5f), "the client moved toward its target");
             Assert.That(clientMoved.x, Is.LessThan(-0.8f), "the client's way is toward the target's side");
             Assert.That(Mathf.DeltaAngle(host.Object.transform.eulerAngles.y, 90f), Is.EqualTo(0f).Within(15f), "free: the host faces its way");
