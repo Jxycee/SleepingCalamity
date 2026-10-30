@@ -27,6 +27,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private readonly Dictionary<ulong, int> _enemyHp = new Dictionary<ulong, int>();
         private readonly Dictionary<ulong, int> _enemySerial = new Dictionary<ulong, int>();
         private readonly HashSet<ulong> _stuckOn = new HashSet<ulong>();   // one stuck finding per target
+        private readonly List<string> _stuckWhy = new List<string>();
         private float _swingClock, _stuckClock;
         private Vector3 _lastPos;
         private int _lastHp = -1;
@@ -64,7 +65,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 {
                     Vector3 to = Flat(target.transform.position - _hero.position);
                     float reach = AttackReach + target.Def.Radius;
-                    if (dist > reach) Steer(ref f, to.normalized);
+                    if (dist > reach) Steer(ref f, AroundObstacles(to.normalized, target.transform.position));
                     else
                     {
                         Steer(ref f, to.normalized * 0.25f);   // a nudge keeps the hero facing its target
@@ -111,9 +112,69 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             float moved = Flat(_hero.position - _lastPos).magnitude;
             _lastPos = _hero.position;
-            if (dist > reach + 0.5f && moved < 0.002f) _stuckClock += dt; else _stuckClock = 0f;
+            if (dist > reach + 0.5f && moved < 0.002f) { _stuckClock += dt; if (_stuckWhy.Count < 6 && Mathf.Repeat(_stuckClock, 0.4f) < dt) _stuckWhy.Add(State()); }
+            else { _stuckClock = 0f; _stuckWhy.Clear(); }
             if (_stuckClock > 2f && _stuckOn.Add(target.NetworkObjectId))
-                Report.Findings.Add($"{time:F2}s stuck: pushing toward a {target.Def.Kind} {dist:F1} m away (reach {reach:F1}) but not moving for 2 s");
+                Report.Findings.Add($"{time:F2}s stuck: pushing toward a {target.Def.Kind} {dist:F1} m away (reach {reach:F1}) but not moving for 2 s. " +
+                                    "Hero state every 0.4 s: " + string.Join(" | ", _stuckWhy));
+        }
+
+        // What can hold the hero still: pause, a non-gameplay input context, the attack machine (MoveScale 0 while busy), hurt lock (0.2), not grounded.
+        private string State()
+        {
+            AttackData a = _combat.CurrentAttack;
+            return $"moveScale {_combat.MoveScale:F1}, attack {(a != null ? a.Id + " @" + _combat.AttackFrame.ToString("F0") + "/" + a.TotalFrames : "none")}, " +
+                   $"paused {HeroInput.IsPaused()}, ctx {_input.Context}, grounded {_loco.IsGrounded}, stick {_input.Frame.MoveX:F1},{_input.Frame.MoveY:F1}, vel {_loco.Velocity.magnitude:F2}, " +
+                   $"at {_hero.position.x:F1},{_hero.position.y:F1},{_hero.position.z:F1}, blocked by {Blocker()}";
+        }
+
+        // A player walks around a pillar instead of into it: when the capsule would hit level geometry within half a metre, slide along its face,
+        // toward whichever side keeps the target closer. Enemies and pickups are not obstacles (the hero walks into them on purpose).
+        private Vector3 AroundObstacles(Vector3 dir, Vector3 goal)
+        {
+            if (!Probe(dir, 0.5f, out RaycastHit h)) return dir;
+            Vector3 n = Flat(h.normal).normalized;
+            Vector3 slide = Flat(Vector3.ProjectOnPlane(dir, n));
+            if (slide.sqrMagnitude < 0.04f) slide = Vector3.Cross(Vector3.up, n);   // head-on: pick a side
+            slide.Normalize();
+            Vector3 alt = -slide, toGoal = Flat(goal - _hero.position).normalized;
+            if (Vector3.Dot(alt, toGoal) > Vector3.Dot(slide, toGoal) + 0.05f && Vector3.Dot(dir, n) < -0.9f) slide = alt;
+            return (slide + n * 0.15f).normalized;   // a touch off the face so the capsule doesn't scrape
+        }
+
+        private bool Probe(Vector3 dir, float distance, out RaycastHit hit)
+        {
+            var cc = _hero.GetComponent<CharacterController>();
+            float r = cc != null ? cc.radius : 0.35f;
+            Vector3 a = _hero.position + Vector3.up * (r + 0.05f), b = _hero.position + Vector3.up * ((cc != null ? cc.height : 1.8f) - r);
+            foreach (RaycastHit h in Physics.CapsuleCastAll(a, b, r * 0.95f, dir, distance, ~0, QueryTriggerInteraction.Ignore))
+            {
+                Transform root = h.collider.transform.root;
+                if (root == _hero.root || h.collider.GetComponentInParent<Enemy>() != null || h.collider.GetComponentInParent<HealingDrop>() != null) continue;
+                hit = h; return true;
+            }
+            hit = default; return false;
+        }
+
+        private string Blocker()
+        {
+            float yaw = _loco.ViewYawDeg * Mathf.Deg2Rad;
+            var forward = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+            var right = new Vector3(forward.z, 0f, -forward.x);
+            Vector3 dir = (right * _input.Frame.MoveX + forward * _input.Frame.MoveY).normalized;
+            var cc = _hero.GetComponent<CharacterController>();
+            float r = cc != null ? cc.radius : 0.35f;
+            Vector3 a = _hero.position + Vector3.up * (r + 0.05f), b = _hero.position + Vector3.up * ((cc != null ? cc.height : 1.8f) - r);
+            foreach (RaycastHit h in Physics.CapsuleCastAll(a, b, r * 0.95f, dir, 0.6f, ~0, QueryTriggerInteraction.Ignore))
+                if (h.collider.transform.root != _hero.root) return $"{Path(h.collider.transform)} ({h.collider.GetType().Name}, {h.distance:F2} m)";
+            return "nothing within 0.6 m";
+        }
+
+        private static string Path(Transform t)
+        {
+            string s = t.name;
+            for (int i = 0; i < 3 && t.parent != null; i++) { t = t.parent; s = t.name + "/" + s; }
+            return s;
         }
 
         private Enemy Nearest(out float best)
