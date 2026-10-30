@@ -36,6 +36,7 @@ namespace SleepingCalamity.EditorTools
             finally
             {
                 GraphicsSettings.defaultRenderPipeline = savedGraphics; QualitySettings.renderPipeline = savedQuality;
+                CleanProbes();
             }
             Debug.Log("SC CAPTURE DONE " + dir);
         }
@@ -54,7 +55,7 @@ namespace SleepingCalamity.EditorTools
             Light sun = RenderSettings.sun;
             sun.transform.rotation = Quaternion.Euler(13f, -32f, 0f); sun.color = new Color(1.0f, 0.62f, 0.36f); sun.intensity = 2.6f;
             RenderSettings.fogColor = new Color(0.82f, 0.68f, 0.58f);
-            RenderSettings.ambientSkyColor = new Color(0.40f, 0.42f, 0.52f); RenderSettings.ambientEquatorColor = new Color(0.46f, 0.38f, 0.32f);
+            RenderSettings.ambientSkyColor = new Color(0.46f, 0.47f, 0.50f); RenderSettings.ambientEquatorColor = new Color(0.50f, 0.44f, 0.37f);   // neutral-warm fill: a blue sky fill under an orange key read purple on the grey cobbles
             foreach (Camera cam in cams) if (cam.name == "Cap_Day_Wide") Save(cam, Path.Combine(dir, "Day_Wide_LowSun.png"));
         }
 
@@ -73,15 +74,24 @@ namespace SleepingCalamity.EditorTools
         }
 
         // A realtime probe in the editor renders asynchronously: ask, then pump until it reports finished.
+        // The realtime probe never finishes in a batch run, so it is baked (blocking) into a temporary EXR, switched to Custom for the capture and
+        // deleted afterwards (the scene file is never saved here, so nothing refers to it).
         static void RenderProbe(ReflectionProbe probe)
         {
-            int id = probe.RenderProbe();
-            for (int i = 0; i < 400 && !probe.IsFinishedRendering(id); i++)
-            {
-                EditorApplication.QueuePlayerLoopUpdate();
-                System.Threading.Thread.Sleep(25);
-            }
-            Debug.Log("SC CAPTURE probe " + probe.transform.root.name + " finished=" + probe.IsFinishedRendering(id));
+            const string folder = "Assets/_Project/Content/Rendering/_ProbeTmp";
+            BuilderUtil.EnsureFolder(folder);
+            string path = folder + "/" + probe.transform.root.name + ".exr";
+            bool ok = Lightmapping.BakeReflectionProbe(probe, path);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture>(path);
+            if (ok && tex != null) { probe.mode = ReflectionProbeMode.Custom; probe.customBakedTexture = tex; }
+            Debug.Log("SC CAPTURE probe " + probe.transform.root.name + " baked=" + ok + " texture=" + (tex != null));
+        }
+
+        static void CleanProbes()
+        {
+            AssetDatabase.DeleteAsset("Assets/_Project/Content/Rendering/_ProbeTmp");
+            AssetDatabase.Refresh();
         }
 
         static void Save(Camera cam, string path)
