@@ -64,14 +64,15 @@ namespace SleepingCalamity.EditorTools
             // Skies per preset (procedural, the sun follows RenderSettings.sun) and the god-ray card material (the LookTest cone shader, fainter than the look test).
             Shader skyShader = Shader.Find("Skybox/Procedural") ?? throw new System.InvalidOperationException("Skybox/Procedural not found");
             Material skyMid = LookTestBuilder.Ensure(MaterialsFolder + "/M_BC_Sky_Midday.mat", skyShader);
-            skyMid.SetFloat("_SunSize", 0.04f); skyMid.SetFloat("_SunSizeConvergence", 5f); skyMid.SetFloat("_AtmosphereThickness", 0.65f);   // above about 0.8 the procedural horizon turns lime
-            skyMid.SetColor("_SkyTint", new Color(0.50f, 0.62f, 0.90f)); skyMid.SetColor("_GroundColor", new Color(0.42f, 0.40f, 0.36f)); skyMid.SetFloat("_Exposure", 1.25f);
+            skyMid.SetFloat("_SunSize", 0.04f); skyMid.SetFloat("_SunSizeConvergence", 5f); skyMid.SetFloat("_AtmosphereThickness", 0.78f);   // above about 0.9 the procedural horizon turns lime
+            skyMid.SetColor("_SkyTint", new Color(0.55f, 0.68f, 0.92f)); skyMid.SetColor("_GroundColor", new Color(0.42f, 0.40f, 0.36f)); skyMid.SetFloat("_Exposure", 1.25f);
             Material skyLow = LookTestBuilder.Ensure(MaterialsFolder + "/M_BC_Sky_LowSun.mat", skyShader);
             skyLow.SetFloat("_SunSize", 0.06f); skyLow.SetFloat("_SunSizeConvergence", 5f); skyLow.SetFloat("_AtmosphereThickness", 1.0f);
             skyLow.SetColor("_SkyTint", new Color(0.66f, 0.56f, 0.64f)); skyLow.SetColor("_GroundColor", new Color(0.42f, 0.38f, 0.33f)); skyLow.SetFloat("_Exposure", 1.0f);
             EditorUtility.SetDirty(skyMid); EditorUtility.SetDirty(skyLow);
             Material cone = LookTestBuilder.Ensure(MaterialsFolder + "/M_BC_LightCone.mat", Shader.Find("SleepingCalamity/LightCone") ?? throw new System.InvalidOperationException("Shader not found: SleepingCalamity/LightCone"));
-            cone.SetColor("_Color", new Color(1.0f, 0.86f, 0.62f)); cone.SetFloat("_Intensity", 0.045f); cone.renderQueue = 3100;
+            cone.SetColor("_Color", new Color(1.0f, 0.86f, 0.62f)); cone.SetFloat("_Intensity", 0.09f); cone.SetFloat("_LengthFade", 0.7f); cone.renderQueue = 3100;
+            cone.SetFloat("_HeightFadeTop", 10f); cone.SetFloat("_HeightFadeRange", 5f);   // alpha 1 below 5 m, 0 at 10 m: the beams stop at the roofline
             EditorUtility.SetDirty(cone);
             // Pollen: a soft round dot (RGB falloff, additive), the URP particle unlit shader set to additive transparent.
             string dot = TexturesFolder + "/pollen_dot_albedo.png";
@@ -153,7 +154,7 @@ namespace SleepingCalamity.EditorTools
             {
                 BeautyCornerTable.Instance inst = row.Instances[i];
                 string tag = row.Instances.Length > 1 ? row.Id + "_" + (i + 1) : row.Id;
-                var go = new GameObject((fbx != null ? "" : "PLACEHOLDER_") + tag);
+                var go = new GameObject((fbx != null || row.Id.StartsWith("NEIGHBOUR_") ? "" : "PLACEHOLDER_") + tag);
                 go.transform.SetParent(group, false);
                 go.transform.localPosition = inst.Pos; go.transform.localRotation = Quaternion.Euler(0f, inst.Yaw, 0f); go.transform.localScale = Vector3.one * inst.Scale;
                 if (fbx != null)
@@ -186,16 +187,16 @@ namespace SleepingCalamity.EditorTools
         static void BuildShafts(Transform atmos)
         {
             Transform shafts = new GameObject("Shafts").transform; shafts.SetParent(atmos, false);
-            shafts.position = new Vector3(-1f, 0f, 4f);
+            shafts.position = new Vector3(-1f, 0f, 7.5f);   // the lit ground at the facade foot: beams cross the facade front and the two gaps between buildings
             Material cone = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_BC_LightCone.mat");
-            float[,] offs = { { -6f, 1.5f, 1.6f }, { -3.2f, 3.5f, 1.2f }, { -0.5f, 0.8f, 1.5f }, { 2.4f, 2.8f, 1.3f }, { 5.2f, 1.2f, 1.7f }, { 7.5f, 3.2f, 1.2f } };
+            float[,] offs = { { -5.5f, 1.2f, 1.1f }, { -3.6f, 2.8f, 1.4f }, { -1.0f, 0.8f, 1.2f }, { 1.4f, 2.4f, 1.5f }, { 3.4f, 1.0f, 1.1f } };
             for (int i = 0; i < offs.GetLength(0); i++)
-                LookTestBuilder.Shape(shafts, "Shaft" + i, SleepingCalamity.Presentation.LookTestGeometry.Shape.Cone, new Vector3(offs[i, 0], offs[i, 1], -10f), new Vector3(offs[i, 2], 0f, 15f), cone, default, 2f, 16, false);
+                LookTestBuilder.Shape(shafts, "Shaft" + i, SleepingCalamity.Presentation.LookTestGeometry.Shape.Cone, new Vector3(offs[i, 0], offs[i, 1], -6f), new Vector3(offs[i, 2], 0f, 12f), cone, default, 2f, 16, false);
         }
 
         static void BuildPollen(Transform atmos)
         {
-            var go = new GameObject("Pollen"); go.transform.SetParent(atmos, false); go.transform.localPosition = new Vector3(-1f, 3f, 2f);
+            var go = new GameObject("Pollen"); go.transform.SetParent(atmos, false); go.transform.localPosition = new Vector3(-1f, 1.1f, 2f);
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             ParticleSystem.MainModule main = ps.main;
@@ -203,8 +204,8 @@ namespace SleepingCalamity.EditorTools
             main.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.055f); main.startColor = new Color(1f, 0.93f, 0.72f, 0.75f);
             main.simulationSpace = ParticleSystemSimulationSpace.World; main.maxParticles = 260; main.gravityModifier = 0f;
             ParticleSystem.EmissionModule em = ps.emission; em.rateOverTime = 20f;
-            ParticleSystem.ShapeModule shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(24f, 4.5f, 20f);
-            ParticleSystem.NoiseModule noise = ps.noise; noise.enabled = true; noise.strength = 0.3f; noise.frequency = 0.25f; noise.scrollSpeed = 0.1f;
+            ParticleSystem.ShapeModule shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(24f, 1.5f, 20f);   // below eye height (go.y 1.1 -> 0.35..1.85 m): against the sky they read as stars
+            ParticleSystem.NoiseModule noise = ps.noise; noise.enabled = true; noise.strength = 0.12f; noise.frequency = 0.25f; noise.scrollSpeed = 0.1f;
             ps.useAutoRandomSeed = false; ps.randomSeed = 7;
             var r = go.GetComponent<ParticleSystemRenderer>();
             r.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_Pollen.mat"); r.renderMode = ParticleSystemRenderMode.Billboard;
@@ -222,7 +223,7 @@ namespace SleepingCalamity.EditorTools
             {
                 rot = Quaternion.Euler(54f, -32f, 0f);
                 sun.color = new Color(1.0f, 0.894f, 0.808f); sun.intensity = 3.0f;     // about 5200 K
-                RenderSettings.fogColor = new Color(0.72f, 0.77f, 0.84f); RenderSettings.fogDensity = 0.010f;
+                RenderSettings.fogColor = new Color(0.70f, 0.78f, 0.90f); RenderSettings.fogDensity = 0.012f;
                 RenderSettings.ambientSkyColor = new Color(0.46f, 0.55f, 0.70f); RenderSettings.ambientEquatorColor = new Color(0.50f, 0.50f, 0.47f);
                 RenderSettings.ambientGroundColor = new Color(0.30f, 0.27f, 0.22f);
             }

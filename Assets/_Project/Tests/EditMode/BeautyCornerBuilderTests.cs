@@ -18,10 +18,12 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.IsTrue(BeautyCornerTable.ForBrief(brief).Any(), "no placement row for brief row: " + brief);
             foreach (BeautyCornerTable.Row r in BeautyCornerTable.Rows)
             {
-                Assert.Contains(r.Brief, BeautyCornerTable.BriefRows, "row " + r.Id + " names an unknown brief row");
+                bool neighbour = r.Id.StartsWith("NEIGHBOUR_");
+                if (neighbour) Assert.AreEqual(BeautyCornerTable.Neighbours, r.Brief);
+                else Assert.Contains(r.Brief, BeautyCornerTable.BriefRows, "row " + r.Id + " names an unknown brief row");
                 Assert.IsNotEmpty(r.Instances, r.Id + " has no instances");
                 Assert.IsNotEmpty(r.Placeholder, r.Id + " has no placeholder parts");
-                Assert.IsNotEmpty(r.Names, r.Id + " has no art folder names");
+                if (!neighbour) Assert.IsNotEmpty(r.Names, r.Id + " has no art folder names");
             }
             Assert.AreEqual(BeautyCornerTable.Rows.Length, BeautyCornerTable.Rows.Select(r => r.Id).Distinct().Count(), "row ids must be unique");
         }
@@ -36,6 +38,19 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(3, BeautyCornerTable.InstanceCount("Baskets"));
             Assert.AreEqual(2, BeautyCornerTable.InstanceCount("Jugs"));
             Assert.AreEqual(2, BeautyCornerTable.ForBrief(BeautyCornerTable.Lanterns).Sum(r => r.Instances.Length), "one stall lantern, one bracket lantern");
+        }
+
+        [Test]
+        public void Table_HasTheThreeNeighbourRows()
+        {
+            CollectionAssert.IsSupersetOf(BeautyCornerTable.Rows.Select(r => r.Id).ToArray(), new[] { "NEIGHBOUR_Left", "NEIGHBOUR_Right", "NEIGHBOUR_Backdrop" });
+        }
+
+        [Test]
+        public void Table_BannerPoleIsBehindTheFountainOnTheLeft()
+        {
+            Vector3 p = BeautyCornerTable.Rows.First(r => r.Id == "BannerPole").Instances[0].Pos;
+            Assert.AreEqual(-2.6f, p.x); Assert.AreEqual(1.8f, p.z);
         }
 
         [Test]

@@ -26,8 +26,10 @@ Material:
     m_Ints: []
     m_Floats:
     - _EdgePower: 2
-    - _Intensity: 0.045
-    - _LengthFade: 1.2
+    - _HeightFadeRange: 5
+    - _HeightFadeTop: 10
+    - _Intensity: 0.09
+    - _LengthFade: 0.7
     m_Colors:
     - _Color: {r: 1, g: 0.86, b: 0.62, a: 1}
   m_BuildTextureStacks: []

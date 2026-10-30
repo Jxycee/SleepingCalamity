@@ -18,6 +18,8 @@ namespace SleepingCalamity.EditorTools
         public const string Cobbles = "Plaza cobbles", Ring = "Fountain flagstone ring", Fountain = "Dry fountain", Banner = "Banner pole + bleached banner",
             Facade = "Facade (2 storeys + roof)", Stall = "Market stall", Props = "Props cluster", Foliage = "Foliage", Lanterns = "Lanterns";
 
+        public const string Neighbours = "Neighbours (greybox massing, not a brief row)";
+
         public static readonly string[] BriefRows = { Cobbles, Ring, Fountain, Banner, Facade, Stall, Props, Foliage, Lanterns };
 
         public enum PartShape { Box, Cylinder }
@@ -59,7 +61,7 @@ namespace SleepingCalamity.EditorTools
                 Instances = new[] { At(0f, 0f, 0f) },     // basin outer diameter 3.4 m, rim 0.55 m, spout column to about 2.4 m
                 Placeholder = new[] { Cyl(0f, 0.275f, 0f, 3.4f, 0.55f, "sandstone"), Cyl(0f, 0.9f, 0f, 1.1f, 0.7f, "sandstone"), Cyl(0f, 1.6f, 0f, 0.38f, 1.6f, "sandstone"), Cyl(0f, 2.35f, 0f, 0.6f, 0.2f, "sandstone") } },
             new Row { Brief = Banner, Id = "BannerPole", Batch = "B10", Names = new[] { "banner_pole", "banner", "bleached_banner", "banner_pole_banner" },
-                Instances = new[] { At(2.4f, 0f, 1.2f) }, // pole about 4.5 m, banner 0.7 x 2.2 m
+                Instances = new[] { At(-2.6f, 0f, 1.8f) }, // pole about 4.5 m, banner 0.7 x 2.2 m (moved from the brief's 2.4, 1.2 by the controller, round 2: frames the left of Wide, clears Mid)
                 Placeholder = new[] { Cyl(0f, 2.25f, 0f, 0.12f, 4.5f, "dark"), Box(0.4f, 3.15f, 0f, 0.7f, 2.2f, 0.03f, "cloth") } },
             new Row { Brief = Facade, Id = "Facade", Batch = "B4", Names = new[] { "facade", "half_timbered_facade", "timber_facade", "house" },
                 Instances = new[] { At(-1.25f, 0f, 7.5f) },   // front 7.5 m wide on z 7.5, x -5..2.5, facing -Z; pivot = front face centre at ground
@@ -124,7 +126,83 @@ namespace SleepingCalamity.EditorTools
             new Row { Brief = Lanterns, Id = "BracketLantern", Batch = "B8", Names = new[] { "bracket_lantern", "wall_lantern", "lantern_bracket" },
                 Instances = new[] { At(0.0f, 2.45f, 7.38f) }, // on the facade wall beside the door (door at x -1.25)
                 Placeholder = new[] { Box(0f, 0f, 0f, 0.22f, 0.36f, 0.22f, "warm"), Box(0f, 0.2f, 0.1f, 0.05f, 0.05f, 0.3f, "iron") } },
+            // Neighbour massing (round 2): greybox buildings closing the square so Wide has no empty ground. Not brief rows; later B4 variants replace them.
+            // Pivot = front face centre at ground, front facing -Z, like the facade. Names stay empty: art never replaces these by folder match.
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Left", Batch = "B4", Names = new string[0],
+                Instances = new[] { At(-9.25f, 0f, 8.5f, -8f) },     // x -13..-5.5, front at z 8.5, turned a little toward the plaza, 3 storeys
+                Placeholder = TallHouse() },
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Right", Batch = "B4", Names = new string[0],
+                Instances = new[] { At(7f, 0f, 10f, 6f) },           // x 3..11, front at z 10, 2 storeys, gable to the plaza, lower roof
+                Placeholder = GableHouse() },
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Backdrop", Batch = "B4", Names = new string[0],
+                Instances = new[] { At(0f, 0f, 18f) },               // low far row past z 16 with a church and bell tower
+                Placeholder = Backdrop() },
         };
+
+        // Left neighbour: three jettied storeys (leaning a little), eave 8.8 m, ridge 11.6 m, chimney.
+        static Part[] TallHouse()
+        {
+            var p = new List<Part>
+            {
+                Box(0f, 0.35f, 3.6f, 7.7f, 0.7f, 7.3f, "sandstone"),
+                Box(0f, 2.05f, 3.5f, 7.5f, 2.7f, 7f, "plaster"),
+                Box(0f, 4.75f, 3.325f, 7.5f, 2.7f, 7.35f, "plaster", 0f, 0f, 1.6f),
+                Box(0f, 3.5f, -0.37f, 7.5f, 0.3f, 0.1f, "oak_timber"),
+                Box(0f, 7.45f, 3.15f, 7.5f, 2.7f, 7.7f, "plaster", 0f, 0f, -1.4f),
+                Box(0f, 6.2f, -0.72f, 7.5f, 0.3f, 0.1f, "oak_timber"),
+                Box(0f, 1.8f, -0.05f, 1.3f, 2.2f, 0.12f, "painted_wood"),
+                Box(0f, 10.2f, 0.975f, 8.1f, 0.25f, 5.17f, "roof_tile", -32.8f),
+                Box(0f, 10.2f, 5.325f, 8.1f, 0.25f, 5.17f, "roof_tile", 32.8f),
+                Box(2.4f, 11.6f, 4.2f, 0.8f, 2.2f, 0.8f, "sandstone"),
+            };
+            float[] ys = { 2.3f, 5.0f, 7.7f }, zs = { -0.05f, -0.4f, -0.75f };
+            for (int s = 0; s < 3; s++)
+                foreach (float x in new[] { -2.4f, 2.4f }) p.Add(Box(x, ys[s], zs[s], 0.9f, 1.2f, 0.1f, "painted_wood"));
+            return p.ToArray();
+        }
+
+        // Right neighbour: two storeys, the gable end toward the plaza (roof ridge along Z), eave 5.8 m, ridge 8.4 m.
+        static Part[] GableHouse()
+        {
+            return new[]
+            {
+                Box(0f, 0.25f, 3.3f, 8.2f, 0.5f, 6.7f, "sandstone"),
+                Box(0f, 1.85f, 3.25f, 8f, 2.7f, 6.5f, "plaster"),
+                Box(0f, 4.5f, 3.1f, 8f, 2.6f, 6.8f, "plaster", 0f, 0f, 1.0f),
+                Box(0f, 3.25f, -0.33f, 8f, 0.28f, 0.1f, "oak_timber"),
+                Box(0f, 6.2f, -0.18f, 7.6f, 0.8f, 0.25f, "plaster"),
+                Box(0f, 7.0f, -0.18f, 5.2f, 0.8f, 0.25f, "plaster"),
+                Box(0f, 7.8f, -0.18f, 2.8f, 0.8f, 0.25f, "plaster"),
+                Box(0f, 1.8f, -0.05f, 1.3f, 2.2f, 0.12f, "painted_wood"),
+                Box(-2.5f, 2.2f, -0.04f, 0.9f, 1.1f, 0.1f, "painted_wood"), Box(2.5f, 2.2f, -0.04f, 0.9f, 1.1f, 0.1f, "painted_wood"),
+                Box(-2.2f, 4.6f, -0.4f, 0.9f, 1.1f, 0.1f, "painted_wood"), Box(2.2f, 4.6f, -0.4f, 0.9f, 1.1f, 0.1f, "painted_wood"),
+                Box(2.2f, 7.1f, 3.1f, 5.1f, 0.25f, 7.4f, "roof_tile", 0f, 0f, -30.6f),
+                Box(-2.2f, 7.1f, 3.1f, 5.1f, 0.25f, 7.4f, "roof_tile", 0f, 0f, 30.6f),
+            };
+        }
+
+        // Far row: small houses with varied heights and leans along x -42..42, a church with a bell tower and spire in the middle gap (tower top about 16.8 m).
+        static Part[] Backdrop()
+        {
+            var p = new List<Part>();
+            int k = 0;
+            for (float x = -42f; x <= 42f; x += 7.4f, k++)
+            {
+                if (x > -10f && x < 10f) continue;
+                float h = 4.0f + (k % 4) * 0.8f, rise = 1.9f + (k % 3) * 0.4f, len = Mathf.Sqrt(3.5f * 3.5f + rise * rise), ang = Mathf.Atan2(rise, 3.5f) * Mathf.Rad2Deg;
+                p.Add(Box(x, h / 2f, 3f, 6.6f, h, 6f, k % 3 == 1 ? "sandstone" : "plaster", 0f, 0f, k % 2 == 0 ? 0.8f : -0.8f));
+                p.Add(Box(x, h + rise / 2f, 1.25f, 7.4f, 0.25f, len, "roof_tile", -ang));
+                p.Add(Box(x, h + rise / 2f, 4.75f, 7.4f, 0.25f, len, "roof_tile", ang));
+            }
+            p.Add(Box(-3f, 5.8f, 2.2f, 4.4f, 11.6f, 4.4f, "sandstone"));
+            p.Add(Box(-3f, 12.7f, 2.2f, 4.8f, 2.2f, 4.8f, "oak_timber"));
+            float[] widths = { 3.6f, 2.6f, 1.6f, 0.8f };
+            for (int i = 0; i < 4; i++) p.Add(Box(-3f, 14.175f + i * 0.75f, 2.2f, widths[i], 0.75f, widths[i], "roof_tile", 0f, 45f, 0f));
+            p.Add(Box(4.6f, 3.8f, 5f, 9f, 7.6f, 10f, "sandstone"));
+            p.Add(Box(4.6f + 2.45f, 9.1f, 5f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, -31.5f));
+            p.Add(Box(4.6f - 2.45f, 9.1f, 5f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, 31.5f));
+            return p.ToArray();
+        }
 
         public static IEnumerable<Row> ForBrief(string brief)
         {
