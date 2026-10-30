@@ -10,8 +10,8 @@
 - **The user owes:** `docs/superpowers/handoff/USER_TODO.md` (arena playtest, remaining Mixamo clips).
 
 ## Next
-1. **User plays the M3 arena** (steps in `USER_TODO.md`); tune the numbers from the verdict.
-2. **Hero animation branch:** import Quaternius + Kevin Iglesias + Mixamo as Humanoid, an Animator driver behind `IHeroAnimationDriver` (replaces `MannequinAnimDriver`), combat swings from `AttackMachine`. Add the remaining Mixamo clips when they arrive.
+1. **M3 readability pass** (branch `m3-readability`, agent running): bow fix, hit flash and knockback, telegraphs matching real reach, directional hurt flash, gentler waves 1-2, playtest checklist. First arena play (user, 2026-10-30): couldn't read hits or enemy reach, waves too hard, bow sometimes fires nothing (A31). Retest after this and the animation branch land.
+2. **Hero animation branch** (`m2-hero-anim`, agent running): import Quaternius + Kevin Iglesias + Mixamo as Humanoid, an Animator driver behind `IHeroAnimationDriver` (replaces `MannequinAnimDriver`), combat swings from `AttackMachine`. Add the remaining Mixamo clips when they arrive.
 3. **M9** (up to 3 art agents, P51): beauty corner first (B4+B6, B7+B8, B10, B9), then the dungeon corner (B5, B11) with the cellar toward the user's reference image (A24).
 4. **M5** room-pool authoring alongside; **M10** Tobin after.
 5. Open: M2/M3/M7 2-player walks wait for a second player. M4/M6 persistence must key growth by the persistent player id, not the session client id (`CombatHost.cs:95`).
