@@ -20,7 +20,9 @@
 #                      Pillow and SciPy go into Blender's own Python too: the tools import PIL inside Blender
 #   Python libs        numpy, pillow, pyarrow, scipy, opencv (headless), imageio, trimesh, pygltflib, requests, pyyaml, matplotlib: tools outside Blender
 #   .NET 8             Tools/cloud/sc_core_tests.py (Core EditMode tests under NUnitLite); NuGet cache warmed for NUnit 3.14
-#   csharp-ls, pwsh    the csharp-lsp plugin's server; PowerShell to read and dry-run Tools/*.ps1
+#   csharp-ls, pwsh    the csharp-lsp plugin's server; PowerShell to read and dry-run Tools/*.ps1. Cloud Claude Code never offers the LSP tool
+#                      (tested 2026-10-30: plugin installed and loaded, no tool, server never started), so sessions query csharp-ls through
+#                      Tools/cloud/sc_lsp.py instead (def / refs / hover / symbols); the SessionStart hook tells each session so
 #   uv / uvx           Python tools on demand (`uvx <tool>`, `uv tool install <tool>`)
 #   Unity 6000.6.5f1   ~/unity/ed/Editor/Unity (Linux) + the registry packages + DXC: Tools/cloud/unity.sh (batchmode twin of Tools/unity.ps1, needs a
 #                      licence: UNITY_EMAIL + UNITY_PASSWORD secrets, see the doc), sc_cloud_compile.py (C# compile, no licence) and sc_shader_check.py
@@ -93,7 +95,7 @@ do_check() {
     row python3      "$(have python3 && python3 --version || echo MISSING)"
     row py-libs      "$(python3 -c 'import numpy, PIL, pyarrow, scipy, cv2, trimesh; print("numpy", numpy.__version__, "pillow", PIL.__version__, "cv2", cv2.__version__, "+7 more")' 2>/dev/null || echo "MISSING (some of: ${PY_LIBS[*]})")"
     row dotnet       "$(have dotnet && dotnet --version 2>/dev/null || echo MISSING)"
-    row csharp-ls    "$(have csharp-ls && echo present || echo MISSING)"
+    row csharp-ls    "$(have csharp-ls && echo 'present (no LSP tool in the cloud: use python3 Tools/cloud/sc_lsp.py)' || echo MISSING)"
     row pwsh         "$(have pwsh && pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>/dev/null || echo MISSING)"
     row uv           "$(have uv && uv --version || echo MISSING)"
     row node         "$(have node && node --version || echo MISSING)"
