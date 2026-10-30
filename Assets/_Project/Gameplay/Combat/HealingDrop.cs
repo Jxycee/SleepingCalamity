@@ -14,6 +14,12 @@ namespace SleepingCalamity.Gameplay
 
         private float _age;
         private Vector3 _basePos;
+        private Transform _visual;   // the prefab's "Visual" child: the bob and spin move this, never the networked root (the server's NetworkTransform owns that)
+
+        private void Awake()
+        {
+            _visual = transform.Find("Visual");
+        }
 
         public override void OnNetworkSpawn()
         {
@@ -25,8 +31,11 @@ namespace SleepingCalamity.Gameplay
         private void Update()
         {
             _age += Time.deltaTime;
-            transform.position = _basePos + Vector3.up * (0.12f * Mathf.Sin(_age * 3f));
-            transform.Rotate(0f, 90f * Time.deltaTime, 0f, Space.World);
+            if (_visual != null)
+            {
+                _visual.localPosition = Vector3.up * (0.12f * Mathf.Sin(_age * 3f));
+                _visual.localRotation = Quaternion.Euler(0f, _age * 90f, 0f);
+            }
             if (!IsServer || !IsSpawned) return;
             if (_age > Lifetime) { NetworkObject.Despawn(true); return; }
             var all = HeroVitals.All;

@@ -213,15 +213,11 @@ namespace SleepingCalamity.Core.Combat
         }
 
         // The dive ends when no player is up. An empty party counts as not ended (nothing to lose yet).
-        public static bool AllDown(IEnumerable<PlayerVitals> party)
+        public static bool AllDown(IReadOnlyList<PlayerVitals> party)
         {
-            bool any = false;
-            foreach (PlayerVitals p in party)
-            {
-                any = true;
-                if (p.Up) return false;
-            }
-            return any;
+            for (int i = 0; i < party.Count; i++)
+                if (party[i].Up) return false;
+            return party.Count > 0;
         }
     }
 }

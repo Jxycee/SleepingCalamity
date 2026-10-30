@@ -1,5 +1,6 @@
 // Core/Audio/CombatSfx.cs: the M3 combat cues, generated like the rest of the procedural set (deterministic for a given seed, peak-normalised by
-// SfxRecipes). Placeholders that are ours: no third-party audio, no licence to record. docs/audio/SOURCES.md says how a CC0 pack could replace them.
+// SfxRecipes). These recipes are the fallback and the mixing source: SfxGenerator.ApplyFileClips swaps in the recorded Kenney CC0 clips by cue id
+// (docs/audio/SOURCES.md has the file mapping); a cue without a file plays its generated sound.
 // Pure C#, no engine. Authority: none.
 using System;
 

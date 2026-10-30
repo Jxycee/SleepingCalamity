@@ -2,7 +2,9 @@
 // the intents cause (CombatHost validates them and applies damage, reactions, revenge and rewards). The owner's copy runs the Core AttackMachine and shows
 // the spark, hitstop and camera kick at once; it then sends a hit intent. Enemy hits are judged here, on the victim's client, against the enemy's replicated
 // attack clock and this hero's own dodge / guard state, so a visible dodge is never hit. Remote copies only mirror the owner's NetSwing / stance for visuals.
-// Replicated (owner writes): NetWeapon (the heirloom index) and NetSwing (swing serial + attack index, for remote visuals). Everything else rides RPCs.
+// Replicated: NetWeapon (the heirloom index; the HOST writes it when the owner asks through SetWeaponServerRpc, so it is in place before any later RPC of that
+// owner is handled) and NetSwing (owner writes: swing serial + attack index, for remote visuals). Everything else rides RPCs. Every hit intent carries the
+// weapon index and the chain's prior hits of its swing, so the host judges it against what the owner actually swung.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
@@ -32,7 +34,7 @@ namespace SleepingCalamity.Gameplay
         private static readonly List<HeroCombat> s_all = new List<HeroCombat>();
         public static IReadOnlyList<HeroCombat> All => s_all;
 
-        public readonly NetworkVariable<byte> NetWeapon = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public readonly NetworkVariable<byte> NetWeapon = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<uint> NetSwing = new NetworkVariable<uint>(NoAttack << 16, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         private AttackMachine _machine = new AttackMachine(AttackCatalog.Axe);
@@ -46,6 +48,7 @@ namespace SleepingCalamity.Gameplay
         private readonly HashSet<long> _judged = new HashSet<long>();
         private readonly GrowthMirror _mirror = new GrowthMirror();
         private int _hitsInSwing;
+        private byte _swingWeapon, _swingPrior;   // the heirloom index and the chain's prior hits when the current swing began (sent with every hit of it)
         private bool _shotFired, _wasDodging, _guarding, _aiming, _wasGuarding;
         private float _guardStart, _reviveReport, _hurtLock, _dodgeBuffer;
         private int _swingSerial, _published;
@@ -176,7 +179,7 @@ namespace SleepingCalamity.Gameplay
             if (Local == this) Local = null;
         }
 
-        private void OnWeaponChanged(byte previous, byte current) { ApplyWeapon(); if (IsOwner) RequestSyncServerRpc(); }
+        private void OnWeaponChanged(byte previous, byte current) { ApplyWeapon(); }
         private void OnSwingChanged(uint previous, uint current) { _remoteClock = 0f; _seenSwing = current; }
 
         private void ApplyWeapon()
@@ -186,16 +189,23 @@ namespace SleepingCalamity.Gameplay
             _guarding = _aiming = false;
         }
 
-        // The owner picks a heirloom (the arena's F5 key; a town swap later).
+        // The owner picks a heirloom (the arena's F5 key; a town swap later). The host writes NetWeapon and re-syncs the growth mirror once; this copy changes
+        // its attack set when the new value arrives (at once on the host, a round trip later on a client).
         public void OwnerSetWeapon(int index)
         {
             if (!IsOwner) return;
             int i = ((index % AttackCatalog.Heirlooms.Length) + AttackCatalog.Heirlooms.Length) % AttackCatalog.Heirlooms.Length;
             if (NetWeapon.Value == i) return;
             _machine.Interrupt();
-            NetWeapon.Value = (byte)i;
-            ApplyWeapon();
-            RequestSyncServerRpc();
+            SetWeaponServerRpc((byte)i);
+        }
+
+        [Rpc(SendTo.Server)]
+        private void SetWeaponServerRpc(byte index)
+        {
+            if (index >= AttackCatalog.Heirlooms.Length || NetWeapon.Value == index) return;
+            NetWeapon.Value = index;
+            CombatHost.Current?.ServerSyncGrowth(this);
         }
 
         // =================================================================================================================================
@@ -290,7 +300,10 @@ namespace SleepingCalamity.Gameplay
             _hitsInSwing = 0;
             _shotFired = false;
             _swingSerial++;
+            _swingWeapon = NetWeapon.Value;
+            _swingPrior = (byte)Mathf.Clamp(_machine.PriorHits, 0, 255);
             PublishSwing((byte)_machine.CurrentIndex);
+            if (a.SpellPips > 0) CastServerRpc(_swingSerial, _swingWeapon, (byte)_machine.CurrentIndex);   // the host spends the pip now, hit or miss
             CombatEvents.RaiseSwing(this, a);
             CombatEvents.RaiseCue(a.Kind == AttackKind.Spell ? CombatCue.Spell : a.Kind == AttackKind.Shot ? CombatCue.Shot : CombatCue.Swing, transform.position);
         }
@@ -386,16 +399,23 @@ namespace SleepingCalamity.Gameplay
             _machine.Freeze(stop);
             CombatEvents.RaiseLocalHit(new LocalHit(point, a, part >= 0, a.CameraKick));
             CombatEvents.RaiseKick(a.CameraKick);
-            SubmitHitServerRpc(_swingSerial, (byte)_machine.CurrentIndex, e.NetworkObjectId, (sbyte)part, transform.position, transform.eulerAngles.y);
+            SubmitHitServerRpc(_swingSerial, _swingWeapon, (byte)_machine.CurrentIndex, _swingPrior, e.NetworkObjectId, (sbyte)part, transform.position, transform.eulerAngles.y);
         }
 
         [Rpc(SendTo.Server)]
-        private void SubmitHitServerRpc(int swingId, byte attackIndex, ulong enemyNetId, sbyte part, Vector3 attackerPos, float attackerYaw)
+        private void SubmitHitServerRpc(int swingId, byte weaponIndex, byte attackIndex, byte priorChainHits, ulong enemyNetId, sbyte part, Vector3 attackerPos, float attackerYaw)
         {
             CombatHost host = CombatHost.Current;
             if (host == null || NetworkManager == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
             Enemy e = obj.GetComponent<Enemy>();
-            if (e != null) host.ServerPlayerHitsEnemy(this, swingId, attackIndex, e, part, attackerPos, attackerYaw);
+            if (e != null) host.ServerPlayerHitsEnemy(this, swingId, attackIndex, e, part, attackerPos, attackerYaw, priorChainHits, weaponIndex);
+        }
+
+        // A spell swing began on the owner: the host spends its pips (keyed by the swing, so the hits of the same swing do not pay again).
+        [Rpc(SendTo.Server)]
+        private void CastServerRpc(int swingId, byte weaponIndex, byte attackIndex)
+        {
+            CombatHost.Current?.ServerCast(this, swingId, weaponIndex, attackIndex);
         }
 
         // =================================================================================================================================

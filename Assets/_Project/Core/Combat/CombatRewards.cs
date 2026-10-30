@@ -37,6 +37,14 @@ namespace SleepingCalamity.Core.Combat
 
         public void ForgetEnemy(string enemyId) { Ledger.Forget(enemyId); if (enemyId != null) _techPaid.Remove(enemyId); }
 
+        // How much tech base value this enemy has already paid (0 once forgotten). For tests and the debug HUD.
+        public float TechPaid(string enemyId)
+        {
+            if (enemyId == null) return 0f;
+            _techPaid.TryGetValue(enemyId, out float used);
+            return used;
+        }
+
         public WeaponState Weapon(string weaponId)
         {
             if (!Weapons.TryGetValue(weaponId, out WeaponState w))

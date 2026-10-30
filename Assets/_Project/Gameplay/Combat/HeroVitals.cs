@@ -89,7 +89,9 @@ namespace SleepingCalamity.Gameplay
         public void ServerReviveHold(HeroVitals reviver)
         {
             if (!IsServer || !IsDowned || reviver == null || reviver == this || !reviver.IsUp) return;
-            if ((reviver.transform.position - transform.position).sqrMagnitude > ReviveReach * ReviveReach) return;
+            // The reviver's own client checked ReviveReach against positions that are a round trip apart from the host's: a margin on the host's re-check.
+            const float hostReach = ReviveReach + 0.5f;
+            if ((reviver.transform.position - transform.position).sqrMagnitude > hostReach * hostReach) return;
             _holdUntil = Time.timeAsDouble + HoldTimeout;
         }
 

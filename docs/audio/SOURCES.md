@@ -2,21 +2,48 @@
 
 Placeholder combat sounds (docs/PHASE1.md 6.6, P42).
 
-## M3 combat cues: generated, no third-party audio (2026-10-30)
+## How a cue gets its sound (2026-10-30)
 
-All fifteen combat cues (`Combat_Hit`, `Combat_HitHeavy`, `Combat_HitCrit`, `Combat_Whoosh`, `Combat_Block`, `Combat_Parry`, `Combat_Slam`, `Combat_Hurt`,
-`Combat_Pop`, `Combat_Heal`, `Combat_Spell`, `Combat_Shot`, `Combat_Dodge`, `Combat_Telegraph`, `Combat_Die`) are procedural recipes in
-`Assets/_Project/Core/Audio/CombatSfx.cs`, generated at boot by the same `SfxGenerator` as the M1 tones. They are ours: no licence to record, nothing to
-attribute, nothing in LFS.
+Every cue id has a generated recipe (`Assets/_Project/Core/Audio/CombatSfx.cs`, `SfxRecipes.cs`; ours, no licence). At boot `SfxGenerator.GenerateAll` makes the
+clips, then `SfxGenerator.ApplyFileClips` replaces each one that has a recorded file named exactly like the cue id in
+`Assets/_Project/Content/Audio/Resources/Sfx/` (loaded with `Resources.LoadAll`). The recipe still supplies the mixing (category, base volume, rate limit), so
+gameplay code is unchanged. To swap a sound, replace the `.ogg` with the same name and update the row below. `SfxFileClipsTests` checks the list.
 
-**Not done: a Kenney (CC0) pack.** The brief allowed one from kenney.nl. Downloading a file needs the user's own go-ahead, and the session that built M3
-did not have it, so nothing was fetched. If the user wants a pack after hearing the procedural cues:
+## Kenney CC0 packs (downloaded 2026-10-30)
 
-1. Download the pack from https://kenney.nl/assets (the "Impact Sounds" and "RPG Audio" packs are CC0) into an empty folder outside the repo.
-2. Copy only the chosen `.ogg` files into `Assets/_Project/Content/Audio/Combat/` (Git LFS takes `*.ogg`).
-3. Add one row per file below: file, pack, URL, licence (CC0 1.0), date.
-4. Point the cue table at the clips (`AudioBus.ApplyCueTable` overrides a recipe by id), keeping the ids above, so no gameplay code changes.
+All three are by Kenney (https://kenney.nl), licence **Creative Commons Zero (CC0 1.0)**, free for commercial use, credit not required (`License.txt` in each pack
+says so, and each kenney.nl page shows "Creative Commons CC0"). Downloaded from the kenney.nl asset pages through the browser (the site refuses scripted requests),
+archives kept outside the repo; only the files below are copied in. Chosen from the file names and categories, not yet auditioned in game: tune by ear and edit the rows.
 
-| File | Pack | Source URL | Licence | Date |
-|---|---|---|---|---|
-| (none yet) | | | | |
+| Pack | URL |
+|---|---|
+| Impact Sounds 1.0 | https://kenney.nl/assets/impact-sounds |
+| RPG Audio | https://kenney.nl/assets/rpg-audio |
+| Interface Sounds | https://kenney.nl/assets/interface-sounds |
+
+| Cue id (= file in Resources/Sfx, `.ogg`) | Used for | Kenney source file | Pack |
+|---|---|---|---|
+| Combat_Hit | a normal hit on an enemy | impactPunch_medium_001 | Impact Sounds |
+| Combat_HitHeavy | finisher / charge hit | impactPunch_heavy_001 | Impact Sounds |
+| Combat_HitCrit | critical hit accent (plays with the hit) | impactMetal_heavy_001 | Impact Sounds |
+| Combat_Whoosh | every swing | knifeSlice | RPG Audio |
+| Combat_Block | enemy blocks; the hero's guard (pitched down) | impactPlate_medium_000 | Impact Sounds |
+| Combat_Parry | a parry | impactMetal_medium_002 | Impact Sounds |
+| Combat_Slam | enemy slam | impactSoft_heavy_001 | Impact Sounds |
+| Combat_Hurt | the hero is hit | impactPunch_medium_003 | Impact Sounds |
+| Combat_Pop | tech pop (bonus ABS) | pluck_002 | Interface Sounds |
+| Combat_Heal | heal (pickup, clear heal) | confirmation_004 | Interface Sounds |
+| Combat_Spell | staff spell cast | maximize_005 | Interface Sounds |
+| Combat_Shot | bow shot | impactTin_medium_001 | Impact Sounds |
+| Combat_Dodge | a visible dodge ignoring a hit | cloth3 | RPG Audio |
+| Combat_Telegraph | an enemy winds up | bong_001 | Interface Sounds |
+| Combat_Die | an enemy dies | impactGlass_medium_002 | Impact Sounds |
+| Ui_Click | UI click | click_001 | Interface Sounds |
+| Ui_Confirm | UI confirm | confirmation_001 | Interface Sounds |
+| Ui_Error | UI error | error_001 | Interface Sounds |
+
+## Still generated (ours, no licence)
+
+- `Wind_Ambient`, `Water_Lap`, `Bell_Ring`: the M1 ambience set, no Kenney equivalent chosen (the packs above have no loops).
+- Hero downed and revive: `CombatCue.Down` and `CombatCue.Revive` exist but nothing raises them and no cue id maps to them yet, so there is no sound to replace. When
+  they get ids, add rows here (candidates: `impactSoft_heavy_*` for down, `confirmation_00*` for revive).

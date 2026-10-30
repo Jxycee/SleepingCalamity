@@ -134,6 +134,7 @@ namespace SleepingCalamity.App
 
             var sfx = new SfxGenerator();
             sfx.GenerateAll(SfxSeed);
+            sfx.ApplyFileClips();   // recorded CC0 clips (docs/audio/SOURCES.md) replace the generated cues that have a file
             services.Register(sfx);
             audio.Initialize(sfx, settings);
             services.Register<AudioBus>(audio); // concrete type

@@ -20,6 +20,7 @@ namespace SleepingCalamity.Presentation
 
         private Enemy _enemy;
         private MaterialPropertyBlock _block;
+        private MaterialPropertyBlock _markerBlock;   // the telegraph footprint's colour, created once in Awake (not a field initializer) and reused every frame
         private GameObject _marker;
         private MeshFilter _markerFilter;
         private MeshRenderer _markerRenderer;
@@ -40,6 +41,7 @@ namespace SleepingCalamity.Presentation
         {
             _enemy = GetComponent<Enemy>();
             _block = new MaterialPropertyBlock();
+            _markerBlock = new MaterialPropertyBlock();
             if (visual != null) _visualBase = visual.localScale;
         }
 
@@ -130,9 +132,8 @@ namespace SleepingCalamity.Presentation
             Vector3 c = _enemy.AttackCentre;
             _marker.transform.SetPositionAndRotation(new Vector3(c.x, c.y + 0.04f, c.z), Quaternion.Euler(0f, a.Origin == HitOrigin.GroundAtTarget ? 0f : _enemy.YawDeg, 0f));
             _marker.SetActive(a.Range < 25f);
-            var block = new MaterialPropertyBlock();
-            block.SetColor(BaseColor, live ? new Color(1f, 0.05f, 0.02f, 0.65f) : new Color(1f, 0.6f, 0.1f, 0.12f + 0.3f * pre));
-            _markerRenderer.SetPropertyBlock(block);
+            _markerBlock.SetColor(BaseColor, live ? new Color(1f, 0.05f, 0.02f, 0.65f) : new Color(1f, 0.6f, 0.1f, 0.12f + 0.3f * pre));
+            _markerRenderer.SetPropertyBlock(_markerBlock);
         }
     }
 }

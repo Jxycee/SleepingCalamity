@@ -38,6 +38,11 @@ namespace SleepingCalamity.Gameplay
         public readonly List<HitRecord> HitLog = new List<HitRecord>();
         public bool AiEnabled = true;                    // tests turn the AI off and drive attacks by hand
         public System.Action<Enemy> ServerDied;
+        public System.Action<Enemy> ServerDespawned;     // host: this enemy left the world by any path (kill, clear, wipe, test); NetworkObjectId is still valid
+
+        // One counter for every enemy on this host, so an attack serial is never seen twice even when NetworkObjectIds are recycled (Bootstrap recycles them
+        // after 120 s): the victim's judged-set and the host's dedupe key on (enemy id, serial) and must never meet a stale pair.
+        private static int s_nextAttackSerial;
 
         private Targetable _targetable;
         private float _staggerLeft, _recoverLeft, _cooldown, _despawnIn = -1f;
@@ -88,7 +93,7 @@ namespace SleepingCalamity.Gameplay
         private void OnDisable() { s_all.Remove(this); }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { s_all.Clear(); }
+        private static void ResetStatics() { s_all.Clear(); s_nextAttackSerial = 0; }
 
         // Host only, BEFORE Spawn: the kind, tier and party size ride in the spawn message.
         public void ServerSeed(EnemyKind kind, int tier, int players)
@@ -124,6 +129,7 @@ namespace SleepingCalamity.Gameplay
             NetHp.OnValueChanged -= OnHpChanged;
             NetPhase.OnValueChanged -= OnPhaseChanged;
             _targetable.Alive = false;
+            if (IsServer) ServerDespawned?.Invoke(this);
         }
 
         private void OnSerialChanged(int previous, int current)
@@ -301,7 +307,8 @@ namespace SleepingCalamity.Gameplay
             _lungeDir = transform.forward;
             NetAttackOrigin.Value = a.Origin == HitOrigin.GroundAtTarget ? new Vector3(targetPos.x, transform.position.y, targetPos.z) : transform.position;
             NetAttackIdx.Value = (short)idx;
-            NetAttackSerial.Value = ++_lastAttackSerial;
+            _lastAttackSerial = ++s_nextAttackSerial;
+            NetAttackSerial.Value = _lastAttackSerial;
             SetPhase(EnemyPhase.Attack);
         }
 
@@ -384,7 +391,7 @@ namespace SleepingCalamity.Gameplay
             if (r.PartBroken >= 0) NetPartsBroken.Value = (byte)(NetPartsBroken.Value | (1 << r.PartBroken));
             if (r.Staggered)
             {
-                NetAttackIdx.Value = -1;
+                EndAttackNow();
                 _staggerLeft = Def.StaggerSeconds;
                 _cooldown = Mathf.Max(_cooldown, 0.5f);
                 SetPhase(EnemyPhase.Stagger);
@@ -398,11 +405,19 @@ namespace SleepingCalamity.Gameplay
             return r;
         }
 
+        // A stagger or a parry cuts the attack short: clients stop its clock, and the grace window for a victim's report already in flight starts now
+        // (only when an attack was actually running, so a stagger during Recover does not reopen the window for an old serial).
+        private void EndAttackNow()
+        {
+            if (Phase == EnemyPhase.Attack) _attackEndedAt = Time.timeAsDouble;
+            NetAttackIdx.Value = -1;
+        }
+
         // A successful parry by a player: the enemy is stunned for a moment and its attack is cancelled.
         public void ServerParried()
         {
             if (Phase == EnemyPhase.Dead) return;
-            NetAttackIdx.Value = -1;
+            EndAttackNow();
             _staggerLeft = Def.IsElite ? 0.7f : 1.1f;
             _cooldown = Mathf.Max(_cooldown, 0.6f);
             SetPhase(EnemyPhase.Stagger);

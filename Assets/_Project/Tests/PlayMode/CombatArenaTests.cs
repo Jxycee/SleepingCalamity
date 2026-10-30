@@ -10,6 +10,7 @@ using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Gameplay;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -209,6 +210,166 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(vitals.Model.Hp, Is.EqualTo(65), "and nothing hurt the hero afterwards; HP history " + string.Join(">", seen));
             yield return Seconds(0.3f);
             Assert.That(Object.FindObjectsByType<HealingDrop>().Length, Is.EqualTo(0), "the pickup is used up");
+        }
+
+        // ---- review round 1 fixes ----
+
+        private static IEnumerator ArenaWithoutWave(System.Action<CombatHost, GameObject, HeroCombat, HeroVitals, FakeInputService> body)
+        {
+            yield return StartCombatSolo();
+            AppBootstrap app = AppBootstrap.Current;
+            GameObject heroObject = app.NetworkManager.LocalClient.PlayerObject.gameObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            combat.AiEnabled = false;
+            combat.CritChance = 0f;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            var input = new FakeInputService();
+            heroObject.GetComponent<HeroLocomotion>().Input = input;
+            heroObject.GetComponent<TargetLockController>().Input = input;
+            HeroCombat hero = heroObject.GetComponent<HeroCombat>();
+            hero.Input = input;
+            yield return Seconds(0.6f);
+            body(combat, heroObject, hero, heroObject.GetComponent<HeroVitals>(), input);
+        }
+
+        // Catches: attack serials that restart at 1 on every enemy, so a recycled NetworkObjectId (Bootstrap recycles ids after 120 s) makes the victim's client and the host
+        // read the new enemy's first attack as the old enemy's already-judged one, and the hero is never hurt by it.
+        [UnityTest]
+        public IEnumerator Solo_RecycledEnemyId_TheNewEnemysFirstAttackStillLands()
+        {
+            yield return StartCombatSolo();
+            AppBootstrap app = AppBootstrap.Current;
+            NetworkManager nm = app.NetworkManager;
+            GameObject heroObject = nm.LocalClient.PlayerObject.gameObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            combat.AiEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            var input = new FakeInputService();
+            heroObject.GetComponent<HeroLocomotion>().Input = input;
+            heroObject.GetComponent<TargetLockController>().Input = input;
+            heroObject.GetComponent<HeroCombat>().Input = input;
+            HeroVitals vitals = heroObject.GetComponent<HeroVitals>();
+            yield return Seconds(0.6f);
+
+            float oldDelay = nm.NetworkConfig.NetworkIdRecycleDelay;
+            nm.NetworkConfig.NetworkIdRecycleDelay = 0f;
+            try
+            {
+                Vector3 spot = heroObject.transform.position + heroObject.transform.forward * 3f;
+                Enemy first = combat.SpawnEnemy(EnemyKind.Slime, 1, spot, ai: false);
+                ulong id = first.NetworkObjectId;
+                first.ServerForceAttack(AttackCatalog.TestNova, heroObject.transform.position);
+                yield return PlayModeHarness.WaitUntil(() => vitals.Model.Hp < vitals.MaxHp, 3f, "the first enemy's attack never hurt the hero (control)");
+                int serialOfFirst = first.Serial;
+                yield return Seconds(1.4f);   // its attack ends
+                first.NetworkObject.Despawn(true);
+                yield return null;
+                vitals.ServerFullReset();
+                yield return null;
+
+                // The id queue is FIFO: spawn and despawn until the old id comes round again (bounded).
+                Enemy second = null;
+                for (int i = 0; i < 16 && (second == null || second.NetworkObjectId != id); i++)
+                {
+                    if (second != null) { second.NetworkObject.Despawn(true); yield return null; }
+                    second = combat.SpawnEnemy(EnemyKind.Slime, 1, spot, ai: false);
+                }
+                Assert.That(second.NetworkObjectId, Is.EqualTo(id), "precondition: the new enemy got the old enemy's NetworkObjectId back");
+                second.ServerForceAttack(AttackCatalog.TestNova, heroObject.transform.position);
+                Assert.That(second.Serial, Is.Not.EqualTo(serialOfFirst), "an attack serial is never reused, by this enemy id or any other");
+                yield return PlayModeHarness.WaitUntil(() => vitals.Model.Hp < vitals.MaxHp, 3f, "the recycled-id enemy's first attack never hurt the hero (its serial was read as already judged)");
+            }
+            finally { nm.NetworkConfig.NetworkIdRecycleDelay = oldDelay; }
+        }
+
+        // Catches: ServerClearEnemies (F6 / a wipe) and any other despawn that skips ForgetEnemy, so a recycled id inherits the old enemy's style-ABS cap and tech cap.
+        [UnityTest]
+        public IEnumerator Solo_EveryRemovalPath_ForgetsTheEnemysRewardLedgers()
+        {
+            Enemy[] enemies = new Enemy[2];
+            string[] keys = new string[2];
+            CombatHost combat = null;
+            PlayerGrowth growth = null;
+            yield return ArenaWithoutWave((c, hero, hc, v, input) =>
+            {
+                combat = c;
+                growth = c.Growth(AppBootstrap.Current.NetworkManager.LocalClientId);
+                for (int i = 0; i < 2; i++)
+                {
+                    enemies[i] = c.SpawnEnemy(EnemyKind.Slime, 1, hero.transform.position + new Vector3(4f + i * 2f, 0f, 4f), ai: false);
+                    keys[i] = enemies[i].NetworkObjectId.ToString();
+                    growth.Ledger.Award(keys[i], WeaponCatalog.DaggerShield, StyleEvent.Hit);
+                    growth.TechBase(keys[i]);
+                    Assert.That(growth.Ledger.Paid(keys[i]), Is.GreaterThan(0f), "setup: the ledger has an entry");
+                    Assert.That(growth.TechPaid(keys[i]), Is.GreaterThan(0f), "setup: the tech cap has an entry");
+                }
+            });
+            combat.ServerClearEnemies();   // path 1: the F6 / wipe clear
+            Assert.That(growth.Ledger.Paid(keys[0]), Is.EqualTo(0f), "ServerClearEnemies forgot the style ledger");
+            Assert.That(growth.TechPaid(keys[0]), Is.EqualTo(0f), "and the tech cap");
+            Assert.That(growth.Ledger.Paid(keys[1]), Is.EqualTo(0f));
+            yield return null;
+
+            Enemy third = combat.SpawnEnemy(EnemyKind.Slime, 1, new Vector3(5f, 0f, 5f), ai: false);   // path 2: any other despawn
+            string key = third.NetworkObjectId.ToString();
+            growth.Ledger.Award(key, WeaponCatalog.DaggerShield, StyleEvent.Hit);
+            growth.TechBase(key);
+            third.NetworkObject.Despawn(true);
+            Assert.That(growth.Ledger.Paid(key), Is.EqualTo(0f), "a plain despawn forgot the style ledger");
+            Assert.That(growth.TechPaid(key), Is.EqualTo(0f), "and the tech cap");
+        }
+
+        // Catches: a staff spell that misses (hits nothing) costing no pip on the host, so only the owner's mirror paid.
+        [UnityTest]
+        public IEnumerator Solo_StaffSpellThatHitsNothing_StillSpendsAPipOnTheHost()
+        {
+            HeroCombat hero = null;
+            FakeInputService input = null;
+            CombatHost combat = null;
+            yield return ArenaWithoutWave((c, h, hc, v, i) => { combat = c; hero = hc; input = i; });
+            hero.OwnerSetWeapon(1);   // the staff
+            Assert.That(hero.WeaponKey, Is.EqualTo(WeaponCatalog.Staff));
+            yield return PlayModeHarness.WaitUntil(() => hero.Mirror.Pips == SpellPips.StartCap, 3f, "the owner's pip mirror never synced");
+            ulong cid = AppBootstrap.Current.NetworkManager.LocalClientId;
+            PlayerGrowth growth = combat.Growth(cid);
+            Assert.That(growth.Pips.Current, Is.EqualTo(SpellPips.StartCap));
+
+            input.Frame.SecondaryPressed = true;
+            yield return null;
+            input.Frame.SecondaryPressed = false;
+            yield return Seconds(1.0f);   // the whole cast; there is nothing to hit
+            Assert.That(growth.Pips.Current, Is.EqualTo(SpellPips.StartCap - 1), "the host spent the pip although the spell hit nothing");
+            yield return PlayModeHarness.WaitUntil(() => hero.Mirror.Pips == SpellPips.StartCap - 1, 3f, "the owner's mirror shows the host's count");
+        }
+
+        // Catches: a finisher bonus that counts hits of earlier combos. A combo started within the 1.2 s grace rebases like AttackMachine.Begin: the second
+        // finisher has the same two prior hits as the first.
+        [UnityTest]
+        public IEnumerator Solo_SecondComboWithinTheGrace_FinisherCountsOnlyItsOwnChain()
+        {
+            Enemy warden = null;
+            HeroCombat hero = null;
+            CombatHost combat = null;
+            yield return ArenaWithoutWave((c, h, hc, v, i) =>
+            {
+                combat = c;
+                hero = hc;
+                warden = c.SpawnEnemy(EnemyKind.DoughWarden, 1, new Vector3(0f, 0f, 6f), ai: false);
+            });
+            int swing = 200;
+            Vector3 at = new Vector3(1f, 0f, 5f);
+            // What the owner's AttackMachine reports at each swing start (PriorHits rebases at every chain start, even inside the grace): 0, 1, 2, then 0, 1, 2 again.
+            int[] priors = { 0, 1, 2, 0, 1, 2 };
+            int[] attacks = { AttackSet.Hit1, AttackSet.Hit2, AttackSet.Finisher, AttackSet.Hit1, AttackSet.Hit2, AttackSet.Finisher };
+            for (int i = 0; i < attacks.Length; i++)
+            {
+                combat.ServerPlayerHitsEnemy(hero, ++swing, attacks[i], warden, -1, at, 90f, priors[i]);
+                Assert.That(combat.LastAppliedPrior, Is.EqualTo(priors[i]), "swing " + i + " used the owner's prior-hit count");
+                if (i == 2) Assert.That(warden.Model.Hp, Is.LessThan(600), "the first combo hit");
+            }
+            Assert.That(combat.LastAppliedPrior, Is.EqualTo(2), "a second combo inside the grace counts only its own two hits (not the first combo's)");
         }
     }
 }

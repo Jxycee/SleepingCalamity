@@ -43,14 +43,16 @@ namespace SleepingCalamity.Gameplay
         private Pcg32 _rng = Rng.Stream(0x5CA11UL, "combat.crit", 0UL);
         private readonly Dictionary<string, PlayerGrowth> _growth = new Dictionary<string, PlayerGrowth>();
         private readonly Dictionary<ulong, HostPlayerState> _states = new Dictionary<ulong, HostPlayerState>();
-        private readonly HashSet<long> _enemyHitDedupe = new HashSet<long>();
+        private readonly HashSet<long> _enemyHitDedupe = new HashSet<long>();   // (victim client << 32) | enemy attack serial; serials are unique per host (Enemy)
         private readonly List<Enemy> _alive = new List<Enemy>();
+        private readonly List<PlayerVitals> _party = new List<PlayerVitals>();   // scratch for Update (no per-frame allocation)
 
         private WaveState _wave = WaveState.Idle;
         private int _waveNumber;
         private float _waveTimer, _broadcastTimer, _wipeTimer;
         private bool _begun;
 
+        public int LastAppliedPrior { get; private set; }   // test hook: the chain-hit count the last applied player hit used for the finisher bonus
         public bool Begun => _begun;
         public int WaveNumber => _waveNumber;
         public WaveState Wave => _wave;
@@ -58,9 +60,8 @@ namespace SleepingCalamity.Gameplay
 
         private sealed class HostPlayerState
         {
-            public int LastSwing = -1, HitsInSwing, PriorAtSwing, ChainHits;
-            public bool Rejected;
-            public double LastChainHit = -10.0;
+            public int LastSwing = -1, HitsInSwing;
+            public bool Rejected;   // this swing is a spell the host could not pay for: its hits are dropped
             public readonly HashSet<ulong> Hit = new HashSet<ulong>();
         }
 
@@ -117,7 +118,12 @@ namespace SleepingCalamity.Gameplay
         public int PlayerCount()
         {
             int n = 0;
-            foreach (HeroVitals v in HeroVitals.All) if (v != null && v.IsSpawned && v.NetworkManager == _nm) n++;
+            IReadOnlyList<HeroVitals> all = HeroVitals.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                HeroVitals v = all[i];
+                if (v != null && v.IsSpawned && v.NetworkManager == _nm) n++;
+            }
             return Mathf.Max(1, n);
         }
 
@@ -125,12 +131,50 @@ namespace SleepingCalamity.Gameplay
         // Player hits on enemies
         // =================================================================================================================================
 
-        public void ServerPlayerHitsEnemy(HeroCombat attacker, int swingId, int attackIndex, Enemy e, int part, Vector3 attackerPos, float attackerYaw)
+        private static string WeaponKeyOf(HeroCombat attacker, int weaponIndex)
+        {
+            string[] all = AttackCatalog.Heirlooms;
+            return weaponIndex >= 0 && weaponIndex < all.Length ? all[weaponIndex] : attacker.WeaponKey;
+        }
+
+        // A swing the host has not seen yet starts its per-swing state; a spell pays its pips here, once, whichever of the cast message or the first hit
+        // arrives first (the owner sends the cast at the start of the swing, so a spell that hits nothing still costs its pip).
+        private void BeginSwingIfNew(HeroCombat attacker, HostPlayerState ps, PlayerGrowth g, int swingId, AttackData attack)
+        {
+            if (swingId == ps.LastSwing) return;
+            ps.LastSwing = swingId;
+            ps.Hit.Clear();
+            ps.HitsInSwing = 0;
+            ps.Rejected = false;
+            if (attack.SpellPips > 0)
+            {
+                ps.Rejected = !g.Pips.TrySpend(attack.SpellPips);   // the rule is checked here, whatever the client's mirror said
+                ServerSyncGrowth(attacker);
+            }
+        }
+
+        // The owner started a spell (HeroCombat.CastServerRpc): pay for it now. weaponIndex is the owner's weapon for this swing.
+        public void ServerCast(HeroCombat attacker, int swingId, int weaponIndex, int attackIndex)
+        {
+            if (_nm == null || !_nm.IsServer || attacker == null) return;
+            HeroVitals vitals = attacker.GetComponent<HeroVitals>();
+            if (vitals == null || !vitals.IsUp) return;
+            string weaponKey = WeaponKeyOf(attacker, weaponIndex);
+            AttackData attack = AttackCatalog.ForFamily(WeaponStyle.FamilyOf(weaponKey)).Get(attackIndex);
+            if (attack == null || attack.SpellPips <= 0) return;
+            ulong cid = attacker.OwnerClientId;
+            BeginSwingIfNew(attacker, StateOf(cid), Growth(cid), swingId, attack);
+        }
+
+        // weaponIndex: the heirloom the owner swung (-1 = the host's NetWeapon for that hero); priorChainHits: hits connected earlier in the owner's chain when
+        // this swing began (AttackMachine.PriorHits, which rebases at each chain start), for the finisher bonus.
+        public void ServerPlayerHitsEnemy(HeroCombat attacker, int swingId, int attackIndex, Enemy e, int part, Vector3 attackerPos, float attackerYaw,
+            int priorChainHits = 0, int weaponIndex = -1)
         {
             if (_nm == null || !_nm.IsServer || attacker == null || e == null) return;
             HeroVitals vitals = attacker.GetComponent<HeroVitals>();
             if (vitals == null || !vitals.IsUp || !e.Alive || e.Model == null || e.Phase == EnemyPhase.Dead) return;
-            string weaponKey = attacker.WeaponKey;
+            string weaponKey = WeaponKeyOf(attacker, weaponIndex);
             AttackData attack = AttackCatalog.ForFamily(WeaponStyle.FamilyOf(weaponKey)).Get(attackIndex);
             if (attack == null) return;
 
@@ -138,20 +182,7 @@ namespace SleepingCalamity.Gameplay
             HostPlayerState ps = StateOf(cid);
             PlayerGrowth g = Growth(cid);
             double now = Time.timeAsDouble;
-            if (swingId != ps.LastSwing)
-            {
-                ps.LastSwing = swingId;
-                ps.Hit.Clear();
-                ps.HitsInSwing = 0;
-                ps.Rejected = false;
-                if (now - ps.LastChainHit > AttackMachine.ChainGraceSeconds) ps.ChainHits = 0;
-                ps.PriorAtSwing = ps.ChainHits;
-                if (attack.SpellPips > 0)
-                {
-                    ps.Rejected = !g.Pips.TrySpend(attack.SpellPips);   // the rule is checked here, whatever the client's mirror said
-                    ServerSyncGrowth(attacker);
-                }
-            }
+            BeginSwingIfNew(attacker, ps, g, swingId, attack);
             if (ps.Rejected || !ps.Hit.Add(e.NetworkObjectId)) return;
 
             if (part >= e.Def.Parts.Length || part < -1 || (part >= 0 && !e.PartIntact(part))) part = -1;
@@ -160,11 +191,12 @@ namespace SleepingCalamity.Gameplay
             toAttacker.y = 0f;
             float bearing = toAttacker.sqrMagnitude > 1e-4f ? Mathf.DeltaAngle(e.transform.eulerAngles.y, MovementMath.YawDeg(toAttacker.x, toAttacker.z)) : 0f;
 
+            LastAppliedPrior = Mathf.Clamp(priorChainHits, 0, 64);
             var input = new EnemyHitInput
             {
                 Attack = attack,
                 Atk = w.Stats.Atk, Fire = w.Stats.Fire, Pest = w.Stats.Pest,
-                PriorChainHits = ps.PriorAtSwing,
+                PriorChainHits = LastAppliedPrior,
                 BearingToAttackerDeg = bearing,
                 PartIndex = part,
                 CritRoll = _rng.NextFloat(),
@@ -173,9 +205,7 @@ namespace SleepingCalamity.Gameplay
             EnemyHitResult r = e.ServerApplyHit(input, attackerPos, now);
             if (r.Damage <= 0) return;
 
-            ps.ChainHits++;
             ps.HitsInSwing++;
-            ps.LastChainHit = now;
             e.HitLog.Add(new HitRecord(cid.ToString(), weaponKey, now));
 
             AbsGain gain = CombatRewards.OnHit(g, weaponKey, e.NetworkObjectId.ToString(), attack, r, ps.HitsInSwing, attack.Kind == AttackKind.Shot && part >= 0);
@@ -217,9 +247,23 @@ namespace SleepingCalamity.Gameplay
                 hero.ServerReportAbs(gain.WeaponKey, gain.Abs, gain.TechPop, gain.LevelsGained, "kill: " + e.Def.Name);
                 ServerSyncGrowth(hero);
             }
+            ForgetEnemyRewards(e);
+        }
+
+        // Every player's per-enemy reward caps for this enemy id go when the enemy goes (a recycled NetworkObjectId must start fresh).
+        private void ForgetEnemyRewards(Enemy e)
+        {
             string key = e.NetworkObjectId.ToString();
             foreach (PlayerGrowth g in _growth.Values) g.ForgetEnemy(key);
         }
+
+        private void OnEnemyDespawned(Enemy e)
+        {
+            _alive.Remove(e);
+            ForgetEnemyRewards(e);
+        }
+
+        private static long DedupeKey(HeroCombat victim, int serial) => ((long)victim.OwnerClientId << 32) | (uint)serial;
 
         private HeroCombat FindHero(ulong clientId)
         {
@@ -240,7 +284,7 @@ namespace SleepingCalamity.Gameplay
             if (a == null) return;
             HeroVitals vitals = victim.GetComponent<HeroVitals>();
             if (vitals == null || !vitals.IsUp) return;
-            long key = ((long)victim.OwnerClientId << 48) ^ ((long)e.NetworkObjectId << 24) ^ (uint)serial;
+            long key = DedupeKey(victim, serial);
             if (_enemyHitDedupe.Count > 512) _enemyHitDedupe.Clear();
             if (!_enemyHitDedupe.Add(key)) return;
 
@@ -254,8 +298,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (_nm == null || !_nm.IsServer || victim == null || e == null || !e.Alive) return;
             if (!e.ServerAcceptsSerial(serial)) return;
-            long key = ((long)victim.OwnerClientId << 48) ^ ((long)e.NetworkObjectId << 24) ^ (uint)serial;
-            if (!_enemyHitDedupe.Add(key)) return;
+            if (!_enemyHitDedupe.Add(DedupeKey(victim, serial))) return;
             e.ServerParried();
             victim.ServerBroadcastParry();
             string weaponKey = victim.WeaponKey;
@@ -284,6 +327,7 @@ namespace SleepingCalamity.Gameplay
             instance.Spawn(destroyWithScene: true);
             _alive.Add(e);
             e.ServerDied += OnEnemyDied;
+            e.ServerDespawned += OnEnemyDespawned;
             return e;
         }
 
@@ -319,12 +363,21 @@ namespace SleepingCalamity.Gameplay
         {
             if (!_begun || _nm == null || !_nm.IsServer || !_nm.IsListening) return;
             float dt = Time.deltaTime;
-            _alive.RemoveAll(x => x == null || !x.IsSpawned);
+            for (int i = _alive.Count - 1; i >= 0; i--)
+            {
+                Enemy x = _alive[i];
+                if (x == null || !x.IsSpawned) _alive.RemoveAt(i);
+            }
 
-            // A wipe: every hero down ends the dive; the greybox arena resets the party and restarts the wave.
-            var party = new List<PlayerVitals>();
-            foreach (HeroVitals v in HeroVitals.All) if (v != null && v.IsSpawned && v.NetworkManager == _nm) party.Add(v.Model);
-            if (_wave != WaveState.Wiped && PlayerVitals.AllDown(party))
+            // A wipe: every hero down ends the dive; the greybox arena resets the party and restarts the wave. (Index loops and a reused list: no per-frame garbage.)
+            IReadOnlyList<HeroVitals> heroes = HeroVitals.All;
+            _party.Clear();
+            for (int i = 0; i < heroes.Count; i++)
+            {
+                HeroVitals v = heroes[i];
+                if (v != null && v.IsSpawned && v.NetworkManager == _nm) _party.Add(v.Model);
+            }
+            if (_wave != WaveState.Wiped && PlayerVitals.AllDown(_party))
             {
                 _wave = WaveState.Wiped;
                 _wipeTimer = 4f;
@@ -335,7 +388,11 @@ namespace SleepingCalamity.Gameplay
                 _wipeTimer -= dt;
                 if (_wipeTimer <= 0f)
                 {
-                    foreach (HeroVitals v in HeroVitals.All) if (v != null && v.IsSpawned && v.NetworkManager == _nm) v.ServerFullReset();
+                    for (int i = 0; i < heroes.Count; i++)
+                    {
+                        HeroVitals v = heroes[i];
+                        if (v != null && v.IsSpawned && v.NetworkManager == _nm) v.ServerFullReset();
+                    }
                     _wave = WavesEnabled ? WaveState.Countdown : WaveState.Idle;
                     _waveTimer = 3f;
                 }
@@ -353,11 +410,14 @@ namespace SleepingCalamity.Gameplay
                         {
                             _wave = WaveState.Cleared;
                             _waveTimer = 4f;
-                            foreach (HeroVitals v in HeroVitals.All)
+                            for (int i = 0; i < heroes.Count; i++)
                             {
+                                HeroVitals v = heroes[i];
                                 if (v == null || !v.IsSpawned || v.NetworkManager != _nm || !v.IsUp) continue;
                                 int healed = v.ServerHeal(Mathf.RoundToInt(ClearHeal));
-                                if (healed > 0) v.GetComponent<HeroCombat>()?.ServerBroadcastHeal(healed);
+                                if (healed <= 0) continue;
+                                HeroCombat combat = v.GetComponent<HeroCombat>();
+                                if (combat != null) combat.ServerBroadcastHeal(healed);
                             }
                         }
                         break;
@@ -373,8 +433,11 @@ namespace SleepingCalamity.Gameplay
             {
                 _broadcastTimer = 0.5f;
                 HeroCombat carrier = null;
-                foreach (HeroVitals v in HeroVitals.All)
+                for (int i = 0; i < heroes.Count; i++)
+                {
+                    HeroVitals v = heroes[i];
                     if (v != null && v.IsSpawned && v.NetworkManager == _nm) { carrier = v.GetComponent<HeroCombat>(); break; }
+                }
                 if (carrier != null) carrier.ServerBroadcastWave(_waveNumber, (byte)_wave, _alive.Count, ArenaWaves.TierOf(_waveNumber));
             }
         }
