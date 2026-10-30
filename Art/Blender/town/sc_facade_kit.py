@@ -39,7 +39,11 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
 plus the plinth and step (chosen at placement).
 
-Status (2026-10-30, cloud): see the git log of this file for rounds and scores.
+Status (2026-10-30, cloud): review 27.5/40 at round 8 (calibrated rubric, brief 3; first review 26/40 at round 6,
+target 31 not reached: rounds 7-8 gained +1 and +0.5, so stopped per the 1.5-point rule). 28.7k tris, audit PASS.
+Next: the PC exports the FBX; in Unity the wear attribute needs the kit's vertex-mask shader; what's left (plaster
+value variation, a stronger silhouette break such as a dormer or oriel, peg heads, real foliage in the flower box,
+8 tiny degenerate faces in the hinge curls) is listed in the branch report for the controller to park.
 """
 import sys, os, math, random, zlib
 import bpy, bmesh
@@ -57,7 +61,7 @@ SEED = 0xB4
 TILE = 2.0                      # metres per tileable repeat (2K at 1024 px/m)
 SHUTTER_TINT = (0.57, 0.73, 0.28)  # painted_wood (#627b85) -> faded sage-forest green, about #4a6a48 (brief 0)
 DOOR_TINT = (0.50, 0.66, 0.25)     # the door a shade deeper green
-DECAL_OPACITY = {'drip': 0.55, 'crack': 0.9, 'moss': 1.0}
+DECAL_OPACITY = {'drip': 0.35, 'crack': 0.9, 'moss': 1.0}
 
 # ----------------------------------------------------------------------------- dimensions (metres)
 W = 3.75                         # half width of the front
@@ -185,7 +189,7 @@ def decal_mat(stem):
 
 def M(key):
     return {
-        'plaster': lambda: tile_mat('FK_Plaster', 'B1_town/plaster', normal=1.2),
+        'plaster': lambda: tile_mat('FK_Plaster', 'B1_town/plaster', normal=0.55),
         'oak': lambda: tile_mat('FK_Oak', 'B1_town/oak_timber', normal=1.2),
         'oak_lt': lambda: tile_mat('FK_OakDoor', 'B1_town/oak_timber', tint=(1.35, 1.25, 1.15)),
         'stone': lambda: tile_mat('FK_Sandstone', 'B1_town/sandstone'),
@@ -287,10 +291,14 @@ def _merge(pc, bm, mat):
             nl[pc.uv].uv = l[uvs].uv
     tmp.free(); bpy.data.meshes.remove(me)
 
+TIMBERS = []   # (a, b, half width) of every oak member, for the plaster edge grime
+
 def member(pc, mat, a, b, w, d, cham=0.025, name='m', sag=0.0, wob=0.006, extend=0.0, up=None):
     """A timber from point a to b (world), section w (across, in the wall plane) x d (depth, along `up` normal).
     Off true by its own small angle, sagging `sag` m at mid-length, wobbled (adzed)."""
     a = Vector(a); b = Vector(b)
+    if mat == 'oak':   # remember wall-plane timbers: the plaster darkens where it meets them
+        TIMBERS.append((a.copy(), b.copy(), w / 2))
     axis = (b - a); L = axis.length + 2 * extend; axis.normalize()
     up = Vector(up) if up else Vector((0, -1, 0))        # wall normal (outward)
     side = axis.cross(up).normalized(); up = side.cross(axis).normalized()
@@ -330,7 +338,7 @@ def quad_grid(pc, mat, corners, nu, nv, push=None, uv_fn=None):
     bm.normal_update()
     _merge(pc, bm, mat)
 
-def wall_panel(pc, mat, plane, x0, x1, z0, z1, holes=(), bulge=0.012, cell=0.25, uv=None, side=False):
+def wall_panel(pc, mat, plane, x0, x1, z0, z1, holes=(), bulge=0.012, cell=0.125, uv=None, side=False):
     """Plaster infill on a wall plane, cut on a breakpoint grid around rectangular holes.
     plane: y of a front-facing wall (normal -Y), or x of a side wall (normal +X) when side=True."""
     xs = sorted(set([x0, x1] + [h[0] for h in holes] + [h[1] for h in holes] +
@@ -361,6 +369,7 @@ def wall_panel(pc, mat, plane, x0, x1, z0, z1, holes=(), bulge=0.012, cell=0.25,
             for l in f.loops:
                 c = l.vert.co
                 l[uvl].uv = ((c.y if side else c.x) / TILE, c.z / TILE)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')   # grid points inside holes
     bm.normal_update()
     _merge(pc, bm, mat)
 
@@ -662,13 +671,23 @@ def kit_flowerbox():
         member(pc, 'oak', (xb, YU - PROUD - 0.02, zt - 0.62), (xb, y + 0.02, zt - 0.24), 0.08, 0.08,
                name='fbk%f' % xb, cham=0.012, up=(1, 0, 0))
     R = rng('flowers')
-    for i in range(16):
+    for i in range(14):   # trailing foliage spilling over the front lip
+        x = (a - 0.08) + (b - a + 0.16) * (i + R.random()) / 14
+        ln = R.uniform(0.18, 0.42)
+        bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0)
+        bm.transform(Matrix.Translation((x, y - 0.17, zt - 0.05 - ln / 2)) @ Matrix.Diagonal((0.06, 0.05, ln / 2, 1)))
+        uvl = bm.loops.layers.uv.new('UVMap'); _merge(pc, bm, 'leaf')
+        if R.random() < 0.6:
+            bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=1, radius=R.uniform(0.03, 0.045))
+            bm.transform(Matrix.Translation((x + R.uniform(-0.03, 0.03), y - 0.2, zt - 0.05 - ln * R.uniform(0.3, 0.9))))
+            uvl = bm.loops.layers.uv.new('UVMap'); _merge(pc, bm, 'bloom')
+    for i in range(22):
         p = Vector(((a - 0.1) + (b - a + 0.2) * R.random(), y + R.uniform(-0.1, 0.1), zt + R.uniform(0.02, 0.16)))
         bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=1, radius=R.uniform(0.07, 0.11))
         bm.transform(Matrix.Translation(p) @ Matrix.Diagonal((1.2, 1.0, 0.8, 1)))
         uvl = bm.loops.layers.uv.new('UVMap'); _merge(pc, bm, 'leaf')
-    for i in range(11):
-        p = Vector(((a - 0.05) + (b - a + 0.1) * R.random(), y + R.uniform(-0.12, 0.08), zt + R.uniform(0.16, 0.26)))
+    for i in range(30):
+        p = Vector(((a - 0.08) + (b - a + 0.16) * R.random(), y + R.uniform(-0.16, 0.10), zt + R.uniform(0.10, 0.30)))
         bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=1, radius=R.uniform(0.035, 0.05))
         bm.transform(Matrix.Translation(p)); uvl = bm.loops.layers.uv.new('UVMap'); _merge(pc, bm, 'bloom')
     return pc
@@ -684,7 +703,8 @@ def roof_surface(x, s):
     t = x / (W + OVER_VERGE)
     zr = ridge_z(x); ze = z_e - 0.05 * (1 - t * t)
     wave = 0.03 * noise.noise(Vector((x * 0.55, s * 2.5, 0.37)))  # wavy, settled courses
-    return Vector((x, y_e + (y_r - y_e) * s, ze + (zr - ze) * s + wave * math.sin(math.pi * min(1.0, s))))
+    kick = 0.34 * max(0.0, 1 - s / 0.22) ** 2                      # bellcast: the slope flattens at the eave
+    return Vector((x, y_e + (y_r - y_e) * s, ze + (zr - ze) * s + wave * math.sin(math.pi * min(1.0, s)) + kick))
 
 def kit_roof():
     pc = Piece('Kit_RoofModule')
@@ -844,6 +864,18 @@ def kit_decals():
     return pc_list
 
 # ----------------------------------------------------------------------------- wear (vertex colour)
+LEAN_X, LEAN_Y = 0.011, 0.007   # whole frame leans 1.1 cm/m toward +X; the upper storey tips 0.7 cm/m outward
+
+def lean(me):
+    """Medium whimsy (brief 0): the house has settled, so nothing above the plinth stands quite plumb."""
+    for v in me.vertices:
+        z = v.co.z
+        v.co.x += LEAN_X * max(0.0, z - PLINTH)
+        v.co.y -= LEAN_Y * max(0.0, z - BRES0)
+
+def lean_pt(p):
+    return Vector((p.x + LEAN_X * max(0.0, p.z - PLINTH), p.y - LEAN_Y * max(0.0, p.z - BRES0), p.z))
+
 def write_wear(ob, chimney_top=None):
     me = ob.data
     attr = me.color_attributes.new('wear', 'FLOAT_COLOR', 'CORNER')   # linear 0-1 masks, not sRGB
@@ -857,6 +889,25 @@ def write_wear(ob, chimney_top=None):
             # splashback band at the foot: strongest at the cobble line, ragged top
             streak = noise.noise(Vector((p.x * 5.0, p.y * 5.0, p.z * 0.7)))
             r = max(0.0, 1 - p.z / (1.35 + 0.3 * nz + 0.25 * streak)) ** 1.2 * 0.9
+            # broad lime-wash mottling (every surface), so no mass reads showroom-clean
+            r = max(r, 0.13 * max(0.0, noise.noise(p * 0.55 + Vector((3.1, 0.0, 1.7)))) +
+                    0.06 * max(0.0, noise.noise(p * 2.3)))
+            # run-off stains on plaster just below the sill rails and the girt, streaked downward
+            if ob.name == 'Kit_Panels':
+                # edge grime: plaster darkens in a soft band where it meets a timber
+                dmin = 9.0
+                for (ta, tb, hw) in TIMBERS_L:
+                    ab = tb - ta; L2 = ab.length_squared
+                    t = 0.0 if L2 < 1e-9 else max(0.0, min(1.0, (p - ta).dot(ab) / L2))
+                    d = (p - (ta + ab * t)).length - hw
+                    if d < dmin:
+                        dmin = d
+                if dmin < 0.16:
+                    r = max(r, (1 - max(0.0, dmin) / 0.16) ** 1.5 * (0.30 + 0.12 * nz))
+                for zr_ in RUNOFF_Z:
+                    dz = zr_ - p.z
+                    if 0.0 < dz < 0.55:
+                        r = max(r, (1 - dz / 0.55) ** 1.6 * (0.28 + 0.22 * streak))
             # damp darkening on the plinth, streaked downward
             if p.z < PLINTH + 0.05:
                 r = max(r, 0.45 + 0.2 * streak)
@@ -887,15 +938,18 @@ def write_wear(ob, chimney_top=None):
             attr.data[li].color = (min(1, r), min(1, g), min(1, b), 1.0)
 
 chimney_top_x = -2.05
+RUNOFF_Z = [GWIN[2] - 0.18, UWIN_Z[0] - 0.16, BRES1 + 0.0, PLINTH + 0.36]
 
 # ----------------------------------------------------------------------------- assembly
 def build():
+    global TIMBERS_L
     bpy.ops.wm.read_factory_settings(use_empty=True)
     root = bpy.data.objects.new('FacadeKit', None); bpy.context.scene.collection.objects.link(root)
     pieces = [kit_plinth(), kit_posts()[0], kit_rails(), kit_braces(), kit_jetty(), kit_panels(), kit_windows(),
               kit_shutters(), kit_door(), kit_roof(), kit_chimney(), kit_flowerbox()]
     obs = []
     total = 0
+    TIMBERS_L = [(lean_pt(a), lean_pt(b), hw) for (a, b, hw) in TIMBERS]
     for pc in pieces:
         me = bpy.data.meshes.new(pc.name)
         pc.bm.normal_update(); pc.bm.to_mesh(me); pc.bm.free()
@@ -903,6 +957,7 @@ def build():
             me.materials.append(m)
         ob = bpy.data.objects.new(pc.name, me); bpy.context.scene.collection.objects.link(ob)
         ob.parent = root
+        lean(me)
         write_wear(ob, chimney_top=10.25)
         for p in me.polygons:
             p.use_smooth = False
@@ -910,6 +965,7 @@ def build():
         print('  %-18s %6d tris  %s' % (pc.name, t, ', '.join(m.name for m in pc.mats)))
         obs.append(ob)
     for pc, me in kit_decals():
+        lean(me)
         for m in pc.mats:
             me.materials.append(m)
         ob = bpy.data.objects.new(pc.name, me); bpy.context.scene.collection.objects.link(ob); ob.parent = root
