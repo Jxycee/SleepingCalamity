@@ -24,6 +24,28 @@ namespace SleepingCalamity.EditorTools
         public static readonly string[] WeaponNames = { "Axe", "Staff", "Dagger", "Bow" };
         public static readonly string[] SlotNames = { "Hit1", "Hit2", "Finisher", "Charge", "Special" };
 
+        // How well a Mixamo file name fits an MX hint: 0 exact (after normalising both), 1 the hint inside the name, -1 no match. A hint ending in a digit must
+        // not run on into another digit, so "greatswordcombo1" does not claim "greatswordcombo10" or "...11".
+        public static int MatchRank(string fileName, string hint)
+        {
+            string name = Normalize(fileName);
+            if (name == hint) return 0;
+            for (int at = name.IndexOf(hint, System.StringComparison.Ordinal); at >= 0; at = name.IndexOf(hint, at + 1, System.StringComparison.Ordinal))
+            {
+                int end = at + hint.Length;
+                bool digitRunsOn = char.IsDigit(hint[hint.Length - 1]) && end < name.Length && char.IsDigit(name[end]);
+                if (!digitRunsOn) return 1;
+            }
+            return -1;
+        }
+
+        static string Normalize(string s)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in s.ToLowerInvariant()) if (char.IsLetterOrDigit(c)) sb.Append(c);
+            return sb.ToString();
+        }
+
         public static string AttackStateName(byte attackId) => "Atk_" + WeaponNames[HeroAnimMap.WeaponOf(attackId)] + "_" + SlotNames[HeroAnimMap.SlotOf(attackId)];
 
         public static List<ClipSlot> Slots()

@@ -345,8 +345,6 @@ namespace SleepingCalamity.EditorTools
                 return list;
             }
 
-            static string Normalize(string s) => new string(s.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
-
             public AnimationClip Resolve(ClipSlot slot, out string used)
             {
                 foreach (string src in slot.Sources)
@@ -378,12 +376,14 @@ namespace SleepingCalamity.EditorTools
                         if (_mixamo == null)
                             _mixamo = AssetDatabase.FindAssets("t:Model", new[] { AnimationImportBuilder.MixamoFolder }).Select(AssetDatabase.GUIDToAssetPath)
                                 .Where(p => p != AnimationImportBuilder.YBot).OrderBy(p => p).ToArray();
+                        string best = null;
+                        int bestRank = int.MaxValue;
                         foreach (string p in _mixamo)
-                            if (Normalize(Path.GetFileNameWithoutExtension(p)).Contains(arg))
-                            {
-                                List<AnimationClip> list = ClipsOf(p);
-                                if (list.Count > 0) return list[0];
-                            }
+                        {
+                            int rank = HeroClipTable.MatchRank(Path.GetFileNameWithoutExtension(p), arg);
+                            if (rank >= 0 && rank < bestRank && ClipsOf(p).Count > 0) { best = p; bestRank = rank; }
+                        }
+                        if (best != null) return ClipsOf(best)[0];
                         return null;
                     }
                 }

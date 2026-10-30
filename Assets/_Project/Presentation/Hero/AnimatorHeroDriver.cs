@@ -13,6 +13,23 @@ namespace SleepingCalamity.Presentation
     {
         private const float MoveDamp = 0.08f;   // seconds; smooths the speed and strafe parameters
 
+        private static readonly int HSpeed = Animator.StringToHash(HeroAnimParam.Speed);
+        private static readonly int HMoveX = Animator.StringToHash(HeroAnimParam.MoveX);
+        private static readonly int HMoveY = Animator.StringToHash(HeroAnimParam.MoveY);
+        private static readonly int HVertSpeed = Animator.StringToHash(HeroAnimParam.VertSpeed);
+        private static readonly int HGrounded = Animator.StringToHash(HeroAnimParam.Grounded);
+        private static readonly int HLocked = Animator.StringToHash(HeroAnimParam.Locked);
+        private static readonly int HDodging = Animator.StringToHash(HeroAnimParam.Dodging);
+        private static readonly int HGuarding = Animator.StringToHash(HeroAnimParam.Guarding);
+        private static readonly int HAiming = Animator.StringToHash(HeroAnimParam.Aiming);
+        private static readonly int HDowned = Animator.StringToHash(HeroAnimParam.Downed);
+        private static readonly int HWeapon = Animator.StringToHash(HeroAnimParam.Weapon);
+        private static readonly int HAttack = Animator.StringToHash(HeroAnimParam.Attack);
+        private static readonly int HAttackTime = Animator.StringToHash(HeroAnimParam.AttackTime);
+        private static readonly int HDodgeTime = Animator.StringToHash(HeroAnimParam.DodgeTime);
+        private static readonly int HHurt = Animator.StringToHash(HeroAnimParam.Hurt);
+        private static readonly int HHurtHeavy = Animator.StringToHash(HeroAnimParam.HurtHeavy);
+
         [SerializeField] private Animator animator;
 
         private readonly HashSet<int> _params = new HashSet<int>();
@@ -53,43 +70,43 @@ namespace SleepingCalamity.Presentation
             HeroAnimParams p = HeroAnimMap.Evaluate(in state);
             LastParams = p;
 
-            Float(HeroAnimParam.Speed, p.Speed, MoveDamp, deltaTime);
-            Float(HeroAnimParam.MoveX, p.MoveX, MoveDamp, deltaTime);
-            Float(HeroAnimParam.MoveY, p.MoveY, MoveDamp, deltaTime);
-            Float(HeroAnimParam.VertSpeed, p.VertSpeed);
-            Bool(HeroAnimParam.Grounded, p.Grounded);
-            Bool(HeroAnimParam.Locked, p.Locked);
-            Bool(HeroAnimParam.Dodging, p.Dodging);
-            Bool(HeroAnimParam.Guarding, p.Guarding);
-            Bool(HeroAnimParam.Aiming, p.Aiming);
-            Bool(HeroAnimParam.Downed, p.Downed);
-            Int(HeroAnimParam.Weapon, p.Weapon);
-            Int(HeroAnimParam.Attack, p.Attack);
-            Float(HeroAnimParam.AttackTime, p.AttackTime);
+            Float(HSpeed, p.Speed, MoveDamp, deltaTime);
+            Float(HMoveX, p.MoveX, MoveDamp, deltaTime);
+            Float(HMoveY, p.MoveY, MoveDamp, deltaTime);
+            Float(HVertSpeed, p.VertSpeed);
+            Bool(HGrounded, p.Grounded);
+            Bool(HLocked, p.Locked);
+            Bool(HDodging, p.Dodging);
+            Bool(HGuarding, p.Guarding);
+            Bool(HAiming, p.Aiming);
+            Bool(HDowned, p.Downed);
+            Int(HWeapon, p.Weapon);
+            Int(HAttack, p.Attack);
+            Float(HAttackTime, p.AttackTime);
 
             _dodgeTime = p.Dodging ? Mathf.Min(1f, _dodgeTime + deltaTime / MovementMath.DodgeDuration) : 0f;
-            Float(HeroAnimParam.DodgeTime, _dodgeTime);
+            Float(HDodgeTime, _dodgeTime);
 
             // A flinch fires once per new hurt, never at spawn (the first frame only records the counter) and never while lying down.
             if (!_hasHurt) { _lastHurt = state.HurtSerial; _hasHurt = true; }
             if (state.HurtSerial != _lastHurt)
             {
                 _lastHurt = state.HurtSerial;
-                if (!p.Downed) Trigger(state.HurtHeavy ? HeroAnimParam.HurtHeavy : HeroAnimParam.Hurt);
+                if (!p.Downed) Trigger(state.HurtHeavy ? HHurtHeavy : HHurt);
             }
             if (p.Downed && !_wasDowned)
             {
-                ResetTrigger(HeroAnimParam.Hurt);
-                ResetTrigger(HeroAnimParam.HurtHeavy);
+                ResetTrigger(HHurt);
+                ResetTrigger(HHurtHeavy);
             }
             _wasDowned = p.Downed;
         }
 
-        private void Float(string name, float value) { int h = Animator.StringToHash(name); if (_params.Contains(h)) animator.SetFloat(h, value); }
-        private void Float(string name, float value, float damp, float dt) { int h = Animator.StringToHash(name); if (_params.Contains(h)) animator.SetFloat(h, value, damp, dt); }
-        private void Bool(string name, bool value) { int h = Animator.StringToHash(name); if (_params.Contains(h)) animator.SetBool(h, value); }
-        private void Int(string name, int value) { int h = Animator.StringToHash(name); if (_params.Contains(h)) animator.SetInteger(h, value); }
-        private void Trigger(string name) { int h = Animator.StringToHash(name); if (_params.Contains(h)) animator.SetTrigger(h); }
-        private void ResetTrigger(string name) { int h = Animator.StringToHash(name); if (_params.Contains(h)) animator.ResetTrigger(h); }
+        private void Float(int h, float value) { if (_params.Contains(h)) animator.SetFloat(h, value); }
+        private void Float(int h, float value, float damp, float dt) { if (_params.Contains(h)) animator.SetFloat(h, value, damp, dt); }
+        private void Bool(int h, bool value) { if (_params.Contains(h)) animator.SetBool(h, value); }
+        private void Int(int h, int value) { if (_params.Contains(h)) animator.SetInteger(h, value); }
+        private void Trigger(int h) { if (_params.Contains(h)) animator.SetTrigger(h); }
+        private void ResetTrigger(int h) { if (_params.Contains(h)) animator.ResetTrigger(h); }
     }
 }
