@@ -1,6 +1,6 @@
 // Authority: none (local, cosmetic). The Animator-free placeholder for the hero's animation: leans the mannequin into its movement, bobs it
-// while it moves, stretches it in the air, crouches and spins it through a dodge. It is only an IHeroAnimationDriver: when the Mixamo clips
-// arrive (docs/design/mixamo-clips.md) an Animator-based driver replaces this component and nothing else changes.
+// while it moves, stretches it in the air, crouches and spins it through a dodge. It is the fallback: while a working AnimatorHeroDriver is on the
+// same object (the Y Bot with its controller) this stands down, and it animates again whenever the Animator is missing or has no controller.
 using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
 using UnityEngine;
@@ -13,12 +13,27 @@ namespace SleepingCalamity.Presentation
 
         private float _leanForward, _leanSide, _stretch = 1f, _bobPhase, _roll;
         private Vector3 _baseScale = Vector3.one;
-        private bool _hasBase;
+        private bool _hasBase, _standingDown;
+        private AnimatorHeroDriver _animatorDriver;
 
         public HeroAnimState Last { get; private set; }
 
         public void Apply(in HeroAnimState state, float deltaTime)
         {
+            // The real clips are playing: put the placeholder pose back once and stay out of the way.
+            if (_animatorDriver == null) _animatorDriver = GetComponent<AnimatorHeroDriver>();
+            if (_animatorDriver != null && _animatorDriver.IsWorking)
+            {
+                if (_hasBase && !_standingDown)
+                {
+                    transform.localPosition = Vector3.zero;
+                    transform.localRotation = Quaternion.identity;
+                    transform.localScale = _baseScale;
+                }
+                _standingDown = true;
+                return;
+            }
+            _standingDown = false;
             if (!_hasBase)
             {
                 _baseScale = transform.localScale;
