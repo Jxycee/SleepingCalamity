@@ -17,8 +17,8 @@
 5. Open: M2/M3/M7 2-player walks wait for a second player. M4/M6 persistence must key growth by the persistent player id, not the session client id (`CombatHost.cs:95`).
 
 ## Branches and worktrees
-- `main` at `4a08f82` (green; last Unity check PASS on `5c4bced`, later merges are tools/docs only), local and GitHub in sync. `claude/intelligent-cray-i7vppb` (cloud unity.sh cold-Library timeout) merged 2026-10-30.
-- Open: `claude/practical-wozniak-vk1q0j` = B11 cellar lantern, in progress in a cloud session (don't touch).
+- `main` at `3d5d18d` (green; check PASS on the axe fix `bb027c9`: EditMode 519, PlayMode 31 + 5 skipped; later merges are art/docs only), local and GitHub in sync. `claude/intelligent-cray-i7vppb` (cloud unity.sh cold-Library timeout) merged 2026-10-30.
+- B11 cellar lantern merged by its cloud session (`7f9adc1`, look locked 28.5/40); free asset sources in `Art/Source/`. No open branches besides its merged `claude/practical-wozniak-vk1q0j`.
 - Cleanup 2026-10-30: finished agent worktrees and all merged local branches removed. 16 merged remote branches deleted on GitHub (user OK). Session worktrees `determined-boyd-9ac4b8` and `infallible-bassi-581d4e` stay until their sessions are archived.
 
 ## Blockers and open questions
