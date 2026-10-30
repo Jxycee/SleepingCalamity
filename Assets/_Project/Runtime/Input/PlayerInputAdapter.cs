@@ -16,7 +16,7 @@ namespace SleepingCalamity.Runtime
         private ISettings _settings;
 
         private InputActionMap _playerMap, _uiMap;
-        private InputAction _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause;
+        private InputAction _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge;
         private InputAction _uiCancel;
         private InputAction[] _deviceProbe = Array.Empty<InputAction>();
 
@@ -108,11 +108,14 @@ namespace SleepingCalamity.Runtime
             _secondary = _actions.FindAction(InputActionNames.Secondary, throwIfNotFound: true);
             _interact = _actions.FindAction(InputActionNames.Interact, throwIfNotFound: true);
             _pause = _actions.FindAction(InputActionNames.Pause, throwIfNotFound: true);
+            _lock = _actions.FindAction(InputActionNames.Lock, throwIfNotFound: true);
+            _switchTarget = _actions.FindAction(InputActionNames.SwitchTarget, throwIfNotFound: true);
+            _dodge = _actions.FindAction(InputActionNames.Dodge, throwIfNotFound: true);
             _uiCancel = _actions.FindAction(InputActionNames.Cancel, throwIfNotFound: true);
 
             _deviceProbe = new[]
             {
-                _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause,
+                _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge,
                 _actions.FindAction(InputActionNames.Navigate, throwIfNotFound: true),
                 _actions.FindAction(InputActionNames.Submit, throwIfNotFound: true),
                 _uiCancel,
@@ -177,6 +180,11 @@ namespace SleepingCalamity.Runtime
             f.SecondaryHeld = Held(_secondary, s.aimToggle, ref _aimLatched);
             f.SecondaryPressed = _secondary.WasPressedThisFrame();
             f.SecondaryReleased = _secondary.WasReleasedThisFrame();
+            f.LockPressed = _lock.WasPressedThisFrame();
+            f.DodgePressed = _dodge.WasPressedThisFrame();
+            Vector2 sw = _switchTarget.ReadValue<Vector2>();
+            f.SwitchX = sw.x;
+            f.SwitchY = sw.y;
             f.InteractPressed = _interact.WasPressedThisFrame();
             f.PausePressed = Context == InputContext.Menu ?_uiCancel.WasPressedThisFrame() : _pause.WasPressedThisFrame();
             return f;

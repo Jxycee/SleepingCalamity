@@ -6,6 +6,7 @@
         "SleepingCalamity.Data",
         "SleepingCalamity.Runtime",
         "SleepingCalamity.Gameplay",
+        "Unity.Cinemachine",
         "Unity.Netcode.Runtime",
         "Unity.Collections",
         "Unity.RenderPipelines.Universal.Runtime",

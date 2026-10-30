@@ -12,8 +12,9 @@ namespace SleepingCalamity.Core
         public const int Ground = 8;         // floors and terrain
         public const int Structure = 9;      // walls, props, buildings
         public const int Interactable = 10;  // things the interact key can use
-        public static readonly int[] UserLayerIndices = { 6, 7, 8, 9, 10 };
-        public static readonly string[] UserLayerNames = { "Player", "RemotePlayer", "Ground", "Structure", "Interactable" };
+        public const int Enemy = 11;         // M2: target dummies and (from M3) enemies; line-of-sight and camera rays ignore it
+        public static readonly int[] UserLayerIndices = { 6, 7, 8, 9, 10, 11 };
+        public static readonly string[] UserLayerNames = { "Player", "RemotePlayer", "Ground", "Structure", "Interactable", "Enemy" };
         public static int Mask(int layer) => 1 << layer;
     }
 }

@@ -7,6 +7,8 @@ namespace SleepingCalamity.Core
         public bool JumpPressed, SprintHeld;
         public bool PrimaryHeld, PrimaryPressed, PrimaryReleased;
         public bool SecondaryHeld, SecondaryPressed, SecondaryReleased;
+        public bool LockPressed, DodgePressed;
+        public float SwitchX, SwitchY;
         public bool InteractPressed, PausePressed;
 
         public static readonly PlayerIntent None = default;

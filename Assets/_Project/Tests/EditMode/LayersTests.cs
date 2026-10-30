@@ -8,9 +8,9 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Layers_UserLayerTables_AlignWithConstants()
         {
-            int[] expectedIndices = { Layers.Player, Layers.RemotePlayer, Layers.Ground, Layers.Structure, Layers.Interactable };
+            int[] expectedIndices = { Layers.Player, Layers.RemotePlayer, Layers.Ground, Layers.Structure, Layers.Interactable, Layers.Enemy };
             Assert.That(Layers.UserLayerIndices, Is.EqualTo(expectedIndices));
-            Assert.That(Layers.UserLayerNames, Is.EqualTo(new[] { "Player", "RemotePlayer", "Ground", "Structure", "Interactable" }));
+            Assert.That(Layers.UserLayerNames, Is.EqualTo(new[] { "Player", "RemotePlayer", "Ground", "Structure", "Interactable", "Enemy" }));
             Assert.That(Layers.Water, Is.EqualTo(4));
             Assert.That(Layers.Default, Is.EqualTo(0));
         }

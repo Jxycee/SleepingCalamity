@@ -48,12 +48,21 @@ namespace SleepingCalamity.App
         {
             if (!SceneNames.IsGameplay(sceneName)) return;
             foreach (ulong clientId in clientsCompleted) SpawnFor(clientId);
+            SpawnTargetDummies();
         }
 
         // A client that joins while a gameplay scene is up: NGO has synchronized the scene to it, now it gets its player.
         private void OnSynchronizeComplete(ulong clientId)
         {
             if (SceneNames.IsGameplay(SceneManager.GetActiveScene().name)) SpawnFor(clientId);
+        }
+
+        // M2: the arena's target dummies are spawned by the host at the same moment as the players (idempotent).
+        public int SpawnTargetDummies()
+        {
+            if (!_nm.IsServer) return 0;
+            TargetDummySpawner dummies = UnityEngine.Object.FindFirstObjectByType<TargetDummySpawner>();
+            return dummies != null ? dummies.SpawnAll(_nm) : 0;
         }
 
         // Idempotent: a client that already has a player object is left alone.
