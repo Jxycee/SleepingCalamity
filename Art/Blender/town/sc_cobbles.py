@@ -1,6 +1,6 @@
 """Cobbles: B6 sculpted granite cobble family (T3, PHASE1 4) and the Hollowmere plaza patch laid from it.
 
-The family: 8 granite setts (chunky storybook size, 15-20 x 12-15 cm tops: about 1.3x the 11-13 cm setts of Alsace
+The family: 8 granite setts, 3 damp setts (darker, glossy, algae in the crevices: the dish around the ring), (chunky storybook size, 15-20 x 12-15 cm tops: about 1.3x the 11-13 cm setts of Alsace
 and Rothenburg squares) plus 3 rubble fragments, each a dense damaged high (voxel remesh, domed and foot-worn tops,
 square-arris spalls, one hairline crack) baked once into one shared set (BaseColor, Normal, Roughness, AO; 2K on the
 PC). Two of the setts are the "path" variants: flatter, polished, a little paler, used where feet go. Lows are the
@@ -78,6 +78,9 @@ FAMILY = [   # tint: value offset (-0.3..+0.3), warm: -1 blue-grey .. +1 pink-ta
     ('sett_f', 0.170, 0.130, 0.10, 'chipped', dict(dome=0.005, bev=0.008, tint=0.20, warm=-0.4)),  # pale cool grey
     ('path_a', 0.185, 0.140, 0.10, 'worn', dict(dome=0.002, bev=0.013, tint=0.16, warm=0.6)),
     ('path_b', 0.165, 0.135, 0.10, 'worn', dict(dome=0.002, bev=0.014, tint=0.06, warm=-0.2)),
+    ('damp_a', 0.180, 0.135, 0.10, 'sett', dict(dome=0.004, bev=0.010, tint=-0.20, warm=0.3, damp=1)),   # the low dish by the ring
+    ('damp_b', 0.170, 0.140, 0.10, 'sett', dict(dome=0.005, bev=0.011, tint=-0.30, warm=-0.5, damp=1)),
+    ('damp_c', 0.190, 0.130, 0.10, 'chipped', dict(dome=0.004, bev=0.009, tint=-0.12, warm=0.8, damp=1)),
     ('small_a', 0.120, 0.105, 0.09, 'sett', dict(dome=0.003, bev=0.009, tint=-0.10, warm=0.7)),
     ('frag_a', 0.120, 0.090, 0.060, 'frag', dict(tint=-0.12, warm=0.3)),
     ('frag_b', 0.090, 0.075, 0.050, 'frag', dict(tint=0.10, warm=0.8)),
@@ -85,12 +88,13 @@ FAMILY = [   # tint: value offset (-0.3..+0.3), warm: -1 blue-grey .. +1 pink-ta
 VAR = {f[0]: f for f in FAMILY}
 SETTS = ['sett_a', 'sett_b', 'sett_c', 'sett_d', 'sett_e', 'sett_f']
 PATHS = ['path_a', 'path_b']
+DAMPS = ['damp_a', 'damp_b', 'damp_c']
 JOINT = 0.015            # nominal joint (m)
 BURY = 0.045             # the lows keep this much body below the top; the rest is underground
 LOD0_T, LOD1_T, FRAG_T = 140, 44, 120
 
 # ----------------------------------------------------------------------------- granite smart material
-def granite(name, tint=0.0, warm=0.4, worn=False):
+def granite(name, tint=0.0, warm=0.4, worn=False, damp=False):
     """Granite: grey with warm lights (#817a7b to #b7b0aa), black mica and pale feldspar specks, foot-polished top,
     dirt below the joint line and in crevices. Object space, so instances and the bake agree."""
     m, T = K.new_mat(name); T.grime = None
@@ -129,10 +133,14 @@ def granite(name, tint=0.0, warm=0.4, worn=False):
         lv = T.node('ShaderNodeTexVoronoi'); T.set(lv, 'Vector', p); lv.inputs['Scale'].default_value = 22.0
         lich = T.math('MULTIPLY', T.smoothstep((lv, 'Distance'), 0.22, 0.10), T.smoothstep((T.sep((lv, 'Color')), 'Y'), 0.86, 0.90))
         col = T.mix(T.math('MULTIPLY', lich, 0.6), col, (0.42, 0.40, 0.25))
+    if damp:                         # damp setts: darker, glossier, green algae in the crevices and the joint band
+        alg = T.math('MAXIMUM', T.math('SUBTRACT', 1.0, cav), bed)
+        col = T.mix(T.math('MULTIPLY', alg, 0.7), T.hsv(col, 0.5, 1.05, 0.78), (0.06, 0.08, 0.025))
     rough = T.math('ADD', 0.74, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.12))
     rough = T.mixf(pol, rough, 0.42 if worn else 0.55)
     rough = T.mixf(T.math('MULTIPLY', mica, 0.7), rough, 0.32)
     rough = T.mixf(T.math('MAXIMUM', bed, T.math('SUBTRACT', 1.0, cav)), rough, 0.92)
+    if damp: rough = T.math('MULTIPLY', rough, 0.62)
     # micro relief: crystal grain + feldspar bumps (the dents and spalls are geometry)
     grain = T.noise(p, scale=380.0, detail=3.0)
     h = T.math('ADD', T.math('MULTIPLY', grain, 0.5), T.math('MULTIPLY', felds, 0.35))
@@ -157,8 +165,9 @@ def make_sett(name, L, W, H, kind, prm):
     topw = K._sstep(zz, -0.05, -0.005)
     # irregular plan: the sides bulge and lean a little (hand-dressed, never a machined box)
     sd = r.random() * 10
-    co[:, 0] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 1.0) - 0.5) * 2 * np.sign(co[:, 0])
-    co[:, 1] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 2.0) - 0.5) * 2 * np.sign(co[:, 1])
+    # (a smooth ramp, not sign(x): sign creased every top along x=0 / y=0 and pinched a dimple at the centre)
+    co[:, 0] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 1.0) - 0.5) * 2 * np.clip(x, -1, 1)
+    co[:, 1] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 2.0) - 0.5) * 2 * np.clip(y, -1, 1)
     # dome, then the worn crown: everything above the wear plane is squashed flat (foot traffic)
     dome = prm['dome'] * np.clip(1 - x ** 2, 0, 1) * np.clip(1 - y ** 2, 0, 1) * topw
     co[:, 2] += dome + 0.0025 * (K.fbm(co + sd, 11.0, 3, 0.5, 3.0) - 0.5) * 2 * topw
@@ -211,7 +220,7 @@ def build_family():
     highs = {}
     for i, (name, L, W, H, kind, prm) in enumerate(FAMILY):
         ob = make_frag(name, L, W, H, prm) if kind == 'frag' else make_sett(name, L, W, H, kind, prm)
-        ob.data.materials.append(granite('M_' + name, prm['tint'], prm['warm'], kind == 'worn'))
+        ob.data.materials.append(granite('M_' + name, prm['tint'], prm['warm'], kind == 'worn', prm.get('damp', False)))
         highs[name] = ob
     return highs
 
@@ -311,6 +320,8 @@ class Layout:
     def pick(self, r, x, z, small=False):
         if small: return 'small_a'
         if r.random() < path_weight(x, z) * 0.85: return r.choice(PATHS)
+        rr = math.hypot(x, z)                     # the dish holds the wet: damp setts within ~1.5 m of the ring
+        if r.random() < 0.85 * P.smoothstep(1.0 - (rr - P.RING_R) / 1.6) + 0.04: return r.choice(DAMPS)
         return r.choice(SETTS)
 
     def course(self, r, pts_fn, length, tol=0.06):
