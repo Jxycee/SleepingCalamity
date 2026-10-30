@@ -26,12 +26,13 @@ These are the steps only the user can take. Claude keeps this list current: when
   3. Environment variables `UNITY_EMAIL` and `UNITY_PASSWORD` (your Unity account; it must not use two-factor sign-in). The cloud activates its own Personal licence with them. Without them it can compile and test Core but can't launch Unity.
   4. Optional: a second environment, "SleepingCalamity Art", with the same settings and `SC_PROFILE="${SC_PROFILE:-art}"` in its script, for live Blender.
 
-## Now: M3 is merged (af71ed0), play it
+## Now: M3 retest (readability + animation merged, d60b4b8)
 - **Play the 5-minute combat arena:**
   1. Open the project in Unity and tick SleepingCalamity > Dev > Combat Arena (optionally also Auto Solo).
   2. Press Play from the Bootstrap scene.
   3. Controls: LMB attack (hold 0.6 s for a charge), RMB guard, aim or spell, Left Ctrl dodge, Tab lock-on (Q/R switch), Space jump, F5 swap heirloom, F6 clear the wave, hold E to revive an ally.
-  4. Say whether the feel is right, or what isn't.
+  4. Open `Assets/_Project/Scenes/Bootstrap.unity` first if Unity shows an empty Untitled scene.
+  5. Answer the 8 yes/no questions in `docs/design/m3-combat-greybox.md` ("Playtest checklist"), plus anything else that feels off.
 
 ## Soon
 4. **Pick Tobin's concept** from the options Claude generates (M10). Claude will ask you when the options are ready.
