@@ -1,6 +1,8 @@
 // Shared helpers for the builders and validators.
 // Get-or-add keeps components, children and the root NetworkObject (and so its GlobalObjectIdHash) stable across rebuilds.
+using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Reflection;
 using Unity.Netcode;
 using UnityEditor;
@@ -158,12 +160,36 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Scenes are rebuilt from an empty scene and saved to the same path (same .meta, same GUID).
+        // Unity gives every scene object a fresh random file id on each rebuild and writes the objects sorted by it, so a rebuild with no real
+        // change would still rewrite the whole file. When the saved scene has the same objects with the same values as the one on disk before
+        // (same multiset of YAML documents once the ids are blanked), the old bytes are put back so git sees nothing.
         public static void SaveScene(Scene scene, string assetPath)
         {
             EnsureFolder(Folder(assetPath));
+            string absolute = Abs(assetPath);
+            byte[] before = File.Exists(absolute) ? File.ReadAllBytes(absolute) : null;
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene, assetPath))
                 throw new System.InvalidOperationException("Could not save scene " + assetPath);
+            if (before == null) return;
+            string oldText = System.Text.Encoding.UTF8.GetString(before);
+            string newText = File.ReadAllText(absolute);
+            if (SceneFingerprint(oldText) == SceneFingerprint(newText)) File.WriteAllBytes(absolute, before);
+        }
+
+        internal static string SceneFingerprint(string yaml)
+        {
+            string[] documents = Regex.Split(yaml.Replace("\r\n", "\n"), @"(?m)^(?=--- !u!)");
+            var blanked = new List<string>();
+            foreach (string document in documents)
+            {
+                if (!document.StartsWith("--- !u!")) continue;
+                string text = Regex.Replace(document, @"&-?\d+", "&_");
+                text = Regex.Replace(text, @"fileID: -?\d+(?!\d)(?!, guid)", "fileID: _");
+                blanked.Add(text);
+            }
+            blanked.Sort(System.StringComparer.Ordinal);
+            return string.Join("\n@@\n", blanked);
         }
     }
 }
