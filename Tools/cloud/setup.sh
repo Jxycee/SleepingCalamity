@@ -2,9 +2,11 @@
 # SleepingCalamity cloud environment setup: gives a Claude Code cloud session (Ubuntu 24.04, root, no GPU) every tool this project's cloud work uses,
 # and leaves the machine set up so more can be installed with one command (apt, pip, uv, npm, dotnet tool).
 #
-# The environment's setup script (cloud environment menu > Edit > Setup script) should be the bootstrap in docs/superpowers/handoff/cloud-environment.md,
-# which cds into the repo and runs this file. It is idempotent (every step checks first) and safe to re-run. It always exits 0 so one bad step never
-# blocks the session; failed steps are listed at the end and `bash Tools/cloud/setup.sh --check` shows the state at any time.
+# SELF-CONTAINED: paste this whole file into the environment's setup script (cloud environment menu > Edit > Setup script); it needs no other repo
+# file, and finds the repo itself (it starts one directory above it). Inside a session, `bash Tools/cloud/setup.sh [flag]` runs the same thing.
+# It is idempotent (every step checks first) and safe to re-run. It always exits 0 so one bad step never blocks the session; failed steps are listed
+# at the end and `bash Tools/cloud/setup.sh --check` shows the state at any time. Keep it in step with UNITY_* in sc_cloud_compile.py and DXC_URL
+# in sc_shader_check.py.
 #
 #   bash Tools/cloud/setup.sh            full: everything below; the 4.2 GB Unity editor download runs in the BACKGROUND so the session starts in a few minutes
 #   bash Tools/cloud/setup.sh --wait     full, but wait for the Unity editor instead of backgrounding it (or, if a background run is going, wait for it)
@@ -40,7 +42,18 @@ BLENDER_VER=4.5.3
 BLENDER_SERIES=4.5
 BLENDER_DIR="$HOME/apps/blender-$BLENDER_VER-linux-x64"
 BLENDER_URL="https://download.blender.org/release/Blender$BLENDER_SERIES/blender-$BLENDER_VER-linux-x64.tar.xz"
-REPO="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." 2>/dev/null && pwd || pwd)}"
+UNITY_VERSION=6000.6.5f1
+UNITY_REVISION=3ff58d469c8a
+UNITY_URL="https://download.unity3d.com/download_unity/$UNITY_REVISION/LinuxEditorInstaller/Unity-$UNITY_VERSION.tar.xz"
+DXC_URL="https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2407/linux_dxc_2024_07_31.x86_64.tar.gz"
+find_repo() { # run from the repo, from Tools/cloud, or pasted as the environment's setup script (which starts one directory above the repo)
+    local d
+    for d in "${CLAUDE_PROJECT_DIR:-}" "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." 2>/dev/null && pwd)" "$PWD" "$PWD/SleepingCalamity" /home/user/SleepingCalamity "$PWD"/*; do
+        [ -n "$d" ] && [ -f "$d/Packages/packages-lock.json" ] && [ -d "$d/Assets/_Project" ] && { echo "$d"; return; }
+    done
+    echo "$PWD"
+}
+REPO="$(find_repo)"
 STATE="$HOME/.sc-setup"                    # background Unity run: unity.log, unity.status (RUNNING|DONE|FAILED), unity.pid
 PY_LIBS=(numpy pillow pyarrow scipy opencv-python-headless imageio trimesh pygltflib requests pyyaml matplotlib)
 BLENDER_PY_LIBS=(pillow scipy)
@@ -196,16 +209,61 @@ link_bins() {
 step "link into /usr/local/bin" link_bins
 
 # ------------------------------------------------------------------------------------------------ unity editor + packages + dxc
-UNITY_JOB="python3 '$REPO/Tools/cloud/sc_cloud_compile.py' --setup --project '$REPO' && python3 '$REPO/Tools/cloud/sc_shader_check.py' --setup"
-unity_job() { # runs in the foreground or under setsid; writes the status file either way
-    echo RUNNING > "$STATE/unity.status"
-    if bash -c "$UNITY_JOB" > "$STATE/unity.log" 2>&1; then echo DONE > "$STATE/unity.status"; else echo FAILED > "$STATE/unity.status"; return 1; fi
+# The same layout sc_cloud_compile.py --setup and sc_shader_check.py --setup produce (~/unity/ed/Editor, ~/unity/pkgs/<name>/package + .version, ~/dxc),
+# so those scripts see it as done. Written to a file so it can run detached from this script.
+write_unity_job() {
+    cat > "$STATE/unity-job.sh" <<JOB
+#!/usr/bin/env bash
+set -euo pipefail
+echo RUNNING > "$STATE/unity.status"
+trap 'echo FAILED > "$STATE/unity.status"' ERR
+mkdir -p "\$HOME/unity/ed" "\$HOME/dxc"
+if [ ! -x "\$HOME/unity/ed/Editor/Unity" ]; then
+    tarball="\$HOME/unity/Unity-$UNITY_VERSION.tar.xz"
+    if [ ! -f "\$tarball" ]; then
+        echo "downloading $UNITY_URL"
+        curl -fL --retry 4 -C - --no-progress-meter -o "\$tarball.part" "$UNITY_URL"
+        mv "\$tarball.part" "\$tarball"
+    fi
+    echo "extracting the editor (about 10 minutes)"
+    tar -xJf "\$tarball" -C "\$HOME/unity/ed" --exclude='*/Documentation/*'
+    rm -f "\$tarball"   # 4.2 GB the session's disk allowance needs back
+fi
+if [ ! -x "\$HOME/dxc/bin/dxc" ]; then
+    echo "downloading DXC"
+    curl -fsSL --retry 4 "$DXC_URL" | tar -xz -C "\$HOME/dxc"
+fi
+if [ -f "$REPO/Packages/packages-lock.json" ]; then
+    python3 - "$REPO/Packages/packages-lock.json" <<'PY'
+import json, os, shutil, subprocess, sys
+pkgs = os.path.expanduser("~/unity/pkgs")
+for name, info in json.load(open(sys.argv[1]))["dependencies"].items():
+    if info.get("source") != "registry":
+        continue
+    dest, ver = os.path.join(pkgs, name), info["version"]
+    stamp = os.path.join(dest, ".version")
+    if os.path.exists(stamp) and open(stamp).read() == ver:
+        continue
+    url = info.get("url", "https://packages.unity.com")
+    meta = json.loads(subprocess.run(["curl", "-sSf", "--retry", "4", f"{url}/{name}"], capture_output=True, text=True, check=True).stdout)
+    tar = meta["versions"][ver]["dist"]["tarball"]
+    shutil.rmtree(dest, ignore_errors=True)
+    os.makedirs(dest)
+    subprocess.run(f"curl -sSfL --retry 4 '{tar}' | tar -xz -C '{dest}'", shell=True, check=True)
+    open(stamp, "w").write(ver)
+    print(f"package {name} {ver}")
+PY
+else
+    echo "no Packages/packages-lock.json found: registry packages skipped (python3 Tools/cloud/sc_cloud_compile.py --setup fetches them)"
+fi
+echo "unity setup done"
+echo DONE > "$STATE/unity.status"
+JOB
 }
 if [ "$MODE" = full ] || [ "$MODE" = wait ]; then
-    say "Unity $(sed -n 's/^UNITY_VERSION = "\(.*\)"/\1/p' "$REPO/Tools/cloud/sc_cloud_compile.py" 2>/dev/null) editor, packages and DXC (4.2 GB download, ~9 GB unpacked)"
-    if [ ! -f "$REPO/Tools/cloud/sc_cloud_compile.py" ]; then
-        echo "repo not found at $REPO: run 'bash Tools/cloud/setup.sh' from inside it" >&2; FAILED+=("unity (repo not found)")
-    elif [ -x "$HOME/unity/ed/Editor/Unity" ] && [ -x "$HOME/dxc/bin/dxc" ] && [ "$(unity_status)" = DONE ]; then
+    say "Unity $UNITY_VERSION editor, registry packages and DXC (4.2 GB download, ~9 GB unpacked)"
+    write_unity_job
+    if [ -x "$HOME/unity/ed/Editor/Unity" ] && [ -x "$HOME/dxc/bin/dxc" ] && [ "$(unity_status)" = DONE ]; then
         echo "ok: already installed"
     elif unity_running; then
         if [ "$MODE" = wait ]; then
@@ -216,10 +274,9 @@ if [ "$MODE" = full ] || [ "$MODE" = wait ]; then
             echo "already running in the background (log $STATE/unity.log)"
         fi
     elif [ "$MODE" = wait ]; then
-        step "unity editor + packages + dxc" unity_job
+        step "unity editor + packages + dxc" bash -c "bash '$STATE/unity-job.sh' > '$STATE/unity.log' 2>&1"
     else
-        export -f unity_job; export STATE UNITY_JOB
-        setsid nohup bash -c unity_job >/dev/null 2>&1 < /dev/null &
+        setsid nohup bash "$STATE/unity-job.sh" > "$STATE/unity.log" 2>&1 < /dev/null &
         echo $! > "$STATE/unity.pid"
         echo "started in the background (pid $!): 'bash Tools/cloud/setup.sh --wait' blocks until it is done; progress in $STATE/unity.log"
     fi

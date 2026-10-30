@@ -6,16 +6,7 @@ How a cloud session gets the same toolchain the PC has, minus the live editors. 
 
 Cloud environment menu in the session's title bar > **Edit**.
 
-**Setup script**: paste this. It runs one directory above the repo at the start of every new session.
-
-```bash
-#!/bin/bash
-# SleepingCalamity cloud toolchain: Blender, Unity editor files, .NET, Python/image/video tools (Tools/cloud/setup.sh)
-for d in SleepingCalamity /home/user/SleepingCalamity; do
-    [ -f "$d/Tools/cloud/setup.sh" ] && { cd "$d" && bash Tools/cloud/setup.sh; break; }
-done
-exit 0
-```
+**Setup script**: paste the whole of `Tools/cloud/setup.sh`. It is self-contained (needs no other repo file and finds the repo itself), so the pasted copy works on any branch. After changing the script in the repo, paste it again.
 
 **Network access**: **Full**. Everything the script and the art tools download (Blender, Unity, Unity's package registry, Microsoft, NuGet, PyPI, GitHub releases, Ubuntu mirrors, Poly Haven, ambientCG, Hugging Face) plus anything a later session decides to install. If you prefer a narrower level, allow at least: `download.blender.org`, `download.unity3d.com`, `packages.unity.com`, `dot.net`, `builds.dotnet.microsoft.com`, `api.nuget.org`, `astral.sh`, `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `polyhaven.com`, `dl.polyhaven.org`, `ambientcg.com`, `huggingface.co`, with "Allow package managers" ticked.
 
