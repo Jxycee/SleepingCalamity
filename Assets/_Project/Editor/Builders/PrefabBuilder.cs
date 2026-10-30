@@ -139,7 +139,8 @@ namespace SleepingCalamity.EditorTools
                 Quaternion bladeForward = Quaternion.Euler(90f, 0f, 0f);   // the held primitives are built blade-up (+Y); +Z in the T-pose
                 var right = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(rh.rotation) * bladeForward, position = rh.InverseTransformPoint(rh.position + Vector3.right * 0.07f) };
                 var left = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(lh.rotation) * bladeForward, position = lh.InverseTransformPoint(lh.position + Vector3.left * 0.07f) };
-                var shield = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(la.rotation), position = la.InverseTransformPoint(la.position + Vector3.left * 0.12f + Vector3.forward * 0.12f) };
+                // The shield faces away from the back of the forearm (+Y in the T-pose, palm down), so it faces outward whatever the arm does; its disc axis is local Z.
+                var shield = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(la.rotation) * Quaternion.Euler(-90f, 0f, 0f), position = la.InverseTransformPoint(la.position + Vector3.left * 0.12f + Vector3.up * 0.1f) };
                 weaponVisual.ConfigureGrips(right, left, shield);
             }
             return true;

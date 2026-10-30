@@ -59,6 +59,13 @@ namespace SleepingCalamity.EditorTools
 
             BuilderUtil.EnsureFolder(BuilderUtil.Folder(path));
             AnimatorController ctrl = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+
+            // Unity gives every state and blend tree a new random fileID on each rebuild, so rebuilding in place would rewrite the whole file. The controller is
+            // therefore a pure function of its inputs (the slot table, the clips it resolved to and those FBX files' import hashes, and this builder's Version):
+            // that signature is kept in the controller's .meta (userData), and a matching one means the file on disk is already right and is left alone.
+            string signature = Signature(slots, byId, clips);
+            if (ctrl != null && AssetImporter.GetAtPath(path) is AssetImporter existing && existing.userData == signature) return ctrl;
+
             if (ctrl == null) ctrl = AnimatorController.CreateAnimatorControllerAtPath(path);   // comes with a default "Base Layer"
             Clear(ctrl, path);
 
@@ -74,7 +81,26 @@ namespace SleepingCalamity.EditorTools
 
             EditorUtility.SetDirty(ctrl);
             AssetDatabase.SaveAssets();
-            return ctrl;
+            AssetImporter importer = AssetImporter.GetAtPath(path);
+            if (importer != null) { importer.userData = signature; importer.SaveAndReimport(); }
+            return AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+        }
+
+        // Bump when the controller's wiring (states, transitions, parameters, thresholds) changes in code, so existing controllers rebuild once.
+        public const int Version = 1;
+
+        static string Signature(List<ClipSlot> slots, Dictionary<string, AnimationClip> byId, ClipResolver clips)
+        {
+            var sb = new System.Text.StringBuilder("v" + Version + ";");
+            foreach (ClipSlot slot in slots)
+            {
+                AnimationClip clip = byId[slot.Id];
+                string clipPath = AssetDatabase.GetAssetPath(clip);
+                sb.Append(slot.Id).Append('|').Append(slot.Mirror).Append('|').Append(clipPath).Append('|').Append(clip.name).Append('|')
+                  .Append(AssetDatabase.GetAssetDependencyHash(clipPath)).Append(';');
+            }
+            using (var sha = System.Security.Cryptography.SHA1.Create())
+                return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(sb.ToString()))).Replace("-", "");
         }
 
         static void Clear(AnimatorController ctrl, string path)

@@ -80,6 +80,26 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Rebuild_LeavesTheFileByteIdentical_AndAStaleSignatureRebuilds()
+        {
+            string path = TempFolder + "/Test.controller";
+            string abs = BuilderUtil.Abs(path);
+            byte[] first = System.IO.File.ReadAllBytes(abs);
+            AssetImporter importer = AssetImporter.GetAtPath(path);
+            string signature = importer.userData;
+            Assert.That(signature, Has.Length.EqualTo(40), "the build records its input signature in the .meta");
+
+            HeroAnimatorBuilder.Build(path, null);
+            Assert.That(System.IO.File.ReadAllBytes(abs), Is.EqualTo(first), "a second build with unchanged inputs must not touch the file");
+            Assert.That(AssetImporter.GetAtPath(path).userData, Is.EqualTo(signature));
+
+            importer.userData = "stale";
+            importer.SaveAndReimport();
+            HeroAnimatorBuilder.Build(path, null);
+            Assert.That(AssetImporter.GetAtPath(path).userData, Is.EqualTo(signature), "inputs that no longer match the signature rebuild the controller");
+        }
+
+        [Test]
         public void DodgeState_PlaysByProgress()
         {
             AnimatorState dodge = _ctrl.layers[0].stateMachine.states.First(s => s.state.name == "Dodge").state;

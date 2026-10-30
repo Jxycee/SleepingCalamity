@@ -155,6 +155,7 @@ namespace SleepingCalamity.Presentation
             bool aim = family == WeaponFamily.Bow && _combat.ShowAim;
             _shield.gameObject.SetActive(family == WeaponFamily.Dagger);
             _bow.gameObject.SetActive(aim);
+            if (_rig != null && family == WeaponFamily.Bow) _weapons[idx].SetActive(!aim);   // the sword is put away while the bow is drawn
             if (_rig == null && family == WeaponFamily.Dagger)
             {
                 _shield.localPosition = guard ? new Vector3(0f, 1.1f, 0.5f) : new Vector3(-0.42f, 1.0f, 0.12f);
