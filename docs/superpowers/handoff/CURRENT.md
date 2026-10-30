@@ -1,33 +1,24 @@
 # CURRENT: Sleeping Calamity running handoff
 
 ## Now
-2026-10-30, end of session 1 (a long session). Phase 0 is done and Phase 1 is underway.
-- **Merged to main** (`5a1e011`):
-  - M1, the foundation: world library with 10 Solo + 10 Multiplayer worlds; the creator hosts.
-  - M2, the networked hero: camera and lock-on.
-  - M4, weapon growth, with the Kingdom Hearts additions.
-  - M8, the art tools: AAA prop tools ported, B1-B3 tileables, look-test scenes tuned (day OK with the user; cellar retuned warm).
-  - Asset skills aligned with the style bible (`a67ad7e`).
-  - Last green check on a merged branch: `393a2e3` (M2) and `3c1b8cd` (cellar). Main is those plus docs.
-- **M3 combat greybox is built but NOT reviewed or merged:** branch `m3-combat`, tip `ee915ed`. `SC RESULT check PASS` (EditMode 483, PlayMode 22), worktree `.claude/worktrees/agent-a3f4b7d611d7e2923`. The play steps are in `docs/design/m3-combat-greybox.md` and the agent's notes. Under the network simulator (148 ms RTT, 2% loss), about half the hits land within one round trip and the rest within about two.
-- **User decisions this session:** the PHASE1.md change log and `decisions-for-review.md` A1-A24.
-  - A24: the user's cellar reference image is the mood target. It lives at `Reference/private/user/cellar_mood_ref_01.webp`: warm local light pools on neutral grey-brown stone, deep shadow, candle highlights. The cellar band was updated to match.
-- **Cloud parity (2026-10-30, cloud session, merged from `claude/eloquent-brown-fopwq1`):** cloud sessions may be the controller and merge on a green `Tools/cloud/unity.sh check` (CLAUDE.md "Cloud sessions" has the PC-to-cloud map). Verified in the cloud: C# compile 11/11, Core tests 194/194, shader check, csharp-ls navigation, live Blender MCP (art environment). Unity launches still need the `UNITY_EMAIL` + `UNITY_PASSWORD` secrets (the PC's licence is a hardware-bound entitlement file, so the cloud activates its own). Setup: `docs/superpowers/handoff/cloud-environment.md`.
-- **The user owes:** `docs/superpowers/handoff/USER_TODO.md`.
+2026-10-30, session 2 (controller on the PC). Phase 1 underway.
+- **Merged to main:** M1, M2, M4, M8 (session 1) and now **M3 combat greybox** (`af71ed0`, `SC RESULT check PASS` EditMode 484, PlayMode 29 + 1 skipped). Risk review, fix re-check and branch review all passed; the fixes: unique host-wide enemy attack serials, spell pip spent at cast, finisher prior from the owner, host-written weapon swap, deterministic netsim tests (0% loss: every hit within one round trip), downed heroes can't jump, out heroes stand up at wave clear. Sounds are Kenney CC0 (`docs/audio/SOURCES.md`).
+- **M3 is NOT done:** waits for the user's 5-minute arena verdict and the 2-player netsim walk (no second player yet).
+- **UGS linked** (`7e9c6c7`): Authentication, Relay and Lobby on the dashboard. Packages kept per the user: Microsoft GDK, IAP 5.4.4, patch bumps (`b4563ac`, `c2fd91e`).
+- **Animation sources gathered** (decisions A25): Quaternius UAL1/UAL2 free (CC0) in `C:\Dev\_private\quaternius\`; Kevin Iglesias FREE packs (Basic Motions, Archer, Spellcasting, Crafting, Throwing, Skeleton) in the Asset Store cache `%APPDATA%\Unity\Asset Store-5.x\Kevin Iglesias\`; Mixamo Y Bot + 4 idles in `C:\Dev\_private\mixamo\`. About 12 Mixamo clips still owed (`docs/design/mixamo-clips.md`). Research: `docs/research/animation-sources.md`, `docs/research/libraries.md`.
+- **Decisions this session:** `decisions-for-review.md` A25-A30. PCSX2 free cam (PINE) waits for M9 look work (user).
+- **The user owes:** `docs/superpowers/handoff/USER_TODO.md` (arena playtest, remaining Mixamo clips).
 
 ## Next
-1. **M3:** risk-review `m3-combat` (the hit-intent RPC flow, host validation, enemy AI authority, downed/revive, wave director). Fix, re-check, merge. Then ask the user to play the 5-minute combat arena (M3 gate: "the feel is right").
-   - The M3 agent made procedural sounds because it believed downloads needed approval. The user allows downloads from trusted sources (memory `web-access-downloads`), so swap in Kenney CC0 packs from kenney.nl.
-2. **M9 (user go-ahead given, up to 3 art agents at once, P51):** the beauty corner first (B4 facade kit + B6 scatter, B7 props + B8 stall, B10 fountain hero, B9 foliage). Then the dungeon corner (B5 vault kit, B11 lantern and grate) with the cellar retuned toward the user's reference image: light pools from candles, sconces and hearth; unlit stone neutral; less orange cast. Follow the skills (rewritten and aligned).
-3. **M5** (Cellars floors 1-4 generator) can start alongside: room-pool authoring.
-4. **M10:** Tobin through the pipeline in the chosen direction (a young viking build plus timber-yard worker; `docs/design/tobin-concepts.md`).
-5. Open from earlier reviews: the M2 manual 2-player walk (gamepad, latency, late join). The Mixamo clips are still owed by the user.
+1. **User plays the M3 arena** (steps in `USER_TODO.md`); tune the numbers from the verdict.
+2. **Hero animation branch:** import Quaternius + Kevin Iglesias + Mixamo as Humanoid, an Animator driver behind `IHeroAnimationDriver` (replaces `MannequinAnimDriver`), combat swings from `AttackMachine`. Add the remaining Mixamo clips when they arrive.
+3. **M9** (up to 3 art agents, P51): beauty corner first (B4+B6, B7+B8, B10, B9), then the dungeon corner (B5, B11) with the cellar toward the user's reference image (A24).
+4. **M5** room-pool authoring alongside; **M10** Tobin after.
+5. Open: M2/M3/M7 2-player walks wait for a second player. M4/M6 persistence must key growth by the persistent player id, not the session client id (`CombatHost.cs:95`).
 
 ## Branches and worktrees
-- `main` at `5a1e011`.
-- `m3-combat` (`ee915ed`, unmerged) in worktree `agent-a3f4b7d611d7e2923`.
-- Worktree `agent-a884291bf0ad9ef08` (M8, finished) and `agent-ad25d53219a200b3c` (M4, finished) can be reused or cleaned up. They have imported Libraries, which saves about 30 minutes each.
-- Merged branches: `m1-foundation`, `m4-*`, `m2-hero-camera`, `m8-*`.
+- `main` at `af71ed0` (green, see Now).
+- Merged: `m1-foundation`, `m2-hero-camera`, `m3-combat`, `m4-*`, `m8-*`. Worktrees `agent-a3f4b7d611d7e2923` (M3), `agent-a884291bf0ad9ef08` (M8), `agent-ad25d53219a200b3c` (M4) are finished; their imported Libraries can be reused.
 
 ## Blockers and open questions
 - The asset skills were rewritten on 2026-10-30. Some legacy FishGame tools still need rework before the art batches; see the tool table in `sc-asset-craft` section 0b.

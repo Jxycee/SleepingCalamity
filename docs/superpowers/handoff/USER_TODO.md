@@ -26,7 +26,7 @@ These are the steps only the user can take. Claude keeps this list current: when
   3. Environment variables `UNITY_EMAIL` and `UNITY_PASSWORD` (your Unity account; it must not use two-factor sign-in). The cloud activates its own Personal licence with them. Without them it can compile and test Core but can't launch Unity.
   4. Optional: a second environment, "SleepingCalamity Art", with the same settings and `SC_PROFILE="${SC_PROFILE:-art}"` in its script, for live Blender.
 
-## After M3 is reviewed and merged (the next session will tell you)
+## Now: M3 is merged (af71ed0), play it
 - **Play the 5-minute combat arena:**
   1. Open the project in Unity and tick SleepingCalamity > Dev > Combat Arena (optionally also Auto Solo).
   2. Press Play from the Bootstrap scene.
