@@ -19,7 +19,7 @@
 ## Branches and worktrees
 - `main` at `4a08f82` (green; last Unity check PASS on `5c4bced`, later merges are tools/docs only), local and GitHub in sync. `claude/intelligent-cray-i7vppb` (cloud unity.sh cold-Library timeout) merged 2026-10-30.
 - Open: `claude/practical-wozniak-vk1q0j` = B11 cellar lantern, in progress in a cloud session (don't touch).
-- Cleanup 2026-10-30: finished agent worktrees and all merged local branches removed. Merged remote branches still on GitHub (deletion needs the user's OK). Session worktrees `determined-boyd-9ac4b8` and `infallible-bassi-581d4e` stay until their sessions are archived.
+- Cleanup 2026-10-30: finished agent worktrees and all merged local branches removed. 16 merged remote branches deleted on GitHub (user OK). Session worktrees `determined-boyd-9ac4b8` and `infallible-bassi-581d4e` stay until their sessions are archived.
 
 ## Blockers and open questions
 - The asset skills were rewritten on 2026-10-30. Some legacy FishGame tools still need rework before the art batches; see the tool table in `sc-asset-craft` section 0b.
