@@ -25,5 +25,7 @@ bash Tools/cloud/sc_unity_license.sh --file-only 2>/dev/null | grep -v '^$' || t
 if [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = DONE ] && [ -f Tools/cloud/sc_cloud_compile.py ]; then
     timeout 300 python3 Tools/cloud/sc_cloud_compile.py --csproj 2>&1 | grep -E '^(wrote|FAIL )' | head -5
 fi
+# cloud Claude Code offers no LSP tool even with the csharp-lsp plugin loaded (tested 2026-10-30); say what stands in for it
+[ -f Tools/cloud/sc_lsp.py ] && echo "No LSP tool in cloud sessions: navigate C# with python3 Tools/cloud/sc_lsp.py def|refs|hover <file>:<line> <name>, or symbols <query>"
 [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && kill -0 "$(cat "$HOME/.sc-setup/unity.pid" 2>/dev/null)" 2>/dev/null && echo "Unity editor still downloading in the background: bash Tools/cloud/setup.sh --wait"
 exit 0
