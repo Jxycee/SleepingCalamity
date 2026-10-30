@@ -11,7 +11,8 @@ These are the steps only the user can take. Claude keeps this list current: when
    4. Close the editor afterwards, because Claude's batch runs need it closed.
 
    *Unblocks: the manual 2-player Relay walk, the last step of M1.*
-3. **Do the 2-player Relay walk** once item 2 is done (about 5 minutes). Use two editors with Multiplayer Play Mode, or one editor plus a development build:
+3. **Waiting for a second player (user, 2026-10-30): the 2-player Relay walk.** Also waiting: the M2 2-player checks and the M7 2-player loop. Solo testing goes ahead without them.
+   **Do the 2-player Relay walk** once item 2 is done (about 5 minutes). Use two editors with Multiplayer Play Mode, or one editor plus a development build:
    1. On one, press "Host online (Relay)" and note the join code.
    2. On the other, press "Join by code" and enter it.
    3. When both players show, press "Start session" on the host. Both players should land in Arena_Greybox.
