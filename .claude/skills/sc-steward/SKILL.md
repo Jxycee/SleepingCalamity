@@ -36,10 +36,10 @@ Classify every new request:
 - **Never** silently expand scope, merge, or start multi-agent work beyond the goal. Over-scoping is Claude's most common failure here, not the user's.
 - Anything costly (multi-agent runs, more than about $20, `Assets/` changes, merges to `main`) → state the agent count and rough cost first (CLAUDE.md rule).
 
-**The Inbox** holds parked ideas so nothing is lost and nothing derails the session: local sessions add a line to `CURRENT.md`'s Inbox section; cloud sessions add it to their branch handoff note, never to `CURRENT.md`. One line each: the idea, who asked, the date.
+**The Inbox** holds parked ideas so nothing is lost and nothing derails the session: the controller (PC or cloud) adds a line to `CURRENT.md`'s Inbox section. One line each: the idea, who asked, the date.
 
 ## 3. Checkpoints
-- When a step lands: one line in the handoff (sc-handoff locally; the branch note in the cloud) with its evidence.
+- When a step lands: one line in the handoff (sc-handoff) with its evidence.
 - About hourly, or when the user returns after a gap: a 3-line status (done, doing, next) before continuing.
 - If two attempts at the same thing fail, stop and re-plan with the user instead of trying a third variation.
 
@@ -51,7 +51,7 @@ Open: <what's half-done and where it lives>
 Next session starts with: <one concrete first action>
 Inbox: <count; anything new>
 ```
-Then update `CURRENT.md` (local, sc-handoff) or the branch handoff note (cloud), commit and push.
+Then update `CURRENT.md` (sc-handoff), commit and push.
 
 ## 5. Housekeeping (when the card shows it, about weekly)
 - `CURRENT.md` over sc-handoff's cap (about 2,800 words) → prune it to the five sections plus Inbox before anything else, moving history to a dated file. (2026-10-25: it was about 10k words and 446 lines.)

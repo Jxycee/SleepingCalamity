@@ -41,3 +41,6 @@ Sources: `docs/research/kh1-sweep.md` and `docs/research/kh2-sweep.md`.
 - Enemies that respawn after leaving a room.
 - A forced travel mini-game.
 - A hard mode that only multiplies damage.
+
+## Tooling (2026-10-30)
+- ~~Cloud `.csproj` generation~~ built 2026-10-30 (`sc_cloud_compile.py --csproj`).

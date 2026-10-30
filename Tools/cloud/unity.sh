@@ -37,7 +37,15 @@ PROJECT="$(cd "$PROJECT" && pwd)"
 case "$OUT" in /*) ;; *) usage "out must be absolute: $OUT" ;; esac
 case "$OUT" in *..*) usage "out must not contain ..: $OUT" ;; esac
 case "$OUT/" in "$PROJECT"/*) usage "out must be outside the project: $OUT" ;; esac
-[ -x "$UNITY" ] || usage "Unity editor not found at $UNITY (run: bash Tools/cloud/setup.sh, or python3 Tools/cloud/sc_cloud_compile.py --setup)"
+if [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && [ -z "${SC_UNITY:-}" ]; then
+    usage "Unity editor still downloading or extracting in the background (bash Tools/cloud/setup.sh --wait)"
+fi
+if [ ! -x "$UNITY" ]; then
+    [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && usage "Unity editor still downloading in the background (bash Tools/cloud/setup.sh --wait)"
+    usage "Unity editor not found at $UNITY (run: bash Tools/cloud/setup.sh --wait)"
+fi
+# licence from the environment's secrets (UNITY_LICENSE, or UNITY_SERIAL + UNITY_EMAIL + UNITY_PASSWORD); without one the editor exits 198
+SC_UNITY="$UNITY" bash "$(dirname "${BASH_SOURCE[0]:-$0}")/sc_unity_license.sh" || say "SC WARN no Unity licence installed; the launch will likely exit 198"
 mkdir -p "$OUT"
 
 ERR_PATTERN='error CS|Exception|Scripts have compiler errors|Compilation failed'
