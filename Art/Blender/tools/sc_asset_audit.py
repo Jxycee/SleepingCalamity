@@ -1,66 +1,65 @@
-# sc_asset_audit.py (2026-10-25, asset skills): measures a SleepingCalamity model export against the project's encoding and budgets, as JSON.
-# Used by the sc-asset-* skills (.claude/skills) to score a model before it is committed; read-only (it never writes into the repo).
+# sc_asset_audit.py (rewritten 2026-10-30, M8): measures a SleepingCalamity model against the style bible budgets (docs/PHASE1.md 3.3), as JSON.
+# Used by the sc-asset-* skills to score a model before it is committed; read-only (it never writes into the repo).
 #
-# Run:  blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- <out.json> [--class prop|outbuilding|building|tree|rock|card|hero|run|creature|cover] <model.fbx|.glb> [...]
+# Run:  blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- <out.json> [--class kit|scatter|hero|building|character|enemy|prop] [--tex-res 2048] <model.fbx|.glb> [...]
+#       blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- --selftest      (builds a T2 test mesh: 2 UV maps + a corner colour attribute)
 # Per mesh object it reports:
-#   size: tris, verts, surface area (m2), tri density (tris/m2), bounding box in metres (Blender axes after FBX import: z up), origin offset
-#   encoding: UVMap / Layer (uv1 = palette slot, texture layer) / Col (vertex colour) present; slot and layer values integral and in range
-#   colour: Col luminance min/mean/max, albedo value p10/mean/p90 (lin(palette[slot]) x 2 x Col as sRGB), the clipped share (a channel at 1.0: the tint went past the 0.5 x ao x tint clamp), ao spread (std)
-#   shading: smooth share, smear share (corner normals > 45 deg off their face: gradients that are not on the surface)
+#   size: tris, verts, surface area (m2), tri density (tris/m2), bounding box in metres (Blender axes after import: z up), origin offset
+#   uv: layer names, UV0 present and inside the tile range, texel density (px/m) for --tex-res against the class target (PHASE1 3.3)
+#   colour attributes: every attribute's name, domain and luminance min/mean/max (a T2 piece's mask-blend colour is allowed, never required)
+#   shading: smooth share, smear share (corner normals > 45 deg off their face)
 #   hygiene: degenerate faces, loose verts, non-manifold edges, material slots
-# and checks each against the class budget in BUDGET (measured from the shipped Millpond exports, 2026-10-25; see the sc-asset-budget skill).
-# An object passes when it has no FAIL; WARN is advice. Exit code is 0 either way: read the JSON.
-import bpy, bmesh, json, math, os, re, sys
+# FAIL = over a PHASE1 3.3 hard budget (triangles, material slots); WARN = advice (texel density, density, hygiene). Exit code is 0 either way: read the JSON.
+#
+# Dropped in the rewrite (FishGame's palette-slot/vertex-colour toon encoding): the ArtPalette.asset read (crashed on any mesh with a second UV map
+# plus a corner colour attribute), the uv1 "Layer" slot check, the required "Col" check, the albedo-from-palette estimate, and the Millpond medians.
+import bpy, bmesh, json, math, os, sys
 from mathutils import Vector
 
-# Budgets per class, from the 232 shipped Millpond FBX (median / p75 tri density per class) and the HF study (sc-asset-budget, 2026-10-25).
-#   tris: hard ceiling per object; dens: tris per m2 of surface (WARN above warn, FAIL above fail); mats: material slots.
+# Budgets per class from docs/PHASE1.md 3.3 (LOD0 triangles) and the sc-asset-budget skill. tex_ppm = target texel density in px/m.
+#   tris: hard ceiling per object; mats: material slots (a kit piece is one tileable set plus an optional trim/blend set; a building shares sets).
 BUDGET = {
-    'prop':     dict(tris=6000,  dens_warn=500,  dens_fail=1500, mats=1),
-    'building': dict(tris=26000, dens_warn=200,  dens_fail=600,  mats=1),
-    'outbuilding': dict(tris=9000, dens_warn=400, dens_fail=1200, mats=1),   # walk-up structures under ~3 m: kilns, sheds, privies, pump houses
-    'tree':     dict(tris=9000,  dens_warn=3600, dens_fail=8000, mats=2),
-    'rock':     dict(tris=1500,  dens_warn=300,  dens_fail=800,  mats=1),
-    'card':     dict(tris=4000,  dens_warn=4000, dens_fail=9000, mats=1),
-    'hero':     dict(tris=40000, dens_warn=900,  dens_fail=2500, mats=2),
-    'run':      dict(tris=6000,  dens_warn=500,  dens_fail=1500, mats=1),   # walls, fences, edges laid in modules: also tris per metre of run
-    # animals and birds (duo round 28): small but slender, so no small-object cap; the shipped Life animals run 628-3698 tris (median 1480) at
-    # 1400-6300 tris/m2 (a kingfisher is 0.2 m), so density is judged loosely
-    'creature': dict(tris=4000, dens_warn=9000, dens_fail=30000, mats=1),
-    # instanced / many-placed shore and ground plants (duo round 30): the sc-asset-budget 300-tri ceiling per season model is a FAIL (it is
-    # drawn hundreds of times); small by nature, so the small-object cap and the smear check don't apply
-    'cover':    dict(tris=300,  dens_warn=2000, dens_fail=6000, mats=1),
+    'kit':       dict(tris=5000,  tex_ppm=1024, mats=2),    # T2 modular kit piece 0.5-5k (walls up to 3 m 1024 px/m; upper storeys 512)
+    'scatter':   dict(tris=400,   tex_ppm=1024, mats=1),    # T3 instanced sculpted piece 50-400
+    'hero':      dict(tris=60000, tex_ppm=1536, mats=3),    # T4 hero prop 30-60k, 1024-2048 px/m
+    'building':  dict(tris=75000, tex_ppm=1024, mats=8),    # a whole building (kit + heroes) at most 75k
+    'character': dict(tris=60000, tex_ppm=None, mats=2),    # hero character 60k, 1x4K body+outfit, 1x2K head+hair
+    'enemy':     dict(tris=25000, tex_ppm=None, mats=1),
+    'prop':      dict(tris=6000,  tex_ppm=1024, mats=2),    # generic fallback for a T2/T3 prop family member
 }
-# class run: the shipped runs' median tris per metre (sc_asset_score_baseline_run.json, duo round 24: StoneWall 699, StoneWallTumbled 574,
-# RaceWall 672, PathEdge 252, FenceRail 221); WARN above 2x
-RUN_MEDIAN_PER_M = 573.5
-SLOTS, LAYERS = 16, 32   # ArtPalette slots; MillpondTextureLayers.Count (0-15 env copy, 16+ Millpond grain)
-# Small things are judged by count, not density (a 0.3 m medal needs a few hundred tris whatever its area): an object whose bounding
-# diagonal is under SMALL_DIAG metres gets SMALL_TRIS and no density check; density applies from DENSITY_MIN_AREA m2 of surface.
-SMALL_DIAG, SMALL_TRIS, DENSITY_MIN_AREA = 0.8, 1600, 1.5
+SMALL_DIAG = 0.8   # objects under this bounding diagonal (m) skip the texel-density judgement
+TEXEL_TOL = 2.0    # WARN when density is outside target / TEXEL_TOL .. target * TEXEL_TOL
 
-def _palette():
-    # ArtPalette.asset Summer, sRGB -> linear (PaletteGlobals linearises it), so the audit can compute the albedo the game draws
-    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'Assets', '_Project', 'Content', 'Art', 'ArtPalette.asset'), encoding='utf-8').read()
-    block = src.split('- name: Summer', 1)[1]
-    cols = re.findall(r'\{r: ([\d.]+), g: ([\d.]+), b: ([\d.]+), a: [\d.]+\}', block)[:16]
-    return [tuple(((x / 12.92) if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4) for x in map(float, c)) for c in cols]
-
-def to_srgb(x):
-    return 12.92 * x if x <= 0.0031308 else 1.055 * x ** (1 / 2.4) - 0.055
 
 def lum(c):
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
-def audit_object(o, cls):
+
+def colour_attrs(me):
+    out = []
+    for ca in me.color_attributes:
+        n = len(ca.data)
+        if not n:
+            continue
+        c = [0.0] * (4 * n)
+        ca.data.foreach_get('color', c)
+        L = [lum(c[4 * i:4 * i + 3]) for i in range(n)]
+        mean = sum(L) / n
+        out.append(dict(name=ca.name, domain=ca.domain, type=ca.data_type, lum=[round(min(L), 3), round(mean, 3), round(max(L), 3)],
+                        std=round(math.sqrt(sum((x - mean) ** 2 for x in L) / n), 4)))
+    return out
+
+
+def audit_object(o, cls, tex_res=2048):
     b = BUDGET[cls]
     me = o.data
     bm = bmesh.new(); bm.from_mesh(me)
     bm.transform(o.matrix_world)
     bm.normal_update()
     tris = sum(len(f.verts) - 2 for f in bm.faces)
-    area = sum(f.calc_area() for f in bm.faces)
-    degenerate = sum(1 for f in bm.faces if f.calc_area() < 1e-8)
+    areas = [f.calc_area() for f in bm.faces]
+    area = sum(areas)
+    degenerate = sum(1 for a in areas if a < 1e-8)
     loose = sum(1 for v in bm.verts if not v.link_edges)
     nonman = sum(1 for e in bm.edges if not e.is_manifold and not e.is_boundary)
     boundary = sum(1 for e in bm.edges if e.is_boundary)
@@ -68,9 +67,21 @@ def audit_object(o, cls):
     xs = [v.co for v in bm.verts]
     lo = Vector((min(p.x for p in xs), min(p.y for p in xs), min(p.z for p in xs))) if xs else Vector()
     hi = Vector((max(p.x for p in xs), max(p.y for p in xs), max(p.z for p in xs))) if xs else Vector()
+    # UV0 texel density: sqrt(uv area / world area) * resolution, face by face (uv units: one tile = 1.0 = tex_res px)
+    uv_area = 0.0
+    uv0 = bm.loops.layers.uv.active
+    uv_out_of_range = 0
+    if uv0 is not None:
+        for f, a in zip(bm.faces, areas):
+            pts = [l[uv0].uv for l in f.loops]
+            for p in pts:
+                if not (-64 <= p.x <= 64 and -64 <= p.y <= 64):
+                    uv_out_of_range += 1
+            s = 0.0
+            for i in range(1, len(pts) - 1):
+                s += abs((pts[i] - pts[0]).cross(pts[i + 1] - pts[0])) * 0.5
+            uv_area += s
     bm.free()
-    # Smear: a corner normal far from its face's normal (> 45 deg) shades the face with a gradient that is not on the surface: a big
-    # smooth-shaded facet, or a thin part averaged across its sides. Intended hard edges (split normals that follow each face) do not count.
     cn = [0.0] * (3 * len(me.loops))
     me.corner_normals.foreach_get('vector', cn)
     smear = 0
@@ -85,66 +96,29 @@ def audit_object(o, cls):
              origin_to_base=round(lo.z - o.matrix_world.translation.z, 3), mats=len(o.material_slots),
              smooth=round(smooth_faces / max(1, len(me.polygons)), 3), smear_share=round(smear / max(1, len(me.loops)), 3),
              degenerate=degenerate, loose=loose, nonmanifold=nonman, open_edges=boundary)
-    uvn = [u.name for u in me.uv_layers]
-    r['uv_layers'] = uvn
-    # FBX import names the second UV set after the exported name ('Layer'); a GLB import may call it UVMap.001
-    lay = me.uv_layers.get('Layer') or (me.uv_layers[1] if len(me.uv_layers) > 1 else None)
-    if lay:
-        vals = [0.0] * (2 * len(me.loops)); lay.data.foreach_get('uv', vals)
-        sl = vals[0::2]; ly = vals[1::2]
-        r['slots'] = sorted({int(round(s)) for s in sl})
-        r['layers'] = sorted({int(round(s)) for s in ly})
-        r['slot_nonint'] = sum(1 for s in sl + ly if abs(s - round(s)) > 0.02)
-        r['slot_range_bad'] = sum(1 for s in sl if not 0 <= round(s) < SLOTS) + sum(1 for s in ly if not 0 <= round(s) < LAYERS)
-    ca = me.color_attributes.get('Col') or (me.color_attributes[0] if len(me.color_attributes) else None)
-    if ca:
-        n = len(ca.data); c = [0.0] * (4 * n); ca.data.foreach_get('color', c)
-        L = [lum(c[4 * i:4 * i + 3]) for i in range(n)]
-        mean = sum(L) / max(1, n)
-        r['col_name'] = ca.name
-        r['col_lum'] = [round(min(L), 3), round(mean, 3), round(max(L), 3)]
-        r['col_std'] = round(math.sqrt(sum((x - mean) ** 2 for x in L) / max(1, n)), 4)
-        r['col_clipped'] = round(sum(1 for i in range(n) if max(c[4 * i:4 * i + 3]) >= 0.999) / max(1, n), 4)
-        mx = sorted(max(c[4 * i:4 * i + 3]) for i in range(n)); r['col_max_p90'] = round(mx[int(0.9 * (n - 1))], 3) if n else 0.0
-        if lay and ca.domain == 'CORNER' and len(sl) == n:
-            # the albedo the game draws: lin(palette[slot]) x 2 x Col, as sRGB value (0-1); area-agnostic (per corner)
-            pal = _palette()
-            vals = []
-            for i in range(n):
-                pc = pal[min(15, max(0, int(round(sl[i]))))]
-                vals.append(to_srgb(lum([pc[k] * 2 * c[4 * i + k] for k in range(3)])))
-            vals.sort()
-            r['albedo_value'] = [round(vals[int(0.1 * (n - 1))], 3), round(sum(vals) / n, 3), round(vals[int(0.9 * (n - 1))], 3)]
+    r['uv_layers'] = [u.name for u in me.uv_layers]
+    r['colour_attrs'] = colour_attrs(me)
+    r['texel_ppm'] = round(tex_res * math.sqrt(uv_area / area), 1) if (uv_area > 0 and area > 1e-6) else None
 
     F, W = [], []
     diag = (hi - lo).length; r['diag'] = round(diag, 3)
-    cap = SMALL_TRIS if (diag < SMALL_DIAG and cls not in ('creature', 'cover')) else b['tris']
-    if tris > cap: F.append('tris %d > %d%s' % (tris, cap, ' (small object)' if diag < SMALL_DIAG else ''))
-    r['dens_checked'] = area >= DENSITY_MIN_AREA   # under DENSITY_MIN_AREA m2 of surface the density is reported but not judged
-    if cls == 'run':
-        run_len = max(hi.x - lo.x, hi.y - lo.y)
-        r['tris_per_m'] = round(tris / max(run_len, 1e-3), 1)
-        if r['tris_per_m'] > 2 * RUN_MEDIAN_PER_M:
-            W.append('%.0f tris per metre of run > 2x the shipped runs\' median %.0f' % (r['tris_per_m'], RUN_MEDIAN_PER_M))
-    if area >= DENSITY_MIN_AREA:
-        if r['dens'] > b['dens_fail']: F.append('density %.0f > %d tris/m2' % (r['dens'], b['dens_fail']))
-        elif r['dens'] > b['dens_warn']: W.append('density %.0f > %d tris/m2 (spend it on the silhouette?)' % (r['dens'], b['dens_warn']))
-    if r['mats'] > b['mats']: F.append('%d material slots > %d (one shared toon material; colour comes from uv1)' % (r['mats'], b['mats']))
-    if not lay: F.append('no uv1 "Layer" (palette slot, texture layer)')
-    elif r['slot_nonint'] or r['slot_range_bad']: F.append('uv1 values not integral/in range (%d/%d)' % (r['slot_nonint'], r['slot_range_bad']))
-    if not ca: F.append('no vertex colour "Col" (0.5 x ao x tint)')
-    else:
-        if r['col_clipped'] > 0.02: W.append('%.1f%% of vertex colours clip at 1.0 (tint too strong for the 0.5 x ao x tint clamp)' % (100 * r['col_clipped']))
-        if r['col_std'] < 0.01: W.append('vertex colour nearly flat (std %.3f): no baked ao/variation' % r['col_std'])
-        if r.get('albedo_value') and r['albedo_value'][1] < 0.22:
-            W.append('dark: mean albedo value %.2f (sRGB; the concepts\' darkest masses sit near 0.25): raise the ao floor or the tint (sc_tint.py)' % r['albedo_value'][1])
-        if r.get('col_max_p90', 0) > 0.88:
-            W.append('no headroom: 10%% of corners have a Col channel above %.2f, so edge wear and brush (sc_paint_pass) cannot lighten them: move the part to a lighter slot (sc_tint.py) so its tint drops' % r['col_max_p90'])
-        if r['col_lum'][1] > 0.75: W.append('vertex colour mean %.2f: not the half-scale encoding (expect ~0.2-0.5)' % r['col_lum'][1])
-    if r['smooth'] < 0.9: W.append('only %.0f%% faces smooth-shaded (R74: rounded, soft)' % (100 * r['smooth']))
-    # Shipped Millpond props: median smear 0.22 (soft averaged normals on chunky shapes are part of the rounded look; woven strands of 3-4 sides
-    # sit at 0.6-0.9). Above 0.6 it is worth a look in the preview, not a defect by itself.
-    if r['smear_share'] > 0.60 and cls not in ('tree', 'card', 'cover'): W.append('%.0f%% of corner normals > 45 deg off their face: check the preview for gradients across flat faces (strands and intended soft blocks are fine)' % (100 * r['smear_share']))
+    r['tris_budget'] = b['tris']
+    if tris > b['tris']:
+        F.append('tris %d > %d (PHASE1 3.3 %s)' % (tris, b['tris'], cls))
+    if r['mats'] > b['mats']:
+        F.append('%d material slots > %d' % (r['mats'], b['mats']))
+    if not r['uv_layers']:
+        W.append('no UV map')
+    elif uv_out_of_range:
+        W.append('%d UV corners far outside the tile range (check UV units)' % uv_out_of_range)
+    ppm = b.get('tex_ppm')
+    if ppm and r['texel_ppm'] and diag >= SMALL_DIAG:
+        if not (ppm / TEXEL_TOL <= r['texel_ppm'] <= ppm * TEXEL_TOL):
+            W.append('texel density %.0f px/m at %d px vs target %d (PHASE1 3.3; 512 is right for upper storeys, roofs, vault crowns)' % (r['texel_ppm'], tex_res, ppm))
+    if r['smooth'] < 0.5 and cls in ('hero', 'character', 'enemy'):
+        W.append('only %.0f%% faces smooth-shaded' % (100 * r['smooth']))
+    if r['smear_share'] > 0.60:
+        W.append('%.0f%% of corner normals > 45 deg off their face: check the preview for gradients across flat faces' % (100 * r['smear_share']))
     if degenerate: W.append('%d degenerate faces' % degenerate)
     if loose: W.append('%d loose verts' % loose)
     if nonman: W.append('%d non-manifold edges' % nonman)
@@ -152,17 +126,52 @@ def audit_object(o, cls):
     r['pass'] = not F
     return r
 
+
+def selftest():
+    """A T2 kit piece: 1 m cube, two UV maps (UV0 tiling in metres at 2K, UV1 a mask-blend UV) and a corner colour attribute.
+    This is the case that crashed the FishGame audit (second UV map + corner colour)."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    me = bpy.data.meshes.new('selftest')
+    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
+    for name in ('UVMap', 'UVMask'):
+        bm.loops.layers.uv.new(name)
+    cl = bm.loops.layers.color.new('BlendMask')
+    u0 = bm.loops.layers.uv['UVMap']
+    for f in bm.faces:
+        for l in f.loops:
+            l[u0].uv = (l.vert.co.x / 2.0 + 0.5, l.vert.co.y / 2.0 + 0.5)   # tile = 2 m on a 2K map = 1024 px/m
+            l[cl] = (0.25, 0.5, 0.75, 1.0)
+    bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new('selftest', me); bpy.context.scene.collection.objects.link(o)
+    r = audit_object(o, 'kit')
+    assert r['uv_layers'] == ['UVMap', 'UVMask'], r['uv_layers']
+    assert r['colour_attrs'] and r['colour_attrs'][0]['name'] == 'BlendMask', r['colour_attrs']
+    assert r['tris'] == 12 and not r['FAIL'], r
+    print('SELFTEST PASS tris=%d texel_ppm=%s uv=%s colour=%s' % (r['tris'], r['texel_ppm'], r['uv_layers'], [c['name'] for c in r['colour_attrs']]))
+    o.data.materials.append(bpy.data.materials.new('a')); o.data.materials.append(bpy.data.materials.new('b')); o.data.materials.append(bpy.data.materials.new('c'))
+    bpy.context.view_layer.update()
+    r2 = audit_object(o, 'kit')
+    assert any('material slots' in f for f in r2['FAIL']), r2
+    print('SELFTEST PASS (FAIL path: 3 materials on a kit piece)')
+
+
 def main(argv):
+    if '--selftest' in argv:
+        selftest(); return
     out = argv[0]; rest = argv[1:]
-    cls = 'prop'
+    cls = 'prop'; tex_res = 2048
     if '--class' in rest:
         i = rest.index('--class'); cls = rest[i + 1]; del rest[i:i + 2]
+    if '--tex-res' in rest:
+        i = rest.index('--tex-res'); tex_res = int(rest[i + 1]); del rest[i:i + 2]
+    if cls not in BUDGET:
+        sys.exit('unknown --class %s; choose from %s' % (cls, ', '.join(BUDGET)))
     rows = []
     for path in rest:
         bpy.ops.wm.read_factory_settings(use_empty=True)
         ext = os.path.splitext(path)[1].lower()
         if ext == '.fbx':
-            bpy.ops.import_scene.fbx(filepath=path, colors_type='LINEAR')   # the kit exports Col as LINEAR (export_fbx); the default SRGB would re-linearise it
+            bpy.ops.import_scene.fbx(filepath=path, colors_type='LINEAR')
         elif ext in ('.glb', '.gltf'):
             bpy.ops.import_scene.gltf(filepath=path)
         elif ext == '.obj':
@@ -171,11 +180,12 @@ def main(argv):
             print('SKIP', path); continue
         for o in bpy.data.objects:
             if o.type == 'MESH':
-                r = audit_object(o, cls); r['file'] = os.path.basename(path); rows.append(r)
-                print('AUDIT %-40s %-28s %s tris=%d dens=%.0f %s' % (r['file'][:40], o.name[:28], 'PASS' if r['pass'] else 'FAIL', r['tris'], r['dens'],
-                                                                   '; '.join(r['FAIL'] + r['WARN'])[:200]))
+                r = audit_object(o, cls, tex_res); r['file'] = os.path.basename(path); rows.append(r)
+                print('AUDIT %-40s %-28s %s tris=%d dens=%.0f ppm=%s %s' % (r['file'][:40], o.name[:28], 'PASS' if r['pass'] else 'FAIL', r['tris'], r['dens'],
+                                                                           r['texel_ppm'], '; '.join(r['FAIL'] + r['WARN'])[:200]))
     with open(out, 'w') as f:
         json.dump(rows, f, indent=1)
 
+
 if __name__ == '__main__':
-    main(sys.argv[sys.argv.index('--') + 1:])
+    main(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
