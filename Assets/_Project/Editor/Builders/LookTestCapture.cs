@@ -61,7 +61,7 @@ namespace SleepingCalamity.EditorTools
 
         // The first renders after a scene opens draw with textures that have not finished uploading (every material sampled the same one):
         // render each camera twice and discard the result, pumping the editor loop in between.
-        static void WarmUp(Camera[] cams)
+        internal static void WarmUp(Camera[] cams)
         {
             for (int pass = 0; pass < 2; pass++)
                 foreach (Camera cam in cams)
@@ -76,7 +76,7 @@ namespace SleepingCalamity.EditorTools
         // A realtime probe in the editor renders asynchronously: ask, then pump until it reports finished.
         // The realtime probe never finishes in a batch run, so it is baked (blocking) into a temporary EXR, switched to Custom for the capture and
         // deleted afterwards (the scene file is never saved here, so nothing refers to it).
-        static void RenderProbe(ReflectionProbe probe)
+        internal static void RenderProbe(ReflectionProbe probe)
         {
             const string folder = "Assets/_Project/Content/Rendering/_ProbeTmp";
             BuilderUtil.EnsureFolder(folder);
@@ -88,13 +88,13 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC CAPTURE probe " + probe.transform.root.name + " baked=" + ok + " texture=" + (tex != null));
         }
 
-        static void CleanProbes()
+        internal static void CleanProbes()
         {
             AssetDatabase.DeleteAsset("Assets/_Project/Content/Rendering/_ProbeTmp");
             AssetDatabase.Refresh();
         }
 
-        static void Save(Camera cam, string path)
+        internal static void Save(Camera cam, string path)
         {
             var rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 1 };
             RenderTexture prevActive = RenderTexture.active;
