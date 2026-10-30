@@ -25,6 +25,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual("err.host_left", EndReasonText.ToastKey(EndReason.HostLeft));
             Assert.AreEqual("err.rejected", EndReasonText.ToastKey(EndReason.Kicked));
             Assert.AreEqual("err.rejected", EndReasonText.ToastKey(EndReason.DuplicateIdentity));
+            Assert.AreEqual("err.wrong_world", EndReasonText.ToastKey(EndReason.WrongWorld));
             Assert.AreEqual("err.timeout", EndReasonText.ToastKey(EndReason.Timeout));
             Assert.AreEqual("err.session_full", EndReasonText.ToastKey(EndReason.FullLobby));
             Assert.AreEqual("err.joins_closed", EndReasonText.ToastKey(EndReason.JoinsClosed));

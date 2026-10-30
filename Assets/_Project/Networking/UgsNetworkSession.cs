@@ -283,6 +283,7 @@ namespace SleepingCalamity.Networking
             _approver = new ConnectionApprover(_config, SessionMode.Online);
             _approver.Install();
 
+            _config.Bridge.Approved += OnJoinApproved;
             nm.OnConnectionEvent += OnConnectionEvent;
             nm.OnClientStarted += OnClientStarted;
             nm.OnServerStopped += OnServerStopped;

@@ -1,6 +1,7 @@
-// Not networked; runs locally on every peer. Session-scope services for one gameplay scene.
-// Lives on the root object "GameScope" in each Spot_* scene. Registers IPauseState and publishes itself as ServiceRoots.Game.
-// Execution order -1500 so it is awake before any other scene object (PlayerSpawner, SceneCameraSwitch, players) looks it up.
+// Not networked; runs locally on every peer. Scene-scope services for one gameplay scene (an Arena_* scene).
+// Lives on a root object named "GameScope" in the gameplay scene. Registers IPauseState and publishes its registry as ServiceRoots.Game.
+// Execution order -1500 so it is awake before any other scene object (spawn points, camera rigs, players) looks it up.
+// No scene carries one yet: the first gameplay system that needs scene-scope services adds it to its scene builder.
 using SleepingCalamity.Runtime;
 using UnityEngine;
 

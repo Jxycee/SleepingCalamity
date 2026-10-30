@@ -117,9 +117,67 @@ namespace SleepingCalamity.Tests.EditMode
             AssertRefused(Ask(K("owner"), 3), EndReason.DuplicateIdentity);   // the owner's key as a second connection: JoinRules says so first
             Assert.That(_world.Players.Recorded.Count, Is.EqualTo(1));
 
+            // The host is never refused: a host key that is not the recorded owner is rebound (solo ownership follows the file).
             _approver.Uninstall();
             _approver = NewApprover(SessionMode.Online);
-            AssertRefused(Ask(K("stranger"), NetworkManager.ServerClientId), EndReason.JoinsClosed);   // a stranger as the host of someone else's solo world
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("owner key did not match"));
+            Assert.That(Ask(K("newkey"), NetworkManager.ServerClientId).Approved, Is.True);
+            Assert.That(_world.Players.IsRecorded(K("newkey")), Is.True);
+        }
+
+        // Catches: an approved newcomer who drops BEFORE connecting keeping their place when the session had already forgotten the approval
+        // (the real subscription order has the session's connection handler run before the approver's).
+        [Test]
+        public void ANewcomerWhoDropsBeforeConnecting_FreesTheirPlace_EvenIfTheBridgeEntryIsGone()
+        {
+            _world.Load(Multi("a", "b", "c"));
+            Assert.That(Ask(K("d"), 4).Approved, Is.True);
+            AssertRefused(Ask(K("e"), 5), EndReason.FullLobby);
+            _config.Bridge.RemovePending(4);      // what a session handler that ran first used to do
+            _approver.ClientDisconnected(4);
+            Assert.That(Ask(K("e"), 5).Approved, Is.True, "the place is free");
+        }
+
+        // Catches (risk review): a player whose link dropped being refused as a duplicate of their own stale connection when they come back.
+        [Test]
+        public void AReconnectingKey_TakesOverItsOwnStaleConnection()
+        {
+            _world.Load(Multi("a", "b"));
+            Assert.That(Ask(K("b"), 3).Approved, Is.True);
+            Connect(3);
+            Assert.That(_roster.ConnectedCount, Is.EqualTo(1));
+
+            Assert.That(Ask(K("b"), 4).Approved, Is.True, "not DuplicateIdentity");
+            Connect(4);
+            Assert.That(_roster.ConnectedCount, Is.EqualTo(1), "still one player");
+            Assert.That(_roster.TryGetKey(4, out PlayerKey key) && key == K("b"), Is.True);
+            Assert.That(_roster.TryGetKey(3, out _), Is.False, "the stale client is gone");
+            _approver.ClientDisconnected(3);   // the old connection's disconnect event arriving late must not remove the new one
+            Assert.That(_roster.ConnectedCount, Is.EqualTo(1));
+
+            // The host's own key is never taken over by a client.
+            Assert.That(Ask(K("host"), NetworkManager.ServerClientId).Approved, Is.True);
+            Connect(NetworkManager.ServerClientId);
+            AssertRefused(Ask(K("host"), 7), EndReason.DuplicateIdentity);
+        }
+
+        // Catches: a mismatched build kicking a connected player by sending their key.
+        [Test]
+        public void AMismatchedBuild_CannotTakeOverAConnection()
+        {
+            _world.Load(Multi("a", "b"));
+            Ask(K("b"), 3);
+            Connect(3);
+            AssertRefused(Ask(K("b"), 4, protocol: Protocol + 1), EndReason.VersionMismatch);
+            Assert.That(_roster.TryGetKey(3, out _), Is.True, "the real connection stays");
+        }
+
+        // Catches: an Ugs key meeting a Local world being turned away with a reason the player cannot act on.
+        [Test]
+        public void AWorldOfAnotherIdentityKind_IsRefusedWithItsOwnReason()
+        {
+            _world.Load(Multi("a", "b"));
+            AssertRefused(Ask(new PlayerKey(IdentityKind.Ugs, "online"), 2), EndReason.WrongWorld);
         }
 
         // Catches: a key written into the world when it is merely approved (an approved client that never arrives would hold a place).
@@ -160,7 +218,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void AKeyOfAnotherIdentityKind_IsRefused()
         {
             _world.Load(Multi("a", "b"));
-            AssertRefused(Ask(new PlayerKey(IdentityKind.Ugs, "a"), 2), EndReason.Kicked);
+            AssertRefused(Ask(new PlayerKey(IdentityKind.Ugs, "a"), 2), EndReason.WrongWorld);
             Assert.That(_world.Players.Recorded.Count, Is.EqualTo(2));
         }
 

@@ -221,7 +221,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void TryRestore_KeepsTheKind_WhateverRecordsSurvive()
         {
-            var one = new WorldPlayersSave { Kind = 1, Identity = 0, Recorded = new List<WorldPlayerSave> { new WorldPlayerSave { Id = "a" } } };
+            var one = new WorldPlayersSave { Kind = 1, Identity = 0, Recorded = new List<WorldPlayerSave> { new WorldPlayerSave { Identity = 0, Id = "a" } } };
             Assert.That(WorldPlayers.TryRestore(one, out WorldPlayers w, out bool dropped), Is.True);
             Assert.That(dropped, Is.False);
             Assert.That(w.Kind, Is.EqualTo(WorldKind.Multiplayer), "one survivor is still a Multiplayer world");
@@ -229,7 +229,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(Join(w, K("b")), Is.EqualTo(WorldPlayerVerdict.Ok), "and takes new players");
             Assert.That(w.CanStart(new[] { K("a"), K("b") }), Is.EqualTo(WorldPlayerVerdict.Ok));
 
-            var none = new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { null, new WorldPlayerSave { Id = "" } } };
+            var none = new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { null, new WorldPlayerSave { Identity = 0, Id = "" } } };
             Assert.That(WorldPlayers.TryRestore(none, out w, out dropped), Is.True);
             Assert.That(dropped, Is.True);
             Assert.That(w.Kind, Is.EqualTo(WorldKind.Multiplayer));
@@ -252,9 +252,9 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(WorldPlayers.TryFromSave(null, out _), Is.False);
             Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 5 }, out _), Is.False, "unknown kind");
             Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 256 }, out _), Is.False, "a kind that would wrap to Solo");
-            Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { new WorldPlayerSave { Id = "a" } } }, out _), Is.False, "multiplayer with one");
+            Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { new WorldPlayerSave { Identity = 0, Id = "a" } } }, out _), Is.False, "multiplayer with one");
             Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 0, Recorded = new List<WorldPlayerSave>() }, out _), Is.False, "solo with none");
-            Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { null, new WorldPlayerSave { Id = "a" } } }, out _), Is.False, "null entry");
+            Assert.That(WorldPlayers.TryFromSave(new WorldPlayersSave { Kind = 1, Recorded = new List<WorldPlayerSave> { null, new WorldPlayerSave { Identity = 0, Id = "a" } } }, out _), Is.False, "null entry");
         }
 
         // Catches: a newer build's members inside the players section being dropped when this build writes the section back.
@@ -266,8 +266,8 @@ namespace SleepingCalamity.Tests.EditMode
                 Kind = 1,
                 Recorded = new List<WorldPlayerSave>
                 {
-                    new WorldPlayerSave { Id = "a", Extra = new Dictionary<string, object> { { "colour", "red" } } },
-                    new WorldPlayerSave { Id = "b" },
+                    new WorldPlayerSave { Identity = 0, Id = "a", Extra = new Dictionary<string, object> { { "colour", "red" } } },
+                    new WorldPlayerSave { Identity = 0, Id = "b" },
                 },
                 Extra = new Dictionary<string, object> { { "futureField", 7 } },
             };
@@ -277,6 +277,34 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(back.Extra["futureField"], Is.EqualTo(7));
             Assert.That(back.Recorded[0].Extra["colour"], Is.EqualTo("red"));
             Assert.That(back.Recorded.Count, Is.EqualTo(3));
+        }
+    
+        // Catches: a player's name not being kept with their record (the picker would show nothing), or surviving a Solo owner rebind wrongly.
+        [Test]
+        public void Names_AreKept_WithTheRecord()
+        {
+            WorldPlayers w = Multi("a", "b");
+            Assert.That(w.SetName(K("a"), "Ann"), Is.True);
+            Assert.That(w.SetName(K("a"), "Ann"), Is.False, "unchanged");
+            Assert.That(w.SetName(K("zzz"), "Nobody"), Is.False, "only recorded players have names");
+            Assert.That(w.NameOf(K("a")), Is.EqualTo("Ann"));
+            Assert.That(w.NameOf(K("b")), Is.EqualTo(""));
+            Assert.That(WorldPlayers.TryRestore(w.ToSave(), out WorldPlayers back, out _), Is.True);
+            Assert.That(back.NameOf(K("a")), Is.EqualTo("Ann"));
+        }
+
+        [Test]
+        public void RebindSoloOwner_ReplacesTheOwner_OnlyOnASoloWorld()
+        {
+            WorldPlayers solo = Solo("old");
+            solo.SetName(K("old"), "Mira");
+            Assert.That(solo.RebindSoloOwner(K("old")), Is.False, "already the owner");
+            Assert.That(solo.RebindSoloOwner(new PlayerKey(IdentityKind.Ugs, "new")), Is.True);
+            Assert.That(solo.Recorded.Count, Is.EqualTo(1));
+            Assert.That(solo.Recorded[0], Is.EqualTo(new PlayerKey(IdentityKind.Ugs, "new")));
+            Assert.That(solo.Identity, Is.EqualTo(IdentityKind.Ugs));
+            Assert.That(solo.NameOf(new PlayerKey(IdentityKind.Ugs, "new")), Is.EqualTo("Mira"));
+            Assert.That(Multi("a", "b").RebindSoloOwner(K("c")), Is.False);
         }
     }
 }

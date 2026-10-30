@@ -50,6 +50,7 @@ namespace SleepingCalamity.Core
         private IdentityKind? _identity;
         private Dictionary<string, object> _sectionExtra;
         private readonly Dictionary<PlayerKey, Dictionary<string, object>> _keyExtra = new Dictionary<PlayerKey, Dictionary<string, object>>();
+        private readonly Dictionary<PlayerKey, string> _names = new Dictionary<PlayerKey, string>();
 
         private WorldPlayers(WorldKind kind, List<PlayerKey> recorded, IdentityKind? identity)
         {
@@ -124,6 +125,39 @@ namespace SleepingCalamity.Core
             return true;
         }
 
+        // A Solo world belongs to the machine that plays it, not to one key: when the local key changed (a new profile, a copied save, an
+        // identity reset) the owner is rebound to the current key and keeps their name. True when the owner changed. False for a world that is
+        // not Solo, an invalid key, or a key that already is the owner.
+        public bool RebindSoloOwner(PlayerKey key)
+        {
+            if (Kind != WorldKind.Solo || !IsValidKey(key)) return false;
+            if (_recorded.Count == 0) return ClaimSoloOwner(key);
+            PlayerKey old = _recorded[0];
+            if (old == key) return false;
+            _names.TryGetValue(old, out string name);
+            _keyExtra.TryGetValue(old, out Dictionary<string, object> extra);
+            _names.Remove(old);
+            _keyExtra.Remove(old);
+            _recorded[0] = key;
+            _identity = key.Kind;
+            if (name != null) _names[key] = name;
+            if (extra != null) _keyExtra[key] = extra;
+            return true;
+        }
+
+        // The display name written down for a recorded player (what the world picker shows), or "" when none was kept.
+        public string NameOf(PlayerKey key) => _names.TryGetValue(key, out string name) ? name : "";
+
+        // Keeps a recorded player's display name; ignored for a key that is not recorded. Returns true when the stored name changed.
+        public bool SetName(PlayerKey key, string name)
+        {
+            if (!IsRecorded(key) || string.IsNullOrWhiteSpace(name)) return false;
+            string clean = DisplayNameRules.Sanitize(name, 0);
+            if (_names.TryGetValue(key, out string old) && old == clean) return false;
+            _names[key] = clean;
+            return true;
+        }
+
         // Session start: may this group begin play? Solo: exactly the owner (or, with the owner record lost, exactly one player).
         // Multiplayer: 2 or more distinct players, every one recorded. Does not change the record (a new player is recorded when they
         // enter the session).
@@ -182,7 +216,7 @@ namespace SleepingCalamity.Core
             foreach (PlayerKey key in _recorded)
             {
                 _keyExtra.TryGetValue(key, out Dictionary<string, object> extra);
-                save.Recorded.Add(new WorldPlayerSave { Identity = (int)key.Kind, Id = key.Id, Extra = extra == null ? null : new Dictionary<string, object>(extra) });
+                save.Recorded.Add(new WorldPlayerSave { Identity = (int)key.Kind, Id = key.Id, Name = NameOf(key), Extra = extra == null ? null : new Dictionary<string, object>(extra) });
             }
             return save;
         }
@@ -201,6 +235,7 @@ namespace SleepingCalamity.Core
 
             var keys = new List<PlayerKey>(MaxRecorded);
             var extras = new Dictionary<PlayerKey, Dictionary<string, object>>();
+            var names = new Dictionary<PlayerKey, string>();
             int limit = kind == WorldKind.Solo ? 1 : MaxRecorded;
             if (save.Recorded == null) droppedAny = true;
             else
@@ -218,12 +253,14 @@ namespace SleepingCalamity.Core
                     if (!identity.HasValue) identity = key.Kind;
                     keys.Add(key);
                     if (p.Extra != null) extras[key] = new Dictionary<string, object>(p.Extra);
+                    if (!string.IsNullOrWhiteSpace(p.Name)) names[key] = DisplayNameRules.Sanitize(p.Name, 0);
                 }
             }
 
             world = new WorldPlayers(kind, keys, identity);
             if (save.Extra != null) world._sectionExtra = new Dictionary<string, object>(save.Extra);
             foreach (KeyValuePair<PlayerKey, Dictionary<string, object>> e in extras) world._keyExtra[e.Key] = e.Value;
+            foreach (KeyValuePair<PlayerKey, string> e in names) world._names[e.Key] = e.Value;
             return true;
         }
 

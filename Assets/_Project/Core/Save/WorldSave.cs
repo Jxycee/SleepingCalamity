@@ -20,6 +20,8 @@ namespace SleepingCalamity.Core
         public int SchemaVersion = CurrentSchemaVersion;
         public string SavedAtUtc = "";            // informational (ISO 8601); never read back as logic
         public string WorldSeed = "";             // 16 hex digits (WorldSaveRules.SeedToHex): a full 64-bit value survives any JSON reader
+        public string WorldId = "";               // WorldIds.NewId(); also the file's name. Empty or malformed: the store fills it from the file name
+        public string CreatedAtUtc = "";          // informational (ISO 8601); shown in the world picker
         public WorldPlayersSave Players;          // null: no world created yet (the host flow creates its kind and players on the first start)
 
         [JsonExtensionData] public Dictionary<string, object> Extra;   // unknown top-level members, round-tripped untouched
@@ -30,7 +32,7 @@ namespace SleepingCalamity.Core
     [Serializable]
     public sealed class WorldPlayersSave
     {
-        public int Kind;
+        public int Kind = -1;                     // no valid default: a section without a kind is damaged, never read as Solo
         public int Identity = -1;
         public List<WorldPlayerSave> Recorded = new List<WorldPlayerSave>();
 
@@ -40,8 +42,9 @@ namespace SleepingCalamity.Core
     [Serializable]
     public sealed class WorldPlayerSave
     {
-        public int Identity;                      // IdentityKind as a number
+        public int Identity = -1;                 // IdentityKind as a number; no valid default (a record without it is damaged)
         public string Id = "";                    // PlayerKey.Id
+        public string Name = "";                  // the player's display name when they entered (shown in the world picker)
 
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }

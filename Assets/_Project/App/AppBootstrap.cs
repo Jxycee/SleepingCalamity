@@ -164,7 +164,7 @@ namespace SleepingCalamity.App
             // Order matters: SceneFlow resets the world for the new session before WorldSaveFlow loads the saved one over it.
             sceneFlow = new SceneFlow(session, NetworkManager, bus, Roster, World);
             worldSaveFlow = new WorldSaveFlow(session, NetworkManager, bus, World);
-            spawner = new ArenaPlayerSpawner(NetworkManager, playerPrefab);
+            spawner = new ArenaPlayerSpawner(NetworkManager, playerPrefab, Roster);
         }
 
         private void Update()

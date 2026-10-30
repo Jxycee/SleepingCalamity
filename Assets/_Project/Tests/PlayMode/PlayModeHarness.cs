@@ -93,6 +93,22 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(session.State, Is.EqualTo(ConnState.Connected));
         }
 
+        // A dev-direct host that KEEPS scene management (so SceneFlow can load the arena). The load-scene timeout is shortened so a second
+        // in-process peer that declines scenes (TestClient declineScenes) does not hold the host's load event for the default two minutes.
+        public static IEnumerator StartDirectHostWithScenes()
+        {
+            AppBootstrap app = AppBootstrap.Current;
+            Assert.That(app, Is.Not.Null, "no App; call LoadBootstrapAndWaitForLobby first");
+            app.NetworkManager.NetworkConfig.LoadSceneTimeOut = 3;
+            var local = app.Services.Get<LocalNetworkSession>();
+            local.Port = NetworkConstants.TestPort;
+            var session = app.Services.Get<INetworkSession>();
+            var cts = new CancellationTokenSource();
+            yield return Await(session.StartLocalAsync(true, cts.Token), SessionTimeoutSeconds, cts);
+            cts.Dispose();
+            Assert.That(session.State, Is.EqualTo(ConnState.Connected));
+        }
+
         public static IEnumerator LeaveAndWaitForLobby()
         {
             AppBootstrap app = AppBootstrap.Current;
@@ -237,7 +253,10 @@ namespace SleepingCalamity.Tests.PlayMode
             public LocalNetworkSession Session { get; }
             public PlayerKey Key { get; }
 
-            public TestClient(AppBootstrap host, string localPlayerId)
+            // declineScenes: the client connects and synchronizes but never loads a scene (one process cannot load the same scene twice), so a
+            // scene-managed host is not confused by a second copy of its own scene. The host's load event then completes by its timeout for
+            // this client (hostConfig.LoadSceneTimeOut), which a test shortens.
+            public TestClient(AppBootstrap host, string localPlayerId, bool declineScenes = false)
             {
                 _go = new GameObject("TestClient_" + localPlayerId.Substring(0, 6));
                 _go.SetActive(false);   // configure before NGO's OnEnable
@@ -253,11 +272,17 @@ namespace SleepingCalamity.Tests.PlayMode
                     PlayerPrefab = null,
                     ProtocolVersion = hostConfig.ProtocolVersion,
                     ForceSamePrefabs = hostConfig.ForceSamePrefabs,
+                    LoadSceneTimeOut = hostConfig.LoadSceneTimeOut,
                     Prefabs = new NetworkPrefabs(),
                 };
                 foreach (NetworkPrefabsList list in hostConfig.Prefabs.NetworkPrefabsLists) config.Prefabs.NetworkPrefabsLists.Add(list);
                 NetworkManager.NetworkConfig = config;
                 _go.SetActive(true);
+                if (declineScenes)
+                {
+                    NetworkManager nm = NetworkManager;
+                    nm.OnClientStarted += () => nm.SceneManager.VerifySceneBeforeLoading = (index, name, mode) => false;
+                }
 
                 _settingsPath = Path.Combine(Path.GetTempPath(), "sc-testclient-" + Guid.NewGuid().ToString("N") + ".json");
                 var settings = new SettingsStore(_settingsPath);
@@ -283,6 +308,23 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (_go != null) UnityEngine.Object.Destroy(_go);
                 try { if (File.Exists(_settingsPath)) File.Delete(_settingsPath); } catch (IOException) { }
             }
+        }
+
+        // Runs a session with the world save ON against a throwaway library folder, so a test can check the files a real session writes.
+        // Returns the folder; pass it to EndSaveTest when done.
+        public static string BeginSaveTest()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "sc-playmode-worlds-" + Guid.NewGuid().ToString("N"));
+            WorldLibrary.DirectoryOverrideForTests = dir;
+            WorldSaveFlow.Enabled = true;
+            return dir;
+        }
+
+        public static void EndSaveTest(string dir)
+        {
+            WorldLibrary.DirectoryOverrideForTests = null;
+            WorldSaveFlow.Enabled = false;
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
 
         // A lowercase GUID "N" id for a test player; a fixed index gives a fixed id so a test can seed the world with it.

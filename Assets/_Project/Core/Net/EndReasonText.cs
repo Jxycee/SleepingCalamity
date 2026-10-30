@@ -12,6 +12,7 @@ namespace SleepingCalamity.Core
                 case EndReason.HostLeft: return "err.host_left";
                 case EndReason.Kicked: return "err.rejected";
                 case EndReason.DuplicateIdentity: return "err.rejected";
+                case EndReason.WrongWorld: return "err.wrong_world";   // the world was made with another kind of identity (Local vs online)
                 case EndReason.Timeout: return "err.timeout";
                 case EndReason.FullLobby: return "err.session_full";
                 case EndReason.JoinsClosed: return "err.joins_closed";

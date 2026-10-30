@@ -14,6 +14,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(EndReason.VersionMismatch, DisconnectClassifier.Classify(false, false, "VersionMismatch", 30.0));
             Assert.AreEqual(EndReason.DuplicateIdentity, DisconnectClassifier.Classify(false, false, EndReason.DuplicateIdentity.ToString(), 1.0));
             Assert.AreEqual(EndReason.Kicked, DisconnectClassifier.Classify(false, true, "Kicked", 5.0));
+            Assert.AreEqual(EndReason.WrongWorld, DisconnectClassifier.Classify(false, false, "WrongWorld", 1.0));
         }
 
         [Test]

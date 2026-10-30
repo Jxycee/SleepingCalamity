@@ -40,13 +40,8 @@ namespace SleepingCalamity.Networking
                     Established();
                 }
             }
-            else if (data.EventType == ConnectionEvent.ClientDisconnected)
-            {
-                if (_isHost)
-                {
-                    _config.Bridge.RemovePending(data.ClientId);
-                }
-            }
+            // A host's pending approvals are removed by ConnectionApprover only (it frees the approved player's place there); this session
+            // must not touch the bridge, or the approver would no longer find the entry.
         }
 
         // Client path. The host's own client also reports here, so the host is skipped (it uses OnServerStopped).

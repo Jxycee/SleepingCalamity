@@ -174,5 +174,62 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(clean.Players.Extra["futureField"], Is.EqualTo("x"));
             Assert.That(clean.Players.Recorded[0].Extra["colour"], Is.EqualTo("red"));
         }
+    
+        // Catches (risk review): a section without a kind being read as Solo (the zero default) and the world quietly changing kind.
+        [Test]
+        public void Players_AMissingKindIsRejected_NeverReadAsSolo()
+        {
+            var rejected = new List<string>();
+            WorldSave noKind = Good();
+            noKind.Players = new WorldPlayersSave { Recorded = new List<WorldPlayerSave> { P("a") } };   // Kind left at its invalid default
+            Assert.That(noKind.Players.Kind, Is.EqualTo(-1));
+            Assert.That(WorldSaveRules.Clean(noKind, DefaultSeed, rejected).Players, Is.Null);
+            Assert.That(rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+
+            WorldSave noIdentityOnRecord = Good();
+            noIdentityOnRecord.Players.Recorded = new List<WorldPlayerSave> { new WorldPlayerSave { Id = "a" }, P("b") };   // a record without its identity kind
+            WorldSave clean = WorldSaveRules.Clean(noIdentityOnRecord, DefaultSeed, rejected);
+            Assert.That(clean.Players.Recorded.ConvertAll(p => p.Id), Is.EqualTo(new[] { "b" }), "that one record is damaged, not Local");
+        }
+
+        // Catches: a malformed world id kept as the file's name, and the picker header misreporting a world.
+        [Test]
+        public void WorldId_IsKeptOnlyWhenValid_AndSummarizeReadsTheHeader()
+        {
+            WorldSave save = Good();
+            save.WorldId = "../evil";
+            save.CreatedAtUtc = "2026-10-30T09:00:00Z";
+            save.SavedAtUtc = "2026-10-30T10:00:00Z";
+            save.Players.Recorded[0].Name = "Ann";
+            WorldSave clean = WorldSaveRules.Clean(save, DefaultSeed, new List<string>());
+            Assert.That(clean.WorldId, Is.EqualTo(""), "blanked, the store fills the real one");
+            Assert.That(clean.CreatedAtUtc, Is.EqualTo("2026-10-30T09:00:00Z"));
+
+            clean.WorldId = "0123456789abcdef0123456789abcdef";
+            WorldSummary summary = WorldSaveRules.Summarize(clean);
+            Assert.That(summary.Id, Is.EqualTo(clean.WorldId));
+            Assert.That(summary.Kind, Is.EqualTo(WorldKind.Multiplayer));
+            Assert.That(summary.Identity, Is.EqualTo(0));
+            Assert.That(summary.PlayerNames, Is.EqualTo(new[] { "Ann", "?", "?" }));
+            Assert.That(summary.LastPlayedUtc, Is.EqualTo("2026-10-30T10:00:00Z"));
+            Assert.That(summary.Matches(WorldKind.Multiplayer, IdentityKind.Local), Is.True);
+            Assert.That(summary.Matches(WorldKind.Multiplayer, IdentityKind.Ugs), Is.False, "Local and online worlds never cross");
+            Assert.That(summary.Matches(WorldKind.Solo, IdentityKind.Local), Is.False);
+
+            Assert.That(WorldSaveRules.Summarize(new WorldSave()), Is.Null, "no players section: not a world to pick");
+            Assert.That(WorldSaveRules.Summarize(null), Is.Null);
+        }
+
+        [Test]
+        public void StartRefusals_AllHaveAMessage()
+        {
+            foreach (WorldPlayerVerdict verdict in (WorldPlayerVerdict[])System.Enum.GetValues(typeof(WorldPlayerVerdict)))
+            {
+                if (verdict == WorldPlayerVerdict.Ok) { Assert.That(WorldStartText.ToastKey(verdict), Is.Null); continue; }
+                Assert.That(WorldStartText.ToastKey(verdict), Does.StartWith("world."), verdict.ToString());
+            }
+            Assert.That(WorldStartText.ToastKey(WorldPlayerVerdict.NotEnoughPlayers), Is.EqualTo("world.need_two_players"));
+            Assert.That(WorldStartText.ToastKey(WorldPlayerVerdict.WrongIdentityKind), Is.EqualTo("world.wrong_kind"));
+        }
     }
 }

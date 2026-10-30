@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using SleepingCalamity.Core;
+using SleepingCalamity.Runtime;
 using Unity.Netcode;
 using Unity.Services.Multiplayer;
 using UnityEngine;
@@ -51,8 +52,7 @@ namespace SleepingCalamity.Networking
                     playerId = TryResolveKey(data.ClientId, out var key) && key.Kind == IdentityKind.Ugs ? key.Id : null;
                 }
 
-                _ugsIdByClient.Remove(data.ClientId);
-                _config.Bridge.RemovePending(data.ClientId);
+                _ugsIdByClient.Remove(data.ClientId);   // the bridge entry is the approver's to remove
 
                 // Free the Lobby seat, or a rejoin would fail as "full".
                 var host = _host;
@@ -61,6 +61,13 @@ namespace SleepingCalamity.Networking
                     _ = RemoveSeatAsync(host, playerId);
                 }
             }
+        }
+
+        // Every approved join, before its client connects: remember the player's service id now, so a client that drops during scene sync
+        // (approved, never ClientConnected) still has its Lobby seat freed in OnConnectionEvent.
+        private void OnJoinApproved(ApprovedJoin join)
+        {
+            if (_isHost && join.Key.Kind == IdentityKind.Ugs && join.ClientId != NetworkManager.ServerClientId) _ugsIdByClient[join.ClientId] = join.Key.Id;
         }
 
         private bool TryResolveKey(ulong clientId, out PlayerKey key)
