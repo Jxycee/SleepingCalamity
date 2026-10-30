@@ -2,7 +2,7 @@
 
 Measured with `Art/Blender/tools/sc_ref_palette.py` (k-means in Lab, k=7, pooled per set) on the 1024 px free-licence photos and public-domain paintings in `Reference/hollowmere/` and `Reference/undercroft/` (88 images, each folder has a `REFS.md` with source and licence). Value is sRGB max channel (0-1), p10 / p50 / p90; warmth is the lights minus the darks (positive = lights warmer).
 
-These are **photo and painting numbers, not game numbers.** No OoT-2026 frames were measured (they are copyrighted and live only in gitignored `Reference/private/`), so the "game shift" column is a proposal for the style bible to confirm against a real in-engine capture. Photos were not cropped to the subject, so sky, people and vehicles leak into some masses (marked); read masses as relations, not exact hexes.
+These are **photo and painting numbers, not game numbers.** OoT-2026 frames were measured on 2026-10-29 (section "Measured OoT 2026 frames"; the frames are copyrighted and live only in gitignored `Reference/private/`, numbers only here). Photos were not cropped to the subject, so sky, people and vehicles leak into some masses (marked); read masses as relations, not exact hexes.
 
 ## Hollowmere (day)
 
@@ -36,15 +36,25 @@ Combined town set with the sky masses excluded (25 images): stone and paving gre
 2. **The dark scenes have no teal in any photo.** Cistern and cellar light is lamp orange (warmth +0.13 to +0.38, olive and brown masses). The target look is teal shadows with gold light, so the teal comes from the style bible's grade and fog colour, not from references. Measured dark-scene value to start from: p10 0.10-0.15, p50 0.30-0.40, p90 0.65-0.75 (paintings go darker still: p50 0.23, p90 0.52). The cistern photos lose 49% of their area to the two darkest browns, so the game should lift shadows enough that shapes read.
 3. **Material relations to keep.** Plaster is the lightest mass (about `#d6dbde`, warm it toward cream); timber is the darkest (about `#282321` to `#4e4844`); roof and brick terracotta sits in a narrow band (`#784430` to `#b3622f`); moss is olive-yellow (`#616e2e`, `#b6ab28`) against cool grey stone; cobble and masonry greys run `#817a7b` to `#b7b0aa` with warm lights (+0.12). In the town set lights are cooler than darks (-0.14 to -0.24) because of sky and overcast, so warm the lit faces in-game.
 
-## How the OoT-2026 target shifts photo values (proposal for the style bible)
+## Measured OoT 2026 frames (2026-10-29)
 
-The target is stylised realism: PBR materials with cleaner, bolder, tidier colour than a photo.
+Source: 25 official Nintendo Life screenshots and 48 stills of the 4K reveal trailer (Video Games Chronicle), resized to 1024 px; same tool, k=7 pooled per set. Only scene frames were used (portraits and menus excluded; the one HUD frame, Castle Town market, cropped below its top bar). These are trailer or press grades, not raw engine captures, and sky and characters leak into masses; read relations, not exact hexes. Warmth is lights minus darks.
 
-- **Day, saturation:** raise chroma about 15-25% on plaster tints, roofs and foliage. Keep plaster near-white with a faint warm cast (photo `#d6dbde` is slightly blue from sky fill). Make roofs a confident red-terracotta around `#9c4a34` rather than the photo's brown `#784430` to `#7e4b42`. Foliage is greener and more yellow-lit than the photo's `#4b6028` to `#6e813d`.
-- **Day, value:** keep the 3-mass structure but lift the dark mass a little (target p10 about 0.20-0.24 instead of 0.17) so shadows stay colourful and readable. Keep p90 near 0.92. Warm the lights so warmth reads +0.05 to +0.15, not the photos' -0.14.
-- **Dark scenes:** photo shadows are near-black brown (`#20110a`, `#211f1b`); replace them with deep teal-blue shadows (roughly `#10303a` to `#1b4a52`) and keep the lamp masses gold (`#c9aa76`, `#b15816` cleaned toward `#d6a24a`). Aim for a clear warm/cool split of +0.2 to +0.3 and lift p10 to about 0.12-0.16 so no mass is pure black.
-- **Wear:** photos are uniformly dusty and desaturated. Keep placed, tidy wear (chips, a few moss patches, streaks) over clean base colour, using the moss and brick pairs above for hue.
-- **Forms:** thicker timbers, chunkier arches and roots than the photos show (storybook proportion); take dimensions from photos, then exaggerate.
+| Set (n) | Main masses (hex, share) | Value p10 / p50 / p90 | Warmth |
+|---|---|---|---|
+| Town day: Castle Town market, Kakariko aerial, Gerudo fortress, ruin arch (5) | cool blue-slate shadow `#2f3a44` 34%, grey-green stone `#5d6660` 20%, pale haze stone `#99a7ac` 16%, sandy plaster `#b7a680` 13%, red-brown timber and roof `#714b3a` 9%, terracotta `#bd8466` 8% | 0.23 / 0.44 / 0.78 | warmer (+0.19) |
+| Forest: Kokiri path, Deku Tree vista (5) | grey-green mid `#55554f` 39%, near-black green `#272921` 26%, hazy light `#908c81` 24%, dark moss `#433f1b` 7%, lit moss olive `#746c29` 4% | 0.15 / 0.33 / 0.56 | slightly warmer (+0.05) |
+| Dungeon dark: water, flooded door, cavern, pool, ghost ship (8) | deep teal-black `#1a2724` 39%, teal `#376268` 25%, olive stone `#57523f` 18%, sand stone `#93856a` 16% | 0.12 / 0.32 / 0.59 | warmer (+0.07); the teal frames alone are cooler (-0.10 to -0.24) |
+| Interiors: castle corridor, boss room, torch halls (5) | near-black olive `#191509` 43%, dark brown `#3b1f13` 26%, brown `#594130` 17%, ember `#884125` 6%, lit plaster `#b59c91` 5% | 0.07 / 0.20 / 0.50 | warmer (+0.15) |
+
+## Measured comparison with the photo sets (replaces the earlier proposal)
+
+1. **The game is darker and lower-contrast than the photos, not brighter.** Town day p50 0.44 and p90 0.78, against photo towns at 0.51 and 0.92. No mass is near-white: the lightest town masses are `#99a7ac` and `#b7a680` (value about 0.65-0.72). The earlier plan to keep plaster near-white at p90 0.92 is wrong for this look. New day target: p10 0.22-0.24 (matches the earlier lift), p50 about 0.44, p90 about 0.78-0.80, with highlights carried by small bright accents rather than a big white mass.
+2. **Shadows are cool slate-teal, never brown-black.** Day shadow mass `#2f3a44` at a third of the frame; dungeon darks `#1a2724` and teal `#376268`. Photo shadows (`#282321`) are warm near-black. Target: cool blue-green shadows in every set; the sunlit side carries the warmth. Lights are warmer than darks by +0.19 in town (photos -0.14), so the plan to warm lit faces stands and is stronger than proposed (+0.15 to +0.20, not +0.05 to +0.15).
+3. **Masonry and plaster are tan, not white.** Plaster reads `#b7a680` to `#afa99f` and warm stone `#bd8466` terracotta, with roofs and timber `#714b3a` (earlier proposal `#9c4a34` was more saturated than any measured town mass). Keep roof red-brown around `#714b3a` to `#bd8466`; saturation comes from the sky blue and foliage, not the roofs.
+4. **Forest and haze are heavy.** Forest p50 0.33, p90 0.56: the whole frame sits mid-low with a hazy grey-green `#55554f` mass and olive moss `#433f1b` to `#746c29`. Distance fog and light shafts do the lifting, so depth fog colour should be a warm grey `#908c81` rather than pure sky.
+5. **Dungeons are teal-and-amber with value 0.12 / 0.32 / 0.59.** Dark-scene p10 0.12 matches the earlier 0.12-0.16 target; p90 is 0.59 (photo cisterns 0.75), so lamp highlights should stay modest. Interiors are darker still (p50 0.20, p90 0.50) with ember `#884125` accents: reserve p50 0.20-0.30 for corridors and halls.
+6. **Unchanged.** Dark-scene lifted blacks, tidy placed wear, chunkier forms, and the 3-mass day structure (cool dark, mid stone, warm tan). The earlier +15-25% chroma raise is not supported by town masses (they are muted: chroma of stone and plaster is low); raise chroma on foliage, sky and accent colours only.
 
 ## Library gaps and licence notes
 
