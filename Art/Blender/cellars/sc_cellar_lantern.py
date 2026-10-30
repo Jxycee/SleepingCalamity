@@ -40,7 +40,7 @@ Z_BODY0, Z_BODY1 = 0.048, 0.336       # posts: plinth top to roof eave
 HW0, HW1 = 0.108, 0.097               # post-line half-width at the bottom and top (the body tapers upward)
 POST = 0.017                          # square bar (about 1.4x real)
 Z_GUARD = 0.192                       # horizontal guard bars
-FLAME = Vector((0.0, 0.0, 0.168))     # candle flame centre: the point light in Unity
+FLAME = Vector((0.0, 0.0, 0.147))     # candle flame centre: the point light in Unity
 VENTS = []                            # (outer point, inward axis, radius, depth): the cutters AND the glow mask
 
 def hw(z):
@@ -169,7 +169,7 @@ def lantern_iron(name, polish_pids, rust=0.55):
         d = T.vmath('SUBTRACT', lp, tuple(o))
         up = T.math('MAXIMUM', T.math('SUBTRACT', (T.sep(d), 'Z'), 0.0), 0.0)
         flat = T.vmath('LENGTH', T.vmath('MULTIPLY', d, (1.0, 1.0, 0.0)), out=1)
-        s = T.math('MULTIPLY', T.smoothstep(flat, rad * 2.6, rad * 0.8), T.smoothstep(up, 0.035, 0.0))
+        s = T.math('MULTIPLY', T.smoothstep(flat, rad * 1.8, rad * 0.7), T.math('MULTIPLY', T.smoothstep(up, 0.05, 0.0), T.smoothstep((T.sep(d), 'Z'), -0.004, 0.002)))
         trail = s if trail == 0.0 else T.math('MAXIMUM', trail, s)
     soot = T.math('MAXIMUM', under, trail)
     soot = T.math('MULTIPLY', soot, T.smoothstep(T.noise(p, scale=30, detail=5), 0.3, 0.55))
@@ -193,6 +193,19 @@ def lantern_iron(name, polish_pids, rust=0.55):
     plan = T.voronoi(p, scale=55.0, out='Distance')                       # planishing facets (centimetre scale)
     h = T.math('ADD', T.math('ADD', T.math('MULTIPLY', ham, 0.3), T.math('MULTIPLY', plan, 0.9)), T.math('MULTIPLY', rm, 0.45))
     T.output(c, r, metal, T.bump(h, strength=0.45, distance=0.0008), Emission_Color=(1.0, 0.42, 0.09), Emission_Strength=glow)
+    return m
+
+def candle_wax(name, col=(0.50, 0.40, 0.22)):
+    """Tallow wax, a little dirty in the drips' creases, glowing warm near the flame (translucent wax lit from above)."""
+    m, T = K.new_mat(name)
+    lp = T.attr('lp'); z = (T.sep(lp), 'Z')
+    cav = T.cavity(dist=0.006, lo=0.3, hi=0.95)
+    c = T.mix(T.noise(lp, scale=60, detail=4), T.hsv(col, 0.5, 1.0, 0.85), T.hsv(col, 0.5, 0.9, 1.1))
+    c = T.mix(T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), 0.6), c, (0.12, 0.08, 0.03))
+    r = T.mixf(T.noise(lp, scale=90, detail=3), 0.3, 0.5)
+    glow = T.math('MULTIPLY', T.smoothstep(z, 0.09, 0.131), 0.45)
+    T.output(c, r, 0.0, T.bump(T.noise(lp, scale=300, detail=3), strength=0.15, distance=0.0004),
+             Emission_Color=(1.0, 0.52, 0.18), Emission_Strength=glow)
     return m
 
 def lantern_glass(name):
@@ -340,17 +353,18 @@ def build():
                                            (0.031, 0.08), (0.024, 0.07), (0.004, 0.068)], 0.0015), 40)
     iron('cup', [cup], 0.0009, erode=wear(0.0003, 80, seed=7.0))
     rr = K.rng('drips')
-    cd = K.lathe('candle', K.smooth_profile([(0.004, 0.066), (0.0205, 0.066), (0.0203, 0.12), (0.0199, 0.148), (0.0186, 0.153),
-                                             (0.012, 0.149), (0.006, 0.146), (0.003, 0.146)], 0.0015), 40)
+    # a fat, burnt-down stub: the rim stands higher than the tunnelled centre, drips half-sunk into the side
+    cd = K.lathe('candle', K.smooth_profile([(0.004, 0.066), (0.0245, 0.066), (0.0243, 0.11), (0.0238, 0.127), (0.0222, 0.1305),
+                                             (0.019, 0.128), (0.012, 0.1225), (0.004, 0.1215)], 0.0015), 48)
     wax = [cd]
-    for i in range(7):
-        a = rr.uniform(0, 2 * math.pi); L = rr.uniform(0.02, 0.085) if i else 0.105; R = 0.0204; n = 10; pts = []; rad = []
+    for i in range(6):
+        a = i * math.pi / 3 + rr.uniform(-0.4, 0.4); L = rr.uniform(0.015, 0.05) if i else 0.072; R = 0.0236; n = 10; pts = []; rad = []
         for k in range(n + 1):
-            t = k / n; zz = 0.152 - t * L
-            rr_ = R + 0.0008 + 0.0012 * math.sin(t * math.pi) + (0.012 * max(0.0, (0.079 - zz)) / 0.03 if zz < 0.08 else 0.0)
-            pts.append((rr_ * math.cos(a + 0.03 * math.sin(t * 7 + i)), rr_ * math.sin(a + 0.03 * math.sin(t * 7 + i)), max(zz, 0.0505)))
-            rad.append(0.0028 * (1 - 0.4 * t) + (0.0016 if k == n else 0))
-        wax.append(K.tube(f'drip{i}', pts, 0.0028, 8, radii=rad))
+            t = k / n; zz = 0.129 - t * L
+            rr_ = R + 0.0006 * math.sin(t * math.pi) + (0.012 * max(0.0, (0.079 - zz)) / 0.03 if zz < 0.08 else 0.0)
+            pts.append((rr_ * math.cos(a + 0.025 * math.sin(t * 7 + i)), rr_ * math.sin(a + 0.025 * math.sin(t * 7 + i)), max(zz, 0.0505)))
+            rad.append(0.0034 * (1 - 0.3 * t) + (0.0014 if k == n else 0))
+        wax.append(K.tube(f'drip{i}', pts, 0.0034, 8, radii=rad))
     spill = K.lathe('spill', K.smooth_profile([(0.003, 0.0495), (0.024, 0.0495), (0.022, 0.0525), (0.012, 0.0545), (0.003, 0.0548)], 0.0012), 32)
     spill.location = (0.012, -0.03, 0.0); spill.scale = (1.4, 0.9, 1.0); bake_xf(spill)
     wax.append(spill)
@@ -358,12 +372,12 @@ def build():
     for name, (obs, vox, kw) in iron_parts.items():
         highs.append(K.make_part(obs, None, pid(name), vox, **kw))
     highs.append(K.make_part(wax, None, pid('wax'), 0.0008, erode=wear(0.0002, 90, seed=8.0), fillet=6))
-    wick = K.tube('wick', [(0, 0, 0.144), (0.0006, 0, 0.156), (0.0025, 0.0006, 0.163)], 0.0012, 6)
+    wick = K.tube('wick', [(0, 0, 0.118), (0.0006, 0, 0.133), (0.0025, 0.0006, 0.141)], 0.0012, 6)
     highs.append(K.make_part(wick, None, pid('wick'), 0.0004))
     im = lantern_iron('M_LanternIron', [PIDS['ring'], PIDS['latch'], PIDS['door']])
     for hgh in highs:
         hgh.data.materials.clear()
-        hgh.data.materials.append(M2.wax('M_Wax', (0.50, 0.40, 0.22)) if hgh.name.startswith('candle') else
+        hgh.data.materials.append(candle_wax('M_Wax') if hgh.name.startswith('candle') else
                                   M2.charcoal('M_Wick', glow=0.6) if hgh.name.startswith('wick') else im)
     return highs, build_unbaked()
 
