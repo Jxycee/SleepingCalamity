@@ -1,3 +1,5 @@
+**Chosen direction (user, 2026-10-30):** "almost like a young adult viking build and timber-yard worker". This is option A (rolled sleeves, leather apron, axe across the back) with a Norse build: broad and thick-limbed, braided or tied hair, fur or wool layers.
+
 # Tobin Marsh: concept options (M10, 2026-10-29)
 
 Pick one direction. Sheets: `docs/design/tobin/option_{a,b,c}.jpg` (front, 3/4, side, back, plus a small figure at gameplay-camera size). Blockouts are primitives with flat colours, made by `Art/Blender/concepts/tobin_blockout.py`. They show mass and silhouette only, not final art, face or hair.
