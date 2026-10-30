@@ -321,6 +321,50 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(growth.TechPaid(key), Is.EqualTo(0f), "and the tech cap");
         }
 
+        // Catches: a downed hero that can still jump (HeroLocomotion ignored HeroCombat.Frozen). The control jump proves the test can see a jump.
+        [UnityTest]
+        public IEnumerator Solo_ADownedHero_CannotJump()
+        {
+            GameObject heroObject = null;
+            HeroVitals vitals = null;
+            FakeInputService input = null;
+            yield return ArenaWithoutWave((c, h, hc, v, i) => { heroObject = h; vitals = v; input = i; });
+            float ground = heroObject.transform.position.y;
+
+            float peak = ground;
+            input.Frame.JumpPressed = true;
+            double until = Time.realtimeSinceStartupAsDouble + 0.6;
+            while (Time.realtimeSinceStartupAsDouble < until) { yield return null; input.Frame.JumpPressed = false; peak = Mathf.Max(peak, heroObject.transform.position.y); }
+            Assert.That(peak - ground, Is.GreaterThan(0.3f), "control: an upright hero jumps");
+            yield return Seconds(1.2f);   // lands
+
+            vitals.ServerDamage(1000);
+            Assert.That(vitals.IsDowned, Is.True);
+            ground = heroObject.transform.position.y;
+            peak = ground;
+            input.Frame.JumpPressed = true;
+            until = Time.realtimeSinceStartupAsDouble + 0.6;
+            while (Time.realtimeSinceStartupAsDouble < until) { yield return null; peak = Mathf.Max(peak, heroObject.transform.position.y); }
+            input.Frame.JumpPressed = false;
+            Assert.That(peak - ground, Is.LessThan(0.05f), "a downed hero stays on the ground");
+        }
+
+        // Catches: a hero left out for good in the arena: a wave clear stands the out hero up (and still heals the others).
+        [UnityTest]
+        public IEnumerator Solo_WaveClear_StandsAnOutHeroBackUp()
+        {
+            HeroVitals vitals = null;
+            CombatHost combat = null;
+            yield return ArenaWithoutWave((c, h, hc, v, i) => { combat = c; vitals = v; });
+            vitals.ServerDamage(1000);
+            vitals.Model.Tick(PlayerVitals.DownedSeconds + 1f, false);   // the downed timer runs out on the host
+            Assert.That(vitals.Model.State, Is.EqualTo(VitalState.Out));
+            combat.ServerOnWaveCleared();   // same frame: the wipe check has not run yet
+            Assert.That(vitals.Model.State, Is.EqualTo(VitalState.Up), "an out hero stands up at wave clear");
+            Assert.That(vitals.Model.Hp, Is.GreaterThan(0));
+            yield return PlayModeHarness.WaitUntil(() => vitals.IsUp && vitals.Hp > 0, 3f, "the revived state never replicated");
+        }
+
         // Catches: a staff spell that misses (hits nothing) costing no pip on the host, so only the owner's mirror paid.
         [UnityTest]
         public IEnumerator Solo_StaffSpellThatHitsNothing_StillSpendsAPipOnTheHost()

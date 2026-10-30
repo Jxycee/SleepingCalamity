@@ -99,8 +99,6 @@ namespace SleepingCalamity.Presentation
             UpdateIndicator();
         }
 
-        // When a wall squeezes the boom until the camera is nearly inside the hero, the hero's own body would fill the screen (or show its inside),
-        // so it is hidden locally until the camera backs off again. Hysteresis: hidden under 1.0 m, shown again over 1.4 m. Cosmetic, owner only.
         // M3: a camera kick on impacts (a quick FOV punch that eases back), owner side only. 0..1; stacked kicks keep the larger.
         private float _kick;
         private bool _kickApplied;
@@ -132,6 +130,8 @@ namespace SleepingCalamity.Presentation
             if (lockCam != null) { LensSettings l = lockCam.Lens; l.FieldOfView = fov; lockCam.Lens = l; }
         }
 
+        // When a wall squeezes the boom until the camera is nearly inside the hero, the hero's own body would fill the screen (or show its inside),
+        // so it is hidden locally until the camera backs off again. Hysteresis: hidden under 1.0 m, shown again over 1.4 m. Cosmetic, owner only.
         private void LateUpdate()
         {
             ApplyKick();

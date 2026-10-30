@@ -410,15 +410,7 @@ namespace SleepingCalamity.Gameplay
                         {
                             _wave = WaveState.Cleared;
                             _waveTimer = 4f;
-                            for (int i = 0; i < heroes.Count; i++)
-                            {
-                                HeroVitals v = heroes[i];
-                                if (v == null || !v.IsSpawned || v.NetworkManager != _nm || !v.IsUp) continue;
-                                int healed = v.ServerHeal(Mathf.RoundToInt(ClearHeal));
-                                if (healed <= 0) continue;
-                                HeroCombat combat = v.GetComponent<HeroCombat>();
-                                if (combat != null) combat.ServerBroadcastHeal(healed);
-                            }
+                            ServerOnWaveCleared();
                         }
                         break;
                     case WaveState.Cleared:
@@ -439,6 +431,24 @@ namespace SleepingCalamity.Gameplay
                     if (v != null && v.IsSpawned && v.NetworkManager == _nm) { carrier = v.GetComponent<HeroCombat>(); break; }
                 }
                 if (carrier != null) carrier.ServerBroadcastWave(_waveNumber, (byte)_wave, _alive.Count, ArenaWaves.TierOf(_waveNumber));
+            }
+        }
+
+        // The arena's wave-clear rule: every hero that is up heals a little, and a hero that is out stands up (so nobody spectates forever; a dive keeps its own rule).
+        public void ServerOnWaveCleared()
+        {
+            if (_nm == null || !_nm.IsServer) return;
+            IReadOnlyList<HeroVitals> heroes = HeroVitals.All;
+            for (int i = 0; i < heroes.Count; i++)
+            {
+                HeroVitals v = heroes[i];
+                if (v == null || !v.IsSpawned || v.NetworkManager != _nm) continue;
+                if (v.ServerReviveFromOut()) continue;   // checks the host's record
+                if (!v.IsUp) continue;
+                int healed = v.ServerHeal(Mathf.RoundToInt(ClearHeal));
+                if (healed <= 0) continue;
+                HeroCombat hero = v.GetComponent<HeroCombat>();
+                if (hero != null) hero.ServerBroadcastHeal(healed);
             }
         }
 

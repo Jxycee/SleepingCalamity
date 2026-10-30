@@ -4,7 +4,8 @@
 //     two copies of the enemy in one process must not double it) and both peers see the same HP.
 //  2. An enemy attack on the client is judged by the client: not dodging, it loses HP on the host and on both peers; dodging (i-frames), it is never hit.
 //     The attack is a 30 m circle, so a roll cannot leave it: only the i-frames can save the hero.
-//  3. The network simulator (Multiplayer Tools) at 150 ms RTT and 2% loss: a hit registers on the attacker's client within a round trip.
+//  3. The network simulator (Multiplayer Tools) at 150 ms RTT: with no loss every hit registers on the attacker's client within a round trip (deterministic);
+//     with 2% loss every hit still arrives (the slowest is a tail sample, capped loosely).
 // Catches: a hit intent that never reaches the host, a host that double-applies (two enemy copies), HP that does not replicate, an enemy hit that
 // ignores a dodge, a dodge that does nothing, a melee that waits for the host before it can feel like a hit.
 // NOT covered by a one-process test (the manual 2-player walk on the PC): two real machines, a second camera, a human's timing.
@@ -83,7 +84,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
         // Host + client connected, the combat arena loaded additively with waves and AI OFF (the test places enemies and drives their attacks), one hero each:
         // the host's at the origin, the client's at (8, 0, 0), both facing +Z.
-        private IEnumerator Setup(Ctx c, bool simulate = false)
+        private IEnumerator Setup(Ctx c, bool simulate = false, int lossPercent = 2)
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             c.App = AppBootstrap.Current;
@@ -91,7 +92,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 _simObject = new GameObject("NetSim");
                 var sim = _simObject.AddComponent<NetworkSimulator>();
-                sim.ConnectionPreset = NetworkSimulatorPreset.Create("test 150 ms / 2%", "M3 walk", packetDelayMs: 37, packetJitterMs: 0, packetLossInterval: 0, packetLossPercent: 2);
+                sim.ConnectionPreset = NetworkSimulatorPreset.Create("test 150 ms / " + lossPercent + "%", "M3 walk", packetDelayMs: 37, packetJitterMs: 0, packetLossInterval: 0, packetLossPercent: lossPercent);
             }
             yield return PlayModeHarness.StartDirectHostWithoutScenes();
             c.HostNm = c.App.NetworkManager;
@@ -238,59 +239,86 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(clientVitalsOnClient.Hp, Is.EqualTo(100), "and its own copy agrees");
         }
 
-        // ---- 3. the network simulator: 150 ms RTT, 2% loss ----
+        // ---- 3. the network simulator: 150 ms RTT ----
 
-        [UnityTest]
-        public IEnumerator Netsim_150msRtt_2PercentLoss_AClientHitRegistersWithinOneRoundTrip()
+        private sealed class NetsimRun
         {
-            var c = new Ctx();
-            yield return Setup(c, simulate: true);
+            public ulong Rtt;
+            public int Swings = 8;
+            public readonly List<double> Latencies = new List<double>();
+            public string Report(string label) =>
+                "SC NETSIM " + label + " rtt(transport)=" + Rtt + " ms; hits sent=" + Swings + "; hits seen on the attacker's client=" + Latencies.Count + "; latencies(ms)=" + string.Join(",", Latencies.ConvertAll(l => ((int)l).ToString()));
+        }
 
-            // The simulator delays every packet at the send and the receive stage of each peer, so 4 x 37 ms gives the 150 ms round trip (75 ms measured 300).
-        // A tough target so a dozen hits do not kill it: the elite (600 HP), AI off, standing in front of the client.
+        // One run: the client swings eight times at a tough target; every hit is timed from the attacker's own contact to the new HP arriving back on its copy of the enemy.
+        // The simulator delays every packet at the send and the receive stage of each peer, so 4 x 37 ms gives the 150 ms round trip (75 ms measured 300).
+        private IEnumerator RunNetsim(Ctx c, NetsimRun run)
+        {
+            // A tough target so a dozen hits do not kill it: the elite (600 HP), AI off, standing in front of the client.
             Enemy hostEnemy = c.Combat.SpawnEnemy(EnemyKind.DoughWarden, 1, new Vector3(8f, 0f, 2.6f), ai: false);
             yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(hostEnemy.NetworkObjectId), Timeout, "the client never received the enemy");
             Enemy clientEnemy = ClientCopy(c, hostEnemy);
 
             var transport = c.ClientNm.NetworkConfig.NetworkTransport as UnityTransport;
             yield return Seconds(1.0f);
-            ulong rtt = transport.GetCurrentRtt(NetworkManager.ServerClientId);
+            run.Rtt = transport.GetCurrentRtt(NetworkManager.ServerClientId);
 
             var contact = new Queue<double>();
-            var latencies = new List<double>();
             System.Action<LocalHit> onHit = h => contact.Enqueue(Time.realtimeSinceStartupAsDouble);
             clientEnemy.NetHp.OnValueChanged += (previous, current) =>
             {
-                if (current < previous && contact.Count > 0) latencies.Add((Time.realtimeSinceStartupAsDouble - contact.Dequeue()) * 1000.0);
+                if (current < previous && contact.Count > 0) run.Latencies.Add((Time.realtimeSinceStartupAsDouble - contact.Dequeue()) * 1000.0);
             };
             CombatEvents.LocalHitLanded += onHit;
-            int swings = 8;
             try
             {
-                for (int i = 0; i < swings; i++)
+                for (int i = 0; i < run.Swings; i++)
                 {
                     yield return PressAttack(c.ClientInput);
                     yield return Seconds(1.1f);   // the chain (hit, hit, finisher) is slower than this: each press is a fresh swing or the next hit
                 }
-                yield return Seconds(1.0f);
+                yield return Seconds(1.5f);
             }
             finally { CombatEvents.LocalHitLanded -= onHit; }
+            run.Latencies.Sort();
+        }
 
-            latencies.Sort();
-            string report = "SC NETSIM rtt(transport)=" + rtt + " ms; hits sent=" + swings + "; hits seen on the attacker's client=" + latencies.Count + "; latencies(ms)=" + string.Join(",", latencies.ConvertAll(l => ((int)l).ToString()));
+        // One round trip is 150 ms; allow two server ticks (33 ms each at 30 Hz) and a frame for the intent and the replicated value to be sampled.
+        private const double OneTripMs = 150.0 + 2 * 33.4 + 40.0;
+
+        // No loss: nothing is ever resent, so this is deterministic: EVERY hit registers on the attacker's client within one round trip.
+        [UnityTest]
+        public IEnumerator Netsim_150msRtt_NoLoss_EveryClientHitRegistersWithinOneRoundTrip()
+        {
+            var c = new Ctx();
+            yield return Setup(c, simulate: true, lossPercent: 0);
+            var run = new NetsimRun();
+            yield return RunNetsim(c, run);
+            string report = run.Report("0% loss");
             TestContext.WriteLine(report);
             Debug.Log(report);
 
-            Assert.That(latencies.Count, Is.GreaterThanOrEqualTo(swings - 2), "most hits arrived back (2% loss, reliable RPCs): " + report);
-            double max = latencies[latencies.Count - 1];
-            Assert.That(latencies[0], Is.GreaterThan(60.0), "the simulator is in effect (a local round trip is a frame or two): " + report);
-            // One round trip is 150 ms; allow two server ticks (33 ms each at 30 Hz) and a frame for the intent and the replicated value to be sampled.
-            double oneTrip = 150.0 + 2 * 33.4 + 40.0;
-            int inOneTrip = latencies.FindAll(l => l <= oneTrip).Count;
-            // With 2% loss at four simulator stages per round trip, a reliable message is sometimes resent and takes another round trip: the measured
-            // spread is a few hits at about one round trip and the rest within about two. So "most" is not guaranteed; at least half is, and none is lost.
-            Assert.That(inOneTrip, Is.GreaterThanOrEqualTo(swings / 2), "at least half the hits register within one round trip (" + oneTrip.ToString("0") + " ms): " + report);
-            Assert.That(max, Is.LessThan(150.0 * 3 + 250.0), "even a resent packet arrives well inside a second: " + report);
+            Assert.That(run.Latencies.Count, Is.EqualTo(run.Swings), "every hit arrived back: " + report);
+            Assert.That(run.Latencies[0], Is.GreaterThan(60.0), "the simulator is in effect (a local round trip is a frame or two): " + report);
+            Assert.That(run.Latencies[run.Latencies.Count - 1], Is.LessThanOrEqualTo(OneTripMs), "every hit registers within one round trip (" + OneTripMs.ToString("0") + " ms): " + report);
+        }
+
+        // 2% loss at four simulator stages per round trip: a reliable message is sometimes resent and takes another round trip or more, so the slowest of eight is a tail
+        // sample and is only capped loosely. What must hold every time: the reliable RPCs lose nothing (all eight hits are applied and come back).
+        [UnityTest]
+        public IEnumerator Netsim_150msRtt_2PercentLoss_EveryClientHitStillArrives()
+        {
+            var c = new Ctx();
+            yield return Setup(c, simulate: true, lossPercent: 2);
+            var run = new NetsimRun();
+            yield return RunNetsim(c, run);
+            string report = run.Report("2% loss");
+            TestContext.WriteLine(report);
+            Debug.Log(report);
+
+            Assert.That(run.Latencies.Count, Is.EqualTo(run.Swings), "no hit was lost to the packet loss (reliable RPCs resend): " + report);
+            Assert.That(run.Latencies[0], Is.GreaterThan(60.0), "the simulator is in effect: " + report);
+            Assert.That(run.Latencies[run.Latencies.Count - 1], Is.LessThan(1500.0), "even a resent packet arrives well inside two seconds: " + report);
         }
     }
 }

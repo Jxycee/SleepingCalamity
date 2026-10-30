@@ -27,6 +27,7 @@ namespace SleepingCalamity.Gameplay
         public VitalState State => (VitalState)NetState.Value;
         public bool IsUp => State == VitalState.Up;
         public bool IsDowned => State == VitalState.Downed;
+        public bool IsOut => State == VitalState.Out;
         public float DownedLeft => NetDownedLeft.Value;
         public float ReviveProgress => NetReviveProgress.Value;
         public System.Action<HeroVitals> ServerWentDown;
@@ -76,6 +77,15 @@ namespace SleepingCalamity.Gameplay
             int gain = Model.Heal(amount);
             if (gain > 0) Push();
             return gain;
+        }
+
+        // Host: an out hero stands up with the revive HP (the arena only; a dive keeps its out rule).
+        public bool ServerReviveFromOut()
+        {
+            if (!IsServer || Model.State != VitalState.Out) return false;
+            Model.Revive();
+            Push();
+            return true;
         }
 
         public void ServerFullReset()

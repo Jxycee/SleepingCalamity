@@ -1,7 +1,7 @@
 // Authority: owner only. HeroNetState enables this component (after the CharacterController) on the owning peer and nowhere else.
 // Moves the owner's CharacterController from the routed PlayerIntent; NetworkTransform (AuthorityMode Owner) replicates the result to everyone.
 // The host never moves players (docs/PHASE1.md 6.4, P11). Ported from FishGame's PlayerLocomotion (intent pattern, jump assist, vertical step),
-// reworked for a third-person hero: walk / jog / run by stick tilt and sprint, camera-relative movement from ViewYawDeg, a dodge stub, and
+// reworked for a third-person hero: walk / jog / run by stick tilt and sprint, camera-relative movement from ViewYawDeg, a dodge roll (i-frames and cancels live in HeroCombat), and
 // strafing (facing the target) while hard-locked. The view yaw / pitch live here, fed by the routed look intent (zero while locked), so
 // movement needs no camera at all; the Presentation camera rig only reads them. Animation is not driven from here: HeroAnimationFeeder
 // derives it from the transform's motion, which also covers remote copies.
@@ -115,7 +115,7 @@ namespace SleepingCalamity.Gameplay
             bool grounded = _cc.isGrounded;
             IsGrounded = grounded;
 
-            // ---- dodge stub: a direction and a duration (i-frames arrive with M3) ----
+            // ---- dodge: a direction and a duration; HeroCombat gates when it may start and its machine owns the i-frames ----
             _dodge.Tick(dt);
             // A press the attack is not ready to give way to yet (mid-swing, before its cancel frame) waits 0.2 s for it.
             if (intent.DodgePressed) _dodgeBuffer = 0.2f;
@@ -177,7 +177,8 @@ namespace SleepingCalamity.Gameplay
 
             // ---- vertical ----
             if (grounded && _vy < 0f) _vy = MovementMath.GroundedPush(dt);
-            if (_jump.Tick(dt, grounded, intent.JumpPressed && !dodging))
+            bool frozen = _combat != null && _combat.Frozen;   // a downed or out hero cannot jump
+            if (_jump.Tick(dt, grounded, intent.JumpPressed && !dodging && !frozen))
                 _vy = MovementMath.JumpVelocity(MovementMath.JumpHeight, MovementMath.Gravity);
             float dy = MovementMath.VerticalStep(ref _vy, MovementMath.Gravity, MovementMath.TerminalVelocity, dt);
 

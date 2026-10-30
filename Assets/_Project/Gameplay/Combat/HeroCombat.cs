@@ -48,6 +48,7 @@ namespace SleepingCalamity.Gameplay
         private readonly HashSet<long> _judged = new HashSet<long>();
         private readonly GrowthMirror _mirror = new GrowthMirror();
         private int _hitsInSwing;
+        private int _pendingWeapon = -1;   // owner: the heirloom asked for and not yet confirmed by the host (a second F5 inside one round trip builds on it)
         private byte _swingWeapon, _swingPrior;   // the heirloom index and the chain's prior hits when the current swing began (sent with every hit of it)
         private bool _shotFired, _wasDodging, _guarding, _aiming, _wasGuarding;
         private float _guardStart, _reviveReport, _hurtLock, _dodgeBuffer;
@@ -68,6 +69,7 @@ namespace SleepingCalamity.Gameplay
         public AttackMachine Machine => _machine;
         public GrowthMirror Mirror => _mirror;
         public int WeaponIndex => NetWeapon.Value;
+        public int WeaponIndexOrPending => _pendingWeapon >= 0 ? _pendingWeapon : NetWeapon.Value;   // owner: where the next swap starts from
         public string WeaponKey => AttackCatalog.Heirlooms[Mathf.Clamp(NetWeapon.Value, 0, AttackCatalog.Heirlooms.Length - 1)];
         public WeaponFamily Family => WeaponStyle.FamilyOf(WeaponKey);
         public bool Guarding => _guarding;
@@ -179,7 +181,13 @@ namespace SleepingCalamity.Gameplay
             if (Local == this) Local = null;
         }
 
-        private void OnWeaponChanged(byte previous, byte current) { ApplyWeapon(); }
+        private void OnWeaponChanged(byte previous, byte current)
+        {
+            bool wasSwinging = IsOwner && _machine.Active;
+            ApplyWeapon();   // a new attack set interrupts a swing in progress
+            if (wasSwinging && !_machine.Active) PublishSwing(NoAttack);   // so remote copies stop showing it
+            if (_pendingWeapon == current) _pendingWeapon = -1;
+        }
         private void OnSwingChanged(uint previous, uint current) { _remoteClock = 0f; _seenSwing = current; }
 
         private void ApplyWeapon()
@@ -195,8 +203,9 @@ namespace SleepingCalamity.Gameplay
         {
             if (!IsOwner) return;
             int i = ((index % AttackCatalog.Heirlooms.Length) + AttackCatalog.Heirlooms.Length) % AttackCatalog.Heirlooms.Length;
-            if (NetWeapon.Value == i) return;
-            _machine.Interrupt();
+            if (WeaponIndexOrPending == i) return;
+            _pendingWeapon = i;
+            if (_machine.Active) { _machine.Interrupt(); PublishSwing(NoAttack); }
             SetWeaponServerRpc((byte)i);
         }
 
@@ -205,7 +214,8 @@ namespace SleepingCalamity.Gameplay
         {
             if (index >= AttackCatalog.Heirlooms.Length || NetWeapon.Value == index) return;
             NetWeapon.Value = index;
-            CombatHost.Current?.ServerSyncGrowth(this);
+            CombatHost host = CombatHost.Current;
+            if (host != null) host.ServerSyncGrowth(this);
         }
 
         // =================================================================================================================================
@@ -238,7 +248,7 @@ namespace SleepingCalamity.Gameplay
 
             if (input is IDevInput dev)
             {
-                if (dev.WasPressed(DevKey.SwapWeapon)) OwnerSetWeapon(NetWeapon.Value + 1);
+                if (dev.WasPressed(DevKey.SwapWeapon)) OwnerSetWeapon(WeaponIndexOrPending + 1);
                 if (dev.WasPressed(DevKey.SkipWave)) SkipWaveServerRpc();
             }
 
@@ -415,7 +425,8 @@ namespace SleepingCalamity.Gameplay
         [Rpc(SendTo.Server)]
         private void CastServerRpc(int swingId, byte weaponIndex, byte attackIndex)
         {
-            CombatHost.Current?.ServerCast(this, swingId, weaponIndex, attackIndex);
+            CombatHost host = CombatHost.Current;
+            if (host != null) host.ServerCast(this, swingId, weaponIndex, attackIndex);
         }
 
         // =================================================================================================================================
@@ -533,7 +544,8 @@ namespace SleepingCalamity.Gameplay
         [Rpc(SendTo.Server)]
         private void RequestSyncServerRpc()
         {
-            CombatHost.Current?.ServerSyncGrowth(this);
+            CombatHost host = CombatHost.Current;
+            if (host != null) host.ServerSyncGrowth(this);
         }
 
         // Host -> this hero's owner.
@@ -625,7 +637,11 @@ namespace SleepingCalamity.Gameplay
         }
 
         [Rpc(SendTo.Server)]
-        private void SkipWaveServerRpc() { CombatHost.Current?.ServerSkipWave(); }
+        private void SkipWaveServerRpc()
+        {
+            CombatHost host = CombatHost.Current;
+            if (host != null) host.ServerSkipWave();
+        }
 
         // Host -> everyone: the parry flash.
         public void ServerBroadcastParry() { ParryClientRpc(); }
