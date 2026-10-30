@@ -34,4 +34,4 @@
   - The ISOs are in `C:\Users\jayce\Desktop\Games\ps2\`.
 
 ## Inbox
-- (none)
+- Trial ramenvr/autopilot (AI playtester in the editor) as an automated smoke tester once M3 combat settles; evaluated 2026-10-30 by a side session, nothing installed.
