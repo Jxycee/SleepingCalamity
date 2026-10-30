@@ -61,10 +61,11 @@ namespace SleepingCalamity.Presentation
             _pivot.localPosition = new Vector3(0.38f, 1.05f, 0.15f);
             _weapons = new GameObject[4];
 
-            // Axe: a shaft with a broad head.
+            // Axe: a shaft with a broad head. The fist sits a hand-width up from the butt, and the head's edge points along +X like the sword's edge
+            // (the grip maps +X to the knuckles' direction), so it leads the swing instead of facing the palm.
             _weapons[0] = Holder("Axe");
-            Prim(_weapons[0], PrimitiveType.Cube, new Vector3(0f, 0.45f, 0f), new Vector3(0.07f, 0.95f, 0.07f), weaponMaterial);
-            Prim(_weapons[0], PrimitiveType.Cube, new Vector3(0f, 0.85f, 0.12f), new Vector3(0.07f, 0.26f, 0.32f), accentMaterial);
+            Prim(_weapons[0], PrimitiveType.Cube, new Vector3(0f, 0.38f, 0f), new Vector3(0.07f, 0.95f, 0.07f), weaponMaterial);
+            Prim(_weapons[0], PrimitiveType.Cube, new Vector3(0.12f, 0.78f, 0f), new Vector3(0.32f, 0.26f, 0.07f), accentMaterial);
 
             // Staff: a long pole with an orb.
             _weapons[1] = Holder("Staff");

@@ -137,7 +137,10 @@ namespace SleepingCalamity.EditorTools
             if (rh != null && lh != null && la != null)
             {
                 Quaternion bladeForward = Quaternion.Euler(90f, 0f, 0f);   // the held primitives are built blade-up (+Y); +Z in the T-pose
-                var right = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(rh.rotation) * bladeForward, position = rh.InverseTransformPoint(rh.position + Vector3.right * 0.07f) };
+                // A fist holds a handle on a diagonal: the head end leans [tune] 15 deg toward the fingertips (+X for the right arm), and the handle runs
+                // through the palm (below the T-pose's palm-down hand), not over the knuckles. Set from the axe captures of 2026-10-30.
+                Quaternion rightGrip = Quaternion.Euler(0f, 15f, 0f) * bladeForward;
+                var right = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(rh.rotation) * rightGrip, position = rh.InverseTransformPoint(rh.position + Vector3.right * 0.085f + Vector3.down * 0.025f) };
                 var left = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(lh.rotation) * bladeForward, position = lh.InverseTransformPoint(lh.position + Vector3.left * 0.07f) };
                 // The shield faces away from the back of the forearm (+Y in the T-pose, palm down), so it faces outward whatever the arm does; its disc axis is local Z.
                 var shield = new HeroWeaponVisual.HandGrip { valid = true, rotation = Quaternion.Inverse(la.rotation) * Quaternion.Euler(-90f, 0f, 0f), position = la.InverseTransformPoint(la.position + Vector3.left * 0.12f + Vector3.up * 0.1f) };
