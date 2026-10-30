@@ -51,8 +51,8 @@ The target: Dark Cloud's whimsical shapes and town and dungeon themes, rendered 
 
 | | Day (Hollowmere square) | Cellars (Undercroft floors 1-4) |
 |---|---|---|
-| Value p10 / p50 / p90 (sRGB max channel) | 0.21-0.25 / 0.44-0.50 / 0.80-0.86 | 0.12-0.16 / 0.30-0.40 / 0.65-0.75 |
-| Warmth (lights minus darks) | +0.12 to +0.20 | +0.20 to +0.30 |
+| Value p10 / p50 / p90 (sRGB max channel) | 0.21-0.25 / 0.44-0.50 / 0.80-0.86 | 0.06-0.10 / 0.24-0.32 / 0.55-0.68 |
+| Warmth (lights minus darks) | +0.12 to +0.20 | +0.25 to +0.35 |
 | Masses | 3-4 readable masses: one pale (plaster, sky), one dark (timber, shadow), one warm mid (stone, roof) | Gold lamplight dominant, deep shadow, warm brick mid |
 | Key hues | plaster warm tan-cream `#cbbd9c` (OoT `#b7a680`, a little lighter); roof red-terracotta `#9c4a34`; timber `#2e2520` to `#4e4844`; cobble `#817a7b` to `#b7b0aa`; foliage yellow-green `#6f8a34`; moss `#616e2e` / `#b6ab28` | lamp gold `#d6a24a`; lit stone `#c9aa76`; brick `#9d7d69` / `#bf7a38`; shadows deep warm umber to plum `#2a1c18` to `#3a2430` (no teal or green); ember accent `#c2412a` (the demon's breath) |
 | Saturation vs photos | OoT-like, moody and slightly muted: no chroma boost on stone, plaster or roofs; +10-15% only on foliage, sky, painted wood, cloth and accents; shadows tinted slate-teal (`#2f3a44`) | Clean, rich firelight gold (saturated, not brown-muddy); clear value steps between lit stone, mid brick and shadow; no mass is pure black |
@@ -358,3 +358,4 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 - 2026-10-30 (user, A16): the creator always hosts a multiplayer world; its save lives on the creator's PC.
 - 2026-10-30 (user): the day look-test mood is right. The Cellars were too blue-green after tuning; go back to warm firelight, cleaner and less muddy (no teal tint, warm umber/plum shadows, saturated gold, crisper values). 3.1 Cellars row and the P34 paragraph updated.
 - 2026-10-30 (user): go-ahead for M9 with up to 3 art agents at once (P51).
+- 2026-10-30 (user reference, decision A24): user-supplied cellar mood image (private: `Reference/private/user/cellar_mood_ref_01.webp`; measured p10/p50/p90 0.04/0.20/0.49, warmth +0.31, masses deep umber `#352214`/`#140c07`/`#58371e`, candle highlights `#e9b96d`/`#f8edbb`). What it teaches: warmth comes from **local light pools** (candles, wall sconces, a hearth fire), unlit stone stays a neutral grey-brown rather than tinted orange, deep near-black shadow between pools, small bright cream-gold highlights, thin smoke and haze in the light, dense dressing (shelves of crocks, hanging herbs, barrels, chains, a table). Cellar value band moved toward it but kept brighter for combat readability: 0.06-0.10 / 0.24-0.32 / 0.55-0.68, warmth +0.25 to +0.35.
