@@ -13,8 +13,8 @@ Sources of truth: `docs/STORY.md` (once locked), `docs/PHASE1.md` (once written)
 ## Running handoff
 The main (controller) session opens with the `sc-steward` skill, which reads `docs/superpowers/handoff/CURRENT.md`. The controller keeps it current after every meaningful step with `sc-handoff`, then commits and pushes it to `main`. Feature branches never edit it.
 
-## Unity (Windows PC only)
-- Run Unity only through the wrapper: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <compile|build|test-edit|test-play|check|exec> -OutDir <scratchpad dir>`. Exit codes: 0 PASS, 1 FAIL, 2 LOCKED, 3 TIMEOUT, 4 usage. It reads the log (exit 0 alone is not proof), adds `-dev-profile sctest` to test runs, and records a PASS marker that the merge gate checks.
+## Unity
+- Run Unity only through the wrapper: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <compile|build|test-edit|test-play|check|exec> -OutDir <scratchpad dir>` on the PC, `bash Tools/cloud/unity.sh <same command> --out <scratchpad dir>` in the cloud. Exit codes: 0 PASS, 1 FAIL, 2 LOCKED, 3 TIMEOUT, 4 usage. It reads the log (exit 0 alone is not proof), adds `-dev-profile sctest` to test runs, and records a PASS marker that the merge gate checks.
 - The Unity plugin's `unity-cli` / `unity run` launch commands don't apply here; the wrapper rule wins.
 - `LOCKED` means the user has the editor open: ask them to close it. Never kill Unity processes and never delete `Temp/UnityLockfile`.
 - PlayMode runs in different worktrees collide on the same UDP port: before `test-play` or `check`, look for another Unity process with `-testPlatform PlayMode` and wait for it.
@@ -22,7 +22,12 @@ The main (controller) session opens with the `sc-steward` skill, which reads `do
 - Logs and test results go in the session scratchpad, never in the repo.
 
 ## Cloud sessions (Linux)
-No Unity and no Windows paths (`Tools/cloud/` has the Linux helpers). Push a feature branch, never edit `CURRENT.md`, and report which Unity tests the local run must check. A cloud session may merge into `main` itself when the merge changes nothing under `Assets/`, `Packages/` or `ProjectSettings/`, or when the PC has reported a green `check` on the exact commit.
+A cloud session works like a PC session (user, 2026-10-30): it can be the controller (`sc-steward`, `CURRENT.md`, push to `main`) and merge on its own green `unity.sh check`, which records the same PASS marker. Only one controller at a time, PC or cloud: if `CURRENT.md` or `main`'s log shows another controller active today, ask the user before taking over. Setup and tool details: `docs/superpowers/handoff/cloud-environment.md` (`bash Tools/cloud/setup.sh --check` shows what is ready). PC to cloud:
+- `Tools/unity.ps1 <cmd> -OutDir D` → `bash Tools/cloud/unity.sh <cmd> --out D` (needs the `UNITY_LICENSE` secret; the editor finishes downloading a few minutes into a new session: `bash Tools/cloud/setup.sh --wait`). Without a licence: `python3 Tools/cloud/sc_cloud_compile.py` (C# compile), `sc_shader_check.py`, `sc_core_tests.py`.
+- `Tools/sync-csproj.ps1` → `python3 Tools/cloud/sc_cloud_compile.py --csproj` (the SessionStart hook runs it; re-run after adding files).
+- `C:\Dev\FishGame` → `add_repo` Jxycee/FishGame (read), `git clone --depth 1 https://github.com/Jxycee/fishgame /home/user/fishgame`; don't register it as a session root (its own CLAUDE.md and skills would load). Same rules: copy from it, never edit it.
+- Blender MCP → the "SleepingCalamity Art" cloud environment (setup script with `SC_PROFILE=art`) serves a live Blender as the `blender` MCP server (`Tools/cloud/sc_blender_mcp.py`, also a CLI). Headless `blender -b` works everywhere.
+- Not in the cloud: the Unity MCP and `sc-walk` (they drive an editor window), `Reference/private/`, a GPU.
 
 ## Code conventions
 - Code under `Assets/_Project/`, one assembly per folder: Core (pure C#, no engine), Data, Runtime, Gameplay, Presentation, UI, App, Networking, Editor, Tests/EditMode, Tests/PlayMode. `ArchitectureTests` enforces the forbidden references (Gameplay, Presentation and UI never touch Unity Services or transports).

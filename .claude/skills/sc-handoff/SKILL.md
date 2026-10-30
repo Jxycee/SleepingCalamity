@@ -4,7 +4,7 @@ description: Update docs/superpowers/handoff/CURRENT.md, the running SleepingCal
 ---
 # Updating CURRENT.md
 
-`docs/superpowers/handoff/CURRENT.md` is the project's working memory between sessions. Only the controller on `main` edits it; feature branches and cloud sessions never do.
+`docs/superpowers/handoff/CURRENT.md` is the project's working memory between sessions. Only the controller on `main` edits it (a PC or a cloud session, one at a time); feature branches never do.
 
 Keep it a **state file under 300 lines and about 4,000 tokens** (`wc -w` under ~2,800 words). Claude Code re-reads files after compaction only up to 5,000 tokens, so a bigger file drops out exactly when it is needed.
 

@@ -9,12 +9,14 @@ sources like the editor does, and compiles them in dependency order with Roslyn 
 
 It catches what a cloud session can get wrong in C#: syntax, types, missing members, wrong assembly references (asmdef edges),
 #if UNITY_EDITOR mistakes. It does not run tests, IL post-processing (Netcode RPCs), shaders or anything that needs the editor:
-the PC's `unity.ps1 check` stays the merge gate for Assets/ changes.
+a licensed `unity.ps1 check` (PC) or `Tools/cloud/unity.sh check` (cloud) stays the merge gate for Assets/ changes.
 
 Setup (once per container; see docs/superpowers/handoff/cloud-environment.md):
     python3 Tools/cloud/sc_cloud_compile.py --setup        # downloads the editor (4.2 GB) and the registry packages to ~/unity
 Usage:
-    python3 Tools/cloud/sc_cloud_compile.py [--project PATH] [--only NAME[,NAME]] [--warnings]
+    python3 Tools/cloud/sc_cloud_compile.py [--project PATH] [--only NAME[,NAME]] [--warnings] [--csproj]
+    --csproj also writes <Assembly>.csproj + SleepingCalamity.sln at the project root for the csharp-lsp plugin (what Tools/sync-csproj.ps1
+    gives a PC worktree); the SessionStart hook runs it in cloud sessions. Gitignored: never commit them.
 Exit codes: 0 every project assembly compiled, 1 compile errors, 2 setup missing or usage.
 """
 import argparse
@@ -324,7 +326,7 @@ def find_csc():
     die("no csc.dll found (install the .NET SDK or run --setup)")
 
 
-def compile_all(project, only, warnings):
+def compile_all(project, only, warnings, csproj=False):
     if not os.path.isdir(EDITOR):
         die(f"Unity editor not found at {EDITOR}: run with --setup first")
     roots = package_roots(project)
@@ -399,8 +401,57 @@ def compile_all(project, only, warnings):
         print(f"FAIL  package assembly {n} ({asms[n].package})")
         for line in failed[n][:15]:
             print("      " + line)
+    if csproj:
+        write_csproj(project, built)
     print("PASS" if not bad else "FAIL")
     return 0 if not bad else 1
+
+
+PROJECT_INFO = {}  # project assembly name -> (defines, references, sources, unsafe), filled by compile_one for --csproj
+
+
+def write_csproj(project, built):
+    """Unity-style <Assembly>.csproj files and SleepingCalamity.sln at the project root, for the csharp-lsp plugin (csharp-ls). Gitignored.
+    Project-to-project references become ProjectReference; everything else (engine, framework, packages, plugins) a HintPath Reference."""
+    own = {path: name for name, path in built.items() if name in PROJECT_INFO}
+    names = []
+    for name, (defines, refs, srcs, unsafe) in sorted(PROJECT_INFO.items()):
+        rel = lambda x: os.path.relpath(x, project)
+        lines = ['<Project Sdk="Microsoft.NET.Sdk">', "  <PropertyGroup>",
+                 "    <TargetFramework>netstandard2.1</TargetFramework>", f"    <LangVersion>{LANG_VERSION}</LangVersion>",
+                 f"    <AssemblyName>{name}</AssemblyName>", f"    <DefineConstants>{';'.join(defines)}</DefineConstants>",
+                 "    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>", "    <NoStdLib>true</NoStdLib>",
+                 "    <EnableDefaultItems>false</EnableDefaultItems>", "    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>",
+                 f"    <AllowUnsafeBlocks>{str(unsafe).lower()}</AllowUnsafeBlocks>", "    <NoWarn>1701;1702;0169;0649;0414</NoWarn>",
+                 f"    <BaseIntermediateOutputPath>Temp/cloud-obj/{name}/</BaseIntermediateOutputPath>",
+                 f"    <OutputPath>Temp/cloud-bin/{name}/</OutputPath>",
+                 "  </PropertyGroup>", "  <ItemGroup>"]
+        lines += [f'    <Compile Include="{rel(x)}" />' for x in srcs]
+        lines += ["  </ItemGroup>", "  <ItemGroup>"]
+        for r in refs:
+            if r in own:
+                lines.append(f'    <ProjectReference Include="{own[r]}.csproj" />')
+            else:
+                lines.append(f'    <Reference Include="{os.path.splitext(os.path.basename(r))[0]}"><HintPath>{r}</HintPath><Private>false</Private></Reference>')
+        lines += ["  </ItemGroup>", "</Project>", ""]
+        open(os.path.join(project, f"{name}.csproj"), "w").write("\n".join(lines))
+        names.append(name)
+    # classic .sln: csharp-ls 0.16 loads .sln, not Unity's .slnx
+    ptype = "FAE04EC0-301F-11D3-BF4B-00C04F79EFBC"
+
+    def guid(n):  # stable per assembly name
+        h = hashlib.md5(n.encode()).hexdigest().upper()
+        return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
+    sln = ["", "Microsoft Visual Studio Solution File, Format Version 12.00", "# Visual Studio Version 17"]
+    for n in names:
+        sln += [f'Project("{{{ptype}}}") = "{n}", "{n}.csproj", "{{{guid(n)}}}"', "EndProject"]
+    sln += ["Global", "\tGlobalSection(SolutionConfigurationPlatforms) = preSolution", "\t\tDebug|Any CPU = Debug|Any CPU", "\tEndGlobalSection",
+            "\tGlobalSection(ProjectConfigurationPlatforms) = postSolution"]
+    for n in names:
+        sln += [f"\t\t{{{guid(n)}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU", f"\t\t{{{guid(n)}}}.Debug|Any CPU.Build.0 = Debug|Any CPU"]
+    sln += ["\tEndGlobalSection", "EndGlobal", ""]
+    open(os.path.join(project, "SleepingCalamity.sln"), "w").write("\r\n".join(sln))
+    print(f"wrote {len(names)} .csproj files and SleepingCalamity.sln (gitignored: never commit them)")
 
 
 def compile_one(a, defines, deps, plugins, engine, gens, csc, warnings):
@@ -421,6 +472,8 @@ def compile_one(a, defines, deps, plugins, engine, gens, csc, warnings):
         seen.add(b)
         uniq.append(r)
     srcs = sorted(a.sources)
+    if a.package is None:
+        PROJECT_INFO[a.name] = (sorted(defines), uniq, srcs, a.data.get("allowUnsafeCode", False))
     h = hashlib.sha256()
     for part in [a.name, LANG_VERSION, ";".join(sorted(defines))] + uniq:
         h.update(part.encode())
@@ -465,12 +518,13 @@ def main():
     ap.add_argument("--setup", action="store_true", help="download the editor and packages to ~/unity, then exit")
     ap.add_argument("--only", default="", help="comma-separated project assembly names")
     ap.add_argument("--warnings", action="store_true", help="print compiler warnings for project assemblies")
+    ap.add_argument("--csproj", action="store_true", help="also write <Assembly>.csproj files and SleepingCalamity.sln for the C# LSP (gitignored)")
     a = ap.parse_args()
     if a.setup:
         setup(a.project)
         return 0
     only = {x for x in a.only.split(",") if x}
-    return compile_all(a.project, only, a.warnings)
+    return compile_all(a.project, only, a.warnings, a.csproj)
 
 
 if __name__ == "__main__":

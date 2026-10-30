@@ -43,4 +43,4 @@ Sources: `docs/research/kh1-sweep.md` and `docs/research/kh2-sweep.md`.
 - A hard mode that only multiplies damage.
 
 ## Tooling (2026-10-30)
-- **Cloud `.csproj` generation** for the csharp-lsp plugin: emit project files from `Tools/cloud/sc_cloud_compile.py`'s asmdef resolution so cloud sessions get LSP navigation without a Unity run. Source: cloud setup session (`docs/superpowers/handoff/cloud-environment.md`).
+- ~~Cloud `.csproj` generation~~ built 2026-10-30 (`sc_cloud_compile.py --csproj`).

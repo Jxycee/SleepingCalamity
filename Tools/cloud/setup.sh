@@ -25,9 +25,18 @@
 #   Unity 6000.6.5f1   ~/unity/ed/Editor/Unity (Linux) + the registry packages + DXC: Tools/cloud/unity.sh (batchmode twin of Tools/unity.ps1, needs a
 #                      licence: UNITY_LICENSE or UNITY_SERIAL secrets, see the doc), sc_cloud_compile.py (C# compile, no licence) and sc_shader_check.py
 #
-# NOT provisioned here (needs the user's PC): the live Blender and Unity MCP servers, AssetRipper/REA, a real GPU.
+#   blender MCP        Tools/cloud/sc_blender_mcp.py (a live, windowed Blender under xvfb) registered as the user-scope `blender` MCP server. The repo's
+#                      deniedMcpServers keeps it off, as on the PC, except with SC_PROFILE=art, which lifts the deny in this checkout only
+#   .csproj + .sln     sc_cloud_compile.py --csproj once Unity is in, for the csharp-lsp plugin (the SessionStart hook refreshes them)
+#
+# NOT provisioned here (needs the user's PC): the Unity MCP and a windowed Unity editor, AssetRipper/REA, a real GPU.
 # Web search and web fetch are Claude Code tools, not packages: they need nothing here beyond the environment's network access (Full, or Trusted plus
 # the domains in the doc).
+
+# Profile: "dev" for normal sessions; "art" for the "SleepingCalamity Art" environment (live Blender MCP on). Setup scripts can't read the
+# environment's variables, so an art environment's pasted copy changes this line.
+SC_PROFILE="${SC_PROFILE:-dev}"
+
 set -u
 MODE=full
 case "${1:-}" in
@@ -97,6 +106,8 @@ do_check() {
     row unity-pkgs   "$(ls -d "$HOME/unity/pkgs/"*/ 2>/dev/null | wc -l) registry packages in ~/unity/pkgs"
     row unity-lic    "$(ls "$HOME/.local/share/unity3d/Unity/Unity_lic.ulf" >/dev/null 2>&1 && echo 'licence file present' || echo 'none (needed only to launch Unity; see the doc)')"
     row dxc          "$([ -x "$HOME/dxc/bin/dxc" ] && echo "$HOME/dxc/bin/dxc present" || echo 'MISSING (python3 Tools/cloud/sc_shader_check.py --setup)')"
+    row csproj       "$(ls "$REPO"/*.csproj >/dev/null 2>&1 && echo "$(ls "$REPO"/*.csproj | wc -l) projects + $(ls "$REPO"/*.sln 2>/dev/null | wc -l) sln" || echo 'none yet (python3 Tools/cloud/sc_cloud_compile.py --csproj)')"
+    row blender-mcp  "$( (cd "$HOME" && claude mcp get blender >/dev/null 2>&1) && echo -n 'registered' || echo -n 'not registered'; grep -qi '"blender"' "$REPO/.claude/settings.json" 2>/dev/null && echo ', denied in this checkout (dev profile)' || echo ', allowed in this checkout (art profile)')"
     local f; f="$(git -C "$REPO" ls-files '*.fbx' '*.png' 2>/dev/null | head -1)"; [ -n "$f" ] && f="$REPO/$f"
     row lfs-content  "$([ -f "$f" ] && { head -c 40 "$f" | grep -q 'git-lfs' && echo 'POINTERS (run git lfs pull)' || echo ok; } || echo 'n/a (file not found)')"
 }
@@ -208,6 +219,30 @@ link_bins() {
 }
 step "link into /usr/local/bin" link_bins
 
+# ------------------------------------------------------------------------------------------------ live blender MCP
+say "Blender MCP (profile: $SC_PROFILE)"
+register_blender_mcp() { # user scope, added from $HOME: inside the repo the project's deny list refuses the add
+    [ -f "$REPO/Tools/cloud/sc_blender_mcp.py" ] || { echo "Tools/cloud/sc_blender_mcp.py not on this branch yet"; return 0; }
+    have claude || { echo "claude CLI not found"; return 1; }
+    (cd "$HOME" && claude mcp get blender >/dev/null 2>&1) && return 0
+    (cd "$HOME" && claude mcp add -s user blender -- python3 "$REPO/Tools/cloud/sc_blender_mcp.py" >/dev/null)
+}
+step "register blender MCP (user scope)" register_blender_mcp
+art_profile() { # lift the blender deny in this checkout only; skip-worktree keeps the edit out of commits (CLAUDE.md: never commit it)
+    local f="$REPO/.claude/settings.json"
+    [ -f "$f" ] || return 1
+    python3 - "$f" <<'PY' || return 1
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["deniedMcpServers"] = [e for e in d.get("deniedMcpServers", []) if e.get("serverName", "").lower() != "blender"]
+json.dump(d, open(p, "w"), indent=2)
+open(p, "a").write("\n")
+PY
+    git -C "$REPO" update-index --skip-worktree .claude/settings.json
+}
+[ "$SC_PROFILE" = art ] && step "art profile: blender MCP allowed in this checkout" art_profile
+
 # ------------------------------------------------------------------------------------------------ unity editor + packages + dxc
 # The same layout sc_cloud_compile.py --setup and sc_shader_check.py --setup produce (~/unity/ed/Editor, ~/unity/pkgs/<name>/package + .version, ~/dxc),
 # so those scripts see it as done. Written to a file so it can run detached from this script.
@@ -255,6 +290,10 @@ for name, info in json.load(open(sys.argv[1]))["dependencies"].items():
 PY
 else
     echo "no Packages/packages-lock.json found: registry packages skipped (python3 Tools/cloud/sc_cloud_compile.py --setup fetches them)"
+fi
+if [ -f "$REPO/Tools/cloud/sc_cloud_compile.py" ]; then
+    echo "writing .csproj files for the C# LSP"
+    python3 "$REPO/Tools/cloud/sc_cloud_compile.py" --project "$REPO" --csproj || echo "csproj: compile errors on this commit (projects still written for the assemblies that built)"
 fi
 echo "unity setup done"
 echo DONE > "$STATE/unity.status"

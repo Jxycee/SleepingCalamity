@@ -88,7 +88,7 @@ while IFS= read -r seg; do
     # which are stripped above, so they don't match.
     if printf '%s' "$seg" | grep -Eq '(^|[[:space:]])-projectPath([[:space:]]|$)' \
        && printf '%s' "$cmd" | grep -Eiq 'unity' && ! printf '%s' "$seg" | grep -Eiq 'unity\.ps1'; then
-        block "run Unity through Tools/unity.ps1 (it checks the lock, adds -dev-profile sctest, reads the log and records the PASS marker)."
+        block "run Unity through Tools/unity.ps1 (PC) or Tools/cloud/unity.sh (cloud): they check the lock, add -dev-profile sctest, read the log and record the PASS marker."
     fi
 
     read -r -a words <<< "$seg"
@@ -129,7 +129,7 @@ while IFS= read -r seg; do
                 if unity=$(git diff --name-only "main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) && [ -z "$unity" ]; then
                     continue
                 fi
-                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Check out that commit in C:\\Dev\\SleepingCalamity (not a worktree), run check (it writes $common/sc-check-pass/$sha), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
+                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Check out that commit in C:\\Dev\\SleepingCalamity (not a worktree) and run Tools/unity.ps1 check, or in the cloud run bash Tools/cloud/unity.sh check (both write $common/sc-check-pass/$sha), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
             done
             ;;
     esac
