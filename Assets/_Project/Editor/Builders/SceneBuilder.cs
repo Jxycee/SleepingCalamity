@@ -4,6 +4,7 @@ using SleepingCalamity.App;
 using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Runtime;
+using Unity.Cinemachine;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEditor;
@@ -68,7 +69,9 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.SaveScene(scene, AssetPaths.LobbyScene);
         }
 
-        // The greybox test arena: ground, a light, a camera that overlooks it and the spawn point. Nothing else (M2 adds the hero and camera rig).
+        // The greybox test arena: ground, a light, a camera with a Cinemachine Brain (the owner's hero rig drives it; without one it overlooks the
+        // arena), the spawn point, walls and steps that exercise line of sight, the camera Deoccluder and the height band, and the target dummies
+        // (spawned by the host from the markers under TargetDummies).
         public static void BuildArena()
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -79,6 +82,8 @@ namespace SleepingCalamity.EditorTools
             cameraObject.AddComponent<Camera>();
             cameraObject.AddComponent<AudioListener>();
             cameraObject.transform.SetPositionAndRotation(new Vector3(0f, 14f, -16f), Quaternion.Euler(40f, 0f, 0f));
+            CinemachineBrain brain = cameraObject.AddComponent<CinemachineBrain>();
+            brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.35f);
 
             var sun = new GameObject("Sun");
             sun.AddComponent<Light>().type = LightType.Directional;
@@ -92,7 +97,60 @@ namespace SleepingCalamity.EditorTools
             spawn.AddComponent<SpawnPoint>();
             spawn.transform.position = Vector3.zero;
 
+            BuildArenaStructures();
+            BuildTargetDummies();
+
             BuilderUtil.SaveScene(scene, AssetPaths.ArenaScene);
+        }
+
+        // Walls and steps, all on the Structure layer (line-of-sight and camera rays hit them; the player walks on them).
+        static void BuildArenaStructures()
+        {
+            Material wall = MaterialLibrary.Get("M_GreyboxWall");
+            Material step = MaterialLibrary.Get("M_GreyboxStep");
+            Transform root = new GameObject("Structures").transform;
+
+            // Behind the spawn point: walk back toward it and the camera boom (5 m, 6.5 m locked) runs into it, so the Deoccluder has something to do.
+            Block(root, "Wall_Behind", new Vector3(0f, 1.5f, -6.5f), new Vector3(10f, 3f, 0.5f), wall);
+            // Between the spawn point and the dummy at (-6, 7): a target you can see over there but cannot see through (line of sight).
+            Block(root, "Wall_Sight", new Vector3(-5f, 1.5f, 3.5f), new Vector3(8f, 3f, 0.5f), wall);
+            // Four 0.35 m steps (the controller's step offset is 0.4 m) up to a 1.4 m platform that holds a dummy.
+            for (int i = 1; i <= 4; i++)
+                Block(root, "Step_" + i, new Vector3(4.4f + 0.8f * (i - 1), 0.35f * i * 0.5f, -6f), new Vector3(0.8f, 0.35f * i, 3f), step);
+            Block(root, "Platform_Low", new Vector3(9f, 0.7f, -6f), new Vector3(4f, 1.4f, 4f), step);
+            // A 2.5 m block with no stairs: a dummy on top is outside the soft target's +-2 m height band, but inside the lock's.
+            Block(root, "Block_High", new Vector3(-6f, 1.25f, -5f), new Vector3(4f, 2.5f, 4f), step);
+        }
+
+        static void Block(Transform parent, string name, Vector3 center, Vector3 size, Material material)
+        {
+            GameObject block = BuilderUtil.EnsurePrimitive(parent, name, PrimitiveType.Cube, center, Quaternion.identity, size, material, keepCollider: true);
+            block.layer = Layers.Structure;
+        }
+
+        // Where the host spawns target dummies. Positions are chosen against the 6.5 numbers: D1 is inside the soft cone, D2/D3 at its edge, the
+        // elite sits at 12 m (outside the 10 m acquire range, so you walk up to it, then it never lets go), one dummy is behind a wall, one on
+        // the platform and one on the high block.
+        static void BuildTargetDummies()
+        {
+            var root = new GameObject("TargetDummies");
+            TargetDummySpawner spawner = root.AddComponent<TargetDummySpawner>();
+            spawner.Configure(BuilderUtil.LoadNetworkPrefab(AssetPaths.DummyPrefab));
+            Marker(root.transform, "Dummy_Near", new Vector3(0f, 0f, 4f), false);
+            Marker(root.transform, "Dummy_Left", new Vector3(-4f, 0f, 7f), false);
+            Marker(root.transform, "Dummy_Right", new Vector3(5f, 0f, 8f), false);
+            Marker(root.transform, "Elite", new Vector3(0f, 0f, 12f), true);
+            Marker(root.transform, "Dummy_BehindWall", new Vector3(-6f, 0f, 7f), false);
+            Marker(root.transform, "Dummy_Platform", new Vector3(9f, 1.4f, -6f), false);
+            Marker(root.transform, "Dummy_HighBlock", new Vector3(-6f, 2.5f, -5f), false);
+        }
+
+        static void Marker(Transform parent, string name, Vector3 position, bool elite)
+        {
+            var marker = new GameObject(name);
+            marker.transform.SetParent(parent, false);
+            marker.transform.position = position;
+            marker.AddComponent<TargetDummyMarker>().Configure(elite);
         }
 
         // Build list in SceneNames.BuildOrder order (Bootstrap at index 0).

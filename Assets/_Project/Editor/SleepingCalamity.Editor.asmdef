@@ -10,6 +10,7 @@
         "SleepingCalamity.Presentation",
         "SleepingCalamity.UI",
         "SleepingCalamity.App",
+        "Unity.Cinemachine",
         "Unity.Netcode.Runtime",
         "Unity.Netcode.Editor",
         "Unity.Collections",

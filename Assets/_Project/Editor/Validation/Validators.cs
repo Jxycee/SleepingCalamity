@@ -115,7 +115,7 @@ namespace SleepingCalamity.EditorTools
         {
             InputAction action = asset.FindAction(path);
             if (action == null) { errors.Add("missing action " + path); return; }
-            bool ok = path == InputActionNames.Move || path == InputActionNames.Look
+            bool ok = path == InputActionNames.Move || path == InputActionNames.Look || path == InputActionNames.SwitchTarget
                 ? action.type == InputActionType.Value && action.expectedControlType == "Vector2"
                 : action.type == InputActionType.Button;
             if (!ok) errors.Add("unexpected type for " + path + ": " + action.type + "/" + action.expectedControlType);

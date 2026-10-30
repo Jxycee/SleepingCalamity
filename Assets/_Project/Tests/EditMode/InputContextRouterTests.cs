@@ -24,6 +24,10 @@ namespace SleepingCalamity.Tests.EditMode
                 SecondaryReleased = true,
                 InteractPressed = true,
                 PausePressed = true,
+                LockPressed = true,
+                DodgePressed = true,
+                SwitchX = 1f,
+                SwitchY = -0.5f,
             };
         }
 
@@ -41,6 +45,32 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsTrue(i.SecondaryHeld && i.SecondaryPressed && i.SecondaryReleased, "Secondary");
             Assert.IsTrue(i.InteractPressed, "Interact");
             Assert.IsTrue(i.PausePressed, "Pause");
+            Assert.IsTrue(i.LockPressed, "Lock");
+            Assert.IsTrue(i.DodgePressed, "Dodge");
+        }
+
+        // Catches: the camera stick doing double duty in Free (a look turn would also flick a target switch).
+        [Test]
+        public void InputContextRouter_Free_ZeroesTheSwitchInput()
+        {
+            PlayerIntent i = InputContextRouter.Route(InputContext.Free, AllActive());
+            Assert.AreEqual(0f, i.SwitchX);
+            Assert.AreEqual(0f, i.SwitchY);
+        }
+
+        // Catches: LockOn leaking Look (the camera would fight the lock), or losing the switch input / buttons.
+        [Test]
+        public void InputContextRouter_LockOn_ZeroesLook_PassesSwitchAndTheRest()
+        {
+            PlayerIntent i = InputContextRouter.Route(InputContext.LockOn, AllActive());
+            Assert.AreEqual(0f, i.LookYawDeg);
+            Assert.AreEqual(0f, i.LookPitchDeg);
+            Assert.AreEqual(1f, i.SwitchX, 1e-6f);
+            Assert.AreEqual(-0.5f, i.SwitchY, 1e-6f);
+            Assert.AreEqual(0.5f, i.MoveX, 1e-6f);
+            Assert.AreEqual(-1f, i.MoveY, 1e-6f);
+            Assert.IsTrue(i.LockPressed, "Lock toggles it off again");
+            Assert.IsTrue(i.DodgePressed && i.JumpPressed && i.SprintHeld && i.PrimaryPressed && i.InteractPressed && i.PausePressed);
         }
 
         // Catches: a Menu row that lets look or move through (the camera would turn behind a menu); Pause zeroed (the menu could not close).
@@ -56,12 +86,16 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsFalse(i.JumpPressed || i.SprintHeld || i.InteractPressed);
             Assert.IsFalse(i.PrimaryHeld || i.PrimaryPressed || i.PrimaryReleased);
             Assert.IsFalse(i.SecondaryHeld || i.SecondaryPressed || i.SecondaryReleased);
+            Assert.IsFalse(i.LockPressed || i.DodgePressed);
+            Assert.AreEqual(0f, i.SwitchX);
+            Assert.AreEqual(0f, i.SwitchY);
         }
 
         [Test]
         public void InputContextRouter_EnabledMaps_MenuIsUiOnly()
         {
             Assert.AreEqual(InputMaps.Player, InputContextRouter.EnabledMaps(InputContext.Free));
+            Assert.AreEqual(InputMaps.Player, InputContextRouter.EnabledMaps(InputContext.LockOn));
             Assert.AreEqual(InputMaps.UI, InputContextRouter.EnabledMaps(InputContext.Menu));
         }
 
@@ -69,6 +103,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void InputContextRouter_InteractLive_OnlyOnFoot()
         {
             Assert.IsTrue(InputContextRouter.InteractLive(InputContext.Free));
+            Assert.IsTrue(InputContextRouter.InteractLive(InputContext.LockOn));
             Assert.IsFalse(InputContextRouter.InteractLive(InputContext.Menu));
         }
     }

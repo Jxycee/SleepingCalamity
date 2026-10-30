@@ -9,6 +9,7 @@ namespace SleepingCalamity.EditorTools
     {
         public const string MaterialsFolder = "Assets/_Project/Content/Materials";
         const string LitShaderName = "Universal Render Pipeline/Lit";
+        const string UnlitShaderName = "Universal Render Pipeline/Unlit";
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         public static void BuildAll()
@@ -19,6 +20,13 @@ namespace SleepingCalamity.EditorTools
 
             Ensure(lit, "M_GreyboxGround", new Color(0.46f, 0.50f, 0.42f));
             Ensure(lit, "M_GreyboxPlayer", new Color(0.86f, 0.62f, 0.28f));
+            Ensure(lit, "M_GreyboxDummy", new Color(0.50f, 0.60f, 0.78f));
+            Ensure(lit, "M_GreyboxElite", new Color(0.86f, 0.26f, 0.20f));
+            Ensure(lit, "M_GreyboxWall", new Color(0.58f, 0.54f, 0.50f));
+            Ensure(lit, "M_GreyboxStep", new Color(0.66f, 0.62f, 0.52f));
+            Shader unlit = Shader.Find(UnlitShaderName);
+            if (unlit == null) throw new System.InvalidOperationException("Shader not found: " + UnlitShaderName);
+            Ensure(unlit, "M_LockIndicator", new Color(1f, 0.85f, 0.15f));
         }
 
         // name without extension, e.g. "M_GreyboxGround".
@@ -29,18 +37,18 @@ namespace SleepingCalamity.EditorTools
             return material;
         }
 
-        static void Ensure(Shader lit, string name, Color color)
+        static void Ensure(Shader shader, string name, Color color)
         {
             string path = MaterialsFolder + "/" + name + ".mat";
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
             bool changed = false;
             if (material == null)
             {
-                material = new Material(lit);
+                material = new Material(shader);
                 AssetDatabase.CreateAsset(material, path);
                 changed = true;
             }
-            if (material.shader != lit) { material.shader = lit; changed = true; }
+            if (material.shader != shader) { material.shader = shader; changed = true; }
             if (material.GetColor(BaseColorId) != color) { material.SetColor(BaseColorId, color); changed = true; }
             if (changed) EditorUtility.SetDirty(material);
         }

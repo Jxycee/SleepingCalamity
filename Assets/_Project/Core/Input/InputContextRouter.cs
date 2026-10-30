@@ -9,14 +9,15 @@ namespace SleepingCalamity.Core
             switch (context)
             {
                 case InputContext.Menu: return RouteMenu(in frame);
+                case InputContext.LockOn: return RouteLockOn(in frame);
                 default: return RouteFree(in frame);
             }
         }
 
-        // World interactables (PlayerInteractor): only on foot.
+        // World interactables (PlayerInteractor): on foot, locked on or not.
         public static bool InteractLive(InputContext context)
         {
-            return context == InputContext.Free;
+            return context == InputContext.Free || context == InputContext.LockOn;
         }
 
         // Menu -> UI only; everything else -> Player.
@@ -25,10 +26,24 @@ namespace SleepingCalamity.Core
             return context == InputContext.Menu ? InputMaps.UI : InputMaps.Player;
         }
 
+        // LockOn: everything Free passes, except Look is zeroed (the camera follows the target) and the switch input passes.
+        private static PlayerIntent RouteLockOn(in PlayerInputFrame f)
+        {
+            PlayerIntent i = RouteFree(in f);
+            i.LookYawDeg = 0f;
+            i.LookPitchDeg = 0f;
+            i.SwitchX = f.SwitchX;
+            i.SwitchY = f.SwitchY;
+            return i;
+        }
+
+        // Free: the switch input is zeroed (the same stick is the camera's Look).
         private static PlayerIntent RouteFree(in PlayerInputFrame f)
         {
             return new PlayerIntent
             {
+                LockPressed = f.LockPressed,
+                DodgePressed = f.DodgePressed,
                 MoveX = f.MoveX,
                 MoveY = f.MoveY,
                 LookYawDeg = f.LookYawDeg,

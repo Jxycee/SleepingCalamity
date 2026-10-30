@@ -13,6 +13,7 @@
         "SleepingCalamity.Presentation",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
+        "Unity.Cinemachine",
         "Unity.Netcode.Runtime",
         "Unity.Collections",
         "Unity.InputSystem"

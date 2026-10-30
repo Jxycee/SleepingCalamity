@@ -65,12 +65,14 @@ namespace SleepingCalamity.Tests.EditMode
 
                 Assert.AreEqual(InputActionType.Value, asset.FindAction(InputActionNames.Move).type, "Move type");
                 Assert.AreEqual("Vector2", asset.FindAction(InputActionNames.Move).expectedControlType, "Move control");
+                Assert.AreEqual(InputActionType.Value, asset.FindAction(InputActionNames.SwitchTarget).type, "SwitchTarget type");
+                Assert.AreEqual("Vector2", asset.FindAction(InputActionNames.SwitchTarget).expectedControlType, "SwitchTarget control");
                 Assert.AreEqual(InputActionType.Value, asset.FindAction(InputActionNames.Look).type, "Look type");
                 Assert.AreEqual("Vector2", asset.FindAction(InputActionNames.Look).expectedControlType, "Look control");
 
                 foreach (string name in InputActionNames.PlayerActions)
                 {
-                    if (name == "Move" || name == "Look") continue;
+                    if (name == "Move" || name == "Look" || name == "SwitchTarget") continue;
                     InputAction a = asset.FindAction(InputActionNames.PlayerMap + "/" + name);
                     Assert.AreEqual(InputActionType.Button, a.type, "Player/" + name + " type");
                 }
@@ -112,6 +114,11 @@ namespace SleepingCalamity.Tests.EditMode
                 new[] { InputActionNames.Secondary, "<Gamepad>/leftTrigger", GP },
                 new[] { InputActionNames.Interact, "<Keyboard>/e", KM },
                 new[] { InputActionNames.Interact, "<Gamepad>/buttonWest", GP },
+                new[] { InputActionNames.Lock, "<Keyboard>/tab", KM },
+                new[] { InputActionNames.Lock, "<Gamepad>/rightStickPress", GP },
+                new[] { InputActionNames.SwitchTarget, "<Gamepad>/rightStick", GP },
+                new[] { InputActionNames.Dodge, "<Keyboard>/leftCtrl", KM },
+                new[] { InputActionNames.Dodge, "<Gamepad>/buttonEast", GP },
                 new[] { InputActionNames.Pause, "<Keyboard>/escape", KM },
                 new[] { InputActionNames.Pause, "<Gamepad>/start", GP },
                 new[] { InputActionNames.Submit, "<Keyboard>/enter", KM },
@@ -137,6 +144,10 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.IsTrue(HasCompositePart(move, "down", "<Keyboard>/s", KM), "Move down = S");
                 Assert.IsTrue(HasCompositePart(move, "left", "<Keyboard>/a", KM), "Move left = A");
                 Assert.IsTrue(HasCompositePart(move, "right", "<Keyboard>/d", KM), "Move right = D");
+
+                InputAction sw = asset.FindAction(InputActionNames.SwitchTarget);
+                Assert.IsTrue(HasCompositePart(sw, "left", "<Keyboard>/q", KM), "Switch target left = Q");
+                Assert.IsTrue(HasCompositePart(sw, "right", "<Keyboard>/r", KM), "Switch target right = R");
             }
             finally
             {

@@ -9,7 +9,9 @@ namespace SleepingCalamity.EditorTools
         public const string ProjectFolder = "Assets/_Project";
         public const string NetworkPrefabsListAsset = "Assets/_Project/Content/Network/SleepingCalamityNetworkPrefabs.asset";
         public const string PrefabsFolder = "Assets/_Project/Prefabs";
-        public const string PlayerPrefab = "Assets/_Project/Prefabs/PlayerCapsule.prefab";   // the M1 stand-in player: a capsule NetworkObject (M2 replaces the body)
+        public const string PlayerPrefab = "Assets/_Project/Prefabs/PlayerCapsule.prefab";   // the player: since M2 the mannequin hero (the file keeps its M1 name so its GUID and references survive)
+        public const string DummyPrefab = "Assets/_Project/Prefabs/TargetDummy.prefab";      // M2: a host-spawned target dummy (NetworkObject)
+        public const string CameraRigPrefab = "Assets/_Project/Prefabs/HeroCameraRig.prefab"; // M2: the owner's Cinemachine rig (not networked)
         public const string ScenesFolder = "Assets/_Project/Scenes";
         public const string BootstrapScene = "Assets/_Project/Scenes/Bootstrap.unity";
         public const string LobbyScene = "Assets/_Project/Scenes/Lobby.unity";

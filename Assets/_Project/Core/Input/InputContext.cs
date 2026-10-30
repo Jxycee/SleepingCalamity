@@ -5,6 +5,7 @@ namespace SleepingCalamity.Core
     public enum InputContext : byte
     {
         Free = 0,
-        Menu = 1
+        Menu = 1,
+        LockOn = 2   // M2: hard lock active. Look is zeroed (the camera follows the target) and the right stick / switch keys feed SwitchX/Y instead.
     }
 }
