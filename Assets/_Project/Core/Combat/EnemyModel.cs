@@ -29,13 +29,15 @@ namespace SleepingCalamity.Core.Combat
         public readonly float MoveSpeed, Radius, Height;
         public readonly bool IsElite, CanRage, FrontalBlock, SuperArmorAlways, WeakToFire, IsPest;
         public readonly float StaggerSeconds;   // how long a flinch lasts when not armoured
+        public readonly float VisualReach;      // metres from the enemy's centre to the farthest point of its greybox body in front of it (arm, snout, broom length)
         public readonly AttackData[] Attacks;
         public readonly PartDefinition[] Parts;
 
         public EnemyDefinition(EnemyKind kind, string id, string name, Species species, int hp, float atk, float def, float moveSpeed, float radius, float height,
             AttackData[] attacks, bool isElite = false, bool canRage = true, bool frontalBlock = false, bool superArmorAlways = false, bool weakToFire = false,
-            bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null)
+            bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null, float visualReach = 1f)
         {
+            VisualReach = visualReach;
             Kind = kind; Id = id; Name = name; Species = species; Hp = hp; Atk = atk; Def = def; MoveSpeed = moveSpeed; Radius = radius; Height = height;
             Attacks = attacks; IsElite = isElite; CanRage = canRage; FrontalBlock = frontalBlock; SuperArmorAlways = superArmorAlways; WeakToFire = weakToFire;
             IsPest = isPest; StaggerSeconds = staggerSeconds; Parts = parts ?? Array.Empty<PartDefinition>();
@@ -47,15 +49,19 @@ namespace SleepingCalamity.Core.Combat
         // Tier 2 (floors 3-4) is the DC2 family ratio: life x3, attack x2.3, defence x3.3.
         public const float Tier2Life = 3f, Tier2Atk = 2.3f, Tier2Def = 3.3f;
 
+        // First playtest (2026-10-30): tier 1 hit too hard to read the fight. Tier 1 attack is x0.65 of the 6.6 table (slime 12 -> 7.8, rat-king 18 -> 11.7,
+        // broom 15 -> 9.75, Warden 30 -> 19.5). Tier 2 still multiplies the table value, so it is unchanged (a x3.5 jump from tier 1 now). P9 Placeholder.
+        public const float Tier1Atk = 0.65f;
+
         // 6.6 tier 1 stats. Placeholder: which are weak to fire (the jam, the wooden broom) and which are pests (the rat-king).
         public static readonly EnemyDefinition Slime = new EnemyDefinition(EnemyKind.Slime, "slime", "Jam-jar slime", Species.Slime, 40, 12f, 5f, 2.6f, 0.55f, 1.0f,
-            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f);
+            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f);
         public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 90, 18f, 10f, 4.6f, 0.5f, 1.2f,
-            new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f);
+            new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f);
         public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 60, 15f, 15f, 2.3f, 0.55f, 1.9f,
-            new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f);
+            new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f);
         public static readonly EnemyDefinition DoughWarden = new EnemyDefinition(EnemyKind.DoughWarden, "dough_warden", "Dough Warden", Species.Elite, 600, 30f, 20f, 2.4f, 1.0f, 2.8f,
-            new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f,
+            new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f,
             parts: new[]
             {
                 new PartDefinition("rolling_pin", 70, 1.5f, 1.4f, 0.5f, 0.2f, 1.3f),    // the arm that slams: reached from its right flank
@@ -113,7 +119,7 @@ namespace SleepingCalamity.Core.Combat
             Players = CoopScaling.ClampPlayers(players);
             float life = Tier == 2 ? EnemyCatalog.Tier2Life : 1f;
             MaxHp = (int)MathF.Ceiling(def.Hp * life * CoopScaling.LifeMultiplier(Players) - 1e-4f);
-            Atk = def.Atk * (Tier == 2 ? EnemyCatalog.Tier2Atk : 1f);   // attack is unchanged by the party size (P23)
+            Atk = def.Atk * (Tier == 2 ? EnemyCatalog.Tier2Atk : EnemyCatalog.Tier1Atk);   // attack is unchanged by the party size (P23)
             DefStat = def.Def * (Tier == 2 ? EnemyCatalog.Tier2Def : 1f);
             Hp = MaxHp;
             Revenge = new RevengeGauge(Players);

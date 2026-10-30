@@ -18,7 +18,11 @@ namespace SleepingCalamity.Presentation
         [SerializeField] private Material sparkMaterial, arcMaterial;
 
         private struct Spark { public Transform T; public float Born, Life, Size; }
-        private struct FloatText { public Vector3 Pos; public string Text; public float Born; public Color Color; public bool Big; }
+        // Damage numbers (readability pass): normal 26 pt, weak point 32, finisher/charge 38, crit 46, rising for 1.6 s (was 18/26 pt for 1.1 s).
+        private struct FloatText { public Vector3 Pos; public string Text; public float Born; public Color Color; public int Size; }
+        private struct Arrow { public Transform T; public Vector3 From, To; public float Born, Life; }
+        public const float NumberSeconds = 1.6f, ArrowSpeed = 70f;
+        private readonly List<Arrow> _arrows = new List<Arrow>();
 
         private readonly List<Spark> _sparks = new List<Spark>();
         private readonly List<FloatText> _texts = new List<FloatText>();
@@ -34,6 +38,7 @@ namespace SleepingCalamity.Presentation
             public MeshFilter Filter;
             public MeshRenderer Renderer;
             public AttackData Shown;
+            public int Look;   // 0 whiff / remote, 1 connected
         }
 
         public void Configure(Material spark, Material arc)
@@ -47,6 +52,8 @@ namespace SleepingCalamity.Presentation
             CombatEvents.LocalHitLanded += OnLocalHit;
             CombatEvents.NumberPopped += OnNumber;
             CombatEvents.Cue += OnCue;
+            CombatEvents.ArrowFired += OnArrow;
+            CombatEvents.HeroHurt += OnHeroHurt;
         }
 
         private void OnDisable()
@@ -54,22 +61,29 @@ namespace SleepingCalamity.Presentation
             CombatEvents.LocalHitLanded -= OnLocalHit;
             CombatEvents.NumberPopped -= OnNumber;
             CombatEvents.Cue -= OnCue;
+            CombatEvents.ArrowFired -= OnArrow;
+            CombatEvents.HeroHurt -= OnHeroHurt;
+            foreach (Arrow ar in _arrows) if (ar.T != null) Destroy(ar.T.gameObject);
+            _arrows.Clear();
             foreach (ArcView v in _arcs.Values) if (v.Go != null) Destroy(v.Go);
             _arcs.Clear();
         }
 
         private void OnLocalHit(LocalHit hit)
         {
-            Burst(hit.Point, hit.Attack.IsFinisher || hit.Attack.Kind == AttackKind.Charge ? 1.3f : 0.7f, hit.Part ? new Color(1f, 0.9f, 0.2f) : Color.white);
+            // A bigger, longer spark than before (0.7 -> 1.1 normal, 1.3 -> 2.0 heavy; 0.14 s -> 0.22 s): the contact has to be unmistakable.
+            Burst(hit.Point, hit.Attack.IsFinisher || hit.Attack.Kind == AttackKind.Charge ? 2.0f : 1.1f, hit.Part ? new Color(1f, 0.9f, 0.2f) : Color.white);
             CombatEvents.RaiseCue(hit.Attack.IsFinisher || hit.Attack.Kind == AttackKind.Charge ? CombatCue.HitFinisher : CombatCue.HitNormal, hit.Point);
         }
 
         private void OnNumber(DamageNumber n)
         {
             string text = n.Heal ? "+" + n.Amount : n.Amount.ToString();
-            Color c = n.Heal ? new Color(0.4f, 1f, 0.5f) : n.OnPlayer ? new Color(1f, 0.35f, 0.3f) : n.Crit ? new Color(1f, 0.85f, 0.2f) : n.WeakPart ? new Color(1f, 0.7f, 0.2f) : Color.white;
-            if (n.Blocked) { text += n.OnPlayer ? " (guarded)" : " (blocked)"; c = new Color(0.7f, 0.8f, 1f); }
-            _texts.Add(new FloatText { Pos = n.Position, Text = text, Born = Time.time, Color = c, Big = n.Crit });
+            int size = n.Crit ? 46 : n.Heavy ? 38 : n.WeakPart ? 32 : n.OnPlayer ? 30 : 26;
+            Color c = n.Heal ? new Color(0.4f, 1f, 0.5f) : n.OnPlayer ? new Color(1f, 0.35f, 0.3f) : n.Crit ? new Color(1f, 0.9f, 0.15f) : n.Heavy ? new Color(1f, 0.55f, 0.1f) : n.WeakPart ? new Color(1f, 0.75f, 0.25f) : Color.white;
+            if (n.Crit) text += "!";
+            if (n.Blocked) { text += n.OnPlayer ? " (guarded)" : " (blocked)"; c = new Color(0.7f, 0.8f, 1f); size = 22; }
+            _texts.Add(new FloatText { Pos = n.Position, Text = text, Born = Time.time, Color = c, Size = size });
             if (_texts.Count > 40) _texts.RemoveAt(0);
         }
 
@@ -100,6 +114,7 @@ namespace SleepingCalamity.Presentation
                 case CombatCue.Pop: id = CombatSfx.Pop; break;
                 case CombatCue.Shot: id = CombatSfx.Shot; break;
                 case CombatCue.Spell: id = CombatSfx.Spell; break;
+                case CombatCue.Whiff: id = CombatSfx.Whiff; break;
             }
             if (id != null) _bus.PlayAt(id, at, pitch);
         }
@@ -116,7 +131,36 @@ namespace SleepingCalamity.Presentation
             var block = new MaterialPropertyBlock();
             block.SetColor(BaseColor, color);
             go.GetComponent<Renderer>().SetPropertyBlock(block);
-            _sparks.Add(new Spark { T = go.transform, Born = Time.time, Life = 0.14f, Size = size });
+            _sparks.Add(new Spark { T = go.transform, Born = Time.time, Life = 0.22f, Size = size });
+        }
+
+        // A thin bright arrow that flies from the bow to where the shot ended, every shot (hit or miss), so "did it fire?" is never in doubt.
+        private void OnArrow(Vector3 from, Vector3 to, bool hit)
+        {
+            if (sparkMaterial == null) return;
+            if (_sparkRoot == null) _sparkRoot = new GameObject("Sparks").transform;
+            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            DestroyImmediate(go.GetComponent<Collider>());
+            go.transform.SetParent(_sparkRoot, false);
+            go.transform.localScale = new Vector3(0.06f, 0.06f, 0.9f);
+            go.GetComponent<Renderer>().sharedMaterial = sparkMaterial;
+            var block = new MaterialPropertyBlock();
+            block.SetColor(BaseColor, hit ? new Color(1f, 0.95f, 0.5f) : new Color(0.85f, 0.9f, 1f));
+            go.GetComponent<Renderer>().SetPropertyBlock(block);
+            float life = Mathf.Max(0.05f, Vector3.Distance(from, to) / ArrowSpeed);
+            go.transform.position = from;
+            if ((to - from).sqrMagnitude > 1e-4f) go.transform.rotation = Quaternion.LookRotation(to - from);
+            _arrows.Add(new Arrow { T = go.transform, From = from, To = to, Born = Time.time, Life = life });
+            if (_arrows.Count > 24) { Destroy(_arrows[0].T.gameObject); _arrows.RemoveAt(0); }
+        }
+
+        // A hurt hero flinches (the component is added to the hero the first time, so the hero prefab needs no edit).
+        private void OnHeroHurt(HeroCombat hero, bool guarded)
+        {
+            if (hero == null || guarded) return;
+            HeroFlinch f = hero.GetComponent<HeroFlinch>();
+            if (f == null) f = hero.gameObject.AddComponent<HeroFlinch>();
+            f.Trigger();
         }
 
         private void Update()
@@ -129,7 +173,14 @@ namespace SleepingCalamity.Presentation
                 if (s.T == null || k >= 1f) { if (s.T != null) Destroy(s.T.gameObject); _sparks.RemoveAt(i); continue; }
                 s.T.localScale = Vector3.one * (s.Size * Mathf.Lerp(0.25f, 1f, k) * (1f - 0.5f * k));
             }
-            for (int i = _texts.Count - 1; i >= 0; i--) if (now - _texts[i].Born > 1.1f) _texts.RemoveAt(i);
+            for (int i = _texts.Count - 1; i >= 0; i--) if (now - _texts[i].Born > NumberSeconds) _texts.RemoveAt(i);
+            for (int i = _arrows.Count - 1; i >= 0; i--)
+            {
+                Arrow ar = _arrows[i];
+                float k = (now - ar.Born) / ar.Life;
+                if (ar.T == null || k >= 1f) { if (ar.T != null) Destroy(ar.T.gameObject); _arrows.RemoveAt(i); continue; }
+                ar.T.position = Vector3.Lerp(ar.From, ar.To, k);
+            }
             UpdateArcs();
         }
 
@@ -159,9 +210,19 @@ namespace SleepingCalamity.Presentation
                 if (v.Shown != a)
                 {
                     v.Shown = a;
+                    v.Look = -1;
                     v.Filter.sharedMesh = a.Shape == HitShape.Circle ? ShapeMeshes.Disc(a.Range) : ShapeMeshes.Wedge(a.Range, a.HalfAngleDeg);
+                }
+                // A swing that has landed a hit lights up warm and strong; one that has hit nothing (yet) stays a dim cool smudge. (Remote heroes: always dim.)
+                int look = h.SwingConnected ? 1 : 0;
+                if (v.Look != look)
+                {
+                    v.Look = look;
                     var block = new MaterialPropertyBlock();
-                    block.SetColor(BaseColor, a.IsFinisher || a.Kind == AttackKind.Charge ? new Color(1f, 0.55f, 0.1f, 0.45f) : a.Kind == AttackKind.Spell ? new Color(1f, 0.3f, 0.1f, 0.45f) : new Color(0.9f, 0.95f, 1f, 0.3f));
+                    bool heavy = a.IsFinisher || a.Kind == AttackKind.Charge;
+                    Color c = look == 1 ? (heavy ? new Color(1f, 0.5f, 0.08f, 0.6f) : new Color(1f, 0.85f, 0.35f, 0.5f))
+                                        : (a.Kind == AttackKind.Spell ? new Color(1f, 0.3f, 0.1f, 0.35f) : new Color(0.75f, 0.85f, 1f, 0.14f));
+                    block.SetColor(BaseColor, c);
                     v.Renderer.SetPropertyBlock(block);
                 }
                 Vector3 p = h.transform.position;
@@ -181,14 +242,18 @@ namespace SleepingCalamity.Presentation
             foreach (FloatText t in _texts)
             {
                 float age = now - t.Born;
-                Vector3 sp = cam.WorldToScreenPoint(t.Pos + Vector3.up * (age * 1.2f));
+                Vector3 sp = cam.WorldToScreenPoint(t.Pos + Vector3.up * (age * 0.9f));
                 if (sp.z <= 0f) continue;
-                _style.fontSize = t.Big ? 26 : 18;
+                float pop = 1f + 0.5f * Mathf.Clamp01(1f - age / 0.12f);   // a quick pop on appearing
+                _style.fontSize = Mathf.RoundToInt(t.Size * pop);
                 Color c = t.Color;
-                c.a = Mathf.Clamp01(1.4f - age);
-                var rect = new Rect(sp.x - 70f, Screen.height - sp.y - 15f, 140f, 30f);
+                c.a = Mathf.Clamp01((NumberSeconds - age) * 2.5f);
+                float w = 220f, hgt = t.Size * 1.6f;
+                var rect = new Rect(sp.x - w * 0.5f, Screen.height - sp.y - hgt * 0.5f, w, hgt);
                 GUI.color = new Color(0f, 0f, 0f, c.a);
-                GUI.Label(new Rect(rect.x + 1.5f, rect.y + 1.5f, rect.width, rect.height), t.Text, _style);
+                for (int dx = -2; dx <= 2; dx += 4)
+                    for (int dy = -2; dy <= 2; dy += 4)
+                        GUI.Label(new Rect(rect.x + dx, rect.y + dy, rect.width, rect.height), t.Text, _style);   // a dark outline so it reads on any floor
                 GUI.color = c;
                 GUI.Label(rect, t.Text, _style);
             }

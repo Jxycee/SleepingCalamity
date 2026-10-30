@@ -10,15 +10,17 @@ namespace SleepingCalamity.Core
     {
         public const string Hit = "Combat_Hit", HitHeavy = "Combat_HitHeavy", HitCrit = "Combat_HitCrit", Whoosh = "Combat_Whoosh", Block = "Combat_Block",
             Parry = "Combat_Parry", Slam = "Combat_Slam", Hurt = "Combat_Hurt", Pop = "Combat_Pop", Heal = "Combat_Heal", Spell = "Combat_Spell",
-            Shot = "Combat_Shot", Dodge = "Combat_Dodge", Telegraph = "Combat_Telegraph", Die = "Combat_Die";
+            Shot = "Combat_Shot", Dodge = "Combat_Dodge", Telegraph = "Combat_Telegraph", Die = "Combat_Die", Whiff = "Combat_Whiff";
 
         private const float TwoPi = 2f * MathF.PI;
 
         public static readonly SfxRecipe[] Recipes =
         {
-            R(Hit, 0.16f, 0.8f, 0.04f), R(HitHeavy, 0.30f, 0.95f, 0.06f), R(HitCrit, 0.30f, 0.9f, 0.08f), R(Whoosh, 0.20f, 0.5f, 0.05f), R(Block, 0.22f, 0.7f, 0.05f),
-            R(Parry, 0.35f, 0.85f, 0.08f), R(Slam, 0.50f, 1.0f, 0.15f), R(Hurt, 0.22f, 0.9f, 0.10f), R(Pop, 0.22f, 0.7f, 0.10f), R(Heal, 0.45f, 0.6f, 0.15f),
-            R(Spell, 0.45f, 0.8f, 0.15f), R(Shot, 0.20f, 0.7f, 0.05f), R(Dodge, 0.18f, 0.45f, 0.08f), R(Telegraph, 0.25f, 0.6f, 0.15f), R(Die, 0.45f, 0.9f, 0.10f),
+            // Readability pass (2026-10-30): a landed hit is the loudest thing in the mix (Hit 0.8 -> 1.0, HitHeavy 0.95 -> 1.0, HitCrit 0.9 -> 1.0) and the swing
+            // whoosh sits under it (0.5 -> 0.3), so a hit and a whiff never sound alike. Whiff is the new dull "nothing there" cue (0.3).
+            R(Hit, 0.16f, 1.0f, 0.04f), R(HitHeavy, 0.30f, 1.0f, 0.06f), R(HitCrit, 0.30f, 1.0f, 0.08f), R(Whoosh, 0.20f, 0.3f, 0.05f), R(Block, 0.22f, 0.7f, 0.05f),
+            R(Parry, 0.35f, 0.85f, 0.08f), R(Slam, 0.50f, 1.0f, 0.15f), R(Hurt, 0.22f, 1.0f, 0.10f), R(Pop, 0.22f, 0.7f, 0.10f), R(Heal, 0.45f, 0.6f, 0.15f),
+            R(Spell, 0.45f, 0.8f, 0.15f), R(Shot, 0.20f, 0.7f, 0.05f), R(Dodge, 0.18f, 0.45f, 0.08f), R(Telegraph, 0.25f, 0.6f, 0.15f), R(Die, 0.45f, 0.9f, 0.10f), R(Whiff, 0.14f, 0.3f, 0.05f),
         };
 
         private static SfxRecipe R(string id, float seconds, float volume, float minInterval) =>
@@ -44,6 +46,7 @@ namespace SleepingCalamity.Core
                 case Dodge: Swell(o, ref rng, 0.15f, 0.9f); break;
                 case Telegraph: Tone(o, sr, 440f, 330f, 6f, 0.5f); Tone(o, sr, 466f, 349f, 6f, 0.5f); break;
                 case Die: Thump(o, sr, 260f, 55f, 7f, 0.8f); Noise(o, ref rng, 12f, 0.3f, 0.6f); break;
+                case Whiff: Swell(o, ref rng, 0.5f, 0.35f); break;   // a short, soft, dull breath of air
                 default: return false;
             }
             return true;

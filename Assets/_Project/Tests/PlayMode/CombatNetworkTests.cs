@@ -215,8 +215,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => clientEnemy.Attacking, 2f, "the client never saw the enemy attack");
             yield return PlayModeHarness.WaitUntil(() => clientVitalsOnHost.Model.Hp < 100, 3f, "an enemy hit on a client that did not dodge never reached the host");
             yield return PlayModeHarness.WaitUntil(() => clientVitalsOnClient.Hp < 100, 3f, "the client never saw its own HP drop");
-            Assert.That(clientVitalsOnHost.Model.Hp, Is.EqualTo(89), "the control hit");
-            Assert.That(clientVitalsOnClient.Hp, Is.EqualTo(89), "both peers agree");
+            Assert.That(clientVitalsOnHost.Model.Hp, Is.EqualTo(92), "the control hit: 8 damage (12 x 0.65 x 100/110 = 7.09 -> 8; was 11, hp 89)");
+            Assert.That(clientVitalsOnClient.Hp, Is.EqualTo(92), "both peers agree");
 
             // Reset the hero, let the first attack end, and do it again with a roll started as the attack appears.
             yield return Seconds(1.4f);

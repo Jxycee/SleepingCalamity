@@ -50,7 +50,7 @@ namespace SleepingCalamity.Gameplay
         private int _hitsInSwing;
         private int _pendingWeapon = -1;   // owner: the heirloom asked for and not yet confirmed by the host (a second F5 inside one round trip builds on it)
         private byte _swingWeapon, _swingPrior;   // the heirloom index and the chain's prior hits when the current swing began (sent with every hit of it)
-        private bool _shotFired, _wasDodging, _guarding, _aiming, _wasGuarding;
+        private bool _shotFired, _wasDodging, _guarding, _aiming, _wasGuarding, _whiffChecked;
         private float _guardStart, _reviveReport, _hurtLock, _dodgeBuffer;
         private int _swingSerial, _published;
         private Vector3 _impulse;
@@ -77,6 +77,7 @@ namespace SleepingCalamity.Gameplay
         public bool ShowGuard => IsOwner ? _guarding : _net != null && _net.StanceIsGuarding;
         public bool ShowAim => IsOwner ? _aiming : _net != null && _net.StanceIsAiming;
         public bool IsUp => _vitals == null || _vitals.IsUp;
+        public bool SwingConnected => IsOwner && _hitsInSwing > 0;   // owner only: the current swing has landed a hit (the arc turns warm; a whiff stays dim)
         public int ComboCount => _machine.ComboCount;
 
         // The attack being shown (owner: the machine; remote: from NetSwing) and its frame (60 Hz), for the swing visuals on every peer.
@@ -202,7 +203,17 @@ namespace SleepingCalamity.Gameplay
             if (wasSwinging && !_machine.Active) PublishSwing(NoAttack);   // so remote copies stop showing it
             if (_pendingWeapon == current) _pendingWeapon = -1;
         }
-        private void OnSwingChanged(uint previous, uint current) { _remoteClock = 0f; _seenSwing = current; }
+        private void OnSwingChanged(uint previous, uint current)
+        {
+            _remoteClock = 0f;
+            _seenSwing = current;
+            if (!IsOwner && (int)((current >> 16) & 0xFF) == AttackSet.Special && Family == WeaponFamily.Bow)
+            {
+                // A remote archer loosed an arrow: draw its flight (a straight line to the end of its range; the hit itself is the host's business).
+                Vector3 o = transform.position + Vector3.up * ShotHeight;
+                CombatEvents.RaiseArrow(o, o + transform.forward * AttackCatalog.Bow.Attacks[AttackSet.Special].Range, false);
+            }
+        }
 
         private void ApplyWeapon()
         {
@@ -278,6 +289,7 @@ namespace SleepingCalamity.Gameplay
             bool free = !dodging && _machine.CanCancel && _hurtLock <= 0f;
             _guarding = family == WeaponFamily.Dagger && intent.SecondaryHeld && free;
             _aiming = family == WeaponFamily.Bow && intent.SecondaryHeld && (free || _machine.Active && _machine.Current.Kind == AttackKind.Shot);
+            if (!_aiming) _machine.ClearSpecialBuffer();   // a shot press only waits while the aim button is still held
             if (_guarding && !_wasGuarding) _guardStart = Time.time;
             _wasGuarding = _guarding;
 
@@ -289,7 +301,7 @@ namespace SleepingCalamity.Gameplay
                 if (_aiming && intent.PrimaryPressed)
                 {
                     ai.Pressed = false;
-                    startedSpecial = _machine.TryStartSpecial();
+                    startedSpecial = _machine.RequestSpecial();   // busy (the previous shot's recovery): the press is buffered, not lost
                 }
                 else if (family == WeaponFamily.Staff && intent.SecondaryPressed && _mirror.Pips > 0 && _machine.CanCancel)
                 {
@@ -309,7 +321,12 @@ namespace SleepingCalamity.Gameplay
             if (_machine.Active)
             {
                 AttackData a = _machine.Current;
-                if (_machine.HitboxOn) DetectHits(a);
+                if (_machine.HitboxSwept) DetectHits(a);   // swept: a clock that steps over a short window (the shot's single frame) still fires it
+                if (!_whiffChecked && a.Kind != AttackKind.Shot && a.Kind != AttackKind.Spell && _machine.Frame >= a.HitOn.End)
+                {
+                    _whiffChecked = true;
+                    if (_hitsInSwing == 0) CombatEvents.RaiseCue(CombatCue.Whiff, transform.position + Vector3.up);   // swung at nothing: a different, dull sound
+                }
             }
 
             JudgeIncoming(dt);
@@ -323,6 +340,7 @@ namespace SleepingCalamity.Gameplay
             _swingHit.Clear();
             _hitsInSwing = 0;
             _shotFired = false;
+            _whiffChecked = false;
             _swingSerial++;
             _swingWeapon = NetWeapon.Value;
             _swingPrior = (byte)Mathf.Clamp(_machine.PriorHits, 0, 255);
@@ -383,22 +401,61 @@ namespace SleepingCalamity.Gameplay
             }
         }
 
+        public const float ShotHeight = 1.3f, ShotAssistDeg = 10f, ShotRadius = 0.25f;
+
+        private static Vector3 EnemyCentre(Enemy e) => e.transform.position + Vector3.up * (e.Def.Height * 0.5f);
+
+        // The aimed shot. Root cause of "the bow does not fire sometimes" (docs/design/m3-combat-greybox.md): (1) its hitbox is ONE 60 Hz frame and the old
+        // once-per-rendered-frame check stepped over it under 60 fps (fixed in AttackMachine.HitboxSwept); (2) a click during the previous shot's recovery was
+        // dropped (RequestSpecial buffers it); (3) the ray left at 1.4 m along the hero's facing, over the top of the slime (1.0 m) and the rat-king (1.2 m), and
+        // aimed at a Targetable.AimPoint that sits ABOVE a slime. Now: from chest height, along the camera's aim, snapped to the enemy nearest the crosshair
+        // (within ShotAssistDeg), at its body centre, with a thick ray. Every shot draws an arrow, hit or miss.
         private void FireShot(AttackData a)
         {
-            Vector3 origin = transform.position + Vector3.up * 1.4f;
-            Vector3 dir = transform.forward;
+            Vector3 origin = transform.position + Vector3.up * ShotHeight;
+            float yaw = _loco != null ? _loco.ViewYawDeg : transform.eulerAngles.y;
+            Vector3 dir = new Vector3(Mathf.Sin(yaw * Mathf.Deg2Rad), 0f, Mathf.Cos(yaw * Mathf.Deg2Rad));
+
+            Enemy aimed = null;
             Targetable t = _lock != null ? (_lock.Locked != null ? _lock.Locked : _lock.Soft) : null;
             if (t != null)
             {
-                Vector3 to = t.AimPoint - origin;
-                if (to.sqrMagnitude > 0.25f && Vector3.Angle(transform.forward, new Vector3(to.x, 0f, to.z)) < 75f) dir = to.normalized;
+                Enemy le = t.GetComponent<Enemy>();
+                if (le != null && le.Alive)
+                {
+                    Vector3 flat = EnemyCentre(le) - origin;
+                    flat.y = 0f;
+                    if (flat.sqrMagnitude > 0.04f && Vector3.Angle(dir, flat) < 75f) aimed = le;
+                }
             }
+            if (aimed == null)
+            {
+                float best = float.MaxValue;
+                IReadOnlyList<Enemy> all = Enemy.All;
+                for (int i = 0; i < all.Count; i++)
+                {
+                    Enemy e = all[i];
+                    if (e == null || !e.IsSpawned || e.NetworkManager != NetworkManager || !e.Alive) continue;
+                    Vector3 to = EnemyCentre(e) - origin;
+                    Vector3 flat = new Vector3(to.x, 0f, to.z);
+                    float dist = flat.magnitude;
+                    if (dist > a.Range || dist < 0.05f) continue;
+                    float slack = Mathf.Asin(Mathf.Min(1f, e.Def.Radius / dist)) * Mathf.Rad2Deg;
+                    float angle = Vector3.Angle(dir, flat);
+                    if (angle > ShotAssistDeg + slack) continue;
+                    if (angle < best) { best = angle; aimed = e; }
+                }
+            }
+            if (aimed != null) dir = (EnemyCentre(aimed) - origin).normalized;
+
             int mask = Layers.Mask(Layers.Enemy) | Layers.Mask(Layers.Structure) | Layers.Mask(Layers.Ground);
-            RaycastHit[] hits = Physics.RaycastAll(origin, dir, a.Range, mask, QueryTriggerInteraction.Ignore);
+            RaycastHit[] hits = Physics.SphereCastAll(origin, ShotRadius, dir, a.Range, mask, QueryTriggerInteraction.Ignore);
             System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
+            Vector3 end = origin + dir * a.Range;
+            bool landed = false;
             foreach (RaycastHit h in hits)
             {
-                if (h.collider.gameObject.layer != Layers.Enemy) break;   // a wall stops the arrow
+                if (h.collider.gameObject.layer != Layers.Enemy) { end = h.distance > 0.001f ? h.point : origin; break; }   // a wall stops the arrow
                 Enemy e = h.collider.GetComponentInParent<Enemy>();
                 if (e == null || e.NetworkManager != NetworkManager || !e.Alive) continue;
                 int part = -1;
@@ -409,9 +466,12 @@ namespace SleepingCalamity.Gameplay
                     Vector3 closest = origin + dir * Mathf.Max(0f, Vector3.Dot(pc - origin, dir));
                     if ((closest - pc).sqrMagnitude <= e.Def.Parts[p].Radius * e.Def.Parts[p].Radius) { part = p; break; }
                 }
-                RegisterHit(a, e, part, h.point);
+                end = h.distance > 0.001f ? h.point : EnemyCentre(e);   // a sphere that starts inside the capsule reports no point
+                RegisterHit(a, e, part, end);
+                landed = true;
                 break;
             }
+            CombatEvents.RaiseArrow(origin, end, landed);
         }
 
         private void RegisterHit(AttackData a, Enemy e, int part, Vector3 point)
@@ -421,6 +481,7 @@ namespace SleepingCalamity.Gameplay
             _machine.RegisterHit();
             int stop = _budget.Request(a.HitstopFrames, Time.time);
             _machine.Freeze(stop);
+            e.ShowHit(transform.position, a.IsFinisher || a.Kind == AttackKind.Charge ? 1f : a.Kind == AttackKind.Shot ? 0.4f : 0.5f);   // white flash and squash at contact
             CombatEvents.RaiseLocalHit(new LocalHit(point, a, part >= 0, a.CameraKick));
             CombatEvents.RaiseKick(a.CameraKick);
             SubmitHitServerRpc(_swingSerial, _swingWeapon, (byte)_machine.CurrentIndex, _swingPrior, e.NetworkObjectId, (sbyte)part, transform.position, transform.eulerAngles.y);
@@ -495,6 +556,7 @@ namespace SleepingCalamity.Gameplay
             {
                 CombatEvents.RaiseCue(CombatCue.PlayerHurt, me);
                 CombatEvents.RaiseKick(0.5f);
+                CombatEvents.RaiseHurtFrom(toEnemy);   // the red screen-edge flash on the side it came from
                 if (!_machine.SuperArmor)
                 {
                     if (_machine.Active) { PublishSwing(NoAttack); _machine.Interrupt(); }
@@ -595,7 +657,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (NetworkManager == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
             Vector3 at = obj.transform.position + Vector3.up * 1.6f;
-            CombatEvents.RaiseNumber(new DamageNumber(at, damage, (flags & FlagCrit) != 0, (flags & FlagBlocked) != 0, false, false, (flags & FlagWeakPart) != 0));
+            CombatEvents.RaiseNumber(new DamageNumber(at, damage, (flags & FlagCrit) != 0, (flags & FlagBlocked) != 0, false, false, (flags & FlagWeakPart) != 0, (flags & FlagFinisher) != 0));
             if (!IsOwner)   // the owner already played the hit locally, at the moment of contact
                 CombatEvents.RaiseCue((flags & FlagFinisher) != 0 ? CombatCue.HitFinisher : (flags & FlagBlocked) != 0 ? CombatCue.Blocked : CombatCue.HitNormal, at);
             else if ((flags & FlagBlocked) != 0) CombatEvents.RaiseCue(CombatCue.Blocked, at);
@@ -614,6 +676,7 @@ namespace SleepingCalamity.Gameplay
             if (!guarded) { HurtSerial++; HurtWasHeavy = HeroAnimMap.IsHeavyHurt(damage, _vitals != null ? _vitals.MaxHp : 0); }
             Vector3 at = transform.position + Vector3.up * 2.1f;
             CombatEvents.RaiseNumber(new DamageNumber(at, damage, false, guarded, true, false, false));
+            CombatEvents.RaiseHeroHurt(this, guarded);
             if (!IsOwner) CombatEvents.RaiseCue(guarded ? CombatCue.Guarded : CombatCue.PlayerHurt, transform.position);
         }
 

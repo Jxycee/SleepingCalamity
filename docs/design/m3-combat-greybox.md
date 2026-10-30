@@ -49,13 +49,88 @@ Debug: F5 cycles the four heirlooms (axe, staff, dagger and shield, bow and swor
 1. In the editor: menu **SleepingCalamity > Dev > Combat Arena** (tick it once; it is remembered), then **Auto Solo** if you want to skip the dev panel, and press
    Play from the Bootstrap scene. Or in the dev panel (top-left in the Lobby) tick "Start in the combat arena (M3)" and press Solo. Or start the player with
    `-dev-combat -dev-solo`.
-2. Wave 1 arrives after 4 s: four slimes. Wave 2: slimes and rat-kings. Wave 3: brooms and rat-kings. Wave 4: the Dough Warden and two slimes. Waves 5 and up
+2. Wave 1 arrives after 4 s: two slimes. Wave 2: three slimes and a rat-king. Wave 3: brooms and rat-kings. Wave 4: the Dough Warden and two slimes. Waves 5 and up
    repeat these at tier 2 (life x3, attack x2.3, defence x3.3). A wave takes 40 s to 2 min; four waves is about five minutes.
 3. Try each heirloom (F5) against the same wave. What to judge: hit feel (hitstop, sound, camera kick), the combo rhythm, dodge timing and how late a roll can be,
    guard and parry on the dagger, the broom (front blocks 80%: flank it, or finish with the axe), the Warden (read the telegraph, break the arm and crown for
    healing, watch the revenge bar).
 4. Two players: the host starts a multiplayer dev-direct world and the second instance joins (Multiplayer Play Mode or a second build): `-dev-combat` on the host.
    Enemy life and count scale with the party. Downed players are revived by holding E for 3 s.
+
+## Readability pass (branch `m3-readability`, 2026-10-30)
+First playtest of the arena: "very hard to progress in the waves; not sure when I'm hitting something or how they hit me from a distance; the bow does not
+work sometimes (no arrow fires at all)". Everything below is a P9 Placeholder; all numbers are data (`AttackCatalog`, `EnemyCatalog`, `ArenaWaves`, `CombatSfx`).
+
+### The bow bug (root cause)
+Three causes, all hidden because a shot had no visual at all:
+1. **The shot's hitbox is one 60 Hz frame (frames 4-5)** and the owner only tested the attack clock once per rendered frame. Under 60 fps (the editor, any hitch)
+   the clock stepped over the window, so `FireShot` never ran while the shot's sound had already played at the press. Fixed in Core: `AttackMachine.HitboxSwept`
+   covers every frame the clock passed this tick; `HeroCombat` uses it for all attacks. Test: `BowReadabilityTests` (red before the fix at dt = 1/35 and slower)
+   and a PlayMode shot at 20 fps.
+2. **A click during the previous shot's 20-frame recovery was thrown away** (fast clicking fired every other shot). `AttackMachine.RequestSpecial` buffers the press
+   (0.25 s plus the time to the cancel frame) while the aim button is held.
+3. **The ray flew over short enemies**: it left at 1.4 m along the hero's facing (a slime is 1.0 m tall, a rat-king 1.2 m) and aimed at `Targetable.AimPoint`, which sits
+   above a slime. Now: from 1.3 m, along the camera's aim, snapped to the enemy nearest the crosshair within 10 degrees (plus its body width) at its body centre, a
+   0.25 m thick cast. A drawn arrow (a bright streak, 70 m/s) now flies on every shot, hit or miss, for every peer's bow.
+
+### Your hits read
+| What | Old | New |
+|---|---|---|
+| Enemy flash on a landed hit | on the HP change, a round trip later, fade 0.17 s | at contact (the attacker's client), full white 0.08 s then fades 0.12 s |
+| Enemy reaction | none | squash 18-40% and a shove 0.18-0.53 m away from the attacker over 0.2 s (heavy hits more) |
+| Hit spark | size 0.7 / 1.3 (finisher), 0.14 s | 1.1 / 2.0, 0.22 s |
+| Damage numbers | 18 pt (crit 26), 1.1 s, no outline | 26 pt, weak point 32, finisher or charge 38 (orange), crit 46 (gold, "!"), 1.6 s, dark outline, a pop on appearing |
+| Screen hit marker | none | a white X at screen centre for 0.18 s (gold and bigger on a finisher or charge) |
+| Hit sound volume | Hit 0.8, HitHeavy 0.95, HitCrit 0.9 | all 1.0 |
+| Swing whoosh volume | 0.5 | 0.3 (a hit is always louder than a swing) |
+| Whiff | same as any swing | a new dull `Combat_Whiff` (0.3) when the hit window ends with no hit; the swing arc stays a dim blue smudge, and turns warm and strong on a connected swing |
+| Hitstop frames (normal / finisher / charge) | axe 4/10/10, staff 3/8/9, dagger 3/8/8, bow-sword 4/9/9; spell 6, shot 3 | axe 6/14/14, staff 5/12/12, dagger 4/11/11, bow-sword 5/12/12; spell 8, shot 4 |
+| Hitstop budget | 12 frames per 0.5 s | 16 (so a 14-frame finisher is never clipped) |
+
+The recorded Kenney clips replace the generated hit and whoosh sounds by file, but the cue's volume comes from the recipe, so the volume edits apply to them too.
+
+### Their hits read
+- **Telegraph footprint** (`Core/Combat/Telegraph.cs`, drawn by `EnemyVisual`): built from the same `AttackData` and the same `HitGeometry` rules as the hit test, so the
+  drawn area is where the hero's centre gets hit (range grown by the hero's radius, a cone's edge widened by the body's slack; `TelegraphTests` prove it point by point). It
+  fills from the centre outward up to the strike frame, turns solid red while the hitbox is live, and fades 8 frames later. A lunge or hop is drawn around its **landing
+  spot** with a lane to it (before, the disc sat at the enemy's own spot and travelled with it). The lunge now always ends before the hitbox opens, a rule
+  (`EnemyAttackRules`) tested for every attack.
+- **The glob lob** has a visible ball that flies in an arc and lands on the strike frame; lob reach 8.5 m -> 6.5 m.
+- **Reach vs look** (`EnemyDefinition.VisualReach` = how far the greybox body extends in front; the rule is range <= VisualReach + 0.6, tested). Range in metres and wind-up
+  (frames before the hitbox opens, 60 per second), old -> new:
+
+| Attack | Range | Wind-up | Lunge |
+|---|---|---|---|
+| Slime hop (circle) | 1.5 -> 1.1 | 30 -> 34 | 2.2 m, ends at the strike |
+| Slime glob (lob circle) | 1.6 -> 1.3 | 42 -> 46 | none |
+| Rat-king lunge (cone) | 2.3 -> 1.45 (half angle 40 -> 42) | 16 -> 28 | 3.4 m; the old hit window ended with the lunge (about 5.7 m of reach from the start), now the lunge ends before it opens |
+| Rat-king tail spin (circle) | 2.5 -> 1.45 | 28 -> 30 | none |
+| Broom sweep (cone) | 3.1 -> 2.4 | 32 -> 36 | none |
+| Broom poke (cone) | 2.2 -> 1.9 | 22 -> 28 | 1.2 m, now ends before the strike |
+| Warden slam / flour sweep / oven-door pound | 3.6 / 3.8 / 4.4 -> 3.0 each | unchanged (56 / 40 / 72) | none |
+| Warden break free | 4.0 -> 3.0 | 18 -> 30 | none |
+
+  The AI's "start the attack" reach is now `Range + 0.7 x lunge + 0.2` for every shape (circles used to ignore their lunge).
+- **When the hero is hurt:** a red wash and a bright band on the screen edge on the side the hit came from (relative to the camera, 0.55 s), the hurt sound at full
+  volume, and a 0.25 s flinch (the body kicks back 18 degrees and dips 8 cm). With the Animator hero (Y Bot) the flinch is the clips' Hurt / HurtHeavy, driven by `HeroCombat.HurtSerial`; `HeroFlinch` (added to the hero at runtime) is only the
+  mannequin fallback and does nothing while an `AnimatorHeroDriver` is working.
+
+### Difficulty and HUD
+- Tier 1 enemy attack x0.65 (`EnemyCatalog.Tier1Atk`): slime 12 -> 7.8, rat-king 18 -> 11.7, broom 15 -> 9.75, Warden 30 -> 19.5 (the 6.6 table values stay the base). A
+  slime hop did 11 damage to the 100 HP hero, now 8. **Tier 2 is unchanged** (the table value x2.3), so the step from wave 4 to wave 5 is now x3.5: expected, tune after the retest.
+- Wave 1: four slimes -> **two slimes**. Wave 2: two slimes + two rat-kings -> **three slimes + one rat-king**. Waves 3 and 4 unchanged.
+- HUD: a big "Wave N - X left" line (34 pt, outlined) at the top centre; the hero's HP bar is 380 x 36 (was 280 x 22) with a large number, green, then amber, then a
+  pulsing red below 30%. The target enemy's bar moved down under the wave line.
+
+## Playtest checklist (answer yes or no after the next arena session)
+1. Can you tell every time you land a hit (flash, number, sound, the X)?
+2. Do you see every enemy attack coming before it lands (the filling ground footprint)?
+3. Can you tell, from the ground marker alone, where an attack will land and how far it reaches, including a lunge or a lobbed glob?
+4. Does the bow fire every time you click while aiming, even clicking fast?
+5. Can you clear waves 1-3 with each heirloom (axe, staff, dagger and shield, bow and sword)?
+6. Does dodging through an attack feel fair (never hit when you rolled, never safe when you did not)?
+7. Does the dagger's parry window (the first 6 frames of a raised guard) feel learnable?
+8. When you are hurt, do you know which side it came from and how much HP you have left?
 
 ## Network simulator
 `Tests/PlayMode/CombatNetworkTests.Netsim_150msRtt_2PercentLoss_...` drives the Multiplayer Tools `NetworkSimulator` component (it works in PlayMode, in the

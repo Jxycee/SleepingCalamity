@@ -15,52 +15,52 @@ namespace SleepingCalamity.Core.Combat
         // ---- Axe: heavy. Slow, long recovery, a guard-breaking finisher, a charge with armour. ----
         public static readonly AttackSet Axe = new AttackSet("Axe",
             new AttackData("axe_1", "Axe swing", AttackKind.Normal, 34, W(11, 16), 1.0f, HitShape.Cone, 2.3f, 55f, comboOpen: W(14, 30), cancelFrom: 22,
-                turn: W(0, 11), turnDegPerSec: 540f, lunge: W(6, 14), lungeMeters: 0.7f, knockback: 0.8f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.35f),
+                turn: W(0, 11), turnDegPerSec: 540f, lunge: W(6, 14), lungeMeters: 0.7f, knockback: 0.8f, revenge: 1f, hitstopFrames: 6, cameraKick: 0.35f),
             new AttackData("axe_2", "Axe backswing", AttackKind.Normal, 36, W(12, 17), 1.1f, HitShape.Cone, 2.4f, 60f, comboOpen: W(15, 32), finisherAllowed: W(15, 32),
-                cancelFrom: 24, turn: W(0, 12), turnDegPerSec: 540f, lunge: W(6, 15), lungeMeters: 0.7f, knockback: 0.9f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.4f),
+                cancelFrom: 24, turn: W(0, 12), turnDegPerSec: 540f, lunge: W(6, 15), lungeMeters: 0.7f, knockback: 0.9f, revenge: 1f, hitstopFrames: 6, cameraKick: 0.4f),
             new AttackData("axe_f", "Axe overhead", AttackKind.Finisher, 58, W(22, 28), 1.6f, HitShape.Cone, 2.7f, 70f, cancelFrom: 44,
-                turn: W(0, 20), turnDegPerSec: 420f, lunge: W(14, 24), lungeMeters: 1.0f, knockback: 3.0f, revenge: 3f, hitstopFrames: 10, cameraKick: 0.9f, guardBreak: true),
+                turn: W(0, 20), turnDegPerSec: 420f, lunge: W(14, 24), lungeMeters: 1.0f, knockback: 3.0f, revenge: 3f, hitstopFrames: 14, cameraKick: 0.9f, guardBreak: true),
             new AttackData("axe_c", "Axe whirlwind", AttackKind.Charge, 62, W(24, 32), 2.0f, HitShape.Circle, 3.0f, 180f, cancelFrom: 48, superArmor: W(0, 36),
-                turn: W(0, 10), turnDegPerSec: 360f, knockback: 4.0f, revenge: 4f, hitstopFrames: 10, cameraKick: 1.0f, guardBreak: true),
+                turn: W(0, 10), turnDegPerSec: 360f, knockback: 4.0f, revenge: 4f, hitstopFrames: 14, cameraKick: 1.0f, guardBreak: true),
             null);
 
         // ---- Staff: long reach and wide sweeps. Its Secondary casts a spell that costs a pip. ----
         public static readonly AttackSet Staff = new AttackSet("Staff",
             new AttackData("staff_1", "Staff sweep", AttackKind.Normal, 26, W(8, 14), 1.0f, HitShape.Cone, 3.3f, 85f, comboOpen: W(10, 22), cancelFrom: 17,
-                turn: W(0, 8), turnDegPerSec: 600f, lunge: W(4, 10), lungeMeters: 0.4f, knockback: 0.6f, revenge: 1f, hitstopFrames: 3, cameraKick: 0.25f),
+                turn: W(0, 8), turnDegPerSec: 600f, lunge: W(4, 10), lungeMeters: 0.4f, knockback: 0.6f, revenge: 1f, hitstopFrames: 5, cameraKick: 0.25f),
             new AttackData("staff_2", "Staff return sweep", AttackKind.Normal, 26, W(8, 14), 1.1f, HitShape.Cone, 3.3f, 85f, comboOpen: W(10, 22), finisherAllowed: W(10, 22),
-                cancelFrom: 17, turn: W(0, 8), turnDegPerSec: 600f, lunge: W(4, 10), lungeMeters: 0.4f, knockback: 0.6f, revenge: 1f, hitstopFrames: 3, cameraKick: 0.25f),
+                cancelFrom: 17, turn: W(0, 8), turnDegPerSec: 600f, lunge: W(4, 10), lungeMeters: 0.4f, knockback: 0.6f, revenge: 1f, hitstopFrames: 5, cameraKick: 0.25f),
             new AttackData("staff_f", "Staff spin", AttackKind.Finisher, 46, W(14, 24), 1.6f, HitShape.Circle, 3.5f, 180f, cancelFrom: 34, turn: W(0, 12), turnDegPerSec: 480f,
-                knockback: 2.6f, revenge: 3f, hitstopFrames: 8, cameraKick: 0.7f),
+                knockback: 2.6f, revenge: 3f, hitstopFrames: 12, cameraKick: 0.7f),
             new AttackData("staff_c", "Staff sweep, charged", AttackKind.Charge, 50, W(18, 26), 2.0f, HitShape.Cone, 4.6f, 100f, cancelFrom: 38, turn: W(0, 10), turnDegPerSec: 480f,
-                knockback: 3.5f, revenge: 4f, hitstopFrames: 9, cameraKick: 0.9f),
+                knockback: 3.5f, revenge: 4f, hitstopFrames: 12, cameraKick: 0.9f),
             new AttackData("staff_s", "Cinder burst", AttackKind.Spell, 42, W(14, 20), 2.2f, HitShape.Circle, 4.5f, 180f, cancelFrom: 34, superArmor: W(0, 20),
-                knockback: 2.5f, revenge: 4f, hitstopFrames: 6, cameraKick: 0.7f, fire: true, spellPips: 1));
+                knockback: 2.5f, revenge: 4f, hitstopFrames: 8, cameraKick: 0.7f, fire: true, spellPips: 1));
 
         // ---- Dagger and shield: fast. Its Secondary is the guard (see GuardMath). ----
         public static readonly AttackSet Dagger = new AttackSet("Dagger and shield",
             new AttackData("dag_1", "Dagger jab", AttackKind.Normal, 16, W(5, 9), 1.0f, HitShape.Cone, 1.9f, 45f, comboOpen: W(6, 15), cancelFrom: 11,
-                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 3, cameraKick: 0.15f),
+                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.15f),
             new AttackData("dag_2", "Dagger slash", AttackKind.Normal, 16, W(5, 9), 1.1f, HitShape.Cone, 1.9f, 50f, comboOpen: W(6, 15), finisherAllowed: W(6, 15), cancelFrom: 11,
-                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 3, cameraKick: 0.15f),
+                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.15f),
             new AttackData("dag_f", "Dagger flurry", AttackKind.Finisher, 30, W(10, 17), 1.6f, HitShape.Cone, 2.1f, 55f, cancelFrom: 22, turn: W(0, 9), turnDegPerSec: 720f,
-                lunge: W(6, 14), lungeMeters: 1.2f, knockback: 1.8f, revenge: 3f, hitstopFrames: 8, cameraKick: 0.6f),
+                lunge: W(6, 14), lungeMeters: 1.2f, knockback: 1.8f, revenge: 3f, hitstopFrames: 11, cameraKick: 0.6f),
             new AttackData("dag_c", "Lunging stab", AttackKind.Charge, 40, W(12, 18), 2.0f, HitShape.Cone, 2.4f, 30f, cancelFrom: 30, turn: W(0, 10), turnDegPerSec: 720f,
-                lunge: W(8, 16), lungeMeters: 3.2f, knockback: 2.0f, revenge: 4f, hitstopFrames: 8, cameraKick: 0.7f),
+                lunge: W(8, 16), lungeMeters: 3.2f, knockback: 2.0f, revenge: 4f, hitstopFrames: 11, cameraKick: 0.7f),
             null);
 
         // ---- Bow and sword: a mid-speed sword chain; the Secondary aims and the shot is a ray. ----
         public static readonly AttackSet Bow = new AttackSet("Bow and sword",
             new AttackData("bow_1", "Sword cut", AttackKind.Normal, 22, W(7, 12), 1.0f, HitShape.Cone, 2.1f, 50f, comboOpen: W(9, 19), cancelFrom: 14,
-                turn: W(0, 7), turnDegPerSec: 720f, lunge: W(3, 9), lungeMeters: 0.6f, knockback: 0.5f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.25f),
+                turn: W(0, 7), turnDegPerSec: 720f, lunge: W(3, 9), lungeMeters: 0.6f, knockback: 0.5f, revenge: 1f, hitstopFrames: 5, cameraKick: 0.25f),
             new AttackData("bow_2", "Sword return", AttackKind.Normal, 22, W(7, 12), 1.1f, HitShape.Cone, 2.1f, 55f, comboOpen: W(9, 19), finisherAllowed: W(9, 19), cancelFrom: 14,
-                turn: W(0, 7), turnDegPerSec: 720f, lunge: W(3, 9), lungeMeters: 0.6f, knockback: 0.5f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.25f),
+                turn: W(0, 7), turnDegPerSec: 720f, lunge: W(3, 9), lungeMeters: 0.6f, knockback: 0.5f, revenge: 1f, hitstopFrames: 5, cameraKick: 0.25f),
             new AttackData("bow_f", "Sword rising cut", AttackKind.Finisher, 40, W(14, 21), 1.6f, HitShape.Cone, 2.3f, 60f, cancelFrom: 30, turn: W(0, 13), turnDegPerSec: 540f,
-                lunge: W(8, 16), lungeMeters: 1.0f, knockback: 2.4f, revenge: 3f, hitstopFrames: 9, cameraKick: 0.7f),
+                lunge: W(8, 16), lungeMeters: 1.0f, knockback: 2.4f, revenge: 3f, hitstopFrames: 12, cameraKick: 0.7f),
             new AttackData("bow_c", "Sword spin", AttackKind.Charge, 48, W(16, 24), 2.0f, HitShape.Circle, 2.7f, 180f, cancelFrom: 36, turn: W(0, 8), turnDegPerSec: 540f,
-                knockback: 3.2f, revenge: 4f, hitstopFrames: 9, cameraKick: 0.8f),
+                knockback: 3.2f, revenge: 4f, hitstopFrames: 12, cameraKick: 0.8f),
             new AttackData("bow_s", "Aimed shot", AttackKind.Shot, 30, W(4, 5), 1.8f, HitShape.Ray, 26f, 0f, cancelFrom: 20, turn: W(0, 4), turnDegPerSec: 1080f,
-                knockback: 1.0f, revenge: 2f, hitstopFrames: 3, cameraKick: 0.4f));
+                knockback: 1.0f, revenge: 2f, hitstopFrames: 4, cameraKick: 0.4f));
 
         public static AttackSet ForFamily(WeaponFamily f)
         {
@@ -86,21 +86,21 @@ namespace SleepingCalamity.Core.Combat
             new AttackData(id, name, AttackKind.Enemy, total, W(hitOnA, hitOnB), mult, shape, range, half, knockback: knockback, guardBreak: guardBreak, guardable: guardable,
                 lunge: lunge, lungeMeters: lunges, superArmor: superArmor, origin: origin, turn: turn, turnDegPerSec: turnSpeed, heightBand: 2.5f, revenge: 0f);
 
-        public static readonly AttackData SlimeHop = E("slime_hop", "Hop", 54, 30, 36, 1.0f, HitShape.Circle, 1.5f, 180f, lunge: W(14, 30), lunges: 2.2f, turn: W(0, 14), turnSpeed: 360f);
-        public static readonly AttackData SlimeGlob = E("slime_glob", "Glob lob", 62, 42, 48, 0.8f, HitShape.Circle, 1.6f, 180f, origin: HitOrigin.GroundAtTarget);
-        public static readonly AttackData RatLunge = E("rat_lunge", "Lunge", 40, 16, 24, 1.1f, HitShape.Cone, 2.3f, 40f, lunge: W(14, 24), lunges: 3.4f, turn: W(0, 14), turnSpeed: 720f);
-        public static readonly AttackData RatSpin = E("rat_spin", "Tail spin", 52, 28, 38, 1.3f, HitShape.Circle, 2.5f, 180f, knockback: 2f);
-        public static readonly AttackData BroomSweep = E("broom_sweep", "Sweep", 64, 32, 40, 1.2f, HitShape.Cone, 3.1f, 80f, knockback: 3f, turn: W(0, 22), turnSpeed: 300f);
-        public static readonly AttackData BroomPoke = E("broom_poke", "Handle poke", 44, 22, 28, 1.0f, HitShape.Cone, 2.2f, 30f, lunge: W(18, 26), lunges: 1.2f, turn: W(0, 16), turnSpeed: 420f);
-        public static readonly AttackData WardenSlam = E("warden_slam", "Rolling-pin slam", 100, 56, 64, 1.5f, HitShape.Cone, 3.6f, 55f, knockback: 4f, guardBreak: true,
+        public static readonly AttackData SlimeHop = E("slime_hop", "Hop", 60, 34, 40, 1.0f, HitShape.Circle, 1.1f, 180f, lunge: W(16, 34), lunges: 2.2f, turn: W(0, 14), turnSpeed: 360f);
+        public static readonly AttackData SlimeGlob = E("slime_glob", "Glob lob", 66, 46, 52, 0.8f, HitShape.Circle, 1.3f, 180f, origin: HitOrigin.GroundAtTarget);
+        public static readonly AttackData RatLunge = E("rat_lunge", "Lunge", 54, 28, 36, 1.1f, HitShape.Cone, 1.45f, 42f, lunge: W(16, 28), lunges: 3.4f, turn: W(0, 16), turnSpeed: 720f);
+        public static readonly AttackData RatSpin = E("rat_spin", "Tail spin", 56, 30, 40, 1.3f, HitShape.Circle, 1.45f, 180f, knockback: 2f);
+        public static readonly AttackData BroomSweep = E("broom_sweep", "Sweep", 70, 36, 44, 1.2f, HitShape.Cone, 2.4f, 80f, knockback: 3f, turn: W(0, 24), turnSpeed: 300f);
+        public static readonly AttackData BroomPoke = E("broom_poke", "Handle poke", 52, 28, 34, 1.0f, HitShape.Cone, 1.9f, 30f, lunge: W(16, 28), lunges: 1.2f, turn: W(0, 16), turnSpeed: 420f);
+        public static readonly AttackData WardenSlam = E("warden_slam", "Rolling-pin slam", 100, 56, 64, 1.5f, HitShape.Cone, 3.0f, 55f, knockback: 4f, guardBreak: true,
             superArmor: W(0, 100), turn: W(0, 40), turnSpeed: 200f);
-        public static readonly AttackData WardenPound = E("warden_pound", "Oven-door pound", 116, 72, 80, 1.8f, HitShape.Circle, 4.4f, 180f, knockback: 5f, guardBreak: true,
+        public static readonly AttackData WardenPound = E("warden_pound", "Oven-door pound", 116, 72, 80, 1.8f, HitShape.Circle, 3.0f, 180f, knockback: 5f, guardBreak: true,
             superArmor: W(0, 116));
-        public static readonly AttackData WardenSweep = E("warden_sweep", "Flour sweep", 84, 40, 50, 1.1f, HitShape.Cone, 3.8f, 100f, knockback: 3f, superArmor: W(0, 84),
+        public static readonly AttackData WardenSweep = E("warden_sweep", "Flour sweep", 84, 40, 50, 1.1f, HitShape.Cone, 3.0f, 100f, knockback: 3f, superArmor: W(0, 84),
             turn: W(0, 30), turnSpeed: 240f);
         // The Warden's answer when its revenge gauge fills: a quick big circle that clears everyone off it.
-        public static readonly AttackData WardenBreakFree = E("warden_breakfree", "Break free", 60, 18, 26, 1.0f, HitShape.Circle, 4.0f, 180f, knockback: 6f, guardBreak: true,
-            superArmor: W(0, 60));
+        public static readonly AttackData WardenBreakFree = E("warden_breakfree", "Break free", 72, 30, 38, 1.0f, HitShape.Circle, 3.0f, 180f, knockback: 6f, guardBreak: true,
+            superArmor: W(0, 72));
         // Test-only: a huge circle that no roll can leave, so a dodge test proves the i-frames and not the distance.
         public static readonly AttackData TestNova = E("test_nova", "Test nova", 60, 12, 40, 1.0f, HitShape.Circle, 30f, 180f, knockback: 0f);
 

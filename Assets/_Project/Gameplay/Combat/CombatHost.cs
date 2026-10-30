@@ -217,7 +217,7 @@ namespace SleepingCalamity.Gameplay
             if (r.Blocked) flags |= HeroCombat.FlagBlocked;
             if (r.WeakPart) flags |= HeroCombat.FlagWeakPart;
             if (r.Killed) flags |= HeroCombat.FlagKilled;
-            if (attack.IsFinisher) flags |= HeroCombat.FlagFinisher;
+            if (attack.IsFinisher || attack.Kind == AttackKind.Charge) flags |= HeroCombat.FlagFinisher;   // "heavy": the big number and the heavy sound
             if (r.PartBroken >= 0) flags |= HeroCombat.FlagPartBroken;
             if (r.GuardBreakHit) flags |= HeroCombat.FlagGuardBreak;
             if (r.ElementMatch) flags |= HeroCombat.FlagElement;

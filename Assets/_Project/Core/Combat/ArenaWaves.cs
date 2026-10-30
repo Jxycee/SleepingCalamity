@@ -1,5 +1,6 @@
 // Core/Combat/ArenaWaves.cs: the combat test arena's waves as data (M3 greybox). Pure C#. Tuned so the user's 5-minute arena covers all three enemies,
-// the elite and a tier 2 pass. P9 Placeholder.
+// the elite and a tier 2 pass. P9 Placeholder. After the first playtest (2026-10-30) waves 1 and 2 are an onboarding: wave 1 was four slimes, now two;
+// wave 2 was two slimes and two rat-kings, now three slimes and ONE rat-king. Waves 3 and 4 are unchanged.
 // Authority: none (static data; the host's CombatHost reads it).
 using System;
 
@@ -23,8 +24,8 @@ namespace SleepingCalamity.Core.Combat
         {
             switch ((Math.Max(1, wave) - 1) % CompositionCount)
             {
-                case 0: return new[] { new WaveEntry(EnemyKind.Slime, 4) };
-                case 1: return new[] { new WaveEntry(EnemyKind.Slime, 2), new WaveEntry(EnemyKind.RatKing, 2) };
+                case 0: return new[] { new WaveEntry(EnemyKind.Slime, 2) };
+                case 1: return new[] { new WaveEntry(EnemyKind.Slime, 3), new WaveEntry(EnemyKind.RatKing, 1) };
                 case 2: return new[] { new WaveEntry(EnemyKind.Broom, 2), new WaveEntry(EnemyKind.RatKing, 2) };
                 default: return new[] { new WaveEntry(EnemyKind.DoughWarden, 1), new WaveEntry(EnemyKind.Slime, 2) };
             }
