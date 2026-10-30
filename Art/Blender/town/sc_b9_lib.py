@@ -251,7 +251,7 @@ def flat_material(name, hexcol, rough=0.85, metal=0.0):
 def u2b(x, y, z):
     return Vector((-x, -z, y))
 
-JETTY_Z = 3.1      # assumed jetty underside height (B4 not merged yet): ivy and stand-in both use it
+JETTY_Z = 3.0      # jetty height as the corner builder's ivy placeholder has it (B4 not merged yet): ivy and stand-in both use it
 CAMS = {'wide': ((1, 1.8, -9), (-1, 3, 6)), 'mid': ((5, 1.7, -2.5), (-1.5, 1.8, 5)), 'close': ((1.6, 1.4, -1.6), (0, 1.0, 0.6))}
 
 def review_scene(eng='BLENDER_EEVEE', jetty=JETTY_Z):
@@ -281,7 +281,7 @@ def review_scene(eng='BLENDER_EEVEE', jetty=JETTY_Z):
     bpy.ops.mesh.primitive_cylinder_add(radius=1.7, depth=0.55, location=(0, 0, 0.275), vertices=64); o = bpy.context.active_object; o.data.materials.append(sand); stand.append(o)
     bpy.ops.mesh.primitive_cylinder_add(radius=0.22, depth=2.4, location=(0, 0, 1.2), vertices=24); o = bpy.context.active_object; o.data.materials.append(sand); stand.append(o)
     # stall at Unity (4.5, 4.5): a counter and an awning slab (stand-in, not rotated)
-    box('SB_Counter', -5.8, -3.2, -5.3, -3.7, 0, 0.95, timber)
+    box('SB_Counter', -5.8, -3.2, -5.3, -3.7, 0, 0.9, timber)
     box('SB_Awning', -5.9, -3.1, -5.5, -3.3, 2.6, 2.68, canvas)
     return stand
 

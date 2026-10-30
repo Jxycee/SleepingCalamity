@@ -9,32 +9,34 @@ The atlas (T_B9_Foliage, 2048, quadrants in UV space):
   u 0-.5  v .5-1   nettle leaves (nettle_plant diff, regraded)       u .5-1  v .5-1   weed rosette leaves (weed_plant_02)
   u 0-.5  v 0-.5   ivy: 3 cluster cells (runner + 4-7 leaves each) and 4 single leaves, composited from LeafSet017
   u .5-1  v 0-.5   grass blade | moss tile / moss fringe | ivy stem bark
-Leaf colour is pulled to the PHASE1 3.1 foliage key (#6f8a34, ivy a shade deeper) with +12% chroma; moss to #616e2e/#b6ab28.
+Leaf colour is pulled to the PHASE1 3.1 foliage key (#6f8a34; ivy #76902f, yellower than the facade's green shutters) with
++18% chroma; moss to #616e2e/#b6ab28.
 
-Models (Blender: z up, metres, front -Y = Unity +z; Unity: rotate 180 deg about Y to face -Z like the facade):
-  SC_B9_IvyWall     2.1 x 5.2 m climbing mass for the facade's left 2 m. Origin = the facade's front-left corner at the
-                    ground (x 0 is the corner, the mass grows toward +x; flip X scale if the corner is on the other side).
-                    Hugs the ground storey (y 0), wraps the jetty beam and climbs the upper storey jettied 0.45 m toward the
-                    camera (--jetty, default 3.1 m, an assumption until B4 lands); a hanging fringe drops from the jetty
-                    edge and a few tendrils escape at the top and the open side.
-  SC_B9_IvyPatchA   1.0 x 1.4 m flat-wall patch; SC_B9_IvyPatchB 0.7 x 0.6 m low patch (wall feet, origin bottom-left).
-  SC_B9_CrackWeed_A..E   cobble-joint and facade-foot clumps (origin at the base centre).
-  SC_B9_MossTuft_A..C    low moss cushions with a fringe skirt (origin at the base centre).
-  SC_B9_GrassClump_A..C  ribbon-blade clumps (origin at the base centre).
-  SC_B9_MossDecal   mesh decal for the basin: a 70 deg band on the basin wall (r 1.7 m, 0-0.38 m up) plus a ground lip.
-                    Origin = the basin centre; rotate it about the vertical to the side you want (it is centred on -Y).
+Models follow the corner builder's convention (BeautyCornerTable.cs): Blender z up, metres, front -Y = Unity -Z, pivot at the
+ground centre. Each exports to its own folder Assets/_Project/Content/Art/Town/B9/<Folder>/ (FOLDERS below) with its texture set.
+  SC_B9_IvyWall     (Ivy_Facade) 2.1 x 5 m mass for the facade's left 2 m. Pivot = bottom centre, back on the wall plane, leaves
+                    toward -Y, the dense corner side at local -x. Hugs the ground storey, wraps the jetty beam and climbs the upper
+                    storey jettied 0.45 m (--jetty, default 3.0 m like the builder's placeholder, until B4 lands); a hanging fringe
+                    drops from the jetty edge and a few tendrils escape at the top and the open side.
+  SC_B9_IvyPatchA/B (Ivy_Patch_A/B) 1.0 x 1.4 m and 0.7 x 0.6 m flat-wall patches, bottom centre on the wall.
+  SC_B9_CrackWeed_A..E  (Weed_A..E) narrow runs along local x for cobble joints and the wall foot (weeds grow in joints).
+  SC_B9_MossTuft_A..C   (Moss_Tuft_A..C) low cushions with a fringe skirt.   SC_B9_GrassClump_A..C (Grass_A..C) ribbon blades.
+  SC_B9_BasinMoss   (Basin_Moss) a 0.9 x 0.5 m cushion lying on the basin rim (own 1K set).
+  SC_B9_MossDecal   (Moss_Band) a 70 deg band on the basin wall (r 1.7 m, 0-0.38 m) plus a ground lip (own 1K set).
+                    Pivot = the basin centre; centred on local -Y (the cameras' side) at yaw 0.
 Cards and ribbons carry bent normals (blended toward the clump's own up-and-out direction) and an AO colour attribute 'Col'
 (dark core to lit rim, for a future foliage shader; URP Lit ignores it). Unity: Normals = Import, URP Lit, Alpha Clipping
 0.5, Render Face Both, BaseColor 'Mip Maps Preserve Coverage' on; ORM = R occlusion, G roughness, B metallic.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_foliage_town.py -- --out <scratch>
-      [--stage all|atlas|models|render] [--res 2048] [--jetty 3.1] [--export]   (--export writes the Unity folder)
+      [--stage all|atlas|models|render] [--res 2048] [--jetty 3.0] [--export]   (--export writes the B9 folders)
       [--rres 960] [--samples 32]
-Export: Assets/_Project/Content/Art/Town/B9/Foliage/ (all FBX + T_B9_Foliage_*) and .../B9/MossDecal/ (+ SOURCES.md).
+Review renders lay the pieces at the builder's rows (BUILDER) plus suggested spots for the rest (EXTRA). Sources: B9/SOURCES.md.
 
-Status (2026-10-30, PC): exported at 2048. Calibrated review 27/40 after 2 rounds (round 1 about 22: sparse stringy ivy, weeds
-too small to read; round 2: ivy cards denser and bigger with lobe-bulged normals, weeds 1.35x). Tris: ivy wall 4.4k, patches
-0.4k / 0.15k, weeds 380, tufts 132, grass 128-224, decal 72. Next ideas (parked): a foliage wind shader reading 'Col'.
+Status (2026-10-30, PC): exported at 2048. Calibrated review 28.5/40 after 3 rounds (round 1 about 22: sparse stringy ivy, weeds
+too small; round 2, 27: denser bigger ivy cards with lobe-bulged normals, weeds 1.35x; round 3: yellower ivy against the green
+shutters, weeds as narrow joint runs, a rim moss cushion, builder pivots and folders). Tris: ivy wall 4.4k, patches 0.4k /
+0.15k, weeds 380, tufts 132, grass 128-224, band 72, rim moss 168. Parked: a foliage wind shader reading 'Col'.
 """
 import sys, os, math, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -53,9 +55,10 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 SRC = os.path.join(REPO, 'Art', 'Source')
 EXP = os.path.join(REPO, 'Assets', '_Project', 'Content', 'Art', 'Town', 'B9')
 TEX = os.path.join(OUT, 'tex'); os.makedirs(TEX, exist_ok=True)
-ATLAS = os.path.join(TEX, 'T_B9_Foliage'); DECAL = os.path.join(TEX, 'T_B9_MossDecal')
+ATLAS = os.path.join(TEX, 'T_B9_Foliage'); DECAL = os.path.join(TEX, 'T_B9_MossDecal'); RIM = os.path.join(TEX, 'T_B9_BasinMoss')
 
-FOLIAGE = '#6f8a34'; IVY = '#64822f'; MOSS_D = '#616e2e'; MOSS_L = '#b6ab28'
+# ivy is kept yellower than the facade's sage / forest-green shutters (brief section 0) so the two never merge
+FOLIAGE = '#6f8a34'; IVY = '#76902f'; MOSS_D = '#616e2e'; MOSS_L = '#b6ab28'
 
 # UV rectangles (u0, v0, u1, v1) in the atlas
 Q_NETTLE = (0.0, 0.5, 0.5, 1.0); Q_WEED = (0.5, 0.5, 1.0, 1.0)
@@ -306,6 +309,13 @@ def build_decal_tex():
     col = tile[..., :3] * (0.8 + 0.25 * L.sstep(v, 0, 0.5))[..., None]
     L.save(L.bleed(col, a, 3, 2), DECAL + '_BaseColor.png', a)
     L.save(L.renorm(tile[..., 3:6]), DECAL + '_Normal.png'); L.save(tile[..., 6:9], DECAL + '_ORM.png')
+    # the rim cushion: an elliptical mask with a ragged, lobed edge and a few bare holes, darker at its foot
+    r = np.hypot((u - 0.5) / 0.5, (v - 0.5) / 0.5)
+    edge = 0.78 + 0.16 * (n1 - 0.5) * 2 + 0.06 * (n2 - 0.5)
+    a2 = np.clip((edge - r) / 0.05, 0, 1) * np.where(n2 > 0.9, 0.2, 1.0)
+    col2 = tile[..., :3] * (0.72 + 0.3 * np.clip(1 - r, 0, 1))[..., None]
+    L.save(L.bleed(col2, a2, 3, 2), RIM + '_BaseColor.png', a2)
+    L.save(L.renorm(tile[..., 3:6]), RIM + '_Normal.png'); L.save(tile[..., 6:9], RIM + '_ORM.png')
 
 # ============================================================================= MODELS
 def cell_uv(rect, uv):
@@ -469,12 +479,13 @@ def weed_clumps(mat):
         o.data.uv_layers[0].data.foreach_set('uv', uv.ravel())
         o.matrix_world = Matrix.Identity(4)
     WEED_SCALE = 1.35          # storybook: crack weeds big enough to read at the facade foot from the mid camera
-    spec = {   # name: [(source, (x, y), yaw deg, scale)], target tris
-        'A': ([('weed_plant_02_a', (0, 0), 0, 1.9)], 380),
-        'B': ([('weed_plant_02_b', (0, 0), 40, 1.8), ('nettle_plant_small_a', (0.11, -0.05), 0, 2.4)], 380),
-        'C': ([('nettle_plant_tall_a', (0, 0), 0, 2.1), ('weed_plant_02_d', (-0.05, 0.03), 120, 1.8)], 380),
-        'D': ([('weed_plant_02_c', (-0.1, 0), 0, 1.8), ('weed_plant_02_e', (0.13, 0.01), 75, 1.9)], 380),
-        'E': ([('nettle_plant_medium_a', (0, 0), 0, 2.3), ('nettle_plant_medium_b', (0.13, 0.03), 140, 2.1), ('weed_plant_02_e', (-0.11, -0.03), 200, 1.8)], 380),
+    SQUASH = 0.6               # weeds grow IN the joints: each clump is a run along local x, narrow across (y)
+    spec = {   # name: [(source, (x, y), yaw deg, scale)], target tris. A is the one the corner builder scatters (joints + wall foot)
+        'A': ([('weed_plant_02_e', (-0.17, 0.0), 90, 1.7), ('nettle_plant_small_a', (0.0, 0.01), 0, 2.2), ('weed_plant_02_d', (0.16, -0.01), 0, 1.6)], 380),
+        'B': ([('nettle_plant_tall_a', (0, 0), 0, 2.0), ('weed_plant_02_c', (-0.15, 0.0), 90, 1.5), ('nettle_plant_small_b', (0.14, 0.0), 0, 2.2)], 380),
+        'C': ([('nettle_plant_medium_a', (-0.08, 0), 0, 2.1), ('nettle_plant_medium_b', (0.08, 0.0), 140, 2.0)], 380),
+        'D': ([('weed_plant_02_a', (0, 0), 90, 1.6)], 380),
+        'E': ([('weed_plant_02_b', (-0.08, 0), 90, 1.5), ('weed_plant_02_e', (0.14, 0.0), 0, 1.6)], 380),
     }
     out = []
     for key, (parts, target) in spec.items():
@@ -494,6 +505,7 @@ def weed_clumps(mat):
             for o in objs: o.select_set(True)
             bpy.context.view_layer.objects.active = ob; bpy.ops.object.join()
         ob.name = f'SC_B9_CrackWeed_{key}'; ob.data.name = ob.name
+        ob.data.transform(Matrix.Diagonal((1.0, SQUASH, 1.0, 1.0)))
         bm = bmesh.new(); bm.from_mesh(ob.data); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0004); bm.to_mesh(ob.data); bm.free()
         t0 = L.tri_count(ob)
         if t0 > target:
@@ -599,21 +611,41 @@ def moss_decal(name):
         mb.face([p(a0, R + lip, 0.004), p(a1, R + lip, 0.004), p(a1, R, 0.004), p(a0, R, 0.004)], [(u0, 0.0), (u1, 0.0), (u1, 0.18), (u0, 0.18)], [up] * 4, [0.9] * 4)
     print(name, 'tris', mb.tris()); return mb
 
+def basin_moss(name):
+    """A moss cushion lying on the basin rim (0.9 x 0.5 m, 2.5 cm proud, ragged alpha edge), domed and draping at its long edges.
+    Origin = its centre on the rim top (the builder's BasinMoss row puts it on the rim, the side away from the sun)."""
+    mb = MB(); NX, NY = 12, 7; W, D, H = 0.9, 0.5, 0.025
+    def pt(i, j):
+        u, v = i / NX, j / NY; x, y = (u - 0.5) * W, (v - 0.5) * D
+        r = min(1.0, math.hypot(x / (W * 0.5), y / (D * 0.5)))
+        z = H * (1 - r * r) + 0.004 * noise.noise(Vector((x * 14, y * 14, 3.0))) - 0.02 * max(0.0, abs(y) / (D * 0.5) - 0.7) / 0.3
+        return Vector((x, y, z)), (u, v)
+    def nrm(p):
+        return Vector((-p.x * 0.4, -p.y * 0.4, 1.0)).normalized()
+    for i in range(NX):
+        for j in range(NY):
+            q = [pt(i, j), pt(i + 1, j), pt(i + 1, j + 1), pt(i, j + 1)]
+            mb.face([a[0] for a in q], [a[1] for a in q], [nrm(a[0]) for a in q], [0.7 + 0.3 * min(1, a[0].z / H) for a in q])
+    print(name, 'tris', mb.tris()); return mb
+
 def build_models():
     for o in list(bpy.data.objects): bpy.data.objects.remove(o)
     mat = L.pbr_material('M_B9_Foliage', ATLAS)
-    dmat = L.pbr_material('M_B9_MossDecal', DECAL)
+    dmat = L.pbr_material('M_B9_MossDecal', DECAL); rmat = L.pbr_material('M_B9_BasinMoss', RIM)
     groups = {}
     wall = Wall(JETTY)
-    groups['SC_B9_IvyWall'] = L.build('SC_B9_IvyWall', grow_ivy('IvyWall', 2.1, 5.0, 7, wall, 4), [mat])
-    groups['SC_B9_IvyPatchA'] = L.build('SC_B9_IvyPatchA', grow_ivy('IvyPatchA', 1.0, 1.4, 17, Wall(0, flat=True), 2, fringe=False, tendrils=3, card_scale=0.85), [mat])
-    groups['SC_B9_IvyPatchB'] = L.build('SC_B9_IvyPatchB', grow_ivy('IvyPatchB', 0.7, 0.6, 29, Wall(0, flat=True), 2, fringe=False, tendrils=2, card_scale=0.75), [mat])
+    # ivy pivots: bottom centre of the mass, back on the wall plane (y 0), growing toward -Y; the dense corner side is local -x
+    for key, args, kw, w in (('SC_B9_IvyWall', ('IvyWall', 2.1, 5.0, 7, wall, 4), {}, 2.1),
+                             ('SC_B9_IvyPatchA', ('IvyPatchA', 1.0, 1.4, 17, Wall(0, flat=True), 2), dict(fringe=False, tendrils=3, card_scale=0.85), 1.0),
+                             ('SC_B9_IvyPatchB', ('IvyPatchB', 0.7, 0.6, 29, Wall(0, flat=True), 2), dict(fringe=False, tendrils=2, card_scale=0.75), 0.7)):
+        groups[key] = L.build(key, grow_ivy(*args, **kw), [mat]); groups[key].data.transform(Matrix.Translation((-w / 2, 0, 0)))
     for ob in weed_clumps(mat): groups[ob.name] = ob
     for k, (seed, w, d, h) in zip('ABC', [(3, 0.30, 0.22, 0.07), (5, 0.20, 0.16, 0.05), (8, 0.42, 0.26, 0.08)]):
         groups[f'SC_B9_MossTuft_{k}'] = L.build(f'SC_B9_MossTuft_{k}', moss_tuft(k, seed, w, d, h), [mat])
     for k, (seed, n, h0, h1, sp) in zip('ABC', [(2, 22, 0.22, 0.42, 0.10), (4, 16, 0.16, 0.30, 0.07), (6, 28, 0.25, 0.50, 0.14)]):
         groups[f'SC_B9_GrassClump_{k}'] = L.build(f'SC_B9_GrassClump_{k}', grass_clump(k, seed, n, h0, h1, sp), [mat])
     groups['SC_B9_MossDecal'] = L.build('SC_B9_MossDecal', moss_decal('MossDecal'), [dmat])
+    groups['SC_B9_BasinMoss'] = L.build('SC_B9_BasinMoss', basin_moss('BasinMoss'), [rmat])
     report = {k: L.tri_count(o) for k, o in groups.items()}
     print('TRIS', report)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'b9_foliage.blend'))
@@ -622,25 +654,35 @@ def build_models():
     return groups
 
 # ============================================================================= REVIEW RENDERS
+# The corner builder's rows (BeautyCornerTable.cs on main, 2026-10-30): (Unity position, yaw). Extra dressing it has no row for yet
+# (tufts, grass, patches, the band) is laid where it would go and listed in SOURCES.md as suggested rows.
+BUILDER = {
+    'SC_B9_IvyWall': [((-4.0, 0, 7.5), 0)],
+    'SC_B9_CrackWeed_A': [((-4.4, 0, 7.3), 0), ((-3.0, 0, 7.35), 40), ((-1.9, 0, 7.3), 80), ((0.2, 0, 7.35), 10), ((1.6, 0, 7.3), 120), ((2.3, 0, 7.3), 60),
+                          ((2.75, 0, 0.8), 30), ((-2.4, 0, -1.7), 100), ((1.2, 0, -2.65), 160), ((-2.8, 0, 0.9), 70)],
+    'SC_B9_BasinMoss': [((-0.9, 0.55, 1.45), -32)],
+    'SC_B8_Stall_Lantern': [((3.58, 0.9, 4.3), 0)],
+    'SC_B8_Lantern_Bracket': [((0.0, 2.45, 7.5), 0)],
+}
+EXTRA = {
+    'SC_B9_IvyPatchA': [((1.6, 0.6, 7.5), 0)], 'SC_B9_IvyPatchB': [((-2.6, 0.0, 7.5), 0)],
+    'SC_B9_MossTuft_A': [((-1.3, 0, -1.15), 20)], 'SC_B9_MossTuft_C': [((-1.65, 0, -0.45), 100)], 'SC_B9_MossTuft_B': [((-0.65, 0, -1.62), 0)],
+    'SC_B9_MossDecal': [((0, 0, 0), 25)],          # yaw 0 = the band on the basin's south face (the cameras' side); 25 turns it south-west
+    'SC_B9_GrassClump_A': [((-4.75, 0, 7.2), 0)], 'SC_B9_GrassClump_C': [((-4.3, 0, 7.15), 0)], 'SC_B9_GrassClump_B': [((3.3, 0, 3.7), 0)],
+    'SC_B9_CrackWeed_C': [((-1.0, 0, 7.3), 0)], 'SC_B9_CrackWeed_B': [((-3.6, 0, 7.3), 0)],
+}
+
+def inst_u(src, pos, yaw):
+    """Place an asset authored in the builder convention (local -Y faces Unity -Z) at a Unity position / yaw in the review scene."""
+    o = src.copy(); bpy.context.scene.collection.objects.link(o); o.hide_render = False
+    o.matrix_world = Matrix.Translation(L.u2b(*pos)) @ Matrix.Rotation(math.pi - math.radians(yaw), 4, 'Z')
+    return o
+
 def place(groups):
-    """Lay the B9 pieces into the corner stand-in (Blender coords; the facade front is y -7.5 facing +Y)."""
-    R = Matrix.Rotation(math.pi, 4, 'Z')
-    def inst(name, loc, yaw=0.0, s=1.0, rot180=False):
-        src = groups[name]; o = src.copy(); bpy.context.scene.collection.objects.link(o)
-        o.matrix_world = Matrix.Translation(loc) @ (R if rot180 else Matrix.Identity(4)) @ Matrix.Rotation(math.radians(yaw), 4, 'Z') @ Matrix.Scale(s, 4)
-        return o
-    inst('SC_B9_IvyWall', (5.0, -7.5, 0), rot180=True)
-    inst('SC_B9_IvyPatchA', (-1.0, -7.5, 0.6), rot180=True)
-    inst('SC_B9_IvyPatchB', (2.6, -7.47, 0.0), rot180=True)
-    for name, loc, yaw in (('SC_B9_CrackWeed_A', (2.2, -7.25, 0), 10), ('SC_B9_CrackWeed_E', (3.4, -7.3, 0), 80), ('SC_B9_CrackWeed_C', (-0.3, -7.3, 0), 0),
-                           ('SC_B9_CrackWeed_B', (1.2, 2.05, 0), 30), ('SC_B9_CrackWeed_D', (-1.5, 1.6, 0), 200), ('SC_B9_CrackWeed_A', (2.1, 0.9, 0), 120),
-                           ('SC_B9_CrackWeed_B', (-2.3, -6.9, 0), 60)):
-        inst(name, loc, yaw)
-    for name, loc, yaw in (('SC_B9_MossTuft_A', (0.9, 1.55, 0), 20), ('SC_B9_MossTuft_C', (-0.4, 1.78, 0), 100), ('SC_B9_MossTuft_B', (-1.1, 1.35, 0), 0)):
-        inst(name, loc, yaw)
-    inst('SC_B9_MossDecal', (0, 0, 0), yaw=180 + 20)
-    for name, loc in (('SC_B9_GrassClump_A', (4.75, -7.2, 0)), ('SC_B9_GrassClump_C', (4.3, -7.15, 0)), ('SC_B9_GrassClump_B', (-3.3, -3.7, 0))):
-        inst(name, loc)
+    for table in (BUILDER, EXTRA):
+        for name, spots in table.items():
+            if name in groups:
+                for pos, yaw in spots: inst_u(groups[name], pos, yaw)
     for o in groups.values(): o.hide_render = True
 
 def studio(groups, path):
@@ -669,8 +711,7 @@ def review(groups):
         with bpy.data.libraries.load(lant) as (src, dst):
             dst.objects = [n for n in src.objects if n.startswith('SC_B8_')]
         for o in dst.objects:
-            bpy.context.scene.collection.objects.link(o)
-            o.matrix_world = Matrix.Translation((-4.0, -3.35, 2.6)) if 'Market' in o.name else Matrix.Translation((1.95, -7.5, 2.35)) @ Matrix.Rotation(math.pi, 4, 'Z')
+            for pos, yaw in BUILDER.get(o.name, []): inst_u(o, pos, yaw)
     for k, (eye, at) in L.CAMS.items():
         L.render(L.camera(k, eye, at), os.path.join(rdir, f'b9_{k}.png'), RRES, SAMPLES)
     # ivy close-up from the mid camera's side, and the studio row
@@ -679,14 +720,25 @@ def review(groups):
     studio(groups, os.path.join(rdir, 'b9_studio.png'))
     print('REVIEW', rdir)
 
+# Asset folder per model (BeautyCornerArt matches folder names: exact alias first, then contains, ties to the first alphabetically).
+# Ivy_Facade wins the Ivy row over Ivy_Patch_*; Weed_A is the clump the CrackWeeds row scatters; Basin_Moss is exact for BasinMoss.
+FOLDERS = {
+    'SC_B9_IvyWall': 'Ivy_Facade', 'SC_B9_IvyPatchA': 'Ivy_Patch_A', 'SC_B9_IvyPatchB': 'Ivy_Patch_B',
+    'SC_B9_CrackWeed_A': 'Weed_A', 'SC_B9_CrackWeed_B': 'Weed_B', 'SC_B9_CrackWeed_C': 'Weed_C', 'SC_B9_CrackWeed_D': 'Weed_D', 'SC_B9_CrackWeed_E': 'Weed_E',
+    'SC_B9_MossTuft_A': 'Moss_Tuft_A', 'SC_B9_MossTuft_B': 'Moss_Tuft_B', 'SC_B9_MossTuft_C': 'Moss_Tuft_C',
+    'SC_B9_GrassClump_A': 'Grass_A', 'SC_B9_GrassClump_B': 'Grass_B', 'SC_B9_GrassClump_C': 'Grass_C',
+    'SC_B9_MossDecal': 'Moss_Band', 'SC_B9_BasinMoss': 'Basin_Moss',
+}
+
 def do_export(groups):
-    fol = os.path.join(EXP, 'Foliage'); dec = os.path.join(EXP, 'MossDecal')
+    """Each folder: its FBX + the texture set it uses (identical atlas copies dedupe in git and LFS)."""
     import shutil
     for k, o in groups.items():
-        L.export_fbx([o], os.path.join(dec if k == 'SC_B9_MossDecal' else fol, k + '.fbx'))
-    for m in ('BaseColor', 'Normal', 'ORM'):
-        shutil.copy(f'{ATLAS}_{m}.png', os.path.join(fol, f'T_B9_Foliage_{m}.png'))
-        shutil.copy(f'{DECAL}_{m}.png', os.path.join(dec, f'T_B9_MossDecal_{m}.png'))
+        d = os.path.join(EXP, FOLDERS[k]); os.makedirs(d, exist_ok=True)
+        L.export_fbx([o], os.path.join(d, k + '.fbx'))
+        src = DECAL if k == 'SC_B9_MossDecal' else RIM if k == 'SC_B9_BasinMoss' else ATLAS
+        for m in ('BaseColor', 'Normal', 'ORM'):
+            shutil.copy(f'{src}_{m}.png', os.path.join(d, f'{os.path.basename(src)}_{m}.png'))
     print('EXPORT', EXP)
 
 if __name__ == '__main__':

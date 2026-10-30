@@ -1,17 +1,18 @@
 """B8 lanterns for the beauty corner (PHASE1 4, B8; docs/art/beauty-corner-brief.md): two adopted Poly Haven lanterns,
 restyled chunky in the locked style: thicker iron, warm glass, soot climbing the upper glass and the cap, 10% oversized.
 
-  SC_B8_MarketLantern  wooden_lantern_01 (CC0, James Ray Cock): the stall's hanging lantern. Body widened 15% and raised
-                       10%, the carry handle thickened, a forged S-hook and ring added on top, a stub candle inside.
-                       Origin = the top of the hook (hang it from the awning beam). About 0.5 m tall.
-  SC_B8_DoorLantern    Lantern_01 (CC0, Rajil Jose Macatangay): the wall lantern beside the facade door. Brass regraded
+  SC_B8_Stall_Lantern  wooden_lantern_01 (CC0, James Ray Cock): the stall's lantern (the corner builder stands it on the
+                       counter). Body widened 15% and raised 10%, the iron carry handle thickened, a stub candle inside.
+                       Origin = the ground centre of its feet. About 0.65 m to the top of the handle.
+  SC_B8_Lantern_Bracket  Lantern_01 (CC0, Rajil Jose Macatangay): the wall lantern beside the facade door. Brass regraded
                        to blackened wrought iron with worn-bright edges, decimated 30.8k -> about 6k tris, thickened,
-                       scaled from 0.29 m to a real wall-lantern size + 10% (0.46 m), hung from a forged wall bracket
+                       scaled from 0.29 m to a real wall-lantern size + 10% (0.52 m), hung from a forged wall bracket
                        (wall plate, square-bar arm with an end curl, scrolled brace). Origin = the back of the wall plate
-                       at its centre (y 0 is the wall face; the bracket points -Y, Unity +z: rotate 180 about Y on the facade).
+                       at its centre (y 0 is the wall face, the arm reaches -Y away from the wall, the builder's -Z).
+Folders match the corner builder's rows exactly (BeautyCornerTable.cs): B8/Stall_Lantern, B8/Lantern_Bracket.
 Each lantern is ONE texture set re-baked onto a fresh UV layout (the sources' UVs overlap or tile): the source maps are
 sampled through their own UVs and graded, the generated iron is a procedural wrought iron, soot is added by height, the
-glass is warm amber whose alpha rises with the soot. Two material slots share the set: M_<name> (opaque, alpha clip 0.5)
+glass is warm amber whose alpha rises with the soot. Two material slots share the set: M_<name> (opaque, no clip)
 and M_<name>_Glass (URP Lit Transparent, uses _BaseColor alpha). ORM = R occlusion, G roughness, B metallic.
 In Unity: a warm point light (about 2700 K) at the candle / burner (LIGHT below) for dusk; unlit at midday.
 
@@ -20,6 +21,7 @@ In Unity: a warm point light (about 2700 K) at the candle / burner (LIGHT below)
 
 Status (2026-10-30, PC): exported at 2048. Calibrated review 27/40 (round 1 22: tris over budget, clear glass, door lantern
 too small at mid distance; round 2: decimated to 5.7k / 5.8k, amber glass, door lantern 0.52 m on a 0.46 m bracket).
+Round 3, 27.5/40: re-pivoted and renamed for the corner builder (the stall lantern stands on the counter, so the S-hook went).
 """
 import sys, os, math, random, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -284,7 +286,7 @@ def finish(ob, name, glass_slots):
 def market_lantern():
     src = os.path.join(PH, 'wooden_lantern_01')
     parts = import_gltf(os.path.join(src, 'wooden_lantern_01_2k.gltf'))
-    ob = join(parts, 'SC_B8_MarketLantern'); weld(ob); decimate(ob, 5200)
+    ob = join(parts, 'SC_B8_Stall_Lantern'); weld(ob); decimate(ob, 5200)
     lo, hi = bbox(ob)
     # the carry handle (everything above 80% of the height) is iron: thicken it
     me = ob.data; me.update(); cap = lo.z + (hi.z - lo.z) * 0.80
@@ -296,25 +298,18 @@ def market_lantern():
     lo, hi = bbox(ob); top = hi.z
     wood = bake_material('bk_wood', os.path.join(src, 'textures', 'wooden_lantern_01'), 'wood', 0.0, top, soot_from=0.72)
     glass = bake_material('bk_glass', None, 'glass', 0.0, top, soot_from=0.55)
-    iron = bake_material('bk_iron', None, 'iron', 0.0, top + 0.12, soot_from=0.9)
     wax = bake_material('bk_wax', None, 'wax', 0.0, top)
     for s in ob.material_slots:
         s.material = glass if 'glass' in s.material.name else wood
-    # forged S-hook and ring above the handle
-    hook = iron_tube('hook', [Vector((0, 0, top - 0.012)), Vector((0, 0, top + 0.03))] +
-                     [Vector((0, 0.022 * math.sin(a), top + 0.055 + 0.022 * -math.cos(a))) for a in np.linspace(0, math.pi * 1.6, 12)], 0.0055)
-    rng_ = ring('ring', (0, 0, top + 0.11), 0.028, 0.006, axis='X')
     candle = None
     # stub candle on the lantern floor (inside the glass), with a wax drip collar
     lo_g = min((v.co.z for p in me.polygons if ob.material_slots[p.material_index].material == glass for v in [me.vertices[i] for i in p.vertices]), default=0.06)
     bpy.ops.mesh.primitive_cylinder_add(radius=0.026, depth=0.075, vertices=14, location=(0, 0, lo_g + 0.0375)); candle = bpy.context.active_object
-    LIGHT['SC_B8_MarketLantern'] = (0, 0, lo_g + 0.09)
-    for o, m in ((hook, iron), (rng_, iron), (candle, wax)):
+    LIGHT['SC_B8_Stall_Lantern'] = (0, 0, lo_g + 0.09)                            # origin stays at the feet
+    for o, m in ((candle, wax),):
         o.data.materials.clear(); o.data.materials.append(m)
-    ob = join([ob, hook, rng_, candle], 'SC_B8_MarketLantern')
-    # origin at the top of the ring
-    lo, hi = bbox(ob); ob.data.transform(Matrix.Translation((0, 0, -hi.z))); LIGHT['SC_B8_MarketLantern'] = tuple(Vector(LIGHT['SC_B8_MarketLantern']) - Vector((0, 0, hi.z)))
-    return ob, finish(ob, 'SC_B8_MarketLantern', {'bk_glass'})
+    ob = join([ob, candle], 'SC_B8_Stall_Lantern')
+    return ob, finish(ob, 'SC_B8_Stall_Lantern', {'bk_glass'})
 
 def door_lantern():
     src = os.path.join(PH, 'Lantern_01')
@@ -324,7 +319,7 @@ def door_lantern():
     t0 = L.tri_count(body); decimate(body, 4200); weld(gl, 0.0001); decimate(gl, 500)
     for v in body.data.vertices: v.co += v.normal * 0.0012                     # thicker iron
     print('door lantern body', t0, '->', L.tri_count(body), 'glass', L.tri_count(gl))
-    ob = join([body, gl], 'SC_B8_DoorLantern')
+    ob = join([body, gl], 'SC_B8_Lantern_Bracket')
     lo, hi = bbox(ob); s = 0.52 / (hi.z - lo.z)
     ob.data.transform(Matrix.Translation((-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -hi.z))); ob.data.transform(Matrix.Scale(s, 4))
     lo, hi = bbox(ob)
@@ -333,7 +328,7 @@ def door_lantern():
     iron = bake_material('bk_iron2', None, 'iron', lo.z, hi.z + 0.25, soot_from=0.95)
     for sl in ob.material_slots:
         sl.material = glass if 'glass' in sl.material.name else brass
-    LIGHT['SC_B8_DoorLantern_rel'] = (0, 0, lo.z + (hi.z - lo.z) * 0.38)
+    LIGHT['SC_B8_Lantern_Bracket_rel'] = (0, 0, lo.z + (hi.z - lo.z) * 0.38)
     # wall bracket: plate on the wall (y 0), arm out along -Y, end curl, a scrolled brace under it
     arm_z = 0.07; reach = 0.46
     hang = Vector((0, -reach + 0.03, arm_z - 0.015))
@@ -353,9 +348,9 @@ def door_lantern():
         o.data.materials.clear(); o.data.materials.append(iron)
     # hang the lantern: its top (z 0) under the hook
     ob.data.transform(Matrix.Translation(hang + Vector((0, 0, -0.045))))
-    LIGHT['SC_B8_DoorLantern'] = tuple(Vector(LIGHT['SC_B8_DoorLantern_rel']) + hang + Vector((0, 0, -0.045)))
-    ob = join([ob, plate, arm, brace, curl, hook] + bolts, 'SC_B8_DoorLantern')
-    return ob, finish(ob, 'SC_B8_DoorLantern', {'bk_glass2'})
+    LIGHT['SC_B8_Lantern_Bracket'] = tuple(Vector(LIGHT['SC_B8_Lantern_Bracket_rel']) + hang + Vector((0, 0, -0.045)))
+    ob = join([ob, plate, arm, brace, curl, hook] + bolts, 'SC_B8_Lantern_Bracket')
+    return ob, finish(ob, 'SC_B8_Lantern_Bracket', {'bk_glass2'})
 
 # ----------------------------------------------------------------------------- review
 def review(lanterns):
@@ -363,12 +358,11 @@ def review(lanterns):
     stand = L.review_scene()
     R = Matrix.Rotation(math.pi, 4, 'Z')
     mk, dr = lanterns
-    # market lantern hangs from the awning's front edge (stand-in awning bottom z 2.6); door lantern beside the door at 2.35 m
-    mk.matrix_world = Matrix.Translation((-4.0, -3.35, 2.6)); dr.matrix_world = Matrix.Translation((1.95, -7.5, 2.35)) @ R
+    # the corner builder's rows: the stall lantern on the counter, the bracket lantern on the facade beside the door
+    mk.matrix_world = Matrix.Translation(L.u2b(3.58, 0.9, 4.3)) @ R; dr.matrix_world = Matrix.Translation(L.u2b(0.0, 2.45, 7.5)) @ R
     L.render(L.camera('mid', *L.CAMS['mid']), os.path.join(rdir, 'b8_mid.png'), RRES, SAMPLES)
-    L.render(L.camera('wide', *L.CAMS['wide']), os.path.join(rdir, 'b8_wide.png'), RRES, SAMPLES)
-    L.render(L.camera('doorc', (-1.0, 2.0, 5.3), (-1.9, 2.1, 7.4), fov_y=40), os.path.join(rdir, 'b8_door.png'), RRES, SAMPLES)
-    L.render(L.camera('stallc', (3.3, 2.1, 2.2), (4.0, 2.25, 3.35), fov_y=40), os.path.join(rdir, 'b8_stall.png'), RRES, SAMPLES)
+    L.render(L.camera('doorc', (1.0, 2.2, 5.6), (0.0, 2.2, 7.4), fov_y=40), os.path.join(rdir, 'b8_door.png'), RRES, SAMPLES)
+    L.render(L.camera('stallc', (2.7, 1.5, 3.1), (3.58, 1.15, 4.3), fov_y=40), os.path.join(rdir, 'b8_stall.png'), RRES, SAMPLES)
     print('REVIEW', rdir)
 
 if __name__ == '__main__':
@@ -376,11 +370,11 @@ if __name__ == '__main__':
     mk, mkp = market_lantern()
     dr, drp = door_lantern()
     for o in (mk, dr): print(o.name, 'tris', L.tri_count(o), 'dims', [round(d, 3) for d in o.dimensions])
-    LIGHT.pop('SC_B8_DoorLantern_rel', None); print('LIGHT', LIGHT)
+    LIGHT.pop('SC_B8_Lantern_Bracket_rel', None); print('LIGHT', LIGHT)
     os.makedirs(os.path.join(OUT, 'fbx'), exist_ok=True)
     for o in (mk, dr): L.export_fbx([o], os.path.join(OUT, 'fbx', o.name + '.fbx'))
     if EXPORT:
-        for o, pre, folder in ((mk, mkp, 'MarketLantern'), (dr, drp, 'DoorLantern')):
+        for o, pre, folder in ((mk, mkp, 'Stall_Lantern'), (dr, drp, 'Lantern_Bracket')):
             d = os.path.join(EXP, folder); L.export_fbx([o], os.path.join(d, o.name + '.fbx'))
             for k in ('BaseColor', 'Normal', 'ORM'): shutil.copy(f'{pre}_{k}.png', os.path.join(d, f'T_{o.name}_{k}.png'))
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'b8_lanterns.blend'))
