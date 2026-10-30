@@ -20,7 +20,7 @@
 - `main` (`c7367cd`). In progress: `m4-fixes` (worktree `agent-ad25d53219a200b3c`) and `m2-hero-camera` (worktree `agent-a3f4b7d611d7e2923`). `m1-foundation` and `m4-weapon-growth` are merged.
 
 ## Blockers and open questions
-- The asset skills other than `sc-reference` still carry FishGame's Riverlight style rules. Rewrite them from PHASE1 section 3 (the style bible) before the art batches.
+- The asset skills were rewritten on 2026-10-30. Some legacy FishGame tools still need rework before the art batches; see the tool table in `sc-asset-craft` section 0b.
 - `sc-walk` documents WalkDriver helpers that don't exist here yet; they arrive with the App/Dev port.
 
 ## Read next
