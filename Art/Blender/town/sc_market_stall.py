@@ -36,7 +36,11 @@ Budget: 28.5k tris (a compound dressing piece between kit and hero in PHASE1 3.3
 FAILs at 6k, audit it as --class hero), one 2K set, 1 material.
 Collider (at placement): a box over the counter and frame, 2.7 x 1.0 x 1.6 m; the awning overhang has none.
 
-Status (2026-10-30, cloud): see the review line at the bottom of this docstring.
+Status (2026-10-30, cloud): relaxed review 29/40 on the --stage bake --res 1024 proof (rounds 25 -> 27 -> 28.5 -> 29;
+round 4 gained under 1.5, so stopped one short of the 30 target). Lines: silhouette 4, proportion 3.5, form 3.5,
+surface 3.5, colour 3.5, wear 4, fits set 3 (judged against proxies only), metal/efficiency 3.5. Audit PASS --class hero.
+Next: the PC runs --stage bake --res 2048 --export and judges it in the Unity corner. Left: nail rows and grime band sit
+in shade at mid; posts read rounded (no adze facets); a stall lantern on the hook; hanging price boards.
 """
 import sys, os, math, zlib, random
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
