@@ -1,7 +1,7 @@
 // Not networked itself. The host decides when the gameplay scene loads (NetworkSceneManager); clients follow NGO scene sync.
 // The flow: Bootstrap composes the App and hands over to the Lobby scene. A session (solo, dev-direct or online) connects while the Lobby is up. THE START GATE LIVES HERE
 // and in HostWorld: TryStartSession asks HostWorld.TryStartSession(HostRoster) (Core WorldPlayers rules) and only on Ok loads the greybox
-// arena for everyone. A Solo session starts by itself when it connects; a multiplayer host starts when its user presses Start, and the gate
+// arena for everyone. The 2-player rule is a START rule only: once the session runs, players leaving it (down to one) never end it. A Solo session starts by itself when it connects; a multiplayer host starts when its user presses Start, and the gate
 // refuses (and says so) until 2 or more recorded players are connected. When the session goes Offline the flow returns to the Lobby.
 // Every peer reacts to INetworkSession events. Error toasts come only from Ended, never from start-task exceptions.
 using System;
@@ -61,7 +61,7 @@ namespace SleepingCalamity.App
             if (LastStartVerdict != WorldPlayerVerdict.Ok)
             {
                 Debug.LogWarning("SceneFlow: the session cannot start yet: " + LastStartVerdict + " (" + roster.ConnectedCount + " connected).");
-                bus.Publish(new ToastRequested("err.world_start", LastStartVerdict.ToString()));
+                bus.Publish(new ToastRequested(WorldStartText.ToastKey(LastStartVerdict), LastStartVerdict.ToString()));
                 if (session.Mode == SessionMode.Solo) ObserveLeave(session.LeaveAsync());
                 return false;
             }

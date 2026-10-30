@@ -11,10 +11,15 @@ namespace SleepingCalamity.Runtime
         // ConnectionApprover sets this to the HostRoster on Install and clears it on Uninstall.
         public IJoinContextProvider Provider { get; set; }
 
+        // Raised when a join is approved, before its client connects (main thread). The online session caches the player's service id here, so
+        // a client that drops during scene sync can still be removed from the Lobby.
+        public event System.Action<ApprovedJoin> Approved;
+
         // Replaces any pending entry for the same ClientId.
         public void AddApproved(in ApprovedJoin join)
         {
             _pending[join.ClientId] = join;
+            EventIsolation.Invoke(Approved, join);
         }
 
         // Removes the entry when found.
@@ -39,6 +44,8 @@ namespace SleepingCalamity.Runtime
             }
         }
 
+        // Only ConnectionApprover removes entries (on the client's disconnect event); a session that removed one first would hide an
+        // approved-but-never-connected client from the approver, which then could not free its place.
         public void RemovePending(ulong clientId)
         {
             _pending.Remove(clientId);

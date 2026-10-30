@@ -1,12 +1,16 @@
 // App/WorldSaveFlow.cs: the host's world save flow. Not networked itself.
-// Authority: host only. When this peer starts a session as the host (state Connecting), it opens this machine's world file (WorldSaveStore,
-// world{suffix}.json) and loads the saved world's players into HostWorld before the host's own approval runs (the approver reads them).
+// Authority: host only. A player keeps up to 10 Solo and 10 Multiplayer worlds (WorldLibrary: one file per world). Before connecting, the host
+// picks a world (Select) or makes one (CreateWorld); when it starts a session as the host (state Connecting) this flow opens that world and loads
+// its players into HostWorld before the host's own approval runs (the approver reads them). With nothing selected it opens the most recently
+// played world of the session's kind and identity kind, or makes one. Local worlds (solo, dev-direct) and online worlds never cross.
 // While hosting it saves:
-//  - shortly after a change (HostWorld.Changed marks the file dirty; a dirty file flushes at most every FlushSeconds),
+//  - at once when the world is created or a player is recorded (HostWorld.Changed), so a crash right after never loses who the world belongs to,
+//  - on the first session start (last-played time) and then at most every FlushSeconds when anything else marks the file dirty,
 //  - when the session ends: on ShuttingDown or Failed (before NGO shuts down), again on Ended, and on quit.
-// A client never opens its own world file. A newer build's file loads read-only (a toast says so). The dev New world button
-// (DevNewWorldRequested) moves the file aside for the next session. One world file per machine profile in v1.
+// A client never opens a world file. A newer build's world loads read-only (a toast says so). One-time migration: the old single
+// world{suffix}.json becomes a world in the library.
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using SleepingCalamity.Core;
 using SleepingCalamity.Runtime;
@@ -17,19 +21,20 @@ namespace SleepingCalamity.App
 {
     public sealed class WorldSaveFlow : IDisposable
     {
-        public const float FlushSeconds = 10f;       // a change is on disk within this
+        public const float FlushSeconds = 10f;       // a dirty file is on disk within this
 
         private readonly INetworkSession session;
         private readonly NetworkManager networkManager;
         private readonly EventBus bus;
         private readonly HostWorld world;
-        private readonly IDisposable newWorldSubscription;
+        private WorldLibrary library;
         private WorldSaveStore store;
         private float nextFlush;
         private bool disposed;
+        private bool migrated;
 
-        // PlayMode tests switch it off, so one test's world never seeds the next one's session (and none touches the profile's real world
-        // file) unless it switches this on. Reset to on for every play session.
+        // PlayMode tests switch it off, so one test's world never seeds the next one's session (and none touches the profile's real worlds)
+        // unless it switches this on (with WorldLibrary.DirectoryOverrideForTests). Reset to on for every play session.
         public static bool Enabled { get; set; } = true;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -44,21 +49,66 @@ namespace SleepingCalamity.App
             session.StateChanged += HandleStateChanged;
             session.Ended += HandleEnded;
             world.Changed += HandleWorldChanged;
-            newWorldSubscription = bus.Subscribe<DevNewWorldRequested>(HandleNewWorld);
         }
 
         // The attached store while hosting (tests read it), else null.
         public WorldSaveStore Store => store;
 
+        // The world the next hosted session opens (set by Select / CreateWorld); null = the most recently played, or a new one.
+        public string SelectedWorldId { get; private set; }
+
+        // The library of this machine's worlds (migrates the old single file once, on first use).
+        public WorldLibrary Library
+        {
+            get
+            {
+                if (library == null)
+                {
+                    library = WorldLibrary.ForThisInstance();
+                    if (Enabled && !migrated)
+                    {
+                        migrated = true;
+                        library.MigrateLegacy(WorldSaveStore.PathForThisInstance());
+                    }
+                }
+                return library;
+            }
+        }
+
         public void Dispose()
         {
             if (disposed) return;
             disposed = true;
-            newWorldSubscription?.Dispose();
             world.Changed -= HandleWorldChanged;
             session.StateChanged -= HandleStateChanged;
             session.Ended -= HandleEnded;
         }
+
+        // ---- picking and managing worlds (used before a session starts) ----
+
+        public void Select(string worldId) => SelectedWorldId = worldId;
+
+        public IReadOnlyList<WorldSummary> ListWorlds(WorldKind kind, IdentityKind identity) => Library.List(kind, identity);
+
+        // A new empty world of the kind and identity kind, selected for the next session. Null (and nothing changes) when that list is full.
+        public string CreateWorld(WorldKind kind, IdentityKind identity)
+        {
+            WorldSaveStore created = Library.Create(kind, identity, NewSeed());
+            if (created == null) return null;
+            SelectedWorldId = created.Current.WorldId;
+            return SelectedWorldId;
+        }
+
+        // Sets a world aside (never erases it). Not while it is the world being hosted.
+        public bool DeleteWorld(string worldId)
+        {
+            if (store != null && store.Current.WorldId == worldId) return false;
+            if (!Library.Delete(worldId)) return false;
+            if (SelectedWorldId == worldId) SelectedWorldId = null;
+            return true;
+        }
+
+        // ---- hosting ----
 
         private void HandleStateChanged(ConnState previous, ConnState current)
         {
@@ -71,15 +121,35 @@ namespace SleepingCalamity.App
 
         private void Open()
         {
-            store = WorldSaveStore.CreateForThisInstance(NewSeed());
-            store.Load();   // never throws
+            WorldKind kind = session.Mode == SessionMode.Solo ? WorldKind.Solo : WorldKind.Multiplayer;
+            IdentityKind identity = session.Mode == SessionMode.Online ? IdentityKind.Ugs : IdentityKind.Local;
+            store = Resolve(kind, identity);
+            if (store == null)
+            {
+                bus.Publish(new ToastRequested("world.library_full", kind.ToString(), 6f));   // 10 worlds of this kind: pick one or delete one
+                return;
+            }
+            SelectedWorldId = store.Current.WorldId;
             world.Load(RestoreWorld(store.Current.Players));
+            Write();   // stamps the last-played time at once
             nextFlush = Time.unscaledTime + FlushSeconds;
             if (store.IsReadOnly)
                 bus.Publish(new ToastRequested(store.NewerVersionOnDisk > 0 ? "save.world_read_only" : "save.world_load_failed", null, 6f));
         }
 
-        // The saved players section as a world, or null when the file has none (a first run).
+        // The selected world if it is one of this kind and identity kind; else the newest of them; else a new one (null when the list is full).
+        private WorldSaveStore Resolve(WorldKind kind, IdentityKind identity)
+        {
+            List<WorldSummary> worlds = Library.List(kind, identity);
+            string id = null;
+            if (!string.IsNullOrEmpty(SelectedWorldId))
+                foreach (WorldSummary w in worlds) if (w.Id == SelectedWorldId) id = w.Id;
+            if (id == null && worlds.Count > 0) id = worlds[0].Id;   // most recently played first
+            if (id != null) return Library.Open(id, NewSeed());
+            return Library.Create(kind, identity, NewSeed());
+        }
+
+        // The saved players section as a world, or null when the file has none.
         private static WorldPlayers RestoreWorld(WorldPlayersSave saved)
         {
             if (saved == null) return null;
@@ -94,11 +164,13 @@ namespace SleepingCalamity.App
             return seed == 0 ? 1UL : seed;
         }
 
+        // The world was created or a player recorded or renamed: on disk now, not on the next tick.
         private void HandleWorldChanged()
         {
             if (store == null) return;
             store.Current.Players = world.Players?.ToSave();
             store.MarkDirty();
+            SaveNow();
         }
 
         // AppBootstrap.Update: the flush while hosting.
@@ -119,7 +191,7 @@ namespace SleepingCalamity.App
             }
         }
 
-        // Writes if anything changed. Host only; never throws (quit and session end call it).
+        // Writes if anything changed (the last-played time moves with it). Host only; never throws (quit and session end call it).
         public void SaveNow()
         {
             if (store == null) return;
@@ -136,6 +208,7 @@ namespace SleepingCalamity.App
         private void Write()
         {
             store.Current.SavedAtUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+            store.MarkDirty();
             store.FlushIfDirty();
         }
 
@@ -144,17 +217,6 @@ namespace SleepingCalamity.App
             if (disposed) return;
             SaveNow();
             store = null;
-        }
-
-        private void HandleNewWorld(DevNewWorldRequested msg)
-        {
-            if (disposed || !Debug.isDebugBuild) return;
-            if (store == null || !networkManager.IsServer)
-            {
-                bus.Publish(new ToastRequested("dev.host_only"));
-                return;
-            }
-            bus.Publish(new ToastRequested(store.Retire() ? "save.new_world" : "save.new_world_failed", null, 6f));
         }
     }
 }

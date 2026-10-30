@@ -55,6 +55,36 @@ namespace SleepingCalamity.Runtime
             return false;
         }
 
+        // The slot a connected client holds (spawn positions follow it).
+        public bool TryGetSlot(ulong clientId, out byte slot)
+        {
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (_entries[i].Connected && _entries[i].ClientId == clientId)
+                {
+                    slot = _entries[i].Slot;
+                    return true;
+                }
+            }
+            slot = 0;
+            return false;
+        }
+
+        // The client a key is connected as now (a reconnecting key takes over its own stale connection).
+        public bool TryFindConnected(PlayerKey key, out ulong clientId)
+        {
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (_entries[i].Connected && _entries[i].Key == key)
+                {
+                    clientId = _entries[i].ClientId;
+                    return true;
+                }
+            }
+            clientId = 0;
+            return false;
+        }
+
         // The keys of the players connected now, in slot order.
         public void GetConnectedKeys(List<PlayerKey> into)
         {

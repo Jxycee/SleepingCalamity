@@ -79,7 +79,7 @@ namespace SleepingCalamity.Networking
             if (_config.Bridge.TryTakeApproved(clientId, out ApprovedJoin join))
             {
                 roster.Connect(join);
-                _config.World?.RecordEntered(join.Key);   // the client is in: now the world writes it down
+                _config.World?.RecordEntered(join.Key, clientId, join.Name);   // the client is in: now the world writes it down, with its name
             }
         }
 
@@ -88,12 +88,7 @@ namespace SleepingCalamity.Networking
             HostRoster roster = _config.Roster;
             if (roster == null) return;
             roster.Disconnect(clientId);
-            if (_config.World != null)
-            {
-                _config.Bridge.GetPending(_pending);   // approved but never connected: its place is free again
-                foreach (ApprovedJoin pending in _pending)
-                    if (pending.ClientId == clientId) _config.World.CancelPending(pending.Key);
-            }
+            _config.World?.CancelPending(clientId);   // approved but never connected: its place is free again (keyed by client id)
             _config.Bridge.RemovePending(clientId);
         }
 
@@ -122,6 +117,9 @@ namespace SleepingCalamity.Networking
 
             ulong clientId = request.ClientNetworkId;
             JoinApprovalBridge bridge = _config.Bridge;
+            // Only a client that would otherwise be approved may take a stale connection over (a mismatched build must not kick anyone).
+            if (_mode != SessionMode.Solo && payload.ProtocolVersion == _config.ProtocolVersion && payload.ContentHash == _config.ContentHash)
+                TakeOverStaleConnection(payload.Key, clientId);
             IJoinContextProvider provider = bridge.Provider;
 
             // Roster = provider slots (empty if none) + pending approvals counted as connected (D4).
@@ -162,7 +160,7 @@ namespace SleepingCalamity.Networking
             HostWorld world = _config.World;
             if (world != null)
             {
-                WorldPlayerVerdict worldVerdict = world.Admit(payload.Key, joinRequest.IsServerSelf);
+                WorldPlayerVerdict worldVerdict = world.Admit(payload.Key, clientId, joinRequest.IsServerSelf);
                 if (worldVerdict != WorldPlayerVerdict.Ok)
                 {
                     Reject(response, HostWorld.ReasonFor(worldVerdict));
@@ -175,6 +173,32 @@ namespace SleepingCalamity.Networking
             response.Approved = true;
             response.CreatePlayerObject = false;
             response.Pending = false;
+        }
+
+        // A key that connects again while an older connection of the same key is still up (a dropped link the host has not noticed yet, a
+        // second launch of the same profile) takes that connection over instead of being refused as a duplicate: the old one is released
+        // and disconnected. Never for the host's own key (a client with the host's key is a duplicate). Also covers an older approval of the
+        // same key that has not connected yet.
+        private void TakeOverStaleConnection(PlayerKey key, ulong newClientId)
+        {
+            HostRoster roster = _config.Roster;
+            if (roster == null || newClientId == NetworkManager.ServerClientId) return;
+            bool found = roster.TryFindConnected(key, out ulong stale) && stale != newClientId;
+            if (!found)
+            {
+                _config.Bridge.GetPending(_pending);
+                foreach (ApprovedJoin pending in _pending)
+                {
+                    if (pending.Key == key && pending.ClientId != newClientId) { stale = pending.ClientId; found = true; break; }
+                }
+            }
+            if (!found || stale == NetworkManager.ServerClientId) return;
+
+            roster.Disconnect(stale);
+            _config.Bridge.RemovePending(stale);
+            _config.World?.CancelPending(stale);
+            NetworkManager nm = _config.NetworkManager;
+            if (nm.IsServer) nm.DisconnectClient(stale, EndReason.Kicked.ToString());
         }
 
         // NGO sends Reason to the pending client before dropping it; the client parses it with DisconnectClassifier.

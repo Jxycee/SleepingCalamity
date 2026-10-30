@@ -105,5 +105,18 @@ namespace SleepingCalamity.Tests.EditMode
                 return false;
             }
         }
+    
+        // Catches: the online session not learning an approved player's service id before the client connects (a client that drops during
+        // scene sync would then keep its Lobby seat).
+        [Test]
+        public void Bridge_Approved_IsRaisedWhenAJoinIsAdded()
+        {
+            var bridge = new JoinApprovalBridge();
+            var seen = new System.Collections.Generic.List<ulong>();
+            bridge.Approved += j => seen.Add(j.ClientId);
+            bridge.AddApproved(MakeJoin(4, "x", 0));
+            bridge.AddApproved(MakeJoin(5, "y", 1));
+            Assert.That(seen, Is.EqualTo(new ulong[] { 4, 5 }));
+        }
     }
 }

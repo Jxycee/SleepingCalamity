@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SleepingCalamity.Core;
+using UnityEngine;
 
 namespace SleepingCalamity.Runtime
 {
@@ -11,13 +12,14 @@ namespace SleepingCalamity.Runtime
     //    It records nothing: RecordEntered writes a key down once its client has actually connected (the approver's connection event).
     //  - TryStartSession is THE start gate. SceneFlow calls it before loading the first gameplay scene. A Multiplayer world is created at the
     //    first start and every start needs 2 or more of its recorded players connected; a Solo world starts with its owner alone.
-    //    Until it returns Ok the host sits in the lobby (the Bootstrap scene): clients can connect but no gameplay scene loads.
+    //    Until it returns Ok the host sits in the lobby: clients can connect but no gameplay scene loads. The 2-player rule is a START rule
+    //    only (user ruling 2026-10-30): once a session runs, players dropping to 1 does not end it (no kick mid-dive); ScalePlayers falls to 1.
     // Before the world exists (Players == null) the session mode decides what it will be (PendingKind). The world save flow loads a saved
     // world into Players before the host connects and persists Players whenever Changed fires.
     public sealed class HostWorld
     {
         private readonly List<PlayerKey> _scratch = new List<PlayerKey>(NetworkConstants.MaxPlayers);
-        private readonly List<PlayerKey> _pendingNew = new List<PlayerKey>(NetworkConstants.MaxPlayers);   // approved new players not yet recorded
+        private readonly Dictionary<ulong, PlayerKey> _pendingNew = new Dictionary<ulong, PlayerKey>(NetworkConstants.MaxPlayers);   // approved new players not yet recorded, by client id
 
         // The recorded players of this machine's world; null until the world exists (first start, or loaded from the save).
         public WorldPlayers Players { get; private set; }
@@ -47,53 +49,60 @@ namespace SleepingCalamity.Runtime
             _pendingNew.Clear();
         }
 
-        // Connection approval. Pure: nothing is recorded here. JoinRules (and so the host's self-approval, IsServerSelf) ran before this.
-        // A joiner goes through WorldPlayers.CanJoin (a Solo world refuses everyone; a key of another identity kind is refused; a new key is
-        // refused when 4 are recorded) and also counts the other approved-but-not-yet-entered new players against the 4 places, so two joiners
-        // approved together cannot both take the last one. The host is the world's owner or creator, never a joiner: on a Solo world it must be
-        // the owner (or the world has no owner record left), on a Multiplayer world its key must fit (identity, and a place if new).
-        public WorldPlayerVerdict Admit(PlayerKey key, bool isHost)
+        // Connection approval. JoinRules (and so the host's self-approval, IsServerSelf) ran before this. Nothing is recorded here.
+        //  - The HOST is never refused (user ruling 2026-10-30). On a Solo world the owner follows the file: a host key that is not the
+        //    recorded owner (a new profile, a copied save) is rebound as the owner and the change is logged. On a Multiplayer world the host is
+        //    admitted whatever its key; if its key is not (and cannot be) recorded, the start gate says so with a clear message.
+        //  - A joiner goes through WorldPlayers.CanJoin (a Solo world refuses everyone; a key of another identity kind is refused; a new key is
+        //    refused when 4 are recorded). Other approved-but-not-yet-entered new players, kept by client id, count against the 4 places, so two
+        //    joiners approved together cannot both take the last one.
+        public WorldPlayerVerdict Admit(PlayerKey key, ulong clientId, bool isHost)
         {
             if (!WorldPlayers.IsValidKey(key)) return WorldPlayerVerdict.InvalidPlayer;
             WorldPlayers world = Players;
             if (world == null) return WorldPlayerVerdict.Ok;   // no world yet: the start gate decides who it records
 
-            WorldPlayerVerdict verdict;
-            if (world.Kind == WorldKind.Solo)
+            if (isHost)
             {
-                bool owner = world.IsRecorded(key) || world.Recorded.Count == 0;
-                verdict = isHost && owner ? WorldPlayerVerdict.Ok : WorldPlayerVerdict.SoloWorldClosed;
-                if (verdict == WorldPlayerVerdict.Ok && world.Identity.HasValue && key.Kind != world.Identity.Value) verdict = WorldPlayerVerdict.WrongIdentityKind;
-                return verdict;
+                if (world.Kind == WorldKind.Solo && !world.IsRecorded(key) && world.RebindSoloOwner(key))
+                {
+                    Debug.LogWarning("HostWorld: the Solo world's owner key did not match this machine's key; the owner is now " + key + ".");
+                    RaiseChanged();
+                }
+                return WorldPlayerVerdict.Ok;
             }
 
-            verdict = world.CanJoin(key);
+            WorldPlayerVerdict verdict = world.CanJoin(key);
             if (verdict != WorldPlayerVerdict.Ok) return verdict;
             if (!world.IsRecorded(key))
             {
                 int others = 0;
-                foreach (PlayerKey pending in _pendingNew) if (pending != key) others++;
+                foreach (KeyValuePair<ulong, PlayerKey> pending in _pendingNew)
+                    if (pending.Key != clientId && pending.Value != key) others++;
                 if (world.Recorded.Count + others >= WorldPlayers.MaxRecorded) return WorldPlayerVerdict.WorldFull;
-                if (!_pendingNew.Contains(key)) _pendingNew.Add(key);
+                _pendingNew[clientId] = key;
             }
             return WorldPlayerVerdict.Ok;
         }
 
-        // The client has entered the session (its connection is up): the key is written into the world now. No-op before the world exists.
-        public void RecordEntered(PlayerKey key)
+        // The client has entered the session (its connection is up): the key is written into the world now, with its display name.
+        // No-op before the world exists. A host whose key cannot be recorded (a full or other-identity Multiplayer world) stays unrecorded;
+        // TryStartSession then refuses with NotRecorded / WrongIdentityKind.
+        public void RecordEntered(PlayerKey key, ulong clientId, string name = null)
         {
-            _pendingNew.Remove(key);
+            _pendingNew.Remove(clientId);
             WorldPlayers world = Players;
             if (world == null) return;
-            bool known = world.IsRecorded(key);
-            bool added;
-            if (world.Kind == WorldKind.Solo) added = world.ClaimSoloOwner(key);
-            else added = !known && world.Record(key) == WorldPlayerVerdict.Ok;
-            if (added) RaiseChanged();
+            bool changed;
+            if (world.Kind == WorldKind.Solo) changed = world.ClaimSoloOwner(key);
+            else changed = !world.IsRecorded(key) && world.Record(key) == WorldPlayerVerdict.Ok;
+            if (name != null && world.SetName(key, name)) changed = true;
+            if (changed) RaiseChanged();
         }
 
-        // An approved client that never entered (it dropped first): its place is free again.
-        public void CancelPending(PlayerKey key) => _pendingNew.Remove(key);
+        // An approved client that never entered (it dropped first): its place is free again. Keyed by client id, so it works whoever
+        // else has already forgotten the approval.
+        public void CancelPending(ulong clientId) => _pendingNew.Remove(clientId);
 
         // The start gate. connected: the players connected now (HostRoster.GetConnectedKeys). Creates the world on the first start.
         public WorldPlayerVerdict TryStartSession(IReadOnlyList<PlayerKey> connected)
@@ -139,7 +148,7 @@ namespace SleepingCalamity.Runtime
             {
                 case WorldPlayerVerdict.SoloWorldClosed: return EndReason.JoinsClosed;
                 case WorldPlayerVerdict.WorldFull: return EndReason.FullLobby;
-                case WorldPlayerVerdict.WrongIdentityKind: return EndReason.Kicked;
+                case WorldPlayerVerdict.WrongIdentityKind: return EndReason.WrongWorld;
                 default: return EndReason.Unknown;
             }
         }

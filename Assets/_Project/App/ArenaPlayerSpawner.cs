@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
+using SleepingCalamity.Runtime;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -16,12 +17,14 @@ namespace SleepingCalamity.App
     {
         private readonly NetworkManager _nm;
         private readonly NetworkObject _playerPrefab;
+        private readonly HostRoster _roster;
         private NetworkSceneManager _attachedTo;
 
-        public ArenaPlayerSpawner(NetworkManager nm, NetworkObject playerPrefab)
+        public ArenaPlayerSpawner(NetworkManager nm, NetworkObject playerPrefab, HostRoster roster)
         {
             _nm = nm ?? throw new ArgumentNullException(nameof(nm));
             _playerPrefab = playerPrefab;
+            _roster = roster;
         }
 
         public void Attach()
@@ -69,9 +72,11 @@ namespace SleepingCalamity.App
             if (player == null) Debug.LogError("ArenaPlayerSpawner: spawning the player for client " + clientId + " failed.");
         }
 
-        // Join order among the connected clients, 0-based (the host first).
+        // The roster slot of the client (0..3, kept for a rejoin), so a player always spawns at the same place around the point. Without a
+        // roster entry (a test that spawns by hand) the join order stands in.
         private int SlotOf(ulong clientId)
         {
+            if (_roster != null && _roster.TryGetSlot(clientId, out byte rosterSlot)) return rosterSlot;
             int slot = 0;
             foreach (ulong id in _nm.ConnectedClientsIds)
             {

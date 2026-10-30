@@ -122,6 +122,7 @@ namespace SleepingCalamity.Networking
                 await NetworkManagerAwait.ShutdownAsync(nm);
             }
 
+            _config.Bridge.Approved -= OnJoinApproved;
             _approver?.Uninstall();
             _approver = null;
             _config.Bridge.Clear();

@@ -11,7 +11,7 @@ namespace SleepingCalamity.Core
 {
     public static class WorldSaveRules
     {
-        public const string SectionSeed = "worldSeed", SectionPlayers = "players";
+        public const string SectionSeed = "worldSeed", SectionPlayers = "players", SectionWorldId = "worldId", SectionCreatedAt = "createdAtUtc";
 
         // A new world: the given seed, nothing else yet.
         public static WorldSave New(ulong seed) => new WorldSave { WorldSeed = SeedToHex(seed) };
@@ -43,6 +43,10 @@ namespace SleepingCalamity.Core
                 rejected?.Add(SectionSeed);
             }
 
+            // The id is the file's name: a malformed one is blanked and the store fills in the real one (not a rejection, nothing is lost).
+            clean.WorldId = WorldIds.IsValid(save.WorldId) ? save.WorldId : "";
+            clean.CreatedAtUtc = save.CreatedAtUtc ?? "";
+
             if (save.Players != null)
             {
                 if (TryCleanPlayers(save.Players, out WorldPlayersSave players, out bool droppedEntry))
@@ -54,6 +58,27 @@ namespace SleepingCalamity.Core
             }
             if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);   // a newer build's members, written back as read
             return clean;
+        }
+
+        // What the world picker shows about a (cleaned) world. Null for a save without a usable players section (not a world a picker can
+        // offer: a world is created with its kind written down). Never throws.
+        public static WorldSummary Summarize(WorldSave save)
+        {
+            if (save == null || save.Players == null || !WorldPlayers.TryRestore(save.Players, out WorldPlayers world, out _)) return null;
+            var summary = new WorldSummary
+            {
+                Id = save.WorldId ?? "",
+                Kind = world.Kind,
+                Identity = world.Identity.HasValue ? (int)world.Identity.Value : -1,
+                CreatedAtUtc = save.CreatedAtUtc ?? "",
+                LastPlayedUtc = save.SavedAtUtc ?? "",
+            };
+            foreach (PlayerKey key in world.Recorded)
+            {
+                string name = world.NameOf(key);
+                summary.PlayerNames.Add(string.IsNullOrEmpty(name) ? "?" : name);
+            }
+            return summary;
         }
 
         // The world's players: bad, null or repeated records, records of another identity kind and records past WorldPlayers.MaxRecorded

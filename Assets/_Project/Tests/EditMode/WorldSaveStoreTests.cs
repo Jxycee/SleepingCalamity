@@ -326,5 +326,49 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.That(rowType, Is.EqualTo(f.FieldType), "WorldSave." + f.Name + "'s row parses it as its own type");
             }
         }
+    
+        // Catches (risk review): one mistyped member of the players section ("identity": "x", "recorded": 5) costing the whole section.
+        [Test]
+        public void AMistypedMember_CostsOnlyThatMember()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("\"identity\": 1, \"recorded\"", "\"identity\": \"x\", \"recorded\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+            Assert.That(store.Current.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer), "the kind stays");
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2), "so do both records");
+            Assert.That(store.Current.Players.Identity, Is.EqualTo(1), "the world's identity kind is read again from its records");
+
+            File.WriteAllText(_path, GoldenV1.Replace("\"recorded\": [", "\"recorded\": 5, \"was\": ["));
+            store = Load();
+            Assert.That(store.Current.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer), "a bad list keeps the kind");
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(0));
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+        }
+
+        // Catches (risk review): a players section with no kind coming back as a Solo world.
+        [Test]
+        public void AMissingKind_IsRejected_NotReadAsSolo()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("\"kind\": 1, ", ""));
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionPlayers }));
+            Assert.That(store.Current.Players, Is.Null);
+        }
+
+        // Catches: the world's id not following its file name (a copied file would claim another world's id), or the header fields lost.
+        [Test]
+        public void TheWorldId_IsTheFileName_AndCreatedAtRoundTrips()
+        {
+            string id = WorldIds.NewId();
+            string path = Path.Combine(_dir, id + ".json");
+            File.WriteAllText(path, GoldenV1.Replace("\"worldSeed\"", "\"worldId\": \"" + new string('a', 32) + "\", \"createdAtUtc\": \"2026-10-01T09:00:00Z\", \"worldSeed\""));
+            var store = new WorldSaveStore(path, DefaultSeed);
+            store.Load();
+            Assert.That(store.Current.WorldId, Is.EqualTo(id), "the file name wins over a copied id");
+            Assert.That(store.Current.CreatedAtUtc, Is.EqualTo("2026-10-01T09:00:00Z"));
+            Assert.That(store.Rejected, Is.Empty);
+        }
     }
 }

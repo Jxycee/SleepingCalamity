@@ -21,6 +21,7 @@ namespace SleepingCalamity.Runtime
 
         private readonly JsonSaveFile<WorldSave> _file;
         private readonly ulong _defaultSeed;
+        private readonly string _filePath;
         private readonly List<string> _rejected = new List<string>();
         private readonly List<string> _scratch = new List<string>();
         private readonly List<string> _parseRejected = new List<string>();   // the last Prepare's dropped sections
@@ -31,6 +32,8 @@ namespace SleepingCalamity.Runtime
         {
             ("worldSeed", typeof(string), WorldSaveRules.SectionSeed),
             ("savedAtUtc", typeof(string), "savedAtUtc"),
+            ("worldId", typeof(string), WorldSaveRules.SectionWorldId),
+            ("createdAtUtc", typeof(string), WorldSaveRules.SectionCreatedAt),
             ("players", typeof(WorldPlayersSave), WorldSaveRules.SectionPlayers),
         };   // every optional WorldSave section needs its row here, or one misfit value costs the whole file (WorldSaveStoreTests checks)
 
@@ -45,9 +48,19 @@ namespace SleepingCalamity.Runtime
             ("players", "recorded", typeof(WorldPlayerSave)),
         };
 
+        // Members of a section that are checked one by one: a member that does not fit is dropped alone (section key, member key, type). A dropped
+        // "kind" leaves the section without one, which WorldSaveRules rejects (a missing kind is never read as Solo).
+        static readonly (string section, string member, Type type)[] MemberSections =
+        {
+            ("players", "kind", typeof(int)),
+            ("players", "identity", typeof(int)),
+            ("players", "recorded", typeof(List<WorldPlayerSave>)),
+        };
+
         public WorldSaveStore(string filePath, ulong defaultSeed)
         {
             _defaultSeed = defaultSeed;
+            _filePath = filePath;   // before the file object: its constructor already normalizes a default value through Clean
             _file = new JsonSaveFile<WorldSave>(filePath, WorldSave.CurrentSchemaVersion, w => w.SchemaVersion, () => WorldSaveRules.New(_defaultSeed),
                 Clean, "world file", "the world is read-only this session", Prepare);
         }
@@ -139,6 +152,9 @@ namespace SleepingCalamity.Runtime
         {
             WorldSave clean = WorldSaveRules.Clean(save, _defaultSeed, _scratch);
             _rejected.AddRange(_scratch);
+            // The file's name is the world's id (a hand-renamed copy is a different world); a name that is not an id (the old world.json) leaves it blank.
+            string nameId = Path.GetFileNameWithoutExtension(_filePath);
+            if (WorldIds.IsValid(nameId)) clean.WorldId = nameId;
             return clean;
         }
 
@@ -168,6 +184,11 @@ namespace SleepingCalamity.Runtime
                     _parseRejected.Add(section);   // a record array's bad element goes alone (one mistyped player keeps the others)
                     dropped = true;
                 }
+                if (p.Value is JObject members && DropMisfitMembers(members, key, _droppedEntries))
+                {
+                    _parseRejected.Add(section);   // one mistyped member (identity, recorded) costs only itself
+                    dropped = true;
+                }
                 if (!Fits(p.Value, type))
                 {
                     p.Remove();
@@ -191,6 +212,22 @@ namespace SleepingCalamity.Runtime
             {
                 return false;
             }
+        }
+
+        // Removes the registered members of a section whose JSON does not fit their type. True when any went.
+        private static bool DropMisfitMembers(JObject section, string sectionKey, List<string> droppedInto)
+        {
+            bool any = false;
+            foreach ((string sectionName, string member, Type type) in MemberSections)
+            {
+                if (!string.Equals(sectionName, sectionKey, StringComparison.OrdinalIgnoreCase)) continue;
+                JProperty property = section.Property(member, StringComparison.OrdinalIgnoreCase);
+                if (property == null || property.Value.Type == JTokenType.Null || Fits(property.Value, type)) continue;
+                property.Remove();
+                droppedInto.Add(sectionKey + "." + member);
+                any = true;
+            }
+            return any;
         }
 
         // Removes the array elements of a registered record array whose JSON does not fit the element type. True when any went.
