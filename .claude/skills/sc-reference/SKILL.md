@@ -5,9 +5,9 @@ description: Find, licence-check, store and measure reference images for Sleepin
 
 # Reference images for Sleeping Calamity
 
-**Target look:** Dark Cloud's whimsical town and dungeon themes rendered with the stylised realism of the 2026 Ocarina of Time Switch 2 remake (handoff section 2): real PBR materials at high detail (cobble, half-timber and plaster, dressed stone, woven cloth, leather, bark, moss), chunky readable storybook shapes, saturated clean daytime colour, rich teal and gold dark scenes, heavy atmosphere (haze, light shafts, drifting motes).
+**Target look:** Dark Cloud's whimsical town and dungeon themes rendered with the stylised realism of the 2026 Ocarina of Time Switch 2 remake (handoff section 2): real PBR materials at high detail (cobble, half-timber and plaster, dressed stone, woven cloth, leather, bark, moss), chunky readable storybook shapes, clean moody daytime colour (OoT-like, slightly muted), warm gold firelit Cellars with no teal, heavy atmosphere (haze, light shafts, drifting motes).
 
-References tell you *what the thing is* (form, construction, proportion, wear, the colour relations between its parts). The style bible (`docs/research/style-targets.md`, later the Phase 1 style bible) tells you *how this game renders it*: cleaner, more saturated, tidier wear, chunkier forms than any photo.
+References tell you *what the thing is* (form, construction, proportion, wear, the colour relations between its parts). The style bible (`docs/PHASE1.md` section 3, the style bible, built on `docs/research/style-targets.md`) tells you *how this game renders it*: cleaner, tidier wear and chunkier forms than any photo.
 
 ## 1. What to look for (3-6 images per subject, two kinds)
 - **Photos, for form and materials.** The subject in its real setting: a full view for proportion, a close view for construction (how the timbers meet, how tiles lap, how brick vaults spring), and a worn one for the wear beats. Material close-ups should be flat-on and evenly lit.
@@ -40,7 +40,7 @@ python -I Art/Blender/tools/sc_ref_fetch.py "<subject>" <scratch>/refs/<set>_pai
 
 ## 4. Measure (turn pictures into targets)
 ```
-python -I Art/Blender/tools/sc_ref_palette.py <set>/*.jpg [--crops crops.json] [--exclude '#hex,...'] --sheet <scratch>/palette.png
+python -I Art/Blender/tools/sc_ref_palette.py <set>/*.jpg [--crops crops.json] [--exclude '#hex,...'] --k 7 --sheet <scratch>/palette.png
 ```
 - **Masses** (k-means hexes with share), **value** (p10 / p50 / p90 and spread), **light warmth** (are the lights warmer than the darks?), and a `--targets` string of masses at 5% or more. Run per image and pooled.
 - **Pool one variant only.** Summer and winter, day and lamplit, wet and dry brick average into a target nobody should hit.
@@ -48,10 +48,10 @@ python -I Art/Blender/tools/sc_ref_palette.py <set>/*.jpg [--crops crops.json] [
 - **`--exclude '#hex'`** drops every mass within dE 30 of the colour, including the subject's own darks if they are close: exclude one colour at a time, check the `x` marks, and read dark subject masses off the masses line by hand.
 - **Photo-to-game correction (the OoT-2026 shift).** Photos are noisy, dusty and desaturated by haze and weathering; the target is cleaner and bolder.
   - Keep the **relations**: moss darker and greener than the stone, lit plaster warmer than shaded plaster, timber darker than plaster, wet brick darker and cooler than dry.
-  - Day scenes: raise saturation (roughly +15-25% on plaster tints, roofs, foliage), keep plaster clean near-white and roofs a confident red; keep shadows cool and readable, never crushed.
-  - Dark scenes: push to rich teal shadows and gold lamplight, with a clear warm/cool split; keep the darkest masses lifted enough to read shape.
+  - Day scenes (PHASE1 3.1; key hues in sc-asset-craft's palette summary): no chroma boost on stone, plaster or roofs, +10-15% only on foliage, sky, painted wood, cloth and accents; plaster tan-cream, roofs red-terracotta, shadows slate-teal and readable, never crushed.
+  - Dark scenes (the Cellars): clean warm firelight with no teal or blue-green; saturated gold lamps, shadows warm umber to plum, crisp value steps rather than brown haze; keep the darkest masses lifted enough to read shape.
   - Wear is tidy and placed (a few chips, streaks, moss patches) rather than uniform grime.
-  - The numbers for the first area are in `docs/research/style-targets.md`.
+  - The measured numbers for the first area are in `docs/PHASE1.md` 3.1 (the style bible exists now) and `docs/research/style-targets.md`.
 - **Paintings give the value structure.** Count the masses the painter used (usually 3-4) and where the darkest dark and the lightest light sit. That is the target for the value read of a scene or prop at thumbnail size.
 
 ## 5. Use them while building
@@ -59,7 +59,7 @@ python -I Art/Blender/tools/sc_ref_palette.py <set>/*.jpg [--crops crops.json] [
 - **Proportion and construction from photos.** Measure against a known size in the frame (a door, a person, a brick) and write the dimensions down before modelling, then exaggerate toward chunky storybook proportion on purpose.
 - **Wear beats** from photos of the old or broken thing: pick the 2-3 that change the value pattern at thumbnail size.
 - **Reference colour scores are advisory.** Grade the *relations* `sc_ref_palette.py` prints, not an exact hex match, and say in the review that targets come from references.
-- **Materials:** use close-ups for the pattern and scale (cobble size, tile course height, plank width) and the style bible for the cleaned-up colour.
+- **Materials:** use close-ups for the pattern and scale (cobble size, tile course height, plank width) and PHASE1 3.1 for the cleaned-up colour.
 
 ## 6. When the subject has no good free reference
 Some things don't exist (a jam-jar slime, a sentient broom, a root wall) or have no free photo. Build from first principles (real dimensions, how it would be made and how it would fail), name the closest real analogue in the header, and note on the board card or report that there is no reference, so the user can supply one.

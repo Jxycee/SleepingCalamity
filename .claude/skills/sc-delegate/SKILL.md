@@ -26,7 +26,7 @@ Files and symbols: <path:line for each thing to change or read first>
 Behaviour: <what must be true afterwards; network authority (host vs owner) if networked>
 Tests: <test names and cases; which must fail first>
 Out of scope: <what not to touch>
-Check: <the Tools/unity.ps1 command that proves it, or "cloud: name the tests the local run must pass">
+Check: <the Tools/unity.ps1 (PC) or Tools/cloud/unity.sh (cloud) command that proves it; cloud without a Unity licence: sc_cloud_compile.py / sc_core_tests.py plus the tests a licensed run must pass>
 Report: what changed, the check result line, anything unverified.
 ```
 Name exact files and symbols so the agent doesn't search. Give the reason behind non-obvious constraints. Put code in the brief only for the tricky parts (math, state machines, RPC sequences), or all of it when routing to Haiku.

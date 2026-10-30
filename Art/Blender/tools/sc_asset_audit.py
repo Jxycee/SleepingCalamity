@@ -1,5 +1,5 @@
 # sc_asset_audit.py (rewritten 2026-10-30, M8): measures a SleepingCalamity model against the style bible budgets (docs/PHASE1.md 3.3), as JSON.
-# Used by the sc-asset-* skills to score a model before it is committed; read-only (it never writes into the repo).
+# Used by the sc-asset-* skills to measure a model against the PHASE1 3.3 budgets before it is committed; read-only (it never writes into the repo).
 #
 # Run:  blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- <out.json> [--class kit|scatter|hero|building|character|enemy|prop] [--tex-res 2048] <model.fbx|.glb> [...]
 #       blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- --selftest      (builds a T2 test mesh: 2 UV maps + a corner colour attribute)
@@ -10,9 +10,8 @@
 #   shading: smooth share, smear share (corner normals > 45 deg off their face)
 #   hygiene: degenerate faces, loose verts, non-manifold edges, material slots
 # FAIL = over a PHASE1 3.3 hard budget (triangles, material slots); WARN = advice (texel density, density, hygiene). Exit code is 0 either way: read the JSON.
-#
-# Dropped in the rewrite (FishGame's palette-slot/vertex-colour toon encoding): the ArtPalette.asset read (crashed on any mesh with a second UV map
-# plus a corner colour attribute), the uv1 "Layer" slot check, the required "Col" check, the albedo-from-palette estimate, and the Millpond medians.
+# It makes no palette, colour-encoding or second-UV checks: a T2 piece may carry a second UV map and a mask-blend colour attribute. Colour is judged
+# from renders and captures with sc_ref_palette.py (sc-asset-review).
 import bpy, bmesh, json, math, os, sys
 from mathutils import Vector
 

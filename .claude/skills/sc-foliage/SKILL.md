@@ -5,7 +5,7 @@ description: Build or refine Sleeping Calamity foliage in the locked stylised-re
 
 # Foliage (trees, ivy, weeds, grass, moss, roots)
 
-**The look:** saturated clean yellow-green by day (PHASE1 3.1: foliage `#6f8a34`, moss `#616e2e` / `#b6ab28`), chunky readable crown masses with light tops and dark undersides, dense dressing in every corner (handoff 2.1). Leaves are real PBR (albedo with alpha, normal, ORM), clean and saturated rather than photo-dull. Phase 1 needs ivy, crack weeds, grass clumps, one orchard tree and moss tufts for the beauty corner, and roots trickling into the cellar (PHASE1 section 4, B9).
+**The look:** clean yellow-green by day (PHASE1 3.1: foliage `#6f8a34`, moss `#616e2e` / `#b6ab28`; foliage may take +10-15% chroma, the only place that boost is wide), chunky readable crown masses with light tops and dark undersides, dense dressing in every corner (handoff 2.1). Leaves are real PBR (albedo with alpha, normal, ORM), clean rather than photo-dull. Phase 1 needs ivy, crack weeds, grass clumps, one orchard tree and moss tufts for the beauty corner, and roots trickling into the cellar (PHASE1 section 4, B9).
 
 Tools: FishGame's tree generator, atlas painter and season machinery were built for its palette-slot toon look and are not ported; build the B9 generator fresh with the methods below. Tool status: sc-asset-craft 0b.
 
@@ -21,7 +21,7 @@ Each tree is a trunk-and-limbs mesh plus alpha-cut foliage cards. The look comes
 ## The foliage atlas
 - **Cells are clusters, not single leaves.** A cell is one clump with its own light-top / dark-underside structure; single-leaf cards read as noise at play distance.
 - **Narrow, lanceolate or hanging leaves** (grass blades, weeds, ivy runners) need their own cell: stretching a broadleaf cluster along a stem reads as palm fronds.
-- Make it a full PBR set like every other material: albedo with alpha (alpha cut, no sorting), normal and ORM. Source leaves from CC0 scans graded to PHASE1 3.1 (clean, +15-25% chroma; no baked light in the albedo).
+- Make it a full PBR set like every other material: albedo with alpha (alpha cut, no sorting), normal and ORM. Source leaves from CC0 scans graded to PHASE1 3.1 (key hues in sc-asset-craft's palette summary; +10-15% chroma for foliage; no baked light in the albedo).
 
 ## Shrubs and bushes
 A bush built like a tree (lobes only at the stem tips) reads as a lollipop on sticks:

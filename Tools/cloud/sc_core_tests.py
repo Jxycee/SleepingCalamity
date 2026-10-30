@@ -7,7 +7,7 @@ launches Unity, and it doesn't cover tests that need UnityEngine, the editor, sc
 
 Run:  python3 Tools/cloud/sc_core_tests.py [--project <worktree>] [--where "test =~ WeirBoards"] [--list]
 Prints NUnitLite's summary; exit 0 when every test passes. The build goes to ~/sc_core_tests (about 20 s cold, a few seconds warm).
-Needs `dotnet` (8.x) and NuGet access for NUnit/NUnitLite 3.14.
+Needs `dotnet` (8.x) and NuGet access for NUnit/NUnitLite 3.14 and Newtonsoft.Json 13.0.2 (Core's save types use it; Unity auto-references it).
 """
 import argparse, os, re, subprocess, sys
 
@@ -89,6 +89,7 @@ def build(work, core, files):
     <Compile Include="Program.cs" />
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnitLite" Version="3.14.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>
 </Project>
 '''

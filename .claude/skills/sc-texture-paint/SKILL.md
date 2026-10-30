@@ -1,11 +1,11 @@
 ---
 name: sc-texture-paint
-description: Make or tune Sleeping Calamity's PBR surface materials - tileables, trim sheets, decals and the smart materials that feed bakes (town plaster, oak timber, cobble, sandstone, roof tile, painted wood, canvas, iron; cellar brick, vault stone, limewash, flagstone, barrel oak, soot, root bark) - from CC0 scans (Poly Haven, ambientCG) plus procedural layers, graded to the style bible's clean saturated colour. Covers naming the consumer, sources and licences, texel density, scan-to-style correction, repetition and seam checks, packing for URP Lit, and proving a change. Use for batches B1-B3, any "surface looks CG / photo-dull / noisy / tiled" problem, or adding a material.
+description: Make or tune Sleeping Calamity's PBR surface materials - tileables, trim sheets, decals and the smart materials that feed bakes (town plaster, oak timber, cobble, sandstone, roof tile, painted wood, canvas, iron; cellar brick, vault stone, limewash, flagstone, barrel oak, soot, root bark) - from CC0 scans (Poly Haven, ambientCG) plus procedural layers, graded to the style bible's palette (PHASE1 3.1). Covers naming the consumer, sources and licences, texel density, scan-to-style correction, repetition and seam checks, packing for URP Lit, and proving a change. Use for batches B1-B3, any "surface looks CG / photo-dull / noisy / tiled" problem, or adding a material.
 ---
 
 # PBR materials, tileables and trims
 
-The skill name is historical: nothing is hand-painted. Every surface is a real PBR set (albedo, normal, ORM) made **once per area as a smart material**: a CC0 scan plus procedural layers in the `aaa_mats2.py` style, shared by every kit piece that uses it (PHASE1 3.2, handoff 3.5). This is where most of the quality comes from, and a fix here reaches every piece.
+The skill name is historical: nothing is hand-painted. Every surface is a real PBR set (albedo, normal, ORM) made **once per area as a smart material**: a CC0 scan plus procedural layers in the `sc_aaa_mats2.py` style, shared by every kit piece that uses it (PHASE1 3.2, handoff 3.5). This is where most of the quality comes from, and a fix here reaches every piece.
 
 Tools (status in sc-asset-craft 0b): ported in M8 as `sc_aaa_mats2.py`, `sc_aaa_scan.py`, `sc_fetch_textures.py` (Poly Haven fetch with a source record), `sc_pack_unity.py` (`--orm`). The batch pipeline is `Art/Blender/textures/sc_tex_batches.py` (grade + ORM + seam ratio + SOURCES.md), `sc_tex_b3.py` (trim sheets, decals) and `sc_tex_sheet.py` (contact sheet, calibrated so 50% grey reads 0.5, plus the `sc_ref_palette.py` measure), helper library `Art/Blender/tools/sc_texgrade.py`. Scans live in `C:\Dev\_private\textures_src\`, outside git. `sc_ref_palette.py` is current. FishGame's texture-array generator and `fg_texture_proto.py` were for the old grey-centred painted arrays and don't apply.
 
@@ -20,31 +20,34 @@ A material nobody samples is the most expensive mistake (FishGame built a whole 
 
 ## 1. Sources (licences recorded)
 - **Poly Haven CC0** and **ambientCG CC0** scans: albedo, normal, roughness, displacement, AO. Poly Haven's API: `https://api.polyhaven.com/files/<id>`; take the file URL from the JSON, since names vary. Fetch into the scratchpad while prototyping; keep scans out of the repo until the material lands.
-- Record every source the material ships with in `Art/Source/<Provider>/SOURCES.md` (the same record sc-asset-adopt uses): id, URL, licence, author, date, what you changed. A procedural generator function is its own source record.
+- Record every source a texture batch ships with in `Art/Textures/<batch>/SOURCES.md` (written by `Art/Blender/textures/sc_tex_batches.py`): id, URL, licence, author, date, what you changed. A procedural generator function is its own source record. (`Art/Source/<Provider>/SOURCES.md` is for adopted models only, see sc-asset-adopt; its first row creates the file.)
 - **Procedural only** when no scan has the material (a fantasy surface, an ember crack). Plain noise reads as mottle and round dots as polka dots; build structure first (cells, strokes, cracks), then break it up.
 - Reference photos (sc-reference) tell you the pattern's scale and the colour relations. They are never textures: never project or trace them.
 
 ## 2. Make it read as the style
-- **Scan to style (the OoT-2026 shift, PHASE1 3.1).** Scans are dusty, desaturated and lit. Keep the **relations** (moss darker and greener than stone, wet brick darker and cooler than dry, timber darker than plaster), then:
-  - push chroma +15-25% on plaster tints, roofs, painted wood, cloth and foliage; keep plaster clean near-white and roofs a confident red;
-  - take the colour toward the PHASE1 3.1 key hues; measure the albedo with `sc_ref_palette.py --k 7` under a neutral render;
+- **Scan to style (PHASE1 3.1; key hues are listed once, in sc-asset-craft's palette summary).** Scans are dusty, desaturated and lit. Keep the **relations** (moss darker and greener than stone, wet brick darker and cooler than dry, timber darker than plaster), then:
+  - no chroma boost on stone, plaster or roof tile; at most +10-15% on foliage, painted wood, cloth and accents, which stay muted and chalky (the look is OoT-like and moody, not candy);
+  - take the colour toward the PHASE1 3.1 key hues (plaster tan-cream `#cbbd9c`, roof `#9c4a34`, timber `#2e2520` to `#4e4844`); measure the albedo with `sc_ref_palette.py --k 7` under a neutral render;
   - **no light in the albedo:** remove the scan's baked shadow and AO from albedo (AO ships in ORM);
-  - Cellar materials stay warm (tan and orange brick, gold-lit stone); teal comes only from the grade's shadow and fog tint.
+  - Cellar materials stay warm (tan and orange brick, gold-lit stone) with no teal or blue-green anywhere; their shadows are warm umber to plum (PHASE1 3.1).
 - **Structure and a value story, not mottle.** Every material has a structure (brick bond and mortar, timber grain and checks, plaster trowel relief and craze, flagstone joints) and a value story (which shapes are light and which dark). Name both before tuning, then check them on the 3 x 3 sheet.
-- **Multi-scale detail.** One scale of noise reads as "sandpaper" or "felt". The mortar fix was a coarser scan tile, a weaker fine normal and stronger value contrast (tile 0.12 -> 0.25, normal 1.8 -> 0.8, contrast 0.45 -> 0.9). Detail under about 1 mm doesn't register at review distance.
+- **Multi-scale detail.** One scale of noise reads as "sandpaper" or "felt". The mortar fix was a coarser scan tile, a weaker fine normal and stronger value contrast (tile 0.12 -> 0.25, normal 1.8 -> 0.8, contrast 0.45 -> 0.9: one example, not a recipe). Very fine detail (roughly under 1 mm) tends not to register at review distance.
 - **Roughness carries the material** as much as albedo: wear, polish, damp and glaze change it. A single waxy roughness was the stand's most repeated review complaint.
 - **Wear is tidy and placed:** a few chips, streaks and moss patches, via masks and decals, over a clean base. Uniform grime is the old photo look, not this one.
 - **Author in part space** for smart materials, so patterns stay continuous across UV seams and vary per part; world space only for scene storytelling.
 
 ## 3. Check it (before any model uses it)
-1. **3 x 3 tiling sheet** at the consumer's texel density: nothing you can point at twice (a bright flake, one big stone, a stain). A recognisable feature larger than about 1/8 of the tile becomes a repeated blob: crop, swap the source, or break it with a second, larger-scale variation layer.
+1. **3 x 3 tiling sheet** at the consumer's texel density: nothing you can point at twice (a bright flake, one big stone, a stain). A recognisable feature that is large against the tile (very roughly over 1/8 of it) tends to become a repeated blob: crop, swap the source, or break it with a second, larger-scale variation layer.
 2. **2 x 2 seam check:** look for a band just inside the edge as well as the edge itself.
 3. **On a model:** apply it to its consumer kit piece and render studio plus mood (sc-asset-review). A tileable that looks right flat can look wrong at a grazing angle or beside its neighbour.
-4. **Reference matcher** (`ref_match.py --inv`, port) against 2-3 flat-on photo crops of the same material, if the set calibrates.
+4. **Against photos:** `ref_match.py` is not ported (sc-asset-craft 0b); compare a flat-on crop of the material with 2-3 flat-on photo crops of the same material, by eye and with `sc_ref_palette.py --k 7` on each.
 5. Colour and value inside PHASE1 3.1 on the render, measured with `sc_ref_palette.py --k 7`.
 
+## 3b. Shape language on trims
+Trim sheets and mouldings carry the style's shape rules (PHASE1 3.4, placeholders [P36]): timber and moulding sections about 1.4x real, arches and voussoirs about 1.3x; chamfers of about 1.5 cm or more on any edge seen at play distance, so a trim's profile shows a chamfer or round rather than a razor corner; old work is never dead straight, so trim strips carry a slight wobble and sag where the model uses them rather than a ruled line; build trims the way the real member is made (planked, coursed, pegged, mortared), with square arrises on spalls. Keep the chunky profile in the geometry and the normal map; don't try to fake it in albedo.
+
 ## 4. Pack and ship
-- Pack for URP Lit with `pack_unity.py` (port): don't hand-pack channels from memory. Normal maps are OpenGL Y+ (as Blender bakes and Unity expects).
+- Pack for URP Lit with `sc_pack_unity.py`: don't hand-pack channels from memory. Normal maps are OpenGL Y+ (as Blender bakes and Unity expects).
 - Emission bakes into 8 bits: keep it at or below 1 in the bake and scale it in the game material.
 - Textures go through Git LFS. Commit the generator or material script, the maps and the SOURCES.md row together; the message names the material, source and the knobs changed (before -> after).
 - **Cloud sessions** can fetch Poly Haven and prototype, but commit the script, not the bakes; the PC rebakes and proves it in Unity.

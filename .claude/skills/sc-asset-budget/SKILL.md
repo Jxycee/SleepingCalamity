@@ -25,14 +25,14 @@ The facts behind them:
 | Hero character / enemy | 60k, 4K body + 2K head / 25k, one 2K-4K set | per character |
 
 - `Art/Blender/tools/sc_asset_audit.py` (rewritten M8) reports tris, surface area, density, UV texel density against these budgets, colour attributes and bounds per object, and FAILs only on triangles and material slots. Report its numbers; the table above is the judge.
-- **Over budget means cut, don't argue,** unless the extra tris are on the silhouette or a story beat the brief names: then say so in the header and the report.
+- **Over budget usually means cut,** unless the extra tris are on the silhouette or a story beat the brief names: then say so in the header and the report. The budgets themselves are placeholders ([P35]) and the controller can change them.
 - A building's 75k includes its instanced roof tiles and stones: count the instances, not the variants.
 
 ## Where triangles pay (in this order)
 1. **Silhouette and outline breaks** seen from play positions: ridges, chimney stacks, overhangs, hoops, handles, broken edges.
-2. **Centimetre-scale form the normal map can't fake at a grazing angle:** chamfers of at least 1.5 cm (PHASE1 3.4), proud joinery, coursed stones that stand out of the wall.
+2. **Centimetre-scale form the normal map can't fake at a grazing angle:** chamfers of about 1.5 cm or more (PHASE1 3.4), proud joinery, coursed stones that stand out of the wall.
 3. **Smooth profiles on turned parts:** enough lathe sides and resampled profile steps that cylinders don't facet into stripes.
-4. **Not:** hidden faces (bottoms on the ground, faces into a wall, buried parts), detail under about 1 mm (it doesn't register at review distance; put it in the normal map), anything under 2 px at play distance.
+4. **Not:** hidden faces (bottoms on the ground, faces into a wall, buried parts), very fine detail (roughly under 1 mm tends not to register at review distance; put it in the normal map), anything that covers only a pixel or two at play distance.
 
 Rules of thumb:
 - Delete the faces you can't see, in the generator and at assembly (the cottage's stone kit only fit once the wall-facing and buried faces were culled).
@@ -48,7 +48,7 @@ Rules of thumb:
 ## Efficient iteration (the work, not just the asset)
 - **Batch by family** (PHASE1 9): one generator per family, all items in one headless Blender session, one joined Cycles bake per batch, one small JPEG contact sheet per batch.
 - **Join highs before a selected-to-active bake:** about 1 h down to 4.5 min on the cottage.
-- **Voxel size** `min(w, h) / 12`, floor 4 mm, cap 6 mm: finer gave 11M tris and a 6.3 GB peak.
+- **Voxel size** about `min(w, h) / 12`, 4-6 mm worked on the cottage: finer gave 11M tris and a 6.3 GB peak.
 - Build with `--no-export` and `--only <stem>` while iterating; export once, at the end, only when the output changed, so unchanged FBX and PNG stay byte-identical (no LFS churn, no Unity reimport).
 - Measure before you look: the audit takes seconds. One review render per round, not one per tweak.
 - **Spend the expensive model on judgement, not typing:** Sonnet agents run generators and renders from a brief; the controller scores the sheet (PHASE1 9). Keep sheets small JPEGs (2000 px or less: big PNGs posterise when viewed).

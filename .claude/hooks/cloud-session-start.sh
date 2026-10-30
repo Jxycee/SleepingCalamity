@@ -16,4 +16,14 @@ if git lfs pull >/dev/null 2>&1; then
 else
     echo "git lfs pull failed; LFS files may still be pointers."
 fi
+# art environment: lift the blender MCP deny again if a fresh checkout or a merge reset settings.json (Tools/cloud/sc_art_profile.sh)
+[ "$(cat "$HOME/.sc-setup/profile" 2>/dev/null)" = art ] && [ -f Tools/cloud/sc_art_profile.sh ] && bash Tools/cloud/sc_art_profile.sh on
+# Unity licence from the environment's secrets (the setup script cannot read them); serial activation waits for unity.sh
+bash Tools/cloud/sc_unity_license.sh --file-only 2>/dev/null | grep -v '^$' || true
+# .csproj + .sln for the csharp-lsp plugin once the Unity editor files are in (the PC gets these from Unity; warm runs take about 15 s)
+# (only after the setup job is DONE: before that the editor may be half-extracted, and the job writes them itself)
+if [ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = DONE ] && [ -f Tools/cloud/sc_cloud_compile.py ]; then
+    timeout 300 python3 Tools/cloud/sc_cloud_compile.py --csproj 2>&1 | grep -E '^(wrote|FAIL )' | head -5
+fi
+[ "$(cat "$HOME/.sc-setup/unity.status" 2>/dev/null)" = RUNNING ] && kill -0 "$(cat "$HOME/.sc-setup/unity.pid" 2>/dev/null)" 2>/dev/null && echo "Unity editor still downloading in the background: bash Tools/cloud/setup.sh --wait"
 exit 0
