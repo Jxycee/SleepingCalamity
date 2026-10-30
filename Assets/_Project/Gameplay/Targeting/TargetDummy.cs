@@ -1,4 +1,4 @@
-// Authority: host. A target dummy (M2 test target, no life yet): spawned by the host (TargetDummySpawner), which also writes NetElite once.
+// Authority: host. A target dummy (M2 test target, no life yet): spawned by the host (TargetDummySpawner), which writes NetElite once, before Spawn.
 // Every peer reads NetElite and mirrors it into the local Targetable. Locking onto a dummy is owner-local and never touches this object.
 using Unity.Netcode;
 using UnityEngine;
@@ -29,11 +29,11 @@ namespace SleepingCalamity.Gameplay
             NetElite.OnValueChanged -= OnEliteChanged;
         }
 
-        // Host only.
-        public void ServerSetElite(bool elite)
+        // Host only, called BEFORE Spawn: the value is part of the spawn message, so no client ever sees a plain elite for a tick.
+        public void ServerSeedElite(bool elite)
         {
-            if (!IsServer) return;
             NetElite.Value = elite;
+            if (_targetable == null) _targetable = GetComponent<Targetable>();
             if (_targetable != null) _targetable.IsElite = elite;
         }
 

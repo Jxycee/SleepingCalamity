@@ -148,6 +148,11 @@ namespace SleepingCalamity.Tests.PlayMode
             NetworkObject clientOwn = clientNm.LocalClient.PlayerObject;
             NetworkObject hostProxyOnClient = clientNm.SpawnManager.SpawnedObjects[hostOwn.NetworkObjectId];
 
+            // The client's copies of the dummies carry the host's elite flag from the spawn on (written before Spawn).
+            yield return PlayModeHarness.WaitUntil(() => CountDummies(clientNm, out _) == 7, Timeout, "the client never received the seven dummies");
+            Assert.That(CountDummies(clientNm, out Vector3 eliteAt), Is.EqualTo(7));
+            AssertNear(eliteAt, new Vector3(0f, 0f, 12f), "the client's copy of the elite (exactly one dummy there is elite)");
+
             // Owner / remote split: only the owner's copy runs the movement and the lock.
             var host = new HeroRig(hostOwn);
             var client = new HeroRig(clientOwn);
@@ -186,6 +191,11 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(client.Input.Context, Is.EqualTo(InputContext.LockOn));
             Assert.That(HeroCameraRig.Local.LockCamLive, Is.True, "the owner rig switched to the lock camera");
 
+            // The lock stance reaches the other peer's copy of each hero (for its animation), and nothing else of the lock does.
+            yield return Seconds(0.4f);
+            Assert.That(hostProxyOnClient.GetComponent<HeroNetState>().StanceIsLocked, Is.True, "the host's stance on the client's copy");
+            Assert.That(clientProxyOnHost.GetComponent<HeroNetState>().StanceIsLocked, Is.True, "the client's stance on the host's copy");
+
             // ---- the host lets go; the client keeps its lock ----
             host.Input.Frame.LockPressed = true;
             yield return null;
@@ -196,6 +206,20 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(client.Lock.IsLocked, Is.True, "the host's release did not touch the client's lock");
             Assert.That(client.Input.Context, Is.EqualTo(InputContext.LockOn));
             Assert.That(HeroCameraRig.Local.LockCamLive, Is.False, "the host's rig went back to the free camera");
+            yield return Seconds(0.4f);
+            Assert.That(hostProxyOnClient.GetComponent<HeroNetState>().StanceIsLocked, Is.False, "the release reached the client's copy");
+            Assert.That(clientProxyOnHost.GetComponent<HeroNetState>().StanceIsLocked, Is.True, "the client is still locked");
+
+            // A dodge shows on the other peer's copy.
+            host.Input.Frame.MoveX = 1f;
+            host.Input.Frame.DodgePressed = true;
+            yield return null;
+            host.Input.Frame.DodgePressed = false;
+            yield return Seconds(0.2f);
+            Assert.That(host.Locomotion.IsDodging, Is.True, "the host is dodging");
+            Assert.That(hostProxyOnClient.GetComponent<HeroNetState>().StanceIsDodging, Is.True, "the dodge reached the client's copy");
+            yield return Seconds(0.6f);
+            Assert.That(host.Locomotion.IsDodging, Is.False, "a dodge lasts half a second");
 
             // ---- independent movement: the host strolls right (free), the client walks toward its locked target ----
             host.Input.Frame.MoveX = 1f;
@@ -218,6 +242,25 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Vector3.Distance(clientProxyOnHost.transform.position, client.Position), Is.LessThan(0.6f), "the client's pose reached the host");
             Assert.That(Vector3.Distance(hostProxyOnClient.transform.position, host.Position), Is.LessThan(0.6f), "the host's pose reached the client");
             Assert.That(clientProxyOnHost.transform.position.x, Is.LessThan(clientStart.x - 0.8f), "and it is the moved pose, not the spawn");
+        }
+
+        // Dummies spawned on this peer's NetworkManager; eliteAt is where the elite one stands (asserts there is exactly one when there are any).
+        private static int CountDummies(NetworkManager nm, out Vector3 eliteAt)
+        {
+            int dummies = 0, elites = 0;
+            eliteAt = Vector3.zero;
+            foreach (NetworkObject o in nm.SpawnManager.SpawnedObjects.Values)
+            {
+                if (o == null || o.GetComponent<TargetDummy>() == null) continue;
+                dummies++;
+                if (o.GetComponent<Targetable>().IsElite)
+                {
+                    elites++;
+                    eliteAt = o.transform.position;
+                }
+            }
+            if (dummies == 7) Assert.That(elites, Is.EqualTo(1), "exactly one elite among the dummies this peer holds");
+            return dummies;
         }
 
         private static void AssertNear(Vector3 actual, Vector3 expected, string message)
@@ -272,6 +315,59 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Frames(2);
             Assert.That(hero.Lock.IsLocked, Is.False);
             Assert.That(hero.Input.Context, Is.EqualTo(InputContext.Free));
+        }
+
+        private static IEnumerator SoloLockNearDummy(System.Action<HeroRig> hero)
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            yield return PlayModeHarness.StartSoloAndWaitForPlayer();
+            AppBootstrap app = AppBootstrap.Current;
+            yield return PlayModeHarness.WaitUntil(() => Targetable.All.Count == 7 && HeroCameraRig.Local != null, Timeout, "arena not ready");
+            var rig = new HeroRig(app.NetworkManager.LocalClient.PlayerObject);
+            rig.TakeOverInput();
+            yield return Seconds(0.5f);
+            rig.Input.Frame.LockPressed = true;
+            yield return null;
+            rig.Input.Frame.LockPressed = false;
+            yield return Frames(3);
+            Assert.That(rig.Lock.IsLocked, Is.True, "locked");
+            Assert.That(HeroCameraRig.Local.LockCamLive, Is.True, "lock camera live");
+            Assert.That(HeroCameraRig.Local.LockIndicator.gameObject.activeSelf, Is.True, "indicator shown");
+            hero(rig);
+        }
+
+        // Catches: a destroyed locked target being a Unity fake null that swallows LockChanged(null) (the camera stayed in lock mode with a frozen marker).
+        [UnityTest]
+        public IEnumerator Solo_LockedDummyDespawns_ReleasesTheLockTheCameraAndTheMarker()
+        {
+            HeroRig hero = null;
+            yield return SoloLockNearDummy(h => hero = h);
+            var spawner = Object.FindAnyObjectByType<TargetDummySpawner>();
+            NetworkObject locked = null;
+            foreach (NetworkObject o in spawner.Spawned) if (o != null && Vector3.Distance(o.transform.position, new Vector3(0f, 0f, 4f)) < 0.1f) locked = o;
+            Assert.That(locked, Is.Not.Null);
+            locked.Despawn(true);
+            yield return Frames(3);
+
+            Assert.That(hero.Lock.IsLocked, Is.False, "the lock ended");
+            Assert.That(hero.Lock.LastDrop, Is.EqualTo(LockDrop.Missing));
+            Assert.That(HeroCameraRig.Local.LockCamLive, Is.False, "the camera left lock mode");
+            Assert.That(HeroCameraRig.Local.LockIndicator.gameObject.activeSelf, Is.False, "the marker is hidden");
+            Assert.That(hero.Input.Context, Is.EqualTo(InputContext.Free));
+        }
+
+        // Catches: a hero that despawns while locked leaving its camera rig behind, the static rig pointer set, or the input stuck in LockOn.
+        [UnityTest]
+        public IEnumerator Solo_HeroDespawnsWhileLocked_CleansUpTheRigAndTheContext()
+        {
+            HeroRig hero = null;
+            yield return SoloLockNearDummy(h => hero = h);
+            hero.Object.Despawn(true);
+            yield return Frames(3);
+
+            Assert.That(HeroCameraRig.Local, Is.Null, "the rig was destroyed with its hero");
+            Assert.That(hero.Input.Context, Is.EqualTo(InputContext.Free), "the input context went back to Free");
+            Assert.That(Object.FindObjectsByType<HeroCameraRig>().Length, Is.EqualTo(0), "no rig left in the scene");
         }
     }
 }

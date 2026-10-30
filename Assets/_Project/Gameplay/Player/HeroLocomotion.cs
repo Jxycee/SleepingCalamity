@@ -14,7 +14,7 @@ namespace SleepingCalamity.Gameplay
 {
     public sealed class HeroLocomotion : MonoBehaviour
     {
-        public const float FreePitchDownDeg = 15f, MinPitchDownDeg = -10f, MaxPitchDownDeg = 60f, LockPitchDownDeg = 18f;
+        public const float FreePitchDownDeg = 15f, MinPitchDownDeg = 2f, MaxPitchDownDeg = 55f, LockPitchDownDeg = 18f;
         private const float LockYawSmoothSeconds = 0.14f, LockPitchSmoothSeconds = 0.25f;
 
         private CharacterController _cc;

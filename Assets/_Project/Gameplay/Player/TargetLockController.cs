@@ -125,7 +125,8 @@ namespace SleepingCalamity.Gameplay
 
         private void SetLocked(Targetable target)
         {
-            if (Locked == target) return;
+            // ReferenceEquals, not ==: a destroyed locked target is a Unity fake null, and "destroyed == null" would swallow LockChanged(null).
+            if (ReferenceEquals(Locked, target)) return;
             Locked = target;
             LockChanged?.Invoke(target);
         }

@@ -34,9 +34,9 @@ namespace SleepingCalamity.Gameplay
             {
                 NetworkObject instance = Instantiate(dummyPrefab, marker.transform.position, marker.transform.rotation);
                 instance.name = marker.name;
-                instance.Spawn(destroyWithScene: true);
                 TargetDummy dummy = instance.GetComponent<TargetDummy>();
-                if (dummy != null) dummy.ServerSetElite(marker.Elite);
+                if (dummy != null) dummy.ServerSeedElite(marker.Elite);   // before Spawn, so it rides in the spawn message
+                instance.Spawn(destroyWithScene: true);
                 _spawned.Add(instance);
                 count++;
             }

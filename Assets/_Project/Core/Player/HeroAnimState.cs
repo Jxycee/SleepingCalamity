@@ -1,6 +1,7 @@
 // Core, no engine references, unit-tested. What an animation driver needs each frame: the seam between the hero's motion and the clips that
-// arrive later (docs/design/mixamo-clips.md). Everything derives from the hero's transform motion, so a remote copy of a hero animates the
-// same way as the owner's with no extra sync. StrafeX/StrafeZ are the local-space velocity divided by RunSpeed (about -1..1).
+// arrive later (docs/design/mixamo-clips.md). Speed, strafe and vertical speed derive from the hero's transform motion, so a remote copy moves
+// the same way as the owner's; Locked and Dodging are the owner's stance (a replicated flag byte, HeroNetState.NetStance), because motion
+// alone cannot tell a strafe from a walk. StrafeX/StrafeZ are the local-space velocity divided by RunSpeed (about -1..1).
 using System;
 
 namespace SleepingCalamity.Core

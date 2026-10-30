@@ -30,11 +30,20 @@ namespace SleepingCalamity.Presentation
         private HeroLocomotion _locomotion;
         private TargetLockController _lockController;
         private Transform _pivot;
+        private Renderer[] _heroRenderers = System.Array.Empty<Renderer>();
+        private bool _heroHidden;
 
         public CinemachineCamera FreeCam => freeCam;
         public CinemachineCamera LockCam => lockCam;
         public CinemachineTargetGroup LockGroup => lockGroup;
+        public Transform LockIndicator => lockIndicator;
         public bool LockCamLive => lockCam != null && lockCam.Priority.Value > freeCam.Priority.Value;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            Local = null;
+        }
 
         public void Configure(CinemachineCamera free, CinemachineCamera locked, CinemachineTargetGroup group, Transform indicator)
         {
@@ -51,6 +60,8 @@ namespace SleepingCalamity.Presentation
             _locomotion = hero.Locomotion;
             _lockController = hero.LockController;
             _pivot = hero.CameraPivot;
+            _heroRenderers = hero.GetComponentsInChildren<Renderer>(true);
+            _heroHidden = false;
             _freeOrbit = freeCam.GetComponent<CinemachineOrbitalFollow>();
             _lockOrbit = lockCam.GetComponent<CinemachineOrbitalFollow>();
 
@@ -60,9 +71,6 @@ namespace SleepingCalamity.Presentation
             freeCam.Priority.Value = FreePriority;
             lockCam.Priority.Value = 0;
             if (_locomotion != null) ApplyAxes();
-            // Start already behind the hero (no swoop on spawn).
-            freeCam.OnTargetObjectWarped(_pivot, Vector3.zero);
-            lockCam.OnTargetObjectWarped(_pivot, Vector3.zero);
 
             if (_lockController != null) _lockController.LockChanged += OnLockChanged;
             OnLockChanged(_lockController != null ? _lockController.Locked : null);
@@ -71,6 +79,7 @@ namespace SleepingCalamity.Presentation
 
         private void Unbind()
         {
+            SetHeroVisible(true);
             if (_lockController != null) _lockController.LockChanged -= OnLockChanged;
             _hero = null;
             _locomotion = null;
@@ -88,6 +97,25 @@ namespace SleepingCalamity.Presentation
             if (_hero == null || _locomotion == null) return;
             ApplyAxes();
             UpdateIndicator();
+        }
+
+        // When a wall squeezes the boom until the camera is nearly inside the hero, the hero's own body would fill the screen (or show its inside),
+        // so it is hidden locally until the camera backs off again. Hysteresis: hidden under 1.0 m, shown again over 1.4 m. Cosmetic, owner only.
+        private void LateUpdate()
+        {
+            if (_hero == null) return;
+            Camera cam = Camera.main;
+            if (cam == null) return;
+            float distance = Vector3.Distance(cam.transform.position, _pivot.position);
+            if (!_heroHidden && distance < 1.0f) SetHeroVisible(false);
+            else if (_heroHidden && distance > 1.4f) SetHeroVisible(true);
+        }
+
+        private void SetHeroVisible(bool visible)
+        {
+            _heroHidden = !visible;
+            foreach (Renderer r in _heroRenderers)
+                if (r != null) r.enabled = visible;
         }
 
         private void ApplyAxes()

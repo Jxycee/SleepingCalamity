@@ -48,6 +48,13 @@ namespace SleepingCalamity.Tests.PlayMode
             cam.targetTexture = null;
             RenderTexture.active = previousActive;
             File.WriteAllBytes(Path.Combine(dir, name + ".png"), tex.EncodeToPNG());
+            HeroNetState hero = Object.FindAnyObjectByType<HeroNetState>();
+            Transform t = cam.transform;
+            string note = name + ": camera " + t.position.ToString("F2") + " euler " + t.eulerAngles.ToString("F0") + " fov " + cam.fieldOfView
+                          + (hero != null ? "; hero " + hero.transform.position.ToString("F2") + " view yaw/pitchDown "
+                              + hero.Locomotion.ViewYawDeg.ToString("F0") + "/" + hero.Locomotion.ViewPitchDownDeg.ToString("F0") : "");
+            TestContext.WriteLine(note);
+            Debug.Log("SC CAPTURE " + note);
             Object.Destroy(rt);
             Object.Destroy(tex);
         }
@@ -75,11 +82,14 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => Targetable.All.Count == 7 && HeroCameraRig.Local != null, 10f, "arena not ready");
             yield return Seconds(1.5f);
 
-            // Free camera: behind the hero at spawn (the wall 4.5 m behind pulls the boom in), then orbited.
-            yield return Shoot(dir, "free_1_behind_wall_deoccluded");
-            loco.SetView(55f, 22f);
-            yield return Seconds(1.0f);
+            // Free camera: behind the hero at spawn, then orbited to the side.
+            yield return Shoot(dir, "free_1_spawn");
+            loco.SetView(40f, 18f);
+            yield return Seconds(1.2f);
             yield return Shoot(dir, "free_2_orbit_right");
+            loco.SetView(55f, 22f);   // aimed at the corner of the high block: the camera must stay outside it
+            yield return Seconds(1.2f);
+            yield return Shoot(dir, "free_2b_orbit_block_corner");
             loco.SetView(0f, 15f);
             yield return Seconds(1.0f);
 
@@ -102,7 +112,22 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Seconds(1.4f);
             yield return Shoot(dir, "lock_3_switched_target");
 
-            Assert.That(Directory.GetFiles(dir, "*.png").Length, Is.GreaterThanOrEqualTo(5));
+            // Back to the free camera, then walk backward toward the wall behind the spawn: the boom is pulled in by the Deoccluder.
+            input.Frame.LockPressed = true;
+            yield return null;
+            input.Frame.LockPressed = false;
+            yield return Seconds(0.5f);
+            loco.SetView(0f, 15f);
+            input.Frame.MoveX = -1f;   // back to the middle of the arena first
+            yield return Seconds(0.75f);
+            input.Frame.MoveX = 0f;
+            input.Frame.MoveY = -1f;
+            yield return Seconds(1.6f);
+            input.Frame.MoveY = 0f;
+            yield return Seconds(1.0f);
+            yield return Shoot(dir, "free_3_wall_deoccluded");
+
+            Assert.That(Directory.GetFiles(dir, "*.png").Length, Is.GreaterThanOrEqualTo(6));
             TestContext.WriteLine("captures: " + dir);
         }
     }
