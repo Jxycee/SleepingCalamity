@@ -1,38 +1,43 @@
-# Mixamo clip list (for M2 and M3)
+# Animation clip list (for M2 and M3)
 
-The user downloads these from mixamo.com with their own Adobe account (PHASE1 section 5, P29). Claude can't sign in for you. Pack names change over time, so each line gives the search term to type into Mixamo plus what the clip is for. Pick the closest match; any clip that reads right works.
+Two sources, both fine to ship:
+- **Quaternius Universal Animation Library 1 and 2** (CC0, free "Standard" tier; Claude imports these, no account needed). Pages: https://quaternius.itch.io/universal-animation-library and https://quaternius.itch.io/universal-animation-library-2.
+- **Mixamo** (the user downloads with their own Adobe account, PHASE1 section 5, P29). Only for what Quaternius' free tier lacks.
 
-## How to download
-- **Mannequin** (the greybox stand-in for every hero, P32): download **Y Bot** once, as **FBX for Unity (.fbx)**, **With Skin**, T-pose.
-- **Every clip:** keep Y Bot selected as the character, choose **FBX for Unity (.fbx)**, **Without Skin**, **30 fps**, and no keyframe reduction.
-- **Locomotion clips** (walk, jog, run, strafe, turn): tick **In Place**.
-- **Where to put them:** save into `C:\Dev\_private\mixamo\` with the default file names, then tell Claude. Claude imports them into the project; the clips themselves are fine to commit, since Mixamo allows use in games.
+Unity's Humanoid retargeting plays both rigs on the same hero, so mixing is fine. The free-tier lists below were read from Quaternius' own anim viewer (quaternius.com/animviewer.html) on 2026-10-30: 44 clips in UAL1, 42 in UAL2. Their paid tiers (UAL1 Pro about $10, UAL2 Source about $15) add strafes, turns, side dodges, knocked-down loops, light/heavy sword combos, aerial attacks and a full bow set; buying those would remove almost every Mixamo line below.
 
-## M2: movement and lock-on (about 22 clips)
-| Search term | Clips to take | For |
+## Mixamo download settings
+- **Mannequin:** Y Bot, FBX for Unity (.fbx), With Skin, T-pose. *(Done 2026-10-30.)*
+- **Every clip:** Y Bot selected, FBX for Unity (.fbx), Without Skin, 30 fps, no keyframe reduction. Tick **In Place** for walk/jog/run/strafe/turn.
+- Save into `C:\Dev\_private\mixamo\` (or Downloads; Claude moves them). Default file names are fine.
+
+Already downloaded (2026-10-30): Y Bot, Warrior Idle, Standing Idle To Action Idle, Action Idle To Standing Idle, Action Idle To Fight Idle.
+
+## M2: movement and lock-on
+| Need | Quaternius free | Still from Mixamo (search term: clips) |
 |---|---|---|
-| idle | 1 relaxed idle, 1 combat-ready idle | free and locked stances |
-| walking | walk forward | locomotion blend |
-| jogging | jog forward | locomotion blend |
-| running | run forward, sprint | locomotion blend |
-| walk backwards | walk back | locked strafing |
-| strafe | left and right strafe (walk and jog) | locked strafing |
-| left turn / right turn | 90-degree turns, both sides | turning in place |
-| jump | jump up, falling idle, landing | traversal |
-| dodge / roll | forward roll, side dodges left and right, back step | dodge (M3 too) |
-| hit reaction | 2 light flinches, 1 heavy knockback, getting up | damage reactions |
-| death / dying | 1 death, 1 "knocked down" loop | downed state (P24) |
-| picking up | pick up from the ground | carrying a haul piece |
-| carry | walking with a carried box | carrying a haul piece |
+| Relaxed idle, combat idle | Idle, Sword_Idle, Idle_Shield (+ your Warrior Idle) | - |
+| Walk, jog, run, sprint | Walk, Jog_Fwd, Sprint | - |
+| Walk back | - | "walk backwards": walk back |
+| Locked strafing | - | "strafe": left and right strafe, walk and jog (4 clips) |
+| Turn in place | - | "left turn" / "right turn": 90-degree turns, both sides |
+| Jump | Jump_Start, Jump (air loop), Jump_Land | - |
+| Dodge | Roll (forward) | "dodge": side dodge left, side dodge right, back step |
+| Hit reactions | Hit_Chest, Hit_Head (light), Hit_Knockback (heavy), LayToIdle (get up) | - |
+| Death, downed | Death01 | "knocked down" or "lying": 1 downed loop |
+| Pick up from the ground | - (PickUp_Table is table height) | "picking up": pick up from the ground |
+| Carry a haul piece | Walk_Carry | - |
 
 ## M3: combat (one set per heirloom)
-| Heirloom (hero) | Search terms | Clips to take |
+| Heirloom (hero) | Quaternius free | Still from Mixamo |
 |---|---|---|
-| Logging axe (Tobin) | "great sword", "axe" | 3-hit combo, a heavy overhead finisher, a charge-up attack, a combat idle, a block-break |
-| Dagger and shield (Pip) | "sword and shield" | 3-4 hit combo, shield block idle, block hit reaction, shield bash, a quick dodge attack |
-| Staff (Wren) | "magic", "staff" | 2-3 staff strikes, a spell cast (forward), an area cast, casting idle |
-| Bow and sword (Ash) | "longbow", "sword" | draw-aim-release loop, a quick shot, aim walk forward and strafe, a 2-hit one-handed sword combo, swapping between bow and sword |
-| All | "kick", "slash" | 1 generic air attack, 1 launcher (an upward strike) |
+| Logging axe (Tobin) | Idle_Shield_Break (block-break) | "great sword": 3-hit two-handed combo, heavy overhead finisher, charge-up attack, two-handed combat idle |
+| Dagger and shield (Pip) | Sword_Regular_A/B/C + Combo, Idle_Shield, Sword_Block, Shield_OneShot (bash), Sword_Dash_RM / Shield_Dash_RM (dodge attack) | "sword and shield": 1 block hit reaction |
+| Staff (Wren) | Spell_Simple_Enter / Idle / Shoot / Exit (forward cast, casting idle) | "staff" or "magic": 2-3 staff strikes, 1 area cast |
+| Bow and sword (Ash) | Sword_Regular_A/B (2-hit one-hand combo) | "longbow": draw-aim-release loop, quick shot, aim walk forward, aim strafe; "sheath" or "draw sword": 1 bow/sword swap |
+| All | - | "jump attack": 1 air attack; "uppercut" or "upward slash": 1 launcher |
+
+Mixamo still owed in total: about 21 clips (M2 11, M3 about 10-12) instead of about 45.
 
 ## Enemies
-The broom, the jam-jar slime, the rat-king and the Dough Warden are greybox shapes in Phase 1 (P5, section 5). They don't need Mixamo.
+The broom, the jam-jar slime, the rat-king and the Dough Warden are greybox shapes in Phase 1 (P5, section 5). They don't need humanoid clips.

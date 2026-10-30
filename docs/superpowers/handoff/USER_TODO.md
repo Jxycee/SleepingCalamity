@@ -3,7 +3,7 @@
 These are the steps only the user can take. Claude keeps this list current: when you finish an item, tick it or tell Claude.
 
 ## Now (unblocks Phase 1 work)
-1. **Download the Mixamo clips** for M2/M3. The list and download settings are in `docs/design/mixamo-clips.md`: Y Bot plus about 22 movement clips and the combat sets, saved into `C:\Dev\_private\mixamo\`. Needs your Adobe account. *Unblocks: M2 animation (movement code can start without it).*
+1. **Download the remaining Mixamo clips** for M2/M3 (Y Bot and 4 idles done; Quaternius CC0 now covers about half). The list and settings are in `docs/design/mixamo-clips.md`: about 21 clips left, saved into `C:\Dev\_private\mixamo\`. Needs your Adobe account. *Unblocks: M2 animation (movement code can start without it).*
 2. **Link Unity Gaming Services** so online co-op can be tested:
    1. Open the project in Unity, go to Project Settings > Services, link it to a Unity Cloud project, and sign in.
    2. On the Unity Cloud dashboard, enable Authentication with anonymous sign-in.
