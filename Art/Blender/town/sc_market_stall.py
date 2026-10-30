@@ -1,19 +1,22 @@
 """MarketStall: B8 market dressing (T2, PHASE1 4), the one stall of the Hollowmere beauty corner.
 
 A storybook timber market stall, 2.6 m wide x 1.6 m deep, awning top 2.7 m. Chunky ochre-painted frame (posts 13 cm, about
-1.4x real, each 1-2 deg out of true) on sandstone pads; knee braces and pegged lintels; a planked oak counter at 0.98 m
-with a shaped front apron board; a closed front of vertical boards below it (one a fresh unpainted replacement);
+1.4x real, each 1-2 deg out of true) on sandstone pads; knee braces and deep pegged lintels; a chunky planked oak counter
+at 0.98 m with a shaped madder-trim apron board and iron corner straps; a closed front of nailed vertical boards below
+it (one a fresh unpainted replacement);
 a two-step display shelf behind the counter; a striped ochre and madder canvas awning sagging between three
 rafter poles, with a scalloped valance on the front and both sides and a plain back cloth; a pennant string slung
-across the opening under the lintel; an iron lantern hook on the fountain-side front post.
+across the opening under the lintel; an arched produce sign (carved apple) on the front bar; a bound wheat sheaf hung
+head-down on each front post; an iron lantern hook on the fountain-side front post. Medium whimsy (controller, 2026-10-30).
 Wear beats (each visible at the three-quarter and mid views): paint chipped at hand height and on edges, showing
 dark oak; a dark splash-and-grime band along the foot; the counter top worn pale and polished where goods slide;
 sun-faded canvas tops and tide stains at the valance scallops; one replaced pale board in the painted front.
-Contrast pair: madder and straw-ochre canvas against the deep ochre frame, pale valance against the dark under-awning.
+Contrast pair: madder and straw-ochre canvas against the deep ochre frame (ochre so it reads against the facade's green
+shutters), pale valance against the dark back cloth.
 
 Landing spots for B7 props (flat within 3 mm): counter top x -1.30..1.30, y -0.86..-0.30, z 0.98;
 shelf tier 1 x -1.10..1.10, y -0.24..-0.04, z 1.15; tier 2 y -0.02..0.20, z 1.33. Lantern hook eye at
-(-1.24, -1.13, 1.92) (B8 lantern hangs here). All in the authoring frame below.
+(-1.25, -1.10, 1.94) (B8 lantern hangs here). All in the authoring frame below.
 
 Authored in Blender axes: z up, front -Y, metres, origin at the bottom centre (FBX -Z forward, Y up: the front becomes
 Unity +Z). The fountain-facing side is the stall's -X side (Blender) once placed at Unity (4.5, 0, 4.5) yaw 200; the
@@ -29,7 +32,8 @@ one material; the PC runs the 2K bake and the export.
       [--rres 960] [--samples 32] [--views wide,mid,tq,front,side] [--paint ochre|green] [--no-render] [--export]
 Renders go to <out>/stall_<stage>_<view>.png; the bake writes <out>/maps/MarketStall_<Map>.png; --export writes
 <out>/MarketStall.fbx. Cloud sessions commit this generator only (sc-asset-craft 4).
-Budget: about 25k tris (a compound dressing piece, between kit and hero in PHASE1 3.3), one 2K set, 1 material.
+Budget: 28.5k tris (a compound dressing piece between kit and hero in PHASE1 3.3: sc_asset_audit's 'prop' class
+FAILs at 6k, audit it as --class hero), one 2K set, 1 material.
 Collider (at placement): a box over the counter and frame, 2.7 x 1.0 x 1.6 m; the awning overhang has none.
 
 Status (2026-10-30, cloud): see the review line at the bottom of this docstring.
@@ -69,6 +73,7 @@ ROPE = lin('#9a845e')
 # ----------------------------------------------------------------------------- dimensions (metres)
 W, D = 2.6, 1.6
 POST = 0.13                        # post section (about 1.4x real)
+LIN_H = 0.19                       # lintel depth (chunky: about 1.4x real)
 PX, PY = W / 2 - POST / 2, D / 2 - POST / 2
 PAD_H = 0.07                       # sandstone pad under each post
 COUNTER_Z = 0.98
@@ -341,9 +346,12 @@ def mat_paint():
     oak, oakn, oako = tset(nt, 'oak_timber', uv)
     tint = attr(nt, 'tint').outputs['Color']
     paint = detail(nt, mix(nt, 1.0, mix(nt, attr(nt, 'stripe').outputs['Fac'], PAINT, TRIM), tint, 'MULTIPLY'), lum_norm(nt, alb, mean_lum('painted_wood')), 0.2)
+    sm = N(nt, 'ShaderNodeMapping'); link(nt, uv, sm.inputs['Vector']); sm.inputs['Scale'].default_value = (3.0, 70.0, 1.0)
+    streak = noise_tex(nt, sm.outputs[0], 1.0, 4.0, 0.6, 2.0)            # brush strokes along the grain
+    paint = mix(nt, 1.0, paint, N_rgb(nt, mth(nt, 'MULTIPLY_ADD', streak, 0.28, 0.86)), 'MULTIPLY')
     fade = noise_tex(nt, obj, 1.6, 3.0, 0.5, 7.0)                         # broad sun-fade blotches
     paint = mix(nt, mth(nt, 'MULTIPLY', ramp(nt, fade, 0.45, 0.75), 0.22), paint, lin('#a9ad8a') if PAINT_KIND == 'green' else lin('#d2b47a'))
-    wood = mix(nt, 0.55, mix(nt, 1.0, oak, (1.6, 1.5, 1.4, 1), 'MULTIPLY'), lin('#6a5c4c'))       # weathered grey oak under the flakes
+    wood = mix(nt, 0.7, mix(nt, 1.0, oak, (1.6, 1.5, 1.4, 1), 'MULTIPLY'), lin('#7f6e5a'))       # weathered grey oak under the flakes
     z = xyz.outputs['Z']
     hand = mth(nt, 'MULTIPLY', ramp(nt, z, 0.70, 0.95), mth(nt, 'SUBTRACT', 1.0, ramp(nt, z, 1.35, 1.70)))
     edge = edge_mask(nt, geo, 0.012, 10.0)
@@ -372,6 +380,7 @@ def mat_oak():
     col = mix(nt, mth(nt, 'MULTIPLY', edge, 0.35), col, lin('#a08a6c'))           # worn pale arrises
     nz = N(nt, 'ShaderNodeSeparateXYZ'); link(nt, geo.outputs['Normal'], nz.inputs[0])
     up = ramp(nt, nz.outputs['Z'], 0.6, 0.9)
+    col = mix(nt, mth(nt, 'MULTIPLY', up, 0.35), col, lin('#8e7c66'))           # up-facing oak sun-greyed
     pol = mth(nt, 'MULTIPLY', up, ramp(nt, noise_tex(nt, obj, 2.2, 3.0, 0.5, 4.0), 0.35, 0.65))
     col = mix(nt, mth(nt, 'MULTIPLY', pol, 0.6), col, lin('#b8a07a'))           # goods slid pale and smooth
     fresh = detail(nt, lin('#c2a274'), lum_norm(nt, oak, mean_lum('oak_timber')), 0.25)
@@ -391,16 +400,18 @@ def mat_canvas():
     odd = mth(nt, 'MODULO', mth(nt, 'FLOOR', mth(nt, 'ADD', st, 0.5)), 2.0)
     base = mix(nt, odd, OCHRE, MADDER)
     base = mix(nt, 1.0, base, attr(nt, 'tint').outputs['Color'], 'MULTIPLY')
-    col = detail(nt, base, lum_norm(nt, alb, mean_lum('canvas')), 0.55)
+    col = detail(nt, base, lum_norm(nt, alb, mean_lum('canvas')), 0.35)
     nz = N(nt, 'ShaderNodeSeparateXYZ'); link(nt, geo.outputs['Normal'], nz.inputs[0])
     sun = mth(nt, 'MULTIPLY', ramp(nt, nz.outputs['Z'], 0.2, 0.9), mth(nt, 'MULTIPLY_ADD', noise_tex(nt, obj, 1.2, 3.0, 0.5, 9.0), 0.25, 0.22))
     col = mix(nt, sun, col, CREAM)                                                   # sun-faded tops
     vh = attr(nt, 'vh').outputs['Fac']
     tide = mth(nt, 'MULTIPLY', ramp(nt, vh, 0.45, 0.95), ramp(nt, noise_tex(nt, obj, 4.0, 4.0, 0.55, 2.0), 0.4, 0.62))
     col = mix(nt, mth(nt, 'MULTIPLY', tide, 0.6), col, lin('#4a3524'))            # damp tide stains at the scallops
+    bind = ramp(nt, vh, 0.86, 0.92)
+    col = mix(nt, mth(nt, 'MULTIPLY', bind, 0.55), col, lin('#3e2a1e'))            # bound edge tape along the scallops
     link(nt, col, bs.inputs['Base Color'])
     link(nt, mth(nt, 'MULTIPLY_ADD', orm.outputs[1], 0.2, 0.72), bs.inputs['Roughness'])
-    link(nt, nmap(nt, nrm, 0.7), bs.inputs['Normal'])
+    link(nt, nmap(nt, nrm, 0.4), bs.inputs['Normal'])
     bs.inputs['Subsurface Weight'].default_value = 0.0
     return m
 
@@ -443,7 +454,15 @@ def mat_stone():
     link(nt, nmap(nt, nrm, 1.0), bs.inputs['Normal'])
     return m
 
-MATS = dict(Paint=mat_paint(), Oak=mat_oak(), Canvas=mat_canvas(), Cloth=mat_cloth(), Rope=mat_rope(),
+def mat_straw():
+    m, nt, bs, uv, obj, xyz, geo = base_nodes('Straw')
+    sm = N(nt, 'ShaderNodeMapping'); link(nt, obj, sm.inputs['Vector']); sm.inputs['Scale'].default_value = (90.0, 90.0, 4.0)
+    n = noise_tex(nt, sm.outputs[0], 1.0, 3.0, 0.5, 1.0)
+    col = mix(nt, 1.0, attr(nt, 'tint').outputs['Color'], N_rgb(nt, mth(nt, 'MULTIPLY_ADD', n, 0.7, 0.62)), 'MULTIPLY')
+    link(nt, col, bs.inputs['Base Color']); bs.inputs['Roughness'].default_value = 0.7
+    return m
+
+MATS = dict(Straw=mat_straw(), Paint=mat_paint(), Oak=mat_oak(), Canvas=mat_canvas(), Cloth=mat_cloth(), Rope=mat_rope(),
             Iron=mat_iron(), Stone=mat_stone())
 
 # ----------------------------------------------------------------------------- frame
@@ -452,7 +471,7 @@ for sx in (-1, 1):
     for sy in (-1, 1):
         nm = f"post_{'L' if sx < 0 else 'R'}{'F' if sy < 0 else 'B'}"; r = rng(nm)
         x, y = sx * PX, sy * PY
-        top = lintel_top(y) - 0.16 + 0.03
+        top = lintel_top(y) - LIN_H + 0.03
         h = top - PAD_H
         board(f'pad_{nm}', (0.24 + 0.03 * r.random(), 0.24 + 0.03 * r.random(), PAD_H + 0.04), 'Stone',
               (x + 0.01 * (r.random() - .5), y + 0.01 * (r.random() - .5), (PAD_H - 0.04) / 2), (0, 0, r.uniform(-8, 8)),
@@ -468,10 +487,10 @@ for sx in (-1, 1):
 # lintels front and back (rafters sit on them), side top beams following the slope
 for sy, tag in ((-1, 'F'), (1, 'B')):
     y = sy * PY; zt = lintel_top(y)
-    board(f'lintel_{tag}', (W + 0.22, POST, 0.16), 'Paint', (0, y, zt - 0.08), (0, 0, 0), grain=0, cut=8,
+    board(f'lintel_{tag}', (W + 0.22, POST, LIN_H), 'Paint', (0, y, zt - LIN_H / 2), (0, 0, 0), grain=0, cut=8,
           chamfer=0.016, wob=0.006, bend=-0.02)
     for sx in (-1, 1):                                       # pegs through the post tenons, standing proud
-        pole(f'peg_{tag}{sx}', [(sx * PX, y - sy * 0.055, zt - 0.08), (sx * PX, y - sy * 0.085, zt - 0.08)], 0.016, 'Oak', 8)
+        pole(f'peg_{tag}{sx}', [(sx * PX, y - sy * 0.055, zt - LIN_H / 2), (sx * PX, y - sy * 0.085, zt - LIN_H / 2)], 0.016, 'Oak', 8)
 slope = math.atan2(canvas_z(-PY) - canvas_z(PY), 2 * PY)
 for sx in (-1, 1):
     zc = (lintel_top(-PY) + lintel_top(PY)) / 2 - 0.07
@@ -479,7 +498,7 @@ for sx in (-1, 1):
           grain=1, cut=6, chamfer=0.014, wob=0.005)
 # knee braces at the front (outline breaks under the lintel), plain ones at the back
 for sy, tag in ((-1, 'F'), (1, 'B')):
-    y = sy * PY; zb = lintel_top(y) - 0.16
+    y = sy * PY; zb = lintel_top(y) - LIN_H
     for sx in (-1, 1):
         L = 0.46; cx = sx * (PX - POST / 2 - 0.15); cz = zb - 0.15
         board(f'brace_{tag}{sx}', (L, 0.085, 0.085), 'Paint', (cx, y, cz), (0, sx * 45, 0), grain=0, cut=2,
@@ -503,7 +522,7 @@ for i in range(nb):
     r = rng(f'plank{i}')
     yc = y0 + bw / 2 + i * (bw + gap)
     ln = W + 0.12 + r.uniform(-0.03, 0.03)
-    board(f'plank{i}', (ln, bw, 0.05), 'Oak', (r.uniform(-0.015, 0.015), yc, COUNTER_Z - 0.025 + r.uniform(-0.002, 0.002)),
+    board(f'plank{i}', (ln, bw, 0.07), 'Oak', (r.uniform(-0.015, 0.015), yc, COUNTER_Z - 0.035 + r.uniform(-0.002, 0.002)),
           (r.uniform(-0.4, 0.4), 0, r.uniform(-0.3, 0.3)), grain=0, cut=10, chamfer=0.007, wob=0.002, bend=-0.004)
 # apron: one wide board with a shaped bottom (shallow central arch, notched ends)
 ap = []
@@ -524,6 +543,18 @@ for i in range(nfb):
     mat, fresh = ('Oak', 1.0) if i == 10 else ('Paint', 0.0)
     board(f'frontboard{i}', (fw - 0.007, 0.03, zt_ - zb_), mat, (xa + fw * (i + .5), -PY + 0.03, (zb_ + zt_) / 2),
           (0, r.uniform(-0.8, 0.8), 0), grain=2, cut=3, chamfer=0.005, wob=0.002, trim=fresh)
+
+# nail rows: front boards nailed to a hidden low rail; iron corner straps on the apron
+for i in range(nfb):
+    r = rng(f'nail{i}')
+    for dx in (-0.25, 0.25):
+        x = xa + fw * (i + 0.5 + dx); z = 0.21 + r.uniform(-0.008, 0.008)
+        pole(f'nail{i}{dx}', [(x, -PY + 0.012, z), (x, -PY + 0.006, z)], 0.0085, 'Iron', 6)
+for sx in (-1, 1):
+    x = sx * (W / 2 - 0.06)
+    board(f'strap{sx}', (0.055, 0.008, 0.27), 'Iron', (x, -0.909, COUNTER_Z - 0.20), grain=2, chamfer=0.002, wob=0.0015)
+    for dz in (-0.09, 0.0, 0.09):
+        pole(f'strapnail{sx}{dz}', [(x, -0.912, COUNTER_Z - 0.20 + dz), (x, -0.919, COUNTER_Z - 0.20 + dz)], 0.008, 'Iron', 6)
 
 # ----------------------------------------------------------------------------- tiered display shelf behind the counter
 T1, T2 = 1.15, 1.33
@@ -549,13 +580,13 @@ def sag_x(x):
     if ax > RAFT_X[-1]:
         return 0.07 * ((ax - RAFT_X[-1]) / (AW_W / 2 - RAFT_X[-1])) ** 1.4      # rolls over the side rafters
     f = (ax % 1.30) / 1.30
-    return 0.065 * math.sin(math.pi * f)
+    return 0.085 * math.sin(math.pi * f) ** 0.9
 def canvas_pt(x, t):
     y = AW_BACK[0] + (AW_FRONT[0] - AW_BACK[0]) * t
     z = canvas_z(y)
     hold = 0.55 + 0.45 * math.sin(math.pi * min(t / 0.84, 1.0)) if t < 0.84 else 0.55 + 0.25 * math.sin(math.pi * (t - 0.84) / 0.16)
     s = sag_x(x)
-    fold = 0.009 * math.sin(2 * math.pi * x / 0.21 + 2.6 * t + 0.7 * noise.noise(Vector((x * 2, t * 3, 1.0)))) * min(1, s / 0.03)
+    fold = 0.016 * math.sin(2 * math.pi * x / 0.21 + 2.6 * t + 0.7 * noise.noise(Vector((x * 2, t * 3, 1.0)))) * min(1, s / 0.03)
     z = z - s * hold + fold + 0.01 * noise.noise(Vector((x * 1.4, t * 2.2, 4.0)))
     return Vector((x, y, z))
 for i, x in enumerate(RAFT_X):
@@ -567,7 +598,7 @@ for i, x in enumerate(RAFT_X):
 fb = [Vector((-AW_W / 2 + 0.05 + (AW_W - 0.1) * k / 10, AW_FRONT[0] + 0.05, 0)) for k in range(11)]
 fb = [Vector((p.x, p.y, AW_FRONT[1] - 0.042 - 0.018 * math.sin(math.pi * k / 10))) for k, p in enumerate(fb)]
 pole('frontbar', fb, 0.038, 'Oak', 12)
-NU, NV = N_STRIPE * 5, 28
+NU, NV = N_STRIPE * 5, 16
 L_SL = (Vector(AW_BACK) - Vector(AW_FRONT)).length
 def cv_fn(u, v):
     x = -AW_W / 2 + AW_W * u
@@ -578,16 +609,16 @@ grid_part('canvas', NU, NV, cv_fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u
 # scalloped valances: front and both sides, one scallop per stripe
 VH, SD = 0.20, 0.085
 def valance(name, p0, p1, n_sc, side_out, phase):
-    rr = rng(name); lens = [rr.uniform(-0.012, 0.012) for _ in range(n_sc)]
+    rr = rng(name); lens = [rr.uniform(-0.012, 0.012) for _ in range(n_sc)]; swing = [rr.uniform(-0.025, 0.025) for _ in range(n_sc)]
     def fn(u, v):
         base = p0.lerp(p1, u)
         k = min(int(u * n_sc), n_sc - 1); f = u * n_sc - k
         circ = math.sqrt(max(0.0, 1 - (2 * f - 1) ** 2))
         drop = v * (VH + lens[k] + SD * circ)
-        sway = 0.012 * math.sin(math.pi * v) + 0.006 * v * math.sin(u * 17 + phase)
+        sway = 0.012 * math.sin(math.pi * v) + 0.006 * v * math.sin(u * 17 + phase) + swing[k] * v * v      # each scallop swings a little on its own
         p = base + side_out * sway + Vector((0, 0, -drop + 0.004 * math.sin(u * 23 + phase)))
         return p, ((p0 - base).length / TILE + phase, drop / TILE), v
-    return grid_part(name, n_sc * 10, 6, fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u * n_sc) + phase,
+    return grid_part(name, n_sc * 7, 4, fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u * n_sc) + phase,
                      tint_fn=lambda u, v: (0.97, 0.97, 0.97, 1))
 fr0 = canvas_pt(-AW_W / 2, 1.0) + Vector((0, -0.01, 0.0)); fr1 = canvas_pt(AW_W / 2, 1.0) + Vector((0, -0.01, 0.0))
 valance('valance_F', fr0, fr1, N_STRIPE, Vector((0, -1, 0)), 0)
@@ -626,7 +657,7 @@ finish(lf, 'Cloth', (0.055, sy - 0.05, sz0 + 0.26), (0, -30, 0), tint=lin('#5f7a
 pole('sign_stem', [(0.0, sy - 0.05, sz0 + 0.235), (0.012, sy - 0.05, sz0 + 0.275)], 0.008, 'Oak', 6)
 
 # ----------------------------------------------------------------------------- pennant string across the opening
-pa, pb = Vector((-W / 2 - 0.01, -PY - 0.08, lintel_top(-PY) - 0.20)), Vector((W / 2 + 0.01, -PY - 0.08, lintel_top(-PY) - 0.20))
+pa, pb = Vector((-W / 2 - 0.01, -PY - 0.08, lintel_top(-PY) - 0.24)), Vector((W / 2 + 0.01, -PY - 0.08, lintel_top(-PY) - 0.24))
 def rope_pt(t, sag=0.22):
     return pa.lerp(pb, t) + Vector((0, -0.02 * math.sin(math.pi * t), -sag * 4 * t * (1 - t)))
 pole('bunting_rope', [rope_pt(k / 24) for k in range(25)], 0.007, 'Rope', 6)
@@ -645,6 +676,39 @@ for k in range(NP):
         return p, (u * 0.2 / TILE + k * 0.1, v * ln / TILE), 0.0
     c = PCOL[k % 4]; j = 0.94 + 0.1 * r.random()
     grid_part(f'pennant{k}', 4, 4, pfn, 'Cloth', solid=0.002, tint_fn=lambda u, v, c=c, j=j: (c[0] * j, c[1] * j, c[2] * j, 1))
+
+# ----------------------------------------------------------------------------- wheat sheaves hung head-down on the front posts (harvest stall)
+def sheaf(name, tie, out):
+    """A bound sheaf hanging from `tie` (on the post's outer face), stalk ends up, ears flaring down. out: +1/-1 side."""
+    r = rng(name); segs, prof = 12, [(0.068, 0.0), (0.08, 0.05), (0.055, 0.15), (0.062, 0.25), (0.085, 0.40), (0.105, 0.47)]
+    bm = bmesh.new(); rings = []
+    for rad, z in prof:
+        rings.append([bm.verts.new((rad * (1 + 0.15 * noise.noise(Vector((i, z * 9, r.random())))) * math.cos(2 * math.pi * i / segs),
+                                    rad * math.sin(2 * math.pi * i / segs), -z)) for i in range(segs)])
+    for a_, b_ in zip(rings[:-1], rings[1:]):
+        for i in range(segs):
+            j = (i + 1) % segs; bm.faces.new((a_[i], a_[j], b_[j], b_[i]))
+    bm.faces.new(rings[0][::-1]); bm.faces.new(rings[-1])
+    for k in range(40):                                   # ears: spindles fanning out and down
+        a = 2.4 * k + r.uniform(-0.2, 0.2); rr = 0.03 + 0.06 * ((k * 0.618) % 1.0); spread = 0.15 + 0.6 * rr / 0.09; ln = r.uniform(0.10, 0.13)
+        base = Vector((rr * math.cos(a), rr * math.sin(a), -0.44 - r.uniform(0, 0.05)))
+        d = Vector((math.sin(spread) * math.cos(a), math.sin(spread) * math.sin(a), -math.cos(spread)))
+        sp = bmesh.ops.create_uvsphere(bm, u_segments=5, v_segments=4, radius=1.0)['verts']
+        q = d.to_track_quat('Z', 'Y').to_matrix()
+        for v in sp:
+            v.co = base + d * ln * 0.5 + q @ Vector((v.co.x * 0.016, v.co.y * 0.012, v.co.z * ln * 0.5))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    uv_metres(bm, 2, (r.random(), r.random()))
+    ob = obj_from_bm(name, bm)
+    finish(ob, 'Straw', tie + Vector((out * 0.09, 0, -0.02)), (r.uniform(-6, 6), r.uniform(-8, 8), r.uniform(0, 360)),
+           tint=lin('#dcc27a'))
+    t = tie + Vector((out * 0.09, 0, -0.17))
+    pole(name + '_band', [t + Vector((0.06 * math.cos(2 * math.pi * k / 10), 0.06 * math.sin(2 * math.pi * k / 10), 0)) for k in range(11)],
+         0.011, 'Rope', 6)
+    pole(name + '_cord', [tie, tie + Vector((out * 0.03, 0, -0.03)), t + Vector((0, 0, 0.03))], 0.006, 'Rope', 6)
+    pole(name + '_nail', [tie - Vector((out * 0.01, 0, 0)), tie + Vector((out * 0.012, 0, 0))], 0.008, 'Iron', 6)
+for sx in (-1, 1):
+    sheaf(f'sheaf{sx}', Vector((sx * (PX + POST / 2), -PY + 0.01, 1.95)), sx)
 
 # ----------------------------------------------------------------------------- lantern hook (iron) on the fountain-side front post
 hx, hy, hz = -PX - 0.01, -PY - POST / 2, 1.98
