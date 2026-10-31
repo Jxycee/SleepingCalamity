@@ -5,7 +5,7 @@
 // bare frames; the belfry empty; the mill a roofless shell) and Rebuilt (ring 1 by HollowmereLayout.RebuiltBuilding: bakery and inn on L lots, homes on M/S,
 // the approved facade on F01, three lots left empty; rings 2-3 as home massing with a few gardens). Each building block faces its lot's default door side.
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
-// BeautyCornerBuilder.PlaceRow at their corner positions; the B8 stall is reused for stalls 2 and 3; the B4 bell tower when its folder exists. Everything
+// BeautyCornerBuilder.PlaceRow at their corner positions; the B8 stall is reused for stalls 2 and 3; the B4 bell tower when its folder exists; the heroes' home from Ring1/HeroesHome (HeroesHomeArt). Everything
 // else is greybox on the LookTest materials. Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
 // approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
@@ -479,7 +479,17 @@ namespace SleepingCalamity.EditorTools
                     LookTestBuilder.Box(g, "Rail", new Vector3(0f, 2.6f, 0f), new Vector3(3.7f, 0.12f, 0.12f), iron, new Vector3(0f, 0f, 4f), 2f);   // cracked: the crossbar hangs askew
                     break;
                 case LandmarkKind.HeroesHome:
-                    if (l.Id == "HeroesHome_Cistern")
+                    if (HeroesHomeArt.Place(g, l.Id))
+                    {
+                        if (l.Id == "HeroesHome_Cistern")
+                        {
+                            var stairA = new GameObject("UndercroftStair");   // P25: the way down; a marker for M5/M6 (inside the house)
+                            stairA.transform.SetParent(g, false);
+                            stairA.transform.position = new Vector3(HollowmereLayout.UndercroftStair.X, l.Y, HollowmereLayout.UndercroftStair.Z);
+                            HeroesHomeArt.AddStairLights(g, stairA.transform);
+                        }
+                    }
+                    else if (l.Id == "HeroesHome_Cistern")
                     {
                         LookTestBuilder.Box(g, "Walls", new Vector3(0f, l.Height * 0.5f, 0f), new Vector3(sx, l.Height, sz), stone, default, 2f);
                         LookTestBuilder.Box(g, "RoofS", new Vector3(0f, l.Height + 1.0f, -sz * 0.25f), new Vector3(sx + 0.5f, 0.25f, sz * 0.62f), roof, new Vector3(-30f, 0f, 0f), 2f);
