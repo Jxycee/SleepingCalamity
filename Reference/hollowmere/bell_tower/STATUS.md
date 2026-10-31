@@ -1,8 +1,8 @@
 # Bell tower integration: status
 
-State: IN PROGRESS (round 4 capture running, materials fix in)
+State: CHECKING (look judged OK; unity.sh check + review running on 9a0e796; merge waits for Wave 0A to land on main)
 Session: cloud, branch claude/brave-keller-3d91gk
-Progress: 65%
+Progress: 85%
 Sheet: Reference/hollowmere/bell_tower/bell_tower_sheet.jpg
 Blocker: none. Unity captures render in the cloud. Root cause of the grey tower found and fixed (see below).
 
@@ -19,6 +19,13 @@ Done:
   textured slot 'Lit' (verified: the same Infill neighbour exported here also came in as 'Lit'; the PC exports point at deleted worktrees so they import fine).
   Fix: `sc_bell_tower.py` exports with `path_mode='STRIP'`; re-exported FBX has the same 22,132 tris. The facade kit has the same latent issue for cloud exports (not changed here).
 - Merge order noted: Wave 0A (claude/cool-ritchie-ofmy47) merges first; I pull main, keep both BeautyCornerBuilder.cs changes, rebuild, re-check, then merge.
+
+- Round 2 capture (materials in): the spire reads red tile and sits right behind the facade chimney in both wide shots (Midday and LowSun); Mid and Close
+  unchanged (tower out of frame). Composition matches the approved frames; no fix round needed. Sheet refreshed (same path).
+  Not visible in any capture camera (hidden behind the facade roof): belfry, bronze bell, clock face and the rubble/quoin shaft, so their WearLit look is unverified in Unity.
+- Hall: kept as the greybox row NEIGHBOUR_ChurchHall (its roof sliver is part of the approved wide frame).
+- Main merged into the branch (9a0e796), no conflicts. Wave 0A (cool-ritchie) only touches HollowmereBuilder.cs / HollowmereTerrain.cs, not BeautyCornerBuilder.cs,
+  so no overlap; I still wait for it to land on main as ordered, then pull main again, re-check and merge.
 
 Pending: round 2 capture with materials, sheet refresh, `unity.sh check`, merge to main, delete the generator branch.
 SC RESULT: (not yet)
