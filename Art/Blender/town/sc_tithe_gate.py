@@ -24,7 +24,7 @@ FK_Iron), so BeautyCornerArt's facade map binds them; placed wear lives in the C
 R grime/rust/soot, G moss, B polish) for WearLit. Own slots, made by the builder: TG_Breath (emissive warm amber), TG_Clay, TG_Straw,
 TG_Wax, TG_Chalk (flat). Foliage = the B9 atlas (M_B9_Foliage; T_B9_Foliage_* copied beside the FBX).
 Children of the root empty TitheGate: Gate (all masonry, iron, glow and offerings), Foliage, SOCKET_Breath (empty at the glow centre,
-15 cm in front of the leaves; the builder hangs its spill light 0.6 m below it). Budget: < 22k tris (landmark, T2, under the 30-60k hero band; printed). Round 3: 20,855 (gate 15,387 + foliage 5,468).
+15 cm in front of the leaves; the builder hangs its spill light 0.6 m below it). Budget: < 24k tris (landmark, T2, under the 30-60k hero band; printed). Round 4: 22,133 (gate 16,665 + foliage 5,468).
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_tithe_gate.py -- --out <scratch>
       [--rres 960] [--samples 32] [--no-render] [--export] [--cams cap,near,close,lowsun]
@@ -70,7 +70,7 @@ SILL = 0.45                                    # threshold top
 FACE = -0.88                                   # front plane of jambs and voussoirs
 GATE_F, GATE_B = -0.245, -0.17                 # leaf plate front / back
 GLOW_Y = -0.12                                 # breath card, behind the leaves
-BAND_Z = [0.80, 1.56, 2.32, 3.08, 3.80]        # band centres
+BAND_Z = [0.70, 1.27, 1.84, 2.41, 2.98, 3.55, 4.05]   # band centres (7: reads as iron, coordinator round 3)
 BAND_H, BAND_P = 0.15, 0.028                   # band height, proud of the plate
 HINGE_X = 1.72
 
@@ -423,12 +423,13 @@ def build_leaf(side):
 
 def build_lock(rngs_left, rngs_right):
     # lock plate on the left leaf, over the second band
-    rngs_left.append(bbox(-0.47, -0.02, GATE_F - 0.05, GATE_F - 0.02, 1.2, 1.8, 'iron', 'lock', bevel=0.012, uvs=1.0))
-    for x in (-0.42, -0.07):
-        for z in (1.25, 1.75):
-            rngs_left.append(rivet(x, GATE_F - 0.05, z, r=0.026, h=0.02))
+    rngs_left.append(bbox(-0.54, 0.02, GATE_F - 0.062, GATE_F - 0.02, 1.1, 1.86, 'iron', 'lock', bevel=0.016, uvs=1.0))      # heavy plate
+    rngs_left.append(bbox(-0.36, -0.14, GATE_F - 0.09, GATE_F - 0.06, 1.3, 1.6, 'iron', 'lock', bevel=0.012, uvs=1.0))       # keyhole boss
+    for x in (-0.48, -0.04):
+        for z in (1.16, 1.48, 1.8):
+            rngs_left.append(rivet(x, GATE_F - 0.062, z, r=0.03, h=0.024))
     # keyhole (glowing): a round head and a tapered slot
-    kx, kz, ky = -0.245, 1.44, GATE_F - 0.0505
+    kx, kz, ky = -0.25, 1.49, GATE_F - 0.0905
     verts = [(kx + 0.032 * math.cos(2 * math.pi * s / 8), ky, kz + 0.032 * math.sin(2 * math.pi * s / 8)) for s in range(8)]
     rngs_left.append(G.add(verts, [tuple(reversed(range(8)))], 'breath', 'breath', uvs=1.0))
     rngs_left.append(G.add([(kx - 0.014, ky, kz - 0.01), (kx + 0.014, ky, kz - 0.01), (kx + 0.024, ky, kz - 0.12), (kx - 0.024, ky, kz - 0.12)],
@@ -489,9 +490,9 @@ def build_gate():
     crack([(0.2, 3.5), (0.36, 3.72), (0.3, 3.95), (0.42, 4.25)], 1, right, 0.018)
     # chalked tithe tallies on the left leaf, low, between the first two bands (pale on dark iron)
     rr = R_('chalk')
-    for row, z in enumerate((0.98, 1.18, 1.36)):
+    for row, z in enumerate((0.9, 1.08)):
         x = -1.52
-        for g in range(4 if row < 2 else 2):
+        for g in range(4 if row < 1 else 3):
             for k in range(4):
                 xx = x + k * 0.03
                 left.append(ribbon([Vector((xx, GATE_F - 0.002, z - 0.05)), Vector((xx + rr.uniform(-0.006, 0.006), GATE_F - 0.002, z + 0.05))],
