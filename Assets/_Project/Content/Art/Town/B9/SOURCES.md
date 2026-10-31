@@ -6,7 +6,7 @@ corner builder's matcher (`BeautyCornerArt.cs`): each holds its FBX plus the tex
 
 | piece | source | licence | what we changed |
 |---|---|---|---|
-| ivy leaves (atlas u 0-.5, v 0-.5) | ambientCG LeafSet017 https://ambientcg.com/view?id=LeafSet017 | CC0 1.0 | 6 scanned leaves composited into 3 runner cells + 4 singles, veins damped, composited into dense two-layer leaf-mass cells, graded to #6f8a34 (outer), #4a5a24 (inner) and #9aa83c (young tips), roughness about 0.62, normal at half strength |
+| ivy leaves (atlas u 0-.5, v 0-.5) | ambientCG LeafSet017 https://ambientcg.com/view?id=LeafSet017 | CC0 1.0 | 6 scanned leaves, veins damped, composited into dense two-layer leaf-mass cells (2 green, 1 dark) + 4 singles, graded to #6f8a34 (outer), #4a5a24 (inner) and #9aa83c (young tips), roughness about 0.62, normal at half strength |
 | nettle leaves (u 0-.5, v .5-1) | Poly Haven nettle_plant https://polyhaven.com/a/nettle_plant (Rob Tuytel, Rico Cilliers) | CC0 1.0 | meshes combined into joint runs, decimated to 380 tris, scaled up (storybook), squashed narrow across the joint; alpha = UV coverage minus the black padding; graded to #6f8a34 |
 | weed rosettes (u .5-1, v .5-1) | Poly Haven weed_plant_02 https://polyhaven.com/a/weed_plant_02 (Rob Tuytel, Rico Cilliers) | CC0 1.0 | as nettle |
 | moss (atlas cells, Basin_Moss, Moss_Band) | ambientCG Moss002 https://ambientcg.com/view?id=Moss002 | CC0 1.0 | graded to #616e2e with #b6ab28 sunlit patches; ragged alpha edges |
