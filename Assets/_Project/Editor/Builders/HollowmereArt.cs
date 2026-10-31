@@ -48,7 +48,11 @@ namespace SleepingCalamity.EditorTools
             // the bell: a flat warm bronze like the bell tower's BT_Bronze (the iron scan tinted stays too dark at distance)
             Flat = new[] { ("SH_Bronze", new Color(0.55f, 0.36f, 0.16f), 0.45f), ("SH_Interior", new Color(0.035f, 0.025f, 0.018f), 0.1f) } };
         public static readonly Spec Mill = new Spec { Name = "Mill", Folder = "Assets/_Project/Content/Art/Town/Ring3/Mill", Fbx = "Mill.fbx",
-            Parts = new[] { "Part_Wheel", "Part_Door" } };
+            Parts = new[] { "Part_Wheel", "Part_Door" },
+            Tinted = new[] { ("ML_Rubble", "sandstone", new Color(0.80f, 0.77f, 0.72f)), ("ML_OakWeathered", "oak_timber", new Color(0.62f, 0.60f, 0.58f)),
+                             ("ML_WheelOak", "oak_timber", new Color(0.72f, 0.64f, 0.54f)), ("ML_Earth", "plaster", new Color(0.42f, 0.32f, 0.22f)),
+                             ("ML_Sack", "canvas", new Color(1.0f, 0.94f, 0.82f)), ("ML_Millstone", "sandstone", new Color(1.1f, 1.08f, 1.0f)) },
+            Flat = new[] { ("ML_Interior", new Color(0.035f, 0.025f, 0.018f), 0.1f) } };
 
         public static bool TryPlaceBakery(Transform g, Foundation f, float footingTop) => TryPlaceBuilding(Bakery, g, f, footingTop);
 
