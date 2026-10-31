@@ -2,9 +2,9 @@
 
 State: IN PROGRESS
 Session: Q1 Home kit families 2 and 4 (cloud session, branch claude/brave-keller-3d91gk; bell tower done before it)
-Progress: 10%
+Progress: 20%
 Sheet: none yet
-Blocker: paused by coordinator for usage (both generator agents asked to commit WIP in their worktrees and stop; resume continues from those commits)
+Blocker: none (resumed 2026-10-31 by the coordinator)
 
 Started 2026-10-31.
 - Stone cottage (family 2, S): `Art/Blender/town/sc_cottage.py`, variants StoneCottage_A/B/C -> `Content/Art/Town/Ring1/StoneCottage/` (implementer agent, Blender only).
@@ -20,4 +20,8 @@ Paused 2026-10-31 (coordinator, usage). Both WIP commits are saved on branch cla
   Design question for resume: the agent made the open front always open and put Part_Door in a side wall (SOCKET_Door on that side). Check against the builder's
   lot orientation (door side faces the lane) before keeping it; the open front should face the lane.
 - Fresh worktrees need `git lfs pull` for Art/Textures/B1_town and the Reference images before Blender can load them.
+
+Resumed 2026-10-31: main (inn, stalls, tithe gate, heroes' home, ruins) merged into claude/brave-keller-3d91gk without conflicts. Both generator agents continue in their
+worktrees. Workshop door question settled: the builder turns the building FRONT (Blender -Y) to the lot's lane side regardless of SOCKET_Door, so the open front is -Y
+and the man door sits in a side wall. Unity next: route one free S ring-2 Home lot to a cottage and one S/M lot to a workshop (greybox fallback when the art is missing).
 
