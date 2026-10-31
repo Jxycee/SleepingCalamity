@@ -156,6 +156,36 @@ def drain_sink(x, z):
     """0..1 near a drain (the fall toward it)."""
     return max(P.smoothstep(1.0 - math.hypot(x - dx, z - dz) / 1.4) for dx, dz, _ in DRAINS)
 
+# r3 (coordinator review, 27/40): break the uniform pattern at mid/far distance.
+DARK_SETTS = ['sett_b', 'sett_e', 'damp_b']
+PALE_SETTS = ['sett_c', 'sett_f', 'path_a']
+def _hash(i, j):
+    h = (i * 374761393 + j * 668265263 + 1013904223) & 0xffffffff
+    h = ((h ^ (h >> 13)) * 1274126177) & 0xffffffff
+    return (h & 0xffff) / 65535.0
+def tone_patch(x, z, cell=4.5):
+    """Smooth value noise (0..1) on a 4.5 m lattice: relaid patches of darker or paler stone."""
+    gx, gz = x / cell + 7.3, z / cell - 3.1
+    i, j = math.floor(gx), math.floor(gz); fx, fz = gx - i, gz - j
+    fx, fz = fx * fx * (3 - 2 * fx), fz * fz * (3 - 2 * fz)
+    a, b, c, d = _hash(i, j), _hash(i + 1, j), _hash(i, j + 1), _hash(i + 1, j + 1)
+    return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz
+def _puddles():
+    r = C.rng('square-puddles'); spots = []
+    for lid in ('Stall_2', 'Stall_3'):                     # wet ground by the stalls (washing produce, a dripping awning)
+        x, z, sx, sz = LANDMARKS[lid]
+        for _ in range(2): spots.append((x + r.uniform(-2.2, 2.2), z + r.uniform(-2.2, 2.2), r.uniform(0.6, 1.1)))
+    for _ in range(4):                                     # round the fountain loop, outside the approved corner
+        a = r.uniform(math.pi * 1.05, math.pi * 1.95); rr = r.uniform(6.5, 9.0)
+        spots.append((rr * math.cos(a), rr * math.sin(a) - 1.0, r.uniform(0.7, 1.2)))
+    for _ in range(5):                                     # strays in the open square
+        spots.append((r.uniform(-17, 17), r.uniform(-19, -7), r.uniform(0.5, 1.0)))
+    return [p for p in spots if corner_edge(p[0], p[1]) is None]
+PUDDLES = _puddles()
+def puddle(x, z):
+    """0..1 inside a damp hollow (dark glossy setts, a 1 cm dip)."""
+    return max([P.smoothstep(1.0 - math.hypot(x - px, z - pz) / pr) for px, pz, pr in PUDDLES] + [0.0])
+
 class SquareLayout(C.Layout):
     def __init__(self, corner):
         self.stones = []
@@ -193,8 +223,12 @@ class SquareLayout(C.Layout):
 
     def pick(self, r, x, z, small=False):
         if small: return 'small_a'
-        if r.random() < square_path_weight(x, z) * 0.8: return r.choice(C.PATHS)
-        if r.random() < 0.8 * drain_sink(x, z) + 0.03: return r.choice(C.DAMPS)
+        pw = square_path_weight(x, z)
+        if r.random() < pw * 0.8: return r.choice(C.PATHS) if r.random() < 0.7 else r.choice(C.DAMPS)   # r3: polished dark setts mixed into the worn lines
+        if r.random() < 0.8 * max(drain_sink(x, z), puddle(x, z)) + 0.03: return r.choice(C.DAMPS)
+        t = tone_patch(x, z)                 # r3: relaid patches of a different stone break the mid/far repetition
+        if t > 0.66 and r.random() < 0.8: return r.choice(DARK_SETTS)
+        if t < 0.30 and r.random() < 0.7: return r.choice(PALE_SETTS)
         return r.choice(C.SETTS)
 
     def hole(self, x, z, half, yaw):
@@ -290,7 +324,7 @@ def heights_and_damage(stones):
     kept, loose, weeds = [], [], []
     for s, u, c, g in zip(stones, und, clus, ragn):
         x, z = s['x'], s['z']; rr = math.hypot(x, z); pw = square_path_weight(x, z)
-        base = P.dish(rr) - 0.025 * drain_sink(x, z) ** 1.5
+        base = P.dish(rr) - 0.025 * drain_sink(x, z) ** 1.5 - 0.01 * puddle(x, z)
         top = base + 0.006 * u + r.gauss(0, 0.0018)
         tx, tz = r.gauss(0, 0.006), r.gauss(0, 0.006)
         si = stub_info(x, z)
