@@ -169,7 +169,7 @@ def bed_material(name):
         nd = T.node('ShaderNodeTexVoronoi', voronoi_dimensions='4D'); T.set(nd, 'Vector', v); T.set(nd, 'W', w)
         nd.inputs['Scale'].default_value = scale; return nd
     dn = n4(6.0); fine = n4(60.0, 2.0)
-    col = T.ramp(dn, [(0.35, (0.022, 0.019, 0.016)), (0.65, (0.048, 0.041, 0.033))])
+    col = T.ramp(dn, [(0.35, (0.032, 0.028, 0.023)), (0.65, (0.064, 0.055, 0.044))])   # r12: a little lighter for low sun
     g = vor4(140.0)                                           # grit: 3-7 mm pebbles
     peb = T.math('MULTIPLY', T.smoothstep((g, 'Distance'), 0.42, 0.22), T.smoothstep((T.sep((g, 'Color')), 'X'), 0.35, 0.45))
     col = T.mix(T.math('MULTIPLY', peb, 0.9), col, T.mix((T.sep((g, 'Color')), 'Y'), (0.09, 0.086, 0.082), (0.18, 0.165, 0.15)))
