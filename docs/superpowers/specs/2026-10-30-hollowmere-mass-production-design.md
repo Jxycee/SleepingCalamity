@@ -61,7 +61,7 @@ Each building generator exports, from one run, in the B4 kit's conventions (metr
 - **All four sides are seen** (four turns): detail every side to the level of the beauty corner's plaza fronts at mid distance; only roof backs and undersides stay cheap. The B4 neighbour variants are already freestanding volumes with plain sides; kit family 1 adds a "freestanding" mode that details all four and fits a square class footprint. That is new generator work on the B4 kit, not a free reuse (controller's call).
 
 ### 5.3 Foundations and decorations
-- **Ruin kit:** foundations per size class, 3 variants each: stone footing, an old doorstep, rubble, weeds (B9 foliage). Placing a building hides the foundation under the building's own plinth.
+- **Ruin kit:** foundations per size class, 3 variants each: stone footing, an old doorstep, rubble, weeds (B9 foliage). Placing a building turns the ruin object off (builder and M6 placement), so ruins may stand taller than a plinth: corner stubs up to about 1.4 m, broken wall runs, rubble spilling inward (controller, 2026-10-31, after the first ruin sheet read as a garden-bed border).
 - **Decorations** (free grid): the B7 props, benches, planters, banners, bunting, lanterns. They're small, carry a footprint and break back to the player if they block a path.
 - **Market stalls (user, 2026-10-30):** fixed in place as part of the square; restored where they stand, like the landmarks.
 
