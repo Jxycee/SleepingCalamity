@@ -89,7 +89,7 @@ namespace SleepingCalamity.EditorTools
             Transform cams = new GameObject("CaptureCameras").transform; cams.SetParent(root, false);
             LookTestBuilder.AddCapture(cams, "Cap_Stair_Top", new Vector3(2.95f, 10.65f, -1.6f), new Vector3(3.2f, 8.0f, -5.6f), 60f);
             LookTestBuilder.AddCapture(cams, "Cap_Stair_Turn", new Vector3(1.6f, 7.4f, -6.4f), new Vector3(-0.2f, 4.5f, -6.3f), 62f);
-            LookTestBuilder.AddCapture(cams, "Cap_Stair_Bottom", new Vector3(0f, 3.6f, -3.0f), new Vector3(0.2f, 1.0f, 5.0f), 60f);
+            LookTestBuilder.AddCapture(cams, "Cap_Stair_Bottom", new Vector3(0f, 2.5f, -3.0f), new Vector3(0.2f, 0.4f, 5.0f), 62f);
             DungeonCornerBuilder.DarkBackground(cams);
 
             // 1.75 m figure on flight A's 4th tread (local top y -0.8, z 0.875; yaw 180 puts it at world z -4.875).
