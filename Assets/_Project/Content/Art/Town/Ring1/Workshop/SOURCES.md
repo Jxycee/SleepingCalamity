@@ -12,7 +12,7 @@ Export (2026-10-31, cloud, Blender 4.5.3), once per variant, each `<Variant>.fbx
 | Folder | Class | Tris (Frame / Part_Door / Part_Shutters) | Total | FOOTPRINT (w x d, m) | Look |
 |---|---|---|---|---|---|
 | `Workshop_A` | S (foundation 6 x 6, body inside 5 x 5) | 16,806 / 1,558 / 1,728 | 20,092 | 4.83 x 4.34 | tile roof, natural weathered boards, sage shutters and door, stove pipe, chopping block; lean-to on +X |
-| `Workshop_B` | M (8 x 8, body inside 7.5 x 7.5) | 21,546 / 1,558 / 2,880 | 25,984 | 6.73 x 6.30 | board roof, ochre-painted battened boards, oxblood shutters and door, sandstone stack on the back wall; lean-to on +X |
+| `Workshop_B` | M (8 x 8, body inside 7.5 x 7.5) | 21,126 / 1,558 / 2,880 | 25,564 | 6.73 x 6.30 | board roof, ochre-painted battened boards, oxblood shutters and door, sandstone stack on the back wall; lean-to on +X |
 | `Workshop_C` | M | 21,054 / 1,558 / 2,304 | 24,916 | 6.95 x 5.28 | tile roof over a board lean-to roof, tarred dark boards, slate-blue shutters and door, stove pipe with a hood; lean-to on -X |
 
 Budgets: S under 30k, M under 35k. Roofs (eaves, verges, lean-to eave) stay inside the 6 / 8 m foundation (asserted by the generator); FOOTPRINT is inside its class.
@@ -38,7 +38,7 @@ Every slot samples a shared `Art/Textures/B1_town/<tileable>` set (`_albedo`, `_
 
 | Slot | Tileable | Linear tint / paint | Used on |
 |---|---|---|---|
-| `FK_Oak` | `oak_timber` | tint (0.64, 0.60, 0.56) (darker than the facade's 0.80, 0.76, 0.72 so the frame reads against the boards), normal 1.2 | posts, plates, braces, rafters, lintel, trusses |
+| `FK_Oak` | `oak_timber` | tint (0.48, 0.45, 0.42) (darker than the facade's 0.80, 0.76, 0.72 so the frame reads against the boards), normal 1.2 | posts, plates, braces, rafters, lintel, trusses |
 | `FK_OakDoor` | `oak_timber` | tint (1.35, 1.25, 1.15) | pale sawn wood: workbench top, planks, logs, offcuts, one bare door plank |
 | `FK_Sandstone` | `sandstone` | tint (1, 1, 1) | plinth stones, threshold |
 | `FK_PlinthJoint` | `sandstone` | tint (0.30, 0.28, 0.24) | recessed plinth mortar core |
@@ -48,7 +48,7 @@ Every slot samples a shared `Art/Textures/B1_town/<tileable>` set (`_albedo`, `_
 | `FK_Glass` | none (flat) | base (0.012, 0.016, 0.02), roughness 0.12 | window panes |
 | `FK_Shutter` (Part_Shutters) | `painted_wood` | paint: A `#4a6a48` = linear (0.0685, 0.1441, 0.0648); B `#6a2e29` = (0.1441, 0.0273, 0.0222); C `#3e5670` = (0.0482, 0.0931, 0.1620) | shutters |
 | `FK_DoorPaint` (Part_Door) | `painted_wood` | same paint colour as the variant's shutters | door planks |
-| `WS_Board` | `oak_timber` | A tint (2.2, 2.0, 1.75) weathered natural; C tint (1.25, 1.12, 1.0) tarred dark; normal 1.1. Not present on B | vertical cladding, gables, lean-to boards (A, C) |
+| `WS_Board` | `oak_timber` | A tint (3.2, 2.9, 2.5) weathered silver-natural; C tint (1.75, 1.5, 1.28) darker brown; normal 1.1. Not present on B | vertical cladding, gables, lean-to boards (A, C) |
 | `WS_BoardPaint` | `painted_wood` | paint `#9c7f4c` = linear (0.3325, 0.2122, 0.0723), normal 0.9. Only on B | B's cladding |
 | `WS_RoofBoard` | `oak_timber` | B tint (1.05, 0.95, 0.85); C tint (0.85, 0.78, 0.70); normal 1.3. B main and lean-to roof, C lean-to roof | board roofs, B ridge cap |
 | `WS_Floor` | `sandstone` | tint (0.52, 0.48, 0.43) | floor slab inside the bay |
