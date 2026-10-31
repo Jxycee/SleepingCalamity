@@ -5,7 +5,7 @@ projected (sc-reference). Every file named here already lives in the repo under 
 
 ## Cottage
 
-Sheet: `cottage_sheet.jpg` (reference on the left, our render right, rows A, B, C; render views fl, fr, bl). Generator
+Sheet: `cottage_sheet.jpg` (reference on the left, our render right, rows A, B, C; render views fl, fr, bl, front). Generator
 `Art/Blender/town/sc_cottage.py`, assets `Assets/_Project/Content/Art/Town/Ring1/StoneCottage/`.
 
 | used for | file (in repo) | creator | licence | source |
