@@ -176,6 +176,16 @@ namespace SleepingCalamity.EditorTools
             return m;
         }
 
+        // The one M_CrackWeeds material every foliage scatter shares (the corner's weeds, the square's edge tufts and weeds). The five B9 folders hold identical
+        // atlases under different GUIDs, so building it from "the first folder that loaded" made the textures flip with call order and rewrote the .mat every build:
+        // it always comes from Weed_A. Null when that folder is missing.
+        public const string SharedFoliageFolder = "Weed_A";
+        public static Material CrackWeedsMaterial()
+        {
+            string folder = FindFolder("B9", SharedFoliageFolder);
+            return folder == null ? null : MaterialFromSet(folder, "T_B9_Foliage", "CrackWeeds", foliage: true);
+        }
+
         // ---- the facade's multi-material setup (B4: shared B1 tileables + B3 decals, wear in the vertex colour) ----
         const string WearShaderName = "SleepingCalamity/WearLit";
         // slot name in Facade.fbx -> LookTest material (the imported B1/B3 tileables), tint (linear, as the generator's tile_mat tint), decal alpha (0 = opaque).
