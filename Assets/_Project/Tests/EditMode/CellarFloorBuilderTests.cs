@@ -12,7 +12,7 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarFloorBuilderTests
     {
-        static readonly (uint Seed, int Floor)[] Cases = { (12345, 1), (12345, 2), (12345, 3), (7, 1), (99, 2), (4242, 3) };
+        static readonly (uint Seed, int Floor)[] Cases = { (12345, 1), (12345, 2), (12345, 3), (7, 1), (99, 2), (4242, 3), (12345, 4) };
 
         Scene scene;
 
