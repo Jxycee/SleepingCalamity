@@ -23,7 +23,6 @@ namespace SleepingCalamity.EditorTools
         const string TexRoot = "Assets/_Project/Content/Textures/B1_town/";
         const float FootingTop = 0.25f;          // top of the lot's footing slab above the pad
         const float RunPost = 1.9f;              // Fence_Run: post centre to post centre
-        const float GatePost = 0.555f;           // Fence_Gate: post centre from the opening centre
         static readonly string[] Scarecrows = { "R2_07", "R3_02" };
 
         static readonly Dictionary<string, GameObject> Loaded = new Dictionary<string, GameObject>();
@@ -32,7 +31,6 @@ namespace SleepingCalamity.EditorTools
         static int lotsAllot, lotsYard, pieces; static long tris;
         static string firstYardLot, allotCamLot = "R2_07";
         const float FenceHeight = 0.75f;         // the whole fence is lowered so the beds read over it
-        const float FrontRun = 1.1f;             // door side: only this much fence beside the gate posts
         static readonly List<Vector2> posts = new List<Vector2>();   // post positions already standing on this lot (lot frame): one post per junction
 
         // ------------------------------------------------------------------------------------------------ allotments
@@ -67,13 +65,9 @@ namespace SleepingCalamity.EditorTools
                 lp.y = FootingTop + 0.03f;
                 HollowmereFoliage.Tuft(root, "Grass_" + "ABC"[(int)(u * 2.999f)], root.TransformPoint(lp), u * 360f, 0.7f + 0.5f * Rand(f.Id, 70 + i));
             }
-            // fence: the gate and a short run beside it on the door side, the other three sides closed; all lowered
+            // fence: the door side is the gate alone (the short stubs beside it read as a second and third fence row in front of the side runs), the other three sides closed; all lowered
             Place(root, "Fence_Gate", xg, -e, 180f);
-            Vector2 gl = new Vector2(xg - GatePost, -e), gr = new Vector2(xg + GatePost, -e);
             Vector2 fl = new Vector2(-e, -e), bl = new Vector2(-e, e), br = new Vector2(e, e), fr = new Vector2(e, -e);
-            AddPost(gl); AddPost(gr);
-            Chain(root, gl, gl + Vector2.left * FrontRun, false, true);
-            Chain(root, gr + Vector2.right * FrontRun, gr, true, false);
             Chain(root, fl, bl, true, true); Chain(root, bl, br, false, true); Chain(root, br, fr, false, true);
             lots.Add(f.Id); lotsAllot++;
             return true;
@@ -237,7 +231,7 @@ namespace SleepingCalamity.EditorTools
         // ------------------------------------------------------------------------------------------------ materials
         static Dictionary<string, Material> Slots()
         {
-            if (slotMats != null && slotMats.Count > 0 && slotMats["Leaf"] != null && slotMats.ContainsKey("Cabbage")) return slotMats;
+            if (slotMats != null && slotMats.Count > 0 && slotMats["Leaf"] != null && slotMats.ContainsKey("Cabbage") && slotMats.ContainsKey("burlap")) return slotMats;
             BuilderUtil.EnsureFolder(MaterialsFolder);
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? throw new System.InvalidOperationException("URP Lit not found");
             slotMats = new Dictionary<string, Material>();
@@ -250,6 +244,13 @@ namespace SleepingCalamity.EditorTools
             Material cab = BeautyCornerArt.MaterialFromSet(Folder + "/VegBed_A", "Cabbage", "GD_Cabbage", foliage: false);
             if (cab != null) { cab.SetFloat("_Cull", 0f); EditorUtility.SetDirty(cab); }
             slotMats["Cabbage"] = cab != null ? cab : FlatLit("Cabbage", new Color(0x5b / 255f, 0x7a / 255f, 0x5a / 255f), 0.4f, lit);
+            // Scarecrow cloth: the canvas tileable tinted per slot (the Blender `tint` attribute is not read by Unity): coat, burlap head, two patches, their seam thread, hat band
+            slotMats["coat"] = TintedCanvas("coat", 0.58f, 0.64f, 0.72f, lit);
+            slotMats["burlap"] = TintedCanvas("burlap", 0.95f, 0.80f, 0.55f, lit);
+            slotMats["patch_ochre"] = TintedCanvas("patch_ochre", 0.93f, 0.72f, 0.42f, lit);
+            slotMats["patch_rust"] = TintedCanvas("patch_rust", 0.74f, 0.42f, 0.34f, lit);
+            slotMats["patch_seam"] = TintedCanvas("patch_seam", 0.50f, 0.37f, 0.27f, lit);
+            slotMats["leather"] = TintedCanvas("leather", 0.50f, 0.34f, 0.26f, lit);
             slotMats["Straw"] = FlatLit("Straw", new Color(0xc9 / 255f, 0xa8 / 255f, 0x5a / 255f), 0.2f, lit);
             // Glass: dark, smooth and slightly see-through (the B4 facade's FK_Glass colour), straight-alpha blend like the decals
             Material glass = LookTestBuilder.Ensure(MaterialsFolder + "/M_GD_Glass.mat", lit);
@@ -260,6 +261,18 @@ namespace SleepingCalamity.EditorTools
             EditorUtility.SetDirty(glass); slotMats["Glass"] = glass;
             AssetDatabase.SaveAssets();
             return slotMats;
+        }
+
+        // The B1 canvas material with its base colour multiplied by a tint (linear RGB as the generator writes it): same maps, its own asset.
+        static Material TintedCanvas(string slot, float r, float g, float b, Shader lit)
+        {
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_GD_" + slot + ".mat", lit);
+            m.CopyPropertiesFromMaterial(LookTestBuilder.Mat("canvas"));
+            Color c = new Color(r, g, b).gamma;
+            m.SetColor("_BaseColor", c); m.SetColor("_Color", c);
+            m.SetShaderPassEnabled("MotionVectors", true);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         static Material FlatLit(string slot, Color srgb, float smooth, Shader lit)

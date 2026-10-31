@@ -92,7 +92,7 @@ namespace SleepingCalamity.EditorTools
             m.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(NormalPath));
             // The look numbers live here (a material keeps the defaults it was created with, so they are set on every build).
             m.SetFloat("_NormalScale", 0.08f); m.SetFloat("_Tile1", 16f); m.SetFloat("_Tile2", 9f); m.SetFloat("_NormalFadeStart", 18f);
-            m.SetFloat("_FoamWidth", 0.06f); m.SetFloat("_ShoreFoam", 0.4f); m.SetFloat("_FlowFoam", 0.8f);
+            m.SetFloat("_FoamWidth", 0.06f); m.SetFloat("_ShoreFoam", 0.4f); m.SetFloat("_FlowFoam", 0.35f); m.SetColor("_FoamColor", new Color(0.74f, 0.80f, 0.78f, 1f));
             m.SetColor("_Absorb", new Color(0.55f, 0.34f, 0.42f, 1f)); m.SetColor("_ShallowColor", new Color(0.26f, 0.28f, 0.18f, 1f)); m.SetColor("_DeepColor", new Color(0.06f, 0.10f, 0.12f, 1f));
             m.SetFloat("_Scatter", 0.40f); m.SetFloat("_FresnelMin", 0.06f); m.SetFloat("_ReflStrength", 1.3f);
             m.SetShaderPassEnabled("ShadowCaster", false);
@@ -184,7 +184,7 @@ namespace SleepingCalamity.EditorTools
             {
                 float t = (s - (f.S + f.Run)) / RunoutLength;
                 if (t < 0f || t >= 1f) continue;
-                best = Mathf.Max(best, Mathf.Pow(1f - t, 1.5f) * 0.9f * (1f - 0.55f * Mathf.Clamp01(lateral / HalfWidth)));
+                best = Mathf.Max(best, Mathf.Pow(1f - t, 1.5f) * 0.5f * (1f - 0.55f * Mathf.Clamp01(lateral / HalfWidth)));
             }
             return best;
         }
@@ -344,7 +344,7 @@ namespace SleepingCalamity.EditorTools
                         var pos = new Vector3(p.x + c.x * dd, y, p.z + c.z * dd);
                         gr[r, k] = ground(pos.x, pos.z);
                         float edge = 2f * f01 - 1f;   // foam at the lip and the base only
-                        idx[r, k] = d.Add(pos, n, c, 1f, new Vector2(dd, ss), new Color(0.3f + 0.7f * edge * edge, 1f, 0f, 1f));
+                        idx[r, k] = d.Add(pos, n, c, 1f, new Vector2(dd, ss), new Color(0.2f + 0.4f * edge * edge, 1f, 0f, 1f));
                     }
                 for (int r = 0; r < rows; r++)
                     for (int k = 0; k < cols; k++)
