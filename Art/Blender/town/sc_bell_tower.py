@@ -441,7 +441,8 @@ if __name__ == '__main__':
             o.select_set(o.name.startswith('Tower_') or o == troot)
         bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'BellTower.fbx'), use_selection=True, axis_forward='-Z',
                                  axis_up='Y', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
-                                 mesh_smooth_type='FACE', add_leaf_bones=False, colors_type='LINEAR')
+                                 mesh_smooth_type='FACE', add_leaf_bones=False, colors_type='LINEAR',
+                                 path_mode='STRIP')   # no texture paths: Unity's material import renames every textured slot 'Lit' when an absolute path resolves on its machine
     if '--no-render' not in argv:
         if with_facade:
             cam = FK.review_scene(froot)
