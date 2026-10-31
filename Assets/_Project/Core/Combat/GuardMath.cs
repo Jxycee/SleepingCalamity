@@ -13,14 +13,20 @@ namespace SleepingCalamity.Core.Combat
         public const float GuardedDamage = 0.2f;      // guarded damage x0.2
         public const int ParryFrames = 6;             // the first 6 frames of a guard (60 Hz) parry
         public const float ParrySeconds = ParryFrames / 60f;
+        // Combat depth (change 5): a raise only arms the parry if the guard was down at least this long before it; a quicker re-raise still guards. Tapping
+        // RMB no longer parries (Critical Points' "primed, then locked out").
+        public const float ParryLockoutSeconds = 0.5f;
+
+        public static bool ParryArmed(float guardDownSeconds) => guardDownSeconds >= ParryLockoutSeconds - 1e-4f;
 
         // guardHeldSeconds: how long the guard has been held (0 = not guarding, use guarding=false). bearingDeg: the angle between the guarder's facing
-        // and the direction to the attacker, 0 = dead ahead. A guard-break or an unguardable attack passes straight through.
-        public static GuardOutcome Resolve(bool guarding, float guardHeldSeconds, float bearingDeg, bool guardBreak, bool guardable)
+        // and the direction to the attacker, 0 = dead ahead. A guard-break or an unguardable attack passes straight through. parryArmed: this raise came
+        // after the lockout (ParryArmed), so its first frames may parry.
+        public static GuardOutcome Resolve(bool guarding, float guardHeldSeconds, float bearingDeg, bool guardBreak, bool guardable, bool parryArmed = true)
         {
             if (!guarding || guardBreak || !guardable) return GuardOutcome.None;
             if (MathF.Abs(bearingDeg) > FrontHalfAngleDeg) return GuardOutcome.None;
-            return guardHeldSeconds <= ParrySeconds + 1e-4f ? GuardOutcome.Parried : GuardOutcome.Guarded;
+            return parryArmed && guardHeldSeconds <= ParrySeconds + 1e-4f ? GuardOutcome.Parried : GuardOutcome.Guarded;
         }
     }
 
@@ -40,6 +46,14 @@ namespace SleepingCalamity.Core.Combat
 
         // The strict window, with no leniency (what the animation shows).
         public static bool IsInIFrames(bool active, float elapsed) => active && elapsed >= IFrameStartSeconds && elapsed <= IFrameEndSeconds;
+
+        // Combat depth (change 5): a dodge is perfect when the hit it dodged met the roll within its first PerfectSeconds (the roll stays safe for 0.4 s;
+        // perfect is the first third), and only if the previous roll ended at least ChainLockoutSeconds before this one began (chained rolls never count).
+        public const float PerfectSeconds = 0.15f;
+        public const float ChainLockoutSeconds = 0.3f;
+
+        public static bool IsPerfect(bool active, float elapsed, float gapBeforeRollSeconds) =>
+            active && elapsed >= 0f && elapsed <= PerfectSeconds + 1e-4f && gapBeforeRollSeconds >= ChainLockoutSeconds - 1e-4f;
     }
 
     // The broom's bristle front (6.6): 80% of frontal damage is blocked unless the hit comes from the flank or behind or is a guard-breaker.

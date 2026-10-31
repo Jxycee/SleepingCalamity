@@ -51,8 +51,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(q.Tell.HoldSfx, Is.Not.Null);
             Assert.That(q.Tell.HoldFrames, Is.GreaterThanOrEqualTo(18), "a long, readable hold");
             Assert.That(q.GuardBreak, Is.True);
-            Assert.That(System.Array.IndexOf(AttackCatalog.AllEnemyAttacks, q), Is.EqualTo(AttackCatalog.AllEnemyAttacks.Length - 1),
-                "appended last: the replicated attack index of every older attack is unchanged");
+            Assert.That(System.Array.IndexOf(AttackCatalog.AllEnemyAttacks, q), Is.EqualTo(11),
+                "appended after the original eleven: the replicated attack index of every older attack is unchanged");
         }
 
         [Test]
@@ -123,7 +123,8 @@ namespace SleepingCalamity.Tests.EditMode
     public class AttackTokensTests
     {
         const int Hero = 1, Hero2 = 2;
-        static readonly PacingProfile P = AttackPacing.Tier1;
+        // Two attackers, the gap of tier 1: the token rules with room for a second attacker (tier 1 allows one since combat depth, 2026-10-30).
+        static readonly PacingProfile P = new PacingProfile(2, AttackPacing.Tier1.MinStrikeGapSeconds, 1f, 1f, 0.3f);
 
         [Test]
         public void AtMostTwoAttackersPerHero_ButAnotherHeroHasItsOwn()
@@ -248,7 +249,8 @@ namespace SleepingCalamity.Tests.EditMode
         public void TierTwo_PressesHarder_WithoutLettingStrikesOverlap()
         {
             PacingProfile t1 = AttackPacing.ForTier(1), t2 = AttackPacing.ForTier(2);
-            Assert.That(t2.MaxAttackersPerHero, Is.EqualTo(t1.MaxAttackersPerHero), "never more at once");
+            Assert.That(t1.MaxAttackersPerHero, Is.EqualTo(1), "tier 1: one duel at a time (OoT: the others wait)");
+            Assert.That(t2.MaxAttackersPerHero, Is.EqualTo(2), "tier 2: two at once, never more");
             Assert.That(t2.MinStrikeGapSeconds, Is.LessThan(t1.MinStrikeGapSeconds).And.GreaterThanOrEqualTo(0.3f), "closer, but every hit still on its own");
             foreach (EnemyKind k in new[] { EnemyKind.Slime, EnemyKind.RatKing, EnemyKind.Broom, EnemyKind.DoughWarden })
                 Assert.That(AttackPacing.CooldownSeconds(k, 2), Is.LessThan(AttackPacing.CooldownSeconds(k, 1)), k.ToString());

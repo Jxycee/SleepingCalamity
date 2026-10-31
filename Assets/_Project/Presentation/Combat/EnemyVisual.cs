@@ -214,6 +214,7 @@ namespace SleepingCalamity.Presentation
                     y += Mathf.Sin(Mathf.PI * (f - a.Lunge.Start) / Mathf.Max(1f, a.Lunge.End - a.Lunge.Start)) * 0.7f;
             }
             if (phase == EnemyPhase.Stagger) squash = 0.8f + 0.1f * Mathf.Sin(t * 40f);
+            else if (_enemy.Braced) squash *= 0.9f;   // combat depth: the broom braces behind its bristles when its guard takes a hit
 
             // A landed hit: squash flat and shove away from the attacker, both easing out (bigger for heavy hits).
             float react = _enemy.HitReact;

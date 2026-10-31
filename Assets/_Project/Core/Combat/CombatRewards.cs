@@ -94,6 +94,7 @@ namespace SleepingCalamity.Core.Combat
             }
             if (result.WeakPart) tech = true;
             if (result.ElementMatch) tech = true;
+            if (result.Opening) tech = true;   // combat depth: a hit in an opening is good play and pops (capped per enemy like every tech)
 
             // A tech event pays its value x1.5 and pops; with no style ABS in the event the tech itself is worth a base point (capped per enemy).
             if (tech)
@@ -117,6 +118,18 @@ namespace SleepingCalamity.Core.Combat
             gain.Abs = t.Abs;
             gain.TechPop = t.Pop;
             gain.LevelsGained = p.Weapon(weaponKey).AddAbs(t.Abs);
+            return gain;
+        }
+
+        // A perfect dodge (combat depth, change 5): a tech pop worth the enemy's tech base, on the weapon in hand (any weapon can roll).
+        public static AbsGain OnPerfectDodge(PlayerGrowth p, string weaponKey, string enemyId)
+        {
+            if (p == null) return default;
+            var gain = new AbsGain { PlayerId = p.PlayerId, WeaponKey = weaponKey };
+            TechResult t = TechBonus.Apply(p.TechBase(enemyId), TechKind.Parry);
+            gain.Abs = t.Abs;
+            gain.TechPop = t.Pop && t.Abs > 0f;
+            if (t.Abs > 0f) gain.LevelsGained = p.Weapon(weaponKey).AddAbs(t.Abs);
             return gain;
         }
 

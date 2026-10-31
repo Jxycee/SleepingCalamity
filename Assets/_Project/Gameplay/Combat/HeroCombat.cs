@@ -52,6 +52,8 @@ namespace SleepingCalamity.Gameplay
         private byte _swingWeapon, _swingPrior;   // the heirloom index and the chain's prior hits when the current swing began (sent with every hit of it)
         private bool _shotFired, _wasDodging, _guarding, _aiming, _wasGuarding, _whiffChecked;
         private float _guardStart, _reviveReport, _hurtLock, _dodgeBuffer;
+        private float _guardEnd = -10f, _rollEndedAt = -10f, _rollGap = 10f;   // combat depth: the parry lockout and the perfect dodge's chain rule
+        private bool _parryArmed = true;
         private int _swingSerial, _published;
         private Vector3 _impulse;
 
@@ -282,7 +284,9 @@ namespace SleepingCalamity.Gameplay
             {
                 if (_machine.Active) PublishSwing(NoAttack);
                 _machine.Interrupt();
+                _rollGap = Time.time - _rollEndedAt;   // a chained roll (DodgeTiming.ChainLockoutSeconds) can never be perfect
             }
+            else if (!dodging && _wasDodging) _rollEndedAt = Time.time;
             _wasDodging = dodging;
 
             WeaponFamily family = Family;
@@ -290,7 +294,12 @@ namespace SleepingCalamity.Gameplay
             _guarding = family == WeaponFamily.Dagger && intent.SecondaryHeld && free;
             _aiming = family == WeaponFamily.Bow && intent.SecondaryHeld && (free || _machine.Active && _machine.Current.Kind == AttackKind.Shot);
             if (!_aiming) _machine.ClearSpecialBuffer();   // a shot press only waits while the aim button is still held
-            if (_guarding && !_wasGuarding) _guardStart = Time.time;
+            if (_guarding && !_wasGuarding)
+            {
+                _guardStart = Time.time;
+                _parryArmed = GuardMath.ParryArmed(Time.time - _guardEnd);   // a quick re-raise guards but cannot parry
+            }
+            else if (!_guarding && _wasGuarding) _guardEnd = Time.time;
             _wasGuarding = _guarding;
 
             var ai = new AttackInput { Pressed = intent.PrimaryPressed, Held = intent.PrimaryHeld, Released = intent.PrimaryReleased, Airborne = !_loco.IsGrounded };
@@ -481,6 +490,10 @@ namespace SleepingCalamity.Gameplay
             _machine.RegisterHit();
             int stop = _budget.Request(a.HitstopFrames, Time.time);
             _machine.Freeze(stop);
+            // Combat depth cues, predicted from the replicated phase and attack clock (the host decides): a committed enemy clanks (it will not flinch,
+            // it trades), an open one rings (x1.5).
+            if (e.CommittedNow) CombatEvents.RaiseCue(CombatCue.Blocked, point);
+            else if (e.OpenNow) CombatEvents.RaiseCue(CombatCue.HitCrit, point);
             e.ShowHit(transform.position, a.IsFinisher || a.Kind == AttackKind.Charge ? 1f : a.Kind == AttackKind.Shot ? 0.4f : 0.5f);   // white flash and squash at contact
             CombatEvents.RaiseLocalHit(new LocalHit(point, a, part >= 0, a.CameraKick));
             CombatEvents.RaiseKick(a.CameraKick);
@@ -533,12 +546,18 @@ namespace SleepingCalamity.Gameplay
             if (_loco.IsInvulnerable || _machine.Invulnerable)
             {
                 CombatEvents.RaiseCue(CombatCue.Dodge, me);
+                // A last-moment roll (the hit met it in its first 0.15 s, and it was not chained onto another roll) opens the attacker (combat depth, change 5).
+                if (DodgeTiming.IsPerfect(_loco.IsDodging, _loco.DodgeElapsed, _rollGap))
+                {
+                    CombatEvents.RaiseCue(CombatCue.Parry, me);
+                    PerfectDodgeServerRpc(e.NetworkObjectId, e.Serial);
+                }
                 return;   // a visible dodge is never hit
             }
             Vector3 toEnemy = e.transform.position - me;
             toEnemy.y = 0f;
             float bearing = toEnemy.sqrMagnitude > 1e-4f ? Mathf.DeltaAngle(transform.eulerAngles.y, MovementMath.YawDeg(toEnemy.x, toEnemy.z)) : 0f;
-            GuardOutcome g = GuardMath.Resolve(_guarding, Time.time - _guardStart, bearing, a.GuardBreak, a.Guardable);
+            GuardOutcome g = GuardMath.Resolve(_guarding, Time.time - _guardStart, bearing, a.GuardBreak, a.Guardable, _parryArmed);
             if (g == GuardOutcome.Parried)
             {
                 CombatEvents.RaiseCue(CombatCue.Parry, me);
@@ -574,6 +593,15 @@ namespace SleepingCalamity.Gameplay
             if (host == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
             Enemy e = obj.GetComponent<Enemy>();
             if (e != null) host.ServerEnemyHitsPlayer(this, e, serial, guarded);
+        }
+
+        [Rpc(SendTo.Server)]
+        private void PerfectDodgeServerRpc(ulong enemyNetId, int serial)
+        {
+            CombatHost host = CombatHost.Current;
+            if (host == null || !NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(enemyNetId, out NetworkObject obj)) return;
+            Enemy e = obj.GetComponent<Enemy>();
+            if (e != null) host.ServerPerfectDodge(this, e, serial);
         }
 
         [Rpc(SendTo.Server)]

@@ -22,8 +22,8 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var t1 = new EnemyModel(EnemyCatalog.Broom, 1, 1);
             var t2 = new EnemyModel(EnemyCatalog.Broom, 2, 1);
-            Assert.That(t1.MaxHp, Is.EqualTo(60));
-            Assert.That(t2.MaxHp, Is.EqualTo(180), "life x3");
+            Assert.That(t1.MaxHp, Is.EqualTo(160));
+            Assert.That(t2.MaxHp, Is.EqualTo(480), "life x3");
             Assert.That(t2.Atk, Is.EqualTo(15f * 1.0f).Within(1e-4f), "attack x1.0 (was x2.3: a x3.5 step from tier 1, retuned 2026-10-30)");
             Assert.That(t2.DefStat, Is.EqualTo(15f * 3.3f).Within(1e-4f), "defence x3.3");
         }
@@ -43,7 +43,8 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void StatsTable_MatchesSection66()
         {
-            Assert.That(new[] { EnemyCatalog.Slime.Hp, EnemyCatalog.RatKing.Hp, EnemyCatalog.Broom.Hp, EnemyCatalog.DoughWarden.Hp }, Is.EqualTo(new[] { 40, 90, 60, 600 }));
+            // Life roughly doubled for small enemies (combat depth, "fewer, tougher enemies"); the 6.6 table was 40 / 90 / 60 / 600.
+            Assert.That(new[] { EnemyCatalog.Slime.Hp, EnemyCatalog.RatKing.Hp, EnemyCatalog.Broom.Hp, EnemyCatalog.DoughWarden.Hp }, Is.EqualTo(new[] { 80, 180, 160, 600 }));
             Assert.That(new[] { EnemyCatalog.Slime.Atk, EnemyCatalog.RatKing.Atk, EnemyCatalog.Broom.Atk, EnemyCatalog.DoughWarden.Atk }, Is.EqualTo(new[] { 12f, 18f, 15f, 30f }));
             Assert.That(new[] { EnemyCatalog.Slime.Def, EnemyCatalog.RatKing.Def, EnemyCatalog.Broom.Def, EnemyCatalog.DoughWarden.Def }, Is.EqualTo(new[] { 5f, 10f, 15f, 20f }));
         }
@@ -54,8 +55,8 @@ namespace SleepingCalamity.Tests.EditMode
             var e = new EnemyModel(EnemyCatalog.Slime);
             EnemyHitResult r = e.ApplyHit(Hit(Axe(AttackSet.Hit1)));
             Assert.That(r.Damage, Is.EqualTo(21), "22 x 100/105 = 20.95");
-            Assert.That(e.Hp, Is.EqualTo(19));
-            Assert.That(r.Staggered, Is.True);
+            Assert.That(e.Hp, Is.EqualTo(59));
+            Assert.That(r.Staggered, Is.True, "axe poise 2 fills the slime's threshold of 2");
             Assert.That(r.Knockback, Is.GreaterThan(0f));
             Assert.That(r.Killed, Is.False);
         }
@@ -64,10 +65,10 @@ namespace SleepingCalamity.Tests.EditMode
         public void Overkill_ClampsDamageToTheLifeLeft_AndKills()
         {
             var e = new EnemyModel(EnemyCatalog.Slime);
-            e.ApplyHit(Hit(Axe(AttackSet.Hit1)));
-            EnemyHitResult r = e.ApplyHit(Hit(Axe(AttackSet.Hit2)));
+            e.ApplyHit(Hit(Axe(AttackSet.Hit1), atk: 60f));   // 60 x 100/105 = 57.1 -> 58, 22 left
+            EnemyHitResult r = e.ApplyHit(Hit(Axe(AttackSet.Hit2), atk: 60f));
             Assert.That(r.Killed, Is.True);
-            Assert.That(r.Damage, Is.EqualTo(19));
+            Assert.That(r.Damage, Is.EqualTo(22));
             Assert.That(e.Alive, Is.False);
             Assert.That(e.ApplyHit(Hit(Axe(AttackSet.Hit1))).Damage, Is.EqualTo(0), "a dead enemy takes nothing");
         }
