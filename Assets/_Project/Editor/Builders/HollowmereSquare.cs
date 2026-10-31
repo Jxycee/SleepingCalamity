@@ -116,6 +116,14 @@ namespace SleepingCalamity.EditorTools
             PlaceDrains(holder, data.drains, t, shelf);
         }
 
+        // Inside the square proper the bed sinks 2.5 cm so the square's paving slab (HollowmereBuilder's SquarePaving, top -0.02) shows in the joints like the approved
+        // corner's; it rises back to the shelf over the last 0.5 m before the square's edge, where the lane stubs have no slab and keep the bed at the setts.
+        static float BedSink(float x, float z)
+        {
+            float inside = Mathf.Min(Mathf.Min(x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - x), Mathf.Min(z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - z));
+            return -0.025f * Mathf.Clamp01(inside / 0.5f);
+        }
+
         // Copies each bed mesh with its vertices moved up by the drape (vertex -> holder space -> + correction -> back), saved as <folder>/SquareBed_Draped[_n].asset
         // (rewritten only when the vertices changed), and puts the copy on the instance's MeshFilter.
         static void DrapeBed(GameObject bedGo, Transform holder, string folder, float[] drop, Vector2 origin, float step, int nx, int nz)
@@ -130,7 +138,7 @@ namespace SleepingCalamity.EditorTools
                 for (int i = 0; i < v.Length; i++)
                 {
                     Vector3 p = m.MultiplyPoint3x4(v[i]);
-                    p.y += SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x, p.z);
+                    p.y += SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x, p.z) + BedSink(p.x, p.z);
                     v[i] = inv.MultiplyPoint3x4(p);
                 }
                 string path = folder + "/SquareBed_Draped" + (n == 0 ? "" : "_" + n) + ".asset"; n++;
