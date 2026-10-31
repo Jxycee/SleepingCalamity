@@ -2,8 +2,8 @@
 
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
-State: IN PROGRESS (terrain pass)
-Progress: 85%
+State: DONE (terrain pass merged)
+Progress: 100%
 Sheet: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 Map: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
 
@@ -20,6 +20,8 @@ Map: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
 | Terrain layers | grass and dirt (flat greybox tints; no B1 grass or soil tileable exists yet) and the B1 cobble under the lanes; the square keeps the corner's own surround paving as a slab |
 | Builder: terrace walls, cut and fill, keep-wall breakup, stairs | done |
 | Captures, both presets | done: `captures/` (HomeDoor, Fountain, TitheGate, LaneMouth, LakeShore, MarketStreet, KeepStairs, KeepWall, LowEast, Overview, Corner_Wide) |
-| `check`, merge | next |
+| `check`, merge | `SC RESULT check PASS` on 591df06 (build PASS; test-edit 591/591; test-play 32 passed, 8 skipped, 0 failed). Merged to main as `1e20cb2`; its tree is identical to 591df06 |
+
+**Not done (coordinator note, not blocking):** the bank face and the slope outside the ditch are still smooth (the LowEast view reads as three flat stripes); give them a little of the erosion noise in a follow-up. Grass and dirt stay flat tints until B1 grass and soil tileables exist.
 
 **Blockers:** none.
