@@ -3,6 +3,7 @@ Session: Wave 2: Square ground + dressing
 Progress: 100%
 Sheet: Reference/hollowmere/square/square_sheet_rebuilt.jpg (+ square_sheet_ruined.jpg, square_sheet_corner_check.jpg, props_sheet_r1.jpg)
 Blocker: none
+Archive: ready
 
 Score: coordinator 27/40 (round 1, approved); after the cheap fixes, self-score about 28/40.
 Tris: square ground 35,450 setts (LOD0 5.0M instanced, LODGroup to the 44-tri LOD1 beyond 10 m) + SquareBed 35k; props 614-6,000 each (table below).
