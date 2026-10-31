@@ -96,3 +96,11 @@ Round 1 plus two fix rounds (jamb gaps closed, patchy ochre, shell battlements, 
 | Kit (End, Buttress, Stair) | 28.5 | stair is hidden behind its own rail at low angles |
 | LowerGate (Frame, Shell) | 30 | silhouette 4.5, proportion 4, form 3.5, surface 3.5, colour 3.5, wear 3.5, set 4, metal 3.5 |
 | EastGate (Frame, Shell) | 30 | same lines; shell battlement fragment is a little tidy |
+
+## Unity placement notes (HollowmereTownWall, Core/Town/TownWallPlan)
+
+- The plan is `TownWallPlan.Plan` (Core, pure C#, seed 8081): each uncut stretch of `OffsetLine(28)` / `WallRun` starts and ends on a `Wall_End` (2 m of body behind the cut face; the second one mirrored), the 4 m modules fill the rest (stretch within +-10 percent; no whole count that fits leaves the remainder as a small gap at both ends), a stretch under 7.6 m gets no wall. A stretch that meets a gatehouse runs to the gate's side face instead of ending on a `Wall_End`, with a `Wall_Stair` on the module beside the gate.
+- Variants differ from the table above: Ruined has about 8 percent `Wall_Breach` and 15 percent `Wall_Crumbled` (stratified along the line, never first or last of a stretch, never touching); Rebuilt keeps the same positions and turns each breach into `Wall_Patched` (about 7 percent, not one in six) and each crumbled module into a plain A/B. No special breach at the lake shore yet.
+- Pivot Y is the highest ground along the centre line minus 0.1 m, as above. Buttresses: every 3 or 4 modules on straight modules where the ground falls at least 0.35 m across 6 m toward the outside (the corner rule is not needed: the line bends about 6 degrees per module). Stairs: every 40 to 60 m where the inside strip is level (0.3 m), plus one at each gate.
+- Colliders: a box per module, buttress and End; the stair uses its own mesh; `Wall_Breach` has none. Gatehouses: a box per pier, the passage stays open, `FOOTPRINT` is never a collider and `Part_Door` stays hidden (`ShowDoorLeaves`).
+- `TW_Walkway`'s 2.7 x tint is not applied (a plain colour cannot brighten); the stone tints above 1 are passed unclamped.

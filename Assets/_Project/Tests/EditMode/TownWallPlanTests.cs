@@ -66,7 +66,7 @@ namespace SleepingCalamity.Tests.EditMode
             List<WallSlot> mods = TownWallPlan.Plan(Pieces(t), (x, z) => 0f, false).Where(s => TownWallPlan.IsModule(s.Piece)).ToList();
             for (int r = 0; r < runs.Count; r++)
             {
-                float len = TownWallPlan.Length(runs[r]);
+                float len = TownWallPlan.Length(runs[r]) - 2f * TownWallPlan.EndLength;   // the Ends take 2 m at each cut
                 List<WallSlot> m = mods.Where(s => s.Run == r).OrderBy(s => s.Start).ToList();
                 if (len < TownWallPlan.ModuleLength * (1f - TownWallPlan.MaxStretch)) { Assert.AreEqual(0, m.Count, "run " + r + " too short for a module"); continue; }
                 Assert.That(m.Count, Is.GreaterThan(0), "run " + r);
@@ -105,8 +105,8 @@ namespace SleepingCalamity.Tests.EditMode
                 if (!hasModules) { Assert.AreEqual(0, ends.Count, "run " + r); continue; }
                 Assert.AreEqual(2, ends.Count, "run " + r + " ends");
                 TownPoint a = runs[r][0], b = runs[r][runs[r].Count - 1];
-                Assert.That(ends.Min(e => TownPoint.Distance(e.Centre, a)), Is.LessThanOrEqualTo(TownWallPlan.ModuleLength * 0.5f), "run " + r + " start jamb");
-                Assert.That(ends.Min(e => TownPoint.Distance(e.Centre, b)), Is.LessThanOrEqualTo(TownWallPlan.ModuleLength * 0.5f), "run " + r + " end jamb");
+                Assert.That(ends.Min(e => TownPoint.Distance(e.Centre, a)), Is.LessThanOrEqualTo(0.01f), "run " + r + " start jamb on the cut face");
+                Assert.That(ends.Min(e => TownPoint.Distance(e.Centre, b)), Is.LessThanOrEqualTo(0.01f), "run " + r + " end jamb on the cut face");
             }
             Assert.That(plan.Count(s => s.Piece == WallPiece.End), Is.GreaterThanOrEqualTo(2));
         }
@@ -125,6 +125,24 @@ namespace SleepingCalamity.Tests.EditMode
             var stairs = plan.Where(s => s.Piece == WallPiece.Stair).OrderBy(s => s.Index).ToList();
             for (int i = 1; i < stairs.Count; i++)
                 if (stairs[i].Run == stairs[i - 1].Run) Assert.That(stairs[i].Start - stairs[i - 1].Start, Is.GreaterThanOrEqualTo(TownWallPlan.StairMin - 4.5f), "stairs " + i);
+        }
+
+        [Test]
+        public void Gates_RunsReachTheGateFace_NoEndThere_StairBesideIt()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var pieces = Pieces(t);
+            List<TownWallPlan.WallGate> gates = TownWallPlan.Gates(t);
+            Assert.AreEqual(2, gates.Count);
+            List<WallSlot> plain = TownWallPlan.Plan(pieces, (x, z) => 0f, false), withGates = TownWallPlan.Plan(pieces, (x, z) => 0f, false, gates);
+            Assert.Less(withGates.Count(s => s.Piece == WallPiece.End), plain.Count(s => s.Piece == WallPiece.End), "a run that meets a gate has no End there");
+            Assert.GreaterOrEqual(withGates.Count(s => s.Piece == WallPiece.Stair), plain.Count(s => s.Piece == WallPiece.Stair) + 2, "a stair beside each gate");
+            foreach (TownWallPlan.WallGate g in gates)
+            {
+                WallSlot nearest = withGates.Where(s => TownWallPlan.IsModule(s.Piece)).OrderBy(s => TownPoint.Distance(s.Centre, g.Centre)).First();
+                float x = System.Math.Abs((nearest.Centre.X - g.Centre.X) * g.Axis.X + (nearest.Centre.Z - g.Centre.Z) * g.Axis.Z);
+                Assert.That(x, Is.InRange(g.HalfWidth, g.HalfWidth + 4.5f), g.Name + ": first module just outside the block");
+            }
         }
 
         [Test]

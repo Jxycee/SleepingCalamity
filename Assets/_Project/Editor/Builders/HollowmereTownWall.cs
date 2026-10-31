@@ -5,10 +5,10 @@
 // Blender -Y = Unity local +Z (exported -Z forward / Y up, like the B4 facade). The plan (which piece where, stretch, ends, buttresses, stairs) is
 // Core/Town/TownWallPlan; this file only places it: each module at HollowmereLayout.Ground under its centre, yawed to the run, stretched along X.
 // Gatehouse frame: pivot at the passage centre at ground, passage axis along Blender Y, outside at -Y (= local +Z). Centred between the two piers, yaw from
-// the pier line (TownWallPlan.GatePlacement), at the piers' height. Ruined shows Shell; Rebuilt shows Frame + Part_Door. When the gatehouse FBX carries the
+// the pier line (TownWallPlan.GatePlacement), at the piers' height. Ruined shows Shell; Rebuilt shows Frame (Part_Door stays hidden: ShowDoorLeaves). When the gatehouse FBX carries the
 // piers (GatePiersIncluded), the pier greyboxes are not built. The child names are constants below: the exact layout is provisional until the art lands.
 // Without the art every entry point returns false and HollowmereBuilder keeps today's greybox (box wall pieces and box piers).
-// Materials: the B4 facade slots (FK_*, BeautyCornerArt.BuildFacadeMaterials) plus the TW_* table (PLACEHOLDER until SOURCES.md lists the real slots).
+// Materials: the B4 facade slots (FK_*, BeautyCornerArt.BuildFacadeMaterials) plus the TW_* table (SOURCES.md slots table: shared sandstone / oak tileables, tint, normal scale).
 // Unknown slots log a warning and take a plain stone material; nothing throws.
 // Authority: none (editor-time scene building).
 using System.Collections.Generic;
@@ -27,10 +27,11 @@ namespace SleepingCalamity.EditorTools
         const string WearShaderName = "SleepingCalamity/WearLit";
 
         // --- art contract constants (change here when the export differs) ---
-        public const float ModuleArtYaw = 0f;     // extra yaw on a module: 0 when the FBX's +Z is the outside; check on a test placement
+        public const float ModuleArtYaw = 0f;     // extra yaw on a module: the FBX's local +Z is the outside (checked in the Q8 captures)
         public const float GateArtYaw = 0f;
-        public const bool EndClosesPlusX = true;  // Wall_End closes its local +X end (the wall body runs toward -X); mirrored (scale.x -1) at the other end
+        public const bool EndClosesPlusX = true;  // Wall_End: pivot on the cut face at x 0, the body runs to -X; mirrored (scale.x -1) at the other side of an opening
         public const bool GatePiersIncluded = true;
+        public const bool ShowDoorLeaves = false;   // Part_Door stays off: the gates are open passages (the leaves would close the arch with no collider behind them)
         public const string GateShell = "Shell", GateFrame = "Frame", GateDoor = "Part_Door", GateSocketDoor = "SOCKET_Door", GateFootprint = "FOOTPRINT";
 
         public static string FileFor(WallPiece p)
@@ -55,14 +56,17 @@ namespace SleepingCalamity.EditorTools
         }
         public static readonly GateDef[] Gates = { new GateDef("LowerGate", "LowerGate_W", "LowerGate_E"), new GateDef("EastGate", "EastGate_N", "EastGate_S") };
 
-        // PLACEHOLDER: the TW_* slots of the wall kit. The real names, sources and tints come from Art/Town/Wall/SOURCES.md once the art agent lists them.
-        static readonly (string Slot, string Source, Color Tint)[] TwSlots =
+        // The TW_* slots (Art/Town/Wall/SOURCES.md, slots table): shared B1 tileable, linear tint, normal scale. TW_Walkway's brightening tint is dropped (see BuildMaterials).
+        static readonly (string Slot, string Source, Color Tint, float Bump)[] TwSlots =
         {
-            ("TW_Stone", "sandstone", Color.white),
-            ("TW_StoneDark", "sandstone", new Color(0.62f, 0.58f, 0.52f)),
-            ("TW_Mortar", "sandstone", new Color(0.30f, 0.28f, 0.24f)),
-            ("TW_Oak", "oak_timber", Color.white),
-            ("TW_Iron", "iron", Color.white),
+            ("TW_Rubble", "sandstone", new Color(0.64f, 0.61f, 0.57f), 1.4f),
+            ("TW_RubbleOchre", "sandstone", new Color(1.00f, 0.89f, 0.73f), 1.4f),
+            ("TW_Coping", "sandstone", new Color(1.14f, 1.09f, 1.00f), 0.9f),
+            ("TW_Patch", "sandstone", new Color(1.30f, 1.16f, 0.94f), 1.0f),
+            ("TW_Footing", "sandstone", new Color(0.46f, 0.43f, 0.39f), 1.2f),
+            ("TW_Joint", "sandstone", new Color(0.66f, 0.61f, 0.54f), 1.0f),
+            ("TW_Crack", "sandstone", new Color(0.10f, 0.09f, 0.08f), 0.6f),
+            ("TW_Walkway", "oak_timber", new Color(2.70f, 2.50f, 2.30f), 1.2f),
         };
 
         static string PiecePath(string name) => Folder + "/" + name + "/" + name + ".fbx";
@@ -80,7 +84,12 @@ namespace SleepingCalamity.EditorTools
                 Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + s.Slot + ".mat", wear);
                 m.CopyPropertiesFromMaterial(src);
                 foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
-                m.SetColor("_BaseColor", new Color(Mathf.Clamp01(s.Tint.r), Mathf.Clamp01(s.Tint.g), Mathf.Clamp01(s.Tint.b), 1f).gamma);
+                // The tint multiplies in linear space, so SetColor gets the gamma value (unclamped: coping and patch stone are brighter than the tileable).
+                // TW_Walkway's 2.7 x would be absurd as a plain colour, so it stays untinted (like FK_OakDoor).
+                Color c = s.Tint.r > 1.5f ? Color.white : new Color(Mathf.LinearToGammaSpace(s.Tint.r), Mathf.LinearToGammaSpace(s.Tint.g), Mathf.LinearToGammaSpace(s.Tint.b), 1f);
+                m.SetColor("_BaseColor", c);
+                m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
+                m.SetFloat("_BumpScale", s.Bump);
                 EditorUtility.SetDirty(m);
                 map[s.Slot] = m;
             }
@@ -143,11 +152,13 @@ namespace SleepingCalamity.EditorTools
                 cache[p] = g;
                 return g;
             }
+            // Runs meet a gatehouse's side face only where its art is in (else the greybox piers stand and the run ends on a Wall_End).
+            List<TownWallPlan.WallGate> gates = TownWallPlan.Gates(t).FindAll(g => Exists(g.Name));
             var tally = new List<string>();
             foreach (bool isRebuilt in new[] { false, true })
             {
                 Transform parent = ChildGroup(isRebuilt ? rebuilt : ruined, "TownWall");
-                List<WallSlot> plan = TownWallPlan.Plan(run, (x, z) => HollowmereLayout.Ground(t, x, z), isRebuilt);
+                List<WallSlot> plan = TownWallPlan.Plan(run, (x, z) => HollowmereLayout.Ground(t, x, z), isRebuilt, gates);
                 int placed = 0;
                 foreach (WallSlot s in plan)
                 {
@@ -155,24 +166,55 @@ namespace SleepingCalamity.EditorTools
                     if (prefab == null) continue;
                     var obj = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
                     obj.name = (s.Piece == WallPiece.End ? "End" : "M" + s.Index.ToString("000")) + "_" + s.Piece;
-                    float y = HollowmereLayout.Ground(t, s.Centre.X, s.Centre.Z);
-                    obj.transform.position = new Vector3(s.Centre.X, y, s.Centre.Z);
+                    // Pivot Y: the highest ground under the piece's centre line minus 0.1 m; the 1.5 m footing covers the fall on the low side.
+                    float y = float.MinValue;
+                    TownPoint along = s.Piece == WallPiece.End ? s.Close * -1f : s.Chord;   // an End's body runs away from the opening, 2 m
+                    float reach = s.Piece == WallPiece.End ? TownWallPlan.EndLength : s.Reach;
+                    for (int k = 0; k <= 4; k++)
+                    {
+                        float f = s.Piece == WallPiece.End ? reach * k / 4f : reach * (-1f + k / 2f);
+                        y = Mathf.Max(y, HollowmereLayout.Ground(t, s.Centre.X + along.X * f, s.Centre.Z + along.Z * f));
+                    }
+                    obj.transform.position = new Vector3(s.Centre.X, y - 0.1f, s.Centre.Z);
                     obj.transform.rotation = Quaternion.Euler(0f, s.Yaw + ModuleArtYaw, 0f);
-                    float sx = TownWallPlan.IsModule(s.Piece) || s.Piece == WallPiece.Buttress || s.Piece == WallPiece.Stair ? s.Stretch : 1f;
+                    float sx = s.Piece == WallPiece.Buttress ? 1f : s.Piece == WallPiece.End ? 1f : s.Stretch;
                     if (s.Piece == WallPiece.End)
                     {
                         TownPoint ex = new TownPoint(Mathf.Cos(s.Yaw * Mathf.Deg2Rad), -Mathf.Sin(s.Yaw * Mathf.Deg2Rad));   // module-local +X in the ground plane
                         float d = ex.X * s.Close.X + ex.Z * s.Close.Z;
-                        sx = (d >= 0f) == EndClosesPlusX ? 1f : -1f;
+                        sx = (d >= 0f) == EndClosesPlusX ? 1f : -1f;   // the body must run away from the opening
                     }
+                    else if (s.Piece == WallPiece.Stair && s.Mirror) sx = -sx;
                     obj.transform.localScale = new Vector3(sx, 1f, 1f);
+                    AddColliders(obj, s.Piece);
                     ApplyMaterials(obj, slots, obj.name);
                     placed++;
                 }
-                tally.Add((isRebuilt ? "Rebuilt " : "Ruined ") + placed);
+                tally.Add((isRebuilt ? "Rebuilt " : "Ruined ") + placed + " [" + string.Join(" ", plan.GroupBy(x => x.Piece).OrderBy(g => g.Key).Select(g => g.Key + "=" + g.Count())) + "]");
             }
             Debug.Log("SC HOLLOWMERE town wall art placed: " + string.Join(", ", tally));
             return true;
+        }
+
+        // Module frame in Unity (Blender x -> x, z -> y, outside -Y -> +Z): boxes from SOURCES.md. Wall_Breach has none (a gap with rubble the player can climb);
+        // the stair uses its own mesh (a box would wall off the steps).
+        static void AddColliders(GameObject obj, WallPiece piece)
+        {
+            switch (piece)
+            {
+                case WallPiece.StraightA: case WallPiece.StraightB: case WallPiece.Patched: Box(obj, new Vector3(0f, 0.95f, 0f), new Vector3(4f, 4.9f, 1.3f)); break;
+                case WallPiece.Crumbled: Box(obj, new Vector3(0f, 0.6f, 0f), new Vector3(4f, 4.2f, 1.4f)); break;
+                case WallPiece.Buttress: Box(obj, new Vector3(0f, 0.655f, 1.13f), new Vector3(1.3f, 4.37f, 1.6f)); break;
+                case WallPiece.End: Box(obj, new Vector3(-1.07f, 0.95f, 0f), new Vector3(2.27f, 4.9f, 1.7f)); break;
+                case WallPiece.Stair:
+                    foreach (MeshFilter mf in obj.GetComponentsInChildren<MeshFilter>(true)) if (mf.sharedMesh != null) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                    break;
+            }
+        }
+
+        static void Box(GameObject go, Vector3 centre, Vector3 size)
+        {
+            var b = go.AddComponent<BoxCollider>(); b.center = centre; b.size = size;
         }
 
         static Transform ChildGroup(Transform parent, string name)
@@ -209,7 +251,8 @@ namespace SleepingCalamity.EditorTools
             TownWallPlan.GatePlacement(a.Footprint.Centre, b.Footprint.Centre, out TownPoint centre, out float yaw, out _);
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(fbx, landmarks);
             obj.name = def.Name;
-            obj.transform.localPosition = new Vector3(centre.X, (a.Y + b.Y) * 0.5f, centre.Z);
+            float gy = HollowmereLayout.Ground(t, centre.X, centre.Z);   // the ground (lane surface) through the passage
+            obj.transform.localPosition = new Vector3(centre.X, gy, centre.Z);
             obj.transform.localRotation = Quaternion.Euler(0f, yaw + GateArtYaw, 0f);
             PrefabUtility.UnpackPrefabInstance(obj, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             Transform shell = obj.transform.Find(GateShell), frame = obj.transform.Find(GateFrame), door = obj.transform.Find(GateDoor);
@@ -218,12 +261,20 @@ namespace SleepingCalamity.EditorTools
             {
                 if (shell != null) shell.gameObject.SetActive(!rebuilt);
                 if (frame != null) frame.gameObject.SetActive(rebuilt);
-                if (door != null) door.gameObject.SetActive(rebuilt);
+                if (door != null) door.gameObject.SetActive(rebuilt && ShowDoorLeaves);
             }
             Transform fp = obj.transform.Find(GateFootprint);
-            if (fp != null) { var r = fp.GetComponent<MeshRenderer>(); if (r != null) r.enabled = false; }
+            if (fp != null) { var r = fp.GetComponent<MeshRenderer>(); if (r != null) r.enabled = false; }   // the footprint is never a collider: it would close the passage
+            // Colliders: one box per pier, the passage between them stays open (SOURCES: clear half widths and block depths).
+            var (halfPassage, depth) = def.Name == "LowerGate" ? (2.1f, 4.4f) : (2.02f, 4.6f);
+            float halfWidth = TownWallPlan.GateDefs.First(d => d.Name == def.Name).HalfWidth, mid = (halfPassage + halfWidth) * 0.5f;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var pierBox = new GameObject("Collider_Pier" + (side < 0f ? "W" : "E")); pierBox.transform.SetParent(obj.transform, false);
+                Box(pierBox, new Vector3(side * mid, 2.95f, 0f), new Vector3(halfWidth - halfPassage, 5.9f, depth));
+            }
             ApplyMaterials(obj, BuildMaterials(), def.Name);
-            Debug.Log("SC HOLLOWMERE gate " + def.Name + " placed " + (rebuilt ? "Rebuilt" : "Ruined") + " centre=" + centre + " yaw=" + yaw.ToString("0.0"));
+            Debug.Log("SC HOLLOWMERE gate " + def.Name + " placed " + (rebuilt ? "Rebuilt" : "Ruined") + " centre=" + centre + " yaw=" + yaw.ToString("0.0") + " groundY=" + gy.ToString("0.00") + " pierY=" + ((a.Y + b.Y) * 0.5f).ToString("0.00"));
             return true;
         }
     }
