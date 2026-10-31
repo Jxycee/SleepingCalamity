@@ -205,3 +205,100 @@ and defence x3.3 are unchanged. Waves 1-4 keep their rosters and cooldowns.
 editor). The simulator delays each packet at the send and the receive stage of both peers, so a per-packet 37 ms gives about 148 ms RTT (75 ms gave 300). For
 the manual walk: add a NetworkSimulator component to the App object, pick "37 ms, 2% loss" (custom preset), and play the two-player arena; hits on the attacker's
 screen must play instantly (spark, hitstop, sound) and the damage number must follow within about one round trip.
+
+## Proposal: enemies that answer the mash (combat depth, 2026-10-30, awaiting the user's approval)
+User verdict after the enemy-polish retest: "It mostly feels like mindless button mashing right now." Chosen directions: research how other games do it,
+enemies punish mashing, fewer and tougher enemies. Research: `docs/research/combat-depth.md` (ranked mechanics and their costs).
+
+**Why it mashes:** `EnemyModel.ApplyHit` flinches every non-elite on every hit and a flinch cancels its attack, so pressing attack during a wind-up is
+always safe and the body tells we just built never get to land. Small enemies die inside one or two chains (a rat-king takes ~80 from one axe combo).
+The dagger's parry restarts on every RMB press. Nothing pays more for hitting at the right moment.
+
+**The idea in one line:** an enemy keeps acting while it is hit; the player earns the moments when it cannot (openings) by reading its tells, and is paid
+extra for hitting then. Every number below is a P9 Placeholder and lives in data (`AttackData`, `EnemyDefinition`, `ArenaWaves`, `AttackPacing`).
+
+### Change 1: poise (DC2's stagger accumulator) and steadiness
+Each hero attack carries a **poise** value; each enemy a **poise threshold**. Hits add poise; the count clears **1.0 s** after the last hit (DC2: 60 steps).
+The enemy flinches only when the count reaches its threshold, then is **steady for 2.0 s** after the flinch ends (no second flinch: one flinch per exchange,
+so poise-break loops cannot stunlock). Threshold x (1 + 0.5 per extra player), the same rule as the revenge cap, so four heroes do not re-stunlock it.
+
+| Attack poise | Hit 1 / 2 | Finisher | Charge | Special | Air 1-2 / finisher |
+|---|---|---|---|---|---|
+| Axe | 2 / 2 | 5 | 6 | - | 2 / 5 |
+| Staff | 1 / 1 | 3 | 4 | spell 4 | 1 / 3 |
+| Dagger | 0.5 / 0.5 | 2 | 3 | (parry opens) | 0.5 / 2 |
+| Bow and sword | 1 / 1 | 3 | 4 | shot 2 | 1 / 3 |
+
+| Enemy | Threshold (solo) | Notes |
+|---|---|---|
+| Slime | 2 | fodder: two light hits flinch it |
+| Rat-king | 4 | an axe pair, a staff or sword finisher, or two dagger chains |
+| Broom | 5 | blocked front hits add **0** poise (flank it or break its guard) |
+| Dough Warden | armoured (unchanged) | keeps revenge, parts, the quake |
+
+### Change 2: committed attacks trade (hyper armour from the glint)
+From an enemy attack's **glint to the end of its hitbox**, hits deal damage but never flinch it, whatever its poise (KH and DMC armour windows; the Warden
+already works this way). Before the glint (anticipation and hold) a poise break still interrupts the attack. So: hit it early while it winds up, or get out
+and punish after; swinging blind into the glint means you take the hit. Every client already runs the tell clock, so the attacker's own screen can show
+a "clank" (dull metal spark, no squash) at contact with no extra replication.
+
+### Change 3: openings pay x1.5
+An enemy is **open** during: its recovery after a strike (the 30+ frame punish window the tell rules already guarantee), a parry stun (1.1 s), a poise
+flinch, a guard break (change 4) and a perfect-dodge opening (change 5). Hits on an open enemy deal **x1.5** (a named `Other` factor), add **double
+poise**, and play a bright "opening" spark and sound so the player learns the rhythm. **Rage counts only hits outside openings** (7 chip hits -> rage,
+unchanged numbers), so mashing makes the enemy angrier while good play never does. ABS: an opening hit adds a small tech bonus (`CombatRewards`).
+
+### Change 4: the broom guards and ripostes
+The broom's bristle front (80% blocked) gets a visible guard response: each blocked front hit makes it brace (a short lean-in and a wooden clack). **Three
+blocked hits within 2.0 s** start a new attack, the **bristle riposte** (cone 2.0 m, half angle 50, x1.0, knockback 2): wind-up 27 frames, glint 12 before
+the hitbox (inside the tell rules, no exemption), taken with `ForceAcquire` like the Warden's break-free. A guard-break hit (axe finisher or charge) on its
+front **breaks the guard**: a 1.2 s flinch that counts as an opening. Appended after `WardenQuake` in `AllEnemyAttacks` (replicated indexes unchanged).
+
+### Change 5: perfect dodge and an honest parry
+- **Perfect dodge:** a roll is perfect when an enemy hitbox it dodged opened within the first **0.15 s** of the roll (the roll stays safe for 0.4 s; the
+  perfect part is the first third), and only if the previous roll ended at least **0.3 s** earlier (chained rolls never count). Reward: that enemy is **open
+  for 1.0 s** (stuck in a stumble), a chime, and an ABS tech pop. Judged by the victim's client like the parry, reported by one new ServerRpc; the host
+  re-checks only that the enemy is performing that attack serial (the same grace rule as `ServerParry`). No slow time (cannot be shared in co-op).
+- **Parry lockout:** the guard's 6-frame parry only counts if the guard was down for at least **0.5 s** before it was raised; a quicker re-raise still
+  guards (x0.2) but cannot parry. Tapping RMB no longer parries.
+
+### Change 6: fewer, tougher enemies; one duel at a time
+OoT's rule (Iwata Asks): the others wait while you fight one. Target: a rat-king takes about **three openings** with the axe (an axe pair in a 0.8 s opening
+deals about 63; the dagger's full chain about 55), a slime two, a broom three. So small-enemy life roughly doubles: **slime 40 -> 80, rat-king 90 -> 180,
+broom 60 -> 160**, Warden 600 unchanged (it loses most of its escorts). Tier 1 allows **1 attack token per hero** (one duel; the other enemy circles and
+waits), tier 2 keeps 2.
+
+| Wave | Old | New |
+|---|---|---|
+| 1 | 2 slimes | 2 slimes (onboarding: they flinch easily) |
+| 2 | 3 slimes, 1 rat-king | 1 rat-king, 1 slime |
+| 3 | 2 brooms, 2 rat-kings | 1 broom, 1 rat-king |
+| 4 | Warden, 2 slimes | Warden alone |
+| 5-8 (tier 2) | 4-5 mixed | 3 mixed (rat-king, broom, slime / 2 rat-kings, broom / 2 brooms, slime / Warden, rat-king) |
+
+Co-op still adds one enemy per extra player.
+
+### How each heirloom opens each enemy (the weapon-choice reward)
+| | Slime | Rat-king | Broom | Warden |
+|---|---|---|---|---|
+| Axe | flinches on hit 1 | the pair flinches it before its glint | finisher or charge breaks the guard | breaks the arm fast; slow to dodge with |
+| Staff | sweeps two at once | spell (poise 4) flinches it in one | wide sweep reaches round the flank | spell on the crown |
+| Dagger | fast chain | low poise: parry or perfect dodge is the opening | parry the riposte | parries stun it (armour does not stop a parry) |
+| Bow and sword | shot from range | shot (2) + cut (1) + cut (1) flinches it | shoot it from the flank | the crown from range |
+
+### Networking and authority (needs `risk-reviewer`)
+- Host: poise, steadiness, openings, the broom's guard count and its riposte, the perfect-dodge check. Owner (victim): perfect-dodge and parry judgement.
+- **New replicated state:** one `NetworkVariable<byte>` of flags on `Enemy` (steady, open, braced) for the visuals. **New RPC:** the perfect-dodge report.
+  **New attack:** the riposte, appended last.
+- **The attacker's screen must not lie:** today the contact squash and shove play on the attacker's client before the host decides. Under poise the full
+  flinch comes only from the host's replicated `Stagger` phase; at contact the client plays a small hit reaction (squash 8%, no shove), or the clank when
+  the replicated tell clock says the enemy is committed.
+
+### Playtest questions (yes or no after the next arena session)
+1. If you mash attack at a rat-king or broom, do you get hit (it trades or ripostes)?
+2. Can you see when an enemy is open (the spark and sound), and does hitting then feel clearly better than hitting any time?
+3. Does hitting a rat-king before its glint interrupt it, and is hitting after the glint clearly a mistake you could have avoided?
+4. Does a perfect dodge feel earned (late roll), never by rolling repeatedly?
+5. Does each fight in waves 2-4 feel like a short duel (two to four exchanges per enemy), not a swarm, and not a slog?
+6. Does each heirloom open enemies its own way (axe guard break, dagger parry, bow from range, staff spell)?
+7. Does tapping RMB stop parrying, while a deliberate raise still parries?
