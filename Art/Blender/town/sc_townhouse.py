@@ -68,6 +68,10 @@ VARIANTS = {'Townhouse_A': 0x7A11, 'Townhouse_B': 0x7B22, 'Townhouse_C': 0x7C33}
 # palettes (linear plaster tint multiplier, shutter/door paint hex) - PHASE1 3.1 warm muted storybook range
 PLASTER = [(1.0, 0.93, 0.82), (1.0, 0.88, 0.80), (0.95, 0.96, 0.97), (1.0, 0.95, 0.86), (1.0, 0.84, 0.70)]
 PAINT = ['#4a6a48', '#6a2e29', '#64807a', '#9c7f4c', '#3e5670', '#7a4a5c']
+COMBOS = [((0.95, 0.96, 0.97), '#3e5670'),   # cool lime white, slate blue
+          ((1.0, 0.93, 0.82), '#7a4a5c'),    # warm cream, plum
+          ((1.0, 0.78, 0.58), '#4a6a48'),    # ochre wash, sage-forest green
+          ((1.0, 0.88, 0.80), '#6a2e29')]    # faint rose, oxblood
 
 def cfg(name):
     R = random.Random(VARIANTS[name])
@@ -77,12 +81,12 @@ def cfg(name):
     depth = round(min(6.0, 6.85 - 2 * jetty - R.uniform(0.0, 0.25)), 2)   # roof verges stay inside the 8 m foundation
     walls = [round(R.uniform(2.05, 2.3), 2), round(R.uniform(1.95, 2.15), 2)]
     pitch = R.uniform(52, 60)
-    plaster = PLASTER[(idx * 2 + R.randrange(2)) % len(PLASTER)]
-    paint = PAINT[(idx * 2 + R.randrange(2)) % len(PAINT)]
+    combo = COMBOS[(idx + R.randrange(len(COMBOS))) % len(COMBOS)] if idx >= len(COMBOS) else COMBOS[idx]
+    plaster, paint = combo   # the three named variants each get their own pair, distinct from the B4 neighbours' (square variety)
     return dict(width=width, depth=depth, jetty=jetty, walls=walls, pitch=pitch, plaster=plaster, paint=fk._lin(paint),
-                paint_hex=paint, lean=(R.choice((-1, 1)) * R.uniform(0.008, 0.016), R.uniform(0.010, 0.022)),
+                paint_hex=paint, lean=(R.choice((-1, 1)) * R.uniform(0.014, 0.022), R.uniform(0.028, 0.040)),   # round 2: the storybook lean has to read at mid distance
                 chimney=(R.uniform(-0.25, 0.3), R.choice((-1, 1))), flowerbox=R.random() < 0.8 or idx == 0,
-                wear=R.uniform(0.85, 1.15), seed=VARIANTS[name], door_side=R.choice((-1, 1)))
+                wear=R.uniform(1.15, 1.4), seed=VARIANTS[name], door_side=R.choice((-1, 1)))
 
 # ----------------------------------------------------------------------------- helpers
 def xf_side(side):
@@ -367,6 +371,7 @@ def build_house(name):
     yc2 = (YU + D) / 2
     save = (fk.W, fk.YU, fk.DEPTH)
     fk.W, fk.YU, fk.DEPTH = (D - YU) / 2, -W, W
+    fk.OVER_EAVE = 1.0   # round 2: a heavier cap over the narrow walls (eaves stay inside the 8 m foundation)
     fk.EAVE_Z = fk.roof_surface(0, 0).z
     roof = fk.kit_roof()
     mirror_roof(roof)
@@ -519,12 +524,12 @@ def build_house_collect(name):
     return c, pieces, decals, st
 
 # ----------------------------------------------------------------------------- review renders
-VIEWS = {
-    'fl': (Vector((-9.5, -13.0, 3.4)), Vector((0, 0, 4.8)), 46),
-    'fr': (Vector((9.5, -13.0, 3.4)), Vector((0, 0, 4.8)), 46),
-    'bl': (Vector((-9.5, 13.0, 3.4)), Vector((0, 0, 4.8)), 46),
-    'br': (Vector((9.5, 13.0, 3.4)), Vector((0, 0, 4.8)), 46),
-    'front': (Vector((0, -16.0, 2.4)), Vector((0, 0, 5.0)), 46),
+VIEWS = {   # the four three-quarter corners (four turns: every side is seen), at the square's mid distance
+    'fl': (Vector((-10.5, -14.5, 3.6)), Vector((0, 0, 5.6)), 50),
+    'fr': (Vector((10.5, -14.5, 3.6)), Vector((0, 0, 5.6)), 50),
+    'bl': (Vector((-10.5, 14.5, 3.6)), Vector((0, 0, 5.6)), 50),
+    'br': (Vector((10.5, 14.5, 3.6)), Vector((0, 0, 5.6)), 50),
+    'front': (Vector((0, -17.0, 2.4)), Vector((0, 0, 5.6)), 50),
 }
 
 def render(name, views, suffix=''):

@@ -315,12 +315,13 @@ namespace SleepingCalamity.Core
         };
 
         // ------------------------------------------------------------------------------------------------ the rebuilt preset (ring 1 assignment; rings 2-3 homes)
-        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden }
+        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Townhouse }
         static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing1 =
         {
             ("F01", BuildingKind.ApprovedFacade), ("F02", BuildingKind.Bakery), ("F09", BuildingKind.Inn),
-            ("F04", BuildingKind.Home), ("F05", BuildingKind.Home), ("F07", BuildingKind.Home), ("F08", BuildingKind.Home),
-            ("F03", BuildingKind.Empty), ("F06", BuildingKind.Empty), ("F10", BuildingKind.Empty),
+            ("F04", BuildingKind.Home), ("F05", BuildingKind.Home), ("F08", BuildingKind.Home),
+            ("F06", BuildingKind.Townhouse), ("F07", BuildingKind.Townhouse),   // kit family 3 (sc_townhouse.py): the pair on the south side, both facing the fountain
+            ("F03", BuildingKind.Empty), ("F10", BuildingKind.Empty),
         };
         static readonly string[] RebuiltGardens = { "R2_07", "R2_18", "R2_22", "R3_02" };   // left as allotments in the rebuilt massing
 

@@ -311,6 +311,9 @@ namespace SleepingCalamity.EditorTools
                 case HollowmereLayout.BuildingKind.Garden:
                     Garden(g, f);
                     break;
+                case HollowmereLayout.BuildingKind.Townhouse:   // kit family 3 art (HollowmereTownhouse); greybox home if the FBX is missing
+                    if (!HollowmereTownhouse.Place(g, f)) Building(g, f, HollowmereLayout.BuildingKind.Home);
+                    break;
                 default:
                     Building(g, f, kind);
                     break;
