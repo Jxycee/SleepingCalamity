@@ -17,6 +17,8 @@ namespace SleepingCalamity.EditorTools
     public static class BeautyCornerArt
     {
         public const string ArtRoot = "Assets/_Project/Content/Art/Town";
+        public const int TextureCap = 2048;   // user rule 2026-10-30: the game targets 1440p, so no corner or lantern texture is imported above 2048 px
+        static readonly string[] CapFolders = { "Assets/_Project/Content/Art", "Assets/_Project/Content/Textures/BeautyCorner" };
         const string DerivedRoot = "Assets/_Project/Content/Textures/BeautyCorner";
         const string MaterialsFolder = "Assets/_Project/Content/Materials/BeautyCorner";
 
@@ -104,12 +106,43 @@ namespace SleepingCalamity.EditorTools
         public static string FirstFbx(string folder) =>
             AssetDatabase.FindAssets("t:Model", new[] { folder }).Select(AssetDatabase.GUIDToAssetPath).Where(p => p.ToLowerInvariant().EndsWith(".fbx")).OrderBy(p => p).FirstOrDefault();
 
+        // Sets the max import size of every texture under Content/Art and the derived BeautyCorner maps to TextureCap (only writes an importer that differs).
+        public static void EnforceTextureCap()
+        {
+            int changed = 0;
+            foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", CapFolders.Where(AssetDatabase.IsValidFolder).ToArray()))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var ti = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (ti == null || ti.maxTextureSize <= TextureCap) continue;
+                ti.maxTextureSize = TextureCap; ti.SaveAndReimport(); changed++;
+            }
+            Debug.Log("SC BEAUTY texture cap " + TextureCap + ": lowered " + changed + " importers");
+        }
+
+        // The ground under and around the cobble patch: B6's 2 m FarCobble tileable (UV metres / 2) with a low-frequency macro breakup so the repeat does not show:
+        // a tileable grey noise (SurroundMacro.png, neutral 0.5) in URP Lit's detail-albedo slot (x2 mode), tiled once per MacroMetres. Null when the tileable is missing.
+        public const float MacroMetres = 23f, FarTileMetres = 2f;
+        public static Material SurroundGround()
+        {
+            string folder = FindFolder("B6", "FarCobble");
+            if (folder == null) return null;
+            Material m = MaterialFromSet(folder, "CobbleFar", "SurroundGround");
+            string macroPath = "Assets/_Project/Content/Textures/BeautyCorner/Surround/SurroundMacro.png";
+            var macro = AssetDatabase.LoadAssetAtPath<Texture2D>(macroPath);
+            if (macro == null) return m;
+            m.SetTexture("_DetailAlbedoMap", macro); m.SetFloat("_DetailAlbedoMapScale", 1f); m.EnableKeyword("_DETAIL_MULX2");
+            m.SetTextureScale("_DetailAlbedoMap", Vector2.one * (FarTileMetres / MacroMetres));   // detail uv = base uv (1 per 2 m) x this
+            EditorUtility.SetDirty(m); AssetDatabase.SaveAssetIfDirty(m);
+            return m;
+        }
+
         // The cellar lantern (B11) is only imported and given a material for now, it is not placed in the town corner.
         public static void EnsureCellarLantern()
         {
             const string folder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
             if (!AssetDatabase.IsValidFolder(folder)) return;
-            if (LoadModel(folder, "CellarLantern.fbx") == null) return;
+            if (LoadModel(folder, "CellarLantern.fbx") == null) return;   // textures: MaterialFromSet caps them at TextureCap
             MaterialFromSet(folder, "CellarLantern", "CellarLantern", emission: "_Emission.png");
         }
 
@@ -146,6 +179,36 @@ namespace SleepingCalamity.EditorTools
         // ---- the facade's multi-material setup (B4: shared B1 tileables + B3 decals, wear in the vertex colour) ----
         const string WearShaderName = "SleepingCalamity/WearLit";
         // slot name in Facade.fbx -> LookTest material (the imported B1/B3 tileables), tint (linear, as the generator's tile_mat tint), decal alpha (0 = opaque).
+        // The B4 neighbour variants share the facade slots; their plaster is tinted and their shutters and doors use WearLit's paint mode (SC_PAINT) with the variant's paint colour.
+        public static bool IsNeighbour(string folderName) => folderName != null && BeautyCornerTable.NeighbourLooks.ContainsKey(folderName);
+        const float PaintLum = 0.17f;   // the generator's PAINT_LUM: mean linear luminance of the painted_wood albedo
+
+        public static Dictionary<string, Material> BuildNeighbourMaterials(string folderName)
+        {
+            Dictionary<string, Material> map = BuildFacadeMaterials();
+            var look = BeautyCornerTable.NeighbourLooks[folderName];
+            Shader wear = Shader.Find(WearShaderName);
+            Material plaster = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + folderName + "_FK_Plaster.mat", wear);
+            plaster.CopyPropertiesFromMaterial(map["FK_Plaster"]);
+            foreach (var k in map["FK_Plaster"].enabledKeywords) plaster.EnableKeyword(k.name);
+            plaster.SetColor("_BaseColor", new Color(look.Plaster.r, look.Plaster.g, look.Plaster.b, 1f).gamma);
+            plaster.SetColor("_Color", plaster.GetColor("_BaseColor")); plaster.SetShaderPassEnabled("MotionVectors", true);
+            EditorUtility.SetDirty(plaster); map["FK_Plaster"] = plaster;
+            foreach (string slot in new[] { "FK_Shutter", "FK_DoorPaint" })
+            {
+                Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + folderName + "_" + slot + ".mat", wear);
+                m.CopyPropertiesFromMaterial(map[slot]);
+                foreach (var k in map[slot].enabledKeywords) m.EnableKeyword(k.name);
+                m.EnableKeyword("_SC_PAINT");
+                m.SetColor("_BaseColor", Color.white); m.SetColor("_Color", Color.white);
+                m.SetVector("_SpecColor", new Vector4(look.Paint.r / PaintLum, look.Paint.g / PaintLum, look.Paint.b / PaintLum, 1f));   // raw linear, SetVector skips the colour-space conversion
+                m.SetShaderPassEnabled("MotionVectors", true);
+                EditorUtility.SetDirty(m); map[slot] = m;
+            }
+            AssetDatabase.SaveAssets();
+            return map;
+        }
+
         static readonly (string Slot, string Source, Color Tint, float DecalAlpha)[] FacadeSlots =
         {
             ("FK_Plaster", "plaster", Color.white, 0f), ("FK_Oak", "oak_timber", Color.white, 0f), ("FK_OakDoor", "oak_timber", new Color(1.35f, 1.25f, 1.15f), 0f),
@@ -241,10 +304,10 @@ namespace SleepingCalamity.EditorTools
             var ti = (TextureImporter)AssetImporter.GetAtPath(path);
             if (ti == null) return;
             TextureImporterType type = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
-            bool dirty = ti.textureType != type || ti.sRGBTexture != srgb || ti.maxTextureSize < 4096 || ti.alphaIsTransparency != alphaTransparency
+            bool dirty = ti.textureType != type || ti.sRGBTexture != srgb || ti.maxTextureSize != TextureCap || ti.alphaIsTransparency != alphaTransparency
                 || ti.mipmapEnabled != true || ti.anisoLevel < 8;
             if (!dirty) return;
-            ti.textureType = type; ti.sRGBTexture = srgb; ti.maxTextureSize = 4096; ti.mipmapEnabled = true;
+            ti.textureType = type; ti.sRGBTexture = srgb; ti.maxTextureSize = TextureCap; ti.mipmapEnabled = true;
             ti.anisoLevel = 8; ti.filterMode = FilterMode.Trilinear;
             ti.alphaSource = alphaTransparency ? TextureImporterAlphaSource.FromInput : TextureImporterAlphaSource.None;
             ti.alphaIsTransparency = alphaTransparency;

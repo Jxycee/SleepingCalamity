@@ -33,7 +33,7 @@ namespace SleepingCalamity.EditorTools
             ti.filterMode = FilterMode.Trilinear;
             ti.anisoLevel = 8;
             ti.wrapMode = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
-            ti.maxTextureSize = assetPath.StartsWith(Root + "BeautyCorner/") ? 4096 : 2048;   // beauty-corner maps unpacked from 4K ORMs keep the source size
+            ti.maxTextureSize = 2048;   // user rule 2026-10-30: the game targets 1440p, nothing above 2048 px
             ti.textureCompression = TextureImporterCompression.CompressedHQ;
             ti.isReadable = false;
             ti.npotScale = TextureImporterNPOTScale.None;

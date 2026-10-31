@@ -155,17 +155,22 @@ namespace SleepingCalamity.EditorTools
             new Row { Brief = Lanterns, Id = "BracketLantern", Batch = "B8", Names = new[] { "bracket_lantern", "wall_lantern", "lantern_bracket" },
                 Instances = new[] { At(-0.37f, 2.45f, 7.5f, 180f) }, // on the facade wall between the door (to x -0.8 with its frame) and the ground window; plate back on the plaster (B8 SOURCES)
                 Placeholder = new[] { Box(0f, 0f, 0f, 0.22f, 0.36f, 0.22f, "warm"), Box(0f, 0.2f, 0.1f, 0.05f, 0.05f, 0.3f, "iron") } },
-            // Neighbour massing (round 2): greybox buildings closing the square so Wide has no empty ground. Not brief rows; later B4 variants replace them.
-            // Pivot = front face centre at ground, front facing -Z, like the facade. Names stay empty: art never replaces these by folder match.
-            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Left", Batch = "B4", Names = new string[0],
-                Instances = new[] { At(-9.25f, 0f, 8.5f, -8f) },     // x -13..-5.5, front at z 8.5, turned a little toward the plaza, 3 storeys
+            // Neighbours (batch 4): the B4 kit variants close the square (Neighbour_Left/Right/Infill, T2 on the shared tileables, linear "wear" colour, shutter and door paint in the
+            // SC_PAINT mode of WearLit; NeighbourLooks below). Same footprints and yaw as the round-2 greyboxes; the art comes in facing +Z like the facade, so ArtYaw 180.
+            // Pivot = front face centre at ground, front facing -Z. Names stay empty: each instance names its folder, art never replaces these by a folder-name match.
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Left", Batch = "B4", Names = new string[0], ArtYaw = 180f,
+                Instances = new[] { new Instance(-9.25f, 0f, 8.5f, -8f, 1f, "Neighbour_Left") },     // x -13..-5.5, front at z 8.5, turned a little toward the plaza, 3 storeys
                 Placeholder = TallHouse() },
-            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Right", Batch = "B4", Names = new string[0],
-                Instances = new[] { At(7f, 0f, 10f, 6f) },           // x 3..11, front at z 10, 2 storeys, gable to the plaza, lower roof
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Right", Batch = "B4", Names = new string[0], ArtYaw = 180f,
+                Instances = new[] { new Instance(7f, 0f, 10f, 6f, 1f, "Neighbour_Right") },          // x 3..11, front at z 10, 2 storeys, gable to the plaza, lower roof
                 Placeholder = GableHouse() },
-            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Backdrop", Batch = "B4", Names = new string[0],
-                Instances = new[] { At(0f, 0f, 18f) },               // low far row past z 16 with a church and bell tower
-                Placeholder = Backdrop() },
+            // Far row past z 16: the three variants again at varied scale, yaw, depth and order so it is not a copy row (BackdropHouses), the church and tower stay greybox.
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Backdrop", Batch = "B4", Names = new string[0], ArtYaw = 180f,
+                Instances = BackdropHouses(),
+                Placeholder = new[] { Box(0f, 2.2f, 3f, 6.6f, 4.4f, 6f, "plaster"), Box(0f, 5.0f, 3f, 7.4f, 0.25f, 6.6f, "roof_tile") } },
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Church", Batch = "B4", Names = new string[0],
+                Instances = new[] { At(0f, 0f, 18f) },               // church with a bell tower and a stone hall in the gap of the far row (no art yet)
+                Placeholder = Church() },
         };
 
         // Left neighbour: three jettied storeys (leaning a little), eave 8.8 m, ridge 11.6 m, chimney.
@@ -210,19 +215,10 @@ namespace SleepingCalamity.EditorTools
             };
         }
 
-        // Far row: small houses with varied heights and leans along x -42..42, a church with a bell tower and spire in the middle gap (tower top about 16.8 m).
-        static Part[] Backdrop()
+        // Church with a bell tower and spire (tower top about 16.8 m) and a stone hall, in the middle gap of the far row.
+        static Part[] Church()
         {
             var p = new List<Part>();
-            int k = 0;
-            for (float x = -42f; x <= 42f; x += 7.4f, k++)
-            {
-                if (x > -10f && x < 10f) continue;
-                float h = 4.0f + (k % 4) * 0.8f, rise = 1.9f + (k % 3) * 0.4f, len = Mathf.Sqrt(3.5f * 3.5f + rise * rise), ang = Mathf.Atan2(rise, 3.5f) * Mathf.Rad2Deg;
-                p.Add(Box(x, h / 2f, 3f, 6.6f, h, 6f, k % 3 == 1 ? "sandstone" : "plaster", 0f, 0f, k % 2 == 0 ? 0.8f : -0.8f));
-                p.Add(Box(x, h + rise / 2f, 1.25f, 7.4f, 0.25f, len, "roof_tile", -ang));
-                p.Add(Box(x, h + rise / 2f, 4.75f, 7.4f, 0.25f, len, "roof_tile", ang));
-            }
             p.Add(Box(-3f, 5.8f, 2.2f, 4.4f, 11.6f, 4.4f, "sandstone"));
             p.Add(Box(-3f, 12.7f, 2.2f, 4.8f, 2.2f, 4.8f, "oak_timber"));
             float[] widths = { 3.6f, 2.6f, 1.6f, 0.8f };
@@ -231,6 +227,48 @@ namespace SleepingCalamity.EditorTools
             p.Add(Box(4.6f + 2.45f, 9.1f, 5f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, -31.5f));
             p.Add(Box(4.6f - 2.45f, 9.1f, 5f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, 31.5f));
             return p.ToArray();
+        }
+
+        // Plaster tint (the generator's PLASTER_TINT, handed to the material as written) and shutter / door paint (linear, VARIANTS[...]["paint"]) of each neighbour folder.
+        public static readonly Dictionary<string, (Color Plaster, Color Paint)> NeighbourLooks = new Dictionary<string, (Color, Color)>
+        {
+            { "Neighbour_Left", (new Color(1.0f, 0.92f, 0.80f), Hex(0x9c, 0x7f, 0x4c)) },     // warm cream, ochre
+            { "Neighbour_Right", (new Color(1.0f, 0.89f, 0.85f), Hex(0x6a, 0x2e, 0x29)) },    // faint rose, oxblood
+            { "Neighbour_Infill", (new Color(0.93f, 0.95f, 0.97f), Hex(0x64, 0x80, 0x7a)) },  // cool lime white, faded blue-green
+        };
+        static Color Hex(int r, int g, int b) => new Color(r / 255f, g / 255f, b / 255f).linear;
+
+        // The far row: x -46..46 in steps of the scaled house widths, the church gap (-7..9.8) left open. A fixed sequence of folders, scales 0.62-0.88, yaw +-11, depth z 17-20.5.
+        static Instance[] BackdropHouses()
+        {
+            string[] order = { "Neighbour_Infill", "Neighbour_Left", "Neighbour_Right", "Neighbour_Infill", "Neighbour_Right", "Neighbour_Left", "Neighbour_Infill", "Neighbour_Right", "Neighbour_Left", "Neighbour_Infill" };
+            float[] widths = { 4.5f, 7.5f, 8.0f };
+            float[] scales = { 0.82f, 0.66f, 0.74f, 0.88f, 0.62f, 0.78f, 0.7f, 0.85f, 0.64f, 0.8f, 0.72f };
+            float[] yaws = { 4f, -9f, 7f, -3f, 11f, -6f, 2f, -11f, 8f, -4f, 6f };
+            float[] zs = { 18.0f, 19.2f, 17.4f, 18.6f, 20.0f, 17.8f, 19.0f, 18.2f, 20.5f, 17.0f, 18.8f };
+            var list = new List<Instance>();
+            for (int side = 0; side < 2; side++)
+            {
+                float x = side == 0 ? -7f : 9.8f;   // walk outward from the church gap
+                int dir = side == 0 ? -1 : 1;
+                for (int k = 0; k < 8; k++)
+                {
+                    int i = (k * 3 + side * 4) % order.Length, j = (k + side * 5) % scales.Length;
+                    int w = order[i] == "Neighbour_Infill" ? 0 : (order[i] == "Neighbour_Left" ? 1 : 2);
+                    float width = widths[w] * scales[j];
+                    float cx = x + dir * width * 0.5f;
+                    list.Add(new Instance(cx, 0f, zs[(k + side * 3) % zs.Length], yaws[(k * 2 + side) % yaws.Length], scales[j], order[i]));
+                    x += dir * (width + 0.5f);
+                }
+            }
+            // Flanks: the Mid camera looks west past the fountain, where the far row is out of frame. Houses along x -17 and x 15 turned to face the plaza (yaw -90 faces +X, +90 faces -X).
+            float[] westZ = { -6.5f, -0.5f, 5.2f, 11.5f, 17.5f }, eastZ = { -3.5f, 2.5f, 9.0f, 15.5f };
+            string[] westA = { "Neighbour_Right", "Neighbour_Infill", "Neighbour_Left", "Neighbour_Infill", "Neighbour_Right" }, eastA = { "Neighbour_Left", "Neighbour_Infill", "Neighbour_Right", "Neighbour_Left" };
+            float[] westS = { 0.86f, 0.9f, 0.8f, 0.95f, 0.84f }, eastS = { 0.82f, 0.9f, 0.78f, 0.88f };
+            float[] westX = { -17.5f, -16.6f, -18.2f, -17.0f, -17.8f }, eastX = { 15.8f, 15.0f, 16.4f, 15.4f };
+            for (int i = 0; i < westZ.Length; i++) list.Add(new Instance(westX[i], 0f, westZ[i], -90f + (i % 2 == 0 ? 3f : -4f), westS[i], westA[i]));
+            for (int i = 0; i < eastZ.Length; i++) list.Add(new Instance(eastX[i], 0f, eastZ[i], 90f + (i % 2 == 0 ? -3f : 4f), eastS[i], eastA[i]));
+            return list.ToArray();
         }
 
         public static IEnumerable<Row> ForBrief(string brief)

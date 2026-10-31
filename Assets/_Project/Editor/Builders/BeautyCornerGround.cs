@@ -160,7 +160,7 @@ namespace SleepingCalamity.EditorTools
             return true;
         }
 
-        const float MaxWeedHeight = 0.25f;
+        const float MaxWeedHeight = 0.25f, MaxTuftHeight = 0.42f;
 
         static float HeightOf(GameObject go)
         {
@@ -177,7 +177,7 @@ namespace SleepingCalamity.EditorTools
             bool stall = Mathf.Sqrt((x - 4.5f) * (x - 4.5f) + (z - 4.5f) * (z - 4.5f)) < 2.2f;
             bool edge = Mathf.Abs(x) > 6f || z < -4.5f || z > 6.2f;
             string bucket; int every;
-            if (s.kind == "facade_foot") return true;
+            if (s.kind == "facade_foot" || s.kind == "edge_grass") return true;   // edge_grass slots get grass tufts (all of them), not weeds
             if (s.kind == "ring_edge") { bucket = "ring"; every = 2; }
             else if (stall) { bucket = "stall"; every = 2; }
             else if (edge) { bucket = "edge"; every = 2; }
@@ -206,28 +206,40 @@ namespace SleepingCalamity.EditorTools
                 if (mat == null) mat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "CrackWeeds", foliage: true);   // the five folders hold one identical atlas
             }
             if (models.Count == 0 || mat == null) return false;
+            // The edge_grass slots (the patch's fading open edges) take the B9 grass clumps A..C: the same foliage atlas, so the same material.
+            var tufts = new List<GameObject>();
+            foreach (char c in "ABC")
+            {
+                string folder = BeautyCornerArt.FindFolder(row.Batch, "Grass_" + c);
+                string fbx = folder != null ? BeautyCornerArt.FirstFbx(folder) : null;
+                GameObject go = fbx != null ? BeautyCornerArt.LoadModel(folder, Path.GetFileName(fbx)) : null;
+                if (go != null) tufts.Add(go);
+            }
 
             Transform holder = Holder(group, row, worldOrigin: true);
             var rnd = new System.Random(9);
             var seen = new Dictionary<string, int>(); var kept = new Dictionary<string, int>();
-            int n = 0;
+            int n = 0, tuftCount = 0;
             foreach (Slot s in data.weed_slots)
             {
                 int k = seen.TryGetValue(s.kind, out int c) ? c : 0; seen[s.kind] = k + 1;
                 if (!KeepWeed(s, k, kept)) continue;
-                GameObject model = models[n % models.Count];
-                var w = (GameObject)PrefabUtility.InstantiatePrefab(model, holder); w.name = "Weed_" + (char)('A' + n % models.Count) + "_" + n;
+                bool tuft = s.kind == "edge_grass" && tufts.Count > 0;
+                GameObject model = tuft ? tufts[n % tufts.Count] : models[n % models.Count];
+                var w = (GameObject)PrefabUtility.InstantiatePrefab(model, holder);
+                w.name = (tuft ? "Tuft_" : "Weed_") + (char)('A' + n % (tuft ? tufts.Count : models.Count)) + "_" + n;
+                if (tuft) tuftCount++;
                 Assign(w, mat, shadows: false);
                 float yaw = s.kind == "facade_foot" ? (n % 2 == 0 ? 0f : 180f) : (float)(rnd.NextDouble() * 360.0);   // wall-foot runs follow the wall (local x)
                 float scale = 0.8f + (float)rnd.NextDouble() * 0.45f;
                 w.transform.localPosition = new Vector3(s.p[0], s.p[1], s.p[2]);
                 w.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
                 w.transform.localScale = Vector3.one * scale;
-                float h = HeightOf(w);   // the tall variants stay under about 25 cm
-                if (h > MaxWeedHeight) w.transform.localScale = Vector3.one * (scale * MaxWeedHeight / h);
+                float h = HeightOf(w), cap = tuft ? MaxTuftHeight : MaxWeedHeight;   // the tall variants stay under about 25 cm (tufts 42 cm)
+                if (h > cap) w.transform.localScale = Vector3.one * (scale * cap / h);
                 n++;
             }
-            Debug.Log("SC BEAUTY weeds placed " + n + " of " + data.weed_slots.Length + " slots with " + models.Count + " variants");
+            Debug.Log("SC BEAUTY weeds placed " + n + " of " + data.weed_slots.Length + " slots with " + models.Count + " variants, of which " + tuftCount + " grass tufts (" + tufts.Count + " variants)");
             return true;
         }
     }
