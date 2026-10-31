@@ -3,6 +3,8 @@
 // beauty corner's own rendering stack (selected for the run only, like BeautyCornerCapture). Output folder: "-scCaptureDir <dir>", else env SC_CAPTURE_DIR.
 //   bash Tools/cloud/unity.sh exec --graphics --method SleepingCalamity.EditorTools.HollowmereCapture.CaptureAll --out <scratch>   (env SC_CAPTURE_DIR = the PNG folder)
 // Files: <Camera>_<Preset>.png, e.g. HM_HomeDoor_Ruined.png. Builds the scene first unless SC_CAPTURE_NOBUILD is set.
+// Look tuning (Q12): SC_LOOK_VARIANTS="a:exposure=-0.9,fog=0.01;b:skythick=0.6" renders every selected camera once per variant (HollowmereLook.Look.Parse
+// overrides on that sun preset's look), files prefixed "<variant>_". Without it the run uses HollowmereLook's committed looks.
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -53,28 +55,36 @@ namespace SleepingCalamity.EditorTools
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 // Default: Midday renders every camera; LowSun (design 7: "at midday and low sun") only the four play-position cameras, files <Camera>_<Preset>_LowSun.png.
                 BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : new[] { BeautyCornerBuilder.Preset.Midday, BeautyCornerBuilder.Preset.LowSun };
+                string variantSpec = System.Environment.GetEnvironmentVariable("SC_LOOK_VARIANTS");
+                string[] variants = string.IsNullOrEmpty(variantSpec) ? new[] { "" } : variantSpec.Split(';');
+                foreach (string variant in variants)
                 foreach (BeautyCornerBuilder.Preset light in lights)
                 {
-                    BeautyCornerBuilder.ApplyPreset(light);
+                    int colon = variant.IndexOf(':');
+                    string vName = colon < 0 ? variant : variant.Substring(0, colon);
+                    HollowmereLook.Look look = HollowmereLook.For(light).Parse(colon < 0 ? null : variant.Substring(colon + 1));
+                    HollowmereLook.Apply(light, look);
+                    string prefix = vName.Length > 0 ? vName + "_" : "";
                     string suffix = light == BeautyCornerBuilder.Preset.Midday ? "" : "_" + light;
                     foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                     {
                         HollowmereBuilder.ApplyPreset(preset);
                         foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
+                        foreach (ParticleSystem ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) ps.Simulate(14f, true, true);   // particles do not run in edit mode: a settled pollen cloud (fixed seeds)
                         LookTestCapture.WarmUp(cams);
                         foreach (Camera cam in cams)
                         {
                             if (!cam.name.StartsWith("Cap_HM_") && !cam.name.StartsWith("Cap_Corner_")) continue;
                             if (!string.IsNullOrEmpty(only) && !only.Split(',').Any(o => cam.name.Contains(o))) continue;
                             if (!lowOnly && light != BeautyCornerBuilder.Preset.Midday && System.Array.IndexOf(PlayPositionCameras, cam.name) < 0) continue;
-                            bool overview = cam.name == "Cap_HM_Overview", fog = RenderSettings.fog;
-                            if (overview) RenderSettings.fog = false;   // the corner's haze is tuned for 10-40 m; at 100 m+ it would hide the town
-                            try { LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + preset + suffix + ".png")); }
-                            finally { RenderSettings.fog = fog; }
+                            bool overview = cam.name == "Cap_HM_Overview", fog = RenderSettings.fog; float density = RenderSettings.fogDensity;
+                            if (overview) { RenderSettings.fog = look.OverviewFog > 0f; RenderSettings.fogDensity = look.OverviewFog; }   // the play-distance haze would hide the town at 100 m+: the overview has its own thin one
+                            try { LookTestCapture.Save(cam, Path.Combine(dir, prefix + cam.name.Replace("Cap_", "") + "_" + preset + suffix + ".png")); }
+                            finally { RenderSettings.fog = fog; RenderSettings.fogDensity = density; }
                         }
                     }
                 }
-                BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
+                HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);
                 HollowmereBuilder.ApplyPreset(HollowmereBuilder.Preset.Ruined);
             }
             finally

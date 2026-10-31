@@ -105,6 +105,14 @@ namespace SleepingCalamity.EditorTools
         static T Pick<T>(System.Random r, T[] a) => a[r.Next(a.Length)];
         static float YawFacing(float nx, float nz) => Mathf.Atan2(nx, nz) * Mathf.Rad2Deg;   // the imported meshes carry their leaves on local +Z (mesh bounds, first capture showed the back faces)
 
+        // A single B9 grass tuft for other builders (the garden's fence foot): world position, yaw and uniform scale; null when the kit is missing.
+        public static GameObject Tuft(Transform parent, string kit, Vector3 worldPos, float yaw, float scale)
+        {
+            if (!Load()) return null;
+            Stats saved = cur; cur = new Stats();
+            try { return Put(parent, kit, worldPos, yaw, scale); } finally { cur = saved; }
+        }
+
         static Transform Group(Transform parent, string name)
         {
             Transform c = parent.Find(name);

@@ -14,3 +14,4 @@ paths:
 - The asset skills (`sc-asset-*`, `sc-texture-paint`, `sc-foliage`, `sc-scene-look`, `sc-water-look`, `sc-ai-model-pipeline`, `sc-reference`) were rewritten for this style on 2026-10-30. Some FishGame tools they mention are legacy; `sc-asset-craft` section 0b has the tool-status table.
 - Copyrighted style frames (press screens, Dark Cloud captures) go only in gitignored `Reference/private/`: study only, never shipped, traced or projected. Free-licence references go in `Reference/<area>/<subject>/` with a `REFS.md` (source, licence, purpose).
 - Blender generators live in `Art/Blender/`; exports go through them so models are reproducible from text. `.blend`, FBX and image files are Git LFS.
+- Export FBX with `path_mode='STRIP'` (absolute texture paths break the Unity import elsewhere). Session usage rules: `session-usage.md`.
