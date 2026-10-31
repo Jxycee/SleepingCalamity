@@ -287,7 +287,7 @@ namespace SleepingCalamity.EditorTools
 
         // Straight-alpha blend (SrcAlpha, OneMinusSrcAlpha), no depth write or shadows. Not the LookTest premultiply state: Unity's material validation strips its
         // _ALPHAPREMULTIPLY_ON keyword on the source material, and a premultiply blend without the keyword draws the decal as a pale rectangle.
-        static void AlphaBlend(Material m)
+        internal static void AlphaBlend(Material m)
         {
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f); m.SetFloat("_SrcBlend", 5f); m.SetFloat("_DstBlend", 10f);
             m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 10f); m.SetFloat("_ZWrite", 0f); m.SetFloat("_AlphaClip", 0f);
@@ -300,7 +300,7 @@ namespace SleepingCalamity.EditorTools
             m.SetTexture("_MetallicGlossMap", null); m.DisableKeyword("_METALLICSPECGLOSSMAP");
         }
 
-        static Material Flat(string slot, Color linear, float smooth, Shader shader)
+        internal static Material Flat(string slot, Color linear, float smooth, Shader shader)
         {
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + slot + ".mat", shader);
             m.SetColor("_BaseColor", linear.gamma); m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", 0f);
@@ -335,7 +335,7 @@ namespace SleepingCalamity.EditorTools
             if (dirty) mi.SaveAndReimport();
         }
 
-        static void ImportTexture(string path, bool srgb, bool normal, bool alphaTransparency)
+        internal static void ImportTexture(string path, bool srgb, bool normal, bool alphaTransparency)
         {
             var ti = (TextureImporter)AssetImporter.GetAtPath(path);
             if (ti == null) return;
