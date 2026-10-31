@@ -20,7 +20,7 @@ namespace SleepingCalamity.EditorTools
         public const float ArtYaw = 180f;
         // The breath: warm amber (linear, as the generator's BREATH), HDR emission subtle against the midday exposure and readable at low sun.
         public static readonly Color BreathColor = new Color(1.0f, 0.42f, 0.10f);
-        public const float BreathEmission = 2.4f, BreathLightIntensity = 1.6f, BreathLightRange = 3.5f;
+        public const float BreathEmission = 2.4f, BreathLightIntensity = 0.9f, BreathLightRange = 4f;
 
         // Places the art under g (the landmark's transform). False when the FBX is missing: the caller keeps its greybox.
         public static bool TryPlace(Transform g)
@@ -47,7 +47,7 @@ namespace SleepingCalamity.EditorTools
             }
             Transform socket = FindDeep(obj.transform, "SOCKET_Breath");
             Vector3 lightPos = socket != null ? g.InverseTransformPoint(socket.position) : new Vector3(0f, 1.6f, -0.4f);
-            LookTestBuilder.AddLight(g, "BreathLight", LightType.Point, lightPos + new Vector3(0f, -0.6f, -0.05f), Quaternion.identity, BreathColor, BreathLightIntensity, BreathLightRange, LightShadows.None);
+            LookTestBuilder.AddLight(g, "BreathLight", LightType.Point, lightPos + new Vector3(0f, -0.7f, -0.55f), Quaternion.identity, BreathColor, BreathLightIntensity, BreathLightRange, LightShadows.None);
             AddColliders(g);
             Debug.Log("SC HOLLOWMERE tithe gate art placed (" + Folder + "), slots=" + slots.Count);
             return true;

@@ -24,7 +24,7 @@ FK_Iron), so BeautyCornerArt's facade map binds them; placed wear lives in the C
 R grime/rust/soot, G moss, B polish) for WearLit. Own slots, made by the builder: TG_Breath (emissive warm amber), TG_Clay, TG_Straw,
 TG_Wax, TG_Chalk (flat). Foliage = the B9 atlas (M_B9_Foliage; T_B9_Foliage_* copied beside the FBX).
 Children of the root empty TitheGate: Gate (all masonry, iron, glow and offerings), Foliage, SOCKET_Breath (empty at the glow centre,
-15 cm in front of the leaves; the builder hangs its spill light 0.6 m below it). Budget: < 24k tris (landmark, T2, under the 30-60k hero band; printed). Round 4: 22,133 (gate 16,665 + foliage 5,468).
+15 cm in front of the leaves; the builder hangs its spill light 0.7 m below and 0.55 m in front of it). Budget: < 24k tris (landmark, T2, under the 30-60k hero band; printed). Round 4: 22,133 (gate 16,665 + foliage 5,468).
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_tithe_gate.py -- --out <scratch>
       [--rres 960] [--samples 32] [--no-render] [--export] [--cams cap,near,close,lowsun]
@@ -156,7 +156,10 @@ class Geo:
     def __init__(self):
         self.v = []; self.f = []; self.slot = []; self.kind = []; self.pid = []; self.smooth = []; self.uvs = []; self.np = 0
         self.post = []          # (vertex range, fn) deformations applied in build
-    def add(self, verts, faces, slot, kind=None, smooth=False, uvs=3.0):
+    def add(self, verts, faces, slot, kind=None, smooth=False, uvs=3.0, face=None):
+        if face is not None:       # one-sided cards (cracks, tallies, the breath card): wind every face toward `face` (Unity culls back faces)
+            vv = [Vector(p) for p in verts]
+            faces = [f if (vv[f[1]] - vv[f[0]]).cross(vv[f[2]] - vv[f[0]]).dot(face) >= 0 else tuple(reversed(f)) for f in faces]
         o = len(self.v); self.v += [Vector(p) for p in verts]
         for f in faces:
             self.f.append(tuple(i + o for i in f)); self.slot.append(SLOTS.index(slot)); self.kind.append(kind or slot)
@@ -242,7 +245,7 @@ def ribbon(pts, widths, slot, kind=None, nrm=Vector((0, -1, 0))):
         verts += [p - side, p + side]
     for i in range(len(pts) - 1):
         faces.append((2 * i, 2 * i + 2, 2 * i + 3, 2 * i + 1))
-    return G.add(verts, faces, slot, kind, uvs=1.0)
+    return G.add(verts, faces, slot, kind, uvs=1.0, face=nrm)
 
 def rivet(x, y, z, r=0.022, h=0.018, slot='iron', axis='Y'):
     """A low dome (6-sided pyramid with a flat crown) proud of a plate facing -Y."""
@@ -431,9 +434,9 @@ def build_lock(rngs_left, rngs_right):
     # keyhole (glowing): a round head and a tapered slot
     kx, kz, ky = -0.25, 1.49, GATE_F - 0.0905
     verts = [(kx + 0.032 * math.cos(2 * math.pi * s / 8), ky, kz + 0.032 * math.sin(2 * math.pi * s / 8)) for s in range(8)]
-    rngs_left.append(G.add(verts, [tuple(reversed(range(8)))], 'breath', 'breath', uvs=1.0))
+    rngs_left.append(G.add(verts, [tuple(reversed(range(8)))], 'breath', 'breath', uvs=1.0, face=Vector((0, -1, 0))))
     rngs_left.append(G.add([(kx - 0.014, ky, kz - 0.01), (kx + 0.014, ky, kz - 0.01), (kx + 0.024, ky, kz - 0.12), (kx - 0.024, ky, kz - 0.12)],
-                           [(3, 2, 1, 0)], 'breath', 'breath', uvs=1.0))
+                           [(3, 2, 1, 0)], 'breath', 'breath', uvs=1.0, face=Vector((0, -1, 0))))
     # drop bar across the meeting edge in two staples
     rngs_left.append(bbox(-0.62, 0.58, GATE_F - 0.105, GATE_F - 0.055, 1.9, 1.99, 'iron', 'lock', bevel=0.012, rot=(0, -0.012, 0), uvs=1.0))
     for x, lst in ((-0.5, rngs_left), (0.46, rngs_right)):
@@ -516,7 +519,7 @@ def build_gate():
     poly = [(-OPEN_R, SILL - 0.01)] + [(OPEN_R * math.cos(math.pi * (1 - k / 16)), SPRING + OPEN_R * math.sin(math.pi * (1 - k / 16))) for k in range(17)] + [(OPEN_R, SILL - 0.01)]
     poly[1] = (-OPEN_R, SPRING)
     verts = [(x, GLOW_Y, z) for x, z in poly]
-    G.add(verts, [tuple(range(len(verts)))], 'breath', 'breath', uvs=1.0)
+    G.add(verts, [tuple(range(len(verts)))], 'breath', 'breath', uvs=1.0, face=Vector((0, -1, 0)))
     # the reveal behind the leaves: a dark lining so the glow only shows at the gaps
     for sgn in (-1, 1):
         x0, x1 = sorted((sgn * (OPEN_R - 0.002), sgn * (OPEN_R + 0.3)))
