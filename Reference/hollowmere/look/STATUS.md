@@ -7,7 +7,7 @@ Archive: ready
 
 Score: 28/40 (sc-asset-review rubric on the final sheets, play cameras only): silhouette 4, proportion 3, form 3, surface 3, colour/value 4, wear 3, fits the set 4, emissive/efficiency 4. Coordinator read r2 at ~27/40; r3 removed the sky-shaft artefacts. Lighting-only scope: the rest is content (notes below).
 SC RESULT check PASS (build PASS, test-edit 681/681, test-play 32 passed / 0 failed / 8 skipped) on 537125f (merged tip; main since then only gained a handoff commit).
-Merge: see the merge commit on main ("Merge claude/q12-town-look-5967e9").
+Merge: 0331588 on main (merge commit, pushed).
 Sheets: Q12_final_midday.jpg, Q12_final_lowsun.jpg ([approved Corner_Wide | Ruined | Rebuilt] per camera); numbers in Q12_final_palette.csv.
 
 ## Final numbers (p10/p50/p90 warmth)
