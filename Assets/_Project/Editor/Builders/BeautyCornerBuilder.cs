@@ -41,12 +41,9 @@ namespace SleepingCalamity.EditorTools
             KeepDecalKeywords();
         }
 
-        // The corner's rendering stack, grade profiles, skies and support materials, without its scene: HollowmereBuilder reuses the same look.
-        public static void EnsureLook()
-        {
-            EnsureLookAssets();
-            KeepDecalKeywords();
-        }
+        // The corner's rendering stack, grade profiles, skies and support materials, without its scene: HollowmereBuilder reuses the same look
+        // (and calls KeepDecalKeywords after its own scene, which builds the facade materials again).
+        public static void EnsureLook() => EnsureLookAssets();
 
         static void EnsureLookAssets()
         {
@@ -60,7 +57,7 @@ namespace SleepingCalamity.EditorTools
 
         // Unity's material validation strips _ALPHAPREMULTIPLY_ON from the look-test decals while the facade materials are built from them; put the committed
         // state back last so a build leaves those three .mat files as they are in git.
-        static void KeepDecalKeywords()
+        internal static void KeepDecalKeywords()
         {
             foreach (string n in new[] { "moss", "grime", "drip", "crack" })
             {

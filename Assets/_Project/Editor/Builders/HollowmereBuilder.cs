@@ -60,6 +60,7 @@ namespace SleepingCalamity.EditorTools
             BeautyCornerBuilder.EnsureLook();
             BuildMaterials();
             BuildScene(layout);
+            BeautyCornerBuilder.KeepDecalKeywords();   // the facade row rebuilt the facade materials, which strips the decal keyword: put it back last
         }
 
         static string Mix(TownLayout t, int ring) => t.Count(ring, FoundationSize.L) + "L/" + t.Count(ring, FoundationSize.M) + "M/" + t.Count(ring, FoundationSize.S) + "S";
