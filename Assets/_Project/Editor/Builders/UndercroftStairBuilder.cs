@@ -8,6 +8,7 @@
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
 using System;
 using System.Collections.Generic;
+using SleepingCalamity.Presentation;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
