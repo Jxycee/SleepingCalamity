@@ -101,6 +101,8 @@ namespace SleepingCalamity.EditorTools
             Candles(set, lighting, own);
             Lights(lighting, own);
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 2.0f, 4f), new Vector3(6f, 4.6f, 9f));
+            // A cellar reflects little: the baked probe sees the HDR hatch and lanterns, and at full strength it washed bevel speculars white.
+            lighting.Find("ReflectionProbe").GetComponent<ReflectionProbe>().intensity = 0.35f;
             LookTestBuilder.AddVolume(lighting, ProfileName);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
@@ -209,7 +211,7 @@ namespace SleepingCalamity.EditorTools
         {
             LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
             Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.15f); c.contrast.Override(55f); c.saturation.Override(-22f);
+            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(0.35f); c.contrast.Override(48f); c.saturation.Override(-22f);
             ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.86f, 0.82f, 0.80f, 0f));   // grey-brown shadow fill, pushed down
             WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(-3f); w.tint.Override(12f);
             LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(1.0f, 0.97f, 0.97f, 0.0f));
