@@ -41,7 +41,7 @@ The decorations still kit-ready in design section 6: vegetable beds, a trellis, 
 
 ## Q7. Cellars room pool, first rooms (M5 authoring)
 Folder: `Reference/hollowmere/room_pool/`
-Claimed: -
+Claimed: cloud session claude/practical-tesla-lqajeo (square, Q5 done), 2026-10-31
 `docs/PHASE1.md` M5 and 7.2: the room pool as data for floors 1-4, in greybox. Start from whatever M5 code is on main (look first; don't duplicate it). Author 8-12 rooms with sub-themes and dressing variants as data, with EditMode tests that every room is valid (exits connect, the key is reachable). Code and data only, no art. If M5's Core floor generator isn't on main yet, write only the room data format plus its tests, and say so in STATUS.md.
 
 ## Q8. Town wall, Lower Gate and East Gate
