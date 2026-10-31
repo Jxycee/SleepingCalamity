@@ -1,25 +1,22 @@
 # Q8 town wall, Lower Gate and East Gate: status
 
-State: IN PROGRESS
+State: DONE (merged to main ca383a8)
 Session: Bell tower: bake, integrate, check, merge
-Job: Q8 Town wall, Lower Gate and East Gate (cloud session, branch claude/brave-keller-3d91gk; bell tower, Q1, Q3 done before it)
-Progress: 60%
-Sheet: Reference/hollowmere/town_wall/wall_sheet.jpg (Blender; the Unity town sheet follows)
+Job: Q8 Town wall, Lower Gate and East Gate (cloud session, branch claude/brave-keller-3d91gk)
+Progress: 100%
+Sheet: Reference/hollowmere/town_wall/wall_town_sheet.jpg (Blender: wall_sheet.jpg, approved by the coordinator ~28/40)
+SC RESULT: SC RESULT check PASS on 89e641b (test-edit 680/680, test-play 32 passed / 8 skipped / 0 failed; origin/main merged before the check); merge Assets equal the checked tip
+Merge commit: ca383a8
 Blocker: none
 
-Started 2026-10-31. Plan: `Art/Blender/town/sc_town_wall.py` exports a tileable wall kit (straight modules, buttress, lane-opening ends, walkway stair; Ruined
-breach and crumbled variants, Rebuilt patched) and the two gatehouses (Lower Gate, East Gate; shell and restored, timber doors) on the shared B1 tileables
-(Blender agent, worktree). Then the builder tiles the kit along HollowmereLayout's wall run at its heights and places the gatehouses between their piers
-(Unity agent). Captures: low east, lake shore, both gates, both presets.
-
-Progress:
-- Art done and merged into the branch (b1124df): 8 wall pieces (Straight A/B 3.4-3.8k tris, Patched, Breach, Crumbled, Buttress, End, Stair) and LowerGate /
-  EastGate (Frame 31.3k / 26.0k, Shell 18.5k / 20.8k, Part_Door 1.2k; piers included). Self-score 28.5-30; controller read: gates about 29, kit about 27
-  (stone reads a little uniform tan). Slots TW_* on sandstone/oak_timber plus FK_*; FK_Decal_crack on the Shells.
-- Unity tiling code in (e6ccf5c, test-edit 618/618): TownWallPlan (pure C#, 9 tests), HollowmereTownWall.cs, Cap_HM_LowerGate / Cap_HM_EastGate. Plan: 5 runs,
-  55 modules, 10 ends, 2 stairs; Ruined 4 breach / 8 crumbled / 11 buttresses, Rebuilt 4 patched / 13 buttresses.
-- Now: wiring the real contract (End/Stair mirroring, pivot at the highest ground, gate children, real TW_ slots, colliders with open gate passages), one capture,
-  the town sheet, check, merge.
+Result:
+- Art: Art/Blender/town/sc_town_wall.py, 8 wall pieces + LowerGate / EastGate (Shell, Frame incl. piers, Part_Door) in Content/Art/Town/Wall/ (SOURCES.md there).
+- Unity: TownWallPlan (pure C#, 10 tests) + HollowmereTownWall.cs tile 52 modules over 3 runs with 4 ends and 4 stairs (one beside each gate); Ruined 4 breach /
+  8 crumbled, Rebuilt 4 patched; 12 buttresses; box colliders per module, open gate passages (pier colliders only); cameras Cap_HM_LowerGate / Cap_HM_EastGate.
+- Weak / open (for Q12 or a follow-up): stone tone and coursing very even, merlon rhythm repeats; about 10 m without wall east of the Lower Gate (existing
+  WallRun clearance near lots/lanes); the East Gate's pier line is about 25 degrees off the wall tangent so the wall meets it at an angle; a few buttress footings
+  hang off the steep east bank; door leaves hidden (ShowDoorLeaves = false) so gates read open; a pale translucent arrow shape behind the wall in the LowEast
+  frames (likely an existing scene marker, not checked); no PlayMode walk through the gates.
 
 ## Usage waste
 Honest look back over this session (bell tower, Q1, Q3, Q8), rough shares of the total spend:
