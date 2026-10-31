@@ -85,11 +85,11 @@ def cfg(name):
         w, d, lw, zt = R.uniform(5.2, 5.4), R.uniform(5.0, 5.3), R.uniform(1.4, 1.55), R.uniform(3.0, 3.15)
     side = R.choice((-1, 1))
     style = [
-        dict(board=(2.2, 2.0, 1.75), boardpaint=None, batten=False, roof='tile', leanroof='tile', chimney='pipe',
+        dict(board=(3.2, 2.9, 2.5), boardpaint=None, batten=False, roof='tile', leanroof='tile', chimney='pipe',
              paint='#4a6a48', block=True),
         dict(board=None, boardpaint=fk._lin('#9c7f4c'), batten=True, roof='board', leanroof='board', chimney='stack',
              paint='#6a2e29', block=False),
-        dict(board=(1.25, 1.12, 1.0), boardpaint=None, batten=False, roof='tile', leanroof='board', chimney='pipe',
+        dict(board=(1.75, 1.5, 1.28), boardpaint=None, batten=False, roof='tile', leanroof='board', chimney='pipe',
              paint='#3e5670', block=True),
     ][idx]
     return dict(name=name, idx=idx, cls=cls, w=round(w, 2), d=round(d, 2), lw=round(lw, 2), zt=round(zt, 2), side=side,
@@ -221,7 +221,7 @@ def boards(P, xa, xb, z0, z1, holes, tag, mat, batten=False):
     if batten:
         for i in range(1, n):
             xb_ = xa + i * bw
-            if any(h0 < xb_ < h1 and hz0 <= z0 + 0.1 and hz1 >= z1 - 0.1 for (h0, h1, hz0, hz1) in holes):
+            if any(h0 - 0.02 < xb_ < h1 + 0.02 for (h0, h1, hz0, hz1) in holes):
                 continue
             fk.add_box(P['Kit_Boards'], 'oak', (0.05, 0.022, z1 - z0 - 0.04), Matrix.Translation((xb_, -0.03, (z0 + z1) / 2)),
                        cham=0.0, long_axis=2, seed=i + 0.3)
@@ -620,7 +620,7 @@ def lean_to(c, P, R_, side, wx_t):
     pxs = [xa + 0.12, (xa + xb) / 2, xb - 0.12]
     vout = lw / (lw + ov)
     z_out_top = zh + 0.06 - (zh + 0.06 - zl) * vout
-    zp = z_out_top - 0.16 - 0.14          # underside of the plate beam
+    zp = z_out_top - 0.26 - 0.14          # underside of the plate beam
     for k, x in enumerate(pxs):
         fk.member(pc, 'oak', (x, yo + 0.1, 0.0), (x, yo + 0.1, zp), 0.2, 0.2, name='lp%d_%d' % (k, c['idx']))
     fk.member(pc, 'oak', (xa - 0.12, yo + 0.1, zp + 0.11), (xb + 0.12, yo + 0.1, zp + 0.11), 0.22, 0.2, name='lplate%d' % c['idx'], sag=0.02)
@@ -633,9 +633,9 @@ def lean_to(c, P, R_, side, wx_t):
     nrf = max(4, int((xb - xa) / 0.7))
     for k in range(nrf + 1):
         u = k / nrf * 0.9 + 0.05
-        fk.member(pc, 'oak', top(u, 0.02) - nrm * 0.245, top(u, 0.96) - nrm * 0.245, 0.14, 0.15, name='lr%d_%d' % (k, c['idx']), up=(0, 0, 1), cham=0.02)
+        fk.member(pc, 'oak', top(u, 0.02) - nrm * 0.36, top(u, 0.96) - nrm * 0.36, 0.14, 0.15, name='lr%d_%d' % (k, c['idx']), up=(0, 0, 1), cham=0.02)
     sheet(pc, mat, lambda u, v: top(u, v), 8, 3, lambda p: nrm, lambda co: (co.x / fk.TILE, co.y / fk.TILE))
-    sheet(pc, 'inner', lambda u, v: top(1 - u, v) - nrm * 0.16, 8, 2, lambda p: -nrm, lambda co: (co.x / fk.TILE, co.y / fk.TILE))
+    sheet(pc, 'inner', lambda u, v: top(1 - u, v) - nrm * 0.26, 8, 2, lambda p: -nrm, lambda co: (co.x / fk.TILE, co.y / fk.TILE))
     # tile or board courses
     nco = 5
     tk = 0.21 if c['leanroof'] == 'tile' else 0.9
@@ -659,10 +659,10 @@ def lean_to(c, P, R_, side, wx_t):
         bm.normal_update(); fk._merge(pc, bm, mat)
     # ends of the slab
     for ue, ox in ((0.0, -1), (1.0, 1)):
-        sheet(pc, 'oak', lambda uu, vv, ue=ue: top(ue, uu) - nrm * (0.06 + 0.10 * vv), 4, 1, lambda p, ox=ox: Vector((ox, 0, 0)),
+        sheet(pc, 'oak', lambda uu, vv, ue=ue: top(ue, uu) - nrm * (0.06 + 0.20 * vv), 4, 1, lambda p, ox=ox: Vector((ox, 0, 0)),
               lambda co: (co.y / fk.TILE, co.z / fk.TILE))
     # fascia along the eave
-    fk.member(pc, 'oak', Vector((xr0, -(lw + ov) + 0.1, zl + 0.0)) - nrm * 0.1, Vector((xr1, -(lw + ov) + 0.1, zl)) - nrm * 0.1, 0.18, 0.06,
+    fk.member(pc, 'oak', Vector((xr0, -(lw + ov) + 0.1, zl + 0.0)) - nrm * 0.16, Vector((xr1, -(lw + ov) + 0.1, zl)) - nrm * 0.16, 0.30, 0.10,
               name='lfa%d' % c['idx'], up=(0, -1, 0.3))
     # the far end (towards the back): full board wall; the outer side: half-height boards with gaps; the front end open
     mat_b = 'boardpaint' if c['boardpaint'] else 'board'
@@ -854,7 +854,7 @@ def assemble(name):
     CUR['board'] = c['board'] or (1, 1, 1)
     CUR['boardpaint'] = c['boardpaint']
     CUR['roofboard'] = (1.05, 0.95, 0.85) if c['idx'] == 1 else (0.85, 0.78, 0.70)
-    fk.OAK_TINT = (0.64, 0.60, 0.56)
+    fk.OAK_TINT = (0.48, 0.45, 0.42)
     fk.SHUTTER_PAINT = fk.DOOR_PAINT = c['paint']
     s = c['side']
     c['cx'] = -s * c['lw'] / 2
@@ -1048,7 +1048,7 @@ def write_wear(ob, c, R_, door_h):
                 r = max(r, (p.z - (zt - 0.7)) / 0.7 * 0.3)
             r = max(r, 0.2 * max(0.0, noise.noise(p * 0.5 + Vector((3.1, 0.0, 1.7)))) + 0.07 * max(0.0, noise.noise(p * 2.5)))
             if nm in ('Kit_Boards',) or mname in ('WS_Board', 'WS_BoardPaint'):    # rain streaks down the boards, tide marks at the base
-                r = max(r, 0.30 * max(0.0, noise.noise(Vector((p.x * 7.0, p.y * 7.0, p.z * 0.35))) - 0.05))
+                r = max(r, 0.20 * max(0.0, noise.noise(Vector((p.x * 7.0, p.y * 7.0, p.z * 0.35))) - 0.05))
             g = 0.0
             b = 0.0
             if nm == 'Kit_Plinth' and n.z > 0.5:
