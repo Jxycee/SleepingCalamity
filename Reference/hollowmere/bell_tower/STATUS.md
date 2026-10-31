@@ -1,10 +1,13 @@
 # Bell tower integration: status
 
-State: CAPTURING after merging main (terrain pass 1e20cb2 in); then unity.sh check and merge
+State: DONE (merged to main ee4fe79)
 Session: cloud, branch claude/brave-keller-3d91gk
-Progress: 90%
+Progress: 100%
 Sheet: Reference/hollowmere/bell_tower/bell_tower_sheet.jpg
-Blocker: none. Unity captures render in the cloud. Root cause of the grey tower found and fixed (see below).
+SC RESULT: SC RESULT check PASS (12a843a: build PASS, test-edit 591/591, test-play 32 passed / 8 skipped / 0 failed); main merge differs only in Reference/docs, so no re-check
+Merge commit: ee4fe79
+Tris: 22,132 (BellTower.fbx, cap 40,000)
+Blocker: none
 
 Done:
 - Merged `7ac0a9d`. Facade kit `__main__` wrap verified harmless: old and new kit export identical tris and bounds
@@ -32,7 +35,9 @@ Done:
   and 6.8 without, so BT_Bronze is now a flat warm bronze, linear (0.55, 0.36, 0.16), like FK_Glass (deterministic bytes).
 - Main merged again (terrain pass 1e20cb2): no conflicts; BeautyCornerBuilder.cs keeps both sides. In the town, HollowmereBuilder places the BellTower landmark at
   l.Y = KeepHeight (+4) and the tower art as its local (0, 0, 0) child, so it stands on the keep terrace; HollowmereLayout untouched. Town capture running to show it.
+- Town (Hollowmere scene) captures: the tower stands on the keep terrace (+4), visible from the overview and above the keep wall at the keep stairs (last row of the sheet).
 
-Pending: round 2 capture with materials, sheet refresh, `unity.sh check`, merge to main, delete the generator branch.
-SC RESULT: (not yet)
-Merge commit: (not yet)
+Unverified: the belfry, bronze bell, clock face and rubble/quoin shaft are hidden behind the facade roof in every corner capture, so their WearLit look was only
+seen at a distance in the town shots (shaft reads grey, spire red). A close camera on the tower would be the next check. The facade kit (sc_facade_kit.py) still exports
+absolute texture paths: a cloud export of it would hit the same 'Lit' slot problem (fix: path_mode='STRIP', as in sc_bell_tower.py).
+Generator branch claude/determined-thompson-6z2mml deleted after the merge.
