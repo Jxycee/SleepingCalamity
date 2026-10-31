@@ -1120,13 +1120,13 @@ def assemble(name, parts, size, sockets, top_z):
     root = bpy.data.objects.new(name, None); coll.objects.link(root); root.empty_display_type = 'PLAIN_AXES'
     frame, dec, glow = parts
     frame.name = 'Frame'; dec.name = 'Decals'; glow.name = 'Glow'
-    objs = [to_object(frame, coll, top_z), to_object(dec, coll, top_z), to_object(glow, coll, top_z), footprint(coll, *size)]
+    objs = [to_object(frame, coll, top_z)] + [to_object(x, coll, top_z) for x in (dec, glow) if x.f] + [footprint(coll, *size)]   # no empty meshes (Unity gives them a stray 'Lit' slot)
     for sname, loc in sockets:
         e = bpy.data.objects.new(sname, None); coll.objects.link(e); e.empty_display_type = 'ARROWS'; e.empty_display_size = 0.4; e.location = loc
         objs.append(e)
     for o in objs:
         o.parent = root; o['base'] = o.name.split('.')[0]; o.name = name + '__' + o['base']
-    tris = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in objs[:3])
+    tris = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in objs if o.type == 'MESH' and o.name != 'FOOTPRINT')
     ext = [max(abs(v.co[i]) for o in objs[:1] for v in o.data.vertices) for i in range(3)]
     print('BUILDING %s: tris %d (frame %d, decals %d, glow %d), extent x %.2f y %.2f z %.2f'
           % (name, tris, frame.tris(), dec.tris(), glow.tris(), ext[0], ext[1], ext[2]))
