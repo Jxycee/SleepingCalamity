@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Wave 1: Market stalls x3 (fixed, ruined + rebuilt)
-Progress: 45%
-Sheet: Reference/hollowmere/stalls/stalls_sheet_r1.jpg
+Progress: 55%
+Sheet: Reference/hollowmere/stalls/stalls_sheet_r3.jpg
 Blocker: none
 Score: round 1 (self, sc-asset-review rubric): produce rebuilt 30, cloth rebuilt 29.5, tools rebuilt 26, ruined x3 26; target 32 (first + 5). Round 3 renders running (round 2 superseded mid-run)
 Tris: produce 49.0k/49.1k, cloth 39.5k/48.4k, tools 37.3k/48.5k (rebuilt/ruined, look stage, before trims)

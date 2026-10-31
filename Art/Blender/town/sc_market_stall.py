@@ -71,8 +71,8 @@ if '--combine' in argv:
     for st in ('Ruined', 'Rebuilt'):
         nm = f'Stall_{VARIANT.capitalize()}_{st}'
         with bpy.data.libraries.load(os.path.join(OUT, nm + '.blend')) as (src, dst):
-            dst.objects = [nm]
-        ob = dst.objects[0]; bpy.context.scene.collection.objects.link(ob)
+            dst.objects = list(src.objects)
+        ob = next(o for o in dst.objects if o and o.type == 'MESH'); bpy.context.scene.collection.objects.link(ob)
         ob.name = st; ob.data.name = st; ob.parent = root
     for o in bpy.context.scene.objects: o.select_set(True)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, root.name + '.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
@@ -556,14 +556,14 @@ def mat_metal():
     m, nt, bs, uv, obj, xyz, geo = base_nodes('Metal')
     alb, nrm, orm = tset(nt, 'iron', uv)
     tint = attr(nt, 'tint').outputs['Color']
-    col = mix(nt, 1.0, mix(nt, 1.0, alb, (1.15, 1.15, 1.15, 1), 'MULTIPLY'), tint, 'MULTIPLY')
+    col = mix(nt, 1.0, mix(nt, 1.0, alb, (1.5, 1.5, 1.5, 1), 'MULTIPLY'), tint, 'MULTIPLY')
     edge = edge_mask(nt, geo, 0.006, 9.0)
     col = mix(nt, mth(nt, 'MULTIPLY', edge, 0.6), col, mix(nt, 1.0, tint, (1.6, 1.6, 1.6, 1), 'MULTIPLY'))
     rust = ramp(nt, noise_tex(nt, obj, 14.0, 6.0, 0.6, 5.0), 0.6, 0.75)
     col = mix(nt, rust, col, lin('#6b3a22'))
     link(nt, col, bs.inputs['Base Color'])
-    link(nt, mixf(nt, rust, 0.85, 0.0), bs.inputs['Metallic'])
-    link(nt, mixf(nt, rust, mth(nt, 'MULTIPLY_ADD', orm.outputs[1], 0.3, mixf(nt, edge, 0.42, 0.25)), 0.9), bs.inputs['Roughness'])
+    link(nt, mixf(nt, rust, mixf(nt, edge, 0.45, 0.8), 0.0), bs.inputs['Metallic'])          # half metallic: reads in the stall's shade (no black metal)
+    link(nt, mixf(nt, rust, mth(nt, 'MULTIPLY_ADD', orm.outputs[1], 0.3, mixf(nt, edge, 0.5, 0.3)), 0.9), bs.inputs['Roughness'])
     link(nt, nmap(nt, nrm, 0.6), bs.inputs['Normal'])
     return m
 
@@ -813,7 +813,7 @@ def back_fn(u, v):
     z = ztop + (zbot - ztop) * v
     y = PY - 0.075 + 0.02 * math.sin(2 * math.pi * u * 7.5) * (0.3 + v)
     return Vector((x, y, z)), (x / TILE, z / TILE), 0.0
-grid_part('backcloth', 40 * (2 if RUIN else 1), 6 * (3 if RUIN else 1), back_fn, 'Cloth', tint_fn=lambda u, v: bleach(lin('#6e4a3a'), 0.5) if RUIN else lin('#6e4a3a'),
+grid_part('backcloth', 60 if RUIN else 40, 14 if RUIN else 6, back_fn, 'Cloth', tint_fn=lambda u, v: bleach(lin('#6e4a3a'), 0.5) if RUIN else lin('#6e4a3a'),
           keep_fn=(lambda u, v: v < 0.45 + 0.4 * noise.noise(Vector((u * 7, 1.0, 2.0))) + 0.25 and not (0.55 < u < 0.7 and v > 0.2)) if RUIN else None, fray=0.03 if RUIN else 0.0)
 
 # ----------------------------------------------------------------------------- small-part helpers (goods, crates, weeds; Wave 1 variants)
@@ -881,7 +881,7 @@ def weeds(name, cx, cy, rad, n, hmax, docks=4):
     for b in range(n):
         a = r.uniform(0, 2 * math.pi); d = rad * math.sqrt(r.random()); base = Vector((cx + d * math.cos(a), cy + d * math.sin(a), 0.0))
         h = hmax * r.uniform(0.45, 1.0); w = r.uniform(0.010, 0.018); lean = r.uniform(0.25, 0.9); fa = a + r.uniform(-0.6, 0.6)
-        out = Vector((math.cos(fa), math.sin(fa), 0)); side = Vector((-out.y, out.x, 0)); seg = 4; rows = []
+        out = Vector((math.cos(fa), math.sin(fa), 0)); side = Vector((-out.y, out.x, 0)); seg = 3; rows = []
         for k in range(seg + 1):
             t = k / seg; p = base + out * (h * lean * t * t) + Vector((0, 0, h * t * (1 - 0.25 * lean * t)))
             ww = w * (1 - t) + 0.001
@@ -1161,9 +1161,11 @@ if VARIANT and not RUIN:
     elif VARIANT == 'tools':
         # tools hung from a rail under the back lintel, pots and a kettle on the tiers, horseshoes, a nail tray and a hammer on the counter,
         # a barrel of long-handled tools at the fountain-side front corner
-        zr = lintel_top(PY) - LIN_H - 0.05; yr = PY - 0.13
+        zr = 1.95; yr = PY - 0.13                                   # rail at eye height on two iron hangers from the back lintel
         COPPER, STEEL = lin('#c27a48'), lin('#b8b4ac')
         pole('tool_rail', [(-1.15, yr, zr), (1.15, yr, zr)], 0.014, 'Iron', 8)
+        for sx in (-1, 1):
+            pole(f'rail_hanger{sx}', [(sx * 1.05, yr, zr), (sx * 1.05, yr, lintel_top(PY) - LIN_H + 0.02)], 0.009, 'Iron', 6)
         def hook(nm, x):
             pole(nm, [(x, yr, zr + 0.01), (x, yr - 0.03, zr - 0.01), (x, yr - 0.03, zr - 0.05)], 0.005, 'Iron', 6)
         TOOLS = [('saw', -0.95), ('hammer', -0.6), ('sickle', -0.3), ('tongs', 0.05), ('saw2', 0.4), ('ladle', 0.72), ('hammer2', 0.98)]
@@ -1227,8 +1229,9 @@ if RUIN:
     crate('crate_r3', 0.44, 0.32, 0.28, Matrix.Translation((-PX - 0.05, PY + 0.32, 0)) @ about((0, 0, 0), rx=8, rz=-10), slats_gone=(1, 3, 6),
           tint=bleach(lin('#b8a88a'), 0.4)); RACK_SKIP.extend(PARTS[-13:])
     if VARIANT == 'tools':                                          # the rail is still there with its bare hooks; the barrel stands empty
-        zr = lintel_top(PY) - LIN_H - 0.05; yr = PY - 0.13
-        pole('tool_rail', [(-1.15, yr, zr), (1.15, yr, zr + 0.03)], 0.014, 'Iron', 8)
+        zr = 1.95; yr = PY - 0.13
+        pole('tool_rail', [(-1.15, yr, zr), (1.15, yr, zr - 0.06)], 0.014, 'Iron', 8)
+        pole('rail_hanger-1', [(-1.05, yr, zr), (-1.05, yr, lintel_top(PY) - LIN_H + 0.02)], 0.009, 'Iron', 6)   # the right hanger rusted through
         for k, x in enumerate((-0.95, -0.3, 0.4, 0.98)):
             pole(f'hook_r{k}', [(x, yr, zr + 0.01), (x, yr - 0.03, zr - 0.01), (x, yr - 0.03, zr - 0.05)], 0.005, 'Iron', 6)
         bx, by = -W / 2 - 0.2, -PY - 0.2; s0 = len(PARTS)
@@ -1251,6 +1254,16 @@ if RUIN:
     for k, (x, y, rad, n, h) in enumerate(((-PX, -PY, 0.24, 80, 0.48), (PX, -PY, 0.22, 70, 0.4), (-PX, PY, 0.28, 90, 0.55), (PX, PY, 0.24, 75, 0.45),
                                             (0.2, -PY - 0.05, 0.2, 45, 0.3), (PX + 0.2, 0.25, 0.24, 55, 0.36))):
         weeds(f'weeds{k}', x + (0.04 if x > 0 else -0.04), y + (-0.03 if y < 0 else 0.03), rad, n, h)
+    # the camera-side front corner of the awning has come down: its rafter slipped off the front lintel, the front bar bends, the cloth slumps with it
+    def droop(w):
+        fx = min(max((w.x - 0.15) / 1.3, 0.0), 1.0); fy = min(max((-w.y - 0.25) / 0.9, 0.0), 1.0)
+        return -0.42 * (fx * fx * (3 - 2 * fx)) * (fy * fy * (3 - 2 * fy))
+    bpy.context.view_layer.update()
+    for ob in PARTS:
+        if not ob.name.startswith(('canvas', 'valance_F', 'valance_1', 'frontbar', 'rafter2')): continue
+        mw = ob.matrix_world; inv = mw.inverted()
+        for v in ob.data.vertices:
+            w = mw @ v.co; w.z += droop(w); v.co = inv @ w
     # the whole frame has racked: leaning toward +X and the back, everything nailed to it going with it (ground pieces stay put)
     rack = Matrix(((1, 0, 0.045, 0), (0, 1, 0.018, 0), (0, 0, 1, 0), (0, 0, 0, 1)))
     bpy.context.view_layer.update()
@@ -1331,6 +1344,14 @@ if '--export' in argv and STALL:
     STALL.select_set(True); bpy.context.view_layer.objects.active = STALL
     for uvl in [l for l in STALL.data.uv_layers if l.name != 'atlas']:   # Unity samples UV0: ship the atlas only
         STALL.data.uv_layers.remove(uvl)
+if '--export' in argv and STALL and VARIANT:
+    # one state of a Wave 1 stall: keep the baked object for --combine (both states into one FBX); the bake masks are not shipped
+    for a in [a for a in STALL.data.attributes if a.name in ('tint', 'stripe', 'vh')]:
+        STALL.data.attributes.remove(a)
+    STALL.parent = None
+    bpy.data.libraries.write(os.path.join(OUT, NAME + '.blend'), {STALL}, fake_user=True)
+    print('SAVED', os.path.join(OUT, NAME + '.blend'))
+elif '--export' in argv and STALL:
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, NAME + '.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
                              apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,   # identity root in Unity, like B4/B6
                              mesh_smooth_type='FACE', add_leaf_bones=False)
