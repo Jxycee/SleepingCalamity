@@ -35,12 +35,15 @@ namespace SleepingCalamity.EditorTools
         public readonly struct Instance
         {
             public readonly Vector3 Pos; public readonly float Yaw, Scale;
-            public Instance(float x, float y, float z, float yaw = 0f, float scale = 1f) { Pos = new Vector3(x, y, z); Yaw = yaw; Scale = scale; }
+            public readonly string Asset;   // art folder of this instance (a B7 prop variant); null = the row's own folder match
+            public Instance(float x, float y, float z, float yaw = 0f, float scale = 1f, string asset = null) { Pos = new Vector3(x, y, z); Yaw = yaw; Scale = scale; Asset = asset; }
         }
 
         public sealed class Row
         {
             public string Brief, Id, Batch; public string[] Names; public Instance[] Instances; public Part[] Placeholder; public bool Foliage;
+            public float ArtYaw;       // extra yaw applied to the art only (the greybox keeps the instance yaw): Facade.fbx comes in facing +Z, the brief wants -Z
+            public bool Scatter;       // art placement is data driven (BeautyCornerGround): Instances are the fallback greybox positions, the scene group holds the scatter
         }
 
         static Part Box(float x, float y, float z, float w, float h, float d, string mat, float rx = 0f, float ry = 0f, float rz = 0f) =>
@@ -48,13 +51,23 @@ namespace SleepingCalamity.EditorTools
         static Part Cyl(float x, float y, float z, float dia, float h, string mat) =>
             new Part(PartShape.Cylinder, new Vector3(x, y, z), new Vector3(dia, h, dia), mat);
         static Instance At(float x, float y, float z, float yaw = 0f, float scale = 1f) => new Instance(x, y, z, yaw, scale);
+        static Instance Prop(string asset, float x, float y, float z, float yaw = 0f) => new Instance(x, y, z, yaw, 1f, asset);
+
+        // The stall stands at StallPos turned StallYaw (brief); OnStall gives a point in the stall's own frame (x along the counter, y up, z out of the counter front).
+        public static readonly Vector3 StallPos = new Vector3(4.5f, 0f, 4.5f);
+        public const float StallYaw = 200f;
+        static Instance OnStall(string asset, float lx, float ly, float lz, float localYaw = 0f)
+        {
+            Vector3 p = StallPos + Quaternion.Euler(0f, StallYaw, 0f) * new Vector3(lx, ly, lz);
+            return new Instance(p.x, p.y, p.z, StallYaw + localYaw, 1f, asset);
+        }
 
         public static readonly Row[] Rows =
         {
-            new Row { Brief = Cobbles, Id = "PlazaCobbles", Batch = "B6", Names = new[] { "plaza_cobbles", "cobbles", "cobble_plaza", "plaza" },
-                Instances = new[] { At(0f, 0f, 1f) },     // x -8..8, z -6..8 (16 x 14 m); the 5 cm dish is the art's job
+            new Row { Brief = Cobbles, Id = "PlazaCobbles", Batch = "B6", Names = new[] { "plaza_cobbles", "cobbles", "cobble_plaza", "plaza" }, Scatter = true,
+                Instances = new[] { At(0f, 0f, 0f) },     // x -8..8, z -6..8 (16 x 14 m): the B6 export is authored around the fountain centre, so it sits at the origin
                 Placeholder = new[] { Box(0f, -0.05f, 0f, 16f, 0.1f, 14f, "cobble") } },
-            new Row { Brief = Ring, Id = "FountainRing", Batch = "B6", Names = new[] { "fountain_ring", "flagstone_ring", "ring", "fountain_flagstone" },
+            new Row { Brief = Ring, Id = "FountainRing", Batch = "B6", Names = new[] { "fountain_ring", "flagstone_ring", "flag_ring", "ring", "fountain_flagstone" }, Scatter = true,
                 Instances = new[] { At(0f, 0f, 0f) },     // 1.2 m wide ring around the 3.4 m basin: outer diameter 5.8 m
                 Placeholder = new[] { Cyl(0f, 0.03f, 0f, 5.8f, 0.06f, "sandstone") } },
             new Row { Brief = Fountain, Id = "DryFountain", Batch = "B10", Names = new[] { "dry_fountain", "fountain" },
@@ -64,6 +77,7 @@ namespace SleepingCalamity.EditorTools
                 Instances = new[] { At(-2.6f, 0f, 1.8f) }, // pole about 4.5 m, banner 0.7 x 2.2 m (moved from the brief's 2.4, 1.2 by the controller, round 2: frames the left of Wide, clears Mid)
                 Placeholder = new[] { Cyl(0f, 2.25f, 0f, 0.12f, 4.5f, "dark"), Box(0.4f, 3.15f, 0f, 0.7f, 2.2f, 0.03f, "cloth") } },
             new Row { Brief = Facade, Id = "Facade", Batch = "B4", Names = new[] { "facade", "half_timbered_facade", "timber_facade", "house" },
+                ArtYaw = 180f,   // Facade.fbx comes in with its front toward local +Z (B4 SOURCES.md): turn the art round to face -Z
                 Instances = new[] { At(-1.25f, 0f, 7.5f) },   // front 7.5 m wide on z 7.5, x -5..2.5, facing -Z; pivot = front face centre at ground
                 Placeholder = new[]
                 {
@@ -79,8 +93,8 @@ namespace SleepingCalamity.EditorTools
                     Box(0f, 7.5f, 1.025f, 8.1f, 0.25f, 4.65f, "roof_tile", -40.2f),      // roof, ridge about 9 m
                     Box(0f, 7.5f, 4.575f, 8.1f, 0.25f, 4.65f, "roof_tile", 40.2f),
                 } },
-            new Row { Brief = Stall, Id = "MarketStall", Batch = "B8", Names = new[] { "market_stall", "stall" },
-                Instances = new[] { At(4.5f, 0f, 4.5f, 200f) },   // 2.6 x 1.6 m, awning top about 2.7 m, rotated 200 deg so the counter faces the fountain
+            new Row { Brief = Stall, Id = "MarketStall", Batch = "B8", Names = new[] { "market_stall" },   // no bare "stall": the contains-match would grab B8/Stall_Lantern
+                Instances = new[] { At(StallPos.x, 0f, StallPos.z, StallYaw) },   // 2.6 x 1.6 m, awning top about 2.7 m, rotated 200 deg so the counter faces the fountain
                 Placeholder = new[]
                 {
                     Box(0f, 0.45f, 0.45f, 2.6f, 0.9f, 0.7f, "painted_wood"),             // counter (front = +Z)
@@ -89,29 +103,32 @@ namespace SleepingCalamity.EditorTools
                     Box(0f, 2.62f, 0f, 2.8f, 0.08f, 1.8f, "canvas", 8f),                 // awning, top about 2.7 m
                 } },
             // Props cluster (B7): 3 barrels, 3 crates, 4 sacks, 2 buckets, 3 baskets, 2 jugs, by the stall and the facade door (door at x -1.25, z 7.5).
+            // Clusters (brief 5: odd groups, touching, mixed heights, a walking path to the door at x -1.4): A left of the door (two barrels, sack, bucket), B under the ground
+            // window (long crate with a crate on top, barrel), C at the stall's far flank (crate with a sack, pair of sacks, sack, bucket); the counter and shelf carry
+            // produce, bread and jugs. Each of the 17 B7 variants is used once; the greybox placeholders stand in where the art is missing.
             new Row { Brief = Props, Id = "Barrels", Batch = "B7", Names = new[] { "barrel", "barrels" },
-                Instances = new[] { At(-0.1f, 0f, 6.95f), At(0.7f, 0f, 7.0f, 40f), At(-3.3f, 0f, 6.9f, 15f) },
+                Instances = new[] { Prop("Barrel_A", -2.6f, 0f, 6.95f), Prop("Barrel_B", -3.4f, 0f, 6.95f, 35f), Prop("Barrel_C", 2.25f, 0f, 6.9f, 10f) },
                 Placeholder = new[] { Cyl(0f, 0.45f, 0f, 0.62f, 0.9f, "barrel_oak") } },
             new Row { Brief = Props, Id = "Crates", Batch = "B7", Names = new[] { "crate", "crates" },
-                Instances = new[] { At(1.9f, 0f, 6.95f, 12f), At(2.1f, 0.6f, 6.95f, -20f), At(5.9f, 0f, 3.2f, 70f) },
+                Instances = new[] { Prop("Crate_B", 1.0f, 0f, 6.95f, 90f), Prop("Crate_A", 1.2f, 0.5f, 6.95f, -8f), Prop("Crate_C", 6.5f, 0f, 4.45f, 15f) },
                 Placeholder = new[] { Box(0f, 0.3f, 0f, 0.6f, 0.6f, 0.6f, "painted_wood") } },
             new Row { Brief = Props, Id = "Sacks", Batch = "B7", Names = new[] { "sack", "sacks" },
-                Instances = new[] { At(-2.1f, 0f, 6.85f, 20f), At(-2.55f, 0f, 6.8f, -15f), At(6.1f, 0f, 5.6f, 100f), At(5.9f, 0f, 6.0f, 60f) },
+                Instances = new[] { Prop("Sack_A", -2.95f, 0f, 6.2f, 165f), Prop("Sack_B", 6.5f, 0.43f, 4.4f, 20f), Prop("Sack_C", 7.1f, 0f, 4.6f, 110f), Prop("Sack_Pair", 6.4f, 0f, 5.55f, 100f) },
                 Placeholder = new[] { Box(0f, 0.275f, 0f, 0.42f, 0.55f, 0.3f, "canvas") } },
             new Row { Brief = Props, Id = "Buckets", Batch = "B7", Names = new[] { "bucket", "buckets" },
-                Instances = new[] { At(-0.9f, 0f, 6.7f), At(5.4f, 0f, 3.0f) },
+                Instances = new[] { Prop("Bucket_A", -4.0f, 0f, 6.55f, 70f), Prop("Bucket_B", 6.0f, 0f, 3.55f) },
                 Placeholder = new[] { Cyl(0f, 0.15f, 0f, 0.32f, 0.3f, "oak_timber") } },
             new Row { Brief = Props, Id = "Baskets", Batch = "B7", Names = new[] { "basket", "baskets" },
-                Instances = new[] { At(3.0f, 0f, 3.5f), At(6.2f, 0f, 4.3f, 30f), At(1.1f, 0f, 6.5f) },
+                Instances = new[] { OnStall("Basket_Produce", -0.55f, 0.98f, 0.58f, 10f), OnStall("Basket_Bread", 0.4f, 0.98f, 0.6f, -15f), Prop("Basket_Lidded", 2.65f, 0f, 5.0f, 40f) },
                 Placeholder = new[] { Cyl(0f, 0.17f, 0f, 0.5f, 0.34f, "oak_timber") } },
             new Row { Brief = Props, Id = "Jugs", Batch = "B7", Names = new[] { "jug", "jugs" },
-                Instances = new[] { At(3.95f, 0.9f, 4.55f), At(3.55f, 0.9f, 4.75f) },   // on the stall counter
+                Instances = new[] { OnStall("Jug_A", 0.8f, 1.15f, 0.14f, 20f), OnStall("Jug_B", -0.7f, 1.33f, -0.09f) },   // shelf tiers 1 and 2 behind the counter (B8 header)
                 Placeholder = new[] { Cyl(0f, 0.2f, 0f, 0.24f, 0.4f, "painted_wood") } },
             // Foliage (B9)
             new Row { Brief = Foliage, Id = "Ivy", Batch = "B9", Names = new[] { "ivy", "facade_ivy" }, Foliage = true,
                 Instances = new[] { At(-4f, 0f, 7.5f) },      // the facade's left 2 m (x -5..-3), ground to the eave; pivot = bottom centre of the 2 m strip
                 Placeholder = new[] { Box(0f, 1.5f, -0.04f, 2f, 3f, 0.06f, "green"), Box(0f, 4.5f, -0.5f, 2f, 3f, 0.06f, "green") } },
-            new Row { Brief = Foliage, Id = "CrackWeeds", Batch = "B9", Names = new[] { "crack_weeds", "weeds", "weed", "crack_weed" }, Foliage = true,
+            new Row { Brief = Foliage, Id = "CrackWeeds", Batch = "B9", Names = new[] { "crack_weeds", "weeds", "weed", "crack_weed" }, Foliage = true, Scatter = true,
                 Instances = new[] { At(-4.4f, 0f, 7.3f), At(-3.0f, 0f, 7.35f, 40f), At(-1.9f, 0f, 7.3f, 80f), At(0.2f, 0f, 7.35f, 10f), At(1.6f, 0f, 7.3f, 120f),
                     At(2.3f, 0f, 7.3f, 60f),
                     At(2.75f, 0f, 0.8f, 30f), At(-2.4f, 0f, -1.7f, 100f), At(1.2f, 0f, -2.65f, 160f), At(-2.8f, 0f, 0.9f, 70f) },   // facade foot, then the fountain ring (radius 2.9)
@@ -119,12 +136,15 @@ namespace SleepingCalamity.EditorTools
             new Row { Brief = Foliage, Id = "BasinMoss", Batch = "B9", Names = new[] { "basin_moss", "moss", "moss_patch" }, Foliage = true,
                 Instances = new[] { At(-0.9f, 0.55f, 1.45f, -32f) },   // on the basin rim, the side away from the sun (the sun shines from +x, -z)
                 Placeholder = new[] { Box(0f, 0.02f, 0f, 0.9f, 0.04f, 0.5f, "green") } },
+            new Row { Brief = Foliage, Id = "MossBand", Batch = "B9", Names = new[] { "moss_band_a" }, Foliage = true,
+                Instances = new[] { At(0f, 0f, 0f) },   // B9 Moss_Band_A: pivot = basin centre, yaw 0 puts the 110 degree band on the south-west foot the cameras see
+                Placeholder = new[] { Box(-1.2f, 0.02f, -1.2f, 0.9f, 0.04f, 0.3f, "green", 0f, 45f, 0f) } },
             // Lanterns (B8)
             new Row { Brief = Lanterns, Id = "StallLantern", Batch = "B8", Names = new[] { "stall_lantern", "lantern", "hanging_lantern" },
-                Instances = new[] { At(3.58f, 0.9f, 4.3f) },  // on the stall counter
+                Instances = new[] { OnStall(null, 1.0f, 0.98f, 0.55f) },  // on the stall counter (top at 0.98, B8 header)
                 Placeholder = new[] { Box(0f, 0.17f, 0f, 0.2f, 0.34f, 0.2f, "warm") } },
             new Row { Brief = Lanterns, Id = "BracketLantern", Batch = "B8", Names = new[] { "bracket_lantern", "wall_lantern", "lantern_bracket" },
-                Instances = new[] { At(0.0f, 2.45f, 7.38f) }, // on the facade wall beside the door (door at x -1.25)
+                Instances = new[] { At(-0.37f, 2.45f, 7.5f, 180f) }, // on the facade wall between the door (to x -0.8 with its frame) and the ground window; plate back on the plaster (B8 SOURCES)
                 Placeholder = new[] { Box(0f, 0f, 0f, 0.22f, 0.36f, 0.22f, "warm"), Box(0f, 0.2f, 0.1f, 0.05f, 0.05f, 0.3f, "iron") } },
             // Neighbour massing (round 2): greybox buildings closing the square so Wide has no empty ground. Not brief rows; later B4 variants replace them.
             // Pivot = front face centre at ground, front facing -Z, like the facade. Names stay empty: art never replaces these by folder match.
