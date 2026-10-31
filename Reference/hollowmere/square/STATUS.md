@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 25%
+Progress: 40%
 Sheet: none (top-down plan: Reference/hollowmere/square/ground_plan_r1.png)
-Blocker: paused by coordinator for usage (both subagents told to finish their current step, commit/leave work, and stop)
+Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test and the art finish+export are running on Sonnet agents)
 
 ## Done
 - Ground generator `Art/Blender/town/sc_square_ground.py` (branch claude/practical-tesla-lqajeo). Reads the plan from HollowmereLayout.cs,
