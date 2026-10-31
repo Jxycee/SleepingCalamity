@@ -26,12 +26,12 @@ Shader "SleepingCalamity/Water"
     Properties
     {
         _NormalMap ("Water normal map (tileable)", 2D) = "bump" {}
-        _NormalScale ("Normal strength", Range(0, 1.5)) = 0.35
-        _Tile1 ("Detail layer 1: metres per tile", Float) = 4.0
-        _Tile2 ("Detail layer 2: metres per tile", Float) = 1.7
+        _NormalScale ("Normal strength", Range(0, 1.5)) = 0.2
+        _Tile1 ("Detail layer 1: metres per tile", Float) = 7.0
+        _Tile2 ("Detail layer 2: metres per tile", Float) = 3.1
         _FlowSpeed ("Flow speed (m/s at vertex colour G = 0.25)", Float) = 0.5
         _Drift ("Still-water drift (tiles/s)", Float) = 0.012
-        _NormalFadeStart ("Normal detail starts fading (m)", Float) = 30
+        _NormalFadeStart ("Normal detail starts fading (m)", Float) = 18
         _NormalFadeLen ("Normal detail fade length (m)", Float) = 130
 
         _ShallowColor ("Shallow scatter colour", Color) = (0.30, 0.40, 0.16, 1)
@@ -48,11 +48,11 @@ Shader "SleepingCalamity/Water"
         _SpecStrength ("Sun glint strength", Range(0, 4)) = 1.0
 
         _FoamColor ("Foam colour", Color) = (0.90, 0.94, 0.90, 1)
-        _FoamWidth ("Shoreline foam width (m of depth)", Float) = 0.30
-        _ShoreFoam ("Shoreline foam strength", Range(0, 1)) = 0.55
+        _FoamWidth ("Shoreline foam width (m of depth)", Float) = 0.10
+        _ShoreFoam ("Shoreline foam strength", Range(0, 1)) = 0.5
         _FoamScale ("Foam noise scale (1/m)", Float) = 1.3
         _LapSpeed ("Lapping speed (rad/s)", Float) = 0.9
-        _FlowFoam ("Flow foam strength", Range(0, 1.5)) = 1.0
+        _FlowFoam ("Flow foam strength", Range(0, 1.5)) = 0.8
     }
     SubShader
     {
@@ -209,13 +209,13 @@ Shader "SleepingCalamity/Water"
                 float lap = 0.5 + 0.5 * sin(t * _LapSpeed + phase);
                 float band = 1.0 - saturate(vertDepth / (_FoamWidth * (0.45 + 0.75 * lap)));
                 float fn = VNoise(fp * _FoamScale + t * 0.03) * 0.65 + VNoise(fp * _FoamScale * 2.9 - t * 0.05) * 0.35;
-                float shore = saturate((band - fn * 0.85 + 0.15) * 3.0) * _ShoreFoam;
+                float shore = saturate((band - fn * 0.95 + 0.05) * 3.0) * _ShoreFoam;
 
                 // ---- flow foam from vertex colour R: streaks that run downstream
                 float fr = i.color.r;
                 float2 fuv = float2(i.uv.x, i.uv.y - flow * t * 1.2);
                 float streak = VNoise(float2(fuv.x * 1.8, fuv.y * 0.55)) * 0.6 + VNoise(float2(fuv.x * 4.7, fuv.y * 1.3 + 7.0)) * 0.4;
-                float flowFoam = saturate((fr * 1.35 - streak * 0.95) * 3.0) * _FlowFoam * saturate(fr * 3.0);
+                float flowFoam = saturate((fr * 0.95 - streak * 1.1 + 0.05) * 2.2) * _FlowFoam * saturate(fr * 3.0);
 
                 float foam = saturate(max(shore, flowFoam));
                 half3 foamCol = _FoamColor.rgb * (amb * 0.9 + L.color * (saturate(L.direction.y) * L.shadowAttenuation * 0.85));

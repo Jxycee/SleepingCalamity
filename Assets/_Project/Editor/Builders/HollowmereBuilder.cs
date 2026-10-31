@@ -61,7 +61,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
             ("Cap_HM_LakeJetty", new Vector3(-22f, 1.3f, -80f), new Vector3(30f, -9f, -106f), 55f),      // low over the water by the future jetty, looking SE across the lake
             ("Cap_HM_Ravine", new Vector3(107.8f, 1.7f, -21.4f), new Vector3(91f, -11.5f, -43f), 55f),    // from the ravine's bank at s ~22 downstream along the pools and weirs W1, W2
-            ("Cap_HM_MillLane", new Vector3(55f, 1.65f, -44f), new Vector3(70f, -7f, -58f), 60f),         // on Mill Lane toward the mill and the stream
+            ("Cap_HM_MillLane", new Vector3(60.5f, 1.65f, -51.5f), new Vector3(72f, -5f, -64f), 65f),         // on Mill Lane toward the mill and the stream
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 

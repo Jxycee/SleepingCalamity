@@ -75,6 +75,9 @@ namespace SleepingCalamity.EditorTools
             }
             Material m = LookTestBuilder.Ensure(MaterialPath, sh);
             m.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(NormalPath));
+            // The look numbers live here (a material keeps the defaults it was created with, so they are set on every build).
+            m.SetFloat("_NormalScale", 0.2f); m.SetFloat("_Tile1", 7f); m.SetFloat("_Tile2", 3.1f); m.SetFloat("_NormalFadeStart", 18f);
+            m.SetFloat("_FoamWidth", 0.10f); m.SetFloat("_ShoreFoam", 0.5f); m.SetFloat("_FlowFoam", 0.8f);
             m.SetShaderPassEnabled("ShadowCaster", false);
             m.renderQueue = 3000;
             EditorUtility.SetDirty(m);
