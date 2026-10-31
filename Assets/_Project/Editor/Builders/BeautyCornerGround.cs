@@ -226,7 +226,7 @@ namespace SleepingCalamity.EditorTools
                 GameObject go = BeautyCornerArt.LoadModel(folder, Path.GetFileName(fbx));
                 if (go == null) continue;
                 models.Add(go);
-                if (mat == null) mat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "CrackWeeds", foliage: true);   // the five folders hold one identical atlas
+                if (mat == null) mat = BeautyCornerArt.CrackWeedsMaterial();   // the five folders hold one identical atlas
             }
             if (models.Count == 0 || mat == null) return false;
             // The edge_grass slots (the patch's fading open edges) take the B9 grass clumps A..C: the same foliage atlas, so the same material.

@@ -142,7 +142,7 @@ namespace SleepingCalamity.EditorTools
                     GameObject go = fbx != null ? BeautyCornerArt.LoadModel(folder, Path.GetFileName(fbx)) : null;
                     if (go == null) continue;
                     into.Add(go);
-                    if (mat == null) mat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "CrackWeeds", foliage: true);   // the same atlas and material as the corner's weeds
+                    if (mat == null) mat = BeautyCornerArt.CrackWeedsMaterial();   // the same atlas and material as the corner's weeds
                 }
             }
             Load("Moss_Tuft_", "ABC", moss); Load("Grass_", "ABC", grass); Load("Weed_", "ABCDE", weeds);
@@ -381,7 +381,7 @@ namespace SleepingCalamity.EditorTools
                     GameObject go = fbx != null ? BeautyCornerArt.LoadModel(folder, Path.GetFileName(fbx)) : null;
                     if (go == null) continue;
                     _models.Add(go);
-                    if (_mat == null) _mat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "CrackWeeds", foliage: true);   // the B9 folders share one atlas
+                    if (_mat == null) _mat = BeautyCornerArt.CrackWeedsMaterial();   // the B9 folders share one atlas
                 }
                 foreach (string name in new[] { "Ivy_Patch_A", "Ivy_Patch_B" })
                 {

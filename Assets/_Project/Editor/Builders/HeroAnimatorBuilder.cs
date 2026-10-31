@@ -97,10 +97,23 @@ namespace SleepingCalamity.EditorTools
                 AnimationClip clip = byId[slot.Id];
                 string clipPath = AssetDatabase.GetAssetPath(clip);
                 sb.Append(slot.Id).Append('|').Append(slot.Mirror).Append('|').Append(clipPath).Append('|').Append(clip.name).Append('|')
-                  .Append(AssetDatabase.GetAssetDependencyHash(clipPath)).Append(';');
+                  .Append(ContentHash(clipPath)).Append(';');
             }
             using (var sha = System.Security.Cryptography.SHA1.Create())
                 return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(sb.ToString()))).Replace("-", "");
+        }
+
+        // SHA1 of the clip's source file and its .meta (import settings, clip names). AssetDatabase.GetAssetDependencyHash is not used: it also covers the editor
+        // build, the platform and the importer's artifact version, so it differs between the PC and the cloud and made every session rebuild the controller.
+        static string ContentHash(string assetPath)
+        {
+            using (var sha = System.Security.Cryptography.SHA1.Create())
+            {
+                string abs = BuilderUtil.Abs(assetPath);
+                byte[] data = File.ReadAllBytes(abs), meta = File.Exists(abs + ".meta") ? File.ReadAllBytes(abs + ".meta") : new byte[0];
+                byte[] a = sha.ComputeHash(data), b = sha.ComputeHash(meta);
+                return BitConverter.ToString(a).Replace("-", "") + BitConverter.ToString(b).Replace("-", "");
+            }
         }
 
         static void Clear(AnimatorController ctrl, string path)
