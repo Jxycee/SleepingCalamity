@@ -1,13 +1,14 @@
 State: IN PROGRESS
 Session: Wave 2: Ground tileables + foliage extension
-Progress: 75%
-Sheet: Reference/hollowmere/foliage/foliage_sheet_r1.jpg
-Blocker: paused by coordinator for usage
+Progress: 85%
+Sheet: Reference/hollowmere/foliage/foliage_sheet_r2.jpg
+Blocker: none
 
-Score: round 1 = 26/40 (self; target 31). Ground reads as real PBR turf/soil/grit, banks and ditch soil, ivy faces out and sits on the keep wall,
+Score: round 2 = 28/40 (self; round 1 26/40 approved by the coordinator). Round 2: greybox keep ivy boxes gone, grass clustered, dry patches calm in the overview.
+Round 1 = 26/40 (self; target 31). Ground reads as real PBR turf/soil/grit, banks and ditch soil, ivy faces out and sits on the keep wall,
   corner rows unchanged. Top fixes in round 2: (1) terrain tufts stand in lines on lane/square paving edges, (2) grass reads as even dots, not meadow
   (cluster it at 4-8 m), (3) old greybox green ivy boxes still on the keep wall; dry patches in the overview were blotchy (softened).
-Tris: grass worst view 368k (Cap_HM_TitheGate, 2,167 clumps; 73k clumps total, instanced terrain details, no shadows);
+Tris: grass worst view 332k (Cap_HM_Bakery, 1,954 clumps; 63k clumps total, instanced terrain details, no shadows);
   placed foliage ruined 1,300 objects / 596k tris town-wide, rebuilt 610 / 295k.
 Check: - (round 2 runs build, captures, then unity.sh check)
 Merge: -
@@ -22,3 +23,4 @@ Merge: -
 - 2026-10-31 ~10:20: PAUSED by the coordinator for usage (resume after the 12:10 UTC reset). Main is merged (`977dac2`). The round 2 code is pushed but unverified: paving margin for the detail grass, grass clustered at 4-8 m, the greybox keep ivy boxes removed. A Unity batch run the stopped subagent started was left to finish on its own (never killed). On resume: build, captures (cap3), sheet r2, check, merge.
 - 2026-10-31: RESUMED. Round 1 approved by the coordinator (26/40). Main merged (townhouse). Applying only the round 2 own fixes, then build, captures in both presets, check, merge.
 - 2026-10-31: PAUSED again for usage. The final capture run (cap3, round 2 code) was already running in Unity and is left to finish on its own (it costs no tokens, and it was not killed); its PNGs land in this session's scratchpad. On resume: read cap3, make sheet r2, run unity.sh check, merge.
+- 2026-10-31: round 2 captures done (both presets, all cameras); sheet r2 pushed. The tuft line on the square in HomeDoor is the approved corner's own CrackWeeds row (unchanged), not this pass. unity.sh check finishing.
