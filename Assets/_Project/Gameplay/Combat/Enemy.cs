@@ -8,6 +8,9 @@
 // lapse when the hit window closes and are released early on stagger, parry, death and despawn. The Warden's signature plays alone: while others still
 // hold tokens on its hero it reserves the hero (no new tokens there) and starts once they lapse. Its revenge break-free takes a forced hold (no checks,
 // but later attacks keep their gap from it). The choice of attack is Core EnemyAttackChooser (the signature on a cadence of AI-chosen attacks).
+// Combat depth (host): poise, steadiness after a flinch, the committed window from the glint, openings, the broom's guard count and its riposte, and the
+// perfect-dodge stumble (Core Poise.cs, EnemyModel). NetFlags mirrors steady / braced for the visuals; the committed and open windows are pure functions
+// of the replicated phase and attack clock, so every peer evaluates them for cosmetics while only the host's answer changes the fight.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
@@ -37,6 +40,8 @@ namespace SleepingCalamity.Gameplay
         public readonly NetworkVariable<byte> NetRage = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<byte> NetRevengePercent = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<byte> NetPartsBroken = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public readonly NetworkVariable<byte> NetFlags = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public const byte FlagSteady = 1, FlagBraced = 2;
 
         // ---- host only ----
         public EnemyModel Model { get; private set; }
@@ -66,6 +71,8 @@ namespace SleepingCalamity.Gameplay
         private bool _waitingForToken;                   // host: refused last time, so hover and strafe instead of closing in
         private float _strafeSign = 1f;
         private int _attacksSinceSignature;              // host, elite: its signature comes after AttackPacing.SignatureEvery other attacks
+        private float _bracedLeft;                       // host: seconds the broom still shows its brace after a blocked hit
+        public const float BracedShowSeconds = 0.35f;
 
         // ---- local on every peer ----
         private float _attackClock;                      // seconds since this peer saw the current attack begin
@@ -85,6 +92,11 @@ namespace SleepingCalamity.Gameplay
         public bool HitboxOn => Attacking && CurrentAttack.HitOn.Contains(AttackFrame);
         public bool WindingUp => Attacking && AttackFrame < CurrentAttack.HitOn.Start;
         public bool WaitingForToken => _waitingForToken;   // host only (tests, the bot report)
+        // Combat depth windows, on every peer (cosmetic on clients; the host decides with its own clock in ServerApplyHit).
+        public bool CommittedNow => Attacking && EnemyWindows.Committed(CurrentAttack, AttackFrame);
+        public bool OpenNow => Phase == EnemyPhase.Stagger || Phase == EnemyPhase.Recover || Attacking && EnemyWindows.Spent(CurrentAttack, AttackFrame);
+        public bool Steady => (NetFlags.Value & FlagSteady) != 0;
+        public bool Braced => (NetFlags.Value & FlagBraced) != 0;
         // Hit feedback for presentation (every peer): Flash is 1 (full white) for FlashHoldSeconds after a landed hit, then fades in FlashFadeSeconds.
         // HitReact is 1 on the hit and falls to 0 over HitReactSeconds (a squash and a small shove away from the attacker, HitDirection, scaled by HitHeavy).
         public const float FlashHoldSeconds = 0.08f, FlashFadeSeconds = 0.12f, HitReactSeconds = 0.2f;
@@ -100,19 +112,23 @@ namespace SleepingCalamity.Gameplay
 
         // The attacker's own client calls this at the moment of contact (before the host answers), so the flash and squash are instant. The NetHp change that
         // follows a round trip later is then ignored for a moment (OnHpChanged), so one hit never flashes twice. heavy: 0 light .. 1 finisher or charge.
+        // Combat depth: the client cannot know whether the host will flinch the enemy (poise is host state), so contact plays only a small reaction
+        // (ContactReact); the full flinch is the replicated Stagger phase. A committed enemy (glint to end of hitbox) barely budges: the clank.
+        public const float ContactReact = 0.4f, CommittedReact = 0.12f;
         public void ShowHit(Vector3 attackerPos, float heavy)
         {
             _localHitAt = Time.time;
             Vector3 away = transform.position - attackerPos;
             away.y = 0f;
-            StartHitFeedback(away, heavy);
+            if (CommittedNow) StartHitFeedback(Vector3.zero, 0f, CommittedReact);
+            else StartHitFeedback(away, heavy, ContactReact);
         }
 
-        private void StartHitFeedback(Vector3 awayFlat, float heavy)
+        private void StartHitFeedback(Vector3 awayFlat, float heavy, float react)
         {
             _flashHold = FlashHoldSeconds;
             _flash = 1f;
-            _hitReact = 1f;
+            _hitReact = Mathf.Clamp01(react);
             _hitHeavy = Mathf.Clamp01(heavy);
             _hitDir = awayFlat.sqrMagnitude > 1e-4f ? awayFlat.normalized : Vector3.zero;
         }
@@ -187,7 +203,7 @@ namespace SleepingCalamity.Gameplay
 
         private void OnHpChanged(int previous, int current)
         {
-            if (current < previous && Time.time - _localHitAt > 0.5f) StartHitFeedback(Vector3.zero, 0.3f);   // someone else's hit (or a remote client's): no direction known
+            if (current < previous && Time.time - _localHitAt > 0.5f) StartHitFeedback(Vector3.zero, 0.3f, ContactReact);   // someone else's hit (or a remote client's): no direction known
         }
 
         private void OnPhaseChanged(byte previous, byte current)
@@ -218,6 +234,9 @@ namespace SleepingCalamity.Gameplay
             if (NetRage.Value != rage) NetRage.Value = rage;
             byte revenge = (byte)Mathf.RoundToInt(Model.Revenge.Fill * 100f);
             if (NetRevengePercent.Value != revenge) NetRevengePercent.Value = revenge;
+            if (_bracedLeft > 0f) _bracedLeft -= dt;
+            byte flags = (byte)((Model.Poise.Steady ? FlagSteady : 0) | (_bracedLeft > 0f ? FlagBraced : 0));
+            if (NetFlags.Value != flags) NetFlags.Value = flags;
 
             if (Phase == EnemyPhase.Dead)
             {
@@ -230,14 +249,18 @@ namespace SleepingCalamity.Gameplay
             }
 
             ServerApplyKnock(dt);
-            if (!AiEnabled) { if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
-
+            // The flinch runs out with or without the AI (tests turn it off), so steadiness and the end of the opening are the same in both.
             if (Phase == EnemyPhase.Stagger)
             {
                 _staggerLeft -= dt;
-                if (_staggerLeft <= 0f) SetPhase(EnemyPhase.Chase);
+                if (_staggerLeft <= 0f)
+                {
+                    Model.Poise.BeginSteady();   // one flinch per exchange: steady for a moment, so flinch loops cannot stunlock it
+                    SetPhase(AiEnabled ? EnemyPhase.Chase : EnemyPhase.Idle);
+                }
                 return;
             }
+            if (!AiEnabled) { if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
 
             HeroVitals target = PickTarget();
             if (_cooldown > 0f) _cooldown -= dt;
@@ -425,7 +448,12 @@ namespace SleepingCalamity.Gameplay
         {
             EnemyHitInput h = input;
             AttackData mine = CurrentAttack;
-            h.EnemyHasSuperArmor = Phase == EnemyPhase.Attack && mine != null && mine.SuperArmor.Contains(_attackFrameServer);
+            bool attacking = Phase == EnemyPhase.Attack && mine != null;
+            h.EnemyHasSuperArmor = attacking && mine.SuperArmor.Contains(_attackFrameServer);
+            h.EnemyCommitted = attacking && EnemyWindows.Committed(mine, _attackFrameServer);
+            h.EnemyOpen = ServerOpen;
+            h.EnemyStaggered = Phase == EnemyPhase.Stagger;
+            h.EnemyAttacking = attacking;
             EnemyHitResult r = Model.ApplyHit(h);
             if (r.Damage <= 0 && !r.Killed) return r;
             NetHp.Value = Model.Hp;
@@ -446,12 +474,22 @@ namespace SleepingCalamity.Gameplay
                 return r;
             }
             if (r.PartBroken >= 0) NetPartsBroken.Value = (byte)(NetPartsBroken.Value | (1 << r.PartBroken));
+            if (r.Braced) _bracedLeft = BracedShowSeconds;
             if (r.Staggered)
             {
                 EndAttackNow();
-                _staggerLeft = Def.StaggerSeconds;
+                _staggerLeft = r.GuardBroken ? EnemyWindows.GuardBreakSeconds : Def.StaggerSeconds;
                 _cooldown = Mathf.Max(_cooldown, 0.5f);
                 SetPhase(EnemyPhase.Stagger);
+            }
+            else if (r.RiposteTriggered && Phase != EnemyPhase.Attack && Phase != EnemyPhase.Stagger)
+            {
+                // The broom's guard was hammered: it answers whatever the tokens say (like the break-free), recording a forced hold on its nearest hero so
+                // later attacks keep their gap from it.
+                HeroVitals near = PickTarget();
+                if (near != null) s_tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.BroomRiposte);
+                else s_tokens.Release(GetHashCode());
+                ServerStartAttack(AttackCatalog.BroomRiposte, transform.position);
             }
             if (r.Knockback > 0f) _knock += away * r.Knockback;
             if (r.RevengeTriggered)
@@ -475,12 +513,37 @@ namespace SleepingCalamity.Gameplay
             s_tokens.Release(GetHashCode());
         }
 
+        // Host: the enemy is open (x1.5, double poise): flinching or stunned, recovering after its attack, or past the hitbox of the attack it is in.
+        public bool ServerOpen
+        {
+            get
+            {
+                if (Phase == EnemyPhase.Stagger || Phase == EnemyPhase.Recover) return true;
+                AttackData mine = CurrentAttack;
+                return Phase == EnemyPhase.Attack && mine != null && EnemyWindows.Spent(mine, _attackFrameServer);
+            }
+        }
+
+        // A perfect dodge by a player (combat depth, change 5): the enemy stumbles out of its attack and is open for a moment.
+        // A late report (inside the serial's grace) only counts while the enemy is still in or just after that attack, and a second hero's report on the
+        // same area attack never extends a stun already running (Max), so co-op cannot chain it.
+        public void ServerPerfectDodged()
+        {
+            if (Phase != EnemyPhase.Attack && Phase != EnemyPhase.Recover && Phase != EnemyPhase.Stagger) return;
+            EndAttackNow();
+            float open = Def.IsElite ? EnemyWindows.PerfectDodgeOpenSecondsElite : EnemyWindows.PerfectDodgeOpenSeconds;
+            _staggerLeft = Phase == EnemyPhase.Stagger ? Mathf.Max(_staggerLeft, open) : open;
+            _cooldown = Mathf.Max(_cooldown, 0.6f);
+            SetPhase(EnemyPhase.Stagger);
+        }
+
         // A successful parry by a player: the enemy is stunned for a moment and its attack is cancelled.
         public void ServerParried()
         {
-            if (Phase == EnemyPhase.Dead) return;
+            if (Phase != EnemyPhase.Attack && Phase != EnemyPhase.Recover && Phase != EnemyPhase.Stagger) return;   // same late-report rule as the perfect dodge
             EndAttackNow();
-            _staggerLeft = Def.IsElite ? 0.7f : 1.1f;
+            float stun = Def.IsElite ? 0.7f : 1.1f;
+            _staggerLeft = Phase == EnemyPhase.Stagger ? Mathf.Max(_staggerLeft, stun) : stun;
             _cooldown = Mathf.Max(_cooldown, 0.6f);
             SetPhase(EnemyPhase.Stagger);
         }

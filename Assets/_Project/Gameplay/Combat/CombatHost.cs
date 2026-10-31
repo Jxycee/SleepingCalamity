@@ -308,6 +308,22 @@ namespace SleepingCalamity.Gameplay
             ServerSyncGrowth(victim);
         }
 
+        // A perfect dodge reported by the victim's client (combat depth, change 5): judged there against its own roll like the parry; the host re-checks only
+        // that the victim is up, the enemy is performing that attack serial (or just ended it) and the serial was not already answered for this victim.
+        public void ServerPerfectDodge(HeroCombat victim, Enemy e, int serial)
+        {
+            if (_nm == null || !_nm.IsServer || victim == null || e == null || !e.Alive) return;
+            HeroVitals vitals = victim.GetComponent<HeroVitals>();
+            if (vitals == null || !vitals.IsUp) return;
+            if (!e.ServerAcceptsSerial(serial)) return;
+            if (!_enemyHitDedupe.Add(DedupeKey(victim, serial))) return;
+            e.ServerPerfectDodged();
+            string weaponKey = victim.WeaponKey;
+            AbsGain gain = CombatRewards.OnPerfectDodge(Growth(victim.OwnerClientId), weaponKey, e.NetworkObjectId.ToString());
+            victim.ServerReportAbs(weaponKey, gain.Abs, gain.TechPop, gain.LevelsGained, "perfect dodge");
+            ServerSyncGrowth(victim);
+        }
+
         // =================================================================================================================================
         // Spawning
         // =================================================================================================================================

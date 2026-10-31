@@ -30,14 +30,18 @@ namespace SleepingCalamity.Core.Combat
         public readonly bool IsElite, CanRage, FrontalBlock, SuperArmorAlways, WeakToFire, IsPest;
         public readonly float StaggerSeconds;   // how long a flinch lasts when not armoured
         public readonly float VisualReach;      // metres from the enemy's centre to the farthest point of its greybox body in front of it (arm, snout, broom length)
+        public readonly float PoiseThreshold;   // solo poise to flinch it (PoiseMeter); ignored while it is armoured
+        public readonly bool Ripostes;          // its blocked front hits count toward the bristle riposte (GuardCounter)
         public readonly AttackData[] Attacks;
         public readonly PartDefinition[] Parts;
 
         public EnemyDefinition(EnemyKind kind, string id, string name, Species species, int hp, float atk, float def, float moveSpeed, float radius, float height,
             AttackData[] attacks, bool isElite = false, bool canRage = true, bool frontalBlock = false, bool superArmorAlways = false, bool weakToFire = false,
-            bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null, float visualReach = 1f)
+            bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null, float visualReach = 1f, float poiseThreshold = 0f, bool ripostes = false)
         {
             VisualReach = visualReach;
+            PoiseThreshold = poiseThreshold;
+            Ripostes = ripostes;
             Kind = kind; Id = id; Name = name; Species = species; Hp = hp; Atk = atk; Def = def; MoveSpeed = moveSpeed; Radius = radius; Height = height;
             Attacks = attacks; IsElite = isElite; CanRage = canRage; FrontalBlock = frontalBlock; SuperArmorAlways = superArmorAlways; WeakToFire = weakToFire;
             IsPest = isPest; StaggerSeconds = staggerSeconds; Parts = parts ?? Array.Empty<PartDefinition>();
@@ -58,12 +62,14 @@ namespace SleepingCalamity.Core.Combat
         public const float Tier1Atk = 0.65f;
 
         // 6.6 tier 1 stats. Placeholder: which are weak to fire (the jam, the wooden broom) and which are pests (the rat-king).
-        public static readonly EnemyDefinition Slime = new EnemyDefinition(EnemyKind.Slime, "slime", "Jam-jar slime", Species.Slime, 40, 12f, 5f, 2.6f, 0.55f, 1.0f,
-            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f);
-        public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 90, 18f, 10f, 4.6f, 0.5f, 1.2f,
-            new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f);
-        public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 60, 15f, 15f, 2.3f, 0.55f, 1.9f,
-            new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f);
+        // Combat depth (2026-10-30, "fewer, tougher enemies"): small-enemy life roughly doubles so each takes a few openings (a rat-king about three with
+        // the axe): slime 40 -> 80, rat-king 90 -> 180, broom 60 -> 160; the Warden stays 600. Poise thresholds: slime 2, rat-king 4, broom 5.
+        public static readonly EnemyDefinition Slime = new EnemyDefinition(EnemyKind.Slime, "slime", "Jam-jar slime", Species.Slime, 80, 12f, 5f, 2.6f, 0.55f, 1.0f,
+            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f, poiseThreshold: 2f);
+        public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 180, 18f, 10f, 4.6f, 0.5f, 1.2f,
+            new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f, poiseThreshold: 4f);
+        public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 160, 15f, 15f, 2.3f, 0.55f, 1.9f,
+            new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f, poiseThreshold: 5f, ripostes: true);
         public static readonly EnemyDefinition DoughWarden = new EnemyDefinition(EnemyKind.DoughWarden, "dough_warden", "Dough Warden", Species.Elite, 600, 30f, 20f, 2.4f, 1.0f, 2.8f,
             new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound, AttackCatalog.WardenQuake }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f,
             parts: new[]
@@ -88,6 +94,10 @@ namespace SleepingCalamity.Core.Combat
         public float CritRoll;               // [0,1), from the host's RNG
         public float CritChance;             // normally DamageFormula.CritChance
         public bool EnemyHasSuperArmor;      // the enemy is inside a super-armour window of its own action right now
+        public bool EnemyCommitted;          // the enemy is between its attack's glint and the end of its hitbox (EnemyWindows.Committed): no flinch
+        public bool EnemyOpen;               // the enemy is open (recovering after its strike, stunned, flinching): x1.5 damage, double poise
+        public bool EnemyStaggered;          // the enemy is already flinching: the hit cannot flinch it again (and adds no poise)
+        public bool EnemyAttacking;          // the enemy is inside one of its own attacks: blocked hits do not count toward a riposte it could not start
     }
 
     public struct EnemyHitResult
@@ -97,8 +107,13 @@ namespace SleepingCalamity.Core.Combat
         public bool ElementMatch, WeakPart, GuardBreakHit;
         public int PartBroken;               // index of the part this hit broke, or -1
         public bool RevengeTriggered, RageStarted;
-        public bool Staggered;               // the hit interrupts the enemy's action (not while it has armour, never for the elite)
-        public float Knockback;              // metres, already reduced by the victim's armour rules
+        public bool Staggered;               // the hit interrupts the enemy's action (its poise broke or its guard was broken; never while armoured or committed)
+        public float Knockback;              // metres, already reduced by the victim's armour rules (only a flinching enemy is pushed)
+        public bool Opening;                 // landed on an open enemy (paid x1.5)
+        public bool PoiseBroken;             // this hit filled the poise count
+        public bool GuardBroken;             // a guard-break hit on a guarding front (the broom): a GuardBreakSeconds flinch
+        public bool Braced;                  // the enemy's guard took the hit (the broom braces)
+        public bool RiposteTriggered;        // this blocked hit completed the guard count: the enemy should riposte
     }
 
     public sealed class EnemyModel
@@ -115,6 +130,8 @@ namespace SleepingCalamity.Core.Combat
         public readonly RageTracker Rage = new RageTracker();
         public readonly RevengeGauge Revenge;
         public readonly BossPart[] Parts;
+        public readonly PoiseMeter Poise;
+        public readonly GuardCounter Guard = new GuardCounter();
 
         public EnemyModel(EnemyDefinition def, int tier = 1, int players = 1)
         {
@@ -127,6 +144,7 @@ namespace SleepingCalamity.Core.Combat
             DefStat = def.Def * (Tier == 2 ? EnemyCatalog.Tier2Def : 1f);
             Hp = MaxHp;
             Revenge = new RevengeGauge(Players);
+            Poise = new PoiseMeter(def.PoiseThreshold, Players);
             Parts = new BossPart[def.Parts.Length];
             for (int i = 0; i < Parts.Length; i++) Parts[i] = new BossPart(def.Parts[i].Id, def.Parts[i].Hp, def.Parts[i].WeakMultiplier);
         }
@@ -156,6 +174,7 @@ namespace SleepingCalamity.Core.Combat
 
             float block = FrontalBlock.Multiplier(Def.FrontalBlock, h.BearingToAttackerDeg, a.GuardBreak);
             r.Blocked = block < 1f;
+            r.Opening = h.EnemyOpen;
             r.GuardBreakHit = Def.FrontalBlock && a.GuardBreak && MathF.Abs(h.BearingToAttackerDeg) <= FrontalBlock.HalfAngleDeg;
 
             bool crit = DamageFormula.RollCrit(h.CritRoll, h.CritChance > 0f ? h.CritChance : 0f);
@@ -171,7 +190,7 @@ namespace SleepingCalamity.Core.Combat
                 Tag = DamageFormula.TagMultiplier(h.Pest, Def.IsPest),
                 Part = partMult,
                 Crit = crit,
-                Other = block,
+                Other = block * (h.EnemyOpen ? EnemyWindows.OpeningDamage : 1f),
             };
             int dmg = DamageFormula.Compute(input);
             r.Crit = crit;
@@ -192,11 +211,23 @@ namespace SleepingCalamity.Core.Combat
                 {
                     if (Revenge.Add(a.Revenge)) r.RevengeTriggered = true;
                 }
-                else if (Def.CanRage && Rage.OnHit()) r.RageStarted = true;
+                // Rage counts only hits outside openings: mashing makes an enemy angrier, punishing it at the right moment never does.
+                else if (Def.CanRage && !h.EnemyOpen && Rage.OnHit()) r.RageStarted = true;
 
-                bool armoured = Def.SuperArmorAlways || h.EnemyHasSuperArmor;
-                r.Staggered = !armoured;
-                r.Knockback = armoured ? 0f : a.Knockback;
+                // Armoured (the elite, a super-armour window) or committed (from its glint to the end of its hitbox): the hit lands but never flinches it,
+                // and adds no poise. Swinging into a committed attack trades.
+                bool armoured = Def.SuperArmorAlways || h.EnemyHasSuperArmor || h.EnemyCommitted;
+                bool canFlinch = !armoured && !h.EnemyStaggered;
+                if (r.Blocked && Def.Ripostes && canFlinch)
+                {
+                    r.Braced = true;
+                    if (!h.EnemyAttacking && Guard.OnBlocked()) r.RiposteTriggered = true;
+                }
+                r.GuardBroken = r.GuardBreakHit && canFlinch;
+                if (canFlinch && !r.Blocked)
+                    r.PoiseBroken = Poise.Add(a.Poise * (h.EnemyOpen ? EnemyWindows.OpeningPoise : 1f));
+                r.Staggered = canFlinch && (r.PoiseBroken || r.GuardBroken);
+                r.Knockback = r.Staggered ? a.Knockback : 0f;
             }
             return r;
         }
@@ -204,6 +235,11 @@ namespace SleepingCalamity.Core.Combat
         // A parry stuns the attacker for a moment (the dagger's answer to a telegraph). The elite's armour does not stop it: a parry is not a hit.
         public bool ParryStuns => Alive;
 
-        public void Tick(float dt) { Rage.Tick(dt); }
+        public void Tick(float dt)
+        {
+            Rage.Tick(dt);
+            Poise.Tick(dt);
+            Guard.Tick(dt);
+        }
     }
 }

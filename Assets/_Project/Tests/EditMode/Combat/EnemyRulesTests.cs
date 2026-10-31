@@ -111,7 +111,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(CoopScaling.LifeMultiplier(9), Is.EqualTo(2.8f), "clamped to four");
             var solo = new EnemyModel(EnemyCatalog.RatKing, 1, 1);
             var four = new EnemyModel(EnemyCatalog.RatKing, 1, 4);
-            Assert.That(four.MaxHp, Is.EqualTo(252), "90 x 2.8");
+            Assert.That(four.MaxHp, Is.EqualTo(504), "180 x 2.8");
             Assert.That(four.Atk, Is.EqualTo(solo.Atk), "P23: co-op scales life, not attack");
         }
 

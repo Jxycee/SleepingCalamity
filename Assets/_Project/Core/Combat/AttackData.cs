@@ -68,12 +68,13 @@ namespace SleepingCalamity.Core.Combat
         public readonly bool Fire;                    // spells: the hit carries the staff's element
         public readonly int SpellPips;                // pips it costs
         public readonly EnemyTell Tell;               // enemy attacks: how the body stages the wind-up (EnemyTell); null for hero attacks
+        public readonly float Poise;                  // hero attacks: what a hit adds to the enemy's poise count (PoiseMeter); defaults to Revenge
 
         public AttackData(string id, string name, AttackKind kind, int totalFrames, FrameWindow hitOn, float multiplier, HitShape shape, float range,
             float halfAngleDeg, FrameWindow comboOpen = default, FrameWindow finisherAllowed = default, int cancelFrom = -1, FrameWindow iFrames = default,
             FrameWindow superArmor = default, FrameWindow turn = default, float turnDegPerSec = 0f, FrameWindow lunge = default, float lungeMeters = 0f,
             float heightBand = 2f, float knockback = 0f, float revenge = 1f, int hitstopFrames = 4, float cameraKick = 0.3f, bool guardBreak = false,
-            bool guardable = true, bool fire = false, int spellPips = 0, HitOrigin origin = HitOrigin.Self, EnemyTell tell = null)
+            bool guardable = true, bool fire = false, int spellPips = 0, HitOrigin origin = HitOrigin.Self, EnemyTell tell = null, float poise = -1f)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("an attack needs an id", nameof(id));
             Id = id;
@@ -105,12 +106,14 @@ namespace SleepingCalamity.Core.Combat
             Fire = fire;
             SpellPips = spellPips;
             Tell = tell;
+            Poise = poise >= 0f ? poise : revenge;
         }
 
         public float TotalSeconds => TotalFrames / (float)FrameRate;
         public bool IsFinisher => Kind == AttackKind.Finisher;
 
-        // The same attack in the air: quicker (x0.85 frames), a touch weaker (x0.9), and the revenge values of KH's air hits (1.5, finisher 3.5).
+        // The same attack in the air: quicker (x0.85 frames), a touch weaker (x0.9), and the revenge values of KH's air hits (1.5, finisher 3.5). Poise is
+        // the ground attack's.
         public AttackData AsAir()
         {
             int Scale(int f) => (int)Math.Round(f * 0.85);
@@ -118,7 +121,7 @@ namespace SleepingCalamity.Core.Combat
             return new AttackData(Id + "_air", Name + " (air)", Kind, Scale(TotalFrames), ScaleW(HitOn), Multiplier * 0.9f, Shape, Range, HalfAngleDeg,
                 ScaleW(ComboOpen), ScaleW(FinisherAllowed), CancelFrom >= TotalFrames ? Scale(TotalFrames) : Scale(CancelFrom), ScaleW(IFrames),
                 ScaleW(SuperArmor), ScaleW(Turn), TurnDegPerSec, FrameWindow.None, 0f, HeightBand + 1f, Knockback, Kind == AttackKind.Finisher ? 3.5f : 1.5f,
-                HitstopFrames, CameraKick, GuardBreak, Guardable, Fire, SpellPips, Origin);
+                HitstopFrames, CameraKick, GuardBreak, Guardable, Fire, SpellPips, Origin, poise: Poise);
         }
     }
 

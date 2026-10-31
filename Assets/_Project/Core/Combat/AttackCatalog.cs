@@ -15,13 +15,13 @@ namespace SleepingCalamity.Core.Combat
         // ---- Axe: heavy. Slow, long recovery, a guard-breaking finisher, a charge with armour. ----
         public static readonly AttackSet Axe = new AttackSet("Axe",
             new AttackData("axe_1", "Axe swing", AttackKind.Normal, 34, W(11, 16), 1.0f, HitShape.Cone, 2.3f, 55f, comboOpen: W(14, 30), cancelFrom: 22,
-                turn: W(0, 11), turnDegPerSec: 540f, lunge: W(6, 14), lungeMeters: 0.7f, knockback: 0.8f, revenge: 1f, hitstopFrames: 6, cameraKick: 0.35f),
+                turn: W(0, 11), turnDegPerSec: 540f, lunge: W(6, 14), lungeMeters: 0.7f, knockback: 0.8f, revenge: 1f, hitstopFrames: 6, cameraKick: 0.35f, poise: 2f),
             new AttackData("axe_2", "Axe backswing", AttackKind.Normal, 36, W(12, 17), 1.1f, HitShape.Cone, 2.4f, 60f, comboOpen: W(15, 32), finisherAllowed: W(15, 32),
-                cancelFrom: 24, turn: W(0, 12), turnDegPerSec: 540f, lunge: W(6, 15), lungeMeters: 0.7f, knockback: 0.9f, revenge: 1f, hitstopFrames: 6, cameraKick: 0.4f),
+                cancelFrom: 24, turn: W(0, 12), turnDegPerSec: 540f, lunge: W(6, 15), lungeMeters: 0.7f, knockback: 0.9f, revenge: 1f, hitstopFrames: 6, cameraKick: 0.4f, poise: 2f),
             new AttackData("axe_f", "Axe overhead", AttackKind.Finisher, 58, W(22, 28), 1.6f, HitShape.Cone, 2.7f, 70f, cancelFrom: 44,
-                turn: W(0, 20), turnDegPerSec: 420f, lunge: W(14, 24), lungeMeters: 1.0f, knockback: 3.0f, revenge: 3f, hitstopFrames: 14, cameraKick: 0.9f, guardBreak: true),
+                turn: W(0, 20), turnDegPerSec: 420f, lunge: W(14, 24), lungeMeters: 1.0f, knockback: 3.0f, revenge: 3f, hitstopFrames: 14, cameraKick: 0.9f, guardBreak: true, poise: 5f),
             new AttackData("axe_c", "Axe whirlwind", AttackKind.Charge, 62, W(24, 32), 2.0f, HitShape.Circle, 3.0f, 180f, cancelFrom: 48, superArmor: W(0, 36),
-                turn: W(0, 10), turnDegPerSec: 360f, knockback: 4.0f, revenge: 4f, hitstopFrames: 14, cameraKick: 1.0f, guardBreak: true),
+                turn: W(0, 10), turnDegPerSec: 360f, knockback: 4.0f, revenge: 4f, hitstopFrames: 14, cameraKick: 1.0f, guardBreak: true, poise: 6f),
             null);
 
         // ---- Staff: long reach and wide sweeps. Its Secondary casts a spell that costs a pip. ----
@@ -40,13 +40,13 @@ namespace SleepingCalamity.Core.Combat
         // ---- Dagger and shield: fast. Its Secondary is the guard (see GuardMath). ----
         public static readonly AttackSet Dagger = new AttackSet("Dagger and shield",
             new AttackData("dag_1", "Dagger jab", AttackKind.Normal, 16, W(5, 9), 1.0f, HitShape.Cone, 1.9f, 45f, comboOpen: W(6, 15), cancelFrom: 11,
-                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.15f),
+                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.15f, poise: 0.5f),
             new AttackData("dag_2", "Dagger slash", AttackKind.Normal, 16, W(5, 9), 1.1f, HitShape.Cone, 1.9f, 50f, comboOpen: W(6, 15), finisherAllowed: W(6, 15), cancelFrom: 11,
-                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.15f),
+                turn: W(0, 5), turnDegPerSec: 900f, lunge: W(2, 8), lungeMeters: 0.8f, knockback: 0.3f, revenge: 1f, hitstopFrames: 4, cameraKick: 0.15f, poise: 0.5f),
             new AttackData("dag_f", "Dagger flurry", AttackKind.Finisher, 30, W(10, 17), 1.6f, HitShape.Cone, 2.1f, 55f, cancelFrom: 22, turn: W(0, 9), turnDegPerSec: 720f,
-                lunge: W(6, 14), lungeMeters: 1.2f, knockback: 1.8f, revenge: 3f, hitstopFrames: 11, cameraKick: 0.6f),
+                lunge: W(6, 14), lungeMeters: 1.2f, knockback: 1.8f, revenge: 3f, hitstopFrames: 11, cameraKick: 0.6f, poise: 2f),
             new AttackData("dag_c", "Lunging stab", AttackKind.Charge, 40, W(12, 18), 2.0f, HitShape.Cone, 2.4f, 30f, cancelFrom: 30, turn: W(0, 10), turnDegPerSec: 720f,
-                lunge: W(8, 16), lungeMeters: 3.2f, knockback: 2.0f, revenge: 4f, hitstopFrames: 11, cameraKick: 0.7f),
+                lunge: W(8, 16), lungeMeters: 3.2f, knockback: 2.0f, revenge: 4f, hitstopFrames: 11, cameraKick: 0.7f, poise: 3f),
             null);
 
         // ---- Bow and sword: a mid-speed sword chain; the Secondary aims and the shot is a ray. ----
@@ -133,12 +133,17 @@ namespace SleepingCalamity.Core.Combat
         public static readonly AttackData WardenQuake = E("warden_quake", "Dough quake", 160, 90, 100, 2.0f, HitShape.Circle, 3.0f, 180f, knockback: 6f, guardBreak: true,
             superArmor: W(0, 160), turn: W(0, 50), turnSpeed: 160f,
             tell: T(TellPart.Crown, 50, 72, lean: 26f, rise: 0.6f, tremble: 0.9f, sfx: CombatSfx.WindUpHeavy, pitch: 0.7f, hold: CombatSfx.EliteToll, charge: true));
+        // The broom's answer to a hammered guard (combat depth, change 4): three blocked front hits inside 2 s and it braces, the bristles flash and it
+        // shoves them back at you. Not in the broom's attack list (it answers being hit, like the Warden's break-free), but it keeps every small-enemy
+        // tell rule: 27 frames of wind-up, the glint 12 before the hitbox, no turning after the glint.
+        public static readonly AttackData BroomRiposte = E("broom_riposte", "Bristle riposte", 58, 27, 33, 1.0f, HitShape.Cone, 2.0f, 50f, knockback: 2f, turn: W(0, 12), turnSpeed: 420f,
+            tell: T(TellPart.Bristles, 9, 15, lean: 14f, tremble: 0.3f, sfx: CombatSfx.WindUpWood, pitch: 1.4f));
         // Test-only: a huge circle that no roll can leave, so a dodge test proves the i-frames and not the distance.
         public static readonly AttackData TestNova = E("test_nova", "Test nova", 60, 12, 40, 1.0f, HitShape.Circle, 30f, 180f, knockback: 0f);
 
         public static readonly AttackData[] AllEnemyAttacks =
         {
-            SlimeHop, SlimeGlob, RatLunge, RatSpin, BroomSweep, BroomPoke, WardenSlam, WardenPound, WardenSweep, WardenBreakFree, TestNova, WardenQuake,
+            SlimeHop, SlimeGlob, RatLunge, RatSpin, BroomSweep, BroomPoke, WardenSlam, WardenPound, WardenSweep, WardenBreakFree, TestNova, WardenQuake, BroomRiposte,
         };
 
         // Lookup by id for the hit intents of enemies against players.

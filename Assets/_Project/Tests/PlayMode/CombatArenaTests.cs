@@ -182,7 +182,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Seconds(0.6f);
 
             Enemy slime = combat.SpawnEnemy(EnemyKind.Slime, 1, heroObject.transform.position + heroObject.transform.forward * 1.6f, ai: false);
-            Assert.That(slime.Model.MaxHp, Is.EqualTo(40), "solo: life x1.0");
+            Assert.That(slime.Model.MaxHp, Is.EqualTo(80), "solo: life x1.0 (80 since combat depth)");
             double until = Time.realtimeSinceStartupAsDouble + 6.0;
             while (slime.Alive && Time.realtimeSinceStartupAsDouble < until)
             {
@@ -196,7 +196,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 input.Frame.PrimaryReleased = false;
                 yield return Seconds(0.12f);
             }
-            Assert.That(slime.Alive, Is.False, "two axe hits kill a 40 HP slime");
+            Assert.That(slime.Alive, Is.False, "a few axe hits kill an 80 HP slime (the first flinches it open)");
 
             ulong cid = app.NetworkManager.LocalClientId;
             WeaponState axe = combat.Growth(cid).Weapon(WeaponCatalog.Axe);

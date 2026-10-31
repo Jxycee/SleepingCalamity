@@ -25,8 +25,9 @@ namespace SleepingCalamity.Core.Combat
 
     public static class AttackPacing
     {
-        // Tier 1 (waves 1-4, which the user passed): the tokens barely bite. Tier 2: the same two attackers, but they come back faster and closer together.
-        public static readonly PacingProfile Tier1 = new PacingProfile(2, 0.5f, 1.0f, 1.0f, 0.3f);
+        // Tier 1 (waves 1-4): one attacker per hero, a duel at a time while the other enemy circles (OoT: the others wait; combat depth 2026-10-30, was
+        // 2). Tier 2: two attackers, and they come back faster and closer together.
+        public static readonly PacingProfile Tier1 = new PacingProfile(1, 0.5f, 1.0f, 1.0f, 0.3f);
         public static readonly PacingProfile Tier2 = new PacingProfile(2, 0.35f, 0.7f, 0.8f, 0.2f);
 
         public static PacingProfile ForTier(int tier) => tier >= 2 ? Tier2 : Tier1;
