@@ -11,7 +11,8 @@
 // that its lowest cloth clears the ground under it.
 // The rows are derived (not typed): wishes per lot are searched outward from a preferred spot in fixed steps and the first spot that passes the same rules
 // Validate applies is taken, so the result is deterministic and stays valid if the layout moves. Rebuilt is dense; Ruined keeps roughly a third as many ground
-// rows, as the *_Broken variants at the same spots (some tilted), the Well_Ruined at the Well's spot, and no signs or washing lines (no standing walls).
+// rows, as the *_Broken variants at the same spots (some tilted), the Well_Ruined at the Well's spot, and no signs or washing lines (no standing walls);
+// plus a few lane-edge wreck groups (AddLaneWrecks: tipped cart, split barrel, slumped crates).
 // Authority: none (static layout data).
 using System;
 using System.Collections.Generic;
@@ -380,6 +381,7 @@ namespace SleepingCalamity.Core
             }
 
             AddRuined(c, plan);
+            AddLaneWrecks(c, plan);
             return plan;
         }
 
@@ -462,6 +464,74 @@ namespace SleepingCalamity.Core
             for (int pass = 0; pass < stride && chosen.Count < target; pass++)
                 for (int i2 = pass; i2 < src.Count && chosen.Count < target; i2 += stride) Try(src[i2], false);
             plan.Rows.AddRange(ruined);
+        }
+
+        // Polish 2 (coordinator note: the Ruined captures showed almost no clutter near the lanes): a few wreck groups at ring 1 / 2 lane edges in Ruined, each a
+        // tipped Handcart_Broken with a leaning RainBarrel_Broken and a slumped CrateStack_Broken beside it, along the lane. Every piece passes the same Fits as
+        // every other row (path graph, foundations, landmarks, dressing, slope, other rows); a group stands only when its cart and at least one partner fit.
+        public const int LaneWreckGroups = 4;
+        const float WreckSpacing = 15f, WreckSample = 2.5f;
+        static readonly float[] WreckOffsets = { 1.1f, 1.7f, 2.4f };   // beyond the lane's half width
+        static void AddLaneWrecks(Ctx c, ClutterPlan plan)
+        {
+            var ruined = new List<ClutterRow>();
+            foreach (ClutterRow r in plan.Rows) if (r.Preset == Ru) ruined.Add(r);
+            var anchors = new List<TownPoint>();
+            Spec cart = SpecOf("Handcart"), barrel = SpecOf("RainBarrel"), crates = SpecOf("CrateStack");
+            int g = 0;
+            ClutterRow Make(Spec s, string id, int ring, TownPoint p, float yaw, float tx, float tz)
+            {
+                ClutterRow r = NewRow(id, s, Ru, true, ring, null, p.X, p.Z, yaw);
+                r.TiltX = tx; r.TiltZ = tz;
+                return r;
+            }
+            bool Place(ClutterRow r, List<ClutterRow> accepted)
+            {
+                foreach (int ring in new[] { 2, 1 })
+                {
+                    r.Ring = ring;
+                    if (Fits(c, r, accepted, null)) return true;
+                }
+                return false;
+            }
+            foreach (Lane lane in c.T.Lanes)
+            {
+                if (lane.Ring > 2 || lane.Points == null || g >= LaneWreckGroups) continue;
+                for (int i = 0; i + 1 < lane.Points.Length && g < LaneWreckGroups; i++)
+                {
+                    TownPoint a = lane.Points[i], b = lane.Points[i + 1], ab = b - a;
+                    float len = (float)Math.Sqrt(ab.X * ab.X + ab.Z * ab.Z);
+                    if (len < 1e-3f) continue;
+                    TownPoint d = ab * (1f / len), n = Pt(-d.Z, d.X);
+                    for (float u = WreckSample * 0.5f; u < len && g < LaneWreckGroups; u += WreckSample)
+                    {
+                        TownPoint m = a + d * u;
+                        bool far = true;
+                        foreach (TownPoint q in anchors) if ((q.X - m.X) * (q.X - m.X) + (q.Z - m.Z) * (q.Z - m.Z) < WreckSpacing * WreckSpacing) { far = false; break; }
+                        if (!far) continue;
+                        foreach (float side in new[] { 1f, -1f })
+                        foreach (float extra in WreckOffsets)
+                        {
+                            if (anchors.Count > 0 && anchors[anchors.Count - 1].X == m.X && anchors[anchors.Count - 1].Z == m.Z) break;
+                            TownPoint o = m + n * (side * (lane.Width * 0.5f + extra));
+                            float yaw = YawOf(d) + (g % 2 == 0 ? 14f : -18f);
+                            string id = "Clutter_Ru_Wreck" + g + "_";
+                            var group = new List<ClutterRow>(ruined);
+                            ClutterRow wc = Make(cart, id + "Handcart", 2, o, yaw, 0f, side * 16f);   // tipped onto one wheel, toward the lane edge
+                            if (!Place(wc, group)) { wc.Yaw = YawOf(d); if (!Place(wc, group)) continue; }   // square to the lane if the yaw jitter is what fails
+                            group.Add(wc);
+                            int partners = 0;
+                            ClutterRow wb = Make(barrel, id + "RainBarrel", 2, o + d * 1.9f + n * (side * 0.2f), yaw + 40f, 11f, -7f);
+                            if (Place(wb, group)) { group.Add(wb); partners++; }
+                            ClutterRow wk = Make(crates, id + "CrateStack", 2, o - d * 1.9f + n * (side * 0.3f), yaw - 25f, 8f, -5f);
+                            if (Place(wk, group)) { group.Add(wk); partners++; }
+                            if (partners == 0) continue;
+                            for (int k = ruined.Count; k < group.Count; k++) { ruined.Add(group[k]); plan.Rows.Add(group[k]); }
+                            anchors.Add(m); g++;
+                        }
+                    }
+                }
+            }
         }
 
         static ClutterRow Broken(ClutterRow r, string id, int idx)
