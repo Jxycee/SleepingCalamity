@@ -4,7 +4,7 @@ State: IN PROGRESS
 Session: Q11. Lane kit: lane walls, steps and lane dressing
 Progress: 15%
 Sheet: none yet
-Blocker: none
+Blocker: paused by coordinator for usage
 
 Score: -
 Tris: -
@@ -26,3 +26,5 @@ History:
   no off-the-shelf lane-dressing tool fits the layout-row builder pattern. Unity editor was still downloading at pause time.
 - Resumed after the usage pause; merged main (Q8 town wall ca383a8). Contract written: Reference/hollowmere/lanes/CONTRACT.md. Dispatching the Blender
   kit agent and the placement implementer (both Sonnet) in parallel. Q8's TownWallPlan + HollowmereTownWall are the placement template.
+- Both agents hit the 5-hour limit, were resumed after the reset, then paused again by the coordinator (usage). Each commits its WIP (art on its worktree
+  branch, placement on this branch) before stopping; on RESUME they continue from their transcripts.
