@@ -28,6 +28,7 @@ namespace SleepingCalamity.EditorTools
             ("LK_Rubble", "sandstone", new Color(0.57f, 0.60f, 0.66f), 1.5f), ("LK_Dressed", "sandstone", new Color(1.00f, 0.95f, 0.86f), 1.3f),
             ("LK_Mortar", "sandstone", new Color(0.26f, 0.245f, 0.21f), 0.6f), ("LK_Oak", "oak_timber", new Color(0.80f, 0.76f, 0.72f), 1.2f),
             ("LK_GatePaint", "painted_wood", new Color(0.66f, 0.72f, 0.28f), 1.0f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
+            ("LK_GutterStone", "sandstone", new Color(0.50f, 0.48f, 0.44f), 1.5f),   // gutter channel: LK_Mortar read as a near-black ribbon
         };
 
         // Local box (centre, size) of each piece at the contract extents: the greybox mesh, and the collider of walls, piers and steps.
@@ -89,7 +90,8 @@ namespace SleepingCalamity.EditorTools
                     GameObject obj = TryClone(fbx, r.Piece, slots, parent);
                     if (obj != null) art++; else obj = Greybox(r.Piece, parent);
                     obj.name = r.Id;
-                    obj.transform.position = new Vector3(r.X, r.Y, r.Z);
+                    bool isGutter = r.Piece == LanePiece.Gutter || r.Piece == LanePiece.GutterChoked || r.Piece == LanePiece.GutterGrate;
+                    obj.transform.position = new Vector3(r.X, r.Y - (isGutter ? 0.02f : 0f), r.Z);
                     obj.transform.rotation = Quaternion.Euler(0f, r.Yaw, r.Tilt);
                     obj.transform.localScale = new Vector3(r.ScaleX, 1f, 1f);
                     if (HasCollider(r.Piece)) { var b = obj.AddComponent<BoxCollider>(); (Vector3 c, Vector3 s) = BoxOf(r.Piece); b.center = c; b.size = s; }
@@ -120,8 +122,16 @@ namespace SleepingCalamity.EditorTools
             Transform child = fbx.transform.Find(piece.ToString());
             if (child == null) { Debug.LogWarning("SC HOLLOWMERE lanes: LaneKit.fbx has no child '" + piece + "', greybox used"); return null; }
             GameObject obj = Object.Instantiate(child.gameObject, parent);
-            ApplyMaterials(obj, slots);
+            bool gutter = piece == LanePiece.Gutter || piece == LanePiece.GutterChoked || piece == LanePiece.GutterGrate;
+            ApplyMaterials(obj, gutter ? GutterSlots(slots) : slots);
             return obj;
+        }
+
+        static Dictionary<string, Material> GutterSlots(Dictionary<string, Material> slots)
+        {
+            var g = new Dictionary<string, Material>(slots);
+            if (slots.TryGetValue("LK_GutterStone", out Material gs) && gs != null) g["LK_Mortar"] = gs;
+            return g;
         }
 
         static GameObject Greybox(LanePiece piece, Transform parent)
