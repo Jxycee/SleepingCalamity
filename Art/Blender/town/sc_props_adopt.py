@@ -33,7 +33,7 @@ Assets (folder name, matched by BeautyCornerBuilder: source -> what changes; tex
   Barrel_A       wooden_barrels_01 barrel01 -> lean, bulge, proud thickened iron hoops          2048
   Barrel_B       wooden_barrels_01 barrel02 -> squatter (0.92 h), stronger bulge                2048
   Barrel_C       wine_barrel_01 (lid, bung, base) -> lighter oak                                2048
-  Crate_A        wooden_crate_01 (lid, latch)                                                   2048
+  Crate_A        wooden_crate_01 (lid, latch) -> faded sage-green painted board band             2048
   Crate_B        wooden_crate_02 (lid) -> faded ochre painted band                              2048
   Crate_C        wooden_crate_01 body + latch, lid leaned on its side, apples, turnips, squash  2048
   Bucket_A       wooden_bucket_01 (rope-hung handle)                                            1024
@@ -55,7 +55,10 @@ Status (2026-10-30, PC): final bake exported. Batch contact-sheet self-review, r
 round 1 26/40 (wear too faint at mid distance) -> 2: 27 (darker foot grime, rust bloom, polish, muted wood chroma) ->
 3: 28.5 (stall goods with squash, slumped sack pair, cluster layout, sun-bleached tops, joint grime, board tone) ->
 4: 29.5 (crate boards bow and sag, weathered darker crates, damp sack feet, crate_02's stencil letters painted out).
-Target was round 1 + 5 = 31; stopped at the 4-round cap (round 4 gained 1). Extra ideas in docs/PARKING_LOT.md.
+Round 5 (controller's in-engine feedback, midday corner): oak darkened (OAK_DARKEN) so barrels and crates separate from
+the plaster at the wide camera, a hard dark contact band at every foot, produce 15% bigger in fuller domed heaps with
+brighter apples and squash, a sage-green painted board on Crate_A. Self-score about 31/40 against the reference pair
+sheet (target round 1 + 5 = 31); the controller's Unity capture is the judge. Extra ideas in docs/PARKING_LOT.md.
 Known quirk: Blender 5.2 segfaulted in uv.pack_islands with locked pins (Crate_C); the generated islands now pack inside their own
 box (ORIGINAL_AABB) instead, and the per-asset batch loop still retries once.
 """
@@ -77,12 +80,14 @@ TEX = os.path.join(ROOT, 'Art', 'Textures', 'B1_town')
 DEST = os.path.join(ROOT, 'Assets', '_Project', 'Content', 'Art', 'Town', 'B7')
 SEED = 7007
 OVERSIZE = 1.10
+PRODUCE = 1.15            # produce scale on top of its storybook size: reads at the wide camera (in-engine round)
 
 def rng(stream):
     return random.Random(SEED ^ zlib.crc32(stream.encode()))
 
 # ---------------------------------------------------------------- asset table
 WOOD = dict(hue_keep=0.55, delight=0.5, contrast=1.15, chroma=0.88)
+OAK_DARKEN = 0.72          # linear gain on the graded oak (about -14% sRGB value), 2026-10-30 in-engine round
 WEAR_WOOD = dict(tone=0.12, grime=0.75, bleach=0.55)
 WEAR_WICKER = dict(tone=0.08, grime=0.5, bleach=0.25)
 WEAR_CLAY = dict(tone=0.0, grime=0.4, bleach=0.0)
@@ -95,20 +100,21 @@ ASSETS = {   # folder names follow the BeautyCornerBuilder's name matching (barr
     'Barrel_C':  dict(src='wine_barrel_01', parts=None, rings=True, res=2048, tris=5200, wood='#74543a',
                       lean=1.0, bulge=0.02, hoop=0.005, wob=0.004, dirt=0.12, polish=(0.80, 1.0), **WEAR_WOOD),
     'Crate_A':   dict(src='wooden_crate_01', parts=None, res=2048, tris=5000, wood='#6c5038',
-                      lean=0.8, bulge=0.03, sag=0.02, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), **WEAR_WOOD),
+                      lean=0.8, bulge=0.03, sag=0.02, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), **WEAR_WOOD,
+                      paint=('#6c8a68', 0.18, 0.52)),   # faded sage-green board band, the facade's shutter green
     'Crate_B':   dict(src='wooden_crate_02', parts=None, res=2048, tris=5000, wood='#694e36',
                       lean=-0.7, bulge=0.03, sag=0.02, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), paint=('#b38a40', 0.30, 0.62), **WEAR_WOOD,
                       erase=((0.02, 0.15, 0.15, 0.29), (0.235, 0.15, 0.37, 0.29))),
     'Crate_C':   dict(src='wooden_crate_01', parts=['wooden_crate_01', 'wooden_crate_01_latch'], res=2048, tris=5800, wood='#725539',
                       lean=0.0, bulge=0.03, sag=0.015, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), leaned_lid=True, **WEAR_WOOD,
-                      produce=dict(kind='crate', n_apple=11, n_turnip=5, n_loaf=0, n_squash=3, max_h=0.09)),
+                      produce=dict(kind='crate', n_apple=14, n_turnip=6, n_loaf=0, n_squash=4, max_h=0.13)),
     'Bucket_A':  dict(src='wooden_bucket_01', parts=None, rings=True, res=1024, tris=4000, wood='#6c4e36',
                       lean=1.5, bulge=0.025, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.70, 1.6), **WEAR_WOOD),
     'Bucket_B':  dict(src='wooden_bucket_02', parts=None, rings=True, res=1024, tris=4500, wood='#664a34',
                       lean=-1.0, bulge=0.02, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.75, 1.0), **WEAR_WOOD),
     'Basket_Produce': dict(src='wicker_basket_01', parts=None, res=1024, tris=5800, wood='#a07a48', basket=True,
                       lean=0.0, bulge=0.02, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.85, 1.0), **WEAR_WICKER,
-                      produce=dict(kind='basket', n_apple=5, n_turnip=2, n_loaf=0, n_squash=1, max_h=0.07)),
+                      produce=dict(kind='basket', n_apple=10, n_turnip=3, n_loaf=0, n_squash=2, max_h=0.15)),
     'Basket_Lidded': dict(src='wicker_basket_02', parts=None, res=1024, tris=5800, wood='#9c7646', basket=True,
                       lean=1.0, bulge=0.03, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.80, 1.0), **WEAR_WICKER),
     'Basket_Bread': dict(src='wicker_basket_02', parts=['wicker_basket_02_base'], res=1024, tris=5000, wood='#a47c4a', basket=True,
@@ -267,8 +273,10 @@ def wear(t, col, rough, metal, H, p, metal_mask=None, ao=None):
         grey = t.mixc(0.55, col, t.rgb('#9a9086'))
         col = t.mixc(top, col, grey); rough = t.mixf(top, rough, 0.88)
     zj = t.math('ADD', z, t.math('MULTIPLY', t.math('SUBTRACT', n1, 0.5), 0.09))
-    dirt = t.math('MULTIPLY', t.mrange(zj, p['dirt'] * 1.3, 0.0), t.mrange(n2, 0.2, 0.6, 0.6, 1.0))
-    col = t.mixc(t.math('MULTIPLY', dirt, 0.9), col, t.mixc(t.mrange(n2, 0.3, 0.7), t.rgb('#3a3129'), t.rgb('#5a4c3c')))
+    dirt = t.math('MULTIPLY', t.mrange(zj, p['dirt'] * 1.7, 0.0), t.mrange(n2, 0.15, 0.55, 0.7, 1.0))
+    contact = t.mrange(z, 0.035, 0.0)                     # a hard dark contact line where it meets the cobbles
+    dirt = t.math('MAXIMUM', dirt, contact)
+    col = t.mixc(t.math('MULTIPLY', dirt, 0.95), col, t.mixc(t.mrange(n2, 0.3, 0.7), t.rgb('#2a231d'), t.rgb('#463a2e')))
     rough = t.mixf(t.math('MULTIPLY', dirt, 0.8), rough, 0.95)
     if metal_mask is not None:
         rust = t.math('MULTIPLY', metal_mask, t.mrange(zj, 0.50 * H, 0.06 * H))
@@ -317,6 +325,7 @@ def graded_albedo(name, src, matname, p):
     else:
         w = valid * (1 - m)
         out = grade_region(lin, w, p['wood'], **WOOD)
+        if not p.get('basket'): out = out * OAK_DARKEN     # in-engine feedback: oak read too close to the plaster at the wide camera
         if m.sum() > 50:
             iron = grade_region(lin, valid * m, IRON, hue_keep=0.3, delight=0.4, contrast=1.2, chroma=0.8)
             out = out * (1 - m[..., None]) + iron * m[..., None]
@@ -496,8 +505,8 @@ def proc_material(kind):
     if kind == 'apple':
         streak_m = t.new('ShaderNodeMapping'); t.link(t.obj(), streak_m.inputs['Vector']); streak_m.inputs['Scale'].default_value = (40, 40, 6)
         st = t.noise(1.0, 3.0, 0.6, 1.0, vec=streak_m.outputs[0])
-        base = t.mixc(t.mrange(t.noise(5.0, 2.0, 0.5, 2.0), 0.3, 0.7), t.rgb('#a09a3a'), t.rgb('#b2402a'))
-        col = t.mixc(t.mrange(st, 0.4, 0.7, 0.0, 0.7), base, t.rgb('#8a2420'))
+        base = t.mixc(t.mrange(t.noise(5.0, 2.0, 0.5, 2.0), 0.3, 0.7), t.rgb('#a8a02e'), t.rgb('#c23a20'))
+        col = t.mixc(t.mrange(st, 0.4, 0.7, 0.0, 0.7), base, t.rgb('#962016'))
         rough = t.mixf(t.noise(30.0), 0.38, 0.55)
         bump = t.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 0.08; t.link(t.noise(80.0), bump.inputs['Height']); nrm = bump.outputs[0]
     elif kind == 'turnip':
@@ -512,7 +521,7 @@ def proc_material(kind):
         a = t.new('ShaderNodeAttribute', attribute_name='tz')
         mp = t.new('ShaderNodeMapping'); t.link(t.obj(), mp.inputs['Vector']); mp.inputs['Scale'].default_value = (30, 30, 3)
         st = t.noise(1.0, 2.0, 0.5, 3.0, vec=mp.outputs[0])
-        col = t.mixc(t.mrange(t.noise(6.0), 0.3, 0.7), t.rgb('#b8641f'), t.rgb('#c98a34'))
+        col = t.mixc(t.mrange(t.noise(6.0), 0.3, 0.7), t.rgb('#c86016'), t.rgb('#da8a26'))
         col = t.mixc(t.mrange(st, 0.55, 0.7, 0.0, 0.6), col, t.rgb('#6e7448'))
         col = t.mixc(t.mrange(a.outputs['Fac'], 0.8, 1.0, 0.0, 0.5), col, t.rgb('#8c6a3a'))
         rough = 0.5
@@ -594,7 +603,7 @@ def tag_tz(o):
         t = (v.co.z - lo) / max(hi - lo, 1e-5); at.data[i].color = (t, t, t, 1)
 
 def apple(name, r):
-    a = r.uniform(0.040, 0.047)
+    a = r.uniform(0.040, 0.047) * PRODUCE
     prof = []
     for k in range(13):
         th = math.pi * (k + 0.5) / 13 - math.pi / 2
@@ -609,7 +618,7 @@ def apple(name, r):
     return [o, st]
 
 def turnip(name, r):
-    a = r.uniform(0.045, 0.055)
+    a = r.uniform(0.045, 0.055) * PRODUCE
     prof = [(0.004, -a * 0.95), (0.010, -a * 0.75), (a * 0.45, -a * 0.35), (a * 0.85, 0.0), (a * 0.95, a * 0.35), (a * 0.75, a * 0.65),
             (a * 0.35, a * 0.85), (a * 0.12, a * 0.9)]
     prof = [(rr, zz + a * 0.95) for rr, zz in prof]
@@ -625,7 +634,7 @@ def turnip(name, r):
 
 def squash(name, r):
     """Small ribbed winter squash (storybook chunky, ~13 cm): 8 lobes, flattened, a thick corky stem."""
-    a = r.uniform(0.060, 0.072); lob = r.choice((8, 9, 10))
+    a = r.uniform(0.060, 0.072) * PRODUCE; lob = r.choice((8, 9, 10))
     prof = []
     for k in range(12):
         th = math.pi * (k + 0.5) / 12 - math.pi / 2
@@ -640,6 +649,7 @@ def squash(name, r):
     return [o, st]
 
 def loaf(name, r, size=1.0):
+    size *= PRODUCE
     L_, W_, Hh = r.uniform(0.20, 0.24) * size, r.uniform(0.11, 0.13) * size, r.uniform(0.075, 0.09) * size
     bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=12, radius=1.0)
     o = bpy.context.active_object; o.name = name
@@ -657,9 +667,9 @@ def place_produce(p, H, bounds_xy, z0, r):
     items = ['loaf'] * p['n_loaf'] + ['squash'] * p.get('n_squash', 0) + ['turnip'] * p['n_turnip'] + ['apple'] * p['n_apple']
     placed = []   # (x, y, z of the centre, radius): spheres resting on the bed or on each other, lowest spot of a few tries
     for k, kind in enumerate(items):
-        rad_k = {'apple': 0.042, 'turnip': 0.048, 'loaf': 0.05, 'squash': 0.058}[kind]
+        rad_k = {'apple': 0.042, 'turnip': 0.048, 'loaf': 0.05, 'squash': 0.058}[kind] * PRODUCE
         best = None
-        for _ in range(24):
+        for _ in range(48):
             if kind == 'loaf':
                 x, y = r.uniform(-0.3, 0.3) * rx, r.uniform(-0.2, 0.2) * ry
             else:
@@ -669,8 +679,9 @@ def place_produce(p, H, bounds_xy, z0, r):
             for px, py, pz, pr in placed:
                 d2 = (x - px) ** 2 + (y - py) ** 2; s = (rad_k + pr) * 0.9
                 if d2 < s * s: zc = max(zc, pz + math.sqrt(s * s - d2))
-            if best is None or zc < best[2]: best = (x, y, zc)
-        x, y, zc = best
+            score = zc + 0.25 * math.hypot(x / rx, y / ry) * rad_k * 2   # lowest spot, nudged toward the middle: a domed heap
+            if best is None or score < best[3]: best = (x, y, zc, score)
+        x, y, zc, _s = best
         if zc > z0 + rad_k * 0.8 + p.get('max_h', 0.1): continue    # a low heap, never a tower
         placed.append((x, y, zc, rad_k))
         z = zc - rad_k * 0.8
@@ -839,7 +850,8 @@ def build_high(name, p):
     if 'produce' in p:
         pr = p['produce']
         cx, cy = 0.0, 0.0
-        rx = (float(mx[0]) - float(mn[0])) / 2 * 0.80; ry = (float(mx[1]) - float(mn[1])) / 2 * 0.78
+        fillk = 0.92 if pr['kind'] == 'basket' else 0.80     # wicker walls are thin: fill to them
+        rx = (float(mx[0]) - float(mn[0])) / 2 * fillk; ry = (float(mx[1]) - float(mn[1])) / 2 * (fillk - 0.02)
         if lid is not None:
             rx = (float(mx[0]) - float(mn[0])) / 2 * 0.80
         ztop = float(mx[2])
@@ -1034,7 +1046,7 @@ def changes(p):
     if 'clay' in p:
         look = 'regraded to clay with a slip glaze over the shoulder ending in runs'
     else:
-        look = ('regraded to a warm straw (PHASE1 3.1)' if p.get('basket') else 'regraded to PHASE1 3.1 (wood and iron separately)') + (', a faded ochre painted band' if 'paint' in p else '') \
+        look = ('regraded to a warm straw (PHASE1 3.1)' if p.get('basket') else 'regraded to PHASE1 3.1 (wood and iron separately)') + (', a faded painted board band' if 'paint' in p else '') \
             + (', its stencilled letters painted out' if p.get('erase') else '')
     wear = (['weave tone', 'grime in the weave'] if p.get('basket') else ['board tone', 'joint grime']) if p.get('tone') else (['cavity grime'] if 'clay' in p else [])
     wear += (['sun-bleached tops'] if p.get('bleach') else []) + (['rust at the foot'] if p.get('rings') or p.get('hoop', 0) > 0 else []) \
