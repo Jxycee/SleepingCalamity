@@ -1,11 +1,11 @@
 State: IN PROGRESS
 Session: Q10. Lake shore, stream and ravine
-Progress: 25%
-Sheet: none yet
+Progress: 45%
+Sheet: Reference/hollowmere/lake/SHEET_lakeshore_r1.jpg
 Blocker: none
 
-Score: -
-Tris: -
+Score: shore set (Blender) 29/40 self, controller agrees ~29; water not scored yet (no capture)
+Tris: LakeShore.fbx 11,118 (6 rocks 330-880, 3 reed clumps 560-732, jetty 5,650)
 SC RESULT: -
 Merge commit: -
 
@@ -39,3 +39,4 @@ Log:
 - Paused by the coordinator (usage). Shore-art agent stopped before it wrote any files (it was choosing Commons references). Unity editor is now
   installed. On resume: compile + fix SC_Water/HollowmereWater, capture the five lake cameras, then relaunch the shore-art generator.
 - Resumed after the usage pause: compile + capture loop (Sonnet), then the shore-art generator (Sonnet).
+- 63af216: sc_lakeshore.py + LakeShore.fbx (rocks, reeds, jetty; baked PBR, CC0/own) + SHEET_lakeshore_r1.jpg. Next: water compile/capture, then place the set.
