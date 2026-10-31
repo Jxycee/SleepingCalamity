@@ -27,6 +27,11 @@ namespace SleepingCalamity.EditorTools
             BuildPlayer();
             BuildEnemies();
             BuildHealingDrop();
+            BuilderUtil.WritePrefab(AssetPaths.CellarFloorSyncPrefab, root =>
+            {
+                BuilderUtil.GetOrAdd<NetworkObject>(root);
+                BuilderUtil.GetOrAdd<CellarFloorSync>(root);   // host writes seed + floor; every peer builds the floor locally
+            });
             foreach (string path in NetworkPrefabsBuilder.Prefabs) BuilderUtil.RefreshNetworkObjectHash(path);
         }
 

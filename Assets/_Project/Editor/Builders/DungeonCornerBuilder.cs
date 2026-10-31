@@ -25,7 +25,7 @@ namespace SleepingCalamity.EditorTools
         public const string KitFbx = "CellarVault.fbx";
         const string LanternFolder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
         const string MaterialsFolder = "Assets/_Project/Content/Materials/DungeonCorner";
-        const string ProfileName = "DungeonCorner_Profile";
+        internal const string ProfileName = "DungeonCorner_Profile";
         const string WearShaderName = "SleepingCalamity/WearLit";
 
         // piece -> LookTest source material and linear tint (the generator's tile_mat tint). Add a row when the controller sees "no material for slot".
@@ -158,7 +158,7 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- materials
         static Material Lit(string name) => LookTestBuilder.Ensure(MaterialsFolder + "/M_" + name + ".mat", Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found"));
 
-        static Dictionary<string, Material> BuildOwnMaterials()
+        internal static Dictionary<string, Material> BuildOwnMaterials()
         {
             var d = new Dictionary<string, Material>();
             Material breath = Lit("CV_Breath");   // faint warm emissive under the grate bars (the town's tithe-gate breath motif)
@@ -189,7 +189,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // CV_* slot name -> WearLit material (a B2 tileable tinted), built only when the FBX is in.
-        static Dictionary<string, Material> SlotMaterials(Dictionary<string, Material> own)
+        internal static Dictionary<string, Material> SlotMaterials(Dictionary<string, Material> own)
         {
             Shader wear = Shader.Find(WearShaderName) ?? throw new InvalidOperationException("Shader not found: " + WearShaderName);
             var map = new Dictionary<string, Material>(StringComparer.Ordinal);
@@ -236,7 +236,7 @@ namespace SleepingCalamity.EditorTools
 
         // --------------------------------------------------------------------------------------------- volume profile
         // A copy of LookTest_Cellar_Profile tuned to the A24 band (darker, no teal), so tuning never moves the LookTest scenes.
-        static void BuildProfile() => LookTestBuilder.EnsureProfile(ProfileName, p =>
+        internal static void BuildProfile() => LookTestBuilder.EnsureProfile(ProfileName, p =>
         {
             LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
             Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
