@@ -159,8 +159,28 @@ namespace SleepingCalamity.EditorTools
             box.transform.SetParent(go.transform, false);
             box.transform.localPosition = new Vector3(0f, size.y * 0.5f - 0.1f, 0f);
             box.transform.localScale = size;
-            box.GetComponent<Renderer>().sharedMaterial = LookTestBuilder.Mat(i.Kind == RoadItemKind.Hedge ? "meadow_grass" : i.Kind == RoadItemKind.Fence || i.Kind == RoadItemKind.Cart ? "oak_timber" : "sandstone");
+            box.GetComponent<Renderer>().sharedMaterial = (i.Kind == RoadItemKind.Hedge ? HollowmereFoliage.FoliageMaterial() : null)
+                ?? TryMat(i.Kind == RoadItemKind.Fence || i.Kind == RoadItemKind.Cart || i.Kind == RoadItemKind.Hedge ? "oak_timber" : "sandstone");
             return go;
+        }
+
+        // A look-test material by name, or null (LookTestBuilder.Mat throws when one is missing).
+        static Material TryMat(string name) => AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/LookTest/M_" + name + ".mat");
+
+        // The ring road's dirt: URP Lit on the B1 worn_path tileable (the terrain's Path layer textures), metre UVs.
+        static Material RoadMaterial()
+        {
+            const string dir = "Assets/_Project/Content/Textures/B1_town/worn_path/worn_path";
+            var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_albedo.png");
+            if (albedo == null) return TryMat("sandstone");
+            BuilderUtil.EnsureFolder(MaterialsFolder);
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_RD_RingRoad.mat", Shader.Find("Universal Render Pipeline/Lit"));
+            m.SetTexture("_BaseMap", albedo); m.SetTexture("_MainTex", albedo);
+            var normal = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_normal.png");
+            if (normal != null) { m.SetTexture("_BumpMap", normal); m.EnableKeyword("_NORMALMAP"); }
+            m.SetFloat("_Smoothness", 0.05f);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         // ------------------------------------------------------------------------------------------------ 2. cards: hedgerow trees and field hedges
@@ -417,7 +437,7 @@ namespace SleepingCalamity.EditorTools
             var go = new GameObject("RingRoad");
             go.transform.SetParent(ring, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = LookTestBuilder.Mat("worn_path") ?? LookTestBuilder.Mat("packed_soil");
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = RoadMaterial();
             r.shadowCastingMode = ShadowCastingMode.Off;
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
         }
