@@ -3,7 +3,7 @@
 State: IN PROGRESS
 Session: Q15. Beyond the Lower Gate: the Saltwake road
 Progress: 85%
-Sheet: Reference/hollowmere/road/road_scene_r2.jpg
+Sheet: Reference/hollowmere/road/road_scene_r3.jpg
 Blocker: none
 
 ## Done so far (2026-10-31)
