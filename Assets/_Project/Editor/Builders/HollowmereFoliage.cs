@@ -227,7 +227,7 @@ namespace SleepingCalamity.EditorTools
                     if (Mathf.Abs(HollowmereLayout.PlateauDistance(x, z) - 27.5f) < 2.2f) foot = true;   // the bank top at the town wall's foot
                     float nz = 0.65f * Mathf.PerlinNoise(x * 0.14f + 5f, z * 0.14f + 91f) + 0.35f * Mathf.PerlinNoise(x * 0.29f + 47f, z * 0.29f + 13f);
                     float thick = Mathf.Max(Smooth(0.60f, 0.67f, nz), foot ? Smooth(0.30f, 0.42f, nz) : 0f);
-                    float p = Mathf.Lerp(0.18f, 6.0f, thick) * cellArea * Mathf.Clamp01(w);
+                    float p = Mathf.Lerp(0.18f, 5.5f, thick) * cellArea * Mathf.Clamp01(w);
                     uint h = Hash((uint)cx, (uint)cy);
                     bool lowPatch = Mathf.PerlinNoise(x * 0.21f + 131f, z * 0.21f + 29f) > 0.64f;
                     bool placed = false;
@@ -337,6 +337,7 @@ namespace SleepingCalamity.EditorTools
         // terrain height; left open where the ground falls to the lake. One shared material, no shadows. Under Set, so both presets show it.
         public static void FarHedge(Transform set)
         {
+            hedgeMat = null;
             if (!Load() || terr == null) return;
             cur = new Stats();
             Transform g = Group(set, "FarHedge");
@@ -356,13 +357,14 @@ namespace SleepingCalamity.EditorTools
                     if (x < HollowmereTerrain.Origin.x + 6f || x > HollowmereTerrain.Origin.x + HollowmereTerrain.Size.x - 6f
                         || z < HollowmereTerrain.Origin.z + 6f || z > HollowmereTerrain.Origin.z + HollowmereTerrain.Size.z - 6f) continue;
                     float y = terr.SampleHeight(new Vector3(x, 0f, z)) + baseY;
-                    if (y < HollowmereLayout.WaterY + 1.6f) continue;   // the lake side stays open
+                    float llx = (x - HollowmereLayout.LakeCentre.X) / HollowmereLayout.LakeRadiusX, llz = (z - HollowmereLayout.LakeCentre.Z) / HollowmereLayout.LakeRadiusZ;
+                    if (llx * llx + llz * llz < 1.5f * 1.5f || y < HollowmereLayout.WaterY + 0.5f) continue;   // the lake side stays open (the meadow itself sits close to the water level)
                     float lump = Mathf.PerlinNoise(x * 0.07f + 9f, z * 0.07f + 71f);   // long-wave lumps: tree-line heights
                     float height = Mathf.Clamp(Mathf.Lerp(2.5f, 6f, lump) + R(rng, -0.9f, 0.9f) + (row == 1 ? 0.6f : 0f), 2.5f, 6f);
                     float w = R(rng, 3f, 6f);
                     Vector2 toward = (centre - new Vector2(x, z)).normalized;
                     GameObject go = Put(g, cards[rng.Next(2)], new Vector3(x, y - 0.15f, z), YawFacing(toward.x, toward.y) + R(rng, -25f, 25f), new Vector3(w, height / cardH, w * 0.6f), rng.Next(2) == 0);
-                    foreach (Renderer rd in go.GetComponentsInChildren<Renderer>()) rd.shadowCastingMode = ShadowCastingMode.Off;
+                    foreach (Renderer rd in go.GetComponentsInChildren<Renderer>()) { rd.shadowCastingMode = ShadowCastingMode.Off; rd.sharedMaterial = HedgeMat(rd.sharedMaterial); }
                     if (row == 0 && k % 2 == 0)   // moss mounds at the base
                     {
                         float ms = R(rng, 10f, 16f);
@@ -373,6 +375,21 @@ namespace SleepingCalamity.EditorTools
             }
             Debug.Log("SC HOLLOWMERE foliage hedge objects=" + cur.Objects + " tris=" + cur.Tris + (cur.Tris > 150000 ? " OVER the 150k budget" : " (budget 150k)"));
             cur = null;
+        }
+
+        // The far hedge's leaf cards in a darker, deeper green than the wall ivy (the ivy atlas's bright young-leaf tone read as a light strip at 120 m):
+        // a copy of the foliage material with a tint, one shared asset so the ring still instances.
+        static Material hedgeMat;
+        static Material HedgeMat(Material src)
+        {
+            if (src == null) return null;
+            if (hedgeMat != null) return hedgeMat;
+            hedgeMat = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/Hollowmere/M_HM_FarHedge.mat", src.shader);
+            hedgeMat.CopyPropertiesFromMaterial(src);
+            hedgeMat.SetColor("_BaseColor", new Color(0.50f, 0.58f, 0.40f, 1f));
+            hedgeMat.enableInstancing = true;
+            EditorUtility.SetDirty(hedgeMat);
+            return hedgeMat;
         }
 
         // ------------------------------------------------------------------------------------------------ 2. lot edges
