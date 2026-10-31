@@ -4,7 +4,7 @@ Progress: 100%
 Status: DONE (foundations; refine later list below)
 Blocker: none (main merged; the art layer in CellarFloorBuilder.Art.cs now draws from the resolved dressing, the greybox socket dressing is gone; vignettes stay greybox; dust is still a marker/TODO)
 Branch: claude/variety-merge
-Last check: pending
+Last check: PASS at 99e6c21 (build PASS, test-edit 737/737, test-play 33 passed, 8 skipped, 0 failed)
 Next: refine later list below; user's three-run samey check on greybox
 Archive: ready
 Branch `cellar-variety` (pushed as `claude/cellar-variety`). Greybox foundations only: data, deterministic Core logic, builder hooks, tests. `check` not run. All new decisions are pure functions of (seed, floor) on their own Rng.Derive streams, so the room, placement and link streams are untouched; `LayoutHash()` stays geometry only (goldens for seed 12345 floors 1-3 unchanged).
