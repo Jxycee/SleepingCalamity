@@ -6,7 +6,8 @@
 // their designed heights. The build itself needs no GPU and runs the same with or without the RAW (without it the ground is the designed heights alone).
 //   Bake:   bash Tools/cloud/unity.sh exec --graphics --method SleepingCalamity.EditorTools.HollowmereTerrain.Bake --out <scratch>
 // The Terrain Tools eroders and noise are internal to that package, so Bake reaches them by reflection, pinned to 5.3.3 (Packages/manifest.json).
-// Layers: grass and dirt (flat greybox tints) and the B1 cobble tileable under the lanes and the square, painted from the layout and the slope.
+// Layers (wave 2, 2026-10-31): the B1 ground tileables meadow_grass, packed_soil and worn_path plus the B1 cobble under the lanes and the square, each with a
+// mask map (height in B) so the terrain height-blends them; painted from the layout and the slope (Splat). Four layers: one terrain pass, height blend on.
 using System;
 using System.IO;
 using System.Linq;
@@ -101,7 +102,10 @@ namespace SleepingCalamity.EditorTools
         public static Terrain Build(Transform parent, TownLayout t)
         {
             BuilderUtil.EnsureFolder(Folder);
-            TerrainLayer[] layers = { Layer("Grass", Flat("hm_grass", new Color32(108, 124, 66, 255)), null, 4f), Layer("Dirt", Flat("hm_dirt", new Color32(112, 92, 70, 255)), null, 4f), CobbleLayer() };
+            TerrainLayer[] layers = { Ground("Grass", "meadow_grass", 3f), Ground("Dirt", "packed_soil", 3f), Ground("Path", "worn_path", 2.5f), CobbleLayer() };
+            layers[0].diffuseRemapMax = new Vector4(0.97f, 0.93f, 0.88f, 1f);   // a little less saturated green (round 3)
+            layers[1].normalScale = 1.8f;                                        // a coarser read on the earth banks (round 3)
+            EditorUtility.SetDirty(layers[0]); EditorUtility.SetDirty(layers[1]);
             var data = AssetDatabase.LoadAssetAtPath<TerrainData>(DataPath);
             if (data == null) { data = new TerrainData(); AssetDatabase.CreateAsset(data, DataPath); }
             data.heightmapResolution = Res;
@@ -134,51 +138,80 @@ namespace SleepingCalamity.EditorTools
             const string path = "Assets/_Project/Content/Materials/Hollowmere/M_HM_Terrain.mat";
             Shader shader = Shader.Find("Universal Render Pipeline/Terrain/Lit") ?? throw new InvalidOperationException("URP Terrain/Lit shader not found");
             Material m = LookTestBuilder.Ensure(path, shader);
+            // Height blend (needs at most 4 layers, all with mask maps): soil shows between grass clumps and grass creeps over the path grit. The shader GUI would set
+            // these keywords from the layers in the editor; a batch build sets them here.
+            m.SetFloat("_EnableHeightBlend", 1f); m.SetFloat("_HeightTransition", 0.25f); m.EnableKeyword("_TERRAIN_BLEND_HEIGHT");
+            m.SetFloat("_EnableInstancedPerPixelNormal", 1f); m.EnableKeyword("_TERRAIN_INSTANCED_PERPIXEL_NORMAL");
+            m.EnableKeyword("_NORMALMAP"); m.EnableKeyword("_MASKMAP");
             EditorUtility.SetDirty(m);
             return m;
         }
 
-        // Splat weights per texel: cobble on the square, the keep top and the lanes; dirt on bare lots, steep banks, the ditch and the lake shore; grass elsewhere.
+        // Splat weights per texel (grass, soil, path, cobble): cobble on the square, the keep top and the lanes; worn path in a 1.6 m band along the lane edges and
+        // on the lots (trodden ground round the old footings); soil on steep banks (24-38 deg), in the dry ditch, on the lake shore and in patches on the lots;
+        // grass on the open ground, with large dry patches (path) and a few bare spots (soil) from low-frequency noise so the 300 m meadow does not read as one tile.
         static float[,,] Splat(TownLayout t, TerrainData data)
         {
-            var a = new float[SplatRes, SplatRes, 3];
+            var a = new float[SplatRes, SplatRes, 4];
             for (int j = 0; j < SplatRes; j++)
                 for (int i = 0; i < SplatRes; i++)
                 {
                     float u = (i + 0.5f) / SplatRes, v = (j + 0.5f) / SplatRes;
                     float x = Origin.x + u * Size.x, z = Origin.z + v * Size.z;
-                    float grass = 1f, dirt = 0f, cobble = 0f;
-                    if (IsPaved(t, x, z)) { cobble = 1f; grass = 0f; }
+                    var p = new TownPoint(x, z);
+                    float grass, soil = 0f, path = 0f, cobble = 0f;
+                    float lane = LaneEdge(t, p);
+                    if (lane < 0f || IsPavedArea(x, z)) { cobble = 1f; grass = 0f; }
                     else
                     {
                         float steep = data.GetSteepness(u, v), y = data.GetInterpolatedHeight(u, v) + Origin.y;
-                        dirt = Mathf.Max(Smooth(24f, 38f, steep), 1f - Smooth(HollowmereLayout.WaterY + 0.3f, HollowmereLayout.WaterY + 1.8f, y));
-                        var p = new TownPoint(x, z);
-                        foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(p, 0.5f)) { dirt = Mathf.Max(dirt, 0.55f); break; }
-                        dirt = Mathf.Clamp01(dirt + 0.18f * (Mathf.PerlinNoise(x * 0.11f + 13f, z * 0.11f + 7f) - 0.5f));
-                        grass = 1f - dirt;
+                        float e = HollowmereLayout.PlateauDistance(x, z);
+                        float n1 = Mathf.PerlinNoise(x * 0.11f + 13f, z * 0.11f + 7f) - 0.5f;          // ~9 m breakup of every edge
+                        float big = Mathf.PerlinNoise(x * 0.035f + 41f, z * 0.035f + 3f);                 // ~30 m dry patches
+                        soil = Mathf.Max(Smooth(24f, 38f, steep), 1f - Smooth(HollowmereLayout.WaterY + 0.3f, HollowmereLayout.WaterY + 1.8f, y));
+                        soil = Mathf.Max(soil, 0.85f * (1f - Smooth(1.2f, 3.0f, Mathf.Abs(e - 31f))));     // the dry ditch floor and its sides
+                        path = 1f - Smooth(0.3f, 1.6f, lane + 0.5f * n1);                                  // the lane edges
+                        foreach (Foundation f in t.Foundations)
+                            if (f.Footprint.Contains(p, 1.2f)) { path = Mathf.Max(path, 0.75f); soil = Mathf.Max(soil, Smooth(0.55f, 0.75f, big + n1)); break; }
+                        foreach (Landmark l in t.Landmarks)
+                            if (l.Footprint.Contains(p, 1.0f)) { path = Mathf.Max(path, 0.6f); break; }
+                        path = Mathf.Max(path, 0.28f * Smooth(0.55f, 0.80f, big));                          // dry meadow patches
+                        soil = Mathf.Max(soil, 0.35f * Smooth(0.62f, 0.75f, Mathf.PerlinNoise(x * 0.09f + 77f, z * 0.09f + 19f)) * (1f - Smooth(0.3f, 0.5f, big)));   // bare spots
+                        // round 3: 40-70 m colour drift on the open lawn: yellow-green dry patches (path layer, <= 0.3) and darker worn patches (soil layer, <= 0.2), other seeds and scales
+                        path = Mathf.Max(path, 0.3f * Smooth(0.45f, 0.85f, Mathf.PerlinNoise(x * 0.017f + 203f, z * 0.017f + 57f)));
+                        soil = Mathf.Max(soil, 0.2f * Smooth(0.5f, 0.9f, Mathf.PerlinNoise(x * 0.022f + 311f, z * 0.022f + 149f)));
+                        soil = Mathf.Clamp01(soil + 0.18f * n1);
+                        path = Mathf.Clamp01(path) * (1f - soil);
+                        grass = Mathf.Max(0f, 1f - soil - path);
                     }
-                    a[j, i, 0] = grass; a[j, i, 1] = dirt; a[j, i, 2] = cobble;
+                    a[j, i, 0] = grass; a[j, i, 1] = soil; a[j, i, 2] = path; a[j, i, 3] = cobble;
                 }
             return a;
         }
 
-        static bool IsPaved(TownLayout t, float x, float z)
+        // Signed distance (m) from the nearest lane's edge: negative inside a lane.
+        static float LaneEdge(TownLayout t, TownPoint p)
         {
-            if (x >= HollowmereLayout.SquareMinX && x <= HollowmereLayout.SquareMaxX && z >= HollowmereLayout.SquareMinZ && z <= HollowmereLayout.SquareMaxZ) return true;
-            if (z > HollowmereLayout.KeepWallZ + 0.6f && z < HollowmereLayout.KeepWallZ + 12f && Mathf.Abs(x) < HollowmereLayout.KeepHalfWidth - 1f) return true;
-            var p = new TownPoint(x, z);
-            foreach (Lane lane in t.Lanes) if (HollowmereLayout.DistanceToPolyline(p, lane.Points) < lane.Width * 0.5f) return true;
-            return false;
+            float d = float.MaxValue;
+            foreach (Lane lane in t.Lanes) d = Mathf.Min(d, HollowmereLayout.DistanceToPolyline(p, lane.Points) - lane.Width * 0.5f);
+            return d;
         }
 
-        static TerrainLayer Layer(string name, Texture2D albedo, Texture2D normal, float tile)
+        // The paved areas that are not lanes: the square (the corner's surround paving slab) and the keep terrace's top beside the stairs and gate.
+        static bool IsPavedArea(float x, float z) =>
+            (x >= HollowmereLayout.SquareMinX && x <= HollowmereLayout.SquareMaxX && z >= HollowmereLayout.SquareMinZ && z <= HollowmereLayout.SquareMaxZ)
+            || (Mathf.Abs(x) < HollowmereLayout.KeepHalfWidth && z > HollowmereLayout.KeepWallZ - 0.2f && z < HollowmereLayout.KeepWallZ + 11f);
+
+        public static bool IsPaved(TownLayout t, float x, float z) => IsPavedArea(x, z) || LaneEdge(t, new TownPoint(x, z)) < 0f;
+
+        static TerrainLayer Layer(string name, Texture2D albedo, Texture2D normal, float tile, Texture2D mask = null)
         {
             string path = Folder + "/HM_" + name + ".terrainlayer";
             var layer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(path);
             if (layer == null) { layer = new TerrainLayer(); AssetDatabase.CreateAsset(layer, path); }
-            layer.diffuseTexture = albedo; layer.normalMapTexture = normal; layer.tileSize = new Vector2(tile, tile);
+            layer.diffuseTexture = albedo; layer.normalMapTexture = normal; layer.maskMapTexture = mask; layer.tileSize = new Vector2(tile, tile);
             layer.smoothness = 0.05f; layer.metallic = 0f;
+            layer.maskMapRemapMin = Vector4.zero; layer.maskMapRemapMax = Vector4.one;
             EditorUtility.SetDirty(layer);
             return layer;
         }
@@ -188,30 +221,19 @@ namespace SleepingCalamity.EditorTools
             const string dir = "Assets/_Project/Content/Textures/B1_town/cobble/";
             var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "cobble_albedo.png");
             var normal = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "cobble_normal.png");
-            TerrainLayer l = Layer("Cobble", albedo != null ? albedo : Flat("hm_cobble", new Color32(128, 120, 110, 255)), normal, 2f);
+            var mask = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "cobble_mask.png");
+            if (albedo == null) throw new InvalidOperationException("B1 cobble tileable missing: " + dir);
+            TerrainLayer l = Layer("Cobble", albedo, normal, 2f, mask);
             l.diffuseRemapMax = new Vector4(0.62f, 0.6f, 0.58f, 1f);   // the bare B1 albedo reads far brighter on the terrain shader than the corner's setts: bring the lanes down to them
             return l;
         }
 
-        // A small flat-tint albedo for the greybox grass and dirt (no B1 grass or soil tileable exists yet), with a little value noise so it is not dead flat.
-        static Texture2D Flat(string name, Color32 c)
+        // A B1 ground tileable (sc_tex_batches.py B1 + sc_tex_to_unity.py) as a terrain layer: albedo, normal and the terrain mask map.
+        static TerrainLayer Ground(string layerName, string material, float tile)
         {
-            string path = Folder + "/" + name + "_albedo.png";
-            if (!File.Exists(BuilderUtil.Abs(path)))
-            {
-                const int n = 64;
-                var tex = new Texture2D(n, n, TextureFormat.RGBA32, false);
-                var px = new Color32[n * n];
-                var rng = new System.Random(Seed);
-                for (int k = 0; k < px.Length; k++)
-                {
-                    float f = 0.92f + 0.16f * (float)rng.NextDouble();
-                    px[k] = new Color32((byte)Mathf.Min(255, c.r * f), (byte)Mathf.Min(255, c.g * f), (byte)Mathf.Min(255, c.b * f), 255);
-                }
-                tex.SetPixels32(px); File.WriteAllBytes(BuilderUtil.Abs(path), tex.EncodeToPNG()); UnityEngine.Object.DestroyImmediate(tex);
-                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-            }
-            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            string dir = "Assets/_Project/Content/Textures/B1_town/" + material + "/" + material;
+            var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_albedo.png") ?? throw new InvalidOperationException("B1 ground tileable missing: " + dir + "_albedo.png");
+            return Layer(layerName, albedo, AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_normal.png"), tile, AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_mask.png"));
         }
 
         // ------------------------------------------------------------------------------------------------ the erosion bake (graphics run)
