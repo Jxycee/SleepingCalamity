@@ -27,7 +27,8 @@ namespace SleepingCalamity.EditorTools
 
         [System.Serializable] sealed class PStone { public string v; public float[] p; }
         [System.Serializable] sealed class PDrain { public float[] p; public float yaw; }
-        [System.Serializable] sealed class PFile { public PStone[] stones; public PDrain[] drains; }
+        [System.Serializable] sealed class PSlot { public float[] p; public string kind; }
+        [System.Serializable] sealed class PFile { public PStone[] stones; public PDrain[] drains; public PSlot[] weed_slots; }
 
         public static void Build(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
         {
@@ -114,6 +115,7 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC HOLLOWMERE square ground: spawner with " + data.stones.Length + " stones from " + prefabs.Count + " variant prefabs");
 
             PlaceDrains(holder, data.drains, t, shelf);
+            ScatterEdges(holder, data.weed_slots, drop, origin, step, nx, nz);
         }
 
         // Inside the square proper the bed sinks 2.5 cm so the square's paving slab (HollowmereBuilder's SquarePaving, top -0.02) shows in the joints like the approved
@@ -122,6 +124,68 @@ namespace SleepingCalamity.EditorTools
         {
             float inside = Mathf.Min(Mathf.Min(x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - x), Mathf.Min(z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - z));
             return -0.025f * Mathf.Clamp01(inside / 0.5f);
+        }
+
+        // B9 tufts on the json's weed slots, like BeautyCornerGround.Weeds does for the corner: lot_edge / edge_grass (the worn grass-to-cobble edges) get a dense mix of
+        // moss tufts and grass clumps, missing_sett gets weeds and moss, joint gets small tufts. One shared foliage material, seeded scale and yaw, heights capped.
+        static void ScatterEdges(Transform holder, PSlot[] slots, float[] drop, Vector2 origin, float step, int nx, int nz)
+        {
+            if (slots == null || slots.Length == 0) return;
+            var moss = new List<GameObject>(); var grass = new List<GameObject>(); var weeds = new List<GameObject>();
+            Material mat = null;
+            void Load(string prefix, string letters, List<GameObject> into)
+            {
+                foreach (char c in letters)
+                {
+                    string folder = BeautyCornerArt.FindFolder("B9", prefix + c);
+                    string fbx = folder != null ? BeautyCornerArt.FirstFbx(folder) : null;
+                    GameObject go = fbx != null ? BeautyCornerArt.LoadModel(folder, Path.GetFileName(fbx)) : null;
+                    if (go == null) continue;
+                    into.Add(go);
+                    if (mat == null) mat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "CrackWeeds", foliage: true);   // the same atlas and material as the corner's weeds
+                }
+            }
+            Load("Moss_Tuft_", "ABC", moss); Load("Grass_", "ABC", grass); Load("Weed_", "ABCDE", weeds);
+            if (mat == null) { Debug.LogWarning("SC HOLLOWMERE square edges: no B9 tuft art, edges stay bare"); return; }
+            float Height(GameObject go) { Bounds b = default; bool any = false; foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true)) { if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds); } return any ? Mathf.Max(0.01f, b.size.y) : 1f; }
+            var heights = new Dictionary<GameObject, float>();
+            foreach (var l in new[] { moss, grass, weeds }) foreach (GameObject g in l) heights[g] = Height(g);
+
+            Transform group = Child(holder, "EdgeTufts");
+            var rnd = new System.Random(23);
+            int n = 0, nEdge = 0, nMissing = 0, nJoint = 0;
+            foreach (PSlot s in slots)
+            {
+                if (s.p == null || s.p.Length < 3) continue;
+                List<GameObject> pool; float lo, hi, cap;
+                switch (s.kind)
+                {
+                    case "lot_edge": case "edge_grass":
+                        pool = rnd.Next(2) == 0 && moss.Count > 0 ? moss : (grass.Count > 0 ? grass : moss); lo = 0.7f; hi = 1.2f; cap = 0.42f; nEdge++; break;
+                    case "missing_sett":
+                        pool = rnd.Next(3) > 0 && weeds.Count > 0 ? weeds : (moss.Count > 0 ? moss : weeds); lo = 0.8f; hi = 1.2f; cap = 0.25f; nMissing++; break;
+                    case "joint":
+                        pool = rnd.Next(2) == 0 && moss.Count > 0 ? moss : (weeds.Count > 0 ? weeds : moss); lo = 0.5f; hi = 0.8f; cap = 0.2f; nJoint++; break;
+                    default: continue;
+                }
+                if (pool.Count == 0) continue;
+                GameObject model = pool[rnd.Next(pool.Count)];
+                var w = (GameObject)PrefabUtility.InstantiatePrefab(model, group);
+                w.name = s.kind + "_" + n;
+                foreach (Renderer rd in w.GetComponentsInChildren<Renderer>(true))
+                {
+                    var mats = new Material[Mathf.Max(1, rd.sharedMaterials.Length)];
+                    for (int k = 0; k < mats.Length; k++) mats[k] = mat;
+                    rd.sharedMaterials = mats; rd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                float scale = lo + (float)rnd.NextDouble() * (hi - lo);
+                scale = Mathf.Min(scale, cap / heights[model]);
+                w.transform.localPosition = new Vector3(s.p[0], s.p[1] + CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, s.p[0], s.p[2]), s.p[2]);
+                w.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
+                w.transform.localScale = Vector3.one * scale;
+                n++;
+            }
+            Debug.Log("SC HOLLOWMERE square edges: " + n + " tufts on " + slots.Length + " slots (" + nEdge + " edge, " + nMissing + " missing sett, " + nJoint + " joint)");
         }
 
         // Copies each bed mesh with its vertices moved up by the drape (vertex -> holder space -> + correction -> back), saved as <folder>/SquareBed_Draped[_n].asset
@@ -400,6 +464,9 @@ namespace SleepingCalamity.EditorTools
                 Placeholder = new[] { new BeautyCornerTable.Part(BeautyCornerTable.PartShape.Box, new Vector3(0f, 0.17f, 0f), new Vector3(0.2f, 0.34f, 0.2f), "warm") },
             };
             BeautyCornerBuilder.PlaceRow(post, row);
+            // A warm pool under the lit lantern: about 2700 K, 6 m, no shadows. Named LampLight; BeautyCornerBuilder.ApplyPreset switches it on for LowSun only.
+            Light l = LookTestBuilder.AddLight(post, "LampLight", LightType.Point, hook + new Vector3(0f, -0.2f, 0f), Quaternion.identity, new Color(1.0f, 0.69f, 0.40f), 4f, 6f, LightShadows.None);
+            l.enabled = false;
         }
 
         // ---------------------------------------------------------------------------------------------------- bunting
