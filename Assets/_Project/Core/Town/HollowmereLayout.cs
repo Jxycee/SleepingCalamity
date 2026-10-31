@@ -315,7 +315,7 @@ namespace SleepingCalamity.Core
         };
 
         // ------------------------------------------------------------------------------------------------ the rebuilt preset (ring 1 assignment; rings 2-3 homes)
-        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Townhouse, StoneCottage, Workshop }
+        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Townhouse, StoneCottage, Workshop, Smithy, Schoolhouse }
         static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing1 =
         {
             ("F01", BuildingKind.ApprovedFacade), ("F02", BuildingKind.Bakery), ("F09", BuildingKind.Inn),
@@ -323,11 +323,13 @@ namespace SleepingCalamity.Core
             ("F06", BuildingKind.Townhouse), ("F07", BuildingKind.Townhouse),   // kit family 3 (sc_townhouse.py): the pair on the south side, both facing the fountain
             ("F03", BuildingKind.Empty), ("F10", BuildingKind.Empty),
         };
-        // Ring 2 kit homes fixed by hand (Q1): R2_09 (S, 6 m) the stone cottage B and R2_08 (M, 8 m) the workshop B, east side of the Ring Lane, fronts to the lane.
-        // Their pads keep the layout heights. The seeded fill below never touches them (and uses them as neighbours).
+        // Ring 2 lots fixed by hand: R2_09 (S, 6 m) the stone cottage B and R2_08 (M, 8 m) the workshop B (Q1), east side of the Ring Lane, fronts to the lane;
+        // the kit-ready shops (design 6, queue Q2) on M lots: R2_01 the smithy, R2_03 the schoolhouse (no variant). Their pads keep the layout heights.
+        // The seeded fill below never touches them (and uses them as neighbours).
         static readonly (string Foundation, BuildingKind Kind, char Variant, int Turn)[] RebuiltRing2Fixed =
         {
             ("R2_09", BuildingKind.StoneCottage, 'B', 0), ("R2_08", BuildingKind.Workshop, 'B', 0),
+            ("R2_01", BuildingKind.Smithy, ' ', 0), ("R2_03", BuildingKind.Schoolhouse, ' ', 0),
         };
         // Ring 1 townhouses (kit family 3): the pair on the south side, both facing the fountain.
         static readonly (string Foundation, char Variant, int Turn)[] RebuiltTownhouses = { ("F06", 'A', 0), ("F07", 'B', 0) };
@@ -335,8 +337,8 @@ namespace SleepingCalamity.Core
 
         // ---- the seeded ring 2 fill (Q3) ----
         // Pool = every ring 2 lot that is not fixed above, not a garden, not an L lot (no home kit fits: the large lots wait for the schoolhouse and the like) and
-        // not reserved. Reserved: R2_17 (M, Ring Lane south-east) for the smithy (queue Q2, "free ring 2 foundation").
-        public static readonly string[] Ring2Reserved = { "R2_17" };
+        // not reserved. Nothing is reserved now: R2_17 was held for the smithy until Q2 put it on R2_01 (fixed above).
+        public static readonly string[] Ring2Reserved = new string[0];
         public const int Ring2Seed = 20261031;
         public const float Ring2EmptyShare = 0.30f;      // about 30% of the pool stay ruins (the tests accept 25-35%)
         public const float NeighbourDistance = 22f;      // "neighbouring": lot centres closer than this (about one lot and a half plus the lane across), on either side of the lane

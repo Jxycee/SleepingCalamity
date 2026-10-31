@@ -102,12 +102,13 @@ namespace SleepingCalamity.Tests.EditMode
         {
             TownLayout t = HollowmereLayout.Create();
             var fill = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed);
-            foreach (string id in new[] { "R2_07", "R2_18", "R2_22", "R2_08", "R2_09" }.Concat(HollowmereLayout.Ring2Reserved))
+            foreach (string id in new[] { "R2_07", "R2_18", "R2_22", "R2_08", "R2_09", "R2_01", "R2_03" }.Concat(HollowmereLayout.Ring2Reserved))
                 CollectionAssert.DoesNotContain(fill.Keys, id, id + " is reserved or already used");
             foreach (Foundation f in t.Foundations.Where(f => f.Size == FoundationSize.L)) CollectionAssert.DoesNotContain(fill.Keys, f.Id, f.Id + " is L");
             foreach (string id in fill.Keys) Assert.AreEqual(2, t.Foundation(id).Ring, id);
             Assert.AreEqual(HollowmereLayout.BuildingKind.Garden, HollowmereLayout.RebuiltBuilding("R2_07"));
-            Assert.AreEqual(HollowmereLayout.BuildingKind.Home, HollowmereLayout.RebuiltBuilding("R2_17"), "the reserved smithy lot keeps its greybox");
+            Assert.AreEqual(HollowmereLayout.BuildingKind.Smithy, HollowmereLayout.RebuiltBuilding("R2_01"), "Q2's smithy stays fixed");
+            Assert.AreEqual(HollowmereLayout.BuildingKind.Schoolhouse, HollowmereLayout.RebuiltBuilding("R2_03"), "Q2's schoolhouse stays fixed");
         }
 
         [Test]
@@ -372,6 +373,19 @@ namespace SleepingCalamity.Tests.EditMode
             }
             Assert.Greater(t.Foundations.Select(f => f.RuinTurn).Distinct().Count(), 2, "the turns vary from lot to lot");
             Assert.AreEqual(HollowmereLayout.Create().Foundations.Select(f => f.RuinTurn), t.Foundations.Select(f => f.RuinTurn), "turns are deterministic");
+        }
+
+        [Test]
+        public void Rebuilt_KitReadyShops_StandOnRing2MediumLots()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            foreach (var kind in new[] { HollowmereLayout.BuildingKind.Smithy, HollowmereLayout.BuildingKind.Schoolhouse })
+            {
+                var lots = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == kind).ToList();
+                Assert.AreEqual(1, lots.Count, kind + " stands on exactly one lot");
+                Assert.AreEqual(2, lots[0].Ring, kind + " is a ring-2 shop");
+                Assert.AreEqual(FoundationSize.M, lots[0].Size, kind + " needs an M lot");
+            }
         }
 
         [Test]
