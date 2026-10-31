@@ -38,6 +38,15 @@ namespace SleepingCalamity.EditorTools
             string folder = Folder + "/" + variant;
             GameObject fbx = BeautyCornerArt.LoadModel(folder, variant + ".fbx", keepMaterialSlots: true);
             if (fbx == null) { Debug.LogWarning("SC HOLLOWMERE townhouse art missing: " + folder); return false; }
+            // A model's first import (no .meta yet) can hand back the prefab built before LoadModel's importer settings applied: every slot is then the
+            // default "Lit" material and the FK_* slot names are lost. Reimport once so the slots carry the FBX material names.
+            Renderer probe = fbx.GetComponentInChildren<Renderer>(true);
+            if (probe != null && probe.sharedMaterials.Length > 0 && probe.sharedMaterials[0] != null && probe.sharedMaterials[0].name == "Lit")
+            {
+                string path = folder + "/" + variant + ".fbx";
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+                fbx = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
             var look = Looks[variant];
             Dictionary<string, Material> slots = BeautyCornerArt.BuildNeighbourMaterials(variant, look.Plaster, look.Paint);
 
