@@ -1,9 +1,9 @@
 State: IN PROGRESS
 Session: Wave 1: Market stalls x3 (fixed, ruined + rebuilt)
-Progress: 60%
-Sheet: Reference/hollowmere/stalls/stalls_sheet_r3.jpg
+Progress: 70%
+Sheet: Reference/hollowmere/stalls/stalls_sheet_r4.jpg
 Blocker: none
-Score: coordinator round 1: produce ~29, cloth ~28, tools ~24, ruined ~25. Round 4 (rendering): tools wall on a pale back board + planes/chisels + front-bar coil and shears; cloth lengths from the front bar to the ground + counter drapes; ruined structures split (produce snapped post / awning down on the counter, cloth bare ribs + rags, tools leaning with fallen side panel); mould on bleached cloth
+Score: round 4 (self): produce rebuilt 30.5, produce ruined 31, cloth rebuilt 31.5, cloth ruined 29.5, tools rebuilt 28.5, tools ruined 29 (round 1: 30/29.5/26/26). 2K bakes running
 Tris: produce 49.0k/49.1k, cloth 39.5k/48.4k, tools 37.3k/48.5k (rebuilt/ruined, look stage, before trims)
 SC RESULT: - (Unity editor still downloading in this container)
 Merge commit: -

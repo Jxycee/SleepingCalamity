@@ -865,7 +865,7 @@ if VARIANT == 'tools':
         r = rng(f'bb{i}'); z0 = BB_Z0 + (r.uniform(0.0, 0.08) if RUIN else 0.0)
         board(f'backboard{i}', (bbw - 0.006, 0.025, BB_Z1 - z0), 'Oak', (-1.18 + bbw * (i + 0.5), BB_Y, (z0 + BB_Z1) / 2),
               (0, r.uniform(-0.6, 0.6) + (6 if RUIN and i == 10 else 0), 0), grain=2, cut=4, chamfer=0.004, wob=0.002,
-              tint=bleach((1.12, 1.08, 1.0, 1), 0.3) if RUIN else (1.12 * r.uniform(0.95, 1.05), 1.08, 1.0, 1))
+              tint=bleach((1.3, 1.25, 1.15, 1), 0.3) if RUIN else (1.45 * r.uniform(0.95, 1.05), 1.4, 1.28, 1))
     for z in (BB_Z0 + 0.12, BB_Z1 - 0.1):
         board(f'bb_batten{z:.2f}', (2.36, 0.025, 0.07), 'Oak', (0, BB_Y + 0.025, z), grain=0, cut=6, chamfer=0.005, wob=0.002, tint=(0.95, 0.92, 0.88, 1))
 else:
@@ -1246,7 +1246,7 @@ if VARIANT and not RUIN:
             peg(nm + '_peg', x, zt)
             for j in range(4):
                 ring(f'{nm}{j}', (x + 0.006 * j, y - 0.01 * j, zt - rr + 0.01), rr - 0.008 * j, 0.014, 'Rope', 'Y', 18, sq=(0.8, 1.05))
-        Z1, Z2 = BB_Z1 - 0.06, BB_Z1 - 0.52                          # top row of pegs, lower row
+        Z1, Z2 = 2.08, 1.70                                          # peg rows: tools hang into the view under the front valance (eye 1.65 m)
         saw('saw', -0.98, Z1, 0.5); auger('auger', -0.6, Z1 - 0.04); coil('coil_w', -0.22, Z1); hammer('hammer', 0.12, Z1)
         auger('auger2', 0.42, Z1 - 0.06); saw('saw2', 0.82, Z1, 0.42)
         hammer('hammer2', -0.8, Z2, 0.11); mallet('mallet', -0.42, Z2)
@@ -1261,19 +1261,16 @@ if VARIANT and not RUIN:
                               for k in range(11)], [0.014 * (1 - 0.7 * k / 10) for k in range(11)], 'Metal', 6, tint=STEEL)
         # hung from the awning's front bar inside the posts: a coil of rope and a pair of shears (front silhouette breaks)
         fbz = AW_FRONT[1] - 0.06; fby = AW_FRONT[0] + 0.05
+        pole('coil_cord', [(0.78, fby, fbz), (0.78, fby, fbz - 0.32)], 0.006, 'Rope', 6)
         for k in range(3):
-            ring(f'coil_f{k}', (0.78 + 0.006 * k, fby, fbz - 0.15 - 0.004 * k), 0.13 - 0.007 * k, 0.014, 'Rope', 'Y', 18, sq=(0.8, 1.1))
-        pole('shears_cord', [(-0.72, fby, fbz), (-0.72, fby, fbz - 0.12)], 0.005, 'Rope', 6)
+            ring(f'coil_f{k}', (0.78 + 0.006 * k, fby, fbz - 0.46 - 0.004 * k), 0.14 - 0.007 * k, 0.015, 'Rope', 'Y', 18, sq=(0.8, 1.1))
+        pole('shears_cord', [(-0.68, fby, fbz), (-0.68, fby, fbz - 0.36)], 0.005, 'Rope', 6)
         for sgn in (-1, 1):
-            pole(f'shears{sgn}', [(-0.72, fby, fbz - 0.12), (-0.72 + sgn * 0.03, fby, fbz - 0.2), (-0.72 + sgn * 0.012, fby, fbz - 0.42)], [0.01, 0.009, 0.004], 'Metal', 6, tint=STEEL)
+            pole(f'shears{sgn}', [(-0.68, fby, fbz - 0.36), (-0.68 + sgn * 0.035, fby, fbz - 0.45), (-0.68 + sgn * 0.014, fby, fbz - 0.7)], [0.012, 0.011, 0.005], 'Metal', 6, tint=STEEL)
         for k, (x, rad) in enumerate(((-0.88, 0.085), (-0.55, 0.07), (0.62, 0.08))):
             lathe(f'pot{k}', [(rad * 0.75, 0.0), (rad, 0.03), (rad * 1.05, rad * 0.9), (rad * 0.85, rad * 1.25), (rad * 0.95, rad * 1.33)],
                   (x, -0.14, T1), 'Metal', tint=COPPER if k != 1 else STEEL, sides=16)
             ring(f'pot_bail{k}', (x, -0.14, T1 + rad * 1.33), rad * 0.9, 0.004, 'Metal', 'X', 12, arc=0.5)
-        lathe('kettle', [(0.06, 0.0), (0.085, 0.04), (0.08, 0.10), (0.04, 0.15), (0.045, 0.16)], (0.25, 0.09, T2), 'Metal', tint=COPPER, sides=16)
-        pole('kettle_spout', [(0.32, 0.09, T2 + 0.06), (0.38, 0.09, T2 + 0.1), (0.41, 0.09, T2 + 0.13)], [0.016, 0.012, 0.009], 'Metal', 8, tint=COPPER)
-        for k, x in enumerate((-0.6, -0.3, 0.6, 0.9)):               # stacked iron pans on the top tier ends
-            lathe(f'pan{k}', [(0.09, 0.0), (0.11, 0.035), (0.115, 0.04)], (x, 0.09, T2 + 0.0), 'Metal', sides=16)
         board('nail_tray', (0.34, 0.22, 0.06), 'Oak', (-0.92, -0.62, CZ + 0.03), (0, 0, 6), grain=0, chamfer=0.006)
         blob('nail_heap', 0.15, (1, 0.62, 0.17), (-0.92, -0.62, CZ + 0.055), 'Metal', None, (0, 0, 6), (16, 8))
         for k, (x, yy, rz, L) in enumerate(((-0.5, -0.52, 8, 0.3), (-0.42, -0.74, -14, 0.24))):   # wooden planes, iron blade wedged in
