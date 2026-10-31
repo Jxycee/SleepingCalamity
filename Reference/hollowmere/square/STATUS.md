@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 75%
+Progress: 85%
 Sheet: Reference/hollowmere/square/props_sheet_r1.jpg (props beside the approved corner; square captures next)
 Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test and the art finish+export are running on Sonnet agents)
 
@@ -36,3 +36,6 @@ Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test 
 All 11 exported: Bench_A 614 tris, Bench_Broken 1,676, Planter_A 6,000, Planter_B 5,999, Planter_Broken 5,700, Pot_Clay 2,905 (placed at 1.5x scale), Pot_Broken 4,127, LanternPost_A 1,830 (carries the B8 lantern), LanternPost_Broken 1,724, Bunting 2,732 (6 pennants + rope, composed along a catenary), Drain_A 895.
 My props-sheet score: about 26/40. Weak spots: the bench reads as a low settle, the planters have no straps, a pale liner shows at the soil edge.
 Next: rebuild with the art, captures in both presets, check.
+
+## Integration (in progress)
+Coordinator's quick prop fixes are folded in: mixed planting in the Rebuilt planters and pots (grass, weeds, ivy trailing over the front), the B8 lantern on every Rebuilt post, bunting sag 0.5-0.8 m with a shared fade tint. Built in Unity. Square captures are rendering now (both presets, midday + low sun, two new cameras Cap_HM_SquareSouth/SquareWest). Next: sheets, merge origin/main (townhouse bca6ee8), check, merge.
