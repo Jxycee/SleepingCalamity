@@ -51,7 +51,7 @@ Replace the greybox town wall on its raised bank with real art: a weathered sand
 
 ## Q9. Keep terrace: the keep hall and the terrace dressing
 Folder: `Reference/hollowmere/keep/`
-Claimed: -
+Claimed: cloud session claude/sharp-goldberg-vpyt8c (bakery, Q2, Q4 done), 2026-10-31
 The bell tower is on main (`ee4fe79`), but its hall stays greybox. Build the keep hall (an old stone hall with tall windows and a slate roof, beside the tower on the +4 terrace), plus the terrace dressing: the buttressed retaining wall with ivy planters (the layout already has them as greybox), both stairs with balustrades, and benches. Captures: keep stairs and keep wall views, in both presets.
 
 ## Q10. Lake shore, stream and ravine
