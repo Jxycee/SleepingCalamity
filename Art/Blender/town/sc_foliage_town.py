@@ -18,6 +18,9 @@ ground centre. Each exports to its own folder Assets/_Project/Content/Art/Town/B
                     toward -Y, the dense corner side at local -x. Hugs the ground storey, wraps the jetty beam and climbs the upper
                     storey jettied 0.45 m (--jetty, default 3.0 m like the builder's placeholder, until B4 lands); a hanging fringe
                     drops from the jetty edge and a few tendrils escape at the top and the open side.
+  SC_B9_IvyLintel   (Lintel_Ivy, not Ivy_*: it must not win the builder's Ivy row) a 1.0 x 0.55 m accent over a lintel or
+                    corner, strands draping down over its face; pivot = the lintel top centre.
+  SC_B9_GrassStrip  (Grass_Strip) 1.5 m of low crossed blades lapping over a wall base toward -Y; pivot = ground centre on the wall.
   SC_B9_IvyPatchA/B (Ivy_Patch_A/B) 1.0 x 1.4 m and 0.7 x 0.6 m flat-wall patches, bottom centre on the wall.
   SC_B9_CrackWeed_A..E  (Weed_A..E) narrow runs along local x for cobble joints and the wall foot (weeds grow in joints).
   SC_B9_MossTuft_A..C   (Moss_Tuft_A..C) low cushions with a fringe skirt.   SC_B9_GrassClump_A..C (Grass_A..C) ribbon blades.
@@ -396,7 +399,7 @@ class Wall:
             return Vector((x, -(w - self.jb), self.jb - off)), Vector((0, 0, -1)), Vector((0, -1, 0))
         return Vector((x, -self.out - off, w - self.out)), Vector((0, -1, 0)), Vector((0, 0, 1))
 
-def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, card_scale=1.0):
+def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, card_scale=1.0, root=True, drape=0):
     """Runners random-walk up the wall and branch; leaf cards follow the runners where a lobed density field allows."""
     rr = random.Random(seed); mb = MB()
     top = wall.out + height if not wall.flat else height
@@ -470,10 +473,10 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             card(mb, p, (nn + upv * 0.4).normalized(), upv, rr.uniform(0.11, 0.16) * card_scale, IVY_YOUNG_CELL, (nn + upv * 0.5).normalized(), ao_c=0.95)
             cards += 1
     # root mass: the ivy rises out of a dense clump at the foot instead of a ragged floating edge, and sprawls a little onto the ground
-    for _ in range(int(width * 12)):
+    for _ in range(int(width * 12) if root else 0):
         leaf(rr.uniform(0.0, width), rr.uniform(0.0, 1.0) ** 1.8 * 0.7, rr.uniform(0.02, 0.14), rr.uniform(0.38, 0.54) * card_scale,
              IVY_DARK_CELL if rr.random() < 0.35 else IVY_CELLS[rr.randrange(2)], inner=False)
-    for _ in range(int(width * 6)):
+    for _ in range(int(width * 6) if root else 0):
         x = rr.uniform(0.1, width - 0.05); p = Vector((x, -rr.uniform(0.06, 0.32) * card_scale, 0.03 + 0.03 * rr.random()))
         cn = Vector((rr.gauss(0, 0.2), -0.35, 1)).normalized()
         card(mb, p, cn, Vector((rr.gauss(0, 0.6), -1, 0)), rr.uniform(0.3, 0.42) * card_scale, IVY_CELLS[rr.randrange(2)], Vector((0, -0.3, 1)).normalized(), ao_c=0.6, ao_edge=0.9)
@@ -498,6 +501,9 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             x = rr.uniform(0.0, width * 0.9) ** 1.2 / max(width * 0.9, 1e-3) ** 0.2
             if rr.random() > density(x, wall.jb) + 0.2: continue
             strand(Vector((x, -wall.out + 0.03, wall.jb - 0.01)), (rr.gauss(0, 0.2), -0.15, -1), rr.uniform(0.25, 0.9), 0.85, single=rr.random() < 0.5)
+    for i in range(drape):                                                 # an accent drapes down over its lintel or rail
+        x = width * (0.1 + 0.8 * (i + rr.random()) / drape)
+        strand(Vector((x, -0.04, 0.0)), (rr.gauss(0, 0.2), -0.25, -1), rr.uniform(0.18, 0.5), 0.95, single=rr.random() < 0.6)
     ends = sorted(runners, key=lambda r: -r[0][-1][1])[:tendrils]
     for path, order in ends:
         x, w = path[-1]; p, nn, upv = wall.at(x, w, off=0.02)
@@ -568,13 +574,14 @@ def weed_clumps(mat):
     for o in list(weeds.values()) + list(nettles.values()): bpy.data.objects.remove(o)
     return out
 
-def blades(rr, n, hmin, hmax, run, across, segs=3):
+def blades(rr, n, hmin, hmax, run, across, segs=3, lean_dir=None):
     """n tapered blades rooted along a joint run (length `run` on local x, `across` wide), leaning out of the joint. Each blade is two
     crossed ribbons (in-engine round 4 caught single ribbons edge-on as dark slivers): no view sees it edge-on."""
     mb = MB()
     for b in range(n):
         base = Vector((rr.uniform(-run / 2, run / 2), rr.gauss(0, across / 4), 0))
         a = rr.uniform(0, 2 * math.pi); outv = Vector((math.cos(a) * 0.5, math.sin(a), 0)).normalized()
+        if lean_dir is not None: outv = (Vector(lean_dir) + Vector((rr.gauss(0, 0.6), rr.gauss(0, 0.25), 0))).normalized()   # lap over away from a wall
         lean = rr.uniform(0.35, 0.9); hgt = hmin + (hmax - hmin) * rr.random() ** 1.6; wid = rr.uniform(0.014, 0.022) * (hgt / 0.2) ** 0.5
         side = outv.cross(Vector((0, 0, 1))).normalized(); rect = C_GRASS if rr.random() < 0.6 else C_GRASS2
         for wdir in (side, outv):                                          # the ribbon and its crossed twin
@@ -724,6 +731,15 @@ def build_models():
                              ('SC_B9_IvyPatchA', ('IvyPatchA', 1.0, 1.4, 17, Wall(0, flat=True), 2), dict(fringe=False, tendrils=3, card_scale=0.85), 1.0),
                              ('SC_B9_IvyPatchB', ('IvyPatchB', 0.7, 0.6, 29, Wall(0, flat=True), 2), dict(fringe=False, tendrils=2, card_scale=0.75), 0.7)):
         groups[key] = L.build(key, grow_ivy(*args, **kw), [mat]); groups[key].data.transform(Matrix.Translation((-w / 2, 0, 0)))
+    # accent ivy (TotK study: ivy as an accent over lintels and in corners, never a wall coat): pivot = the lintel top centre,
+    # a 1.0 x 0.55 m cushion on the wall above it and strands draping 0.2-0.5 m down over its face
+    key = 'SC_B9_IvyLintel'
+    groups[key] = L.build(key, grow_ivy('IvyLintel', 1.0, 0.55, 41, Wall(0, flat=True), 2, fringe=False, tendrils=2, card_scale=0.7, root=False, drape=7), [mat])
+    groups[key].data.transform(Matrix.Translation((-0.5, 0, 0)))
+    # wall-base grass strip: low crossed blades along 1.5 m that lap over the wall foot toward the plaza (pivot = ground centre, wall on y 0)
+    gs = blades(random.Random(77), 36, 0.07, 0.2, 1.5, 0.06, segs=2, lean_dir=(0, -1, 0.0))
+    for k in range(len(gs.p)): gs.p[k] = (gs.p[k][0], gs.p[k][1] - 0.04, gs.p[k][2])
+    groups['SC_B9_GrassStrip'] = L.build('SC_B9_GrassStrip', gs, [mat])
     for ob in weed_clumps(mat): groups[ob.name] = ob
     for k, (seed, w, d, h) in zip('ABC', [(3, 0.30, 0.22, 0.07), (5, 0.20, 0.16, 0.05), (8, 0.42, 0.26, 0.08)]):
         groups[f'SC_B9_MossTuft_{k}'] = L.build(f'SC_B9_MossTuft_{k}', moss_tuft(k, seed, w, d, h), [mat])
@@ -752,6 +768,7 @@ BUILDER = {
 }
 EXTRA = {
     'SC_B9_IvyPatchA': [((1.6, 0.6, 7.5), 0)], 'SC_B9_IvyPatchB': [((-2.6, 0.0, 7.5), 0)],
+    'SC_B9_IvyLintel': [((-1.25, 2.25, 7.5), 0)], 'SC_B9_GrassStrip': [((0.9, 0, 7.5), 0), ((-2.9, 0, 7.5), 0)],
     'SC_B9_MossTuft_A': [((-1.3, 0, -1.15), 20)], 'SC_B9_MossTuft_C': [((-1.65, 0, -0.45), 100)], 'SC_B9_MossTuft_B': [((-0.65, 0, -1.62), 0)],
     'SC_B9_MossBandA': [((0, 0, 0), 0)],           # yaw 0 = the south-west foot (the old Moss_Band stays exported, unplaced here)
     'SC_B9_GrassClump_A': [((-4.75, 0, 7.2), 0)], 'SC_B9_GrassClump_C': [((-4.3, 0, 7.15), 0)], 'SC_B9_GrassClump_B': [((3.3, 0, 3.7), 0)],
@@ -813,6 +830,7 @@ FOLDERS = {
     'SC_B9_IvyWall': 'Ivy_Facade', 'SC_B9_IvyPatchA': 'Ivy_Patch_A', 'SC_B9_IvyPatchB': 'Ivy_Patch_B',
     'SC_B9_CrackWeed_A': 'Weed_A', 'SC_B9_CrackWeed_B': 'Weed_B', 'SC_B9_CrackWeed_C': 'Weed_C', 'SC_B9_CrackWeed_D': 'Weed_D', 'SC_B9_CrackWeed_E': 'Weed_E',
     'SC_B9_MossTuft_A': 'Moss_Tuft_A', 'SC_B9_MossTuft_B': 'Moss_Tuft_B', 'SC_B9_MossTuft_C': 'Moss_Tuft_C',
+    'SC_B9_IvyLintel': 'Lintel_Ivy', 'SC_B9_GrassStrip': 'Grass_Strip',
     'SC_B9_GrassClump_A': 'Grass_A', 'SC_B9_GrassClump_B': 'Grass_B', 'SC_B9_GrassClump_C': 'Grass_C',
     'SC_B9_MossDecal': 'Moss_Band', 'SC_B9_BasinMoss': 'Basin_Moss', 'SC_B9_MossBandA': 'Moss_Band_A',
 }
