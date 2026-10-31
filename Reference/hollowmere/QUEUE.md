@@ -41,3 +41,28 @@ The decorations still kit-ready in design section 6: vegetable beds, a trellis, 
 Folder: `Reference/hollowmere/room_pool/`
 Claimed: -
 `docs/PHASE1.md` M5 and 7.2: the room pool as data for floors 1-4, in greybox. Start from whatever M5 code is on main (look first; don't duplicate it). Author 8-12 rooms with sub-themes and dressing variants as data, with EditMode tests that every room is valid (exits connect, the key is reachable). Code and data only, no art. If M5's Core floor generator isn't on main yet, write only the room data format plus its tests, and say so in STATUS.md.
+
+## Q8. Town wall, Lower Gate and East Gate
+Folder: `Reference/hollowmere/town_wall/`
+Claimed: -
+Replace the greybox town wall on its raised bank with real art: a weathered sandstone curtain wall with a walkway, crenels, buttresses and breaches in Ruined (patched in Rebuilt); the Lower Gate (onto the Saltwake road) and the East Gate (down Mill Lane) as gatehouses with timber doors. A kit generator (`Art/Blender/town/sc_town_wall.py`) that tiles along the layout's wall path at its heights. Captures: low east, lake shore, both gates, in both presets.
+
+## Q9. Keep terrace: the keep hall and the terrace dressing
+Folder: `Reference/hollowmere/keep/`
+Claimed: -
+The bell tower is on main (`ee4fe79`), but its hall stays greybox. Build the keep hall (an old stone hall with tall windows and a slate roof, beside the tower on the +4 terrace), plus the terrace dressing: the buttressed retaining wall with ivy planters (the layout already has them as greybox), both stairs with balustrades, and benches. Captures: keep stairs and keep wall views, in both presets.
+
+## Q10. Lake shore, stream and ravine
+Folder: `Reference/hollowmere/lake/`
+Claimed: -
+The lake basin (water at -12 m) and the stream ravine, using `sc-water-look`: a stylised-real water surface with a shoreline foam and depth tint, reeds, shore stones, a small jetty, and stream rocks with small falls down the ravine toward the mill. Keep within the terrain from `HollowmereTerrain`. Captures: lake shore, the ravine and Mill Lane, at midday and low sun.
+
+## Q11. Lane kit: lane walls, steps and lane dressing
+Folder: `Reference/hollowmere/lanes/`
+Claimed: -
+The design keeps the lane kits at final quality but unplaced. Build the ring 2 lane kit (garden walls, terrace retaining walls, lane steps and ramps matching the 20 degree rule, wall lanterns, gates into yards, drain gutters) and place it along the lanes at their heights in both presets. Captures: Market Street, a lane mouth, the terrace steps.
+
+## Q12. Whole-town look pass
+Folder: `Reference/hollowmere/look/`
+Claimed: -
+Take this one only after Q3 or Q8 has merged, so there is a real town to light. Use `sc-scene-look` on the whole of Hollowmere: light, atmosphere (haze, volumetrics, pollen), the colour grade at midday and low sun, matched to the approved corner's bands (`sc_ref_palette.py`) and the style bible 3.1/3.5. Fixed capture set (overview, square, lanes, keep, lake) as a contact sheet beside the approved corner. Change only lighting, volume and grade settings and the builder's look hooks.
