@@ -39,14 +39,14 @@ Axes (Blender): z up, front -Y, metres. Origin = foundation centre at ground (th
 Budget: under 45k tris (task cap), 2048 px maps (shared sets).
 Status (2026-10-31, cloud): round 3, self-review 31.5/40 (silhouette 4.5, proportion 4, form 3.5, surface 3.5, colour 4,
 wear 3.5, set 4, metal/emissive 4); first review 29 (target 34 not reached: round 3 gained about 0.5, so stopped per brief 3).
-44,774 tris (Frame 40,226, Part_Door 1,558, Part_Oven 656, Part_Sign 2,334); FOOTPRINT 9.62 x 6.84 m; everything inside
+44,994 tris (Frame 40,446, Part_Door 1,558, Part_Oven 656, Part_Sign 2,334; reproducible: seeds from zlib.crc32); FOOTPRINT 9.62 x 6.84 m; everything inside
 x -5.43..5.33, y -4.42..4.99. Round 2: wear was being written before the parts' transforms updated (every part read full
 grime), painted gilt, smooth sacks, flour heap; round 3: a true pretzel, back door hood, run-off and smoke stains.
-Sheet: Reference/hollowmere/bakery/SHEET_bakery_r3.jpg. Next visible gains: a stronger oven bulge (it had to shrink to fit
+Sheets: Reference/hollowmere/bakery/SHEET_bakery_r3.jpg, SHEET_bakery_unity.jpg (in engine on F02). Next visible gains: a stronger oven bulge (it had to shrink to fit
 the foundation; a deeper niche would let it bulge more), plaster value variation per panel, a few B9 weeds at the wall foot,
 a warm lit interior through the open doorway in the frame state.
 """
-import sys, os, math
+import sys, os, math, zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpy, bmesh
 from mathutils import Vector, Matrix, noise
@@ -268,7 +268,7 @@ def timber_wall(tag, L, za, zb, posts, rails, opens=(), braces=(), plinth=False,
     for k, o in enumerate(opens):
         kind, u0, u1, z0, z1 = o
         if kind.startswith('win'):
-            window(pc, 0.0, u0, u1, z0, z1, hash(tag) % 97 + k)
+            window(pc, 0.0, u0, u1, z0, z1, zlib.crc32(tag.encode()) % 97 + k)
             # sill and head rails across the bay
             mem(pc, (u0 - 0.2, z0 - 0.11), (u1 + 0.2, z0 - 0.11), w=0.20, proud=PROUD + 0.01, name='%sws%d' % (tag, k))
             mem(pc, (u0 - 0.2, z1 + 0.11), (u1 + 0.2, z1 + 0.11), w=0.20, proud=PROUD + 0.01, name='%swh%d' % (tag, k))
@@ -285,7 +285,7 @@ def timber_wall(tag, L, za, zb, posts, rails, opens=(), braces=(), plinth=False,
             segs.append((a, o[1] - 0.02)); a = o[2] + 0.02
         segs.append((a, L))
         for s0, s1 in segs:
-            plinth_run(pc, s0, s1, hash(tag) % 31 + s0)
+            plinth_run(pc, s0, s1, zlib.crc32(tag.encode()) % 31 + s0)
     return pc
 
 def doorway(pc, u0, u1, z0, z1, depth=0.30, inner=1.3):

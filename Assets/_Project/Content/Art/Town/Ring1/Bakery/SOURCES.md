@@ -1,11 +1,11 @@
 # Bakery (ring 1, L class): sources
 
 - Generator: `Art/Blender/town/sc_bakery.py` (procedural, reproducible from text; builds on the `sc_facade_kit.py` helpers).
-- Cloud export (2026-10-31, Blender 4.5.3): `blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_bakery.py -- --out <scratch> --export`; `<scratch>/Bakery.fbx` is copied here.
-- `Bakery.fbx` hierarchy (root `Bakery`), 44,774 tris in all:
+- Cloud export (2026-10-31, Blender 4.5.3): `blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_bakery.py -- --out <scratch> --export`; `<scratch>/Bakery.fbx` is copied here. The export strips texture paths (`path_mode='STRIP'`): with cloud paths that exist on the Unity machine, Unity named every textured slot 'Lit'.
+- `Bakery.fbx` hierarchy (root `Bakery`), 44,994 tris in all:
   | Object | Tris | What |
   |---|---|---|
-  | `Frame` | 40,226 | walls, roof, oven annex with the empty niche, chimney, sign bracket, shop window and bread shelf, woodpile, yard stepping stones |
+  | `Frame` | 40,446 | walls, roof, oven annex with the empty niche, chimney, sign bracket, shop window and bread shelf, woodpile, yard stepping stones |
   | `Part_Door` | 1,558 | planked green front door; pivot = `SOCKET_Door` |
   | `Part_Oven` | 656 | brick oven dome, mouth with ember bed (`BK_Ember`, emissive), iron door, peel; pivot = `SOCKET_Oven` |
   | `Part_Sign` | 2,334 | oval sign board (loaf, wheat), gilt pretzel, chains; pivot = `SOCKET_Sign` |
