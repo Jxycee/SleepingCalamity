@@ -1,6 +1,7 @@
 // Import settings for the look-test and material textures, applied by suffix so nobody edits .meta files by hand (M8, PHASE1 3.3).
 //   *_albedo  sRGB colour (decal albedo keeps its alpha as transparency, clamped); *_normal  normal map (OpenGL Y+, as the packer writes it);
-//   *_ms      linear, R metallic, A smoothness (URP Lit Metallic map); *_occ  linear occlusion.
+//   *_ms      linear, R metallic, A smoothness (URP Lit Metallic map); *_occ  linear occlusion;
+//   *_mask    linear RGBA, URP Terrain Lit mask map (R metallic, G occlusion, B height, A smoothness).
 // All 2048 max, trilinear, 8x aniso, mipmaps, high-quality compression.
 using System.IO;
 using UnityEditor;
@@ -22,7 +23,7 @@ namespace SleepingCalamity.EditorTools
             if (!assetPath.StartsWith(Root)) return;
             var ti = (TextureImporter)assetImporter;
             string name = Path.GetFileNameWithoutExtension(assetPath);
-            bool albedo = name.EndsWith("_albedo"), normal = name.EndsWith("_normal"), ms = name.EndsWith("_ms");
+            bool albedo = name.EndsWith("_albedo"), normal = name.EndsWith("_normal"), ms = name.EndsWith("_ms") || name.EndsWith("_mask");
             bool decal = IsDecal(assetPath);
 
             ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
