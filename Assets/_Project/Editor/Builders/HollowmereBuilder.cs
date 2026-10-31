@@ -40,11 +40,11 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Fountain", new Vector3(-6.5f, 1.65f, -9.5f), new Vector3(2.5f, 2.6f, 9f), 50f),
             ("Cap_HM_TitheGate", new Vector3(5.2f, 1.65f, 8.2f), new Vector3(5.6f, 5.5f, 22f), 55f),
             ("Cap_HM_LaneMouth", new Vector3(-0.4f, 1.65f, -40f), new Vector3(0f, 1.0f, -8f), 50f),
-            ("Cap_HM_LakeShore", new Vector3(-22f, 1.7f, -84f), new Vector3(-2f, 3f, -20f), 50f),       // from the lake shore by R3_01 up at the hill town and the keep
+            ("Cap_HM_LakeShore", new Vector3(-26f, 1.7f, -88f), new Vector3(-2f, 3f, -20f), 50f),       // from the lake shore by R3_01 up at the hill town and the keep
             ("Cap_HM_MarketStreet", new Vector3(0.6f, 1.65f, -19.8f), new Vector3(-0.5f, -6.5f, -58f), 55f), // the square's south edge down Market Street to the second terrace and the wall
-            ("Cap_HM_KeepStairs", new Vector3(-38f, 1.7f, 15.2f), new Vector3(-20f, 2.5f, 19.4f), 55f),  // along the Wall Ginnel: terrace step, west stair, keep wall
+            ("Cap_HM_KeepStairs", new Vector3(-31f, 1.7f, 13.8f), new Vector3(-20f, 3.0f, 19.6f), 58f),  // along the Wall Ginnel: terrace step, west stair, keep wall
             ("Cap_HM_KeepWall", new Vector3(-2f, 1.65f, -3f), new Vector3(2f, 3.2f, 19.6f), 60f),          // from the fountain: keep wall, buttresses, planters, stairs (Ruined shows it whole)
-            ("Cap_HM_LowEast", new Vector3(70f, 1.7f, -6f), new Vector3(22f, 0f, -8f), 50f),             // outside the east wall: ditch, bank, wall, terraces, keep
+            ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -168,6 +168,11 @@ namespace SleepingCalamity.EditorTools
         static void BuildGround(Transform set, TownLayout t)
         {
             HollowmereTerrain.Build(set, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
+            // The square keeps the approved corner's surround paving (B6 FarCobble with its macro breakup) as a slab over the terrain, so the corner reads as approved.
+            Material far = BeautyCornerArt.SurroundGround();
+            var sq = LookTestBuilder.Box(set, "SquarePaving", new Vector3((HollowmereLayout.SquareMinX + HollowmereLayout.SquareMaxX) * 0.5f, -0.17f, (HollowmereLayout.SquareMinZ + HollowmereLayout.SquareMaxZ) * 0.5f),
+                new Vector3(HollowmereLayout.SquareMaxX - HollowmereLayout.SquareMinX, 0.3f, HollowmereLayout.SquareMaxZ - HollowmereLayout.SquareMinZ),
+                far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? BeautyCornerArt.FarTileMetres : 3f);
 
             var water = LookTestBuilder.Box(set, "Lake", new Vector3(HollowmereLayout.LakeCentre.X, HollowmereLayout.WaterY - 0.05f, HollowmereLayout.LakeCentre.Z),
                 new Vector3(HollowmereLayout.LakeRadiusX * 2.3f, 0.1f, HollowmereLayout.LakeRadiusZ * 2.3f), M("water"), default, 4f);

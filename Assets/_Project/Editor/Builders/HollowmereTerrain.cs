@@ -119,7 +119,7 @@ namespace SleepingCalamity.EditorTools
             GameObject go = Terrain.CreateTerrainGameObject(data);
             go.name = "Terrain";
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = Origin + new Vector3(0f, -0.02f, 0f);   // the corner's surround sat 2 cm down so the B6 setts read above it
+            go.transform.localPosition = Origin + new Vector3(0f, -0.06f, 0f);   // just under the square's paving slab (top at -0.02, where the corner's surround sat)
             var terrain = go.GetComponent<Terrain>();
             terrain.materialTemplate = TerrainMaterial();
             terrain.drawInstanced = true;
@@ -188,7 +188,9 @@ namespace SleepingCalamity.EditorTools
             const string dir = "Assets/_Project/Content/Textures/B1_town/cobble/";
             var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "cobble_albedo.png");
             var normal = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "cobble_normal.png");
-            return Layer("Cobble", albedo != null ? albedo : Flat("hm_cobble", new Color32(128, 120, 110, 255)), normal, 2f);
+            TerrainLayer l = Layer("Cobble", albedo != null ? albedo : Flat("hm_cobble", new Color32(128, 120, 110, 255)), normal, 2f);
+            l.diffuseRemapMax = new Vector4(0.62f, 0.6f, 0.58f, 1f);   // the bare B1 albedo reads far brighter on the terrain shader than the corner's setts: bring the lanes down to them
+            return l;
         }
 
         // A small flat-tint albedo for the greybox grass and dirt (no B1 grass or soil tileable exists yet), with a little value noise so it is not dead flat.
