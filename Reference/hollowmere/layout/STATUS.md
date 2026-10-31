@@ -2,9 +2,9 @@
 
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
-State: IN PROGRESS (ruin integration)
-Progress: 90% (ready; waiting for the bakery to merge first)
-SC RESULT: pending (the last run passed on 8d86098; it runs again after the bakery merge, on the final tip)
+State: DONE (ruin integration merged)
+Progress: 100%
+SC RESULT check PASS on d72bc47 (build PASS; test-edit 592/592; test-play 32 passed, 8 skipped, 0 failed). Merge commit 7a4661d (main 006a57a; identical to d72bc47 under Assets, Packages and ProjectSettings)
 Sheet: Reference/hollowmere/layout/Hollowmere_Ruins_vs_Kit.jpg
 Captures: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 
@@ -15,8 +15,10 @@ Captures: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 | Layout: `RuinVariant` = kit folder name, `RuinTurn` 0-3; test `Ruins_MatchTheKitAndTurn` | done (23 tests pass under `sc_core_tests`) |
 | Builder: ruin placement and materials, greybox fallback, a ruin capture camera | done (e59b22b) |
 | Captures in both presets, side by side with the ruin kit sheet | done: `Hollowmere_Ruins_vs_Kit.jpg` (kit sheet on top, in-engine ruins below), `captures/HM_Ruins_{Ruined,Rebuilt}.jpg`; all 9 variants load, no missing material slot |
-| `check`, merge | `check` PASS on 8d86098 (build PASS; test-edit 592/592; test-play 32 passed, 8 skipped, 0 failed). After it: a fix so the shared ruin foliage material builds from one fixed folder (it flipped between the byte-identical atlas copies). Next: merge origin/main after the bakery lands, regenerate Hollowmere.unity with the builder if it conflicts, `check` again, merge, then State DONE |
+| `check`, merge | done: main (bakery and bell tower) merged in, Hollowmere.unity regenerated with the builder (bakery on F02, B4 bell tower on the keep, ruins on every empty lot), check PASS, merged |
 
 **Earlier (done):** Wave 0 greybox merged `1f6ff88`; terrain pass merged `1e20cb2`.
+
+**Next:** none claimed. QUEUE.md claiming is PAUSED (usage pacing), so this session stops here. Q5 (builder churn) suits it when claiming reopens. The remaining churn is `HeroAnimator.controller` (+ .meta) on every cloud build; the ruin foliage material is now stable.
 
 **Blockers:** none.
