@@ -265,6 +265,20 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Ruins_MatchTheKitAndTurn()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            foreach (Foundation f in t.Foundations)
+            {
+                StringAssert.IsMatch("^Ruin_[SML]_[ABC]$", f.RuinVariant, f.Id);
+                Assert.AreEqual("Ruin_" + f.Size + "_", f.RuinVariant.Substring(0, 7), f.Id + " ruin of its own size class");
+                Assert.That(f.RuinTurn, Is.InRange(0, 3), f.Id);
+            }
+            Assert.Greater(t.Foundations.Select(f => f.RuinTurn).Distinct().Count(), 2, "the turns vary from lot to lot");
+            Assert.AreEqual(HollowmereLayout.Create().Foundations.Select(f => f.RuinTurn), t.Foundations.Select(f => f.RuinTurn), "turns are deterministic");
+        }
+
+        [Test]
         public void Footprint_SegmentTest()
         {
             var fp = new Footprint(new TownPoint(0f, 0f), 4f, 2f, 30f);
