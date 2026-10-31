@@ -159,6 +159,7 @@ namespace SleepingCalamity.EditorTools
                 cam.farClipPlane = 400f;
             }
 
+            HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
             BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
             ApplyPreset(Preset.Ruined);
             BuilderUtil.SaveScene(scene, ScenePath);
@@ -248,30 +249,127 @@ namespace SleepingCalamity.EditorTools
         static void BuildKeep(Transform set, TownLayout t)
         {
             Transform keep = Child(set, "Keep");
+            HollowmereKeepArt kit = HollowmereKeepArt.Load();
             Material stone = LookTestBuilder.Mat("sandstone"), green = BeautyCornerBuilder.PlaceholderMat("green");
             float kh = HollowmereLayout.KeepHeight, kz = HollowmereLayout.KeepWallZ;
             int i = 0;
             var run = HollowmereLayout.WallRun(t, HollowmereLayout.KeepWallLine(1f), 0.3f);
-            foreach (var (a, b) in run)
+            int segments = 0, ends = 0, buttresses = 0, planters = 0;
+            if (kit == null)
             {
-                TownPoint mid = (a + b) * 0.5f;
-                LookTestBuilder.Box(keep, "KeepWall" + (i++), new Vector3(mid.X, (kh + 0.9f - 0.6f) * 0.5f, mid.Z), new Vector3(TownPoint.Distance(a, b) + 0.02f, kh + 0.9f + 0.6f, 1.2f), stone, default, 2f);
+                foreach (var (a, b) in run)
+                {
+                    TownPoint mid = (a + b) * 0.5f;
+                    LookTestBuilder.Box(keep, "KeepWall" + (i++), new Vector3(mid.X, (kh + 0.9f - 0.6f) * 0.5f, mid.Z), new Vector3(TownPoint.Distance(a, b) + 0.02f, kh + 0.9f + 0.6f, 1.2f), stone, default, 2f);
+                }
+            }
+            else
+            {
+                // Merge the 1 m pieces into continuous runs, tile each with 2 m wall segments, and cap the ends that face a gap (stairs, the tithe gate).
+                var spans = new List<(float X0, float X1)>();
+                foreach (var (a, b) in run)
+                {
+                    float x0 = Mathf.Min(a.X, b.X), x1 = Mathf.Max(a.X, b.X);
+                    if (spans.Count > 0 && x0 <= spans[spans.Count - 1].X1 + 0.01f) spans[spans.Count - 1] = (spans[spans.Count - 1].X0, Mathf.Max(x1, spans[spans.Count - 1].X1));
+                    else spans.Add((x0, x1));
+                }
+                foreach (var (x0, x1) in spans)
+                {
+                    int n = Mathf.Max(1, Mathf.RoundToInt((x1 - x0) / 2f));
+                    float w = (x1 - x0) / n;
+                    for (int k = 0; k < n; k++, segments++)
+                        kit.Clone("WallSegment", keep, "KeepWall" + segments, new Vector3(x0 + (k + 0.5f) * w, 0f, kz), 0f, new Vector3(w / 2f, 1f, 1f));
+                    float edge = HollowmereLayout.KeepHalfWidth - 0.01f;
+                    if (x0 > -edge) { kit.Clone("WallEnd", keep, "KeepWallEnd" + ends++, new Vector3(x0 - 0.3f, 0f, kz), 0f, Vector3.one); }
+                    if (x1 < edge) { kit.Clone("WallEnd", keep, "KeepWallEnd" + ends++, new Vector3(x1 + 0.3f, 0f, kz), 0f, Vector3.one); }
+                }
             }
             for (float x = -HollowmereLayout.KeepHalfWidth + 3f; x < HollowmereLayout.KeepHalfWidth; x += 6f)
             {
                 var p = new TownPoint(x, kz - 0.9f);
                 if (!InRun(run, x)) continue;   // no buttress in a gap (stairs, the tithe gate)
                 if (t.Foundations.Exists(f => f.Footprint.Contains(p, 0.6f))) continue;
-                LookTestBuilder.Box(keep, "Buttress" + x, new Vector3(x, kh * 0.45f - 0.3f, kz - 0.95f), new Vector3(1.1f, kh * 0.9f + 0.6f, 0.7f), stone, new Vector3(-6f, 0f, 0f), 2f);
+                if (kit != null) { kit.Clone("Buttress", keep, "Buttress" + x, new Vector3(x, 0f, kz), 0f, Vector3.one); buttresses++; }
+                else LookTestBuilder.Box(keep, "Buttress" + x, new Vector3(x, kh * 0.45f - 0.3f, kz - 0.95f), new Vector3(1.1f, kh * 0.9f + 0.6f, 0.7f), stone, new Vector3(-6f, 0f, 0f), 2f);
             }
             for (float x = -HollowmereLayout.KeepHalfWidth + 1.5f; x < HollowmereLayout.KeepHalfWidth; x += 4.5f)
             {
                 if (!InRun(run, x) || !InRun(run, x - 1f) || !InRun(run, x + 1f)) continue;
-                LookTestBuilder.Box(keep, "Planter" + x, new Vector3(x, kh + 1.05f, kz + 0.2f), new Vector3(1.8f, 0.3f, 0.6f), green, default, 2f);
+                if (kit != null) { kit.Clone("Planter", keep, "Planter" + x, new Vector3(x, kh + 0.9f, kz), 0f, Vector3.one); planters++; }
+                else LookTestBuilder.Box(keep, "Planter" + x, new Vector3(x, kh + 1.05f, kz + 0.2f), new Vector3(1.8f, 0.3f, 0.6f), green, default, 2f);
             }
-            Stair(keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, stone);
-            Stair(keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, stone);
+            if (kit == null)
+            {
+                Stair(keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, stone);
+                Stair(keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, stone);
+                Debug.Log("SC HOLLOWMERE keep art=missing, greybox wall=" + run.Count + " pieces");
+                return;
+            }
+            int steps = KitStair(kit, keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, run, kz);
+            steps += KitStair(kit, keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, run, kz);
+            // Benches on the terrace by the parapet, clear of the walk edges, the hall, the tower and the annex.
+            int benches = 0;
+            foreach (float bx in new[] { -15.5f, -11.5f, 22.0f })
+            {
+                var bp = new TownPoint(bx, kz + 1.4f);
+                if (t.Landmarks.Exists(l => l.Footprint.Contains(bp, 0.8f))) continue;
+                kit.Clone("Bench", keep, "Bench" + benches++, new Vector3(bx, kh, kz + 1.4f), 180f, Vector3.one);   // back to the terrace, facing the parapet's view
+            }
+            Debug.Log("SC HOLLOWMERE keep art=KeepTerrace wallSegments=" + segments + " ends=" + ends + " buttresses=" + buttresses + " planters=" + planters + " stairSteps=" + steps + " benches=" + benches);
         }
+
+        // One flight from the kit: StairStep treads stacked foot to head (scaled to the width and the real rise and run), a stone core under them, raked balustrades on the
+        // open sides (not where the retaining wall stands) and newels at the foot and the head. Returns the step count.
+        static int KitStair(HollowmereKeepArt kit, Transform parent, string name, PathNode foot, PathNode head, float width, List<(TownPoint A, TownPoint B)> run, float kz)
+        {
+            Transform g = Child(parent, name);
+            TownPoint d = head.Pos - foot.Pos;
+            float len = d.Length, yaw = Mathf.Atan2(d.X, d.Z) * Mathf.Rad2Deg, rise = head.Y - foot.Y;
+            int n = Mathf.Max(6, Mathf.RoundToInt(rise / 0.222f));
+            n = Mathf.Max(6, (n / 6) * 6);   // whole balustrade blocks of 6 steps
+            float pitch = len / n, r = rise / n;
+            var dir = new Vector3(d.X / len, 0f, d.Z / len);
+            var side = new Vector3(dir.z, 0f, -dir.x);   // to the flight's right
+            Material core = null;
+            for (int s = 0; s < n; s++)
+            {
+                Vector3 start = new Vector3(foot.Pos.X, 0f, foot.Pos.Z) + dir * (pitch * s);
+                float top = foot.Y + r * (s + 1);
+                kit.Clone("StairStep", g, "Step" + s, new Vector3(start.x, top - r, start.z), yaw, new Vector3(width / 2f, r / 0.222f, pitch / 0.367f));
+                float bottom = foot.Y - 0.3f, h = top - r - bottom;
+                if (h > 0.01f)
+                {
+                    var box = LookTestBuilder.Box(g, "Core" + s, start + dir * (pitch * 0.5f) + Vector3.up * (bottom + h * 0.5f), new Vector3(width - 0.2f, h, pitch + 0.02f),
+                        core ?? (core = kit.CoreMaterial()), new Vector3(0f, yaw, 0f), 2f);
+                }
+            }
+            float rake = kit.RakeSign();
+            int blocks = n / 6;
+            for (int k = 0; k < blocks; k++)
+            {
+                Vector3 mid = new Vector3(foot.Pos.X, 0f, foot.Pos.Z) + dir * (pitch * (6 * k + 3));
+                float y = foot.Y + r * (6 * k + 3.5f);
+                foreach (float sd in new[] { -1f, 1f })
+                {
+                    Vector3 p = mid + side * (sd * (width * 0.5f - 0.12f));
+                    if (InWall(run, p, kz)) continue;
+                    p.y = y;
+                    float by = yaw + (rake > 0f ? -90f : 90f);
+                    kit.Clone("BalustradeRaked", g, "Rail" + k + (sd < 0 ? "L" : "R"), p, by, new Vector3(pitch / 0.367f, r / 0.222f, 1f));
+                }
+            }
+            foreach (float sd in new[] { -1f, 1f })
+            {
+                Vector3 fp = new Vector3(foot.Pos.X, foot.Y, foot.Pos.Z) + dir * 0.2f + side * (sd * (width * 0.5f - 0.12f));
+                kit.Clone("Newel", g, "NewelFoot" + (sd < 0 ? "L" : "R"), fp, yaw, Vector3.one);
+                Vector3 hp = new Vector3(head.Pos.X, head.Y, head.Pos.Z) - dir * 0.2f + side * (sd * (width * 0.5f - 0.12f));
+                if (!InWall(run, hp, kz)) kit.Clone("Newel", g, "NewelHead" + (sd < 0 ? "L" : "R"), hp, yaw, Vector3.one);
+            }
+            return n;
+        }
+
+        // Inside the retaining wall's footprint (1.2 m thick on KeepWallZ, along a wall run, with a little margin).
+        static bool InWall(List<(TownPoint A, TownPoint B)> run, Vector3 p, float kz) => Mathf.Abs(p.z - kz) < 0.9f && InRun(run, p.x);
 
         static bool InRun(List<(TownPoint A, TownPoint B)> run, float x)
         {
@@ -355,6 +453,7 @@ namespace SleepingCalamity.EditorTools
                     break;
                 default:
                     Building(g, f, kind);
+                    HollowmereGarden.Yard(g, f, kind);   // Q6: a bed, a water butt and a back fence on deep-yard ring 2 homes
                     break;
             }
         }
@@ -449,6 +548,7 @@ namespace SleepingCalamity.EditorTools
 
         static void Garden(Transform g, Foundation f)
         {
+            if (HollowmereGarden.Allotment(g, f)) return;   // Q6 art (Garden/); the greybox below is the fallback
             float half = f.Side * 0.5f;
             Material oak = LookTestBuilder.Mat("oak_timber");
             for (int i = 0; i < 3; i++)
@@ -537,6 +637,13 @@ namespace SleepingCalamity.EditorTools
                     break;
                 case LandmarkKind.BellTower:
                     BellTower(g, l, rebuilt);
+                    break;
+                case LandmarkKind.KeepHall:
+                    if (HollowmereArt.TryPlaceKeepHall(g, rebuilt)) break;   // Q9 art (sc_keep_hall.py): Shell when ruined, Frame + door when rebuilt
+                    LookTestBuilder.Box(g, "Walls", new Vector3(0f, 3f, 0f), new Vector3(sx, 6f, sz), stone, default, 2f);
+                    LookTestBuilder.Box(g, "RoofS", new Vector3(0f, 7.6f, -sz * 0.25f), new Vector3(sx + 0.6f, 0.25f, sz * 0.62f), roof, new Vector3(-38f, 0f, 0f), 2f);
+                    LookTestBuilder.Box(g, "RoofN", new Vector3(0f, 7.6f, sz * 0.25f), new Vector3(sx + 0.6f, 0.25f, sz * 0.62f), roof, new Vector3(38f, 0f, 0f), 2f);
+                    LookTestBuilder.Box(g, "Door", new Vector3(-sx * 0.5f - 0.06f, 1.1f, 0.5f), new Vector3(0.12f, 2.2f, 1.3f), wood, default, 2f);
                     break;
                 case LandmarkKind.TitheGate:
                     if (HollowmereTitheGate.TryPlace(g)) break;   // Wave 2 art (sc_tithe_gate.py) at the row's height; the greybox below stays as the fallback
