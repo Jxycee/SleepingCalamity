@@ -37,6 +37,7 @@ namespace SleepingCalamity.Core
 
     public static class HollowmereDressing
     {
+        public const float StallMargin = 0.4f;               // market stalls keep a wider berth (their art overhangs the footprint)
         public const float Clearance = 0.25f;               // gap kept between a footprint and any path node / edge
         public const float MinBuntingHeight = 2.6f, MaxBuntingSpan = 14f;
         public const float SquareMargin = 1f;
@@ -156,7 +157,8 @@ namespace SleepingCalamity.Core
                     if (a != null && b != null && pad.SegmentCrosses(a.Pos, b.Pos)) errors.Add(r.Id + " blocks path edge " + e.A + "-" + e.B);
                 }
                 foreach (Foundation f in t.Foundations) if (pad.Overlaps(f.Footprint)) errors.Add(r.Id + " overlaps foundation " + f.Id);
-                foreach (Landmark l in t.Landmarks) if (pad.Overlaps(l.Footprint)) errors.Add(r.Id + " overlaps landmark " + l.Id);
+                foreach (Landmark l in t.Landmarks)
+                    if ((l.Kind == LandmarkKind.Stall ? Inflated(r, StallMargin) : pad).Overlaps(l.Footprint)) errors.Add(r.Id + " overlaps landmark " + l.Id);
                 if (fp.Overlaps(CornerRect)) errors.Add(r.Id + " stands in the approved beauty corner");
                 foreach (TownPoint c in fp.Corners()) if (!OnSquareOrStub(t, c)) { errors.Add(r.Id + " is off the square and its lane stubs"); break; }
                 foreach (DecoRow o in rows)

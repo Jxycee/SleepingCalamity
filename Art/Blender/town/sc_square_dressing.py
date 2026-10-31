@@ -232,7 +232,6 @@ def sq_adopted(name, src, matname, p, H):
     if 'chip' in p:        # paint chipped and peeled to the oak: edges first, the seat front, then flakes anywhere
         c = p['chip']; flake = t.noise(55.0, 5.0, 0.7, 9.1); big = t.noise(6.0, 3.0, 0.6, 2.2)
         edge = edge_mask(t, 0.011, 0.996, 0.90)
-        front = t.mrange(t.new('ShaderNodeNewGeometry').outputs['Position'], -10, 10) if False else 0.0
         drive = t.math('ADD', t.math('MULTIPLY', edge, 0.55 * c['edge']), t.math('MULTIPLY', t.mrange(big, 0.62, 0.40), 0.28 * c['patch']))
         v = t.math('ADD', flake, t.math('MULTIPLY', drive, 0.5))
         chip = t.mrange(v, 0.70 - 0.06 * c['amount'], 0.74 - 0.06 * c['amount'])
@@ -410,7 +409,6 @@ def build_bench(name, p):
     for v in hi.data.vertices:
         co = v.co; wx = max(0.0, min(1.0, (-co.x - 0.15 * sx) / (0.6 * sx))); wy = max(0.0, min(1.0, (-co.y + 0.05) / (0.3 * sy)))
         co.z -= 0.085 * (wx * wy) ** 1.3
-    for v in foot_piece.data.vertices: pass
     # the dropped plank: right part (x > 0.14) lies on the cobbles, turned a little
     parts = [x for x in loose_parts(piece) if len(x.data.polygons) > 20]
     plank = parts[0]
@@ -425,8 +423,6 @@ def build_bench(name, p):
     hi = join([hi, plank], name + '_high')
     mn2, mx2 = bounds(hi)
     hi.data.transform(Matrix.Translation((0, 0, -float(mn2[2]) + 0.0)))
-    # origin: bottom centre of the bench body, not the scattered pieces
-    hi.data.transform(Matrix.Translation((-float((mn2[0] + mx2[0]) / 2) + 0.0 * 1, 0, 0))) if False else None
     ORIGINS[name].append('- Pieces: the broken-off right front plank lies about %.2f m in front of the bench, the broken foot at its left-front corner.' % (0.43 * sy))
     return hi, H
 
@@ -557,6 +553,16 @@ def join_copy(objs):
         c = o.copy(); c.data = o.data.copy(); bpy.context.scene.collection.objects.link(c); cp.append(c)
     return join(cp, 'tmp_all')
 
+def shrink(lo, budget):
+    """Second decimate pass when make_low's single collapse left the mesh over budget (boolean-cut pieces keep many tiny faces)."""
+    for _ in range(3):
+        n = tris_of(lo)
+        if n <= budget: break
+        mod = lo.modifiers.new('dec2', 'DECIMATE'); mod.ratio = max(0.05, budget * 0.95 / n); mod.use_collapse_triangulate = True
+        dg = bpy.context.evaluated_depsgraph_get(); m2 = bpy.data.meshes.new_from_object(lo.evaluated_get(dg)); lo.modifiers.clear()
+        old = lo.data; lo.data = m2; m2.name = lo.name
+    return lo
+
 def main():
     bpy.ops.wm.read_homefile(use_empty=True)
     names = [n for n in SQ if ONLY is None or n in ONLY]
@@ -576,7 +582,9 @@ def main():
         p = dict(SQ[name]); os.makedirs(os.path.join(OUT, name), exist_ok=True)
         hi, H = build_high_sq(name, p)
         res = int(p['res'] * RES_SCALE)
-        lo = make_low(hi, name, p) if not p.get('_custom_low') else p['_custom_low']
+        print('SQ hi tris', name, tris_of(hi))
+        lo = make_low(hi, name, p)
+        lo = shrink(lo, p['tris'])
         paths = bake(hi, lo, name, res)
         if p['kind'] == 'bunting': lo = split_bunting(lo, name)
         export_sq(lo, name, p, paths)
