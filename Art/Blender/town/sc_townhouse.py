@@ -638,7 +638,8 @@ def export(name, root):
         o.select_set(True)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, name + '.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
                              apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE',
-                             add_leaf_bones=False, colors_type='LINEAR', object_types={'EMPTY', 'MESH'})
+                             add_leaf_bones=False, colors_type='LINEAR', object_types={'EMPTY', 'MESH'},
+                             path_mode='STRIP')   # no texture paths: Unity's legacy import found the cloud paths and named every slot 'Lit'
 
 if __name__ == '__main__':
     which = arg('--variant', 'all')
