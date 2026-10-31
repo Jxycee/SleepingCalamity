@@ -14,7 +14,7 @@ A linear corner attribute `wear` (R grime, G moss, B polish) is written as in th
 | VegBed_A | 9036 (Body 9036) | 2.50 x 1.32 x 0.80 | Cabbage, Leaf, Produce, oak_timber, packed_soil | 2.50 x 1.30 | none |
 | VegBed_B | 7754 (Body 7754) | 1.70 x 1.14 x 1.55 | Cabbage, Leaf, Produce, oak_timber, packed_soil | 1.70 x 1.14 | none |
 | Trellis | 2296 (Body 2296) | 2.10 x 0.30 x 1.91 | Leaf, oak_timber | 2.10 x 0.30 | none |
-| Scarecrow | 2264 (Body 2264) | 1.77 x 1.00 x 2.16 | Straw, canvas, iron, oak_timber | 0.55 x 0.55 | none |
+| Scarecrow | 2264 (Body 2264) | 1.77 x 1.00 x 2.16 | Straw, burlap, coat, iron, leather, oak_timber, patch_ochre, patch_rust, patch_seam | 0.55 x 0.55 | none |
 | WaterButt | 1828 (Body 1828) | 0.82 x 0.91 x 1.08 | iron, oak_timber, sandstone | 0.82 x 0.82 | SOCKET_Tap |
 | Fence_Run | 968 (Body 792, Part_PostA 88, Part_PostB 88) | 2.05 x 0.16 x 1.06 | oak_timber | 2.00 x 0.16 | SOCKET_PostA, SOCKET_PostB, Part_PostA, Part_PostB |
 | Fence_Gate | 908 (Body 220, Part_Leaf 688) | 1.25 x 0.16 x 1.24 | iron, oak_timber | 1.20 x 0.16 | SOCKET_Hinge, SOCKET_Gate, Part_Leaf |

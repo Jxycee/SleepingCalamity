@@ -24,7 +24,6 @@ Deterministic: the seed is fixed per asset name.
 import sys, os, math, random, zlib, shutil
 import bpy, bmesh
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import sc_cabbage_tex
 from mathutils import Vector, Matrix, Quaternion, Euler, noise
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -396,7 +395,7 @@ def scarecrow(a):
     b.beam(E, (-0.8, 0.0, 1.5), (0.8, 0.0, 1.43), 0.055, 0.055, bev=0.014)
     # canvas coat: smooth lathe (canvas tileable, faded-blue tint), ragged hem tabs, two patches
     prof = [(0.23, 0.92), (0.262, 0.98), (0.285, 1.05), (0.288, 1.15), (0.272, 1.27), (0.238, 1.38), (0.19, 1.46), (0.135, 1.53), (0.1, 1.57)]
-    b.lathe('canvas', prof, segs=16, smooth=True, tint=COAT)
+    b.lathe('coat', prof, segs=16, smooth=True, tint=COAT)
     def coat_r(z):
         for (r0, z0), (r1, z1) in zip(prof, prof[1:]):
             if z0 <= z <= z1: return r0 + (r1 - r0) * (z - z0) / (z1 - z0)
@@ -408,24 +407,24 @@ def scarecrow(a):
             q = ang + da; rr = coat_r(0.99) + 0.004 + fl
             return Vector((math.cos(q) * rr, math.sin(q) * rr, 0.99 + dz))
         pts = [pt(-wd, 0, 0), pt(wd, 0, 0), pt(wd * 0.85, -ln * 0.5, 0.02), pt(-wd * 0.85, -ln * 0.5, 0.02), pt(r.uniform(-0.3, 0.3) * wd, -ln, 0.035)]
-        b.thin('canvas', pts, [(0, 1, 2, 3), (3, 2, 4)], radial, half=0.003, tint=tuple(c * r.uniform(0.9, 1.0) for c in COAT))
-    def patch(deg, zc, wdeg, wz, tn, border):
-        for off, sc_, tt in ((0.007, 1.18, border), (0.013, 1.0, tn)):
+        b.thin('coat', pts, [(0, 1, 2, 3), (3, 2, 4)], radial, half=0.003, tint=tuple(c * r.uniform(0.9, 1.0) for c in COAT))
+    def patch(deg, zc, wdeg, wz, tn, border, slot):
+        for off, sc_, tt, sl in ((0.007, 1.18, border, 'patch_seam'), (0.013, 1.0, tn, slot)):
             def fn(s, u, off=off, sc_=sc_):
                 q = math.radians(deg + (u - 0.5) * wdeg * sc_ + (s - 0.5) * 4); z = zc + (s - 0.5) * wz * sc_
                 rr = coat_r(z) + off
                 return Vector((math.cos(q) * rr, math.sin(q) * rr, z))
-            b.grid('canvas', fn, 4, 4, radial, half=0.003, tint=tt)
-    patch(-82, 1.22, 40, 0.17, (0.93, 0.72, 0.42), (0.55, 0.42, 0.28))
-    patch(-128, 1.05, 30, 0.12, (0.74, 0.42, 0.34), (0.45, 0.3, 0.26))
+            b.grid(sl, fn, 4, 4, radial, half=0.003, tint=tt)
+    patch(-82, 1.22, 40, 0.17, (0.93, 0.72, 0.42), (0.55, 0.42, 0.28), 'patch_ochre')
+    patch(-128, 1.05, 30, 0.12, (0.74, 0.42, 0.34), (0.45, 0.3, 0.26), 'patch_rust')
     for sx in (-1, 1):
         sh = Vector((sx * 0.12, 0, 1.46)); cuff = Vector((sx * 0.64, 0.0, 1.39 if sx < 0 else 1.40))
         d = cuff - sh
-        b.cyl('canvas', (sh + cuff) / 2, 0.105, d.length, rot=aim(d), segs=10, r2=0.085, smooth=True, tint=COAT)
+        b.cyl('coat', (sh + cuff) / 2, 0.105, d.length, rot=aim(d), segs=10, r2=0.085, smooth=True, tint=COAT)
         for i in range(5):   # ragged cuff
             ang = i * 2 * math.pi / 5 + 0.4; ln = r.uniform(0.04, 0.1)
             v = Vector((0, math.cos(ang), math.sin(ang))) * 0.075
-            b.cyl('canvas', cuff + v + Vector((sx * ln / 2, 0, 0)), 0.03, ln, rot=(0, 90 * sx, 0), segs=3, r2=0.004, tint=COAT)
+            b.cyl('coat', cuff + v + Vector((sx * ln / 2, 0, 0)), 0.03, ln, rot=(0, 90 * sx, 0), segs=3, r2=0.004, tint=COAT)
         for i in range(10):   # straw tufts at the cuff
             ang = r.uniform(0, 2 * math.pi); sp = r.uniform(0.15, 0.55)
             dd = Vector((sx * 1.0, math.cos(ang) * sp, math.sin(ang) * sp - 0.15))
@@ -438,9 +437,9 @@ def scarecrow(a):
         b.blade('Straw', (math.cos(ang) * 0.16, math.sin(ang) * 0.16, 1.0), (math.cos(ang) * 0.5, math.sin(ang) * 0.5, -0.9), r.uniform(0.12, 0.2), 0.008, 0.003, segs=3)
     # burlap sack head (canvas tileable, tan tint): button eyes, stitched mouth
     hc = Vector((0.01, 0, 1.79)); hr = Vector((0.215, 0.205, 0.23))
-    b.blob('canvas', hc, hr, rot=(0, 0, 12), u=14, v=9, smooth=True, tint=BURLAP)
+    b.blob('burlap', hc, hr, rot=(0, 0, 12), u=14, v=9, smooth=True, tint=BURLAP)
     b.cyl(E, (0, 0, 1.6), 0.085, 0.05, segs=10, r2=0.075, smooth=True)   # rope at the neck
-    b.cyl('canvas', (0.03, 0.0, 1.985), 0.04, 0.05, rot=(0, 18, 0), segs=6, r2=0.012, smooth=True, tint=BURLAP)   # the sack's knotted top
+    b.cyl('burlap', (0.03, 0.0, 1.985), 0.04, 0.05, rot=(0, 18, 0), segs=6, r2=0.012, smooth=True, tint=BURLAP)   # the sack's knotted top
     def on_head(x, z):
         k = 1 - (x / hr.x) ** 2 - ((z - hc.z) / hr.z) ** 2
         return Vector((hc.x + x, hc.y - hr.y * math.sqrt(max(0.05, k)), z))
@@ -449,7 +448,7 @@ def scarecrow(a):
         b.cyl('iron', e + Vector((0, -0.004, 0)), 0.03, 0.016, rot=(90, 0, 0), segs=10, smooth=True)
         for rz in (0, 90):
             b.box(E, e + Vector((0, -0.014, 0)), (0.034, 0.004, 0.006), rot=(0, rz + 45, 0), bev=0.0)
-    n0 = on_head(0.0, hc.z - 0.03); b.cyl('canvas', n0 + Vector((0, -0.02, 0)), 0.035, 0.07, rot=(90, 0, 0), segs=8, r2=0.02, smooth=True, tint=BURLAP)
+    n0 = on_head(0.0, hc.z - 0.03); b.cyl('burlap', n0 + Vector((0, -0.02, 0)), 0.035, 0.07, rot=(90, 0, 0), segs=8, r2=0.02, smooth=True, tint=BURLAP)
     mp = [on_head(-0.1 + i * 0.025, hc.z - 0.105 + 0.02 * math.cos((i - 4) * 0.4) - 0.02 + (0.0)) for i in range(9)]
     b.tube(E, [p + Vector((0, -0.003, 0)) for p in mp], 0.0035, segs=4)   # the mouth seam
     for i in range(9):   # cross stitches over the seam
@@ -459,7 +458,7 @@ def scarecrow(a):
     b.G = pivot(hc + Vector((0, 0, 0.12)), (-9, 7, 8))
     b.lathe('Straw', [(0.12, 1.945), (0.26, 1.965), (0.40, 1.93), (0.435, 1.905), (0.43, 1.892), (0.395, 1.9), (0.26, 1.935), (0.12, 1.915)], segs=20, closed=True, smooth=True)
     b.lathe('Straw', [(0.155, 1.93), (0.158, 1.99), (0.148, 2.06), (0.118, 2.12), (0.065, 2.148), (0.0, 2.155)], segs=16, smooth=True, tint=(1.0, 0.96, 0.88))
-    b.lathe('canvas', [(0.16, 1.97), (0.164, 2.005), (0.152, 2.005), (0.15, 1.97)], segs=16, closed=True, smooth=True, tint=(0.5, 0.34, 0.26))
+    b.lathe('leather', [(0.16, 1.97), (0.164, 2.005), (0.152, 2.005), (0.15, 1.97)], segs=16, closed=True, smooth=True, tint=(0.5, 0.34, 0.26))
     for i in range(6):
         ang = r.uniform(0, 2 * math.pi)
         b.blade('Straw', (math.cos(ang) * 0.42, math.sin(ang) * 0.42, 1.91), (math.cos(ang), math.sin(ang), -0.4), r.uniform(0.08, 0.15), 0.008, 0.003, segs=3)
@@ -587,7 +586,9 @@ def hex2lin(h):
 
 MATS = {}
 FLAT = {'Leaf': ('#6f8a34', 0.7), 'Produce': ('#86a67c', 0.55), 'Straw': ('#c9a85a', 0.8)}
-TINTED = ('Produce', 'Straw', 'canvas')   # Blender renders multiply the base by the per-corner `tint` attribute (Unity uses the flat slot colour / tileable)
+TINTED = ('Produce', 'Straw', 'canvas', 'coat', 'burlap', 'patch_ochre', 'patch_rust', 'patch_seam', 'leather')
+# scarecrow cloth slots: the canvas tileable, tinted per slot in Unity (the `tint` attribute is Blender-only), so the head, coat, patches and hatband read apart
+ALIAS = {n: 'canvas' for n in ('coat', 'burlap', 'patch_ochre', 'patch_rust', 'patch_seam', 'leather')}   # Blender renders multiply the base by the per-corner `tint` attribute (Unity uses the flat slot colour / tileable)
 def link_tint(nt, bs, src=None):
     at = nt.nodes.new('ShaderNodeAttribute'); at.attribute_name = 'tint'; at.attribute_type = 'GEOMETRY'
     mx = nt.nodes.new('ShaderNodeMix'); mx.data_type = 'RGBA'; mx.blend_type = 'MULTIPLY'; mx.inputs[0].default_value = 1.0
@@ -617,9 +618,9 @@ def get_mat(name):
     elif name == 'FOOTPRINT':
         bs.inputs['Base Color'].default_value = (0.8, 0.2, 0.2, 1)
     else:
-        d = os.path.join(TEX, name)
+        tn_ = ALIAS.get(name, name); d = os.path.join(TEX, tn_)
         def img(suffix, cs):
-            n = nt.nodes.new('ShaderNodeTexImage'); n.image = bpy.data.images.load(os.path.join(d, '%s_%s.png' % (name, suffix)), check_existing=True)
+            n = nt.nodes.new('ShaderNodeTexImage'); n.image = bpy.data.images.load(os.path.join(d, '%s_%s.png' % (tn_, suffix)), check_existing=True)
             n.image.colorspace_settings.name = cs; return n
         c = img('albedo', 'sRGB'); o = img('orm', 'Non-Color'); nrm = img('normal', 'Non-Color')
         sep = nt.nodes.new('ShaderNodeSeparateColor'); nm = nt.nodes.new('ShaderNodeNormalMap')
@@ -734,7 +735,8 @@ def world_bounds(root):
 
 def main():
     bpy.ops.wm.read_homefile(use_empty=True)
-    sc_cabbage_tex.make(CABTEX)
+    if ONLY is None or any(n.startswith("VegBed") for n in ONLY):   # needs Pillow (not in Blender python): only the bed runs
+        import sc_cabbage_tex; sc_cabbage_tex.make(CABTEX)
     names = [n for n in ASSETS if ONLY is None or n in ONLY]
     built = {}; rows = []
     for n in names:
