@@ -63,7 +63,7 @@ namespace SleepingCalamity.EditorTools
         // Cameras for the road (absolute targets, eye height over the ground as the town's other cameras).
         public static readonly (string Name, Vector3 Pos, Vector3 Target, float Fov)[] Cameras =
         {
-            ("Cap_HM_RoadOut", new Vector3(-22.6f, 1.65f, -72.4f), new Vector3(-98f, -13.5f, -94f), 56f),    // from just outside the Lower Gate, down the road into the valley
+            ("Cap_HM_RoadOut", new Vector3(-24.5f, 1.7f, -74.2f), new Vector3(-94f, -18.5f, -106f), 56f),    // from just outside the Lower Gate, down the road into the valley (R3_02 kept to the right edge)
             ("Cap_HM_RoadBack", new Vector3(-97f, 1.7f, -87.6f), new Vector3(-32f, -3.5f, -60f), 55f),         // from the road below the first bend, back up at the gate, wall and keep
         };
 
@@ -223,7 +223,7 @@ namespace SleepingCalamity.EditorTools
                 var key = (Mathf.FloorToInt(i.X / TileSize), Mathf.FloorToInt(i.Z / TileSize), i.OnRing);
                 if (!tiles.TryGetValue(key, out CardMesh cm)) tiles[key] = cm = new CardMesh();
                 float y = GroundY(t, i.X, i.Z);
-                if (i.Kind == RoadItemKind.Tree) Tree(cm, new Vector3(i.X, y - 0.3f, i.Z), i.Yaw, TreeHeight * i.Scale, i.Variant, atlas);
+                if (i.Kind == RoadItemKind.Tree) Tree(cm, new Vector3(i.X, y - 0.9f * i.Scale, i.Z), i.Yaw, TreeHeight * i.Scale, i.Variant, atlas);
                 else Hedge(cm, new Vector3(i.X, y - 0.2f, i.Z), i.Yaw, i.Scale, i.Variant, atlas);
                 cards++;
             }

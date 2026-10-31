@@ -41,7 +41,7 @@ namespace SleepingCalamity.Core
         public const float FieldAngleDeg = 17f, FieldU = 36f, FieldV = 48f;               // the patchwork grid: rotated, brick-bonded rows
         public const float FieldStartOffset = 38f;      // fields start this far outside the plateau (past the wall bank 26-29.5, the ditch 31 and its outer slope)
         public const float TerrainMinX = -150f, TerrainMaxX = 150f, TerrainMinZ = -170f, TerrainMaxZ = 130f;   // HollowmereTerrain.Origin / Size
-        public const float RingRadius = 620f, RingHedgeRadius = 300f, CopseChance = 0.02f;           // the backdrop ring's trees and fields stop here (fogged out long before)
+        public const float RingRadius = 620f, RingHedgeRadius = 300f, CopseChance = 0.035f;           // the backdrop ring's trees and fields stop here (fogged out long before)
         public static readonly TownPoint RingCentre = new TownPoint(0f, -20f);
 
         // ------------------------------------------------------------------------------------------------ fields
@@ -220,7 +220,7 @@ namespace SleepingCalamity.Core
             if (gap > 0.1f && hedgeHere) items.Add(new RoadItem { Kind = RoadItemKind.FieldHedge, X = x, Z = z, Yaw = yaw, Scale = 0.85f + 0.4f * Hash01(key, 53), Variant = (int)(Hash01(key, 55) * 4f) % 4, Presets = RoadPresets.Both, OnRing = !onTerrain });
             // a hedgerow tree every ~6 samples (about 24 m), further from the road on the terrain so the cards are never seen close
             if (Hash01(key, 57) < 0.17f && (!onTerrain || dRoad > 26f))
-                items.Add(new RoadItem { Kind = RoadItemKind.Tree, X = x, Z = z, Yaw = Hash01(key, 59) * 360f, Scale = 0.8f + 0.45f * Hash01(key, 61), Variant = (int)(Hash01(key, 63) * 4f) % 4, Presets = RoadPresets.Both, OnRing = !onTerrain });
+                items.Add(new RoadItem { Kind = RoadItemKind.Tree, X = x, Z = z, Yaw = Hash01(key, 59) * 360f, Scale = 0.95f + 0.55f * Hash01(key, 61), Variant = (int)(Hash01(key, 63) * 4f) % 4, Presets = RoadPresets.Both, OnRing = !onTerrain });
             // now and then a copse in the field corner: 6-13 trees in a loose clump 8-16 m into the field (the horizon's mass, not only lines)
             if (along && Hash01(key, 71) < CopseChance)
             {
@@ -233,7 +233,7 @@ namespace SleepingCalamity.Core
                     bool cOn = OnTerrain(cx, cz, 2f);
                     if (cOn != onTerrain) continue;
                     if (cOn && (FieldWeight(t, cx, cz) < 0.8f || HollowmereLayout.DistanceToPolyline(new TownPoint(cx, cz), road.Points) < 30f)) continue;
-                    items.Add(new RoadItem { Kind = RoadItemKind.Tree, X = cx, Z = cz, Yaw = Hash01(key + i, 83) * 360f, Scale = 0.75f + 0.5f * Hash01(key + i, 85), Variant = (int)(Hash01(key + i, 87) * 4f) % 4, Presets = RoadPresets.Both, OnRing = !cOn });
+                    items.Add(new RoadItem { Kind = RoadItemKind.Tree, X = cx, Z = cz, Yaw = Hash01(key + i, 83) * 360f, Scale = 0.85f + 0.6f * Hash01(key + i, 85), Variant = (int)(Hash01(key + i, 87) * 4f) % 4, Presets = RoadPresets.Both, OnRing = !cOn });
                 }
             }
         }
