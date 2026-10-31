@@ -34,6 +34,68 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(GoldenSeed12345Floor1, l.LayoutHash(), "golden changed; actual = " + l.LayoutHash() + "UL\n" + l.ToAscii());
         }
 
+        const ulong GoldenSeed12345Floor2 = 18317817182715499079UL, GoldenSeed12345Floor3 = 10285151120262563894UL;   // computed once from the first run (floors 2 and 3 pin PickRooms' exclusion chain too)
+
+        [Test]
+        public void Golden_Seed12345_Floors2And3()
+        {
+            CellarFloorLayout l2 = CellarFloorGenerator.Generate(12345, 2), l3 = CellarFloorGenerator.Generate(12345, 3);
+            Assert.That(l2.LayoutHash() == GoldenSeed12345Floor2 && l3.LayoutHash() == GoldenSeed12345Floor3,
+                "golden changed; actual floor 2 = " + l2.LayoutHash() + "UL, floor 3 = " + l3.LayoutHash() + "UL\n" + l2.ToAscii() + "\n" + l3.ToAscii());
+        }
+
+        [Test]
+        public void EdgeSeeds_NeverThrow_AndValidate()
+        {
+            foreach (uint seed in new uint[] { 0, 1, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, unchecked((uint)-1), unchecked((uint)int.MinValue), (uint)int.MaxValue })
+                for (int floor = 1; floor <= 4; floor++)
+                {
+                    CellarFloorLayout l = null;
+                    Assert.DoesNotThrow(() => l = CellarFloorGenerator.Generate(seed, floor), "seed " + seed + " floor " + floor);
+                    Assert.IsEmpty(CellarFloorValidator.Validate(l), "seed " + seed + " floor " + floor + "\n" + l.ToAscii());
+                }
+        }
+
+        [Test]
+        public void TwentyThousandRandomSeeds_NeverThrow_AndValidate()
+        {
+            var rng = new Pcg32(20261031UL);   // fixed stream across the full uint range
+            var errs = new List<string>();
+            int retry = 0, lastResort = 0, total = 0;
+            for (int i = 0; i < 20000 && errs.Count < 8; i++)
+            {
+                uint seed = rng.NextUInt();
+                for (int floor = 1; floor <= 4; floor++)
+                {
+                    CellarFloorLayout l; int fb;
+                    try { l = CellarFloorGenerator.Generate(seed, floor, out fb); }
+                    catch (Exception e) { errs.Add("seed " + seed + " floor " + floor + " threw " + e.Message); continue; }
+                    total++; if (fb == 1) retry++; else if (fb == 2) lastResort++;
+                    List<string> v = CellarFloorValidator.Validate(l);
+                    if (v.Count > 0) errs.Add(string.Join("; ", v) + "\n" + l.ToAscii());
+                }
+            }
+            TestContext.WriteLine("SWEEP floors generated " + total + ", retry stream " + retry + ", last resort " + lastResort);
+            Assert.IsEmpty(errs, string.Join("\n", errs));
+        }
+
+        [Test]
+        public void LastResort_IsDeterministic_AndValid()
+        {
+            var rng = new Pcg32(77UL);
+            for (int i = 0; i < 300; i++)
+            {
+                uint seed = rng.NextUInt();
+                for (int floor = 1; floor <= 3; floor++)
+                {
+                    CellarFloorLayout a = CellarFloorGenerator.GenerateLastResort(seed, floor), b = CellarFloorGenerator.GenerateLastResort(seed, floor);
+                    Assert.AreEqual(a.LayoutHash(), b.LayoutHash());
+                    Assert.IsEmpty(CellarFloorValidator.Validate(a), "seed " + seed + " floor " + floor + "\n" + a.ToAscii());
+                    if (floor > 1) Assert.IsFalse(CellarFloorGenerator.MinimalPlan(seed, floor).Combat.Any(r => CellarFloorGenerator.PickRooms(seed, floor - 1).Combat.Contains(r)));
+                }
+            }
+        }
+
         [Test]
         public void FloorSeed_IsAHash_NotASum()
         {
@@ -114,6 +176,67 @@ namespace SleepingCalamity.Tests.EditMode
             // a dropped corridor cell leaves rooms disconnected
             var cut = new CellarFloorLayout(l.Seed, l.Floor, l.IsStub, l.Theme, l.Rooms, l.Corridors.Skip(1).ToList(), l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, l.Carrier);
             Assert.IsNotEmpty(CellarFloorValidator.Validate(cut));
+        }
+
+        // ---- lock/key rule mutations: each breaks one rule of a real locked layout and the validator must say so ----
+
+        static CellarFloorLayout RealLockedLayout()
+        {
+            for (uint seed = 0; seed < 500; seed++)
+                for (int floor = 1; floor <= 3; floor++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                    if (l.HasLockedRoom && l.KeyChest != null && l.Carrier != null) { Assert.IsEmpty(CellarFloorValidator.Validate(l)); return l; }
+                }
+            Assert.Fail("no locked layout in 500 seeds"); return null;
+        }
+
+        static CellarFloorLayout With(CellarFloorLayout l, IEnumerable<FloorLink> links = null, IEnumerable<FloorChest> chests = null, int? lockedLink = null, int? keyIdx = null, GateKeyCarrier carrier = null)
+            => new CellarFloorLayout(l.Seed, l.Floor, l.IsStub, l.Theme, l.Rooms, l.Corridors, links ?? l.Links, l.DeadEnds, chests ?? l.Chests, l.LockedRoomIndex,
+                lockedLink ?? l.LockedLinkIndex, keyIdx ?? l.KeyChestIndex, carrier ?? l.Carrier);
+
+        [Test]
+        public void Validator_ExitOnlyBehindTheLock_Fails()
+        {
+            CellarFloorLayout l = RealLockedLayout();
+            // moving the lock onto a link that the exit depends on makes the exit reachable only through the locked door
+            bool caught = false;
+            for (int k = 0; k < l.Links.Count && !caught; k++)
+            {
+                if (k == l.LockedLinkIndex) continue;
+                caught = CellarFloorValidator.Validate(With(l, lockedLink: k)).Any(e => e.Contains("stair exit is not reachable"));
+            }
+            Assert.IsTrue(caught, "no link on the way to the exit made the validator complain\n" + l.ToAscii());
+        }
+
+        [Test]
+        public void Validator_LockedRoomWithSecondLink_Fails()
+        {
+            CellarFloorLayout l = RealLockedLayout();
+            int lr = l.LockedRoomIndex, other = (lr + 1) % l.Rooms.Count;
+            var links = new List<FloorLink>(l.Links) { new FloorLink(lr, 0, other, 0, false, new CellPos[0]) };
+            Assert.That(CellarFloorValidator.Validate(With(l, links: links)).Any(e => e.Contains("needs exactly 1")), "a second link on the locked room must fail");
+        }
+
+        [Test]
+        public void Validator_KeyChestInTheLockedRoom_Fails()
+        {
+            CellarFloorLayout l = RealLockedLayout();
+            var chests = new List<FloorChest>(l.Chests);
+            FloorChest k = chests[l.KeyChestIndex];
+            chests[l.KeyChestIndex] = new FloorChest(k.X, k.Y, l.LockedRoomIndex, true);
+            Assert.That(CellarFloorValidator.Validate(With(l, chests: chests)).Any(e => e.Contains("key chest is in the locked room")));
+        }
+
+        [Test]
+        public void Validator_CarrierBehindTheLock_Fails()
+        {
+            CellarFloorLayout l = RealLockedLayout();
+            PlacedRoom lr = l.Rooms[l.LockedRoomIndex];
+            CellarSpawn sp = lr.Room.Spawns[0]; CellPos w = lr.Cell(sp.X, sp.Y);
+            List<string> errs = CellarFloorValidator.Validate(With(l, carrier: new GateKeyCarrier(l.LockedRoomIndex, 0, w.X, w.Y)));
+            Assert.That(errs.Any(e => e.Contains("carrier is in the locked room")), string.Join("\n", errs));
+            Assert.That(errs.Any(e => e.Contains("carrier is not reachable without passing the locked door")), string.Join("\n", errs));
         }
 
         [Test]
