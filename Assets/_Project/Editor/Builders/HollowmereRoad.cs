@@ -361,7 +361,7 @@ namespace SleepingCalamity.EditorTools
         struct Haze { public float Near, Far, D0, D1; public Color Tint; public Haze(float n, float f, float d0, float d1, Color tint) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; } }
         static readonly Haze NearHaze = new Haze(0.62f, 0.84f, 150f, 700f, Color.white);     // the ring trees: the nearest silhouette layer
         static readonly Haze GroundHaze = new Haze(0.86f, 0.9f, 150f, 700f, Color.white);   // the ring ground: matches the scene fog at the terrain edge (no seam)
-        static readonly Haze MidHaze = new Haze(0.79f, 0.85f, 900f, 1500f, new Color(0.98f, 1.0f, 1.04f));
+        static readonly Haze MidHaze = new Haze(0.78f, 0.85f, 900f, 1500f, new Color(0.98f, 1.0f, 1.03f));
         static readonly Haze FarHaze = new Haze(0.88f, 0.91f, 1800f, 2700f, new Color(0.95f, 1.0f, 1.08f));
 
         static Material Backdrop(string name, Texture2D tex, Color tint, Haze h, bool cards)
@@ -373,7 +373,7 @@ namespace SleepingCalamity.EditorTools
             m.SetColor("_BaseColor", tint);
             m.SetFloat("_HazeNear", h.Near); m.SetFloat("_HazeFar", h.Far); m.SetFloat("_DistNear", h.D0); m.SetFloat("_DistFar", h.D1);
             m.SetColor("_HazeTint", h.Tint);
-            m.SetFloat("_GroundMist", 0.06f); m.SetFloat("_MistTop", -8f);
+            m.SetFloat("_GroundMist", h.Near < 0.75f ? 0.06f : 0f); m.SetFloat("_MistTop", -8f);   // foot mist only on the near layer (on the hills it read as a pale water band)
             m.SetFloat("_AlphaClip", cards ? 1f : 0f); m.SetFloat("_Cutoff", 0.5f);
             if (cards) m.EnableKeyword("_ALPHATEST_ON"); else m.DisableKeyword("_ALPHATEST_ON");
             m.SetFloat("_Cull", (float)(cards ? CullMode.Off : CullMode.Back));
