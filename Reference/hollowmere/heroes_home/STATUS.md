@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Wave 1: Heroes' home (fixed landmark)
-Progress: 85%
+Progress: 90%
 Sheet: Reference/hollowmere/heroes_home/heroes_home_sheet_r3.jpg
 Blocker: none
 
@@ -24,3 +24,4 @@ Merge commit: none
 - Round 3 (coordinator's last round) exported; list panel lifted clear of the proudest stones. Unity integration + check in progress.
 - Paused by the coordinator (usage). Done: art r3 (29/40), export, Unity code (HeroesHomeArt.cs + HollowmereBuilder HeroesHome case, pushed as WIP). Left: unity.sh check on the tip, merge, DONE.
 - Unity agent: first unity.sh check PASS (build, 591/591 edit, 32 play passed / 0 failed) on the round-1 FBX; HeroesHomeArt now maps the annex's empty Glow slot and adds the door-lantern light (untested). Final check on round 3 pending after the pause.
+- Resumed: round 3 approved by the coordinator. origin/main merged (builder header kept both sides). Capture cameras Cap_HM_HeroesHome / Cap_HM_HeroesAnnex added; final unity.sh check + captures running.
