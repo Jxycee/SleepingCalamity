@@ -2,8 +2,8 @@
 
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
-State: DONE (terrain pass merged)
-Progress: 100%
+State: IN PROGRESS (ruin integration)
+Progress: 30%
 Sheet: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 Map: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
 

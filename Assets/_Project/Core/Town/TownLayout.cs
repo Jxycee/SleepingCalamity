@@ -101,6 +101,7 @@ namespace SleepingCalamity.Core
     {
         public const float DoorstepOffset = 0.6f;   // doorstep and corner nodes sit this far outside the lot edge
         public string Id; public int Ring; public FoundationSize Size; public TownPoint Centre; public float Yaw; public LotSide Facing; public string RuinVariant;
+        public int RuinTurn;   // 0-3 quarter turns of the ruin on the lot (in the lot's own frame); the ruin is switched off once a building stands here
         public float Y;   // ground height of the lot (the pad the builder flattens)
 
         public static float SideLength(FoundationSize s) => s == FoundationSize.S ? 6f : s == FoundationSize.M ? 8f : 11f;
