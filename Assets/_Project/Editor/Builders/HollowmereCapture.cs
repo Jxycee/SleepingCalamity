@@ -67,6 +67,10 @@ namespace SleepingCalamity.EditorTools
                     string suffix = light == BeautyCornerBuilder.Preset.Midday ? "" : "_" + light;
                     foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                     {
+                        // SC_CAPTURE_PRESET=Ruined|Rebuilt renders one preset only (Q15: a software-GL run can stall on the first frame after the preset switch;
+                        // one preset per process avoids it)
+                        string onlyPreset = System.Environment.GetEnvironmentVariable("SC_CAPTURE_PRESET");
+                        if (!string.IsNullOrEmpty(onlyPreset) && onlyPreset != preset.ToString()) continue;
                         HollowmereBuilder.ApplyPreset(preset);
                         foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
                         foreach (ParticleSystem ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) ps.Simulate(14f, true, true);   // particles do not run in edit mode: a settled pollen cloud (fixed seeds)
