@@ -31,7 +31,9 @@ tileable's measured hue #b9a07a (Art/Textures/B1_town/SOURCES.md).
       [--stage look|bake]   look (default): procedural highs rendered directly, no bake; bake: lows + baked maps + render
       [--res 1024]          bake resolution (the PC's final bake: --res 4096 for DryFountain, 2048 for BannerPole)
       [--only fountain,pole] [--tris 46000] [--ptris 9000] [--rres 960] [--samples 48]
-      [--views wide,mid,close,tq] [--moods noon,lowsun] [--no-render]
+      [--views wide,mid,close,tq] [--moods noon,lowsun] [--no-render] [--export]
+  --export (with --stage bake) writes <out>/DryFountain.fbx and <out>/BannerPole.fbx; the maps are <out>/props/tex/<Name>_*.png,
+      packed for Unity with `python Art/Blender/tools/sc_pack_unity.py --to-orm <out>/props/tex <Name> Assets/_Project/Content/Art/Town/B10/<Name>`.
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 
 Status (2026-10-31, cloud): look rounds 1-3 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28/40:
@@ -39,7 +41,10 @@ round 2 dropped the dish and beast 0.30 m into the 38 deg close camera, fixed th
 and the ruff; round 3 added the shaft flutes, rosier and paler replacement stones, rain streaks under the coping, a
 clean dish and a paler seat. Bake proof (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
 BannerPole high 0.79M -> low 8,996 (57.7k together, in the T4 30-60k band); at 1024 the closed-eye lid lines soften
-toward brows, so check them first in the PC's 4K bake. Next: the PC runs --stage bake --res 4096 (DryFountain) / 2048 (BannerPole) and exports.
+toward brows, so check them first in the PC's 4K bake.
+PC bake (2026-10-30, Blender 5.2.2): --stage bake --res 4096 --export -> DryFountain 48,725 tris (4K), BannerPole 8,996
+(2K), exported to Assets/_Project/Content/Art/Town/B10/{DryFountain,BannerPole}/. At 4K the shut eyes still read as two
+dark dots in the close camera rather than lid lines: a look item for the next cloud round.
 Parked (optional, after the captures): an octagonal basin variant on one worn step A/B'd at the mid camera; B9 crack
 weeds and moss tufts at the basin foot and in the north joints; ruff locks with a spiral twist and varied length (side-on
 they read as stacked discs); a sun-side bleach gradient across the banner and a loose thread from each tear.
@@ -456,14 +461,16 @@ def beast_cuts(ob):
 # ----------------------------------------------------------------------------- bowl contents
 def silt():
     """Cracked silt: Voronoi plates over the bowl floor, cracks 1-2 cm deep, plate edges curling up as they dried."""
-    from scipy.spatial import cKDTree
-    R = R_WI + 0.01; step = 0.011; xs = np.arange(-R, R + step, step)
+    R =R_WI + 0.01; step = 0.011; xs = np.arange(-R, R + step, step)
     X, Y = np.meshgrid(xs, xs); keep = np.hypot(X, Y) < R; P = np.stack([X[keep], Y[keep]], 1)
     r = K.rng('silt'); seeds = []
     while len(seeds) < 260:
         x, y = r.uniform(-R, R), r.uniform(-R, R)
         if math.hypot(x, y) < R: seeds.append((x, y))
-    d, _ = cKDTree(np.array(seeds)).query(P, k=2); edge = d[:, 1] - d[:, 0]
+    kd = kdtree.KDTree(len(seeds))                                    # mathutils, not scipy: Blender's Python has no scipy
+    for i, (x, y) in enumerate(seeds): kd.insert((x, y, 0.0), i)
+    kd.balance()
+    d = np.array([[h[2] for h in kd.find_n((px, py, 0.0), 2)] for px, py in P]); edge = d[:, 1] - d[:, 0]
     rr = np.hypot(P[:, 0], P[:, 1])
     z = Z_SILT - 0.02 * (1 - np.clip(edge / 0.012, 0, 1)) ** 1.5 + 0.006 * np.exp(-edge / 0.03) * np.clip(edge / 0.012, 0, 1)
     z += 0.012 * np.clip((rr - 1.05) / 0.25, 0, 1) ** 2                # silt banked against the wall
@@ -899,11 +906,34 @@ ph = build_pole() if 'pole' in ONLY else []
 print('HIGH TRIS', {h.name: K.tris(h) for h in fh + ph}, 'total', sum(K.tris(h) for h in fh + ph))
 if STAGE == 'bake':
     pdir = os.path.join(OUT, 'props'); os.makedirs(pdir, exist_ok=True)
+    # both pieces are built at the origin, so the pole stands through the column: hide the other piece from render while
+    # each one bakes, or the AO bake traces it (a phantom pole ring on the beast, the basin's low around the socket)
+    def hide(obs, flag):
+        for o in obs:
+            if o: o.hide_render = flag
     if fh:
+        hide(ph, True)
         lf = K.bake_prop(NAME_F, fh, pdir, target=int(arg('--tris', '46000')), res=RES, extrusion=0.012, ray=0.03); print('LOW TRIS', NAME_F, K.tris(lf))
+        hide(ph, False)
     if ph:
+        fl = [bpy.data.objects.get(NAME_F)]; hide(fl, True)
         lp_ = K.bake_prop(NAME_P, ph, pdir, target=int(arg('--ptris', '9000')), res=max(RES // 2, 512), extrusion=0.006, ray=0.015); print('LOW TRIS', NAME_P, K.tris(lp_))
+        hide(fl, False)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(pdir, NAME_F + '.blend'))
+    if '--export' in argv:
+        # one FBX per piece, written before the pole is moved to its plaza spot (each origin on the ground: basin centre,
+        # pole foot); the bake UV is the only UV set (Unity samples UV0); -Z forward, Y up, metres, transforms baked.
+        # Maps: <out>/props/tex/<Name>_*.png, packed with sc_pack_unity.py --to-orm (beauty-corner brief 4).
+        for nm in ([NAME_F] if fh else []) + ([NAME_P] if ph else []):
+            ob = bpy.data.objects[nm]
+            act = ob.data.uv_layers.active.name
+            for uvl in [l for l in ob.data.uv_layers if l.name != act]: ob.data.uv_layers.remove(uvl)
+            for o in bpy.context.selected_objects: o.select_set(False)
+            ob.select_set(True); bpy.context.view_layer.objects.active = ob
+            bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, nm + '.fbx'), use_selection=True, object_types={'MESH'},
+                                     axis_forward='-Z', axis_up='Y', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
+                                     mesh_smooth_type='FACE', add_leaf_bones=False, bake_anim=False, use_custom_props=False, path_mode='STRIP')
+            print('EXPORT', os.path.join(OUT, nm + '.fbx'), K.tris(ob), 'tris')
 for o in ph if STAGE == 'look' else ([bpy.data.objects.get(NAME_P)] if ph else []):
     if o: o.location = POLE; bpy.context.view_layer.update()
 if '--no-render' not in argv:
