@@ -26,11 +26,11 @@ Every piece is inside its brief budget (milestones 0.6-1.2k, shrines 4-7k, carts
 
 `T_Road_FarTrees_BaseColor.png` (2048 x 1024, sRGB, alpha = coverage, colour bled under transparent pixels) and `T_Road_FarTrees_Normal.png` (tangent-space crown normal seen from the front, R x right, G z up, B toward the viewer).
 4 cells of 512 x 1024 px, cell k = columns 512k..512k+511; scale 64 px per metre (a cell is 8 m wide x 16 m tall); tree base at the cell's bottom centre (row 16 from the bottom, column 256 within the cell).
-Orthographic side view of B9 ivy leaf-mass cards on a union-of-ellipsoids crown, soft top-light AO, B9 yellow-greens only. Use as crossed billboard cards; scale 1 = the sizes below.
+Round 2 (2026-10-31): four distinct storybook trees built from ragged lumpy leaf clumps (B9 leaf-mass cells for leaf-scale alpha and detail, per-clump dome normals, AO at each clump's lower edge and in the notches, top-left rim light, darker lower crown, 3 green hues from yellow-green tops to deep olive), over a dark interior layer, with visible trunks and limbs and a few sky gaps. Use as crossed billboard cards; scale 1 = the sizes below.
 
-| Cell | Tree | Visible height (m) | Crown width (m) |
-|---|---|---|---|
-| 0 | round oak | 9.8 | 7.6 |
-| 1 | tall oval | 11.2 | 6.3 |
-| 2 | wide spreading | 7.9 | 7.6 |
-| 3 | tall round | 10.7 | 7.4 |
+| Cell | Tree | Visible height (m) | Crown width (m) | Crown base height (m) |
+|---|---|---|---|---|
+| 0 | hedgerow oak (broad, flat-topped, stout trunk) | 8.5 | 7.6 | 3.2 |
+| 1 | field maple (3 tiers, slight lean) | 9.1 | 6.1 | 2.6 |
+| 2 | poplar column (ragged edge) | 13.8 | 4.8 | 1.5 |
+| 3 | thorn / willow clump (multi-stem, to the ground) | 4.6 | 7.9 | 0 |
