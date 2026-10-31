@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Q14. Decorations batch 2: market and lane clutter
-Progress: 60%
-Sheet: Reference/hollowmere/clutter/clutter_sheet_r3.jpg
+Progress: 80%
+Sheet: Reference/hollowmere/clutter/clutter_engine_sheet.jpg
 Blocker: none
 
 Score: art rounds (Blender sheet, visible faces): r1 27 -> r2 28.5 -> r3 29 (agent); controller read about 28/40 (flower clumps read as pastel blobs, cloth pale). Stopped at round 3 (gain < 1.5); in-engine check next.
@@ -21,7 +21,9 @@ Then: merge origin/main, build scene, capture Cap_HM_Clutter, unity.sh check, me
 - Unity (740e0a5): Core HollowmereClutter (rows outside lots: clear of garden/keep), Rebuilt 53 ground rows + 6 signs (4 workshops, tailor F06, grocer F07) + 3 washing spans, Ruined 15; HollowmereClutterTests 13 green on the Core runner (path node / edge negative tests). Editor placement written, not yet compiled (Unity editor still downloading in this container).
 - Coordinator: sheet r3 ~27/40 APPROVED, no more art rounds. Later polish: sacks are smooth pillows (no burlap weave/stitching), flower clumps pastel blobs, washing-line cloth pale.
 - 2026-10-31: Unity editor finally extracted in this container (the download stalled ~45 min); origin/main merged (lake, stair). In-engine step starting.
-- Next: compile, footprints to real extents, scene build, capture Cap_HM_Clutter only, in-engine sheet, then check + merge.
+- In-engine (9a7f545): build PASS, log `SC HOLLOWMERE clutter: rebuilt rows=53 ruined rows=15 signs=6 washing lines=3 | art rows=68 greybox rows=0 ... tris=158092`; footprints raised to the real art extents; Validate empty, Core tests 317/317. CL_Paint/PaintRed moved to plaster (painted_wood read teal). Capture: pieces sit on the ground, workshop sign on its wall; washing line not in frame yet.
+- Now: Cap_HM_Clutter re-aimed at the R2_19-R2_20 washing line, one capture, then merge origin/main and one check.
+- Old next: compile, footprints to real extents, scene build, capture Cap_HM_Clutter only, in-engine sheet, then check + merge.
 
 ## Usage waste
 - (filled at the end)
