@@ -115,6 +115,7 @@ namespace SleepingCalamity.EditorTools
             }
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt); }
+            HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");
@@ -167,7 +168,7 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- ground, water, walls, keep
         static void BuildGround(Transform set, TownLayout t)
         {
-            HollowmereTerrain.Build(set, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
+            HollowmereFoliage.TerrainGrass(HollowmereTerrain.Build(set, t), t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
             // The square keeps the approved corner's surround paving (B6 FarCobble with its macro breakup) as a slab over the terrain, so the corner reads as approved.
             Material far = BeautyCornerArt.SurroundGround();
             var sq = LookTestBuilder.Box(set, "SquarePaving", new Vector3((HollowmereLayout.SquareMinX + HollowmereLayout.SquareMaxX) * 0.5f, -0.17f, (HollowmereLayout.SquareMinZ + HollowmereLayout.SquareMaxZ) * 0.5f),
