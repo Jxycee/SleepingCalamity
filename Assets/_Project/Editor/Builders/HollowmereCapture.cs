@@ -17,7 +17,8 @@ namespace SleepingCalamity.EditorTools
     public static class HollowmereCapture
     {
         // The design 7 play positions: square entry from the heroes' home, the fountain, the tithe gate, a lane mouth.
-        static readonly string[] PlayPositionCameras = { "Cap_HM_HomeDoor", "Cap_HM_Fountain", "Cap_HM_TitheGate", "Cap_HM_LaneMouth" };
+        static readonly string[] PlayPositionCameras = { "Cap_HM_HomeDoor", "Cap_HM_Fountain", "Cap_HM_TitheGate", "Cap_HM_LaneMouth",
+            "Cap_HM_LakeShore", "Cap_HM_LakeJetty", "Cap_HM_Ravine", "Cap_HM_MillLane", "Cap_HM_Mill" };   // + the water cameras (Q10)
 
         [MenuItem("SleepingCalamity/Art/Capture Hollowmere")]
         public static void CaptureMenu()
@@ -53,7 +54,7 @@ namespace SleepingCalamity.EditorTools
                 string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");   // e.g. "SquareSouth,Fountain": only the cameras whose name contains one of them
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 // Default: Midday renders every camera; LowSun (design 7: "at midday and low sun") only the four play-position cameras, files <Camera>_<Preset>_LowSun.png.
-                BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : new[] { BeautyCornerBuilder.Preset.Midday, BeautyCornerBuilder.Preset.LowSun };
+                BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") == "Midday" ? new[] { BeautyCornerBuilder.Preset.Midday } : new[] { BeautyCornerBuilder.Preset.Midday, BeautyCornerBuilder.Preset.LowSun };
                 string variantSpec = System.Environment.GetEnvironmentVariable("SC_LOOK_VARIANTS");
                 string[] variants = string.IsNullOrEmpty(variantSpec) ? new[] { "" } : variantSpec.Split(';');
                 foreach (string variant in variants)
@@ -67,6 +68,8 @@ namespace SleepingCalamity.EditorTools
                     string suffix = light == BeautyCornerBuilder.Preset.Midday ? "" : "_" + light;
                     foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                     {
+                        string onlyPreset = System.Environment.GetEnvironmentVariable("SC_CAPTURE_PRESET");   // e.g. "Rebuilt": skip the other preset
+                        if (!string.IsNullOrEmpty(onlyPreset) && onlyPreset != preset.ToString()) continue;
                         HollowmereBuilder.ApplyPreset(preset);
                         foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
                         foreach (ParticleSystem ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) ps.Simulate(14f, true, true);   // particles do not run in edit mode: a settled pollen cloud (fixed seeds)
