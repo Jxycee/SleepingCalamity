@@ -10,3 +10,4 @@ Export: Assets/_Project/Content/Art/Town/Ruins/<Name>/<Name>.fbx (+ B9 foliage a
 Contract: inside the S x S square, pivot at centre/ground, front -Y (Unity +Z), children Footing / Foliage / FOOTPRINT / SOCKET_Doorstep (threshold top, z 0.22); Footing slots FK_Sandstone, FK_ChimneyStone, FK_PlinthJoint, FK_Oak; linear 'wear' colour attribute (WearLit)
 Note: unity.sh check rewrites HeroAnimator.controller(.meta) and BeautyCorner_Hollowmere.unity on every cloud run (pre-existing builder churn, left uncommitted)
 Needs: none
+Archive: ready
