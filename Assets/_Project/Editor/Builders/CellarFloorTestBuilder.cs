@@ -69,8 +69,8 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 0.7f;   // a roofless 50 m floor needs more fill than the 8 m corner (0.23)
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
+            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 1.6f;   // a roofless 50 m floor needs more fill than the 8 m corner (0.23)
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.004f; RenderSettings.fogColor = new Color(0.20f, 0.15f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
 
@@ -84,6 +84,7 @@ namespace SleepingCalamity.EditorTools
             var (camPos, camTarget) = RoomView(layout);
             LookTestBuilder.AddCapture(cams, "Floor_Room", camPos, camTarget, 78f);
             DungeonCornerBuilder.DarkBackground(cams);
+            foreach (Camera cc in cams.GetComponentsInChildren<Camera>(true)) cc.backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // warm umber backdrop instead of the corner's teal-black void
 
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
