@@ -55,7 +55,9 @@ Nothing else here is a gate. Approval is the user's, on captures (3.7).
 | 7 | **Fits the set** | matches its kit and neighbours in scale, texel density and colour | one mismatch (texel density, a material's hue) | looks imported from another game |
 | 8 | **Glass, liquid, emissive, metal** (where present; else score efficiency against PHASE1 3.3) | glass and liquid read through fake refraction, glow sits in the right place, metals reflect | readable but flat | murky shells, neon liquids, black metal |
 
-**User calibration (2026-10-30):** the user reads our totals about 8-10 points low ("your 20/40 is more like a 30/40"). Stop a round at **25/40**, score only what the capture or play cameras see (backs, undersides and hidden faces don't count), and phrase every fix as a change visible at mid distance. Details: `docs/art/beauty-corner-brief.md` section 3.
+**Side-by-side, always (user, 2026-10-30):** every review round builds one image with the reference pasted right next to the render (reference left, render right, same height, labelled) and scores from that sheet. For in-engine work, pair the Unity capture with the reference frame the same way.
+
+**User calibration (2026-10-30):** the user reads our totals about 8-10 points low ("your 20/40 is more like a 30/40"). Treat **25/40** as the floor: if the first review already reaches it, the target becomes first score + 5 (max about 4 rounds, each with a visible gain of 1.5+ points), score only what the capture or play cameras see (backs, undersides and hidden faces don't count), and phrase every fix as a change visible at mid distance. Details: `docs/art/beauty-corner-brief.md` section 3.
 
 Rubric expectation (same as sc-aaa-prop): about 4 per line is shipped-quality art, and the /40 total is harsher than shipped games' own art scored blind, so use scores to rank and compare, not to pass or fail.
 
