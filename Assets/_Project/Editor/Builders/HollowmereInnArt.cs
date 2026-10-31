@@ -96,6 +96,7 @@ namespace SleepingCalamity.EditorTools
             // The lit lantern panes: URP Lit with an HDR warm emission.
             Material flame = LookTestBuilder.Ensure(MaterialsFolder + "/M_IN_Flame.mat", Shader.Find("Universal Render Pipeline/Lit"));
             flame.SetColor("_BaseColor", new Color(0.40f, 0.22f, 0.06f).gamma); flame.SetFloat("_Smoothness", 0.2f);
+            flame.SetColor("_Color", flame.GetColor("_BaseColor"));   // the mirror a graphics import writes: the same bytes from a -nographics check
             flame.SetColor("_EmissionColor", new Color(1.0f, 0.62f, 0.22f) * 2f); flame.EnableKeyword("_EMISSION");
             flame.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             EditorUtility.SetDirty(flame); map["IN_Flame"] = flame;
