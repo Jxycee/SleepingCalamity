@@ -40,4 +40,4 @@ Done:
 Unverified: the belfry, bronze bell, clock face and rubble/quoin shaft are hidden behind the facade roof in every corner capture, so their WearLit look was only
 seen at a distance in the town shots (shaft reads grey, spire red). A close camera on the tower would be the next check. The facade kit (sc_facade_kit.py) still exports
 absolute texture paths: a cloud export of it would hit the same 'Lit' slot problem (fix: path_mode='STRIP', as in sc_bell_tower.py).
-Generator branch claude/determined-thompson-6z2mml deleted after the merge.
+Generator branch claude/determined-thompson-6z2mml: fully merged into main (its last b4 STATUS commit via 3611f6b), but NOT deleted: the cloud git proxy ignores remote branch deletes (push --delete returns "Everything up-to-date"). Safe to delete from the PC.
