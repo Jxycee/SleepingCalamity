@@ -233,11 +233,42 @@ namespace SleepingCalamity.Core
             public readonly List<Body> Bodies = new List<Body>();
             public readonly Dictionary<string, Body> ByLot = new Dictionary<string, Body>();
             public readonly List<(Footprint Fp, string Lot)> CutFill = new List<(Footprint, string)>();
+            public List<(Footprint Fp, LaneKitRow Row)> LaneBlockers;   // Q11 lane-kit pieces with a ground footprint (walls, piers, buttresses, steps, gate leaves, kerbs)
+        }
+
+        // The lane kit's ground footprints. Step modules are 2 m wide (ScaleX stretches that), walls 2 m long along their own X, piers and buttresses 0.8 m square.
+        static (Footprint, LaneKitRow)? LaneFootprint(LaneKitRow k)
+        {
+            TownPoint p = Pt(k.X, k.Z);
+            switch (k.Piece)
+            {
+                case LanePiece.GardenWall: case LanePiece.GardenWallBroken: case LanePiece.GardenWallEnd:
+                case LanePiece.RetainWall: case LanePiece.RetainWallLow: case LanePiece.RetainWallBreach:
+                    return (new Footprint(p, 2f * k.ScaleX, 2f * LaneKitPlan.WallHalfThick, k.Yaw), k);
+                case LanePiece.RetainButtress: case LanePiece.GatePier: return (new Footprint(p, 0.8f, 0.8f, k.Yaw), k);
+                case LanePiece.LaneStep: return (new Footprint(p, 2f * k.ScaleX, LaneKitPlan.StepRun, k.Yaw), k);
+                case LanePiece.GateLeaf: case LanePiece.GateLeafBroken: return (new Footprint(p, 1.2f, 0.2f, k.Yaw), k);
+                case LanePiece.LaneKerb: return (new Footprint(p, 2f * k.ScaleX, 0.3f, k.Yaw), k);
+                default: return null;
+            }
+        }
+
+        static TownLayout _laneFor; static List<(Footprint Fp, LaneKitRow Row)> _laneCache;
+        static List<(Footprint Fp, LaneKitRow Row)> LaneBlockersOf(TownLayout t)
+        {
+            lock (typeof(HollowmereClutter))
+            {
+                if (_laneFor == t && _laneCache != null) return _laneCache;
+                var list = new List<(Footprint, LaneKitRow)>();
+                foreach (LaneKitRow k in LaneKitPlan.Plan(t)) { var f = LaneFootprint(k); if (f.HasValue) list.Add(f.Value); }
+                _laneFor = t; _laneCache = list;
+                return list;
+            }
         }
 
         static Ctx MakeCtx(TownLayout t)
         {
-            var c = new Ctx { T = t };
+            var c = new Ctx { T = t, LaneBlockers = LaneBlockersOf(t) };
             foreach (Foundation f in t.Foundations)
             {
                 HollowmereLayout.HomeAssignment a = HollowmereLayout.RebuiltHome(f.Id);
@@ -483,6 +514,8 @@ namespace SleepingCalamity.Core
             foreach ((Footprint box, string lot) in c.CutFill) if (fp.Overlaps(box)) { e.Add(r.Id + " stands on the cut or fill wall of " + lot); if (first) return; }
             if (r.Ring != 1 && r.Ring != 2) { e.Add(r.Id + ": ring " + r.Ring + " is not 1 or 2"); if (first) return; }
             else foreach (TownPoint p in fp.Corners()) if (!OnRing(t, r.Ring, p)) { e.Add(r.Id + " is off ring " + r.Ring + " (the square and its lane stubs / beside a ring 2 lane)"); if (first) return; break; }
+            foreach ((Footprint lf, LaneKitRow lk) in c.LaneBlockers)
+                if (lk.In(r.Preset == Rb) && Inflated(r, Clearance).Overlaps(lf)) { e.Add(r.Id + " stands on lane kit " + lk.Id + " (" + lk.Piece + ")"); if (first) return; }
             foreach (DecoRow d in HollowmereDressing.Rows)
                 if (HollowmereDressing.InPreset(d.Preset, r.Preset) && Inflated(r, DressingGap).Overlaps(HollowmereDressing.FootprintOf(d))) { e.Add(r.Id + " overlaps square dressing " + d.Id); if (first) return; }
             // slope: the four corners and the centre must sit on ground within MaxSlope of each other

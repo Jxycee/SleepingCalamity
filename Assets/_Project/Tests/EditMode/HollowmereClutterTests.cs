@@ -113,6 +113,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void NoClutterRow_StandsOnLaneKitPieces_OfASharedPreset()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var errors = HollowmereClutter.Validate(t).Where(e => e.Contains("lane kit")).ToList();
+            Assert.IsEmpty(errors, string.Join("\n", errors));
+            // the rule is real: a crate stack dropped on a lane step is reported
+            LaneKitRow step = LaneKitPlan.Plan(t).First(k => k.Piece == LanePiece.LaneStep && k.Preset == LanePreset.Both);
+            var bad = new ClutterRow { Id = "X_step", Asset = "CrateStack", Kind = ClutterKind.CrateStack, Preset = DecoPreset.Rebuilt, Ring = 2, X = step.X, Z = step.Z, SizeX = 1.3f, SizeZ = 0.9f, Height = 1.4f };
+            List<string> bad1 = HollowmereClutter.Validate(t, new[] { bad }, new ClutterSign[0], new WashingSpan[0]);
+            Assert.IsTrue(bad1.Any(e => e.Contains("lane kit")), string.Join("\n", bad1));
+        }
+
+        [Test]
         public void Validate_ReportsARowOnAPathNode()
         {
             TownLayout t = HollowmereLayout.Create();
