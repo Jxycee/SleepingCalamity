@@ -40,6 +40,7 @@ namespace SleepingCalamity.Presentation
         public const float CellSize = CellarFloorLayout.CellMeters, WallHeight = 3.6f, WallThickness = 0.4f, DoorWidth = 2.4f, DoorHeight = 2.8f, PillarSize = 1.0f;
         public const string FloorGroup = "Floor", WallGroup = "Walls", DoorGroup = "Doors", PillarGroup = "Pillars", MarkerGroup = "Markers", LampGroup = "Lamps";
         const float Tile = 2f;
+        const int BigRoomCells = 12;
         static readonly Color GoldLamp = new Color(1.0f, 0.80f, 0.54f);   // the approved dungeon corner's paler lantern gold (not orange)
 
         public static Vector3 CellCenter(int x, int y) => new Vector3((x + 0.5f) * CellSize, 0f, -(y + 0.5f) * CellSize);
@@ -199,6 +200,7 @@ namespace SleepingCalamity.Presentation
                 return;
             }
             var col = cell.gameObject.AddComponent<BoxCollider>(); col.center = new Vector3(0, -0.1f, 0); col.size = new Vector3(CellSize, 0.2f, CellSize);
+            Box(cell, "Bed", c + new Vector3(0, -0.07f, 0), new Vector3(CellSize, 0.1f, CellSize), mats.Floor, Tile, false);   // a bed under the flags, so the joints read as stone, not void
             for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++)
             {
                 GameObject t = Object.Instantiate(kit.FloorTile, cell, false);
@@ -263,7 +265,7 @@ namespace SleepingCalamity.Presentation
                     Box(wl, "Hook", wl.position + wall * 0.12f + new Vector3(0, 0.02f, 0), wall.x != 0 ? new Vector3(0.26f, 0.04f, 0.04f) : new Vector3(0.04f, 0.04f, 0.26f), mats.Iron, 1f, false);
                     result.Lamps++;
                 }
-                if (n > 0) continue;
+                if (n > 0 && p.Room.FloorCount < BigRoomCells) continue;   // a big room gets a hanging centre lamp as well as its wall lanterns
                 // nearest floor cell to the room's centre
                 float cx = p.X + p.Width * 0.5f - 0.5f, cy = p.Y + p.Height * 0.5f - 0.5f; int bx = -1, by = -1; float best = float.MaxValue;
                 for (int lx = 0; lx < p.Width; lx++) for (int ly = 0; ly < p.Height; ly++)

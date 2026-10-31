@@ -143,6 +143,7 @@ namespace SleepingCalamity.Presentation
                 }
 
             Sockets(layout, grid, kit, mats, ceiling, dressing, result);
+            Corners(layout, grid, kit, mats, dressing, result);
 
             // a candle cluster on every chest (the chest marker is 0.8 m tall), and a warm fill per room
             foreach (FloorChest ch in layout.Chests)
@@ -207,6 +208,57 @@ namespace SleepingCalamity.Presentation
                     }
                     if (g != null) result.Props++;
                 }
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------------ corner dressing
+        // Up to two free inside corners per room (a floor cell closed on two adjacent sides, holding no chest, start, stair, spawn, carrier or socket) get
+        // barrels with a candle or a crate stack, picked by a hash of (seed, cell), so sparse combat rooms gain storage at their edges without new data.
+        static void Corners(CellarFloorLayout layout, Grid grid, CellarFloorKit kit, Mats mats, Transform dressing, CellarFloorBuild result)
+        {
+            var busy = new HashSet<(int, int)>();
+            foreach (FloorChest ch in layout.Chests) busy.Add((ch.X, ch.Y));
+            foreach (CellPos s in layout.EntryStarts) busy.Add((s.X, s.Y));
+            if (layout.StairExit.HasValue) busy.Add((layout.StairExit.Value.X, layout.StairExit.Value.Y));
+            if (layout.Carrier != null) busy.Add((layout.Carrier.X, layout.Carrier.Y));
+            foreach (PlacedRoom p in layout.Rooms)
+            {
+                foreach (CellarSpawn sp in p.Room.Spawns) busy.Add((p.X + sp.X, p.Y + sp.Y));
+                foreach (DressingSocket so in p.Room.Sockets) busy.Add((p.X + so.X, p.Y + so.Y));
+            }
+            for (int r = 0; r < layout.Rooms.Count; r++)
+            {
+                PlacedRoom p = layout.Rooms[r]; int placed = 0;
+                for (int ly = 0; ly < p.Height && placed < 2; ly++)
+                    for (int lx = 0; lx < p.Width && placed < 2; lx++)
+                    {
+                        int x = p.X + lx, y = p.Y + ly;
+                        if (p.Room.CellAt(lx, ly) != CellKind.Floor || busy.Contains((x, y))) continue;
+                        for (int k = 0; k < 4; k++)
+                        {
+                            CellSide a = Sides[k], b = Sides[(k + 1) % 4];
+                            if (EdgeOf(grid, x, y, a) != Edge.Closed || EdgeOf(grid, x, y, b) != Edge.Closed) continue;
+                            Vector3 c = CellCenter(x, y), da = SideDir(a), db = SideDir(b);
+                            uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663) ^ layout.Seed * 83492791u;
+                            string id = "r" + r + "_" + x + "_" + y;
+                            if ((h & 1u) == 0 && HasPiece(kit, "Barrels"))
+                            {
+                                // the cradle along wall a, heads toward the room
+                                PlacePiece(kit, "Barrels", dressing, "CornerBarrels_" + id, c + da * 1.3f + db * 0.6f, Quaternion.LookRotation(Vector3.Cross(-da, Vector3.up), Vector3.up), Vector3.one);
+                                CandleCluster(dressing, mats, c + da * 1.3f + db * 0.6f - da * 0.95f + new Vector3(0, 1.0f, 0), "corner_" + id, new Vector3(0, 0.3f, 0)); result.Candles++;
+                            }
+                            else
+                            {
+                                Vector3 at = c + (da + db) * 1.2f; float yaw = (h >> 3) % 30;
+                                var crate = new GameObject("CornerCrates_" + id).transform; crate.SetParent(dressing, false); crate.position = at;
+                                Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw, 0);
+                                Box(crate, "CrateB", at - da * 0.9f + new Vector3(0, 0.35f, 0), new Vector3(0.7f, 0.7f, 0.7f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, -yaw, 0);
+                                Box(crate, "CrateC", at + new Vector3(0, 1.1f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw + 20f, 0);
+                            }
+                            result.Props++; placed++;
+                            break;
+                        }
+                    }
             }
         }
 
