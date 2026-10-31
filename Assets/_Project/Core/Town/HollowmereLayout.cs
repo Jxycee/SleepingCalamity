@@ -315,7 +315,7 @@ namespace SleepingCalamity.Core
         };
 
         // ------------------------------------------------------------------------------------------------ the rebuilt preset (ring 1 assignment; rings 2-3 homes)
-        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Townhouse, StoneCottage, Workshop }
+        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Townhouse, StoneCottage, Workshop, Smithy, Schoolhouse }
         static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing1 =
         {
             ("F01", BuildingKind.ApprovedFacade), ("F02", BuildingKind.Bakery), ("F09", BuildingKind.Inn),
@@ -325,7 +325,12 @@ namespace SleepingCalamity.Core
         };
         // Ring 2 kit homes, east side of the Ring Lane, both on the square side with their fronts to the lane: R2_09 (S, 6 m) the stone cottage (kit family 2, StoneCottage_B),
         // R2_08 (M, 8 m) the workshop (kit family 4, Workshop_B). Their pads keep the layout heights.
-        static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing2 = { ("R2_09", BuildingKind.StoneCottage), ("R2_08", BuildingKind.Workshop) };
+        // Kit-ready shops (design 6, queue Q2) on ring-2 M lots: R2_01 the smithy, R2_03 the schoolhouse; any free M lot would take them in play.
+        static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing2 =
+        {
+            ("R2_09", BuildingKind.StoneCottage), ("R2_08", BuildingKind.Workshop),
+            ("R2_01", BuildingKind.Smithy), ("R2_03", BuildingKind.Schoolhouse),
+        };
         static readonly string[] RebuiltGardens = { "R2_07", "R2_18", "R2_22", "R3_02" };   // left as allotments in the rebuilt massing
 
         public static BuildingKind RebuiltBuilding(string foundationId)

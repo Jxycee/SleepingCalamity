@@ -7,7 +7,7 @@
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
 // BeautyCornerBuilder.PlaceRow at their corner positions; the three stalls are the Wave 1 Ring1/Stalls art (ruined or rebuilt state), else the B8 stall; the B4 bell tower when its folder exists;
 // the heroes' home from Ring1/HeroesHome (HeroesHomeArt). Everything else is greybox on the LookTest materials, except the buildings whose final export is in
-// (HollowmereArt: the bakery; HollowmereInnArt: the inn). Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
+// (HollowmereArt: the bakery, smithy, schoolhouse and mill; HollowmereInnArt: the inn). Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
 // approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Ruins: every empty lot shows its ruin kit variant (RuinVariant, RuinTurn); a placed building or garden switches it off.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
@@ -45,6 +45,9 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_LakeShore", new Vector3(-26f, 1.7f, -88f), new Vector3(-2f, 3f, -20f), 50f),       // from the lake shore by R3_01 up at the hill town and the keep
             ("Cap_HM_MarketStreet", new Vector3(0.6f, 1.65f, -19.8f), new Vector3(-0.5f, -6.5f, -58f), 55f), // the square's south edge down Market Street to the second terrace and the wall
             ("Cap_HM_KeepStairs", new Vector3(-31f, 1.7f, 13.8f), new Vector3(-20f, 3.0f, 19.6f), 58f),  // along the Wall Ginnel: terrace step, west stair, keep wall
+            ("Cap_HM_Smithy", new Vector3(-48.6f, 1.7f, 2.9f), new Vector3(-38.8f, -1.0f, 7.4f), 55f),       // ring 2: the smithy on R2_01 from the Ring Lane (forge bay toward the camera)
+            ("Cap_HM_Schoolhouse", new Vector3(-44.4f, 1.7f, -39.7f), new Vector3(-38.2f, -1.5f, -30.9f), 55f), // ring 2: the schoolhouse on R2_03 from the Ring Lane
+            ("Cap_HM_Mill", new Vector3(70.8f, 2.0f, -74.3f), new Vector3(71.2f, -6.0f, -59.5f), 55f),        // the mill's front and wheel side from the stream below
             ("Cap_HM_Bakery", new Vector3(-6.2f, 1.65f, 2.6f), new Vector3(-12.5f, 3.4f, 12.2f), 55f),       // from the square at the bakery front on F02 (oven side on the right)
             ("Cap_HM_HeroesHome", new Vector3(1.5f, 1.65f, -2.0f), new Vector3(12.0f, 3.6f, 12.5f), 50f),    // from the fountain at the heroes' home: Wren's list, the lit door, the annex above
             ("Cap_HM_HeroesAnnex", new Vector3(19.0f, 1.65f, 20.8f), new Vector3(11.8f, 6.6f, 24.5f), 55f),  // from the keep stair head at the bell-loft annex door and loft
@@ -339,6 +342,10 @@ namespace SleepingCalamity.EditorTools
                     break;
                 case HollowmereLayout.BuildingKind.Inn when HollowmereInnArt.TryPlaceInn(g, f, 0.25f):   // on the footing slab's top
                     break;
+                case HollowmereLayout.BuildingKind.Smithy when HollowmereArt.TryPlaceBuilding(HollowmereArt.Smithy, g, f, 0.25f):
+                    break;
+                case HollowmereLayout.BuildingKind.Schoolhouse when HollowmereArt.TryPlaceBuilding(HollowmereArt.Schoolhouse, g, f, 0.25f):
+                    break;
                 default:
                     Building(g, f, kind);
                     break;
@@ -599,6 +606,7 @@ namespace SleepingCalamity.EditorTools
                     }
                     break;
                 case LandmarkKind.Mill:
+                    if (HollowmereArt.TryPlaceMill(g, rebuilt)) break;   // Q2 art (sc_mill.py): Shell when ruined, restored Frame + wheel and door when rebuilt
                     if (rebuilt)
                     {
                         LookTestBuilder.Box(g, "Walls", new Vector3(0f, 3f, 0f), new Vector3(sx, 6f, sz), stone, default, 2f);
