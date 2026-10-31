@@ -248,7 +248,7 @@ namespace SleepingCalamity.Presentation
         }
 
         // ------------------------------------------------------------------------------------------------ lamps
-        // Room Lantern sockets hang on their wall; a room without one gets a centre lamp; every third corridor cell gets a ceiling lamp.
+        // Room Lantern sockets hang on their wall; a room without one gets a centre lamp; every other corridor cell (checkerboard) gets a ceiling lamp.
         static void Lamps(CellarFloorLayout layout, Grid grid, Transform group, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
         {
             for (int r = 0; r < layout.Rooms.Count; r++)
@@ -279,7 +279,7 @@ namespace SleepingCalamity.Presentation
             }
             foreach (PlacedCorridor c in layout.Corridors)
             {
-                if ((c.X + c.Y) % 3 != 0) continue;
+                if ((c.X + c.Y) % 2 != 0) continue;
                 Transform kl = Lamp(group, "Lamp_c" + c.X + "_" + c.Y, CellCenter(c.X, c.Y) + new Vector3(0, 3.0f, 0), kit, mats, CorridorLampIntensity, 9f, false);
                 Chain(kl, mats, CorridorSpring + VaultRise);
                 result.Lamps++;

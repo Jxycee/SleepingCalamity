@@ -21,7 +21,7 @@ namespace SleepingCalamity.EditorTools
         public const string ScenePath = "Assets/_Project/Scenes/CellarFloorTest.unity";
         public const uint Seed = 12345;
         public const int FloorNumber = 1;
-        const float Ambient = 0.55f;
+        const float Ambient = 0.8f;
         const string MaterialsFolder = "Assets/_Project/Content/Materials/CellarFloor";
         const string LanternFolder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
         static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate" };
@@ -102,7 +102,7 @@ namespace SleepingCalamity.EditorTools
             var (corPos, corTarget) = CorridorView(layout);
             LookTestBuilder.AddCapture(cams, "Floor_Corridor", corPos, corTarget, 70f);
             DungeonCornerBuilder.DarkBackground(cams);
-            foreach (Camera cc in cams.GetComponentsInChildren<Camera>(true)) cc.backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // warm umber backdrop instead of the corner's teal-black void
+            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // the roofless cutaway: warm umber backdrop; the vaulted views keep the corner's near-black
 
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);

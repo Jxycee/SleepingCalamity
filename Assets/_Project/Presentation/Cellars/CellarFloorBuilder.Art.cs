@@ -21,7 +21,7 @@ namespace SleepingCalamity.Presentation
     {
         public const string VaultGroup = "Vaults", CeilingGroup = "Ceiling", FaceGroup = "Faces", DressingGroup = "Dressing";
         public const float RoomSpring = 2.6f, CorridorSpring = 1.6f, VaultHalfSpan = 2.0f, VaultRise = 2.5f;
-        public const float WallLampIntensity = 9f, CentreLampIntensity = 9f, CorridorLampIntensity = 5f;
+        public const float WallLampIntensity = 18f, CentreLampIntensity = 18f, CorridorLampIntensity = 11f;
         const float FaceDepth = 0.2f, KitAcross = 0.725f;   // VaultSegment / ArchRib (5 m inside, 6 m outside): 0.725 keeps the outer wall face 2.175 m from the axis, just behind a neighbour's 0.2 m face, inner face 1.83 m (on the wall colliders)
         static readonly Color CandleGold = new Color(1.0f, 0.72f, 0.44f), FillGold = new Color(1.0f, 0.76f, 0.52f);
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
@@ -114,7 +114,9 @@ namespace SleepingCalamity.Presentation
                                 CandleCluster(dressing, mats, sill, "niche_" + sid, -d * 0.12f + new Vector3(0, 0.25f, 0)); result.Candles++;
                             }
                             else if (room && across) face = PlacePiece(kit, "EndWall", faces, "EndWall_" + sid, facePlane, inward, kitScale);
-                            if (face == null)
+                            if (face != null)   // the B5 end walls are arch-topped (the 6 m vault's profile): a limewash backing fills the spandrels to 3.6 m
+                                Box(faces, "Backing_" + sid, c + d * (CellSize * 0.5f - 0.05f) + new Vector3(0, WallHeight * 0.5f, 0), Size(alongEdge, WallHeight, 0.1f, ns), mats.Limewash, 2f, false);
+                            else
                                 Box(faces, "Face_" + sid, faceMid + new Vector3(0, WallHeight * 0.5f, 0), Size(alongEdge, WallHeight, FaceDepth, ns),
                                     room && across ? mats.Limewash : mats.Wall, 2f, false);
                             result.Faces++;
@@ -152,7 +154,7 @@ namespace SleepingCalamity.Presentation
                 PlacedRoom p = layout.Rooms[r];
                 Vector3 a = CellCenter(p.X, p.Y), b = CellCenter(p.X + p.Width - 1, p.Y + p.Height - 1);
                 float span = Mathf.Max(p.Width, p.Height) * CellSize;
-                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, 1.6f, 0), FillGold, 2.2f, span * 0.75f + 2f);
+                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, 1.8f, 0), FillGold, 4f, span * 0.75f + 2f);
             }
             if (kit.Mote != null)
                 foreach (Transform lamp in root.Find(LampGroup))
