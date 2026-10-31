@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Town polish 2: wall stone, merlons, ruined clutter
-Progress: 45% (wall fixes 1+2 exported: 10 wall FBX + 2 gates, new Wall_Straight_A/B_Ruined; Blender preview sheet reviewed; waiting for the Unity editor download and Q14 on main)
+Progress: 55% (wall fixes exported + Cap_HM_WallRun camera; in-engine capture WallRun/LowerGate/EastGate running; Q14 clutter not on main yet; Q15 merges before my check per coordinator)
 Sheet: Blender preview (scratch); in-engine captures next
 Needs: -
 Blocker: none
