@@ -19,8 +19,10 @@
 // the exit. The key sits in a KeyCandidate chest of another combat room; the gate-key carrier is one random spawn of a non-locked combat room.
 // Chests: every chest slot of every room, plus a chest at the end of a side dead end when the rooms alone fall short of the 6-8 target (PickRooms keeps
 // the room slots at 3 or more, and a floor has 1-3 dead ends, so the target is always reachable).
-// Retries: placement is retried inside one RNG stream (MaxAttempts whole attempts, RoomTries positions per room); if every attempt fails Generate throws,
-// so the 10,000-seed test surfaces it.
+// Retries: placement is retried inside one RNG stream (MaxAttempts whole attempts, RoomTries positions per room). Generate never throws for a valid floor:
+// if room picking or placement is exhausted it retries over derived streams (Rng.Derive(seed, "cellars.retry", floor<<32 | n)), and as a last resort
+// builds MinimalPlan (the 2-3 smallest unlocked combat rooms) over derived streams. Retry 0 is the original stream, so seeds that worked keep their floor.
+// Generate(seed, floor, out fallback) reports 0 / 1 (retry) / 2 (last resort) so tests can count them.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,7 +43,7 @@ namespace SleepingCalamity.Core
 
     public static class CellarFloorGenerator
     {
-        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92;
+        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16;
         const int G = CellarFloorLayout.GridSize;
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
@@ -62,6 +64,40 @@ namespace SleepingCalamity.Core
         public static CellarFloorPlan PickRooms(uint seed, int floor)
         {
             if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "PickRooms is for floors 1-3");
+            return PickRooms(seed, floor, out _);
+        }
+
+        // fallback: 0 = original stream, 1 = a retry stream, 2 = the minimal plan.
+        public static CellarFloorPlan PickRooms(uint seed, int floor, out int fallback)
+        {
+            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "PickRooms is for floors 1-3");
+            for (int retry = 0; retry <= PlanRetries; retry++)
+            {
+                CellarFloorPlan p = TryPickRooms(seed, floor, retry);
+                if (p != null) { fallback = retry == 0 ? 0 : 1; return p; }
+            }
+            fallback = 2;
+            return MinimalPlan(seed, floor);
+        }
+
+        // The guaranteed fallback plan: the smallest combat rooms (area, then id) that the previous floor did not use, unlocked. 3 rooms (2 on floor 2, which
+        // also holds the checkpoint). Pure in (seed, floor).
+        public static CellarFloorPlan MinimalPlan(uint seed, int floor)
+        {
+            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "MinimalPlan is for floors 1-3");
+            var excluded = new HashSet<string>();   // lookups only
+            if (floor > 1) foreach (CellarRoom r in PickRooms(seed, floor - 1).Combat) excluded.Add(r.Id);
+            var cand = new List<CellarRoom>();
+            foreach (CellarRoom r in CellarRoomPool.All) if (r.Kind == RoomKind.Combat && r.LockedDoor == null && !excluded.Contains(r.Id)) cand.Add(r);
+            cand.Sort((a, b) => { int c = (a.Width * a.Height).CompareTo(b.Width * b.Height); return c != 0 ? c : string.CompareOrdinal(a.Id, b.Id); });
+            int count = floor == 2 ? 2 : 3;
+            return new CellarFloorPlan(floor, (SubTheme)floor, false, floor == 2, cand.GetRange(0, count), null, null, 6);
+        }
+
+        // One full pass of the room picking over its own RNG stream (retry 0 is the original stream, so existing seeds keep their plan). Null when the
+        // 400 inner attempts all fail.
+        static CellarFloorPlan TryPickRooms(uint seed, int floor, int retry)
+        {
             SubTheme theme = (SubTheme)floor;
             var excluded = new HashSet<string>();   // lookups only
             if (floor > 1) foreach (CellarRoom r in PickRooms(seed, floor - 1).Combat) excluded.Add(r.Id);
@@ -69,7 +105,7 @@ namespace SleepingCalamity.Core
             foreach (CellarRoom r in CellarRoomPool.All) if (r.Kind == RoomKind.Combat && !excluded.Contains(r.Id)) all.Add(r);
             SubTheme[] others = new[] { SubTheme.Larder, SubTheme.WineVault, SubTheme.CoalCellar }.Where(t => t != theme).ToArray();
             bool cp = floor == 2;
-            var rng = new Pcg32(Rng.Derive(seed, "cellars.rooms", (ulong)floor));
+            var rng = new Pcg32(retry == 0 ? Rng.Derive(seed, "cellars.rooms", (ulong)floor) : Rng.Derive(seed, "cellars.retry", ((ulong)floor << 32) | (uint)retry));
             bool wantLocked = rng.Range(0, 2) == 1;             // the 50% coin is flipped once, so the room-set rejections below cannot skew it
             for (int attempt = 0; attempt < 400; attempt++)
             {
@@ -112,24 +148,55 @@ namespace SleepingCalamity.Core
                 int target = rng.Range(6, 9);
                 return new CellarFloorPlan(floor, theme, locked, cp, picked, locked ? picked[0] : null, locked ? picked[1] : null, target);
             }
-            throw new InvalidOperationException("PickRooms: no room set for seed " + seed + " floor " + floor);
+            return null;
         }
 
         // ---- generation ----
 
-        public static CellarFloorLayout Generate(uint seed, int floor)
+        public static CellarFloorLayout Generate(uint seed, int floor) => Generate(seed, floor, out _);
+
+        // fallback: 0 = the primary stream worked, 1 = a retry stream (room picking or placement) was needed, 2 = the minimal-plan last resort was used.
+        // Deterministic in (seed, floor) whatever the fallback.
+        public static CellarFloorLayout Generate(uint seed, int floor, out int fallback)
         {
+            fallback = 0;
             if (floor == 4) return BuildStub(seed);
             if (floor < 1 || floor > 4) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-4");
-            CellarFloorPlan plan = PickRooms(seed, floor);
-            var b = new Builder(new Pcg32(FloorSeed(seed, floor)));
-            for (int attempt = 0; attempt < MaxAttempts; attempt++)
+            CellarFloorPlan plan = PickRooms(seed, floor, out fallback);
+            for (int retry = 0; retry <= BuildRetries; retry++)
+            {
+                ulong stream = retry == 0 ? FloorSeed(seed, floor) : Rng.Derive(seed, "cellars.retry", ((ulong)floor << 32) | (uint)(0x10000 + retry));
+                CellarFloorLayout l = BuildWith(seed, plan, stream, MaxAttempts);
+                if (l != null) { if (retry > 0 && fallback == 0) fallback = 1; return l; }
+            }
+            fallback = 2;
+            return GenerateLastResort(seed, floor);
+        }
+
+        // The last resort on its own (public so a test can force it): the minimal plan, built over up to LastResortStreams streams. It cannot fail for
+        // the pool's small rooms; the throw is the unreachable end.
+        public static CellarFloorLayout GenerateLastResort(uint seed, int floor)
+        {
+            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-3");
+            CellarFloorPlan plan = MinimalPlan(seed, floor);
+            for (int n = 0; n < LastResortStreams; n++)
+            {
+                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts);
+                if (l != null) return l;
+            }
+            throw new InvalidOperationException("CellarFloorGenerator: even the minimal plan did not place for seed " + seed + " floor " + floor);
+        }
+
+        static CellarFloorLayout BuildWith(uint seed, CellarFloorPlan plan, ulong stream, int attempts)
+        {
+            var b = new Builder(new Pcg32(stream));
+            for (int attempt = 0; attempt < attempts; attempt++)
             {
                 b.Reset();
                 CellarFloorLayout l = b.TryBuild(seed, plan, attempt);
                 if (l != null) return l;
             }
-            throw new InvalidOperationException("CellarFloorGenerator: no layout for seed " + seed + " floor " + floor + " in " + MaxAttempts + " attempts (lost at placement " + b.Fails[0] + ", loops " + b.Fails[1] + ", dead ends " + b.Fails[2] + ", carriers " + b.Fails[3] + ")");
+            return null;
         }
 
         // Floor 4 PLACEHOLDER. The real floor 4 is the taken bakery's oven maze with the baker asleep at its heart and the Dough Warden on guard (PHASE1

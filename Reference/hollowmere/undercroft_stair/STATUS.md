@@ -1,13 +1,14 @@
-State: IN PROGRESS
+State: DONE
 Session: Q13. The Undercroft stair: heroes' home to the Cellars
-Progress: 90%
+Progress: 100%
 Sheet: Reference/hollowmere/undercroft_stair/SHEET_undercroft_stair_final.jpg
 Blocker: none
+Archive: ready
 
 Score: final 28.5/40 (r3 28 (r1 24.5, r2 25.5; coordinator cap 3 rounds reached; target 29.5 not reached) (target 29.5 = r1 + 5; floor 25)
 Tris: CellarStair 13,500 (StairFlight 3,748, StairTurn 3,724, StairDoor 6,028; budget 20k)
 SC RESULT: check PASS on ee547d0 (build PASS, test-edit 681/681, test-play 32 passed / 8 skipped / 0 failed); re-check on the final tip pending after review
-Merge commit: -
+Merge commit: 4b89894
 
 ## Log
 - 2026-10-31: started on branch claude/beautiful-sagan-1xmzq1. Reading the B5 kit generator, DungeonCornerBuilder and the heroes' home layout rows.
