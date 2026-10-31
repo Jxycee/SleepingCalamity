@@ -34,14 +34,16 @@ tileable's measured hue #b9a07a (Art/Textures/B1_town/SOURCES.md).
       [--views wide,mid,close,tq] [--moods noon,lowsun] [--no-render]
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 
-Status (2026-10-31, cloud): look rounds 1-5 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28 -> 29.5 -> 30.5/40:
+Status (2026-10-31, cloud): look rounds 1-6 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28 -> 29.5 -> 30.5 -> 31/40:
 round 2 dropped the dish and beast 0.30 m into the 38 deg close camera, fixed the values, tide line, ground-line damp
 and the ruff; round 3 added the shaft flutes, rosier and paler replacement stones, rain streaks under the coping, a
 clean dish and a paler seat; round 4 gave the beast puffy shut lids with lid lines deep enough to bake, twisted locks of
 varied length in the ruff, loose threads at the banner's tears and hem, and sun-bleached banner edges; round 5 (the controller's 4K in-engine note: the beast read awake, its deep nostril
 holes looked like two open eyes) made it read asleep: small shallow nostril slits on a low flat nose pad, sagging
 crescent lid lines cut deeper, a low relaxed brow drooping outward, slumped cheeks, a more lolling head, one slack
-mouth slit round the spout bore, and the beast's tail draped round the column under the dish. Beside the
+mouth slit round the spout bore, and the beast's tail draped round the column under the dish; round 6 (in-engine: the snout read as a pig's disc with two round nostrils)
+built a lion's muzzle: a broad bridge down from the brow, a heart-shaped nose pad with curled nostril slits, two puffy
+whisker pads with whisker pits either side of a groove, and heavier shut lids. Beside the
 fountain refs (Reference/hollowmere/fountain/) the gap is weathering: the real basins carry darker grey-green patina low
 down and more tone change between stones; bc_109 stands on two wide steps. Bake proof (round 3) (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
 BannerPole high 0.79M -> low 8,996 (57.7k together, in the T4 30-60k band); at 1024 the closed-eye lid lines soften
@@ -416,13 +418,18 @@ def beast():
     obs = [blob('chest', (-0.05, 0.0, 0.03), (0.21, 0.25, 0.15), tilt=False),
            blob('cranium', (0.02, 0.0, 0.27), (0.24, 0.27, 0.23)),
            blob('muzzle', (0.21, 0.0, 0.19), (0.15, 0.16, 0.11)),
-           blob('nose', (0.33, 0.0, 0.225), (0.045, 0.085, 0.034)),   # a broad flat nose pad, low on the muzzle
+           # a lion's muzzle, not a pig's disc: a broad bridge down from the brow to a heart-shaped nose pad,
+           # two puffy whisker pads under it either side of a groove, the mouth below them
+           blob('bridge', (0.27, 0.0, 0.275), (0.10, 0.055, 0.04), rot=Matrix.Rotation(math.radians(-18), 4, 'Y')),
+           blob('noseL', (0.335, 0.03, 0.238), (0.036, 0.04, 0.027)), blob('noseR', (0.335, -0.03, 0.238), (0.036, 0.04, 0.027)),
+           blob('nosetip', (0.348, 0.0, 0.214), (0.03, 0.03, 0.022)),
            blob('chin', (0.18, 0.0, 0.065), (0.10, 0.12, 0.06))]
     for s in (1, -1):
         obs.append(blob(f'jowl{s}', (0.215, s * 0.11, 0.10), (0.105, 0.105, 0.095)))   # cheeks slumped low, dozing
         e = EYE[(1 - s) // 2]
-        obs.append(blob(f'eyemound{s}', e, (0.056, 0.068, 0.047)))     # a puffy shut lid, and the fold above it
-        obs.append(blob(f'lidfold{s}', (e[0] + 0.006, e[1], e[2] + 0.026), (0.042, 0.07, 0.024)))
+        obs.append(blob(f'eyemound{s}', e, (0.058, 0.07, 0.05)))       # a heavy shut lid, and the fold above it
+        obs.append(blob(f'lidfold{s}', (e[0] + 0.01, e[1], e[2] + 0.024), (0.046, 0.074, 0.028)))
+        obs.append(blob(f'whisker{s}', (0.302, s * 0.048, 0.168), (0.056, 0.058, 0.046)))
         # a relaxed brow: low, soft, drooping toward the outer corner (never arched, which reads surprised)
         brow = [HW((0.195 + 0.025 * math.cos(u), s * (0.118 + 0.065 * math.sin(u)), 0.352 + 0.006 * math.cos(u) - 0.016 * math.sin(u))) for u in np.linspace(-1.4, 1.4, 16)]
         obs.append(K.tube(f'brow{s}', brow, 0.02, 12, radii=[0.012 + 0.01 * math.cos(u) for u in np.linspace(-1.4, 1.4, 16)]))
@@ -463,14 +470,18 @@ def beast_cuts(ob):
             b = a + Vector((0.0, s * 0.012 * (u + 0.3), -0.02))
             cut.append(_snap_tube(bvh, f'lash{s}{k}', [HW(a.lerp(b, t)) for t in np.linspace(0, 1, 5)], 0.0055, 6))
         # nostrils: small shallow slits curling outward, not deep holes (deep dark holes read as wide-open eyes)
-        ns = [HW((0.372, s * (0.018 + 0.026 * t), 0.222 + 0.008 * t - 0.012 * t * t)) for t in np.linspace(0, 1, 6)]
-        cut.append(_snap_tube(bvh, f'nostril{s}', ns, 0.006, 8, radii=[0.004 + 0.003 * math.sin(math.pi * t) for t in np.linspace(0, 1, 6)]))
+        ns = [HW((0.37, s * (0.012 + 0.03 * t), 0.226 + 0.012 * t - 0.018 * t * t)) for t in np.linspace(0, 1, 7)]
+        cut.append(_snap_tube(bvh, f'nostril{s}', ns, 0.006, 8, radii=[0.0035 + 0.0035 * math.sin(math.pi * t) for t in np.linspace(0, 1, 7)]))
+        for j, (dy, dz) in enumerate(((0.035, 0.18), (0.055, 0.17), (0.045, 0.152))):   # whisker pits on the pads
+            q = bvh.find_nearest(HW((0.36, s * dy, dz)))[0]
+            if q is not None: cut.append(sphere(f'whpit{s}{j}', q, 0.0065, (1, 1, 1), 12))
         ec = HW((-0.02, s * 0.25, 0.41)); out = (HW((0.04, s * 0.24, 0.41)) - ec).normalized()
         cup = sphere(f'earcup{s}', ec + out * 0.045, 0.04, (1.0, 1.0, 1.4)); cut.append(cup)
         for dy in (-0.021, 0.021):                                   # toe grooves
             pts = [HW((x, s * 0.12 + dy, 0.0), tilt=False) for x in np.linspace(0.27, 0.36, 6)]
             cut.append(_snap_tube(bvh, f'toeg{s}{dy}', pts, 0.006, 6))
     m = Vector(MOUTH)
+    cut.append(_snap_tube(bvh, 'philtrum', [HW((0.36, 0.0, z)) for z in np.linspace(0.198, 0.13, 6)], 0.006, 8))   # the groove between the pads
     for k, dy in enumerate(np.linspace(-0.05, 0.05, 9)):            # slack, a little open: one wide shallow slit, corners turned down
         mo = m + Vector((-0.004 * abs(dy) / 0.05, dy, -0.014 - 0.012 * (abs(dy) / 0.05) ** 2))
         cut.append(cyl(f'mouth{k}', HW(mo + Vector((0.04, 0, 0))), HW(mo - Vector((0.04, 0, 0.004))) - HW(mo + Vector((0.04, 0, 0))), 0.011, 0.07, back=0.0, seg=12))
