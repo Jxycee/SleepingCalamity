@@ -13,7 +13,7 @@ All geometry, bottles, jars and roots are original procedural meshes. References
 | Pillar | 220 | CV_VaultStone | 0.76 x 0.76, y 0..1.61 |
 | EndWall | 750 | CV_Brick, CV_Limewash | x -3..3, z -0.5..0, y 0..4.6 |
 | NicheWall | 8,700 | CV_Brick, CV_VaultStone, CV_Limewash, CV_Glass | as EndWall, sills to z +0.12 |
-| StairEntry | 2,876 | CV_Brick, CV_VaultStone, CV_Limewash | wall as EndWall, doorway 1.2 m, steps/tunnel z -4.01..-0.5 up to y 2.6 (tunnel top to 5.2) |
+| StairEntry | 2,876 | CV_Brick, CV_VaultStone, CV_Limewash | wall as EndWall, doorway 1.2 m, steps/tunnel z -4.01..-0.5 up to y 2.6 (tunnel top to 5.2); tunnel side walls are CV_VaultStone since 2026-10-31 (were brick), CV_Brick remains on the door ring and jambs; tris unchanged |
 | FloorTile | 1,772 | CV_Mortar, CV_Flagstone | x -1..1, z 0..2, top y 0 (mortar bed to -0.14) |
 | CoalChute | 4,170 | CV_Oak, CV_Iron, CV_Daylight, CV_Soot | x 0.84..2.53, z -0.7..0.7, y 0..3.02 |
 | LarderShelf | 4,824 | CV_Oak, CV_Iron, CV_Clay, CV_GlazeAmber, CV_GlazeCream, CV_Cheese | x -2.55..-2.05, z 0..2, y 0..2.29 |

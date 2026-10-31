@@ -80,7 +80,7 @@ namespace SleepingCalamity.EditorTools
         {
             const string folder = "Assets/_Project/Content/Rendering/_ProbeTmp";
             BuilderUtil.EnsureFolder(folder);
-            string path = folder + "/" + probe.transform.root.name + ".exr";
+            string path = folder + "/" + probe.transform.root.name + (probe.name == "ReflectionProbe" ? "" : "_" + probe.name) + ".exr";   // named probes (the water's) get their own file
             bool ok = Lightmapping.BakeReflectionProbe(probe, path);
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             var tex = AssetDatabase.LoadAssetAtPath<Texture>(path);

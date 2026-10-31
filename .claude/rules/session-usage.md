@@ -6,6 +6,7 @@ From the working sessions' own usage reviews (2026-10-31: bell tower, bakery and
 - One job per fresh session. A finished session sets `Archive: ready` and stops; it never takes the next job (the coordinator starts a new session).
 - The session's own turns plan, score and merge. Generators, render loops, Unity runs and fixes go to Sonnet subagents (`model: sonnet`) from the first step; scans, logs and mechanical edits go to Haiku (`model: haiku`). Don't do art loops in the controller.
 - One fresh subagent per step (build, capture, check) with a short brief. Don't resume a big agent: every resume re-reads its whole transcript. Stop an agent as soon as it reports.
+- In every new worktree run `git lfs checkout` first: a fresh worktree holds LFS pointer stubs and the first Unity run fails on texture import (cost the Q12 baseline run).
 - Run subagents in their own git worktree, so the controller checkout stays clean and the stop hook doesn't loop on uncommitted changes.
 - Read files by grep and line range, never whole. Read long Unity logs through a subagent summary.
 - Batch STATUS lines into real commits; no STATUS-only commits between milestones.
