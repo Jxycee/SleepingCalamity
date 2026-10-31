@@ -8,7 +8,7 @@ Blocker: none
 Job: QUEUE Q15, cloud session, branch claude/upbeat-meitner-64d6hn
 Score: r3 APPROVED by the coordinator ~27/40 (final round; my own read 29/40; r2 25 coordinator / 28 mine; r1 24)
 Tris: roadside props 606-5,376 per piece (table below); cards 7,093 quads (162 terrain trees + 10 roadside clumps, 4,339 ring trees, 2,582 hedgerow cards), ring + hills + ridge ~45k
-SC RESULT: SC RESULT check PASS on 14c9cfb (test-edit 718/718, test-play 33 passed / 8 skipped / 0 failed); main then moved (Q10 weir, polish merge), merged again in cbb1f14: rebuild + re-check running
+SC RESULT: SC RESULT check PASS on 0b01899 (test-edit 718/718, test-play 33 passed / 8 skipped / 0 failed); main then gained Asset changes again (Cellars floor art 0bc51ae, regenerated scenes): merged again, rebuild + re-check running
 Merge commit: none yet
 Next: -nographics rebuild + one check on the new tip, merge to main if PASS, then State DONE + Archive: ready
 Accepted weak points (coordinator): the R3_02 house blocks the RoadOut Rebuilt view; the haze band behind the tree line reads as a flat strip; the low-sun ridges are flat orange.
