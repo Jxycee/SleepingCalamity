@@ -52,6 +52,8 @@ Round log (look stage, ground with the flag ring and stand-ins):
   r9 (Unity feedback, 2026-10-31): wider tone spread between variants (k = 1 + 2.3 tint), dirt stain up to 3 mm
      under the crown, darker joint bed, ~1.6x crown relief; patch extended to x -12 (8,673 setts) so the wide
      camera never sees the west seam. Wide-camera ground value spread 19 -> 22 (p10 0.44 -> 0.41).
+  r10 (study note, TotK villages): no hard border; setts thin out into sparse sunken stones and dirt over ragged
+     2.5 m (west) and 1.5 m (east, south) bands, with `edge_grass` weed slots for B9; kicked-loose doorstep.
   The `damp` bed vertex colour is not read by the Unity shader yet: the CobbleBed tileable carries base moss alone.
   Parked ideas: docs/PARKING_LOT.md (B6 plaza ground).
 """
@@ -386,17 +388,36 @@ class Layout:
                     if self.place(v, x, z, base + da, sc, tol=0.16): break
         return self.stones
 
+def edge_thin(x, z, g):
+    """0..1 chance a sett is left out near the patch's west, east and south edges (bands 2.5, 1.5, 1.5 m, ragged by g)."""
+    e = min((x - X0) / 2.5, (X1 - x) / 1.5, (z - Z0) / 1.5)
+    t = 1.0 - P.smoothstep(e + (g - 0.5) * 0.9)
+    return min(1.0, t * 1.15)
+
 def heights_and_damage(stones):
     """Uneven heights, clustered sunken and tilted setts, missing setts, loose stones; weed slots for B9."""
     r = rng('damage')
     pts = np.array([[s['x'], 0.0, s['z']] for s in stones])
     und = (K.fbm(pts, 0.7, 3, 0.5, 11.0) - 0.5) * 2              # slow undulation
     clus = K.fbm(pts, 0.45, 2, 0.5, 23.0)                          # sinking clusters
+    ragn = K.fbm(pts, 0.9, 3, 0.5, 31.0)                           # ragged edge noise
     kept, loose, weeds = [], [], []
-    for s, u, c in zip(stones, und, clus):
+    for s, u, c, g in zip(stones, und, clus, ragn):
         x, z = s['x'], s['z']; rr = math.hypot(x, z); pw = path_weight(x, z)
         top = P.dish(rr) + 0.006 * u + r.gauss(0, 0.0018)
         tx, tz = r.gauss(0, 0.012), r.gauss(0, 0.012)
+        # no hard border: toward the west, east and south edges the setts thin out into sparse, sunken stones and dirt
+        th = edge_thin(x, z, g)
+        if th > 0:
+            if r.random() < th:
+                if r.random() < 0.12: weeds.append(dict(p=[x, P.dish(rr) - 0.02, z], kind='edge_grass'))
+                continue
+            top -= th * r.uniform(0.004, 0.02); tx += r.gauss(0, 0.05 * th); tz += r.gauss(0, 0.05 * th)
+        # the doorstep: feet have kicked the setts loose, worn dirt shows
+        dx, dz = (x - DOOR_U[0]) / 0.95, (z - (DOOR_U[1] - 0.2)) / 0.6
+        if dx * dx + dz * dz < 1.0:
+            if r.random() < 0.35 * (1 - (dx * dx + dz * dz)): continue
+            top -= r.uniform(0.0, 0.012)
         near_ring = P.smoothstep(1.0 - (rr - P.RING_R) / 2.0)
         sink_p = 0.03 + 0.25 * P.smoothstep((c - 0.58) / 0.12) + 0.06 * near_ring
         if r.random() < sink_p:
