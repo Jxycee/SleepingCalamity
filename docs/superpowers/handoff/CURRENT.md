@@ -1,6 +1,8 @@
 # CURRENT: Sleeping Calamity running handoff
 
 ## Now
+- ~17:50 UTC: **Q9 keep merged** `7bac761` (`SC RESULT check PASS` on `dcd944d`: test-edit 681, test-play 32 + 8 skipped; keep hall shell/restored + terrace kit). Bakery session DONE, Archive: ready. Usage rule (user): ~0.3%/min per 5 h window; keep >=1 local PC session active. Paused for usage: Q14, Q15; running Q6 (merging), Q10, Q11, Q12 (local), Q13. Finished remote branches to delete (classifier blocked the coordinator): brave-keller, cool-ritchie, practical-tesla, sharp-goldberg, sweet-bardeen, tender-dirac, zen-noether.
+- ~17:15 UTC: 5 h window reset (17:10-22:10; weekly 57%). User: go ahead, make older sessions finish and mark archive-ready. Started **Q12 look** (local PC session `local_4168d8ab`, own worktree, GPU captures), **Q14 clutter** and **Q15 Saltwake road** (cloud). 8 running: Q6 (cabbage approved by the user, merging), Q9 (Bakery's last job), Q10, Q11, Q13, Q12, Q14, Q15. Archive ready for the user: Bell tower, Square ground (+ earlier list). All QUEUE items now started.
 - ~17:05 UTC: **Q8 town wall merged** `ca383a8` (`SC RESULT check PASS` on `89e641b`: test-edit 680, test-play 32 + 8 skipped; 52 wall modules, Lower + East gatehouses shell/restored; coordinator ~28/40). Bell tower session DONE, Archive: ready. Q11 + Q13 resumed (were paused for usage). **Q12 look pass unblocked** (start on the user's next desktop message, local PC session for GPU captures). Usage-waste answers being collected (side notes `usage-waste-answers.md`); fixes follow.
 - ~16:20 UTC: user: "keep a manageable amount of sessions that will keep us working into the limit, raise it a bit after the limit resets". Bakery resumed on Q9; started cloud **Q10 lake** (`claude/eloquent-faraday-bha6xz`), **Q11 lanes** (`claude/zen-feynman-991yav`), **Q13 Undercroft stair** (`claude/beautiful-sagan-1xmzq1`), all reporting. 6 running (Q6, Q8, Q9, Q10, Q11, Q13). Board names now match sidebar titles (STATUS `Session:` = sidebar title, job on `Job:`, c270443). Unstarted: Q12, Q14, Q15 (need a user desktop message).
 - ~16:00 UTC: **DUNGEON CORNER APPROVED by the user** ("make it a bit less orange and then I approve", 2026-10-31) now that the pass merged: `2ebceb6` (branch check `SC RESULT check PASS` on `05932d2`: test-edit 670, test-play 32 + 8 skipped; paler gold, deeper grey-brown darks, probe 0.35). M9 both corners done. Same merge brought Q9 keep hall + terrace art; Q9 integration resumes after the 17:10 reset.
@@ -10,7 +12,7 @@
 
 ## Next
 1. 17:10 UTC reset: resume the Bakery session (dungeon polish, then Q9 keep integration); pacing cron `4,24,44`, log `C:/Users/jayce/.claude/coordinator/_paused.txt`.
-2. On the user's next desktop message: start Q12, Q14, Q15 (`Reference/hollowmere/QUEUE.md`) as NEW cloud sessions (env "SleepingCalamity Cloud", one job each), within pacing; Q12 look pass after Q8 merges.
+2. Review sheets as they land; QUEUE is exhausted after Q15: plan the next batch with the user (local PC sessions are always available).
 3. Merge Q6 garden on green check; turn the sessions' usage-waste answers into brief/skill rules. Older history: `history-2026-10-31.md`. The user owes: `USER_TODO.md` (Mixamo clips, 2-player walks).
 
 ## Branches and worktrees
