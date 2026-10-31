@@ -102,7 +102,7 @@ namespace SleepingCalamity.EditorTools
 
         static float R(System.Random r, float a, float b) => a + (float)r.NextDouble() * (b - a);
         static T Pick<T>(System.Random r, T[] a) => a[r.Next(a.Length)];
-        static float YawFacing(float nx, float nz) => Mathf.Atan2(-nx, -nz) * Mathf.Rad2Deg;   // the models' leaves look toward their local -Z
+        static float YawFacing(float nx, float nz) => Mathf.Atan2(nx, nz) * Mathf.Rad2Deg;   // the imported meshes carry their leaves on local +Z (mesh bounds, first capture showed the back faces)
 
         static Transform Group(Transform parent, string name)
         {
@@ -179,7 +179,7 @@ namespace SleepingCalamity.EditorTools
             }
             data.SetDetailResolution(DetailRes, DetailPatch);
             data.detailPrototypes = protos;
-            data.detailScatterMode = DetailScatterMode.InstanceCountMode;
+            data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
 
             float[,,] splat = data.GetAlphamaps(0, 0, data.alphamapResolution, data.alphamapResolution);
             int sr = data.alphamapResolution;
@@ -513,7 +513,7 @@ namespace SleepingCalamity.EditorTools
             void Facade(float x, bool mirror, float s)
             {
                 float y = G(t, x, face - 0.3f);
-                Put(g, "Ivy_Facade", new Vector3(x, y, face - 0.03f), 0f, s, mirror);
+                Put(g, "Ivy_Facade", new Vector3(x, y, face - 0.03f), 180f, s, !mirror);   // yaw 180: leaves to -Z, so local -x (dense side) is world +x
                 taken.Add(x);
             }
 
@@ -544,14 +544,14 @@ namespace SleepingCalamity.EditorTools
                 {
                     float x = R(rng, a + 1f, b - 1f);
                     if (NearButtress(x, 0.7f) || Taken(x, 1.8f)) continue;
-                    Put(g, rng.Next(2) == 0 ? "Ivy_Patch_A" : "Ivy_Patch_B", new Vector3(x, G(t, x, face - 0.3f) + R(rng, 0.3f, 2.6f), face - 0.03f), 0f, R(rng, 1.0f, 1.4f), rng.Next(2) == 0);
+                    Put(g, rng.Next(2) == 0 ? "Ivy_Patch_A" : "Ivy_Patch_B", new Vector3(x, G(t, x, face - 0.3f) + R(rng, 0.3f, 2.6f), face - 0.03f), 180f, R(rng, 1.0f, 1.4f), rng.Next(2) == 0);
                 }
                 for (float x = a + 0.75f; x < b - 0.75f; x += 1.5f)
                 {
                     if (rng.NextDouble() > (ruined ? 0.55 : 0.3) || NearButtress(x, 0.75f)) continue;
                     if (Blocked(t, x, face - 0.35f, null, 0f)) continue;
-                    Put(g, "Grass_Strip", new Vector3(x, G(t, x, face - 0.3f), face - 0.02f), 0f, R(rng, 0.9f, 1.15f));
-                    if (rng.NextDouble() < (ruined ? 0.5 : 0.2)) Put(g, Pick(rng, Weeds), new Vector3(x + R(rng, -0.4f, 0.4f), G(t, x, face - 0.4f), face - 0.3f), R(rng, -20f, 20f) + (rng.Next(2) == 0 ? 0f : 180f), R(rng, 0.9f, 1.3f));
+                    Put(g, "Grass_Strip", new Vector3(x, G(t, x, face - 0.3f), face - 0.02f), 180f, R(rng, 0.9f, 1.15f));
+                    if (rng.NextDouble() < (ruined ? 0.5 : 0.2)) Put(g, Pick(rng, Weeds), new Vector3(x + R(rng, -0.4f, 0.4f), G(t, x, face - 0.4f), face - 0.3f), 180f + R(rng, -20f, 20f) + (rng.Next(2) == 0 ? 0f : 180f), R(rng, 0.9f, 1.3f));
                 }
             }
         }

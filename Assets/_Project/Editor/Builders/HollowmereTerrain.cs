@@ -172,8 +172,8 @@ namespace SleepingCalamity.EditorTools
                             if (f.Footprint.Contains(p, 1.2f)) { path = Mathf.Max(path, 0.75f); soil = Mathf.Max(soil, Smooth(0.55f, 0.75f, big + n1)); break; }
                         foreach (Landmark l in t.Landmarks)
                             if (l.Footprint.Contains(p, 1.0f)) { path = Mathf.Max(path, 0.6f); break; }
-                        path = Mathf.Max(path, 0.45f * Smooth(0.58f, 0.72f, big));                          // dry meadow patches
-                        soil = Mathf.Max(soil, 0.6f * Smooth(0.62f, 0.7f, Mathf.PerlinNoise(x * 0.09f + 77f, z * 0.09f + 19f)) * (1f - Smooth(0.3f, 0.5f, big)));   // bare spots
+                        path = Mathf.Max(path, 0.28f * Smooth(0.55f, 0.80f, big));                          // dry meadow patches
+                        soil = Mathf.Max(soil, 0.35f * Smooth(0.62f, 0.75f, Mathf.PerlinNoise(x * 0.09f + 77f, z * 0.09f + 19f)) * (1f - Smooth(0.3f, 0.5f, big)));   // bare spots
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
                         grass = Mathf.Max(0f, 1f - soil - path);
@@ -190,6 +190,11 @@ namespace SleepingCalamity.EditorTools
             foreach (Lane lane in t.Lanes) d = Mathf.Min(d, HollowmereLayout.DistanceToPolyline(p, lane.Points) - lane.Width * 0.5f);
             return d;
         }
+
+        // The paved areas that are not lanes: the square (the corner's surround paving slab) and the keep terrace's top beside the stairs and gate.
+        static bool IsPavedArea(float x, float z) =>
+            (x >= HollowmereLayout.SquareMinX && x <= HollowmereLayout.SquareMaxX && z >= HollowmereLayout.SquareMinZ && z <= HollowmereLayout.SquareMaxZ)
+            || (Mathf.Abs(x) < HollowmereLayout.KeepHalfWidth && z > HollowmereLayout.KeepWallZ - 0.2f && z < HollowmereLayout.KeepWallZ + 11f);
 
         public static bool IsPaved(TownLayout t, float x, float z) => IsPavedArea(x, z) || LaneEdge(t, new TownPoint(x, z)) < 0f;
 
