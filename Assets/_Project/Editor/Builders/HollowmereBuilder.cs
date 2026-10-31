@@ -5,9 +5,11 @@
 // bare frames; the belfry empty; the mill a roofless shell) and Rebuilt (ring 1 by HollowmereLayout.RebuiltBuilding: bakery and inn on L lots, homes on M/S,
 // the approved facade on F01, three lots left empty; rings 2-3 as home massing with a few gardens). Each building block faces its lot's default door side.
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
-// BeautyCornerBuilder.PlaceRow at their corner positions; the B8 stall is reused for stalls 2 and 3; the B4 bell tower when its folder exists; the heroes' home from Ring1/HeroesHome (HeroesHomeArt). Everything
-// else is greybox on the LookTest materials. Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
-// approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
+// BeautyCornerBuilder.PlaceRow at their corner positions; the three stalls are the Wave 1 Ring1/Stalls art (ruined or rebuilt state), else the B8 stall; the B4 bell tower when its folder exists;
+// the heroes' home from Ring1/HeroesHome (HeroesHomeArt). Everything else is greybox on the LookTest materials, except the buildings whose final export is in
+// (HollowmereArt: the bakery). Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the approved corner looks
+// the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
+// Ruins: every empty lot shows its ruin kit variant (RuinVariant, RuinTurn); a placed building or garden switches it off.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
 using System;
 using System.Collections.Generic;
@@ -43,7 +45,9 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_LakeShore", new Vector3(-26f, 1.7f, -88f), new Vector3(-2f, 3f, -20f), 50f),       // from the lake shore by R3_01 up at the hill town and the keep
             ("Cap_HM_MarketStreet", new Vector3(0.6f, 1.65f, -19.8f), new Vector3(-0.5f, -6.5f, -58f), 55f), // the square's south edge down Market Street to the second terrace and the wall
             ("Cap_HM_KeepStairs", new Vector3(-31f, 1.7f, 13.8f), new Vector3(-20f, 3.0f, 19.6f), 58f),  // along the Wall Ginnel: terrace step, west stair, keep wall
+            ("Cap_HM_Bakery", new Vector3(-6.2f, 1.65f, 2.6f), new Vector3(-12.5f, 3.4f, 12.2f), 55f),       // from the square at the bakery front on F02 (oven side on the right)
             ("Cap_HM_KeepWall", new Vector3(-2f, 1.65f, -3f), new Vector3(2f, 3.2f, 19.6f), 60f),          // from the fountain: keep wall, buttresses, planters, stairs (Ruined shows it whole)
+            ("Cap_HM_Ruins", new Vector3(-15.5f, 1.65f, -1.5f), new Vector3(-26f, 0.2f, -8f), 50f),          // from the square's west side over the F03 and F05 ruins
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
@@ -57,6 +61,7 @@ namespace SleepingCalamity.EditorTools
 
         public static void Build()
         {
+            RuinCache.Clear(); ruinFoliage = null;
             TownLayout layout = HollowmereLayout.Create();
             List<string> errors = layout.Validate();
             if (errors.Count > 0) throw new InvalidOperationException("Hollowmere layout invalid (" + errors.Count + "): " + string.Join("; ", errors.Take(20)));
@@ -111,7 +116,8 @@ namespace SleepingCalamity.EditorTools
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows)
             {
                 if (row.Id.StartsWith("NEIGHBOUR_", StringComparison.Ordinal)) continue;
-                BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, row);
+                BeautyCornerTable.Row placed = StallFolder("Stall_1") != null ? WithoutStallDressing(row) : row;   // the produce stall art carries its own goods and lantern
+                if (placed != null) BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, placed);
             }
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt); }
@@ -297,12 +303,16 @@ namespace SleepingCalamity.EditorTools
             Material stone = LookTestBuilder.Mat("sandstone");
             HollowmereLayout.BuildingKind kind = preset == Preset.Ruined ? HollowmereLayout.BuildingKind.Empty : HollowmereLayout.RebuiltBuilding(f.Id);
 
-            if (kind != HollowmereLayout.BuildingKind.ApprovedFacade)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
+            // An empty lot shows its ruin (the ruin kit, or the greybox stubs when the art is missing); a placed building or garden switches the ruin off
+            // (design 5.3), so it stands on a plain footing slab instead.
+            bool ruin = kind == HollowmereLayout.BuildingKind.Empty && PlaceRuin(go.transform, f);
+            if (kind != HollowmereLayout.BuildingKind.ApprovedFacade && !ruin)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
                 LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(side, 0.4f, side), stone, default, 2f);
             CutAndFill(go.transform, f, stone);
             switch (kind)
             {
                 case HollowmereLayout.BuildingKind.Empty:
+                    if (ruin) break;
                     LookTestBuilder.Box(g, "Doorstep", new Vector3(0f, 0.11f, -half - 0.45f), new Vector3(1.6f, 0.22f, 0.9f), stone, default, 2f);
                     RuinStubs(g, f, stone);
                     break;
@@ -310,6 +320,8 @@ namespace SleepingCalamity.EditorTools
                     break;   // the corner's Facade row stands here (Corner group of the rebuilt root)
                 case HollowmereLayout.BuildingKind.Garden:
                     Garden(g, f);
+                    break;
+                case HollowmereLayout.BuildingKind.Bakery when HollowmereArt.TryPlaceBakery(g, f, 0.25f):   // on the footing slab's top
                     break;
                 default:
                     Building(g, f, kind);
@@ -352,7 +364,64 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        // The ruined lot by its variant: a = back wall stub and a side stub; b = a broken back corner and rubble; c = broken front wall each side of the doorway and rubble.
+        // ------------------------------------------------------------------------------------------------ ruin kit (Content/Art/Town/Ruins, Reference/hollowmere/ruins)
+        // Contract: one FBX per Ruin_<S|M|L>_<A|B|C>, pivot at the lot centre on the ground, front (doorstep) toward local +Z, children Footing (slots
+        // FK_Sandstone / FK_ChimneyStone / FK_PlinthJoint / FK_Oak, the B4 facade kit's names, WearLit), Foliage (M_B9_Foliage), FOOTPRINT (hidden) and
+        // SOCKET_Doorstep. Placed on the pad at the lot's RuinVariant and RuinTurn (layout data), in the lot's own frame.
+        const string RuinsFolder = "Assets/_Project/Content/Art/Town/Ruins";
+        sealed class RuinArt { public GameObject Fbx; public Dictionary<string, Material> Slots; }
+        static readonly Dictionary<string, RuinArt> RuinCache = new Dictionary<string, RuinArt>();
+
+        static RuinArt LoadRuin(string variant)
+        {
+            if (RuinCache.TryGetValue(variant, out RuinArt cached)) return cached;
+            RuinArt art = null;
+            string folder = RuinsFolder + "/" + variant;
+            GameObject fbx = AssetDatabase.IsValidFolder(folder) ? BeautyCornerArt.LoadModel(folder, variant + ".fbx", keepMaterialSlots: true) : null;
+            if (fbx != null)
+            {
+                var slots = new Dictionary<string, Material>(BeautyCornerArt.BuildFacadeMaterials());
+                slots["M_B9_Foliage"] = RuinFoliage();
+                art = new RuinArt { Fbx = fbx, Slots = slots };
+            }
+            Debug.Log("SC HOLLOWMERE ruin " + variant + " art=" + (art != null ? folder + "/" + variant + ".fbx" : "missing, greybox stubs"));
+            RuinCache[variant] = art;
+            return art;
+        }
+
+        // The ruin folders hold byte-identical copies of the B9 atlas (different GUIDs): build the one shared material from a fixed folder, so it does not
+        // flip between copies with the order the variants load in.
+        static Material ruinFoliage;
+        static Material RuinFoliage()
+        {
+            if (ruinFoliage == null) ruinFoliage = BeautyCornerArt.MaterialFromSet(RuinsFolder + "/Ruin_S_A", "T_B9_Foliage", "HM_RuinFoliage", foliage: true);
+            return ruinFoliage;
+        }
+
+        static bool PlaceRuin(Transform lot, Foundation f)
+        {
+            RuinArt art = LoadRuin(f.RuinVariant);
+            if (art == null) return false;
+            var obj = (GameObject)PrefabUtility.InstantiatePrefab(art.Fbx, lot);
+            obj.name = "Ruin_" + f.RuinVariant.Substring(5) + "_T" + f.RuinTurn;
+            obj.transform.localPosition = Vector3.zero;
+            obj.transform.rotation = Quaternion.Euler(0f, f.Yaw + 90f * f.RuinTurn, 0f);
+            foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r.name.StartsWith("FOOTPRINT", StringComparison.Ordinal)) { r.enabled = false; continue; }   // the collider / NPC-block shape, never drawn
+                var mats = new Material[Mathf.Max(1, r.sharedMaterials.Length)];
+                for (int k = 0; k < mats.Length; k++)
+                {
+                    string slot = k < r.sharedMaterials.Length && r.sharedMaterials[k] != null ? r.sharedMaterials[k].name : "";
+                    int dot = slot.IndexOf('.'); if (dot > 0) slot = slot.Substring(0, dot);
+                    if (!art.Slots.TryGetValue(slot, out mats[k])) { Debug.LogWarning("SC HOLLOWMERE ruin: no material for slot '" + slot + "' on " + r.name); mats[k] = LookTestBuilder.Mat("sandstone"); }
+                }
+                r.sharedMaterials = mats;
+            }
+            return true;
+        }
+
+        // The ruined lot by its variant (greybox, used when the ruin kit art is missing): a = back wall stub and a side stub; b = a broken back corner and rubble; c = broken front wall each side of the doorway and rubble.
         static void RuinStubs(Transform g, Foundation f, Material stone)
         {
             float half = f.Side * 0.5f, inset = half - 0.35f;
@@ -460,6 +529,7 @@ namespace SleepingCalamity.EditorTools
                 case LandmarkKind.Fountain:
                     break;   // the corner's DryFountain row (B10) stands at the origin in both presets
                 case LandmarkKind.Stall:
+                    if (StallArt(g, l.Id, rebuilt)) break;
                     if (rebuilt && l.Id == "Stall_1") break;   // the corner's MarketStall row
                     if (rebuilt) { StallArt(g); break; }
                     // Ruined: a bare frame, counter and corner posts, no awning (design 3).
@@ -559,7 +629,51 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.Box(g, "Door", new Vector3(0f, 2.1f, 3.3f), new Vector3(1.2f, 2.2f, 0.12f), LookTestBuilder.Mat("painted_wood"), default, 2f);
         }
 
-        // Stalls 2 and 3 reuse the B8 MarketStall row's art (or its greybox) at their own place and turn.
+        // The three fixed stalls (Wave 1): Ring1/Stalls/<Variant>/Stall_<Variant>.fbx holds both states as children Ruined and Rebuilt, each with its own baked
+        // set (Stall_<Variant>_<State>_BaseColor/_Normal/_ORM); the preset keeps its state and drops the other. Placed at the landmark (layout row incl. its pad height),
+        // counter to local +Z. False when the art is not in, so the greybox below stands in.
+        const string StallsFolder = BeautyCornerArt.ArtRoot + "/Ring1/Stalls";
+        static readonly Dictionary<string, string> StallVariants = new Dictionary<string, string> { { "Stall_1", "Produce" }, { "Stall_2", "Cloth" }, { "Stall_3", "Tools" } };
+        static readonly HashSet<string> OnStallAssets = new HashSet<string> { "Basket_Produce", "Basket_Bread", "Jug_A", "Jug_B" };   // corner B7 goods on the B8 counter
+
+        static string StallFolder(string id) =>
+            StallVariants.TryGetValue(id, out string v) && AssetDatabase.IsValidFolder(StallsFolder + "/" + v) ? StallsFolder + "/" + v : null;
+
+        static bool StallArt(Transform g, string id, bool rebuilt)
+        {
+            string folder = StallFolder(id);
+            if (folder == null) return false;
+            string v = StallVariants[id], keep = rebuilt ? "Rebuilt" : "Ruined";
+            GameObject model = BeautyCornerArt.LoadModel(folder, "Stall_" + v + ".fbx");
+            if (model == null) return false;
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(model, g);
+            go.name = "Stall_" + v + "_" + keep;
+            go.transform.localPosition = Vector3.zero; go.transform.localRotation = Quaternion.identity;
+            Material m = BeautyCornerArt.MaterialFromSet(folder, "Stall_" + v + "_" + keep, "Stall_" + v + "_" + keep);
+            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            foreach (Transform c in go.transform.Cast<Transform>().ToList())
+            {
+                if (c.name != keep) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }
+                c.GetComponent<MeshRenderer>().sharedMaterial = m;
+            }
+            var col = go.AddComponent<BoxCollider>();   // counter and frame (B8 header); the awning overhang has none
+            col.center = new Vector3(0f, 0.8f, 0f); col.size = new Vector3(2.7f, 1.6f, 1.6f);
+            return true;
+        }
+
+        // A corner row without the B8 stall, its counter lantern and the B7 goods standing on its counter (the produce stall art replaces all three); null = drop the row.
+        static BeautyCornerTable.Row WithoutStallDressing(BeautyCornerTable.Row row)
+        {
+            if (row.Id == "MarketStall" || row.Id == "StallLantern") return null;
+            if (!row.Instances.Any(i => i.Asset != null && OnStallAssets.Contains(i.Asset))) return row;
+            return new BeautyCornerTable.Row
+            {
+                Brief = row.Brief, Id = row.Id, Batch = row.Batch, Names = row.Names, Placeholder = row.Placeholder, Foliage = row.Foliage, ArtYaw = row.ArtYaw, Scatter = row.Scatter,
+                Instances = row.Instances.Where(i => i.Asset == null || !OnStallAssets.Contains(i.Asset)).ToArray(),
+            };
+        }
+
+        // Without the Wave 1 art: stalls 2 and 3 reuse the B8 MarketStall row's art (or its greybox) at their own place and turn.
         static void StallArt(Transform g)
         {
             BeautyCornerTable.Row src = BeautyCornerTable.Rows.First(r => r.Id == "MarketStall");
