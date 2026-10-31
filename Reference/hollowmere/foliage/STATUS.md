@@ -2,7 +2,7 @@ State: IN PROGRESS
 Session: Wave 2: Ground tileables + foliage extension
 Progress: 75%
 Sheet: Reference/hollowmere/foliage/foliage_sheet_r1.jpg
-Blocker: none
+Blocker: paused by coordinator for usage
 
 Score: round 1 = 26/40 (self; target 31). Ground reads as real PBR turf/soil/grit, banks and ditch soil, ivy faces out and sits on the keep wall,
   corner rows unchanged. Top fixes in round 2: (1) terrain tufts stand in lines on lane/square paving edges, (2) grass reads as even dots, not meadow
@@ -21,3 +21,4 @@ Merge: -
 - 2026-10-31 ~10:05: round 1 committed (`7698550`): HollowmereFoliage.cs (Unity Terrain detail prototypes, GPU instanced, density from the grass splat; edges, ruins, ivy), the B9 meshes face +Z in Unity (SOURCES.md says -Y/-Z: the yaws were flipped). The ruin kit art carries its own weeds/moss, so the ruin pass runs only on greybox stubs; the tithe gate art has its own ivy. Sheet r1 pushed. Round 2 (Sonnet) running: paving margin, clustered grass, greybox ivy removal, then check.
 - 2026-10-31 ~10:20: PAUSED by the coordinator for usage (resume after the 12:10 UTC reset). Main is merged (`977dac2`). The round 2 code is pushed but unverified: paving margin for the detail grass, grass clustered at 4-8 m, the greybox keep ivy boxes removed. A Unity batch run the stopped subagent started was left to finish on its own (never killed). On resume: build, captures (cap3), sheet r2, check, merge.
 - 2026-10-31: RESUMED. Round 1 approved by the coordinator (26/40). Main merged (townhouse). Applying only the round 2 own fixes, then build, captures in both presets, check, merge.
+- 2026-10-31: PAUSED again for usage. The final capture run (cap3, round 2 code) was already running in Unity and is left to finish on its own (it costs no tokens, and it was not killed); its PNGs land in this session's scratchpad. On resume: read cap3, make sheet r2, run unity.sh check, merge.
