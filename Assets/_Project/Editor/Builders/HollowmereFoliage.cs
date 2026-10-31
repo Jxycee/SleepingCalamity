@@ -8,8 +8,8 @@
 //      the corners; the doorstep side, lanes, the square and other lots are skipped. Ruined is denser and taller, Rebuilt tidier and sparser. The approved facade lot (F01
 //      in Rebuilt) is left alone: it has the corner's own grass strips.
 //   3. Ruins (Ruined only): weeds in the footing slab's joints and at the feet of the ruin stubs, Moss_Tuft_A..C along stub bases and tops and in the slab corners.
-//      Placed where water and shade gather (wall feet, inner corners), never a uniform coat. The stub boxes are mirrored from HollowmereBuilder.RuinStubs.
-//   4. Ivy: Ivy_Patch_A/B, Lintel_Ivy and Ivy_Facade on the landmark walls that exist (cistern house, annex, tithe gate, town gate piers, mill) and climbing the keep
+//      Placed where water and shade gather (wall feet, inner corners), never a uniform coat. Only used for the greybox stubs (HollowmereBuilder.RuinStubs, mirrored here); the ruin kit art carries its own interior foliage.
+//   4. Ivy: Ivy_Patch_A/B, Lintel_Ivy and Ivy_Facade on the landmark walls that exist (cistern house, annex, town gate piers, mill; the tithe gate and bell tower art bring their own) and climbing the keep
 //      terrace's south retaining wall (dense at the wall ends and beside the buttresses, the stairs' gaps left clear). Ruined carries more, Rebuilt a trimmed-back set.
 // The models share one atlas, so everything uses one material (M_B9_Foliage: URP Lit, alpha clip 0.5, both faces, GPU instancing). Pieces are plain mesh objects (no nested
 // prefab instances), marked batching-static, under <Preset>/Foliage. Pivots follow B9/SOURCES.md: Blender front -Y = builder -Z, pivots on the wall plane or the ground centre.
@@ -275,7 +275,7 @@ namespace SleepingCalamity.EditorTools
                 {
                     if (!isRuined && HollowmereLayout.RebuiltBuilding(f.Id) == HollowmereLayout.BuildingKind.ApprovedFacade) continue;
                     Edges(edges, t, f, isRuined);
-                    if (isRuined) RuinInterior(inside, t, f);
+                    if (isRuined && !HasRuinArt(ruined, f)) RuinInterior(inside, t, f);   // the ruin kit art carries its own interior weeds, moss and strips
                 }
                 foreach (Landmark l in t.Landmarks) LandmarkIvy(lm, t, l, isRuined);
                 KeepWall(keep, t, isRuined);
@@ -354,6 +354,16 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ------------------------------------------------------------------------------------------------ 3. ruined lots
+        // The ruin kit (Content/Art/Town/Ruins) has its weeds, moss and grass inside the S x S footing. Only the greybox stubs (art missing) need the stub-based pass below.
+        static bool HasRuinArt(Transform ruined, Foundation f)
+        {
+            Transform lots = ruined.Find("Foundations");
+            if (lots == null) return false;
+            foreach (Transform c in lots)
+                if (c.name.StartsWith(f.Id + "_", StringComparison.Ordinal)) return c.Find("Ruin_" + f.RuinVariant.Substring(5) + "_T" + f.RuinTurn) != null;
+            return false;
+        }
+
         // (centre x/z, size x/z, top height over the pad) of the ruin stubs in the lot frame: mirrors HollowmereBuilder.RuinStubs.
         static List<(float cx, float cz, float sx, float sz, float top)> StubBoxes(Foundation f)
         {
@@ -462,16 +472,7 @@ namespace SleepingCalamity.EditorTools
                     OnLandmarkWall(g, l, "Ivy_Patch_A", sx * 0.2f, 0f, -sz * 0.5f, NZ, Vector3.zero, 1.1f * k);
                     if (ruined) OnLandmarkWall(g, l, "Ivy_Facade", -sx * 0.5f, 0f, 0.1f * sz, NX, PZ, 0.9f);
                     break;
-                case LandmarkKind.TitheGate:
-                    // two piers (x = +-2.3, 1.0 x 1.6) under a lintel whose top is 5.1 m up; the glow and bars fill the opening
-                    OnLandmarkWall(g, l, "Lintel_Ivy", 0f, 5.1f, -0.8f, NZ, Vector3.zero, 1.3f * k);
-                    foreach (float x in new[] { -2.3f, 2.3f })
-                    {
-                        OnLandmarkWall(g, l, "Ivy_Patch_A", x, 0f, -0.8f, NZ, Vector3.zero, 1.0f * k);
-                        if (ruined) OnLandmarkWall(g, l, "Ivy_Patch_B", x, 1.7f, -0.8f, NZ, Vector3.zero, 1.0f);
-                        OnLandmarkWall(g, l, "Ivy_Patch_B", x + Mathf.Sign(x) * 0.5f, 0.3f, 0f, x < 0f ? NX : PX, Vector3.zero, 1.1f * k);
-                    }
-                    break;
+                // TitheGate and BellTower: the art brings its own foliage (HollowmereTitheGate, B4 tower), nothing added here.
                 case LandmarkKind.TownGate:   // a free-standing pier 2.4 x 2.4, 5 m above its pad
                     OnLandmarkWall(g, l, "Ivy_Patch_A", 0f, 0.2f, -sz * 0.5f, NZ, Vector3.zero, 1.2f * k);
                     if (ruined) { OnLandmarkWall(g, l, "Ivy_Patch_B", sx * 0.5f, 0.2f, 0f, PX, Vector3.zero, 1.3f); OnLandmarkWall(g, l, "Ivy_Patch_B", -sx * 0.5f, 0.2f, 0f, NX, Vector3.zero, 1.3f); }
