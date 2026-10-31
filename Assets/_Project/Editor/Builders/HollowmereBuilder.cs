@@ -8,6 +8,7 @@
 // BeautyCornerBuilder.PlaceRow at their corner positions; the B8 stall is reused for stalls 2 and 3; the B4 bell tower when its folder exists. Everything
 // else is greybox on the LookTest materials, except the buildings whose final export is in (HollowmereArt: the bakery). Light, grade, sky and renderer: the
 // beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
+// Ruins: every empty lot shows its ruin kit variant (RuinVariant, RuinTurn); a placed building or garden switches it off.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
 using System;
 using System.Collections.Generic;
@@ -45,6 +46,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_KeepStairs", new Vector3(-31f, 1.7f, 13.8f), new Vector3(-20f, 3.0f, 19.6f), 58f),  // along the Wall Ginnel: terrace step, west stair, keep wall
             ("Cap_HM_Bakery", new Vector3(-6.2f, 1.65f, 2.6f), new Vector3(-12.5f, 3.4f, 12.2f), 55f),       // from the square at the bakery front on F02 (oven side on the right)
             ("Cap_HM_KeepWall", new Vector3(-2f, 1.65f, -3f), new Vector3(2f, 3.2f, 19.6f), 60f),          // from the fountain: keep wall, buttresses, planters, stairs (Ruined shows it whole)
+            ("Cap_HM_Ruins", new Vector3(-15.5f, 1.65f, -1.5f), new Vector3(-26f, 0.2f, -8f), 50f),          // from the square's west side over the F03 and F05 ruins
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
@@ -58,6 +60,7 @@ namespace SleepingCalamity.EditorTools
 
         public static void Build()
         {
+            RuinCache.Clear(); ruinFoliage = null;
             TownLayout layout = HollowmereLayout.Create();
             List<string> errors = layout.Validate();
             if (errors.Count > 0) throw new InvalidOperationException("Hollowmere layout invalid (" + errors.Count + "): " + string.Join("; ", errors.Take(20)));
@@ -298,12 +301,16 @@ namespace SleepingCalamity.EditorTools
             Material stone = LookTestBuilder.Mat("sandstone");
             HollowmereLayout.BuildingKind kind = preset == Preset.Ruined ? HollowmereLayout.BuildingKind.Empty : HollowmereLayout.RebuiltBuilding(f.Id);
 
-            if (kind != HollowmereLayout.BuildingKind.ApprovedFacade)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
+            // An empty lot shows its ruin (the ruin kit, or the greybox stubs when the art is missing); a placed building or garden switches the ruin off
+            // (design 5.3), so it stands on a plain footing slab instead.
+            bool ruin = kind == HollowmereLayout.BuildingKind.Empty && PlaceRuin(go.transform, f);
+            if (kind != HollowmereLayout.BuildingKind.ApprovedFacade && !ruin)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
                 LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(side, 0.4f, side), stone, default, 2f);
             CutAndFill(go.transform, f, stone);
             switch (kind)
             {
                 case HollowmereLayout.BuildingKind.Empty:
+                    if (ruin) break;
                     LookTestBuilder.Box(g, "Doorstep", new Vector3(0f, 0.11f, -half - 0.45f), new Vector3(1.6f, 0.22f, 0.9f), stone, default, 2f);
                     RuinStubs(g, f, stone);
                     break;
@@ -355,7 +362,64 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        // The ruined lot by its variant: a = back wall stub and a side stub; b = a broken back corner and rubble; c = broken front wall each side of the doorway and rubble.
+        // ------------------------------------------------------------------------------------------------ ruin kit (Content/Art/Town/Ruins, Reference/hollowmere/ruins)
+        // Contract: one FBX per Ruin_<S|M|L>_<A|B|C>, pivot at the lot centre on the ground, front (doorstep) toward local +Z, children Footing (slots
+        // FK_Sandstone / FK_ChimneyStone / FK_PlinthJoint / FK_Oak, the B4 facade kit's names, WearLit), Foliage (M_B9_Foliage), FOOTPRINT (hidden) and
+        // SOCKET_Doorstep. Placed on the pad at the lot's RuinVariant and RuinTurn (layout data), in the lot's own frame.
+        const string RuinsFolder = "Assets/_Project/Content/Art/Town/Ruins";
+        sealed class RuinArt { public GameObject Fbx; public Dictionary<string, Material> Slots; }
+        static readonly Dictionary<string, RuinArt> RuinCache = new Dictionary<string, RuinArt>();
+
+        static RuinArt LoadRuin(string variant)
+        {
+            if (RuinCache.TryGetValue(variant, out RuinArt cached)) return cached;
+            RuinArt art = null;
+            string folder = RuinsFolder + "/" + variant;
+            GameObject fbx = AssetDatabase.IsValidFolder(folder) ? BeautyCornerArt.LoadModel(folder, variant + ".fbx", keepMaterialSlots: true) : null;
+            if (fbx != null)
+            {
+                var slots = new Dictionary<string, Material>(BeautyCornerArt.BuildFacadeMaterials());
+                slots["M_B9_Foliage"] = RuinFoliage();
+                art = new RuinArt { Fbx = fbx, Slots = slots };
+            }
+            Debug.Log("SC HOLLOWMERE ruin " + variant + " art=" + (art != null ? folder + "/" + variant + ".fbx" : "missing, greybox stubs"));
+            RuinCache[variant] = art;
+            return art;
+        }
+
+        // The ruin folders hold byte-identical copies of the B9 atlas (different GUIDs): build the one shared material from a fixed folder, so it does not
+        // flip between copies with the order the variants load in.
+        static Material ruinFoliage;
+        static Material RuinFoliage()
+        {
+            if (ruinFoliage == null) ruinFoliage = BeautyCornerArt.MaterialFromSet(RuinsFolder + "/Ruin_S_A", "T_B9_Foliage", "HM_RuinFoliage", foliage: true);
+            return ruinFoliage;
+        }
+
+        static bool PlaceRuin(Transform lot, Foundation f)
+        {
+            RuinArt art = LoadRuin(f.RuinVariant);
+            if (art == null) return false;
+            var obj = (GameObject)PrefabUtility.InstantiatePrefab(art.Fbx, lot);
+            obj.name = "Ruin_" + f.RuinVariant.Substring(5) + "_T" + f.RuinTurn;
+            obj.transform.localPosition = Vector3.zero;
+            obj.transform.rotation = Quaternion.Euler(0f, f.Yaw + 90f * f.RuinTurn, 0f);
+            foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r.name.StartsWith("FOOTPRINT", StringComparison.Ordinal)) { r.enabled = false; continue; }   // the collider / NPC-block shape, never drawn
+                var mats = new Material[Mathf.Max(1, r.sharedMaterials.Length)];
+                for (int k = 0; k < mats.Length; k++)
+                {
+                    string slot = k < r.sharedMaterials.Length && r.sharedMaterials[k] != null ? r.sharedMaterials[k].name : "";
+                    int dot = slot.IndexOf('.'); if (dot > 0) slot = slot.Substring(0, dot);
+                    if (!art.Slots.TryGetValue(slot, out mats[k])) { Debug.LogWarning("SC HOLLOWMERE ruin: no material for slot '" + slot + "' on " + r.name); mats[k] = LookTestBuilder.Mat("sandstone"); }
+                }
+                r.sharedMaterials = mats;
+            }
+            return true;
+        }
+
+        // The ruined lot by its variant (greybox, used when the ruin kit art is missing): a = back wall stub and a side stub; b = a broken back corner and rubble; c = broken front wall each side of the doorway and rubble.
         static void RuinStubs(Transform g, Foundation f, Material stone)
         {
             float half = f.Side * 0.5f, inset = half - 0.35f;

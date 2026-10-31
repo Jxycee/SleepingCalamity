@@ -2,26 +2,21 @@
 
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
-State: DONE (terrain pass merged)
-Progress: 100%
-Sheet: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
-Map: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
+State: IN PROGRESS (ruin integration)
+Progress: 90% (ready; waiting for the bakery to merge first)
+SC RESULT: pending (the last run passed on 8d86098; it runs again after the bakery merge, on the final tip)
+Sheet: Reference/hollowmere/layout/Hollowmere_Ruins_vs_Kit.jpg
+Captures: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 
-**Wave 0 greybox:** merged to main as `1f6ff88` (`check` PASS on main).
-
-**Terrain pass (user feedback 2026-10-31):** heights are in the layout data (`Foundation.Y`, `Landmark.Y`, `Lane.Heights`, path node `Y`; metres relative to the square). The square shelf is 0 and the keep terrace +4. The Ring Lane is one 3 m terrace down on the flanks (-3.5) and spirals down to a second terrace on the south (-6.5). The town wall stands on a raised bank with a dry ditch outside it (-9 to -12). The lake is a basin with water at -12 (bed -16.5), the stream runs in a ravine, and the south slope falls to the lake. Every lot is a flat pad at its lane's height (cut and fill walls in the builder). Lanes are relaxed to 17 deg or less. Validation adds a 20 deg rule (stairs exempt) and requires doorsteps at the lot's height. The keep wall gets buttresses, planters with ivy and a second (west) stair. Foundations have not moved.
+**Current task:** wire the ruin kit (`Content/Art/Town/Ruins/Ruin_{S,M,L}_{A,B,C}`) into HollowmereBuilder. In Ruined, every lot shows the ruin of its size class at its layout `RuinVariant` and `RuinTurn` (deterministic per lot id, stored in the layout data), on its pad. Footing uses the facade kit's materials, Foliage the B9 atlas, and FOOTPRINT is hidden. In Rebuilt, a lot with a building or garden has no ruin; the lots left empty keep theirs. Merge order (coordinator): after the bakery, then stalls; origin/main is merged in right before the merge.
 
 | Item | State |
 |---|---|
-| Heights + validation + tests (22) | done; `sc_core_tests` PASS |
-| Elevation-shaded map | done (`Hollowmere_Map_Town.jpg`, `Hollowmere_Map_Square.jpg`) |
-| Ground as a Unity Terrain (controller, 2026-10-31) | done: `HollowmereTerrain` writes the layout heights with `TerrainData.SetHeights` (513, 0.59 m texels); the custom mesh is gone |
-| Terrain Tools erosion | done: `com.unity.terrain-tools` 5.3.3 added; its Perlin noise and hydraulic and thermal erosion ran in a cloud graphics run (llvmpipe compute) and are baked to `Content/Terrain/Hollowmere/Hollowmere_Eroded_513.r16` (seed 1031, max 1.55 m change, open ground only). The build blends the RAW in outside the protect mask (shelf, pads, lanes, walls, bank, ditch), so pads stay exact and the build needs no GPU. Rebake: `unity.sh exec --graphics --method SleepingCalamity.EditorTools.HollowmereTerrain.Bake`. The eroders are internal to the package, so the bake calls them by reflection (pinned to 5.3.3) |
-| Terrain layers | grass and dirt (flat greybox tints; no B1 grass or soil tileable exists yet) and the B1 cobble under the lanes; the square keeps the corner's own surround paving as a slab |
-| Builder: terrace walls, cut and fill, keep-wall breakup, stairs | done |
-| Captures, both presets | done: `captures/` (HomeDoor, Fountain, TitheGate, LaneMouth, LakeShore, MarketStreet, KeepStairs, KeepWall, LowEast, Overview, Corner_Wide) |
-| `check`, merge | `SC RESULT check PASS` on 591df06 (build PASS; test-edit 591/591; test-play 32 passed, 8 skipped, 0 failed). Merged to main as `1e20cb2`; its tree is identical to 591df06 |
+| Layout: `RuinVariant` = kit folder name, `RuinTurn` 0-3; test `Ruins_MatchTheKitAndTurn` | done (23 tests pass under `sc_core_tests`) |
+| Builder: ruin placement and materials, greybox fallback, a ruin capture camera | done (e59b22b) |
+| Captures in both presets, side by side with the ruin kit sheet | done: `Hollowmere_Ruins_vs_Kit.jpg` (kit sheet on top, in-engine ruins below), `captures/HM_Ruins_{Ruined,Rebuilt}.jpg`; all 9 variants load, no missing material slot |
+| `check`, merge | `check` PASS on 8d86098 (build PASS; test-edit 592/592; test-play 32 passed, 8 skipped, 0 failed). After it: a fix so the shared ruin foliage material builds from one fixed folder (it flipped between the byte-identical atlas copies). Next: merge origin/main after the bakery lands, regenerate Hollowmere.unity with the builder if it conflicts, `check` again, merge, then State DONE |
 
-**Not done (coordinator note, not blocking):** the bank face and the slope outside the ditch are still smooth (the LowEast view reads as three flat stripes); give them a little of the erosion noise in a follow-up. Grass and dirt stay flat tints until B1 grass and soil tileables exist.
+**Earlier (done):** Wave 0 greybox merged `1f6ff88`; terrain pass merged `1e20cb2`.
 
 **Blockers:** none.
