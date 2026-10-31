@@ -18,8 +18,7 @@ namespace SleepingCalamity.EditorTools
         public const string Folder = "Assets/_Project/Content/Art/Town/Ring1/Townhouse";
         const float FootingTop = 0.25f;
 
-        // Variant per lot, and each variant's plaster tint and paint (linear), as sc_townhouse.py COMBOS gives them.
-        static readonly Dictionary<string, string> LotVariant = new Dictionary<string, string> { { "F06", "Townhouse_A" }, { "F07", "Townhouse_B" } };
+        // Each variant's plaster tint and paint (linear), as sc_townhouse.py COMBOS gives them. Variant and turn per lot: HollowmereLayout.RebuiltHome.
         static readonly Dictionary<string, (Color Plaster, Color Paint)> Looks = new Dictionary<string, (Color, Color)>
         {
             { "Townhouse_A", (new Color(0.95f, 0.96f, 0.97f), Hex(0x3e, 0x56, 0x70)) },   // cool lime white, slate blue
@@ -28,13 +27,11 @@ namespace SleepingCalamity.EditorTools
         };
         static Color Hex(int r, int g, int b) => new Color(r / 255f, g / 255f, b / 255f).linear;
 
-        public static string VariantFor(string foundationId) =>
-            LotVariant.TryGetValue(foundationId, out string v) ? v : (foundationId[foundationId.Length - 1] & 1) == 0 ? "Townhouse_A" : "Townhouse_C";
-
         // Places the townhouse on lot g (the lot's facing frame). Returns false when the art is missing (the caller builds the greybox instead).
         public static bool Place(Transform g, Foundation f)
         {
-            string variant = VariantFor(f.Id);
+            HollowmereLayout.HomeAssignment assigned = HollowmereLayout.RebuiltHome(f.Id);
+            string variant = assigned.VariantName;
             string folder = Folder + "/" + variant;
             GameObject fbx = BeautyCornerArt.LoadModel(folder, variant + ".fbx", keepMaterialSlots: true);
             if (fbx == null) { Debug.LogWarning("SC HOLLOWMERE townhouse art missing: " + folder); return false; }
@@ -53,7 +50,7 @@ namespace SleepingCalamity.EditorTools
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(fbx, g);
             obj.name = "Art_" + variant;
             obj.transform.localPosition = new Vector3(0f, FootingTop, 0f);
-            obj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            obj.transform.localRotation = Quaternion.Euler(0f, 180f + 90f * assigned.Turn, 0f);
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
                 if (r.name == "FOOTPRINT") continue;

@@ -525,6 +525,11 @@ MonoBehaviour:
   - {fileID: 9114747556443579443, guid: 4c51602948543ad4185593339440cfa4, type: 3}
   - {fileID: 1452964126775788107, guid: 4adf2f74004bb064c9c3ede82e612344, type: 3}
   - {fileID: 3302319267374371649, guid: 4a0d08c469a0fc3438c0e68c7c82e8aa, type: 3}
+  m_DropY: []
+  m_DropOrigin: {x: 0, y: 0}
+  m_DropStep: 0
+  m_DropNX: 0
+  m_DropNZ: 0
 --- !u!1 &1018
 GameObject:
   m_ObjectHideFlags: 0
