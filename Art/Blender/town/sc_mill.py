@@ -65,6 +65,22 @@ FK.member = lean_member
 
 def piece(n): return FK.Piece(n)
 
+def back_skin(pc, n0):
+    """Duplicate the faces added since n0 with reversed winding: torn plaster seen from inside the roofless shell stays solid."""
+    pc.bm.faces.ensure_lookup_table()
+    d = bmesh.ops.duplicate(pc.bm, geom=pc.bm.faces[n0:])
+    bmesh.ops.reverse_faces(pc.bm, faces=[g for g in d['geom'] if isinstance(g, bmesh.types.BMFace)])
+
+def orient(pc, n0, expect):
+    """Reverse every face added since index n0 whose normal points away from expect (a vector or fn(face_centre)); no inside-out walls."""
+    pc.bm.faces.ensure_lookup_table(); pc.bm.normal_update()
+    bad = []
+    for f in pc.bm.faces[n0:]:
+        e = expect(f.calc_center_median()) if callable(expect) else expect
+        if f.normal.dot(e) < 0: bad.append(f)
+    if bad: bmesh.ops.reverse_faces(pc.bm, faces=bad)
+
+
 def merge(dst, src, xf=None, lean=False):
     if xf is not None:
         bmesh.ops.transform(src.bm, matrix=xf, verts=src.bm.verts[:])
@@ -74,6 +90,14 @@ def merge(dst, src, xf=None, lean=False):
     if lean:
         for v in src.bm.verts:
             v.co = Vector((v.co.x - 0.010 * max(0.0, v.co.z - GZ), v.co.y - 0.006 * max(0.0, v.co.z - GZ), v.co.z))
+    if '--facing' in argv and src.name[0] in 'GU':
+        src.bm.normal_update(); out = inn = 0
+        for f in src.bm.faces:
+            if abs(f.normal.z) > 0.5: continue
+            c = f.calc_center_median(); d = Vector((c.x, c.y, 0))
+            if f.normal.dot(d) > 0: out += f.calc_area()
+            else: inn += f.calc_area()
+        print('    FACING %-10s outward %.1f inward %.1f' % (src.name, out, inn))
     remap = []
     for m in src.mats:
         if m not in dst.mats: dst.mats.append(m)
@@ -231,7 +255,7 @@ def upper_wall(tag, L, wins, ruin):
     posts = sorted(posts)
     holes = [(w[0], w[1], w[2], w[3]) for w in wins]
     if not ruin:
-        FK.wall_panel(pc, 'plaster', 0.0, 0.0, L, za, zb, holes=holes, bulge=0.014, cell=0.7)
+        n0 = len(pc.bm.faces); FK.wall_panel(pc, 'plaster', 0.0, 0.0, L, za, zb, holes=holes, bulge=0.014, cell=0.7); orient(pc, n0, Vector((0, -1, 0)))
     for i, u in enumerate(posts):
         if not ruin: mem(pc, (u, za), (u, zb), name=tag + 'p%d' % i)
         elif R.random() < 0.8:
@@ -251,7 +275,7 @@ def upper_wall(tag, L, wins, ruin):
     if ruin:   # a few torn plaster bays
         for k, (s0, s1) in enumerate(zip(posts, posts[1:])):
             if R.random() < 0.45 and not any(w[0] - 0.2 < (s0 + s1) / 2 < w[1] + 0.2 for w in wins):
-                FK.wall_panel(pc, 'plaster', 0.0, s0, s1, za, R.uniform(za + 1.2, zb - 0.3), bulge=0.01, cell=0.6)
+                n0 = len(pc.bm.faces); FK.wall_panel(pc, 'plaster', 0.0, s0, s1, za, R.uniform(za + 1.2, zb - 0.3), bulge=0.01, cell=0.6); orient(pc, n0, Vector((0, -1, 0))); back_skin(pc, n0)
     for k, w in enumerate(wins):
         u0, u1, z0, z1 = w[:4]
         if ruin:
@@ -270,7 +294,24 @@ def upper_wall(tag, L, wins, ruin):
             xm = (u0 + u1) / 2
             mem(pc, (xm, z0), (xm, z1), w=0.06, d=0.09, proud=-0.1, name='%swm%d' % (tag, k))
             FK.add_box(pc, 'oak', (u1 - u0 + 0.22, 0.2, 0.07), Matrix.Translation((xm, -0.04, z0 - 0.02)), cham=0.015, long_axis=0, seed=k + 0.5)
+    for k, w in enumerate(wins):
+        shutters(pc, w, k, tag, ruin)
     return pc
+
+def shutters(pc, w, k, tag, ruin):
+    """Green-painted leaves hung open against the wall either side of an upper window (ruin: one left, hanging off a hinge)."""
+    R = FK.rng('mlsh' + tag + str(k)); u0, u1, z0, z1 = w[:4]; lw = (u1 - u0) / 2 + 0.03; h = z1 - z0 + 0.1; zc = (z0 + z1) / 2
+    for side in (-1, 1):
+        if ruin and (side > 0 or k % 2):
+            continue
+        hx = u0 - 0.03 if side < 0 else u1 + 0.03
+        ang = math.radians((R.uniform(8, 18) if not ruin else R.uniform(50, 62)) * -side * -1)
+        hinge = Matrix.Translation((hx, -0.11, zc)) @ Matrix.Rotation(ang * (1 if side < 0 else -1) * -1, 4, 'Z')
+        if ruin: hinge = hinge @ Matrix.Rotation(math.radians(R.uniform(6, 12)), 4, 'X')
+        leaf = Matrix.Translation((side * lw / 2, 0, 0))
+        FK.add_box(pc, 'door', (lw, 0.045, h), hinge @ leaf, cham=0.012, cuts=(0, 0, 2), long_axis=2, wob=0.004, seed=R.random() * 90)
+        for dz in (-h * 0.32, h * 0.32):
+            FK.add_box(pc, 'oak', (lw * 0.96, 0.03, 0.09), hinge @ leaf @ Matrix.Translation((0, -0.036, dz)), cham=0.008, long_axis=0, seed=R.random() * 90)
 
 def slope_pt(side, x, t, ruin=False):
     xr = X1 + OV_V
@@ -303,8 +344,11 @@ def tile_courses(pc, edge, n, nc, tag, flip, drop=None):
                 pb = a0.lerp(b0, u) + n * (0.045 + j); pt = a1.lerp(b1, u)
                 pts.append((bm.verts.new(pb - n * 0.05), bm.verts.new(pb), bm.verts.new(pt)))
             a, b = pts
-            for q in ((a[1], b[1], b[2], a[2]), (a[0], b[0], b[1], a[1])):
-                f = bm.faces.new(q[::-1] if flip else q)
+            for qi, q in enumerate(((a[1], b[1], b[2], a[2]), (a[0], b[0], b[1], a[1]))):
+                f = bm.faces.new(q)
+                f.normal_update()
+                want = n if qi == 0 else (a[1].co - a[2].co)       # top faces up out of the roof, risers down-slope toward the eave
+                if f.normal.dot(want) < 0: f.normal_flip()
                 for l in f.loops:
                     co = l.vert.co
                     l[uvl].uv = ((co - a0).dot((b0 - a0).normalized()) / TILE, (c * 0.37 + (co - a0).dot((a1 - a0).normalized())) / TILE)
@@ -322,13 +366,13 @@ def roof(ruin):
             return slope_pt(side, xa + (xb - xa) * u, v) - n * TH
         flip = side > 0
         g = lambda p, u, v: (p.x / TILE, p.y / TILE)
-        FK.quad_grid(pc, 'roof' if not ruin else 'oakw', [(0, 0, 0)] * 4, 20, 8, push=deck, uv_fn=lambda c: (c.x / TILE, c.y / TILE))
-        FK.quad_grid(pc, 'oak', [(0, 0, 0)] * 4, 20, 4, push=under, uv_fn=lambda c: (c.x / TILE, c.y / TILE))
+        n0 = len(pc.bm.faces); FK.quad_grid(pc, 'roof' if not ruin else 'oakw', [(0, 0, 0)] * 4, 20, 8, push=deck, uv_fn=lambda c: (c.x / TILE, c.y / TILE)); orient(pc, n0, n)
+        n0 = len(pc.bm.faces); FK.quad_grid(pc, 'oak', [(0, 0, 0)] * 4, 20, 4, push=under, uv_fn=lambda c: (c.x / TILE, c.y / TILE)); orient(pc, n0, -n)
         if ruin:   # tile courses with dropouts: bare sarking shows through
             drop = lambda c, i, nt: FK.rng('mld%d%d%d' % (side, c, i)).random() < (0.25 + 0.08 * c / 15)
         else:
             drop = None
-        tile_courses(pc, lambda t, side=side: tuple(slope_pt(side, x, t) for x in roof_range(side, t, ruin)), n, 15, 'mill%d' % side, flip=flip, drop=drop)
+        n0 = len(pc.bm.faces); tile_courses(pc, lambda t, side=side: tuple(slope_pt(side, x, t) for x in roof_range(side, t, ruin)), n, 15, 'mill%d' % side, flip=flip, drop=drop)
         xa, xb = roof_range(side, 0, ruin)
         FK.member(pc, 'oak', slope_pt(side, xa, 0) - n * 0.13, slope_pt(side, xb, 0) - n * 0.13, 0.2, 0.07, name='fascia%d' % side, up=(0, side, 0.4))
         if ruin:   # bare rafters in the roofless part
@@ -337,8 +381,60 @@ def roof(ruin):
                 if x > roof_range(side, 0.5, True)[0] and k > 3: continue
                 tt = FK.rng('mlraft%d%d' % (side, k)).uniform(0.45, 1.0)
                 FK.member(pc, 'oakw', slope_pt(side, x, 0.0) - n * 0.2, slope_pt(side, x, tt) - n * 0.2, 0.13, 0.17, name='raft%d%d' % (side, k), up=tuple(-n))
-    FK.member(pc, 'oak', Vector((X0 - OV_V + (3.0 if ruin else 0), 0, RIDGE + 0.12)), Vector((X1 + OV_V, 0, RIDGE + 0.12)), 0.26, 0.22, name='ridge', up=(0, 0, 1))
+    ridge_tiles(pc, X0 - OV_V + (3.0 if ruin else 0), X1 + OV_V)
+    for side in (1, -1):
+        n = Vector((0, side * TANP, 1)).normalized()
+        rolled_eave(pc, side, roof_range(side, 0, ruin)[0], X1 + OV_V)
+        for xe in ((X1 + OV_V,) if ruin else (X0 - OV_V, X1 + OV_V)):
+            FK.member(pc, 'oak', slope_pt(side, xe, 0) - n * 0.12, slope_pt(side, xe, 1) - n * 0.12, 0.3, 0.07, name='barge%d%d' % (side, xe), up=(1, 0, 0))
     return pc
+
+def orient_bm(bm, expect):
+    bm.normal_update()
+    bad = [f for f in bm.faces if f.normal.dot(expect(f.calc_center_median())) < 0]
+    if bad: bmesh.ops.reverse_faces(bm, faces=bad)
+
+def ridge_tiles(pc, xa, xb):
+    xr = X1 + OV_V; n = max(2, int((xb - xa) / 0.42))
+    for i in range(n):
+        R = FK.rng('mlrt%d' % i)
+        x = xa + (xb - xa) * (i + 0.5) / n
+        zc = RIDGE + 0.24 - 0.2 * (1 - (x / xr) ** 2) - 0.02
+        bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); segs = 8; Lt = (xb - xa) / n + 0.05; rows = []
+        for e in (-1, 1):
+            rr = 0.17 * (1.0 if e < 0 else 1.06)
+            rows.append([bm.verts.new((x + e * Lt / 2 + R.uniform(-0.01, 0.01), -rr * math.cos(math.pi * k / segs), zc + rr * math.sin(math.pi * k / segs) * 0.85 - 0.05)) for k in range(segs + 1)])
+        for k in range(segs):
+            f = bm.faces.new((rows[0][k], rows[1][k], rows[1][k + 1], rows[0][k + 1]))
+            for l in f.loops: l[uvl].uv = (l.vert.co.x / TILE, k * 0.07 / TILE)
+        orient_bm(bm, lambda c, zc=zc: Vector((0, c.y, c.z - (zc - 0.05))))
+        FK.two_sided(bm); FK._merge(pc, bm, 'roof')
+
+def rolled_eave(pc, side, xa, xb):
+    segs = 6; rr = 0.11; rows = []; ny = max(2, int((xb - (X0 - OV_V)) / 0.5))
+    xa = max(xa, X0 - OV_V)
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); ny = max(2, int((xb - xa) / 0.5))
+    for i in range(ny + 1):
+        x = xa + (xb - xa) * i / ny
+        c = slope_pt(side, x, 0) + Vector((0, -side * 0.02, -0.03))
+        rows.append([bm.verts.new((x, c.y + side * math.cos(math.pi * 0.15 + math.pi * 1.25 * k / segs) * rr, c.z + math.sin(math.pi * 0.15 + math.pi * 1.25 * k / segs) * rr)) for k in range(segs + 1)])
+    for i in range(ny):
+        for k in range(segs):
+            f = bm.faces.new((rows[i][k], rows[i + 1][k], rows[i + 1][k + 1], rows[i][k + 1]))
+            for l in f.loops: l[uvl].uv = (l.vert.co.x / TILE, k * rr / TILE)
+    cz = slope_pt(side, (xa + xb) / 2, 0).z - 0.03; cy = slope_pt(side, (xa + xb) / 2, 0).y - side * 0.02
+    orient_bm(bm, lambda c: Vector((0, c.y - cy, c.z - cz)))
+    FK.two_sided(bm); FK._merge(pc, bm, 'roof')
+
+def hood(pc, tag):
+    """Hoist hood: a small boarded gable over the loft door and its beam, knee-braced off the wall."""
+    rz = 11.25; pa = math.radians(38); L = 0.82; zy = -0.47
+    for sd in (-1, 1):
+        c = Vector((HWY + sd * 0.5 * L * math.cos(pa) * 0.95, zy, rz - 0.5 * L * math.sin(pa) * 0.95 - 0.02))
+        FK.add_box(pc, 'roof', (L, 0.8, 0.07), Matrix.Translation(c) @ Matrix.Rotation(sd * pa, 4, 'Y'), cham=0.012, long_axis=0, seed=sd + 9.0)
+        FK.add_box(pc, 'oak', (0.1, 0.84, 0.1), Matrix.Translation(c + Vector((sd * 0.2, 0, -0.17))) @ Matrix.Rotation(sd * pa, 4, 'Y'), cham=0.01, long_axis=1, seed=sd + 9.5)
+        FK.member(pc, 'oak', (HWY + sd * 0.78, -0.12, 10.6), (HWY + sd * 0.45, -0.7, 10.9), 0.1, 0.1, name=tag + 'knee%d' % sd, up=(0, 0, 1))
+    FK.add_box(pc, 'oak', (0.12, 0.82, 0.1), Matrix.Translation((HWY, zy, rz + 0.02)), cham=0.015, long_axis=1, seed=9.9)
 
 def gable(tag, F, ruin, loft):
     pc = piece(tag); L = 7.0; R = FK.rng('mlg' + tag)
@@ -350,7 +446,8 @@ def gable(tag, F, ruin, loft):
         if ruin:
             if R.random() < 0.55: continue
             zt = min(zt, R.uniform(PL + 0.3, PL + 2.8))
-        FK.quad_grid(pc, 'plaster', [(a, 0, PL), (b, 0, PL), (b, 0, zt), (a, 0, zt)], 1, 3, uv_fn=lambda c: (c.x / TILE, c.z / TILE))
+        n0 = len(pc.bm.faces); FK.quad_grid(pc, 'plaster', [(a, 0, PL), (b, 0, PL), (b, 0, zt), (a, 0, zt)], 1, 3, uv_fn=lambda c: (c.x / TILE, c.z / TILE)); orient(pc, n0, Vector((0, -1, 0)))
+        if ruin: back_skin(pc, n0)
     mem(pc, (0, PL + 0.12), (L, PL + 0.12), w=0.24, proud=FK.PROUD + 0.02, name=tag + 'tie')
     h = RIDGE - 0.4 if not ruin else PL + 1.6
     mem(pc, (HWY, PL + 0.2), (HWY, h), name=tag + 'king')
@@ -362,7 +459,8 @@ def gable(tag, F, ruin, loft):
             for i in range(4):
                 pw = (lo[1] - lo[0]) / 4
                 FK.add_box(pc, 'door', (pw - 0.01, 0.05, lo[3] - lo[2]), Matrix.Translation((lo[0] + pw * (i + 0.5), 0.05, (lo[2] + lo[3]) / 2)), cham=0.01, long_axis=2, seed=i)
-            FK.add_box(pc, 'oak', (0.24, 0.95, 0.26), Matrix.Translation((HWY, -0.45, 10.75)), cham=0.03, cuts=(0, 2, 0), long_axis=1, seed=6.1)
+            FK.add_box(pc, 'oak', (0.24, 0.76, 0.26), Matrix.Translation((HWY, -0.4, 10.75)), cham=0.03, cuts=(0, 2, 0), long_axis=1, seed=6.1)
+            hood(pc, tag)
         else:
             FK.add_box(pc, 'oak', (0.24, 0.4, 0.26), Matrix.Translation((HWY, -0.15, 10.75)), cham=0.03, long_axis=1, seed=6.2)
     return pc
@@ -594,7 +692,7 @@ def build():
         print('  %-12s %6d tris' % (ob.name, tris(ob)))
     me = bpy.data.meshes.new('FOOTPRINT'); bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
     bm.transform(Matrix.Translation((0, 0, 0.05)) @ Matrix.Diagonal((9.0, 7.0, 0.1, 1))); bm.to_mesh(me); bm.free()
-    fp = bpy.data.objects.new('FOOTPRINT', me); bpy.context.scene.collection.objects.link(fp); fp.parent = root; fp.display_type = 'WIRE'
+    fp = bpy.data.objects.new('FOOTPRINT', me); bpy.context.scene.collection.objects.link(fp); fp.parent = root; fp.display_type = 'WIRE'; fp.hide_render = True
     print('  Frame %d tris' % tris(frame))
     for o in [shell] + objs:
         xs = [(o.matrix_world @ Vector(c)) for c in o.bound_box]
@@ -611,6 +709,10 @@ VIEWS_DEF = {
     'frame': (Vector((13.0, -16.0, 5.5)), Vector((1.0, 0, 5.0)), 46),
     'shell': (Vector((13.0, -16.0, 5.5)), Vector((1.0, 0, 5.0)), 46),
     'shellb': (Vector((11.0, 15.0, 5.5)), Vector((0.5, 0, 5.0)), 46),
+    'shellf': (Vector((0.0, -10.0, 4.0)), Vector((0.0, 0, 3.8)), 60),
+    'eave': (Vector((9.0, -9.0, 4.0)), Vector((3.0, -3.5, 7.5)), 50),
+    'shellc': (Vector((2.0, -12.0, 9.0)), Vector((0.0, 0, 3.5)), 50),
+    'shelld': (Vector((-3.0, 13.0, 9.0)), Vector((0.0, 0, 3.0)), 50),
 }
 
 def backface_override():
@@ -627,7 +729,7 @@ def review(root, shell, objs):
     cam = FK.review_scene(root, variant=True)
     bf = '--backface' in argv
     if bf:
-        sc.view_layer.material_override = backface_override(); sc.cycles.samples = 6
+        bpy.context.view_layer.material_override = backface_override(); sc.cycles.samples = 6
     fig = bpy.data.objects.get('Figure175')
     if fig is None:
         bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.75, location=(-2.2, -5.0, 0.875))
