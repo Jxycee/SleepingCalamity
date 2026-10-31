@@ -13,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using SleepingCalamity.Core;
+using SleepingCalamity.Presentation;
 using UnityEditor;
 using UnityEngine;
 
@@ -55,18 +56,43 @@ namespace SleepingCalamity.EditorTools
             Transform holder = new GameObject("SquareGround").transform; holder.SetParent(set, false);
             holder.localPosition = new Vector3(0f, shelf, 0f);
 
-            // The stones are laid in shelf-relative metres: check the terrain really is the shelf under them (sampled every ~2 m).
-            float maxDrift = 0f; Vector2 worst = default; var cells = new HashSet<long>();
+            // The stones are laid in shelf-relative metres on a flat shelf; the town's ground is not flat under the whole square (the lane stubs slope away), so the setts and
+            // the bed are draped: a 0.5 m grid of Ground - shelf over the stones' bounds (+1 m), added to every stone's y by the spawner and to the bed's vertices here.
+            float minX = float.MaxValue, minZ = float.MaxValue, maxX = float.MinValue, maxZ = float.MinValue;
+            foreach (PStone s in data.stones)
+            {
+                if (s.p == null || s.p.Length < 3) continue;
+                minX = Mathf.Min(minX, s.p[0]); maxX = Mathf.Max(maxX, s.p[0]); minZ = Mathf.Min(minZ, s.p[2]); maxZ = Mathf.Max(maxZ, s.p[2]);
+            }
+            const float step = 0.5f;
+            var origin = new Vector2(Mathf.Floor((minX - 1f) / step) * step, Mathf.Floor((minZ - 1f) / step) * step);
+            int nx = Mathf.CeilToInt((maxX + 1f - origin.x) / step) + 1, nz = Mathf.CeilToInt((maxZ + 1f - origin.y) / step) + 1;
+            var drop = new float[nx * nz];
+            float maxCorr = 0f, maxCornerCorr = 0f, maxSlope = 0f;
+            for (int iz = 0; iz < nz; iz++)
+                for (int ix = 0; ix < nx; ix++)
+                {
+                    float x = origin.x + ix * step, z = origin.y + iz * step;
+                    float c = HollowmereLayout.Ground(t, x, z) - shelf;
+                    drop[iz * nx + ix] = c;
+                    maxCorr = Mathf.Max(maxCorr, Mathf.Abs(c));
+                    if (x >= -12f && x <= 8f && z >= -6f && z <= 8f) maxCornerCorr = Mathf.Max(maxCornerCorr, Mathf.Abs(c));
+                    if (ix > 0) maxSlope = Mathf.Max(maxSlope, Mathf.Abs(c - drop[iz * nx + ix - 1]) / step);
+                    if (iz > 0) maxSlope = Mathf.Max(maxSlope, Mathf.Abs(c - drop[(iz - 1) * nx + ix]) / step);
+                }
+            float residual = 0f; var cells = new HashSet<long>();
             foreach (PStone s in data.stones)
             {
                 if (s.p == null || s.p.Length < 3) continue;
                 long key = ((long)Mathf.FloorToInt(s.p[0] / 2f) << 32) ^ (uint)Mathf.FloorToInt(s.p[2] / 2f);
                 if (!cells.Add(key)) continue;
-                float dev = Mathf.Abs(HollowmereLayout.Ground(t, s.p[0], s.p[2]) - shelf);
-                if (dev > maxDrift) { maxDrift = dev; worst = new Vector2(s.p[0], s.p[2]); }
+                residual = Mathf.Max(residual, Mathf.Abs(HollowmereLayout.Ground(t, s.p[0], s.p[2]) - shelf - CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, s.p[0], s.p[2])));
             }
-            string drift = "SC HOLLOWMERE square ground: shelf y " + shelf.ToString("F3") + ", max |Ground - shelf| " + maxDrift.ToString("F3") + " m (worst at x " + worst.x.ToString("F1") + ", z " + worst.y.ToString("F1") + ") over " + cells.Count + " samples";
-            if (maxDrift > DriftWarn) Debug.LogWarning(drift + " (over " + DriftWarn + " m: the stones float or sink somewhere)"); else Debug.Log(drift);
+            Debug.Log("SC HOLLOWMERE square ground: shelf y " + shelf.ToString("F3") + ", draped on a " + nx + "x" + nz + " grid (" + step + " m): max correction " + maxCorr.ToString("F3") + " m, max slope " + maxSlope.ToString("F3")
+                + " (" + (Mathf.Atan(maxSlope) * Mathf.Rad2Deg).ToString("F1") + " deg), residual after drape " + residual.ToString("F3") + " m over " + cells.Count + " samples");
+            string corner = "SC HOLLOWMERE square ground: max correction inside the corner rect (x -12..8, z -6..8) " + maxCornerCorr.ToString("F3") + " m";
+            if (maxCornerCorr > 0.01f) Debug.LogWarning(corner + " (over 0.01 m: the draped square would move the approved corner's seam)"); else Debug.Log(corner);
+            if (residual > DriftWarn) Debug.LogWarning("SC HOLLOWMERE square ground: residual " + residual.ToString("F3") + " m after the drape (over " + DriftWarn + " m)");
 
             Dictionary<string, GameObject> prefabs = BeautyCornerGround.SettPrefabs(data.stones.Select(s => s.v).Where(v => !string.IsNullOrEmpty(v)).Distinct(), out Material bed);
             if (prefabs == null) { Debug.LogWarning("SC HOLLOWMERE square ground: the B6 Cobbles art (CobbleFamily.fbx) is missing, no setts"); return; }
@@ -76,6 +102,7 @@ namespace SleepingCalamity.EditorTools
             {
                 var bedGo = (GameObject)PrefabUtility.InstantiatePrefab(bedFbx, holder); bedGo.name = "Art_SquareBed";
                 BeautyCornerGround.Assign(bedGo, bed);
+                DrapeBed(bedGo, holder, folder, drop, origin, step, nx, nz);
             }
             else Debug.LogWarning("SC HOLLOWMERE square ground: SquareBed.fbx is missing");
 
@@ -83,13 +110,47 @@ namespace SleepingCalamity.EditorTools
             string[] names = prefabs.Keys.OrderBy(k => k, System.StringComparer.Ordinal).ToArray();
             var spawner = new GameObject("Setts").AddComponent<SleepingCalamity.Presentation.CobbleSpawner>();
             spawner.transform.SetParent(holder, false);
-            spawner.Configure(textAsset, names, names.Select(n => prefabs[n]).ToArray());
+            spawner.Configure(textAsset, names, names.Select(n => prefabs[n]).ToArray(), drop, origin, step, nx, nz);
             Debug.Log("SC HOLLOWMERE square ground: spawner with " + data.stones.Length + " stones from " + prefabs.Count + " variant prefabs");
 
-            PlaceDrains(holder, data.drains);
+            PlaceDrains(holder, data.drains, t, shelf);
         }
 
-        static void PlaceDrains(Transform holder, PDrain[] drains)
+        // Copies each bed mesh with its vertices moved up by the drape (vertex -> holder space -> + correction -> back), saved as <folder>/SquareBed_Draped[_n].asset
+        // (rewritten only when the vertices changed), and puts the copy on the instance's MeshFilter.
+        static void DrapeBed(GameObject bedGo, Transform holder, string folder, float[] drop, Vector2 origin, float step, int nx, int nz)
+        {
+            int n = 0;
+            foreach (MeshFilter mf in bedGo.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Mesh src = mf.sharedMesh;
+                if (src == null) continue;
+                Matrix4x4 m = holder.worldToLocalMatrix * mf.transform.localToWorldMatrix, inv = m.inverse;
+                Vector3[] v = src.vertices;
+                for (int i = 0; i < v.Length; i++)
+                {
+                    Vector3 p = m.MultiplyPoint3x4(v[i]);
+                    p.y += SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x, p.z);
+                    v[i] = inv.MultiplyPoint3x4(p);
+                }
+                string path = folder + "/SquareBed_Draped" + (n == 0 ? "" : "_" + n) + ".asset"; n++;
+                var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+                Mesh result;
+                if (existing != null && existing.vertexCount == v.Length && existing.vertices.SequenceEqual(v) && existing.subMeshCount == src.subMeshCount) result = existing;
+                else
+                {
+                    var copy = Object.Instantiate(src); copy.name = "SquareBed_Draped"; copy.vertices = v;
+                    copy.RecalculateBounds();
+                    if (src.normals != null && src.normals.Length > 0) copy.RecalculateNormals();   // the drape tilts the bed a little: keep the lighting honest
+                    if (existing != null) { EditorUtility.CopySerialized(copy, existing); Object.DestroyImmediate(copy); result = existing; EditorUtility.SetDirty(result); }
+                    else { AssetDatabase.CreateAsset(copy, path); result = copy; }
+                    AssetDatabase.SaveAssets();
+                }
+                mf.sharedMesh = result;
+            }
+        }
+
+        static void PlaceDrains(Transform holder, PDrain[] drains, TownLayout t, float shelf)
         {
             if (drains == null) return;
             Transform group = Child(holder, "Drains");
@@ -101,7 +162,7 @@ namespace SleepingCalamity.EditorTools
             {
                 PDrain d = drains[i];
                 if (d.p == null || d.p.Length < 3) continue;
-                var pos = new Vector3(d.p[0], d.p[1], d.p[2]);
+                var pos = new Vector3(d.p[0], d.p[1] + HollowmereLayout.Ground(t, d.p[0], d.p[2]) - shelf, d.p[2]);   // on the draped ground
                 if (fbx != null)
                 {
                     var go = (GameObject)PrefabUtility.InstantiatePrefab(fbx, group); go.name = "Drain_" + i;
@@ -285,10 +346,10 @@ namespace SleepingCalamity.EditorTools
                     hook = new Vector3(float.Parse(m.Groups[1].Value, ci), float.Parse(m.Groups[2].Value, ci), float.Parse(m.Groups[3].Value, ci));
                 }
             }
-            // The same B8 art path as the corner's StallLantern row; the art's origin is its base, so it hangs 0.34 m below the hook.
+            // The same B8 art path as the corner's StallLantern row (same row id, so the same material and textures, none per post); the art's origin is its base, so it hangs 0.34 m below the hook.
             var row = new BeautyCornerTable.Row
             {
-                Brief = "Square dressing", Id = "Lantern_" + r.Id, Batch = "B8", Names = new[] { "stall_lantern", "lantern", "hanging_lantern" },
+                Brief = "Square dressing", Id = "StallLantern", Batch = "B8", Names = new[] { "stall_lantern", "lantern", "hanging_lantern" },
                 Instances = new[] { new BeautyCornerTable.Instance(hook.x, hook.y - 0.34f, hook.z) },
                 Placeholder = new[] { new BeautyCornerTable.Part(BeautyCornerTable.PartShape.Box, new Vector3(0f, 0.17f, 0f), new Vector3(0.2f, 0.34f, 0.2f), "warm") },
             };

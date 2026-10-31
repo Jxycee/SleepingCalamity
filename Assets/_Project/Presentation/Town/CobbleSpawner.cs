@@ -31,12 +31,31 @@ namespace SleepingCalamity.Presentation
         [SerializeField] string[] m_VariantNames = new string[0];
         [SerializeField] GameObject[] m_VariantPrefabs = new GameObject[0];
 
+        // Optional height correction (the square draped onto the town's ground): a grid of y offsets in this object's local x/z, bilinear; empty = none (the corner).
+        [SerializeField] float[] m_DropY = new float[0];
+        [SerializeField] Vector2 m_DropOrigin;
+        [SerializeField] float m_DropStep;
+        [SerializeField] int m_DropNX, m_DropNZ;
+
         Transform _container;
         static readonly List<Transform> s_Scratch = new List<Transform>(4096);
 
-        public void Configure(TextAsset placements, string[] variantNames, GameObject[] variantPrefabs)
+        // The y offset of the correction grid at local (x, z): bilinear, clamped to the grid edge; 0 when there is no grid. Also used by the editor to drape meshes the same way.
+        public static float SampleDrop(float[] dropY, Vector2 origin, float step, int nx, int nz, float x, float z)
+        {
+            if (dropY == null || step <= 0f || nx < 2 || nz < 2 || dropY.Length < nx * nz) return 0f;
+            float fx = Mathf.Clamp((x - origin.x) / step, 0f, nx - 1f), fz = Mathf.Clamp((z - origin.y) / step, 0f, nz - 1f);
+            int ix = Mathf.Min((int)fx, nx - 2), iz = Mathf.Min((int)fz, nz - 2);
+            float tx = fx - ix, tz = fz - iz;
+            int i = iz * nx + ix;
+            float a = dropY[i] + (dropY[i + 1] - dropY[i]) * tx, b = dropY[i + nx] + (dropY[i + nx + 1] - dropY[i + nx]) * tx;
+            return a + (b - a) * tz;
+        }
+
+        public void Configure(TextAsset placements, string[] variantNames, GameObject[] variantPrefabs, float[] dropY = null, Vector2 dropOrigin = default, float dropStep = 0f, int dropNX = 0, int dropNZ = 0)
         {
             m_Placements = placements; m_VariantNames = variantNames; m_VariantPrefabs = variantPrefabs;
+            m_DropY = dropY ?? new float[0]; m_DropOrigin = dropOrigin; m_DropStep = dropStep; m_DropNX = dropNX; m_DropNZ = dropNZ;
             if (isActiveAndEnabled) Rebuild();
         }
 
@@ -90,6 +109,7 @@ namespace SleepingCalamity.Presentation
             container.transform.SetParent(transform, false);
             _container = container.transform;
             int spawned = 0;
+            bool drop = m_DropY != null && m_DropY.Length > 0;
             GameObject lastPrefab = null; string lastVariant = null;
             foreach (Sett s in data.Setts)
             {
@@ -97,7 +117,9 @@ namespace SleepingCalamity.Presentation
                 if (lastPrefab == null) continue;
                 GameObject go = Instantiate(lastPrefab, _container, false);
                 go.name = lastPrefab.name;
-                go.transform.SetLocalPositionAndRotation(s.Pos, s.Rot);
+                Vector3 pos = s.Pos;
+                if (drop) pos.y += SampleDrop(m_DropY, m_DropOrigin, m_DropStep, m_DropNX, m_DropNZ, pos.x, pos.z);
+                go.transform.SetLocalPositionAndRotation(pos, s.Rot);
                 go.transform.localScale = s.Scale;
                 spawned++;
             }
