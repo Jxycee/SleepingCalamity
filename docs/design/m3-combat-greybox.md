@@ -206,7 +206,13 @@ editor). The simulator delays each packet at the send and the receive stage of b
 the manual walk: add a NetworkSimulator component to the App object, pick "37 ms, 2% loss" (custom preset), and play the two-player arena; hits on the attacker's
 screen must play instantly (spark, hitstop, sound) and the damage number must follow within about one round trip.
 
-## Proposal: enemies that answer the mash (combat depth, 2026-10-30, awaiting the user's approval)
+## Combat depth: enemies that answer the mash (branch `claude/combat-depth-276a8c`, 2026-10-30)
+**Status:** approved by the user 2026-10-30 (all six changes; counter style "trade + broom riposte"; toughness as proposed) and built as written.
+Core: `Poise.cs` (`PoiseMeter`, `EnemyWindows`, `GuardCounter`), `AttackData.Poise`, `EnemyModel.ApplyHit`, `GuardMath.ParryArmed`,
+`DodgeTiming.IsPerfect`, `CombatRewards.OnPerfectDodge`, `AttackCatalog.BroomRiposte` (appended last), `ArenaWaves`, `AttackPacing.Tier1` (1 token).
+Host: `Enemy` (`NetFlags`, `ServerOpen`, steadiness at the end of a flinch, the riposte via `ForceAcquire`, `ServerPerfectDodged`),
+`CombatHost.ServerPerfectDodge`. Owner: `HeroCombat` (parry lockout, perfect-dodge report, clank and opening cues at contact). Tests: `CombatDepthTests`.
+Rewards cue reuse: the clank is the `Blocked` cue, the opening ring is `HitCrit`, the perfect dodge chime is `Parry` (new sounds can follow the playtest).
 User verdict after the enemy-polish retest: "It mostly feels like mindless button mashing right now." Chosen directions: research how other games do it,
 enemies punish mashing, fewer and tougher enemies. Research: `docs/research/combat-depth.md` (ranked mechanics and their costs).
 
