@@ -8,11 +8,11 @@ Review renders: `--stair --room` (chain per the contract placements, proxy light
 ## Hierarchy (root `CellarStair`, every piece a direct child mesh at its own pivot at the origin)
 | piece | tris | slots | Unity extent (m) |
 |---|---|---|---|
-| StairFlight | 4,452 | CV_VaultStone, CV_Limewash, CV_Brick, CV_Mortar | x -1.00..1.00, z -0.03..2.03, y -2.10..2.50 |
-| StairTurn | 3,724 | CV_VaultStone, CV_Limewash, CV_Brick, CV_Mortar | x -1.00..1.00, z -0.40..1.60, y -1.80..3.00 |
-| StairDoor | 6,028 | CV_Mortar, CV_Flagstone, CV_Limewash, CV_Brick, CV_VaultStone, CV_Oak, CV_Iron | x -1.60..1.60, z -3.60..0.02, y -0.24..3.20 |
+| StairFlight | 3,748 | CV_VaultStone, CV_Brick, CV_Mortar | x -1.00..1.00, z -0.03..2.03, y -2.10..2.50 |
+| StairTurn | 3,724 | CV_VaultStone, CV_Brick, CV_Mortar | x -1.00..1.00, z -0.40..1.60, y -1.80..3.00 |
+| StairDoor | 6,028 | CV_Mortar, CV_Flagstone, CV_VaultStone, CV_Limewash, CV_Oak, CV_Iron | x -1.60..1.60, z -3.60..0.02, y -0.24..3.20 |
 
-Total 14,204 tris (cap 20k, piece cap 8k). Axes as CellarVault (authored z up, exported -Z forward / Y up, identity transforms).
+Total 13,500 tris (cap 20k, piece cap 8k). Axes as CellarVault (authored z up, exported -Z forward / Y up, identity transforms).
 
 ## Deviations from the contract
 - StairFlight side walls top out at nosing + 1.9 (contract 1.75) so they stay above every ring's springing; vault rings, steps and arch band as contracted.
@@ -24,3 +24,6 @@ Tread polish (B) on the flight centre line and the winders' walking line round t
 
 ## Round 2 (2026-10-31)
 Side walls, landing walls, turn left wall, corner pier and tympanum are CV_Limewash (brick stays on arch bands and the turn's front wall); wall stones are near flush (0.015 proud) plus 3 thin bare-brick patches (0.012 proud) per flight wall; wall prisms and boxes are unchamfered so joins between pieces leave no dark seam slot.
+
+## Round 3 (2026-10-31)
+Side walls, landing walls, turn left wall, pier and tympanum are CV_VaultStone (grey-brown rubble); the proud wall stones and bare-brick patches are removed; the door wall's house face is CV_Limewash (StairDoor no longer uses CV_Brick). Brick stays on the arch bands and the turn's front wall.

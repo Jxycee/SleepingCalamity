@@ -879,7 +879,7 @@ def p_stair_door():
     r = 0.5                                                                                    # door wall with the arched doorway (1.0 wide, springing 1.6)
     prof = ([(-1.6, -0.2), (-0.5, -0.2), (-0.5, 1.6)] + [(r * math.cos(math.pi * (1 - i / 16)), 1.6 + r * math.sin(math.pi * (1 - i / 16))) for i in range(1, 16)] +
             [(0.5, 1.6), (0.5, -0.2), (1.6, -0.2), (1.6, 3.2), (-1.6, 3.2)])
-    solid(pc, prism_ax(prof, 'y', -1.6, -1.2), 'brick', cham=0.03)
+    solid(pc, prism_ax(prof, 'y', -1.6, -1.2), 'lime', cham=0.03)      # limewashed house face (a brick door wall read maroon)
     for sx in (-1, 1):                                                                         # vault-stone jambs and voussoirs on the house face
         for k in range(4):
             box(pc, 'vault', (0.22 + R.uniform(0, 0.04), 0.14, 0.38), (sx * (0.61 + R.uniform(0, 0.02)), -1.67, 0.2 + 0.4 * k), Rx(R.uniform(-0.6, 0.6)),

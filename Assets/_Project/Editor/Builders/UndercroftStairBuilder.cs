@@ -21,7 +21,7 @@ namespace SleepingCalamity.EditorTools
         public const string ScenePath = "Assets/_Project/Scenes/UndercroftStair.unity";
         public const string KitFolder = "Assets/_Project/Content/Art/Cellar/B5/CellarStair";
         public const string KitFbx = "CellarStair.fbx";
-        const float HouseSpot = 14f, HouseFill = 3f;   // house daylight tuning
+        const float HouseSpot = 3.5f, HouseFill = 0.8f;   // house daylight tuning
 
         // piece, position, yaw (degrees about +Y). Door and flight A share an origin: the door's landing runs the other way (local -Z).
         static readonly (string Name, string Piece, Vector3 Pos, float Yaw)[] Placements =
@@ -70,6 +70,8 @@ namespace SleepingCalamity.EditorTools
             Light day = LookTestBuilder.AddLight(lighting, "HouseDaylight", LightType.Spot, winPos, Quaternion.LookRotation(winAim - winPos, Vector3.up),
                 new Color(0.86f, 0.89f, 0.96f), HouseSpot, 12f, LightShadows.Soft);
             day.spotAngle = 110f; day.innerSpotAngle = 70f;
+            // Cool daylight spilling out of the door onto the landing and the first steps.
+            LookTestBuilder.AddLight(lighting, "DoorSpill", LightType.Point, new Vector3(3.2f, 9.9f, -3.1f), Quaternion.identity, new Color(0.86f, 0.89f, 0.96f), 1.6f, 3.6f, LightShadows.None);
             LookTestBuilder.AddLight(lighting, "HouseFill", LightType.Point, new Vector3(3.2f, 11.2f, -0.6f), Quaternion.identity, new Color(0.86f, 0.89f, 0.96f), HouseFill, 8f, LightShadows.None);
             // Few, small motes well down the stair (none within 2 m of a capture camera).
             DungeonCornerBuilder.Motes(lighting, "Motes_Stair", new Vector3(3.2f, 8.2f, -5.2f), new Vector3(0.8f, 0.9f, 1.2f), 24, own);
@@ -81,15 +83,18 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.Box(stair, "Corbel_Foot", new Vector3(candle.x, candle.y - 0.16f, -7.14f), new Vector3(0.2f, 0.12f, 0.14f), stone);
             DungeonCornerBuilder.CandleCluster(stair, lighting, own, candle, "Turn1", new Vector3(0, 0.25f, 0.15f));
             Light candleLight = lighting.Find("CandleLightTurn1").GetComponent<Light>();
-            candleLight.range = 3.5f; candleLight.color = new Color(1.0f, 0.76f, 0.52f);   // the room's paler gold
+            candleLight.intensity = 2.4f; candleLight.range = 3.5f; candleLight.color = new Color(1.0f, 0.76f, 0.52f);   // the room's paler gold
 
             // Turn2: a B11 lantern on a hook on the front wall (world x -0.6 face), gold, soft shadows, motes.
-            DungeonCornerBuilder.Lanterns(stair, lighting, own, new[] { (new Vector3(-0.55f, 6.4f, -6.8f), new Vector3(-1, 0, 0)) }, "Turn2", 4f, 7f);
+            DungeonCornerBuilder.Lanterns(stair, lighting, own, new[] { (new Vector3(-0.55f, 6.4f, -6.8f), new Vector3(-1, 0, 0)) }, "Turn2", 6f, 7f);
 
             // Warm bounce mid StairEntry.
-            LookTestBuilder.AddLight(lighting, "EntryBounce", LightType.Point, new Vector3(0f, 2.5f, -2.5f), Quaternion.identity, new Color(1.0f, 0.84f, 0.62f), 1.0f, 4.0f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "EntryBounce", LightType.Point, new Vector3(0f, 2.5f, -2.5f), Quaternion.identity, new Color(0.96f, 0.88f, 0.76f), 2.0f, 4.5f, LightShadows.None);
             // Greyer ambient than the room's warm umber/plum (stair scene only): the tunnel and walls read stone, not maroon.
-            RenderSettings.ambientSkyColor = new Color(0.20f, 0.185f, 0.17f); RenderSettings.ambientEquatorColor = new Color(0.19f, 0.175f, 0.155f);
+            RenderSettings.ambientSkyColor = new Color(0.19f, 0.18f, 0.17f); RenderSettings.ambientEquatorColor = new Color(0.18f, 0.17f, 0.16f);
+
+            // Top zone only: a local volume that overrides just the vignette (the shared DungeonCorner_Profile stays as approved).
+            TopVignetteVolume(lighting);
 
             // One probe per zone (the room keeps its own): house/top, turns, bottom.
             AddZoneProbe(lighting, "Probe_Top", new Vector3(3.2f, 9.6f, -3.0f), new Vector3(5f, 4.6f, 6f));
@@ -109,6 +114,21 @@ namespace SleepingCalamity.EditorTools
 
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC STAIR scene built " + ScenePath);
+        }
+
+        static void TopVignetteVolume(Transform parent)
+        {
+            const string path = "Assets/_Project/Content/Materials/UndercroftStair/US_TopVolume.asset";
+            var profile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(path);
+            if (profile == null) { profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>(); AssetDatabase.CreateAsset(profile, path); }
+            profile.components.Clear();
+            var vig = profile.Add<UnityEngine.Rendering.Universal.Vignette>(true);
+            vig.intensity.Override(0.15f);
+            EditorUtility.SetDirty(vig); EditorUtility.SetDirty(profile); AssetDatabase.SaveAssets();
+            var go = new GameObject("TopVolume"); go.transform.SetParent(parent, false);
+            go.transform.position = new Vector3(3.2f, 10.2f, -1.4f);
+            var box = go.AddComponent<BoxCollider>(); box.isTrigger = true; box.size = new Vector3(4.8f, 3.4f, 6.4f);
+            var vol = go.AddComponent<UnityEngine.Rendering.Volume>(); vol.isGlobal = false; vol.priority = 2f; vol.blendDistance = 1f; vol.sharedProfile = profile;
         }
 
         // House interior: limewashed stone walls, flagstone floor, two oak beams, a faint cool window quad on the east wall (the light itself comes from HouseDaylight).
