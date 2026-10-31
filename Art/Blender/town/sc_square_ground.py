@@ -300,7 +300,7 @@ def heights_and_damage(stones):
         if th > 0:
             if r.random() < th:
                 if r.random() < 0.14: weeds.append(dict(p=[x, base - 0.02, z], kind='lot_edge' if lot_dist(x, z) < 1.8 else 'edge_grass'))
-                if r.random() < 0.05 * th:     # a dislodged sett left lying in the dirt
+                if r.random() < 0.012 * th:    # a dislodged sett left lying in the dirt (r2: was 0.05, read as a field of pegs)
                     loose.append(dict(v=s['v'], x=x, z=z, a=r.uniform(0, 6.28), top=None, tilt=(r.uniform(0.2, 0.5), r.uniform(-0.3, 0.3)), s=s['s']))
                 continue
             top -= th * r.uniform(0.004, 0.02); tx += r.gauss(0, 0.05 * th); tz += r.gauss(0, 0.05 * th)
@@ -339,8 +339,12 @@ def records(kept, loose):
             if kind == 'sett': y = s['top']
             elif C.VAR[v][4] == 'frag': y = ground - 0.004
             else:
-                Mb = Matrix.Rotation(r.uniform(-1, 1) * 0.3, 4, 'Z') @ Matrix.Rotation(math.pi / 2 * r.choice((-1, 1)), 4, 'X') @ Matrix.Rotation(yaw_b, 4, 'Z')
-                y = ground + C.VAR[v][2] * s['s'] / 2 - 0.004
+                if r.random() < 0.25:                     # a few lie on their side, as in the corner
+                    Mb = Matrix.Rotation(r.uniform(-1, 1) * 0.3, 4, 'Z') @ Matrix.Rotation(math.pi / 2 * r.choice((-1, 1)), 4, 'X') @ Matrix.Rotation(yaw_b, 4, 'Z')
+                    y = ground + C.VAR[v][2] * s['s'] / 2 - 0.004
+                else:                                     # most lie top-up, tipped and half sunk in the dirt (r2: on-side stones read as dark pegs)
+                    Mb = Matrix.Rotation(r.uniform(0.15, 0.4) * r.choice((-1, 1)), 4, 'X') @ Matrix.Rotation(r.uniform(-0.2, 0.2), 4, 'Y') @ Matrix.Rotation(yaw_b, 4, 'Z')
+                    y = ground + r.uniform(0.0, 0.03)
             sc = (s['s'], s['s'], 1.0 if kind == 'sett' else s['s'])
             recs.append(dict(v=v, kind=kind, p=[round(s['x'], 3), round(y, 4), round(s['z'], 3)], q=[round(c, 4) for c in P.rot_b2u_quat(Mb)],
                              s=[round(sc[0], 3), round(sc[2], 3), round(sc[1], 3)]))
