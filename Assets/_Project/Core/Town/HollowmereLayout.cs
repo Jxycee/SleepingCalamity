@@ -323,21 +323,148 @@ namespace SleepingCalamity.Core
             ("F06", BuildingKind.Townhouse), ("F07", BuildingKind.Townhouse),   // kit family 3 (sc_townhouse.py): the pair on the south side, both facing the fountain
             ("F03", BuildingKind.Empty), ("F10", BuildingKind.Empty),
         };
-        // Ring 2 kit homes, east side of the Ring Lane, both on the square side with their fronts to the lane: R2_09 (S, 6 m) the stone cottage (kit family 2, StoneCottage_B),
-        // R2_08 (M, 8 m) the workshop (kit family 4, Workshop_B). Their pads keep the layout heights.
-        // Kit-ready shops (design 6, queue Q2) on ring-2 M lots: R2_01 the smithy, R2_03 the schoolhouse; any free M lot would take them in play.
-        static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing2 =
+        // Ring 2 lots fixed by hand: R2_09 (S, 6 m) the stone cottage B and R2_08 (M, 8 m) the workshop B (Q1), east side of the Ring Lane, fronts to the lane;
+        // the kit-ready shops (design 6, queue Q2) on M lots: R2_01 the smithy, R2_03 the schoolhouse (no variant). Their pads keep the layout heights.
+        // The seeded fill below never touches them (and uses them as neighbours).
+        static readonly (string Foundation, BuildingKind Kind, char Variant, int Turn)[] RebuiltRing2Fixed =
         {
-            ("R2_09", BuildingKind.StoneCottage), ("R2_08", BuildingKind.Workshop),
-            ("R2_01", BuildingKind.Smithy), ("R2_03", BuildingKind.Schoolhouse),
+            ("R2_09", BuildingKind.StoneCottage, 'B', 0), ("R2_08", BuildingKind.Workshop, 'B', 0),
+            ("R2_01", BuildingKind.Smithy, ' ', 0), ("R2_03", BuildingKind.Schoolhouse, ' ', 0),
         };
+        // Ring 1 townhouses (kit family 3): the pair on the south side, both facing the fountain.
+        static readonly (string Foundation, char Variant, int Turn)[] RebuiltTownhouses = { ("F06", 'A', 0), ("F07", 'B', 0) };
         static readonly string[] RebuiltGardens = { "R2_07", "R2_18", "R2_22", "R3_02" };   // left as allotments in the rebuilt massing
+
+        // ---- the seeded ring 2 fill (Q3) ----
+        // Pool = every ring 2 lot that is not fixed above, not a garden, not an L lot (no home kit fits: the large lots wait for the schoolhouse and the like) and
+        // not reserved. Nothing is reserved now: R2_17 was held for the smithy until Q2 put it on R2_01 (fixed above).
+        public static readonly string[] Ring2Reserved = new string[0];
+        public const int Ring2Seed = 20261031;
+        public const float Ring2EmptyShare = 0.30f;      // about 30% of the pool stay ruins (the tests accept 25-35%)
+        public const float NeighbourDistance = 22f;      // "neighbouring": lot centres closer than this (about one lot and a half plus the lane across), on either side of the lane
+
+        // Kit variants by class (the FBXs that exist): S lots take the three cottages or Workshop_A, M lots the three townhouses or Workshop_B / C.
+        public static IEnumerable<(BuildingKind Kind, char Variant)> HomeVariants(FoundationSize size)
+        {
+            if (size == FoundationSize.S)
+            {
+                yield return (BuildingKind.StoneCottage, 'A'); yield return (BuildingKind.StoneCottage, 'B'); yield return (BuildingKind.StoneCottage, 'C');
+                yield return (BuildingKind.Workshop, 'A');
+            }
+            else if (size == FoundationSize.M)
+            {
+                yield return (BuildingKind.Townhouse, 'A'); yield return (BuildingKind.Townhouse, 'B'); yield return (BuildingKind.Townhouse, 'C');
+                yield return (BuildingKind.Workshop, 'B'); yield return (BuildingKind.Workshop, 'C');
+            }
+        }
+
+        /// <summary>One placed (or deliberately empty) lot of the Rebuilt preset: the family, the variant letter (A-C) and the turn in quarter turns (0 = front to the door side).</summary>
+        public readonly struct HomeAssignment
+        {
+            public readonly BuildingKind Kind; public readonly char Variant; public readonly int Turn;
+            public HomeAssignment(BuildingKind kind, char variant, int turn) { Kind = kind; Variant = variant; Turn = turn; }
+            /// <summary>The art name, e.g. "Townhouse_A" (the FBX folder).</summary>
+            public string VariantName => Kind + "_" + Variant;
+        }
+
+        /// <summary>The ring 2 lots the seeded fill considers, in table order (see the comment on Ring2Reserved).</summary>
+        public static List<Foundation> Ring2Pool(TownLayout t)
+        {
+            var pool = new List<Foundation>();
+            foreach (Foundation f in t.Foundations)
+            {
+                if (f.Ring != 2 || f.Size == FoundationSize.L) continue;
+                if (Array.IndexOf(RebuiltGardens, f.Id) >= 0 || Array.IndexOf(Ring2Reserved, f.Id) >= 0) continue;
+                bool fixedLot = false;
+                foreach (var r in RebuiltRing2Fixed) if (r.Foundation == f.Id) fixedLot = true;
+                if (!fixedLot) pool.Add(f);
+            }
+            return pool;
+        }
+
+        /// <summary>The deterministic ring 2 assignment for a layout: pool lot id to its home or Empty. Empties are picked by farthest-point sampling (so they spread round the ring); the rest take a variant that fits their class and differs from every assigned lot within NeighbourDistance (the fixed R2_08 / R2_09
+        /// and the ring 1 townhouses count), so no neighbour repeats a variant (and a variant + turn pair can never repeat along a lane). Turn is 0 everywhere: fronts to the lane.</summary>
+        public static Dictionary<string, HomeAssignment> AssignRing2(TownLayout t, int seed)
+        {
+            List<Foundation> pool = Ring2Pool(t);
+            var rng = new Lcg((uint)seed);
+            int empties = (int)Math.Round(pool.Count * Ring2EmptyShare);
+            // Farthest-point sampling: a seeded first empty, then each next one is the pool lot farthest from every empty so far, so the ruins spread round the ring.
+            var empty = new HashSet<string>();
+            var picked = new List<Foundation> { pool[rng.Next(pool.Count)] };
+            while (picked.Count < empties)
+            {
+                Foundation best = null; float bestD = -1f;
+                foreach (Foundation f in pool)
+                {
+                    if (picked.Contains(f)) continue;
+                    float d = float.MaxValue;
+                    foreach (Foundation q in picked) d = Math.Min(d, TownPoint.Distance(f.Centre, q.Centre));
+                    if (d > bestD + 1e-3f) { bestD = d; best = f; }
+                }
+                picked.Add(best);
+            }
+            foreach (Foundation f in picked) empty.Add(f.Id);
+
+            var result = new Dictionary<string, HomeAssignment>();
+            var placed = new List<(TownPoint Centre, BuildingKind Kind, char Variant)>();
+            foreach (var r in RebuiltRing2Fixed) placed.Add((t.Foundation(r.Foundation).Centre, r.Kind, r.Variant));
+            foreach (var r in RebuiltTownhouses) placed.Add((t.Foundation(r.Foundation).Centre, BuildingKind.Townhouse, r.Variant));
+            var todo = new List<Foundation>();
+            foreach (Foundation f in pool) { if (empty.Contains(f.Id)) result[f.Id] = new HomeAssignment(BuildingKind.Empty, 'A', 0); else todo.Add(f); }
+
+            var order = new List<List<(BuildingKind, char)>>();
+            foreach (Foundation f in todo)
+            {
+                var c = new List<(BuildingKind, char)>(HomeVariants(f.Size));
+                for (int i = c.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); var tmp = c[i]; c[i] = c[j]; c[j] = tmp; }
+                order.Add(c);
+            }
+            if (!Fill(todo, order, 0, placed, result)) throw new InvalidOperationException("ring 2 fill: no variant assignment avoids neighbouring duplicates");
+            return result;
+        }
+
+        static bool Fill(List<Foundation> todo, List<List<(BuildingKind, char)>> order, int i, List<(TownPoint Centre, BuildingKind Kind, char Variant)> placed, Dictionary<string, HomeAssignment> result)
+        {
+            if (i == todo.Count) return true;
+            Foundation f = todo[i];
+            foreach (var (kind, variant) in order[i])
+            {
+                bool clash = false;
+                foreach (var p in placed) if (p.Kind == kind && p.Variant == variant && TownPoint.Distance(p.Centre, f.Centre) < NeighbourDistance) { clash = true; break; }
+                if (clash) continue;
+                placed.Add((f.Centre, kind, variant)); result[f.Id] = new HomeAssignment(kind, variant, 0);
+                if (Fill(todo, order, i + 1, placed, result)) return true;
+                placed.RemoveAt(placed.Count - 1); result.Remove(f.Id);
+            }
+            return false;
+        }
+
+        // A tiny deterministic generator (the assignment must not depend on System.Random's implementation).
+        sealed class Lcg
+        {
+            uint _s;
+            public Lcg(uint seed) { _s = seed * 2654435761u + 1u; }
+            public int Next(int bound) { unchecked { _s = _s * 1664525u + 1013904223u; return (int)((_s >> 8) % (uint)bound); } }
+        }
+
+        static Dictionary<string, HomeAssignment> _ring2;
+        static Dictionary<string, HomeAssignment> Ring2() => _ring2 ?? (_ring2 = AssignRing2(Create(), Ring2Seed));
+
+        public static HomeAssignment RebuiltHome(string foundationId)
+        {
+            foreach (var r in RebuiltTownhouses) if (r.Foundation == foundationId) return new HomeAssignment(BuildingKind.Townhouse, r.Variant, r.Turn);
+            foreach (var r in RebuiltRing2Fixed) if (r.Foundation == foundationId) return new HomeAssignment(r.Kind, r.Variant, r.Turn);
+            if (Ring2().TryGetValue(foundationId, out HomeAssignment a)) return a;
+            return new HomeAssignment(RebuiltBuilding(foundationId), 'A', 0);
+        }
 
         public static BuildingKind RebuiltBuilding(string foundationId)
         {
             foreach (var r in RebuiltRing1) if (r.Foundation == foundationId) return r.Kind;
-            foreach (var r in RebuiltRing2) if (r.Foundation == foundationId) return r.Kind;
+            foreach (var r in RebuiltRing2Fixed) if (r.Foundation == foundationId) return r.Kind;
             if (Array.IndexOf(RebuiltGardens, foundationId) >= 0) return BuildingKind.Garden;
+            if (Ring2().TryGetValue(foundationId, out HomeAssignment a)) return a.Kind;
             return foundationId.StartsWith("F", StringComparison.Ordinal) ? BuildingKind.Empty : BuildingKind.Home;
         }
 

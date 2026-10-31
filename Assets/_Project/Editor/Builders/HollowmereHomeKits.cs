@@ -73,7 +73,7 @@ namespace SleepingCalamity.EditorTools
         public static Color Hex(int r, int g, int b) => new Color(r / 255f, g / 255f, b / 255f).linear;
 
         // Instantiates folder/variant/variant.fbx in lot frame g, assigns slots per renderer, adds the FOOTPRINT collider and checks the class. False when the art is missing.
-        public static bool Place(Transform g, Foundation f, string folder, string variant, string label, System.Func<Dictionary<string, Material>> materials)
+        public static bool Place(Transform g, Foundation f, string folder, string variant, int turn, string label, System.Func<Dictionary<string, Material>> materials)
         {
             string dir = folder + "/" + variant;
             GameObject fbx = BeautyCornerArt.LoadModel(dir, variant + ".fbx", keepMaterialSlots: true);
@@ -92,7 +92,7 @@ namespace SleepingCalamity.EditorTools
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(fbx, g);
             obj.name = "Art_" + variant;
             obj.transform.localPosition = new Vector3(0f, FootingTop, 0f);
-            obj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            obj.transform.localRotation = Quaternion.Euler(0f, 180f + 90f * turn, 0f);   // turn = quarter turns from the door side (HollowmereLayout.HomeAssignment.Turn)
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
                 if (r.name == "FOOTPRINT") continue;
@@ -128,8 +128,7 @@ namespace SleepingCalamity.EditorTools
     {
         public const string Folder = "Assets/_Project/Content/Art/Town/Ring1/StoneCottage";
 
-        // Variant per lot; any other S lot gets A or C by its id. Per variant: SC_Rubble tint, SC_Thatch tint (B and C only), door and shutter paint (linear), as SOURCES.md.
-        static readonly Dictionary<string, string> LotVariant = new Dictionary<string, string> { { "R2_09", "StoneCottage_B" } };
+        // The variant and turn per lot come from HollowmereLayout.RebuiltHome (the seeded ring 2 fill). Per variant: SC_Rubble tint, SC_Thatch tint (B and C only), door and shutter paint (linear), as SOURCES.md.
         static readonly Dictionary<string, (Color Rubble, Color Thatch, Color Paint)> Looks = new Dictionary<string, (Color, Color, Color)>
         {
             { "StoneCottage_A", (new Color(0.56f, 0.64f, 0.80f), Color.white, new Color(0.0482f, 0.0931f, 0.162f)) },     // slate blue, red tile roof (no thatch)
@@ -137,13 +136,11 @@ namespace SleepingCalamity.EditorTools
             { "StoneCottage_C", (new Color(0.58f, 0.63f, 0.78f), new Color(2.05f, 1.92f, 1.30f), new Color(0.1441f, 0.0273f, 0.0222f)) },   // oxblood
         };
 
-        public static string VariantFor(string foundationId) =>
-            LotVariant.TryGetValue(foundationId, out string v) ? v : (foundationId[foundationId.Length - 1] & 1) == 0 ? "StoneCottage_A" : "StoneCottage_C";
-
         public static bool Place(Transform g, Foundation f)
         {
-            string variant = VariantFor(f.Id);
-            return HomeKitBuild.Place(g, f, Folder, variant, "stonecottage", () => Materials(variant));
+            HollowmereLayout.HomeAssignment a = HollowmereLayout.RebuiltHome(f.Id);
+            string variant = a.VariantName;
+            return HomeKitBuild.Place(g, f, Folder, variant, a.Turn, "stonecottage", () => Materials(variant));
         }
 
         static Dictionary<string, Material> Materials(string variant)
@@ -168,7 +165,6 @@ namespace SleepingCalamity.EditorTools
     {
         public const string Folder = "Assets/_Project/Content/Art/Town/Ring1/Workshop";
 
-        static readonly Dictionary<string, string> LotVariant = new Dictionary<string, string> { { "R2_08", "Workshop_B" } };
         // Linear paint (SOURCES.md): A sage, B oxblood, C slate blue.
         static readonly Dictionary<string, Color> PaintLinear = new Dictionary<string, Color>
         {
@@ -178,13 +174,11 @@ namespace SleepingCalamity.EditorTools
         // Class per variant: only A fits an S lot.
         public static FoundationSize ClassOf(string variant) => variant == "Workshop_A" ? FoundationSize.S : FoundationSize.M;
 
-        public static string VariantFor(string foundationId) =>
-            LotVariant.TryGetValue(foundationId, out string v) ? v : "Workshop_B";
-
         public static bool Place(Transform g, Foundation f)
         {
-            string variant = VariantFor(f.Id);
-            return HomeKitBuild.Place(g, f, Folder, variant, "workshop", () => Materials(variant));
+            HollowmereLayout.HomeAssignment a = HollowmereLayout.RebuiltHome(f.Id);
+            string variant = a.VariantName;
+            return HomeKitBuild.Place(g, f, Folder, variant, a.Turn, "workshop", () => Materials(variant));
         }
 
         static Dictionary<string, Material> Materials(string variant)
