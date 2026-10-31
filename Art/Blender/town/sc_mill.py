@@ -1,4 +1,4 @@
-"""Mill: Hollowmere's watermill (ring 3 fixed landmark, two states in one FBX). WORK IN PROGRESS (pacing stop, 2026-10-31).
+"""Mill: Hollowmere's watermill (ring 3 fixed landmark, two states in one FBX). 
 
 Root `Mill` with children: Shell (ruined start), Frame (restored), Part_Wheel (pivot SOCKET_Wheel at the axle),
 Part_Door (pivot SOCKET_Door at the threshold), SOCKET_* empties under Frame, FOOTPRINT (9 x 7 m body, 0.1 m tall).
@@ -10,8 +10,16 @@ broken flume, rubble heaps).
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_mill.py -- --out <scratch> [--no-render] [--export] [--tris]
 
-Status (2026-10-31, cloud): first buildable pass only. No renders, no self-score, no export, no SOURCES.md, no sheet yet.
-Next: render rounds, roof tile detail, hoist hood, windows and shutters, wear tuning, export and SOURCES.md.
+Status (2026-10-31, cloud, Blender 4.5.3): exported to Assets/_Project/Content/Art/Town/Ring3/Mill/Mill.fbx, sheet Reference/hollowmere/mill/SHEET_mill_final.jpg.
+  Tris: Shell 24,784 (cap 30k); Frame 27,404 + Part_Wheel 3,588 + Part_Door 540 = 31,532 (cap 45k). Deterministic (two runs equal).
+  Bounds: Shell x -5.15..8.00 y -4.96..4.36 z -0.56..12.66; Frame x -5.46..8.00 y -4.93..4.36 z -0.55..12.66; wheel z min -0.38 (0.17 m above the pit floor).
+  Fixed this round: pit pieces were offset by PIT_Z (z -1.1), shell inner wall skins sat 9 m off (origin at the wrong end), yard/heaps/millstones moved in
+  (door side), roof decks/tiles/plaster are orient()ed (no inside-out faces on the +Y slope), torn plaster is double-skinned (back_skin) so the roofless shell
+  is solid from inside; added ridge tiles, rolled eave, barge boards, shutters, hoist hood, wheel/roof wear. Facing check: `--backface --views ...` renders
+  backfaces red; remaining red is only the far side of single-sided walls seen through window gaps (culled in Unity, shows the room).
+  Self-score (sc-asset-review rubric, 2 rounds, floor 25): silhouette 4, proportion 3.5, form 3.5, surface 3.5, colour 4, wear 3, set fit 3.5, glass/metal 3 = 28/40.
+  Next visible gains: the wheel reads small behind the stone cheeks (a bigger, brighter paddle wheel needs the x <= 8.0 limit lifted), flume has no water,
+  shell lacks sagging on the plate beams, hoist hood is small, ground-floor windows have no shutters.
 """
 import sys, os, math, zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -305,8 +313,8 @@ def shutters(pc, w, k, tag, ruin):
         if ruin and (side > 0 or k % 2):
             continue
         hx = u0 - 0.03 if side < 0 else u1 + 0.03
-        ang = math.radians((R.uniform(8, 18) if not ruin else R.uniform(50, 62)) * -side * -1)
-        hinge = Matrix.Translation((hx, -0.11, zc)) @ Matrix.Rotation(ang * (1 if side < 0 else -1) * -1, 4, 'Z')
+        ang = math.radians(R.uniform(8, 18) if not ruin else R.uniform(50, 62))
+        hinge = Matrix.Translation((hx, -0.11, zc)) @ Matrix.Rotation(-side * ang, 4, 'Z')
         if ruin: hinge = hinge @ Matrix.Rotation(math.radians(R.uniform(6, 12)), 4, 'X')
         leaf = Matrix.Translation((side * lw / 2, 0, 0))
         FK.add_box(pc, 'door', (lw, 0.045, h), hinge @ leaf, cham=0.012, cuts=(0, 0, 2), long_axis=2, wob=0.004, seed=R.random() * 90)
@@ -428,12 +436,12 @@ def rolled_eave(pc, side, xa, xb):
 
 def hood(pc, tag):
     """Hoist hood: a small boarded gable over the loft door and its beam, knee-braced off the wall."""
-    rz = 11.25; pa = math.radians(38); L = 0.82; zy = -0.47
+    rz = 11.5; pa = math.radians(36); L = 1.05; zy = -0.47
     for sd in (-1, 1):
         c = Vector((HWY + sd * 0.5 * L * math.cos(pa) * 0.95, zy, rz - 0.5 * L * math.sin(pa) * 0.95 - 0.02))
         FK.add_box(pc, 'roof', (L, 0.8, 0.07), Matrix.Translation(c) @ Matrix.Rotation(sd * pa, 4, 'Y'), cham=0.012, long_axis=0, seed=sd + 9.0)
         FK.add_box(pc, 'oak', (0.1, 0.84, 0.1), Matrix.Translation(c + Vector((sd * 0.2, 0, -0.17))) @ Matrix.Rotation(sd * pa, 4, 'Y'), cham=0.01, long_axis=1, seed=sd + 9.5)
-        FK.member(pc, 'oak', (HWY + sd * 0.78, -0.12, 10.6), (HWY + sd * 0.45, -0.7, 10.9), 0.1, 0.1, name=tag + 'knee%d' % sd, up=(0, 0, 1))
+        FK.member(pc, 'oak', (HWY + sd * 0.95, -0.12, 10.55), (HWY + sd * 0.6, -0.78, 10.95), 0.1, 0.1, name=tag + 'knee%d' % sd, up=(0, 0, 1))
     FK.add_box(pc, 'oak', (0.12, 0.82, 0.1), Matrix.Translation((HWY, zy, rz + 0.02)), cham=0.015, long_axis=1, seed=9.9)
 
 def gable(tag, F, ruin, loft):
@@ -450,7 +458,10 @@ def gable(tag, F, ruin, loft):
         if ruin: back_skin(pc, n0)
     mem(pc, (0, PL + 0.12), (L, PL + 0.12), w=0.24, proud=FK.PROUD + 0.02, name=tag + 'tie')
     h = RIDGE - 0.4 if not ruin else PL + 1.6
-    mem(pc, (HWY, PL + 0.2), (HWY, h), name=tag + 'king')
+    if loft:   # the king post stops short of the loft door and the hood
+        mem(pc, (HWY, PL + 0.2), (HWY, 8.85), name=tag + 'king'); mem(pc, (HWY, 10.55), (HWY, h), name=tag + 'kingu')
+    else:
+        mem(pc, (HWY, PL + 0.2), (HWY, h), name=tag + 'king')
     if loft:
         lo = (HWY - 0.5, HWY + 0.5, 9.0, 10.3)
         for u in (lo[0] - 0.1, lo[1] + 0.1): mem(pc, (u, lo[2] - 0.1), (u, lo[3] + 0.1), w=0.14, name=tag + 'lp%f' % u)
@@ -458,7 +469,7 @@ def gable(tag, F, ruin, loft):
         if not ruin:
             for i in range(4):
                 pw = (lo[1] - lo[0]) / 4
-                FK.add_box(pc, 'door', (pw - 0.01, 0.05, lo[3] - lo[2]), Matrix.Translation((lo[0] + pw * (i + 0.5), 0.05, (lo[2] + lo[3]) / 2)), cham=0.01, long_axis=2, seed=i)
+                FK.add_box(pc, 'door', (pw - 0.01, 0.05, lo[3] - lo[2]), Matrix.Translation((lo[0] + pw * (i + 0.5), -0.03, (lo[2] + lo[3]) / 2)), cham=0.01, long_axis=2, seed=i)
             FK.add_box(pc, 'oak', (0.24, 0.76, 0.26), Matrix.Translation((HWY, -0.4, 10.75)), cham=0.03, cuts=(0, 2, 0), long_axis=1, seed=6.1)
             hood(pc, tag)
         else:
@@ -657,6 +668,8 @@ def write_wear(ob):
             if n.z > 0.5 and p.z < 0.2: g = max(g, 0.3 + 0.3 * nz)
             if shell: g = max(g, 0.3 * max(0.0, nz + 0.4))
             if p.x > 4.4 and abs(p.y) < 1.6 and p.z < 4.6: r = max(r, 0.4)   # wheel splash
+            if n.z > 0.4 and p.z > 8.0 and p.y > 0.3: g = max(g, 0.28 + 0.3 * nz)   # moss on the shaded roof slope
+            if ob.name == 'Part_Wheel': g = 0.16 * max(0.0, nz + 0.6); r = min(r, 0.3)
             b = 0.0
             if ob.name == 'Part_Door': b = 0.4 * max(0.0, 1 - abs(p.z - 1.2) / 0.5)
             attr.data[li].color = (min(1.0, r), min(1.0, g), b, 1.0)
@@ -711,6 +724,7 @@ VIEWS_DEF = {
     'shellb': (Vector((11.0, 15.0, 5.5)), Vector((0.5, 0, 5.0)), 46),
     'shellf': (Vector((0.0, -10.0, 4.0)), Vector((0.0, 0, 3.8)), 60),
     'eave': (Vector((9.0, -9.0, 4.0)), Vector((3.0, -3.5, 7.5)), 50),
+    'loft': (Vector((-10.0, -3.0, 9.5)), Vector((-4.5, 0.0, 10.2)), 40),
     'shellc': (Vector((2.0, -12.0, 9.0)), Vector((0.0, 0, 3.5)), 50),
     'shelld': (Vector((-3.0, 13.0, 9.0)), Vector((0.0, 0, 3.0)), 50),
 }
