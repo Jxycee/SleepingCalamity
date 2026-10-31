@@ -1,17 +1,17 @@
-State: IN PROGRESS
+State: DONE
 Session: Wave 2: Ground tileables + foliage extension
-Progress: 95%
+Progress: 100%
 Sheet: Reference/hollowmere/foliage/foliage_sheet_r3.jpg
 Blocker: none
 
-Score: round 3 = 27/40 (self; coordinator scored r1 24/40). Round 3: lawn colour drift and coarser bank, grass clustered with seed heads and rosettes. NOT fixed: the bare horizon on the low cameras (scaled-ivy hedge ring read as giant strands, removed; parked for real tree-line cards in docs/PARKING_LOT.md).
+Score: round 3 = 27/40 (APPROVED by the coordinator; r1 was 24/40). Round 3: lawn colour drift and coarser bank, grass clustered with seed heads and rosettes. NOT fixed: the bare horizon on the low cameras (scaled-ivy hedge ring read as giant strands, removed; parked for real tree-line cards in docs/PARKING_LOT.md).
 Round 1 = 26/40 (self; target 31). Ground reads as real PBR turf/soil/grit, banks and ditch soil, ivy faces out and sits on the keep wall,
   corner rows unchanged. Top fixes in round 2: (1) terrain tufts stand in lines on lane/square paving edges, (2) grass reads as even dots, not meadow
   (cluster it at 4-8 m), (3) old greybox green ivy boxes still on the keep wall; dry patches in the overview were blotchy (softened).
 Tris: grass worst view 378k (Cap_HM_MarketStreet, 2,222 clumps; 57k clumps total, 5 prototypes, instanced terrain details, no shadows);
   placed foliage ruined 1,300 objects / 596k tris town-wide, rebuilt 610 / 295k.
-Check: SC RESULT check PASS (build PASS, test-edit 594/594, test-play 32 + 8 skipped) on the merged tip ba3cc6b; final check after removing the hedge running
-Merge: -
+Check: SC RESULT check PASS (build PASS, test-edit 600/600, test-play 32 + 8 skipped) on 24e4607; main merge 9c9e891 has the identical tree
+Merge: 9c9e891 (main)
 
 ## Log
 - 2026-10-31: started on branch claude/ecstatic-bardeen-pr8wbk; reading HollowmereTerrain, B9 foliage atlas, sc-texture-paint / sc-foliage. Unity editor still downloading in the background.
@@ -28,3 +28,4 @@ Merge: -
 - 2026-10-31 ~13:00: round 3 code compiles and is pushed (lawn colour variation, coarser soil normal, clustered grass + seed-head and rosette detail prototypes, far hedgerow ring). Round 3 captures running in Unity now (17 of ~34 PNGs; software rendering takes about 40 min per set). Then sheet r3, merge main (Q1 kits), check, merge. No blocker: Unity works here.
 - 2026-10-31: round 3 check PASS (on 26ecd51 + the hedge fix in the working tree). Hedge ring fixed (95k tris, darker tint) and grass worst view 378k. Main merged (Q1 kits). Running now: final captures on the merged tip (sheet r3), then check on the tip, then merge.
 - 2026-10-31: final captures (cap5) and check on the merged tip PASS. The far hedge didn't work and was taken out of the build. Sheet r3 pushed. Rebuilding the scene, re-checking the tip, then merging.
+- 2026-10-31: MERGED to main as `9c9e891` (no-ff; tree identical to the checked tip 24e4607, so the main re-check was skipped). Square merge kept both builder hooks (square, then foliage). Left for later: the bare low-camera horizon (QUEUE Q12, FarHedge code parked), M_CrackWeeds.mat texture-GUID churn between identical B9 atlas copies (for Q5).
