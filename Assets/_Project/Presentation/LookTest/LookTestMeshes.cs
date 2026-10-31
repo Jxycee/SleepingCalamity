@@ -100,5 +100,47 @@ namespace SleepingCalamity.Presentation
             mesh.RecalculateBounds();
             return mesh;
         }
+
+        // The underside of a square groin vault (two crossing elliptical barrels, the higher one wins): footprint x, z in -halfSpan..halfSpan,
+        // springing at y = 0, crown y = rise. Height = rise * sqrt(1 - (min(|x|, |z|) / halfSpan)^2); the groin creases run along the diagonals,
+        // which are vertex lines (segments is rounded up to even), and each half keeps its own barrel normals so the creases stay sharp.
+        // Seen from below. UV: along each barrel the arc (mean-radius approximation) / tileMetres, across it the straight axis / tileMetres.
+        public static Mesh GroinVault(float halfSpan, float rise, int segments, float tileMetres)
+        {
+            int n = Mathf.Max(2, segments + (segments & 1)), cols = n + 1, per = cols * cols;
+            float rx = Mathf.Max(0.01f, halfSpan), ry = Mathf.Max(0.01f, rise), meanR = (rx + ry) * 0.5f;
+            var verts = new Vector3[per * 2]; var normals = new Vector3[per * 2]; var uvs = new Vector2[per * 2];
+            for (int i = 0; i < cols; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    float x = -rx + 2f * rx * i / n, z = -rx + 2f * rx * j / n;
+                    float m = Mathf.Min(Mathf.Abs(x), Mathf.Abs(z));
+                    float y = ry * Mathf.Sqrt(Mathf.Max(0f, 1f - (m / rx) * (m / rx)));
+                    var p = new Vector3(x, y, z);
+                    int a = i * cols + j, b = per + a;
+                    verts[a] = p; verts[b] = p;
+                    // half 0: the barrel along x (height from z); half 1: the barrel along z (height from x). Inward ellipse normals.
+                    normals[a] = -new Vector3(0f, y / (ry * ry), z / (rx * rx)).normalized;
+                    normals[b] = -new Vector3(x / (rx * rx), y / (ry * ry), 0f).normalized;
+                    float az = Mathf.Acos(Mathf.Clamp(z / rx, -1f, 1f)) * meanR, ax = Mathf.Acos(Mathf.Clamp(x / rx, -1f, 1f)) * meanR;
+                    uvs[a] = new Vector2(x / tileMetres, az / tileMetres);
+                    uvs[b] = new Vector2(ax / tileMetres, z / tileMetres);
+                }
+            var tris = new int[n * n * 6]; int k = 0;
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < n; j++)
+                {
+                    float cx = -rx + 2f * rx * (i + 0.5f) / n, cz = -rx + 2f * rx * (j + 0.5f) / n;
+                    int o = Mathf.Abs(cz) <= Mathf.Abs(cx) ? 0 : per;
+                    int a = o + i * cols + j, b = o + (i + 1) * cols + j, c = o + (i + 1) * cols + j + 1, d = o + i * cols + j + 1;
+                    // the split follows the crease of this quadrant (x = z where x * z > 0, x = -z otherwise); front faces look down
+                    if (cx * cz > 0f) { tris[k++] = a; tris[k++] = b; tris[k++] = c; tris[k++] = a; tris[k++] = c; tris[k++] = d; }
+                    else { tris[k++] = a; tris[k++] = b; tris[k++] = d; tris[k++] = b; tris[k++] = c; tris[k++] = d; }
+                }
+            var mesh = new Mesh { name = "LookTestGroinVault" };
+            mesh.vertices = verts; mesh.normals = normals; mesh.uv = uvs; mesh.triangles = tris;
+            mesh.RecalculateBounds(); mesh.RecalculateTangents();
+            return mesh;
+        }
     }
 }
