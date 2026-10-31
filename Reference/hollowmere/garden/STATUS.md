@@ -1,15 +1,15 @@
-State: IN PROGRESS
+State: DONE
 Session: Wave 2: Ground tileables + foliage extension
 Job: Q6. Garden and allotment decorations
-Progress: 92%
+Progress: 100%
 Sheet: Reference/hollowmere/garden/garden_sheet_final.jpg
-Needs: coordinator
-Blocker: none (asking the coordinator below)
+Blocker: none
+Archive: ready
 
 Score: round 2 = 27/40 (self; r1 ~25). Layered cabbages, smooth burlap scarecrow with patches and stitched face, cold frame with glazing bars; timber beds, butt and fences unchanged.
 Tris: pieces 908-2,996 each; placed 95 pieces / 140k tris (4 allotments + 3 ring 2 yards, Rebuilt only)
-Check: -
-Merge: -
+Check: SC RESULT check PASS (build PASS, test-edit 681/681, test-play 32 + 8 skipped) on 56da0d9
+Merge: 27426a0 (main; Assets identical to the checked tip, later main commits non-Assets)
 
 ## Log
 - 2026-10-31: claimed Q6 (`8782020`) after the ground tileables + foliage merge (`9c9e891`). Branch claude/ecstatic-bardeen-pr8wbk (restarted from main). Reading design 5.3 / section 6, the B7 prop generator and contact-sheet flow, and the ring 2 home placement.
@@ -23,8 +23,10 @@ Merge: -
 - 2026-10-31: cabbage rebuilt (attempt 2 accepted; attempt 1 rejected as paper sheets): smooth subdivided curved leaves with a painted procedural leaf texture (veins and midrib in albedo and normal, `sc_cabbage_tex.py`), a wrapped head; about 1.9k tris per cabbage, beds 9.0k / 7.8k. Close-up in `cabbage_r3.jpg`. No CC0 cabbage model exists on Poly Haven or ambientCG (checked). Next: rebuild, one allotment capture, check, merge.
 - 2026-10-31 17:45: the user approved the cabbage; no captures. Main merged again (keep, town wall, cellar; only the generated scene conflicted, taken from main) at `b0ccace`. Build + check running on the tip now; merge on PASS. Lost about 80 min to my own wait loop (`pgrep -f` matched its own command line), now fixed.
 - QUESTION FOR THE COORDINATOR (the user asked me to check in; this cloud session can't message the PC session, so here it is): main keeps moving under this branch, and every new merge regenerates `Hollowmere.unity` and needs a fresh build + check (about 45 min). Should I (a) merge to main on this check even if main has moved by then, and re-check on main afterwards, or (b) wait for a quiet window you announce? Default: (a) if main's new commits don't touch `Assets/`, otherwise one more merge + check. Answer in your next message.
+- 2026-10-31: MERGED to main as `27426a0` (user approved the cabbage; coordinator answer (a)). Known for Q12/Q14: front fence runs stack, scarecrow tint flat in Unity, the yard camera mostly frames a back wall.
 
 ## Usage waste (self-review, 2026-10-31, both jobs)
 1. **Long-lived Sonnet subagents with big contexts, about 40%.** The foliage implementer was resumed 3 times (about 250k tokens), and the garden builder used about 247k. Every resume re-reads the whole transcript, and they re-read builder files and Unity logs while waiting on 35-40 min software-rendered captures. Fix: a fresh agent per step with a short brief (build, capture, check as separate small jobs); reduced captures (`SC_CAPTURE_ONLY=<cams>`) by default and the full 26-34 PNG set only for the final sheet; wait on Unity with one blocking command, never by polling in turns.
 2. **Rework from runs that proved nothing, about 30%.** The first check died silently mid-build. A full capture set was shot on code already superseded (round 2 to 3). The scaled-ivy far hedge took a full capture plus a check before it was judged a failure and removed. There were three foliage art rounds. Pause/resume twice mid-run cost re-orientation. Fix: before any 40-minute run, prove the risky piece with one reduced capture of the camera that shows it; never start a full capture until the code is final for that round; give art ideas built from substitute assets (ivy as hedge) a 1-camera test first.
 3. **Opus controller turns on bookkeeping, about 20%.** There were around 15 turns answering the stop hook ("uncommitted changes") while subagents were mid-run in the same checkout, plus STATUS-only commits, and early full-file dumps (the builder, about 32 KB). Fix: run subagents in a git worktree so the controller checkout stays clean (no hook loop); batch STATUS lines into real commits; read files by grep and line range, never whole.
+4. **Self-matching wait loop, about 80 min wall clock (few tokens).** `until ! pgrep -f "…Editor/Unity -batchmode"` matched its own shell command line, so it waited forever. Fix: wait on `pgrep -x` of the real process name, or on the wrapper's exit or marker file, never on a pattern that appears in your own command.
