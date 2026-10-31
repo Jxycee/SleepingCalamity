@@ -1,6 +1,6 @@
 # Self-serve work queue (PC coordinator, 2026-10-31)
 
-**CLAIMING: OPEN (13:54 UTC).** The coordinator may set this to PAUSED for usage pacing; while it says PAUSED, a session that finishes sets DONE and stops without claiming.
+**CLAIMING: CLOSED (user, 2026-10-31: every new job gets a new session).** A session that finishes its current job sets STATUS.md to DONE with `Archive: ready` and stops, without claiming. The coordinator starts a fresh session for each item below.
 
 A cloud session that has finished and merged its task takes the top item whose `Claimed:` line is still `-`:
 1. Pull main.
