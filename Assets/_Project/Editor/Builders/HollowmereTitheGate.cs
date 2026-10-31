@@ -19,8 +19,8 @@ namespace SleepingCalamity.EditorTools
         const string MaterialsFolder = "Assets/_Project/Content/Materials/Hollowmere";
         public const float ArtYaw = 180f;
         // The breath: warm amber (linear, as the generator's BREATH), HDR emission subtle against the midday exposure and readable at low sun.
-        public static readonly Color BreathColor = new Color(1.0f, 0.42f, 0.10f);
-        public const float BreathEmission = 2.4f, BreathLightIntensity = 0.9f, BreathLightRange = 4f;
+        public static readonly Color BreathColor = new Color(1.0f, 0.30f, 0.06f);   // redder than the Blender preview: the corner grade pushes amber toward yellow-green
+        public const float BreathEmission = 1.8f, BreathLightIntensity = 0.9f, BreathLightRange = 4f;
 
         // Places the art under g (the landmark's transform). False when the FBX is missing: the caller keeps its greybox.
         public static bool TryPlace(Transform g)

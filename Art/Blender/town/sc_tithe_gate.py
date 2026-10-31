@@ -133,8 +133,8 @@ def glow_mat(name, col, strength):
     bs.inputs['Emission Color'].default_value = (*col, 1); bs.inputs['Emission Strength'].default_value = strength
     return m
 
-# Glow colour and strength: shared with the builder (TitheGateArt.BreathColor / BreathIntensity), linear.
-BREATH = (1.0, 0.42, 0.10)
+# Glow colour and strength for the review renders (the builder has its own, tuned in Unity captures).
+BREATH = (1.0, 0.42, 0.10)   # Blender preview; Unity uses HollowmereTitheGate.BreathColor (1, 0.30, 0.06) x 1.8 against its grade
 BREATH_STRENGTH = float(arg('--breath', '1.1'))
 BREATH_LIGHT_W = 25.0     # preview of the builder's spill light (Unity: point, range 3.5 m)
 
