@@ -30,7 +30,9 @@ static class P {
       sb.Append("],\"wall\":[");
       Seg(sb, t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TownWallOffset, 16f), 0.5f));
       sb.Append("],\"terrace\":[");
-      Seg(sb, t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TerraceOffset, 16f), 1.0f));
+      Seg(sb, t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TerraceOffset, 16f), 1.0f, 1.0f));
+      sb.Append("],\"terrace2\":[");
+      Seg(sb, t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.LowerTerraceOffset, 16f), 1.0f, 1.0f));
       sb.Append("],\"keepwall\":[");
       Seg(sb, t, HollowmereLayout.WallRun(t, HollowmereLayout.KeepWallLine(), 0.3f));
       sb.Append($"],\"waterY\":{F(HollowmereLayout.WaterY)},\"keepWallZ\":{F(HollowmereLayout.KeepWallZ)},\"keepHalfWidth\":{F(HollowmereLayout.KeepHalfWidth)},\"keepHeight\":{F(HollowmereLayout.KeepHeight)},");
