@@ -2,7 +2,7 @@
 
 State: IN PROGRESS
 Session: Q15. Beyond the Lower Gate: the Saltwake road
-Progress: 75%
+Progress: 85%
 Sheet: Reference/hollowmere/road/road_scene_r2.jpg
 Blocker: none
 
@@ -27,6 +27,14 @@ The town's fog (exp2 density 0.016, from the corner's Midday/LowSun presets) lea
 - In-engine r2 (`road_scene_r2.jpg`, midday, Ruined): 28/40 (composition 4, materials 3.5, colour 3, wear/story 3.5, density 3, atmosphere/horizon 4, scale 3.5, style 3.5). Varied hedgerow trees; a hazy tree line now frames the low cameras' horizon (RoadOut, Ruins); the overview shows hedged field patchwork, ploughed strips and copses round the town, continuing on the ring. Target met (floor 25; r1 below it).
 - Capture issue: the r2 run timed out in the Rebuilt reflection-probe bake (Lightmapping.BakeReflectionProbe hung ~90 min after the Ruined frames were written in 2 min). Low-sun run in progress as a retest.
 - Weak / for later: hedges use the shared B9 lime leaf atlas (a darker hedge leaf set would help); RoadOut's valley drop reads only as the road falling over a crest; broken cart could tip more.
+
+## Round 3 (coordinator review of r2: ~25/40, one final round)
+- (1) Layered backdrop: new `SleepingCalamity/Backdrop` shader (URP, lit by the main light + ambient SH, no scene fog, its own haze toward the fog/horizon colour by distance; DXC check 24/24 variants). Three depths: the ring trees (haze 0.62-0.84), the mid hill ridge at ~1.2 km (0.78-0.85, slight blue) and the far ridge at ~2.3 km (0.88-0.91, bluer); the ring ground matches the scene fog at the terrain edge (no seam). Low cameras draw to 3 km (overview stays 400 m).
+- (2) Gate apron: cobble hands over to the dirt road over ~7 m with a ragged edge, then scattered setts in the dirt for ~9 m.
+- (3) RoadOut skyline: roadside clumps of 2-3 card trees every 14 m, alternating sides, 20-34 m off the road.
+- First r3 Ruined frames look right (layers read; a pale band at the hill foot from ground mist, fixed in c609e3b).
+- Capture issue found: in one software-GL process the first frame after the Ruined -> Rebuilt switch stalls until the timeout (3 runs). Workaround: `SC_CAPTURE_PRESET=Ruined|Rebuilt` (HollowmereCapture, 43e2cfb) renders one preset per process. Earlier "timeouts" were also the wrapper's 5 min default when --timeout was dropped.
+- Running now (2026-10-31 ~22:00 UTC): r3 captures Ruined midday, Rebuilt midday, Rebuilt low sun (one process each), then the r3 sheet, merge origin/main, -nographics build, check, merge.
 
 ## Next
 HollowmereTerrain: blend the old erosion RAW on top of OuterFall (Final/Bake), dirt road ruts instead of cobble on the Saltwake Road, field splat; HollowmereRoad builder (art placement, far-tree and hedge cards, ring mesh + road ribbon), cameras Cap_HM_RoadOut / Cap_HM_RoadBack, captures midday + low sun, score, check, merge.
