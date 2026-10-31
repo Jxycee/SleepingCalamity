@@ -1,13 +1,14 @@
-State: IN PROGRESS
+State: DONE
 Session: Q10. Lake shore, stream and ravine
-Progress: 85%
+Progress: 100%
 Sheet: Reference/hollowmere/lake/SHEET_water_r2.jpg
 Blocker: none
+Archive: ready
 
 Score: coordinator APPROVED water r2 ~26/40 (my 27/40); shore set (Blender) 29/40 self, controller agrees ~29; water r2 in Unity 27/40 (composition 3.5, proportion 3.5, form 3.5, surface 3, colour 3, story 3.5, set fit 3.5, liquid 3.5; target first+5 = 26.5 met); r1 was 21.5/40 (silhouette 3, proportion 3, form 2.5, surface 2.5, colour 2.5, story 2, set fit 3, liquid 3): the W1 fall is a white slab, normal speckle, pools too teal, no dressing yet. Coordinator: shore set ~28/40 APPROVED
 Tris: LakeShore.fbx 11,118 (6 rocks 330-880, 3 reed clumps 560-732, jetty 5,650)
 SC RESULT: -
-Merge commit: -
+Merge commit: 8031234
 
 Plan (2026-10-31):
 - Terrain measured from the eroded RAW (no terrain or layout change): the ravine floor is flat at about -14 m, rims about -10.5 m, so it sits BELOW the
