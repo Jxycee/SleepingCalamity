@@ -50,3 +50,14 @@ export -Z forward / Y up, `path_mode='STRIP'`). Axis mapping after export: Unity
   had them, planters on the parapet, stairs from the existing foot/head nodes with balustrades on the open side and newels, 3-4 benches on the
   terrace by the parapet), greybox fallback when the FBX is missing. Then `unity.sh build`, captures (`HollowmereCapture`, cameras
   Cap_HM_KeepStairs / Cap_HM_KeepWall), `unity.sh check`.
+
+## Corrections after the art (2026-10-31)
+- Keep hall orientation: the generator follows the axis mapping, so its square side is Blender +Y = Unity -Z and its west door is Blender +X = Unity -X
+  directly: place it with yaw 0 (NOT the 180 the lot buildings use). SOCKET_Door at Unity local (-4.5, 0, 0.5).
+- The west porch reaches Unity local x -5.75 (world -8.75 at the hall centre -3.0): put the door node outside it at about (-9.2, 25.0), not (-8.3, 25.0).
+- Keep hall slots: KH_Rubble sandstone (0.62,0.60,0.57); KH_Slate sandstone (0.30,0.36,0.47); KH_Bronze iron (2.1,1.5,0.75) -> use a flat warm bronze
+  like BT_Bronze; KH_Limewash, KH_Flag, KH_OakWeathered, KH_DoorOak: read the tints in sc_keep_hall.py's EXTRA; FK_* from the facade set.
+- Terrace kit: slots KT_Rubble sandstone (0.56,0.56,0.56), KT_Dressed sandstone (0.94,0.94,0.92), KT_Mortar sandstone (0.26,0.245,0.21),
+  KT_Soil flat (0.034,0.025,0.017) r0.95, M_B9_Foliage = the existing Assets/_Project/Content/Materials/BeautyCorner/M_B9_Foliage.mat.
+  Extra piece BalustradeRaked (6 steps: run 2.2, rise 1.33, origin mid base underside, rotate 90 about Y to run along +Z). StairStep stacks
+  at 0.367 run / 0.222 rise. WallEnd centred 0.3 m into a gap. Planter at y 4.9 on the coping.

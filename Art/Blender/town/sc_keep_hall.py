@@ -14,6 +14,13 @@ Door threshold centre Blender (4.5, -0.5, 0) = Unity local (-4.5, 0, 0.5).
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_keep_hall.py -- --out <scratch>
       [--no-render] [--export] [--tris] [--views sq,tq,back,frame,shell,door] [--rres 1000] [--samples 20]
+
+Status (2026-10-31, cloud, Blender 4.5.3): exported to Assets/_Project/Content/Art/Town/Keep/KeepHall/KeepHall.fbx, sheet Reference/hollowmere/keep/SHEET_keep_hall.jpg.
+  Tris: Shell 22,706 (cap 25k); Frame 30,359 + Part_Door 624 = 30,983 (cap 35k). Deterministic (two runs equal).
+  Bounds Frame x -4.77..5.75 y -3.58..3.58 z -0.1..11.94; Shell x -4.77..6.55 y -4.48..4.36 z -0.1..10.9. Porch sticks 0.8 m out of the west wall.
+  Self-score (sc-asset-review rubric, 3 render rounds, floor 25): silhouette 4, proportion 3.5, form 3.5, surface 3.5, colour 3, wear 3, set fit 4, glass/metal 3 = 27.5/40.
+  Next visible gains: slate still reads grey-brown rather than blue-grey (sandstone tint; a real slate tileable would fix it), windows read as black slots (no light behind
+  the glass), wear is mild on the roof, no figure-scale steps or benches at the door, plank door is very dark in the porch shade.
 """
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -594,8 +601,8 @@ def door_part():
 # ----------------------------------------------------------------------------- rubble (Shell)
 def heaps():
     pc = piece('Heaps'); R = FK.rng('khheaps')
-    spots = [(2.2, 1.0, 1.2, 0.7), (3.4, -1.6, 1.0, 0.6), (0.4, -0.9, 0.8, 0.4), (5.9, 1.8, 1.1, 0.7), (3.6, -4.0, 1.3, 0.8), (-0.8, -3.9, 0.8, 0.4),
-             (5.7, -2.4, 0.9, 0.55), (1.3, 3.8, 0.9, 0.5), (-1.7, 0.9, 0.7, 0.3)]
+    spots = [(2.2, 1.0, 1.2, 0.7), (3.4, -1.6, 1.0, 0.6), (0.4, -0.9, 0.8, 0.4), (5.4, 1.6, 0.9, 0.7), (3.4, -3.7, 0.9, 0.8), (-0.8, -3.6, 0.7, 0.4),
+             (5.4, -2.3, 0.7, 0.55), (1.3, 3.6, 0.8, 0.5), (-1.7, 0.9, 0.7, 0.3)]
     for k, (cx, cy, r, h) in enumerate(spots):
         bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0)
         for v in bm.verts:
