@@ -56,7 +56,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Townhouses", new Vector3(-1f, 1.65f, -4f), new Vector3(-1f, 5.2f, -27f), 64f),        // from the square at the townhouse pair on F06 and F07 (kit family 3)
             ("Cap_HM_TownhouseSide", new Vector3(22f, 1.65f, -11f), new Vector3(5f, 5.0f, -27f), 55f),    // three-quarter on F07's front and east side
             ("Cap_HM_Kits", new Vector3(45.5f, 1.65f, 12f), new Vector3(39f, 2f, -1f), 62f),           // from the Ring Lane's north end looking south along the east run at the stone cottage on R2_09 and the workshop on R2_08 (kit families 2 and 4)
-            ("Cap_HM_WallRun", new Vector3(-69f, 1.65f, 5f), new Vector3(-62f, -1.2f, 11.5f), 50f),        // polish 2: close on the west wall run outside (stone tint, coursing, merlons)
+            ("Cap_HM_WallRun", new Vector3(-64.4f, 1.65f, 1.5f), new Vector3(-62.3f, -1.0f, 14f), 55f),     // polish 2: on the bank top, looking along the west wall run outside (stone tint, coursing, merlons)
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_LowerGate", new Vector3(-21.3f, 1.65f, -78f), new Vector3(-21.3f, -3.2f, -64.6f), 52f),   // Q8: the Lower Gate from the road outside, looking north up through the wall (Target is absolute: the gate stands at about y -7.4)
             ("Cap_HM_EastGate", new Vector3(64.2f, 1.65f, -54.6f), new Vector3(56.6f, -4.5f, -46f), 52f),       // Q8: the East Gate from the Mill Lane outside, looking back up at the wall (gate at about y -8.5)

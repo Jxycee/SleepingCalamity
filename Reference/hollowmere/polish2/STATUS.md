@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Town polish 2: wall stone, merlons, ruined clutter
-Progress: 55%
-Sheet: round 1 Blender preview (scratch, not committed); in-engine round 1 capture running (WallRun, LowerGate, EastGate)
+Progress: 60%
+Sheet: round 1 in-engine (Ruined only, scratch): WallRun / LowerGate / EastGate; final sheet committed with round 2
 Needs: Q14 clutter on main (fix 3 builds on HollowmereClutter); Q15 merged first (both touch HollowmereTownWall.cs)
 Blocker: none
 Archive: no
@@ -15,9 +15,9 @@ Status:
 - (3) waiting for Q14: plan is a LaneWrecks pass after AddRuined (Handcart_Broken tipped, RainBarrel_Broken, CrateStack_Broken at lane edges, every row through Q14's Fits = path-graph safe).
 Next: review in-engine capture; Q14 lands -> fix 3 + Ruined lane capture; after Q15 lands merge origin/main, regenerate Hollowmere (-nographics), one check, merge.
 
-Score: round 1 not scored yet
+Score: round 1 wall self 29.5/40 (was ~28.5): tint spread and broken gate battlements read in engine; WallRun camera was in the ditch (moved onto the bank top); Rebuilt not seen (capture run OOM-killed at ~10 GB on the second preset: round 2 runs one preset per run via SC_CAPTURE_PRESET after Q15 lands)
 SC RESULT: - (no check yet)
 Merge commit: -
 
 ## Usage waste
-- none so far (one preview render agent, one reduced capture)
+- round 1 capture (23 min, first Library import included) lost its Rebuilt half to an OOM kill: both presets in one graphics run exceed the container's memory; one preset per run from now on
