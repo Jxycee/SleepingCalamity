@@ -36,7 +36,7 @@ Every build rewrites `BeautyCorner_Hollowmere.unity`, flips `M_Pollen` `_SrcBlen
 
 ## Q6. Garden and allotment decorations
 Folder: `Reference/hollowmere/garden/`
-Claimed: -
+Claimed: cloud session claude/ecstatic-bardeen-pr8wbk (ground tileables + foliage done), 2026-10-31
 The decorations still kit-ready in design section 6: vegetable beds, a trellis, a scarecrow, a water butt, fences and a cold frame, each a small free-grid decoration with a footprint (design 5.3). Contact sheet per batch (B7 style); place a few beside ring 2 homes in Rebuilt.
 
 ## Q7. Cellars room pool, first rooms (M5 authoring)
