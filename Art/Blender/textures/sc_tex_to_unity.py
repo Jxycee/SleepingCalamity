@@ -5,6 +5,8 @@ Per material <name> in each batch folder it writes <out>/<batch>/<name>/
   <name>_normal.png    byte copy (OpenGL Y+; the importer flags it as a normal map)
   <name>_ms.png        URP Lit Metallic map: R metallic, A smoothness = 1 - roughness (sc_pack_unity.py --orm logic)
   <name>_occ.png       URP Lit Occlusion map (the AO channel, grey)
+  <name>_mask.png      only when <name>_height.png exists (the terrain ground set): URP Terrain Lit mask map, R metallic, G occlusion,
+                       B height (for the terrain's height blend), A smoothness
 Import settings come from the Editor's LookTestTextureImporter (an AssetPostprocessor keyed on the file suffix), not from hand-edited .meta files.
 Deterministic: unchanged inputs give byte-identical outputs, and files whose bytes would not change are left alone (no LFS churn, no reimport).
 """
@@ -23,7 +25,9 @@ def write_if_changed(path, make):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--textures', default='Art/Textures'); ap.add_argument('--out', default='Assets/_Project/Content/Textures')
+    ap.add_argument('--only', default='', help='comma list of material names to pack (Pillow versions encode PNGs differently: repack only what changed)')
     a = ap.parse_args()
+    only = set(a.only.split(',')) if a.only else None
     n = 0
     for batch in sorted(os.listdir(a.textures)):
         bdir = os.path.join(a.textures, batch)
@@ -31,7 +35,7 @@ def main():
             continue
         for name in sorted(os.listdir(bdir)):
             d = os.path.join(bdir, name)
-            if not os.path.isdir(d):
+            if not os.path.isdir(d) or (only and name not in only):
                 continue
             o = os.path.join(a.out, batch, name); os.makedirs(o, exist_ok=True)
             for kind in ('albedo', 'normal'):
@@ -45,6 +49,13 @@ def main():
                 Image.fromarray(np.dstack([orm[..., 0]] * 3).astype(np.uint8), 'RGB').save(t, format='PNG', optimize=True)
             n += write_if_changed(os.path.join(o, f'{name}_ms.png'), make_ms)
             n += write_if_changed(os.path.join(o, f'{name}_occ.png'), make_occ)
+            hp = os.path.join(d, f'{name}_height.png')
+            if os.path.exists(hp):
+                hgt = np.asarray(Image.open(hp).convert('L'))
+                def make_mask(t):
+                    mk = np.dstack([orm[..., 2], orm[..., 0], hgt, 255 - orm[..., 1]]).astype(np.uint8)
+                    Image.fromarray(mk, 'RGBA').save(t, format='PNG', optimize=True)
+                n += write_if_changed(os.path.join(o, f'{name}_mask.png'), make_mask)
             print('packed', batch, name)
     print('files written:', n)
 
