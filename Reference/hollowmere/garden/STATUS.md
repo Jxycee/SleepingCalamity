@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Wave 2: Ground tileables + foliage extension
 Job: Q6. Garden and allotment decorations
-Progress: 85%
+Progress: 80%
 Sheet: Reference/hollowmere/garden/garden_sheet_final.jpg
 Blocker: none
 
@@ -17,3 +17,4 @@ Merge: -
 - 2026-10-31: not idle. Unity build PASS with the garden placed (`SC HOLLOWMERE garden allotments=4 yards=4`, 101 pieces, 138k tris). Captures running now (about 40 min under software rendering). Next: one art fix pass (smooth the faceted cabbages and scarecrow, cold-frame glass), check, merge, claim the next item.
 - 2026-10-31: art round 2 exported (tris 908-2,996 per piece) and Unity placement committed (`a92a1ef`). The allotment capture in Unity is clean (no pink, nothing floating). Final run next: a lower front fence and soil inside the allotments, deduplicated fence posts, the yard camera fixed, captures, check, merge.
 - 2026-10-31: placement round 2 in Unity: soil inside the allotments, front fence lowered (gate + short runs, fences x0.75), one post per junction, grass tufts at the fence foot; main merged clean. Final sheet pushed. Running check on the tip, then merge. Known: Unity shows the scarecrow/cabbage tints flat (a second colour set is not read), and the yard camera view is mostly back wall.
+- 2026-10-31: USER review: "The cabbage is low quality, but everything else looks wonderful." Cabbage pass running: its own outer/mid/heart materials (Unity ignored the colour attribute, so every leaf was one flat green), 5-7 cupped outer leaves with real midribs and veins, a tight wrapped head, up to about 6k tris per bed. Then re-check and merge.
