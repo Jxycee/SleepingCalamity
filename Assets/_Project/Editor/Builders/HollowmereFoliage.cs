@@ -31,7 +31,7 @@ namespace SleepingCalamity.EditorTools
             "Ivy_Patch_A", "Ivy_Patch_B", "Lintel_Ivy", "Ivy_Facade" };
         static readonly string[] Weeds = { "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E" }, Grasses = { "Grass_A", "Grass_B", "Grass_C" }, Mosses = { "Moss_Tuft_A", "Moss_Tuft_B", "Moss_Tuft_C" };
 
-        const float GrassPerM2 = 1.3f;          // mean clumps per m2 on full grass weight (the view budget below fixes this)
+        const float GrassPerM2 = 1.2f;          // mean clumps per m2 on full grass weight (the view budget below fixes this)
         const int DetailRes = 1024, DetailPatch = 32;
         const float DetailDistance = 60f, AvgGrassTris = 170f;
 
