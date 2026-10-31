@@ -2,7 +2,7 @@
 // Art/Blender/town/sc_garden.py (SOURCES.md there): VegBed_A/B, Trellis, Scarecrow, WaterButt, Fence_Run (Part_PostA/B), Fence_Gate (Part_Leaf), ColdFrame, each with
 // a flat FOOTPRINT and no maps. The FBX front is local +Z, so a piece is turned 180 to face a lot's door side (local -Z) like the kit buildings.
 // Slots map by name to the shared B1 tileables (LookTest M_ materials; M_GD_packed_soil / M_GD_meadow_grass are made here the same way) and to flat Lit materials
-// M_GD_Leaf / Produce / Straw / Glass under Content/Materials/Hollowmere. FOOTPRINT keeps a BoxCollider and loses its renderer (as the kit pieces do).
+// M_GD_Leaf / Produce / Straw / Glass under Content/Materials/Hollowmere; the beds' Cabbage slot is the textured set next to VegBed_A.fbx (Cabbage_BaseColor/_Normal/_ORM, painted by sc_cabbage_tex.py), double sided. FOOTPRINT keeps a BoxCollider and loses its renderer (as the kit pieces do).
 // Everything stands on the lot's footing slab (top FootingTop above the pad; the lot frame already carries the pad height f.Y) and inside the lot footprint.
 //  - Allotment(g, f): the four garden lots (HollowmereLayout.RebuiltGardens), a fenced plot with the gate on the door side, two bed columns, a trellis,
 //    a water butt, a cold frame or a second bed, and a scarecrow on two of them. Seeded by lot id.
@@ -237,7 +237,7 @@ namespace SleepingCalamity.EditorTools
         // ------------------------------------------------------------------------------------------------ materials
         static Dictionary<string, Material> Slots()
         {
-            if (slotMats != null && slotMats.Count > 0 && slotMats["Leaf"] != null) return slotMats;
+            if (slotMats != null && slotMats.Count > 0 && slotMats["Leaf"] != null && slotMats.ContainsKey("Cabbage")) return slotMats;
             BuilderUtil.EnsureFolder(MaterialsFolder);
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? throw new System.InvalidOperationException("URP Lit not found");
             slotMats = new Dictionary<string, Material>();
@@ -246,6 +246,10 @@ namespace SleepingCalamity.EditorTools
             slotMats["meadow_grass"] = Tileable("meadow_grass", lit);
             slotMats["Leaf"] = FlatLit("Leaf", new Color(0x6f / 255f, 0x8a / 255f, 0x34 / 255f), 0.25f, lit);
             slotMats["Produce"] = FlatLit("Produce", new Color(0x7f / 255f, 0x9c / 255f, 0x5c / 255f), 0.3f, lit);
+            // Cabbage: the procedural leaf atlas (outer leaf / pale heart halves), waxy, both faces rendered (the leaves are single-sided sheets)
+            Material cab = BeautyCornerArt.MaterialFromSet(Folder + "/VegBed_A", "Cabbage", "GD_Cabbage", foliage: false);
+            if (cab != null) { cab.SetFloat("_Cull", 0f); EditorUtility.SetDirty(cab); }
+            slotMats["Cabbage"] = cab != null ? cab : FlatLit("Cabbage", new Color(0x5b / 255f, 0x7a / 255f, 0x5a / 255f), 0.4f, lit);
             slotMats["Straw"] = FlatLit("Straw", new Color(0xc9 / 255f, 0xa8 / 255f, 0x5a / 255f), 0.2f, lit);
             // Glass: dark, smooth and slightly see-through (the B4 facade's FK_Glass colour), straight-alpha blend like the decals
             Material glass = LookTestBuilder.Ensure(MaterialsFolder + "/M_GD_Glass.mat", lit);

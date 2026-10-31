@@ -8,11 +8,13 @@ frequency warp and a lean on every piece, each board and picket turned a degree 
 Conventions (as the B4 kit, sc_townhouse.py): metres, front -Y in Blender (FBX -Z forward / Y up, so the front is +Z in Unity), pivot at the ground centre,
 root empty <Asset> with child meshes `Body` and `Part_*` (origin at their SOCKET), `SOCKET_<Part>` empties and a flat 0.1 m `FOOTPRINT` box.
 Materials are SLOT NAMES, Unity maps them to the shared tileables (no maps are exported): oak_timber, canvas, iron, sandstone, packed_soil (B1 tileables,
-UVs in metres by box projection, 1 UV unit = 2 m) and the flat slots Leaf (#6f8a34 family), Produce (cabbage green #86a67c; Blender renders darken the outer leaves and warm the heart through a per-corner `tint` colour attribute, Unity gets the flat slot colour), Straw (#c9a85a), Glass. The corner
+UVs in metres by box projection, 1 UV unit = 2 m) and the flat slots Leaf (#6f8a34 family), Produce (#86a67c, onions; Blender renders warm them through a per-corner `tint` colour attribute, Unity gets the flat slot colour), Straw (#c9a85a), Glass,
+and the one TEXTURED slot Cabbage: the beds' cabbages are UV'd, subdivided single-sided leaf sheets (see vegbed/cabbage) painted by sc_cabbage_tex.py (Cabbage_BaseColor / _Normal / _ORM, a
+1024 x 512 atlas: outer leaf left, pale heart right), written next to each bed's FBX on --export. The corner
 attribute `wear` (R grime, G moss, B polish, linear) is written as the B4 kit does; the flat slots ignore it in Unity.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_garden.py -- --out <scratch> [--only VegBed_A,Trellis] [--export]
-      [--no-render] [--rres 900] [--samples 24]
+      [--no-render] [--rres 900] [--samples 24] [--close]
   --export copies the FBX and SOURCES.md to Assets/_Project/Content/Art/Town/Garden/<Asset>/. Renders: <out>/renders/<Asset>_tq.png and group.png.
 
 Pieces (tris and sizes are printed per run and written to SOURCES.md): VegBed_A 2.4 x 1.1, VegBed_B 1.6 x 1.0 (bean tents), Trellis 2.0 x 1.9,
@@ -21,6 +23,8 @@ Deterministic: the seed is fixed per asset name.
 """
 import sys, os, math, random, zlib, shutil
 import bpy, bmesh
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sc_cabbage_tex
 from mathutils import Vector, Matrix, Quaternion, Euler, noise
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -28,12 +32,13 @@ def arg(k, d=None):
     return argv[argv.index(k) + 1] if k in argv else d
 OUT = os.path.abspath(arg('--out') or sys.exit('pass --out <scratch dir>')); os.makedirs(OUT, exist_ok=True)
 ONLY = arg('--only').split(',') if arg('--only') else None
-EXPORT = '--export' in argv; RENDER = '--no-render' not in argv
+EXPORT = '--export' in argv; CLOSE = '--close' in argv; RENDER = '--no-render' not in argv
 RRES = int(arg('--rres', '900')); SAMPLES = int(arg('--samples', '24'))
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
 TEX = os.path.join(ROOT, 'Art', 'Textures', 'B1_town')
 DEST = os.path.join(ROOT, 'Assets', '_Project', 'Content', 'Art', 'Town', 'Garden')
 SEED = 3106
+CABTEX = os.path.join(OUT, 'cabtex')   # the procedural cabbage maps (sc_cabbage_tex.py), written here, copied next to each bed's FBX on --export
 BEV = 0.016          # timber chamfer (style bible 3: 1.5 cm and up where the section allows)
 
 def rng(stream):
@@ -67,8 +72,12 @@ class Piece:
         t.transform(self.G)
         if self.G.determinant() < 0: bmesh.ops.reverse_faces(t, faces=t.faces[:])
         vm = {v: self.bm.verts.new(v.co) for v in t.verts}
+        tu = t.loops.layers.uv.get('UVMap')   # sheets bring their own UVs (finish() box-projects only the faces of the other slots)
+        su = (self.bm.loops.layers.uv.get('UVMap') or self.bm.loops.layers.uv.new('UVMap')) if tu else None
         for f in t.faces:
             nf = self.bm.faces.new([vm[v] for v in f.verts]); nf.material_index = mi
+            if tu:
+                for lo, ln in zip(f.loops, nf.loops): ln[su].uv = lo[tu].uv
             nf.smooth = f.smooth if smooth is None else smooth
             self.ftint.append(tint or (1.0, 1.0, 1.0))
         t.free()
@@ -164,6 +173,33 @@ class Piece:
         faces = [(i * nv + j, i * nv + j + 1, (i + 1) * nv + j + 1, (i + 1) * nv + j) for i in range(nu - 1) for j in range(nv - 1)]
         self.thin(slot, pts, faces, ref, half, tint, smooth)
 
+    def sheet(self, slot, fn, nu, nv, ref, uvfn):
+        """A single-sided UV'd grid (nu x nv vertices): fn(s, u) -> point with s along the leaf and u across (both 0..1), uvfn(s, u) -> UV; see surf()."""
+        pts, uvs = [], []
+        for j in range(nv):
+            for i in range(nu):
+                s, u = j / (nv - 1), i / (nu - 1); pts.append(fn(s, u)); uvs.append(uvfn(s, u))
+        faces = [(i + j * nu, i + 1 + j * nu, i + 1 + (j + 1) * nu, i + (j + 1) * nu) for j in range(nv - 1) for i in range(nu - 1)]
+        self.surf(slot, pts, faces, uvs, ref)
+
+    def surf(self, slot, pts, faces, uvs, ref):
+        """A single-sided UV'd surface from points, faces (index tuples) and a UV per point. Faces point to the side `ref(p)` names (majority vote, so
+        the sheet stays one consistent shell), then one Catmull-Clark level is applied (a real Subsurf modifier evaluated here, so the FBX carries the
+        result), smooth shaded. UVs are carried through; `finish` leaves them alone."""
+        t = bmesh.new(); uv = t.loops.layers.uv.new('UVMap')
+        vs = [t.verts.new(p) for p in pts]; fl = [t.faces.new([vs[i] for i in f]) for f in faces]
+        t.normal_update()
+        if sum(1 if f.normal.dot(Vector(ref(f.calc_center_median()))) >= 0 else -1 for f in fl) < 0: bmesh.ops.reverse_faces(t, faces=fl)
+        for v, q in zip(vs, uvs):
+            for lo in v.link_loops: lo[uv].uv = q
+        me = bpy.data.meshes.new('cab_tmp'); t.to_mesh(me); t.free()
+        ob = bpy.data.objects.new('cab_tmp', me); bpy.context.scene.collection.objects.link(ob)
+        md = ob.modifiers.new('sub', 'SUBSURF'); md.levels = 1; md.render_levels = 1; md.boundary_smooth = 'ALL'; md.uv_smooth = 'PRESERVE_BOUNDARIES'
+        ev = ob.evaluated_get(bpy.context.evaluated_depsgraph_get()); m2 = ev.to_mesh()
+        t2 = bmesh.new(); t2.from_mesh(m2); ev.to_mesh_clear()
+        bpy.data.objects.remove(ob); bpy.data.meshes.remove(me)
+        self.absorb(t2, slot, smooth=True, fix=False)
+
     def tube(self, slot, pts, r0, r1=None, segs=5, **kw):
         pts = [Vector(p) for p in pts]; r1 = r0 if r1 is None else r1; t = bmesh.new(); rings = []
         for i, p in enumerate(pts):
@@ -213,25 +249,73 @@ def vegbed(a, L, W, variant):
     for y in rows:
         b.prism('packed_soil', [(-0.12, 0), (0.12, 0), (0.075, 0.055), (-0.075, 0.055)], L - 0.2, c=(0, y, 0.299), plane='yz', bev=0.01)
 
-    def cabbage(x, y, rad, nl=(5, 4, 2)):
-        """Tight pale head, then 2-3 layers of cupped, curling leaves (thin double-sided sheets, smooth shaded); size, yaw and tone vary per head."""
-        z = 0.35; yaw0 = r.uniform(0, 360); k = r.uniform(0.9, 1.1)
-        hc = Vector((x, y, z + rad * 0.42))
-        b.blob('Produce', hc, (rad * 0.54, rad * 0.52, rad * 0.5), rot=(0, 0, yaw0), u=9, v=5, smooth=True, tint=(1.0, 1.0, 0.8))
-        layers = [(nl[0], 24, 1.30, 1.15, 0.30, (0.50 * k, 0.70 * k, 0.66 * k), 0.50),     # outer: wide, spread, darkest blue-green
-                  (nl[1], 50, 1.05, 1.00, 0.20, (0.66 * k, 0.84 * k, 0.72 * k), 0.55),     # middle
-                  (nl[2], 74, 0.78, 0.88, 0.12, (0.84, 0.95, 0.76), 0.55)]                 # inner wrap round the head
-        for li, (n, tilt, L, W, br, tn, curl) in enumerate(layers):
-            if n <= 0: continue
-            for i in range(n):
-                yaw = yaw0 + i * 360 / n + li * 38 + r.uniform(-12, 12); ar = math.radians(yaw)
-                base = Vector((x + math.cos(ar) * br * rad, y + math.sin(ar) * br * rad, z + rad * (0.03 + 0.12 * li)))
-                M = Matrix.Translation(base) @ Euler((math.radians(tilt + r.uniform(-6, 6)), 0, math.radians(yaw - 90)), 'XYZ').to_matrix().to_4x4()
-                zl = (M.to_3x3() @ Vector((0, 0, 1))).normalized(); Lr = L * rad * r.uniform(0.92, 1.08); Wr = W * rad
-                def fn(s, u, M=M, Lr=Lr, Wr=Wr, curl=curl):
-                    w = Wr * (0.12 + 0.88 * math.sin(math.pi * (0.16 + 0.84 * s)) ** 0.7); xx = (u - 0.5) * w
-                    return M @ Vector((xx, s * Lr, curl * Lr * s * s + 1.3 * xx * xx / max(Wr, 0.01)))
-                b.grid('Produce', fn, 4, 3, lambda p, zl=zl: zl, half=0.003, tint=tn)
+    def cabbage(x, y, rad, burn):
+        """Savoy-style head from smooth UV'd sheets (slot Cabbage, textured: atlas left half = outer leaf, right half = pale heart): 4 wrapped heart leaves,
+        2 mid leaves standing round the head, 5 broad cupped outer leaves flaring out and down, tips curled back, the lowest lying on the soil.
+        Each sheet is a coarse grid cut to a round wavy outline, cupped and bent by smooth functions, one subdivision level, single sided."""
+        for _ in range(2 + 3 * burn): r.random()   # keep the bed's shared random stream where the first cabbage left it (leeks and onions stay put)
+        c = rng('cab%.3f_%.3f' % (x, y)); z0 = 0.335   # head sunk ~1.5 cm into the soil
+        yaw0 = c.uniform(0, 360); k = c.uniform(0.92, 1.08); R = rad * 0.62 * k
+        hc = Vector((x, y, z0 + R * 0.92)); ry = min(rows, key=lambda q: abs(q - y))
+        def ground(px, py): return 0.299 + 0.055 * min(1.0, max(0.0, (0.12 - abs(py - ry)) / 0.045)) + 0.004   # soil top incl. the raised row
+        uvo = lambda half: (lambda s, u: (0.5 * half + 0.5 * (0.012 + 0.976 * u), s))      # atlas half 0 outer, 1 heart; v along the leaf
+        # head: four gores of a sphere, each from below the equator past the pole, overlapping, radii stepped so they never z-fight
+        for i in range(4):
+            lam = math.radians(yaw0 + i * 90 + c.uniform(-10, 10)); Ri = R * (1.0 + 0.045 * i); span = math.radians(c.uniform(190, 215)); top = math.radians(c.uniform(94, 102))
+            def fn(s, u, lam=lam, Ri=Ri, span=span, top=top):
+                el = math.radians(-42) + s * (top - math.radians(-42)); u2 = (u - 0.5) * 2
+                g = math.sqrt(max(0.0, 1 - (1 - min(1.0, s / 0.38)) ** 2)) * 0.9 + 0.1    # rounded lower end of the wrap
+                lon = lam + u2 * 0.5 * span * max(0.12, math.cos(el)) ** 0.7 * g
+                rr = Ri * (1 + 0.03 * math.sin(el * 5 + lam) * abs(u2) ** 2)
+                q = hc + Vector((math.cos(el) * math.cos(lon), math.cos(el) * math.sin(lon), math.sin(el))) * rr
+                q.z = max(q.z, ground(q.x, q.y)); return q
+            b.sheet('Cabbage', fn, 4, 5, lambda p: p - hc, uvo(1))
+        # a leaf: a polar mesh (centre fan + rings) whose rim is a smooth obovate outline with a gentle wave, laid in a flat leaf plane (x across, y along from the
+        # stalk), then bent: the centreline falls with an elevation angle (tip curling back up), the blade is cupped across and ruffled softly at the rim.
+        # The UV is the flat leaf plane (u across, v along), so the midrib texture runs down the length of every leaf.
+        def leaf(half, yaw, a0, sweep, tip, Lr, Wr, cup, nth, nr, base, ruffle=0.03):
+            rot = Matrix.Rotation(math.radians(yaw - 90), 3, 'Z')
+            nS = 36; cy = [0.0]; cz = [0.0]; ang = []
+            for j in range(nS):
+                s = (j + 0.5) / nS; al = math.radians(a0 - sweep * s ** 1.4 + tip * max(0.0, (s - 0.6) / 0.4) ** 2)
+                cy.append(cy[-1] + math.cos(al) * Lr / nS); cz.append(cz[-1] + math.sin(al) * Lr / nS); ang.append(al)
+            ph = c.uniform(0, 6.28); ph2 = c.uniform(0, 6.28); lobes = c.choice((4, 5)); cyc = 0.56 * Lr   # widest a little past the middle
+            def bend(x, yv, f, th):
+                s = min(1.0, max(0.0, yv / Lr)); t = min(nS - 1e-6, s * nS); j = int(t); fr = t - j
+                yy = cy[j] + (cy[j + 1] - cy[j]) * fr; zz = cz[j] + (cz[j + 1] - cz[j]) * fr; al = ang[j]
+                dz = cup * x * x / max(Wr, 0.01) + ruffle * f ** 2.5 * math.sin(lobes * th + ph2)
+                q = base + rot @ Vector((x, yy - math.sin(al) * dz, zz + math.cos(al) * dz))
+                q.z = max(q.z, ground(q.x, q.y)); return q
+            pts = [bend(0.0, cyc, 0.0, 0.0)]; uvs = []
+            def uvp(x, yv): return (0.5 * half + 0.5 * (0.012 + 0.976 * (0.5 + 0.5 * x / (1.06 * Wr))), min(1.0, max(0.0, yv / Lr)))
+            uvs.append(uvp(0.0, cyc))
+            for k in range(1, nr + 1):
+                f = k / nr
+                for i in range(nth):
+                    th = 2 * math.pi * i / nth - math.pi / 2          # starts at the stalk and runs round
+                    rho = 1 + 0.085 * math.sin(lobes * th + ph) * f   # gentle rim lobes
+                    ch, sh = math.cos(th), math.sin(th)
+                    x = f * rho * Wr * ch * (1 - 0.38 * max(0.0, -sh))
+                    yv = cyc + f * rho * sh * ((Lr - cyc) if sh > 0 else cyc * 0.97)
+                    pts.append(bend(x, yv, f, th)); uvs.append(uvp(x, yv))
+            faces = [(0, 1 + i, 1 + (i + 1) % nth) for i in range(nth)]
+            for k in range(1, nr):
+                for i in range(nth):
+                    a = 1 + (k - 1) * nth; b2 = 1 + k * nth
+                    faces.append((a + i, b2 + i, b2 + (i + 1) % nth, a + (i + 1) % nth))
+            b.surf('Cabbage', pts, faces, uvs, lambda p: Vector((0, 0, 1)))
+        # mid leaves: stand up round the head, wide, tips folding out
+        for i in range(2):
+            yaw = yaw0 + 70 + i * 180 + c.uniform(-20, 20); ar = math.radians(yaw)
+            leaf(0, yaw, c.uniform(54, 64), c.uniform(40, 55), 30, rad * 1.15 * k, rad * 0.8 * k, 0.5, 10, 2,
+                 Vector((x + math.cos(ar) * R * 0.55, y + math.sin(ar) * R * 0.55, z0 + R * 0.35)), ruffle=0.012)
+        # outer leaves: broad, flaring out and down, tips curled back; every other one lies on the soil
+        yawo = yaw0 + c.uniform(0, 70)
+        for i in range(5):
+            yaw = yawo + i * 72 + c.uniform(-12, 12); ar = math.radians(yaw); low = i % 2 == 0
+            leaf(0, yaw, c.uniform(4, 14) if low else c.uniform(30, 42), c.uniform(18, 30) if low else c.uniform(75, 100), 40 if low else 55,
+                 rad * c.uniform(1.5, 1.75) * k, rad * c.uniform(1.0, 1.12) * k, 0.55 if low else 0.5, 11, 3,
+                 Vector((x + math.cos(ar) * R * 0.5, y + math.sin(ar) * R * 0.5, z0 + (0.02 if low else 0.07))))
 
     def leek(x, y, n=5, h=0.42):
         z = 0.35
@@ -248,12 +332,12 @@ def vegbed(a, L, W, variant):
 
     if variant == 'A':
         for x in (-0.82, -0.27, 0.27, 0.82):
-            cabbage(x + jit(r, 0.04), rows[0] + jit(r, 0.03), r.uniform(0.15, 0.18))
+            cabbage(x + jit(r, 0.04), rows[0] + jit(r, 0.03), r.uniform(0.15, 0.18), 11)
         for i in range(6): leek(-0.72 + i * 0.29 + jit(r, 0.03), rows[1] + jit(r, 0.025))
         for i in range(5): onion(-0.84 + i * 0.42 + jit(r, 0.04), rows[2] + jit(r, 0.03))
     else:
         for x in (-0.5, 0.0, 0.5):
-            cabbage(x + jit(r, 0.03), rows[0] + jit(r, 0.03), r.uniform(0.13, 0.16), nl=(4, 3, 2))
+            cabbage(x + jit(r, 0.03), rows[0] + jit(r, 0.03), r.uniform(0.13, 0.16), 9)
         for i in range(3): onion(-0.4 + i * 0.4 + jit(r, 0.04), rows[1] - 0.05 + jit(r, 0.03))
         # two bean tents (A-frames across the bed) joined by a ridge pole
         top = 1.55; poles = []
@@ -275,7 +359,7 @@ def vegbed(a, L, W, variant):
                 for k in range(2):
                     aa = ang + k * math.pi
                     b.leaf('Leaf', p, (math.cos(aa), math.sin(aa) * 0.5, 0.45), 0.13, 0.095)
-    a.foot = (L + 0.1, W + 0.1)
+    a.foot = (L + 0.1, W + 0.1 + (0.1 if variant == 'A' else 0.04))   # wide enough for the cabbage leaves that overhang the planks
     a.lean = (0.006, 0.0)
 
 def trellis(a):
@@ -517,6 +601,16 @@ def get_mat(name):
     if name in FLAT:
         bs.inputs['Base Color'].default_value = (*hex2lin(FLAT[name][0]), 1); bs.inputs['Roughness'].default_value = FLAT[name][1]
         if name in TINTED: link_tint(nt, bs)
+    elif name == 'Cabbage':
+        def cimg(suffix, cs):
+            n = nt.nodes.new('ShaderNodeTexImage'); n.image = bpy.data.images.load(os.path.join(CABTEX, 'Cabbage_%s.png' % suffix), check_existing=True)
+            n.image.colorspace_settings.name = cs; return n
+        c = cimg('BaseColor', 'sRGB'); o = cimg('ORM', 'Non-Color'); nrm = cimg('Normal', 'Non-Color')
+        sep = nt.nodes.new('ShaderNodeSeparateColor'); nm = nt.nodes.new('ShaderNodeNormalMap')
+        nt.links.new(o.outputs['Color'], sep.inputs[0]); nt.links.new(nrm.outputs['Color'], nm.inputs['Color'])
+        nt.links.new(c.outputs['Color'], bs.inputs['Base Color']); nt.links.new(sep.outputs[1], bs.inputs['Roughness'])
+        nt.links.new(sep.outputs[2], bs.inputs['Metallic']); nt.links.new(nm.outputs[0], bs.inputs['Normal'])
+        m.use_backface_culling = False   # single-sided leaves, both faces render
     elif name == 'Glass':
         bs.inputs['Base Color'].default_value = (0.7, 0.86, 0.84, 1); bs.inputs['Roughness'].default_value = 0.06
         bs.inputs['Alpha'].default_value = 0.68; m.blend_method = 'BLEND' if hasattr(m, 'blend_method') else None
@@ -544,8 +638,10 @@ def finish(a, piece):
         co += n * a.amp * f
         co.x += a.lean[0] * max(0.0, co.z); co.y += a.lean[1] * max(0.0, co.z)
     bm.normal_update()
-    uv = bm.loops.layers.uv.new('UVMap')
+    uv = bm.loops.layers.uv.get('UVMap') or bm.loops.layers.uv.new('UVMap')
+    own = piece.slots.index('Cabbage') if 'Cabbage' in piece.slots else -1   # sheets keep the UVs they were built with
     for f in bm.faces:
+        if f.material_index == own: continue
         n = f.normal; ax = max(range(3), key=lambda i: abs(n[i]))
         for l in f.loops:
             p = l.vert.co
@@ -602,6 +698,8 @@ def export(a, root, tris):
                              bake_anim=False, use_custom_props=False, path_mode='STRIP')
     if EXPORT:
         dd = os.path.join(DEST, a.name); os.makedirs(dd, exist_ok=True); shutil.copy(fbx, os.path.join(dd, a.name + '.fbx'))
+        if any('Cabbage' in p.slots for p in a.pieces()):
+            for f in os.listdir(CABTEX): shutil.copy(os.path.join(CABTEX, f), os.path.join(dd, f))
 
 # ---------------------------------------------------------------- review renders
 def review_scene():
@@ -636,6 +734,7 @@ def world_bounds(root):
 
 def main():
     bpy.ops.wm.read_homefile(use_empty=True)
+    sc_cabbage_tex.make(CABTEX)
     names = [n for n in ASSETS if ONLY is None or n in ONLY]
     built = {}; rows = []
     for n in names:
@@ -644,6 +743,8 @@ def main():
         for o in root.children: o.name += '@' + n   # the next asset must find the plain names free (Blender would number them .001 into the FBX)
         mn, mx = world_bounds(root); total = sum(tris.values())
         built[n] = (a, root); rows.append((n, total, tris, a, mx - mn))
+        ct = sum(len(pl.vertices) - 2 for o in objs for pl in o.data.polygons if o.data.materials[pl.material_index].name == 'Cabbage')
+        if ct: print('GARDEN %-11s cabbage tris %d' % (n, ct))
         print('GARDEN %-11s tris %5d  size %.2f x %.2f x %.2f  slots %s  footprint %.2f x %.2f' % (n, total, *(mx - mn), '/'.join(sorted({s for o in objs for s in o.data.materials.keys()})), *a.foot))
     if EXPORT: write_sources(rows)
     if not RENDER: return
@@ -653,6 +754,10 @@ def main():
         mn, mx = world_bounds(root); c = (mn + mx) / 2; s = max(mx - mn); d = s * 2.2 + 0.4
         look(co, (c.x + d * 0.55, c.y - d * 0.85, c.z + d * 0.5), c, 50)
         bpy.context.scene.render.filepath = os.path.join(rd, n + '_tq.png'); bpy.ops.render.render(write_still=True)
+    if CLOSE and 'VegBed_A' in built:   # 0.6 m from one cabbage, 3/4 view
+        for m, (_, r2) in built.items(): hide(r2, m != 'VegBed_A')
+        tg = Vector((-0.27, -0.34, 0.43)); look(co, tg + Vector((0.33, -0.38, 0.27)), tg, 50)
+        bpy.context.scene.render.filepath = os.path.join(rd, 'cabbage_close.png'); bpy.ops.render.render(write_still=True)
     for n, (a, root) in built.items(): hide(root, False)
     layout = {'Scarecrow': (-4.6, 3.0, 20), 'WaterButt': (-3.0, 3.2, 0), 'Trellis': (-0.9, 4.0, 0), 'VegBed_A': (0.7, 1.4, 0), 'VegBed_B': (3.5, 1.8, 0),
               'ColdFrame': (-3.0, 1.4, 0), 'Fence_Run': (5.4, 3.6, 0), 'Fence_Gate': (7.1, 3.6, 0)}
@@ -673,8 +778,8 @@ def write_sources(rows):
     L = ['# Garden and allotment decorations (queue Q6)', '',
          'Generated by `Art/Blender/town/sc_garden.py` (procedural, deterministic; the run line is in its header). Original geometry, no external source; licence: ours.',
          'Metres, front -Y in Blender (+Z in Unity), pivot at the ground centre. Each FBX: root `<Asset>`, mesh `Body`, `Part_*` meshes (origin at their `SOCKET_*`),',
-         '`SOCKET_*` empties and a flat 0.1 m `FOOTPRINT` box (collider only). No maps: materials are slot names that Unity maps to the shared B1 tileables',
-         '(`Art/Textures/B1_town/`, UVs in metres by box projection, 1 UV unit = 2 m) and flat colours (`Leaf` #6f8a34, `Produce` #86a67c, `Straw` #c9a85a, `Glass` dark, slightly transparent).',
+         '`SOCKET_*` empties and a flat 0.1 m `FOOTPRINT` box (collider only). No maps except the beds\' cabbage set: materials are slot names that Unity maps to the shared B1 tileables',
+         '(`Art/Textures/B1_town/`, UVs in metres by box projection, 1 UV unit = 2 m) and flat colours (`Leaf` #6f8a34, `Produce` #86a67c, `Straw` #c9a85a, `Glass` dark, slightly transparent), except the beds\' `Cabbage` slot.',
          'A linear corner attribute `wear` (R grime, G moss, B polish) is written as in the B4 kit.', '',
          '| Asset | Tris (total) | Size x y z (m) | Slots | Footprint (m) | Sockets / parts |', '|---|---|---|---|---|---|']
     for n, total, tris, a, size in rows:

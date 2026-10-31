@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Wave 2: Ground tileables + foliage extension
 Job: Q6. Garden and allotment decorations
-Progress: 80%
+Progress: 88%
 Sheet: Reference/hollowmere/garden/garden_sheet_final.jpg
 Blocker: none
 
@@ -19,6 +19,7 @@ Merge: -
 - 2026-10-31: placement round 2 in Unity: soil inside the allotments, front fence lowered (gate + short runs, fences x0.75), one post per junction, grass tufts at the fence foot; main merged clean. Final sheet pushed. Running check on the tip, then merge. Known: Unity shows the scarecrow/cabbage tints flat (a second colour set is not read), and the yard camera view is mostly back wall.
 - 2026-10-31: USER review: "The cabbage is low quality, but everything else looks wonderful." Cabbage pass running: its own outer/mid/heart materials (Unity ignored the colour attribute, so every leaf was one flat green), 5-7 cupped outer leaves with real midribs and veins, a tight wrapped head, up to about 6k tris per bed. Then re-check and merge.
 - 2026-10-31: coordinator APPROVED the final sheet (~26/40). Known, for Q12/Q14 (no capture round spent): fence runs stack two or three deep at the allotment front and read cluttered; the scarecrow tint is flat in Unity (its second colour set is not read: give it slot materials like the cabbage). The user's cabbage fix (Blender + slot materials, no new captures) lands before the merge.
+- 2026-10-31: cabbage rebuilt (attempt 2 accepted; attempt 1 rejected as paper sheets): smooth subdivided curved leaves with a painted procedural leaf texture (veins and midrib in albedo and normal, `sc_cabbage_tex.py`), a wrapped head; about 1.9k tris per cabbage, beds 9.0k / 7.8k. Close-up in `cabbage_r3.jpg`. No CC0 cabbage model exists on Poly Haven or ambientCG (checked). Next: rebuild, one allotment capture, check, merge.
 
 ## Usage waste (self-review, 2026-10-31, both jobs)
 1. **Long-lived Sonnet subagents with big contexts, about 40%.** The foliage implementer was resumed 3 times (about 250k tokens), and the garden builder used about 247k. Every resume re-reads the whole transcript, and they re-read builder files and Unity logs while waiting on 35-40 min software-rendered captures. Fix: a fresh agent per step with a short brief (build, capture, check as separate small jobs); reduced captures (`SC_CAPTURE_ONLY=<cams>`) by default and the full 26-34 PNG set only for the final sheet; wait on Unity with one blocking command, never by polling in turns.
