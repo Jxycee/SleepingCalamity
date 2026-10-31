@@ -9,7 +9,8 @@
 //  - A Landmark is a fixed piece with its own footprint (no size class): it blocks the path graph like any building.
 //  - Lanes are spine polylines; PathNodes and PathEdges are the NPC path graph M6 uses to refuse buildings and break decorations.
 // Validate() is the rule set the builder fails the build on: no foundation overlaps another foundation, a landmark or a path node; no path edge or node
-// is inside a foundation or landmark footprint; ids are unique and edges name real nodes; every doorstep of every foundation reaches the graph's root.
+// is inside a foundation or landmark footprint; no path edge is steeper than MaxGrade (20 deg) unless it is a stair; ids are unique and edges name real
+// nodes; every doorstep of every foundation sits at the lot's height and reaches the graph's root.
 // Authority: none (static layout data; M6 runs its placement checks host-side over these rows).
 using System;
 using System.Collections.Generic;
@@ -131,6 +132,7 @@ namespace SleepingCalamity.Core
     public sealed class Lane
     {
         public string Id, Name; public int Ring; public float Width; public TownPoint[] Points;
+        public float[] Heights;   // ground height of each point (the relaxed lane profile); the lane surface is linear between points
     }
 
     public sealed class PathNode
@@ -152,6 +154,7 @@ namespace SleepingCalamity.Core
         public readonly List<PathNode> Nodes = new List<PathNode>();
         public readonly List<PathEdge> Edges = new List<PathEdge>();
         public string RootNode;   // reachability is measured from here (the fountain loop)
+        public const float MaxGrade = 0.364f;   // tan 20 deg: the steepest walkable path edge; an edge between two Stair nodes is a stair and may be steeper
 
         public PathNode Node(string id) { foreach (PathNode n in Nodes) if (n.Id == id) return n; return null; }
         public Foundation Foundation(string id) { foreach (Foundation f in Foundations) if (f.Id == id) return f; return null; }
@@ -211,6 +214,9 @@ namespace SleepingCalamity.Core
                 PathNode a = Node(e.A), b = Node(e.B);
                 if (a == null || b == null) { errors.Add("path edge " + e.A + "-" + e.B + " names a missing node"); continue; }
                 if (e.A == e.B) { errors.Add("path edge " + e.A + " loops to itself"); continue; }
+                float run = TownPoint.Distance(a.Pos, b.Pos), rise = Math.Abs(a.Y - b.Y);
+                bool stair = a.Kind == PathNodeKind.Stair && b.Kind == PathNodeKind.Stair;
+                if (!stair && rise > MaxGrade * run + 0.05f) errors.Add("path edge " + e.A + "-" + e.B + " is too steep: rises " + rise.ToString("0.0") + " m over " + run.ToString("0.0") + " m");
                 foreach (Foundation f in Foundations) if (f.Footprint.SegmentCrosses(a.Pos, b.Pos)) errors.Add("path edge " + e.A + "-" + e.B + " crosses foundation " + f.Id);
                 foreach (Landmark l in Landmarks) if (l.Footprint.SegmentCrosses(a.Pos, b.Pos)) errors.Add("path edge " + e.A + "-" + e.B + " crosses landmark " + l.Id);
             }
@@ -225,6 +231,7 @@ namespace SleepingCalamity.Core
                     if (n == null) errors.Add(f.Id + ": no doorstep node on its " + s + " side");
                     else if (!reach.Contains(id)) errors.Add(f.Id + ": the " + s + " doorstep is not reachable from " + RootNode);
                     else if (TownPoint.Distance(n.Pos, f.DoorstepPoint(s)) > 0.05f) errors.Add(f.Id + ": the " + s + " doorstep node is not at the middle of that side");
+                    else if (Math.Abs(n.Y - f.Y) > 0.05f) errors.Add(f.Id + ": the " + s + " doorstep is not at the lot's height");
                 }
             foreach (Landmark l in Landmarks)
                 if (l.DoorNode != null && !reach.Contains(l.DoorNode)) errors.Add(l.Id + ": door node " + l.DoorNode + " is not reachable from " + RootNode);

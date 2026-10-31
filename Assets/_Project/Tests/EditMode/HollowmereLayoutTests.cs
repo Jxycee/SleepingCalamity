@@ -201,6 +201,69 @@ namespace SleepingCalamity.Tests.EditMode
             AssertError(t, "names a missing node");
         }
 
+        // ------------------------------------------------------------------------------------------------ terrain (terrain pass, 2026-10-31)
+        [Test]
+        public void Terrain_TerracesStepDownTheHill()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            Assert.AreEqual(0f, HollowmereLayout.Ground(t, 0f, -10f), 0.05f, "the square is the datum");
+            Assert.AreEqual(HollowmereLayout.KeepHeight, HollowmereLayout.Ground(t, 0f, 30f), 0.3f, "the keep terrace stands 4 m above the square");
+            float flank = HollowmereLayout.Ground(t, -46f, -10f), south = HollowmereLayout.Ground(t, 0f, -49f);
+            Assert.That(flank, Is.InRange(-4.5f, -2.5f), "the Ring Lane on the west flank is one terrace (about 3 m) down");
+            Assert.That(south, Is.InRange(-7.5f, -5.5f), "the Ring Lane on the south is two terraces down: it spirals");
+            float water = HollowmereLayout.WaterY;
+            Assert.That(-water, Is.InRange(10f, 14f), "the lake sits 10-14 m below the square");
+            Assert.Less(HollowmereLayout.Ground(t, HollowmereLayout.LakeCentre.X, HollowmereLayout.LakeCentre.Z), water - 2f, "the lake fills a basin");
+            Assert.Less(HollowmereLayout.NaturalGround(0f, -67f), HollowmereLayout.NaturalGround(0f, -64f) - 2f, "a dry ditch lies outside the wall's bank");
+        }
+
+        [Test]
+        public void Terrain_EveryLotIsAFlatPadAtItsOwnHeight()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            foreach (Foundation f in t.Foundations)
+                foreach (TownPoint c in f.Footprint.Corners())
+                    Assert.AreEqual(f.Y, HollowmereLayout.Ground(t, c.X, c.Z), 0.05f, f.Id + " pad is not flat at its corner " + c);
+            foreach (Foundation f in t.Foundations.Where(f => f.Ring == 1)) Assert.AreEqual(0f, f.Y, 1e-3f, f.Id + " stands on the square");
+        }
+
+        [Test]
+        public void Terrain_NoPathIsSteeperThan20Degrees()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            foreach (PathEdge e in t.Edges)
+            {
+                PathNode a = t.Node(e.A), b = t.Node(e.B);
+                if (a.Kind == PathNodeKind.Stair && b.Kind == PathNodeKind.Stair) continue;
+                float run = TownPoint.Distance(a.Pos, b.Pos);
+                Assert.LessOrEqual(System.Math.Abs(a.Y - b.Y), TownLayout.MaxGrade * run + 0.05f, e.A + "-" + e.B);
+            }
+        }
+
+        [Test]
+        public void Validator_RejectsASteepEdgeButNotAStair()
+        {
+            TownLayout t = Tiny();
+            t.Nodes.Add(new PathNode { Id = "up", Pos = new TownPoint(0f, -12f), Y = 3f, Kind = PathNodeKind.Lane });
+            t.Edges.Add(new PathEdge("root", "up"));
+            AssertError(t, "path edge root-up is too steep");
+
+            TownLayout s = Tiny();
+            s.Node("root").Kind = PathNodeKind.Stair;
+            s.Nodes.Add(new PathNode { Id = "up", Pos = new TownPoint(0f, -12f), Y = 3f, Kind = PathNodeKind.Stair });
+            s.Edges.Add(new PathEdge("root", "up"));
+            List<string> errors = s.Validate();
+            Assert.IsEmpty(errors, string.Join("\n", errors));
+        }
+
+        [Test]
+        public void Validator_RejectsADoorstepOffTheLotHeight()
+        {
+            TownLayout t = Tiny();
+            t.Node("A_West").Y = 1.2f;
+            AssertError(t, "A: the West doorstep is not at the lot's height");
+        }
+
         [Test]
         public void Footprint_SegmentTest()
         {
