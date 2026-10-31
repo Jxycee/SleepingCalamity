@@ -59,24 +59,39 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(s.IndexOf("&1000"), Is.LessThan(s.IndexOf("&1003")), "documents are written in new-id order");
         }
 
-        const string PrefabInstanceScene =
-            "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n--- !u!29 &1\nOcclusionCullingSettings:\n  a: 1\n" +
-            "--- !u!1001 &5555\nPrefabInstance:\n  m_Modification: {}\n" +
-            "--- !u!1 &700\nGameObject:\n  m_Component:\n  - component: {fileID: 701}\n" +
-            "--- !u!4 &701\nTransform:\n  m_GameObject: {fileID: 700}\n  m_Children: []\n" +
-            "--- !u!1660057539 &9223372036854775807\nSceneRoots:\n  m_Roots:\n  - {fileID: 701}\n";
+        // A PrefabInstance placed under a scene object through its stripped transform, as Unity saves a prefab dropped into a scene.
+        static string PrefabScene(long inst, long strippedTf, long go, long tf, bool instFirst)
+        {
+            string instance = $"--- !u!1001 &{inst}\nPrefabInstance:\n  m_Modification:\n    m_TransformParent: {{fileID: {tf}}}\n    m_Modifications:\n" +
+                "    - target: {fileID: -8679921383154817045, guid: abc, type: 3}\n      objectReference: {fileID: 0}\n  m_SourcePrefab: {fileID: 100100000, guid: abc, type: 3}\n";
+            string stripped = $"--- !u!4 &{strippedTf} stripped\nTransform:\n  m_CorrespondingSourceObject: {{fileID: -8679921383154817045, guid: abc, type: 3}}\n  m_PrefabInstance: {{fileID: {inst}}}\n  m_PrefabAsset: {{fileID: 0}}\n";
+            return "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n--- !u!29 &1\nOcclusionCullingSettings:\n  a: 1\n" +
+                (instFirst ? instance + stripped : stripped + instance) +
+                $"--- !u!1 &{go}\nGameObject:\n  m_Component:\n  - component: {{fileID: {tf}}}\n" +
+                $"--- !u!4 &{tf}\nTransform:\n  m_GameObject: {{fileID: {go}}}\n  m_Children:\n  - {{fileID: {strippedTf}}}\n" +
+                $"--- !u!1660057539 &9223372036854775807\nSceneRoots:\n  m_Roots:\n  - {{fileID: {tf}}}\n";
+        }
 
         [Test]
-        public void Normalize_LeavesPrefabInstanceStrippedAndNegativeIdScenesUntouched_WithAWarning()
+        public void Normalize_RenumbersPrefabInstancesAndStrippedTransforms_AndKeepsGuidReferences()
         {
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("SceneFileNormalizer"));
-            Assert.That(SceneFileNormalizer.Normalize(PrefabInstanceScene), Is.EqualTo(PrefabInstanceScene));
+            string a = SceneFileNormalizer.Normalize(PrefabScene(5760954, 5760955, 13215343, 13215344, true));
+            string b = SceneFileNormalizer.Normalize(PrefabScene(900, 123456, 77, 78, false));
+            Assert.That(b, Is.EqualTo(a));
+            StringAssert.Contains("--- !u!1 &1000\n", a);
+            StringAssert.Contains("--- !u!4 &1001\nTransform:\n  m_GameObject: {fileID: 1000}\n  m_Children:\n  - {fileID: 1003}", a);
+            StringAssert.Contains("--- !u!1001 &1002\nPrefabInstance:", a);
+            StringAssert.Contains("m_TransformParent: {fileID: 1001}", a);
+            StringAssert.Contains("--- !u!4 &1003 stripped\n", a);
+            StringAssert.Contains("m_PrefabInstance: {fileID: 1002}", a);
+            StringAssert.Contains("target: {fileID: -8679921383154817045, guid: abc, type: 3}", a);
+            Assert.That(SceneFileNormalizer.Normalize(a), Is.EqualTo(a));
+        }
 
-            string stripped = PrefabInstanceScene.Replace("--- !u!1001 &5555\n", "--- !u!4 &5555 stripped\n");
-            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("SceneFileNormalizer"));
-            Assert.That(SceneFileNormalizer.Normalize(stripped), Is.EqualTo(stripped));
-
-            string negative = PrefabInstanceScene.Replace("--- !u!1001 &5555\n", "--- !u!4 &-5555\n");
+        [Test]
+        public void Normalize_LeavesNegativeIdScenesUntouched_WithAWarning()
+        {
+            string negative = PrefabScene(5555, 5556, 700, 701, true).Replace("--- !u!1001 &5555\n", "--- !u!1001 &-5555\n");
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("SceneFileNormalizer"));
             Assert.That(SceneFileNormalizer.Normalize(negative), Is.EqualTo(negative));
         }

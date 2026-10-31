@@ -87,18 +87,13 @@ namespace SleepingCalamity.EditorTools
                 GameObject prefab = SettPrefab(v, family, cobble);
                 if (prefab != null) prefabs[v] = prefab; else Debug.LogWarning("SC BEAUTY cobbles: no mesh for variant " + v);
             }
-            Transform stones = new GameObject("Setts").transform; stones.SetParent(holder, false);
-            int placed = 0;
-            foreach (Stone s in data.stones)
-            {
-                if (!prefabs.TryGetValue(s.v, out GameObject prefab)) continue;
-                var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, stones);
-                go.transform.localPosition = new Vector3(s.p[0], s.p[1], s.p[2]);
-                go.transform.localRotation = new Quaternion(s.q[0], s.q[1], s.q[2], s.q[3]);
-                go.transform.localScale = new Vector3(s.s[0], s.s[1], s.s[2]);
-                placed++;
-            }
-            Debug.Log("SC BEAUTY cobbles placed " + placed + " of " + data.stones.Length + " from " + prefabs.Count + " variant prefabs");
+            // The stones are not serialized: a CobbleSpawner (Presentation) reads cobble_placements.json at load and spawns them as hidden, unsaved prefab instances.
+            var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(folder + "/cobble_placements.json");
+            var names = prefabs.Keys.OrderBy(k => k, System.StringComparer.Ordinal).ToArray();
+            var spawner = new GameObject("Setts").AddComponent<SleepingCalamity.Presentation.CobbleSpawner>();
+            spawner.transform.SetParent(holder, false);
+            spawner.Configure(textAsset, names, names.Select(n => prefabs[n]).ToArray());
+            Debug.Log("SC BEAUTY cobbles: spawner with " + data.stones.Length + " stones from " + prefabs.Count + " variant prefabs");
             return true;
         }
 
@@ -165,6 +160,32 @@ namespace SleepingCalamity.EditorTools
             return true;
         }
 
+        const float MaxWeedHeight = 0.25f;
+
+        static float HeightOf(GameObject go)
+        {
+            Bounds b = default; bool any = false;
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true)) { if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds); }
+            return any ? b.size.y : 0f;
+        }
+
+        // Weeds sit where they are believed: the facade foot (all), the ring joints (every 2nd), the stall base and the plaza edge (every 2nd), and one in eight
+        // of the rest, so the open plaza reads as swept cobbles (about 60% fewer there than the first pass).
+        static bool KeepWeed(Slot s, int index, Dictionary<string, int> kept)
+        {
+            float x = s.p[0], z = s.p[2];
+            bool stall = Mathf.Sqrt((x - 4.5f) * (x - 4.5f) + (z - 4.5f) * (z - 4.5f)) < 2.2f;
+            bool edge = Mathf.Abs(x) > 6f || z < -4.5f || z > 6.2f;
+            string bucket; int every;
+            if (s.kind == "facade_foot") return true;
+            if (s.kind == "ring_edge") { bucket = "ring"; every = 2; }
+            else if (stall) { bucket = "stall"; every = 2; }
+            else if (edge) { bucket = "edge"; every = 2; }
+            else { bucket = "open"; every = 8; }
+            int c = kept.TryGetValue(bucket, out int v) ? v : 0; kept[bucket] = c + 1;
+            return c % every == 0;
+        }
+
         // ------------------------------------------------------------------------------------------------ weeds
         // A subset of the json's weed slots (the missing setts, joints, ring edge and facade foot), all five Weed_A..E sizes in rotation, scale and yaw varied.
         static bool Weeds(Transform group, BeautyCornerTable.Row row)
@@ -188,13 +209,12 @@ namespace SleepingCalamity.EditorTools
 
             Transform holder = Holder(group, row, worldOrigin: true);
             var rnd = new System.Random(9);
-            var seen = new Dictionary<string, int>();
+            var seen = new Dictionary<string, int>(); var kept = new Dictionary<string, int>();
             int n = 0;
             foreach (Slot s in data.weed_slots)
             {
                 int k = seen.TryGetValue(s.kind, out int c) ? c : 0; seen[s.kind] = k + 1;
-                int every = s.kind == "facade_foot" ? 1 : s.kind == "missing_sett" ? 3 : 2;
-                if (k % every != 0) continue;
+                if (!KeepWeed(s, k, kept)) continue;
                 GameObject model = models[n % models.Count];
                 var w = (GameObject)PrefabUtility.InstantiatePrefab(model, holder); w.name = "Weed_" + (char)('A' + n % models.Count) + "_" + n;
                 Assign(w, mat, shadows: false);
@@ -203,6 +223,8 @@ namespace SleepingCalamity.EditorTools
                 w.transform.localPosition = new Vector3(s.p[0], s.p[1], s.p[2]);
                 w.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
                 w.transform.localScale = Vector3.one * scale;
+                float h = HeightOf(w);   // the tall variants stay under about 25 cm
+                if (h > MaxWeedHeight) w.transform.localScale = Vector3.one * (scale * MaxWeedHeight / h);
                 n++;
             }
             Debug.Log("SC BEAUTY weeds placed " + n + " of " + data.weed_slots.Length + " slots with " + models.Count + " variants");

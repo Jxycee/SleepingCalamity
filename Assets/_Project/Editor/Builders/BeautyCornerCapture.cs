@@ -2,8 +2,7 @@
 // A1 rendering stack (LookTest_RPAsset, selected for the run only). Output folder: command line "-scCaptureDir <dir>", else env SC_CAPTURE_DIR.
 //   Tools\unity.ps1 exec -Graphics -Method SleepingCalamity.EditorTools.BeautyCornerCapture.CaptureAll -OutDir <scratch>   (env SC_CAPTURE_DIR = the PNG folder)
 // Menu: SleepingCalamity/Art/Capture Beauty Corner (asks for the folder). Files: Corner_Wide_Midday.png, Corner_Mid_Midday.png, Corner_Close_Midday.png, Corner_Wide_LowSun.png.
-// Unity can re-save ProjectSettings/GraphicsSettings.asset and QualitySettings.asset when a batch run exits: discard with
-//   git checkout -- ProjectSettings/GraphicsSettings.asset ProjectSettings/QualitySettings.asset
+// The run leaves ProjectSettings untouched (the pipeline is swapped through QualitySettings.renderPipeline only and put back).
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -39,8 +38,10 @@ namespace SleepingCalamity.EditorTools
             Directory.CreateDirectory(dir);
             if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("SC_CAPTURE_NOBUILD"))) BeautyCornerBuilder.Build();
             var rp = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(LookTestBuilder.RpAssetPath) ?? throw new FileNotFoundException(LookTestBuilder.RpAssetPath);
-            RenderPipelineAsset savedGraphics = GraphicsSettings.defaultRenderPipeline, savedQuality = QualitySettings.renderPipeline;
-            GraphicsSettings.defaultRenderPipeline = rp; QualitySettings.renderPipeline = rp;
+            // Only the quality level's override is set (it wins over the default pipeline): touching GraphicsSettings.defaultRenderPipeline dirties
+            // ProjectSettings/GraphicsSettings.asset, and Unity then re-saves it with its newer default fields on exit.
+            RenderPipelineAsset savedQuality = QualitySettings.renderPipeline;
+            QualitySettings.renderPipeline = rp;
             try
             {
                 Debug.Log("SC CAPTURE pipeline=" + GraphicsSettings.currentRenderPipeline.name);
@@ -59,7 +60,7 @@ namespace SleepingCalamity.EditorTools
             }
             finally
             {
-                GraphicsSettings.defaultRenderPipeline = savedGraphics; QualitySettings.renderPipeline = savedQuality;
+                QualitySettings.renderPipeline = savedQuality;
                 LookTestCapture.CleanProbes();
             }
             Debug.Log("SC CAPTURE DONE " + dir);

@@ -65,8 +65,8 @@ namespace SleepingCalamity.EditorTools
             {
                 SetInt(so, "m_Settings.Source", 1);                  // DepthNormals
                 SetFloat(so, "m_Settings.Radius", 0.35f);
-                SetFloat(so, "m_Settings.Intensity", 1.2f);
-                SetFloat(so, "m_Settings.DirectLightingStrength", 0.15f);
+                SetFloat(so, "m_Settings.Intensity", 1.8f);
+                SetFloat(so, "m_Settings.DirectLightingStrength", 0.3f);
                 if (so.ApplyModifiedPropertiesWithoutUndo()) changed = true;
             }
             if (changed) { EditorUtility.SetDirty(renderer); EditorUtility.SetDirty(ssao); }

@@ -39,6 +39,20 @@ namespace SleepingCalamity.EditorTools
             BuildSupportMaterials();
             BeautyCornerArt.EnsureCellarLantern();
             BuildScene();
+            KeepDecalKeywords();
+        }
+
+        // Unity's material validation strips _ALPHAPREMULTIPLY_ON from the look-test decals while the facade materials are built from them; put the committed
+        // state back last so a build leaves those three .mat files as they are in git.
+        static void KeepDecalKeywords()
+        {
+            foreach (string n in new[] { "moss", "grime", "drip", "crack" })
+            {
+                Material m = LookTestBuilder.Mat(n);
+                if (m.IsKeywordEnabled("_ALPHAPREMULTIPLY_ON")) continue;
+                m.EnableKeyword("_ALPHAPREMULTIPLY_ON"); EditorUtility.SetDirty(m);
+            }
+            AssetDatabase.SaveAssets();
         }
 
         // --------------------------------------------------------------------------------------------- support assets
@@ -48,9 +62,9 @@ namespace SleepingCalamity.EditorTools
             {
                 LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
                 Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.25f); b.scatter.Override(0.8f); b.clamp.Override(65000f);
-                ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(0.0f); c.contrast.Override(8f); c.saturation.Override(-4f);
-                ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.80f, 0.92f, 1.0f, 0f));   // slate-teal shadows (3.1)
-                LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.94f, 0.98f, 1.0f, 0.02f));
+                ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.55f); c.contrast.Override(30f); c.saturation.Override(0f);
+                ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.95f, 1.0f, 1.0f, 0f));   // slate-teal shadows (3.1)
+                LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.97f, 1.0f, 1.0f, 0.0f));
                 Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.18f); v.smoothness.Override(0.5f);
             });
             AssetDatabase.SaveAssets();
@@ -73,7 +87,7 @@ namespace SleepingCalamity.EditorTools
             skyLow.SetColor("_SkyTint", new Color(0.66f, 0.56f, 0.64f)); skyLow.SetColor("_GroundColor", new Color(0.42f, 0.38f, 0.33f)); skyLow.SetFloat("_Exposure", 1.0f);
             EditorUtility.SetDirty(skyMid); EditorUtility.SetDirty(skyLow);
             Material cone = LookTestBuilder.Ensure(MaterialsFolder + "/M_BC_LightCone.mat", Shader.Find("SleepingCalamity/LightCone") ?? throw new System.InvalidOperationException("Shader not found: SleepingCalamity/LightCone"));
-            cone.SetColor("_Color", new Color(1.0f, 0.86f, 0.62f)); cone.SetFloat("_Intensity", 0.09f); cone.SetFloat("_LengthFade", 0.7f); cone.renderQueue = 3100;
+            cone.SetColor("_Color", new Color(1.0f, 0.86f, 0.62f)); cone.SetFloat("_Intensity", 0.14f); cone.SetFloat("_LengthFade", 0.7f); cone.renderQueue = 3100;
             cone.SetFloat("_HeightFadeTop", 10f); cone.SetFloat("_HeightFadeRange", 5f);   // alpha 1 below 5 m, 0 at 10 m: the beams stop at the roofline
             EditorUtility.SetDirty(cone);
             // Pollen: a soft round dot (RGB falloff, additive), the URP particle unlit shader set to additive transparent.
@@ -92,7 +106,7 @@ namespace SleepingCalamity.EditorTools
             }
             Material pollen = LookTestBuilder.Ensure(MaterialsFolder + "/M_Pollen.mat", Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? lit);
             pollen.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(dot)); pollen.SetColor("_BaseColor", new Color(1f, 0.93f, 0.72f, 1f));
-            pollen.SetFloat("_Surface", 1f); pollen.SetFloat("_Blend", 2f); pollen.SetFloat("_SrcBlend", 1f); pollen.SetFloat("_DstBlend", 1f);
+            pollen.SetFloat("_Surface", 1f); pollen.SetFloat("_Blend", 2f); pollen.SetFloat("_SrcBlend", 5f); pollen.SetFloat("_DstBlend", 1f);
             pollen.SetFloat("_SrcBlendAlpha", 1f); pollen.SetFloat("_DstBlendAlpha", 1f); pollen.SetFloat("_ZWrite", 0f);
             pollen.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); pollen.SetOverrideTag("RenderType", "Transparent"); pollen.renderQueue = 3000;
             EditorUtility.SetDirty(pollen);
@@ -125,7 +139,7 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 3f, 3f), new Vector3(30f, 12f, 28f));
             LookTestBuilder.AddVolume(lighting, ProfileName);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight; RenderSettings.ambientIntensity = 1f;
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential;
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared;   // crisp near field, haze building toward the far buildings (TotK study)
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
             RenderSettings.sun = sun;
 
@@ -269,18 +283,18 @@ namespace SleepingCalamity.EditorTools
             if (preset == Preset.Midday)
             {
                 rot = Quaternion.Euler(54f, -32f, 0f);
-                sun.color = new Color(1.0f, 0.894f, 0.808f); sun.intensity = 3.0f;     // about 5200 K
-                RenderSettings.fogColor = new Color(0.70f, 0.78f, 0.90f); RenderSettings.fogDensity = 0.012f;
-                RenderSettings.ambientSkyColor = new Color(0.46f, 0.55f, 0.70f); RenderSettings.ambientEquatorColor = new Color(0.50f, 0.50f, 0.47f);
-                RenderSettings.ambientGroundColor = new Color(0.30f, 0.27f, 0.22f);
+                sun.color = new Color(1.0f, 0.91f, 0.83f); sun.intensity = 3.5f;     // about 5200 K
+                RenderSettings.fogColor = new Color(0.70f, 0.78f, 0.90f); RenderSettings.fogDensity = 0.016f;
+                RenderSettings.ambientSkyColor = new Color(0.42f, 0.48f, 0.55f); RenderSettings.ambientEquatorColor = new Color(0.40f, 0.41f, 0.42f);
+                RenderSettings.ambientGroundColor = new Color(0.24f, 0.22f, 0.19f);
             }
             else
             {
                 rot = Quaternion.Euler(12f, -32f, 0f);
-                sun.color = new Color(1.0f, 0.62f, 0.36f); sun.intensity = 2.6f;
-                RenderSettings.fogColor = new Color(0.82f, 0.68f, 0.58f); RenderSettings.fogDensity = 0.012f;
-                RenderSettings.ambientSkyColor = new Color(0.46f, 0.47f, 0.50f); RenderSettings.ambientEquatorColor = new Color(0.50f, 0.44f, 0.37f);
-                RenderSettings.ambientGroundColor = new Color(0.30f, 0.27f, 0.22f);
+                sun.color = new Color(1.0f, 0.68f, 0.42f); sun.intensity = 2.8f;
+                RenderSettings.fogColor = new Color(0.82f, 0.68f, 0.58f); RenderSettings.fogDensity = 0.016f;
+                RenderSettings.ambientSkyColor = new Color(0.32f, 0.33f, 0.38f); RenderSettings.ambientEquatorColor = new Color(0.34f, 0.29f, 0.24f);
+                RenderSettings.ambientGroundColor = new Color(0.20f, 0.17f, 0.14f);
             }
             RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + (preset == Preset.Midday ? "/M_BC_Sky_Midday.mat" : "/M_BC_Sky_LowSun.mat"));
             sun.transform.rotation = rot;
