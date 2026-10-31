@@ -304,11 +304,14 @@ def mat_stone(key, H, p, seed=7.0):
     col, ao, rough, metal, nrm, lumi = tile_set(t, 'sandstone', p.get('tile', 1.1), bump=0.9)
     col = t.mixc(1.0, col, p.get('lift', (0.95, 0.9, 0.84, 1.0)), blend='MULTIPLY')
     z = t.z(); n2 = t.noise(22.0, 3.0, 0.6, seed)
-    dirt = t.math('MULTIPLY', t.mrange(t.math('ADD', z, t.math('MULTIPLY', t.math('SUBTRACT', n2, 0.5), 0.12)), 0.30, 0.0), 0.8)
+    dz = p.get('dirt_z', (0.30, 0.0))
+    dirt = t.math('MULTIPLY', t.mrange(t.math('ADD', z, t.math('MULTIPLY', t.math('SUBTRACT', n2, 0.5), 0.12)), dz[0], dz[1]), p.get('dirt_amt', 0.8))
     col = t.mixc(dirt, col, t.rgb('#3a3028')); rough = t.mixf(dirt, rough, 0.95)
     cav = t.mrange(ao, 0.9, 0.4)
     col = t.mixc(t.math('MULTIPLY', cav, 0.45), col, t.rgb('#2e271f'))
-    col, rough = moss_on(t, col, rough, z, p.get('moss_h', 0.12), p.get('moss', 0.75), seed + 1.1)
+    if p.get('moss', 0.75) > 0: col, rough = moss_on(t, col, rough, z, p.get('moss_h', 0.12), p.get('moss', 0.75), seed + 1.1)
+    if p.get('void'):      # the gully: everything below the grate falls to near black
+        col = t.mixc(t.mrange(z, -0.04, -0.20), col, t.rgb('#0b0907'))
     finish(t, col, rough, 0.0, ao, nrm, bevel=0.01)
     return mat
 
@@ -316,8 +319,8 @@ def mat_stone(key, H, p, seed=7.0):
 OAK = dict(wood='#664834')
 SQ = {
     'Bench_A':   dict(kind='bench', res=2048, tris=6000, scale=1.15, squash=0.66, infl=0.007, lean=0.8, wob=0.003, wood='#7f9a84', darken=1.0, hue_keep=0.3,
-                      tone=0.06, grime=0.6, bleach=0.0, dirt=0.16, polish=(0.7, 1.0),
-                      chip=dict(amount=0.8, edge=1.0, patch=0.8)),
+                      tone=0.06, grime=0.6, bleach=0.0, dirt=0.2, polish=(0.7, 1.0),
+                      chip=dict(amount=1.0, edge=1.0, patch=0.8)),
     'Bench_Broken': dict(kind='bench', broken=True, res=2048, tris=6000, scale=1.15, squash=0.66, infl=0.007, lean=1.4, wob=0.005, wood='#728a78', darken=0.92, hue_keep=0.3,
                       tone=0.08, grime=1.0, bleach=0.0, dirt=0.24, polish=(0.7, 1.0), moss=(0.12, 0.5),
                       chip=dict(amount=1.1, edge=1.2, patch=1.2)),
@@ -493,6 +496,292 @@ def build_pot(name, p):
     hi = join([hi] + extra, name + '_high')
     return hi, H
 
+# ---------------------------------------------------------------- generated: lantern posts
+POST_WEAR = dict(tone=0.12, grime=0.7, bleach=0.55, dirt=0.15, polish=(0.45, 0.62), lift=(1.55, 1.42, 1.3, 1.0), tile=0.9)
+STONE_P = dict(tile=0.8, moss=0.5, moss_h=0.12)
+IRON_P = dict(tile=1.6)
+PROF_BAR = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+
+def bar(h):
+    return [(x * h, y * h) for x, y in PROF_BAR]
+
+def hook_geometry(Za=2.63, y0=-0.07, yend=-0.54, R=0.045, hb=0.013):
+    """Arm path (y, z) then the crook: the arm runs out to yend, then curls down, back toward the post and up (270 degrees)."""
+    pts = [(y0 + (yend - y0) * i / 9.0, Za + 0.006 * math.sin(math.pi * i / 9.0)) for i in range(10)]
+    cy, cz = yend, Za - R
+    for i in range(1, 23):
+        ph = math.radians(260.0 * i / 22.0); pts.append((cy - R * math.sin(ph), cz + R * math.cos(ph)))
+    return pts, (cy, cz - R + hb * 0.7)
+
+def build_footing(bm_s, r, z_top=0.40):
+    w = 0.45; c = 0.045; base = chamfer_square(w, w, c)
+    prof = []                      # 16 points: edge midpoints added for the noise to bite on
+    for i in range(8):
+        a, b = base[i], base[(i + 1) % 8]; prof += [a, ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)]
+    zs = [-0.04, 0.03, 0.10, 0.17, 0.24, 0.31, 0.37, z_top]
+    jit = [(r.uniform(-0.007, 0.007), r.uniform(-0.007, 0.007)) for _ in prof]
+    def fn(x, y, z, k, j):
+        s = 1.0 - 0.05 * max(0.0, (z - 0.15) / 0.25); top = 0.012 if k == len(zs) - 1 else 0.0
+        return (x * s + jit[j][0] - math.copysign(top, x) * (abs(x) > 0.1), y * s + jit[j][1] - math.copysign(top, y) * (abs(y) > 0.1), z)
+    return add_prism(bm_s, prof, zs, fn)
+
+def build_post_geo(name, p, r, z0, z1, broken_bottom=False, broken_top=False, bracket=True, cap=True):
+    """Returns (oak_obj, iron_obj, stone_obj or None) in post-local coordinates (z up, arm toward -Y)."""
+    bm_o, bm_i = bmesh.new(), bmesh.new()
+    prof = chamfer_square(0.16, 0.16, 0.022)
+    zs = [z0 + (z1 - z0) * i / max(1, int(round((z1 - z0) / 0.06))) for i in range(int(round((z1 - z0) / 0.06)) + 1)]
+    if cap and not broken_top: zs = [z for z in zs if z < z1 - 0.12] + [z1 - 0.10, z1 - 0.045, z1]
+    jb = [(r.uniform(-0.03, 0.03), r.uniform(0, 1)) for _ in prof]
+    def fn(x, y, z, k, j):
+        x += 0.004 * math.sin(z * 1.7); y += 0.003 * math.sin(z * 2.3 + 1.0)
+        if cap and not broken_top:
+            if z > z1 - 0.11: s = 1.0 + 0.10 * (z - (z1 - 0.11)) / 0.11 if z < z1 - 0.05 else 1.0 - 0.28 * (z - (z1 - 0.05)) / 0.05 + 0.055   # flared cap, then a chamfered top
+            else: s = 1.0
+            x *= s; y *= s
+        if broken_top and k == len(zs) - 1:      # splintered top: slanted, uneven, one long splinter
+            z = z + 0.10 * (0.5 + 0.5 * x / 0.08) + jb[j][0] + (0.17 if j in (1, 2) else 0.0)
+        if broken_bottom and k == 0:
+            z = z + 0.08 * (0.5 - 0.5 * y / 0.08) + jb[j][0] * 0.8
+        return (x, y, z)
+    rings, faces = add_prism(bm_o, prof, zs, fn)
+    for f in bm_o.faces:           # fracture faces are fresh wood (slot 1)
+        if (broken_top and f.index >= len(faces) - 1 and all(v in rings[-1] for v in f.verts)) or (broken_bottom and all(v in rings[0] for v in f.verts)): f.material_index = 1
+    if bracket:
+        Za = 2.63
+        for zc, h, w in ((Za, 0.075, 0.18), (2.16, 0.05, 0.178)):
+            if z0 < zc - 0.05 and z1 > zc + 0.05:
+                add_prism(bm_i, chamfer_square(w, w, 0.012), [zc - h / 2, zc - h / 2 + 0.006, zc + h / 2 - 0.006, zc + h / 2])
+                for sx, sy in ((0, -1), (1, 0), (-1, 0)):
+                    for dz in (-0.02, 0.02):
+                        bmesh.ops.create_icosphere(bm_i, subdivisions=1, radius=0.0085, matrix=Matrix.Translation((sx * (w / 2 + 0.002), sy * (w / 2 + 0.002), zc + dz)))
+        if z0 < Za - 0.1:
+            pts, hk = hook_geometry(Za)
+            sweep(bm_i, [(0.0, y, z) for y, z in pts], bar(0.013), scale_fn=lambda t: 1.0 - 0.38 * t)
+            # scroll brace: starts up the post face, swings out to the arm underside, ends in a foot curl
+            P0, P1, P2 = Vector((-0.07, 2.10)), Vector((-0.07, 2.50)), Vector((-0.38, Za - 0.012))
+            br = [(0.0, *((1 - t) ** 2 * P0 + 2 * t * (1 - t) * P1 + t * t * P2)) for t in [i / 14.0 for i in range(15)]]
+            sweep(bm_i, br, bar(0.0095), scale_fn=lambda t: 1.0 - 0.25 * t)
+            cy, cz = -0.115, 2.10; sp = []
+            for i in range(0, 17):
+                th = -math.radians(360 * 1.25 * i / 16.0); rr = 0.040 * (1 - 0.7 * i / 16.0)
+                sp.append((0.0, cy + rr * math.cos(th), cz + rr * math.sin(th)))
+            sweep(bm_i, sp, bar(0.0085), scale_fn=lambda t: 1.0 - 0.3 * t)
+            p['_hook'] = hk
+    fix_normals(bm_i); fix_normals(bm_o)
+    raw = raw_mat('R_%s_raw' % name)
+    oak = to_obj(bm_o, name + '_oak', [mat_oak('G_%s_oak' % name, 3.0, POST_WEAR), raw], smooth=False)
+    displace(oak, lambda co: 0.0035 * noise.fractal(Vector((co.x * 28, co.y * 28, co.z * 3.5)), 0.6, 2.0, 3))
+    iron = to_obj(bm_i, name + '_iron', [mat_iron('G_%s_iron' % name, 3.0, IRON_P, rust=0.8)], smooth=False)
+    return oak, iron
+
+def build_post(name, p):
+    r = rng(name); broken = bool(p.get('broken'))
+    bm_s = bmesh.new(); build_footing(bm_s, r); fix_normals(bm_s)
+    stone = to_obj(bm_s, name + '_stone', [mat_stone('G_%s_stone' % name, 0.4, STONE_P)], smooth=False)
+    displace(stone, lambda co: 0.013 * noise.fractal(Vector((co.x * 9, co.y * 9, co.z * 9)), 0.55, 2.0, 3))
+    parts = [stone]
+    if not broken:
+        oak, iron = build_post_geo(name, p, r, 0.30, 3.0)
+        parts += [oak, iron]
+        hk = p['_hook']; ORIGINS[name] = [
+            '- Height 3.00 m (cap top); oak post 0.16 m square with 22 mm chamfers on a sandstone footing 0.45 m wide, 0.40 m tall (sunk 4 cm, bottom faces deleted).',
+            '- Bracket arm reaches 0.54 m out along Blender -Y (Unity +Z) at about 2.63 m and ends in a crook (hook).',
+            '- **hook (%.3f, %.3f, %.3f)** in Unity coordinates, relative to the origin (the lowest inner point of the crook where a lantern ring hangs; Blender (%.3f, %.3f, %.3f)). '
+            'Hang the B8 Stall_Lantern with its top at this point.' % (0.0, hk[1], -hk[0], 0.0, hk[0], hk[1])]
+        p['_hook_u'] = (0.0, hk[1], -hk[0])
+    else:
+        oak, iron = build_post_geo(name + 'a', p, r, 0.30, 1.20, broken_top=True, bracket=False, cap=False)      # the stump
+        parts += [oak]
+        up_oak, up_iron = build_post_geo(name + 'b', p, r, 1.20, 3.0, broken_bottom=True)                         # the fallen top
+        for v in up_iron.data.vertices:          # arm and brace bend down under their own weight
+            d = max(0.0, -v.co.y - 0.06)
+            v.co.x += 0.30 * d * d
+        yaw = math.radians(24)
+        M = Matrix.Translation((0.40, -0.52, 0)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.radians(90), 4, 'Y') @ Matrix.Translation((0, 0, -1.2))
+        for o in (up_oak, up_iron): o.data.transform(M)
+        mn, mx = mesh_bounds(up_oak); dz = -float(mn[2]) + 0.002
+        for o in (up_oak, up_iron): o.data.transform(Matrix.Translation((0, 0, dz)))
+        parts += [up_oak, up_iron]
+        ORIGINS[name] = ['- The post is snapped about 1.2 m up (stump with a splintered top, fresh wood showing). The top section (1.8 m, cap, collars, arm bent down by its weight, no lantern) '
+                         'lies in front of it on the cobbles at about 24 degrees. Footing 0.45 m wide, 0.40 m tall.']
+    p['_origin'] = 'at the bottom centre of the footing on the ground'
+    hi = join(parts, name + '_high'); return hi, 3.0
+
+# ---------------------------------------------------------------- generated: drain
+def chamfer_box(bm, cx, cy, w, d, z0, z1, c, mat=0, ch=0.008):
+    """Box centred at (cx, cy) with chamfered vertical edges (c) and a chamfered top edge (ch)."""
+    def fn(x, y, z, k, j):
+        top = k == 2
+        return (x * (1 - ch * 1.6 / w * top) + cx, y * (1 - ch * 1.6 / d * top) + cy, z)
+    return add_prism(bm, chamfer_square(w, d, c), [z0, z1 - ch, z1], fn, mat=mat)
+
+def build_drain(name, p):
+    r = rng(name)
+    bm_s, bm_i = bmesh.new(), bmesh.new()
+    for cx, cy, w, d in ((0, 0.21, 0.5, 0.08), (0, -0.21, 0.5, 0.08), (0.21, 0, 0.08, 0.34), (-0.21, 0, 0.08, 0.34)):
+        chamfer_box(bm_s, cx, cy, w, d, -0.12, 0.0, 0.01)
+    for cx, cy, w, d in ((0, 0.16, 0.34, 0.03), (0, -0.16, 0.34, 0.03), (0.16, 0, 0.03, 0.34), (-0.16, 0, 0.03, 0.34)):   # shaft walls
+        chamfer_box(bm_s, cx, cy, w, d, -0.34, -0.06, 0.004, ch=0.002)
+    chamfer_box(bm_s, 0, 0, 0.34, 0.34, -0.36, -0.30, 0.004, ch=0.002)                                                      # shaft floor
+    for i in range(7):          # cast-iron bars
+        chamfer_box(bm_i, -0.144 + i * 0.048, 0, 0.026, 0.37, -0.058, -0.012, 0.004, ch=0.004)
+    for yy in (-0.085, 0.085):
+        chamfer_box(bm_i, 0, yy, 0.37, 0.026, -0.052, -0.022, 0.004, ch=0.003)
+    fix_normals(bm_s); fix_normals(bm_i)
+    for k in range(14):         # grit and silt lodged between the bars
+        bmesh.ops.create_icosphere(bm_s, subdivisions=1, radius=r.uniform(0.007, 0.013),
+                                   matrix=Matrix.Translation((r.uniform(-0.15, 0.15), r.uniform(-0.15, 0.15), -0.045 + r.uniform(-0.01, 0.0))) @ Matrix.Diagonal((1, 1, 0.5, 1)))
+    sp = dict(STONE_P, void=True, dirt_z=(0.0, -0.3), dirt_amt=0.5, moss=0.0, tile=0.9, lift=(0.80, 0.77, 0.72, 1.0))
+    stone = to_obj(bm_s, name + '_stone', [mat_stone('G_%s_stone' % name, 0.4, sp)], smooth=False)
+    displace(stone, lambda co: 0.004 * noise.fractal(Vector((co.x * 20, co.y * 20, co.z * 20)), 0.55, 2.0, 3))
+    iron = to_obj(bm_i, name + '_iron', [mat_iron('G_%s_iron' % name, 1.0, IRON_P, rust=0.5)], smooth=False)
+    ORIGINS[name] = ['- **Origin is the TOP centre**: the frame top surface is at height 0 (flush with the cobbles); the body is sunk to -0.36 m (bottom faces deleted). '
+                     'Place it at the cobble surface height, not raised.',
+                     '- Frame 0.50 x 0.50 m (80 mm stone border, 10 mm chamfer), opening 0.34 x 0.34 m with 7 chunky cast-iron bars (top at -12 mm) and two ties; dark gully below with grit in the slots.']
+    p['_origin'] = 'at the TOP centre (frame top surface = height 0, flush with the cobbles)'
+    return join([stone, iron], name + '_high'), 0.4
+
+# ---------------------------------------------------------------- generated: bunting parts
+ZOFF = 1.0            # parts are built 1 m up so the bottom-face rule of make_low leaves hanging cloth alone; split_bunting takes it back out
+ROPE_Y = 0.35
+DYES = ['#a8544a', '#c49a48', '#4f7388', '#d8ccaa', '#9a5a50', '#6b8794', '#9a8460']
+
+def pennant_bm(bm, r, x_off, idx, nu, nv, ripple, torn=0, W=0.15, drop=0.38):
+    R, th = 0.0105, 0.0015
+    nflap, narc = max(2, nv // 5), max(3, nv // 5); nfront = nv - nflap - narc
+    path = [(R, -0.04 + 0.04 * i / nflap, 0, 0.0) for i in range(nflap + 1)]
+    path += [(R * math.cos(math.pi * i / narc), R * math.sin(math.pi * i / narc), 1, 0.0) for i in range(1, narc)]
+    path += [(-R, -drop * i / nfront, 2, i / nfront) for i in range(nfront + 1)]
+    sd = idx * 7.3
+    def half(s, side):      # half width at drop fraction s on the left (-1) or right (+1)
+        w = W * (1 - 0.965 * s) + 0.004
+        if torn:
+            rag = 1.0 + 0.22 * noise.noise(Vector((s * 7, side * 3 + sd, 0)))
+            w *= rag
+            if (torn == 1 and side < 0) or (torn == 2 and side > 0): w *= 0.30 if s > 0.38 else 1.0 - 0.7 * max(0, (s - 0.2) / 0.18)
+        return w
+    pl = bm.faces.layers.int.get('part') or bm.faces.layers.int.new('part')
+    cl = bm.verts.layers.float_color.get('pc') or bm.verts.layers.float_color.new('pc')
+    curl = r.uniform(0.7, 1.3) * (0.05 if torn else 0.03); lean = r.uniform(-1, 1) * 0.012
+    def pt(i, j):
+        y, z, kind, s = path[i]; u = -1 + 2 * j / nu; x = u * (half(s, -1 if u < 0 else 1))
+        if kind == 2:
+            y = y + curl * s * s + 0.012 * u * u * s + ripple * (0.0045 * noise.noise(Vector((x * 22, s * 14, sd))) + 0.0015 * noise.noise(Vector((x * 70, s * 40, sd + 3))))
+            z = z + 0.012 * u * u * s * s * (1 if torn else 0.5)
+            x = x + lean * s
+        # normal in the (y, z) plane
+        i0, i1 = max(0, i - 1), min(len(path) - 1, i + 1)
+        ty, tz = path[i1][0] - path[i0][0], path[i1][1] - path[i0][1]; L = math.hypot(ty, tz) or 1.0
+        return Vector((x, y, z)), Vector((0, -tz / L, ty / L))
+    A, B = [], []
+    for i in range(len(path)):
+        ra, rb = [], []
+        for j in range(nu + 1):
+            P, N = pt(i, j); ra.append(bm.verts.new(P + N * th + Vector((x_off, 0, ZOFF)))); rb.append(bm.verts.new(P - N * th + Vector((x_off, 0, ZOFF))))
+        A.append(ra); B.append(rb)
+    fs = []
+    for i in range(len(path) - 1):
+        for j in range(nu):
+            fs.append(bm.faces.new((A[i][j], A[i][j + 1], A[i + 1][j + 1], A[i + 1][j])))
+            fs.append(bm.faces.new((B[i][j], B[i + 1][j], B[i + 1][j + 1], B[i][j + 1])))
+    for i in range(len(path) - 1):
+        fs.append(bm.faces.new((A[i][0], A[i + 1][0], B[i + 1][0], B[i][0]))); fs.append(bm.faces.new((A[i + 1][nu], A[i][nu], B[i][nu], B[i + 1][nu])))
+    for j in range(nu):
+        fs.append(bm.faces.new((A[-1][j], A[-1][j + 1], B[-1][j + 1], B[-1][j])))
+        fs.append(bm.faces.new((A[0][j + 1], A[0][j], B[0][j], B[0][j + 1])))
+    vs = {v for f in fs for v in f.verts}
+    for f in fs: f[pl] = idx
+    for v in vs: v[cl] = (idx / 8.0, idx / 8.0, idx / 8.0, 1.0)
+
+def rope_bm(bm, r, idx, sides, nseg, ridge):
+    pl = bm.faces.layers.int.get('part') or bm.faces.layers.int.new('part')
+    cl = bm.verts.layers.float_color.get('pc') or bm.verts.layers.float_color.new('pc')
+    rings = []
+    for k in range(nseg + 1):
+        x = -k / nseg; ring = []
+        for j in range(sides):
+            a = 2 * math.pi * j / sides; rr = 0.006 * (1 + ridge * math.cos(3 * a - 2 * math.pi * 17 * x))
+            ring.append(bm.verts.new((x, ROPE_Y + rr * math.cos(a), ZOFF + rr * math.sin(a))))
+        rings.append(ring)
+    fs = []
+    for k in range(nseg):
+        for j in range(sides): fs.append(bm.faces.new((rings[k][j], rings[k][(j + 1) % sides], rings[k + 1][(j + 1) % sides], rings[k + 1][j])))
+    fs.append(bm.faces.new(list(reversed(rings[0])))); fs.append(bm.faces.new(rings[-1]))
+    for f in fs: f[pl] = idx
+    for ring in rings:
+        for v in ring: v[cl] = (idx / 8.0, idx / 8.0, idx / 8.0, 1.0)
+
+def mat_cloth(key):
+    mat = new_mat(key); t = NT(mat)
+    pc = t.new('ShaderNodeAttribute', attribute_name='pc').outputs['Fac']
+    col = t.rgb(DYES[0])
+    steps = []
+    for i in range(1, 7):
+        st = t.mrange(pc, (i - 0.5) / 8.0, (i - 0.42) / 8.0); steps.append(st); col = t.mixc(st, col, t.rgb(DYES[i]))
+    rope = steps[5]
+    z = t.z(); sep = t.new('ShaderNodeSeparateXYZ'); t.link(t.obj(), sep.inputs[0])
+    wa = t.new('ShaderNodeTexWave', wave_type='BANDS', bands_direction='X'); t.link(t.obj(), wa.inputs['Vector']); wa.inputs['Scale'].default_value = 260; wa.inputs['Distortion'].default_value = 1.0
+    wb = t.new('ShaderNodeTexWave', wave_type='BANDS', bands_direction='Z'); t.link(t.obj(), wb.inputs['Vector']); wb.inputs['Scale'].default_value = 260; wb.inputs['Distortion'].default_value = 1.0
+    weave = t.math('MULTIPLY', t.math('ADD', wa.outputs['Fac'], wb.outputs['Fac']), 0.5)
+    n1 = t.noise(6.0, 4.0, 0.6, 1.0); n2 = t.noise(30.0, 4.0, 0.6, 5.0)
+    col = t.mixc(t.math('MULTIPLY', t.math('SUBTRACT', weave, 0.5), 0.5), col, t.mixc(1.0, col, (0.7, 0.7, 0.7, 1.0), blend='MULTIPLY'))
+    fade = t.math('MULTIPLY', t.mrange(z, ZOFF, ZOFF - 0.38), t.mrange(n1, 0.3, 0.7, 0.4, 1.0))         # sun-bleached toward the free edge
+    col = t.mixc(t.math('MULTIPLY', fade, 0.40), col, t.rgb('#d6cdb8'))
+    dirt = t.math('MULTIPLY', t.mrange(n1, 0.35, 0.85), t.mrange(t.math('ADD', t.math('SUBTRACT', ZOFF, z), t.math('MULTIPLY', n2, 0.1)), 0.05, 0.30, 0.15, 0.7))
+    col = t.mixc(t.math('MULTIPLY', dirt, 0.28), col, t.rgb('#4a3d2e'))
+    # rope: three strands twisting (angle about its axis + position along it), lighter on the ridges
+    yy = t.math('SUBTRACT', sep.outputs['Y'], ROPE_Y); zz = t.math('SUBTRACT', sep.outputs['Z'], ZOFF)
+    ang = t.math('ARCTAN2', yy, zz)
+    ph = t.math('SUBTRACT', t.math('MULTIPLY', ang, 3.0 / 1.0), t.math('MULTIPLY', sep.outputs['X'], 2 * math.pi * 17 * -1.0))
+    ridge = t.mrange(t.math('SINE', ph), -1.0, 1.0)
+    rc = t.mixc(ridge, t.rgb('#5e4c32'), t.mixc(n2, t.rgb('#a89468'), t.rgb('#8c7852')))
+    col = t.mixc(rope, col, rc)
+    rough = t.mixf(rope, 0.88, 0.9)
+    height = t.mixf(rope, t.math('MULTIPLY', weave, 0.6), ridge)
+    bp = t.new('ShaderNodeBump'); bp.inputs['Strength'].default_value = 0.6; bp.inputs['Distance'].default_value = 0.0025; t.link(height, bp.inputs['Height'])
+    finish(t, col, rough, 0.0, 1.0, bp.outputs[0], bevel=0.0)
+    return mat
+
+def build_bunting(name, p):
+    r = rng(name); mat = mat_cloth('G_%s_cloth' % name)
+    hi, lo = bmesh.new(), bmesh.new()
+    spec = [(0, 0), (1, 0), (2, 0), (3, 0), (4, 1), (5, 2)]            # (part idx, torn kind); pennants then T0 (left side torn), T1 (right)
+    for k, (idx, torn) in enumerate(spec):
+        pennant_bm(hi, rng('h%d' % idx), 0.42 * k, idx, 22, 40, 1.0, torn)
+        pennant_bm(lo, rng('h%d' % idx), 0.42 * k, idx, 6, 14, 0.0, torn)
+    rope_bm(hi, r, 6, 16, 90, 0.14); rope_bm(lo, r, 6, 8, 14, 0.0)
+    fix_normals(hi); fix_normals(lo)
+    ho = to_obj(hi, name + '_high', [mat]); lo_o = to_obj(lo, name + '_lowsrc', [mat], smooth=False)
+    p['_lo_src'] = lo_o; p['_objs'] = True
+    p['_origin'] = 'per child mesh (below); the parts are not laid out for placement: instantiate each by name'
+    ORIGINS[name] = [
+        '- One FBX, one material, one texture set, SEVEN child meshes (all at the FBX origin; each mesh is built about its own pivot): `Pennant_0` (madder red), `Pennant_1` (ochre), '
+        '`Pennant_2` (woad blue), `Pennant_3` (cream), `Pennant_T0` and `Pennant_T1` (torn, ragged, faded madder / woad), `Rope_1m`. The torn pennants live in this FBX (no separate Bunting_Torn folder).',
+        '- **Pennant**: origin = the middle of its top edge, where the rope passes. The top edge runs along local X, so **local X is "along the rope"** (it is Unity +X after export). '
+        'The pennant **hangs down local -Y in Unity (Blender -Z)**; the cloth faces +/-Z in Unity (front = Unity +Z). About 0.30 m wide at the top, 0.38 m drop, hem folded over a 12 mm rope '
+        '(hem inner radius 9 mm), solid 3 mm thick (two shells joined at the edges, so it is closed and double sided with no cull trouble).',
+        '- **Rope_1m**: origin at its start; it runs 1.00 m along **Unity +X** (authored along Blender -X; Unity x = -Blender x), 12 mm diameter, 8 sides, three-strand twist baked into the normal.',
+        '- Per-mesh bounds (m, Unity x/y/z): pennants 0.30 x 0.38 x ~0.03 (hem top at +0.0105 above the origin); rope 1.00 x 0.012 x 0.012.']
+    return ho, 0.4
+
+def split_bunting(lo, name):
+    """Separate the baked low into Pennant_0..3, Pennant_T0/T1 and Rope_1m, each moved so its pivot sits at its own origin (z offset removed)."""
+    names = {0: 'Pennant_0', 1: 'Pennant_1', 2: 'Pennant_2', 3: 'Pennant_3', 4: 'Pennant_T0', 5: 'Pennant_T1', 6: 'Rope_1m'}
+    outs = []; mat = lo.data.materials[0]
+    for idx, nm in names.items():
+        bm = bmesh.new(); bm.from_mesh(lo.data); pl = bm.faces.layers.int.get('part')
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[pl] != idx], context='FACES')
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+        off = Vector((0.42 * idx, 0, ZOFF)) if idx < 6 else Vector((0, ROPE_Y, ZOFF))
+        for v in bm.verts: v.co -= off
+        me = bpy.data.meshes.new(nm); bm.to_mesh(me); bm.free()
+        for f in me.polygons: f.use_smooth = True
+        if hasattr(me, 'set_sharp_from_angle'): me.set_sharp_from_angle(angle=math.radians(50))
+        me.materials.append(mat)
+        o = bpy.data.objects.new(nm, me); bpy.context.scene.collection.objects.link(o); outs.append(o)
+    bpy.data.objects.remove(lo, do_unlink=True)
+    return outs
+
 # ---------------------------------------------------------------- SOURCES.md, build dispatch, main
 SQ_CREDIT = {'painted_wooden_bench': 'Eugene Chebotar', 'planter_box_01': 'see Art/Source/PolyHaven/SOURCES.md', 'planter_box_02': 'see Art/Source/PolyHaven/SOURCES.md',
              'planter_pot_clay': 'Amal Kumar'}
@@ -555,6 +844,8 @@ def join_copy(objs):
 
 def shrink(lo, budget):
     """Second decimate pass when make_low's single collapse left the mesh over budget (boolean-cut pieces keep many tiny faces)."""
+    if tris_of(lo) > budget:     # touching boards share edges between 4 faces after the weld: split them so the collapse can work
+        bm = bmesh.new(); bm.from_mesh(lo.data); bmesh.ops.split_edges(bm, edges=[e for e in bm.edges if len(e.link_faces) > 2]); bm.to_mesh(lo.data); bm.free()
     for _ in range(3):
         n = tris_of(lo)
         if n <= budget: break
@@ -562,6 +853,23 @@ def shrink(lo, budget):
         dg = bpy.context.evaluated_depsgraph_get(); m2 = bpy.data.meshes.new_from_object(lo.evaluated_get(dg)); lo.modifiers.clear()
         old = lo.data; lo.data = m2; m2.name = lo.name
     return lo
+
+def write_index():
+    """Square/SOURCES.md: one row per exported asset, rebuilt from the per-asset SOURCES.md files."""
+    import re
+    rows = []
+    for n in SQ:
+        f = os.path.join(DEST, n, 'SOURCES.md')
+        if not os.path.exists(f): continue
+        t = open(f, encoding='utf-8').read()
+        tr = re.search(r'(\d+) tris', t); sz = re.search(r'Size \(Blender[^:]*\): ([^.]*\.[^ ]*[^.]*?) m\.', t)
+        src = re.search(r'Poly Haven `([^`]+)`', t)
+        rows.append('| %s | %s | %s | %s | %s |' % (n, ('Poly Haven `%s` (CC0)' % src.group(1)) if src else 'generated (ours)', tr.group(1) if tr else '?', sz.group(1) if sz else '-', SQ[n]['res']))
+    head = ('# Town square dressing (Hollowmere square)\n\nGenerated by `Art/Blender/town/sc_square_dressing.py` (re-run lines in its header). One folder per asset: `<Asset>.fbx`, '
+            '`<Asset>_BaseColor.png`, `<Asset>_Normal.png` (OpenGL), `<Asset>_ORM.png` (R AO, G rough, B metal), and a `SOURCES.md` with source, licence, origin and the numbers '
+            'Unity reads (`soil ... N m` for planters and pots, `hook (x, y, z)` for LanternPost_A, origin notes for Drain_A and Bunting).\n\n'
+            '| asset | source | tris | size (Blender x, y, z m) | map px |\n|---|---|---|---|---|\n')
+    with open(os.path.join(DEST, 'SOURCES.md'), 'w', encoding='utf-8', newline='\n') as fh: fh.write(head + '\n'.join(rows) + '\n')
 
 def main():
     bpy.ops.wm.read_homefile(use_empty=True)
@@ -583,7 +891,7 @@ def main():
         hi, H = build_high_sq(name, p)
         res = int(p['res'] * RES_SCALE)
         print('SQ hi tris', name, tris_of(hi))
-        lo = make_low(hi, name, p)
+        lo = make_low(p.pop('_lo_src', None) or hi, name, p)
         lo = shrink(lo, p['tris'])
         paths = bake(hi, lo, name, res)
         if p['kind'] == 'bunting': lo = split_bunting(lo, name)
@@ -593,6 +901,7 @@ def main():
         bpy.data.objects.remove(hi, do_unlink=True)
         for o in los: o.hide_render = True
         lows[name] = los
+    if EXPORT: write_index()
     if not RENDER: return
     rd = os.path.join(OUT, 'renders'); os.makedirs(rd, exist_ok=True)
     co = review_scene(); ground = bpy.data.objects['REV_ground']; ground.location.z = -0.003
@@ -606,11 +915,23 @@ def main():
             ground.modifiers.new('h', 'BOOLEAN').object = cutb; ground.modifiers['h'].operation = 'DIFFERENCE'; ground.modifiers['h'].solver = 'EXACT'
             ground.data = bpy.data.meshes.new_from_object(ground.evaluated_get(bpy.context.evaluated_depsgraph_get())); ground.modifiers.clear(); cutb.hide_render = True
         for lo in los: lo.hide_render = False; lo.location = (0, 0, 0)
-        mins = np.array([bounds(lo)[0] for lo in los]).min(0); maxs = np.array([bounds(lo)[1] for lo in los]).max(0)
-        c = Vector(((mins[0] + maxs[0]) / 2, (mins[1] + maxs[1]) / 2, (mins[2] + maxs[2]) / 2)); s = float((maxs - mins).max())
-        d = s * 2.3 + 0.35; lens = 50
-        aim(co, (c.x + d * 0.62, c.y - d * 0.85, c.z + d * 0.55), c, lens)
+        extra_objs = []
+        if name == 'Bunting':       # review layout: two ropes end to end along Unity +X, the pennants hanging from them
+            k = 0
+            for lo in los:
+                if lo.name.startswith('Pennant'): lo.location = (0.7 - 0.32 * k, 0, 1.2); k += 1
+                else:
+                    lo.location = (0.9, 0, 1.2); r2 = lo.copy(); r2.data = lo.data; r2.location = (-0.1, 0, 1.2)
+                    bpy.context.scene.collection.objects.link(r2); extra_objs.append(r2)
+            c = Vector((-0.1, 0, 1.0)); s = 2.2; d = s * 1.35
+            aim(co, (c.x + 0.25 * d, c.y - d, c.z + 0.12 * d), c, 50)
+        else:
+            mins = np.array([bounds(lo)[0] for lo in los]).min(0); maxs = np.array([bounds(lo)[1] for lo in los]).max(0)
+            c = Vector(((mins[0] + maxs[0]) / 2, (mins[1] + maxs[1]) / 2, (mins[2] + maxs[2]) / 2)); s = float((maxs - mins).max())
+            d = s * 2.3 + 0.35; lens = 68 if s > 2.0 else 50
+            aim(co, (c.x + d * 0.62, c.y - d * 0.85, c.z + d * 0.55), c, lens)
         render(os.path.join(rd, '%s_tq.png' % name))
+        for o in extra_objs: bpy.data.objects.remove(o, do_unlink=True)
         for lo in los: lo.hide_render = True
 
 main()
