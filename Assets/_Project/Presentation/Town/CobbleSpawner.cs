@@ -2,7 +2,7 @@
 // component instead of 8,673 serialized prefab instances (21 MB, reordered on every rebuild). The stones are ordinary prefab instances of the per-variant LODGroup prefabs
 // (so the GPU Resident Drawer and LOD fade behave as for hand-placed ones), children of a hidden container that is never saved (HideFlags.DontSave).
 // Runs in the editor too (ExecuteAlways) so a loaded scene captures identically. Positions and rotations are in this object's local space.
-// Cost: the json is parsed once per distinct TextAsset (cached across enables and scene loads in the same domain) into flat arrays; a Rebuild is then one
+// Cost: the json is parsed once per distinct TextAsset (cached per file across enables and scene loads in the same domain) into flat arrays; a Rebuild is then one
 // instantiate loop plus one hide-flag pass. The time of each rebuild is logged ("SC COBBLES") so a scene-load regression shows up in the editor log.
 using System.Collections.Generic;
 using UnityEngine;
@@ -25,7 +25,7 @@ namespace SleepingCalamity.Presentation
         }
 
         sealed class Parsed { public EntityId AssetId; public long Size; public Sett[] Setts; public int Skipped; }
-        static Parsed s_Cache;   // one entry is enough: the corner has one placements file. Cleared by the domain reload.
+        static readonly Dictionary<(EntityId, long), Parsed> s_Cache = new Dictionary<(EntityId, long), Parsed>();   // one parse per placements file (the corner's and the square's); cleared by the domain reload
 
         [SerializeField] TextAsset m_Placements;
         [SerializeField] string[] m_VariantNames = new string[0];
@@ -57,7 +57,7 @@ namespace SleepingCalamity.Presentation
         static Parsed Parse(TextAsset asset)
         {
             EntityId id = asset.GetEntityId(); long size = asset.dataSize;
-            if (s_Cache != null && s_Cache.AssetId == id && s_Cache.Size == size) return s_Cache;
+            if (s_Cache.TryGetValue((id, size), out Parsed cached)) return cached;
             Placements data = JsonUtility.FromJson<Placements>(asset.text);
             var parsed = new Parsed { AssetId = id, Size = size, Setts = new Sett[0] };
             if (data != null && data.stones != null)
@@ -70,7 +70,7 @@ namespace SleepingCalamity.Presentation
                 }
                 parsed.Setts = list.ToArray();
             }
-            s_Cache = parsed;
+            s_Cache[(id, size)] = parsed;
             return parsed;
         }
 

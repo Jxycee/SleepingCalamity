@@ -115,6 +115,7 @@ namespace SleepingCalamity.EditorTools
             }
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt); }
+            HollowmereSquare.Build(set, ruined, rebuilt, t);
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");
