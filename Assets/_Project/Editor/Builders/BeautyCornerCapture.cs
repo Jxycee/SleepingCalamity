@@ -51,6 +51,7 @@ namespace SleepingCalamity.EditorTools
                 SimulatePollen();
                 LookTestCapture.WarmUp(cams);
                 foreach (Camera cam in cams) LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_Midday.png"));
+                foreach (Camera cam in cams) LogFrameTime(cam);
 
                 BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.LowSun);
                 foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
@@ -62,6 +63,33 @@ namespace SleepingCalamity.EditorTools
                 LookTestCapture.CleanProbes();
             }
             Debug.Log("SC CAPTURE DONE " + dir);
+        }
+
+        // Rough frame cost of one capture camera: the mean wall time of 10 renders to a 1920x1080 target, each ended by a ReadPixels (which waits for the GPU).
+        // It includes the CPU render-loop cost and, in a batch run, the editor's own overhead: use it to compare rounds, not as a game frame time.
+        static void LogFrameTime(Camera cam)
+        {
+            var rt = RenderTexture.GetTemporary(1920, 1080, 24, RenderTextureFormat.ARGB32);
+            RenderTexture prevTarget = cam.targetTexture, prevActive = RenderTexture.active;
+            var tex = new Texture2D(8, 8, TextureFormat.RGBA32, false);
+            try
+            {
+                cam.targetTexture = rt;
+                for (int i = 0; i < 3; i++) cam.Render();
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                const int n = 10;
+                for (int i = 0; i < n; i++)
+                {
+                    cam.Render();
+                    RenderTexture.active = rt; tex.ReadPixels(new Rect(0, 0, 8, 8), 0, 0);
+                }
+                sw.Stop();
+                Debug.Log("SC CAPTURE frame " + cam.name + " ms=" + (sw.Elapsed.TotalMilliseconds / n).ToString("F1"));
+            }
+            finally
+            {
+                cam.targetTexture = prevTarget; RenderTexture.active = prevActive; RenderTexture.ReleaseTemporary(rt); Object.DestroyImmediate(tex);
+            }
         }
 
         // Particles do not run in edit mode: step the pollen forward so the frame holds a settled cloud (fixed seed, so every round is identical).

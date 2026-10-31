@@ -5,6 +5,7 @@
 // cool sky fill, exponential haze, bloom + Neutral tonemap in BeautyCorner_Day_Profile. No volumetric package is in Packages/manifest.json, so god rays are
 // authored additive light-cone cards (the Shafts root is aligned to the sun by ApplyPreset), plus drifting pollen. Presets: Midday and LowSun.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene; materials and textures are updated in place.
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -36,6 +37,7 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.BuildMaterials();
             BuildProfile();
             BuildSupportMaterials();
+            BeautyCornerArt.EnsureCellarLantern();
             BuildScene();
         }
 
@@ -139,33 +141,78 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC BEAUTY scene built " + ScenePath);
         }
 
-        static void PlaceRow(Transform set, BeautyCornerTable.Row row)
+        // Art for one instance: its own folder (a B7 prop variant, Instance.Asset) or the row's folder match. Cached per folder so 3 barrels import 3 variants once each.
+        sealed class RowArt { public GameObject Fbx; public Material Mat; public BeautyCornerArt.Found Found; public Dictionary<string, Material> Slots; }
+
+        static RowArt LoadArt(BeautyCornerTable.Row row, string asset, Dictionary<string, RowArt> cache)
         {
-            BeautyCornerArt.Found found = BeautyCornerArt.Find(row);
-            GameObject fbx = null; Material artMat = null;
+            string key = asset ?? "";
+            if (cache.TryGetValue(key, out RowArt cached)) return cached;
+            RowArt art = null;
+            BeautyCornerArt.Found found = null;
+            if (asset != null)
+            {
+                string folder = BeautyCornerArt.FindFolder(row.Batch, asset);
+                found = folder != null ? BeautyCornerArt.FindIn(folder) : null;
+            }
+            else found = BeautyCornerArt.Find(row);
             if (found != null)
             {
-                try { fbx = BeautyCornerArt.Prepare(found, row.Id, row.Foliage, out artMat); }
-                catch (System.Exception e) { Debug.LogWarning("SC BEAUTY art for " + row.Id + " failed, using placeholder: " + e.Message); fbx = null; }
+                try
+                {
+                    art = new RowArt { Found = found };
+                    if (row.Id == "Facade")   // multi-material: keep the FBX slot names and map them to the shared-tileable materials
+                    {
+                        art.Fbx = BeautyCornerArt.LoadModel(found.Folder, Path.GetFileName(found.Fbx), keepMaterialSlots: true);
+                        art.Slots = BeautyCornerArt.BuildFacadeMaterials();
+                    }
+                    else art.Fbx = BeautyCornerArt.Prepare(found, asset ?? row.Id, row.Foliage, out art.Mat);
+                    if (art.Fbx == null) art = null;
+                }
+                catch (System.Exception e) { Debug.LogWarning("SC BEAUTY art for " + row.Id + (asset != null ? "/" + asset : "") + " failed, using placeholder: " + e.Message); art = null; }
             }
-            Debug.Log("SC BEAUTY row=" + row.Id + " batch=" + row.Batch + " art=" + (fbx != null ? found.Fbx : "placeholder"));
+            Debug.Log("SC BEAUTY row=" + row.Id + (asset != null ? " asset=" + asset : "") + " batch=" + row.Batch + " art=" + (art != null ? found.Fbx : "placeholder"));
+            cache[key] = art;
+            return art;
+        }
+
+        static void PlaceRow(Transform set, BeautyCornerTable.Row row)
+        {
             Transform group = new GameObject(row.Id).transform; group.SetParent(set, false);
+            if (row.Scatter && BeautyCornerGround.TryPlace(group, row)) { Debug.Log("SC BEAUTY row=" + row.Id + " batch=" + row.Batch + " art=scatter"); return; }
+            var cache = new Dictionary<string, RowArt>();
             for (int i = 0; i < row.Instances.Length; i++)
             {
                 BeautyCornerTable.Instance inst = row.Instances[i];
+                RowArt art = LoadArt(row, inst.Asset, cache);
                 string tag = row.Instances.Length > 1 ? row.Id + "_" + (i + 1) : row.Id;
-                var go = new GameObject((fbx != null || row.Id.StartsWith("NEIGHBOUR_") ? "" : "PLACEHOLDER_") + tag);
+                var go = new GameObject((art != null || row.Id.StartsWith("NEIGHBOUR_") ? "" : "PLACEHOLDER_") + tag);
                 go.transform.SetParent(group, false);
                 go.transform.localPosition = inst.Pos; go.transform.localRotation = Quaternion.Euler(0f, inst.Yaw, 0f); go.transform.localScale = Vector3.one * inst.Scale;
-                if (fbx != null)
+                if (art != null)
                 {
-                    var art = (GameObject)PrefabUtility.InstantiatePrefab(fbx, go.transform);
-                    art.name = "Art_" + row.Id;
-                    foreach (Renderer r in art.GetComponentsInChildren<Renderer>(true))
+                    var obj = (GameObject)PrefabUtility.InstantiatePrefab(art.Fbx, go.transform);
+                    obj.name = "Art_" + (inst.Asset ?? row.Id);
+                    obj.transform.localRotation = Quaternion.Euler(0f, row.ArtYaw, 0f);
+                    foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
                     {
                         var mats = new Material[Mathf.Max(1, r.sharedMaterials.Length)];
-                        for (int k = 0; k < mats.Length; k++) mats[k] = artMat;
+                        for (int k = 0; k < mats.Length; k++)
+                        {
+                            if (art.Slots == null) { mats[k] = art.Mat; continue; }
+                            string slot = k < r.sharedMaterials.Length && r.sharedMaterials[k] != null ? r.sharedMaterials[k].name : "";
+                            int dot = slot.IndexOf('.'); if (dot > 0) slot = slot.Substring(0, dot);   // "FK_Plaster.001"
+                            if (!art.Slots.TryGetValue(slot, out mats[k])) { Debug.LogWarning("SC BEAUTY facade: no material for slot '" + slot + "' on " + r.name); mats[k] = PlaceholderMat("dark"); }
+                            if (slot.StartsWith("FK_Decal")) r.shadowCastingMode = ShadowCastingMode.Off;
+                        }
                         r.sharedMaterials = mats;
+                    }
+                    if (row.Id == "Facade")   // the wear shader needs the FBX vertex colour: say how many kit meshes kept it
+                    {
+                        int total = 0, withColor = 0;
+                        foreach (MeshFilter mf in obj.GetComponentsInChildren<MeshFilter>(true))
+                        { total++; if (mf.sharedMesh != null && mf.sharedMesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.Color)) withColor++; }
+                        Debug.Log("SC BEAUTY facade meshes=" + total + " with vertex colour (wear)=" + withColor);
                     }
                     continue;
                 }
