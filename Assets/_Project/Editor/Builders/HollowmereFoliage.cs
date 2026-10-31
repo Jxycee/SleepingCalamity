@@ -335,6 +335,7 @@ namespace SleepingCalamity.EditorTools
         // A low dark-green hedgerow / tree line in two staggered rows about 125-133 m from (0, -20), just inside the terrain edge, so the bare horizon and the hard sky band are
         // hidden behind it through the fog. B9 leaf-mass cards (Ivy_Patch_A/B stood upright, 3-6x wide, 2.5-6 m tall, facing the town) with Moss_Tuft mounds at the base. Rooted on the
         // terrain height; left open where the ground falls to the lake. One shared material, no shadows. Under Set, so both presets show it.
+        // NOT CALLED (2026-10-31): scaled B9 ivy cards read as giant ivy strands, not a hedge, at the horizon; kept for a real tree-line card set (PARKING_LOT).
         public static void FarHedge(Transform set)
         {
             hedgeMat = null;
