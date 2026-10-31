@@ -1385,9 +1385,27 @@ def bake():
     bpy.ops.object.join()
     st = bpy.context.view_layer.objects.active; st.name = NAME; st.data.name = NAME
     me = st.data; at = me.uv_layers.new(name='atlas'); me.uv_layers.active = at
-    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    weed = [i for i, s_ in enumerate(st.material_slots) if s_.material and s_.material.name.startswith('Weed')]
+    bpy.ops.object.mode_set(mode='EDIT')
+    if weed:
+        # ruined: hundreds of weed blades would each take an island and its margin; pack everything else into 92% of the atlas,
+        # then lay the weeds top-down into the last strip (overlapping is fine: they bake to one graded green)
+        bm = bmesh.from_edit_mesh(me)
+        for f in bm.faces: f.select_set(f.material_index not in weed)
+        bmesh.update_edit_mesh(me)
+    else:
+        bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=math.radians(55), island_margin=0.003, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.uv.pack_islands(rotate=True, margin=0.003)
+    if weed:
+        bm = bmesh.from_edit_mesh(me); ul = bm.loops.layers.uv['atlas']
+        for f in bm.faces:
+            for lp in f.loops:
+                if f.material_index in weed:
+                    co = lp.vert.co; lp[ul].uv = (0.925 + 0.07 * min(max((co.x + 2.2) / 4.4, 0), 1), 0.005 + 0.99 * min(max((co.y + 1.6) / 3.2, 0), 1))
+                else:
+                    lp[ul].uv = (lp[ul].uv.x * 0.92, lp[ul].uv.y * 0.92)   # uniform: keeps texels square
+        bmesh.update_edit_mesh(me)
     bpy.ops.object.mode_set(mode='OBJECT')
     SC.render.engine = 'CYCLES'; SC.cycles.device = 'CPU'; SC.cycles.samples = 16; SC.cycles.use_denoising = False
     bk = SC.render.bake; bk.margin = 8; bk.use_selected_to_active = False; bk.use_clear = True
