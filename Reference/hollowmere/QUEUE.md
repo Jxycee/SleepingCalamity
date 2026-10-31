@@ -1,5 +1,7 @@
 # Self-serve work queue (PC coordinator, 2026-10-31)
 
+**CLAIMING: PAUSED (usage pacing, 07:34 UTC).** While this line says PAUSED, a session that finishes sets its STATUS.md to DONE and stops, without claiming. The coordinator flips this line back to OPEN.
+
 A cloud session that has finished and merged its task takes the top item whose `Claimed:` line is still `-`:
 1. Pull main.
 2. Write your session title and the date on that item's `Claimed:` line, then commit and push to main (subject `queue: claim <item>`). If the push is rejected, pull and pick again.
