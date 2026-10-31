@@ -9,7 +9,7 @@ Status: pre-merge check running
 Archive: not yet
 Branch: claude/laughing-bell-0zcpod
 
-Score: round 2 25/40 -> round 3 27/40 (final room re-capture after the lantern fix: p90 .51) (silhouette 3.5, proportion 3.5, form 3.5, surface 3.5, colour 4, wear 3, set 3, emissive 3); target first + 5 = 30 not reached in the 3-round cap (round 3 gained 2)
+Score: coordinator approved round 3 at about 26/40 (final). Self: round 2 25/40 -> round 3 27/40 (final room re-capture after the lantern fix: p90 .51) (silhouette 3.5, proportion 3.5, form 3.5, surface 3.5, colour 4, wear 3, set 3, emissive 3); target first + 5 = 30 not reached in the 3-round cap (round 3 gained 2)
 SC RESULT: build PASS on 134d979; check running
 Merge commit: -
 
@@ -18,6 +18,10 @@ Merge commit: -
 - Socket dressing: Shelf -> LarderShelf, Chute -> CoalChute, Barrel -> Barrels + candle, Crate -> crates, Roots -> Roots from the crown; kit piers on Pillar cells; up to 2 hashed corner props per room; candle cluster (real point light) on every chest; dust motes at wall lanterns; one warm fill per room; centre hanging lamp (chain) in rooms of 12+ cells; corridor lamps every other cell; lamps in the corner's paler gold (not #d6a24a orange).
 - Test scene: DungeonCorner_Profile grade, ambient 0.8, the corner's fog; new `Floor_Corridor` camera (longest straight run); overview capture hides the Ceiling groups (cutaway); SC_CAPTURE_ONLY honoured.
 - Every seed still builds (the layer reads only the layout); the stage-2 tests and the network peer test compare the same groups.
+
+## Follow-ups (coordinator, round 3 approved at about 26/40, cap reached)
+- Rooms read near empty: few shelves, barrels, crates or rubble from the corner kit in the play space. Wants denser socket data and/or a rubble/clutter pass.
+- The floor reads more sepia/orange than the approved corner (the user asked for "less orange"): pull lamp/candle/fill warmth and the floor's ambient toward the corner's paler gold and grey-brown darks.
 
 ## Known
 - Overview: the two far rooms render dark: the cloud's software GL path caps visible lights (about 50 lights in the cutaway); the play-height views are lit. Check on a GPU session.
