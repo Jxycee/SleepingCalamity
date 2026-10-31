@@ -1,9 +1,8 @@
-// Renders the beauty-corner captures (PHASE1 3.7, brief section 1): Wide, Mid and Close at Midday plus Wide at LowSun, PNG 1920x1080, through the LookTest
-// A1 rendering stack (LookTest_RPAsset, selected for the run only). Output folder: command line "-scCaptureDir <dir>", else env SC_CAPTURE_DIR.
+// Renders the beauty-corner captures (PHASE1 3.7, brief section 1): Wide, Mid and Close at Midday plus Wide at LowSun, PNG 1920x1080, through the beauty corner's
+// own copy of the LookTest A1 rendering stack (BeautyCorner_RPAsset, selected for the run only). Output folder: command line "-scCaptureDir <dir>", else env SC_CAPTURE_DIR.
 //   Tools\unity.ps1 exec -Graphics -Method SleepingCalamity.EditorTools.BeautyCornerCapture.CaptureAll -OutDir <scratch>   (env SC_CAPTURE_DIR = the PNG folder)
 // Menu: SleepingCalamity/Art/Capture Beauty Corner (asks for the folder). Files: Corner_Wide_Midday.png, Corner_Mid_Midday.png, Corner_Close_Midday.png, Corner_Wide_LowSun.png.
-// Unity can re-save ProjectSettings/GraphicsSettings.asset and QualitySettings.asset when a batch run exits: discard with
-//   git checkout -- ProjectSettings/GraphicsSettings.asset ProjectSettings/QualitySettings.asset
+// The run leaves ProjectSettings untouched (the pipeline is swapped through QualitySettings.renderPipeline only and put back).
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -38,9 +37,11 @@ namespace SleepingCalamity.EditorTools
         {
             Directory.CreateDirectory(dir);
             if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("SC_CAPTURE_NOBUILD"))) BeautyCornerBuilder.Build();
-            var rp = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(LookTestBuilder.RpAssetPath) ?? throw new FileNotFoundException(LookTestBuilder.RpAssetPath);
-            RenderPipelineAsset savedGraphics = GraphicsSettings.defaultRenderPipeline, savedQuality = QualitySettings.renderPipeline;
-            GraphicsSettings.defaultRenderPipeline = rp; QualitySettings.renderPipeline = rp;
+            var rp = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(BeautyCornerBuilder.RpAssetPath) ?? throw new FileNotFoundException(BeautyCornerBuilder.RpAssetPath);
+            // Only the quality level's override is set (it wins over the default pipeline): touching GraphicsSettings.defaultRenderPipeline dirties
+            // ProjectSettings/GraphicsSettings.asset, and Unity then re-saves it with its newer default fields on exit.
+            RenderPipelineAsset savedQuality = QualitySettings.renderPipeline;
+            QualitySettings.renderPipeline = rp;
             try
             {
                 Debug.Log("SC CAPTURE pipeline=" + GraphicsSettings.currentRenderPipeline.name);
@@ -52,6 +53,7 @@ namespace SleepingCalamity.EditorTools
                 LookTestCapture.WarmUp(cams);
                 foreach (Camera cam in cams) LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_Midday.png"));
                 foreach (Camera cam in cams) LogFrameTime(cam);
+                foreach (Camera cam in cams) LogCobbleLods(cam);
 
                 BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.LowSun);
                 foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
@@ -59,10 +61,29 @@ namespace SleepingCalamity.EditorTools
             }
             finally
             {
-                GraphicsSettings.defaultRenderPipeline = savedGraphics; QualitySettings.renderPipeline = savedQuality;
+                QualitySettings.renderPipeline = savedQuality;
                 LookTestCapture.CleanProbes();
             }
             Debug.Log("SC CAPTURE DONE " + dir);
+        }
+
+        // Proof that the spawned cobbles render with their LODGroups: how many setts each capture camera sees at LOD0, LOD1 or culled (-1).
+        static void LogCobbleLods(Camera cam)
+        {
+            int l0 = 0, l1 = 0, culled = 0, other = 0, groups = 0;
+            foreach (LODGroup g in Resources.FindObjectsOfTypeAll<LODGroup>())   // the spawned setts are hidden, DontSave objects: only this finds them
+            {
+                if (!g.gameObject.scene.IsValid()) continue;   // prefab assets
+                groups++; if (!g.name.StartsWith("Sett_")) continue;
+                // The LODGroup rule: relative screen height = size x largest scale / (2 x distance x tan(fov / 2)); the first LOD whose threshold it reaches is shown.
+                LOD[] lods = g.GetLODs(); Transform t = g.transform; Vector3 sc = t.lossyScale;
+                float dist = Vector3.Distance(cam.transform.position, t.TransformPoint(g.localReferencePoint));
+                float h = g.size * Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z)) / (2f * Mathf.Max(0.01f, dist) * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad));
+                int lod = -1;
+                for (int i = 0; i < lods.Length; i++) if (h >= lods[i].screenRelativeTransitionHeight) { lod = i; break; }
+                if (lod == 0) l0++; else if (lod == 1) l1++; else if (lod < 0) culled++; else other++;
+            }
+            Debug.Log("SC CAPTURE cobble lods " + cam.name + " lod0=" + l0 + " lod1=" + l1 + " culled=" + culled + " other=" + other + " (of " + groups + " LODGroups in the scene)");
         }
 
         // Rough frame cost of one capture camera: the mean wall time of 10 renders to a 1920x1080 target, each ended by a ReadPixels (which waits for the GPU).

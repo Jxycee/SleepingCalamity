@@ -18,6 +18,9 @@ ground centre. Each exports to its own folder Assets/_Project/Content/Art/Town/B
                     toward -Y, the dense corner side at local -x. Hugs the ground storey, wraps the jetty beam and climbs the upper
                     storey jettied 0.45 m (--jetty, default 3.0 m like the builder's placeholder, until B4 lands); a hanging fringe
                     drops from the jetty edge and a few tendrils escape at the top and the open side.
+  SC_B9_IvyLintel   (Lintel_Ivy, not Ivy_*: it must not win the builder's Ivy row) a 1.0 x 0.55 m accent over a lintel or
+                    corner, strands draping down over its face; pivot = the lintel top centre.
+  SC_B9_GrassStrip  (Grass_Strip) 1.5 m of low crossed blades lapping over a wall base toward -Y; pivot = ground centre on the wall.
   SC_B9_IvyPatchA/B (Ivy_Patch_A/B) 1.0 x 1.4 m and 0.7 x 0.6 m flat-wall patches, bottom centre on the wall.
   SC_B9_CrackWeed_A..E  (Weed_A..E) narrow runs along local x for cobble joints and the wall foot (weeds grow in joints).
   SC_B9_MossTuft_A..C   (Moss_Tuft_A..C) low cushions with a fringe skirt.   SC_B9_GrassClump_A..C (Grass_A..C) ribbon blades.
@@ -38,7 +41,9 @@ Status (2026-10-30, PC): exported at 2048. Round 4 (from the controller's in-eng
 weeds too small, moss hidden on the north side) calibrated 31/40: ivy is two card layers of dense leaf-mass cells (inner #4a5a24,
 outer #6f8a34, young #9aa83c tips only), roughness about 0.62, half-strength normal, a root mass at the foot and a few bare-wall
 gaps; weeds are 1.6x with 12-20 blades each and five distinct sizes; Moss_Band_A covers the visible south-west foot. Earlier rounds:
-22, 27, 28.5. Tris: ivy wall 6.0k (facade dressing, inside the building budget), patches 354 / 208, weeds 360-400, tufts 132,
+22, 27, 28.5. Round 5 (in-engine round 4 notes) 32/40: ivy lifted ~15% toward yellow-green (#7c9a38 / #5a6c2a) with lobe
+normals tipped to the sky for the jetty shade; weed blades are crossed pairs (no edge-on slivers), clumps capped at 12-25 cm
+and dense at the base. Tris: ivy wall 6.0k (facade dressing, inside the building budget), patches 354 / 208, weeds 360-400, tufts 132,
 grass 128-224, bands 72 / 104, rim moss 168. Parked: a foliage wind shader reading 'Col'.
 """
 import sys, os, math, random
@@ -62,7 +67,8 @@ ATLAS = os.path.join(TEX, 'T_B9_Foliage'); DECAL = os.path.join(TEX, 'T_B9_MossD
 BANDA = os.path.join(TEX, 'T_B9_MossBandA')
 
 # ivy is kept yellower than the facade's sage / forest-green shutters (brief section 0) so the two never merge
-FOLIAGE = '#6f8a34'; IVY = '#6f8a34'; IVY_DARK = '#4a5a24'; IVY_YOUNG = '#9aa83c'; MOSS_D = '#616e2e'; MOSS_L = '#b6ab28'
+# round 5 (in-engine: the ivy went blue-grey in the jetty shade): ivy value lifted ~15% and pushed toward yellow-green
+FOLIAGE = '#6f8a34'; IVY = '#7c9a38'; IVY_DARK = '#5a6c2a'; IVY_YOUNG = '#9aa83c'; MOSS_D = '#616e2e'; MOSS_L = '#b6ab28'
 
 # UV rectangles (u0, v0, u1, v1) in the atlas
 Q_NETTLE = (0.0, 0.5, 0.5, 1.0); Q_WEED = (0.5, 0.5, 1.0, 1.0)
@@ -393,7 +399,7 @@ class Wall:
             return Vector((x, -(w - self.jb), self.jb - off)), Vector((0, 0, -1)), Vector((0, -1, 0))
         return Vector((x, -self.out - off, w - self.out)), Vector((0, -1, 0)), Vector((0, 0, 1))
 
-def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, card_scale=1.0):
+def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, card_scale=1.0, root=True, drape=0):
     """Runners random-walk up the wall and branch; leaf cards follow the runners where a lobed density field allows."""
     rr = random.Random(seed); mb = MB()
     top = wall.out + height if not wall.flat else height
@@ -444,7 +450,7 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
         tilt = math.radians(rr.uniform(5, 20) if inner else rr.uniform(12, 35)); yaw = math.radians(rr.uniform(-25, 25))
         cn = Matrix.Rotation(yaw, 3, upv) @ (nn * math.cos(tilt) + upv * math.sin(tilt))
         cup = Matrix.Rotation(math.radians(rr.gauss(180, 55)), 3, cn) @ upv                 # leaf tips mostly droop
-        lobe_n = (nn + upv * 0.3 + bulge * 0.75).normalized()                              # each lobe shades as one soft form
+        lobe_n = (nn + upv * 0.5 + bulge * 0.75).normalized()                              # one soft form per lobe, tipped to the sky
         ao_c = 0.45 if inner else 0.6 + 0.4 * min(1.0, off / 0.16)
         card(mb, p, cn, cup, size, rect, lobe_n, ao_c=ao_c, ao_edge=min(1.0, ao_c + 0.2))
         cards += 1
@@ -467,10 +473,10 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             card(mb, p, (nn + upv * 0.4).normalized(), upv, rr.uniform(0.11, 0.16) * card_scale, IVY_YOUNG_CELL, (nn + upv * 0.5).normalized(), ao_c=0.95)
             cards += 1
     # root mass: the ivy rises out of a dense clump at the foot instead of a ragged floating edge, and sprawls a little onto the ground
-    for _ in range(int(width * 12)):
+    for _ in range(int(width * 12) if root else 0):
         leaf(rr.uniform(0.0, width), rr.uniform(0.0, 1.0) ** 1.8 * 0.7, rr.uniform(0.02, 0.14), rr.uniform(0.38, 0.54) * card_scale,
              IVY_DARK_CELL if rr.random() < 0.35 else IVY_CELLS[rr.randrange(2)], inner=False)
-    for _ in range(int(width * 6)):
+    for _ in range(int(width * 6) if root else 0):
         x = rr.uniform(0.1, width - 0.05); p = Vector((x, -rr.uniform(0.06, 0.32) * card_scale, 0.03 + 0.03 * rr.random()))
         cn = Vector((rr.gauss(0, 0.2), -0.35, 1)).normalized()
         card(mb, p, cn, Vector((rr.gauss(0, 0.6), -1, 0)), rr.uniform(0.3, 0.42) * card_scale, IVY_CELLS[rr.randrange(2)], Vector((0, -0.3, 1)).normalized(), ao_c=0.6, ao_edge=0.9)
@@ -495,6 +501,9 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             x = rr.uniform(0.0, width * 0.9) ** 1.2 / max(width * 0.9, 1e-3) ** 0.2
             if rr.random() > density(x, wall.jb) + 0.2: continue
             strand(Vector((x, -wall.out + 0.03, wall.jb - 0.01)), (rr.gauss(0, 0.2), -0.15, -1), rr.uniform(0.25, 0.9), 0.85, single=rr.random() < 0.5)
+    for i in range(drape):                                                 # an accent drapes down over its lintel or rail
+        x = width * (0.1 + 0.8 * (i + rr.random()) / drape)
+        strand(Vector((x, -0.04, 0.0)), (rr.gauss(0, 0.2), -0.25, -1), rr.uniform(0.18, 0.5), 0.95, single=rr.random() < 0.6)
     ends = sorted(runners, key=lambda r: -r[0][-1][1])[:tendrils]
     for path, order in ends:
         x, w = path[-1]; p, nn, upv = wall.at(x, w, off=0.02)
@@ -517,17 +526,18 @@ def weed_clumps(mat):
         o.matrix_world = Matrix.Identity(4)
     WEED_SCALE = 1.35          # storybook: crack weeds big enough to read at the facade foot from the mid camera
     SQUASH = 0.6               # weeds grow IN the joints: the leaf parts are a run along local x, narrow across (y)
-    # name: ([(source, (x, y), yaw deg, scale)], tris, (blades, h min, h max, run length, run width), size factor)
-    # A is the one the corner builder scatters (joints + wall foot): in-engine round 3 found it too small, so 1.6x and fuller.
+    # name: ([(source, (x, y), yaw deg, scale)], tris, (blades, h min, h max, run length, run width), size factor, height cap m)
+    # A is the one the corner builder scatters (joints + wall foot). In-engine round 4: the tall ones read sparse in the open
+    # plaza, so every clump is capped (25 cm at most, joint weeds hug the ground) and its blades crowd the base.
     spec = {
-        'A': ([('weed_plant_02_e', (-0.17, 0.0), 90, 1.7), ('nettle_plant_small_a', (0.0, 0.01), 0, 2.2), ('weed_plant_02_d', (0.16, -0.01), 0, 1.6)], 400, (18, 0.16, 0.34, 0.5, 0.12), 1.6),
-        'B': ([('nettle_plant_tall_a', (0, 0), 0, 2.0), ('weed_plant_02_c', (-0.15, 0.0), 90, 1.5), ('nettle_plant_small_b', (0.14, 0.0), 0, 2.2)], 400, (14, 0.28, 0.52, 0.4, 0.1), 1.45),
-        'C': ([('nettle_plant_medium_a', (-0.08, 0), 0, 2.1), ('nettle_plant_medium_b', (0.08, 0.0), 140, 2.0)], 360, (12, 0.08, 0.17, 0.18, 0.06), 0.8),
-        'D': ([('weed_plant_02_a', (0, 0), 90, 1.6)], 380, (12, 0.12, 0.26, 0.3, 0.1), 1.15),
-        'E': ([('weed_plant_02_b', (-0.08, 0), 90, 1.5), ('weed_plant_02_e', (0.14, 0.0), 0, 1.6)], 400, (20, 0.18, 0.4, 0.75, 0.14), 1.9),
+        'A': ([('weed_plant_02_e', (-0.17, 0.0), 90, 1.7), ('nettle_plant_small_a', (0.0, 0.01), 0, 2.2), ('weed_plant_02_d', (0.16, -0.01), 0, 1.6)], 400, (16, 0.07, 0.16, 0.5, 0.12), 1.6, 0.16),
+        'B': ([('nettle_plant_tall_a', (0, 0), 0, 2.0), ('weed_plant_02_c', (-0.15, 0.0), 90, 1.5), ('nettle_plant_small_b', (0.14, 0.0), 0, 2.2)], 400, (14, 0.1, 0.24, 0.4, 0.1), 1.45, 0.25),
+        'C': ([('nettle_plant_medium_a', (-0.08, 0), 0, 2.1), ('nettle_plant_medium_b', (0.08, 0.0), 140, 2.0)], 360, (12, 0.05, 0.11, 0.18, 0.06), 0.8, 0.12),
+        'D': ([('weed_plant_02_a', (0, 0), 90, 1.6)], 380, (12, 0.06, 0.14, 0.3, 0.1), 1.15, 0.15),
+        'E': ([('weed_plant_02_b', (-0.08, 0), 90, 1.5), ('weed_plant_02_e', (0.14, 0.0), 0, 1.6)], 400, (16, 0.08, 0.19, 0.75, 0.14), 1.9, 0.2),
     }
     out = []
-    for key, (parts, target, bl, size) in spec.items():
+    for key, (parts, target, bl, size, cap) in spec.items():
         objs = []
         for src, (x, y), yaw, s in parts:
             x, y, s = x * WEED_SCALE * size, y * WEED_SCALE * size, s * WEED_SCALE * size
@@ -555,31 +565,36 @@ def weed_clumps(mat):
         bo = L.build(ob.name + '_blades', bmb, [ob.data.materials[0]] if ob.data.materials else [])
         for o in bpy.context.view_layer.objects: o.select_set(False)
         ob.select_set(True); bo.select_set(True); bpy.context.view_layer.objects.active = ob; bpy.ops.object.join()
-        bend_normals(ob, 0.55)
+        zmax = max(v.co.z for v in ob.data.vertices)
+        if zmax > cap: ob.data.transform(Matrix.Diagonal((1.0, 1.0, cap / zmax, 1.0)))      # squat, dense at the base
+        bend_normals(ob, 0.6)
         ob.data.materials.clear(); ob.data.materials.append(mat)
         print(ob.name, 'tris', t0, '->', L.tri_count(ob))
         out.append(ob)
     for o in list(weeds.values()) + list(nettles.values()): bpy.data.objects.remove(o)
     return out
 
-def blades(rr, n, hmin, hmax, run, across, segs=3):
-    """n tapered ribbon blades rooted along a joint run (length `run` on local x, `across` wide), leaning out of the joint."""
+def blades(rr, n, hmin, hmax, run, across, segs=3, lean_dir=None):
+    """n tapered blades rooted along a joint run (length `run` on local x, `across` wide), leaning out of the joint. Each blade is two
+    crossed ribbons (in-engine round 4 caught single ribbons edge-on as dark slivers): no view sees it edge-on."""
     mb = MB()
     for b in range(n):
         base = Vector((rr.uniform(-run / 2, run / 2), rr.gauss(0, across / 4), 0))
         a = rr.uniform(0, 2 * math.pi); outv = Vector((math.cos(a) * 0.5, math.sin(a), 0)).normalized()
-        lean = rr.uniform(0.2, 0.75); hgt = rr.uniform(hmin, hmax); wid = rr.uniform(0.012, 0.02) * (hgt / 0.3) ** 0.5
+        if lean_dir is not None: outv = (Vector(lean_dir) + Vector((rr.gauss(0, 0.6), rr.gauss(0, 0.25), 0))).normalized()   # lap over away from a wall
+        lean = rr.uniform(0.35, 0.9); hgt = hmin + (hmax - hmin) * rr.random() ** 1.6; wid = rr.uniform(0.014, 0.022) * (hgt / 0.2) ** 0.5
         side = outv.cross(Vector((0, 0, 1))).normalized(); rect = C_GRASS if rr.random() < 0.6 else C_GRASS2
-        prev = None
-        for k in range(segs + 1):
-            t = k / segs
-            p = base + outv * (lean * hgt * t * t * 0.9) + Vector((0, 0, hgt * (t - 0.28 * lean * t * t)))
-            hw = wid * (1 - t ** 1.6) + 0.0015; Lp, Rp = p - side * hw, p + side * hw
-            nn = (outv * (0.3 + 0.5 * t) + Vector((0, 0, 1))).normalized(); ao = 0.45 + 0.55 * t
-            if prev:
-                pl, pr, pn, pa, pt = prev
-                mb.face([pl, pr, Rp, Lp], [cell_uv(rect, (0, pt)), cell_uv(rect, (1, pt)), cell_uv(rect, (1, t)), cell_uv(rect, (0, t))], [pn, pn, nn, nn], [pa, pa, ao, ao])
-            prev = (Lp, Rp, nn, ao, t)
+        for wdir in (side, outv):                                          # the ribbon and its crossed twin
+            prev = None
+            for k in range(segs + 1):
+                t = k / segs
+                p = base + outv * (lean * hgt * t * t * 0.9) + Vector((0, 0, hgt * (t - 0.28 * lean * t * t)))
+                hw = wid * (1 - t ** 1.6) + 0.0015; Lp, Rp = p - wdir * hw, p + wdir * hw
+                nn = (outv * (0.3 + 0.5 * t) + Vector((0, 0, 1))).normalized(); ao = 0.5 + 0.5 * t
+                if prev:
+                    pl, pr, pn, pa, pt = prev
+                    mb.face([pl, pr, Rp, Lp], [cell_uv(rect, (0, pt)), cell_uv(rect, (1, pt)), cell_uv(rect, (1, t)), cell_uv(rect, (0, t))], [pn, pn, nn, nn], [pa, pa, ao, ao])
+                prev = (Lp, Rp, nn, ao, t)
     return mb
 
 def bend_normals(ob, bend, up_bias=0.6):
@@ -716,6 +731,15 @@ def build_models():
                              ('SC_B9_IvyPatchA', ('IvyPatchA', 1.0, 1.4, 17, Wall(0, flat=True), 2), dict(fringe=False, tendrils=3, card_scale=0.85), 1.0),
                              ('SC_B9_IvyPatchB', ('IvyPatchB', 0.7, 0.6, 29, Wall(0, flat=True), 2), dict(fringe=False, tendrils=2, card_scale=0.75), 0.7)):
         groups[key] = L.build(key, grow_ivy(*args, **kw), [mat]); groups[key].data.transform(Matrix.Translation((-w / 2, 0, 0)))
+    # accent ivy (TotK study: ivy as an accent over lintels and in corners, never a wall coat): pivot = the lintel top centre,
+    # a 1.0 x 0.55 m cushion on the wall above it and strands draping 0.2-0.5 m down over its face
+    key = 'SC_B9_IvyLintel'
+    groups[key] = L.build(key, grow_ivy('IvyLintel', 1.0, 0.55, 41, Wall(0, flat=True), 2, fringe=False, tendrils=2, card_scale=0.7, root=False, drape=7), [mat])
+    groups[key].data.transform(Matrix.Translation((-0.5, 0, 0)))
+    # wall-base grass strip: low crossed blades along 1.5 m that lap over the wall foot toward the plaza (pivot = ground centre, wall on y 0)
+    gs = blades(random.Random(77), 36, 0.07, 0.2, 1.5, 0.06, segs=2, lean_dir=(0, -1, 0.0))
+    for k in range(len(gs.p)): gs.p[k] = (gs.p[k][0], gs.p[k][1] - 0.04, gs.p[k][2])
+    groups['SC_B9_GrassStrip'] = L.build('SC_B9_GrassStrip', gs, [mat])
     for ob in weed_clumps(mat): groups[ob.name] = ob
     for k, (seed, w, d, h) in zip('ABC', [(3, 0.30, 0.22, 0.07), (5, 0.20, 0.16, 0.05), (8, 0.42, 0.26, 0.08)]):
         groups[f'SC_B9_MossTuft_{k}'] = L.build(f'SC_B9_MossTuft_{k}', moss_tuft(k, seed, w, d, h), [mat])
@@ -744,6 +768,7 @@ BUILDER = {
 }
 EXTRA = {
     'SC_B9_IvyPatchA': [((1.6, 0.6, 7.5), 0)], 'SC_B9_IvyPatchB': [((-2.6, 0.0, 7.5), 0)],
+    'SC_B9_IvyLintel': [((-1.25, 2.25, 7.5), 0)], 'SC_B9_GrassStrip': [((0.9, 0, 7.5), 0), ((-2.9, 0, 7.5), 0)],
     'SC_B9_MossTuft_A': [((-1.3, 0, -1.15), 20)], 'SC_B9_MossTuft_C': [((-1.65, 0, -0.45), 100)], 'SC_B9_MossTuft_B': [((-0.65, 0, -1.62), 0)],
     'SC_B9_MossBandA': [((0, 0, 0), 0)],           # yaw 0 = the south-west foot (the old Moss_Band stays exported, unplaced here)
     'SC_B9_GrassClump_A': [((-4.75, 0, 7.2), 0)], 'SC_B9_GrassClump_C': [((-4.3, 0, 7.15), 0)], 'SC_B9_GrassClump_B': [((3.3, 0, 3.7), 0)],
@@ -805,6 +830,7 @@ FOLDERS = {
     'SC_B9_IvyWall': 'Ivy_Facade', 'SC_B9_IvyPatchA': 'Ivy_Patch_A', 'SC_B9_IvyPatchB': 'Ivy_Patch_B',
     'SC_B9_CrackWeed_A': 'Weed_A', 'SC_B9_CrackWeed_B': 'Weed_B', 'SC_B9_CrackWeed_C': 'Weed_C', 'SC_B9_CrackWeed_D': 'Weed_D', 'SC_B9_CrackWeed_E': 'Weed_E',
     'SC_B9_MossTuft_A': 'Moss_Tuft_A', 'SC_B9_MossTuft_B': 'Moss_Tuft_B', 'SC_B9_MossTuft_C': 'Moss_Tuft_C',
+    'SC_B9_IvyLintel': 'Lintel_Ivy', 'SC_B9_GrassStrip': 'Grass_Strip',
     'SC_B9_GrassClump_A': 'Grass_A', 'SC_B9_GrassClump_B': 'Grass_B', 'SC_B9_GrassClump_C': 'Grass_C',
     'SC_B9_MossDecal': 'Moss_Band', 'SC_B9_BasinMoss': 'Basin_Moss', 'SC_B9_MossBandA': 'Moss_Band_A',
 }

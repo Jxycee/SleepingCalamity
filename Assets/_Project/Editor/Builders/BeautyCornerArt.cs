@@ -173,6 +173,9 @@ namespace SleepingCalamity.EditorTools
                 Color tint = s.DecalAlpha > 0f ? new Color(1f, 1f, 1f, s.DecalAlpha) : s.Tint;
                 m.SetColor("_BaseColor", s.DecalAlpha > 0f ? tint : new Color(Mathf.Clamp01(tint.r), Mathf.Clamp01(tint.g), Mathf.Clamp01(tint.b), 1f).gamma);
                 if (s.Tint.r > 1f) m.SetColor("_BaseColor", Color.white);   // oak_lt brightens (1.35 x): the tileable is already light, keep it untinted instead of clipping
+                // Set explicitly what a graphics-device import settles on, so a -nographics run (check, tests) leaves the same bytes: _Color mirrors _BaseColor and the
+                // motion-vector pass stays enabled (a no-graphics import disables it and zeroes the _Color mirror).
+                m.SetColor("_Color", m.GetColor("_BaseColor")); if (s.DecalAlpha <= 0f) m.SetShaderPassEnabled("MotionVectors", true);
                 EditorUtility.SetDirty(m);
                 map[s.Slot] = m;
             }

@@ -7,14 +7,17 @@ it (one a fresh unpainted replacement);
 a two-step display shelf behind the counter; a striped ochre and madder canvas awning sagging between three
 rafter poles, with a scalloped valance on the front and both sides and a plain back cloth; a pennant string slung
 across the opening under the lintel; an arched produce sign (carved apple) on the front bar; a bound wheat sheaf hung
-head-down on each front post; an iron lantern hook on the fountain-side front post. Medium whimsy (controller, 2026-10-30).
+head-down on each front post; an iron lantern hook on the fountain-side front post; a cream counter cloth with madder
+dots and an ochre border lying on the counter centre and draped over the apron (frames the goods); a small loaf sign
+on a stake just outside the fountain-side front corner (brief 5.5, 2026-10-30). Medium whimsy (controller, 2026-10-30).
 Wear beats (each visible at the three-quarter and mid views): paint chipped at hand height and on edges, showing
 dark oak; a dark splash-and-grime band along the foot; the counter top worn pale and polished where goods slide;
 sun-faded canvas tops and tide stains at the valance scallops; one replaced pale board in the painted front.
 Contrast pair: madder and straw-ochre canvas against the deep ochre frame (ochre so it reads against the facade's green
 shutters), pale valance against the dark back cloth.
 
-Landing spots for B7 props (flat within 3 mm): counter top x -1.30..1.30, y -0.86..-0.30, z 0.98;
+Landing spots for B7 props (flat within 3 mm): counter top x -1.30..1.30, y -0.86..-0.30, z 0.98 (the cloth adds 7 mm
+over x -0.72..0.72: the goods cluster belongs on it);
 shelf tier 1 x -1.10..1.10, y -0.24..-0.04, z 1.15; tier 2 y -0.02..0.20, z 1.33. Lantern hook eye at
 (-1.25, -1.10, 1.94) (B8 lantern hangs here). All in the authoring frame below.
 
@@ -32,15 +35,16 @@ one material; the PC runs the 2K bake and the export.
       [--rres 960] [--samples 32] [--views wide,mid,tq,front,side] [--paint ochre|green] [--no-render] [--export]
 Renders go to <out>/stall_<stage>_<view>.png; the bake writes <out>/maps/MarketStall_<Map>.png; --export writes
 <out>/MarketStall.fbx. Cloud sessions commit this generator only (sc-asset-craft 4).
-Budget: 28.5k tris (a compound dressing piece between kit and hero in PHASE1 3.3: sc_asset_audit's 'prop' class
+Budget: 35.3k tris (a compound dressing piece between kit and hero in PHASE1 3.3: sc_asset_audit's 'prop' class
 FAILs at 6k, audit it as --class hero), one 2K set, 1 material.
-Collider (at placement): a box over the counter and frame, 2.7 x 1.0 x 1.6 m; the awning overhang has none.
+Collider (at placement): a box over the counter and frame, 2.7 x 1.0 x 1.6 m, plus a thin box for the sign stake at
+(-1.43, -0.92); the awning overhang has none.
 
-Status (2026-10-30, cloud): relaxed review 29/40 on the --stage bake --res 1024 proof (rounds 25 -> 27 -> 28.5 -> 29;
-round 4 gained under 1.5, so stopped one short of the 30 target). Lines: silhouette 4, proportion 3.5, form 3.5,
-surface 3.5, colour 3.5, wear 4, fits set 3 (judged against proxies only), metal/efficiency 3.5. Audit PASS --class hero.
+Status (2026-10-30, cloud): relaxed review 30/40 on the --stage bake --res 1024 proof (rounds 25 -> 27 -> 28.5 -> 29,
+then the brief 5.5 layers lift colour to 4 and adze-faceted posts and lintels lift form to 4). Lines: silhouette 4, proportion 3.5, form 4,
+surface 3.5, colour 4, wear 4, fits set 3 (judged against proxies only), metal/efficiency 3.5. Audit PASS --class hero.
 Next: the PC runs --stage bake --res 2048 --export and judges it in the Unity corner. Left: nail rows and grime band sit
-in shade at mid; posts read rounded (no adze facets); a stall lantern on the hook; hanging price boards.
+in shade at mid; a stall lantern on the hook (PC lantern batch); hanging price boards.
 """
 import sys, os, math, zlib, random
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
@@ -160,8 +164,21 @@ def finish(ob, mat, loc=(0, 0, 0), rot=(0, 0, 0), tint=None, stripe=0.0, vh=None
     bpy.context.view_layer.update()
     return ob
 
+def adze_facets(ob, size, grain, depth, r):
+    """Hewn timber: each long face is cut into flat adze bands along the grain, each band dished by its own depth."""
+    seg = 0.17; marks = {}
+    for v in ob.data.vertices:
+        rest = [a for a in range(3) if a != grain]
+        side = max(rest, key=lambda a: abs(v.co[a]) / (size[a] / 2))
+        sgn = 1 if v.co[side] > 0 else -1
+        k = math.floor((v.co[grain] + size[grain] / 2) / seg)
+        key = (side, sgn, k)
+        if key not in marks: marks[key] = r.uniform(0.2, 1.0) * depth
+        t = ((v.co[grain] + size[grain] / 2) / seg) % 1.0
+        v.co[side] -= sgn * marks[key] * (0.55 + 0.45 * math.sin(math.pi * t))   # scooped band, ridge between bands
+
 def board(name, size, mat, loc, rot=(0, 0, 0), grain=0, cut=1, chamfer=0.008, wob=0.003, bend=0.0,
-          bend_up=2, tint=None, stream=None, trim=0.0):
+          bend_up=2, tint=None, stream=None, trim=0.0, adze=0.0):
     """A box part (centred), grain along local `grain` axis, chamfered, warped a little, metre UVs."""
     r = rng(stream or name)
     bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
@@ -175,6 +192,7 @@ def board(name, size, mat, loc, rot=(0, 0, 0), grain=0, cut=1, chamfer=0.008, wo
     if chamfer: bevel(ob, chamfer)
     apply_mods(ob)
     if wob: warp(ob, wob, 0.5, r.random() * 50)
+    if adze: adze_facets(ob, size, grain, adze, r)
     if bend: bow(ob, grain, bend_up, bend * (0.6 + 0.8 * r.random()))
     if tint is None:
         k = 0.92 + 0.16 * r.random(); tint = (k * (0.98 + 0.04 * r.random()), k, k * (0.97 + 0.05 * r.random()), 1)
@@ -466,7 +484,27 @@ def mat_straw():
     link(nt, col, bs.inputs['Base Color']); bs.inputs['Roughness'].default_value = 0.7
     return m
 
-MATS = dict(Straw=mat_straw(), Paint=mat_paint(), Oak=mat_oak(), Canvas=mat_canvas(), Cloth=mat_cloth(), Rope=mat_rope(),
+def mat_rug():
+    """Counter cloth: cream field with madder dots, ochre and madder border bands (pattern in cloth metres from UVMap)."""
+    m, nt, bs, uv, obj, xyz, geo = base_nodes('Rug')
+    alb, nrm, orm = tset(nt, 'canvas', uv)
+    sep = N(nt, 'ShaderNodeSeparateXYZ'); link(nt, uv, sep.inputs[0])
+    u = mth(nt, 'MULTIPLY', sep.outputs['X'], TILE); v = mth(nt, 'MULTIPLY', sep.outputs['Y'], TILE)
+    du = mth(nt, 'SUBTRACT', mth(nt, 'FRACT', mth(nt, 'MULTIPLY', u, 9.0)), 0.5)
+    dv = mth(nt, 'SUBTRACT', mth(nt, 'FRACT', mth(nt, 'MULTIPLY', mth(nt, 'ADD', v, mth(nt, 'MULTIPLY', mth(nt, 'FLOOR', mth(nt, 'MULTIPLY', u, 9.0)), 0.0556)), 9.0)), 0.5)
+    r = mth(nt, 'SQRT', mth(nt, 'ADD', mth(nt, 'MULTIPLY', du, du), mth(nt, 'MULTIPLY', dv, dv)))
+    dot = mth(nt, 'LESS_THAN', r, 0.19)
+    edge = mth(nt, 'MINIMUM', mth(nt, 'MINIMUM', u, mth(nt, 'SUBTRACT', 1.44, u)), mth(nt, 'SUBTRACT', 0.795, v))   # distance to the hem
+    band = mth(nt, 'LESS_THAN', edge, 0.07)
+    line = mth(nt, 'MULTIPLY', mth(nt, 'GREATER_THAN', edge, 0.085), mth(nt, 'LESS_THAN', edge, 0.1))
+    col = mix(nt, dot, CREAM, MADDER)
+    col = mix(nt, line, col, MADDER); col = mix(nt, band, col, OCHRE)
+    col = detail(nt, col, lum_norm(nt, alb, mean_lum('canvas')), 0.4)
+    link(nt, col, bs.inputs['Base Color']); bs.inputs['Roughness'].default_value = 0.88
+    link(nt, nmap(nt, nrm, 0.5), bs.inputs['Normal'])
+    return m
+
+MATS = dict(Rug=mat_rug(), Straw=mat_straw(), Paint=mat_paint(), Oak=mat_oak(), Canvas=mat_canvas(), Cloth=mat_cloth(), Rope=mat_rope(),
             Iron=mat_iron(), Stone=mat_stone())
 
 # ----------------------------------------------------------------------------- frame
@@ -482,8 +520,8 @@ for sx in (-1, 1):
               grain=0, cut=2, chamfer=0.014, wob=0.006)
         # lean 1-2 deg about the base: rotate the post about its foot, not its middle
         lx, ly = r.uniform(1.0, 2.0) * r.choice((-1, 1)), r.uniform(0.6, 1.6) * r.choice((-1, 1))
-        ob = board(nm, (POST, POST, h), 'Paint', (x, y, PAD_H + h / 2), (0, 0, 0), grain=2, cut=6, chamfer=0.018,
-                   wob=0.006, bend=0.012, bend_up=0)
+        ob = board(nm, (POST, POST, h), 'Paint', (x, y, PAD_H + h / 2), (0, 0, 0), grain=2, cut=24, chamfer=0.018,
+                   wob=0.004, bend=0.012, bend_up=0, adze=0.004)
         ob.location = Matrix.Rotation(math.radians(lx), 4, 'X') @ Matrix.Rotation(math.radians(ly), 4, 'Y') @ Vector((0, 0, h / 2))
         ob.location += Vector((x, y, PAD_H)); ob.rotation_euler = (math.radians(lx), math.radians(ly), 0)
         POSTS.append((x, y, top))
@@ -491,8 +529,8 @@ for sx in (-1, 1):
 # lintels front and back (rafters sit on them), side top beams following the slope
 for sy, tag in ((-1, 'F'), (1, 'B')):
     y = sy * PY; zt = lintel_top(y)
-    board(f'lintel_{tag}', (W + 0.22, POST, LIN_H), 'Paint', (0, y, zt - LIN_H / 2), (0, 0, 0), grain=0, cut=8,
-          chamfer=0.016, wob=0.006, bend=-0.02)
+    board(f'lintel_{tag}', (W + 0.22, POST, LIN_H), 'Paint', (0, y, zt - LIN_H / 2), (0, 0, 0), grain=0, cut=30,
+          chamfer=0.016, wob=0.004, bend=-0.02, adze=0.004)
     for sx in (-1, 1):                                       # pegs through the post tenons, standing proud
         pole(f'peg_{tag}{sx}', [(sx * PX, y - sy * 0.055, zt - LIN_H / 2), (sx * PX, y - sy * 0.085, zt - LIN_H / 2)], 0.016, 'Oak', 8)
 slope = math.atan2(canvas_z(-PY) - canvas_z(PY), 2 * PY)
@@ -659,6 +697,35 @@ for v in bm.verts: v.co.y *= 0.25; v.co.z *= 0.45
 uv_metres(bm, 0, (0.1, 0.2)); lf = obj_from_bm('sign_leaf', bm)
 finish(lf, 'Cloth', (0.055, sy - 0.05, sz0 + 0.26), (0, -30, 0), tint=lin('#5f7a32'))
 pole('sign_stem', [(0.0, sy - 0.05, sz0 + 0.235), (0.012, sy - 0.05, sz0 + 0.275)], 0.008, 'Oak', 6)
+
+# ----------------------------------------------------------------------------- patterned cloth framing the goods (flat on the counter, draped over the apron)
+RUG_W, RUG_TOP, RUG_DROP = 1.44, 0.555, 0.24
+def rug_fn(u, v):
+    x = -RUG_W / 2 + RUG_W * u; sv = v * (RUG_TOP + RUG_DROP)
+    if sv <= RUG_TOP:
+        p = Vector((x, -0.33 - sv, COUNTER_Z + 0.004))
+    else:
+        d = sv - RUG_TOP; a = min(d / 0.05, 1.0) * math.pi / 2          # rolls over the counter's front edge
+        p = Vector((x, -0.885 - 0.032 * math.sin(a) - 0.004, COUNTER_Z + 0.004 - 0.03 * (1 - math.cos(a)) - max(0.0, d - 0.05)))
+        f = (d / RUG_DROP) ** 1.3
+        p.y -= f * (0.014 * math.sin(2 * math.pi * x / 0.26 + 0.6) + 0.008)
+        p.z += f * 0.012 * math.sin(x * 9.0)
+    p = Matrix.Rotation(math.radians(1.5), 3, 'Z') @ p
+    return p, (u * RUG_W / TILE, sv / TILE), 0.0
+grid_part('counter_cloth', 36, 22, rug_fn, 'Rug', solid=0.003)
+
+# ----------------------------------------------------------------------------- small sign on a stake at the fountain-side front corner (bread)
+stx, sty = -W / 2 - 0.13, -PY - 0.12
+board('stake', (0.06, 0.06, 1.12), 'Paint', (stx, sty, 0.56), (0, 2.0, 0), grain=2, cut=3, chamfer=0.01, wob=0.003)
+board('stake_board', (0.36, 0.035, 0.24), 'Paint', (stx, sty - 0.05, 1.02), (-8, 0, 3), grain=0, chamfer=0.008, trim=1.0)
+board('stake_face', (0.30, 0.01, 0.18), 'Cloth', (stx, sty - 0.07, 1.022), (-8, 0, 3), grain=0, chamfer=0.003, tint=lin('#d6c69c'))
+bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=1.0)
+for v in bm.verts: v.co = Vector((v.co.x * 0.095, v.co.y * 0.02, v.co.z * 0.045 + 0.012 * (1 - (v.co.x) ** 2)))
+uv_metres(bm, 0, (0.4, 0.2)); loaf = obj_from_bm('stake_loaf', bm)
+finish(loaf, 'Cloth', (stx, sty - 0.078, 1.02), (-8, 0, 3), tint=lin('#a8703a'))
+for k in (-1, 0, 1):                                  # scored crust
+    board(f'stake_score{k}', (0.008, 0.006, 0.05), 'Cloth', (stx + k * 0.045, sty - 0.099, 1.03), (-8, 0, 3 + 25), chamfer=0, wob=0,
+          tint=lin('#e0c48a'))
 
 # ----------------------------------------------------------------------------- pennant string across the opening
 pa, pb = Vector((-W / 2 - 0.01, -PY - 0.08, lintel_top(-PY) - 0.24)), Vector((W / 2 + 0.01, -PY - 0.08, lintel_top(-PY) - 0.24))
