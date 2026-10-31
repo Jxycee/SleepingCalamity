@@ -43,6 +43,12 @@ Axes (Blender): z up, front -Y, metres. Origin = foundation centre at ground (th
   FOOTPRINT). Renders go to <out>/inn_<view>.png; views starting 'frame' hide every part. --tris prints tris per piece.
 
 Budget: under 50k tris (task cap), 2048 px maps (shared sets).
+Status (2026-10-31, cloud): round 4, self-review 31.5/40 (silhouette 4.5, proportion 3.5, form 4, surface 3.5, colour 4,
+wear 3.5, set 4.5, metal/emissive 4); first review 26, target 31 reached. 49,890 tris (Frame 45,132, Part_Door 1,150,
+Part_Sign 1,488, Part_Porch 1,904, Part_Lantern 216); FOOTPRINT 9.96 x 8.97 m; everything inside x -5.49..5.50,
+y -5.07..5.46. Sheet: Reference/hollowmere/inn/SHEET_inn_r4.jpg. Next visible gains: a wider, lower massing (the 4-way
+turn and the chimney limit the width to the foundation), plaster value variation per panel, B9 weeds at the stone foot,
+a warm lit taproom through the open doorway in the frame state, more tri room for shutters on every window.
 """
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
