@@ -86,7 +86,8 @@ LEDGER_Z = 2.98
 BEAM_Z = 2.38
 LANT_U, LANT_Z, LANT_OUT = 4.40, 2.62, 0.46
 SIGN_Z, SIGN_ARM = 5.30, 1.50
-SIGN_HOOKS = (0.48, 1.30)
+SIGN_HOOKS = (0.42, 1.36)
+SIGN_SCALE = 1.30                  # the board group is built at 1.16 x 0.84 m and scaled up: a big inn board
 CHM = (1.05, 2.25)                 # chimney y range on the -X side
 CH_TOP = 12.15
 
@@ -632,7 +633,7 @@ def woodstack(pc, u0, u1):
 def cellar_hatch(pc, u0, u1):
     """Sloping double cellar doors in a stone kerb at the wall foot, three barrels beside them (wall-local, +X side)."""
     R = FK.rng('hatch'); dp = 0.72; h0, h1 = 0.55, 0.20
-    FK.add_box(pc, 'stone_dk', (u1 - u0 + 0.3, dp + 0.15, 0.16), Matrix.Translation(((u0 + u1) / 2, -dp / 2 - 0.05, 0.08)), cham=0.03,
+    FK.add_box(pc, 'stone_dk', (u1 - u0 + 0.3, dp + 0.08, 0.16), Matrix.Translation(((u0 + u1) / 2, -dp / 2, 0.08)), cham=0.03,
                uv_world=True, seed=5.0)
     for s in (-1, 1):   # cheek stones
         FK.add_box(pc, 'stone', (0.15, dp, h0), Matrix.Translation(((u0 + u1) / 2 + s * ((u1 - u0) / 2 + 0.07), -dp / 2, h0 / 2)), cham=0.025,
@@ -1207,6 +1208,11 @@ def part_sign():
         x = bw / 2 - 0.035 - (bw - 0.07) * t
         zz = (bh / 2 - 0.08) + 0.14 * math.sin(math.pi * t) - 0.02
         cyl(pc, 'gilt', (0, yc - x, zc + zz), 0.022, 0.022, 0.09, segs=6, axis='X')
+    # scale the board and its motifs (everything under the chains) about the chain foot
+    piv = Vector((0, yc, ztop + 0.02))
+    for v in pc.bm.verts:
+        if v.co.z < ztop + 0.03:
+            v.co = piv + (v.co - piv) * SIGN_SCALE
     return pc, 'bracket', Vector((0, -(hy0 + hy1) / 2, z - 0.05))
 
 # ----------------------------------------------------------------------------- whimsy, wear, assembly
@@ -1356,8 +1362,6 @@ VIEWS_DEF = {
     'close': (Vector((4.0, -9.0, 1.7)), Vector((-0.8, -2.6, 1.9)), 46),
     'frameclose': (Vector((4.0, -9.0, 1.7)), Vector((-0.8, -2.6, 1.9)), 46),
     'sign': (Vector((-0.5, -8.5, 3.6)), Vector((-4.9, -2.6, 4.7)), 34),
-    'corner': (Vector((6.0, -9.0, 8.5)), Vector((-4.3, -3.0, 8.4)), 30),
-    'corner2': (Vector((-10.0, -8.0, 11.0)), Vector((-4.0, -2.5, 9.0)), 30),
     'side': (Vector((16.0, 1.0, 3.0)), Vector((0.5, 1.0, 5.4)), 46),
     'left': (Vector((-16.5, 2.5, 3.0)), Vector((0.0, 1.3, 5.6)), 46),
 }
