@@ -154,6 +154,7 @@ namespace SleepingCalamity.EditorTools
                 cam.farClipPlane = 400f;
             }
 
+            HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
             BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
             ApplyPreset(Preset.Ruined);
             BuilderUtil.SaveScene(scene, ScenePath);
@@ -350,6 +351,7 @@ namespace SleepingCalamity.EditorTools
                     break;
                 default:
                     Building(g, f, kind);
+                    HollowmereGarden.Yard(g, f, kind);   // Q6: a bed, a water butt and a back fence on deep-yard ring 2 homes
                     break;
             }
         }
@@ -477,6 +479,7 @@ namespace SleepingCalamity.EditorTools
 
         static void Garden(Transform g, Foundation f)
         {
+            if (HollowmereGarden.Allotment(g, f)) return;   // Q6 art (Garden/); the greybox below is the fallback
             float half = f.Side * 0.5f;
             Material oak = LookTestBuilder.Mat("oak_timber");
             for (int i = 0; i < 3; i++)
