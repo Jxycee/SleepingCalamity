@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 94%
+Progress: 96%
 Sheet: Reference/hollowmere/square/square_sheet_rebuilt.jpg (+ square_sheet_ruined.jpg, square_sheet_corner_check.jpg, props_sheet_r1.jpg)
 Blocker: none
 
@@ -54,3 +54,4 @@ Left: (1) the black pegs are 355 loose setts lying on their sides from sc_square
 - Dusk: warm 2700 K lamp pools at the post lanterns in LowSun only. The approved corner's lights and grade are left unchanged.
 - origin/main (townhouse) merged at 785cf90. Next: build, captures, test-edit, check, merge.
 - 7d8c39d: B9 tufts on the weed slots and warm lamp lights for low sun are committed. Captures rendering now; then merge origin/main (Q1 kits 3e4c2d8), build, test-edit, check, merge. Dressing stays inside the square and its stubs (Validate bounds it), clear of ring 2.
+- 830af66: square cameras re-captured with r3 ground + tufts + lamp pools. The sheets (square_sheet_rebuilt/ruined.jpg) are updated: no more pegs, stone tone now varies, edges softened. Self-score about 28/40. Weak spots for a later look pass: the Market Street stub still reads pale against its green bank, and the dusk row is still dark (the global grade is shared with the approved corner, so I left it). origin/main merged (47468e7). Check is running.
