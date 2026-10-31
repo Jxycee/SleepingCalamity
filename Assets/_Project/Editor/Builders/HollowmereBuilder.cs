@@ -5,7 +5,7 @@
 // bare frames; the belfry empty; the mill a roofless shell) and Rebuilt (ring 1 by HollowmereLayout.RebuiltBuilding: bakery and inn on L lots, homes on M/S,
 // the approved facade on F01, three lots left empty; rings 2-3 as home massing with a few gardens). Each building block faces its lot's default door side.
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
-// BeautyCornerBuilder.PlaceRow at their corner positions; the B8 stall is reused for stalls 2 and 3; the B4 bell tower when its folder exists. Everything
+// BeautyCornerBuilder.PlaceRow at their corner positions; the three stalls are the Wave 1 Ring1/Stalls art (ruined or rebuilt state), else the B8 stall; the B4 bell tower when its folder exists. Everything
 // else is greybox on the LookTest materials. Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
 // approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
@@ -111,7 +111,8 @@ namespace SleepingCalamity.EditorTools
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows)
             {
                 if (row.Id.StartsWith("NEIGHBOUR_", StringComparison.Ordinal)) continue;
-                BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, row);
+                BeautyCornerTable.Row placed = StallFolder("Stall_1") != null ? WithoutStallDressing(row) : row;   // the produce stall art carries its own goods and lantern
+                if (placed != null) BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, placed);
             }
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt); }
@@ -460,6 +461,7 @@ namespace SleepingCalamity.EditorTools
                 case LandmarkKind.Fountain:
                     break;   // the corner's DryFountain row (B10) stands at the origin in both presets
                 case LandmarkKind.Stall:
+                    if (StallArt(g, l.Id, rebuilt)) break;
                     if (rebuilt && l.Id == "Stall_1") break;   // the corner's MarketStall row
                     if (rebuilt) { StallArt(g); break; }
                     // Ruined: a bare frame, counter and corner posts, no awning (design 3).
@@ -549,7 +551,51 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.Box(g, "Door", new Vector3(0f, 2.1f, 3.3f), new Vector3(1.2f, 2.2f, 0.12f), LookTestBuilder.Mat("painted_wood"), default, 2f);
         }
 
-        // Stalls 2 and 3 reuse the B8 MarketStall row's art (or its greybox) at their own place and turn.
+        // The three fixed stalls (Wave 1): Ring1/Stalls/<Variant>/Stall_<Variant>.fbx holds both states as children Ruined and Rebuilt, each with its own baked
+        // set (Stall_<Variant>_<State>_BaseColor/_Normal/_ORM); the preset keeps its state and drops the other. Placed at the landmark (layout row incl. its pad height),
+        // counter to local +Z. False when the art is not in, so the greybox below stands in.
+        const string StallsFolder = BeautyCornerArt.ArtRoot + "/Ring1/Stalls";
+        static readonly Dictionary<string, string> StallVariants = new Dictionary<string, string> { { "Stall_1", "Produce" }, { "Stall_2", "Cloth" }, { "Stall_3", "Tools" } };
+        static readonly HashSet<string> OnStallAssets = new HashSet<string> { "Basket_Produce", "Basket_Bread", "Jug_A", "Jug_B" };   // corner B7 goods on the B8 counter
+
+        static string StallFolder(string id) =>
+            StallVariants.TryGetValue(id, out string v) && AssetDatabase.IsValidFolder(StallsFolder + "/" + v) ? StallsFolder + "/" + v : null;
+
+        static bool StallArt(Transform g, string id, bool rebuilt)
+        {
+            string folder = StallFolder(id);
+            if (folder == null) return false;
+            string v = StallVariants[id], keep = rebuilt ? "Rebuilt" : "Ruined";
+            GameObject model = BeautyCornerArt.LoadModel(folder, "Stall_" + v + ".fbx");
+            if (model == null) return false;
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(model, g);
+            go.name = "Stall_" + v + "_" + keep;
+            go.transform.localPosition = Vector3.zero; go.transform.localRotation = Quaternion.identity;
+            Material m = BeautyCornerArt.MaterialFromSet(folder, "Stall_" + v + "_" + keep, "Stall_" + v + "_" + keep);
+            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            foreach (Transform c in go.transform.Cast<Transform>().ToList())
+            {
+                if (c.name != keep) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }
+                c.GetComponent<MeshRenderer>().sharedMaterial = m;
+            }
+            var col = go.AddComponent<BoxCollider>();   // counter and frame (B8 header); the awning overhang has none
+            col.center = new Vector3(0f, 0.8f, 0f); col.size = new Vector3(2.7f, 1.6f, 1.6f);
+            return true;
+        }
+
+        // A corner row without the B8 stall, its counter lantern and the B7 goods standing on its counter (the produce stall art replaces all three); null = drop the row.
+        static BeautyCornerTable.Row WithoutStallDressing(BeautyCornerTable.Row row)
+        {
+            if (row.Id == "MarketStall" || row.Id == "StallLantern") return null;
+            if (!row.Instances.Any(i => i.Asset != null && OnStallAssets.Contains(i.Asset))) return row;
+            return new BeautyCornerTable.Row
+            {
+                Brief = row.Brief, Id = row.Id, Batch = row.Batch, Names = row.Names, Placeholder = row.Placeholder, Foliage = row.Foliage, ArtYaw = row.ArtYaw, Scatter = row.Scatter,
+                Instances = row.Instances.Where(i => i.Asset == null || !OnStallAssets.Contains(i.Asset)).ToArray(),
+            };
+        }
+
+        // Without the Wave 1 art: stalls 2 and 3 reuse the B8 MarketStall row's art (or its greybox) at their own place and turn.
         static void StallArt(Transform g)
         {
             BeautyCornerTable.Row src = BeautyCornerTable.Rows.First(r => r.Id == "MarketStall");
