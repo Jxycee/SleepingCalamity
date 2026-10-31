@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Q13. The Undercroft stair: heroes' home to the Cellars
 Progress: 85%
-Sheet: Reference/hollowmere/undercroft_stair/SHEET_undercroft_stair_r2.jpg
+Sheet: Reference/hollowmere/undercroft_stair/SHEET_undercroft_stair_final.jpg
 Blocker: none
 
 Score: r3 28/40 (r1 24.5, r2 25.5; coordinator cap 3 rounds reached; target 29.5 not reached) (target 29.5 = r1 + 5; floor 25)
