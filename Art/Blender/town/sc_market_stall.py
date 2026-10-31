@@ -476,6 +476,10 @@ def mat_canvas():
     vh = attr(nt, 'vh').outputs['Fac']
     tide = mth(nt, 'MULTIPLY', ramp(nt, vh, 0.45, 0.95), ramp(nt, noise_tex(nt, obj, 4.0, 4.0, 0.55, 2.0), 0.4, 0.62))
     col = mix(nt, mth(nt, 'MULTIPLY', tide, TIDE_K), col, lin('#4a3524'))            # damp tide stains at the scallops
+    if RUIN:                                                         # green-grey mould blooms and grime in the damp folds, so the bleached cloth never reads clean
+        mould = mth(nt, 'MULTIPLY', ramp(nt, noise_tex(nt, obj, 3.2, 5.0, 0.62, 6.0), 0.48, 0.66), 0.75)
+        col = mix(nt, mould, col, lin('#5f6650'))
+        col = mix(nt, 1.0, col, N_rgb(nt, mth(nt, 'MULTIPLY_ADD', noise_tex(nt, obj, 1.4, 3.0, 0.5, 8.0), 0.35, 0.68)), 'MULTIPLY')
     bind = ramp(nt, vh, 0.86, 0.92)
     col = mix(nt, mth(nt, 'MULTIPLY', bind, 0.55), col, lin('#3e2a1e'))            # bound edge tape along the scallops
     link(nt, col, bs.inputs['Base Color'])
@@ -490,6 +494,8 @@ def mat_cloth():
     col = detail(nt, attr(nt, 'tint').outputs['Color'], lum_norm(nt, alb, mean_lum('canvas')), 0.5)
     g = grime_band(nt, xyz, obj, 1.6)        # back cloth hem dirtier toward the bottom
     col = mix(nt, mth(nt, 'MULTIPLY', g, 0.0), col, lin('#3a3026'))
+    if RUIN:
+        col = mix(nt, mth(nt, 'MULTIPLY', ramp(nt, noise_tex(nt, obj, 3.2, 5.0, 0.62, 6.0), 0.5, 0.68), 0.7), col, lin('#5f6650'))
     link(nt, col, bs.inputs['Base Color'])
     bs.inputs['Roughness'].default_value = 0.88
     link(nt, nmap(nt, nrm, 0.6), bs.inputs['Normal'])
@@ -601,9 +607,23 @@ def mat_glass():
 MATS = dict(Rug=mat_rug(), Straw=mat_straw(), Paint=mat_paint(), Oak=mat_oak(), Canvas=mat_canvas(), Cloth=mat_cloth(), Rope=mat_rope(),
             Iron=mat_iron(), Stone=mat_stone(), Fruit=mat_fruit(), Weed=mat_weed(), Glass=mat_glass(), Metal=mat_metal())
 
+def group_xf(start, M):
+    """Apply a world matrix to every part made since PARTS[start] (a crate, a sign that hangs askew)."""
+    bpy.context.view_layer.update()
+    for ob in PARTS[start:]: ob.matrix_world = M @ ob.matrix_world
+    bpy.context.view_layer.update()
+
+def about(p, rx=0, ry=0, rz=0):
+    p = Vector(p)
+    return Matrix.Translation(p) @ (Matrix.Rotation(math.radians(rz), 4, 'Z') @ Matrix.Rotation(math.radians(ry), 4, 'Y')
+                                   @ Matrix.Rotation(math.radians(rx), 4, 'X')) @ Matrix.Translation(-p)
+
 # ----------------------------------------------------------------------------- frame
 RACK_SKIP = []                     # ruined: parts lying on the ground, left out of the racked frame's shear
 FB_GONE, FB_HANG = [3, 4, 12], 7   # ruined: front boards missing, and the one hanging askew
+# Each ruined stall fails its own way (controller review 2026-10-31): produce = the camera-side front post snapped, the awning frame down on the counter;
+# cloth = the awning gone, only its ribs and rags left; tools = the frame leaning hard, its fountain-side panel fallen flat.
+SNAP = RUIN and VARIANT == 'produce'; RIBS = RUIN and VARIANT == 'cloth'; LEAN = RUIN and VARIANT == 'tools'
 POSTS = []
 for sx in (-1, 1):
     for sy in (-1, 1):
@@ -616,6 +636,14 @@ for sx in (-1, 1):
               grain=0, cut=2, chamfer=0.014, wob=0.006)
         # lean 1-2 deg about the base: rotate the post about its foot, not its middle
         lx, ly = r.uniform(1.0, 2.0) * r.choice((-1, 1)), r.uniform(0.6, 1.6) * r.choice((-1, 1))
+        if SNAP and nm == 'post_RF':                                 # snapped at counter height: a splintered stub, the top lies against the counter
+            hs = 0.93
+            board(nm, (POST, POST, hs), 'Paint', (x, y, PAD_H + hs / 2), grain=2, cut=10, chamfer=0.018, wob=0.004, adze=0.004)
+            for k, (dx, dy, hh) in enumerate(((-0.03, -0.03, 0.16), (0.035, -0.02, 0.09), (0.0, 0.035, 0.12), (-0.035, 0.03, 0.06))):
+                board(f'{nm}_splinter{k}', (0.035, 0.03, hh), 'Oak', (x + dx, y + dy, PAD_H + hs + hh / 2 - 0.01), (dy * 200, -dx * 200, 0), grain=2, chamfer=0.003, wob=0.002)
+            RACK_SKIP.append(board(f'{nm}_top', (POST, POST, h - hs - 0.05), 'Paint', (x + 0.42, y - 0.42, 0.55), (-34, 30, 20), grain=2, cut=14,
+                                   chamfer=0.018, wob=0.004, adze=0.004))
+            POSTS.append((x, y, top)); continue
         ob = board(nm, (POST, POST, h), 'Paint', (x, y, PAD_H + h / 2), (0, 0, 0), grain=2, cut=24, chamfer=0.018,
                    wob=0.004, bend=0.012, bend_up=0, adze=0.004)
         ob.location = Matrix.Rotation(math.radians(lx), 4, 'X') @ Matrix.Rotation(math.radians(ly), 4, 'Y') @ Vector((0, 0, h / 2))
@@ -632,6 +660,9 @@ for sy, tag in ((-1, 'F'), (1, 'B')):
 slope = math.atan2(canvas_z(-PY) - canvas_z(PY), 2 * PY)
 for sx in (-1, 1):
     zc = (lintel_top(-PY) + lintel_top(PY)) / 2 - 0.07
+    if SNAP and sx > 0:                                              # came down with the post: lies in the weeds
+        RACK_SKIP.append(board(f'sidebeam_{sx}', (POST * 0.9, 2 * PY - POST, 0.13), 'Paint', (PX + 0.4, 0.15, 0.065), (0, 90, 12),
+                               grain=1, cut=6, chamfer=0.014, wob=0.005)); continue
     board(f'sidebeam_{sx}', (POST * 0.9, 2 * PY - POST, 0.13), 'Paint', (sx * PX, 0, zc), (-math.degrees(slope), 0, 0),
           grain=1, cut=6, chamfer=0.014, wob=0.005)
 # knee braces at the front (outline breaks under the lintel), plain ones at the back
@@ -644,6 +675,14 @@ for sy, tag in ((-1, 'F'), (1, 'B')):
               chamfer=0.012, wob=0.003)
 # rails: sides at counter height and low, back the same; front has the counter and boards instead
 for sx in (-1, 1):
+    if LEAN and sx < 0:                                              # the whole side panel fell outward and lies flat
+        s0 = len(PARTS)
+        for xo, nm in ((0.0, 'hi'), (0.66, 'lo')):
+            board(f'siderail_{nm}{sx}', (0.085, 2 * PY - POST + 0.04, 0.10), 'Paint', (-xo, 0, 0.05), (0, 90, 0), grain=1, cut=4, chamfer=0.012, wob=0.004)
+        L = math.hypot(2 * PY - POST, 0.62); a = math.degrees(math.atan2(0.62, 2 * PY - POST))
+        board(f'sidebrace{sx}', (0.075, L, 0.075), 'Paint', (-0.33, 0, 0.13), (0, 0, -a), grain=1, cut=3, chamfer=0.01, wob=0.003)
+        group_xf(s0, Matrix.Translation((-PX - 0.32, 0.05, 0)) @ about((0, 0, 0), rz=-9)); RACK_SKIP.extend(PARTS[s0:])
+        continue
     for z, nm in ((0.90, 'hi'), (0.24, 'lo')):
         if RUIN and sx > 0 and nm == 'lo':                         # dropped off its pegs: lies in the weeds beside the stall
             RACK_SKIP.append(board(f'siderail_{nm}{sx}', (0.085, 2 * PY - POST + 0.04, 0.10), 'Paint', (PX + 0.30, -0.05, 0.05),
@@ -768,8 +807,9 @@ def cv_fn(u, v):
     x = -AW_W / 2 + AW_W * u
     p = canvas_pt(x, v)
     return p, (x / TILE, v * L_SL / TILE), 0.0
-grid_part('canvas', NU * 3 // 2 if RUIN else NU, NV * 3 // 2 if RUIN else NV, cv_fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u * N_STRIPE),
-          tint_fn=lambda u, v: (1, 1, 1, 1), keep_fn=(lambda u, v: tear_d(u, v) > 0) if RUIN else None, fray=0.022 if RUIN else 0.0)
+if not RIBS:
+  grid_part('canvas', NU * 3 // 2 if RUIN else NU, NV * 3 // 2 if RUIN else NV, cv_fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u * N_STRIPE),
+            tint_fn=lambda u, v: (1, 1, 1, 1), keep_fn=(lambda u, v: tear_d(u, v) > 0) if RUIN else None, fray=0.022 if RUIN else 0.0)
 if RUIN:
     # torn strips hang from the holes' lips and the chewed front edge, twisted and swinging, each narrowing to a ragged point
     def strip(nm, u0, v0, ln, w0, tw, seed):
@@ -781,9 +821,12 @@ if RUIN:
             return p, (x / TILE, v * ln / TILE), 0.6 * v
         grid_part(nm, 5, 9, fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u0 * N_STRIPE),
                   keep_fn=lambda u, v: v < 0.78 or abs(u - 0.5) < 0.32 - (v - 0.78) * 1.2 + 0.08 * r.random(), fray=0.012)
-    for k, (u0, v0, ln, w0, tw) in enumerate(((0.62, 0.66, 0.62, 0.26, 0.6), (0.78, 0.64, 0.45, 0.14, -0.9), (0.70, 0.36, 0.38, 0.18, 0.4),
+    STRIPS = (((0.05, 0.25, 0.7, 0.2, 0.6), (0.03, 0.62, 0.45, 0.14, -0.7), (0.5, 0.15, 0.5, 0.22, 0.5), (0.52, 0.55, 0.85, 0.24, -0.4),
+               (0.48, 0.9, 0.4, 0.12, 0.8), (0.96, 0.35, 0.6, 0.18, 0.7), (0.95, 0.8, 0.35, 0.1, -0.5)) if RIBS else
+              ((0.62, 0.66, 0.62, 0.26, 0.6), (0.78, 0.64, 0.45, 0.14, -0.9), (0.70, 0.36, 0.38, 0.18, 0.4),
                                              (0.25, 0.37, 0.33, 0.11, 0.8), (0.33, 0.93, 0.5, 0.12, -0.5), (0.43, 0.94, 0.36, 0.09, 0.7),
-                                             (0.90, 0.97, 0.42, 0.1, 0.5), (0.12, 0.96, 0.3, 0.08, -0.6))):
+                                             (0.90, 0.97, 0.42, 0.1, 0.5), (0.12, 0.96, 0.3, 0.08, -0.6)))
+    for k, (u0, v0, ln, w0, tw) in enumerate(STRIPS):                 # cloth: rags still nailed to the bare ribs
         strip(f'canvas_strip{k}', u0, v0, ln, w0, tw, k)
 # scalloped valances: front and both sides, one scallop per stripe
 VH, SD = 0.20, 0.085
@@ -800,21 +843,34 @@ def valance(name, p0, p1, n_sc, side_out, phase):
     gone = VAL_GONE.get(name, ()) if RUIN else ()
     return grid_part(name, n_sc * 7, 4, fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u * n_sc) + phase,
                      tint_fn=lambda u, v: (0.97, 0.97, 0.97, 1), keep_fn=lambda u, v: min(int(u * n_sc), n_sc - 1) not in gone, fray=0.012 if RUIN else 0.0)
-VAL_GONE = {'valance_F': (3, 4, 8, 9, 10), 'valance_1': (1, 2), 'valance_-1': (4,)}   # ruined: scallops torn away (under the holes)
+VAL_GONE = {'valance_F': (3, 4, 8, 9, 10), 'valance_1': (1, 2), 'valance_-1': (0, 1, 3, 4, 6) if RIBS else (4,)}   # ruined: scallops torn away (under the holes)
 fr0 = canvas_pt(-AW_W / 2, 1.0) + Vector((0, -0.01, 0.0)); fr1 = canvas_pt(AW_W / 2, 1.0) + Vector((0, -0.01, 0.0))
-valance('valance_F', fr0, fr1, N_STRIPE, Vector((0, -1, 0)), 0)
+if not RIBS: valance('valance_F', fr0, fr1, N_STRIPE, Vector((0, -1, 0)), 0)
 n_side = round(L_SL / SW)
 for sx in (-1, 1):
     a = canvas_pt(sx * AW_W / 2, 0.0) + Vector((sx * 0.005, 0, 0)); b = canvas_pt(sx * AW_W / 2, 1.0) + Vector((sx * 0.005, 0, 0))
-    valance(f'valance_{sx}', a, b, n_side, Vector((sx, 0, 0)), 1 if sx > 0 else 0)
+    if not RIBS or sx < 0: valance(f'valance_{sx}', a, b, n_side, Vector((sx, 0, 0)), 1 if sx > 0 else 0)
 # plain back cloth hanging from the back lintel
 def back_fn(u, v):
     x = -1.18 + 2.36 * u; ztop = lintel_top(PY) - 0.17; zbot = 1.42 + 0.03 * math.sin(u * 9.0)
     z = ztop + (zbot - ztop) * v
     y = PY - 0.075 + 0.02 * math.sin(2 * math.pi * u * 7.5) * (0.3 + v)
     return Vector((x, y, z)), (x / TILE, z / TILE), 0.0
-grid_part('backcloth', 60 if RUIN else 40, 14 if RUIN else 6, back_fn, 'Cloth', tint_fn=lambda u, v: bleach(lin('#6e4a3a'), 0.5) if RUIN else lin('#6e4a3a'),
-          keep_fn=(lambda u, v: v < 0.45 + 0.4 * noise.noise(Vector((u * 7, 1.0, 2.0))) + 0.25 and not (0.55 < u < 0.7 and v > 0.2)) if RUIN else None, fray=0.03 if RUIN else 0.0)
+if VARIANT == 'tools':
+    # the tools stall has a pale planked back board instead of a cloth: the tool wall (dark iron on pale wood reads from across the square)
+    BB_Y, BB_Z0, BB_Z1 = PY - 0.05, 1.36, lintel_top(PY) - LIN_H + 0.01
+    nbb = 13; bbw = 2.36 / nbb
+    for i in range(nbb):
+        if RUIN and i in (3, 4, 9): continue                         # ruined: boards gone, the dark gaps show
+        r = rng(f'bb{i}'); z0 = BB_Z0 + (r.uniform(0.0, 0.08) if RUIN else 0.0)
+        board(f'backboard{i}', (bbw - 0.006, 0.025, BB_Z1 - z0), 'Oak', (-1.18 + bbw * (i + 0.5), BB_Y, (z0 + BB_Z1) / 2),
+              (0, r.uniform(-0.6, 0.6) + (6 if RUIN and i == 10 else 0), 0), grain=2, cut=4, chamfer=0.004, wob=0.002,
+              tint=bleach((1.12, 1.08, 1.0, 1), 0.3) if RUIN else (1.12 * r.uniform(0.95, 1.05), 1.08, 1.0, 1))
+    for z in (BB_Z0 + 0.12, BB_Z1 - 0.1):
+        board(f'bb_batten{z:.2f}', (2.36, 0.025, 0.07), 'Oak', (0, BB_Y + 0.025, z), grain=0, cut=6, chamfer=0.005, wob=0.002, tint=(0.95, 0.92, 0.88, 1))
+else:
+  grid_part('backcloth', 60 if RUIN else 40, 14 if RUIN else 6, back_fn, 'Cloth', tint_fn=lambda u, v: bleach(lin('#6e4a3a'), 0.5) if RUIN else lin('#6e4a3a'),
+            keep_fn=(lambda u, v: v < 0.45 + 0.4 * noise.noise(Vector((u * 7, 1.0, 2.0))) + 0.25 and not (0.55 < u < 0.7 and v > 0.2)) if RUIN else None, fray=0.03 if RUIN else 0.0)
 
 # ----------------------------------------------------------------------------- small-part helpers (goods, crates, weeds; Wave 1 variants)
 def blob(name, r, scale, loc, mat, tint, rot=(0, 0, 0), segs=(14, 8), fn=None):
@@ -841,17 +897,6 @@ def ring(name, c, rad, tube, mat, axis='Y', n=16, tint=None, arc=1.0, sq=(1, 1))
         a1, a2 = math.cos(a) * rad * sq[0], math.sin(a) * rad * sq[1]
         pts.append(Vector(c) + (Vector((a1, 0, a2)) if axis == 'Y' else Vector((0, a1, a2)) if axis == 'X' else Vector((a1, a2, 0))))
     return pole(name, pts, tube, mat, 8, tint=tint, cap=arc < 1)
-
-def group_xf(start, M):
-    """Apply a world matrix to every part made since PARTS[start] (a crate, a sign that hangs askew)."""
-    bpy.context.view_layer.update()
-    for ob in PARTS[start:]: ob.matrix_world = M @ ob.matrix_world
-    bpy.context.view_layer.update()
-
-def about(p, rx=0, ry=0, rz=0):
-    p = Vector(p)
-    return Matrix.Translation(p) @ (Matrix.Rotation(math.radians(rz), 4, 'Z') @ Matrix.Rotation(math.radians(ry), 4, 'Y')
-                                   @ Matrix.Rotation(math.radians(rx), 4, 'X')) @ Matrix.Translation(-p)
 
 def crate(name, L, Wd, H, M, slats_gone=(), tint=None):
     """A slatted crate (open top) built at the origin then placed by M: corner posts, two slats a side, a three-slat floor."""
@@ -967,7 +1012,7 @@ def rug_fn(u, v):
         p.z += f * 0.012 * math.sin(x * 9.0)
     p = Matrix.Rotation(math.radians(1.5), 3, 'Z') @ p
     return p, (u * RUG_W / TILE, sv / TILE), 0.0
-if not RUIN and VARIANT != 'tools':
+if not RUIN and VARIANT not in ('tools', 'cloth'):
     grid_part('counter_cloth', 36, 22, rug_fn, 'Rug', solid=0.003)
 
 # ----------------------------------------------------------------------------- small sign on a stake at the fountain-side front corner (bread)
@@ -1112,7 +1157,7 @@ def apples(name, cx, cy, ztop, L, Wd, cols, nx=6, ny=4, r=0.04):
         blob(f'{name}top{k}', r, (1, 1, 0.9), (cx + rr.uniform(-L / 4, L / 4), cy + rr.uniform(-Wd / 4, Wd / 4), ztop + r * 1.4 + 0.05), 'Fruit', c,
              (0, 0, rr.uniform(0, 360)), (10, 6))
 
-CZ = COUNTER_Z + (0.007 if VARIANT in ('produce', 'cloth') else 0.0)   # counter landing height (the counter cloth adds 7 mm)
+CZ = COUNTER_Z + (0.007 if VARIANT == 'produce' else 0.0)   # counter landing height (the counter cloth adds 7 mm)
 if VARIANT and not RUIN:
     lantern(hx, hy - 0.30, hz - 0.065)
     if VARIANT == 'produce':
@@ -1136,7 +1181,7 @@ if VARIANT and not RUIN:
     elif VARIANT == 'cloth':
         # folded stacks on the counter, bolts lying on the low tier and standing on the top tier, two lengths hung inside the front posts
         DYE = [lin(c) for c in ('#d8c9a2', '#3d5f78', '#9c3b2c', '#b48a3a', '#6f7d4a', '#b77a6a', '#5a4a6e')]
-        for st, (x, n) in enumerate(((-0.78, 5), (-0.12, 4), (0.55, 6))):
+        for st, (x, n) in enumerate(((-0.75, 4), (0.62, 5))):
             r = rng(f'stack{st}'); z = CZ
             for k in range(n):
                 h = r.uniform(0.04, 0.055)
@@ -1150,44 +1195,77 @@ if VARIANT and not RUIN:
             x = -0.98 + 0.39 * k; c = DYE[(k * 3 + 2) % len(DYE)]; r = rng(f'bolt{k}')
             lathe(f'bolt_up{k}', [(0.055, 0.0), (0.058, 0.02), (0.058, 0.52), (0.055, 0.54)], (x, 0.12, T2), 'Cloth', tint=c,
                   rot=(r.uniform(-6, -2), r.uniform(-4, 4), 0))
-        for sx, c in ((-1, DYE[1]), (1, DYE[2])):                   # hung lengths: a rod under the lintel inside each front post, the cloth folding down
-            x0 = sx * (PX - 0.32); ztop = lintel_top(-PY) - LIN_H - 0.06
-            pole(f'hang_rod{sx}', [(x0 - 0.24, -PY + 0.07, ztop), (x0 + 0.24, -PY + 0.07, ztop)], 0.012, 'Oak', 8)
-            def hang_fn(u, v, x0=x0, ztop=ztop, sx=sx):
-                x = x0 - 0.21 + 0.42 * u; z = ztop - 0.85 * v - 0.03 * math.sin(math.pi * u) * v
-                y = -PY + 0.07 + 0.025 * math.sin(2 * math.pi * u * 3 + sx) * (0.3 + v) - 0.02 * v
-                return Vector((x, y, z)), (u * 0.42 / TILE, v * 0.85 / TILE), 0.0
-            grid_part(f'hang{sx}', 18, 10, hang_fn, 'Cloth', solid=0.003, tint_fn=lambda u, v, c=c: c if (v * 9) % 3 > 0.35 else tuple(0.8 * q for q in c[:3]) + (1,))
+        # two long lengths hung from the awning's front bar, framing the opening and falling to just above the ground (colour columns, cloth_02)
+        fbz = AW_FRONT[1] - 0.07; fby = AW_FRONT[0] + 0.06
+        for sx, c, c2 in ((-1, DYE[1], DYE[0]), (1, DYE[2], DYE[3])):
+            x0 = sx * 0.93
+            def hang_fn(u, v, x0=x0, sx=sx):
+                L = 2.05; x = x0 - 0.21 + 0.42 * u + 0.03 * v * v * sx
+                z = fbz - L * v; y = fby + 0.022 * math.sin(2 * math.pi * u * 3 + sx + v) * (0.3 + v) - 0.06 * v * v
+                return Vector((x, y, z)), (u * 0.42 / TILE, v * L / TILE), 0.0
+            grid_part(f'hang{sx}', 18, 22, hang_fn, 'Cloth', solid=0.003,
+                      tint_fn=lambda u, v, c=c, c2=c2: c2 if (v * 14) % 3 < 0.45 or abs(u - 0.5) > 0.44 else c)
+        # three bold lengths laid over the counter front, falling most of the way down the boards
+        for k, (x, w, drop, c, c2) in enumerate(((-0.55, 0.44, 0.78, DYE[4], DYE[0]), (-0.05, 0.4, 0.62, DYE[5], DYE[6]), (0.45, 0.46, 0.84, DYE[3], DYE[2]))):
+            def drape_fn(u, v, x=x, w=w, drop=drop, k=k):
+                top = 0.30; sv = v * (top + drop); xx = x - w / 2 + w * u
+                if sv <= top:
+                    p = Vector((xx, -0.58 - sv, CZ + 0.004 + 0.004 * k))
+                else:
+                    d = sv - top; a = min(d / 0.05, 1.0) * math.pi / 2
+                    p = Vector((xx, -0.885 - 0.034 * math.sin(a) - 0.006 - 0.004 * k, CZ + 0.004 - 0.03 * (1 - math.cos(a)) - max(0.0, d - 0.05)))
+                    f = d / drop; p.y -= f * (0.016 * math.sin(2 * math.pi * xx / 0.2 + k) + 0.03 * f + 0.004 * k)
+                return p, (u * w / TILE, sv / TILE), 0.0
+            grid_part(f'drape{k}', 14, 24, drape_fn, 'Cloth', solid=0.003,
+                      tint_fn=lambda u, v, c=c, c2=c2: c2 if (u * 8) % 2 < 0.35 or v > 0.95 else c)
     elif VARIANT == 'tools':
         # tools hung from a rail under the back lintel, pots and a kettle on the tiers, horseshoes, a nail tray and a hammer on the counter,
         # a barrel of long-handled tools at the fountain-side front corner
-        zr = 1.95; yr = PY - 0.13                                   # rail at eye height on two iron hangers from the back lintel
         COPPER, STEEL = lin('#c27a48'), lin('#b8b4ac')
-        pole('tool_rail', [(-1.15, yr, zr), (1.15, yr, zr)], 0.014, 'Iron', 8)
-        for sx in (-1, 1):
-            pole(f'rail_hanger{sx}', [(sx * 1.05, yr, zr), (sx * 1.05, yr, lintel_top(PY) - LIN_H + 0.02)], 0.009, 'Iron', 6)
-        def hook(nm, x):
-            pole(nm, [(x, yr, zr + 0.01), (x, yr - 0.03, zr - 0.01), (x, yr - 0.03, zr - 0.05)], 0.005, 'Iron', 6)
-        TOOLS = [('saw', -0.95), ('hammer', -0.6), ('sickle', -0.3), ('tongs', 0.05), ('saw2', 0.4), ('ladle', 0.72), ('hammer2', 0.98)]
-        for nm, x in TOOLS:
-            hook(f'hook_{nm}', x); y = yr - 0.04; zt = zr - 0.05
-            if nm.startswith('saw'):
-                L = 0.46 if nm == 'saw' else 0.36
-                prism(f'{nm}_blade', [(x - 0.035, zt - 0.06), (x + 0.035, zt - 0.06), (x + 0.025, zt - 0.06 - L), (x - 0.06, zt - 0.06 - L + 0.04)], 0.004, 'Metal', y, chamfer=0.001)
-                board(f'{nm}_grip', (0.1, 0.03, 0.12), 'Oak', (x, y + 0.002, zt - 0.03), grain=2, chamfer=0.01)
-            elif nm.startswith('hammer'):
-                board(f'{nm}_handle', (0.03, 0.026, 0.34), 'Oak', (x, y, zt - 0.2), grain=2, chamfer=0.007)
-                board(f'{nm}_head', (0.13 if nm == 'hammer' else 0.1, 0.04, 0.045), 'Metal', (x, y, zt - 0.39), grain=0, chamfer=0.008)
-            elif nm == 'sickle':
-                board('sickle_handle', (0.032, 0.03, 0.13), 'Oak', (x, y, zt - 0.08), grain=2, chamfer=0.008)
-                pole('sickle_blade', [(x + 0.18 * math.sin(math.pi * 0.85 * k / 10) - 0.0, y, zt - 0.15 - 0.18 * (1 - math.cos(math.pi * 0.85 * k / 10)))
-                                      for k in range(11)], [0.012 * (1 - 0.7 * k / 10) for k in range(11)], 'Metal', 6)
-            elif nm == 'tongs':
-                for sgn in (-1, 1):
-                    pole(f'tongs{sgn}', [(x + sgn * 0.01, y, zt - 0.02), (x + sgn * 0.02, y, zt - 0.3), (x - sgn * 0.01, y, zt - 0.4), (x - sgn * 0.02, y, zt - 0.46)], 0.008, 'Metal', 6)
-            elif nm == 'ladle':
-                pole('ladle_shaft', [(x, y, zt - 0.02), (x, y, zt - 0.36)], 0.007, 'Metal', 6)
-                blob('ladle_bowl', 0.05, (1, 1, 0.55), (x, y, zt - 0.38), 'Metal', None, segs=(12, 6), fn=lambda co: Vector((co.x, co.y, min(co.z, 0.2))))
+        y = BB_Y - 0.035                                             # in front of the board, hung on oak pegs
+        def peg(nm, x, z):
+            pole(nm, [(x, BB_Y - 0.012, z), (x, BB_Y - 0.07, z + 0.012)], 0.011, 'Oak', 8)
+        def saw(nm, x, zt, L):
+            peg(nm + '_peg', x, zt)
+            prism(nm + '_blade', [(x - 0.045, zt - 0.08), (x + 0.045, zt - 0.08), (x + 0.035, zt - 0.08 - L), (x - 0.08, zt - 0.08 - L + 0.05)], 0.005, 'Metal', y, chamfer=0.0015, tint=STEEL)
+            board(nm + '_grip', (0.12, 0.035, 0.14), 'Oak', (x, y + 0.002, zt - 0.04), grain=2, chamfer=0.012, tint=lin('#c99a62'))
+        def auger(nm, x, zt):
+            peg(nm + '_peg', x, zt + 0.02)
+            board(nm + '_t', (0.32, 0.04, 0.045), 'Oak', (x, y, zt), grain=0, chamfer=0.012, tint=lin('#b07a48'))
+            pole(nm + '_shaft', [(x, y, zt - 0.02), (x, y, zt - 0.32)], 0.009, 'Metal', 6, tint=STEEL)
+            pole(nm + '_bit', [(x + 0.02 * math.cos(k * 0.9), y + 0.02 * math.sin(k * 0.9), zt - 0.32 - 0.012 * k) for k in range(18)], 0.006, 'Metal', 6, tint=STEEL)
+        def hammer(nm, x, zt, hw=0.15):
+            peg(nm + '_peg', x, zt)
+            board(nm + '_handle', (0.034, 0.03, 0.38), 'Oak', (x, y, zt - 0.2), grain=2, chamfer=0.008, tint=lin('#c99a62'))
+            board(nm + '_head', (hw, 0.05, 0.055), 'Metal', (x, y, zt - 0.4), grain=0, chamfer=0.01)
+        def mallet(nm, x, zt):
+            peg(nm + '_peg', x, zt)
+            board(nm + '_handle', (0.034, 0.03, 0.34), 'Oak', (x, y, zt - 0.18), grain=2, chamfer=0.008, tint=lin('#c99a62'))
+            lathe(nm + '_head', [(0.058, -0.09), (0.062, -0.07), (0.062, 0.07), (0.058, 0.09)], (x, y, zt - 0.38), 'Oak', tint=lin('#a87444'), rot=(0, 90, 0))
+        def coil(nm, x, zt, rr=0.14):
+            peg(nm + '_peg', x, zt)
+            for j in range(4):
+                ring(f'{nm}{j}', (x + 0.006 * j, y - 0.01 * j, zt - rr + 0.01), rr - 0.008 * j, 0.014, 'Rope', 'Y', 18, sq=(0.8, 1.05))
+        Z1, Z2 = BB_Z1 - 0.06, BB_Z1 - 0.52                          # top row of pegs, lower row
+        saw('saw', -0.98, Z1, 0.5); auger('auger', -0.6, Z1 - 0.04); coil('coil_w', -0.22, Z1); hammer('hammer', 0.12, Z1)
+        auger('auger2', 0.42, Z1 - 0.06); saw('saw2', 0.82, Z1, 0.42)
+        hammer('hammer2', -0.8, Z2, 0.11); mallet('mallet', -0.42, Z2)
+        peg('tongs_peg', 0.0, Z2)
+        for sgn in (-1, 1):
+            pole(f'tongs{sgn}', [(sgn * 0.01, y, Z2 - 0.02), (sgn * 0.022, y, Z2 - 0.28), (-sgn * 0.01, y, Z2 - 0.38), (-sgn * 0.024, y, Z2 - 0.44)], 0.009, 'Metal', 6)
+        peg('whet_peg', 0.36, Z2)                                    # a whetstone on its peg
+        lathe('whetstone', [(0.035, -0.022), (0.12, -0.02), (0.125, 0.0), (0.12, 0.02), (0.035, 0.022)], (0.36, y - 0.01, Z2 - 0.12), 'Stone', rot=(90, 0, 0), sides=20)
+        peg('sickle_peg', 0.7, Z2)
+        board('sickle_handle', (0.036, 0.032, 0.14), 'Oak', (0.7, y, Z2 - 0.08), grain=2, chamfer=0.008, tint=lin('#c99a62'))
+        pole('sickle_blade', [(0.7 + 0.2 * math.sin(math.pi * 0.85 * k / 10), y, Z2 - 0.15 - 0.2 * (1 - math.cos(math.pi * 0.85 * k / 10)))
+                              for k in range(11)], [0.014 * (1 - 0.7 * k / 10) for k in range(11)], 'Metal', 6, tint=STEEL)
+        # hung from the awning's front bar inside the posts: a coil of rope and a pair of shears (front silhouette breaks)
+        fbz = AW_FRONT[1] - 0.06; fby = AW_FRONT[0] + 0.05
+        for k in range(3):
+            ring(f'coil_f{k}', (0.78 + 0.006 * k, fby, fbz - 0.15 - 0.004 * k), 0.13 - 0.007 * k, 0.014, 'Rope', 'Y', 18, sq=(0.8, 1.1))
+        pole('shears_cord', [(-0.72, fby, fbz), (-0.72, fby, fbz - 0.12)], 0.005, 'Rope', 6)
+        for sgn in (-1, 1):
+            pole(f'shears{sgn}', [(-0.72, fby, fbz - 0.12), (-0.72 + sgn * 0.03, fby, fbz - 0.2), (-0.72 + sgn * 0.012, fby, fbz - 0.42)], [0.01, 0.009, 0.004], 'Metal', 6, tint=STEEL)
         for k, (x, rad) in enumerate(((-0.88, 0.085), (-0.55, 0.07), (0.62, 0.08))):
             lathe(f'pot{k}', [(rad * 0.75, 0.0), (rad, 0.03), (rad * 1.05, rad * 0.9), (rad * 0.85, rad * 1.25), (rad * 0.95, rad * 1.33)],
                   (x, -0.14, T1), 'Metal', tint=COPPER if k != 1 else STEEL, sides=16)
@@ -1196,11 +1274,20 @@ if VARIANT and not RUIN:
         pole('kettle_spout', [(0.32, 0.09, T2 + 0.06), (0.38, 0.09, T2 + 0.1), (0.41, 0.09, T2 + 0.13)], [0.016, 0.012, 0.009], 'Metal', 8, tint=COPPER)
         for k, x in enumerate((-0.6, -0.3, 0.6, 0.9)):               # stacked iron pans on the top tier ends
             lathe(f'pan{k}', [(0.09, 0.0), (0.11, 0.035), (0.115, 0.04)], (x, 0.09, T2 + 0.0), 'Metal', sides=16)
-        board('nail_tray', (0.34, 0.22, 0.06), 'Oak', (-0.65, -0.62, CZ + 0.03), (0, 0, 6), grain=0, chamfer=0.006)
-        blob('nail_heap', 0.15, (1, 0.62, 0.17), (-0.65, -0.62, CZ + 0.055), 'Metal', None, (0, 0, 6), (16, 8))
+        board('nail_tray', (0.34, 0.22, 0.06), 'Oak', (-0.92, -0.62, CZ + 0.03), (0, 0, 6), grain=0, chamfer=0.006)
+        blob('nail_heap', 0.15, (1, 0.62, 0.17), (-0.92, -0.62, CZ + 0.055), 'Metal', None, (0, 0, 6), (16, 8))
+        for k, (x, yy, rz, L) in enumerate(((-0.5, -0.52, 8, 0.3), (-0.42, -0.74, -14, 0.24))):   # wooden planes, iron blade wedged in
+            board(f'plane{k}', (L, 0.075, 0.075), 'Oak', (x, yy, CZ + 0.0375), (0, 0, rz), grain=0, chamfer=0.012, tint=lin('#b5834e'))
+            group0 = len(PARTS)
+            board(f'plane{k}_blade', (0.012, 0.052, 0.07), 'Metal', (x + 0.02, yy, CZ + 0.09), (0, -40, rz), chamfer=0.002, tint=STEEL)
+            blob(f'plane{k}_knob', 0.03, (1, 1, 1.2), (x - L * 0.32, yy, CZ + 0.09), 'Oak', lin('#8a5a34'), segs=(10, 6))
+        for k in range(4):                                           # chisels laid side by side, handles toward the buyer
+            x = -0.1 + 0.075 * k
+            pole(f'chisel{k}_h', [(x, -0.78, CZ + 0.016), (x, -0.62, CZ + 0.016)], 0.016, 'Oak', 8, tint=lin('#c99a62'))
+            board(f'chisel{k}_b', (0.022 - 0.003 * k, 0.16, 0.007), 'Metal', (x, -0.53, CZ + 0.008), grain=1, chamfer=0.0015, tint=STEEL)
         for k in range(4):
             r = rng(f'shoe{k}')
-            ring(f'shoe{k}', (0.05 + 0.13 * k, -0.62 + r.uniform(-0.05, 0.05), CZ + 0.012), 0.055, 0.011, 'Metal', 'Z', 12, arc=0.72)
+            ring(f'shoe{k}', (0.45 + 0.03 * (k % 2), -0.62 + r.uniform(-0.02, 0.02), CZ + 0.012 + 0.022 * k), 0.06, 0.012, 'Metal', 'Z', 12, arc=0.72)
         board('hammer_c_handle', (0.3, 0.03, 0.026), 'Oak', (0.85, -0.55, CZ + 0.014), (0, 0, -24), grain=0, chamfer=0.006)
         board('hammer_c_head', (0.045, 0.12, 0.045), 'Metal', (0.98, -0.61, CZ + 0.024), (0, 0, -24), grain=1, chamfer=0.008)
         bx, by = -W / 2 - 0.2, -PY - 0.2                             # barrel of long-handled tools
@@ -1229,11 +1316,8 @@ if RUIN:
     crate('crate_r3', 0.44, 0.32, 0.28, Matrix.Translation((-PX - 0.05, PY + 0.32, 0)) @ about((0, 0, 0), rx=8, rz=-10), slats_gone=(1, 3, 6),
           tint=bleach(lin('#b8a88a'), 0.4)); RACK_SKIP.extend(PARTS[-13:])
     if VARIANT == 'tools':                                          # the rail is still there with its bare hooks; the barrel stands empty
-        zr = 1.95; yr = PY - 0.13
-        pole('tool_rail', [(-1.15, yr, zr), (1.15, yr, zr - 0.06)], 0.014, 'Iron', 8)
-        pole('rail_hanger-1', [(-1.05, yr, zr), (-1.05, yr, lintel_top(PY) - LIN_H + 0.02)], 0.009, 'Iron', 6)   # the right hanger rusted through
-        for k, x in enumerate((-0.95, -0.3, 0.4, 0.98)):
-            pole(f'hook_r{k}', [(x, yr, zr + 0.01), (x, yr - 0.03, zr - 0.01), (x, yr - 0.03, zr - 0.05)], 0.005, 'Iron', 6)
+        for k, (x, z) in enumerate(((-0.98, BB_Z1 - 0.06), (-0.22, BB_Z1 - 0.06), (0.82, BB_Z1 - 0.06), (-0.42, BB_Z1 - 0.52), (0.7, BB_Z1 - 0.52))):
+            pole(f'peg_r{k}', [(x, BB_Y - 0.012, z), (x, BB_Y - 0.07, z + 0.012)], 0.011, 'Oak', 8)   # bare pegs: the tool wall's ghost
         bx, by = -W / 2 - 0.2, -PY - 0.2; s0 = len(PARTS)
         lathe('barrel', [(0.2, 0.0), (0.225, 0.15), (0.235, 0.3), (0.225, 0.45), (0.2, 0.6)], (bx, by, 0), 'Oak', sides=20, tint=bleach(lin('#c8b89a'), 0.3))
         ring('barrel_hoop', (bx, by, 0.08), 0.22, 0.008, 'Iron', 'Z', 20)
@@ -1254,18 +1338,22 @@ if RUIN:
     for k, (x, y, rad, n, h) in enumerate(((-PX, -PY, 0.24, 80, 0.48), (PX, -PY, 0.22, 70, 0.4), (-PX, PY, 0.28, 90, 0.55), (PX, PY, 0.24, 75, 0.45),
                                             (0.2, -PY - 0.05, 0.2, 45, 0.3), (PX + 0.2, 0.25, 0.24, 55, 0.36))):
         weeds(f'weeds{k}', x + (0.04 if x > 0 else -0.04), y + (-0.03 if y < 0 else 0.03), rad, n, h)
-    # the camera-side front corner of the awning has come down: its rafter slipped off the front lintel, the front bar bends, the cloth slumps with it
-    def droop(w):
-        fx = min(max((w.x - 0.15) / 1.3, 0.0), 1.0); fy = min(max((-w.y - 0.25) / 0.9, 0.0), 1.0)
-        return -0.42 * (fx * fx * (3 - 2 * fx)) * (fy * fy * (3 - 2 * fy))
-    bpy.context.view_layer.update()
-    for ob in PARTS:
-        if not ob.name.startswith(('canvas', 'valance_F', 'valance_1', 'frontbar', 'rafter2')): continue
-        mw = ob.matrix_world; inv = mw.inverted()
-        for v in ob.data.vertices:
-            w = mw @ v.co; w.z += droop(w); v.co = inv @ w
+    if SNAP:
+        # the snapped post let the camera-side front of the frame down onto the counter: everything above 1.5 m at the front drops with it, most at that corner
+        def droop(w):
+            fx = min(max((w.x + PX) / (2 * PX + 0.15), 0.0), 1.0); fy = min(max((-w.y - 0.2) / 0.55, 0.0), 1.0)
+            fz = min(max((w.z - 1.45) / 0.45, 0.0), 1.0)
+            return -1.1 * fx * (fy * fy * (3 - 2 * fy)) * (fz * fz * (3 - 2 * fz))
+        bpy.context.view_layer.update()
+        skip = set(o.name for o in RACK_SKIP)
+        for ob in PARTS:
+            if ob.name in skip or ob.name.startswith(('post_', 'pad_', 'hook_')): continue
+            mw = ob.matrix_world; inv = mw.inverted()
+            for v in ob.data.vertices:
+                w = mw @ v.co; w.z += droop(w); v.co = inv @ w
     # the whole frame has racked: leaning toward +X and the back, everything nailed to it going with it (ground pieces stay put)
-    rack = Matrix(((1, 0, 0.045, 0), (0, 1, 0.018, 0), (0, 0, 1, 0), (0, 0, 0, 1)))
+    kx, ky = (0.12, 0.03) if LEAN else (0.025, 0.012) if SNAP else (0.045, 0.018)
+    rack = Matrix(((1, 0, kx, 0), (0, 1, ky, 0), (0, 0, 1, 0), (0, 0, 0, 1)))
     bpy.context.view_layer.update()
     skip = set(o.name for o in RACK_SKIP)
     for ob in PARTS:
@@ -1277,6 +1365,11 @@ def tris_of(ob):
     return sum(len(p.vertices) - 2 for p in ob.data.polygons)
 TRIS = sum(tris_of(o) for o in PARTS)
 print(f'STALL parts={len(PARTS)} tris={TRIS}')
+if '--dump' in argv:                                                 # part name, world centre and size (debugging placement)
+    bpy.context.view_layer.update()
+    for o in PARTS:
+        bb = [o.matrix_world @ Vector(c) for c in o.bound_box]; c = sum(bb, Vector()) / 8
+        print('PART', o.name, tuple(round(x, 2) for x in c), tuple(round(x, 2) for x in o.dimensions))
 
 # ----------------------------------------------------------------------------- bake stage: join, atlas, bake, game material
 def bake():
