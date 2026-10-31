@@ -102,7 +102,8 @@ namespace SleepingCalamity.EditorTools
                 {
                     string slot = mats[i] != null ? mats[i].name : "";
                     int dot = slot.IndexOf('.'); if (dot > 0) slot = slot.Substring(0, dot);
-                    if (map.TryGetValue(slot, out Material m)) mats[i] = m;
+                    if (r.gameObject.name == "Glow" && map.TryGetValue("HH_Glow", out Material gm) && !map.ContainsKey(slot)) mats[i] = gm;   // the Glow child may carry a default "Lit" slot
+                    else if (map.TryGetValue(slot, out Material m)) mats[i] = m;
                     else Debug.LogWarning("SC HEROESHOME unknown material slot '" + slot + "' on " + id + "/" + r.gameObject.name);
                 }
                 r.sharedMaterials = mats;
@@ -117,6 +118,8 @@ namespace SleepingCalamity.EditorTools
             a.transform.position = stair.position + new Vector3(0f, -0.8f, 0.4f);
             Light b = LookTestBuilder.AddLight(parent, "StairHeadLight", LightType.Point, Vector3.zero, Quaternion.identity, new Color(1f, 0.70f, 0.42f), 1.2f, 4f, LightShadows.None);
             b.transform.position = stair.position + new Vector3(0f, 1.9f, -0.2f);
+            Light c = LookTestBuilder.AddLight(parent, "DoorLanternLight", LightType.Point, Vector3.zero, Quaternion.identity, new Color(1f, 0.62f, 0.32f), 2.5f, 6f, LightShadows.None);
+            c.transform.position = new Vector3(12.85f, parent.position.y + 2.0f, 8.55f);   // just inside the front door (the door lantern)
         }
     }
 }
