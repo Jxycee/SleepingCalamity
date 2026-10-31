@@ -1,14 +1,20 @@
 State: IN PROGRESS
 Session: Wave 1: Heroes' home (fixed landmark)
-Progress: 5%
+Progress: 40%
 Sheet: none yet
 Blocker: none
 
 Score: not yet scored
-Tris: n/a
+Tris: cistern 50.2k, annex 19.1k (budget 75k each)
 SC RESULT: no check yet
 Merge commit: none
 
 ## Log
 - 2026-10-31: started. Layout rows read: HeroesHome_Cistern (12.5, 11.25) 9 x 7.5 m, y 0, door south (12.5, 6.75), Undercroft stair (15, 12.5);
   HeroesHome_Annex (11.9, 24) 5.5 x 5 m, y = KeepHeight 4, door east (15.3, 24), beside the bell tower (5.6, 24).
+- Generator Art/Blender/town/sc_heroes_home.py written (self-contained, B4 FK_* slots + HH_* slots, wear attribute). Round 1 fixes: rubble
+  courses (bigger, irregular, dark joints), shutters folded flat, door re-hinged so the stair's warm light shows, paint mode for
+  red/blue/ochre boards, inner liner cut at openings. Found and fixed a Blender gotcha: adding the colour attribute after the UV layer
+  left a stale UV handle that wrote UVs into the wear colours (create both, then fetch by name).
+- Checked before building (user rule): no existing open-source "stone cottage" generator fits the B4 slot/wear contract; reused the
+  in-repo practice (sc_ruin_kit tile_mat + pillow stones, sc_facade_kit conventions, BeautyCornerArt slot mapping) instead of new tools.
