@@ -12,13 +12,15 @@ Reads at 20 m from the square cameras: silhouette first (a broken, stepped stone
 (grime band at the foot, moss on the shaded back side and the tops, char on the stubs, polish in the step's dip).
 
 Contract (design 5.1-5.3): Blender z up, metres, pivot at the foundation centre at ground, front (doorstep side) -Y; export
--Z forward, Y up (front = local +Z in Unity, like the B4 kit). All geometry stays inside the S x S square, under 0.5 m, and
-inside the outer 1 m band, so the interior is clear and a building's plinth covers the footing. Children of the root empty
+-Z forward, Y up (front = local +Z in Unity, like the B4 kit). All geometry stays inside the S x S square. The footing courses
+stay under 0.5 m; round 5 (controller, 2026-10-31: the builder hides the ruin when a building is placed) adds 1-2 corner stubs
+(1.05-1.4 m, stepped), one broken wall run (0.75-1.05 m), 1-2 gaps, rubble spilling inward, and an interior (sooted hearth with
+a kerb, fallen blocks, the fallen sill beam, weeds); foliage capped at 0.9 m. Children of the root empty
 Ruin_<C>_<V>: Footing (stones, core, wood; FK_Sandstone, FK_ChimneyStone, FK_PlinthJoint, FK_Oak), Foliage (M_B9_Foliage,
 the B9 atlas T_B9_Foliage), FOOTPRINT (flat S x S x 0.1 m box, material FOOTPRINT), SOCKET_Doorstep (empty, threshold top
 centre, facing -Y). T2: no unique maps; the stones sample the shared B1 tileables on metre UVs (2 m per tile, like B4) and
 placed wear lives in the CORNER colour attribute 'wear' (linear 0-1; R grime/char, G moss, B polish), read by WearLit.
-Budget: < 8k tris per variant (printed per variant).
+Budget: < 10k tris per variant (controller round 5; printed per variant).
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_ruin_kit.py -- --out <scratch>
       [--only Ruin_M_B,...] [--rres 960] [--samples 32] [--no-render] [--export]
@@ -29,8 +31,8 @@ Budget: < 8k tris per variant (printed per variant).
 refs: Reference/hollowmere/ruins/REFS.md (deserted-village house platforms and cottage footings), PHASE1 3.1 palette, 3.4 shape
 language; docs/art/beauty-corner-brief.md for the scoring.
 
-Status (2026-10-31, cloud): exported. Self-review 30/40 (calibrated rubric; rounds 26, 28, 29.5, 30; target 31 not reached
-within the 4-round limit). Tris S 5.8-6.6k, M 7.0-7.5k, L 6.9-7.6k. Rounds, per-variant table and parked ideas: Ruins/SOURCES.md.
+Status (2026-10-31, cloud): exported. Self-review 31/40 (calibrated rubric; rounds 26, 28, 29.5, 30, then the controller's round 5
+for standing remains: 31). Tris printed per variant (all < 10k). Rounds, per-variant table and parked ideas: Ruins/SOURCES.md.
 """
 import sys, os, math, random, zlib, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -56,7 +58,9 @@ ONLY = arg('--only', '').split(',') if arg('--only') else NAMES
 BLOCK = {'S': 1.0, 'M': 1.1, 'L': 1.4}   # block length scale per class (big houses, big stones; holds the budget)
 FOOT_W = 0.58                   # footing width (one block across)
 FOOT_IN = 0.16                  # footing outer face this far inside the square edge (room for the step and slumped blocks)
-MAX_Z = 0.5                     # contract: nothing taller (a building's plinth covers it)
+FOOT_MAX = 0.5                  # the footing courses stay low; stubs and the wall run stand above it
+MAX_Z = 1.45                    # controller round 5 (2026-10-31): the builder hides the ruin under a placed building, so stubs may stand
+FOL_MAX = 0.9                   # taller grass and weeds allowed (interior clumps)
 OAK_TINT = (0.80, 0.76, 0.72)
 
 # ----------------------------------------------------------------------------- materials (same slots as the B4 kit)
@@ -185,7 +189,7 @@ class Ruin:
         self.name = name; self.cls = name.split('_')[1]; self.S = CLASSES[self.cls]; self.h = self.S / 2
         self.seed = zlib.crc32(name.encode()) & 0xFFFF
         self.R = random.Random(self.seed); self.nofs = Vector((self.seed % 97, self.seed % 61, 0.0))
-        self.g = Geo(self.h - 0.03, self.h - 1.0); self.plants = []        # (kind, x, y, z, yaw, scale)
+        self.g = Geo(self.h - 0.03, 0.0); self.plants = []        # (kind, x, y, z, yaw, scale)
         self.rc = self.h - FOOT_IN - FOOT_W / 2  # footing centre line (distance from the centre)
         R = self.R
         self.door_x = R.choice([-1, 0, 1]) * R.uniform(0.15, 0.3) * self.h
@@ -194,7 +198,19 @@ class Ruin:
         self.lost = R.sample(range(4), R.choice([1, 2]))
         self.collapse = R.choice([1, 2, 3])
         self.decay = {'A': 0.25, 'B': -0.05, 'C': -0.3}[name[-1]] + R.uniform(-0.1, 0.1)   # A mostly whole, C mostly gone
-        self.heaps = []
+        self.heaps = []; self.moss_spots = []
+        # round 5: standing remains. 1-2 corner stubs (0.8-1.4 m, stepped down along both sides), one broken wall run, 1-2 gaps
+        alive = [c for c in range(4) if c not in self.lost]
+        R.shuffle(alive)
+        self.stubs = {c: (R.uniform(1.05, 1.4), R.uniform(1.4, 2.2), R.uniform(1.0, 1.7)) for c in alive[:{'A': 1, 'B': 2, 'C': 1}[name[-1]]]}
+        S_ = 2 * self.rc
+        wk = R.choice([k for k in (1, 2, 3) if k != self.collapse])
+        wl = R.uniform(1.8, min(3.2, S_ * 0.45)); wt = R.uniform(0.3, 0.7) * S_
+        self.wall = (wk, max(1.0, wt - wl / 2), min(S_ - 1.0, wt + wl / 2), R.uniform(0.75, 1.05))
+        self.gaps = []
+        for gk in R.sample([k for k in (1, 2, 3) if k != wk], {'A': 1, 'B': 1, 'C': 2}[name[-1]]):
+            gl = R.uniform(0.9, 1.5); gt = R.uniform(0.3, 0.7) * S_
+            self.gaps.append((gk, gt - gl / 2, gt + gl / 2))
 
     # side frame: side k runs from corner k to corner k+1, counter-clockwise from front-left
     def side_frame(self, k):
@@ -270,7 +286,7 @@ class Ruin:
                 p = a + d * tc + out * R.uniform(-0.04, 0.04)
                 h1 = R.uniform(0.15, 0.22)
                 z0 = R.uniform(0.20, 0.25)
-                h1 = min(h1, MAX_Z - z0 - 0.04)
+                h1 = min(h1, FOOT_MAX - z0 - 0.04)
                 xf = place(p.x, p.y, z0 + h1 / 2, yaw + math.radians(R.uniform(-4, 4)), math.radians(R.uniform(-3, 3)),
                            math.radians(R.uniform(-3, 3)))
                 vs, fs = soft_box((ln - 0.05, FOOT_W - R.uniform(0.04, 0.16), h1), xf, R, soft=R.uniform(0.08, 0.18), wob=0.022,
@@ -282,7 +298,7 @@ class Ruin:
         """Big corner blocks where a corner survived: the tallest, squarest stones, the anchors of the silhouette."""
         R = self.R
         for c in range(4):
-            if c in self.lost:
+            if c in self.lost or c in self.stubs:
                 continue
             a, b, d, out = self.side_frame(c)
             hq = R.uniform(0.40, 0.47)
@@ -293,10 +309,13 @@ class Ruin:
 
     def runs(self, k, L_):
         """Core runs (t0, t1) for side k: the whole side, minus the doorway on the front."""
-        if k == 0:
-            dx = self.door_x + self.rc
-            return [(-0.1, dx - self.door_w / 2), (dx + self.door_w / 2, L_ + 0.1)]
-        return [(-0.1, L_ + 0.1)]
+        cuts = [(self.door_x + self.rc - self.door_w / 2, self.door_x + self.rc + self.door_w / 2)] if k == 0 else []
+        cuts += [(g0, g1) for gk, g0, g1 in self.gaps if gk == k]
+        out_, t = [], -0.1
+        for c0, c1 in sorted(cuts):
+            out_.append((t, c0)); t = c1
+        out_.append((t, L_ + 0.1))
+        return out_
 
     def is_door(self, k, t):
         return k == 0 and abs((t - self.rc) - self.door_x) < self.door_w / 2 + 0.38
@@ -304,6 +323,8 @@ class Ruin:
     def skip(self, k, t, L_, course):
         R = self.R
         if self.is_door(k, t):
+            return True
+        if self.in_zone(k, t, L_):
             return True
         # lost corners: both courses go for about a block either side of the corner
         for c in self.lost:
@@ -319,6 +340,99 @@ class Ruin:
         if course == 0 and R.random() < 0.06:          # a missing block mid-run
             self.heaps.append((k, t)); return True
         return False
+
+    def in_zone(self, k, t, L_):
+        """Inside a stub, the wall run or a gap: the normal courses step aside."""
+        for c, (H, la, lb) in self.stubs.items():
+            if (c == k and t < la) or ((c - 1) % 4 == k and t > L_ - lb):
+                return True
+        wk, w0, w1, _ = self.wall
+        if k == wk and w0 - 0.1 < t < w1 + 0.1:
+            return True
+        return any(k == gk and g0 < t < g1 for gk, g0, g1 in self.gaps)
+
+    def courses(self, k, t0, t1, hfn, ch=(0.17, 0.22)):
+        """Coursed blocks along side k from t0 to t1, each column as tall as hfn(t): stepped, broken, joints offset per course."""
+        R = self.R; g = self.g
+        a, b, d, out = self.side_frame(k)
+        yaw = math.atan2(d.y, d.x)
+        z = -0.04; j = 0
+        hmax = max(hfn(t0 + (t1 - t0) * i / 20) for i in range(21))
+        while z < hmax - 0.08:
+            h = R.uniform(*ch)
+            t = t0 + (R.uniform(0.15, 0.35) * BLOCK[self.cls] if j % 2 else 0.0)
+            if j % 2:
+                pass
+            while t < t1 - 0.12:
+                ln = min(R.uniform(0.45, 0.8) * BLOCK[self.cls], t1 - t)
+                tc = t + ln / 2
+                top = hfn(tc)
+                if z + h * 0.55 < top:
+                    last = z + h * 1.6 > top                     # the broken top of this column
+                    p = a + d * tc + out * R.uniform(-0.03, 0.03)
+                    xf = place(p.x, p.y, z + h / 2, yaw + math.radians(R.uniform(-3, 3)), math.radians(R.uniform(-2.5, 2.5)),
+                               math.radians(R.uniform(-2.5, 2.5)))
+                    vs, fs = soft_box((ln - 0.035, FOOT_W - R.uniform(0.02, 0.1), h - 0.02), xf, R, soft=R.uniform(0.07, 0.16), wob=0.02,
+                                      bulge=0.01, cuts=1 if last else 0, top_break=0.06 if last and R.random() < 0.6 else 0.0)
+                    g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
+                t += ln
+            z += h; j += 1
+
+    def build_standing(self):
+        R = self.R
+        for c, (H, la, lb) in self.stubs.items():
+            ka = c; kb = (c - 1) % 4
+            La = (self.side_frame(ka)[1] - self.side_frame(ka)[0]).length
+            nz = R.random() * 9
+            def fa(t, H=H, la=la, nz=nz):          # tallest at the corner, stepping down with a ragged line
+                f = min(1.0, max(0.0, 1 - max(0.0, t) / la) * 1.7)   # a full-height chunk at the corner, then the steps
+                return 0.22 + (H - 0.22) * f ** 1.2 + 0.08 * noise.noise(Vector((t * 2.5 + nz, 0, 0)))
+            def fb(t, H=H, lb=lb, La=La, nz=nz):
+                f = min(1.0, max(0.0, 1 - max(0.0, La - t) / lb) * 1.5)
+                return 0.22 + (H * 0.85 - 0.22) * f ** 1.2 + 0.08 * noise.noise(Vector((t * 2.5 + nz, 3, 0)))
+            self.courses(ka, -FOOT_W / 2, la, fa)
+            self.courses(kb, La - lb, La - FOOT_W / 2 - 0.02, fb)
+            a = self.side_frame(ka)[0]
+            self.heaps.append((ka, la * 0.8))                 # what fell off the stub lies at its foot
+            self.moss_spots.append((a.x, a.y, 0.0))
+        wk, w0, w1, wh = self.wall
+        nz = R.random() * 9
+        def fw(t):
+            u = (t - w0) / (w1 - w0)
+            return 0.25 + (wh - 0.25) * math.sin(math.pi * min(1, max(0, u))) ** 0.6 + 0.07 * noise.noise(Vector((t * 3 + nz, 1, 0)))
+        self.courses(wk, w0, w1, fw)
+        # gaps: a few blocks lie where they fell, both sides of the line
+        for gk, g0, g1 in self.gaps:
+            self.heaps.append((gk, (g0 + g1) / 2))
+
+    def build_interior(self):
+        """Round 5: an old hearth (sooted flags and a kerb of stones) against the back, a few fallen blocks, the fallen beam."""
+        R = self.R; g = self.g; h = self.h
+        hx = R.uniform(-0.35, 0.35) * h; hy = self.rc - FOOT_W / 2 - R.uniform(0.9, 1.2)
+        self.hearth = (hx, hy)
+        for i in range(R.randint(3, 4)):
+            q = (hx + R.uniform(-0.45, 0.45), hy + R.uniform(-0.3, 0.3))
+            vs, fs = soft_box((R.uniform(0.45, 0.65), R.uniform(0.4, 0.55), 0.07), place(q[0], q[1], 0.0, R.uniform(0, 3.1),
+                              math.radians(R.uniform(-2, 2)), math.radians(R.uniform(-2, 2))), R, soft=0.2, wob=0.012, bulge=0.004, cuts=0)
+            g.add(vs, fs, 'core')                        # the dark tint + full soot in the wear
+        for i in range(7):
+            ang = math.pi * (0.1 + 0.8 * i / 6)
+            q = (hx + math.cos(ang) * 0.9, hy - math.sin(ang) * 0.65 + 0.25)
+            sz = R.uniform(0.24, 0.34)
+            vs, fs = soft_box((sz * 1.3, sz, sz * 0.8), place(q[0], q[1], sz * 0.3, R.uniform(0, 3.1), math.radians(R.uniform(-10, 10)), 0), R,
+                              soft=0.3, wob=0.02, bulge=0.01, cuts=0)
+            g.add(vs, fs, 'stone_dk')
+        for i in range(R.randint(3, 5)):                 # fallen blocks
+            ang = R.uniform(0, 6.28); r_ = R.uniform(0.3, 0.75) * (h - 1.0)
+            x, y = math.cos(ang) * r_, math.sin(ang) * r_
+            if abs(x - hx) < 1.0 and abs(y - hy) < 0.8:
+                continue
+            sz = R.uniform(0.3, 0.45)
+            vs, fs = soft_box((sz * 1.5, sz, sz * 0.7), place(x, y, sz * 0.25, R.uniform(0, 3.1), math.radians(R.uniform(-15, 15)),
+                              math.radians(R.uniform(-15, 15))), R, soft=0.15, wob=0.02, bulge=0.01, cuts=1, top_break=0.04)
+            g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
+            if R.random() < 0.6 and sum(1 for pl in self.plants if pl[0] == 'weed') < 2:
+                self.plants.append(('weed', x + R.uniform(-0.3, 0.3), y + R.uniform(-0.3, 0.3), 0.0, R.uniform(0, 6.3), R.uniform(1.5, 1.9)))
 
     def build_doorstep(self):
         R = self.R; g = self.g
@@ -367,7 +481,8 @@ class Ruin:
             n = R.randint(5, 8)
             for i in range(n):
                 side = R.choice([-1, 1, 1])                   # mostly spilled outward
-                q = base + d * R.uniform(-0.45, 0.45) + out * side * R.uniform(0.15, 0.45)
+                reach = 1.1 if side < 0 else 0.45                # inward it runs out across the old floor
+                q = base + d * R.uniform(-0.45, 0.45) + out * side * R.uniform(0.15, reach)
                 q = self.clamp_band(q)
                 if self.near_step(q):
                     continue
@@ -391,7 +506,7 @@ class Ruin:
         """Keep a point inside the square (0.1 m margin) and inside the outer 1 m band."""
         lim = self.h - 0.12
         x = max(-lim, min(lim, q.x)); y = max(-lim, min(lim, q.y))
-        inner = self.h - 1.0
+        inner = self.h - 1.8
         if abs(x) < inner and abs(y) < inner:          # pushed into the clear interior: move it out to the band
             if abs(x) > abs(y):
                 x = math.copysign(inner + 0.05, x)
@@ -423,11 +538,10 @@ class Ruin:
         k = R.choice([1, 2, 3])
         a, b, d, out = self.side_frame(k)
         L_ = (b - a).length
-        ln = min(R.uniform(1.6, 2.6), L_ * 0.5)
+        ln = min(R.uniform(2.0, 3.0), L_ * 0.5)
         t = R.uniform(ln / 2 + 0.4, L_ - ln / 2 - 0.4)
-        p = a + d * t + out * R.uniform(0.25, 0.4)
-        p = self.clamp_band(p)
-        yaw = math.atan2(d.y, d.x) + math.radians(R.uniform(-8, 8))
+        p = a + d * t - out * R.uniform(1.0, 1.6)        # fell inward across the old floor
+        yaw = math.atan2(d.y, d.x) + math.radians(R.uniform(20, 40) * R.choice([-1, 1]))
         vs, fs = soft_box((ln, 0.24, 0.20), place(p.x, p.y, 0.07, yaw, math.radians(R.uniform(-4, 4)), math.radians(R.uniform(-3, 3))), R,
                           soft=0.12, wob=0.02, bulge=0.0, cuts=1)
         # rotted ends: pull the end verts down and in
@@ -485,6 +599,12 @@ class Ruin:
             q = a + d * t + (Vector() if on_top else -out * (FOOT_W / 2 + 0.08))
             z = self.top_at(q) if on_top else 0.0
             self.plants.append(('moss', q.x, q.y, z, math.atan2(d.y, d.x), R.uniform(1.4, 1.8)))
+        for (x, y, _) in self.moss_spots:                 # a cushion on each stub top, grass at its foot
+            q = Vector((x, y, 0.0))
+            self.plants.append(('moss', x, y, self.top_at(q), R.uniform(0, 6.3), R.uniform(1.5, 1.9)))
+            self.plants.append(('grass', x * 0.9, y * 0.9, 0.0, R.uniform(0, 6.3), R.uniform(1.4, 1.7)))
+        hx, hy = self.hearth                               # weeds through the old hearth kerb
+        self.plants.append(('weed', hx + 0.5, hy - 0.4, 0.0, R.uniform(0, 6.3), R.uniform(1.6, 2.0)))
 
     def top_at(self, q):
         """Highest stone vertex within 0.2 m of q (moss sits on what is really there)."""
@@ -542,14 +662,17 @@ class Ruin:
             r = max(r, min(0.95, 0.55 + 0.9 * p.z + 0.25 * nz))
         if slot == 'core':
             r = max(r, 0.5)
+            hx, hy = self.hearth
+            if abs(p.x - hx) < 0.8 and abs(p.y - hy) < 0.6:
+                r = max(r, 0.8 + 0.15 * nz)          # the hearth flags: soot
         # G: moss on the shaded back side (+Y) and in a broken patch on tops everywhere
         back = max(0.0, (p.y - (self.h - 1.2)) / 1.0)
         gm = 0.0
         if n.z > 0.45:
             gm = max(gm, min(1.0, back) * (0.8 + 0.3 * nz))
             gm = max(gm, min(1.0, 0.45 + 0.9 * noise.noise(p * 1.4 + self.nofs + Vector((5.0, 0.0, 0.0)))))
-        if n.y > 0.4 and p.z < 0.35:                      # the north-facing (back) faces of every stone
-            gm = max(gm, 0.55 * n.y + 0.2 * nz)
+        if n.y > 0.4:                                     # the north-facing (back) faces of every stone and stub
+            gm = max(gm, 0.6 * n.y + 0.25 * nz)
         if slot == 'oak':
             gm *= 0.4
         # B: polish in the threshold and step dips (feet went in and out for years)
@@ -598,7 +721,7 @@ def build_foliage(ruin, lib, coll):
         src = R.choice(lib[kind])
         o = src.copy(); o.data = src.data.copy(); coll.objects.link(o)
         top = max(c[2] for c in src.bound_box) * s
-        sz = s * min(1.0, (MAX_Z - 0.02 - z) / top) if top > 0 else s     # nothing over the contract height
+        sz = s * min(1.0, (FOL_MAX - z) / top) if top > 0 else s     # nothing over the foliage cap
         o.matrix_world = Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Diagonal((s, s, sz, 1.0))
         bb = [o.matrix_world @ Vector(c) for c in o.bound_box]
         lim = ruin.h - 0.03
@@ -634,7 +757,7 @@ def footprint_box(S, coll):
 def build_variant(name, lib):
     coll = bpy.data.collections.new(name); bpy.context.scene.collection.children.link(coll)
     rn = Ruin(name)
-    rn.build_footing(); rn.build_quoins(); rn.build_doorstep(); rn.build_wood(); rn.build_rubble(); rn.plan_plants()
+    rn.build_standing(); rn.build_footing(); rn.build_quoins(); rn.build_doorstep(); rn.build_interior(); rn.build_wood(); rn.build_rubble(); rn.plan_plants()
     foot = rn.to_object(coll)
     fol = build_foliage(rn, lib, coll)
     for c in fol.users_collection:
