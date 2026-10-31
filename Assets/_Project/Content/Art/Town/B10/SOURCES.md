@@ -7,13 +7,16 @@ PC bake 2026-10-30, Blender 5.2.2 (OptiX); round 3 PC re-bake 2026-10-30 from fo
 `blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_dry_fountain.py -- --out <scratch> --stage bake --res 4096 --export`
 (DryFountain bakes at 4096, BannerPole at half: 2048), then per piece
 `python Art/Blender/tools/sc_pack_unity.py --to-orm <scratch>/props/tex <Name> <this folder>/<Name>`.
+**Texture cap 2048 px (user, 2026-10-30: the game targets 1440p, bake nothing above 2048).** The round-7 DryFountain bake
+ran at 4096 and was downsampled to 2048 (Lanczos for BaseColor/ORM; the normal map filtered as vectors and
+renormalised). Future bakes: `--res 2048` (the pole then bakes at 1024 unless the generator's half rule changes).
 Maps: `_BaseColor` sRGB, `_Normal` tangent space (OpenGL Y+), `_ORM` R occlusion, G roughness, B metallic (linear).
 FBX: one mesh, one material, UV0 = the bake UV (the only UV set); -Z forward, Y up, metres, scale 1, transforms baked.
 
 ## DryFountain (`DryFountain/`)
 - `DryFountain.fbx`: 48,725 tris (round 7; 48,713 after FBX re-import triangulation), sandstone basin r 1.70 m (footing r 1.74), coping crown 0.555 m, central column with the beast spout; silt and leaves in the bowl.
 - Pivot: ground centre of the basin (Unity placement (0, 0, 0), rotation 0; the beast faces the cameras).
-- `DryFountain_BaseColor/_Normal/_ORM.png` 4096 px. No metal (ORM B = 0).
+- `DryFountain_BaseColor/_Normal/_ORM.png` 2048 px (downsampled from the 4096 bake). No metal (ORM B = 0).
 - Colliders (builder): cylinder r 1.70 h 0.55 for the basin plus a capsule on the column.
 
 ## BannerPole (`BannerPole/`)
