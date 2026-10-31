@@ -94,5 +94,26 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(Mathf.PI * 2f / 2f, umax, 1e-3f, "half circumference / tile");
             Assert.AreEqual(3f, vmax, 1e-4f, "6 m length / 2 m tile");
         }
+
+        [Test]
+        public void GroinVault_CrownCornersAndDownwardFaces()
+        {
+            Mesh mesh = LookTestMeshes.GroinVault(2f, 2.5f, 15, 2f);   // odd segments round up to 16
+            Vector3[] v = mesh.vertices; Vector3[] nr = mesh.normals; int[] t = mesh.triangles;
+            Assert.AreEqual(16 * 16 * 6, t.Length);
+            float crown = float.MinValue; foreach (Vector3 p in v) crown = Mathf.Max(crown, p.y);
+            Assert.AreEqual(2.5f, crown, 1e-4f, "crown = rise");
+            foreach (Vector3 p in v)
+            {
+                if (Mathf.Abs(Mathf.Abs(p.x) - 2f) < 1e-4f && Mathf.Abs(Mathf.Abs(p.z) - 2f) < 1e-4f) Assert.AreEqual(0f, p.y, 1e-4f, "corners spring at 0");
+                if (Mathf.Abs(p.x) < 1e-4f && Mathf.Abs(Mathf.Abs(p.z) - 2f) < 1e-4f) Assert.AreEqual(2.5f, p.y, 1e-4f, "edge midpoints are arch crowns (open to the next bay)");
+            }
+            for (int i = 0; i < t.Length; i += 3)
+            {
+                Vector3 c = Vector3.Cross(v[t[i + 1]] - v[t[i]], v[t[i + 2]] - v[t[i]]);
+                Assert.Less(c.y, 1e-6f, "front faces look down");
+                Assert.Less(nr[t[i]].y, 1e-4f, "normals point down or sideways");
+            }
+        }
     }
 }

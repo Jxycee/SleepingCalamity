@@ -7,10 +7,10 @@ namespace SleepingCalamity.Presentation
     [ExecuteAlways, DisallowMultipleComponent, RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public sealed class LookTestGeometry : MonoBehaviour
     {
-        public enum Shape { Box, TrimBox, VaultInterior, Cone }
+        public enum Shape { Box, TrimBox, VaultInterior, Cone, GroinVault }
 
         [SerializeField] Shape m_Shape = Shape.Box;
-        [SerializeField] Vector3 m_Size = Vector3.one;     // Box: size in metres. VaultInterior: x = radius, z = length. Cone: x = far radius, z = length.
+        [SerializeField] Vector3 m_Size = Vector3.one;     // Box: size in metres. VaultInterior: x = radius, z = length. Cone: x = far radius, z = length. GroinVault: x = half span, y = rise.
         [SerializeField] float m_TileMetres = 2f;
         [SerializeField] int m_Segments = 24;
         [SerializeField] bool m_Collider;
@@ -38,6 +38,7 @@ namespace SleepingCalamity.Presentation
             {
                 case Shape.VaultInterior: _mesh = LookTestMeshes.VaultInterior(m_Size.x, m_Size.z, m_Segments, m_TileMetres); break;
                 case Shape.Cone: _mesh = LookTestMeshes.Cone(m_Size.x, m_Size.z, m_Segments); break;
+                case Shape.GroinVault: _mesh = LookTestMeshes.GroinVault(m_Size.x, m_Size.y, m_Segments, m_TileMetres); break;
                 case Shape.TrimBox: _mesh = LookTestMeshes.Box(m_Size, m_TileMetres, true); break;
                 default: _mesh = LookTestMeshes.Box(m_Size, m_TileMetres, false); break;
             }
