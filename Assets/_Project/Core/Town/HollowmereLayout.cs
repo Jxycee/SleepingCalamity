@@ -315,7 +315,7 @@ namespace SleepingCalamity.Core
         };
 
         // ------------------------------------------------------------------------------------------------ the rebuilt preset (ring 1 assignment; rings 2-3 homes)
-        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden }
+        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Smithy, Schoolhouse }
         static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing1 =
         {
             ("F01", BuildingKind.ApprovedFacade), ("F02", BuildingKind.Bakery), ("F09", BuildingKind.Inn),
@@ -323,10 +323,13 @@ namespace SleepingCalamity.Core
             ("F03", BuildingKind.Empty), ("F06", BuildingKind.Empty), ("F10", BuildingKind.Empty),
         };
         static readonly string[] RebuiltGardens = { "R2_07", "R2_18", "R2_22", "R3_02" };   // left as allotments in the rebuilt massing
+        // Kit-ready shops (design 6, queue Q2) shown on ring-2 M lots in the rebuilt preset; any free M lot would take them in play.
+        static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing2 = { ("R2_01", BuildingKind.Smithy), ("R2_03", BuildingKind.Schoolhouse) };
 
         public static BuildingKind RebuiltBuilding(string foundationId)
         {
             foreach (var r in RebuiltRing1) if (r.Foundation == foundationId) return r.Kind;
+            foreach (var r in RebuiltRing2) if (r.Foundation == foundationId) return r.Kind;
             if (Array.IndexOf(RebuiltGardens, foundationId) >= 0) return BuildingKind.Garden;
             return foundationId.StartsWith("F", StringComparison.Ordinal) ? BuildingKind.Empty : BuildingKind.Home;
         }

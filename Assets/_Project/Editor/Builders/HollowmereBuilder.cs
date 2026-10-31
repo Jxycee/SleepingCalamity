@@ -7,7 +7,7 @@
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
 // BeautyCornerBuilder.PlaceRow at their corner positions; the three stalls are the Wave 1 Ring1/Stalls art (ruined or rebuilt state), else the B8 stall; the B4 bell tower when its folder exists;
 // the heroes' home from Ring1/HeroesHome (HeroesHomeArt). Everything else is greybox on the LookTest materials, except the buildings whose final export is in
-// (HollowmereArt: the bakery; HollowmereInnArt: the inn). Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
+// (HollowmereArt: the bakery, smithy, schoolhouse and mill; HollowmereInnArt: the inn). Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
 // approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Ruins: every empty lot shows its ruin kit variant (RuinVariant, RuinTurn); a placed building or garden switches it off.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
@@ -327,6 +327,10 @@ namespace SleepingCalamity.EditorTools
                     break;
                 case HollowmereLayout.BuildingKind.Inn when HollowmereInnArt.TryPlaceInn(g, f, 0.25f):   // on the footing slab's top
                     break;
+                case HollowmereLayout.BuildingKind.Smithy when HollowmereArt.TryPlaceBuilding(HollowmereArt.Smithy, g, f, 0.25f):
+                    break;
+                case HollowmereLayout.BuildingKind.Schoolhouse when HollowmereArt.TryPlaceBuilding(HollowmereArt.Schoolhouse, g, f, 0.25f):
+                    break;
                 default:
                     Building(g, f, kind);
                     break;
@@ -587,6 +591,7 @@ namespace SleepingCalamity.EditorTools
                     }
                     break;
                 case LandmarkKind.Mill:
+                    if (HollowmereArt.TryPlaceMill(g, rebuilt)) break;   // Q2 art (sc_mill.py): Shell when ruined, restored Frame + wheel and door when rebuilt
                     if (rebuilt)
                     {
                         LookTestBuilder.Box(g, "Walls", new Vector3(0f, 3f, 0f), new Vector3(sx, 6f, sz), stone, default, 2f);

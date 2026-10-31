@@ -279,6 +279,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Rebuilt_KitReadyShops_StandOnRing2MediumLots()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            foreach (var kind in new[] { HollowmereLayout.BuildingKind.Smithy, HollowmereLayout.BuildingKind.Schoolhouse })
+            {
+                var lots = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == kind).ToList();
+                Assert.AreEqual(1, lots.Count, kind + " stands on exactly one lot");
+                Assert.AreEqual(2, lots[0].Ring, kind + " is a ring-2 shop");
+                Assert.AreEqual(FoundationSize.M, lots[0].Size, kind + " needs an M lot");
+            }
+        }
+
+        [Test]
         public void Footprint_SegmentTest()
         {
             var fp = new Footprint(new TownPoint(0f, 0f), 4f, 2f, 30f);
