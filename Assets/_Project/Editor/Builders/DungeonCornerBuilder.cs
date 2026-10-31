@@ -101,6 +101,8 @@ namespace SleepingCalamity.EditorTools
             Candles(set, lighting, own);
             Lights(lighting, own);
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 2.0f, 4f), new Vector3(6f, 4.6f, 9f));
+            // A cellar reflects little: the baked probe sees the HDR hatch and lanterns, and at full strength it washed bevel speculars white.
+            lighting.Find("ReflectionProbe").GetComponent<ReflectionProbe>().intensity = 0.35f;
             LookTestBuilder.AddVolume(lighting, ProfileName);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
@@ -144,9 +146,9 @@ namespace SleepingCalamity.EditorTools
             flame.SetColor("_EmissionColor", new Color(3.0f, 1.9f, 0.7f)); flame.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; d["flame"] = flame;
             Shader cone = Shader.Find("SleepingCalamity/LightCone") ?? throw new InvalidOperationException("Shader not found: SleepingCalamity/LightCone");
             Material shaft = LookTestBuilder.Ensure(MaterialsFolder + "/M_DC_DaylightCone.mat", cone);
-            shaft.SetColor("_Color", new Color(0.86f, 0.88f, 0.95f)); shaft.SetFloat("_Intensity", 0.05f); shaft.renderQueue = 3100; d["shaft"] = shaft;
+            shaft.SetColor("_Color", new Color(0.86f, 0.88f, 0.95f)); shaft.SetFloat("_Intensity", 0.12f); shaft.renderQueue = 3100; d["shaft"] = shaft;
             Material lampCone = LookTestBuilder.Ensure(MaterialsFolder + "/M_DC_LampCone.mat", cone);
-            lampCone.SetColor("_Color", new Color(1.0f, 0.72f, 0.36f)); lampCone.SetFloat("_Intensity", 0.05f); lampCone.renderQueue = 3100; d["lampcone"] = lampCone;
+            lampCone.SetColor("_Color", new Color(1.0f, 0.72f, 0.36f)); lampCone.SetFloat("_Intensity", 0.09f); lampCone.renderQueue = 3100; d["lampcone"] = lampCone;
             Shader pu = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new InvalidOperationException("URP Particles/Unlit not found");
             Material mote = LookTestBuilder.Ensure(MaterialsFolder + "/M_DC_Mote.mat", pu);
             mote.SetFloat("_Surface", 1f); mote.SetFloat("_Blend", 2f); mote.SetFloat("_SrcBlend", 1f); mote.SetFloat("_DstBlend", 1f); mote.SetFloat("_SrcBlendAlpha", 1f); mote.SetFloat("_DstBlendAlpha", 1f);
@@ -209,15 +211,15 @@ namespace SleepingCalamity.EditorTools
         {
             LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
             Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.1f); c.contrast.Override(26f); c.saturation.Override(-6f);
-            ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(1.0f, 0.94f, 0.94f, 0f));
-            WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(0f);
+            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(0.35f); c.contrast.Override(48f); c.saturation.Override(-22f);
+            ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.86f, 0.82f, 0.80f, 0f));   // grey-brown shadow fill, pushed down
+            WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(-3f); w.tint.Override(12f);
             LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(1.0f, 0.97f, 0.97f, 0.0f));
-            Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.28f); v.smoothness.Override(0.5f);
+            Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.34f); v.smoothness.Override(0.5f);
         });
 
         // --------------------------------------------------------------------------------------------- lanterns, candles, lights
-        static readonly Color Gold = new Color(1.0f, 0.74f, 0.38f);
+        static readonly Color Gold = new Color(1.0f, 0.80f, 0.54f);
 
         static void Lanterns(Transform set, Transform lighting, Dictionary<string, Material> own)
         {
@@ -249,7 +251,7 @@ namespace SleepingCalamity.EditorTools
                     flame = hook - new Vector3(0, 0.2f, 0);
                 }
                 LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.0f, 10f, LightShadows.Soft);
-                Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 36, own);
+                Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 90, own);
             }
         }
 
@@ -265,21 +267,21 @@ namespace SleepingCalamity.EditorTools
                 LookTestBuilder.Prim(set, "Candle_" + i, PrimitiveType.Cylinder, c + offs[i] + new Vector3(0, hs[i] * 0.5f, 0), new Vector3(0.035f, hs[i] * 0.5f, 0.035f), own["wax"]);
                 LookTestBuilder.Prim(set, "Flame_" + i, PrimitiveType.Sphere, c + offs[i] + new Vector3(0, hs[i] + 0.02f, 0), new Vector3(0.015f, 0.03f, 0.015f), own["flame"]);
             }
-            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.12f), Quaternion.identity, new Color(1.0f, 0.62f, 0.28f), 1.6f, 3.8f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.12f), Quaternion.identity, new Color(1.0f, 0.72f, 0.44f), 1.6f, 3.8f, LightShadows.None);
         }
 
         static void Lights(Transform lighting, Dictionary<string, Material> own)
         {
             LookTestBuilder.AddLight(lighting, "GrateLight", LightType.Point, new Vector3(0.6f, 0.45f, 6.2f), Quaternion.identity, new Color(0.95f, 0.30f, 0.12f), 0.8f, 3.2f, LightShadows.None);
             // A warm pool on the larder shelves and the barrels (a candle on the shelf, in effect).
-            LookTestBuilder.AddLight(lighting, "LarderLight", LightType.Point, new Vector3(-1.75f, 1.45f, 5.0f), Quaternion.identity, new Color(1.0f, 0.68f, 0.34f), 2.6f, 5.5f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "LarderLight", LightType.Point, new Vector3(-1.75f, 1.45f, 5.0f), Quaternion.identity, new Color(1.0f, 0.76f, 0.52f), 2.6f, 5.5f, LightShadows.None);
             // Daylight shaft from the coal hatch: the CV_Daylight quad centre is (2.5 cos 21, 1.6 + 2.5 sin 21, 5.5) = (2.33, 2.50, 5.5); start just inside it.
             Vector3 hatch = new Vector3(2.27f, 2.52f, 5.5f), dir = new Vector3(-0.55f, -0.83f, 0.0f).normalized;
             Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
             Light spot = LookTestBuilder.AddLight(lighting, "DaylightShaft", LightType.Spot, hatch, rot, new Color(0.86f, 0.89f, 0.96f), 6f, 6.5f, LightShadows.Soft);
             spot.spotAngle = 16f; spot.innerSpotAngle = 8f;
             LookTestBuilder.Shape(lighting, "DaylightCone", LookTestGeometry.Shape.Cone, hatch, new Vector3(0.7f, 0f, 3.6f), own["shaft"], rot.eulerAngles, 2f, 16, false);
-            Motes(lighting, "Motes_Shaft", hatch + dir * 1.8f, new Vector3(1.0f, 1.0f, 1.8f), 28, own, rot);
+            Motes(lighting, "Motes_Shaft", hatch + dir * 2.2f, new Vector3(0.9f, 0.9f, 3.2f), 220, own, rot);
         }
 
         // Warm dust motes: a slow box emitter, prewarmed (the capture also simulates a few seconds so the edit-mode render shows them).
@@ -287,8 +289,8 @@ namespace SleepingCalamity.EditorTools
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = pos; go.transform.localRotation = rot ?? Quaternion.identity;
             var ps = go.AddComponent<ParticleSystem>();
-            var main = ps.main; main.loop = true; main.prewarm = true; main.startLifetime = 8f; main.startSpeed = 0.02f; main.startSize = 0.012f; main.maxParticles = count;
-            main.startColor = new Color(1.0f, 0.78f, 0.45f, 0.8f); main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var main = ps.main; main.loop = true; main.prewarm = true; main.startLifetime = 8f; main.startSpeed = 0.02f; main.startSize = new ParticleSystem.MinMaxCurve(0.010f, 0.022f); main.maxParticles = count;
+            main.startColor = new Color(1.0f, 0.78f, 0.45f, 1.0f); main.simulationSpace = ParticleSystemSimulationSpace.World;
             var em = ps.emission; em.rateOverTime = count / 8f;
             var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = box;
             var vel = ps.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World;

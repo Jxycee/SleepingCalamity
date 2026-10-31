@@ -89,7 +89,7 @@ def flat(name, col, rough):
 EXTRA = {
     'brick': lambda: FK.tile_mat('CV_Brick', 'B2_cellar/old_brick', tint=(0.98, 1.04, 1.0), normal=1.2),
     'vault': lambda: FK.tile_mat('CV_VaultStone', 'B2_cellar/vault_stone', tint=(0.93, 0.91, 0.88), normal=1.3),
-    'lime': lambda: FK.tile_mat('CV_Limewash', 'B2_cellar/limewash', tint=(1.06, 1.0, 0.94), normal=0.8),
+    'lime': lambda: FK.tile_mat('CV_Limewash', 'B2_cellar/limewash', tint=(1.06, 1.0, 0.94), normal=0.45),
     'flag': lambda: FK.tile_mat('CV_Flagstone', 'B2_cellar/flagstone', tint=(1.0, 0.95, 0.9), normal=1.2),
     'barrel': lambda: FK.tile_mat('CV_BarrelOak', 'B2_cellar/barrel_oak', tint=(1.1, 1.0, 0.9), normal=1.2),
     'soot': lambda: FK.tile_mat('CV_Soot', 'B2_cellar/soot_coal', tint=(1.1, 1.05, 1.0), rough_add=0.3, normal=1.3),
@@ -235,7 +235,7 @@ def wall_profile(r=R_OUT, segs=24):
     pts.append((-r, SPRING))
     return pts
 
-def wall_body(pc, cutters, y0=-0.5, y1=0.0, back_key=None):
+def wall_body(pc, cutters, y0=-0.5, y1=0.0, back_key=None, uvfix=None):
     """Brick wall body of the vault section with arched cutters (boolean), chamfered rim; returns after merging into pc.
     Recess faces facing +y inside a cutter get limewash, the rest brick."""
     bm = prism_bm(wall_profile(), y0, y1)
@@ -260,6 +260,9 @@ def wall_body(pc, cutters, y0=-0.5, y1=0.0, back_key=None):
     out.normal_update()
     uvl = out.loops.layers.uv.new('UVMap')
     FK._uv_project(out.faces, uvl, Matrix.Identity(4), None, (0, 0))
+    if uvfix:
+        for f in out.faces:
+            uvfix(f, uvl)
     def key(f):
         c = f.calc_center_median()
         if f.normal.y > 0.9:
@@ -393,7 +396,21 @@ def p_niche_wall():
     wins = windows(R, [(0.1, 0.5, 1), (3.1, 3.5, 2)], avoid=zone)
     wins += windows(R, [(0.3, 2.9, 5)], avoid=zone + wins, xs=[(-2.12, -1.98), (1.98, 2.12)], wr=(0.36, 0.5))
     cutters += [(blob(w, R), -0.045, 0.2) for w in wins]
-    wall_body(pc, cutters, -0.5, 0.0)
+    def niche_uv(f, uvl):
+        # the arch soffit of a niche: arc-length u (metres / TILE) and depth v, so the plaster is one continuous 2 m/tile surface
+        # instead of per-facet planar projections (which smear where the dominant axis flips)
+        if abs(f.normal.y) > 0.6:
+            return
+        c = f.calc_center_median()
+        for z0 in NICHE_Z:
+            zs = z0 + NICHE_H - NICHE_W / 2
+            for cx in NICHE_X:
+                if abs(c.x - cx) < NICHE_W / 2 + 0.02 and zs - 0.02 <= c.z <= zs + NICHE_W / 2 + 0.02 and -NICHE_D - 0.01 <= c.y <= 0.0:
+                    for l in f.loops:
+                        a = math.atan2(l.vert.co.z - zs, l.vert.co.x - cx)
+                        l[uvl].uv = (a * (NICHE_W / 2) / FK.TILE + 0.37 * z0, l.vert.co.y / FK.TILE)
+                    return
+    wall_body(pc, cutters, -0.5, 0.0, uvfix=niche_uv)
     # sills (vault stone) project in front of each niche; brick-red arch rings of voussoirs around the heads
     for ri, z0 in enumerate(NICHE_Z):
         for ci, cx in enumerate(NICHE_X):
@@ -404,7 +421,8 @@ def p_niche_wall():
                 am = 180 / n * (i + 0.5)
                 tang = 2 * (NICHE_W / 2) * math.tan(math.radians(180 / n / 2)) * 1.02
                 # ring stops at r 0.46 + 0.12: 0.14 m of plain wall (a pier) stays between neighbouring rings
-                arc_stone(pc, 'brick', cx, zs, am, NICHE_W / 2, NICHE_W / 2 + 0.12, tang, 0.025, 0.07, cham=0.015, R=R, tilt=R.uniform(-1, 1), wob=0.003)
+                # seated: inner radius 0.02 inside the niche opening, 0.07 m embedded into the wall face (y -0.07..0.05), tangential 1.07 so joints close
+                arc_stone(pc, 'brick', cx, zs, am, NICHE_W / 2 - 0.02, NICHE_W / 2 + 0.12, tang * 1.05, -0.01, 0.12, cham=0.012, R=R, tilt=R.uniform(-0.3, 0.3), wob=0.0015)
     # (the render windows are part of the wall body cutters above)
     # bottles lying in the niches (neck out, y -0.36 .. -0.04)
     for ri, z0 in enumerate(NICHE_Z):
