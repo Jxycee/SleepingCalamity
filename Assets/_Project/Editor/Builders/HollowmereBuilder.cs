@@ -6,8 +6,8 @@
 // the approved facade on F01, three lots left empty; rings 2-3 as home massing with a few gardens). Each building block faces its lot's default door side.
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
 // BeautyCornerBuilder.PlaceRow at their corner positions; the B8 stall is reused for stalls 2 and 3; the B4 bell tower when its folder exists. Everything
-// else is greybox on the LookTest materials. Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
-// approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
+// else is greybox on the LookTest materials, except the buildings whose final export is in (HollowmereArt: the bakery). Light, grade, sky and renderer: the
+// beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
 using System;
 using System.Collections.Generic;
@@ -43,6 +43,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_LakeShore", new Vector3(-26f, 1.7f, -88f), new Vector3(-2f, 3f, -20f), 50f),       // from the lake shore by R3_01 up at the hill town and the keep
             ("Cap_HM_MarketStreet", new Vector3(0.6f, 1.65f, -19.8f), new Vector3(-0.5f, -6.5f, -58f), 55f), // the square's south edge down Market Street to the second terrace and the wall
             ("Cap_HM_KeepStairs", new Vector3(-31f, 1.7f, 13.8f), new Vector3(-20f, 3.0f, 19.6f), 58f),  // along the Wall Ginnel: terrace step, west stair, keep wall
+            ("Cap_HM_Bakery", new Vector3(-6.2f, 1.65f, 2.6f), new Vector3(-12.5f, 3.4f, 12.2f), 55f),       // from the square at the bakery front on F02 (oven side on the right)
             ("Cap_HM_KeepWall", new Vector3(-2f, 1.65f, -3f), new Vector3(2f, 3.2f, 19.6f), 60f),          // from the fountain: keep wall, buttresses, planters, stairs (Ruined shows it whole)
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
@@ -310,6 +311,8 @@ namespace SleepingCalamity.EditorTools
                     break;   // the corner's Facade row stands here (Corner group of the rebuilt root)
                 case HollowmereLayout.BuildingKind.Garden:
                     Garden(g, f);
+                    break;
+                case HollowmereLayout.BuildingKind.Bakery when HollowmereArt.TryPlaceBakery(g, f, 0.25f):   // on the footing slab's top
                     break;
                 default:
                     Building(g, f, kind);
