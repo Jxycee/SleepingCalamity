@@ -39,7 +39,9 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
 plus the plinth and step (chosen at placement).
 
-Status (2026-10-31, cloud): round 11 from the Unity corner review: plaster smooth-shaded and welded (the flat
+Status (2026-10-31, cloud): round 12 (TotK study): plinth is two courses of a few big pillowy stones over a dark
+recessed joint core, shade-damp band under the deep eave, ragged lifted eave course. Self-review 30/40.
+Round 11 from the Unity corner review: plaster smooth-shaded and welded (the flat
 cells showed as dotted vertical seams in Unity), grime up to ~0.85 at the foot and a sheltered band under the jetty,
 timbers 7 cm proud and a shade darker (OAK_TINT) so the frame reads at the wide camera. Self-review 29.5/40.
 Earlier: review 28.5/40 at round 10 (calibrated rubric, brief 3). First review 26/40 (round 6);
@@ -201,6 +203,7 @@ def M(key):
         'oak': lambda: tile_mat('FK_Oak', 'B1_town/oak_timber', tint=OAK_TINT, normal=1.2),
         'oak_lt': lambda: tile_mat('FK_OakDoor', 'B1_town/oak_timber', tint=(1.35, 1.25, 1.15)),
         'stone': lambda: tile_mat('FK_Sandstone', 'B1_town/sandstone'),
+        'mortar': lambda: tile_mat('FK_PlinthJoint', 'B1_town/sandstone', tint=(0.30, 0.28, 0.24)),
         'stone_dk': lambda: tile_mat('FK_ChimneyStone', 'B1_town/sandstone', tint=(0.80, 0.74, 0.68)),
         'roof': lambda: tile_mat('FK_RoofTile', 'B1_town/roof_tile', normal=1.3),
         'shutter': lambda: tile_mat('FK_Shutter', 'B1_town/painted_wood', tint=SHUTTER_TINT),
@@ -241,7 +244,7 @@ def _uv_project(faces, uvl, to_local, long_axis=None, off=(0.0, 0.0), grain_u=Fa
             uu, vv = (p[vax], p[uax]) if grain_u and long_axis is not None else (p[uax], p[vax])
             l[uvl].uv = (uu / TILE + off[0], vv / TILE + off[1])
 
-def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_world=False, bend=None, wob=0.0,
+def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_world=False, bend=None, wob=0.0, segs=1,
             seed=0.0, off=None):
     """Chamfered box of `size` centred at the local origin, then placed by matrix `xf`.
     cuts subdivide each axis (for bends); bend(p_local) -> offset applied before placing."""
@@ -259,7 +262,7 @@ def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_wor
                 bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no)
     if cham > 0:
         edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0) > 0.5]
-        bmesh.ops.bevel(bm, geom=edges, offset=cham, segments=1, affect='EDGES', profile=0.5)
+        bmesh.ops.bevel(bm, geom=edges, offset=cham, segments=segs, affect='EDGES', profile=0.5)
     if bend or wob:
         for v in bm.verts:
             d = bend(v.co.copy()) if bend else Vector()
@@ -382,15 +385,42 @@ def wall_panel(pc, mat, plane, x0, x1, z0, z1, holes=(), bulge=0.012, cell=0.125
     _merge(pc, bm, mat)
 
 # ----------------------------------------------------------------------------- kit pieces
+def plinth_run(pc, a, b, face, seed):
+    """Two courses of big chamfered stones along one plinth face, joints broken, each stone its own size and tilt."""
+    R = rng('plinth%s%f' % (face, seed))
+    zc = [(0.0, 0.31), (0.31, PLINTH)]
+    for ci, (z0, z1) in enumerate(zc):
+        x = a + (R.uniform(0.1, 0.35) if ci else 0.0)
+        while x < b - 0.05:
+            ln = min(R.uniform(0.55, 0.95), b - x)
+            if b - (x + ln) < 0.25:
+                ln = b - x
+            g = 0.035                                     # deep joint
+            h = z1 - z0 - g; dpt = 0.40 + R.uniform(-0.02, 0.03)
+            cz = z0 + g / 2 + h / 2
+            proud = R.uniform(0.0, 0.025)
+            if face == 'front':
+                xf = Matrix.Translation((x + ln / 2, 0.14 - proud, cz))
+                size = (ln - g, dpt, h)
+            else:
+                xf = Matrix.Translation((W - 0.14 + proud, x + ln / 2, cz))
+                size = (dpt, ln - g, h)
+            xf = xf @ Matrix.Rotation(math.radians(R.uniform(-1.2, 1.2)), 4, 'Y' if face == 'front' else 'X')
+            add_box(pc, 'stone', size, xf, cham=0.05, segs=2, cuts=(1, 0, 0) if face == 'front' else (0, 1, 0),
+                    uv_world=True, wob=0.012, seed=R.random() * 90)
+            x += ln
+
 def kit_plinth():
     pc = Piece('Kit_Plinth')
     xd0, xd1 = DOOR[0] - TIM, DOOR[1] + TIM
-    for (a, b) in ((-W - 0.06, xd0), (xd1, W + 0.06)):
-        add_box(pc, 'stone', (b - a, 0.40, PLINTH), Matrix.Translation(((a + b) / 2, 0.14, PLINTH / 2)),
-                cham=0.035, cuts=(int((b - a) / 0.5), 0, 0), uv_world=True, wob=0.008, seed=a)
-    # left return (+X) plinth, full depth
-    add_box(pc, 'stone', (0.40, DEPTH + 0.06, PLINTH), Matrix.Translation((W - 0.14, DEPTH / 2 - 0.03, PLINTH / 2)),
-            cham=0.035, cuts=(0, int(DEPTH / 0.5), 0), uv_world=True, wob=0.008, seed=7.0)
+    # a dark mortar core, recessed, then two courses of a few big pillowy stones laid over it (TotK study, brief 5)
+    for (a, b) in ((-W - 0.02, xd0), (xd1, W + 0.02)):
+        add_box(pc, 'mortar', (b - a, 0.36, PLINTH - 0.02), Matrix.Translation(((a + b) / 2, 0.16, (PLINTH - 0.02) / 2)),
+                cham=0.0, uv_world=True)
+        plinth_run(pc, a, b, 'front', seed=a)
+    add_box(pc, 'mortar', (0.36, DEPTH, PLINTH - 0.02), Matrix.Translation((W - 0.16, DEPTH / 2, (PLINTH - 0.02) / 2)),
+            cham=0.0, uv_world=True)
+    plinth_run(pc, -0.02, DEPTH + 0.02, 'side', seed=7.0)
     # worn threshold step, dished in the middle where feet go
     def dish(p):
         u = max(0.0, 1 - (p.x / 0.55) ** 2); v = max(0.0, 1 - ((p.y + 0.05) / 0.3) ** 2)
@@ -752,7 +782,7 @@ def kit_roof():
         nt = nx * 2                                                  # tile runs of about 21 cm, split
         for i in range(nt):
             xa = X0 + (X1 - X0) * i / nt; xb = X0 + (X1 - X0) * (i + 1) / nt
-            j = R.uniform(-0.012, 0.012)
+            j = R.uniform(-0.012, 0.012) if c else R.uniform(-0.01, 0.045)   # the eave course is ragged, lifted
             a, b = row(xa + 0.002, j), row(xb - 0.002, j + R.uniform(-0.006, 0.006))
             for q in ((a[1], b[1], b[2], a[2]), (a[0], b[0], b[1], a[1])):
                 f = bm.faces.new(q)
@@ -974,6 +1004,9 @@ def write_wear(ob, chimney_top=None):
             # splashback band at the foot: strongest at the cobble line, ragged top
             streak = noise.noise(Vector((p.x * 5.0, p.y * 5.0, p.z * 0.7)))
             r = max(0.0, 1 - p.z / (1.45 + 0.3 * nz + 0.25 * streak)) ** 1.0 * 0.85
+            # shade-damp band under the deep eave on the upper storey
+            if p.z > PLATE0 - 0.75 and p.z < PLATE1 + 0.05 and p.y < YU + 0.15:
+                r = max(r, (p.z - (PLATE0 - 0.75)) / 0.75 * 0.38)
             # sheltered dust and soot under the jetty: ground-storey front, girt, joists and soffit
             if 2.2 < p.z < JOIST1 + 0.02 and p.y > YU - 0.12 and p.x < W - 0.06:
                 r = max(r, min(0.6, (p.z - 2.2) / 0.85 * 0.6) * (0.85 + 0.15 * streak))
