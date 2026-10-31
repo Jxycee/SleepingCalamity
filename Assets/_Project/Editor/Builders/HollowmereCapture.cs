@@ -15,7 +15,8 @@ namespace SleepingCalamity.EditorTools
     public static class HollowmereCapture
     {
         // The design 7 play positions: square entry from the heroes' home, the fountain, the tithe gate, a lane mouth.
-        static readonly string[] PlayPositionCameras = { "Cap_HM_HomeDoor", "Cap_HM_Fountain", "Cap_HM_TitheGate", "Cap_HM_LaneMouth" };
+        static readonly string[] PlayPositionCameras = { "Cap_HM_HomeDoor", "Cap_HM_Fountain", "Cap_HM_TitheGate", "Cap_HM_LaneMouth",
+            "Cap_HM_LakeShore", "Cap_HM_LakeJetty", "Cap_HM_Ravine", "Cap_HM_MillLane", "Cap_HM_Mill" };   // + the water cameras (Q10)
 
         [MenuItem("SleepingCalamity/Art/Capture Hollowmere")]
         public static void CaptureMenu()
