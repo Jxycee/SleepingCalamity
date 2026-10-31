@@ -52,7 +52,7 @@ namespace SleepingCalamity.EditorTools
             return JsonUtility.FromJson<Placements>(File.ReadAllText(BuilderUtil.Abs(path)));
         }
 
-        static void Assign(GameObject root, Material m, bool shadows = true)
+        internal static void Assign(GameObject root, Material m, bool shadows = true)
         {
             foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
             {
@@ -97,8 +97,31 @@ namespace SleepingCalamity.EditorTools
             return true;
         }
 
+        // The corner's Sett_<v> prefabs (same family, same instanced material) for any variant list, plus the CobbleBed material: the Hollowmere square ground reuses them.
+        // Null when the B6 Cobbles art is missing.
+        internal static Dictionary<string, GameObject> SettPrefabs(IEnumerable<string> variants, out Material bed)
+        {
+            bed = null;
+            string folder = BeautyCornerArt.FindFolder("B6", "Cobbles");
+            if (folder == null) return null;
+            GameObject family = BeautyCornerArt.LoadModel(folder, "CobbleFamily.fbx");
+            if (family == null) return null;
+            Material cobble = BeautyCornerArt.MaterialFromSet(folder, "Cobble", "PlazaCobbles");
+            bed = BeautyCornerArt.MaterialFromSet(folder, "CobbleBed", "PlazaBed");
+            cobble.enableInstancing = true; bed.enableInstancing = true;
+            EditorUtility.SetDirty(cobble); EditorUtility.SetDirty(bed);
+            BuilderUtil.EnsureFolder(PrefabFolder);
+            var prefabs = new Dictionary<string, GameObject>();
+            foreach (string v in variants)
+            {
+                GameObject prefab = SettPrefab(v, family, cobble);
+                if (prefab != null) prefabs[v] = prefab; else Debug.LogWarning("SC HOLLOWMERE square cobbles: no mesh for variant " + v);
+            }
+            return prefabs;
+        }
+
         // Sett_<v>.prefab: LODGroup over LOD0/LOD1 child renderers. Rewritten only when its meshes or material changed (a rewrite renumbers the prefab's file ids).
-        static GameObject SettPrefab(string v, GameObject family, Material mat)
+        internal static GameObject SettPrefab(string v, GameObject family, Material mat)
         {
             Mesh Find(string suffix)
             {

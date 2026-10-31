@@ -57,6 +57,8 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_TownhouseSide", new Vector3(22f, 1.65f, -11f), new Vector3(5f, 5.0f, -27f), 55f),    // three-quarter on F07's front and east side
             ("Cap_HM_Kits", new Vector3(45.5f, 1.65f, 12f), new Vector3(39f, 2f, -1f), 62f),           // from the Ring Lane's north end looking south along the east run at the stone cottage on R2_09 and the workshop on R2_08 (kit families 2 and 4)
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
+            ("Cap_HM_SquareSouth", new Vector3(-6.0f, 1.65f, -17.0f), new Vector3(4f, 1.2f, -6f), 55f),   // benches, planters, the Market Street mouth and the bunting
+            ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -129,6 +131,8 @@ namespace SleepingCalamity.EditorTools
             }
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt); }
+            HollowmereSquare.Build(set, ruined, rebuilt, t);
+            HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");
@@ -181,7 +185,7 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- ground, water, walls, keep
         static void BuildGround(Transform set, TownLayout t)
         {
-            HollowmereTerrain.Build(set, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
+            HollowmereFoliage.TerrainGrass(HollowmereTerrain.Build(set, t), t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
             // The square keeps the approved corner's surround paving (B6 FarCobble with its macro breakup) as a slab over the terrain, so the corner reads as approved.
             Material far = BeautyCornerArt.SurroundGround();
             var sq = LookTestBuilder.Box(set, "SquarePaving", new Vector3((HollowmereLayout.SquareMinX + HollowmereLayout.SquareMaxX) * 0.5f, -0.17f, (HollowmereLayout.SquareMinZ + HollowmereLayout.SquareMaxZ) * 0.5f),
@@ -258,8 +262,6 @@ namespace SleepingCalamity.EditorTools
             {
                 if (!InRun(run, x) || !InRun(run, x - 1f) || !InRun(run, x + 1f)) continue;
                 LookTestBuilder.Box(keep, "Planter" + x, new Vector3(x, kh + 1.05f, kz + 0.2f), new Vector3(1.8f, 0.3f, 0.6f), green, default, 2f);
-                float len = 1.4f + 1.8f * Mathf.Repeat(x * 0.37f, 1f);
-                LookTestBuilder.Box(keep, "Ivy" + x, new Vector3(x + 0.2f, kh + 0.9f - len * 0.5f, kz - 0.63f), new Vector3(1.3f, len, 0.06f), green, default, 2f);
             }
             Stair(keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, stone);
             Stair(keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, stone);

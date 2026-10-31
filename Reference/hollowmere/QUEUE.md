@@ -31,12 +31,12 @@ Claimed: cloud session claude/sharp-goldberg-vpyt8c (bakery, Q2 done), 2026-10-3
 
 ## Q5. Builder churn fix
 Folder: `Reference/hollowmere/churn/`
-Claimed: -
+Claimed: cloud session claude/practical-tesla-lqajeo (square ground + dressing done), 2026-10-31
 Every build rewrites `BeautyCorner_Hollowmere.unity`, flips `M_Pollen` `_SrcBlend`, and rewrites `HeroAnimator.controller` (and its .meta) with no real change, so every session leaves them uncommitted. Make the builders deterministic, so that two `unity.sh build` runs in a row leave `git status` clean, and add an EditMode test or a check script for it. Code only; a `reviewer`-grade self-review before merging.
 
 ## Q6. Garden and allotment decorations
 Folder: `Reference/hollowmere/garden/`
-Claimed: -
+Claimed: cloud session claude/ecstatic-bardeen-pr8wbk (ground tileables + foliage done), 2026-10-31
 The decorations still kit-ready in design section 6: vegetable beds, a trellis, a scarecrow, a water butt, fences and a cold frame, each a small free-grid decoration with a footprint (design 5.3). Contact sheet per batch (B7 style); place a few beside ring 2 homes in Rebuilt.
 
 ## Q7. Cellars room pool, first rooms (M5 authoring)
