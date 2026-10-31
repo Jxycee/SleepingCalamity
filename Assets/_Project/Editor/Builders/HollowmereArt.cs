@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using SleepingCalamity.Core;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace SleepingCalamity.EditorTools
 {
@@ -42,7 +41,7 @@ namespace SleepingCalamity.EditorTools
             obj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);   // the export's door side is local +Z (like the facade): turn it to the lot's -Z
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
-                if (r.name == "FOOTPRINT") { r.enabled = false; r.shadowCastingMode = ShadowCastingMode.Off; continue; }
+                if (r.name == "FOOTPRINT") { r.enabled = false; continue; }
                 var mats = new Material[Mathf.Max(1, r.sharedMaterials.Length)];
                 for (int k = 0; k < mats.Length; k++)
                 {
@@ -52,9 +51,19 @@ namespace SleepingCalamity.EditorTools
                 }
                 r.sharedMaterials = mats;
             }
-            Transform foot = obj.transform.Find("FOOTPRINT") ?? throw new InvalidOperationException("Bakery.fbx has no FOOTPRINT");
-            Bounds b = foot.GetComponent<MeshFilter>().sharedMesh.bounds;
-            Vector3 size = Vector3.Scale(b.size, foot.localScale);
+            Transform foot = null;
+            foreach (Transform t in obj.GetComponentsInChildren<Transform>(true)) if (t.name == "FOOTPRINT") foot = t;
+            MeshFilter fm = foot != null ? foot.GetComponent<MeshFilter>() : null;
+            if (fm == null || fm.sharedMesh == null) throw new InvalidOperationException("Bakery.fbx has no FOOTPRINT mesh");
+            // Its extent in the lot frame (rotation and any FBX unit scale included): the eight bounds corners through the hierarchy.
+            Bounds b = fm.sharedMesh.bounds;
+            float x0 = float.MaxValue, x1 = float.MinValue, z0 = float.MaxValue, z1 = float.MinValue;
+            for (int c = 0; c < 8; c++)
+            {
+                Vector3 p = g.InverseTransformPoint(foot.TransformPoint(new Vector3((c & 1) == 0 ? b.min.x : b.max.x, (c & 2) == 0 ? b.min.y : b.max.y, (c & 4) == 0 ? b.min.z : b.max.z)));
+                x0 = Mathf.Min(x0, p.x); x1 = Mathf.Max(x1, p.x); z0 = Mathf.Min(z0, p.z); z1 = Mathf.Max(z1, p.z);
+            }
+            Vector3 size = new Vector3(x1 - x0, 0f, z1 - z0);
             float max = Foundation.MaxBuilding(f.Size);
             if (size.x > max + 1e-3f || size.z > max + 1e-3f)
                 throw new InvalidOperationException("Bakery FOOTPRINT " + size.x.ToString("0.00") + " x " + size.z.ToString("0.00") + " m is larger than the " + f.Size + " class allows (" + max + " m)");
@@ -84,12 +93,14 @@ namespace SleepingCalamity.EditorTools
             }
             Material interior = LookTestBuilder.Ensure(MaterialsFolder + "/M_BK_Interior.mat", wear);
             interior.SetColor("_BaseColor", new Color(0.035f, 0.025f, 0.018f).gamma); interior.SetFloat("_Smoothness", 0.1f); interior.SetFloat("_Metallic", 0f);
+            interior.SetColor("_Color", interior.GetColor("_BaseColor")); interior.SetShaderPassEnabled("MotionVectors", true);   // same bytes with and without graphics
             EditorUtility.SetDirty(interior); map["BK_Interior"] = interior;
             // The lit oven mouth: URP Lit with an HDR orange emission (the generator's strength 6 read as about x3 here, the corner's exposure is lower).
             Material ember = LookTestBuilder.Ensure(MaterialsFolder + "/M_BK_Ember.mat", Shader.Find("Universal Render Pipeline/Lit"));
             ember.SetColor("_BaseColor", new Color(0.35f, 0.08f, 0.01f).gamma); ember.SetFloat("_Smoothness", 0.2f);
             ember.SetColor("_EmissionColor", new Color(1.0f, 0.36f, 0.06f) * 3f); ember.EnableKeyword("_EMISSION");
             ember.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            ember.SetColor("_Color", ember.GetColor("_BaseColor")); ember.SetShaderPassEnabled("MotionVectors", true);
             EditorUtility.SetDirty(ember); map["BK_Ember"] = ember;
             AssetDatabase.SaveAssets();
             return map;
