@@ -12,7 +12,7 @@ half a fan per 1.0 m row) laid by an occupancy raster, three concentric courses 
 sc_flag_ring.py), a gutter course along the facade foot (z 7.45), small setts filling the leftovers. Heights follow
 the 5 cm dish toward the fountain (sc_plaza_common.dish) plus a slow 6 mm undulation; clustered sunken and tilted
 setts; missing setts (the dirt bed shows, a weed slot, and sometimes the dislodged sett lies beside its hole). Under
-the setts a joint bed mesh (0.2 m grid, UV in 2 m tiles, vertex colour `damp`) (R damp/moss, G worn-path dust) carries a tileable dirt-and-grit set
+the setts a joint bed mesh (0.2 m grid, UV in 2 m tiles, vertex colour `damp`) (R damp/moss, G worn-path dust, A perimeter fade for blending into the surround) carries a tileable dirt-and-grit set
 (CobbleBed, 2 m, 2K) that darkens and greens toward the fountain and the facade foot.
 Wear story: a worn, paler path from the south edge round the fountain to the stall and the facade door; damp,
 mossy joints near the basin and the facade's shaded foot; sunken setts in the low dish around the ring.
@@ -28,8 +28,9 @@ Segmentbogenpflaster, arcs about 2 m wide; joints 1-2 cm filled with grit; foot-
 cobble #817a7b to #b7b0aa with warm lights.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_cobbles.py -- --out <scratch>
-      [--stage look|bake]   look (default): highs instanced with their procedural material, no bake (fast iteration);
-                            bake: highs -> lows -> one baked set, LOD0/LOD1 instanced with the baked game material
+      [--stage look|bake|far]  look (default): highs instanced with their procedural material, no bake (fast iteration);
+                            bake: highs -> lows -> one baked set, LOD0/LOD1 instanced with the baked game material;
+                            far: the 2 m CobbleFar surround tileable only (tex/CobbleFar_*.png) + a check render
       [--res 1024]          family and bed bake resolution (the PC's final bake: --res 2048)
       [--views wide,mid,close,ground] [--rres 960] [--samples 48] [--mood midday|lowsun] [--ring] [--no-render]
       [--export]            write CobbleFamily.fbx and PlazaBed.fbx to --out (PC only; cloud sessions commit the generator)
@@ -53,9 +54,12 @@ Round log (look stage, ground with the flag ring and stand-ins):
      under the crown, darker joint bed, ~1.6x crown relief; patch extended to x -12 (8,673 setts) so the wide
      camera never sees the west seam. Wide-camera ground value spread 19 -> 22 (p10 0.44 -> 0.41).
   r10 (study note, TotK villages): no hard border; setts thin out into sparse sunken stones and dirt over ragged
-     2.5 m (west) and 1.5 m (east, south) bands, with `edge_grass` weed slots for B9; kicked-loose doorstep.
+     edge bands (r12: west 4 m, east/south 2 m, north 2.5 m outside the facade), with `edge_grass` weed slots for B9; kicked-loose doorstep.
   r11 (ref-beside-render sheet vs bc_265 Munich fans): salt-and-pepper granite grain relative to each stone's colour (fine
      noise mottle + feldspar and mica crystals), pale tints capped (k = 1 + 1.1 tint), tilts halved (a laid, nearly flush surface), near-neutral grey, split edges (bevels x0.6), joints 1.1 cm.
+  r12 (Unity batch 3): open edges fade over longer ragged bands incl. the north edge outside the facade; the bed
+     rises flush with the surround at the perimeter (vertex alpha = fade); lighter darks and bed stain for low sun;
+     --stage far bakes the CobbleFar 2 m tileable for the surround ground.
   The `damp` bed vertex colour is not read by the Unity shader yet: the CobbleBed tileable carries base moss alone.
   Parked ideas: docs/PARKING_LOT.md (B6 plaza ground).
 """
@@ -117,7 +121,7 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     big = T.noise(p, scale=2.5, detail=2.0)
     # wide value spread between stones: the only per-stone value cue in Unity
     k = 1.0 + (2.3 if tint < 0 else 1.1) * tint; hue = (1.0 + 0.05 * warm, 1.0 + 0.005 * warm, 1.0 - 0.05 * warm)   # near-neutral grey: the refs aren't beige
-    lo = tuple(c * k * h for c, h in zip((0.175, 0.161, 0.163), hue))          # within one stone: a narrow band, so the stones differ
+    lo = tuple(c * k * h for c, h in zip((0.19, 0.175, 0.177), hue))          # within one stone: a narrow band, so the stones differ
     hi = tuple(c * k * h for c, h in zip((0.295, 0.27, 0.25), hue))
     col = T.ramp(T.math('ADD', T.math('MULTIPLY', mott, 0.75), T.math('MULTIPLY', big, 0.35)),
                  [(0.30, lo), (0.52, tuple((a + b) / 2 for a, b in zip(lo, hi))), (0.72, hi)])
@@ -150,7 +154,7 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     col = T.mix(T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), 0.75), col, dirt)
     # the body below the joint line sits in the grit bed: dirt-stained, matte
     bed = T.smoothstep(T.math('ADD', z, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.012)), -0.003, -0.020)     # dirt stain rises to 3 mm under the crown: joints read wide and dark at 5-10 m
-    col = T.mix(T.math('MULTIPLY', bed, 0.85), col, (0.11, 0.092, 0.072))
+    col = T.mix(T.math('MULTIPLY', bed, 0.85), col, (0.15, 0.13, 0.10))
     # sparse pale lichen dots on the unworn setts, in the micro hollows of the top
     if not worn:
         lv = T.node('ShaderNodeTexVoronoi'); T.set(lv, 'Vector', p); lv.inputs['Scale'].default_value = 22.0
@@ -394,11 +398,18 @@ class Layout:
                     if self.place(v, x, z, base + da, sc, tol=0.16): break
         return self.stones
 
+def edge_dist(x, z):
+    """Metres-in from the nearest open patch edge, each side scaled by its fade band (west 4 m, others 2-2.5 m);
+    the north edge behind the facade footprint is not open."""
+    e = min((x - X0) / 4.0, (X1 - x) / 2.0, (z - Z0) / 2.0)
+    if not (FACADE[0] - 0.3 < x < FACADE[1] + 0.3): e = min(e, (Z1 - z) / 2.5)
+    return e
+
 def edge_thin(x, z, g):
-    """0..1 chance a sett is left out near the patch's west, east and south edges (bands 2.5, 1.5, 1.5 m, ragged by g)."""
-    e = min((x - X0) / 2.5, (X1 - x) / 1.5, (z - Z0) / 1.5)
-    t = 1.0 - P.smoothstep(e + (g - 0.5) * 0.9)
-    return min(1.0, t * 1.15)
+    """0..1 chance a sett is left out near the open edges: a long ragged tail of sparse stones, no line."""
+    e = edge_dist(x, z) + (g - 0.5) * 0.7
+    t = 1.0 - P.smoothstep(e) ** 0.6
+    return min(1.0, t * 1.1)
 
 def heights_and_damage(stones):
     """Uneven heights, clustered sunken and tilted setts, missing setts, loose stones; weed slots for B9."""
@@ -475,7 +486,8 @@ def build_bed():
     for i in range(nx + 1):
         for j in range(nz + 1):
             xu, zu = X0 + i * step, Z0 + j * step
-            y = P.dish(math.hypot(xu, zu)) - 0.034
+            fade = P.smoothstep(min(xu - X0, X1 - xu, zu - Z0, (Z1 - zu) if not (FACADE[0] < xu < FACADE[1]) else 9.0) / 1.0)
+            y = P.dish(math.hypot(xu, zu)) - 0.034 * fade - 0.004      # flush with the surround at the perimeter
             vs[i, j] = bm.verts.new(P.u2b((xu, y, zu)))
     for i in range(nx):
         for j in range(nz):
@@ -486,7 +498,9 @@ def build_bed():
             for lp in f.loops:
                 b = lp.vert.co; xu, zu = -b.x, -b.y
                 lp[uvl].uv = (xu / 2.0, zu / 2.0)
-                d = bed_damp(xu, zu); pw = path_weight(xu, zu); lp[col] = (d * (1 - pw), pw, 0.0, 1.0)
+                d = bed_damp(xu, zu); pw = path_weight(xu, zu)
+                fa = P.smoothstep(min(xu - X0, X1 - xu, zu - Z0, (Z1 - zu) if not (FACADE[0] < xu < FACADE[1]) else 9.0) / 1.5)
+                lp[col] = (d * (1 - pw), pw, 0.0, fa)      # A: 0 at the open perimeter -> blend into the surround ground
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ob = K._obj_from_bm('PlazaBed', bm)
@@ -554,9 +568,97 @@ def ground_cam():
     """A low look at the cobbles south-east of the fountain (not a capture camera: a material check)."""
     P.CAMS_U['ground'] = ((3.2, 0.9, -4.6), (1.8, 0.0, -2.4))
 
+
+# ----------------------------------------------------------------------------- far / surround tileable
+def build_far_tile(highs, period=2.0):
+    """A 2 m x 2 m tileable of the laid cobbles for the surround ground (controller, 2026-10-31): fan courses on a
+    torus (2.0 m fans, 1.0 m rows offset half a fan, so the layout repeats every 2 m both ways), the real highs
+    (decimated to 4k tris) and the joint bed, baked top-down onto a 2 m plane: CobbleFar_{BaseColor,Normal,
+    Roughness,AO}. Returns the bake paths."""
+    r = rng('far'); N = int(period / RES_G); occ = np.zeros((N, N), dtype=bool); placed = []
+    def place(v, x, z, a, sc, tol):
+        L, W = VAR[v][1] * sc, VAR[v][2] * sc; m = JOINT / 2
+        hx = abs(L / 2 * math.cos(a)) + abs(W / 2 * math.sin(a)) + m; hz = abs(L / 2 * math.sin(a)) + abs(W / 2 * math.cos(a)) + m
+        i0, i1 = int(math.floor((x - hx) / RES_G)), int(math.ceil((x + hx) / RES_G))
+        j0, j1 = int(math.floor((z - hz) / RES_G)), int(math.ceil((z + hz) / RES_G))
+        gx = (np.arange(i0, i1) + 0.5)[:, None] * RES_G - x; gz = (np.arange(j0, j1) + 0.5)[None, :] * RES_G - z
+        u = gx * math.cos(a) + gz * math.sin(a); w = -gx * math.sin(a) + gz * math.cos(a)
+        mask = (np.abs(u) < L / 2 + m) & (np.abs(w) < W / 2 + m)
+        ix = np.ix_(np.arange(i0, i1) % N, np.arange(j0, j1) % N)
+        if (occ[ix] & mask).sum() > tol * mask.sum(): return False
+        occ[ix] |= mask; placed.append((v, x % period, z % period, a, sc)); return True
+    FW, FH, RMAX = 2.0, 1.0, 1.45
+    for j in range(2):
+        ox = (FW / 2 if j % 2 else 0.0); oz = j * FH - 0.6
+        Rk = RMAX
+        while Rk > 0.22:
+            a = math.asin(min(0.97, (FW * 0.52) / Rk)); arc = 2 * a * Rk; s_ = r.uniform(0, 0.08)
+            while s_ < arc:
+                v = r.choice(SETTS); sc = r.uniform(0.94, 1.06); L = VAR[v][1] * sc
+                t = math.pi / 2 + a - (s_ + L / 2) / Rk
+                place(v, ox + Rk * math.cos(t), oz + Rk * math.sin(t), t - math.pi / 2 + r.uniform(-0.05, 0.05), sc, 0.07)
+                s_ += L + JOINT * r.uniform(0.8, 1.3)
+            Rk -= 0.14 + JOINT
+    for small, scl in ((False, (0.9, 1.0)), (True, (0.92, 1.04)), (True, (0.72, 0.8))):
+        free = np.argwhere(~occ).tolist(); idx = list(range(0, len(free), 2)); r.shuffle(idx)
+        for t in idx:
+            i, j = free[t]
+            if occ[i, j]: continue
+            v = 'small_a' if small else r.choice(SETTS); sc = r.uniform(*scl); base = r.uniform(-0.3, 0.3)
+            for da in (0.0, math.pi / 2, math.pi / 4, -math.pi / 4):
+                if place(v, (i + 0.5) * RES_G, (j + 0.5) * RES_G, base + da, sc, 0.16): break
+    # geometry: decimated highs, every stone plus its wrapped copies that reach into the tile
+    lows = {}
+    for n in set(p[0] for p in placed):
+        lows[n] = K.dup(highs[n], n + '_far'); K.decimate_to(lows[n], 4000)
+    bm = bmesh.new(); mats = []
+    for v, x, z, a, sc in placed:
+        for dx in (-period, 0.0, period):
+            for dz in (-period, 0.0, period):
+                X, Z = x + dx, z + dz
+                if not (-0.25 < X < period + 0.25 and -0.25 < Z < period + 0.25): continue
+                yaw_b = math.atan2(-math.sin(a), -math.cos(a))
+                M = Matrix.Translation(P.u2b((X, r.gauss(0, 0.0015), Z))) @ Matrix.Rotation(r.gauss(0, 0.006), 4, 'X') @ Matrix.Rotation(yaw_b, 4, 'Z') @ Matrix.Diagonal((sc, sc, 1.0, 1.0))
+                me = lows[v].data.copy(); me.transform(M)
+                mi = mats.index(highs[v].data.materials[0]) if highs[v].data.materials[0] in mats else (mats.append(highs[v].data.materials[0]) or len(mats) - 1)
+                for poly in me.polygons: poly.material_index = mi
+                bm.from_mesh(me); bpy.data.meshes.remove(me)
+    stones = K._obj_from_bm('FarStones', bm)
+    for mt in mats: stones.data.materials.append(mt)
+    for o in lows.values(): bpy.data.objects.remove(o)
+    c = P.u2b((period / 2, 0, period / 2))
+    bpy.ops.mesh.primitive_plane_add(size=period + 1.0, location=(c.x, c.y, -0.034)); bed = bpy.context.active_object; bed.name = 'FarBed'
+    for lp in bed.data.loops:
+        co = bed.data.vertices[lp.vertex_index].co + bed.location
+        bed.data.uv_layers.active.data[lp.index].uv = (-co.x / 2.0, -co.y / 2.0)
+    bed.data.materials.append(P.bed_material('M_CobbleBed'))
+    bpy.ops.mesh.primitive_plane_add(size=period, location=(c.x, c.y, -0.012)); low = bpy.context.active_object; low.name = 'CobbleFar'
+    print('FAR stones', len(placed), 'high tris', K.tris(stones))
+    paths = K.bake_to_low(low, [stones, bed], os.path.join(OUT, 'tex'), 'CobbleFar', res=RES, samples=32, extrusion=0.03, ray=0.07, ao_dist=0.05)
+    bpy.data.objects.remove(stones); bpy.data.objects.remove(bed); bpy.data.objects.remove(low)
+    return paths
+
+def far_check(paths):
+    """The far tileable on a 30 x 20 m plane (UV in 2 m tiles) seen from the wide and mid cameras."""
+    gm = K.game_material('M_CobbleFar', paths)
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
+    vs = [bm.verts.new(P.u2b(p)) for p in ((-20, -0.01, -10), (12, -0.01, -10), (12, -0.01, 12), (-20, -0.01, 12))]
+    f = bm.faces.new(vs)
+    for lp in f.loops: lp[uvl].uv = (-lp.vert.co.x / 2.0, -lp.vert.co.y / 2.0)
+    ob = K._obj_from_bm('FarCheck', bm)
+    if ob.data.polygons[0].normal.z < 0: ob.data.flip_normals()
+    ob.data.materials.append(gm)
+
 # ----------------------------------------------------------------------------- main
 if __name__ == '__main__':
     K.reset(); sc = bpy.context.scene
+    if STAGE == 'far':                                   # the surround tileable only
+        highs = build_family()
+        far_check(build_far_tile(highs))
+        for h in highs.values(): bpy.data.objects.remove(h)
+        if '--no-render' not in argv:
+            P.standins(); P.render_cams(sc, OUT, 'CobbleFar', [v for v in VIEWS if v in ('wide', 'mid')] or ['wide'], RRES, SAMPLES, MOOD)
+        sys.exit(0)
     lay = Layout(); stones = lay.build()
     kept, loose, weeds = heights_and_damage(stones)
     print('LAYOUT setts', len(kept), 'loose', len(loose), 'weed slots', len(weeds))
