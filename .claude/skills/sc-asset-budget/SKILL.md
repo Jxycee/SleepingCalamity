@@ -15,14 +15,16 @@ The facts behind them:
 - **Co-op:** up to four players' cameras, volumetrics, SSAO and lights share the frame (urp-stylised-realism section 10). Alpha-tested foliage shadows are a common hidden cost.
 
 ## Applying the budgets
+**Texture cap (user, 2026-10-30): the game targets 1440p, so nothing bakes above 2048 px.**
+
 | Tier | Budget (PHASE1 3.3) | Judge it as |
 |---|---|---|
 | T1 tileable / trim | 2K shared sets; 1024 px/m (ground, walls up to 3 m), 512 px/m (upper storeys, roofs, vault crowns) | texel density on the kit pieces that use it |
 | T2 kit piece | 0.5-5k tris, shared textures | per piece, and per metre of run against its kit neighbours |
 | T3 instanced piece | 50-400 tris each, one 2K set per family | per variant; the family's atlas is the texture cost |
-| T4 hero prop | 30-60k tris, up to 2 x 4K | per prop |
-| Whole building (kit + heroes) | at most 75k tris; 2x4K + 4x2K + 2x1K | summed over every piece that belongs to it |
-| Hero character / enemy | 60k, 4K body + 2K head / 25k, one 2K-4K set | per character |
+| T4 hero prop | 30-60k tris, up to 2 x 2K | per prop |
+| Whole building (kit + heroes) | at most 75k tris; 6x2K + 2x1K | summed over every piece that belongs to it |
+| Hero character / enemy | 60k, 2K body + 2K head / 25k, one 2K set | per character |
 
 - `Art/Blender/tools/sc_asset_audit.py` (rewritten M8) reports tris, surface area, density, UV texel density against these budgets, colour attributes and bounds per object, and FAILs only on triangles and material slots. Report its numbers; the table above is the judge.
 - **Over budget usually means cut,** unless the extra tris are on the silhouette or a story beat the brief names: then say so in the header and the report. The budgets themselves are placeholders ([P35]) and the controller can change them.
