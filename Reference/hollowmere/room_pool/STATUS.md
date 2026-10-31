@@ -3,6 +3,7 @@ Session: Q7. Cellars room pool, first rooms (M5 authoring)
 Progress: 100%
 Sheet: ROOMS.md (table + ASCII + sockets of all 21 rooms; generated from the code)
 Blocker: none
+Archive: ready
 
 Landed 2026-10-31: Core/Cellars/CellarRoom.cs (format, ASCII parser, Validate), CellarRoomPool.cs (12 combat rooms, 4 per sub-theme; entry, stair-exit,
 checkpoint; 6 corridor pieces; pool rules), Tests/EditMode/CellarRoomPoolTests.cs (61 tests). No M5 floor generator existed on main, so only the

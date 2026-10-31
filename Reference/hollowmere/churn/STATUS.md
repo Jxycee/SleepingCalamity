@@ -3,6 +3,7 @@ Session: Q5. Builder churn fix
 Progress: 100%
 Sheet: none (code only)
 Blocker: none
+Archive: ready
 
 Fixed on claude/practical-tesla-lqajeo (74ebff1, 0467581, 9d863fb):
 - HeroAnimator.controller rewrite: its skip-signature used AssetDatabase.GetAssetDependencyHash, which differs between machines (editor build, platform, artifact cache), so every PC/cloud switch rebuilt it with new fileIDs. It now uses SHA1 of each clip's FBX + .meta bytes (.meta eol is pinned to lf, so the hash is the same on Windows).
