@@ -2,9 +2,9 @@
 
 State: IN PROGRESS
 Session: Q1 Home kit families 2 and 4 (cloud session, branch claude/brave-keller-3d91gk; bell tower done before it)
-Progress: 20%
+Progress: 50%
 Sheet: none yet
-Blocker: paused by coordinator for usage (second pause; agents asked to commit WIP in their worktrees and stop; resume after the 12:10 UTC reset at the latest)
+Blocker: none (resumed again 2026-10-31; townhouse merged in, its HollowmereTownhouse.cs is the integration precedent)
 
 Started 2026-10-31.
 - Stone cottage (family 2, S): `Art/Blender/town/sc_cottage.py`, variants StoneCottage_A/B/C -> `Content/Art/Town/Ring1/StoneCottage/` (implementer agent, Blender only).
