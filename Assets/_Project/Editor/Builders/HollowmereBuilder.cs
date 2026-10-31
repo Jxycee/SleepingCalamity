@@ -126,6 +126,7 @@ namespace SleepingCalamity.EditorTools
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt); }
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets
+            HollowmereFoliage.FarHedge(set);   // far hedgerow ring hiding the bare horizon
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");

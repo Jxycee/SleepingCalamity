@@ -42,6 +42,7 @@ namespace SleepingCalamity.EditorTools
         static Material mat;
         static Stats cur;
         static int grassClumps;
+        static Terrain terr;   // the terrain TerrainGrass dressed: the far hedge roots on its height
 
         // ------------------------------------------------------------------------------------------------ assets
         static bool Load()
@@ -165,7 +166,8 @@ namespace SleepingCalamity.EditorTools
             if (!Load()) return;
             TerrainData data = terrain.terrainData;
             BuilderUtil.EnsureFolder(HollowmereTerrain.Folder);
-            var protos = new DetailPrototype[Grasses.Length];
+            terr = terrain;
+            var protos = new DetailPrototype[Grasses.Length + 2];
             Color[] healthy = { new Color(0.50f, 0.62f, 0.24f), new Color(0.46f, 0.58f, 0.22f), new Color(0.56f, 0.62f, 0.26f) };
             Color[] dry = { new Color(0.66f, 0.64f, 0.30f), new Color(0.62f, 0.60f, 0.27f), new Color(0.70f, 0.64f, 0.32f) };   // yellow-green family, never blue-green
             for (int i = 0; i < Grasses.Length; i++)
@@ -177,6 +179,19 @@ namespace SleepingCalamity.EditorTools
                     healthyColor = healthy[i], dryColor = dry[i], positionJitter = 1f, alignToGround = 0f, useDensityScaling = true,
                 };
             }
+            // taller seed-head grass (Grass_C at 1.5-1.9), sparse and mostly in the clumps; a low clover rosette (Weed_D) scattered in low patches
+            protos[3] = new DetailPrototype
+            {
+                prototype = DetailPrefab(kits["Grass_C"], "Grass_C_Tall"), usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = true,
+                minWidth = 1.5f, maxWidth = 1.9f, minHeight = 1.5f, maxHeight = 1.9f, noiseSeed = 61, noiseSpread = 0.7f, holeEdgePadding = 0f,
+                healthyColor = new Color(0.58f, 0.62f, 0.27f), dryColor = new Color(0.76f, 0.67f, 0.33f), positionJitter = 1f, alignToGround = 0f, useDensityScaling = true,
+            };
+            protos[4] = new DetailPrototype
+            {
+                prototype = DetailPrefab(kits["Weed_D"], "Weed_D_Rosette"), usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = true,
+                minWidth = 0.8f, maxWidth = 1.5f, minHeight = 0.8f, maxHeight = 1.3f, noiseSeed = 73, noiseSpread = 0.5f, holeEdgePadding = 0f,
+                healthyColor = new Color(0.42f, 0.56f, 0.22f), dryColor = new Color(0.58f, 0.60f, 0.28f), positionJitter = 1f, alignToGround = 0f, useDensityScaling = true,
+            };
             data.SetDetailResolution(DetailRes, DetailPatch);
             data.detailPrototypes = protos;
             data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
@@ -201,21 +216,33 @@ namespace SleepingCalamity.EditorTools
                     float w = splat[sy, sx, 0] + 0.3f * splat[sy, sx, 2];
                     if (w <= 0.02f || nearCobble[sy, sx]) continue;
                     float x = HollowmereTerrain.Origin.x + u * HollowmereTerrain.Size.x, z = HollowmereTerrain.Origin.z + v * HollowmereTerrain.Size.z;
-                    // meadow, not a dot grid: two noise octaves (about 7 m and 3.5 m) pick thick patches, the rest is sparse
-                    float nz = 0.65f * Mathf.PerlinNoise(x * 0.14f + 5f, z * 0.14f + 91f) + 0.35f * Mathf.PerlinNoise(x * 0.29f + 47f, z * 0.29f + 13f);
-                    float thick = Smooth(0.53f, 0.62f, nz);   // about a third of the open ground
-                    float p = Mathf.Lerp(SparseM2, DenseM2, thick) * cellArea * Mathf.Clamp01(w);
-                    uint h = Hash((uint)cx, (uint)cy);
-                    if ((h & 0xFFFFFF) / (float)0x1000000 >= p) continue;
-                    if (InSquare(x, z, 0.6f) || NearPaved(t, x, z)) continue;
-                    if (data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y < HollowmereLayout.WaterY + 0.5f) continue;
+                    // round 3: tight clumps. Dense along wall feet, lot and landmark footprint edges and the bank top; two noise octaves (about 7 m / 3.5 m) pick a
+                    // few more clumps in the open; bare gaps elsewhere.
                     var pt = new TownPoint(x, z);
-                    bool blocked = false;
-                    foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(pt, 0.3f)) { blocked = true; break; }
-                    if (!blocked) foreach (Landmark l in t.Landmarks) if (l.Footprint.Contains(pt, 0.3f)) { blocked = true; break; }
+                    bool blocked = false, foot = false;
+                    foreach (Foundation f in t.Foundations) { if (f.Footprint.Contains(pt, 0.3f)) { blocked = true; break; } if (!foot && f.Footprint.Contains(pt, 2.2f)) foot = true; }
                     if (blocked) continue;
-                    layers[PickProto(h >> 24)][cy, cx] = 1;
-                    spots.Add(new Vector2(x, z)); grassClumps++;
+                    foreach (Landmark l in t.Landmarks) { if (l.Footprint.Contains(pt, 0.3f)) { blocked = true; break; } if (!foot && l.Footprint.Contains(pt, 2.2f)) foot = true; }
+                    if (blocked) continue;
+                    if (Mathf.Abs(HollowmereLayout.PlateauDistance(x, z) - 27.5f) < 2.2f) foot = true;   // the bank top at the town wall's foot
+                    float nz = 0.65f * Mathf.PerlinNoise(x * 0.14f + 5f, z * 0.14f + 91f) + 0.35f * Mathf.PerlinNoise(x * 0.29f + 47f, z * 0.29f + 13f);
+                    float thick = Mathf.Max(Smooth(0.60f, 0.67f, nz), foot ? Smooth(0.30f, 0.42f, nz) : 0f);
+                    float p = Mathf.Lerp(0.18f, 6.0f, thick) * cellArea * Mathf.Clamp01(w);
+                    uint h = Hash((uint)cx, (uint)cy);
+                    bool lowPatch = Mathf.PerlinNoise(x * 0.21f + 131f, z * 0.21f + 29f) > 0.64f;
+                    bool placed = false;
+                    if ((h & 0xFFFFFF) / (float)0x1000000 < p && !InSquare(x, z, 0.6f) && !NearPaved(t, x, z)
+                        && data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y >= HollowmereLayout.WaterY + 0.5f)
+                    {
+                        int pr = PickProto(h >> 24);
+                        if (thick > 0.5f && ((h >> 20) & 15u) < 3u) pr = 3;   // seed-head grass mostly inside the clumps
+                        else if (thick <= 0.5f && ((h >> 20) & 63u) == 0u) pr = 3;
+                        layers[pr][cy, cx] = 1; placed = true;
+                    }
+                    else if (lowPatch && ((h >> 3) & 0xFFFFFFu) / (float)0x1000000 < 0.9f * cellArea * Mathf.Clamp01(w) && !InSquare(x, z, 0.6f) && !NearPaved(t, x, z)
+                        && data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y >= HollowmereLayout.WaterY + 0.5f)
+                    { layers[4][cy, cx] = 1; placed = true; }
+                    if (placed) { spots.Add(new Vector2(x, z)); grassClumps++; }
                 }
             for (int i = 0; i < layers.Length; i++) data.SetDetailLayer(0, 0, i, layers[i]);
             EditorUtility.SetDirty(data);
@@ -302,6 +329,50 @@ namespace SleepingCalamity.EditorTools
             }
             cur = null;
             Debug.Log("SC HOLLOWMERE foliage ruined=" + sr.Objects + "/" + sr.Tris + " rebuilt=" + sb.Objects + "/" + sb.Tris + " grass=" + grassClumps);
+        }
+
+        // ------------------------------------------------------------------------------------------------ 5. far hedge (round 3)
+        // A low dark-green hedgerow / tree line in two staggered rows about 125-133 m from (0, -20), just inside the terrain edge, so the bare horizon and the hard sky band are
+        // hidden behind it through the fog. B9 leaf-mass cards (Ivy_Patch_A/B stood upright, 3-6x wide, 2.5-6 m tall, facing the town) with Moss_Tuft mounds at the base. Rooted on the
+        // terrain height; left open where the ground falls to the lake. One shared material, no shadows. Under Set, so both presets show it.
+        public static void FarHedge(Transform set)
+        {
+            if (!Load() || terr == null) return;
+            cur = new Stats();
+            Transform g = Group(set, "FarHedge");
+            var rng = new System.Random(Seed("farhedge", 808));
+            var centre = new Vector2(0f, -20f);
+            string[] cards = { "Ivy_Patch_A", "Ivy_Patch_B" };
+            float cardH = kits["Ivy_Patch_A"].Bounds.max.y;
+            float baseY = terr.transform.position.y;
+            for (int row = 0; row < 2; row++)
+            {
+                float radius = row == 0 ? 125f : 131f, arc = 4.6f;
+                int n = Mathf.RoundToInt(2f * Mathf.PI * radius / arc);
+                for (int k = 0; k < n; k++)
+                {
+                    float a = (k + (row == 1 ? 0.5f : 0f) + R(rng, -0.25f, 0.25f)) / n * 2f * Mathf.PI, r = radius + R(rng, -2.5f, 2.5f);
+                    float x = centre.x + Mathf.Cos(a) * r, z = centre.y + Mathf.Sin(a) * r;
+                    if (x < HollowmereTerrain.Origin.x + 6f || x > HollowmereTerrain.Origin.x + HollowmereTerrain.Size.x - 6f
+                        || z < HollowmereTerrain.Origin.z + 6f || z > HollowmereTerrain.Origin.z + HollowmereTerrain.Size.z - 6f) continue;
+                    float y = terr.SampleHeight(new Vector3(x, 0f, z)) + baseY;
+                    if (y < HollowmereLayout.WaterY + 1.6f) continue;   // the lake side stays open
+                    float lump = Mathf.PerlinNoise(x * 0.07f + 9f, z * 0.07f + 71f);   // long-wave lumps: tree-line heights
+                    float height = Mathf.Clamp(Mathf.Lerp(2.5f, 6f, lump) + R(rng, -0.9f, 0.9f) + (row == 1 ? 0.6f : 0f), 2.5f, 6f);
+                    float w = R(rng, 3f, 6f);
+                    Vector2 toward = (centre - new Vector2(x, z)).normalized;
+                    GameObject go = Put(g, cards[rng.Next(2)], new Vector3(x, y - 0.15f, z), YawFacing(toward.x, toward.y) + R(rng, -25f, 25f), new Vector3(w, height / cardH, w * 0.6f), rng.Next(2) == 0);
+                    foreach (Renderer rd in go.GetComponentsInChildren<Renderer>()) rd.shadowCastingMode = ShadowCastingMode.Off;
+                    if (row == 0 && k % 2 == 0)   // moss mounds at the base
+                    {
+                        float ms = R(rng, 10f, 16f);
+                        GameObject m = Put(g, Pick(rng, Mosses), new Vector3(x + toward.x * 1.2f, y - 0.05f, z + toward.y * 1.2f), R(rng, 0f, 360f), ms);
+                        foreach (Renderer rd in m.GetComponentsInChildren<Renderer>()) rd.shadowCastingMode = ShadowCastingMode.Off;
+                    }
+                }
+            }
+            Debug.Log("SC HOLLOWMERE foliage hedge objects=" + cur.Objects + " tris=" + cur.Tris + (cur.Tris > 150000 ? " OVER the 150k budget" : " (budget 150k)"));
+            cur = null;
         }
 
         // ------------------------------------------------------------------------------------------------ 2. lot edges

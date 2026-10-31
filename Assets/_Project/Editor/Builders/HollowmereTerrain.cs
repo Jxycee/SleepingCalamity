@@ -103,6 +103,9 @@ namespace SleepingCalamity.EditorTools
         {
             BuilderUtil.EnsureFolder(Folder);
             TerrainLayer[] layers = { Ground("Grass", "meadow_grass", 3f), Ground("Dirt", "packed_soil", 3f), Ground("Path", "worn_path", 2.5f), CobbleLayer() };
+            layers[0].diffuseRemapMax = new Vector4(0.97f, 0.93f, 0.88f, 1f);   // a little less saturated green (round 3)
+            layers[1].normalScale = 1.8f;                                        // a coarser read on the earth banks (round 3)
+            EditorUtility.SetDirty(layers[0]); EditorUtility.SetDirty(layers[1]);
             var data = AssetDatabase.LoadAssetAtPath<TerrainData>(DataPath);
             if (data == null) { data = new TerrainData(); AssetDatabase.CreateAsset(data, DataPath); }
             data.heightmapResolution = Res;
@@ -174,6 +177,9 @@ namespace SleepingCalamity.EditorTools
                             if (l.Footprint.Contains(p, 1.0f)) { path = Mathf.Max(path, 0.6f); break; }
                         path = Mathf.Max(path, 0.28f * Smooth(0.55f, 0.80f, big));                          // dry meadow patches
                         soil = Mathf.Max(soil, 0.35f * Smooth(0.62f, 0.75f, Mathf.PerlinNoise(x * 0.09f + 77f, z * 0.09f + 19f)) * (1f - Smooth(0.3f, 0.5f, big)));   // bare spots
+                        // round 3: 40-70 m colour drift on the open lawn: yellow-green dry patches (path layer, <= 0.3) and darker worn patches (soil layer, <= 0.2), other seeds and scales
+                        path = Mathf.Max(path, 0.3f * Smooth(0.45f, 0.85f, Mathf.PerlinNoise(x * 0.017f + 203f, z * 0.017f + 57f)));
+                        soil = Mathf.Max(soil, 0.2f * Smooth(0.5f, 0.9f, Mathf.PerlinNoise(x * 0.022f + 311f, z * 0.022f + 149f)));
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
                         grass = Mathf.Max(0f, 1f - soil - path);
