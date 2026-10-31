@@ -77,7 +77,8 @@ namespace SleepingCalamity.EditorTools
                 for (int i = 0; i < Res; i++)
                 {
                     float m = ProtectMask(t, WorldX(i), WorldZ(j));
-                    h[j, i] = Mathf.Lerp(raw[j, i], h[j, i], m);
+                    // the RAW stores heights without the western fall (Q15 OuterFall, added after the bake): add it back under the erosion
+                    h[j, i] = Mathf.Lerp(raw[j, i] + HollowmereLayout.OuterFall(WorldX(i), WorldZ(j)) / Size.y, h[j, i], m);
                 }
             return h;
         }
@@ -160,8 +161,23 @@ namespace SleepingCalamity.EditorTools
                     float x = Origin.x + u * Size.x, z = Origin.z + v * Size.z;
                     var p = new TownPoint(x, z);
                     float grass, soil = 0f, path = 0f, cobble = 0f;
-                    float lane = LaneEdge(t, p);
+                    float lane = LaneEdge(t, p, false);
+                    float road = CountryRoad(t, p, out float roadOff);
                     if (lane < 0f || IsPavedArea(x, z)) { cobble = 1f; grass = 0f; }
+                    else if (road < 0.6f)
+                    {
+                        // Q15: the Saltwake Road past the gate apron is a rutted dirt road: worn path, two soil ruts about 0.8 m either side of the
+                        // crown, a thin grass strip on the crown, grass creeping in over the edges.
+                        float n2 = Mathf.PerlinNoise(x * 0.35f + 5f, z * 0.35f + 9f) - 0.5f;
+                        float ao = Mathf.Abs(roadOff);
+                        soil = 0.9f * (1f - Smooth(0.25f, 0.55f, Mathf.Abs(ao - 0.85f) + 0.15f * n2));
+                        float crown = 0.55f * (1f - Smooth(0.15f, 0.4f, ao + 0.2f * n2));
+                        float edge = Smooth(-0.9f, 0.6f, road + 0.6f * n2);
+                        grass = Mathf.Max(crown, edge);
+                        path = Mathf.Max(0f, 1f - soil - grass);
+                        soil *= 1f - grass;
+                        grass = Mathf.Max(0f, 1f - soil - path);
+                    }
                     else
                     {
                         float steep = data.GetSteepness(u, v), y = data.GetInterpolatedHeight(u, v) + Origin.y;
@@ -180,6 +196,7 @@ namespace SleepingCalamity.EditorTools
                         // round 3: 40-70 m colour drift on the open lawn: yellow-green dry patches (path layer, <= 0.3) and darker worn patches (soil layer, <= 0.2), other seeds and scales
                         path = Mathf.Max(path, 0.3f * Smooth(0.45f, 0.85f, Mathf.PerlinNoise(x * 0.017f + 203f, z * 0.017f + 57f)));
                         soil = Mathf.Max(soil, 0.2f * Smooth(0.5f, 0.9f, Mathf.PerlinNoise(x * 0.022f + 311f, z * 0.022f + 149f)));
+                        FieldPaint(t, x, z, ref soil, ref path);   // Q15: the patchwork outside the wall
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
                         grass = Mathf.Max(0f, 1f - soil - path);
@@ -189,12 +206,61 @@ namespace SleepingCalamity.EditorTools
             return a;
         }
 
-        // Signed distance (m) from the nearest lane's edge: negative inside a lane.
-        static float LaneEdge(TownLayout t, TownPoint p)
+        // Signed distance (m) from the nearest lane's edge: negative inside a lane. Without countryRoad the Saltwake Road past the gate apron is left out
+        // (it is painted as a dirt road, CountryRoad); IsPaved keeps it, so grass and foliage still stay off it.
+        static float LaneEdge(TownLayout t, TownPoint p, bool countryRoad = true)
         {
             float d = float.MaxValue;
-            foreach (Lane lane in t.Lanes) d = Mathf.Min(d, HollowmereLayout.DistanceToPolyline(p, lane.Points) - lane.Width * 0.5f);
+            foreach (Lane lane in t.Lanes)
+            {
+                if (!countryRoad && lane.Id == SaltwakeRoadPlan.RoadLane && CountryRoad(t, p, out _) < 3f) continue;
+                d = Mathf.Min(d, HollowmereLayout.DistanceToPolyline(p, lane.Points) - lane.Width * 0.5f);
+            }
             return d;
+        }
+
+        public const float GateApron = 9f;   // the Saltwake Road stays cobbled this far from the Lower Gate, then turns to dirt
+
+        // Signed distance (m) from the Saltwake Road's edge past the gate apron (float.MaxValue near the gate); offset = signed distance from its centre line.
+        static float CountryRoad(TownLayout t, TownPoint p, out float offset)
+        {
+            offset = 0f;
+            Lane road = HollowmereLayout.FindLane(t, SaltwakeRoadPlan.RoadLane);
+            float best = float.MaxValue, s = 0f, bestS = 0f;
+            for (int i = 1; i < road.Points.Length; i++)
+            {
+                TownPoint a = road.Points[i - 1], b = road.Points[i];
+                TownPoint c = HollowmereLayout.ClosestOnSegment(p, a, b, out float tt);
+                float d = TownPoint.Distance(p, c), len = TownPoint.Distance(a, b);
+                if (d < best)
+                {
+                    best = d; bestS = s + tt * len;
+                    TownPoint dir = (b - a) * (1f / len), rel = p - c;
+                    offset = rel.X * dir.Z - rel.Z * dir.X;   // + right of travel
+                }
+                s += len;
+            }
+            if (bestS < GateApron) return float.MaxValue;
+            return best - road.Width * 0.5f;
+        }
+
+        // The field patchwork (SaltwakeRoadPlan.Field) where the open ground allows it: hay fields dry yellow-green (path layer), ploughed fields soil in
+        // furrows, a soil band under the hedgerows on the field edges; pasture stays meadow.
+        static void FieldPaint(TownLayout t, float x, float z, ref float soil, ref float path)
+        {
+            float w = SaltwakeRoadPlan.FieldWeight(t, x, z);
+            if (w <= 0f) return;
+            FieldKind kind = SaltwakeRoadPlan.Field(x, z, out float edge, out int cell);
+            float inField = Smooth(1.2f, 3.5f, edge);
+            if (kind == FieldKind.Hay) path = Mathf.Max(path, w * inField * 0.62f);
+            else if (kind == FieldKind.Ploughed)
+            {
+                float a = SaltwakeRoadPlan.FurrowYaw(cell) * Mathf.Deg2Rad;
+                float across = x * Mathf.Cos(a) - z * Mathf.Sin(a);
+                float furrow = 0.5f + 0.5f * Mathf.Sin(across * (2f * Mathf.PI / 2.4f));
+                soil = Mathf.Max(soil, w * inField * (0.55f + 0.4f * furrow));
+            }
+            soil = Mathf.Max(soil, w * 0.55f * (1f - Smooth(0.6f, 1.6f, edge)));   // the hedge bottom
         }
 
         // The paved areas that are not lanes: the square (the corner's surround paving slab) and the keep terrace's top beside the stairs and gate.
@@ -290,8 +356,8 @@ namespace SleepingCalamity.EditorTools
                     for (int i = 0; i < Res; i++)
                     {
                         float m = ProtectMask(t, WorldX(i), WorldZ(j));
-                        float v = Mathf.Clamp01(Mathf.Lerp(eroded[j, i], designed[j, i], m));
-                        maxDelta = Mathf.Max(maxDelta, Mathf.Abs(v - designed[j, i]) * Size.y);
+                        float v = Mathf.Clamp01(Mathf.Lerp(eroded[j, i], designed[j, i], m) - HollowmereLayout.OuterFall(WorldX(i), WorldZ(j)) / Size.y);   // stored without the fall (Final adds it)
+                        maxDelta = Mathf.Max(maxDelta, Mathf.Abs(v + HollowmereLayout.OuterFall(WorldX(i), WorldZ(j)) / Size.y - designed[j, i]) * Size.y);
                         ushort q = (ushort)Mathf.RoundToInt(v * 65535f);
                         int k = (j * Res + i) * 2; bytes[k] = (byte)(q & 0xff); bytes[k + 1] = (byte)(q >> 8);
                     }

@@ -135,6 +135,7 @@ namespace SleepingCalamity.EditorTools
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
+            HollowmereRoad.Build(set, ruined, rebuilt, t);   // Q15: the Saltwake road's dressing, the field hedgerows and trees, the backdrop ring
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");
@@ -158,6 +159,8 @@ namespace SleepingCalamity.EditorTools
                 cam.farClipPlane = 400f;
             }
 
+            foreach (var c in HollowmereRoad.Cameras)   // Q15: from the gate looking out, from the road looking back (Target absolute)
+                LookTestBuilder.AddCapture(cams, c.Name, new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z), c.Target, c.Fov).farClipPlane = 700f;
             HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);   // the corner's light with the town-scale haze, sky and grade (Q12)
             ApplyPreset(Preset.Ruined);
