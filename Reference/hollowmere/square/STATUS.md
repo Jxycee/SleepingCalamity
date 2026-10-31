@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 90%
+Progress: 92%
 Sheet: Reference/hollowmere/square/square_sheet_rebuilt.jpg (+ square_sheet_ruined.jpg, square_sheet_corner_check.jpg, props_sheet_r1.jpg)
-Blocker: paused by coordinator for usage (resume after the 12:10 UTC reset)
+Blocker: none
 
 ## Done
 - Ground generator `Art/Blender/town/sc_square_ground.py` (branch claude/practical-tesla-lqajeo). Reads the plan from HollowmereLayout.cs,
@@ -46,3 +46,10 @@ The Unity agent was told to finish its current step and push. Open items: the bl
 ## At the pause (5de3de5)
 Done: all 58 decorations use real art, 5 drains, 6 lanterns on the posts sharing one material, planters planted (grass/weed clumps + trailing ivy), bunting sag 0.6-0.8 m with the fade tint, the bed sunk under the slab inside the square. 32 captures in captures/ and three sheets (Rebuilt, Ruined, corner check: the corner ground is unchanged). Build PASS after the last merge.
 Left: (1) the black pegs are 355 loose setts lying on their sides from sc_square_ground.py: fix in the generator (fewer loose stones, lay them flat) and re-export; (2) merge origin/main (townhouse), rebuild, re-capture the two square cameras; (3) test-edit + check; (4) merge.
+
+## Resumed, coordinator review 27/40 (cheap fixes, no new round)
+- Black cubes: they were loose setts lying on their sides. Fixed in r2: 183-197 loose stones, most top-up and half sunk.
+- Uniform pattern: r3 adds relaid tone patches (darker/paler stone on a 4.5 m noise lattice), damp puddle hollows by the stalls and round the fountain, polished dark setts in the worn lines (64f7f82).
+- Hard grass edges: B9 moss/grass/weeds are being scattered on the square's 1,067 weed slots (Unity agent).
+- Dusk: warm 2700 K lamp pools at the post lanterns in LowSun only. The approved corner's lights and grade are left unchanged.
+- origin/main (townhouse) merged at 785cf90. Next: build, captures, test-edit, check, merge.
