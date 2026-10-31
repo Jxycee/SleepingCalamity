@@ -43,7 +43,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_TitheGate", new Vector3(5.2f, 1.65f, 8.2f), new Vector3(5.6f, 5.5f, 22f), 55f),
             ("Cap_HM_LaneMouth", new Vector3(-0.4f, 1.65f, -40f), new Vector3(0f, 1.0f, -8f), 50f),
             ("Cap_HM_LakeShore", new Vector3(-26f, 1.7f, -88f), new Vector3(-2f, 3f, -20f), 50f),       // from the lake shore by R3_01 up at the hill town and the keep
-            ("Cap_HM_MarketStreet", new Vector3(0.6f, 1.65f, -19.8f), new Vector3(-0.5f, -6.5f, -58f), 55f), // the square's south edge down Market Street to the second terrace and the wall
+            ("Cap_HM_MarketStreet", new Vector3(0.6f, 3.4f, -16.5f), new Vector3(-0.3f, -2.5f, -34f), 55f), // the square's south edge down Market Street to the second terrace and the wall
             ("Cap_HM_KeepStairs", new Vector3(-31f, 1.7f, 13.8f), new Vector3(-20f, 3.0f, 19.6f), 58f),  // along the Wall Ginnel: terrace step, west stair, keep wall
             ("Cap_HM_Smithy", new Vector3(-48.6f, 1.7f, 2.9f), new Vector3(-38.8f, -1.0f, 7.4f), 55f),       // ring 2: the smithy on R2_01 from the Ring Lane (forge bay toward the camera)
             ("Cap_HM_Schoolhouse", new Vector3(-44.4f, 1.7f, -39.7f), new Vector3(-38.2f, -1.5f, -30.9f), 55f), // ring 2: the schoolhouse on R2_03 from the Ring Lane
