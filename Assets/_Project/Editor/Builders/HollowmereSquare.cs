@@ -56,15 +56,16 @@ namespace SleepingCalamity.EditorTools
             holder.localPosition = new Vector3(0f, shelf, 0f);
 
             // The stones are laid in shelf-relative metres: check the terrain really is the shelf under them (sampled every ~2 m).
-            float maxDrift = 0f; var cells = new HashSet<long>();
+            float maxDrift = 0f; Vector2 worst = default; var cells = new HashSet<long>();
             foreach (PStone s in data.stones)
             {
                 if (s.p == null || s.p.Length < 3) continue;
                 long key = ((long)Mathf.FloorToInt(s.p[0] / 2f) << 32) ^ (uint)Mathf.FloorToInt(s.p[2] / 2f);
                 if (!cells.Add(key)) continue;
-                maxDrift = Mathf.Max(maxDrift, Mathf.Abs(HollowmereLayout.Ground(t, s.p[0], s.p[2]) - shelf));
+                float dev = Mathf.Abs(HollowmereLayout.Ground(t, s.p[0], s.p[2]) - shelf);
+                if (dev > maxDrift) { maxDrift = dev; worst = new Vector2(s.p[0], s.p[2]); }
             }
-            string drift = "SC HOLLOWMERE square ground: shelf y " + shelf.ToString("F3") + ", max |Ground - shelf| " + maxDrift.ToString("F3") + " m over " + cells.Count + " samples";
+            string drift = "SC HOLLOWMERE square ground: shelf y " + shelf.ToString("F3") + ", max |Ground - shelf| " + maxDrift.ToString("F3") + " m (worst at x " + worst.x.ToString("F1") + ", z " + worst.y.ToString("F1") + ") over " + cells.Count + " samples";
             if (maxDrift > DriftWarn) Debug.LogWarning(drift + " (over " + DriftWarn + " m: the stones float or sink somewhere)"); else Debug.Log(drift);
 
             Dictionary<string, GameObject> prefabs = BeautyCornerGround.SettPrefabs(data.stones.Select(s => s.v).Where(v => !string.IsNullOrEmpty(v)).Distinct(), out Material bed);
