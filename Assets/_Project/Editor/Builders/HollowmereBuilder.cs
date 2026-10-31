@@ -6,7 +6,7 @@
 // the approved facade on F01, three lots left empty; rings 2-3 as home massing with a few gardens). Each building block faces its lot's default door side.
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
 // BeautyCornerBuilder.PlaceRow at their corner positions; the three stalls are the Wave 1 Ring1/Stalls art (ruined or rebuilt state), else the B8 stall; the B4 bell tower when its folder exists. Everything
-// else is greybox on the LookTest materials, except the buildings whose final export is in (HollowmereArt: the bakery). Light, grade, sky and renderer: the
+// else is greybox on the LookTest materials, except the buildings whose final export is in (HollowmereArt: the bakery; HollowmereInnArt: the inn). Light, grade, sky and renderer: the
 // beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Ruins: every empty lot shows its ruin kit variant (RuinVariant, RuinTurn); a placed building or garden switches it off.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
@@ -321,6 +321,8 @@ namespace SleepingCalamity.EditorTools
                     Garden(g, f);
                     break;
                 case HollowmereLayout.BuildingKind.Bakery when HollowmereArt.TryPlaceBakery(g, f, 0.25f):   // on the footing slab's top
+                    break;
+                case HollowmereLayout.BuildingKind.Inn when HollowmereInnArt.TryPlaceInn(g, f, 0.25f):   // on the footing slab's top
                     break;
                 default:
                     Building(g, f, kind);
