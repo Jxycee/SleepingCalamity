@@ -252,7 +252,7 @@ namespace SleepingCalamity.Core
         static bool HasPrev(Ctx c, Seg s) => c.Segs.Exists(o => o.LaneIdx == s.LaneIdx && o.I == s.I - 1);
 
         // ---- garden walls, gates, retaining walls beside the lanes
-        sealed class Cand { public Seg S; public float Sm, Len, Scale; public TownPoint Out, Pos; public bool Kept, Retain; public float Rise; public int Index; }
+        sealed class Cand { public Seg S; public float Sm, Len, Scale; public TownPoint Out, Pos; public bool Kept, Retain, Break; public float Rise; public int Index; }
 
         static bool WallPointBlocked(Ctx c, TownPoint p, Lane own)
         {
@@ -269,39 +269,46 @@ namespace SleepingCalamity.Core
 
         static void GardenWalls(Ctx c)
         {
-            foreach (Seg s in c.Segs)
+            for (int li = 0; li < c.Lanes.Count; li++)
                 foreach (int side in new[] { 1, -1 })
                 {
-                    float a = RangeA(s, WallJunctionClip), b = RangeB(s, WallJunctionClip), len = b - a;
-                    if (len < 1.5f) continue;
-                    int n = Math.Max(1, (int)Math.Round(len / 2f));
-                    float piece = len / n, scale = piece / 2f;
-                    TownPoint outward = s.Right * side;
-                    float lat = side * (s.Hw + WallOffset);
-                    var cands = new List<Cand>();
-                    for (int i = 0; i < n; i++)
+                    var cands = new List<Cand>();   // every piece along one lane edge in order; runs continue across segments that join end to end
+                    Seg prev = null;
+                    foreach (Seg s in c.Segs)
                     {
-                        float sm = a + (i + 0.5f) * piece;
-                        TownPoint pos = s.P(sm, lat);
-                        bool blocked = false;
-                        foreach (float dx in new[] { -1f, 0f, 1f })
-                            foreach (float dl in new[] { -WallHalfThick, WallHalfThick })
-                                if (WallPointBlocked(c, s.P(sm + dx * scale, lat + side * dl), s.Lane)) blocked = true;
-                        if (!blocked) blocked = CrossesEdge(c.Edges, s.P(sm - scale, lat), s.P(sm + scale, lat), 0.4f);
-                        var cd = new Cand { S = s, Sm = sm, Len = piece, Scale = scale, Out = outward, Pos = pos, Kept = !blocked, Index = i };
-                        if (cd.Kept)
+                        if (s.LaneIdx != li) continue;
+                        float a = RangeA(s, WallJunctionClip), b = RangeB(s, WallJunctionClip), len = b - a;
+                        bool joined = prev != null && prev.I == s.I - 1 && !prev.JB && !s.JA && prev.S1 > prev.Len - 0.15f && s.S0 < 0.05f;
+                        prev = s;
+                        if (len < 1.5f) { prev = null; continue; }
+                        int n = Math.Max(1, (int)Math.Round(len / 2f));
+                        float piece = len / n, scale = piece / 2f;
+                        TownPoint outward = s.Right * side;
+                        float lat = side * (s.Hw + WallOffset);
+                        for (int i = 0; i < n; i++)
                         {
-                            float up = c.G(s.P(sm, side * (s.Hw + 2.2f))), low = s.H(sm);
-                            cd.Rise = up - low; cd.Retain = cd.Rise > 0.8f;
+                            float sm = a + (i + 0.5f) * piece;
+                            TownPoint pos = s.P(sm, lat);
+                            bool blocked = false;
+                            foreach (float dx in new[] { -1f, 0f, 1f })
+                                foreach (float dl in new[] { -WallHalfThick, WallHalfThick })
+                                    if (WallPointBlocked(c, s.P(sm + dx * scale, lat + side * dl), s.Lane)) blocked = true;
+                            if (!blocked) blocked = CrossesEdge(c.Edges, s.P(sm - scale, lat), s.P(sm + scale, lat), 0.4f);
+                            var cd = new Cand { S = s, Sm = sm, Len = piece, Scale = scale, Out = outward, Pos = pos, Kept = !blocked, Index = i, Break = i == 0 && !joined };
+                            if (cd.Kept)
+                            {
+                                float up = c.G(s.P(sm, side * (s.Hw + 2.2f))), low = s.H(sm);
+                                cd.Rise = up - low; cd.Retain = cd.Rise > 0.8f;
+                            }
+                            cands.Add(cd);
                         }
-                        cands.Add(cd);
                     }
                     int start = 0;
                     while (start < cands.Count)
                     {
                         if (!cands[start].Kept) { start++; continue; }
                         int end = start;
-                        while (end + 1 < cands.Count && cands[end + 1].Kept) end++;
+                        while (end + 1 < cands.Count && cands[end + 1].Kept && !cands[end + 1].Break) end++;
                         EmitChain(c, cands, start, end, side);
                         start = end + 1;
                     }
@@ -322,7 +329,7 @@ namespace SleepingCalamity.Core
             for (int i = start; i <= end; i++)
             {
                 Cand cd = cands[i];
-                float yaw = Yaw(cd.Out), lat = side * (s.Hw + WallOffset);
+                float yaw = Yaw(cd.Out);
                 TownPoint along = new TownPoint(cd.Out.Z, -cd.Out.X);   // local +X
                 if (i == gate)
                 {
@@ -365,14 +372,14 @@ namespace SleepingCalamity.Core
         static void EmitGate(Ctx c, Cand cd, float yaw, TownPoint along, string lane)
         {
             // Opening 1.4 m between the pier inner faces: pier centres +-1.0 from the centre, along the wall.
-            float y = c.G(cd.Pos);
             TownPoint p1 = cd.Pos - along * 1.0f, p2 = cd.Pos + along * 1.0f;
             Add(c, LanePiece.GatePier, LanePreset.Both, lane, p1, c.G(p1), yaw);
             Add(c, LanePiece.GatePier, LanePreset.Both, lane, p2, c.G(p2), yaw);
             TownPoint hinge = cd.Pos - along * 0.7f;
             float roll = TownWallPlan.Hash(Seed, 3000, c.Counter);
-            Add(c, LanePiece.GateLeaf, LanePreset.Rebuilt, lane, hinge, y, yaw);
-            if (roll < 0.6f) Add(c, LanePiece.GateLeafBroken, LanePreset.Ruined, lane, hinge, y, yaw);
+            float hy = c.G(hinge);
+            Add(c, LanePiece.GateLeaf, LanePreset.Rebuilt, lane, hinge, hy, yaw);
+            if (roll < 0.6f) Add(c, LanePiece.GateLeafBroken, LanePreset.Ruined, lane, hinge, hy, yaw);
             AddMount(c, cd.S, cd.Sm, 3f, p1 - cd.Out * 0.3f, c.G(p1) + 1.8f, yaw);
         }
 
@@ -437,15 +444,25 @@ namespace SleepingCalamity.Core
         // One retaining module on the line through `mid`: +Z toward the upper ground `up`, coping flush with `upperY`.
         static void EmitModule(Ctx c, string lane, TownPoint mid, TownPoint up, float upperY, float step, float len, int salt, ref float sinceButtress, ref float interval)
         {
-            LanePiece piece = step <= 1.6f ? LanePiece.RetainWallLow : LanePiece.RetainWall;
-            float top = Top(piece), y = upperY - top, yaw = Yaw(up), scale = len / 2f;
-            LanePiece ruined = piece == LanePiece.RetainWall && TownWallPlan.Hash(Seed, salt, c.Counter) < BreachShare ? LanePiece.RetainWallBreach : piece;
-            AddPair(c, ruined, piece, lane, mid, y, yaw, scale);
-            sinceButtress += len;
-            if (piece == LanePiece.RetainWall && sinceButtress >= interval)
+            // A step taller than one module is built as a stack, each module's coping hidden 0.3 m into the one above; the top module takes the breach and the buttress.
+            float rem = step, ub = upperY, yaw = Yaw(up), scale = len / 2f, y = 0f;
+            LanePiece piece = LanePiece.RetainWall;
+            for (int layer = 0; layer < 3 && (layer == 0 || rem > 0.3f); layer++)
             {
-                Add(c, LanePiece.RetainButtress, LanePreset.Both, lane, mid, y, yaw);
-                sinceButtress = 0f; interval = 6f + 2f * TownWallPlan.Hash(Seed, salt + 1, c.Counter);
+                piece = rem <= 1.6f ? LanePiece.RetainWallLow : LanePiece.RetainWall;
+                float top = Top(piece); y = ub - top;
+                LanePiece ruined = layer == 0 && piece == LanePiece.RetainWall && TownWallPlan.Hash(Seed, salt, c.Counter) < BreachShare ? LanePiece.RetainWallBreach : piece;
+                AddPair(c, ruined, piece, lane, mid, y, yaw, scale);
+                if (layer == 0)
+                {
+                    sinceButtress += len;
+                    if (piece == LanePiece.RetainWall && sinceButtress >= interval)
+                    {
+                        Add(c, LanePiece.RetainButtress, LanePreset.Both, lane, mid, y, yaw);
+                        sinceButtress = 0f; interval = 6f + 2f * TownWallPlan.Hash(Seed, salt + 1, c.Counter);
+                    }
+                }
+                rem -= top - 0.3f; ub -= top - 0.3f;
             }
             // Lantern mount on the lane-facing (lower) face when a lane runs within 3 m.
             NearestLane(c, mid, out int li, out float ls, out float dist);
@@ -455,9 +472,9 @@ namespace SleepingCalamity.Core
 
         // ---- lanterns
         static void AddMount(Ctx c, Seg s, float sm, float prio, TownPoint pos, float y, float yaw) =>
-            c.Mounts.Add(new Mount { LaneIdx = s.LaneIdx, S = s.Cum + sm, Prio = prio, Pos = pos, Y = y, Yaw = yaw });
+            c.Mounts.Add(new Mount { LaneIdx = s.LaneIdx, S = s.Cum + sm, Prio = prio, Pos = pos, Y = Math.Max(y, c.G(pos) + 0.9f), Yaw = yaw });
         static void AddMount(int li, Ctx c, float s, float prio, TownPoint pos, float y, float yaw) =>
-            c.Mounts.Add(new Mount { LaneIdx = li, S = s, Prio = prio, Pos = pos, Y = y, Yaw = yaw });
+            c.Mounts.Add(new Mount { LaneIdx = li, S = s, Prio = prio, Pos = pos, Y = Math.Max(y, c.G(pos) + 0.9f), Yaw = yaw });
 
         static void NearestLane(Ctx c, TownPoint p, out int li, out float s, out float dist)
         {
