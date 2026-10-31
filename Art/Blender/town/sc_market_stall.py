@@ -113,7 +113,7 @@ CHIP_T, FADE_K, SUN_K, TIDE_K = 0.742, 0.22, 1.0, 0.6
 if RUIN:
     # Ruined: paint flaked down to grey oak over most of the frame, the awning bleached to a ghost of its stripes, damp-stained.
     PAINT, TRIM, PAINT_FADE = bleach(PAINT, 0.45, '#8f8775'), bleach(TRIM, 0.45, '#8f8775'), bleach(PAINT_FADE, 0.4)
-    STRIPE_A, STRIPE_B = bleach(STRIPE_A, 0.55), bleach(STRIPE_B, 0.5)
+    STRIPE_A, STRIPE_B = bleach(STRIPE_A, 0.4), bleach(STRIPE_B, 0.3)
     PCOL = [bleach(c, 0.6) for c in PCOL]
     CHIP_T, FADE_K, SUN_K, TIDE_K = 0.655, 0.5, 1.8, 0.85
 
@@ -551,6 +551,22 @@ def mat_rug():
     link(nt, nmap(nt, nrm, 0.5), bs.inputs['Normal'])
     return m
 
+def mat_metal():
+    """Wares metal (Wave 1 tools stall): forged iron or copper by the part's tint, lighter than the frame ironwork, worn bright on the edges, rust in spots."""
+    m, nt, bs, uv, obj, xyz, geo = base_nodes('Metal')
+    alb, nrm, orm = tset(nt, 'iron', uv)
+    tint = attr(nt, 'tint').outputs['Color']
+    col = mix(nt, 1.0, mix(nt, 1.0, alb, (1.15, 1.15, 1.15, 1), 'MULTIPLY'), tint, 'MULTIPLY')
+    edge = edge_mask(nt, geo, 0.006, 9.0)
+    col = mix(nt, mth(nt, 'MULTIPLY', edge, 0.6), col, mix(nt, 1.0, tint, (1.6, 1.6, 1.6, 1), 'MULTIPLY'))
+    rust = ramp(nt, noise_tex(nt, obj, 14.0, 6.0, 0.6, 5.0), 0.6, 0.75)
+    col = mix(nt, rust, col, lin('#6b3a22'))
+    link(nt, col, bs.inputs['Base Color'])
+    link(nt, mixf(nt, rust, 0.85, 0.0), bs.inputs['Metallic'])
+    link(nt, mixf(nt, rust, mth(nt, 'MULTIPLY_ADD', orm.outputs[1], 0.3, mixf(nt, edge, 0.42, 0.25)), 0.9), bs.inputs['Roughness'])
+    link(nt, nmap(nt, nrm, 0.6), bs.inputs['Normal'])
+    return m
+
 def mat_fruit():
     """Produce skins: the part's tint, mottled and blushed at two scales, satin roughness."""
     m, nt, bs, uv, obj, xyz, geo = base_nodes('Fruit')
@@ -583,7 +599,7 @@ def mat_glass():
     return m
 
 MATS = dict(Rug=mat_rug(), Straw=mat_straw(), Paint=mat_paint(), Oak=mat_oak(), Canvas=mat_canvas(), Cloth=mat_cloth(), Rope=mat_rope(),
-            Iron=mat_iron(), Stone=mat_stone(), Fruit=mat_fruit(), Weed=mat_weed(), Glass=mat_glass())
+            Iron=mat_iron(), Stone=mat_stone(), Fruit=mat_fruit(), Weed=mat_weed(), Glass=mat_glass(), Metal=mat_metal())
 
 # ----------------------------------------------------------------------------- frame
 RACK_SKIP = []                     # ruined: parts lying on the ground, left out of the racked frame's shear
@@ -716,7 +732,7 @@ def sag_x(x):
     f = (ax % 1.30) / 1.30
     return 0.085 * math.sin(math.pi * f) ** 0.9
 # Ruined awning: two ragged holes (the big one over the +X bay, the camera side) and a chewed front edge; the cloth bellies down round them.
-TEARS = [(0.70, 0.52, 0.17), (0.22, 0.30, 0.085)]
+TEARS = [(0.70, 0.52, 0.2), (0.22, 0.30, 0.095), (0.47, 0.18, 0.07)]
 def tear_d(u, v):
     """<0 inside a hole: distance to the nearest ragged hole edge in (u, v) units."""
     best = 9.0
@@ -755,16 +771,20 @@ def cv_fn(u, v):
 grid_part('canvas', NU * 3 // 2 if RUIN else NU, NV * 3 // 2 if RUIN else NV, cv_fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u * N_STRIPE),
           tint_fn=lambda u, v: (1, 1, 1, 1), keep_fn=(lambda u, v: tear_d(u, v) > 0) if RUIN else None, fray=0.022 if RUIN else 0.0)
 if RUIN:
-    # a torn flap still hangs from the big hole's front lip, twisted, swinging below the front bar line
-    cu, cv, r = TEARS[0]; fx = -AW_W / 2 + AW_W * (cu - 0.05)
-    top = canvas_pt(fx, cv + r * 0.9)
-    def flap_fn(u, v):
-        w = 0.26 * (1 - 0.55 * v); x = fx + (u - 0.5) * w + 0.05 * v * v
-        tw = 0.6 * v; p = Vector((x, top.y - 0.04 * v + (u - 0.5) * w * math.sin(tw) * 0.5, top.z - 0.02 - 0.62 * v))
-        p.y += 0.03 * math.sin(v * 5 + u * 3)
-        return p, (x / TILE, v * 0.62 / TILE), 0.6 * v
-    grid_part('canvas_flap', 6, 10, flap_fn, 'Canvas', stripe_fn=lambda u, v: math.floor(cu * N_STRIPE),
-              keep_fn=lambda u, v: v < 0.82 or abs(u - 0.5) < 0.3 - (v - 0.82), fray=0.015)
+    # torn strips hang from the holes' lips and the chewed front edge, twisted and swinging, each narrowing to a ragged point
+    def strip(nm, u0, v0, ln, w0, tw, seed):
+        fx = -AW_W / 2 + AW_W * u0; top = canvas_pt(fx, v0); r = rng(nm)
+        def fn(u, v):
+            w = w0 * (1 - 0.6 * v); x = fx + (u - 0.5) * w * math.cos(tw * v) + 0.04 * v * v * (1 if seed % 2 else -1)
+            p = Vector((x, top.y - 0.03 * v + (u - 0.5) * w * math.sin(tw * v), top.z - 0.015 - ln * v))
+            p.y += 0.025 * math.sin(v * 5 + u * 3 + seed)
+            return p, (x / TILE, v * ln / TILE), 0.6 * v
+        grid_part(nm, 5, 9, fn, 'Canvas', stripe_fn=lambda u, v: math.floor(u0 * N_STRIPE),
+                  keep_fn=lambda u, v: v < 0.78 or abs(u - 0.5) < 0.32 - (v - 0.78) * 1.2 + 0.08 * r.random(), fray=0.012)
+    for k, (u0, v0, ln, w0, tw) in enumerate(((0.62, 0.66, 0.62, 0.26, 0.6), (0.78, 0.64, 0.45, 0.14, -0.9), (0.70, 0.36, 0.38, 0.18, 0.4),
+                                             (0.25, 0.37, 0.33, 0.11, 0.8), (0.33, 0.93, 0.5, 0.12, -0.5), (0.43, 0.94, 0.36, 0.09, 0.7),
+                                             (0.90, 0.97, 0.42, 0.1, 0.5), (0.12, 0.96, 0.3, 0.08, -0.6))):
+        strip(f'canvas_strip{k}', u0, v0, ln, w0, tw, k)
 # scalloped valances: front and both sides, one scallop per stripe
 VH, SD = 0.20, 0.085
 def valance(name, p0, p1, n_sc, side_out, phase):
@@ -793,8 +813,8 @@ def back_fn(u, v):
     z = ztop + (zbot - ztop) * v
     y = PY - 0.075 + 0.02 * math.sin(2 * math.pi * u * 7.5) * (0.3 + v)
     return Vector((x, y, z)), (x / TILE, z / TILE), 0.0
-grid_part('backcloth', 40, 6 * (2 if RUIN else 1), back_fn, 'Cloth', tint_fn=lambda u, v: bleach(lin('#6e4a3a'), 0.5) if RUIN else lin('#6e4a3a'),
-          keep_fn=(lambda u, v: v < 0.45 + 0.4 * noise.noise(Vector((u * 7, 1.0, 2.0))) + 0.25 and not (0.55 < u < 0.7 and v > 0.2)) if RUIN else None, fray=0.02 if RUIN else 0.0)
+grid_part('backcloth', 40 * (2 if RUIN else 1), 6 * (3 if RUIN else 1), back_fn, 'Cloth', tint_fn=lambda u, v: bleach(lin('#6e4a3a'), 0.5) if RUIN else lin('#6e4a3a'),
+          keep_fn=(lambda u, v: v < 0.45 + 0.4 * noise.noise(Vector((u * 7, 1.0, 2.0))) + 0.25 and not (0.55 < u < 0.7 and v > 0.2)) if RUIN else None, fray=0.03 if RUIN else 0.0)
 
 # ----------------------------------------------------------------------------- small-part helpers (goods, crates, weeds; Wave 1 variants)
 def blob(name, r, scale, loc, mat, tint, rot=(0, 0, 0), segs=(14, 8), fn=None):
@@ -1142,6 +1162,7 @@ if VARIANT and not RUIN:
         # tools hung from a rail under the back lintel, pots and a kettle on the tiers, horseshoes, a nail tray and a hammer on the counter,
         # a barrel of long-handled tools at the fountain-side front corner
         zr = lintel_top(PY) - LIN_H - 0.05; yr = PY - 0.13
+        COPPER, STEEL = lin('#c27a48'), lin('#b8b4ac')
         pole('tool_rail', [(-1.15, yr, zr), (1.15, yr, zr)], 0.014, 'Iron', 8)
         def hook(nm, x):
             pole(nm, [(x, yr, zr + 0.01), (x, yr - 0.03, zr - 0.01), (x, yr - 0.03, zr - 0.05)], 0.005, 'Iron', 6)
@@ -1150,53 +1171,53 @@ if VARIANT and not RUIN:
             hook(f'hook_{nm}', x); y = yr - 0.04; zt = zr - 0.05
             if nm.startswith('saw'):
                 L = 0.46 if nm == 'saw' else 0.36
-                prism(f'{nm}_blade', [(x - 0.035, zt - 0.06), (x + 0.035, zt - 0.06), (x + 0.025, zt - 0.06 - L), (x - 0.06, zt - 0.06 - L + 0.04)], 0.004, 'Iron', y, chamfer=0.001)
+                prism(f'{nm}_blade', [(x - 0.035, zt - 0.06), (x + 0.035, zt - 0.06), (x + 0.025, zt - 0.06 - L), (x - 0.06, zt - 0.06 - L + 0.04)], 0.004, 'Metal', y, chamfer=0.001)
                 board(f'{nm}_grip', (0.1, 0.03, 0.12), 'Oak', (x, y + 0.002, zt - 0.03), grain=2, chamfer=0.01)
             elif nm.startswith('hammer'):
                 board(f'{nm}_handle', (0.03, 0.026, 0.34), 'Oak', (x, y, zt - 0.2), grain=2, chamfer=0.007)
-                board(f'{nm}_head', (0.13 if nm == 'hammer' else 0.1, 0.04, 0.045), 'Iron', (x, y, zt - 0.39), grain=0, chamfer=0.008)
+                board(f'{nm}_head', (0.13 if nm == 'hammer' else 0.1, 0.04, 0.045), 'Metal', (x, y, zt - 0.39), grain=0, chamfer=0.008)
             elif nm == 'sickle':
                 board('sickle_handle', (0.032, 0.03, 0.13), 'Oak', (x, y, zt - 0.08), grain=2, chamfer=0.008)
                 pole('sickle_blade', [(x + 0.18 * math.sin(math.pi * 0.85 * k / 10) - 0.0, y, zt - 0.15 - 0.18 * (1 - math.cos(math.pi * 0.85 * k / 10)))
-                                      for k in range(11)], [0.012 * (1 - 0.7 * k / 10) for k in range(11)], 'Iron', 6)
+                                      for k in range(11)], [0.012 * (1 - 0.7 * k / 10) for k in range(11)], 'Metal', 6)
             elif nm == 'tongs':
                 for sgn in (-1, 1):
-                    pole(f'tongs{sgn}', [(x + sgn * 0.01, y, zt - 0.02), (x + sgn * 0.02, y, zt - 0.3), (x - sgn * 0.01, y, zt - 0.4), (x - sgn * 0.02, y, zt - 0.46)], 0.008, 'Iron', 6)
+                    pole(f'tongs{sgn}', [(x + sgn * 0.01, y, zt - 0.02), (x + sgn * 0.02, y, zt - 0.3), (x - sgn * 0.01, y, zt - 0.4), (x - sgn * 0.02, y, zt - 0.46)], 0.008, 'Metal', 6)
             elif nm == 'ladle':
-                pole('ladle_shaft', [(x, y, zt - 0.02), (x, y, zt - 0.36)], 0.007, 'Iron', 6)
-                blob('ladle_bowl', 0.05, (1, 1, 0.55), (x, y, zt - 0.38), 'Iron', None, segs=(12, 6), fn=lambda co: Vector((co.x, co.y, min(co.z, 0.2))))
+                pole('ladle_shaft', [(x, y, zt - 0.02), (x, y, zt - 0.36)], 0.007, 'Metal', 6)
+                blob('ladle_bowl', 0.05, (1, 1, 0.55), (x, y, zt - 0.38), 'Metal', None, segs=(12, 6), fn=lambda co: Vector((co.x, co.y, min(co.z, 0.2))))
         for k, (x, rad) in enumerate(((-0.88, 0.085), (-0.55, 0.07), (0.62, 0.08))):
             lathe(f'pot{k}', [(rad * 0.75, 0.0), (rad, 0.03), (rad * 1.05, rad * 0.9), (rad * 0.85, rad * 1.25), (rad * 0.95, rad * 1.33)],
-                  (x, -0.14, T1), 'Iron', sides=16)
-            ring(f'pot_bail{k}', (x, -0.14, T1 + rad * 1.33), rad * 0.9, 0.004, 'Iron', 'X', 12, arc=0.5)
-        lathe('kettle', [(0.06, 0.0), (0.085, 0.04), (0.08, 0.10), (0.04, 0.15), (0.045, 0.16)], (0.25, 0.09, T2), 'Iron', sides=16)
-        pole('kettle_spout', [(0.32, 0.09, T2 + 0.06), (0.38, 0.09, T2 + 0.1), (0.41, 0.09, T2 + 0.13)], [0.016, 0.012, 0.009], 'Iron', 8)
+                  (x, -0.14, T1), 'Metal', tint=COPPER if k != 1 else STEEL, sides=16)
+            ring(f'pot_bail{k}', (x, -0.14, T1 + rad * 1.33), rad * 0.9, 0.004, 'Metal', 'X', 12, arc=0.5)
+        lathe('kettle', [(0.06, 0.0), (0.085, 0.04), (0.08, 0.10), (0.04, 0.15), (0.045, 0.16)], (0.25, 0.09, T2), 'Metal', tint=COPPER, sides=16)
+        pole('kettle_spout', [(0.32, 0.09, T2 + 0.06), (0.38, 0.09, T2 + 0.1), (0.41, 0.09, T2 + 0.13)], [0.016, 0.012, 0.009], 'Metal', 8, tint=COPPER)
         for k, x in enumerate((-0.6, -0.3, 0.6, 0.9)):               # stacked iron pans on the top tier ends
-            lathe(f'pan{k}', [(0.09, 0.0), (0.11, 0.035), (0.115, 0.04)], (x, 0.09, T2 + 0.0), 'Iron', sides=16)
+            lathe(f'pan{k}', [(0.09, 0.0), (0.11, 0.035), (0.115, 0.04)], (x, 0.09, T2 + 0.0), 'Metal', sides=16)
         board('nail_tray', (0.34, 0.22, 0.06), 'Oak', (-0.65, -0.62, CZ + 0.03), (0, 0, 6), grain=0, chamfer=0.006)
-        blob('nail_heap', 0.15, (1, 0.62, 0.17), (-0.65, -0.62, CZ + 0.055), 'Iron', None, (0, 0, 6), (16, 8))
+        blob('nail_heap', 0.15, (1, 0.62, 0.17), (-0.65, -0.62, CZ + 0.055), 'Metal', None, (0, 0, 6), (16, 8))
         for k in range(4):
             r = rng(f'shoe{k}')
-            ring(f'shoe{k}', (0.05 + 0.13 * k, -0.62 + r.uniform(-0.05, 0.05), CZ + 0.012), 0.055, 0.011, 'Iron', 'Z', 12, arc=0.72)
+            ring(f'shoe{k}', (0.05 + 0.13 * k, -0.62 + r.uniform(-0.05, 0.05), CZ + 0.012), 0.055, 0.011, 'Metal', 'Z', 12, arc=0.72)
         board('hammer_c_handle', (0.3, 0.03, 0.026), 'Oak', (0.85, -0.55, CZ + 0.014), (0, 0, -24), grain=0, chamfer=0.006)
-        board('hammer_c_head', (0.045, 0.12, 0.045), 'Iron', (0.98, -0.61, CZ + 0.024), (0, 0, -24), grain=1, chamfer=0.008)
+        board('hammer_c_head', (0.045, 0.12, 0.045), 'Metal', (0.98, -0.61, CZ + 0.024), (0, 0, -24), grain=1, chamfer=0.008)
         bx, by = -W / 2 - 0.2, -PY - 0.2                             # barrel of long-handled tools
         lathe('barrel', [(0.2, 0.0), (0.225, 0.15), (0.235, 0.3), (0.225, 0.45), (0.2, 0.6)], (bx, by, 0), 'Oak', sides=20)
         for z, rr_ in ((0.08, 0.214), (0.52, 0.214)):
-            ring(f'barrel_hoop{z}', (bx, by, z), rr_ + 0.006, 0.008, 'Iron', 'Z', 20)
+            ring(f'barrel_hoop{z}', (bx, by, z), rr_ + 0.006, 0.008, 'Metal', 'Z', 20)
         for k, (dx, dy, lx, ly, nm) in enumerate(((-0.06, 0.04, -8, 5, 'shovel'), (0.07, -0.02, 9, -4, 'fork'), (0.0, -0.08, 3, 10, 'rake'))):
             base = Vector((bx + dx, by + dy, 0.12)); d = (Matrix.Rotation(math.radians(lx), 3, 'Y') @ Matrix.Rotation(math.radians(ly), 3, 'X')) @ Vector((0, 0, 1))
             top = base + d * 1.35
             pole(f'{nm}_shaft', [base, top], 0.016, 'Oak', 8)
             if nm == 'shovel':
-                board('shovel_blade', (0.2, 0.012, 0.26), 'Iron', tuple(top + d * 0.12), (ly, lx, 0), grain=2, chamfer=0.003)
+                board('shovel_blade', (0.2, 0.012, 0.26), 'Metal', tuple(top + d * 0.12), (ly, lx, 0), grain=2, chamfer=0.003)
             elif nm == 'fork':
                 for t in (-1, 0, 1):
-                    pole(f'fork_tine{t}', [top, top + d * 0.05 + Vector((t * 0.05, 0, 0)), top + d * 0.28 + Vector((t * 0.055, 0, 0))], 0.006, 'Iron', 6)
+                    pole(f'fork_tine{t}', [top, top + d * 0.05 + Vector((t * 0.05, 0, 0)), top + d * 0.28 + Vector((t * 0.055, 0, 0))], 0.006, 'Metal', 6)
             else:
                 board('rake_head', (0.34, 0.03, 0.03), 'Oak', tuple(top + d * 0.02), (ly, lx, 0), grain=0, chamfer=0.005)
                 for t in range(7):
-                    pole(f'rake_tine{t}', [top + Vector((-0.15 + 0.05 * t, 0, 0)), top + Vector((-0.15 + 0.05 * t, -0.01, 0.1))], 0.005, 'Iron', 6)
+                    pole(f'rake_tine{t}', [top + Vector((-0.15 + 0.05 * t, 0, 0)), top + Vector((-0.15 + 0.05 * t, -0.01, 0.1))], 0.005, 'Metal', 6)
 if RUIN:
     # Ruined, every variant: empty crates (one tipped on the counter, one beside the camera-side front post, one at the back corner)
     crate('crate_r1', 0.46, 0.32, 0.26, Matrix.Translation((0.55, -0.55, COUNTER_Z + 0.16)) @ about((0, 0, 0), rx=-90, rz=12) @ Matrix.Translation((0, 0, -0.16)),
