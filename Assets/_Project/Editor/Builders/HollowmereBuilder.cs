@@ -32,15 +32,19 @@ namespace SleepingCalamity.EditorTools
         // Corner rows that belong to the rebuilt F01 house and the dressed stall (absent in the ruined start), and the rows never brought in (the corner's backdrop).
         static readonly string[] RebuiltOnlyRows = { "Facade", "MarketStall", "Barrels", "Crates", "Sacks", "Buckets", "Baskets", "Jugs", "Ivy", "LintelIvy", "GrassStrip", "StallLantern", "BracketLantern" };
 
-        // Play-position capture cameras (design 7: square entry from the heroes' home, fountain, tithe gate, a lane mouth) plus a high oblique overview.
+        // Play-position capture cameras (design 7: square entry from the heroes' home, fountain, tithe gate, a lane mouth), three low-angle terrain views and a
+        // high oblique overview. Pos.y is the eye height above the ground at Pos (Ground, so the cameras follow the terrain); Target is absolute.
         // The approved corner's own three cameras are added too, unchanged (BeautyCornerTable.Cameras).
         public static readonly (string Name, Vector3 Pos, Vector3 Target, float Fov)[] Cameras =
         {
             ("Cap_HM_HomeDoor", new Vector3(12.0f, 1.65f, 5.4f), new Vector3(-3f, 1.6f, -5f), 50f),
             ("Cap_HM_Fountain", new Vector3(-6.5f, 1.65f, -9.5f), new Vector3(2.5f, 2.6f, 9f), 50f),
             ("Cap_HM_TitheGate", new Vector3(5.2f, 1.65f, 8.2f), new Vector3(5.6f, 5.5f, 22f), 55f),
-            ("Cap_HM_LaneMouth", new Vector3(-0.4f, 1.65f, -40f), new Vector3(0f, 3.0f, -8f), 50f),
-            ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),   // rendered without fog (HollowmereCapture)
+            ("Cap_HM_LaneMouth", new Vector3(-0.4f, 1.65f, -40f), new Vector3(0f, 1.0f, -8f), 50f),
+            ("Cap_HM_LowSouth", new Vector3(-40f, 1.7f, -77.5f), new Vector3(-2f, -2f, -32f), 50f),     // from the Saltwake road below the Lower Gate, up at the town
+            ("Cap_HM_LowEast", new Vector3(70f, 1.7f, -6f), new Vector3(22f, 0f, -8f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
+            ("Cap_HM_Terraces", new Vector3(-31f, 1.7f, -47.5f), new Vector3(-8f, -1.5f, -24f), 52f),   // from the Ring Lane's south-west bend up the terraces to the square
+            ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]
@@ -126,7 +130,8 @@ namespace SleepingCalamity.EditorTools
             foreach (var c in BeautyCornerTable.Cameras) LookTestBuilder.AddCapture(cams, c.Name, c.Pos, c.Target, c.Fov);
             foreach (var c in Cameras)
             {
-                Camera cam = LookTestBuilder.AddCapture(cams, c.Name, c.Pos, c.Target, c.Fov);
+                Vector3 pos = c.Name == "Cap_HM_Overview" ? c.Pos : new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z);
+                Camera cam = LookTestBuilder.AddCapture(cams, c.Name, pos, c.Target, c.Fov);
                 cam.farClipPlane = 400f;
             }
 
@@ -172,7 +177,7 @@ namespace SleepingCalamity.EditorTools
             go.AddComponent<HollowmereGround>().Configure(new Vector2(-130f, -150f), new Vector2(140f, 100f), 1f, paving != null ? BeautyCornerArt.FarTileMetres : 3f, true);
 
             var water = LookTestBuilder.Box(set, "Lake", new Vector3(HollowmereLayout.LakeCentre.X, HollowmereLayout.WaterY - 0.05f, HollowmereLayout.LakeCentre.Z),
-                new Vector3(HollowmereLayout.LakeRadiusX * 2.4f, 0.1f, HollowmereLayout.LakeRadiusZ * 2.4f), M("water"), default, 4f);
+                new Vector3(HollowmereLayout.LakeRadiusX * 2.3f, 0.1f, HollowmereLayout.LakeRadiusZ * 2.3f), M("water"), default, 4f);
             water.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             Transform stream = Child(set, "Stream");
             TownPoint[] s = HollowmereLayout.Stream;
@@ -188,45 +193,85 @@ namespace SleepingCalamity.EditorTools
         static void BuildWalls(Transform set, TownLayout t)
         {
             Wall(Child(set, "TownWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TownWallOffset, 16f), 0.5f), 2.4f, 1.0f);
-            Wall(Child(set, "TerraceWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TerraceOffset, 16f), 1.0f), 0.8f, 0.6f);
+            Wall(Child(set, "TerraceWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TerraceOffset, 16f), 1.0f, 1.0f), 0.9f, 0.8f);
+            Wall(Child(set, "LowerTerraceWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.LowerTerraceOffset, 16f), 1.0f, 1.0f), 0.9f, 0.8f);
         }
 
-        // A run of wall pieces standing on the ground: each piece reaches 1.5 m below its lowest end and `height` above its highest.
+        // A run of wall pieces standing on the ground: each piece reaches 1 m below the lowest ground on either side (1.5 m out) and `height` above the
+        // highest, so a terrace wall retains its whole step and a free-standing wall gets its parapet height.
         static void Wall(Transform parent, TownLayout t, List<(TownPoint A, TownPoint B)> run, float height, float thick)
         {
             Material stone = LookTestBuilder.Mat("sandstone");
             int i = 0;
             foreach (var (a, b) in run)
             {
-                TownPoint mid = (a + b) * 0.5f;
-                float ya = HollowmereLayout.Ground(t, a.X, a.Z), yb = HollowmereLayout.Ground(t, b.X, b.Z), ym = HollowmereLayout.Ground(t, mid.X, mid.Z);
-                float lo = Mathf.Min(ya, Mathf.Min(yb, ym)) - 1.5f, hi = Mathf.Max(ya, Mathf.Max(yb, ym)) + height;
+                TownPoint mid = (a + b) * 0.5f, dir = b - a;
+                var nrm = new TownPoint(dir.Z / dir.Length, -dir.X / dir.Length);
+                float lo = float.MaxValue, hi = float.MinValue;
+                foreach (TownPoint p in new[] { a, b, mid })
+                    foreach (float side in new[] { -1.5f, 0f, 1.5f })
+                    {
+                        TownPoint q = p + nrm * side;
+                        float y = HollowmereLayout.Ground(t, q.X, q.Z);
+                        lo = Mathf.Min(lo, y); hi = Mathf.Max(hi, y);
+                    }
+                lo -= 1f; hi += height;
                 float yaw = Mathf.Atan2(b.X - a.X, b.Z - a.Z) * Mathf.Rad2Deg;
                 LookTestBuilder.Box(parent, "Wall" + (i++), new Vector3(mid.X, (lo + hi) * 0.5f, mid.Z), new Vector3(thick, hi - lo, TownPoint.Distance(a, b) + 0.05f), stone, new Vector3(0f, yaw, 0f), 2f);
             }
         }
 
-        // The keep terrace's retaining wall with its parapet, and the stair up from the square's north-east corner (Keep_StairFoot to Keep_StairHead).
+        // The keep terrace's retaining wall with its parapet, broken up so it is not one blank face: buttresses every 6 m, ivy falling from planters on the
+        // parapet, and the two stairs (Keep_StairFoot/Head from the square's north-east corner, Keep_WStairFoot/Head along the face from the Wall Ginnel).
         static void BuildKeep(Transform set, TownLayout t)
         {
             Transform keep = Child(set, "Keep");
-            Material stone = LookTestBuilder.Mat("sandstone");
+            Material stone = LookTestBuilder.Mat("sandstone"), green = BeautyCornerBuilder.PlaceholderMat("green");
+            float kh = HollowmereLayout.KeepHeight, kz = HollowmereLayout.KeepWallZ;
             int i = 0;
-            foreach (var (a, b) in HollowmereLayout.WallRun(t, HollowmereLayout.KeepWallLine(1f), 0.3f))
+            var run = HollowmereLayout.WallRun(t, HollowmereLayout.KeepWallLine(1f), 0.3f);
+            foreach (var (a, b) in run)
             {
                 TownPoint mid = (a + b) * 0.5f;
-                LookTestBuilder.Box(keep, "KeepWall" + (i++), new Vector3(mid.X, (HollowmereLayout.KeepHeight + 0.9f - 0.6f) * 0.5f, mid.Z),
-                    new Vector3(TownPoint.Distance(a, b) + 0.02f, HollowmereLayout.KeepHeight + 0.9f + 0.6f, 1.2f), stone, default, 2f);
+                LookTestBuilder.Box(keep, "KeepWall" + (i++), new Vector3(mid.X, (kh + 0.9f - 0.6f) * 0.5f, mid.Z), new Vector3(TownPoint.Distance(a, b) + 0.02f, kh + 0.9f + 0.6f, 1.2f), stone, default, 2f);
             }
-            PathNode foot = t.Node("Keep_StairFoot"), head = t.Node("Keep_StairHead");
-            const int steps = 16;
-            float z0 = foot.Pos.Z + 0.4f, z1 = HollowmereLayout.KeepWallZ - 0.6f, run = (z1 - z0) / steps;
+            for (float x = -HollowmereLayout.KeepHalfWidth + 3f; x < HollowmereLayout.KeepHalfWidth; x += 6f)
+            {
+                var p = new TownPoint(x, kz - 0.9f);
+                if (!InRun(run, x)) continue;   // no buttress in a gap (stairs, the tithe gate)
+                if (t.Foundations.Exists(f => f.Footprint.Contains(p, 0.6f))) continue;
+                LookTestBuilder.Box(keep, "Buttress" + x, new Vector3(x, kh * 0.45f - 0.3f, kz - 0.95f), new Vector3(1.1f, kh * 0.9f + 0.6f, 0.7f), stone, new Vector3(-6f, 0f, 0f), 2f);
+            }
+            for (float x = -HollowmereLayout.KeepHalfWidth + 1.5f; x < HollowmereLayout.KeepHalfWidth; x += 4.5f)
+            {
+                if (!InRun(run, x) || !InRun(run, x - 1f) || !InRun(run, x + 1f)) continue;
+                LookTestBuilder.Box(keep, "Planter" + x, new Vector3(x, kh + 1.05f, kz + 0.2f), new Vector3(1.8f, 0.3f, 0.6f), green, default, 2f);
+                float len = 1.4f + 1.8f * Mathf.Repeat(x * 0.37f, 1f);
+                LookTestBuilder.Box(keep, "Ivy" + x, new Vector3(x + 0.2f, kh + 0.9f - len * 0.5f, kz - 0.63f), new Vector3(1.3f, len, 0.06f), green, default, 2f);
+            }
+            Stair(keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, stone);
+            Stair(keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, stone);
+        }
+
+        static bool InRun(List<(TownPoint A, TownPoint B)> run, float x)
+        {
+            foreach (var (a, b) in run) if (x >= Mathf.Min(a.X, b.X) - 0.01f && x <= Mathf.Max(a.X, b.X) + 0.01f) return true;
+            return false;
+        }
+
+        // A straight flight from foot to head: solid steps rising from the foot's height to the head's, run along the line between them.
+        static void Stair(Transform parent, string name, PathNode foot, PathNode head, float width, Material stone)
+        {
+            Transform g = Child(parent, name);
+            TownPoint d = head.Pos - foot.Pos;
+            float len = d.Length, yaw = Mathf.Atan2(d.X, d.Z) * Mathf.Rad2Deg, rise = head.Y - foot.Y;
+            int steps = Mathf.Max(4, Mathf.RoundToInt(Mathf.Abs(rise) / 0.22f));
             for (int s = 0; s < steps; s++)
             {
-                float top = HollowmereLayout.KeepHeight * (s + 1) / steps;
-                LookTestBuilder.Box(keep, "Step" + s, new Vector3(foot.Pos.X, top * 0.5f - 0.1f, z0 + (s + 0.5f) * run), new Vector3(2.2f, top + 0.2f, run + 0.01f), stone, default, 2f);
+                float f = (s + 0.5f) / steps, top = foot.Y + rise * (s + 1) / steps, bottom = Mathf.Min(foot.Y, head.Y) - 0.3f;
+                TownPoint c = foot.Pos + d * f;
+                LookTestBuilder.Box(g, "Step" + s, new Vector3(c.X, (top + bottom) * 0.5f, c.Z), new Vector3(width, top - bottom, len / steps + 0.02f), stone, new Vector3(0f, yaw, 0f), 2f);
             }
-            LookTestBuilder.Box(keep, "StairLanding", new Vector3(head.Pos.X, HollowmereLayout.KeepHeight * 0.5f - 0.1f, HollowmereLayout.KeepWallZ), new Vector3(2.2f, HollowmereLayout.KeepHeight + 0.2f, 1.3f), stone, default, 2f);
         }
 
         // --------------------------------------------------------------------------------------------- foundations
@@ -256,6 +301,7 @@ namespace SleepingCalamity.EditorTools
 
             if (kind != HollowmereLayout.BuildingKind.ApprovedFacade)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
                 LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(side, 0.4f, side), stone, default, 2f);
+            CutAndFill(go.transform, f, stone);
             switch (kind)
             {
                 case HollowmereLayout.BuildingKind.Empty:
@@ -270,6 +316,41 @@ namespace SleepingCalamity.EditorTools
                 default:
                     Building(g, f, kind);
                     break;
+            }
+        }
+
+        // The lot's pad against the natural slope (both presets): on a side where the hill stands more than 0.7 m above the pad, a retaining wall 1.3 m out
+        // holds the cut; where the hill falls more than 0.7 m below, a stone fill bank under the pad's yard edge holds it up. Built in the lot's own frame
+        // (yaw = the lot's Yaw, not the facing turn), so walls run along the lot edges.
+        static void CutAndFill(Transform lot, Foundation f, Material stone)
+        {
+            var g = new GameObject("CutAndFill").transform;
+            g.SetParent(lot, false);
+            g.rotation = Quaternion.Euler(0f, f.Yaw, 0f);
+            float half = f.Side * 0.5f;
+            foreach (LotSide s in TownLayout.AllSides)
+            {
+                TownPoint dir = Foundation.SideDir(s), along = new TownPoint(-dir.Z, dir.X);
+                float hi = float.MinValue, lo = float.MaxValue;
+                for (int k = -2; k <= 2; k++)
+                {
+                    TownPoint l = dir * (half + 2.3f) + along * (k * half * 0.45f);
+                    TownPoint w = f.Footprint.ToWorld(l.X, l.Z);
+                    float y = HollowmereLayout.NaturalGround(w.X, w.Z);
+                    hi = Mathf.Max(hi, y); lo = Mathf.Min(lo, y);
+                }
+                Vector3 outward = new Vector3(dir.X, 0f, dir.Z);
+                Vector3 size = Mathf.Abs(dir.X) > 0.5f ? new Vector3(0.7f, 1f, f.Side + 2.6f) : new Vector3(f.Side + 2.6f, 1f, 0.7f);
+                if (hi > f.Y + 0.7f)
+                {
+                    float h = hi - f.Y + 0.6f;
+                    LookTestBuilder.Box(g, "Retain" + s, outward * (half + 1.3f) + Vector3.up * (h * 0.5f - 0.3f), new Vector3(size.x, h, size.z), stone, default, 2f);
+                }
+                if (lo < f.Y - 0.7f)
+                {
+                    float h = f.Y - lo + 0.8f;
+                    LookTestBuilder.Box(g, "Fill" + s, outward * (half + 0.65f) + Vector3.up * (0.25f - h * 0.5f), new Vector3(Mathf.Abs(dir.X) > 0.5f ? 1.3f : f.Side + 1.3f, h, Mathf.Abs(dir.X) > 0.5f ? f.Side + 1.3f : 1.3f), stone, default, 2f);
+                }
             }
         }
 

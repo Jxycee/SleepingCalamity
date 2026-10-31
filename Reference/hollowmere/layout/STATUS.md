@@ -1,22 +1,20 @@
-# Hollowmere Wave 0 layout greybox: status
+# Hollowmere layout: status
 
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
-Progress: 100% (Wave 0 greybox merged; terrain pass next on a new branch)
-Sheet: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
+State: IN PROGRESS (terrain pass)
+Progress: 50%
+Sheet: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
 
-**State:** MERGED to main as `1f6ff88` (merge commit). `check` on main: `SC RESULT check PASS` (build PASS; test-edit 586/586; test-play 32 passed, 8 skipped, 0 failed; marker 1f6ff88). HollowmereBuilder is on main for Wave 1. Next: the terrain pass (user feedback 2026-10-31) on a new branch.
+**Wave 0 greybox:** merged to main as `1f6ff88` (`check` PASS on main).
+
+**Terrain pass (user feedback 2026-10-31):** heights are in the layout data (`Foundation.Y`, `Landmark.Y`, `Lane.Heights`, path node `Y`; metres relative to the square). The square shelf is 0 and the keep terrace +4. The Ring Lane is one 3 m terrace down on the flanks (-3.5) and spirals down to a second terrace on the south (-6.5). The town wall stands on a raised bank with a dry ditch outside it (-9 to -12). The lake is a basin with water at -12 (bed -16.5), the stream runs in a ravine, and the south slope falls to the lake. Every lot is a flat pad at its lane's height (cut and fill walls in the builder). Lanes are relaxed to 17 deg or less. Validation adds a 20 deg rule (stairs exempt) and requires doorsteps at the lot's height. The keep wall gets buttresses, planters with ivy and a second (west) stair. Foundations have not moved.
 
 | Item | State |
 |---|---|
-| Layout data + validator (`Assets/_Project/Core/Town/`) | done, 0 rule violations |
-| EditMode tests (`HollowmereLayoutTests`, 17) | pass in Unity (`check` test-edit 586/586) |
-| `HollowmereBuilder` + `HollowmereCapture` in `ProjectBuilder.RunAll` | done; `unity.sh build` PASS; reviewer pass, fixes applied |
-| Top-down maps | `Hollowmere_Map_Town.jpg`, `Hollowmere_Map_Square.jpg` (PIL from the layout data) |
-| Play-position captures, both presets | `captures/HM_{HomeDoor,Fountain,TitheGate,LaneMouth,Overview}_{Ruined,Rebuilt}.jpg`, `captures/Corner_Wide_*.jpg` (Unity, cloud, xvfb) |
-| `unity.sh check` | PASS on branch tip 30dfa7d and on main 1f6ff88 |
-| Merge to main | done: 1f6ff88 |
-
-**Foundation counts:** ring 1: 10 (3 L, 4 M, 3 S); ring 2: 23 (4 L, 14 M, 5 S); ring 3: 3 (1 M, 2 S). 36 in all.
+| Heights + validation + tests (22) | done; `sc_core_tests` PASS |
+| Elevation-shaded map | done (`Hollowmere_Map_Town.jpg`, `Hollowmere_Map_Square.jpg`) |
+| Builder: terrain mesh, terrace walls, cut and fill, keep wall breakup, low-angle cameras | written, compiles; Unity build and captures next |
+| `check`, merge | not yet |
 
 **Blockers:** none.

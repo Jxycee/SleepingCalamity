@@ -24,33 +24,65 @@ namespace SleepingCalamity.Core
         // ------------------------------------------------------------------------------------------------ fixed numbers
         public const float SquareMinX = -20f, SquareMaxX = 20f, SquareMinZ = -21f, SquareMaxZ = 7f;
         public const float KeepWallZ = 19.6f, KeepHeight = 4f, KeepHalfWidth = 24f;   // the keep terrace: north of KeepWallZ, |x| < KeepHalfWidth
-        public const float WaterY = -10.5f;                                            // the lake surface
+        public const float WaterY = -12f;                                              // the lake surface, 12 m below the square
         public static readonly TownPoint UndercroftStair = new TownPoint(15f, 12.5f); // inside the cistern house, the way down (P25)
-        public static readonly TownPoint LakeCentre = new TownPoint(10f, -106f);
-        public const float LakeRadiusX = 72f, LakeRadiusZ = 27f;
+        public static readonly TownPoint LakeCentre = new TownPoint(10f, -102f);
+        public const float LakeRadiusX = 70f, LakeRadiusZ = 24f;
         const float LotSetback = 1.0f;   // lane edge to lot edge
+        public const float MaxLaneGrade = 0.30f;   // lanes are relaxed to this rise per metre (about 17 deg), under TownLayout.MaxGrade (20 deg)
 
         // Plateau (ring 1 shelf) for the ground: x -34..34, south to z -36, open to the north, south corners rounded (radius 10).
         const float PlateauHalfX = 34f, PlateauMinZ = -36f, PlateauCorner = 10f;
-        // Lines drawn by the builder (greybox walls, no path rule): the old town wall and the ring 1 terrace edge, as offsets from the plateau.
-        public const float TownWallOffset = 28f, TerraceOffset = 0.5f;
+        // Lines drawn by the builder (greybox walls, no path rule), as offsets from the plateau: the ring 1 terrace edge, the second terrace edge below the
+        // square's south side, and the old town wall on its bank.
+        public const float TerraceOffset = 0.75f, LowerTerraceOffset = 2.6f, TownWallOffset = 28f;
+        public const float TerraceStep = 3f;   // each terrace drops about 3 m
 
         // ------------------------------------------------------------------------------------------------ ground
-        // Natural ground height (no lot pads): the shelf at 0, falling away round the hill to the low meadow (-9.5), the keep terrace stepping up 4 m in the
-        // north, the hill rising behind it, and the lake basin dipping under the water in the south.
+        // Natural ground height (before lane corridors and lot pads), a castle hill in terraces:
+        //   the square's shelf at 0 (ring 1), the keep terrace 4 m higher on its north side and the hill rising behind it;
+        //   one TerraceStep down at the shelf edge (TerraceOffset) for the lanes on the west, east and north flanks;
+        //   on the south side a second TerraceStep just below (LowerTerraceOffset), so the Ring Lane spirals down about 3 m from the flanks to the south;
+        //   the town wall on a raised bank (offset 26-29.5), a dry ditch outside it (offset 31), then the land falls to the meadow and the lake basin
+        //   (water 12 m below the square), with the stream in a ravine running down to the lake.
         public static float NaturalGround(float x, float z)
         {
-            float e = PlateauDistance(x, z);
-            float fall = e < 4f ? -0.25f * e * e / 8f : -0.25f * (e - 2f);
-            fall = SoftMax(fall, -9.5f, 1.5f);
-            float ax = Math.Abs(x);
+            float e = PlateauDistance(x, z), ax = Math.Abs(x);
+            float south = Smooth(-24f, -40f, z);   // 0 on the north and flanks, 1 on the south slope (the orchard side)
+            float y = -0.04f * Math.Min(e, 29.5f) - TerraceStep * Smooth(TerraceOffset - 0.3f, TerraceOffset + 0.3f, e)
+                - TerraceStep * south * Smooth(LowerTerraceOffset - 0.3f, LowerTerraceOffset + 0.3f, e);
+            y += 1.0f * Smooth(25.5f, 27f, e) * (1f - Smooth(29.5f, 30.5f, e));   // the wall's raised bank
+            if (e > 29.5f)
+            {
+                float rim = y;
+                float outer = rim - 2.5f - 0.14f * Math.Max(0f, e - 33f) * (0.5f + 0.5f * south);
+                y = rim + (outer - rim) * Smooth(29.5f, 33f, e);
+                y = SoftMax(y, -10.5f, 1.2f);
+                y -= 3.0f * (1f - Smooth(1.0f, 3.0f, Math.Abs(e - 31f)));   // the dry ditch
+            }
             float keep = KeepHeight * Smooth(KeepWallZ - 0.4f, KeepWallZ + 0.4f, z) * (1f - Smooth(KeepHalfWidth, KeepHalfWidth + 6f, ax));
-            float hill = 0.12f * Math.Max(0f, z - 32f) * (1f - Smooth(34f, 60f, ax));
+            float hill = 0.14f * Math.Max(0f, z - 32f) * (1f - Smooth(34f, 60f, ax));
             float lx = (x - LakeCentre.X) / LakeRadiusX, lz = (z - LakeCentre.Z) / LakeRadiusZ;
             double th = Math.Atan2(lz, lx);   // a ragged shore, not an oval
             float shore = 1f + 0.07f * (float)Math.Sin(3 * th + 1.0) + 0.05f * (float)Math.Sin(5 * th + 2.3) + 0.03f * (float)Math.Sin(9 * th);
-            float lake = -4.5f * (1f - Smooth(0.75f, 1.0f, (float)Math.Sqrt(lx * lx + lz * lz) / shore));
-            return fall + keep + hill + lake;
+            float lake = -6f * (1f - Smooth(0.7f, 1.0f, (float)Math.Sqrt(lx * lx + lz * lz) / shore));
+            float ravine = e > 30f ? -3.5f * (1f - Smooth(1.5f, 7f, DistanceToPolyline(new TownPoint(x, z), Stream))) : 0f;
+            return y + keep + hill + Math.Min(lake, 0f) + ravine;
+        }
+
+        public static float DistanceToPolyline(TownPoint p, TownPoint[] pts)
+        {
+            float best = float.MaxValue;
+            for (int i = 1; i < pts.Length; i++) best = Math.Min(best, TownPoint.Distance(p, ClosestOnSegment(p, pts[i - 1], pts[i], out _)));
+            return best;
+        }
+
+        public static TownPoint ClosestOnSegment(TownPoint p, TownPoint a, TownPoint b, out float t)
+        {
+            TownPoint ab = b - a, ap = p - a;
+            float len2 = ab.X * ab.X + ab.Z * ab.Z;
+            t = len2 > 0f ? Math.Max(0f, Math.Min(1f, (ap.X * ab.X + ap.Z * ab.Z) / len2)) : 0f;
+            return a + ab * t;
         }
 
         // Distance outside the plateau (0 inside); offsets of this give the terrace edge and the town wall lines.
@@ -80,13 +112,20 @@ namespace SleepingCalamity.Core
         // The pieces of a greybox wall line that stay clear of the town: a piece is dropped where a path edge crosses it (lanes and stairs get their
         // opening), where it comes within `clearance` of a foundation (lots keep their yard), or where it runs into a landmark (the tithe gate and the
         // gate piers stand in the gap). Walls are scenery: they are not path blockers.
-        public static List<(TownPoint A, TownPoint B)> WallRun(TownLayout t, TownPoint[] line, float clearance)
+        // minStep > 0 keeps only pieces where the natural ground steps at least that much across the line (a terrace wall fades out with its terrace).
+        public static List<(TownPoint A, TownPoint B)> WallRun(TownLayout t, TownPoint[] line, float clearance, float minStep = 0f)
         {
             var run = new List<(TownPoint, TownPoint)>();
             for (int i = 1; i < line.Length; i++)
             {
                 TownPoint a = line[i - 1], b = line[i], mid = (a + b) * 0.5f;
                 bool keep = true;
+                if (minStep > 0f)
+                {
+                    TownPoint dir = b - a; float len = dir.Length; var nrm = new TownPoint(dir.Z / len, -dir.X / len);
+                    TownPoint p1 = mid + nrm * 1.5f, p2 = mid - nrm * 1.5f;
+                    keep = Math.Abs(NaturalGround(p1.X, p1.Z) - NaturalGround(p2.X, p2.Z)) >= minStep;
+                }
                 foreach (Foundation f in t.Foundations)
                     if (f.Footprint.Contains(a, clearance) || f.Footprint.Contains(b, clearance) || f.Footprint.Contains(mid, clearance)) { keep = false; break; }
                 if (keep) foreach (Landmark l in t.Landmarks) if (l.Footprint.Contains(a) || l.Footprint.Contains(b) || l.Footprint.Contains(mid) || l.Footprint.SegmentCrosses(a, b)) { keep = false; break; }
@@ -108,17 +147,36 @@ namespace SleepingCalamity.Core
             return pts.ToArray();
         }
 
-        // Ground with every lot and landmark pad flattened to its own height (blended over PadBlend metres): the ground mesh and the builder use this.
+        // Ground with every lane corridor following its relaxed profile and every lot and landmark pad flattened to its own height (blended over PadBlend
+        // metres): the ground mesh, the builder's walls and the cameras use this.
         public const float PadBlend = 3f;
         public static float Ground(TownLayout layout, float x, float z)
         {
             float g = NaturalGround(x, z), wSum = 0f, hSum = 0f;
             var p = new TownPoint(x, z);
+            // Inside a lot's footprint plus its 1 m yard margin the pad wins outright: lots are flat whatever lane runs past.
+            foreach (Foundation f in layout.Foundations) if (f.Footprint.Contains(p, 1.0f)) return f.Y;
+            foreach (Lane lane in layout.Lanes)
+            {
+                if (lane.Heights == null) continue;
+                float bestD = float.MaxValue, bestH = 0f;
+                for (int i = 1; i < lane.Points.Length; i++)
+                {
+                    TownPoint c = ClosestOnSegment(p, lane.Points[i - 1], lane.Points[i], out float t);
+                    float d = TownPoint.Distance(p, c);
+                    if (d < bestD) { bestD = d; bestH = lane.Heights[i - 1] + (lane.Heights[i] - lane.Heights[i - 1]) * t; }
+                }
+                float od = bestD - (lane.Width * 0.5f + 0.75f);
+                if (od >= PadBlend) continue;
+                if (Math.Abs(x) < KeepHalfWidth && z > KeepWallZ - 0.6f) continue;   // lanes never pull the keep terrace down
+                float w = od <= 0f ? 1f : 1f - Smooth(0f, PadBlend, od);
+                wSum += w; hSum += w * bestH;
+            }
             foreach (Foundation f in layout.Foundations) Pad(f.Footprint, f.Y, 1.0f, p, ref wSum, ref hSum);
-            foreach (Landmark l in layout.Landmarks) if (l.Kind != LandmarkKind.TitheGate) Pad(l.Footprint, l.Y, 1.0f, p, ref wSum, ref hSum);
+            foreach (Landmark l in layout.Landmarks) if (l.Kind != LandmarkKind.TitheGate && l.Kind != LandmarkKind.TownGate) Pad(l.Footprint, l.Y, 1.0f, p, ref wSum, ref hSum);
             if (wSum <= 0f) return g;
-            float w = Math.Min(1f, wSum);
-            return g * (1f - w) + (hSum / wSum) * w;
+            float wt = Math.Min(1f, wSum);
+            return g * (1f - wt) + (hSum / wSum) * wt;
         }
 
         static void Pad(Footprint fp, float y, float margin, TownPoint p, ref float wSum, ref float hSum)
@@ -237,18 +295,23 @@ namespace SleepingCalamity.Core
         public const float FountainLoopRadius = 4.2f;
         // Spokes from the fountain loop (index 0 = north, clockwise in 45 degree steps) to square-loop points.
         static readonly (int Fl, float X, float Z)[] Spokes = { (0, -1.25f, 6.1f), (2, 19.6f, 0f), (4, 0f, -20.6f), (6, -19.4f, 0f), (5, -19.4f, -20.6f), (7, -12.5f, 6.1f) };
-        // The keep: stair from the square's north-east corner up the terrace wall, the terrace walk to the annex and round the tower to its door.
+        // The keep: stairs up the terrace wall from the square's north-east corner and from the Wall Ginnel in the west, the terrace walk to the annex and round
+        // the tower to its door.
         static readonly (string Id, float X, float Z, float Y, PathNodeKind Kind)[] KeepNodes =
         {
             ("Keep_StairFoot", 19.2f, 14.0f, 0f, PathNodeKind.Stair),
             ("Keep_StairHead", 19.2f, 20.6f, KeepHeight, PathNodeKind.Stair),
             ("Keep_Walk_E", 17.8f, 28.6f, KeepHeight, PathNodeKind.Lane),
             ("Keep_Walk_N", 5.6f, 29.2f, KeepHeight, PathNodeKind.Lane),
+            ("Keep_WStairFoot", -26.5f, 17.6f, 0f, PathNodeKind.Stair),   // the west stair climbs along the terrace wall's face from the Wall Ginnel
+            ("Keep_WStairHead", -20.8f, 20.6f, KeepHeight, PathNodeKind.Stair),
+            ("Keep_Walk_W", -8f, 29.0f, KeepHeight, PathNodeKind.Lane),
         };
         static readonly (string A, string B)[] KeepEdges =
         {
             ("NorthEastStub_1", "Keep_StairFoot"), ("Keep_StairFoot", "Keep_StairHead"), ("Keep_StairHead", "HeroesHome_Annex_Door"),
             ("Keep_StairHead", "Keep_Walk_E"), ("Keep_Walk_E", "Keep_Walk_N"), ("Keep_Walk_N", "BellTower_Door"),
+            ("NorthWestGinnel_2", "Keep_WStairFoot"), ("Keep_WStairFoot", "Keep_WStairHead"), ("Keep_WStairHead", "Keep_Walk_W"), ("Keep_Walk_W", "Keep_Walk_N"),
         };
 
         // ------------------------------------------------------------------------------------------------ the rebuilt preset (ring 1 assignment; rings 2-3 homes)
@@ -296,7 +359,6 @@ namespace SleepingCalamity.Core
                 float yaw = (float)(Math.Atan2(n.X, n.Z) * 180.0 / Math.PI);   // lot +Z points away from the lane, so its South side faces it
                 t.Foundations.Add(new Foundation { Id = r.Id, Ring = r.Ring, Size = r.Size, Centre = c, Yaw = (float)Math.Round(yaw, 2), Facing = LotSide.South, RuinVariant = Variant(r.Size, variants[vi++ % 3]) });
             }
-            foreach (Foundation f in t.Foundations) f.Y = Round(NaturalGround(f.Centre.X, f.Centre.Z));
 
             foreach (var r in LandmarkRows)
             {
@@ -343,64 +405,138 @@ namespace SleepingCalamity.Core
             foreach (Foundation f in t.Foundations) blockers.Add(f.Footprint);
             foreach (Landmark l in t.Landmarks) blockers.Add(l.Footprint);
 
-            // Fountain loop.
+            // Fountain loop and square loop: the square's shelf, fixed at 0.
             for (int i = 0; i < 8; i++)
             {
                 double a = i * Math.PI / 4;
-                AddNode(t, "FL_" + i, new TownPoint(FountainLoopRadius * (float)Math.Sin(a), FountainLoopRadius * (float)Math.Cos(a)), PathNodeKind.Loop);
+                AddNode(t, "FL_" + i, new TownPoint(FountainLoopRadius * (float)Math.Sin(a), FountainLoopRadius * (float)Math.Cos(a)), PathNodeKind.Loop, 0f);
             }
             for (int i = 0; i < 8; i++) t.Edges.Add(new PathEdge("FL_" + i, "FL_" + ((i + 1) % 8)));
-
-            // Square loop.
             int nSq = SquareLoop.Length / 2;
-            for (int i = 0; i < nSq; i++) AddNode(t, "SQ_" + i, new TownPoint(SquareLoop[2 * i], SquareLoop[2 * i + 1]), PathNodeKind.Loop);
+            for (int i = 0; i < nSq; i++) AddNode(t, "SQ_" + i, new TownPoint(SquareLoop[2 * i], SquareLoop[2 * i + 1]), PathNodeKind.Loop, 0f);
             for (int i = 0; i < nSq; i++) t.Edges.Add(new PathEdge("SQ_" + i, "SQ_" + ((i + 1) % nSq)));
             foreach (var s in Spokes) t.Edges.Add(new PathEdge("FL_" + s.Fl, NodeAt(t, new TownPoint(s.X, s.Z)).Id));
 
             // Lane spines: a node per lane point; a point within 0.3 m of an existing node joins it (lane junctions and the square loop).
+            var laneNodes = new Dictionary<Lane, PathNode[]>();
             foreach (Lane lane in t.Lanes)
             {
-                string prev = null;
+                var nodes = new PathNode[lane.Points.Length];
                 for (int i = 0; i < lane.Points.Length; i++)
                 {
-                    PathNode n = NodeAt(t, lane.Points[i]) ?? AddNode(t, lane.Id + "_" + i, lane.Points[i], PathNodeKind.Lane);
-                    if (prev != null) t.Edges.Add(new PathEdge(prev, n.Id));
-                    prev = n.Id;
+                    nodes[i] = NodeAt(t, lane.Points[i]) ?? AddNode(t, lane.Id + "_" + i, lane.Points[i], PathNodeKind.Lane);
+                    if (i > 0) t.Edges.Add(new PathEdge(nodes[i - 1].Id, nodes[i].Id));
                 }
+                laneNodes[lane] = nodes;
             }
+            RelaxLanes(t);
+            foreach (var kv in laneNodes) { kv.Key.Heights = new float[kv.Value.Length]; for (int i = 0; i < kv.Value.Length; i++) kv.Key.Heights[i] = kv.Value[i].Y; }
 
-            // Landmark doors and the keep.
+            // The keep (fixed heights) and the landmark doors.
+            foreach (var k in KeepNodes) AddNode(t, k.Id, new TownPoint(k.X, k.Z), k.Kind, k.Y);
+            foreach (var e in KeepEdges) t.Edges.Add(new PathEdge(e.A, e.B));
             foreach (var r in LandmarkRows)
             {
                 if (float.IsNaN(r.DoorX)) continue;
                 string id = r.Id + "_Door";
-                float y = r.Kind == LandmarkKind.BellTower || r.Id == "HeroesHome_Annex" ? KeepHeight : float.NaN;
-                PathNode n = AddNode(t, id, new TownPoint(r.DoorX, r.DoorZ), PathNodeKind.Door, y);
-                t.Landmark(r.Id).DoorNode = id;
+                Landmark lm = t.Landmark(r.Id);
+                PathNode n = AddNode(t, id, new TownPoint(r.DoorX, r.DoorZ), PathNodeKind.Door, float.IsNaN(r.Y) ? 0f : r.Y);
+                lm.DoorNode = id;
+                if (!HasEdge(t, id))
+                {
+                    PathNode target = LinkToNetwork(t, n, blockers, 14f, float.IsNaN(r.Y));
+                    if (target != null && float.IsNaN(r.Y)) { n.Y = target.Y; lm.Y = target.Y; }   // a landmark off the shelf (the mill) stands at the level of its lane
+                }
             }
-            foreach (var k in KeepNodes) AddNode(t, k.Id, new TownPoint(k.X, k.Z), k.Kind, k.Y);
-            foreach (var e in KeepEdges) t.Edges.Add(new PathEdge(e.A, e.B));
-            var network = new List<PathNode>();
-            foreach (PathNode n in t.Nodes) if (n.Kind == PathNodeKind.Loop || n.Kind == PathNodeKind.Lane) network.Add(n);
-            foreach (Landmark l in t.Landmarks)
-                if (l.DoorNode != null && !HasEdge(t, l.DoorNode)) Link(t, t.Node(l.DoorNode), network, blockers, 14f);
 
-            // Each foundation: a doorstep in the middle of each side and a corner node off each corner, linked round the lot; the front doorstep links to the
-            // nearest lane or loop node it can see, and any other doorstep within 3.5 m of one links too.
+            // Each foundation: a doorstep in the middle of each side and a corner node off each corner, linked round the lot. The front doorstep links to the
+            // nearest point of a lane or the square it can see, and the lot takes that point's height: its pad is cut into the slope (or built up on fill)
+            // level with its lane. Any other doorstep within 3.5 m of a lane links too, when that link is not too steep.
             foreach (Foundation f in t.Foundations)
             {
-                float y = f.Y;
-                for (int c = 0; c < 4; c++) AddNode(t, f.CornerId(c), f.CornerPoint(c), PathNodeKind.Corner, y);
-                foreach (LotSide s in TownLayout.AllSides) AddNode(t, f.DoorstepId(s), f.DoorstepPoint(s), PathNodeKind.Doorstep, y);
+                for (int c = 0; c < 4; c++) AddNode(t, f.CornerId(c), f.CornerPoint(c), PathNodeKind.Corner, 0f);
+                foreach (LotSide s in TownLayout.AllSides) AddNode(t, f.DoorstepId(s), f.DoorstepPoint(s), PathNodeKind.Doorstep, 0f);
                 string[] ring = { f.CornerId(0), f.DoorstepId(LotSide.South), f.CornerId(1), f.DoorstepId(LotSide.East), f.CornerId(2), f.DoorstepId(LotSide.North), f.CornerId(3), f.DoorstepId(LotSide.West) };
                 for (int i = 0; i < ring.Length; i++) t.Edges.Add(new PathEdge(ring[i], ring[(i + 1) % ring.Length]));
             }
             foreach (Foundation f in t.Foundations)
             {
-                Link(t, t.Node(f.DoorstepId(f.Facing)), network, blockers, 14f);
-                foreach (LotSide s in TownLayout.AllSides) if (s != f.Facing) Link(t, t.Node(f.DoorstepId(s)), network, blockers, 3.5f);
+                PathNode front = t.Node(f.DoorstepId(f.Facing));
+                PathNode target = LinkToNetwork(t, front, blockers, 14f, true);
+                f.Y = target != null ? target.Y : Round(NaturalGround(f.Centre.X, f.Centre.Z));
+                for (int c = 0; c < 4; c++) t.Node(f.CornerId(c)).Y = f.Y;
+                foreach (LotSide s in TownLayout.AllSides) t.Node(f.DoorstepId(s)).Y = f.Y;
             }
+            foreach (Foundation f in t.Foundations)
+                foreach (LotSide s in TownLayout.AllSides) if (s != f.Facing) LinkToNetwork(t, t.Node(f.DoorstepId(s)), blockers, 3.5f, false);
         }
+
+        // Lane profiles: every lane and loop edge eased to MaxLaneGrade by moving its free ends toward each other. The square, the fountain loop and the
+        // keep are fixed; everything else starts on the natural ground. Junction nodes are shared, so the lanes meet at one height.
+        static void RelaxLanes(TownLayout t)
+        {
+            var edges = new List<(PathNode A, PathNode B, float D)>();
+            foreach (PathEdge e in t.Edges)
+            {
+                PathNode a = t.Node(e.A), b = t.Node(e.B);
+                if (a.Kind == PathNodeKind.Lane || b.Kind == PathNodeKind.Lane) edges.Add((a, b, TownPoint.Distance(a.Pos, b.Pos)));
+            }
+            for (int iter = 0; iter < 400; iter++)
+            {
+                bool moved = false;
+                foreach (var (a, b, d) in edges)
+                {
+                    float diff = b.Y - a.Y, max = MaxLaneGrade * d;
+                    if (Math.Abs(diff) <= max) continue;
+                    float excess = Math.Abs(diff) - max, sign = Math.Sign(diff);
+                    bool fa = a.Kind != PathNodeKind.Lane, fb = b.Kind != PathNodeKind.Lane;
+                    if (fa && fb) continue;
+                    if (fa) b.Y -= sign * excess;
+                    else if (fb) a.Y += sign * excess;
+                    else { a.Y += sign * excess * 0.5f; b.Y -= sign * excess * 0.5f; }
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+            foreach (var (a, b, _) in edges) { a.Y = Round(a.Y); b.Y = Round(b.Y); }
+        }
+
+        // Links n to the nearest point, within maxDist, of a lane, loop or keep-walk edge whose straight segment from n crosses no footprint. A point in the
+        // middle of an edge splits it with a new node at the interpolated height. With matchHeight the caller sets n to the target's height (a lot pad);
+        // otherwise a link steeper than MaxGrade is not made. No candidate leaves n unlinked here: Validate() then reports it, the build failure we want.
+        static PathNode LinkToNetwork(TownLayout t, PathNode n, List<Footprint> blockers, float maxDist, bool matchHeight)
+        {
+            PathEdge bestEdge = default; TownPoint bestP = default; float bestT = 0f, bestD = maxDist; bool found = false;
+            foreach (PathEdge e in t.Edges)
+            {
+                PathNode a = t.Node(e.A), b = t.Node(e.B);
+                if (!IsNetwork(a) || !IsNetwork(b)) continue;
+                TownPoint c = ClosestOnSegment(n.Pos, a.Pos, b.Pos, out float tt);
+                float d = TownPoint.Distance(n.Pos, c);
+                if (d >= bestD) continue;
+                bool clear = true;
+                foreach (Footprint fp in blockers) if (fp.SegmentCrosses(n.Pos, c)) { clear = false; break; }
+                if (!clear) continue;
+                float y = a.Y + (b.Y - a.Y) * tt;
+                if (!matchHeight && Math.Abs(y - n.Y) > TownLayout.MaxGrade * d) continue;
+                bestEdge = e; bestP = c; bestT = tt; bestD = d; found = true;
+            }
+            if (!found) return null;
+            PathNode na = t.Node(bestEdge.A), nb = t.Node(bestEdge.B), target;
+            if (TownPoint.Distance(bestP, na.Pos) < 0.5f) target = na;
+            else if (TownPoint.Distance(bestP, nb.Pos) < 0.5f) target = nb;
+            else
+            {
+                target = AddNode(t, "J_" + n.Id, bestP, na.Kind == PathNodeKind.Loop && nb.Kind == PathNodeKind.Loop ? PathNodeKind.Loop : PathNodeKind.Lane, Round(na.Y + (nb.Y - na.Y) * bestT));
+                t.Edges.Remove(bestEdge);
+                t.Edges.Add(new PathEdge(na.Id, target.Id)); t.Edges.Add(new PathEdge(target.Id, nb.Id));
+            }
+            if (matchHeight) n.Y = target.Y;
+            t.Edges.Add(new PathEdge(n.Id, target.Id));
+            return target;
+        }
+
+        static bool IsNetwork(PathNode n) => n.Kind == PathNodeKind.Loop || n.Kind == PathNodeKind.Lane;
 
         static PathNode AddNode(TownLayout t, string id, TownPoint p, PathNodeKind kind, float y = float.NaN)
         {
@@ -417,21 +553,5 @@ namespace SleepingCalamity.Core
 
         static bool HasEdge(TownLayout t, string id) { foreach (PathEdge e in t.Edges) if (e.A == id || e.B == id) return true; return false; }
 
-        // Links n to the nearest node of `network` within maxDist whose straight segment crosses no footprint. No candidate leaves n unlinked here:
-        // Validate() then reports it unreachable, which is the build failure we want.
-        static void Link(TownLayout t, PathNode n, List<PathNode> network, List<Footprint> blockers, float maxDist)
-        {
-            PathNode best = null; float bestD = maxDist;
-            foreach (PathNode m in network)
-            {
-                if (m == n) continue;
-                float d = TownPoint.Distance(n.Pos, m.Pos);
-                if (d >= bestD) continue;
-                bool clear = true;
-                foreach (Footprint fp in blockers) if (fp.SegmentCrosses(n.Pos, m.Pos)) { clear = false; break; }
-                if (clear) { best = m; bestD = d; }
-            }
-            if (best != null) t.Edges.Add(new PathEdge(n.Id, best.Id));
-        }
     }
 }
