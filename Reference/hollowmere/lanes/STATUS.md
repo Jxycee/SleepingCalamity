@@ -2,7 +2,7 @@
 
 State: IN PROGRESS
 Session: Q11. Lane kit: lane walls, steps and lane dressing
-Progress: 50%
+Progress: 60%
 Sheet: Reference/hollowmere/lanes/SHEET_lane_kit.jpg
 Blocker: none
 
@@ -34,3 +34,5 @@ History:
   (1326 rows, golden), 7 LaneKitPlanTests, Core suite 310/310; HollowmereLanes placer + builder wiring (terrace Wall lines and CutAndFill replaced),
   cameras Cap_HM_LaneMouthWest, Cap_HM_TerraceSteps (+ existing Cap_HM_MarketStreet). Editor code not yet Unity-compiled: the Unity download had died
   at a container restart; restarted, waiting for it.
+- Kit fix round done (coordinator's two fixes + moss; self 29.5/40; the flat slab was the review backdrop, replaced by real RetainWall modules; gate leaf
+  planks + straps), on worktree branch commit 362d0a3, merged after the Unity integration agent (compile fixes, build, SC_CAPTURE_ONLY captures) reports.
