@@ -35,6 +35,14 @@ Axes (Blender): z up, front (door side) -Y, metres. Origin = foundation centre a
   FOOTPRINT). Renders go to <out>/schoolhouse_<view>.png; views starting 'frame' hide every part.
 
 Budget: under 40k tris, 2048 px maps (shared sets).
+Status (2026-10-31, cloud): 2 render rounds; self-review 28/40 (silhouette 4, proportion 3.5, form 3.5, surface 3.5,
+colour 3.5, wear 3, set 3.5, glass/metal 3.5); first round about 26, round 2 (moss cut back, notice board and hood
+resized, camera) gained about 2; stopped under the 1.5-point rule for a third.
+29,480 tris (Frame 25,192, Part_Door 1,558, Part_Bell 1,962, Part_Sign 768; reproducible); FOOTPRINT 5.40 x 6.40 m;
+everything inside x -3.14..3.92, y -3.89..3.95, z 0..10.65. Sheet: Reference/hollowmere/kit_ready/schoolhouse/SHEET_schoolhouse_final.jpg.
+Next visible gains: a shorter, sturdier bell-cote (it is tall and thin at mid distance), per-panel limewash value
+variation and flaking, green gable boards less saturated, the empty-state close render of the bare bearings (not
+rendered), a real mid-height wear stain pass on the long walls, tiled ridge reads thin next to the cote.
 """
 import sys, os, math, zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -221,7 +229,7 @@ def gable_boards(tag, L, vent_z=5.9):
 def hood():
     """Tiled pent hood over the door on knee brackets."""
     pc = piece('Hood')
-    hw = 1.25
+    hw = 1.12
     def P(u, v, off=0.0):
         return Vector((u * hw, Y0 - 0.98 * v, 3.12 - 0.60 * v))
     n = Vector((0, -0.52, 0.85)).normalized()
@@ -231,11 +239,11 @@ def hood():
         sheet(pc, 'oak', lambda u, v, sx=sx: P(sx, v) - n * (0.06 + 0.14 * u), 1, 3, Vector((sx, 0, 0)), lambda c: (c.y / TILE, c.z / TILE))
     tc(pc, lambda t: (P(-1, t), P(1, t)), n, 6, 'hood')
     # fascia and two rafters
-    FK.member(pc, 'oak', P(-1.02, 1.0) - n * 0.12, P(1.02, 1.0) - n * 0.12, 0.2, 0.07, name='hoodfascia', up=(0, -1, 0.3))
-    for sx in (-0.55, 0.55):
+    FK.member(pc, 'oak', P(-0.92, 1.0) - n * 0.12, P(0.92, 1.0) - n * 0.12, 0.2, 0.07, name='hoodfascia', up=(0, -1, 0.3))
+    for sx in (-0.5, 0.5):
         FK.member(pc, 'oak', P(sx / hw, 0.0) - n * 0.22, P(sx / hw, 1.0) - n * 0.22, 0.10, 0.12, name='hoodraft%f' % sx, up=tuple(-n))
     # knee brackets
-    for sx in (-1.05, 1.05):
+    for sx in (-0.95, 0.95):
         FK.member(pc, 'oak', Vector((sx, Y0 - 0.04, 1.95)), Vector((sx, Y0 - 0.88, 2.43)), 0.11, 0.10, name='knee%f' % sx, up=(1, 0, 0))
         FK.member(pc, 'oak', Vector((sx, Y0 - 0.88, 2.0)), Vector((sx, Y0 - 0.88, 2.55)), 0.10, 0.10, name='hpost%f' % sx, up=(1, 0, 0))
     return pc
@@ -260,7 +268,7 @@ def front_extras():
         FK.add_box(pc, 'oak', (0.09, 0.36, 0.50), Matrix.Translation((sx, by, 0.25)), cham=0.012, wob=0.004, seed=sx + 30)
     FK.member(pc, 'oak', Vector((bx0 + 0.2, by + 0.14, 0.52)), Vector((bx1 - 0.2, by + 0.14, 0.52)), 0.06, 0.06, name='benchrail')
     # notice board right of the door: oak frame, slate, pinned papers, chalk marks, a little pent cap
-    nx0, nx1, nz0, nz1 = 1.0, 2.2, 1.30, 2.30
+    nx0, nx1, nz0, nz1 = 1.30, 2.02, 1.35, 2.25
     cx, cz = (nx0 + nx1) / 2, (nz0 + nz1) / 2
     yb = Y0 - 0.05
     FK.add_box(pc, 'slate', (nx1 - nx0 - 0.12, 0.04, nz1 - nz0 - 0.12), Matrix.Translation((cx, yb - 0.01, cz)), cham=0.006, seed=5.5)
@@ -268,19 +276,19 @@ def front_extras():
                         ('b', (nx0, nz0 + 0.05), (nx1, nz0 + 0.05), 0.10), ('t', (nx0, nz1 - 0.05), (nx1, nz1 - 0.05), 0.10)):
         FK.member(pc, 'oak', Vector((a[0], yb - 0.04, a[1])), Vector((b[0], yb - 0.04, b[1])), w, 0.07, name='nb' + nm, cham=0.012,
                   up=(0, -1, 0))
-    FK.add_box(pc, 'oak', (nx1 - nx0 + 0.24, 0.26, 0.05), Matrix.Translation((cx, yb - 0.09, nz1 + 0.15)) @ Matrix.Rotation(math.radians(-18), 4, 'X'),
+    FK.add_box(pc, 'oak', (nx1 - nx0 + 0.24, 0.26, 0.05), Matrix.Translation((cx, yb - 0.09, nz1 + 0.07)) @ Matrix.Rotation(math.radians(-18), 4, 'X'),
                cham=0.01, long_axis=0, seed=6.6)
     for sx in (nx0 + 0.04, nx1 - 0.04):
-        FK.member(pc, 'oak', Vector((sx, yb - 0.02, nz1 + 0.02)), Vector((sx, yb - 0.17, nz1 + 0.16)), 0.05, 0.05, name='nbk%f' % sx,
+        FK.member(pc, 'oak', Vector((sx, yb - 0.02, nz1 - 0.06)), Vector((sx, yb - 0.17, nz1 + 0.07)), 0.05, 0.05, name='nbk%f' % sx,
                   up=(1, 0, 0))
-    for k in range(5):
-        px = nx0 + 0.24 + (k % 3) * 0.32 + R.uniform(-0.03, 0.03)
-        pz = nz0 + 0.30 + (k // 3) * 0.42 + R.uniform(-0.03, 0.03)
-        FK.add_box(pc, 'chalk', (0.20, 0.012, 0.27), Matrix.Translation((px, yb - 0.05 - k * 0.001, pz)) @ Matrix.Rotation(math.radians(R.uniform(-7, 7)), 4, 'Y'),
+    for k in range(6):
+        px = nx0 + 0.20 + (k % 2) * 0.30 + R.uniform(-0.02, 0.02)
+        pz = nz0 + 0.24 + (k // 2) * 0.26 + R.uniform(-0.02, 0.02)
+        FK.add_box(pc, 'chalk', (0.17, 0.012, 0.22), Matrix.Translation((px, yb - 0.05 - k * 0.001, pz)) @ Matrix.Rotation(math.radians(R.uniform(-7, 7)), 4, 'Y'),
                    cham=0.0, seed=k + 8)
-        box(pc, 'iron', (0.022, 0.02, 0.022), Vector((px, yb - 0.065, pz + 0.11)), cham=0.004, seed=k)
+        box(pc, 'iron', (0.022, 0.02, 0.022), Vector((px, yb - 0.065, pz + 0.09)), cham=0.004, seed=k)
     for k in range(4):   # chalk scrawl on the bare slate
-        FK.add_box(pc, 'chalk', (0.12 + 0.05 * (k % 2), 0.008, 0.012), Matrix.Translation((nx0 + 0.3 + 0.35 * (k % 2), yb - 0.035, nz0 + 0.1 + 0.07 * k)) @
+        FK.add_box(pc, 'chalk', (0.10 + 0.04 * (k % 2), 0.008, 0.012), Matrix.Translation((nx0 + 0.25 + 0.2 * (k % 2), yb - 0.035, nz0 + 0.06 + 0.04 * k)) @
                    Matrix.Rotation(math.radians(R.uniform(-5, 5)), 4, 'Y'), cham=0.0, seed=k + 20)
     return pc
 
@@ -379,7 +387,7 @@ def cote():
                       0.20, 0.06, name='cbarge%d%d' % (side, end), up=(0, sg, 0))
         tc(pc, lambda t: (cp(side, ey0, t), cp(side, ey1, t)), n, 6, 'cote%d' % side)
         FK.member(pc, 'oak', cp(side, ey0, 0) - n * 0.10, cp(side, ey1, 0) - n * 0.10, 0.14, 0.06, name='cfas%d' % side, up=(side, 0, 0.4))
-    BK.ridge_tiles(pc, Vector((0, ey0 + 0.05, zr + 0.10)), Vector((0, ey1 - 0.05, zr + 0.10)), 2, 'cote')
+    BK.ridge_tiles(pc, Vector((0, ey0 + 0.05, zr + 0.05)), Vector((0, ey1 - 0.12, zr + 0.05)), 2, 'cote')
     return pc
 
 # ----------------------------------------------------------------------------- yard
@@ -515,7 +523,7 @@ def write_wear(ob):
             nz = noise.noise(p * 1.7)
             streak = noise.noise(Vector((p.x * 4.0, p.y * 4.0, p.z * 0.5)))
             r = max(0.0, 1 - p.z / (0.9 + 0.25 * nz)) ** 1.2 * 0.75
-            r = max(r, 0.12 * max(0.0, noise.noise(p * 0.5 + Vector((3.0, 1.0, 2.0)))) + 0.05 * max(0.0, nz))
+            r = max(r, 0.22 * max(0.0, noise.noise(p * 0.6 + Vector((3.0, 1.0, 2.0)))) + 0.06 * max(0.0, nz))
             if PLATE - 0.7 < p.z < PLATE + 0.1 and abs(p.x) > HX - 0.35:
                 r = max(r, 0.24 + 0.1 * streak)                 # damp under the eaves
             for zs_ in RUNOFF:
@@ -529,7 +537,10 @@ def write_wear(ob):
             g = 0.0
             if roofish and n.z > 0.2:
                 z_rel = p.z - ZE
-                g = max(0.0, 1 - z_rel / 1.5) * 0.75 + max(0.0, 0.15 + 0.45 * nz) * 0.3
+                if p.z > 3.8:
+                    g = max(0.0, 1 - z_rel / 1.3) * 0.5 + max(0.0, 0.1 + 0.4 * nz) * 0.18
+                else:
+                    g = 0.12 + 0.12 * max(0.0, nz)
                 if p.y > 1.4:
                     g = max(g, 0.2 + 0.2 * nz)
                 tv = ((poly.index * 2654435761) % 1009) / 1009.0
@@ -537,7 +548,7 @@ def write_wear(ob):
             elif n.z > 0.6 and p.z < PL + 0.1:
                 g = 0.3 + 0.3 * nz
             if mname == 'FK_Shutter' and ob.name == 'Frame':
-                r = max(r, 0.18 * (1 - min(1.0, (p.z - PLATE) / 2.5)) + 0.08 * streak)   # splash on the lower gable boards
+                r = max(r, 0.30 * (1 - min(1.0, (p.z - PLATE) / 3.0)) + 0.14 * streak + 0.10 * max(0.0, nz))   # splash on the lower gable boards
             b = 0.0
             dd = Vector((p.x, p.y, 0)).length
             dstep = (Vector((p.x, p.y, 0)) - Vector((0, Y0 - 0.5, 0))).length
@@ -651,10 +662,10 @@ def build():
 
 # ----------------------------------------------------------------------------- review
 VIEWS_DEF = {
-    'tq': (Vector((9.5, -13.0, 4.2)), Vector((0.0, 0, 4.8)), 44),
-    'tql': (Vector((-10.5, -12.0, 4.0)), Vector((0.0, 0, 4.8)), 44),
+    'tq': (Vector((10.5, -14.5, 4.6)), Vector((0.0, 0, 5.2)), 46),
+    'tql': (Vector((-11.5, -13.5, 4.4)), Vector((0.0, 0, 5.2)), 46),
     'back': (Vector((9.0, 13.0, 4.0)), Vector((0.0, 0.5, 4.8)), 44),
-    'frame': (Vector((9.5, -13.0, 4.2)), Vector((0.0, 0, 4.8)), 44),
+    'frame': (Vector((10.5, -14.5, 4.6)), Vector((0.0, 0, 5.2)), 46),
     'frameback': (Vector((-9.0, 13.0, 4.0)), Vector((0.0, 0.5, 4.8)), 44),
     'cote': (Vector((3.4, -8.0, 8.6)), Vector((0.0, -2.6, 8.7)), 36),
     'door': (Vector((2.8, -7.0, 1.9)), Vector((0.0, -3.0, 1.9)), 44),

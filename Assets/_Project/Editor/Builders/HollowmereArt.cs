@@ -42,7 +42,11 @@ namespace SleepingCalamity.EditorTools
         public static readonly Spec Smithy = new Spec { Name = "Smithy", Folder = "Assets/_Project/Content/Art/Town/Ring2/Smithy", Fbx = "Smithy.fbx",
             Parts = new[] { "Part_Forge", "Part_Anvil", "Part_Sign" } };
         public static readonly Spec Schoolhouse = new Spec { Name = "Schoolhouse", Folder = "Assets/_Project/Content/Art/Town/Ring2/Schoolhouse", Fbx = "Schoolhouse.fbx",
-            Parts = new[] { "Part_Door", "Part_Bell", "Part_Sign" } };
+            Parts = new[] { "Part_Door", "Part_Bell", "Part_Sign" },
+            Tinted = new[] { ("SH_Limewash", "plaster", new Color(1.05f, 1.03f, 0.97f)), ("SH_Slate", "soot_coal", new Color(0.85f, 0.9f, 0.95f)),
+                             ("SH_Chalk", "plaster", new Color(1.45f, 1.45f, 1.42f)), ("SH_Rope", "canvas", new Color(1.0f, 0.85f, 0.62f)) },
+            // the bell: a flat warm bronze like the bell tower's BT_Bronze (the iron scan tinted stays too dark at distance)
+            Flat = new[] { ("SH_Bronze", new Color(0.55f, 0.36f, 0.16f), 0.45f), ("SH_Interior", new Color(0.035f, 0.025f, 0.018f), 0.1f) } };
         public static readonly Spec Mill = new Spec { Name = "Mill", Folder = "Assets/_Project/Content/Art/Town/Ring3/Mill", Fbx = "Mill.fbx",
             Parts = new[] { "Part_Wheel", "Part_Door" } };
 
