@@ -70,10 +70,10 @@ The target: Dark Cloud's whimsical shapes and town and dungeon themes, rendered 
 | Ground, walls up to 3 m, cellar walls and floors | 1024 px/m (tileables) | kit piece 0.5-5k | shared tileables and trims, 2K |
 | Upper storeys, roofs, vault crowns | 512 px/m | as above | shared |
 | Instanced sculpted pieces (cobbles, tiles, rubble, roots) | 1024 px/m, one baked set per family | 50-400 each | 1 x 2K per family |
-| Hero props | 1024-2048 px/m | 30-60k | unique bake, up to 2 x 4K |
-| A whole building (kit + heroes) | n/a | at most 75k | 2x4K + 4x2K + 2x1K (cottage budget) |
-| Hero character | n/a | 60k | 1 x 4K body and outfit, 1 x 2K head and hair |
-| Enemy (later) | n/a | 25k | 1 x 2K-4K |
+| Hero props | 1024-2048 px/m | 30-60k | unique bake, up to 2 x 2K |
+| A whole building (kit + heroes) | n/a | at most 75k | 6x2K + 2x1K (cottage budget) |
+| Hero character | n/a | 60k | 1 x 2K body and outfit, 1 x 2K head and hair |
+| Enemy (later) | n/a | 25k | 1 x 2K |
 
 ### 3.4 Shape language [P36]
 - Take dimensions from photos, then exaggerate. Timber sections are about 1.4x real (25 cm and up), arches and voussoirs about 1.3x, and roof overhangs and chimney stacks are bigger and chunkier.
@@ -358,5 +358,6 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 - 2026-10-30 (user, A16): the creator always hosts a multiplayer world; its save lives on the creator's PC.
 - 2026-10-30 (user): the day look-test mood is right. The Cellars were too blue-green after tuning; go back to warm firelight, cleaner and less muddy (no teal tint, warm umber/plum shadows, saturated gold, crisper values). 3.1 Cellars row and the P34 paragraph updated.
 - 2026-10-30 (user): go-ahead for M9 with up to 3 art agents at once (P51).
+- 2026-10-30 (user): **texture cap 2048 px.** The game targets 1440p, so no bake above 2K (hero props, buildings, characters and enemies included); 4K maps already exported are imported at max 2048. Section 3.3 updated.
 - 2026-10-30 (user): **M3 is done for solo.** Its 2-player network-simulator walk moves into M7 (needs a second player). Combat depth ("feels better, but mostly mindless button mashing") continues as an ongoing Phase 1 tuning thread, not an M3 gate: research and proposal in the Combat depth session (`docs/research/combat-depth.md`).
 - 2026-10-30 (user reference, decision A24): user-supplied cellar mood image (private: `Reference/private/user/cellar_mood_ref_01.webp`; measured p10/p50/p90 0.04/0.20/0.49, warmth +0.31, masses deep umber `#352214`/`#140c07`/`#58371e`, candle highlights `#e9b96d`/`#f8edbb`). What it teaches: warmth comes from **local light pools** (candles, wall sconces, a hearth fire), unlit stone stays a neutral grey-brown rather than tinted orange, deep near-black shadow between pools, small bright cream-gold highlights, thin smoke and haze in the light, dense dressing (shelves of crocks, hanging herbs, barrels, chains, a table). Cellar value band moved toward it but kept brighter for combat readability: 0.06-0.10 / 0.24-0.32 / 0.55-0.68, warmth +0.25 to +0.35.
