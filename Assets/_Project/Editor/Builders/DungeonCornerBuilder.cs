@@ -144,9 +144,9 @@ namespace SleepingCalamity.EditorTools
             flame.SetColor("_EmissionColor", new Color(3.0f, 1.9f, 0.7f)); flame.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; d["flame"] = flame;
             Shader cone = Shader.Find("SleepingCalamity/LightCone") ?? throw new InvalidOperationException("Shader not found: SleepingCalamity/LightCone");
             Material shaft = LookTestBuilder.Ensure(MaterialsFolder + "/M_DC_DaylightCone.mat", cone);
-            shaft.SetColor("_Color", new Color(0.86f, 0.88f, 0.95f)); shaft.SetFloat("_Intensity", 0.05f); shaft.renderQueue = 3100; d["shaft"] = shaft;
+            shaft.SetColor("_Color", new Color(0.86f, 0.88f, 0.95f)); shaft.SetFloat("_Intensity", 0.12f); shaft.renderQueue = 3100; d["shaft"] = shaft;
             Material lampCone = LookTestBuilder.Ensure(MaterialsFolder + "/M_DC_LampCone.mat", cone);
-            lampCone.SetColor("_Color", new Color(1.0f, 0.72f, 0.36f)); lampCone.SetFloat("_Intensity", 0.05f); lampCone.renderQueue = 3100; d["lampcone"] = lampCone;
+            lampCone.SetColor("_Color", new Color(1.0f, 0.72f, 0.36f)); lampCone.SetFloat("_Intensity", 0.09f); lampCone.renderQueue = 3100; d["lampcone"] = lampCone;
             Shader pu = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new InvalidOperationException("URP Particles/Unlit not found");
             Material mote = LookTestBuilder.Ensure(MaterialsFolder + "/M_DC_Mote.mat", pu);
             mote.SetFloat("_Surface", 1f); mote.SetFloat("_Blend", 2f); mote.SetFloat("_SrcBlend", 1f); mote.SetFloat("_DstBlend", 1f); mote.SetFloat("_SrcBlendAlpha", 1f); mote.SetFloat("_DstBlendAlpha", 1f);
@@ -209,8 +209,8 @@ namespace SleepingCalamity.EditorTools
         {
             LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
             Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.1f); c.contrast.Override(26f); c.saturation.Override(-6f);
-            ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(1.0f, 0.94f, 0.94f, 0f));
+            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.1f); c.contrast.Override(42f); c.saturation.Override(-16f);
+            ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.92f, 0.88f, 0.86f, -0.35f)); s.shadowsStart.Override(0f); s.shadowsEnd.Override(0.4f);   // grey-brown shadow fill, pushed down
             WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(0f);
             LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(1.0f, 0.97f, 0.97f, 0.0f));
             Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.28f); v.smoothness.Override(0.5f);
@@ -249,7 +249,7 @@ namespace SleepingCalamity.EditorTools
                     flame = hook - new Vector3(0, 0.2f, 0);
                 }
                 LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.0f, 10f, LightShadows.Soft);
-                Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 36, own);
+                Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 90, own);
             }
         }
 
@@ -279,7 +279,7 @@ namespace SleepingCalamity.EditorTools
             Light spot = LookTestBuilder.AddLight(lighting, "DaylightShaft", LightType.Spot, hatch, rot, new Color(0.86f, 0.89f, 0.96f), 6f, 6.5f, LightShadows.Soft);
             spot.spotAngle = 16f; spot.innerSpotAngle = 8f;
             LookTestBuilder.Shape(lighting, "DaylightCone", LookTestGeometry.Shape.Cone, hatch, new Vector3(0.7f, 0f, 3.6f), own["shaft"], rot.eulerAngles, 2f, 16, false);
-            Motes(lighting, "Motes_Shaft", hatch + dir * 1.8f, new Vector3(1.0f, 1.0f, 1.8f), 28, own, rot);
+            Motes(lighting, "Motes_Shaft", hatch + dir * 2.2f, new Vector3(0.9f, 0.9f, 3.2f), 220, own, rot);
         }
 
         // Warm dust motes: a slow box emitter, prewarmed (the capture also simulates a few seconds so the edit-mode render shows them).
@@ -287,8 +287,8 @@ namespace SleepingCalamity.EditorTools
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = pos; go.transform.localRotation = rot ?? Quaternion.identity;
             var ps = go.AddComponent<ParticleSystem>();
-            var main = ps.main; main.loop = true; main.prewarm = true; main.startLifetime = 8f; main.startSpeed = 0.02f; main.startSize = 0.012f; main.maxParticles = count;
-            main.startColor = new Color(1.0f, 0.78f, 0.45f, 0.8f); main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var main = ps.main; main.loop = true; main.prewarm = true; main.startLifetime = 8f; main.startSpeed = 0.02f; main.startSize = new ParticleSystem.MinMaxCurve(0.016f, 0.034f); main.maxParticles = count;
+            main.startColor = new Color(1.0f, 0.78f, 0.45f, 1.0f); main.simulationSpace = ParticleSystemSimulationSpace.World;
             var em = ps.emission; em.rateOverTime = count / 8f;
             var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = box;
             var vel = ps.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World;
