@@ -61,6 +61,8 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_EastGate", new Vector3(64.2f, 1.65f, -54.6f), new Vector3(56.6f, -4.5f, -46f), 52f),       // Q8: the East Gate from the Mill Lane outside, looking back up at the wall (gate at about y -8.5)
             ("Cap_HM_SquareSouth", new Vector3(-6.0f, 1.65f, -17.0f), new Vector3(4f, 1.2f, -6f), 55f),   // benches, planters, the Market Street mouth and the bunting
             ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
+            ("Cap_HM_LaneMouthWest", new Vector3(-45.0f, 1.65f, -8.1f), new Vector3(-30f, -0.6f, -7.3f), 55f),   // Q11: from the Ring Lane at the West Lane junction up the West Lane flight to the square
+            ("Cap_HM_TerraceSteps", new Vector3(-46.2f, 1.65f, -20f), new Vector3(-44.5f, -5.2f, -33f), 55f),   // Q11: the Ring Lane's south-west 0.24 drop: flight, kerbs, gutter, the retaining wall
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -123,6 +125,7 @@ namespace SleepingCalamity.EditorTools
             Transform ruined = Child(root, RuinedRoot), rebuilt = Child(root, RebuiltRoot);
             BuildWalls(set, t, ruined, rebuilt);
             BuildKeep(set, t);
+            HollowmereLanes.Build(set, ruined, rebuilt, t);   // Q11 lane kit: terrace and lot retaining walls, steps, kerbs, gutters, garden walls, gates, lanterns
 
             Transform both = Child(set, "Corner");
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows)
@@ -214,8 +217,7 @@ namespace SleepingCalamity.EditorTools
             // The town wall: the Q8 module kit per preset when its FBX are in (HollowmereTownWall), else today's greybox boxes under Set.
             var townRun = HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TownWallOffset, 16f), 0.5f);
             if (!HollowmereTownWall.TryBuild(ruined, rebuilt, t, townRun)) Wall(Child(set, "TownWall"), t, townRun, 2.4f, 1.0f);
-            Wall(Child(set, "TerraceWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TerraceOffset, 16f), 1.0f, 1.0f), 0.9f, 0.8f);
-            Wall(Child(set, "LowerTerraceWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.LowerTerraceOffset, 16f), 1.0f, 1.0f), 0.9f, 0.8f);
+            // The terrace retaining walls are the lane kit's (HollowmereLanes), not greybox boxes.
         }
 
         // A run of wall pieces standing on the ground: each piece reaches 1 m below the lowest ground on either side (1.5 m out) and `height` above the
@@ -420,7 +422,6 @@ namespace SleepingCalamity.EditorTools
             bool ruin = kind == HollowmereLayout.BuildingKind.Empty && PlaceRuin(go.transform, f);
             if (kind != HollowmereLayout.BuildingKind.ApprovedFacade && !ruin)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
                 LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(side, 0.4f, side), stone, default, 2f);
-            CutAndFill(go.transform, f, stone);
             switch (kind)
             {
                 case HollowmereLayout.BuildingKind.Empty:
@@ -457,40 +458,7 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        // The lot's pad against the natural slope (both presets): on a side where the hill stands more than 0.7 m above the pad, a retaining wall 1.3 m out
-        // holds the cut; where the hill falls more than 0.7 m below, a stone fill bank under the pad's yard edge holds it up. Built in the lot's own frame
-        // (yaw = the lot's Yaw, not the facing turn), so walls run along the lot edges.
-        static void CutAndFill(Transform lot, Foundation f, Material stone)
-        {
-            var g = new GameObject("CutAndFill").transform;
-            g.SetParent(lot, false);
-            g.rotation = Quaternion.Euler(0f, f.Yaw, 0f);
-            float half = f.Side * 0.5f;
-            foreach (LotSide s in TownLayout.AllSides)
-            {
-                TownPoint dir = Foundation.SideDir(s), along = new TownPoint(-dir.Z, dir.X);
-                float hi = float.MinValue, lo = float.MaxValue;
-                for (int k = -2; k <= 2; k++)
-                {
-                    TownPoint l = dir * (half + 2.3f) + along * (k * half * 0.45f);
-                    TownPoint w = f.Footprint.ToWorld(l.X, l.Z);
-                    float y = HollowmereLayout.NaturalGround(w.X, w.Z);
-                    hi = Mathf.Max(hi, y); lo = Mathf.Min(lo, y);
-                }
-                Vector3 outward = new Vector3(dir.X, 0f, dir.Z);
-                Vector3 size = Mathf.Abs(dir.X) > 0.5f ? new Vector3(0.7f, 1f, f.Side + 2.6f) : new Vector3(f.Side + 2.6f, 1f, 0.7f);
-                if (hi > f.Y + 0.7f)
-                {
-                    float h = hi - f.Y + 0.6f;
-                    LookTestBuilder.Box(g, "Retain" + s, outward * (half + 1.3f) + Vector3.up * (h * 0.5f - 0.3f), new Vector3(size.x, h, size.z), stone, default, 2f);
-                }
-                if (lo < f.Y - 0.7f)
-                {
-                    float h = f.Y - lo + 0.8f;
-                    LookTestBuilder.Box(g, "Fill" + s, outward * (half + 0.65f) + Vector3.up * (0.25f - h * 0.5f), new Vector3(Mathf.Abs(dir.X) > 0.5f ? 1.3f : f.Side + 1.3f, h, Mathf.Abs(dir.X) > 0.5f ? f.Side + 1.3f : 1.3f), stone, default, 2f);
-                }
-            }
-        }
+        // The lot's pad against the natural slope (retaining walls on cut sides, fill walls on built-up sides) is the lane kit's (HollowmereLanes, LaneKitPlan.LotSideHeights).
 
         // ------------------------------------------------------------------------------------------------ ruin kit (Content/Art/Town/Ruins, Reference/hollowmere/ruins)
         // Contract: one FBX per Ruin_<S|M|L>_<A|B|C>, pivot at the lot centre on the ground, front (doorstep) toward local +Z, children Footing (slots
