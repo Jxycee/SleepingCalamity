@@ -67,7 +67,19 @@ namespace SleepingCalamity.Core
             float shore = 1f + 0.07f * (float)Math.Sin(3 * th + 1.0) + 0.05f * (float)Math.Sin(5 * th + 2.3) + 0.03f * (float)Math.Sin(9 * th);
             float lake = -6f * (1f - Smooth(0.7f, 1.0f, (float)Math.Sqrt(lx * lx + lz * lz) / shore));
             float ravine = e > 30f ? -3.5f * (1f - Smooth(1.5f, 7f, DistanceToPolyline(new TownPoint(x, z), Stream))) : 0f;
-            return y + keep + hill + Math.Min(lake, 0f) + ravine;
+            return y + keep + hill + Math.Min(lake, 0f) + ravine + OuterFall(x, z);
+        }
+
+        // Q15: west of the lake the meadow falls away toward Saltwake, so the road winds down a real hillside into a shallow valley (0 east of x -72, so the
+        // town, the lots by the road and the lake are untouched; about FallDepth lower at the terrain's west edge, x -150, with a gentle north-south roll).
+        // HollowmereTerrain blends its baked erosion RAW on top of this term (the RAW predates it), and the backdrop ring continues it past the terrain edge.
+        public const float FallDepth = 9f, FallStartX = -72f, FallEndX = -150f;
+        public static float OuterFall(float x, float z)
+        {
+            if (x >= FallStartX) return 0f;
+            float w = Smooth(FallStartX, FallEndX, x);
+            float roll = 1f + 0.16f * (float)Math.Sin(z * 0.043f + 0.6f) + 0.08f * (float)Math.Sin(z * 0.11f + x * 0.03f);
+            return -FallDepth * w * roll;
         }
 
         public static float DistanceToPolyline(TownPoint p, TownPoint[] pts)
@@ -205,7 +217,8 @@ namespace SleepingCalamity.Core
             ("NorthEastStub", "Keep Lane", 2, 4.0f, new[] { 18.6f, 6.1f, 19f, 10.5f, 27f, 11.5f, 36f, 11f, 45.5f, 12f }),
             ("NorthWestGinnel", "Wall Ginnel", 2, 2.5f, new[] { -19.4f, 6.1f, -19.25f, 15f, -30f, 16.5f, -38f, 14.5f, -46f, 12f }),
             ("LowerLane", "Lower Lane", 2, 3.5f, new[] { -12f, -48.8f, -15f, -55f, -18.5f, -60f, -20.5f, -63f, -24f, -70f }),
-            ("SaltwakeRoad", "Saltwake Road", 3, 5.0f, new[] { -24f, -70f, -36f, -76f, -55f, -79f, -80f, -80f, -110f, -81f }),
+            // Q15: past R3_02 the road winds down the western fall (OuterFall) in two easy S-bends and leaves the terrain's west edge (the backdrop ring carries it on).
+            ("SaltwakeRoad", "Saltwake Road", 3, 5.0f, new[] { -24f, -70f, -36f, -76f, -55f, -79f, -80f, -80f, -93f, -85f, -104f, -93.5f, -117f, -98.5f, -131f, -95f, -142f, -88.5f, -152f, -86f }),
             ("MillLane", "Mill Lane", 3, 3.5f, new[] { 44.3f, -34.4f, 51f, -38.5f, 55.5f, -44.5f, 59.5f, -50f, 63.6f, -54f }),
         };
 
