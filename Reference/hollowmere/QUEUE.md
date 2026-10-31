@@ -21,7 +21,7 @@ Kit-ready list from design section 6. Smithy (M, forge and chimney, uses the wor
 
 ## Q3. Ring 2 fill and the play-position captures
 Folder: `Reference/hollowmere/ring2/`
-Claimed: -
+Claimed: cloud session claude/brave-keller-3d91gk (bell tower, Q1 done), 2026-10-31
 Once Q1 and the townhouse (`Reference/hollowmere/townhouse/`) are on main: give the Rebuilt preset a believable spread of homes across ring 2. Draw from the merged kit families with seeded variants and turns, at pad heights, leaving some lots empty with ruins. Then the design 7 capture set: square entry from the heroes' home, fountain, tithe gate and a lane mouth, each in Ruined and Rebuilt, at midday and low sun, with a contact sheet beside the approved corner (`Reference/hollowmere/approved_corner/`).
 
 ## Q4. Dungeon corner: B5 cellar vault kit and the room

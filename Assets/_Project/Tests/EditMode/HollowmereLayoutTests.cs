@@ -61,6 +61,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void RebuiltHomeKits_SitOnFreeRing2LotsThatFitTheirClass()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var cottage = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == HollowmereLayout.BuildingKind.StoneCottage).ToList();
+            var workshop = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == HollowmereLayout.BuildingKind.Workshop).ToList();
+            Assert.AreEqual(1, cottage.Count, "one stone cottage"); Assert.AreEqual(1, workshop.Count, "one workshop");
+            Assert.AreEqual(2, cottage[0].Ring); Assert.AreEqual(2, workshop[0].Ring);
+            Assert.AreEqual(FoundationSize.S, cottage[0].Size, "stone cottages are S class (FOOTPRINT up to 4.88 m)");
+            Assert.That(workshop[0].Size, Is.Not.EqualTo(FoundationSize.S), "the placed workshop variant (B, 6.73 x 6.30 m) needs an M or L lot");
+            Assert.AreNotEqual(0f, cottage[0].Y, "pad height kept"); Assert.AreNotEqual(0f, workshop[0].Y, "pad height kept");
+        }
+
+        [Test]
         public void ApprovedCorner_KeepsItsPlace()
         {
             TownLayout t = HollowmereLayout.Create();
