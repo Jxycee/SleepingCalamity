@@ -52,6 +52,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Ruins", new Vector3(-15.5f, 1.65f, -1.5f), new Vector3(-26f, 0.2f, -8f), 50f),          // from the square's west side over the F03 and F05 ruins
             ("Cap_HM_Townhouses", new Vector3(-1f, 1.65f, -4f), new Vector3(-1f, 5.2f, -27f), 64f),        // from the square at the townhouse pair on F06 and F07 (kit family 3)
             ("Cap_HM_TownhouseSide", new Vector3(22f, 1.65f, -11f), new Vector3(5f, 5.0f, -27f), 55f),    // three-quarter on F07's front and east side
+            ("Cap_HM_Kits", new Vector3(45.5f, 1.65f, 12f), new Vector3(39f, 2f, -1f), 62f),           // from the Ring Lane's north end looking south along the east run at the stone cottage on R2_09 and the workshop on R2_08 (kit families 2 and 4)
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
@@ -327,6 +328,12 @@ namespace SleepingCalamity.EditorTools
                     break;
                 case HollowmereLayout.BuildingKind.Townhouse:   // kit family 3 art (HollowmereTownhouse); greybox home if the FBX is missing
                     if (!HollowmereTownhouse.Place(g, f)) Building(g, f, HollowmereLayout.BuildingKind.Home);
+                    break;
+                case HollowmereLayout.BuildingKind.StoneCottage:   // kit family 2 art (HollowmereStoneCottage); greybox home if the FBX is missing
+                    if (!HollowmereStoneCottage.Place(g, f)) Building(g, f, HollowmereLayout.BuildingKind.Home);
+                    break;
+                case HollowmereLayout.BuildingKind.Workshop:   // kit family 4 art (HollowmereWorkshop); greybox home if the FBX is missing
+                    if (!HollowmereWorkshop.Place(g, f)) Building(g, f, HollowmereLayout.BuildingKind.Home);
                     break;
                 case HollowmereLayout.BuildingKind.Bakery when HollowmereArt.TryPlaceBakery(g, f, 0.25f):   // on the footing slab's top
                     break;
