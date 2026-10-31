@@ -14,20 +14,20 @@ closed island (outward normals) and, with `--ray`, a visible-face ray test. The 
 
 | Variant | Roof | Chimney | Extras | Shutter and door paint | w x d (wall body, m) |
 |---|---|---|---|---|---|
-| StoneCottage_A | red tile (B4 kit roof) | gable end, +X | gabled porch hood, flower box | #3e5670 slate blue | 4.09 x 3.54 |
-| StoneCottage_B | thatch | gable end, -X | gabled dormer in the thatch, flower box | #4a6a48 sage green | 3.85 x 3.75 |
-| StoneCottage_C | thatch | ridge | low tiled lean-to woodshed on +X, no flower box | #6a2e29 oxblood | 3.48 x 3.89 |
+| StoneCottage_A | red tile (B4 kit roof), low 36.6 deg | tall gable stack, +X (1.05 m over the ridge) | deep, wide gabled porch hood (1.0 m), flower box | #3e5670 slate blue | 4.09 x 3.37 |
+| StoneCottage_B | thatch, steep 53.6 deg | squat gable stack, -X, offset 0.85 m toward the back slope, topping out 0.3 m under the ridge | twin gabled dormers, flower box | #4a6a48 sage green | 3.85 x 3.75 |
+| StoneCottage_C | thatch, 43.6 deg | ridge stack | low tiled lean-to woodshed on +X, no dormer, no flower box | #6a2e29 oxblood | 3.48 x 3.89 |
 
-Seeded (crc32 of the variant name): width, depth, wall height 2.3-2.55 m, roof pitch (tile 36-40, thatch 44-48 deg), door side,
+Seeded (crc32 of the variant name): width, depth, wall height 2.3-2.55 m, roof pitch (A 34-37, B 51-54, C 42-45 deg), door side,
 chimney offset, wear amount.
 
 ## Numbers (re-imported FBX)
 
 | Variant | Frame tris | Part_Door | Part_Shutters | Total | FOOTPRINT (x by Blender-y, m) | Roof extent (m) | Height to chimney pots |
 |---|---|---|---|---|---|---|---|
-| StoneCottage_A | 22,122 | 1,558 | 1,728 | 25,408 | 4.85 x 4.79 | 5.19 x 5.19 | 5.51 |
-| StoneCottage_B | 24,260 | 1,558 | 1,728 | 27,546 | 4.61 x 4.38 | 4.98 x 4.82 | 6.42 |
-| StoneCottage_C | 22,704 | 1,558 | 1,728 | 25,990 | 4.88 x 4.52 | 5.26 x 4.94 | 6.28 |
+| StoneCottage_A | 22,202 | 1,558 | 1,728 | 25,488 | 4.85 x 4.77 | 5.19 x 5.17 | 5.75 |
+| StoneCottage_B | 25,010 | 1,558 | 1,728 | 28,296 | 4.61 x 4.38 | 4.98 x 4.82 | 6.01 |
+| StoneCottage_C | 22,728 | 1,558 | 1,728 | 26,014 | 4.88 x 4.52 | 5.26 x 4.94 | 6.11 |
 
 FOOTPRINT is a flat 0.1 m box over walls, plinth, chimney breast, porch (A) and lean-to (C), centred on the pivot; all inside the
 5 x 5 m body limit; the roofs stay inside the 6 x 6 m foundation.
@@ -44,16 +44,16 @@ Root `<Variant>` with children `Frame`, `Part_Door`, `Part_Shutters`, `SOCKET_Do
 
 | Variant | SOCKET_Door (Blender x, y, z) | SOCKET_Shutters (Blender x, y, z) |
 |---|---|---|
-| StoneCottage_A | -0.86, -1.145, 0.22 | 0.81, -1.315, 1.32 |
+| StoneCottage_A | -0.86, -0.99, 0.22 | 0.81, -1.15, 1.32 |
 | StoneCottage_B | 0.83, -1.56, 0.22 | -0.70, -1.73, 1.32 |
 | StoneCottage_C | -1.19, -1.63, 0.22 | 0.19, -1.80, 1.32 |
 
 - Part_Shutters holds every shutter on the front and back windows (open, standing off the wall); the Frame keeps bare hinge pins
   at the window jambs. Without Part_Door the Frame shows a deep stone-lined doorway into a dark room (FK_PlinthJoint liner), never
   a hole; without shutters the windows keep their casings and deep reveals.
-- Door and window glass: window glass is the dark FK_Glass quad set back 24 cm in the reveal.
+- Window panes sit 24 cm back in the reveal, built from four flat quads (SC_GlassHi, SC_GlassSky, SC_Curtain, FK_Glass) so the glass reads as a lit reflection over a dark room with a half-drawn curtain.
 - `wear` (linear float colour, per corner) on every mesh incl. FOOTPRINT: R grime and run-off (splashback band, eave shade, soot at
-  the chimney pots, chipped paint), G moss (plinth tops, roof, rubble foot), B polish (door step, fresh ridge straw). Same channel use as
+  the chimney pots, chipped paint, older dark roof patches, a dark ridge line), G moss (plinth tops, roof, rubble foot), B polish (door step, newer paler roof patches). Same channel use as
   the B4 kit (the kit's vertex-mask tile shader reads it).
 
 ## Material slots (Unity must rebuild exactly these)
@@ -74,12 +74,15 @@ albedo times `paint / 0.17` (PAINT_LUM) instead of `tint`. `FK_*` names are the 
 | FK_DoorPaint | painted_wood | paint A (0.0482, 0.0931, 0.162), B (0.0685, 0.1441, 0.0648), C (0.1441, 0.0273, 0.0222) | 1.0 | 0 | Part_Door planks |
 | FK_Shutter | painted_wood | same paint as FK_DoorPaint | 1.0 | 0 | Part_Shutters |
 | FK_Iron | iron | (1, 1, 1) | 1.0 | 0 | hinges, pintles, lattice came, door furniture |
-| FK_Glass | none (flat) | base colour (0.012, 0.016, 0.02), roughness 0.12 | - | - | window glass |
+| FK_Glass | none (flat) | base colour (0.012, 0.016, 0.02), roughness 0.12 | - | - | window glass, dark pane (lower right) |
+| SC_GlassHi | none (flat) | base colour (0.34, 0.40, 0.46), roughness 0.05 | - | - | top 18 % of every window pane: pale sky glare |
+| SC_GlassSky | none (flat) | base colour (0.13, 0.17, 0.21), roughness 0.07 | - | - | next 22 % of the pane: darker reflection (gradient step) |
+| SC_Curtain | none (flat) | base colour (0.52, 0.47, 0.37), roughness 0.9 | - | - | pale half-drawn curtain behind the lower left 46 % of every pane |
 | FK_Leaf | none (flat) | base colour (0.07, 0.13, 0.025), roughness 0.6 | - | - | flower box foliage (A, B) |
 | FK_Bloom | none (flat) | base colour (0.45, 0.04, 0.03), roughness 0.5 | - | - | flower box blooms (A, B) |
 
 Per variant the slot lists (Frame / Part_Door / Part_Shutters):
-- A Frame: FK_RoofTile, FK_Oak, SC_Rubble, FK_Sandstone, FK_PlinthJoint, FK_Glass, FK_Iron, FK_Leaf, FK_Bloom. B Frame: SC_Thatch, FK_Oak, SC_Rubble, FK_Sandstone, FK_PlinthJoint, FK_Glass, FK_Iron, FK_Leaf, FK_Bloom, FK_RoofTile (chimney pots only). C Frame: SC_Thatch, FK_Oak, SC_Rubble, FK_Sandstone, FK_PlinthJoint, FK_Glass, FK_Iron, FK_RoofTile, FK_OakDoor.
+- A Frame: FK_RoofTile, FK_Oak, SC_Rubble, FK_Sandstone, FK_PlinthJoint, SC_GlassHi, SC_GlassSky, SC_Curtain, FK_Glass, FK_Iron, FK_Leaf, FK_Bloom. B Frame: SC_Thatch, FK_Oak, SC_Rubble, FK_Sandstone, FK_PlinthJoint, SC_GlassHi, SC_GlassSky, SC_Curtain, FK_Glass, FK_Iron, FK_Leaf, FK_Bloom, FK_RoofTile (chimney pots only). C Frame: SC_Thatch, FK_Oak, SC_Rubble, FK_Sandstone, FK_PlinthJoint, SC_GlassHi, SC_GlassSky, SC_Curtain, FK_Glass, FK_Iron, FK_RoofTile, FK_OakDoor.
 - Part_Door: FK_Oak, FK_Iron, FK_DoorPaint, FK_OakDoor. Part_Shutters: FK_Iron, FK_Shutter.
 
 Linear paint colours are the sRGB hex above converted to linear. SC_Thatch has no thatch tileable in `Art/Textures`: it is a tint of

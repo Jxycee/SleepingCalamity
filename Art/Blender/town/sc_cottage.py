@@ -49,7 +49,22 @@ def repatch(fn, subs):
         src = src.replace(a, b)
     exec(compile(src, FK.__file__, 'exec'), FK.__dict__)
 
-repatch('window', [("    s = 0.16\n", "    s = 0.22\n"),
+def glass_pane(pc, x0, x1, z0, z1, gy):
+    """Glass that reads as glass: pale sky glare at the top fading to a darker reflection, the dark pane below, and a half-drawn
+    pale curtain behind the lower left (flat slots SC_GlassHi, SC_GlassSky, FK_Glass, SC_Curtain)."""
+    h = z1 - z0; w = x1 - x0
+    zh, zs = z1 - 0.18 * h, z1 - 0.40 * h
+    uv = lambda c: (c.x, c.z)
+    FK.quad_grid(pc, 'glass_hi', [(x0, gy, zh), (x1, gy, zh), (x1, gy, z1), (x0, gy, z1)], 1, 1, uv_fn=uv)
+    FK.quad_grid(pc, 'glass_sky', [(x0, gy, zs), (x1, gy, zs), (x1, gy, zh), (x0, gy, zh)], 1, 1, uv_fn=uv)
+    xc = x0 + 0.46 * w
+    FK.quad_grid(pc, 'curtain', [(x0, gy, z0), (xc, gy, z0), (xc, gy, zs), (x0, gy, zs)], 1, 1, uv_fn=uv)
+    FK.quad_grid(pc, 'glass', [(xc, gy, z0), (x1, gy, z0), (x1, gy, zs), (xc, gy, zs)], 1, 1, uv_fn=uv)
+FK.glass_pane = glass_pane
+
+repatch('window', [("    quad_grid(pc, 'glass', [(x0, gy, z0), (x1, gy, z0), (x1, gy, z1), (x0, gy, z1)], 1, 1,\n              uv_fn=lambda c: (c.x, c.z))\n",
+                    "    glass_pane(pc, x0, x1, z0, z1, gy)\n"),
+                   ("    s = 0.16\n", "    s = 0.22\n"),
                    ("            add_box(pc, 'iron', (ln, 0.010, 0.012), xf, cham=0.0, long_axis=0, seed=i)",
                     "            pa = Vector((a[0], gy - 0.008, a[1])); pb = Vector((b[0], gy - 0.008, b[1])); dd = (pb - pa).normalized()\n"
                     "            nn = Vector((-dd.z, 0, dd.x)) * 0.006\n"
@@ -59,11 +74,11 @@ repatch('kit_roof', [('for i in range(13):', 'for i in range(9):'), ('i * (2 * W
 # ----------------------------------------------------------------------------- variants
 VARIANTS = {
     'StoneCottage_A': dict(roof='tile', chimney='gable+', porch=True, lean=False, dormer=False, flower=True,
-                           hex='#3e5670', rubble=(0.56, 0.64, 0.80), thatch=None),
+                           hex='#3e5670', rubble=(0.56, 0.64, 0.80), thatch=None, pitch_rng=(34, 37), chim_dz=1.05),
     'StoneCottage_B': dict(roof='thatch', chimney='gable-', porch=False, lean=False, dormer=True, flower=True,
-                           hex='#4a6a48', rubble=(0.60, 0.65, 0.74), thatch=(2.55, 2.35, 1.20)),
+                           hex='#4a6a48', rubble=(0.60, 0.65, 0.74), thatch=(2.55, 2.35, 1.20), pitch_rng=(51, 54), chim_dz=-0.30, chim_off=0.85, dormers=(-0.95, 0.95)),
     'StoneCottage_C': dict(roof='thatch', chimney='ridge', porch=False, lean=True, dormer=False, flower=False,
-                           hex='#6a2e29', rubble=(0.58, 0.63, 0.78), thatch=(2.05, 1.92, 1.30)),
+                           hex='#6a2e29', rubble=(0.58, 0.63, 0.78), thatch=(2.05, 1.92, 1.30), pitch_rng=(42, 45), chim_dz=0.55),
 }
 for _n in VARIANTS:
     VARIANTS[_n]['seed'] = zlib.crc32(_n.encode())
@@ -78,13 +93,13 @@ def cfg(name):
     V = dict(VARIANTS[name]); R = random.Random(V['seed'])
     gable = V['chimney'].startswith('gable')
     V['w'] = round(R.uniform(3.80, 4.15) if gable else R.uniform(3.40, 3.50), 2)
-    V['d'] = round(R.uniform(3.45, 3.60) if V['porch'] else R.uniform(3.55, 3.95), 2)
+    V['d'] = round(R.uniform(3.28, 3.42) if V['porch'] else R.uniform(3.55, 3.95), 2)
     V['WH'] = round(R.uniform(2.30, 2.55), 2)
-    V['pitch'] = round(R.uniform(36, 40) if V['roof'] == 'tile' else R.uniform(44, 48), 1)
+    V['pitch'] = round(R.uniform(*V['pitch_rng']), 1)
     V['ds'] = R.choice((-1, 1))                       # door side: -1 door left of the window
     V['door_x'] = round(-V['ds'] * (0.55 + R.uniform(-0.05, 0.10)), 2)
     V['win_x'] = round(V['ds'] * (V['w'] / 2 - 0.95), 2)
-    V['chim_off'] = round(R.uniform(-0.25, 0.25), 2)
+    V['chim_off'] = V.get('chim_off', round(R.uniform(-0.25, 0.25), 2))
     V['wear'] = round(R.uniform(1.1, 1.35), 2)
     V['paint'] = FK._lin(V['hex'])
     return V
@@ -105,6 +120,12 @@ def _M(k):
         return FK.tile_mat('SC_Rubble', 'B1_town/sandstone', tint=CUR['rubble'], normal=1.4)
     if k == 'thatch':
         return FK.tile_mat('SC_Thatch', 'B1_town/oak_timber', tint=CUR['thatch'] or (1.7, 1.6, 1.0), normal=1.1, rough_add=0.2)
+    if k == 'glass_hi':
+        return FK.flat_mat('SC_GlassHi', (0.34, 0.40, 0.46), 0.05)
+    if k == 'glass_sky':
+        return FK.flat_mat('SC_GlassSky', (0.13, 0.17, 0.21), 0.07)
+    if k == 'curtain':
+        return FK.flat_mat('SC_Curtain', (0.52, 0.47, 0.37), 0.9)
     return _orig_M(k)
 FK.M = _M
 
@@ -333,10 +354,11 @@ def chimney_gable(pc, c, sgn, ridge_top):
     FK.add_box(pc, 'stone', (0.86, 1.48, 0.13), Matrix.Translation((xw + sgn * 0.27, cy, WH + 0.30 + 0.05)), cham=0.04, segs=2,
                uv_world=True, wob=0.006, seed=32.0)
     zb = WH + 0.36
-    chimney_stack(pc, xw + sgn * 0.27 + sgn * 0.02, cy, zb, ridge_top + 0.60, 0.80, 1.18, 33.0)
+    ztop = ridge_top + c['chim_dz']
+    chimney_stack(pc, xw + sgn * 0.27 + sgn * 0.02, cy, zb, ztop, 0.80, 1.18, 33.0)
     # pale quoins up the stack corners
     R = FK.rng('chq%d' % sgn)
-    nn = int((ridge_top + 0.60 - zb) / 0.30)
+    nn = int((ztop - zb) / 0.30)
     for i in range(nn):
         for sy in (-1, 1):
             ln = R.uniform(0.28, 0.40)
@@ -615,11 +637,13 @@ def build(name):
     if c['roof'] == 'tile':
         roof, under, ridge_top, zt = tile_roof(c)
         absorb(F, roof, Matrix.Identity(4))
+        c['ridge_z'] = FK.RIDGE
     else:
         roof, S = thatch_roof(c)
         absorb(F, roof, Matrix.Identity(4))
         under = lambda y: S.zt - S.th * 0.78 + (d / 2 - abs(y)) * S.tanp
         ridge_top = S.zr + 0.28; zt = S.zt
+        c['ridge_z'] = S.zr
     mark(F, 'roof')
     # ---- walls
     front_wins = [(c['win_x'] - WIN[0] / 2, c['win_x'] + WIN[0] / 2, WIN[1], WIN[2])]
@@ -706,14 +730,14 @@ def build(name):
     else:
         chimney_gable(F, c, chim_side, ridge_top)
         c['chim_pos'] = (chim_side * (w / 2 + 0.3), c['chim_off'])
-    c['chim_top'] = ridge_top + 0.60 + 0.5
+    c['chim_top'] = ridge_top + (c['chim_dz'] if chim_side else 0.55) + 0.5
     mark(F, 'chimney')
     # ---- porch (A)
     if c['porch']:
         porch(F, c, door, ridge_top)
     # ---- dormer (B)
-    if c['dormer']:
-        dormer(F, c, S)
+    for ddx in c.get('dormers', ()):
+        dormer(F, c, S, ddx)
     mark(F, 'porch/dormer')
     # ---- lean-to (C)
     if c['lean']:
@@ -725,14 +749,14 @@ def build(name):
 def porch(F, c, door, ridge_top):
     w, d = c['w'], c['d']
     dx = c['door_x']
-    hw = 0.92; P = 0.85
+    hw = 1.06; P = 1.0; px = hw - 0.13
     y0 = -d / 2; y1 = y0 - P
     zE = 2.30; rise = 0.66
     for sx in (-1, 1):
-        FK.member(F, 'oak', (dx + sx * 0.80, y1 + 0.12, 0.0), (dx + sx * 0.80, y1 + 0.12, zE), 0.17, 0.17, name='pp%d' % sx, cham=0.02)
-        FK.member(F, 'oak', (dx + sx * 0.80, y1 + 0.12, zE - 0.02), (dx + sx * 0.80, y0, zE - 0.02), 0.15, 0.20, name='pb%d' % sx, up=(1, 0, 0), cham=0.02)
-        FK.member(F, 'oak', (dx + sx * 0.80, y1 + 0.12, zE - 0.5), (dx + sx * 0.52, y1 + 0.12, zE - 0.02), 0.09, 0.10, name='pk%d' % sx, cham=0.015)
-    FK.member(F, 'oak', (dx - 0.80, y1 + 0.12, zE - 0.02), (dx + 0.80, y1 + 0.12, zE - 0.02), 0.20, 0.17, name='pbeam', cham=0.02)
+        FK.member(F, 'oak', (dx + sx * px, y1 + 0.12, 0.0), (dx + sx * px, y1 + 0.12, zE), 0.17, 0.17, name='pp%d' % sx, cham=0.02)
+        FK.member(F, 'oak', (dx + sx * px, y1 + 0.12, zE - 0.02), (dx + sx * px, y0, zE - 0.02), 0.15, 0.20, name='pb%d' % sx, up=(1, 0, 0), cham=0.02)
+        FK.member(F, 'oak', (dx + sx * px, y1 + 0.12, zE - 0.5), (dx + sx * (px - 0.28), y1 + 0.12, zE - 0.02), 0.09, 0.10, name='pk%d' % sx, cham=0.015)
+    FK.member(F, 'oak', (dx - px, y1 + 0.12, zE - 0.02), (dx + px, y1 + 0.12, zE - 0.02), 0.20, 0.17, name='pbeam', cham=0.02)
     # tiled roof: two slabs, ridge to the wall
     zr = zE + 0.18 + rise
     for sx in (-1, 1):
@@ -743,13 +767,12 @@ def porch(F, c, door, ridge_top):
     FK.add_box(F, 'stone', (1.3, 0.50, 0.12), Matrix.Translation((dx, y1 + 0.05, 0.06)), cham=0.03, segs=2, uv_world=True, seed=9.0)
     ext(dx - 1.0, dx + 1.0, y1 - 0.30, y0)
 
-def dormer(F, c, S):
+def dormer(F, c, S, dx):
     w, d, WH = c['w'], c['d'], c['WH']
-    dx = c['door_x']
     yf = -d / 2 + 0.40
     zf = S.zt + (d / 2 - abs(yf)) * S.tanp + 0.02
     ze = zf + 0.88
-    half = 0.52
+    half = 0.56
     tn = math.tan(math.radians(46))
     zr = ze + (half + 0.14) * tn
     win = (-0.27, 0.27, zf + 0.20, zf + 0.78)
@@ -851,12 +874,26 @@ def write_wear(ob, c, kind):
                 tv = ((poly.index * 2654435761) % 1009) / 1009.0
                 r = max(r, 0.30 * tv * tv)
                 g = max(g, max(0.0, noise.noise(p * 1.6 + Vector((2, 0, 5))) * 1.5 - 0.25) * (0.9 if p.y > 0 else 0.45))
+                pn = noise.noise(p * 0.75 + Vector((8, 3, 1)))        # mid-scale patches: newer pale sections, older dark ones
+                if pn > 0.15:
+                    b = max(b, min(0.34, (pn - 0.15) * 1.6))
+                if pn < -0.22:
+                    r = max(r, min(0.50, (-0.22 - pn) * 2.0))
+                g = max(g, max(0.0, noise.noise(p * 0.85 + Vector((1, 9, 4))) * 2.0 - 0.7) * 0.9)
+                if abs(p.y) < 0.42 and p.z > c['ridge_z'] - 0.5:
+                    r = max(r, 0.88); b = 0.0                          # dark, soot-and-damp ridge line
             if mn == 'SC_Thatch':
                 low = max(0.0, 1 - (p.z - (WH - 0.2)) / 0.9)
                 r = max(r, low * 0.35 + 0.10 * max(0.0, nz))
                 g = max(g, max(0.0, noise.noise(p * 2.0 + Vector((5, 1, 0))) * 1.3 - 0.35) * (0.6 if p.y > 0 else 0.2))
-                if abs(p.y) < 0.38 and p.z > c['WH'] + 1.0 and n.z > 0.2:
-                    b = max(b, 0.45)                                  # fresher, paler straw on the ridge roll
+                pn = noise.noise(p * 0.7 + Vector((4, 8, 2)))          # mid-scale patches: fresh pale straw, old dark straw
+                if pn > 0.15:
+                    b = max(b, min(0.34, (pn - 0.15) * 1.6))
+                if pn < -0.2:
+                    r = max(r, min(0.42, (-0.2 - pn) * 1.8))
+                g = max(g, max(0.0, noise.noise(p * 0.9 + Vector((7, 2, 6))) * 2.0 - 0.8) * 0.9 * (1.0 if p.y > 0 else 0.5))
+                if abs(p.y) < 0.42 and p.z > c['ridge_z'] - 0.5 and n.z > 0.1:
+                    r = max(r, 0.7); b = 0.0                           # darker weathered ridge roll
             if mn == 'FK_ChimneyStone' or (mn in ('SC_Rubble', 'FK_Sandstone', 'FK_RoofTile') and p.z > ctop - 1.4 and
                                            abs(p.x - cp[0]) < 0.9 and abs(p.y - cp[1]) < 0.8):
                 r = max(r, min(1.0, (p.z - (ctop - 1.9)) / 1.2) ** 0.9 * 0.85)
@@ -947,7 +984,6 @@ def render(name, views, suffix=''):
     sc = bpy.context.scene
     FK.RRES = int(arg('--rres', '960')); FK.SAMPLES = int(arg('--samples', '32'))
     cam = FK.review_scene(bpy.data.objects[name], variant=True)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.75, location=(2.0, -4.2, 0.875))
     for v in views:
         frm, to, fov = VIEWS[v]
         FK.look(cam, frm, to); cam.data.angle = math.radians(fov)
