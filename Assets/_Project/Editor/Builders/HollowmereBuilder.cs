@@ -253,8 +253,6 @@ namespace SleepingCalamity.EditorTools
             {
                 if (!InRun(run, x) || !InRun(run, x - 1f) || !InRun(run, x + 1f)) continue;
                 LookTestBuilder.Box(keep, "Planter" + x, new Vector3(x, kh + 1.05f, kz + 0.2f), new Vector3(1.8f, 0.3f, 0.6f), green, default, 2f);
-                float len = 1.4f + 1.8f * Mathf.Repeat(x * 0.37f, 1f);
-                LookTestBuilder.Box(keep, "Ivy" + x, new Vector3(x + 0.2f, kh + 0.9f - len * 0.5f, kz - 0.63f), new Vector3(1.3f, len, 0.06f), green, default, 2f);
             }
             Stair(keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, stone);
             Stair(keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, stone);

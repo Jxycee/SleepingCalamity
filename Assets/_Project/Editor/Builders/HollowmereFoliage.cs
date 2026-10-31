@@ -31,7 +31,7 @@ namespace SleepingCalamity.EditorTools
             "Ivy_Patch_A", "Ivy_Patch_B", "Lintel_Ivy", "Ivy_Facade" };
         static readonly string[] Weeds = { "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E" }, Grasses = { "Grass_A", "Grass_B", "Grass_C" }, Mosses = { "Moss_Tuft_A", "Moss_Tuft_B", "Moss_Tuft_C" };
 
-        const float GrassPerM2 = 1.2f;          // mean clumps per m2 on full grass weight (the view budget below fixes this)
+        const float DenseM2 = 3.8f, SparseM2 = 0.3f;   // clumps per m2 in the thick patches and between them; the view budget below fixes the mix
         const int DetailRes = 1024, DetailPatch = 32;
         const float DetailDistance = 60f, AvgGrassTris = 170f;
 
@@ -173,7 +173,7 @@ namespace SleepingCalamity.EditorTools
                 protos[i] = new DetailPrototype
                 {
                     prototype = DetailPrefab(kits[Grasses[i]], Grasses[i]), usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = true,
-                    minWidth = 0.8f, maxWidth = 1.3f, minHeight = 0.8f, maxHeight = 1.3f, noiseSeed = 11 + i * 7, noiseSpread = 0.4f, holeEdgePadding = 0f,
+                    minWidth = 0.7f, maxWidth = 1.4f, minHeight = 0.7f, maxHeight = 1.4f, noiseSeed = 11 + i * 7, noiseSpread = 0.4f, holeEdgePadding = 0f,
                     healthyColor = healthy[i], dryColor = dry[i], positionJitter = 1f, alignToGround = 0f, useDensityScaling = true,
                 };
             }
@@ -186,6 +186,12 @@ namespace SleepingCalamity.EditorTools
             var layers = new int[protos.Length][,];
             for (int i = 0; i < layers.Length; i++) layers[i] = new int[DetailRes, DetailRes];
             float cell = HollowmereTerrain.Size.x / DetailRes, cellArea = cell * (HollowmereTerrain.Size.z / DetailRes);
+            var nearCobble = new bool[sr, sr];   // cobble weight above 0 within one alphamap texel (0.6 m): no grass pokes through paving
+            for (int y = 0; y < sr; y++)
+                for (int x = 0; x < sr; x++)
+                    if (splat[y, x, 3] > 0f)
+                        for (int dy = -1; dy <= 1; dy++)
+                            for (int dx = -1; dx <= 1; dx++) { int yy = y + dy, xx = x + dx; if (yy >= 0 && xx >= 0 && yy < sr && xx < sr) nearCobble[yy, xx] = true; }
             var spots = new List<Vector2>();
             for (int cy = 0; cy < DetailRes; cy++)
                 for (int cx = 0; cx < DetailRes; cx++)
@@ -193,20 +199,22 @@ namespace SleepingCalamity.EditorTools
                     float u = (cx + 0.5f) / DetailRes, v = (cy + 0.5f) / DetailRes;
                     int sx = Mathf.Min(sr - 1, (int)(u * sr)), sy = Mathf.Min(sr - 1, (int)(v * sr));
                     float w = splat[sy, sx, 0] + 0.3f * splat[sy, sx, 2];
-                    if (w <= 0.02f || splat[sy, sx, 3] > 0.3f) continue;
+                    if (w <= 0.02f || nearCobble[sy, sx]) continue;
                     float x = HollowmereTerrain.Origin.x + u * HollowmereTerrain.Size.x, z = HollowmereTerrain.Origin.z + v * HollowmereTerrain.Size.z;
-                    float meadow = 0.55f + 0.9f * Mathf.PerlinNoise(x * 0.045f + 5f, z * 0.045f + 91f);   // lush and thin areas
-                    float p = GrassPerM2 * cellArea * Mathf.Clamp01(w) * meadow;
+                    // meadow, not a dot grid: two noise octaves (about 7 m and 3.5 m) pick thick patches, the rest is sparse
+                    float nz = 0.65f * Mathf.PerlinNoise(x * 0.14f + 5f, z * 0.14f + 91f) + 0.35f * Mathf.PerlinNoise(x * 0.29f + 47f, z * 0.29f + 13f);
+                    float thick = Smooth(0.53f, 0.62f, nz);   // about a third of the open ground
+                    float p = Mathf.Lerp(SparseM2, DenseM2, thick) * cellArea * Mathf.Clamp01(w);
                     uint h = Hash((uint)cx, (uint)cy);
                     if ((h & 0xFFFFFF) / (float)0x1000000 >= p) continue;
-                    if (InSquare(x, z, 0.5f)) continue;
+                    if (InSquare(x, z, 0.6f) || NearPaved(t, x, z)) continue;
                     if (data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y < HollowmereLayout.WaterY + 0.5f) continue;
                     var pt = new TownPoint(x, z);
                     bool blocked = false;
                     foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(pt, 0.3f)) { blocked = true; break; }
                     if (!blocked) foreach (Landmark l in t.Landmarks) if (l.Footprint.Contains(pt, 0.3f)) { blocked = true; break; }
                     if (blocked) continue;
-                    layers[(int)((h >> 24) % (uint)protos.Length)][cy, cx] = 1;
+                    layers[PickProto(h >> 24)][cy, cx] = 1;
                     spots.Add(new Vector2(x, z)); grassClumps++;
                 }
             for (int i = 0; i < layers.Length; i++) data.SetDetailLayer(0, 0, i, layers[i]);
@@ -217,6 +225,18 @@ namespace SleepingCalamity.EditorTools
             terrain.drawTreesAndFoliage = true;
             Debug.Log("SC HOLLOWMERE foliage grass clumps=" + grassClumps + " prototypes=" + protos.Length);
             ViewBudget(t, spots);
+        }
+
+        static float Smooth(float a, float b, float x) { float u = Mathf.Clamp01((x - a) / (b - a)); return u * u * (3f - 2f * u); }
+
+        static int PickProto(uint h) { uint k = h % 10u; return k < 2u ? 0 : k < 6u ? 1 : 2; }   // Grass_A 20 %, B 40 %, C 40 % (size variety)
+
+        // Paving or a lane within 0.6 m of the point.
+        static bool NearPaved(TownLayout t, float x, float z)
+        {
+            const float m = 0.6f;
+            return HollowmereTerrain.IsPaved(t, x, z) || HollowmereTerrain.IsPaved(t, x + m, z) || HollowmereTerrain.IsPaved(t, x - m, z)
+                || HollowmereTerrain.IsPaved(t, x, z + m) || HollowmereTerrain.IsPaved(t, x, z - m);
         }
 
         static uint Hash(uint a, uint b)
