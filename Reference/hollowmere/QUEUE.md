@@ -9,7 +9,7 @@ The shared rules are unchanged: `CLAUDE.md`, the mass-production design (`docs/s
 
 ## Q1. Home kit families 2 and 4
 Folder: `Reference/hollowmere/kits/`
-Claimed: -
+Claimed: cloud session claude/brave-keller-3d91gk (bell tower done), 2026-10-31
 Design 5.4 family 2 (stone cottage, S: rubble walls like the tower, thatch or tile, low and wide) and family 4 (workshop with lean-to, S/M: timber and board, open front). One seeded generator each (`Art/Blender/town/sc_cottage.py`, `sc_workshop.py`). Each exports Frame, Part_Door, Part_Shutters, SOCKET_* and FOOTPRINT, with 3 variants per family, to `Content/Art/Town/Ring1/<Family>/<Variant>/`. Place one of each on a free ring 2 foundation in the Rebuilt preset.
 
 ## Q2. Smithy, schoolhouse and mill
