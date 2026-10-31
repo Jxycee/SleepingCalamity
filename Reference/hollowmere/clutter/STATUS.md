@@ -1,29 +1,42 @@
-State: IN PROGRESS
+State: DONE
 Session: Q14. Decorations batch 2: market and lane clutter
-Progress: 80%
-Sheet: Reference/hollowmere/clutter/clutter_engine_sheet.jpg
+Progress: 100%
+Sheet: Reference/hollowmere/clutter/clutter_engine_sheet.jpg (Blender set: clutter_sheet_r3.jpg)
 Blocker: none
+Archive: ready
 
-Score: art rounds (Blender sheet, visible faces): r1 27 -> r2 28.5 -> r3 29 (agent); controller read about 28/40 (flower clumps read as pastel blobs, cloth pale). Stopped at round 3 (gain < 1.5); in-engine check next.
-Tris: props 994-2712 (Well 2634), signs 580-1340, washing-line parts 36-384; all within CONTRACT budgets.
-SC RESULT: -
-Merge commit: -
+Branch: claude/blissful-goldberg-prbbeg (tip 690694a)
+Score: art r1 27 -> r2 28.5 -> r3 29/40 (agent self-score); coordinator ~27/40 APPROVED (Blender sheet and in-engine sheet). Stopped at round 3 (gain < 1.5).
+Tris: props 994-2712 (Well 2634), signs 580-1340, washing-line parts 36-384; all within CONTRACT budgets. In scene: 155,752 tris for all clutter.
+SC RESULT: SC RESULT check PASS on 690694a (build PASS, test-edit 726/726, test-play 33 passed / 8 skipped / 0 failed), SC MARKER 690694ac299dd5b9dcbf67293634a5762a80081b; origin/main merged right before the check.
+Merge commit: 302c607
 
-Resumed 2026-10-31 after the usage pause; origin/main merged (45da48c: garden, keep, town look).
-Plan: CONTRACT.md (asset names, footprints, pivots, CL_* slots on shared B1 tileables, no bakes). Two agents running:
-- art: Art/Blender/town/sc_clutter.py (handcart, crate/sack stacks, rain barrel, flower box, well, 6 trade signs, washing-line parts; each with a ruined look), export to Content/Art/Town/Clutter, contact sheet with references.
-- Unity: Core HollowmereClutter (ring 1/2 rows, Validate incl. path graph), EditMode tests, Editor HollowmereClutter placement + Cap_HM_Clutter.
-Then: merge origin/main, build scene, capture Cap_HM_Clutter, unity.sh check, merge.
+## Result
+- Art: `Art/Blender/town/sc_clutter.py` (Gen, slot materials on shared B1 tileables, no bakes, FBX path_mode STRIP): Handcart, CrateStack, SackStack,
+  RainBarrel, FlowerBox, Well, each with a ruined look (_Broken / Well_Ruined); ShopSign_Bakery/Inn/Smithy/Workshop/Tailor/Grocer + ShopSign_Broken;
+  WashingLine parts (rope, hook, peg, 5 cloths, 2 torn rags). Export: `Assets/_Project/Content/Art/Town/Clutter/` (21 FBX, SOURCES.md). Contract: CONTRACT.md.
+- Unity: Core `HollowmereClutter` builds the plan from the layout: Rebuilt 52 ground rows (Well 1, RainBarrel 19, CrateStack 8, FlowerBox 16,
+  Handcart 3, SackStack 5) + 6 trade signs (Workshop on R2_08/R2_13/R2_19/R2_23, Tailor F06, Grocer F07; none where the building art carries its own sign)
+  + 3 washing lines (R2_11-R2_12, R2_19-R2_20, R2_04-R2_05, 6.3-7.2 m); Ruined 15 broken rows (every kind, Well_Ruined at the well's spot).
+  Rows stay outside lots (clear of the Q6 garden), off the keep terrace, the beauty corner, the square dressing and the Q11 lane kit.
+- Path graph: `Validate` rejects any footprint (inflated by the clearance) that covers a path node or crosses a path edge; `HollowmereClutterTests`
+  (14) includes negative tests (row on a node, row across an edge, row on a lane step) plus counts, signs, well, washing-line clearance.
+- Editor `HollowmereClutter.cs` places it all (real art, M_CL_* materials, box colliders), camera `Cap_HM_Clutter` (the R2_19-R2_20 washing line).
 
-## Progress
-- Art (7231bf9): Art/Blender/town/sc_clutter.py, 21 FBX in Content/Art/Town/Clutter (Gen, slot materials on shared tileables, no bakes), SOURCES.md.
-  Deviations: a few meshes overhang their FOOTPRINT by up to 0.14 m (RainBarrel, FlowerBox, SackStack_Broken, Well_Ruined); signs reach 0.95 m; painted_wood is blue-grey, so CL_Paint/PaintRed may read duller in Unity.
-- Unity (740e0a5): Core HollowmereClutter (rows outside lots: clear of garden/keep), Rebuilt 53 ground rows + 6 signs (4 workshops, tailor F06, grocer F07) + 3 washing spans, Ruined 15; HollowmereClutterTests 13 green on the Core runner (path node / edge negative tests). Editor placement written, not yet compiled (Unity editor still downloading in this container).
-- Coordinator: sheet r3 ~27/40 APPROVED, no more art rounds. Later polish: sacks are smooth pillows (no burlap weave/stitching), flower clumps pastel blobs, washing-line cloth pale.
-- 2026-10-31: Unity editor finally extracted in this container (the download stalled ~45 min); origin/main merged (lake, stair). In-engine step starting.
-- In-engine (9a7f545): build PASS, log `SC HOLLOWMERE clutter: rebuilt rows=53 ruined rows=15 signs=6 washing lines=3 | art rows=68 greybox rows=0 ... tris=158092`; footprints raised to the real art extents; Validate empty, Core tests 317/317. CL_Paint/PaintRed moved to plaster (painted_wood read teal). Capture: pieces sit on the ground, workshop sign on its wall; washing line not in frame yet.
-- Now: Cap_HM_Clutter re-aimed at the R2_19-R2_20 washing line, one capture, then merge origin/main and one check.
-- Old next: compile, footprints to real extents, scene build, capture Cap_HM_Clutter only, in-engine sheet, then check + merge.
+## Open (later polish, not blocking)
+- Sacks are smooth pillows (no burlap weave or stitching), flower clumps read as pastel blobs, washing-line cloth pale in Blender and near black when backlit in Unity.
+- The Ruined capture shows almost no clutter near the camera: a tipped cart or split barrel in view would sell the ruin.
+- Cap_HM_Clutter now frames the washing line, not R2_19's crates and sign; the crates and sign were seen in the previous framing (engine sheet).
+- One ring-2 crate stack (R2_13) was dropped because Q11's lane steps took its spot; nothing nearby passes the rules.
 
 ## Usage waste
-- (filled at the end)
+Rough shares of this session's spend:
+1. About 30%: the Unity editor download stalled in the container (~45 min idle before any in-engine work), then a disk-full episode (worktrees with
+   their own Library folders filled the allowance) and a container restart that killed a running check. Fix: run in-engine steps in the main checkout,
+   not per-agent worktrees (each Unity worktree costs ~3-6 GB), and check `setup.sh --check` at session start so a stalled editor download is caught early.
+2. About 25%: three extra check/merge rounds because main kept moving under Assets (Q11 lane kit, polish merge, cellar art) while each 40-minute
+   check ran, plus one fix round (a crate stack on Q11's new lane steps that the plan didn't know about). Fix: a coordinator merge slot per session.
+3. About 20%: the usage pause mid-start: two agents were spawned, then paused, then replaced by fresh ones that re-read the same context.
+4. About 10%: one wasted camera capture (the first Cap_HM_Clutter framing missed the washing line; the span coordinates should have been printed
+   from the plan before choosing the camera), and an agent that re-read a stale capture PNG.
+The rest was ordinary work (contract, generator, plan, reviews, merge).
