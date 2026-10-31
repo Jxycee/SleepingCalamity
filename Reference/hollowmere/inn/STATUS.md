@@ -10,4 +10,5 @@ Blocker: none
 - Export + integration: Inn.fbx on F09 (L) at its pad height via HollowmereInnArt.cs + a builder row (d79c9a0; check PASS there: build, edit 591/591, play 32 pass). Merged origin/main (bakery, ruins, stalls) at 6d92db0; check re-running on the tip.
 - sc_facade_kit.py: only the `if __name__ == '__main__'` import guard, byte-identical to the bell tower / bakery branches (additive).
 - Unity captures: not taken (no GPU in this cloud session; HollowmereCapture.CaptureAll needs --graphics): a PC batch job.
-- Merge: pending the tip check.
+SC RESULT check FAIL (6d92db0 merge tip): build PASS, edit 592/592, play 31 pass / 1 fail / 8 skip; the failure is CombatArenaTests.Solo_DaggerGuard_Reduces_AndAParryStopsTheHit (a real-time 6-frame parry window landed as a held guard, hp 98), unrelated to the inn. Re-running check on da47412 (scene regenerated with the inn + bakery).
+- Merge: pending a green check.
