@@ -1,6 +1,6 @@
 # Hollowmere mass production: design (2026-10-30, session 3)
 
-Status: DRAFT for user approval. Nothing is built from this until the user approves it. Builder check done; user answers folded in (2026-10-30).
+Status: APPROVED by the user 2026-10-30 ("Approve, start Wave 0"). PHASE1 7.1 and P26 amended to match.
 
 ## 1. Intent
 The beauty corner proved the art pipeline (cloud Blender generators, bake, `BeautyCornerBuilder` table, captures, reference-beside-render sheets) and the user approved its look. This plan turns that one corner into the whole starting area, built around the rebuild loop (STORY 5 and 8.3): pieces carried out of the Undercroft are placed back in town across three rings. So every building needs more than one state, and every lot has to work with M6 placement.
