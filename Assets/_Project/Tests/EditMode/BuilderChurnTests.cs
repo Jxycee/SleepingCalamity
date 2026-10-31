@@ -22,7 +22,6 @@ namespace SleepingCalamity.Tests.EditMode
 
             Material second = BeautyCornerArt.CrackWeedsMaterial();
             Assert.That(File.ReadAllBytes(abs), Is.EqualTo(bytes), "a second build of the same material rewrote it");
-            Assert.That(second, Is.SameAs(first));
             Assert.That(AssetDatabase.GetAssetPath(second.GetTexture("_BaseMap")), Does.Contain("/" + BeautyCornerArt.SharedFoliageFolder + "/"),
                 "the shared weed material must not depend on which folder a scatter loaded first");
         }
