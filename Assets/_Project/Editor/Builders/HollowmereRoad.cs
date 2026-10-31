@@ -10,8 +10,9 @@
 //  3. The backdrop ring (Set/Country/Ring): one mesh from the terrain's edge out to SaltwakeRoadPlan.RingRadius, its heights continuing
 //     HollowmereLayout.NaturalGround (with the western fall) at the edge and rising into low far hills; a generated field-patchwork texture (the same
 //     SaltwakeRoadPlan.Field cells as the terrain's splat, so the fields carry on past the edge), and a dirt ribbon carrying the road on toward Saltwake.
-// The town's haze (HollowmereLook, exp2 0.012) leaves almost nothing past ~150 m, so the low cameras' horizon is framed by the terrain's tree lines
-// (40-140 m); the ring shows in the overview (its own thin haze) and fills the fogged horizon line with ground instead of sky.
+// The town's haze (HollowmereLook, exp2 0.012) leaves almost nothing past ~150 m (one flat fog colour), so everything past the terrain uses the
+// SleepingCalamity/Backdrop shader: no scene fog, its own haze graded toward the fog (horizon) colour by distance, at three depths: the near ring and
+// its trees (150-700 m), a mid hill ridge (~1.2 km) and a bluer far ridge (~2.3 km), like painted backdrop layers. The low cameras draw to 3 km.
 // Authority: none (editor-time scene building).
 using System.Collections.Generic;
 using System.IO;
@@ -30,6 +31,7 @@ namespace SleepingCalamity.EditorTools
         const string FieldsTexPath = BackdropFolder + "/T_Road_Fields.png";
         const string MaterialsFolder = "Assets/_Project/Content/Materials/Hollowmere";
         const float TreeHeight = 10f, TileSize = 100f;
+        public const float FarClip = 3000f;   // the low cameras draw the backdrop ridges (2.3-2.7 km)
         const float CartYaw = 90f;   // the plan's cart yaw points local +Z along the road; the cart model's length runs along local X
 
         static readonly Dictionary<string, GameObject> Models = new Dictionary<string, GameObject>();
@@ -172,15 +174,7 @@ namespace SleepingCalamity.EditorTools
         {
             const string dir = "Assets/_Project/Content/Textures/B1_town/worn_path/worn_path";
             var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_albedo.png");
-            if (albedo == null) return TryMat("sandstone");
-            BuilderUtil.EnsureFolder(MaterialsFolder);
-            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_RD_RingRoad.mat", Shader.Find("Universal Render Pipeline/Lit"));
-            m.SetTexture("_BaseMap", albedo); m.SetTexture("_MainTex", albedo);
-            var normal = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_normal.png");
-            if (normal != null) { m.SetTexture("_BumpMap", normal); m.EnableKeyword("_NORMALMAP"); }
-            m.SetFloat("_Smoothness", 0.05f);
-            EditorUtility.SetDirty(m);
-            return m;
+            return albedo != null ? Backdrop("M_RD_RingRoad", albedo, Color.white, GroundHaze, false) : TryMat("sandstone");
         }
 
         // ------------------------------------------------------------------------------------------------ 2. cards: hedgerow trees and field hedges
@@ -216,6 +210,7 @@ namespace SleepingCalamity.EditorTools
         {
             Material mat = CardMaterial();
             bool atlas = mat != null && mat.name == "M_RD_FarTrees";
+            Material ringMat = atlas ? Backdrop("M_RD_FarTreesBackdrop", mat.GetTexture("_BaseMap") as Texture2D, Color.white, NearHaze, true) : mat;
             var tiles = new Dictionary<(int, int, bool), CardMesh>();
             foreach (RoadItem i in plan)
             {
@@ -238,7 +233,7 @@ namespace SleepingCalamity.EditorTools
                 var go = new GameObject(name);
                 go.transform.SetParent(root, false);
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = mat;
+                var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = kv.Key.Item3 ? ringMat : mat;
                 r.shadowCastingMode = kv.Key.Item3 ? ShadowCastingMode.Off : ShadowCastingMode.On;   // the terrain's trees cast; the ring is far past the shadow distance
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
             }
@@ -357,6 +352,71 @@ namespace SleepingCalamity.EditorTools
             r.shadowCastingMode = ShadowCastingMode.Off;
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
             RoadRibbon(ring, t);
+            // the mid hill ridge and the far ridge: annuli rising out of the ring's edge (their feet tucked under the layer in front)
+            Annulus(ring, "MidHills", 640f, 1150f, 1500f, 20, 256, 45f, 55f, 7f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
+            Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 256, 150f, 120f, 23f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
+        }
+
+        // The three haze layers (SleepingCalamity/Backdrop): haze at DistNear, haze at DistFar, the distances, the tint on the fog colour.
+        struct Haze { public float Near, Far, D0, D1; public Color Tint; public Haze(float n, float f, float d0, float d1, Color tint) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; } }
+        static readonly Haze NearHaze = new Haze(0.62f, 0.84f, 150f, 700f, Color.white);     // the ring trees: the nearest silhouette layer
+        static readonly Haze GroundHaze = new Haze(0.86f, 0.9f, 150f, 700f, Color.white);   // the ring ground: matches the scene fog at the terrain edge (no seam)
+        static readonly Haze MidHaze = new Haze(0.79f, 0.85f, 900f, 1500f, new Color(0.98f, 1.0f, 1.04f));
+        static readonly Haze FarHaze = new Haze(0.88f, 0.91f, 1800f, 2700f, new Color(0.95f, 1.0f, 1.08f));
+
+        static Material Backdrop(string name, Texture2D tex, Color tint, Haze h, bool cards)
+        {
+            Shader sh = Shader.Find("SleepingCalamity/Backdrop") ?? Shader.Find("Universal Render Pipeline/Lit");
+            BuilderUtil.EnsureFolder(MaterialsFolder);
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/" + name + ".mat", sh);
+            m.SetTexture("_BaseMap", tex != null ? tex : Texture2D.whiteTexture);
+            m.SetColor("_BaseColor", tint);
+            m.SetFloat("_HazeNear", h.Near); m.SetFloat("_HazeFar", h.Far); m.SetFloat("_DistNear", h.D0); m.SetFloat("_DistFar", h.D1);
+            m.SetColor("_HazeTint", h.Tint);
+            m.SetFloat("_GroundMist", 0.06f); m.SetFloat("_MistTop", -8f);
+            m.SetFloat("_AlphaClip", cards ? 1f : 0f); m.SetFloat("_Cutoff", 0.5f);
+            if (cards) m.EnableKeyword("_ALPHATEST_ON"); else m.DisableKeyword("_ALPHATEST_ON");
+            m.SetFloat("_Cull", (float)(cards ? CullMode.Off : CullMode.Back));
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        // A polar ring of ground from r0 (its foot, just under the layer in front: RingHeight there minus 3 m) up to a ridge at rPeak (peak + spread x
+        // seamless noise round the circle) and falling a little behind to r1. Lumps (lump m) give the light something to model.
+        static void Annulus(Transform parent, string name, float r0, float rPeak, float r1, int rings, int segs, float peak, float spread, float lump, Material m)
+        {
+            TownPoint c = SaltwakeRoadPlan.RingCentre;
+            var v = new List<Vector3>(); var uv = new List<Vector2>(); var idx = new List<int>();
+            for (int j = 0; j <= rings; j++)
+            {
+                float u = j / (float)rings, r = r0 + (r1 - r0) * u;
+                for (int i = 0; i <= segs; i++)
+                {
+                    float a = i * 2f * Mathf.PI / segs, ca = Mathf.Cos(a), sa = Mathf.Sin(a);
+                    float x = c.X + r * ca, z = c.Z + r * sa;
+                    float top = peak + spread * Mathf.PerlinNoise(ca * 2.2f + 11f + r0 * 0.001f, sa * 2.2f + 7f) + 0.35f * spread * Mathf.PerlinNoise(ca * 7f + 3f, sa * 7f + r0 * 0.002f);
+                    float foot = RingHeight(c.X + r0 * ca, c.Z + r0 * sa) - 3f;
+                    float y = r <= rPeak ? Mathf.Lerp(foot, top, Smooth(r0, rPeak, r)) : Mathf.Lerp(top, top * 0.65f, Smooth(rPeak, r1, r));
+                    y += lump * (Mathf.PerlinNoise(x * 0.0045f + 5f, z * 0.0045f + 9f) - 0.5f) * Smooth(r0, r0 + 120f, r);
+                    v.Add(new Vector3(x, y, z)); uv.Add(new Vector2(i / (float)segs, u));
+                }
+            }
+            int w = segs + 1;
+            for (int j = 0; j < rings; j++)
+                for (int i = 0; i < segs; i++)
+                {
+                    int a = j * w + i, b = a + 1, d = a + w, e = d + 1;
+                    idx.AddRange(new[] { a, d, e, a, e, b });
+                }
+            var mesh = new Mesh { name = "RD_" + name, indexFormat = IndexFormat.UInt32 };
+            mesh.SetVertices(v); mesh.SetUVs(0, uv); mesh.SetTriangles(idx, 0);
+            mesh.RecalculateNormals(); mesh.RecalculateBounds();
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r2 = go.AddComponent<MeshRenderer>(); r2.sharedMaterial = m; r2.shadowCastingMode = ShadowCastingMode.Off;
+            GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
         }
 
         // The field patchwork as a texture over the ring's square (1 px = size/1024 m): the same cells as the terrain's splat, hedge lines dark along the
@@ -391,13 +451,7 @@ namespace SleepingCalamity.EditorTools
             if (!File.Exists(abs) || !File.ReadAllBytes(abs).SequenceEqual(png)) { File.WriteAllBytes(abs, png); AssetDatabase.ImportAsset(FieldsTexPath, ImportAssetOptions.ForceUpdate); }
             var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(FieldsTexPath);
 
-            BuilderUtil.EnsureFolder(MaterialsFolder);
-            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_RD_BackdropRing.mat", Shader.Find("Universal Render Pipeline/Lit"));
-            m.SetTexture("_BaseMap", albedo); m.SetTexture("_MainTex", albedo);
-            m.SetFloat("_Smoothness", 0.05f); m.SetFloat("_EnvironmentReflections", 0f); m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
-            m.SetFloat("_SpecularHighlights", 0f); m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
-            EditorUtility.SetDirty(m);
-            return m;
+            return Backdrop("M_RD_BackdropRing", albedo, Color.white, GroundHaze, false);
         }
 
         // A 4.6 m dirt ribbon on the ring along SaltwakeRoadPlan.RingRoad, from the terrain's west edge on (the worn_path tileable, metre UVs).

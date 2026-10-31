@@ -169,6 +169,27 @@ namespace SleepingCalamity.Core
                 items.Add(Item(RoadItemKind.Shrine, "Shrine", p, yaw, 1f, 0f, RoadPresets.Rebuilt));
             }
 
+            // Roadside clumps (card trees): 2-3 trees every ~14 m, alternating sides, 20-34 m off the road, so trees and bushes break the near skyline
+            // from the gate (RoadOut) without ever standing close to the road. Never in the lake, a lot or another lane.
+            int ci = 0;
+            for (float s = RoadsideStart + 8f; s < roadEnd - 6f; s += 14f, ci++)
+            {
+                HollowmereLayout.PointAlong(pts, s, out TownPoint c, out TownPoint dir);
+                float side = ci % 2 == 0 ? 1f : -1f;
+                var n = new TownPoint(dir.Z, -dir.X) * side;
+                TownPoint basePt = c + n * (half + 18f + 12f * Hash01(ci, 101));
+                int count = 2 + (int)(Hash01(ci, 103) * 2f);
+                for (int k = 0; k < count; k++)
+                {
+                    float a = Hash01(ci * 7 + k, 105) * 6.2832f, r = k == 0 ? 0f : 2.5f + 3f * Hash01(ci * 7 + k, 107);
+                    var p = new TownPoint(basePt.X + r * (float)Math.Cos(a), basePt.Z + r * (float)Math.Sin(a));
+                    if (!OnTerrain(p.X, p.Z, 3f) || !Clear(t, p, 4f) || InLake(p.X, p.Z)) continue;
+                    if (HollowmereLayout.DistanceToPolyline(p, pts) < RoadsideTreeDistance) continue;
+                    int variant = Hash01(ci * 7 + k, 109) < 0.45f ? 3 : (Hash01(ci * 7 + k, 111) < 0.6f ? 0 : 1);   // thorn clumps first, then oak / maple
+                    items.Add(new RoadItem { Kind = RoadItemKind.Tree, X = p.X, Z = p.Z, Yaw = Hash01(ci * 7 + k, 113) * 360f, Scale = 0.85f + 0.4f * Hash01(ci * 7 + k, 115), Variant = variant, Presets = RoadPresets.Both });
+                }
+            }
+
             // The cart, on the south verge between the first milestone and the shrine: tipped into the verge in Ruined, parked square to the road in Rebuilt.
             {
                 float s = (RoadsideStart + bend) * 0.5f + 4f;
@@ -303,6 +324,14 @@ namespace SleepingCalamity.Core
                 s += len;
             }
             return s;
+        }
+
+        public const float RoadsideTreeDistance = 19f;   // no card tree nearer the road's centre line than this
+
+        static bool InLake(float x, float z)
+        {
+            float lx = (x - HollowmereLayout.LakeCentre.X) / HollowmereLayout.LakeRadiusX, lz = (z - HollowmereLayout.LakeCentre.Z) / HollowmereLayout.LakeRadiusZ;
+            return lx * lx + lz * lz < 1.15f * 1.15f;   // the lake's ragged shore stays inside 1.15 radii (the western valley may lie below the water line)
         }
 
         static bool Clear(TownLayout t, TownPoint p, float margin)

@@ -88,8 +88,10 @@ namespace SleepingCalamity.Tests.EditMode
             {
                 Assert.AreEqual(!i.OnRing, SaltwakeRoadPlan.OnTerrain(i.X, i.Z), "ring flag: " + i);
                 if (!i.OnRing && i.Kind == RoadItemKind.Tree)
-                    Assert.Greater(HollowmereLayout.DistanceToPolyline(new TownPoint(i.X, i.Z), road.Points), 25f, "a card tree too close to the road: " + i);
-                if (!i.OnRing) Assert.Greater(SaltwakeRoadPlan.FieldWeight(T, i.X, i.Z), 0.5f, "outside the fields: " + i);
+                    Assert.GreaterOrEqual(HollowmereLayout.DistanceToPolyline(new TownPoint(i.X, i.Z), road.Points), SaltwakeRoadPlan.RoadsideTreeDistance, "a card tree too close to the road: " + i);
+                if (!i.OnRing && i.Kind == RoadItemKind.FieldHedge) Assert.Greater(SaltwakeRoadPlan.FieldWeight(T, i.X, i.Z), 0.5f, "outside the fields: " + i);
+                float lx = (i.X - HollowmereLayout.LakeCentre.X) / HollowmereLayout.LakeRadiusX, lz = (i.Z - HollowmereLayout.LakeCentre.Z) / HollowmereLayout.LakeRadiusZ;
+                if (!i.OnRing) Assert.Greater(lx * lx + lz * lz, 1.1f * 1.1f, "in the lake: " + i);   // (the western valley lies below the water line, away from the lake)
             }
             Assert.Greater(Plan.Count(i => i.Kind == RoadItemKind.Tree && !i.OnRing), 60, "trees on the terrain frame the low cameras");
             Assert.Greater(Plan.Count(i => i.Kind == RoadItemKind.Tree && i.OnRing), 500, "trees on the backdrop ring");

@@ -156,11 +156,11 @@ namespace SleepingCalamity.EditorTools
             {
                 Vector3 pos = c.Name == "Cap_HM_Overview" ? c.Pos : new Vector3(c.Pos.x, Mathf.Max(HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z), HollowmereLayout.WaterY) + c.Pos.y, c.Pos.z);   // never under the lake
                 Camera cam = LookTestBuilder.AddCapture(cams, c.Name, pos, c.Target, c.Fov);
-                cam.farClipPlane = 400f;
+                cam.farClipPlane = c.Name == "Cap_HM_Overview" ? 400f : HollowmereRoad.FarClip;   // Q15: the low cameras see the backdrop ridges
             }
 
             foreach (var c in HollowmereRoad.Cameras)   // Q15: from the gate looking out, from the road looking back (Target absolute)
-                LookTestBuilder.AddCapture(cams, c.Name, new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z), c.Target, c.Fov).farClipPlane = 700f;
+                LookTestBuilder.AddCapture(cams, c.Name, new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z), c.Target, c.Fov).farClipPlane = HollowmereRoad.FarClip;
             HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);   // the corner's light with the town-scale haze, sky and grade (Q12)
             ApplyPreset(Preset.Ruined);

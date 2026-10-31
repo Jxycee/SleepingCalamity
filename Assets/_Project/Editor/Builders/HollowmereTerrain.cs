@@ -162,7 +162,7 @@ namespace SleepingCalamity.EditorTools
                     var p = new TownPoint(x, z);
                     float grass, soil = 0f, path = 0f, cobble = 0f;
                     float lane = LaneEdge(t, p, false);
-                    float road = CountryRoad(t, p, out float roadOff);
+                    float road = CountryRoad(t, p, out float roadOff, out float roadS);
                     if (lane < 0f || IsPavedArea(x, z)) { cobble = 1f; grass = 0f; }
                     else if (road < 0.6f)
                     {
@@ -177,6 +177,11 @@ namespace SleepingCalamity.EditorTools
                         path = Mathf.Max(0f, 1f - soil - grass);
                         soil *= 1f - grass;
                         grass = Mathf.Max(0f, 1f - soil - path);
+                        // the hand-over from the gate's cobbles: a ragged edge over ~7 m, then scattered setts in the dirt for ~9 m more
+                        float n3 = Mathf.PerlinNoise(x * 0.6f + 31f, z * 0.6f + 17f);
+                        float c = 1f - Smooth(GateApron - 4f, GateApron + 3f, roadS + 5f * (n3 - 0.5f));
+                        c = Mathf.Max(c, Smooth(0.6f, 0.68f, n3) * (1f - Smooth(GateApron + 1f, GateApron + 10f, roadS)) * (1f - Smooth(1.6f, 2.4f, ao)));
+                        grass *= 1f - c; soil *= 1f - c; path *= 1f - c; cobble = c;
                     }
                     else
                     {
@@ -213,20 +218,21 @@ namespace SleepingCalamity.EditorTools
             float d = float.MaxValue;
             foreach (Lane lane in t.Lanes)
             {
-                if (!countryRoad && lane.Id == SaltwakeRoadPlan.RoadLane && CountryRoad(t, p, out _) < 3f) continue;
+                if (!countryRoad && lane.Id == SaltwakeRoadPlan.RoadLane && CountryRoad(t, p, out _, out _) < 3f) continue;
                 d = Mathf.Min(d, HollowmereLayout.DistanceToPolyline(p, lane.Points) - lane.Width * 0.5f);
             }
             return d;
         }
 
-        public const float GateApron = 9f;   // the Saltwake Road stays cobbled this far from the Lower Gate, then turns to dirt
+        public const float GateApron = 9f;   // the Saltwake Road stays cobbled about this far from the Lower Gate, then turns to dirt (blended over GateApron -4..+10)
 
-        // Signed distance (m) from the Saltwake Road's edge past the gate apron (float.MaxValue near the gate); offset = signed distance from its centre line.
-        static float CountryRoad(TownLayout t, TownPoint p, out float offset)
+        // Signed distance (m) from the Saltwake Road's edge from the cobble/dirt hand-over on (float.MaxValue nearer the gate); offset = signed distance from its
+        // centre line, s = arc length from the gate.
+        static float CountryRoad(TownLayout t, TownPoint p, out float offset, out float s)
         {
-            offset = 0f;
+            offset = 0f; s = 0f;
             Lane road = HollowmereLayout.FindLane(t, SaltwakeRoadPlan.RoadLane);
-            float best = float.MaxValue, s = 0f, bestS = 0f;
+            float best = float.MaxValue, run = 0f, bestS = 0f;
             for (int i = 1; i < road.Points.Length; i++)
             {
                 TownPoint a = road.Points[i - 1], b = road.Points[i];
@@ -234,13 +240,14 @@ namespace SleepingCalamity.EditorTools
                 float d = TownPoint.Distance(p, c), len = TownPoint.Distance(a, b);
                 if (d < best)
                 {
-                    best = d; bestS = s + tt * len;
+                    best = d; bestS = run + tt * len;
                     TownPoint dir = (b - a) * (1f / len), rel = p - c;
                     offset = rel.X * dir.Z - rel.Z * dir.X;   // + right of travel
                 }
-                s += len;
+                run += len;
             }
-            if (bestS < GateApron) return float.MaxValue;
+            s = bestS;
+            if (bestS < GateApron - 4f) return float.MaxValue;
             return best - road.Width * 0.5f;
         }
 
