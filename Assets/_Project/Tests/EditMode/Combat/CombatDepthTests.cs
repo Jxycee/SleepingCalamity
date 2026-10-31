@@ -182,6 +182,21 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Broom_BlocksDuringItsOwnAttack_DoNotUseUpTheRiposte()
+        {
+            var broom = new EnemyModel(EnemyCatalog.Broom);
+            for (int i = 0; i < 3; i++)
+            {
+                EnemyHitInput h = Hit(Axe(AttackSet.Hit1), bearing: 0f);
+                h.EnemyAttacking = true;   // winding up before its glint: it braces but cannot riposte, so the count must not empty
+                EnemyHitResult r = broom.ApplyHit(h);
+                Assert.That(r.Braced, Is.True);
+                Assert.That(r.RiposteTriggered, Is.False);
+            }
+            Assert.That(broom.Guard.Count, Is.EqualTo(0));
+        }
+
+        [Test]
         public void OnlyTheBroomRipostes()
         {
             var rat = new EnemyModel(EnemyCatalog.RatKing);
@@ -221,6 +236,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(DodgeTiming.IsInvulnerable(true, 0.2f), Is.True);
             Assert.That(DodgeTiming.IsPerfect(true, 0.05f, 0.2f), Is.False, "chained onto the last roll");
             Assert.That(DodgeTiming.IsPerfect(false, 0.05f, 1f), Is.False);
+            Assert.That(DodgeTiming.IsPerfect(true, 0.05f, 1f, hitboxOpenSeconds: 0.04f), Is.True, "the hitbox opened after the roll began");
+            Assert.That(DodgeTiming.IsPerfect(true, 0.05f, 1f, hitboxOpenSeconds: 0.10f), Is.False, "rolled into a hitbox that was already open");
             Assert.That(DodgeTiming.PerfectSeconds / (DodgeTiming.IFrameEndSeconds + DodgeTiming.LenienceSeconds), Is.LessThan(0.5f),
                 "a much tighter window than the safe roll, so rolling repeatedly earns nothing");
         }

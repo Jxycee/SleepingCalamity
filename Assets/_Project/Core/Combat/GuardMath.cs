@@ -52,8 +52,11 @@ namespace SleepingCalamity.Core.Combat
         public const float PerfectSeconds = 0.15f;
         public const float ChainLockoutSeconds = 0.3f;
 
-        public static bool IsPerfect(bool active, float elapsed, float gapBeforeRollSeconds) =>
-            active && elapsed >= 0f && elapsed <= PerfectSeconds + 1e-4f && gapBeforeRollSeconds >= ChainLockoutSeconds - 1e-4f;
+        // hitboxOpenSeconds: how long the hitbox had been open when it met the roll. It must have opened after the roll began (rolling into a hitbox that
+        // is already open is a dodge, not a perfect one); one 60 Hz frame of slack for the judging tick.
+        public static bool IsPerfect(bool active, float elapsed, float gapBeforeRollSeconds, float hitboxOpenSeconds = 0f) =>
+            active && elapsed >= 0f && elapsed <= PerfectSeconds + 1e-4f && gapBeforeRollSeconds >= ChainLockoutSeconds - 1e-4f &&
+            hitboxOpenSeconds <= elapsed + 1f / 60f;
     }
 
     // The broom's bristle front (6.6): 80% of frontal damage is blocked unless the hit comes from the flank or behind or is a guard-breaker.

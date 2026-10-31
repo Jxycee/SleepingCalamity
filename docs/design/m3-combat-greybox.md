@@ -294,7 +294,10 @@ Co-op still adds one enemy per extra player.
 
 ### Networking and authority (needs `risk-reviewer`)
 - Host: poise, steadiness, openings, the broom's guard count and its riposte, the perfect-dodge check. Owner (victim): perfect-dodge and parry judgement.
-- **New replicated state:** one `NetworkVariable<byte>` of flags on `Enemy` (steady, open, braced) for the visuals. **New RPC:** the perfect-dodge report.
+- **New replicated state:** one `NetworkVariable<byte>` of flags on `Enemy` (steady, braced) for the visuals; "open" and "committed" are worked out on
+  every peer from the replicated phase and attack clock. Late parry or perfect-dodge reports count only while the enemy is in, just after, or stunned by
+  that attack, and never extend a running stun (a second hero's report on one area attack cannot chain it). A perfect dodge also opens the Warden
+  (0.7 s, like its parry), including on the quake: playtest whether that is too generous. **New RPC:** the perfect-dodge report.
   **New attack:** the riposte, appended last.
 - **The attacker's screen must not lie:** today the contact squash and shove play on the attacker's client before the host decides. Under poise the full
   flinch comes only from the host's replicated `Stagger` phase; at contact the client plays a small hit reaction (squash 8%, no shove), or the clank when

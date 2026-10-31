@@ -249,18 +249,18 @@ namespace SleepingCalamity.Gameplay
             }
 
             ServerApplyKnock(dt);
-            if (!AiEnabled) { if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
-
+            // The flinch runs out with or without the AI (tests turn it off), so steadiness and the end of the opening are the same in both.
             if (Phase == EnemyPhase.Stagger)
             {
                 _staggerLeft -= dt;
                 if (_staggerLeft <= 0f)
                 {
                     Model.Poise.BeginSteady();   // one flinch per exchange: steady for a moment, so flinch loops cannot stunlock it
-                    SetPhase(EnemyPhase.Chase);
+                    SetPhase(AiEnabled ? EnemyPhase.Chase : EnemyPhase.Idle);
                 }
                 return;
             }
+            if (!AiEnabled) { if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
 
             HeroVitals target = PickTarget();
             if (_cooldown > 0f) _cooldown -= dt;
@@ -453,6 +453,7 @@ namespace SleepingCalamity.Gameplay
             h.EnemyCommitted = attacking && EnemyWindows.Committed(mine, _attackFrameServer);
             h.EnemyOpen = ServerOpen;
             h.EnemyStaggered = Phase == EnemyPhase.Stagger;
+            h.EnemyAttacking = attacking;
             EnemyHitResult r = Model.ApplyHit(h);
             if (r.Damage <= 0 && !r.Killed) return r;
             NetHp.Value = Model.Hp;
@@ -524,11 +525,14 @@ namespace SleepingCalamity.Gameplay
         }
 
         // A perfect dodge by a player (combat depth, change 5): the enemy stumbles out of its attack and is open for a moment.
+        // A late report (inside the serial's grace) only counts while the enemy is still in or just after that attack, and a second hero's report on the
+        // same area attack never extends a stun already running (Max), so co-op cannot chain it.
         public void ServerPerfectDodged()
         {
-            if (Phase == EnemyPhase.Dead) return;
+            if (Phase != EnemyPhase.Attack && Phase != EnemyPhase.Recover && Phase != EnemyPhase.Stagger) return;
             EndAttackNow();
-            _staggerLeft = Def.IsElite ? EnemyWindows.PerfectDodgeOpenSecondsElite : EnemyWindows.PerfectDodgeOpenSeconds;
+            float open = Def.IsElite ? EnemyWindows.PerfectDodgeOpenSecondsElite : EnemyWindows.PerfectDodgeOpenSeconds;
+            _staggerLeft = Phase == EnemyPhase.Stagger ? Mathf.Max(_staggerLeft, open) : open;
             _cooldown = Mathf.Max(_cooldown, 0.6f);
             SetPhase(EnemyPhase.Stagger);
         }
@@ -536,9 +540,10 @@ namespace SleepingCalamity.Gameplay
         // A successful parry by a player: the enemy is stunned for a moment and its attack is cancelled.
         public void ServerParried()
         {
-            if (Phase == EnemyPhase.Dead) return;
+            if (Phase != EnemyPhase.Attack && Phase != EnemyPhase.Recover && Phase != EnemyPhase.Stagger) return;   // same late-report rule as the perfect dodge
             EndAttackNow();
-            _staggerLeft = Def.IsElite ? 0.7f : 1.1f;
+            float stun = Def.IsElite ? 0.7f : 1.1f;
+            _staggerLeft = Phase == EnemyPhase.Stagger ? Mathf.Max(_staggerLeft, stun) : stun;
             _cooldown = Mathf.Max(_cooldown, 0.6f);
             SetPhase(EnemyPhase.Stagger);
         }

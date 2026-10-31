@@ -547,7 +547,8 @@ namespace SleepingCalamity.Gameplay
             {
                 CombatEvents.RaiseCue(CombatCue.Dodge, me);
                 // A last-moment roll (the hit met it in its first 0.15 s, and it was not chained onto another roll) opens the attacker (combat depth, change 5).
-                if (DodgeTiming.IsPerfect(_loco.IsDodging, _loco.DodgeElapsed, _rollGap))
+                float openFor = Mathf.Max(0f, (e.AttackFrame - a.HitOn.Start) / AttackData.FrameRate);
+                if (DodgeTiming.IsPerfect(_loco.IsDodging, _loco.DodgeElapsed, _rollGap, openFor))
                 {
                     CombatEvents.RaiseCue(CombatCue.Parry, me);
                     PerfectDodgeServerRpc(e.NetworkObjectId, e.Serial);

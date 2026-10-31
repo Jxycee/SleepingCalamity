@@ -97,6 +97,7 @@ namespace SleepingCalamity.Core.Combat
         public bool EnemyCommitted;          // the enemy is between its attack's glint and the end of its hitbox (EnemyWindows.Committed): no flinch
         public bool EnemyOpen;               // the enemy is open (recovering after its strike, stunned, flinching): x1.5 damage, double poise
         public bool EnemyStaggered;          // the enemy is already flinching: the hit cannot flinch it again (and adds no poise)
+        public bool EnemyAttacking;          // the enemy is inside one of its own attacks: blocked hits do not count toward a riposte it could not start
     }
 
     public struct EnemyHitResult
@@ -220,7 +221,7 @@ namespace SleepingCalamity.Core.Combat
                 if (r.Blocked && Def.Ripostes && canFlinch)
                 {
                     r.Braced = true;
-                    if (Guard.OnBlocked()) r.RiposteTriggered = true;
+                    if (!h.EnemyAttacking && Guard.OnBlocked()) r.RiposteTriggered = true;
                 }
                 r.GuardBroken = r.GuardBreakHit && canFlinch;
                 if (canFlinch && !r.Blocked)
