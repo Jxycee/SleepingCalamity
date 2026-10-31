@@ -185,8 +185,15 @@ namespace SleepingCalamity.EditorTools
 
         public static Dictionary<string, Material> BuildNeighbourMaterials(string folderName)
         {
-            Dictionary<string, Material> map = BuildFacadeMaterials();
             var look = BeautyCornerTable.NeighbourLooks[folderName];
+            return BuildNeighbourMaterials(folderName, look.Plaster, look.Paint);
+        }
+
+        // Same, for any B4-kit house with its own plaster tint and shutter / door paint (linear): the neighbours and the townhouse kit family.
+        public static Dictionary<string, Material> BuildNeighbourMaterials(string folderName, Color plasterTint, Color paintLinear)
+        {
+            Dictionary<string, Material> map = BuildFacadeMaterials();
+            var look = (Plaster: plasterTint, Paint: paintLinear);
             Shader wear = Shader.Find(WearShaderName);
             Material plaster = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + folderName + "_FK_Plaster.mat", wear);
             plaster.CopyPropertiesFromMaterial(map["FK_Plaster"]);
