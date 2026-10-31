@@ -82,6 +82,7 @@ namespace SleepingCalamity.Presentation
                 _hpText = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
             }
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F1) _help = !_help;
+            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F2) CombatAssists.GroundTelegraph = !CombatAssists.GroundTelegraph;   // the footprint assist
 
             HeroVitals v = me.GetComponent<HeroVitals>();
             float x = 16f, y = 16f;
@@ -162,8 +163,8 @@ namespace SleepingCalamity.Presentation
                 GUI.color = Color.white;
             }
 
-            GUI.Label(new Rect(Screen.width - 520f, Screen.height - (_help ? 150f : 26f), 510f, 150f), _help
-                ? "<b>Controls</b> (F1 hides)\nLMB attack x2 + finisher; hold LMB 0.6 s, release = charge\nLeft Ctrl dodge (i-frames)  Tab lock-on (Q/R switch)  Shift sprint  Space jump (air combo)\nRMB: dagger guard (tap at the hit = parry), bow aim + LMB shoots, staff spell\nF5 swap heirloom   F6 skip wave   hold E near a downed ally = revive"
+            GUI.Label(new Rect(Screen.width - 520f, Screen.height - (_help ? 170f : 26f), 510f, 170f), _help
+                ? "<b>Controls</b> (F1 hides)\nLMB attack x2 + finisher; hold LMB 0.6 s, release = charge\nLeft Ctrl dodge (i-frames)  Tab lock-on (Q/R switch)  Shift sprint  Space jump (air combo)\nRMB: dagger guard (tap at the hit = parry), bow aim + LMB shoots, staff spell\nF5 swap heirloom   F6 skip wave   hold E near a downed ally = revive\nF2 ground attack markers (assist): " + (CombatAssists.GroundTelegraph ? "on" : "off")
                 : "F1 controls", _label);
         }
 

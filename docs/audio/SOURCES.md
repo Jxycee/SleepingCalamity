@@ -36,7 +36,13 @@ archives kept outside the repo; only the files below are copied in. Chosen from 
 | Combat_Spell | staff spell cast | maximize_005 | Interface Sounds |
 | Combat_Shot | bow shot | impactTin_medium_001 | Impact Sounds |
 | Combat_Dodge | a visible dodge ignoring a hit | cloth3 | RPG Audio |
-| Combat_Telegraph | an enemy winds up | bong_001 | Interface Sounds |
+| Combat_Telegraph | unused since the enemy tells (kept for the cue list) | bong_001 | Interface Sounds |
+| Combat_WindUp | slime wind-up (hop, glob), pitched up | impactSoft_medium_002 | Impact Sounds |
+| Combat_WindUpScratch | rat-king wind-up (lunge, tail spin) | scratch_002 | Interface Sounds |
+| Combat_WindUpWood | broom wind-up (sweep, poke): a wooden creak | creak1 | RPG Audio |
+| Combat_WindUpHeavy | Dough Warden wind-up, pitched down | creak3 | RPG Audio |
+| Combat_Glint | the glint at an enemy attack's commit (12-24 frames before its hitbox) | drawKnife2 | RPG Audio |
+| Combat_EliteToll | the Warden's signature attack, at the peak of its wind-up | impactBell_heavy_001 | Impact Sounds |
 | Combat_Die | an enemy dies | impactGlass_medium_002 | Impact Sounds |
 | Ui_Click | UI click | click_001 | Interface Sounds |
 | Ui_Confirm | UI confirm | confirmation_001 | Interface Sounds |

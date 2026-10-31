@@ -11,6 +11,9 @@ namespace SleepingCalamity.Core
         public const string Hit = "Combat_Hit", HitHeavy = "Combat_HitHeavy", HitCrit = "Combat_HitCrit", Whoosh = "Combat_Whoosh", Block = "Combat_Block",
             Parry = "Combat_Parry", Slam = "Combat_Slam", Hurt = "Combat_Hurt", Pop = "Combat_Pop", Heal = "Combat_Heal", Spell = "Combat_Spell",
             Shot = "Combat_Shot", Dodge = "Combat_Dodge", Telegraph = "Combat_Telegraph", Die = "Combat_Die", Whiff = "Combat_Whiff";
+        // Enemy tells (EnemyTell, 2026-10-30): a wind-up per body type, the glint "shing" at the commit, and the toll at the peak of the elite's signature.
+        public const string WindUp = "Combat_WindUp", WindUpScratch = "Combat_WindUpScratch", WindUpWood = "Combat_WindUpWood", WindUpHeavy = "Combat_WindUpHeavy",
+            Glint = "Combat_Glint", EliteToll = "Combat_EliteToll";
 
         private const float TwoPi = 2f * MathF.PI;
 
@@ -21,6 +24,9 @@ namespace SleepingCalamity.Core
             R(Hit, 0.16f, 1.0f, 0.04f), R(HitHeavy, 0.30f, 1.0f, 0.06f), R(HitCrit, 0.30f, 1.0f, 0.08f), R(Whoosh, 0.20f, 0.3f, 0.05f), R(Block, 0.22f, 0.7f, 0.05f),
             R(Parry, 0.35f, 0.85f, 0.08f), R(Slam, 0.50f, 1.0f, 0.15f), R(Hurt, 0.22f, 1.0f, 0.10f), R(Pop, 0.22f, 0.7f, 0.10f), R(Heal, 0.45f, 0.6f, 0.15f),
             R(Spell, 0.45f, 0.8f, 0.15f), R(Shot, 0.20f, 0.7f, 0.05f), R(Dodge, 0.18f, 0.45f, 0.08f), R(Telegraph, 0.25f, 0.6f, 0.15f), R(Die, 0.45f, 0.9f, 0.10f), R(Whiff, 0.14f, 0.3f, 0.05f),
+            // Tells sit under the hits (a wind-up is information, a hit is the event) but over the swing whoosh; the glint is short and bright so it cuts through.
+            R(WindUp, 0.30f, 0.6f, 0.08f), R(WindUpScratch, 0.25f, 0.6f, 0.08f), R(WindUpWood, 0.40f, 0.65f, 0.08f), R(WindUpHeavy, 0.60f, 0.8f, 0.15f),
+            R(Glint, 0.25f, 0.75f, 0.06f), R(EliteToll, 1.20f, 0.9f, 0.5f),
         };
 
         private static SfxRecipe R(string id, float seconds, float volume, float minInterval) =>
@@ -47,6 +53,12 @@ namespace SleepingCalamity.Core
                 case Telegraph: Tone(o, sr, 440f, 330f, 6f, 0.5f); Tone(o, sr, 466f, 349f, 6f, 0.5f); break;
                 case Die: Thump(o, sr, 260f, 55f, 7f, 0.8f); Noise(o, ref rng, 12f, 0.3f, 0.6f); break;
                 case Whiff: Swell(o, ref rng, 0.5f, 0.35f); break;   // a short, soft, dull breath of air
+                case WindUp: Tone(o, sr, 180f, 120f, 5f, 0.6f); Swell(o, ref rng, 0.8f, 0.3f); break;            // a soft gathering squelch
+                case WindUpScratch: Noise(o, ref rng, 8f, 0.9f, 0.5f); Tone(o, sr, 900f, 1400f, 6f, 0.25f); break;
+                case WindUpWood: Tone(o, sr, 140f, 190f, 3f, 0.5f); Noise(o, ref rng, 5f, 0.3f, 0.3f); break;   // a creak
+                case WindUpHeavy: Tone(o, sr, 70f, 110f, 2f, 0.8f); Swell(o, ref rng, 0.85f, 0.4f); break;      // a low rising groan
+                case Glint: Tone(o, sr, 2637f, 2637f, 14f, 0.6f); Tone(o, sr, 3951f, 3951f, 18f, 0.35f); Noise(o, ref rng, 60f, 1f, 0.2f); break;
+                case EliteToll: Tone(o, sr, 98f, 98f, 1.6f, 0.8f); Tone(o, sr, 196f, 196f, 2.2f, 0.4f); Tone(o, sr, 294f, 293f, 3f, 0.25f); break;
                 default: return false;
             }
             return true;

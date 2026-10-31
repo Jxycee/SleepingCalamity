@@ -13,6 +13,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             CombatSfx.Hit, CombatSfx.HitHeavy, CombatSfx.HitCrit, CombatSfx.Whoosh, CombatSfx.Block, CombatSfx.Parry, CombatSfx.Slam, CombatSfx.Hurt, CombatSfx.Pop,
             CombatSfx.Heal, CombatSfx.Spell, CombatSfx.Shot, CombatSfx.Dodge, CombatSfx.Telegraph, CombatSfx.Die, SfxIds.UiClick, SfxIds.UiConfirm, SfxIds.UiError,
+            CombatSfx.WindUp, CombatSfx.WindUpScratch, CombatSfx.WindUpWood, CombatSfx.WindUpHeavy, CombatSfx.Glint, CombatSfx.EliteToll,
         };
         private static readonly string[] StayGenerated = { SfxIds.WindAmbient, SfxIds.WaterLap, SfxIds.BellRing, CombatSfx.Whiff };
 

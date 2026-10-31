@@ -3,6 +3,11 @@
 // hitbox clock locally. Enemy hits on PLAYERS are judged by the victim's client (HeroCombat) against this clock, and the host re-checks only rules
 // (the enemy is alive and that attack serial is the one it is performing, or just ended). Player hits on enemies arrive as intents (CombatHost).
 // Greybox: simple state machines, no navmesh (an open arena with pillars): Chase -> Attack (telegraph, hit-on, recover) -> Recover.
+// Attack tokens (host only, never replicated; AttackPacing): before starting an attack the host asks for a token on its target hero. At most two enemies
+// wind up at one hero at once and their strikes land a gap apart; a refused enemy hovers at the edge of its reach and strafes until it gets one. Tokens
+// lapse when the hit window closes and are released early on stagger, parry, death and despawn. The Warden's signature plays alone: while others still
+// hold tokens on its hero it reserves the hero (no new tokens there) and starts once they lapse. Its revenge break-free takes a forced hold (no checks,
+// but later attacks keep their gap from it). The choice of attack is Core EnemyAttackChooser (the signature on a cadence of AI-chosen attacks).
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
@@ -44,6 +49,10 @@ namespace SleepingCalamity.Gameplay
         // after 120 s): the victim's judged-set and the host's dedupe key on (enemy id, serial) and must never meet a stale pair.
         private static int s_nextAttackSerial;
 
+        // Host: who may attack which hero right now (Core AttackTokens; keys are the Unity objects' hash codes, their instance ids, unique across the NetworkManagers of a test process).
+        private static readonly AttackTokens s_tokens = new AttackTokens();
+        public static AttackTokens Tokens => s_tokens;
+
         private Targetable _targetable;
         private float _staggerLeft, _recoverLeft, _cooldown, _despawnIn = -1f;
         private Vector3 _knock;
@@ -53,6 +62,10 @@ namespace SleepingCalamity.Gameplay
         private Vector3 _lungeDir;
         private float _initialCooldown = 0.6f;
         private Vector3 _scatterDir;
+        private float _tokenRetry;                       // host: seconds before asking for a token again after a refusal
+        private bool _waitingForToken;                   // host: refused last time, so hover and strafe instead of closing in
+        private float _strafeSign = 1f;
+        private int _attacksSinceSignature;              // host, elite: its signature comes after AttackPacing.SignatureEvery other attacks
 
         // ---- local on every peer ----
         private float _attackClock;                      // seconds since this peer saw the current attack begin
@@ -70,6 +83,8 @@ namespace SleepingCalamity.Gameplay
         public float AttackFrame => _attackClock * AttackData.FrameRate;
         public bool Attacking => CurrentAttack != null && AttackFrame < CurrentAttack.TotalFrames;
         public bool HitboxOn => Attacking && CurrentAttack.HitOn.Contains(AttackFrame);
+        public bool WindingUp => Attacking && AttackFrame < CurrentAttack.HitOn.Start;
+        public bool WaitingForToken => _waitingForToken;   // host only (tests, the bot report)
         // Hit feedback for presentation (every peer): Flash is 1 (full white) for FlashHoldSeconds after a landed hit, then fades in FlashFadeSeconds.
         // HitReact is 1 on the hit and falls to 0 over HitReactSeconds (a squash and a small shove away from the attacker, HitDirection, scaled by HitHeavy).
         public const float FlashHoldSeconds = 0.08f, FlashFadeSeconds = 0.12f, HitReactSeconds = 0.2f;
@@ -120,7 +135,7 @@ namespace SleepingCalamity.Gameplay
         private void OnDisable() { s_all.Remove(this); }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { s_all.Clear(); s_nextAttackSerial = 0; }
+        private static void ResetStatics() { s_all.Clear(); s_nextAttackSerial = 0; s_tokens.Clear(); }
 
         // Host only, BEFORE Spawn: the kind, tier and party size ride in the spawn message.
         public void ServerSeed(EnemyKind kind, int tier, int players)
@@ -156,14 +171,18 @@ namespace SleepingCalamity.Gameplay
             NetHp.OnValueChanged -= OnHpChanged;
             NetPhase.OnValueChanged -= OnPhaseChanged;
             _targetable.Alive = false;
-            if (IsServer) ServerDespawned?.Invoke(this);
+            if (IsServer)
+            {
+                s_tokens.Release(GetHashCode());
+                ServerDespawned?.Invoke(this);
+            }
         }
 
         private void OnSerialChanged(int previous, int current)
         {
             _attackClock = 0f;
             _seenSerial = current;
-            CombatEvents.RaiseCue(CombatCue.EnemyTelegraph, transform.position);
+            // No generic telegraph cue any more: EnemyVisual plays this attack's own wind-up, hold and glint sounds from its EnemyTell.
         }
 
         private void OnHpChanged(int previous, int current)
@@ -240,10 +259,37 @@ namespace SleepingCalamity.Gameplay
 
             SetPhase(EnemyPhase.Chase);
             FaceToward(to, Def.Kind == EnemyKind.DoughWarden ? 200f : 420f, dt);
+            if (_tokenRetry > 0f) _tokenRetry -= dt;
             AttackData next = ChooseAttack(dist);
-            if (next != null && _cooldown <= 0f) { ServerStartAttack(next, target.transform.position); return; }
+            if (next == null) _waitingForToken = false;
+            else if (_cooldown <= 0f && _tokenRetry <= 0f)
+            {
+                PacingProfile pacing = AttackPacing.ForTier(Tier);
+                if (s_tokens.TryAcquire(target.GetHashCode(), GetHashCode(), Time.timeAsDouble, next, pacing, exclusive: next == AttackCatalog.WardenQuake))
+                {
+                    _waitingForToken = false;
+                    ServerStartAttack(next, target.transform.position);
+                    // Only AI-chosen attacks count toward the signature's cadence (not the break-free, not a test's forced attack).
+                    if (EnemyAttackChooser.IsSignature(next)) _attacksSinceSignature = 0;
+                    else if (Def.IsElite) _attacksSinceSignature++;
+                    return;
+                }
+                _tokenRetry = pacing.RetrySeconds * (1f + 0.5f * Random.value);
+                if (!_waitingForToken) _strafeSign = Random.value < 0.5f ? -1f : 1f;
+                _waitingForToken = true;
+            }
+            Vector3 dir = to / Mathf.Max(0.001f, dist);
+            float speed = Def.MoveSpeed * (Model.Rage.State == RageState.Raging ? 1.25f : 1f);
             float stop = Def.Radius + 0.55f;
-            if (dist > stop + 0.3f) MoveHorizontal(to / Mathf.Max(0.001f, dist), Def.MoveSpeed * (Model.Rage.State == RageState.Raging ? 1.25f : 1f), dt);
+            if (_waitingForToken)
+            {
+                // Waiting for a turn: hold at the edge of reach and circle the hero (KH's hovering crowd), drifting out if crowded in.
+                Vector3 side = Vector3.Cross(Vector3.up, dir) * _strafeSign;
+                float hover = stop + 1.2f;
+                Vector3 radial = dist < hover ? -dir * 0.6f : dist > hover + 1.5f ? dir : Vector3.zero;
+                MoveHorizontal((side + radial).normalized, speed * 0.45f, dt);
+            }
+            else if (dist > stop + 0.3f) MoveHorizontal(dir, speed, dt);
         }
 
         private HeroVitals PickTarget()
@@ -261,33 +307,10 @@ namespace SleepingCalamity.Gameplay
             return best;
         }
 
-        // How far a glob can be lobbed (m). Was 8.5: the first playtest read a hit from that far as "hit from a distance" with nothing flying at you; the
-        // glob is now drawn in flight (EnemyVisual) and lobbed from at most 6.5 m.
-        public const float LobReach = 6.5f;
+        // How far a glob can be lobbed (m): Core EnemyAttackChooser.LobReach (was 8.5; the glob is drawn in flight, EnemyVisual).
+        public const float LobReach = EnemyAttackChooser.LobReach;
 
-        private float Reach(AttackData a)
-        {
-            if (a.Origin == HitOrigin.GroundAtTarget) return LobReach;
-            return a.Range + a.LungeMeters * 0.7f + 0.2f;   // a lunge or hop lands up to LungeMeters ahead, the strike is Range around the landing spot
-        }
-
-        private AttackData ChooseAttack(float dist)
-        {
-            AttackData pick = null;
-            float roll = Random.value;
-            AttackData[] attacks = Def.Attacks;
-            int start = Mathf.Clamp(Mathf.FloorToInt(roll * attacks.Length), 0, attacks.Length - 1);
-            for (int k = 0; k < attacks.Length; k++)
-            {
-                AttackData a = attacks[(start + k) % attacks.Length];
-                bool lob = a.Origin == HitOrigin.GroundAtTarget;
-                if (lob && dist < 3.2f) continue;
-                if (dist > Reach(a)) continue;
-                pick = a;
-                break;
-            }
-            return pick;
-        }
+        private AttackData ChooseAttack(float dist) => EnemyAttackChooser.Choose(Def, dist, Random.value, _attacksSinceSignature);
 
         private void FaceToward(Vector3 flatDir, float degPerSec, float dt)
         {
@@ -365,8 +388,9 @@ namespace SleepingCalamity.Gameplay
             {
                 _attackEndedAt = Time.timeAsDouble;
                 NetAttackIdx.Value = -1;
-                _cooldown = Def.Kind == EnemyKind.DoughWarden ? 1.4f : Def.Kind == EnemyKind.RatKing ? 0.8f : 1.2f;
-                _recoverLeft = Def.Kind == EnemyKind.RatKing ? 0.9f : 0.35f;
+                s_tokens.Release(GetHashCode());
+                _cooldown = AttackPacing.CooldownSeconds(Def.Kind, Tier);
+                _recoverLeft = AttackPacing.RecoverSeconds(Def.Kind, Tier) + (a == AttackCatalog.WardenQuake ? AttackPacing.SignatureExtraRecoverSeconds : 0f);
                 Vector3 away = target != null ? transform.position - target.transform.position : -transform.forward;
                 away.y = 0f;
                 Vector3 side = Vector3.Cross(Vector3.up, away.normalized) * (Random.value < 0.5f ? 1f : -1f);
@@ -412,6 +436,7 @@ namespace SleepingCalamity.Gameplay
 
             if (r.Killed)
             {
+                s_tokens.Release(GetHashCode());
                 _lastAttackData = null;
                 NetAttackIdx.Value = -1;
                 SetPhase(EnemyPhase.Dead);
@@ -431,7 +456,11 @@ namespace SleepingCalamity.Gameplay
             if (r.Knockback > 0f) _knock += away * r.Knockback;
             if (r.RevengeTriggered)
             {
-                // Break free: a quick circle that clears everyone off it (the elite's answer to being chained).
+                // Break free: a quick circle that clears everyone off it (the elite's answer to being chained). It answers the heroes hitting it, so it
+                // starts whatever the tokens say, but records a forced hold on its nearest hero so the next attacks keep their gap from it.
+                HeroVitals near = PickTarget();
+                if (near != null) s_tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.WardenBreakFree);
+                else s_tokens.Release(GetHashCode());
                 ServerStartAttack(AttackCatalog.WardenBreakFree, transform.position);
             }
             return r;
@@ -443,6 +472,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (Phase == EnemyPhase.Attack) _attackEndedAt = Time.timeAsDouble;
             NetAttackIdx.Value = -1;
+            s_tokens.Release(GetHashCode());
         }
 
         // A successful parry by a player: the enemy is stunned for a moment and its attack is cancelled.

@@ -24,18 +24,18 @@ namespace SleepingCalamity.Tests.EditMode
             var t2 = new EnemyModel(EnemyCatalog.Broom, 2, 1);
             Assert.That(t1.MaxHp, Is.EqualTo(60));
             Assert.That(t2.MaxHp, Is.EqualTo(180), "life x3");
-            Assert.That(t2.Atk, Is.EqualTo(15f * 2.3f).Within(1e-4f), "attack x2.3");
+            Assert.That(t2.Atk, Is.EqualTo(15f * 1.0f).Within(1e-4f), "attack x1.0 (was x2.3: a x3.5 step from tier 1, retuned 2026-10-30)");
             Assert.That(t2.DefStat, Is.EqualTo(15f * 3.3f).Within(1e-4f), "defence x3.3");
         }
 
         [Test]
-        public void Tier1Attack_IsThirtyFivePercentDown_AndTier2IsUntouched()
+        public void Tier1Attack_IsThirtyFivePercentDown_AndTier2IsTheTableValue()
         {
             Assert.That(EnemyCatalog.Tier1Atk, Is.EqualTo(0.65f));
             foreach (EnemyDefinition def in EnemyCatalog.All)
             {
                 Assert.That(new EnemyModel(def, 1, 1).Atk, Is.EqualTo(def.Atk * 0.65f).Within(1e-4f), def.Name + " tier 1");
-                Assert.That(new EnemyModel(def, 2, 1).Atk, Is.EqualTo(def.Atk * 2.3f).Within(1e-4f), def.Name + " tier 2 keeps the 6.6 table value x2.3");
+                Assert.That(new EnemyModel(def, 2, 1).Atk, Is.EqualTo(def.Atk * 1.0f).Within(1e-4f), def.Name + " tier 2 is the 6.6 table value");
             }
             Assert.That(new EnemyModel(EnemyCatalog.Slime, 1, 1).AttackDamage(AttackCatalog.SlimeHop, PlayerVitals.BaseDef), Is.EqualTo(8), "a slime hop: 12 x 0.65 x 1.0 x 100/110 = 7.09 -> 8 (was 11)");
         }

@@ -46,11 +46,15 @@ namespace SleepingCalamity.Core.Combat
 
     public static class EnemyCatalog
     {
-        // Tier 2 (floors 3-4) is the DC2 family ratio: life x3, attack x2.3, defence x3.3.
-        public const float Tier2Life = 3f, Tier2Atk = 2.3f, Tier2Def = 3.3f;
+        // Tier 2 (floors 3-4): life x3 and defence x3.3 are the DC2 family ratio. Attack was x2.3 (a x3.5 step from tier 1 after the first playtest): against
+        // the 100 HP, DEF 10 hero that is a 26-point slime hop and a 113-point Warden pound, a one-shot. DC1's early enemies take 19-46% of the hero's HP per
+        // hit, typically 25% (docs/research/combat-timings.md row 22). Now x1.0, a x1.54 step: slime hop 8 -> 11, rat-king spin 14 -> 22, broom sweep 11 -> 19,
+        // Warden slam 27 -> 41 and pound 32 -> 50 (the elite's big hits sit at the top of DC1's band). Tier 2 presses through pacing instead: faster
+        // cooldowns, a tighter strike gap (AttackPacing.Tier2) and mixed rosters (ArenaWaves). P9 Placeholder.
+        public const float Tier2Life = 3f, Tier2Atk = 1.0f, Tier2Def = 3.3f;
 
         // First playtest (2026-10-30): tier 1 hit too hard to read the fight. Tier 1 attack is x0.65 of the 6.6 table (slime 12 -> 7.8, rat-king 18 -> 11.7,
-        // broom 15 -> 9.75, Warden 30 -> 19.5). Tier 2 still multiplies the table value, so it is unchanged (a x3.5 jump from tier 1 now). P9 Placeholder.
+        // broom 15 -> 9.75, Warden 30 -> 19.5). P9 Placeholder.
         public const float Tier1Atk = 0.65f;
 
         // 6.6 tier 1 stats. Placeholder: which are weak to fire (the jam, the wooden broom) and which are pests (the rat-king).
@@ -61,7 +65,7 @@ namespace SleepingCalamity.Core.Combat
         public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 60, 15f, 15f, 2.3f, 0.55f, 1.9f,
             new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f);
         public static readonly EnemyDefinition DoughWarden = new EnemyDefinition(EnemyKind.DoughWarden, "dough_warden", "Dough Warden", Species.Elite, 600, 30f, 20f, 2.4f, 1.0f, 2.8f,
-            new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f,
+            new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound, AttackCatalog.WardenQuake }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f,
             parts: new[]
             {
                 new PartDefinition("rolling_pin", 70, 1.5f, 1.4f, 0.5f, 0.2f, 1.3f),    // the arm that slams: reached from its right flank

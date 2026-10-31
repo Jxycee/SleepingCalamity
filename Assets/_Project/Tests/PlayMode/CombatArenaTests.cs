@@ -94,6 +94,51 @@ namespace SleepingCalamity.Tests.PlayMode
             while (Time.realtimeSinceStartupAsDouble < until) yield return null;
         }
 
+        // Catches overlapping enemy attacks (enemy polish, 2026-10-30): four slimes crowd an idle hero; the host's attack tokens must keep at most two of them
+        // winding up at once, make the rest wait (hover and strafe), and open no two strikes closer than the tier's gap.
+        [UnityTest, Timeout(60000)]
+        public IEnumerator Solo_AttackTokens_KeepACrowdToTwoAttackers_AndTheirStrikesApart()
+        {
+            yield return StartCombatSolo();
+            var hero = AppBootstrap.Current.NetworkManager.LocalClient.PlayerObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            yield return Seconds(0.3f);
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * Mathf.PI * 0.5f;
+                combat.SpawnEnemy(EnemyKind.Slime, 1, hero.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 2.6f);
+            }
+            int maxWindUps = 0, strikes = 0;
+            bool someoneWaited = false;
+            float minGap = float.MaxValue, lastStrike = -1f;
+            var seen = new System.Collections.Generic.HashSet<(ulong, int)>();
+            double until = Time.realtimeSinceStartupAsDouble + 8.0;
+            while (Time.realtimeSinceStartupAsDouble < until)
+            {
+                int windUps = 0;
+                foreach (Enemy e in Enemy.All)
+                {
+                    if (!e.IsSpawned || !e.Alive) continue;
+                    if (e.WindingUp) windUps++;
+                    if (e.WaitingForToken) someoneWaited = true;
+                    if (e.HitboxOn && seen.Add((e.NetworkObjectId, e.Serial)))
+                    {
+                        if (lastStrike >= 0f) minGap = Mathf.Min(minGap, Time.time - lastStrike);
+                        lastStrike = Time.time;
+                        strikes++;
+                    }
+                }
+                maxWindUps = Mathf.Max(maxWindUps, windUps);
+                yield return null;
+            }
+            Assert.That(strikes, Is.GreaterThanOrEqualTo(3), "the crowd attacked");
+            Assert.That(maxWindUps, Is.LessThanOrEqualTo(AttackPacing.Tier1.MaxAttackersPerHero), "never more than two winding up at the hero");
+            Assert.That(someoneWaited, Is.True, "with four in reach, some had to wait for a token");
+            Assert.That(minGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "two strikes opened " + minGap.ToString("F2") + " s apart");
+        }
+
         [UnityTest]
         public IEnumerator Solo_WaveOne_Spawns_AndTheEnemiesChaseAndHurtAnIdleHero()
         {
