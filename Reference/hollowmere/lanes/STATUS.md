@@ -4,7 +4,7 @@ State: IN PROGRESS
 Session: Q11. Lane kit: lane walls, steps and lane dressing
 Progress: 15%
 Sheet: none yet
-Blocker: paused by coordinator for usage
+Blocker: none
 
 Score: -
 Tris: -
@@ -28,3 +28,5 @@ History:
   kit agent and the placement implementer (both Sonnet) in parallel. Q8's TownWallPlan + HollowmereTownWall are the placement template.
 - Both agents hit the 5-hour limit, were resumed after the reset, then paused again by the coordinator (usage). Each commits its WIP (art on its worktree
   branch, placement on this branch) before stopping; on RESUME they continue from their transcripts.
+- Resumed (coordinator). Placement WIP a9fce01 (LaneKitPlan.cs, uncompiled); art not started. Both agents continue. Contract note: retaining walls and
+  lanterns are tested as "Ground lies between base and coping" (they are sunk or wall-mounted by design), not "Y within 0.25 m".
