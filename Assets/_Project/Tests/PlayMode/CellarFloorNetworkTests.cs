@@ -113,6 +113,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return WaitBuilt(peerA, seedB, 2, "client A");
             AssertSame(host, peerA, seedB, 2, "client A seedB f2");
             Assert.That(peerA.BuildCount, Is.EqualTo(4), "one rebuild per change, not one per variable");
+            Assert.That(host.BuildCount, Is.EqualTo(4), "the host builds once per change, no double build");
 
             // Late join: client B connects after the seed was set and must build the current floor from the spawn alone.
             PlayModeHarness.TestClient b = null;
@@ -124,8 +125,12 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(peerB.BuildCount, Is.EqualTo(1), "the late joiner builds once");
 
             // Back to no floor: all peers clear.
+            GameObject[] oldRoots = { host.Built.Root.gameObject, peerA.Built.Root.gameObject, peerB.Built.Root.gameObject };
             Assert.That(host.ServerSetFloor(seedB, 0), Is.True);
             yield return PlayModeHarness.WaitUntil(() => peerA.BuiltFloor == 0 && peerB.BuiltFloor == 0 && host.BuiltFloor == 0, Timeout, "floor 0 never cleared the peers");
+            yield return null;   // Destroy takes effect at the end of the frame
+            Assert.That(host.Built == null && peerA.Built == null && peerB.Built == null, Is.True, "Built is null on all 3 peers after floor 0");
+            Assert.That(oldRoots[0] == null && oldRoots[1] == null && oldRoots[2] == null, Is.True, "the previous floor root is destroyed on all 3 peers");
         }
     }
 }
