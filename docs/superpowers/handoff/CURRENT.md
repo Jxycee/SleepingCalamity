@@ -1,6 +1,7 @@
 # CURRENT: Sleeping Calamity running handoff
 
 ## Now
+- ~16:20 UTC: user: "keep a manageable amount of sessions that will keep us working into the limit, raise it a bit after the limit resets". Bakery resumed on Q9; started cloud **Q10 lake** (`claude/eloquent-faraday-bha6xz`), **Q11 lanes** (`claude/zen-feynman-991yav`), **Q13 Undercroft stair** (`claude/beautiful-sagan-1xmzq1`), all reporting. 6 running (Q6, Q8, Q9, Q10, Q11, Q13). Board names now match sidebar titles (STATUS `Session:` = sidebar title, job on `Job:`, c270443). Unstarted: Q12, Q14, Q15 (need a user desktop message).
 - ~16:00 UTC: **DUNGEON CORNER APPROVED by the user** ("make it a bit less orange and then I approve", 2026-10-31) now that the pass merged: `2ebceb6` (branch check `SC RESULT check PASS` on `05932d2`: test-edit 670, test-play 32 + 8 skipped; paler gold, deeper grey-brown darks, probe 0.35). M9 both corners done. Same merge brought Q9 keep hall + terrace art; Q9 integration resumes after the 17:10 reset.
 - 2026-10-31 ~15:50 UTC: **session 5 is coordinator** (board `claim`; note `C:/Users/jayce/.claude/coordinator/_handoff.md`). Q7 room pool merged `513ac08` (21 rooms, 61 tests). Running: Q8 town wall (15%, `claude/brave-keller-3d91gk`), Q6 garden (r2 self 27/40, Unity placement `a92a1ef`, final run then check). Paused for usage (5 h window 74% at 15:46, resets 17:10): session "Wave 1: Bakery" carrying both the **dungeon corner less-orange polish** (still WIP: `7dd1592`/`247ae4d`; the earlier note that 588dd81 passed check was wrong, 588dd81 is a STATUS commit) and **Q9 keep** (art done `5262394`, integration left). User approval of the dungeon corner ("make it a bit less orange and then I approve") gets recorded here once that polish merges. Archive ready (user, sidebar): Wave 0A, townhouse, stalls, inn, heroes' home, tithe gate, square/churn/room_pool. Weekly 53%.
 - ~15:35 UTC: **session 4 handing off** (context 88%; note `C:/Users/jayce/.claude/coordinator/_handoff.md`). Merged since 13:30: square `c66ea1f`, foliage `9c9e891`, Q3 ring 2 `d87f6bf`, Q5 churn fix `2f90e87`, Q4 dungeon corner `9cf4559` (user: "make it a bit less orange and then I approve"; polish pass running). User rules: new job = new session (QUEUE claiming CLOSED `097f916`); archive sessions that say ready. Pending starts (desktop message needed): Q10 lake, Q11 lanes, successor coordinator.
@@ -8,7 +9,7 @@
 
 ## Next
 1. 17:10 UTC reset: resume the Bakery session (dungeon polish, then Q9 keep integration); pacing cron `4,24,44`, log `C:/Users/jayce/.claude/coordinator/_paused.txt`.
-2. On the user's next desktop message: start Q10-Q15 (`Reference/hollowmere/QUEUE.md`) as NEW cloud sessions (env "SleepingCalamity Cloud", one job each), within pacing; Q12 look pass after Q8 merges.
+2. On the user's next desktop message: start Q12, Q14, Q15 (`Reference/hollowmere/QUEUE.md`) as NEW cloud sessions (env "SleepingCalamity Cloud", one job each), within pacing; Q12 look pass after Q8 merges.
 3. Merge Q6 garden and Q8 wall on green check. Older history: `history-2026-10-31.md`. The user owes: `USER_TODO.md` (Mixamo clips, 2-player walks).
 
 ## Branches and worktrees
