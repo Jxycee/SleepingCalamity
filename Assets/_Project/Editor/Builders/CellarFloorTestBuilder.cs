@@ -1,8 +1,9 @@
 // M5 stage 2: CellarFloorTest.unity, the generated Cellars floor (seed 12345, floor 1) built by CellarFloorBuilder (Presentation, the same code stage 3 runs on
 // every client) and lit like the approved dungeon corner: its DungeonCorner_Profile volume, trilight ambient, fog, a baked-in-capture reflection probe and the
 // warm gold lamp rig (the builder's own point lights; B11 cellar lanterns on the wall hooks). Dressing: B5 CellarVault FloorTile (four per cell) when the FBX is in,
-// CV_* WearLit materials from the dungeon corner, coloured greybox markers. A SpawnPoint at the entry makes it walkable; two fixed capture cameras,
-// Floor_Overview (high three-quarter view of the whole floor) and Floor_Room (play-height view into the largest combat room).
+// CV_* WearLit materials from the dungeon corner, coloured greybox markers. A SpawnPoint at the entry makes it walkable; three fixed capture cameras,
+// Floor_Overview (high three-quarter view of the whole floor, ceilings hidden by the capture), Floor_Room (play-height view into the largest combat room) and
+// Floor_Corridor (down the longest straight corridor). The art layer (vaults, B5 faces and dressing, candles) lives in CellarFloorBuilder.Art.cs.
 // Idempotent through BuilderUtil.SaveScene. Wired into ProjectBuilder.RunAll after DungeonCorner (shares its profile, materials and rendering stack).
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -20,8 +21,10 @@ namespace SleepingCalamity.EditorTools
         public const string ScenePath = "Assets/_Project/Scenes/CellarFloorTest.unity";
         public const uint Seed = 12345;
         public const int FloorNumber = 1;
+        const float Ambient = 0.8f;
         const string MaterialsFolder = "Assets/_Project/Content/Materials/CellarFloor";
         const string LanternFolder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
+        static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate" };
 
         [MenuItem("SleepingCalamity/Art/Build Cellar Floor Test")]
         public static void Build()
@@ -43,7 +46,10 @@ namespace SleepingCalamity.EditorTools
                 KeyChest = Marker("CF_KeyChest", new Color(0.95f, 0.72f, 0.12f), 0.8f), Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
                 EntryStart = Marker("CF_Entry", new Color(0.30f, 0.58f, 0.18f), 0.5f), StairExit = Marker("CF_Stair", new Color(0.55f, 0.30f, 0.70f), 0.6f),
                 SpawnT1 = Marker("CF_SpawnT1", new Color(0.60f, 0.58f, 0.52f), 0.2f), SpawnT2 = Marker("CF_SpawnT2", new Color(0.85f, 0.42f, 0.08f), 0.5f),
-                FogBaseDensity = 0.004f, FogBaseColor = new Color(0.20f, 0.15f, 0.11f),   // the floor's atmosphere roll scales and warms this
+                FogBaseDensity = 0.007f, FogBaseColor = new Color(0.16f, 0.13f, 0.11f),   // the corner's fog; the floor's atmosphere roll scales and warms this
+                Ceiling = slots["CV_VaultStone"], Limewash = slots["CV_Limewash"], Iron = slots["CV_Iron"], Crate = slots["CV_BarrelOak"],
+                Wax = own["wax"], Mote = own["mote"],
+                Pieces = new Dictionary<string, GameObject>(),
             };
             GameObject vault = BeautyCornerArt.LoadModel(DungeonCornerBuilder.KitFolder, DungeonCornerBuilder.KitFbx, keepMaterialSlots: true);
             Transform tileSrc = vault != null ? vault.transform.Find("FloorTile") : null;
@@ -53,6 +59,16 @@ namespace SleepingCalamity.EditorTools
                 DungeonCornerBuilder.Clone(tileSrc, holder, slots, "FloorTile");
                 kit.FloorTile = holder.GetChild(0).gameObject;
             }
+            // the art layer's B5 pieces: one holder per piece, the clone keeps its authored transform inside it
+            foreach (string piece in ArtPieces)
+            {
+                Transform src = vault != null ? vault.transform.Find(piece) : null;
+                if (src == null) continue;
+                var holder = new GameObject(piece).transform; holder.SetParent(templates, false);
+                DungeonCornerBuilder.Clone(src, holder, slots, piece);
+                kit.Pieces[piece] = holder.gameObject;
+            }
+            Debug.Log("SC CELLARFLOOR art pieces " + kit.Pieces.Count + "/" + ArtPieces.Length + ": " + string.Join(",", kit.Pieces.Keys));
             GameObject lantern = BeautyCornerArt.LoadModel(LanternFolder, "CellarLantern.fbx");
             string[] guids = AssetDatabase.FindAssets("M_CellarLantern t:Material");
             Material lanternMat = guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
@@ -70,7 +86,7 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 1.6f;   // a roofless 50 m floor needs more fill than the 8 m corner (0.23)
+            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = Ambient;   // vaulted rooms: nearer the corner's 0.23 than the roofless greybox's 1.6
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
 
@@ -83,8 +99,10 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.AddCapture(cams, "Floor_Overview", c + new Vector3(0, span * 0.66f, -span * 0.40f), c, 50f);
             var (camPos, camTarget) = RoomView(layout);
             LookTestBuilder.AddCapture(cams, "Floor_Room", camPos, camTarget, 78f);
+            var (corPos, corTarget) = CorridorView(layout);
+            LookTestBuilder.AddCapture(cams, "Floor_Corridor", corPos, corTarget, 70f);
             DungeonCornerBuilder.DarkBackground(cams);
-            foreach (Camera cc in cams.GetComponentsInChildren<Camera>(true)) cc.backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // warm umber backdrop instead of the corner's teal-black void
+            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // the roofless cutaway: warm umber backdrop; the vaulted views keep the corner's near-black
 
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
@@ -108,6 +126,40 @@ namespace SleepingCalamity.EditorTools
             Vector3 pos = CellarFloorBuilder.CellCenter(p.X + sx, p.Y + sy) + new Vector3(-1.2f, 1.7f, -1.2f);
             Vector3 target = CellarFloorBuilder.CellCenter(p.X + tx, p.Y + ty) + new Vector3(0, 1.2f, 0);
             if ((target - pos).sqrMagnitude < 9f) target = pos + new Vector3(1f, -0.1f, 1f) * 5f;
+            return (pos, target);
+        }
+
+        // The longest straight corridor run (first found on a tie, scanning rows then columns): the camera stands at play height half a cell inside one end
+        // and looks down the run to the far end. Falls back to the room view when the floor has no straight corridor cell.
+        internal static (Vector3 Pos, Vector3 Target) CorridorView(CellarFloorLayout layout)
+        {
+            int n = CellarFloorLayout.GridSize;
+            var mask = new int[n, n]; var has = new bool[n, n];
+            foreach (PlacedCorridor c in layout.Corridors) if (c.X >= 0 && c.Y >= 0 && c.X < n && c.Y < n) { mask[c.X, c.Y] = c.Mask; has[c.X, c.Y] = true; }
+            int ns = CellarRoom.MaskBit(CellSide.North) | CellarRoom.MaskBit(CellSide.South), ew = CellarRoom.MaskBit(CellSide.East) | CellarRoom.MaskBit(CellSide.West);
+            int best = 0; Vector3 a = default, b = default;
+            for (int pass = 0; pass < 2; pass++)
+                for (int i = 0; i < n; i++)
+                {
+                    int run = 0;
+                    for (int j = 0; j <= n; j++)
+                    {
+                        int x = pass == 0 ? j : i, y = pass == 0 ? i : j;
+                        bool straight = j < n && has[x, y] && mask[x, y] == (pass == 0 ? ew : ns);
+                        if (straight) { run++; continue; }
+                        if (run > best)
+                        {
+                            best = run;
+                            int x0 = pass == 0 ? j - run : i, y0 = pass == 0 ? i : j - run, x1 = pass == 0 ? j - 1 : i, y1 = pass == 0 ? i : j - 1;
+                            a = CellarFloorBuilder.CellCenter(x0, y0); b = CellarFloorBuilder.CellCenter(x1, y1);
+                        }
+                        run = 0;
+                    }
+                }
+            if (best == 0) return RoomView(layout);
+            Vector3 dir = (b - a).sqrMagnitude > 0.01f ? (b - a).normalized : Vector3.forward;
+            Vector3 pos = a - dir * (CellarFloorBuilder.CellSize * 0.5f - 0.6f) + new Vector3(0.5f, 1.6f, 0f);
+            Vector3 target = b + dir * CellarFloorBuilder.CellSize + new Vector3(0, 1.5f, 0);
             return (pos, target);
         }
 

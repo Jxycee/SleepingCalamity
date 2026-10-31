@@ -1,7 +1,11 @@
 Session: Q12. Whole-town look pass (local PC)
 Job: M5 Cellars floor generator
 Progress: 100%
-Status: DONE (stages 1-3)
+Status: DONE (stages 1-3), merged to main (28b3fde, 657a67f, 40a9c0c)
+Blocker: none
+Branch: claude/m5-stage1, claude/m5-stage2, claude/m5-stage3 (all merged)
+Last check: PASS on d80c68a (build, edit 711/711, play 33/0/8)
+Next: see Next steps below (variety layers now in Reference/cellars/variety)
 Archive: ready
 
 Stage 1 (pure Core, branch claude/m5-cellars-floors): `CellarFloorGenerator.Generate(seed, floor)` for floors 1-3, `PickRooms(seed, floor)`, `CellarFloorLayout` (hashes, ASCII dump) and `CellarFloorValidator`, all in Assets/_Project/Core/Cellars. Floor 4 is a fixed placeholder stub (entry, press hall, stair hall, chicane) until the bakery oven-maze step.

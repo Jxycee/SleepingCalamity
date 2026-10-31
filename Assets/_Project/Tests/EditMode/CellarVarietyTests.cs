@@ -414,9 +414,23 @@ namespace SleepingCalamity.Tests.EditMode
                 CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 Assert.AreEqual(d.DressingHash(), b.Dressing.DressingHash());
-                int props = d.Sockets.Count(s => s.Filled && s.Kind != SocketKind.Lantern);
-                Assert.AreEqual(props, b.DressingProps, "one prop group per filled non-lantern socket");
-                Assert.AreEqual(props, b.Root.Find(CellarFloorBuilder.DressingGroup).childCount);
+                // the art layer draws from the resolved dressing: with no kit only the crate stacks are procedural (the other pieces need the kit), and they stand at the chosen cell
+                Transform dressed = b.Root.Find(CellarFloorBuilder.DressingGroup);
+                int crates = 0;
+                foreach (DressedSocket s in d.Sockets)
+                {
+                    string prefix = "r" + s.RoomIndex + "_" + s.Socket.Id + "_";
+                    Transform[] hits = dressed.Cast<Transform>().Where(t => t.name.Contains(prefix)).ToArray();
+                    if (!s.Filled || s.Kind == SocketKind.Lantern) { Assert.IsEmpty(hits, "an empty (or lamp) socket draws no dressing: " + prefix); continue; }
+                    if (s.Kind != SocketKind.Crate) continue;
+                    crates++;
+                    Assert.AreEqual(1, hits.Length, "one crate stack per filled crate socket: " + prefix);
+                    Vector3 c = CellarFloorBuilder.CellCenter(s.Cell.X, s.Cell.Y), at = hits[0].position;
+                    Assert.LessOrEqual(Mathf.Abs(at.x - c.x), CellarFloorBuilder.CellSize * 0.5f, "stack stands in the resolved cell " + prefix);
+                    Assert.LessOrEqual(Mathf.Abs(at.z - c.z), CellarFloorBuilder.CellSize * 0.5f, "stack stands in the resolved cell " + prefix);
+                    Assert.IsTrue(hits[0].name.EndsWith(s.Variant), "the chosen variant names the stack");
+                }
+                Assert.GreaterOrEqual(b.Props, crates);
                 Assert.AreEqual(d.Vignettes.Count, b.VignetteGroups);
                 Assert.AreEqual(d.Vignettes.Count, b.Root.Find(CellarFloorBuilder.VignetteGroup).childCount);
                 Assert.AreEqual(d.Atmosphere.DustVisibleHere, b.DustMotes);
