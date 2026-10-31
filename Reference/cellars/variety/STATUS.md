@@ -2,9 +2,9 @@ Session: Q12. Whole-town look pass (local PC)
 Job: Cellars variety foundations (asked by the user directly, 2026-10-31)
 Progress: 100%
 Status: DONE (foundations; refine later list below)
-Blocker: main merge not done: CellarFloorBuilder.cs, CellarFloorTestBuilder.cs and CellarFloorTest.unity conflict with main's Cellars floor art layer (CellarFloorBuilder.Art.cs); both dress the same sockets and lamps, needs a design call
-Branch: claude/variety-final
-Last check: not run yet (no merge with main)
+Blocker: none (main merged; the art layer in CellarFloorBuilder.Art.cs now draws from the resolved dressing, the greybox socket dressing is gone; vignettes stay greybox; dust is still a marker/TODO)
+Branch: claude/variety-merge
+Last check: pending
 Next: refine later list below; user's three-run samey check on greybox
 Archive: ready
 Branch `cellar-variety` (pushed as `claude/cellar-variety`). Greybox foundations only: data, deterministic Core logic, builder hooks, tests. `check` not run. All new decisions are pure functions of (seed, floor) on their own Rng.Derive streams, so the room, placement and link streams are untouched; `LayoutHash()` stays geometry only (goldens for seed 12345 floors 1-3 unchanged).
