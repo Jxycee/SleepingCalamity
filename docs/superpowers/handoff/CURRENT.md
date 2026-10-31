@@ -1,6 +1,7 @@
 # CURRENT: Sleeping Calamity running handoff
 
 ## Now
+- ~18:35 UTC: **Q12 whole-town look merged** `0331588` (`SC RESULT check PASS` on `537125f`: test-edit 681, test-play 32 + 8 skipped; 28/40; `HollowmereLook` town grade, neutral sky, town haze, pollen, gate shafts; approved corner untouched). Local Q12 session DONE: the local slot needs a new long job (user picks; suggested M5 Cellars floor generator).
 - ~18:05 UTC: **Q6 garden merged** `27426a0` (`SC RESULT check PASS` on `56da0d9`: test-edit 681, test-play 32 + 8 skipped; user approved the cabbage). Ground tileables session DONE, Archive: ready: all older sessions are finished. Q11 lane kit sheet ~26/40 (two fixes, then Unity). Q10 nudged (quiet 46 min).
 - ~17:55 UTC: usage-waste reviews in from bell tower, bakery and foliage sessions (side notes `usage-waste-answers.md`); rules written to `.claude/rules/session-usage.md` (`aab52a9`, linked from QUEUE.md and art-assets.md). Running sessions get them with their next coordinator message (no extra wake).
 - ~17:50 UTC: **Q9 keep merged** `7bac761` (`SC RESULT check PASS` on `dcd944d`: test-edit 681, test-play 32 + 8 skipped; keep hall shell/restored + terrace kit). Bakery session DONE, Archive: ready. Usage rule (user): ~0.3%/min per 5 h window; keep >=1 local PC session active. Paused for usage: Q14, Q15; running Q6 (merging), Q10, Q11, Q12 (local), Q13. Finished remote branches to delete (classifier blocked the coordinator): brave-keller, cool-ritchie, practical-tesla, sharp-goldberg, sweet-bardeen, tender-dirac, zen-noether.
