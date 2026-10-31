@@ -1420,7 +1420,8 @@ if __name__ == '__main__':
             o.select_set(o == root or o.parent in (root, fo))
         bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'Bakery.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
                                  apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, object_types={'EMPTY', 'MESH'},
-                                 mesh_smooth_type='FACE', add_leaf_bones=False, colors_type='LINEAR')
+                                 mesh_smooth_type='FACE', add_leaf_bones=False, colors_type='LINEAR',
+                                 path_mode='STRIP')   # no texture paths: Unity names textured slots 'Lit' when a cloud path exists
         print('exported', os.path.join(OUT, 'Bakery.fbx'))
     if '--blend' in argv:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'bakery.blend'))
