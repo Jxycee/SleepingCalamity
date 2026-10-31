@@ -22,7 +22,7 @@ namespace SleepingCalamity.Core
     // A side of a foundation in its own frame: North = local +Z.
     public enum LotSide : byte { North = 0, East = 1, South = 2, West = 3 }
 
-    public enum LandmarkKind : byte { Fountain, Stall, BellTower, TitheGate, HeroesHome, Mill, TownGate }
+    public enum LandmarkKind : byte { Fountain, Stall, BellTower, TitheGate, HeroesHome, Mill, TownGate, KeepHall }
 
     public enum PathNodeKind : byte { Loop, Lane, Doorstep, Corner, Door, Stair }
 
