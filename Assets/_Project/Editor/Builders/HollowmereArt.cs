@@ -33,7 +33,7 @@ namespace SleepingCalamity.EditorTools
         // One building export: folder, FBX, required parts, and its own slots beyond the facade and bakery sets.
         public sealed class Spec
         {
-            public string Name, Folder, Fbx; public string[] Parts;
+            public string Name, Folder, Fbx; public string[] Parts; public float Yaw = 180f;   // Yaw: the export's front is local +Z for the lot buildings (turn 180); the keep hall is exported in Unity axes (0)
             public (string Slot, string Source, Color Tint)[] Tinted = new (string, string, Color)[0];
             public (string Slot, Color Linear, float Smooth)[] Flat = new (string, Color, float)[0];
         }
@@ -56,6 +56,31 @@ namespace SleepingCalamity.EditorTools
                              ("ML_WheelOak", "oak_timber", new Color(0.72f, 0.64f, 0.54f)), ("ML_Earth", "plaster", new Color(0.42f, 0.32f, 0.22f)),
                              ("ML_Sack", "canvas", new Color(1.0f, 0.94f, 0.82f)), ("ML_Millstone", "sandstone", new Color(1.1f, 1.08f, 1.0f)) },
             Flat = new[] { ("ML_Interior", new Color(0.035f, 0.025f, 0.018f), 0.1f) } };
+
+        // The keep hall (Q9, sc_keep_hall.py): square side Unity -Z and the west gable door already in Unity axes, so yaw 0.
+        public static readonly Spec KeepHall = new Spec { Name = "KeepHall", Folder = "Assets/_Project/Content/Art/Town/Keep/KeepHall", Fbx = "KeepHall.fbx", Yaw = 0f,
+            Parts = new string[0],   // Part_Door sits under Frame; checked in TryPlaceKeepHall
+            Tinted = new[] { ("KH_Rubble", "sandstone", new Color(0.62f, 0.60f, 0.57f)), ("KH_Slate", "sandstone", new Color(0.30f, 0.36f, 0.47f)),
+                             ("KH_OakWeathered", "oak_timber", new Color(0.62f, 0.60f, 0.58f)), ("KH_DoorOak", "oak_timber", new Color(1.25f, 1.05f, 0.85f)),
+                             ("KH_Limewash", "plaster", new Color(0.92f, 0.88f, 0.80f)), ("KH_Flag", "sandstone", new Color(0.56f, 0.54f, 0.51f)) },
+            Flat = new[] { ("KH_Bronze", new Color(0.55f, 0.36f, 0.16f), 0.45f) } };
+
+        // The keep hall in its row frame g (centre on the terrace): Shell when ruined, Frame (with Part_Door under it) when rebuilt. False when the export is missing.
+        public static bool TryPlaceKeepHall(Transform g, bool rebuilt)
+        {
+            GameObject obj = Instantiate(KeepHall, g, 0f);
+            if (obj == null) return false;
+            Transform shell = obj.transform.Find("Shell") ?? throw new InvalidOperationException("KeepHall.fbx has no Shell");
+            Transform frame = obj.transform.Find("Frame") ?? throw new InvalidOperationException("KeepHall.fbx has no Frame");
+            shell.gameObject.SetActive(!rebuilt); frame.gameObject.SetActive(rebuilt);
+            Transform door = null;
+            foreach (Transform c in obj.GetComponentsInChildren<Transform>(true)) if (c.name == "Part_Door") door = c;
+            if (door == null) throw new InvalidOperationException("KeepHall.fbx has no Part_Door");
+            if (!door.IsChildOf(frame)) door.gameObject.SetActive(rebuilt);
+            Vector2 size = FootprintSize(KeepHall, obj, g);
+            Debug.Log("SC HOLLOWMERE keep hall " + (rebuilt ? "restored" : "shell") + " footprint=" + size.x.ToString("0.00") + "x" + size.y.ToString("0.00"));
+            return true;
+        }
 
         public static bool TryPlaceBakery(Transform g, Foundation f, float footingTop) => TryPlaceBuilding(Bakery, g, f, footingTop);
 
@@ -94,7 +119,7 @@ namespace SleepingCalamity.EditorTools
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(fbx, g);
             obj.name = "Art_" + spec.Name;
             obj.transform.localPosition = new Vector3(0f, y, 0f);
-            obj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);   // the export's door side is local +Z (like the facade): turn it to the frame's -Z
+            obj.transform.localRotation = Quaternion.Euler(0f, spec.Yaw, 0f);   // the export's door side is local +Z (like the facade): turn it to the frame's -Z
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
                 if (r.name == "FOOTPRINT") { r.enabled = false; continue; }
@@ -139,7 +164,7 @@ namespace SleepingCalamity.EditorTools
             return map;
         }
 
-        static Material Tinted(string slot, string source, Color tint, Shader wear)
+        internal static Material Tinted(string slot, string source, Color tint, Shader wear)
         {
             Material src = LookTestBuilder.Mat(source) ?? throw new InvalidOperationException("LookTest material missing: " + source);
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + slot + ".mat", wear);
@@ -152,7 +177,7 @@ namespace SleepingCalamity.EditorTools
             return m;
         }
 
-        static Material Flat(string slot, Color linear, float smooth, Shader wear)
+        internal static Material Flat(string slot, Color linear, float smooth, Shader wear)
         {
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + slot + ".mat", wear);
             m.SetColor("_BaseColor", linear.gamma); m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", 0f);

@@ -286,6 +286,7 @@ namespace SleepingCalamity.Core
             ("Stall_2", "Market stall (cloth)", LandmarkKind.Stall, -7f, -3f, 2.8f, 1.8f, 66.8f, 2.7f, float.NaN, float.NaN, 0f),
             ("Stall_3", "Market stall (tools)", LandmarkKind.Stall, 5.5f, -8.5f, 2.8f, 1.8f, -32.9f, 2.7f, float.NaN, float.NaN, 0f),
             ("BellTower", "Bell tower", LandmarkKind.BellTower, 5.6f, 24f, 6.5f, 6.5f, 0f, 17f, 5.6f, 28.0f, KeepHeight),
+            ("KeepHall", "Keep hall", LandmarkKind.KeepHall, -3.0f, 24.5f, 9f, 6f, 0f, 10f, -9.2f, 25.0f, KeepHeight),   // Q9: art yaw 0, west gable door; the node sits outside its porch (reaches x -8.75)
             ("TitheGate", "Sealed tithe gate", LandmarkKind.TitheGate, 5.6f, KeepWallZ, 5f, 1.2f, 0f, 4.5f, 5.6f, 18.4f, 0f),
             ("HeroesHome_Cistern", "Heroes' home: cistern house", LandmarkKind.HeroesHome, 12.5f, 11.25f, 9f, 7.5f, 0f, 6.5f, 12.5f, 6.75f, 0f),
             ("HeroesHome_Annex", "Heroes' home: bell-loft annex", LandmarkKind.HeroesHome, 11.9f, 24f, 5.5f, 5f, 0f, 7f, 15.3f, 24f, KeepHeight),
@@ -324,7 +325,7 @@ namespace SleepingCalamity.Core
         {
             ("NorthEastStub_1", "Keep_StairFoot"), ("Keep_StairFoot", "Keep_StairHead"), ("Keep_StairHead", "HeroesHome_Annex_Door"),
             ("Keep_StairHead", "Keep_Walk_E"), ("Keep_Walk_E", "Keep_Walk_N"), ("Keep_Walk_N", "BellTower_Door"),
-            ("NorthWestGinnel_2", "Keep_WStairFoot"), ("Keep_WStairFoot", "Keep_WStairHead"), ("Keep_WStairHead", "Keep_Walk_W"), ("Keep_Walk_W", "Keep_Walk_N"),
+            ("NorthWestGinnel_2", "Keep_WStairFoot"), ("Keep_WStairFoot", "Keep_WStairHead"), ("Keep_WStairHead", "Keep_Walk_W"), ("Keep_Walk_W", "Keep_Walk_N"), ("KeepHall_Door", "Keep_Walk_W"),
         };
 
         // ------------------------------------------------------------------------------------------------ the rebuilt preset (ring 1 assignment; rings 2-3 homes)

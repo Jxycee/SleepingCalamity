@@ -30,6 +30,14 @@ R grime/soot/damp, G moss, B polish) are named CV_*; CV_Breath and CV_Daylight a
   (Unity coordinates converted); the lineup views show the loose kit. --tris prints triangles per piece and the total.
 Budget: kit under 60k tris, a piece under 12k.
 
+--stair builds STAIR_PIECES (Q13 undercroft stair; not part of PIECES, CellarVault.fbx is unaffected) under the empty root CellarStair:
+  StairFlight   8 steps (run 2.0, drop 1.6), sloped brick walls, 4 stepped vault rings on a mortar backing, brick arch band
+  StairTurn     right-hand winder quarter turn, 4 winders round a newel, sail vault, tympanum over the exit arch
+  StairDoor     home cellar door, flagstone landing with barrel vault, door wall, jambs, threshold, oak door open 105 deg, house floor
+  with --export writes CellarStair.fbx to --export-dir; --stair --room assembles the chain (Unity yaw about +Y, instance() uses -yaw about
+  Blender Z) with the StairEntry, proxy lights and cameras top/turn/bottom (--sl scales the proxy lights). Budget: piece under 8k, all under 20k.
+  Status (2026-10-31): 14,132 tris (4,252 / 3,788 / 6,092), joins checked in 2 render passes (no gaps, treads continuous, chain ends at StairEntry's top step).
+
 Status (2026-10-31, cloud): 3 review rounds (+ one bug-fix re-render), self-score 27 -> 28.5 -> 29/40 (calibrated rubric, target first + 5 = 32 not
 reached: round 3 gained 0.5, so stopped). Final lines: silhouette 3.5, proportion 4, form 3.5, surface 3.5, colour 3.5, wear 3.5, set 4,
 glass/metal/emissive 3.5. 36,460 tris (VaultSegment 5,372, ArchRib 1,100, Pillar 220, EndWall 750, NicheWall 8,700, StairEntry 2,876,
@@ -465,7 +473,7 @@ def p_stair_entry():
     nose = lambda y: STEP_H + slope * (-0.5 - y)
     top = lambda y: nose(y) + 2.1
     ya, yb = -0.5, -4.0
-    for sx in (-1, 1):   # side walls (brick) following the stair
+    for sx in (-1, 1):   # side walls (vault stone) following the stair
         prof = [(ya, 0.0), (yb, 0.0), (yb, top(yb)), (ya, top(ya))]
         bm = bmesh.new()
         f0 = [bm.verts.new((sx * 0.6, y, z)) for y, z in prof]; f1 = [bm.verts.new((sx * 1.0, y, z)) for y, z in prof]
@@ -476,7 +484,7 @@ def p_stair_entry():
         bmesh.ops.bevel(bm, geom=bm.edges[:], offset=0.025, segments=1, affect='EDGES')
         uvl = bm.loops.layers.uv.new('UVMap'); bm.normal_update()
         FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0, 0))
-        merge_faces(pc, bm, uvl, lambda f: 'brick')
+        merge_faces(pc, bm, uvl, lambda f: 'vault')
     prof = [(ya, top(ya) - 0.05), (yb, top(yb) - 0.05), (yb, top(yb) + 0.35), (ya, top(ya) + 0.35)]
     bm = bmesh.new()
     f0 = [bm.verts.new((-1.0, y, z)) for y, z in prof]; f1 = [bm.verts.new((1.0, y, z)) for y, z in prof]
@@ -703,14 +711,261 @@ def p_barrels():
     barrel(pc, Matrix.Translation(Vector((0.05, 1.50, 0.0))) @ Rz(R.uniform(0, 90)), 1.05, seed=9)
     return pc
 
+# ----------------------------------------------------------------------------- stair kit (Q13 undercroft stair, exported as CellarStair.fbx)
+# Same authoring frame (A = x across, y along, z up = Unity x, z, y). Contract: Reference/hollowmere/undercroft_stair/CONTRACT.md.
+# Every flight descends toward +y (Unity +Z): step k top z = -0.2 (k + 1) over y 0.25 k .. 0.25 (k + 1); nosing line z = -0.8 y.
+S_N, S_RISE, S_RUN = 8, 0.2, 0.25
+SAIL_R = 0.85
+
+def s_nose(y):
+    return -0.8 * y
+
+def prism_ax(profile, axis, a0, a1):
+    """Closed prism of a 2D profile extruded along an axis from a0 to a1: 'x' (profile = (y, z)), 'y' ((x, z)) or 'z' ((x, y))."""
+    bm = bmesh.new()
+    P = {'x': lambda u, v, a: (a, u, v), 'y': lambda u, v, a: (u, a, v), 'z': lambda u, v, a: (u, v, a)}[axis]
+    f0 = [bm.verts.new(P(u, v, a0)) for u, v in profile]; f1 = [bm.verts.new(P(u, v, a1)) for u, v in profile]
+    bm.faces.new(f0); bm.faces.new(f1[::-1])
+    n = len(profile)
+    for i in range(n):
+        bm.faces.new((f0[i], f0[(i + 1) % n], f1[(i + 1) % n], f1[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return bm
+
+def solid(pc, bm, key, cham=0.025):
+    """Chamfer the sharp edges of a closed bmesh, project world metre UVs and merge it into pc (key = material key or fn(face))."""
+    bm.normal_update()
+    if cham > 0:
+        edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0) > 0.5]
+        bmesh.ops.bevel(bm, geom=edges, offset=cham, segments=1, affect='EDGES', profile=0.5)
+    bm.normal_update()
+    uvl = bm.loops.layers.uv.new('UVMap')
+    FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0, 0))
+    merge_faces(pc, bm, uvl, key if callable(key) else (lambda f: key))
+
+def band_profile(cx, cz, r_in, r_out, n=16):
+    """The upper half annulus r_in..r_out about (cx, cz) as an (x, z) polygon (legs end flat at z = cz)."""
+    outer = [(cx + r_out * math.cos(math.pi * i / n), cz + r_out * math.sin(math.pi * i / n)) for i in range(n + 1)]
+    inner = [(cx + r_in * math.cos(math.pi * i / n), cz + r_in * math.sin(math.pi * i / n)) for i in range(n, -1, -1)]
+    return outer + inner
+
+def arc_stone_x(pc, mat, cy, cz, a_deg, r_in, r_out, tang, x_c, x_len, cham=0.018, R=None, tilt=0.0, **kw):
+    """Voussoir of an arch in the y-z plane (axis along x), angle a from +y about (cy, cz): the ring that arc_stone makes for arches along y."""
+    a = math.radians(a_deg); rad = r_out - r_in; rc = r_in + rad / 2
+    pos = Vector((x_c, cy + rc * math.cos(a), cz + rc * math.sin(a)))
+    kw.setdefault('wob', 0.005); kw.setdefault('seed', (R or R_('arcx')).random() * 90)
+    box(pc, mat, (x_len, rad, tang), pos, Rx(a_deg) @ Ry(tilt), cham=cham, **kw)
+
+def arc_ring_x(pc, mat, cy, cz, r_in, r_out, n, x_c, x_len, cham=0.02, tag='ringx'):
+    R = R_(tag); da = 180.0 / n
+    for i in range(n):
+        tang = 2 * r_in * math.tan(math.radians(da / 2)) * 1.04
+        arc_stone_x(pc, mat, cy, cz, da * (i + 0.5), r_in, r_out, tang, x_c + R.uniform(-0.01, 0.01), x_len + R.uniform(-0.02, 0.02),
+                    cham=cham, R=R, tilt=R.uniform(-0.8, 0.8))
+
+def flags(pc, R, x0, x1, y0, y1, rows, top=0.0):
+    """Irregular flagstones (top at z = top) over the rectangle, mortar bed below."""
+    box(pc, 'mortar', (x1 - x0, y1 - y0, 0.2), ((x0 + x1) / 2, (y0 + y1) / 2, top - 0.14), cham=0.0)
+    ys = [y0] + [y0 + (y1 - y0) * i / rows + R.uniform(-0.07, 0.07) for i in range(1, rows)] + [y1]
+    for ri in range(rows):
+        n = max(2, int(round((x1 - x0) / 0.62)))
+        xc = [x0] + sorted(x0 + (x1 - x0) * i / n + R.uniform(-0.1, 0.1) for i in range(1, n)) + [x1]
+        for ci in range(n):
+            xa, xb = xc[ci] + 0.016, xc[ci + 1] - 0.016; ya, yb = ys[ri] + 0.016, ys[ri + 1] - 0.016
+            sx, sy = xb - xa, yb - ya
+            def dish(p, sx=sx, sy=sy):
+                if p.z < 0.0:
+                    return Vector()
+                return Vector((0, 0, -0.016 * max(0.0, 1 - (2 * p.x / sx) ** 2 - (2 * p.y / sy) ** 2)))
+            t = top - 0.004 + R.uniform(-0.006, 0.006)
+            box(pc, 'flag', (sx, sy, 0.12), ((xa + xb) / 2, (ya + yb) / 2, t - 0.06), Rz(R.uniform(-0.8, 0.8)), cham=0.028, segs=1, cuts=(2, 2, 0),
+                bend=dish, wob=0.004, seed=R.random() * 90)
+
+def p_stair_flight():
+    """8 steps, run 2.0, drop 1.6; origin = centre of the top edge at the previous tread level."""
+    pc = FK.Piece('StairFlight'); R = R_('sflight')
+    for k in range(S_N):                                   # treads: vault stone blocks, per-step jitter like StairEntry
+        zt = -S_RISE * (k + 1)
+        box(pc, 'vault', (1.2 + R.uniform(0, 0.03), S_RUN + 0.01, 0.5), (R.uniform(-0.012, 0.012), S_RUN * k + S_RUN / 2 + 0.005, zt - 0.25),
+            Rz(R.uniform(-0.7, 0.7)), cham=0.032, segs=2, wob=0.004, seed=R.random() * 90)
+    top = lambda y: s_nose(y) + 1.9                        # wall tops stay above every ring's springing (contract: nosing + 1.75)
+    for sx in (-1, 1):                                     # sloped brick side walls
+        bm = prism_ax([(0.0, -1.8), (2.0, -1.8), (2.0, top(2.0)), (0.0, top(0.0))], 'x', 0.6 if sx > 0 else -1.0, 1.0 if sx > 0 else -0.6)
+        solid(pc, bm, 'vault', cham=0.0)                   # grey-brown rubble side walls (unchamfered: no dark seam at piece joins)
+    for i in range(4):                                     # vault: stepped rings (0.4 down per 0.5 m) on a continuous mortar backing
+        sp = 1.5 - 0.4 * i
+        solid(pc, prism_ax(band_profile(0.0, sp, 0.64, 1.0), 'y', 0.5 * i - 0.01, 0.5 * (i + 1) + 0.01), 'mortar', cham=0.0)
+        arc_ring(pc, 'vault', 0, sp, 0.6, 1.0, 11, 0.5 * i + 0.25, 0.5, keystone=0.04, cham=0.02, tag='sfr%d' % i)
+    arc_ring(pc, 'brick', 0, 1.5, 0.56, 0.82, 9, 0.1, 0.2, keystone=0.0, cham=0.02, tag='sfband')   # proud brick arch band at the top face
+    return pc
+
+def sail_z(x, y):
+    xc = min(0.6, max(-0.6, x)); yc = min(1.2, max(0.0, y))
+    return 2.0 + math.sqrt(max(0.0, SAIL_R ** 2 - xc * xc - (yc - 0.6) ** 2))
+
+def sail_slab(pc):
+    """Solid vault over the well: soffit = sphere r 0.85 at (0, 0.6, 2.0) clipped to the square, skirt over the walls, flat top z 3.0."""
+    xs = [-1.0, -0.6] + [-0.45 + 0.15 * i for i in range(7)] + [0.6, 1.0]
+    ys = [0.0] + [0.15 * i for i in range(1, 8)] + [1.2, 1.6]
+    bm = bmesh.new()
+    vb = [[bm.verts.new((x, y, sail_z(x, y))) for x in xs] for y in ys]
+    vt = [[bm.verts.new((x, y, 3.0)) for x in xs] for y in ys]
+    nx, ny = len(xs), len(ys)
+    for j in range(ny - 1):
+        for i in range(nx - 1):
+            bm.faces.new((vb[j][i], vb[j][i + 1], vb[j + 1][i + 1], vb[j + 1][i]))
+            bm.faces.new((vt[j][i], vt[j][i + 1], vt[j + 1][i + 1], vt[j + 1][i]))
+    for i in range(nx - 1):
+        bm.faces.new((vb[0][i], vb[0][i + 1], vt[0][i + 1], vt[0][i]))
+        bm.faces.new((vb[ny - 1][i], vb[ny - 1][i + 1], vt[ny - 1][i + 1], vt[ny - 1][i]))
+    for j in range(ny - 1):
+        bm.faces.new((vb[j][0], vb[j + 1][0], vt[j + 1][0], vt[j][0]))
+        bm.faces.new((vb[j][nx - 1], vb[j + 1][nx - 1], vt[j + 1][nx - 1], vt[j][nx - 1]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    solid(pc, bm, lambda f: 'vault' if f.normal.z < -0.3 else 'mortar', cham=0.0)
+
+def p_stair_turn():
+    """Right-hand winder quarter turn: enters heading +y at the origin, exits heading +x at (0.6, 0.6)."""
+    pc = FK.Piece('StairTurn'); R = R_('sturn')
+    ext = lambda t: ((lambda s: (0.6 - s * math.cos(math.radians(t)), s * math.sin(math.radians(t))))(
+        min(1.22 / max(1e-6, math.cos(math.radians(t))), 1.22 / max(1e-6, math.sin(math.radians(t))))))
+    for k in range(4):                                     # winders fanned about the inner corner C = (0.6, 0)
+        ta, tb = 22.5 * k, 22.5 * (k + 1)
+        ca = (0.6 - 0.08 * math.cos(math.radians(ta)), 0.08 * math.sin(math.radians(ta)))
+        cb = (0.6 - 0.08 * math.cos(math.radians(tb)), 0.08 * math.sin(math.radians(tb)))
+        pa, pb = ext(ta), ext(tb)
+        zt = -S_RISE * (k + 1)
+        solid(pc, prism_ax([ca, pa, pb, cb], 'z', zt - 0.6, zt), 'vault', cham=0.02)
+    lathe(pc, [(0, -1.0), (0.12, -1.0), (0.12, 0.9), (0.16, 0.92), (0.16, 1.02), (0.12, 1.04), (0.12, 2.05), (0, 2.05)], T(0.6, 0.0, 0.0), sides=14, mat='vault', seed=3.0)   # newel
+    box(pc, 'vault', (0.4, 1.2, 4.5), (-0.8, 0.6, 0.45), cham=0.0, wob=0.003, seed=1)           # outer wall (left)
+    box(pc, 'brick', (2.0, 0.4, 4.5), (0.0, 1.4, 0.45), cham=0.025, wob=0.003, seed=2)            # outer wall (front)
+    box(pc, 'vault', (0.4, 0.4, 4.5), (0.8, -0.2, 0.45), cham=0.0, wob=0.003, seed=3)           # corner pier
+    rr = 0.64                                              # exit tympanum above the next flight's arch (centre y 0.6, springing z 0.7)
+    arc = [(1.2 * i / 14, 0.7 + math.sqrt(rr * rr - (1.2 * i / 14 - 0.6) ** 2)) for i in range(15)]
+    solid(pc, prism_ax(arc + [(1.2, 2.7), (0.0, 2.7)], 'x', 0.62, 1.0), 'vault', cham=0.025)
+    arc_ring_x(pc, 'brick', 0.6, 0.7, 0.6, 0.85, 7, 0.56, 0.12, tag='stvous')                   # brick voussoir ring on the tympanum
+    sail_slab(pc)
+    # sail vault stonework: concentric courses on the dome, arch bands on the four wall lines
+    for j, rho in enumerate((0.30, 0.50)):
+        n = int(round(2 * math.pi * rho / 0.21))
+        for kk in range(n):
+            th = 2 * math.pi * (kk + 0.5 * (j % 2)) / n
+            x, y = rho * math.cos(th), 0.6 + rho * math.sin(th)
+            if abs(x) > 0.48 or y < 0.12 or y > 1.08:
+                continue
+            phi = math.asin(rho / SAIL_R)
+            p = Vector((0, 0.6, 2.0)) + SAIL_R * Vector((math.sin(phi) * math.cos(th), math.sin(phi) * math.sin(th), math.cos(phi)))
+            t = Vector((-math.sin(th), math.cos(th), 0)); s = Vector((math.cos(phi) * math.cos(th), math.cos(phi) * math.sin(th), -math.sin(phi)))
+            nin = t.cross(s)
+            rot = Matrix(((t.x, s.x, nin.x, 0), (t.y, s.y, nin.y, 0), (t.z, s.z, nin.z, 0), (0, 0, 0, 1)))
+            box(pc, 'vault', (2 * rho * math.pi / n * 0.92, 0.15, 0.06), p + nin * 0.01, rot @ Rz(R.uniform(-1.5, 1.5)), cham=0.014, wob=0.004, seed=R.random() * 90)
+    arc_ring(pc, 'brick', 0, 2.0, 0.55, 0.85, 9, 0.075, 0.15, tag='stband')                     # entry face band
+    arc_ring(pc, 'brick', 0, 2.0, 0.58, 0.85, 9, 1.125, 0.15, tag='stband2')                    # front wall band
+    arc_ring_x(pc, 'brick', 0.6, 2.0, 0.58, 0.85, 9, -0.525, 0.15, tag='stbandl')               # left wall band
+    arc_ring_x(pc, 'brick', 0.6, 2.0, 0.58, 0.85, 9, 0.545, 0.15, tag='stbandr')                # right (tympanum) band
+    return pc
+
+def p_stair_door():
+    """The heroes' home cellar door and top landing; origin = start of the first flight. Landing y -1.2..0, door wall y -1.6..-1.2, house floor y -3.6..-1.6."""
+    pc = FK.Piece('StairDoor'); R = R_('sdoor')
+    flags(pc, R, -0.62, 0.62, -1.2, 0.0, 2)                                                    # landing floor
+    flags(pc, R, -1.6, 1.6, -3.6, -1.6, 4)                                                     # house floor
+    for sx in (-1, 1):                                                                         # landing walls up to the springing
+        box(pc, 'vault', (0.4, 1.2, 1.9), (sx * 0.8, -0.6, 0.75), cham=0.0, wob=0.003, seed=sx + 5)
+    ar = [(0.64 * math.cos(math.pi * (1 - i / 16)), 1.7 + 0.64 * math.sin(math.pi * (1 - i / 16))) for i in range(1, 16)]
+    solid(pc, prism_ax([(-1.0, 1.7), (-0.64, 1.7)] + ar + [(0.64, 1.7), (1.0, 1.7), (1.0, 3.2), (-1.0, 3.2)], 'y', -1.2, 0.0), 'mortar', cham=0.0)   # backing over the vault
+    for i, yc in enumerate((-0.9, -0.3)):
+        arc_ring(pc, 'vault', 0, 1.7, 0.6, 1.0, 11, yc, 0.6, keystone=0.04, cham=0.02, tag='sdr%d' % i)
+    r = 0.5                                                                                    # door wall with the arched doorway (1.0 wide, springing 1.6)
+    prof = ([(-1.6, -0.2), (-0.5, -0.2), (-0.5, 1.6)] + [(r * math.cos(math.pi * (1 - i / 16)), 1.6 + r * math.sin(math.pi * (1 - i / 16))) for i in range(1, 16)] +
+            [(0.5, 1.6), (0.5, -0.2), (1.6, -0.2), (1.6, 3.2), (-1.6, 3.2)])
+    solid(pc, prism_ax(prof, 'y', -1.6, -1.2), 'lime', cham=0.03)      # limewashed house face (a brick door wall read maroon)
+    for sx in (-1, 1):                                                                         # vault-stone jambs and voussoirs on the house face
+        for k in range(4):
+            box(pc, 'vault', (0.22 + R.uniform(0, 0.04), 0.14, 0.38), (sx * (0.61 + R.uniform(0, 0.02)), -1.67, 0.2 + 0.4 * k), Rx(R.uniform(-0.6, 0.6)),
+                cham=0.02, wob=0.004, seed=R.random() * 90)
+    arc_ring(pc, 'vault', 0, 1.6, 0.5, 0.76, 7, -1.67, 0.14, keystone=0.05, cham=0.02, tag='sdvous')
+    def worn(p):
+        return Vector((0, 0, -0.02 * max(0.0, 1 - (p.x / 0.55) ** 2)))
+    box(pc, 'vault', (1.08, 0.52, 0.24), (0.0, -1.4, -0.08), cham=0.03, segs=2, cuts=(3, 2, 0), bend=worn, wob=0.003, seed=4)   # worn threshold
+    # oak plank door: 5 boards, arched top, iron strap hinges and a ring, hinged at x -0.5 on the house side, open 105 degrees toward -y
+    M0 = Matrix.Translation(Vector((-0.5, -1.77, 0.0))) @ Rz(-105)
+    for j in range(5):
+        xc = 0.1 + 0.2 * j
+        top = 1.6 + math.sqrt(max(0.0, 0.25 - (xc - 0.5) ** 2)) - 0.02
+        h = top - 0.02
+        FK.add_box(pc, 'oak', (0.194, 0.05, h), M0 @ Matrix.Translation(Vector((xc, 0, 0.02 + h / 2))) @ Rz(R.uniform(-0.4, 0.4)), cham=0.008, wob=0.003,
+                   seed=R.random() * 90, long_axis=2, uv_world=False)
+    for zc in (0.45, 1.35):                                                                    # ledges on the landing side
+        FK.add_box(pc, 'oak', (0.93, 0.04, 0.13), M0 @ Matrix.Translation(Vector((0.5, 0.045, zc))), cham=0.01, wob=0.003, seed=zc * 10, long_axis=0, uv_world=False)
+    for zc in (0.38, 1.28):                                                                    # iron strap hinges on the house side
+        FK.add_box(pc, 'iron', (0.78, 0.014, 0.085), M0 @ Matrix.Translation(Vector((0.4, -0.032, zc))), cham=0.006, wob=0.001, seed=zc * 7)
+        FK.add_box(pc, 'iron', (0.1, 0.02, 0.14), M0 @ Matrix.Translation(Vector((0.02, -0.032, zc))), cham=0.006, wob=0.001, seed=zc * 3)
+        FK.add_box(pc, 'iron', (0.04, 0.05, 0.16), M0 @ Matrix.Translation(Vector((-0.005, -0.012, zc))), cham=0.006, wob=0.001, seed=zc * 5)
+    FK.add_box(pc, 'iron', (0.1, 0.012, 0.1), M0 @ Matrix.Translation(Vector((0.5, -0.031, 1.05))), cham=0.005, wob=0.001, seed=9)
+    ring_prof = [(0.075 + 0.014 * math.cos(2 * math.pi * a / 8), 0.014 * math.sin(2 * math.pi * a / 8)) for a in range(8)]
+    lathe(pc, ring_prof, M0 @ Matrix.Translation(Vector((0.5, -0.058, 1.0))) @ Rx(90), sides=14, mat='iron', closed=True, seed=2.0)   # the ring
+    return pc
+
+STAIR_PIECES = [('StairFlight', p_stair_flight), ('StairTurn', p_stair_turn), ('StairDoor', p_stair_door)]
+
 # ----------------------------------------------------------------------------- wear
-LAMPS = [Vector((-2.3, 2.0, 2.3)), Vector((2.3, 4.0, 2.3))]
+LAMPS =[Vector((-2.3, 2.0, 2.3)), Vector((2.3, 4.0, 2.3))]
 ROOT_SITES = [(-0.4, 3.2), (0.9, 5.0)]
 WALLY = {'VaultSegment', 'EndWall', 'NicheWall', 'StairEntry', 'ArchRib', 'Pillar'}
 
 def sstep(a, b, x):
     t = min(1.0, max(0.0, (x - a) / (b - a)))
     return t * t * (3 - 2 * t)
+
+STAIR_NAMES = {'StairFlight', 'StairTurn', 'StairDoor'}     # deliberately not in WALLY: its tide line is absolute z and would soak a descending flight
+
+def stair_wear(name, p, n, mname, nz, st, r, g, b):
+    """Stair kit wear: polish on treads (centre line / winders' walking line), damp in the lower 0.4 m above each tread, joints, smoke, moss at wall feet."""
+    stone = mname in ('CV_Brick', 'CV_VaultStone', 'CV_Mortar')
+    if name == 'StairFlight':
+        d = p.z - s_nose(p.y)
+    elif name == 'StairTurn':
+        ang = 90.0 if (p.x >= 0.6 and p.y > 0.0) else math.degrees(math.atan2(max(p.y, 0.0), 0.6 - p.x))
+        d = p.z + S_RISE * (min(3, max(0, int(ang / 22.5))) + 1)
+    else:
+        d = p.z
+    if abs(n.z) < 0.7 and 0.0 <= d < 0.4 and stone:
+        r = max(r, 0.85 * (1 - d / 0.4) * (0.8 + 0.2 * min(1.0, nz + 0.6)))              # damp rises from the tread
+        if mname == 'CV_Brick' and d < 0.3:
+            g = max(g, 0.5 * max(0.0, nz * 2 - 0.15) * (1 - d / 0.3))                      # moss at the wall foot
+    if mname == 'CV_Mortar':
+        r = max(r, 0.55 + 0.2 * nz)                                                         # dark joints
+    if mname in ('CV_VaultStone', 'CV_Brick') and abs(n.z) < 0.7:                          # stone-to-stone value variation: damp and soot patches
+        pn = noise.noise(Vector((p.x * 5.3 + 7.0, p.y * 5.3, p.z * 5.3)))
+        r = max(r, 0.5 * max(0.0, pn + 0.15))
+    if name == 'StairFlight':
+        if mname == 'CV_VaultStone' and n.z > 0.6 and d < 0.3:
+            b = 0.95 * max(0.0, 1 - abs(p.x) / 0.62) ** 0.6 * (0.8 + 0.2 * nz); r = max(r, 0.2)
+        if stone and d > 1.55:
+            r = max(r, sstep(1.55, 2.5, d) * 0.7 * (0.7 + 0.5 * st))                        # smoke on the vault crown
+    elif name == 'StairTurn':
+        if mname == 'CV_VaultStone' and n.z > 0.6 and d < 0.3 and p.z < 0.0:
+            rho = math.hypot(p.x - 0.6, p.y)
+            b = 0.95 * math.exp(-((rho - 0.75) / 0.3) ** 2) * (0.8 + 0.2 * nz); r = max(r, 0.2)   # the walking line round the newel
+        if stone and p.z > 2.3:
+            r = max(r, sstep(2.3, 2.85, p.z) * 0.7 * (0.7 + 0.5 * st))
+    else:
+        if mname == 'CV_VaultStone':
+            if n.z > 0.6 and p.z < 0.1 and -1.7 < p.y < -1.1:
+                b = 0.95 * (0.8 + 0.2 * nz); r = max(r, 0.15)                               # worn threshold
+            elif p.y < -1.55:
+                b = max(b, 0.55 * (0.6 + 0.4 * nz))                                         # hand-polished ring and jambs
+        if mname == 'CV_Flagstone' and n.z > 0.5:
+            b = 0.7 * math.exp(-(p.x / 0.5) ** 2) * (0.7 + 0.3 * nz)
+            r = max(r, 0.12 + 0.2 * max(0.0, nz))
+        if mname == 'CV_Oak':
+            b = 0.3 + 0.4 * math.exp(-((p.z - 1.05) / 0.25) ** 2); r = max(r, 0.2)
+        if mname == 'CV_Iron':
+            r = max(r, 0.3); b = 0.35
+        if stone and p.z > 2.0 and -1.3 < p.y < 0.1:
+            r = max(r, sstep(2.0, 2.4, p.z) * 0.6 * (0.7 + 0.5 * st))
+    return r, g, b
 
 def wear_at(name, p, n, mname, place=None):
     nz = noise.noise(p * 1.7)
@@ -745,7 +1000,7 @@ def wear_at(name, p, n, mname, place=None):
     if name == 'StairEntry' and mname == 'CV_VaultStone' and n.z > 0.6 and p.y < -0.45:
         b = 0.95 * max(0.0, 1 - abs(p.x) / 0.62) ** 0.6 * (0.8 + 0.2 * nz)
         r = max(r, 0.2)
-    if name == 'StairEntry' and p.y < -0.45 and mname in ('CV_Brick',):
+    if name == 'StairEntry' and p.y < -0.45 and n.z < 0.6 and mname in ('CV_Brick', 'CV_VaultStone'):
         r = max(r, 0.45)
     if name == 'FloorTile':
         r = 0.16 + 0.26 * max(0.0, nz + 0.2)
@@ -790,6 +1045,8 @@ def wear_at(name, p, n, mname, place=None):
                 b = 0.3 * max(0.0, nz)
             if abs(n.x) > 0.8 and p.z < 0.7:
                 r = max(r, 0.3)
+    if name in STAIR_NAMES:
+        r, g, b = stair_wear(name, p, n, mname, nz, st, r, g, b)
     # placed overlays (room mode): soot plumes over the lantern hooks, root stains under the crack
     if pw is not None and name in WALLY | {'FloorTile'} and mname in ('CV_Brick', 'CV_VaultStone', 'CV_Limewash', 'CV_Mortar'):
         for L in LAMPS:
@@ -856,15 +1113,16 @@ def W(x, y, z):
     return Vector((-x, -z, y))
 
 def instance(obs, name, ux, uy, uz, yaw=0.0, rewear=True):
-    """Place a kit piece at Unity position (ux, uy, uz) with a yaw of 0 or 180 about the vertical."""
+    """Place a kit piece at Unity position (ux, uy, uz) with a Unity yaw in degrees about +Y (positive turns +Z toward +X).
+    Unity (x, z) -> Blender (-x, -z) is a half turn, so a Unity yaw of t is a Blender rotation of -t about Z."""
     src = obs[name]
     ob = bpy.data.objects.new(name + '_i', src.data.copy() if rewear else src.data)
     ob['piece'] = name
     bpy.context.scene.collection.objects.link(ob)
-    ob.location = W(ux, uy, uz); ob.rotation_euler = (0, 0, math.radians(yaw))
+    ob.location = W(ux, uy, uz); ob.rotation_euler = (0, 0, math.radians(-yaw))
     bpy.context.view_layer.update()
     if rewear:
-        off = Vector((ux, uz, uy)); yr = math.radians(yaw)
+        off = Vector((ux, uz, uy)); yr = math.radians(-yaw)
         Rm = Matrix.Rotation(yr, 3, 'Z')
         write_wear(ob, place=lambda p: off + Rm @ p)
     return ob
@@ -1001,6 +1259,117 @@ def review(root, obs):
             look(cam, Vector(frm), Vector(to)); cam_d.angle = math.radians(fov)
             sc.render.filepath = os.path.join(OUT, 'vault_%s.png' % v)
             bpy.ops.render.render(write_still=True); print('rendered', v)
+
+# ----------------------------------------------------------------------------- stair build and review (--stair)
+def build_stair():
+    root = bpy.data.objects.new('CellarStair', None); bpy.context.scene.collection.objects.link(root)
+    obs = {}; total = 0
+    for name, fn in STAIR_PIECES:
+        ob = to_object(fn(), root)
+        obs[name] = ob; t = tris(ob); total += t
+        cs = [Vector(c) for c in ob.bound_box]       # Blender local = Rz180 of the authoring frame; Unity (x, y, z) = (-bx, bz, -by)
+        ext = (-max(c.x for c in cs), -min(c.x for c in cs), min(c.z for c in cs), max(c.z for c in cs), -max(c.y for c in cs), -min(c.y for c in cs))
+        print('  %-11s %6d tris  %2d slots  %s' % (name, t, len(ob.data.materials), ', '.join(m.name for m in ob.data.materials)))
+        print('              Unity extent x %.3f..%.3f  y %.3f..%.3f  z %.3f..%.3f' % ext)
+        if t > 8000:
+            print('  !! %s over the 8000 tri piece cap' % name)
+    print('CellarStair total tris: %d (cap 20000, piece cap 8000)' % total)
+    return root, obs
+
+SL = float(FK.arg('--sl', '0.12'))      # stair review light scale
+STAIR_VIEWS = FK.arg('--views', 'top,turn,bottom' if '--room' in FK.argv else 'lineS').split(',')
+CAMS_STAIR = {   # Unity (from, to, vertical fov), the contract's capture cameras (+ debug views)
+    'dSlot': ((1.9, 6.6, -6.5), (0.9, 6.5, -7.15), 45),
+    'dJ1': ((3.2, 9.6, -4.4), (3.3, 7.3, -6.3), 70),
+    'dJ6': ((0.0, 4.1, -4.7), (0.0, 2.4, -3.3), 70),
+    'dJ2': ((3.3, 8.0, -6.4), (2.2, 6.4, -6.6), 70),
+    'dJ3': ((1.6, 6.5, -6.6), (0.5, 4.9, -6.5), 70),
+    'dJ4': ((0.3, 5.4, -6.7), (0.0, 4.1, -5.6), 70),
+    'dJ5': ((0.0, 4.7, -5.4), (0.0, 2.8, -3.0), 70),
+    'dW': ((2.9, 9.0, -4.3), (3.8, 9.7, -5.3), 70),
+    'dA': ((3.2, 10.2, -3.0), (3.2, 7.6, -6.0), 62),
+    'dT1': ((3.4, 8.7, -5.5), (2.7, 6.8, -7.0), 62),
+    'dB': ((3.0, 7.8, -6.6), (0.8, 5.6, -6.6), 62),
+    'dT2': ((1.3, 6.3, -6.6), (-0.2, 4.4, -6.6), 62),
+    'dC': ((0.0, 5.5, -6.4), (0.0, 3.2, -3.6), 62),
+    'top': ((2.95, 10.65, -1.6), (3.2, 8.0, -5.6), 60),
+    'turn': ((1.6, 7.4, -6.4), (-0.2, 4.5, -6.3), 62),
+    'bottom': ((0.0, 3.6, -3.0), (0.2, 1.0, 5.0), 60),
+}
+STAIR_CHAIN = [('StairDoor', 3.2, 9.0, -4.0, 180), ('StairFlight', 3.2, 9.0, -4.0, 180), ('StairTurn', 3.2, 7.4, -6.0, 180),
+               ('StairFlight', 2.6, 6.6, -6.6, -90), ('StairTurn', 0.6, 5.0, -6.6, -90), ('StairFlight', 0.0, 4.2, -6.0, 0)]
+
+def build_stair_room(obs):
+    sc = bpy.context.scene
+    ent = to_object(p_stair_entry(), None)          # review only: the B5 StairEntry whose top step (0, 2.6, -4.0) the chain must reach
+    obs = dict(obs); obs['StairEntry'] = ent
+    for o in obs.values():
+        o.hide_render = True; o.hide_viewport = True
+    for name, ux, uy, uz, yaw in STAIR_CHAIN:
+        instance(obs, name, ux, uy, uz, yaw, rewear=False)
+    instance(obs, 'StairEntry', 0, 0, 0, 0, rewear=False)
+    plug = bpy.data.objects.new('plug', bpy.data.meshes.new('plug')); sc.collection.objects.link(plug)
+    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
+    for v in bm.verts:
+        v.co = Vector((v.co.x * 1.2, v.co.y * 0.15, v.co.z * 0.5))
+    bm.to_mesh(plug.data); bm.free()
+    plug.data.materials.append(FK.M('vault')); plug.location = W(0, 4.95, -3.975)
+    # proxy lights (Unity coordinates)
+    sp = W(3.2, 11.0, -1.0); tgt = W(3.2, 8.4, -4.8)
+    s = light(sc, 'SPOT', 'House', sp, (0.82, 0.88, 1.0), LAMP * 6 * SL, spot_size=math.radians(60), spot_blend=0.6, shadow_soft_size=0.1); aim(s, sp, tgt)
+    for loc, col, e, rad, name in ((W(3.2, 8.8, -7.05), (1.0, 0.66, 0.28), LAMP / 25 * SL, 0.03, 'Candle'),
+                                   (W(-0.45, 6.4, -6.8), (1.0, 0.74, 0.40), LAMP * 0.8 * SL, 0.10, 'Lantern'),
+                                   (W(0.0, 2.5, -2.5), (1.0, 0.62, 0.28), LAMP / 8 * SL, 0.15, 'Glow')):
+        light(sc, 'POINT', name, loc, col, e, shadow_soft_size=rad)
+    lm = W(-0.45, 6.4, -6.8)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.07, location=lm); gl = bpy.context.object
+    gl.data.materials.append(emissive('CV_proxyFlame', (1, 0.6, 0.2), (1.0, 0.70, 0.30), 70.0))
+    world_color(sc, (0.05, 0.045, 0.04), 1.0)
+
+def review_stair(root, obs):
+    sc = bpy.context.scene
+    setup_render(sc)
+    cam_d = bpy.data.cameras.new('Cam'); cam = bpy.data.objects.new('Cam', cam_d); sc.collection.objects.link(cam)
+    sc.camera = cam; cam_d.sensor_fit = 'VERTICAL'; cam_d.clip_start = 0.05
+    room = [v for v in STAIR_VIEWS if v in CAMS_STAIR]
+    if room:
+        build_stair_room(obs)
+        for v in room:
+            frm, to, fov = CAMS_STAIR[v]
+            look(cam, W(*frm), W(*to)); cam_d.angle = math.radians(fov)
+            sc.render.filepath = os.path.join(OUT, 'stair_%s.png' % v)
+            bpy.ops.render.render(write_still=True); print('rendered', v)
+    if 'lineS' in STAIR_VIEWS:
+        world_color(sc, (0.30, 0.26, 0.22), 1.0)
+        sun = light(sc, 'SUN', 'Key', (0, 0, 10), (1.0, 0.85, 0.66), 3.2, angle=math.radians(4)); sun.rotation_euler = (math.radians(55), 0, math.radians(-35))
+        for k, (name, x) in enumerate((('StairDoor', -5.5), ('StairFlight', 0.0), ('StairTurn', 4.5))):
+            ob = obs[name]; ob.rotation_euler = (0, 0, 0); ob.location = (0, 0, 0)
+            bpy.context.view_layer.update()
+            cs = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
+            ob.location = (x - (min(c.x for c in cs) + max(c.x for c in cs)) / 2, -(min(c.y for c in cs) + max(c.y for c in cs)) / 2, 0)
+        look(cam, Vector((0, -14, 5.5)), Vector((0, 0, 1.0))); cam_d.angle = math.radians(60)
+        sc.render.filepath = os.path.join(OUT, 'stair_lineS.png')
+        bpy.ops.render.render(write_still=True); print('rendered lineS')
+
+def export_fbx(root, filename):
+    ed = os.path.abspath(FK.arg('--export-dir', OUT)); os.makedirs(ed, exist_ok=True)
+    for o in bpy.context.scene.objects:
+        o.select_set(o == root or o.parent == root)
+    bpy.ops.export_scene.fbx(filepath=os.path.join(ed, filename), use_selection=True, axis_forward='-Z', axis_up='Y',
+                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, object_types={'EMPTY', 'MESH'},
+                             mesh_smooth_type='FACE', add_leaf_bones=False, colors_type='LINEAR', path_mode='STRIP')
+    print('exported', os.path.join(ed, filename))
+
+if __name__ == '__main__' and '--stair' in argv:
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    root, obs = build_stair()
+    if '--export' in argv:
+        export_fbx(root, 'CellarStair.fbx')
+    if '--blend' in argv:
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'stair.blend'))
+    if '--no-render' not in argv:
+        review_stair(root, obs)
+    sys.exit(0)
 
 if __name__ == '__main__':
     bpy.ops.wm.read_factory_settings(use_empty=True)
