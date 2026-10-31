@@ -34,7 +34,7 @@ namespace SleepingCalamity.Presentation
         public const float CellSize = CellarFloorLayout.CellMeters, WallHeight = 3.6f, WallThickness = 0.4f, DoorWidth = 2.4f, DoorHeight = 2.8f, PillarSize = 1.0f;
         public const string FloorGroup = "Floor", WallGroup = "Walls", DoorGroup = "Doors", PillarGroup = "Pillars", MarkerGroup = "Markers", LampGroup = "Lamps";
         const float Tile = 2f;
-        static readonly Color GoldLamp = new Color(1.0f, 0.80f, 0.54f);
+        static readonly Color GoldLamp = new Color(0.839f, 0.635f, 0.290f);   // #d6a24a
 
         public static Vector3 CellCenter(int x, int y) => new Vector3((x + 0.5f) * CellSize, 0f, -(y + 0.5f) * CellSize);
 
