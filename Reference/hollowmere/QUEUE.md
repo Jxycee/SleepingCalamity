@@ -46,7 +46,7 @@ Claimed: cloud session claude/practical-tesla-lqajeo (square, Q5 done), 2026-10-
 
 ## Q8. Town wall, Lower Gate and East Gate
 Folder: `Reference/hollowmere/town_wall/`
-Claimed: -
+Claimed: cloud session claude/brave-keller-3d91gk (bell tower, Q1, Q3 done), 2026-10-31
 Replace the greybox town wall on its raised bank with real art: a weathered sandstone curtain wall with a walkway, crenels, buttresses and breaches in Ruined (patched in Rebuilt); the Lower Gate (onto the Saltwake road) and the East Gate (down Mill Lane) as gatehouses with timber doors. A kit generator (`Art/Blender/town/sc_town_wall.py`) that tiles along the layout's wall path at its heights. Captures: low east, lake shore, both gates, in both presets.
 
 ## Q9. Keep terrace: the keep hall and the terrace dressing
