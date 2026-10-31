@@ -21,7 +21,7 @@ import sc_facade_kit as FK
 
 OUT = FK.OUT; argv = FK.argv; TILE = FK.TILE; TIM = FK.TIM
 RRES = int(FK.arg('--rres', '1100')); SAMPLES = int(FK.arg('--samples', '24'))
-VIEWS = FK.arg('--views', 'tq,back,frame,shell,close').split(',')
+VIEWS = FK.arg('--views', 'tq,back,left,wheel,door,frame,shell,shellb').split(',')
 
 X0, X1, Y0, Y1 = -4.5, 4.5, -3.5, 3.5
 T = 0.6; GZ = 4.4; PL = 8.0; RIDGE = 12.35; HWY = 3.5
@@ -66,10 +66,11 @@ FK.member = lean_member
 def piece(n): return FK.Piece(n)
 
 def merge(dst, src, xf=None, lean=False):
-    if '--tris' in argv:
-        print('    %-14s %6d tris' % (src.name, sum(len(f.verts) - 2 for f in src.bm.faces)))
     if xf is not None:
         bmesh.ops.transform(src.bm, matrix=xf, verts=src.bm.verts[:])
+    if '--tris' in argv and src.bm.verts:
+        co = [v.co for v in src.bm.verts]
+        print('    %-12s %6d tris  x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f' % ((src.name, sum(len(f.verts) - 2 for f in src.bm.faces)) + tuple(f(c[i] for c in co) for i in range(3) for f in (min, max))))
     if lean:
         for v in src.bm.verts:
             v.co = Vector((v.co.x - 0.010 * max(0.0, v.co.z - GZ), v.co.y - 0.006 * max(0.0, v.co.z - GZ), v.co.z))
@@ -202,7 +203,7 @@ def ground_wall(tag, F, L, spans, opens, topf, ruin):
         opening(pc, o[0], o[1], o[2], o[3], o[4], ruin)
     out.append((pc, F))
     if ruin:   # inner face: the roofless shell shows it
-        o_in = F @ Vector((0, T, 0)); n_in = -(F.to_3x3() @ Vector((0, -1, 0)))
+        o_in = F @ Vector((L, T, 0)); n_in = -(F.to_3x3() @ Vector((0, -1, 0)))
         Fi = face_xf(o_in, n_in)
         pi = piece(tag + 'In')
         ih = [(L - h[1], L - h[0], h[2], h[3]) for h in holes]
@@ -377,7 +378,7 @@ def pit(ruin):
     pc = piece('Pit'); R = FK.rng('mlpit')
     flat(pc, 'stone', [(XN, -PW, PIT_Z), (8.0, -PW, PIT_Z), (8.0, PW, PIT_Z), (XN, PW, PIT_Z)], (0, 0, 1), 4, 2)
     # back wall of the notch, soffit over it, oak lintel beam
-    Fb = face_xf((XN, -PW, PIT_Z), (1, 0, 0)); pb = piece('PitBack')
+    Fb = face_xf((XN, -PW, 0), (1, 0, 0)); pb = piece('PitBack')
     stone_wall(pb, 0, 2 * PW, PIT_Z, GZ, None, [(0.5, 1.4, PIT_Z - 0.1, 0.4)], seed='pitback')
     backing(pb, 0, 2 * PW, PIT_Z, GZ, None, [(0.5, 1.4, PIT_Z - 0.1, 0.4)])
     flat(pb, 'interior', [(0.5, 0.5, PIT_Z), (1.4, 0.5, PIT_Z), (1.4, 0.5, 0.4), (0.5, 0.5, 0.4)], (0, -1, 0))
@@ -389,13 +390,13 @@ def pit(ruin):
         topf = lambda x, broken=broken, s=s: cheek_top(x) - ((1.6 * max(0.0, noise.noise(Vector((x * 1.3, 2.0, 0.3))) * 2 + 0.6)) if broken and x > 4.4 else 0.0)
         # inner face: x XN..7.3, outward = toward the pit centre
         t = Vector((s, 0, 0))
-        Fi = face_xf((XN if s > 0 else 7.3, s * PW, PIT_Z), (0, -s, 0))
+        Fi = face_xf((XN if s > 0 else 7.3, s * PW, 0), (0, -s, 0))
         p1 = piece('CheekIn')
         tfun = (lambda u, s=s, topf=topf: topf(XN + u if s > 0 else 7.3 - u))
         stone_wall(p1, 0, 7.3 - XN, PIT_Z, GZ, tfun, (), seed='ci%d' % s)
         backing(p1, 0, 7.3 - XN, PIT_Z, GZ, tfun, ())
         merge(pc, p1, Fi)
-        Fo = face_xf((7.3 if s > 0 else 4.5, s * (PW + CT), PIT_Z), (0, s, 0))
+        Fo = face_xf((7.3 if s > 0 else 4.5, s * (PW + CT), 0), (0, s, 0))
         p2 = piece('CheekOut')
         tfo = (lambda u, s=s, topf=topf: topf(7.3 - u if s > 0 else 4.5 + u))
         stone_wall(p2, 0, 7.3 - 4.5, PIT_Z, GZ, tfo, (), seed='co%d' % s)
@@ -406,8 +407,8 @@ def pit(ruin):
             FK.add_box(pc, 'rubble', (b - a, CT, hh - PIT_Z), Matrix.Translation(((a + b) / 2, s * (PW + CT / 2), (hh + PIT_Z) / 2)), cham=0.0, uv_world=True, seed=a)
             FK.add_box(pc, 'stone', (b - a + 0.06, CT + 0.12, 0.2), Matrix.Translation(((a + b) / 2, s * (PW + CT / 2), hh + 0.1)), cham=0.03, uv_world=True, seed=a + s)
         if not ruin:   # pier carrying the flume's upstream end, and the bearing block holding the axle
-            FK.add_box(pc, 'rubble', (0.7, CT, 4.05 - PIT_Z), Matrix.Translation((7.65, s * (PW + CT / 2), (4.05 + PIT_Z) / 2)), cham=0.02, uv_world=True, seed=7.7 + s)
-            FK.add_box(pc, 'stone', (0.82, CT + 0.12, 0.2), Matrix.Translation((7.65, s * (PW + CT / 2), 4.15)), cham=0.03, uv_world=True, seed=8 + s)
+            FK.add_box(pc, 'rubble', (0.7, CT, 4.05 - PIT_Z), Matrix.Translation((7.6, s * (PW + CT / 2), (4.05 + PIT_Z) / 2)), cham=0.02, uv_world=True, seed=7.7 + s)
+            FK.add_box(pc, 'stone', (0.76, CT + 0.12, 0.2), Matrix.Translation((7.6, s * (PW + CT / 2), 4.15)), cham=0.03, uv_world=True, seed=8 + s)
             FK.add_box(pc, 'oakw', (0.6, 0.44, 0.45), Matrix.Translation((AXLE.x, s * (PW + CT / 2), 1.55 + 0.325 + 0.0)), cham=0.03, seed=s)
             FK.add_box(pc, 'iron', (0.64, 0.48, 0.05), Matrix.Translation((AXLE.x, s * (PW + CT / 2), 2.15)), cham=0.0, seed=s + 1)
     return pc
@@ -477,7 +478,7 @@ def door_part():
 
 def millstones():
     pc = piece('Millstones')
-    for k, (x, y, yaw) in enumerate(((-3.2, -3.95, 0.1), (-2.55, -3.92, -0.15))):
+    for k, (x, y, yaw) in enumerate(((-0.25, -3.95, 0.1), (0.42, -3.92, -0.15))):
         bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=20, radius1=0.65, radius2=0.65, depth=0.22)
         bm.transform(Matrix.Translation((x, y, 0.62)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.radians(80), 4, 'X'))
         bm.normal_update(); uvl = bm.loops.layers.uv.new('UVMap'); FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (k * 0.3, 0)); FK._merge(pc, bm, 'millstone')
@@ -485,7 +486,7 @@ def millstones():
 
 def heaps():
     pc = piece('Heaps'); R = FK.rng('mlheaps')
-    for k, (cx, cy, r) in enumerate(((-1.6, -0.5, 1.4), (1.0, 1.2, 1.0), (-3.0, 1.5, 0.9), (-2.5, -4.3, 0.9), (2.3, -4.0, 0.8))):
+    for k, (cx, cy, r) in enumerate(((-1.6, -0.5, 1.4), (1.0, 1.2, 1.0), (-3.0, 1.5, 0.9), (-2.4, -4.0, 0.8), (2.3, -4.0, 0.8))):
         bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
         for v in bm.verts:
             p = v.co; q = p * 2.0 + Vector((k * 3.1, 0, 0))
@@ -539,8 +540,8 @@ def build_state(ruin):
 
 def FK_yard(pc):
     y = piece('Yard'); R = FK.rng('mlyard')
-    for k in range(4):
-        FK.add_box(y, 'stone', (0.75, 0.5, 0.07), Matrix.Translation((-2.3 + R.uniform(-0.1, 0.1), Y0 - 0.9 - k * 0.8, 0.025)) @ Matrix.Rotation(R.uniform(-0.25, 0.25), 4, 'Z'), cham=0.03, uv_world=True, seed=k + 50)
+    for k in range(3):
+        FK.add_box(y, 'stone', (0.9, 0.26, 0.07), Matrix.Translation((-2.2 + R.uniform(-0.1, 0.1), -4.35 - k * 0.22, 0.025)) @ Matrix.Rotation(R.uniform(-0.05, 0.05), 4, 'Z'), cham=0.03, uv_world=True, seed=k + 50)
     merge(pc, y)
 
 def write_wear(ob):
@@ -601,6 +602,50 @@ def build():
     print('Mill: Shell %d, Frame+parts %d tris (caps 30000 / 45000)' % (tris(shell), total))
     return root, shell, objs
 
+VIEWS_DEF = {
+    'tq': (Vector((13.0, -16.0, 5.5)), Vector((1.0, 0, 5.0)), 46),
+    'back': (Vector((11.0, 15.0, 5.5)), Vector((0.5, 0, 5.0)), 46),
+    'left': (Vector((-15.0, -9.0, 6.0)), Vector((0.0, 0, 5.2)), 44),
+    'wheel': (Vector((14.0, -5.0, 3.0)), Vector((5.5, 0, 2.4)), 46),
+    'door': (Vector((-1.0, -9.5, 2.0)), Vector((-1.0, -3.5, 1.7)), 44),
+    'frame': (Vector((13.0, -16.0, 5.5)), Vector((1.0, 0, 5.0)), 46),
+    'shell': (Vector((13.0, -16.0, 5.5)), Vector((1.0, 0, 5.0)), 46),
+    'shellb': (Vector((11.0, 15.0, 5.5)), Vector((0.5, 0, 5.0)), 46),
+}
+
+def backface_override():
+    m = bpy.data.materials.new('BF'); m.use_nodes = True; nt = m.node_tree
+    for n in list(nt.nodes): nt.nodes.remove(n)
+    g = nt.nodes.new('ShaderNodeNewGeometry'); e1 = nt.nodes.new('ShaderNodeEmission'); e2 = nt.nodes.new('ShaderNodeEmission')
+    e1.inputs[0].default_value = (1, 0, 0, 1); e2.inputs[0].default_value = (0.35, 0.35, 0.35, 1)
+    mx = nt.nodes.new('ShaderNodeMixShader'); out = nt.nodes.new('ShaderNodeOutputMaterial')
+    nt.links.new(g.outputs['Backfacing'], mx.inputs[0]); nt.links.new(e2.outputs[0], mx.inputs[1]); nt.links.new(e1.outputs[0], mx.inputs[2]); nt.links.new(mx.outputs[0], out.inputs[0])
+    return m
+
+def review(root, shell, objs):
+    sc = bpy.context.scene; FK.RRES = RRES; FK.SAMPLES = SAMPLES
+    cam = FK.review_scene(root, variant=True)
+    bf = '--backface' in argv
+    if bf:
+        sc.view_layer.material_override = backface_override(); sc.cycles.samples = 6
+    fig = bpy.data.objects.get('Figure175')
+    if fig is None:
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.75, location=(-2.2, -5.0, 0.875))
+        fig = bpy.context.object; fig.name = 'Figure175'
+        fm = bpy.data.materials.new('Figure'); fm.use_nodes = True
+        fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.25, 0.18, 0.12, 1)
+        fig.data.materials.append(fm)
+    for v in VIEWS:
+        frm, to, fov = VIEWS_DEF[v]
+        isshell = v.startswith('shell')
+        shell.hide_render = not isshell
+        for o in objs: o.hide_render = isshell
+        if v == 'frame': objs[1].hide_render = True; objs[2].hide_render = True
+        FK.look(cam, frm, to); cam.data.angle = math.radians(fov)
+        sc.render.filepath = os.path.join(OUT, 'mill_%s%s.png' % (v, '_bf' if bf else ''))
+        bpy.ops.render.render(write_still=True)
+        print('rendered', v)
+
 if __name__ == '__main__':
     bpy.ops.wm.read_factory_settings(use_empty=True)
     root, shell, objs = build()
@@ -608,3 +653,7 @@ if __name__ == '__main__':
         for o in bpy.context.scene.objects: o.select_set(o == root or o.parent in (root, objs[0]))
         bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'Mill.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y', apply_scale_options='FBX_SCALE_UNITS',
                                  bake_space_transform=True, object_types={'EMPTY', 'MESH'}, mesh_smooth_type='FACE', add_leaf_bones=False, colors_type='LINEAR', path_mode='STRIP')
+    if '--blend' in argv:
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'mill.blend'))
+    if '--no-render' not in argv:
+        review(root, shell, objs)
