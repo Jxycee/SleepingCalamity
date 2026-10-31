@@ -204,10 +204,11 @@ namespace SleepingCalamity.EditorTools
                 {
                     art = new RowArt { Found = found };
                     string folderName = Path.GetFileName(found.Folder);
-                    if (row.Id == "Facade" || BeautyCornerArt.IsNeighbour(folderName))   // multi-material: keep the FBX slot names and map them to the shared-tileable materials
+                    if (row.Id == "Facade" || BeautyCornerArt.IsNeighbour(folderName) || BeautyCornerArt.IsTower(folderName))   // multi-material: keep the FBX slot names and map them to the shared-tileable materials
                     {
                         art.Fbx = BeautyCornerArt.LoadModel(found.Folder, Path.GetFileName(found.Fbx), keepMaterialSlots: true);
-                        art.Slots = BeautyCornerArt.IsNeighbour(folderName) ? BeautyCornerArt.BuildNeighbourMaterials(folderName) : BeautyCornerArt.BuildFacadeMaterials();
+                        art.Slots = BeautyCornerArt.IsNeighbour(folderName) ? BeautyCornerArt.BuildNeighbourMaterials(folderName)
+                            : BeautyCornerArt.IsTower(folderName) ? BeautyCornerArt.BuildTowerMaterials() : BeautyCornerArt.BuildFacadeMaterials();
                     }
                     else art.Fbx = BeautyCornerArt.Prepare(found, asset ?? row.Id, row.Foliage, out art.Mat);
                     if (art.Fbx == null) art = null;
