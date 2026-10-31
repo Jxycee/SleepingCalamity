@@ -483,7 +483,8 @@ def p_stair_entry():
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
         bmesh.ops.bevel(bm, geom=bm.edges[:], offset=0.025, segments=1, affect='EDGES')
         uvl = bm.loops.layers.uv.new('UVMap'); bm.normal_update()
-        FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0, 0))
+        # both walls projected the same (y, z) metre UVs, so the tunnel relief read mirrored left/right; the +x wall gets its own tile offset
+        FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0.413, 0.271) if sx > 0 else (0, 0))
         merge_faces(pc, bm, uvl, lambda f: 'vault')
     prof = [(ya, top(ya) - 0.05), (yb, top(yb) - 0.05), (yb, top(yb) + 0.35), (ya, top(ya) + 0.35)]
     bm = bmesh.new()
