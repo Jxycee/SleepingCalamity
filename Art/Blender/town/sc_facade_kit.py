@@ -27,7 +27,7 @@ posts 18-22 cm real -> 26-30 cm here, panels ~0.8-1.4 m), PHASE1 3.1 palette, 3.
 
 Axes (Blender): z up, front -Y, metres. Origin = bottom centre of the ground-storey plaster line (front face of the
 plaster at y 0, plinth stands 6 cm proud). Width x -3.75..3.75, depth y 0..7.0 (upper storey front at y -0.45),
-eave (wall plate) 6.0 m, ridge 9.6 m (sags 22 cm at mid), chimney top about 11.1 m; lean-to on the +X end. Unity placement (brief 1):
+eave (wall plate) 6.0 m, ridge 9.6 m (sags 22 cm at mid), chimney top about 11.1 m; lean-to on the -X end. Unity placement (brief 1):
 local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transforms applied.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_facade_kit.py -- --out <scratch>
@@ -39,7 +39,12 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
 plus the plinth and step (chosen at placement).
 
-Status (2026-10-31, cloud): round 13: upper windows 1.15 x 1.25 m clear with bigger shutters (Eguisheim ref
+Status (2026-10-31, cloud): round 14 (Unity batch 3): every timber member was wound inside-out (a mirrored
+placement frame), so Unity culled the frame's outside and showed only the jetty; fixed in add_box, plus the rolled
+eave and lean-to winding, two-sided ridge tiles and eave lip, closed roof verges, a back-slope underside, a dark
+interior liner and a ledged door back (no sky through gaps). Ray-cast facing check from the four cameras: 0-3%
+back-face hits (grazing edges only). Lean-to moved to the -X end (wide camera).
+Round 13: upper windows 1.15 x 1.25 m clear with bigger shutters (Eguisheim ref
 proportion). Self-review 30.5/40 (silhouette 4, proportion 4, form 4, surface 3.5, colour 4, wear 3.5, set 3.5,
 glass/metal 3.5); target 31.
 Round 12 (TotK study): plinth is two courses of a few big pillowy stones over a dark
@@ -276,6 +281,8 @@ def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_wor
     bm.normal_update()
     uvl = bm.loops.layers.uv.new('UVMap')
     o = off if off is not None else (rng('uv%f' % seed).random(), rng('uvv%f' % seed).random())
+    if xf.to_3x3().determinant() < 0:   # a mirrored placement frame flips the winding: Unity would cull the outside
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     if uv_world:  # stone: project in world space after placing so courses line up across pieces
         bm.transform(xf); bm.normal_update()
         _uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0, 0))
@@ -331,6 +338,19 @@ def member(pc, mat, a, b, w, d, cham=0.025, name='m', sag=0.0, wob=0.006, extend
         return Vector((sag * (1 - t * t), 0, 0))
     add_box(pc, mat, (w, d, L), xf, cham=cham, cuts=(0, 0, cuts), long_axis=2, bend=bend2 if sag else None,
             wob=wob, seed=R.random() * 100)
+
+def two_sided(bm, inset=0.006):
+    """Thin shells (ridge tiles, the rolled eave) get a reversed inner copy: Unity culls back faces."""
+    bm.normal_update()
+    src = bm.faces[:]
+    uvl = bm.loops.layers.uv.active
+    for f in src:
+        vs = [bm.verts.new(v.co - f.normal * inset) for v in reversed(f.verts)]
+        nf = bm.faces.new(vs)
+        if uvl:
+            for l, ol in zip(nf.loops, reversed(f.loops)):
+                l[uvl].uv = ol[uvl].uv
+    bm.normal_update()
 
 def quad_grid(pc, mat, corners, nu, nv, push=None, uv_fn=None):
     """Bilinear grid patch from 4 corners (p00, p10, p11, p01). push(p) -> displaced point."""
@@ -565,6 +585,9 @@ def kit_panels():
         ha = half * (1 - (za - PLATE1) / (RIDGE - 0.2 - PLATE1)); hb = half * (1 - (zb - PLATE1) / (RIDGE - 0.2 - PLATE1))
         quad_grid(pc, 'plaster', [(W, yc - ha, za), (W, yc + ha, za), (W, yc + hb, zb), (W, yc - hb, zb)],
                   max(1, int(2 * ha / 0.5)), 1, push=gpush, uv_fn=lambda c: (c.y / TILE, c.z / TILE))
+    # dark interior liner just inside the front walls: anything seen through a gap lands on a front face
+    quad_grid(pc, 'plaster', [(-W, 0.45, 0.0), (W, 0.45, 0.0), (W, 0.45, PLATE1), (-W, 0.45, PLATE1)], 1, 1,
+              uv_fn=lambda c: (c.x / TILE, c.z / TILE))
     # plain planes: back wall and right end (-X), unseen by the cameras
     quad_grid(pc, 'plaster', [(W, DEPTH, 0.0), (-W, DEPTH, 0.0), (-W, DEPTH, PLATE1), (W, DEPTH, PLATE1)], 1, 1,
               uv_fn=lambda c: (c.x / TILE, c.z / TILE))
@@ -672,6 +695,9 @@ def kit_door():
                 Matrix.Translation((cx, yd, (z0 + z1) / 2 + R.uniform(-0.004, 0.004))) @
                 Matrix.Rotation(math.radians(R.uniform(-0.6, 0.6)), 4, 'Y'),
                 cham=0.012, cuts=(0, 0, 3), long_axis=2, wob=0.004, seed=R.random() * 80)
+    # ledged back behind the planks, so the plank gaps read dark instead of open
+    quad_grid(pc, 'oak', [(x0 - 0.02, yd + 0.04, z0), (x1 + 0.02, yd + 0.04, z0), (x1 + 0.02, yd + 0.04, z1),
+                          (x0 - 0.02, yd + 0.04, z1)], 1, 1, uv_fn=lambda c: (c.x / TILE, c.z / TILE))
     # strap hinges with curled tips and bolt heads
     for zz in (z0 + 0.42, z1 - 0.42):
         L = 0.82
@@ -762,6 +788,12 @@ def kit_roof():
     def under(p, u, v):
         return roof_surface(X0 + (X1 - X0) * (1 - u), v) - nrm_dir * TH
     quad_grid(pc, 'oak', [(0, 0, 0)] * 4, nx, 6, push=under, uv_fn=lambda c: (c.x / TILE, c.y / TILE))
+    # verge end strips close the slab between the deck and its underside
+    for xv, sgn in ((X0, -1), (X1, 1)):
+        def vend(p, u, v, xv=xv, sgn=sgn):
+            sv = v if sgn > 0 else 1 - v
+            return roof_surface(xv, sv) - nrm_dir * (0.06 + (TH - 0.06) * u)
+        quad_grid(pc, 'oak', [(0, 0, 0)] * 4, 1, 10, push=vend, uv_fn=lambda c: (c.y / TILE, c.z / TILE))
     # back slope: plain sheared plane on the tileable
     def back(p, u, v):
         x = X0 + (X1 - X0) * u
@@ -769,6 +801,9 @@ def kit_roof():
         zr = ridge_z(x); zb = PLATE1 + 0.22 - OVER_EAVE * 0.6 * (RIDGE - PLATE1) / (DEPTH - y_r)
         return Vector((x, y_r + (yb - y_r) * v, zr + (zb - zr) * v))
     quad_grid(pc, 'roof', [(0, 0, 0)] * 4, nx, 1, push=lambda p, u, v: back(p, u, v),
+              uv_fn=lambda c: (c.x / TILE, c.y / TILE))
+    # its underside (seen past the gable verge from the mid and three-quarter cameras)
+    quad_grid(pc, 'oak', [(0, 0, 0)] * 4, nx, 1, push=lambda p, u, v: back(p, 1 - u, v) - Vector((0, 0, TH)),
               uv_fn=lambda c: (c.x / TILE, c.y / TILE))
     # tile courses: each a tilted strip whose butt stands proud, jittered per tile run
     course = 0.40
@@ -817,6 +852,7 @@ def kit_roof():
         bmesh.ops.rotate(bm, verts=bm.verts[:], cent=Vector((x, y_r, ridge_z(x))),
                          matrix=Matrix.Rotation(math.radians(R.uniform(-2.5, 2.5)), 3, 'Y'))
         bm.normal_update()
+        two_sided(bm)
         _merge(pc, bm, 'roof')
     # rafter tails under the front overhang
     for i in range(13):
@@ -845,15 +881,15 @@ def kit_roof():
         ring_rows.append(row)
     for i in range(len(ring_rows) - 1):
         for k in range(segs):
-            f = bm.faces.new((ring_rows[i][k], ring_rows[i][k + 1], ring_rows[i + 1][k + 1], ring_rows[i + 1][k]))
+            f = bm.faces.new((ring_rows[i][k], ring_rows[i + 1][k], ring_rows[i + 1][k + 1], ring_rows[i][k + 1]))
             for l in f.loops:
-                l[uvl].uv = (l.vert.co.x / TILE, (k + (l.vert in ring_rows[i] and 0 or 0)) * rr / TILE)
-    bm.normal_update()
+                l[uvl].uv = (l.vert.co.x / TILE, k * rr / TILE)
+    two_sided(bm)
     _merge(pc, bm, 'roof')
     return pc
 
 def kit_leanto():
-    """Lean-to woodshed on the +X end: breaks the side, a low tiled mono-pitch over a stacked woodpile."""
+    """Lean-to woodshed on the -X end (seen at the wide camera): breaks the side, a low tiled mono-pitch over a stacked woodpile."""
     pc = Piece('Kit_LeanTo')
     x0, x1, y0, y1 = W + 0.02, W + 1.55, 2.75, 5.35
     zh, zl = 2.85, 2.05
@@ -883,15 +919,15 @@ def kit_leanto():
             j = R.uniform(-0.01, 0.01)
             q = [rs(ya, 1 - s0) + nrm * (0.05 + j), rs(yb, 1 - s0) + nrm * (0.05 + j), rs(yb, max(0, 1 - s1)), rs(ya, max(0, 1 - s1))]
             v = [bm.verts.new(p) for p in q]
-            f = bm.faces.new((v[1], v[0], v[3], v[2]))
+            f = bm.faces.new((v[0], v[1], v[2], v[3]))
             for l in f.loops:
                 l[uvl].uv = (l.vert.co.y / TILE, (l.vert.co.x - x0) / TILE)
             u = [bm.verts.new(p - nrm * 0.05) for p in q[:2]]
-            f = bm.faces.new((v[0], v[1], u[1], u[0]))
+            f = bm.faces.new((v[1], v[0], u[0], u[1]))
             for l in f.loops:
                 l[uvl].uv = (l.vert.co.y / TILE, l.vert.co.z / TILE)
         bm.normal_update(); _merge(pc, bm, 'roof')
-    quad_grid(pc, 'oak', [rs(y1 + 0.25, 0) , rs(y0 - 0.25, 0), rs(y0 - 0.25, 1), rs(y1 + 0.25, 1)], ny, 3,
+    quad_grid(pc, 'oak', [rs(y0 - 0.25, 0), rs(y1 + 0.25, 0), rs(y1 + 0.25, 1), rs(y0 - 0.25, 1)], ny, 3,
               uv_fn=lambda c: (c.y / TILE, c.x / TILE))
     # woodpile: split logs, end grain toward the plaza
     for row in range(6):
@@ -910,6 +946,9 @@ def kit_leanto():
                 for l in f.loops:
                     l[uvl].uv = (l.vert.co.x / TILE * 3, l.vert.co.y / TILE)
             bm.normal_update(); _merge(pc, bm, 'oak_lt')
+    # built on +X, mirrored onto the -X end: there it shows at the wide camera beside the house (Unity review)
+    bmesh.ops.scale(pc.bm, vec=(-1, 1, 1), verts=pc.bm.verts[:])
+    bmesh.ops.reverse_faces(pc.bm, faces=pc.bm.faces[:])
     return pc
 
 def kit_chimney():
