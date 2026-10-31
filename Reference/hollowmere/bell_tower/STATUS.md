@@ -1,8 +1,8 @@
 # Bell tower integration: status
 
-State: CHECKING (look judged OK; unity.sh check + review running on 9a0e796; merge waits for Wave 0A to land on main)
+State: CAPTURING after merging main (terrain pass 1e20cb2 in); then unity.sh check and merge
 Session: cloud, branch claude/brave-keller-3d91gk
-Progress: 85%
+Progress: 90%
 Sheet: Reference/hollowmere/bell_tower/bell_tower_sheet.jpg
 Blocker: none. Unity captures render in the cloud. Root cause of the grey tower found and fixed (see below).
 
@@ -26,6 +26,12 @@ Done:
 - Hall: kept as the greybox row NEIGHBOUR_ChurchHall (its roof sliver is part of the approved wide frame).
 - Main merged into the branch (9a0e796), no conflicts. Wave 0A (cool-ritchie) only touches HollowmereBuilder.cs / HollowmereTerrain.cs, not BeautyCornerBuilder.cs,
   so no overlap; I still wait for it to land on main as ordered, then pull main again, re-check and merge.
+
+- check PASS on 997878b (before the terrain pass): build PASS, EditMode 586/586, PlayMode 32 passed / 8 skipped / 0 failed. Re-check runs on the final tip.
+- Review (reviewer agent): no blocking findings; three doc/comment nits fixed. Its churn warning was real: the raw HDR bronze tint wrote _Color 6.8000007 with graphics
+  and 6.8 without, so BT_Bronze is now a flat warm bronze, linear (0.55, 0.36, 0.16), like FK_Glass (deterministic bytes).
+- Main merged again (terrain pass 1e20cb2): no conflicts; BeautyCornerBuilder.cs keeps both sides. In the town, HollowmereBuilder places the BellTower landmark at
+  l.Y = KeepHeight (+4) and the tower art as its local (0, 0, 0) child, so it stands on the keep terrace; HollowmereLayout untouched. Town capture running to show it.
 
 Pending: round 2 capture with materials, sheet refresh, `unity.sh check`, merge to main, delete the generator branch.
 SC RESULT: (not yet)
