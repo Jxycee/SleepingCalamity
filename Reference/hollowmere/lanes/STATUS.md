@@ -2,12 +2,12 @@
 
 State: IN PROGRESS
 Session: Q11. Lane kit: lane walls, steps and lane dressing
-Progress: 15%
-Sheet: none yet
+Progress: 50%
+Sheet: Reference/hollowmere/lanes/SHEET_lane_kit.jpg
 Blocker: none
 
-Score: -
-Tris: -
+Score: kit sheet self 29/40 (agent: 26.5 -> 28 -> 29; controller read about 27: gate leaf reads flat, steps slab-like); Unity captures pending
+Tris: kit 18,562 (17 pieces, all within budget)
 SC RESULT: -
 Merge commit: -
 
@@ -30,3 +30,7 @@ History:
   branch, placement on this branch) before stopping; on RESUME they continue from their transcripts.
 - Resumed (coordinator). Placement WIP a9fce01 (LaneKitPlan.cs, uncompiled); art not started. Both agents continue. Contract note: retaining walls and
   lanterns are tested as "Ground lies between base and coping" (they are sunk or wall-mounted by design), not "Y within 0.25 m".
+- Art merged (3c40274 via fa3e10b): sc_lane_kit.py, LaneKit.fbx, SOURCES.md (LK_* slots), sheet. Placement pushed (dfe90ed): Core LaneKitPlan
+  (1326 rows, golden), 7 LaneKitPlanTests, Core suite 310/310; HollowmereLanes placer + builder wiring (terrace Wall lines and CutAndFill replaced),
+  cameras Cap_HM_LaneMouthWest, Cap_HM_TerraceSteps (+ existing Cap_HM_MarketStreet). Editor code not yet Unity-compiled: the Unity download had died
+  at a container restart; restarted, waiting for it.
