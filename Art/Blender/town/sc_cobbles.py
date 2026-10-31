@@ -7,7 +7,7 @@ PC). Two of the setts are the "path" variants: flatter, polished, a little paler
 decimated highs with the buried underside cut away: LOD0 about 140 tris, LOD1 about 44 tris (setts more than 12 m from
 the wide camera), rubble about 120.
 
-The patch (brief section 1: x -8..8, z -6..8 Unity, origin = fountain centre): fan/arc courses (2.0 m fans, offset
+The patch (brief section 1: x -8..8, z -6..8 Unity, extended to x -12 on 2026-10-31 so the wide camera never sees its west edge): fan/arc courses (2.0 m fans, offset
 half a fan per 1.0 m row) laid by an occupancy raster, three concentric courses hugging the flagstone ring (r 2.9 m,
 sc_flag_ring.py), a gutter course along the facade foot (z 7.45), small setts filling the leftovers. Heights follow
 the 5 cm dish toward the fountain (sc_plaza_common.dish) plus a slow 6 mm undulation; clustered sunken and tilted
@@ -49,6 +49,10 @@ Round log (look stage, ground with the flag ring and stand-ins):
   r6 28: (flag ring pass, sc_flag_ring.py).
   r7 29: fixed a crease + centre dimple on every sett top (sign() in the plan bulge); 3 damp setts in the dish.
   r8 29: rim dirt band, crown pitting, stronger grain: no visible gain at the mid camera, so the loop stopped.
+  r9 (Unity feedback, 2026-10-31): wider tone spread between variants (k = 1 + 2.3 tint), dirt stain up to 3 mm
+     under the crown, darker joint bed, ~1.6x crown relief; patch extended to x -12 (8,673 setts) so the wide
+     camera never sees the west seam. Wide-camera ground value spread 19 -> 22 (p10 0.44 -> 0.41).
+  The `damp` bed vertex colour is not read by the Unity shader yet: the CobbleBed tileable carries base moss alone.
   Parked ideas: docs/PARKING_LOT.md (B6 plaza ground).
 """
 import sys, os, math, json, zlib, random
@@ -107,7 +111,8 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     z = (T.sep(p), 'Z')
     mott = T.noise(p, scale=9.0, detail=5.0, rough=0.6)
     big = T.noise(p, scale=2.5, detail=2.0)
-    k = 1.0 + 1.6 * tint; hue = (1.0 + 0.10 * warm, 1.0 + 0.01 * warm, 1.0 - 0.10 * warm)
+    # wide value spread between stones: the only per-stone value cue in Unity
+    k = 1.0 + 2.3 * tint; hue = (1.0 + 0.10 * warm, 1.0 + 0.01 * warm, 1.0 - 0.10 * warm)
     lo = tuple(c * k * h for c, h in zip((0.175, 0.161, 0.163), hue))          # within one stone: a narrow band, so the stones differ
     hi = tuple(c * k * h for c, h in zip((0.295, 0.27, 0.25), hue))
     col = T.ramp(T.math('ADD', T.math('MULTIPLY', mott, 0.75), T.math('MULTIPLY', big, 0.35)),
@@ -136,7 +141,7 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     dirt = (0.085, 0.070, 0.055)
     col = T.mix(T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), 0.75), col, dirt)
     # the body below the joint line sits in the grit bed: dirt-stained, matte
-    bed = T.smoothstep(T.math('ADD', z, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.012)), -0.010, -0.030)
+    bed = T.smoothstep(T.math('ADD', z, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.012)), -0.003, -0.020)     # dirt stain rises to 3 mm under the crown: joints read wide and dark at 5-10 m
     col = T.mix(T.math('MULTIPLY', bed, 0.85), col, (0.11, 0.092, 0.072))
     # sparse pale lichen dots on the unworn setts, in the micro hollows of the top
     if not worn:
@@ -180,14 +185,14 @@ def make_sett(name, L, W, H, kind, prm):
     co[:, 1] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 2.0) - 0.5) * 2 * np.clip(y, -1, 1)
     # dome, then the worn crown: everything above the wear plane is squashed flat (foot traffic)
     dome = prm['dome'] * np.clip(1 - x ** 2, 0, 1) * np.clip(1 - y ** 2, 0, 1) * topw
-    co[:, 2] += dome + 0.0025 * (K.fbm(co + sd, 11.0, 3, 0.5, 3.0) - 0.5) * 2 * topw
+    co[:, 2] += dome + 0.0040 * (K.fbm(co + sd, 11.0, 3, 0.5, 3.0) - 0.5) * 2 * topw
     zt = co[:, 2].max() - (0.0045 if kind == 'worn' else 0.0022)
     hi_ = co[:, 2] > zt
     co[hi_, 2] = zt + (co[hi_, 2] - zt) * (0.18 if kind == 'worn' else 0.4)
     K.set_co(ob, co)
     co, no = K.mesh_arrays(ob)
     # surface lumps (coarse pick-dressing, softened by wear on the path variants)
-    amp = 0.0008 if kind == 'worn' else 0.0014
+    amp = 0.0011 if kind == 'worn' else 0.0022
     d = amp * (K.fbm(co, 38.0, 3, 0.55, 4.0 + sd) - 0.5) * 2
     nchip = {'chipped': 9, 'worn': 2, 'cracked': 4}.get(kind, 5)
     d = d + K.scoops(ob, nchip, 0.008, 0.020, 0.55, (75.0, 170.0), seed=sd + 5.0, co=co, no=no, flake=True) * topw

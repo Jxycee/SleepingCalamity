@@ -20,7 +20,7 @@ from mathutils import Vector, Matrix
 BASIN_R = 1.7                 # basin outer radius (B10: diameter 3.4 m)
 RING_W = 1.2                  # flagstone ring width (B6)
 RING_R = BASIN_R + RING_W     # 2.9: the cobbles start here
-PATCH_U = (-8.0, 8.0, -6.0, 8.0)   # Unity x0, x1, z0, z1
+PATCH_U = (-12.0, 8.0, -6.0, 8.0)  # Unity x0, x1, z0, z1 (x0 -12: the wide camera saw the seam at -8 in Unity)
 
 # capture cameras, Unity coordinates (brief section 1)
 CAMS_U = {'wide': ((1.0, 1.8, -9.0), (-1.0, 3.0, 6.0)),
@@ -169,10 +169,10 @@ def bed_material(name):
         nd = T.node('ShaderNodeTexVoronoi', voronoi_dimensions='4D'); T.set(nd, 'Vector', v); T.set(nd, 'W', w)
         nd.inputs['Scale'].default_value = scale; return nd
     dn = n4(6.0); fine = n4(60.0, 2.0)
-    col = T.ramp(dn, [(0.35, (0.030, 0.026, 0.021)), (0.65, (0.065, 0.055, 0.043))])
+    col = T.ramp(dn, [(0.35, (0.022, 0.019, 0.016)), (0.65, (0.048, 0.041, 0.033))])
     g = vor4(140.0)                                           # grit: 3-7 mm pebbles
     peb = T.math('MULTIPLY', T.smoothstep((g, 'Distance'), 0.42, 0.22), T.smoothstep((T.sep((g, 'Color')), 'X'), 0.35, 0.45))
-    col = T.mix(T.math('MULTIPLY', peb, 0.9), col, T.mix((T.sep((g, 'Color')), 'Y'), (0.12, 0.115, 0.11), (0.24, 0.22, 0.20)))
+    col = T.mix(T.math('MULTIPLY', peb, 0.9), col, T.mix((T.sep((g, 'Color')), 'Y'), (0.09, 0.086, 0.082), (0.18, 0.165, 0.15)))
     g2 = vor4(40.0)                                           # a few bigger stones (1-2 cm)
     peb2 = T.math('MULTIPLY', T.smoothstep((g2, 'Distance'), 0.30, 0.18), T.smoothstep((T.sep((g2, 'Color')), 'X'), 0.82, 0.86))
     col = T.mix(peb2, col, (0.19, 0.175, 0.16))
