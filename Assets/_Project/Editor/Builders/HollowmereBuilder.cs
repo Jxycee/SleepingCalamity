@@ -40,7 +40,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Fountain", new Vector3(-6.5f, 1.65f, -9.5f), new Vector3(2.5f, 2.6f, 9f), 50f),
             ("Cap_HM_TitheGate", new Vector3(5.2f, 1.65f, 8.2f), new Vector3(5.6f, 5.5f, 22f), 55f),
             ("Cap_HM_LaneMouth", new Vector3(-0.4f, 1.65f, -40f), new Vector3(0f, 3.0f, -8f), 50f),
-            ("Cap_HM_Overview", new Vector3(58f, 62f, -92f), new Vector3(2f, -4f, -16f), 42f),
+            ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),   // rendered without fog (HollowmereCapture)
         };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]

@@ -123,6 +123,8 @@ namespace SleepingCalamity.Core
 
         static void Pad(Footprint fp, float y, float margin, TownPoint p, ref float wSum, ref float hSum)
         {
+            // A pad never blends across the keep wall: the tower's terrace must not ramp down into the square, nor a square lot drag the terrace down.
+            if (Math.Abs(p.X) < KeepHalfWidth && (p.Z > KeepWallZ) != (fp.Centre.Z > KeepWallZ)) return;
             TownPoint l = fp.ToLocal(p);
             float ox = Math.Abs(l.X) - fp.HalfX - margin, oz = Math.Abs(l.Z) - fp.HalfZ - margin;
             float d = (float)Math.Sqrt(Math.Max(0f, ox) * Math.Max(0f, ox) + Math.Max(0f, oz) * Math.Max(0f, oz));

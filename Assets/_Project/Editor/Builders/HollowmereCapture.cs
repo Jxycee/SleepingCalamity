@@ -1,5 +1,5 @@
 // Renders the Hollowmere approval captures (Wave 0, design section 7): every HollowmereBuilder play-position camera (heroes' home door, fountain, tithe gate,
-// lane mouth, overview) in both presets (Ruined, Rebuilt) at Midday, plus the approved corner's Wide camera in both presets, PNG 1920x1080, through the
+// lane mouth, overview without fog) in both presets (Ruined, Rebuilt) at Midday, plus the approved corner's Wide camera in both presets, PNG 1920x1080, through the
 // beauty corner's own rendering stack (selected for the run only, like BeautyCornerCapture). Output folder: "-scCaptureDir <dir>", else env SC_CAPTURE_DIR.
 //   bash Tools/cloud/unity.sh exec --graphics --method SleepingCalamity.EditorTools.HollowmereCapture.CaptureAll --out <scratch>   (env SC_CAPTURE_DIR = the PNG folder)
 // Files: <Camera>_<Preset>.png, e.g. HM_HomeDoor_Ruined.png. Builds the scene first unless SC_CAPTURE_NOBUILD is set.
@@ -52,7 +52,10 @@ namespace SleepingCalamity.EditorTools
                     foreach (Camera cam in cams)
                     {
                         if (!cam.name.StartsWith("Cap_HM_") && cam.name != "Cap_Corner_Wide") continue;
-                        LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + preset + ".png"));
+                        bool overview = cam.name == "Cap_HM_Overview", fog = RenderSettings.fog;
+                        if (overview) RenderSettings.fog = false;   // the corner's haze is tuned for 10-40 m; at 100 m+ it would hide the town
+                        try { LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + preset + ".png")); }
+                        finally { RenderSettings.fog = fog; }
                     }
                 }
                 HollowmereBuilder.ApplyPreset(HollowmereBuilder.Preset.Ruined);
