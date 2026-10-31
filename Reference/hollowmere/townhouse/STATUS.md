@@ -3,6 +3,7 @@ Session: Wave 2: Kit family 3, tall jettied townhouse (M)
 Progress: 100%
 Sheet: Reference/hollowmere/townhouse/SHEET_r3_four_sides.jpg
 Blocker: none
+Archive: ready
 
 Score: r3 29/40 (silhouette 4, proportion 4, form 4, surface 3.5, colour 3.5, wear 3.5, set 3.5, glass/metal 3); r1 26.5; target 31.5 not reached, stopped at 3 rounds for usage pacing
 Tris: A 34,265 / B 32,346 / C 34,531 (budget 35k; Part_Door 1,558, Part_Shutters 3,456)

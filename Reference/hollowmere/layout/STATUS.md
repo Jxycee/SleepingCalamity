@@ -4,6 +4,7 @@ Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
 State: DONE (ruin integration merged)
 Progress: 100%
+Archive: ready (all work merged: Wave 0 greybox 1f6ff88, terrain pass 1e20cb2, ruin integration 7a4661d; no queue item claimed)
 SC RESULT check PASS on d72bc47 (build PASS; test-edit 592/592; test-play 32 passed, 8 skipped, 0 failed). Merge commit 7a4661d (main 006a57a; identical to d72bc47 under Assets, Packages and ProjectSettings)
 Sheet: Reference/hollowmere/layout/Hollowmere_Ruins_vs_Kit.jpg
 Captures: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
@@ -19,6 +20,6 @@ Captures: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 
 **Earlier (done):** Wave 0 greybox merged `1f6ff88`; terrain pass merged `1e20cb2`.
 
-**Next:** none claimed. QUEUE.md claiming is PAUSED (usage pacing), so this session stops here. Q5 (builder churn) suits it when claiming reopens. The remaining churn is `HeroAnimator.controller` (+ .meta) on every cloud build; the ruin foliage material is now stable.
+**Next:** none. Per the coordinator (user decision: every new job gets a new session), this session takes no queue item and is ready to archive. The remaining churn is `HeroAnimator.controller` (+ .meta) on every cloud build; the ruin foliage material is now stable.
 
 **Blockers:** none.

@@ -100,6 +100,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void ProjectController_MatchesItsRecordedSignature_SoABuildLeavesTheCommittedFileAlone()
+        {
+            // The signature must not depend on the machine (editor build, platform, artifact cache), or every session rebuilds the committed controller.
+            string abs = BuilderUtil.Abs(HeroAnimatorBuilder.ControllerPath);
+            Assert.That(System.IO.File.Exists(abs), "the project controller is committed");
+            byte[] before = System.IO.File.ReadAllBytes(abs);
+            string metaBefore = System.IO.File.ReadAllText(abs + ".meta");
+            HeroAnimatorBuilder.Build();
+            Assert.That(System.IO.File.ReadAllBytes(abs), Is.EqualTo(before), "HeroAnimator.controller was rewritten by an unchanged build");
+            Assert.That(System.IO.File.ReadAllText(abs + ".meta"), Is.EqualTo(metaBefore), "HeroAnimator.controller.meta was rewritten by an unchanged build");
+        }
+
+        [Test]
         public void DodgeState_PlaysByProgress()
         {
             AnimatorState dodge = _ctrl.layers[0].stateMachine.states.First(s => s.state.name == "Dodge").state;

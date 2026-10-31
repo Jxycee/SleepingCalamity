@@ -60,17 +60,114 @@ namespace SleepingCalamity.Tests.EditMode
                 }
         }
 
+        // ---- Q3: the seeded ring 2 fill ----
+        // "Neighbouring" = two assigned lots whose centres are closer than HollowmereLayout.NeighbourDistance (22 m: the next lot or two along the lane and the
+        // lots across it). Turn is 0 everywhere (fronts to the lane), so the same variant twice in a row along a lane is also a variant clash.
+        static List<(Foundation F, HollowmereLayout.HomeAssignment A)> KitLots(TownLayout t) =>
+            t.Foundations.Where(f => f.Ring <= 2).Select(f => (f, HollowmereLayout.RebuiltHome(f.Id)))
+                .Where(x => x.Item2.Kind == HollowmereLayout.BuildingKind.Townhouse || x.Item2.Kind == HollowmereLayout.BuildingKind.StoneCottage || x.Item2.Kind == HollowmereLayout.BuildingKind.Workshop).ToList();
+
         [Test]
-        public void RebuiltHomeKits_SitOnFreeRing2LotsThatFitTheirClass()
+        public void Ring2Fill_IsDeterministic()
         {
             TownLayout t = HollowmereLayout.Create();
-            var cottage = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == HollowmereLayout.BuildingKind.StoneCottage).ToList();
-            var workshop = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == HollowmereLayout.BuildingKind.Workshop).ToList();
-            Assert.AreEqual(1, cottage.Count, "one stone cottage"); Assert.AreEqual(1, workshop.Count, "one workshop");
-            Assert.AreEqual(2, cottage[0].Ring); Assert.AreEqual(2, workshop[0].Ring);
-            Assert.AreEqual(FoundationSize.S, cottage[0].Size, "stone cottages are S class (FOOTPRINT up to 4.88 m)");
-            Assert.That(workshop[0].Size, Is.Not.EqualTo(FoundationSize.S), "the placed workshop variant (B, 6.73 x 6.30 m) needs an M or L lot");
-            Assert.AreNotEqual(0f, cottage[0].Y, "pad height kept"); Assert.AreNotEqual(0f, workshop[0].Y, "pad height kept");
+            var a = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed);
+            var b = HollowmereLayout.AssignRing2(HollowmereLayout.Create(), HollowmereLayout.Ring2Seed);
+            CollectionAssert.AreEqual(a.Keys.OrderBy(k => k).ToList(), b.Keys.OrderBy(k => k).ToList());
+            foreach (var kv in a) { Assert.AreEqual(kv.Value.Kind, b[kv.Key].Kind, kv.Key); Assert.AreEqual(kv.Value.Variant, b[kv.Key].Variant, kv.Key); Assert.AreEqual(kv.Value.Turn, b[kv.Key].Turn, kv.Key); }
+            foreach (var kv in a) Assert.AreEqual(kv.Value.Kind, HollowmereLayout.RebuiltHome(kv.Key).Kind, kv.Key + " via RebuiltHome");
+        }
+
+        [Test]
+        public void Ring2Fill_FamiliesFitTheLotClass()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            foreach (var (f, a) in KitLots(t))
+            {
+                Assert.That(a.Turn, Is.InRange(0, 3), f.Id + " turn");
+                switch (a.Kind)
+                {
+                    case HollowmereLayout.BuildingKind.StoneCottage: Assert.AreEqual(FoundationSize.S, f.Size, f.Id + " cottage is S class"); break;
+                    case HollowmereLayout.BuildingKind.Townhouse: Assert.AreEqual(FoundationSize.M, f.Size, f.Id + " townhouse is M class"); break;
+                    case HollowmereLayout.BuildingKind.Workshop:
+                        if (a.Variant == 'A') Assert.AreEqual(FoundationSize.S, f.Size, f.Id + " Workshop_A is S class");
+                        else Assert.AreEqual(FoundationSize.M, f.Size, f.Id + " Workshop_" + a.Variant + " is M class");
+                        break;
+                }
+            }
+        }
+
+        [Test]
+        public void Ring2Fill_LeavesReservedAndOtherLotsAlone()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var fill = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed);
+            foreach (string id in new[] { "R2_07", "R2_18", "R2_22", "R2_08", "R2_09", "R2_01", "R2_03" }.Concat(HollowmereLayout.Ring2Reserved))
+                CollectionAssert.DoesNotContain(fill.Keys, id, id + " is reserved or already used");
+            foreach (Foundation f in t.Foundations.Where(f => f.Size == FoundationSize.L)) CollectionAssert.DoesNotContain(fill.Keys, f.Id, f.Id + " is L");
+            foreach (string id in fill.Keys) Assert.AreEqual(2, t.Foundation(id).Ring, id);
+            Assert.AreEqual(HollowmereLayout.BuildingKind.Garden, HollowmereLayout.RebuiltBuilding("R2_07"));
+            Assert.AreEqual(HollowmereLayout.BuildingKind.Smithy, HollowmereLayout.RebuiltBuilding("R2_01"), "Q2's smithy stays fixed");
+            Assert.AreEqual(HollowmereLayout.BuildingKind.Schoolhouse, HollowmereLayout.RebuiltBuilding("R2_03"), "Q2's schoolhouse stays fixed");
+        }
+
+        [Test]
+        public void Ring2Fill_EmptyShareIsAboutAThird()
+        {
+            var fill = HollowmereLayout.AssignRing2(HollowmereLayout.Create(), HollowmereLayout.Ring2Seed);
+            int empty = fill.Values.Count(a => a.Kind == HollowmereLayout.BuildingKind.Empty);
+            double share = empty / (double)fill.Count;
+            Assert.That(fill.Count, Is.GreaterThanOrEqualTo(10), "a real spread");
+            Assert.That(share, Is.InRange(0.25, 0.35), empty + " of " + fill.Count + " empty");
+        }
+
+        [Test]
+        public void Ring2Fill_NoNeighbourRepeatsAVariant()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var lots = KitLots(t);
+            for (int i = 0; i < lots.Count; i++)
+                for (int j = i + 1; j < lots.Count; j++)
+                {
+                    var (fa, a) = lots[i]; var (fb, b) = lots[j];
+                    if (a.Kind != b.Kind || a.Variant != b.Variant) continue;
+                    Assert.GreaterOrEqual(TownPoint.Distance(fa.Centre, fb.Centre), HollowmereLayout.NeighbourDistance, fa.Id + " and " + fb.Id + " both " + a.VariantName);
+                }
+        }
+
+        [Test]
+        public void Ring2Fill_EmptiesAreSpreadNotClumped()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var empties = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed).Where(kv => kv.Value.Kind == HollowmereLayout.BuildingKind.Empty).Select(kv => t.Foundation(kv.Key)).ToList();
+            for (int i = 0; i < empties.Count; i++)
+                for (int j = i + 1; j < empties.Count; j++)
+                    Assert.GreaterOrEqual(TownPoint.Distance(empties[i].Centre, empties[j].Centre), 14f, empties[i].Id + " and " + empties[j].Id + " are next to each other");
+        }
+
+        [Test]
+        public void Ring2Fill_GoldenForTheFixedSeed()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var fill = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed);
+            CollectionAssert.AreEquivalent(new[] { "R2_10", "R2_15", "R2_17", "R2_21" }, fill.Where(kv => kv.Value.Kind == HollowmereLayout.BuildingKind.Empty).Select(kv => kv.Key).ToList(), "empty lots for the shipped seed");
+            Assert.AreEqual("Townhouse_B", fill["R2_02"].VariantName);
+            Assert.AreEqual("Workshop_C", fill["R2_13"].VariantName);
+            Assert.AreEqual("Workshop_C", fill["R2_23"].VariantName);
+            var other = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed + 1);
+            Assert.IsTrue(fill.Any(kv => other[kv.Key].Kind != kv.Value.Kind || other[kv.Key].Variant != kv.Value.Variant), "a different seed gives a different town");
+        }
+
+        [Test]
+        public void EarlierPlacements_AreUnchanged()
+        {
+            Assert.AreEqual("Townhouse_A", HollowmereLayout.RebuiltHome("F06").VariantName); Assert.AreEqual(0, HollowmereLayout.RebuiltHome("F06").Turn);
+            Assert.AreEqual("Townhouse_B", HollowmereLayout.RebuiltHome("F07").VariantName); Assert.AreEqual(0, HollowmereLayout.RebuiltHome("F07").Turn);
+            Assert.AreEqual("StoneCottage_B", HollowmereLayout.RebuiltHome("R2_09").VariantName); Assert.AreEqual(0, HollowmereLayout.RebuiltHome("R2_09").Turn);
+            Assert.AreEqual("Workshop_B", HollowmereLayout.RebuiltHome("R2_08").VariantName); Assert.AreEqual(0, HollowmereLayout.RebuiltHome("R2_08").Turn);
+            TownLayout t = HollowmereLayout.Create();
+            Assert.AreEqual(FoundationSize.S, t.Foundation("R2_09").Size); Assert.AreEqual(FoundationSize.M, t.Foundation("R2_08").Size);
+            Assert.AreNotEqual(0f, t.Foundation("R2_09").Y, "pad height kept"); Assert.AreNotEqual(0f, t.Foundation("R2_08").Y, "pad height kept");
         }
 
         [Test]
