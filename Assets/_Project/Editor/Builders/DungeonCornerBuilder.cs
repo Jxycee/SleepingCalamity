@@ -65,15 +65,57 @@ namespace SleepingCalamity.EditorTools
             return l.ToArray();
         }
 
+        // What another builder needs from the room: the scene groups, the shared materials, and the CV_* slot map (null while the vault FBX is missing).
+        internal sealed class RoomKit
+        {
+            public Transform Set, Lighting;
+            public Dictionary<string, Material> Own;
+            public Dictionary<string, Material> Slots;   // null when CellarVault.fbx is missing
+            public GameObject Kit;
+            Dictionary<string, Material> built;
+            // The slot map built on demand, so a second kit (CellarStair) can map its CV_* slots even when the vault FBX is missing.
+            public Dictionary<string, Material> SlotMap() => Slots ?? (built ?? (built = SlotMaterials(Own)));
+        }
+
         [MenuItem("SleepingCalamity/Art/Build Dungeon Corner")]
         public static void Build()
+        {
+            Scene scene = NewRoomScene();
+            var root = new GameObject("DungeonCorner_Cellars").transform;
+            BuildRoom(root);
+
+            Transform cams = new GameObject("CaptureCameras").transform; cams.SetParent(root, false);
+            LookTestBuilder.AddCapture(cams, "Cap_Cellar_Wide", new Vector3(0.3f, 1.7f, 0.6f), new Vector3(0f, 1.6f, 8f), 62f);
+            LookTestBuilder.AddCapture(cams, "Cap_Cellar_Mid", new Vector3(1.6f, 1.6f, 2.4f), new Vector3(-2.0f, 1.2f, 5.5f), 55f);
+            LookTestBuilder.AddCapture(cams, "Cap_Cellar_Close", new Vector3(0.4f, 1.3f, 6.4f), new Vector3(-0.5f, 1.4f, 7.9f), 48f);
+            DarkBackground(cams);
+
+            Transform dbg = new GameObject("Debug").transform; dbg.SetParent(root, false);
+            LookTestBuilder.Prim(dbg, "Figure_1.75m", PrimitiveType.Capsule, new Vector3(0.9f, 0.875f, 3.0f), new Vector3(0.5f, 0.875f, 0.5f), LookTestBuilder.Mat("iron"));
+            dbg.gameObject.SetActive(false);
+
+            BuilderUtil.SaveScene(scene, ScenePath);
+            Debug.Log("SC DUNGEON scene built " + ScenePath);
+        }
+
+        internal static void DarkBackground(Transform cams)
+        {
+            foreach (Camera c in cams.GetComponentsInChildren<Camera>(true)) { c.clearFlags = CameraClearFlags.SolidColor; c.backgroundColor = new Color(0.02f, 0.015f, 0.012f); }
+        }
+
+        // Inputs the room needs, then a new empty scene (NewScene(Single) unloads unused assets, so everything the scene uses is loaded after it: SceneBuilder's rule).
+        internal static Scene NewRoomScene()
         {
             if (AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/LookTest/M_old_brick.mat") == null) LookTestBuilder.BuildMaterials();
             if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(LookTestBuilder.RpAssetPath) == null) LookTestBuilder.EnsureRendering();
             BuilderUtil.EnsureFolder(MaterialsFolder);
             BuilderUtil.EnsureFolder(LookTestBuilder.RenderingFolder);
-            // The new scene first: NewScene(Single) unloads unused assets, so everything the scene uses is loaded after it (SceneBuilder's rule).
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            return EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        }
+
+        // The room: profile, materials, kit placements (Set), lanterns, candles, lights, probe, volume, ambient and fog (Lighting). Call after NewRoomScene.
+        internal static RoomKit BuildRoom(Transform root)
+        {
             BuildProfile();
             BeautyCornerArt.EnsureCellarLantern();
             Dictionary<string, Material> own = BuildOwnMaterials();
@@ -82,7 +124,6 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC DUNGEON kit " + (kit != null ? KitFolder + "/" + KitFbx : "FBX missing, greybox for every piece"));
             Dictionary<string, Material> slots = kit != null ? SlotMaterials(own) : null;
 
-            var root = new GameObject("DungeonCorner_Cellars").transform;
             Transform set = new GameObject("Set").transform; set.SetParent(root, false);
             var report = new SortedDictionary<string, string>();
             int n = 0;
@@ -97,7 +138,7 @@ namespace SleepingCalamity.EditorTools
             foreach (var kv in report) Debug.Log("SC DUNGEON piece " + kv.Key + " " + kv.Value);
 
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
-            Lanterns(set, lighting, own);
+            Lanterns(set, lighting, own, RoomHooks);
             Candles(set, lighting, own);
             Lights(lighting, own);
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 2.0f, 4f), new Vector3(6f, 4.6f, 9f));
@@ -111,19 +152,7 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
-
-            Transform cams = new GameObject("CaptureCameras").transform; cams.SetParent(root, false);
-            LookTestBuilder.AddCapture(cams, "Cap_Cellar_Wide", new Vector3(0.3f, 1.7f, 0.6f), new Vector3(0f, 1.6f, 8f), 62f);
-            LookTestBuilder.AddCapture(cams, "Cap_Cellar_Mid", new Vector3(1.6f, 1.6f, 2.4f), new Vector3(-2.0f, 1.2f, 5.5f), 55f);
-            LookTestBuilder.AddCapture(cams, "Cap_Cellar_Close", new Vector3(0.4f, 1.3f, 6.4f), new Vector3(-0.5f, 1.4f, 7.9f), 48f);
-            foreach (Camera c in cams.GetComponentsInChildren<Camera>(true)) { c.clearFlags = CameraClearFlags.SolidColor; c.backgroundColor = new Color(0.02f, 0.015f, 0.012f); }
-
-            Transform dbg = new GameObject("Debug").transform; dbg.SetParent(root, false);
-            LookTestBuilder.Prim(dbg, "Figure_1.75m", PrimitiveType.Capsule, new Vector3(0.9f, 0.875f, 3.0f), new Vector3(0.5f, 0.875f, 0.5f), LookTestBuilder.Mat("iron"));
-            dbg.gameObject.SetActive(false);
-
-            BuilderUtil.SaveScene(scene, ScenePath);
-            Debug.Log("SC DUNGEON scene built " + ScenePath);
+            return new RoomKit { Set = set, Lighting = lighting, Own = own, Slots = slots, Kit = kit };
         }
 
         // --------------------------------------------------------------------------------------------- materials
@@ -187,7 +216,7 @@ namespace SleepingCalamity.EditorTools
             return map;
         }
 
-        static void Clone(Transform src, Transform parent, Dictionary<string, Material> slots, string piece)
+        internal static void Clone(Transform src, Transform parent, Dictionary<string, Material> slots, string piece)
         {
             GameObject clone = UnityEngine.Object.Instantiate(src.gameObject, parent, false);
             clone.name = piece;
@@ -221,23 +250,28 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- lanterns, candles, lights
         static readonly Color Gold = new Color(1.0f, 0.80f, 0.54f);
 
-        static void Lanterns(Transform set, Transform lighting, Dictionary<string, Material> own)
+        // hook position + the direction the wall lies in (the hook plate sits 0.1 m that way)
+        static readonly (Vector3 Hook, Vector3 Side)[] RoomHooks =
+        {
+            (new Vector3(-2.3f, 2.3f, 2.0f), new Vector3(-1, 0, 0)), (new Vector3(2.3f, 2.3f, 4.0f), new Vector3(1, 0, 0)),
+        };
+
+        internal static void Lanterns(Transform set, Transform lighting, Dictionary<string, Material> own, (Vector3 Hook, Vector3 Side)[] hooks, string tag = "", float intensity = 6.0f, float range = 10f)
         {
             GameObject fbx = BeautyCornerArt.LoadModel(LanternFolder, "CellarLantern.fbx");
             string[] guids = AssetDatabase.FindAssets("M_CellarLantern t:Material");
             Material lm = guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
             Debug.Log("SC DUNGEON lanterns " + (fbx != null && lm != null ? "art (B11)" : "greybox"));
-            var hooks = new[] { new Vector3(-2.3f, 2.3f, 2.0f), new Vector3(2.3f, 2.3f, 4.0f) };
             for (int i = 0; i < hooks.Length; i++)
             {
-                Vector3 hook = hooks[i];
-                Vector3 side = new Vector3(Mathf.Sign(hook.x), 0, 0);
-                LookTestBuilder.Box(set, "LanternHook_" + i, hook + side * 0.1f + new Vector3(0, 0.02f, 0), new Vector3(0.2f, 0.04f, 0.04f), LookTestBuilder.Mat("iron"));
+                Vector3 hook = hooks[i].Hook;
+                Vector3 side = hooks[i].Side;
+                LookTestBuilder.Box(set, "LanternHook_" + tag + i, hook + side * 0.1f + new Vector3(0, 0.02f, 0), new Vector3(0.2f, 0.04f, 0.04f), LookTestBuilder.Mat("iron"));
                 Vector3 flame;
                 if (fbx != null && lm != null)
                 {
                     var l = (GameObject)PrefabUtility.InstantiatePrefab(fbx, set);
-                    l.name = "CellarLantern_" + i;
+                    l.name = "CellarLantern_" + tag + i;
                     foreach (Renderer r in l.GetComponentsInChildren<Renderer>(true)) { var m = new Material[Mathf.Max(1, r.sharedMaterials.Length)]; for (int k = 0; k < m.Length; k++) m[k] = lm; r.sharedMaterials = m; }
                     l.transform.position = hook;   // pivot bottom centre: measure, then hang the top ring from the hook
                     Bounds b = new Bounds(hook, Vector3.zero); bool first = true;
@@ -247,11 +281,11 @@ namespace SleepingCalamity.EditorTools
                 }
                 else
                 {
-                    LookTestBuilder.Prim(set, "CellarLantern_" + i, PrimitiveType.Sphere, hook - new Vector3(0, 0.2f, 0), Vector3.one * 0.22f, own["flame"]);
+                    LookTestBuilder.Prim(set, "CellarLantern_" + tag + i, PrimitiveType.Sphere, hook - new Vector3(0, 0.2f, 0), Vector3.one * 0.22f, own["flame"]);
                     flame = hook - new Vector3(0, 0.2f, 0);
                 }
-                LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.0f, 10f, LightShadows.Soft);
-                Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 90, own);
+                LookTestBuilder.AddLight(lighting, "LanternLight_" + tag + i, LightType.Point, flame, Quaternion.identity, Gold, intensity, range, LightShadows.Soft);
+                Motes(lighting, "Motes_Lantern" + tag + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 90, own);
             }
         }
 
@@ -259,15 +293,20 @@ namespace SleepingCalamity.EditorTools
         {
             // one cluster on the sill of a niche (NicheWall at z 8 is turned 180 degrees: world x = -niche x; the row-1 sill top is y 1.31, the
             // sill front lip is at z ~7.97, bottles stand deeper at z 8.04+). Niche column cx +1.3 -> world x -1.3.
-            Vector3 c = new Vector3(-1.3f, 1.31f, 8.08f);
+            CandleCluster(set, lighting, own, new Vector3(-1.3f, 1.31f, 8.08f), "", new Vector3(0, 0.25f, -0.12f));
+        }
+
+        // Three candles standing at c (the foot of the tallest), one warm point light at c + lightOffset.
+        internal static void CandleCluster(Transform set, Transform lighting, Dictionary<string, Material> own, Vector3 c, string tag, Vector3 lightOffset)
+        {
             var offs = new[] { new Vector3(0, 0, 0), new Vector3(0.14f, 0, 0.06f), new Vector3(-0.12f, 0, 0.08f) };
             var hs = new[] { 0.16f, 0.1f, 0.07f };
             for (int i = 0; i < 3; i++)
             {
-                LookTestBuilder.Prim(set, "Candle_" + i, PrimitiveType.Cylinder, c + offs[i] + new Vector3(0, hs[i] * 0.5f, 0), new Vector3(0.035f, hs[i] * 0.5f, 0.035f), own["wax"]);
-                LookTestBuilder.Prim(set, "Flame_" + i, PrimitiveType.Sphere, c + offs[i] + new Vector3(0, hs[i] + 0.02f, 0), new Vector3(0.015f, 0.03f, 0.015f), own["flame"]);
+                LookTestBuilder.Prim(set, "Candle_" + tag + i, PrimitiveType.Cylinder, c + offs[i] + new Vector3(0, hs[i] * 0.5f, 0), new Vector3(0.035f, hs[i] * 0.5f, 0.035f), own["wax"]);
+                LookTestBuilder.Prim(set, "Flame_" + tag + i, PrimitiveType.Sphere, c + offs[i] + new Vector3(0, hs[i] + 0.02f, 0), new Vector3(0.015f, 0.03f, 0.015f), own["flame"]);
             }
-            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.12f), Quaternion.identity, new Color(1.0f, 0.72f, 0.44f), 1.6f, 3.8f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "CandleLight" + tag, LightType.Point, c + lightOffset, Quaternion.identity, new Color(1.0f, 0.72f, 0.44f), 1.6f, 3.8f, LightShadows.None);
         }
 
         static void Lights(Transform lighting, Dictionary<string, Material> own)
@@ -285,7 +324,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Warm dust motes: a slow box emitter, prewarmed (the capture also simulates a few seconds so the edit-mode render shows them).
-        static void Motes(Transform parent, string name, Vector3 pos, Vector3 box, int count, Dictionary<string, Material> own, Quaternion? rot = null)
+        internal static void Motes(Transform parent, string name, Vector3 pos, Vector3 box, int count, Dictionary<string, Material> own, Quaternion? rot = null)
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = pos; go.transform.localRotation = rot ?? Quaternion.identity;
             var ps = go.AddComponent<ParticleSystem>();
@@ -300,7 +339,7 @@ namespace SleepingCalamity.EditorTools
 
         // --------------------------------------------------------------------------------------------- greybox pieces
         // Stand-ins in the same Unity extents as the contract table, built from LookTest shapes and the B2 materials.
-        static void Greybox(string piece, Transform t, Dictionary<string, Material> own)
+        internal static void Greybox(string piece, Transform t, Dictionary<string, Material> own)
         {
             Material brick = LookTestBuilder.Mat("old_brick"), vault = LookTestBuilder.Mat("vault_stone"), lime = LookTestBuilder.Mat("limewash"), flag = LookTestBuilder.Mat("flagstone"),
                 oak = LookTestBuilder.Mat("barrel_oak"), coal = LookTestBuilder.Mat("soot_coal"), root = LookTestBuilder.Mat("root_bark"), iron = LookTestBuilder.Mat("iron");
