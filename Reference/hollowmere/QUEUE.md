@@ -14,7 +14,7 @@ Design 5.4 family 2 (stone cottage, S: rubble walls like the tower, thatch or ti
 
 ## Q2. Smithy, schoolhouse and mill
 Folder: `Reference/hollowmere/kit_ready/`
-Claimed: -
+Claimed: cloud session claude/sharp-goldberg-vpyt8c (bakery done), 2026-10-31
 Kit-ready list from design section 6. Smithy (M, forge and chimney, uses the workshop outbuilding look), schoolhouse (M/L, bell-cote, long windows), and mill (the shell and the restored state, on the stream at its landmark row height, about -10 m; wheel at the stream). One generator each, following the 5.2 contract. Place the mill on its landmark row in both presets; the smithy and schoolhouse go on free ring 2 foundations in Rebuilt.
 
 ## Q3. Ring 2 fill and the play-position captures
