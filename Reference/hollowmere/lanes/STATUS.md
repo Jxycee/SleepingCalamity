@@ -2,9 +2,9 @@
 
 State: IN PROGRESS
 Session: Q11. Lane kit: lane walls, steps and lane dressing
-Progress: 10%
+Progress: 15%
 Sheet: none yet
-Blocker: paused by coordinator for usage
+Blocker: none
 
 Score: -
 Tris: -
@@ -24,3 +24,5 @@ History:
   Saltwake road or Q8's town wall). Captures: Market Street, West Lane mouth, Ring Lane south-west terrace steps.
 - Checked for existing practice: the stepped street / cordonata pattern of hill towns for >13 deg grades; Q9's terrace kit as the code template;
   no off-the-shelf lane-dressing tool fits the layout-row builder pattern. Unity editor was still downloading at pause time.
+- Resumed after the usage pause; merged main (Q8 town wall ca383a8). Contract written: Reference/hollowmere/lanes/CONTRACT.md. Dispatching the Blender
+  kit agent and the placement implementer (both Sonnet) in parallel. Q8's TownWallPlan + HollowmereTownWall are the placement template.
