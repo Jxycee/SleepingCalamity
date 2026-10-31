@@ -123,12 +123,12 @@ namespace SleepingCalamity.Core
 
         public static readonly BuntingSpan[] Bunting =
         {
-            new BuntingSpan { Id = "Bunting_Banners", Preset = Rb, AX = -3.2f, AZ = -19.6f, AH = 4.2f, BX = 3.2f, BZ = -19.6f, BH = 4.2f, Sag = 0.55f },
-            new BuntingSpan { Id = "Bunting_WestLamp", Preset = Rb, AX = -9.5f, AZ = -18.8f, AH = 2.9f, BX = -3.2f, BZ = -19.6f, BH = 4.0f, Sag = 0.45f },
-            new BuntingSpan { Id = "Bunting_EastLamp", Preset = Rb, AX = 3.2f, AZ = -19.6f, AH = 4.0f, BX = 9.5f, BZ = -18.8f, BH = 2.9f, Sag = 0.45f },
-            new BuntingSpan { Id = "Bunting_Inn", Preset = Rb, AX = 21f, AZ = -3f, AH = 4.5f, BX = 15f, BZ = -3.5f, BH = 2.9f, Sag = 0.5f },
-            new BuntingSpan { Id = "Bunting_WestLane", Preset = Rb, AX = -15f, AZ = -3f, AH = 2.9f, BX = -15f, BZ = -13f, BH = 2.9f, Sag = 0.6f },
-            new BuntingSpan { Id = "Bunting_EastLane", Preset = Rb, AX = 15f, AZ = -3.5f, AH = 2.9f, BX = 15f, BZ = -11f, BH = 2.9f, Sag = 0.5f },
+            new BuntingSpan { Id = "Bunting_Banners", Preset = Rb, AX = -3.2f, AZ = -19.6f, AH = 4.2f, BX = 3.2f, BZ = -19.6f, BH = 4.2f, Sag = 0.7f },
+            new BuntingSpan { Id = "Bunting_WestLamp", Preset = Rb, AX = -9.5f, AZ = -18.8f, AH = 2.9f, BX = -3.2f, BZ = -19.6f, BH = 4.0f, Sag = 0.6f },
+            new BuntingSpan { Id = "Bunting_EastLamp", Preset = Rb, AX = 3.2f, AZ = -19.6f, AH = 4.0f, BX = 9.5f, BZ = -18.8f, BH = 2.9f, Sag = 0.6f },
+            new BuntingSpan { Id = "Bunting_Inn", Preset = Rb, AX = 21f, AZ = -3f, AH = 4.5f, BX = 15f, BZ = -3.5f, BH = 2.9f, Sag = 0.65f },
+            new BuntingSpan { Id = "Bunting_WestLane", Preset = Rb, AX = -15f, AZ = -3f, AH = 3.1f, BX = -15f, BZ = -13f, BH = 3.1f, Sag = 0.8f },
+            new BuntingSpan { Id = "Bunting_EastLane", Preset = Rb, AX = 15f, AZ = -3.5f, AH = 3.1f, BX = 15f, BZ = -11f, BH = 3.1f, Sag = 0.7f },
             new BuntingSpan { Id = "Bunting_Torn", Preset = Ru, AX = -3.2f, AZ = -19.6f, AH = 3.6f, BX = -6.5f, BZ = -19.9f, BH = 2.7f, Sag = 0.9f, Torn = true },
         };
 

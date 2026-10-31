@@ -296,7 +296,8 @@ namespace SleepingCalamity.EditorTools
         sealed class PlantKit
         {
             readonly List<GameObject> _models = new List<GameObject>();
-            Material _mat; bool _loaded;
+            readonly List<GameObject> _ivy = new List<GameObject>();
+            Material _mat, _ivyMat; bool _loaded;
 
             void Load()
             {
@@ -310,6 +311,15 @@ namespace SleepingCalamity.EditorTools
                     _models.Add(go);
                     if (_mat == null) _mat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "CrackWeeds", foliage: true);   // the B9 folders share one atlas
                 }
+                foreach (string name in new[] { "Ivy_Patch_A", "Ivy_Patch_B" })
+                {
+                    string folder = BeautyCornerArt.FindFolder("B9", name);
+                    string fbx = folder != null ? BeautyCornerArt.FirstFbx(folder) : null;
+                    GameObject go = fbx != null ? BeautyCornerArt.LoadModel(folder, Path.GetFileName(fbx)) : null;
+                    if (go == null) continue;
+                    _ivy.Add(go);
+                    if (_ivyMat == null) _ivyMat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "IvyPatch", foliage: true);
+                }
             }
 
             // Stands r.Plants instances on the soil top of the planter or pot at root (its local frame), seeded by the row id.
@@ -318,7 +328,25 @@ namespace SleepingCalamity.EditorTools
                 if (!_loaded) Load();
                 if (_models.Count == 0 || _mat == null) return;
                 var rnd = new System.Random(r.Id.Aggregate(17, (a, c) => a * 31 + c));
-                for (int i = 0; i < r.Plants; i++)
+                // Fuller mixed planting: a lived-in planter carries 3-5 clumps (grass, herb and weed shapes) and ivy trailing down its front face.
+                int count = r.Kind == DecoKind.Planter && !r.Broken ? 3 + rnd.Next(3) : r.Plants;
+                if (r.Kind == DecoKind.Planter && !r.Broken && _ivy.Count > 0 && _ivyMat != null)
+                    for (int k = 0; k < 2; k++)
+                    {
+                        var iv = (GameObject)PrefabUtility.InstantiatePrefab(_ivy[(k + rnd.Next(2)) % _ivy.Count], root);
+                        iv.name = "Ivy_" + k;
+                        foreach (Renderer rd in iv.GetComponentsInChildren<Renderer>(true))
+                        {
+                            var mats = new Material[Mathf.Max(1, rd.sharedMaterials.Length)];
+                            for (int q = 0; q < mats.Length; q++) mats[q] = _ivyMat;
+                            rd.sharedMaterials = mats; rd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        }
+                        float sc = 0.32f + (float)rnd.NextDouble() * 0.12f;   // the patch leaves face local +Z: laid on the front face from the rim down
+                        iv.transform.localPosition = new Vector3((k == 0 ? -0.25f : 0.2f) * r.SizeX + ((float)rnd.NextDouble() - 0.5f) * 0.1f, Mathf.Max(0.02f, soilY - 0.42f * sc * 1.4f - 0.02f), r.SizeZ * 0.5f + 0.015f);
+                        iv.transform.localRotation = Quaternion.Euler(0f, ((float)rnd.NextDouble() - 0.5f) * 14f, 0f);
+                        iv.transform.localScale = Vector3.one * sc;
+                    }
+                for (int i = 0; i < count; i++)
                 {
                     GameObject model = _models[rnd.Next(_models.Count)];
                     var w = (GameObject)PrefabUtility.InstantiatePrefab(model, root);
@@ -377,6 +405,11 @@ namespace SleepingCalamity.EditorTools
             if (fbx == null) return null;
             var meshes = new Dictionary<string, Mesh>(System.StringComparer.OrdinalIgnoreCase);
             foreach (MeshFilter mf in fbx.GetComponentsInChildren<MeshFilter>(true)) if (mf.sharedMesh != null) meshes[mf.name] = mf.sharedMesh;
+            if (mat != null)   // a slight fade for the one shared bunting material
+            {
+                mat.SetColor("_BaseColor", new Color(0.92f, 0.90f, 0.86f, 1f)); mat.SetColor("_Color", new Color(0.92f, 0.90f, 0.86f, 1f));
+                EditorUtility.SetDirty(mat);
+            }
             if (!meshes.ContainsKey("Rope_1m") || !meshes.ContainsKey("Pennant_0")) { Debug.LogWarning("SC HOLLOWMERE bunting: " + found.Fbx + " lacks Rope_1m or Pennant_0 (has " + string.Join(", ", meshes.Keys) + "), using the greybox"); return null; }
             return meshes;
         }
