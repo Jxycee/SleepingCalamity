@@ -1,7 +1,7 @@
 // Builds BeautyCorner_Hollowmere (M9, docs/art/beauty-corner-brief.md, PHASE1 3.1/3.5/3.7): the half-timbered facade, dry fountain, stall and props on cobbles,
 // every piece at its brief footprint (BeautyCornerTable). Each row uses the real art when BeautyCornerArt finds it under Content/Art/Town/<Batch>/<Asset>/,
 // else a labelled greybox (PLACEHOLDER_*), so art drops in as it lands: rerun the builder (SleepingCalamity/Art/Build Beauty Corner, or ProjectBuilder.RunAll).
-// Light: PHASE1 3.5 day numbers through the LookTest A1 stack (Forward+, SSAO, 4 cascades 100 m 4096 soft High; LookTestBuilder.EnsureRendering), a 5200 K sun,
+// Light: PHASE1 3.5 day numbers through the LookTest A1 stack (Forward+, SSAO, 4 cascades 100 m 4096 soft High; BeautyCornerBuilder.RpAssetPath, a copy of the look-test assets with SSAO 1.8 / 0.3), a 5200 K sun,
 // cool sky fill, exponential haze, bloom + Neutral tonemap in BeautyCorner_Day_Profile. No volumetric package is in Packages/manifest.json, so god rays are
 // authored additive light-cone cards (the Shafts root is aligned to the sun by ApplyPreset), plus drifting pollen. Presets: Midday and LowSun.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene; materials and textures are updated in place.
@@ -20,6 +20,9 @@ namespace SleepingCalamity.EditorTools
     {
         public const string ScenePath = "Assets/_Project/Scenes/BeautyCorner_Hollowmere.unity";
         public const string ProfileName = "BeautyCorner_Day_Profile";
+        // The corner's own copy of the look-test renderer / RP asset with the stronger SSAO (1.8 / 0.3), so the LookTest scenes keep 1.2 / 0.15.
+        public const string RendererPath = LookTestBuilder.RenderingFolder + "/BeautyCorner_Renderer.asset";
+        public const string RpAssetPath = LookTestBuilder.RenderingFolder + "/BeautyCorner_RPAsset.asset";
         const string MaterialsFolder = "Assets/_Project/Content/Materials/BeautyCorner";
         const string TexturesFolder = "Assets/_Project/Content/Textures/BeautyCorner";
         public enum Preset { Midday, LowSun }
@@ -33,7 +36,8 @@ namespace SleepingCalamity.EditorTools
 
         public static void Build()
         {
-            LookTestBuilder.EnsureRendering();
+            LookTestBuilder.EnsureRendering();   // the look-test stack is the copy source of the corner's own assets (and is put back to its own numbers)
+            LookTestBuilder.EnsureRendering(RendererPath, RpAssetPath, LookTestBuilder.RendererPath, LookTestBuilder.RpAssetPath, 1.8f, 0.3f);
             LookTestBuilder.BuildMaterials();
             BuildProfile();
             BuildSupportMaterials();

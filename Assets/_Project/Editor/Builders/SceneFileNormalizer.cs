@@ -6,6 +6,9 @@
 // PrefabInstance (class 1001) documents and the stripped documents that stand in for a prefab's objects are renumbered like any other local object: the
 // instance is numbered just before the stripped transform that places it in the hierarchy (everything a scene we build contains has plain local ids; a
 // stripped id Unity derived from an asset would be negative or XOR-ed, and a scene with a negative document id is returned unchanged with a warning).
+// Walk order inside a prefab instance: the instance's added objects in their saved order (m_AddedGameObjects, m_AddedComponents), then its other stripped
+// documents (stripped GameObjects and components) by their source-object reference, then nested instances parented to it. Documents the walk cannot reach are
+// swept up in old-id order, except stripped ones, which sort by their instance's new id and source object so no stripped document depends on an old id.
 // References that carry a guid (the prefab source, modification targets) are never touched.
 // NGO derives an in-scene NetworkObject's GlobalObjectIdHash from its fileID (NetworkObject.OnValidate) and serializes it in the scene, so
 // renumbering invalidates the stored hash: BuilderUtil.SaveScene reopens a scene that has a NetworkObject, runs OnValidate and saves again
@@ -28,6 +31,9 @@ namespace SleepingCalamity.EditorTools
         static readonly Regex GameObjectRef = new Regex(@"^\s*m_GameObject: \{fileID: (-?\d+)\}");
         static readonly Regex PrefabInstanceRef = new Regex(@"^\s*m_PrefabInstance: \{fileID: (-?\d+)\}");
         static readonly Regex ComponentRef = new Regex(@"^\s*- component: \{fileID: (-?\d+)\}");
+        static readonly Regex TransformParentRef = new Regex(@"^\s*m_TransformParent: \{fileID: (-?\d+)\}");
+        static readonly Regex AddedObjectRef = new Regex(@"^\s*addedObject: \{fileID: (-?\d+)\}");
+        static readonly Regex SourceObjectRef = new Regex(@"^\s*m_CorrespondingSourceObject: (.*)$");
         static readonly Regex ListRef = new Regex(@"^\s*- \{fileID: (-?\d+)\}");
 
         sealed class Doc
@@ -90,13 +96,60 @@ namespace SleepingCalamity.EditorTools
                     foreach (string c in AllRefs(owner, ComponentRef)) Assign(c);
                 Assign(transformId);   // normally already assigned as one of the components
                 foreach (string child in ChildRefs(transform)) Walk(child);
+                string instanceId = FirstRef(transform, PrefabInstanceRef);
+                if (instanceId != null && byId.TryGetValue(instanceId, out Doc instance)) WalkInstance(instance);
+            }
+            void WalkInstance(Doc instance)
+            {
+                foreach (string added in AllRefs(instance, AddedObjectRef))
+                {
+                    if (!byId.TryGetValue(added, out Doc a)) continue;
+                    if (a.Class == "4" || a.Class == "224") { Walk(added); continue; }   // an added child object: its transform leads
+                    string owner = FirstRef(a, GameObjectRef);
+                    if (owner != null && byId.TryGetValue(owner, out Doc ownerDoc) && ownerDoc.Suffix.Length > 0) Assign(owner);   // component on a stripped GameObject
+                    Assign(added);
+                }
+                var stripped = new List<Doc>();
+                foreach (Doc d in docs) if (d.Suffix.Length > 0 && FirstRef(d, PrefabInstanceRef) == instance.Id) stripped.Add(d);
+                stripped.Sort((x, y) => string.CompareOrdinal(StrippedKey(x), StrippedKey(y)));
+                foreach (Doc d in stripped) if (d.Class != "4" && d.Class != "224") Assign(d.Id);
+                // Nested prefab instances placed under this instance's objects: their stripped transforms, in a key order independent of old ids.
+                var nested = new List<Doc>();
+                foreach (Doc d in docs)
+                    if (d.Class == "1001" && d != instance)
+                    {
+                        string parent = FirstRef(d, TransformParentRef);
+                        if (parent != null && byId.TryGetValue(parent, out Doc pd) && pd.Suffix.Length > 0 && FirstRef(pd, PrefabInstanceRef) == instance.Id) nested.Add(d);
+                    }
+                nested.Sort((x, y) => string.CompareOrdinal(string.Join("\n", x.Lines), string.Join("\n", y.Lines)));
+                foreach (Doc n in nested)
+                    foreach (Doc d in docs)
+                        if (d.Suffix.Length > 0 && (d.Class == "4" || d.Class == "224") && FirstRef(d, PrefabInstanceRef) == n.Id) { Walk(d.Id); break; }
+            }
+            string StrippedKey(Doc d)
+            {
+                string src = FirstRef(d, SourceObjectRef) ?? "";
+                return d.Class + "|" + src + "|" + FirstRef(d, GameObjectRef);
             }
             foreach (Doc d in docs)
                 if (d.Class == SceneRootsClass)
                     foreach (string root in AllRefs(d, ListRef)) Walk(root);
             var rest = new List<Doc>();
             foreach (Doc d in docs) if (!d.Fixed && !map.ContainsKey(d.Id)) rest.Add(d);
-            rest.Sort((a, b) => ulong.Parse(a.Id, CultureInfo.InvariantCulture).CompareTo(ulong.Parse(b.Id, CultureInfo.InvariantCulture)));
+            // Stripped documents the walk did not reach go last, keyed by their instance's new id and their source object; everything else in old-id order.
+            string RestKey(Doc d)
+            {
+                string inst = FirstRef(d, PrefabInstanceRef);
+                long ni = inst != null && map.TryGetValue(inst, out long m2) ? m2 : long.MaxValue;
+                return ni.ToString("D20", CultureInfo.InvariantCulture) + "|" + StrippedKey(d);
+            }
+            rest.Sort((a, b) =>
+            {
+                bool sa = a.Suffix.Length > 0, sb2 = b.Suffix.Length > 0;
+                if (sa != sb2) return sa ? 1 : -1;
+                if (sa) return string.CompareOrdinal(RestKey(a), RestKey(b));
+                return ulong.Parse(a.Id, CultureInfo.InvariantCulture).CompareTo(ulong.Parse(b.Id, CultureInfo.InvariantCulture));
+            });
             foreach (Doc d in rest) Assign(d.Id);
 
             // Rewrite references and headers, then put the renumbered documents back in id order inside the slots they occupied.

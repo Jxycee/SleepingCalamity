@@ -39,16 +39,22 @@ namespace SleepingCalamity.EditorTools
         }
 
         // --------------------------------------------------------------------------------------------- rendering stack
-        public static void EnsureRendering()
+        // The look-test stack: SSAO intensity 1.2, direct-lighting strength 0.15 (these two decide how the LookTest scenes look; the beauty corner has its own copy).
+        public static void EnsureRendering() =>
+            EnsureRendering(RendererPath, RpAssetPath, SourceRenderer, SourceRpAsset, 1.2f, 0.15f);
+
+        // The same Forward+ / SSAO / 4-cascade stack at other asset paths: each is copied from its source asset when missing, then brought to the numbers below.
+        // BeautyCornerBuilder passes its own copy of the look-test assets with a stronger SSAO, so tuning the corner never moves the LookTest scenes.
+        public static void EnsureRendering(string rendererPath, string rpAssetPath, string sourceRenderer, string sourceRp, float ssaoIntensity, float ssaoDirect)
         {
             BuilderUtil.EnsureFolder(RenderingFolder);
-            if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(RendererPath) == null)
-                if (!AssetDatabase.CopyAsset(SourceRenderer, RendererPath)) throw new System.InvalidOperationException("Cannot copy " + SourceRenderer);
-            if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(RpAssetPath) == null)
-                if (!AssetDatabase.CopyAsset(SourceRpAsset, RpAssetPath)) throw new System.InvalidOperationException("Cannot copy " + SourceRpAsset);
+            if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(rendererPath) == null)
+                if (!AssetDatabase.CopyAsset(sourceRenderer, rendererPath)) throw new System.InvalidOperationException("Cannot copy " + sourceRenderer);
+            if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(rpAssetPath) == null)
+                if (!AssetDatabase.CopyAsset(sourceRp, rpAssetPath)) throw new System.InvalidOperationException("Cannot copy " + sourceRp);
 
-            var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(RendererPath);
-            var rp = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(RpAssetPath);
+            var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(rendererPath);
+            var rp = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(rpAssetPath);
             if (renderer == null || rp == null) throw new System.InvalidOperationException("Look-test rendering assets did not load");
 
             // Renderer: Forward+, no depth priming (a decision-A1 stack), plus SSAO (depth normals, radius 0.35, low direct-lighting strength).
@@ -65,8 +71,8 @@ namespace SleepingCalamity.EditorTools
             {
                 SetInt(so, "m_Settings.Source", 1);                  // DepthNormals
                 SetFloat(so, "m_Settings.Radius", 0.35f);
-                SetFloat(so, "m_Settings.Intensity", 1.8f);
-                SetFloat(so, "m_Settings.DirectLightingStrength", 0.3f);
+                SetFloat(so, "m_Settings.Intensity", ssaoIntensity);
+                SetFloat(so, "m_Settings.DirectLightingStrength", ssaoDirect);
                 if (so.ApplyModifiedPropertiesWithoutUndo()) changed = true;
             }
             if (changed) { EditorUtility.SetDirty(renderer); EditorUtility.SetDirty(ssao); }

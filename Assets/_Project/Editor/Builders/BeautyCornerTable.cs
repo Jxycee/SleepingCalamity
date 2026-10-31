@@ -125,9 +125,18 @@ namespace SleepingCalamity.EditorTools
                 Instances = new[] { OnStall("Jug_A", 0.8f, 1.15f, 0.14f, 20f), OnStall("Jug_B", -0.7f, 1.33f, -0.09f) },   // shelf tiers 1 and 2 behind the counter (B8 header)
                 Placeholder = new[] { Cyl(0f, 0.2f, 0f, 0.24f, 0.4f, "painted_wood") } },
             // Foliage (B9)
-            new Row { Brief = Foliage, Id = "Ivy", Batch = "B9", Names = new[] { "ivy", "facade_ivy" }, Foliage = true,
+            new Row { Brief = Foliage, Id = "Ivy", Batch = "B9", Names = new[] { "ivy_facade", "ivy", "facade_ivy" }, Foliage = true,
                 Instances = new[] { At(-4f, 0f, 7.5f) },      // the facade's left 2 m (x -5..-3), ground to the eave; pivot = bottom centre of the 2 m strip
                 Placeholder = new[] { Box(0f, 1.5f, -0.04f, 2f, 3f, 0.06f, "green"), Box(0f, 4.5f, -0.5f, 2f, 3f, 0.06f, "green") } },
+            // B9 accent ivy: a cushion over the door lintel with strands draping down the face (pivot = lintel top centre, wall on the local y=0 plane, like Ivy_Facade).
+            // The door (x -1.25) is 1.4 m wide and 2.4 m high, so its lintel top sits at about 2.25..2.45; tuned against the captures.
+            new Row { Brief = Foliage, Id = "LintelIvy", Batch = "B9", Names = new[] { "lintel_ivy" }, Foliage = true,
+                Instances = new[] { At(-1.25f, 2.25f, 7.5f, 0f, 1.35f) },
+                Placeholder = new[] { Box(0f, 0.2f, -0.04f, 1.0f, 0.5f, 0.06f, "green") } },
+            // B9 wall-base grass: 1.5 m strips of low blades lapping over the plinth foot (pivot = ground centre on the wall line); the crack weeds sit partly over them.
+            new Row { Brief = Foliage, Id = "GrassStrip", Batch = "B9", Names = new[] { "grass_strip" }, Foliage = true,
+                Instances = new[] { At(-4.3f, 0f, 7.5f, 0f, 1.05f), At(-2.35f, 0f, 7.5f), At(-0.05f, 0f, 7.5f, 0f, 1.1f), At(2.0f, 0f, 7.5f, 0f, 0.95f) },
+                Placeholder = new[] { Box(0f, 0.08f, -0.1f, 1.5f, 0.16f, 0.2f, "green") } },
             new Row { Brief = Foliage, Id = "CrackWeeds", Batch = "B9", Names = new[] { "crack_weeds", "weeds", "weed", "crack_weed" }, Foliage = true, Scatter = true,
                 Instances = new[] { At(-4.4f, 0f, 7.3f), At(-3.0f, 0f, 7.35f, 40f), At(-1.9f, 0f, 7.3f, 80f), At(0.2f, 0f, 7.35f, 10f), At(1.6f, 0f, 7.3f, 120f),
                     At(2.3f, 0f, 7.3f, 60f),
