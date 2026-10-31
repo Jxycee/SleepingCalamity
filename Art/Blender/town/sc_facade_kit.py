@@ -1464,18 +1464,19 @@ def render(cam):
         print('rendered', v)
 
 VARIANT = arg('--variant')
-if VARIANT and '--views' not in argv:
-    VIEWS = ['vfront', 'vtq']
-root, obs = build(VARIANT)
-if '--export' in argv:
-    for o in bpy.context.scene.objects:
-        o.select_set(o.name.startswith('Kit_') or o == root)
-    bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, (VARIANT or 'FacadeKit') + '.fbx'), use_selection=True, axis_forward='-Z',
-                             axis_up='Y', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
-                             mesh_smooth_type='FACE', add_leaf_bones=False,
-                             colors_type='LINEAR')   # 'wear' is a linear mask; the default SRGB would gamma-encode it
-if '--no-render' not in argv:
-    cam = review_scene(root, variant=bool(VARIANT))
-    if '--blend' in argv:
-        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'facade.blend'))
-    render(cam)
+if __name__ == '__main__':   # importable: sc_bell_tower.py reuses the kit helpers
+    if VARIANT and '--views' not in argv:
+        VIEWS = ['vfront', 'vtq']
+    root, obs = build(VARIANT)
+    if '--export' in argv:
+        for o in bpy.context.scene.objects:
+            o.select_set(o.name.startswith('Kit_') or o == root)
+        bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, (VARIANT or 'FacadeKit') + '.fbx'), use_selection=True, axis_forward='-Z',
+                                 axis_up='Y', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
+                                 mesh_smooth_type='FACE', add_leaf_bones=False,
+                                 colors_type='LINEAR')   # 'wear' is a linear mask; the default SRGB would gamma-encode it
+    if '--no-render' not in argv:
+        cam = review_scene(root, variant=bool(VARIANT))
+        if '--blend' in argv:
+            bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'facade.blend'))
+        render(cam)
