@@ -168,7 +168,7 @@ namespace SleepingCalamity.EditorTools
             new Row { Brief = Neighbours, Id = "NEIGHBOUR_Backdrop", Batch = "B4", Names = new string[0], ArtYaw = 180f,
                 Instances = BackdropHouses(),
                 Placeholder = new[] { Box(0f, 2.2f, 3f, 6.6f, 4.4f, 6f, "plaster"), Box(0f, 5.0f, 3f, 7.4f, 0.25f, 6.6f, "roof_tile") } },
-            // B4 BellTower (sc_bell_tower.py, T2 on the shared tileables, NeighbourLooks-style slots in BeautyCornerArt.BuildTowerMaterials): pivot = bottom centre of the shaft,
+            // B4 BellTower (sc_bell_tower.py, T2 on the shared tileables, facade slots plus its own BT_* in BeautyCornerArt.BuildTowerMaterials): pivot = bottom centre of the shaft,
             // front (clock face) toward local +Z like the kit, so ArtYaw 180. Where the round-2 greybox tower stood, seen behind the facade chimney in the wide shot.
             new Row { Brief = Neighbours, Id = "NEIGHBOUR_Church", Batch = "B4", Names = new string[0], ArtYaw = 180f,
                 Instances = new[] { new Instance(-3f, 0f, 20.2f, 0f, 1f, BeautyCornerArt.TowerFolder) },

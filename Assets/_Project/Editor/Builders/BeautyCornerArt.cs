@@ -210,10 +210,10 @@ namespace SleepingCalamity.EditorTools
         }
 
         // The B4 bell tower (BellTower/, sc_bell_tower.py) reuses the facade slots plus three of its own: grey rubble and the clock face are tinted B1 tileables
-        // (the generator's tints); the bronze is the iron tileable lifted well past the generator's (2.1, 1.5, 0.75) so the bell reads warm at the far-row distance.
+        // (the generator's tints); the bronze is a flat warm colour, brighter than the generator's iron x (2.1, 1.5, 0.75) (about (0.17, 0.10, 0.05)), so the bell
+        // reads warm at the far-row distance. Flat like FK_Glass: a raw HDR tint on the iron tileable wrote different _Color bytes with and without graphics.
         public const string TowerFolder = "BellTower";
         public static bool IsTower(string folderName) => string.Equals(folderName, TowerFolder, System.StringComparison.OrdinalIgnoreCase);
-        static readonly Vector4 BronzeTint = new Vector4(6.8f, 5.4f, 2.6f, 1f);   // raw linear x iron albedo (mean 0.08) -> about (0.55, 0.36, 0.16)
 
         public static Dictionary<string, Material> BuildTowerMaterials()
         {
@@ -233,10 +233,7 @@ namespace SleepingCalamity.EditorTools
             }
             map["BT_Rubble"] = Tinted("BT_Rubble", "sandstone", new Color(0.62f, 0.60f, 0.57f), 1.4f);   // grey so the pale quoins read
             map["BT_ClockFace"] = Tinted("BT_ClockFace", "plaster", new Color(0.96f, 0.93f, 0.86f), 0.4f);
-            Material bronze = Tinted("BT_Bronze", "iron", Color.white, 1f);
-            bronze.SetVector("_BaseColor", BronzeTint); bronze.SetVector("_Color", BronzeTint);   // raw linear, SetVector skips the colour-space conversion (as the paint colour)
-            EditorUtility.SetDirty(bronze);
-            map["BT_Bronze"] = bronze;
+            map["BT_Bronze"] = Flat("BT_Bronze", new Color(0.55f, 0.36f, 0.16f), 0.45f, wear);
             AssetDatabase.SaveAssets();
             return map;
         }
