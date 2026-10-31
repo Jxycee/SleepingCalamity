@@ -1,10 +1,10 @@
 State: IN PROGRESS
 Session: Q10. Lake shore, stream and ravine
-Progress: 45%
-Sheet: Reference/hollowmere/lake/SHEET_lakeshore_r1.jpg
+Progress: 60%
+Sheet: Reference/hollowmere/lake/SHEET_water_r1.jpg
 Blocker: none
 
-Score: shore set (Blender) 29/40 self, controller agrees ~29; water not scored yet (no capture)
+Score: shore set (Blender) 29/40 self, controller agrees ~29; water r1 in Unity 21.5/40 (silhouette 3, proportion 3, form 2.5, surface 2.5, colour 2.5, story 2, set fit 3, liquid 3): the W1 fall is a white slab, normal speckle, pools too teal, no dressing yet. Coordinator: shore set ~28/40 APPROVED
 Tris: LakeShore.fbx 11,118 (6 rocks 330-880, 3 reed clumps 560-732, jetty 5,650)
 SC RESULT: -
 Merge commit: -
@@ -41,3 +41,7 @@ Log:
 - Resumed after the usage pause: compile + capture loop (Sonnet), then the shore-art generator (Sonnet).
 - 63af216: sc_lakeshore.py + LakeShore.fbx (rocks, reeds, jetty; baked PBR, CC0/own) + SHEET_lakeshore_r1.jpg. Next: water compile/capture, then place the set.
 - 18:00 UTC: pushes are current (db85588: water compile fixes + generated meshes). Water agent capturing the lake cameras; next a fresh Sonnet agent places the shore set. Note for merge: M_HM_WaterSurface.mat came from a graphics run; regenerate it and the scene with a -nographics build before the check (session-usage rule).
+- Compile: SC RESULT compile PASS (9c3fcd4). Round-1 capture (pre-Q12 look, 5 lake cams): water works (refraction, depth colour, reflection, glint, clean bank edges, pools and weirs read); capture hit the 60 min timeout before LowSun Rebuilt.
+- c3f1149: merged origin/main (Q12 look) as the coordinator asked; clean.
+- Round 2 running (fresh Sonnet agent): place LakeShore.fbx (jetty, reeds, shore stones, weir boulders), fall foam as streaks, no foam sheet on flat ground, calmer pool colour; reduced capture (LakeJetty, Ravine, Mill).
+- Worktree note: subagents run in this checkout, not their own worktree: a fresh worktree would re-import the whole Unity Library on the cloud box (hours).
