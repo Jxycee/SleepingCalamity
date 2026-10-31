@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 60%
-Sheet: none (top-down plan: Reference/hollowmere/square/ground_plan_r1.png)
+Progress: 75%
+Sheet: Reference/hollowmere/square/props_sheet_r1.jpg (props beside the approved corner; square captures next)
 Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test and the art finish+export are running on Sonnet agents)
 
 ## Done
@@ -31,3 +31,8 @@ Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test 
 ## Unity (fc56874)
 - Compile PASS, build PASS, test-edit 598/598 PASS. The square ground follows the layout heights: a 0.5 m correction grid on the spawner, a draped bed copy, residual 0.009 m, 0.000 m inside the corner rect. Spawn: square 35,749 setts in 5.2 s, corner 6,967 in 0.35-0.53 s.
 - Decorations: 58 rows. Validate (path graph with 0.25 m clearance, stalls with a 0.4 m margin, lots, landmarks, corner rect) is empty. Waiting for the dressing art export, then captures, check and merge.
+
+## Dressing art (bf9749f)
+All 11 exported: Bench_A 614 tris, Bench_Broken 1,676, Planter_A 6,000, Planter_B 5,999, Planter_Broken 5,700, Pot_Clay 2,905 (placed at 1.5x scale), Pot_Broken 4,127, LanternPost_A 1,830 (carries the B8 lantern), LanternPost_Broken 1,724, Bunting 2,732 (6 pennants + rope, composed along a catenary), Drain_A 895.
+My props-sheet score: about 26/40. Weak spots: the bench reads as a low settle, the planters have no straps, a pale liner shows at the soil edge.
+Next: rebuild with the art, captures in both presets, check.
