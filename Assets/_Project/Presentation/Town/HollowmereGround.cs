@@ -1,7 +1,7 @@
 // Authority: none (presentation only). The Hollowmere greybox ground: a height-field mesh built from Core's HollowmereLayout.Ground (hill, keep terrace,
 // lake basin, every lot and landmark pad flattened) when the component is enabled, so the scene file holds only the grid settings (no embedded mesh).
 // Three submeshes: meadow, lane (within a lane's half width of its spine) and paving (the square and the keep terrace top). Runs in the editor too
-// (ExecuteAlways) so captures taken from a loaded scene see it. HollowmereBuilder adds it.
+// (ExecuteAlways) so captures taken from a loaded scene see it; the collider is added in play mode only. HollowmereBuilder adds it.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using UnityEngine;
@@ -26,7 +26,7 @@ namespace SleepingCalamity.Presentation
             Rebuild();
         }
 
-        void OnEnable() => Rebuild();
+        void OnEnable() { if (_mesh == null) Rebuild(); }   // once per load: the mesh is not saved (HideAndDontSave), Configure forces a rebuild
 
         void OnDestroy()
         {
@@ -41,7 +41,7 @@ namespace SleepingCalamity.Presentation
             _mesh.hideFlags = HideFlags.HideAndDontSave;
             GetComponent<MeshFilter>().sharedMesh = _mesh;
             var mc = GetComponent<MeshCollider>();
-            if (m_Collider) { if (mc == null) mc = gameObject.AddComponent<MeshCollider>(); mc.sharedMesh = _mesh; }
+            if (m_Collider && Application.isPlaying) { if (mc == null) mc = gameObject.AddComponent<MeshCollider>(); mc.sharedMesh = _mesh; }   // play only: edit mode never adds components to the scene
         }
 
         public enum Surface { Meadow = 0, Lane = 1, Paving = 2 }

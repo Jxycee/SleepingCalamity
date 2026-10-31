@@ -317,12 +317,13 @@ namespace SleepingCalamity.EditorTools
         static void Building(Transform g, Foundation f, HollowmereLayout.BuildingKind kind)
         {
             float max = Foundation.MaxBuilding(f.Size);
-            float w = max * (kind == HollowmereLayout.BuildingKind.Home ? 0.82f + 0.16f * Rand(f.Id, 1) : 0.95f);
-            float d = max * (kind == HollowmereLayout.BuildingKind.Home ? 0.72f + 0.22f * Rand(f.Id, 2) : 0.82f);
+            // Bakery and inn leave room inside the body limit for their oven bay (side) and porch (front).
+            float w = max * (kind == HollowmereLayout.BuildingKind.Home ? 0.82f + 0.16f * Rand(f.Id, 1) : kind == HollowmereLayout.BuildingKind.Bakery ? 0.74f : 0.95f);
+            float d = max * (kind == HollowmereLayout.BuildingKind.Home ? 0.72f + 0.22f * Rand(f.Id, 2) : kind == HollowmereLayout.BuildingKind.Inn ? 0.61f : 0.82f);
             float eave = (f.Size == FoundationSize.S ? 3.6f : f.Size == FoundationSize.M ? 5.6f : 6.2f) + 0.8f * Rand(f.Id, 3);
             if (kind == HollowmereLayout.BuildingKind.Inn) eave = 8.4f;
             float pitch = 36f + 10f * Rand(f.Id, 4);
-            float zc = -(max - d) * 0.35f;   // the block sits toward the door side; the yard is behind it
+            float zc = kind == HollowmereLayout.BuildingKind.Inn ? max * 0.5f - d * 0.5f : -(max - d) * 0.35f;   // the block sits toward the door side, the yard behind it; the inn sits back behind its porch
             const float plinth = 0.55f;
             Material plaster = LookTestBuilder.Mat("plaster"), roof = LookTestBuilder.Mat("roof_tile"), stone = LookTestBuilder.Mat("sandstone"), wood = LookTestBuilder.Mat("painted_wood"), oak = LookTestBuilder.Mat("oak_timber");
 
@@ -345,7 +346,7 @@ namespace SleepingCalamity.EditorTools
                 if (w > 5f) LookTestBuilder.Box(g, "Shutter" + k, new Vector3(k * w * 0.3f, 0.25f + plinth + 1.5f, front - 0.05f), new Vector3(0.9f, 1.1f, 0.1f), wood, default, 2f);
             if (kind == HollowmereLayout.BuildingKind.Bakery)
             {
-                LookTestBuilder.Box(g, "OvenBay", new Vector3(w * 0.5f + 0.6f, 0.25f + 1.4f, zc + d * 0.15f), new Vector3(1.4f, 2.8f, 2.6f), stone, default, 2f);
+                LookTestBuilder.Box(g, "OvenBay", new Vector3(w * 0.5f + 0.6f, 0.25f + 1.4f, zc + d * 0.15f), new Vector3(1.2f, 2.8f, 2.6f), stone, default, 2f);
                 LookTestBuilder.Box(g, "Chimney", new Vector3(w * 0.32f, 0.25f + eave + rise + 0.6f, zc + d * 0.2f), new Vector3(1.0f, 2.6f, 1.0f), stone, default, 2f);
             }
             if (kind == HollowmereLayout.BuildingKind.Inn)
@@ -380,7 +381,7 @@ namespace SleepingCalamity.EditorTools
                     break;   // the corner's DryFountain row (B10) stands at the origin in both presets
                 case LandmarkKind.Stall:
                     if (rebuilt && l.Id == "Stall_1") break;   // the corner's MarketStall row
-                    if (rebuilt) { StallArt(g, l); break; }
+                    if (rebuilt) { StallArt(g); break; }
                     // Ruined: a bare frame, counter and corner posts, no awning (design 3).
                     LookTestBuilder.Box(g, "Counter", new Vector3(0f, 0.45f, 0.45f), new Vector3(2.6f, 0.9f, 0.7f), wood, default, 2f);
                     foreach (float x in new[] { -1.25f, 1.25f }) foreach (float z in new[] { -0.75f, 0.7f })
@@ -469,7 +470,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Stalls 2 and 3 reuse the B8 MarketStall row's art (or its greybox) at their own place and turn.
-        static void StallArt(Transform g, Landmark l)
+        static void StallArt(Transform g)
         {
             BeautyCornerTable.Row src = BeautyCornerTable.Rows.First(r => r.Id == "MarketStall");
             var row = new BeautyCornerTable.Row
@@ -481,8 +482,8 @@ namespace SleepingCalamity.EditorTools
         }
 
         // --------------------------------------------------------------------------------------------- path graph (editor-only gizmo data)
-        // The graph as an inactive child of line renderers would bloat the scene; instead keep a small marker per lane node so the graph shows in the hierarchy.
-        // The graph itself lives in Core (HollowmereLayout) and the approval map draws it.
+        // An inactive empty per doorstep, door and stair node, so M6 work can find them in the hierarchy; the full graph lives in Core (HollowmereLayout)
+        // and the approval map draws it.
         static void BuildPathDebug(Transform root, TownLayout t)
         {
             Transform dbg = Child(root, "PathGraph (markers, hidden)");
