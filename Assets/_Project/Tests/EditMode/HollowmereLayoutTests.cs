@@ -195,6 +195,22 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsTrue(t.Landmark("BellTower").Footprint.Centre.Z > HollowmereLayout.SquareMaxZ, "the bell tower is on the north side");
         }
 
+        [Test]
+        public void KeepHall_StandsOnTheTerrace_AndItsDoorIsReachableFromTheSquare()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            Landmark hall = t.Landmark("KeepHall");
+            Assert.IsNotNull(hall, "KeepHall landmark");
+            Assert.AreEqual(LandmarkKind.KeepHall, hall.Kind);
+            Assert.AreEqual(HollowmereLayout.KeepHeight, hall.Y, 1e-4f, "on the terrace");
+            Assert.AreEqual("KeepHall_Door", hall.DoorNode);
+            PathNode door = t.Node(hall.DoorNode);
+            Assert.IsNotNull(door);
+            Assert.AreEqual(HollowmereLayout.KeepHeight, door.Y, 1e-4f);
+            Assert.IsFalse(hall.Footprint.Contains(door.Pos), "the door node is outside the footprint");
+            Assert.IsTrue(t.ReachableFrom(t.RootNode).Contains(door.Id), "door reachable from the square");
+        }
+
         // ------------------------------------------------------------------------------------------------ the validator on broken layouts
         static TownLayout Tiny()
         {
