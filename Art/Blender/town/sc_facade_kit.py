@@ -27,11 +27,16 @@ posts 18-22 cm real -> 26-30 cm here, panels ~0.8-1.4 m), PHASE1 3.1 palette, 3.
 
 Axes (Blender): z up, front -Y, metres. Origin = bottom centre of the ground-storey plaster line (front face of the
 plaster at y 0, plinth stands 6 cm proud). Width x -3.75..3.75, depth y 0..7.0 (upper storey front at y -0.45),
-eave (wall plate) 6.0 m, ridge 9.6 m (sags 22 cm at mid), chimney top about 11.1 m; lean-to on the +X end. Unity placement (brief 1):
+eave (wall plate) 6.0 m, ridge 9.6 m (sags 22 cm at mid), chimney top about 11.1 m; lean-to on the -X end. Unity placement (brief 1):
 local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transforms applied.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_facade_kit.py -- --out <scratch>
       [--views wide,mid,close,tq] [--rres 960] [--samples 48] [--no-render] [--export] [--blend]
+      [--variant NEIGHBOUR_Left|NEIGHBOUR_Right|INFILL_Narrow]   a neighbour from the same kit (VARIANTS table:
+      width, storeys, bays, window bays, eave or gable front, roof rise, lean, plaster tint, shutter paint); plaza
+      front detailed, sides/back/rear gable plain; renders vfront + vtq; --export writes <out>/<variant>.fbx.
+      Shutter/door paint on variants = greyscale(painted_wood albedo) x paint colour / 0.17 (linear), so the URP
+      shader needs the same paint mode or a baked albedo.
   --export writes <out>/FacadeKit.fbx (cloud sessions commit only this generator; the PC exports to
   Assets/_Project/Content/Art/Town/B4/Facade/Facade.fbx, see SOURCES.md there). Renders go to <out>/facade_<view>.png. Review cameras are the
   brief's capture cameras (Unity (x,y,z) -> Blender (x,z,y)), vertical FOV 46/42/38 as LookTestBuilder.
@@ -39,7 +44,24 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
 plus the plinth and step (chosen at placement).
 
-Status (2026-10-30, cloud): review 28.5/40 at round 10 (calibrated rubric, brief 3). First review 26/40 (round 6);
+Status (2026-10-31, cloud): variants v1: NEIGHBOUR_Left (7.5 m, 3 storeys, eave 8.8 m, ochre, 36.8k tris),
+NEIGHBOUR_Right (8 m, 2 storeys, gable to the plaza, eave 5.8 m, oxblood, 30.4k), INFILL_Narrow (4.5 m, 3 storeys,
+blue-green, 22.4k); facing check clean from their cameras; window reveal head and right jamb now face the opening;
+lock-plate degenerates fixed (audit clean).
+Round 14 (Unity batch 3): every timber member was wound inside-out (a mirrored
+placement frame), so Unity culled the frame's outside and showed only the jetty; fixed in add_box, plus the rolled
+eave and lean-to winding, two-sided ridge tiles and eave lip, closed roof verges, a back-slope underside, a dark
+interior liner and a ledged door back (no sky through gaps). Ray-cast facing check from the four cameras: 0-3%
+back-face hits (grazing edges only). Lean-to moved to the -X end (wide camera).
+Round 13: upper windows 1.15 x 1.25 m clear with bigger shutters (Eguisheim ref
+proportion). Self-review 30.5/40 (silhouette 4, proportion 4, form 4, surface 3.5, colour 4, wear 3.5, set 3.5,
+glass/metal 3.5); target 31.
+Round 12 (TotK study): plinth is two courses of a few big pillowy stones over a dark
+recessed joint core, shade-damp band under the deep eave, ragged lifted eave course. Self-review 30/40.
+Round 11 from the Unity corner review: plaster smooth-shaded and welded (the flat
+cells showed as dotted vertical seams in Unity), grime up to ~0.85 at the foot and a sheltered band under the jetty,
+timbers 7 cm proud and a shade darker (OAK_TINT) so the frame reads at the wide camera. Self-review 29.5/40.
+Earlier: review 28.5/40 at round 10 (calibrated rubric, brief 3). First review 26/40 (round 6);
 target 31 not reached after the 4-round limit: r7 +1 (plaster, flower box), r8 +0.5 (lean, kick, edge grime), r9 +1
 (heavy roof cap with rolled eave, deep-set windows, lean-to woodshed), r10 ~0 (lime patches, paint chips, bleached
 timber tops: too subtle at camera distance). About 31k tris, audit PASS (8 tiny degenerate faces in the hinge curls).
@@ -64,6 +86,10 @@ SEED = 0xB4
 TILE = 2.0                      # metres per tileable repeat (2K at 1024 px/m)
 SHUTTER_TINT = (0.57, 0.73, 0.28)  # painted_wood (#627b85) -> faded sage-forest green, about #4a6a48 (brief 0)
 DOOR_TINT = (0.50, 0.66, 0.25)     # the door a shade deeper green
+OAK_TINT = (0.80, 0.76, 0.72)      # a shade darker than the tileable: the frame reads at the wide camera
+PLASTER_TINT = (1.0, 1.0, 1.0)
+SHUTTER_PAINT = DOOR_PAINT = None  # hero: tinted scan; variants: linear paint colour (see VARIANTS)
+PAINT_LUM = 0.17                   # mean linear luminance of the painted_wood albedo
 DECAL_OPACITY = {'drip': 0.35, 'crack': 0.9, 'moss': 1.0}
 
 # ----------------------------------------------------------------------------- dimensions (metres)
@@ -71,7 +97,7 @@ W = 3.75                         # half width of the front
 DEPTH = 7.0
 PLINTH = 0.60
 TIM = 0.28                       # post / rail section (1.4x real)
-PROUD = 0.04                     # timber face stands this far in front of the plaster
+PROUD = 0.07                     # timber face stands this far in front of the plaster (deep relief, Unity review r10)
 GIRT0, GIRT1 = 2.80, 3.06        # ground-storey head beam
 JETTY = 0.45
 JOIST0, JOIST1 = 3.06, 3.28
@@ -83,8 +109,8 @@ OVER_EAVE, OVER_VERGE = 0.85, 0.55
 CHIM_TOP = 10.9
 DOOR = (-0.68, 0.42, 0.16, 2.36)   # x0, x1, z0 (threshold top), z1: 1.10 x 2.20 clear
 GWIN = (1.35, 2.65, 1.33, 2.25)    # ground window clear opening
-UWIN = [(-2.41, -1.49), (0.89, 1.81)]
-UWIN_Z = (4.21, 5.30)
+UWIN = [(-2.55, -1.40), (0.78, 1.93)]   # 1.15 m clear: shutters read as big as the Eguisheim refs
+UWIN_Z = (4.12, 5.37)
 YU = -JETTY                      # upper storey plaster plane
 
 def rng(stream):
@@ -98,7 +124,7 @@ def _img(path, non_color):
         im.colorspace_settings.name = 'Non-Color'
     return im
 
-def tile_mat(name, folder, stem=None, tint=(1, 1, 1), rough_add=0.0, normal=1.0):
+def tile_mat(name, folder, stem=None, tint=(1, 1, 1), rough_add=0.0, normal=1.0, paint=None):
     if name in MATS:
         return MATS[name]
     stem = stem or folder.split('/')[-1]
@@ -116,7 +142,11 @@ def tile_mat(name, folder, stem=None, tint=(1, 1, 1), rough_add=0.0, normal=1.0)
     sep = N.new('ShaderNodeSeparateColor'); L.new(col.outputs[0], sep.inputs[0])
     tin = N.new('ShaderNodeMix'); tin.data_type = 'RGBA'; tin.blend_type = 'MULTIPLY'
     tin.inputs[0].default_value = 1.0; tin.inputs[7].default_value = (*tint, 1)
-    L.new(alb.outputs[0], tin.inputs[6])
+    if paint:   # paint mode: greyscale of the scan x a paint colour (variants: ochre, oxblood, blue-green)
+        bw = N.new('ShaderNodeRGBToBW'); L.new(alb.outputs[0], bw.inputs[0]); L.new(bw.outputs[0], tin.inputs[6])
+        tin.inputs[7].default_value = (*[c / PAINT_LUM for c in paint], 1)
+    else:
+        L.new(alb.outputs[0], tin.inputs[6])
     # R: grime / soot -> darker, warm-grey
     gri = N.new('ShaderNodeMix'); gri.data_type = 'RGBA'; gri.blend_type = 'MIX'
     gri.inputs[7].default_value = (0.055, 0.045, 0.036, 1)
@@ -193,14 +223,15 @@ def decal_mat(stem):
 
 def M(key):
     return {
-        'plaster': lambda: tile_mat('FK_Plaster', 'B1_town/plaster', normal=0.55),
-        'oak': lambda: tile_mat('FK_Oak', 'B1_town/oak_timber', normal=1.2),
+        'plaster': lambda: tile_mat('FK_Plaster', 'B1_town/plaster', tint=PLASTER_TINT, normal=0.55),
+        'oak': lambda: tile_mat('FK_Oak', 'B1_town/oak_timber', tint=OAK_TINT, normal=1.2),
         'oak_lt': lambda: tile_mat('FK_OakDoor', 'B1_town/oak_timber', tint=(1.35, 1.25, 1.15)),
         'stone': lambda: tile_mat('FK_Sandstone', 'B1_town/sandstone'),
+        'mortar': lambda: tile_mat('FK_PlinthJoint', 'B1_town/sandstone', tint=(0.30, 0.28, 0.24)),
         'stone_dk': lambda: tile_mat('FK_ChimneyStone', 'B1_town/sandstone', tint=(0.80, 0.74, 0.68)),
         'roof': lambda: tile_mat('FK_RoofTile', 'B1_town/roof_tile', normal=1.3),
-        'shutter': lambda: tile_mat('FK_Shutter', 'B1_town/painted_wood', tint=SHUTTER_TINT),
-        'door': lambda: tile_mat('FK_DoorPaint', 'B1_town/painted_wood', tint=DOOR_TINT),
+        'shutter': lambda: tile_mat('FK_Shutter', 'B1_town/painted_wood', tint=SHUTTER_TINT, paint=SHUTTER_PAINT),
+        'door': lambda: tile_mat('FK_DoorPaint', 'B1_town/painted_wood', tint=DOOR_TINT, paint=DOOR_PAINT),
         'iron': lambda: tile_mat('FK_Iron', 'B1_town/iron'),
         'glass': glass_mat,
         'leaf': lambda: flat_mat('FK_Leaf', (0.07, 0.13, 0.025), 0.6),     # placeholder until B9 swaps in its foliage
@@ -237,7 +268,7 @@ def _uv_project(faces, uvl, to_local, long_axis=None, off=(0.0, 0.0), grain_u=Fa
             uu, vv = (p[vax], p[uax]) if grain_u and long_axis is not None else (p[uax], p[vax])
             l[uvl].uv = (uu / TILE + off[0], vv / TILE + off[1])
 
-def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_world=False, bend=None, wob=0.0,
+def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_world=False, bend=None, wob=0.0, segs=1,
             seed=0.0, off=None):
     """Chamfered box of `size` centred at the local origin, then placed by matrix `xf`.
     cuts subdivide each axis (for bends); bend(p_local) -> offset applied before placing."""
@@ -255,7 +286,7 @@ def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_wor
                 bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no)
     if cham > 0:
         edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0) > 0.5]
-        bmesh.ops.bevel(bm, geom=edges, offset=cham, segments=1, affect='EDGES', profile=0.5)
+        bmesh.ops.bevel(bm, geom=edges, offset=cham, segments=segs, affect='EDGES', profile=0.5)
     if bend or wob:
         for v in bm.verts:
             d = bend(v.co.copy()) if bend else Vector()
@@ -266,6 +297,8 @@ def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_wor
     bm.normal_update()
     uvl = bm.loops.layers.uv.new('UVMap')
     o = off if off is not None else (rng('uv%f' % seed).random(), rng('uvv%f' % seed).random())
+    if xf.to_3x3().determinant() < 0:   # a mirrored placement frame flips the winding: Unity would cull the outside
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     if uv_world:  # stone: project in world space after placing so courses line up across pieces
         bm.transform(xf); bm.normal_update()
         _uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0, 0))
@@ -321,6 +354,19 @@ def member(pc, mat, a, b, w, d, cham=0.025, name='m', sag=0.0, wob=0.006, extend
         return Vector((sag * (1 - t * t), 0, 0))
     add_box(pc, mat, (w, d, L), xf, cham=cham, cuts=(0, 0, cuts), long_axis=2, bend=bend2 if sag else None,
             wob=wob, seed=R.random() * 100)
+
+def two_sided(bm, inset=0.006):
+    """Thin shells (ridge tiles, the rolled eave) get a reversed inner copy: Unity culls back faces."""
+    bm.normal_update()
+    src = bm.faces[:]
+    uvl = bm.loops.layers.uv.active
+    for f in src:
+        vs = [bm.verts.new(v.co - f.normal * inset) for v in reversed(f.verts)]
+        nf = bm.faces.new(vs)
+        if uvl:
+            for l, ol in zip(nf.loops, reversed(f.loops)):
+                l[uvl].uv = ol[uvl].uv
+    bm.normal_update()
 
 def quad_grid(pc, mat, corners, nu, nv, push=None, uv_fn=None):
     """Bilinear grid patch from 4 corners (p00, p10, p11, p01). push(p) -> displaced point."""
@@ -378,15 +424,42 @@ def wall_panel(pc, mat, plane, x0, x1, z0, z1, holes=(), bulge=0.012, cell=0.125
     _merge(pc, bm, mat)
 
 # ----------------------------------------------------------------------------- kit pieces
+def plinth_run(pc, a, b, face, seed):
+    """Two courses of big chamfered stones along one plinth face, joints broken, each stone its own size and tilt."""
+    R = rng('plinth%s%f' % (face, seed))
+    zc = [(0.0, 0.31), (0.31, PLINTH)]
+    for ci, (z0, z1) in enumerate(zc):
+        x = a + (R.uniform(0.1, 0.35) if ci else 0.0)
+        while x < b - 0.05:
+            ln = min(R.uniform(0.55, 0.95), b - x)
+            if b - (x + ln) < 0.25:
+                ln = b - x
+            g = 0.035                                     # deep joint
+            h = z1 - z0 - g; dpt = 0.40 + R.uniform(-0.02, 0.03)
+            cz = z0 + g / 2 + h / 2
+            proud = R.uniform(0.0, 0.025)
+            if face == 'front':
+                xf = Matrix.Translation((x + ln / 2, 0.14 - proud, cz))
+                size = (ln - g, dpt, h)
+            else:
+                xf = Matrix.Translation((W - 0.14 + proud, x + ln / 2, cz))
+                size = (dpt, ln - g, h)
+            xf = xf @ Matrix.Rotation(math.radians(R.uniform(-1.2, 1.2)), 4, 'Y' if face == 'front' else 'X')
+            add_box(pc, 'stone', size, xf, cham=0.05, segs=2, cuts=(1, 0, 0) if face == 'front' else (0, 1, 0),
+                    uv_world=True, wob=0.012, seed=R.random() * 90)
+            x += ln
+
 def kit_plinth():
     pc = Piece('Kit_Plinth')
     xd0, xd1 = DOOR[0] - TIM, DOOR[1] + TIM
-    for (a, b) in ((-W - 0.06, xd0), (xd1, W + 0.06)):
-        add_box(pc, 'stone', (b - a, 0.40, PLINTH), Matrix.Translation(((a + b) / 2, 0.14, PLINTH / 2)),
-                cham=0.035, cuts=(int((b - a) / 0.5), 0, 0), uv_world=True, wob=0.008, seed=a)
-    # left return (+X) plinth, full depth
-    add_box(pc, 'stone', (0.40, DEPTH + 0.06, PLINTH), Matrix.Translation((W - 0.14, DEPTH / 2 - 0.03, PLINTH / 2)),
-            cham=0.035, cuts=(0, int(DEPTH / 0.5), 0), uv_world=True, wob=0.008, seed=7.0)
+    # a dark mortar core, recessed, then two courses of a few big pillowy stones laid over it (TotK study, brief 5)
+    for (a, b) in ((-W - 0.02, xd0), (xd1, W + 0.02)):
+        add_box(pc, 'mortar', (b - a, 0.36, PLINTH - 0.02), Matrix.Translation(((a + b) / 2, 0.16, (PLINTH - 0.02) / 2)),
+                cham=0.0, uv_world=True)
+        plinth_run(pc, a, b, 'front', seed=a)
+    add_box(pc, 'mortar', (0.36, DEPTH, PLINTH - 0.02), Matrix.Translation((W - 0.16, DEPTH / 2, (PLINTH - 0.02) / 2)),
+            cham=0.0, uv_world=True)
+    plinth_run(pc, -0.02, DEPTH + 0.02, 'side', seed=7.0)
     # worn threshold step, dished in the middle where feet go
     def dish(p):
         u = max(0.0, 1 - (p.x / 0.55) ** 2); v = max(0.0, 1 - ((p.y + 0.05) / 0.3) ** 2)
@@ -528,6 +601,9 @@ def kit_panels():
         ha = half * (1 - (za - PLATE1) / (RIDGE - 0.2 - PLATE1)); hb = half * (1 - (zb - PLATE1) / (RIDGE - 0.2 - PLATE1))
         quad_grid(pc, 'plaster', [(W, yc - ha, za), (W, yc + ha, za), (W, yc + hb, zb), (W, yc - hb, zb)],
                   max(1, int(2 * ha / 0.5)), 1, push=gpush, uv_fn=lambda c: (c.y / TILE, c.z / TILE))
+    # dark interior liner just inside the front walls: anything seen through a gap lands on a front face
+    quad_grid(pc, 'plaster', [(-W, 0.45, 0.0), (W, 0.45, 0.0), (W, 0.45, PLATE1), (-W, 0.45, PLATE1)], 1, 1,
+              uv_fn=lambda c: (c.x / TILE, c.z / TILE))
     # plain planes: back wall and right end (-X), unseen by the cameras
     quad_grid(pc, 'plaster', [(W, DEPTH, 0.0), (-W, DEPTH, 0.0), (-W, DEPTH, PLATE1), (W, DEPTH, PLATE1)], 1, 1,
               uv_fn=lambda c: (c.x / TILE, c.z / TILE))
@@ -558,10 +634,12 @@ def window(pc, plane, x0, x1, z0, z1, k, sill_out=0.10):
     quad_grid(pc, 'glass', [(x0, gy, z0), (x1, gy, z0), (x1, gy, z1), (x0, gy, z1)], 1, 1,
               uv_fn=lambda c: (c.x, c.z))
     # reveals (plaster-free inner jamb in oak so the opening never shows the interior)
-    for (a, b, dz) in ((x0, x0, 0), (x1, x1, 0)):
-        quad_grid(pc, 'oak', [(a, plane, z0), (a, gy, z0), (a, gy, z1), (a, plane, z1)], 1, 1,
-                  uv_fn=lambda c: (c.y / TILE, c.z / TILE))
-    quad_grid(pc, 'oak', [(x0, plane, z1), (x1, plane, z1), (x1, gy, z1), (x0, gy, z1)], 1, 1,
+    # (each jamb and the head face into the opening)
+    quad_grid(pc, 'oak', [(x0, plane, z0), (x0, gy, z0), (x0, gy, z1), (x0, plane, z1)], 1, 1,
+              uv_fn=lambda c: (c.y / TILE, c.z / TILE))
+    quad_grid(pc, 'oak', [(x1, gy, z0), (x1, plane, z0), (x1, plane, z1), (x1, gy, z1)], 1, 1,
+              uv_fn=lambda c: (c.y / TILE, c.z / TILE))
+    quad_grid(pc, 'oak', [(x1, plane, z1), (x0, plane, z1), (x0, gy, z1), (x1, gy, z1)], 1, 1,
               uv_fn=lambda c: (c.x / TILE, c.y / TILE))
     s = 0.16
     lim = [(x0, z0), (x1, z1)]
@@ -593,14 +671,16 @@ def kit_windows():
         window(pc, YU, a, b, UWIN_Z[0], UWIN_Z[1], k + 1)
     return pc
 
-def kit_shutters():
+def kit_shutters(wins=None):
+    """wins: (x0, x1, z0, z1, wall plane y) per window; default the hero's upper windows."""
     pc = Piece('Kit_Shutters')
-    for k, (a, b) in enumerate(UWIN):
-        h = UWIN_Z[1] - UWIN_Z[0] + 0.04; w = (b - a) / 2 + 0.02
+    wins = wins or [(a, b, UWIN_Z[0], UWIN_Z[1], YU) for a, b in UWIN]
+    for k, (a, b, wz0, wz1, plane) in enumerate(wins):
+        h = wz1 - wz0 + 0.06; w = (b - a) / 2 + 0.05
         for side, hx in ((-1, a), (1, b)):
             R = rng('shut%d%d' % (k, side))
             ang = math.radians(R.uniform(14, 28))   # stands off the wall at its outer edge
-            hinge = Vector((hx, YU - PROUD - 0.035, (UWIN_Z[0] + UWIN_Z[1]) / 2))
+            hinge = Vector((hx, plane - PROUD - 0.035, (wz0 + wz1) / 2))
             rot = Matrix.Rotation(-side * ang, 4, 'Z')
             base = Matrix.Translation(hinge) @ rot
             # three boards with gaps, the battens and Z brace face out (the inside face, shutter open)
@@ -635,6 +715,9 @@ def kit_door():
                 Matrix.Translation((cx, yd, (z0 + z1) / 2 + R.uniform(-0.004, 0.004))) @
                 Matrix.Rotation(math.radians(R.uniform(-0.6, 0.6)), 4, 'Y'),
                 cham=0.012, cuts=(0, 0, 3), long_axis=2, wob=0.004, seed=R.random() * 80)
+    # ledged back behind the planks, so the plank gaps read dark instead of open
+    quad_grid(pc, 'oak', [(x0 - 0.02, yd + 0.04, z0), (x1 + 0.02, yd + 0.04, z0), (x1 + 0.02, yd + 0.04, z1),
+                          (x0 - 0.02, yd + 0.04, z1)], 1, 1, uv_fn=lambda c: (c.x / TILE, c.z / TILE))
     # strap hinges with curled tips and bolt heads
     for zz in (z0 + 0.42, z1 - 0.42):
         L = 0.82
@@ -655,7 +738,7 @@ def kit_door():
         add_box(pc, 'iron', (0.07, 0.05, 0.05), Matrix.Translation((x0 - 0.03, yd - 0.04, zz)), cham=0.008, seed=zz + 1)
     # lock plate, ring pull, latch bar
     hx = x1 - 0.17; hz = 1.12
-    add_box(pc, 'iron', (0.11, 0.012, 0.19), Matrix.Translation((hx, yd - 0.036, hz)), cham=0.006, seed=9)
+    add_box(pc, "iron", (0.11, 0.016, 0.19), Matrix.Translation((hx, yd - 0.036, hz)), cham=0.004, seed=9)
     ring_r = 0.07
     for j in range(12):
         a0 = j / 12 * 2 * math.pi
@@ -664,15 +747,16 @@ def kit_door():
     add_box(pc, 'iron', (0.03, 0.04, 0.03), Matrix.Translation((hx, yd - 0.05, hz - 0.02)), cham=0.006, seed=11)
     return pc
 
-def kit_flowerbox():
+def kit_flowerbox(a=None, b=None, zt=None, plane=None):
     """Oak flower box on brackets under the right upper window: a break in the plaster and a red accent."""
     pc = Piece('Kit_FlowerBox')
-    a, b = UWIN[1]
-    zt = UWIN_Z[0] - 0.02; y = YU - PROUD - 0.24
+    if a is None:
+        (a, b), zt, plane = UWIN[1], UWIN_Z[0] - 0.02, YU
+    y = plane - PROUD - 0.24
     add_box(pc, 'oak', (b - a + 0.30, 0.30, 0.24), Matrix.Translation(((a + b) / 2, y, zt - 0.12)), cham=0.02,
             long_axis=0, wob=0.004, seed=31.0)
     for xb in (a + 0.05, b - 0.05):
-        member(pc, 'oak', (xb, YU - PROUD - 0.02, zt - 0.62), (xb, y + 0.02, zt - 0.24), 0.08, 0.08,
+        member(pc, 'oak', (xb, plane - PROUD - 0.02, zt - 0.62), (xb, y + 0.02, zt - 0.24), 0.08, 0.08,
                name='fbk%f' % xb, cham=0.012, up=(1, 0, 0))
     R = rng('flowers')
     for i in range(14):   # trailing foliage spilling over the front lip
@@ -725,6 +809,12 @@ def kit_roof():
     def under(p, u, v):
         return roof_surface(X0 + (X1 - X0) * (1 - u), v) - nrm_dir * TH
     quad_grid(pc, 'oak', [(0, 0, 0)] * 4, nx, 6, push=under, uv_fn=lambda c: (c.x / TILE, c.y / TILE))
+    # verge end strips close the slab between the deck and its underside
+    for xv, sgn in ((X0, -1), (X1, 1)):
+        def vend(p, u, v, xv=xv, sgn=sgn):
+            sv = v if sgn > 0 else 1 - v
+            return roof_surface(xv, sv) - nrm_dir * (0.06 + (TH - 0.06) * u)
+        quad_grid(pc, 'oak', [(0, 0, 0)] * 4, 1, 10, push=vend, uv_fn=lambda c: (c.y / TILE, c.z / TILE))
     # back slope: plain sheared plane on the tileable
     def back(p, u, v):
         x = X0 + (X1 - X0) * u
@@ -732,6 +822,9 @@ def kit_roof():
         zr = ridge_z(x); zb = PLATE1 + 0.22 - OVER_EAVE * 0.6 * (RIDGE - PLATE1) / (DEPTH - y_r)
         return Vector((x, y_r + (yb - y_r) * v, zr + (zb - zr) * v))
     quad_grid(pc, 'roof', [(0, 0, 0)] * 4, nx, 1, push=lambda p, u, v: back(p, u, v),
+              uv_fn=lambda c: (c.x / TILE, c.y / TILE))
+    # its underside (seen past the gable verge from the mid and three-quarter cameras)
+    quad_grid(pc, 'oak', [(0, 0, 0)] * 4, nx, 1, push=lambda p, u, v: back(p, 1 - u, v) - Vector((0, 0, TH)),
               uv_fn=lambda c: (c.x / TILE, c.y / TILE))
     # tile courses: each a tilted strip whose butt stands proud, jittered per tile run
     course = 0.40
@@ -748,7 +841,7 @@ def kit_roof():
         nt = nx * 2                                                  # tile runs of about 21 cm, split
         for i in range(nt):
             xa = X0 + (X1 - X0) * i / nt; xb = X0 + (X1 - X0) * (i + 1) / nt
-            j = R.uniform(-0.012, 0.012)
+            j = R.uniform(-0.012, 0.012) if c else R.uniform(-0.01, 0.045)   # the eave course is ragged, lifted
             a, b = row(xa + 0.002, j), row(xb - 0.002, j + R.uniform(-0.006, 0.006))
             for q in ((a[1], b[1], b[2], a[2]), (a[0], b[0], b[1], a[1])):
                 f = bm.faces.new(q)
@@ -780,6 +873,7 @@ def kit_roof():
         bmesh.ops.rotate(bm, verts=bm.verts[:], cent=Vector((x, y_r, ridge_z(x))),
                          matrix=Matrix.Rotation(math.radians(R.uniform(-2.5, 2.5)), 3, 'Y'))
         bm.normal_update()
+        two_sided(bm)
         _merge(pc, bm, 'roof')
     # rafter tails under the front overhang
     for i in range(13):
@@ -808,15 +902,15 @@ def kit_roof():
         ring_rows.append(row)
     for i in range(len(ring_rows) - 1):
         for k in range(segs):
-            f = bm.faces.new((ring_rows[i][k], ring_rows[i][k + 1], ring_rows[i + 1][k + 1], ring_rows[i + 1][k]))
+            f = bm.faces.new((ring_rows[i][k], ring_rows[i + 1][k], ring_rows[i + 1][k + 1], ring_rows[i][k + 1]))
             for l in f.loops:
-                l[uvl].uv = (l.vert.co.x / TILE, (k + (l.vert in ring_rows[i] and 0 or 0)) * rr / TILE)
-    bm.normal_update()
+                l[uvl].uv = (l.vert.co.x / TILE, k * rr / TILE)
+    two_sided(bm)
     _merge(pc, bm, 'roof')
     return pc
 
 def kit_leanto():
-    """Lean-to woodshed on the +X end: breaks the side, a low tiled mono-pitch over a stacked woodpile."""
+    """Lean-to woodshed on the -X end (seen at the wide camera): breaks the side, a low tiled mono-pitch over a stacked woodpile."""
     pc = Piece('Kit_LeanTo')
     x0, x1, y0, y1 = W + 0.02, W + 1.55, 2.75, 5.35
     zh, zl = 2.85, 2.05
@@ -846,15 +940,15 @@ def kit_leanto():
             j = R.uniform(-0.01, 0.01)
             q = [rs(ya, 1 - s0) + nrm * (0.05 + j), rs(yb, 1 - s0) + nrm * (0.05 + j), rs(yb, max(0, 1 - s1)), rs(ya, max(0, 1 - s1))]
             v = [bm.verts.new(p) for p in q]
-            f = bm.faces.new((v[1], v[0], v[3], v[2]))
+            f = bm.faces.new((v[0], v[1], v[2], v[3]))
             for l in f.loops:
                 l[uvl].uv = (l.vert.co.y / TILE, (l.vert.co.x - x0) / TILE)
             u = [bm.verts.new(p - nrm * 0.05) for p in q[:2]]
-            f = bm.faces.new((v[0], v[1], u[1], u[0]))
+            f = bm.faces.new((v[1], v[0], u[0], u[1]))
             for l in f.loops:
                 l[uvl].uv = (l.vert.co.y / TILE, l.vert.co.z / TILE)
         bm.normal_update(); _merge(pc, bm, 'roof')
-    quad_grid(pc, 'oak', [rs(y1 + 0.25, 0) , rs(y0 - 0.25, 0), rs(y0 - 0.25, 1), rs(y1 + 0.25, 1)], ny, 3,
+    quad_grid(pc, 'oak', [rs(y0 - 0.25, 0), rs(y1 + 0.25, 0), rs(y1 + 0.25, 1), rs(y0 - 0.25, 1)], ny, 3,
               uv_fn=lambda c: (c.y / TILE, c.x / TILE))
     # woodpile: split logs, end grain toward the plaza
     for row in range(6):
@@ -873,11 +967,14 @@ def kit_leanto():
                 for l in f.loops:
                     l[uvl].uv = (l.vert.co.x / TILE * 3, l.vert.co.y / TILE)
             bm.normal_update(); _merge(pc, bm, 'oak_lt')
+    # built on +X, mirrored onto the -X end: there it shows at the wide camera beside the house (Unity review)
+    bmesh.ops.scale(pc.bm, vec=(-1, 1, 1), verts=pc.bm.verts[:])
+    bmesh.ops.reverse_faces(pc.bm, faces=pc.bm.faces[:])
     return pc
 
 def kit_chimney():
     pc = Piece('Kit_Chimney')
-    cx, cy = -2.05, 2.15
+    cx, cy = CHIM_X, CHIM_Y
     z_base = roof_surface(cx, 0).z + 1.5
     top = CHIM_TOP
     lean = Matrix.Rotation(math.radians(1.3), 4, 'Y') @ Matrix.Rotation(math.radians(-0.8), 4, 'X')
@@ -911,7 +1008,8 @@ def kit_chimney():
         _merge(pc, bm, 'roof')
     return pc
 
-def kit_decals():
+def kit_decals(spec=None):
+    """spec: (stem, centre, size, normal, rot) per decal; default the hero's placement."""
     pc_list = []
     def decal(stem, center, size, normal, rot=0.0, name=None):
         pc = Piece('Kit_Decal_%s_%d' % (stem, len(pc_list)))
@@ -932,6 +1030,10 @@ def kit_decals():
         si = 0; pc.mats.append(decal_mat(stem))
         me = bpy.data.meshes.new(pc.name); bm.to_mesh(me); bm.free()
         pc_list.append((pc, me))
+    if spec is not None:
+        for st, c, sz, nrm, rt in spec:
+            decal(st, c, sz, nrm, rot=rt)
+        return pc_list
     # drips under each window sill
     decal('drip', ((GWIN[0] + GWIN[1]) / 2, -0.003, GWIN[2] - 0.62), (1.1, 1.0), (0, -1, 0))
     for a, b in UWIN:
@@ -969,7 +1071,13 @@ def write_wear(ob, chimney_top=None):
             nz = noise.noise(p * 2.1)
             # splashback band at the foot: strongest at the cobble line, ragged top
             streak = noise.noise(Vector((p.x * 5.0, p.y * 5.0, p.z * 0.7)))
-            r = max(0.0, 1 - p.z / (1.35 + 0.3 * nz + 0.25 * streak)) ** 1.2 * 0.9
+            r = max(0.0, 1 - p.z / (1.45 + 0.3 * nz + 0.25 * streak)) ** 1.0 * 0.85
+            # shade-damp band under the deep eave on the upper storey
+            if p.z > PLATE0 - 0.75 and p.z < PLATE1 + 0.05 and p.y < YU + 0.15:
+                r = max(r, (p.z - (PLATE0 - 0.75)) / 0.75 * 0.38)
+            # sheltered dust and soot under the jetty: ground-storey front, girt, joists and soffit
+            if 2.2 < p.z < JOIST1 + 0.02 and p.y > YU - 0.12 and p.x < W - 0.06:
+                r = max(r, min(0.6, (p.z - 2.2) / 0.85 * 0.6) * (0.85 + 0.15 * streak))
             # broad lime-wash mottling (every surface), so no mass reads showroom-clean
             r = max(r, 0.22 * max(0.0, noise.noise(p * 0.45 + Vector((3.1, 0.0, 1.7)))) +
                     0.06 * max(0.0, noise.noise(p * 2.3)))
@@ -991,17 +1099,17 @@ def write_wear(ob, chimney_top=None):
                         r = max(r, (1 - dz / 0.55) ** 1.6 * (0.28 + 0.22 * streak))
             # damp darkening on the plinth, streaked downward
             if p.z < PLINTH + 0.05:
-                r = max(r, 0.45 + 0.2 * streak)
+                r = max(r, 0.6 + 0.2 * streak)
             # hand grime round the latch and on the door post edges
             dh = (p - door_h).length
             r = max(r, max(0.0, 1 - dh / 0.35) * 0.4)
             # soot round the chimney top and above the pots
-            if chimney_top is not None and p.z > chimney_top - 1.0 and abs(p.x - chimney_top_x) < 0.8 and abs(p.y - 2.15) < 0.7:
+            if chimney_top is not None and p.z > chimney_top - 1.0 and abs(p.x - CHIM_WX) < 0.8 and abs(p.y - CHIM_WY) < 0.7:
                 r = max(r, min(1.0, (p.z - (chimney_top - 1.3)) / 1.1) ** 0.9 * 0.85)
             # roof: the lowest courses and the eave get grime streaks from the run-off
             g = 0.0
             if ob.name == 'Kit_RoofModule' and n.z > 0.3:
-                s = (p.z - 5.6) / (RIDGE - 5.6)
+                s = (p.z - EAVE_Z) / (RIDGE - EAVE_Z)
                 g = max(0.0, 1 - s * 2.2) * 0.9 + max(0.0, 0.1 + 0.5 * nz) * 0.3 + max(0.0, s - 0.88) * 5.0
                 tv = ((poly.index * 2654435761) % 1009) / 1009.0          # tile-to-tile colour
                 r = max(r, 0.32 * tv * tv)
@@ -1031,21 +1139,30 @@ def write_wear(ob, chimney_top=None):
                 b = max(b, 0.35)
             attr.data[li].color = (min(1, r), min(1, g), min(1, b), 1.0)
 
-chimney_top_x = -2.05
+CHIM_X, CHIM_Y = -2.05, 2.15   # roof-local
+CHIM_WX, CHIM_WY = CHIM_X, CHIM_Y   # world (differs on gable-front variants)
+EAVE_Z = 5.6
 RUNOFF_Z = [GWIN[2] - 0.18, UWIN_Z[0] - 0.16, BRES1 + 0.0, PLINTH + 0.36]
 
 # ----------------------------------------------------------------------------- assembly
-def build():
+def build(variant=None):
     global TIMBERS_L
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    root = bpy.data.objects.new('FacadeKit', None); bpy.context.scene.collection.objects.link(root)
-    pieces = [kit_plinth(), kit_posts()[0], kit_rails(), kit_braces(), kit_jetty(), kit_panels(), kit_windows(),
-              kit_shutters(), kit_door(), kit_roof(), kit_chimney(), kit_flowerbox(), kit_leanto()]
+    root = bpy.data.objects.new(variant or 'FacadeKit', None); bpy.context.scene.collection.objects.link(root)
+    if variant:
+        pieces, dspec = vbuild(variant)
+    else:
+        pieces, dspec = [kit_plinth(), kit_posts()[0], kit_rails(), kit_braces(), kit_jetty(), kit_panels(),
+                         kit_windows(), kit_shutters(), kit_door(), kit_roof(), kit_chimney(), kit_flowerbox(),
+                         kit_leanto()], None
     obs = []
     total = 0
     TIMBERS_L = [(lean_pt(a), lean_pt(b), hw) for (a, b, hw) in TIMBERS]
     for pc in pieces:
         me = bpy.data.meshes.new(pc.name)
+        pc_smooth = pc.name == 'Kit_Panels'
+        if pc_smooth:   # weld the plaster bands and sheets so no seam runs through a wall
+            bmesh.ops.remove_doubles(pc.bm, verts=pc.bm.verts[:], dist=0.002)
         pc.bm.normal_update(); pc.bm.to_mesh(me); pc.bm.free()
         for m in pc.mats:
             me.materials.append(m)
@@ -1054,19 +1171,197 @@ def build():
         lean(me)
         write_wear(ob, chimney_top=CHIM_TOP)
         for p in me.polygons:
-            p.use_smooth = False
+            p.use_smooth = pc_smooth   # plaster smooth: flat cells showed as dotted seams in Unity
+        if pc_smooth:   # keep wall corners crisp
+            me.set_sharp_from_angle(angle=math.radians(30))
         t = sum(len(p.vertices) - 2 for p in me.polygons); total += t
         print('  %-18s %6d tris  %s' % (pc.name, t, ', '.join(m.name for m in pc.mats)))
         obs.append(ob)
-    for pc, me in kit_decals():
+    for pc, me in kit_decals(dspec):
         lean(me)
         for m in pc.mats:
             me.materials.append(m)
         ob = bpy.data.objects.new(pc.name, me); bpy.context.scene.collection.objects.link(ob); ob.parent = root
         total += len(me.polygons) * 2
         obs.append(ob)
-    print('FacadeKit total tris: %d (building budget 75000)' % total)
+    print('%s total tris: %d (building budget 75000)' % (root.name, total))
     return root, obs
+
+# ----------------------------------------------------------------------------- neighbour variants (--variant NAME)
+def _lin(hexs):
+    c = [int(hexs[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    return tuple(v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in c)
+
+# Plaza-facing fronts only (sides, back and gables plain). Bays are equal; per storey: window bays, the rest braced.
+VARIANTS = {
+    'NEIGHBOUR_Left': dict(width=7.5, depth=7.0, storeys=3, walls=[2.2, 2.0], bays=6, gable_front=False, rise=3.6,
+                           door=1, gwin=[3, 4], uwin=[[1, 4], [1, 4]], crosses=True, flowerbox=(1, 0),
+                           paint=_lin('#9c7f4c'), plaster=(1.0, 0.92, 0.80), lean=(0.015, 0.02),
+                           chimney=(2.1, 0.6)),    # ochre shutters, warm cream; upper storeys tip out
+    'NEIGHBOUR_Right': dict(width=8.0, depth=9.0, storeys=2, walls=[1.97], bays=6, gable_front=True, rise=4.2,
+                            door=4, gwin=[1], uwin=[[1, 4]], crosses=False, flowerbox=None,
+                            paint=_lin('#6a2e29'), plaster=(1.0, 0.89, 0.85), lean=(-0.012, 0.008),
+                            chimney=(1.6, -1.2)),  # oxblood shutters, faint rose plaster, gable to the plaza
+    'INFILL_Narrow': dict(width=4.5, depth=6.0, storeys=3, walls=[2.1, 2.0], bays=3, gable_front=False, rise=2.9,
+                          door=0, gwin=[2], uwin=[[1], [1]], crosses=True, flowerbox=None,
+                          paint=_lin('#64807a'), plaster=(0.93, 0.95, 0.97), lean=(0.008, 0.014),
+                          chimney=(-0.9, 0.5)),    # faded blue-green shutters, cool lime white
+}
+
+def vbuild(name):
+    """Build one neighbour from the kit: returns the list of Pieces plus the decal spec."""
+    global W, DEPTH, YU, PLATE0, PLATE1, RIDGE, DOOR, GWIN, CHIM_X, CHIM_Y, CHIM_WX, CHIM_WY, CHIM_TOP, EAVE_Z
+    global LEAN_X, LEAN_Y, SHUTTER_PAINT, DOOR_PAINT, PLASTER_TINT, RUNOFF_Z
+    cfg = VARIANTS[name]
+    W = cfg['width'] / 2; DEPTH = cfg['depth']; n = cfg['bays']
+    LEAN_X, LEAN_Y = cfg['lean']; SHUTTER_PAINT = DOOR_PAINT = cfg['paint']; PLASTER_TINT = cfg['plaster']
+    xs = [-W + 2 * W * i / n for i in range(n + 1)]
+    # storeys: plane y, wall bottom zb, wall top zt, base (bottom of joists or plinth)
+    st = [dict(plane=0.0, zb=PLINTH + 0.24, zt=GIRT0, top=GIRT1, base=0.0)]
+    for k, h in enumerate(cfg['walls']):
+        base = st[-1]['top']
+        st.append(dict(plane=-JETTY * (k + 1), zb=base + 0.52, zt=base + 0.52 + h, top=base + 0.78, base=base))
+        st[-1]['top'] = st[-1]['zt'] + (PLATE1 - PLATE0)
+    YU = st[-1]['plane']; PLATE0 = st[-1]['zt']; PLATE1 = st[-1]['top']
+    RIDGE = PLATE1 + cfg['rise']
+    bx = lambda i: (xs[i] + TIM / 2 + 0.05, xs[i + 1] - TIM / 2 - 0.05)
+    d0, d1 = xs[cfg['door']] + TIM / 2, xs[cfg['door'] + 1] - TIM / 2
+    DOOR = (d0 + 0.02, d1 - 0.02, 0.16, 2.36)
+    gw = cfg['gwin'][0]; GWIN = (*bx(gw), 1.33, 2.25)
+    posts, rails, braces, jet, pan, win = (Piece(n_) for n_ in ('Kit_Posts', 'Kit_Rails', 'Kit_Braces', 'Kit_JettyBeams',
+                                                                 'Kit_Panels', 'Kit_Windows'))
+    shut, decals, runoff = [], [], []
+    for k, S in enumerate(st):
+        yc = S['plane'] - PROUD + TIM / 2
+        wins = []
+        if k == 0:
+            wins = [(*bx(i), 1.33, 2.25) for i in cfg['gwin']]
+        else:
+            hz = min(1.2, S['zt'] - S['zb'] - 0.85)
+            wins = [(*bx(i), S['zb'] + 0.55, S['zb'] + 0.55 + hz) for i in cfg['uwin'][k - 1]]
+        winbays = cfg['gwin'] if k == 0 else cfg['uwin'][k - 1]
+        # posts on every bay line
+        for i, x in enumerate(xs):
+            xp = max(-W + TIM / 2, min(W - TIM / 2, x))
+            zb = DOOR[2] if (k == 0 and i in (cfg['door'], cfg['door'] + 1)) else S['zb']
+            member(posts, 'oak', (xp, yc, zb), (xp, yc, S['zt']), TIM, TIM, name='%s_p%d_%d' % (name, k, i))
+        # rails: ground sole (broken at the door) + girt; upper bressumer, joists, wall plate
+        if k == 0:
+            for i0, i1 in ((0, cfg['door']), (cfg['door'] + 1, n)):
+                if i1 > i0:
+                    member(rails, 'oak', (xs[i0], yc, PLINTH + 0.12), (xs[i1], yc, PLINTH + 0.12), 0.24, TIM,
+                           name='%s_sole%d' % (name, i0), extend=0.02)
+            member(rails, 'oak', (-W - 0.04, yc, (GIRT0 + GIRT1) / 2), (W + 0.04, yc, (GIRT0 + GIRT1) / 2),
+                   GIRT1 - GIRT0, TIM, name=name + '_girt', sag=0.025)
+            member(rails, 'oak', (DOOR[0] - 0.02, yc, DOOR[3] + 0.11), (DOOR[1] + 0.02, yc, DOOR[3] + 0.11), 0.22,
+                   TIM, name=name + '_lintel', sag=0.012)
+        else:
+            prev = st[k - 1]['plane']
+            for j in range(int(2 * W / 0.5) + 1):
+                x = -W + 0.25 + j * (2 * W - 0.5) / int(2 * W / 0.5)
+                member(jet, 'oak', (x, prev + 0.15, S['base'] + 0.11), (x, S['plane'] - 0.10, S['base'] + 0.11), 0.17,
+                       0.22, name='%s_j%d_%d' % (name, k, j), cham=0.03, up=(0, 0, -1))
+            member(jet, 'oak', (-W - 0.10, S['plane'] - PROUD + 0.15, S['base'] + 0.37),
+                   (W + 0.10, S['plane'] - PROUD + 0.15, S['base'] + 0.37), 0.30, 0.32, name='%s_bres%d' % (name, k),
+                   sag=0.05, cham=0.03)
+            quad_grid(pan, 'plaster', [(-W, prev, S['base'] + 0.22), (W, prev, S['base'] + 0.22),
+                                       (W, S['plane'], S['base'] + 0.22), (-W, S['plane'], S['base'] + 0.22)],
+                      max(1, n), 1, uv_fn=lambda c: (c.x / TILE, c.y / TILE))
+            member(rails, 'oak', (-W - 0.1, yc, S['zt'] + 0.13), (W + 0.1, yc, S['zt'] + 0.13), 0.26, TIM + 0.04,
+                   name='%s_plate%d' % (name, k), sag=0.04)
+        # window bays: sill and head rails, casing and glass, shutters on the upper storeys
+        for wi, (a, b, z0, z1) in enumerate(wins):
+            i = winbays[wi]
+            member(rails, 'oak', (xs[i], yc, z0 - 0.08), (xs[i + 1], yc, z0 - 0.08), 0.16, TIM, name='%s_s%d%d' % (name, k, wi))
+            member(rails, 'oak', (xs[i], yc, z1 + 0.08), (xs[i + 1], yc, z1 + 0.08), 0.16, TIM, name='%s_h%d%d' % (name, k, wi))
+            window(win, S['plane'], a, b, z0, z1, 10 * k + wi)
+            runoff.append(z0 - 0.16)
+            decals.append(('drip', ((a + b) / 2, S['plane'] - 0.003, z0 - 0.45), (b - a + 0.1, 0.7), (0, -1, 0), 0.0))
+            if k > 0:
+                shut.append((a, b, z0, z1, S['plane']))
+                if cfg['crosses']:
+                    ya = yc + 0.015
+                    member(braces, 'oak', (xs[i] + TIM / 2, ya, S['zb'] + 0.02), (xs[i + 1] - TIM / 2, ya, z0 - 0.16),
+                           0.13, TIM - 0.03, name='%s_xa%d%d' % (name, k, wi), cham=0.02)
+                    member(braces, 'oak', (xs[i + 1] - TIM / 2, ya, S['zb'] + 0.02), (xs[i] + TIM / 2, ya, z0 - 0.16),
+                           0.13, TIM - 0.03, name='%s_xb%d%d' % (name, k, wi), cham=0.02)
+        # braced bays: a foot brace rising toward the house centre (chevrons about the middle)
+        for i in range(n):
+            if i in winbays or (k == 0 and i == cfg['door']):
+                continue
+            x0b, x1b = xs[i] + TIM / 2, xs[i + 1] - TIM / 2
+            ztb = S['zb'] + 0.75 * (S['zt'] - S['zb'])
+            a, b = ((x0b, S['zb']), (x1b, ztb)) if (xs[i] + xs[i + 1]) < 0 else ((x1b, S['zb']), (x0b, ztb))
+            member(braces, 'oak', (a[0], yc + 0.015, a[1]), (b[0], yc + 0.015, b[1]), 0.22, TIM - 0.03,
+                   name='%s_b%d%d' % (name, k, i), cham=0.02)
+        holes = [(a, b, z0, z1) for (a, b, z0, z1) in wins]
+        if k == 0:
+            holes.append((DOOR[0], DOOR[1], DOOR[2] - 0.5, DOOR[3]))
+        wall_panel(pan, 'plaster', S['plane'], -W, W, (PLINTH + 0.2) if k == 0 else S['zb'] - 0.05, S['zt'] + 0.05,
+                   holes=holes)
+        # plain sides for this storey
+        z_lo = 0.0 if k == 0 else S['base']
+        quad_grid(pan, 'plaster', [(W, S['plane'], z_lo), (W, DEPTH, z_lo), (W, DEPTH, S['top']), (W, S['plane'], S['top'])],
+                  1, 1, uv_fn=lambda c: (c.y / TILE, c.z / TILE))
+        quad_grid(pan, 'plaster', [(-W, DEPTH, z_lo), (-W, S['plane'], z_lo), (-W, S['plane'], S['top']),
+                                   (-W, DEPTH, S['top'])], 1, 1, uv_fn=lambda c: (c.y / TILE, c.z / TILE))
+    RUNOFF_Z = runoff + [PLINTH + 0.36]
+    # back wall, interior liner
+    quad_grid(pan, 'plaster', [(W, DEPTH, 0.0), (-W, DEPTH, 0.0), (-W, DEPTH, PLATE1), (W, DEPTH, PLATE1)], 1, 1,
+              uv_fn=lambda c: (c.x / TILE, c.z / TILE))
+    quad_grid(pan, 'plaster', [(-W, 0.45, 0.0), (W, 0.45, 0.0), (W, 0.45, PLATE1), (-W, 0.45, PLATE1)], 1, 1,
+              uv_fn=lambda c: (c.x / TILE, c.z / TILE))
+    # gables and roof
+    yc2 = (YU + DEPTH) / 2
+    def tri(pc, mat, pts):
+        quad_grid(pc, mat, pts, 1, 1, uv_fn=lambda c: ((c.x + c.y) / TILE, c.z / TILE))
+    if not cfg['gable_front']:
+        tri(pan, 'plaster', [(W, YU, PLATE1), (W, DEPTH, PLATE1), (W, yc2 + 0.001, RIDGE - 0.2), (W, yc2, RIDGE - 0.2)])
+        tri(pan, 'plaster', [(-W, DEPTH, PLATE1), (-W, YU, PLATE1), (-W, yc2, RIDGE - 0.2), (-W, yc2 + 0.001, RIDGE - 0.2)])
+        EAVE_Z = roof_surface(0, 0).z
+        roof = kit_roof(); CHIM_X, CHIM_Y = cfg['chimney']; CHIM_TOP = RIDGE + 1.1
+        CHIM_Y = YU + (yc2 - YU) * CHIM_Y
+        chim = kit_chimney(); CHIM_WX, CHIM_WY = CHIM_X, CHIM_Y
+    else:
+        # detailed front gable on the top storey plane: plaster triangle, king post, collar, raking braces
+        yg = YU; yt = yg - PROUD + TIM / 2
+        nz = 8
+        for j in range(nz):
+            za = PLATE1 + (RIDGE - 0.2 - PLATE1) * j / nz; zb2 = PLATE1 + (RIDGE - 0.2 - PLATE1) * (j + 1) / nz
+            ha = W * (1 - j / nz); hb = W * (1 - (j + 1) / nz)
+            quad_grid(pan, 'plaster', [(-ha, yg, za), (ha, yg, za), (hb, yg, zb2), (-hb, yg, zb2)],
+                      max(1, int(2 * ha / 0.5)), 1, uv_fn=lambda c: (c.x / TILE, c.z / TILE))
+        member(posts, 'oak', (0, yt, PLATE1), (0, yt, RIDGE - 0.45), TIM, TIM, name=name + '_king')
+        zc = PLATE1 + 0.45 * (RIDGE - PLATE1); hc = W * (1 - (zc - PLATE1) / (RIDGE - 0.2 - PLATE1))
+        member(rails, 'oak', (-hc + 0.1, yt, zc), (hc - 0.1, yt, zc), 0.24, TIM, name=name + '_collar')
+        for sgn in (-1, 1):
+            member(braces, 'oak', (sgn * W * 0.62, yt + 0.015, PLATE1), (sgn * TIM / 2, yt + 0.015, zc - 0.15), 0.22,
+                   TIM - 0.03, name='%s_gb%d' % (name, sgn), cham=0.02)
+            xq = sgn * W * 0.42
+            member(posts, 'oak', (xq, yt, PLATE1), (xq, yt, PLATE1 + (RIDGE - 0.2 - PLATE1) * (1 - abs(xq) / W) - 0.15),
+                   0.22, TIM, name='%s_gq%d' % (name, sgn))
+        tri(pan, 'plaster', [(W, DEPTH, PLATE1), (-W, DEPTH, PLATE1), (-0.001, DEPTH, RIDGE - 0.2), (0, DEPTH, RIDGE - 0.2)])
+        # roof built in its own frame (ridge along local X), then turned so the ridge runs front to back
+        save = (W, YU, DEPTH)
+        W, YU, DEPTH = (save[2] - save[1]) / 2, -save[0], save[0]
+        EAVE_Z = roof_surface(0, 0).z
+        roof = kit_roof(); CHIM_X, CHIM_Y = cfg['chimney']; CHIM_TOP = RIDGE + 1.1
+        chim = kit_chimney()
+        W, YU, DEPTH = save
+        xf = Matrix.Translation((0, yc2, 0)) @ Matrix.Rotation(math.pi / 2, 4, 'Z')
+        for pc in (roof, chim):
+            bmesh.ops.transform(pc.bm, matrix=xf, verts=pc.bm.verts[:])
+        wc = xf @ Vector((CHIM_X, CHIM_Y, 0)); CHIM_WX, CHIM_WY = wc.x, wc.y
+    # the door, its step and the plinth (the hero's kit pieces read W, DEPTH and DOOR)
+    plinth = kit_plinth()
+    add_box(plinth, 'stone', (0.36, DEPTH, PLINTH), Matrix.Translation((-W + 0.16, DEPTH / 2, PLINTH / 2)), cham=0.03,
+            uv_world=True)
+    pieces = [plinth, posts, rails, braces, jet, pan, win, kit_shutters(shut), kit_door(), roof, chim]
+    if cfg['flowerbox']:
+        si, k = cfg['flowerbox']
+        a, b, z0, z1, plane = shut[si]
+        pieces.append(kit_flowerbox(a, b, z0 - 0.02, plane))
+    return pieces, decals
 
 # ----------------------------------------------------------------------------- review scene
 def U(x, y, z):
@@ -1083,9 +1378,9 @@ def zero_wear(o):
     for d in a.data:
         d.color = (0, 0, 0, 1)
 
-def review_scene(root):
+def review_scene(root, variant=False):
     sc = bpy.context.scene
-    root.location = U(-1.25, 0, 7.5)
+    root.location = (0, 0, 0) if variant else U(-1.25, 0, 7.5)
     # ground: cobble tileable, fountain + stall proxies, a 1.75 m figure by the door
     gm = tile_mat('FK_Cobble', 'B1_town/cobble')
     bpy.ops.mesh.primitive_plane_add(size=1); g = bpy.context.object; g.name = 'Ground'
@@ -1101,6 +1396,8 @@ def review_scene(root):
             uvl.data[li].uv = (co.x / TILE, co.y / TILE)
     zero_wear(g)
     st = tile_mat('FK_Sandstone', 'B1_town/sandstone')
+    if variant:
+        return review_lights(sc)
     bpy.ops.mesh.primitive_cylinder_add(radius=1.7, depth=0.55, vertices=48, location=(0, 0, 0.275))
     f = bpy.context.object; f.name = 'FountainProxy'; f.data.materials.append(st)
     bpy.ops.mesh.primitive_cylinder_add(radius=0.25, depth=2.4, vertices=24, location=(0, 0, 1.2))
@@ -1117,6 +1414,9 @@ def review_scene(root):
     fm = bpy.data.materials.new('Figure'); fm.use_nodes = True
     fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.25, 0.18, 0.12, 1)
     fig.data.materials.append(fm)
+    return review_lights(sc)
+
+def review_lights(sc):
     # light: warm midday sun (about 5200 K) + Nishita sky
     sun = bpy.data.lights.new('Sun', 'SUN'); sun.energy = 4.2; sun.color = (1.0, 0.90, 0.80); sun.angle = math.radians(1.2)
     so = bpy.data.objects.new('Sun', sun); sc.collection.objects.link(so)
@@ -1151,26 +1451,31 @@ VIEWS_DEF = {
     'close': (U(1.6, 1.4, -1.6), U(0, 1.0, 0.6), 38),
     'tq': (U(6.5, 3.0, 1.5), U(-1.6, 4.6, 7.8), 50),
     'door': (U(1.4, 1.6, 3.6), U(-1.2, 1.6, 7.5), 40),
+    'vfront': (Vector((0, -17.5, 4.6)), Vector((0, 0, 4.9)), 46),     # variants: square-on and three-quarter
+    'vtq': (Vector((10.5, -12.5, 3.6)), Vector((0, 1.5, 5.0)), 46),
 }
 
 def render(cam):
     for v in VIEWS:
         frm, to, fov = VIEWS_DEF[v]
         look(cam, frm, to); cam.data.angle = math.radians(fov)
-        bpy.context.scene.render.filepath = os.path.join(OUT, 'facade_%s.png' % v)
+        bpy.context.scene.render.filepath = os.path.join(OUT, '%s_%s.png' % ((VARIANT or 'facade'), v))
         bpy.ops.render.render(write_still=True)
         print('rendered', v)
 
-root, obs = build()
+VARIANT = arg('--variant')
+if VARIANT and '--views' not in argv:
+    VIEWS = ['vfront', 'vtq']
+root, obs = build(VARIANT)
 if '--export' in argv:
     for o in bpy.context.scene.objects:
         o.select_set(o.name.startswith('Kit_') or o == root)
-    bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'FacadeKit.fbx'), use_selection=True, axis_forward='-Z',
+    bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, (VARIANT or 'FacadeKit') + '.fbx'), use_selection=True, axis_forward='-Z',
                              axis_up='Y', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
                              mesh_smooth_type='FACE', add_leaf_bones=False,
                              colors_type='LINEAR')   # 'wear' is a linear mask; the default SRGB would gamma-encode it
 if '--no-render' not in argv:
-    cam = review_scene(root)
+    cam = review_scene(root, variant=bool(VARIANT))
     if '--blend' in argv:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'facade.blend'))
     render(cam)
