@@ -1285,6 +1285,11 @@ if VARIANT and not RUIN:
         for k in range(4):
             r = rng(f'shoe{k}')
             ring(f'shoe{k}', (0.45 + 0.03 * (k % 2), -0.62 + r.uniform(-0.02, 0.02), CZ + 0.012 + 0.022 * k), 0.06, 0.012, 'Metal', 'Z', 12, arc=0.72)
+        prism('saw_c_blade', [(0.18, -0.36), (0.62, -0.38), (0.62, -0.46), (0.18, -0.42)], 0.005, 'Metal', 0, chamfer=0.0015, tint=STEEL)   # a saw laid flat
+        PARTS[-1].rotation_euler = (math.radians(-90), 0, math.radians(3)); PARTS[-1].location = (0.0, -0.0, CZ + 0.006 - 0.0)
+        board('saw_c_grip', (0.12, 0.1, 0.035), 'Oak', (0.12, -0.4, CZ + 0.018), (0, 0, 3), grain=0, chamfer=0.01, tint=lin('#c99a62'))
+        board('mallet_c_handle', (0.3, 0.032, 0.03), 'Oak', (1.0, -0.4, CZ + 0.05), (0, 0, 70), grain=0, chamfer=0.007, tint=lin('#c99a62'))
+        lathe('mallet_c_head', [(0.058, -0.09), (0.062, -0.07), (0.062, 0.07), (0.058, 0.09)], (1.06, -0.55, CZ + 0.06), 'Oak', tint=lin('#a87444'), rot=(0, 90, -20))
         board('hammer_c_handle', (0.3, 0.03, 0.026), 'Oak', (0.85, -0.55, CZ + 0.014), (0, 0, -24), grain=0, chamfer=0.006)
         board('hammer_c_head', (0.045, 0.12, 0.045), 'Metal', (0.98, -0.61, CZ + 0.024), (0, 0, -24), grain=1, chamfer=0.008)
         bx, by = -W / 2 - 0.2, -PY - 0.2                             # barrel of long-handled tools
