@@ -1,11 +1,11 @@
 State: WORKING
 Session: Local next: M5 floor 4 set-piece + banking (+ stir meter)
-Progress: 10% (floor 4 implementer running; banking + stir queued)
-Status: item 1 of 3 in progress
+Progress: 45% (floor 4 done + reviewed, waits for claude/cellar-variety to land; banking done + risk-reviewed; stir implementer running)
+Status: items 1-2 code done, merges queued behind the variety branch
 Archive: not ready
 Branch: claude/m5-next-639689 (floor 4 on a subagent worktree branch, merges back here)
-Last check: none yet
-Next step: review floor 4, one check, merge to main; then banking
+Last check: PASS baaba42 (floor 4, edit 718/718, play 33 pass 0 fail 8 skip) - stale after main moved
+Next step: after variety merges: merge main, rerun floor EditMode tests, check, merge floor 4; then banking (claude/m5-banking 6e30325) check + merge; then stir
 Sheet: none yet
 Needs: none
 Blocker: none
@@ -26,7 +26,10 @@ Blocker: none
 All Q1-Q5 proposals OK. Stir values/thresholds are P21 placeholders kept in one data/config spot; only pieces add the +5 term (chest loot rides in the haul, no stir); host owns meter and haul; bank RPC + DiveState get a risk-reviewer pass.
 
 ## Results
-(none yet)
+- Item 1 floor 4 oven maze: worktree-agent-adcba4d63b883e0ab a838e67, merged into this branch. 7 rooms (entry, ring of 4 oven rooms, antechamber, heart with Bank + baker), Dough Warden Tier2 on the approach, 7 chests, no stair/lock/key. New CellarBakeryPool.cs; enums appended (SubTheme.Bakery, RoomKind.Heart, FeatureKind.Baker). Golden floor 4 = 8894238083671442472 (all seeds). reviewer: approve, no blockers. Check PASS baaba42; merge waits for claude/cellar-variety (coordinator order). Main art pass 0bc51ae merged in cleanly (fda3b8d).
+- Item 2 banking: claude/m5-banking 0111014 + review fix 6e30325. Core DiveHaul/DiveState, Presentation DiveHaulSync (host-written summary NV, RequestBankRpc SendTo.Server, host checks floor has bank + 5 m XZ range when a PlayerObject and the matching built floor exist). risk-reviewer: approve; should-fix (bank cell from a stale floor) and the floor-3 refusal test nit fixed in 6e30325. Not done: P47 healing; nothing spawns DiveHaulSync in game yet; banked state not saved (M6).
 
 ## Usage waste
-(none yet)
+- The wrapper's -ProjectRoot defaults to the main checkout: a subagent's first test-edit tested main (one wasted run). Briefs now always pass -ProjectRoot.
+- First check in a fresh worktree hit the default 5 min build timeout during import, then LOCKED on its own leftover Unity: 2 wasted runs. Use -TimeoutMinutes 30 on a worktree's first run.
+- The first check (baaba42) went stale when main gained the floor art pass and the variety branch was queued ahead: one full check to be repeated.
