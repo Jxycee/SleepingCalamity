@@ -4,8 +4,8 @@
 // Frame as TownLayout: metres, +Z north, yaw in degrees clockwise from above (forward = (sin yaw, cos yaw)). A ground row's footprint is centred on (X, Z), SizeX along
 // its own X, SizeZ along its own Z (the art's front is local +Z), turned by Yaw.
 // Design rule: free-grid decoration never blocks the NPC path graph. Every ground row, inflated by Clearance, covers no path node and crosses no path edge (lot
-// ring edges and doorstep links included), stands outside every lot (except a marked front-yard row, which keeps the door corridor and the body clear), outside
-// landmarks, the approved beauty corner, the lots' cut and fill walls and every HollowmereDressing row of its preset, on ring 1 (the square +1 m) or ring 2 (beside a
+// ring edges and doorstep links included), stands outside every lot (lot yards belong to the garden pieces: no clutter there), outside
+// landmarks, the approved beauty corner, the lots' cut and fill walls, the keep terrace wall strip and every HollowmereDressing row of its preset, on ring 1 (the square +1 m) or ring 2 (beside a
 // lane), on ground flat enough not to float it. Signs and washing lines are overhead: no ground footprint, but a sign must sit on the door-side face of the right
 // rebuilt building with its board above head height, and a washing line must run wall to wall between two rebuilt houses without crossing a house, high enough
 // that its lowest cloth clears the ground under it.
@@ -25,8 +25,7 @@ namespace SleepingCalamity.Core
     {
         public string Id, Asset, Lot; public ClutterKind Kind; public DecoPreset Preset; public bool Broken;
         public int Ring;               // 1 = on the square, 2 = beside a lane
-        public bool Yard;              // stands in its lot's front yard (on the lot's footing slab, Lift above the pad)
-        public float X, Z, Yaw, SizeX, SizeZ, Height, Lift;
+        public float X, Z, Yaw, SizeX, SizeZ, Height;
         public float TiltX, TiltZ;     // euler degrees for a leaning or toppled prop (the builder sits the tilted art on the ground)
         public bool Tilted => TiltX != 0f || TiltZ != 0f;
     }
@@ -61,7 +60,9 @@ namespace SleepingCalamity.Core
         public const float LaneMargin = 4f;             // beside a lane: within half its width plus this
         public const float SignHeight = 3.0f, SignDrop = 0.75f, SignArm = 0.9f, MinSignBoard = 2.25f;
         public const float MinLineEnd = 2.8f, MinLineSpan = 3f, MaxLineSpan = 10f, ClothHang = 1.0f, MinClothClearance = 2.0f, LineSag = 0.4f;
-        const float YardMargin = 0.3f, DoorCorridor = 1.8f, DressingGap = 0.1f, RowGap = 0.05f;
+        const float DressingGap = 0.1f, RowGap = 0.05f;
+        // The keep terrace's south wall strip (HollowmereBuilder.BuildKeep: wall, buttresses and planters on KeepWallZ, stair feet): no ground clutter there.
+        static readonly Footprint KeepStrip = new Footprint(Pt(0f, HollowmereLayout.KeepWallZ - 0.4f), 2f * (HollowmereLayout.KeepHalfWidth + 1f), 4f, 0f);
         const DecoPreset Rb = DecoPreset.Rebuilt, Ru = DecoPreset.Ruined;
 
         // ---------------------------------------------------------------------------------------------------- assets
@@ -93,6 +94,12 @@ namespace SleepingCalamity.Core
         }
 
         public static readonly string[] Trades = { "Bakery", "Inn", "Smithy", "Workshop", "Tailor", "Grocer" };
+        /// <summary>The trades that get a board in the town: the Bakery, Inn and Smithy buildings (and the schoolhouse) carry their own Part_Sign, so they get no second one.</summary>
+        public static readonly string[] SignedTrades = { "Workshop", "Tailor", "Grocer" };
+
+        /// <summary>True for a building whose kit art already has a Part_Sign (HollowmereArt / HollowmereInnArt Spec.Parts).</summary>
+        public static bool HasOwnSignArt(HollowmereLayout.BuildingKind kind) =>
+            kind == HollowmereLayout.BuildingKind.Bakery || kind == HollowmereLayout.BuildingKind.Inn || kind == HollowmereLayout.BuildingKind.Smithy || kind == HollowmereLayout.BuildingKind.Schoolhouse;
 
         // The building kind a trade sign hangs on (Tailor and Grocer go on ring 1 homes and townhouses).
         public static bool TradeFits(string trade, HollowmereLayout.BuildingKind kind, int ring)
@@ -109,26 +116,25 @@ namespace SleepingCalamity.Core
         }
 
         // ---------------------------------------------------------------------------------------------------- the wishes
-        // (lot, asset, side, u, v, yaw relative to outward, yard). Side F = the door side, R / L = the lot's right / left as seen from outside. u = metres beyond the
-        // lot edge to the item's centre (negative = inside the lot, yard rows), v = metres along the edge from the lot's centre line (F: + = right; R / L: + = outward
-        // along the door direction). yaw 0 = the art's front out, X along the edge; 90 = length along the edge (the handcart).
-        // Each wish is searched outward from its spot (Reach) and dropped when nothing near passes the rules.
-        const float Reach = 2.25f, ReachYard = 0.75f, Step = 0.25f;
+        // (lot, asset, side, u, v, yaw relative to outward). Side F = the door side, R / L = the lot's right / left as seen from outside. u = metres beyond the
+        // lot edge to the item's centre, v = metres along the edge from the lot's centre line (F: + = right; R / L: + = outward along the door direction).
+        // yaw 0 = the art's front out, X along the edge; 90 = length along the edge (the handcart).
+        // Each wish is searched outward from its spot (Reach) and dropped when nothing near passes the rules. Never inside a lot: yards belong to the garden pieces.
+        const float Reach = 2.25f, Step = 0.25f;
 
         struct Wish
         {
-            public string Lot, Asset; public char Side; public float U, V, Yaw; public bool Yard;
-            public Wish(string lot, string asset, char side, float u, float v, float yaw, bool yard = false) { Lot = lot; Asset = asset; Side = side; U = u; V = v; Yaw = yaw; Yard = yard; }
+            public string Lot, Asset; public char Side; public float U, V, Yaw;
+            public Wish(string lot, string asset, char side, float u, float v, float yaw) { Lot = lot; Asset = asset; Side = side; U = u; V = v; Yaw = yaw; }
         }
 
-        static Wish W(string lot, string asset, char side, float u, float v, float yaw = 0f, bool yard = false) => new Wish(lot, asset, side, u, v, yaw, yard);
+        static Wish W(string lot, string asset, char side, float u, float v, float yaw = 0f) => new Wish(lot, asset, side, u, v, yaw);
 
         static readonly Wish[] Wishes =
         {
             // ---- ring 1: the square's frontages. The bakery (flour sacks, a handcart), the inn, the homes and the two townhouses.
-            W("F02", "SackStack", 'F', -0.9f, -3.3f, 0f, true), W("F02", "CrateStack", 'F', -0.9f, 3.4f, 0f, true), W("F02", "SackStack", 'F', -0.9f, 4.2f, 10f, true),
-            W("F02", "Handcart", 'R', 1.4f, 2.0f, 90f), W("F02", "RainBarrel", 'L', 1.4f, 1.0f),
-            W("F09", "RainBarrel", 'F', 1.5f, -3.5f), W("F09", "CrateStack", 'F', 1.4f, 3.5f), W("F09", "FlowerBox", 'F', 1.4f, -1.9f), W("F09", "Handcart", 'F', 2.0f, 5.0f, 90f),
+            W("F02", "SackStack", 'F', 1.6f, -3.5f), W("F02", "Handcart", 'F', 2.2f, 4.2f, 90f), W("F02", "CrateStack", 'F', 1.5f, 0.5f), W("F02", "RainBarrel", 'L', 1.4f, 1.0f),
+            W("F09", "RainBarrel", 'F', 1.5f, -3.5f), W("F09", "CrateStack", 'F', 1.4f, 3.5f), W("F09", "FlowerBox", 'F', 1.4f, -1.9f),
             W("F04", "FlowerBox", 'F', 1.5f, 0.0f), W("F04", "RainBarrel", 'F', 1.6f, 2.4f),
             W("F05", "FlowerBox", 'F', 1.5f, 0.0f), W("F05", "RainBarrel", 'F', 1.6f, 3.0f),
             W("F06", "FlowerBox", 'F', 1.5f, -1.8f), W("F06", "RainBarrel", 'F', 1.6f, 3.0f),
@@ -136,22 +142,29 @@ namespace SleepingCalamity.Core
             W("F08", "FlowerBox", 'F', 1.5f, 0.0f), W("F08", "RainBarrel", 'F', 1.6f, 2.2f),
 
             // ---- ring 2: the Ring Lane's houses, shops and workshops.
-            W("R2_01", "CrateStack", 'F', 1.4f, -2.8f), W("R2_01", "RainBarrel", 'F', 1.4f, 2.8f), W("R2_01", "SackStack", 'F', -0.9f, 2.4f, 0f, true),
+            W("R2_01", "CrateStack", 'F', 1.4f, -2.8f), W("R2_01", "RainBarrel", 'F', 1.4f, 2.8f),
             W("R2_02", "FlowerBox", 'F', 1.4f, 0.0f), W("R2_02", "RainBarrel", 'F', 1.4f, 2.6f),
             W("R2_03", "FlowerBox", 'F', 1.4f, -1.8f), W("R2_03", "RainBarrel", 'F', 1.4f, 2.8f),
             W("R2_04", "FlowerBox", 'F', 1.4f, 0.0f), W("R2_04", "RainBarrel", 'F', 1.4f, -2.8f),
-            W("R2_05", "FlowerBox", 'F', 1.4f, -2.5f), W("R2_05", "RainBarrel", 'F', 1.4f, 3.8f), W("R2_05", "SackStack", 'F', 1.4f, 0.0f),
+            W("R2_05", "FlowerBox", 'F', 1.4f, -2.5f), W("R2_05", "RainBarrel", 'F', 1.4f, 3.8f),
             W("R2_06", "FlowerBox", 'F', 1.4f, 0.0f), W("R2_06", "RainBarrel", 'F', 1.4f, 2.6f),
-            W("R2_08", "CrateStack", 'F', 1.4f, -2.6f), W("R2_08", "Handcart", 'F', 1.9f, 2.6f, 90f), W("R2_08", "SackStack", 'F', -0.9f, -2.3f, 0f, true),
+            W("R2_08", "CrateStack", 'F', 1.4f, -2.6f), W("R2_08", "Handcart", 'F', 1.9f, 2.6f, 90f), W("R2_08", "SackStack", 'F', 1.4f, 0.2f),
             W("R2_09", "FlowerBox", 'F', 1.4f, 0.0f), W("R2_09", "RainBarrel", 'F', 1.4f, 2.2f),
             W("R2_11", "FlowerBox", 'F', 1.4f, 0.0f), W("R2_11", "RainBarrel", 'F', 1.4f, -2.6f),
             W("R2_12", "FlowerBox", 'F', 1.4f, -2.6f), W("R2_12", "RainBarrel", 'F', 1.4f, 3.8f), W("R2_12", "CrateStack", 'F', 1.4f, 0.0f),
-            W("R2_13", "CrateStack", 'F', 1.4f, 2.7f), W("R2_13", "SackStack", 'F', 1.4f, -2.7f), W("R2_13", "Handcart", 'F', 1.9f, 0.0f, 90f),
+            W("R2_13", "CrateStack", 'F', 1.4f, 2.7f), W("R2_13", "SackStack", 'F', 1.4f, -2.7f),
             W("R2_14", "FlowerBox", 'F', 1.4f, 0.0f), W("R2_14", "RainBarrel", 'F', 1.4f, 2.6f),
             W("R2_16", "FlowerBox", 'F', 1.4f, -2.8f), W("R2_16", "RainBarrel", 'F', 1.4f, 4.0f), W("R2_16", "CrateStack", 'F', 1.4f, 0.0f),
             W("R2_19", "CrateStack", 'F', 1.4f, -2.6f), W("R2_19", "SackStack", 'F', 1.4f, 2.6f), W("R2_19", "RainBarrel", 'F', 1.4f, 0.0f),
             W("R2_20", "FlowerBox", 'F', 1.4f, 0.0f), W("R2_20", "RainBarrel", 'F', 1.4f, -3.6f),
             W("R2_23", "CrateStack", 'F', 1.4f, 0.0f), W("R2_23", "RainBarrel", 'F', 1.4f, 2.6f),
+        };
+
+        // Spots on the square beside the market stalls (ring 1, anchored on a landmark instead of a lot): (asset, x, z, yaw, reach).
+        static readonly (string Asset, float X, float Z, float Yaw, float Reach)[] StallWishes =
+        {
+            ("Handcart", 9.2f, -6.6f, 90f, 2.5f),    // by the tools stall (Stall_3)
+            ("SackStack", 7.4f, 5.6f, 160f, 2.5f),   // by the produce stall (Stall_1)
         };
 
         // The well: the first of these spots that passes (ring, centre x, z). A square-edge spot clear of the capture sight lines first, then ring 2 lane widenings.
@@ -160,19 +173,22 @@ namespace SleepingCalamity.Core
             (1, 15.5f, 1.0f), (1, 14.5f, 2.5f), (1, 12.5f, 2.0f), (1, 16.5f, -0.2f),
         };
 
-        // Signs: (lot, trade, side of the face centre: +1 right / -1 left as seen from outside).
+        // Signs: (lot, trade, side of the face centre: +1 right / -1 left as seen from outside). Only buildings without their own Part_Sign: the workshops (no sign
+        // part in their kit) and a tailor and a grocer on the south townhouses. The bakery, inn, smithy and schoolhouse art carry their own boards.
         static readonly (string Lot, string Trade, int Side)[] SignWishes =
         {
-            ("F02", "Bakery", 1), ("F09", "Inn", 1), ("R2_01", "Smithy", 1),
             ("R2_08", "Workshop", 1), ("R2_13", "Workshop", 1), ("R2_19", "Workshop", -1), ("R2_23", "Workshop", 1),
             ("F06", "Tailor", -1), ("F07", "Grocer", 1),
         };
 
-        // Washing lines: neighbouring rebuilt houses (the wall of each that faces the other).
+        // Washing lines: neighbouring rebuilt houses (the wall of each that faces the other), at most ~7 m apart. A candidate that does not pass SpanProblems is dropped.
         static readonly (string A, string B, float UA, float UB, float AH, float BH)[] SpanWishes =
         {
             ("R2_11", "R2_12", 0.4f, 0.4f, 3.5f, 3.4f),
             ("R2_19", "R2_20", 0.4f, 0.4f, 3.5f, 3.4f),
+            ("R2_08", "R2_09", 0.3f, 0.3f, 3.5f, 3.3f),
+            ("R2_12", "R2_13", 0.3f, 0.3f, 3.5f, 3.4f),
+            ("R2_04", "R2_05", 0.3f, 0.3f, 3.5f, 3.4f),
         };
 
         // ---------------------------------------------------------------------------------------------------- lot frames
@@ -288,7 +304,7 @@ namespace SleepingCalamity.Core
             Spec well = SpecOf("Well");
             foreach (var s in WellSpots)
             {
-                ClutterRow r = NewRow("Clutter_Well", well, Rb, false, s.Ring, null, s.X, s.Z, 0f, false);
+                ClutterRow r = NewRow("Clutter_Well", well, Rb, false, s.Ring, null, s.X, s.Z, 0f);
                 if (Fits(c, r, rebuilt, null)) { rebuilt.Add(r); break; }
             }
             var perLot = new Dictionary<string, int>();
@@ -299,6 +315,14 @@ namespace SleepingCalamity.Core
                 perLot.TryGetValue(w.Lot, out int n);
                 ClutterRow r = Search(c, f, w, rebuilt, "Clutter_" + w.Lot + "_" + n + "_" + w.Asset);
                 if (r != null) { rebuilt.Add(r); perLot[w.Lot] = n + 1; }
+            }
+
+            int sq = 0;
+            foreach (var sw in StallWishes)
+            {
+                Spec s = SpecOf(sw.Asset);
+                ClutterRow r = SearchAround(c, s, Pt(sw.X, sw.Z), Pt(0f, 1f), Pt(1f, 0f), sw.Yaw, 1, null, sw.Reach, rebuilt, "Clutter_Sq_" + sq + "_" + sw.Asset);
+                if (r != null) { rebuilt.Add(r); sq++; }
             }
 
             foreach (var sw in SignWishes)
@@ -318,19 +342,22 @@ namespace SleepingCalamity.Core
                 if (sa == 0f || sb == 0f) continue;
                 TownPoint pa = a.Lot.Centre + a.Right * (sa * a.W * 0.5f) + a.Dir * (sp.UA * a.D * 0.5f);
                 TownPoint pb = b.Lot.Centre + b.Right * (sb * b.W * 0.5f) + b.Dir * (sp.UB * b.D * 0.5f);
-                plan.Spans.Add(new WashingSpan { Id = "Line_" + sp.A + "_" + sp.B, LotA = sp.A, LotB = sp.B, Preset = Rb, AX = pa.X, AZ = pa.Z, AH = sp.AH, BX = pb.X, BZ = pb.Z, BH = sp.BH, Sag = LineSag });
+                var span = new WashingSpan { Id = "Line_" + sp.A + "_" + sp.B, LotA = sp.A, LotB = sp.B, Preset = Rb, AX = pa.X, AZ = pa.Z, AH = sp.AH, BX = pb.X, BZ = pb.Z, BH = sp.BH, Sag = LineSag };
+                var spanErrors = new List<string>();
+                SpanProblems(c, span, spanErrors);
+                if (spanErrors.Count == 0) plan.Spans.Add(span);
             }
 
             AddRuined(c, plan);
             return plan;
         }
 
-        static ClutterRow NewRow(string id, Spec s, DecoPreset preset, bool broken, int ring, string lot, float x, float z, float yaw, bool yard)
+        static ClutterRow NewRow(string id, Spec s, DecoPreset preset, bool broken, int ring, string lot, float x, float z, float yaw)
         {
             return new ClutterRow
             {
-                Id = id, Asset = broken ? s.Broken : s.Asset, Kind = s.Kind, Preset = preset, Broken = broken, Ring = ring, Lot = lot, Yard = yard, X = x, Z = z, Yaw = yaw,
-                SizeX = broken ? s.BX : s.X, SizeZ = broken ? s.BZ : s.Z, Height = broken ? s.BH : s.H, Lift = yard ? 0.25f : 0f,   // the lot's footing slab top
+                Id = id, Asset = broken ? s.Broken : s.Asset, Kind = s.Kind, Preset = preset, Broken = broken, Ring = ring, Lot = lot, X = x, Z = z, Yaw = yaw,
+                SizeX = broken ? s.BX : s.X, SizeZ = broken ? s.BZ : s.Z, Height = broken ? s.BH : s.H,
             };
         }
 
@@ -342,7 +369,13 @@ namespace SleepingCalamity.Core
             if (w.Side == 'F') { o = b.Dir; a = b.Right; }
             else if (w.Side == 'R') { o = b.Right; a = b.Dir; }
             else { o = Pt(-b.Right.X, -b.Right.Z); a = b.Dir; }
-            float half = f.Side * 0.5f, yaw = YawOf(o) + w.Yaw, reach = w.Yard ? ReachYard : Reach;
+            float half = f.Side * 0.5f;
+            return SearchAround(c, s, f.Centre + o * (half + w.U) + a * w.V, o, a, YawOf(o) + w.Yaw, f.Ring, f.Id, Reach, accepted, id);
+        }
+
+        // The first spot that passes the rules, searched outward (nearest first) from baseP in steps along o (outward) and a (along the edge).
+        static ClutterRow SearchAround(Ctx c, Spec s, TownPoint baseP, TownPoint o, TownPoint a, float yaw, int ring, string lot, float reach, List<ClutterRow> accepted, string id)
+        {
             int n = (int)Math.Round(reach / Step);
             var offsets = new List<(float Du, float Dv)>();
             for (int i = -n; i <= n; i++) for (int j = -n; j <= n; j++) offsets.Add((i * Step, j * Step));
@@ -356,50 +389,54 @@ namespace SleepingCalamity.Core
             });
             foreach (var off in offsets)
             {
-                TownPoint p = f.Centre + o * (half + w.U + off.Du) + a * (w.V + off.Dv);
-                ClutterRow r = NewRow(id, s, Rb, false, f.Ring, f.Id, p.X, p.Z, yaw, w.Yard);
+                TownPoint p = baseP + o * off.Du + a * off.Dv;
+                ClutterRow r = NewRow(id, s, Rb, false, ring, lot, p.X, p.Z, yaw);
                 if (Fits(c, r, accepted, null)) return r;
             }
             return null;
         }
 
         // ---------------------------------------------------------------------------------------------------- ruined
-        // About a third of the ground rows, as the broken variants at the same spots (every kind at least once), the Well_Ruined at the Well's spot. Yard rows stay out
-        // (a Ruined lot shows its ruin there). Some are tilted. A spot that does not take the broken footprint is skipped for the next row.
+        // About a third of the ground rows, as the broken variants at the same spots (every kind at least once: a kind whose first spot does not take the broken
+        // footprint tries its next Rebuilt spot), the Well_Ruined at the Well's spot. Some are tilted.
         static void AddRuined(Ctx c, ClutterPlan plan)
         {
             var src = new List<ClutterRow>();
             ClutterRow well = null;
-            foreach (ClutterRow r in plan.Rows) { if (r.Kind == ClutterKind.Well) well = r; else if (!r.Yard) src.Add(r); }
-            int target = Math.Max(5, (int)Math.Floor(src.Count / 3.5f));
+            foreach (ClutterRow r in plan.Rows) { if (r.Kind == ClutterKind.Well) well = r; else src.Add(r); }
+            int target = Math.Max(7, (int)Math.Floor(src.Count / 3.5f));
             var chosen = new List<ClutterRow>();
             var ruined = new List<ClutterRow>();
-            if (well != null)
-            {
-                ClutterRow rw = Broken(well, "Clutter_Ru_Well", 0);
-                ruined.Add(rw);
-            }
+            if (well != null) ruined.Add(Broken(well, "Clutter_Ru_Well", 0));
             var taken = new HashSet<ClutterRow>();
             var kindsSeen = new HashSet<ClutterKind>();
             int idx = 0;
-            void Try(ClutterRow r)
+            bool Try(ClutterRow r, bool force)
             {
-                if (taken.Contains(r) || chosen.Count >= target) return;
+                if (taken.Contains(r) || (!force && chosen.Count >= target)) return false;
                 ClutterRow b = Broken(r, "Clutter_Ru_" + (r.Lot ?? "Sq") + "_" + r.Kind + "_" + idx, idx);
-                if (!Fits(c, b, ruined, null)) return;
+                if (!Fits(c, b, ruined, null))
+                {
+                    // the tilt or yaw jitter may be what fails: try it square-on
+                    b.Yaw = r.Yaw; b.TiltX = b.TiltZ = 0f;
+                    if (!Fits(c, b, ruined, null)) return false;
+                }
                 ruined.Add(b); chosen.Add(b); taken.Add(r); kindsSeen.Add(r.Kind); idx++;
+                return true;
             }
-            foreach (ClutterRow r in src) if (!kindsSeen.Contains(r.Kind)) Try(r);                 // one of each kind first
+            // one of each kind first, walking the Rebuilt spots of that kind until one takes the broken variant
+            foreach (ClutterKind k in new[] { ClutterKind.Handcart, ClutterKind.CrateStack, ClutterKind.SackStack, ClutterKind.RainBarrel, ClutterKind.FlowerBox })
+                foreach (ClutterRow r in src) if (r.Kind == k && !kindsSeen.Contains(k)) Try(r, true);
             int stride = Math.Max(1, src.Count / Math.Max(1, target));
             for (int pass = 0; pass < stride && chosen.Count < target; pass++)
-                for (int i = pass; i < src.Count && chosen.Count < target; i += stride) Try(src[i]);
+                for (int i2 = pass; i2 < src.Count && chosen.Count < target; i2 += stride) Try(src[i2], false);
             plan.Rows.AddRange(ruined);
         }
 
         static ClutterRow Broken(ClutterRow r, string id, int idx)
         {
             Spec s = SpecOf(r.Asset);
-            ClutterRow b = NewRow(id, s, Ru, true, r.Ring, r.Lot, r.X, r.Z, r.Yaw, false);
+            ClutterRow b = NewRow(id, s, Ru, true, r.Ring, r.Lot, r.X, r.Z, r.Yaw);
             if (s.Kind != ClutterKind.Well)
             {
                 b.Yaw = r.Yaw + ((idx * 37) % 41 - 20);
@@ -437,12 +474,11 @@ namespace SleepingCalamity.Core
             }
             foreach (Foundation f in t.Foundations)
             {
-                if (r.Yard && f.Id == r.Lot) { YardRules(c, r, f, fp, e); if (first && e.Count > 0) return; continue; }
                 if (pad.Overlaps(f.Footprint)) { e.Add(r.Id + " overlaps foundation " + f.Id); if (first) return; }
             }
-            if (r.Yard && (r.Lot == null || t.Foundation(r.Lot) == null)) e.Add(r.Id + ": a yard row needs its lot");
             foreach (Landmark l in t.Landmarks)
                 if ((l.Kind == LandmarkKind.Stall ? Inflated(r, StallMargin) : pad).Overlaps(l.Footprint)) { e.Add(r.Id + " overlaps landmark " + l.Id); if (first) return; }
+            if (fp.Overlaps(KeepStrip)) { e.Add(r.Id + " stands on the keep terrace wall strip"); if (first) return; }
             if (fp.Overlaps(HollowmereDressing.CornerRect)) { e.Add(r.Id + " stands in the approved beauty corner"); if (first) return; }
             foreach ((Footprint box, string lot) in c.CutFill) if (fp.Overlaps(box)) { e.Add(r.Id + " stands on the cut or fill wall of " + lot); if (first) return; }
             if (r.Ring != 1 && r.Ring != 2) { e.Add(r.Id + ": ring " + r.Ring + " is not 1 or 2"); if (first) return; }
@@ -450,7 +486,6 @@ namespace SleepingCalamity.Core
             foreach (DecoRow d in HollowmereDressing.Rows)
                 if (HollowmereDressing.InPreset(d.Preset, r.Preset) && Inflated(r, DressingGap).Overlaps(HollowmereDressing.FootprintOf(d))) { e.Add(r.Id + " overlaps square dressing " + d.Id); if (first) return; }
             // slope: the four corners and the centre must sit on ground within MaxSlope of each other
-            if (!r.Yard)
             {
                 float lo = float.MaxValue, hi = float.MinValue;
                 foreach (TownPoint p in fp.Corners()) { float g = HollowmereLayout.Ground(t, p.X, p.Z); lo = Math.Min(lo, g); hi = Math.Max(hi, g); }
@@ -464,20 +499,6 @@ namespace SleepingCalamity.Core
         }
 
         static bool SharesPreset(DecoPreset a, DecoPreset b) => a == DecoPreset.Both || b == DecoPreset.Both || a == b;
-
-        // A front-yard row: wholly inside its lot, clear of the building body and of the corridor from the front doorstep to the door.
-        static void YardRules(Ctx c, ClutterRow r, Foundation f, Footprint fp, List<string> e)
-        {
-            if (r.Preset != Rb) e.Add(r.Id + ": a yard row is Rebuilt only");
-            foreach (TownPoint p in fp.Corners()) if (!f.Footprint.Contains(p, -YardMargin)) { e.Add(r.Id + " is not inside the yard of " + f.Id); break; }
-            if (!c.ByLot.TryGetValue(f.Id, out Body b)) { e.Add(r.Id + ": " + f.Id + " has no building"); return; }
-            var body = new Footprint(b.Fp.Centre, b.W + 2f * YardMargin, b.D + 2f * YardMargin, b.Fp.Yaw);
-            if (fp.Overlaps(body)) e.Add(r.Id + " is too close to the building on " + f.Id);
-            float half = f.Side * 0.5f, len = Math.Max(0.2f, half - b.D * 0.5f) + 0.6f;
-            TownPoint centre = f.Centre + b.Dir * (b.D * 0.5f + len * 0.5f - 0.1f);
-            var corridor = new Footprint(centre, DoorCorridor, len, YawOf(b.Dir));
-            if (fp.Overlaps(corridor)) e.Add(r.Id + " blocks the door path of " + f.Id);
-        }
 
         static bool OnRing(TownLayout t, int ring, TownPoint p)
         {
@@ -522,6 +543,7 @@ namespace SleepingCalamity.Core
             if (f == null) { e.Add(s.Id + ": no lot " + s.Lot); return; }
             if (s.Preset != Rb) e.Add(s.Id + ": a sign needs a standing building, so Rebuilt only");
             HollowmereLayout.BuildingKind kind = HollowmereLayout.RebuiltBuilding(s.Lot);
+            if (HasOwnSignArt(kind)) e.Add(s.Id + ": the " + kind + " art already has its own Part_Sign");
             if (!TradeFits(s.Trade, kind, f.Ring)) e.Add(s.Id + ": a " + s.Trade + " sign does not belong on a " + kind + " (" + s.Lot + ")");
             if (s.Asset != "ShopSign_" + s.Trade) e.Add(s.Id + ": asset " + s.Asset + " is not the " + s.Trade + " sign");
             if (s.PivotHeight - SignDrop < MinSignBoard) e.Add(s.Id + ": the board's lowest point " + (s.PivotHeight - SignDrop).ToString("0.00") + " m is under " + MinSignBoard + " m");

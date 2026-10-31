@@ -61,6 +61,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_EastGate", new Vector3(64.2f, 1.65f, -54.6f), new Vector3(56.6f, -4.5f, -46f), 52f),       // Q8: the East Gate from the Mill Lane outside, looking back up at the wall (gate at about y -8.5)
             ("Cap_HM_SquareSouth", new Vector3(-6.0f, 1.65f, -17.0f), new Vector3(4f, 1.2f, -6f), 55f),   // benches, planters, the Market Street mouth and the bunting
             ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
+            ("Cap_HM_Clutter", new Vector3(45.3f, 1.65f, -33f), new Vector3(51f, -1.0f, -18f), 58f),      // Q14: up the east Ring Lane at R2_19's crates, sacks and workshop sign, and the washing line to R2_20
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -134,6 +135,7 @@ namespace SleepingCalamity.EditorTools
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
+            HollowmereClutter.Build(ruined, rebuilt, t);   // Q14: market and lane clutter, shop signs and washing lines
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
             BuildPathDebug(root, t);
 
