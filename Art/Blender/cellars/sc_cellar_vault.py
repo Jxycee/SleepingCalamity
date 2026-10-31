@@ -473,7 +473,7 @@ def p_stair_entry():
     nose = lambda y: STEP_H + slope * (-0.5 - y)
     top = lambda y: nose(y) + 2.1
     ya, yb = -0.5, -4.0
-    for sx in (-1, 1):   # side walls (brick) following the stair
+    for sx in (-1, 1):   # side walls (vault stone) following the stair
         prof = [(ya, 0.0), (yb, 0.0), (yb, top(yb)), (ya, top(ya))]
         bm = bmesh.new()
         f0 = [bm.verts.new((sx * 0.6, y, z)) for y, z in prof]; f1 = [bm.verts.new((sx * 1.0, y, z)) for y, z in prof]
@@ -484,7 +484,7 @@ def p_stair_entry():
         bmesh.ops.bevel(bm, geom=bm.edges[:], offset=0.025, segments=1, affect='EDGES')
         uvl = bm.loops.layers.uv.new('UVMap'); bm.normal_update()
         FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0, 0))
-        merge_faces(pc, bm, uvl, lambda f: 'brick')
+        merge_faces(pc, bm, uvl, lambda f: 'vault')
     prof = [(ya, top(ya) - 0.05), (yb, top(yb) - 0.05), (yb, top(yb) + 0.35), (ya, top(ya) + 0.35)]
     bm = bmesh.new()
     f0 = [bm.verts.new((-1.0, y, z)) for y, z in prof]; f1 = [bm.verts.new((1.0, y, z)) for y, z in prof]
@@ -791,15 +791,7 @@ def p_stair_flight():
     top = lambda y: s_nose(y) + 1.9                        # wall tops stay above every ring's springing (contract: nosing + 1.75)
     for sx in (-1, 1):                                     # sloped brick side walls
         bm = prism_ax([(0.0, -1.8), (2.0, -1.8), (2.0, top(2.0)), (0.0, top(0.0))], 'x', 0.6 if sx > 0 else -1.0, 1.0 if sx > 0 else -0.6)
-        solid(pc, bm, 'lime', cham=0.0)                    # worn limewash body (brick stays for the arch bands)
-        for j in range(5):                                 # wall stones, nearly flush (0.015 proud of the wall face at |x| 0.6)
-            y = R.uniform(0.2, 1.8)
-            box(pc, 'lime', (0.05, R.uniform(0.22, 0.34), R.uniform(0.1, 0.16)), (sx * 0.61, y, s_nose(y) + R.uniform(0.35, 1.3)), Rx(R.uniform(-0.6, 0.6)),
-                cham=0.01, wob=0.002, seed=R.random() * 90)
-        for j in range(3):                                 # bare brick showing through the limewash: thin patches (0.012 proud)
-            y = R.uniform(0.2, 1.8); w = R.uniform(0.2, 0.34); h = R.uniform(0.14, 0.24)
-            box(pc, 'brick', (0.04, w, h), (sx * (0.6 + 0.02 - 0.012), y, s_nose(y) + R.uniform(0.2, 1.3)), Rx(R.uniform(-0.1, 0.1)),
-                cham=0.006, wob=0.003, seed=R.random() * 90)
+        solid(pc, bm, 'vault', cham=0.0)                   # grey-brown rubble side walls (unchamfered: no dark seam at piece joins)
     for i in range(4):                                     # vault: stepped rings (0.4 down per 0.5 m) on a continuous mortar backing
         sp = 1.5 - 0.4 * i
         solid(pc, prism_ax(band_profile(0.0, sp, 0.64, 1.0), 'y', 0.5 * i - 0.01, 0.5 * (i + 1) + 0.01), 'mortar', cham=0.0)
@@ -845,12 +837,12 @@ def p_stair_turn():
         zt = -S_RISE * (k + 1)
         solid(pc, prism_ax([ca, pa, pb, cb], 'z', zt - 0.6, zt), 'vault', cham=0.02)
     lathe(pc, [(0, -1.0), (0.12, -1.0), (0.12, 0.9), (0.16, 0.92), (0.16, 1.02), (0.12, 1.04), (0.12, 2.05), (0, 2.05)], T(0.6, 0.0, 0.0), sides=14, mat='vault', seed=3.0)   # newel
-    box(pc, 'lime', (0.4, 1.2, 4.5), (-0.8, 0.6, 0.45), cham=0.0, wob=0.003, seed=1)           # outer wall (left)
+    box(pc, 'vault', (0.4, 1.2, 4.5), (-0.8, 0.6, 0.45), cham=0.0, wob=0.003, seed=1)           # outer wall (left)
     box(pc, 'brick', (2.0, 0.4, 4.5), (0.0, 1.4, 0.45), cham=0.025, wob=0.003, seed=2)            # outer wall (front)
-    box(pc, 'lime', (0.4, 0.4, 4.5), (0.8, -0.2, 0.45), cham=0.0, wob=0.003, seed=3)           # corner pier
+    box(pc, 'vault', (0.4, 0.4, 4.5), (0.8, -0.2, 0.45), cham=0.0, wob=0.003, seed=3)           # corner pier
     rr = 0.64                                              # exit tympanum above the next flight's arch (centre y 0.6, springing z 0.7)
     arc = [(1.2 * i / 14, 0.7 + math.sqrt(rr * rr - (1.2 * i / 14 - 0.6) ** 2)) for i in range(15)]
-    solid(pc, prism_ax(arc + [(1.2, 2.7), (0.0, 2.7)], 'x', 0.62, 1.0), 'lime', cham=0.025)
+    solid(pc, prism_ax(arc + [(1.2, 2.7), (0.0, 2.7)], 'x', 0.62, 1.0), 'vault', cham=0.025)
     arc_ring_x(pc, 'brick', 0.6, 0.7, 0.6, 0.85, 7, 0.56, 0.12, tag='stvous')                   # brick voussoir ring on the tympanum
     sail_slab(pc)
     # sail vault stonework: concentric courses on the dome, arch bands on the four wall lines
@@ -879,7 +871,7 @@ def p_stair_door():
     flags(pc, R, -0.62, 0.62, -1.2, 0.0, 2)                                                    # landing floor
     flags(pc, R, -1.6, 1.6, -3.6, -1.6, 4)                                                     # house floor
     for sx in (-1, 1):                                                                         # landing walls up to the springing
-        box(pc, 'lime', (0.4, 1.2, 1.9), (sx * 0.8, -0.6, 0.75), cham=0.0, wob=0.003, seed=sx + 5)
+        box(pc, 'vault', (0.4, 1.2, 1.9), (sx * 0.8, -0.6, 0.75), cham=0.0, wob=0.003, seed=sx + 5)
     ar = [(0.64 * math.cos(math.pi * (1 - i / 16)), 1.7 + 0.64 * math.sin(math.pi * (1 - i / 16))) for i in range(1, 16)]
     solid(pc, prism_ax([(-1.0, 1.7), (-0.64, 1.7)] + ar + [(0.64, 1.7), (1.0, 1.7), (1.0, 3.2), (-1.0, 3.2)], 'y', -1.2, 0.0), 'mortar', cham=0.0)   # backing over the vault
     for i, yc in enumerate((-0.9, -0.3)):
@@ -944,7 +936,7 @@ def stair_wear(name, p, n, mname, nz, st, r, g, b):
             g = max(g, 0.5 * max(0.0, nz * 2 - 0.15) * (1 - d / 0.3))                      # moss at the wall foot
     if mname == 'CV_Mortar':
         r = max(r, 0.55 + 0.2 * nz)                                                         # dark joints
-    if mname in ('CV_Limewash', 'CV_Brick') and abs(n.z) < 0.7:                             # stone-to-stone value variation: damp and soot patches
+    if mname in ('CV_VaultStone', 'CV_Brick') and abs(n.z) < 0.7:                          # stone-to-stone value variation: damp and soot patches
         pn = noise.noise(Vector((p.x * 5.3 + 7.0, p.y * 5.3, p.z * 5.3)))
         r = max(r, 0.5 * max(0.0, pn + 0.15))
     if name == 'StairFlight':
@@ -1008,7 +1000,7 @@ def wear_at(name, p, n, mname, place=None):
     if name == 'StairEntry' and mname == 'CV_VaultStone' and n.z > 0.6 and p.y < -0.45:
         b = 0.95 * max(0.0, 1 - abs(p.x) / 0.62) ** 0.6 * (0.8 + 0.2 * nz)
         r = max(r, 0.2)
-    if name == 'StairEntry' and p.y < -0.45 and mname in ('CV_Brick',):
+    if name == 'StairEntry' and p.y < -0.45 and n.z < 0.6 and mname in ('CV_Brick', 'CV_VaultStone'):
         r = max(r, 0.45)
     if name == 'FloorTile':
         r = 0.16 + 0.26 * max(0.0, nz + 0.2)

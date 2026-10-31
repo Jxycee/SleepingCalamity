@@ -21,6 +21,7 @@ namespace SleepingCalamity.EditorTools
         public const string ScenePath = "Assets/_Project/Scenes/UndercroftStair.unity";
         public const string KitFolder = "Assets/_Project/Content/Art/Cellar/B5/CellarStair";
         public const string KitFbx = "CellarStair.fbx";
+        const float HouseSpot = 14f, HouseFill = 3f;   // house daylight tuning
 
         // piece, position, yaw (degrees about +Y). Door and flight A share an origin: the door's landing runs the other way (local -Z).
         static readonly (string Name, string Piece, Vector3 Pos, float Yaw)[] Placements =
@@ -62,11 +63,14 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.Box(stair, "TunnelPlug", new Vector3(0f, 4.95f, -3.975f), new Vector3(1.2f, 0.5f, 0.15f), LookTestBuilder.Mat("vault_stone"));
 
             Transform lighting = new GameObject("StairLighting").transform; lighting.SetParent(root, false);
-            // House daylight through the door: a cool-neutral spot from the house (local z -3.2 of the door piece, 2.4 up) aimed down the first flight.
-            Vector3 housePos = new Vector3(3.2f, 11.0f, -0.2f), houseAim = new Vector3(3.3f, 9.8f, -2.6f);
-            Light day = LookTestBuilder.AddLight(lighting, "HouseDaylight", LightType.Spot, housePos, Quaternion.LookRotation(houseAim - housePos, Vector3.up),
-                new Color(0.86f, 0.89f, 0.96f), 18f, 10f, LightShadows.Soft);
-            day.spotAngle = 56f; day.innerSpotAngle = 30f;   // lights the door leaf, jambs and threshold, then the first flight
+            // The heroes' home (cistern-house) around the top camera: a 4 x 4 m shell, door wall's house face at world z -2.4, lit by broad cool window light from the east wall.
+            HouseShell(stair, room.SlotMap());
+            // Broad soft daylight from a window out of frame (east wall): a wide spot with soft shadows plus a shadowless cool fill, so walls, floor, leaf and jambs all read.
+            Vector3 winPos = new Vector3(4.9f, 11.0f, 0.5f), winAim = new Vector3(2.8f, 9.4f, -2.0f);
+            Light day = LookTestBuilder.AddLight(lighting, "HouseDaylight", LightType.Spot, winPos, Quaternion.LookRotation(winAim - winPos, Vector3.up),
+                new Color(0.86f, 0.89f, 0.96f), HouseSpot, 12f, LightShadows.Soft);
+            day.spotAngle = 110f; day.innerSpotAngle = 70f;
+            LookTestBuilder.AddLight(lighting, "HouseFill", LightType.Point, new Vector3(3.2f, 11.2f, -0.6f), Quaternion.identity, new Color(0.86f, 0.89f, 0.96f), HouseFill, 8f, LightShadows.None);
             // Few, small motes well down the stair (none within 2 m of a capture camera).
             DungeonCornerBuilder.Motes(lighting, "Motes_Stair", new Vector3(3.2f, 8.2f, -5.2f), new Vector3(0.8f, 0.9f, 1.2f), 24, own);
 
@@ -105,6 +109,29 @@ namespace SleepingCalamity.EditorTools
 
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC STAIR scene built " + ScenePath);
+        }
+
+        // House interior: limewashed stone walls, flagstone floor, two oak beams, a faint cool window quad on the east wall (the light itself comes from HouseDaylight).
+        static void HouseShell(Transform parent, Dictionary<string, Material> slots)
+        {
+            Material M(string k, string fallback) => slots != null && slots.TryGetValue(k, out Material m) ? m : LookTestBuilder.Mat(fallback);
+            Material lime = M("CV_Limewash", "limewash"), flag = M("CV_Flagstone", "flagstone"), oak = M("CV_Oak", "oak_timber");
+            Transform h = new GameObject("House").transform; h.SetParent(parent, false);
+            const float x0 = 1.2f, x1 = 5.2f, zN = -2.4f, zS = 1.6f, y0 = 9.0f, y1 = 11.8f, t = 0.2f;
+            LookTestBuilder.Box(h, "Floor", new Vector3((x0 + x1) / 2, y0 - 0.115f, (zN + zS) / 2), new Vector3(x1 - x0 + 0.4f, 0.2f, zS - zN + 0.2f), flag);
+            LookTestBuilder.Box(h, "Ceiling", new Vector3((x0 + x1) / 2, y1 + t / 2, (zN + zS) / 2), new Vector3(x1 - x0 + 0.4f, t, zS - zN + 0.4f), lime);
+            LookTestBuilder.Box(h, "WallW", new Vector3(x0 - t / 2, (y0 + y1) / 2, (zN + zS) / 2), new Vector3(t, y1 - y0, zS - zN + 0.4f), lime);
+            LookTestBuilder.Box(h, "WallE", new Vector3(x1 + t / 2, (y0 + y1) / 2, (zN + zS) / 2), new Vector3(t, y1 - y0, zS - zN + 0.4f), lime);
+            LookTestBuilder.Box(h, "WallS", new Vector3((x0 + x1) / 2, (y0 + y1) / 2, zS + t / 2), new Vector3(x1 - x0 + 0.4f, y1 - y0, t), lime);
+            // door wall shoulders beyond the piece's x 1.6..4.8 (the piece's wall is z -2.8..-2.4)
+            LookTestBuilder.Box(h, "DoorWallShoulderW", new Vector3((x0 + 1.6f) / 2, (y0 + y1) / 2, -2.6f), new Vector3(1.6f - x0, y1 - y0, 0.4f), lime);
+            LookTestBuilder.Box(h, "DoorWallShoulderE", new Vector3((4.8f + x1) / 2, (y0 + y1) / 2, -2.6f), new Vector3(x1 - 4.8f, y1 - y0, 0.4f), lime);
+            foreach (float z in new[] { -1.0f, 0.6f })
+                LookTestBuilder.Box(h, "Beam_" + z, new Vector3((x0 + x1) / 2, y1 - 0.14f, z), new Vector3(x1 - x0, 0.28f, 0.22f), oak);
+            Material win = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/UndercroftStair/M_US_Window.mat", Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found"));
+            win.SetColor("_BaseColor", new Color(0.3f, 0.32f, 0.36f)); win.EnableKeyword("_EMISSION"); win.SetColor("_EmissionColor", new Color(0.86f, 0.89f, 0.96f) * 1.2f);
+            win.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; EditorUtility.SetDirty(win);
+            LookTestBuilder.Box(h, "WindowQuad", new Vector3(x1 - 0.02f, 10.5f, 0.5f), new Vector3(0.03f, 1.1f, 0.7f), win);
         }
 
         // Soft round additive mote: a generated 32 px radial-falloff texture saved next to the stair's own material.
