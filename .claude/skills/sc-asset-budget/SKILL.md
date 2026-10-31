@@ -15,13 +15,13 @@ The facts behind them:
 - **Co-op:** up to four players' cameras, volumetrics, SSAO and lights share the frame (urp-stylised-realism section 10). Alpha-tested foliage shadows are a common hidden cost.
 
 ## Applying the budgets
+**Texture cap (user, 2026-10-30): the game targets 1440p, so nothing bakes above 2048 px.**
+
 | Tier | Budget (PHASE1 3.3) | Judge it as |
 |---|---|---|
 | T1 tileable / trim | 2K shared sets; 1024 px/m (ground, walls up to 3 m), 512 px/m (upper storeys, roofs, vault crowns) | texel density on the kit pieces that use it |
 | T2 kit piece | 0.5-5k tris, shared textures | per piece, and per metre of run against its kit neighbours |
 | T3 instanced piece | 50-400 tris each, one 2K set per family | per variant; the family's atlas is the texture cost |
-**Texture cap (user, 2026-10-30): the game targets 1440p, so nothing bakes above 2048 px.**
-
 | T4 hero prop | 30-60k tris, up to 2 x 2K | per prop |
 | Whole building (kit + heroes) | at most 75k tris; 6x2K + 2x1K | summed over every piece that belongs to it |
 | Hero character / enemy | 60k, 2K body + 2K head / 25k, one 2K set | per character |
