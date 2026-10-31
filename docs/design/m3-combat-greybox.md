@@ -198,6 +198,8 @@ and defence x3.3 are unchanged. Waves 1-4 keep their rosters and cooldowns.
 4. Do waves 5-8 feel harder through the mix and pace of enemies, without hits you could not see or answer?
 5. Do enemies waiting their turn read as waiting (circling at the edge), not as broken AI?
 
+**Retest result (user, 2026-10-30, on `main` after `955ddb4`):** "It feels better but we will need to continue iterating on it as we go." Combat tuning stays an ongoing thread through Phase 1, not a gate.
+
 ## Network simulator
 `Tests/PlayMode/CombatNetworkTests.Netsim_150msRtt_2PercentLoss_...` drives the Multiplayer Tools `NetworkSimulator` component (it works in PlayMode, in the
 editor). The simulator delays each packet at the send and the receive stage of both peers, so a per-packet 37 ms gives about 148 ms RTT (75 ms gave 300). For
