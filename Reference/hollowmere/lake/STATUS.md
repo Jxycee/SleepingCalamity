@@ -1,10 +1,10 @@
 State: IN PROGRESS
 Session: Q10. Lake shore, stream and ravine
-Progress: 75%
+Progress: 85%
 Sheet: Reference/hollowmere/lake/SHEET_water_r2.jpg
 Blocker: none
 
-Score: shore set (Blender) 29/40 self, controller agrees ~29; water r2 in Unity 27/40 (composition 3.5, proportion 3.5, form 3.5, surface 3, colour 3, story 3.5, set fit 3.5, liquid 3.5; target first+5 = 26.5 met); r1 was 21.5/40 (silhouette 3, proportion 3, form 2.5, surface 2.5, colour 2.5, story 2, set fit 3, liquid 3): the W1 fall is a white slab, normal speckle, pools too teal, no dressing yet. Coordinator: shore set ~28/40 APPROVED
+Score: coordinator APPROVED water r2 ~26/40 (my 27/40); shore set (Blender) 29/40 self, controller agrees ~29; water r2 in Unity 27/40 (composition 3.5, proportion 3.5, form 3.5, surface 3, colour 3, story 3.5, set fit 3.5, liquid 3.5; target first+5 = 26.5 met); r1 was 21.5/40 (silhouette 3, proportion 3, form 2.5, surface 2.5, colour 2.5, story 2, set fit 3, liquid 3): the W1 fall is a white slab, normal speckle, pools too teal, no dressing yet. Coordinator: shore set ~28/40 APPROVED
 Tris: LakeShore.fbx 11,118 (6 rocks 330-880, 3 reed clumps 560-732, jetty 5,650)
 SC RESULT: -
 Merge commit: -
@@ -47,3 +47,5 @@ Log:
 - Worktree note: subagents run in this checkout, not their own worktree: a fresh worktree would re-import the whole Unity Library on the cloud box (hours).
 - b7375df round 2: shore set placed (jetty 1, reeds 85, shore stones 55, stream boulders 31) by HollowmereLakeArt.cs; larger softer ripples (normal 0.08, tiles 16/9 m), muted colour, falls foam at lip/base only, shore foam gated by water depth. SC RESULT test-edit PASS 681/681; two reduced captures PASS.
 - Round 3 (last, per coordinator): less teal, weir sill reads as a pale plinth (dark wet stone + denser boulder rows), Mill cam pale slab, MillLane cam sees only the mill's shaded back, jetty framing. Then the -nographics rebuild, one check, merge.
+- Coordinator approved round 2; round 3 cancelled (agent stopped before it changed any file). Known, not blocking: the weir foam reads as white spikes/wedges, the near-shore lake is still a bit teal, the bare far shore is Q15's backdrop job; also the MillLane camera frames the mill's shaded back and the far jetty piles stop short of the bed.
+- 690fedf: merged origin/main (Q13). Graphics-run M_LS_*.mat deleted; a fresh Sonnet agent regenerates Hollowmere.unity + materials with a -nographics build, then one check. Code review (Sonnet reviewer) runs in parallel.
