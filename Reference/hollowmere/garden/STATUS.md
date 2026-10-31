@@ -1,5 +1,6 @@
 State: IN PROGRESS
-Session: Q6. Garden and allotment decorations
+Session: Wave 2: Ground tileables + foliage extension
+Job: Q6. Garden and allotment decorations
 Progress: 70%
 Sheet: Reference/hollowmere/garden/garden_sheet_r2.jpg
 Blocker: none
