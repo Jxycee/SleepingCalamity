@@ -41,9 +41,10 @@ namespace SleepingCalamity.EditorTools
             try
             {
                 EditorSceneManager.OpenScene(DungeonCornerBuilder.ScenePath, OpenSceneMode.Single);
-                Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include);
-                foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>()) LookTestCapture.RenderProbe(probe);
-                foreach (ParticleSystem ps in Object.FindObjectsByType<ParticleSystem>()) ps.Simulate(8f, true, true);   // motes exist in the edit-mode render
+                Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                System.Array.Sort(cams, (a, b) => string.CompareOrdinal(a.name, b.name));   // deterministic warm-up and save order
+                foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
+                foreach (ParticleSystem ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) ps.Simulate(8f, true, true);   // motes exist in the edit-mode render
                 LookTestCapture.WarmUp(cams);
                 foreach (Camera cam in cams)
                     if (cam.name.StartsWith("Cap_Cellar_")) LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + ".png"));

@@ -72,6 +72,8 @@ namespace SleepingCalamity.EditorTools
             if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(LookTestBuilder.RpAssetPath) == null) LookTestBuilder.EnsureRendering();
             BuilderUtil.EnsureFolder(MaterialsFolder);
             BuilderUtil.EnsureFolder(LookTestBuilder.RenderingFolder);
+            // The new scene first: NewScene(Single) unloads unused assets, so everything the scene uses is loaded after it (SceneBuilder's rule).
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             BuildProfile();
             BeautyCornerArt.EnsureCellarLantern();
             Dictionary<string, Material> own = BuildOwnMaterials();
@@ -80,7 +82,6 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC DUNGEON kit " + (kit != null ? KitFolder + "/" + KitFbx : "FBX missing, greybox for every piece"));
             Dictionary<string, Material> slots = kit != null ? SlotMaterials(own) : null;
 
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var root = new GameObject("DungeonCorner_Cellars").transform;
             Transform set = new GameObject("Set").transform; set.SetParent(root, false);
             var report = new SortedDictionary<string, string>();
@@ -247,7 +248,7 @@ namespace SleepingCalamity.EditorTools
                     LookTestBuilder.Prim(set, "CellarLantern_" + i, PrimitiveType.Sphere, hook - new Vector3(0, 0.2f, 0), Vector3.one * 0.22f, own["flame"]);
                     flame = hook - new Vector3(0, 0.2f, 0);
                 }
-                Light light = LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.0f, 10f, LightShadows.Soft);
+                LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.0f, 10f, LightShadows.Soft);
                 Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 36, own);
             }
         }
