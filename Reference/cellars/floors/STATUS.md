@@ -1,6 +1,6 @@
 Session: Q12. Whole-town look pass (local PC)
 Job: M5 Cellars floor generator
-Progress: 65%
+Progress: 85%
 Archive: no
 
 Stage 1 (pure Core, branch claude/m5-cellars-floors): `CellarFloorGenerator.Generate(seed, floor)` for floors 1-3, `PickRooms(seed, floor)`, `CellarFloorLayout` (hashes, ASCII dump) and `CellarFloorValidator`, all in Assets/_Project/Core/Cellars. Floor 4 is a fixed placeholder stub (entry, press hall, stair hall, chicane) until the bakery oven-maze step.
@@ -16,3 +16,7 @@ Stage 2 (greybox builder, 2026-10-31): `Presentation/Cellars/CellarFloorBuilder.
 - Captures: Reference/cellars/floors/floor_overview.jpg and floor_room.jpg (1920x1080). Palette (k 7): overview value p10/p50/p90 0.09/0.09/0.28, warmth +0.13; room 0.09/0.09/0.27, warmth +0.12. p50 is the black void and fog, so both sit under the Cellars band (0.12-0.16/0.30-0.40/0.65-0.75, warmth +0.20..+0.30). Lamps (16 on wall lanterns, 14 centre, 8 corridor) are far brighter than the corner's to read at all.
 - Tests: Tests/EditMode/CellarFloorBuilderTests.cs, 4 tests over 6 (seed, floor) cases (tiles per cell, door openings and walls checked with physics, marker counts, entry walkable + identical rebuild).
 - Rough: no ceiling or vault (the overview needs it open), corridors are full 4 m halls, no props or dressing sockets, tile joints read as black lines, lighting flat and dim.
+
+Stage 3 (netcode, 2026-10-31): `Presentation/Cellars/CellarFloorSync.cs` (NetworkBehaviour, prefab `Prefabs/CellarFloorSync.prefab` in the NetworkPrefabs list via PrefabBuilder). Host-authoritative: one host-written `NetworkVariable<DiveFloor>` holds (uint seed, floor 0-4) together (atomic, so late joiners get it with the spawn and no peer builds a mixed pair); every peer including the host runs CellarFloorGenerator + CellarFloorBuilder locally when the pair changes (floor 0 clears). `ServerSetFloor` refuses on a client.
+- Tests: Tests/PlayMode/CellarFloorNetworkTests.cs, host + 2 clients (second joins after the seed was set): seeds 12345 and 0xC0FFEE12 x floors 1,2; LayoutHash equal on every peer and equal to the generator (and the 12345/f1 golden), built tile/wall/door/pillar/lamp counts and per-group child counts equal, one rebuild per change, clear on floor 0. Not covered: relay latency, floor inside a scene load (manual 2-player walk).
+- Not wired yet: nothing in the game calls ServerSetFloor (the dive flow picks the seed in a later stage).
