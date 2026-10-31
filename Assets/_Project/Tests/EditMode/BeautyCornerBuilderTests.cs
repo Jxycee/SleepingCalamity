@@ -79,7 +79,8 @@ namespace SleepingCalamity.Tests.EditMode
                 {
                     Transform group = set.Find(r.Id);
                     Assert.IsNotNull(group, "scene has no group for " + r.Id);
-                    Assert.AreEqual(r.Instances.Length, group.childCount, r.Id + " instance count");
+                    if (r.Scatter) Assert.Greater(group.childCount, 0, r.Id + " is empty");   // scatter rows hold the whole data-driven placement in one child (or the greybox fallback)
+                    else Assert.AreEqual(r.Instances.Length, group.childCount, r.Id + " instance count");
                 }
                 Assert.AreEqual(3, root.GetComponentsInChildren<Camera>(true).Length);
                 Assert.IsNotNull(RenderSettings.sun);
