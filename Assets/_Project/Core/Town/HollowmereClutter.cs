@@ -72,15 +72,15 @@ namespace SleepingCalamity.Core
             public Spec(string asset, string broken, ClutterKind kind, float x, float z, float h, float bx, float bz, float bh) { Asset = asset; Broken = broken; Kind = kind; X = x; Z = z; H = h; BX = bx; BZ = bz; BH = bh; }
         }
 
-        // Footprints and heights from the contract table.
+        // Footprints and heights from the contract table, widened to the real exported extents (rounded up to 0.05) where the art overhangs.
         static readonly Spec[] Specs =
         {
-            new Spec("Handcart", "Handcart_Broken", ClutterKind.Handcart, 1.0f, 1.9f, 1.0f, 1.2f, 1.9f, 0.8f),
+            new Spec("Handcart", "Handcart_Broken", ClutterKind.Handcart, 1.05f, 1.9f, 1.0f, 1.2f, 1.95f, 0.8f),
             new Spec("CrateStack", "CrateStack_Broken", ClutterKind.CrateStack, 1.3f, 0.9f, 1.4f, 1.4f, 1.1f, 0.7f),
-            new Spec("SackStack", "SackStack_Broken", ClutterKind.SackStack, 1.2f, 0.9f, 0.9f, 1.2f, 1.0f, 0.4f),
-            new Spec("RainBarrel", "RainBarrel_Broken", ClutterKind.RainBarrel, 0.8f, 0.8f, 1.1f, 0.9f, 0.9f, 0.9f),
-            new Spec("FlowerBox", "FlowerBox_Broken", ClutterKind.FlowerBox, 1.4f, 0.45f, 0.7f, 1.4f, 0.5f, 0.45f),
-            new Spec("Well", "Well_Ruined", ClutterKind.Well, 2.0f, 2.0f, 3.0f, 2.0f, 2.0f, 1.4f),
+            new Spec("SackStack", "SackStack_Broken", ClutterKind.SackStack, 1.2f, 1.05f, 0.9f, 1.25f, 1.1f, 0.4f),
+            new Spec("RainBarrel", "RainBarrel_Broken", ClutterKind.RainBarrel, 0.85f, 0.9f, 1.1f, 0.95f, 0.95f, 0.9f),
+            new Spec("FlowerBox", "FlowerBox_Broken", ClutterKind.FlowerBox, 1.4f, 0.5f, 0.7f, 1.4f, 0.55f, 0.45f),
+            new Spec("Well", "Well_Ruined", ClutterKind.Well, 2.0f, 2.0f, 3.0f, 2.15f, 2.0f, 1.4f),
         };
 
         static Spec SpecOf(string asset) { foreach (Spec s in Specs) if (s.Asset == asset || s.Broken == asset) return s; throw new ArgumentException("no clutter asset " + asset); }
@@ -136,10 +136,10 @@ namespace SleepingCalamity.Core
             W("F02", "SackStack", 'F', 1.6f, -3.5f), W("F02", "Handcart", 'F', 2.2f, 4.2f, 90f), W("F02", "CrateStack", 'F', 1.5f, 0.5f), W("F02", "RainBarrel", 'L', 1.4f, 1.0f),
             W("F09", "RainBarrel", 'F', 1.5f, -3.5f), W("F09", "CrateStack", 'F', 1.4f, 3.5f), W("F09", "FlowerBox", 'F', 1.4f, -1.9f),
             W("F04", "FlowerBox", 'F', 1.5f, 0.0f), W("F04", "RainBarrel", 'F', 1.6f, 2.4f),
-            W("F05", "FlowerBox", 'F', 1.5f, 0.0f), W("F05", "RainBarrel", 'F', 1.6f, 3.0f),
+            W("F05", "FlowerBox", 'F', 1.5f, 0.0f), W("F05", "RainBarrel", 'F', 1.6f, 3.0f), W("F05", "SackStack", 'F', 1.6f, -3.2f),
             W("F06", "FlowerBox", 'F', 1.5f, -1.8f), W("F06", "RainBarrel", 'F', 1.6f, 3.0f),
             W("F07", "FlowerBox", 'F', 1.5f, 1.8f), W("F07", "RainBarrel", 'F', 1.6f, -3.0f), W("F07", "SackStack", 'F', 1.6f, 3.2f),
-            W("F08", "FlowerBox", 'F', 1.5f, 0.0f), W("F08", "RainBarrel", 'F', 1.6f, 2.2f),
+            W("F08", "FlowerBox", 'F', 1.5f, 0.0f), W("F08", "RainBarrel", 'F', 1.6f, 2.2f), W("F08", "SackStack", 'F', 1.6f, -2.6f),
 
             // ---- ring 2: the Ring Lane's houses, shops and workshops.
             W("R2_01", "CrateStack", 'F', 1.4f, -2.8f), W("R2_01", "RainBarrel", 'F', 1.4f, 2.8f),
