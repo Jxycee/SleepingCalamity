@@ -4,6 +4,7 @@
 //   bash Tools/cloud/unity.sh exec --graphics --method SleepingCalamity.EditorTools.HollowmereCapture.CaptureAll --out <scratch>   (env SC_CAPTURE_DIR = the PNG folder)
 // Files: <Camera>_<Preset>.png, e.g. HM_HomeDoor_Ruined.png. Builds the scene first unless SC_CAPTURE_NOBUILD is set.
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -42,7 +43,9 @@ namespace SleepingCalamity.EditorTools
             try
             {
                 EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
-                BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
+                // SC_CAPTURE_SUN=LowSun renders the low-sun look and adds "_LowSun" to the file names (default Midday, names unchanged).
+                bool low = System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") == "LowSun";
+                BeautyCornerBuilder.ApplyPreset(low ? BeautyCornerBuilder.Preset.LowSun : BeautyCornerBuilder.Preset.Midday);
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                 {
@@ -51,10 +54,12 @@ namespace SleepingCalamity.EditorTools
                     LookTestCapture.WarmUp(cams);
                     foreach (Camera cam in cams)
                     {
-                        if (!cam.name.StartsWith("Cap_HM_") && cam.name != "Cap_Corner_Wide") continue;
+                        if (!cam.name.StartsWith("Cap_HM_") && !cam.name.StartsWith("Cap_Corner_")) continue;
+                        string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");   // e.g. "SquareSouth,Fountain": only the cameras whose name contains one of them
+                        if (!string.IsNullOrEmpty(only) && !only.Split(',').Any(o => cam.name.Contains(o))) continue;
                         bool overview = cam.name == "Cap_HM_Overview", fog = RenderSettings.fog;
                         if (overview) RenderSettings.fog = false;   // the corner's haze is tuned for 10-40 m; at 100 m+ it would hide the town
-                        try { LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + preset + ".png")); }
+                        try { LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + preset + (low ? "_LowSun" : "") + ".png")); }
                         finally { RenderSettings.fog = fog; }
                     }
                 }
