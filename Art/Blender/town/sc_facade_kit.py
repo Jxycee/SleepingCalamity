@@ -39,7 +39,10 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
 plus the plinth and step (chosen at placement).
 
-Status (2026-10-30, cloud): review 28.5/40 at round 10 (calibrated rubric, brief 3). First review 26/40 (round 6);
+Status (2026-10-31, cloud): round 11 from the Unity corner review: plaster smooth-shaded and welded (the flat
+cells showed as dotted vertical seams in Unity), grime up to ~0.85 at the foot and a sheltered band under the jetty,
+timbers 7 cm proud and a shade darker (OAK_TINT) so the frame reads at the wide camera. Self-review 29.5/40.
+Earlier: review 28.5/40 at round 10 (calibrated rubric, brief 3). First review 26/40 (round 6);
 target 31 not reached after the 4-round limit: r7 +1 (plaster, flower box), r8 +0.5 (lean, kick, edge grime), r9 +1
 (heavy roof cap with rolled eave, deep-set windows, lean-to woodshed), r10 ~0 (lime patches, paint chips, bleached
 timber tops: too subtle at camera distance). About 31k tris, audit PASS (8 tiny degenerate faces in the hinge curls).
@@ -64,6 +67,7 @@ SEED = 0xB4
 TILE = 2.0                      # metres per tileable repeat (2K at 1024 px/m)
 SHUTTER_TINT = (0.57, 0.73, 0.28)  # painted_wood (#627b85) -> faded sage-forest green, about #4a6a48 (brief 0)
 DOOR_TINT = (0.50, 0.66, 0.25)     # the door a shade deeper green
+OAK_TINT = (0.80, 0.76, 0.72)      # a shade darker than the tileable: the frame reads at the wide camera
 DECAL_OPACITY = {'drip': 0.35, 'crack': 0.9, 'moss': 1.0}
 
 # ----------------------------------------------------------------------------- dimensions (metres)
@@ -71,7 +75,7 @@ W = 3.75                         # half width of the front
 DEPTH = 7.0
 PLINTH = 0.60
 TIM = 0.28                       # post / rail section (1.4x real)
-PROUD = 0.04                     # timber face stands this far in front of the plaster
+PROUD = 0.07                     # timber face stands this far in front of the plaster (deep relief, Unity review r10)
 GIRT0, GIRT1 = 2.80, 3.06        # ground-storey head beam
 JETTY = 0.45
 JOIST0, JOIST1 = 3.06, 3.28
@@ -194,7 +198,7 @@ def decal_mat(stem):
 def M(key):
     return {
         'plaster': lambda: tile_mat('FK_Plaster', 'B1_town/plaster', normal=0.55),
-        'oak': lambda: tile_mat('FK_Oak', 'B1_town/oak_timber', normal=1.2),
+        'oak': lambda: tile_mat('FK_Oak', 'B1_town/oak_timber', tint=OAK_TINT, normal=1.2),
         'oak_lt': lambda: tile_mat('FK_OakDoor', 'B1_town/oak_timber', tint=(1.35, 1.25, 1.15)),
         'stone': lambda: tile_mat('FK_Sandstone', 'B1_town/sandstone'),
         'stone_dk': lambda: tile_mat('FK_ChimneyStone', 'B1_town/sandstone', tint=(0.80, 0.74, 0.68)),
@@ -969,7 +973,10 @@ def write_wear(ob, chimney_top=None):
             nz = noise.noise(p * 2.1)
             # splashback band at the foot: strongest at the cobble line, ragged top
             streak = noise.noise(Vector((p.x * 5.0, p.y * 5.0, p.z * 0.7)))
-            r = max(0.0, 1 - p.z / (1.35 + 0.3 * nz + 0.25 * streak)) ** 1.2 * 0.9
+            r = max(0.0, 1 - p.z / (1.45 + 0.3 * nz + 0.25 * streak)) ** 1.0 * 0.85
+            # sheltered dust and soot under the jetty: ground-storey front, girt, joists and soffit
+            if 2.2 < p.z < JOIST1 + 0.02 and p.y > YU - 0.12 and p.x < W - 0.06:
+                r = max(r, min(0.6, (p.z - 2.2) / 0.85 * 0.6) * (0.85 + 0.15 * streak))
             # broad lime-wash mottling (every surface), so no mass reads showroom-clean
             r = max(r, 0.22 * max(0.0, noise.noise(p * 0.45 + Vector((3.1, 0.0, 1.7)))) +
                     0.06 * max(0.0, noise.noise(p * 2.3)))
@@ -991,7 +998,7 @@ def write_wear(ob, chimney_top=None):
                         r = max(r, (1 - dz / 0.55) ** 1.6 * (0.28 + 0.22 * streak))
             # damp darkening on the plinth, streaked downward
             if p.z < PLINTH + 0.05:
-                r = max(r, 0.45 + 0.2 * streak)
+                r = max(r, 0.6 + 0.2 * streak)
             # hand grime round the latch and on the door post edges
             dh = (p - door_h).length
             r = max(r, max(0.0, 1 - dh / 0.35) * 0.4)
@@ -1046,6 +1053,9 @@ def build():
     TIMBERS_L = [(lean_pt(a), lean_pt(b), hw) for (a, b, hw) in TIMBERS]
     for pc in pieces:
         me = bpy.data.meshes.new(pc.name)
+        pc_smooth = pc.name == 'Kit_Panels'
+        if pc_smooth:   # weld the plaster bands and sheets so no seam runs through a wall
+            bmesh.ops.remove_doubles(pc.bm, verts=pc.bm.verts[:], dist=0.002)
         pc.bm.normal_update(); pc.bm.to_mesh(me); pc.bm.free()
         for m in pc.mats:
             me.materials.append(m)
@@ -1054,7 +1064,9 @@ def build():
         lean(me)
         write_wear(ob, chimney_top=CHIM_TOP)
         for p in me.polygons:
-            p.use_smooth = False
+            p.use_smooth = pc_smooth   # plaster smooth: flat cells showed as dotted seams in Unity
+        if pc_smooth:   # keep wall corners crisp
+            me.set_sharp_from_angle(angle=math.radians(30))
         t = sum(len(p.vertices) - 2 for p in me.polygons); total += t
         print('  %-18s %6d tris  %s' % (pc.name, t, ', '.join(m.name for m in pc.mats)))
         obs.append(ob)
