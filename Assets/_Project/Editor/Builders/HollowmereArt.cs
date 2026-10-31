@@ -1,9 +1,10 @@
-// Final art for Hollowmere's ring-1 buildings (docs/superpowers/specs/2026-10-30-hollowmere-mass-production-design.md section 5.2), placed by HollowmereBuilder
-// on their lots when the export is in, else the builder keeps its greybox block. One FBX per building: Frame, Part_* meshes (pivot at their socket),
-// SOCKET_* empties under Frame and a flat FOOTPRINT box. The Rebuilt preset shows every part placed (P28: a building counts once all its parts are on).
-// Materials: the facade kit's shared-tileable WearLit slots (BeautyCornerArt.BuildFacadeMaterials) plus the building's own BK_* slots, built the same way
-// (a B1/B2 tileable tinted as the generator's tile_mat tint), so frame and parts share one look with the vertex-colour wear.
-// The FOOTPRINT is checked against the lot's size class and fails the build when it slips past it (design 10, footprint drift).
+// Final art for Hollowmere's buildings (docs/superpowers/specs/2026-10-30-hollowmere-mass-production-design.md section 5.2), placed by HollowmereBuilder
+// when the export is in, else the builder keeps its greybox: the bakery (ring 1), the smithy and schoolhouse (kit-ready shops on ring-2 lots) and the mill
+// landmark. One FBX per building: Frame, Part_* meshes (pivot at their socket), SOCKET_* empties under Frame and a flat FOOTPRINT box; a landmark adds a
+// Shell (its ruined state). The Rebuilt preset shows every part placed (P28: a building counts once all its parts are on); the mill shows Shell when ruined.
+// Materials: the facade kit's shared-tileable WearLit slots (BeautyCornerArt.BuildFacadeMaterials), the bakery's BK_* set (shared: the smithy's fire is
+// BK_Ember) and each building's own slots, built the same way (a B1/B2 tileable tinted as the generator's tile_mat tint, or a flat colour).
+// A lot building's FOOTPRINT is checked against the lot's size class and fails the build when it slips past it (design 10, footprint drift).
 using System;
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -29,16 +30,71 @@ namespace SleepingCalamity.EditorTools
             ("BK_Cloth", "canvas", new Color(1.05f, 0.62f, 0.55f)), ("BK_Gilt", "plaster", new Color(1.15f, 0.80f, 0.30f)),
         };
 
-        // Places the bakery art in the lot frame g (origin at the lot centre on its pad, local -Z = the lot's door side). False when the export is missing.
-        public static bool TryPlaceBakery(Transform g, Foundation f, float footingTop)
+        // One building export: folder, FBX, required parts, and its own slots beyond the facade and bakery sets.
+        public sealed class Spec
         {
-            GameObject fbx = BeautyCornerArt.LoadModel(BakeryFolder, "Bakery.fbx", keepMaterialSlots: true);
-            if (fbx == null) return false;
-            Dictionary<string, Material> slots = BakeryMaterials();
+            public string Name, Folder, Fbx; public string[] Parts;
+            public (string Slot, string Source, Color Tint)[] Tinted = new (string, string, Color)[0];
+            public (string Slot, Color Linear, float Smooth)[] Flat = new (string, Color, float)[0];
+        }
+
+        public static readonly Spec Bakery = new Spec { Name = "Bakery", Folder = BakeryFolder, Fbx = "Bakery.fbx", Parts = BakeryParts };
+        public static readonly Spec Smithy = new Spec { Name = "Smithy", Folder = "Assets/_Project/Content/Art/Town/Ring2/Smithy", Fbx = "Smithy.fbx",
+            Parts = new[] { "Part_Forge", "Part_Anvil", "Part_Sign" },
+            Tinted = new[] { ("BK_Leather", "canvas", new Color(0.50f, 0.30f, 0.18f)), ("BK_Coal", "soot_coal", new Color(0.55f, 0.55f, 0.58f)),
+                             ("BK_Ash", "soot_coal", new Color(2.6f, 2.5f, 2.4f)), ("BK_Grindstone", "sandstone", new Color(0.85f, 0.85f, 0.88f)) },
+            Flat = new[] { ("BK_Water", new Color(0.025f, 0.04f, 0.03f), 0.94f) } };   // the quench trough: dark, glossy
+        public static readonly Spec Schoolhouse = new Spec { Name = "Schoolhouse", Folder = "Assets/_Project/Content/Art/Town/Ring2/Schoolhouse", Fbx = "Schoolhouse.fbx",
+            Parts = new[] { "Part_Door", "Part_Bell", "Part_Sign" },
+            Tinted = new[] { ("SH_Limewash", "plaster", new Color(0.95f, 0.93f, 0.87f)), ("SH_Slate", "soot_coal", new Color(0.85f, 0.9f, 0.95f)),
+                             ("SH_Chalk", "plaster", new Color(1.45f, 1.45f, 1.42f)), ("SH_Rope", "canvas", new Color(1.0f, 0.85f, 0.62f)) },
+            // the bell: a flat warm bronze like the bell tower's BT_Bronze (the iron scan tinted stays too dark at distance)
+            Flat = new[] { ("SH_Bronze", new Color(0.55f, 0.36f, 0.16f), 0.45f), ("SH_Interior", new Color(0.035f, 0.025f, 0.018f), 0.1f) } };
+        public static readonly Spec Mill = new Spec { Name = "Mill", Folder = "Assets/_Project/Content/Art/Town/Ring3/Mill", Fbx = "Mill.fbx",
+            Parts = new[] { "Part_Wheel", "Part_Door" },
+            Tinted = new[] { ("ML_Rubble", "sandstone", new Color(0.80f, 0.77f, 0.72f)), ("ML_OakWeathered", "oak_timber", new Color(0.62f, 0.60f, 0.58f)),
+                             ("ML_WheelOak", "oak_timber", new Color(0.72f, 0.64f, 0.54f)), ("ML_Earth", "plaster", new Color(0.42f, 0.32f, 0.22f)),
+                             ("ML_Sack", "canvas", new Color(1.0f, 0.94f, 0.82f)), ("ML_Millstone", "sandstone", new Color(1.1f, 1.08f, 1.0f)) },
+            Flat = new[] { ("ML_Interior", new Color(0.035f, 0.025f, 0.018f), 0.1f) } };
+
+        public static bool TryPlaceBakery(Transform g, Foundation f, float footingTop) => TryPlaceBuilding(Bakery, g, f, footingTop);
+
+        // Places a lot building in the lot frame g (origin at the lot centre on its pad, local -Z = the lot's door side). False when the export is missing.
+        public static bool TryPlaceBuilding(Spec spec, Transform g, Foundation f, float footingTop)
+        {
+            GameObject obj = Instantiate(spec, g, footingTop);
+            if (obj == null) return false;
+            Vector2 size = FootprintSize(spec, obj, g);
+            float max = Foundation.MaxBuilding(f.Size);
+            if (size.x > max + 1e-3f || size.y > max + 1e-3f)
+                throw new InvalidOperationException(spec.Name + " FOOTPRINT " + size.x.ToString("0.00") + " x " + size.y.ToString("0.00") + " m is larger than the " + f.Size + " class allows (" + max + " m)");
+            Debug.Log("SC HOLLOWMERE " + spec.Name.ToLowerInvariant() + " on " + f.Id + " footprint=" + size.x.ToString("0.00") + "x" + size.y.ToString("0.00") + " class=" + f.Size + " parts=" + spec.Parts.Length);
+            return true;
+        }
+
+        // The mill landmark in its row frame g: Shell when ruined, Frame and its parts when rebuilt. False when the export is missing.
+        public static bool TryPlaceMill(Transform g, bool rebuilt)
+        {
+            GameObject obj = Instantiate(Mill, g, 0f);
+            if (obj == null) return false;
+            Transform shell = obj.transform.Find("Shell") ?? throw new InvalidOperationException("Mill.fbx has no Shell");
+            shell.gameObject.SetActive(!rebuilt);
+            foreach (Transform c in obj.transform)
+                if (c.name == "Frame" || c.name.StartsWith("Part_", StringComparison.Ordinal)) c.gameObject.SetActive(rebuilt);
+            Vector2 size = FootprintSize(Mill, obj, g);
+            Debug.Log("SC HOLLOWMERE mill " + (rebuilt ? "restored" : "shell") + " footprint=" + size.x.ToString("0.00") + "x" + size.y.ToString("0.00"));
+            return true;
+        }
+
+        static GameObject Instantiate(Spec spec, Transform g, float y)
+        {
+            GameObject fbx = BeautyCornerArt.LoadModel(spec.Folder, spec.Fbx, keepMaterialSlots: true);
+            if (fbx == null) return null;
+            Dictionary<string, Material> slots = Materials(spec);
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(fbx, g);
-            obj.name = "Art_Bakery";
-            obj.transform.localPosition = new Vector3(0f, footingTop, 0f);
-            obj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);   // the export's door side is local +Z (like the facade): turn it to the lot's -Z
+            obj.name = "Art_" + spec.Name;
+            obj.transform.localPosition = new Vector3(0f, y, 0f);
+            obj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);   // the export's door side is local +Z (like the facade): turn it to the frame's -Z
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
                 if (r.name == "FOOTPRINT") { r.enabled = false; continue; }
@@ -47,15 +103,22 @@ namespace SleepingCalamity.EditorTools
                 {
                     string slot = k < r.sharedMaterials.Length && r.sharedMaterials[k] != null ? r.sharedMaterials[k].name : "";
                     int dot = slot.IndexOf('.'); if (dot > 0) slot = slot.Substring(0, dot);
-                    if (!slots.TryGetValue(slot, out mats[k])) throw new InvalidOperationException("Bakery: no material for slot '" + slot + "' on " + r.name);
+                    if (!slots.TryGetValue(slot, out mats[k])) throw new InvalidOperationException(spec.Name + ": no material for slot '" + slot + "' on " + r.name);
                 }
                 r.sharedMaterials = mats;
             }
+            foreach (string p in spec.Parts)
+                if (obj.transform.Find(p) == null) throw new InvalidOperationException(spec.Fbx + " has no " + p);
+            return obj;
+        }
+
+        // The FOOTPRINT's x/z extent in frame g (rotation and any FBX unit scale included): its eight bounds corners through the hierarchy.
+        static Vector2 FootprintSize(Spec spec, GameObject obj, Transform g)
+        {
             Transform foot = null;
             foreach (Transform t in obj.GetComponentsInChildren<Transform>(true)) if (t.name == "FOOTPRINT") foot = t;
             MeshFilter fm = foot != null ? foot.GetComponent<MeshFilter>() : null;
-            if (fm == null || fm.sharedMesh == null) throw new InvalidOperationException("Bakery.fbx has no FOOTPRINT mesh");
-            // Its extent in the lot frame (rotation and any FBX unit scale included): the eight bounds corners through the hierarchy.
+            if (fm == null || fm.sharedMesh == null) throw new InvalidOperationException(spec.Fbx + " has no FOOTPRINT mesh");
             Bounds b = fm.sharedMesh.bounds;
             float x0 = float.MaxValue, x1 = float.MinValue, z0 = float.MaxValue, z1 = float.MinValue;
             for (int c = 0; c < 8; c++)
@@ -63,14 +126,39 @@ namespace SleepingCalamity.EditorTools
                 Vector3 p = g.InverseTransformPoint(foot.TransformPoint(new Vector3((c & 1) == 0 ? b.min.x : b.max.x, (c & 2) == 0 ? b.min.y : b.max.y, (c & 4) == 0 ? b.min.z : b.max.z)));
                 x0 = Mathf.Min(x0, p.x); x1 = Mathf.Max(x1, p.x); z0 = Mathf.Min(z0, p.z); z1 = Mathf.Max(z1, p.z);
             }
-            Vector3 size = new Vector3(x1 - x0, 0f, z1 - z0);
-            float max = Foundation.MaxBuilding(f.Size);
-            if (size.x > max + 1e-3f || size.z > max + 1e-3f)
-                throw new InvalidOperationException("Bakery FOOTPRINT " + size.x.ToString("0.00") + " x " + size.z.ToString("0.00") + " m is larger than the " + f.Size + " class allows (" + max + " m)");
-            foreach (string p in BakeryParts)
-                if (obj.transform.Find(p) == null) throw new InvalidOperationException("Bakery.fbx has no " + p);
-            Debug.Log("SC HOLLOWMERE bakery on " + f.Id + " footprint=" + size.x.ToString("0.00") + "x" + size.z.ToString("0.00") + " class=" + f.Size + " parts=" + BakeryParts.Length);
-            return true;
+            return new Vector2(x1 - x0, z1 - z0);
+        }
+
+        static Dictionary<string, Material> Materials(Spec spec)
+        {
+            Dictionary<string, Material> map = BakeryMaterials();
+            Shader wear = Shader.Find(WearShaderName);
+            foreach (var t in spec.Tinted) map[t.Slot] = Tinted(t.Slot, t.Source, t.Tint, wear);
+            foreach (var fl in spec.Flat) map[fl.Slot] = Flat(fl.Slot, fl.Linear, fl.Smooth, wear);
+            AssetDatabase.SaveAssets();
+            return map;
+        }
+
+        static Material Tinted(string slot, string source, Color tint, Shader wear)
+        {
+            Material src = LookTestBuilder.Mat(source) ?? throw new InvalidOperationException("LookTest material missing: " + source);
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + slot + ".mat", wear);
+            m.CopyPropertiesFromMaterial(src);
+            foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
+            float peak = Mathf.Max(1f, Mathf.Max(tint.r, Mathf.Max(tint.g, tint.b)));
+            m.SetColor("_BaseColor", new Color(tint.r / peak, tint.g / peak, tint.b / peak, 1f).gamma);   // linear tint handed over as sRGB, hue kept above 1
+            m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);   // same bytes with and without graphics
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        static Material Flat(string slot, Color linear, float smooth, Shader wear)
+        {
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + slot + ".mat", wear);
+            m.SetColor("_BaseColor", linear.gamma); m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", 0f);
+            m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         static Dictionary<string, Material> BakeryMaterials()
@@ -78,23 +166,8 @@ namespace SleepingCalamity.EditorTools
             Dictionary<string, Material> map = BeautyCornerArt.BuildFacadeMaterials();
             BuilderUtil.EnsureFolder(MaterialsFolder);
             Shader wear = Shader.Find(WearShaderName) ?? throw new InvalidOperationException("Shader not found: " + WearShaderName);
-            foreach (var s in BakerySlots)
-            {
-                Material src = LookTestBuilder.Mat(s.Source) ?? throw new InvalidOperationException("LookTest material missing: " + s.Source);
-                Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + s.Slot + ".mat", wear);
-                m.CopyPropertiesFromMaterial(src);
-                foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
-                float peak = Mathf.Max(1f, Mathf.Max(s.Tint.r, Mathf.Max(s.Tint.g, s.Tint.b)));
-                Color tint = new Color(s.Tint.r / peak, s.Tint.g / peak, s.Tint.b / peak, 1f);
-                m.SetColor("_BaseColor", tint.gamma);   // linear tint handed over as sRGB, as BuildFacadeMaterials
-                m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
-                EditorUtility.SetDirty(m);
-                map[s.Slot] = m;
-            }
-            Material interior = LookTestBuilder.Ensure(MaterialsFolder + "/M_BK_Interior.mat", wear);
-            interior.SetColor("_BaseColor", new Color(0.035f, 0.025f, 0.018f).gamma); interior.SetFloat("_Smoothness", 0.1f); interior.SetFloat("_Metallic", 0f);
-            interior.SetColor("_Color", interior.GetColor("_BaseColor")); interior.SetShaderPassEnabled("MotionVectors", true);   // same bytes with and without graphics
-            EditorUtility.SetDirty(interior); map["BK_Interior"] = interior;
+            foreach (var s in BakerySlots) map[s.Slot] = Tinted(s.Slot, s.Source, s.Tint, wear);
+            map["BK_Interior"] = Flat("BK_Interior", new Color(0.035f, 0.025f, 0.018f), 0.1f, wear);
             // The lit oven mouth: URP Lit with an HDR orange emission (the generator's strength 6 read as about x3 here, the corner's exposure is lower).
             Material ember = LookTestBuilder.Ensure(MaterialsFolder + "/M_BK_Ember.mat", Shader.Find("Universal Render Pipeline/Lit"));
             ember.SetColor("_BaseColor", new Color(0.35f, 0.08f, 0.01f).gamma); ember.SetFloat("_Smoothness", 0.2f);

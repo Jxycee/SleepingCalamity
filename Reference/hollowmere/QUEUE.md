@@ -1,6 +1,6 @@
 # Self-serve work queue (PC coordinator, 2026-10-31)
 
-**CLAIMING: PAUSED (usage pacing, 07:34 UTC).** While this line says PAUSED, a session that finishes sets its STATUS.md to DONE and stops, without claiming. The coordinator flips this line back to OPEN.
+**CLAIMING: OPEN (usage window reset 12:10 UTC).** The coordinator may set this to PAUSED for usage pacing; while it says PAUSED, a session that finishes sets DONE and stops without claiming.
 
 A cloud session that has finished and merged its task takes the top item whose `Claimed:` line is still `-`:
 1. Pull main.
@@ -21,12 +21,12 @@ Kit-ready list from design section 6. Smithy (M, forge and chimney, uses the wor
 
 ## Q3. Ring 2 fill and the play-position captures
 Folder: `Reference/hollowmere/ring2/`
-Claimed: -
+Claimed: cloud session claude/brave-keller-3d91gk (bell tower, Q1 done), 2026-10-31
 Once Q1 and the townhouse (`Reference/hollowmere/townhouse/`) are on main: give the Rebuilt preset a believable spread of homes across ring 2. Draw from the merged kit families with seeded variants and turns, at pad heights, leaving some lots empty with ruins. Then the design 7 capture set: square entry from the heroes' home, fountain, tithe gate and a lane mouth, each in Ruined and Rebuilt, at midday and low sun, with a contact sheet beside the approved corner (`Reference/hollowmere/approved_corner/`).
 
 ## Q4. Dungeon corner: B5 cellar vault kit and the room
 Folder: `Reference/hollowmere/dungeon_corner/`
-Claimed: -
+Claimed: cloud session claude/sharp-goldberg-vpyt8c (bakery, Q2 done), 2026-10-31
 `docs/PHASE1.md` 3.7, the B5 row and line 124: one barrel-vault cellar room with a wine-niche wall, larder shelves of jars, the coal chute, the B11 cellar lantern (on main), the breath grate, roots trickling in, and dust in the lamp shafts. It's lit exactly as generated floors will be. Generator `Art/Blender/cellar/sc_cellar_vault.py` (the kit pieces: vault segment, end wall, niche wall, arch, pillar, stair, floor tiles, chute) plus an editor builder for a `DungeonCorner_Cellars` scene with fixed capture cameras, like `BeautyCornerBuilder`. Decision A24: aim the room at the user's reference image (see `docs/superpowers/handoff/decisions-for-review.md`).
 
 ## Q5. Builder churn fix

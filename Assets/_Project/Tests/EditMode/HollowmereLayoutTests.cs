@@ -61,6 +61,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void RebuiltHomeKits_SitOnFreeRing2LotsThatFitTheirClass()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var cottage = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == HollowmereLayout.BuildingKind.StoneCottage).ToList();
+            var workshop = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == HollowmereLayout.BuildingKind.Workshop).ToList();
+            Assert.AreEqual(1, cottage.Count, "one stone cottage"); Assert.AreEqual(1, workshop.Count, "one workshop");
+            Assert.AreEqual(2, cottage[0].Ring); Assert.AreEqual(2, workshop[0].Ring);
+            Assert.AreEqual(FoundationSize.S, cottage[0].Size, "stone cottages are S class (FOOTPRINT up to 4.88 m)");
+            Assert.That(workshop[0].Size, Is.Not.EqualTo(FoundationSize.S), "the placed workshop variant (B, 6.73 x 6.30 m) needs an M or L lot");
+            Assert.AreNotEqual(0f, cottage[0].Y, "pad height kept"); Assert.AreNotEqual(0f, workshop[0].Y, "pad height kept");
+        }
+
+        [Test]
         public void ApprovedCorner_KeepsItsPlace()
         {
             TownLayout t = HollowmereLayout.Create();
@@ -276,6 +289,19 @@ namespace SleepingCalamity.Tests.EditMode
             }
             Assert.Greater(t.Foundations.Select(f => f.RuinTurn).Distinct().Count(), 2, "the turns vary from lot to lot");
             Assert.AreEqual(HollowmereLayout.Create().Foundations.Select(f => f.RuinTurn), t.Foundations.Select(f => f.RuinTurn), "turns are deterministic");
+        }
+
+        [Test]
+        public void Rebuilt_KitReadyShops_StandOnRing2MediumLots()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            foreach (var kind in new[] { HollowmereLayout.BuildingKind.Smithy, HollowmereLayout.BuildingKind.Schoolhouse })
+            {
+                var lots = t.Foundations.Where(f => HollowmereLayout.RebuiltBuilding(f.Id) == kind).ToList();
+                Assert.AreEqual(1, lots.Count, kind + " stands on exactly one lot");
+                Assert.AreEqual(2, lots[0].Ring, kind + " is a ring-2 shop");
+                Assert.AreEqual(FoundationSize.M, lots[0].Size, kind + " needs an M lot");
+            }
         }
 
         [Test]

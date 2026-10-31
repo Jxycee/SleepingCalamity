@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 85%
-Sheet: Reference/hollowmere/square/props_sheet_r1.jpg (props beside the approved corner; square captures next)
-Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test and the art finish+export are running on Sonnet agents)
+Progress: 94%
+Sheet: Reference/hollowmere/square/square_sheet_rebuilt.jpg (+ square_sheet_ruined.jpg, square_sheet_corner_check.jpg, props_sheet_r1.jpg)
+Blocker: none
 
 ## Done
 - Ground generator `Art/Blender/town/sc_square_ground.py` (branch claude/practical-tesla-lqajeo). Reads the plan from HollowmereLayout.cs,
@@ -39,3 +39,18 @@ Next: rebuild with the art, captures in both presets, check.
 
 ## Integration (in progress)
 Coordinator's quick prop fixes are folded in: mixed planting in the Rebuilt planters and pots (grass, weeds, ivy trailing over the front), the B8 lantern on every Rebuilt post, bunting sag 0.5-0.8 m with a shared fade tint. Built in Unity. Square captures are rendering now (both presets, midday + low sun, two new cameras Cap_HM_SquareSouth/SquareWest). Next: sheets, merge origin/main (townhouse bca6ee8), check, merge.
+
+## Paused (2026-10-31)
+The Unity agent was told to finish its current step and push. Open items: the black sticks in the east half (diagnosis pending), the wide green joints (SquareBed may move under the slab), the final captures/sheets, merging origin/main (townhouse bca6ee8), check, merge.
+
+## At the pause (5de3de5)
+Done: all 58 decorations use real art, 5 drains, 6 lanterns on the posts sharing one material, planters planted (grass/weed clumps + trailing ivy), bunting sag 0.6-0.8 m with the fade tint, the bed sunk under the slab inside the square. 32 captures in captures/ and three sheets (Rebuilt, Ruined, corner check: the corner ground is unchanged). Build PASS after the last merge.
+Left: (1) the black pegs are 355 loose setts lying on their sides from sc_square_ground.py: fix in the generator (fewer loose stones, lay them flat) and re-export; (2) merge origin/main (townhouse), rebuild, re-capture the two square cameras; (3) test-edit + check; (4) merge.
+
+## Resumed, coordinator review 27/40 (cheap fixes, no new round)
+- Black cubes: they were loose setts lying on their sides. Fixed in r2: 183-197 loose stones, most top-up and half sunk.
+- Uniform pattern: r3 adds relaid tone patches (darker/paler stone on a 4.5 m noise lattice), damp puddle hollows by the stalls and round the fountain, polished dark setts in the worn lines (64f7f82).
+- Hard grass edges: B9 moss/grass/weeds are being scattered on the square's 1,067 weed slots (Unity agent).
+- Dusk: warm 2700 K lamp pools at the post lanterns in LowSun only. The approved corner's lights and grade are left unchanged.
+- origin/main (townhouse) merged at 785cf90. Next: build, captures, test-edit, check, merge.
+- 7d8c39d: B9 tufts on the weed slots and warm lamp lights for low sun are committed. Captures rendering now; then merge origin/main (Q1 kits 3e4c2d8), build, test-edit, check, merge. Dressing stays inside the square and its stubs (Validate bounds it), clear of ring 2.
