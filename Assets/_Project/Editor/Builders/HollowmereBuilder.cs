@@ -41,9 +41,11 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Fountain", new Vector3(-6.5f, 1.65f, -9.5f), new Vector3(2.5f, 2.6f, 9f), 50f),
             ("Cap_HM_TitheGate", new Vector3(5.2f, 1.65f, 8.2f), new Vector3(5.6f, 5.5f, 22f), 55f),
             ("Cap_HM_LaneMouth", new Vector3(-0.4f, 1.65f, -40f), new Vector3(0f, 1.0f, -8f), 50f),
-            ("Cap_HM_LowSouth", new Vector3(-40f, 1.7f, -77.5f), new Vector3(-2f, -2f, -32f), 50f),     // from the Saltwake road below the Lower Gate, up at the town
-            ("Cap_HM_LowEast", new Vector3(70f, 1.7f, -6f), new Vector3(22f, 0f, -8f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
-            ("Cap_HM_Terraces", new Vector3(-31f, 1.7f, -47.5f), new Vector3(-8f, -1.5f, -24f), 52f),   // from the Ring Lane's south-west bend up the terraces to the square
+            ("Cap_HM_LakeShore", new Vector3(-22f, 1.7f, -84f), new Vector3(-2f, 3f, -20f), 50f),       // from the lake shore by R3_01 up at the hill town and the keep
+            ("Cap_HM_MarketStreet", new Vector3(0.6f, 1.65f, -19.8f), new Vector3(-0.5f, -6.5f, -58f), 55f), // the square's south edge down Market Street to the second terrace and the wall
+            ("Cap_HM_KeepStairs", new Vector3(-38f, 1.7f, 15.2f), new Vector3(-20f, 2.5f, 19.4f), 55f),  // along the Wall Ginnel: terrace step, west stair, keep wall
+            ("Cap_HM_KeepWall", new Vector3(-2f, 1.65f, -3f), new Vector3(2f, 3.2f, 19.6f), 60f),          // from the fountain: keep wall, buttresses, planters, stairs (Ruined shows it whole)
+            ("Cap_HM_LowEast", new Vector3(70f, 1.7f, -6f), new Vector3(22f, 0f, -8f), 50f),             // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -130,7 +132,7 @@ namespace SleepingCalamity.EditorTools
             foreach (var c in BeautyCornerTable.Cameras) LookTestBuilder.AddCapture(cams, c.Name, c.Pos, c.Target, c.Fov);
             foreach (var c in Cameras)
             {
-                Vector3 pos = c.Name == "Cap_HM_Overview" ? c.Pos : new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z);
+                Vector3 pos = c.Name == "Cap_HM_Overview" ? c.Pos : new Vector3(c.Pos.x, Mathf.Max(HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z), HollowmereLayout.WaterY) + c.Pos.y, c.Pos.z);   // never under the lake
                 Camera cam = LookTestBuilder.AddCapture(cams, c.Name, pos, c.Target, c.Fov);
                 cam.farClipPlane = 400f;
             }
