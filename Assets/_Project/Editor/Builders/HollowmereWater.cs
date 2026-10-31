@@ -6,6 +6,19 @@
 // upstream of the mill tail. Heights are sampled from the built terrain; neither the terrain nor the layout is changed.
 // Meshes: Assets/_Project/Content/Terrain/Hollowmere/HM_Water_*.asset; material M_HM_WaterSurface (SC_Water; not M_HM_Water, which would collide with the
 // greybox M_HM_water on case-insensitive file systems). Reflection probes: one over the lake, one along the ravine (baked at capture time like the corner's).
+// Round 2 knob changes (one per knob; before -> after):
+//   falls: flow foam was saturate((R*0.95 - streak*1.1 + 0.05)*2.2) = a solid slab on the fall; now saturate((R*0.5 - streak)*6 + 0.5), streak noise stretched along the flow
+//          (u freq 1.8/4.7 -> 3.0/6.5, v freq 0.55/1.3 -> 0.3/0.8): ~50% broken streaks at R = 1, fading with the run-out (SC_Water.shader)
+//   shore foam: new gate smoothstep(0.02, 0.04, water column), so a sheet over flat ground (column < 3 cm) shows none (SC_Water.shader)
+//   FlatClip: new, 0 -> 0.05 m: lake and pool cells whose four corners are all within 0.05 m of the level are not built (no sheet lying on flat ground)
+//   pool colour (EnsureMaterial): _Absorb (0.85,0.30,0.42) -> (0.60,0.30,0.50); _ShallowColor (0.30,0.40,0.16) -> (0.30,0.34,0.14);
+//          _DeepColor (0.015,0.13,0.15) -> (0.035,0.115,0.12); warmer olive/brown where the bed shows, muted blue-green in depth
+// Round 2b (coordinator addendum):
+//   ripples: _NormalScale 0.2 -> 0.08 (shader multiplies by 1 + 1.5 * saturate(G * 3.3): lake x1, pools x2.5 = 0.2), _Tile1 7 -> 16 m, _Tile2 3.1 -> 9 m (larger, softer)
+//   colour/reflection: _Absorb (0.60,0.30,0.50) -> (0.55,0.34,0.42); _ShallowColor (0.30,0.34,0.14) -> (0.26,0.28,0.18); _DeepColor (0.035,0.115,0.12) -> (0.06,0.10,0.12);
+//          _Scatter 0.55 -> 0.40; _FresnelMin 0.025 -> 0.06; _ReflStrength 1.0 -> 1.3 (the sky does most of the work, like Reference/hollowmere/lake/jetty_small_lake_pier.jpg)
+//   falls: vertex R along a fall 1 everywhere -> 0.3 + 0.7 * (2f - 1)^2 (foam at the lip and the base only; the boulders break the ribbon)
+//   mill-tail shore band: _FoamWidth 0.10 -> 0.06, _ShoreFoam 0.5 -> 0.4 (thin, broken)
 // Authority: none (editor builder, no networking). Called from HollowmereBuilder.BuildGround.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -22,6 +35,7 @@ namespace SleepingCalamity.EditorTools
         public const float HeadS = -8f;                  // the head bowl: the first pool starts here (clipped by the ground)
         public const float HalfWidth = 8f;               // corridor half width: the channel is ~12 m wide at -11, rims 6-7 m out
         public const float ClipAbove = 0.4f;             // a cell gets water when any corner ground is below level + this
+        public const float FlatClip = 0.05f;             // a cell whose four corners are all within this of the level is dropped (flat ground at the waterline)
         public const float RunoutLength = 4f;            // foam run-out below each fall (m)
         // Pool surface levels, top to bottom: Reach 1 (spring, s 0..30), Reach 2 (30..52), Reach 3 (52..mill, under the mill culvert), then the lake.
         public static readonly float[] PoolLevels = { -10.85f, -11.15f, -11.45f, -12.0f };
@@ -54,6 +68,7 @@ namespace SleepingCalamity.EditorTools
             }
             Place(stream, "Falls", FallsMesh(ground), water, false);
             Place(stream, "Weirs", WeirsMesh(), stone, true);
+            HollowmereLakeArt.Build(set, t, terrain);   // jetty, reeds, stones and boulders on and around the water (HollowmereLakeArt.cs)
 
             // Reflection probes: baked at capture time (LookTestCapture.RenderProbe), realtime-by-script in the scene like the corner's.
             Transform probes = Child(lake, "Probes");
@@ -76,8 +91,10 @@ namespace SleepingCalamity.EditorTools
             Material m = LookTestBuilder.Ensure(MaterialPath, sh);
             m.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(NormalPath));
             // The look numbers live here (a material keeps the defaults it was created with, so they are set on every build).
-            m.SetFloat("_NormalScale", 0.2f); m.SetFloat("_Tile1", 7f); m.SetFloat("_Tile2", 3.1f); m.SetFloat("_NormalFadeStart", 18f);
-            m.SetFloat("_FoamWidth", 0.10f); m.SetFloat("_ShoreFoam", 0.5f); m.SetFloat("_FlowFoam", 0.8f);
+            m.SetFloat("_NormalScale", 0.08f); m.SetFloat("_Tile1", 16f); m.SetFloat("_Tile2", 9f); m.SetFloat("_NormalFadeStart", 18f);
+            m.SetFloat("_FoamWidth", 0.06f); m.SetFloat("_ShoreFoam", 0.4f); m.SetFloat("_FlowFoam", 0.8f);
+            m.SetColor("_Absorb", new Color(0.55f, 0.34f, 0.42f, 1f)); m.SetColor("_ShallowColor", new Color(0.26f, 0.28f, 0.18f, 1f)); m.SetColor("_DeepColor", new Color(0.06f, 0.10f, 0.12f, 1f));
+            m.SetFloat("_Scatter", 0.40f); m.SetFloat("_FresnelMin", 0.06f); m.SetFloat("_ReflStrength", 1.3f);
             m.SetShaderPassEnabled("ShadowCaster", false);
             m.renderQueue = 3000;
             EditorUtility.SetDirty(m);
@@ -137,7 +154,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Position and smoothed horizontal flow direction at s.
-        static void Frame(float s, out Vector3 pos, out Vector3 fwd)
+        internal static void Frame(float s, out Vector3 pos, out Vector3 fwd)
         {
             pos = PosAt(s);
             fwd = PosAt(s + 1.5f) - PosAt(s - 1.5f);
@@ -145,7 +162,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Nearest point on the polyline: its arc length and distance (the lake's cut-off and the foam run-out use it).
-        static void Project(float x, float z, out float s, out float dist)
+        internal static void Project(float x, float z, out float s, out float dist)
         {
             EnsureArcs();
             TownPoint[] p = Path;
@@ -218,6 +235,7 @@ namespace SleepingCalamity.EditorTools
                 {
                     float lo = Mathf.Min(Mathf.Min(g[i, j], g[i + 1, j]), Mathf.Min(g[i, j + 1], g[i + 1, j + 1]));
                     if (lo >= level + ClipAbove) continue;
+                    if (Flat(g[i, j], g[i + 1, j], g[i, j + 1], g[i + 1, j + 1], level)) continue;
                     Project(x0 + (i + 0.5f) * h, z0 + (j + 0.5f) * h, out float s, out float dist);
                     if (dist <= HalfWidth + 1.5f && s < cutS) continue;   // the ravine upstream of the mill tail belongs to the reaches
                     ok[i, j] = true;
@@ -292,10 +310,14 @@ namespace SleepingCalamity.EditorTools
                 {
                     float lo = Mathf.Min(Mathf.Min(gr[r, k], gr[r + 1, k]), Mathf.Min(gr[r, k + 1], gr[r + 1, k + 1]));
                     if (lo >= level + ClipAbove) continue;
+                    if (Flat(gr[r, k], gr[r + 1, k], gr[r, k + 1], gr[r + 1, k + 1], level)) continue;
                     d.QuadUp(V(r, k), V(r + 1, k), V(r + 1, k + 1), V(r, k + 1));
                 }
             return Save(name, d, false);
         }
+
+        static bool Flat(float a, float b, float c, float d, float level) =>
+            Mathf.Abs(a - level) < FlatClip && Mathf.Abs(b - level) < FlatClip && Mathf.Abs(c - level) < FlatClip && Mathf.Abs(d - level) < FlatClip;
 
         static float Ease(float t) => t * t * (3f - 2f * t);
 
@@ -321,7 +343,8 @@ namespace SleepingCalamity.EditorTools
                         Vector3 n = (Vector3.up - slope * f).normalized;
                         var pos = new Vector3(p.x + c.x * dd, y, p.z + c.z * dd);
                         gr[r, k] = ground(pos.x, pos.z);
-                        idx[r, k] = d.Add(pos, n, c, 1f, new Vector2(dd, ss), new Color(1f, 1f, 0f, 1f));
+                        float edge = 2f * f01 - 1f;   // foam at the lip and the base only
+                        idx[r, k] = d.Add(pos, n, c, 1f, new Vector2(dd, ss), new Color(0.3f + 0.7f * edge * edge, 1f, 0f, 1f));
                     }
                 for (int r = 0; r < rows; r++)
                     for (int k = 0; k < cols; k++)

@@ -61,7 +61,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_EastGate", new Vector3(64.2f, 1.65f, -54.6f), new Vector3(56.6f, -4.5f, -46f), 52f),       // Q8: the East Gate from the Mill Lane outside, looking back up at the wall (gate at about y -8.5)
             ("Cap_HM_SquareSouth", new Vector3(-6.0f, 1.65f, -17.0f), new Vector3(4f, 1.2f, -6f), 55f),   // benches, planters, the Market Street mouth and the bunting
             ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
-            ("Cap_HM_LakeJetty", new Vector3(-22f, 1.3f, -80f), new Vector3(30f, -9f, -106f), 55f),      // low over the water by the future jetty, looking SE across the lake
+            ("Cap_HM_LakeJetty", new Vector3(-13.5f, 1.9f, -76.5f), new Vector3(-16f, -12.2f, -100f), 55f),   // Q10: from the north bank beside the jetty (root ~(-22,-82), deck heading SE), looking over it and the lake to the far shore
             ("Cap_HM_Ravine", new Vector3(107.8f, 1.7f, -21.4f), new Vector3(91f, -11.5f, -43f), 55f),    // from the ravine's bank at s ~22 downstream along the pools and weirs W1, W2
             ("Cap_HM_MillLane", new Vector3(60.5f, 1.65f, -51.5f), new Vector3(72f, -5f, -64f), 65f),         // on Mill Lane toward the mill and the stream
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)

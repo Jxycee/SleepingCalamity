@@ -27,8 +27,8 @@ Shader "SleepingCalamity/Water"
     {
         _NormalMap ("Water normal map (tileable)", 2D) = "bump" {}
         _NormalScale ("Normal strength", Range(0, 1.5)) = 0.2
-        _Tile1 ("Detail layer 1: metres per tile", Float) = 7.0
-        _Tile2 ("Detail layer 2: metres per tile", Float) = 3.1
+        _Tile1 ("Detail layer 1: metres per tile", Float) = 16.0
+        _Tile2 ("Detail layer 2: metres per tile", Float) = 9.0
         _FlowSpeed ("Flow speed (m/s at vertex colour G = 0.25)", Float) = 0.5
         _Drift ("Still-water drift (tiles/s)", Float) = 0.012
         _NormalFadeStart ("Normal detail starts fading (m)", Float) = 18
@@ -156,7 +156,7 @@ Shader "SleepingCalamity/Water"
                 float fade = 1.0 - 0.8 * saturate((dist - _NormalFadeStart) / _NormalFadeLen);
                 half3 n1 = UnpackNormalScale(SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, uvA), 1.0);
                 half3 n2 = UnpackNormalScale(SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, uvB), 1.0);
-                float2 nxy = (n1.xy + n2.xy) * (_NormalScale * fade);
+                float2 nxy = (n1.xy + n2.xy) * (_NormalScale * fade * (1.0 + 1.5 * saturate(i.color.g * 3.3)));   // lake (G 0) very gentle, stream reaches (G 0.3) x2.5, falls more
                 float3 N0 = normalize(i.nWS);
                 float3 T = normalize(i.tWS.xyz);
                 float3 B = cross(N0, T) * i.tWS.w;
@@ -209,13 +209,13 @@ Shader "SleepingCalamity/Water"
                 float lap = 0.5 + 0.5 * sin(t * _LapSpeed + phase);
                 float band = 1.0 - saturate(vertDepth / (_FoamWidth * (0.45 + 0.75 * lap)));
                 float fn = VNoise(fp * _FoamScale + t * 0.03) * 0.65 + VNoise(fp * _FoamScale * 2.9 - t * 0.05) * 0.35;
-                float shore = saturate((band - fn * 0.95 + 0.05) * 3.0) * _ShoreFoam;
+                float shore = saturate((band - fn * 0.95 + 0.05) * 3.0) * _ShoreFoam * smoothstep(0.02, 0.04, vertDepth);   // none under ~3 cm of water: no foam sheet on flat ground
 
                 // ---- flow foam from vertex colour R: streaks that run downstream
                 float fr = i.color.r;
                 float2 fuv = float2(i.uv.x, i.uv.y - flow * t * 1.2);
-                float streak = VNoise(float2(fuv.x * 1.8, fuv.y * 0.55)) * 0.6 + VNoise(float2(fuv.x * 4.7, fuv.y * 1.3 + 7.0)) * 0.4;
-                float flowFoam = saturate((fr * 0.95 - streak * 1.1 + 0.05) * 2.2) * _FlowFoam * saturate(fr * 3.0);
+                float streak = VNoise(float2(fuv.x * 3.0, fuv.y * 0.3)) * 0.6 + VNoise(float2(fuv.x * 6.5, fuv.y * 0.8 + 7.0)) * 0.4;   // stretched along the flow
+                float flowFoam = saturate((fr * 0.5 - streak) * 6.0 + 0.5) * _FlowFoam * saturate(fr * 3.0);                          // ~50% coverage at R = 1, thinning with the run-out
 
                 float foam = saturate(max(shore, flowFoam));
                 half3 foamCol = _FoamColor.rgb * (amb * 0.9 + L.color * (saturate(L.direction.y) * L.shadowAttenuation * 0.85));
