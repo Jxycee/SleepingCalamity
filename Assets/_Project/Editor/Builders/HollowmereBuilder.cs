@@ -57,6 +57,8 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_TownhouseSide", new Vector3(22f, 1.65f, -11f), new Vector3(5f, 5.0f, -27f), 55f),    // three-quarter on F07's front and east side
             ("Cap_HM_Kits", new Vector3(45.5f, 1.65f, 12f), new Vector3(39f, 2f, -1f), 62f),           // from the Ring Lane's north end looking south along the east run at the stone cottage on R2_09 and the workshop on R2_08 (kit families 2 and 4)
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
+            ("Cap_HM_LowerGate", new Vector3(-21.3f, 1.65f, -78f), new Vector3(-21.3f, -3.2f, -64.6f), 52f),   // Q8: the Lower Gate from the road outside, looking north up through the wall (Target is absolute: the gate stands at about y -7.4)
+            ("Cap_HM_EastGate", new Vector3(64.2f, 1.65f, -54.6f), new Vector3(56.6f, -4.5f, -46f), 52f),       // Q8: the East Gate from the Mill Lane outside, looking back up at the wall (gate at about y -8.5)
             ("Cap_HM_SquareSouth", new Vector3(-6.0f, 1.65f, -17.0f), new Vector3(4f, 1.2f, -6f), 55f),   // benches, planters, the Market Street mouth and the bunting
             ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
@@ -118,10 +120,10 @@ namespace SleepingCalamity.EditorTools
             Transform set = Child(root, "Set");
 
             BuildGround(set, t);
-            BuildWalls(set, t);
+            Transform ruined = Child(root, RuinedRoot), rebuilt = Child(root, RebuiltRoot);
+            BuildWalls(set, t, ruined, rebuilt);
             BuildKeep(set, t);
 
-            Transform ruined = Child(root, RuinedRoot), rebuilt = Child(root, RebuiltRoot);
             Transform both = Child(set, "Corner");
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows)
             {
@@ -130,7 +132,7 @@ namespace SleepingCalamity.EditorTools
                 if (placed != null) BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, placed);
             }
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
-            foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt); }
+            foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
             BuildPathDebug(root, t);
@@ -206,9 +208,11 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        static void BuildWalls(Transform set, TownLayout t)
+        static void BuildWalls(Transform set, TownLayout t, Transform ruined, Transform rebuilt)
         {
-            Wall(Child(set, "TownWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TownWallOffset, 16f), 0.5f), 2.4f, 1.0f);
+            // The town wall: the Q8 module kit per preset when its FBX are in (HollowmereTownWall), else today's greybox boxes under Set.
+            var townRun = HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TownWallOffset, 16f), 0.5f);
+            if (!HollowmereTownWall.TryBuild(ruined, rebuilt, t, townRun)) Wall(Child(set, "TownWall"), t, townRun, 2.4f, 1.0f);
             Wall(Child(set, "TerraceWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.TerraceOffset, 16f), 1.0f, 1.0f), 0.9f, 0.8f);
             Wall(Child(set, "LowerTerraceWall"), t, HollowmereLayout.WallRun(t, HollowmereLayout.OffsetLine(HollowmereLayout.LowerTerraceOffset, 16f), 1.0f, 1.0f), 0.9f, 0.8f);
         }
@@ -636,7 +640,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // --------------------------------------------------------------------------------------------- landmarks
-        static void BuildLandmark(Transform parent, Landmark l, Preset preset)
+        static void BuildLandmark(Transform parent, Landmark l, Preset preset, TownLayout t)
         {
             var go = new GameObject(l.Id);
             go.transform.SetParent(parent, false);
@@ -730,6 +734,7 @@ namespace SleepingCalamity.EditorTools
                     wheel.transform.localRotation = Quaternion.Euler(rebuilt ? 0f : 18f, 0f, 90f);
                     break;
                 case LandmarkKind.TownGate:
+                    if (HollowmereTownWall.PierHandled(parent, t, l, rebuilt)) break;   // Q8 gatehouse art (carries the piers); the greybox pier below is the fallback
                     LookTestBuilder.Box(g, "Pier", new Vector3(0f, l.Height * 0.5f - 1f, 0f), new Vector3(sx, l.Height + 2f, sz), stone, default, 2f);
                     break;
             }
