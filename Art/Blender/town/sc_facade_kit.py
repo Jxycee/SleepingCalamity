@@ -39,7 +39,10 @@ local origin at (-1.25, 0, 7.5), facing -Z. Export FBX -Z forward, Y up, transfo
 Budget (PHASE1 3.3 building, <= 75k tris): see the tris line printed per kit piece. Collider: one box per storey
 plus the plinth and step (chosen at placement).
 
-Status (2026-10-31, cloud): round 12 (TotK study): plinth is two courses of a few big pillowy stones over a dark
+Status (2026-10-31, cloud): round 13: upper windows 1.15 x 1.25 m clear with bigger shutters (Eguisheim ref
+proportion). Self-review 30.5/40 (silhouette 4, proportion 4, form 4, surface 3.5, colour 4, wear 3.5, set 3.5,
+glass/metal 3.5); target 31.
+Round 12 (TotK study): plinth is two courses of a few big pillowy stones over a dark
 recessed joint core, shade-damp band under the deep eave, ragged lifted eave course. Self-review 30/40.
 Round 11 from the Unity corner review: plaster smooth-shaded and welded (the flat
 cells showed as dotted vertical seams in Unity), grime up to ~0.85 at the foot and a sheltered band under the jetty,
@@ -89,8 +92,8 @@ OVER_EAVE, OVER_VERGE = 0.85, 0.55
 CHIM_TOP = 10.9
 DOOR = (-0.68, 0.42, 0.16, 2.36)   # x0, x1, z0 (threshold top), z1: 1.10 x 2.20 clear
 GWIN = (1.35, 2.65, 1.33, 2.25)    # ground window clear opening
-UWIN = [(-2.41, -1.49), (0.89, 1.81)]
-UWIN_Z = (4.21, 5.30)
+UWIN = [(-2.55, -1.40), (0.78, 1.93)]   # 1.15 m clear: shutters read as big as the Eguisheim refs
+UWIN_Z = (4.12, 5.37)
 YU = -JETTY                      # upper storey plaster plane
 
 def rng(stream):
@@ -630,7 +633,7 @@ def kit_windows():
 def kit_shutters():
     pc = Piece('Kit_Shutters')
     for k, (a, b) in enumerate(UWIN):
-        h = UWIN_Z[1] - UWIN_Z[0] + 0.04; w = (b - a) / 2 + 0.02
+        h = UWIN_Z[1] - UWIN_Z[0] + 0.06; w = (b - a) / 2 + 0.05
         for side, hx in ((-1, a), (1, b)):
             R = rng('shut%d%d' % (k, side))
             ang = math.radians(R.uniform(14, 28))   # stands off the wall at its outer edge
