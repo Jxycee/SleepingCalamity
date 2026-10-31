@@ -7,13 +7,12 @@
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
 // BeautyCornerBuilder.PlaceRow at their corner positions; the B8 stall is reused for stalls 2 and 3; the B4 bell tower when its folder exists. Everything
 // else is greybox on the LookTest materials. Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
-// approved corner looks the same here. Ground: HollowmereGround (Presentation), a mesh generated from the layout when the scene loads.
+// approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using SleepingCalamity.Core;
-using SleepingCalamity.Presentation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -168,15 +167,7 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- ground, water, walls, keep
         static void BuildGround(Transform set, TownLayout t)
         {
-            var go = new GameObject("Ground");
-            go.transform.SetParent(set, false);
-            go.transform.localPosition = new Vector3(0f, -0.02f, 0f);   // the corner's surround sat 2 cm down so the B6 setts read above it
-            go.AddComponent<MeshFilter>();
-            var r = go.AddComponent<MeshRenderer>();
-            Material paving = BeautyCornerArt.SurroundGround();
-            Material lane = LookTestBuilder.Mat("cobble");
-            r.sharedMaterials = new[] { M("meadow"), lane, paving != null ? paving : lane };
-            go.AddComponent<HollowmereGround>().Configure(new Vector2(-130f, -150f), new Vector2(140f, 100f), 1f, paving != null ? BeautyCornerArt.FarTileMetres : 3f, true);
+            HollowmereTerrain.Build(set, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
 
             var water = LookTestBuilder.Box(set, "Lake", new Vector3(HollowmereLayout.LakeCentre.X, HollowmereLayout.WaterY - 0.05f, HollowmereLayout.LakeCentre.Z),
                 new Vector3(HollowmereLayout.LakeRadiusX * 2.3f, 0.1f, HollowmereLayout.LakeRadiusZ * 2.3f), M("water"), default, 4f);
