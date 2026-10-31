@@ -1,9 +1,8 @@
 State: IN PROGRESS
 Session: Q2: Smithy, schoolhouse and mill (kit-ready buildings)
-Progress: 60%
+Progress: 65%
 Sheet: Reference/hollowmere/mill/SHEET_mill_final.jpg
 Needs: none
-Blocker: paused by coordinator for usage
 
 - Branch: claude/sharp-goldberg-vpyt8c (main merged at resume).
 - Schoolhouse DONE (art): sc_schoolhouse.py, Ring2/Schoolhouse/Schoolhouse.fbx, 29,480 tris, self 28/40, sheet Reference/hollowmere/kit_ready/schoolhouse/SHEET_schoolhouse_final.jpg.
