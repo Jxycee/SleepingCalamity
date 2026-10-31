@@ -147,6 +147,8 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
             RenderSettings.sun = sun;
 
+            HollowmereLook.BuildAtmosphere(root, t);   // Q12: town-wide pollen and god-ray shafts
+
             Transform cams = Child(root, "CaptureCameras");
             foreach (var c in BeautyCornerTable.Cameras) LookTestBuilder.AddCapture(cams, c.Name, c.Pos, c.Target, c.Fov);
             foreach (var c in Cameras)
@@ -156,7 +158,7 @@ namespace SleepingCalamity.EditorTools
                 cam.farClipPlane = 400f;
             }
 
-            BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
+            HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);   // the corner's light with the town-scale haze, sky and grade (Q12)
             ApplyPreset(Preset.Ruined);
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC HOLLOWMERE scene built " + ScenePath);
