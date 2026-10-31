@@ -22,13 +22,12 @@ namespace SleepingCalamity.EditorTools
         const string FbxName = "LaneKit.fbx", MaterialsFolder = "Assets/_Project/Content/Materials/Hollowmere", WearShaderName = "SleepingCalamity/WearLit";
         public const float LanternIntensity = 0.9f, LanternRange = 6f;
 
-        // LK_* slots (SOURCES.md): shared B1 tileable, linear tint, normal scale.
+        // LK_* slots (LaneKit/SOURCES.md, slots table): shared B1 tileable, linear tint, normal scale. LK_Earth and LK_GlassLit are flat (see BuildMaterials).
         static readonly (string Slot, string Source, Color Tint, float Bump)[] LkSlots =
         {
-            ("LK_Rubble", "sandstone", new Color(0.62f, 0.59f, 0.55f), 1.4f), ("LK_Dressed", "sandstone", new Color(1.05f, 1.00f, 0.92f), 1.0f),
-            ("LK_Mortar", "sandstone", new Color(0.48f, 0.44f, 0.40f), 1.0f), ("LK_Oak", "oak_timber", new Color(1f, 1f, 1f), 1.2f),
-            ("LK_GatePaint", "oak_timber", new Color(0.38f, 0.52f, 0.36f), 0.8f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
-            ("LK_Earth", "cobble", new Color(0.40f, 0.33f, 0.26f), 0.8f),
+            ("LK_Rubble", "sandstone", new Color(0.57f, 0.60f, 0.66f), 1.5f), ("LK_Dressed", "sandstone", new Color(1.00f, 0.95f, 0.86f), 1.3f),
+            ("LK_Mortar", "sandstone", new Color(0.26f, 0.245f, 0.21f), 0.6f), ("LK_Oak", "oak_timber", new Color(0.80f, 0.76f, 0.72f), 1.2f),
+            ("LK_GatePaint", "painted_wood", new Color(0.66f, 0.72f, 0.28f), 1.0f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
         };
 
         // Local box (centre, size) of each piece at the contract extents: the greybox mesh, and the collider of walls, piers and steps.
@@ -166,8 +165,11 @@ namespace SleepingCalamity.EditorTools
                 EditorUtility.SetDirty(m);
                 map[s.Slot] = m;
             }
-            Material glass = LookTestBuilder.Mat("LampGlow");
-            if (glass != null) map["LK_GlassLit"] = glass;   // emissive warm glass (the look-test lamp glow)
+            map["LK_Earth"] = BeautyCornerArt.Flat("LK_Earth", new Color(0.034f, 0.025f, 0.017f), 0.05f, wear);
+            Material glass = BeautyCornerArt.Flat("LK_GlassLit", new Color(0.9f, 0.55f, 0.2f), 0.7f, wear);   // warm lit glass: emissive linear (1, 0.62, 0.28) x 3
+            glass.SetColor("_EmissionColor", new Color(1f, 0.62f, 0.28f) * 3f); glass.EnableKeyword("_EMISSION");
+            glass.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; EditorUtility.SetDirty(glass);
+            map["LK_GlassLit"] = glass;
             AssetDatabase.SaveAssets();
             return map;
         }
