@@ -43,6 +43,16 @@ B1 = {
                        why='canvas and linen (awnings, banners): muted sun-faded ochre with a procedural plain weave and slubs; stripes are dyed into the threads'),
     'iron':       dict(src='rusty_metal_02', target='#4d4a48', hue_keep=0.0, delight=0.6, contrast=1.4, rough=(0.5, 0.35), nrm=1.0, post='iron', metal=1.0, vmin=0.04,
                        why='wrought iron: dark metal, rust only in placed patches (metallic 1 on bare metal, 0 on rust)'),
+    # Hollowmere terrain ground (wave 2, 2026-10-31): the three non-paved HollowmereTerrain layers, 3 m tiles (683 px/m: the terrain spans 300 m, so a
+    # 2 m tile repeats too visibly from the play cameras). height=True also writes <name>_height.png (the scan's displacement) for the terrain mask map's
+    # B channel, so the terrain's height blend lets soil show between grass clumps and grass creep over the path's stones.
+    'meadow_grass': dict(src='Grass004', provider='ambientcg', target='#6a7a3a', hue_keep=0.45, delight=0.75, contrast=1.15, chroma=0.92, rough=(0.35, 0.62), nrm=0.9,
+                         vary=0.10, post='meadow', height=True,
+                         why='HollowmereTerrain open ground: short meadow turf, yellow-green a step darker and drier than the foliage #6f8a34 (blades shade each other), with sunlit and darker clumps at 20-60 cm'),
+    'packed_soil':  dict(src='brown_mud_dry', target='#7a634b', hue_keep=0.45, delight=0.75, contrast=1.10, chroma=0.95, rough=(0.6, 0.38), nrm=1.0, vary=0.12, height=True,
+                         why='HollowmereTerrain steep banks, the ditch, the lake shore and bare lots: dry packed earth with small clods, warm mid brown'),
+    'worn_path':    dict(src='grass_path_2', target='#8c7d63', hue_keep=0.65, delight=0.75, contrast=1.10, chroma=1.00, rough=(0.7, 0.25), nrm=1.0, vary=0.16, height=True,
+                         why='HollowmereTerrain lane edges and trodden ground by doorsteps: worn earth and grit with grass tufts surviving in it (the grass-soil blend)'),
 }
 B2 = {
     'old_brick':  dict(src='brown_brick_02', target='#94654a', hue_keep=0.75, delight=0.6, contrast=1.25, chroma=0.85, rough=(0.8, 0.15), nrm=1.0, vary=0.14, post='brick',
@@ -74,6 +84,11 @@ def post_albedo(name, alb, ctx):
         st = np.fft.irfft2(F * np.exp(-2 * np.pi ** 2 * ((40.0 * fy) ** 2 + (0.8 * fx) ** 2)).astype(np.float32), s=(n, n)); st = st / (st.std() + 1e-6)
         lin = G.srgb2lin(alb) * (1 + 0.18 * np.clip(st, -2, 2)[..., None] * np.array([1.0, 0.9, 0.7], np.float32)[None, None, :])
         return G.lin2srgb(lin), -0.05 * st, z, None
+    if name == 'meadow':
+        # mid-scale turf clumps (20-60 cm at a 3 m tile): sunlit yellower tops and darker greener hollows, so the turf has a structure at play distance
+        clump = np.clip((G.fbm_periodic(n, 91, beta=2.2, kmin=3, kmax=12) - 0.5) * 2.4, -1, 1)
+        lin = G.srgb2lin(alb) * (1 + 0.26 * clump[..., None] * np.array([1.10, 1.0, 0.62], np.float32)[None, None, :])
+        return G.lin2srgb(lin), -0.04 * clump, clump * 6.0, None
     if name == 'bark':
         # damp sheen in the furrows: darker, lower roughness where the scan's luminance is lowest
         lin = G.srgb2lin(alb); L = G.luminance(lin); furrow = 1 - G.smoothstep(L / L.mean(), 0.45, 0.95)
@@ -152,7 +167,7 @@ def post_albedo(name, alb, ctx):
 def build_material(name, spec, src_dir, out_dir, rows):
     n = RES
     sid = spec['src']
-    P = lambda k, ext='jpg': os.path.join(src_dir, f'{sid}_{k}_2k.{ext}')
+    P = lambda k, ext='jpg': os.path.join(src_dir, f'{sid}_{k}_2k.{ext}')   # ambientCG maps are renamed to the same pattern (Color->diff, NormalGL->nor_gl, ...)
     src_rgb = G.load_srgb(P('diff'), n)
     alb = G.grade_albedo(src_rgb, spec['target'], spec.get('hue_keep', 0.6), spec.get('delight', 0.7), spec.get('contrast', 1.0),
                          spec.get('chroma', 1.0), vmin=spec.get('vmin', 0.0))
@@ -183,6 +198,10 @@ def build_material(name, spec, src_dir, out_dir, rows):
     G.save_rgb(alb, os.path.join(d, f'{name}_albedo.png'))
     G.save_rgb(nor, os.path.join(d, f'{name}_normal.png'))
     G.save_rgb(orm, os.path.join(d, f'{name}_orm.png'))
+    if spec.get('height'):
+        h = G.load_gray(P('disp'), n)
+        h = (h - h.min()) / max(float(h.max() - h.min()), 1e-6)
+        Image.fromarray((h * 255 + 0.5).astype(np.uint8), 'L').save(os.path.join(d, f'{name}_height.png'), optimize=True)
     rows.append(dict(name=name, spec=spec, alb=alb, seam=dict(albedo=G.seam_ratio(alb), normal=G.seam_ratio(nor), orm=G.seam_ratio(orm))))
     print('built', name, 'seam a/n/o %.2f %.2f %.2f' % tuple(rows[-1]['seam'].values()))
     return alb
@@ -205,12 +224,40 @@ def write_sources(batch_dir, batch, rows, src_records):
     for r in rows:
         s = r['spec']; a = r['measure']
         rec = src_records.get(s['src'], {})
-        lines.append('| %s | [%s](https://polyhaven.com/a/%s) | CC0 1.0 | %s | %s | %s | %s | %.2f / %.2f / %.2f | %.2f / %.2f / %.2f | hue_keep %.2f, delight %.2f, contrast %.2f, chroma %.2f, rough x%.2f+%.2f, normal x%.2f |'
-                     % (r['name'], s['src'], s['src'], rec.get('author', '?'), rec.get('fetched', '?'), s['target'], a['mean_hex'], a['p10'], a['p50'], a['p90'],
+        url = ('https://ambientcg.com/view?id=%s' if s.get('provider') == 'ambientcg' else 'https://polyhaven.com/a/%s') % s['src']
+        lines.append('| %s | [%s](%s) | CC0 1.0 | %s | %s | %s | %s | %.2f / %.2f / %.2f | %.2f / %.2f / %.2f | hue_keep %.2f, delight %.2f, contrast %.2f, chroma %.2f, rough x%.2f+%.2f, normal x%.2f |'
+                     % (r['name'], s['src'], url, rec.get('author', '?'), rec.get('fetched', '?'), s['target'], a['mean_hex'], a['p10'], a['p50'], a['p90'],
                         r['seam']['albedo'], r['seam']['normal'], r['seam']['orm'], s.get('hue_keep', 0.6), s.get('delight', 0.7), s.get('contrast', 1.0), s.get('chroma', 1.0),
                         s['rough'][0], s['rough'][1], s.get('nrm', 1.0)))
     lines += ['', 'Used for:', ''] + ['- **%s**: %s' % (r['name'], r['spec'].get('why', '')) for r in rows]
     return '\n'.join(lines) + '\n'
+
+
+def merge_sources(old, new):
+    """--only runs: replace (or append) just the rebuilt materials' table rows and 'Used for' lines in the existing SOURCES.md, keep everything else."""
+    def split(text):
+        rows, uses = {}, {}
+        for ln in text.splitlines():
+            if ln.startswith('| ') and not ln.startswith('| material') :
+                rows[ln.split('|')[1].strip()] = ln
+            elif ln.startswith('- **'):
+                uses[ln[4:].split('**')[0]] = ln
+        return rows, uses
+    nr, nu = split(new)
+    out, seen_r, seen_u = [], set(), set()
+    lines = old.splitlines()
+    for k, ln in enumerate(lines):
+        if ln.startswith('| ') and not ln.startswith('| material'):
+            key = ln.split('|')[1].strip(); out.append(nr.get(key, ln)); seen_r.add(key)
+            if k + 1 >= len(lines) or not lines[k + 1].startswith('| '):
+                out += [v for kk, v in nr.items() if kk not in seen_r]
+        elif ln.startswith('- **'):
+            key = ln[4:].split('**')[0]; out.append(nu.get(key, ln)); seen_u.add(key)
+            if k + 1 >= len(lines) or not lines[k + 1].startswith('- **'):
+                out += [v for kk, v in nu.items() if kk not in seen_u]
+        else:
+            out.append(ln)
+    return '\n'.join(out) + '\n'
 
 
 def read_records(src_dir):
@@ -238,8 +285,13 @@ def run_batch(batch, specs, args):
         if args.qa:
             os.makedirs(args.qa, exist_ok=True)
             G.tile3(r['alb'], 1024).save(os.path.join(args.qa, f"{batch}_{r['name']}_tile3.jpg"), quality=85)
-    if not only:
-        open(os.path.join(out_dir, 'SOURCES.md'), 'w', encoding='utf-8').write(write_sources(out_dir, batch, rows, read_records(args.src)))
+    sp = os.path.join(out_dir, 'SOURCES.md')
+    text = write_sources(out_dir, batch, rows, read_records(args.src))
+    if only and os.path.exists(sp):
+        text = merge_sources(open(sp, encoding='utf-8').read(), text)
+    open(sp, 'w', encoding='utf-8').write(text)
+    if only:
+        return rows
     json.dump({r['name']: dict(mean=r['measure']['mean_hex'], p=[r['measure'][k] for k in ('p10', 'p50', 'p90')], seam=r['seam']) for r in rows},
               open(os.path.join(args.qa or out_dir, f'{batch}_measure.json'), 'w'), indent=1)
     return rows

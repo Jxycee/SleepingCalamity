@@ -13,6 +13,9 @@ the source scans live outside git in `C:\Dev\_private\textures_src\` (fetched wi
 | painted_wood | [blue_painted_planks](https://polyhaven.com/a/blue_painted_planks) | CC0 1.0 | Rob Tuytel | 2026-10-29 | #62808c | #627b85 | 0.35 / 0.51 / 0.63 | 1.16 / 1.13 / 1.27 | hue_keep 0.30, delight 0.70, contrast 1.10, chroma 0.85, rough x0.70+0.20, normal x1.00 |
 | canvas | [rough_linen](https://polyhaven.com/a/rough_linen) | CC0 1.0 | colormass, Rico Cilliers | 2026-10-29 | #b08c52 | #a3845c | 0.48 / 0.66 / 0.68 | 1.04 / 1.36 / 1.25 | hue_keep 0.00, delight 0.90, contrast 1.50, chroma 0.95, rough x0.50+0.50, normal x1.60 |
 | iron | [rusty_metal_02](https://polyhaven.com/a/rusty_metal_02) | CC0 1.0 | Rob Tuytel | 2026-10-29 | #4d4a48 | #504845 | 0.26 / 0.32 / 0.35 | 1.35 / 2.38 / 1.25 | hue_keep 0.00, delight 0.60, contrast 1.40, chroma 1.00, rough x0.50+0.35, normal x1.00 |
+| meadow_grass | [Grass004](https://ambientcg.com/view?id=Grass004) | CC0 1.0 | ambientCG (Lennart Demes) | 2026-10-31 | #6a7a3a | #67763e | 0.35 / 0.45 / 0.56 | 1.16 / 1.19 / 1.11 | hue_keep 0.45, delight 0.75, contrast 1.15, chroma 0.92, rough x0.35+0.62, normal x0.90 |
+| packed_soil | [brown_mud_dry](https://polyhaven.com/a/brown_mud_dry) | CC0 1.0 | Rob Tuytel | 2026-10-31 | #7a634b | #725d47 | 0.32 / 0.43 / 0.56 | 1.17 / 1.15 / 1.32 | hue_keep 0.45, delight 0.75, contrast 1.10, chroma 0.95, rough x0.60+0.38, normal x1.00 |
+| worn_path | [grass_path_2](https://polyhaven.com/a/grass_path_2) | CC0 1.0 | Rob Tuytel | 2026-10-31 | #8c7d63 | #897a60 | 0.41 / 0.53 / 0.64 | 1.24 / 1.14 / 1.18 | hue_keep 0.65, delight 0.75, contrast 1.10, chroma 1.00, rough x0.70+0.25, normal x1.00 |
 
 Used for:
 
@@ -24,3 +27,6 @@ Used for:
 - **painted_wood**: painted wood (shutters, stalls): faded chalky blue-grey over bare wood (review 2026-10-30: muted OoT saturation)
 - **canvas**: canvas and linen (awnings, banners): muted sun-faded ochre with a procedural plain weave and slubs; stripes are dyed into the threads
 - **iron**: wrought iron: dark metal, rust only in placed patches (metallic 1 on bare metal, 0 on rust)
+- **meadow_grass**: HollowmereTerrain open ground: short meadow turf, yellow-green a step darker and drier than the foliage #6f8a34 (blades shade each other), with sunlit and darker clumps at 20-60 cm
+- **packed_soil**: HollowmereTerrain steep banks, the ditch, the lake shore and bare lots: dry packed earth with small clods, warm mid brown
+- **worn_path**: HollowmereTerrain lane edges and trodden ground by doorsteps: worn earth and grit with grass tufts surviving in it (the grass-soil blend)
