@@ -23,6 +23,9 @@
 // if room picking or placement is exhausted it retries over derived streams (Rng.Derive(seed, "cellars.retry", floor<<32 | n)), and as a last resort
 // builds MinimalPlan (the 2-3 smallest unlocked combat rooms) over derived streams. Retry 0 is the original stream, so seeds that worked keep their floor.
 // Generate(seed, floor, out fallback) reports 0 / 1 (retry) / 2 (last resort) so tests can count them.
+// Exit distance (variety layer 7, research 3.7a): a built floor whose walk from the first party start to the stair exit is shorter than MinExitDistance
+// steps is thrown away like any failed attempt (the attempt loop rolls again on the same stream), so the way down is never right next to the way in.
+// Floors that were already long enough keep their layout; only the short ones re-roll. The last resort relaxes the bound only after every stream failed it.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -43,7 +46,7 @@ namespace SleepingCalamity.Core
 
     public static class CellarFloorGenerator
     {
-        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16;
+        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16, MinExitDistance = 12;
         const int G = CellarFloorLayout.GridSize;
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
@@ -166,7 +169,7 @@ namespace SleepingCalamity.Core
             for (int retry = 0; retry <= BuildRetries; retry++)
             {
                 ulong stream = retry == 0 ? FloorSeed(seed, floor) : Rng.Derive(seed, "cellars.retry", ((ulong)floor << 32) | (uint)(0x10000 + retry));
-                CellarFloorLayout l = BuildWith(seed, plan, stream, MaxAttempts);
+                CellarFloorLayout l = BuildWith(seed, plan, stream, MaxAttempts, MinExitDistance);
                 if (l != null) { if (retry > 0 && fallback == 0) fallback = 1; return l; }
             }
             fallback = 2;
@@ -181,15 +184,20 @@ namespace SleepingCalamity.Core
             CellarFloorPlan plan = MinimalPlan(seed, floor);
             for (int n = 0; n < LastResortStreams; n++)
             {
-                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts);
+                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, MinExitDistance);
+                if (l != null) return l;
+            }
+            for (int n = 0; n < LastResortStreams; n++)   // no stream met the exit bound: a floor with a short exit beats no floor
+            {
+                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, 0);
                 if (l != null) return l;
             }
             throw new InvalidOperationException("CellarFloorGenerator: even the minimal plan did not place for seed " + seed + " floor " + floor);
         }
 
-        static CellarFloorLayout BuildWith(uint seed, CellarFloorPlan plan, ulong stream, int attempts)
+        static CellarFloorLayout BuildWith(uint seed, CellarFloorPlan plan, ulong stream, int attempts, int minExit)
         {
-            var b = new Builder(new Pcg32(stream));
+            var b = new Builder(new Pcg32(stream)) { MinExit = minExit };
             for (int attempt = 0; attempt < attempts; attempt++)
             {
                 b.Reset();
@@ -231,7 +239,8 @@ namespace SleepingCalamity.Core
             readonly int[] parent = new int[G * G];
             readonly int[] queue = new int[G * G];
             int lockedIndex = -1, lockedLink = -1;
-            public readonly int[] Fails = new int[5];   // attempts lost per stage: room placement, loops, dead ends, carriers, (spare); shown when Generate gives up
+            public int MinExit;                          // least entry-to-exit walking distance a built floor may have (0 = no bound)
+            public readonly int[] Fails = new int[5];   // attempts lost per stage: room placement, loops, dead ends, carriers, exit too close; shown when Generate gives up
 
             public Builder(Pcg32 rng) { this.rng = rng; }
 
@@ -526,7 +535,9 @@ namespace SleepingCalamity.Core
                 }
                 if (carriers.Count == 0) { Fails[3]++; return null; }
                 GateKeyCarrier carrier = carriers[rng.Range(0, carriers.Count)];
-                return Assemble(seed, plan.Floor, false, plan.Theme, carrier, keyRoom, need);
+                CellarFloorLayout built = Assemble(seed, plan.Floor, false, plan.Theme, carrier, keyRoom, need);
+                if (MinExit > 0 && built.EntryToExitDistance() < MinExit) { Fails[4]++; return null; }
+                return built;
             }
 
             // Fixed placement for the floor 4 stub (no rng, no checks beyond Fits).

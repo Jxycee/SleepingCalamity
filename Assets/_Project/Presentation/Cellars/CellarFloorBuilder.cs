@@ -3,6 +3,9 @@
 // gate, the gate-key carrier, the entry starts, the spawns and the stair exit. Everything is created from the layout alone (no Random, no time, no editor API), in
 // a fixed order, so every client that rebuilds (seed, floor) gets an identical hierarchy (stage 3 calls Build at runtime on every client).
 // World frame: x grows east, z grows north, so grid y (south) maps to -z; cell (x, y) has its centre at ((x + 0.5) * 4, 0, -(y + 0.5) * 4).
+// Variety layers (Core/Cellars/CellarFloorDressing + CellarAtmosphere): the builder also resolves the floor's dressing from the same layout and shows it: greybox
+// shapes per filled socket (empty sockets draw nothing), the vignette prop groups, and the atmosphere (lamp count and intensity, fog density and tint, an odd-light
+// patch, a dust-motes marker). Still a pure function of the layout, so every peer gets the same hierarchy.
 // Authority: none (presentation of static data). Art is optional: pass a CellarFloorKit with materials and prefab templates (the Editor builder does) or null
 // for plain URP Lit colours.
 using System.Collections.Generic;
@@ -19,6 +22,8 @@ namespace SleepingCalamity.Presentation
         public GameObject FloorTile;            // optional template: a 2 x 2 m flagstone, x -1..1, z 0..2, top at y 0 (four per cell); inactive templates are fine
         public GameObject Lantern;              // optional template: a lantern with its pivot at the bottom centre
         public Material LanternMaterial;        // applied to every renderer of the lantern clones when set
+        public float FogBaseDensity;            // > 0: Build sets RenderSettings exponential fog to this density times the floor's FogPercent, tinted from FogBaseColor
+        public Color FogBaseColor;              // the scene's fog colour before the floor's warm offset
     }
 
     public sealed class CellarFloorBuild
@@ -26,6 +31,10 @@ namespace SleepingCalamity.Presentation
         public Transform Root;
         public Bounds Bounds;                   // world bounds of the occupied cells (floor level)
         public int FloorTiles, Walls, DoorOpenings, Pillars, Lamps;
+        public CellarFloorDressing Dressing;    // the resolved sockets, vignettes and atmosphere this build shows
+        public int DressingProps, VignetteGroups;
+        public bool DustMotes;                  // the floor's dust is thick enough to show (a marker object stands in until the particle prefab exists)
+        public float FogDensity;                // the density applied when the kit asked for fog, else 0
         public Vector3 EntryCenter;             // the first entry start cell
     }
 
@@ -33,6 +42,7 @@ namespace SleepingCalamity.Presentation
     {
         public const float CellSize = CellarFloorLayout.CellMeters, WallHeight = 3.6f, WallThickness = 0.4f, DoorWidth = 2.4f, DoorHeight = 2.8f, PillarSize = 1.0f;
         public const string FloorGroup = "Floor", WallGroup = "Walls", DoorGroup = "Doors", PillarGroup = "Pillars", MarkerGroup = "Markers", LampGroup = "Lamps";
+        public const string DressingGroup = "Dressing", VignetteGroup = "Vignettes", AtmosphereGroup = "Atmosphere";
         const float Tile = 2f;
         static readonly Color GoldLamp = new Color(0.839f, 0.635f, 0.290f);   // #d6a24a
 
@@ -175,8 +185,12 @@ namespace SleepingCalamity.Presentation
                 }
             }
 
+            CellarFloorDressing dressing = CellarFloorDressing.Resolve(layout); result.Dressing = dressing;
             Markers(layout, markers, mats, kit, result);
-            Lamps(layout, grid, lamps, kit, mats, result);
+            Lamps(layout, dressing, lamps, kit, mats, result);
+            DressSockets(dressing, Group(root, DressingGroup), mats, result);
+            Vignettes(dressing, Group(root, VignetteGroup), mats, result);
+            Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
             return result;
         }
 
@@ -239,21 +253,25 @@ namespace SleepingCalamity.Presentation
         }
 
         // ------------------------------------------------------------------------------------------------ lamps
-        // Room Lantern sockets hang on their wall; a room without one gets a centre lamp; every third corridor cell gets a ceiling lamp.
-        static void Lamps(CellarFloorLayout layout, Grid grid, Transform group, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
+        // Filled room Lantern sockets hang on their wall; a room with no Lantern socket at all gets a centre lamp; most corridor cells get a ceiling lamp (every third, thinned by
+        // the floor's lamp percent). The lamp percent also scales every intensity; on a dark floor combat rooms without a lantern socket keep their centre lamp off.
+        static void Lamps(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
         {
+            CellarAtmosphere atm = dressing.Atmosphere; float k = Mathf.Clamp(atm.LampPercent, 20, 115) / 100f;
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
-                PlacedRoom p = layout.Rooms[r]; int n = 0;
-                foreach (DressingSocket s in p.Room.Sockets)
+                PlacedRoom p = layout.Rooms[r]; int n = 0; bool hasSocket = false;
+                foreach (DressedSocket s in dressing.SocketsOf(r))
                 {
                     if (s.Kind != SocketKind.Lantern) continue;
-                    Vector3 c = CellCenter(p.X + s.X, p.Y + s.Y);
+                    hasSocket = true;
+                    if (!s.Filled) continue;
+                    Vector3 c = CellCenter(s.Cell.X, s.Cell.Y);
                     Vector3 wall = SideDir(CellarRoom.Opposite(s.Facing));
-                    Lamp(group, "Lamp_r" + r + "_" + n++, c + wall * (CellSize * 0.5f - 0.3f) + new Vector3(0, 2.3f, 0), kit, mats, 16.0f, 16f, true);
+                    Lamp(group, "Lamp_r" + r + "_" + n++, c + wall * (CellSize * 0.5f - 0.3f) + new Vector3(0, 2.3f, 0), kit, mats, 16.0f * k, 16f, true, GoldLamp);
                     result.Lamps++;
                 }
-                if (n > 0) continue;
+                if (hasSocket || (atm.Dark && p.Room.Kind == RoomKind.Combat)) continue;
                 // nearest floor cell to the room's centre
                 float cx = p.X + p.Width * 0.5f - 0.5f, cy = p.Y + p.Height * 0.5f - 0.5f; int bx = -1, by = -1; float best = float.MaxValue;
                 for (int lx = 0; lx < p.Width; lx++) for (int ly = 0; ly < p.Height; ly++)
@@ -263,22 +281,23 @@ namespace SleepingCalamity.Presentation
                     if (d < best) { best = d; bx = p.X + lx; by = p.Y + ly; }
                 }
                 if (bx < 0) continue;
-                Lamp(group, "Lamp_r" + r + "_c", CellCenter(bx, by) + new Vector3(0, 3.0f, 0), kit, mats, 14.0f, 14f, false);
+                Lamp(group, "Lamp_r" + r + "_c", CellCenter(bx, by) + new Vector3(0, 3.0f, 0), kit, mats, 14.0f * k, 14f, false, GoldLamp);
                 result.Lamps++;
             }
             foreach (PlacedCorridor c in layout.Corridors)
             {
                 if ((c.X + c.Y) % 3 != 0) continue;
-                Lamp(group, "Lamp_c" + c.X + "_" + c.Y, CellCenter(c.X, c.Y) + new Vector3(0, 3.0f, 0), kit, mats, 8.0f, 10f, false);
+                if ((c.X * 31 + c.Y * 17) % 100 >= atm.LampPercent) continue;   // thinned by position, no RNG: the same cells on every peer
+                Lamp(group, "Lamp_c" + c.X + "_" + c.Y, CellCenter(c.X, c.Y) + new Vector3(0, 3.0f, 0), kit, mats, 8.0f * k, 10f, false, GoldLamp);
                 result.Lamps++;
             }
         }
 
-        static void Lamp(Transform group, string name, Vector3 pos, CellarFloorKit kit, Mats mats, float intensity, float range, bool shadows)
+        static void Lamp(Transform group, string name, Vector3 pos, CellarFloorKit kit, Mats mats, float intensity, float range, bool shadows, Color color)
         {
             var go = new GameObject(name).transform; go.SetParent(group, false); go.position = pos;
             var lg = new GameObject("Light"); lg.transform.SetParent(go, false);
-            Light l = lg.AddComponent<Light>(); l.type = LightType.Point; l.color = GoldLamp; l.intensity = intensity; l.range = range;
+            Light l = lg.AddComponent<Light>(); l.type = LightType.Point; l.color = color; l.intensity = intensity; l.range = range;
             l.shadows = shadows ? LightShadows.Soft : LightShadows.None;
             if (shadows) { l.shadowStrength = 1f; l.shadowBias = 0.03f; l.shadowNormalBias = 0.4f; }
             if (kit.Lantern != null)
@@ -292,6 +311,115 @@ namespace SleepingCalamity.Presentation
                 lan.transform.position = new Vector3(pos.x, pos.y - b.size.y, pos.z);
             }
             else Prim(go, "Flame", PrimitiveType.Sphere, pos - new Vector3(0, 0.15f, 0), new Vector3(0.18f, 0.24f, 0.18f), mats.Marker(kit.Flame, new Color(1.0f, 0.7f, 0.3f)));
+        }
+
+        // ------------------------------------------------------------------------------------------------ dressing
+        static readonly Color BarrelCol = new Color(0.36f, 0.24f, 0.14f), CrateCol = new Color(0.42f, 0.31f, 0.18f), ShelfCol = new Color(0.33f, 0.24f, 0.16f),
+            RackCol = new Color(0.30f, 0.20f, 0.12f), ChuteCol = new Color(0.12f, 0.11f, 0.10f), RootsCol = new Color(0.30f, 0.22f, 0.14f);
+
+        // One greybox shape group per filled socket (Lantern sockets are drawn by Lamps). Wall-mounted kinds sit against the wall behind them (the side opposite their
+        // facing); Barrel and Crate stand in their cell, pushed toward that side. Variants change the silhouette: stacked, tipped, open, broken.
+        static void DressSockets(CellarFloorDressing dressing, Transform group, Mats mats, CellarFloorBuild result)
+        {
+            foreach (DressedSocket s in dressing.Sockets)
+            {
+                if (!s.Filled || s.Kind == SocketKind.Lantern) continue;
+                Vector3 c = CellCenter(s.Cell.X, s.Cell.Y); Vector3 back = SideDir(CellarRoom.Opposite(s.Facing));
+                bool ns = s.Facing == CellSide.North || s.Facing == CellSide.South;   // a wall piece is long across its facing
+                var root = new GameObject("Dress_r" + s.RoomIndex + "_" + s.Socket.Id + "_" + s.Variant).transform; root.SetParent(group, false); root.position = c;
+                Vector3 at = c + back * (CellSize * 0.5f - 0.45f);
+                switch (s.Kind)
+                {
+                    case SocketKind.Shelf:
+                        Prim(root, "Shelf", PrimitiveType.Cube, at + new Vector3(0, 1.0f, 0), ns ? new Vector3(2.6f, 2.0f, 0.5f) : new Vector3(0.5f, 2.0f, 2.6f), mats.Flat(ShelfCol));
+                        if (s.Variant != "Sacks") Prim(root, s.Variant, PrimitiveType.Cylinder, at - back * 0.1f + new Vector3(0, 1.3f, 0), new Vector3(0.4f, 0.2f, 0.4f), mats.Flat(s.Variant == "Hams" ? new Color(0.55f, 0.28f, 0.22f) : new Color(0.55f, 0.50f, 0.38f)));
+                        break;
+                    case SocketKind.Rack:
+                        Prim(root, "Rack", PrimitiveType.Cube, at + new Vector3(0, 1.1f, 0), ns ? new Vector3(2.8f, 2.2f, 0.6f) : new Vector3(0.6f, 2.2f, 2.8f), mats.Flat(RackCol));
+                        if (s.Variant != "Empty") Prim(root, s.Variant, PrimitiveType.Cylinder, at - back * 0.15f + new Vector3(0, 1.2f, 0), new Vector3(s.Variant == "Casks" ? 0.7f : 0.25f, 0.5f, s.Variant == "Casks" ? 0.7f : 0.25f), mats.Flat(new Color(0.28f, 0.36f, 0.20f)));
+                        break;
+                    case SocketKind.Chute:
+                        Prim(root, "Chute", PrimitiveType.Cube, at + new Vector3(0, 1.5f, 0), ns ? new Vector3(1.4f, 3.0f, 0.6f) : new Vector3(0.6f, 3.0f, 1.4f), mats.Flat(ChuteCol));
+                        if (s.Variant == "Heaped") Prim(root, "Coal", PrimitiveType.Sphere, c + back * 1.1f + new Vector3(0, 0.3f, 0), new Vector3(1.4f, 0.7f, 1.4f), mats.Flat(ChuteCol));
+                        break;
+                    case SocketKind.Roots:
+                    {
+                        float thick = s.Variant == "Thick" ? 0.35f : 0.18f;
+                        Prim(root, "Roots", PrimitiveType.Cylinder, at + new Vector3(0, 2.0f, 0), new Vector3(thick, 1.5f, thick), mats.Flat(RootsCol));
+                        break;
+                    }
+                    case SocketKind.Barrel:
+                    {
+                        Vector3 p0 = c + back * 1.0f;
+                        if (s.Variant == "Tipped") { GameObject g = Prim(root, "Barrel", PrimitiveType.Cylinder, p0 + new Vector3(0, 0.45f, 0), new Vector3(0.9f, 0.55f, 0.9f), mats.Flat(BarrelCol)); g.transform.rotation = Quaternion.Euler(0, 0, 90); }
+                        else
+                        {
+                            Prim(root, "Barrel", PrimitiveType.Cylinder, p0 + new Vector3(0, 0.55f, 0), new Vector3(0.95f, 0.55f, 0.95f), mats.Flat(BarrelCol));
+                            if (s.Variant == "Stacked") Prim(root, "BarrelTop", PrimitiveType.Cylinder, p0 + new Vector3(0, 1.65f, 0), new Vector3(0.9f, 0.55f, 0.9f), mats.Flat(BarrelCol));
+                        }
+                        break;
+                    }
+                    default:   // Crate
+                    {
+                        Vector3 p0 = c + back * 1.0f;
+                        if (s.Variant == "Open") { Prim(root, "Crate", PrimitiveType.Cube, p0 + new Vector3(0, 0.3f, 0), new Vector3(1.1f, 0.6f, 1.1f), mats.Flat(CrateCol)); Prim(root, "Lid", PrimitiveType.Cube, p0 + new Vector3(0.7f, 0.1f, 0.2f), new Vector3(1.0f, 0.08f, 0.9f), mats.Flat(CrateCol)); }
+                        else if (s.Variant == "Broken") { GameObject g = Prim(root, "Crate", PrimitiveType.Cube, p0 + new Vector3(0, 0.35f, 0), new Vector3(1.1f, 0.7f, 1.1f), mats.Flat(CrateCol)); g.transform.rotation = Quaternion.Euler(0, 20, 12); }
+                        else
+                        {
+                            Prim(root, "Crate", PrimitiveType.Cube, p0 + new Vector3(0, 0.5f, 0), new Vector3(1.1f, 1.0f, 1.1f), mats.Flat(CrateCol));
+                            Prim(root, "CrateTop", PrimitiveType.Cube, p0 + new Vector3(0.1f, 1.5f, 0), new Vector3(0.9f, 0.9f, 0.9f), mats.Flat(CrateCol));
+                        }
+                        break;
+                    }
+                }
+                result.DressingProps++;
+            }
+        }
+
+        // The vignette prop groups: simple primitives in flat colours under one transform per vignette, turned by the placement's quarter turns.
+        static void Vignettes(CellarFloorDressing dressing, Transform group, Mats mats, CellarFloorBuild result)
+        {
+            foreach (PlacedVignette pv in dressing.Vignettes)
+            {
+                var root = new GameObject("Vignette_" + pv.Vignette.Id + "_r" + pv.RoomIndex).transform; root.SetParent(group, false);
+                root.position = CellCenter(pv.Cell.X, pv.Cell.Y); root.rotation = Quaternion.Euler(0, 90f * pv.Turns, 0);   // a positive turn about +Y runs north to east: clockwise from above
+                foreach (VignetteProp pr in pv.Vignette.Props)
+                {
+                    PrimitiveType type = pr.Shape == PropShape.Box ? PrimitiveType.Cube : pr.Shape == PropShape.Cylinder ? PrimitiveType.Cylinder : pr.Shape == PropShape.Sphere ? PrimitiveType.Sphere : PrimitiveType.Capsule;
+                    Vector3 scale = pr.Shape == PropShape.Cylinder || pr.Shape == PropShape.Capsule ? new Vector3(pr.SizeX, pr.SizeY * 0.5f, pr.SizeX) : new Vector3(pr.SizeX, pr.SizeY, pr.SizeZ);
+                    var col = new Color(((pr.Rgb >> 16) & 255) / 255f, ((pr.Rgb >> 8) & 255) / 255f, (pr.Rgb & 255) / 255f);
+                    GameObject g = Prim(root, pr.Name, type, root.position, scale, mats.Flat(col));
+                    g.transform.localPosition = new Vector3(pr.X, pr.Y, pr.Z);
+                    // a capsule lies on its side (its length runs along the yaw); everything else turns about the vertical
+                    g.transform.localRotation = pr.Shape == PropShape.Capsule ? Quaternion.Euler(0, pr.YawDegrees, 90) : Quaternion.Euler(0, pr.YawDegrees, 0);
+                }
+                result.VignetteGroups++;
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------------ atmosphere
+        // Fog (when the kit gives a base), the odd-light patch of one combat room (a warm tinted point light) and the dust-motes marker. TODO: a ParticleSystem prefab for the
+        // motes once the dungeon corner kit has one (none exists yet); the empty marker object marks where it goes and lets a test read the toggle.
+        static void Atmosphere(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, CellarFloorKit kit, CellarFloorBuild result)
+        {
+            CellarAtmosphere atm = dressing.Atmosphere;
+            if (kit.FogBaseDensity > 0f)
+            {
+                atm.FogTintOffset(out float fr, out float fg, out float fb);
+                result.FogDensity = kit.FogBaseDensity * atm.FogPercent / 100f;
+                RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = result.FogDensity;
+                RenderSettings.fogColor = new Color(Mathf.Clamp01(kit.FogBaseColor.r + fr), Mathf.Clamp01(kit.FogBaseColor.g + fg), kit.FogBaseColor.b + fb);
+            }
+            if (atm.OddLightRoom >= 0)
+            {
+                PlacedRoom p = layout.Rooms[atm.OddLightRoom];
+                var go = new GameObject("OddLight_r" + atm.OddLightRoom + "_" + atm.OddLight).transform; go.SetParent(group, false);
+                go.position = CellCenter(p.X + p.Width / 2, p.Y + p.Height / 2) + new Vector3(0, 2.2f, 0);
+                Light l = go.gameObject.AddComponent<Light>(); l.type = LightType.Point; l.range = 9f; l.intensity = atm.Dark ? 6f : 4f; l.shadows = LightShadows.None;
+                int rgb = atm.OddLightRgb; l.color = new Color(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f);
+            }
+            result.DustMotes = atm.DustVisibleHere;
+            if (result.DustMotes) { var dust = new GameObject("DustMotes_" + atm.DustPercent).transform; dust.SetParent(group, false); dust.position = result.Bounds.center + new Vector3(0, 1.8f, 0); }
         }
 
         // ------------------------------------------------------------------------------------------------ helpers
@@ -326,7 +454,7 @@ namespace SleepingCalamity.Presentation
                 Pillar = k.Pillar ?? Flat(new Color(0.50f, 0.46f, 0.42f)); Trim = k.Trim ?? Flat(new Color(0.34f, 0.25f, 0.17f));
             }
             public Material Marker(Material fromKit, Color fallback) => fromKit != null ? fromKit : Flat(fallback);
-            Material Flat(Color c)
+            public Material Flat(Color c)
             {
                 if (flat.TryGetValue(c, out Material m)) return m;
                 Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");

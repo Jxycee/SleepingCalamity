@@ -43,6 +43,7 @@ namespace SleepingCalamity.EditorTools
                 KeyChest = Marker("CF_KeyChest", new Color(0.95f, 0.72f, 0.12f), 0.8f), Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
                 EntryStart = Marker("CF_Entry", new Color(0.30f, 0.58f, 0.18f), 0.5f), StairExit = Marker("CF_Stair", new Color(0.55f, 0.30f, 0.70f), 0.6f),
                 SpawnT1 = Marker("CF_SpawnT1", new Color(0.60f, 0.58f, 0.52f), 0.2f), SpawnT2 = Marker("CF_SpawnT2", new Color(0.85f, 0.42f, 0.08f), 0.5f),
+                FogBaseDensity = 0.004f, FogBaseColor = new Color(0.20f, 0.15f, 0.11f),   // the floor's atmosphere roll scales and warms this
             };
             GameObject vault = BeautyCornerArt.LoadModel(DungeonCornerBuilder.KitFolder, DungeonCornerBuilder.KitFbx, keepMaterialSlots: true);
             Transform tileSrc = vault != null ? vault.transform.Find("FloorTile") : null;
@@ -70,7 +71,6 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);
             RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 1.6f;   // a roofless 50 m floor needs more fill than the 8 m corner (0.23)
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.004f; RenderSettings.fogColor = new Color(0.20f, 0.15f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
 
