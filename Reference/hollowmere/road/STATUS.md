@@ -2,8 +2,8 @@
 
 State: IN PROGRESS
 Session: Q15. Beyond the Lower Gate: the Saltwake road
-Progress: 45%
-Sheet: none yet
+Progress: 75%
+Sheet: Reference/hollowmere/road/road_scene_r2.jpg
 Blocker: none
 
 ## Done so far (2026-10-31)
@@ -20,6 +20,13 @@ The town's fog (exp2 density 0.016, from the corner's Midday/LowSun presets) lea
 - New `HollowmereRoad.cs`: roadside art from Content/Art/Town/Road (greybox stand-ins until the FBX land), crossed-card trees and hedgerow cards merged per 100 m tile, the backdrop ring mesh (NaturalGround at the edge rising into far hills) with a generated field-patchwork texture, and a road ribbon past the terrain. Cameras Cap_HM_RoadOut / Cap_HM_RoadBack. Hooks: one line in HollowmereBuilder (+ the camera loop), HollowmereTownWall.BuildMaterials/ApplyMaterials made internal, HollowmereFoliage.FoliageMaterial().
 - Art: a fresh Sonnet agent (own worktree) is running and fixing the generator, writing the far-tree atlas, rendering, scoring and exporting.
 - Unity editor download had died in the background setup; restarted.
+
+## Art and in-engine rounds (2026-10-31)
+- Props (Sonnet, own worktree): Milestone_A 820 / Milestone_B 606 / Shrine 4,144 / Shrine_Ruined 5,078 / Cart 5,056 / Cart_Broken 5,376 / Fence_Rail 816 / Fence_Rail_Broken 856 / Hedge_A 1,792 / Hedge_B 1,842 tris, all inside budget; Blender sheet r2 28/40 self-score (`road_props_sheet_r2.jpg`; my read ~25: hedges lime leaf-boxes, broken cart barely tipped). Far-tree atlas r2 (`far_trees_r2.jpg`): oak, maple, poplar, thorn clump, irregular lobed crowns (r1 read as lollipops in engine).
+- In-engine r1 (cap2, greybox-free): 24/40. Hedgerow, fence, ruts and the town behind read well from the road; card trees lollipops; RoadOut aimed flat along the apron, R3_02's house blocking it in Rebuilt.
+- In-engine r2 (`road_scene_r2.jpg`, midday, Ruined): 28/40 (composition 4, materials 3.5, colour 3, wear/story 3.5, density 3, atmosphere/horizon 4, scale 3.5, style 3.5). Varied hedgerow trees; a hazy tree line now frames the low cameras' horizon (RoadOut, Ruins); the overview shows hedged field patchwork, ploughed strips and copses round the town, continuing on the ring. Target met (floor 25; r1 below it).
+- Capture issue: the r2 run timed out in the Rebuilt reflection-probe bake (Lightmapping.BakeReflectionProbe hung ~90 min after the Ruined frames were written in 2 min). Low-sun run in progress as a retest.
+- Weak / for later: hedges use the shared B9 lime leaf atlas (a darker hedge leaf set would help); RoadOut's valley drop reads only as the road falling over a crest; broken cart could tip more.
 
 ## Next
 HollowmereTerrain: blend the old erosion RAW on top of OuterFall (Final/Bake), dirt road ruts instead of cobble on the Saltwake Road, field splat; HollowmereRoad builder (art placement, far-tree and hedge cards, ring mesh + road ribbon), cameras Cap_HM_RoadOut / Cap_HM_RoadBack, captures midday + low sun, score, check, merge.
