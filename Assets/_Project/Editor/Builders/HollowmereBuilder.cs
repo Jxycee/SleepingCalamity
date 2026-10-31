@@ -5,9 +5,10 @@
 // bare frames; the belfry empty; the mill a roofless shell) and Rebuilt (ring 1 by HollowmereLayout.RebuiltBuilding: bakery and inn on L lots, homes on M/S,
 // the approved facade on F01, three lots left empty; rings 2-3 as home massing with a few gardens). Each building block faces its lot's default door side.
 // Art where it exists: the approved corner's rows (fountain B10, cobbles B6, stall B8, facade B4, props, foliage, lanterns) come in through
-// BeautyCornerBuilder.PlaceRow at their corner positions; the three stalls are the Wave 1 Ring1/Stalls art (ruined or rebuilt state), else the B8 stall; the B4 bell tower when its folder exists. Everything
-// else is greybox on the LookTest materials, except the buildings whose final export is in (HollowmereArt: the bakery; HollowmereInnArt: the inn). Light, grade, sky and renderer: the
-// beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
+// BeautyCornerBuilder.PlaceRow at their corner positions; the three stalls are the Wave 1 Ring1/Stalls art (ruined or rebuilt state), else the B8 stall; the B4 bell tower when its folder exists;
+// the heroes' home from Ring1/HeroesHome (HeroesHomeArt). Everything else is greybox on the LookTest materials, except the buildings whose final export is in
+// (HollowmereArt: the bakery; HollowmereInnArt: the inn). Light, grade, sky and renderer: the beauty corner's (BeautyCornerBuilder.EnsureLook / ApplyPreset), so the
+// approved corner looks the same here. Ground: a Unity Terrain from the layout heights (HollowmereTerrain).
 // Ruins: every empty lot shows its ruin kit variant (RuinVariant, RuinTurn); a placed building or garden switches it off.
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
 using System;
@@ -45,6 +46,8 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_MarketStreet", new Vector3(0.6f, 1.65f, -19.8f), new Vector3(-0.5f, -6.5f, -58f), 55f), // the square's south edge down Market Street to the second terrace and the wall
             ("Cap_HM_KeepStairs", new Vector3(-31f, 1.7f, 13.8f), new Vector3(-20f, 3.0f, 19.6f), 58f),  // along the Wall Ginnel: terrace step, west stair, keep wall
             ("Cap_HM_Bakery", new Vector3(-6.2f, 1.65f, 2.6f), new Vector3(-12.5f, 3.4f, 12.2f), 55f),       // from the square at the bakery front on F02 (oven side on the right)
+            ("Cap_HM_HeroesHome", new Vector3(1.5f, 1.65f, -2.0f), new Vector3(12.0f, 3.6f, 12.5f), 50f),    // from the fountain at the heroes' home: Wren's list, the lit door, the annex above
+            ("Cap_HM_HeroesAnnex", new Vector3(19.0f, 1.65f, 20.8f), new Vector3(11.8f, 6.6f, 24.5f), 55f),  // from the keep stair head at the bell-loft annex door and loft
             ("Cap_HM_KeepWall", new Vector3(-2f, 1.65f, -3f), new Vector3(2f, 3.2f, 19.6f), 60f),          // from the fountain: keep wall, buttresses, planters, stairs (Ruined shows it whole)
             ("Cap_HM_Ruins", new Vector3(-15.5f, 1.65f, -1.5f), new Vector3(-26f, 0.2f, -8f), 50f),          // from the square's west side over the F03 and F05 ruins
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
@@ -551,7 +554,17 @@ namespace SleepingCalamity.EditorTools
                     LookTestBuilder.Box(g, "Rail", new Vector3(0f, 2.6f, 0f), new Vector3(3.7f, 0.12f, 0.12f), iron, new Vector3(0f, 0f, 4f), 2f);   // cracked: the crossbar hangs askew
                     break;
                 case LandmarkKind.HeroesHome:
-                    if (l.Id == "HeroesHome_Cistern")
+                    if (HeroesHomeArt.Place(g, l.Id))
+                    {
+                        if (l.Id == "HeroesHome_Cistern")
+                        {
+                            var stairA = new GameObject("UndercroftStair");   // P25: the way down; a marker for M5/M6 (inside the house)
+                            stairA.transform.SetParent(g, false);
+                            stairA.transform.position = new Vector3(HollowmereLayout.UndercroftStair.X, l.Y, HollowmereLayout.UndercroftStair.Z);
+                            HeroesHomeArt.AddStairLights(g, stairA.transform);
+                        }
+                    }
+                    else if (l.Id == "HeroesHome_Cistern")
                     {
                         LookTestBuilder.Box(g, "Walls", new Vector3(0f, l.Height * 0.5f, 0f), new Vector3(sx, l.Height, sz), stone, default, 2f);
                         LookTestBuilder.Box(g, "RoofS", new Vector3(0f, l.Height + 1.0f, -sz * 0.25f), new Vector3(sx + 0.5f, 0.25f, sz * 0.62f), roof, new Vector3(-30f, 0f, 0f), 2f);
