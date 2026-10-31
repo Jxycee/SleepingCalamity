@@ -34,7 +34,7 @@ tileable's measured hue #b9a07a (Art/Textures/B1_town/SOURCES.md).
       [--views wide,mid,close,tq] [--moods noon,lowsun] [--no-render]
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 
-Status (2026-10-31, cloud): look rounds 1-6 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28 -> 29.5 -> 30.5 -> 31/40:
+Status (2026-10-31, cloud): look rounds 1-7 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28 -> 29.5 -> 30.5 -> 31 -> 31/40:
 round 2 dropped the dish and beast 0.30 m into the 38 deg close camera, fixed the values, tide line, ground-line damp
 and the ruff; round 3 added the shaft flutes, rosier and paler replacement stones, rain streaks under the coping, a
 clean dish and a paler seat; round 4 gave the beast puffy shut lids with lid lines deep enough to bake, twisted locks of
@@ -43,7 +43,10 @@ holes looked like two open eyes) made it read asleep: small shallow nostril slit
 crescent lid lines cut deeper, a low relaxed brow drooping outward, slumped cheeks, a more lolling head, one slack
 mouth slit round the spout bore, and the beast's tail draped round the column under the dish; round 6 (in-engine: the snout read as a pig's disc with two round nostrils)
 built a lion's muzzle: a broad bridge down from the brow, a heart-shaped nose pad with curled nostril slits, two puffy
-whisker pads with whisker pits either side of a groove, and heavier shut lids. Beside the
+whisker pads with whisker pits either side of a groove, and heavier shut lids; round 7 (user, from sleeping-lion
+photos: the bridge read as a second nose above the nose, and the puffy lids as almond eyes; the slits read better)
+made the nose one long form widening into a triangular nose leather, and the shut eyes thin bowed slits slanting up
+to the outer corner, nearly flush, under a quieter brow, with no lashes. Beside the
 fountain refs (Reference/hollowmere/fountain/) the gap is weathering: the real basins carry darker grey-green patina low
 down and more tone change between stones; bc_109 stands on two wide steps. Bake proof (round 3) (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
 BannerPole high 0.79M -> low 8,996 (57.7k together, in the T4 30-60k band); at 1024 the closed-eye lid lines soften
@@ -418,21 +421,20 @@ def beast():
     obs = [blob('chest', (-0.05, 0.0, 0.03), (0.21, 0.25, 0.15), tilt=False),
            blob('cranium', (0.02, 0.0, 0.27), (0.24, 0.27, 0.23)),
            blob('muzzle', (0.21, 0.0, 0.19), (0.15, 0.16, 0.11)),
-           # a lion's muzzle, not a pig's disc: a broad bridge down from the brow to a heart-shaped nose pad,
-           # two puffy whisker pads under it either side of a groove, the mouth below them
-           blob('bridge', (0.27, 0.0, 0.275), (0.10, 0.055, 0.04), rot=Matrix.Rotation(math.radians(-18), 4, 'Y')),
-           blob('noseL', (0.335, 0.03, 0.238), (0.036, 0.04, 0.027)), blob('noseR', (0.335, -0.03, 0.238), (0.036, 0.04, 0.027)),
-           blob('nosetip', (0.348, 0.0, 0.214), (0.03, 0.03, 0.022)),
+           # a lion's nose is one long form: from between the eyes it runs down the muzzle, widening, into a broad
+           # triangular nose leather at the tip (sleeping-lion refs); whisker pads sit under it either side of a groove
+           K.tube('nose', [HW((0.205 + 0.13 * t, 0.0, 0.33 - 0.09 * t + 0.02 * t * (1 - t))) for t in np.linspace(0, 1, 12)], 0.03, 16,
+                  radii=[0.022 + 0.022 * t ** 1.5 for t in np.linspace(0, 1, 12)]),
+           blob('noseleather', (0.338, 0.0, 0.232), (0.03, 0.06, 0.026), rot=Matrix.Rotation(math.radians(-25), 4, 'Y')),
            blob('chin', (0.18, 0.0, 0.065), (0.10, 0.12, 0.06))]
     for s in (1, -1):
         obs.append(blob(f'jowl{s}', (0.215, s * 0.11, 0.10), (0.105, 0.105, 0.095)))   # cheeks slumped low, dozing
         e = EYE[(1 - s) // 2]
-        obs.append(blob(f'eyemound{s}', e, (0.058, 0.07, 0.05)))       # a heavy shut lid, and the fold above it
-        obs.append(blob(f'lidfold{s}', (e[0] + 0.01, e[1], e[2] + 0.024), (0.046, 0.074, 0.028)))
+        obs.append(blob(f'eyemound{s}', e, (0.046, 0.064, 0.034)))     # a low shut lid, nearly flush with the face
         obs.append(blob(f'whisker{s}', (0.302, s * 0.048, 0.168), (0.056, 0.058, 0.046)))
         # a relaxed brow: low, soft, drooping toward the outer corner (never arched, which reads surprised)
-        brow = [HW((0.195 + 0.025 * math.cos(u), s * (0.118 + 0.065 * math.sin(u)), 0.352 + 0.006 * math.cos(u) - 0.016 * math.sin(u))) for u in np.linspace(-1.4, 1.4, 16)]
-        obs.append(K.tube(f'brow{s}', brow, 0.02, 12, radii=[0.012 + 0.01 * math.cos(u) for u in np.linspace(-1.4, 1.4, 16)]))
+        brow = [HW((0.195 + 0.025 * math.cos(u), s * (0.118 + 0.065 * math.sin(u)), 0.354 + 0.005 * math.cos(u) + 0.008 * math.sin(u))) for u in np.linspace(-1.4, 1.4, 16)]
+        obs.append(K.tube(f'brow{s}', brow, 0.02, 12, radii=[0.006 + 0.007 * math.cos(u) for u in np.linspace(-1.4, 1.4, 16)]))   # a soft brow, quieter than the eye
         obs.append(blob(f'ear{s}', (-0.04, s * 0.235, 0.41), (0.045, 0.07, 0.088), rot=Matrix.Rotation(s * math.radians(-35), 4, 'X')))
         obs.append(blob(f'paw{s}', (0.21, s * 0.12, -0.03), (0.12, 0.078, 0.056), tilt=False))
         for k, dy in enumerate((-0.042, 0.0, 0.042)):
@@ -456,25 +458,23 @@ def _snap_tube(bvh, name, pts, r, sides=8, radii=None):
     return K.tube(name, q, r, sides, radii=radii)
 
 def beast_cuts(ob):
-    """Closed-eye lid lines with lash ticks, nostrils, the open mouth and its bore, ear cups, toe and lock grooves,
+    """Closed-eye slits, nostrils, the open mouth and its bore, ear cups, toe and lock grooves,
     all snapped onto the carved surface."""
     from mathutils.bvhtree import BVHTree
     bvh = BVHTree.FromObject(ob, bpy.context.evaluated_depsgraph_get())
     cut = []
     for s in (1, -1):
         e = Vector(EYE[(1 - s) // 2])
-        lid = [HW(e + Vector((0.06, s * 0.058 * u, -0.01 + 0.022 * u * u))) for u in np.linspace(-1, 1, 16)]   # a sagging crescent: the shut lid line
-        cut.append(_snap_tube(bvh, f'lid{s}', lid, 0.01, radii=[0.007 + 0.007 * math.cos(u * 1.4) for u in np.linspace(-1, 1, 16)]))   # deep enough to survive the bake
-        for k, u in enumerate((-0.55, -0.1, 0.35, 0.75)):
-            a = e + Vector((0.06, s * 0.058 * u, -0.012 + 0.022 * u * u))
-            b = a + Vector((0.0, s * 0.012 * (u + 0.3), -0.02))
-            cut.append(_snap_tube(bvh, f'lash{s}{k}', [HW(a.lerp(b, t)) for t in np.linspace(0, 1, 5)], 0.0055, 6))
+        # shut eyes as a lion's: thin slits, gently bowed, slanting up from the inner corner by the nose to the outer
+        # corner (sleeping-lion refs); no lashes, no lid bulge (both read as almond eyes)
+        lid = [HW(e + Vector((0.05, s * 0.06 * u, 0.016 * u - 0.006 * (1 - u * u)))) for u in np.linspace(-1, 1, 16)]
+        cut.append(_snap_tube(bvh, f'lid{s}', lid, 0.008, radii=[0.0055 + 0.0065 * math.cos(u * 1.35) for u in np.linspace(-1, 1, 16)]))
         # nostrils: small shallow slits curling outward, not deep holes (deep dark holes read as wide-open eyes)
         ns = [HW((0.37, s * (0.012 + 0.03 * t), 0.226 + 0.012 * t - 0.018 * t * t)) for t in np.linspace(0, 1, 7)]
         cut.append(_snap_tube(bvh, f'nostril{s}', ns, 0.006, 8, radii=[0.0035 + 0.0035 * math.sin(math.pi * t) for t in np.linspace(0, 1, 7)]))
-        for j, (dy, dz) in enumerate(((0.035, 0.18), (0.055, 0.17), (0.045, 0.152))):   # whisker pits on the pads
+        for j, (dy, dz) in enumerate(((0.035, 0.18), (0.055, 0.17), (0.045, 0.155))):   # whisker pits on the pads
             q = bvh.find_nearest(HW((0.36, s * dy, dz)))[0]
-            if q is not None: cut.append(sphere(f'whpit{s}{j}', q, 0.0065, (1, 1, 1), 12))
+            if q is not None: cut.append(sphere(f'whpit{s}{j}', q, 0.0045, (1, 1, 1), 12))
         ec = HW((-0.02, s * 0.25, 0.41)); out = (HW((0.04, s * 0.24, 0.41)) - ec).normalized()
         cup = sphere(f'earcup{s}', ec + out * 0.045, 0.04, (1.0, 1.0, 1.4)); cut.append(cup)
         for dy in (-0.021, 0.021):                                   # toe grooves
