@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 85%
-Sheet: Reference/hollowmere/square/props_sheet_r1.jpg (props beside the approved corner; square captures next)
+Progress: 90%
+Sheet: Reference/hollowmere/square/square_sheet_rebuilt.jpg (+ square_sheet_ruined.jpg, square_sheet_corner_check.jpg, props_sheet_r1.jpg)
 Blocker: paused by coordinator for usage (resume after the 12:10 UTC reset)
 
 ## Done
@@ -42,3 +42,7 @@ Coordinator's quick prop fixes are folded in: mixed planting in the Rebuilt plan
 
 ## Paused (2026-10-31)
 The Unity agent was told to finish its current step and push. Open items: the black sticks in the east half (diagnosis pending), the wide green joints (SquareBed may move under the slab), the final captures/sheets, merging origin/main (townhouse bca6ee8), check, merge.
+
+## At the pause (5de3de5)
+Done: all 58 decorations use real art, 5 drains, 6 lanterns on the posts sharing one material, planters planted (grass/weed clumps + trailing ivy), bunting sag 0.6-0.8 m with the fade tint, the bed sunk under the slab inside the square. 32 captures in captures/ and three sheets (Rebuilt, Ruined, corner check: the corner ground is unchanged). Build PASS after the last merge.
+Left: (1) the black pegs are 355 loose setts lying on their sides from sc_square_ground.py: fix in the generator (fewer loose stones, lay them flat) and re-export; (2) merge origin/main (townhouse), rebuild, re-capture the two square cameras; (3) test-edit + check; (4) merge.
