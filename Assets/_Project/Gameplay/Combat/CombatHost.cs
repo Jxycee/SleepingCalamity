@@ -349,6 +349,15 @@ namespace SleepingCalamity.Gameplay
             _alive.Clear();
         }
 
+        // Test hook (the bot playtester): clear the arena and count down into `wave` (e.g. 5, the first tier-2 wave).
+        public void ServerJumpToWave(int wave)
+        {
+            ServerClearEnemies();
+            _waveNumber = Mathf.Max(1, wave);
+            _wave = WavesEnabled ? WaveState.Countdown : WaveState.Idle;
+            _waveTimer = 1.5f;
+        }
+
         // F6 in the arena: kill off the wave and move on.
         public void ServerSkipWave()
         {

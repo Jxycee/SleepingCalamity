@@ -136,6 +136,60 @@ The recorded Kenney clips replace the generated hit and whoosh sounds by file, b
 the hands (grip to fix). The ground footprints helped, but the real game should read enemy attacks without indicators: telegraph through the enemy's own wind-up
 (pose, anticipation, sound, a glint) and keep the footprint as an optional assist at most.
 
+## Enemy polish: tells from the body, pacing (branch `m3-enemy-polish`, 2026-10-30)
+User notes after the retest: enemy attacks must read without ground indicators (wind-up pose, anticipation, sound, glint); retune the wave 4 to 5 step with
+`docs/research/combat-timings.md`. Everything is a P9 Placeholder, all numbers are data.
+
+### How an attack is staged (Core `EnemyTell`, `TellMath`; drawn by `EnemyVisual`)
+Studied from the research: early DC1 and KH enemies give 0.65-0.7 s from motion start to damage, KH1's first enemy holds its first pose 8 ticks, KH2's single
+big strikes 1.2-1.3 s. Every enemy attack now goes **anticipate** (lean back / crouch / coil / rise to a peak) -> **hold** (still, shivering) -> **commit**
+(the attacking part flashes white-hot with a star flare and a metallic "shing", 12-24 frames before the hitbox) -> a 6-frame snap into the **strike**
+(overshoot forward, stretch) -> eased **recovery**. Each attack plays its own wind-up sound as it starts. Rules (`EnemyAttackRules`, tested): the glint leads
+the hitbox by 12-24 frames, the enemy stops turning and has not started its lunge before the glint (where it faces at the glint is where it strikes), wind-up
+at least 27 frames for small enemies, 54 for the elite's own attacks, 36 for its break-free; attack frames after the hitbox plus the AI's recover time at least 30.
+
+| Attack | Wind-up (frames) | Pose | Glint part, lead | Sound |
+|---|---|---|---|---|
+| Slime hop | 34 | crouch 35%, shiver | lid, 18 | squelch (pitched up) |
+| Slime glob | 46 | lean back 16, glob swells on the lid, thrown at the glint | lid, 20 | squelch |
+| Rat-king lunge | 28 | rears back 22, crouch, shiver | head (crown), 14 | scratch |
+| Rat-king tail spin | 30 | coils 75 the other way | tail, 14 | scratch |
+| Broom sweep | 36 | twists back 60, leans 10 | bristles, 14 | wooden creak |
+| Broom poke | 28 | draws back 20 | handle, 14 | creak (higher) |
+| Warden slam | 56 | leans back 22, rises 0.25 m | rolling pin, 16 | low groan |
+| Warden flour sweep | 40 -> **54** | coils 80 | rolling pin, 16 | groan |
+| Warden oven-door pound | 72 | leans back, crouch, rises 0.35 m | whole body, 16 | groan |
+| Warden break free | 30 -> **36** | crouch 30%, hard shiver | whole body, 14 | groan |
+| **Warden dough quake (new signature)** | **90** (1.5 s) | rises 0.6 m, leans back 26, long trembling hold; crown glows hotter through the hold | crown, 18 | groan, then a **bell toll** at the peak |
+
+Recovery: rat-king lunge and spin 18/16 -> 26/22 frames after the hit. The quake is chosen every 3 Warden attacks (never by the random roll), takes its
+hero's attack token alone (nothing else starts during its tell), and leaves the Warden stuck 1 s extra: the reward for reading it. It is a 3 m ring (guard
+break, knockback 6, x2.0).
+
+The glob always shows in flight and casts a shadow that grows at its landing spot (a shadow, not a marker). **The ground footprint is an assist, off by
+default** (`CombatAssists.GroundTelegraph`, saved per machine; **F2** in the arena toggles it, the F1 help shows its state).
+
+### Pacing: attack tokens (Core `AttackPacing`, `AttackTokens`; host only, nothing replicated)
+Before starting an attack the host asks for a token on its target hero: at most **2** enemies winding up or striking at one hero, and two enemies' strikes
+on the same hero open at least a gap apart (**0.5 s** tier 1, **0.35 s** tier 2). A refused enemy hovers at the edge of its reach and strafes, asking again
+every 0.2-0.45 s (KH's hovering crowd; DC1 never has more than 3 monsters near each other). A token lapses when its hit window closes (so it cannot leak) and
+is released early on stagger, parry, death and despawn. The Warden's revenge break-free needs none.
+
+### The wave 4 to 5 step
+Against the 100 HP, DEF 10 hero tier 2 at x2.3 meant a 26-point slime hop and a 113-point Warden pound (a one-shot); DC1's early enemies take 19-46% per hit
+(typically 25%). Tier 2 attack is now **x1.0** of the 6.6 table (a x1.54 step, not x3.5): slime hop 8 -> 11, rat-king spin 14 -> 22, broom sweep 11 -> 19,
+Warden slam 27 -> 41, pound 32 -> 50. Tier 2 presses through pacing instead: cooldowns x0.7, recover x0.8, the tighter strike gap, and **mixed rosters**
+(wave 5: 2 slimes, a rat-king, a broom; 6: 2 rat-kings, 2 slimes, a broom; 7: 2 brooms, a rat-king, 2 slimes; 8: the Warden, a rat-king, a broom). Life x3
+and defence x3.3 are unchanged. Waves 1-4 keep their rosters and cooldowns.
+
+### Checks
+- EditMode: `EnemyTellTests` (tells honest, floors, punish window, signature, stage sampling, glint, crossing at low fps), `AttackTokensTests` (count, gap,
+  lapse, release, exclusive, tier 2), updated `ArenaWavesTests` and `EnemyModelTests`.
+- PlayMode: `CombatArenaTests.Solo_AttackTokens_KeepACrowdToTwoAttackers_AndTheirStrikesApart` (four slimes on an idle hero).
+- Bot (`SC_BOT=1`): `Bot_TierTwo_WaveFive_StaysReadable`; the report now lists strikes, the closest two strikes, most winding up at once, most waiting, and
+  hits taken within 0.5 s of another.
+- Captures: `TellCaptureTests` (Explicit, `-Graphics`) writes every attack's tell frame by frame with the footprint off.
+
 ## Network simulator
 `Tests/PlayMode/CombatNetworkTests.Netsim_150msRtt_2PercentLoss_...` drives the Multiplayer Tools `NetworkSimulator` component (it works in PlayMode, in the
 editor). The simulator delays each packet at the send and the receive stage of both peers, so a per-packet 37 ms gives about 148 ms RTT (75 ms gave 300). For

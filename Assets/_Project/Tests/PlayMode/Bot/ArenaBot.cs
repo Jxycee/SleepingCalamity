@@ -26,6 +26,9 @@ namespace SleepingCalamity.Tests.PlayMode
         private readonly HashSet<(ulong, int)> _dodged = new HashSet<(ulong, int)>();
         private readonly Dictionary<ulong, int> _enemyHp = new Dictionary<ulong, int>();
         private readonly Dictionary<ulong, int> _enemySerial = new Dictionary<ulong, int>();
+        private readonly HashSet<(ulong, int)> _strikes = new HashSet<(ulong, int)>();
+        private float _lastStrikeAt = -1f;
+        private ulong _lastStriker;
         private readonly HashSet<ulong> _stuckOn = new HashSet<ulong>();   // one stuck finding per target
         private readonly List<string> _stuckWhy = new List<string>();
         private float _swingClock, _stuckClock;
@@ -86,7 +89,11 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 Report.HitsTaken++; Report.DamageTaken += _lastHp - hp;
                 Report.Events.Add($"{time:F2}s hero hit for {_lastHp - hp} ({hp}/{_vitals.MaxHp})");
-                if (Report.LastHitTaken >= 0f) Report.MinGapBetweenHitsTaken = Mathf.Min(Report.MinGapBetweenHitsTaken, time - Report.LastHitTaken);
+                if (Report.LastHitTaken >= 0f)
+                {
+                    Report.MinGapBetweenHitsTaken = Mathf.Min(Report.MinGapBetweenHitsTaken, time - Report.LastHitTaken);
+                    if (time - Report.LastHitTaken < 0.5f) Report.HitsStacked++;
+                }
                 Report.LastHitTaken = time;
             }
             if (hp > _lastHp && _lastHp >= 0) Report.Events.Add($"{time:F2}s hero healed {hp - _lastHp}");
@@ -94,15 +101,28 @@ namespace SleepingCalamity.Tests.PlayMode
             Report.LowestHpPercent = Mathf.Min(Report.LowestHpPercent, 100f * hp / Mathf.Max(1, _vitals.MaxHp));
             if (!_vitals.IsUp && !Report.WentDown) { Report.WentDown = true; Report.Events.Add($"{time:F2}s hero went down"); }
 
+            int windUps = 0, waiting = 0;
             foreach (Enemy e in Enemy.All)
             {
                 if (!e.IsSpawned) continue;
+                if (e.Alive && e.WindingUp) windUps++;
+                if (e.Alive && e.WaitingForToken) waiting++;
+                if (e.Alive && e.HitboxOn && _strikes.Add((e.NetworkObjectId, e.Serial)))
+                {
+                    // A strike opened: how long since another enemy's strike opened (attack tokens keep these apart).
+                    if (_lastStrikeAt >= 0f && _lastStriker != e.NetworkObjectId) Report.MinGapBetweenStrikes = Mathf.Min(Report.MinGapBetweenStrikes, time - _lastStrikeAt);
+                    _lastStrikeAt = time;
+                    _lastStriker = e.NetworkObjectId;
+                    Report.Strikes++;
+                }
                 int ehp = e.NetHp.Value;
                 if (_enemyHp.TryGetValue(e.NetworkObjectId, out int before) && ehp < before) { Report.HitsDealt++; Report.DamageDealt += before - ehp; }
                 if (!_enemyHp.ContainsKey(e.NetworkObjectId)) Report.EnemiesSeen++;
                 _enemyHp[e.NetworkObjectId] = ehp;
                 if (e.Attacking && (!_enemySerial.TryGetValue(e.NetworkObjectId, out int seen) || seen != e.Serial)) { _enemySerial[e.NetworkObjectId] = e.Serial; Report.EnemyAttacksStarted++; }
             }
+            Report.MaxWindUpsAtOnce = Mathf.Max(Report.MaxWindUpsAtOnce, windUps);
+            Report.MaxWaitingAtOnce = Mathf.Max(Report.MaxWaitingAtOnce, waiting);
             var arena = CombatHost.Current;
             if (arena != null && arena.WaveNumber > Report.HighestWave) { Report.HighestWave = arena.WaveNumber; Report.Events.Add($"{time:F2}s wave {arena.WaveNumber}"); }
             if (arena != null && arena.Wave == WaveState.Cleared && Report.ClearedWaves < arena.WaveNumber) { Report.ClearedWaves = arena.WaveNumber; Report.Events.Add($"{time:F2}s wave {arena.WaveNumber} cleared"); }
@@ -220,8 +240,9 @@ namespace SleepingCalamity.Tests.PlayMode
     {
         public string Goal = "";
         public bool GoalMet;
-        public float Seconds, LowestHpPercent = 100f, LastHitTaken = -1f, MinGapBetweenHitsTaken = float.MaxValue;
+        public float Seconds, LowestHpPercent = 100f, LastHitTaken = -1f, MinGapBetweenHitsTaken = float.MaxValue, MinGapBetweenStrikes = float.MaxValue;
         public int HitsTaken, DamageTaken, HitsDealt, DamageDealt, Swings, Dodges, EnemiesSeen, EnemyAttacksStarted, HighestWave, ClearedWaves;
+        public int Strikes, HitsStacked, MaxWindUpsAtOnce, MaxWaitingAtOnce;   // pacing: strikes opened, hits taken < 0.5 s after another, peaks
         public bool WentDown;
         public readonly List<string> Events = new List<string>();
         public readonly List<string> Findings = new List<string>();
@@ -236,6 +257,8 @@ namespace SleepingCalamity.Tests.PlayMode
             sb.AppendLine($"- Hero: took {HitsTaken} hits / {DamageTaken} damage, lowest HP {LowestHpPercent:F0}%, went down: {(WentDown ? "yes" : "no")}" +
                           (HitsTaken > 1 ? $", closest two hits {MinGapBetweenHitsTaken:F2} s apart" : ""));
             sb.AppendLine($"- Hero: {Swings} attack presses, {HitsDealt} hits / {DamageDealt} damage dealt, {Dodges} rolls");
+            sb.AppendLine($"- Pacing: {Strikes} enemy strikes, closest two from different enemies {(Strikes > 1 && MinGapBetweenStrikes < float.MaxValue ? MinGapBetweenStrikes.ToString("F2") + " s" : "n/a")} apart; " +
+                          $"most winding up at once {MaxWindUpsAtOnce}, most waiting for a token {MaxWaitingAtOnce}; hits taken < 0.5 s after another {HitsStacked}");
             sb.AppendLine();
             sb.AppendLine("## Findings");
             if (Findings.Count == 0) sb.AppendLine("- none");
