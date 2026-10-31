@@ -7,7 +7,8 @@ Sheet: Reference/hollowmere/lanes/SHEET_lane_kit.jpg
 Blocker: none
 
 Score: kit sheet self 29/40 (agent: 26.5 -> 28 -> 29; controller read about 27: gate leaf reads flat, steps slab-like); Unity captures pending
-Tris: kit 18,562 (17 pieces, all within budget)
+Tris: kit 19,066 after the art fix round (gate leaf rebuilt, review backdrop replaced by real RetainWall modules; self 29.5/40)
+Tris (old): kit 18,562 (17 pieces, all within budget)
 SC RESULT: -
 Merge commit: -
 

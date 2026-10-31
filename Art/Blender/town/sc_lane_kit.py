@@ -22,11 +22,12 @@ LK_Rubble, LK_Dressed, LK_Mortar (sandstone), LK_Oak, LK_GatePaint (painted_wood
   run stepping down beside it with a gate and lanterns and a 3 m retaining wall with a buttress and lantern (left, Rebuilt), the Ruined
   variants on the right. Without it the loose kit is lined up. --tris prints the table and stops. Budget: kit under 30k tris.
 
-Status (2026-10-31, cloud): 3 render rounds (+1 review-scene UV fix), self-score 26.5 -> 28 -> 29/40 (calibrated; first + 5 = 31.5 not reached,
-stopped at the 3-round limit). Final lines: silhouette 4, proportion 3.5, form 4, surface 3.5, colour 3, wear 3.5, set 3.5, efficiency 4.
-18,562 tris (--tris, two runs agree). Sheet: Reference/hollowmere/lanes/SHEET_lane_kit.jpg (existing refs: the Commons API was rate-limited).
-Round changes: r1 baseline (textures were LFS pointers: pulled); r2 greyer rubble tint plus stronger per-stone tone, gate boards with relief;
-r3 cooler grey rubble against warm pale dressed stone, one mossy stone in three, heavier moss on tops and damp feet.
+Status (2026-10-31, cloud): 3 render rounds + 1 art fix round (coordinator read 26/40), self-score 29.5/40 (calibrated). Final lines:
+silhouette 4, proportion 3.5, form 4, surface 3.5, colour 3, wear 3.5, set 4, efficiency 4. 19,066 tris (--tris). Sheet:
+Reference/hollowmere/lanes/SHEET_lane_kit.jpg. Fix round: the "flat brown slab" was only the review scene's packed_soil backdrop quad behind the
+terraces (RetainWall itself already has coursed rubble); replaced by RetainWall + RetainButtress modules across the terrace. GateLeaf rebuilt with
+7 bevelled planks, front Z-brace and ledges, strap hinges with rivets, latch (996 / 784 tris) and worn plank edges via wear; more moss on copings.
+Earlier rounds: r1 baseline; r2 greyer rubble tint, per-stone tone; r3 cooler grey rubble against warm dressed stone, mossy stones, damp feet.
 Next visible gains: moss that reads as cushions on wall tops (a B9 foliage tuft row), warmer ochre stones mixed into the rubble (needs a second
 rubble slot or a tint channel), board-and-batten paint chipping on the gate, more varied cap heights, a dedicated sett normal for LaneStep.
 """
@@ -399,19 +400,28 @@ def lantern(name, broken=False):
     return pc
 
 def gate_leaf(name, broken=False):
+    """Board gate: 7 separate planks (2 cm gaps, bevelled, uneven tops), Z-brace and two ledges on the lane face, strap hinges with rivets, latch."""
     pc = FK.Piece(name); R = R_(name)
     for i in range(7):
         if broken and i == 4:
             continue
-        h = 1.2 - R.uniform(0, 0.03) - (0.5 if (broken and i == 5) else 0.0)
-        fb(pc, 'paint', (0.186, 0.035, h), (0.1 + 0.2 * i, -0.0125, 0.05 + h / 2), rot=Ry(R.uniform(-0.4, 0.4)), cham=0.008, wob=0.002, seed=i * 3.0)
-    for z in (0.2, 0.65, 1.1):
-        fb(pc, 'oak', (1.38, 0.032, 0.1), (0.7, 0.0225, z), cham=0.005)
-    rbar(pc, 'oak', (0.1, 0.0225, 0.22), (1.28, 0.0225, 1.08), 0.09, 0.03, 0.004)
-    for z in ((0.25, 1.05) if not broken else (1.05,)):
-        fb(pc, 'iron', (0.55, 0.012, 0.07), (0.275, -0.036, z), cham=0.003)
-        fb(pc, 'iron', (0.05, 0.05, 0.13), (0.02, -0.015, z), cham=0.005)
-    fb(pc, 'iron', (0.11, 0.012, 0.045), (1.3, -0.036, 0.65), cham=0.003)
+        h = 1.2 - R.uniform(0, 0.05) - (0.5 if (broken and i == 5) else 0.0)
+        fb(pc, 'paint', (0.18, 0.03, h), (0.1 + 0.2 * i, R.uniform(-0.003, 0.003), 0.05 + h / 2), rot=Ry(R.uniform(-0.5, 0.5)), cham=0.009, wob=0.002,
+           seed=i * 3.0, sid='%s:pl%d' % (name, i))
+    for z in (0.2, 1.1):     # back ledges (keep the old depth extent)
+        fb(pc, 'oak', (1.38, 0.02, 0.1), (0.7, 0.025, z), cham=0.005)
+    for z in (0.2, 1.1):     # front ledges, painted
+        fb(pc, 'paint', (1.34, 0.022, 0.1), (0.7, -0.026, z), cham=0.007, sid='%s:led%.1f' % (name, z))
+    rbar(pc, 'paint', (0.12, -0.026, 0.22), (1.26, -0.026, 1.08), 0.09, 0.022, 0.007)      # Z-brace
+    for z in ((0.2, 1.1) if not broken else (1.1,)):
+        fb(pc, 'iron', (0.62, 0.005, 0.06), (0.31, -0.0395, z), cham=0.0015)                  # strap hinge
+        fb(pc, 'iron', (0.075, 0.006, 0.085), (0.62, -0.0395, z), cham=0.002)                 # spade end
+        fb(pc, 'iron', (0.05, 0.05, 0.12), (0.02, -0.015, z), cham=0.005)                     # pintle sleeve
+        for xr in (0.12, 0.28, 0.44):
+            fb(pc, 'iron', (0.022, 0.008, 0.022), (xr, -0.041, z), cham=0)                    # rivets
+    fb(pc, 'iron', (0.13, 0.005, 0.07), (1.29, -0.0395, 0.65), cham=0.0015)                   # latch plate
+    fb(pc, 'iron', (0.17, 0.012, 0.022), (1.22, -0.043, 0.66), cham=0.003)                    # latch bar
+    fb(pc, 'iron', (0.05, 0.012, 0.05), (1.1, -0.04, 0.64), cham=0.006)                       # keeper
     if broken:
         since(pc, 0, Ry(15) @ Rz(7))
     return pc
@@ -460,9 +470,13 @@ def wear_at(name, p, n, mname):
         elif p.z < h + 0.5:
             r = max(r, 0.3 * (1 - (p.z - h) / 0.5) * (0.7 + 0.5 * st))
         if up and p.z > top - 0.45 and name.startswith('Retain'):
-            g = max(g, 0.8 + 0.2 * (nz + 0.2)); r = max(r, 0.2)
+            g = max(g, 0.92 + 0.08 * (nz + 0.2)); r = max(r, 0.2)
+        if name.startswith('Retain') and p.z > top - 0.05 and not up:
+            g = max(g, 0.55 * max(0.0, nzp + 0.5))                      # moss dripping over the parapet lip
+        if name.startswith('GardenWall') and not name.endswith('End') and p.z > 0.85 and not up:
+            g = max(g, 0.45 * max(0.0, nzp + 0.5))
         if name.startswith('GardenWall') and not name.endswith('End') and p.z > 0.95:
-            g = max(g, (0.85 + 0.15 * (nz + 0.2)) if up else 0.3 * max(0.0, nzp + 0.2)); r = max(r, 0.2)
+            g = max(g, (0.95 + 0.05 * (nz + 0.2)) if up else 0.3 * max(0.0, nzp + 0.2)); r = max(r, 0.2)
         if name == 'GatePier' or name == 'GardenWallEnd':
             if p.z > 1.45 and up:
                 g = max(g, 0.4 * max(0.0, nzp + 0.2)); r = max(r, 0.2)
@@ -499,10 +513,14 @@ def wear_at(name, p, n, mname):
     if name.startswith('GateLeaf'):
         i = int(max(0.0, p.x) / 0.2)
         bd = FK.rng('board%d' % i).random()
-        r = 0.12 + 0.3 * bd + (0.45 * (1 - p.z / 0.45) if p.z < 0.45 else 0.0) + 0.1 * max(0.0, nz)
+        xm = max(0.0, p.x) % 0.2
+        edge = 1.0 - sstep(0.0, 0.03, min(abs(xm - 0.01), abs(xm - 0.19)))          # worn plank edges / dark gaps
+        endg = 1.0 - sstep(0.0, 0.05, min(abs(p.z - 0.05), 1.0))
+        r = 0.12 + 0.3 * bd + (0.45 * (1 - p.z / 0.45) if p.z < 0.45 else 0.0) + 0.1 * max(0.0, nz) + 0.35 * edge * (0.5 + 0.5 * nzp + 0.3)
+        b = min(1.0, 0.75 * edge * (0.4 + 0.6 * max(0.0, nzp + 0.6)) + 0.25 * max(0.0, st) + 0.3 * bd)      # paint worn through to pale wood
         g = 0.3 * (1 - p.z / 0.3) * max(0.0, nzp + 0.5) if p.z < 0.3 else 0.0
         if mname == 'LK_Iron':
-            r = 0.4
+            r = 0.45; b = 0.0
         if up:
             r = max(r, 0.3)
     # per-stone value variation: dark end through grime (R), light end through polish (B)
@@ -513,7 +531,7 @@ def wear_at(name, p, n, mname):
             r = min(1.0, r + (-t) * 0.5 * amp)
         else:
             b = min(1.0, b + t * 0.5 * amp)
-        if mo > 0.68 and mname == 'LK_Rubble' and name != 'LaneStep' and n.z > -0.2:
+        if mo > (0.6 if p.z > 0.9 else 0.68) and mname == 'LK_Rubble' and name != 'LaneStep' and n.z > -0.2:
             g = max(g, 0.62 * (0.55 + 0.45 * nzp + 0.2 * n.z))      # a mossy stone in three
     return min(1.0, r), min(1.0, g), min(1.0, b)
 
@@ -598,7 +616,11 @@ def build_assembly(obs):
     for s in (-1, 1):
         x0, x1 = (3.2 * s + 0.36 * s, 14 * s)
         quad(sc, 'terr', [(x0, 4.92, 8.5), (x1, 4.92, 8.5), (x1, 4.92, 22), (x0, 4.92, 22)], gra, (0.05, 0.15, 0))
-        quad(sc, 'face', [(x0, 1.92, 8.5), (x1, 1.92, 8.5), (x1, 4.92, 8.5), (x0, 4.92, 8.5)], FK.tile_mat('LK_Bank', 'B1_town/packed_soil'), (0.15, 0.05, 0))
+        # end wall across the terrace: real RetainWall modules (lane face -Z toward the lane) instead of a flat bank
+        for k in range(6):
+            xc = (x0 + 1.0 + 2.0 * k) * s
+            place(obs, 'RetainWall', (xc, 1.92, 8.85), run=(1, 0, 0) if s > 0 else (-1, 0, 0))
+        place(obs, 'RetainButtress', ((x0 + 5.0) * s, 1.92, 8.85), run=(1, 0, 0) if s > 0 else (-1, 0, 0))
     # the flight: 12 LaneSteps 5 m wide (2.5 steps scaled across)
     for k in range(12):
         for cx in (-1.667, 0.0, 1.667):
@@ -648,6 +670,8 @@ CAMS = {   # Unity (from, to, vertical fov)
     'flight': ((7.5, 3.6, -2.5), (-0.5, 1.0, 5.0), 48),
     'close': ((-0.2, 2.2, -0.2), (-3.4, 1.6, 3.2), 42),
     'ruined': ((-0.5, 3.1, 5.0), (3.4, 2.9, 11.0), 62),
+    'retain': ((-5.0, 2.8, 2.5), (-8.5, 3.6, 8.5), 50),
+    'gate': ((-1.3, 1.9, 1.0), (-3.4, 1.5, 3.0), 34),
 }
 
 def setup_light(sc):
