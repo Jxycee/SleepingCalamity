@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
-Progress: 25%
+Progress: 40%
 Sheet: none (top-down plan: Reference/hollowmere/square/ground_plan_r1.png)
-Blocker: none
+Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test and the art finish+export are running on Sonnet agents)
 
 ## Done
 - Ground generator `Art/Blender/town/sc_square_ground.py` (branch claude/practical-tesla-lqajeo). Reads the plan from HollowmereLayout.cs,
@@ -20,3 +20,10 @@ Blocker: none
 - Reused: sc_cobbles.py Layout/course/fill code and family, CobbleSpawner, sc_props_adopt pipeline, sc_fetch_models.py, B10 BannerPole, B7 props, B8 lantern.
 - Poly Haven model list searched (api.polyhaven.com) for bench/planter/lamp/bunting/drain: bench + planters + pot adopted; no medieval
   lantern post, bunting or gully grate there, so those three are generated (bunting = pennant/rope parts composed along a catenary in Unity, the usual approach).
+
+## Paused state (2026-10-31)
+- Dressing art: 7 of 11 assets built as previews only (--res-scale 0.25). Nothing is exported yet. Generator `Art/Blender/town/sc_square_dressing.py` is committed (WIP).
+  Tris: Bench_A 614, Bench_Broken 1,655, Planter_A 5,999, Planter_B 6,000, Planter_Broken 29,090 (over budget: the decimate didn't apply to the boolean mesh; fix before export), Pot_Clay 2,905, Pot_Broken 3,852.
+  Not started: LanternPost_A/Broken, Bunting (Rope_1m must run along Blender -X to be Unity +X), Drain_A. No contact sheet yet.
+- Unity placement: written and pushed (d5c21bd + 1d3a8a1), but not compiled because the Unity editor was still downloading. Core HollowmereDressing.cs (rows, footprints, Validate) passes its 6 Core tests (sc_core_tests: Validate is empty against the path graph). HollowmereSquare.cs places the ground, the drains, the dressing (greybox until the art is exported) and the bunting. HollowmereBuilder gets one line.
+  Resume: setup.sh --wait, sc_cloud_compile.py (--csproj first), unity.sh build, test-edit, then captures, check and merge.
