@@ -50,6 +50,7 @@ The user reads our rubric scores about 8-10 points low ("your 20/40 is more like
 ## 4. Deliverables and paths (so sessions never collide)
 - Generator: `Art/Blender/town/sc_<asset>.py` (one per asset family, header docstring like `Art/Blender/cellars/sc_cellar_lantern.py`: what it is, run line, status, score).
 - Review renders and bakes: your scratchpad, never the repo.
+- **Side-by-side sheet every round (user, 2026-10-30):** paste the reference image right next to your render in one image (reference left, render right, same height, labelled) and judge from that sheet, not from memory. Use the closest frame from `Reference/` (or the controller's latest Unity capture for in-engine fixes). `Art/Blender/tools/sc_ab_sheet.py` / `sc_sheet.py` or a few lines of PIL do it. Put the sheet path in every report.
 - **Clean up screenshots and renders (user, 2026-10-30):** delete a round's renders once it's superseded; at the end keep only the final contact sheet and the renders in your report.
 - **Cloud sessions** commit the generator only (no FBX, no textures), plus a `--stage bake --res 1024` proof render in the message. The PC runs the 2K/4K bake and exports.
 - **Local (PC) sessions** also run the final bake and write the export to `Assets/_Project/Content/Art/Town/<Batch>/<Asset>/` (FBX, `_BaseColor`, `_Normal`, `_ORM` PNG; no `.meta`: the controller's Unity import makes them). Adopted models keep a `SOURCES.md` with source and licence beside the export.
