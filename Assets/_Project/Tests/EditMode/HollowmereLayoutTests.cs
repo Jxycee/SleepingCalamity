@@ -146,6 +146,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Ring2Fill_GoldenForTheFixedSeed()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            var fill = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed);
+            CollectionAssert.AreEquivalent(new[] { "R2_10", "R2_15", "R2_17", "R2_21" }, fill.Where(kv => kv.Value.Kind == HollowmereLayout.BuildingKind.Empty).Select(kv => kv.Key).ToList(), "empty lots for the shipped seed");
+            Assert.AreEqual("Townhouse_B", fill["R2_02"].VariantName);
+            Assert.AreEqual("Workshop_C", fill["R2_13"].VariantName);
+            Assert.AreEqual("Workshop_C", fill["R2_23"].VariantName);
+            var other = HollowmereLayout.AssignRing2(t, HollowmereLayout.Ring2Seed + 1);
+            Assert.IsTrue(fill.Any(kv => other[kv.Key].Kind != kv.Value.Kind || other[kv.Key].Variant != kv.Value.Variant), "a different seed gives a different town");
+        }
+
+        [Test]
         public void EarlierPlacements_AreUnchanged()
         {
             Assert.AreEqual("Townhouse_A", HollowmereLayout.RebuiltHome("F06").VariantName); Assert.AreEqual(0, HollowmereLayout.RebuiltHome("F06").Turn);
