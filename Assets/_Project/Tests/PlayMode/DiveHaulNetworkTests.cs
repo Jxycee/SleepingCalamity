@@ -103,7 +103,9 @@ namespace SleepingCalamity.Tests.PlayMode
 
             // A bank request on floor 3 (no bank point) changes nothing.
             peerA.RequestBank();
-            yield return new WaitForSeconds(0.5f);
+            float until = Time.realtimeSinceStartup + 10f;
+            while (host.BankRequestsHandled < 1 && Time.realtimeSinceStartup < until) yield return null;
+            Assert.That(host.BankRequestsHandled, Is.EqualTo(1), "the floor-3 bank request never reached the host");
             Assert.That(host.Current.UnbankedPieces, Is.EqualTo(2), "no bank on floor 3");
             Assert.That(host.Current.BankedPieces, Is.EqualTo(0));
 

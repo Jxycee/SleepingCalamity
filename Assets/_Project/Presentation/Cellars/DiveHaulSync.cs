@@ -89,8 +89,11 @@ namespace SleepingCalamity.Presentation
         // Any player may interact with a bank point; the host validates (see the class comment) and banks the whole shared haul.
         public void RequestBank() { RequestBankRpc(); }
 
+        // Host only: bank requests received over the RPC, accepted or refused (lets a test wait for a refusal to land).
+        public int BankRequestsHandled { get; private set; }
+
         [Rpc(SendTo.Server)]
-        private void RequestBankRpc(RpcParams rpcParams = default) { ServerTryBankFor(rpcParams.Receive.SenderClientId); }
+        private void RequestBankRpc(RpcParams rpcParams = default) { BankRequestsHandled++; ServerTryBankFor(rpcParams.Receive.SenderClientId); }
 
         public bool ServerTryBankFor(ulong clientId)
         {
@@ -113,6 +116,7 @@ namespace SleepingCalamity.Presentation
             if (FloorSync == null) FloorSync = FindFirstObjectByType<CellarFloorSync>();
             CellarFloorSync fs = FloorSync;
             if (fs == null || fs.Layout == null || fs.Built == null || fs.Built.Root == null || !fs.Layout.BankCell.HasValue) return false;
+            if (fs.BuiltFloor != _state.CurrentFloor) return false;   // the built floor lags or leads the dive floor: no cell to trust, skip the range check
             CellPos cell = fs.Layout.BankCell.Value;
             pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(cell.X, cell.Y));
             return true;
