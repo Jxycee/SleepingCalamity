@@ -22,7 +22,7 @@ namespace SleepingCalamity.EditorTools
     internal static class HollowmereSquare
     {
         const string SquareBatch = "Square";
-        const float DefaultSoilHeight = 0.45f, PotSoilHeight = 0.4f, DriftWarn = 0.02f, PennantSpacing = 0.33f, RopeSegment = 0.5f;
+        const float DefaultSoilHeight = 0.45f, PotSoilHeight = 0.4f, PotScale = 1.5f, DriftWarn = 0.02f, PennantSpacing = 0.33f, RopeSegment = 0.5f;
         static readonly Vector3 DefaultHook = new Vector3(0f, 2.85f, 0.6f);   // lantern post hook point (Unity terms, post-local) when SOURCES.md does not say
 
         [System.Serializable] sealed class PStone { public string v; public float[] p; }
@@ -225,7 +225,15 @@ namespace SleepingCalamity.EditorTools
             var box = root.gameObject.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, r.Height * 0.5f, 0f); box.size = new Vector3(r.SizeX, r.Height, r.SizeZ);
 
-            if (r.Plants > 0) plants.Stand(root, r, r.Kind == DecoKind.Pot ? PotSoilHeight : SoilHeight(r.Asset));
+            float soil = r.Kind == DecoKind.Pot ? PotSoilHeight : SoilHeight(r.Asset);
+            if (r.Kind == DecoKind.Pot && real)
+            {
+                body.localScale = Vector3.one * PotScale;   // the art pot is 0.30 m: storybook scale wants it bigger, the footprint stays 0.5
+                soil = SoilHeight(r.Asset);
+                if (soil == DefaultSoilHeight) soil = PotSoilHeight;
+                soil *= PotScale;
+            }
+            if (r.Plants > 0) plants.Stand(root, r, soil);
             if (r.Light) HangLantern(root, r);
             return real;
         }
@@ -277,7 +285,9 @@ namespace SleepingCalamity.EditorTools
             string src = folder != null ? BuilderUtil.Abs(folder + "/SOURCES.md") : null;
             if (src != null && File.Exists(src))
             {
-                Match m = Regex.Match(File.ReadAllText(src), @"soil[^0-9\r\n]{0,40}([0-9]+(?:\.[0-9]+)?)\s*m", RegexOptions.IgnoreCase);
+                string text = File.ReadAllText(src);
+                Match m = Regex.Match(text, @"soil top height:\s*([0-9]+(?:\.[0-9]+)?)\s*m", RegexOptions.IgnoreCase);
+                if (!m.Success) m = Regex.Match(text, @"soil[^0-9\r\n]{0,40}([0-9]+(?:\.[0-9]+)?)\s*m", RegexOptions.IgnoreCase);
                 if (m.Success && float.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v) && v > 0.05f && v < 2f) return v;
             }
             return DefaultSoilHeight;

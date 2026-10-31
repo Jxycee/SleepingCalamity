@@ -42,7 +42,9 @@ namespace SleepingCalamity.EditorTools
             try
             {
                 EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
-                BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
+                // SC_CAPTURE_SUN=LowSun renders the low-sun look and adds "_LowSun" to the file names (default Midday, names unchanged).
+                bool low = System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") == "LowSun";
+                BeautyCornerBuilder.ApplyPreset(low ? BeautyCornerBuilder.Preset.LowSun : BeautyCornerBuilder.Preset.Midday);
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                 {
@@ -51,10 +53,10 @@ namespace SleepingCalamity.EditorTools
                     LookTestCapture.WarmUp(cams);
                     foreach (Camera cam in cams)
                     {
-                        if (!cam.name.StartsWith("Cap_HM_") && cam.name != "Cap_Corner_Wide") continue;
+                        if (!cam.name.StartsWith("Cap_HM_") && !cam.name.StartsWith("Cap_Corner_")) continue;
                         bool overview = cam.name == "Cap_HM_Overview", fog = RenderSettings.fog;
                         if (overview) RenderSettings.fog = false;   // the corner's haze is tuned for 10-40 m; at 100 m+ it would hide the town
-                        try { LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + preset + ".png")); }
+                        try { LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + preset + (low ? "_LowSun" : "") + ".png")); }
                         finally { RenderSettings.fog = fog; }
                     }
                 }
