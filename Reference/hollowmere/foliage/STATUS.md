@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Wave 2: Ground tileables + foliage extension
-Progress: 88%
+Progress: 92%
 Sheet: Reference/hollowmere/foliage/foliage_sheet_r2.jpg
 Blocker: none
 
@@ -10,7 +10,7 @@ Round 1 = 26/40 (self; target 31). Ground reads as real PBR turf/soil/grit, bank
   (cluster it at 4-8 m), (3) old greybox green ivy boxes still on the keep wall; dry patches in the overview were blotchy (softened).
 Tris: grass worst view 332k (Cap_HM_Bakery, 1,954 clumps; 63k clumps total, instanced terrain details, no shadows);
   placed foliage ruined 1,300 objects / 596k tris town-wide, rebuilt 610 / 295k.
-Check: - (round 2 runs build, captures, then unity.sh check)
+Check: SC RESULT check PASS (test-edit 592/592, test-play 32 + 8 skipped) on round 3 code 26ecd51; final check on the merged tip running
 Merge: -
 
 ## Log
@@ -26,3 +26,4 @@ Merge: -
 - 2026-10-31: round 2 captures done (both presets, all cameras); sheet r2 pushed. The tuft line on the square in HomeDoor is the approved corner's own CrackWeeds row (unchanged), not this pass. unity.sh check finishing.
 - 2026-10-31: coordinator review of sheet r1: 24/40, one more round (this supersedes the earlier "round 1 approved"). Round 3 running (Sonnet): (1) a large-scale lawn colour variation (dry yellow-green and worn patches at 40-70 m), a coarser soil normal, the grass desaturated a touch; (2) grass clustered harder, with taller seed-head grass (Grass_C scaled up) and clover rosettes (Weed_D), since B9 has no seed-head or clover cards; (3) a far hedgerow/tree-line ring at 120-145 m built from scaled B9 leaf-mass cards (no tree models exist), so the low cameras get a framed horizon. Then captures, check, merge.
 - 2026-10-31 ~13:00: round 3 code compiles and is pushed (lawn colour variation, coarser soil normal, clustered grass + seed-head and rosette detail prototypes, far hedgerow ring). Round 3 captures running in Unity now (17 of ~34 PNGs; software rendering takes about 40 min per set). Then sheet r3, merge main (Q1 kits), check, merge. No blocker: Unity works here.
+- 2026-10-31: round 3 check PASS (on 26ecd51 + the hedge fix in the working tree). Hedge ring fixed (95k tris, darker tint) and grass worst view 378k. Main merged (Q1 kits). Running now: final captures on the merged tip (sheet r3), then check on the tip, then merge.
