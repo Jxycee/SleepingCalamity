@@ -3,8 +3,9 @@
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
 State: IN PROGRESS (terrain pass)
-Progress: 50%
-Sheet: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
+Progress: 85%
+Sheet: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
+Map: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
 
 **Wave 0 greybox:** merged to main as `1f6ff88` (`check` PASS on main).
 
@@ -14,7 +15,11 @@ Sheet: Reference/hollowmere/layout/Hollowmere_Map_Town.jpg
 |---|---|
 | Heights + validation + tests (22) | done; `sc_core_tests` PASS |
 | Elevation-shaded map | done (`Hollowmere_Map_Town.jpg`, `Hollowmere_Map_Square.jpg`) |
-| Builder: terrain mesh, terrace walls, cut and fill, keep wall breakup, low-angle cameras | written, compiles; Unity build and captures next |
-| `check`, merge | not yet |
+| Ground as a Unity Terrain (controller, 2026-10-31) | done: `HollowmereTerrain` writes the layout heights with `TerrainData.SetHeights` (513, 0.59 m texels); the custom mesh is gone |
+| Terrain Tools erosion | done: `com.unity.terrain-tools` 5.3.3 added; its Perlin noise and hydraulic and thermal erosion ran in a cloud graphics run (llvmpipe compute) and are baked to `Content/Terrain/Hollowmere/Hollowmere_Eroded_513.r16` (seed 1031, max 1.55 m change, open ground only). The build blends the RAW in outside the protect mask (shelf, pads, lanes, walls, bank, ditch), so pads stay exact and the build needs no GPU. Rebake: `unity.sh exec --graphics --method SleepingCalamity.EditorTools.HollowmereTerrain.Bake`. The eroders are internal to the package, so the bake calls them by reflection (pinned to 5.3.3) |
+| Terrain layers | grass and dirt (flat greybox tints; no B1 grass or soil tileable exists yet) and the B1 cobble under the lanes; the square keeps the corner's own surround paving as a slab |
+| Builder: terrace walls, cut and fill, keep-wall breakup, stairs | done |
+| Captures, both presets | done: `captures/` (HomeDoor, Fountain, TitheGate, LaneMouth, LakeShore, MarketStreet, KeepStairs, KeepWall, LowEast, Overview, Corner_Wide) |
+| `check`, merge | next |
 
 **Blockers:** none.

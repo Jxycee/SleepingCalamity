@@ -74,6 +74,7 @@ Packages/packages-lock.json linguist-generated
 # Unity LFS
 *.cubemap               lfs
 *.r16                   lfs
+Assets/_Project/Content/Terrain/**/*.asset lfs
 *.unitypackage          lfs
 
 # 3D models
