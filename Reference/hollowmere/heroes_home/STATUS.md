@@ -2,7 +2,7 @@ State: IN PROGRESS
 Session: Wave 1: Heroes' home (fixed landmark)
 Progress: 80%
 Sheet: Reference/hollowmere/heroes_home/heroes_home_sheet_r3.jpg
-Blocker: none
+Blocker: paused by coordinator for usage
 
 Score: 29/40 after round 3 (r1 26.5, r2 27.5; coordinator's r2 read ~26). r3: salvage shown (faded-blue sailcloth tarp lashed over a roof hole, boarded upper window, planked wall section, new oak lintel, rope-tied barrel), older stone (bigger blocks, rain streaks, north moss/lichen, ridges sag 4 cm/m), a lantern inside the door so warm light spills on the threshold. Art rounds closed.
 Tris: cistern 45.9k, annex 18.6k (budget 75k each)
@@ -22,3 +22,4 @@ Merge commit: none
   smoother washing, grimier list panel. Exported to Assets/_Project/Content/Art/Town/Ring1/HeroesHome/ (SOURCES.md). Unity integration running
   (HeroesHomeArt.cs + the HeroesHome case in HollowmereBuilder), then unity.sh check.
 - Round 3 (coordinator's last round) exported; list panel lifted clear of the proudest stones. Unity integration + check in progress.
+- Paused by the coordinator (usage). Done: art r3 (29/40), export, Unity code (HeroesHomeArt.cs + HollowmereBuilder HeroesHome case, pushed as WIP). Left: unity.sh check on the tip, merge, DONE.
