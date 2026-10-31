@@ -51,3 +51,7 @@ Raw downloads for adoption (sc-asset-adopt). Written by `Art/Blender/tools/sc_fe
 | nettle_plant | https://polyhaven.com/a/nettle_plant | CC0 1.0 (polyhaven.com/license) | Rob Tuytel, Rico Cilliers | 2026-10-30 | 46195 | B9 | crack weed source | none (glTF 2k as published) |
 | weed_plant_02 | https://polyhaven.com/a/weed_plant_02 | CC0 1.0 (polyhaven.com/license) | Rob Tuytel, Rico Cilliers | 2026-10-30 | 17062 | B9 | crack weed source | none (glTF 2k as published) |
 | grass_medium_01 | https://polyhaven.com/a/grass_medium_01 | CC0 1.0 (polyhaven.com/license) | Rob Tuytel, Rico Cilliers | 2026-10-30 | 1606633 | B9 | grass clump source | not fetched: over budget (1606633 tris), fetch on demand with --max-tris |
+| painted_wooden_bench | https://polyhaven.com/a/painted_wooden_bench | CC0 1.0 (polyhaven.com/license) | Kirill Sannikov | 2026-10-31 | 630 | sq | bench | none (glTF 2k as published) |
+| planter_box_01 | https://polyhaven.com/a/planter_box_01 | CC0 1.0 (polyhaven.com/license) | James Ray Cock | 2026-10-31 | 8094 | sq | planter | none (glTF 2k as published) |
+| planter_box_02 | https://polyhaven.com/a/planter_box_02 | CC0 1.0 (polyhaven.com/license) | James Ray Cock | 2026-10-31 | 10944 | sq | planter | none (glTF 2k as published) |
+| planter_box_03 | https://polyhaven.com/a/planter_box_03 | CC0 1.0 (polyhaven.com/license) | James Ray Cock | 2026-10-31 | 13112 | sq | planter | none (glTF 2k as published) |
