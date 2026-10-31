@@ -1,9 +1,10 @@
 State: IN PROGRESS
 Session: Wave 2: Ground tileables + foliage extension
 Job: Q6. Garden and allotment decorations
-Progress: 88%
+Progress: 92%
 Sheet: Reference/hollowmere/garden/garden_sheet_final.jpg
-Blocker: none
+Needs: coordinator
+Blocker: none (asking the coordinator below)
 
 Score: round 2 = 27/40 (self; r1 ~25). Layered cabbages, smooth burlap scarecrow with patches and stitched face, cold frame with glazing bars; timber beds, butt and fences unchanged.
 Tris: pieces 908-2,996 each; placed 95 pieces / 140k tris (4 allotments + 3 ring 2 yards, Rebuilt only)
@@ -20,6 +21,8 @@ Merge: -
 - 2026-10-31: USER review: "The cabbage is low quality, but everything else looks wonderful." Cabbage pass running: its own outer/mid/heart materials (Unity ignored the colour attribute, so every leaf was one flat green), 5-7 cupped outer leaves with real midribs and veins, a tight wrapped head, up to about 6k tris per bed. Then re-check and merge.
 - 2026-10-31: coordinator APPROVED the final sheet (~26/40). Known, for Q12/Q14 (no capture round spent): fence runs stack two or three deep at the allotment front and read cluttered; the scarecrow tint is flat in Unity (its second colour set is not read: give it slot materials like the cabbage). The user's cabbage fix (Blender + slot materials, no new captures) lands before the merge.
 - 2026-10-31: cabbage rebuilt (attempt 2 accepted; attempt 1 rejected as paper sheets): smooth subdivided curved leaves with a painted procedural leaf texture (veins and midrib in albedo and normal, `sc_cabbage_tex.py`), a wrapped head; about 1.9k tris per cabbage, beds 9.0k / 7.8k. Close-up in `cabbage_r3.jpg`. No CC0 cabbage model exists on Poly Haven or ambientCG (checked). Next: rebuild, one allotment capture, check, merge.
+- 2026-10-31 17:45: the user approved the cabbage; no captures. Main merged again (keep, town wall, cellar; only the generated scene conflicted, taken from main) at `b0ccace`. Build + check running on the tip now; merge on PASS. Lost about 80 min to my own wait loop (`pgrep -f` matched its own command line), now fixed.
+- QUESTION FOR THE COORDINATOR (the user asked me to check in; this cloud session can't message the PC session, so here it is): main keeps moving under this branch, and every new merge regenerates `Hollowmere.unity` and needs a fresh build + check (about 45 min). Should I (a) merge to main on this check even if main has moved by then, and re-check on main afterwards, or (b) wait for a quiet window you announce? Default: (a) if main's new commits don't touch `Assets/`, otherwise one more merge + check. Answer in your next message.
 
 ## Usage waste (self-review, 2026-10-31, both jobs)
 1. **Long-lived Sonnet subagents with big contexts, about 40%.** The foliage implementer was resumed 3 times (about 250k tokens), and the garden builder used about 247k. Every resume re-reads the whole transcript, and they re-read builder files and Unity logs while waiting on 35-40 min software-rendered captures. Fix: a fresh agent per step with a short brief (build, capture, check as separate small jobs); reduced captures (`SC_CAPTURE_ONLY=<cams>`) by default and the full 26-34 PNG set only for the final sheet; wait on Unity with one blocking command, never by polling in turns.
