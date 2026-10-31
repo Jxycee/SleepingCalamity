@@ -34,7 +34,9 @@ B polish), read by WearLit. Budget: <= 75k tris per building (PHASE1 3.3; printe
 refs: Reference/hollowmere/heroes_home/REFS.md (old rubble walls and stone-slate roofs), Reference/hollowmere/materials (Cotswold
 slate roofs), PHASE1 3.1 palette, 3.4 shape language (1.3x arches, 1-3 deg off true, sagging ridges, chamfers).
 
-Status: see Reference/hollowmere/heroes_home/STATUS.md (score, tris, rounds).
+Status (2026-10-31, cloud): exported. Self-review r1 26.5/40, r2 27.5/40 (calibrated rubric; stopped: r2 gained < 1.5). Tris: cistern 51.3k,
+annex 19.1k. Next visible gains: foliage at the wall feet and ivy (Wave 2 foliage extension), lichen on the tops, grime streaks under the
+gutter and sills, a smaller and greyer lime panel. Rounds: Reference/hollowmere/heroes_home/STATUS.md.
 """
 import sys, os, math, random, shutil, subprocess
 import bpy, bmesh
@@ -143,7 +145,8 @@ SLOT_DEFS = {   # slot -> builder. FK_* = the B4 facade slots (BeautyCornerArt.F
     'FK_Shutter': lambda: tile_mat('FK_Shutter', 'B1_town/painted_wood', tint=(0.57, 0.73, 0.28)),
     'FK_Iron': lambda: tile_mat('FK_Iron', 'B1_town/iron'),
     'FK_Glass': lambda: flat_mat('FK_Glass', (0.05, 0.075, 0.095), 0.1),
-    'HH_OldStone': lambda: tile_mat('HH_OldStone', 'B1_town/sandstone', tint=(0.66, 0.62, 0.57)),
+    'HH_OldStone': lambda: tile_mat('HH_OldStone', 'B1_town/sandstone', tint=(0.86, 0.76, 0.60)),   # honey, a shade under the dressed sandstone
+    'HH_Mortar': lambda: tile_mat('HH_Mortar', 'B1_town/sandstone', tint=(0.46, 0.41, 0.34)),       # lime mortar in shadow: warm, not black
     'HH_Slate': lambda: tile_mat('HH_Slate', 'B1_town/sandstone', tint=(0.50, 0.47, 0.43), normal=1.4),
     'HH_PlankGrey': lambda: tile_mat('HH_PlankGrey', 'B1_town/oak_timber', tint=(1.05, 1.05, 1.08)),
     'HH_PaintRed': lambda: tile_mat('HH_PaintRed', 'B1_town/painted_wood', paint=PAINTS['HH_PaintRed']),
@@ -420,7 +423,7 @@ class Wall:
                 if any(o.u0 - 0.001 <= (u0 + u1) / 2 <= o.u1 + 0.001 and o.z0 - 0.001 <= (z0 + z1) / 2 <= (o.z1 + 0.001) for o in self.ops):
                     continue
                 vs = [self.P(u, min(zz, self.top(u)), d) for u, zz in ((u0, z0), (u1, z0), (u1, z1), (u0, z1))]
-                self.g.add(vs, [(0, 1, 2, 3) if self._facing_ok() else (3, 2, 1, 0)], 'FK_PlinthJoint', 'core')
+                self.g.add(vs, [(0, 1, 2, 3) if self._facing_ok() else (3, 2, 1, 0)], 'HH_Mortar', 'core')
     def _facing_ok(self):
         # quad (u0,z0),(u1,z0),(u1,z1),(u0,z1): normal = U x Z; we want it along N
         return self.U.cross(Vector((0, 0, 1))).dot(self.N) > 0
@@ -646,8 +649,9 @@ def cloth(g, R, p_top_left, width, drop, along, slot, sway=0.04):
     a = Vector(p_top_left); al = Vector(along).normalized(); nr = al.cross(Vector((0, 0, 1))).normalized()
     ph = R.random() * 6
     def P(u, v):
-        return a + al * (u * width) + Vector((0, 0, -drop * v * (1 + 0.06 * math.sin(u * 7 + ph)))) + nr * (sway * v * math.sin(u * 4 + ph) + 0.03 * math.sin(v * 3 + u * 9))
-    quad_grid(g, slot, P, 4, 3, 'cloth', R, two=True)
+        sagu = 0.04 * math.sin(u * math.pi)   # hangs between the pegs
+        return a + al * (u * width) + Vector((0, 0, -sagu - drop * v * (1 + 0.05 * math.sin(u * 7 + ph)))) + nr * (sway * v * math.sin(u * 4 + ph) + 0.035 * math.sin(v * 2.5 + u * 11) * (0.3 + v))
+    quad_grid(g, slot, P, 8, 6, 'cloth', R, two=True)
     for u in (0.1, 0.9):   # pegs
         box(g, 'FK_OakDoor', (0.02, 0.025, 0.08), Matrix.Translation(a + al * (u * width) + Vector((0, 0, 0.0))), 'wood', R)
 
@@ -1010,11 +1014,12 @@ def wear_rgb(p, n, tag, slot, top_z):
     if tag in ('stone', 'core', 'floor', 'step', 'plaster'):
         r = 0.62 * max(0.0, 1 - p.z / 0.75) ** 1.4 + 0.12 * nz            # splash-back band at the foot
         r += 0.18 * max(0.0, 1 - abs(p.z - top_z) / 0.9) * nf              # weathering under the eaves
-        gr = (0.55 if n.z > 0.55 else 0.0) * nf + 0.35 * max(0.0, 1 - p.z / 0.9) * (0.5 + 0.5 * max(0.0, n.y)) * nz
+        gr = (0.8 if n.z > 0.55 else 0.0) * nf + 0.45 * max(0.0, 1 - p.z / 1.1) * (0.5 + 0.5 * max(0.0, n.y)) * nz \
+            + 0.35 * max(0.0, n.y) * max(0.0, nf - 0.45)
         if tag == 'step':
             b = 0.55
         if tag == 'plaster':
-            r = 0.18 + 0.22 * nf + 0.3 * max(0.0, 1 - (p.z - 0.8) / 0.6); gr = 0.0
+            r = 0.30 + 0.25 * nf + 0.3 * max(0.0, 1 - (p.z - 0.8) / 0.6); gr = 0.12 * max(0.0, nz - 0.5)
     elif tag == 'slate':
         r = 0.12 + 0.2 * nz; gr = (0.75 * nf if nz > 0.45 else 0.15 * nf) * (1.0 if n.z > 0.3 else 0.3)
     elif tag in ('wood', 'door'):
