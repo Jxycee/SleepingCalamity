@@ -216,7 +216,8 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
 - **Built by an Editor builder from a layout file** (no hand-edited scenes).
 - **The square:** about 40 x 30 m around the dry fountain on the hilltop above the lake. Lanes leave it as stubs, and the bell tower and the sealed tithe gate show on its north side.
 - **The heroes' home** (the cistern house, the bell-loft annex) sits on the square's edge. Its cellar stair is the way into the Undercroft.
-- **The build zone** covers the square's empty plots. Placement is free on a 0.5 m snap grid with 15-degree rotation, with an undo, a free camera, and a live wish preview (lessons). There are no fixed lots.
+- **Buildings go on old foundations** (user, 2026-10-30; design `docs/superpowers/specs/2026-10-30-hollowmere-mass-production-design.md`): a building snaps onto any empty foundation of its size class (S 6 m, M 8 m, L 11 m square) on any opened ring, in four turns, frame first and then its parts. A building that would block an NPC path is refused. Anything placed can always be picked back up. Fixed in place: bell tower, heroes' home, fountain, mill, tithe gate, market stalls.
+- **Decorations** stay free on a 0.5 m snap grid with 15-degree rotation anywhere in town, with an undo, a free camera, and a live wish preview (lessons); one that blocks an NPC path breaks and returns to the player.
 - **Wishes are deterministic predicates,** extending FishGame's `PlacementWish` kinds (AtLot, NearPoint, FarFrom) with Facing, NextTo and InArea, after DC1's vocabulary. Wishes carry equal weight (DC1) and are shown in plain words with a live tick.
 - **The bakery** comes home as 4 pieces (frame, oven, door, sign) plus the baker. It counts only when all are placed (DC1 completion gate).
 - **The baker's wishes:** "near the fountain, so folk pass my door" (within 12 m), "door facing the square", and "not right against the inn" (8 m or more from it). Meeting all three opens his service: healing loaves for the next dive. [P48]
@@ -321,7 +322,7 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 23. **P23 Call:** co-op scales enemy life (x1.7, 2.3, 2.8) and enemy count, not attack.
 24. **P24 Call:** co-op players are downed for 20 s and revived by an ally; all down ends the dive.
 25. **P25 Call:** the Undercroft's entrance is the cellar stair of the heroes' cistern house.
-26. **P26 Call:** placement is free on a 0.5 m snap grid in a build zone (no fixed lots), with undo and equal-weight wishes shown live.
+26. **P26 Call (amended by the user 2026-10-30):** buildings snap onto old foundations by size class with four turns; decorations stay free on a 0.5 m snap grid; undo and equal-weight wishes shown live.
 27. **P27 Placeholder:** the baker's three wishes (12 m, facing the square, 8 m from the inn) and the loaf count (three per dive); the service itself is P48.
 28. **P28 Call:** the bakery is 4 pieces plus the baker and counts only when all are placed.
 29. **P29 Call:** the character pipeline is a hybrid: an MPFB2 base body, Tripo-made head, hair and outfit parts, and Mixamo animation retargeted through Unity Humanoid.
@@ -349,6 +350,7 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 51. **P51 Call:** at most 3 art-batch agents run at once, after the user's go-ahead.
 
 ## Change log
+- 2026-10-30 (user): Hollowmere mass-production design approved: ring 1 at final quality and the lanes/mill kits final-but-unplaced move forward from the vertical slice; buildings on foundations by size class (P26 amended, 7.1).
 - 2026-10-30 (user, decision A11): day palette moved toward the measured OoT 2026 frames, keeping as much of the OoT look as possible with slightly brighter light; moody, darker saturation stays. Day value bands, warmth, plaster hue, saturation and slate-teal shadows updated in 3.1.
 - 2026-10-30 (user): every multiplayer session needs 2+ recorded players at start (confirmed). Claude's call: if players drop mid-session the session continues and difficulty scales down.
 - 2026-10-30 (user): up to 10 worlds per player, with Solo and Multiplayer worlds in separate tabs (Claude reads this as 10 per tab; placeholder). One save file per world (M1).
