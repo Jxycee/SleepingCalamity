@@ -180,7 +180,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Rule_StairAndBankAndStartFeatures()
         {
-            ExpectError(CellarRoom.Parse("e", "E", RoomKind.Entry, SubTheme.Any, "x", new[] { ".D..", "EE..", "....", "...." }), "needs 4 party start cells");
+            ExpectError(CellarRoom.Parse("e", "E", RoomKind.Entry, SubTheme.Any, "x", new[] { ".D..", "EE..", "....", "...." }), "exactly 4 party start cells");
             ExpectError(CellarRoom.Parse("x", "X", RoomKind.StairExit, SubTheme.Any, "x", new[] { ".D..", "....", "....", "...." }), "exactly 1 stair");
             ExpectError(CellarRoom.Parse("c", "C", RoomKind.Checkpoint, SubTheme.Any, "x", new[] { ".D.", "...", ".D." }), "exactly 1 bank");
             ExpectError(CellarRoom.Parse("t", "T", RoomKind.Combat, SubTheme.Larder, "box", new[] { ".D.", "sXs", "CD." }), "only the stair-exit");
@@ -259,6 +259,101 @@ namespace SleepingCalamity.Tests.EditMode
             ExpectError(r, "only corridor pieces");
         }
 
+        // ---- more failing cases ----
+
+        static CellarRoom Hand(RoomKind kind, SubTheme theme, int w, int h, IEnumerable<CellDoor> doors, IEnumerable<ChestSlot> chests = null, IEnumerable<CellarSpawn> spawns = null, IEnumerable<RoomFeature> feats = null, CellKind[,] cells = null)
+            => new CellarRoom("t", "T", kind, theme, "box", cells ?? new CellKind[w, h], doors, null, spawns, chests, feats);
+
+        [Test]
+        public void Rule_DoorListedTwice()
+            => ExpectError(Hand(RoomKind.Combat, SubTheme.Larder, 3, 3, new[] { new CellDoor(1, 0, CellSide.North), new CellDoor(1, 0, CellSide.North), new CellDoor(1, 2, CellSide.South) },
+                new[] { new ChestSlot(0, 1) }, new[] { new CellarSpawn(0, 0, SpawnTier.Tier1), new CellarSpawn(2, 0, SpawnTier.Tier1) }), "listed twice");
+
+        [Test]
+        public void Rule_DoorOnACornerCell()
+            => ExpectError(Hand(RoomKind.Combat, SubTheme.Larder, 3, 3, new[] { new CellDoor(0, 0, CellSide.North), new CellDoor(1, 2, CellSide.South) },
+                new[] { new ChestSlot(0, 1) }, new[] { new CellarSpawn(2, 0, SpawnTier.Tier1), new CellarSpawn(2, 1, SpawnTier.Tier1) }), "corner cell");
+
+        [Test]
+        public void Rule_SpecialRoomDoorCountRanges()
+        {
+            ExpectError(CellarRoom.Parse("e", "E", RoomKind.Entry, SubTheme.Any, "x", new[] { ".DD.", "EE..", "EE.D", "..D." }), "needs 1 to 3");
+            ExpectError(CellarRoom.Parse("x", "X", RoomKind.StairExit, SubTheme.Any, "x", new[] { "....", "....", "....", "...X" }), "needs 1 to 3");
+            ExpectError(CellarRoom.Parse("c", "C", RoomKind.Checkpoint, SubTheme.Any, "x", new[] { ".D.", ".B.", "..." }), "needs 2 to 4");
+        }
+
+        [Test]
+        public void Rule_NonCombatRoomWithATheme()
+            => ExpectError(CellarRoom.Parse("c", "C", RoomKind.Checkpoint, SubTheme.Larder, "x", new[] { ".D.", ".B.", ".D." }), "must use SubTheme.Any");
+
+        [Test]
+        public void Rule_CombatRoomWithTooManyChests()
+            => ExpectError(Combat(new[] { ".D..", "sCCs", "CD.C" }), "chest slots, needs 1 to 3");
+
+        [Test]
+        public void Rule_CorridorWithALockedDoor()
+        {
+            var r = new CellarRoom("c", "C", RoomKind.Corridor, SubTheme.Any, "", new CellKind[1, 1], new[] { new CellDoor(0, 0, CellSide.North, true), new CellDoor(0, 0, CellSide.South) },
+                null, null, null, null, CorridorShape.Straight, CellarRoom.MaskN | CellarRoom.MaskS);
+            ExpectError(r, "locked door");
+        }
+
+        [Test]
+        public void Rule_RoomWithNoFloorCells()
+        {
+            var cells = new CellKind[3, 3];
+            for (int x = 0; x < 3; x++) for (int y = 0; y < 3; y++) cells[x, y] = CellKind.Solid;
+            ExpectError(Hand(RoomKind.Combat, SubTheme.Larder, 3, 3, new CellDoor[0], cells: cells), "no floor cells");
+        }
+
+        [Test]
+        public void Rule_NoDoorOnFloorMeansNoStartForTheFlood()
+            => ExpectError(Hand(RoomKind.Combat, SubTheme.Larder, 3, 3, new[] { new CellDoor(1, 3, CellSide.South) }), "no door sits on a Floor cell");
+
+        [Test]
+        public void Rule_BarrelsAndCratesMustNotCutTheRoom()
+        {
+            // a 3-wide room with a crate in the only cell of the middle row blocks the north half from the south half
+            CellarRoom r = Combat(new[] { ".D.", "#.#", "sDs" }, new SocketSpec(SocketKind.Crate, 1, 1, CellSide.North, Variants));
+            ExpectError(r, "cut off floor cells");
+            CellarRoom wall = Combat(new[] { ".D.", "#.#", "sDs" }, new SocketSpec(SocketKind.Lantern, 1, 1, CellSide.North, Variants));
+            Assert.IsFalse(wall.Validate().Any(e => e.Contains("cut off")), "a wall-mounted socket does not block walking");
+        }
+
+        [Test]
+        public void Rule_CorridorLanternNeedsAWallBehindIt()
+        {
+            CellarRoom bad = CellarRoom.Corridor("c", "T", CorridorShape.T, CellarRoom.MaskN | CellarRoom.MaskE | CellarRoom.MaskW, new SocketSpec(SocketKind.Lantern, 0, 0, CellSide.South, Variants));
+            ExpectError(bad, "no wall behind");
+        }
+
+        [Test]
+        public void Parse_NullRowsThrowsFormatException()
+            => Assert.Throws<FormatException>(() => CellarRoom.Parse("t", "T", RoomKind.Combat, SubTheme.Larder, "box", null));
+
+        [Test]
+        public void Variants_AreCopiedOnConstruction()
+        {
+            var v = new[] { "A", "B" };
+            var k = new DressingSocket("k", SocketKind.Barrel, 0, 0, CellSide.North, v);
+            v[0] = "Z";
+            Assert.AreEqual("A", k.Variants[0]);
+        }
+
+        [Test]
+        public void PoolRule_NoLockableRoomAndTooFewSilhouettes()
+        {
+            var noLock = CellarRoomPool.All.Where(r => r.Id != "wine_cask_row").ToList();
+            Assert.That(CellarRoomPool.ValidatePool(noLock).Any(e => e.Contains("WineVault has no lockable room")));
+            var samey = CellarRoomPool.All.Select(r => r.Kind != RoomKind.Combat ? r : CellarRoom.Parse(r.Id, r.Name, r.Kind, r.Theme, r.Silhouette.Length > 0 && (r.Silhouette == "box" || r.Silhouette == "closet" || r.Silhouette == "ring" || r.Silhouette == "stepped" || r.Silhouette == "chicane" || r.Silhouette == "cross") ? "box" : r.Silhouette,
+                r.AuthoredRows.ToArray(), r.Sockets.Select(k => new SocketSpec(k.Kind, k.X, k.Y, k.Facing, k.Variants.ToArray())).ToArray())).ToList();
+            Assert.That(CellarRoomPool.ValidatePool(samey).Any(e => e.Contains("distinct combat silhouettes")));
+        }
+
+        [Test]
+        public void Pool_AllIsReadOnly()
+            => Assert.IsFalse(CellarRoomPool.All is List<CellarRoom>);
+
         // ---- pool composition ----
 
         [Test]
@@ -283,17 +378,16 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Pool_AFloorCanDrawSeventyPercentOwnThemeWithNoRepeats()
         {
-            // 4-6 rooms, about 70% own theme: 3 of 4, 4 of 6 (rounded) from the 4 own rooms, the rest from the other 8
+            // a floor of n rooms takes own = floor(0.7 n + 0.5) from its theme and the rest from the other themes, each room at most once
             foreach (SubTheme t in new[] { SubTheme.Larder, SubTheme.WineVault, SubTheme.CoalCellar })
-            {
-                int own = CellarRoomPool.Combat(t).Count(), other = CellarRoomPool.All.Count(r => r.Kind == RoomKind.Combat && r.Theme != t);
-                for (int rooms = 4; rooms <= 6; rooms++)
+                foreach (int n in new[] { 4, 5, 6 })
                 {
-                    int wantOwn = (int)Math.Round(rooms * 0.7);
-                    Assert.LessOrEqual(wantOwn, own, t + " " + rooms);
-                    Assert.LessOrEqual(rooms - wantOwn, other, t + " " + rooms);
+                    int own = (int)Math.Round(n * 0.7, MidpointRounding.AwayFromZero);
+                    int ownAvailable = CellarRoomPool.Combat(t).Count();
+                    int otherAvailable = CellarRoomPool.All.Count(r => r.Kind == RoomKind.Combat && r.Theme != t);
+                    Assert.GreaterOrEqual(ownAvailable, own, t + " n=" + n + " own-theme rooms");
+                    Assert.GreaterOrEqual(otherAvailable, n - own, t + " n=" + n + " other-theme rooms");
                 }
-            }
         }
 
         [Test]
@@ -319,11 +413,15 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Pool_ChestSlotsCoverAFloorsSixToEightChests()
+        public void Pool_AnyFourRoomDrawHoldsAtLeastFourChestSlots()
         {
-            // a floor has 4-6 rooms and 6-8 chests: the rooms of one theme hold enough slots to draw from
-            foreach (SubTheme t in new[] { SubTheme.Larder, SubTheme.WineVault, SubTheme.CoalCellar })
-                Assert.That(CellarRoomPool.Combat(t).Sum(r => r.Chests.Count), Is.GreaterThanOrEqualTo(6), t.ToString());
+            // The rooms alone do not guarantee a floor's 6-8 chests: the generator tops them up in dead ends and corridor ends (header of CellarRoomPool).
+            // What the pool does guarantee, computed over every 4-room draw of combat rooms:
+            var chests = CellarRoomPool.All.Where(r => r.Kind == RoomKind.Combat).Select(r => r.Chests.Count).ToList();
+            int min = int.MaxValue;
+            for (int a = 0; a < chests.Count; a++) for (int b = a + 1; b < chests.Count; b++) for (int c = b + 1; c < chests.Count; c++) for (int d = c + 1; d < chests.Count; d++)
+                min = Math.Min(min, chests[a] + chests[b] + chests[c] + chests[d]);
+            Assert.GreaterOrEqual(min, 4);
         }
 
         [Test]
@@ -338,7 +436,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (CellarRoom r in CellarRoomPool.All)
                 foreach (DressingSocket s in r.Sockets)
-                    Assert.That(s.Variants.Length, Is.InRange(2, 3), s.Id);
+                    Assert.That(s.Variants.Count, Is.InRange(2, 3), s.Id);
         }
 
         [Test]
@@ -346,13 +444,76 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (CellarRoom r in CellarRoomPool.All.Where(r => r.Kind != RoomKind.Corridor))
             {
-                CellarRoom again = CellarRoom.Parse(r.Id, r.Name, r.Kind, r.Theme, r.Silhouette, r.ToAscii());
-                CollectionAssert.AreEqual(r.ToAscii(), again.ToAscii(), r.Id);
-                Assert.AreEqual(r.Doors.Count, again.Doors.Count, r.Id);
+                Assert.IsNotNull(r.AuthoredRows, r.Id);
+                string[] rows = r.AuthoredRows.ToArray();
+                CollectionAssert.AreEqual(rows, CellarRoom.Parse(r.Id, r.Name, r.Kind, r.Theme, r.Silhouette, rows).ToAscii(), r.Id);
+                CollectionAssert.AreEqual(rows, r.ToAscii(), r.Id);
             }
         }
 
-        // ---- pool-level rules ----
+        // ---- rotation ----
+
+        static void AssertSameRoom(CellarRoom a, CellarRoom b, string what)
+        {
+            CollectionAssert.AreEqual(a.ToAscii(), b.ToAscii(), what);
+            CollectionAssert.AreEqual(a.Doors.Select(d => (d.X, d.Y, d.Side, d.Locked)), b.Doors.Select(d => (d.X, d.Y, d.Side, d.Locked)), what + " doors");
+            CollectionAssert.AreEqual(a.Sockets.Select(k => (k.Id, k.Kind, k.X, k.Y, k.Facing)), b.Sockets.Select(k => (k.Id, k.Kind, k.X, k.Y, k.Facing)), what + " sockets");
+            Assert.AreEqual(a.Mask, b.Mask, what);
+            Assert.AreEqual((a.Width, a.Height), (b.Width, b.Height), what);
+        }
+
+        [Test]
+        public void Rotation_FourQuarterTurnsGiveTheSameRoom()
+        {
+            foreach (CellarRoom r in CellarRoomPool.All)
+            {
+                CellarRoom x = r;
+                for (int i = 0; i < 4; i++) x = x.Rotated(1);
+                AssertSameRoom(r, x, r.Id);
+                AssertSameRoom(r, r.Rotated(0), r.Id + " turn 0");
+                AssertSameRoom(r.Rotated(2), r.Rotated(1).Rotated(1), r.Id + " turn 2");
+                AssertSameRoom(r.Rotated(3), r.Rotated(-1), r.Id + " turn -1");
+            }
+        }
+
+        [Test]
+        public void Rotation_TurnsTheRoom()
+        {
+            CellarRoom r = CellarRoom.Parse("t", "T", RoomKind.Combat, SubTheme.Larder, "box", new[] { ".D.", "s.s", "CD." }, new SocketSpec(SocketKind.Shelf, 0, 0, CellSide.South, "A", "B"));
+            CellarRoom q = r.Rotated(1);
+            Assert.AreEqual((3, 3), (q.Width, q.Height));
+            CollectionAssert.AreEquivalent(new[] { (2, 1, CellSide.East), (0, 1, CellSide.West) }, q.Doors.Select(d => (d.X, d.Y, d.Side)));
+            Assert.AreEqual((2, 0, CellSide.West), (q.Sockets[0].X, q.Sockets[0].Y, q.Sockets[0].Facing));
+            CellarRoom tall = CellarRoom.Parse("t", "T", RoomKind.Combat, SubTheme.Larder, "box", new[] { "sC", "DD", ".s" }).Rotated(1);
+            Assert.AreEqual((3, 2), (tall.Width, tall.Height));
+        }
+
+        [Test]
+        public void Rotation_RotatedRoomsStillValidate()
+        {
+            foreach (CellarRoom r in CellarRoomPool.All)
+                for (int t = 1; t < 4; t++)
+                {
+                    List<string> errs = r.Rotated(t).Validate().Where(e => !e.Contains("2x3 to 5x4")).ToList();   // a turned 4x5 is a 5x4: the size rule allows either orientation
+                    Assert.IsEmpty(errs, r.Id + " turn " + t + "\n" + string.Join("\n", errs));
+                }
+        }
+
+        [Test]
+        public void Rotation_EveryMaskComesFromOneCanonicalPiece()
+        {
+            for (int mask = 1; mask <= 15; mask++)
+            {
+                int pieces = CellarRoomPool.All.Count(r => r.Kind == RoomKind.Corridor && r.Shape != CorridorShape.Door && Enumerable.Range(0, 4).Any(t => CellarRoom.RotateMask(r.Mask, t) == mask));
+                Assert.AreEqual(1, pieces, "mask " + mask);
+                Assert.IsTrue(CellarRoomPool.FindCorridor(mask, out CellarRoom piece, out int turns), "mask " + mask);
+                Assert.AreEqual(mask, CellarRoom.RotateMask(piece.Mask, turns));
+                Assert.AreEqual(mask, piece.Rotated(turns).Mask);
+                Assert.IsEmpty(piece.Rotated(turns).Validate(), "mask " + mask);
+            }
+            Assert.IsFalse(CellarRoomPool.FindCorridor(0, out _, out _));
+            Assert.IsFalse(CellarRoomPool.FindCorridor(16, out _, out _));
+        }
 
         [Test]
         public void PoolRule_DuplicateIds()

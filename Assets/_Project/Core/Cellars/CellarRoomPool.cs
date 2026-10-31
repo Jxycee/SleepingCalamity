@@ -5,6 +5,8 @@
 // Why four combat rooms per theme: a floor has 4-6 rooms and about 70% of them come from its own theme, so 3 of 4 (or 4 of 6) own-theme rooms; four own
 // rooms are enough to draw them with no repeat, and the rest come from the 8 rooms of the other two themes. Each theme has a lockable room (L) and a key
 // chest room (K), so a floor can have its locked room and key without leaving its theme.
+// Chests: every combat room has 1-2 chest slots (4 rooms hold at least 4), but a floor wants 6-8, so the M5 generator tops the count up with chest slots
+// in the 1-3 side dead ends it adds per floor (PHASE1 7.2) and at corridor ends; the rooms alone do not guarantee 6.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +17,17 @@ namespace SleepingCalamity.Core
     {
         public const int CombatPerThemeMin = 4;
 
-        public static readonly IReadOnlyList<CellarRoom> All = Build();
+        public static readonly IReadOnlyList<CellarRoom> All = Build().AsReadOnly();
+
+        // The corridor piece that makes `mask` (N 1, E 2, S 4, W 8) after `turns` clockwise quarter turns (fewest turns first). The Door piece is never
+        // returned: it is a straight with a door in it, which the generator chooses on purpose. False when mask is not 1..15.
+        public static bool FindCorridor(int mask, out CellarRoom piece, out int turns)
+        {
+            for (int t = 0; t < 4; t++)
+                foreach (CellarRoom r in All)
+                    if (r.Kind == RoomKind.Corridor && r.Shape != CorridorShape.Door && CellarRoom.RotateMask(r.Mask, t) == mask) { piece = r; turns = t; return true; }
+            piece = null; turns = 0; return false;
+        }
 
         public static CellarRoom Find(string id) => All.FirstOrDefault(r => r.Id == id);
         public static IEnumerable<CellarRoom> Combat(SubTheme theme) => All.Where(r => r.Kind == RoomKind.Combat && r.Theme == theme);
@@ -42,7 +54,7 @@ namespace SleepingCalamity.Core
         static CellarRoom Combat(string id, string name, SubTheme t, string sil, string[] rows, params SocketSpec[] socks) => CellarRoom.Parse(id, name, RoomKind.Combat, t, sil, rows, socks);
         static CellarRoom Special(string id, string name, RoomKind k, string sil, string[] rows, params SocketSpec[] socks) => CellarRoom.Parse(id, name, k, SubTheme.Any, sil, rows, socks);
 
-        static IReadOnlyList<CellarRoom> Build()
+        static List<CellarRoom> Build()
         {
             const SubTheme L = SubTheme.Larder, WV = SubTheme.WineVault, CC = SubTheme.CoalCellar;
             const SocketKind Shelf = SocketKind.Shelf, Rack = SocketKind.Rack, Barrel = SocketKind.Barrel, Crate = SocketKind.Crate, Chute = SocketKind.Chute, Lantern = SocketKind.Lantern, Roots = SocketKind.Roots;
