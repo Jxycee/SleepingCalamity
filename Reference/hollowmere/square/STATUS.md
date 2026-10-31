@@ -2,7 +2,7 @@ State: IN PROGRESS
 Session: Wave 2: Square ground + dressing
 Progress: 85%
 Sheet: Reference/hollowmere/square/props_sheet_r1.jpg (props beside the approved corner; square captures next)
-Blocker: none (resumed; origin/main merged at c6ca07b: Unity compile/build/test and the art finish+export are running on Sonnet agents)
+Blocker: paused by coordinator for usage (resume after the 12:10 UTC reset)
 
 ## Done
 - Ground generator `Art/Blender/town/sc_square_ground.py` (branch claude/practical-tesla-lqajeo). Reads the plan from HollowmereLayout.cs,
@@ -39,3 +39,6 @@ Next: rebuild with the art, captures in both presets, check.
 
 ## Integration (in progress)
 Coordinator's quick prop fixes are folded in: mixed planting in the Rebuilt planters and pots (grass, weeds, ivy trailing over the front), the B8 lantern on every Rebuilt post, bunting sag 0.5-0.8 m with a shared fade tint. Built in Unity. Square captures are rendering now (both presets, midday + low sun, two new cameras Cap_HM_SquareSouth/SquareWest). Next: sheets, merge origin/main (townhouse bca6ee8), check, merge.
+
+## Paused (2026-10-31)
+The Unity agent was told to finish its current step and push. Open items: the black sticks in the east half (diagnosis pending), the wide green joints (SquareBed may move under the slab), the final captures/sheets, merging origin/main (townhouse bca6ee8), check, merge.
