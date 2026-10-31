@@ -25,4 +25,5 @@ Blocker: paused by coordinator for usage (both subagents told to finish their cu
 - Dressing art: 7 of 11 assets built as previews only (--res-scale 0.25). Nothing is exported yet. Generator `Art/Blender/town/sc_square_dressing.py` is committed (WIP).
   Tris: Bench_A 614, Bench_Broken 1,655, Planter_A 5,999, Planter_B 6,000, Planter_Broken 29,090 (over budget: the decimate didn't apply to the boolean mesh; fix before export), Pot_Clay 2,905, Pot_Broken 3,852.
   Not started: LanternPost_A/Broken, Bunting (Rope_1m must run along Blender -X to be Unity +X), Drain_A. No contact sheet yet.
-- Unity placement: HollowmereSquare.cs + CobbleSpawner cache are committed as WIP but not compiled. Waiting for the Unity agent's pause report.
+- Unity placement: written and pushed (d5c21bd + 1d3a8a1), but not compiled because the Unity editor was still downloading. Core HollowmereDressing.cs (rows, footprints, Validate) passes its 6 Core tests (sc_core_tests: Validate is empty against the path graph). HollowmereSquare.cs places the ground, the drains, the dressing (greybox until the art is exported) and the bunting. HollowmereBuilder gets one line.
+  Resume: setup.sh --wait, sc_cloud_compile.py (--csproj first), unity.sh build, test-edit, then captures, check and merge.
