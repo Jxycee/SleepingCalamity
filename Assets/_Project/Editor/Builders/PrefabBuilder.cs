@@ -32,6 +32,11 @@ namespace SleepingCalamity.EditorTools
                 BuilderUtil.GetOrAdd<NetworkObject>(root);
                 BuilderUtil.GetOrAdd<CellarFloorSync>(root);   // host writes seed + floor; every peer builds the floor locally
             });
+            BuilderUtil.WritePrefab(AssetPaths.DiveHaulSyncPrefab, root =>
+            {
+                BuilderUtil.GetOrAdd<NetworkObject>(root);
+                BuilderUtil.GetOrAdd<DiveHaulSync>(root);   // host owns the shared haul; peers read the summary
+            });
             foreach (string path in NetworkPrefabsBuilder.Prefabs) BuilderUtil.RefreshNetworkObjectHash(path);
         }
 
