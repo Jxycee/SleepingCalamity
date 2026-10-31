@@ -1,9 +1,9 @@
-State: PAUSED
+State: IN PROGRESS
 Session: Town polish 2: wall stone, merlons, ruined clutter
 Progress: 60%
 Sheet: round 1 in-engine (Ruined only, scratch): WallRun / LowerGate / EastGate; final sheet committed with round 2
 Needs: Q14 clutter on main (fix 3 builds on HollowmereClutter); Q15 merged first (both touch HollowmereTownWall.cs)
-Blocker: paused by coordinator for usage
+Blocker: none (waiting for Q14 on main for fix 3, Q15 before the check)
 Archive: no
 
 Job: coordinator notes (1) wall stone tone/coursing, (2) merlon rhythm, (3) Ruined clutter near lanes; max 2 rounds
