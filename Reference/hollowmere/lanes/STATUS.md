@@ -2,7 +2,7 @@
 
 State: IN PROGRESS
 Session: Q11. Lane kit: lane walls, steps and lane dressing
-Progress: 60%
+Progress: 70%
 Sheet: Reference/hollowmere/lanes/SHEET_lane_kit.jpg
 Blocker: none
 
@@ -36,3 +36,4 @@ History:
   at a container restart; restarted, waiting for it.
 - Kit fix round done (coordinator's two fixes + moss; self 29.5/40; the flat slab was the review backdrop, replaced by real RetainWall modules; gate leaf
   planks + straps), on worktree branch commit 362d0a3, merged after the Unity integration agent (compile fixes, build, SC_CAPTURE_ONLY captures) reports.
+- Unity integration: compile fixed, LK_* slots matched to SOURCES.md, nographics build with scene committed (8c17ed2), first capture set of the 3 cameras x 2 presets taken, a camera fix round in progress (0cc7bb2).
