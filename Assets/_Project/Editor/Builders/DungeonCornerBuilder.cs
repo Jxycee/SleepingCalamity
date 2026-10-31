@@ -31,9 +31,19 @@ namespace SleepingCalamity.EditorTools
         // piece -> LookTest source material and linear tint (the generator's tile_mat tint). Add a row when the controller sees "no material for slot".
         static readonly (string Slot, string Source, Color Tint)[] Slots =
         {
-            ("CV_Brick", "old_brick", Color.white), ("CV_Vault", "vault_stone", Color.white), ("CV_Lime", "limewash", Color.white),
-            ("CV_Flag", "flagstone", Color.white), ("CV_Oak", "barrel_oak", Color.white), ("CV_Soot", "soot_coal", Color.white),
-            ("CV_Root", "root_bark", Color.white), ("CV_Iron", "iron", Color.white),
+            ("CV_Brick", "old_brick", new Color(0.98f, 1.04f, 1.0f)), ("CV_VaultStone", "vault_stone", new Color(0.93f, 0.91f, 0.88f)),
+            ("CV_Limewash", "limewash", new Color(1.06f, 1.0f, 0.94f)), ("CV_Flagstone", "flagstone", new Color(1.0f, 0.95f, 0.9f)),
+            ("CV_BarrelOak", "barrel_oak", new Color(1.1f, 1.0f, 0.9f)), ("CV_Soot", "soot_coal", new Color(1.1f, 1.05f, 1.0f)),
+            ("CV_RootBark", "root_bark", new Color(2.0f, 1.65f, 1.25f)), ("CV_Oak", "oak_timber", new Color(0.85f, 0.74f, 0.62f)),
+            ("CV_Iron", "iron", new Color(0.62f, 0.58f, 0.55f)), ("CV_Mortar", "vault_stone", new Color(0.22f, 0.19f, 0.16f)),
+            ("CV_Clay", "limewash", new Color(1.05f, 0.58f, 0.34f)),
+        };
+
+        // flat slots: linear colour, smoothness = 1 - roughness
+        static readonly (string Slot, Color Linear, float Smooth)[] FlatSlots =
+        {
+            ("CV_GlazeAmber", new Color(0.26f, 0.095f, 0.022f), 0.83f), ("CV_GlazeCream", new Color(0.62f, 0.46f, 0.24f), 0.75f),
+            ("CV_Cheese", new Color(0.55f, 0.30f, 0.05f), 0.45f), ("CV_Glass", new Color(0.10f, 0.15f, 0.03f), 0.95f),
         };
 
         // piece, position, yaw (degrees). Unity +Z runs along the vault. Contract "Scene" section.
@@ -94,8 +104,8 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);   // warm umber to plum, no blue-green
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 0.6f;
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.012f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
+            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 0.28f;
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
 
@@ -120,9 +130,13 @@ namespace SleepingCalamity.EditorTools
         {
             var d = new Dictionary<string, Material>();
             Material breath = Lit("CV_Breath");   // faint warm emissive under the grate bars (the town's tithe-gate breath motif)
-            breath.SetColor("_BaseColor", new Color(0.10f, 0.04f, 0.02f)); breath.EnableKeyword("_EMISSION"); breath.SetColor("_EmissionColor", new Color(0.9f, 0.28f, 0.07f));
+            breath.SetColor("_BaseColor", new Color(0.10f, 0.04f, 0.02f)); breath.EnableKeyword("_EMISSION"); breath.SetColor("_EmissionColor", new Color(1.0f, 0.30f, 0.05f) * 2.2f);
             breath.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; breath.SetShaderPassEnabled("MotionVectors", true);
             d["CV_Breath"] = breath;
+            Material day = Lit("CV_Daylight");   // the coal hatch opening
+            day.SetColor("_BaseColor", new Color(0.2f, 0.2f, 0.18f)); day.EnableKeyword("_EMISSION"); day.SetColor("_EmissionColor", new Color(1.0f, 0.97f, 0.90f) * 6f);
+            day.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; day.SetShaderPassEnabled("MotionVectors", true);
+            d["CV_Daylight"] = day;
             Material dark = Lit("DC_Dark"); dark.SetColor("_BaseColor", new Color(0.03f, 0.022f, 0.016f)); dark.SetFloat("_Smoothness", 0.1f); d["dark"] = dark;
             Material wax = Lit("DC_Wax"); wax.SetColor("_BaseColor", new Color(0.62f, 0.55f, 0.42f)); wax.SetFloat("_Smoothness", 0.3f); d["wax"] = wax;
             Material flame = Lit("DC_Flame"); flame.SetColor("_BaseColor", new Color(0.1f, 0.08f, 0.05f)); flame.EnableKeyword("_EMISSION");
@@ -137,7 +151,7 @@ namespace SleepingCalamity.EditorTools
             mote.SetFloat("_Surface", 1f); mote.SetFloat("_Blend", 2f); mote.SetFloat("_SrcBlend", 1f); mote.SetFloat("_DstBlend", 1f); mote.SetFloat("_SrcBlendAlpha", 1f); mote.SetFloat("_DstBlendAlpha", 1f);
             mote.SetFloat("_ZWrite", 0f); mote.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); mote.SetOverrideTag("RenderType", "Transparent"); mote.renderQueue = 3000;
             mote.SetColor("_BaseColor", new Color(1.0f, 0.75f, 0.4f)); d["mote"] = mote;
-            foreach (Material m in d.Values) EditorUtility.SetDirty(m);
+            foreach (Material m in d.Values) { if (m.HasProperty("_BaseColor")) m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true); EditorUtility.SetDirty(m); }
             AssetDatabase.SaveAssets();
             return d;
         }
@@ -158,7 +172,14 @@ namespace SleepingCalamity.EditorTools
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);   // same bytes with and without graphics
                 EditorUtility.SetDirty(m); map[s.Slot] = m;
             }
-            map["CV_Breath"] = own["CV_Breath"];
+            foreach (var f in FlatSlots)
+            {
+                Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + f.Slot + ".mat", wear);
+                m.SetColor("_BaseColor", f.Linear.gamma); m.SetFloat("_Smoothness", f.Smooth); m.SetFloat("_Metallic", 0f);
+                m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
+                EditorUtility.SetDirty(m); map[f.Slot] = m;
+            }
+            map["CV_Breath"] = own["CV_Breath"]; map["CV_Daylight"] = own["CV_Daylight"];
             AssetDatabase.SaveAssets();
             return map;
         }
@@ -226,7 +247,7 @@ namespace SleepingCalamity.EditorTools
                     LookTestBuilder.Prim(set, "CellarLantern_" + i, PrimitiveType.Sphere, hook - new Vector3(0, 0.2f, 0), Vector3.one * 0.22f, own["flame"]);
                     flame = hook - new Vector3(0, 0.2f, 0);
                 }
-                Light light = LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 3.4f, 9f, LightShadows.Soft);
+                Light light = LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.5f, 10f, LightShadows.Soft);
                 Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 36, own);
             }
         }
@@ -242,7 +263,7 @@ namespace SleepingCalamity.EditorTools
                 LookTestBuilder.Prim(set, "Candle_" + i, PrimitiveType.Cylinder, c + offs[i] + new Vector3(0, hs[i] * 0.5f, 0), new Vector3(0.035f, hs[i] * 0.5f, 0.035f), own["wax"]);
                 LookTestBuilder.Prim(set, "Flame_" + i, PrimitiveType.Sphere, c + offs[i] + new Vector3(0, hs[i] + 0.02f, 0), new Vector3(0.015f, 0.03f, 0.015f), own["flame"]);
             }
-            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.05f), Quaternion.identity, new Color(1.0f, 0.62f, 0.28f), 0.5f, 3.5f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.05f), Quaternion.identity, new Color(1.0f, 0.62f, 0.28f), 1.6f, 3.8f, LightShadows.None);
         }
 
         static void Lights(Transform lighting, Dictionary<string, Material> own)
