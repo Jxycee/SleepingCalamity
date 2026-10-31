@@ -164,13 +164,18 @@ namespace SleepingCalamity.EditorTools
             new Row { Brief = Neighbours, Id = "NEIGHBOUR_Right", Batch = "B4", Names = new string[0], ArtYaw = 180f,
                 Instances = new[] { new Instance(7f, 0f, 10f, 6f, 1f, "Neighbour_Right") },          // x 3..11, front at z 10, 2 storeys, gable to the plaza, lower roof
                 Placeholder = GableHouse() },
-            // Far row past z 16: the three variants again at varied scale, yaw, depth and order so it is not a copy row (BackdropHouses), the church and tower stay greybox.
+            // Far row past z 16: the three variants again at varied scale, yaw, depth and order so it is not a copy row (BackdropHouses), the bell tower and the church hall in its gap.
             new Row { Brief = Neighbours, Id = "NEIGHBOUR_Backdrop", Batch = "B4", Names = new string[0], ArtYaw = 180f,
                 Instances = BackdropHouses(),
                 Placeholder = new[] { Box(0f, 2.2f, 3f, 6.6f, 4.4f, 6f, "plaster"), Box(0f, 5.0f, 3f, 7.4f, 0.25f, 6.6f, "roof_tile") } },
-            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Church", Batch = "B4", Names = new string[0],
-                Instances = new[] { At(0f, 0f, 18f) },               // church with a bell tower and a stone hall in the gap of the far row (no art yet)
-                Placeholder = Church() },
+            // B4 BellTower (sc_bell_tower.py, T2 on the shared tileables, NeighbourLooks-style slots in BeautyCornerArt.BuildTowerMaterials): pivot = bottom centre of the shaft,
+            // front (clock face) toward local +Z like the kit, so ArtYaw 180. Where the round-2 greybox tower stood, seen behind the facade chimney in the wide shot.
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_Church", Batch = "B4", Names = new string[0], ArtYaw = 180f,
+                Instances = new[] { new Instance(-3f, 0f, 20.2f, 0f, 1f, BeautyCornerArt.TowerFolder) },
+                Placeholder = TowerGreybox() },
+            new Row { Brief = Neighbours, Id = "NEIGHBOUR_ChurchHall", Batch = "B4", Names = new string[0],
+                Instances = new[] { At(4.6f, 0f, 23f) },             // the church's stone hall beside the tower (greybox, no art yet)
+                Placeholder = HallGreybox() },
         };
 
         // Left neighbour: three jettied storeys (leaning a little), eave 8.8 m, ridge 11.6 m, chimney.
@@ -215,19 +220,22 @@ namespace SleepingCalamity.EditorTools
             };
         }
 
-        // Church with a bell tower and spire (tower top about 16.8 m) and a stone hall, in the middle gap of the far row.
-        static Part[] Church()
+        // Bell tower greybox (no BellTower art): stone shaft, timber belfry and a stepped spire, tower top about 16.8 m. Pivot = bottom centre of the shaft.
+        static Part[] TowerGreybox()
         {
-            var p = new List<Part>();
-            p.Add(Box(-3f, 5.8f, 2.2f, 4.4f, 11.6f, 4.4f, "sandstone"));
-            p.Add(Box(-3f, 12.7f, 2.2f, 4.8f, 2.2f, 4.8f, "oak_timber"));
+            var p = new List<Part> { Box(0f, 5.8f, 0f, 4.4f, 11.6f, 4.4f, "sandstone"), Box(0f, 12.7f, 0f, 4.8f, 2.2f, 4.8f, "oak_timber") };
             float[] widths = { 3.6f, 2.6f, 1.6f, 0.8f };
-            for (int i = 0; i < 4; i++) p.Add(Box(-3f, 14.175f + i * 0.75f, 2.2f, widths[i], 0.75f, widths[i], "roof_tile", 0f, 45f, 0f));
-            p.Add(Box(4.6f, 3.8f, 5f, 9f, 7.6f, 10f, "sandstone"));
-            p.Add(Box(4.6f + 2.45f, 9.1f, 5f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, -31.5f));
-            p.Add(Box(4.6f - 2.45f, 9.1f, 5f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, 31.5f));
+            for (int i = 0; i < 4; i++) p.Add(Box(0f, 14.175f + i * 0.75f, 0f, widths[i], 0.75f, widths[i], "roof_tile", 0f, 45f, 0f));
             return p.ToArray();
         }
+
+        // The church's stone hall: 9 x 10 m, eave 7.6 m, pitched tile roof. Pivot = middle of the footprint.
+        static Part[] HallGreybox() => new[]
+        {
+            Box(0f, 3.8f, 0f, 9f, 7.6f, 10f, "sandstone"),
+            Box(2.45f, 9.1f, 0f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, -31.5f),
+            Box(-2.45f, 9.1f, 0f, 5.75f, 0.25f, 10.6f, "roof_tile", 0f, 0f, 31.5f),
+        };
 
         // Plaster tint (the generator's PLASTER_TINT, handed to the material as written) and shutter / door paint (linear, VARIANTS[...]["paint"]) of each neighbour folder.
         public static readonly Dictionary<string, (Color Plaster, Color Paint)> NeighbourLooks = new Dictionary<string, (Color, Color)>

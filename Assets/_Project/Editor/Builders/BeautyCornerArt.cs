@@ -209,6 +209,38 @@ namespace SleepingCalamity.EditorTools
             return map;
         }
 
+        // The B4 bell tower (BellTower/, sc_bell_tower.py) reuses the facade slots plus three of its own: grey rubble and the clock face are tinted B1 tileables
+        // (the generator's tints); the bronze is the iron tileable lifted well past the generator's (2.1, 1.5, 0.75) so the bell reads warm at the far-row distance.
+        public const string TowerFolder = "BellTower";
+        public static bool IsTower(string folderName) => string.Equals(folderName, TowerFolder, System.StringComparison.OrdinalIgnoreCase);
+        static readonly Vector4 BronzeTint = new Vector4(6.8f, 5.4f, 2.6f, 1f);   // raw linear x iron albedo (mean 0.08) -> about (0.55, 0.36, 0.16)
+
+        public static Dictionary<string, Material> BuildTowerMaterials()
+        {
+            Dictionary<string, Material> map = BuildFacadeMaterials();
+            Shader wear = Shader.Find(WearShaderName);
+            Material Tinted(string slot, string source, Color tint, float bumpScale)
+            {
+                Material src = LookTestBuilder.Mat(source);
+                Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + slot + ".mat", wear);
+                m.CopyPropertiesFromMaterial(src);
+                foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
+                m.SetColor("_BaseColor", tint.gamma); m.SetColor("_Color", m.GetColor("_BaseColor"));
+                if (m.HasProperty("_BumpScale")) m.SetFloat("_BumpScale", src.GetFloat("_BumpScale") * bumpScale);
+                m.SetShaderPassEnabled("MotionVectors", true);
+                EditorUtility.SetDirty(m);
+                return m;
+            }
+            map["BT_Rubble"] = Tinted("BT_Rubble", "sandstone", new Color(0.62f, 0.60f, 0.57f), 1.4f);   // grey so the pale quoins read
+            map["BT_ClockFace"] = Tinted("BT_ClockFace", "plaster", new Color(0.96f, 0.93f, 0.86f), 0.4f);
+            Material bronze = Tinted("BT_Bronze", "iron", Color.white, 1f);
+            bronze.SetVector("_BaseColor", BronzeTint); bronze.SetVector("_Color", BronzeTint);   // raw linear, SetVector skips the colour-space conversion (as the paint colour)
+            EditorUtility.SetDirty(bronze);
+            map["BT_Bronze"] = bronze;
+            AssetDatabase.SaveAssets();
+            return map;
+        }
+
         static readonly (string Slot, string Source, Color Tint, float DecalAlpha)[] FacadeSlots =
         {
             ("FK_Plaster", "plaster", Color.white, 0f), ("FK_Oak", "oak_timber", Color.white, 0f), ("FK_OakDoor", "oak_timber", new Color(1.35f, 1.25f, 1.15f), 0f),
