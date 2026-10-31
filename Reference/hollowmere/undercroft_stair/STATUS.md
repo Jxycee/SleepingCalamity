@@ -1,11 +1,11 @@
 State: IN PROGRESS
 Session: Q13. The Undercroft stair: heroes' home to the Cellars
-Progress: 60%
-Sheet: Reference/hollowmere/undercroft_stair/SHEET_undercroft_stair_r1.jpg
+Progress: 70%
+Sheet: Reference/hollowmere/undercroft_stair/SHEET_undercroft_stair_r2.jpg
 Blocker: none
 
-Score: r1 24.5/40 (target 29.5 = r1 + 5; floor 25)
-Tris: CellarStair 14,132 (StairFlight 4,252, StairTurn 3,788, StairDoor 6,092; budget 20k)
+Score: r2 25.5/40 (r1 24.5) (target 29.5 = r1 + 5; floor 25)
+Tris: CellarStair 14,204 (StairFlight 4,452, StairTurn 3,724, StairDoor 6,028; budget 20k)
 SC RESULT: -
 Merge commit: -
 
@@ -19,3 +19,4 @@ Merge commit: -
 - Paused by the coordinator (usage). WIP committed: the stair pieces in sc_cellar_vault.py (p_stair_flight/turn/door, --stair) are partly written (agent stopped while adding the wear rules; not yet rendered or exported; Python syntax OK). Unity download left running (no token use). Next on resume: finish the wear hook, --stair --room review renders, export CellarStair.fbx, compile, captures, score, check, merge.
 - Resumed. Builder compile fixed (missing using; sc_cloud_compile PASS); origin/main merged (Q9 keep 7bac761). Unity editor installed.
 - Round 1 in Unity (licensed compile PASS; DungeonCorner scene unchanged by the BuildRoom refactor; stair art picked up). Score 24.5: silhouette 3, proportion 3.5, form 3, surface 3, colour 2.5, wear 3, set 3.5, light 3. Fixes for r2: red-maroon cast (all-brick walls + orange fills) -> limewashed/stone walls and the room's paler gold; Top too dark, door out of frame, motes as big squares near the lens; proud wall stones read as brackets + a dark slot along the flight wall top; Bottom tunnel flat orange.
+- Round 2 (coordinator notes folded in): limewash walls, stair-only round motes (24, shared M_DC_Mote untouched), paler gold, the room's single DungeonCorner_Profile volume only, top camera inside the house framing the open door, wall-top slot closed. Captures p10/p50/p90/warmth: Top .018/.018/.108/+24, Turn .019/.111/.442/+48, Bottom .024/.112/.271/+46. Score 25.5 (+1, under the 1.5 rule): the door framing gained, but the top is a black void around a spot circle (no house), limewash normal reads lumpy under grazing light, flush wall stones read as black slashes, StairEntry tunnel brick still maroon. Round 3 has concrete fixes (house shell + broad daylight, rubble stone walls, StairEntry tunnel walls to stone); if it doesn't gain 1.5 I stop at the floor and merge.

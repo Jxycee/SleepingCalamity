@@ -8,6 +8,7 @@
 // Idempotent: the scene is rebuilt through BuilderUtil.SaveScene.
 using System;
 using System.Collections.Generic;
+using System.IO;
 using SleepingCalamity.Presentation;
 using UnityEditor;
 using UnityEngine;
@@ -38,7 +39,8 @@ namespace SleepingCalamity.EditorTools
             Scene scene = DungeonCornerBuilder.NewRoomScene();
             var root = new GameObject("UndercroftStair").transform;
             DungeonCornerBuilder.RoomKit room = DungeonCornerBuilder.BuildRoom(root);
-            Dictionary<string, Material> own = room.Own;
+            // Stair-only round mote material (the room's M_DC_Mote has no texture and renders particles as squares); the dungeon captures stay as approved.
+            var own = new Dictionary<string, Material>(room.Own) { ["mote"] = RoundMote() };
 
             GameObject kit = BeautyCornerArt.LoadModel(KitFolder, KitFbx, keepMaterialSlots: true);
             Debug.Log("SC STAIR kit " + (kit != null ? KitFolder + "/" + KitFbx : "FBX missing, greybox for every piece"));
@@ -61,11 +63,12 @@ namespace SleepingCalamity.EditorTools
 
             Transform lighting = new GameObject("StairLighting").transform; lighting.SetParent(root, false);
             // House daylight through the door: a cool-neutral spot from the house (local z -3.2 of the door piece, 2.4 up) aimed down the first flight.
-            Vector3 housePos = new Vector3(3.2f, 11.4f, -0.8f), houseAim = new Vector3(3.2f, 8.4f, -5.0f);
+            Vector3 housePos = new Vector3(3.2f, 11.0f, -0.2f), houseAim = new Vector3(3.3f, 9.8f, -2.6f);
             Light day = LookTestBuilder.AddLight(lighting, "HouseDaylight", LightType.Spot, housePos, Quaternion.LookRotation(houseAim - housePos, Vector3.up),
-                new Color(0.86f, 0.89f, 0.96f), 5f, 10f, LightShadows.Soft);
-            day.spotAngle = 42f; day.innerSpotAngle = 22f;
-            DungeonCornerBuilder.Motes(lighting, "Motes_House", new Vector3(3.2f, 9.6f, -3.0f), new Vector3(1.2f, 1.8f, 2.4f), 70, own);
+                new Color(0.86f, 0.89f, 0.96f), 18f, 10f, LightShadows.Soft);
+            day.spotAngle = 56f; day.innerSpotAngle = 30f;   // lights the door leaf, jambs and threshold, then the first flight
+            // Few, small motes well down the stair (none within 2 m of a capture camera).
+            DungeonCornerBuilder.Motes(lighting, "Motes_Stair", new Vector3(3.2f, 8.2f, -5.2f), new Vector3(0.8f, 0.9f, 1.2f), 24, own);
 
             // Turn1: candle on a small corbel on the front wall (world z -7.2 face, 1.4 m above the turn's floor).
             Vector3 candle = new Vector3(3.2f, 8.8f, -7.05f);
@@ -73,13 +76,16 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.Box(stair, "Corbel_Top", new Vector3(candle.x, candle.y - 0.05f, -7.08f), new Vector3(0.34f, 0.1f, 0.26f), stone);
             LookTestBuilder.Box(stair, "Corbel_Foot", new Vector3(candle.x, candle.y - 0.16f, -7.14f), new Vector3(0.2f, 0.12f, 0.14f), stone);
             DungeonCornerBuilder.CandleCluster(stair, lighting, own, candle, "Turn1", new Vector3(0, 0.25f, 0.15f));
-            lighting.Find("CandleLightTurn1").GetComponent<Light>().range = 3.5f;
+            Light candleLight = lighting.Find("CandleLightTurn1").GetComponent<Light>();
+            candleLight.range = 3.5f; candleLight.color = new Color(1.0f, 0.76f, 0.52f);   // the room's paler gold
 
             // Turn2: a B11 lantern on a hook on the front wall (world x -0.6 face), gold, soft shadows, motes.
             DungeonCornerBuilder.Lanterns(stair, lighting, own, new[] { (new Vector3(-0.55f, 6.4f, -6.8f), new Vector3(-1, 0, 0)) }, "Turn2", 4f, 7f);
 
             // Warm bounce mid StairEntry.
-            LookTestBuilder.AddLight(lighting, "EntryBounce", LightType.Point, new Vector3(0f, 2.5f, -2.5f), Quaternion.identity, new Color(1.0f, 0.72f, 0.44f), 1.2f, 4.5f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "EntryBounce", LightType.Point, new Vector3(0f, 2.5f, -2.5f), Quaternion.identity, new Color(1.0f, 0.84f, 0.62f), 1.0f, 4.0f, LightShadows.None);
+            // Greyer ambient than the room's warm umber/plum (stair scene only): the tunnel and walls read stone, not maroon.
+            RenderSettings.ambientSkyColor = new Color(0.20f, 0.185f, 0.17f); RenderSettings.ambientEquatorColor = new Color(0.19f, 0.175f, 0.155f);
 
             // One probe per zone (the room keeps its own): house/top, turns, bottom.
             AddZoneProbe(lighting, "Probe_Top", new Vector3(3.2f, 9.6f, -3.0f), new Vector3(5f, 4.6f, 6f));
@@ -87,7 +93,7 @@ namespace SleepingCalamity.EditorTools
             AddZoneProbe(lighting, "Probe_Bottom", new Vector3(0f, 3.4f, -4.5f), new Vector3(3f, 3.4f, 5f));
 
             Transform cams = new GameObject("CaptureCameras").transform; cams.SetParent(root, false);
-            LookTestBuilder.AddCapture(cams, "Cap_Stair_Top", new Vector3(2.95f, 10.65f, -1.6f), new Vector3(3.2f, 8.0f, -5.6f), 60f);
+            LookTestBuilder.AddCapture(cams, "Cap_Stair_Top", new Vector3(3.0f, 10.5f, 0.4f), new Vector3(3.2f, 9.2f, -3.4f), 62f);   // inside the house: open plank leaf, arched doorway, landing and first flight
             LookTestBuilder.AddCapture(cams, "Cap_Stair_Turn", new Vector3(1.6f, 7.4f, -6.4f), new Vector3(-0.2f, 4.5f, -6.3f), 62f);
             LookTestBuilder.AddCapture(cams, "Cap_Stair_Bottom", new Vector3(0f, 2.5f, -3.0f), new Vector3(0.2f, 0.4f, 5.0f), 62f);
             DungeonCornerBuilder.DarkBackground(cams);
@@ -99,6 +105,33 @@ namespace SleepingCalamity.EditorTools
 
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC STAIR scene built " + ScenePath);
+        }
+
+        // Soft round additive mote: a generated 32 px radial-falloff texture saved next to the stair's own material.
+        static Material RoundMote()
+        {
+            const string folder = "Assets/_Project/Content/Materials/UndercroftStair";
+            if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets/_Project/Content/Materials", "UndercroftStair");
+            string texPath = folder + "/T_US_MoteRound.png";
+            var t = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            for (int y = 0; y < 32; y++)
+                for (int x = 0; x < 32; x++)
+                {
+                    float d = Mathf.Clamp01(Mathf.Sqrt((x - 15.5f) * (x - 15.5f) + (y - 15.5f) * (y - 15.5f)) / 15.5f), a = (1f - d) * (1f - d) * (3f - 2f * (1f - d));
+                    t.SetPixel(x, y, new Color(a, a, a, a));
+                }
+            File.WriteAllBytes(texPath, t.EncodeToPNG()); UnityEngine.Object.DestroyImmediate(t);
+            AssetDatabase.ImportAsset(texPath);
+            var imp = (TextureImporter)AssetImporter.GetAtPath(texPath);
+            imp.alphaIsTransparency = true; imp.mipmapEnabled = false; imp.wrapMode = TextureWrapMode.Clamp; imp.SaveAndReimport();
+            Shader pu = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new InvalidOperationException("URP Particles/Unlit not found");
+            Material m = LookTestBuilder.Ensure(folder + "/M_US_Mote.mat", pu);
+            m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 2f); m.SetFloat("_SrcBlend", 1f); m.SetFloat("_DstBlend", 1f); m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 1f);
+            m.SetFloat("_ZWrite", 0f); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.SetOverrideTag("RenderType", "Transparent"); m.renderQueue = 3000;
+            m.SetColor("_BaseColor", new Color(1.0f, 0.80f, 0.54f));
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
+            EditorUtility.SetDirty(m); AssetDatabase.SaveAssets();
+            return m;
         }
 
         static void AddZoneProbe(Transform lighting, string name, Vector3 pos, Vector3 size)

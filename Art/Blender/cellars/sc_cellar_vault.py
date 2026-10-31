@@ -791,11 +791,15 @@ def p_stair_flight():
     top = lambda y: s_nose(y) + 1.9                        # wall tops stay above every ring's springing (contract: nosing + 1.75)
     for sx in (-1, 1):                                     # sloped brick side walls
         bm = prism_ax([(0.0, -1.8), (2.0, -1.8), (2.0, top(2.0)), (0.0, top(0.0))], 'x', 0.6 if sx > 0 else -1.0, 1.0 if sx > 0 else -0.6)
-        solid(pc, bm, 'lime', cham=0.025)                  # worn limewash body (brick stays for the arch bands)
+        solid(pc, bm, 'lime', cham=0.0)                    # worn limewash body (brick stays for the arch bands)
         for j in range(5):                                 # wall stones, nearly flush (0.015 proud of the wall face at |x| 0.6)
             y = R.uniform(0.2, 1.8)
             box(pc, 'lime', (0.05, R.uniform(0.22, 0.34), R.uniform(0.1, 0.16)), (sx * 0.61, y, s_nose(y) + R.uniform(0.35, 1.3)), Rx(R.uniform(-0.6, 0.6)),
                 cham=0.01, wob=0.002, seed=R.random() * 90)
+        for j in range(3):                                 # bare brick showing through the limewash: thin patches (0.012 proud)
+            y = R.uniform(0.2, 1.8); w = R.uniform(0.2, 0.34); h = R.uniform(0.14, 0.24)
+            box(pc, 'brick', (0.04, w, h), (sx * (0.6 + 0.02 - 0.012), y, s_nose(y) + R.uniform(0.2, 1.3)), Rx(R.uniform(-0.1, 0.1)),
+                cham=0.006, wob=0.003, seed=R.random() * 90)
     for i in range(4):                                     # vault: stepped rings (0.4 down per 0.5 m) on a continuous mortar backing
         sp = 1.5 - 0.4 * i
         solid(pc, prism_ax(band_profile(0.0, sp, 0.64, 1.0), 'y', 0.5 * i - 0.01, 0.5 * (i + 1) + 0.01), 'mortar', cham=0.0)
@@ -841,9 +845,9 @@ def p_stair_turn():
         zt = -S_RISE * (k + 1)
         solid(pc, prism_ax([ca, pa, pb, cb], 'z', zt - 0.6, zt), 'vault', cham=0.02)
     lathe(pc, [(0, -1.0), (0.12, -1.0), (0.12, 0.9), (0.16, 0.92), (0.16, 1.02), (0.12, 1.04), (0.12, 2.05), (0, 2.05)], T(0.6, 0.0, 0.0), sides=14, mat='vault', seed=3.0)   # newel
-    box(pc, 'lime', (0.4, 1.2, 4.5), (-0.8, 0.6, 0.45), cham=0.025, wob=0.003, seed=1)           # outer wall (left)
+    box(pc, 'lime', (0.4, 1.2, 4.5), (-0.8, 0.6, 0.45), cham=0.0, wob=0.003, seed=1)           # outer wall (left)
     box(pc, 'brick', (2.0, 0.4, 4.5), (0.0, 1.4, 0.45), cham=0.025, wob=0.003, seed=2)            # outer wall (front)
-    box(pc, 'lime', (0.4, 0.4, 4.5), (0.8, -0.2, 0.45), cham=0.025, wob=0.003, seed=3)           # corner pier
+    box(pc, 'lime', (0.4, 0.4, 4.5), (0.8, -0.2, 0.45), cham=0.0, wob=0.003, seed=3)           # corner pier
     rr = 0.64                                              # exit tympanum above the next flight's arch (centre y 0.6, springing z 0.7)
     arc = [(1.2 * i / 14, 0.7 + math.sqrt(rr * rr - (1.2 * i / 14 - 0.6) ** 2)) for i in range(15)]
     solid(pc, prism_ax(arc + [(1.2, 2.7), (0.0, 2.7)], 'x', 0.62, 1.0), 'lime', cham=0.025)
@@ -875,7 +879,7 @@ def p_stair_door():
     flags(pc, R, -0.62, 0.62, -1.2, 0.0, 2)                                                    # landing floor
     flags(pc, R, -1.6, 1.6, -3.6, -1.6, 4)                                                     # house floor
     for sx in (-1, 1):                                                                         # landing walls up to the springing
-        box(pc, 'lime', (0.4, 1.2, 1.9), (sx * 0.8, -0.6, 0.75), cham=0.025, wob=0.003, seed=sx + 5)
+        box(pc, 'lime', (0.4, 1.2, 1.9), (sx * 0.8, -0.6, 0.75), cham=0.0, wob=0.003, seed=sx + 5)
     ar = [(0.64 * math.cos(math.pi * (1 - i / 16)), 1.7 + 0.64 * math.sin(math.pi * (1 - i / 16))) for i in range(1, 16)]
     solid(pc, prism_ax([(-1.0, 1.7), (-0.64, 1.7)] + ar + [(0.64, 1.7), (1.0, 1.7), (1.0, 3.2), (-1.0, 3.2)], 'y', -1.2, 0.0), 'mortar', cham=0.0)   # backing over the vault
     for i, yc in enumerate((-0.9, -0.3)):
@@ -940,6 +944,9 @@ def stair_wear(name, p, n, mname, nz, st, r, g, b):
             g = max(g, 0.5 * max(0.0, nz * 2 - 0.15) * (1 - d / 0.3))                      # moss at the wall foot
     if mname == 'CV_Mortar':
         r = max(r, 0.55 + 0.2 * nz)                                                         # dark joints
+    if mname in ('CV_Limewash', 'CV_Brick') and abs(n.z) < 0.7:                             # stone-to-stone value variation: damp and soot patches
+        pn = noise.noise(Vector((p.x * 5.3 + 7.0, p.y * 5.3, p.z * 5.3)))
+        r = max(r, 0.5 * max(0.0, pn + 0.15))
     if name == 'StairFlight':
         if mname == 'CV_VaultStone' and n.z > 0.6 and d < 0.3:
             b = 0.95 * max(0.0, 1 - abs(p.x) / 0.62) ** 0.6 * (0.8 + 0.2 * nz); r = max(r, 0.2)
