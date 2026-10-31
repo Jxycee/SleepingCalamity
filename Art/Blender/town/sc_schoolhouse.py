@@ -38,8 +38,10 @@ Budget: under 40k tris, 2048 px maps (shared sets).
 Status (2026-10-31, cloud): 2 render rounds; self-review 28/40 (silhouette 4, proportion 3.5, form 3.5, surface 3.5,
 colour 3.5, wear 3, set 3.5, glass/metal 3.5); first round about 26, round 2 (moss cut back, notice board and hood
 resized, camera) gained about 2; stopped under the 1.5-point rule for a third.
-29,480 tris (Frame 25,192, Part_Door 1,558, Part_Bell 1,962, Part_Sign 768; reproducible); FOOTPRINT 5.40 x 6.40 m;
+29,344 tris (Frame 25,056, Part_Door 1,558, Part_Bell 1,962, Part_Sign 768; reproducible); FOOTPRINT 5.40 x 6.40 m;
 everything inside x -3.14..3.92, y -3.89..3.95, z 0..10.65. Sheet: Reference/hollowmere/kit_ready/schoolhouse/SHEET_schoolhouse_final.jpg.
+Coordinator fixes 1-5 applied (2026-10-31): review figure moved to x -5.2 out of the door view; notice board rebuilt (dark slate field, thick oak frame,
+gabled cap, two posts, three small SH_Limewash papers); SH_Limewash tint (0.95, 0.93, 0.87); glass left as is (renders dark).
 Next visible gains: a shorter, sturdier bell-cote (it is tall and thin at mid distance), per-panel limewash value
 variation and flaking, green gable boards less saturated, the empty-state close render of the bare bearings (not
 rendered), a real mid-height wear stain pass on the long walls, tiled ridge reads thin next to the cote.
@@ -81,7 +83,7 @@ def top_z(ax):
     return ZE + (XE - ax) * T
 
 EXTRA = {
-    'lime': lambda: FK.tile_mat('SH_Limewash', 'B1_town/plaster', tint=(1.05, 1.03, 0.97), normal=0.7),
+    'lime': lambda: FK.tile_mat('SH_Limewash', 'B1_town/plaster', tint=(0.95, 0.93, 0.87), normal=0.7),
     'slate': lambda: FK.tile_mat('SH_Slate', 'B2_cellar/soot_coal', tint=(0.85, 0.9, 0.95), normal=0.5),
     'bronze': lambda: FK.tile_mat('SH_Bronze', 'B1_town/iron', tint=(3.0, 1.75, 0.60), rough_add=-0.05, normal=0.5),
     'chalk': lambda: FK.tile_mat('SH_Chalk', 'B1_town/plaster', tint=(1.45, 1.45, 1.42), normal=0.1),
@@ -267,28 +269,28 @@ def front_extras():
     for sx in (bx0 + 0.18, bx1 - 0.18):
         FK.add_box(pc, 'oak', (0.09, 0.36, 0.50), Matrix.Translation((sx, by, 0.25)), cham=0.012, wob=0.004, seed=sx + 30)
     FK.member(pc, 'oak', Vector((bx0 + 0.2, by + 0.14, 0.52)), Vector((bx1 - 0.2, by + 0.14, 0.52)), 0.06, 0.06, name='benchrail')
-    # notice board right of the door: oak frame, slate, pinned papers, chalk marks, a little pent cap
+    # notice board right of the door: a dark slate field in a thick oak frame under a small gabled cap, standing proud of the wall
+    # on two short posts, with only three small papers pinned at angles and a little chalk
     nx0, nx1, nz0, nz1 = 1.30, 2.02, 1.35, 2.25
     cx, cz = (nx0 + nx1) / 2, (nz0 + nz1) / 2
-    yb = Y0 - 0.05
-    FK.add_box(pc, 'slate', (nx1 - nx0 - 0.12, 0.04, nz1 - nz0 - 0.12), Matrix.Translation((cx, yb - 0.01, cz)), cham=0.006, seed=5.5)
-    for nm, a, b, w in (('l', (nx0 + 0.05, nz0), (nx0 + 0.05, nz1), 0.10), ('r', (nx1 - 0.05, nz0), (nx1 - 0.05, nz1), 0.10),
-                        ('b', (nx0, nz0 + 0.05), (nx1, nz0 + 0.05), 0.10), ('t', (nx0, nz1 - 0.05), (nx1, nz1 - 0.05), 0.10)):
-        FK.member(pc, 'oak', Vector((a[0], yb - 0.04, a[1])), Vector((b[0], yb - 0.04, b[1])), w, 0.07, name='nb' + nm, cham=0.012,
+    yb = Y0 - 0.24
+    FK.add_box(pc, 'slate', (nx1 - nx0 - 0.1, 0.05, nz1 - nz0 - 0.1), Matrix.Translation((cx, yb, cz)), cham=0.006, seed=5.5)
+    for nm, a_, b_ in (('l', (nx0 + 0.06, nz0), (nx0 + 0.06, nz1)), ('r', (nx1 - 0.06, nz0), (nx1 - 0.06, nz1)),
+                       ('b', (nx0, nz0 + 0.06), (nx1, nz0 + 0.06)), ('t', (nx0, nz1 - 0.06), (nx1, nz1 - 0.06))):
+        FK.member(pc, 'oak', Vector((a_[0], yb - 0.035, a_[1])), Vector((b_[0], yb - 0.035, b_[1])), 0.12, 0.09, name='nb' + nm, cham=0.014,
                   up=(0, -1, 0))
-    FK.add_box(pc, 'oak', (nx1 - nx0 + 0.24, 0.26, 0.05), Matrix.Translation((cx, yb - 0.09, nz1 + 0.07)) @ Matrix.Rotation(math.radians(-18), 4, 'X'),
-               cham=0.01, long_axis=0, seed=6.6)
-    for sx in (nx0 + 0.04, nx1 - 0.04):
-        FK.member(pc, 'oak', Vector((sx, yb - 0.02, nz1 - 0.06)), Vector((sx, yb - 0.17, nz1 + 0.07)), 0.05, 0.05, name='nbk%f' % sx,
-                  up=(1, 0, 0))
-    for k in range(6):
-        px = nx0 + 0.20 + (k % 2) * 0.30 + R.uniform(-0.02, 0.02)
-        pz = nz0 + 0.24 + (k // 2) * 0.26 + R.uniform(-0.02, 0.02)
-        FK.add_box(pc, 'chalk', (0.17, 0.012, 0.22), Matrix.Translation((px, yb - 0.05 - k * 0.001, pz)) @ Matrix.Rotation(math.radians(R.uniform(-7, 7)), 4, 'Y'),
+    for sx in (nx0 + 0.12, nx1 - 0.12):    # two short posts carrying the board
+        FK.add_box(pc, 'oak', (0.11, 0.11, nz1 - 0.05), Matrix.Translation((sx, yb + 0.02, (nz1 - 0.05) / 2)), cham=0.012, wob=0.004, seed=sx + 60)
+    for sgn, ang in ((-1, 36), (1, -36)):  # gabled cap: two sloped oak boards meeting over the top rail
+        FK.add_box(pc, 'oak', (nx1 - nx0 + 0.26, 0.21, 0.04), Matrix.Translation((cx, yb + sgn * 0.085, nz1 + 0.06)) @ Matrix.Rotation(math.radians(ang), 4, 'X'),
+                   cham=0.008, long_axis=0, seed=6.6 + sgn)
+    for k, (px, pz, ang) in enumerate(((nx0 + 0.22, nz1 - 0.28, 11), (nx0 + 0.50, nz1 - 0.42, -14), (nx0 + 0.34, nz0 + 0.40, 7))):
+        px += R.uniform(-0.02, 0.02); pz += R.uniform(-0.02, 0.02)
+        FK.add_box(pc, 'lime', (0.13, 0.008, 0.17), Matrix.Translation((px, yb - 0.032 - k * 0.001, pz)) @ Matrix.Rotation(math.radians(ang), 4, 'Y'),
                    cham=0.0, seed=k + 8)
-        box(pc, 'iron', (0.022, 0.02, 0.022), Vector((px, yb - 0.065, pz + 0.09)), cham=0.004, seed=k)
-    for k in range(4):   # chalk scrawl on the bare slate
-        FK.add_box(pc, 'chalk', (0.10 + 0.04 * (k % 2), 0.008, 0.012), Matrix.Translation((nx0 + 0.25 + 0.2 * (k % 2), yb - 0.035, nz0 + 0.06 + 0.04 * k)) @
+        box(pc, 'iron', (0.02, 0.02, 0.02), Vector((px, yb - 0.045, pz + 0.07)), cham=0.004, seed=k)
+    for k in range(3):   # chalk scrawl on the bare slate
+        FK.add_box(pc, 'chalk', (0.10 + 0.04 * (k % 2), 0.006, 0.012), Matrix.Translation((nx0 + 0.45 + 0.1 * (k % 2), yb - 0.028, nz0 + 0.28 + 0.07 * k)) @
                    Matrix.Rotation(math.radians(R.uniform(-5, 5)), 4, 'Y'), cham=0.0, seed=k + 20)
     return pc
 
@@ -676,7 +678,7 @@ def review(root, parts):
     sc = bpy.context.scene
     FK.RRES = RRES; FK.SAMPLES = SAMPLES
     cam = FK.review_scene(root, variant=True)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.75, location=(-0.9, -3.4, 0.875))
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.75, location=(-5.2, -4.5, 0.875))
     fig = bpy.context.object; fig.name = 'Figure175'
     fm = bpy.data.materials.new('Figure'); fm.use_nodes = True
     fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.25, 0.18, 0.12, 1)

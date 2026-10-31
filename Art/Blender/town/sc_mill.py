@@ -18,6 +18,8 @@ Status (2026-10-31, cloud, Blender 4.5.3): exported to Assets/_Project/Content/A
   is solid from inside; added ridge tiles, rolled eave, barge boards, shutters, hoist hood, wheel/roof wear. Facing check: `--backface --views ...` renders
   backfaces red; remaining red is only the far side of single-sided walls seen through window gaps (culled in Unity, shows the room).
   Self-score (sc-asset-review rubric, 2 rounds, floor 25): silhouette 4, proportion 3.5, form 3.5, surface 3.5, colour 4, wear 3, set fit 3.5, glass/metal 3 = 28/40.
+  Coordinator fixes 1-5 applied (2026-10-31): wear-only change (tris and bounds unchanged): per-face stone value patches, streaky damp at the wall foot,
+  cheek/pit/flume-runoff staining, eave band and splash-back staining on the plaster (grime gain 1.5 stone, 1.7 plaster).
   Next visible gains: the wheel reads small behind the stone cheeks (a bigger, brighter paddle wheel needs the x <= 8.0 limit lifted), flume has no water,
   shell lacks sagging on the plate beams, hoist hood is small, ground-floor windows have no shutters.
 """
@@ -653,11 +655,24 @@ def FK_yard(pc):
         FK.add_box(y, 'stone', (0.9, 0.26, 0.07), Matrix.Translation((-2.2 + R.uniform(-0.1, 0.1), -4.35 - k * 0.22, 0.025)) @ Matrix.Rotation(R.uniform(-0.05, 0.05), 4, 'Z'), cham=0.03, uv_world=True, seed=k + 50)
     merge(pc, y)
 
+def _clamp01(v): return max(0.0, min(1.0, v))
+
+def _streak(p, fx=6.0, fz=0.5):
+    """0..1 vertical streak mask: tight across the wall, long in z (stains run down)."""
+    return _clamp01((noise.noise(Vector((p.x * fx, p.y * fx, p.z * fz + 3.1))) + 0.1) * 2.2)
+
+STONE_MATS = ('FK_Sandstone', 'ML_Rubble', 'FK_ChimneyStone')
+
 def write_wear(ob):
     me = ob.data; attr = me.color_attributes.new('wear', 'FLOAT_COLOR', 'CORNER'); mw = ob.matrix_world
     shell = ob.name == 'Shell'
     for poly in me.polygons:
         n = (mw.to_3x3() @ poly.normal).normalized()
+        mname = me.materials[poly.material_index].name
+        stone = mname in STONE_MATS; plaster = mname == 'FK_Plaster'
+        c = mw @ poly.center
+        # per-face stone value: low-frequency patches plus a medium-frequency per-stone-ish term (R 0.1-0.3)
+        sv = 0.08 + 0.28 * _clamp01(0.5 + 1.2 * noise.noise(Vector((c.x * 2.6 + 7, c.y * 2.6, c.z * 3.2))) + 0.6 * noise.noise(c * 0.55 + Vector((1, 4, 2))))
         for li in poly.loop_indices:
             p = mw @ me.vertices[me.loops[li].vertex_index].co
             nz = noise.noise(p * 1.7)
@@ -667,7 +682,26 @@ def write_wear(ob):
             if p.x > 4.4 and p.z < 3.0: g = 0.5 + 0.3 * nz            # damp cheek walls and pit
             if n.z > 0.5 and p.z < 0.2: g = max(g, 0.3 + 0.3 * nz)
             if shell: g = max(g, 0.3 * max(0.0, nz + 0.4))
-            if p.x > 4.4 and abs(p.y) < 1.6 and p.z < 4.6: r = max(r, 0.4)   # wheel splash
+            st = _streak(p)
+            wall = abs(n.z) < 0.7
+            if p.x > 4.4 and abs(p.y) < 1.6 and p.z < 4.6:             # wheel splash
+                r = max(r, (0.25 + 0.45 * st) if stone else 0.4)
+            if stone:
+                r = max(sv + (0.08 if shell else 0.0) + 0.04 * nz, r if p.z < 0.6 else 0.0)
+                if wall:    # damp rising at the wall foot, streaky (R up to 0.8 in the bottom 0.9 m)
+                    foot = _clamp01(1 - max(p.z, 0.0) / 1.0) ** 0.55
+                    r = max(r, 0.8 * foot * (0.5 + 0.5 * st), 0.3 * _clamp01(1 - p.z / 1.5) * st)
+                    if p.x > 3.0 and abs(p.y) < 1.2 and 1.5 < p.z < 4.45 and st > 0.2:   # runoff under the flume outlet
+                        r = max(r, 0.65 * st * _clamp01(1 - (4.45 - p.z) / 2.9))
+                    if p.x > 3.0 and abs(p.y) < 1.55 and p.z < 3.2:   # cheek walls and pit: dark, streaky
+                        r = max(r, 0.35 + 0.4 * st)
+                elif p.x > 3.0 and abs(p.y) < 1.7 and p.z < 3.0:      # pit floor and edge
+                    r = max(r, 0.45 + 0.25 * st)
+            if plaster and wall and p.z > 4.4:
+                eave = _clamp01((p.z - 6.85) / 1.15)                  # soot/damp band just below the eaves (R 0.2-0.35)
+                r = max(r, (0.2 + 0.15 * st) * eave, 0.14 * st * _clamp01(0.4 + (7.2 - p.z) / 3.0), 0.22 * _clamp01(1 - (p.z - 4.4) / 0.9))
+            if stone and ob.name != 'Part_Wheel': r = min(1.0, r * 1.5)    # the grime mix reads weak on this sandstone: gain so the values below show at mid distance
+            if plaster: r = min(1.0, r * 1.7)
             if n.z > 0.4 and p.z > 8.0 and p.y > 0.3: g = max(g, 0.28 + 0.3 * nz)   # moss on the shaded roof slope
             if ob.name == 'Part_Wheel': g = 0.16 * max(0.0, nz + 0.6); r = min(r, 0.3)
             b = 0.0

@@ -2,10 +2,10 @@
 
 - Generator: `Art/Blender/town/sc_schoolhouse.py` (procedural, reproducible from text; builds on `sc_facade_kit.py` and imports helpers from `sc_bakery.py`).
 - Cloud export (2026-10-31, Blender 4.5.3): `blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_schoolhouse.py -- --out <scratch> --export`; `<scratch>/Schoolhouse.fbx` is copied here. The export strips texture paths (`path_mode='STRIP'`) so Unity names slots by material, not 'Lit'.
-- `Schoolhouse.fbx` hierarchy (root `Schoolhouse`), 29,480 tris in all (two runs gave the same count):
+- `Schoolhouse.fbx` hierarchy (root `Schoolhouse`), 29,344 tris in all (two runs gave the same count):
   | Object | Tris | What |
   |---|---|---|
-  | `Frame` | 25,192 | limewashed walls with quoins and ground course, 8 tall windows (3 + 3 + 2 at the back, none in the front), open lined doorway, green boarded gables with round loft vents, tiled gable roof, ridge chimney, pent hood on knee brackets, bench, slate notice board, two empty iron sign hooks, empty bell-cote with bare bearing rings, yard (stepping slabs, hopscotch, water butt) |
+  | `Frame` | 25,056 | limewashed walls with quoins and ground course, 8 tall windows (3 + 3 + 2 at the back, none in the front), open lined doorway, green boarded gables with round loft vents, tiled gable roof, ridge chimney, pent hood on knee brackets, bench, slate notice board, two empty iron sign hooks, empty bell-cote with bare bearing rings, yard (stepping slabs, hopscotch, water butt) |
   | `Part_Door` | 1,558 | planked green front door (`FK.kit_door`); pivot = `SOCKET_Door` |
   | `Part_Bell` | 1,962 | bronze bell, clapper, oak headstock with iron straps and gudgeons, half wheel, rope and toggle; pivot = `SOCKET_Bell` (the axle centre) |
   | `Part_Sign` | 768 | green board with gilt lettering blocks and oak edge, chains; pivot = `SOCKET_Sign` (midpoint of the two hook tips) |
