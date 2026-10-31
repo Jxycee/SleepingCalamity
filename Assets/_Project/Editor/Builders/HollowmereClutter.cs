@@ -30,7 +30,7 @@ namespace SleepingCalamity.EditorTools
         static readonly (string Slot, string Source, Color Tint)[] TintedSlots =
         {
             ("CL_Oak", "oak_timber", new Color(0.80f, 0.72f, 0.62f)), ("CL_OakGrey", "oak_timber", new Color(0.62f, 0.60f, 0.58f)),
-            ("CL_Paint", "painted_wood", new Color(0.60f, 0.72f, 0.52f)), ("CL_PaintRed", "painted_wood", new Color(0.85f, 0.45f, 0.32f)),
+            ("CL_Paint", "plaster", new Color(0.62f, 0.74f, 0.54f)), ("CL_PaintRed", "plaster", new Color(0.82f, 0.40f, 0.28f)),   // plaster, not painted_wood: that map is blue-grey and turned the sage teal
             ("CL_Iron", "iron", new Color(1f, 1f, 1f)), ("CL_Stone", "sandstone", new Color(1f, 1f, 1f)), ("CL_Tile", "roof_tile", new Color(1f, 1f, 1f)),
             ("CL_Canvas", "canvas", new Color(1.0f, 0.94f, 0.82f)), ("CL_Rope", "canvas", new Color(1.0f, 0.85f, 0.62f)),
             ("CL_Linen", "canvas", new Color(1.15f, 1.12f, 1.05f)), ("CL_ClothBlue", "canvas", new Color(0.45f, 0.58f, 0.80f)),
