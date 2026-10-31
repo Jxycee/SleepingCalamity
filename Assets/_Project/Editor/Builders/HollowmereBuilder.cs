@@ -472,6 +472,7 @@ namespace SleepingCalamity.EditorTools
                     BellTower(g, l, rebuilt);
                     break;
                 case LandmarkKind.TitheGate:
+                    if (HollowmereTitheGate.TryPlace(g)) break;   // Wave 2 art (sc_tithe_gate.py) at the row's height; the greybox below stays as the fallback
                     foreach (float x in new[] { -2.3f, 2.3f }) LookTestBuilder.Box(g, "Pier", new Vector3(x, 2.4f, 0f), new Vector3(1.0f, 5.4f, 1.6f), stone, default, 2f);
                     LookTestBuilder.Box(g, "Lintel", new Vector3(0f, 4.6f, 0f), new Vector3(5.6f, 1.0f, 1.6f), stone, default, 2f);
                     LookTestBuilder.Box(g, "Glow", new Vector3(0f, 2.0f, 0.5f), new Vector3(3.6f, 4.0f, 0.05f), BeautyCornerBuilder.PlaceholderMat("warm"), default, 2f);

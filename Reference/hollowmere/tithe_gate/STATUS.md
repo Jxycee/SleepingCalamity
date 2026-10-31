@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Wave 2: Tithe gate (fixed landmark)
-Progress: 45%
+Progress: 55%
 Sheet: Reference/hollowmere/tithe_gate/tithe_gate_sheet_r3.jpg
 Blocker: none
 
@@ -13,4 +13,5 @@ Merge commit: n/a
 - 2026-10-31: generator `Art/Blender/town/sc_tithe_gate.py` (T2: B1 sandstone + iron tileables through the B4 FK_* slots, linear `wear` attribute, emissive TG_Breath slot, B9 ivy/weeds/moss). Exported to `Assets/_Project/Content/Art/Town/Ring1/TitheGate/` (cloud Blender 4.5, like the Ruins kit).
 - Fits the keep wall gap (WallRun leaves world x 3.0..9.0): 6.9 m wide surround, arch opening 3.4 x 4.25 m (sill 0.45, springing 3.0), gable to 6.55 + finial over the 4.9 m parapet, pilasters with pinnacles. Placed at the row's own height (y 0) with ArtYaw 180.
 - Rounds: r1 iron near-black, cracks white, glow too strong -> r2 lighter rusty iron, amber glow at half strength, warm spill light on the steps, bigger ivy -> r3 meeting gap tapers (closed at the foot, widest at the top: the sprung leaf), stronger breath soot above the arch.
+- Builder: new `Editor/Builders/HollowmereTitheGate.cs` (art placement, slot materials, breath light, colliders, `CaptureGate`); `HollowmereBuilder` TitheGate case calls it first, greybox kept as fallback. Waiting on the cloud Unity download for compile + captures.
 - Checked before building (user rule): the proven practice here is the project's own T2 kit route (sc_ruin_kit / sc_facade_kit: shared tileables + wear colour + WearLit), reused rather than a new system; references from Openverse via sc_ref_fetch.py (CC BY 2.0, REFS.md).

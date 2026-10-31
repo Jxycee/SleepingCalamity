@@ -24,7 +24,7 @@ FK_Iron), so BeautyCornerArt's facade map binds them; placed wear lives in the C
 R grime/rust/soot, G moss, B polish) for WearLit. Own slots, made by the builder: TG_Breath (emissive warm amber), TG_Clay, TG_Straw,
 TG_Wax, TG_Chalk (flat). Foliage = the B9 atlas (M_B9_Foliage; T_B9_Foliage_* copied beside the FBX).
 Children of the root empty TitheGate: Gate (all masonry, iron, glow and offerings), Foliage, SOCKET_Breath (empty at the glow centre,
-just behind the leaves). Budget: < 22k tris (landmark, T2, under the 30-60k hero band; printed). Round 3: 20,855 (gate 15,387 + foliage 5,468).
+15 cm in front of the leaves; the builder hangs its spill light 0.6 m below it). Budget: < 22k tris (landmark, T2, under the 30-60k hero band; printed). Round 3: 20,855 (gate 15,387 + foliage 5,468).
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_tithe_gate.py -- --out <scratch>
       [--rres 960] [--samples 32] [--no-render] [--export] [--cams cap,near,close,lowsun]
