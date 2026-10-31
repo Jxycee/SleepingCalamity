@@ -19,7 +19,7 @@ namespace SleepingCalamity.EditorTools
     public static class BeautyCornerBuilder
     {
         public const string ScenePath = "Assets/_Project/Scenes/BeautyCorner_Hollowmere.unity";
-        public const string ProfileName = "BeautyCorner_Day_Profile";
+        public const string ProfileName = "BeautyCorner_Day_Profile", LowSunProfileName = "BeautyCorner_LowSun_Profile";
         // The corner's own copy of the look-test renderer / RP asset with the stronger SSAO (1.8 / 0.3), so the LookTest scenes keep 1.2 / 0.15.
         public const string RendererPath = LookTestBuilder.RenderingFolder + "/BeautyCorner_Renderer.asset";
         public const string RpAssetPath = LookTestBuilder.RenderingFolder + "/BeautyCorner_RPAsset.asset";
@@ -62,12 +62,23 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- support assets
         static void BuildProfile()
         {
-            LookTestBuilder.EnsureProfile(ProfileName, p =>
+            // The low-sun look is the approved one (user, polish1): its own profile with the pre-polish grade; midday carries the polish1 highlight lift.
+            LookTestBuilder.EnsureProfile(LowSunProfileName, p =>
             {
                 LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
                 Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.25f); b.scatter.Override(0.8f); b.clamp.Override(65000f);
                 ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.55f); c.contrast.Override(30f); c.saturation.Override(0f);
+                ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.95f, 1.0f, 1.0f, 0f));
+                LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.97f, 1.0f, 1.0f, 0.0f));
+                Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.18f); v.smoothness.Override(0.5f);
+            });
+            LookTestBuilder.EnsureProfile(ProfileName, p =>
+            {
+                LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
+                Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.25f); b.scatter.Override(0.8f); b.clamp.Override(65000f);
+                ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.70f); c.contrast.Override(30f); c.saturation.Override(0f);
                 ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.95f, 1.0f, 1.0f, 0f));   // slate-teal shadows (3.1)
+                s.highlights.Override(new Vector4(1f, 1f, 1f, 0.6f)); s.highlightsStart.Override(0.40f); s.highlightsEnd.Override(1.1f);   // polish1: lift the sunlit highlights only
                 LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.97f, 1.0f, 1.0f, 0.0f));
                 Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.18f); v.smoothness.Override(0.5f);
             });
@@ -143,6 +154,7 @@ namespace SleepingCalamity.EditorTools
 
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
             Light sun = LookTestBuilder.AddLight(lighting, "Sun", LightType.Directional, new Vector3(0, 10, 0), Quaternion.identity, Color.white, 3f, 10f, LightShadows.Soft);
+            LookTestBuilder.AddLight(lighting, "ShadeFill", LightType.Directional, new Vector3(0, 10, 0), Quaternion.Euler(22f, 18f, 0f), new Color(0.78f, 0.84f, 1.0f), 0.5f, 10f, LightShadows.None);   // polish1: soft cool fill from the camera side, no shadows, keeps shaded paint readable
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 3f, 3f), new Vector3(30f, 12f, 28f));
             LookTestBuilder.AddVolume(lighting, ProfileName);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight; RenderSettings.ambientIntensity = 1f;
@@ -291,10 +303,10 @@ namespace SleepingCalamity.EditorTools
             if (preset == Preset.Midday)
             {
                 rot = Quaternion.Euler(54f, -32f, 0f);
-                sun.color = new Color(1.0f, 0.91f, 0.83f); sun.intensity = 3.5f;     // about 5200 K
+                sun.color = new Color(1.0f, 0.91f, 0.83f); sun.intensity = 4.5f;     // about 5200 K
                 RenderSettings.fogColor = new Color(0.70f, 0.78f, 0.90f); RenderSettings.fogDensity = 0.016f;
-                RenderSettings.ambientSkyColor = new Color(0.42f, 0.48f, 0.55f); RenderSettings.ambientEquatorColor = new Color(0.40f, 0.41f, 0.42f);
-                RenderSettings.ambientGroundColor = new Color(0.24f, 0.22f, 0.19f);
+                RenderSettings.ambientSkyColor = new Color(0.50f, 0.56f, 0.64f); RenderSettings.ambientEquatorColor = new Color(0.47f, 0.48f, 0.49f);
+                RenderSettings.ambientGroundColor = new Color(0.29f, 0.26f, 0.22f);
             }
             else
             {
@@ -304,6 +316,10 @@ namespace SleepingCalamity.EditorTools
                 RenderSettings.ambientSkyColor = new Color(0.32f, 0.33f, 0.38f); RenderSettings.ambientEquatorColor = new Color(0.34f, 0.29f, 0.24f);
                 RenderSettings.ambientGroundColor = new Color(0.20f, 0.17f, 0.14f);
             }
+            Volume post = Object.FindFirstObjectByType<Volume>();
+            if (post != null) post.sharedProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/_Project/Content/Rendering/" + (preset == Preset.Midday ? ProfileName : LowSunProfileName) + ".asset");
+            GameObject fillGo = GameObject.Find("ShadeFill");
+            if (fillGo != null) { Light fill = fillGo.GetComponent<Light>(); fill.intensity = preset == Preset.Midday ? 0.35f : 0.22f; fill.color = preset == Preset.Midday ? new Color(0.78f, 0.84f, 1.0f) : new Color(1.0f, 0.86f, 0.72f); }
             RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + (preset == Preset.Midday ? "/M_BC_Sky_Midday.mat" : "/M_BC_Sky_LowSun.mat"));
             sun.transform.rotation = rot;
             GameObject shafts = GameObject.Find("Shafts");

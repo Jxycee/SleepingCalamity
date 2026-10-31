@@ -212,7 +212,7 @@ namespace SleepingCalamity.EditorTools
         static readonly (string Slot, string Source, Color Tint, float DecalAlpha)[] FacadeSlots =
         {
             ("FK_Plaster", "plaster", Color.white, 0f), ("FK_Oak", "oak_timber", Color.white, 0f), ("FK_OakDoor", "oak_timber", new Color(1.35f, 1.25f, 1.15f), 0f),
-            ("FK_Sandstone", "sandstone", Color.white, 0f), ("FK_ChimneyStone", "sandstone", new Color(0.80f, 0.74f, 0.68f), 0f), ("FK_RoofTile", "roof_tile", Color.white, 0f),
+            ("FK_Sandstone", "sandstone", Color.white, 0f), ("FK_PlinthJoint", "sandstone", new Color(0.30f, 0.28f, 0.24f), 0f), ("FK_ChimneyStone", "sandstone", new Color(0.80f, 0.74f, 0.68f), 0f), ("FK_RoofTile", "roof_tile", Color.white, 0f),
             ("FK_Shutter", "painted_wood", new Color(0.57f, 0.73f, 0.28f), 0f), ("FK_DoorPaint", "painted_wood", new Color(0.50f, 0.66f, 0.25f), 0f),
             ("FK_Iron", "iron", Color.white, 0f),
             ("FK_Decal_crack", "crack", Color.white, 0.9f), ("FK_Decal_drip", "drip", Color.white, 0.35f), ("FK_Decal_moss", "moss", Color.white, 1.0f),
