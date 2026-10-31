@@ -301,6 +301,7 @@ namespace SleepingCalamity.Presentation
                 if (kit.LanternMaterial != null)
                     foreach (Renderer rd in lan.GetComponentsInChildren<Renderer>(true))
                     { var m = new Material[Mathf.Max(1, rd.sharedMaterials.Length)]; for (int k = 0; k < m.Length; k++) m[k] = kit.LanternMaterial; rd.sharedMaterials = m; }
+                foreach (Renderer rd in lan.GetComponentsInChildren<Renderer>(true)) rd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // its own light sits inside it: no square shadow pool under the lamp
                 var b = new Bounds(pos, Vector3.zero); bool first = true;   // pivot at the bottom centre: hang the top ring from the lamp point
                 foreach (Renderer rd in lan.GetComponentsInChildren<Renderer>(true)) { if (first) { b = rd.bounds; first = false; } else b.Encapsulate(rd.bounds); }
                 lan.transform.position = new Vector3(pos.x, pos.y - b.size.y, pos.z);
