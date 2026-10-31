@@ -64,13 +64,20 @@ namespace SleepingCalamity.Presentation
 
         public override void OnNetworkDespawn() { _state = null; }
 
+        // Host only: raised when the deep-closes countdown ran out and the dive was failed (the dive flow sends the party home).
+        public event System.Action DiveFailed;
+
+        // Longest host frame the countdown counts; a hitch (a floor build) must not eat seconds of it.
+        private const float MaxTickSeconds = 0.25f;
+
         // Host only: the stir countdown runs on the host clock, and the player factor follows who is connected right now.
         private void Update()
         {
             if (!Host) return;
             _state.Stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
-            _state.Tick(Time.deltaTime);
+            bool failed = _state.Tick(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             Publish();
+            if (failed) DiveFailed?.Invoke();
         }
 
         private void Publish()

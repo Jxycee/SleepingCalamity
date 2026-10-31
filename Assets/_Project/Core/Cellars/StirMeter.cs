@@ -58,7 +58,7 @@ namespace SleepingCalamity.Core
         // Counts a floor once per dive. False when already counted.
         public bool OnFloorCleared(int floor)
         {
-            if (floor < 1 || floor > 30) return false;
+            if (floor < 1 || floor > DiveState.MaxFloor) return false;
             int bit = 1 << (floor - 1);
             if ((_floorMask & bit) != 0) return false;
             _floorMask |= bit; Refresh(); return true;
