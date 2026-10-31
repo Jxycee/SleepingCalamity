@@ -176,7 +176,11 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        // Foam (vertex colour R) below a fall: strongest at the fall's foot, gone after RunoutLength, thinner toward the sides.
+        // Foam (vertex colour R) is feathered across the stream: full over the middle 40%, easing to 0 at the corridor sides (a hard 0 -> 1 between two vertices
+        // read as white spikes and wedges). Shared by the falls ribbon and the run-out below it, so the two meshes agree where they meet.
+        static float CrossFeather(float lateral) => 1f - Ease(Mathf.Clamp01((lateral / HalfWidth - 0.4f) / 0.6f));
+
+        // Foam (vertex colour R) below a fall: strongest at the fall's foot (matching the ribbon's base), eased out over RunoutLength and across the stream.
         static float Runout(float s, float lateral)
         {
             float best = 0f;
@@ -184,7 +188,7 @@ namespace SleepingCalamity.EditorTools
             {
                 float t = (s - (f.S + f.Run)) / RunoutLength;
                 if (t < 0f || t >= 1f) continue;
-                best = Mathf.Max(best, Mathf.Pow(1f - t, 1.5f) * 0.9f * (1f - 0.55f * Mathf.Clamp01(lateral / HalfWidth)));
+                best = Mathf.Max(best, (1f - Ease(t)) * CrossFeather(lateral));
             }
             return best;
         }
@@ -344,7 +348,7 @@ namespace SleepingCalamity.EditorTools
                         var pos = new Vector3(p.x + c.x * dd, y, p.z + c.z * dd);
                         gr[r, k] = ground(pos.x, pos.z);
                         float edge = 2f * f01 - 1f;   // foam at the lip and the base only
-                        idx[r, k] = d.Add(pos, n, c, 1f, new Vector2(dd, ss), new Color(0.3f + 0.7f * edge * edge, 1f, 0f, 1f));
+                        idx[r, k] = d.Add(pos, n, c, 1f, new Vector2(dd, ss), new Color((0.3f + 0.7f * edge * edge) * CrossFeather(Mathf.Abs(dd)), 1f, 0f, 1f));
                     }
                 for (int r = 0; r < rows; r++)
                     for (int k = 0; k < cols; k++)

@@ -214,8 +214,8 @@ Shader "SleepingCalamity/Water"
                 // ---- flow foam from vertex colour R: streaks that run downstream
                 float fr = i.color.r;
                 float2 fuv = float2(i.uv.x, i.uv.y - flow * t * 1.2);
-                float streak = VNoise(float2(fuv.x * 3.0, fuv.y * 0.3)) * 0.6 + VNoise(float2(fuv.x * 6.5, fuv.y * 0.8 + 7.0)) * 0.4;   // stretched along the flow
-                float flowFoam = saturate((fr * 0.5 - streak) * 6.0 + 0.5) * _FlowFoam * saturate(fr * 3.0);                          // ~50% coverage at R = 1, thinning with the run-out
+                float streak = VNoise(float2(fuv.x * 3.0, fuv.y * 0.6)) * 0.6 + VNoise(float2(fuv.x * 6.5, fuv.y * 1.5 + 7.0)) * 0.4;   // stretched along the flow
+                float flowFoam = smoothstep(0.0, 1.0, saturate((fr * 0.5 - streak) * 2.2 + 0.45)) * _FlowFoam * smoothstep(0.0, 0.6, fr) * 0.8;                          // ~50% coverage at R = 1, thinning with the run-out
 
                 float foam = saturate(max(shore, flowFoam));
                 half3 foamCol = _FoamColor.rgb * (amb * 0.9 + L.color * (saturate(L.direction.y) * L.shadowAttenuation * 0.85));
