@@ -40,3 +40,4 @@ Log:
   installed. On resume: compile + fix SC_Water/HollowmereWater, capture the five lake cameras, then relaunch the shore-art generator.
 - Resumed after the usage pause: compile + capture loop (Sonnet), then the shore-art generator (Sonnet).
 - 63af216: sc_lakeshore.py + LakeShore.fbx (rocks, reeds, jetty; baked PBR, CC0/own) + SHEET_lakeshore_r1.jpg. Next: water compile/capture, then place the set.
+- 18:00 UTC: pushes are current (db85588: water compile fixes + generated meshes). Water agent capturing the lake cameras; next a fresh Sonnet agent places the shore set. Note for merge: M_HM_WaterSurface.mat came from a graphics run; regenerate it and the scene with a -nographics build before the check (session-usage rule).
