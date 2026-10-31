@@ -124,3 +124,7 @@ __pycache__/
 
 # Editor folders
 .vscode/
+
+# Tools/town dump build output
+Tools/town/bin/
+Tools/town/obj/

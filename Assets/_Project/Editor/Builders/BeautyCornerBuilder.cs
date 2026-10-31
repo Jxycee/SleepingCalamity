@@ -36,19 +36,28 @@ namespace SleepingCalamity.EditorTools
 
         public static void Build()
         {
+            EnsureLookAssets();
+            BuildScene();
+            KeepDecalKeywords();
+        }
+
+        // The corner's rendering stack, grade profiles, skies and support materials, without its scene: HollowmereBuilder reuses the same look
+        // (and calls KeepDecalKeywords after its own scene, which builds the facade materials again).
+        public static void EnsureLook() => EnsureLookAssets();
+
+        static void EnsureLookAssets()
+        {
             LookTestBuilder.EnsureRendering();   // the look-test stack is the copy source of the corner's own assets (and is put back to its own numbers)
             LookTestBuilder.EnsureRendering(RendererPath, RpAssetPath, LookTestBuilder.RendererPath, LookTestBuilder.RpAssetPath, 1.8f, 0.3f);
             LookTestBuilder.BuildMaterials();
             BuildProfile();
             BuildSupportMaterials();
             BeautyCornerArt.EnsureCellarLantern();
-            BuildScene();
-            KeepDecalKeywords();
         }
 
         // Unity's material validation strips _ALPHAPREMULTIPLY_ON from the look-test decals while the facade materials are built from them; put the committed
         // state back last so a build leaves those three .mat files as they are in git.
-        static void KeepDecalKeywords()
+        internal static void KeepDecalKeywords()
         {
             foreach (string n in new[] { "moss", "grime", "drip", "crack" })
             {
@@ -135,7 +144,7 @@ namespace SleepingCalamity.EditorTools
             EditorUtility.SetDirty(m);
         }
 
-        static Material PlaceholderMat(string key) =>
+        internal static Material PlaceholderMat(string key) =>
             AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_BC_" + key + ".mat")
             ?? (key == "warm" ? AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/LookTest/M_LampGlow.mat") : LookTestBuilder.Mat(key));
 
@@ -210,7 +219,8 @@ namespace SleepingCalamity.EditorTools
             return art;
         }
 
-        static void PlaceRow(Transform set, BeautyCornerTable.Row row)
+        // Also used by HollowmereBuilder for the corner rows that stand in the town square (same art lookup, same greybox fallback).
+        internal static void PlaceRow(Transform set, BeautyCornerTable.Row row)
         {
             Transform group = new GameObject(row.Id).transform; group.SetParent(set, false);
             if (row.Scatter && BeautyCornerGround.TryPlace(group, row)) { Debug.Log("SC BEAUTY row=" + row.Id + " batch=" + row.Batch + " art=scatter"); return; }
