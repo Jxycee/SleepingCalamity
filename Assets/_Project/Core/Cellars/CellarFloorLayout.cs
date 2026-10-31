@@ -68,7 +68,7 @@ namespace SleepingCalamity.Core
         public const int GridSize = 14, CellMeters = 4;
 
         public readonly uint Seed; public readonly int Floor;
-        public readonly bool IsStub;                      // floor 4: the fixed placeholder, exempt from the count rules of floors 1-3
+        public readonly bool IsStub;                      // floor 4: the fixed bakery set-piece (the name is kept from the old placeholder), exempt from the count rules of floors 1-3
         public readonly SubTheme Theme;
         public readonly IReadOnlyList<PlacedRoom> Rooms;
         public readonly IReadOnlyList<PlacedCorridor> Corridors;   // row-major (y, then x)
@@ -80,7 +80,8 @@ namespace SleepingCalamity.Core
         public readonly int KeyChestIndex = -1;           // index into Chests
         public readonly GateKeyCarrier Carrier;           // null on the stub
         public readonly IReadOnlyList<CellPos> EntryStarts;
-        public readonly CellPos? StairExit, BankCell;
+        public readonly CellPos? StairExit, BankCell;      // BankCell is the lamp nook on floor 2 and the baker's rescue bank point on floor 4
+        public readonly CellPos? BakerCell, WardenCell;   // floor 4: the sleeping baker, and the Dough Warden's spawn in the antechamber
         public bool HasCheckpoint => BankCell.HasValue;
         public bool HasLockedRoom => LockedRoomIndex >= 0;
         public FloorChest KeyChest => KeyChestIndex < 0 ? null : Chests[KeyChestIndex];
@@ -99,7 +100,11 @@ namespace SleepingCalamity.Core
                     if (f.Kind == FeatureKind.EntryStart) starts.Add(p.Cell(f.X, f.Y));
                     else if (f.Kind == FeatureKind.Stair) StairExit = p.Cell(f.X, f.Y);
                     else if (f.Kind == FeatureKind.Bank) BankCell = p.Cell(f.X, f.Y);
+                    else if (f.Kind == FeatureKind.Baker) BakerCell = p.Cell(f.X, f.Y);
                 }
+            foreach (PlacedRoom p in Rooms)
+                if (p.RoomId == CellarBakeryPool.AntechamberId)
+                    foreach (CellarSpawn sp in p.Room.Spawns) if (sp.Tier == SpawnTier.Tier2 && !WardenCell.HasValue) WardenCell = p.Cell(sp.X, sp.Y);
             EntryStarts = starts;
         }
 
