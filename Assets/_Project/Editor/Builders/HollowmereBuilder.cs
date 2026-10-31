@@ -50,8 +50,8 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_HeroesAnnex", new Vector3(19.0f, 1.65f, 20.8f), new Vector3(11.8f, 6.6f, 24.5f), 55f),  // from the keep stair head at the bell-loft annex door and loft
             ("Cap_HM_KeepWall", new Vector3(-2f, 1.65f, -3f), new Vector3(2f, 3.2f, 19.6f), 60f),          // from the fountain: keep wall, buttresses, planters, stairs (Ruined shows it whole)
             ("Cap_HM_Ruins", new Vector3(-15.5f, 1.65f, -1.5f), new Vector3(-26f, 0.2f, -8f), 50f),          // from the square's west side over the F03 and F05 ruins
-            ("Cap_HM_Townhouses", new Vector3(-1f, 1.65f, -13f), new Vector3(-1f, 4.6f, -27f), 62f),       // from the square at the townhouse pair on F06 and F07 (kit family 3)
-            ("Cap_HM_TownhouseSide", new Vector3(17f, 1.65f, -15.5f), new Vector3(3f, 4.2f, -28f), 55f),  // three-quarter on F07's front and east side
+            ("Cap_HM_Townhouses", new Vector3(-1f, 1.65f, -4f), new Vector3(-1f, 5.2f, -27f), 64f),        // from the square at the townhouse pair on F06 and F07 (kit family 3)
+            ("Cap_HM_TownhouseSide", new Vector3(22f, 1.65f, -11f), new Vector3(5f, 5.0f, -27f), 55f),    // three-quarter on F07's front and east side
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
