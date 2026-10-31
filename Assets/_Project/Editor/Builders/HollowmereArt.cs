@@ -40,7 +40,10 @@ namespace SleepingCalamity.EditorTools
 
         public static readonly Spec Bakery = new Spec { Name = "Bakery", Folder = BakeryFolder, Fbx = "Bakery.fbx", Parts = BakeryParts };
         public static readonly Spec Smithy = new Spec { Name = "Smithy", Folder = "Assets/_Project/Content/Art/Town/Ring2/Smithy", Fbx = "Smithy.fbx",
-            Parts = new[] { "Part_Forge", "Part_Anvil", "Part_Sign" } };
+            Parts = new[] { "Part_Forge", "Part_Anvil", "Part_Sign" },
+            Tinted = new[] { ("BK_Leather", "canvas", new Color(0.50f, 0.30f, 0.18f)), ("BK_Coal", "soot_coal", new Color(0.55f, 0.55f, 0.58f)),
+                             ("BK_Ash", "soot_coal", new Color(2.6f, 2.5f, 2.4f)), ("BK_Grindstone", "sandstone", new Color(0.85f, 0.85f, 0.88f)) },
+            Flat = new[] { ("BK_Water", new Color(0.025f, 0.04f, 0.03f), 0.94f) } };   // the quench trough: dark, glossy
         public static readonly Spec Schoolhouse = new Spec { Name = "Schoolhouse", Folder = "Assets/_Project/Content/Art/Town/Ring2/Schoolhouse", Fbx = "Schoolhouse.fbx",
             Parts = new[] { "Part_Door", "Part_Bell", "Part_Sign" },
             Tinted = new[] { ("SH_Limewash", "plaster", new Color(1.05f, 1.03f, 0.97f)), ("SH_Slate", "soot_coal", new Color(0.85f, 0.9f, 0.95f)),

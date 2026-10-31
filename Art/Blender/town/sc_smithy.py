@@ -32,6 +32,13 @@ forward, Y up: the front (Blender -Y) is local +Z in Unity.
       [--views tq,tql,back,frame,close,sign,anvil] [--rres 1000] [--samples 20] [--no-render] [--export] [--blend] [--tris]
 
 Budget: under 35k tris.
+Status (2026-10-31, cloud): 2 render rounds, self-review 27.5/40 (silhouette 4, proportion 3.5, form 3.5, surface 3.5,
+colour 3.5, wear 3, set fit 3.5, glass/metal/emissive 3); not above the 25 floor by the 1.5 pt margin worth another round.
+31,524 tris (Frame 28,450, Part_Forge 1,750, Part_Anvil 572, Part_Sign 752; deterministic, two builds equal); FOOTPRINT
+7.20 x 5.60 m; bounds x -3.95..3.80, y -3.92..3.65, z to 8.47. Sheet: Reference/hollowmere/kit_ready/smithy/SHEET_smithy_final.jpg.
+Not seen in any render: the anvil and forge parts up close (the bay is dark from the review angles). Next visible gains: a
+warm fill and larger ember glow so the bay reads, plaster value variation on the workshop front, a brighter hood, a closer
+review view of the parts, B9 weeds at the plinth.
 """
 import sys, os, math, zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -354,31 +361,6 @@ F_LEFT = BK.face_xf((X0, Y1, 0), (-1, 0, 0))
 F_BACK = BK.face_xf((XW, Y1, 0), (0, 1, 0))
 F_RIGHT = BK.face_xf((XW, Y0, 0), (1, 0, 0))
 
-def plank_leaf(pc, xf, w, h, seed, np_=4, ring=True):
-    """A closed planked leaf in leaf-local coords (x along the width from 0, z up), iron straps and a ring pull."""
-    R = FK.rng('leaf%f' % seed)
-    pw = w / np_
-    for i in range(np_):
-        box(pc, 'oak', (pw * (i + 0.5), 0.0, h / 2), (pw - 0.012, 0.05, h - 0.02), rot=Ry(math.radians(R.uniform(-0.6, 0.6))),
-            cham=0.01, long_axis=2, wob=0.003, seed=R.random() * 30)
-    for k, zz in enumerate((0.38, h - 0.38)):
-        FK.add_box(pc, 'iron', (w * 0.96, 0.016, 0.085), xf @ T(w / 2, -0.032, zz), cham=0.0, long_axis=0, seed=zz + seed)
-        for r_ in range(3):
-            FK.add_box(pc, 'iron', (0.03, 0.02, 0.03), xf @ T(0.1 + r_ * (w - 0.2) / 2, -0.045, zz), cham=0.0, seed=r_ + zz)
-    if ring:
-        pts = [Vector((w - 0.12 + math.cos(a) * 0.045, -0.06, h * 0.5 + math.sin(a) * 0.045)) for a in [i * math.pi / 4 for i in range(9)]]
-        BK.tube(pc, 'iron', [xf @ p for p in pts], 0.007, 4)
-
-def put_leaf(pc, base, w, h, seed, np_=4, ring=True):
-    """Build a plank leaf into a scratch piece and merge it transformed by base."""
-    tmp = piece('leaf')
-    plank_leaf(tmp, base, w, h, seed, np_, ring)
-    # plank_leaf built the boxes untransformed (leaf-local): move them by base, iron already placed by base
-    bm_l = []
-    for v in tmp.bm.verts:
-        pass
-    return tmp
-
 def leaf_into(pc, base, w, h, seed, np_=4, ring=True):
     """Planks in leaf-local coordinates placed by `base`; straps and ring placed by plank_leaf with the same base."""
     R = FK.rng('leaf%f' % seed)
@@ -634,11 +616,12 @@ def chimney():
 
 def vane():
     pc = piece('Vane')
-    c = Vector((XR, 0.1, RIDGE + 0.12 - 0.09))
-    FK.add_box(pc, 'iron', (0.03, 0.03, 0.95), T(c.x, c.y, c.z + 0.47), cham=0.0, seed=1.0)
+    c = Vector((XR, 0.1, RIDGE + 0.04))
+    FK.add_box(pc, 'iron', (0.05, 0.05, 0.95), T(c.x, c.y, c.z + 0.47), cham=0.0, seed=1.0)
+    FK.add_box(pc, 'iron', (0.16, 0.16, 0.10), T(c.x, c.y, c.z + 0.04), cham=0.02, seed=1.5)
     for k in range(4):
         a = k * math.pi / 2
-        FK.add_box(pc, 'iron', (0.30, 0.02, 0.02), T(c.x, c.y, c.z + 0.30) @ Rz(a) @ T(0.1, 0, 0), cham=0.0, seed=k)
+        FK.add_box(pc, 'iron', (0.30, 0.03, 0.03), T(c.x, c.y, c.z + 0.24) @ Rz(a) @ T(0.1, 0, 0), cham=0.0, seed=k)
     # a hammer-and-horseshoe vane (flat), facing along Y
     FK.add_box(pc, 'iron', (0.02, 0.62, 0.07), T(c.x, c.y, c.z + 0.78), cham=0.0, seed=2.0)
     FK.add_box(pc, 'iron', (0.02, 0.12, 0.16), T(c.x, c.y - 0.26, c.z + 0.80), cham=0.0, seed=3.0)
@@ -667,7 +650,7 @@ def yard():
     R = FK.rng('yard')
     xd = X0 + (DOOR[0] + DOOR[1]) / 2
     for k in range(2):
-        FK.add_box(pc, 'stone', (0.85 + R.uniform(-0.06, 0.06), 0.52, 0.07), T(xd + R.uniform(-0.1, 0.1), Y0 - 0.62 - k * 0.58, 0.025) @ Rz(R.uniform(-0.2, 0.2)),
+        FK.add_box(pc, 'stone', (0.85 + R.uniform(-0.06, 0.06), 0.52, 0.07), T(xd + R.uniform(-0.1, 0.1), Y0 - 0.60 - k * 0.46, 0.025) @ Rz(R.uniform(-0.2, 0.2)),
                    cham=0.03, segs=2, uv_world=True, wob=0.012, seed=k + 50)
     # quench trough, front right: oak planks in iron bands on two stone feet, murky water
     tx, ty, tl, tw, th = 2.75, -3.42, 1.55, 0.58, 0.52
@@ -747,11 +730,8 @@ def part_forge():
     oy0, oy1, oz0, oz1 = OPEN
     zb = oz0 + 0.045
     # fire bed: a heap of coal in a low brick rim, ember glow under the crown
-    for k in range(4):
-        a = [(0.83, 0.07, 0.42, 0.08), (1.40, 0.07, 0.10, 0.50), (0.83, 1.13, 0.42, 0.08), (1.28, 0.0, 0.0, 0.0)][k]
-        if k < 3:
-            FK.add_box(pc, 'brick', (a[2] if a[2] else 0.10, a[3] if a[3] else 1.0, 0.09), T(a[0] + (0.21 if k != 1 else 0), a[1] + (0.5 if k == 1 else 0), zb + 0.045),
-                       cham=0.01, uv_world=True, seed=k + 70)
+    for (cx_, cy_, sx_, sy_) in ((1.04, 0.07, 0.42, 0.09), (1.04, 1.13, 0.42, 0.09), (1.45, 0.60, 0.09, 1.0)):
+        FK.add_box(pc, 'brick', (sx_, sy_, 0.09), T(cx_, cy_, zb + 0.045), cham=0.01, uv_world=True, seed=cx_ + cy_)
     blob(pc, 'coal', (1.10, 0.60, zb + 0.07), (0.42, 0.46, 0.17), 11.0, sub=2, flat=0.2)
     for k in range(26):
         r = FK.rng('fb%d' % k)
