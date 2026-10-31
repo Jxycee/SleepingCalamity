@@ -315,7 +315,7 @@ namespace SleepingCalamity.Core
         };
 
         // ------------------------------------------------------------------------------------------------ the rebuilt preset (ring 1 assignment; rings 2-3 homes)
-        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Townhouse }
+        public enum BuildingKind : byte { Empty, Home, Bakery, Inn, ApprovedFacade, Garden, Townhouse, StoneCottage, Workshop }
         static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing1 =
         {
             ("F01", BuildingKind.ApprovedFacade), ("F02", BuildingKind.Bakery), ("F09", BuildingKind.Inn),
@@ -323,11 +323,15 @@ namespace SleepingCalamity.Core
             ("F06", BuildingKind.Townhouse), ("F07", BuildingKind.Townhouse),   // kit family 3 (sc_townhouse.py): the pair on the south side, both facing the fountain
             ("F03", BuildingKind.Empty), ("F10", BuildingKind.Empty),
         };
+        // Ring 2 kit homes, east side of the Ring Lane, both on the square side with their fronts to the lane: R2_09 (S, 6 m) the stone cottage (kit family 2, StoneCottage_B),
+        // R2_08 (M, 8 m) the workshop (kit family 4, Workshop_B). Their pads keep the layout heights.
+        static readonly (string Foundation, BuildingKind Kind)[] RebuiltRing2 = { ("R2_09", BuildingKind.StoneCottage), ("R2_08", BuildingKind.Workshop) };
         static readonly string[] RebuiltGardens = { "R2_07", "R2_18", "R2_22", "R3_02" };   // left as allotments in the rebuilt massing
 
         public static BuildingKind RebuiltBuilding(string foundationId)
         {
             foreach (var r in RebuiltRing1) if (r.Foundation == foundationId) return r.Kind;
+            foreach (var r in RebuiltRing2) if (r.Foundation == foundationId) return r.Kind;
             if (Array.IndexOf(RebuiltGardens, foundationId) >= 0) return BuildingKind.Garden;
             return foundationId.StartsWith("F", StringComparison.Ordinal) ? BuildingKind.Empty : BuildingKind.Home;
         }
