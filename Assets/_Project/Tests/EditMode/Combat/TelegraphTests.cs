@@ -100,7 +100,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void EveryEnemyAttack_HasAWindUpYouCanReactTo()
         {
             foreach (AttackData a in RealAttacks())
-                Assert.That(a.HitOn.Start, Is.GreaterThanOrEqualTo(EnemyAttackRules.MinWindUpFrames), a.Id + ": the hitbox opens after at least " + EnemyAttackRules.MinWindUpFrames + " frames (0.4 s)");
+                Assert.That(a.HitOn.Start, Is.GreaterThanOrEqualTo(EnemyAttackRules.MinWindUpFrames), a.Id + ": the hitbox opens after at least " + EnemyAttackRules.MinWindUpFrames + " frames (0.45 s)");
         }
 
         [Test]

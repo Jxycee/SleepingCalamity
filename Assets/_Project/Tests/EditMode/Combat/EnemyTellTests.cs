@@ -200,6 +200,51 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void TheSignature_WaitsForCurrentHolders_AndReservesTheHero_SoItIsNeverStarved()
+        {
+            var t = new AttackTokens();
+            AttackData q = AttackCatalog.WardenQuake;
+            Assert.That(t.TryAcquire(Hero, 11, 0.0, AttackCatalog.RatLunge, P), Is.True, "a rat is already winding up");
+            Assert.That(t.TryAcquire(Hero, 10, 0.1, q, P, exclusive: true), Is.False, "the quake's tell must not overlap the rat's");
+            Assert.That(t.IsReserved(Hero, 0.1), Is.True);
+            Assert.That(t.TryAcquire(Hero, 12, 0.2, AttackCatalog.SlimeHop, P), Is.False, "nobody new while the quake waits");
+            Assert.That(t.TryAcquire(Hero2, 12, 0.2, AttackCatalog.SlimeHop, P), Is.True, "another hero is not reserved");
+            double ratDone = AttackCatalog.RatLunge.HitOn.End / 60.0;
+            Assert.That(t.TryAcquire(Hero, 10, ratDone + 0.01, q, P, exclusive: true), Is.True, "the quake starts once the rat's token lapses");
+            Assert.That(t.IsReserved(Hero, ratDone + 0.01), Is.False, "taking the token ends the reservation");
+        }
+
+        [Test]
+        public void AReservation_Lapses_IfTheSignatureNeverComesBack()
+        {
+            var t = new AttackTokens();
+            Assert.That(t.TryAcquire(Hero, 11, 0.0, AttackCatalog.WardenSlam, P), Is.True);
+            Assert.That(t.TryAcquire(Hero, 10, 0.0, AttackCatalog.WardenQuake, P, exclusive: true), Is.False);
+            double later = AttackTokens.ReserveSeconds + 0.01;
+            Assert.That(t.IsReserved(Hero, later), Is.False);
+            Assert.That(t.TryAcquire(Hero, 12, later, AttackCatalog.SlimeHop, P), Is.True);
+            var u = new AttackTokens();
+            Assert.That(u.TryAcquire(Hero, 11, 0.0, AttackCatalog.WardenSlam, P), Is.True);
+            Assert.That(u.TryAcquire(Hero, 10, 0.0, AttackCatalog.WardenQuake, P, exclusive: true), Is.False);
+            u.Release(10);   // the elite died or despawned
+            Assert.That(u.IsReserved(Hero, 0.0), Is.False);
+        }
+
+        [Test]
+        public void TheBreakFree_TakesAForcedHold_ThatLaterAttacksKeepTheirGapFrom()
+        {
+            var t = new AttackTokens();
+            var one = new PacingProfile(1, 0.5f, 1f, 1f, 0.3f);
+            Assert.That(t.TryAcquire(Hero, 11, 0.0, AttackCatalog.WardenPound, one), Is.True);
+            t.ForceAcquire(Hero, 10, 0.0, AttackCatalog.WardenBreakFree);   // past the cap of one
+            Assert.That(t.HoldersOn(Hero, 0.0), Is.EqualTo(2), "recorded although the cap was full");
+            t.Release(11);
+            Assert.That(t.TryAcquire(Hero, 12, 0.0, AttackCatalog.SlimeHop, one), Is.False, "the break-free's hold still counts");
+            double after = AttackCatalog.WardenBreakFree.HitOn.End / 60.0 + 0.01;
+            Assert.That(t.TryAcquire(Hero, 12, after, AttackCatalog.SlimeHop, one), Is.True);
+        }
+
+        [Test]
         public void TierTwo_PressesHarder_WithoutLettingStrikesOverlap()
         {
             PacingProfile t1 = AttackPacing.ForTier(1), t2 = AttackPacing.ForTier(2);
@@ -209,6 +254,60 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.That(AttackPacing.CooldownSeconds(k, 2), Is.LessThan(AttackPacing.CooldownSeconds(k, 1)), k.ToString());
             Assert.That(AttackPacing.CooldownSeconds(EnemyKind.Slime, 1), Is.EqualTo(1.2f).Within(1e-4f), "tier 1 keeps the greybox values the user passed");
             Assert.That(AttackPacing.RecoverSeconds(EnemyKind.RatKing, 1), Is.EqualTo(0.9f).Within(1e-4f));
+        }
+    }
+
+    // Catches the signature's cadence breaking (the AI-only path, otherwise covered only by the opt-in bot) and the attack roll being biased by list order.
+    public class EnemyAttackChooserTests
+    {
+        static readonly EnemyDefinition W = EnemyCatalog.DoughWarden;
+
+        [Test]
+        public void TheSignature_ComesAfterThreeOtherAttacks_InReach_AndNeverFromTheRoll()
+        {
+            for (int since = 0; since < AttackPacing.SignatureEvery; since++)
+                for (float roll = 0f; roll < 1f; roll += 0.05f)
+                    Assert.That(EnemyAttackChooser.Choose(W, 2f, roll, since), Is.Not.SameAs(AttackCatalog.WardenQuake), "since " + since + " roll " + roll);
+            Assert.That(EnemyAttackChooser.Choose(W, 2f, 0.5f, AttackPacing.SignatureEvery), Is.SameAs(AttackCatalog.WardenQuake));
+            Assert.That(EnemyAttackChooser.Choose(W, 2f, 0.5f, AttackPacing.SignatureEvery + 4), Is.SameAs(AttackCatalog.WardenQuake), "still due later");
+            float far = EnemyAttackChooser.Reach(AttackCatalog.WardenQuake) + 0.5f;
+            Assert.That(EnemyAttackChooser.Choose(W, far, 0.5f, AttackPacing.SignatureEvery), Is.Not.SameAs(AttackCatalog.WardenQuake), "only in reach");
+        }
+
+        [Test]
+        public void TheRoll_PicksEvenlyAmongTheOtherAttacks()
+        {
+            var counts = new System.Collections.Generic.Dictionary<AttackData, int>();
+            const int steps = 300;
+            for (int i = 0; i < steps; i++)
+            {
+                AttackData a = EnemyAttackChooser.Choose(W, 1.5f, (i + 0.5f) / steps, 0);
+                counts[a] = counts.TryGetValue(a, out int c) ? c + 1 : 1;
+            }
+            Assert.That(counts.Count, Is.EqualTo(3), "slam, sweep and pound");
+            foreach (var kv in counts) Assert.That(kv.Value, Is.EqualTo(steps / 3).Within(2), kv.Key.Id);
+        }
+
+        [Test]
+        public void TheSignatureCanSitAnywhereInTheList()
+        {
+            var shuffled = new EnemyDefinition(EnemyKind.DoughWarden, "w2", "Warden copy", W.Species, W.Hp, W.Atk, W.Def, W.MoveSpeed, W.Radius, W.Height,
+                new[] { AttackCatalog.WardenQuake, AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound }, isElite: true);
+            for (float roll = 0f; roll < 1f; roll += 0.05f)
+                Assert.That(EnemyAttackChooser.Choose(shuffled, 2f, roll, 0), Is.Not.SameAs(AttackCatalog.WardenQuake));
+            Assert.That(EnemyAttackChooser.Choose(shuffled, 2f, 0.1f, AttackPacing.SignatureEvery), Is.SameAs(AttackCatalog.WardenQuake));
+        }
+
+        [Test]
+        public void ASlime_LobsOnlyFromRange_AndNothingIsChosenOutOfReach()
+        {
+            EnemyDefinition s = EnemyCatalog.Slime;
+            for (float roll = 0f; roll < 1f; roll += 0.1f)
+            {
+                Assert.That(EnemyAttackChooser.Choose(s, 1.5f, roll, 0), Is.SameAs(AttackCatalog.SlimeHop), "too close to lob");
+                Assert.That(EnemyAttackChooser.Choose(s, 5f, roll, 0), Is.SameAs(AttackCatalog.SlimeGlob), "only the lob reaches 5 m");
+                Assert.That(EnemyAttackChooser.Choose(s, 8f, roll, 0), Is.Null);
+            }
         }
     }
 }

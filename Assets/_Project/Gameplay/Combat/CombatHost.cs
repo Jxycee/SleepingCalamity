@@ -5,7 +5,7 @@
 //  - validating an enemy-hits-player report from the victim's client (the enemy is alive and that attack serial is the one it is performing, one hit per
 //    serial), then applying damage to the host-held HP;
 //  - each player's growth (their heirlooms, style ledger, pips), the healing drops, and the wave director (waves 1-4 tier 1, then tier 2).
-// Test hooks: AiEnabled, WavesEnabled, CritChance, SpawnEnemy.
+// Test hooks: AiEnabled, WavesEnabled, CritChance, SpawnEnemy, ServerJumpToWave.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;

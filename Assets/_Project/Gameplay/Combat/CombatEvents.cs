@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace SleepingCalamity.Gameplay
 {
+    // EnemyTelegraph is no longer raised (each attack's own wind-up, hold and glint sounds come from EnemyVisual); kept so the values after it do not move.
     public enum CombatCue : byte
     {
         Swing, HitNormal, HitFinisher, HitCrit, Blocked, Parry, Dodge, PlayerHurt, Guarded, EnemyTelegraph, EnemySlam, EnemyDie, Heal, Pop, Shot, Spell, Down, Revive, Whiff,

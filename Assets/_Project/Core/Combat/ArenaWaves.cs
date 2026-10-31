@@ -19,7 +19,7 @@ namespace SleepingCalamity.Core.Combat
     {
         public const int CompositionCount = 4;
 
-        // Waves 1-4 are tier 1; every wave after 4 repeats the same four compositions at tier 2.
+        // Waves 1-4 are tier 1; every wave after 4 is tier 2 and cycles through its own four mixed compositions (below).
         public static int TierOf(int wave) => wave > CompositionCount ? 2 : 1;
 
         public static WaveEntry[] Composition(int wave)

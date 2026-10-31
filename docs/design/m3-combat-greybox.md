@@ -173,7 +173,8 @@ default** (`CombatAssists.GroundTelegraph`, saved per machine; **F2** in the are
 Before starting an attack the host asks for a token on its target hero: at most **2** enemies winding up or striking at one hero, and two enemies' strikes
 on the same hero open at least a gap apart (**0.5 s** tier 1, **0.35 s** tier 2). A refused enemy hovers at the edge of its reach and strafes, asking again
 every 0.2-0.45 s (KH's hovering crowd; DC1 never has more than 3 monsters near each other). A token lapses when its hit window closes (so it cannot leak) and
-is released early on stagger, parry, death and despawn. The Warden's revenge break-free needs none.
+is released early on stagger, parry, death and despawn. The Warden's signature plays alone: while others still hold tokens on its hero it reserves the hero (no new tokens there, at most 2.5 s) and starts once they lapse. Its revenge break-free starts at once but records a forced hold, so later attacks keep their gap from it. The attack choice is Core `EnemyAttackChooser` (signature every 3 AI-chosen attacks; forced and break-free attacks do not count).
+**Co-op caveat (for the 2-player walk):** tokens are per target hero. Two heroes can each have two attackers, and a circle attack aimed at one hero can also catch the other while that hero's own attackers strike, so overlap is still possible in co-op; check it on the 2P walk.
 
 ### The wave 4 to 5 step
 Against the 100 HP, DEF 10 hero tier 2 at x2.3 meant a 26-point slime hop and a 113-point Warden pound (a one-shot); DC1's early enemies take 19-46% per hit

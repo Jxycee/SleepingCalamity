@@ -107,7 +107,6 @@ namespace SleepingCalamity.Presentation
                 case CombatCue.Parry: id = CombatSfx.Parry; break;
                 case CombatCue.Dodge: id = CombatSfx.Dodge; break;
                 case CombatCue.PlayerHurt: id = CombatSfx.Hurt; break;
-                case CombatCue.EnemyTelegraph: id = CombatSfx.Telegraph; break;
                 case CombatCue.EnemySlam: id = CombatSfx.Slam; break;
                 case CombatCue.EnemyDie: id = CombatSfx.Die; break;
                 case CombatCue.Heal: id = CombatSfx.Heal; break;

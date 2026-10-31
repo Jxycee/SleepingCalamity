@@ -5,7 +5,9 @@
 // Greybox: simple state machines, no navmesh (an open arena with pillars): Chase -> Attack (telegraph, hit-on, recover) -> Recover.
 // Attack tokens (host only, never replicated; AttackPacing): before starting an attack the host asks for a token on its target hero. At most two enemies
 // wind up at one hero at once and their strikes land a gap apart; a refused enemy hovers at the edge of its reach and strafes until it gets one. Tokens
-// lapse when the hit window closes and are released early on stagger, parry, death and despawn. The Warden's signature takes its hero's token alone.
+// lapse when the hit window closes and are released early on stagger, parry, death and despawn. The Warden's signature plays alone: while others still
+// hold tokens on its hero it reserves the hero (no new tokens there) and starts once they lapse. Its revenge break-free takes a forced hold (no checks,
+// but later attacks keep their gap from it). The choice of attack is Core EnemyAttackChooser (the signature on a cadence of AI-chosen attacks).
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
@@ -267,6 +269,9 @@ namespace SleepingCalamity.Gameplay
                 {
                     _waitingForToken = false;
                     ServerStartAttack(next, target.transform.position);
+                    // Only AI-chosen attacks count toward the signature's cadence (not the break-free, not a test's forced attack).
+                    if (EnemyAttackChooser.IsSignature(next)) _attacksSinceSignature = 0;
+                    else if (Def.IsElite) _attacksSinceSignature++;
                     return;
                 }
                 _tokenRetry = pacing.RetrySeconds * (1f + 0.5f * Random.value);
@@ -302,37 +307,10 @@ namespace SleepingCalamity.Gameplay
             return best;
         }
 
-        // How far a glob can be lobbed (m). Was 8.5: the first playtest read a hit from that far as "hit from a distance" with nothing flying at you; the
-        // glob is now drawn in flight (EnemyVisual) and lobbed from at most 6.5 m.
-        public const float LobReach = 6.5f;
+        // How far a glob can be lobbed (m): Core EnemyAttackChooser.LobReach (was 8.5; the glob is drawn in flight, EnemyVisual).
+        public const float LobReach = EnemyAttackChooser.LobReach;
 
-        private float Reach(AttackData a)
-        {
-            if (a.Origin == HitOrigin.GroundAtTarget) return LobReach;
-            return a.Range + a.LungeMeters * 0.7f + 0.2f;   // a lunge or hop lands up to LungeMeters ahead, the strike is Range around the landing spot
-        }
-
-        private AttackData ChooseAttack(float dist)
-        {
-            // The elite's signature on a cadence, never by the random roll, so its big tell is an event the player learns to expect.
-            if (Def.IsElite && _attacksSinceSignature >= AttackPacing.SignatureEvery && dist <= Reach(AttackCatalog.WardenQuake)) return AttackCatalog.WardenQuake;
-            AttackData pick = null;
-            float roll = Random.value;
-            AttackData[] attacks = Def.Attacks;
-            // The signature sits last in the elite's list and is never rolled, so the roll covers only the others (evenly).
-            int n = attacks.Length > 1 && attacks[attacks.Length - 1] == AttackCatalog.WardenQuake ? attacks.Length - 1 : attacks.Length;
-            int start = Mathf.Clamp(Mathf.FloorToInt(roll * n), 0, n - 1);
-            for (int k = 0; k < n; k++)
-            {
-                AttackData a = attacks[(start + k) % n];
-                bool lob = a.Origin == HitOrigin.GroundAtTarget;
-                if (lob && dist < 3.2f) continue;
-                if (dist > Reach(a)) continue;
-                pick = a;
-                break;
-            }
-            return pick;
-        }
+        private AttackData ChooseAttack(float dist) => EnemyAttackChooser.Choose(Def, dist, Random.value, _attacksSinceSignature);
 
         private void FaceToward(Vector3 flatDir, float degPerSec, float dt)
         {
@@ -386,8 +364,6 @@ namespace SleepingCalamity.Gameplay
             NetAttackIdx.Value = (short)idx;
             _lastAttackSerial = ++s_nextAttackSerial;
             NetAttackSerial.Value = _lastAttackSerial;
-            if (a == AttackCatalog.WardenQuake) _attacksSinceSignature = 0;
-            else if (Def.IsElite) _attacksSinceSignature++;
             SetPhase(EnemyPhase.Attack);
         }
 
@@ -480,9 +456,11 @@ namespace SleepingCalamity.Gameplay
             if (r.Knockback > 0f) _knock += away * r.Knockback;
             if (r.RevengeTriggered)
             {
-                // Break free: a quick circle that clears everyone off it (the elite's answer to being chained). It needs no token: it answers the heroes
-                // hitting it, so it drops whatever token it held.
-                s_tokens.Release(GetHashCode());
+                // Break free: a quick circle that clears everyone off it (the elite's answer to being chained). It answers the heroes hitting it, so it
+                // starts whatever the tokens say, but records a forced hold on its nearest hero so the next attacks keep their gap from it.
+                HeroVitals near = PickTarget();
+                if (near != null) s_tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.WardenBreakFree);
+                else s_tokens.Release(GetHashCode());
                 ServerStartAttack(AttackCatalog.WardenBreakFree, transform.position);
             }
             return r;
