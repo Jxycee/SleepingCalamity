@@ -60,6 +60,8 @@ Round log (look stage, ground with the flag ring and stand-ins):
   r12 (Unity batch 3): open edges fade over longer ragged bands incl. the north edge outside the facade; the bed
      rises flush with the surround at the perimeter (vertex alpha = fade); lighter darks and bed stain for low sun;
      --stage far bakes the CobbleFar 2 m tileable for the surround ground.
+     Judged on ref sheets: far tile wraps with no seams (145 stones, high 928k tris; the 2 m repeat shows on close
+     inspection, so vary it in Unity); the open edge thins into sparse stones; low sun keeps readable mid tones.
   The `damp` bed vertex colour is not read by the Unity shader yet: the CobbleBed tileable carries base moss alone.
   Parked ideas: docs/PARKING_LOT.md (B6 plaza ground).
 """
