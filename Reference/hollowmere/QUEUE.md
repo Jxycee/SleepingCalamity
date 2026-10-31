@@ -1,6 +1,6 @@
 # Self-serve work queue (PC coordinator, 2026-10-31)
 
-**CLAIMING: PAUSED (usage pacing, 13:34 UTC).** While this line says PAUSED, a session that finishes sets its STATUS.md to DONE and stops, without claiming. The coordinator flips this line back to OPEN.
+**CLAIMING: OPEN (13:54 UTC).** The coordinator may set this to PAUSED for usage pacing; while it says PAUSED, a session that finishes sets DONE and stops without claiming.
 
 A cloud session that has finished and merged its task takes the top item whose `Claimed:` line is still `-`:
 1. Pull main.
