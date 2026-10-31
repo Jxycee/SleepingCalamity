@@ -34,10 +34,13 @@ tileable's measured hue #b9a07a (Art/Textures/B1_town/SOURCES.md).
       [--views wide,mid,close,tq] [--moods noon,lowsun] [--no-render]
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 
-Status (2026-10-31, cloud): look rounds 1-3 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28/40:
+Status (2026-10-31, cloud): look rounds 1-4 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28 -> 29.5/40:
 round 2 dropped the dish and beast 0.30 m into the 38 deg close camera, fixed the values, tide line, ground-line damp
 and the ruff; round 3 added the shaft flutes, rosier and paler replacement stones, rain streaks under the coping, a
-clean dish and a paler seat. Bake proof (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
+clean dish and a paler seat; round 4 gave the beast puffy shut lids with lid lines deep enough to bake, twisted locks of
+varied length in the ruff, loose threads at the banner's tears and hem, and sun-bleached banner edges. Beside the
+fountain refs (Reference/hollowmere/fountain/) the gap is weathering: the real basins carry darker grey-green patina low
+down and more tone change between stones; bc_109 stands on two wide steps. Bake proof (round 3) (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
 BannerPole high 0.79M -> low 8,996 (57.7k together, in the T4 30-60k band); at 1024 the closed-eye lid lines soften
 toward brows, so check them first in the PC's 4K bake. Next: the PC runs --stage bake --res 4096 (DryFountain) / 2048 (BannerPole) and exports.
 Parked (optional, after the captures): an octagonal basin variant on one worn step A/B'd at the mid camera; B9 crack
@@ -399,17 +402,21 @@ def beast():
            blob('chin', (0.18, 0.0, 0.065), (0.10, 0.12, 0.06))]
     for s in (1, -1):
         obs.append(blob(f'jowl{s}', (0.22, s * 0.105, 0.12), (0.10, 0.10, 0.09)))
-        obs.append(blob(f'eyemound{s}', EYE[(1 - s) // 2], (0.05, 0.062, 0.042)))
+        e = EYE[(1 - s) // 2]
+        obs.append(blob(f'eyemound{s}', e, (0.056, 0.068, 0.047)))     # a puffy shut lid, and the fold above it
+        obs.append(blob(f'lidfold{s}', (e[0] + 0.006, e[1], e[2] + 0.026), (0.042, 0.07, 0.024)))
         brow = [HW((0.19 + 0.03 * math.cos(u), s * (0.118 + 0.07 * math.sin(u)), 0.36 + 0.02 * math.cos(u))) for u in np.linspace(-1.5, 1.5, 16)]
         obs.append(K.tube(f'brow{s}', brow, 0.03, 12, radii=[0.018 + 0.016 * math.cos(u) for u in np.linspace(-1.5, 1.5, 16)]))
         obs.append(blob(f'ear{s}', (-0.04, s * 0.235, 0.41), (0.045, 0.07, 0.088), rot=Matrix.Rotation(s * math.radians(-35), 4, 'X')))
         obs.append(blob(f'paw{s}', (0.21, s * 0.12, -0.03), (0.12, 0.078, 0.056), tilt=False))
         for k, dy in enumerate((-0.042, 0.0, 0.042)):
             obs.append(blob(f'toe{s}{k}', (0.315, s * 0.12 + dy, -0.032), (0.036, 0.03, 0.036), tilt=False, seg=20))
-    for k, a in enumerate(np.linspace(-2.0, 2.0, 13)):              # the ruff: broad, flat, overlapping carved locks round the head
-        ctr = (-0.06, 0.275 * math.sin(a), 0.22 + 0.275 * math.cos(a))
-        rot = Matrix.Rotation(-a, 4, 'X') @ Matrix.Rotation(0.35, 4, 'Y')
-        obs.append(blob(f'lock{k}', ctr, (0.05, 0.095, 0.12), rot=rot, seg=24))
+    rl = K.rng('locks')
+    for k, a in enumerate(np.linspace(-2.0, 2.0, 13)):              # the ruff: broad overlapping locks, each twisted and its own length
+        L = rl.uniform(0.85, 1.2); R = 0.275 + 0.02 * (L - 1)
+        ctr = (-0.06, R * math.sin(a), 0.22 + R * math.cos(a))
+        rot = Matrix.Rotation(-a, 4, 'X') @ Matrix.Rotation(0.35, 4, 'Y') @ Matrix.Rotation((0.45 if k % 2 else -0.45) * L, 4, 'Z')
+        obs.append(blob(f'lock{k}', ctr, (0.055, 0.095, 0.12 * L), rot=rot, seg=24))
         if abs(a) < 1.8:
             ctr2 = (-0.12, 0.215 * math.sin(a + 0.15), 0.22 + 0.215 * math.cos(a + 0.15))
             obs.append(blob(f'lockb{k}', ctr2, (0.05, 0.085, 0.10), rot=Matrix.Rotation(-(a + 0.15), 4, 'X'), seg=20))
@@ -431,11 +438,11 @@ def beast_cuts(ob):
     for s in (1, -1):
         e = Vector(EYE[(1 - s) // 2])
         lid = [HW(e + Vector((0.06, s * 0.052 * u, -0.006 + 0.016 * u * u))) for u in np.linspace(-1, 1, 14)]
-        cut.append(_snap_tube(bvh, f'lid{s}', lid, 0.0075, radii=[0.004 + 0.004 * math.cos(u * 1.4) for u in np.linspace(-1, 1, 14)]))
+        cut.append(_snap_tube(bvh, f'lid{s}', lid, 0.01, radii=[0.0065 + 0.0055 * math.cos(u * 1.4) for u in np.linspace(-1, 1, 14)]))   # deep enough to survive the bake
         for k, u in enumerate((-0.55, -0.1, 0.35, 0.75)):
             a = e + Vector((0.06, s * 0.052 * u, -0.006 + 0.016 * u * u))
             b = a + Vector((0.0, s * 0.012 * (u + 0.3), -0.02))
-            cut.append(_snap_tube(bvh, f'lash{s}{k}', [HW(a.lerp(b, t)) for t in np.linspace(0, 1, 5)], 0.004, 6))
+            cut.append(_snap_tube(bvh, f'lash{s}{k}', [HW(a.lerp(b, t)) for t in np.linspace(0, 1, 5)], 0.0055, 6))
         n0 = HW((0.39, s * 0.03, 0.245)); n1 = HW((0.30, s * 0.03, 0.25))
         cut.append(cyl(f'nostril{s}', n0, n1 - n0, 0.013, 0.035, back=0.02, seg=14))
         ec = HW((-0.02, s * 0.25, 0.41)); out = (HW((0.04, s * 0.24, 0.41)) - ec).normalized()
@@ -588,7 +595,15 @@ def banner(top_ctr):
     uv = np.array([(i / NU, j / NV, hem(i / NU)) for i in range(NU + 1) for j in range(NV + 1)])
     store_attr(ob, 'cuv', np.stack([uv[:, 0], uv[:, 1] * uv[:, 2] / H, uv[:, 1]], 1))
     sm = ob.modifiers.new('sol', 'SOLIDIFY'); sm.thickness = 0.004; sm.offset = 0.0; K.apply_mods(ob)
-    return ob
+    threads = []                                                     # loose threads hanging from the tears and the hem
+    for k in range(14):
+        u = r.choice([0.25, 0.27, 0.29, 0.69, 0.71, 0.73]) if k < 6 else r.uniform(0.04, 0.96)
+        L0 = hem(u); Lt = r.uniform(0.04, 0.10)
+        x = x0 + Vector(((u - 0.5) * W * (1 - 0.04), 0.07 + 0.03 * math.sin(u * 4.0) + 0.028 * math.sin(2 * math.pi * (u * 2.6 + 0.15)), -L0 + 0.004))
+        pts = [x + Vector((0.006 * math.sin(t * 5 + k), 0.004 * t, -Lt * t)) for t in np.linspace(0, 1, 6)]
+        th = K.tube(f'thread{k}', pts, 0.0018, 5)
+        store_attr(th, 'cuv', np.tile([u, 1.0, 1.0], (len(th.data.vertices), 1))); threads.append(th)
+    return K.join('banner', [ob] + threads)
 
 # ----------------------------------------------------------------------------- materials
 def _blockspace(T):
@@ -772,6 +787,7 @@ def banner_mat(name):
     m, T = K.new_mat(name)
     cu = T.sep(T.attr('cuv')); u, v = (cu, 'X'), (cu, 'Z'); lp = T.attr('lp')
     blch = T.math('ADD', T.smoothstep(v, 0.95, 0.0), T.math('MULTIPLY', T.noise(lp, scale=3.0, detail=4), 0.5))
+    blch = T.math('ADD', blch, T.math('MULTIPLY', T.smoothstep(T.math('ABSOLUTE', T.math('SUBTRACT', u, 0.5)), 0.38, 0.5), 0.45))   # sun-bleached edges
     blch = T.math('MULTIPLY', blch, 0.8)
     c = T.mix(T.smoothstep(blch, 0.2, 1.0), (0.36, 0.10, 0.08), (0.66, 0.46, 0.39))
     # the harvest device: two bands and a roundel, dyed paler; faded nearly away
