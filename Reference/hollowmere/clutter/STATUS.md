@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Q14. Decorations batch 2: market and lane clutter
-Progress: 55%
+Progress: 60%
 Sheet: Reference/hollowmere/clutter/clutter_sheet_r3.jpg
 Blocker: none
 
@@ -19,6 +19,8 @@ Then: merge origin/main, build scene, capture Cap_HM_Clutter, unity.sh check, me
 - Art (7231bf9): Art/Blender/town/sc_clutter.py, 21 FBX in Content/Art/Town/Clutter (Gen, slot materials on shared tileables, no bakes), SOURCES.md.
   Deviations: a few meshes overhang their FOOTPRINT by up to 0.14 m (RainBarrel, FlowerBox, SackStack_Broken, Well_Ruined); signs reach 0.95 m; painted_wood is blue-grey, so CL_Paint/PaintRed may read duller in Unity.
 - Unity (740e0a5): Core HollowmereClutter (rows outside lots: clear of garden/keep), Rebuilt 53 ground rows + 6 signs (4 workshops, tailor F06, grocer F07) + 3 washing spans, Ruined 15; HollowmereClutterTests 13 green on the Core runner (path node / edge negative tests). Editor placement written, not yet compiled (Unity editor still downloading in this container).
+- Coordinator: sheet r3 ~27/40 APPROVED, no more art rounds. Later polish: sacks are smooth pillows (no burlap weave/stitching), flower clumps pastel blobs, washing-line cloth pale.
+- 2026-10-31: Unity editor finally extracted in this container (the download stalled ~45 min); origin/main merged (lake, stair). In-engine step starting.
 - Next: compile, footprints to real extents, scene build, capture Cap_HM_Clutter only, in-engine sheet, then check + merge.
 
 ## Usage waste
