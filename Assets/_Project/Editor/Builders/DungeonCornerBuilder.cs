@@ -209,15 +209,15 @@ namespace SleepingCalamity.EditorTools
         {
             LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
             Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.1f); c.contrast.Override(42f); c.saturation.Override(-16f);
-            ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.92f, 0.88f, 0.86f, -0.35f)); s.shadowsStart.Override(0f); s.shadowsEnd.Override(0.4f);   // grey-brown shadow fill, pushed down
-            WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(0f);
+            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.15f); c.contrast.Override(55f); c.saturation.Override(-22f);
+            ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.86f, 0.82f, 0.80f, 0f));   // grey-brown shadow fill, pushed down
+            WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(-3f); w.tint.Override(12f);
             LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(1.0f, 0.97f, 0.97f, 0.0f));
-            Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.28f); v.smoothness.Override(0.5f);
+            Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.34f); v.smoothness.Override(0.5f);
         });
 
         // --------------------------------------------------------------------------------------------- lanterns, candles, lights
-        static readonly Color Gold = new Color(1.0f, 0.74f, 0.38f);
+        static readonly Color Gold = new Color(1.0f, 0.80f, 0.54f);
 
         static void Lanterns(Transform set, Transform lighting, Dictionary<string, Material> own)
         {
@@ -265,14 +265,14 @@ namespace SleepingCalamity.EditorTools
                 LookTestBuilder.Prim(set, "Candle_" + i, PrimitiveType.Cylinder, c + offs[i] + new Vector3(0, hs[i] * 0.5f, 0), new Vector3(0.035f, hs[i] * 0.5f, 0.035f), own["wax"]);
                 LookTestBuilder.Prim(set, "Flame_" + i, PrimitiveType.Sphere, c + offs[i] + new Vector3(0, hs[i] + 0.02f, 0), new Vector3(0.015f, 0.03f, 0.015f), own["flame"]);
             }
-            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.12f), Quaternion.identity, new Color(1.0f, 0.62f, 0.28f), 1.6f, 3.8f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.12f), Quaternion.identity, new Color(1.0f, 0.72f, 0.44f), 1.6f, 3.8f, LightShadows.None);
         }
 
         static void Lights(Transform lighting, Dictionary<string, Material> own)
         {
             LookTestBuilder.AddLight(lighting, "GrateLight", LightType.Point, new Vector3(0.6f, 0.45f, 6.2f), Quaternion.identity, new Color(0.95f, 0.30f, 0.12f), 0.8f, 3.2f, LightShadows.None);
             // A warm pool on the larder shelves and the barrels (a candle on the shelf, in effect).
-            LookTestBuilder.AddLight(lighting, "LarderLight", LightType.Point, new Vector3(-1.75f, 1.45f, 5.0f), Quaternion.identity, new Color(1.0f, 0.68f, 0.34f), 2.6f, 5.5f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "LarderLight", LightType.Point, new Vector3(-1.75f, 1.45f, 5.0f), Quaternion.identity, new Color(1.0f, 0.76f, 0.52f), 2.6f, 5.5f, LightShadows.None);
             // Daylight shaft from the coal hatch: the CV_Daylight quad centre is (2.5 cos 21, 1.6 + 2.5 sin 21, 5.5) = (2.33, 2.50, 5.5); start just inside it.
             Vector3 hatch = new Vector3(2.27f, 2.52f, 5.5f), dir = new Vector3(-0.55f, -0.83f, 0.0f).normalized;
             Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
@@ -287,7 +287,7 @@ namespace SleepingCalamity.EditorTools
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = pos; go.transform.localRotation = rot ?? Quaternion.identity;
             var ps = go.AddComponent<ParticleSystem>();
-            var main = ps.main; main.loop = true; main.prewarm = true; main.startLifetime = 8f; main.startSpeed = 0.02f; main.startSize = new ParticleSystem.MinMaxCurve(0.016f, 0.034f); main.maxParticles = count;
+            var main = ps.main; main.loop = true; main.prewarm = true; main.startLifetime = 8f; main.startSpeed = 0.02f; main.startSize = new ParticleSystem.MinMaxCurve(0.010f, 0.022f); main.maxParticles = count;
             main.startColor = new Color(1.0f, 0.78f, 0.45f, 1.0f); main.simulationSpace = ParticleSystemSimulationSpace.World;
             var em = ps.emission; em.rateOverTime = count / 8f;
             var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = box;

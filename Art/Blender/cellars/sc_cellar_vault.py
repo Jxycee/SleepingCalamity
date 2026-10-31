@@ -89,7 +89,7 @@ def flat(name, col, rough):
 EXTRA = {
     'brick': lambda: FK.tile_mat('CV_Brick', 'B2_cellar/old_brick', tint=(0.98, 1.04, 1.0), normal=1.2),
     'vault': lambda: FK.tile_mat('CV_VaultStone', 'B2_cellar/vault_stone', tint=(0.93, 0.91, 0.88), normal=1.3),
-    'lime': lambda: FK.tile_mat('CV_Limewash', 'B2_cellar/limewash', tint=(1.06, 1.0, 0.94), normal=0.8),
+    'lime': lambda: FK.tile_mat('CV_Limewash', 'B2_cellar/limewash', tint=(1.06, 1.0, 0.94), normal=0.45),
     'flag': lambda: FK.tile_mat('CV_Flagstone', 'B2_cellar/flagstone', tint=(1.0, 0.95, 0.9), normal=1.2),
     'barrel': lambda: FK.tile_mat('CV_BarrelOak', 'B2_cellar/barrel_oak', tint=(1.1, 1.0, 0.9), normal=1.2),
     'soot': lambda: FK.tile_mat('CV_Soot', 'B2_cellar/soot_coal', tint=(1.1, 1.05, 1.0), rough_add=0.3, normal=1.3),
