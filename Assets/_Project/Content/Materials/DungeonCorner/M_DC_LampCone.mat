@@ -28,7 +28,7 @@ Material:
     - _EdgePower: 2
     - _HeightFadeRange: 1
     - _HeightFadeTop: 1000
-    - _Intensity: 0.05
+    - _Intensity: 0.09
     - _LengthFade: 1.2
     m_Colors:
     - _Color: {r: 1, g: 0.72, b: 0.36, a: 1}

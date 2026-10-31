@@ -1,6 +1,7 @@
 # Hollowmere layout: status
 
-Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
+Session: Wave 0A: Hollowmere greybox layout + builder
+Job: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
 State: DONE (ruin integration merged)
 Progress: 100%

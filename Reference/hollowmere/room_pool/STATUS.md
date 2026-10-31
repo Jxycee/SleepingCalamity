@@ -1,5 +1,6 @@
 State: DONE
-Session: Q7. Cellars room pool, first rooms (M5 authoring)
+Session: Wave 2: Square ground + dressing
+Job: Q7. Cellars room pool, first rooms (M5 authoring)
 Progress: 100%
 Sheet: ROOMS.md (table + ASCII + sockets of all 21 rooms; generated from the code)
 Blocker: none
