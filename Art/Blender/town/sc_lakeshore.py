@@ -20,7 +20,14 @@ stalk). Each set is BaseColor + Normal + ORM (R AO, G roughness, B metal).
   --export writes <out>/LakeShore.fbx (path_mode STRIP) and <out>/tex/*.png; the PC/cloud copies them to
   Assets/_Project/Content/Art/Town/Ring3/Lake/ (see SOURCES.md there).
 
-Status: see the end of this docstring (filled by the last run).
+Status (2026-10-31, cloud, Blender 4.5.3): exported to Assets/_Project/Content/Art/Town/Ring3/Lake/LakeShore.fbx (+ Textures/, SOURCES.md),
+sheet Reference/hollowmere/lake/SHEET_lakeshore_r1.jpg. Bake run takes about 15 min on 4 CPU cores at --hi 5 (--hi 4 for a quick pass; --from-blend
+<scratch>/lakeshore.blend --views ... re-renders the review without baking). Deterministic seeds.
+  Tris: Rock_Shore A/B/C 640/480/330, Rock_Stream A/B/C 880/720/540, Reed A/B/C 732/586/560, Jetty 5,650 (cap 6,000): total 11,118 (cap ~20k).
+  Self-score (sc-asset-review rubric, 1 improvement round after the first look): silhouette 4, proportion 4, form 3.5, surface 3.5, colour 3.5,
+  wear 3.5, set fit 3.5, glass/metal (iron, rope) 3.5 = 29/40.
+  Next visible gains: more and deeper moss on the boulders (the reference is far greener), crisper fractured facets on the stream boulders, reed
+  blades with a visible mid-rib normal and more blades per clump at the edge, a mossy/slimed lower deck edge, ladder rungs that read at the waterline.
 """
 import sys, os, math, zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -100,9 +107,11 @@ def rock_src(name, tint, band, moss, seed, wetfrac=None, algae=0.8):
     tc = b.N.new('ShaderNodeTexCoord'); mp = b.N.new('ShaderNodeMapping')
     mp.inputs['Scale'].default_value = (0.7, 0.7, 0.7); mp.inputs['Location'].default_value = (seed * 1.7, seed * 0.9, seed * 2.3)
     b.L.new(tc.outputs['Object'], mp.inputs[0])
-    alb = b.img(tex_base('B1_town/sandstone') + '_albedo.png', False, mp.outputs[0], box=True)
-    orm = b.img(tex_base('B1_town/sandstone') + '_orm.png', True, mp.outputs[0], box=True)
-    base = b.mixc(alb.outputs[0], tint, 1.0, 'MULTIPLY')
+    n0 = b.noise(tc.outputs['Object'], 2.4 + 0.15 * seed, 5.0)
+    base = b.mixc((0.135, 0.115, 0.092, 1), (0.27, 0.23, 0.18, 1), b.rng(n0, 0.38, 0.62, 0.0, 1.0))
+    base = b.mixc(base, tint, 1.0, 'MULTIPLY')
+    grain = b.noise(tc.outputs['Object'], 38.0, 8.0, 0.65)
+    base = b.mixc(base, (0.75, 0.74, 0.72, 1), b.rng(grain, 0.35, 0.65, 0.0, 1.0), 'MULTIPLY')
     big = b.noise(tc.outputs['Object'], 1.3 + 0.1 * seed, 4.0)
     patch = b.rng(big, 0.35, 0.65, 0.0, 1.0)
     base = b.mixc(base, (0.62, 0.62, 0.60, 1), patch, 'MULTIPLY')          # darker mottled patches (value variation)
@@ -115,25 +124,24 @@ def rock_src(name, tint, band, moss, seed, wetfrac=None, algae=0.8):
     wetc = b.mixc(base, (0.30, 0.33, 0.26, 1), 0.85, 'MULTIPLY')
     c = b.mixc(base, wetc, d)
     a = b.math('MULTIPLY', b.math('MULTIPLY', d, b.math('SUBTRACT', 1.0, d)), 4.0)
-    an = b.rng(b.noise(tc.outputs['Object'], 14.0, 4.0), 0.38, 0.6, 0.35, 1.0)
-    algc = b.mixc((0.09, 0.14, 0.035, 1), (0.20, 0.25, 0.07, 1), b.noise(tc.outputs['Object'], 25.0, 3.0))
+    an = b.rng(b.noise(tc.outputs['Object'], 14.0, 4.0), 0.30, 0.52, 0.5, 1.0)
+    algc = b.mixc((0.02, 0.04, 0.01, 1), (0.05, 0.075, 0.02, 1), b.noise(tc.outputs['Object'], 25.0, 3.0))
     c = b.mixc(c, algc, b.math('MULTIPLY', b.math('MULTIPLY', a, an, True), algae, True))
     geo = b.N.new('ShaderNodeNewGeometry')
     nzs = b.sep(geo.outputs['Normal'])[2]
-    up = b.rng(nzs, 0.42, 0.78, 0.0, 1.0)
-    mn = b.rng(b.noise(tc.outputs['Object'], 5.5 + 0.2 * seed, 8.0, 0.6), 0.40, 0.56, 0.0, 1.0)
+    up = b.rng(nzs, 0.15, 0.62, 0.0, 1.0)
+    mn = b.rng(b.noise(tc.outputs['Object'], 5.5 + 0.2 * seed, 8.0, 0.6), 0.30, 0.46, 0.0, 1.0)
     mm = b.math('MULTIPLY', b.math('MULTIPLY', up, mn), moss * (1.0), True)
     mm = b.math('MULTIPLY', mm, b.math('SUBTRACT', 1.0, d), True)
-    mosscol = b.mixc((0.07, 0.13, 0.025, 1), (0.22, 0.30, 0.05, 1), b.noise(tc.outputs['Object'], 18.0, 3.0))
-    c = b.mixc(c, mosscol, b.rng(mm, 0.12, 0.45, 0.0, 1.0))
-    msk = b.rng(mm, 0.12, 0.45, 0.0, 1.0)
-    so = b.N.new('ShaderNodeSeparateColor'); b.L.new(orm.outputs[0], so.inputs[0])
-    r = b.mixf(b.math('MULTIPLY', so.outputs[1], 1.0, True), 0.30, b.math('MULTIPLY', d, 0.85))
+    mosscol = b.mixc((0.025, 0.04, 0.006, 1), (0.065, 0.085, 0.011, 1), b.noise(tc.outputs['Object'], 18.0, 3.0))
+    c = b.mixc(c, mosscol, b.rng(mm, 0.08, 0.35, 0.0, 1.0))
+    msk = b.rng(mm, 0.08, 0.35, 0.0, 1.0)
+    r0 = b.math('ADD', 0.72, b.math('MULTIPLY', b.math('SUBTRACT', grain, 0.5), 0.5))
+    r = b.mixf(r0, 0.30, b.math('MULTIPLY', d, 0.85))
     r = b.mixf(r, 0.93, msk)
-    bw = b.N.new('ShaderNodeRGBToBW'); b.L.new(alb.outputs[0], bw.inputs[0])
-    h = b.math('ADD', bw.outputs[0], b.math('MULTIPLY', b.noise(tc.outputs['Object'], 40.0, 3.0), 0.8))
+    h = b.math('ADD', b.math('MULTIPLY', grain, 1.2), b.math('MULTIPLY', b.noise(tc.outputs['Object'], 6.0, 6.0), 1.4))
     h = b.math('ADD', h, b.math('MULTIPLY', msk, 0.9))
-    bump = b.N.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 0.55; bump.inputs['Distance'].default_value = 0.012
+    bump = b.N.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 1.0; bump.inputs['Distance'].default_value = 0.02
     b.L.new(h, bump.inputs['Height']); b.L.new(bump.outputs[0], bsdf.inputs['Normal'])
     b.L.new(c, bsdf.inputs['Base Color']); b.L.new(r, bsdf.inputs['Roughness'])
     name_nodes(m, c, r, b.math('MULTIPLY', 0.0, 0.0))
@@ -182,10 +190,10 @@ JSRC = {}
 def jsrc(key):
     if key in JSRC: return JSRC[key]
     mk = {
-        'oak': lambda: uv_tile_src('LS_src_oak', 'B1_town/oak_timber', (0.60, 0.59, 0.58, 1), 1.3),
-        'oak_lt': lambda: uv_tile_src('LS_src_oak_lt', 'B1_town/oak_timber', (0.74, 0.68, 0.60, 1), 1.3),
-        'oak_dk': lambda: uv_tile_src('LS_src_oak_dk', 'B1_town/oak_timber', (0.44, 0.42, 0.40, 1), 1.3),
-        'iron': lambda: uv_tile_src('LS_src_iron', 'B1_town/iron', (0.85, 0.82, 0.80, 1), 1.0, varattr=False, metal=True),
+        'oak': lambda: uv_tile_src('LS_src_oak', 'B1_town/oak_timber', (2.6, 3.7, 5.2, 1), 1.3),
+        'oak_lt': lambda: uv_tile_src('LS_src_oak_lt', 'B1_town/oak_timber', (3.4, 4.6, 6.0, 1), 1.3),
+        'oak_dk': lambda: uv_tile_src('LS_src_oak_dk', 'B1_town/oak_timber', (1.9, 2.6, 3.6, 1), 1.3),
+        'iron': lambda: uv_tile_src('LS_src_iron', 'B1_town/iron', (0.6, 0.6, 0.65, 1), 1.0, varattr=False, metal=True),
         'rope': rope_src,
         'pile': lambda: uv_tile_src('LS_src_pile', 'B1_town/oak_timber', (1, 1, 1, 1), 1.0, varattr=False),
     }
@@ -339,17 +347,17 @@ def smart_uv(ob, margin=0.012, layer='UVMap', faces=None):
     bm = bmesh.from_edit_mesh(ob.data)
     for f in bm.faces: f.select = (faces is None) or (f.index in faces)
     bmesh.update_edit_mesh(ob.data)
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=margin, area_weight=0.6, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(80), island_margin=margin, area_weight=0.6, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
 
 # ----------------------------------------------------------------------------- rocks
 ROCKS = {   # name: (w, d, h, tris, flat_top, tint, band m, moss, wet-lower-half?)
-    'Rock_Shore_A': ((1.20, 0.95, 0.72), 640, False, (0.95, 0.92, 0.88, 1), 0.18, 0.9),
-    'Rock_Shore_B': ((0.82, 0.70, 0.50), 480, False, (0.88, 0.88, 0.86, 1), 0.17, 0.8),
-    'Rock_Shore_C': ((0.52, 0.44, 0.34), 330, False, (1.0, 0.95, 0.88, 1), 0.15, 0.7),
-    'Rock_Stream_A': ((1.80, 1.30, 0.95), 880, True, (0.82, 0.82, 0.80, 1), 0.46, 0.8),
-    'Rock_Stream_B': ((1.30, 1.10, 0.80), 720, True, (0.90, 0.88, 0.84, 1), 0.38, 0.75),
-    'Rock_Stream_C': ((0.95, 0.85, 0.64), 540, True, (0.86, 0.86, 0.84, 1), 0.30, 0.7),
+    'Rock_Shore_A': ((1.20, 0.95, 0.72), 640, False, (1.05, 0.97, 0.86, 1), 0.18, 1.0),
+    'Rock_Shore_B': ((0.82, 0.70, 0.50), 480, False, (1.0, 0.93, 0.84, 1), 0.17, 0.9),
+    'Rock_Shore_C': ((0.52, 0.44, 0.34), 330, False, (1.1, 1.0, 0.88, 1), 0.15, 0.8),
+    'Rock_Stream_A': ((1.80, 1.30, 0.95), 880, True, (0.98, 0.90, 0.80, 1), 0.46, 0.9),
+    'Rock_Stream_B': ((1.30, 1.10, 0.80), 720, True, (1.0, 0.92, 0.82, 1), 0.38, 0.85),
+    'Rock_Stream_C': ((0.95, 0.85, 0.64), 540, True, (1.05, 0.95, 0.83, 1), 0.30, 0.8),
 }
 ROCK_ORDER = list(ROCKS)
 
@@ -452,7 +460,7 @@ def reed_textures():
         u0, u1 = k * 64, (k + 1) * 64
         loc = np.linspace(-1, 1, 64)[None, :]                # across the blade
         cell = base[:, u0:u1].copy()
-        shade = [0.96, 1.05, 0.90, 1.0][k]; warm = [(1.0, 1.0, 1.0), (1.05, 1.0, 0.9), (0.92, 1.02, 0.95), (1.1, 1.0, 0.85)][k]
+        shade = [0.96, 1.05, 0.90, 1.0][k]; warm = [(1.0, 1.0, 1.0), (1.03, 1.0, 0.93), (0.93, 1.02, 0.96), (1.06, 1.0, 0.9)][k]
         cell *= np.array(warm)[None, None, :] * shade
         rib = np.exp(-(loc / 0.14) ** 2) * 0.10
         cell *= (1.0 + rib - (np.abs(loc) ** 3) * 0.16)[:, :, None]
@@ -492,11 +500,11 @@ def reed(name, nblades, heads, seed, hmin, hmax, spread, mat):
         th = R.uniform(0, 2 * math.pi); rr = spread * math.sqrt(R.random())
         base = Vector((math.cos(th) * rr, math.sin(th) * rr, -0.04))
         L = R.uniform(hmin, hmax) * (1.0 - 0.18 * (rr / spread))   # outer blades a little shorter
-        lean = math.radians(R.uniform(3, 9) + 20 * (rr / spread) ** 1.2)
-        bend = math.radians(R.uniform(8, 38))
+        lean = math.radians(R.uniform(2, 6) + 11 * (rr / spread) ** 1.2)
+        bend = math.radians(R.uniform(8, 30))
         bdir = th + R.uniform(-0.5, 0.5)
         d = Vector((math.cos(bdir), math.sin(bdir), 0)); side0 = Vector((-d.y, d.x, 0))
-        w0 = R.uniform(0.020, 0.032); twist = R.uniform(-0.7, 0.7); k = R.randrange(4)
+        w0 = R.uniform(0.026, 0.040); twist = R.uniform(-0.7, 0.7); k = R.randrange(4)
         pts = [base.copy()]; p = base.copy(); ang = lean
         for s in range(1, nseg + 1):
             t = s / nseg; ang = lean + bend * t ** 1.5
@@ -554,6 +562,7 @@ PILE_ZLO, PILE_ZHI = -3.0, 1.2
 
 def jetty_pieces():
     R = rng('jetty'); pc = FK.Piece('Jetty')
+    plank_n = [0]
     var = []                      # (face_start, face_end, value) for the per-board 'var' colour attribute
     def addbox(key, size, xf, **kw):
         n0 = len(pc.bm.faces); FK.add_box(pc, key, size, xf, **kw); n1 = len(pc.bm.faces)
@@ -572,7 +581,7 @@ def jetty_pieces():
         xf = Matrix.Translation((xo, yc, zc)) @ Matrix.Rotation(math.radians(yaw), 4, 'Z') @ Matrix.Rotation(math.radians(roll), 4, 'Y') @ Matrix.Rotation(math.radians(pitch), 4, 'X')
         n0, n1 = addbox('oak', (L, w, t), xf, cham=0.011, long_axis=0, wob=0.0035, seed=R.random() * 90)
         shade = R.uniform(0.82, 1.1) if i not in SAG else (0.74 if i in (19, 33) else 1.12)
-        var.append((n0, n1, shade))
+        var.append((n0, n1, shade)); plank_n[0] = len(var)
         for sx in (-0.55, 0.55):                              # nail heads at the two stringers
             ztop = zc + t / 2 + sx * math.sin(math.radians(roll)) * (1 if True else 0)
             nails.append((Vector((xo + sx, yc + R.uniform(-0.01, 0.01), ztop)), roll))
@@ -619,7 +628,6 @@ def jetty_pieces():
                 rb = r0 * 1.06 + 0.012
                 tube(pc, 'iron', [ctr - Vector((0, 0, 0.035)), ctr + Vector((0, 0, 0.035))], [rb, rb], 10,
                      lambda i, jf, kk: (jf * 2.0, i * 0.2), cap0=False, cap1=False)
-    n_all = len(pc.bm.faces)
     # ---- rope: coil on the deck by the +x mooring post and a wrapped line on the -x post with a hanging tail
     cc = Vector((0.40, -8.35, 0.0)); pts = []; rad = []
     for s in range(0, 3 * 12 + 1):
@@ -654,7 +662,7 @@ def jetty_pieces():
         n0 = len(pc.bm.faces)
         tube(pc, 'oak_lt', pr, [0.030, 0.030, 0.030], 6, lambda i, jf, kk: (jf, i * 0.3), cap0=True, cap1=True, up=(0, 0, 1))
         var.append((n0, len(pc.bm.faces), 1.0))
-    return pc, var
+    return pc, var, plank_n[0]
 
 def pile_textures():
     """Piles: oak_timber stacked along height, weathered silver-grey above the splash zone, damp dark brown below -0.35, an algae band
@@ -671,7 +679,7 @@ def pile_textures():
         big = np.concatenate(tiles, 0)                        # 4096 x 1024
         # grain along v: the tileable's grain runs along image x or y? use as is; downsample by 2 (box)
         return big.reshape(2048, 2, 512, 2, 3).mean((1, 3))
-    alb = stack(alb0); nrm = stack(nrm0); orm = stack(orm0)
+    alb = stack(np.clip(alb0, 0, 0.34)); nrm = stack(nrm0); orm = stack(orm0)
     nrm = nrm / np.maximum(np.linalg.norm(nrm * 2 - 1, axis=2, keepdims=True) * 0 + 1, 1)
     z = PILE_ZLO + (np.arange(H) + 0.5) / H * (PILE_ZHI - PILE_ZLO); Z = z[:, None]
     wob = (R.rand(1, W) * 0.5 + 0.5)
@@ -681,7 +689,7 @@ def pile_textures():
     wet = np.clip((-0.25 - wz) / 0.35, 0, 1)[..., None]       # 0 above -0.25, 1 below -0.6
     splash = np.clip((0.1 - wz) / 0.35, 0, 1)[..., None] * (1 - wet)
     alg = np.exp(-(((wz + 0.62) / 0.16) ** 2))[..., None] * (0.55 + 0.45 * R.rand(H, W)[..., None]) ** 2
-    tint = np.array([0.62, 0.61, 0.60])                       # weathered silver-grey oak
+    tint = np.array([1.57, 2.0, 2.6])                         # weathered silver-brown oak (the tileable is very dark)
     c = alb * tint * (1 - 0.35 * splash) * (1 - wet * 0.58) * np.array([1, 1.0, 0.95]) ** wet
     c = c * (1 - alg * 0.8) + alg * 0.8 * np.array([0.12, 0.17, 0.05])
     below = np.clip((-0.9 - wz) / 0.8, 0, 1)[..., None]; c *= (1 - 0.35 * below)
@@ -696,7 +704,7 @@ def pile_textures():
 
 def build_jetty():
     setup_bake()
-    pc, var = jetty_pieces()
+    pc, var, nplank = jetty_pieces()
     # classify faces: deck set (everything except 'pile') bakes; pile faces keep direct UVs
     pile_mat = jsrc('pile')
     ob = to_obj(pc, 'Jetty')
@@ -709,6 +717,14 @@ def build_jetty():
     for p in me.polygons:
         if p.material_index in pile_idx:
             for li in p.loop_indices: vattr.data[li].color = (1, 1, 1, 1)
+    # drop the plank undersides (never seen: the deck hides them, only gaps of 1-2 cm) so the deck bake spends its texels on what shows
+    drop = set()
+    for (a, b_, val) in var[:nplank]:
+        for pi in range(a, min(b_, len(me.polygons))):
+            if me.polygons[pi].normal.z < -0.8: drop.add(pi)
+    bmj = bmesh.new(); bmj.from_mesh(me); bmj.faces.ensure_lookup_table()
+    bmesh.ops.delete(bmj, geom=[bmj.faces[i] for i in sorted(drop)], context='FACES'); bmj.to_mesh(me); bmj.free(); me.update()
+    pile_idx = [i for i, m in enumerate(me.materials) if m == pile_mat]
     # unique bake UVs for the deck faces
     deck_faces = {p.index for p in me.polygons if p.material_index not in pile_idx}
     smart_uv(ob, 0.006, 'UVBake', deck_faces)
@@ -785,9 +801,102 @@ def report(objs):
             o.name, t, mx.x - mn.x, mx.z - mn.z, mx.y - mn.y, mn.x, mx.x, mn.z, mx.z, -mx.y, -mn.y, [m.name for m in o.data.materials]))
     print('LakeShore total %d tris' % total)
 
+
+# ----------------------------------------------------------------------------- review scene (not exported)
+def simple_tile(name, folder, tint, scale=2.0):
+    m, b, bsdf = new_mat(name)
+    uv = b.N.new('ShaderNodeUVMap'); uv.uv_map = 'UVMap'
+    mp = b.N.new('ShaderNodeMapping'); mp.inputs['Scale'].default_value = (2.0 / scale,) * 3; b.L.new(uv.outputs[0], mp.inputs[0])
+    alb = b.img(tex_base(folder) + '_albedo.png', False, mp.outputs[0]); nrm = b.img(tex_base(folder) + '_normal.png', True, mp.outputs[0])
+    b.L.new(b.mixc(alb.outputs[0], tint, 1.0, 'MULTIPLY'), bsdf.inputs['Base Color'])
+    nm = b.N.new('ShaderNodeNormalMap'); b.L.new(nrm.outputs[0], nm.inputs['Color']); b.L.new(nm.outputs[0], bsdf.inputs['Normal'])
+    bsdf.inputs['Roughness'].default_value = 0.85
+    return m
+
+def grid(name, x0, x1, y0, y1, nx, ny, zf, mat, uvs=0.5):
+    bm = bmesh.new(); vs = {}
+    for i in range(nx + 1):
+        for j in range(ny + 1):
+            x = x0 + (x1 - x0) * i / nx; y = y0 + (y1 - y0) * j / ny; vs[(i, j)] = bm.verts.new((x, y, zf(x, y)))
+    uvl = bm.loops.layers.uv.new('UVMap')
+    for i in range(nx):
+        for j in range(ny):
+            f = bm.faces.new([vs[(i, j)], vs[(i + 1, j)], vs[(i + 1, j + 1)], vs[(i, j + 1)]])
+            for l in f.loops: l[uvl].uv = (l.vert.co.x * uvs, l.vert.co.y * uvs)
+    bm.normal_update(); me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free(); me.materials.append(mat)
+    for p in me.polygons: p.use_smooth = True
+    ob = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(ob); return ob
+
+def water_mat():
+    m, b, bsdf = new_mat('RV_Water')
+    bsdf.inputs['Base Color'].default_value = (0.012, 0.05, 0.06, 1); bsdf.inputs['Roughness'].default_value = 0.05
+    return m
+
+def dup(ob, name, loc, rot=0.0, scale=1.0):
+    o = ob.copy(); o.name = name; bpy.context.scene.collection.objects.link(o)
+    o.hide_render = False; o.location = loc; o.rotation_euler = (0, 0, math.radians(rot)); o.scale = (scale,) * 3; return o
+
+def review_scene(objs):
+    sc = bpy.context.scene; byn = {o.name: o for o in objs}
+    soil = simple_tile('RV_Soil', 'B1_town/packed_soil', (0.9, 0.85, 0.8, 1), 2.0)
+    grass = simple_tile('RV_Grass', 'B1_town/meadow_grass', (1.0, 1.0, 1.0, 1), 2.0)
+    wm = water_mat()
+    def bank(x, y):
+        return 0.0 if y >= -0.2 else max(-1.6, 1.6 * (y + 0.2))
+    grid('RV_Bank', -30, 30, -30, 8, 60, 76, bank, soil)
+    g2 = grid('RV_Grass', -30, 30, 1.2, 12, 30, 12, lambda x, y: 0.02, grass); g2.location.z = 0.0
+    w = grid('RV_Water', -60, 60, -60, 0.4, 2, 2, lambda x, y: -0.6, wm)
+    fig = bpy.data.objects.new('Fig', bpy.data.meshes.new('Fig')); sc.collection.objects.link(fig)
+    bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=12, radius1=0.22, radius2=0.2, depth=1.75); bm.to_mesh(fig.data); bm.free()
+    fm = bpy.data.materials.new('Figure'); fm.use_nodes = True; fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.25, 0.18, 0.12, 1); fig.data.materials.append(fm)
+    fig.location = (0.35, -2.1, 0.875)
+    for n in ROCK_ORDER + ['Reed_A', 'Reed_B', 'Reed_C']: byn[n].hide_render = True
+    zw = -0.6 - 0.17      # shore stones: waterline reaches the top of the 18 cm band
+    shore = [dup(byn['Rock_Shore_A'], 'sA', (-3.2, -0.95, zw), 20), dup(byn['Rock_Shore_B'], 'sB', (-4.4, -0.7, zw - 0.05), 70), dup(byn['Rock_Shore_C'], 'sC', (-2.2, -1.3, zw), 140),
+             dup(byn['Rock_Shore_B'], 'sB2', (-6.0, -0.9, zw), 200), dup(byn['Rock_Shore_C'], 'sC2', (-5.2, -1.4, zw), 10), dup(byn['Rock_Shore_A'], 'sA2', (-7.6, -1.0, zw), 250)]
+    reeds = [dup(byn['Reed_A'], 'rA', (3.0, -1.0, -0.65), 30), dup(byn['Reed_C'], 'rC', (4.1, -0.7, -0.6), 100), dup(byn['Reed_B'], 'rB', (5.1, -1.1, -0.65), 200),
+             dup(byn['Reed_C'], 'rC2', (6.4, -0.8, -0.6), 10), dup(byn['Reed_A'], 'rA2', (7.5, -1.2, -0.65), 140), dup(byn['Reed_B'], 'rB2', (2.2, -1.5, -0.65), 300)]
+    # weir far away at y = 60, x = 0: three stream rocks plus echoes across a 10 m stream, water 0.30 up, lower 0.05 below
+    wy = 60.0
+    wsoil = grid('RV_StreamBed', -12, 12, wy - 14, wy + 14, 24, 28, lambda x, y: -0.35 + 0.10 * max(0, abs(x) - 5.2) ** 1.3, soil)
+    wsoil.location.z = 0.0
+    up = grid('RV_StreamUp', -5.2, 5.2, wy, wy + 14, 2, 2, lambda x, y: 0.30, wm); dn = grid('RV_StreamDn', -5.2, 5.2, wy - 14, wy, 2, 2, lambda x, y: 0.02, wm)
+    wsrc = ['Rock_Stream_A', 'Rock_Stream_B', 'Rock_Stream_C']
+    xs = [-4.4, -3.0, -1.8, -0.7, 0.5, 1.7, 2.8, 4.0, 5.0]
+    for k, x in enumerate(xs):
+        dup(byn[wsrc[k % 3]], 'w%d' % k, (x + 0.2 * math.sin(k), wy + 0.25 * math.cos(k * 2), -0.02), k * 47, 1.0 if k % 2 == 0 else 0.92)
+    # reed + rock closeup bed
+    cam = FK.review_lights(sc)
+    return cam, fig
+
+VIEWS_DEF = {
+    'jetty': (Vector((3.9, 3.8, 1.8)), Vector((0.0, -5.0, -0.5)), 50),
+    'jettyfar': (Vector((-4.2, -15.0, 1.1)), Vector((0.3, -8.0, 0.1)), 50),
+    'jettyside': (Vector((8.0, -6.0, 0.7)), Vector((0.0, -6.0, -0.8)), 46),
+    'shore': (Vector((-2.0, -7.5, 1.0)), Vector((-4.2, -0.8, -0.2)), 48),
+    'reeds': (Vector((4.8, -6.0, 0.9)), Vector((4.8, -1.0, 0.4)), 44),
+    'moor': (Vector((-2.6, -11.2, 1.5)), Vector((0.2, -8.3, 0.2)), 46),
+    'ladder': (Vector((4.2, -9.8, 0.9)), Vector((1.0, -7.7, -0.4)), 40),
+    'weir': (Vector((1.0, 52.0, 1.5)), Vector((0.0, 60.0, 0.2)), 52),
+    'weirhi': (Vector((9.0, 63.0, 3.0)), Vector((0.0, 60.0, 0.1)), 50),
+}
+
+def render_views(cam, fig):
+    sc = bpy.context.scene
+    for v in VIEWS:
+        frm, to, fov = VIEWS_DEF[v]
+        fig.hide_render = not v.startswith('jetty')
+        FK.look(cam, frm, to); cam.data.angle = math.radians(fov)
+        sc.render.filepath = os.path.join(OUT, 'ls_%s.png' % v)
+        bpy.ops.render.render(write_still=True); print('rendered', v)
+
 if __name__ == '__main__':
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    objs = build()
+    if '--from-blend' in argv:     # review-only rerun: reuse a saved --blend (skips the bakes)
+        bpy.ops.wm.open_mainfile(filepath=FK.arg('--from-blend'))
+        objs = [o for o in bpy.data.objects if o.name.startswith(('Rock_', 'Reed_', 'Jetty'))]
+    else:
+        objs = build()
     report(objs)
     if '--export' in argv:
         bpy.ops.object.select_all(action='DESELECT')
@@ -797,3 +906,6 @@ if __name__ == '__main__':
                                  mesh_smooth_type='FACE', add_leaf_bones=False, path_mode='STRIP')
     if '--blend' in argv:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'lakeshore.blend'))
+    if '--no-render' not in argv:
+        cam, fig = review_scene(objs)
+        render_views(cam, fig)
