@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Q13. The Undercroft stair: heroes' home to the Cellars
-Progress: 30%
+Progress: 35%
 Sheet: none yet
-Blocker: none
+Blocker: paused by coordinator for usage
 
 Score: -
 Tris: -
@@ -16,3 +16,4 @@ Merge commit: -
 - Resumed by the coordinator; generator + builder agents starting.
 - Checked before building (user rule): Blender's bundled stair generators (Archimesh stairs, Extra Objects) don't produce our CV_* slots + wear attribute or the B5 joins, so the stair pieces extend the in-repo B5 generator (same helpers as StairEntry) and the scene reuses DungeonCornerBuilder (room factored into BuildRoom) rather than new tools.
 - Builder + capture committed (722ecd5): UndercroftStairBuilder (greybox stair until CellarStair.fbx lands), UndercroftStairCapture, wired into RunAll after DungeonCorner. Not compiled yet: the cloud Unity download had died during the pause (571 MB .part); restarted with resume. Blender stair pieces in progress (Sonnet agent).
+- Paused by the coordinator (usage). WIP committed: the stair pieces in sc_cellar_vault.py (p_stair_flight/turn/door, --stair) are partly written (agent stopped while adding the wear rules; not yet rendered or exported; Python syntax OK). Unity download left running (no token use). Next on resume: finish the wear hook, --stair --room review renders, export CellarStair.fbx, compile, captures, score, check, merge.
