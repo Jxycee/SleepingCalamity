@@ -1,8 +1,13 @@
 State: WORKING
 Session: Local next: M5 floor 4 set-piece + banking (+ stir meter)
-Progress: 5% (plan; floor 4 starting)
+Progress: 10% (floor 4 implementer running; banking + stir queued)
+Status: item 1 of 3 in progress
+Archive: not ready
+Branch: claude/m5-next-639689 (floor 4 on a subagent worktree branch, merges back here)
+Last check: none yet
+Next step: review floor 4, one check, merge to main; then banking
 Sheet: none yet
-Needs: coordinator - design choices Q1-Q5 below (floor 4 proceeds meanwhile)
+Needs: none
 Blocker: none
 
 ## Plan (each item merges on its own green check)
@@ -16,6 +21,9 @@ Blocker: none
 - Q3 Stir effects scope in M5: [meter + threshold events + the 90 s timer that fails the dive; "+1 enemy per room" exposed as a count the spawner reads; the rat-king hunter is an event + placeholder spawn marker only, real enemy later].
 - Q4 Banking input: [any player interacts at the Bank feature; client asks via RPC, host banks; no auto-bank on walk-in].
 - Q5 Dive flow (seed pick, floor transitions, return-from-checkpoint, failure): [M5 adds only a minimal host `DiveState` (current floor, checkpoint reached, cleared floors) that banking/stir need; the full flow and town banking UI are M6].
+
+## Coordinator answers (session 6, 2026-10-31)
+All Q1-Q5 proposals OK. Stir values/thresholds are P21 placeholders kept in one data/config spot; only pieces add the +5 term (chest loot rides in the haul, no stir); host owns meter and haul; bank RPC + DiveState get a risk-reviewer pass.
 
 ## Results
 (none yet)
