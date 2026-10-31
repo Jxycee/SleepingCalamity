@@ -122,7 +122,7 @@ def flag_solid(name, ra, rb, a0, a1, z_off=0.0, tilt=(0.0, 0.0)):
     return K._obj_from_bm(name, bm)
 
 def ring_bed():
-    """Dirt bed under the flags so the joints read dark (render only: in Unity the PlazaBed and the basin cover it)."""
+    """Dirt bed under the flags so the joints read dark; --export writes it as RingBed.fbx (PlazaBed stops at r 2.8)."""
     bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); cl = bm.loops.layers.color.new('damp'); n = 192; rs = []
     for ri, rr in enumerate((R0 - 0.02, R1, R2 + 0.06)):
         rs.append([bm.verts.new((rr * math.cos(2 * math.pi * k / n), rr * math.sin(2 * math.pi * k / n), P.dish(rr) - 0.03)) for k in range(n)])
@@ -200,6 +200,12 @@ if __name__ == '__main__':
             low.select_set(True)
             bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'FlagRing.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
                                      apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE')
+            bed = bpy.data.objects.get('RingBed')       # PlazaBed stops at r 2.8: the ring's joints need this bed under them
+            if bed:
+                low.select_set(False); bed.select_set(True)
+                bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'RingBed.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
+                                         apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE',
+                                         colors_type='LINEAR')
     if '--no-render' not in argv:
         P.standins()
         P.render_cams(sc, OUT, f'FlagRing_{STAGE}', arg('--views', 'wide,mid,close').split(','), int(arg('--rres', '960')), int(arg('--samples', '48')), arg('--mood', 'midday'))

@@ -14,3 +14,4 @@ packed with `python Art/Blender/tools/sc_pack_unity.py --to-orm <scratch>/tex <P
 ## FlagRing (`FlagRing/`)
 - Run: `blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_flag_ring.py -- --out <scratch> --stage bake --res 4096 --export` (4K per the generator header: the ring's 17 m2 at 1024 px/m).
 - `FlagRing.fbx`: one mesh, 11,972 tris, pivot at the fountain centre, ring r 1.7-2.9 m; `FlagRing_BaseColor/_Normal/_ORM.png` 4096 px.
+- `RingBed.fbx`: the dirt bed under the flags (768 tris, r 1.68-2.96 m, 8 cm down), so the ring's 2 cm joints read dark: PlazaBed stops at r 2.8. It uses the same M_CobbleBed tileable as PlazaBed (`../Cobbles/CobbleBed_*`) and the linear `damp` attribute.
