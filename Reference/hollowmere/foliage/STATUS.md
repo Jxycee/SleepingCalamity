@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Wave 2: Ground tileables + foliage extension
-Progress: 85%
+Progress: 80%
 Sheet: Reference/hollowmere/foliage/foliage_sheet_r2.jpg
 Blocker: none
 
@@ -24,3 +24,4 @@ Merge: -
 - 2026-10-31: RESUMED. Round 1 approved by the coordinator (26/40). Main merged (townhouse). Applying only the round 2 own fixes, then build, captures in both presets, check, merge.
 - 2026-10-31: PAUSED again for usage. The final capture run (cap3, round 2 code) was already running in Unity and is left to finish on its own (it costs no tokens, and it was not killed); its PNGs land in this session's scratchpad. On resume: read cap3, make sheet r2, run unity.sh check, merge.
 - 2026-10-31: round 2 captures done (both presets, all cameras); sheet r2 pushed. The tuft line on the square in HomeDoor is the approved corner's own CrackWeeds row (unchanged), not this pass. unity.sh check finishing.
+- 2026-10-31: coordinator review of sheet r1: 24/40, one more round (this supersedes the earlier "round 1 approved"). Round 3 running (Sonnet): (1) a large-scale lawn colour variation (dry yellow-green and worn patches at 40-70 m), a coarser soil normal, the grass desaturated a touch; (2) grass clustered harder, with taller seed-head grass (Grass_C scaled up) and clover rosettes (Weed_D), since B9 has no seed-head or clover cards; (3) a far hedgerow/tree-line ring at 120-145 m built from scaled B9 leaf-mass cards (no tree models exist), so the low cameras get a framed horizon. Then captures, check, merge.
