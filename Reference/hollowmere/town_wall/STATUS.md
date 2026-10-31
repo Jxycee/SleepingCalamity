@@ -8,6 +8,7 @@ Sheet: Reference/hollowmere/town_wall/wall_town_sheet.jpg (Blender: wall_sheet.j
 SC RESULT: SC RESULT check PASS on 89e641b (test-edit 680/680, test-play 32 passed / 8 skipped / 0 failed; origin/main merged before the check); merge Assets equal the checked tip
 Merge commit: ca383a8
 Blocker: none
+Archive: ready
 
 Result:
 - Art: Art/Blender/town/sc_town_wall.py, 8 wall pieces + LowerGate / EastGate (Shell, Frame incl. piers, Part_Door) in Content/Art/Town/Wall/ (SOURCES.md there).
