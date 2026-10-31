@@ -62,6 +62,9 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_SquareSouth", new Vector3(-6.0f, 1.65f, -17.0f), new Vector3(4f, 1.2f, -6f), 55f),   // benches, planters, the Market Street mouth and the bunting
             ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
             ("Cap_HM_Clutter", new Vector3(45.3f, 1.65f, -33f), new Vector3(51f, -1.0f, -18f), 58f),      // Q14: up the east Ring Lane at R2_19's crates, sacks and workshop sign, and the washing line to R2_20
+            ("Cap_HM_LakeJetty", new Vector3(-13.5f, 1.9f, -76.5f), new Vector3(-16f, -12.2f, -100f), 55f),   // Q10: from the north bank beside the jetty (root ~(-22,-82), deck heading SE), looking over it and the lake to the far shore
+            ("Cap_HM_Ravine", new Vector3(107.8f, 1.7f, -21.4f), new Vector3(91f, -11.5f, -43f), 55f),    // from the ravine's bank at s ~22 downstream along the pools and weirs W1, W2
+            ("Cap_HM_MillLane", new Vector3(60.5f, 1.65f, -51.5f), new Vector3(72f, -5f, -64f), 65f),         // on Mill Lane toward the mill and the stream
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -192,25 +195,15 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- ground, water, walls, keep
         static void BuildGround(Transform set, TownLayout t)
         {
-            HollowmereFoliage.TerrainGrass(HollowmereTerrain.Build(set, t), t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
+            Terrain terrain = HollowmereTerrain.Build(set, t);
+            HollowmereFoliage.TerrainGrass(terrain, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
             // The square keeps the approved corner's surround paving (B6 FarCobble with its macro breakup) as a slab over the terrain, so the corner reads as approved.
             Material far = BeautyCornerArt.SurroundGround();
             var sq = LookTestBuilder.Box(set, "SquarePaving", new Vector3((HollowmereLayout.SquareMinX + HollowmereLayout.SquareMaxX) * 0.5f, -0.17f, (HollowmereLayout.SquareMinZ + HollowmereLayout.SquareMaxZ) * 0.5f),
                 new Vector3(HollowmereLayout.SquareMaxX - HollowmereLayout.SquareMinX, 0.3f, HollowmereLayout.SquareMaxZ - HollowmereLayout.SquareMinZ),
                 far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? BeautyCornerArt.FarTileMetres : 3f);
 
-            var water = LookTestBuilder.Box(set, "Lake", new Vector3(HollowmereLayout.LakeCentre.X, HollowmereLayout.WaterY - 0.05f, HollowmereLayout.LakeCentre.Z),
-                new Vector3(HollowmereLayout.LakeRadiusX * 2.3f, 0.1f, HollowmereLayout.LakeRadiusZ * 2.3f), M("water"), default, 4f);
-            water.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            Transform stream = Child(set, "Stream");
-            TownPoint[] s = HollowmereLayout.Stream;
-            for (int i = 1; i < s.Length; i++)
-            {
-                TownPoint a = s[i - 1], b = s[i], mid = (a + b) * 0.5f;
-                float len = TownPoint.Distance(a, b) + 1f, yaw = Mathf.Atan2(b.X - a.X, b.Z - a.Z) * Mathf.Rad2Deg;
-                float y = Mathf.Min(HollowmereLayout.Ground(t, a.X, a.Z), HollowmereLayout.Ground(t, b.X, b.Z)) + 0.04f;
-                LookTestBuilder.Box(stream, "Stream" + i, new Vector3(mid.X, y, mid.Z), new Vector3(3.5f, 0.1f, len), M("water"), new Vector3(0f, yaw, 0f), 4f);
-            }
+            HollowmereWater.Build(set, t, terrain);   // lake + stepped stream pools + weir falls (SC_Water; HollowmereWater.cs)
         }
 
         static void BuildWalls(Transform set, TownLayout t, Transform ruined, Transform rebuilt)

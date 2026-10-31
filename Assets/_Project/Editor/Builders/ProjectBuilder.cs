@@ -43,6 +43,7 @@ namespace SleepingCalamity.EditorTools
             Step(errors, "BeautyCorner", BeautyCornerBuilder.Build);
             Step(errors, "Hollowmere", HollowmereBuilder.Build);   // after BeautyCorner: reuses its look assets and rows; throws on an invalid town layout
             Step(errors, "DungeonCorner", DungeonCornerBuilder.Build);   // after LookTest: shares its B2 materials, rendering stack and volume helpers
+            Step(errors, "UndercroftStair", UndercroftStairBuilder.Build);   // after DungeonCorner: builds the same room plus the stair down to it
             Step(errors, "BuildSettings", SceneBuilder.ApplyBuildSettings);
             Step(errors, "Save", AssetDatabase.SaveAssets);
             Step(errors, "Validate", () => errors.AddRange(ValidationRunner.Run()));   // after Save: the validators read what is on disk
