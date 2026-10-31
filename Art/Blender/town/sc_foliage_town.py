@@ -18,9 +18,9 @@ ground centre. Each exports to its own folder Assets/_Project/Content/Art/Town/B
                     toward -Y, the dense corner side at local -x. Hugs the ground storey, wraps the jetty beam and climbs the upper
                     storey jettied 0.45 m (--jetty, default 3.0 m like the builder's placeholder, until B4 lands); a hanging fringe
                     drops from the jetty edge and a few tendrils escape at the top and the open side.
-  SC_B9_IvyLintel   (Lintel_Ivy, not Ivy_*: it must not win the builder's Ivy row) a 1.0 x 0.55 m accent over a lintel or
-                    corner, strands draping down over its face; pivot = the lintel top centre.
-  SC_B9_GrassStrip  (Grass_Strip) 1.5 m of low crossed blades lapping over a wall base toward -Y; pivot = ground centre on the wall.
+  SC_B9_IvyLintel   (Lintel_Ivy, not Ivy_*: it must not win the builder's Ivy row) a 2.0 x 1.1 m accent over a lintel or
+                    corner, light green (no dark layer), strands draping 0.35-1.0 m down over its face; pivot = the lintel top centre.
+  SC_B9_GrassStrip  (Grass_Strip) 1.5 m of dense 25-35 cm crossed blades lapping over a wall base toward -Y; pivot = ground centre on the wall.
   SC_B9_IvyPatchA/B (Ivy_Patch_A/B) 1.0 x 1.4 m and 0.7 x 0.6 m flat-wall patches, bottom centre on the wall.
   SC_B9_CrackWeed_A..E  (Weed_A..E) narrow runs along local x for cobble joints and the wall foot (weeds grow in joints).
   SC_B9_MossTuft_A..C   (Moss_Tuft_A..C) low cushions with a fringe skirt.   SC_B9_GrassClump_A..C (Grass_A..C) ribbon blades.
@@ -43,7 +43,9 @@ outer #6f8a34, young #9aa83c tips only), roughness about 0.62, half-strength nor
 gaps; weeds are 1.6x with 12-20 blades each and five distinct sizes; Moss_Band_A covers the visible south-west foot. Earlier rounds:
 22, 27, 28.5. Round 5 (in-engine round 4 notes) 32/40: ivy lifted ~15% toward yellow-green (#7c9a38 / #5a6c2a) with lobe
 normals tipped to the sky for the jetty shade; weed blades are crossed pairs (no edge-on slivers), clumps capped at 12-25 cm
-and dense at the base. Tris: ivy wall 6.0k (facade dressing, inside the building budget), patches 354 / 208, weeds 360-400, tufts 132,
+and dense at the base. Round 6 (in-engine batch 3): the facade ivy climbs
+(cards flat to the wall, tapering and thinning toward the top, tendrils climbing on, a smaller root clump), Lintel_Ivy 2x with no
+dark layer and 0.35-1.0 m strands, Grass_Strip 25-35 cm and dense. Tris: ivy wall 6.0k (facade dressing, inside the building budget), patches 354 / 208, weeds 360-400, tufts 132,
 grass 128-224, bands 72 / 104, rim moss 168. Parked: a foliage wind shader reading 'Col'.
 """
 import sys, os, math, random
@@ -399,8 +401,10 @@ class Wall:
             return Vector((x, -(w - self.jb), self.jb - off)), Vector((0, 0, -1)), Vector((0, -1, 0))
         return Vector((x, -self.out - off, w - self.out)), Vector((0, -1, 0)), Vector((0, 0, 1))
 
-def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, card_scale=1.0, root=True, drape=0):
-    """Runners random-walk up the wall and branch; leaf cards follow the runners where a lobed density field allows."""
+def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, card_scale=1.0, root=True, drape=0, climb=False, dark=True):
+    """Runners random-walk up the wall and branch; leaf cards follow the runners where a lobed density field allows.
+    climb=True (in-engine batch 3: the facade ivy read as a bush): cards lie flatter on the wall, the mass tapers and thins toward
+    the top where tendrils climb on, the root clump is smaller. dark=False drops the shaded inner layer (small accents read black)."""
     rr = random.Random(seed); mb = MB()
     top = wall.out + height if not wall.flat else height
     lobes = [(rr.uniform(0.1, width - 0.1), rr.uniform(0.2, top - 0.3), rr.uniform(0.35, 0.65) * min(1.0, width / 1.6 + 0.3)) for _ in range(max(4, int(width * top * 1.1)))]
@@ -412,6 +416,12 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
         d += 0.5 * math.exp(-w / 0.9) + 0.35 * math.exp(-x / 0.35)        # dense at the foot and in the corner
         for hx, hw_, hr in holes: d -= 1.2 * math.exp(-((x - hx) ** 2 + (w - hw_) ** 2) / (hr * hr))   # a few gaps of bare wall
         return max(0.0, min(1.0, d))
+    def reach(w):                                            # climbing ivy narrows as it rises (the corner side stays put)
+        return width * (1.0 - 0.45 * (w / top) ** 1.8) if climb else width
+    if climb:
+        dens0 = density
+        def density(x, w):
+            return min(1.0, dens0(x, w) * 1.25 * (1.0 - 0.4 * (w / top) ** 2.5))
     runners = []
     heads = [(rr.uniform(0.05, width * 0.8) if i else 0.08, 0.0, math.radians(rr.uniform(-12, 12)), 0) for i in range(n_roots)]
     while heads:
@@ -420,10 +430,10 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
         for _ in range(400):
             ang += math.radians(rr.gauss(0, 9)) - ang * 0.04
             if x < 0.05: ang -= 0.08
-            if x > width - 0.05: ang += 0.08
+            if x > reach(w) - 0.05: ang += 0.08
             x += math.sin(ang) * step * (-1); w += math.cos(ang) * step
             path.append((x, w))
-            if w > topline(min(max(x, 0), width)) or x < -0.02 or x > width + 0.05: break
+            if w > topline(min(max(x, 0), width)) or x < -0.02 or x > reach(w) + 0.05: break
             if order < 3 and rr.random() < 0.055 / (1 + order) and len(heads) < 60:
                 heads.append((x, w, ang + math.radians(rr.choice([-1, 1]) * rr.uniform(30, 60)), order + 1))
         if len(path) > 2: runners.append((path, order))
@@ -447,10 +457,12 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
         p, nn, upv = wall.at(jx, max(jw, 0.0), off=off)
         lx, lw, lr = min(lobes, key=lambda l: ((jx - l[0]) ** 2 + (jw - l[1]) ** 2) / (l[2] * l[2]))
         bulge = (Vector((jx - lx, 0, 0)) + upv * (jw - lw)) / lr
-        tilt = math.radians(rr.uniform(5, 20) if inner else rr.uniform(12, 35)); yaw = math.radians(rr.uniform(-25, 25))
+        if climb: off *= 0.45                                           # flat against the wall: climbing, not mounding
+        tilt = math.radians((rr.uniform(3, 12) if inner else rr.uniform(6, 20)) if climb else (rr.uniform(5, 20) if inner else rr.uniform(12, 35)))
+        yaw = math.radians(rr.uniform(-25, 25))
         cn = Matrix.Rotation(yaw, 3, upv) @ (nn * math.cos(tilt) + upv * math.sin(tilt))
         cup = Matrix.Rotation(math.radians(rr.gauss(180, 55)), 3, cn) @ upv                 # leaf tips mostly droop
-        lobe_n = (nn + upv * 0.5 + bulge * 0.75).normalized()                              # one soft form per lobe, tipped to the sky
+        lobe_n = (nn + upv * 0.5 + bulge * (0.35 if climb else 0.75)).normalized()           # one soft form per lobe, tipped to the sky
         ao_c = 0.45 if inner else 0.6 + 0.4 * min(1.0, off / 0.16)
         card(mb, p, cn, cup, size, rect, lobe_n, ao_c=ao_c, ao_edge=min(1.0, ao_c + 0.2))
         cards += 1
@@ -462,9 +474,10 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             acc = 0.0
             dn = density(min(max(x, 0), width), w)
             if rr.random() > dn * 1.3 + 0.15: continue
-            if rr.random() < 0.7:
-                leaf(x + rr.gauss(0, 0.06), w + rr.gauss(0, 0.06), rr.uniform(0.01, 0.035), rr.uniform(0.44, 0.6) * card_scale, IVY_DARK_CELL, inner=True)
-            for rep in range(1 + int(dn > 0.55) + int(dn > 0.9)):
+            if rr.random() < (0.45 if climb else 0.7):                     # a flat climber needs less backing
+                leaf(x + rr.gauss(0, 0.06), w + rr.gauss(0, 0.06), rr.uniform(0.01, 0.035), rr.uniform(0.44, 0.6) * card_scale,
+                     IVY_DARK_CELL if dark else IVY_CELLS[rr.randrange(2)], inner=True)
+            for rep in range(1 + int(dn > (0.4 if climb else 0.55)) + int(dn > (0.75 if climb else 0.9))):
                 leaf(x + rr.gauss(0, 0.08), w + rr.gauss(0, 0.08), rr.uniform(0.04, 0.08) + 0.12 * dn * rr.random(),
                      rr.uniform(0.34, 0.5) * card_scale, IVY_CELLS[rr.randrange(2)])
         x, w = path[-1]                                                     # a young yellow leaf or two at each growing tip
@@ -473,10 +486,10 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             card(mb, p, (nn + upv * 0.4).normalized(), upv, rr.uniform(0.11, 0.16) * card_scale, IVY_YOUNG_CELL, (nn + upv * 0.5).normalized(), ao_c=0.95)
             cards += 1
     # root mass: the ivy rises out of a dense clump at the foot instead of a ragged floating edge, and sprawls a little onto the ground
-    for _ in range(int(width * 12) if root else 0):
+    for _ in range((int(width * 6) if climb else int(width * 12)) if root else 0):
         leaf(rr.uniform(0.0, width), rr.uniform(0.0, 1.0) ** 1.8 * 0.7, rr.uniform(0.02, 0.14), rr.uniform(0.38, 0.54) * card_scale,
-             IVY_DARK_CELL if rr.random() < 0.35 else IVY_CELLS[rr.randrange(2)], inner=False)
-    for _ in range(int(width * 6) if root else 0):
+             IVY_DARK_CELL if dark and rr.random() < 0.35 else IVY_CELLS[rr.randrange(2)], inner=False)
+    for _ in range((int(width * 2) if climb else int(width * 6)) if root else 0):
         x = rr.uniform(0.1, width - 0.05); p = Vector((x, -rr.uniform(0.06, 0.32) * card_scale, 0.03 + 0.03 * rr.random()))
         cn = Vector((rr.gauss(0, 0.2), -0.35, 1)).normalized()
         card(mb, p, cn, Vector((rr.gauss(0, 0.6), -1, 0)), rr.uniform(0.3, 0.42) * card_scale, IVY_CELLS[rr.randrange(2)], Vector((0, -0.3, 1)).normalized(), ao_c=0.6, ao_edge=0.9)
@@ -503,11 +516,11 @@ def grow_ivy(name, width, height, seed, wall, n_roots, fringe=True, tendrils=6, 
             strand(Vector((x, -wall.out + 0.03, wall.jb - 0.01)), (rr.gauss(0, 0.2), -0.15, -1), rr.uniform(0.25, 0.9), 0.85, single=rr.random() < 0.5)
     for i in range(drape):                                                 # an accent drapes down over its lintel or rail
         x = width * (0.1 + 0.8 * (i + rr.random()) / drape)
-        strand(Vector((x, -0.04, 0.0)), (rr.gauss(0, 0.2), -0.25, -1), rr.uniform(0.18, 0.5), 0.95, single=rr.random() < 0.6)
+        strand(Vector((x, -0.04, 0.0)), (rr.gauss(0, 0.2), -0.25, -1), rr.uniform(0.35, 1.0), 0.95, single=rr.random() < 0.5)
     ends = sorted(runners, key=lambda r: -r[0][-1][1])[:tendrils]
     for path, order in ends:
         x, w = path[-1]; p, nn, upv = wall.at(x, w, off=0.02)
-        strand(p, (rr.gauss(0, 0.4), -0.6, 0.8), rr.uniform(0.3, 0.55), 1.0)
+        strand(p, (rr.gauss(0, 0.3), -0.2, 1.0) if climb else (rr.gauss(0, 0.4), -0.6, 0.8), rr.uniform(0.35, 0.7) if climb else rr.uniform(0.3, 0.55), 1.0)
     print(name, 'runners', len(runners), 'cards', cards, 'tris', mb.tris())
     return mb
 
@@ -574,7 +587,7 @@ def weed_clumps(mat):
     for o in list(weeds.values()) + list(nettles.values()): bpy.data.objects.remove(o)
     return out
 
-def blades(rr, n, hmin, hmax, run, across, segs=3, lean_dir=None):
+def blades(rr, n, hmin, hmax, run, across, segs=3, lean_dir=None, wide=1.0):
     """n tapered blades rooted along a joint run (length `run` on local x, `across` wide), leaning out of the joint. Each blade is two
     crossed ribbons (in-engine round 4 caught single ribbons edge-on as dark slivers): no view sees it edge-on."""
     mb = MB()
@@ -582,7 +595,7 @@ def blades(rr, n, hmin, hmax, run, across, segs=3, lean_dir=None):
         base = Vector((rr.uniform(-run / 2, run / 2), rr.gauss(0, across / 4), 0))
         a = rr.uniform(0, 2 * math.pi); outv = Vector((math.cos(a) * 0.5, math.sin(a), 0)).normalized()
         if lean_dir is not None: outv = (Vector(lean_dir) + Vector((rr.gauss(0, 0.6), rr.gauss(0, 0.25), 0))).normalized()   # lap over away from a wall
-        lean = rr.uniform(0.35, 0.9); hgt = hmin + (hmax - hmin) * rr.random() ** 1.6; wid = rr.uniform(0.014, 0.022) * (hgt / 0.2) ** 0.5
+        lean = rr.uniform(0.35, 0.9); hgt = hmin + (hmax - hmin) * rr.random() ** 1.6; wid = rr.uniform(0.014, 0.022) * (hgt / 0.2) ** 0.5 * wide
         side = outv.cross(Vector((0, 0, 1))).normalized(); rect = C_GRASS if rr.random() < 0.6 else C_GRASS2
         for wdir in (side, outv):                                          # the ribbon and its crossed twin
             prev = None
@@ -727,17 +740,17 @@ def build_models():
     groups = {}
     wall = Wall(JETTY)
     # ivy pivots: bottom centre of the mass, back on the wall plane (y 0), growing toward -Y; the dense corner side is local -x
-    for key, args, kw, w in (('SC_B9_IvyWall', ('IvyWall', 2.1, 5.0, 7, wall, 4), {}, 2.1),
+    for key, args, kw, w in (('SC_B9_IvyWall', ('IvyWall', 2.1, 5.5, 7, wall, 6), dict(climb=True, tendrils=10), 2.1),
                              ('SC_B9_IvyPatchA', ('IvyPatchA', 1.0, 1.4, 17, Wall(0, flat=True), 2), dict(fringe=False, tendrils=3, card_scale=0.85), 1.0),
                              ('SC_B9_IvyPatchB', ('IvyPatchB', 0.7, 0.6, 29, Wall(0, flat=True), 2), dict(fringe=False, tendrils=2, card_scale=0.75), 0.7)):
         groups[key] = L.build(key, grow_ivy(*args, **kw), [mat]); groups[key].data.transform(Matrix.Translation((-w / 2, 0, 0)))
     # accent ivy (TotK study: ivy as an accent over lintels and in corners, never a wall coat): pivot = the lintel top centre,
     # a 1.0 x 0.55 m cushion on the wall above it and strands draping 0.2-0.5 m down over its face
     key = 'SC_B9_IvyLintel'
-    groups[key] = L.build(key, grow_ivy('IvyLintel', 1.0, 0.55, 41, Wall(0, flat=True), 2, fringe=False, tendrils=2, card_scale=0.7, root=False, drape=7), [mat])
-    groups[key].data.transform(Matrix.Translation((-0.5, 0, 0)))
+    groups[key] = L.build(key, grow_ivy('IvyLintel', 2.0, 1.1, 41, Wall(0, flat=True), 3, fringe=False, tendrils=3, card_scale=1.0, root=False, drape=11, dark=False), [mat])
+    groups[key].data.transform(Matrix.Translation((-1.0, 0, 0)))
     # wall-base grass strip: low crossed blades along 1.5 m that lap over the wall foot toward the plaza (pivot = ground centre, wall on y 0)
-    gs = blades(random.Random(77), 36, 0.07, 0.2, 1.5, 0.06, segs=2, lean_dir=(0, -1, 0.0))
+    gs = blades(random.Random(77), 56, 0.25, 0.35, 1.5, 0.2, segs=2, lean_dir=(0, -1, 0.0), wide=1.5)
     for k in range(len(gs.p)): gs.p[k] = (gs.p[k][0], gs.p[k][1] - 0.04, gs.p[k][2])
     groups['SC_B9_GrassStrip'] = L.build('SC_B9_GrassStrip', gs, [mat])
     for ob in weed_clumps(mat): groups[ob.name] = ob
