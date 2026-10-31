@@ -67,12 +67,13 @@ namespace SleepingCalamity.Core.Combat
         public readonly bool Guardable;               // enemy attacks only: a guard or parry can answer it
         public readonly bool Fire;                    // spells: the hit carries the staff's element
         public readonly int SpellPips;                // pips it costs
+        public readonly EnemyTell Tell;               // enemy attacks: how the body stages the wind-up (EnemyTell); null for hero attacks
 
         public AttackData(string id, string name, AttackKind kind, int totalFrames, FrameWindow hitOn, float multiplier, HitShape shape, float range,
             float halfAngleDeg, FrameWindow comboOpen = default, FrameWindow finisherAllowed = default, int cancelFrom = -1, FrameWindow iFrames = default,
             FrameWindow superArmor = default, FrameWindow turn = default, float turnDegPerSec = 0f, FrameWindow lunge = default, float lungeMeters = 0f,
             float heightBand = 2f, float knockback = 0f, float revenge = 1f, int hitstopFrames = 4, float cameraKick = 0.3f, bool guardBreak = false,
-            bool guardable = true, bool fire = false, int spellPips = 0, HitOrigin origin = HitOrigin.Self)
+            bool guardable = true, bool fire = false, int spellPips = 0, HitOrigin origin = HitOrigin.Self, EnemyTell tell = null)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("an attack needs an id", nameof(id));
             Id = id;
@@ -103,6 +104,7 @@ namespace SleepingCalamity.Core.Combat
             Guardable = guardable;
             Fire = fire;
             SpellPips = spellPips;
+            Tell = tell;
         }
 
         public float TotalSeconds => TotalFrames / (float)FrameRate;

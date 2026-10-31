@@ -80,33 +80,65 @@ namespace SleepingCalamity.Core.Combat
         public static readonly string[] Heirlooms = { WeaponCatalog.Axe, WeaponCatalog.Staff, WeaponCatalog.DaggerShield, WeaponCatalog.BowSword };
 
         // ---- Enemy attacks (the same type; Kind.Enemy). The windows double as the telegraph: the hit-on frame is when the wind-up ends. ----
+        // Every real attack carries an EnemyTell: the body's own wind-up (pose, hold, glint on the attacking part, sound), so it reads with the ground
+        // footprint switched off (now an assist, off by default). Rules in EnemyAttackRules: the glint comes 12-24 frames before the hitbox, the enemy stops
+        // turning at the glint, small enemies wind up for at least 27 frames and the elite for 54 (research recommendation 4).
         static AttackData E(string id, string name, int total, int hitOnA, int hitOnB, float mult, HitShape shape, float range, float half,
             float knockback = 1f, bool guardBreak = false, bool guardable = true, FrameWindow lunge = default, float lunges = 0f,
-            FrameWindow superArmor = default, HitOrigin origin = HitOrigin.Self, FrameWindow turn = default, float turnSpeed = 0f) =>
+            FrameWindow superArmor = default, HitOrigin origin = HitOrigin.Self, FrameWindow turn = default, float turnSpeed = 0f, EnemyTell tell = null) =>
             new AttackData(id, name, AttackKind.Enemy, total, W(hitOnA, hitOnB), mult, shape, range, half, knockback: knockback, guardBreak: guardBreak, guardable: guardable,
-                lunge: lunge, lungeMeters: lunges, superArmor: superArmor, origin: origin, turn: turn, turnDegPerSec: turnSpeed, heightBand: 2.5f, revenge: 0f);
+                lunge: lunge, lungeMeters: lunges, superArmor: superArmor, origin: origin, turn: turn, turnDegPerSec: turnSpeed, heightBand: 2.5f, revenge: 0f, tell: tell);
 
-        public static readonly AttackData SlimeHop = E("slime_hop", "Hop", 60, 34, 40, 1.0f, HitShape.Circle, 1.1f, 180f, lunge: W(16, 34), lunges: 2.2f, turn: W(0, 14), turnSpeed: 360f);
-        public static readonly AttackData SlimeGlob = E("slime_glob", "Glob lob", 66, 46, 52, 0.8f, HitShape.Circle, 1.3f, 180f, origin: HitOrigin.GroundAtTarget);
-        public static readonly AttackData RatLunge = E("rat_lunge", "Lunge", 54, 28, 36, 1.1f, HitShape.Cone, 1.45f, 42f, lunge: W(16, 28), lunges: 3.4f, turn: W(0, 16), turnSpeed: 720f);
-        public static readonly AttackData RatSpin = E("rat_spin", "Tail spin", 56, 30, 40, 1.3f, HitShape.Circle, 1.45f, 180f, knockback: 2f);
-        public static readonly AttackData BroomSweep = E("broom_sweep", "Sweep", 70, 36, 44, 1.2f, HitShape.Cone, 2.4f, 80f, knockback: 3f, turn: W(0, 24), turnSpeed: 300f);
-        public static readonly AttackData BroomPoke = E("broom_poke", "Handle poke", 52, 28, 34, 1.0f, HitShape.Cone, 1.9f, 30f, lunge: W(16, 28), lunges: 1.2f, turn: W(0, 16), turnSpeed: 420f);
+        static EnemyTell T(TellPart part, int poseEnd, int commit, float lean = 0f, float crouch = 0f, float rise = 0f, float twist = 0f, float tremble = 0f,
+            string sfx = null, float pitch = 1f, string hold = null, bool charge = false) =>
+            new EnemyTell(part, poseEnd, commit, lean, crouch, rise, twist, tremble, sfx, pitch, hold, charge);
+
+        // Slime: squashes down into the jar and shivers, the lid flashes, then it springs.
+        public static readonly AttackData SlimeHop = E("slime_hop", "Hop", 60, 34, 40, 1.0f, HitShape.Circle, 1.1f, 180f, lunge: W(16, 34), lunges: 2.2f, turn: W(0, 14), turnSpeed: 360f,
+            tell: T(TellPart.Lid, 10, 16, crouch: 0.35f, tremble: 0.6f, sfx: CombatSfx.WindUp, pitch: 1.25f));
+        // Leans back with the glob swelling on its lid; the lid flashes as it throws (the glob flies from the glint to the strike frame).
+        public static readonly AttackData SlimeGlob = E("slime_glob", "Glob lob", 66, 46, 52, 0.8f, HitShape.Circle, 1.3f, 180f, origin: HitOrigin.GroundAtTarget,
+            tell: T(TellPart.Lid, 18, 26, lean: 16f, crouch: 0.2f, tremble: 0.4f, sfx: CombatSfx.WindUp, pitch: 1.1f));
+        // Rat-king: rears back on its haunches, crown glints, lunges. Recovery 18 -> 26 frames after the bite (research recommendation 6: the punish window).
+        public static readonly AttackData RatLunge = E("rat_lunge", "Lunge", 62, 28, 36, 1.1f, HitShape.Cone, 1.45f, 42f, lunge: W(16, 28), lunges: 3.4f, turn: W(0, 14), turnSpeed: 720f,
+            tell: T(TellPart.Head, 8, 14, lean: 22f, crouch: 0.2f, tremble: 0.8f, sfx: CombatSfx.WindUpScratch, pitch: 1.2f));
+        // Coils its body the other way, tail raised and glinting, then whips round. Recovery 16 -> 22 frames.
+        public static readonly AttackData RatSpin = E("rat_spin", "Tail spin", 62, 30, 40, 1.3f, HitShape.Circle, 1.45f, 180f, knockback: 2f,
+            tell: T(TellPart.Tail, 12, 16, crouch: 0.1f, twist: 75f, tremble: 0.4f, sfx: CombatSfx.WindUpScratch, pitch: 1.0f));
+        // Broom: twists its bristles back with a wooden creak, bristles flash, sweeps.
+        public static readonly AttackData BroomSweep = E("broom_sweep", "Sweep", 70, 36, 44, 1.2f, HitShape.Cone, 2.4f, 80f, knockback: 3f, turn: W(0, 20), turnSpeed: 300f,
+            tell: T(TellPart.Bristles, 14, 22, lean: 10f, twist: 60f, tremble: 0.3f, sfx: CombatSfx.WindUpWood, pitch: 1.0f));
+        // Draws its handle back, the handle glints, jabs forward.
+        public static readonly AttackData BroomPoke = E("broom_poke", "Handle poke", 52, 28, 34, 1.0f, HitShape.Cone, 1.9f, 30f, lunge: W(16, 28), lunges: 1.2f, turn: W(0, 14), turnSpeed: 420f,
+            tell: T(TellPart.Handle, 8, 14, lean: 20f, tremble: 0.3f, sfx: CombatSfx.WindUpWood, pitch: 1.25f));
+        // Dough Warden: big and slow, every tell at least 0.9 s.
         public static readonly AttackData WardenSlam = E("warden_slam", "Rolling-pin slam", 100, 56, 64, 1.5f, HitShape.Cone, 3.0f, 55f, knockback: 4f, guardBreak: true,
-            superArmor: W(0, 100), turn: W(0, 40), turnSpeed: 200f);
+            superArmor: W(0, 100), turn: W(0, 40), turnSpeed: 200f,
+            tell: T(TellPart.RollingPin, 28, 40, lean: 22f, rise: 0.25f, tremble: 0.5f, sfx: CombatSfx.WindUpHeavy, pitch: 0.9f));
         public static readonly AttackData WardenPound = E("warden_pound", "Oven-door pound", 116, 72, 80, 1.8f, HitShape.Circle, 3.0f, 180f, knockback: 5f, guardBreak: true,
-            superArmor: W(0, 116));
-        public static readonly AttackData WardenSweep = E("warden_sweep", "Flour sweep", 84, 40, 50, 1.1f, HitShape.Cone, 3.0f, 100f, knockback: 3f, superArmor: W(0, 84),
-            turn: W(0, 30), turnSpeed: 240f);
-        // The Warden's answer when its revenge gauge fills: a quick big circle that clears everyone off it.
-        public static readonly AttackData WardenBreakFree = E("warden_breakfree", "Break free", 72, 30, 38, 1.0f, HitShape.Circle, 3.0f, 180f, knockback: 6f, guardBreak: true,
-            superArmor: W(0, 72));
+            superArmor: W(0, 116),
+            tell: T(TellPart.Body, 40, 56, lean: 16f, crouch: 0.2f, rise: 0.35f, tremble: 0.6f, sfx: CombatSfx.WindUpHeavy, pitch: 0.8f));
+        // Wind-up 40 -> 54 frames (the elite floor; research recommendation 4).
+        public static readonly AttackData WardenSweep = E("warden_sweep", "Flour sweep", 98, 54, 64, 1.1f, HitShape.Cone, 3.0f, 100f, knockback: 3f, superArmor: W(0, 98),
+            turn: W(0, 36), turnSpeed: 240f,
+            tell: T(TellPart.RollingPin, 26, 38, lean: 8f, twist: 80f, tremble: 0.4f, sfx: CombatSfx.WindUpHeavy, pitch: 1.0f));
+        // The Warden's answer when its revenge gauge fills: a quick big circle that clears everyone off it. Wind-up 30 -> 36 (research recommendation 4);
+        // it is not in the Warden's attack list (it answers being chained), so the 54-frame elite floor does not apply.
+        public static readonly AttackData WardenBreakFree = E("warden_breakfree", "Break free", 78, 36, 44, 1.0f, HitShape.Circle, 3.0f, 180f, knockback: 6f, guardBreak: true,
+            superArmor: W(0, 78),
+            tell: T(TellPart.Body, 14, 22, crouch: 0.3f, tremble: 1.0f, sfx: CombatSfx.WindUpHeavy, pitch: 1.1f));
+        // The Warden's signature (the elite's dramatic tell): it rises to full height leaning far back with the rolling pin overhead, a low bell tolls as
+        // it peaks, the dough crown glows hotter through a long trembling hold, flashes, and it brings everything down in a ring. 1.5 s to the hitbox
+        // (KH2's single big strikes are 1.2-1.3 s), then a second stuck in the floor: the reward for reading it. Chosen every few attacks, never at random.
+        public static readonly AttackData WardenQuake = E("warden_quake", "Dough quake", 160, 90, 100, 2.0f, HitShape.Circle, 3.0f, 180f, knockback: 6f, guardBreak: true,
+            superArmor: W(0, 160), turn: W(0, 50), turnSpeed: 160f,
+            tell: T(TellPart.Crown, 50, 72, lean: 26f, rise: 0.6f, tremble: 0.9f, sfx: CombatSfx.WindUpHeavy, pitch: 0.7f, hold: CombatSfx.EliteToll, charge: true));
         // Test-only: a huge circle that no roll can leave, so a dodge test proves the i-frames and not the distance.
         public static readonly AttackData TestNova = E("test_nova", "Test nova", 60, 12, 40, 1.0f, HitShape.Circle, 30f, 180f, knockback: 0f);
 
         public static readonly AttackData[] AllEnemyAttacks =
         {
-            SlimeHop, SlimeGlob, RatLunge, RatSpin, BroomSweep, BroomPoke, WardenSlam, WardenPound, WardenSweep, WardenBreakFree, TestNova,
+            SlimeHop, SlimeGlob, RatLunge, RatSpin, BroomSweep, BroomPoke, WardenSlam, WardenPound, WardenSweep, WardenBreakFree, TestNova, WardenQuake,
         };
 
         // Lookup by id for the hit intents of enemies against players.

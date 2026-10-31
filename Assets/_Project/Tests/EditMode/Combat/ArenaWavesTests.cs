@@ -37,11 +37,17 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void WaveFive_StartsTierTwo_AndRepeatsTheCompositions()
+        public void TierTwo_MixesKinds_InEveryWave_AndKeepsTheEliteInItsFourth()
         {
+            // Enemy polish (2026-10-30): tier 2 was waves 1-4 again at x3.5 attack; now every tier-2 wave mixes at least three kinds and the attack step is
+            // x1.54 (EnemyModelTests), so later waves are harder through mix and pacing.
             Assert.That(ArenaWaves.TierOf(5), Is.EqualTo(2));
-            Assert.That(ArenaWaves.Roster(5, 1), Is.EqualTo(ArenaWaves.Roster(1, 1)));
-            Assert.That(ArenaWaves.Roster(8, 1), Is.EqualTo(ArenaWaves.Roster(4, 1)));
+            for (int w = 5; w <= 12; w++)
+                Assert.That(ArenaWaves.Roster(w, 1).Distinct().Count(), Is.GreaterThanOrEqualTo(3), "wave " + w + " mixes three kinds");
+            for (int w = 5; w <= 7; w++) Assert.That(ArenaWaves.Roster(w, 1).Contains(EnemyKind.DoughWarden), Is.False, "wave " + w);
+            Assert.That(ArenaWaves.Roster(8, 1).Count(k => k == EnemyKind.DoughWarden), Is.EqualTo(1));
+            Assert.That(ArenaWaves.Roster(9, 1), Is.EqualTo(ArenaWaves.Roster(5, 1)), "tier 2 repeats its own four");
+            for (int w = 5; w <= 8; w++) Assert.That(ArenaWaves.Roster(w, 1).Length, Is.LessThanOrEqualTo(5), "no bigger crowds than tier 1 (DC1: 1-3 near you)");
         }
 
         [Test]

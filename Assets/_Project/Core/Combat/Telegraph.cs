@@ -64,8 +64,33 @@ namespace SleepingCalamity.Core.Combat
         // An attack may reach this far past what its enemy visibly extends (hero contact slack plus the splash of a landing); see EnemyDefinition.VisualReach.
         public const float ReachSlack = 0.6f;
 
-        // Telegraph and strike frames the player gets to see before the hitbox opens (60 Hz), at least, for every attack a tier-1 trash enemy uses.
-        public const int MinWindUpFrames = 24;
+        // Frames the player gets to see before the hitbox opens (60 Hz), at least: 27 (0.45 s) for small enemies, 54 (0.9 s) for the elite's own attacks,
+        // 36 for its revenge break-free (research recommendation 4; DC1's early median is 0.65 s, KH's first enemies 0.67-0.7 s).
+        public const int MinWindUpFrames = 27, EliteWindUpFrames = 54, BreakFreeWindUpFrames = 36;
+
+        // Frames after the hitbox closes plus the AI's recover time, at least: the punish window (research recommendation 6: >= 0.5 s).
+        public const int MinPunishFrames = 30;
+
+        public static int WindUpFloor(AttackData a, EnemyDefinition def) =>
+            a == AttackCatalog.WardenBreakFree ? BreakFreeWindUpFrames : def != null && def.IsElite ? EliteWindUpFrames : MinWindUpFrames;
+
+        public static int PunishFrames(AttackData a, EnemyKind kind, int tier) =>
+            a.TotalFrames - a.HitOn.End + (int)(AttackPacing.RecoverSeconds(kind, tier) * AttackData.FrameRate);
+
+        // The body's tell is complete and honest: the pose peaks, holds, then glints 12-24 frames before the hitbox, and the enemy no longer turns or
+        // starts its lunge before the glint (so where it faces at the glint is where it strikes). Null for a valid tell, else what is wrong.
+        public static string TellProblem(AttackData a)
+        {
+            EnemyTell t = a.Tell;
+            if (t == null) return "no tell";
+            if (t.PoseEnd <= 0 || t.PoseEnd > t.Commit) return "pose must peak before the commit";
+            if (t.HoldFrames < 4) return "the hold before the glint is shorter than 4 frames";
+            int lead = a.HitOn.Start - t.Commit;
+            if (lead < TellMath.MinReactFrames || lead > TellMath.MaxReactFrames) return "glint leads the hitbox by " + lead + " frames (12-24)";
+            if (!a.Turn.IsEmpty && a.Turn.End > t.Commit) return "still turning after the glint (turn ends " + a.Turn.End + ")";
+            if (a.LungeMeters > 0f && a.Lunge.Start < t.Commit) return "the lunge starts before the glint";
+            return null;
+        }
 
         // The lunge must finish before the hitbox opens, so the footprint drawn around the landing spot is the whole truth.
         public static bool LungeEndsBeforeStrike(AttackData a) => a.LungeMeters <= 0f || a.Lunge.End <= a.HitOn.Start;
