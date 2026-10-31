@@ -23,10 +23,10 @@ Every piece: chunky storybook forms ~10% oversize, timber ~1.4x real section, 1.
 ### Shop signs
 Pivot = the centre of the wall plate at the wall plane (Unity local origin on the facade, the arm runs out along local +Z, up = +Y). Iron wall bracket
 (wall plate ~0.3 x 0.4, scrolled arm reaching 0.9 m out), board ~0.6 wide x 0.5 high x 0.05 thick hanging from two short chains/rings under the arm, its
-face in the local X-Y plane (readable from both sides of the lane). Each trade has a chunky carved emblem proud of the board on both faces:
+face in the local Y-Z plane, i.e. along the arm and square to the wall (fixed 2026-10-31: read from both directions along the lane). Each trade has a chunky carved emblem proud of the board on both faces:
 Bakery a loaf, Inn a tankard, Smithy an anvil, Workshop a crossed saw and hammer, Tailor open shears, Grocer an apple with a leaf. Board shapes vary
 (rounded top, shield, plain with notched corners). ShopSign_Broken: bracket arm bent down ~25 deg, board hanging from one chain only, tilted ~35 deg, a corner split off.
-The lowest point of any sign is at most 0.75 m below the pivot (builder mounts the pivot at 3.0 m, so the board clears 2.25 m).
+No FOOTPRINT on signs. The lowest point of any sign is at most 0.75 m below the pivot (Broken: use a shorter chain or smaller board to stay inside it) (builder mounts the pivot at 3.0 m, so the board clears 2.25 m).
 
 ### Washing line
 One FBX `WashingLine` with separate objects (no FOOTPRINT): `Rope_1m` (along +X from x 0 to 1, ~1.6 cm dia), `Hook` (wall hook/eye, pivot at the wall
