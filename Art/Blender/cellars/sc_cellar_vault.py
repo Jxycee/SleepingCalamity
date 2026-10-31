@@ -30,6 +30,14 @@ R grime/soot/damp, G moss, B polish) are named CV_*; CV_Breath and CV_Daylight a
   (Unity coordinates converted); the lineup views show the loose kit. --tris prints triangles per piece and the total.
 Budget: kit under 60k tris, a piece under 12k.
 
+--stair builds STAIR_PIECES (Q13 undercroft stair; not part of PIECES, CellarVault.fbx is unaffected) under the empty root CellarStair:
+  StairFlight   8 steps (run 2.0, drop 1.6), sloped brick walls, 4 stepped vault rings on a mortar backing, brick arch band
+  StairTurn     right-hand winder quarter turn, 4 winders round a newel, sail vault, tympanum over the exit arch
+  StairDoor     home cellar door, flagstone landing with barrel vault, door wall, jambs, threshold, oak door open 105 deg, house floor
+  with --export writes CellarStair.fbx to --export-dir; --stair --room assembles the chain (Unity yaw about +Y, instance() uses -yaw about
+  Blender Z) with the StairEntry, proxy lights and cameras top/turn/bottom (--sl scales the proxy lights). Budget: piece under 8k, all under 20k.
+  Status (2026-10-31): 14,132 tris (4,252 / 3,788 / 6,092), joins checked in 2 render passes (no gaps, treads continuous, chain ends at StairEntry's top step).
+
 Status (2026-10-31, cloud): 3 review rounds (+ one bug-fix re-render), self-score 27 -> 28.5 -> 29/40 (calibrated rubric, target first + 5 = 32 not
 reached: round 3 gained 0.5, so stopped). Final lines: silhouette 3.5, proportion 4, form 3.5, surface 3.5, colour 3.5, wear 3.5, set 4,
 glass/metal/emissive 3.5. 36,460 tris (VaultSegment 5,372, ArchRib 1,100, Pillar 220, EndWall 750, NicheWall 8,700, StairEntry 2,876,
