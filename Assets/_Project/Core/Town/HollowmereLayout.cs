@@ -345,7 +345,7 @@ namespace SleepingCalamity.Core
                 t.Lanes.Add(new Lane { Id = l.Id, Name = l.Name, Ring = l.Ring, Width = l.Width, Points = pts });
             }
 
-            char[] variants = { 'a', 'b', 'c' };
+            char[] variants = { 'A', 'B', 'C' };
             int vi = 0;
             foreach (var r in Ring1)
                 t.Foundations.Add(new Foundation { Id = r.Id, Ring = 1, Size = r.Size, Centre = new TownPoint(r.X, r.Z), Yaw = r.Yaw, Facing = r.Facing, RuinVariant = Variant(r.Size, variants[vi++ % 3]) });
@@ -361,6 +361,7 @@ namespace SleepingCalamity.Core
                 t.Foundations.Add(new Foundation { Id = r.Id, Ring = r.Ring, Size = r.Size, Centre = c, Yaw = (float)Math.Round(yaw, 2), Facing = LotSide.South, RuinVariant = Variant(r.Size, variants[vi++ % 3]) });
             }
 
+            foreach (Foundation f in t.Foundations) f.RuinTurn = Turn(f.Id);
             foreach (var r in LandmarkRows)
             {
                 var lm = new Landmark { Id = r.Id, Name = r.Name, Kind = r.Kind, Footprint = new Footprint(new TownPoint(r.X, r.Z), r.SX, r.SZ, r.Yaw), Height = r.H };
@@ -372,7 +373,18 @@ namespace SleepingCalamity.Core
             return t;
         }
 
-        static string Variant(FoundationSize s, char v) => "Ruin_" + s + "_" + v;
+        static string Variant(FoundationSize s, char v) => "Ruin_" + s + "_" + v;   // the ruin kit folder name (Content/Art/Town/Ruins/Ruin_<S|M|L>_<A|B|C>)
+
+        // A stable 0..3 turn per lot id (FNV-1a), so the same ruin variant reads differently from lot to lot.
+        static int Turn(string id)
+        {
+            unchecked
+            {
+                uint h = 2166136261u;
+                foreach (char c in id) { h ^= c; h *= 16777619u; }
+                return (int)((h ^ (h >> 16)) % 4u);
+            }
+        }
         static float Round(float v) => (float)Math.Round(v, 2);
 
         public static Lane FindLane(TownLayout t, string id)

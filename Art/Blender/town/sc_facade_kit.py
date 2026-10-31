@@ -1464,7 +1464,7 @@ def render(cam):
         print('rendered', v)
 
 VARIANT = arg('--variant')
-if __name__ == '__main__':   # sc_townhouse.py imports this module as the kit library
+if __name__ == '__main__':   # importable: sc_bell_tower.py and sc_townhouse.py reuse the kit helpers
     if VARIANT and '--views' not in argv:
         VIEWS = ['vfront', 'vtq']
     root, obs = build(VARIANT)
