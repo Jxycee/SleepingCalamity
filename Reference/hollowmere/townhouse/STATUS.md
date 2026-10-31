@@ -1,13 +1,13 @@
-State: IN PROGRESS
+State: DONE
 Session: Wave 2: Kit family 3, tall jettied townhouse (M)
-Progress: 92%
+Progress: 100%
 Sheet: Reference/hollowmere/townhouse/SHEET_r3_four_sides.jpg
 Blocker: none
 
 Score: r3 29/40 (silhouette 4, proportion 4, form 4, surface 3.5, colour 3.5, wear 3.5, set 3.5, glass/metal 3); r1 26.5; target 31.5 not reached, stopped at 3 rounds for usage pacing
 Tris: A 34,265 / B 32,346 / C 34,531 (budget 35k; Part_Door 1,558, Part_Shutters 3,456)
-SC RESULT check PASS (7edfa87: build PASS, test-edit 592/592, test-play 32 passed 8 skipped); final check on the merged tip after captures
-Merge commit: n/a
+SC RESULT check PASS on 0d6f684 (build PASS, test-edit 592/592, test-play 32 passed 8 skipped); main gained only a STATUS file since
+Merge commit: bca6ee8 (main)
 
 ## Log
 - 2026-10-31: started. Reading the contract (spec 5.2/5.4), the B4 facade kit, HollowmereLayout/Builder. Unity editor still downloading in the background.
@@ -25,3 +25,4 @@ Merge commit: n/a
 - Unity editor in (download had stalled at 04:45; setup.sh --wait restarted it). Cloud C# compile PASS. unity.sh check running; captures (Cap_HM_Townhouses, Cap_HM_TownhouseSide) after.
 - r3 APPROVED by the coordinator. check PASS on the pre-merge tip; both townhouses placed (F06 Townhouse_A, F07 Townhouse_B, pad Y 0.00, footprints 5.45x6.85 and 5.71x6.19 inside M 7.5). First FBX import lost the slot names (default 'Lit'): reimport guard added, metas committed. Merged origin/main (inn 2c436ed). Captures running.
 - Fixed: the first exports carried absolute texture paths that exist in the cloud container, so Unity's legacy FBX import built every slot as the URP default 'Lit' (the townhouses rendered all-plaster). Re-exported with path_mode STRIP: 0 'Lit' slots, check PASS (7edfa87). Capture cameras pulled back; captures running.
+- DONE: merged bca6ee8. Unity captures (ruined + rebuilt, Cap_HM_Townhouses and Cap_HM_TownhouseSide): Reference/hollowmere/townhouse/unity/CAPTURES_townhouses_ruined_rebuilt.jpg. Townhouse_C is exported and kit-ready, not placed. Cloud lesson for other Blender exporters: export FBX with path_mode='STRIP', or Unity's legacy material import resolves the container's texture paths and names every slot 'Lit'.
