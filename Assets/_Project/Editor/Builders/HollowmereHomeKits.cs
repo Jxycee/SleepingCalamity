@@ -58,6 +58,18 @@ namespace SleepingCalamity.EditorTools
             return m;
         }
 
+        // A flat colour slot (linear colour, roughness), as BeautyCornerArt.Flat and HollowmereArt's interior: _Color mirrors _BaseColor and the MotionVectors pass is on,
+        // so the .mat has the same bytes with and without graphics.
+        public static Material Flat(string matName, Color linear, float roughness)
+        {
+            BuilderUtil.EnsureFolder(MaterialsFolder);
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + matName + ".mat", Wear);
+            m.SetColor("_BaseColor", linear.gamma); m.SetFloat("_Smoothness", 1f - roughness); m.SetFloat("_Metallic", 0f);
+            m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         public static Color Hex(int r, int g, int b) => new Color(r / 255f, g / 255f, b / 255f).linear;
 
         // Instantiates folder/variant/variant.fbx in lot frame g, assigns slots per renderer, adds the FOOTPRINT collider and checks the class. False when the art is missing.
@@ -142,6 +154,10 @@ namespace SleepingCalamity.EditorTools
             if (variant != "StoneCottage_A") map["SC_Thatch"] = HomeKitBuild.Tinted(variant + "_SC_Thatch", "oak_timber", look.Thatch, 1.1f, 0.2f);
             map["FK_Shutter"] = HomeKitBuild.Paint(map, variant + "_FK_Shutter", look.Paint);
             map["FK_DoorPaint"] = HomeKitBuild.Paint(map, variant + "_FK_DoorPaint", look.Paint);
+            // The window pane bands (SOURCES.md): pale sky glare on top, a darker reflection step, a half-drawn curtain; the dark FK_Glass fills the rest.
+            map["SC_GlassHi"] = HomeKitBuild.Flat("SC_GlassHi", new Color(0.34f, 0.40f, 0.46f), 0.05f);
+            map["SC_GlassSky"] = HomeKitBuild.Flat("SC_GlassSky", new Color(0.13f, 0.17f, 0.21f), 0.07f);
+            map["SC_Curtain"] = HomeKitBuild.Flat("SC_Curtain", new Color(0.52f, 0.47f, 0.37f), 0.9f);
             AssetDatabase.SaveAssets();
             return map;
         }

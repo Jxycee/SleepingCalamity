@@ -62,3 +62,7 @@ Slots present per object (re-import): A Frame `FK_Oak, WS_Board, WS_Inner, FK_Ir
 ## Licences
 
 The B1 tileables are graded Poly Haven scans, CC0 1.0 (`Art/Textures/B1_town/SOURCES.md`). Geometry is generated; no other external assets. Reference photos used for the review sheet are listed in `Reference/hollowmere/kits/REFS.md` (study only, never shipped).
+
+## Unity placement (Hollowmere, Rebuilt preset)
+
+`HollowmereWorkshop` (Editor/Builders/HollowmereHomeKits.cs) places Workshop_B on R2_08 (M lot). Slots are rebuilt from the tables above through WearLit: tints above 1 keep their hue and are scaled to fit (a non-HDR `_BaseColor` cannot exceed 1), paint slots use the `_SC_PAINT` mode. No colour lift is applied: B's `WS_BoardPaint` is the ochre infill and reads as designed, and the dark-board variants A and C are not placed yet (a lift for them is decided when one is placed). Workshop FK_Oak uses the darker (0.48, 0.45, 0.42) tint of the table, not the facade's.
