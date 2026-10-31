@@ -37,7 +37,9 @@ Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 t
 Status (2026-10-31, cloud): look rounds 1-3 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28/40:
 round 2 dropped the dish and beast 0.30 m into the 38 deg close camera, fixed the values, tide line, ground-line damp
 and the ruff; round 3 added the shaft flutes, rosier and paler replacement stones, rain streaks under the coping, a
-clean dish and a paler seat. Next: the PC runs --stage bake --res 4096 (DryFountain) / 2048 (BannerPole) and exports.
+clean dish and a paler seat. Bake proof (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
+BannerPole high 0.79M -> low 8,996 (57.7k together, in the T4 30-60k band); at 1024 the closed-eye lid lines soften
+toward brows, so check them first in the PC's 4K bake. Next: the PC runs --stage bake --res 4096 (DryFountain) / 2048 (BannerPole) and exports.
 Parked (optional, after the captures): an octagonal basin variant on one worn step A/B'd at the mid camera; B9 crack
 weeds and moss tufts at the basin foot and in the north joints; ruff locks with a spiral twist and varied length (side-on
 they read as stacked discs); a sun-side bleach gradient across the banner and a loose thread from each tear.
