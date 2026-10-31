@@ -1,11 +1,11 @@
 State: IN PROGRESS
 Session: Q14. Decorations batch 2: market and lane clutter
-Progress: 15%
-Sheet: none yet
+Progress: 55%
+Sheet: Reference/hollowmere/clutter/clutter_sheet_r3.jpg
 Blocker: none
 
-Score: -
-Tris: -
+Score: art rounds (Blender sheet, visible faces): r1 27 -> r2 28.5 -> r3 29 (agent); controller read about 28/40 (flower clumps read as pastel blobs, cloth pale). Stopped at round 3 (gain < 1.5); in-engine check next.
+Tris: props 994-2712 (Well 2634), signs 580-1340, washing-line parts 36-384; all within CONTRACT budgets.
 SC RESULT: -
 Merge commit: -
 
@@ -15,12 +15,11 @@ Plan: CONTRACT.md (asset names, footprints, pivots, CL_* slots on shared B1 tile
 - Unity: Core HollowmereClutter (ring 1/2 rows, Validate incl. path graph), EditMode tests, Editor HollowmereClutter placement + Cap_HM_Clutter.
 Then: merge origin/main, build scene, capture Cap_HM_Clutter, unity.sh check, merge.
 
-## Resume notes
-- Unity agent (WIP 658bfcf): Core HollowmereClutter.cs pushed (ClutterPlan + Validate, path graph rule in). Rebuilt 50 ground rows + 9 signs + 2 washing spans, Ruined 11.
-  Open: CrateStack_Broken/SackStack_Broken missing in Ruined; washing spans 2 (want 3-5); signs may double the Bakery/Inn Part_Sign; Inn footprint assumed 9.0 x 6.5.
-  Next: tests (HollowmereClutterTests), Editor HollowmereClutter + one-line BuildScene call + Cap_HM_Clutter, cloud compile + core tests.
-- Art agent: nothing built yet (read-only prep; garden kit copy in scratchpad sc_garden_ref.py). Next: write sc_clutter.py, renders, sheet, max 3 rounds, export.
-  Contract fixed: sign board face in the local Y-Z plane (along the arm), no FOOTPRINT on signs.
+## Progress
+- Art (7231bf9): Art/Blender/town/sc_clutter.py, 21 FBX in Content/Art/Town/Clutter (Gen, slot materials on shared tileables, no bakes), SOURCES.md.
+  Deviations: a few meshes overhang their FOOTPRINT by up to 0.14 m (RainBarrel, FlowerBox, SackStack_Broken, Well_Ruined); signs reach 0.95 m; painted_wood is blue-grey, so CL_Paint/PaintRed may read duller in Unity.
+- Unity (740e0a5): Core HollowmereClutter (rows outside lots: clear of garden/keep), Rebuilt 53 ground rows + 6 signs (4 workshops, tailor F06, grocer F07) + 3 washing spans, Ruined 15; HollowmereClutterTests 13 green on the Core runner (path node / edge negative tests). Editor placement written, not yet compiled (Unity editor still downloading in this container).
+- Next: compile, footprints to real extents, scene build, capture Cap_HM_Clutter only, in-engine sheet, then check + merge.
 
 ## Usage waste
 - (filled at the end)
