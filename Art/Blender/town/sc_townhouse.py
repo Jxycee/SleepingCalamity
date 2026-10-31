@@ -48,13 +48,15 @@ repatch('member', [('cuts = max(0, int(L / 0.6))', 'cuts = max(0, int(L / 1.6))'
 repatch('window', [('def window(pc, plane, x0, x1, z0, z1, k, sill_out=0.10):', 'def window(pc, plane, x0, x1, z0, z1, k, sill_out=0.10, lite=False):'),
                    ("    member(pc, 'oak', (xm, yc + 0.02, z0)", "    if not lite: member(pc, 'oak', (xm, yc + 0.02, z0)"),
                    ("    member(pc, 'oak', (x0, yc + 0.02, zt)", "    if not lite: member(pc, 'oak', (x0, yc + 0.02, zt)"),
-                   ('    s = 0.16\n', '    s = 0.30 if lite else 0.19\n'),
+                   ('    s = 0.16\n', '    s = 0.30 if lite else 0.22\n'),
                    ("            add_box(pc, 'iron', (ln, 0.010, 0.012), xf, cham=0.0, long_axis=0, seed=i)",
                     "            pa = Vector((a[0], gy - 0.008, a[1])); pb = Vector((b[0], gy - 0.008, b[1])); dd = (pb - pa).normalized()\n"
                     "            nn = Vector((-dd.z, 0, dd.x)) * 0.007\n"
                     "            quad_grid(pc, 'iron', [pa - nn, pb - nn, pb + nn, pa + nn], 1, 1, uv_fn=lambda c: (c.x, c.z))")])
 repatch('plinth_run', [('cham=0.05, segs=2, cuts=(1, 0, 0) if face == \'front\' else (0, 1, 0)', 'cham=0.05, segs=1, cuts=(0, 0, 0)'),
                        ('ln = min(R.uniform(0.55, 0.95), b - x)', 'ln = min(R.uniform(0.75, 1.25), b - x)')])
+repatch('kit_leanto', [('x0, x1, y0, y1 = W + 0.02, W + 1.55, 2.75, 5.35', 'x0, x1, y0, y1 = W + 0.02, W + 1.0, 2.75, 5.35'),
+                       ('for row in range(6):', 'for row in range(5):')])   # inside the 8 m foundation; a lighter woodpile
 repatch('kit_roof', [('segs = 10; rr = 0.11', 'segs = 6; rr = 0.11'), ('nt = nx * 2 ', 'nt = nx '), ('segs = 8; r = 0.15', 'segs = 5; r = 0.15'),
                      ('for i in range(13):', 'for i in range(9):'), ('for i in range(nx * 2 + 1):', 'for i in range(nx + 1):'),
                      ('x = X0 + (X1 - X0) * i / (nx * 2)', 'x = X0 + (X1 - X0) * i / nx'), ('nx, 10, push=deck', 'nx, 6, push=deck'), ('i * (2 * W - 0.6) / 12', 'i * (2 * W - 0.6) / 8')])
@@ -76,17 +78,39 @@ COMBOS = [((0.95, 0.96, 0.97), '#3e5670'),   # cool lime white, slate blue
 def cfg(name):
     R = random.Random(VARIANTS[name])
     idx = list(VARIANTS).index(name)
-    width = round(R.uniform(4.7, 5.7), 2)
-    jetty = round(R.uniform(0.32, 0.50), 2)
-    depth = round(min(6.0, 6.85 - 2 * jetty - R.uniform(0.0, 0.25)), 2)   # roof verges stay inside the 8 m foundation
-    walls = [round(R.uniform(2.05, 2.3), 2), round(R.uniform(1.95, 2.15), 2)]
-    pitch = R.uniform(52, 60)
+    # round 3 (coordinator r1 review): the silhouette varies by seed, not only the paint. A: gable to the street;
+    # B: eave to the street (side gables); C: gable to the street with a log-store lean-to and a crooked twist.
+    roof = ('front', 'side', 'front')[idx] if idx < 3 else R.choice(('front', 'side'))
+    width = round(R.uniform(4.7, 5.7) if idx != 2 else R.uniform(4.7, 5.2), 2)   # C keeps room for its lean-to
+    jetty = round(R.uniform(0.42, 0.58), 2)                                      # deep jetties: shadow lines that read from the street
+    if roof == 'front':   # roof verges (0.55) stay inside the 8 m foundation
+        depth = round(min(6.0, 6.85 - 2 * jetty - R.uniform(0.0, 0.2)), 2)
+    else:                 # eaves (0.8) front and back
+        depth = round(6.15 - 2 * jetty - R.uniform(0.0, 0.15), 2)
+    walls = [round(R.uniform(2.0, 2.45), 2), round(R.uniform(1.9, 2.3), 2)]
+    pitch = R.uniform(52, 60) if roof == 'front' else R.uniform(44, 50)
     combo = COMBOS[(idx + R.randrange(len(COMBOS))) % len(COMBOS)] if idx >= len(COMBOS) else COMBOS[idx]
     plaster, paint = combo   # the three named variants each get their own pair, distinct from the B4 neighbours' (square variety)
     return dict(width=width, depth=depth, jetty=jetty, walls=walls, pitch=pitch, plaster=plaster, paint=fk._lin(paint),
                 paint_hex=paint, lean=(R.choice((-1, 1)) * R.uniform(0.014, 0.022), R.uniform(0.028, 0.040)),   # round 2: the storybook lean has to read at mid distance
                 chimney=(R.uniform(-0.25, 0.3), R.choice((-1, 1))), flowerbox=R.random() < 0.8 or idx == 0,
-                wear=R.uniform(1.15, 1.4), seed=VARIANTS[name], door_side=R.choice((-1, 1)))
+                wear=R.uniform(1.15, 1.4), seed=VARIANTS[name], door_side=R.choice((-1, 1)),
+                roof=roof, leanto=idx == 2, twist=0.006 if idx == 2 else 0.0, back_win=R.choice((0, 2)))
+
+# ----------------------------------------------------------------------------- lean (+ an optional twist about the house's centre)
+TWIST = 0.0; TWIST_YC = 0.0
+PLINTH0 = fk.PLINTH
+def lean_pt_tw(p):
+    q = Vector((p.x + fk.LEAN_X * max(0.0, p.z - PLINTH0), p.y - fk.LEAN_Y * max(0.0, p.z - fk.BRES0), p.z))
+    a = TWIST * max(0.0, p.z - fk.BRES0)
+    if a:
+        dx, dy = q.x, q.y - TWIST_YC
+        q.x, q.y = dx * math.cos(a) - dy * math.sin(a), TWIST_YC + dx * math.sin(a) + dy * math.cos(a)
+    return q
+def lean_tw(me):
+    for v in me.vertices:
+        v.co = lean_pt_tw(v.co)
+fk.lean, fk.lean_pt = lean_tw, lean_pt_tw
 
 # ----------------------------------------------------------------------------- helpers
 def xf_side(side):
@@ -275,7 +299,12 @@ def build_house(name):
         st.append(dict(plane=-J * (k + 1), zb=base + 0.52, zt=base + 0.52 + h, top=base + 0.78, base=base))
         st[-1]['top'] = st[-1]['zt'] + (fk.PLATE1 - fk.PLATE0)
     YU = st[-1]['plane']; fk.YU = YU; fk.PLATE0 = st[-1]['zt']; fk.PLATE1 = st[-1]['top']
-    rise = W * math.tan(math.radians(c['pitch']))
+    global TWIST, TWIST_YC
+    TWIST, TWIST_YC = c['twist'], (YU + D) / 2
+    fk.RIDGE_SAG = 0.32   # a sway-backed ridge (storybook crooked roofline)
+    yc2 = (YU + D) / 2
+    front_gable = c['roof'] == 'front'
+    rise = (W if front_gable else (D - YU) / 2) * math.tan(math.radians(c['pitch']))
     fk.RIDGE = fk.PLATE1 + rise
     house = {n: fk.Piece(n) for n in Side.NAMES + ('Kit_Shutters',)}
     house['_decals'] = []
@@ -283,7 +312,9 @@ def build_house(name):
     wpw = R.uniform(0.80, 0.95)          # window clear width: narrow, so open shutters stay inside their bay
     cell = 0.30                           # plaster grid on the front (tris budget: the hero uses 0.125); sides/back 0.35
     side_win = {sd: [R.randrange(1, 3) for _ in st] for sd in ('right', 'left')}   # one window per storey per side
-    back_win = [[1], [0, 2], [1]]
+    back_win = [[c['back_win']], [0, 2], [1]]   # bay 1 of the ground storey is the back door
+    if c['leanto']:
+        side_win['left'][0] = side_win['right'][0] = 1
 
     # front: door bay at one side of centre, windows in the other bays, shutters and crosses on the upper storeys
     xs_g = bays(-W, W, 2 * W / 3)   # three bays: door in the middle
@@ -302,22 +333,25 @@ def build_house(name):
                     d = door_bay if k == 0 else None
                 else:
                     winb = back_win[k]
-                    d = None
+                    d = 1 if k == 0 else None
                 xf_y = Matrix.Identity(4) if side == 'back' else Matrix.Translation((0, plane, 0))   # the back does not jetty
             else:
                 xs = bays(x0, x1, 1.6)
                 n = len(xs) - 1
-                winb = [min(n - 1, side_win[side][k])]
+                winb = [max(1, min(n - 2, side_win[side][k]))]   # never the back bay (chimney breast)
                 d = None
                 xf_y = Matrix.Identity(4)
             # front / back walls sit on their storey plane; the frame offsets a sub-Side by that plane
             sub = Side(side); sub.st = st; sub.seed = S.seed; sub.runoff = runoff
             dd = storey_wall(sub, k, xs, winb, d, crosses=(side != 'back' or k == 1),
                              shutters=(k > 0 and side == 'front') or (k == 1 and side in ('right', 'left')),
-                             wpw=wpw, cell=cell if side == 'front' else 0.35, lite=side != 'front', ends=(True, True) if side in ('front', 'back') else (False, False),
+                             wpw=wpw, cell=cell if side == 'front' else 0.45, lite=side != 'front', ends=(True, True) if side in ('front', 'back') else (False, False),
                              base_band=(k > 0 and side in ('right', 'left', 'back')))
             if side == 'front' and k == 0:
                 fk.DOOR = (dd[0], dd[1], 0.16, 2.36)
+            if side == 'back' and k == 0:
+                back_door(sub.p['Kit_Windows'], dd[0], dd[1])
+                S.back_gap = (dd[0] - TIM, dd[1] + TIM)
             # soffit under each jetty on the front
             if side == 'front' and k > 0:
                 prev = st[k - 1]['plane'] - plane   # positive, in this sub-frame
@@ -330,6 +364,12 @@ def build_house(name):
                 fk.quad_grid(sub.p['Kit_Panels'], 'plaster', [(-W, prev, st[k]['base'] + 0.22), (W, prev, st[k]['base'] + 0.22),
                                                               (W, 0.0, st[k]['base'] + 0.22), (-W, 0.0, st[k]['base'] + 0.22)],
                              max(1, nb), 1, uv_fn=lambda cc: (cc.x / fk.TILE, cc.y / fk.TILE))
+                # bracket ends under the jetty at every post line: the jetty reads from the street
+                for i, x in enumerate(xs):
+                    xp = max(-W + TIM / 2, min(W - TIM / 2, x))
+                    fk.member(sub.p['Kit_JettyBeams'], 'oak', (xp, prev - PROUD + 0.10, st[k]['base'] - 0.85),
+                              (xp, -PROUD + 0.14, st[k]['base'] + 0.24), 0.17, 0.19, name='bk%d_%d_%d' % (k, i, S.seed),
+                              cham=0.03, up=(1, 0, 0), sag=0.05)
             # bring the storey into the side frame (front/back planes)
             for nme, pc in sub.p.items():
                 absorb(S.p[nme], pc, xf_y)
@@ -341,9 +381,21 @@ def build_house(name):
         # plinth on every side; the front plinth gaps for the door
         x0, x1 = wall_range(side, 0.0)
         plinth_wall(S, x0 - (0.02 if side in ('front', 'back') else 0.0), x1 + (0.02 if side in ('front', 'back') else 0.0),
-                    gap=(fk.DOOR[0] - TIM, fk.DOOR[1] + TIM) if side == 'front' else None)
+                    gap=(fk.DOOR[0] - TIM, fk.DOOR[1] + TIM) if side == 'front' else getattr(S, 'back_gap', None))
+        if side == 'back':   # a plain step at the back door
+            g0, g1 = S.back_gap
+            fk.add_box(S.p['Kit_Plinth'], 'stone', (g1 - g0 + 0.2, 0.5, 0.16), Matrix.Translation(((g0 + g1) / 2, -0.1, 0.08)),
+                       cham=0.03, uv_world=True, wob=0.006, seed=5.5)
+        if not front_gable and side in ('right', 'left'):   # side gables (eave to the street)
+            G = Side(side)
+            gable(G, (D - YU) / 2, fk.PLATE1, fk.RIDGE - 0.2, cell)
+            gxf = Matrix.Translation((yc2 if side == 'right' else -yc2, 0, 0))
+            for nme, pc in G.p.items():
+                absorb(S.p[nme], pc, gxf)
+            for i in range(G.t0, len(fk.TIMBERS)):
+                a, b, hw = fk.TIMBERS[i]; fk.TIMBERS[i] = (gxf @ a, gxf @ b, hw)
         # gable on front and back (the top storey plane), framed
-        if side in ('front', 'back'):
+        if front_gable and side in ('front', 'back'):
             G = Side(side)
             gable(G, W, fk.PLATE1, fk.RIDGE - 0.2, cell)
             yg = YU if side == 'front' else -0.0
@@ -367,44 +419,79 @@ def build_house(name):
                    ((W - 0.45, D - 0.45), (-W + 0.45, D - 0.45)), ((-W + 0.45, D - 0.45), (-W + 0.45, 0.45))):
         fk.quad_grid(pan, 'plaster', [(a[0], a[1], 0.0), (b[0], b[1], 0.0), (b[0], b[1], fk.PLATE1), (a[0], a[1], fk.PLATE1)], 1, 1,
                      uv_fn=lambda cc: ((cc.x + cc.y) / fk.TILE, cc.z / fk.TILE))
-    # roof (gable to the front): built in the kit's roof frame (ridge along local X), then turned so the ridge runs front-back
-    yc2 = (YU + D) / 2
-    save = (fk.W, fk.YU, fk.DEPTH)
-    fk.W, fk.YU, fk.DEPTH = (D - YU) / 2, -W, W
-    fk.OVER_EAVE = 1.0   # round 2: a heavier cap over the narrow walls (eaves stay inside the 8 m foundation)
-    fk.EAVE_Z = fk.roof_surface(0, 0).z
-    roof = fk.kit_roof()
-    mirror_roof(roof)
-    cx_frac, cside = c['chimney']
-    fk.CHIM_X = cx_frac * fk.W; fk.CHIM_Y = -W * 0.42; fk.CHIM_TOP = fk.RIDGE + 1.0
-    chim = fk.kit_chimney()
-    if cside > 0:   # chimney on the other slope
-        bmesh.ops.scale(chim.bm, vec=(1, -1, 1), verts=chim.bm.verts[:]); bmesh.ops.reverse_faces(chim.bm, faces=chim.bm.faces[:])
-        fk.CHIM_Y = -fk.CHIM_Y
-    fk.W, fk.YU, fk.DEPTH = save
-    xf = Matrix.Translation((0, yc2, 0)) @ Matrix.Rotation(math.pi / 2, 4, 'Z')
-    for pc in (roof, chim):
-        bmesh.ops.transform(pc.bm, matrix=xf, verts=pc.bm.verts[:])
-    wc = xf @ Vector((fk.CHIM_X, fk.CHIM_Y, 0)); fk.CHIM_WX, fk.CHIM_WY = wc.x, wc.y
+    # chimney: an external stone stack on one side wall over the back bay (round 3: the sides get a chimney breast)
+    cside = c['chimney'][1]
+    nb0 = max(2, round(D / 1.6))
+    chim_w = Vector((cside * (W + 0.36), D - D / nb0 / 2, 0))
+    fk.CHIM_TOP = fk.RIDGE + 0.5
+    if front_gable:
+        # roof built in the kit's roof frame (ridge along local X), then turned so the ridge runs front-back
+        save = (fk.W, fk.YU, fk.DEPTH)
+        fk.W, fk.YU, fk.DEPTH = (D - YU) / 2, -W, W
+        fk.OVER_EAVE = 1.0   # a heavy cap over the narrow walls (eaves stay inside the 8 m foundation)
+        fk.EAVE_Z = fk.roof_surface(0, 0).z
+        roof = fk.kit_roof()
+        mirror_roof(roof)
+        fk.CHIM_X, fk.CHIM_Y = chim_w.y - yc2, -chim_w.x
+        chim = fk.kit_chimney()
+        zb_chim = fk.roof_surface(fk.CHIM_X, 0).z + 1.5
+        fk.W, fk.YU, fk.DEPTH = save
+        xf = Matrix.Translation((0, yc2, 0)) @ Matrix.Rotation(math.pi / 2, 4, 'Z')
+        for pc in (roof, chim):
+            bmesh.ops.transform(pc.bm, matrix=xf, verts=pc.bm.verts[:])
+        bw = (0.72, 1.15)
+    else:
+        fk.OVER_EAVE = 0.8
+        fk.EAVE_Z = fk.roof_surface(0, 0).z
+        roof = fk.kit_roof()
+        mirror_roof(roof, yc2)
+        fk.CHIM_X, fk.CHIM_Y = chim_w.x, chim_w.y
+        chim = fk.kit_chimney()
+        zb_chim = fk.roof_surface(fk.CHIM_X, 0).z + 1.5
+        bw = (0.92, 0.95)
+    fk.CHIM_WX, fk.CHIM_WY = chim_w.x, chim_w.y
+    # the breast: from the ground up to the stack's base, stepping in twice
+    fk.add_box(chim, 'stone_dk', (bw[0], bw[1], zb_chim + 0.05), Matrix.Translation((chim_w.x, chim_w.y, (zb_chim + 0.05) / 2)),
+               cham=0.035, cuts=(0, 0, int(zb_chim / 1.2)), wob=0.012, seed=41.0, uv_world=True)
+    for zo in (0.7, 2.9):
+        fk.add_box(chim, 'stone_dk', (bw[0] + 0.1, bw[1] + 0.1, 0.16), Matrix.Translation((chim_w.x, chim_w.y, zo)), cham=0.03,
+                   seed=zo, uv_world=True)
     pieces = [house[n] for n in Side.NAMES] + [house['Kit_Shutters'], fk.kit_door(), roof, chim]
+    if c['leanto']:   # log store on the side away from the chimney
+        lt = fk.kit_leanto()   # built on -X
+        if -cside > 0:
+            bmesh.ops.scale(lt.bm, vec=(-1, 1, 1), verts=lt.bm.verts[:]); bmesh.ops.reverse_faces(lt.bm, faces=lt.bm.faces[:])
+        pieces.append(lt)
     return c, pieces, house['_decals'], st
 
 FRONT_SHUT = []
 
-def mirror_roof(roof):
-    """The kit roof details one slope; drop its plain back slope and mirror the detailed one onto that side."""
+def back_door(pc, x0, x1, z0=0.16, z1=2.30):
+    """A plain ledged back door (part of the frame, not a carried part): four painted planks, two straps, a ring."""
+    n = 4; pw = (x1 - x0) / n; yd = 0.10
+    for i in range(n):
+        fk.add_box(pc, 'door', (pw - 0.01, 0.05, z1 - z0), Matrix.Translation((x0 + pw * (i + 0.5), yd, (z0 + z1) / 2)),
+                   cham=0.01, long_axis=2, wob=0.004, seed=60 + i)
+    fk.quad_grid(pc, 'oak', [(x0 - 0.02, yd + 0.04, z0), (x1 + 0.02, yd + 0.04, z0), (x1 + 0.02, yd + 0.04, z1), (x0 - 0.02, yd + 0.04, z1)],
+                 1, 1, uv_fn=lambda c: (c.x / fk.TILE, c.z / fk.TILE))
+    for zz in (z0 + 0.4, z1 - 0.4):
+        fk.add_box(pc, 'iron', (x1 - x0 - 0.2, 0.012, 0.06), Matrix.Translation(((x0 + x1) / 2 - 0.05, yd - 0.032, zz)), cham=0.0, seed=zz)
+    fk.add_box(pc, 'iron', (0.05, 0.04, 0.05), Matrix.Translation((x1 - 0.16, yd - 0.04, 1.08)), cham=0.008, seed=61.5)
+
+def mirror_roof(roof, yr=0.0):
+    """The kit roof details one slope; drop its plain back slope and mirror the detailed one onto that side (about y = yr)."""
     bm = roof.bm
     bm.faces.ensure_lookup_table()
     def ridge(cc):   # the half-round ridge tiles straddle the ridge line: keep them once
-        return abs(cc.y) < 0.2 and cc.z > fk.ridge_z(cc.x) - 0.12
-    kill = [f for f in bm.faces if f.calc_center_median().y > 0.001 and not ridge(f.calc_center_median())]
+        return abs(cc.y - yr) < 0.2 and cc.z > fk.ridge_z(cc.x) - 0.12
+    kill = [f for f in bm.faces if f.calc_center_median().y > yr + 0.001 and not ridge(f.calc_center_median())]
     bmesh.ops.delete(bm, geom=kill, context='FACES')
-    dup_src = [f for f in bm.faces if f.calc_center_median().y < -0.001 and not ridge(f.calc_center_median())]
+    dup_src = [f for f in bm.faces if f.calc_center_median().y < yr - 0.001 and not ridge(f.calc_center_median())]
     ret = bmesh.ops.duplicate(bm, geom=dup_src)
     nv = [e for e in ret['geom'] if isinstance(e, bmesh.types.BMVert)]
     nf = [e for e in ret['geom'] if isinstance(e, bmesh.types.BMFace)]
     for v in nv:
-        v.co.y = -v.co.y
+        v.co.y = 2 * yr - v.co.y
     bmesh.ops.reverse_faces(bm, faces=nf)
     bm.normal_update()
 

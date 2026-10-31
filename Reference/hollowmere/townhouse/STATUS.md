@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Wave 2: Kit family 3, tall jettied townhouse (M)
-Progress: 50%
+Progress: 60%
 Sheet: Reference/hollowmere/townhouse/SHEET_r2_four_sides.jpg
-Blocker: paused by coordinator for usage
+Blocker: none
 
 Score: r1 26.5/40 (silhouette 3.5, proportion 3.5, form 3.5, surface 3, colour 3.5, wear 3, set 3.5, glass/metal 3); target 31.5 (first + 5)
 Tris: A 34,317 / B 34,383 / C 34,007 (budget 35k; Frame + Part_Door 1,558 + Part_Shutters 3,456)
@@ -20,3 +20,4 @@ Merge commit: n/a
 - r3 plan (written, not applied yet; resumes on the coordinator's word): B side-gabled (eave to the street, gables on the sides, mirror_roof about the house centre); C log-store lean-to (kit_leanto narrowed to stay inside the foundation) + a 0.006 rad/m twist; jetty 0.42-0.58 with curved bracket ends at every post line; storey heights 2.0-2.45 / 1.9-2.3; sway-backed ridge (sag 0.32); a ledged back door with step on every variant; an external stone chimney breast and stack over the back bay of one side wall; budget relief by side plaster grid 0.45 and front lattice 0.22.
 - sc_facade_kit.py change is additive only (a __main__ guard, defaults untouched): the facade and bakery export unchanged.
 - Unity: editor still downloading; check not run yet. HollowmereTownhouse.cs.meta will be committed after the first Unity import.
+- Resumed: merged origin/main (6762a0f; kept the bakery placement and the shared kit guard). r3 applied: A front gable 34,265 / B side gables 32,346 / C front gable + lean-to + twist 34,531 tris. r3 sheet rendering. Unity editor still downloading.
