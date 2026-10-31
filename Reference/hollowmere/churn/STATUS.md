@@ -1,5 +1,6 @@
 State: DONE
-Session: Q5. Builder churn fix
+Session: Wave 2: Square ground + dressing
+Job: Q5. Builder churn fix
 Progress: 100%
 Sheet: none (code only)
 Blocker: none

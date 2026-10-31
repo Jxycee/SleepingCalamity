@@ -1,7 +1,8 @@
 # Q3 ring 2 fill and the play-position captures: status
 
 State: DONE (merged to main d87f6bf)
-Session: Q3 Ring 2 fill and the play-position captures (cloud session, branch claude/brave-keller-3d91gk)
+Session: Bell tower: bake, integrate, check, merge
+Job: Q3 Ring 2 fill and the play-position captures (cloud session, branch claude/brave-keller-3d91gk)
 Progress: 100%
 Sheet: Reference/hollowmere/ring2/ring2_sheet.jpg
 SC RESULT: SC RESULT check PASS on 09be625 (test-edit 607/607, test-play 32 passed / 8 skipped / 0 failed); the merge's Assets equal the checked tip

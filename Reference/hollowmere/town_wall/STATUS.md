@@ -1,7 +1,8 @@
 # Q8 town wall, Lower Gate and East Gate: status
 
 State: IN PROGRESS
-Session: Q8 Town wall, Lower Gate and East Gate (cloud session, branch claude/brave-keller-3d91gk; bell tower, Q1, Q3 done before it)
+Session: Bell tower: bake, integrate, check, merge
+Job: Q8 Town wall, Lower Gate and East Gate (cloud session, branch claude/brave-keller-3d91gk; bell tower, Q1, Q3 done before it)
 Progress: 15%
 Sheet: none yet
 Blocker: none

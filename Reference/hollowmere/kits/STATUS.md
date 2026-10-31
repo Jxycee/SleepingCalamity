@@ -1,7 +1,8 @@
 # Q1 home kit families 2 and 4: status
 
 State: DONE (merged to main 3e4c2d8)
-Session: Q1 Home kit families 2 and 4 (cloud session, branch claude/brave-keller-3d91gk)
+Session: Bell tower: bake, integrate, check, merge
+Job: Q1 Home kit families 2 and 4 (cloud session, branch claude/brave-keller-3d91gk)
 Progress: 100%
 Sheet: Reference/hollowmere/kits/kits_town_sheet.jpg (also cottage_sheet.jpg, workshop_sheet.jpg)
 SC RESULT: SC RESULT check PASS on 7376e14 (test-edit 593/593, test-play 32 passed / 8 skipped / 0 failed); the merge's Assets equal the checked tip

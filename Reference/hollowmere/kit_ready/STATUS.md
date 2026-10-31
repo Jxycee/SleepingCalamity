@@ -1,5 +1,6 @@
 State: DONE
-Session: Q2: Smithy, schoolhouse and mill (kit-ready buildings)
+Session: Wave 1: Bakery (L, frame + parts)
+Job: Q2: Smithy, schoolhouse and mill (kit-ready buildings)
 Progress: 100%
 Sheet: Reference/hollowmere/kit_ready/SHEET_q2_unity.jpg
 Needs: none

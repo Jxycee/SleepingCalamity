@@ -1,5 +1,6 @@
 State: IN PROGRESS
-Session: Q9: Keep terrace (keep hall and terrace dressing)
+Session: Wave 1: Bakery (L, frame + parts)
+Job: Q9: Keep terrace (keep hall and terrace dressing)
 Progress: 50%
 Blocker: paused by coordinator for usage
 Needs: none

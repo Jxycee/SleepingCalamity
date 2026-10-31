@@ -1,5 +1,6 @@
 State: DONE
-Session: Q4: Dungeon corner (B5 cellar vault kit and the room)
+Session: Wave 1: Bakery (L, frame + parts)
+Job: Q4: Dungeon corner (B5 cellar vault kit and the room)
 Progress: 100%
 Sheet: Reference/hollowmere/dungeon_corner/SHEET_dungeon_corner_unity.jpg
 Needs: none

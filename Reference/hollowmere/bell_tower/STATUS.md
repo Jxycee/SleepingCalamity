@@ -1,7 +1,8 @@
 # Bell tower integration: status
 
 State: DONE (merged to main ee4fe79)
-Session: cloud, branch claude/brave-keller-3d91gk
+Session: Bell tower: bake, integrate, check, merge
+Job: cloud, branch claude/brave-keller-3d91gk
 Progress: 100%
 Sheet: Reference/hollowmere/bell_tower/bell_tower_sheet.jpg
 SC RESULT: SC RESULT check PASS (12a843a: build PASS, test-edit 591/591, test-play 32 passed / 8 skipped / 0 failed); main merge differs only in Reference/docs, so no re-check
