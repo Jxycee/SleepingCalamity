@@ -77,7 +77,7 @@ namespace SleepingCalamity.EditorTools
         static string PiecePath(string name) => Folder + "/" + name + "/" + name + ".fbx";
         static bool Exists(string name) => AssetDatabase.IsValidFolder(Folder) && AssetImporter.GetAtPath(PiecePath(name)) != null;
 
-        static Dictionary<string, Material> BuildMaterials()
+        internal static Dictionary<string, Material> BuildMaterials()   // also the Q15 road props (HollowmereRoad)
         {
             Dictionary<string, Material> map = BeautyCornerArt.BuildFacadeMaterials();
             BuilderUtil.EnsureFolder(MaterialsFolder);
@@ -103,7 +103,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Replaces every renderer's slot materials from the map; an unknown slot logs a warning and takes plain stone.
-        static void ApplyMaterials(GameObject obj, Dictionary<string, Material> slots, string label)
+        internal static void ApplyMaterials(GameObject obj, Dictionary<string, Material> slots, string label)
         {
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
