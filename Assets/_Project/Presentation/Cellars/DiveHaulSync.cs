@@ -6,6 +6,8 @@
 //   2. when the sender has a player object and the built floor's bank cell is known, the player is within BankRadius metres (XZ) of the bank cell centre
 //      (cell origin math from CellarFloorBuilder.CellCenter, via CellarFloorSync). Known gap: with no player object or no built floor on the host the
 //      position check is skipped (floor-has-bank only); no anti-cheat by design, so a modded client standing elsewhere is not a concern.
+// Stir meter (Core/Cellars/StirMeter, owned by the DiveState): host-only. The host's Update feeds it the connected player count, ticks the deep-closes countdown with
+// Time.deltaTime and fails the dive at 0; value, extra-enemy count, hunter/deep-closes latches and whole seconds left ride in the same Summary. Clients never write.
 // No auto-bank on walk-in. Healing at bank points (P47) is not here: no host HP API is wired to it yet.
 // Host disconnect: NGO shuts the session down and this object despawns (no host migration in Phase 1).
 using Unity.Netcode;
@@ -24,16 +26,23 @@ namespace SleepingCalamity.Presentation
         {
             public int UnbankedPieces, BankedPieces, UnbankedLoot, LeftFloor1, LeftFloor2, LeftFloor3, ClearedMask, CurrentFloor;
             public bool CheckpointReached;
+            // Stir meter (host-computed): value rounded to a whole point 0-100, extra enemies per room (latched), hunter and deep-closes latches, whole seconds left (rounded up, 0 = not running).
+            public int StirValue, ExtraEnemiesPerRoom, DeepSecondsLeft;
+            public bool HunterLatched, DeepClosesLatched;
             public int Left(int floor) => floor == 1 ? LeftFloor1 : floor == 2 ? LeftFloor2 : floor == 3 ? LeftFloor3 : 0;
             public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
             {
                 s.SerializeValue(ref UnbankedPieces); s.SerializeValue(ref BankedPieces); s.SerializeValue(ref UnbankedLoot);
                 s.SerializeValue(ref LeftFloor1); s.SerializeValue(ref LeftFloor2); s.SerializeValue(ref LeftFloor3);
                 s.SerializeValue(ref ClearedMask); s.SerializeValue(ref CurrentFloor); s.SerializeValue(ref CheckpointReached);
+                s.SerializeValue(ref StirValue); s.SerializeValue(ref ExtraEnemiesPerRoom); s.SerializeValue(ref DeepSecondsLeft);
+                s.SerializeValue(ref HunterLatched); s.SerializeValue(ref DeepClosesLatched);
             }
             public bool Equals(Summary o) => UnbankedPieces == o.UnbankedPieces && BankedPieces == o.BankedPieces && UnbankedLoot == o.UnbankedLoot
                 && LeftFloor1 == o.LeftFloor1 && LeftFloor2 == o.LeftFloor2 && LeftFloor3 == o.LeftFloor3 && ClearedMask == o.ClearedMask
-                && CurrentFloor == o.CurrentFloor && CheckpointReached == o.CheckpointReached;
+                && CurrentFloor == o.CurrentFloor && CheckpointReached == o.CheckpointReached
+                && StirValue == o.StirValue && ExtraEnemiesPerRoom == o.ExtraEnemiesPerRoom && DeepSecondsLeft == o.DeepSecondsLeft
+                && HunterLatched == o.HunterLatched && DeepClosesLatched == o.DeepClosesLatched;
             public override bool Equals(object obj) => obj is Summary o && Equals(o);
             public override int GetHashCode() => unchecked(((UnbankedPieces * 31 + BankedPieces) * 31 + UnbankedLoot) * 31 + ClearedMask * 7 + CurrentFloor);
         }
@@ -55,15 +64,29 @@ namespace SleepingCalamity.Presentation
 
         public override void OnNetworkDespawn() { _state = null; }
 
+        // Host only: the stir countdown runs on the host clock, and the player factor follows who is connected right now.
+        private void Update()
+        {
+            if (!Host) return;
+            _state.Stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
+            _state.Tick(Time.deltaTime);
+            Publish();
+        }
+
         private void Publish()
         {
             DiveHaul h = _state.Haul;
-            Net.Value = new Summary
+            StirMeter stir = _state.Stir;
+            stir.Refresh();
+            var next = new Summary
             {
+                StirValue = Mathf.RoundToInt(stir.Value), ExtraEnemiesPerRoom = stir.ExtraEnemiesPerRoom, DeepSecondsLeft = Mathf.CeilToInt(stir.DeepClosesSecondsLeft),
+                HunterLatched = stir.HunterLatched, DeepClosesLatched = stir.DeepClosesLatched,
                 UnbankedPieces = h.UnbankedPieceCount, BankedPieces = h.BankedPieceCount, UnbankedLoot = h.UnbankedLootCount,
                 LeftFloor1 = h.PiecesLeft(1), LeftFloor2 = h.PiecesLeft(2), LeftFloor3 = h.PiecesLeft(3),
                 ClearedMask = _state.ClearedMask, CurrentFloor = _state.CurrentFloor, CheckpointReached = _state.CheckpointReached,
             };
+            if (!next.Equals(Net.Value)) Net.Value = next;   // the countdown ticks every frame; only send when something a peer can see changed
         }
 
         private bool Host => IsServer && IsSpawned && _state != null;
@@ -72,8 +95,13 @@ namespace SleepingCalamity.Presentation
         // New dive state with the given pieces per floor 1-3 (clears checkpoint, cleared floors and the haul).
         public bool ServerBegin(int[] piecesPerFloor)
         {
+            return ServerBegin(piecesPerFloor, StirTuning.Default);
+        }
+        // Same, with explicit stir tuning (tests use a short countdown).
+        public bool ServerBegin(int[] piecesPerFloor, StirTuning tuning)
+        {
             if (!IsServer || !IsSpawned || piecesPerFloor == null) return false;
-            _state = new DiveState(new DiveHaul(piecesPerFloor)); Publish(); return true;
+            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); Publish(); return true;
         }
         public bool ServerAddPiece(int pieceId) { if (!Host || !_state.Haul.AddPiece(pieceId)) return false; Publish(); return true; }
         public bool ServerAddLoot(int itemId, int count) { if (!Host || !_state.Haul.AddLoot(itemId, count)) return false; Publish(); return true; }

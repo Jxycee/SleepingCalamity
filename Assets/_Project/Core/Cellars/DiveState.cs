@@ -13,7 +13,10 @@ namespace SleepingCalamity.Core
         public bool CheckpointReached { get; private set; }
         public int ClearedMask { get; private set; }
 
-        public DiveState(DiveHaul haul) { Haul = haul; }
+        public StirMeter Stir { get; }   // floors cleared / unbanked pieces / banks feed it; town bank and failed dive reset it
+
+        public DiveState(DiveHaul haul) : this(haul, StirTuning.Default) { }
+        public DiveState(DiveHaul haul, StirTuning tuning) { Haul = haul; Stir = new StirMeter(haul, tuning); }
 
         public static bool FloorHasBank(int floor) => floor == CheckpointFloor || floor == HeartFloor;
 
@@ -30,6 +33,7 @@ namespace SleepingCalamity.Core
         {
             if (floor < 1 || floor > MaxFloor) return false;
             ClearedMask |= 1 << (floor - 1);
+            Stir.OnFloorCleared(floor);
             return true;
         }
 
@@ -38,6 +42,7 @@ namespace SleepingCalamity.Core
         {
             if (!FloorHasBank(CurrentFloor)) return false;
             Haul.Bank();
+            Stir.OnBank();
             if (CurrentFloor == CheckpointFloor) CheckpointReached = true;
             return true;
         }
@@ -47,6 +52,7 @@ namespace SleepingCalamity.Core
         {
             if (CurrentFloor != Town) return false;
             Haul.Bank();
+            Stir.ResetAll();
             return true;
         }
 
@@ -54,7 +60,16 @@ namespace SleepingCalamity.Core
         public void FailDive()
         {
             Haul.FailDive();
+            Stir.ResetAll();
             CurrentFloor = Town;
+        }
+
+        // Host clock: advances the stir countdown. True when the deep closed and the dive was failed.
+        public bool Tick(float dt)
+        {
+            if (!Stir.Tick(dt)) return false;
+            FailDive();
+            return true;
         }
     }
 }
