@@ -31,6 +31,9 @@ namespace SleepingCalamity.EditorTools
         static readonly HashSet<string> lots = new HashSet<string>();
         static int lotsAllot, lotsYard, pieces; static long tris;
         static string firstYardLot, allotCamLot = "R2_07";
+        const float FenceHeight = 0.75f;         // the whole fence is lowered so the beds read over it
+        const float FrontRun = 1.1f;             // door side: only this much fence beside the gate posts
+        static readonly List<Vector2> posts = new List<Vector2>();   // post positions already standing on this lot (lot frame): one post per junction
 
         // ------------------------------------------------------------------------------------------------ allotments
         // Fills a garden lot in its lot frame g. False when the art is missing (the caller keeps the greybox).
@@ -38,6 +41,7 @@ namespace SleepingCalamity.EditorTools
         {
             if (Model("Fence_Run") == null || Model("VegBed_A") == null) { Debug.LogWarning("SC HOLLOWMERE garden art missing: " + Folder); return false; }
             var root = new GameObject("Allotment").transform; root.SetParent(g, false);
+            posts.Clear();
             float half = f.Side * 0.5f, iH = half - 0.4f, e = half - 0.3f;
             float colX = Mathf.Min(half - 1.05f, 1.9f);
             float s = Rand(f.Id, 1) > 0.5f ? 1f : -1f;                 // which side takes the butt and the cold frame
@@ -53,12 +57,24 @@ namespace SleepingCalamity.EditorTools
             Place(root, "VegBed_A", s * colX, iH - 1.3f, s * 90f + 180f + Jit(f.Id, 14, 3f));
             Place(root, "Trellis", xg * 0.5f, iH - 0.2f, 180f + Jit(f.Id, 15, 2f));
             if (System.Array.IndexOf(Scarecrows, f.Id) >= 0) Place(root, "Scarecrow", xg, iH - 1.5f, 180f + Jit(f.Id, 16, 25f));
-            // fence all round, the gate on the door side
+            // soil over the slab interior and tufts along the fence foot
+            Soil(root, f.Side - 0.4f);
+            for (int i = 0; i < 8; i++)
+            {
+                float t = Rand(f.Id, 30 + i), u = Rand(f.Id, 50 + i), inner = e - 0.22f;
+                int side = i % 3;   // back, left, right (the door side has the gate and stays clear)
+                Vector3 lp = side == 0 ? new Vector3((t - 0.5f) * 2f * inner, 0f, inner) : new Vector3(side == 1 ? -inner : inner, 0f, (t - 0.5f) * 2f * inner * 0.8f + 0.3f);
+                lp.y = FootingTop + 0.03f;
+                HollowmereFoliage.Tuft(root, "Grass_" + "ABC"[(int)(u * 2.999f)], root.TransformPoint(lp), u * 360f, 0.7f + 0.5f * Rand(f.Id, 70 + i));
+            }
+            // fence: the gate and a short run beside it on the door side, the other three sides closed; all lowered
             Place(root, "Fence_Gate", xg, -e, 180f);
             Vector2 gl = new Vector2(xg - GatePost, -e), gr = new Vector2(xg + GatePost, -e);
             Vector2 fl = new Vector2(-e, -e), bl = new Vector2(-e, e), br = new Vector2(e, e), fr = new Vector2(e, -e);
-            Chain(root, gl, fl, false, true); Chain(root, fl, bl, false, true); Chain(root, bl, br, false, true);
-            Chain(root, br, fr, false, true); Chain(root, fr, gr, false, false);
+            AddPost(gl); AddPost(gr);
+            Chain(root, gl, gl + Vector2.left * FrontRun, false, true);
+            Chain(root, gr + Vector2.right * FrontRun, gr, true, false);
+            Chain(root, fl, bl, true, true); Chain(root, bl, br, false, true); Chain(root, br, fr, false, true);
             lots.Add(f.Id); lotsAllot++;
             return true;
         }
@@ -80,6 +96,7 @@ namespace SleepingCalamity.EditorTools
             float room = YardRoom(f, out float be, out float w);
             if (room < 1.3f || Model("Fence_Run") == null) return;
             var root = new GameObject("Yard").transform; root.SetParent(g, false);
+            posts.Clear();
             float half = f.Side * 0.5f, e = half - 0.3f;
             float s = Rand(f.Id, 4) > 0.5f ? 1f : -1f;
             Place(root, "VegBed_B", -s * 1.0f, be + 0.2f + 0.55f, 0f + Jit(f.Id, 20, 2f));
@@ -126,9 +143,32 @@ namespace SleepingCalamity.EditorTools
                 Vector2 c = a + d * ((i + 0.5f) * len / n);
                 GameObject o = Place(root, "Fence_Run", c.x, c.y, yaw, scale);
                 if (o == null) continue;
-                SetPart(o, "Part_PostA", i == 0 && showA);
-                SetPart(o, "Part_PostB", i < n - 1 || showB);
+                Vector2 pa = c - d * (RunPost * scale * 0.5f), pb = c + d * (RunPost * scale * 0.5f);
+                SetPart(o, "Part_PostA", i == 0 && showA && AddPost(pa));
+                SetPart(o, "Part_PostB", (i < n - 1 || showB) && AddPost(pb));
             }
+        }
+
+        // True when no post stands within 0.2 m of p yet (then it is recorded); a second post at a junction is hidden.
+        static bool AddPost(Vector2 p)
+        {
+            foreach (Vector2 q in posts) if ((q - p).sqrMagnitude < 0.04f) return false;
+            posts.Add(p); return true;
+        }
+
+        // A 3 cm slab of packed soil over the footing top, inset 0.2 m from its edge, UVs in metres / 2 (the tileable convention).
+        static void Soil(Transform root, float slab)
+        {
+            float h = slab * 0.5f - 0.2f, y = FootingTop + 0.03f;
+            var m = new Mesh { name = "GD_Soil" };
+            m.vertices = new[] { new Vector3(-h, y, -h), new Vector3(-h, y, h), new Vector3(h, y, h), new Vector3(h, y, -h) };
+            m.uv = new[] { new Vector2(-h, -h) * 0.5f, new Vector2(-h, h) * 0.5f, new Vector2(h, h) * 0.5f, new Vector2(h, -h) * 0.5f };
+            m.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+            m.RecalculateNormals(); m.RecalculateTangents(); m.RecalculateBounds();
+            var go = new GameObject("GD_Soil"); go.transform.SetParent(root, false);
+            go.AddComponent<MeshFilter>().sharedMesh = m;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = Slots()["packed_soil"]; r.shadowCastingMode = ShadowCastingMode.Off;
+            tris += 2;
         }
 
         static void SetPart(GameObject o, string part, bool on)
@@ -147,7 +187,7 @@ namespace SleepingCalamity.EditorTools
             obj.name = "GD_" + asset;
             obj.transform.localPosition = new Vector3(x, FootingTop, z);
             obj.transform.localRotation = Quaternion.Euler(0f, faceYaw, 0f);
-            obj.transform.localScale = new Vector3(lengthScale, 1f, 1f);
+            obj.transform.localScale = new Vector3(lengthScale, asset.StartsWith("Fence_") ? FenceHeight : 1f, 1f);
             Dictionary<string, Material> slots = Slots();
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
