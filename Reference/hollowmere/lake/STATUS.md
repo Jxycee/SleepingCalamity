@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Q10. Lake shore, stream and ravine
-Progress: 20%
+Progress: 25%
 Sheet: none yet
-Blocker: paused by coordinator for usage
+Blocker: none
 
 Score: -
 Tris: -
@@ -38,3 +38,4 @@ Log:
 - WIP 9c3fcd4: SC_Water.shader, HollowmereWater.cs, lake cameras, uncompiled. Waiting for the Unity editor install (cloud setup still extracting).
 - Paused by the coordinator (usage). Shore-art agent stopped before it wrote any files (it was choosing Commons references). Unity editor is now
   installed. On resume: compile + fix SC_Water/HollowmereWater, capture the five lake cameras, then relaunch the shore-art generator.
+- Resumed after the usage pause: compile + capture loop (Sonnet), then the shore-art generator (Sonnet).
