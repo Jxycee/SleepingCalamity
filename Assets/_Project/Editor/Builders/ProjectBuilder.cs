@@ -41,6 +41,7 @@ namespace SleepingCalamity.EditorTools
             Step(errors, "Scenes", SceneBuilder.BuildAll);
             Step(errors, "LookTest", LookTestBuilder.Build);
             Step(errors, "BeautyCorner", BeautyCornerBuilder.Build);
+            Step(errors, "Hollowmere", HollowmereBuilder.Build);   // after BeautyCorner: reuses its look assets and rows; throws on an invalid town layout
             Step(errors, "BuildSettings", SceneBuilder.ApplyBuildSettings);
             Step(errors, "Save", AssetDatabase.SaveAssets);
             Step(errors, "Validate", () => errors.AddRange(ValidationRunner.Run()));   // after Save: the validators read what is on disk
