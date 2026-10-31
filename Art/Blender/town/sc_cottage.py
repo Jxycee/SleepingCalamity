@@ -59,11 +59,11 @@ repatch('kit_roof', [('for i in range(13):', 'for i in range(9):'), ('i * (2 * W
 # ----------------------------------------------------------------------------- variants
 VARIANTS = {
     'StoneCottage_A': dict(roof='tile', chimney='gable+', porch=True, lean=False, dormer=False, flower=True,
-                           hex='#3e5670', rubble=(0.60, 0.60, 0.60), thatch=None),
+                           hex='#3e5670', rubble=(0.54, 0.56, 0.58), thatch=None),
     'StoneCottage_B': dict(roof='thatch', chimney='gable-', porch=False, lean=False, dormer=True, flower=True,
-                           hex='#4a6a48', rubble=(0.67, 0.61, 0.53), thatch=(1.80, 1.66, 1.02)),
+                           hex='#4a6a48', rubble=(0.62, 0.58, 0.52), thatch=(2.55, 2.35, 1.20)),
     'StoneCottage_C': dict(roof='thatch', chimney='ridge', porch=False, lean=True, dormer=False, flower=False,
-                           hex='#6a2e29', rubble=(0.62, 0.60, 0.57), thatch=(1.52, 1.46, 1.12)),
+                           hex='#6a2e29', rubble=(0.56, 0.56, 0.57), thatch=(2.05, 1.92, 1.30)),
 }
 for _n in VARIANTS:
     VARIANTS[_n]['seed'] = zlib.crc32(_n.encode())
@@ -78,9 +78,9 @@ def cfg(name):
     V = dict(VARIANTS[name]); R = random.Random(V['seed'])
     gable = V['chimney'].startswith('gable')
     V['w'] = round(R.uniform(3.80, 4.15) if gable else R.uniform(3.50, 3.65), 2)
-    V['d'] = round(R.uniform(3.50, 3.75) if V['porch'] else R.uniform(3.55, 3.95), 2)
+    V['d'] = round(R.uniform(3.45, 3.60) if V['porch'] else R.uniform(3.55, 3.95), 2)
     V['WH'] = round(R.uniform(2.30, 2.55), 2)
-    V['pitch'] = round(R.uniform(41, 45) if V['roof'] == 'tile' else R.uniform(47, 52), 1)
+    V['pitch'] = round(R.uniform(36, 40) if V['roof'] == 'tile' else R.uniform(44, 48), 1)
     V['ds'] = R.choice((-1, 1))                       # door side: -1 door left of the window
     V['door_x'] = round(-V['ds'] * (0.55 + R.uniform(-0.05, 0.10)), 2)
     V['win_x'] = round(V['ds'] * (V['w'] / 2 - 0.95), 2)
@@ -184,7 +184,7 @@ def _grid_faces(pc, mat, org, n, t, us, zrows, holes, lump, skip_hole=True):
             l[uvl].uv = _uv_world(l.vert.co, n)
     FK._merge(pc, bm, mat)
 
-def panel(pc, mat, org, nrm, u0, u1, z0, z1, holes=(), cell=0.24, lump=0.03):
+def panel(pc, mat, org, nrm, u0, u1, z0, z1, holes=(), cell=0.20, lump=0.045):
     n = Vector(nrm); t = Vector((0, 0, 1)).cross(n); org = Vector(org)
     k = lambda a, b: max(1, round((b - a) / cell))
     us = sorted(set([u0, u1] + [h[0] for h in holes] + [h[1] for h in holes] + [u0 + (u1 - u0) * i / k(u0, u1) for i in range(1, k(u0, u1))]))
@@ -192,7 +192,7 @@ def panel(pc, mat, org, nrm, u0, u1, z0, z1, holes=(), cell=0.24, lump=0.03):
     us = [u for u in us if u0 <= u <= u1]; zs = [z for z in zs if z0 <= z <= z1]
     _grid_faces(pc, mat, org, n, t, us, [zs] * len(us), holes, lump)
 
-def panel_top(pc, mat, org, nrm, u0, u1, z0, topfn, cell=0.24, nv=4, lump=0.03):
+def panel_top(pc, mat, org, nrm, u0, u1, z0, topfn, cell=0.22, nv=4, lump=0.045):
     """Panel whose top edge follows topfn(u) (gable triangles, lean-to walls)."""
     n = Vector(nrm); t = Vector((0, 0, 1)).cross(n); org = Vector(org)
     nu = max(1, round((u1 - u0) / cell))
@@ -333,7 +333,7 @@ def chimney_gable(pc, c, sgn, ridge_top):
     FK.add_box(pc, 'stone', (0.86, 1.48, 0.13), Matrix.Translation((xw + sgn * 0.27, cy, WH + 0.30 + 0.05)), cham=0.04, segs=2,
                uv_world=True, wob=0.006, seed=32.0)
     zb = WH + 0.36
-    chimney_stack(pc, xw + sgn * 0.27 + sgn * 0.02, cy, zb, ridge_top + 0.60, 0.70, 1.00, 33.0)
+    chimney_stack(pc, xw + sgn * 0.27 + sgn * 0.02, cy, zb, ridge_top + 0.60, 0.80, 1.18, 33.0)
     # pale quoins up the stack corners
     R = FK.rng('chq%d' % sgn)
     nn = int((ridge_top + 0.60 - zb) / 0.30)
@@ -490,14 +490,14 @@ def thatch_roof(c):
         pts = [Vector((p[0], p[1], zu(*p))) for p in (a, b, cc, dd)]
         poly(pc, 'oak', pts, away=Vector((0, 0, S.zr + 2)))
     # ridge roll along x: a fat half-round of thatch, bound, with rounded ends
-    rr = 0.27; segs = 10; nxr = 24
+    rr = 0.25; segs = 10; nxr = 28
     bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
     rows = []
     for q in range(nxr + 1):
         x = -S.X1 - 0.06 + (2 * S.X1 + 0.12) * q / nxr
         u = abs(x) / (S.X1 + 0.06)
-        end = max(0.0, (u - 0.90) / 0.10)
-        sc = math.sqrt(max(0.0, 1 - end * end * 0.8))                 # round the end
+        end = max(0.0, (u - 0.80) / 0.20)
+        sc = math.sqrt(max(0.0, 1 - end * end * 0.92))                 # round the end
         xe = x + math.copysign(0.0, x)
         row = []
         zc = S.smooth(x, 0.0) - 0.03
@@ -638,7 +638,7 @@ def build(name):
         u0, u1 = spans[side]
         # the wall's u runs along t = Z x n; for back/left the u axis flips, so holes are given in u already
         hs = [(a, b, z0, z1) for (a, b, z0, z1) in holes[side]]
-        panel(F, 'rubble', org, n, u0, u1, 0.20, WH, hs, cell=0.24)
+        panel(F, 'rubble', org, n, u0, u1, 0.20, WH, hs, cell=0.20)
         if side == 'front':
             reveal(F, org, n, door[0], door[1], door[2], door[3], T)   # windows get the kit's oak reveals
     # gable triangles
@@ -725,7 +725,7 @@ def build(name):
 def porch(F, c, door, ridge_top):
     w, d = c['w'], c['d']
     dx = c['door_x']
-    hw = 0.92; P = 0.92
+    hw = 0.92; P = 0.85
     y0 = -d / 2; y1 = y0 - P
     zE = 2.30; rise = 0.66
     for sx in (-1, 1):
@@ -853,8 +853,8 @@ def write_wear(ob, c, kind):
                 g = max(g, max(0.0, noise.noise(p * 1.6 + Vector((2, 0, 5))) * 1.5 - 0.25) * (0.9 if p.y > 0 else 0.45))
             if mn == 'SC_Thatch':
                 low = max(0.0, 1 - (p.z - (WH - 0.2)) / 0.9)
-                r = max(r, low * 0.55 + 0.25 * max(0.0, nz))
-                g = max(g, max(0.0, noise.noise(p * 2.0 + Vector((5, 1, 0))) * 1.5 - 0.1) * (0.85 if p.y > 0 else 0.35))
+                r = max(r, low * 0.35 + 0.10 * max(0.0, nz))
+                g = max(g, max(0.0, noise.noise(p * 2.0 + Vector((5, 1, 0))) * 1.3 - 0.35) * (0.6 if p.y > 0 else 0.2))
                 if abs(p.y) < 0.38 and p.z > c['WH'] + 1.0 and n.z > 0.2:
                     b = max(b, 0.45)                                  # fresher, paler straw on the ridge roll
             if mn == 'FK_ChimneyStone' or (mn in ('SC_Rubble', 'FK_Sandstone', 'FK_RoofTile') and p.z > ctop - 1.4 and
@@ -982,10 +982,49 @@ def audit(name):
             print('  mesh %-14s parent=%-16s tris=%5d wear=%s slots=%s' % (o.name, o.parent.name if o.parent else None, tris, 'wear' in ca, slots))
         else:
             print('  empty %-14s parent=%s loc=%s' % (o.name, o.parent.name if o.parent else None, tuple(round(x, 2) for x in o.matrix_world.translation)))
-    # facing check: from every face of each mesh, a ray along its normal must not hit another face from behind
+    # facing check: every closed island (stones, posts, pots, logs...) must have positive signed volume (outward normals);
+    # open shells (wall panels, roof decks, lips) are oriented by construction and are checked by --ray below.
+    tot_closed = tot_open = tot_neg = 0
+    for o in allo:
+        if o.type != 'MESH' or o.name == 'FOOTPRINT':
+            continue
+        bm = bmesh.new(); bm.from_mesh(o.data); bm.faces.ensure_lookup_table()
+        seen = set(); neg = []; nclosed = nopen = 0
+        for f0 in bm.faces:
+            if f0.index in seen:
+                continue
+            stack = [f0]; isl = []
+            seen.add(f0.index)
+            while stack:
+                f = stack.pop(); isl.append(f)
+                for e in f.edges:
+                    for g in e.link_faces:
+                        if g.index not in seen:
+                            seen.add(g.index); stack.append(g)
+            closed = all(len(e.link_faces) == 2 for f in isl for e in f.edges)
+            if closed:
+                nclosed += 1
+                vol = 0.0
+                for f in isl:
+                    vs = [v.co for v in f.verts]
+                    for i in range(1, len(vs) - 1):
+                        vol += vs[0].dot(vs[i].cross(vs[i + 1])) / 6.0
+                if vol < 0:
+                    neg.append((round(vol, 4), tuple(round(x, 2) for x in isl[0].calc_center_median())))
+            else:
+                nopen += 1
+        bm.free()
+        tot_closed += nclosed; tot_open += nopen; tot_neg += len(neg)
+        print('  normals %-14s closed islands %4d (inside-out %d)  open shells %4d  %s' % (o.name, nclosed, len(neg), nopen, neg[:4]))
+    print('  NORMALS closed inside-out total:', tot_neg)
+    fp = [o for o in allo if o.name == 'FOOTPRINT']
+    if fp:
+        bb = [fp[0].matrix_world @ Vector(v) for v in fp[0].bound_box]
+        print('  FOOTPRINT size (Unity x,z):', round(max(v.x for v in bb) - min(v.x for v in bb), 2), 'x', round(max(v.y for v in bb) - min(v.y for v in bb), 2))
+    if '--ray' not in argv:
+        return
     dg = bpy.context.evaluated_depsgraph_get()
     meshes = [o for o in allo if o.type == 'MESH' and o.name != 'FOOTPRINT']
-    bad_total = 0
     verts = []; tri = []; owner = []
     for o in meshes:
         me = o.data; me.calc_loop_triangles()
@@ -995,28 +1034,23 @@ def audit(name):
             tri.append(tuple(base + i for i in lt.vertices)); owner.append((o.name, me.materials[me.polygons[lt.polygon_index].material_index].name))
     bvh = BVHTree.FromPolygons(verts, tri)
     from collections import Counter
-    bad = Counter()
-    n_ok = 0
-    for ti, t in enumerate(tri):
-        a, b, c_ = [verts[i] for i in t]
-        nrm = (b - a).cross(c_ - a)
-        if nrm.length < 1e-9:
+    rr = random.Random(5)
+    bad = Counter(); n_hit = 0
+    for _ in range(6000):
+        # a ray from a sphere around the building aimed at a random point of the body: the first surface it meets must face it
+        th = rr.uniform(0, 2 * math.pi); el = rr.uniform(-0.05, 1.1)
+        o = Vector((14 * math.cos(el) * math.cos(th), 14 * math.cos(el) * math.sin(th), 14 * math.sin(el) + 1.0))
+        tgt = Vector((rr.uniform(-2.5, 2.5), rr.uniform(-2.5, 2.5), rr.uniform(0.2, 5.0)))
+        dirv = (tgt - o).normalized()
+        hit = bvh.ray_cast(o, dirv)
+        if hit[0] is None:
             continue
-        nrm.normalize()
-        ctr = (a + b + c_) / 3
-        hit = bvh.ray_cast(ctr + nrm * 0.004, nrm, 4.0)
-        if hit[0] is not None:
-            tn = tri[hit[2]]
-            hn = (verts[tn[1]] - verts[tn[0]]).cross(verts[tn[2]] - verts[tn[0]])
-            if hn.length > 1e-9 and hn.normalized().dot(nrm) > 0.05:
-                bad[owner[ti]] += 1
-                continue
-        n_ok += 1
-    print('  facing: %d tris ok, %d see a back face along their normal: %s' % (n_ok, sum(bad.values()), dict(bad)))
-    fp = [o for o in allo if o.name == 'FOOTPRINT']
-    if fp:
-        bb = [fp[0].matrix_world @ Vector(v) for v in fp[0].bound_box]
-        print('  FOOTPRINT size (Unity x,z):', round(max(v.x for v in bb) - min(v.x for v in bb), 2), 'x', round(max(v.y for v in bb) - min(v.y for v in bb), 2))
+        n_hit += 1
+        tn = tri[hit[2]]
+        hn = (verts[tn[1]] - verts[tn[0]]).cross(verts[tn[2]] - verts[tn[0]])
+        if hn.length > 1e-9 and hn.normalized().dot(dirv) > 0.0:
+            bad[owner[hit[2]]] += 1
+    print('  VISIBLE-FACE ray test: %d rays hit, %d first hits are back faces: %s' % (n_hit, sum(bad.values()), dict(bad)))
 
 if __name__ == '__main__':
     which = arg('--variant', 'all')
