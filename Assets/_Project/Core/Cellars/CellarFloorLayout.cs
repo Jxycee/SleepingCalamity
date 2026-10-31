@@ -68,6 +68,8 @@ namespace SleepingCalamity.Core
         public const int GridSize = 14, CellMeters = 4;
 
         public readonly uint Seed; public readonly int Floor;
+        public bool LastResort { get; private set; }      // set only by CellarFloorGenerator.GenerateLastResort when it had to relax the exit bound; the validator then skips that one bound
+        public void MarkLastResort() { LastResort = true; }
         public readonly bool IsStub;                      // floor 4: the fixed placeholder, exempt from the count rules of floors 1-3
         public readonly SubTheme Theme;
         public readonly IReadOnlyList<PlacedRoom> Rooms;

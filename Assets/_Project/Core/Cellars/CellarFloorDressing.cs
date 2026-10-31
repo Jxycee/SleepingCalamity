@@ -114,7 +114,7 @@ namespace SleepingCalamity.Core
             if (room.CellAt(x, y) != CellKind.Floor) return false;
             // never on a door, chest, feature or a cell a barrel or crate may stand in; strict also keeps off the cells beside doors, spawns and wall-mounted sockets
             foreach (CellDoor d in room.Doors) if (Math.Abs(d.X - x) + Math.Abs(d.Y - y) <= (strict ? 1 : 0)) return false;
-            foreach (CellarSpawn s in room.Spawns) if (strict && s.X == x && s.Y == y) return false;
+            foreach (CellarSpawn s in room.Spawns) if (s.X == x && s.Y == y) return false;   // enemy spawn cells stay clear in every pass
             foreach (ChestSlot c in room.Chests) if (c.X == x && c.Y == y) return false;
             foreach (RoomFeature f in room.Features) if (f.X == x && f.Y == y) return false;
             foreach (DressingSocket k in room.Sockets)

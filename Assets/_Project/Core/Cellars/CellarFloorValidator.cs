@@ -159,9 +159,9 @@ namespace SleepingCalamity.Core
                 for (int x = 0; x < G; x++) for (int y = 0; y < G; y++) if (walk[x, y] && !all[x, y]) lost++;
                 if (lost > 0) Err(lost + " walkable cell(s) cannot be reached from the entry (rooms not all connected)");
                 if (l.StairExit.HasValue && !open[l.StairExit.Value.X, l.StairExit.Value.Y]) Err("the stair exit is not reachable from the entry without passing the locked door");
-                if (!l.IsStub && l.StairExit.HasValue && l.EntryToExitDistance() < CellarFloorGenerator.MinExitDistance)
-                Err("the stair exit is only " + l.EntryToExitDistance() + " steps from the entry, needs at least " + CellarFloorGenerator.MinExitDistance);
-            if (l.KeyChest != null && !open[l.KeyChest.X, l.KeyChest.Y]) Err("the key chest is not reachable without passing the locked door");
+                if (!l.IsStub && !l.LastResort && l.StairExit.HasValue && l.EntryToExitDistance() < CellarFloorGenerator.MinExitDistance)
+                    Err("the stair exit is only " + l.EntryToExitDistance() + " steps from the entry, needs at least " + CellarFloorGenerator.MinExitDistance);
+                if (l.KeyChest != null && !open[l.KeyChest.X, l.KeyChest.Y]) Err("the key chest is not reachable without passing the locked door");
                 if (l.Carrier != null && !open[l.Carrier.X, l.Carrier.Y]) Err("the gate-key carrier is not reachable without passing the locked door");
             }
 

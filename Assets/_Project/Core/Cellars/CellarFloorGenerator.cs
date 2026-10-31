@@ -182,15 +182,14 @@ namespace SleepingCalamity.Core
         {
             if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-3");
             CellarFloorPlan plan = MinimalPlan(seed, floor);
+            // Two streams get the full exit bound; the minimal plan rarely reaches it, so the rest relax it at once instead of burning every stream first.
             for (int n = 0; n < LastResortStreams; n++)
             {
-                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, MinExitDistance);
-                if (l != null) return l;
-            }
-            for (int n = 0; n < LastResortStreams; n++)   // no stream met the exit bound: a floor with a short exit beats no floor
-            {
-                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, 0);
-                if (l != null) return l;
+                int bound = n < 2 ? MinExitDistance : 0;
+                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, bound);
+                if (l == null) continue;
+                if (l.EntryToExitDistance() < MinExitDistance) l.MarkLastResort();   // a floor with a short exit beats no floor
+                return l;
             }
             throw new InvalidOperationException("CellarFloorGenerator: even the minimal plan did not place for seed " + seed + " floor " + floor);
         }
