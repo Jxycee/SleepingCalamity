@@ -1,16 +1,30 @@
 # Q11 lane kit: status
 
-State: IN PROGRESS
+State: DONE
+Archive: ready
 Session: Q11. Lane kit: lane walls, steps and lane dressing
-Progress: 70%
-Sheet: Reference/hollowmere/lanes/SHEET_lane_kit.jpg
+Progress: 100%
+Sheet: Reference/hollowmere/lanes/SHEET_lanes_unity.jpg (kit sheet: Reference/hollowmere/lanes/SHEET_lane_kit.jpg)
 Blocker: none
 
-Score: kit sheet self 29/40 (agent: 26.5 -> 28 -> 29; controller read about 27: gate leaf reads flat, steps slab-like); Unity captures pending
-Tris: kit 19,066 after the art fix round (gate leaf rebuilt, review backdrop replaced by real RetainWall modules; self 29.5/40)
-Tris (old): kit 18,562 (17 pieces, all within budget)
-SC RESULT: -
-Merge commit: -
+Score: Unity captures about 28/40 (Market Street 29, West Lane mouth 28, Ring Lane SW steps 26; first 26, target 31 not reached, stopped at the
+  round limit). Kit sheet: self 29.5/40 after the coordinator's fix round (coordinator read ~26 before it).
+Tris: kit 19,066 (17 pieces, all within budget); 1326 placement rows (Ruined 1059, Rebuilt 1061 pieces).
+SC RESULT: SC RESULT check PASS on f578e61 (build PASS, test-edit 711/711, test-play 32 passed / 8 skipped / 0 failed); the merge's tree equals the checked tip
+Merge commit: 6ce70f2
+
+Result:
+- Art: Art/Blender/town/sc_lane_kit.py -> Content/Art/Town/Lanes/LaneKit/LaneKit.fbx + SOURCES.md (LK_* slots on the shared B1 tileables): garden
+  wall/broken/end, retaining wall/low/breach/buttress, lane step, kerb, gutter/choked/grate, wall lantern/broken, gate pier, gate leaf/broken.
+- Placement: Core LaneKitPlan (pure C#, golden-tested): stepped flights on every lane segment >= 0.18 grade (all within the 20 deg rule, risers
+  <= 0.2 m and under the player step offset), kerbed ramps 0.05-0.18, gutters with grates, garden walls with yard gates on free lane edges, kit
+  retaining walls replacing the greybox terrace lines and the lot cut/fill boxes (stacked to full height), lanterns ~15 m (lit in Rebuilt, broken
+  in Ruined). Ring 2 lanes only; clear of the Q8 wall, the keep, lots, landmarks and path edges. Editor placer HollowmereLanes (art or greybox).
+- Cameras: Cap_HM_MarketStreet (low on the street looking up the flight), Cap_HM_LaneMouthWest, Cap_HM_TerraceSteps.
+- Checked first (user rule): the hill-town stepped street for >13 deg lanes; Q8's TownWallPlan/HollowmereTownWall and Q9's keep terrace kit as
+  templates; no external tool fits the layout-row builder.
+- Weak / next visible gains: the gutter still reads dark and thin at mid distance (Ring Lane SW); gate paint pale grey-green; retaining wall flat
+  tan at range; moss cushions on wall tops; warmer ochre stones in the rubble.
 
 History:
 - 2026-10-31 started on branch claude/zen-feynman-991yav (main merged in). Read the spec (2, 5, 7), the brief, HollowmereLayout lanes, the builder's
