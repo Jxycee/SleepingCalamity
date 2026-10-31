@@ -43,6 +43,20 @@ def local_to_world(cx, cz, yaw, lx, lz):
     return cx + math.cos(r) * lx + math.sin(r) * lz, cz - math.sin(r) * lx + math.cos(r) * lz
 
 
+# Hypsometric tint: low meadow green, mid olive, the shelf warm ochre, the keep and hill pale stone (metres, square = 0).
+HYPSO = [(-12, (96, 136, 92)), (-9, (120, 156, 98)), (-6, (150, 172, 104)), (-3, (186, 186, 118)), (0, (222, 204, 140)), (4, (236, 222, 180)), (14, (246, 240, 222))]
+
+
+def hypso(y):
+    if y <= HYPSO[0][0]:
+        return HYPSO[0][1]
+    for (y0, c0), (y1, c1) in zip(HYPSO, HYPSO[1:]):
+        if y <= y1:
+            t = (y - y0) / (y1 - y0)
+            return tuple(int(a + (b - a) * t) for a, b in zip(c0, c1))
+    return HYPSO[-1][1]
+
+
 def ground_image(d, v):
     hm = d["hm"]
     nx, nz, step, x0, z0, h = hm["nx"], hm["nz"], hm["step"], hm["x0"], hm["z0"], hm["h"]
@@ -73,13 +87,12 @@ def ground_image(d, v):
                 depth = min(1.0, (water - y) / 3.5)
                 col = (int(118 - 40 * depth), int(160 - 35 * depth), int(178 - 10 * depth))
             else:
-                t = max(0.0, min(1.0, (y + 10) / 18.0))   # meadow green low, ochre-green up the hill
-                col = (int(150 + 50 * t), int(170 + 22 * t), int(112 + 18 * t))
+                col = hypso(y)
                 # hillshade from the north-west
                 dx = hs[j][min(gw - 1, i + 1)] - hs[j][max(0, i - 1)]
                 dz = hs[max(0, j - 1)][i] - hs[min(gh - 1, j + 1)][i]
-                shade = max(-1.0, min(1.0, (-dx + dz) / (4 * res) * 1.6))
-                col = tuple(int(max(0, min(255, c * (1 + 0.22 * shade)))) for c in col)
+                shade = max(-1.0, min(1.0, (-dx + dz) / (4 * res) * 1.2))
+                col = tuple(int(max(0, min(255, c * (1 + 0.38 * shade)))) for c in col)
                 # contours
                 c1 = math.floor(y)
                 edge = any(math.floor(hs[jj][ii]) != c1 for jj, ii in ((j, min(gw - 1, i + 1)), (min(gh - 1, j + 1), i)))
@@ -119,7 +132,7 @@ def draw(d, v, out, title, detail):
     kw, kz = d["keepHalfWidth"], d["keepWallZ"]
     dr.polygon([v.p(-kw, kz), v.p(kw, kz), v.p(kw, kz + 16), v.p(-kw, kz + 16)], fill=(200, 192, 170, 150))
     # walls
-    for key, col, wd in (("terrace", (140, 120, 96), max(2, 0.5 * s)), ("wall", (92, 72, 58), max(3, 1.0 * s)), ("keepwall", (92, 72, 58), max(3, 1.0 * s))):
+    for key, col, wd in (("terrace", (120, 98, 76), max(2, 0.6 * s)), ("terrace2", (120, 98, 76), max(2, 0.6 * s)), ("wall", (92, 72, 58), max(3, 1.0 * s)), ("keepwall", (92, 72, 58), max(3, 1.0 * s))):
         for a in d[key]:
             dr.line([v.p(a[0], a[1]), v.p(a[2], a[3])], fill=col, width=int(wd))
 
@@ -212,6 +225,21 @@ def draw(d, v, out, title, detail):
     else:
         halo(v.p(-14, kz + 1.6), "keep terrace wall (+4 m)", font(int(1.1 * s)), fill=(240, 230, 210))
 
+    # spot heights (metres relative to the square), from the layout's own numbers
+    spots = []
+    for f in d["foundations"]:
+        if detail or f["ring"] > 1:
+            spots.append((f["x"], f["z"] - f["side"] * 0.5 + 1.0, f["y"]))
+    for l in d["landmarks"]:
+        if l["kind"] in ("BellTower", "Mill"):
+            spots.append((l["x"], l["z"] - l["sz"] * 0.5 - 1.6, l["y"]))
+    if not detail:
+        spots += [(0, -12, 0.0), (52, -100, d["waterY"])]
+    sf = font(max(10, int(1.1 * s)) if detail else max(10, int(1.25 * s)), True)
+    for x, z, y in spots:
+        if v.x0 < x < v.x1 and v.z0 < z < v.z1:
+            dr.text(v.p(x, z), ("%+.1f" % y).replace("+0.0", "0") + " m", font=sf, fill=(255, 255, 255), anchor="mm", stroke_width=3, stroke_fill=(40, 34, 30))
+
     # header, legend, scale bar, north arrow
     dr.rectangle([0, 0, v.w, v.mt - 8], fill=(244, 238, 224, 255))
     dr.text((24, 18), title, font=font(46, True), fill=(40, 30, 22))
@@ -230,6 +258,16 @@ def draw(d, v, out, title, detail):
     dr.line([lx, ly + 11, lx + 30, ly + 11], fill=(200, 40, 40), width=3); dr.ellipse([lx + 11, ly + 7, lx + 19, ly + 15], fill=(255, 236, 120), outline=(90, 20, 20))
     dr.text((lx + 40, ly + 11), "NPC path graph (yellow = doorstep)", font=font(20), fill=(40, 30, 22), anchor="lm"); lx += 420
     dr.rectangle([lx, ly + 4, lx + 22, ly + 18], fill=(60, 40, 30)); dr.text((lx + 30, ly + 11), "default door side", font=font(20), fill=(40, 30, 22), anchor="lm")
+
+    # height key
+    kx, ky = v.w - 400, v.h - 64
+    dr.rectangle([kx - 12, ky - 40, v.w - 12, ky + 30], fill=(244, 238, 224, 235))
+    dr.text((kx, ky - 34), "height vs the square (m), contours 1 m / 5 m", font=font(16), fill=(30, 30, 30))
+    for k in range(25):
+        y = -12 + k * (18 / 24)
+        dr.rectangle([kx + k * 12, ky - 10, kx + k * 12 + 12, ky + 6], fill=hypso(y))
+    for y in (-12, -6, 0, 4):
+        dr.text((kx + (y + 12) / 18 * 300, ky + 10), "%d" % y, font=font(15), fill=(30, 30, 30), anchor="mt")
 
     bar = 20 if detail else 50
     bx, by = 30, v.h - 30
@@ -250,7 +288,7 @@ def main():
     d = json.load(open(sys.argv[1]))
     out = sys.argv[2]
     os.makedirs(out, exist_ok=True)
-    draw(d, View(-100, 100, -135, 45, 12), os.path.join(out, "Hollowmere_Map_Town.jpg"), "Hollowmere: town plan (Wave 0 greybox layout)", False)
+    draw(d, View(-100, 100, -135, 45, 12), os.path.join(out, "Hollowmere_Map_Town.jpg"), "Hollowmere: town plan and terrain (Wave 0 greybox)", False)
     draw(d, View(-36, 36, -38, 32, 28), os.path.join(out, "Hollowmere_Map_Square.jpg"), "Hollowmere: ring 1, the square", True)
 
 
