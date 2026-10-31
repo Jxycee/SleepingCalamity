@@ -2,7 +2,7 @@ State: IN PROGRESS
 Session: Wave 1: Heroes' home (fixed landmark)
 Progress: 85%
 Sheet: Reference/hollowmere/heroes_home/heroes_home_sheet_r3.jpg
-Blocker: paused by coordinator for usage
+Blocker: none
 
 Score: 29/40 after round 3 (r1 26.5, r2 27.5; coordinator's r2 read ~26). r3: salvage shown (faded-blue sailcloth tarp lashed over a roof hole, boarded upper window, planked wall section, new oak lintel, rope-tied barrel), older stone (bigger blocks, rain streaks, north moss/lichen, ridges sag 4 cm/m), a lantern inside the door so warm light spills on the threshold. Art rounds closed.
 Tris: cistern 45.9k, annex 18.6k (budget 75k each)
