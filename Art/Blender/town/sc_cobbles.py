@@ -1,13 +1,13 @@
 """Cobbles: B6 sculpted granite cobble family (T3, PHASE1 4) and the Hollowmere plaza patch laid from it.
 
-The family: 8 granite setts (chunky storybook size, 15-20 x 12-15 cm tops: about 1.3x the 11-13 cm setts of Alsace
+The family: 8 granite setts, 3 damp setts (darker, glossy, algae in the crevices: the dish around the ring), (chunky storybook size, 15-20 x 12-15 cm tops: about 1.3x the 11-13 cm setts of Alsace
 and Rothenburg squares) plus 3 rubble fragments, each a dense damaged high (voxel remesh, domed and foot-worn tops,
 square-arris spalls, one hairline crack) baked once into one shared set (BaseColor, Normal, Roughness, AO; 2K on the
 PC). Two of the setts are the "path" variants: flatter, polished, a little paler, used where feet go. Lows are the
 decimated highs with the buried underside cut away: LOD0 about 140 tris, LOD1 about 44 tris (setts more than 12 m from
 the wide camera), rubble about 120.
 
-The patch (brief section 1: x -8..8, z -6..8 Unity, origin = fountain centre): fan/arc courses (2.0 m fans, offset
+The patch (brief section 1: x -8..8, z -6..8 Unity, extended to x -12 on 2026-10-31 so the wide camera never sees its west edge): fan/arc courses (2.0 m fans, offset
 half a fan per 1.0 m row) laid by an occupancy raster, three concentric courses hugging the flagstone ring (r 2.9 m,
 sc_flag_ring.py), a gutter course along the facade foot (z 7.45), small setts filling the leftovers. Heights follow
 the 5 cm dish toward the fountain (sc_plaza_common.dish) plus a slow 6 mm undulation; clustered sunken and tilted
@@ -36,15 +36,24 @@ cobble #817a7b to #b7b0aa with warm lights.
   --ring builds the flagstone ring (sc_flag_ring.py, look stage) into the renders.
 Budget (PHASE1 3.3, T3): 50-400 tris per variant, one 2K set per family (+ the 2K bed tileable), 1024 px/m or more.
 
-Status (2026-10-30, cloud): look locked at 28/40 (sc-asset-review rubric, scored on the brief's three cameras plus
-a low ground check; first scored round 26, target was 31 under the 2026-10-30 "+5" rule, stopped at the ~4-round
-cap). Next: the PC runs --stage bake --res 2048 --export and the controller's builder instances the placements.
+Status (2026-10-31, cloud): look at 29/40 (sc-asset-review rubric, scored on the brief's three cameras plus a low
+ground check; first scored round 26, target 31 under the "+5" rule; stopped when r8 gave no visible gain).
+Bake proof (--stage bake --res 1024, r6 code): LOD0 139-140 tris, LOD1 43-44, frags 118-120; 6,732 setts + 45 loose,
+636k instanced tris (6,094 inside a capture frame); bed 9,820 tris. The baked lows hold the look-stage read.
+Next: the PC runs --stage bake --res 2048 --export and the controller's builder instances the placements.
 Round log (look stage, ground with the flag ring and stand-ins):
   r1-r2 (unscored setup): fan layout + fill pass; setts were pillow-soft, pale, polka-dot feldspar, joints too pale.
   r3 26/40: blocky setts (bevel 8-14 mm), per-variant granite tones (blue-grey to pink), green moss in the joints.
   r4 26.5: warmer sun / cooler fill, joints 3.4 cm deep, dusty moss-free joints on the worn path.
   r5 27.5: narrow tone band inside each stone, wide between stones (tone now changes stone to stone), wider joints.
-  r6 28: (flag ring pass, sc_flag_ring.py). Parked ideas: docs/PARKING_LOT.md (B6 cobbles).
+  r6 28: (flag ring pass, sc_flag_ring.py).
+  r7 29: fixed a crease + centre dimple on every sett top (sign() in the plan bulge); 3 damp setts in the dish.
+  r8 29: rim dirt band, crown pitting, stronger grain: no visible gain at the mid camera, so the loop stopped.
+  r9 (Unity feedback, 2026-10-31): wider tone spread between variants (k = 1 + 2.3 tint), dirt stain up to 3 mm
+     under the crown, darker joint bed, ~1.6x crown relief; patch extended to x -12 (8,673 setts) so the wide
+     camera never sees the west seam. Wide-camera ground value spread 19 -> 22 (p10 0.44 -> 0.41).
+  The `damp` bed vertex colour is not read by the Unity shader yet: the CobbleBed tileable carries base moss alone.
+  Parked ideas: docs/PARKING_LOT.md (B6 plaza ground).
 """
 import sys, os, math, json, zlib, random
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -78,6 +87,9 @@ FAMILY = [   # tint: value offset (-0.3..+0.3), warm: -1 blue-grey .. +1 pink-ta
     ('sett_f', 0.170, 0.130, 0.10, 'chipped', dict(dome=0.005, bev=0.008, tint=0.20, warm=-0.4)),  # pale cool grey
     ('path_a', 0.185, 0.140, 0.10, 'worn', dict(dome=0.002, bev=0.013, tint=0.16, warm=0.6)),
     ('path_b', 0.165, 0.135, 0.10, 'worn', dict(dome=0.002, bev=0.014, tint=0.06, warm=-0.2)),
+    ('damp_a', 0.180, 0.135, 0.10, 'sett', dict(dome=0.004, bev=0.010, tint=-0.20, warm=0.3, damp=1)),   # the low dish by the ring
+    ('damp_b', 0.170, 0.140, 0.10, 'sett', dict(dome=0.005, bev=0.011, tint=-0.30, warm=-0.5, damp=1)),
+    ('damp_c', 0.190, 0.130, 0.10, 'chipped', dict(dome=0.004, bev=0.009, tint=-0.12, warm=0.8, damp=1)),
     ('small_a', 0.120, 0.105, 0.09, 'sett', dict(dome=0.003, bev=0.009, tint=-0.10, warm=0.7)),
     ('frag_a', 0.120, 0.090, 0.060, 'frag', dict(tint=-0.12, warm=0.3)),
     ('frag_b', 0.090, 0.075, 0.050, 'frag', dict(tint=0.10, warm=0.8)),
@@ -85,12 +97,13 @@ FAMILY = [   # tint: value offset (-0.3..+0.3), warm: -1 blue-grey .. +1 pink-ta
 VAR = {f[0]: f for f in FAMILY}
 SETTS = ['sett_a', 'sett_b', 'sett_c', 'sett_d', 'sett_e', 'sett_f']
 PATHS = ['path_a', 'path_b']
+DAMPS = ['damp_a', 'damp_b', 'damp_c']
 JOINT = 0.015            # nominal joint (m)
 BURY = 0.045             # the lows keep this much body below the top; the rest is underground
 LOD0_T, LOD1_T, FRAG_T = 140, 44, 120
 
 # ----------------------------------------------------------------------------- granite smart material
-def granite(name, tint=0.0, warm=0.4, worn=False):
+def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     """Granite: grey with warm lights (#817a7b to #b7b0aa), black mica and pale feldspar specks, foot-polished top,
     dirt below the joint line and in crevices. Object space, so instances and the bake agree."""
     m, T = K.new_mat(name); T.grime = None
@@ -98,7 +111,8 @@ def granite(name, tint=0.0, warm=0.4, worn=False):
     z = (T.sep(p), 'Z')
     mott = T.noise(p, scale=9.0, detail=5.0, rough=0.6)
     big = T.noise(p, scale=2.5, detail=2.0)
-    k = 1.0 + 1.6 * tint; hue = (1.0 + 0.10 * warm, 1.0 + 0.01 * warm, 1.0 - 0.10 * warm)
+    # wide value spread between stones: the only per-stone value cue in Unity
+    k = 1.0 + 2.3 * tint; hue = (1.0 + 0.10 * warm, 1.0 + 0.01 * warm, 1.0 - 0.10 * warm)
     lo = tuple(c * k * h for c, h in zip((0.175, 0.161, 0.163), hue))          # within one stone: a narrow band, so the stones differ
     hi = tuple(c * k * h for c, h in zip((0.295, 0.27, 0.25), hue))
     col = T.ramp(T.math('ADD', T.math('MULTIPLY', mott, 0.75), T.math('MULTIPLY', big, 0.35)),
@@ -115,6 +129,11 @@ def granite(name, tint=0.0, warm=0.4, worn=False):
     top = T.math('MULTIPLY', up, T.smoothstep(z, -0.012, -0.002))
     pol = T.math('MULTIPLY', top, 0.85 if worn else 0.45)
     col = T.mix(T.math('MULTIPLY', pol, 0.35), col, T.hsv(col, 0.5, 0.9, 1.12))
+    # dirt creeps 1-3 cm in from each stone's rim; feet polish the centre (the strongest per-stone cue at mid distance)
+    sx = T.sep(p)
+    rim = T.math('MAXIMUM', T.math('ABSOLUTE', T.math('DIVIDE', (sx, 'X'), L / 2)), T.math('ABSOLUTE', T.math('DIVIDE', (sx, 'Y'), W / 2)))
+    rimd = T.smoothstep(T.math('ADD', rim, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.25)), 0.62, 0.98)
+    col = T.mix(T.math('MULTIPLY', rimd, 0.32 if worn else 0.45), col, T.hsv(col, 0.5, 1.0, 0.62))
     # crisp convex edges catch a little light; crevices hold dirt
     ed = T.edge(0.004, 0.03, 0.25)
     col = T.mix(T.math('MULTIPLY', ed, 0.25), col, T.hsv(col, 0.5, 0.9, 1.15))
@@ -122,21 +141,25 @@ def granite(name, tint=0.0, warm=0.4, worn=False):
     dirt = (0.085, 0.070, 0.055)
     col = T.mix(T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), 0.75), col, dirt)
     # the body below the joint line sits in the grit bed: dirt-stained, matte
-    bed = T.smoothstep(T.math('ADD', z, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.012)), -0.010, -0.030)
+    bed = T.smoothstep(T.math('ADD', z, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.012)), -0.003, -0.020)     # dirt stain rises to 3 mm under the crown: joints read wide and dark at 5-10 m
     col = T.mix(T.math('MULTIPLY', bed, 0.85), col, (0.11, 0.092, 0.072))
     # sparse pale lichen dots on the unworn setts, in the micro hollows of the top
     if not worn:
         lv = T.node('ShaderNodeTexVoronoi'); T.set(lv, 'Vector', p); lv.inputs['Scale'].default_value = 22.0
         lich = T.math('MULTIPLY', T.smoothstep((lv, 'Distance'), 0.22, 0.10), T.smoothstep((T.sep((lv, 'Color')), 'Y'), 0.86, 0.90))
         col = T.mix(T.math('MULTIPLY', lich, 0.6), col, (0.42, 0.40, 0.25))
+    if damp:                         # damp setts: darker, glossier, green algae in the crevices and the joint band
+        alg = T.math('MAXIMUM', T.math('SUBTRACT', 1.0, cav), bed)
+        col = T.mix(T.math('MULTIPLY', alg, 0.7), T.hsv(col, 0.5, 1.05, 0.78), (0.06, 0.08, 0.025))
     rough = T.math('ADD', 0.74, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.12))
     rough = T.mixf(pol, rough, 0.42 if worn else 0.55)
     rough = T.mixf(T.math('MULTIPLY', mica, 0.7), rough, 0.32)
     rough = T.mixf(T.math('MAXIMUM', bed, T.math('SUBTRACT', 1.0, cav)), rough, 0.92)
+    if damp: rough = T.math('MULTIPLY', rough, 0.62)
     # micro relief: crystal grain + feldspar bumps (the dents and spalls are geometry)
     grain = T.noise(p, scale=380.0, detail=3.0)
     h = T.math('ADD', T.math('MULTIPLY', grain, 0.5), T.math('MULTIPLY', felds, 0.35))
-    nrm = T.bump(h, strength=0.22 if worn else 0.35, distance=0.0008)
+    nrm = T.bump(h, strength=0.3 if worn else 0.55, distance=0.0008)
     T.output(col, rough, 0.0, nrm)
     return m
 
@@ -157,22 +180,26 @@ def make_sett(name, L, W, H, kind, prm):
     topw = K._sstep(zz, -0.05, -0.005)
     # irregular plan: the sides bulge and lean a little (hand-dressed, never a machined box)
     sd = r.random() * 10
-    co[:, 0] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 1.0) - 0.5) * 2 * np.sign(co[:, 0])
-    co[:, 1] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 2.0) - 0.5) * 2 * np.sign(co[:, 1])
+    # (a smooth ramp, not sign(x): sign creased every top along x=0 / y=0 and pinched a dimple at the centre)
+    co[:, 0] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 1.0) - 0.5) * 2 * np.clip(x, -1, 1)
+    co[:, 1] += 0.006 * (K.fbm(co + sd, 6.0, 2, 0.5, 2.0) - 0.5) * 2 * np.clip(y, -1, 1)
     # dome, then the worn crown: everything above the wear plane is squashed flat (foot traffic)
     dome = prm['dome'] * np.clip(1 - x ** 2, 0, 1) * np.clip(1 - y ** 2, 0, 1) * topw
-    co[:, 2] += dome + 0.0025 * (K.fbm(co + sd, 11.0, 3, 0.5, 3.0) - 0.5) * 2 * topw
+    co[:, 2] += dome + 0.0040 * (K.fbm(co + sd, 11.0, 3, 0.5, 3.0) - 0.5) * 2 * topw
     zt = co[:, 2].max() - (0.0045 if kind == 'worn' else 0.0022)
     hi_ = co[:, 2] > zt
     co[hi_, 2] = zt + (co[hi_, 2] - zt) * (0.18 if kind == 'worn' else 0.4)
     K.set_co(ob, co)
     co, no = K.mesh_arrays(ob)
     # surface lumps (coarse pick-dressing, softened by wear on the path variants)
-    amp = 0.0008 if kind == 'worn' else 0.0014
+    amp = 0.0011 if kind == 'worn' else 0.0022
     d = amp * (K.fbm(co, 38.0, 3, 0.55, 4.0 + sd) - 0.5) * 2
     nchip = {'chipped': 9, 'worn': 2, 'cracked': 4}.get(kind, 5)
     d = d + K.scoops(ob, nchip, 0.008, 0.020, 0.55, (75.0, 170.0), seed=sd + 5.0, co=co, no=no, flake=True) * topw
     co = co - no * d[:, None]
+    if kind != 'worn':                          # pick-dressed pitting on the crown: shallow 2-5 mm bites
+        d2 = K.scoops(ob, 70, 0.002, 0.005, 0.35, (-1e9, 1e9), seed=sd + 7.0, co=co, no=no) * K._sstep(co[:, 2], co[:, 2].max() - 0.012, co[:, 2].max() - 0.003)
+        co = co - no * d2[:, None]
     if kind == 'cracked':                       # hairline crack across the crown, open at the top
         ang = r.uniform(0.3, 1.2); n2 = np.array([math.cos(ang), math.sin(ang), 0.0])
         dist = np.abs((co * n2).sum(1) + 0.01 * (K.fbm(co, 25.0, 2, 0.5, 9.0) - 0.5))
@@ -211,7 +238,7 @@ def build_family():
     highs = {}
     for i, (name, L, W, H, kind, prm) in enumerate(FAMILY):
         ob = make_frag(name, L, W, H, prm) if kind == 'frag' else make_sett(name, L, W, H, kind, prm)
-        ob.data.materials.append(granite('M_' + name, prm['tint'], prm['warm'], kind == 'worn'))
+        ob.data.materials.append(granite('M_' + name, prm['tint'], prm['warm'], kind == 'worn', prm.get('damp', False), L, W))
         highs[name] = ob
     return highs
 
@@ -311,6 +338,8 @@ class Layout:
     def pick(self, r, x, z, small=False):
         if small: return 'small_a'
         if r.random() < path_weight(x, z) * 0.85: return r.choice(PATHS)
+        rr = math.hypot(x, z)                     # the dish holds the wet: damp setts within ~1.5 m of the ring
+        if r.random() < 0.85 * P.smoothstep(1.0 - (rr - P.RING_R) / 1.6) + 0.04: return r.choice(DAMPS)
         return r.choice(SETTS)
 
     def course(self, r, pts_fn, length, tol=0.06):
