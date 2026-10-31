@@ -2,20 +2,21 @@
 
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
-Progress: 65%
+Progress: 85%
+Sheet: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 
-**State:** in progress. Unity editor installed; the Roslyn compile of every assembly passes. The first licensed `unity.sh build` (ProjectBuilder.RunAll with HollowmereBuilder) is running now; then captures, `check`, merge. The user approved the town plan from the maps (2026-10-31, relayed by the controller).
+**State:** builder runs in Unity (cloud `unity.sh build` PASS); captures rendered in Unity in the cloud, both presets. Next: bring main in, `unity.sh check`, merge. After the merge: the terrain pass (user feedback 2026-10-31) on a new branch.
 
 | Item | State |
 |---|---|
 | Layout data + validator (`Assets/_Project/Core/Town/`) | done, 0 rule violations |
-| EditMode tests (`HollowmereLayoutTests`, 17) | pass under `sc_core_tests.py` (.NET, no Unity) |
-| `HollowmereBuilder` + `HollowmereCapture`, wired into `ProjectBuilder.RunAll` | compiles (cloud Roslyn); reviewer pass done, 2 fixes applied (bab7b44); Unity build running |
-| Top-down maps (`Hollowmere_Map_Town.jpg`, `Hollowmere_Map_Square.jpg`) | done (PIL, `Tools/town/sc_town_map.py`) |
-| Play-position captures, both presets | waiting for Unity |
-| `unity.sh check` | waiting for Unity |
+| EditMode tests (`HollowmereLayoutTests`, 17) | pass under `sc_core_tests.py`; Unity run in `check` next |
+| `HollowmereBuilder` + `HollowmereCapture` in `ProjectBuilder.RunAll` | done; `unity.sh build` PASS; reviewer pass, fixes applied |
+| Top-down maps | `Hollowmere_Map_Town.jpg`, `Hollowmere_Map_Square.jpg` (PIL from the layout data) |
+| Play-position captures, both presets | `captures/HM_{HomeDoor,Fountain,TitheGate,LaneMouth,Overview}_{Ruined,Rebuilt}.jpg`, `captures/Corner_Wide_*.jpg` (Unity, cloud, xvfb) |
+| `unity.sh check` | next |
 | Merge to main | not yet |
 
 **Foundation counts:** ring 1: 10 (3 L, 4 M, 3 S); ring 2: 23 (4 L, 14 M, 5 S); ring 3: 3 (1 M, 2 S). 36 in all.
 
-**Blockers:** none. (The Unity download died once in the background and was restarted; it finished.)
+**Blockers:** none.
