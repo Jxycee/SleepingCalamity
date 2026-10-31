@@ -335,6 +335,9 @@ namespace SleepingCalamity.EditorTools
             sun.transform.rotation = rot;
             GameObject shafts = GameObject.Find("Shafts");
             if (shafts != null) shafts.transform.rotation = rot;
+            // Hollowmere's lantern-post pools (HollowmereSquare "LampLight"): lit at low sun only. The corner scene has none, its own lights are untouched.
+            foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (l.name == "LampLight") l.enabled = preset == Preset.LowSun;
             DynamicGI.UpdateEnvironment();
         }
     }

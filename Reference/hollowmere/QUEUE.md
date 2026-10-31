@@ -1,6 +1,6 @@
 # Self-serve work queue (PC coordinator, 2026-10-31)
 
-**CLAIMING: OPEN (usage window reset 12:10 UTC).** The coordinator may set this to PAUSED for usage pacing; while it says PAUSED, a session that finishes sets DONE and stops without claiming.
+**CLAIMING: OPEN (13:54 UTC).** The coordinator may set this to PAUSED for usage pacing; while it says PAUSED, a session that finishes sets DONE and stops without claiming.
 
 A cloud session that has finished and merged its task takes the top item whose `Claimed:` line is still `-`:
 1. Pull main.
@@ -31,7 +31,7 @@ Claimed: cloud session claude/sharp-goldberg-vpyt8c (bakery, Q2 done), 2026-10-3
 
 ## Q5. Builder churn fix
 Folder: `Reference/hollowmere/churn/`
-Claimed: -
+Claimed: cloud session claude/practical-tesla-lqajeo (square ground + dressing done), 2026-10-31
 Every build rewrites `BeautyCorner_Hollowmere.unity`, flips `M_Pollen` `_SrcBlend`, and rewrites `HeroAnimator.controller` (and its .meta) with no real change, so every session leaves them uncommitted. Make the builders deterministic, so that two `unity.sh build` runs in a row leave `git status` clean, and add an EditMode test or a check script for it. Code only; a `reviewer`-grade self-review before merging.
 
 ## Q6. Garden and allotment decorations
