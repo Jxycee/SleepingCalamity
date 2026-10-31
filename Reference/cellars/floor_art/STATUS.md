@@ -1,16 +1,16 @@
 State: WORKING
 Session: Cellars room art pass: dress the greybox floor
-Progress: 85% - 3 art rounds done (max reached); final lantern-shadow fix in, re-capturing Floor_Room, then merge origin/main, nographics build, check, merge
+Progress: 92% - final room capture in (lantern shadow fixed), origin/main merged (00b0439), nographics build PASS, scenes committed (134d979); check running on 134d979
 Sheet: Reference/cellars/floor_art/SHEET_floor_art.jpg (round 3; captures floor_overview/room/corridor.jpg beside it)
 Needs: nothing
 Blocker: none
 Job: dress the generated Cellars floor (CellarFloorBuilder art layer) to the approved dungeon corner look
-Status: art rounds finished, pre-merge check pending
+Status: pre-merge check running
 Archive: not yet
 Branch: claude/laughing-bell-0zcpod
 
-Score: round 2 25/40 -> round 3 27/40 (silhouette 3.5, proportion 3.5, form 3.5, surface 3.5, colour 4, wear 3, set 3, emissive 3); target first + 5 = 30 not reached in the 3-round cap (round 3 gained 2)
-SC RESULT: no check yet (captures: exec PASS x3)
+Score: round 2 25/40 -> round 3 27/40 (final room re-capture after the lantern fix: p90 .51) (silhouette 3.5, proportion 3.5, form 3.5, surface 3.5, colour 4, wear 3, set 3, emissive 3); target first + 5 = 30 not reached in the 3-round cap (round 3 gained 2)
+SC RESULT: build PASS on 134d979; check running
 Merge commit: -
 
 ## What landed
