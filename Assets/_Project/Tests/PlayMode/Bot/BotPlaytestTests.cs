@@ -59,6 +59,17 @@ namespace SleepingCalamity.Tests.PlayMode
                 startWave: 5);
         }
 
+        // The Dough Warden's signature (the "dough quake", every 3 Warden attacks) must fire under the real AI in wave 4, alongside the slimes, without
+        // breaking the two-attackers rule (its token is exclusive).
+        [UnityTest, Timeout(200000)]
+        public IEnumerator Bot_WaveFour_WardenSignatureFires()
+        {
+            yield return Play("wave 4: the Warden's dough quake fires, at most 2 wind-ups at once", 120f, dodges: true,
+                done: r => r.SignatureAttacks >= 1 && r.Seconds > 20f || r.ClearedWaves >= 4 || r.WentDown,
+                met: r => r.SignatureAttacks >= 1 && r.MaxWindUpsAtOnce <= 2,
+                startWave: 4);
+        }
+
         private static IEnumerator Play(string goal, float limit, bool dodges, System.Func<BotReport, bool> done, System.Func<BotReport, bool> met, int startWave = 1)
         {
             if (System.Environment.GetEnvironmentVariable("SC_BOT") != "1") Assert.Ignore("bot playtest: set SC_BOT=1 to run");

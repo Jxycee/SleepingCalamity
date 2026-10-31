@@ -119,7 +119,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (_enemyHp.TryGetValue(e.NetworkObjectId, out int before) && ehp < before) { Report.HitsDealt++; Report.DamageDealt += before - ehp; }
                 if (!_enemyHp.ContainsKey(e.NetworkObjectId)) Report.EnemiesSeen++;
                 _enemyHp[e.NetworkObjectId] = ehp;
-                if (e.Attacking && (!_enemySerial.TryGetValue(e.NetworkObjectId, out int seen) || seen != e.Serial)) { _enemySerial[e.NetworkObjectId] = e.Serial; Report.EnemyAttacksStarted++; }
+                if (e.Attacking && (!_enemySerial.TryGetValue(e.NetworkObjectId, out int seen) || seen != e.Serial)) { _enemySerial[e.NetworkObjectId] = e.Serial; Report.EnemyAttacksStarted++; if (e.CurrentAttack == AttackCatalog.WardenQuake) { Report.SignatureAttacks++; Report.Events.Add($"{time:F2}s Warden dough quake"); } }
             }
             Report.MaxWindUpsAtOnce = Mathf.Max(Report.MaxWindUpsAtOnce, windUps);
             Report.MaxWaitingAtOnce = Mathf.Max(Report.MaxWaitingAtOnce, waiting);
@@ -242,7 +242,7 @@ namespace SleepingCalamity.Tests.PlayMode
         public bool GoalMet;
         public float Seconds, LowestHpPercent = 100f, LastHitTaken = -1f, MinGapBetweenHitsTaken = float.MaxValue, MinGapBetweenStrikes = float.MaxValue;
         public int HitsTaken, DamageTaken, HitsDealt, DamageDealt, Swings, Dodges, EnemiesSeen, EnemyAttacksStarted, HighestWave, ClearedWaves;
-        public int Strikes, HitsStacked, MaxWindUpsAtOnce, MaxWaitingAtOnce;   // pacing: strikes opened, hits taken < 0.5 s after another, peaks
+        public int Strikes, HitsStacked, MaxWindUpsAtOnce, MaxWaitingAtOnce, SignatureAttacks;   // pacing: strikes opened, hits taken < 0.5 s after another, peaks
         public bool WentDown;
         public readonly List<string> Events = new List<string>();
         public readonly List<string> Findings = new List<string>();
@@ -258,7 +258,7 @@ namespace SleepingCalamity.Tests.PlayMode
                           (HitsTaken > 1 ? $", closest two hits {MinGapBetweenHitsTaken:F2} s apart" : ""));
             sb.AppendLine($"- Hero: {Swings} attack presses, {HitsDealt} hits / {DamageDealt} damage dealt, {Dodges} rolls");
             sb.AppendLine($"- Pacing: {Strikes} enemy strikes, closest two from different enemies {(Strikes > 1 && MinGapBetweenStrikes < float.MaxValue ? MinGapBetweenStrikes.ToString("F2") + " s" : "n/a")} apart; " +
-                          $"most winding up at once {MaxWindUpsAtOnce}, most waiting for a token {MaxWaitingAtOnce}; hits taken < 0.5 s after another {HitsStacked}");
+                          $"most winding up at once {MaxWindUpsAtOnce}, most waiting for a token {MaxWaitingAtOnce}; hits taken < 0.5 s after another {HitsStacked}; Warden signatures {SignatureAttacks}");
             sb.AppendLine();
             sb.AppendLine("## Findings");
             if (Findings.Count == 0) sb.AppendLine("- none");

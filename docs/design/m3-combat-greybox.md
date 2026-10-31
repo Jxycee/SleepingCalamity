@@ -190,6 +190,13 @@ and defence x3.3 are unchanged. Waves 1-4 keep their rosters and cooldowns.
   hits taken within 0.5 s of another.
 - Captures: `TellCaptureTests` (Explicit, `-Graphics`) writes every attack's tell frame by frame with the footprint off.
 
+### Playtest checklist (answer yes or no; play with F2 off, the default)
+1. Can you tell every enemy attack is coming from the enemy alone (its pose, hold and wind-up sound), with no ground marker?
+2. Does the glint and its "shing" work as your cue to roll or guard (never too late, never so early it means nothing)?
+3. Does the Warden's dough quake feel like an event: the rise, the bell, the glowing crown, the hold, then a window to punish it?
+4. Do waves 5-8 feel harder through the mix and pace of enemies, without hits you could not see or answer?
+5. Do enemies waiting their turn read as waiting (circling at the edge), not as broken AI?
+
 ## Network simulator
 `Tests/PlayMode/CombatNetworkTests.Netsim_150msRtt_2PercentLoss_...` drives the Multiplayer Tools `NetworkSimulator` component (it works in PlayMode, in the
 editor). The simulator delays each packet at the send and the receive stage of both peers, so a per-packet 37 ms gives about 148 ms RTT (75 ms gave 300). For

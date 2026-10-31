@@ -319,11 +319,12 @@ namespace SleepingCalamity.Gameplay
             AttackData pick = null;
             float roll = Random.value;
             AttackData[] attacks = Def.Attacks;
-            int start = Mathf.Clamp(Mathf.FloorToInt(roll * attacks.Length), 0, attacks.Length - 1);
-            for (int k = 0; k < attacks.Length; k++)
+            // The signature sits last in the elite's list and is never rolled, so the roll covers only the others (evenly).
+            int n = attacks.Length > 1 && attacks[attacks.Length - 1] == AttackCatalog.WardenQuake ? attacks.Length - 1 : attacks.Length;
+            int start = Mathf.Clamp(Mathf.FloorToInt(roll * n), 0, n - 1);
+            for (int k = 0; k < n; k++)
             {
-                AttackData a = attacks[(start + k) % attacks.Length];
-                if (a == AttackCatalog.WardenQuake) continue;
+                AttackData a = attacks[(start + k) % n];
                 bool lob = a.Origin == HitOrigin.GroundAtTarget;
                 if (lob && dist < 3.2f) continue;
                 if (dist > Reach(a)) continue;
