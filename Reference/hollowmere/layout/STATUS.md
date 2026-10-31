@@ -3,8 +3,8 @@
 Session: cloud, branch `claude/cool-ritchie-ofmy47`. Updated 2026-10-31.
 
 State: IN PROGRESS (ruin integration)
-Progress: 70%
-SC RESULT: pending
+Progress: 90% (ready; waiting for the bakery to merge first)
+SC RESULT: pending (the last run passed on 8d86098; it runs again after the bakery merge, on the final tip)
 Sheet: Reference/hollowmere/layout/Hollowmere_Ruins_vs_Kit.jpg
 Captures: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 
@@ -15,7 +15,7 @@ Captures: Reference/hollowmere/layout/Hollowmere_Captures_Sheet.jpg
 | Layout: `RuinVariant` = kit folder name, `RuinTurn` 0-3; test `Ruins_MatchTheKitAndTurn` | done (23 tests pass under `sc_core_tests`) |
 | Builder: ruin placement and materials, greybox fallback, a ruin capture camera | done (e59b22b) |
 | Captures in both presets, side by side with the ruin kit sheet | done: `Hollowmere_Ruins_vs_Kit.jpg` (kit sheet on top, in-engine ruins below), `captures/HM_Ruins_{Ruined,Rebuilt}.jpg`; all 9 variants load, no missing material slot |
-| `check`, merge | after the bakery merges |
+| `check`, merge | `check` PASS on 8d86098 (build PASS; test-edit 592/592; test-play 32 passed, 8 skipped, 0 failed). After it: a fix so the shared ruin foliage material builds from one fixed folder (it flipped between the byte-identical atlas copies). Next: merge origin/main after the bakery lands, regenerate Hollowmere.unity with the builder if it conflicts, `check` again, merge, then State DONE |
 
 **Earlier (done):** Wave 0 greybox merged `1f6ff88`; terrain pass merged `1e20cb2`.
 

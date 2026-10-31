@@ -59,7 +59,7 @@ namespace SleepingCalamity.EditorTools
 
         public static void Build()
         {
-            RuinCache.Clear();
+            RuinCache.Clear(); ruinFoliage = null;
             TownLayout layout = HollowmereLayout.Create();
             List<string> errors = layout.Validate();
             if (errors.Count > 0) throw new InvalidOperationException("Hollowmere layout invalid (" + errors.Count + "): " + string.Join("; ", errors.Take(20)));
@@ -376,12 +376,21 @@ namespace SleepingCalamity.EditorTools
             if (fbx != null)
             {
                 var slots = new Dictionary<string, Material>(BeautyCornerArt.BuildFacadeMaterials());
-                slots["M_B9_Foliage"] = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "HM_RuinFoliage", foliage: true);   // byte-identical atlas copies: one material
+                slots["M_B9_Foliage"] = RuinFoliage();
                 art = new RuinArt { Fbx = fbx, Slots = slots };
             }
             Debug.Log("SC HOLLOWMERE ruin " + variant + " art=" + (art != null ? folder + "/" + variant + ".fbx" : "missing, greybox stubs"));
             RuinCache[variant] = art;
             return art;
+        }
+
+        // The ruin folders hold byte-identical copies of the B9 atlas (different GUIDs): build the one shared material from a fixed folder, so it does not
+        // flip between copies with the order the variants load in.
+        static Material ruinFoliage;
+        static Material RuinFoliage()
+        {
+            if (ruinFoliage == null) ruinFoliage = BeautyCornerArt.MaterialFromSet(RuinsFolder + "/Ruin_S_A", "T_B9_Foliage", "HM_RuinFoliage", foliage: true);
+            return ruinFoliage;
         }
 
         static bool PlaceRuin(Transform lot, Foundation f)
