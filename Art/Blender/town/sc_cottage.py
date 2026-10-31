@@ -59,11 +59,11 @@ repatch('kit_roof', [('for i in range(13):', 'for i in range(9):'), ('i * (2 * W
 # ----------------------------------------------------------------------------- variants
 VARIANTS = {
     'StoneCottage_A': dict(roof='tile', chimney='gable+', porch=True, lean=False, dormer=False, flower=True,
-                           hex='#3e5670', rubble=(0.54, 0.56, 0.58), thatch=None),
+                           hex='#3e5670', rubble=(0.56, 0.64, 0.80), thatch=None),
     'StoneCottage_B': dict(roof='thatch', chimney='gable-', porch=False, lean=False, dormer=True, flower=True,
-                           hex='#4a6a48', rubble=(0.62, 0.58, 0.52), thatch=(2.55, 2.35, 1.20)),
+                           hex='#4a6a48', rubble=(0.60, 0.65, 0.74), thatch=(2.55, 2.35, 1.20)),
     'StoneCottage_C': dict(roof='thatch', chimney='ridge', porch=False, lean=True, dormer=False, flower=False,
-                           hex='#6a2e29', rubble=(0.56, 0.56, 0.57), thatch=(2.05, 1.92, 1.30)),
+                           hex='#6a2e29', rubble=(0.58, 0.63, 0.78), thatch=(2.05, 1.92, 1.30)),
 }
 for _n in VARIANTS:
     VARIANTS[_n]['seed'] = zlib.crc32(_n.encode())
@@ -72,12 +72,12 @@ PH = 0.34           # plinth height
 T = 0.42            # wall thickness
 DOORW, DOORZ0, DOORZ1 = 0.95, 0.22, 2.05
 WIN = (0.70, 0.92, 1.72)   # window clear width, sill z, head z
-LL = 1.10           # lean-to depth
+LL = 1.20           # lean-to depth
 
 def cfg(name):
     V = dict(VARIANTS[name]); R = random.Random(V['seed'])
     gable = V['chimney'].startswith('gable')
-    V['w'] = round(R.uniform(3.80, 4.15) if gable else R.uniform(3.50, 3.65), 2)
+    V['w'] = round(R.uniform(3.80, 4.15) if gable else R.uniform(3.40, 3.50), 2)
     V['d'] = round(R.uniform(3.45, 3.60) if V['porch'] else R.uniform(3.55, 3.95), 2)
     V['WH'] = round(R.uniform(2.30, 2.55), 2)
     V['pitch'] = round(R.uniform(36, 40) if V['roof'] == 'tile' else R.uniform(44, 48), 1)
@@ -280,13 +280,13 @@ def plinth_seg(pc, p0, p1, n, seed, gap=None):
                 Matrix.Rotation(math.radians(R.uniform(-1.0, 1.0)), 4, 'Y')
             FK.add_box(pc, 'stone', size, xf, cham=0.045, segs=2, uv_world=True, wob=0.012, seed=R.random() * 90)
 
-def quoins(pc, cx, cy, sx, sy, WH, seed):
+def quoins(pc, cx, cy, sx, sy, WH, seed, ln_scale=1.0):
     """Alternating long-and-short pale corner stones at one wall corner (cx, cy), going outward by (sx, sy)."""
     R = FK.rng('quo%f' % seed)
     nn = max(5, int((WH - PH) / 0.32))
     h = (WH - PH) / nn
     for i in range(nn):
-        ln, sh = R.uniform(0.60, 0.74), R.uniform(0.34, 0.42)
+        ln, sh = R.uniform(0.60, 0.74) * ln_scale, R.uniform(0.34, 0.42) * (0.8 if ln_scale < 1 else 1.0)
         lx, ly = (ln, sh) if (i + (sx * sy > 0)) % 2 else (sh, ln)
         c = Vector((cx - sx * (lx / 2 - 0.06), cy - sy * (ly / 2 - 0.06), PH + h * (i + 0.5)))
         FK.add_box(pc, 'stone', (lx, ly, h - 0.03), Matrix.Translation(c) @ Matrix.Rotation(math.radians(R.uniform(-1.5, 1.5)), 4, 'Z'),
@@ -777,9 +777,9 @@ def lean_to(F, c, sgn, zt):
         return zh + (zl - zh) * t
     topw = lambda x: rz(x) - 0.18          # wall top under the slab
     # front wall with a wood-store opening, back wall, end wall
-    op = (xw + sgn * 0.20, xw + sgn * 0.93) if sgn > 0 else (xw + sgn * 0.93, xw + sgn * 0.20)
-    hole = (op[0], op[1], 0.20, 1.40)
-    panel(F, 'rubble', (0, yf, 0), (0, -1, 0), min(xw, xo), max(xw, xo), 0.20, 1.55, [hole], cell=0.22)
+    op = (xw + sgn * 0.12, xw + sgn * 0.88) if sgn > 0 else (xw + sgn * 0.88, xw + sgn * 0.12)
+    hole = (op[0], op[1], 0.20, 1.50)
+    panel(F, 'rubble', (0, yf, 0), (0, -1, 0), min(xw, xo), max(xw, xo), 0.20, 1.58, [hole], cell=0.22)
     reveal(F, (0, yf, 0), (0, -1, 0), hole[0], hole[1], hole[2], hole[3], 0.36)
     surround(F, (0, yf, 0), (0, -1, 0), hole[0], hole[1], hole[2], hole[3], seed=55.0, door=True)
     panel_top(F, 'rubble', (0, yf, 0), (0, -1, 0), min(xw, xo), max(xw, xo), 1.53, lambda u: max(1.56, topw(u)), cell=0.3, nv=2)
@@ -811,7 +811,7 @@ def lean_to(F, c, sgn, zt):
     plinth_seg(F, (xo, yf, 0), (xo, yb, 0), (sgn, 0, 0), 13.0)
     # quoins at the two outer corners
     for k, sy in enumerate((-1, 1)):
-        quoins(F, xo, yf if sy < 0 else yb, sgn, sy, 1.62, 20 + k)
+        quoins(F, xo, yf if sy < 0 else yb, sgn, sy, 1.62, 20 + k, ln_scale=0.5)
     # tiled mono-pitch roof (flat slab on the shared roof tileable), overhanging the walls
     ov = 0.22
     xa, xb = xw - sgn * 0.02, xo + sgn * ov
