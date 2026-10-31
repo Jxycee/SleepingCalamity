@@ -121,8 +121,8 @@ namespace SleepingCalamity.EditorTools
             const string path = "Assets/_Project/Content/Materials/UndercroftStair/US_TopVolume.asset";
             var profile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(path);
             if (profile == null) { profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>(); AssetDatabase.CreateAsset(profile, path); }
-            profile.components.Clear();
-            var vig = profile.Add<UnityEngine.Rendering.Universal.Vignette>(true);
+            profile.components.RemoveAll(c => c == null);   // drop entries left by an unsaved component
+            var vig = LookTestBuilder.Comp<UnityEngine.Rendering.Universal.Vignette>(profile);   // sub-asset of the profile, updated in place
             vig.intensity.Override(0.15f);
             EditorUtility.SetDirty(vig); EditorUtility.SetDirty(profile); AssetDatabase.SaveAssets();
             var go = new GameObject("TopVolume"); go.transform.SetParent(parent, false);
@@ -146,11 +146,12 @@ namespace SleepingCalamity.EditorTools
             // door wall shoulders beyond the piece's x 1.6..4.8 (the piece's wall is z -2.8..-2.4)
             LookTestBuilder.Box(h, "DoorWallShoulderW", new Vector3((x0 + 1.6f) / 2, (y0 + y1) / 2, -2.6f), new Vector3(1.6f - x0, y1 - y0, 0.4f), lime);
             LookTestBuilder.Box(h, "DoorWallShoulderE", new Vector3((4.8f + x1) / 2, (y0 + y1) / 2, -2.6f), new Vector3(x1 - 4.8f, y1 - y0, 0.4f), lime);
-            foreach (float z in new[] { -1.0f, 0.6f })
-                LookTestBuilder.Box(h, "Beam_" + z, new Vector3((x0 + x1) / 2, y1 - 0.14f, z), new Vector3(x1 - x0, 0.28f, 0.22f), oak);
+            float[] beams = { -1.0f, 0.6f };
+            for (int i = 0; i < beams.Length; i++)
+                LookTestBuilder.Box(h, "Beam_" + i, new Vector3((x0 + x1) / 2, y1 - 0.14f, beams[i]), new Vector3(x1 - x0, 0.28f, 0.22f), oak);
             Material win = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/UndercroftStair/M_US_Window.mat", Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found"));
             win.SetColor("_BaseColor", new Color(0.3f, 0.32f, 0.36f)); win.EnableKeyword("_EMISSION"); win.SetColor("_EmissionColor", new Color(0.86f, 0.89f, 0.96f) * 1.2f);
-            win.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; EditorUtility.SetDirty(win);
+            win.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; EditorUtility.SetDirty(win); AssetDatabase.SaveAssets();
             LookTestBuilder.Box(h, "WindowQuad", new Vector3(x1 - 0.02f, 10.5f, 0.5f), new Vector3(0.03f, 1.1f, 0.7f), win);
         }
 
@@ -160,6 +161,8 @@ namespace SleepingCalamity.EditorTools
             const string folder = "Assets/_Project/Content/Materials/UndercroftStair";
             if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets/_Project/Content/Materials", "UndercroftStair");
             string texPath = folder + "/T_US_MoteRound.png";
+            if (!File.Exists(texPath))   // generated once; rewriting it every build would churn the import
+            {
             var t = new Texture2D(32, 32, TextureFormat.RGBA32, false);
             for (int y = 0; y < 32; y++)
                 for (int x = 0; x < 32; x++)
@@ -171,6 +174,7 @@ namespace SleepingCalamity.EditorTools
             AssetDatabase.ImportAsset(texPath);
             var imp = (TextureImporter)AssetImporter.GetAtPath(texPath);
             imp.alphaIsTransparency = true; imp.mipmapEnabled = false; imp.wrapMode = TextureWrapMode.Clamp; imp.SaveAndReimport();
+            }
             Shader pu = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new InvalidOperationException("URP Particles/Unlit not found");
             Material m = LookTestBuilder.Ensure(folder + "/M_US_Mote.mat", pu);
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 2f); m.SetFloat("_SrcBlend", 1f); m.SetFloat("_DstBlend", 1f); m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 1f);
