@@ -19,7 +19,7 @@ namespace SleepingCalamity.EditorTools
     public static class BeautyCornerBuilder
     {
         public const string ScenePath = "Assets/_Project/Scenes/BeautyCorner_Hollowmere.unity";
-        public const string ProfileName = "BeautyCorner_Day_Profile";
+        public const string ProfileName = "BeautyCorner_Day_Profile", LowSunProfileName = "BeautyCorner_LowSun_Profile";
         // The corner's own copy of the look-test renderer / RP asset with the stronger SSAO (1.8 / 0.3), so the LookTest scenes keep 1.2 / 0.15.
         public const string RendererPath = LookTestBuilder.RenderingFolder + "/BeautyCorner_Renderer.asset";
         public const string RpAssetPath = LookTestBuilder.RenderingFolder + "/BeautyCorner_RPAsset.asset";
@@ -62,6 +62,16 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- support assets
         static void BuildProfile()
         {
+            // The low-sun look is the approved one (user, polish1): its own profile with the pre-polish grade; midday carries the polish1 highlight lift.
+            LookTestBuilder.EnsureProfile(LowSunProfileName, p =>
+            {
+                LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
+                Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.25f); b.scatter.Override(0.8f); b.clamp.Override(65000f);
+                ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(-0.55f); c.contrast.Override(30f); c.saturation.Override(0f);
+                ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.95f, 1.0f, 1.0f, 0f));
+                LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(0.97f, 1.0f, 1.0f, 0.0f));
+                Vignette v = LookTestBuilder.Comp<Vignette>(p); v.intensity.Override(0.18f); v.smoothness.Override(0.5f);
+            });
             LookTestBuilder.EnsureProfile(ProfileName, p =>
             {
                 LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
@@ -301,13 +311,15 @@ namespace SleepingCalamity.EditorTools
             else
             {
                 rot = Quaternion.Euler(12f, -32f, 0f);
-                sun.color = new Color(1.0f, 0.68f, 0.42f); sun.intensity = 3.2f;
+                sun.color = new Color(1.0f, 0.68f, 0.42f); sun.intensity = 2.8f;
                 RenderSettings.fogColor = new Color(0.82f, 0.68f, 0.58f); RenderSettings.fogDensity = 0.016f;
-                RenderSettings.ambientSkyColor = new Color(0.46f, 0.46f, 0.52f); RenderSettings.ambientEquatorColor = new Color(0.48f, 0.40f, 0.33f);
-                RenderSettings.ambientGroundColor = new Color(0.30f, 0.24f, 0.19f);
+                RenderSettings.ambientSkyColor = new Color(0.32f, 0.33f, 0.38f); RenderSettings.ambientEquatorColor = new Color(0.34f, 0.29f, 0.24f);
+                RenderSettings.ambientGroundColor = new Color(0.20f, 0.17f, 0.14f);
             }
+            Volume post = Object.FindFirstObjectByType<Volume>();
+            if (post != null) post.sharedProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/_Project/Content/Rendering/" + (preset == Preset.Midday ? ProfileName : LowSunProfileName) + ".asset");
             GameObject fillGo = GameObject.Find("ShadeFill");
-            if (fillGo != null) { Light fill = fillGo.GetComponent<Light>(); fill.intensity = preset == Preset.Midday ? 0.35f : 0.6f; fill.color = preset == Preset.Midday ? new Color(0.78f, 0.84f, 1.0f) : new Color(0.88f, 0.82f, 0.90f); }
+            if (fillGo != null) { Light fill = fillGo.GetComponent<Light>(); fill.intensity = preset == Preset.Midday ? 0.35f : 0.22f; fill.color = preset == Preset.Midday ? new Color(0.78f, 0.84f, 1.0f) : new Color(1.0f, 0.86f, 0.72f); }
             RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + (preset == Preset.Midday ? "/M_BC_Sky_Midday.mat" : "/M_BC_Sky_LowSun.mat"));
             sun.transform.rotation = rot;
             GameObject shafts = GameObject.Find("Shafts");
