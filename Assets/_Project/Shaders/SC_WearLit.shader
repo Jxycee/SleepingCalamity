@@ -136,6 +136,8 @@ Shader "SleepingCalamity/WearLit"
             #pragma shader_feature_local_fragment _ENVIRONMENTREFLECTIONS_OFF
             #pragma shader_feature_local_fragment _SCREENSPACEREFLECTIONS_OFF
             #pragma shader_feature_local_fragment _SPECULAR_SETUP
+            // SC paint mode (B4 neighbour shutters and doors): albedo = luminance(tileable) * _SpecColor.rgb. See SC_WearForwardPass.hlsl.
+            #pragma shader_feature_local_fragment _SC_PAINT
 
             // -------------------------------------
             // Universal Pipeline keywords

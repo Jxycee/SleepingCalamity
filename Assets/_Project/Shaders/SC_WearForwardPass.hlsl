@@ -265,6 +265,13 @@ void LitPassFragment(
     SurfaceData surfaceData;
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
 
+#if defined(_SC_PAINT)
+    // SC paint mode: the neighbour variants paint shutters and doors as greyscale(painted_wood albedo) x paint / 0.17 (sc_facade_kit.py, linear), so one scan
+    // carries ochre, oxblood or blue-green. _SpecColor (unused in the metallic workflow, but in the SRP-batcher cbuffer) holds paint / 0.17, set linear and raw.
+    half3 paintTex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb;
+    surfaceData.albedo = dot(paintTex, half3(0.2126h, 0.7152h, 0.0722h)) * _SpecColor.rgb;
+#endif
+
     // SC_WEAR: vertex-colour masks. Unity gives meshes with no colour (1,1,1,1), which must mean "no wear".
     half3 wm = input.wear.rgb;
     half hasWear = (wm.r + wm.g + wm.b) < 2.99h ? 1.0h : 0.0h;

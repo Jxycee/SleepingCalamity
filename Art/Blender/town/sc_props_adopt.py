@@ -33,7 +33,7 @@ Assets (folder name, matched by BeautyCornerBuilder: source -> what changes; tex
   Barrel_A       wooden_barrels_01 barrel01 -> lean, bulge, proud thickened iron hoops          2048
   Barrel_B       wooden_barrels_01 barrel02 -> squatter (0.92 h), stronger bulge                2048
   Barrel_C       wine_barrel_01 (lid, bung, base) -> lighter oak                                2048
-  Crate_A        wooden_crate_01 (lid, latch) -> faded sage-green painted board band             2048
+  Crate_A        wooden_crate_01 (lid, latch) -> one faded, chipped sage painted band            2048
   Crate_B        wooden_crate_02 (lid) -> faded ochre painted band                              2048
   Crate_C        wooden_crate_01 body + latch, lid leaned on its side, apples, turnips, squash  2048
   Bucket_A       wooden_bucket_01 (rope-hung handle)                                            1024
@@ -57,7 +57,7 @@ round 1 26/40 (wear too faint at mid distance) -> 2: 27 (darker foot grime, rust
 4: 29.5 (crate boards bow and sag, weathered darker crates, damp sack feet, crate_02's stencil letters painted out).
 Round 5 (controller's in-engine feedback, midday corner): oak darkened (OAK_DARKEN) so barrels and crates separate from
 the plaster at the wide camera, a hard dark contact band at every foot, produce 15% bigger in fuller domed heaps with
-brighter apples and squash, a sage-green painted board on Crate_A. Self-score about 31/40 against the reference pair
+brighter apples and squash, a sage-green painted board on Crate_A (toned after batch 3 to one faded, chipped band). Self-score about 31/40 against the reference pair
 sheet (target round 1 + 5 = 31); the controller's Unity capture is the judge. Extra ideas in docs/PARKING_LOT.md.
 Known quirk: Blender 5.2 segfaulted in uv.pack_islands with locked pins (Crate_C); the generated islands now pack inside their own
 box (ORIGINAL_AABB) instead, and the per-asset batch loop still retries once.
@@ -101,7 +101,7 @@ ASSETS = {   # folder names follow the BeautyCornerBuilder's name matching (barr
                       lean=1.0, bulge=0.02, hoop=0.005, wob=0.004, dirt=0.12, polish=(0.80, 1.0), **WEAR_WOOD),
     'Crate_A':   dict(src='wooden_crate_01', parts=None, res=2048, tris=5000, wood='#6c5038',
                       lean=0.8, bulge=0.03, sag=0.02, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), **WEAR_WOOD,
-                      paint=('#6c8a68', 0.18, 0.52)),   # faded sage-green board band, the facade's shutter green
+                      paint=('#6c8a6a', 0.28, 0.48, 0.72, 0.7)),   # one faded, chipped sage board (the shutter green), toned down in-engine
     'Crate_B':   dict(src='wooden_crate_02', parts=None, res=2048, tris=5000, wood='#694e36',
                       lean=-0.7, bulge=0.03, sag=0.02, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), paint=('#b38a40', 0.30, 0.62), **WEAR_WOOD,
                       erase=((0.02, 0.15, 0.15, 0.29), (0.235, 0.15, 0.37, 0.29))),
@@ -367,16 +367,19 @@ def adopted_material(name, src, matname, p, H):
         col = t.mixc(t.math('MULTIPLY', g, 0.9), col, gl)
         rough = t.mixf(g, t.math('ADD', t.math('MULTIPLY', rough, 0.3), 0.6), 0.22)
     if 'paint' in p:
-        # faded painted band (chalky ochre) worn off the edges and the lower boards
-        hexp, a, b = p['paint']
+        # faded painted band worn off the edges; optional (strength, chip) tone it down to an old, chipped coat
+        hexp, a, b = p['paint'][:3]; strength = p['paint'][3] if len(p['paint']) > 3 else 0.85
+        chip = p['paint'][4] if len(p['paint']) > 4 else 0.0
         z = t.z()
         band = t.math('MULTIPLY', t.mrange(z, a * H - 0.01, a * H + 0.01), t.mrange(z, b * H + 0.01, b * H - 0.01))
         geo = t.new('ShaderNodeNewGeometry')
         keep = t.math('MULTIPLY', band, t.math('SUBTRACT', 1.0, t.mrange(geo.outputs['Pointiness'], 0.53, 0.58)))
         keep = t.math('MULTIPLY', keep, t.mrange(t.noise(14.0, 6.0, 0.7, 3.3), 0.28, 0.45), clamp=True)
+        if chip > 0:   # small flakes of bare wood through the coat
+            keep = t.math('MULTIPLY', keep, t.mrange(t.noise(55.0, 4.0, 0.7, 9.1), 0.5 - chip * 0.1, 0.52), clamp=True)
         bw = t.new('ShaderNodeRGBToBW'); t.link(col, bw.inputs[0])
         pc = t.mixc(1.0, t.rgb(hexp), t.math('ADD', t.math('MULTIPLY', bw.outputs[0], 2.5), 0.35), blend='MULTIPLY')
-        col = t.mixc(t.math('MULTIPLY', keep, 0.85), col, pc)
+        col = t.mixc(t.math('MULTIPLY', keep, strength), col, pc)
         rough = t.mixf(keep, rough, 0.75); metal = t.mixf(keep, metal, 0.0)
     col, rough, metal = wear(t, col, rough, metal, H, p, metal_mask, ao if not isinstance(ao, float) else None)
     finish(t, col, rough, metal, ao, nm.outputs[0])

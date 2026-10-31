@@ -135,7 +135,10 @@ namespace SleepingCalamity.EditorTools
             var root = new GameObject("BeautyCorner").transform;
             Transform set = new GameObject("Set").transform; set.SetParent(root, false);
 
-            LookTestBuilder.Box(set, "Surround_Ground (scene fill, not a brief row)", new Vector3(0f, -0.17f, 0f), new Vector3(140f, 0.3f, 140f), LookTestBuilder.Mat("cobble"), default, 3f);
+            BeautyCornerArt.EnforceTextureCap();
+            Material far = BeautyCornerArt.SurroundGround();   // B6 FarCobble with a macro breakup; the LookTest cobble when that art is missing
+            LookTestBuilder.Box(set, "Surround_Ground (scene fill, not a brief row)", new Vector3(0f, -0.17f, 0f), new Vector3(140f, 0.3f, 140f),
+                far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? BeautyCornerArt.FarTileMetres : 3f);
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows) PlaceRow(set, row);
 
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
@@ -179,10 +182,11 @@ namespace SleepingCalamity.EditorTools
                 try
                 {
                     art = new RowArt { Found = found };
-                    if (row.Id == "Facade")   // multi-material: keep the FBX slot names and map them to the shared-tileable materials
+                    string folderName = Path.GetFileName(found.Folder);
+                    if (row.Id == "Facade" || BeautyCornerArt.IsNeighbour(folderName))   // multi-material: keep the FBX slot names and map them to the shared-tileable materials
                     {
                         art.Fbx = BeautyCornerArt.LoadModel(found.Folder, Path.GetFileName(found.Fbx), keepMaterialSlots: true);
-                        art.Slots = BeautyCornerArt.BuildFacadeMaterials();
+                        art.Slots = BeautyCornerArt.IsNeighbour(folderName) ? BeautyCornerArt.BuildNeighbourMaterials(folderName) : BeautyCornerArt.BuildFacadeMaterials();
                     }
                     else art.Fbx = BeautyCornerArt.Prepare(found, asset ?? row.Id, row.Foliage, out art.Mat);
                     if (art.Fbx == null) art = null;
@@ -225,7 +229,7 @@ namespace SleepingCalamity.EditorTools
                         }
                         r.sharedMaterials = mats;
                     }
-                    if (row.Id == "Facade")   // the wear shader needs the FBX vertex colour: say how many kit meshes kept it
+                    if (art.Slots != null && i == 0)   // the wear shader needs the FBX vertex colour: say how many kit meshes kept it
                     {
                         int total = 0, withColor = 0;
                         foreach (MeshFilter mf in obj.GetComponentsInChildren<MeshFilter>(true))

@@ -12,7 +12,7 @@ half a fan per 1.0 m row) laid by an occupancy raster, three concentric courses 
 sc_flag_ring.py), a gutter course along the facade foot (z 7.45), small setts filling the leftovers. Heights follow
 the 5 cm dish toward the fountain (sc_plaza_common.dish) plus a slow 6 mm undulation; clustered sunken and tilted
 setts; missing setts (the dirt bed shows, a weed slot, and sometimes the dislodged sett lies beside its hole). Under
-the setts a joint bed mesh (0.2 m grid, UV in 2 m tiles, vertex colour `damp`) (R damp/moss, G worn-path dust) carries a tileable dirt-and-grit set
+the setts a joint bed mesh (0.2 m grid, UV in 2 m tiles, vertex colour `damp`) (R damp/moss, G worn-path dust, A perimeter fade for blending into the surround) carries a tileable dirt-and-grit set
 (CobbleBed, 2 m, 2K) that darkens and greens toward the fountain and the facade foot.
 Wear story: a worn, paler path from the south edge round the fountain to the stall and the facade door; damp,
 mossy joints near the basin and the facade's shaded foot; sunken setts in the low dish around the ring.
@@ -28,8 +28,9 @@ Segmentbogenpflaster, arcs about 2 m wide; joints 1-2 cm filled with grit; foot-
 cobble #817a7b to #b7b0aa with warm lights.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_cobbles.py -- --out <scratch>
-      [--stage look|bake]   look (default): highs instanced with their procedural material, no bake (fast iteration);
-                            bake: highs -> lows -> one baked set, LOD0/LOD1 instanced with the baked game material
+      [--stage look|bake|far]  look (default): highs instanced with their procedural material, no bake (fast iteration);
+                            bake: highs -> lows -> one baked set, LOD0/LOD1 instanced with the baked game material;
+                            far: the 2 m CobbleFar surround tileable only (tex/CobbleFar_*.png) + a check render
       [--res 1024]          family and bed bake resolution (the PC's final bake: --res 2048)
       [--views wide,mid,close,ground] [--rres 960] [--samples 48] [--mood midday|lowsun] [--ring] [--no-render]
       [--export]            write CobbleFamily.fbx and PlazaBed.fbx to --out (PC only; cloud sessions commit the generator)
@@ -52,6 +53,15 @@ Round log (look stage, ground with the flag ring and stand-ins):
   r9 (Unity feedback, 2026-10-31): wider tone spread between variants (k = 1 + 2.3 tint), dirt stain up to 3 mm
      under the crown, darker joint bed, ~1.6x crown relief; patch extended to x -12 (8,673 setts) so the wide
      camera never sees the west seam. Wide-camera ground value spread 19 -> 22 (p10 0.44 -> 0.41).
+  r10 (study note, TotK villages): no hard border; setts thin out into sparse sunken stones and dirt over ragged
+     edge bands (r12: west 4 m, east/south 2 m, north 2.5 m outside the facade), with `edge_grass` weed slots for B9; kicked-loose doorstep.
+  r11 (ref-beside-render sheet vs bc_265 Munich fans): salt-and-pepper granite grain relative to each stone's colour (fine
+     noise mottle + feldspar and mica crystals), pale tints capped (k = 1 + 1.1 tint), tilts halved (a laid, nearly flush surface), near-neutral grey, split edges (bevels x0.6), joints 1.1 cm.
+  r12 (Unity batch 3): open edges fade over longer ragged bands incl. the north edge outside the facade; the bed
+     rises flush with the surround at the perimeter (vertex alpha = fade); lighter darks and bed stain for low sun;
+     --stage far bakes the CobbleFar 2 m tileable for the surround ground.
+     Judged on ref sheets: far tile wraps with no seams (145 stones, high 928k tris; the 2 m repeat shows on close
+     inspection, so vary it in Unity); the open edge thins into sparse stones; low sun keeps readable mid tones.
   The `damp` bed vertex colour is not read by the Unity shader yet: the CobbleBed tileable carries base moss alone.
   Parked ideas: docs/PARKING_LOT.md (B6 plaza ground).
 """
@@ -79,18 +89,18 @@ def rng(stream):
 # ----------------------------------------------------------------------------- family definition
 #  name, top length L, top width W, body height H, kind, params
 FAMILY = [   # tint: value offset (-0.3..+0.3), warm: -1 blue-grey .. +1 pink-tan (granite blocks differ: the refs' strongest cue)
-    ('sett_a', 0.180, 0.140, 0.10, 'sett', dict(dome=0.004, bev=0.010, tint=0.00, warm=0.2)),
-    ('sett_b', 0.195, 0.130, 0.10, 'sett', dict(dome=0.005, bev=0.009, tint=-0.26, warm=-0.9)),    # dark blue-grey
-    ('sett_c', 0.160, 0.145, 0.10, 'sett', dict(dome=0.006, bev=0.013, tint=0.14, warm=1.0)),      # pale pink granite
-    ('sett_d', 0.175, 0.135, 0.10, 'wedge', dict(dome=0.004, bev=0.010, tint=-0.06, warm=0.5, taper=0.16)),
-    ('sett_e', 0.185, 0.140, 0.10, 'cracked', dict(dome=0.003, bev=0.009, tint=-0.18, warm=0.1)),
-    ('sett_f', 0.170, 0.130, 0.10, 'chipped', dict(dome=0.005, bev=0.008, tint=0.20, warm=-0.4)),  # pale cool grey
-    ('path_a', 0.185, 0.140, 0.10, 'worn', dict(dome=0.002, bev=0.013, tint=0.16, warm=0.6)),
-    ('path_b', 0.165, 0.135, 0.10, 'worn', dict(dome=0.002, bev=0.014, tint=0.06, warm=-0.2)),
-    ('damp_a', 0.180, 0.135, 0.10, 'sett', dict(dome=0.004, bev=0.010, tint=-0.20, warm=0.3, damp=1)),   # the low dish by the ring
-    ('damp_b', 0.170, 0.140, 0.10, 'sett', dict(dome=0.005, bev=0.011, tint=-0.30, warm=-0.5, damp=1)),
-    ('damp_c', 0.190, 0.130, 0.10, 'chipped', dict(dome=0.004, bev=0.009, tint=-0.12, warm=0.8, damp=1)),
-    ('small_a', 0.120, 0.105, 0.09, 'sett', dict(dome=0.003, bev=0.009, tint=-0.10, warm=0.7)),
+    ('sett_a', 0.180, 0.140, 0.10, 'sett', dict(dome=0.004, bev=0.0060, tint=0.00, warm=0.2)),
+    ('sett_b', 0.195, 0.130, 0.10, 'sett', dict(dome=0.005, bev=0.0054, tint=-0.26, warm=-0.9)),    # dark blue-grey
+    ('sett_c', 0.160, 0.145, 0.10, 'sett', dict(dome=0.006, bev=0.0078, tint=0.14, warm=1.0)),      # pale pink granite
+    ('sett_d', 0.175, 0.135, 0.10, 'wedge', dict(dome=0.004, bev=0.0060, tint=-0.06, warm=0.5, taper=0.16)),
+    ('sett_e', 0.185, 0.140, 0.10, 'cracked', dict(dome=0.003, bev=0.0054, tint=-0.18, warm=0.1)),
+    ('sett_f', 0.170, 0.130, 0.10, 'chipped', dict(dome=0.005, bev=0.0048, tint=0.20, warm=-0.4)),  # pale cool grey
+    ('path_a', 0.185, 0.140, 0.10, 'worn', dict(dome=0.002, bev=0.0078, tint=0.16, warm=0.6)),
+    ('path_b', 0.165, 0.135, 0.10, 'worn', dict(dome=0.002, bev=0.0084, tint=0.06, warm=-0.2)),
+    ('damp_a', 0.180, 0.135, 0.10, 'sett', dict(dome=0.004, bev=0.0060, tint=-0.20, warm=0.3, damp=1)),   # the low dish by the ring
+    ('damp_b', 0.170, 0.140, 0.10, 'sett', dict(dome=0.005, bev=0.0066, tint=-0.30, warm=-0.5, damp=1)),
+    ('damp_c', 0.190, 0.130, 0.10, 'chipped', dict(dome=0.004, bev=0.0054, tint=-0.12, warm=0.8, damp=1)),
+    ('small_a', 0.120, 0.105, 0.09, 'sett', dict(dome=0.003, bev=0.0054, tint=-0.10, warm=0.7)),
     ('frag_a', 0.120, 0.090, 0.060, 'frag', dict(tint=-0.12, warm=0.3)),
     ('frag_b', 0.090, 0.075, 0.050, 'frag', dict(tint=0.10, warm=0.8)),
 ]
@@ -98,7 +108,7 @@ VAR = {f[0]: f for f in FAMILY}
 SETTS = ['sett_a', 'sett_b', 'sett_c', 'sett_d', 'sett_e', 'sett_f']
 PATHS = ['path_a', 'path_b']
 DAMPS = ['damp_a', 'damp_b', 'damp_c']
-JOINT = 0.015            # nominal joint (m)
+JOINT = 0.011            # nominal joint (m)
 BURY = 0.045             # the lows keep this much body below the top; the rest is underground
 LOD0_T, LOD1_T, FRAG_T = 140, 44, 120
 
@@ -112,18 +122,22 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     mott = T.noise(p, scale=9.0, detail=5.0, rough=0.6)
     big = T.noise(p, scale=2.5, detail=2.0)
     # wide value spread between stones: the only per-stone value cue in Unity
-    k = 1.0 + 2.3 * tint; hue = (1.0 + 0.10 * warm, 1.0 + 0.01 * warm, 1.0 - 0.10 * warm)
-    lo = tuple(c * k * h for c, h in zip((0.175, 0.161, 0.163), hue))          # within one stone: a narrow band, so the stones differ
+    k = 1.0 + (2.3 if tint < 0 else 1.1) * tint; hue = (1.0 + 0.05 * warm, 1.0 + 0.005 * warm, 1.0 - 0.05 * warm)   # near-neutral grey: the refs aren't beige
+    lo = tuple(c * k * h for c, h in zip((0.19, 0.175, 0.177), hue))          # within one stone: a narrow band, so the stones differ
     hi = tuple(c * k * h for c, h in zip((0.295, 0.27, 0.25), hue))
     col = T.ramp(T.math('ADD', T.math('MULTIPLY', mott, 0.75), T.math('MULTIPLY', big, 0.35)),
                  [(0.30, lo), (0.52, tuple((a + b) / 2 for a, b in zip(lo, hi))), (0.72, hi)])
     # specks: feldspar (pale, a little warm) and mica (near black, glossy)
-    vf = T.node('ShaderNodeTexVoronoi'); T.set(vf, 'Vector', p); vf.inputs['Scale'].default_value = 150.0
-    felds = T.math('MULTIPLY', T.smoothstep((vf, 'Distance'), 0.36, 0.20), T.smoothstep((T.sep((vf, 'Color')), 'X'), 0.62, 0.70))
-    vm = T.node('ShaderNodeTexVoronoi'); T.set(vm, 'Vector', T.vmath('ADD', p, (3.1, 1.7, 0.4))); vm.inputs['Scale'].default_value = 220.0
-    mica = T.math('MULTIPLY', T.smoothstep((vm, 'Distance'), 0.26, 0.12), T.smoothstep((T.sep((vm, 'Color')), 'X'), 0.62, 0.68))
-    col = T.mix(T.math('MULTIPLY', felds, 0.3), col, (0.46, 0.43, 0.39))
-    col = T.mix(T.math('MULTIPLY', mica, 0.5), col, (0.05, 0.048, 0.052))
+    vf = T.node('ShaderNodeTexVoronoi'); T.set(vf, 'Vector', p); vf.inputs['Scale'].default_value = 110.0
+    felds = T.math('MULTIPLY', T.smoothstep((vf, 'Distance'), 0.36, 0.20), T.smoothstep((T.sep((vf, 'Color')), 'X'), 0.35, 0.45))   # salt: dense pale feldspar grains
+    vm = T.node('ShaderNodeTexVoronoi'); T.set(vm, 'Vector', T.vmath('ADD', p, (3.1, 1.7, 0.4))); vm.inputs['Scale'].default_value = 140.0
+    mica = T.math('MULTIPLY', T.smoothstep((vm, 'Distance'), 0.26, 0.12), T.smoothstep((T.sep((vm, 'Color')), 'X'), 0.45, 0.52))   # pepper: black mica/hornblende
+    # grain relative to each stone's own colour (fixed white/black dots read as terrazzo on the dark setts)
+    gr = T.noise(p, scale=150.0, detail=2.0, rough=0.5)
+    col = T.mix(T.math('MULTIPLY', T.smoothstep(gr, 0.56, 0.66), 0.7), col, T.hsv(col, 0.5, 0.6, 1.55))
+    col = T.mix(T.math('MULTIPLY', T.smoothstep(gr, 0.44, 0.34), 0.7), col, T.hsv(col, 0.5, 1.0, 0.45))
+    col = T.mix(T.math('MULTIPLY', felds, 0.5), col, T.hsv(col, 0.5, 0.5, 1.6))
+    col = T.mix(T.math('MULTIPLY', mica, 0.8), col, T.hsv(col, 0.5, 1.0, 0.18))
     # foot polish: the top faces are paler and smoother; worn variants more so
     up = T.up(0.75, 0.97)
     top = T.math('MULTIPLY', up, T.smoothstep(z, -0.012, -0.002))
@@ -142,7 +156,7 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     col = T.mix(T.math('MULTIPLY', T.math('SUBTRACT', 1.0, cav), 0.75), col, dirt)
     # the body below the joint line sits in the grit bed: dirt-stained, matte
     bed = T.smoothstep(T.math('ADD', z, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.012)), -0.003, -0.020)     # dirt stain rises to 3 mm under the crown: joints read wide and dark at 5-10 m
-    col = T.mix(T.math('MULTIPLY', bed, 0.85), col, (0.11, 0.092, 0.072))
+    col = T.mix(T.math('MULTIPLY', bed, 0.85), col, (0.15, 0.13, 0.10))
     # sparse pale lichen dots on the unworn setts, in the micro hollows of the top
     if not worn:
         lv = T.node('ShaderNodeTexVoronoi'); T.set(lv, 'Vector', p); lv.inputs['Scale'].default_value = 22.0
@@ -158,7 +172,7 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     if damp: rough = T.math('MULTIPLY', rough, 0.62)
     # micro relief: crystal grain + feldspar bumps (the dents and spalls are geometry)
     grain = T.noise(p, scale=380.0, detail=3.0)
-    h = T.math('ADD', T.math('MULTIPLY', grain, 0.5), T.math('MULTIPLY', felds, 0.35))
+    h = T.math('ADD', T.math('ADD', T.math('MULTIPLY', grain, 0.5), T.math('MULTIPLY', felds, 0.35)), T.math('MULTIPLY', mica, -0.3))
     nrm = T.bump(h, strength=0.3 if worn else 0.55, distance=0.0008)
     T.output(col, rough, 0.0, nrm)
     return m
@@ -386,21 +400,47 @@ class Layout:
                     if self.place(v, x, z, base + da, sc, tol=0.16): break
         return self.stones
 
+def edge_dist(x, z):
+    """Metres-in from the nearest open patch edge, each side scaled by its fade band (west 4 m, others 2-2.5 m);
+    the north edge behind the facade footprint is not open."""
+    e = min((x - X0) / 4.0, (X1 - x) / 2.0, (z - Z0) / 2.0)
+    if not (FACADE[0] - 0.3 < x < FACADE[1] + 0.3): e = min(e, (Z1 - z) / 2.5)
+    return e
+
+def edge_thin(x, z, g):
+    """0..1 chance a sett is left out near the open edges: a long ragged tail of sparse stones, no line."""
+    e = edge_dist(x, z) + (g - 0.5) * 0.7
+    t = 1.0 - P.smoothstep(e) ** 0.6
+    return min(1.0, t * 1.1)
+
 def heights_and_damage(stones):
     """Uneven heights, clustered sunken and tilted setts, missing setts, loose stones; weed slots for B9."""
     r = rng('damage')
     pts = np.array([[s['x'], 0.0, s['z']] for s in stones])
     und = (K.fbm(pts, 0.7, 3, 0.5, 11.0) - 0.5) * 2              # slow undulation
     clus = K.fbm(pts, 0.45, 2, 0.5, 23.0)                          # sinking clusters
+    ragn = K.fbm(pts, 0.9, 3, 0.5, 31.0)                           # ragged edge noise
     kept, loose, weeds = [], [], []
-    for s, u, c in zip(stones, und, clus):
+    for s, u, c, g in zip(stones, und, clus, ragn):
         x, z = s['x'], s['z']; rr = math.hypot(x, z); pw = path_weight(x, z)
         top = P.dish(rr) + 0.006 * u + r.gauss(0, 0.0018)
-        tx, tz = r.gauss(0, 0.012), r.gauss(0, 0.012)
+        tx, tz = r.gauss(0, 0.006), r.gauss(0, 0.006)        # a laid surface: setts nearly flush (r11)
+        # no hard border: toward the west, east and south edges the setts thin out into sparse, sunken stones and dirt
+        th = edge_thin(x, z, g)
+        if th > 0:
+            if r.random() < th:
+                if r.random() < 0.12: weeds.append(dict(p=[x, P.dish(rr) - 0.02, z], kind='edge_grass'))
+                continue
+            top -= th * r.uniform(0.004, 0.02); tx += r.gauss(0, 0.05 * th); tz += r.gauss(0, 0.05 * th)
+        # the doorstep: feet have kicked the setts loose, worn dirt shows
+        dx, dz = (x - DOOR_U[0]) / 0.95, (z - (DOOR_U[1] - 0.2)) / 0.6
+        if dx * dx + dz * dz < 1.0:
+            if r.random() < 0.35 * (1 - (dx * dx + dz * dz)): continue
+            top -= r.uniform(0.0, 0.012)
         near_ring = P.smoothstep(1.0 - (rr - P.RING_R) / 2.0)
         sink_p = 0.03 + 0.25 * P.smoothstep((c - 0.58) / 0.12) + 0.06 * near_ring
         if r.random() < sink_p:
-            top -= r.uniform(0.008, 0.022); tx += r.uniform(-1, 1) * 0.06; tz += r.uniform(-1, 1) * 0.06
+            top -= r.uniform(0.008, 0.022); tx += r.uniform(-1, 1) * 0.03; tz += r.uniform(-1, 1) * 0.03
         miss_p = 0.002 + 0.06 * P.smoothstep((c - 0.66) / 0.08) * (1 - pw)
         if r.random() < miss_p and s['v'] != 'small_a':
             weeds.append(dict(p=[x, P.dish(rr) - 0.02, z], kind='missing_sett'))
@@ -448,7 +488,8 @@ def build_bed():
     for i in range(nx + 1):
         for j in range(nz + 1):
             xu, zu = X0 + i * step, Z0 + j * step
-            y = P.dish(math.hypot(xu, zu)) - 0.034
+            fade = P.smoothstep(min(xu - X0, X1 - xu, zu - Z0, (Z1 - zu) if not (FACADE[0] < xu < FACADE[1]) else 9.0) / 1.0)
+            y = P.dish(math.hypot(xu, zu)) - 0.034 * fade - 0.004      # flush with the surround at the perimeter
             vs[i, j] = bm.verts.new(P.u2b((xu, y, zu)))
     for i in range(nx):
         for j in range(nz):
@@ -459,7 +500,9 @@ def build_bed():
             for lp in f.loops:
                 b = lp.vert.co; xu, zu = -b.x, -b.y
                 lp[uvl].uv = (xu / 2.0, zu / 2.0)
-                d = bed_damp(xu, zu); pw = path_weight(xu, zu); lp[col] = (d * (1 - pw), pw, 0.0, 1.0)
+                d = bed_damp(xu, zu); pw = path_weight(xu, zu)
+                fa = P.smoothstep(min(xu - X0, X1 - xu, zu - Z0, (Z1 - zu) if not (FACADE[0] < xu < FACADE[1]) else 9.0) / 1.5)
+                lp[col] = (d * (1 - pw), pw, 0.0, fa)      # A: 0 at the open perimeter -> blend into the surround ground
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ob = K._obj_from_bm('PlazaBed', bm)
@@ -527,9 +570,97 @@ def ground_cam():
     """A low look at the cobbles south-east of the fountain (not a capture camera: a material check)."""
     P.CAMS_U['ground'] = ((3.2, 0.9, -4.6), (1.8, 0.0, -2.4))
 
+
+# ----------------------------------------------------------------------------- far / surround tileable
+def build_far_tile(highs, period=2.0):
+    """A 2 m x 2 m tileable of the laid cobbles for the surround ground (controller, 2026-10-31): fan courses on a
+    torus (2.0 m fans, 1.0 m rows offset half a fan, so the layout repeats every 2 m both ways), the real highs
+    (decimated to 4k tris) and the joint bed, baked top-down onto a 2 m plane: CobbleFar_{BaseColor,Normal,
+    Roughness,AO}. Returns the bake paths."""
+    r = rng('far'); N = int(period / RES_G); occ = np.zeros((N, N), dtype=bool); placed = []
+    def place(v, x, z, a, sc, tol):
+        L, W = VAR[v][1] * sc, VAR[v][2] * sc; m = JOINT / 2
+        hx = abs(L / 2 * math.cos(a)) + abs(W / 2 * math.sin(a)) + m; hz = abs(L / 2 * math.sin(a)) + abs(W / 2 * math.cos(a)) + m
+        i0, i1 = int(math.floor((x - hx) / RES_G)), int(math.ceil((x + hx) / RES_G))
+        j0, j1 = int(math.floor((z - hz) / RES_G)), int(math.ceil((z + hz) / RES_G))
+        gx = (np.arange(i0, i1) + 0.5)[:, None] * RES_G - x; gz = (np.arange(j0, j1) + 0.5)[None, :] * RES_G - z
+        u = gx * math.cos(a) + gz * math.sin(a); w = -gx * math.sin(a) + gz * math.cos(a)
+        mask = (np.abs(u) < L / 2 + m) & (np.abs(w) < W / 2 + m)
+        ix = np.ix_(np.arange(i0, i1) % N, np.arange(j0, j1) % N)
+        if (occ[ix] & mask).sum() > tol * mask.sum(): return False
+        occ[ix] |= mask; placed.append((v, x % period, z % period, a, sc)); return True
+    FW, FH, RMAX = 2.0, 1.0, 1.45
+    for j in range(2):
+        ox = (FW / 2 if j % 2 else 0.0); oz = j * FH - 0.6
+        Rk = RMAX
+        while Rk > 0.22:
+            a = math.asin(min(0.97, (FW * 0.52) / Rk)); arc = 2 * a * Rk; s_ = r.uniform(0, 0.08)
+            while s_ < arc:
+                v = r.choice(SETTS); sc = r.uniform(0.94, 1.06); L = VAR[v][1] * sc
+                t = math.pi / 2 + a - (s_ + L / 2) / Rk
+                place(v, ox + Rk * math.cos(t), oz + Rk * math.sin(t), t - math.pi / 2 + r.uniform(-0.05, 0.05), sc, 0.07)
+                s_ += L + JOINT * r.uniform(0.8, 1.3)
+            Rk -= 0.14 + JOINT
+    for small, scl in ((False, (0.9, 1.0)), (True, (0.92, 1.04)), (True, (0.72, 0.8))):
+        free = np.argwhere(~occ).tolist(); idx = list(range(0, len(free), 2)); r.shuffle(idx)
+        for t in idx:
+            i, j = free[t]
+            if occ[i, j]: continue
+            v = 'small_a' if small else r.choice(SETTS); sc = r.uniform(*scl); base = r.uniform(-0.3, 0.3)
+            for da in (0.0, math.pi / 2, math.pi / 4, -math.pi / 4):
+                if place(v, (i + 0.5) * RES_G, (j + 0.5) * RES_G, base + da, sc, 0.16): break
+    # geometry: decimated highs, every stone plus its wrapped copies that reach into the tile
+    lows = {}
+    for n in set(p[0] for p in placed):
+        lows[n] = K.dup(highs[n], n + '_far'); K.decimate_to(lows[n], 4000)
+    bm = bmesh.new(); mats = []
+    for v, x, z, a, sc in placed:
+        for dx in (-period, 0.0, period):
+            for dz in (-period, 0.0, period):
+                X, Z = x + dx, z + dz
+                if not (-0.25 < X < period + 0.25 and -0.25 < Z < period + 0.25): continue
+                yaw_b = math.atan2(-math.sin(a), -math.cos(a))
+                M = Matrix.Translation(P.u2b((X, r.gauss(0, 0.0015), Z))) @ Matrix.Rotation(r.gauss(0, 0.006), 4, 'X') @ Matrix.Rotation(yaw_b, 4, 'Z') @ Matrix.Diagonal((sc, sc, 1.0, 1.0))
+                me = lows[v].data.copy(); me.transform(M)
+                mi = mats.index(highs[v].data.materials[0]) if highs[v].data.materials[0] in mats else (mats.append(highs[v].data.materials[0]) or len(mats) - 1)
+                for poly in me.polygons: poly.material_index = mi
+                bm.from_mesh(me); bpy.data.meshes.remove(me)
+    stones = K._obj_from_bm('FarStones', bm)
+    for mt in mats: stones.data.materials.append(mt)
+    for o in lows.values(): bpy.data.objects.remove(o)
+    c = P.u2b((period / 2, 0, period / 2))
+    bpy.ops.mesh.primitive_plane_add(size=period + 1.0, location=(c.x, c.y, -0.034)); bed = bpy.context.active_object; bed.name = 'FarBed'
+    for lp in bed.data.loops:
+        co = bed.data.vertices[lp.vertex_index].co + bed.location
+        bed.data.uv_layers.active.data[lp.index].uv = (-co.x / 2.0, -co.y / 2.0)
+    bed.data.materials.append(P.bed_material('M_CobbleBed'))
+    bpy.ops.mesh.primitive_plane_add(size=period, location=(c.x, c.y, -0.012)); low = bpy.context.active_object; low.name = 'CobbleFar'
+    print('FAR stones', len(placed), 'high tris', K.tris(stones))
+    paths = K.bake_to_low(low, [stones, bed], os.path.join(OUT, 'tex'), 'CobbleFar', res=RES, samples=32, extrusion=0.03, ray=0.07, ao_dist=0.05)
+    bpy.data.objects.remove(stones); bpy.data.objects.remove(bed); bpy.data.objects.remove(low)
+    return paths
+
+def far_check(paths):
+    """The far tileable on a 30 x 20 m plane (UV in 2 m tiles) seen from the wide and mid cameras."""
+    gm = K.game_material('M_CobbleFar', paths)
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
+    vs = [bm.verts.new(P.u2b(p)) for p in ((-20, -0.01, -10), (12, -0.01, -10), (12, -0.01, 12), (-20, -0.01, 12))]
+    f = bm.faces.new(vs)
+    for lp in f.loops: lp[uvl].uv = (-lp.vert.co.x / 2.0, -lp.vert.co.y / 2.0)
+    ob = K._obj_from_bm('FarCheck', bm)
+    if ob.data.polygons[0].normal.z < 0: ob.data.flip_normals()
+    ob.data.materials.append(gm)
+
 # ----------------------------------------------------------------------------- main
 if __name__ == '__main__':
     K.reset(); sc = bpy.context.scene
+    if STAGE == 'far':                                   # the surround tileable only
+        highs = build_family()
+        far_check(build_far_tile(highs))
+        for h in highs.values(): bpy.data.objects.remove(h)
+        if '--no-render' not in argv:
+            P.standins(); P.render_cams(sc, OUT, 'CobbleFar', [v for v in VIEWS if v in ('wide', 'mid')] or ['wide'], RRES, SAMPLES, MOOD)
+        sys.exit(0)
     lay = Layout(); stones = lay.build()
     kept, loose, weeds = heights_and_damage(stones)
     print('LAYOUT setts', len(kept), 'loose', len(loose), 'weed slots', len(weeds))

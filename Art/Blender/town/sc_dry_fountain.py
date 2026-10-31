@@ -36,10 +36,21 @@ tileable's measured hue #b9a07a (Art/Textures/B1_town/SOURCES.md).
       packed for Unity with `python Art/Blender/tools/sc_pack_unity.py --to-orm <out>/props/tex <Name> Assets/_Project/Content/Art/Town/B10/<Name>`.
 Cloud sessions commit this generator only; the PC runs --stage bake --res 4096 to write the textures (sc-asset-craft 4).
 
-Status (2026-10-31, cloud): look rounds 1-3 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28/40:
+Status (2026-10-31, cloud): look rounds 1-7 scored (calibrated sc-asset-review, camera-visible only) 23.5 -> 27 -> 28 -> 29.5 -> 30.5 -> 31 -> 31/40:
 round 2 dropped the dish and beast 0.30 m into the 38 deg close camera, fixed the values, tide line, ground-line damp
 and the ruff; round 3 added the shaft flutes, rosier and paler replacement stones, rain streaks under the coping, a
-clean dish and a paler seat. Bake proof (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
+clean dish and a paler seat; round 4 gave the beast puffy shut lids with lid lines deep enough to bake, twisted locks of
+varied length in the ruff, loose threads at the banner's tears and hem, and sun-bleached banner edges; round 5 (the controller's 4K in-engine note: the beast read awake, its deep nostril
+holes looked like two open eyes) made it read asleep: small shallow nostril slits on a low flat nose pad, sagging
+crescent lid lines cut deeper, a low relaxed brow drooping outward, slumped cheeks, a more lolling head, one slack
+mouth slit round the spout bore, and the beast's tail draped round the column under the dish; round 6 (in-engine: the snout read as a pig's disc with two round nostrils)
+built a lion's muzzle: a broad bridge down from the brow, a heart-shaped nose pad with curled nostril slits, two puffy
+whisker pads with whisker pits either side of a groove, and heavier shut lids; round 7 (user, from sleeping-lion
+photos: the bridge read as a second nose above the nose, and the puffy lids as almond eyes; the slits read better)
+made the nose one long form widening into a triangular nose leather, and the shut eyes thin bowed slits slanting up
+to the outer corner, nearly flush, under a quieter brow, with no lashes. Beside the
+fountain refs (Reference/hollowmere/fountain/) the gap is weathering: the real basins carry darker grey-green patina low
+down and more tone change between stones; bc_109 stands on two wide steps. Bake proof (round 3) (--stage bake --res 1024, cloud): DryFountain high 4.31M -> low 48,724 tris,
 BannerPole high 0.79M -> low 8,996 (57.7k together, in the T4 30-60k band); at 1024 the closed-eye lid lines soften
 toward brows, so check them first in the PC's 4K bake.
 PC bake (2026-10-30, Blender 5.2.2): --stage bake --res 4096 --export -> DryFountain 48,725 tris (4K), BannerPole 8,996
@@ -351,11 +362,26 @@ def column():
     return obs
 
 SHAFT_FLUTES = (0.60 + 0.12 * (0.71 + ZT) / 0.71, 0.60 + 0.60 * (0.71 + ZT) / 0.71)
+def tail():
+    """The beast's tail, curled down round the fluted shaft from under the dish, ending in a carved tuft."""
+    cam = math.atan2(1.6, -1.6)                                      # the close camera's bearing: drape the tail across its view
+    z0, z1 = 0.98, 0.70; pts = []; rads = []; a0, a_end = cam + 1.5, cam - 1.3
+    for t in np.linspace(0, 1, 90):
+        a = a0 + (a_end - a0) * t; z = z0 + (z1 - z0) * t ** 0.9
+        R = 0.188 - 0.008 * t
+        pts.append((R * math.cos(a), R * math.sin(a), z)); rads.append(0.044 - 0.022 * t)
+    obs = [K.tube('tail', pts, 0.03, 14, radii=rads)]
+    a = a_end; tip = Vector((0.19 * math.cos(a), 0.19 * math.sin(a), z1 - 0.03))
+    for k in range(5):                                               # tuft: five chunky curls
+        d = Vector((math.cos(a + 0.5 * (k - 2) * 0.5), math.sin(a + 0.5 * (k - 2) * 0.5), 0)) * 0.012
+        obs.append(sphere(f'tuft{k}', tip + d + Vector((0, 0, -0.012 * abs(k - 2))), 0.026, (1.0, 1.0, 1.5), 16))
+    return obs
+
 def flutes(ob):
     """14 flutes cut into the shaft after the remesh and fillet (the seam fillet smooths concave channels away):
     round channels between flat fillets, with rounded stops top and bottom."""
     co, _ = K.mesh_arrays(ob); z0f, z1f = SHAFT_FLUTES
-    r = np.hypot(co[:, 0], co[:, 1]); m = (co[:, 2] > z0f) & (co[:, 2] < z1f) & (r < 0.2)
+    r = np.hypot(co[:, 0], co[:, 1]); m = (co[:, 2] > z0f) & (co[:, 2] < z1f) & (r < 0.168)   # the shaft, not the tail
     u = np.mod(14 * np.arctan2(co[:, 1], co[:, 0]) / (2 * math.pi), 1.0)
     ch = np.sqrt(np.clip(1 - ((u - 0.5) / 0.4) ** 2, 0, 1))
     e = np.sqrt(np.clip(np.minimum((co[:, 2] - z0f) / 0.05, (z1f - co[:, 2]) / 0.05), 0, 1))
@@ -378,7 +404,7 @@ def dish_nubs():
 # remesh unions into one carving (Tripo-style compound, sc-asset-craft 5).
 PIVOT = Vector((0.0, 0.0, 1.60 + ZT))
 R_FACE = Matrix.Rotation(FACE_AZ, 4, 'Z')
-R_TILT = Matrix.Rotation(math.radians(7.0), 4, 'X') @ Matrix.Rotation(math.radians(6.0), 4, 'Y')   # lolling, nose dipping
+R_TILT = Matrix.Rotation(math.radians(10.0), 4, 'X') @ Matrix.Rotation(math.radians(9.0), 4, 'Y')   # dozing: head lolling, nose dipping
 FF = Vector((math.cos(FACE_AZ), math.sin(FACE_AZ), 0.0)); FL = Vector((0, 0, 1)).cross(FF)
 
 def HW(p, tilt=True):
@@ -400,21 +426,30 @@ def beast():
     obs = [blob('chest', (-0.05, 0.0, 0.03), (0.21, 0.25, 0.15), tilt=False),
            blob('cranium', (0.02, 0.0, 0.27), (0.24, 0.27, 0.23)),
            blob('muzzle', (0.21, 0.0, 0.19), (0.15, 0.16, 0.11)),
-           blob('nose', (0.335, 0.0, 0.245), (0.05, 0.078, 0.042)),
+           # a lion's nose is one long form: from between the eyes it runs down the muzzle, widening, into a broad
+           # triangular nose leather at the tip (sleeping-lion refs); whisker pads sit under it either side of a groove
+           K.tube('nose', [HW((0.205 + 0.13 * t, 0.0, 0.33 - 0.09 * t + 0.02 * t * (1 - t))) for t in np.linspace(0, 1, 12)], 0.03, 16,
+                  radii=[0.022 + 0.022 * t ** 1.5 for t in np.linspace(0, 1, 12)]),
+           blob('noseleather', (0.338, 0.0, 0.232), (0.03, 0.06, 0.026), rot=Matrix.Rotation(math.radians(-25), 4, 'Y')),
            blob('chin', (0.18, 0.0, 0.065), (0.10, 0.12, 0.06))]
     for s in (1, -1):
-        obs.append(blob(f'jowl{s}', (0.22, s * 0.105, 0.12), (0.10, 0.10, 0.09)))
-        obs.append(blob(f'eyemound{s}', EYE[(1 - s) // 2], (0.05, 0.062, 0.042)))
-        brow = [HW((0.19 + 0.03 * math.cos(u), s * (0.118 + 0.07 * math.sin(u)), 0.36 + 0.02 * math.cos(u))) for u in np.linspace(-1.5, 1.5, 16)]
-        obs.append(K.tube(f'brow{s}', brow, 0.03, 12, radii=[0.018 + 0.016 * math.cos(u) for u in np.linspace(-1.5, 1.5, 16)]))
+        obs.append(blob(f'jowl{s}', (0.215, s * 0.11, 0.10), (0.105, 0.105, 0.095)))   # cheeks slumped low, dozing
+        e = EYE[(1 - s) // 2]
+        obs.append(blob(f'eyemound{s}', e, (0.046, 0.064, 0.034)))     # a low shut lid, nearly flush with the face
+        obs.append(blob(f'whisker{s}', (0.302, s * 0.048, 0.168), (0.056, 0.058, 0.046)))
+        # a relaxed brow: low, soft, drooping toward the outer corner (never arched, which reads surprised)
+        brow = [HW((0.195 + 0.025 * math.cos(u), s * (0.118 + 0.065 * math.sin(u)), 0.354 + 0.005 * math.cos(u) + 0.008 * math.sin(u))) for u in np.linspace(-1.4, 1.4, 16)]
+        obs.append(K.tube(f'brow{s}', brow, 0.02, 12, radii=[0.006 + 0.007 * math.cos(u) for u in np.linspace(-1.4, 1.4, 16)]))   # a soft brow, quieter than the eye
         obs.append(blob(f'ear{s}', (-0.04, s * 0.235, 0.41), (0.045, 0.07, 0.088), rot=Matrix.Rotation(s * math.radians(-35), 4, 'X')))
         obs.append(blob(f'paw{s}', (0.21, s * 0.12, -0.03), (0.12, 0.078, 0.056), tilt=False))
         for k, dy in enumerate((-0.042, 0.0, 0.042)):
             obs.append(blob(f'toe{s}{k}', (0.315, s * 0.12 + dy, -0.032), (0.036, 0.03, 0.036), tilt=False, seg=20))
-    for k, a in enumerate(np.linspace(-2.0, 2.0, 13)):              # the ruff: broad, flat, overlapping carved locks round the head
-        ctr = (-0.06, 0.275 * math.sin(a), 0.22 + 0.275 * math.cos(a))
-        rot = Matrix.Rotation(-a, 4, 'X') @ Matrix.Rotation(0.35, 4, 'Y')
-        obs.append(blob(f'lock{k}', ctr, (0.05, 0.095, 0.12), rot=rot, seg=24))
+    rl = K.rng('locks')
+    for k, a in enumerate(np.linspace(-2.0, 2.0, 13)):              # the ruff: broad overlapping locks, each twisted and its own length
+        L = rl.uniform(0.85, 1.2); R = 0.275 + 0.02 * (L - 1)
+        ctr = (-0.06, R * math.sin(a), 0.22 + R * math.cos(a))
+        rot = Matrix.Rotation(-a, 4, 'X') @ Matrix.Rotation(0.35, 4, 'Y') @ Matrix.Rotation((0.45 if k % 2 else -0.45) * L, 4, 'Z')
+        obs.append(blob(f'lock{k}', ctr, (0.055, 0.095, 0.12 * L), rot=rot, seg=24))
         if abs(a) < 1.8:
             ctr2 = (-0.12, 0.215 * math.sin(a + 0.15), 0.22 + 0.215 * math.cos(a + 0.15))
             obs.append(blob(f'lockb{k}', ctr2, (0.05, 0.085, 0.10), rot=Matrix.Rotation(-(a + 0.15), 4, 'X'), seg=20))
@@ -428,28 +463,33 @@ def _snap_tube(bvh, name, pts, r, sides=8, radii=None):
     return K.tube(name, q, r, sides, radii=radii)
 
 def beast_cuts(ob):
-    """Closed-eye lid lines with lash ticks, nostrils, the open mouth and its bore, ear cups, toe and lock grooves,
+    """Closed-eye slits, nostrils, the open mouth and its bore, ear cups, toe and lock grooves,
     all snapped onto the carved surface."""
     from mathutils.bvhtree import BVHTree
     bvh = BVHTree.FromObject(ob, bpy.context.evaluated_depsgraph_get())
     cut = []
     for s in (1, -1):
         e = Vector(EYE[(1 - s) // 2])
-        lid = [HW(e + Vector((0.06, s * 0.052 * u, -0.006 + 0.016 * u * u))) for u in np.linspace(-1, 1, 14)]
-        cut.append(_snap_tube(bvh, f'lid{s}', lid, 0.0075, radii=[0.004 + 0.004 * math.cos(u * 1.4) for u in np.linspace(-1, 1, 14)]))
-        for k, u in enumerate((-0.55, -0.1, 0.35, 0.75)):
-            a = e + Vector((0.06, s * 0.052 * u, -0.006 + 0.016 * u * u))
-            b = a + Vector((0.0, s * 0.012 * (u + 0.3), -0.02))
-            cut.append(_snap_tube(bvh, f'lash{s}{k}', [HW(a.lerp(b, t)) for t in np.linspace(0, 1, 5)], 0.004, 6))
-        n0 = HW((0.39, s * 0.03, 0.245)); n1 = HW((0.30, s * 0.03, 0.25))
-        cut.append(cyl(f'nostril{s}', n0, n1 - n0, 0.013, 0.035, back=0.02, seg=14))
+        # shut eyes as a lion's: thin slits, gently bowed, slanting up from the inner corner by the nose to the outer
+        # corner (sleeping-lion refs); no lashes, no lid bulge (both read as almond eyes)
+        lid = [HW(e + Vector((0.05, s * 0.06 * u, 0.016 * u - 0.006 * (1 - u * u)))) for u in np.linspace(-1, 1, 16)]
+        cut.append(_snap_tube(bvh, f'lid{s}', lid, 0.008, radii=[0.0055 + 0.0065 * math.cos(u * 1.35) for u in np.linspace(-1, 1, 16)]))
+        # nostrils: small shallow slits curling outward, not deep holes (deep dark holes read as wide-open eyes)
+        ns = [HW((0.37, s * (0.012 + 0.03 * t), 0.226 + 0.012 * t - 0.018 * t * t)) for t in np.linspace(0, 1, 7)]
+        cut.append(_snap_tube(bvh, f'nostril{s}', ns, 0.006, 8, radii=[0.0035 + 0.0035 * math.sin(math.pi * t) for t in np.linspace(0, 1, 7)]))
+        for j, (dy, dz) in enumerate(((0.035, 0.18), (0.055, 0.17), (0.045, 0.155))):   # whisker pits on the pads
+            q = bvh.find_nearest(HW((0.36, s * dy, dz)))[0]
+            if q is not None: cut.append(sphere(f'whpit{s}{j}', q, 0.0045, (1, 1, 1), 12))
         ec = HW((-0.02, s * 0.25, 0.41)); out = (HW((0.04, s * 0.24, 0.41)) - ec).normalized()
         cup = sphere(f'earcup{s}', ec + out * 0.045, 0.04, (1.0, 1.0, 1.4)); cut.append(cup)
         for dy in (-0.021, 0.021):                                   # toe grooves
             pts = [HW((x, s * 0.12 + dy, 0.0), tilt=False) for x in np.linspace(0.27, 0.36, 6)]
             cut.append(_snap_tube(bvh, f'toeg{s}{dy}', pts, 0.006, 6))
     m = Vector(MOUTH)
-    slot = blob('mouthslot', MOUTH, (0.05, 0.075, 0.02)); slot.data.materials.clear(); cut.append(slot)
+    cut.append(_snap_tube(bvh, 'philtrum', [HW((0.36, 0.0, z)) for z in np.linspace(0.198, 0.13, 6)], 0.006, 8))   # the groove between the pads
+    for k, dy in enumerate(np.linspace(-0.05, 0.05, 9)):            # slack, a little open: one wide shallow slit, corners turned down
+        mo = m + Vector((-0.004 * abs(dy) / 0.05, dy, -0.014 - 0.012 * (abs(dy) / 0.05) ** 2))
+        cut.append(cyl(f'mouth{k}', HW(mo + Vector((0.04, 0, 0))), HW(mo - Vector((0.04, 0, 0.004))) - HW(mo + Vector((0.04, 0, 0))), 0.011, 0.07, back=0.0, seg=12))
     cut.append(cyl('bore', HW(m + Vector((0.04, 0, 0))), HW(m - Vector((0.1, 0, 0.02))) - HW(m + Vector((0.04, 0, 0))), 0.026, 0.2, back=0.0))
     for k, a in enumerate(np.linspace(-2.0, 2.0, 13)):              # a lock groove down each curl of the ruff
         c0 = (-0.06 + 0.05, 0.29 * math.sin(a), 0.22 + 0.29 * math.cos(a))
@@ -595,7 +635,15 @@ def banner(top_ctr):
     uv = np.array([(i / NU, j / NV, hem(i / NU)) for i in range(NU + 1) for j in range(NV + 1)])
     store_attr(ob, 'cuv', np.stack([uv[:, 0], uv[:, 1] * uv[:, 2] / H, uv[:, 1]], 1))
     sm = ob.modifiers.new('sol', 'SOLIDIFY'); sm.thickness = 0.004; sm.offset = 0.0; K.apply_mods(ob)
-    return ob
+    threads = []                                                     # loose threads hanging from the tears and the hem
+    for k in range(14):
+        u = r.choice([0.25, 0.27, 0.29, 0.69, 0.71, 0.73]) if k < 6 else r.uniform(0.04, 0.96)
+        L0 = hem(u); Lt = r.uniform(0.04, 0.10)
+        x = x0 + Vector(((u - 0.5) * W * (1 - 0.04), 0.07 + 0.03 * math.sin(u * 4.0) + 0.028 * math.sin(2 * math.pi * (u * 2.6 + 0.15)), -L0 + 0.004))
+        pts = [x + Vector((0.006 * math.sin(t * 5 + k), 0.004 * t, -Lt * t)) for t in np.linspace(0, 1, 6)]
+        th = K.tube(f'thread{k}', pts, 0.0018, 5)
+        store_attr(th, 'cuv', np.tile([u, 1.0, 1.0], (len(th.data.vertices), 1))); threads.append(th)
+    return K.join('banner', [ob] + threads)
 
 # ----------------------------------------------------------------------------- materials
 def _blockspace(T):
@@ -699,7 +747,8 @@ def sandstone(name, column=False):
         dx = T.vmath('LENGTH', T.comb(T.math('SUBTRACT', x, mw.x), T.math('SUBTRACT', y, mw.y), 0.0))
         lipz = T.math('MULTIPLY', T.smoothstep(z, 1.43 + ZT, 1.465 + ZT), T.smoothstep(z, 1.50 + ZT, 1.48 + ZT))
         lipc = T.math('MULTIPLY', lipz, T.smoothstep(rr, 0.40, 0.47))
-        mouth = T.smoothstep(T.vmath('LENGTH', T.vmath('SUBTRACT', lp, tuple(mw))), 0.09, 0.04)
+        md = T.vmath('LENGTH', T.vmath('SUBTRACT', lp, tuple(mw)))
+        mouth = T.math('MULTIPLY', T.math('MULTIPLY', T.smoothstep(md, 0.11, 0.075), T.smoothstep(md, 0.06, 0.075)), T.smoothstep(z, mw.z - 0.01, mw.z - 0.035))   # a crust ring on the chin, outside the mouth
         streak2 = T.noise(T.vmath('MULTIPLY', p, (9.0, 9.0, 0.5)), scale=5.0, detail=4)
         runs = T.math('MULTIPLY', T.math('MULTIPLY', T.smoothstep(dx, 0.16, 0.05), T.smoothstep(z, mw.z + 0.02, mw.z - 0.03)), T.smoothstep(streak2, 0.5, 0.64))
         runs = T.math('MULTIPLY', runs, T.smoothstep(z, 1.42 + ZT, 1.47 + ZT))
@@ -779,6 +828,7 @@ def banner_mat(name):
     m, T = K.new_mat(name)
     cu = T.sep(T.attr('cuv')); u, v = (cu, 'X'), (cu, 'Z'); lp = T.attr('lp')
     blch = T.math('ADD', T.smoothstep(v, 0.95, 0.0), T.math('MULTIPLY', T.noise(lp, scale=3.0, detail=4), 0.5))
+    blch = T.math('ADD', blch, T.math('MULTIPLY', T.smoothstep(T.math('ABSOLUTE', T.math('SUBTRACT', u, 0.5)), 0.38, 0.5), 0.45))   # sun-bleached edges
     blch = T.math('MULTIPLY', blch, 0.8)
     c = T.mix(T.smoothstep(blch, 0.2, 1.0), (0.36, 0.10, 0.08), (0.66, 0.46, 0.39))
     # the harvest device: two bands and a roundel, dyed paler; faded nearly away
@@ -806,7 +856,7 @@ def build_fountain():
     wear = K.wear_generic
     highs.append(K.make_part(basin_blocks(), stone, pid('basin'), 0.005, erode=masonry_erode(1.0), fillet=2, cuts=basin_cuts))
     highs.append(K.make_part(coping(), stone, pid('coping'), 0.0045, erode=coping_erode(2.0), fillet=2, cuts=coping_cuts))
-    col = K.make_part(column() + dish_nubs(), colst, pid('column'), 0.004, erode=K.chain(flutes, wear(0.0007, 30, chips=14, chip_r=(0.006, 0.014), seed=3.0)), fillet=3)
+    col = K.make_part(column() + dish_nubs() + tail(), colst, pid('column'), 0.004, erode=K.chain(flutes, wear(0.0007, 30, chips=14, chip_r=(0.006, 0.014), seed=3.0)), fillet=3)
     highs.append(col)
     highs.append(K.make_part(beast(), colst, pid('beast'), 0.003, erode=wear(0.0005, 40, chips=8, chip_r=(0.005, 0.01), seed=4.0), fillet=3, cuts=beast_cuts))
     s = K.make_part(silt(), silt_mat('M_Silt'), pid('silt'), 0.0); highs.append(s)
