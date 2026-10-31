@@ -518,14 +518,15 @@ namespace SleepingCalamity.Core
         }
 
         // ------------------------------------------------------------------------------------------------ signature (tests)
+        // Integer-quantised so the hash does not depend on the runtime's float formatting (Unity's Mono and .NET round "0.000" differently at ties).
+        static long Q(float v, double k) => (long)Math.Round((double)v * k, MidpointRounding.AwayFromZero);
+
         public static string Signature(IList<LaneKitRow> rows)
         {
             var sb = new System.Text.StringBuilder();
             foreach (LaneKitRow r in rows)
-                sb.Append(r.Piece).Append(':').Append((int)r.Preset).Append(':')
-                  .Append(r.X.ToString("0.000", CultureInfo.InvariantCulture)).Append(':').Append(r.Y.ToString("0.000", CultureInfo.InvariantCulture)).Append(':')
-                  .Append(r.Z.ToString("0.000", CultureInfo.InvariantCulture)).Append(':').Append(r.Yaw.ToString("0.0", CultureInfo.InvariantCulture)).Append(':')
-                  .Append(r.ScaleX.ToString("0.00", CultureInfo.InvariantCulture)).Append(';');
+                sb.Append(r.Piece).Append(':').Append((int)r.Preset).Append(':').Append(Q(r.X, 1000)).Append(':').Append(Q(r.Y, 1000)).Append(':')
+                  .Append(Q(r.Z, 1000)).Append(':').Append(Q(r.Yaw, 10)).Append(':').Append(Q(r.ScaleX, 100)).Append(';');
             return sb.ToString();
         }
 
