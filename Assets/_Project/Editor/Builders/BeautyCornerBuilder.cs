@@ -211,6 +211,7 @@ namespace SleepingCalamity.EditorTools
                             : BeautyCornerArt.IsTower(folderName) ? BeautyCornerArt.BuildTowerMaterials() : BeautyCornerArt.BuildFacadeMaterials();
                     }
                     else art.Fbx = BeautyCornerArt.Prepare(found, asset ?? row.Id, row.Foliage, out art.Mat);
+                    if (row.Id == "CrackWeeds" && asset == null) art.Mat = BeautyCornerArt.CrackWeedsMaterial() ?? art.Mat;   // M_CrackWeeds is shared with the square: one fixed texture source
                     if (art.Fbx == null) art = null;
                 }
                 catch (System.Exception e) { Debug.LogWarning("SC BEAUTY art for " + row.Id + (asset != null ? "/" + asset : "") + " failed, using placeholder: " + e.Message); art = null; }

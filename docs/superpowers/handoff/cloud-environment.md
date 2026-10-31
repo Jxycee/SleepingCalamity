@@ -60,6 +60,8 @@ dotnet tool install -g <pkg> --version <v>   # pick a version that targets net8.
 ~/apps/blender-4.5.3-linux-x64/4.5/python/bin/python3.11 -m pip install <pkg>   # into Blender's Python
 ```
 
+`bash Tools/cloud/sc_churn_check.sh` runs `unity.sh build` twice from a clean tree and fails (listing the files) if `git status` is not clean afterwards: run it after changing any builder.
+
 Anything a session installs is gone when the container is reclaimed. To make it permanent, add it to `Tools/cloud/setup.sh` (on a branch; it changes nothing under `Assets/`, so a cloud session may merge it).
 
 ## 4. What still needs the PC
