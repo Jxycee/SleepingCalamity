@@ -1,7 +1,11 @@
 Session: Q12. Whole-town look pass (local PC)
-Job: B art polish batch
+Job: B art polish batch (incl. Q10 weir foam)
 Progress: 100%
-Status: DONE
+Status: DONE, merged to main (85d2c7e fence/scarecrow/stair, 4ada664 weir foam)
+Blocker: none
+Branch: claude/polish-merge, claude/weir-final (both merged)
+Last check: PASS on 82bed3e (build, edit 711/711, play 33/0/8) and PASS on 1a170fc (play 33/0/8)
+Next: none for this job; follow-ups listed below (scarecrow colour, weir broken foam via shader, StairFlight duplicate UVs, Q14 sacks after Q14 merges)
 Archive: ready
 
 - Fix 1 (Q6 garden front fence): cause: no duplicated geometry inside the lot (checked the placed pieces: gate + two 1.1 m stubs on the front, closed side and back runs, no overlap) and the Q11 lane garden walls cannot overlap (WallPointBlocked keeps them 1 m off every lot footprint); the "2-3 deep" read came from the two front stubs sitting between the gate and the side runs, so the front showed gate, stub, open gap, side run, corner post as stacked rows. Change: HollowmereGarden.Allotment front is the gate alone (stubs and FrontRun/GatePost removed). Sheet: Reference/hollowmere/polish/SHEET_polish_hm.jpg (top row).

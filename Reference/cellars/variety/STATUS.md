@@ -1,9 +1,12 @@
 Session: Q12. Whole-town look pass (local PC)
 Job: Cellars variety foundations (asked by the user directly, 2026-10-31)
 Progress: 30%
-Status: implementer running on claude/cellar-variety
-Needs: none
+Status: implementer building on claude/cellar-variety (not pushed yet)
 Blocker: none
+Branch: claude/cellar-variety
+Last check: none yet (one check before merge)
+Next: reviewer pass, one check, merge, then DONE and the session is ready to archive
+Needs: none
 Archive: no
 
 Session summary for the coordinator:
