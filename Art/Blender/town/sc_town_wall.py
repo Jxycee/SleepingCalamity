@@ -44,7 +44,7 @@ def R_(s):
 EXTRA = {
     'rubble': lambda: FK.tile_mat('TW_Rubble', 'B1_town/sandstone', tint=(0.64, 0.61, 0.57), normal=1.4),
     # polish 2: per-stone value / hue spread (dark cool, warm, pale) so the rubble reads as mixed field stone, not one batch
-    'rubble_d': lambda: FK.tile_mat('TW_RubbleDark', 'B1_town/sandstone', tint=(0.47, 0.46, 0.45), normal=1.4),
+    'rubble_d': lambda: FK.tile_mat('TW_RubbleDark', 'B1_town/sandstone', tint=(0.42, 0.42, 0.41), normal=1.4),
     'rubble_w': lambda: FK.tile_mat('TW_RubbleWarm', 'B1_town/sandstone', tint=(0.76, 0.66, 0.54), normal=1.4),
     'rubble_l': lambda: FK.tile_mat('TW_RubblePale', 'B1_town/sandstone', tint=(0.84, 0.80, 0.73), normal=1.3),
     'ochre': lambda: FK.tile_mat('TW_RubbleOchre', 'B1_town/sandstone', tint=(1.0, 0.89, 0.73), normal=1.4),
@@ -156,7 +156,7 @@ def masonry(pc, O, U, Vv, N, u0, u1, v0, v1, R, key='rubble', vmax=None, skip=No
         if not (mix and k == 'rubble'):
             return k
         x = R.random()
-        return 'rubble_d' if x < 0.2 else 'rubble_w' if x < 0.4 else 'rubble_l' if x < 0.53 else 'rubble'
+        return 'rubble_d' if x < 0.25 else 'rubble_w' if x < 0.42 else 'rubble_l' if x < 0.57 else 'rubble'
     while v < v1 - 0.06:
         h = R.uniform(*course)
         if v1 - (v + h) < 0.15:

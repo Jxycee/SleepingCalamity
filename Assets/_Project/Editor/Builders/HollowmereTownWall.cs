@@ -62,7 +62,7 @@ namespace SleepingCalamity.EditorTools
         static readonly (string Slot, string Source, Color Tint, float Bump)[] TwSlots =
         {
             ("TW_Rubble", "sandstone", new Color(0.64f, 0.61f, 0.57f), 1.4f),
-            ("TW_RubbleDark", "sandstone", new Color(0.47f, 0.46f, 0.45f), 1.4f),    // polish 2: per-stone value / hue spread
+            ("TW_RubbleDark", "sandstone", new Color(0.42f, 0.42f, 0.41f), 1.4f),    // polish 2: per-stone value / hue spread
             ("TW_RubbleWarm", "sandstone", new Color(0.76f, 0.66f, 0.54f), 1.4f),
             ("TW_RubblePale", "sandstone", new Color(0.84f, 0.80f, 0.73f), 1.3f),
             ("TW_RubbleOchre", "sandstone", new Color(1.00f, 0.89f, 0.73f), 1.4f),
