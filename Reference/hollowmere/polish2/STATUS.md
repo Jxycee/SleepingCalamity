@@ -1,6 +1,6 @@
 State: IN PROGRESS
 Session: Town polish 2: wall stone, merlons, ruined clutter
-Progress: 5% (reading sc_town_wall.py; Q14 clutter not on main yet, starting with wall fixes 1+2)
+Progress: 30% (wall fixes 1+2 coded: 4-tint rubble, wandering courses, split/pinning stones, varied + chipped/missing merlons, Ruined A/B modules; builder loads _Ruined in Ruined; Blender previews rendering; Q14 not on main yet)
 Sheet: -
 Needs: -
 Blocker: none
