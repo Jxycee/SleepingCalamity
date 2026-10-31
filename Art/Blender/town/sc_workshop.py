@@ -67,7 +67,7 @@ EXTRA = {
     'boardpaint': lambda: fk.tile_mat('WS_BoardPaint', 'B1_town/painted_wood', paint=CUR['boardpaint'], normal=0.9),
     'roofboard': lambda: fk.tile_mat('WS_RoofBoard', 'B1_town/oak_timber', tint=CUR['roofboard'], normal=1.3),
     'floor': lambda: fk.tile_mat('WS_Floor', 'B1_town/sandstone', tint=(0.52, 0.48, 0.43)),
-    'inner': lambda: fk.tile_mat('WS_Inner', 'B1_town/oak_timber', tint=(0.50, 0.45, 0.41)),
+    'inner': lambda: fk.tile_mat('WS_Inner', 'B1_town/oak_timber', tint=(0.78, 0.70, 0.63)),
 }
 _orig_M = fk.M
 fk.M = lambda k: EXTRA[k]() if k in EXTRA else _orig_M(k)
@@ -85,11 +85,11 @@ def cfg(name):
         w, d, lw, zt = R.uniform(5.2, 5.4), R.uniform(5.0, 5.3), R.uniform(1.4, 1.55), R.uniform(3.0, 3.15)
     side = R.choice((-1, 1))
     style = [
-        dict(board=(0.98, 0.93, 0.86), boardpaint=None, batten=False, roof='tile', leanroof='tile', chimney='pipe',
+        dict(board=(2.2, 2.0, 1.75), boardpaint=None, batten=False, roof='tile', leanroof='tile', chimney='pipe',
              paint='#4a6a48', block=True),
         dict(board=None, boardpaint=fk._lin('#9c7f4c'), batten=True, roof='board', leanroof='board', chimney='stack',
              paint='#6a2e29', block=False),
-        dict(board=(0.60, 0.55, 0.50), boardpaint=None, batten=False, roof='tile', leanroof='board', chimney='pipe',
+        dict(board=(1.25, 1.12, 1.0), boardpaint=None, batten=False, roof='tile', leanroof='board', chimney='pipe',
              paint='#3e5670', block=True),
     ][idx]
     return dict(name=name, idx=idx, cls=cls, w=round(w, 2), d=round(d, 2), lw=round(lw, 2), zt=round(zt, 2), side=side,
@@ -304,7 +304,7 @@ def wall(P, c, side, L, items, tag, zb=PL):
             holes.append((o0, o1, -1.0, it['z1']))
             gaps.append((o0 - 0.32, o1 + 0.32))
         else:
-            bx0, bx1 = xc - wd / 2 - 0.30, xc + wd / 2 + 0.30
+            bx0, bx1 = xc - wd / 2 - 0.27, xc + wd / 2 + 0.27
             post_x += [(bx0, PW), (bx1, PW)]
     # even posts so no bay is wider than ~1.7
     xs = sorted([p[0] for p in post_x] + [-(L / 2 - 0.105), L / 2 - 0.105])
@@ -599,7 +599,8 @@ def gable(P, c, R_, side, tag, hatch=None):
     # raking struts, collar
     zc = zt + 0.40 * (zk - zt)
     hc = (w / 2) * (1 - (zc - zt) / (zk - zt))
-    fk.member(P['Kit_Rails'], 'oak', (-hc + 0.12, -PRD + PW / 2, zc), (hc - 0.12, -PRD + PW / 2, zc), 0.22, PW, name='collar' + tag)
+    if not hatch:
+        fk.member(P['Kit_Rails'], 'oak', (-hc + 0.12, -PRD + PW / 2, zc), (hc - 0.12, -PRD + PW / 2, zc), 0.22, PW, name='collar' + tag)
     for sg in (-1, 1):
         fk.member(P['Kit_Braces'], 'oak', (sg * (w / 2 - 0.35), -PRD + PW / 2 + 0.015, zt), (sg * 0.72, -PRD + PW / 2 + 0.015, zc - 0.10), 0.2, PW - 0.03,
                   name='gs%s%d' % (tag, sg), cham=0.02)
@@ -615,26 +616,24 @@ def lean_to(c, P, R_, side, wx_t):
     slope = math.radians(14 if c['cls'] == 'S' else 17)
     zl = zh - (lw + ov) * math.tan(slope)
     Rn = rng('lean%d' % c['idx'])
-    yo = -(lw + 0.0)             # outer post line
-    zpost = zl - 0.28 + 0.05 + (lw + ov - lw) * 0.0
-    # outer posts at the ends and middle, plate beam
+    yo = -lw                     # outer post line
     pxs = [xa + 0.12, (xa + xb) / 2, xb - 0.12]
+    vout = lw / (lw + ov)
+    z_out_top = zh + 0.06 - (zh + 0.06 - zl) * vout
+    zp = z_out_top - 0.16 - 0.14          # underside of the plate beam
     for k, x in enumerate(pxs):
-        zp = zh - (lw - 0.1) * math.tan(slope) - 0.35
         fk.member(pc, 'oak', (x, yo + 0.1, 0.0), (x, yo + 0.1, zp), 0.2, 0.2, name='lp%d_%d' % (k, c['idx']))
-    zp = zh - (lw - 0.1) * math.tan(slope) - 0.35
-    fk.member(pc, 'oak', (xa - 0.12, yo + 0.1, zp + 0.1), (xb + 0.12, yo + 0.1, zp + 0.1), 0.22, 0.2, name='lplate%d' % c['idx'], sag=0.025)
-    # rafters from the main wall to the plate (a cheap fan: 4-6)
-    nrf = max(4, int((xb - xa) / 0.7))
-    for k in range(nrf + 1):
-        x = xa - 0.1 + (xb - xa + 0.2) * k / nrf
-        fk.member(pc, 'oak', (x, 0.15, zh - 0.30), (x, yo - ov + 0.05, zl - 0.30), 0.14, 0.17, name='lr%d_%d' % (k, c['idx']), up=(0, 0, 1), cham=0.02)
+    fk.member(pc, 'oak', (xa - 0.12, yo + 0.1, zp + 0.11), (xb + 0.12, yo + 0.1, zp + 0.11), 0.22, 0.2, name='lplate%d' % c['idx'], sag=0.02)
     # roof
     mat = 'roof' if c['leanroof'] == 'tile' else 'roofboard'
     xr0, xr1 = xa - 0.18, xb + 0.18
     def top(u, v):   # u along x, v 0 at the main wall -> 1 at the eave
         return Vector((xr0 + (xr1 - xr0) * u, -(lw + ov) * v + 0.1, zh + 0.06 - (zh + 0.06 - zl) * v + 0.0))
     nrm = Vector((0, -math.sin(slope), math.cos(slope)))
+    nrf = max(4, int((xb - xa) / 0.7))
+    for k in range(nrf + 1):
+        u = k / nrf * 0.9 + 0.05
+        fk.member(pc, 'oak', top(u, 0.02) - nrm * 0.245, top(u, 0.96) - nrm * 0.245, 0.14, 0.15, name='lr%d_%d' % (k, c['idx']), up=(0, 0, 1), cham=0.02)
     sheet(pc, mat, lambda u, v: top(u, v), 8, 3, lambda p: nrm, lambda co: (co.x / fk.TILE, co.y / fk.TILE))
     sheet(pc, 'inner', lambda u, v: top(1 - u, v) - nrm * 0.16, 8, 2, lambda p: -nrm, lambda co: (co.x / fk.TILE, co.y / fk.TILE))
     # tile or board courses
@@ -659,8 +658,8 @@ def lean_to(c, P, R_, side, wx_t):
                     l[uvl].uv = (l.vert.co.x / fk.TILE, l.vert.co.y / fk.TILE + 0.1 * ci)
         bm.normal_update(); fk._merge(pc, bm, mat)
     # ends of the slab
-    for xe, ox in ((xr0, -1), (xr1, 1)):
-        sheet(pc, 'oak', lambda u, v, xe=xe: (top_edge(xe, u) - nrm * (0.06 + 0.10 * v)), 4, 1, lambda p, ox=ox: Vector((ox, 0, 0)),
+    for ue, ox in ((0.0, -1), (1.0, 1)):
+        sheet(pc, 'oak', lambda uu, vv, ue=ue: top(ue, uu) - nrm * (0.06 + 0.10 * vv), 4, 1, lambda p, ox=ox: Vector((ox, 0, 0)),
               lambda co: (co.y / fk.TILE, co.z / fk.TILE))
     # fascia along the eave
     fk.member(pc, 'oak', Vector((xr0, -(lw + ov) + 0.1, zl + 0.0)) - nrm * 0.1, Vector((xr1, -(lw + ov) + 0.1, zl)) - nrm * 0.1, 0.18, 0.06,
@@ -677,7 +676,6 @@ def lean_to(c, P, R_, side, wx_t):
         hh = top_z - 0.45
         dp = 0.045
         fk.add_box(pc, mat_b, (dp, lw / nbk - 0.012, hh), Matrix.Translation((xe + sgn * 0.0, y, 0.45 + hh / 2)), cham=0.0, long_axis=2, seed=i + 2.0)
-    fk.member(pc, 'oak', (xe, -0.0, 0.0), (xe, 0.0, zh - 0.45), 0.2, 0.2, name='lend%d' % c['idx'], up=(0, -1, 0))
     nb = int((xb - xa) / 0.21)
     for i in range(nb):
         x = xa + (i + 0.5) * (xb - xa) / nb
@@ -699,23 +697,17 @@ def lean_to(c, P, R_, side, wx_t):
             if x > xlog[1]:
                 continue
             z = 0.1 + row * 0.15
-            yy = -(lw - 0.2) / 2 - 0.05
-            cyl(st, 'oak_lt', (x, yy - (lw - 0.2) / 2 * 0.0 + 0.0 + (lw - 0.25) / 2, z), (x, yy - (lw - 0.25) / 2, z), r, r * 0.95, segs=7, uvs=1.0)
+            cyl(st, 'oak_lt', (x, -0.10, z), (x, -(lw - 0.15), z), r, r * 0.95, segs=7, uvs=1.0)
     npl = 7 if c['cls'] == 'M' else 5
     for k in range(npl):
         z = 0.12 + k * 0.095
-        for pi_ in range(2):
-            wpl = (xpl[1] - xpl[0])
-            fk.add_box(st, 'oak_lt', (wpl, lw - 0.3, 0.04), Matrix.Translation(((xpl[0] + xpl[1]) / 2 + Rn.uniform(-0.03, 0.03), -(lw) / 2 - 0.02 + Rn.uniform(-0.03, 0.03), z + pi_ * 0.0)) @
-                       Matrix.Rotation(math.radians(Rn.uniform(-1, 1)), 4, 'Z'), cham=0.006, long_axis=1, seed=k * 3 + pi_)
-            break
+        wpl = (xpl[1] - xpl[0])
+        fk.add_box(st, 'oak_lt', (wpl, lw - 0.3, 0.04), Matrix.Translation(((xpl[0] + xpl[1]) / 2 + Rn.uniform(-0.03, 0.03), -(lw) / 2 - 0.02 + Rn.uniform(-0.03, 0.03), z)) @
+                   Matrix.Rotation(math.radians(Rn.uniform(-1, 1)), 4, 'Z'), cham=0.006, long_axis=1, seed=k * 3)
         if k % 2 == 0:
             for sx in (0.25, 0.5, 0.75):
                 fk.add_box(st, 'oak', (0.04, lw - 0.3, 0.03), Matrix.Translation((xpl[0] + (xpl[1] - xpl[0]) * sx, -(lw) / 2 - 0.02, z + 0.04)), cham=0.0, seed=k + sx)
     return (xa, xb), zh
-
-def top_edge(xe, u):
-    return Vector((xe, 0.0, 0.0))
 
 # ----------------------------------------------------------------------------- chimneys
 def stove_pipe(P, c, R_, x, y, z_from, hood=False):
@@ -738,8 +730,8 @@ def stone_stack(P, c, R_, x, yb):
     pc = P['Kit_Chimney']
     ztop = R_.zridge(yb) + 0.95
     h = ztop
-    W_, D_ = 1.0, 0.80
-    yc = yb + 0.20 - D_ / 2 + 0.02       # back face 0.2 proud of the wall plane
+    W_, D_ = 1.0, 0.70
+    yc = yb + 0.45 - D_ / 2       # back face 0.2 proud of the wall plane
     def taper(p, h=h):
         t = (p.z + h / 2) / h
         return Vector((p.x * -0.05 * t, p.y * -0.05 * t, 0))
@@ -830,9 +822,7 @@ def inside(c, P, R_):
     fk.add_box(pc, 'iron', (0.025, 0.5, 0.025), Matrix.Translation((gx, gy, 0.62)), cham=0.0, seed=14.0)
     fk.add_box(pc, 'oak', (0.05, 0.05, 0.26), Matrix.Translation((gx + 0.28, gy + 0.22, 0.52)), cham=0.005, seed=14.2)
     # barrel and an offcut bin
-    bxx = cx + (c['side']) * (w / 2 - 0.7) * 0.0 + (-c['side']) * (w / 2 - 0.75) * 0.0 + (c['side'] * 0.0)
-    brx, bry = (cx - c['side'] * 0.0 + (c['bench_x'] * -1.3 if abs(c['bench_x']) > 0.1 else 0.9)), yB - 1.1
-    brx = max(cx - w / 2 + 0.7, min(cx + w / 2 - 0.7, brx))
+    brx = cx - (1 if c['bench_x'] > 0 else -1) * (w / 2 - 0.75); bry = yB - 0.75
     cyl(pc, 'oak_lt', (brx, bry, 0.0), (brx, bry, 0.78), 0.30, 0.30, segs=12)
     for zz in (0.14, 0.62):
         cyl(pc, 'iron', (brx, bry, zz - 0.02), (brx, bry, zz + 0.02), 0.312, 0.312, segs=12)
@@ -863,7 +853,8 @@ def assemble(name):
     fk.MATS.clear(); fk.TIMBERS.clear()
     CUR['board'] = c['board'] or (1, 1, 1)
     CUR['boardpaint'] = c['boardpaint']
-    CUR['roofboard'] = (0.78, 0.72, 0.66) if c['idx'] == 1 else (0.62, 0.58, 0.54)
+    CUR['roofboard'] = (1.05, 0.95, 0.85) if c['idx'] == 1 else (0.85, 0.78, 0.70)
+    fk.OAK_TINT = (0.64, 0.60, 0.56)
     fk.SHUTTER_PAINT = fk.DOOR_PAINT = c['paint']
     s = c['side']
     c['cx'] = -s * c['lw'] / 2
@@ -890,14 +881,12 @@ def assemble(name):
         if side == 'front':
             items.append(dict(kind='open', xc=0.0, w=ow, z1=oh))
         elif side == 'back':
-            items.append(dict(kind='win', xc=Rn.uniform(-0.5, 0.5) + (0.5 if c['idx'] == 0 else 0.0), w=0.8, z0=1.25, z1=2.15))
-            if c['cls'] == 'M':
-                items.append(dict(kind='win', xc=-1.4 * (1 if c['idx'] == 2 else -1) , w=0.8, z0=1.25, z1=2.15))
+            for xw in ([0.0] if c['idx'] == 0 else [-1.5, 1.5] if c['idx'] == 1 else [-1.35, 1.35]):
+                items.append(dict(kind='win', xc=xw, w=0.8, z0=1.25, z1=2.15))
         elif side == ('left' if s > 0 else 'right'):     # the free side
-            items.append(dict(kind='door', xc=wx(c['door_t'] + 0.6), w=0.95, z1=2.12 if c['cls'] == 'S' else 2.18))
-            items.append(dict(kind='win', xc=wx(d * 0.72), w=0.8, z0=1.25, z1=2.15))
-            if d > 5.2:
-                items.append(dict(kind='win', xc=wx(d * 0.46 + 0.35), w=0.8, z0=1.25, z1=2.15))
+            items.append(dict(kind='door', xc=wx(c['door_t']), w=0.95, z1=2.12 if c['cls'] == 'S' else 2.18))
+            for tw in ([2.95, 4.5] if d > 5.45 else [d * 0.68]):
+                items.append(dict(kind='win', xc=wx(tw), w=0.8, z0=1.25, z1=2.15))
         else:
             pass   # the lean-to side wall: boards and braces only
         shut, door, post_x, gaps = wall(P, c, side, L, items, '%s%d' % (side, c['idx']))
@@ -905,7 +894,7 @@ def assemble(name):
         if side in ('front', 'back'):
             hatch = None
             if side == 'front':
-                hz0 = zt + 0.50; hz1 = hz0 + (0.72 if c['cls'] == 'S' else 0.85); hw_ = 0.34 if c['cls'] == 'S' else 0.38
+                hz0 = zt + 0.30; hz1 = hz0 + (0.72 if c['cls'] == 'S' else 0.85); hw_ = 0.34 if c['cls'] == 'S' else 0.38
                 hatch = (-hw_, hw_, hz0, hz1)
             gable(P, c, R_, side, '%s%d' % (side, c['idx']), hatch=hatch)
             if hatch:
@@ -956,7 +945,7 @@ def assemble(name):
     # ---- chimney
     if c['chimney'] == 'pipe':
         px = cx - s * (w / 2 - 1.15); py = d / 2 - 1.15
-        stove_pipe(A, c, R_, px, py, 1.4, hood=(c['idx'] == 2))
+        stove_pipe(A, c, R_, px, py, 0.86, hood=(c['idx'] == 2))
         # the drum stove under it
         fk.add_box(A['Kit_Inside'], 'iron', (0.5, 0.5, 0.62), Matrix.Translation((px, py, 0.55)), cham=0.04, seed=33.0)
         for sx in (-1, 1):
@@ -1001,7 +990,7 @@ def assemble(name):
     shutters = [o for o in obs if o.name == 'Kit_Shutters'][0]
     frame_obs = [o for o in obs if o not in (door, shutters)]
     # SOCKET_Shutters: the loft hatch centre in the front gable
-    hz = zt + 0.50 + (0.36 if c['cls'] == 'S' else 0.425)
+    hz = zt + 0.30 + (0.36 if c['cls'] == 'S' else 0.425)
     sock_shut = lean_xyz(Vector((cx, -d / 2, hz)), c)
     def as_part(ob, nm, at):
         ob.name = nm; ob.data.name = nm
@@ -1022,7 +1011,7 @@ def assemble(name):
     # footprint: body incl. the lean-to (and the stack), flat
     xfree = cx - s * (w / 2 + 0.07); xlean = cx + s * (w / 2 + c['lw'] + 0.07)
     x0, x1 = sorted((xfree, xlean))
-    y0, y1 = -d / 2 - 0.07, d / 2 + (0.22 if c['stack'] else 0.07)
+    y0, y1 = -d / 2 - 0.07, d / 2 + (0.5 if c['stack'] else 0.07)
     fw, fd = x1 - x0, y1 - y0
     bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
     bm.transform(Matrix.Translation(((x0 + x1) / 2, (y0 + y1) / 2, 0.05)) @ Matrix.Diagonal((fw, fd, 0.1, 1)))
@@ -1032,16 +1021,10 @@ def assemble(name):
     fp.hide_render = True
     tris = {o.name: sum(len(p.vertices) - 2 for p in o.data.polygons) for o in (frame, door, shutters)}
     total = sum(tris.values())
-    roof_x = (cx - R_.hw[-1] if False else min(cx - R_.hw[-1], cx - R_.hw[1]), max(cx + R_.hw[-1], cx + R_.hw[1]))
-    # the lean-to eave reaches further on its side
-    lean_eave = cx + s * (w / 2 + c['lw'] + 0.30)
-    ext_x = max(abs(cx - R_.hw[-s] * 1) if s else 0, abs(cx + s * 0 + R_.hw[s] * s))
-    extents = dict(x=(min(cx - (R_.hw[-s] if s > 0 else R_.hw[s]), lean_eave) if s > 0 else min(cx - R_.hw[s], cx - R_.hw[-s]),
-                      max(cx + (R_.hw[-s] if s < 0 else R_.hw[s]), lean_eave) if s > 0 else max(cx + R_.hw[-s], lean_eave)),
-                   y=(R_.y0, R_.y1))
+    extents = dict(x=tuple(sorted((cx - s * R_.hw[-s], cx + s * max(R_.hw[s], w / 2 + c['lw'] + 0.40)))), y=(R_.y0, R_.y1))
     cls_cap, found = CAP[c['cls']]
     print('SC WORKSHOP %s class=%s w=%.2f d=%.2f lw=%.2f zt=%.2f pitch=%.1f side=%+d footprint=%.2fx%.2f (cap %.1f) tris=%d (%s)' %
-          (name, c['cls'], w, d, c['lw'], zt, c['pitch'], fw, fd, cls_cap, total, ', '.join('%s %d' % kv for kv in tris.items())))
+          (name, c['cls'], w, d, c['lw'], zt, c['pitch'], s, fw, fd, cls_cap, total, ', '.join('%s %d' % kv for kv in tris.items())))
     assert fw <= cls_cap and fd <= cls_cap, 'FOOTPRINT outside its class'
     assert abs(extents['x'][0]) <= found / 2 + 1e-6 and abs(extents['x'][1]) <= found / 2 + 1e-6 and abs(extents['y'][0]) <= found / 2 and abs(extents['y'][1]) <= found / 2, ('roof outside the foundation', extents)
     return root, frame, door, shutters, fp, c, dict(footprint=(fw, fd), tris=total, parts=tris, ridge=R_.zr0, roof_extents=extents)
@@ -1101,26 +1084,33 @@ def write_wear(ob, c, R_, door_h):
             attr.data[li].color = (min(1.0, r * (amt if mname not in ('FK_Iron',) else 1.0)), min(1.0, g), min(1.0, b), 1.0)
 
 # ----------------------------------------------------------------------------- review renders
-VIEWS = {   # the four three-quarter corners (four turns: every side is seen) at the lane's mid distance, plus square-on and inside
-    'fl': (Vector((-8.8, -10.8, 2.9)), Vector((0, 0, 2.1)), 50),
-    'fr': (Vector((8.8, -10.8, 2.9)), Vector((0, 0, 2.1)), 50),
-    'bl': (Vector((-8.8, 10.8, 2.9)), Vector((0, 0, 2.1)), 50),
-    'br': (Vector((8.8, 10.8, 2.9)), Vector((0, 0, 2.1)), 50),
-    'front': (Vector((0, -13.5, 1.9)), Vector((0, 0, 2.2)), 46),
-    'in': (Vector((1.8, -6.5, 1.6)), Vector((0, 1.5, 1.2)), 55),
+VIEWS = {   # the four three-quarter corners (four turns: every side is seen), square-on, and a look into the open bay; scaled by class
+    'fl': (Vector((-6.6, -8.4, 2.6)), Vector((0, 0, 2.0)), 46),
+    'fr': (Vector((6.6, -8.4, 2.6)), Vector((0, 0, 2.0)), 46),
+    'bl': (Vector((-6.6, 8.4, 2.6)), Vector((0, 0, 2.0)), 46),
+    'br': (Vector((6.6, 8.4, 2.6)), Vector((0, 0, 2.0)), 46),
+    'front': (Vector((0, -10.5, 1.8)), Vector((0, 0, 2.1)), 42),
+    'in': (Vector((1.6, -5.6, 1.5)), Vector((0, 1.0, 1.3)), 58),
 }
 
-def render(name, views, suffix=''):
+def render(name, views, c, suffix=''):
     sc = bpy.context.scene
     fk.RRES = int(arg('--rres', '960')); fk.SAMPLES = int(arg('--samples', '32'))
     cam = fk.review_scene(bpy.data.objects[name], variant=True)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.75, location=(2.4, -5.4, 0.875))
+    # review-only fill: stands in for the corner's bounce light inside the open bay (not exported, not parented)
+    fl = bpy.data.lights.new('Fill', 'POINT'); fl.energy = 260; fl.color = (1.0, 0.82, 0.62); fl.shadow_soft_size = 0.4
+    fo = bpy.data.objects.new('Fill', fl); sc.collection.objects.link(fo); fo.location = (c['cx'], -c['d'] / 2 + 1.4, 2.3)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.75, location=(c['cx'] + 1.9, -c['d'] / 2 - 2.6, 0.875))
     fig = bpy.context.object; fig.name = 'Figure175'
     fm = bpy.data.materials.new('Figure'); fm.use_nodes = True
     fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.25, 0.18, 0.12, 1)
     fig.data.materials.append(fm)
+    k = 1.0 if c['cls'] == 'S' else 1.3
     for v in views:
         frm, to, fov = VIEWS[v]
+        if v != 'in':
+            frm = Vector((frm.x * k, frm.y * k, frm.z)); 
+        fig.hide_render = v != 'front'
         fk.look(cam, frm, to); cam.data.angle = math.radians(fov)
         sc.render.filepath = os.path.join(OUT, '%s_%s%s.png' % (name, v, suffix))
         bpy.ops.render.render(write_still=True)
@@ -1147,6 +1137,6 @@ if __name__ == '__main__':
         if '--frame-only' in argv:
             door.hide_render = shut.hide_render = True
         if '--no-render' not in argv:
-            render(nm, views, '_frame' if '--frame-only' in argv else '')
+            render(nm, views, c, '_frame' if '--frame-only' in argv else '')
         with open(os.path.join(OUT, nm + '_info.txt'), 'w') as f:
             f.write(repr(dict(cfg={k: v for k, v in c.items() if k not in ('paint',)}, **info)) + '\n')
