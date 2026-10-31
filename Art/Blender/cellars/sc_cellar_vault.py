@@ -32,7 +32,7 @@ Budget: kit under 60k tris, a piece under 12k.
 
 Status (2026-10-31, cloud): 3 review rounds (+ one bug-fix re-render), self-score 27 -> 28.5 -> 29/40 (calibrated rubric, target first + 5 = 32 not
 reached: round 3 gained 0.5, so stopped). Final lines: silhouette 3.5, proportion 4, form 3.5, surface 3.5, colour 3.5, wear 3.5, set 4,
-glass/metal/emissive 3.5. 35,756 tris (VaultSegment 5,372, ArchRib 1,100, Pillar 220, EndWall 750, NicheWall 7,996, StairEntry 2,876,
+glass/metal/emissive 3.5. 36,460 tris (VaultSegment 5,372, ArchRib 1,100, Pillar 220, EndWall 750, NicheWall 8,700, StairEntry 2,876,
 FloorTile 1,772, CoalChute 4,170, LarderShelf 4,824, BreathGrate 604, Roots 2,776, Barrels 3,296; two --no-render --tris runs agree).
 Round 2 made the end walls limewashed with ragged windows where the render fell off (boolean cutters, chamfered rims) and the bottle glass olive
 green; round 3 raised the lamps, made the tide line, salt bloom and lantern soot plumes readable. Sheet: Reference/hollowmere/dungeon_corner/SHEET_cellar_vault.jpg.
@@ -371,9 +371,9 @@ NICHE_W, NICHE_H, NICHE_D = 0.92, 0.80, 0.42
 NICHE_X = (-1.3, 0.0, 1.3)
 NICHE_Z = (0.35, 1.30, 2.25)
 # bottles per niche (bottom row, second row, fallen, broken) indexed [row][col]
-NICHE_FILL = [[(4, 2, 0, 0), (6, 4, 0, 0), (0, 0, 0, 0)],
+NICHE_FILL = [[(4, 2, 0, 0), (6, 4, 0, 0), (3, 1, 0, 0)],
               [(5, 2, 0, 0), (0, 0, 1, 0), (3, 0, 0, 1)],
-              [(2, 0, 0, 0), (4, 2, 0, 0), (0, 0, 0, 0)]]
+              [(2, 0, 0, 0), (4, 2, 0, 0), (0, 0, 1, 1)]]
 
 BOTTLE = [(0, 0), (0.040, 0.0), (0.052, 0.012), (0.052, 0.19), (0.036, 0.232), (0.019, 0.262), (0.017, 0.300), (0.023, 0.306), (0.023, 0.322), (0, 0.322)]
 
@@ -402,8 +402,9 @@ def p_niche_wall():
             n = 5
             for i in range(n):
                 am = 180 / n * (i + 0.5)
-                tang = 2 * (NICHE_W / 2) * math.tan(math.radians(180 / n / 2)) * 1.08
-                arc_stone(pc, 'brick', cx, zs, am, NICHE_W / 2, NICHE_W / 2 + 0.17, tang, 0.025, 0.07, cham=0.015, R=R, tilt=R.uniform(-1, 1), wob=0.003)
+                tang = 2 * (NICHE_W / 2) * math.tan(math.radians(180 / n / 2)) * 1.02
+                # ring stops at r 0.46 + 0.12: 0.14 m of plain wall (a pier) stays between neighbouring rings
+                arc_stone(pc, 'brick', cx, zs, am, NICHE_W / 2, NICHE_W / 2 + 0.12, tang, 0.025, 0.07, cham=0.015, R=R, tilt=R.uniform(-1, 1), wob=0.003)
     # (the render windows are part of the wall body cutters above)
     # bottles lying in the niches (neck out, y -0.36 .. -0.04)
     for ri, z0 in enumerate(NICHE_Z):

@@ -12,7 +12,7 @@ All geometry, bottles, jars and roots are original procedural meshes. References
 | ArchRib | 1,100 | CV_Brick, CV_VaultStone | x -3.07..3.07, z -0.38..0.38, y 0..4.6 |
 | Pillar | 220 | CV_VaultStone | 0.76 x 0.76, y 0..1.61 |
 | EndWall | 750 | CV_Brick, CV_Limewash | x -3..3, z -0.5..0, y 0..4.6 |
-| NicheWall | 7,996 | CV_Brick, CV_VaultStone, CV_Limewash, CV_Glass | as EndWall, sills to z +0.12 |
+| NicheWall | 8,700 | CV_Brick, CV_VaultStone, CV_Limewash, CV_Glass | as EndWall, sills to z +0.12 |
 | StairEntry | 2,876 | CV_Brick, CV_VaultStone, CV_Limewash | wall as EndWall, doorway 1.2 m, steps/tunnel z -4.01..-0.5 up to y 2.6 (tunnel top to 5.2) |
 | FloorTile | 1,772 | CV_Mortar, CV_Flagstone | x -1..1, z 0..2, top y 0 (mortar bed to -0.14) |
 | CoalChute | 4,170 | CV_Oak, CV_Iron, CV_Daylight, CV_Soot | x 0.84..2.53, z -0.7..0.7, y 0..3.02 |
@@ -21,7 +21,7 @@ All geometry, bottles, jars and roots are original procedural meshes. References
 | Roots | 2,776 | CV_Soot, CV_RootBark | origin at the crown top, y -1.70..0 relative |
 | Barrels | 3,296 | CV_Oak, CV_BarrelOak, CV_Iron | x -0.62..0.51, z -0.99..1.93, y 0..1.05 |
 
-Total 35,756 tris (cap 60k, largest piece 7,996 of 12k).
+Total 36,460 tris (cap 60k, largest piece 8,700 of 12k).
 
 ## Axes
 Authored z up, exported -Z forward / Y up (bake_space_transform): Unity (x, y, z) = Blender (-x, z, -y); +Z runs along the vault. Identity transforms on every child.

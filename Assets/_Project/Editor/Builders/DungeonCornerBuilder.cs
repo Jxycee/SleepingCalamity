@@ -104,7 +104,7 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);   // warm umber to plum, no blue-green
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 0.28f;
+            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 0.23f;
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
@@ -247,15 +247,16 @@ namespace SleepingCalamity.EditorTools
                     LookTestBuilder.Prim(set, "CellarLantern_" + i, PrimitiveType.Sphere, hook - new Vector3(0, 0.2f, 0), Vector3.one * 0.22f, own["flame"]);
                     flame = hook - new Vector3(0, 0.2f, 0);
                 }
-                Light light = LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.5f, 10f, LightShadows.Soft);
+                Light light = LookTestBuilder.AddLight(lighting, "LanternLight_" + i, LightType.Point, flame, Quaternion.identity, Gold, 6.0f, 10f, LightShadows.Soft);
                 Motes(lighting, "Motes_Lantern" + i, flame + new Vector3(0, 0.3f, 0), new Vector3(3f, 2.2f, 3f), 36, own);
             }
         }
 
         static void Candles(Transform set, Transform lighting, Dictionary<string, Material> own)
         {
-            Vector3 c = new Vector3(-0.55f, 1.0f, 7.7f);   // one cluster on a stone ledge in front of the niche wall
-            LookTestBuilder.Box(set, "CandleLedge", c - new Vector3(0, 0.03f, 0), new Vector3(0.55f, 0.06f, 0.4f), LookTestBuilder.Mat("vault_stone"));
+            // one cluster on the sill of a niche (NicheWall at z 8 is turned 180 degrees: world x = -niche x; the row-1 sill top is y 1.31, the
+            // sill front lip is at z ~7.97, bottles stand deeper at z 8.04+). Niche column cx +1.3 -> world x -1.3.
+            Vector3 c = new Vector3(-1.3f, 1.31f, 8.08f);
             var offs = new[] { new Vector3(0, 0, 0), new Vector3(0.14f, 0, 0.06f), new Vector3(-0.12f, 0, 0.08f) };
             var hs = new[] { 0.16f, 0.1f, 0.07f };
             for (int i = 0; i < 3; i++)
@@ -263,14 +264,16 @@ namespace SleepingCalamity.EditorTools
                 LookTestBuilder.Prim(set, "Candle_" + i, PrimitiveType.Cylinder, c + offs[i] + new Vector3(0, hs[i] * 0.5f, 0), new Vector3(0.035f, hs[i] * 0.5f, 0.035f), own["wax"]);
                 LookTestBuilder.Prim(set, "Flame_" + i, PrimitiveType.Sphere, c + offs[i] + new Vector3(0, hs[i] + 0.02f, 0), new Vector3(0.015f, 0.03f, 0.015f), own["flame"]);
             }
-            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.05f), Quaternion.identity, new Color(1.0f, 0.62f, 0.28f), 1.6f, 3.8f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "CandleLight", LightType.Point, c + new Vector3(0, 0.25f, -0.12f), Quaternion.identity, new Color(1.0f, 0.62f, 0.28f), 1.6f, 3.8f, LightShadows.None);
         }
 
         static void Lights(Transform lighting, Dictionary<string, Material> own)
         {
             LookTestBuilder.AddLight(lighting, "GrateLight", LightType.Point, new Vector3(0.6f, 0.45f, 6.2f), Quaternion.identity, new Color(0.95f, 0.30f, 0.12f), 0.8f, 3.2f, LightShadows.None);
-            // Daylight shaft from the coal hatch (right wall, high): a narrow cool-neutral spot (not teal) down and across the room, plus its additive cone.
-            Vector3 hatch = new Vector3(2.15f, 2.75f, 5.5f), dir = new Vector3(-0.55f, -0.83f, 0.0f).normalized;
+            // A warm pool on the larder shelves and the barrels (a candle on the shelf, in effect).
+            LookTestBuilder.AddLight(lighting, "LarderLight", LightType.Point, new Vector3(-1.75f, 1.45f, 5.0f), Quaternion.identity, new Color(1.0f, 0.68f, 0.34f), 2.6f, 5.5f, LightShadows.None);
+            // Daylight shaft from the coal hatch: the CV_Daylight quad centre is (2.5 cos 21, 1.6 + 2.5 sin 21, 5.5) = (2.33, 2.50, 5.5); start just inside it.
+            Vector3 hatch = new Vector3(2.27f, 2.52f, 5.5f), dir = new Vector3(-0.55f, -0.83f, 0.0f).normalized;
             Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
             Light spot = LookTestBuilder.AddLight(lighting, "DaylightShaft", LightType.Spot, hatch, rot, new Color(0.86f, 0.89f, 0.96f), 6f, 6.5f, LightShadows.Soft);
             spot.spotAngle = 16f; spot.innerSpotAngle = 8f;
