@@ -29,7 +29,8 @@ Budget: < 8k tris per variant (printed per variant).
 refs: Reference/hollowmere/ruins/REFS.md (deserted-village house platforms and cottage footings), PHASE1 3.1 palette, 3.4 shape
 language; docs/art/beauty-corner-brief.md for the scoring.
 
-Status: see the bottom of Assets/_Project/Content/Art/Town/Ruins/SOURCES.md for rounds, scores and tris.
+Status (2026-10-31, cloud): exported. Self-review 30/40 (calibrated rubric; rounds 26, 28, 29.5, 30; target 31 not reached
+within the 4-round limit). Tris S 5.8-6.6k, M 7.0-7.5k, L 6.9-7.6k. Rounds, per-variant table and parked ideas: Ruins/SOURCES.md.
 """
 import sys, os, math, random, zlib, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -52,7 +53,7 @@ TILE = 2.0                      # metres per tileable repeat, as the B4 kit
 CLASSES = {'S': 6.0, 'M': 8.0, 'L': 11.0}
 NAMES = ['Ruin_%s_%s' % (c, v) for c in 'SML' for v in 'ABC']
 ONLY = arg('--only', '').split(',') if arg('--only') else NAMES
-BLOCK = {'S': 1.0, 'M': 1.1, 'L': 1.25}   # block length scale per class (big houses, big stones; holds the budget)
+BLOCK = {'S': 1.0, 'M': 1.1, 'L': 1.4}   # block length scale per class (big houses, big stones; holds the budget)
 FOOT_W = 0.58                   # footing width (one block across)
 FOOT_IN = 0.16                  # footing outer face this far inside the square edge (room for the step and slumped blocks)
 MAX_Z = 0.5                     # contract: nothing taller (a building's plinth covers it)
@@ -274,7 +275,7 @@ class Ruin:
                            math.radians(R.uniform(-3, 3)))
                 vs, fs = soft_box((ln - 0.05, FOOT_W - R.uniform(0.04, 0.16), h1), xf, R, soft=R.uniform(0.08, 0.18), wob=0.022,
                                   bulge=R.uniform(0.0, 0.015), top_break=0.05 if R.random() < 0.4 else 0.0)
-                g.add(vs, fs, 'stone_dk' if R.random() < 0.45 else 'stone')
+                g.add(vs, fs, 'stone_dk' if R.random() < 0.6 else 'stone')
                 t += ln
 
     def build_quoins(self):
@@ -298,7 +299,7 @@ class Ruin:
         return [(-0.1, L_ + 0.1)]
 
     def is_door(self, k, t):
-        return k == 0 and abs((t - self.rc) - self.door_x) < self.door_w / 2 + 0.05
+        return k == 0 and abs((t - self.rc) - self.door_x) < self.door_w / 2 + 0.38
 
     def skip(self, k, t, L_, course):
         R = self.R
@@ -341,6 +342,13 @@ class Ruin:
                           math.radians(R.uniform(-1.5, 1.5))), R, soft=0.18, wob=0.01, bulge=0.004, cuts=3)
         dish(0.035, x, 0.55, 0.3, sy)(vs)
         g.add(vs, fs, 'stone')
+        # door-jamb bases: two squarer stones standing proud either side of the threshold (the doorway reads in silhouette)
+        for sgn in (-1, 1):
+            hj = R.uniform(0.40, 0.47)
+            vs, fs = soft_box((0.36, FOOT_W + 0.04, hj), place(x + sgn * (self.door_w / 2 + 0.2), -c, hj / 2 - 0.04, math.radians(R.uniform(-3, 3)),
+                              math.radians(R.uniform(-2, 2)), math.radians(R.uniform(-3, 3))), R, soft=0.14, wob=0.015, bulge=0.01,
+                              top_break=0.05 if sgn > 0 else 0.0)
+            g.add(vs, fs, 'stone_dk')
         self.socket = Vector((x, -c, thr_top - 0.02))
         self.step = (x, sy)
 
@@ -350,9 +358,9 @@ class Ruin:
         spots = list(self.heaps)
         a, b, d, out = self.side_frame(self.collapse)
         L_ = (b - a).length
-        spots += [(self.collapse, L_ * f) for f in (0.35, 0.5, 0.65)]
+        main = [(self.collapse, L_ * f) for f in (0.35, 0.5, 0.65)]
         R.shuffle(spots)
-        spots = spots[:5 + {'S': 0, 'M': 1, 'L': 2}[self.cls]]
+        spots = main + spots[:2 + {'S': 0, 'M': 1, 'L': 2}[self.cls]]
         for (k, t) in spots:
             a, b, d, out = self.side_frame(k)
             base = a + d * t
@@ -363,12 +371,19 @@ class Ruin:
                 q = self.clamp_band(q)
                 if self.near_step(q):
                     continue
-                big = R.random() < 0.45
+                big = R.random() < (0.6 if k == self.collapse else 0.4)
                 s = R.uniform(0.32, 0.48) if big else R.uniform(0.18, 0.28)
                 size = (s * R.uniform(0.9, 1.5), s * R.uniform(0.8, 1.2), s * R.uniform(0.45, 0.75))
                 xf = place(q.x, q.y, size[2] * 0.35, R.uniform(0, math.pi), math.radians(R.uniform(-18, 18)), math.radians(R.uniform(-18, 18)))
                 vs, fs = soft_box(size, xf, R, soft=0.3, wob=0.03 * s / 0.3, bulge=0.01, cuts=1 if big else 0, top_break=0.03 if big else 0.0)
                 g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
+                if big and i < 3:                               # a second layer: heaps, not a scatter
+                    s2 = R.uniform(0.2, 0.3)
+                    size2 = (s2 * R.uniform(1.0, 1.4), s2, s2 * 0.6)
+                    q2 = q + d * R.uniform(-0.12, 0.12)
+                    xf = place(q2.x, q2.y, size[2] * 0.7 + size2[2] * 0.3, R.uniform(0, math.pi), math.radians(R.uniform(-25, 25)), math.radians(R.uniform(-25, 25)))
+                    vs, fs = soft_box(size2, xf, R, soft=0.3, wob=0.02, bulge=0.01, cuts=0)
+                    g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
             if R.random() < 0.2:
                 self.plants.append(('grass', base.x + out.x * 0.4, base.y + out.y * 0.4, 0.0, R.uniform(0, 6.3), R.uniform(1.4, 1.8)))
 
@@ -426,10 +441,10 @@ class Ruin:
     def plan_plants(self):
         """Weeds in the joints at the footing's foot (both faces), grass at corners and against the stones, moss on the back course."""
         R = self.R
-        nweed = {'S': 1, 'M': 2, 'L': 1}[self.cls]
+        nweed = {'S': 1, 'M': 1, 'L': 0}[self.cls]
         ngrass = {'S': 1, 'M': 1, 'L': 1}[self.cls]
         # B9 grass strips lapping off the footing's foot (breaks the stone-to-ground seam), alternating faces
-        nstrip = {'S': 4, 'M': 5, 'L': 5}[self.cls]
+        nstrip = {'S': 4, 'M': 5, 'L': 4}[self.cls]
         ks = [0, 1, 2, 3] + [R.choice([1, 2, 3]) for _ in range(nstrip - 4)]
         for j, k in enumerate(ks):
             a, b, d, out = self.side_frame(k)
@@ -441,7 +456,7 @@ class Ruin:
             dvec = out * side
             q = a + d * t + dvec * (FOOT_W / 2 - 0.03)
             self.plants.append(('strip', q.x, q.y, 0.0, math.atan2(dvec.x, -dvec.y), R.uniform(0.95, 1.25)))
-        nmoss = {'S': 3, 'M': 3, 'L': 4}[self.cls]
+        nmoss = {'S': 5, 'M': 6, 'L': 7}[self.cls]
         for i in range(nweed):
             k = R.choice([1, 2, 3, 0, 2])
             a, b, d, out = self.side_frame(k)
@@ -459,11 +474,14 @@ class Ruin:
             q = self.clamp_band(q)
             self.plants.append(('grass', q.x, q.y, 0.0, R.uniform(0, 6.3), R.uniform(1.6, 2.0)))
         # moss tufts on the shaded back course tops (+Y side) and the inner foot
-        a, b, d, out = self.side_frame(2)
-        L_ = (b - a).length
         for i in range(nmoss):
+            k = 2 if i % 2 == 0 else R.choice([0, 1, 3])
+            a, b, d, out = self.side_frame(k)
+            L_ = (b - a).length
             t = R.uniform(0.1, 0.9) * L_
-            on_top = R.random() < 0.6
+            if self.is_door(k, t):
+                continue
+            on_top = R.random() < 0.8
             q = a + d * t + (Vector() if on_top else -out * (FOOT_W / 2 + 0.08))
             z = self.top_at(q) if on_top else 0.0
             self.plants.append(('moss', q.x, q.y, z, math.atan2(d.y, d.x), R.uniform(1.4, 1.8)))
@@ -517,7 +535,7 @@ class Ruin:
         # R: grime / damp at the foot, ragged top; dark core; char on the oak (heaviest at the broken top)
         r = max(0.0, 1 - p.z / (0.24 + 0.07 * nz + 0.05 * streak)) * 0.92
         r = max(r, 0.18 * max(0.0, noise.noise(p * 0.6 + self.nofs + Vector((2.0, 1.0, 0.0)))) + 0.05)
-        r = max(r, 0.42 * self.piece_v ** 1.5)          # block-to-block value: weathered, reused and fire-darkened stones
+        r = max(r, 0.55 * self.piece_v ** 1.3)          # block-to-block value: weathered, reused and fire-darkened stones
         if n.z < 0.3:                                     # damp creeps up the vertical faces, streaked
             r = max(r, (0.5 + 0.2 * streak) * max(0.0, 1 - p.z / 0.32))
         if slot == 'oak':
@@ -537,8 +555,8 @@ class Ruin:
         # B: polish in the threshold and step dips (feet went in and out for years)
         b = 0.0
         if n.z > 0.6 and abs(p.x - self.door_x) < 0.6 and p.y < -self.rc + 0.3:
-            b = max(0.0, 1 - abs(p.x - self.door_x) / 0.55) * 0.55
-            gm *= 0.2; r *= 0.6
+            b = max(0.0, 1 - abs(p.x - self.door_x) / 0.6) * 0.8
+            gm *= 0.1; r *= 0.35
         return (min(1.0, max(0.0, r)), min(1.0, max(0.0, gm)), min(1.0, b), 1.0)
 
 # ----------------------------------------------------------------------------- B9 foliage (the exported meshes, re-used)
@@ -579,7 +597,9 @@ def build_foliage(ruin, lib, coll):
     for (kind, x, y, z, yaw, s) in ruin.plants:
         src = R.choice(lib[kind])
         o = src.copy(); o.data = src.data.copy(); coll.objects.link(o)
-        o.matrix_world = Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Scale(s, 4)
+        top = max(c[2] for c in src.bound_box) * s
+        sz = s * min(1.0, (MAX_Z - 0.02 - z) / top) if top > 0 else s     # nothing over the contract height
+        o.matrix_world = Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Diagonal((s, s, sz, 1.0))
         bb = [o.matrix_world @ Vector(c) for c in o.bound_box]
         lim = ruin.h - 0.03
         for ax, val in ((0, x), (1, y)):
@@ -628,8 +648,10 @@ def build_variant(name, lib):
     root = bpy.data.objects.new(name, None); coll.objects.link(root); root.empty_display_type = 'PLAIN_AXES'
     for o in (foot, fol, fp, sock):
         o.parent = root
+        o['base'] = o.name.split('.')[0]
+        o.name = name + '__' + o['base']
     tris = L.tri_count(foot) + L.tri_count(fol)
-    zmax = max(v.co.z for v in foot.data.vertices)
+    zmax = max(v.co.z for o in (foot, fol) for v in o.data.vertices)
     ext = max(max(abs(v.co.x), abs(v.co.y)) for o in (foot, fol) for v in o.data.vertices)
     inner = rn.h - 1.0
     intr = sum(1 for v in foot.data.vertices if abs(v.co.x) < inner - 0.02 and abs(v.co.y) < inner - 0.02)
@@ -640,6 +662,9 @@ def build_variant(name, lib):
 
 def export(v):
     path = os.path.join(OUT, 'fbx', v['name'] + '.fbx'); os.makedirs(os.path.dirname(path), exist_ok=True)
+    kids = [o for o in v['objs'] if 'base' in o]
+    for o in kids:
+        o.name = o['base']
     bpy.ops.object.select_all(action='DESELECT')
     for o in v['objs']:
         o.select_set(True)
@@ -648,6 +673,8 @@ def export(v):
                              mesh_smooth_type='OFF', colors_type='LINEAR', apply_scale_options='FBX_SCALE_UNITS',
                              axis_forward='-Z', axis_up='Y', bake_space_transform=True, add_leaf_bones=False, bake_anim=False,
                              use_custom_props=False, use_tspace=True, path_mode='STRIP')
+    for o in kids:
+        o.name = v['name'] + '__' + o['base']
     dst = os.path.join(EXP, v['name']); os.makedirs(dst, exist_ok=True)
     shutil.copy(path, os.path.join(dst, v['name'] + '.fbx'))
     for suf in ('_BaseColor.png', '_Normal.png', '_ORM.png'):
@@ -686,7 +713,7 @@ def show_only(vs, keep):
     for v in vs:
         hide = v is not keep
         for o in v['objs']:
-            o.hide_render = hide or o.name.startswith('FOOTPRINT')
+            o.hide_render = hide or o.name.endswith('FOOTPRINT')
 
 def review(vs):
     sun = stage()
@@ -718,4 +745,3 @@ def main():
         review(vs)
 
 main()
-if "--dbg" in argv: exec(open(arg("--dbg")).read())
