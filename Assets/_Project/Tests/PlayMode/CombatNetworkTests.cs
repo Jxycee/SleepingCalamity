@@ -173,7 +173,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(hostEnemy, Is.Not.Null);
             yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(hostEnemy.NetworkObjectId), Timeout, "the client never received the enemy");
             Enemy clientEnemy = ClientCopy(c, hostEnemy);
-            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(68), "40 x 1.7 for two players (P23)");
+            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(136), "80 x 1.7 for two players (P23)");
 
             bool sparked = false;
             System.Action<LocalHit> onHit = h => sparked = true;
@@ -182,15 +182,15 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 yield return PressAttack(c.ClientInput);
                 yield return PlayModeHarness.WaitUntil(() => sparked, 2f, "the attacker's client never played its own hit (spark) locally");
-                yield return PlayModeHarness.WaitUntil(() => hostEnemy.Model.Hp < 68, 3f, "the host never applied the hit intent");
+                yield return PlayModeHarness.WaitUntil(() => hostEnemy.Model.Hp < 136, 3f, "the host never applied the hit intent");
             }
             finally { CombatEvents.LocalHitLanded -= onHit; }
 
-            yield return PlayModeHarness.WaitUntil(() => clientEnemy.NetHp.Value < 68, 3f, "the client never saw the new HP");
+            yield return PlayModeHarness.WaitUntil(() => clientEnemy.NetHp.Value < 136, 3f, "the client never saw the new HP");
             yield return Seconds(0.4f);
-            Assert.That(hostEnemy.Model.Hp, Is.EqualTo(47), "22 x 100/105 = 21 damage from 68, applied once (not once per enemy copy)");
-            Assert.That(hostEnemy.NetHp.Value, Is.EqualTo(47), "the host's copy shows it");
-            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(47), "the client's copy shows it");
+            Assert.That(hostEnemy.Model.Hp, Is.EqualTo(115), "22 x 100/105 = 21 damage from 136, applied once (not once per enemy copy)");
+            Assert.That(hostEnemy.NetHp.Value, Is.EqualTo(115), "the host's copy shows it");
+            Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(115), "the client's copy shows it");
             Assert.That(c.ClientCombat.ComboCount, Is.EqualTo(1), "the attacker's own combo counted the hit");
             Assert.That(c.HostCombat.ComboCount, Is.EqualTo(0), "the host hero swung at nothing");
         }
