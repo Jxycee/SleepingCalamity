@@ -2,9 +2,16 @@
 
 State: IN PROGRESS
 Session: Q15. Beyond the Lower Gate: the Saltwake road
-Progress: 85%
+Progress: 92%
 Sheet: Reference/hollowmere/road/road_scene_r3.jpg
 Blocker: none
+Job: QUEUE Q15, cloud session, branch claude/upbeat-meitner-64d6hn
+Score: r3 APPROVED by the coordinator ~27/40 (final round; my own read 29/40; r2 25 coordinator / 28 mine; r1 24)
+Tris: roadside props 606-5,376 per piece (table below); cards 7,093 quads (162 terrain trees + 10 roadside clumps, 4,339 ring trees, 2,582 hedgerow cards), ring + hills + ridge ~45k
+SC RESULT: SC RESULT check PASS on 14c9cfb (test-edit 718/718, test-play 33 passed / 8 skipped / 0 failed); main then moved (Q10 weir, polish merge), merged again in cbb1f14: rebuild + re-check running
+Merge commit: none yet
+Next: -nographics rebuild + one check on the new tip, merge to main if PASS, then State DONE + Archive: ready
+Accepted weak points (coordinator): the R3_02 house blocks the RoadOut Rebuilt view; the haze band behind the tree line reads as a flat strip; the low-sun ridges are flat orange.
 
 ## Done so far (2026-10-31)
 - Layout: `HollowmereLayout.OuterFall` (the meadow west of x -72 falls about 9 m to the terrain's west edge); the Saltwake Road rerouted past R3_02 in two S-bends down that fall and off the terrain's west edge (drops about 8 m; R3 lots untouched). Core tests 303/303 + 7 new.
