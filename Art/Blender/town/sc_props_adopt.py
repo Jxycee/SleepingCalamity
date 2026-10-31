@@ -19,37 +19,45 @@ Axes: authored in Blender axes (z up, front -Y, metres), origin at the bottom ce
 front is +z in Unity. Leans rotate about the low base edge, which stays at z 0.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_props_adopt.py -- --out <scratch>
-      [--only BarrelOak,SackOpen] [--res-scale 0.5]  preview bakes at half the final texture size
+      [--only Barrel_A,Sack_C] [--res-scale 0.5]  preview bakes at half the final texture size
       [--export]                write FBX + maps + SOURCES.md to Assets/_Project/Content/Art/Town/B7/<Asset>/ (final bake)
       [--no-render] [--rres 900] [--samples 16] [--cpu]
       [--render-only]           skip building: load <out>/<Asset>/<Asset>.fbx + maps and render the review set
+      [--sources-only]          rewrite the exported SOURCES.md files from <out>/<Asset>/<Asset>.fbx (no bake)
   Batch run used on the PC (one process per asset, so a Cycles crash costs one asset; then one render pass):
       for a in <assets>; do blender ... -- --out <scratch> --only $a --no-render [--export]; done
       blender ... -- --out <scratch> --render-only
 Outputs in <scratch>: <Asset>/ (maps, fbx), renders/<Asset>_tq.png, renders/group.png. Sheet: sc_sheet.py on the renders.
 
-Assets (name: source -> what changes; tex size):
-  BarrelOak    wooden_barrels_01 barrel01 -> lean, bulge, proud hoops                     2048
-  BarrelStout  wooden_barrels_01 barrel02 -> squatter (0.92 h), stronger bulge            2048
-  BarrelWine   wine_barrel_01 (lid, bung, base) -> lighter oak                            2048
-  CrateLidded  wooden_crate_01 (lid, latch)                                               2048
-  CrateLong    wooden_crate_02 (lid) -> faded ochre painted band                          2048
-  CrateOpen    wooden_crate_01 body + latch, lid leaned on its side, apples and turnips   2048
-  BucketWell   wooden_bucket_01 (rope-hung handle)                                        1024
-  BucketTub    wooden_bucket_02 (lug handles)                                             1024
-  BasketProduce wicker_basket_01 + heaped apples, turnips and a loaf                      1024
-  BasketLidded wicker_basket_02 base + lid                                                1024
-  BasketBread  wicker_basket_02 base, lid off, two loaves                                 1024
-  Jug          jug_01 -> brown slip glaze over the shoulder, bare clay foot               1024
-  Crock        ceramic_vase_02 -> regraded to salt-glaze stoneware, brown glaze lip       1024
-  SackTied     generated: upright grain sack, gathered neck tied with rope                2048
-  SackSlumped  generated: tied sack slumped sideways, neck flopped over                   2048
-  SackOpen     generated: open sack, rolled cuff, grain showing                           2048
+Assets (folder name, matched by BeautyCornerBuilder: source -> what changes; tex size):
+  Barrel_A       wooden_barrels_01 barrel01 -> lean, bulge, proud thickened iron hoops          2048
+  Barrel_B       wooden_barrels_01 barrel02 -> squatter (0.92 h), stronger bulge                2048
+  Barrel_C       wine_barrel_01 (lid, bung, base) -> lighter oak                                2048
+  Crate_A        wooden_crate_01 (lid, latch)                                                   2048
+  Crate_B        wooden_crate_02 (lid) -> faded ochre painted band                              2048
+  Crate_C        wooden_crate_01 body + latch, lid leaned on its side, apples, turnips, squash  2048
+  Bucket_A       wooden_bucket_01 (rope-hung handle)                                            1024
+  Bucket_B       wooden_bucket_02 (lug handles)                                                 1024
+  Basket_Produce wicker_basket_01 + heaped apples, turnips, squash and a loaf (stall goods)     1024
+  Basket_Lidded  wicker_basket_02 base + lid                                                    1024
+  Basket_Bread   wicker_basket_02 base, lid off, two loaves                                     1024
+  Jug_A          jug_01 -> brown slip glaze over the shoulder, bare clay foot                   1024
+  Jug_B          ceramic_vase_02 -> squat salt-glaze stoneware crock, brown glaze lip           1024
+  Sack_A         generated: upright grain sack, gathered neck tied with rope                    2048
+  Sack_B         generated: tied sack slumped sideways, neck flopped over                       2048
+  Sack_C         generated: open sack, rolled cuff, grain showing                               2048
+  Sack_Pair      generated: a tied sack slumped against a slumped one (sacks slump together)    2048
+Wear on wood (every barrel, crate, bucket): board-to-board tone, grime packed in the joints, up-facing lids and chimes
+sun-bleached silver-grey, a dark splash at the cobble line, rust blooming on the iron at the foot, polished rims.
 Budget per asset (PHASE1 3.3, audit class prop): at most 6000 tris, 1 material slot.
 
-Status (2026-10-30, PC): final bake exported (2 review rounds, self-score 27/40 on the batch sheet; round 1 was 26 with the
-wear too faint at mid distance, round 2 darkened the foot grime, raised the rust bloom and polish, muted the wood chroma).
-Known quirk: Blender 5.2 occasionally segfaults in uv.pack_islands (locked pins) on CrateOpen; the per-asset batch loop retries.
+Status (2026-10-30, PC): final bake exported. Batch contact-sheet self-review, rubric as written, visible faces only:
+round 1 26/40 (wear too faint at mid distance) -> 2: 27 (darker foot grime, rust bloom, polish, muted wood chroma) ->
+3: 28.5 (stall goods with squash, slumped sack pair, cluster layout, sun-bleached tops, joint grime, board tone) ->
+4: 29.5 (crate boards bow and sag, weathered darker crates, damp sack feet, crate_02's stencil letters painted out).
+Target was round 1 + 5 = 31; stopped at the 4-round cap (round 4 gained 1). Extra ideas in docs/PARKING_LOT.md.
+Known quirk: Blender 5.2 segfaulted in uv.pack_islands with locked pins (Crate_C); the generated islands now pack inside their own
+box (ORIGINAL_AABB) instead, and the per-asset batch loop still retries once.
 """
 import sys, os, math, glob, random, zlib, shutil
 import bpy, bmesh
@@ -62,7 +70,7 @@ def arg(k, d=None):
 OUT = os.path.abspath(arg('--out') or sys.exit('pass --out <scratch dir>')); os.makedirs(OUT, exist_ok=True)
 ONLY = arg('--only', '').split(',') if arg('--only') else None
 RES_SCALE = float(arg('--res-scale', '1.0')); RRES = int(arg('--rres', '900')); SAMPLES = int(arg('--samples', '16'))
-EXPORT = '--export' in argv; RENDER = '--no-render' not in argv; CPU = '--cpu' in argv; RENDER_ONLY = '--render-only' in argv
+EXPORT = '--export' in argv; RENDER = '--no-render' not in argv; CPU = '--cpu' in argv; RENDER_ONLY = '--render-only' in argv or '--sources-only' in argv
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
 SRC = os.path.join(ROOT, 'Art', 'Source', 'PolyHaven')
 TEX = os.path.join(ROOT, 'Art', 'Textures', 'B1_town')
@@ -75,40 +83,45 @@ def rng(stream):
 
 # ---------------------------------------------------------------- asset table
 WOOD = dict(hue_keep=0.55, delight=0.5, contrast=1.15, chroma=0.88)
+WEAR_WOOD = dict(tone=0.12, grime=0.75, bleach=0.55)
+WEAR_WICKER = dict(tone=0.08, grime=0.5, bleach=0.25)
+WEAR_CLAY = dict(tone=0.0, grime=0.4, bleach=0.0)
 IRON = '#4a4542'
-ASSETS = {
-    'BarrelOak':   dict(src='wooden_barrels_01', parts=['wooden_barrels_01_barrel01'], rings=True, res=2048, tris=5200, wood='#664834',
-                        lean=1.6, bulge=0.03, hoop=0.006, wob=0.004, dirt=0.13, polish=(0.80, 1.0)),
-    'BarrelStout': dict(src='wooden_barrels_01', parts=['wooden_barrels_01_barrel02'], rings=True, res=2048, tris=5200, wood='#5e4230',
-                        lean=-1.2, bulge=0.05, squash=0.92, hoop=0.006, wob=0.004, dirt=0.13, polish=(0.80, 1.0)),
-    'BarrelWine':  dict(src='wine_barrel_01', parts=None, rings=True, res=2048, tris=5200, wood='#74543a',
-                        lean=1.0, bulge=0.02, hoop=0.005, wob=0.004, dirt=0.12, polish=(0.80, 1.0)),
-    'CrateLidded': dict(src='wooden_crate_01', parts=None, res=2048, tris=5000, wood='#7c5c3e',
-                        lean=0.8, bulge=0.01, hoop=0.004, wob=0.005, dirt=0.10, polish=(0.75, 1.0)),
-    'CrateLong':   dict(src='wooden_crate_02', parts=None, res=2048, tris=5000, wood='#76583c',
-                        lean=-0.7, bulge=0.01, hoop=0.004, wob=0.005, dirt=0.10, polish=(0.75, 1.0), paint=('#b38a40', 0.30, 0.62)),
-    'CrateOpen':   dict(src='wooden_crate_01', parts=['wooden_crate_01', 'wooden_crate_01_latch'], res=2048, tris=5800, wood='#80603f',
-                        lean=0.0, bulge=0.01, hoop=0.004, wob=0.005, dirt=0.10, polish=(0.75, 1.0), leaned_lid=True,
-                        produce=dict(kind='crate', n_apple=16, n_turnip=7, n_loaf=0)),
-    'BucketWell':  dict(src='wooden_bucket_01', parts=None, rings=True, res=1024, tris=4000, wood='#6c4e36',
-                        lean=1.5, bulge=0.025, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.70, 1.6)),
-    'BucketTub':   dict(src='wooden_bucket_02', parts=None, rings=True, res=1024, tris=4500, wood='#664a34',
-                        lean=-1.0, bulge=0.02, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.75, 1.0)),
-    'BasketProduce': dict(src='wicker_basket_01', parts=None, res=1024, tris=5800, wood='#a07a48', basket=True,
-                        lean=0.0, bulge=0.02, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.85, 1.0),
-                        produce=dict(kind='basket', n_apple=9, n_turnip=4, n_loaf=1)),
-    'BasketLidded': dict(src='wicker_basket_02', parts=None, res=1024, tris=5800, wood='#9c7646', basket=True,
-                        lean=1.0, bulge=0.03, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.80, 1.0)),
-    'BasketBread': dict(src='wicker_basket_02', parts=['wicker_basket_02_base'], res=1024, tris=5000, wood='#a47c4a', basket=True,
-                        lean=-1.0, bulge=0.03, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.80, 1.0),
-                        produce=dict(kind='bread', n_apple=0, n_turnip=0, n_loaf=2)),
-    'Jug':         dict(src='jug_01', parts=None, res=1024, tris=3000, clay='#a8714a', glaze='#5a3420', glaze_from=0.45,
-                        lean=1.5, bulge=0.04, hoop=0.0, wob=0.002, dirt=0.04, polish=(0.85, 1.0)),
-    'Crock':       dict(src='ceramic_vase_02', parts=None, res=1024, tris=3000, clay='#a89676', glaze='#6a4026', glaze_from=0.70,
-                        lean=-1.2, bulge=0.08, squash=0.82, hoop=0.0, wob=0.002, dirt=0.05, polish=(0.85, 1.0)),
-    'SackTied':    dict(gen='sack', variant='tied', res=2048, tris=4000, dirt=0.10),
-    'SackSlumped': dict(gen='sack', variant='slumped', res=2048, tris=4000, dirt=0.10),
-    'SackOpen':    dict(gen='sack', variant='open', res=2048, tris=5000, dirt=0.10),
+ASSETS = {   # folder names follow the BeautyCornerBuilder's name matching (barrel, crate, sack, bucket, basket, jug)
+    'Barrel_A':  dict(src='wooden_barrels_01', parts=['wooden_barrels_01_barrel01'], rings=True, res=2048, tris=5200, wood='#664834',
+                      lean=1.6, bulge=0.03, hoop=0.006, wob=0.004, dirt=0.13, polish=(0.80, 1.0), **WEAR_WOOD),
+    'Barrel_B':  dict(src='wooden_barrels_01', parts=['wooden_barrels_01_barrel02'], rings=True, res=2048, tris=5200, wood='#5e4230',
+                      lean=-1.2, bulge=0.05, squash=0.92, hoop=0.006, wob=0.004, dirt=0.13, polish=(0.80, 1.0), **WEAR_WOOD),
+    'Barrel_C':  dict(src='wine_barrel_01', parts=None, rings=True, res=2048, tris=5200, wood='#74543a',
+                      lean=1.0, bulge=0.02, hoop=0.005, wob=0.004, dirt=0.12, polish=(0.80, 1.0), **WEAR_WOOD),
+    'Crate_A':   dict(src='wooden_crate_01', parts=None, res=2048, tris=5000, wood='#6c5038',
+                      lean=0.8, bulge=0.03, sag=0.02, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), **WEAR_WOOD),
+    'Crate_B':   dict(src='wooden_crate_02', parts=None, res=2048, tris=5000, wood='#694e36',
+                      lean=-0.7, bulge=0.03, sag=0.02, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), paint=('#b38a40', 0.30, 0.62), **WEAR_WOOD,
+                      erase=((0.02, 0.15, 0.15, 0.29), (0.235, 0.15, 0.37, 0.29))),
+    'Crate_C':   dict(src='wooden_crate_01', parts=['wooden_crate_01', 'wooden_crate_01_latch'], res=2048, tris=5800, wood='#725539',
+                      lean=0.0, bulge=0.03, sag=0.015, hoop=0.004, wob=0.008, dirt=0.10, polish=(0.75, 1.0), leaned_lid=True, **WEAR_WOOD,
+                      produce=dict(kind='crate', n_apple=11, n_turnip=5, n_loaf=0, n_squash=3, max_h=0.09)),
+    'Bucket_A':  dict(src='wooden_bucket_01', parts=None, rings=True, res=1024, tris=4000, wood='#6c4e36',
+                      lean=1.5, bulge=0.025, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.70, 1.6), **WEAR_WOOD),
+    'Bucket_B':  dict(src='wooden_bucket_02', parts=None, rings=True, res=1024, tris=4500, wood='#664a34',
+                      lean=-1.0, bulge=0.02, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.75, 1.0), **WEAR_WOOD),
+    'Basket_Produce': dict(src='wicker_basket_01', parts=None, res=1024, tris=5800, wood='#a07a48', basket=True,
+                      lean=0.0, bulge=0.02, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.85, 1.0), **WEAR_WICKER,
+                      produce=dict(kind='basket', n_apple=5, n_turnip=2, n_loaf=0, n_squash=1, max_h=0.07)),
+    'Basket_Lidded': dict(src='wicker_basket_02', parts=None, res=1024, tris=5800, wood='#9c7646', basket=True,
+                      lean=1.0, bulge=0.03, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.80, 1.0), **WEAR_WICKER),
+    'Basket_Bread': dict(src='wicker_basket_02', parts=['wicker_basket_02_base'], res=1024, tris=5000, wood='#a47c4a', basket=True,
+                      lean=-1.0, bulge=0.03, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.80, 1.0), **WEAR_WICKER,
+                      produce=dict(kind='bread', n_apple=0, n_turnip=0, n_loaf=2, n_squash=0)),
+    'Jug_A':     dict(src='jug_01', parts=None, res=1024, tris=3000, clay='#a8714a', glaze='#5a3420', glaze_from=0.45,
+                      lean=1.5, bulge=0.04, hoop=0.0, wob=0.002, dirt=0.04, polish=(0.85, 1.0), **WEAR_CLAY),
+    'Jug_B':     dict(src='ceramic_vase_02', parts=None, res=1024, tris=3000, clay='#a89676', glaze='#6a4026', glaze_from=0.70,
+                      lean=-1.2, bulge=0.08, squash=0.82, hoop=0.0, wob=0.002, dirt=0.05, polish=(0.85, 1.0), **WEAR_CLAY),   # a stoneware crock
+    'Sack_A':    dict(gen='sack', variant='tied', res=2048, tris=4000, dirt=0.16),
+    'Sack_B':    dict(gen='sack', variant='slumped', res=2048, tris=4000, dirt=0.16),
+    'Sack_C':    dict(gen='sack', variant='open', res=2048, tris=5000, dirt=0.16),
+    'Sack_Pair': dict(gen='sack', variant='pair', res=2048, tris=6000, dirt=0.16),   # a tied sack slumped against a slumped one
 }
 
 # ---------------------------------------------------------------- colour helpers (numpy; same maths as sc_texgrade, no Pillow)
@@ -236,9 +249,23 @@ def finish(t, col, rough, metal, ao, nrm, bevel=0.012):
         else: t.link(v, rr.inputs[0])
     bsdf.name = 'BSDF'; out.name = 'OUT'
 
-def wear(t, col, rough, metal, H, p, metal_mask=None):
-    """Placed wear in object space: dirt splash at the foot, rust on iron near the foot, polished rims at hand height."""
+def wear(t, col, rough, metal, H, p, metal_mask=None, ao=None):
+    """Placed wear in object space: board-to-board tone, grime in the joints, sun-bleached tops, dirt splash at the foot,
+    rust on iron near the foot, polished rims at hand height."""
     z = t.z(); n1 = t.noise(7.0, 4.0, 0.6, 1.3); n2 = t.noise(22.0, 3.0, 0.6, 4.1)
+    wood = 1.0 if metal_mask is None else t.math('SUBTRACT', 1.0, metal_mask)
+    if p.get('tone', 0) > 0:      # each board/stave a slightly different oak (coarse noise ~ board width)
+        tn = t.mrange(t.noise(3.5, 1.0, 0.4, 5.5), 0.3, 0.7, 1 - p['tone'], 1 + p['tone'], smooth=False)
+        col = t.mixc(wood, col, t.mixc(1.0, col, t.math('MULTIPLY', tn, 1.0), blend='MULTIPLY'))
+    if ao is not None and p.get('grime', 0) > 0:   # dirt packed into the stave gaps and board joints (the scan's cavities)
+        cav = t.math('MULTIPLY', t.mrange(ao, 0.85, 0.35), p['grime'])
+        col = t.mixc(cav, col, t.rgb('#2b231c')); rough = t.mixf(cav, rough, 0.95)
+    if p.get('bleach', 0) > 0:    # up-facing wood sun- and rain-bleached toward silver-grey (lids and chimes, what the cameras see)
+        geo0 = t.new('ShaderNodeNewGeometry'); sep = t.new('ShaderNodeSeparateXYZ'); t.link(geo0.outputs['Normal'], sep.inputs[0])
+        top = t.math('MULTIPLY', t.mrange(sep.outputs['Z'], 0.55, 0.92), t.mrange(t.noise(5.0, 4.0, 0.6, 7.7), 0.25, 0.6, 0.6, 1.0))
+        top = t.math('MULTIPLY', t.math('MULTIPLY', top, wood), p['bleach'])
+        grey = t.mixc(0.55, col, t.rgb('#9a9086'))
+        col = t.mixc(top, col, grey); rough = t.mixf(top, rough, 0.88)
     zj = t.math('ADD', z, t.math('MULTIPLY', t.math('SUBTRACT', n1, 0.5), 0.09))
     dirt = t.math('MULTIPLY', t.mrange(zj, p['dirt'] * 1.3, 0.0), t.mrange(n2, 0.2, 0.6, 0.6, 1.0))
     col = t.mixc(t.math('MULTIPLY', dirt, 0.9), col, t.mixc(t.mrange(n2, 0.3, 0.7), t.rgb('#3a3129'), t.rgb('#5a4c3c')))
@@ -270,6 +297,15 @@ def graded_albedo(name, src, matname, p):
     tp = tex_paths(src, matname)
     _, d = img_np(tp['diff'], 'sRGB')
     lin = srgb2lin(d[..., :3])        # loaded as byte sRGB: pixels are the stored sRGB values
+    for (x0, y0, x1, y1) in p.get('erase', ()):
+        # paint out source markings (crate_02's stencilled letters read as modern text): clone the clean stretch of the same
+        # boards just below (boards run along v there; above sits a nail row), feathered at the edges
+        Hh, Ww = lin.shape[:2]; c0, c1 = int(x0 * Ww), int(x1 * Ww)
+        r0, r1 = int(y0 * Hh), int(y1 * Hh)   # Blender pixel rows run bottom-up, like UV v
+        h = r1 - r0; src = lin[r0 - h:r0, c0:c1].copy()
+        fy = np.minimum(np.arange(h) + 1, h - np.arange(h)) / 12.0; fx = np.minimum(np.arange(c1 - c0) + 1, (c1 - c0) - np.arange(c1 - c0)) / 12.0
+        f = np.clip(np.minimum(fy[:, None], fx[None, :]), 0, 1)[..., None]
+        lin[r0:r1, c0:c1] = lin[r0:r1, c0:c1] * (1 - f) + src * f
     L = lum(lin)
     valid = (L > 0.004).astype(np.float32)   # atlas padding is black: keep it out of the means
     if tp['arm']:
@@ -333,7 +369,7 @@ def adopted_material(name, src, matname, p, H):
         pc = t.mixc(1.0, t.rgb(hexp), t.math('ADD', t.math('MULTIPLY', bw.outputs[0], 2.5), 0.35), blend='MULTIPLY')
         col = t.mixc(t.math('MULTIPLY', keep, 0.85), col, pc)
         rough = t.mixf(keep, rough, 0.75); metal = t.mixf(keep, metal, 0.0)
-    col, rough, metal = wear(t, col, rough, metal, H, p, metal_mask)
+    col, rough, metal = wear(t, col, rough, metal, H, p, metal_mask, ao if not isinstance(ao, float) else None)
     finish(t, col, rough, metal, ao, nm.outputs[0])
     return mat
 
@@ -419,6 +455,9 @@ def reshape(o, p, name, metal=None):
         co = v.co.copy(); h = co.z / max(H, 1e-4)
         s = 1.0 + p.get('bulge', 0.0) * math.sin(math.pi * min(max(h, 0), 1))
         co.x *= s; co.y *= s; co.z *= sq
+        if p.get('sag', 0) > 0 and h > 0.5:   # lid and top boards sag toward the middle of the long span
+            u = co.x / max(R, 1e-3); w_ = co.y / max(R, 1e-3)
+            co.z -= p['sag'] * (h - 0.5) * 2 * max(0.0, 1 - u * u) * max(0.0, 1 - 0.5 * w_ * w_)
         w = noise.noise_vector(co * (1.6 / max(R, 0.1)) + off) * p.get('wob', 0.0)
         co += Vector((w.x, w.y, w.z * 0.5))
         if metal is not None and p.get('hoop', 0) > 0 and metal[i] > 0.6:
@@ -468,6 +507,16 @@ def proc_material(kind):
                      t.rgb('#d6ccb0'), t.rgb('#7a3a62'))
         rough = 0.55
         bump = t.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 0.15; t.link(t.noise(45.0, 4.0), bump.inputs['Height']); nrm = bump.outputs[0]
+    elif kind == 'squash':
+        # deep ochre-orange with paler lobe ridges and a few green-grey streaks (stall harvest)
+        a = t.new('ShaderNodeAttribute', attribute_name='tz')
+        mp = t.new('ShaderNodeMapping'); t.link(t.obj(), mp.inputs['Vector']); mp.inputs['Scale'].default_value = (30, 30, 3)
+        st = t.noise(1.0, 2.0, 0.5, 3.0, vec=mp.outputs[0])
+        col = t.mixc(t.mrange(t.noise(6.0), 0.3, 0.7), t.rgb('#b8641f'), t.rgb('#c98a34'))
+        col = t.mixc(t.mrange(st, 0.55, 0.7, 0.0, 0.6), col, t.rgb('#6e7448'))
+        col = t.mixc(t.mrange(a.outputs['Fac'], 0.8, 1.0, 0.0, 0.5), col, t.rgb('#8c6a3a'))
+        rough = 0.5
+        bump = t.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 0.12; t.link(t.noise(60.0), bump.inputs['Height']); nrm = bump.outputs[0]
     elif kind == 'leaf':
         col = t.mixc(t.noise(20.0), t.rgb('#5e7a2c'), t.rgb('#7c8c34')); rough = 0.6
     elif kind == 'bread':
@@ -531,6 +580,8 @@ def material_for(kind, p, H):
         # grain dust paler around the opening and the neck; damp, darker foot (where it sat on the cobbles)
         dust = t.math('MULTIPLY', t.mrange(z, 0.62 * H, 0.95 * H), t.mrange(t.noise(9.0, 3.0), 0.35, 0.6))
         col = t.mixc(t.math('MULTIPLY', dust, 0.35), col, t.rgb('#d2c09a'))
+        damp = t.math('MULTIPLY', t.mrange(t.math('ADD', z, t.math('MULTIPLY', t.noise(4.0, 3.0), 0.08)), 0.16, 0.04), 0.55)
+        col = t.mixc(damp, col, t.mixc(1.0, col, (0.62, 0.58, 0.52, 1.0), blend='MULTIPLY'))
         col, rough, metal = wear(t, col, rough, metal, H, dict(dirt=p.get('dirt', 0.1), polish=(2.0, 3.0)))
     finish(t, col, rough, metal, ao, nrm, bevel=0.0 if kind in ('grain', 'straw') else 0.004)
     return mat
@@ -572,6 +623,22 @@ def turnip(name, r):
         lf.data.materials.append(material_for('leaf', {}, 0)); leaves.append(lf)
     return [o] + leaves
 
+def squash(name, r):
+    """Small ribbed winter squash (storybook chunky, ~13 cm): 8 lobes, flattened, a thick corky stem."""
+    a = r.uniform(0.060, 0.072); lob = r.choice((8, 9, 10))
+    prof = []
+    for k in range(12):
+        th = math.pi * (k + 0.5) / 12 - math.pi / 2
+        rr = a * math.cos(th); zz = a * 0.72 * (math.sin(th) + 1)
+        if k >= 10: zz -= a * 0.10 * (k - 9)
+        if k <= 1: zz += a * 0.06 * (2 - k)
+        prof.append((max(rr, a * 0.10), zz))
+    o = lathe_obj(name, prof, lob * 4, lambda rr, zz, ang, k: rr * (1 - 0.09 * abs(math.sin(ang * lob / 2)) ** 0.7))
+    tag_tz(o); o.data.materials.append(material_for('squash', {}, 0))
+    st = lathe_obj(name + '_stem', [(0.011, a * 1.30), (0.008, a * 1.55), (0.009, a * 1.70)], 6)
+    st.data.transform(Matrix.Rotation(r.uniform(-0.3, 0.3), 4, 'X')); st.data.materials.append(material_for('rope', {}, 0))
+    return [o, st]
+
 def loaf(name, r, size=1.0):
     L_, W_, Hh = r.uniform(0.20, 0.24) * size, r.uniform(0.11, 0.13) * size, r.uniform(0.075, 0.09) * size
     bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=12, radius=1.0)
@@ -587,10 +654,10 @@ def loaf(name, r, size=1.0):
 def place_produce(p, H, bounds_xy, z0, r):
     """Heap chunky produce inside an ellipse (rx, ry) from fill height z0, a dome toward the middle."""
     rx, ry = bounds_xy; objs = []
-    items = ['loaf'] * p['n_loaf'] + ['turnip'] * p['n_turnip'] + ['apple'] * p['n_apple']
+    items = ['loaf'] * p['n_loaf'] + ['squash'] * p.get('n_squash', 0) + ['turnip'] * p['n_turnip'] + ['apple'] * p['n_apple']
     placed = []   # (x, y, z of the centre, radius): spheres resting on the bed or on each other, lowest spot of a few tries
     for k, kind in enumerate(items):
-        rad_k = {'apple': 0.042, 'turnip': 0.048, 'loaf': 0.05}[kind]
+        rad_k = {'apple': 0.042, 'turnip': 0.048, 'loaf': 0.05, 'squash': 0.058}[kind]
         best = None
         for _ in range(24):
             if kind == 'loaf':
@@ -604,9 +671,10 @@ def place_produce(p, H, bounds_xy, z0, r):
                 if d2 < s * s: zc = max(zc, pz + math.sqrt(s * s - d2))
             if best is None or zc < best[2]: best = (x, y, zc)
         x, y, zc = best
+        if zc > z0 + rad_k * 0.8 + p.get('max_h', 0.1): continue    # a low heap, never a tower
         placed.append((x, y, zc, rad_k))
         z = zc - rad_k * 0.8
-        parts = loaf('pr_loaf_%d' % k, r, min(1.0, rx * 1.25 / 0.22)) if kind == 'loaf' else {'apple': apple, 'turnip': turnip}[kind]('pr_%s_%d' % (kind, k), r)
+        parts = loaf('pr_loaf_%d' % k, r, min(1.0, rx * 1.25 / 0.22)) if kind == 'loaf' else {'apple': apple, 'turnip': turnip, 'squash': squash}[kind]('pr_%s_%d' % (kind, k), r)
         rot = Matrix.Rotation(r.uniform(0, 6.28), 4, 'Z') @ Matrix.Rotation(r.uniform(-0.5, 0.5) if kind != 'loaf' else r.uniform(-0.1, 0.1), 4, 'X')
         if kind == 'turnip': rot = rot @ Matrix.Rotation(r.uniform(1.0, 1.5), 4, 'Y')   # turnips lie on their side
         for o in parts:
@@ -720,7 +788,17 @@ def sack(name, variant, p):
 def build_high(name, p):
     p['_name'] = name
     if p.get('gen') == 'sack':
-        parts, H = sack(name, p['variant'], p)
+        if p['variant'] == 'pair':
+            # two sacks slumped together (brief 5): a slumped one, and a tied one sheared over onto its shoulder (base stays planted)
+            pb, Hb = sack(name + '_b', 'slumped', p)
+            pa, Ha = sack(name + '_a', 'tied', p)
+            for o in pb: o.data.transform(Matrix.Translation((0.30, 0.04, 0)))
+            for o in pa:
+                o.data.transform(Matrix(((1, 0, 0.30, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))))   # x += 0.30 z
+                o.data.transform(Matrix.Rotation(-0.25, 4, 'Z')); o.data.transform(Matrix.Translation((-0.26, -0.03, 0)))
+            parts, H = pa + pb, max(Ha, Hb)
+        else:
+            parts, H = sack(name, p['variant'], p)
         hi = join(parts, name + '_high'); recentre(hi, 1.0)
         # smooth folds: a Catmull-Clark high (the low is decimated from it, the bake carries the rest)
         mod = hi.modifiers.new('sub', 'SUBSURF'); mod.levels = 2; mod.render_levels = 2
@@ -809,7 +887,6 @@ def make_low(hi, name, p):
         s = 1.0 if src_face.all() else 0.80
         uv[loop_src] = uv[loop_src] * s
         uvl.data.foreach_set('uv', uv.ravel())
-        for i, pv in enumerate(uvl.pin): pv.value = bool(loop_src[i])
     if not keep_src or not src_face.all():
         bpy.ops.object.select_all(action='DESELECT'); lo.select_set(True); bpy.context.view_layer.objects.active = lo
         bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='DESELECT')
@@ -818,15 +895,23 @@ def make_low(hi, name, p):
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.uv.smart_project(angle_limit=math.radians(55), island_margin=0.006, area_weight=0.0, scale_to_bounds=False)
         if keep_src:
-            # pack the new islands into the space the scaled source atlas left free; pinned source islands stay locked
-            bpy.ops.mesh.select_all(action='SELECT')
+            # the source atlas sits scaled in u, v < 0.80; squeeze the new islands into the free column (u 0.805..0.995), then
+            # re-pack only them inside that box (ORIGINAL_AABB). Locked-pin packing segfaulted Blender 5.2 on Crate_C.
+            bpy.ops.object.mode_set(mode='OBJECT')
+            me = lo.data; uvl = me.uv_layers['UVMap']     # edit-mode toggles invalidate layer references
+            uv = np.empty(len(me.loops) * 2, np.float32); uvl.data.foreach_get('uv', uv); uv = uv.reshape(-1, 2)
+            gl = ~loop_src
+            lo_, hi_ = uv[gl].min(0), uv[gl].max(0)
+            uv[gl] = (0.805, 0.005) + (uv[gl] - lo_) / np.maximum(hi_ - lo_, 1e-6) * (0.19, 0.99)
+            uvl.data.foreach_set('uv', uv.ravel())
+            bpy.ops.object.mode_set(mode='EDIT')
             bpy.ops.uv.select_all(action='SELECT')
-            bpy.ops.uv.pack_islands(udim_source='CLOSEST_UDIM', rotate=True, scale=True, margin_method='FRACTION', margin=0.004,
-                                    pin=True, pin_method='LOCKED', shape_method='CONCAVE')
+            bpy.ops.uv.pack_islands(udim_source='ORIGINAL_AABB', rotate=True, scale=True, margin_method='FRACTION', margin=0.004,
+                                    shape_method='CONCAVE')
         else:
             bpy.ops.uv.pack_islands(margin=0.006, rotate=True)
     if bpy.context.object and bpy.context.object.mode == 'EDIT': bpy.ops.object.mode_set(mode='OBJECT')
-    for pv in uvl.pin: pv.value = False
+    me = lo.data
     for f in me.polygons: f.use_smooth = True
     if hasattr(me, 'set_sharp_from_angle'): me.set_sharp_from_angle(angle=math.radians(50))
     return lo
@@ -938,11 +1023,29 @@ def sources_md(name, p, lo):
         parts = ', '.join(p['parts']) if p['parts'] else 'all parts'
         src = ('- Source: Poly Haven `%s` (https://polyhaven.com/a/%s), %s; raw files in `Art/Source/PolyHaven/%s/`.\n'
                '- Licence: CC0 1.0 (https://polyhaven.com/license). Author: %s. No attribution required; credited here anyway.\n'
-               '- What we changed: scaled %.0f%%, reshaped (bulge, lean, wobble, iron pushed proud), albedo regraded to PHASE1 3.1, '
-               'placed wear (rust at the foot, polished rims, dirt splash), decimated and rebaked to a new UV set.%s\n'
-               % (p['src'], p['src'], parts, p['src'], CREDIT.get(p['src'], 'see Art/Source/PolyHaven/SOURCES.md'), (OVERSIZE - 1) * 100,
-                  ' Generated produce (apples, turnips, bread) and straw added.' if 'produce' in p else ''))
+               '- What we changed: %s\n'
+               % (p['src'], p['src'], parts, p['src'], CREDIT.get(p['src'], 'see Art/Source/PolyHaven/SOURCES.md'), changes(p)))
     return head + src + stats
+
+def changes(p):
+    """The 'what we changed' line of an adopted asset's SOURCES.md, from its table row."""
+    shape = ['bulge', 'lean', 'wobble'] + (['iron hoops thickened and pushed proud'] if p.get('rings') else ['iron bands pushed proud'] if p.get('hoop', 0) > 0 else []) \
+        + (['lid and top boards sag'] if p.get('sag') else []) + (['lid leaned against its side'] if p.get('leaned_lid') else [])
+    if 'clay' in p:
+        look = 'regraded to clay with a slip glaze over the shoulder ending in runs'
+    else:
+        look = ('regraded to a warm straw (PHASE1 3.1)' if p.get('basket') else 'regraded to PHASE1 3.1 (wood and iron separately)') + (', a faded ochre painted band' if 'paint' in p else '') \
+            + (', its stencilled letters painted out' if p.get('erase') else '')
+    wear = (['weave tone', 'grime in the weave'] if p.get('basket') else ['board tone', 'joint grime']) if p.get('tone') else (['cavity grime'] if 'clay' in p else [])
+    wear += (['sun-bleached tops'] if p.get('bleach') else []) + (['rust at the foot'] if p.get('rings') or p.get('hoop', 0) > 0 else []) \
+        + ['polished rims', 'dirt splash at the base']
+    pr = ''
+    if 'produce' in p:
+        q = p['produce']
+        kinds = [k for k, n in (('apples', q['n_apple']), ('turnips', q['n_turnip']), ('squash', q.get('n_squash', 0)), ('loaves', q['n_loaf'])) if n]
+        pr = ' Generated produce (%s)%s added.' % (', '.join(kinds), ' on a straw bed' if q['kind'] in ('crate', 'basket') else '')
+    return ('scaled %.0f%%, reshaped (%s), albedo %s, placed wear (%s), decimated and rebaked onto the source UVs '
+            '(generated parts packed beside them).%s' % ((OVERSIZE - 1) * 100, ', '.join(shape), look, ', '.join(wear), pr))
 
 # ---------------------------------------------------------------- review renders
 def review_scene():
@@ -1003,6 +1106,11 @@ def main():
         before = set(bpy.data.objects); bpy.ops.import_scene.fbx(filepath=fbx)
         lo = [o for o in bpy.data.objects if o not in before and o.type == 'MESH'][0]
         bpy.context.view_layer.update(); lo.data.transform(lo.matrix_world); lo.matrix_world = Matrix(); lo.name = name
+        if '--sources-only' in argv:   # rewrite the exported SOURCES.md from the table without rebaking
+            p = dict(ASSETS[name]); p['_name'] = name; dd = os.path.join(DEST, name)
+            if os.path.isdir(dd):
+                with open(os.path.join(dd, 'SOURCES.md'), 'w', encoding='utf-8', newline=chr(10)) as fh: fh.write(sources_md(name, p, lo))
+            continue
         lm = bpy.data.materials.new('R_' + name); lm.use_nodes = True; lo.data.materials.clear(); lo.data.materials.append(lm)
         d = os.path.join(OUT, name)
         low_material(lm, dict(col=os.path.join(d, name + '_BaseColor.png'), nrm=os.path.join(d, name + '_Normal.png'),
@@ -1020,7 +1128,7 @@ def main():
         print('B7 %-14s tris %5d  size %.2f x %.2f x %.2f  res %d' % (name, tris, mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2], res))
         bpy.data.objects.remove(hi, do_unlink=True)
         lo.hide_render = True; lows[name] = lo
-    if not RENDER: return
+    if not RENDER or '--sources-only' in argv: return
     rd = os.path.join(OUT, 'renders'); os.makedirs(rd, exist_ok=True)
     co = review_scene()
     for name, lo in lows.items():
@@ -1031,20 +1139,23 @@ def main():
         render(os.path.join(rd, '%s_tq.png' % name))
         lo.hide_render = True
     # group: the cluster as the mid camera sees it (by the stall and the facade door), 1.75 m figure for scale
-    layout = {'BarrelOak': (-1.3, 1.2, 10), 'BarrelStout': (-0.55, 1.45, 40), 'BarrelWine': (-1.0, 2.1, 0), 'CrateLidded': (0.35, 1.5, 8),
-              'CrateLong': (0.3, 2.15, -5), 'CrateOpen': (1.1, 1.05, 20), 'BucketWell': (-0.2, 0.75, 0), 'BucketTub': (1.9, 1.4, 0),
-              'BasketProduce': (0.95, 0.35, 15), 'BasketLidded': (0.3, 1.5, 0), 'BasketBread': (1.65, 0.55, -20), 'Jug': (-0.65, 0.55, 30),
-              'Crock': (-0.95, 0.75, 0), 'SackTied': (-1.85, 0.7, 0), 'SackSlumped': (-1.7, 1.75, 30), 'SackOpen': (-2.4, 1.35, 0)}
-    stack = {'BasketLidded': 'CrateLidded'}
+    # odd groups to one side against the wall (y 4): a barrel pair plus one, sacks slumped together, baskets on crates (brief 5)
+    layout = {'Barrel_A': (-1.2, 3.5, 10), 'Barrel_B': (-0.35, 3.55, 40), 'Barrel_C': (-0.8, 2.75, 0),
+              'Sack_Pair': (-2.35, 3.4, 15), 'Sack_A': (-2.0, 2.65, 0), 'Sack_B': (-2.75, 2.55, 40), 'Sack_C': (-1.55, 2.15, 0),
+              'Crate_A': (0.55, 2.95, 8), 'Crate_B': (1.45, 3.55, 92), 'Crate_C': (1.65, 2.45, -15),
+              'Bucket_A': (-0.15, 2.45, 0), 'Bucket_B': (2.7, 3.35, 0),
+              'Basket_Lidded': (0.55, 2.95, 20), 'Basket_Produce': (1.45, 3.55, -10), 'Basket_Bread': (2.55, 2.3, 0),
+              'Jug_A': (-0.45, 2.15, 30), 'Jug_B': (0.15, 2.2, 0)}
+    stack = {'Basket_Lidded': 'Crate_A', 'Basket_Produce': 'Crate_B'}
     for name, lo in lows.items():
         x, y, rz = layout.get(name, (0, 0, 0)); z = 0.0
         if name in stack and stack[name] in lows:
-            z = bounds(lows[stack[name]])[1][2]
+            z = float(bounds(lows[stack[name]])[1][2])
         lo.location = (x, y, z); lo.rotation_euler = (0, 0, math.radians(rz)); lo.hide_render = False
-    f = figure(); f.location = (2.7, 1.9, 0)
-    aim(co, (2.2, -1.2, 1.5), (-0.3, 1.3, 0.4), 32)
+    f = figure(); f.location = (3.3, 2.4, 0)
+    aim(co, (2.9, -0.7, 1.7), (-0.2, 3.0, 0.45), 30)
     render(os.path.join(rd, 'group.png'))
-    aim(co, (1.2, -0.6, 1.05), (-0.3, 1.1, 0.35), 35)
+    aim(co, (1.5, 0.6, 1.25), (0.3, 3.0, 0.45), 35)
     render(os.path.join(rd, 'group_close.png'))
 
 main()
