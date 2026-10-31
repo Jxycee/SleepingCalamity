@@ -1,6 +1,6 @@
-State: IN PROGRESS
+State: DONE
 Session: Wave 1: Inn (L, frame + parts)
-Progress: 90%
+Progress: 100%
 Sheet: Reference/hollowmere/inn/SHEET_inn_r4.jpg
 Blocker: none
 
@@ -10,5 +10,5 @@ Blocker: none
 - Export + integration: Inn.fbx on F09 (L) at its pad height via HollowmereInnArt.cs + a builder row (d79c9a0; check PASS there: build, edit 591/591, play 32 pass). Merged origin/main (bakery, ruins, stalls) at 6d92db0; check re-running on the tip.
 - sc_facade_kit.py: only the `if __name__ == '__main__'` import guard, byte-identical to the bell tower / bakery branches (additive).
 - Unity captures: not taken (no GPU in this cloud session; HollowmereCapture.CaptureAll needs --graphics): a PC batch job.
-SC RESULT check FAIL (6d92db0 merge tip): build PASS, edit 592/592, play 31 pass / 1 fail / 8 skip; the failure is CombatArenaTests.Solo_DaggerGuard_Reduces_AndAParryStopsTheHit (a real-time 6-frame parry window landed as a held guard, hp 98), unrelated to the inn. Re-run on da47412: SC RESULT check PASS (edit 592/592, play 32 pass / 0 fail). Main moved (tithe gate): merged again, scene regenerated (34274f1), final check on that tip running.
-- Merge: pending a green check.
+SC RESULT check PASS (2a5200e, after merging main with the tithe gate; build PASS, edit 592/592, play 32 pass / 0 fail / 8 skip). An earlier tip run failed once on CombatArenaTests.Solo_DaggerGuard_Reduces_AndAParryStopsTheHit (real-time parry window, unrelated); passed on both re-runs.
+- Merge: 2c436ed on main (tree identical to the checked 2a5200e, main had not moved, so no second check).
