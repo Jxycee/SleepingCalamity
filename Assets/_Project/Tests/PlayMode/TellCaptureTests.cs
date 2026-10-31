@@ -84,13 +84,13 @@ namespace SleepingCalamity.Tests.PlayMode
                 foreach (var s in shots)
                 {
                     Vector3 h = hero.transform.position;
-                    // Seen three-quarter from the side: the enemy ahead and to the right, facing the hero, so a lean or coil reads in profile.
-                    Vector3 at = h + Quaternion.Euler(0f, 30f, 0f) * Vector3.forward * s.dist;
+                    // Seen from the side: the enemy ahead and well to the right, facing the hero, so a lean or coil reads in profile.
+                    Vector3 at = h + Quaternion.Euler(0f, 62f, 0f) * Vector3.forward * (s.dist * 0.8f);
                     Enemy e = combat.SpawnEnemy(s.kind, 1, at, ai: false);
                     Vector3 face = h - at;
                     face.y = 0f;
                     e.transform.rotation = Quaternion.LookRotation(face.normalized);
-                    loco.SetView(18f, 14f);
+                    loco.SetView(48f, 10f);
                     for (int i = 0; i < 40; i++) yield return null;   // settle the camera
                     // A lob is aimed beside the hero so the splash shows; everything else at the hero.
                     e.ServerForceAttack(s.attack, s.attack.Origin == HitOrigin.GroundAtTarget ? h + Vector3.right * 1.2f : h);

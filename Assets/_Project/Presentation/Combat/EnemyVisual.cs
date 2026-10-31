@@ -141,7 +141,7 @@ namespace SleepingCalamity.Presentation
             // The attacking part: glows hotter through a charge hold, then flashes white-hot at the commit (the glint).
             Color partTint = tint;
             if (pose.Charge > 0f) partTint = Color.Lerp(partTint, ChargeColor, 0.35f + 0.5f * pose.Charge + 0.15f * Mathf.Sin(t * (14f + 20f * pose.Charge)));
-            if (pose.Glint > 0f) partTint = Color.Lerp(partTint, GlintColor, Mathf.Sqrt(pose.Glint));
+            if (pose.Glint > 0f) partTint = Color.Lerp(partTint, GlintColor * 2f, Mathf.Sqrt(pose.Glint));   // over 1: brighter than lit white, so it reads as a flash
             _partBlock.SetColor(BaseColor, partTint);
             bool partLit = pose.Charge > 0f || pose.Glint > 0f;
 
@@ -253,7 +253,7 @@ namespace SleepingCalamity.Presentation
             Bounds b = PartBounds();
             Vector3 toCam = cam != null ? (cam.transform.position - b.center).normalized : -transform.forward;
             Vector3 at = b.center + Vector3.up * (b.extents.y * 0.5f) + toCam * Mathf.Min(0.6f, b.extents.magnitude * 0.6f);
-            float size = 0.55f + 0.35f * _enemy.Def.Radius;
+            float size = 0.8f + 0.5f * _enemy.Def.Radius;
             float s = g > 0f ? size * Mathf.Sqrt(g) * (1f + 0.4f * (1f - g)) : size * 0.35f * charge * (0.8f + 0.2f * Mathf.Sin(Time.time * 30f));
             _flare.gameObject.SetActive(true);
             _flare.position = at;
