@@ -1,14 +1,17 @@
-State: IN PROGRESS
+State: DONE
 Session: Wave 1: Bakery (L, frame + parts)
 Job: Q9: Keep terrace (keep hall and terrace dressing)
-Progress: 80%
+Progress: 100%
 Needs: none
+Archive: ready
+Sheet: Reference/hollowmere/keep/SHEET_keep_unity.jpg
 
 - Branch: claude/sharp-goldberg-vpyt8c (restarted from main after Q4 merge 9cf4559). Contract: Reference/hollowmere/keep/CONTRACT.md.
 - Plan: Sonnet agents write sc_keep_hall.py (landmark, Shell + Frame + Part_Door) and sc_keep_terrace.py (wall/buttress/planter/stair/balustrade/newel/bench kit); then one integration agent (layout row KeepHall, BuildKeep on the kit, captures, check). Also in flight on the same branch: the coordinator's dungeon-corner polish pass (Q4 follow-up).
 - Art done (committed): KeepHall.fbx (Shell 22,706 / Frame+door 30,983 tris, self 27.5/40, SHEET_keep_hall.jpg) and KeepTerrace.fbx (20,666 tris, 26.5/40, SHEET_keep_terrace.jpg). Contract corrections at the end of CONTRACT.md (hall yaw 0, door node (-9.2, 25.0), slot tables).
-- RESUMED (coordinator session 5). Integration agent (Sonnet) running Unity: KeepHall row + door edge + test, hall placer, BuildKeep on the kit, keep captures, then one check and merge.
-- Left: integration (layout row KeepHall + door edge + test, BuildKeep on the kit, hall placer), captures, check, merge.
+- Merged: 7bac761 on main. Check on the branch tip dcd944d (main merged in, Hollowmere.unity regenerated): SC RESULT check PASS (build PASS, test-edit 681/681, test-play 32 passed / 8 skipped / 0 failed); main had no Asset changes since.
+- Integration: LandmarkKind.KeepHall + row at (-3, 24.5) on the terrace, door node (-9.2, 25.0) linked to Keep_Walk_W, EditMode test; HollowmereArt per-spec yaw (hall yaw 0), Shell in Ruined / Frame + Part_Door in Rebuilt; BuildKeep on the kit (20 wall segments, 6 ends, 6 buttresses, 8 planters, 36 stair steps with raked balustrades + newels, 3 benches), greybox fallback. Captures: KeepStairs both presets, KeepWall Ruined (the Rebuilt KeepWall capture timed out; not re-run per the coordinator's finish-now priority).
+- Unverified guesses to check next time: bench facing, newel/balustrade lateral offset, the west stair up close, the hall's rebuilt door.
 
 ## Usage waste (this session, honest look back; rough shares of what it spent)
 1. **One long Opus controller session carrying everything (~40%).** This session has run the bakery, Q2, Q4 and Q9 back to back, so every turn re-sends a huge context; on top of that I did the bakery art myself on Opus (render/inspect loops, reading big parts of sc_facade_kit.py, full-size images in context). Fix: one queue item per fresh session, with the controller only planning, scoring and merging; art and Unity loops go to Sonnet from the first step, with a short brief instead of the controller's history.
