@@ -36,15 +36,20 @@ cobble #817a7b to #b7b0aa with warm lights.
   --ring builds the flagstone ring (sc_flag_ring.py, look stage) into the renders.
 Budget (PHASE1 3.3, T3): 50-400 tris per variant, one 2K set per family (+ the 2K bed tileable), 1024 px/m or more.
 
-Status (2026-10-30, cloud): look locked at 28/40 (sc-asset-review rubric, scored on the brief's three cameras plus
-a low ground check; first scored round 26, target was 31 under the 2026-10-30 "+5" rule, stopped at the ~4-round
-cap). Next: the PC runs --stage bake --res 2048 --export and the controller's builder instances the placements.
+Status (2026-10-31, cloud): look at 29/40 (sc-asset-review rubric, scored on the brief's three cameras plus a low
+ground check; first scored round 26, target 31 under the "+5" rule; stopped when r8 gave no visible gain).
+Bake proof (--stage bake --res 1024, r6 code): LOD0 139-140 tris, LOD1 43-44, frags 118-120; 6,732 setts + 45 loose,
+636k instanced tris (6,094 inside a capture frame); bed 9,820 tris. The baked lows hold the look-stage read.
+Next: the PC runs --stage bake --res 2048 --export and the controller's builder instances the placements.
 Round log (look stage, ground with the flag ring and stand-ins):
   r1-r2 (unscored setup): fan layout + fill pass; setts were pillow-soft, pale, polka-dot feldspar, joints too pale.
   r3 26/40: blocky setts (bevel 8-14 mm), per-variant granite tones (blue-grey to pink), green moss in the joints.
   r4 26.5: warmer sun / cooler fill, joints 3.4 cm deep, dusty moss-free joints on the worn path.
   r5 27.5: narrow tone band inside each stone, wide between stones (tone now changes stone to stone), wider joints.
-  r6 28: (flag ring pass, sc_flag_ring.py). Parked ideas: docs/PARKING_LOT.md (B6 cobbles).
+  r6 28: (flag ring pass, sc_flag_ring.py).
+  r7 29: fixed a crease + centre dimple on every sett top (sign() in the plan bulge); 3 damp setts in the dish.
+  r8 29: rim dirt band, crown pitting, stronger grain: no visible gain at the mid camera, so the loop stopped.
+  Parked ideas: docs/PARKING_LOT.md (B6 plaza ground).
 """
 import sys, os, math, json, zlib, random
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -94,7 +99,7 @@ BURY = 0.045             # the lows keep this much body below the top; the rest 
 LOD0_T, LOD1_T, FRAG_T = 140, 44, 120
 
 # ----------------------------------------------------------------------------- granite smart material
-def granite(name, tint=0.0, warm=0.4, worn=False, damp=False):
+def granite(name, tint=0.0, warm=0.4, worn=False, damp=False, L=0.18, W=0.14):
     """Granite: grey with warm lights (#817a7b to #b7b0aa), black mica and pale feldspar specks, foot-polished top,
     dirt below the joint line and in crevices. Object space, so instances and the bake agree."""
     m, T = K.new_mat(name); T.grime = None
@@ -119,6 +124,11 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False):
     top = T.math('MULTIPLY', up, T.smoothstep(z, -0.012, -0.002))
     pol = T.math('MULTIPLY', top, 0.85 if worn else 0.45)
     col = T.mix(T.math('MULTIPLY', pol, 0.35), col, T.hsv(col, 0.5, 0.9, 1.12))
+    # dirt creeps 1-3 cm in from each stone's rim; feet polish the centre (the strongest per-stone cue at mid distance)
+    sx = T.sep(p)
+    rim = T.math('MAXIMUM', T.math('ABSOLUTE', T.math('DIVIDE', (sx, 'X'), L / 2)), T.math('ABSOLUTE', T.math('DIVIDE', (sx, 'Y'), W / 2)))
+    rimd = T.smoothstep(T.math('ADD', rim, T.math('MULTIPLY', T.math('SUBTRACT', mott, 0.5), 0.25)), 0.62, 0.98)
+    col = T.mix(T.math('MULTIPLY', rimd, 0.32 if worn else 0.45), col, T.hsv(col, 0.5, 1.0, 0.62))
     # crisp convex edges catch a little light; crevices hold dirt
     ed = T.edge(0.004, 0.03, 0.25)
     col = T.mix(T.math('MULTIPLY', ed, 0.25), col, T.hsv(col, 0.5, 0.9, 1.15))
@@ -144,7 +154,7 @@ def granite(name, tint=0.0, warm=0.4, worn=False, damp=False):
     # micro relief: crystal grain + feldspar bumps (the dents and spalls are geometry)
     grain = T.noise(p, scale=380.0, detail=3.0)
     h = T.math('ADD', T.math('MULTIPLY', grain, 0.5), T.math('MULTIPLY', felds, 0.35))
-    nrm = T.bump(h, strength=0.22 if worn else 0.35, distance=0.0008)
+    nrm = T.bump(h, strength=0.3 if worn else 0.55, distance=0.0008)
     T.output(col, rough, 0.0, nrm)
     return m
 
@@ -182,6 +192,9 @@ def make_sett(name, L, W, H, kind, prm):
     nchip = {'chipped': 9, 'worn': 2, 'cracked': 4}.get(kind, 5)
     d = d + K.scoops(ob, nchip, 0.008, 0.020, 0.55, (75.0, 170.0), seed=sd + 5.0, co=co, no=no, flake=True) * topw
     co = co - no * d[:, None]
+    if kind != 'worn':                          # pick-dressed pitting on the crown: shallow 2-5 mm bites
+        d2 = K.scoops(ob, 70, 0.002, 0.005, 0.35, (-1e9, 1e9), seed=sd + 7.0, co=co, no=no) * K._sstep(co[:, 2], co[:, 2].max() - 0.012, co[:, 2].max() - 0.003)
+        co = co - no * d2[:, None]
     if kind == 'cracked':                       # hairline crack across the crown, open at the top
         ang = r.uniform(0.3, 1.2); n2 = np.array([math.cos(ang), math.sin(ang), 0.0])
         dist = np.abs((co * n2).sum(1) + 0.01 * (K.fbm(co, 25.0, 2, 0.5, 9.0) - 0.5))
@@ -220,7 +233,7 @@ def build_family():
     highs = {}
     for i, (name, L, W, H, kind, prm) in enumerate(FAMILY):
         ob = make_frag(name, L, W, H, prm) if kind == 'frag' else make_sett(name, L, W, H, kind, prm)
-        ob.data.materials.append(granite('M_' + name, prm['tint'], prm['warm'], kind == 'worn', prm.get('damp', False)))
+        ob.data.materials.append(granite('M_' + name, prm['tint'], prm['warm'], kind == 'worn', prm.get('damp', False), L, W))
         highs[name] = ob
     return highs
 
