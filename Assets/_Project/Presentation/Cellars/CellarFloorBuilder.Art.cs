@@ -2,7 +2,7 @@
 // dungeon corner, from the layout alone (per cell and per room data, no Random), so every seed builds and every client gets the same hierarchy:
 //  - Ceilings: rooms get one barrel bay per cell along the room's long axis (springing 2.6 m, the corner's 2.0 x 2.5 m elliptical profile, crown 5.1 m) with oak
 //    valley beams between parallel bays, a stone cornice along the side walls and a limewash tympanum over every end wall and door; straight corridor cells get
-//    two B5 VaultSegments (scaled 0.8 across to the 4 m cell) with ArchRibs between bays; corridor corners and junctions get a groin bay with the same profile.
+//    two B5 VaultSegments (scaled 0.725 across into the 4 m cell) with ArchRibs between bays; corridor corners and junctions get a groin bay with the same profile.
 //  - Wall faces: every closed cell side draws its own face 0.2 m deep (the wall boxes are colliders only): limewash B5 EndWall (or NicheWall on a Rack socket)
 //    across the room's axis, brick along it and in corridors; nothing where a kit VaultSegment already carries the wall.
 //  - Dressing from the room's sockets: Shelf -> LarderShelf, Rack -> NicheWall with a candle cluster, Barrel -> Barrels with a candle, Crate -> oak crates,
@@ -22,7 +22,7 @@ namespace SleepingCalamity.Presentation
         public const string VaultGroup = "Vaults", CeilingGroup = "Ceiling", FaceGroup = "Faces", DressingGroup = "Dressing";
         public const float RoomSpring = 2.6f, CorridorSpring = 1.6f, VaultHalfSpan = 2.0f, VaultRise = 2.5f;
         public const float WallLampIntensity = 9f, CentreLampIntensity = 9f, CorridorLampIntensity = 5f;
-        const float FaceDepth = 0.2f, KitAcross = 0.8f;   // VaultSegment / ArchRib are 5 m inside: 0.8 brings the inner wall face to the 4 m cell edge
+        const float FaceDepth = 0.2f, KitAcross = 0.725f;   // VaultSegment / ArchRib (5 m inside, 6 m outside): 0.725 keeps the outer wall face 2.175 m from the axis, just behind a neighbour's 0.2 m face, inner face 1.83 m (on the wall colliders)
         static readonly Color CandleGold = new Color(1.0f, 0.72f, 0.44f), FillGold = new Color(1.0f, 0.76f, 0.52f);
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
