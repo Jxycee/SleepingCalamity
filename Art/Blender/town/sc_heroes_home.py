@@ -34,7 +34,7 @@ B polish), read by WearLit. Budget: <= 75k tris per building (PHASE1 3.3; printe
 refs: Reference/hollowmere/heroes_home/REFS.md (old rubble walls and stone-slate roofs), Reference/hollowmere/materials (Cotswold
 slate roofs), PHASE1 3.1 palette, 3.4 shape language (1.3x arches, 1-3 deg off true, sagging ridges, chamfers).
 
-Status (2026-10-31, cloud): exported. Self-review r1 26.5/40, r2 27.5/40 (calibrated rubric; stopped: r2 gained < 1.5). Tris: cistern 51.3k,
+Status (2026-10-31, cloud): exported. Self-review r1 26.5/40, r2 27.5/40, r3 29/40 (coordinator's last round: salvage, older stone, door glow). Tris: cistern 51.3k,
 annex 19.1k. Next visible gains: foliage at the wall feet and ivy (Wave 2 foliage extension), lichen on the tops, grime streaks under the
 gutter and sills, a smaller and greyer lime panel. Rounds: Reference/hollowmere/heroes_home/STATUS.md.
 """
@@ -61,6 +61,7 @@ OAK_TINT = (0.80, 0.76, 0.72)
 # layout rows (HollowmereLayout.LandmarkRows): centre x, z (Unity) and ground height
 SITES = {'HeroesHome_Cistern': (12.5, 11.25, 0.0), 'HeroesHome_Annex': (11.9, 24.0, 4.0)}
 STAIR = (15.0 - 12.5, 12.5 - 11.25)   # HollowmereLayout.UndercroftStair in the cistern house's frame
+LANTERN = (0.35, -3.75 + 1.05, 2.05)   # inside the front door (Unity world (12.85, 2.05, 8.55)); the builder adds a warm point light here
 
 # ----------------------------------------------------------------------------- materials
 MATS = {}
@@ -157,7 +158,7 @@ SLOT_DEFS = {   # slot -> builder. FK_* = the B4 facade slots (BeautyCornerArt.F
     'HH_ClothBlue': lambda: tile_mat('HH_ClothBlue', 'B1_town/canvas', tint=(0.45, 0.58, 0.80)),
     'HH_ClothLinen': lambda: tile_mat('HH_ClothLinen', 'B1_town/canvas', tint=(1.15, 1.12, 1.05)),
     'HH_Rope': lambda: flat_mat('HH_Rope', (0.32, 0.25, 0.16), 0.9),
-    'HH_Glow': lambda: flat_mat('HH_Glow', (1.0, 0.55, 0.22), 0.8, emit=6.0),
+    'HH_Glow': lambda: flat_mat('HH_Glow', (1.0, 0.55, 0.22), 0.8, emit=14.0),
     'HH_Dark': lambda: flat_mat('HH_Dark', (0.035, 0.028, 0.022), 0.95),
     'HH_List': lambda: decal_mat('HH_List', LIST_PNG),
     'FK_Decal_drip': lambda: decal_mat('FK_Decal_drip', os.path.join(TEX, 'B3_trims', 'drip', 'drip_albedo.png'), 0.35),
@@ -305,8 +306,8 @@ def plank(g, slot, a, b, w, t, up, R, tag='wood', wob=0.01):
 
 # ----------------------------------------------------------------------------- walls
 class Opening:
-    def __init__(self, u0, u1, z0, z1, kind='window', arch=False):
-        self.u0, self.u1, self.z0, self.z1, self.kind, self.arch = u0, u1, z0, z1, kind, arch
+    def __init__(self, u0, u1, z0, z1, kind='window', arch=False, timber=False):
+        self.u0, self.u1, self.z0, self.z1, self.kind, self.arch, self.timber = u0, u1, z0, z1, kind, arch, timber
         self.r = (u1 - u0) / 2; self.uc = (u0 + u1) / 2; self.spring = z1 - self.r if arch else z1
     def hits(self, u0, u1, z0, z1, pad):
         if self.arch:
@@ -336,7 +337,7 @@ class Patch:
 class Wall:
     """One stone wall face: o = outer face start corner at ground, U along the face, N outward; top(u) = wall top (gable)."""
     def __init__(self, g, o, U, N, L, top, R, openings=(), patches=(), q0=True, q1=True, plinth=0.48, stone_slot='HH_OldStone',
-                 base=0.0, course=(0.30, 0.52)):
+                 base=0.0, course=(0.36, 0.62)):
         self.g, self.o, self.U, self.N, self.L, self.top, self.R = g, Vector(o), Vector(U).normalized(), Vector(N).normalized(), L, top, R
         self.ops, self.patches, self.q0, self.q1, self.plinth, self.slot, self.base, self.course = list(openings), list(patches), q0, q1, plinth, stone_slot, base, course
         self.xf = M4(self.o, self.U, self.N)
@@ -369,7 +370,7 @@ class Wall:
                 u = -R.uniform(0.0, 0.3)
             while u < self.L - 0.02:
                 qz0 = self.q0 and u <= 0.0001 and ci > 0
-                ln = (R.uniform(0.95, 1.45) if R.random() < 0.18 else R.uniform(0.45, 1.0)) * (1.2 if ci == 0 else 1.0)
+                ln = (R.uniform(1.0, 1.6) if R.random() < 0.25 else R.uniform(0.55, 1.15)) * (1.2 if ci == 0 else 1.0)
                 slot = None
                 if qz0 or (self.q1 and ci > 0 and u + ln > self.L - (0.55 if ci % 2 else 0.95)):
                     pass
@@ -469,6 +470,12 @@ class Wall:
                     if not self._facing_ok():
                         fs = [tuple(reversed(f)) for f in fs]
                     self.g.add(vs, fs, 'FK_Sandstone', 'stone', R)
+            elif o.timber:   # the old stone lintel cracked: the heroes put in a new oak beam, mortar packed rough above it
+                xf = self.xf @ Matrix.Translation((o.uc, jd / 2 - 0.05, o.z1 + 0.14)) @ rot(0, 0, math.radians(1.5))
+                box(self.g, 'FK_OakDoor', (o.u1 - o.u0 + 0.8, jd, 0.28), xf, 'wood', R, cham=0.025)
+                box(self.g, 'HH_Mortar', (o.u1 - o.u0 + 0.7, 0.06, 0.12), self.xf @ Matrix.Translation((o.uc, -0.01, o.z1 + 0.34)), 'core', R)
+                for du in (-0.3, 0.3):
+                    cyl(self.g, 'FK_Iron', self.P(o.uc + du, o.z1 + 0.14, 0.11), self.P(o.uc + du, o.z1 + 0.14, 0.07), 0.025, 6, 'metal', R)
             else:   # lintel
                 xf = self.xf @ Matrix.Translation((o.uc, jd / 2 - 0.03, o.z1 + 0.17))
                 stone(self.g, 'FK_Sandstone', (o.u1 - o.u0 + 0.62, jd, 0.34), xf, R, soft=0.12, bulge=0.015, back=False)
@@ -684,9 +691,9 @@ def build_cistern():
     g = Geo('HeroesHome_Cistern'); dec = Geo('Decals'); glow = Geo('Glow')
     # --- walls (outer faces): S (y=-HY, U +x, N -y), E (x=+HX, U +y), N (y=+HY, U -x), W (x=-HX, U -y)
     door = Opening(HX - 0.8, HX + 0.8, 0.0, 2.75, 'door', arch=True)
-    sw = Opening(HX + 1.9, HX + 2.75, 1.25, 2.30)
+    sw = Opening(HX + 1.9, HX + 2.75, 1.25, 2.30, timber=True)
     s_up = Opening(HX + 1.55, HX + 2.25, 3.05, 3.75)                    # small upper light (blue single shutter)
-    patch_s = Patch(HX + 3.7, 3.35, 0.45, 0.42, 1.3)                       # boarded breach high on the right
+    patch_s = Patch(HX + 3.55, 3.6, 0.72, 0.52, 1.3)                       # a planked wall section high on the right (a breach)
     S_ = Wall(g, (-HX, -HY, 0), (1, 0, 0), (0, -1, 0), 2 * HX, lambda u: EAVE, random.Random(11), [door, sw, s_up], [patch_s])
     ew = Opening(2.1, 2.9, 1.3, 2.25)
     E_ = Wall(g, (HX, -HY, 0), (0, 1, 0), (1, 0, 0), 2 * HY, lambda u: gable_top(u, 2 * HY), random.Random(12), [ew], [])
@@ -745,9 +752,21 @@ def build_cistern():
     # --- the front door: mismatched planks, ajar (inward), salvaged painted boards among the oak
     xf = Matrix.Translation((door.u0 - HX + 0.05, -HY + 0.55, 0.14)) @ Matrix.Rotation(math.radians(80), 4, 'Z') @ Matrix.Translation((1.5 / 2, 0, 0))   # hinged west, swung in
     door_leaf(g, R, 1.5, 2.6, xf, ['FK_Oak', 'FK_OakDoor', 'HH_PaintOchre', 'FK_Shutter', 'HH_PlankGrey'], arch_r=0.75)
+    # a lantern hung just inside the doorway (the warm spill on the threshold, seen from the square)
+    lp = Vector(LANTERN)
+    cyl(g, 'FK_Iron', lp + Vector((0, 0, 0.22)), lp + Vector((0, 0, 0.75)), 0.008, 4, 'metal', R, caps=False)
+    box(g, 'FK_Iron', (0.22, 0.22, 0.03), Matrix.Translation(lp + Vector((0, 0, 0.2))), 'metal', R)
+    box(g, 'FK_Iron', (0.24, 0.24, 0.03), Matrix.Translation(lp + Vector((0, 0, -0.2))), 'metal', R)
+    for dx in (-0.1, 0.1):
+        for dy in (-0.1, 0.1):
+            box(g, 'FK_Iron', (0.02, 0.02, 0.4), Matrix.Translation(lp + Vector((dx, dy, 0))), 'metal', R)
+    box(glow, 'HH_Glow', (0.13, 0.13, 0.26), Matrix.Translation(lp), 'glow', R)
     # windows: frames + glass, mismatched shutters
     window_fill(g, R, S_, sw, 0.45); open_shutters(g, R, S_, sw, ['FK_Shutter', 'HH_PaintRed'])
-    window_fill(g, R, S_, s_up, 0.45); open_shutters(g, R, S_, s_up, [None, 'HH_PaintBlue'])
+    window_fill(g, R, S_, s_up, 0.45)   # boarded up: three odd boards nailed across, one painted
+    for k, (zz, sl, tw) in enumerate(((s_up.z0 + 0.15, 'HH_PlankGrey', 0.06), (s_up.z0 + 0.36, 'HH_PaintBlue', -0.04), (s_up.z0 + 0.58, 'FK_Oak', 0.03))):
+        xf = S_.xf @ Matrix.Translation((s_up.uc + R.uniform(-0.05, 0.05), -0.07, zz)) @ rot(0, 0, tw)
+        box(g, sl, (s_up.u1 - s_up.u0 + 0.75, 0.035, 0.17), xf, 'wood', R, cham=0.01)
     window_fill(g, R, E_, ew, 0.45); closed_shutters(g, R, E_, ew, 'HH_PlankGrey')
     window_fill(g, R, W_, ww, 0.45); open_shutters(g, R, W_, ww, ['HH_PaintBlue', 'FK_Oak'], ang=(6, 35))
     # north window stuffed with canvas
@@ -787,11 +806,12 @@ def build_cistern():
             x = xb
     # --- roof: two stone-slate slopes between the parapets; tarp over missing slates (south), boards (north)
     rx0, rx1 = -HX + T - 0.02, HX - T + 0.02
-    sag = 0.18
-    tarp_box = (0.6, 2.6, 1.2, 2.9)            # x0, x1, s0, s1 on the south slope
+    sag = 0.38                                 # an old ridge, sagging 4 cm/m
+    tarp_box = (0.2, 3.0, 0.8, 3.5)            # x0, x1, s0, s1 on the south slope: over a roof hole
     planks_box = (-2.9, -1.3, 0.9, 2.6)       # on the north slope
     def skip_s(x, s):
-        return tarp_box[0] + 0.15 < x < tarp_box[1] - 0.15 and tarp_box[2] + 0.15 < s < tarp_box[3] - 0.15
+        return (tarp_box[0] + 0.15 < x < tarp_box[1] - 0.15 and tarp_box[2] + 0.15 < s < tarp_box[3] - 0.15) or \
+            (tarp_box[1] - 0.2 < x < tarp_box[1] + 0.45 and tarp_box[2] + 1.2 < s < tarp_box[3] - 0.4)   # the hole's ragged edge peeks out
     def skip_n(x, s):
         return planks_box[0] + 0.1 < x < planks_box[1] - 0.1 and planks_box[2] + 0.1 < s < planks_box[3] - 0.1
     ov = 0.45
@@ -799,7 +819,11 @@ def build_cistern():
     S_s, Ls, d_s, n_s = slate_roof(g, R, rx0, rx1, -ye, 0.0, ze, RIDGE + 0.12, -1, sag, skip_s)
     S_n, Ln, d_n, n_n = slate_roof(g, R, rx0, rx1, ye, 0.0, ze, RIDGE + 0.12, 1, sag, skip_n)
     ridge_cap(g, R, rx0, rx1, 0.0, RIDGE + 0.18, sag)
-    tarp(g, R, S_s, *tarp_box)
+    tarp(g, R, S_s, *tarp_box, slot='HH_ClothBlue')   # salvaged faded-blue sailcloth: the patch reads from the square
+    for xx in (tarp_box[0] + 0.3, (tarp_box[0] + tarp_box[1]) / 2, tarp_box[1] - 0.3):   # lashings over the ridge and down to the gutter brackets
+        rope(g, S_s(xx, tarp_box[3] - 0.05, 0.14), S_s(xx, Ls + 0.05, 0.12), -0.02, 3, 0.012)
+        rope(g, S_s(xx, Ls + 0.05, 0.12), S_n(xx, Ln - 0.6, 0.08), -0.02, 3, 0.012)
+        rope(g, S_s(xx, tarp_box[2] + 0.05, 0.14), S_s(xx, -0.05, 0.02) + Vector((0, -0.12, -0.15)), -0.02, 3, 0.012)
     # north slope board patch: boards laid down the slope
     x = planks_box[0]
     while x < planks_box[1]:
@@ -816,6 +840,12 @@ def build_cistern():
         box(g, 'FK_Iron', (0.03, 0.4, 0.03), Matrix.Translation((xx, gy + 0.12, gz0 + 0.02)), 'metal', R)
     cyl(g, 'FK_Oak', (HX - 0.05, gy, gz0 - 0.02), (HX - 0.3, -HY - 0.45, 1.05), 0.06, 6, 'wood', R)   # a wooden downspout
     barrel(g, R, (HX - 0.3, -HY - 0.45, 0.0))
+    bc = Vector((HX - 0.3, -HY - 0.45, 0.0))
+    for zz in (0.32, 0.62):
+        cyl(g, 'HH_Rope', bc + Vector((0, 0, zz - 0.02)), bc + Vector((0, 0, zz + 0.02)), 0.395, 12, 'rope', None, caps=False)
+    ring = Vector((HX - 0.3, -HY - 0.02, 0.62))
+    cyl(g, 'FK_Iron', ring + Vector((-0.05, -0.03, 0)), ring + Vector((0.05, -0.03, 0)), 0.05, 8, 'metal', R, caps=False)
+    rope(g, ring + Vector((0, -0.05, 0)), bc + Vector((0, 0.39, 0.62)), 0.02, 2, 0.014)
     # chimney on the west gable apex
     cx = -HX + T / 2 - 0.05; ch0 = RIDGE - 0.6; ch1 = RIDGE + 1.6
     z = ch0; k = 0
@@ -834,10 +864,10 @@ def build_cistern():
         uu = lu0 + (lu1 - lu0) * u; zz = lz0 + (lz1 - lz0) * v
         e = min(u, 1 - u, v, 1 - v)
         rag = (0.045 * math.sin(u * 9 + v * 13) + 0.02 * math.sin(v * 21 + u * 5)) * max(0.0, 1 - e * 8)
-        return S_.P(uu + rag, zz, 0.05 + 0.006 * math.sin(u * 17) * math.sin(v * 13))
+        return S_.P(uu + rag, zz, 0.095 + 0.006 * math.sin(u * 17) * math.sin(v * 13))   # clear of the proudest stones
     quad_grid(g, 'FK_Plaster', lim, 20, 20, 'plaster', R)
     pad = 0.12
-    quad_grid(dec, 'HH_List', lambda u, v: S_.P(lu0 + pad + (lu1 - lu0 - 2 * pad) * u, lz0 + pad + (lz1 - lz0 - 2 * pad) * v, 0.064), 1, 1, 'decal')
+    quad_grid(dec, 'HH_List', lambda u, v: S_.P(lu0 + pad + (lu1 - lu0 - 2 * pad) * u, lz0 + pad + (lz1 - lz0 - 2 * pad) * v, 0.108), 1, 1, 'decal')
     # a paint pot and brush on a ledge stone under the list (Wren keeps it up to date)
     cyl(g, 'FK_Iron', S_.P(2.55, 0.0, -0.32) + Vector((0, 0, 0.0)), S_.P(2.55, 0.0, -0.32) + Vector((0, 0, 0.2)), 0.09, 8, 'metal', R)
     cyl(g, 'FK_Oak', S_.P(2.55, 0.18, -0.30), S_.P(2.62, 0.42, -0.36), 0.012, 5, 'wood', R)
@@ -941,7 +971,7 @@ def build_annex():
         return lambda y, s, off=0.0: None
     # slate_roof works along x; build in a rotated frame (x->y): generate in a temp Geo, then rotate 90 deg about z
     tmp = Geo('tmp')
-    S_w, Lw, dw, nwv = slate_roof(tmp, R, ry0, ry1, -xe, 0.0, ze, A_RIDGE + 0.1, -1, 0.10, lambda x, s: False, course0=0.30, course1=0.20)
+    S_w, Lw, dw, nwv = slate_roof(tmp, R, ry0, ry1, -xe, 0.0, ze, A_RIDGE + 0.1, -1, 0.20, lambda x, s: False, course0=0.30, course1=0.20)
     rz = Matrix.Rotation(math.radians(-90), 4, 'Z')   # slope's -y (west after rotation)... x -> -y
     rz = Matrix(((0, -1, 0, 0), (1, 0, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)))   # (x, y) -> (-y, x): eave at -xe goes to x = +xe? fixed below
     rz = Matrix(((0, 1, 0, 0), (1, 0, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)))    # mirror swap x<->y: eave y=-xe -> x=-xe (west), ridge along y
@@ -960,7 +990,7 @@ def build_annex():
         ne = -ne
     def Se(yy, s, off=0.0):
         t = (yy - ry0) / (ry1 - ry0)
-        return Vector((xe, yy, ze)) + de * s + ne * (off - 0.10 * 4 * t * (1 - t) * (s / Le))
+        return Vector((xe, yy, ze)) + de * s + ne * (off - 0.20 * 4 * t * (1 - t) * (s / Le))
     quad_grid(g, 'FK_Oak', lambda u, v: Se(ry0 + (ry1 - ry0) * (1 - u), Le * v, -0.02), 8, 3, 'wood', R)
     quad_grid(g, 'FK_Oak', lambda u, v: Se(ry0 + (ry1 - ry0) * u, Le * v, -0.12), 8, 3, 'wood', R)
     yy = ry0
@@ -974,7 +1004,7 @@ def build_annex():
         return Se(x, s, off + 0.06)
     tarp(g, R, Se_x, -1.2, 0.6, 1.0, 2.6)
     ridge = Matrix(((0, 1, 0, 0), (1, 0, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)))
-    tmp2 = Geo('tmp2'); ridge_cap(tmp2, R, ry0, ry1, 0.0, A_RIDGE + 0.16, 0.10)
+    tmp2 = Geo('tmp2'); ridge_cap(tmp2, R, ry0, ry1, 0.0, A_RIDGE + 0.16, 0.20)
     base = len(g.v); g.v += [ridge @ v for v in tmp2.v]
     for f, sl, tg, uo in zip(tmp2.f, tmp2.slot, tmp2.tag, tmp2.uvo):
         g.f.append(tuple(i + base for i in reversed(f))); g.slot.append(sl); g.tag.append(tg); g.uvo.append(uo)
@@ -1014,8 +1044,10 @@ def wear_rgb(p, n, tag, slot, top_z):
     if tag in ('stone', 'core', 'floor', 'step', 'plaster'):
         r = 0.62 * max(0.0, 1 - p.z / 0.75) ** 1.4 + 0.12 * nz            # splash-back band at the foot
         r += 0.18 * max(0.0, 1 - abs(p.z - top_z) / 0.9) * nf              # weathering under the eaves
+        streak = max(0.0, noise.noise(Vector((p.x * 2.7 + p.y * 2.7, 0.0, 0.3))) - 0.1)   # vertical rain streaks: centuries of run-off
+        r += 0.8 * streak * (0.4 + 0.6 * nf)
         gr = (0.8 if n.z > 0.55 else 0.0) * nf + 0.45 * max(0.0, 1 - p.z / 1.1) * (0.5 + 0.5 * max(0.0, n.y)) * nz \
-            + 0.35 * max(0.0, n.y) * max(0.0, nf - 0.45)
+            + 0.35 * max(0.0, n.y) * max(0.0, nf - 0.45) + (0.75 * nf + 0.2 if (n.y > 0.5 and p.y > 0) else 0.0)   # north faces: moss and lichen
         if tag == 'step':
             b = 0.55
         if tag == 'plaster':
@@ -1150,6 +1182,9 @@ def stage():
     lamp2 = bpy.data.objects.new('StairHeadLight', bpy.data.lights.new('StairHeadLight', 'POINT')); sc.collection.objects.link(lamp2)
     lamp2.data.energy = 45; lamp2.data.color = (1.0, 0.70, 0.42); lamp2.data.shadow_soft_size = 0.2
     lamp2.location = (x + STAIR[0], z + STAIR[1] - 0.2, y + 1.9)
+    lamp3 = bpy.data.objects.new('DoorLantern', bpy.data.lights.new('DoorLantern', 'POINT')); sc.collection.objects.link(lamp3)
+    lamp3.data.energy = 90; lamp3.data.color = (1.0, 0.62, 0.32); lamp3.data.shadow_soft_size = 0.1
+    lamp3.location = (x + LANTERN[0], z + LANTERN[1], y + LANTERN[2] - 0.05)
     ob = to_object(gg, sc.collection, 99)
     return sun
 

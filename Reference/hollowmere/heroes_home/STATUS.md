@@ -1,11 +1,11 @@
 State: IN PROGRESS
 Session: Wave 1: Heroes' home (fixed landmark)
-Progress: 70%
-Sheet: Reference/hollowmere/heroes_home/heroes_home_sheet_r2.jpg
+Progress: 80%
+Sheet: Reference/hollowmere/heroes_home/heroes_home_sheet_r3.jpg
 Blocker: none
 
-Score: 27.5/40 (r1 26.5: silhouette 4, proportion 3.5, form 3.5, surface 3, colour 3, wear 3.5, dressing 3.5, glass/metal 2.5; r2 +1: warmer honey stone, warm mortar joints, softer washing). Target was 31.5; stopped after r2 (gain < 1.5, brief rule). Biggest gap to the refs is vegetation at the feet and on the walls: Wave 2 foliage extension.
-Tris: cistern 51.3k, annex 19.1k (budget 75k each)
+Score: 29/40 after round 3 (r1 26.5, r2 27.5; coordinator's r2 read ~26). r3: salvage shown (faded-blue sailcloth tarp lashed over a roof hole, boarded upper window, planked wall section, new oak lintel, rope-tied barrel), older stone (bigger blocks, rain streaks, north moss/lichen, ridges sag 4 cm/m), a lantern inside the door so warm light spills on the threshold. Art rounds closed.
+Tris: cistern 45.9k, annex 18.6k (budget 75k each)
 SC RESULT: no check yet
 Merge commit: none
 
@@ -21,3 +21,4 @@ Merge commit: none
 - Round 2: warm honey stone (HH_OldStone), warm lime mortar joints (HH_Mortar instead of the near-black FK_PlinthJoint), lichen/moss on tops,
   smoother washing, grimier list panel. Exported to Assets/_Project/Content/Art/Town/Ring1/HeroesHome/ (SOURCES.md). Unity integration running
   (HeroesHomeArt.cs + the HeroesHome case in HollowmereBuilder), then unity.sh check.
+- Round 3 (coordinator's last round) exported; list panel lifted clear of the proudest stones. Unity integration + check in progress.

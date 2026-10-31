@@ -8,11 +8,11 @@
   `SOCKET_Door`, and on the cistern house `SOCKET_UndercroftStair` (the stair head, HollowmereLayout.UndercroftStair).
 - Axes: -Z forward, Y up, metres, transforms baked; pivot at the footprint centre at ground. Blender x = Unity east, y = north; the builder turns the art
   180 deg (ArtYaw 180, like the B4 facade). One state (lived in); story additions come later.
-- Tris: cistern 51.3k, annex 19.1k (PHASE1 3.3 building budget 75k each).
+- Tris: cistern 45.9k, annex 18.6k (PHASE1 3.3 building budget 75k each).
 - Materials (T2, no unique bake): B4 slot names `FK_*` bind through `BeautyCornerArt.BuildFacadeMaterials`; `HH_*` slots are tinted B1 tileables
   (`HH_OldStone`, `HH_Mortar`, `HH_Slate` from sandstone; `HH_PlankGrey` oak; `HH_Canvas`, `HH_Cloth*` canvas), WearLit paint mode boards
   (`HH_PaintRed/Blue/Ochre`, greyscale x paint / 0.17 like the B4 neighbours), flat `HH_Rope`, `HH_Dark`, emissive `HH_Glow`, and the
   alpha decal `HH_List` (`HH_List_BaseColor.png`, 1024 px: Wren's list, 120 placeholder resident names of our own, DejaVu Serif under the Bitstream
   Vera/DejaVu licence, free for any use). Mapped in `Assets/_Project/Editor/Builders/HeroesHomeArt.cs`. Wear: CORNER colour attribute `wear` (LINEAR,
   R grime, G moss, B polish) for WearLit.
-- Reference: `Reference/hollowmere/heroes_home/REFS.md`; sheet `Reference/hollowmere/heroes_home/heroes_home_sheet_r2.jpg`. Self-review 27.5/40.
+- Reference: `Reference/hollowmere/heroes_home/REFS.md`; sheet `Reference/hollowmere/heroes_home/heroes_home_sheet_r3.jpg`. Self-review 29/40 (round 3).
