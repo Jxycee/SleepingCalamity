@@ -245,11 +245,14 @@ namespace SleepingCalamity.EditorTools
             if (cab != null) { cab.SetFloat("_Cull", 0f); EditorUtility.SetDirty(cab); }
             slotMats["Cabbage"] = cab != null ? cab : FlatLit("Cabbage", new Color(0x5b / 255f, 0x7a / 255f, 0x5a / 255f), 0.4f, lit);
             // Scarecrow cloth: the canvas tileable tinted per slot (the Blender `tint` attribute is not read by Unity): coat, burlap head, two patches, their seam thread, hat band
-            slotMats["coat"] = TintedCanvas("coat", 0.58f, 0.64f, 0.72f, lit);
-            slotMats["burlap"] = TintedCanvas("burlap", 0.95f, 0.80f, 0.55f, lit);
-            slotMats["patch_ochre"] = TintedCanvas("patch_ochre", 0.93f, 0.72f, 0.42f, lit);
-            slotMats["patch_rust"] = TintedCanvas("patch_rust", 0.74f, 0.42f, 0.34f, lit);
-            slotMats["patch_seam"] = TintedCanvas("patch_seam", 0.50f, 0.37f, 0.27f, lit);
+            // Colour story (polish 3): the canvas albedo is tan (linear ~0.37/0.22/0.11), so a multiply can only warm or darken it; a blue coat
+            // came out tan-grey. The coat is a faded madder red (complement of the garden greens, mid-dark value), the burlap head is the
+            // untinted light canvas, one patch is light ochre and one dark umber so both read against the coat by value.
+            slotMats["coat"] = TintedCanvas("coat", 0.80f, 0.36f, 0.50f, lit);
+            slotMats["burlap"] = TintedCanvas("burlap", 1.00f, 0.96f, 0.86f, lit);
+            slotMats["patch_ochre"] = TintedCanvas("patch_ochre", 1.00f, 0.85f, 0.45f, lit);
+            slotMats["patch_rust"] = TintedCanvas("patch_rust", 0.30f, 0.30f, 0.45f, lit);
+            slotMats["patch_seam"] = TintedCanvas("patch_seam", 0.35f, 0.28f, 0.25f, lit);
             slotMats["leather"] = TintedCanvas("leather", 0.50f, 0.34f, 0.26f, lit);
             slotMats["Straw"] = FlatLit("Straw", new Color(0xc9 / 255f, 0xa8 / 255f, 0x5a / 255f), 0.2f, lit);
             // Glass: dark, smooth and slightly see-through (the B4 facade's FK_Glass colour), straight-alpha blend like the decals
