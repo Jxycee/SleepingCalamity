@@ -1,0 +1,3 @@
+Status: DONE
+Merged to main (2b937250): 1 tree-keyed marker (unity.sh, unity.ps1, guard.sh; untested end to end, no editor in cloud yet), 2 STATUS-only commit guard (tested), 3 git lfs checkout in unity.sh/unity.ps1/session-start, 5 FBX path_mode STRIP in all exporters, 6 combat doc refresh, 7 sc_aaa_mats merged into mats2 (shim kept), sc_sheet -> sc_ab_sheet --grid (shim kept; PIL broken in this VM so not run, py_compile only).
+NOT merged: 4 WebGL meta. Chose commit-once (173 files, block copied from Standalone, matches the 291 existing); a postprocessor cannot be verified without an editor. Branch pipeline-webgl-meta needs a unity.sh check (Assets changed) then a merge.
