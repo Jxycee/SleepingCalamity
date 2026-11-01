@@ -1,14 +1,14 @@
 Session: Polish 3 (cloud, resumed): scarecrow colour + StairFlight UVs
 Job: (1) scarecrow colour story in Cap_HM_Allotment; (2) StairFlight wall UV offset (StairEntry pattern, 522018d)
-Progress: 85%
-Status: APPROVED: waiting to merge after the procgen and Cellars floor art sessions land (both regenerate scenes)
-Blocker: merge order (after procgen + Cellars floor art)
-Archive: no
+Progress: 100%
+Status: DONE (merged b2f10a6)
+Blocker: none
+Archive: ready
 Branch: claude/vibrant-heisenberg-csgj6z (continues claude/admiring-brahmagupta-0jjuph)
 Score: coordinator APPROVED the final sheet at ~25-26/40 (own read ~27); StairFlight UV fix proven
 Sheet: Reference/hollowmere/polish3/polish3_final.jpg (Richter PD painting beside round 1 / round 2 Allotment crops; Kassel cellar stair photo beside Stair_Turn)
-SC RESULT: -
-Merge commit: -
+SC RESULT: check PASS on daa5702 (build PASS; test-edit 887/887; test-play 61 passed / 8 skipped / 0 failed); merge tree == checked tip (main gained only docs/superpowers/handoff/CURRENT.md)
+Merge commit: b2f10a6
 
 - Scarecrow cause: the canvas albedo is tan (linear ~0.37/0.22/0.11) and TintedCanvas only multiplies, so the old blue tint (0.58/0.64/0.72) came out tan-grey. New story: faded madder red coat (tint 0.80/0.36/0.50, sRGB ~0.58/0.31/0.25, complement of the garden greens), untinted light burlap head (1.0/0.96/0.86), light ochre patch and dark umber patch (value contrast both ways), dark seam thread.
 - StairFlight: both sloped side walls projected the same (y, z) metre UVs; solid() takes an off= and the +x wall uses (0.413, 0.271) like StairEntry.
@@ -22,3 +22,8 @@ Merge commit: -
 - Known follow-up (no round left): the face still sits in the hat brim's midday shadow; fix in sc_garden.py scarecrow() by raising/narrowing the brim or tipping the head forward (re-export, tris about equal).
 - Undercroft stair capture (UndercroftStairCapture, 3 cameras, small scene): Stair_Turn frames both StairFlight walls; stone layouts differ left/right, no mirrored repeat. Stone still stretches along the slope (separate from this job).
 - Coordinator notes, not now: the round 2 head still renders dark grey (sheet label corrected), and the forms read a bit smooth and plastic.
+
+## Usage waste
+- First round 2 Allotment capture was OOM-killed at ~10.6 GB about 5 min in (the agent misread it as a timeout); the retry alone fit. Check `dmesg` before calling a short run a timeout.
+- First check timed out in test-edit: unity.sh's default step limit is 5 min and EditMode (887 tests) takes longer; run `check --timeout 30`.
+- Graphics captures and every builder run rewrite .mat files and Hollowmere.unity / CellarFloorTest.unity (builder churn, fix queued); reverted each time.
