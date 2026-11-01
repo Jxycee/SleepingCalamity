@@ -31,7 +31,7 @@ Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/
 - Merge order (coordinator): M5 spine, then M5 contents, then procgen item 1, then floor art. When contents is on main: merge origin/main (take main's .unity on conflict), regenerate scenes with the -nographics `build`, commit, one `check`, then `sc-merge`. After item 1, hold procgen merges while a spine/contents STATUS says "check running".
 - `claude/procgen-item2` (subagent, may still be running at handoff): layout presets Spine/Ring/Hub/Wing on stream "cellars.preset", far-dead-end exit (leaf, not adjacent to entry), preset in LayoutHash. Moves seed-12345 goldens deliberately (all re-pinned, listed in STATUS). Needs review (reviewer) + check after item 1 merges; branch it onto main after item 1.
 - `claude/procgen-item4` (subagent, may still be running): chunk regions (`CellarRoomChunks.Resolve`, stream "cellars.chunks", greybox in the Procgen partial). Must keep LayoutHash/DressingHash goldens. Needs review + check.
-- If a branch above is missing or unpushed, look in `C:\Dev\SleepingCalamity\.claude\worktreesgent-*` for its worktree (`git -C <wt> log -1`).
+- If a branch above is missing or unpushed, look in `C:\Dev\SleepingCalamity\.claude\worktrees\agent-*` for its worktree (`git -C <wt> log -1`).
 - Then: item 5 (vignettes 12-20, state-conditioned odds; Core + greybox). Items 1d (loot mix) and 3 (roster subset, twists) wait on the M5 contents session (owns chests, loot roll, spawner).
 - Don't touch: `CellarFloorBuilder.cs` beyond the one call line, user tuning constants, the pity save (M6), real art.
 
