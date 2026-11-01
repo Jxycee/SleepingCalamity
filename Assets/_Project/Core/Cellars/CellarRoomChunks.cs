@@ -2,6 +2,7 @@
 // LayoutHash and DressingHash are untouched, ChunksHash() is the cross-peer proof of this layer.
 //   - per placed room one stream Rng.Derive(seed, "cellars.chunks", floor << 32 | roomIndex); per region, in order, exactly one draw (the starting variant), so a skipped pick
 //     never shifts another region's draw;
+//   - the floor's heal point (CellarHealing.PointFor, read-only; it depends on layout and dressing, not on chunks) counts as taken, so no variant puts a block or cover on it;
 //   - from the drawn variant the resolver tries the variants in order (wrapping round); a variant is legal when none of its blocking or cover cells lands on a filled dressing socket
 //     or a vignette cell, and the room stays connected: with the variant's cells, the other regions' picks, the filled barrels and crates and the vignette cells blocked, every
 //     remaining floor cell and every door is still reachable from the first door. The open variant is always legal, so it is the fallback;
@@ -38,6 +39,7 @@ namespace SleepingCalamity.Core
         {
             if (layout == null) throw new ArgumentNullException(nameof(layout));
             var list = new List<ResolvedChunk>();
+            CellPos? heal = layout.IsStub ? null : CellarHealing.PointFor(layout, dressing);   // a pure function of (seed, floor); null when the floor has no heal point
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r]; CellarRoom room = p.Room;
@@ -45,6 +47,11 @@ namespace SleepingCalamity.Core
                 var rng = new Pcg32(Rng.Derive(layout.Seed, "cellars.chunks", ((ulong)layout.Floor << 32) | (uint)r));
                 // cells a chunk must not touch: dressed sockets and vignettes (local coordinates); cells that stand in the way of walking: filled barrels and crates and vignettes
                 var taken = new bool[room.Width, room.Height]; var props = new bool[room.Width, room.Height];
+                if (heal.HasValue)
+                {
+                    int hx = heal.Value.X - p.X, hy = heal.Value.Y - p.Y;
+                    if (hx >= 0 && hy >= 0 && hx < room.Width && hy < room.Height) taken[hx, hy] = true;   // taken only: a heal point is walkable, it just must not be built over
+                }
                 if (dressing != null)
                 {
                     foreach (DressedSocket s in dressing.SocketsOf(r))

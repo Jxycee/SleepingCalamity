@@ -87,17 +87,36 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Chunks_DoNotMoveLayoutOrDressingHashes()
+        public void Chunks_ResolveIsReadOnly_LayoutAndDressingHashesStayPut()
         {
-            // Same pinned values as CellarFloorGeneratorTests / CellarVarietyTests would have: resolving chunks (and regions on the rooms) changes neither hash.
+            // Proves only that Resolve does not mutate the layout or dressing it reads (the pinned LayoutHash / DressingHash goldens live in CellarFloorGeneratorTests / CellarVarietyTests).
             foreach (uint seed in new uint[] { 12345, 7, 99 })
                 for (int f = 1; f <= 4; f++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f);
-                    ulong lh = l.LayoutHash(), dh = CellarFloorDressing.Resolve(l).DressingHash();
-                    CellarRoomChunks.Resolve(l);
-                    Assert.AreEqual(lh, l.LayoutHash()); Assert.AreEqual(dh, CellarFloorDressing.Resolve(l).DressingHash());
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d0 = CellarFloorDressing.Resolve(l);
+                    ulong lh = l.LayoutHash(), dh = d0.DressingHash();
+                    CellarRoomChunks.Resolve(l, d0);
+                    Assert.AreEqual(lh, l.LayoutHash()); Assert.AreEqual(dh, d0.DressingHash());
                 }
+        }
+
+        [Test]
+        public void Chunks_NeverCoverTheHealPoint()
+        {
+            int withHeal = 0;
+            for (int f = 1; f <= 3; f++)
+                for (uint seed = 1; seed <= Seeds; seed++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellPos? heal = CellarHealing.PointFor(l, d);
+                    if (!heal.HasValue) continue;
+                    withHeal++;
+                    CellarRoomChunks c = CellarRoomChunks.Resolve(l, d);
+                    foreach (ResolvedChunk ch in c.Chunks)
+                        foreach (var (cell, kind) in CellarRoomChunks.SolidCells(l, ch))
+                            Assert.IsFalse(cell.X == heal.Value.X && cell.Y == heal.Value.Y, "seed " + seed + " floor " + f + ": " + ch.Region.Id + " " + kind + " sits on the heal point");
+                }
+            Assert.Greater(withHeal, 500);
         }
 
         [Test]
