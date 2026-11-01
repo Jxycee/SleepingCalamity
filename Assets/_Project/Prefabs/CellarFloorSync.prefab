@@ -122,3 +122,13 @@ MonoBehaviour:
       Prefab: {fileID: 7702254243505710654, guid: 6e950a6ecdfc24a4ea3c2dbd3e019844, type: 3}
     - Name: BreathGrate
       Prefab: {fileID: 853013468221079726, guid: 8f1dc79eaf0afeb4fbad257744898d16, type: 3}
+    - Name: Crate
+      Prefab: {fileID: 6458253713029912029, guid: 7ee70508cc765c908ab5528ddbe27aa0, type: 3}
+    - Name: CrateStack
+      Prefab: {fileID: 2909552802730312708, guid: 30f7a52d3429fa2f4b48a92d41fe33cd, type: 3}
+    - Name: JarCluster
+      Prefab: {fileID: 6222716541392744269, guid: 251456743cab1d6d3ae46128205f842d, type: 3}
+    - Name: Rubble
+      Prefab: {fileID: 6508633923054619584, guid: 1b52cdc32e4073db4864e5f52d938905, type: 3}
+    - Name: SackPile
+      Prefab: {fileID: 6021016450455666633, guid: 6763c08a47de1e015b67d24ce8668ca7, type: 3}

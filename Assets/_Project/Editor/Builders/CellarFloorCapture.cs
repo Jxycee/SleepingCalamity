@@ -42,6 +42,7 @@ namespace SleepingCalamity.EditorTools
             try
             {
                 EditorSceneManager.OpenScene(CellarFloorTestBuilder.ScenePath, OpenSceneMode.Single);
+                Debug.Log("SC CAPTURE RenderSettings ambientIntensity=" + RenderSettings.ambientIntensity + " mode=" + RenderSettings.ambientMode + " fog=" + RenderSettings.fog + " fogColor=" + RenderSettings.fogColor);
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 System.Array.Sort(cams, (a, b) => string.CompareOrdinal(a.name, b.name));
                 foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
