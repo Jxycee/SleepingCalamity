@@ -1,9 +1,9 @@
 # Cellars procedural generation (procgen track)
-Status: IN PROGRESS (item 1)
+Status: IN PROGRESS (item 1a-c built, 1d waits)
 Blocker: item 1d (loot mix) waits on P47 healing's item ids (asked local M5 session)
 Branch: claude/cellar-procgen
 Last check: none
-Next: item 1 (a-c) implementation
+Next: item 1d after P47 ids; then item 2
 Archive: no
 
 Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/procedural-dungeons.md` (3, takeaways). Coordinator order, 2026-10-31.
@@ -27,3 +27,7 @@ Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/
 
 ## Log
 - 2026-10-31: track opened, branch from main b499a71.
+- 2026-10-31: item 1a-c built (branch claude/procgen-item1). Core: `CellarFloorRoute` (+ `CellarRoomGraph`: rooms + corridor cells, because branch links end on existing corridors), `CellarSpecialRoom` (`SpecialRoomDive`), `CellarDoorHints`; greybox `DoorHint_r<room>_d<door>` icons and `SpecialRoom_<Kind>_r<room>` marker in `CellarFloorBuilder` (group `Procgen`). Tests `CellarProcgenTests` (8, EditMode); full test-edit 794/794 PASS; LayoutHash/DressingHash goldens untouched.
+  - 1a: spine = fewest-step entry-to-exit route; arcs = off-spine loops (one shortest per spine-node pair, may hold no room); roles Spine/Arc/Branch/Locked; cycle role Plain/KeyArc/ShortcutBack/None. Measured over 1200 seeds: None 3.3/2.4/3.3% (floors 1/2/3), Plain ~65%, KeyArc ~13%, ShortcutBack ~18%; ~4 arcs per floor. Placeholders: KeyArcPercent 70, ShortcutMinSteps 6.
+  - 1c: kinds EliteDen (floor 2+), Treasury, Shrine, Quiet; per-floor chance 40/55/55 (placeholders in `SpecialRoomDive`); a kind is spent when drawn even if the floor has no eligible room (keeps floor N independent of earlier layouts). Measured: special on 44/52/57% of floors 1/2/3, 11% of dives have none, 1.5 per dive, never a repeat kind, never locked / elite-vignette room / non-combat / floor 4; Spine room only when no off-path room is eligible (2% of specials).
+  - 1b: a hint per open door with something beyond it, over the whole corridor network behind the door (a T junction shows every room on it; union of flags). Because networks are big, 97% of hints carry a flag (key 32%, special 33%, reward vignette 19% of hints): too noisy to read as a choice. Refine later: hint only the next room on the route, or only the nearest room per branch.
