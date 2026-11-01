@@ -97,7 +97,34 @@ Candidates for `docs/PARKING_LOT.md`:
 - a viewpoint
 - resident wish targets that use the land ("where I can see the lake", STORY 8.3)
 
-## Open questions for the user
+## Decisions (user, 2026-11-01)
+
+1. **A closed ring, Nier Replicant style.** The land around Hollowmere is a walkable valley ring bounded by natural edges, not an open world that runs to the terrain's edge. Possible bounds: a cliff or ravine line, steep wooded slopes, the lake shore, the stream. Exits stay shut until the story opens them; the Saltwake road opens with ring 3.
+   - This also removes today's walk-off-the-world edge at x ≈ -150 (BUGS.md item 17).
+   - Everything past the ring is horizon: silhouettes, haze, landmarks.
+2. **Ambient life goes in, if easy and good models that match the style can be found** (see the sourcing plan below).
+3. **The Mawrrow mountain goes on the horizon, but it must not be the whole background.** It is one landmark among several: the Saltwake road and a far lighthouse glint to the west, a ruined windmill or watchtower on a ridge, and real tree and ridge silhouettes in between.
+4. **No people in Hollowmere until a rebuild unlocks someone.** Ruined Hollowmere has wildlife only, plus the heroes' own chimney smoke. Later towns may reveal a survivor (parked).
+
+## Ambient life: sourcing plan
+
+Rule: no paid assets. Free means CC0 or CC BY from a trusted source, or a free Asset Store item the user adds (`.claude/rules/art-assets.md`, `sc-asset-adopt`). The finding that shapes the plan: most free animal sets are flat-shaded low poly or cartoon, which clashes with our PBR stylised realism up close. So pick the cheapest route per creature, by how close the camera gets.
+
+| Creature or effect | Camera distance | Route | Why |
+|---|---|---|---|
+| Distant flocks, circling crows, swallows, gulls over the lake | 20 m and more | **VFX:** GPU particles or vertex-animated cards with a wing-flap shader, or a tiny bird mesh from a Blender generator | No model quality question at that size; cheap; reproducible from text |
+| Butterflies, bees, pollen, fish rings, chimney smoke, wind waves, cloud shadows | any | **VFX / shader only** | No models needed |
+| Crows perched on ruins and the bell tower (idle, peck, fly off) | 5-15 m | One crow from our own Blender generator (a simple shape, a few bones), or trial the free Asset Store "Living Birds" (Dinopunch; dated 2018 and built for Unity 4.5, so it needs a material and quality check) | The closest common creature; one model covers all perches |
+| Rabbits, a fox, deer at field edges; a heron at the lake; feral sheep in a fold | 10-40 m | **A/B before choosing:** (a) Quaternius's CC0 animated animals reshaped and re-textured through `sc-asset-adopt`, vs (b) the AI pipeline (Tripo image-to-3D plus auto-rig, `sc-ai-model-pipeline`) in our style. Score both with `sc-asset-review` | Needs a rig and animation; the low-poly source risks the style, the AI route risks the rig |
+
+Order:
+1. VFX-only life first. No style risk, and the biggest change to the "empty" feel.
+2. Then one crow, and one deer or rabbit through the A/B above.
+3. Only then the rest of the fauna set.
+
+Every adopted asset gets a SOURCES.md row with its licence. Quaternius's pack contents and licence page must be confirmed on its own site before adopting (the pack page could not be fetched today).
+
+## Open questions for the user (answered 2026-11-01, see Decisions)
 
 1. How far should the hero walk beyond the walls? Today the terrain is walkable to its edge, and the hero can walk off the world at x ≈ -150 (BUGS.md item 17). Backdrop-only, a small ring of fields, or out to the road?
 2. Ambient life (C1) now as Phase 1 polish, or with the after-Phase-1 square dressing?
