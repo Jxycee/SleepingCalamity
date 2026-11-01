@@ -26,6 +26,7 @@ namespace SleepingCalamity.Core
         public int ProtocolOffset { get; private set; }        // -dev-protocol-offset <int>, default 0
         public bool LongTimeout { get; private set; }          // -dev-long-timeout
         public bool CombatArena { get; private set; }          // -dev-combat: the first gameplay scene is the M3 combat arena
+        public bool DiveArena { get; private set; }            // -dev-dive: the first gameplay scene is the M5 dive hub (Arena_Dive)
 
         public static DevFlags Parse(IReadOnlyList<string> args)
         {
@@ -48,6 +49,10 @@ namespace SleepingCalamity.Core
                 else if (Is(arg, "-dev-combat"))
                 {
                     flags.CombatArena = true;
+                }
+                else if (Is(arg, "-dev-dive"))
+                {
+                    flags.DiveArena = true;
                 }
                 else if (Is(arg, "-dev-long-timeout"))
                 {
