@@ -4,7 +4,7 @@ Blocker: none. Coordinator 2026-10-31: Core-only items first (1, 2, 4); hold pro
 Branch: claude/cellar-procgen
 Last check: PASS at d7403e2 (build PASS, EditMode 811/811, PlayMode 37 passed, 8 skipped, 0 failed) before the partial move; tip eb4efc0 needs scene regen + check
 Next: see Handoff below
-Archive: no
+Archive: ready (variety session handed off; successor continues)
 
 Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/procedural-dungeons.md` (3, takeaways). Coordinator order, 2026-10-31.
 
