@@ -10,6 +10,7 @@ namespace SleepingCalamity.Core
             {
                 case InputContext.Menu: return RouteMenu(in frame);
                 case InputContext.LockOn: return RouteLockOn(in frame);
+                case InputContext.Placement: return RoutePlacement(in frame);
                 default: return RouteFree(in frame);
             }
         }
@@ -35,6 +36,22 @@ namespace SleepingCalamity.Core
             i.SwitchX = f.SwitchX;
             i.SwitchY = f.SwitchY;
             return i;
+        }
+
+        // Placement: the hero stands still and the camera is the placement camera, so Move, Look, Sprint, Dodge and Lock are zeroed. Passed: the switch input (move the ghost to the
+        // neighbouring lot), Primary/Secondary pressed (place / pick up), Interact pressed (next free lot), Jump pressed (turn the building a quarter), Pause (leave placement).
+        private static PlayerIntent RoutePlacement(in PlayerInputFrame f)
+        {
+            return new PlayerIntent
+            {
+                SwitchX = f.SwitchX,
+                SwitchY = f.SwitchY,
+                PrimaryPressed = f.PrimaryPressed,
+                SecondaryPressed = f.SecondaryPressed,
+                InteractPressed = f.InteractPressed,
+                JumpPressed = f.JumpPressed,
+                PausePressed = f.PausePressed,
+            };
         }
 
         // Free: the switch input is zeroed (the same stick is the camera's Look).

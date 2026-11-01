@@ -75,6 +75,26 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsTrue(i.DodgePressed && i.JumpPressed && i.SprintHeld && i.PrimaryPressed && i.InteractPressed && i.InteractHeld && i.PausePressed);
         }
 
+        // Catches: a Placement row that lets the hero walk or the camera turn while a building is being placed (Move/Look/Sprint/Dodge/Lock leaking), or one that drops a placement
+        // button (switch input, place, pick up, next lot, turn, leave).
+        [Test]
+        public void InputContextRouter_Placement_ZeroesMoveLookAndCombat_PassesThePlacementButtons()
+        {
+            PlayerIntent i = InputContextRouter.Route(InputContext.Placement, AllActive());
+            Assert.AreEqual(0f, i.MoveX); Assert.AreEqual(0f, i.MoveY);
+            Assert.AreEqual(0f, i.LookYawDeg); Assert.AreEqual(0f, i.LookPitchDeg);
+            Assert.IsFalse(i.SprintHeld || i.DodgePressed || i.LockPressed || i.InteractHeld);
+            Assert.IsFalse(i.PrimaryHeld || i.PrimaryReleased || i.SecondaryHeld || i.SecondaryReleased);
+            Assert.AreEqual(1f, i.SwitchX, 1e-6f); Assert.AreEqual(-0.5f, i.SwitchY, 1e-6f);
+            Assert.IsTrue(i.PrimaryPressed, "place");
+            Assert.IsTrue(i.SecondaryPressed, "pick up");
+            Assert.IsTrue(i.InteractPressed, "next lot");
+            Assert.IsTrue(i.JumpPressed, "turn");
+            Assert.IsTrue(i.PausePressed, "leave");
+            Assert.AreEqual(InputMaps.Player, InputContextRouter.EnabledMaps(InputContext.Placement));
+            Assert.IsFalse(InputContextRouter.InteractLive(InputContext.Placement), "world interactables are off while placing");
+        }
+
         // Catches: a Menu row that lets look or move through (the camera would turn behind a menu); Pause zeroed (the menu could not close).
         [Test]
         public void InputContextRouter_Menu_PassesPauseOnly()

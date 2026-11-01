@@ -6,6 +6,7 @@ namespace SleepingCalamity.Core
     {
         Free = 0,
         Menu = 1,
-        LockOn = 2   // M2: hard lock active. Look is zeroed (the camera follows the target) and the right stick / switch keys feed SwitchX/Y instead.
+        LockOn = 2,  // M2: hard lock active. Look is zeroed (the camera follows the target) and the right stick / switch keys feed SwitchX/Y instead.
+    Placement = 3 // M6 S4: town placement mode. Move/look/jump/dodge/lock are zeroed (the hero stands still, the placement camera is fixed); the switch input, primary (place), secondary (pick up), interact (next lot), jump (turn) and pause (leave) pass.
     }
 }

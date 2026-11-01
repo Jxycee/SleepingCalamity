@@ -42,6 +42,11 @@ namespace SleepingCalamity.EditorTools
                 BuilderUtil.GetOrAdd<NetworkObject>(root);
                 BuilderUtil.GetOrAdd<DiveDirector>(root);   // host owns the dive flow; peers read its variables and ask by RPC
             });
+            BuilderUtil.WritePrefab(AssetPaths.TownSyncPrefab, root =>
+            {
+                BuilderUtil.GetOrAdd<NetworkObject>(root);
+                BuilderUtil.GetOrAdd<TownSync>(root);   // host publishes the town + builder lock; peers read it and ask by RPC
+            });
             BuilderUtil.WritePrefab(AssetPaths.CellarContentsSyncPrefab, root =>
             {
                 BuilderUtil.GetOrAdd<NetworkObject>(root);

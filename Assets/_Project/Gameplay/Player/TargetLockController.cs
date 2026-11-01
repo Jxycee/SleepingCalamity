@@ -133,6 +133,7 @@ namespace SleepingCalamity.Gameplay
 
         private void WriteContext(IInputService input, InputContext context)
         {
+            if (input.GameplayContext == InputContext.Placement) return;   // M6 S4: placement mode owns the context until it hands it back to Free (the lock must not overwrite it)
             if (input.GameplayContext != context) input.GameplayContext = context;
             _wroteContext = true;
         }

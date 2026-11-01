@@ -85,6 +85,7 @@ namespace SleepingCalamity.Presentation
 
         public CellarFloorSync FloorSync { get; private set; }      // host: the spawned syncs; clients resolve their own through ResolveSyncs
         public DiveHaulSync HaulSync { get; private set; }
+        public TownSync TownSync { get; private set; }   // M6 S4: host-spawned with the director; replicates the town and holds the builder lock
         public CellarContentsSync ContentsSync { get; private set; }   // contents hook: host-spawned with the other two; the host arms it per built floor (ContentsTick)
         public uint Seed => _seed;
 
@@ -508,6 +509,8 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             if (_world != null) { _world.UnregisterTownSource(this); _world = null; }
+            if (TownSync != null && IsServer && TownSync.IsSpawned) TownSync.NetworkObject.Despawn(true);
+            TownSync = null;
             if (HaulSync != null) { HaulSync.Banked -= OnBanked; HaulSync.DiveFailed -= OnDiveFailed; }
             if (ContentsSync != null) ContentsSync.ExitUnlocked -= ServerOpenStair;
             FloorSync = null; HaulSync = null; ContentsSync = null; _haulBegun = false; _armedBuild = -1;   // a re-spawn re-creates and re-wires the syncs (EnsureSyncs)
@@ -519,6 +522,18 @@ namespace SleepingCalamity.Presentation
         {
             if (Instance == null || IsServer) Instance = this;   // one process can hold several peers' directors (tests): the host's wins
             if (IsServer && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostWorld w)) { _world = w; w.RegisterTownSource(this); }
+            if (IsServer) SpawnTownSync();
+        }
+
+        // Host (M6 S4): the town's replication object, a dynamic network prefab spawned beside the director so a late joiner gets it with the spawn. The town it publishes is Town.State.
+        private void SpawnTownSync()
+        {
+            if (TownSync != null) return;
+            NetworkObject prefab = FindPrefab<TownSync>();
+            if (prefab == null) { Debug.LogError("DiveDirector: TownSync is not in the network prefab list (run the project builder)."); return; }
+            TownSync = NetworkManager.SpawnManager.InstantiateAndSpawn(prefab, NetworkManager.LocalClientId, true, false, false, Vector3.zero, Quaternion.identity).GetComponent<TownSync>();
+            TownSync.Director = this;
+            TownSync.ServerRefresh();
         }
 
         private void Update()
