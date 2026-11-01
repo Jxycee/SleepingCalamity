@@ -412,6 +412,7 @@ namespace SleepingCalamity.Presentation
                 _ownsCombat = true;
             }
             c.ServerBegin(NetworkManager);
+            c.RoomOf = RoomOfWorld;   // room-scoped aggro: an enemy notices any hero inside its own room (the same lookup EnterRooms uses)
             _combat = c; return c;
         }
 
@@ -421,6 +422,14 @@ namespace SleepingCalamity.Presentation
             if (p != null && p.Floor == _layout.Floor && p.Seed == _layout.Seed) return p;
             DiveHaulSync.Summary s = HaulSync != null ? HaulSync.Current : default;
             return CellarEncounterPlan.BuildForDive(_layout, _dressing, s.ExtraEnemiesPerRoom, s.HunterLatched);
+        }
+
+        // Room index of a world position, -1 outside every room (or with no layout armed).
+        private int RoomOfWorld(Vector3 world)
+        {
+            if (_layout == null || _root == null) return -1;
+            Vector3 local = _root.InverseTransformPoint(world);
+            return _layout.RoomAt(Mathf.FloorToInt(local.x / CellarFloorBuilder.CellSize), Mathf.FloorToInt(-local.z / CellarFloorBuilder.CellSize));
         }
 
         private void EnterRooms(CellarFloorSync fs)

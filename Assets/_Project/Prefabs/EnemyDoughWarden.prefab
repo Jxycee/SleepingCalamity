@@ -354,6 +354,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: SleepingCalamity.Gameplay::SleepingCalamity.Gameplay.Enemy
   ShowTopMostFoldoutHeaderGroup: 1
   AiEnabled: 1
+  Hunts: 0
 --- !u!136 &2332307657706177714
 CapsuleCollider:
   m_ObjectHideFlags: 0
