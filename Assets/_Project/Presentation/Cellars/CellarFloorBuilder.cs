@@ -16,7 +16,8 @@ using UnityEngine;
 namespace SleepingCalamity.Presentation
 {
     // What the builder dresses with. Every field may be null; a null material falls back to a flat URP Lit colour.
-    public sealed class CellarFloorKit
+    [System.Serializable]
+    public sealed class CellarFloorKit : ISerializationCallbackReceiver
     {
         public Material Floor, Wall, Pillar, Trim, Flame;
         public Material LockedGate, Chest, KeyChest, Carrier, EntryStart, StairExit, SpawnT1, SpawnT2;
@@ -29,7 +30,21 @@ namespace SleepingCalamity.Presentation
         public Material Ceiling, Limewash, Iron, Wax, Mote, Crate;   // vault stone, end-wall limewash, chains and hooks, candles, dust motes, crates
         // B5 CellarVault pieces by name (VaultSegment, ArchRib, Pillar, EndWall, NicheWall, LarderShelf, CoalChute, Barrels, Roots, BreathGrate): each a holder
         // whose child is the piece at its authored pivot, so the builder only moves, turns and scales the holder. Missing pieces fall back to boxes or nothing.
-        public Dictionary<string, GameObject> Pieces;
+        // Serialized as two parallel lists (a Dictionary does not serialize), so a prefab such as CellarFloorSync can carry the kit; the dictionary is rebuilt on load.
+        [System.NonSerialized] public Dictionary<string, GameObject> Pieces;
+        [SerializeField, HideInInspector] List<string> pieceNames = new List<string>();
+        [SerializeField, HideInInspector] List<GameObject> pieceObjects = new List<GameObject>();
+        public void OnBeforeSerialize()
+        {
+            pieceNames.Clear(); pieceObjects.Clear();
+            if (Pieces == null) return;
+            foreach (var kv in Pieces) { pieceNames.Add(kv.Key); pieceObjects.Add(kv.Value); }
+        }
+        public void OnAfterDeserialize()
+        {
+            Pieces = new Dictionary<string, GameObject>();
+            for (int i = 0; i < pieceNames.Count && i < pieceObjects.Count; i++) if (!string.IsNullOrEmpty(pieceNames[i])) Pieces[pieceNames[i]] = pieceObjects[i];
+        }
     }
 
     public sealed class CellarFloorBuild

@@ -34,13 +34,51 @@ namespace SleepingCalamity.EditorTools
             CellarFloorLayout layout = CellarFloorGenerator.Generate(Seed, FloorNumber);
             Scene scene = DungeonCornerBuilder.NewRoomScene();
             DungeonCornerBuilder.BuildProfile();
+
+            var root = new GameObject("CellarFloorTest").transform;
+            var templates = new GameObject("KitTemplates").transform; templates.SetParent(root, false); templates.gameObject.SetActive(false);
+            CellarFloorKit kit = BuildKit(templates);
+            CellarFloorBuild built = CellarFloorBuilder.Build(layout, root, kit);
+            Object.DestroyImmediate(templates.gameObject);
+
+            var lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
+            Vector3 c = built.Bounds.center;
+            LookTestBuilder.AddProbe(lighting, new Vector3(c.x, 2.0f, c.z), new Vector3(built.Bounds.size.x + 8f, 4.6f, built.Bounds.size.z + 8f));
+            lighting.Find("ReflectionProbe").GetComponent<ReflectionProbe>().intensity = 0.35f;
+            LookTestBuilder.AddVolume(lighting, DungeonCornerBuilder.ProfileName);
+            RenderSettings.skybox = null;
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);
+            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = Ambient;   // vaulted rooms: nearer the corner's 0.23 than the roofless greybox's 1.6
+            RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+            RenderSettings.sun = null;
+
+            var spawn = new GameObject("SpawnPoint"); spawn.transform.SetParent(root, false);
+            spawn.transform.position = built.EntryCenter + new Vector3(0, 0.1f, 0); spawn.transform.rotation = Quaternion.identity;
+            spawn.AddComponent<SpawnPoint>();
+
+            Transform cams = new GameObject("CaptureCameras").transform; cams.SetParent(root, false);
+            Vector3 ext = built.Bounds.size; float span = Mathf.Max(ext.x, ext.z);
+            LookTestBuilder.AddCapture(cams, "Floor_Overview", c + new Vector3(0, span * 0.66f, -span * 0.40f), c, 50f);
+            var (camPos, camTarget) = RoomView(layout);
+            LookTestBuilder.AddCapture(cams, "Floor_Room", camPos, camTarget, 78f);
+            var (corPos, corTarget) = CorridorView(layout);
+            LookTestBuilder.AddCapture(cams, "Floor_Corridor", corPos, corTarget, 70f);
+            DungeonCornerBuilder.DarkBackground(cams);
+            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // the roofless cutaway: warm umber backdrop; the vaulted views keep the corner's near-black
+
+            BuilderUtil.SaveScene(scene, ScenePath);
+            Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
+        }
+
+        // The art-layer kit of the real Cellars floor: floor tile, B5 vault pieces, the floor-art-2 clutter (Crate, CrateStack, JarCluster, Rubble, SackPile), lantern, materials
+        // and fog. `templates` (an inactive child of whatever carries the kit) holds the piece holders. Shared by this scene and the CellarFloorSync prefab (CellarFloorKitBuilder).
+        internal static CellarFloorKit BuildKit(Transform templates)
+        {
             BeautyCornerArt.EnsureCellarLantern();
             Dictionary<string, Material> own = DungeonCornerBuilder.BuildOwnMaterials();
             Dictionary<string, Material> slots = DungeonCornerBuilder.SlotMaterials(own);
             BuilderUtil.EnsureFolder(MaterialsFolder);
-
-            var root = new GameObject("CellarFloorTest").transform;
-            var templates = new GameObject("KitTemplates").transform; templates.SetParent(root, false); templates.gameObject.SetActive(false);
             var kit = new CellarFloorKit
             {
                 Floor = slots["CV_Flagstone"], Wall = slots["CV_Brick"], Pillar = slots["CV_VaultStone"], Trim = slots["CV_Oak"], Flame = own["flame"],
@@ -86,38 +124,7 @@ namespace SleepingCalamity.EditorTools
             Material lanternMat = guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
             if (lantern != null && lanternMat != null) { kit.Lantern = lantern; kit.LanternMaterial = lanternMat; }
             Debug.Log("SC CELLARFLOOR kit floorTile=" + (kit.FloorTile != null ? "B5 art" : "greybox slab") + " lantern=" + (kit.Lantern != null ? "B11 art" : "flame sphere"));
-
-            CellarFloorBuild built = CellarFloorBuilder.Build(layout, root, kit);
-            Object.DestroyImmediate(templates.gameObject);
-
-            var lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
-            Vector3 c = built.Bounds.center;
-            LookTestBuilder.AddProbe(lighting, new Vector3(c.x, 2.0f, c.z), new Vector3(built.Bounds.size.x + 8f, 4.6f, built.Bounds.size.z + 8f));
-            lighting.Find("ReflectionProbe").GetComponent<ReflectionProbe>().intensity = 0.35f;
-            LookTestBuilder.AddVolume(lighting, DungeonCornerBuilder.ProfileName);
-            RenderSettings.skybox = null;
-            RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = Ambient;   // vaulted rooms: nearer the corner's 0.23 than the roofless greybox's 1.6
-            RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
-            RenderSettings.sun = null;
-
-            var spawn = new GameObject("SpawnPoint"); spawn.transform.SetParent(root, false);
-            spawn.transform.position = built.EntryCenter + new Vector3(0, 0.1f, 0); spawn.transform.rotation = Quaternion.identity;
-            spawn.AddComponent<SpawnPoint>();
-
-            Transform cams = new GameObject("CaptureCameras").transform; cams.SetParent(root, false);
-            Vector3 ext = built.Bounds.size; float span = Mathf.Max(ext.x, ext.z);
-            LookTestBuilder.AddCapture(cams, "Floor_Overview", c + new Vector3(0, span * 0.66f, -span * 0.40f), c, 50f);
-            var (camPos, camTarget) = RoomView(layout);
-            LookTestBuilder.AddCapture(cams, "Floor_Room", camPos, camTarget, 78f);
-            var (corPos, corTarget) = CorridorView(layout);
-            LookTestBuilder.AddCapture(cams, "Floor_Corridor", corPos, corTarget, 70f);
-            DungeonCornerBuilder.DarkBackground(cams);
-            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // the roofless cutaway: warm umber backdrop; the vaulted views keep the corner's near-black
-
-            BuilderUtil.SaveScene(scene, ScenePath);
-            Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
+            return kit;
         }
 
         // The largest combat room (first on a tie): the camera stands at play height in its south-west corner cell and looks at its far north-east cell.
