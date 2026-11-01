@@ -139,7 +139,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Goldens_AreUnchanged()
+        public void Goldens_Seed12345_AfterItem2()
         {
             Assert.AreEqual(2055763217958189686UL, CellarFloorGenerator.Generate(12345, 1).LayoutHash());
             Assert.AreEqual(1402270470201830695UL, CellarFloorGenerator.Generate(12345, 2).LayoutHash());

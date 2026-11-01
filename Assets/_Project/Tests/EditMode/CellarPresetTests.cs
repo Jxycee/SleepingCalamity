@@ -127,6 +127,48 @@ namespace SleepingCalamity.Tests.EditMode
             Stat("loops per preset: " + string.Join(" ", hist.OrderBy(kv => kv.Key, System.StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)));
         }
 
+        // Wing: the one loop stays inside branch Y (rooms 1..m/2, m = the middle rooms, which are placed in index order) or the entry. With no Y (m == 1) the generator uses room 1 (branch X's
+        // single room, the exit's parent) as the branch, so the allowed set is the entry plus room 1 and the loop still cannot join the two halves of the path.
+        [Test]
+        public void Wing_LoopEndpoints_StayInsideBranchY_OrTheEntry()
+        {
+            int wings = 0;
+            foreach (Sample s in All())
+            {
+                CellarFloorLayout l = s.Layout;
+                if (l.Preset != LayoutPreset.Wing || s.Fallback != 0) continue;
+                wings++;
+                int m = l.Rooms.Count - 2 - (l.HasLockedRoom ? 1 : 0), ny = m / 2, last = System.Math.Max(ny, 1);
+                bool Inside(int r) => r >= 0 && r <= last;   // 0 is the entry
+                var loops = l.Links.Where(k => k.RoomB < 0).ToList();
+                string who = "seed " + s.Seed + " floor " + s.Floor + " m=" + m + "\n" + l.ToAscii();
+                Assert.AreEqual(1, loops.Count, who);
+                FloorLink loop = loops[0];
+                Assert.IsTrue(Inside(loop.RoomA), "loop starts outside branch Y: room " + loop.RoomA + " " + who);
+                CellPos end = loop.Path[loop.Path.Count - 1];
+                // the cell it lands on belongs to a link between the allowed rooms only (a branch link, never the spine link of branch X)
+                bool onBranchLink = l.Links.Any(k => !ReferenceEquals(k, loop) && Inside(k.RoomA) && Inside(k.RoomB) && k.Path.Any(c => c.X == end.X && c.Y == end.Y));
+                Assert.IsTrue(onBranchLink, "loop lands outside branch Y: " + who);
+            }
+            Assert.Greater(wings, 50, "too few Wing floors to prove anything");
+        }
+
+        [Test]
+        public void ExitAdjacentToEntry_FloodMatchesTheRoomGraph()
+        {
+            int adjacent = 0;
+            foreach (Sample s in All())
+            {
+                CellarFloorLayout l = s.Layout;
+                int e = l.ExitRoomIndex(), en = l.Rooms.ToList().FindIndex(r => r.Room.Kind == RoomKind.Entry);
+                CellarRoomGraph g = CellarRoomGraph.Build(l); bool viaGraph = false;
+                for (int d = 0; d < l.Rooms[e].Room.Doors.Count; d++) if (l.DoorIsOpen(e, d) && g.DoorNeighbours(e, d).Contains(en)) viaGraph = true;
+                Assert.AreEqual(viaGraph, l.ExitAdjacentToEntry(), "seed " + s.Seed + " floor " + s.Floor);
+                if (viaGraph) adjacent++;
+            }
+            Stat("generated floors with the exit next to the entry (must be 0): " + adjacent);
+        }
+
         [Test]
         public void Ring_Floors_HaveAnArc_AtLeast95Percent()
         {

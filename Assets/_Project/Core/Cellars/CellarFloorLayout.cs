@@ -164,13 +164,47 @@ namespace SleepingCalamity.Core
         }
 
         // True when the exit's door opens onto the same corridor network as a door of the entry room (so the two are next to each other).
+        // Same answer as CellarRoomGraph.DoorNeighbours(...).Contains(entry) (a test pins that), but one flood over the corridor cells from the exit's doors instead of a whole
+        // graph, because the generator asks it once per attempt. The locked room joins no network; only its gate pair counts, as the graph reports it.
         public bool ExitAdjacentToEntry()
         {
             int e = ExitRoomIndex(), en = -1;
             for (int i = 0; i < Rooms.Count; i++) if (Rooms[i].Room.Kind == RoomKind.Entry) en = i;
             if (e < 0 || en < 0) return false;
-            CellarRoomGraph g = CellarRoomGraph.Build(this);
-            for (int d = 0; d < Rooms[e].Room.Doors.Count; d++) if (DoorIsOpen(e, d) && g.DoorNeighbours(e, d).Contains(en)) return true;
+            const int G = GridSize;
+            if (LockedLinkIndex >= 0)
+            {
+                FloorLink l = Links[LockedLinkIndex];
+                if ((l.RoomA == e && l.RoomB == en && DoorIsOpen(e, l.DoorA)) || (l.RoomB == e && l.RoomA == en && DoorIsOpen(e, l.DoorB))) return true;
+            }
+            if (e == LockedRoomIndex || en == LockedRoomIndex) return false;
+            var corr = new PlacedCorridor[G, G]; foreach (PlacedCorridor c in Corridors) corr[c.X, c.Y] = c;
+            bool InGrid(CellPos c) => c.X >= 0 && c.Y >= 0 && c.X < G && c.Y < G;
+            var seen = new bool[G, G]; var queue = new Queue<CellPos>();
+            var sides = new[] { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
+            for (int d = 0; d < Rooms[e].Room.Doors.Count; d++)
+            {
+                if (!DoorIsOpen(e, d)) continue;
+                CellPos o = Rooms[e].DoorOutside(d);
+                if (InGrid(o) && corr[o.X, o.Y] != null && !seen[o.X, o.Y]) { seen[o.X, o.Y] = true; queue.Enqueue(o); }
+            }
+            while (queue.Count > 0)
+            {
+                CellPos c = queue.Dequeue();
+                foreach (CellSide s in sides)
+                {
+                    if ((corr[c.X, c.Y].Mask & CellarRoom.MaskBit(s)) == 0) continue;
+                    CellPos m = c.Step(s);
+                    if (!InGrid(m) || corr[m.X, m.Y] == null || seen[m.X, m.Y]) continue;
+                    seen[m.X, m.Y] = true; queue.Enqueue(m);
+                }
+            }
+            for (int d = 0; d < Rooms[en].Room.Doors.Count; d++)
+            {
+                if (!DoorIsOpen(en, d)) continue;
+                CellPos o = Rooms[en].DoorOutside(d);
+                if (InGrid(o) && seen[o.X, o.Y]) return true;
+            }
             return false;
         }
 

@@ -664,8 +664,9 @@ namespace SleepingCalamity.Core
                 if (carriers.Count == 0) { Fails[3]++; return null; }
                 GateKeyCarrier carrier = carriers[rng.Range(0, carriers.Count)];
                 CellarFloorLayout built = Assemble(seed, plan.Floor, false, plan.Theme, carrier, keyRoom, need, Preset);
-                if (!built.ExitIsLeaf() || built.ExitAdjacentToEntry()) { Fails[5]++; return null; }
+                if (!built.ExitIsLeaf()) { Fails[5]++; return null; }
                 if (MinExit > 0 && built.EntryToExitDistance() < MinExit) { Fails[4]++; return null; }
+                if (built.ExitAdjacentToEntry()) { Fails[5]++; return null; }   // dearest check last; the same attempts fail, only the cheap ones first
                 return built;
             }
 
