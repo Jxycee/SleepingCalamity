@@ -91,6 +91,7 @@ namespace SleepingCalamity.Presentation
         private sealed class Tracked { public int Room; public bool Carrier; }
         private readonly Dictionary<Enemy, Tracked> _tracked = new Dictionary<Enemy, Tracked>();
         private Enemy _carrierEnemy, _hunter; private bool _hunterSpawned;
+        private int _carrierLostRoom = -1;   // the carrier despawned without dying while room-mates lived: its room resets once no tracked enemy is left, so the key stays obtainable
         private CombatHost _combat; private bool _ownsCombat;
         private int _hostBuild = -1; private bool _resetRequested;
         private DiveHaulSync _subscribedHaul;
@@ -234,7 +235,7 @@ namespace SleepingCalamity.Presentation
         }
 
         /// <summary>Owner side: true when an Interact press at `p` would open a chest or the gate. The dive director then leaves that press to the contents (one press, one action).</summary>
-        public bool WouldUseInteract(Vector3 p) { int c = FindLocalTarget(FloorSync, p, out bool gate); return c >= 0 || gate; }
+        public bool WouldUseInteract(Vector3 p) { int c = FindLocalTarget(FloorSync, p, out bool gate); return c >= 0 || (gate && Net.Value.RoomKeyHeld); }   // the locked gate takes no press without the key
 
         public void RequestOpenChest(int chestIndex) { RequestOpenChestRpc(chestIndex); }
         public void RequestOpenDoor() { RequestOpenDoorRpc(); }
@@ -348,7 +349,7 @@ namespace SleepingCalamity.Presentation
             if (!IsServer) return;
             UntrackAll();
             if (_combat != null) _combat.ServerClearEnemies();
-            _clear.Reset(); _entered.Clear(); _carrierEnemy = null; _hunter = null; _hunterSpawned = false;
+            _clear.Reset(); _entered.Clear(); _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
             _layout = null; _root = null; _dressing = null; _armPos.Clear(); _live.Clear(); _hasBounds = false;
             _st = new ContentsState();
             if (IsSpawned) Publish();
@@ -488,17 +489,20 @@ namespace SleepingCalamity.Presentation
             if (!died)
             {
                 if (e == _carrierEnemy) _carrierEnemy = null;
-                bool roomLeft = false;
-                foreach (Tracked o in _tracked.Values) if (o.Room == t.Room) { roomLeft = true; break; }
-                if (roomLeft) _clear.Despawned(t.Room);
-                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); }
+                bool roomLeft = RoomHasTracked(t.Room);
+                if (roomLeft) { _clear.Despawned(t.Room); if (t.Carrier && _st.GateKey == 0) _carrierLostRoom = t.Room; }
+                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); if (_carrierLostRoom == t.Room) _carrierLostRoom = -1; }
                 _st.Cleared = _clear.ClearedMask; Publish();
                 return;
             }
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = e.transform.position; }
             if (_clear.Died(t.Room)) { _st.Cleared = _clear.ClearedMask; RoomCleared?.Invoke(t.Room); }
+            if (_carrierLostRoom == t.Room && _st.GateKey == 0 && !RoomHasTracked(t.Room))   // its carrier was lost without a drop: reset the room so the carrier comes back on entry
+            { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _carrierLostRoom = -1; _st.Cleared = _clear.ClearedMask; }
             Publish();
         }
+
+        private bool RoomHasTracked(int room) { foreach (Tracked o in _tracked.Values) if (o.Room == room) return true; return false; }
 
         private void TickGateKey()
         {

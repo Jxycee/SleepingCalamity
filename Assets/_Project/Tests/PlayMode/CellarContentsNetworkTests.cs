@@ -238,6 +238,29 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(0));
         }
 
+        // The carrier leaves without dying (despawned) while room-mates live: no key, but once the room-mates are dead the room resets and the carrier is back on the next entry.
+        [UnityTest]
+        public IEnumerator CarrierDespawnedAlive_RoomMatesLive_NoKey_ThenTheRoomResetsAndTheCarrierComesBack()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            GateKeyCarrier car = c.Layout.Carrier; int room = car.RoomIndex;
+            int expected = CellarEncounterPlan.Build(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
+            Assume.That(expected, Is.GreaterThan(1), "premise: the carrier has room-mates");
+            c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected && c.Contents.GateKeyCarrierEnemy != null, Timeout, "the room's enemies were not spawned");
+
+            Enemy carrier = c.Contents.GateKeyCarrierEnemy;
+            carrier.NetworkObject.Despawn(true);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.GateKeyCarrierEnemy == null, Timeout, "the carrier was not forgotten");
+            Assert.That(c.Contents.State.GateKey, Is.EqualTo((byte)0), "a despawn is not a kill: no key");
+            foreach (Enemy e in EnemiesOn(c.HostNm)) Kill(e);
+            c.Players[c.HostId] = Cell(c, 0, 0) + new Vector3(60f, 0f, 0f);
+            yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.HostNm).Count == 0, Timeout, "the room-mates did not die");
+            Assert.That(c.Contents.State.GateKey, Is.EqualTo((byte)0), "the carrier never died: still no key");
+            c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.GateKeyCarrierEnemy != null, Timeout, "the carrier never came back, so the key is lost");
+        }
+
         [UnityTest]
         public IEnumerator FloorUnderARootAt200_ChestsPiecesAndRoomSpawnsAreWhereTheHostChecks()
         {

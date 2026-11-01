@@ -249,6 +249,41 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return AllBuilt(rig, 1);
         }
 
+        // Wipe: every hero is really downed through HeroVitals (the damage path), mid-dive. The dive must fail, the party must be home, and every hero must be up again.
+        [UnityTest]
+        public IEnumerator PartyWipe_AllHeroesDowned_FailsTheDive_SendsEveryoneHome_AndResetsTheHeroes()
+        {
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = 4242u;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, 1);
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
+            var hostVitals = rig.HostHero.GetComponent<HeroVitals>(); var clientVitals = rig.HeroesOnHost[0].GetComponent<HeroVitals>();
+            Assert.That(hostVitals.IsUp && clientVitals.IsUp, Is.True, "test premise: both heroes start up");
+
+            // One hero down is not a wipe.
+            hostVitals.ServerDamage(100000);
+            Assert.That(hostVitals.IsUp, Is.False);
+            yield return Seconds(1f);
+            Assert.That(rig.Host.NetActive.Value, Is.True, "one hero still stands: the dive goes on");
+
+            clientVitals.ServerDamage(100000);
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value, Timeout, "every hero down never failed the dive");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Peers[0].NetActive.Value, Timeout, "the client never saw the dive end");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(0), "the wiped dive failed the haul");
+            yield return NearOnHost(rig, Home, "home after the wipe");
+            yield return PlayModeHarness.WaitUntil(() => hostVitals.IsUp && clientVitals.IsUp, Timeout, "the heroes stayed down after the dive ended");
+            Assert.That(hostVitals.Hp, Is.EqualTo(hostVitals.MaxHp), "a wiped hero arrives home at full health");
+
+            // A new dive after the wipe starts with a standing party and is not failed at once.
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return AllBuilt(rig, 1);
+            yield return Seconds(1f);
+            Assert.That(rig.Host.NetActive.Value, Is.True, "the next dive survives its first second");
+        }
+
         [UnityTest]
         public IEnumerator Floor4_BankThenGoHome_EndsTheDive_BankedPiecesKept_NoGoHomeBeforeTheBank()
         {
