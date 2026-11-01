@@ -42,6 +42,8 @@ namespace SleepingCalamity.Presentation
         public bool DustMotes;                  // the floor's dust is thick enough to show (a marker object stands in until the particle prefab exists)
         public float FogDensity;                // the density applied when the kit asked for fog, else 0
         public int Vaults, Faces, Props, Candles;   // art layer: ceiling bays (kit or procedural), wall faces, dressing pieces, candle clusters
+        public CellPos? HealingCell;            // P47: the floor's healing point cell (null when it has none)
+        public GameObject HealingOrb;           // the glowing orb above the point: shown while the point is ready, hidden while it recharges (DiveHaulSync drives it on every peer)
         public Vector3 EntryCenter;             // the first entry start cell
     }
 
@@ -254,6 +256,13 @@ namespace SleepingCalamity.Presentation
             {
                 CellPos s = layout.BankCell.Value;
                 Prim(group, "Bank", PrimitiveType.Cylinder, CellCenter(s.X, s.Y) + new Vector3(0, 0.25f, 0), new Vector3(1.2f, 0.25f, 1.2f), mats.Marker(kit.Bank, new Color(0.95f, 0.80f, 0.35f)));
+            }
+            CellPos? heal = CellarHealing.PointFor(layout, result.Dressing);   // P47: its own Rng stream, so no hash moves
+            if (heal.HasValue)
+            {
+                CellPos h = heal.Value; result.HealingCell = h;
+                Prim(group, "HealingPoint", PrimitiveType.Cylinder, CellCenter(h.X, h.Y) + new Vector3(0, 0.04f, 0), new Vector3(1.3f, 0.04f, 1.3f), mats.Marker(null, new Color(0.30f, 0.78f, 0.45f)));
+                result.HealingOrb = Prim(group, "HealingOrb", PrimitiveType.Sphere, CellCenter(h.X, h.Y) + new Vector3(0, 0.8f, 0), new Vector3(0.5f, 0.5f, 0.5f), mats.Marker(null, new Color(0.55f, 1.0f, 0.65f)));
             }
             if (layout.BakerCell.HasValue)
             {

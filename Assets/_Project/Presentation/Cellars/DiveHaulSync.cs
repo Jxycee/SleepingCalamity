@@ -8,11 +8,18 @@
 //      position check is skipped (floor-has-bank only); no anti-cheat by design, so a modded client standing elsewhere is not a concern.
 // Stir meter (Core/Cellars/StirMeter, owned by the DiveState): host-only. The host's Update feeds it the connected player count, ticks the deep-closes countdown with
 // Time.deltaTime and fails the dive at 0; value, extra-enemy count, hunter/deep-closes latches and whole seconds left ride in the same Summary. Clients never write.
-// No auto-bank on walk-in. Healing at bank points (P47) is not here: no host HP API is wired to it yet.
+// No auto-bank on walk-in.
+// Healing (P47, host-authoritative): a successful bank (ServerBank, so the client RPC path and scripted banks alike) fully heals every living connected hero
+// (HeroVitals.ServerHeal + HeroCombat.ServerBroadcastHeal, like HealingDrop) and raises Banked. The floor's healing point (Core/Cellars/CellarHealing, cell from the
+// built floor's CellarFloorBuild.HealingCell) is walked onto: the host's Update heals every hurt living hero within HealTuning.RadiusMeters of its cell centre in
+// one tick, then the point recharges HealTuning.RechargeSeconds on the host clock. Peers see only NetHealSecondsLeft (0 = ready, else whole seconds left, one
+// host-written NetworkVariable so late joiners get it with the spawn) and show/hide the orb on their own built floor. Downed or out heroes are not healed
+// (PlayerVitals.Heal refuses them; the revive rule stands). A point recharges per floor visit: a new (seed, floor) starts ready.
 // Host disconnect: NGO shuts the session down and this object despawns (no host migration in Phase 1).
 using Unity.Netcode;
 using UnityEngine;
 using SleepingCalamity.Core;
+using SleepingCalamity.Gameplay;
 
 namespace SleepingCalamity.Presentation
 {
@@ -49,9 +56,23 @@ namespace SleepingCalamity.Presentation
 
         public readonly NetworkVariable<Summary> Net = new NetworkVariable<Summary>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-        private DiveState _state;   // host only
+        // Whole seconds until the floor's healing point can be used again: 0 = ready (or the floor has none). Host-written.
+        public readonly NetworkVariable<int> NetHealSecondsLeft = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-        public CellarFloorSync FloorSync;   // optional; found in the scene when null. Used only for the bank position check.
+        private DiveState _state;   // host only
+        private HealTuning _healTuning = HealTuning.Default;   // host only
+        private HealingPointState _heal;                        // host only; the current floor's point
+        private uint _healSeed; private int _healFloor;        // host only: which built floor _heal belongs to
+
+        public CellarFloorSync FloorSync;   // optional; found in the scene when null. Used for the bank position check, the healing point and its orb.
+        private float _nextFloorLookup;     // the scene search runs at most once a second while no floor sync exists (town, haul-only tests)
+
+        private void ResolveFloorSync()
+        {
+            if (FloorSync != null || Time.unscaledTime < _nextFloorLookup) return;
+            _nextFloorLookup = Time.unscaledTime + 1f;
+            FloorSync = FindFirstObjectByType<CellarFloorSync>();
+        }
 
         public Summary Current => Net.Value;
         // Host only; null on clients.
@@ -70,9 +91,14 @@ namespace SleepingCalamity.Presentation
         // Longest host frame the countdown counts; a hitch (a floor build) must not eat seconds of it.
         private const float MaxTickSeconds = 0.25f;
 
+        // Host only: raised after a successful bank, once every living hero has been healed.
+        public event System.Action Banked;
+
         // Host only: the stir countdown runs on the host clock, and the player factor follows who is connected right now.
         private void Update()
         {
+            if (Host) TickHealingPoint(Mathf.Min(Time.deltaTime, MaxTickSeconds));
+            if (IsSpawned) ShowHealingOrb();
             if (!Host) return;
             _state.Stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
             bool failed = _state.Tick(Mathf.Min(Time.deltaTime, MaxTickSeconds));
@@ -108,7 +134,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerBegin(int[] piecesPerFloor, StirTuning tuning)
         {
             if (!IsServer || !IsSpawned || piecesPerFloor == null) return false;
-            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); Publish(); return true;
+            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; Publish(); return true;
         }
         public bool ServerAddPiece(int pieceId) { if (!Host || !_state.Haul.AddPiece(pieceId)) return false; Publish(); return true; }
         public bool ServerAddLoot(int itemId, int count) { if (!Host || !_state.Haul.AddLoot(itemId, count)) return false; Publish(); return true; }
@@ -116,7 +142,87 @@ namespace SleepingCalamity.Presentation
         public bool ServerMarkCleared(int floor) { if (!Host || !_state.MarkCleared(floor)) return false; Publish(); return true; }
         public bool ServerFailDive() { if (!Host) return false; _state.FailDive(); Publish(); return true; }
         // Banks at the current floor's bank point with no position check (host logic, e.g. a scripted bank).
-        public bool ServerBank() { if (!Host || !_state.BankAtPoint()) return false; Publish(); return true; }
+        public bool ServerBank()
+        {
+            if (!Host || !_state.BankAtPoint()) return false;
+            Publish();
+            HealEveryone();
+            Banked?.Invoke();
+            return true;
+        }
+
+        // Host only: test hook, the healing tuning (short recharge). Restarts the current point ready.
+        public bool ServerSetHealTuning(HealTuning tuning)
+        {
+            if (!IsServer || !IsSpawned) return false;
+            _healTuning = tuning; _heal = null; return true;
+        }
+
+        // ---- healing (host) ----
+        private static void HealOne(HeroVitals v)
+        {
+            int healed = v.ServerHeal(v.MaxHp);
+            if (healed <= 0) return;
+            HeroCombat c = v.GetComponent<HeroCombat>();
+            if (c != null) c.ServerBroadcastHeal(healed);
+        }
+
+        private bool IsMine(HeroVitals v) => v != null && v.IsSpawned && v.NetworkManager == NetworkManager && v.IsUp;
+
+        private void HealEveryone()
+        {
+            var all = HeroVitals.All;
+            for (int i = 0; i < all.Count; i++) if (IsMine(all[i])) HealOne(all[i]);
+        }
+
+        private bool TryHealWorldPosition(out Vector3 pos)
+        {
+            pos = default;
+            ResolveFloorSync();
+            CellarFloorSync fs = FloorSync;
+            if (fs == null || fs.Built == null || fs.Built.Root == null || !fs.Built.HealingCell.HasValue || fs.BuiltFloor != _state.CurrentFloor) return false;
+            CellPos cell = fs.Built.HealingCell.Value;
+            pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(cell.X, cell.Y));
+            return true;
+        }
+
+        private void TickHealingPoint(float dt)
+        {
+            int left = 0;
+            if (TryHealWorldPosition(out Vector3 pos))
+            {
+                if (_heal == null || _healSeed != FloorSync.BuiltSeed || _healFloor != FloorSync.BuiltFloor)
+                { _heal = new HealingPointState(_healTuning.RechargeSeconds); _healSeed = FloorSync.BuiltSeed; _healFloor = FloorSync.BuiltFloor; }
+                _heal.Tick(dt);
+                if (_heal.Ready)
+                {
+                    bool any = false; float r2 = _healTuning.RadiusMeters * _healTuning.RadiusMeters;
+                    var all = HeroVitals.All;
+                    for (int i = 0; i < all.Count; i++)
+                    {
+                        HeroVitals v = all[i];
+                        if (!IsMine(v) || v.Hp >= v.MaxHp) continue;
+                        float dx = v.transform.position.x - pos.x, dz = v.transform.position.z - pos.z;
+                        if (dx * dx + dz * dz > r2) continue;
+                        HealOne(v); any = true;
+                    }
+                    if (any) _heal.TryUse();
+                }
+                left = Mathf.CeilToInt(_heal.SecondsLeft);
+            }
+            else _heal = null;
+            if (NetHealSecondsLeft.Value != left) NetHealSecondsLeft.Value = left;
+        }
+
+        // Every peer: the orb over the healing point is lit while the point is ready.
+        private void ShowHealingOrb()
+        {
+            ResolveFloorSync();
+            CellarFloorSync fs = FloorSync;
+            if (fs == null || fs.Built == null || fs.Built.HealingOrb == null) return;
+            bool ready = NetHealSecondsLeft.Value <= 0;
+            if (fs.Built.HealingOrb.activeSelf != ready) fs.Built.HealingOrb.SetActive(ready);
+        }
         // Town banking for the M6 flow and the stir reset.
         public bool ServerBankInTown() { if (!Host || !_state.BankInTown()) return false; Publish(); return true; }
 
@@ -148,7 +254,7 @@ namespace SleepingCalamity.Presentation
         private bool TryBankWorldPosition(out Vector3 pos)
         {
             pos = default;
-            if (FloorSync == null) FloorSync = FindFirstObjectByType<CellarFloorSync>();
+            ResolveFloorSync();
             CellarFloorSync fs = FloorSync;
             if (fs == null || fs.Layout == null || fs.Built == null || fs.Built.Root == null || !fs.Layout.BankCell.HasValue) return false;
             if (fs.BuiltFloor != _state.CurrentFloor) return false;   // the built floor lags or leads the dive floor: no cell to trust, skip the range check
