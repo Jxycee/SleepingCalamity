@@ -280,7 +280,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 2850147991725104214UL, GoldenClutter12345Floor2 = 4782008884309582705UL, GoldenClutter12345Floor3 = 79306669354946077UL;
+        const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 7084911976074808467UL, GoldenClutter12345Floor3 = 16045132977935244835UL;   // re-pinned 2026-11-01 (procgen item 2: presets moved the placement, deliberate)
 
         [Test]
         public void Golden_Seed12345_ClutterHash()
@@ -291,8 +291,8 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // The layout and dressing goldens belong to the room pool and Q12; the clutter pass must not move them (it only reads them).
-        const ulong GoldenLayout12345Floor1 = 7160980227004277501UL, GoldenLayout12345Floor2 = 18317817182715499079UL, GoldenLayout12345Floor3 = 10285151120262563894UL;
-        const ulong GoldenDressing12345Floor1 = 17686853826976377517UL;
+        const ulong GoldenLayout12345Floor1 = 2055763217958189686UL, GoldenLayout12345Floor2 = 1402270470201830695UL, GoldenLayout12345Floor3 = 11057337751887225001UL;   // re-pinned by procgen item 2 (layout presets, deliberate)
+        const ulong GoldenDressing12345Floor1 = 7289301962720901386UL;   // re-pinned by procgen item 2
 
         [Test]
         public void Resolving_DoesNotMoveLayoutOrDressingHashes()
