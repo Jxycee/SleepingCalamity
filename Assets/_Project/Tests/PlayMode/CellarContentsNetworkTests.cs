@@ -386,6 +386,16 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => c.Peer.PieceVisible(0), Timeout, "the piece did not reappear on the client");
         }
 
+        private static bool NearRing(Ctx c, CellPos[] ring, Enemy e)
+        {
+            foreach (CellPos cell in ring)
+            {
+                Vector3 w = Cell(c, cell.X, cell.Y);
+                if (Vector2.Distance(new Vector2(e.transform.position.x, e.transform.position.z), new Vector2(w.x, w.z)) < 2.5f) return true;
+            }
+            return false;
+        }
+
         // procgen 3b: on an Ambush floor the ambush room's enemies spring after FloorTwistTuning.AmbushDelaySeconds at CellarAmbush cells, and the client sees them.
         [UnityTest]
         public IEnumerator AmbushFloor_EnteringTheAmbushRoom_SpawnsAtRingCellsAfterTheDelay_ClientSeesThem()
@@ -406,16 +416,17 @@ namespace SleepingCalamity.Tests.PlayMode
             PlacedRoom pr = c.Layout.Rooms[room];
 
             c.Players[c.HostId] = Cell(c, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].X : pr.X, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].Y : pr.Y) + Vector3.forward * 0.1f;
+            float t0 = Time.time;
             for (int i = 0; i < 5; i++) yield return null;
+            Assert.That(Time.time - t0, Is.LessThan(FloorTwistTuning.AmbushDelaySeconds * 0.5f), "the frames before the delay check must stay well inside the delay");
             Assert.That(c.Contents.EnterEnemyCount(room), Is.EqualTo(0), "nothing springs before the delay");
             yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected, Timeout, "the ambush enemies did not spring");
+            float springAt = Time.time;   // the host spawned them this frame or the one before: positions are still the spawn cells
+            Assert.That(springAt - t0, Is.GreaterThanOrEqualTo(FloorTwistTuning.AmbushDelaySeconds - 0.1f), "the ambush sprang before the delay ran out");
+            Assert.That(EnemiesOn(c.HostNm).Count, Is.EqualTo(expected));
+            foreach (Enemy e in EnemiesOn(c.HostNm)) Assert.That(NearRing(c, ring, e), Is.True, "a host ambush enemy stands near one of the ring cells right after the spawn");
             yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.Client.NetworkManager).Count == expected, Timeout, "the client does not see the ambush enemies");
-            foreach (Enemy e in EnemiesOn(c.HostNm))
-            {
-                bool near = false;
-                foreach (CellPos cell in ring) if (Vector2.Distance(new Vector2(e.transform.position.x, e.transform.position.z), new Vector2(Cell(c, cell.X, cell.Y).x, Cell(c, cell.X, cell.Y).z)) < 2.5f) near = true;
-                Assert.That(near, Is.True, "an ambush enemy stands near one of the ring cells");
-            }
+            foreach (Enemy e in EnemiesOn(c.Client.NetworkManager)) Assert.That(NearRing(c, ring, e), Is.True, "a client ambush enemy stands near one of the ring cells");
         }
     }
 }

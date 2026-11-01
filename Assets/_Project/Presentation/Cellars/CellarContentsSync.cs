@@ -7,7 +7,7 @@
 // edge of the local hero's InteractPressed/Held) picks the nearest chest or the gate in range and sends the RPC.
 // Host logic (Update, host only): (1) floor change or DiveFailed resets per-floor state and despawns the floor's enemies; (2) a player stepping into a Combat room for the
 // first time spawns that room's CellarEncounterPlan spawns (DiveHaulSync.EncounterPlan, extras at that moment included) through CombatHost.SpawnEnemy: Tier1 = floor-banded
-// Slime/Broom/RatKing (CellarEnemyMix), Tier2 = RatKing tier 2, the bakery's WardenCell = DoughWarden; (3) when the plan's Hunter appears one tier-2 RatKing spawns at its cell;
+// Slime/Broom/RatKing (CellarEnemyMix), Tier2 = RatKing tier 2, the bakery's WardenCell = DoughWarden; (2b) the Ambush floor's ambush room (host-only twist) springs its enemies after FloorTwistTuning.AmbushDelaySeconds at CellarAmbush ring cells, cancelled (room re-armed) if no living player is left when the delay ends; (3) when the plan's Hunter appears one tier-2 RatKing spawns at its cell;
 // (4) the enemy spawned for layout.Carrier drops the GATE key where it falls (only on death: a wipe/clear despawn drops nothing, resets the room and it respawns on re-entry): a player within GateKeyRange picks it up and ExitUnlocked is raised; keys live only in this state (GateKey, RoomKeyHeld), never in the haul's loot;
 // (5) pieces: a player within PieceRange of an uncollected piece spot adds it to the haul (ServerAddPiece), the collected mask follows the haul every frame so a failed
 // dive shows the pieces again; (6) the room key (key chest) lets the host open the locked gate, by Interact or by walking up to it.
@@ -441,6 +441,7 @@ namespace SleepingCalamity.Presentation
         {
             if (_ambushRoom < 0 || Time.time < _ambushDue) return;
             int room = _ambushRoom; _ambushRoom = -1;
+            if (_players.Count == 0) { _entered.Remove(room); return; }   // party wipe during the delay: no spring now, re-entering the room triggers it again
             SpawnRoom(fs, room, true);
         }
 
