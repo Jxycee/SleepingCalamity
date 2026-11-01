@@ -107,6 +107,18 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Greater(rows, 1000, "the resolver produced clutter");
         }
 
+        // CellarEncounterPlan can put an extra enemy or the hunter on any free floor cell of a Combat room, at any stir level: clutter never stands on one.
+        [Test]
+        public void Rooms_NeverOnACellTheEncounterPlanCanUse()
+        {
+            foreach (var (l, d, c) in All())
+                for (int r = 0; r < l.Rooms.Count; r++)
+                {
+                    var free = new HashSet<(int, int)>(CellarEncounterPlan.FreeCellsOf(l, d, r).Select(q => (q.X, q.Y)));
+                    foreach (CellarClutterRow row in c.Rows.Where(q => q.RoomIndex == r)) Assert.IsFalse(free.Contains((row.CellX, row.CellY)), "seed " + l.Seed + " floor " + l.Floor + " " + row.Id + " on an encounter cell");
+                }
+        }
+
         [Test]
         public void Rooms_KeepEveryDoorAndCellReachable_AndTheCentreOpen()
         {
@@ -187,7 +199,7 @@ namespace SleepingCalamity.Tests.EditMode
                     if (l.LockedLinkIndex >= 0) Assert.IsFalse(l.Links[l.LockedLinkIndex].Path.Any(e => e.X == r.CellX && e.Y == r.CellY), who + ": on the locked link");
                     foreach (var m in markers) Assert.IsFalse(Near(r.CellX, r.CellY, m.x, m.y, m.beside), who + ": on or beside " + m.what);
                     foreach (CellSide s in Sides) { var (dx, dy) = CellarRoom.Step(s); Assert.IsFalse(used.Contains((r.CellX + dx, r.CellY + dy)), who + ": clutter in a neighbouring corridor cell"); }
-                    Assert.LessOrEqual(r.DepthCm, 100, who + ": too deep");
+                    Assert.LessOrEqual(r.DepthCm, 110, who + ": too deep");
                     var (hx, hz) = Extent(r);
                     int cxCm = r.CellX * 400 + 200, czCm = -(r.CellY * 400 + 200);
                     double offWall = r.Wall == CellSide.East || r.Wall == CellSide.West ? Math.Abs(r.XCm - cxCm) + hx : Math.Abs(r.ZCm - czCm) + hz;
@@ -226,7 +238,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 2519945404672838134UL, GoldenClutter12345Floor2 = 3131079044826686144UL, GoldenClutter12345Floor3 = 795856827869180477UL;
+        const ulong GoldenClutter12345Floor1 = 8877616815583968620UL, GoldenClutter12345Floor2 = 8515750821942516149UL, GoldenClutter12345Floor3 = 2142417129372944810UL;
 
         [Test]
         public void Golden_Seed12345_ClutterHash()
@@ -256,21 +268,48 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
-        [Test]
-        public void RoomsCarryEnoughClutter()
+        // NUnitLite hides test output: SC_CLUTTER_STATS=<file> appends the density lines there.
+        static void Report(string line)
         {
-            int rooms = 0, rows = 0, floors = 0, floorRows = 0; var perPiece = new Dictionary<string, int>();
+            TestContext.Progress.WriteLine(line);
+            string f = Environment.GetEnvironmentVariable("SC_CLUTTER_STATS");
+            if (!string.IsNullOrEmpty(f)) System.IO.File.AppendAllText(f, line + "\n");
+        }
+
+        [Test]
+        public void RoomsAndCorridorsCarryClutter_Stats()
+        {
+            int rooms = 0, rows = 0, combat = 0, combatRows = 0, corr = 0, corrRows = 0, floors = 0; var perPiece = new Dictionary<string, int>();
             foreach (var (l, d, c) in All())
             {
                 if (l.Seed >= 300) continue;
-                floors++; floorRows += c.Rows.Count;
-                for (int r = 0; r < l.Rooms.Count; r++) if (l.Rooms[r].Room.Kind == RoomKind.Combat) { rooms++; rows += c.CountInRoom(r); }
+                floors++; corr += l.Corridors.Count; corrRows += c.Rows.Count(q => q.InCorridor);
+                for (int r = 0; r < l.Rooms.Count; r++)
+                {
+                    rooms++; rows += c.CountInRoom(r);
+                    if (l.Rooms[r].Room.Kind == RoomKind.Combat) { combat++; combatRows += c.CountInRoom(r); }
+                }
                 foreach (CellarClutterRow row in c.Rows) { perPiece.TryGetValue(row.Piece, out int k); perPiece[row.Piece] = k + 1; }
             }
             double avg = rows / (double)rooms;
-            TestContext.Out.WriteLine("clutter: " + avg.ToString("0.00") + " rows per combat room (" + rooms + " rooms), " + (floorRows / (double)floors).ToString("0.0") + " per floor; "
+            Report("clutter: " + avg.ToString("0.00") + " rows per room (" + rooms + " rooms), " + (combatRows / (double)Math.Max(1, combat)).ToString("0.00") + " per combat room, "
+                + (corrRows / (double)corr).ToString("0.000") + " per corridor cell, " + ((rows + corrRows) / (double)floors).ToString("0.0") + " per floor; "
                 + string.Join(", ", perPiece.OrderBy(k => k.Key).Select(k => k.Key + " " + k.Value)));
-            Assert.GreaterOrEqual(avg, 2.0, "combat rooms should read dressed, got " + avg);
+            Assert.GreaterOrEqual(avg, 1.5, "rooms should read dressed, got " + avg);
+        }
+
+        // Without the encounter rule (avoidEncounterCells false) Combat rooms are dressed too.
+        [Test]
+        public void WithoutEncounterAvoidance_CombatRoomsCarryMore()
+        {
+            int a = 0, b = 0;
+            for (uint seed = 0; seed < 200; seed++)
+            {
+                var l = CellarFloorGenerator.Generate(seed, 1); var d = CellarFloorDressing.Resolve(l);
+                a += CellarFloorClutter.Resolve(l, d).Rows.Count; b += CellarFloorClutter.Resolve(l, d, false).Rows.Count;
+            }
+            Report("floor 1 rows over 200 seeds: with avoidance " + a + ", without " + b);
+            Assert.GreaterOrEqual(b, a);
         }
     }
 }

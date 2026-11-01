@@ -12,7 +12,7 @@
 //     never cover more than two fifths of the room's floor cells. Cells beside a filled barrel, shelf, chute or crate socket are tried first, so storage clusters.
 //     0-2 Rubble per room go on other wall cells (low, they never block).
 //   - corridors: only straight cells, not the cell in front of a door, a dead end, the locked link, the bank or the healing cell; about one in eight gets one small
-//     piece (Rubble or Crate) against a side wall, never in two neighbouring cells. A piece takes at most 1.0 m of the 3.6 m between the wall faces and has no collider.
+//     piece (Rubble or Crate) against a side wall, never in two neighbouring cells. A piece takes at most 1.1 m of the 3.6 m between the wall faces (2.5 m or more stay walkable).
 // Frame: the builder's world frame in whole centimetres (x east, z north: cell (x, y) has its centre at ((x * 4 + 2) m, -(y * 4 + 2) m)); yaw in degrees clockwise from above
 // with the piece's front (local +Z) facing into the room; Width is along the piece's own X (along the wall), Depth along its own Z (off the wall).
 // Authority: none (every peer derives the same clutter from (seed, floor)).
@@ -47,9 +47,9 @@ namespace SleepingCalamity.Core
         public const int CellCm = CellarFloorLayout.CellMeters * 100, WallFaceCm = 180, WallGapCm = 10;   // the wall face stands 1.8 m from the cell centre
         public const int CorridorChancePercent = 12, MaxRubblePerRoom = 2, BlockedPercentCap = 40;
 
-        // Footprints (cm) the Blender pieces are built to: width along the wall, depth off it, height.
+        // Footprints (cm) of CellarClutter.fbx (Assets/_Project/Content/Art/Cellar/B5/CellarClutter/; pivot bottom centre, front local +X, wall side -X): width along the wall, depth off it, height.
         static readonly string[] Names = { Crate, CrateStack, JarCluster, Rubble, SackPile };
-        static readonly int[][] Sizes = { new[] { 70, 70, 70 }, new[] { 140, 80, 140 }, new[] { 90, 70, 75 }, new[] { 140, 100, 40 }, new[] { 100, 80, 60 } };
+        static readonly int[][] Sizes = { new[] { 72, 72, 75 }, new[] { 149, 81, 145 }, new[] { 96, 79, 75 }, new[] { 146, 106, 41 }, new[] { 115, 84, 56 } };
         public static IReadOnlyList<string> PieceNames => Names;
         public static (int w, int d, int h) SizeOf(string piece)
         {
@@ -79,7 +79,7 @@ namespace SleepingCalamity.Core
             return h.Value;
         }
 
-        public static CellarFloorClutter Resolve(CellarFloorLayout layout, CellarFloorDressing dressing)
+        public static CellarFloorClutter Resolve(CellarFloorLayout layout, CellarFloorDressing dressing, bool avoidEncounterCells = true)
         {
             if (layout == null) throw new ArgumentNullException(nameof(layout));
             if (dressing == null) throw new ArgumentNullException(nameof(dressing));
@@ -117,6 +117,12 @@ namespace SleepingCalamity.Core
                     Ban(onlyBan, inFront.X, inFront.Y);
                 }
             }
+
+            // Every cell CellarEncounterPlan could ever put an extra enemy or the rat-king placeholder on (its free-cell rule, whatever the stir level) stays clear of clutter.
+            // That rule is the whole free floor of a Combat room, so Combat rooms keep only the cells the plan itself excludes; pass false to dress them too.
+            if (avoidEncounterCells)
+                for (int r = 0; r < layout.Rooms.Count; r++)
+                    foreach (CellPos c in CellarEncounterPlan.FreeCellsOf(layout, dressing, r)) Ban(onlyBan, c.X, c.Y);
 
             for (int r = 0; r < layout.Rooms.Count; r++) ResolveRoom(layout, dressing, r, onlyBan, nearBan, rows);
             ResolveCorridors(layout, onlyBan, nearBan, doorOutside, heal, rows);
@@ -207,14 +213,14 @@ namespace SleepingCalamity.Core
                     case JarCluster: companion = companionRoll < 60 ? Crate : null; break;
                     default: companion = companionRoll < 40 ? Crate : null; break;
                 }
-                int jl = (jit - 10) * 2;   // -20..20 cm
+                int jl = jit - 10;   // -10..10 cm
                 string id = "r" + r + "_" + (p.X + c.x) + "_" + (p.Y + c.y);
                 if (companion == null)
                     rows.Add(Make(id + "_0", primary, r, p.X + c.x, p.Y + c.y, groups, wall, (jit - 10) * 6, yawJit));
                 else
                 {
-                    rows.Add(Make(id + "_0", primary, r, p.X + c.x, p.Y + c.y, groups, wall, -sign * 85 + jl, yawJit));
-                    rows.Add(Make(id + "_1", companion, r, p.X + c.x, p.Y + c.y, groups, wall, sign * 65 - jl, -yawJit));
+                    rows.Add(Make(id + "_0", primary, r, p.X + c.x, p.Y + c.y, groups, wall, -sign * 92 + jl, yawJit));
+                    rows.Add(Make(id + "_1", companion, r, p.X + c.x, p.Y + c.y, groups, wall, sign * 70 - jl, -yawJit));
                 }
             }
 
@@ -253,7 +259,7 @@ namespace SleepingCalamity.Core
                 if (neighbour) continue;
                 CellSide a = c.Mask == ns ? CellSide.East : CellSide.North, b = CellarRoom.Opposite(a);   // the two closed sides
                 used[c.X, c.Y] = true;
-                rows.Add(Make("c" + c.X + "_" + c.Y, pieceRoll < 60 ? Rubble : Crate, -1, c.X, c.Y, 2000 + rows.Count, sideRoll == 0 ? a : b, (jit - 10) * 5, yawJit / 2));
+                rows.Add(Make("c" + c.X + "_" + c.Y, pieceRoll < 60 ? Rubble : Crate, -1, c.X, c.Y, 2000 + rows.Count, sideRoll == 0 ? a : b, (jit - 10) * 5, 0));
             }
         }
 
