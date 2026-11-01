@@ -1,5 +1,6 @@
 // Authority: none (pure EditMode tests). Core/Town/SaltwakeRoadPlan and the western fall (HollowmereLayout.OuterFall): the Saltwake road outside the
 // Lower Gate (Q15).
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -95,6 +96,37 @@ namespace SleepingCalamity.Tests.EditMode
             }
             Assert.Greater(Plan.Count(i => i.Kind == RoadItemKind.Tree && !i.OnRing), 60, "trees on the terrain frame the low cameras");
             Assert.Greater(Plan.Count(i => i.Kind == RoadItemKind.Tree && i.OnRing), 500, "trees on the backdrop ring");
+        }
+
+        [Test]
+        public void HorizonBelt_IsADenseWoodedBandWithAGapOverTheLake()
+        {
+            List<RoadItem> belt = Plan.Where(i => i.Belt).ToList();
+            Assert.Greater(belt.Count, 700, "dense enough to read as a wooded skyline");
+            Assert.Less(belt.Count, 3000);
+            TownPoint[] ringRoad = SaltwakeRoadPlan.RingRoad(T);
+            foreach (RoadItem i in belt)
+            {
+                Assert.AreEqual(RoadItemKind.Tree, i.Kind); Assert.IsTrue(i.OnRing);
+                float r = TownPoint.Distance(new TownPoint(i.X, i.Z), SaltwakeRoadPlan.RingCentre);
+                Assert.That(r, Is.InRange(SaltwakeRoadPlan.BeltMinRadius, SaltwakeRoadPlan.BeltMaxRadius), i.ToString());
+                Assert.That(i.Scale, Is.InRange(SaltwakeRoadPlan.BeltMinScale, SaltwakeRoadPlan.BeltMaxScale), i.ToString());
+                Assert.IsFalse(SaltwakeRoadPlan.InBeltGap(i.X, i.Z), "in the lake gap: " + i);
+                Assert.IsFalse(SaltwakeRoadPlan.OnTerrain(i.X, i.Z, -10f), "on the terrain: " + i);
+                var p = new TownPoint(i.X, i.Z);
+                Assert.GreaterOrEqual(HollowmereLayout.DistanceToPolyline(p, Road.Points), SaltwakeRoadPlan.BeltRoadClear, "on the road: " + i);
+                Assert.GreaterOrEqual(HollowmereLayout.DistanceToPolyline(p, ringRoad), SaltwakeRoadPlan.BeltRoadClear, "on the ring road: " + i);
+            }
+            Assert.Greater(belt.Max(i => i.Scale) - belt.Min(i => i.Scale), 0.7f, "scale variation");
+            // all the way round: every 30-degree sector outside the gap holds trees
+            for (int sector = 0; sector < 12; sector++)
+            {
+                float mid = -180f + sector * 30f + 15f, cx = SaltwakeRoadPlan.RingCentre.X + 220f * (float)System.Math.Cos(mid * System.Math.PI / 180), cz = SaltwakeRoadPlan.RingCentre.Z + 220f * (float)System.Math.Sin(mid * System.Math.PI / 180);
+                Func<float, bool> gapAt = d => SaltwakeRoadPlan.InBeltGap(SaltwakeRoadPlan.RingCentre.X + 220f * (float)Math.Cos(d * Math.PI / 180), SaltwakeRoadPlan.RingCentre.Z + 220f * (float)Math.Sin(d * Math.PI / 180));
+                bool wholeGap = gapAt(mid - 14f) && gapAt(mid + 14f), noGap = !gapAt(mid - 15f) && !gapAt(mid) && !gapAt(mid + 15f);
+                int inSector = belt.Count(i => { float a = (float)(Math.Atan2(i.Z - SaltwakeRoadPlan.RingCentre.Z, i.X - SaltwakeRoadPlan.RingCentre.X) * 180 / Math.PI); return a >= mid - 15f && a < mid + 15f; });
+                if (wholeGap) Assert.AreEqual(0, inSector, "gap sector " + mid); else if (noGap) Assert.Greater(inSector, 10, "sector " + mid);
+            }
         }
 
         [Test]
