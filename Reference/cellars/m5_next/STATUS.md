@@ -1,11 +1,11 @@
-State: WORKING
+State: DONE
 Session: Local next: M5 floor 4 set-piece + banking (+ stir meter)
-Progress: 60% (floor 4 MERGED df109f2; banking check running; stir reviewed + fixed, queued)
-Status: item 1 merged; item 2 in its check; item 3 waits
-Archive: not ready
+Progress: 100% (all three merged: floor 4 df109f2, banking f1b34ac, stir b700d92)
+Status: DONE
+Archive: ready
 Branch: claude/m5-next-639689 (floor 4 on a subagent worktree branch, merges back here)
-Last check: PASS d40fe81 (floor 4 + variety merged: edit 765/765, play 33 pass 0 fail 8 skip)
-Next step: banking check on claude/m5-banking aa1fa5a then merge; then stir (claude/m5-stir e6b17dc) merge main, check, merge
+Last check: PASS 586a673 (stir: edit 786/786, play 36 pass 0 fail 8 skip); banking PASS aa1fa5a (775/775, 35/0/8); floor 4 PASS d40fe81
+Next step: none for this session. Follow-ups (not mine): dive flow that spawns CellarFloorSync + DiveHaulSync and calls ServerSetFloor/ServerBegin, wires DiveFailed; P47 healing at bank points; stir HUD reading latch flags; banked haul in the world save (M6); 2-player walk of floors 1-4
 Sheet: none yet
 Needs: none
 Blocker: none
@@ -27,10 +27,11 @@ All Q1-Q5 proposals OK. Stir values/thresholds are P21 placeholders kept in one 
 
 ## Results
 - Item 1 floor 4 oven maze: worktree-agent-adcba4d63b883e0ab a838e67, merged into this branch. 7 rooms (entry, ring of 4 oven rooms, antechamber, heart with Bank + baker), Dough Warden Tier2 on the approach, 7 chests, no stair/lock/key. New CellarBakeryPool.cs; enums appended (SubTheme.Bakery, RoomKind.Heart, FeatureKind.Baker). Golden floor 4 = 8894238083671442472 (all seeds). reviewer: approve, no blockers. SC RESULT check PASS d40fe81 after merging main with Cellars variety dbc8996 (conflicts in Layout/Validator resolved keeping LastResort + exit-distance rule beside the bakery checks). MERGED to main df109f2. Main art pass 0bc51ae merged in cleanly (fda3b8d).
-- Item 2 banking: claude/m5-banking 0111014 + review fix 6e30325. Core DiveHaul/DiveState, Presentation DiveHaulSync (host-written summary NV, RequestBankRpc SendTo.Server, host checks floor has bank + 5 m XZ range when a PlayerObject and the matching built floor exist). risk-reviewer: approve; should-fix (bank cell from a stale floor) and the floor-3 refusal test nit fixed in 6e30325. Floor 4 vignettes: off on the bakery (aa1fa5a, rides with banking; dressing + atmosphere stay; selection replay untouched). Not done: P47 healing; nothing spawns DiveHaulSync in game yet; banked state not saved (M6).
+- Item 2 banking: SC RESULT check PASS aa1fa5a (edit 775/775, play 35 pass 0 fail 8 skip); MERGED to main f1b34ac. claude/m5-banking 0111014 + review fix 6e30325. Core DiveHaul/DiveState, Presentation DiveHaulSync (host-written summary NV, RequestBankRpc SendTo.Server, host checks floor has bank + 5 m XZ range when a PlayerObject and the matching built floor exist). risk-reviewer: approve; should-fix (bank cell from a stale floor) and the floor-3 refusal test nit fixed in 6e30325. Floor 4 vignettes: off on the bakery (aa1fa5a, rides with banking; dressing + atmosphere stay; selection replay untouched). Not done: P47 healing; nothing spawns DiveHaulSync in game yet; banked state not saved (M6).
 
 ## Usage waste
 - The wrapper's -ProjectRoot defaults to the main checkout: a subagent's first test-edit tested main (one wasted run). Briefs now always pass -ProjectRoot.
 - First check in a fresh worktree hit the default 5 min build timeout during import, then LOCKED on its own leftover Unity: 2 wasted runs. Use -TimeoutMinutes 30 on a worktree's first run.
 - The first check (baaba42) went stale when main gained the floor art pass and the variety branch was queued ahead: one full check to be repeated.
-- Item 3 stir meter: claude/m5-stir 09ecf7a + review fixes e6b17dc (DiveFailed host event, countdown dt clamped to 0.25 s, floor bound from MaxFloor). Core StirMeter + StirTuning.Default (all P21 numbers in one spot), owned by DiveState, host-ticked in DiveHaulSync, fields in the synced Summary (seconds left CeilToInt so one update per second). test-edit 732/732, test-play 36 pass 0 fail 8 skip (pre-fix). risk-reviewer: approve with notes (HUD should read latch flags, not compare StirValue).
+- One stir check re-run for the flaky parry test (CombatArenaTests.Solo_DaggerGuard_Reduces_AndAParryStopsTheHit, real-time parry window; also seen in the inn session). Worth a fix: drive that test off frames or widen its window.
+- Item 3 stir meter: SC RESULT check PASS 586a673 (edit 786/786, play 36 pass 0 fail 8 skip; the first run failed once on the known-flaky real-time parry test CombatArenaTests.Solo_DaggerGuard_Reduces_AndAParryStopsTheHit, passed on re-run); MERGED to main b700d92. claude/m5-stir 09ecf7a + review fixes e6b17dc (DiveFailed host event, countdown dt clamped to 0.25 s, floor bound from MaxFloor). Core StirMeter + StirTuning.Default (all P21 numbers in one spot), owned by DiveState, host-ticked in DiveHaulSync, fields in the synced Summary (seconds left CeilToInt so one update per second). test-edit 732/732, test-play 36 pass 0 fail 8 skip (pre-fix). risk-reviewer: approve with notes (HUD should read latch flags, not compare StirValue).
