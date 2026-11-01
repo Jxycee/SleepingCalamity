@@ -45,8 +45,10 @@ namespace SleepingCalamity.App
         {
             if (!Debug.isDebugBuild) return;
             if (flags != null && flags.CombatArena) SceneFlow.DevCombatArena = true;
+            if (flags != null && flags.DiveArena) SceneFlow.DevDiveArena = true;
 #if UNITY_EDITOR
             if (EditorPrefs.GetBool(DevPrefKeys.CombatArena, false) && IsMainEditor()) SceneFlow.DevCombatArena = true;
+            if (EditorPrefs.GetBool(DevPrefKeys.DiveArena, false) && IsMainEditor()) SceneFlow.DevDiveArena = true;
 #endif
             if (session == null || flags == null) return;
 

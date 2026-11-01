@@ -37,6 +37,11 @@ namespace SleepingCalamity.EditorTools
                 BuilderUtil.GetOrAdd<NetworkObject>(root);
                 BuilderUtil.GetOrAdd<DiveHaulSync>(root);   // host owns the shared haul; peers read the summary
             });
+            BuilderUtil.WritePrefab(AssetPaths.DiveDirectorPrefab, root =>
+            {
+                BuilderUtil.GetOrAdd<NetworkObject>(root);
+                BuilderUtil.GetOrAdd<DiveDirector>(root);   // host owns the dive flow; peers read its variables and ask by RPC
+            });
             foreach (string path in NetworkPrefabsBuilder.Prefabs) BuilderUtil.RefreshNetworkObjectHash(path);
         }
 
