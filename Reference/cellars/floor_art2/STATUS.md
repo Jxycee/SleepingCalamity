@@ -2,7 +2,7 @@ State: IN PROGRESS
 Session: Cellars floor art 2: dense dressing and the corner's grade
 Job: dress the generated Cellars rooms to the approved corner's density (B5 kit shelves, barrels, crates, rubble, jars) and match the corner's grade, lamp colour and fog (less orange)
 Progress: 55% - code on claude/floor-art2-code a4dde79 (resolver + tests, placement, tuning block, combat-room clearance rule; test-edit 821/821, build PASS); round 1 captures running
-Status: round 1 capturing (room + corridor)
+Status: round 2 running (room clutter missing in round 1 view; retune; main-file fold)
 Blocker: none (one coordinator decision below, not blocking the rounds)
 Archive: no
 Branch: claude/happy-ramanujan-41karq
@@ -40,3 +40,10 @@ Cellars branches touching CellarFloorBuilder.cs merge in order: M5 spine, M5 con
 - Density: 3.52 rows per room (combat 2.05, was 0.54 under a blanket exclusion), per floor 1-4: 3.57/3.87/3.20/3.41. ClutterHash golden new; Layout/Dressing goldens unchanged.
 - Tuning block `CellarArtTuning` (top of CellarFloorBuilder.Art.cs): ambient 0.8 -> 0.35; room fill 4.0 -> 1.8, (1.0,.76,.52) -> (1.0,.86,.70); lamp gold -> (1.0,.82,.58), lamp intensity x1.2; candle (1.0,.72,.44); fog warm offset x0.5, clamped within 0.03 of base.
 - Usage: disk filled (four 2.9 GB agent worktrees + the Unity archive); cleared, now one persistent worktree /home/user/sc-art2 shared by the step agents.
+
+## Round 1 (a4dde79, captures not committed)
+| capture | p10/p50/p90 | warm | dark/mid/light | light sat |
+|---|---|---|---|---|
+| room | .09/.30/.59 | +.26 | 42/48/9 | .54 |
+| corridor | .17/.35/.65 | +.23 | 23/62/14 | .54 |
+Read: lamp pools stronger (light share up) but overall too bright and the corridor brick is a mid-tone wash; light sat down only .03. The Floor_Room view shows no clutter (unchanged dressing): being diagnosed. Corridor shows Rubble. Self score r1: not scored (density not visible).
