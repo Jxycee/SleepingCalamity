@@ -83,17 +83,22 @@ namespace SleepingCalamity.Tests.EditMode
         public void LastResort_IsDeterministic_AndValid()
         {
             var rng = new Pcg32(77UL);
+            int min = int.MaxValue, max = 0, marked = 0, n = 0; long sum = 0;
             for (int i = 0; i < 300; i++)
             {
                 uint seed = rng.NextUInt();
                 for (int floor = 1; floor <= 3; floor++)
                 {
                     CellarFloorLayout a = CellarFloorGenerator.GenerateLastResort(seed, floor), b = CellarFloorGenerator.GenerateLastResort(seed, floor);
+                    int ex = a.EntryToExitDistance(); min = Math.Min(min, ex); max = Math.Max(max, ex); sum += ex; n++; if (a.LastResort) marked++;
+                    if (!a.LastResort) Assert.GreaterOrEqual(ex, CellarFloorGenerator.MinExitDistance, "an unmarked last resort meets the exit bound");
                     Assert.AreEqual(a.LayoutHash(), b.LayoutHash());
+                    Assert.AreEqual(a.LastResort, b.LastResort);
                     Assert.IsEmpty(CellarFloorValidator.Validate(a), "seed " + seed + " floor " + floor + "\n" + a.ToAscii());
                     if (floor > 1) Assert.IsFalse(CellarFloorGenerator.MinimalPlan(seed, floor).Combat.Any(r => CellarFloorGenerator.PickRooms(seed, floor - 1).Combat.Contains(r)));
                 }
             }
+            TestContext.WriteLine("last resort exit distance: min " + min + ", mean " + (sum / (double)n).ToString("F1") + ", max " + max + ", relaxed (marked) " + marked + " of " + n);
         }
 
         [Test]
@@ -129,13 +134,127 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsEmpty(errs, string.Join("\n", errs));
         }
 
+        const ulong GoldenFloor4 = 8894238083671442472UL;   // the fixed bakery set-piece; the same for every seed
+
+        static readonly uint[] Floor4Seeds = { 0, 1, 12345, 987654, 0x80000000, 0xFFFFFFFF };
+
         [Test]
-        public void Floor4_IsAFixedValidStub()
+        public void Floor4_IsTheFixedBakery_ForEverySeed()
         {
-            CellarFloorLayout a = CellarFloorGenerator.Generate(1, 4), b = CellarFloorGenerator.Generate(987654, 4);
-            Assert.IsTrue(a.IsStub);
-            Assert.AreEqual(a.LayoutHash(), b.LayoutHash(), "the stub does not depend on the seed");
-            Assert.IsEmpty(CellarFloorValidator.Validate(a), string.Join("\n", CellarFloorValidator.Validate(a)) + "\n" + a.ToAscii());
+            CellarFloorLayout first = CellarFloorGenerator.Generate(Floor4Seeds[0], 4);
+            Assert.IsTrue(first.IsStub, "IsStub marks the fixed floor-4 set-piece");
+            Assert.AreEqual(SubTheme.Bakery, first.Theme);
+            foreach (uint seed in Floor4Seeds)
+            {
+                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 4);
+                Assert.AreEqual(first.LayoutHash(), l.LayoutHash(), "the layout does not depend on the seed " + seed);
+                Assert.AreEqual(first.ToAscii(), l.ToAscii());
+                Assert.IsEmpty(CellarFloorValidator.Validate(l), string.Join("\n", CellarFloorValidator.Validate(l)) + "\n" + l.ToAscii());
+            }
+        }
+
+        [Test]
+        public void Golden_Floor4_Bakery()
+        {
+            CellarFloorLayout l = CellarFloorGenerator.Generate(12345, 4);
+            Assert.AreEqual(GoldenFloor4, l.LayoutHash(), "golden changed; actual = " + l.LayoutHash() + "UL\n" + l.ToAscii());
+        }
+
+        static int IndexOf(CellarFloorLayout l, System.Func<PlacedRoom, bool> pick)
+        {
+            for (int i = 0; i < l.Rooms.Count; i++) if (pick(l.Rooms[i])) return i;
+            return -1;
+        }
+
+        [Test]
+        public void Floor4_HasNoStairKeyLockOrCarrier_ButABankBakerAndWarden()
+        {
+            CellarFloorLayout l = CellarFloorGenerator.Generate(5, 4);
+            Assert.IsFalse(l.StairExit.HasValue, "the rescue replaces the stair");
+            Assert.AreEqual(0, l.Rooms.Count(r => r.Room.Kind == RoomKind.StairExit));
+            Assert.IsFalse(l.HasLockedRoom); Assert.IsNull(l.KeyChest); Assert.IsNull(l.Carrier); Assert.IsFalse(l.Links.Any(k => k.Locked));
+            Assert.IsTrue(l.BankCell.HasValue && l.BakerCell.HasValue && l.WardenCell.HasValue);
+            int heart = IndexOf(l, p => p.Room.Kind == RoomKind.Heart), ante = IndexOf(l, p => p.RoomId == CellarBakeryPool.AntechamberId);
+            Assert.AreEqual(heart, l.RoomAt(l.BankCell.Value.X, l.BankCell.Value.Y), "the bank is in the heart");
+            Assert.AreEqual(heart, l.RoomAt(l.BakerCell.Value.X, l.BakerCell.Value.Y), "the baker is in the heart");
+            Assert.AreEqual(ante, l.RoomAt(l.WardenCell.Value.X, l.WardenCell.Value.Y), "the Warden spawns in the antechamber");
+            PlacedRoom a = l.Rooms[ante];
+            Assert.IsTrue(a.Room.Spawns.Any(sp => sp.Tier == SpawnTier.Tier2 && a.Cell(sp.X, sp.Y).X == l.WardenCell.Value.X && a.Cell(sp.X, sp.Y).Y == l.WardenCell.Value.Y), "a Tier2 spawn");
+        }
+
+        // Room-level graph of the links, skipping link `skip` and entering no link of room `blockRoom`; true when `to` is reached from `from`.
+        static bool RoomsConnected(CellarFloorLayout l, int from, int to, int skip = -1, int blockRoom = -1)
+        {
+            var seen = new HashSet<int> { from }; var q = new Queue<int>(); q.Enqueue(from);
+            while (q.Count > 0)
+            {
+                int r = q.Dequeue();
+                for (int k = 0; k < l.Links.Count; k++)
+                {
+                    FloorLink lk = l.Links[k];
+                    if (k == skip || lk.RoomB < 0 || !lk.Touches(r)) continue;
+                    int o = lk.RoomA == r ? lk.RoomB : lk.RoomA;
+                    if (o == blockRoom || !seen.Add(o)) continue;
+                    q.Enqueue(o);
+                }
+            }
+            return seen.Contains(to);
+        }
+
+        [Test]
+        public void Floor4_HeartIsOnlyApproachedThroughTheAntechamberDoor()
+        {
+            CellarFloorLayout l = CellarFloorGenerator.Generate(1, 4);
+            int entry = IndexOf(l, p => p.Room.Kind == RoomKind.Entry), heart = IndexOf(l, p => p.Room.Kind == RoomKind.Heart), ante = IndexOf(l, p => p.RoomId == CellarBakeryPool.AntechamberId);
+            Assert.AreEqual(1, l.Rooms[heart].Room.Doors.Count, "the heart has a single door");
+            Assert.AreEqual(1, l.Links.Count(k => k.Touches(heart)), "one link into the heart");
+            Assert.IsTrue(l.Links.Single(k => k.Touches(heart)).Touches(ante), "and it comes from the antechamber");
+            Assert.IsTrue(RoomsConnected(l, entry, heart), "the heart is reachable");
+            Assert.IsFalse(RoomsConnected(l, entry, heart, blockRoom: ante), "but not round the antechamber");
+            Assert.IsEmpty(CellarFloorValidator.Validate(l));   // the validator's cell-level walk checks the same on the real corridors
+        }
+
+        [Test]
+        public void Floor4_MazeHasALoop_SoThereAreTwoRoutesThroughIt()
+        {
+            CellarFloorLayout l = CellarFloorGenerator.Generate(1, 4);
+            int entry = IndexOf(l, p => p.Room.Kind == RoomKind.Entry), ante = IndexOf(l, p => p.RoomId == CellarBakeryPool.AntechamberId);
+            int ovens = l.Rooms.Count(p => p.Room.Kind == RoomKind.Combat && p.Room.Theme == SubTheme.Bakery && p.RoomId != CellarBakeryPool.AntechamberId);
+            Assert.That(ovens, Is.InRange(4, 6), "the oven maze has 4-6 rooms");
+            Assert.GreaterOrEqual(l.Links.Count - (l.Rooms.Count - 1), 1, "at least one loop");
+            int ring = 0;   // links inside the maze whose loss still leaves a route entry -> antechamber
+            for (int k = 0; k < l.Links.Count; k++)
+                if (!l.Links[k].Touches(entry) && !l.Links[k].Touches(ante) && RoomsConnected(l, entry, ante, skip: k)) ring++;
+            Assert.GreaterOrEqual(ring, 4, "the four ring links each leave a second route");
+        }
+
+        [Test]
+        public void Floor4_HasSixToEightChests_AllInRoomsOnFloorCells()
+        {
+            CellarFloorLayout l = CellarFloorGenerator.Generate(1, 4);
+            Assert.That(l.Chests.Count, Is.InRange(6, 8));
+            Assert.IsTrue(l.Chests.All(c => c.RoomIndex >= 0 && !c.HoldsKey));
+        }
+
+        [Test]
+        public void Floors1To3_NeverDrawBakeryRooms_AndThePoolStaysSeparate()
+        {
+            Assert.IsEmpty(CellarBakeryPool.Validate(), string.Join("\n", CellarBakeryPool.Validate()));
+            foreach (CellarRoom r in CellarBakeryPool.All) Assert.IsNull(CellarRoomPool.Find(r.Id), r.Id + " must not be in the cellar pool");
+            Assert.IsFalse(CellarRoomPool.All.Any(r => r.Theme == SubTheme.Bakery || r.Kind == RoomKind.Heart));
+            for (uint seed = 0; seed < 100; seed++)
+                for (int floor = 1; floor <= 3; floor++)
+                    Assert.IsFalse(CellarFloorGenerator.Generate(seed, floor).Rooms.Any(p => CellarBakeryPool.Find(p.RoomId) != null), "seed " + seed + " floor " + floor);
+        }
+
+        [Test]
+        public void Validator_CatchesABrokenFloor4()
+        {
+            CellarFloorLayout l = CellarFloorGenerator.Generate(1, 4);
+            var fewer = new CellarFloorLayout(l.Seed, l.Floor, l.IsStub, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests.Take(3).ToList(), -1, -1, -1, null);
+            Assert.IsTrue(CellarFloorValidator.Validate(fewer).Any(e => e.Contains("chests")));
+            var cut = new CellarFloorLayout(l.Seed, l.Floor, l.IsStub, l.Theme, l.Rooms, l.Corridors.Skip(1).ToList(), l.Links, l.DeadEnds, l.Chests, -1, -1, -1, null);
+            Assert.IsNotEmpty(CellarFloorValidator.Validate(cut));
         }
 
         [Test]

@@ -1,16 +1,17 @@
 # Q15 Beyond the Lower Gate: the Saltwake road: status
 
-State: IN PROGRESS
+State: DONE
 Session: Q15. Beyond the Lower Gate: the Saltwake road
-Progress: 92%
+Progress: 100%
 Sheet: Reference/hollowmere/road/road_scene_r3.jpg
 Blocker: none
 Job: QUEUE Q15, cloud session, branch claude/upbeat-meitner-64d6hn
 Score: r3 APPROVED by the coordinator ~27/40 (final round; my own read 29/40; r2 25 coordinator / 28 mine; r1 24)
 Tris: roadside props 606-5,376 per piece (table below); cards 7,093 quads (162 terrain trees + 10 roadside clumps, 4,339 ring trees, 2,582 hedgerow cards), ring + hills + ridge ~45k
-SC RESULT: SC RESULT check PASS on 0b01899 (test-edit 718/718, test-play 33 passed / 8 skipped / 0 failed); main then gained Asset changes again (Cellars floor art 0bc51ae, regenerated scenes): merged again, rebuild + re-check running
-Merge commit: none yet
-Next: -nographics rebuild + one check on the new tip, merge to main if PASS, then State DONE + Archive: ready
+SC RESULT: SC RESULT check PASS on 318f72a (build PASS; test-edit 733/733, test-play 33 passed / 8 skipped / 0 failed); merge tree == checked tip
+Merge commit: db9003a (main, no-ff)
+Archive: ready
+Next: none (session stops)
 Accepted weak points (coordinator): the R3_02 house blocks the RoadOut Rebuilt view; the haze band behind the tree line reads as a flat strip; the low-sun ridges are flat orange.
 
 ## Done so far (2026-10-31)
@@ -47,4 +48,9 @@ The town's fog (exp2 density 0.016, from the corner's Midday/LowSun presets) lea
 HollowmereTerrain: blend the old erosion RAW on top of OuterFall (Final/Bake), dirt road ruts instead of cobble on the Saltwake Road, field splat; HollowmereRoad builder (art placement, far-tree and hedge cards, ring mesh + road ribbon), cameras Cap_HM_RoadOut / Cap_HM_RoadBack, captures midday + low sun, score, check, merge.
 
 ## Usage waste
-(filled in at the end)
+Rough shares of this session's spend:
+1. About 35%: Unity capture runs that bought nothing. Two agent-run captures dropped the `--timeout` flag and were cut off by the wrapper's 5-minute default, which looked like hangs; three more ran to their full timeout because one software-GL process stalls on the first frame after the Ruined -> Rebuilt switch. Fix (now on main): `SC_CAPTURE_PRESET` renders one preset per process. Write the timeout unit (minutes) and the preset split into every capture brief.
+2. About 25%: the merge chase. main gained Asset changes three times between my green check and my merge (weir, Cellars floor art, Q14 clutter), so I did 4 main merges, 4 -nographics rebuilds and 3 checks (about 25 min each), plus one restart that lost a check. Fix: the coordinator holds other Asset merges once a session's final round is approved (it did for the last one).
+3. About 20%: art agents. The first prop agent burned ~190k tokens and ran out of time before ever running Blender (it read helpers in chunks, and its reference fetches timed out); a second agent did the real work. The reference fetcher (Openverse) timed out in every attempt: fall back to the frames already in Reference/ at once.
+4. About 10%: controller context. Two long pauses and a resume, re-reading builder code at line ranges. Leftover sleep loops and fetch loops from agents had to be killed by hand.
+The remaining ~10% is ordinary work (plan, Core code and tests, the backdrop shader, sheets, scoring).
