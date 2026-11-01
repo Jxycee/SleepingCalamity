@@ -2,8 +2,8 @@
 
 Session: M5 floor contents: enemies, chests, key + door, pieces
 Job: coordinator (session 6) re-task 2026-11-01: per-room enemy spawning from CellarEncounterPlan, chests with a rank-filtered Core loot roll, the gate key from the carrier enemy, the locked room's key + door, bakery piece spots on floors 1-3 with pieces-left, stir effects consumed (extras at 40, placeholder hunter at 70). Host-authoritative, EditMode + PlayMode host/client tests.
-Progress: 90%
-Status: IN PROGRESS (spine merged into the branch at ae447dc; wiring into DiveDirector + scene regeneration running; then risk review and check)
+Progress: 93%
+Status: IN PROGRESS (wired into DiveDirector, branch runs green; risk review of fixes + wiring running; then check)
 Blocker: none
 Archive: no
 Branch: claude/m5-contents
@@ -51,3 +51,8 @@ Merge commit: -
   - ExitUnlocked -> ServerOpenStair, and RequireGateKey = true;
   - a CombatHost for Arena_Dive;
   - one interact press does one thing.
+- Wiring 9abc810 (pushed 3c7884b) puts commented "contents hook" lines in DiveDirector:
+  - EnsureSyncs spawns CellarContentsSync, sets AutoArm=false, ExitUnlocked -> ServerOpenStair and RequireGateKey=true;
+  - ContentsTick arms once per floor build; ContentsClear runs in EndDive;
+  - LocalInteract defers to CellarContentsSync.WouldUseInteract.
+  Contents creates a waves-off CombatHost on the host, with the new CombatHost.WipeResetsParty=false. Runs: build PASS, test-edit 838/838, test-play 55 passed / 8 skipped / 0 failed; scenes regenerated with -nographics.
