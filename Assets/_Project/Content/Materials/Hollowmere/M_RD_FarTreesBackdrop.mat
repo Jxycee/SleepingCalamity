@@ -35,12 +35,18 @@ Material:
     - _Cutoff: 0.5
     - _DistFar: 700
     - _DistNear: 150
-    - _GroundMist: 0.06
-    - _HazeFar: 0.84
-    - _HazeNear: 0.62
+    - _GroundMist: 0.1
+    - _HazeCoolAmt: 0.25
+    - _HazeFar: 0.76
+    - _HazeNear: 0.56
+    - _MistScale: 30
     - _MistTop: -8
+    - _NoiseAmp: 0.05
+    - _NoiseLit: 0.03
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _HazeTint: {r: 1, g: 1, b: 1, a: 1}
+    - _HazeCool: {r: 0.95, g: 1, b: 1.05, a: 1}
+    - _HazeTint: {r: 0.97, g: 1, b: 0.93, a: 1}
+    - _ShadowTint: {r: 0.3, g: 0.38, b: 0.48, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
