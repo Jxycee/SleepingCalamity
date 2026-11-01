@@ -88,6 +88,8 @@ namespace SleepingCalamity.Gameplay
             if (nm == null || !nm.IsServer || _begun) return false;
             _nm = nm;
             _begun = true;
+            // A CombatHost made without an Identity (CellarContentsSync.EnsureCombat) takes the session's roster, so its growth is keyed per recorded player.
+            if (Identity == null && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostRoster roster)) Identity = roster;
             _wave = WavesEnabled ? WaveState.Countdown : WaveState.Idle;
             _waveTimer = 4f;
             _waveNumber = 1;
@@ -130,7 +132,7 @@ namespace SleepingCalamity.Gameplay
             if (hero == null || !hero.IsSpawned) return;
             PlayerGrowth g = Growth(hero.OwnerClientId);
             // Every growth change (hit ABS, kill ABS, spell pips, build-up) ends in this call, so unlocks are checked here, for all weapons: a kill can credit
-            // a weapon other than the one in hand. Unlocks only grow. Kept per recorded player for the session; not saved yet (WeaponsSave restore is M6).
+            // a weapon other than the one in hand. Unlocks only grow. Kept per recorded player for the life of this CombatHost instance (the arena and the Cellars each own one); not saved yet (WeaponsSave restore is M6).
             foreach (WeaponState owned in g.Weapons.Values) g.Abilities.Update(owned);
             WeaponState w = g.Weapon(hero.WeaponKey);
             hero.ServerPushGrowth(hero.WeaponKey, w.Level, w.Abs, w.LevelCostNow, w.Stats.Atk, w.Stats.Fire, w.Stats.Pest, g.Pips.Current, g.Pips.Cap);

@@ -47,6 +47,9 @@ namespace SleepingCalamity.App
         private void OnLoadEventCompleted(string sceneName, LoadSceneMode mode, List<ulong> clientsCompleted, List<ulong> clientsTimedOut)
         {
             if (!SceneNames.IsGameplay(sceneName)) return;
+            // Identity first: a hero's spawn-time growth sync must key by the recorded player, not leave a client-id record behind.
+            CombatHost combat = UnityEngine.Object.FindFirstObjectByType<CombatHost>();
+            if (combat != null && _nm.IsServer) combat.Identity = _roster;
             foreach (ulong clientId in clientsCompleted) SpawnFor(clientId);
             SpawnTargetDummies();
             BeginCombat();
