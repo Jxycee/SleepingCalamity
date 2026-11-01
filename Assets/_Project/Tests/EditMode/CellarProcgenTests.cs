@@ -44,7 +44,7 @@ namespace SleepingCalamity.Tests.EditMode
             // Fresh goldens (new layers, no earlier value to move). LayoutHash/DressingHash stay pinned by CellarFloorGeneratorTests / CellarVarietyTests.
             ulong[][] expect =
             {
-                new ulong[] { 690935452282621397UL, 8845299293798975808UL, 13704606209555056737UL },     // route, special, hints (hints re-pinned 2026-10-31: first-reached rooms only, deliberate change; route and special unchanged)
+                new ulong[] { 690935452282621397UL, 8845299293798975808UL, 13704606209555056737UL },     // route, special, hints (hints re-pinned 2026-10-31: first-reached rooms only, deliberate change; route/hints goldens moved with item 2 layout presets, deliberate)
                 new ulong[] { 12317519853489886730UL, 8103913021369237331UL, 8535885715987663944UL },
                 new ulong[] { 10929967913840331367UL, 9026194201199058082UL, 7482022743495240998UL },
             };
