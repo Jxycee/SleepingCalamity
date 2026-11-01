@@ -20,6 +20,7 @@ namespace SleepingCalamity.Presentation
     {
         public Material Floor, Wall, Pillar, Trim, Flame;
         public Material LockedGate, Chest, KeyChest, Carrier, EntryStart, StairExit, SpawnT1, SpawnT2;
+        public Material Bank, Baker, Warden;    // floor 4: the rescue bank point, the sleeping baker, the Dough Warden (null falls back to a flat colour)
         public GameObject FloorTile;            // optional template: a 2 x 2 m flagstone, x -1..1, z 0..2, top at y 0 (four per cell); inactive templates are fine
         public GameObject Lantern;              // optional template: a lantern with its pivot at the bottom centre
         public Material LanternMaterial;        // applied to every renderer of the lantern clones when set
@@ -248,6 +249,22 @@ namespace SleepingCalamity.Presentation
             {
                 CellPos s = layout.StairExit.Value;
                 Prim(group, "StairExit", PrimitiveType.Cylinder, CellCenter(s.X, s.Y) + new Vector3(0, 0.4f, 0), new Vector3(1.6f, 0.4f, 1.6f), mats.Marker(kit.StairExit, new Color(0.55f, 0.30f, 0.70f)));
+            }
+            if (layout.BankCell.HasValue)
+            {
+                CellPos s = layout.BankCell.Value;
+                Prim(group, "Bank", PrimitiveType.Cylinder, CellCenter(s.X, s.Y) + new Vector3(0, 0.25f, 0), new Vector3(1.2f, 0.25f, 1.2f), mats.Marker(kit.Bank, new Color(0.95f, 0.80f, 0.35f)));
+            }
+            if (layout.BakerCell.HasValue)
+            {
+                CellPos s = layout.BakerCell.Value;   // the baker lies asleep: a capsule on its side
+                GameObject g = Prim(group, "Baker", PrimitiveType.Capsule, CellCenter(s.X, s.Y) + new Vector3(0, 0.45f, 0), new Vector3(0.8f, 1.0f, 0.8f), mats.Marker(kit.Baker, new Color(0.92f, 0.86f, 0.70f)));
+                g.transform.rotation = Quaternion.Euler(0f, 0f, 90f);
+            }
+            if (layout.WardenCell.HasValue)
+            {
+                CellPos s = layout.WardenCell.Value;
+                Prim(group, "Warden", PrimitiveType.Capsule, CellCenter(s.X, s.Y) + new Vector3(0, 1.3f, 0), new Vector3(1.6f, 1.3f, 1.6f), mats.Marker(kit.Warden, new Color(0.80f, 0.55f, 0.20f)));
             }
             for (int r = 0; r < layout.Rooms.Count; r++)
             {

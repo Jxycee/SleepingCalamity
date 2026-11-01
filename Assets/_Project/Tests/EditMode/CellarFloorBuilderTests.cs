@@ -99,6 +99,9 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.AreEqual(l.StairExit.HasValue ? 1 : 0, m.Count(t => t.name == "StairExit"), "stair, " + at);
                 Assert.AreEqual(l.Carrier != null ? 1 : 0, m.Count(t => t.name.StartsWith("Carrier_")), "carrier, " + at);
                 Assert.AreEqual(l.Rooms.Sum(p => p.Room.Spawns.Count), m.Count(t => t.name.StartsWith("Spawn_")), "spawns, " + at);
+                Assert.AreEqual(l.BankCell.HasValue ? 1 : 0, m.Count(t => t.name == "Bank"), "bank, " + at);
+                Assert.AreEqual(l.BakerCell.HasValue ? 1 : 0, m.Count(t => t.name == "Baker"), "baker, " + at);
+                Assert.AreEqual(l.WardenCell.HasValue ? 1 : 0, m.Count(t => t.name == "Warden"), "warden, " + at);
                 Object.DestroyImmediate(b.Root.gameObject);
             }
         }
