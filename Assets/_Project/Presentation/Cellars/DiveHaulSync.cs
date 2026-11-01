@@ -74,6 +74,31 @@ namespace SleepingCalamity.Presentation
             FloorSync = FindFirstObjectByType<CellarFloorSync>();
         }
 
+        // ---- stir encounter plan (host only; P49) ----
+        // Where the extra enemies and the rat-king placeholder stand on the BUILT floor, recomputed whenever the built floor, ExtraEnemiesPerRoom or the hunter latch changes.
+        // A future spawner reads EncounterPlan (and listens to EncounterChanged); nothing spawns from it yet. Null off the host or while no floor is built.
+        // Peers derive the same plan from the synced Summary flags plus their own built layout (CellarEncounterPlan.Build is a pure function), so no RPC is needed.
+        public CellarEncounterPlan EncounterPlan { get; private set; }
+        public event System.Action EncounterChanged;
+        private uint _planSeed; private int _planFloor, _planExtra; private bool _planHunter;
+
+        private void RefreshEncounterPlan()
+        {
+            ResolveFloorSync();
+            CellarFloorSync fs = FloorSync;
+            StirMeter stir = _state.Stir;
+            if (fs == null || fs.Layout == null || fs.Built == null || fs.BuiltFloor != _state.CurrentFloor)
+            {
+                if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); }
+                return;
+            }
+            int extra = stir.ExtraEnemiesPerRoom; bool hunter = stir.HunterLatched;
+            if (EncounterPlan != null && _planSeed == fs.BuiltSeed && _planFloor == fs.BuiltFloor && _planExtra == extra && _planHunter == hunter) return;
+            EncounterPlan = CellarEncounterPlan.Build(fs.Layout, fs.Built.Dressing, extra, hunter);
+            _planSeed = fs.BuiltSeed; _planFloor = fs.BuiltFloor; _planExtra = extra; _planHunter = hunter;
+            EncounterChanged?.Invoke();
+        }
+
         public Summary Current => Net.Value;
         // Host only; null on clients.
         public DiveState HostState => _state;
@@ -83,7 +108,7 @@ namespace SleepingCalamity.Presentation
             if (IsServer) { _state = new DiveState(new DiveHaul(DefaultPiecesPerFloor)); Publish(); }
         }
 
-        public override void OnNetworkDespawn() { _state = null; }
+        public override void OnNetworkDespawn() { _state = null; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } }
 
         // Host only: raised when the deep-closes countdown ran out and the dive was failed (the dive flow sends the party home).
         public event System.Action DiveFailed;
@@ -103,6 +128,7 @@ namespace SleepingCalamity.Presentation
             _state.Stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
             bool failed = _state.Tick(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             Publish();
+            RefreshEncounterPlan();
             if (failed) DiveFailed?.Invoke();
         }
 
@@ -134,7 +160,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerBegin(int[] piecesPerFloor, StirTuning tuning)
         {
             if (!IsServer || !IsSpawned || piecesPerFloor == null) return false;
-            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; Publish(); return true;
+            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
         public bool ServerAddPiece(int pieceId) { if (!Host || !_state.Haul.AddPiece(pieceId)) return false; Publish(); return true; }
         public bool ServerAddLoot(int itemId, int count) { if (!Host || !_state.Haul.AddLoot(itemId, count)) return false; Publish(); return true; }
