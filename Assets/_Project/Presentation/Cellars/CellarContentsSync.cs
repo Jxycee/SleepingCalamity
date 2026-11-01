@@ -211,11 +211,11 @@ namespace SleepingCalamity.Presentation
         // host
         // =================================================================================================================================
 
-        private bool HostReady(CellarFloorSync fs) => IsServer && IsSpawned && fs != null && fs.Built != null && fs.Layout != null && _st.Floor == fs.BuiltFloor && _st.Seed == fs.BuiltSeed;
+        private bool HostReady(CellarFloorSync fs) => IsServer && IsSpawned && _layout != null && _root != null && _st.Floor == _layout.Floor && _st.Seed == _layout.Seed;
 
         private static float FlatSqr(Vector3 a, Vector3 b) { float dx = a.x - b.x, dz = a.z - b.z; return dx * dx + dz * dz; }
 
-        private Vector3 World(CellarFloorSync fs, CellPos c) => fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(c.X, c.Y));
+        private Vector3 World(CellarFloorSync fs, CellPos c) => _root.TransformPoint(CellarFloorBuilder.CellCenter(c.X, c.Y));
 
         private void CollectPlayers()
         {
@@ -246,7 +246,12 @@ namespace SleepingCalamity.Presentation
                 _subscribedHaul = HaulSync; _subscribedHaul.DiveFailed += OnDiveFailed;
             }
             int build = fs.Built == null ? 0 : fs.BuildCount;
-            if (build != _hostBuild || _resetRequested) { _resetRequested = false; _hostBuild = build; ResetFloor(fs); }
+            if (AutoArm && build != _hostBuild)
+            {
+                _hostBuild = build; _resetRequested = false;
+                if (fs.Built == null || fs.Layout == null) ServerClearFloor(); else ServerArmFloor(fs.Layout, fs.Built.Root);
+            }
+            else if (_resetRequested) { _resetRequested = false; if (_layout != null) ServerArmFloor(_layout, _root); }
             if (!HostReady(fs)) return;
 
             CollectPlayers();
@@ -258,15 +263,54 @@ namespace SleepingCalamity.Presentation
             Publish();
         }
 
-        private void ResetFloor(CellarFloorSync fs)
+        // Host entry point 1: arm the contents for a built floor (resets all per-floor state, despawns the old floor's enemies). `floorRoot` is the built floor's root: every
+        // world position (spawns, pieces, room entry) goes through its transform, so a floor built anywhere (the spine builds 200 m east of the hub) works. A floor 1-3 with no
+        // usable gate-key carrier raises ExitUnlocked(floor) at once, so the stair can never soft-lock. The auto path (AutoArm, default on) calls this whenever the
+        // CellarFloorSync builds a new floor and when the dive fails; the spine may set AutoArm = false and call it on FloorChanged instead.
+        public bool ServerArmFloor(CellarFloorLayout layout, Transform floorRoot)
         {
+            if (!IsServer || !IsSpawned || layout == null || floorRoot == null) return false;
+            ServerClearFloor();
+            _layout = layout; _root = floorRoot; _dressing = CellarFloorDressing.Resolve(layout);
+            _st = new ContentsState { Seed = layout.Seed, Floor = layout.Floor };
+            if (layout.Floor >= 1 && layout.Floor <= DiveHaul.PieceFloors && !CarrierIsValid(layout, _dressing)) _st.ExitUnlocked = true;
+            Publish();
+            if (_st.ExitUnlocked) ExitUnlocked?.Invoke(layout.Floor);
+            return true;
+        }
+
+        // Host entry point 2: forget the floor (dive ended or failed): despawns its enemies and publishes an empty state. Safe to call when nothing is armed.
+        public void ServerClearFloor()
+        {
+            if (!IsServer) return;
             UntrackAll();
             if (_combat != null) _combat.ServerClearEnemies();
             _clear.Reset(); _entered.Clear(); _carrierEnemy = null; _hunter = null; _hunterSpawned = false;
+            _layout = null; _root = null; _dressing = null;
             _st = new ContentsState();
-            if (fs.Built != null) { _st.Seed = fs.BuiltSeed; _st.Floor = fs.BuiltFloor; }
-            Publish();
+            if (IsSpawned) Publish();
         }
+
+        // The carrier is usable when its room exists, it stands in that room and an authored spawn of a Combat room sits on its cell.
+        private static bool CarrierIsValid(CellarFloorLayout l, CellarFloorDressing dressing)
+        {
+            GateKeyCarrier c = l.Carrier;
+            if (c == null || c.RoomIndex < 0 || c.RoomIndex >= l.Rooms.Count || l.RoomAt(c.X, c.Y) != c.RoomIndex) return false;
+            foreach (EncounterSpawn s in CellarEncounterPlan.Build(l, dressing, 0, false).Spawns)
+                if (s.RoomIndex == c.RoomIndex && s.Kind == EncounterKind.Authored && s.X == c.X && s.Y == c.Y) return true;
+            return false;
+        }
+
+        // Host: may the stair of `floor` be used? True on floor 4 and beyond (no stair gate), on any floor 1-3 whose carrier is missing/invalid, and once the gate key was picked.
+        // False for a floor 1-3 that is not the armed one. The spine's wiring: ExitUnlocked += f => DiveDirector.Instance.ServerOpenStair(f).
+        public bool IsExitUnlocked(int floor)
+        {
+            if (floor < 1 || floor > DiveHaul.PieceFloors) return true;
+            return _layout != null && _layout.Floor == floor && _st.ExitUnlocked;
+        }
+
+        public bool AutoArm = true;
+        private CellarFloorLayout _layout; private Transform _root; private CellarFloorDressing _dressing;
 
         private void Publish() { if (!_st.Equals(Net.Value)) Net.Value = _st; }
 
@@ -297,17 +341,17 @@ namespace SleepingCalamity.Presentation
         private CellarEncounterPlan CurrentPlan(CellarFloorSync fs)
         {
             CellarEncounterPlan p = HaulSync != null ? HaulSync.EncounterPlan : null;
-            if (p != null && p.Floor == fs.BuiltFloor && p.Seed == fs.BuiltSeed) return p;
+            if (p != null && p.Floor == _layout.Floor && p.Seed == _layout.Seed) return p;
             DiveHaulSync.Summary s = HaulSync != null ? HaulSync.Current : default;
-            return CellarEncounterPlan.Build(fs.Layout, fs.Built.Dressing, s.ExtraEnemiesPerRoom, s.HunterLatched);
+            return CellarEncounterPlan.Build(_layout, _dressing, s.ExtraEnemiesPerRoom, s.HunterLatched);
         }
 
         private void EnterRooms(CellarFloorSync fs)
         {
             foreach (PlayerPos p in _players)
             {
-                Vector3 local = fs.Built.Root.InverseTransformPoint(p.Position);
-                int room = fs.Layout.RoomAt(Mathf.FloorToInt(local.x / CellarFloorBuilder.CellSize), Mathf.FloorToInt(-local.z / CellarFloorBuilder.CellSize));
+                Vector3 local = _root.InverseTransformPoint(p.Position);
+                int room = _layout.RoomAt(Mathf.FloorToInt(local.x / CellarFloorBuilder.CellSize), Mathf.FloorToInt(-local.z / CellarFloorBuilder.CellSize));
                 if (room < 0 || !_entered.Add(room)) continue;
                 SpawnRoom(fs, room);
                 RoomEntered?.Invoke(room);
@@ -319,7 +363,7 @@ namespace SleepingCalamity.Presentation
             CellarEncounterPlan plan = CurrentPlan(fs);
             if (plan.CountIn(room) == 0) return;
             CombatHost combat = EnsureCombat();
-            CellarFloorLayout l = fs.Layout; int index = 0;
+            CellarFloorLayout l = _layout; int index = 0;
             foreach (EncounterSpawn sp in plan.Spawns)
             {
                 if (sp.RoomIndex != room || sp.Kind == EncounterKind.Hunter) continue;
@@ -328,8 +372,12 @@ namespace SleepingCalamity.Presentation
                 int tier = sp.Tier == SpawnTier.Tier2 ? 2 : 1;
                 index++;
                 Enemy e = combat.SpawnEnemy(kind, tier, World(fs, sp.Cell));
-                if (e == null) continue;
                 bool carrier = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
+                if (e == null)
+                {
+                    if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
+                    continue;
+                }
                 _tracked[e] = new Tracked { Room = room, Carrier = carrier };
                 if (carrier) _carrierEnemy = e;
                 _clear.Spawn(room);
@@ -342,7 +390,7 @@ namespace SleepingCalamity.Presentation
         {
             if (_hunterSpawned) return;
             CellarEncounterPlan plan = HaulSync != null ? HaulSync.EncounterPlan : null;
-            if (plan == null || plan.Hunter == null || plan.Floor != fs.BuiltFloor || plan.Seed != fs.BuiltSeed) return;
+            if (plan == null || plan.Hunter == null || plan.Floor != _layout.Floor || plan.Seed != _layout.Seed) return;
             _hunterSpawned = true;
             _hunter = EnsureCombat().SpawnEnemy(EnemyKind.RatKing, 2, World(fs, plan.Hunter.Cell));
         }
@@ -377,7 +425,7 @@ namespace SleepingCalamity.Presentation
         private void TickPieces(CellarFloorSync fs)
         {
             DiveHaul haul = HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState.Haul : null;
-            int floor = fs.BuiltFloor;
+            int floor = _layout.Floor;
             for (int i = 0; i < _pieceSpots.Length; i++)
             {
                 int id = DiveHaul.PieceId(floor, i);
@@ -402,14 +450,14 @@ namespace SleepingCalamity.Presentation
         public bool ServerTryOpenChest(ulong clientId, int chestIndex)
         {
             CellarFloorSync fs = FloorSync;
-            if (!HostReady(fs) || chestIndex < 0 || chestIndex >= fs.Layout.Chests.Count || chestIndex >= 64) return false;
+            if (!HostReady(fs) || chestIndex < 0 || chestIndex >= _layout.Chests.Count || chestIndex >= 64) return false;
             if ((_st.Chests & (1UL << chestIndex)) != 0) return false;
             if (!TryPlayerPos(clientId, out Vector3 pos)) return false;
             Transform chest = chestIndex < _chests.Length ? _chests[chestIndex] : null;
-            Vector3 at = chest != null ? chest.position : World(fs, new CellPos(fs.Layout.Chests[chestIndex].X, fs.Layout.Chests[chestIndex].Y));
+            Vector3 at = chest != null ? chest.position : World(fs, new CellPos(_layout.Chests[chestIndex].X, _layout.Chests[chestIndex].Y));
             if (FlatSqr(pos, at) > ChestRange * ChestRange) return false;
-            FloorChest fc = fs.Layout.Chests[chestIndex];
-            int item = CellarLoot.Roll(fs.Layout.Seed, fs.Layout.Floor, chestIndex, fc.HoldsKey);
+            FloorChest fc = _layout.Chests[chestIndex];
+            int item = CellarLoot.Roll(_layout.Seed, _layout.Floor, chestIndex, fc.HoldsKey);
             _st.Chests |= 1UL << chestIndex;
             if (fc.HoldsKey) _st.RoomKeyHeld = true;
             LastLootItem = item;

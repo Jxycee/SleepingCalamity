@@ -215,6 +215,40 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator ArmFloor_WithNoOrBadCarrier_UnlocksTheExitAtOnce_AndClearFloorForgets()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            Assert.That(c.Contents.IsExitUnlocked(1), Is.False, "a normal floor 1 is locked until the gate key is picked");
+            Assert.That(c.Contents.IsExitUnlocked(4), Is.True, "floor 4 has no stair gate");
+            Assert.That(c.Contents.IsExitUnlocked(2), Is.False, "floor 2 is not the armed floor");
+
+            c.Contents.AutoArm = false;
+            CellarFloorLayout l = c.Layout;
+            var noCarrier = new CellarFloorLayout(l.Seed, 1, false, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, null);
+            var badCarrier = new CellarFloorLayout(l.Seed, 1, false, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, new GateKeyCarrier(99, 0, 0, 0));
+            int fired = -1;
+            c.Contents.ExitUnlocked += f => fired = f;
+
+            Assert.That(c.Contents.ServerArmFloor(noCarrier, c.Floor.Built.Root), Is.True);
+            Assert.That(fired, Is.EqualTo(1), "the event fires inside ServerArmFloor");
+            Assert.That(c.Contents.IsExitUnlocked(1), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.ExitUnlocked, Timeout, "the client never saw the unlocked exit");
+
+            fired = -1;
+            c.Contents.ServerClearFloor();
+            Assert.That(c.Contents.IsExitUnlocked(1), Is.False);
+            Assert.That(c.Contents.ServerArmFloor(badCarrier, c.Floor.Built.Root), Is.True);
+            Assert.That(fired, Is.EqualTo(1), "an invalid carrier also unlocks");
+
+            fired = -1;
+            c.Contents.ServerClearFloor();
+            Assert.That(c.Contents.ServerArmFloor(l, c.Floor.Built.Root), Is.True);
+            Assert.That(fired, Is.EqualTo(-1), "a valid carrier keeps the exit locked");
+            Assert.That(c.Contents.IsExitUnlocked(1), Is.False);
+            yield return PlayModeHarness.WaitUntil(() => !c.Peer.State.ExitUnlocked, Timeout, "the client kept the old unlocked flag");
+        }
+
+        [UnityTest]
         public IEnumerator Pieces_StepOverAddsToHaul_HiddenOnClient_ReappearAfterAFailedDive()
         {
             Ctx c = null; yield return Setup(x => c = x);
