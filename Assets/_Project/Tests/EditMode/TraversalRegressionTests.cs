@@ -9,7 +9,7 @@ using UnityEditor.SceneManagement;
 
 namespace SleepingCalamity.Tests.EditMode
 {
-    [Category("Traversal")]
+    [Category("Traversal"), Timeout(1200000)]
     public class TraversalRegressionTests
     {
         static List<TraversalScan.QuickEntry> s_run;
@@ -21,9 +21,13 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [OneTimeTearDown]
-        public void Close() => EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        public void Close()
+        {
+            UnityEngine.AI.NavMesh.RemoveAllNavMeshData();
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        }
 
-        [Test, Timeout(1200000)]
+        [Test]
         public void HeroCapsule_ComesFromThePrefab()
         {
             HeroCapsule h = HeroCapsule.FromPrefab();
@@ -51,7 +55,8 @@ namespace SleepingCalamity.Tests.EditMode
                 if (e.Blocked > k.blocked) failures.Add($"{e.Space}: {e.Blocked} blocked spots on intended paths (baseline {k.blocked}): " + string.Join("; ", e.Spots.Where(s => s.StartsWith("Blocked")).Take(5)));
                 if (e.Narrow > k.narrow) failures.Add($"{e.Space}: {e.Narrow} narrow spots on intended paths (baseline {k.narrow}): " + string.Join("; ", e.Spots.Where(s => s.StartsWith("Narrow")).Take(5)));
             }
-            Assert.IsEmpty(failures, string.Join("\n", failures));
+            Assert.IsEmpty(failures, string.Join("\n", failures) + "\n\nA failure here means: run the traversal scan (TraversalScan.RunAll) and look at REPORT.md. If the change is intended or fixes issues elsewhere, "
+                + "rewrite the baseline with SleepingCalamity.EditorTools.TraversalScan.WriteBaseline (unity.sh exec) and commit " + TraversalScan.BaselineFile + ".");
         }
     }
 }

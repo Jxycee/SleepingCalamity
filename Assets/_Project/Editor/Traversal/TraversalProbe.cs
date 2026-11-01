@@ -111,12 +111,18 @@ namespace SleepingCalamity.EditorTools
             if (space.Locks.Count > 0 && space.Targets.Any(t => t.BehindLock))
             {
                 foreach (GameObject g in space.Locks) if (g != null) g.SetActive(false);
-                Physics.SyncTransforms();
-                open = BakeGrid(space, hero, opt, physMask, visLayer, out _);
-                foreach (TraversalTarget t in space.Targets.Where(t => t.BehindLock)) Reach(open, t);
-                foreach (GameObject g in space.Locks) if (g != null) g.SetActive(true);
-                Physics.SyncTransforms();
-                NavMesh.RemoveAllNavMeshData();
+                try
+                {
+                    Physics.SyncTransforms();
+                    open = BakeGrid(space, hero, opt, physMask, visLayer, out _);
+                    foreach (TraversalTarget t in space.Targets.Where(t => t.BehindLock)) Reach(open, t);
+                }
+                finally
+                {
+                    foreach (GameObject g in space.Locks) if (g != null) g.SetActive(true);
+                    Physics.SyncTransforms();
+                    NavMesh.RemoveAllNavMeshData();
+                }
             }
             WalkGrid grid = BakeGrid(space, hero, opt, physMask, visLayer, out NavMeshDataInstance inst);
             res.Grid = grid;
