@@ -56,12 +56,14 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Townhouses", new Vector3(-1f, 1.65f, -4f), new Vector3(-1f, 5.2f, -27f), 64f),        // from the square at the townhouse pair on F06 and F07 (kit family 3)
             ("Cap_HM_TownhouseSide", new Vector3(22f, 1.65f, -11f), new Vector3(5f, 5.0f, -27f), 55f),    // three-quarter on F07's front and east side
             ("Cap_HM_Kits", new Vector3(45.5f, 1.65f, 12f), new Vector3(39f, 2f, -1f), 62f),           // from the Ring Lane's north end looking south along the east run at the stone cottage on R2_09 and the workshop on R2_08 (kit families 2 and 4)
+            ("Cap_HM_WallRun", new Vector3(-76f, 4.5f, 0f), new Vector3(-62f, -0.6f, 12f), 50f),     // polish 2: high outside the west wall, over the steep bank, looking along the wall run (stone tint, coursing, merlons)
             ("Cap_HM_LowEast", new Vector3(86f, 2.5f, -14f), new Vector3(30f, -2f, -6f), 50f),            // outside the east wall: ditch, bank, wall, terraces, keep
             ("Cap_HM_LowerGate", new Vector3(-21.3f, 1.65f, -78f), new Vector3(-21.3f, -3.2f, -64.6f), 52f),   // Q8: the Lower Gate from the road outside, looking north up through the wall (Target is absolute: the gate stands at about y -7.4)
             ("Cap_HM_EastGate", new Vector3(64.2f, 1.65f, -54.6f), new Vector3(56.6f, -4.5f, -46f), 52f),       // Q8: the East Gate from the Mill Lane outside, looking back up at the wall (gate at about y -8.5)
             ("Cap_HM_SquareSouth", new Vector3(-6.0f, 1.65f, -17.0f), new Vector3(4f, 1.2f, -6f), 55f),   // benches, planters, the Market Street mouth and the bunting
             ("Cap_HM_SquareWest", new Vector3(14.0f, 1.65f, -14.0f), new Vector3(-14f, 1.0f, -8f), 55f),   // the square's west half and the West Lane mouth
             ("Cap_HM_Clutter", new Vector3(44.6f, 1.65f, -17.2f), new Vector3(52.3f, -1.3f, -16.6f), 55f),      // Q14: down the gap beside R2_19 at the washing line to R2_20 (span x 52.1-52.6, z -19.75 to -13.43, ends 3.5 m up), eye 1.65 m
+            ("Cap_HM_RuinedLane", new Vector3(-45.5f, 1.65f, -9.5f), new Vector3(-42f, -3.0f, -1.5f), 55f),      // polish 2: up the Ring Lane at the west lane wreck group (tipped cart, split barrel, slumped crates; Ruined)
             ("Cap_HM_LaneMouthWest", new Vector3(-45.0f, 1.65f, -8.1f), new Vector3(-30f, -0.6f, -7.3f), 55f),   // Q11: from the Ring Lane at the West Lane junction up the West Lane flight to the square
             ("Cap_HM_TerraceSteps", new Vector3(-46.2f, 1.65f, -20f), new Vector3(-44.5f, -5.2f, -33f), 55f),   // Q11: the Ring Lane's south-west 0.24 drop: flight, kerbs, gutter, the retaining wall
             ("Cap_HM_LakeJetty", new Vector3(-13.5f, 1.9f, -76.5f), new Vector3(-16f, -12.2f, -100f), 55f),   // Q10: from the north bank beside the jetty (root ~(-22,-82), deck heading SE), looking over it and the lake to the far shore
