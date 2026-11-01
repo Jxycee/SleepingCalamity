@@ -9,6 +9,9 @@
 //     nothing is reachable.
 //   - floor 4 (the bakery set-piece) is treated like any floor: its Combat rooms take extras and the hunter may roam it. Its fixed rooms keep every authored cell, so a legal cell
 //     is simply the room's remaining free floor.
+//   - procgen 3: the plan also carries the floor's roster (RosterMask, CellarFloorRoster) and, from BuildForDive only, its twist: Thin drops one spawn per room that has more than
+//     one (an authored spawn first, never the gate-key carrier or the warden; extras survive), Crowded adds one extra in about half the Combat rooms (at least one), Ambush only names AmbushRoom (plan
+//     data; the runtime behaviour is not built yet). Build() (no twist) stays the plain plan the older tests and the carrier check use.
 // Own Rng stream, never touches the layout/dressing goldens. No float, no string hashing for decisions.
 // Authority: none (static data); the host consumes it.
 using System.Collections.Generic;
@@ -27,10 +30,12 @@ namespace SleepingCalamity.Core
     public sealed class CellarEncounterPlan
     {
         public readonly uint Seed; public readonly int Floor, ExtraPerRoom; public readonly bool HunterLatched;
+        public readonly int RosterMask;                           // Tier1 kinds allowed on this floor (CellarFloorRoster bits); spawners pick only these
+        public readonly FloorTwist Twist; public readonly int AmbushRoom;   // AmbushRoom: room index when Twist is Ambush, else -1
         public readonly IReadOnlyList<EncounterSpawn> Spawns;     // room by room (authored, then extras), then the hunter last
         public EncounterSpawn Hunter { get; }                     // null when not latched or no legal cell
-        CellarEncounterPlan(uint seed, int floor, int extra, bool hunterLatched, List<EncounterSpawn> spawns, EncounterSpawn hunter)
-        { Seed = seed; Floor = floor; ExtraPerRoom = extra; HunterLatched = hunterLatched; Spawns = spawns; Hunter = hunter; }
+        CellarEncounterPlan(uint seed, int floor, int extra, bool hunterLatched, List<EncounterSpawn> spawns, EncounterSpawn hunter, int rosterMask, FloorTwist twist, int ambushRoom)
+        { Seed = seed; Floor = floor; ExtraPerRoom = extra; HunterLatched = hunterLatched; Spawns = spawns; Hunter = hunter; RosterMask = rosterMask; Twist = twist; AmbushRoom = ambushRoom; }
 
         // Spawns of one room (the hunter is never counted); kind filters when given.
         public int CountIn(int roomIndex, EncounterKind? kind = null)
@@ -41,11 +46,33 @@ namespace SleepingCalamity.Core
         }
 
         public static CellarEncounterPlan Build(CellarFloorLayout layout, CellarFloorDressing dressing, int extraEnemiesPerRoom, bool hunterLatched)
+            => Build(layout, dressing, extraEnemiesPerRoom, hunterLatched, false);
+
+        // The plan the host spawns from and peers rebuild (DiveHaulSync, CellarContentsSync): Build plus the floor's twist.
+        public static CellarEncounterPlan BuildForDive(CellarFloorLayout layout, CellarFloorDressing dressing, int extraEnemiesPerRoom, bool hunterLatched)
+            => Build(layout, dressing, extraEnemiesPerRoom, hunterLatched, true);
+
+        static CellarEncounterPlan Build(CellarFloorLayout layout, CellarFloorDressing dressing, int extraEnemiesPerRoom, bool hunterLatched, bool applyTwist)
         {
             if (layout == null) throw new System.ArgumentNullException(nameof(layout));
+            FloorTwist twist = applyTwist ? CellarFloorRoster.TwistOf(layout.Seed, layout.Floor) : FloorTwist.None;
+            int ambushRoom = -1;
+            if (twist == FloorTwist.Ambush)
+            {
+                var combat = new List<int>();
+                for (int r = 0; r < layout.Rooms.Count; r++) if (layout.Rooms[r].Room.Kind == RoomKind.Combat && layout.Rooms[r].Room.Spawns.Count > 0 && r != layout.LockedRoomIndex) combat.Add(r);
+                if (combat.Count > 0) ambushRoom = combat[new Pcg32(Rng.Derive(layout.Seed, "cellars.twist.rooms", ((ulong)layout.Floor << 32) | 0xFFFFFFFFUL)).Range(0, combat.Count)];
+                else twist = FloorTwist.None;
+            }
             int extra = extraEnemiesPerRoom < 0 ? 0 : extraEnemiesPerRoom;
             int n = CellarFloorLayout.GridSize;
             bool[,] blocked = BlockedCells(layout, dressing);
+            int firstCombat = -1;   // Crowded: the guaranteed room is the first Combat room that has a free cell, so the twist always adds one
+            if (twist == FloorTwist.Crowded)
+            {
+                for (int r = 0; r < layout.Rooms.Count && firstCombat < 0; r++) if (layout.Rooms[r].Room.Kind == RoomKind.Combat && FreeCells(layout.Rooms[r], blocked).Count > 0) firstCombat = r;
+                if (firstCombat < 0) twist = FloorTwist.None;
+            }
 
             var spawns = new List<EncounterSpawn>();
             var taken = new bool[n, n];
@@ -58,15 +85,20 @@ namespace SleepingCalamity.Core
                     CellPos w = p.Cell(sp.X, sp.Y); taken[w.X, w.Y] = true;
                     spawns.Add(new EncounterSpawn(w.X, w.Y, r, sp.Tier, EncounterKind.Authored));
                 }
-                if (extra == 0) continue;
-                List<CellPos> free = FreeCells(p, blocked);
-                var rng = new Pcg32(Rng.Derive(layout.Seed, "cellars.encounter", ((ulong)layout.Floor << 32) | (uint)r));
-                for (int k = 0; k < extra && free.Count > 0; k++)
+                int roomExtra = extra;
+                if (twist == FloorTwist.Crowded && (r == firstCombat || new Pcg32(Rng.Derive(layout.Seed, "cellars.twist.rooms", ((ulong)layout.Floor << 32) | (uint)r)).Range(0, 2) == 0)) roomExtra++;
+                if (roomExtra > 0)
                 {
-                    int i = rng.Range(0, free.Count);
-                    CellPos c = free[i]; free.RemoveAt(i); taken[c.X, c.Y] = true;
-                    spawns.Add(new EncounterSpawn(c.X, c.Y, r, SpawnTier.Tier1, EncounterKind.Extra));
+                    List<CellPos> free = FreeCells(p, blocked);
+                    var rng = new Pcg32(Rng.Derive(layout.Seed, "cellars.encounter", ((ulong)layout.Floor << 32) | (uint)r));
+                    for (int k = 0; k < roomExtra && free.Count > 0; k++)
+                    {
+                        int i = rng.Range(0, free.Count);
+                        CellPos c = free[i]; free.RemoveAt(i); taken[c.X, c.Y] = true;
+                        spawns.Add(new EncounterSpawn(c.X, c.Y, r, SpawnTier.Tier1, EncounterKind.Extra));
+                    }
                 }
+                if (twist == FloorTwist.Thin) ThinRoom(layout, spawns, taken, r);
             }
 
             EncounterSpawn hunter = null;
@@ -97,7 +129,27 @@ namespace SleepingCalamity.Core
                     }
                 }
             }
-            return new CellarEncounterPlan(layout.Seed, layout.Floor, extra, hunterLatched, spawns, hunter);
+            return new CellarEncounterPlan(layout.Seed, layout.Floor, extra, hunterLatched, spawns, hunter, CellarFloorRoster.RosterMask(layout.Seed, layout.Floor), twist, ambushRoom);
+        }
+
+        // Thin twist: -1 spawn in a room that has more than one: the last authored spawn that is not the gate-key carrier or the warden (so stir extras survive);
+        // only when none qualifies, the last extra. Never below one spawn per room.
+        static void ThinRoom(CellarFloorLayout layout, List<EncounterSpawn> spawns, bool[,] taken, int room)
+        {
+            int count = 0; for (int i = 0; i < spawns.Count; i++) if (spawns[i].RoomIndex == room) count++;
+            if (count <= 1) return;
+            int pick = -1;
+            for (int i = spawns.Count - 1; i >= 0 && pick < 0; i--)
+            {
+                EncounterSpawn s = spawns[i];
+                if (s.RoomIndex != room || s.Kind != EncounterKind.Authored) continue;
+                if (layout.Carrier != null && layout.Carrier.X == s.X && layout.Carrier.Y == s.Y) continue;
+                if (layout.WardenCell.HasValue && layout.WardenCell.Value.X == s.X && layout.WardenCell.Value.Y == s.Y) continue;
+                pick = i;
+            }
+            for (int i = spawns.Count - 1; i >= 0 && pick < 0; i--) if (spawns[i].RoomIndex == room && spawns[i].Kind == EncounterKind.Extra) pick = i;
+            if (pick < 0) return;
+            taken[spawns[pick].X, spawns[pick].Y] = false; spawns.RemoveAt(pick);
         }
 
         static bool[,] BlockedCells(CellarFloorLayout layout, CellarFloorDressing dressing)
