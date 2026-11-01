@@ -24,11 +24,12 @@ namespace SleepingCalamity.Core.Weapons
 
     public static class WeaponGrowth
     {
-        public const float FinisherMultiplier = 1.25f;
-        public const double CreditWindowSeconds = 10.0;   // inclusive: a hit exactly 10.0 s before the kill still counts
-        public const int FlatAtkFromLevel = 5;            // +2 ATK per level up to and including level 5, then +1
-        public const float BuildUpThreshold = 0.9f;       // build-up opens at 90% of the target's base
-        public const float BuildUpBonus = 0.1f;           // +10% of the target's base stats
+        // Tunable (Core/Tuning, "weaponGrowth"); the defaults are in WeaponGrowthTuning.
+        public static float FinisherMultiplier => Tuning.WeaponGrowthTuning.FinisherMultiplier;          // 1.25
+        public static double CreditWindowSeconds => Tuning.WeaponGrowthTuning.CreditWindowSeconds;       // 10.0, inclusive: a hit exactly 10.0 s before the kill still counts
+        public static int FlatAtkFromLevel => Tuning.WeaponGrowthTuning.FlatAtkFromLevel;                // 5: +2 ATK per level up to and including level 5, then +1
+        public static float BuildUpThreshold => Tuning.WeaponGrowthTuning.BuildUpThreshold;              // 0.9: build-up opens at 90% of the target's base
+        public static float BuildUpBonus => Tuning.WeaponGrowthTuning.BuildUpBonus;                      // 0.1: +10% of the target's base stats
 
         public static float SpeciesValue(Species s)
         {

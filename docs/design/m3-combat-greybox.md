@@ -136,6 +136,30 @@ The recorded Kenney clips replace the generated hit and whoosh sounds by file, b
 the hands (grip to fix). The ground footprints helped, but the real game should read enemy attacks without indicators: telegraph through the enemy's own wind-up
 (pose, anticipation, sound, a glint) and keep the footprint as an optional assist at most.
 
+## Tuning files (branch `tuning-loader`, 2026-11-01)
+Every number is still a P9 Placeholder, but the hero-side ones can now be changed without a rebuild. Optional `*.json` files are read once at startup
+(`TuningBootstrap`, Runtime) and laid over the code defaults by Core `TuningStore` (strict parser `MiniJson`, since Core cannot reference Newtonsoft).
+- **Folders, later wins:** `<StreamingAssets>/Tuning/` first, then `<persistentDataPath>/Tuning/` (the mod folder). Inside a folder files load in name order, so
+  `b.json` beats `a.json`. A missing folder or no files changes nothing: behaviour is identical to the code defaults.
+- **File shape:** one JSON object; each top-level key is a section, and only the keys you give are changed. Key names are case-insensitive.
+- **Sections and keys** (defaults are the old constants; defaults live in `Core/Tuning/TuningSections.cs`):
+  - `poise`: `resetSeconds`, `steadySeconds`, `perExtraPlayer` (`PoiseMeter`).
+  - `weaponGrowth`: `finisherMultiplier`, `creditWindowSeconds`, `flatAtkFromLevel` (whole number), `buildUpThreshold`, `buildUpBonus` (`WeaponGrowth`).
+  - `targeting`: `softConeHalfAngleDeg`, `softRange`, `heightBand`, `acquireRange`, `releaseRange`, `losGraceSeconds`, `hardHeightBand`, `facingWeight`,
+    `flickOn`, `flickOff`, `flickConeHalfAngleDeg` (`TargetingConfig`).
+  - `heroCombat`: `knockbackScale`, `hurtStagger`, `shotHeight`, `shotAssistDeg`, `shotRadius` (`HeroCombat` reads them from Core `HeroCombatTuning`).
+  - `attacks`: keyed by the hero attack id (`axe_1`, `axe_2`, `axe_f`, `axe_c`, `staff_1` ... `staff_s`, `dag_1` ... `dag_c`, `bow_1` ... `bow_s`), then any of
+    whole frames `totalFrames`, `cancelFrom`, `hitstopFrames`; windows `[start, end]` `hitOn`, `comboOpen`, `finisherAllowed`, `iFrames`, `superArmor`, `turn`,
+    `lunge`; numbers `multiplier`, `range`, `halfAngleDeg`, `heightBand`, `knockback`, `revenge`, `cameraKick`, `poise`, `turnDegPerSec`, `lungeMeters`;
+    flags `guardBreak`, `guardable`, `fire`. The air versions are derived from the ground ones again.
+  - Example: `{ "poise": { "steadySeconds": 3 }, "attacks": { "axe_1": { "range": 2.6, "hitOn": [10, 16] } } }`
+- **Bad input:** a file that is not a JSON object is ignored whole; an unknown section or key, a wrong type, a fractional value where a whole number is needed, or a
+  value outside its range is skipped and the default stays. Each message goes to `TuningStore.Log` (Unity's warning log) once, however often it repeats.
+- **Not covered yet:** enemy tables (`EnemyModel`, `EnemyRules`, `Core/Combat/Ai`, enemy attacks); another session owns them. `TuningStore.RegisterSection` is the
+  hook for an `enemies` section (marked TODO in `TuningStore.cs`). Enemy attack ids in `attacks` are logged as unknown.
+- **Multiplayer:** host and clients must load the same files; nothing is replicated.
+- Tests: `TuningStoreTests` (defaults unchanged, override, bad JSON, invalid values, unknown key once, folder order).
+
 ## Enemy polish: tells from the body, pacing (branch `m3-enemy-polish`, 2026-10-30)
 User notes after the retest: enemy attacks must read without ground indicators (wind-up pose, anticipation, sound, glint); retune the wave 4 to 5 step with
 `docs/research/combat-timings.md`. Everything is a P9 Placeholder, all numbers are data.

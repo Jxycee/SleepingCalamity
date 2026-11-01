@@ -147,7 +147,22 @@ namespace SleepingCalamity.Core.Combat
             Attacks[AirHit1] = hit1.AsAir();
             Attacks[AirHit2] = hit2.AsAir();
             Attacks[AirFinisher] = finisher.AsAir();
+            _defaults = (AttackData[])Attacks.Clone();
         }
+
+        readonly AttackData[] _defaults;
+
+        // Tuning (Core/Tuning): swap one ground attack for a tuned copy; the air version of a chain attack is derived again. Startup only.
+        public void Replace(int slot, AttackData tuned)
+        {
+            if (slot < Hit1 || slot > Special || tuned == null) return;
+            Attacks[slot] = tuned;
+            if (slot == Hit1) Attacks[AirHit1] = tuned.AsAir();
+            else if (slot == Hit2) Attacks[AirHit2] = tuned.AsAir();
+            else if (slot == Finisher) Attacks[AirFinisher] = tuned.AsAir();
+        }
+
+        public void RestoreDefaults() { Array.Copy(_defaults, Attacks, Count); }
 
         public AttackData Get(int index) => index >= 0 && index < Count ? Attacks[index] : null;
 

@@ -20,7 +20,9 @@ namespace SleepingCalamity.Gameplay
     public sealed class HeroCombat : NetworkBehaviour
     {
         public const byte NoAttack = 0xFF;
-        public const float KnockbackScale = 1f, HurtStagger = 0.25f;
+        // Tunable through Core/Tuning ("heroCombat"); defaults 1 and 0.25.
+        public static float KnockbackScale => SleepingCalamity.Core.Tuning.HeroCombatTuning.KnockbackScale;
+        public static float HurtStagger => SleepingCalamity.Core.Tuning.HeroCombatTuning.HurtStagger;
 
         // The owner's view of its own growth, refreshed by the host after every change (HUD, the spell gate).
         public sealed class GrowthMirror
@@ -411,7 +413,10 @@ namespace SleepingCalamity.Gameplay
             }
         }
 
-        public const float ShotHeight = 1.3f, ShotAssistDeg = 10f, ShotRadius = 0.25f;
+        // Tunable through Core/Tuning ("heroCombat"); defaults 1.3, 10 and 0.25.
+        public static float ShotHeight => SleepingCalamity.Core.Tuning.HeroCombatTuning.ShotHeight;
+        public static float ShotAssistDeg => SleepingCalamity.Core.Tuning.HeroCombatTuning.ShotAssistDeg;
+        public static float ShotRadius => SleepingCalamity.Core.Tuning.HeroCombatTuning.ShotRadius;
 
         private static Vector3 EnemyCentre(Enemy e) => e.transform.position + Vector3.up * (e.Def.Height * 0.5f);
 
