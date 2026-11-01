@@ -103,6 +103,45 @@ namespace SleepingCalamity.Core
             return PlaceResult.Ok;
         }
 
+        // Save restore (M6 S2): puts a building back exactly as saved, with the very pieces it consumed (pieces has one id per BuildingDef.Parts entry, -1 for an empty
+        // slot; the frame slot must be filled). Same rules as placing (size, occupied, path) plus: every piece belongs to that building's part and is not already stock or
+        // placed. Takes nothing from stock. A resident only moves in to a complete building and only if it is not already placed. Refused: nothing changes.
+        public PlaceResult RestoreBuilding(string buildingId, string foundationId, int turn, IReadOnlyList<int> pieces, bool withResident)
+        {
+            BuildingDef def = TownBuildings.Get(buildingId);
+            if (def == null) return PlaceResult.UnknownBuilding;
+            Foundation f = _layout.Foundation(foundationId);
+            if (f == null) return PlaceResult.UnknownFoundation;
+            if (f.Size != def.Size) return PlaceResult.SizeMismatch;
+            if (OccupantOf(foundationId) != null) return PlaceResult.FoundationOccupied;
+            if (_placed.ContainsKey(buildingId)) return PlaceResult.AlreadyPlaced;
+            if (pieces == null || pieces.Count != def.Parts.Length) return PlaceResult.UnknownPart;
+            if (pieces[0] < 0) return PlaceResult.NoFrame;
+            var used = new HashSet<int>();
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                int id = pieces[i];
+                if (id < 0) continue;
+                if (!PieceCatalog.TryGet(id, out PieceInfo info)) return PlaceResult.UnknownPiece;
+                if (info.Building != def.Id || info.Part != def.Parts[i]) return PlaceResult.UnknownPart;
+                if (!used.Add(id) || _stockPieces.Contains(id) || IsPlacedPiece(id)) return PlaceResult.AlreadyKnown;
+            }
+            var pb = new PlacedBuilding(def, foundationId, WishEvaluator.NormalTurn(turn), pieces[0]);
+            for (int i = 1; i < pieces.Count; i++) pb.PiecesByPart[i] = pieces[i] < 0 ? -1 : pieces[i];
+            if (PathRule.Blocked(_layout, _adj, Plus(pb))) return PlaceResult.PathBlocked;
+            if (withResident)
+            {
+                bool complete = true;
+                foreach (int p in pb.PiecesByPart) if (p < 0) complete = false;
+                if (!complete) return PlaceResult.NotComplete;
+                if (IsPlacedResident(def.ResidentId)) return PlaceResult.ResidentAlreadyPlaced;
+                pb.Resident = def.ResidentId;
+                _stockResidents.Remove(def.ResidentId);
+            }
+            _placed[buildingId] = pb;
+            return PlaceResult.Ok;
+        }
+
         // Turns a placed building (the foundation snap keeps it on its lot); refused if the new door side cuts the path graph.
         public PlaceResult SetTurn(string buildingId, int turn)
         {
