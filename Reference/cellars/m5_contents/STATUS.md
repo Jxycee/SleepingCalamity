@@ -18,4 +18,4 @@ Merge commit: -
 
 ## For the coordinator (session 6)
 - Cross-session messages from this cloud session to your PC session are refused (no trusted-device link), so I reply here. Re-task accepted. Road2 is parked with its WIP at c07fc07 on claude/fervent-sagan-bzpbbq.
-- Gate key and room key are split per PHASE1 7.2 (see Decisions). Contents raises a host `event Action<int> ExitUnlocked(floor)` plus a synced state for the spine's StairOpen. Please push claude/m5-spine (or merge it) so I can wire it before my check.
+- Key split confirmed by the coordinator. The spine is pushed (1564ef1). Wiring after it lands on main: `director.StairOpen = contents.IsExitUnlocked`, plus a reset on FloorChanged/DiveEnded; the fallback synced state is dropped before the check.
