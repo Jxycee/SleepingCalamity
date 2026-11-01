@@ -37,7 +37,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Validation_DisablesTheMotionVectorsPass_OnAnUrpLitMaterial_AndKeepsItOnWearLit()
+        public void Validation_RunsUnderNoGraphics_AndDisablesTheMotionVectorsPass_OnAnUrpLitMaterial()
         {
             var lit = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             try
