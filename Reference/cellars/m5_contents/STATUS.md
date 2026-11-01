@@ -2,8 +2,8 @@
 
 Session: M5 floor contents: enemies, chests, key + door, pieces
 Job: coordinator (session 6) re-task 2026-11-01: per-room enemy spawning from CellarEncounterPlan, chests with a rank-filtered Core loot roll, the gate key from the carrier enemy, the locked room's key + door, bakery piece spots on floors 1-3 with pieces-left, stir effects consumed (extras at 40, placeholder hunter at 70). Host-authoritative, EditMode + PlayMode host/client tests.
-Progress: 85%
-Status: IN PROGRESS (green on the branch; waiting for the spine on main, then merge main + wiring + check)
+Progress: 90%
+Status: IN PROGRESS (spine merged into the branch at ae447dc; wiring into DiveDirector + scene regeneration running; then risk review and check)
 Blocker: none
 Archive: no
 Branch: claude/m5-contents
@@ -44,3 +44,10 @@ Merge commit: -
 - Disk: the session allowance filled with three worktree Libraries; two merged worktrees were removed.
 - Branch runs on f0cedfb: build PASS; test-edit PASS 822/822; test-play PASS 46 passed / 8 skipped / 0 failed (the 8 skips predate this job). Not the merge check.
 - CellarFloorBuilder.cs now differs from main by one removed line and one call line (ParentBuiltFloor lives in CellarFloorBuilder.Contents.cs), per the coordinator's merge-order ask (spine, contents, Q12 procgen, floor art).
+- Spine on main (e525a51), merged into the branch at ae447dc. Conflicts resolved: both prefab entries kept, and the generated asset and test scene were taken from main for regeneration.
+- Wiring now in progress, as a small, commented contents hook in DiveDirector:
+  - spawn CellarContentsSync;
+  - FloorChanged -> ServerArmFloor, DiveEnded/DiveFailed -> ServerClearFloor;
+  - ExitUnlocked -> ServerOpenStair, and RequireGateKey = true;
+  - a CombatHost for Arena_Dive;
+  - one interact press does one thing.
