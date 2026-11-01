@@ -80,3 +80,4 @@ MonoBehaviour:
   healPrefab: {fileID: 496700376229797227, guid: d702d00db174db24389a5f9c487887ca, type: 3}
   FloorSync: {fileID: 0}
   HaulSync: {fileID: 0}
+  AutoArm: 1
