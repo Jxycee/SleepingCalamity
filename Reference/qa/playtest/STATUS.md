@@ -1,12 +1,12 @@
 # Alpha playtest (bug hunt)
-Status: IN PROGRESS (BUGS.md written: 6 major + 12 minor + speculative; check running, then merge)
+Status: DONE (BUGS.md: 6 major + 12 minor + speculative leads; DiveBot, VoidEdge scan check and the bug list merged to main on a green check)
 Blocker: none
 Branch: claude/great-lovelace-r22yqw (restarted from main dd4526c)
-Last check: none yet on this branch
-Next: green check -> merge DiveBot + VoidEdge scan check + BUGS.md to main -> DONE
+Last check: PASS at 5acf6b6 (EditMode all passed, PlayMode 68 passed 15 skipped: the bot runs are SC_BOT-only)
+Next: owners take BUGS.md items (combat/enemy AI: 1, 2, 6-8, 14-16; dive flow: 3-5, 9-11; contents: 12-13; town: 17). With M6 S3 on main, re-run TraversalScan on the new Hollowmere hub and WriteBaseline before working FIXLIST town items.
 Session: World traversal scan (cloud), second job on the user's request
 Job: Alpha tester: find as many play bugs as possible (DiveBot playthroughs of real solo dives + code read-throughs of dive flow, contents, combat)
-Archive: no
+Archive: ready
 
 ## Results so far
 - Bug list: Reference/qa/playtest/BUGS.md (owners per item: combat / enemy AI, dive flow, contents, town).
