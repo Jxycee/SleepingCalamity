@@ -15,7 +15,8 @@ namespace SleepingCalamity.Core
     // PLACEHOLDER tuning in ONE spot (percent of floors 2-3; the rest is None). The user's three-run check decides the real numbers.
     public static class FloorTwistTuning
     {
-        public const int AmbushPercent = 0;   // inert until the runtime ambush behaviour exists (the plan data, AmbushRoom, is kept)
+        public const int AmbushPercent = 12;   // procgen 3b ambush, deliberate: placeholder, the user's three-run check decides the real number
+        public const float AmbushDelaySeconds = 0.75f;   // placeholder: how long after a player enters the ambush room its enemies spring at the ring cells
         public const int ThinPercent = 12;
         public const int CrowdedPercent = 12;
         public const int FirstTwistFloor = 2, LastTwistFloor = 3;
