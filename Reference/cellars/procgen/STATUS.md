@@ -1,9 +1,9 @@
 # Cellars procedural generation (procgen track)
-Status: IN PROGRESS (item 1a-c merging; 1d and 3 deferred to the M5 contents session's chests/spawner)
-Blocker: none. Coordinator 2026-10-31: Core-only items first (1, 2, 4); hold procgen merges while a spine or contents STATUS says "check running"; builder hooks only in CellarFloorBuilder.Procgen.cs
-Branch: claude/cellar-procgen
-Last check: PASS at 9c7a8040 (EditMode 855/855, PlayMode 58 passed 8 skipped); item 1 merged to main 49dfca96
-Next: item 2 check running at 65013614 (main 94f4c3d0 merged in, scenes regenerated); then item 4 (54e3bd9a, has item 2 in it, ChunksHash re-pinned); then 1d, 3 (unblocked by M5 contents), 5
+Status: IN PROGRESS (items 1a-c, 1d, 2, 3, 4 merged; 4-clutter follow-up waits for Road 2b; 5, 6 next)
+Blocker: none
+Branch: one per item (claude/procgen-<item>); merged: cellar-procgen (1a-c), procgen-item2, procgen-item4, procgen-1d-loot
+Last check: PASS at fbf68c6c (1d; EditMode 892/892, PlayMode 61 passed 8 skipped); merged 1e410aff
+Next: clutter follow-up (claude/procgen-item4-clutter 94dd1550) after Road 2b; then 5 (vignettes), 6 (floor-art follow-ups: bare-room socket density, wall/overhead sockets, warm light sockets)
 Session: Procgen next (successor, worktree procgen-next-73e90d)
 Archive: no
 
@@ -59,3 +59,9 @@ Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/
 - 2026-10-31: item 2 should-fixes done (afc69465, EditMode 847/847): ExitAdjacentToEntry is one corridor flood (no CellarRoomGraph per attempt), ~5 ms/floor, 373 retries / 0 fallbacks in 16000 floors; timeouts 900 s -> 300 s with seed counts 20000->4000, 10000->2000; Wing loop endpoint test; stale golden names renamed.
 - 2026-10-31: item 4 heal fix done (7715779d): CellarRoomChunks marks CellarHealing.PointFor's cell as taken; Chunks_NeverCoverTheHealPoint (1000 seeds x floors 1-3); hash test reworded; spread 59.1% / 61.5% unchanged. Item 2 merged into item 4 (54e3bd9a, 856/856), ChunksHash floors 1-3 re-pinned (deliberate, layout moved).
 - 2026-10-31: item 1 merged to main 49dfca96 (check PASS 9c7a8040).
+- 2026-11-01: item 2 merged 82ec8951 (check PASS cebcc2aa). Goldens moved on purpose incl. floor-art CellarFloorClutterTests (layout/dressing/clutter). DiveWalkQaTests stir step entered the room on an enemy spawn cell; the spawned enemy shoved the hero off the new layout's floor edge: test now uses a free non-spawn cell.
+- 2026-11-01: item 4 merged 8e545b6c (check PASS f3202da2). Follow-up: chunks avoiding floor clutter killed variety (worst variant 93.8%), so clutter yields to chunk block/cover cells instead (CellarFloorClutter.Resolve takes chunks; builder passes them; clutter goldens floors 2-3 re-pinned): claude/procgen-item4-clutter 94dd1550, EditMode 888/888, merges after Road 2b.
+- 2026-11-01: item 1d merged 1e410aff (check PASS fbf68c6c). CellarLootMix: integer feedback steering of non-key chest category (Common 1-2 / Fine 3 / Rare 4-5) toward per-floor targets, K=2, placeholders in CellarLootMixTuning; 1500 dives: Common .476/.477, Fine .328/.327, Rare .196/.195. No network shape change. User check: floor-1 Common low-share test limit 0.85 -> 0.80 (real chests only).
+- 2026-11-01: item 3 built (claude/procgen-3-roster 6994ef10): CellarFloorRoster roster subset (floors 2-3) + twist None/Ambush/Thin/Crowded (floors 2-3, once per dive), BuildForDive on host and peer fallback, spawner uses RosterMask. Risk review: approve with fixes (Thin must keep stir extras; Ambush 0% until runtime exists; tautological test; shared array) in progress.
+- Wrapper note: Tools/unity.ps1 defaults -ProjectRoot to the main checkout; from a worktree always pass -ProjectRoot <worktree>.
+- 2026-11-01: item 3 merged 81e02815 (check PASS ac07c6b2). Twist shares floors 2-3: None .782, Thin .112, Crowded .107, Ambush 0 (inert until runtime ambush exists). Item 5 (vignettes) being built on claude/procgen-5-vignettes.
