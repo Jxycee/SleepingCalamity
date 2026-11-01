@@ -280,7 +280,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 7084911976074808467UL, GoldenClutter12345Floor3 = 16045132977935244835UL;   // re-pinned 2026-11-01 (procgen item 2: presets moved the placement, deliberate)
+        const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 7084911976074808467UL, GoldenClutter12345Floor3 = 3584408126852206761UL;   // floor 3 re-pinned 2026-11-01: procgen 5 vignettes, deliberate (floors 1-2 unchanged; earlier: procgen item 2)
 
         [Test]
         public void Golden_Seed12345_ClutterHash()
