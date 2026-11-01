@@ -12,7 +12,7 @@ Builds Hollowmere and the Cellars test floor first, unless `SC_CAPTURE_NOBUILD` 
 
 ## Output
 
-- `Reference/private/trailers/<yyyy-MM-dd>-<sha>/trailer.mp4` (gitignored), burned in bottom right: short sha and date.
+- `<main checkout>\Reference\private	railers\<yyyy-MM-dd>-<sha>	railer.mp4` (main checkout, gitignored, survives worktree removal; override with SC_TRAILER_OUT), burned in bottom right: short sha and date.
 - `key_01..key_06.png` in the same folder: ruined square, rebuilt square, lane, home door, stair, cellar.
 - Frames: `%TEMP%\sc_trailer_frames` (cleaned at start; `seq/` holds the numbered PNGs ffmpeg read).
 
@@ -33,7 +33,7 @@ Every frame's camera is tested against temporary MeshColliders added to the scen
 
 ## ffmpeg
 
-Looked for in this order: `SC_FFMPEG`, `C:\Dev\_tools\ffmpeg\**\bin\ffmpeg.exe`, PATH. Installed from the official BtbN build (https://github.com/BtbN/FFmpeg-Builds/releases, `ffmpeg-master-latest-win64-gpl.zip`) into `C:\Dev\_tools\ffmpeg`. Encode: libx264, crf 16, yuv420p, drawtext with `C:/Windows/Fonts/arial.ttf`.
+Looked for in this order: `SC_FFMPEG`, `C:\Dev\_tools\ffmpeg\**\bin\ffmpeg.exe`, PATH. Installed from the official BtbN build (https://github.com/BtbN/FFmpeg-Builds/releases, `ffmpeg-master-latest-win64-gpl.zip`) into `C:\Dev\_tools\ffmpeg`. Encode: libx264, preset slow, crf 26 (about 30-60 MB for 75 s), yuv420p, faststart, drawtext with `C:/Windows/Fonts/arial.ttf`.
 
 ## Notes
 

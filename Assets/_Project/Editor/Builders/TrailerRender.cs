@@ -2,7 +2,7 @@
 // door to the Undercroft stair) and then the Cellars test floor (fixed seed), encoded to MP4 with ffmpeg. Everything is deterministic: the camera route is a table of waypoints
 // evaluated with Catmull-Rom splines at t = frame / 30, Midday light, particles simulated once to a fixed settled time, no Time.deltaTime.
 //   powershell -NoProfile -ExecutionPolicy Bypass -File Tools\unity.ps1 exec -Graphics -Method SleepingCalamity.EditorTools.TrailerRender.Render -OutDir <scratch>
-// Output: <repo>/Reference/private/trailers/<yyyy-MM-dd>-<sha>/trailer.mp4 + key_01..key_06.png (gitignored). Frames go to %TEMP%\sc_trailer_frames (cleaned at start).
+// Output: <main checkout>/Reference/private/trailers/<yyyy-MM-dd>-<sha>/trailer.mp4 + key_01..key_06.png (gitignored). Frames go to %TEMP%\sc_trailer_frames (cleaned at start).
 // Env knobs: SC_TRAILER_FPS_SKIP=N (render every Nth frame, encode at 30/N fps, file trailer_preview.mp4), SC_TRAILER_FRAMES="a-b" (frame range),
 //   SC_TRAILER_CHECKONLY=1 (no rendering: only the per-frame camera clearance check), SC_CAPTURE_NOBUILD (reuse the built scenes), SC_FFMPEG (ffmpeg.exe path),
 //   SC_TRAILER_OUT (output folder), SC_TRAILER_FRAMEDIR.
@@ -124,7 +124,7 @@ namespace SleepingCalamity.EditorTools
             string sha = Git(projectRoot, "rev-parse --short HEAD");
             string date = DateTime.Now.ToString("yyyy-MM-dd");
             string outDir = Env("SC_TRAILER_OUT");
-            if (string.IsNullOrEmpty(outDir)) outDir = Path.Combine(projectRoot, "Reference", "private", "trailers", date + "-" + sha);
+            if (string.IsNullOrEmpty(outDir)) outDir = Path.Combine(MainCheckoutRoot(projectRoot), "Reference", "private", "trailers", date + "-" + sha);   // the main checkout, so videos outlive a worktree
             string frameDir = Env("SC_TRAILER_FRAMEDIR");
             if (string.IsNullOrEmpty(frameDir)) frameDir = Path.Combine(Path.GetTempPath(), "sc_trailer_frames");
             string ffmpeg = checkOnly ? null : FindFfmpeg();   // fail early, before the long render
@@ -437,13 +437,22 @@ namespace SleepingCalamity.EditorTools
             string text = sha + "  " + date;   // no colon: drawtext would need it escaped
             string vf = "drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':text='" + text + "':fontcolor=white@0.9:fontsize=24:x=w-tw-28:y=h-th-24:box=1:boxcolor=black@0.35:boxborderw=8";
             var psi = new ProcessStartInfo(ffmpeg) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
-            foreach (string a in new[] { "-y", "-framerate", fps.ToString(), "-i", Path.Combine(seqDir, "s_%05d.png"), "-vf", vf, "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", mp4 }) psi.ArgumentList.Add(a);
+            foreach (string a in new[] { "-y", "-framerate", fps.ToString(), "-i", Path.Combine(seqDir, "s_%05d.png"), "-vf", vf, "-c:v", "libx264", "-preset", "slow", "-crf", "26", "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4 }) psi.ArgumentList.Add(a);
             using (Process p = Process.Start(psi))
             {
                 string err = p.StandardError.ReadToEnd();
                 if (!p.WaitForExit(20 * 60 * 1000)) { try { p.Kill(); } catch { } throw new TimeoutException("ffmpeg timed out"); }
                 if (p.ExitCode != 0) throw new InvalidOperationException("ffmpeg failed (" + p.ExitCode + "): " + err.Substring(Mathf.Max(0, err.Length - 1500)));
             }
+        }
+
+        // The checkout that owns the .git folder (the repo root itself when not in a linked worktree).
+        static string MainCheckoutRoot(string projectRoot)
+        {
+            string common = Git(projectRoot, "rev-parse --git-common-dir");
+            if (common == "nogit") return projectRoot;
+            string gitDir = Path.GetFullPath(Path.IsPathRooted(common) ? common : Path.Combine(projectRoot, common));
+            return Path.GetDirectoryName(gitDir.TrimEnd('\\', '/'));
         }
 
         static string Git(string workDir, string args)
