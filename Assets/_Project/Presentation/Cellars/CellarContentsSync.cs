@@ -210,8 +210,17 @@ namespace SleepingCalamity.Presentation
             bool now = intent.InteractPressed || intent.InteractHeld;
             bool edge = now && !_prevInteract; _prevInteract = now;
             if (!edge || fs.Built == null) return;
+            int best = FindLocalTarget(fs, po.transform.position, out bool gate);
+            if (best >= 0) RequestOpenChest(best);
+            else if (gate) RequestOpenDoor();
+        }
+
+        // The chest (index) or the gate that an Interact press at `p` would use; -1 and gate=false when none is in range.
+        private int FindLocalTarget(CellarFloorSync fs, Vector3 p, out bool gate)
+        {
+            gate = false;
+            if (fs == null || fs.Built == null) return -1;
             ContentsState s = Net.Value; bool ok = StateMatches(fs, s);
-            Vector3 p = po.transform.position;
             int best = -1; float bestD = ChestRange * ChestRange;
             for (int i = 0; i < _chests.Length; i++)
             {
@@ -219,9 +228,13 @@ namespace SleepingCalamity.Presentation
                 float d = FlatSqr(p, _chests[i].position);
                 if (d <= bestD) { bestD = d; best = i; }
             }
-            if (best >= 0) { RequestOpenChest(best); return; }
-            if (_gate != null && !(ok && s.DoorOpen) && FlatSqr(p, _gate.position) <= GateRange * GateRange) RequestOpenDoor();
+            if (best >= 0) return best;
+            gate = _gate != null && !(ok && s.DoorOpen) && FlatSqr(p, _gate.position) <= GateRange * GateRange;
+            return -1;
         }
+
+        /// <summary>Owner side: true when an Interact press at `p` would open a chest or the gate. The dive director then leaves that press to the contents (one press, one action).</summary>
+        public bool WouldUseInteract(Vector3 p) { int c = FindLocalTarget(FloorSync, p, out bool gate); return c >= 0 || gate; }
 
         public void RequestOpenChest(int chestIndex) { RequestOpenChestRpc(chestIndex); }
         public void RequestOpenDoor() { RequestOpenDoorRpc(); }
@@ -392,7 +405,7 @@ namespace SleepingCalamity.Presentation
             if (c == null)
             {
                 var go = new GameObject("CellarCombat"); go.transform.SetParent(transform, false);
-                c = go.AddComponent<CombatHost>(); c.WavesEnabled = false;
+                c = go.AddComponent<CombatHost>(); c.WavesEnabled = false; c.WipeResetsParty = false;
                 c.Configure(slimePrefab, ratPrefab, broomPrefab, wardenPrefab, healPrefab);
                 _ownsCombat = true;
             }

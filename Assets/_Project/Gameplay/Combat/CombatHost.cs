@@ -38,6 +38,7 @@ namespace SleepingCalamity.Gameplay
 
         public bool AiEnabled = true;
         public bool WavesEnabled = true;
+        public bool WipeResetsParty = true;   // false (the dive's contents host): a wipe clears the enemies but leaves the revive/fail flow to the dive director
         public float CritChance = DamageFormula.CritChance;
         public float ClearHeal = 20f;
 
@@ -425,7 +426,7 @@ namespace SleepingCalamity.Gameplay
             if (_wave == WaveState.Wiped)
             {
                 _wipeTimer -= dt;
-                if (_wipeTimer <= 0f)
+                if (_wipeTimer <= 0f && WipeResetsParty)
                 {
                     for (int i = 0; i < heroes.Count; i++)
                     {
