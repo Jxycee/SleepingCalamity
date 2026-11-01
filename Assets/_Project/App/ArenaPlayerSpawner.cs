@@ -57,6 +57,7 @@ namespace SleepingCalamity.App
         {
             if (!_nm.IsServer) return false;
             CombatHost combat = UnityEngine.Object.FindFirstObjectByType<CombatHost>();
+            if (combat != null) combat.Identity = _roster;   // growth follows the recorded player, not the client id
             return combat != null && combat.ServerBegin(_nm);
         }
 
