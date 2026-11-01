@@ -29,6 +29,16 @@ Solo runs the same steps as a local host. In co-op, every step is host-authorita
 | Weapons | `Core/Weapons/WeaponsSave.cs` (keyed by `OwnerId` = `PlayerKey.Id`, round-trip tested, **not wired**); `CombatHost` keeps growth by `clientId.ToString()` | A host map from client id to `PlayerKey` (the roster already knows both at approval); growth keyed by `PlayerKey`; restore on spawn; capture on save |
 | Data | `Data` assembly is empty; all content is static Core tables with int or string ids | Keep it that way for Phase 1 (Core tables: pieces, buildings, residents, wishes) |
 
+## 3a. User decisions (2026-11-01, 8:10am CST)
+All six recommendations were accepted:
+- **Q1:** A, Hollowmere is the hub scene and floors are built under the town.
+- **Q2:** A, one builder at a time, under a host lock.
+- **Q3:** A, wishes are measured from the door and the footprint, in pure Core functions.
+- **Q4:** C, the split: the first-meet beat is permanent, and loaves are granted at dive start only if the wishes are met then.
+- **Q5:** C, per-entry cleaning plus a conservation pass. Quitting mid-dive counts as a failed dive.
+- **Q6:** A, no decorations in M6.
+S0 keying (weapon growth by PlayerKey) is merged in `fa18ff88`. The S0 `weapons` save section is next.
+
 ## 3. Open questions for the user
 **Q1. How does the party get home?** (scene shape)
 - A. **Hollowmere becomes the hub scene.** Floors are built at an offset under the town, as `Arena_Dive` does now. No scene loads during play.
