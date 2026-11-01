@@ -21,7 +21,9 @@ namespace SleepingCalamity.EditorTools
         public const string ScenePath = "Assets/_Project/Scenes/CellarFloorTest.unity";
         public const uint Seed = 12345;
         public const int FloorNumber = 1;
-        const float Ambient = 0.8f;
+        const float Ambient = CellarArtTuning.Ambient;   // the colour tuning block lives in CellarFloorBuilder.Art.cs (was 0.8)
+        const string ClutterFolder = "Assets/_Project/Content/Art/Cellar/B5/CellarClutter";
+        static readonly string[] ClutterPieces = { "Crate", "CrateStack", "JarCluster", "Rubble", "SackPile" };
         const string MaterialsFolder = "Assets/_Project/Content/Materials/CellarFloor";
         const string LanternFolder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
         static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate" };
@@ -68,7 +70,17 @@ namespace SleepingCalamity.EditorTools
                 DungeonCornerBuilder.Clone(src, holder, slots, piece);
                 kit.Pieces[piece] = holder.gameObject;
             }
-            Debug.Log("SC CELLARFLOOR art pieces " + kit.Pieces.Count + "/" + ArtPieces.Length + ": " + string.Join(",", kit.Pieces.Keys));
+            // the floor-art-2 clutter kit (Crate, CrateStack, JarCluster, Rubble, SackPile): same CV_* material slots, loaded by path; a missing FBX leaves the greybox fallback
+            GameObject clutterFbx = BeautyCornerArt.LoadModel(ClutterFolder, "CellarClutter.fbx", keepMaterialSlots: true);
+            foreach (string piece in ClutterPieces)
+            {
+                Transform src = clutterFbx != null ? clutterFbx.transform.Find(piece) : null;
+                if (src == null) continue;
+                var holder = new GameObject(piece).transform; holder.SetParent(templates, false);
+                DungeonCornerBuilder.Clone(src, holder, slots, piece);
+                kit.Pieces[piece] = holder.gameObject;
+            }
+            Debug.Log("SC CELLARFLOOR art pieces " + kit.Pieces.Count + "/" + (ArtPieces.Length + ClutterPieces.Length) + ": " + string.Join(",", kit.Pieces.Keys));
             GameObject lantern = BeautyCornerArt.LoadModel(LanternFolder, "CellarLantern.fbx");
             string[] guids = AssetDatabase.FindAssets("M_CellarLantern t:Material");
             Material lanternMat = guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
