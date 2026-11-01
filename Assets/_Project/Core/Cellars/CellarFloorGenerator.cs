@@ -1,5 +1,5 @@
 // Core/Cellars/CellarFloorGenerator.cs: the M5 seeded floor generator for the Undercroft Cellars (PHASE1 7.2). Pure C#, no engine references.
-// Generate(seed, floor) builds floors 1-3 from the room pool; floor 4 is a fixed placeholder (see BuildStub). Authority: none (static; the host sends
+// Generate(seed, floor) builds floors 1-3 from the room pool; floor 4 is the fixed bakery oven maze (see BuildBakery, rooms in CellarBakeryPool). Authority: none (static; the host sends
 // (seed, floor) and every client builds the same floor, so nothing here may depend on the machine).
 //
 // Determinism: only Pcg32 / Rng / Fnv1a64 are used. No string.GetHashCode, no iteration over a HashSet or Dictionary for a decision (those are only used
@@ -23,6 +23,9 @@
 // if room picking or placement is exhausted it retries over derived streams (Rng.Derive(seed, "cellars.retry", floor<<32 | n)), and as a last resort
 // builds MinimalPlan (the 2-3 smallest unlocked combat rooms) over derived streams. Retry 0 is the original stream, so seeds that worked keep their floor.
 // Generate(seed, floor, out fallback) reports 0 / 1 (retry) / 2 (last resort) so tests can count them.
+// Exit distance (variety layer 7, research 3.7a): a built floor whose walk from the first party start to the stair exit is shorter than MinExitDistance
+// steps is thrown away like any failed attempt (the attempt loop rolls again on the same stream), so the way down is never right next to the way in.
+// Floors that were already long enough keep their layout; only the short ones re-roll. The last resort relaxes the bound only after every stream failed it.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -43,7 +46,7 @@ namespace SleepingCalamity.Core
 
     public static class CellarFloorGenerator
     {
-        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16;
+        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16, MinExitDistance = 12;
         const int G = CellarFloorLayout.GridSize;
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
@@ -160,13 +163,13 @@ namespace SleepingCalamity.Core
         public static CellarFloorLayout Generate(uint seed, int floor, out int fallback)
         {
             fallback = 0;
-            if (floor == 4) return BuildStub(seed);
+            if (floor == 4) return BuildBakery(seed);
             if (floor < 1 || floor > 4) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-4");
             CellarFloorPlan plan = PickRooms(seed, floor, out fallback);
             for (int retry = 0; retry <= BuildRetries; retry++)
             {
                 ulong stream = retry == 0 ? FloorSeed(seed, floor) : Rng.Derive(seed, "cellars.retry", ((ulong)floor << 32) | (uint)(0x10000 + retry));
-                CellarFloorLayout l = BuildWith(seed, plan, stream, MaxAttempts);
+                CellarFloorLayout l = BuildWith(seed, plan, stream, MaxAttempts, MinExitDistance);
                 if (l != null) { if (retry > 0 && fallback == 0) fallback = 1; return l; }
             }
             fallback = 2;
@@ -179,17 +182,21 @@ namespace SleepingCalamity.Core
         {
             if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-3");
             CellarFloorPlan plan = MinimalPlan(seed, floor);
+            // Two streams get the full exit bound; the minimal plan rarely reaches it, so the rest relax it at once instead of burning every stream first.
             for (int n = 0; n < LastResortStreams; n++)
             {
-                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts);
-                if (l != null) return l;
+                int bound = n < 2 ? MinExitDistance : 0;
+                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, bound);
+                if (l == null) continue;
+                if (l.EntryToExitDistance() < MinExitDistance) l.MarkLastResort();   // a floor with a short exit beats no floor
+                return l;
             }
             throw new InvalidOperationException("CellarFloorGenerator: even the minimal plan did not place for seed " + seed + " floor " + floor);
         }
 
-        static CellarFloorLayout BuildWith(uint seed, CellarFloorPlan plan, ulong stream, int attempts)
+        static CellarFloorLayout BuildWith(uint seed, CellarFloorPlan plan, ulong stream, int attempts, int minExit)
         {
-            var b = new Builder(new Pcg32(stream));
+            var b = new Builder(new Pcg32(stream)) { MinExit = minExit };
             for (int attempt = 0; attempt < attempts; attempt++)
             {
                 b.Reset();
@@ -199,22 +206,32 @@ namespace SleepingCalamity.Core
             return null;
         }
 
-        // Floor 4 PLACEHOLDER. The real floor 4 is the taken bakery's oven maze with the baker asleep at its heart and the Dough Warden on guard (PHASE1
-        // 7.2); that set-piece is the next M5 step. Until then this is a small fixed layout from the same pool so the dive loop can end somewhere:
-        // entry, the press hall, the stair hall and a chicane room (the stair hall is the way down/out), no locked room, no gate key, no extra chest
-        // top-up. It is exempt from the 6-8 chest rule. The rooms and positions are hard-coded (all unrotated); only the corridor routes are computed.
-        static CellarFloorLayout BuildStub(uint seed)
+        // Floor 4: the taken bakery's oven maze (PHASE1 7.2), a FIXED layout: the seed is ignored (every seed gives the same floor; only the layout's Seed
+        // field records it). Rooms and positions are hard-coded, all unrotated; only the corridor routes are computed (unshuffled BFS, so they are fixed too).
+        //   entry -> oven mouth -+-> proofing room -+-> kneading hall -> flue antechamber -> baker's hearth
+        //                        '-> flour store ---'
+        // The mouth, proofing room, kneading hall and flour store form a ring (the loop, two routes through the maze). The antechamber (the Dough Warden's
+        // Tier2 spawn) has the hearth's only door, so the heart (baker marker + the rescue Bank cell, a second bank point that leads home) is reached only
+        // through it. No stair exit, no locked room, no gate key; 7 chests in the maze rooms and the antechamber (PHASE1: 6-8 per floor).
+        static CellarFloorLayout BuildBakery(uint seed)
         {
             var b = new Builder(new Pcg32(4444));
             b.Reset();
-            int entry = b.PlaceFixed(Special(RoomKind.Entry), 0, 1, 1);
-            int hall = b.PlaceFixed(CellarRoomPool.Find("wine_press_hall"), 0, 6, 1);
-            int exit = b.PlaceFixed(Special(RoomKind.StairExit), 0, 6, 7);
-            int chicane = b.PlaceFixed(CellarRoomPool.Find("coal_stoke_chicane"), 0, 2, 7);
-            b.LinkFixed(entry, CellSide.East, hall, CellSide.West);
-            b.LinkFixed(hall, CellSide.East, exit, CellSide.North);
-            b.LinkFixed(exit, CellSide.West, chicane, CellSide.East);
-            return b.Assemble(seed, 4, true, SubTheme.Any, null);
+            int entry = b.PlaceFixed(Special(RoomKind.Entry), 0, 0, 0);
+            int mouth = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.MouthId), 0, 5, 0);
+            int proof = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.ProofingId), 0, 9, 0);
+            int flour = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.FlourId), 0, 5, 5);
+            int knead = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.KneadingId), 0, 9, 5);
+            int ante = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.AntechamberId), 0, 9, 9);
+            int heart = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.HeartId), 0, 2, 9);
+            b.LinkFixed(entry, CellSide.East, mouth, CellSide.West);
+            b.LinkFixed(mouth, CellSide.East, proof, CellSide.West);
+            b.LinkFixed(mouth, CellSide.South, flour, CellSide.North);
+            b.LinkFixed(proof, CellSide.South, knead, CellSide.North);
+            b.LinkFixed(flour, CellSide.East, knead, CellSide.West);
+            b.LinkFixed(knead, CellSide.South, ante, CellSide.North);
+            b.LinkFixed(ante, CellSide.West, heart, CellSide.East);
+            return b.Assemble(seed, 4, true, SubTheme.Bakery, null);
         }
 
         // All mutable placement state for one attempt. rng is a mutable struct kept in this field and never copied.
@@ -231,7 +248,8 @@ namespace SleepingCalamity.Core
             readonly int[] parent = new int[G * G];
             readonly int[] queue = new int[G * G];
             int lockedIndex = -1, lockedLink = -1;
-            public readonly int[] Fails = new int[5];   // attempts lost per stage: room placement, loops, dead ends, carriers, (spare); shown when Generate gives up
+            public int MinExit;                          // least entry-to-exit walking distance a built floor may have (0 = no bound)
+            public readonly int[] Fails = new int[5];   // attempts lost per stage: room placement, loops, dead ends, carriers, exit too close; shown when Generate gives up
 
             public Builder(Pcg32 rng) { this.rng = rng; }
 
@@ -526,10 +544,12 @@ namespace SleepingCalamity.Core
                 }
                 if (carriers.Count == 0) { Fails[3]++; return null; }
                 GateKeyCarrier carrier = carriers[rng.Range(0, carriers.Count)];
-                return Assemble(seed, plan.Floor, false, plan.Theme, carrier, keyRoom, need);
+                CellarFloorLayout built = Assemble(seed, plan.Floor, false, plan.Theme, carrier, keyRoom, need);
+                if (MinExit > 0 && built.EntryToExitDistance() < MinExit) { Fails[4]++; return null; }
+                return built;
             }
 
-            // Fixed placement for the floor 4 stub (no rng, no checks beyond Fits).
+            // Fixed placement for floor 4 (no rng, no checks beyond Fits).
             public int PlaceFixed(CellarRoom room, int q, int x, int y)
             {
                 CellarRoom rot = Rot(room, q);

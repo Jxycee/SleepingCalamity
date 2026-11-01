@@ -79,6 +79,9 @@ namespace SleepingCalamity.EditorTools
             return kits.Count == KitNames.Length;
         }
 
+        // The shared B9 foliage material (M_B9_Foliage), for other builders' leaf slots (Q15 road hedges); null when the B9 art is missing.
+        internal static Material FoliageMaterial() => Load() ? mat : null;
+
         static int Tris(Mesh m) { int n = 0; for (int i = 0; i < m.subMeshCount; i++) n += (int)m.GetIndexCount(i); return n / 3; }
 
         static Bounds Transformed(Bounds b, Matrix4x4 m)

@@ -8,7 +8,8 @@
 //    L  like D, but this door is the LOCKED one when the generator picks this room as the locked room (at most one per room)
 //    s  tier-1 spawn point         S  tier-2 spawn point (combat rooms)
 //    C  chest slot                 K  chest slot that may hold the floor's key (a room with K never has L: the key is not behind its own lock)
-//    E  party start cell (entry room, 4 of them)   X  the stair down (stair-exit room)   B  the bank point (checkpoint room)
+//    E  party start cell (entry room, 4 of them)   X  the stair down (stair-exit room)   B  the bank point (checkpoint room, or the bakery heart)
+//    Z  the sleeping baker (the bakery heart room only)
 // Dressing sockets are not in the ASCII: each has an id, a kind, a floor cell, a facing and 2-3 named variants, given beside the rows. A socket sits on
 // a plain floor cell (no door, spawn, chest or feature on it); wall-mounted kinds (Shelf, Rack, Chute, Lantern, Roots) need a wall behind them (the
 // cell opposite their facing is Solid, a Pillar or the room edge, and not a door on that edge); Barrel and Crate stand free.
@@ -26,10 +27,12 @@ using System.Text;
 
 namespace SleepingCalamity.Core
 {
-    public enum RoomKind : byte { Combat = 0, Entry = 1, StairExit = 2, Checkpoint = 3, Corridor = 4 }
+    // Heart: the floor-4 bakery's heart room (the baker's bed, the rescue bank point); only the bakery set-piece (CellarBakeryPool) uses it.
+    public enum RoomKind : byte { Combat = 0, Entry = 1, StairExit = 2, Checkpoint = 3, Corridor = 4, Heart = 5 }
 
     // Which floor's sub-theme a room dresses as. Any = entry, exit, checkpoint and corridor pieces.
-    public enum SubTheme : byte { Any = 0, Larder = 1, WineVault = 2, CoalCellar = 3 }
+    // Bakery: the fixed floor-4 set-piece rooms (CellarBakeryPool); never drawn for floors 1-3.
+    public enum SubTheme : byte { Any = 0, Larder = 1, WineVault = 2, CoalCellar = 3, Bakery = 4 }
 
     public enum CellKind : byte { Floor = 0, Solid = 1, Pillar = 2 }
 
@@ -39,7 +42,7 @@ namespace SleepingCalamity.Core
 
     public enum SpawnTier : byte { Tier1 = 1, Tier2 = 2 }
 
-    public enum FeatureKind : byte { EntryStart, Stair, Bank }
+    public enum FeatureKind : byte { EntryStart, Stair, Bank, Baker }
 
     public enum CorridorShape : byte { None = 0, Straight, Corner, T, Cross, DeadEnd, Door }
 
@@ -49,19 +52,37 @@ namespace SleepingCalamity.Core
         public CellDoor(int x, int y, CellSide side, bool locked = false) { X = x; Y = y; Side = side; Locked = locked; }
     }
 
+    // Chance is the percent of visits on which the socket is filled at all (100 = always; a miss leaves the spot empty). Alternatives are extra cells the
+    // socket may sit in (the cell X, Y is the first option); a wall-mounted socket keeps its facing, so its alternatives sit against the same wall.
+    // CellarFloorDressing picks among them per floor. No two sockets of one room share any candidate cell, so a pick never collides.
     public sealed class DressingSocket
     {
+        public const int MaxAlternatives = 3;
         public readonly string Id; public readonly SocketKind Kind; public readonly int X, Y; public readonly CellSide Facing; public readonly IReadOnlyList<string> Variants;
+        public readonly int Chance;
+        public readonly IReadOnlyList<CellPos> Alternatives;
         public DressingSocket(string id, SocketKind kind, int x, int y, CellSide facing, params string[] variants)
-        { Id = id; Kind = kind; X = x; Y = y; Facing = facing; Variants = (variants ?? new string[0]).ToArray(); }
+            : this(id, kind, x, y, facing, 100, null, variants) { }
+        public DressingSocket(string id, SocketKind kind, int x, int y, CellSide facing, int chance, IEnumerable<CellPos> alternatives, params string[] variants)
+        {
+            Id = id; Kind = kind; X = x; Y = y; Facing = facing; Variants = (variants ?? new string[0]).ToArray();
+            Chance = chance; Alternatives = (alternatives ?? new CellPos[0]).ToList();
+        }
         public bool WallMounted => Kind == SocketKind.Shelf || Kind == SocketKind.Rack || Kind == SocketKind.Chute || Kind == SocketKind.Lantern || Kind == SocketKind.Roots;
+        public int CellOptions => 1 + Alternatives.Count;
+        // Option 0 is the authored cell, then the alternatives in order.
+        public CellPos OptionCell(int option) => option == 0 ? new CellPos(X, Y) : Alternatives[option - 1];
     }
 
-    // A socket as authored beside the ASCII rows; the room gives it its id.
+    // A socket as authored beside the ASCII rows; the room gives it its id. Chance and Alt return a changed copy: Sk(...).Chance(70).Alt((2, 3), (3, 3)).
     public readonly struct SocketSpec
     {
         public readonly SocketKind Kind; public readonly int X, Y; public readonly CellSide Facing; public readonly string[] Variants;
-        public SocketSpec(SocketKind kind, int x, int y, CellSide facing, params string[] variants) { Kind = kind; X = x; Y = y; Facing = facing; Variants = variants; }
+        public readonly int FillChance; public readonly CellPos[] Alternatives;
+        public SocketSpec(SocketKind kind, int x, int y, CellSide facing, params string[] variants) : this(kind, x, y, facing, 100, null, variants) { }
+        SocketSpec(SocketKind kind, int x, int y, CellSide facing, int chance, CellPos[] alts, string[] variants) { Kind = kind; X = x; Y = y; Facing = facing; Variants = variants; FillChance = chance; Alternatives = alts ?? new CellPos[0]; }
+        public SocketSpec Chance(int percent) => new SocketSpec(Kind, X, Y, Facing, percent, Alternatives, Variants);
+        public SocketSpec Alt(params (int x, int y)[] cells) => new SocketSpec(Kind, X, Y, Facing, FillChance, cells.Select(c => new CellPos(c.x, c.y)).ToArray(), Variants);
     }
 
     public sealed class CellarSpawn
@@ -161,13 +182,14 @@ namespace SleepingCalamity.Core
                         case 'E': feats.Add(new RoomFeature(x, y, FeatureKind.EntryStart)); break;
                         case 'X': feats.Add(new RoomFeature(x, y, FeatureKind.Stair)); break;
                         case 'B': feats.Add(new RoomFeature(x, y, FeatureKind.Bank)); break;
+                        case 'Z': feats.Add(new RoomFeature(x, y, FeatureKind.Baker)); break;
                         default: throw new FormatException(id + ": unknown glyph '" + c + "' at (" + x + "," + y + ")");
                     }
                 }
             }
             var socks = new List<DressingSocket>();
             for (int i = 0; i < sockets.Length; i++)
-                socks.Add(new DressingSocket(id + ".s" + (i + 1), sockets[i].Kind, sockets[i].X, sockets[i].Y, sockets[i].Facing, sockets[i].Variants));
+                socks.Add(new DressingSocket(id + ".s" + (i + 1), sockets[i].Kind, sockets[i].X, sockets[i].Y, sockets[i].Facing, sockets[i].FillChance, sockets[i].Alternatives, sockets[i].Variants));
             return new CellarRoom(id, name, kind, theme, silhouette, cells, doors, socks, spawns, chests, feats, CorridorShape.None, 0, rows);
         }
 
@@ -176,7 +198,7 @@ namespace SleepingCalamity.Core
         {
             var doors = new List<CellDoor>();
             foreach (CellSide s in new[] { CellSide.North, CellSide.East, CellSide.South, CellSide.West }) if ((mask & MaskBit(s)) != 0) doors.Add(new CellDoor(0, 0, s));
-            var socks = sockets.Select((sp, i) => new DressingSocket(id + ".s" + (i + 1), sp.Kind, sp.X, sp.Y, sp.Facing, sp.Variants)).ToList();
+            var socks = sockets.Select((sp, i) => new DressingSocket(id + ".s" + (i + 1), sp.Kind, sp.X, sp.Y, sp.Facing, sp.FillChance, sp.Alternatives, sp.Variants)).ToList();
             return new CellarRoom(id, name, RoomKind.Corridor, SubTheme.Any, "", new CellKind[1, 1], doors, socks, null, null, null, shape, mask);
         }
 
@@ -206,7 +228,7 @@ namespace SleepingCalamity.Core
             for (int x = 0; x < Width; x++) for (int y = 0; y < Height; y++) { var p = At(x, y); nc[p.x, p.y] = cells[x, y]; }
             return new CellarRoom(Id, Name, Kind, Theme, Silhouette, nc,
                 Doors.Select(d => { var p = At(d.X, d.Y); return new CellDoor(p.x, p.y, Rotate(d.Side, q), d.Locked); }),
-                Sockets.Select(k => { var p = At(k.X, k.Y); return new DressingSocket(k.Id, k.Kind, p.x, p.y, Rotate(k.Facing, q), k.Variants.ToArray()); }),
+                Sockets.Select(k => { var p = At(k.X, k.Y); return new DressingSocket(k.Id, k.Kind, p.x, p.y, Rotate(k.Facing, q), k.Chance, k.Alternatives.Select(a => { var pa = At(a.X, a.Y); return new CellPos(pa.x, pa.y); }), k.Variants.ToArray()); }),
                 Spawns.Select(k => { var p = At(k.X, k.Y); return new CellarSpawn(p.x, p.y, k.Tier); }),
                 Chests.Select(k => { var p = At(k.X, k.Y); return new ChestSlot(p.x, p.y, k.KeyCandidate); }),
                 Features.Select(k => { var p = At(k.X, k.Y); return new RoomFeature(p.x, p.y, k.Kind); }),
@@ -232,7 +254,7 @@ namespace SleepingCalamity.Core
             CellarSpawn sp = Spawns.FirstOrDefault(q => q.X == x && q.Y == y); if (sp != null) return sp.Tier == SpawnTier.Tier2 ? 'S' : 's';
             ChestSlot ch = Chests.FirstOrDefault(q => q.X == x && q.Y == y); if (ch != null) return ch.KeyCandidate ? 'K' : 'C';
             RoomFeature f = Features.FirstOrDefault(q => q.X == x && q.Y == y);
-            if (f != null) return f.Kind == FeatureKind.EntryStart ? 'E' : f.Kind == FeatureKind.Stair ? 'X' : 'B';
+            if (f != null) return f.Kind == FeatureKind.EntryStart ? 'E' : f.Kind == FeatureKind.Stair ? 'X' : f.Kind == FeatureKind.Baker ? 'Z' : 'B';
             return cells[x, y] == CellKind.Solid ? '#' : cells[x, y] == CellKind.Pillar ? 'P' : '.';
         }
 
@@ -256,7 +278,7 @@ namespace SleepingCalamity.Core
             }
             else
             {
-                if (Theme != SubTheme.Any) Err(Kind + " room must use SubTheme.Any");
+                if (Kind == RoomKind.Heart ? Theme != SubTheme.Bakery : Theme != SubTheme.Any) Err(Kind + " room must use SubTheme." + (Kind == RoomKind.Heart ? "Bakery" : "Any"));
                 if (Kind != RoomKind.Corridor && (lo < 2 || hi > 6)) Err(Kind + " room is " + Width + "x" + Height + ", outside 2..6 per side");
             }
 
@@ -277,6 +299,7 @@ namespace SleepingCalamity.Core
             {
                 case RoomKind.Combat: if (nd < 2) Err("combat room has " + nd + " door(s), needs at least 2"); break;
                 case RoomKind.Entry: case RoomKind.StairExit: if (nd < 1 || nd > 3) Err(Kind + " room has " + nd + " doors, needs 1 to 3"); break;
+                case RoomKind.Heart: if (nd != 1) Err("heart room has " + nd + " doors, needs exactly 1 (the antechamber is the only approach)"); break;
                 case RoomKind.Checkpoint: if (nd < 2 || nd > 4) Err("checkpoint room has " + nd + " doors, needs 2 to 4"); break;
             }
 
@@ -301,7 +324,10 @@ namespace SleepingCalamity.Core
             List<string> Unreached(bool blockProps, out bool noStart)
             {
                 var blocked = new bool[Width, Height];
-                if (blockProps) foreach (DressingSocket k in Sockets) if ((k.Kind == SocketKind.Barrel || k.Kind == SocketKind.Crate) && InBounds(k.X, k.Y)) blocked[k.X, k.Y] = true;
+                if (blockProps)   // every candidate cell of a free-standing prop counts, so any pick the dressing makes leaves the room walkable
+                    foreach (DressingSocket k in Sockets)
+                        if (k.Kind == SocketKind.Barrel || k.Kind == SocketKind.Crate)
+                            for (int o = 0; o < k.CellOptions; o++) { CellPos c = k.OptionCell(o); if (InBounds(c.X, c.Y)) blocked[c.X, c.Y] = true; }
                 CellDoor start = Doors.FirstOrDefault(d => InBounds(d.X, d.Y) && cells[d.X, d.Y] == CellKind.Floor && !blocked[d.X, d.Y]);
                 noStart = start == null;
                 var lost = new List<string>();
@@ -333,17 +359,32 @@ namespace SleepingCalamity.Core
                 if (string.IsNullOrEmpty(k.Id) || !ids.Add(k.Id)) Err("socket id '" + k.Id + "' is empty or duplicated");
                 if (k.Variants.Count < MinVariants || k.Variants.Count > MaxVariants) Err("socket " + k.Id + " has " + k.Variants.Count + " variants, needs " + MinVariants + " to " + MaxVariants);
                 if (k.Variants.Any(string.IsNullOrWhiteSpace) || k.Variants.Distinct(StringComparer.OrdinalIgnoreCase).Count() != k.Variants.Count) Err("socket " + k.Id + " has an empty or repeated variant name");
-                if (k.WallMounted && InBounds(k.X, k.Y))
+                if (k.Chance < 0 || k.Chance > 100) Err("socket " + k.Id + " fill chance " + k.Chance + " is outside 0..100");
+                if (k.Alternatives.Count > DressingSocket.MaxAlternatives) Err("socket " + k.Id + " has " + k.Alternatives.Count + " alternative cells, at most " + DressingSocket.MaxAlternatives);
+                for (int o = 0; o < k.CellOptions; o++)
                 {
-                    var (dx, dy) = Step(Opposite(k.Facing)); int bx = k.X + dx, by = k.Y + dy;
-                    // out of the room: the edge is the wall unless this cell has a door on that side (only a corridor cell can, since other rooms keep sockets off door cells)
-                    bool wall = InBounds(bx, by) ? cells[bx, by] != CellKind.Floor : !Doors.Any(d => d.X == k.X && d.Y == k.Y && d.Side == Opposite(k.Facing));
-                    if (!wall) Err("wall-mounted socket " + k.Id + " (" + k.Kind + ") at (" + k.X + "," + k.Y + ") has no wall behind it");
+                    CellPos c = k.OptionCell(o);
+                    if (!InBounds(c.X, c.Y)) continue;   // the primary cell was reported by Mark above; an alternative is reported here
+                    if (o > 0)
+                    {
+                        if (cells[c.X, c.Y] != CellKind.Floor) Err("socket " + k.Id + " alternative " + c + " is on a " + cells[c.X, c.Y] + " cell");
+                        if (used.TryGetValue((c.X, c.Y), out string other) && !other.StartsWith("socket ")) Err("socket " + k.Id + " alternative " + c + " shares its cell with a " + other);
+                        if (Sockets.Any(j => j != k && Enumerable.Range(0, j.CellOptions).Any(p => j.OptionCell(p).X == c.X && j.OptionCell(p).Y == c.Y)))
+                            Err("socket " + k.Id + " alternative " + c + " is also a candidate cell of another socket");
+                        for (int p = 0; p < o; p++) if (k.OptionCell(p).X == c.X && k.OptionCell(p).Y == c.Y) Err("socket " + k.Id + " lists cell " + c + " twice");
+                    }
+                    if (k.WallMounted)
+                    {
+                        var (dx, dy) = Step(Opposite(k.Facing)); int bx = c.X + dx, by = c.Y + dy;
+                        // out of the room: the edge is the wall unless this cell has a door on that side (only a corridor cell can, since other rooms keep sockets off door cells)
+                        bool wall = InBounds(bx, by) ? cells[bx, by] != CellKind.Floor : !Doors.Any(d => d.X == c.X && d.Y == c.Y && d.Side == Opposite(k.Facing));
+                        if (!wall) Err("wall-mounted socket " + k.Id + " (" + k.Kind + ") at " + c + " has no wall behind it");
+                    }
                 }
             }
 
             // spawns, chests, features and keys by kind
-            int starts = Features.Count(f => f.Kind == FeatureKind.EntryStart), stairs = Features.Count(f => f.Kind == FeatureKind.Stair), banks = Features.Count(f => f.Kind == FeatureKind.Bank);
+            int starts = Features.Count(f => f.Kind == FeatureKind.EntryStart), stairs = Features.Count(f => f.Kind == FeatureKind.Stair), banks = Features.Count(f => f.Kind == FeatureKind.Bank), bakers = Features.Count(f => f.Kind == FeatureKind.Baker);
             if (Kind == RoomKind.Combat)
             {
                 if (Spawns.Count < 2) Err("combat room has " + Spawns.Count + " spawn point(s), needs at least 2");
@@ -353,7 +394,8 @@ namespace SleepingCalamity.Core
             if (Kind != RoomKind.Combat && Chests.Count > (Kind == RoomKind.Checkpoint ? 2 : 0)) Err(Kind + " room has too many chest slots");
             if (Kind == RoomKind.Entry ? starts != 4 : starts > 0) Err(Kind == RoomKind.Entry ? "entry room needs exactly 4 party start cells, has " + starts : "only the entry room has party start cells");
             if (Kind == RoomKind.StairExit ? stairs != 1 : stairs > 0) Err(Kind == RoomKind.StairExit ? "stair-exit room needs exactly 1 stair cell, has " + stairs : "only the stair-exit room has a stair cell");
-            if (Kind == RoomKind.Checkpoint ? banks != 1 : banks > 0) Err(Kind == RoomKind.Checkpoint ? "checkpoint room needs exactly 1 bank cell, has " + banks : "only the checkpoint room has a bank cell");
+            if (Kind == RoomKind.Checkpoint || Kind == RoomKind.Heart ? banks != 1 : banks > 0) Err(Kind == RoomKind.Checkpoint ? "checkpoint room needs exactly 1 bank cell, has " + banks : Kind == RoomKind.Heart ? "heart room needs exactly 1 bank cell, has " + banks : "only the checkpoint room has a bank cell");
+            if (Kind == RoomKind.Heart ? bakers != 1 : bakers > 0) Err(Kind == RoomKind.Heart ? "heart room needs exactly 1 baker cell, has " + bakers : "only the heart room has a baker cell");
 
             int locked = Doors.Count(d => d.Locked);
             if (locked > 1) Err("more than one locked door");

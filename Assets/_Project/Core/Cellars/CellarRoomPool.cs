@@ -41,7 +41,7 @@ namespace SleepingCalamity.Core
             {
                 case SocketKind.Shelf: return new[] { "Jars", "Hams", "Sacks" };
                 case SocketKind.Rack: return new[] { "Bottles", "Casks", "Empty" };
-                case SocketKind.Barrel: return new[] { "Full", "Stacked" };
+                case SocketKind.Barrel: return new[] { "Full", "Stacked", "Tipped" };
                 case SocketKind.Crate: return new[] { "Stacked", "Open", "Broken" };
                 case SocketKind.Chute: return new[] { "Clear", "Heaped" };
                 case SocketKind.Lantern: return new[] { "Lit", "Dim", "Out" };
@@ -49,7 +49,21 @@ namespace SleepingCalamity.Core
             }
         }
 
-        static SocketSpec Sk(SocketKind k, int x, int y, CellSide facing) => new SocketSpec(k, x, y, facing, V(k));
+        // Fill chance per kind (percent of visits the socket is filled at all): free-standing clutter is the most optional, lanterns and racks always stand.
+        // Kinds not listed are 100. CellarFloorDressing rolls these on its own stream, so changing one never moves a room, a link or a chest.
+        static int Fill(SocketKind k)
+        {
+            switch (k)
+            {
+                case SocketKind.Barrel: return 70;
+                case SocketKind.Crate: return 65;
+                case SocketKind.Roots: return 60;
+                case SocketKind.Shelf: return 85;
+                default: return 100;
+            }
+        }
+
+        static SocketSpec Sk(SocketKind k, int x, int y, CellSide facing) => new SocketSpec(k, x, y, facing, V(k)).Chance(Fill(k));
 
         static CellarRoom Combat(string id, string name, SubTheme t, string sil, string[] rows, params SocketSpec[] socks) => CellarRoom.Parse(id, name, RoomKind.Combat, t, sil, rows, socks);
         static CellarRoom Special(string id, string name, RoomKind k, string sil, string[] rows, params SocketSpec[] socks) => CellarRoom.Parse(id, name, k, SubTheme.Any, sil, rows, socks);
@@ -71,18 +85,18 @@ namespace SleepingCalamity.Core
                     "s..",
                     "C.s",
                     ".L." },
-                    Sk(Shelf, 0, 0, S), Sk(Shelf, 2, 0, S), Sk(Barrel, 0, 3, N), Sk(Crate, 2, 3, N)),
+                    Sk(Shelf, 0, 0, S), Sk(Shelf, 2, 0, S), Sk(Barrel, 0, 3, N), Sk(Crate, 2, 3, N).Alt((2, 1))),
                 Combat("larder_hanging_hall", "Hanging hall", L, "pillared-hall", new[] {
                     "..DC",
                     ".P.s",
                     "DsP.",
                     "..CS" },
-                    Sk(Shelf, 0, 0, S), Sk(Shelf, 1, 0, S), Sk(Lantern, 0, 3, E), Sk(Roots, 1, 3, N)),
+                    Sk(Shelf, 0, 0, S), Sk(Shelf, 1, 0, S), Sk(Lantern, 0, 3, E).Alt((0, 1)), Sk(Roots, 1, 3, N)),
                 Combat("larder_smoke_gallery", "Smoke gallery", L, "gallery", new[] {   // key chest
                     "...K.",
                     "D.s.D",
                     ".s.SC" },
-                    Sk(Shelf, 0, 0, S), Sk(Shelf, 2, 0, S), Sk(Shelf, 4, 0, S), Sk(Barrel, 0, 2, N)),
+                    Sk(Shelf, 0, 0, S), Sk(Shelf, 2, 0, S).Alt((1, 0)), Sk(Shelf, 4, 0, S), Sk(Barrel, 0, 2, N).Alt((2, 2))),
 
                 // ---- floor 2: wine vaults ----
                 Combat("wine_cask_row", "Cask row", WV, "box", new[] {   // lockable: the north door
@@ -101,14 +115,14 @@ namespace SleepingCalamity.Core
                     "..s..",
                     "D.S.D",
                     "#CK.#" },
-                    Sk(Rack, 1, 0, S), Sk(Rack, 3, 0, S), Sk(Barrel, 0, 1, N), Sk(Barrel, 4, 1, N), Sk(Barrel, 1, 1, N), Sk(Lantern, 3, 3, N)),
+                    Sk(Rack, 1, 0, S), Sk(Rack, 3, 0, S), Sk(Barrel, 0, 1, N), Sk(Barrel, 4, 1, N).Alt((3, 1)), Sk(Barrel, 1, 1, N), Sk(Lantern, 3, 3, N)),
                 Combat("wine_aisles", "Rack aisles", WV, "aisles", new[] {
                     ".D..",
                     ".#s.",
                     "D#.C",
                     "C#s.",
                     "S.D." },
-                    Sk(Rack, 3, 0, S), Sk(Rack, 3, 1, W), Sk(Rack, 3, 3, W), Sk(Crate, 2, 2, N), Sk(Lantern, 3, 4, N)),
+                    Sk(Rack, 3, 0, S).Alt((2, 0)), Sk(Rack, 3, 1, W), Sk(Rack, 3, 3, W), Sk(Crate, 2, 2, N), Sk(Lantern, 3, 4, N)),
 
                 // ---- floor 3: coal cellars ----
                 Combat("coal_bunker", "Coal bunker", CC, "box", new[] {   // lockable: the north door
@@ -134,7 +148,7 @@ namespace SleepingCalamity.Core
                     "#..s.",
                     "D.S.D",
                     "C.C.." },
-                    Sk(Chute, 3, 0, S), Sk(Chute, 4, 0, S), Sk(Lantern, 1, 1, E), Sk(Crate, 4, 1, N), Sk(Lantern, 1, 3, N)),
+                    Sk(Chute, 3, 0, S), Sk(Chute, 4, 0, S), Sk(Lantern, 1, 1, E), Sk(Crate, 4, 1, N).Alt((4, 3)), Sk(Lantern, 1, 3, N).Alt((3, 3))),
 
                 // ---- the three specials ----
                 Special("cellar_entry", "Stair landing", RoomKind.Entry, "landing", new[] {
@@ -142,13 +156,13 @@ namespace SleepingCalamity.Core
                     "EE..",
                     "EE.D",
                     "...." },
-                    Sk(Lantern, 0, 0, S), Sk(Lantern, 2, 0, S), Sk(Barrel, 0, 3, N), Sk(Crate, 3, 3, N)),
+                    Sk(Lantern, 0, 0, S), Sk(Lantern, 2, 0, S).Alt((3, 0)), Sk(Barrel, 0, 3, N).Alt((1, 3)), Sk(Crate, 3, 3, N).Alt((2, 3))),
                 Special("cellar_exit", "Stair hall", RoomKind.StairExit, "landing", new[] {
                     ".D..",
                     "....",
                     "D...",
                     "...X" },
-                    Sk(Lantern, 0, 0, S), Sk(Lantern, 2, 0, S), Sk(Crate, 0, 3, N), Sk(Barrel, 1, 3, N)),
+                    Sk(Lantern, 0, 0, S), Sk(Lantern, 2, 0, S).Alt((3, 0)), Sk(Crate, 0, 3, N), Sk(Barrel, 1, 3, N).Alt((2, 3))),
                 Special("cellar_checkpoint", "Lamp nook", RoomKind.Checkpoint, "nook", new[] {
                     ".D.",
                     ".B.",
