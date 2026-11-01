@@ -179,7 +179,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 foreach (Enemy e in all)
                 {
                     if (!e.IsSpawned || !e.Alive) continue;
-                    if (e.WindingUp) winding[(int)e.Def.CategoryOf(e.CurrentAttack)]++;
+                    if (e.WindingUp || e.HitboxOn) winding[(int)e.Def.CategoryOf(e.CurrentAttack)]++;
                     if (!e.HitboxOn) continue;
                     on++;
                     if (_seen.Add((e.NetworkObjectId, e.Serial)))
