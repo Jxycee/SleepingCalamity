@@ -8,7 +8,7 @@
 //   - the floor's cycle role is for ONE chosen arc, drawn on its own stream Rng.Derive(seed, "cellars.route", floor): KeyArc (the arc holds the key chest's room, floor locked;
 //     preferred with KeyArcPercent chance when such an arc exists), else ShortcutBack (the arc rejoins the Spine in its last third and skips at least one Spine room: label
 //     only, no mechanic yet), else Plain; None when no arc crosses the path.
-// The three draws are always made, so the stream position never depends on the layout. No string hashing, no dictionary or set iteration for a decision, no float.
+// The three draws are always made, so the stream position never depends on the layout. No string.GetHashCode (only Rng.Derive labels), no dictionary or set iteration for a decision, no float.
 // Floor 4 (the fixed bakery) returns the empty route. RouteHash() is the cross-peer proof. Authority: none (every peer derives the same route from the layout).
 using System;
 using System.Collections.Generic;

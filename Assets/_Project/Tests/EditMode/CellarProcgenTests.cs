@@ -98,7 +98,6 @@ namespace SleepingCalamity.Tests.EditMode
                     }
                     Assert.AreEqual(r.Arcs.Count == 0, r.Cycle == CycleRole.None, at); Assert.AreEqual(r.Cycle == CycleRole.None, r.ChosenArc < 0, at);
                     if (r.Cycle == CycleRole.KeyArc) { Assert.IsTrue(l.HasLockedRoom && r.Chosen.Rooms.Contains(l.KeyChest.RoomIndex), at + " key arc"); }
-                    else if (r.Cycle != CycleRole.None && l.HasLockedRoom && l.KeyChest.RoomIndex >= 0) { /* a plain pick may still hold the key; only KeyArc is a claim */ }
                     cycle[f, (int)r.Cycle]++; floors[f]++; arcsTotal += r.Arcs.Count; spineTotal += r.Spine.Count; if (r.Cycle == CycleRole.None) bad++;
                 }
             var sb = new StringBuilder("ROUTE (" + Seeds + " seeds)\n");
