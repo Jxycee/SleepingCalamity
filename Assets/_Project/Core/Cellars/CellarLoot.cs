@@ -39,11 +39,20 @@ namespace SleepingCalamity.Core
 
         public static float PeakRank(int floor) => Peak[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
 
-        // The rank drawn for this chest (1-5).
+        // The rank drawn for this chest (1-5): the category comes from the dive-wide loot-mix steering (CellarLootMix, procgen 1d), the rank is the floor's triangular draw clamped into its band.
         public static int RollRank(uint seed, int floor, int chestIndex)
         {
             var rng = new Pcg32(Rng.Derive(seed, "cellars.loot", ((ulong)floor << 32) | (uint)chestIndex));
-            return DrawRank(ref rng, floor);
+            return SteeredRank(ref rng, seed, floor, chestIndex);
+        }
+
+        // THE call site of the loot-mix resolver.
+        static int SteeredRank(ref Pcg32 rng, uint seed, int floor, int chestIndex)
+        {
+            int drawn = DrawRank(ref rng, floor);
+            LootCategory cat = CellarLootMix.CategoryFor(seed, floor, chestIndex, CellarLootMix.KeyFlagsOfDive(seed, floor));
+            int lo = CellarLootMixTuning.BandLo[(int)cat], hi = CellarLootMixTuning.BandHi[(int)cat];
+            return drawn < lo ? lo : drawn > hi ? hi : drawn;
         }
 
         static int DrawRank(ref Pcg32 rng, int floor)
@@ -58,7 +67,7 @@ namespace SleepingCalamity.Core
         {
             if (holdsKey) return RoomKeyId;
             var rng = new Pcg32(Rng.Derive(seed, "cellars.loot", ((ulong)floor << 32) | (uint)chestIndex));
-            int rank = DrawRank(ref rng, floor);
+            int rank = SteeredRank(ref rng, seed, floor, chestIndex);
             int n = 0; foreach (LootItem i in Items) if (i.Rank == rank) n++;
             int pick = rng.Range(0, n);
             foreach (LootItem i in Items) if (i.Rank == rank && pick-- == 0) return i.Id;
