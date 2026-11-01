@@ -2,8 +2,8 @@
 Status: IN PROGRESS (item 1a-c merging; 1d and 3 deferred to the M5 contents session's chests/spawner)
 Blocker: none. Coordinator 2026-10-31: Core-only items first (1, 2, 4); hold procgen merges while a spine or contents STATUS says "check running"; builder hooks only in CellarFloorBuilder.Procgen.cs
 Branch: claude/cellar-procgen
-Last check: PASS at d7403e2 (build PASS, EditMode 811/811, PlayMode 37 passed, 8 skipped, 0 failed); re-check on the partial move pending
-Next: merge item 1, then item 2 (layout presets + far-dead-end exit), then item 4
+Last check: PASS at d7403e2 (build PASS, EditMode 811/811, PlayMode 37 passed, 8 skipped, 0 failed) before the partial move; tip eb4efc0 needs scene regen + check
+Next: see Handoff below
 Archive: no
 
 Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/procedural-dungeons.md` (3, takeaways). Coordinator order, 2026-10-31.
@@ -24,6 +24,16 @@ Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/
 3. Per-floor enemy roster subset + ambush / thin / crowded twists.
 4. Swappable chunk regions inside room grids.
 5. More greybox vignettes (target 12-20) + state-conditioned odds.
+
+## Handoff (2026-10-31, variety session to successor)
+- Merged to main: nothing from procgen yet.
+- `claude/cellar-procgen` tip eb4efc0: item 1 a-c (route arc roles, special room, door hints; greybox in `CellarFloorBuilder.Procgen.cs`, one call line + `partial` in the main builder). Reviewed: approve (reviewer, Sonnet). Main incl. Town polish 2 merged; the two scenes were taken from main and are NOT regenerated yet.
+- Merge order (coordinator): M5 spine, then M5 contents, then procgen item 1, then floor art. When contents is on main: merge origin/main (take main's .unity on conflict), regenerate scenes with the -nographics `build`, commit, one `check`, then `sc-merge`. After item 1, hold procgen merges while a spine/contents STATUS says "check running".
+- `claude/procgen-item2` (subagent, may still be running at handoff): layout presets Spine/Ring/Hub/Wing on stream "cellars.preset", far-dead-end exit (leaf, not adjacent to entry), preset in LayoutHash. Moves seed-12345 goldens deliberately (all re-pinned, listed in STATUS). Needs review (reviewer) + check after item 1 merges; branch it onto main after item 1.
+- `claude/procgen-item4` (subagent, may still be running): chunk regions (`CellarRoomChunks.Resolve`, stream "cellars.chunks", greybox in the Procgen partial). Must keep LayoutHash/DressingHash goldens. Needs review + check.
+- If a branch above is missing or unpushed, look in `C:\Dev\SleepingCalamity\.claude\worktreesgent-*` for its worktree (`git -C <wt> log -1`).
+- Then: item 5 (vignettes 12-20, state-conditioned odds; Core + greybox). Items 1d (loot mix) and 3 (roster subset, twists) wait on the M5 contents session (owns chests, loot roll, spawner).
+- Don't touch: `CellarFloorBuilder.cs` beyond the one call line, user tuning constants, the pity save (M6), real art.
 
 ## Item 1 tuning notes
 - Door icons: notable (non-chest) hints mark 74.3% of doors (flagged incl. chests 92.0%; key 23.6%, special 22.5%, reward vignette 14.0%; 1200 seeds x floors 1-3). Still most doors; if the three-run check finds the icons noisy, drop Exit/Checkpoint from Notable or hint only along the route. Test bound < 75%.
