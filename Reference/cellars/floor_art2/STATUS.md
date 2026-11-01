@@ -1,13 +1,13 @@
 State: IN PROGRESS
 Session: Cellars floor art 2: dense dressing and the corner's grade
 Job: dress the generated Cellars rooms to the approved corner's density (B5 kit shelves, barrels, crates, rubble, jars) and match the corner's grade, lamp colour and fog (less orange)
-Progress: 75% - round 2 pushed (31e779f); round 3 (final: density x2 per wall cell, door-lane rule, corridor falloff, full capture + sheet) running
-Status: round 3 running (final round)
+Progress: 85% - 3 rounds done (cap), final sheet on claude/floor-art2-code ab973e2; merging origin/main (spine + contents) into the code branch; waits for Q12 procgen to merge first (coordinator order), then one check and merge
+Status: rounds done; merge prep (main merge + test-edit/test-play), then wait for Q12's merge
 Blocker: none (one coordinator decision below, not blocking the rounds)
 Archive: no
 Branch: claude/happy-ramanujan-41karq
-Score: -
-Sheet: -
+Score: self round 3 about 25/40 (silhouette 3, proportion 3.5, form 3, surface 3.5, colour 4, wear 3, set/density 2.5, emissive 3); r2 24; floor 25 met, cap reached
+Sheet: Reference/cellars/floor_art2/SHEET_floor_art2.jpg (corner reference wide/mid above floor_room, floor_corridor, floor_overview; on the code branch until merge)
 SC RESULT: -
 Merge commit: -
 
@@ -55,3 +55,18 @@ Root cause of the bare room view: room 3 (seed 12345 fl 1, 14 cells) lost most w
 | room | .09/.24/.49 | +.20 | 51/44/4 | .49 |
 | corridor | .14/.27/.51 | +.18 | 42/53/4 | .50 |
 Self score r2: about 24/40 (colour 4 in the room, density 2.5: one crate + one jar cluster in view; corridor still a mid wash).
+
+## Round 3 (ab973e2, final)
+Density: pairs per wall cell (about 83% of groups, clustered at one end), Rubble/SackPile as companions, corner pass fills up to 4 corners; door-lane rule in and tested but never fires (a 4 m cell can't hold a piece 1.2 m clear of a 2.4 m opening). Rows per room 4.91 -> 6.03 (combat 4.38 -> 4.87; round 0 about 2.6 socket+corner pieces). Corridor lamp range x0.7, centre hanging lamp x1.15. test-edit 822/822, Core 409/409.
+| frame | p10/p50/p90 | warm | dark/mid/light | light sat |
+|---|---|---|---|---|
+| room | .09/.23/.48 | +.20 | 53/42/4 | .48 |
+| corridor | .12/.24/.49 | +.19 | 53/43/3 | .49 |
+| overview | .09/.26/.39 | +.16 | 48/50/1 | .46 |
+| corner (ref) | .09-.11/.23-.24/.49-.55 | +.21..+.27 | 52-54/38/6-8 | .42-.53 |
+Read: colour now sits with the corner (no orange cast, grey-brown darks, paler gold pools); corridor falls off between lamps. Shortfalls: the Floor_Room camera's room 3 is crowded with sockets/chests/spawns so its view still reads sparse (crate, jar cluster, sack pile) though the floor average is 6 rows per room; light share 3-4% (target 5) because the pools are smaller than the corner's lantern + larder + niche glow.
+
+## Follow-ups (for the coordinator)
+- Density beyond wall clutter needs room-pool socket data (more Shelf/Barrel sockets in bare rooms) - Q12's pinned DressingHash territory; or a camera on a less crowded room to judge. Wall/overhead dressing (hanging herbs, wall racks) would add density without floor cost.
+- Gameplay markers (chest boxes, spawn discs) are still greybox and read as clutter-free floor in captures.
+- Light share: add the corner's secondary warm sources (niche candle glow, larder light) to room sockets.
