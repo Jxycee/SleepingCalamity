@@ -44,7 +44,7 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (PlacedVignette v in d.Vignettes) m.Add((v.Cell.X, v.Cell.Y, "vignette", false));
             foreach (PlacedRoom p in l.Rooms)
             {
-                foreach (CellarSpawn s in p.Room.Spawns) m.Add((p.X + s.X, p.Y + s.Y, "spawn", false));
+                // spawn cells take wall clutter (1.0 m clear of the spawn point, the encounter test below), so only the 1.9 m rule applies to them
                 foreach (ChestSlot c in p.Room.Chests) m.Add((p.X + c.X, p.Y + c.Y, "chest slot", false));
                 foreach (RoomFeature f in p.Room.Features) m.Add((p.X + f.X, p.Y + f.Y, "feature", false));
             }
@@ -107,6 +107,22 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Greater(rows, 1000, "the resolver produced clutter");
         }
 
+        // Distance (cm) from the row's cell centre to its yawed footprint rectangle, by corners and edges (independent of CellarFloorClutter.CentreClearanceCm); 0 inside.
+        static double PolygonDistance(CellarClutterRow r)
+        {
+            double a = r.YawDeg * Math.PI / 180.0, fx = Math.Sin(a), fz = Math.Cos(a), rx = fz, rz = -fx, hw = r.WidthCm / 2.0, hd = r.DepthCm / 2.0;
+            var cx = new[] { r.XCm - rx * hw - fx * hd, r.XCm + rx * hw - fx * hd, r.XCm + rx * hw + fx * hd, r.XCm - rx * hw + fx * hd };
+            var cz = new[] { r.ZCm - rz * hw - fz * hd, r.ZCm + rz * hw - fz * hd, r.ZCm + rz * hw + fz * hd, r.ZCm - rz * hw + fz * hd };
+            double px = r.CellX * 400 + 200, pz = -(r.CellY * 400 + 200); bool inside = true; double best = double.MaxValue;
+            for (int i = 0; i < 4; i++)
+            {
+                int j = (i + 1) % 4; double ex = cx[j] - cx[i], ez = cz[j] - cz[i], t = Math.Max(0, Math.Min(1, ((px - cx[i]) * ex + (pz - cz[i]) * ez) / (ex * ex + ez * ez)));
+                best = Math.Min(best, Math.Sqrt(Math.Pow(px - (cx[i] + t * ex), 2) + Math.Pow(pz - (cz[i] + t * ez), 2)));
+                if (ex * (pz - cz[i]) - ez * (px - cx[i]) < 0) inside = false;
+            }
+            return inside ? 0 : best;
+        }
+
         // CellarEncounterPlan can put an extra enemy or the hunter on any free floor cell of a Combat room, at any stir level. The plan stores only the cell (no spawner yet), so the
         // standing point is the cell centre: every footprint (jitter included) on such a cell keeps at least 1.0 m of horizontal clearance from it.
         [Test]
@@ -117,12 +133,11 @@ namespace SleepingCalamity.Tests.EditMode
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     var free = new HashSet<(int, int)>(CellarEncounterPlan.FreeCellsOf(l, d, r).Select(q => (q.X, q.Y)));
+                    foreach (CellarSpawn sp in l.Rooms[r].Room.Spawns) free.Add((l.Rooms[r].X + sp.X, l.Rooms[r].Y + sp.Y));   // a spawn point is a standing point too
                     foreach (CellarClutterRow row in c.Rows.Where(q => q.RoomIndex == r && free.Contains((q.CellX, q.CellY))))
                     {
                         onEncounterCells++;
-                        double mx = row.CellX * 400 + 200, mz = -(row.CellY * 400 + 200);
-                        var (hx, hz) = Extent(row);
-                        double dx = Math.Max(0, Math.Abs(mx - row.XCm) - hx), dz = Math.Max(0, Math.Abs(mz - row.ZCm) - hz), dist = Math.Sqrt(dx * dx + dz * dz);
+                        double dist = PolygonDistance(row);   // nearest point of the yawed footprint rectangle, measured on its four edges
                         min = Math.Min(min, dist);
                         Assert.GreaterOrEqual(dist, 100.0, "seed " + l.Seed + " floor " + l.Floor + " " + row.Id + " is " + dist.ToString("0") + " cm from the encounter standing point");
                     }
@@ -144,13 +159,13 @@ namespace SleepingCalamity.Tests.EditMode
                     foreach (PlacedVignette v in d.Vignettes) if (v.RoomIndex == r) blockedBase[v.Cell.X - p.X, v.Cell.Y - p.Y] = true;
                     var blocked = (bool[,])blockedBase.Clone();
                     int groups = 0;
+                    // clutter hugs a wall and never blocks a cell: every piece leaves a lane of 2.5 m or more between the wall faces (3.6 m), so the cell stays walkable
                     foreach (CellarClutterRow row in c.Rows.Where(q => q.RoomIndex == r && q.Piece != CellarFloorClutter.Rubble))
+                    {
+                        Assert.LessOrEqual(row.DepthCm, 110, "seed " + l.Seed + " floor " + l.Floor + " " + row.Id + ": too deep to leave a 2.5 m lane");
                         if (!blocked[row.CellX - p.X, row.CellY - p.Y]) { blocked[row.CellX - p.X, row.CellY - p.Y] = true; groups++; }
-                    var before = Reach(room, blockedBase); var after = Reach(room, blocked);
+                    }
                     string tag = "seed " + l.Seed + " floor " + l.Floor + " room " + r;
-                    for (int x = 0; x < room.Width; x++) for (int y = 0; y < room.Height; y++)
-                        if (before[x, y] && !blocked[x, y]) Assert.IsTrue(after[x, y], tag + ": cell " + x + "," + y + " cut off by clutter");
-                    foreach (CellDoor dr in room.Doors) if (before[dr.X, dr.Y]) Assert.IsTrue(after[dr.X, dr.Y], tag + ": a door cut off");
                     int floorCells = room.FloorCount;
                     Assert.LessOrEqual(groups * 100, floorCells * CellarFloorClutter.BlockedPercentCap, tag + ": clutter fills too much of the room");
                     // the centre cell (nearest the centroid) is free
@@ -167,24 +182,6 @@ namespace SleepingCalamity.Tests.EditMode
                     Assert.IsFalse(c.Rows.Any(q => q.RoomIndex == r && q.CellX == p.X + bx && q.CellY == p.Y + by), tag + ": clutter in the room centre");
                 }
             }
-        }
-
-        static bool[,] Reach(CellarRoom room, bool[,] blocked)
-        {
-            var seen = new bool[room.Width, room.Height];
-            CellDoor start = room.Doors.FirstOrDefault(dr => !blocked[dr.X, dr.Y]);
-            if (start == null) return seen;
-            var q = new Queue<(int, int)>(); seen[start.X, start.Y] = true; q.Enqueue((start.X, start.Y));
-            while (q.Count > 0)
-            {
-                var (cx, cy) = q.Dequeue();
-                foreach (CellSide s in Sides)
-                {
-                    var (dx, dy) = CellarRoom.Step(s); int nx = cx + dx, ny = cy + dy;
-                    if (room.InBounds(nx, ny) && !seen[nx, ny] && !blocked[nx, ny] && room.CellAt(nx, ny) == CellKind.Floor) { seen[nx, ny] = true; q.Enqueue((nx, ny)); }
-                }
-            }
-            return seen;
         }
 
         [Test]
@@ -250,7 +247,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 12434377020846033822UL, GoldenClutter12345Floor2 = 3470356462926828300UL, GoldenClutter12345Floor3 = 1615557534642611247UL;
+        const ulong GoldenClutter12345Floor1 = 6667249822921251674UL, GoldenClutter12345Floor2 = 16591471619076685582UL, GoldenClutter12345Floor3 = 7994937135666888102UL;
 
         [Test]
         public void Golden_Seed12345_ClutterHash()

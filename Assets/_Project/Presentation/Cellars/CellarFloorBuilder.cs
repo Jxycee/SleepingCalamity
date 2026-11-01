@@ -56,7 +56,7 @@ namespace SleepingCalamity.Presentation
         public int VignetteGroups;
         public bool DustMotes;                  // the floor's dust is thick enough to show (a marker object stands in until the particle prefab exists)
         public float FogDensity;                // the density applied when the kit asked for fog, else 0
-        public int Vaults, Faces, Props, Candles, Clutter;   // art layer: ceiling bays (kit or procedural), wall faces, dressing pieces, candle clusters
+        public int Vaults, Faces, Props, Candles;   // art layer: ceiling bays (kit or procedural), wall faces, dressing pieces, candle clusters
         public CellPos? HealingCell;            // P47: the floor's healing point cell (null when it has none)
         public GameObject HealingOrb;           // the glowing orb above the point: shown while the point is ready, hidden while it recharges (DiveHaulSync drives it on every peer)
         public Vector3 EntryCenter;             // the first entry start cell
@@ -69,7 +69,7 @@ namespace SleepingCalamity.Presentation
         public const string VignetteGroup = "Vignettes", AtmosphereGroup = "Atmosphere";
         const float Tile = 2f;
         const int BigRoomCells = 12;
-        static readonly Color GoldLamp = CellarArtTuning.LampGold;   // the lamp gold lives in the art tuning block (CellarFloorBuilder.Art.cs)
+        static readonly Color GoldLamp = new Color(1.0f, 0.80f, 0.54f);   // the approved dungeon corner's paler lantern gold (not orange)
 
         public static Vector3 CellCenter(int x, int y) => new Vector3((x + 0.5f) * CellSize, 0f, -(y + 0.5f) * CellSize);
 
@@ -218,6 +218,7 @@ namespace SleepingCalamity.Presentation
             Dress(layout, dressing, grid, root, kit, mats, result);
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
             Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
+            ArtFinish(root, kit, result);   // art layer: lamp gold and fog colour from CellarArtTuning
             return result;
         }
 
@@ -411,7 +412,7 @@ namespace SleepingCalamity.Presentation
                 atm.FogTintOffset(out float fr, out float fg, out float fb);
                 result.FogDensity = kit.FogBaseDensity * atm.FogPercent / 100f;
                 RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = result.FogDensity;
-                RenderSettings.fogColor = CellarArtTuning.FogColor(kit.FogBaseColor, fr, fg, fb);   // warm offset halved and clamped (art tuning block)
+                RenderSettings.fogColor = new Color(Mathf.Clamp01(kit.FogBaseColor.r + fr), Mathf.Clamp01(kit.FogBaseColor.g + fg), kit.FogBaseColor.b + fb);
             }
             if (atm.OddLightRoom >= 0)
             {

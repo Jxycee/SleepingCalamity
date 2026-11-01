@@ -142,7 +142,7 @@ namespace SleepingCalamity.EditorTools
                 if (sx < 0 || ly > sy || (ly == sy && lx < sx)) { sx = lx; sy = ly; }                    // southernmost, then westernmost
                 if (tx < 0 || ly < ty || (ly == ty && lx > tx)) { tx = lx; ty = ly; }                    // northernmost, then easternmost
             }
-            Vector3 pos = CellarFloorBuilder.CellCenter(p.X + sx, p.Y + sy) + new Vector3(-1.2f, 1.7f, -1.2f);
+            Vector3 pos = CellarFloorBuilder.CellCenter(p.X + sx, p.Y + sy) + new Vector3(-0.7f, 1.7f, -0.7f);   // 0.99 m from the cell centre: the clutter keeps 1.0 m clear of it, so the camera never sits inside a piece
             Vector3 target = CellarFloorBuilder.CellCenter(p.X + tx, p.Y + ty) + new Vector3(0, 1.2f, 0);
             if ((target - pos).sqrMagnitude < 9f) target = pos + new Vector3(1f, -0.1f, 1f) * 5f;
             return (pos, target);

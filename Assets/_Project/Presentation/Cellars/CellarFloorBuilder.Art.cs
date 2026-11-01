@@ -20,19 +20,20 @@ namespace SleepingCalamity.Presentation
     // ---------------------------------------------------------------------------------------------------------------------------------------------------
     // COLOUR TUNING BLOCK (floor art round 2). Round 0 measured the floor at 48-58% mid-tones against the dungeon corner's 38%, fewer deep darks and more saturated
     // lamp pools (light saturation .57 vs .42-.53): too much flat orange fill. Everything below pulls it toward DungeonCornerBuilder (deep grey-brown darks, paler gold pools).
-    // Old -> new:  ambient 0.8 -> 0.35 | per-room fill 4.0 -> 1.8 and (1.0,0.76,0.52) -> (1.0,0.86,0.70) | lamp gold (1.0,0.80,0.54) -> (1.0,0.82,0.58), lamp intensity x1.2
+    // Round 2: ambient 0.35 -> 0.28 | fill 1.8 -> 1.0 | lamp x1.2 -> x1.0, corridor lamps a further x0.8 | lamp gold (1.0,0.85,0.66).
+    // Round 1, old -> new:  ambient 0.8 -> 0.35 | per-room fill 4.0 -> 1.8 and (1.0,0.76,0.52) -> (1.0,0.86,0.70) | lamp gold (1.0,0.80,0.54) -> (1.0,0.82,0.58), lamp intensity x1.2
     // (wall 18 -> 21.6, centre 18 -> 21.6, corridor 11 -> 13.2) | candle gold stays the corner's (1.0,0.72,0.44) | fog warm offset x0.5, each channel held within 0.03 of the base.
     // The volume stays DungeonCorner_Profile with no extra warm grade. Applies to every floor built by CellarFloorBuilder (lamps, fills, candles, fog) and, for ambient,
     // to whichever scene builder sets RenderSettings (CellarFloorTestBuilder today; a real dive scene should read CellarArtTuning.Ambient too).
     // ---------------------------------------------------------------------------------------------------------------------------------------------------
     public static class CellarArtTuning
     {
-        public const float Ambient = 0.35f;                         // trilight ambient intensity (was 0.8; the corner uses 0.23)
-        public const float FillIntensity = 1.8f;                    // per-room fill light (was 4.0)
-        public const float LampBoost = 1.2f;                        // wall, centre and corridor lamp intensity multiplier
+        public const float Ambient = 0.28f;                         // trilight ambient intensity (was 0.8, round 1 0.35; the corner uses 0.23)
+        public const float FillIntensity = 1.0f;                    // per-room fill light (was 4.0, round 1 1.8)
+        public const float LampBoost = 1.0f, CorridorLampScale = 0.8f;   // wall, centre and corridor lamp intensity multiplier (round 1 1.2), corridor lamps a further x0.8
         public const float FogWarmScale = 0.5f, FogWarmClamp = 0.03f;   // the per-floor fog warm offset: halved, then within this of the base colour per channel
         public static readonly Color FillGold = new Color(1.0f, 0.86f, 0.70f);
-        public static readonly Color LampGold = new Color(1.0f, 0.82f, 0.58f);
+        public static readonly Color LampGold = new Color(1.0f, 0.85f, 0.66f);
         public static readonly Color CandleGold = new Color(1.0f, 0.72f, 0.44f);
 
         // Fog colour for a floor: the base (the corner's ~(0.16, 0.13, 0.11)) plus the floor's warm offset, halved and clamped so it stays grey-brown.
@@ -47,7 +48,7 @@ namespace SleepingCalamity.Presentation
     {
         public const string VaultGroup = "Vaults", CeilingGroup = "Ceiling", FaceGroup = "Faces", DressingGroup = "Dressing", ClutterGroup = "Clutter";
         public const float RoomSpring = 2.6f, CorridorSpring = 1.6f, VaultHalfSpan = 2.0f, VaultRise = 2.5f;
-        public const float WallLampIntensity = 18f * CellarArtTuning.LampBoost, CentreLampIntensity = 18f * CellarArtTuning.LampBoost, CorridorLampIntensity = 11f * CellarArtTuning.LampBoost;
+        public const float WallLampIntensity = 18f * CellarArtTuning.LampBoost, CentreLampIntensity = 18f * CellarArtTuning.LampBoost, CorridorLampIntensity = 11f * CellarArtTuning.LampBoost * CellarArtTuning.CorridorLampScale;
         const float FaceDepth = 0.2f, KitAcross = 0.725f;   // VaultSegment / ArchRib (5 m inside, 6 m outside): 0.725 keeps the outer wall face 2.175 m from the axis, just behind a neighbour's 0.2 m face, inner face 1.83 m (on the wall colliders)
         static readonly Color CandleGold = CellarArtTuning.CandleGold, FillGold = CellarArtTuning.FillGold;
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
@@ -175,7 +176,7 @@ namespace SleepingCalamity.Presentation
             CellarFloorClutter clutter = CellarFloorClutter.Resolve(layout, resolved);
             Sockets(resolved, grid, kit, mats, ceiling, dressing, result);
             Corners(layout, resolved, grid, kit, mats, dressing, result, clutter);
-            Clutter(clutter, kit, mats, dressing, result);
+            Clutter(clutter, kit, mats, dressing);
 
             // a candle cluster on every chest (the chest marker is 0.8 m tall), and a warm fill per room
             foreach (FloorChest ch in layout.Chests)
@@ -345,7 +346,7 @@ namespace SleepingCalamity.Presentation
         // Core CellarFloorClutter rows (whole centimetres in this builder's frame; yaw clockwise from above, the piece's front into the room) become kit pieces under
         // Dressing/Clutter. The Blender pieces stand with the pivot bottom centre, front +X, wall side -X, +Z along the wall, so a row turns by yaw - 90 degrees.
         // A missing kit piece falls back to a primitive of the row's footprint in the kit's materials. Pure function of (seed, floor): no Random, no Time.
-        static void Clutter(CellarFloorClutter clutter, CellarFloorKit kit, Mats mats, Transform dressing, CellarFloorBuild result)
+        static void Clutter(CellarFloorClutter clutter, CellarFloorKit kit, Mats mats, Transform dressing)
         {
             if (clutter.Rows.Count == 0) return;
             Transform group = Group(dressing, ClutterGroup);
@@ -359,7 +360,19 @@ namespace SleepingCalamity.Presentation
                     go = Box(group, r.Piece + "_" + r.Id, pos + new Vector3(0, r.Height * 0.5f, 0), new Vector3(r.Depth, r.Height, r.Width), m, 1f, false);   // x = off the wall, z = along it
                     go.transform.rotation = rot;
                 }
-                result.Clutter++;
+            }
+        }
+
+        // The one hook the main builder calls after its own pass (lamps, atmosphere): recolours every lamp light to CellarArtTuning.LampGold and sets the fog colour from the
+        // tuning block (the base plus the floor's warm offset, halved and clamped), so the colour tuning lives in this file only.
+        static void ArtFinish(Transform root, CellarFloorKit kit, CellarFloorBuild result)
+        {
+            Transform lamps = root != null ? root.Find(LampGroup) : null;
+            if (lamps != null) foreach (Light l in lamps.GetComponentsInChildren<Light>(true)) l.color = CellarArtTuning.LampGold;
+            if (kit != null && kit.FogBaseDensity > 0f && result.Dressing != null)
+            {
+                result.Dressing.Atmosphere.FogTintOffset(out float fr, out float fg, out float fb);
+                RenderSettings.fogColor = CellarArtTuning.FogColor(kit.FogBaseColor, fr, fg, fb);
             }
         }
 
