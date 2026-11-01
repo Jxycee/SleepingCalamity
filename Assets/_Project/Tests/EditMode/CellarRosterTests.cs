@@ -92,8 +92,8 @@ namespace SleepingCalamity.Tests.EditMode
                 }
             }
             // Floor 2 sits at the placeholders; floor 3 loses the repeats, so the overall share is a little under.
-            Assert.AreEqual(0, count[(int)FloorTwist.Ambush], "ambush is inert (AmbushPercent 0) until the runtime behaviour exists");
-            Assert.That(count[(int)FloorTwist.None] / (double)floors, Is.InRange(0.72, 0.84), "none");
+            Assert.That(count[(int)FloorTwist.Ambush] / (double)floors, Is.InRange(0.08, 0.14), "ambush (procgen 3b ambush, deliberate)");
+            Assert.That(count[(int)FloorTwist.None] / (double)floors, Is.InRange(0.58, 0.72), "none");
             Assert.That(count[(int)FloorTwist.Thin] / (double)floors, Is.InRange(0.08, 0.14), "thin");
             Assert.That(count[(int)FloorTwist.Crowded] / (double)floors, Is.InRange(0.08, 0.14), "crowded");
             TestContext.WriteLine("twist shares of floors 2-3: none " + count[0] / (double)floors + " ambush " + count[1] / (double)floors + " thin " + count[2] / (double)floors + " crowded " + count[3] / (double)floors);
@@ -192,7 +192,6 @@ namespace SleepingCalamity.Tests.EditMode
         public void Plan_Ambush_NamesACombatRoom_SpawnsUnchanged()
         {
             int checkedFloors = 0;
-            if (FloorTwistTuning.AmbushPercent == 0) { Assert.AreEqual(0, TwistedFloors(FloorTwist.Ambush).Count, "no Ambush while inert"); return; }
             foreach (var (seed, floor) in TwistedFloors(FloorTwist.Ambush))
             {
                 CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
