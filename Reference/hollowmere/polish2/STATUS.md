@@ -1,7 +1,7 @@
 State: IN PROGRESS
 Session: Town polish 2: wall stone, merlons, ruined clutter
-Progress: 80%
-Sheet: round 1 in-engine (Ruined only, scratch): WallRun / LowerGate / EastGate; final sheet committed with round 2
+Progress: 85%
+Sheet: round 2 in progress: Ruined captures done (WallRun, LowerGate, RuinedLane), Rebuilt WallRun capture running; sheet + score follow
 Needs: -
 Blocker: none
 Archive: no
