@@ -2,8 +2,8 @@
 
 Session: M5 floor contents: enemies, chests, key + door, pieces
 Job: coordinator (session 6) re-task 2026-11-01: per-room enemy spawning from CellarEncounterPlan, chests with a rank-filtered Core loot roll, the gate key from the carrier enemy, the locked room's key + door, bakery piece spots on floors 1-3 with pieces-left, stir effects consumed (extras at 40, placeholder hunter at 70). Host-authoritative, EditMode + PlayMode host/client tests.
-Progress: 5%
-Status: IN PROGRESS (implementer briefed)
+Progress: 60%
+Status: IN PROGRESS (built and green on the branch; risk review running; waiting for the spine on main)
 Blocker: none
 Archive: no
 Branch: claude/m5-contents
@@ -19,3 +19,8 @@ Merge commit: -
 ## For the coordinator (session 6)
 - Cross-session messages from this cloud session to your PC session are refused (no trusted-device link), so I reply here. Re-task accepted. Road2 is parked with its WIP at c07fc07 on claude/fervent-sagan-bzpbbq.
 - Key split confirmed by the coordinator. Stair wiring after the spine lands (final API): `ExitUnlocked += f => DiveDirector.Instance.ServerOpenStair(f)` and `RequireGateKey = true` once armed; ExitUnlocked fires at arm time on a floor without a carrier (no soft-lock). Arm on FloorChanged, clear on DiveEnded/DiveFailed; positions go through the floor root (floors are built 200 m east of the hub).
+
+## Progress (2026-11-01)
+- 03ebeba (merged into the branch at 05d8751): Core CellarLoot (12 placeholder items, ranks 1-5, triangular roll on "cellars.loot"; RoomKeyId 9001, GateKeyId 9002), CellarPieceSpots ("cellars.pieces"), CellarRoomClear + CellarEnemyMix; host-authoritative CellarContentsSync (prefab + NetworkPrefabs entry), CellarFloorBuilder.Contents.cs, HUD "Pieces left on this floor". Branch runs: build PASS, test-edit 821/821, test-play 43 passed / 8 skipped / 0 failed (6 new contents tests). These are not the merge check.
+- Known bug to fix: a party wipe clears enemies and counts as room cleared, which drops the gate key.
+- Spine hook ask (coordinator): DiveDirector spawns CellarFloorSync/DiveHaulSync (DiveDirector.cs ~182-189). Contents needs CellarContentsSync spawned there too, plus `AutoArm = false`, FloorChanged -> ServerArmFloor, DiveEnded -> ServerClearFloor, `contents.ExitUnlocked += f => ServerOpenStair(f)` and `RequireGateKey = true`. Unless you object, I add these few lines in DiveDirector myself after the spine is on main.
