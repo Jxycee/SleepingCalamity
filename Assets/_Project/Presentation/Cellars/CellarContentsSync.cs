@@ -314,6 +314,7 @@ namespace SleepingCalamity.Presentation
 
             CollectPlayers();
             EnterRooms(fs);
+            TickAmbush(fs);
             SpawnHunter(fs);
             TickGateKey();
             TickPieces(fs);
@@ -349,7 +350,7 @@ namespace SleepingCalamity.Presentation
             if (!IsServer) return;
             UntrackAll();
             if (_combat != null) _combat.ServerClearEnemies();
-            _clear.Reset(); _entered.Clear(); _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
+            _clear.Reset(); _entered.Clear(); _ambushRoom = -1; _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
             _layout = null; _root = null; _dressing = null; _armPos.Clear(); _live.Clear(); _hasBounds = false;
             _st = new ContentsState();
             if (IsSpawned) Publish();
@@ -434,22 +435,38 @@ namespace SleepingCalamity.Presentation
             }
         }
 
-        private void SpawnRoom(CellarFloorSync fs, int room)
+        private int _ambushRoom = -1; private float _ambushDue;   // host: the ambush room waiting out AmbushDelaySeconds
+
+        private void TickAmbush(CellarFloorSync fs)
+        {
+            if (_ambushRoom < 0 || Time.time < _ambushDue) return;
+            int room = _ambushRoom; _ambushRoom = -1;
+            SpawnRoom(fs, room, true);
+        }
+
+        private void SpawnRoom(CellarFloorSync fs, int room, bool ambushNow = false)
         {
             CellarEncounterPlan plan = CurrentPlan(fs);
             if (plan.CountIn(room) == 0) return;
             CombatHost combat = EnsureCombat();
-            CellarFloorLayout l = _layout; int index = 0;
+            CellarFloorLayout l = _layout; int index = 0, slot = -1;
+            CellPos[] ambush = null;
+            if (plan.Twist == FloorTwist.Ambush && room == plan.AmbushRoom)   // host-only twist: the room's enemies spring from the ring cells after a short delay
+            {
+                if (!ambushNow) { _ambushRoom = room; _ambushDue = Time.time + FloorTwistTuning.AmbushDelaySeconds; return; }
+                ambush = CellarAmbush.Cells(l, _dressing, plan, room);
+            }
             foreach (EncounterSpawn sp in plan.Spawns)
             {
                 if (sp.RoomIndex != room || sp.Kind == EncounterKind.Hunter) continue;
+                slot++;
                 bool carrierSpawn = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
                 if (carrierSpawn && _st.GateKey != 0) { index++; continue; }   // its key already dropped (or was taken): a re-entered room does not bring the carrier back
                 bool warden = l.WardenCell.HasValue && l.WardenCell.Value.X == sp.X && l.WardenCell.Value.Y == sp.Y;
                 EnemyKind kind = warden ? EnemyKind.DoughWarden : sp.Tier == SpawnTier.Tier2 ? EnemyKind.RatKing : CellarEnemyMix.Tier1Kind(l.Seed, l.Floor, room, index, plan.RosterMask);
                 int tier = sp.Tier == SpawnTier.Tier2 ? 2 : 1;
                 index++;
-                Enemy e = combat.SpawnEnemy(kind, tier, World(fs, sp.Cell));
+                Enemy e = combat.SpawnEnemy(kind, tier, World(fs, ambush != null ? ambush[slot] : sp.Cell));
                 bool carrier = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
                 if (e == null)
                 {
