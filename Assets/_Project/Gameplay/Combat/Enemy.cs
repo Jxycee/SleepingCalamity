@@ -84,6 +84,8 @@ namespace SleepingCalamity.Gameplay
         public int Room => _room;
         private Vector3 _home; private bool _homeSet;   // host: where it spawned; after a leash it walks back here
         private const float HomeArrive = 1f;
+        private const float HomeGiveUp = 8f;   // host: a walk home blocked by a corner stops here and idles instead of grinding the wall
+        private float _homeWalk;
         private float _bracedLeft;                       // host: seconds the broom still shows its brace after a blocked hit
         public const float BracedShowSeconds = 0.35f;
 
@@ -283,6 +285,7 @@ namespace SleepingCalamity.Gameplay
             if (_cooldown > 0f) _cooldown -= dt;
             if (Phase == EnemyPhase.Attack) { ServerAdvanceAttack(dt, target); return; }
             if (target == null) { ServerReturnHome(dt); return; }
+            _homeWalk = 0f;
 
             // The brain decides (Core AiBrain); this applies its action. PickTarget just filled the context's hero snapshot.
             FillContext(dt);
@@ -310,7 +313,8 @@ namespace SleepingCalamity.Gameplay
         {
             Vector3 p = transform.position;
             float dx = _home.x - p.x, dz = _home.z - p.z;
-            if (Hunts || !_homeSet || dx * dx + dz * dz <= HomeArrive * HomeArrive) { SetPhase(EnemyPhase.Idle); return; }
+            if (Hunts || !_homeSet || dx * dx + dz * dz <= HomeArrive * HomeArrive || _homeWalk >= HomeGiveUp) { SetPhase(EnemyPhase.Idle); return; }
+            _homeWalk += dt;
             SetPhase(EnemyPhase.Chase);
             Vector3 dir = new Vector3(dx, 0f, dz).normalized;
             FaceToward(dir, 420f, dt);
@@ -343,6 +347,8 @@ namespace SleepingCalamity.Gameplay
             _ctx.Heroes.Clear();
             _heroBuf.Clear();
             int self = GetHashCode();
+            // the room override (always noticed, never leashed) holds only while this enemy is itself inside its room: one that followed a hero into a corridor leashes normally
+            bool selfInRoom = _room >= 0 && _host != null && _host.RoomOf != null && _host.RoomOf(transform.position) == _room;
             IReadOnlyList<HeroVitals> all = HeroVitals.All;
             for (int i = 0; i < all.Count; i++)
             {
@@ -350,7 +356,7 @@ namespace SleepingCalamity.Gameplay
                 if (v == null || v.NetworkManager != NetworkManager || !v.IsUp) continue;
                 Vector3 hp = v.transform.position;
                 int id = v.GetHashCode();
-                bool inRoom = _room >= 0 && _host != null && _host.RoomOf != null && _host.RoomOf(hp) == _room;
+                bool inRoom = selfInRoom && _host.RoomOf(hp) == _room;
                 _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, InRoom = inRoom, Load = Targets.CountOn(id, self) });
                 _heroBuf.Add(v);
             }
