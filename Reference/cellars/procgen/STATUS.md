@@ -1,9 +1,9 @@
 # Cellars procedural generation (procgen track)
-Status: IN PROGRESS (items 1a-c, 1d, 2, 3, 4 merged; 4-clutter follow-up waits for Road 2b; 5, 6 next)
+Status: IN PROGRESS (items 1-6 and the clutter follow-up all merged; follow-up 3b runtime Ambush being built)
 Blocker: none
 Branch: one per item (claude/procgen-<item>); merged: cellar-procgen (1a-c), procgen-item2, procgen-item4, procgen-1d-loot
-Last check: PASS at fbf68c6c (1d; EditMode 892/892, PlayMode 61 passed 8 skipped); merged 1e410aff
-Next: clutter follow-up (claude/procgen-item4-clutter 94dd1550) after Road 2b; then 5 (vignettes), 6 (floor-art follow-ups: bare-room socket density, wall/overhead sockets, warm light sockets)
+Last check: PASS at 61472b25 (item 6; EditMode 925/925, PlayMode 61 passed 8 skipped); merged 29da2ac4
+Next: 3b runtime Ambush (claude/procgen-3b-ambush: ambush cells + delayed host spawn, AmbushPercent back to 12); then door-hint noise (74% of doors notable) and a coordinator-assigned task
 Session: Procgen next (successor, worktree procgen-next-73e90d)
 Archive: no
 
@@ -65,3 +65,7 @@ Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/
 - 2026-11-01: item 3 built (claude/procgen-3-roster 6994ef10): CellarFloorRoster roster subset (floors 2-3) + twist None/Ambush/Thin/Crowded (floors 2-3, once per dive), BuildForDive on host and peer fallback, spawner uses RosterMask. Risk review: approve with fixes (Thin must keep stir extras; Ambush 0% until runtime exists; tautological test; shared array) in progress.
 - Wrapper note: Tools/unity.ps1 defaults -ProjectRoot to the main checkout; from a worktree always pass -ProjectRoot <worktree>.
 - 2026-11-01: item 3 merged 81e02815 (check PASS ac07c6b2). Twist shares floors 2-3: None .782, Thin .112, Crowded .107, Ambush 0 (inert until runtime ambush exists). Item 5 (vignettes) being built on claude/procgen-5-vignettes.
+- 2026-11-01: item 6 (floor-art follow-ups, claude/procgen-6-density). Core `CellarFloorTrim` (wall Plaque/Hook/WallShelf >=1 m up, <=0.4 m deep; overhead Beam/Hanging >=2 m; stream cellars.trim) and `CellarFloorWarmLights` (<=2 candle/sconce per room, RoomLightCap 6 counting wall lanterns, centre lamp, fill, chest candles, odd light; stream cellars.warmlight); greybox in Procgen.cs `ProcgenTrim`. Pool sockets NOT added: the free cells of the barest rooms are the piece-spot/clutter cells (a barrel in wine_vault_l starved CellarPieceSpots, a shelf in cellar_entry lowered its density). Density per floor cell (1000 seeds, floors 1-3): floor pieces only wine_press_hall .394, wine_vault_l .449, coal_boiler_hall .476, entry .503; with trim .755 / .818 / .841 / .871 (all rooms >= .755). Lights: 84% of rooms get one. Only the clutter floor-3 golden re-pinned. test-edit 920/920.
+- 2026-11-01: clutter-yields-to-chunks merged 6943c19a (check PASS 029ebe16).
+- 2026-11-01: item 5 merged d4a603ad (check PASS 19a83bf8): vignettes 6 -> 16, all once per dive; odds by floor depth, special-room kind, family spacing 0.4x, category fatigue 0.7x (placeholders in CellarVignetteTuning); 4000 seeds: 1.35 per floor, top share 16%, min 1.5%, 1.4% placement drop; no bare dive. Combined items 4+5 clutter floor-3 golden 5831406759042979402.
+- 2026-11-01: item 6 merged 29da2ac4 (check PASS 61472b25): CellarFloorTrim (wall + overhead) and CellarFloorWarmLights (<= 2 per room, cap 6 real lights, builder-verified test). Pool sockets not added (broke CellarPieceSpots counts). Mobile_Renderer is plain Forward (4 lights per object): a 6-light room can exceed it there; PC renderer is Forward+.
