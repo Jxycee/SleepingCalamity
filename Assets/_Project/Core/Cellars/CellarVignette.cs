@@ -59,6 +59,7 @@ namespace SleepingCalamity.Core
                 new CellarVignette("abandoned_camp", "Abandoned adventurer camp", VignetteCategory.Fluff, 4, 1, true, false, false,
                     P("Bedroll", B, -0.9f, 0.1f, 0.5f, 1.8f, 0.2f, 0.8f, 0x6B5B45, 12f), P("FireRing", Cy, 0.7f, 0.1f, -0.2f, 0.9f, 0.2f, 0.9f, 0x3A3532),
                     P("Embers", Sp, 0.7f, 0.2f, -0.2f, 0.3f, 0.12f, 0.3f, 0x7A3B1E), P("Pack", B, -0.5f, 0.3f, -0.9f, 0.6f, 0.6f, 0.4f, 0x7C6A3E, -20f)),
+                // Note: toppled_wine_rack, collapsed_shelf and lantern_cache are OncePerDive on purpose (procgen 5: every vignette shows once per dive).
                 new CellarVignette("toppled_wine_rack", "Toppled wine rack with rats", VignetteCategory.Danger, 5, 1, true, false, false,
                     P("RackFrame", B, 0f, 0.35f, 0f, 2.6f, 0.3f, 0.9f, 0x5A3E26, 8f), P("Bottle1", Ca, 0.9f, 0.12f, 0.8f, 0.14f, 0.5f, 0.14f, 0x3E5A32, 80f),
                     P("Bottle2", Ca, -0.4f, 0.12f, 0.9f, 0.14f, 0.5f, 0.14f, 0x3E5A32, 100f), P("Bottle3", Ca, 0.3f, 0.12f, -0.9f, 0.14f, 0.5f, 0.14f, 0x2F4A5A, 70f),
@@ -76,7 +77,7 @@ namespace SleepingCalamity.Core
                     P("Crate", B, 0f, 0.3f, 0f, 0.9f, 0.6f, 0.7f, 0x6A4A28), P("Oil1", Cy, 0.8f, 0.2f, 0.5f, 0.3f, 0.4f, 0.3f, 0xC8A040), P("Oil2", Cy, -0.8f, 0.2f, -0.4f, 0.3f, 0.4f, 0.3f, 0xC8A040),
                     P("Glint", Sp, 0f, 0.8f, 0f, 0.2f, 0.2f, 0.2f, 0xF2D58A)),
 
-                // ---- procgen item 5: ten more greybox vignettes (premises are ours; one 4 m cell each; any combat room, WallHug ones need a wall cell) ----
+                // ---- procgen item 5: ten more greybox vignettes (premises are ours; one 4 m cell each; any combat room, WallHug ones need a wall cell). Premises that imply behaviour (rats that come out, the alarm bell, the idol's curse, sleeping monsters) are greybox only; behaviour later. ----
                 // A seep has pooled where the vault floor sagged; a leaking cask drips into it.
                 new CellarVignette("flooded_alcove", "Flooded alcove", VignetteCategory.Fluff, 10, 1, true, false, false,
                     P("Puddle", Cy, 0f, 0.02f, 0f, 2.4f, 0.03f, 2.4f, 0x2F4650), P("Cask", Cy, 1.1f, 0.35f, -1.0f, 0.7f, 0.7f, 0.7f, 0x5A3E26), P("Drip", Sp, 1.1f, 0.05f, -0.4f, 0.12f, 0.12f, 0.12f, 0x6A8EA0)),
@@ -94,7 +95,7 @@ namespace SleepingCalamity.Core
                 new CellarVignette("crate_stack_nest", "Crate stack with a nest", VignetteCategory.Danger, 14, 1, true, false, true,
                     P("CrateA", B, -0.5f, 0.35f, -1.2f, 0.9f, 0.7f, 0.9f, 0x6A4A28), P("CrateB", B, 0.5f, 0.35f, -1.2f, 0.9f, 0.7f, 0.9f, 0x5A3E26, 6f), P("CrateC", B, 0f, 1.05f, -1.2f, 0.9f, 0.7f, 0.9f, 0x6A4A28, -8f),
                     P("Nest", Sp, 0f, 0.1f, -0.4f, 0.5f, 0.2f, 0.5f, 0x4A4038)),
-                // A cord across the passage runs to a bell; whoever trips it tells every sleeper on the floor.
+                // A cord across the passage runs to a bell; whoever trips it tells every sleeper on the floor. (Greybox only; behaviour later: no tripwire or alarm exists yet.)
                 new CellarVignette("tripwire_bell", "Tripwire bell", VignetteCategory.Danger, 16, 2, true, false, false,
                     P("PostA", Cy, -1.5f, 0.4f, 0f, 0.12f, 0.8f, 0.12f, 0x4A4038), P("PostB", Cy, 1.5f, 0.4f, 0f, 0.12f, 0.8f, 0.12f, 0x4A4038), P("Cord", B, 0f, 0.2f, 0f, 3.0f, 0.02f, 0.02f, 0xA8987A),
                     P("Bell", Sp, 1.5f, 0.9f, 0f, 0.22f, 0.22f, 0.22f, 0xB89040)),

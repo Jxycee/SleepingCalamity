@@ -297,9 +297,27 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(mean, Is.InRange(0.9, 1.5), "vignettes per floor");
             Assert.AreEqual(0, bare, "dives of floors 1-3 with no vignette (pity)");
             Assert.LessOrEqual(dropped, n * 3 / 50, "chosen vignettes without a legal cell (spawn cells are never used, so a few rooms have none; pity above keeps every dive at one or more)");
-            // procgen 5: the 16-vignette pool leaves no bare dive at floor 3, so the guarantee is a rarely used fallback and is no longer required to fire
             foreach (VignetteCategory c in Enum.GetValues(typeof(VignetteCategory))) Assert.Greater(perCategory.GetValueOrDefault(c), 0, c + " never shown");
             TestContext.WriteLine("vignette mean per floor " + mean.ToString("F3") + ", forced floors " + forcedFloors + ", per category " + string.Join(" ", perCategory.OrderBy(k => (int)k.Key).Select(k => k.Key + "=" + k.Value)));
+        }
+
+        [Test]
+        public void Vignettes_Floor3Guarantee_ForcesOneWhenTheDiveWouldBeBare()
+        {
+            // The guarantee is a rare fallback with the 16-vignette pool: scan for a dive whose floors 1-2 drew nothing and whose floor-3 rolls hit nothing.
+            int found = 0; uint firstSeed = 0;
+            for (uint seed = 0; seed < 400000 && found < 3; seed++)
+            {
+                if (VignetteDive.Select(seed, VignetteDive.GuaranteeFloor).Forced)
+                {
+                    if (found++ == 0) firstSeed = seed;
+                    Assert.AreEqual(0, VignetteDive.Select(seed, 1).Chosen.Count, "forced dive " + seed + " floor 1");
+                    Assert.AreEqual(0, VignetteDive.Select(seed, 2).Chosen.Count, "forced dive " + seed + " floor 2");
+                    Assert.AreEqual(1, VignetteDive.Select(seed, VignetteDive.GuaranteeFloor).Chosen.Count, "forced floor draws exactly one");
+                }
+            }
+            Assert.Greater(found, 0, "no seed under 400000 reached the floor-3 guarantee: the fallback is untested; widen the scan or add a test hook");
+            TestContext.WriteLine("guarantee fired for " + found + " seeds, first " + firstSeed);
         }
 
         [Test]

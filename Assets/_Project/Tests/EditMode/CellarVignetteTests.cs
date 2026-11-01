@@ -128,7 +128,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Placement_ClearOfHealPoint_Stairs_AndClutter()
+        public void Placement_ClearOfHealPoint_StairExit_AndEntry()
         {
             for (uint seed = 0; seed < 300; seed++)
                 for (int f = 1; f <= 3; f++)
@@ -136,7 +136,40 @@ namespace SleepingCalamity.Tests.EditMode
                     CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                     var heal = CellarHealing.PointFor(l, d);
                     foreach (PlacedVignette v in d.Vignettes)
+                    {
                         if (heal.HasValue) Assert.IsFalse(heal.Value.X == v.Cell.X && heal.Value.Y == v.Cell.Y, "vignette on the heal point");
+                        if (l.StairExit.HasValue) Assert.IsFalse(l.StairExit.Value.X == v.Cell.X && l.StairExit.Value.Y == v.Cell.Y, "vignette on the stair exit");
+                        foreach (CellPos e in l.EntryStarts) Assert.IsFalse(e.X == v.Cell.X && e.Y == v.Cell.Y, "vignette on an entry start");
+                    }
+                }
+        }
+
+        [Test]
+        public void Placement_NoVignetteOnChunkSolidCells_Over1000Seeds()
+        {
+            for (uint seed = 0; seed < 1000; seed++)
+                for (int f = 1; f <= 3; f++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    if (d.Vignettes.Count == 0) continue;
+                    var solid = new HashSet<(int, int)>();
+                    foreach (ResolvedChunk c in CellarRoomChunks.Resolve(l, d).Chunks)
+                        foreach (var sc in CellarRoomChunks.SolidCells(l, c)) solid.Add((sc.cell.X, sc.cell.Y));
+                    foreach (PlacedVignette v in d.Vignettes) Assert.IsFalse(solid.Contains((v.Cell.X, v.Cell.Y)), v.Vignette.Id + " on a chunk block/cover cell, seed " + seed + " floor " + f);
+                }
+        }
+
+        [Test]
+        public void Placement_NoVignetteOnClutterCells_Over1000Seeds()
+        {
+            for (uint seed = 0; seed < 1000; seed++)
+                for (int f = 1; f <= 3; f++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    if (d.Vignettes.Count == 0) continue;
+                    var clutter = new HashSet<(int, int)>();
+                    foreach (CellarClutterRow r in CellarFloorClutter.Resolve(l, d).Rows) clutter.Add((r.CellX, r.CellY));
+                    foreach (PlacedVignette v in d.Vignettes) Assert.IsFalse(clutter.Contains((v.Cell.X, v.Cell.Y)), v.Vignette.Id + " on a clutter cell, seed " + seed + " floor " + f);
                 }
         }
 
