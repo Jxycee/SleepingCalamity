@@ -12,13 +12,14 @@ namespace SleepingCalamity.Core
         public const string ArenaGreybox = "Arena_Greybox";
         public const string ArenaCombat = "Arena_Combat";   // M3: the combat test arena (waves of the three enemies and the elite)
         public const string ArenaDive = "Arena_Dive";   // M5: the Cellars dive hub (Undercroft stair stand-in); the dive floors are built far from it
+        public const string Hollowmere = "Hollowmere";   // M6 S3: the town is the session (hub) scene; the Cellars floors are built under it, no scene loads during play
         public const string ArenaPrefix = "Arena_";
-        public static readonly string[] BuildOrder = { Bootstrap, Lobby, ArenaGreybox, ArenaCombat, ArenaDive };
+        public static readonly string[] BuildOrder = { Bootstrap, Lobby, ArenaGreybox, ArenaCombat, ArenaDive, Hollowmere };
 
-        // True when sceneName starts with ArenaPrefix (ordinal, case-sensitive). Null -> false. Later milestones add their own gameplay prefixes here.
+        // True when sceneName starts with ArenaPrefix or is the town (ordinal, case-sensitive). Null -> false.
         public static bool IsGameplay(string sceneName)
         {
-            return sceneName != null && sceneName.StartsWith(ArenaPrefix, StringComparison.Ordinal);
+            return sceneName != null && (sceneName.StartsWith(ArenaPrefix, StringComparison.Ordinal) || string.Equals(sceneName, Hollowmere, StringComparison.Ordinal));
         }
     }
 }

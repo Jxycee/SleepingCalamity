@@ -18,6 +18,15 @@ block() {
     exit 2
 }
 
+# Tree key of a commit's Unity content: the Assets, Packages and ProjectSettings tree ids joined with '-'
+# (git rev-parse <rev>:Assets <rev>:Packages <rev>:ProjectSettings). Pipe-free; must match Tools/unity.ps1 and Tools/cloud/unity.sh.
+# Prints nothing when a path is missing or rev-parse fails.
+unity_tree_key() {
+    local out; out=$(git rev-parse "$1:Assets" "$1:Packages" "$1:ProjectSettings" 2>/dev/null | tr -d '\r') || return 0
+    [ "$(printf '%s\n' "$out" | grep -Ecx '[0-9a-f]{40}')" = 3 ] || return 0
+    printf '%s' "$out" | tr '\n' '-'
+}
+
 tool=$(json_field tool_name)
 cwd=$(json_field cwd)
 [ -n "$cwd" ] && cd "$cwd" 2>/dev/null
@@ -92,6 +101,12 @@ while IFS= read -r seg; do
     fi
 
     read -r -a words <<< "$seg"
+    # Leading VAR=value words (env prefix): remember SC_GATE_SKIP=1, then drop them so words[0] is the command.
+    gate_skip=0
+    while [ "${#words[@]}" -gt 0 ] && [[ "${words[0]}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do
+        [ "${words[0]}" = "SC_GATE_SKIP=1" ] && gate_skip=1
+        words=("${words[@]:1}")
+    done
     [ "${words[0]}" = "git" ] || continue
     sub="${words[1]}"
     args=("${words[@]:2}")
@@ -102,6 +117,16 @@ while IFS= read -r seg; do
             last="${args[${#args[@]}-1]}"
             case " ${args[*]} " in *" -b "*|*" -c "*|*" -- "*) ;; *) [ -n "$last" ] && [ "${last#-}" = "$last" ] && branch="$last" ;; esac
             ;;
+        commit)
+            # A commit that touches only Reference/**/STATUS.md must be a milestone (session-usage.md: no STATUS-only commits).
+            files=$(git diff --cached --name-only 2>/dev/null)
+            case " ${args[*]} " in *" -a "*|*" -am "*|*" -a"[a-z]*|*" --all "*) files=$(printf '%s\n%s' "$files" "$(git diff --name-only 2>/dev/null)") ;; esac
+            files=$(printf '%s\n' "$files" | sed '/^$/d')
+            if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -Evq '^Reference/.*STATUS\.md$'; then
+                printf '%s' "$cmd" | grep -q 'STATUS milestone:' \
+                    || block "this commit touches only Reference/**/STATUS.md. Batch STATUS lines into real commits (.claude/rules/session-usage.md); a STATUS-only commit is allowed only at a milestone, with a message starting \"STATUS milestone:\"."
+            fi
+            ;;
         push)
             for word in "${args[@]}"; do
                 case "$word" in
@@ -110,6 +135,49 @@ while IFS= read -r seg; do
                     -*f*) block "never force-push (CLAUDE.md)." ;;
                 esac
             done
+            # Fast gate: a branch push that changes Unity-imported files needs a passing 'unity gate' (or 'check')
+            # for the pushed commit. Pushes to main follow a checked merge; deletes and tag pushes are exempt.
+            [ "$gate_skip" = 1 ] && continue
+            positional=(); skipgate=0
+            for word in "${args[@]}"; do
+                case "$word" in
+                    --delete|-d|--tags|--mirror|--all) skipgate=1 ;;
+                    -*) ;;
+                    *) positional+=("$word") ;;
+                esac
+            done
+            [ "$skipgate" = 1 ] && continue
+            if [ "${#positional[@]}" -ge 2 ]; then refspec="${positional[${#positional[@]}-1]}"; else refspec=""; fi
+            if [ -z "$refspec" ]; then src="HEAD"; dst="$branch"
+            else
+                refspec="${refspec#+}"
+                case "$refspec" in *:*) src="${refspec%%:*}"; dst="${refspec#*:}" ;; *) src="$refspec"; dst="$refspec" ;; esac
+                [ "$src" = "HEAD" ] && [ "$dst" = "HEAD" ] && dst="$branch"
+            fi
+            dst="${dst#refs/heads/}"
+            [ -z "$src" ] && continue
+            [ "$dst" = "main" ] && continue
+            sha=$(git rev-parse --verify --quiet "$src^{commit}" 2>/dev/null) || continue
+            unity=$(git diff --name-only "origin/main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) || continue
+            [ -z "$unity" ] && continue
+            tkey=$(unity_tree_key "$sha")
+            ok=0
+            for d in sc-gate-pass sc-check-pass; do
+                [ -f "$common/$d/$sha" ] && ok=1
+                [ -n "$tkey" ] && [ -f "$common/$d-tree/$tkey" ] && ok=1
+            done
+            if [ "$ok" = 0 ]; then
+                # A gated ancestor with no Unity-file changes since (docs/STATUS commits on top) still counts.
+                for anc in $(git rev-list -n 30 "$sha" 2>/dev/null); do
+                    for d in sc-gate-pass sc-check-pass; do
+                        [ -f "$common/$d/$anc" ] || continue
+                        if [ -z "$(git diff --name-only "$anc" "$sha" -- Assets Packages ProjectSettings 2>/dev/null)" ]; then ok=1; break; fi
+                    done
+                    [ "$ok" = 1 ] && break
+                done
+            fi
+            [ "$ok" = 1 ] && continue
+            block "branch push changes Assets/Packages/ProjectSettings but no fast gate passed for $sha. Run Tools/unity.ps1 gate (PC) or bash Tools/cloud/unity.sh gate (cloud) from this worktree, or prefix SC_GATE_SKIP=1 when no Unity licence is available (say so in the push report)."
             ;;
         merge)
             # Merge gate: merging into main needs a passing Tools/unity.ps1 check on each merged commit,
@@ -125,11 +193,14 @@ while IFS= read -r seg; do
                 esac
                 sha=$(git rev-parse --verify --quiet "$word^{commit}" 2>/dev/null) || continue
                 [ -f "$common/sc-check-pass/$sha" ] && continue
+                # Same content under the Unity paths as a checked commit (tree-keyed marker, written by unity.sh/unity.ps1 check).
+                tkey=$(unity_tree_key "$sha")
+                [ -n "$tkey" ] && [ -f "$common/sc-check-pass-tree/$tkey" ] && continue
                 # Art-only or docs-only merge: no check needed. A failed diff (no merge base in a shallow clone) falls through.
                 if unity=$(git diff --name-only "main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) && [ -z "$unity" ]; then
                     continue
                 fi
-                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Check out that commit in C:\\Dev\\SleepingCalamity (not a worktree) and run Tools/unity.ps1 check, or in the cloud run bash Tools/cloud/unity.sh check (both write $common/sc-check-pass/$sha), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
+                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Check out that commit in C:\\Dev\\SleepingCalamity (not a worktree) and run Tools/unity.ps1 check, or in the cloud run bash Tools/cloud/unity.sh check (both write $common/sc-check-pass/$sha and a tree-keyed marker in sc-check-pass-tree), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
             done
             ;;
     esac

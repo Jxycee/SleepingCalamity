@@ -61,6 +61,11 @@ namespace SleepingCalamity.Presentation
         public event System.Action<DiveEndReason> DiveEnded;
         public int RequestsHandled { get; private set; }            // host: RPCs received, accepted or refused (a test waits for refusals to land)
 
+        // M6 S3, host only: the town's stock, held in memory (no save yet: S2). Created on first use from the Hollowmere layout. StockReceived(newPieces) fires when a dive end moved the banked haul in.
+        public TownStock Town => _town ?? (_town = new TownStock(HollowmereLayout.Create()));
+        public event System.Action<int> StockReceived;
+        private TownStock _town;
+
         public CellarFloorSync FloorSync { get; private set; }      // host: the spawned syncs; clients resolve their own through ResolveSyncs
         public DiveHaulSync HaulSync { get; private set; }
         public CellarContentsSync ContentsSync { get; private set; }   // contents hook: host-spawned with the other two; the host arms it per built floor (ContentsTick)
@@ -189,6 +194,13 @@ namespace SleepingCalamity.Presentation
             {
                 HaulSync.ServerSetFloor(DiveState.Town);
                 HaulSync.ServerBankInTown();   // the stir reset of a finished dive (the heart bank already banked the haul)
+            }
+            // M6 S3: whatever the party banked is safe and comes home with it, whether the dive ended well or not: the banked haul moves into the host-held town stock
+            // (the haul keeps it "collected" so the floors never respawn it). The heart bank is the baker's rescue.
+            if (HaulSync != null && HaulSync.HostState != null)
+            {
+                int stocked = Town.Receive(HaulSync.HostState.Haul, _heartBanked);
+                if (stocked > 0 || _heartBanked) StockReceived?.Invoke(stocked);
             }
             NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false; _openedStairs.Clear();
             _gen++; _needsPlacement = true;
