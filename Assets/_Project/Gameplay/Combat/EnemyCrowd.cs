@@ -15,9 +15,10 @@ namespace SleepingCalamity.Gameplay
         public const float AuditSeconds = 2f;   // how often CombatHost audits the shared tokens
 
         public readonly AttackTokens Tokens;
+        public readonly TargetLedger Targets;   // who targets whom, host-wide like the tokens (ThreatTable load balance)
         private readonly Dictionary<int, Enemy> _members = new Dictionary<int, Enemy>();
 
-        public EnemyCrowd(AttackTokens tokens) { Tokens = tokens ?? new AttackTokens(); }
+        public EnemyCrowd(AttackTokens tokens, TargetLedger targets = null) { Tokens = tokens ?? new AttackTokens(); Targets = targets ?? new TargetLedger(); }
 
         public int Count => _members.Count;
         public bool Contains(Enemy e) => e != null && _members.ContainsKey(e.GetHashCode());
@@ -33,6 +34,7 @@ namespace SleepingCalamity.Gameplay
             if (e == null) return;
             int id = e.GetHashCode();
             _members.Remove(id);
+            Targets.Remove(id);
             Tokens.Release(id, Time.timeAsDouble);
         }
 

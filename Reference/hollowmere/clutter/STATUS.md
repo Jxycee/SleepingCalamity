@@ -1,4 +1,4 @@
-State: IN PROGRESS
+State: DONE (merged 690694a to main; session archived; closed by session 6 on 2026-11-01)
 Session: Q14. Decorations batch 2: market and lane clutter
 Progress: 80%
 Sheet: Reference/hollowmere/clutter/clutter_engine_sheet.jpg

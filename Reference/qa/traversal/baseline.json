@@ -1,0 +1,265 @@
+{
+    "note": "Known traversal issues the regression test tolerates (TraversalRegressionTests). Rewrite with TraversalScan.WriteBaseline only after fixing issues or with the owner's OK.",
+    "hero": "radius 0.35 m, height 1.80 m, step offset 0.40 m, slope limit 45°, skin 0.05 m, jump 1.2 m; fits = width >= 0.80 m",
+    "entries": [
+        {
+            "space": "Hollowmere_Ruined",
+            "unreachable": [
+                "R2_03_C3",
+                "R2_16_North",
+                "SaltwakeRoad_9"
+            ],
+            "blocked": 29,
+            "narrow": 0
+        },
+        {
+            "space": "Hollowmere_Rebuilt",
+            "unreachable": [
+                "R2_03_C3",
+                "SaltwakeRoad_9"
+            ],
+            "blocked": 39,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s12345",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s12345",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s12345",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s12345",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s1",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s1",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s1",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s1",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s2",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s2",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s2",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s2",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s3",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s3",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s3",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s3",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s4",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s4",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s4",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s4",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s5",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s5",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s5",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s5",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s6",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s6",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s6",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s6",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s7",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s7",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s7",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s7",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s8",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s8",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s8",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s8",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F1_s9",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F2_s9",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F3_s9",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        },
+        {
+            "space": "Cellars_F4_s9",
+            "unreachable": [],
+            "blocked": 0,
+            "narrow": 0
+        }
+    ]
+}
