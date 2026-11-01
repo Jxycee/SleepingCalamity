@@ -431,21 +431,32 @@ namespace SleepingCalamity.Presentation
             GameObject go = Object.Instantiate(kit.Pieces[piece], parent, false);
             go.name = name; go.SetActive(true);
             go.transform.SetPositionAndRotation(pos, rot); go.transform.localScale = scale;
-            if (solid) AddSolidBox(go);
+            if (solid) AddSolidBox(go, piece.Contains("Barrel"));
             return go;
+        }
+
+        static bool IsLightBit(MeshRenderer mr, Transform root)
+        {
+            if (mr.GetComponentInChildren<Light>(true) != null) return true;
+            for (Transform t = mr.transform; t != null && t != root; t = t.parent)
+            {
+                string n = t.name;
+                if (n.Contains("Candle") || n.Contains("Flame") || n.Contains("Lantern") || n.Contains("Lamp") || n.Contains("Light")) return true;
+                if (t.GetComponent<Light>() != null || t.parent != null && t.parent.GetComponent<Light>() != null) return true;
+            }
+            return false;
         }
 
         // Floor-standing dressing blocks the hero: one BoxCollider from the combined mesh bounds of the piece's renderers in its own local space. Candles, flames and lanterns
         // (small hanging or lit bits) are left out of the bounds. Walls, vaults, ribs, piers and overhead pieces never call this.
-        static void AddSolidBox(GameObject go)
+        static void AddSolidBox(GameObject go, bool round = false)
         {
             if (go.GetComponent<Collider>() != null) return;
             Matrix4x4 toLocal = go.transform.worldToLocalMatrix;
             bool any = false; Bounds b = default;
             foreach (MeshRenderer mr in go.GetComponentsInChildren<MeshRenderer>(false))
             {
-                string n = mr.name;
-                if (n.Contains("Candle") || n.Contains("Flame") || n.Contains("Lantern") || n.Contains("Lamp") || n.Contains("Light")) continue;
+                if (IsLightBit(mr, go.transform)) continue;
                 MeshFilter mf = mr.GetComponent<MeshFilter>(); if (mf == null || mf.sharedMesh == null) continue;
                 Bounds mb = mf.sharedMesh.bounds; Matrix4x4 m = toLocal * mr.transform.localToWorldMatrix;
                 for (int i = 0; i < 8; i++)
@@ -455,6 +466,13 @@ namespace SleepingCalamity.Presentation
                 }
             }
             if (!any) return;
+            if (round)
+            {
+                // upright capsule: radius = half the smaller horizontal extent, so a round barrel leaves no invisible corners
+                CapsuleCollider cap = go.AddComponent<CapsuleCollider>(); cap.direction = 1; cap.center = b.center;
+                cap.height = b.size.y; cap.radius = Mathf.Min(b.size.x, b.size.z) * 0.5f;
+                return;
+            }
             BoxCollider col = go.AddComponent<BoxCollider>(); col.center = b.center; col.size = b.size;
         }
 
