@@ -16,7 +16,8 @@ namespace SleepingCalamity.Core.Combat
         public float X, Y, Z;
         public bool Up;         // alive and not downed
         public bool InRoom;     // inside the enemy's own room (room enemies only; the host fills it): always noticed, never leashed
-        public int Load;        // OTHER enemies already targeting this hero (host-wide TargetLedger); the load-balance input of ThreatTable
+        public float FaceX, FaceZ;  // the hero's flat facing (RingPlanner keeps the arc in front half clear); zero: unknown
+        public int Load;      // OTHER enemies already targeting this hero (host-wide TargetLedger); the load-balance input of ThreatTable
     }
 
     // What the host fills each tick. Heroes are the ones in the enemy's own world (already filtered by the host).
@@ -34,6 +35,7 @@ namespace SleepingCalamity.Core.Combat
         public float CooldownLeft;      // after this tick's decrement
         public float RecoverLeft;       // before this tick's decrement
         public float ScatterX, ScatterZ;
+        public Func<float, float, bool> InBounds;   // optional (host, room enemies): is (x, z) inside this enemy's room? Hover slots outside are pulled in; null skips the clamp
         public int TargetIndex = -1;    // set by AiBrain.PickTarget
         public bool HasTarget => TargetIndex >= 0;
     }
@@ -62,7 +64,12 @@ namespace SleepingCalamity.Core.Combat
 
         private readonly bool _hunts;   // always knows where the heroes are (arena waves, the hunter): no aggro or leash limit
 
-        public AiBrain(AttackTokens tokens, Func<float> rand, EnemyDefinition def = null, bool hunts = false) { _tokens = tokens; _rand = rand; _def = def; _hunts = hunts; }
+        // The host-wide planner (CombatHost). A brain built without one (tests, an enemy spawned outside CombatHost) gets a private one: same logic, only itself in it.
+        private readonly RingPlanner _rings;
+        private const float HoverEngageSlack = 1.5f;   // approaching enemies start reporting to the planner (separation) this far outside their ring
+
+        public AiBrain(AttackTokens tokens, Func<float> rand, EnemyDefinition def = null, bool hunts = false, RingPlanner rings = null)
+        { _tokens = tokens; _rand = rand; _def = def; _hunts = hunts; _rings = rings ?? new RingPlanner(); }
 
         // Who this enemy goes for (stage 3). Created on first use from the enemy's own ranges.
         // Hunters keep the normal distance scale (their near/role terms still differ per hero) and only skip the range filter.
@@ -76,6 +83,19 @@ namespace SleepingCalamity.Core.Combat
             bool ranged = c.Def != null && c.Def.TokenCategory == TokenCategory.Ranged;
             c.TargetIndex = Threat.Pick(c.Heroes, c.SelfX, c.SelfY, c.SelfZ, c.Dt, locked, ranged);
             return c.TargetIndex;
+        }
+
+        // The hover ring, held inside the enemy's own reach so a waiting enemy never drifts out of range of every attack (it would drop "waiting", close in, be refused and drift out again).
+        private float _ringFor = float.NaN;
+        private float RingFor(EnemyDefinition def)
+        {
+            if (float.IsNaN(_ringFor))
+            {
+                float reach = 0f;
+                for (int i = 0; i < def.Attacks.Length; i++) reach = Math.Max(reach, EnemyAttackChooser.Reach(def.Attacks[i]));
+                _ringFor = Math.Min(def.PreferredRing, Math.Max(def.Radius + 1.0f, reach - 0.3f));
+            }
+            return _ringFor;
         }
 
         public bool WaitingForToken => _waiting;
@@ -143,21 +163,50 @@ namespace SleepingCalamity.Core.Combat
             float dirX = toX / denom, dirZ = toZ / denom;
             float speed = c.Def.MoveSpeed * (c.Raging ? 1.25f : 1f);
             float stop = c.Def.Radius + 0.55f;
+            float ring = RingFor(c.Def);
+            float sepR = c.Def.SeparationRadius;
             if (_waiting)
             {
-                // Waiting for a turn: hold at the edge of reach and circle the hero (KH's hovering crowd), drifting out if crowded in.
-                float sideX = dirZ * _strafeSign, sideZ = -dirX * _strafeSign;   // cross(up, dir) * sign
-                float hover = stop + 1.2f;
-                float rx = 0f, rz = 0f;
-                if (dist < hover) { rx = -dirX * 0.6f; rz = -dirZ * 0.6f; }
-                else if (dist > hover + 1.5f) { rx = dirX; rz = dirZ; }
-                float mx = sideX + rx, mz = sideZ + rz;
+                // Waiting for a turn (stage 4): hold a shared slot on the hero's ring and circle it (KH's hovering crowd); RingPlanner spaces the crowd.
+                var q = new RingRequest
+                {
+                    SelfId = c.SelfId, HeroId = t.Id, HeroX = t.X, HeroZ = t.Z, FrontX = t.FaceX, FrontZ = t.FaceZ, SelfX = c.SelfX, SelfZ = c.SelfZ,
+                    Ring = ring, CircleSpeed = speed * c.Def.CircleSpeedScale, FlipMin = c.Def.StrafeFlipMin, FlipMax = c.Def.StrafeFlipMax,
+                    SeparationRadius = sepR, InitialSign = _strafeSign, Now = c.Time, Dt = c.Dt, InBounds = c.InBounds,
+                };
+                RingResult r = _rings.Plan(in q);
+                float tx = r.SlotX - c.SelfX, tz = r.SlotZ - c.SelfZ;
+                float td = (float)Math.Sqrt(tx * tx + tz * tz);
+                float mx = td > 0.05f ? tx / td : 0f, mz = td > 0.05f ? tz / td : 0f;
+                mx += r.SepX * _rings.Tuning.SeparationGain; mz += r.SepZ * _rings.Tuning.SeparationGain;
                 float mag = (float)Math.Sqrt(mx * mx + mz * mz);
-                if (mag > 1e-5f) { mx /= mag; mz /= mag; } else { mx = 0f; mz = 0f; }
-                a.MoveX = mx; a.MoveZ = mz; a.MoveSpeed = speed * 0.45f;
+                if (mag > 1e-3f)
+                {
+                    float circle = speed * c.Def.CircleSpeedScale;
+                    float ms = Math.Min(speed, circle * (1f + td));   // keeps up with a circling slot; catches up faster the farther behind it is
+                    mx /= mag; mz /= mag;
+                    if (_rings.Slide(c.SelfId, c.Time, ms, c.Dt, ref mx, ref mz)) { a.MoveX = mx; a.MoveZ = mz; a.MoveSpeed = ms; }
+                }
                 a.State = AiState.Hover;
             }
-            else if (dist > stop + 0.3f) { a.MoveX = dirX; a.MoveZ = dirZ; a.MoveSpeed = speed; }
+            else
+            {
+                float mx = 0f, mz = 0f, ms = 0f;
+                if (dist > stop + 0.3f) { mx = dirX; mz = dirZ; ms = speed; }
+                if (dist <= ring + HoverEngageSlack)
+                {
+                    // Closing in on a hero with the crowd: report the position and let the separation push nudge it off its neighbours.
+                    _rings.Observe(c.SelfId, c.SelfX, c.SelfZ, sepR, c.Time, out float sx, out float sz);
+                    if (sx * sx + sz * sz > 1e-6f)
+                    {
+                        mx += sx * _rings.Tuning.SeparationGain; mz += sz * _rings.Tuning.SeparationGain;
+                        float mag = (float)Math.Sqrt(mx * mx + mz * mz);
+                        if (mag > 1e-3f) { mx /= mag; mz /= mag; if (ms <= 0f) ms = speed * c.Def.CircleSpeedScale; }
+                    }
+                    if (ms > 0f && !_rings.Slide(c.SelfId, c.Time, ms, c.Dt, ref mx, ref mz)) ms = 0f;
+                }
+                if (ms > 0f) { a.MoveX = mx; a.MoveZ = mz; a.MoveSpeed = ms; }
+            }
             State = a.State;
             return a;
         }

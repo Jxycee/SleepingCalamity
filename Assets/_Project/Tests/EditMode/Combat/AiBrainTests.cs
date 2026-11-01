@@ -120,11 +120,10 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(a.StartAttack, Is.Null);
             Assert.That(a.State, Is.EqualTo(AiState.Hover));
             Assert.That(brain.WaitingForToken, Is.True);
-            Assert.That(a.MoveSpeed, Is.EqualTo(def.MoveSpeed * 0.45f).Within(1e-5f));
-            // dir = (1,0), side = cross(up, dir) * -1 = (0,0,+1)... cross(up,(1,0,0)) = (0,0,-1), times -1 = (0,0,1); radial = -dir*0.6 = (-0.6,0)
-            float len = (float)System.Math.Sqrt(0.6 * 0.6 + 1.0);
-            Assert.That(a.MoveX, Is.EqualTo(-0.6f / len).Within(1e-5f));
-            Assert.That(a.MoveZ, Is.EqualTo(1f / len).Within(1e-5f));
+            // Stage 4: it heads for its slot on the hero's ring (the hero is at +x, so out to -x), starting the circle the way the drawn side says (-1: the slot angle falls, so z > 0).
+            Assert.That(a.MoveSpeed, Is.GreaterThan(def.MoveSpeed * def.CircleSpeedScale - 1e-4f));
+            Assert.That(a.MoveX, Is.LessThan(-0.5f), "out to the ring, away from the hero");
+            Assert.That(a.MoveZ, Is.GreaterThan(0f), "circling toward the drawn side");
         }
 
         [Test]
@@ -139,8 +138,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(brain.WaitingForToken, Is.True);
             AiAction second = brain.Tick(Ctx(EnemyCatalog.Broom, 2.5f));  // retry still running: only the roll is drawn
             Assert.That(r.Drawn, Is.EqualTo(4));
-            Assert.That(second.MoveX, Is.EqualTo(first.MoveX).Within(1e-6f));
-            Assert.That(second.MoveZ, Is.EqualTo(first.MoveZ).Within(1e-6f), "same strafe side");
+            Assert.That(System.Math.Sign(second.MoveZ), Is.EqualTo(System.Math.Sign(first.MoveZ)), "same strafe side");
+            Assert.That(first.MoveZ, Is.LessThan(0f), "side +1: the slot angle rises from pi, so z < 0");
         }
 
         [Test]

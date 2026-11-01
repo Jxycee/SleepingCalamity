@@ -58,6 +58,7 @@ namespace SleepingCalamity.Gameplay
         // across every room's enemies) and one crowd (membership) per room that shares it (docs/research/enemy-ai.md 10.4).
         public readonly AttackTokens Tokens = new AttackTokens();
         public readonly TargetLedger Targets = new TargetLedger();   // host-wide too: a hero's load counts every room's enemies
+        public readonly RingPlanner Rings = new RingPlanner();       // host-wide: shared hover slots per hero and enemy separation (enemy AI stage 4)
         private readonly Dictionary<int, EnemyCrowd> _crowds = new Dictionary<int, EnemyCrowd>();
         private float _auditIn = EnemyCrowd.AuditSeconds;
         // Host: which room a world position is in (-1 outside every room). Set by the dive's room owner (CellarContentsSync); room enemies use it to notice
@@ -65,7 +66,7 @@ namespace SleepingCalamity.Gameplay
         public System.Func<Vector3, int> RoomOf;
         public EnemyCrowd CrowdFor(int room)
         {
-            if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd(Tokens, Targets);
+            if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd(Tokens, Targets, Rings);
             return c;
         }
 

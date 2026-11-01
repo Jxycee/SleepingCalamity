@@ -127,6 +127,47 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(tracker.MinGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "a strike opened " + tracker.MinGap.ToString("F2") + " s after the last one closed");
         }
 
+        // Enemy AI stage 4: six rat-kings on one idle hero spread over the shared hover slots instead of piling on one spot. After the first seconds, any two that
+        // are not mid-attack stay about their separation radius apart (soft limit: a lunge may close in, so the bar is half the radius; measured 0.83 to 1.20 m against 1.2 m).
+        [UnityTest, Timeout(90000)]
+        public IEnumerator Solo_SixRatsOnOneHero_DoNotStack()
+        {
+            yield return StartCombatSolo();
+            var heroObject = AppBootstrap.Current.NetworkManager.LocalClient.PlayerObject;
+            HeroVitals vitals = heroObject.GetComponent<HeroVitals>();
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            yield return Seconds(0.3f);
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * Mathf.PI * 2f / 6f + 0.3f;
+                combat.SpawnEnemy(EnemyKind.RatKing, 1, heroObject.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 4.5f);
+            }
+            float radius = EnemyCatalog.RatKing.SeparationRadius;
+            float worst = float.MaxValue;
+            var near = new System.Collections.Generic.List<Vector3>();
+            double start = Time.realtimeSinceStartupAsDouble;
+            while (Time.realtimeSinceStartupAsDouble < start + 14.0)
+            {
+                vitals.ServerHeal(1000);   // an idle hero must stay up so the crowd keeps working on it
+                if (Time.realtimeSinceStartupAsDouble > start + 5.0)
+                {
+                    near.Clear();
+                    foreach (Enemy e in Enemy.All) if (e.IsSpawned && e.Alive && e.Phase == EnemyPhase.Chase) near.Add(e.transform.position);
+                    for (int i = 0; i < near.Count; i++)
+                        for (int j = i + 1; j < near.Count; j++)
+                        {
+                            Vector3 d = near[i] - near[j]; d.y = 0f;
+                            worst = Mathf.Min(worst, d.magnitude);
+                        }
+                }
+                yield return null;
+            }
+            Debug.Log("[RingPlanner] six rats on one hero: min pairwise distance while not attacking " + worst.ToString("F2") + " m (radius " + radius.ToString("F2") + ")");
+            Assert.That(worst, Is.GreaterThanOrEqualTo(radius * 0.5f), "two waiting enemies stacked");
+        }
+
         // Enemy AI stage 2 risk-review fix: the attack tokens are ONE set per CombatHost, not one per room. Targeting is world-wide, so two rooms' enemies can
         // work the same hero; four rat-kings (all melee) split over two rooms must still honour the hero's melee cap and the strike gap between hit windows.
         [UnityTest, Timeout(60000)]

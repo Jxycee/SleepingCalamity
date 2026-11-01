@@ -35,14 +35,22 @@ namespace SleepingCalamity.Core.Combat
         public readonly AttackData[] Attacks;
         public readonly PartDefinition[] Parts;
         public readonly float AggroRange, LeashRange, RetargetInterval;   // threat targeting (ThreatTable; docs/research/enemy-ai.md 10.2): notice within Aggro, drop beyond Leash, re-score at most this often
+        // Spacing (RingPlanner, docs/research/enemy-ai.md 3, 10.2): which ring it hovers on (m from the hero), how fast it circles (share of run speed), how often
+        // it flips circling direction (seconds, min to max), and the distance it keeps from other enemies. P9 Placeholder values in the catalog below.
+        public readonly EnemyRole Role;
+        public readonly float PreferredRing, CircleSpeedScale, StrafeFlipMin, StrafeFlipMax, SeparationRadius;
         public readonly TokenCategory TokenCategory;   // the attack-token pool its attacks draw from unless an attack names its own (AttackData.TokenPool; docs/research/enemy-ai.md 2.3, 5)
 
         public EnemyDefinition(EnemyKind kind, string id, string name, Species species, int hp, float atk, float def, float moveSpeed, float radius, float height,
             AttackData[] attacks, bool isElite = false, bool canRage = true, bool frontalBlock = false, bool superArmorAlways = false, bool weakToFire = false,
             bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null, float visualReach = 1f, float poiseThreshold = 0f, bool ripostes = false,
             TokenCategory tokenCategory = TokenCategory.Melee, float aggroRange = ThreatTuning.DefaultAggroRange, float leashRange = ThreatTuning.DefaultLeashRange,
-            float retargetInterval = ThreatTuning.DefaultRetargetInterval)
+            float retargetInterval = ThreatTuning.DefaultRetargetInterval,
+            EnemyRole role = EnemyRole.Rusher, float preferredRing = RingTuning.DefaultHoverRing, float circleSpeedScale = RingTuning.DefaultCircleSpeedScale,
+            float strafeFlipMin = RingTuning.DefaultFlipMinSeconds, float strafeFlipMax = RingTuning.DefaultFlipMaxSeconds, float separationRadius = 0f)
         {
+            Role = role; PreferredRing = preferredRing; CircleSpeedScale = circleSpeedScale; StrafeFlipMin = strafeFlipMin; StrafeFlipMax = strafeFlipMax;
+            SeparationRadius = separationRadius > 0f ? separationRadius : radius * 2f + 0.2f;   // doc 3.4: radius sum plus 0.2 m
             TokenCategory = tokenCategory;
             AggroRange = aggroRange; LeashRange = leashRange; RetargetInterval = retargetInterval;
             VisualReach = visualReach;
@@ -74,13 +82,17 @@ namespace SleepingCalamity.Core.Combat
         // Combat depth (2026-10-30, "fewer, tougher enemies"): small-enemy life roughly doubles so each takes a few openings (a rat-king about three with
         // the axe): slime 40 -> 80, rat-king 90 -> 180, broom 60 -> 160; the Warden stays 600. Poise thresholds: slime 2, rat-king 4, broom 5.
         public static readonly EnemyDefinition Slime = new EnemyDefinition(EnemyKind.Slime, "slime", "Jam-jar slime", Species.Slime, 80, 12f, 5f, 2.6f, 0.55f, 1.0f,
-            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f, poiseThreshold: 2f, tokenCategory: TokenCategory.Ranged);
+            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f, poiseThreshold: 2f, tokenCategory: TokenCategory.Ranged,
+            role: EnemyRole.Ranged, preferredRing: 6.0f, strafeFlipMin: 2.0f, strafeFlipMax: 4.0f);   // far ring (5 to 8 m)
         public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 180, 18f, 10f, 4.6f, 0.5f, 1.2f,
-            new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f, poiseThreshold: 4f);
+            new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f, poiseThreshold: 4f,
+            role: EnemyRole.Rusher);
         public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 160, 15f, 15f, 2.3f, 0.55f, 1.9f,
-            new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f, poiseThreshold: 5f, ripostes: true);
+            new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f, poiseThreshold: 5f, ripostes: true,
+            role: EnemyRole.Skirmisher, preferredRing: 3.6f);
         public static readonly EnemyDefinition DoughWarden = new EnemyDefinition(EnemyKind.DoughWarden, "dough_warden", "Dough Warden", Species.Elite, 600, 30f, 20f, 2.4f, 1.0f, 2.8f,
             new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound, AttackCatalog.WardenQuake }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f, tokenCategory: TokenCategory.Heavy,
+            role: EnemyRole.Heavy, preferredRing: 4.0f, circleSpeedScale: 0.35f, strafeFlipMin: 2.5f, strafeFlipMax: 4.5f,
             parts: new[]
             {
                 new PartDefinition("rolling_pin", 70, 1.5f, 1.4f, 0.5f, 0.2f, 1.3f),    // the arm that slams: reached from its right flank

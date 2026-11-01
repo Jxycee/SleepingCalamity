@@ -76,7 +76,9 @@ namespace SleepingCalamity.Gameplay
         private readonly AiContext _ctx = new AiContext();
         private readonly List<HeroVitals> _heroBuf = new List<HeroVitals>();   // parallel to _ctx.Heroes
         private static readonly System.Func<float> s_rand = () => Random.value;
-        private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand, Def, Hunts);
+        private RingPlanner Rings => (Crowd ??= new EnemyCrowd(new AttackTokens())).Rings;
+        private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand, Def, Hunts, Rings);
+        private System.Func<float, float, bool> _inRoom;   // cached: hover slots must lie in this enemy's room (null for roomless enemies or no room lookup)
         // Host: true for enemies spawned without a room (arena waves, the hunter): they chase from anywhere. Room enemies use their aggro/leash ranges. Set before the first tick.
         public bool Hunts;
         private CombatHost _host; private int _room = EnemyCrowd.ArenaRoom;   // host: the room this enemy belongs to (room scope of its aggro, doc 6.4)
@@ -357,11 +359,15 @@ namespace SleepingCalamity.Gameplay
                 Vector3 hp = v.transform.position;
                 int id = v.GetHashCode();
                 bool inRoom = selfInRoom && _host.RoomOf(hp) == _room;
-                _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, InRoom = inRoom, Load = Targets.CountOn(id, self) });
+                Vector3 fwd = v.transform.forward;
+                _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, InRoom = inRoom, FaceX = fwd.x, FaceZ = fwd.z, Load = Targets.CountOn(id, self) });
                 _heroBuf.Add(v);
             }
             Vector3 p = transform.position;
             _ctx.SelfX = p.x; _ctx.SelfY = p.y; _ctx.SelfZ = p.z;
+            if (_room >= 0 && _host != null && _host.RoomOf != null)
+                _ctx.InBounds = _inRoom ??= (x, z) => _host.RoomOf(new Vector3(x, transform.position.y, z)) == _room;
+            else _ctx.InBounds = null;
         }
 
         // The target for this tick by Core ThreatTable (aggro/leash, load balance, stickiness, no switch while locked); null when nobody is in range.
