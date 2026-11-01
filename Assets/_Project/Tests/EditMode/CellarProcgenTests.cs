@@ -44,9 +44,9 @@ namespace SleepingCalamity.Tests.EditMode
             // Fresh goldens (new layers, no earlier value to move). LayoutHash/DressingHash stay pinned by CellarFloorGeneratorTests / CellarVarietyTests.
             ulong[][] expect =
             {
-                new ulong[] { 6953842550523460259UL, 8845299293798975808UL, 4365898949852775968UL },     // route, special, hints
-                new ulong[] { 6927223471848255729UL, 8103913021369237331UL, 6266512765179997033UL },
-                new ulong[] { 13414999220360951603UL, 9026194201199058082UL, 11314896784504401504UL },
+                new ulong[] { 6953842550523460259UL, 8845299293798975808UL, 3007781364789904690UL },     // route, special, hints (hints re-pinned 2026-10-31: first-reached rooms only, deliberate change; route and special unchanged)
+                new ulong[] { 6927223471848255729UL, 8103913021369237331UL, 6651676963127450526UL },
+                new ulong[] { 13414999220360951603UL, 9026194201199058082UL, 2601345680961567774UL },
             };
             var sb = new StringBuilder();
             for (int f = 1; f <= 3; f++) { ulong[] g = Hashes(12345, f); sb.Append("floor " + f + ": " + g[0] + "UL, " + g[1] + "UL, " + g[2] + "UL\n"); }
@@ -187,7 +187,7 @@ namespace SleepingCalamity.Tests.EditMode
                         foreach (int nb in x.Neighbours)
                         {
                             Assert.AreNotEqual(x.RoomIndex, nb, at);
-                            Assert.IsTrue(h.Hints.Any(y => y.RoomIndex == nb && y.Neighbours.Contains(x.RoomIndex)), at + " neighbour sees us back");
+                            Assert.IsTrue(graph.DoorNeighbours(x.RoomIndex, x.DoorIndex).Contains(nb), at + " first-reached room is on the door's network");   // a subset of the whole network
                         }
                         bool keyThere = l.KeyChest != null && x.Neighbours.Contains(l.KeyChest.RoomIndex);
                         Assert.AreEqual(keyThere, x.Has(DoorHintFlags.Key), at + " key flag");
@@ -200,6 +200,7 @@ namespace SleepingCalamity.Tests.EditMode
                     }
                     Assert.AreEqual(l.HasLockedRoom ? 1 : 0, lockedHints, at + " exactly one locked-door hint");
                 }
+            Assert.Less(withFlag * 100.0 / hints, 95.0, "first-reached hints must flag clearly fewer doors than the whole-network version (97%)");
             Report("HINTS (" + Seeds + " seeds x floors 1-3): " + hints + " door hints, flagged " + Pct(withFlag, hints) + ", key " + Pct(keyHints, hints) + ", special " + Pct(specialHints, hints) + ", reward vignette " + Pct(rewardHints, hints) + "\n");
         }
 
