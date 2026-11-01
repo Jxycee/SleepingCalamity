@@ -29,6 +29,7 @@ namespace SleepingCalamity.Core
         public List<int> Pieces = new List<int>();
         public List<string> Residents = new List<string>();
         public List<LootCountSave> Loot = new List<LootCountSave>();
+        [JsonIgnore] public bool LootUnknown;               // capture only: the source did not know the loot counts (null), so the host keeps its saved Loot instead of wiping it
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }
 
@@ -76,6 +77,8 @@ namespace SleepingCalamity.Core
         public List<LootCountSave> BankedLoot = new List<LootCountSave>();
         public List<int> OnFloorPieces = new List<int>();   // known pieces not yet found (or lost to a failed dive): back on their floors
         public List<string> OnFloorResidents = new List<string>();   // the baker before the rescue
+        public List<int> KnownPieces;                       // every piece id the writing build knew; null: a save from before this list (every then-current id counts as known)
+        public List<string> KnownResidents;                 // same for resident ids
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }
 
@@ -144,6 +147,7 @@ namespace SleepingCalamity.Core
             clean.Pieces = CleanPieces(s.Pieces, dropped, "piece");
             clean.Residents = CleanResidentIds(s.Residents, dropped, "resident");
             clean.Loot = CleanLoot(s.Loot, dropped, "loot");
+            clean.LootUnknown = s.LootUnknown;
             clean.Extra = CopyExtra(s.Extra);
             return clean;
         }
@@ -224,6 +228,9 @@ namespace SleepingCalamity.Core
             clean.BankedLoot = CleanLoot(s.BankedLoot, dropped, "banked loot");
             clean.OnFloorPieces = CleanPieces(s.OnFloorPieces, dropped, "floor piece");
             clean.OnFloorResidents = CleanResidentIds(s.OnFloorResidents, dropped, "floor resident");
+            // the known-id lists are kept as written (null stays null: an older save); ids this build does not know are dropped quietly (a save from a newer build)
+            if (s.KnownPieces != null) { var kp = new SortedSet<int>(); foreach (int id in s.KnownPieces) if (KnownPiece(id)) kp.Add(id); clean.KnownPieces = new List<int>(kp); }
+            if (s.KnownResidents != null) { var kr = new SortedSet<string>(StringComparer.Ordinal); foreach (string id in s.KnownResidents) if (KnownResident(id)) kr.Add(id); clean.KnownResidents = new List<string>(kr); }
             clean.Extra = CopyExtra(s.Extra);
             return clean;
         }
@@ -240,6 +247,40 @@ namespace SleepingCalamity.Core
             if (s.Dive != null) { d.Clear(); clean.Dive = CleanDive(s.Dive, d); if (d.Count > 0) rejected?.Add(SectionDive); }
             Reconcile(clean, repaired, failMidDive);
             return clean;
+        }
+
+        // A latch never rolls back: every first-meet beat true in `previous` is true in the result. `live` (an object the caller owns) is updated in place and returned;
+        // null live with a previous gives a copy of previous; both null gives null.
+        public static ResidentsSave MergeLatches(ResidentsSave live, ResidentsSave previous)
+        {
+            if (previous == null) return live;
+            if (live == null) live = new ResidentsSave { Extra = CopyExtra(previous.Extra) };
+            foreach (ResidentSave p in previous.Residents)
+            {
+                if (p == null || string.IsNullOrEmpty(p.Id)) continue;
+                ResidentSave have = live.Residents.Find(x => x != null && x.Id == p.Id);
+                if (have == null) live.Residents.Add(new ResidentSave { Id = p.Id, FirstMeetBeat = p.FirstMeetBeat, Extra = CopyExtra(p.Extra) });
+                else have.FirstMeetBeat |= p.FirstMeetBeat;
+            }
+            return live;
+        }
+
+        // What a source captured, filled in from the host's previous sections where the source said nothing: a null section, null loot counts (StockSave.LootUnknown),
+        // null residents keep the previous copy, and a first-meet beat never goes back to false. Returns a new snapshot (clean it before use); inputs are not changed.
+        public static TownSnapshot MergeLive(TownSnapshot live, TownSnapshot previous)
+        {
+            if (live == null) return previous;
+            previous = previous ?? new TownSnapshot();
+            var d = new List<string>();
+            StockSave stock = live.Stock;
+            if (stock != null && stock.LootUnknown)
+            {
+                stock = CleanStock(stock, d);
+                stock.Loot = CleanStock(previous.Stock, d).Loot;
+                stock.LootUnknown = false;
+            }
+            ResidentsSave res = live.Residents == null ? null : CleanResidents(live.Residents, d);
+            return new TownSnapshot { Stock = stock ?? previous.Stock, Town = live.Town ?? previous.Town, Dive = live.Dive ?? previous.Dive, Residents = MergeLatches(res, previous.Residents) };
         }
 
         // ---------------------------------------------------------------- the conservation pass (operates on cleaned sections, in place)
@@ -271,12 +312,33 @@ namespace SleepingCalamity.Core
                 RemoveSeen(s.Dive.BankedResidents, residents, repaired, "banked haul");
                 RemoveSeen(s.Dive.OnFloorPieces, pieces, repaired, "floor");
                 RemoveSeen(s.Dive.OnFloorResidents, residents, repaired, "floor");
+                // An id the save knew but that is nowhere was lost: back in stock. An id the save never knew (content a later build added) is not owed: it goes to its floor,
+                // unrescued. A dive section without the known lists (written before them) treats every then-current id as known, so older saves behave as before.
+                HashSet<int> knownP = s.Dive.KnownPieces == null ? null : new HashSet<int>(s.Dive.KnownPieces);
+                HashSet<string> knownR = s.Dive.KnownResidents == null ? null : new HashSet<string>(s.Dive.KnownResidents, StringComparer.Ordinal);
                 foreach (int id in KnownPieceIds())
-                    if (!pieces.Contains(id)) { s.Stock.Pieces.Add(id); pieces.Add(id); repaired?.Add("piece " + id + " was nowhere: back in stock"); }
+                {
+                    if (pieces.Contains(id)) continue;
+                    pieces.Add(id);
+                    if (knownP == null || knownP.Contains(id)) { s.Stock.Pieces.Add(id); repaired?.Add("piece " + id + " was nowhere: back in stock"); }
+                    else { s.Dive.OnFloorPieces.Add(id); repaired?.Add("piece " + id + " is new content: on its floor"); }
+                }
                 foreach (string id in KnownResidentIds())
-                    if (!residents.Contains(id)) { s.Stock.Residents.Add(id); residents.Add(id); repaired?.Add("resident " + id + " was nowhere: back in stock"); }
+                {
+                    if (residents.Contains(id)) continue;
+                    residents.Add(id);
+                    if (knownR == null || knownR.Contains(id)) { s.Stock.Residents.Add(id); repaired?.Add("resident " + id + " was nowhere: back in stock"); }
+                    else { s.Dive.OnFloorResidents.Add(id); repaired?.Add("resident " + id + " is new content: on its floor"); }
+                }
                 s.Stock.Pieces.Sort();
                 s.Stock.Residents.Sort(StringComparer.Ordinal);
+                s.Dive.OnFloorPieces.Sort();
+                s.Dive.OnFloorResidents.Sort(StringComparer.Ordinal);
+                // every current id is accounted for now: the next save knows them all
+                s.Dive.KnownPieces = new List<int>(KnownPieceIds());
+                s.Dive.KnownResidents = new List<string>(KnownResidentIds());
+                s.Dive.KnownPieces.Sort();
+                s.Dive.KnownResidents.Sort(StringComparer.Ordinal);
             }
         }
 
@@ -315,10 +377,13 @@ namespace SleepingCalamity.Core
     {
         // The sections for the host's live town and dive. dive may be null (no dive state yet); bankedResidents is the baker (or any resident) banked in the haul and not yet
         // home; stockLoot is the town's loot counts (TownState keeps none); residents is the host's resident state. Everything not in stock, placed or banked (an unbanked
-        // haul piece included: a quit mid-dive loses it) is written as left on its floor. The result is cleaned and conserved.
+        // haul piece included: a quit mid-dive loses it) is written as left on its floor. The result is cleaned and conserved. A null stockLoot or residents means "the source
+        // does not know": the snapshot says so (Stock.LootUnknown, Residents null) and HostWorld keeps its saved copy instead of writing an empty one.
         public static TownSnapshot Capture(TownState town, DiveState dive, IReadOnlyDictionary<int, int> stockLoot, IEnumerable<string> bankedResidents, ResidentsSave residents)
         {
-            var raw = new TownSnapshot { Stock = new StockSave(), Town = new TownSave(), Residents = residents ?? new ResidentsSave(), Dive = new DiveSave() };
+            var raw = new TownSnapshot { Stock = new StockSave { LootUnknown = stockLoot == null }, Town = new TownSave(), Residents = residents, Dive = new DiveSave() };
+            raw.Dive.KnownPieces = new List<int>(TownSaveRules.KnownPieceIds());
+            raw.Dive.KnownResidents = new List<string>(TownSaveRules.KnownResidentIds());
             var pieces = new HashSet<int>();
             var people = new HashSet<string>(StringComparer.Ordinal);
             if (town != null)
@@ -361,8 +426,17 @@ namespace SleepingCalamity.Core
                 foreach (PlacedBuildingSave b in snap.Town.Buildings)
                 {
                     PlaceResult r = state.RestoreBuilding(b.BuildingId, b.FoundationId, b.Turn, b.Parts, b.Resident != null);
-                    if (r == PlaceResult.NotComplete || r == PlaceResult.ResidentAlreadyPlaced) r = state.RestoreBuilding(b.BuildingId, b.FoundationId, b.Turn, b.Parts, false);
-                    if (r == PlaceResult.Ok) continue;
+                    bool residentLeft = false;
+                    if (r == PlaceResult.NotComplete || r == PlaceResult.ResidentAlreadyPlaced)
+                    {
+                        r = state.RestoreBuilding(b.BuildingId, b.FoundationId, b.Turn, b.Parts, false);
+                        residentLeft = b.Resident != null;
+                    }
+                    if (r == PlaceResult.Ok)
+                    {
+                        if (residentLeft) { backPeople.Add(b.Resident); repaired?.Add("resident " + b.Resident + " could not move into " + b.BuildingId + ": back in stock"); }
+                        continue;
+                    }
                     repaired?.Add("building " + b.BuildingId + " on " + b.FoundationId + " refused (" + r + "): back in stock");
                     foreach (int p in b.Parts) if (p >= 0) back.Add(p);
                     if (b.Resident != null) backPeople.Add(b.Resident);
@@ -393,6 +467,9 @@ namespace SleepingCalamity.Core
             foreach (int p in dive.BankedPieces) haul.AddPiece(p);
             foreach (LootCountSave l in dive.BankedLoot) haul.AddLoot(l.ItemId, l.Count);
             haul.Bank();
+            // Every other known piece that is not left on its floor is already in the town (stock or placed): collected, so the cellar does not spawn it again.
+            var onFloor = new HashSet<int>(dive.OnFloorPieces);
+            foreach (int id in TownSaveRules.KnownPieceIds()) if (!onFloor.Contains(id)) haul.MarkHome(id);
             return haul;
         }
 

@@ -555,5 +555,105 @@ namespace SleepingCalamity.Tests.EditMode
             saved.Stock.Pieces.Add(101);
             Assert.That(world.Town.Stock.Pieces, Is.EqualTo(new[] { Frame }));
         }
+
+        // Catches: the first-meet latch rolling back when the source's resident state says false, says nothing (null), or the host never loaded the file's value.
+        [Test]
+        public void Host_FirstMeetBeat_NeverRollsBack_FalseOrNullFromTheSource()
+        {
+            (TownState town, DiveState dive) = Live();
+            TownSnapshot snap = TownSaves.Capture(town, dive, null, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
+            var saved = new WorldSave { Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive };
+
+            var world = new HostWorld();
+            world.LoadTown(saved);
+            var src = new FakeTown { Next = TownSaves.Capture(town, dive, null, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = false } } }) };
+            world.RegisterTownSource(src);
+            world.CaptureTownInto(saved);
+            Assert.That(TownSaves.FirstMeetBeat(saved.Residents, Baker), Is.True, "source says false");
+
+            src.Next = TownSaves.Capture(town, dive, null, null, null);
+            world.CaptureTownInto(saved);
+            Assert.That(TownSaves.FirstMeetBeat(saved.Residents, Baker), Is.True, "source says nothing");
+            Assert.That(TownSaves.FirstMeetBeat(world.Town.Residents, Baker), Is.True, "the host's copy keeps it too");
+
+            var fresh = new HostWorld();   // never loaded the file: the file's own latch still wins
+            fresh.RegisterTownSource(new FakeTown { Next = TownSaves.Capture(town, dive, null, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker } } }) });
+            fresh.CaptureTownInto(saved);
+            Assert.That(TownSaves.FirstMeetBeat(saved.Residents, Baker), Is.True, "file's latch");
+        }
+
+        // Catches: a source that does not know the loot counts (null) wiping the saved loot.
+        [Test]
+        public void Host_NullStockLoot_FromTheSource_KeepsTheSavedLoot()
+        {
+            (TownState town, DiveState dive) = Live();
+            TownSnapshot snap = TownSaves.Capture(town, dive, new Dictionary<int, int> { { 9, 4 } }, null, null);
+            var saved = new WorldSave { Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive };
+            var world = new HostWorld();
+            world.LoadTown(saved);
+            world.RegisterTownSource(new FakeTown { Next = TownSaves.Capture(town, dive, null, null, null) });
+            world.CaptureTownInto(saved);
+            Assert.That(TownSaves.StockLoot(new TownSnapshot { Stock = saved.Stock })[9], Is.EqualTo(4));
+            Assert.That(TownSaves.StockLoot(world.Town)[9], Is.EqualTo(4));
+        }
+
+        // Catches: a restored haul that treats stock and placed pieces as uncollected, so the cellar spawns them again after a load.
+        [Test]
+        public void RestoreHaul_EveryKnownPieceNotOnItsFloor_IsCollected()
+        {
+            (TownState town, DiveState dive) = Live();
+            TownSnapshot loaded = TownSaveRules.CleanSnapshot(TownSaves.Capture(town, dive, null, null, null), null);
+            DiveHaul haul = TownSaves.RestoreHaul(loaded.Dive, PerFloor);
+            foreach (int id in TownSaveRules.KnownPieceIds())
+                Assert.That(haul.IsCollected(id), Is.EqualTo(!loaded.Dive.OnFloorPieces.Contains(id)), "piece " + id);
+            Assert.That(haul.IsCollected(SpareOven), Is.False, "the unbanked one went back to its floor");
+            Assert.That(haul.BankedPieces, Is.EqualTo(new[] { SpareFrame }), "only the banked haul is banked");
+            Assert.That(haul.PiecesLeft(1), Is.EqualTo(0));
+            Assert.That(haul.PiecesLeft(3), Is.EqualTo(1));
+        }
+
+        // Catches: a part-built building with a resident losing the resident when the retry without them succeeds.
+        [Test]
+        public void ToState_RetryWithoutResident_PutsTheResidentBackInStock()
+        {
+            var snap = new TownSnapshot { Stock = new StockSave(), Town = new TownSave() };
+            snap.Town.Buildings.Add(new PlacedBuildingSave { BuildingId = "bakery", FoundationId = "F02", Parts = new List<int> { Frame, -1, -1, -1 }, Resident = Baker });
+            TownState s = TownSaves.ToState(snap, Hollow);
+            Assert.That(s.PlacedBuildingOf("bakery"), Is.Not.Null);
+            Assert.That(s.PlacedBuildingOf("bakery").Resident, Is.Null);
+            Assert.That(s.StockResidents, Is.EquivalentTo(new[] { Baker }));
+        }
+
+        // Catches: pieces or residents added in a later build handed out free from stock because an older dive section never listed them.
+        [Test]
+        public void Reconcile_IdsTheSaveNeverKnew_GoToTheirFloors_NotStock()
+        {
+            var dive = new DiveSave { KnownPieces = new List<int>(), KnownResidents = new List<string>() };   // knew nothing: everything is "new content"
+            TownSnapshot c = TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = new StockSave(), Town = new TownSave(), Dive = dive }, null);
+            Assert.That(c.Stock.Pieces, Is.Empty);
+            Assert.That(c.Stock.Residents, Is.Empty);
+            AssertExactlyOnce(c);
+            Assert.That(c.Dive.OnFloorPieces.Count, Is.EqualTo(TownSaveRules.KnownPieceIds().Count()));
+            Assert.That(c.Dive.OnFloorResidents, Is.EquivalentTo(TownSaveRules.KnownResidentIds()));
+
+            // only one id unknown to the save: that one goes to its floor, the rest of the missing ones still go to stock
+            var some = new DiveSave { KnownPieces = TownSaveRules.KnownPieceIds().Where(i => i != SpareOven).ToList(), KnownResidents = TownSaveRules.KnownResidentIds().ToList() };
+            c = TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = new StockSave(), Town = new TownSave(), Dive = some }, null);
+            Assert.That(c.Dive.OnFloorPieces, Is.EqualTo(new[] { SpareOven }));
+            Assert.That(c.Stock.Pieces.Contains(SpareOven), Is.False);
+            Assert.That(c.Stock.Pieces.Count, Is.EqualTo(TownSaveRules.KnownPieceIds().Count() - 1));
+            AssertExactlyOnce(c);
+
+            // an older save (no known lists) treats every current id as known: unchanged behaviour, missing goes to stock
+            c = TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = new StockSave(), Town = new TownSave(), Dive = new DiveSave() }, null);
+            Assert.That(c.Stock.Pieces.Count, Is.EqualTo(TownSaveRules.KnownPieceIds().Count()));
+            Assert.That(c.Dive.OnFloorPieces, Is.Empty);
+
+            // a capture records what it knew
+            (TownState town, DiveState dv) = Live();
+            TownSnapshot cap = TownSaves.Capture(town, dv, null, null, null);
+            Assert.That(cap.Dive.KnownPieces, Is.EquivalentTo(TownSaveRules.KnownPieceIds()));
+            Assert.That(cap.Dive.KnownResidents, Is.EquivalentTo(TownSaveRules.KnownResidentIds()));
+        }
     }
 }

@@ -99,11 +99,12 @@ namespace SleepingCalamity.Runtime
 
         // ---- the town sections (stock, town, residents, dive; M6 S2) ----
         // The host's live town and haul (M6 S3/S4: the hub's TownState, DiveState and the resident state) implement ITownSource. CaptureTown returns the sections as they
-        // stand now (TownSaves.Capture does the work from a TownState and DiveState); it must not hand out the live objects. At load the cleaned, conserved sections are
-        // in Town (never null; empty sections for an older save): the provider builds its state from them with TownSaves.ToState / RestoreHaul /
-        // DiveState.RestoreProgress, once, when it starts. A mid-dive quit has already been turned into a failed dive (InDive false).
+        // stand now (TownSaves.Capture does the work from a TownState and DiveState); it must not hand out the live objects. A section the source returns as null (or
+        // loot counts / residents it passes as null to Capture) means "I do not know": the host keeps its previous copy of it, and a first-meet beat never goes back to false.
         // RestoreTown is called by RegisterTownSource, before the source is live (so a save flush can never capture its still-empty state over the loaded town): it gets its
-        // own cleaned copy of the loaded sections (sections an older save lacks are null) and builds TownState / DiveHaul / DiveState / resident state from it.
+        // own cleaned, conserved copy of the loaded sections and builds TownState / DiveHaul / DiveState / resident state from it, once, with TownSaves.ToState /
+        // RestoreHaul / DiveState.RestoreProgress. Sections an older save lacks are null in that copy (the Town property itself is a snapshot whose sections may be null).
+        // A mid-dive quit has already been turned into a failed dive (InDive false).
         public interface ITownSource { TownSnapshot CaptureTown(); void RestoreTown(TownSnapshot loaded); }
 
         private TownSnapshot _town = new TownSnapshot();
@@ -142,7 +143,7 @@ namespace SleepingCalamity.Runtime
         {
             if (_townSource == null) return;
             TownSnapshot live = _townSource.CaptureTown();
-            if (live != null) _town = TownSaveRules.CleanSnapshot(live, null, null, false);
+            if (live != null) _town = TownSaveRules.CleanSnapshot(TownSaveRules.MergeLive(live, _town), null, null, false);   // what the source did not say (null) keeps the previous copy
         }
 
         // Captures and copies each town section into `save` when it differs. A fresh-world (pristine) section is not written for a save that has none, so old saves stay as
@@ -152,6 +153,7 @@ namespace SleepingCalamity.Runtime
             if (save == null) return false;
             CaptureTownFromSource();
             TownSnapshot copy = TownSaveRules.CleanSnapshot(_town, null, null, false);
+            copy.Residents = TownSaveRules.MergeLatches(copy.Residents, save.Residents);   // the file's first-meet beats never roll back either
             bool changed = false;
             changed |= SyncSection(ref save.Stock, copy.Stock, TownSaveRules.IsPristine(copy.Stock));
             changed |= SyncSection(ref save.Town, copy.Town, TownSaveRules.IsPristine(copy.Town));
