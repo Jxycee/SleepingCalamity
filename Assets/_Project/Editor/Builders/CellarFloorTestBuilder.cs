@@ -72,7 +72,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // The art-layer kit of the real Cellars floor: floor tile, B5 vault pieces, the floor-art-2 clutter (Crate, CrateStack, JarCluster, Rubble, SackPile), lantern, materials
-        // and fog. `templates` (an inactive child of whatever carries the kit) holds the piece holders. Shared by this scene and the CellarFloorSync prefab (CellarFloorKitBuilder).
+        // and fog. `templates` (an inactive child of whatever carries the kit) holds the piece holders. Shared by this scene and the CellarFloorSync prefab (SaveRuntimeKit).
         internal static CellarFloorKit BuildKit(Transform templates)
         {
             BeautyCornerArt.EnsureCellarLantern();
@@ -180,6 +180,33 @@ namespace SleepingCalamity.EditorTools
             Vector3 pos = a - dir * (CellarFloorBuilder.CellSize * 0.5f - 0.6f) + new Vector3(0.5f, 1.6f, 0f);
             Vector3 target = b + dir * CellarFloorBuilder.CellSize + new Vector3(0, 1.5f, 0);
             return (pos, target);
+        }
+
+        const string RuntimeKitFolder = "Assets/_Project/Content/Art/Cellar/FloorKit";
+
+        // The same kit for the game: every template saved as a prefab asset (so a prefab can reference it) and the result written into the CellarFloorSync prefab's Kit,
+        // which makes every peer's runtime floor the dressed one. Idempotent (SaveAsPrefabAsset overwrites).
+        public static void SaveRuntimeKit()
+        {
+            BuilderUtil.EnsureFolder(RuntimeKitFolder);
+            var holderRoot = new GameObject("CellarFloorKitTemplates");
+            try
+            {
+                CellarFloorKit kit = BuildKit(holderRoot.transform);
+                GameObject Save(GameObject template, string name)
+                {
+                    template.SetActive(true);   // a saved prefab is a plain active asset (the builder also activates its clones)
+                    return PrefabUtility.SaveAsPrefabAsset(template, RuntimeKitFolder + "/" + name + ".prefab");
+                }
+                if (kit.FloorTile != null) { kit.FloorTile.transform.SetParent(holderRoot.transform, false); kit.FloorTile = Save(kit.FloorTile, "FloorTile"); }   // the tile itself, not its holder (the builder sets its pose)
+                var saved = new List<CellarFloorKit.NamedPiece>();
+                foreach (KeyValuePair<string, GameObject> piece in kit.Pieces) saved.Add(new CellarFloorKit.NamedPiece { Name = piece.Key, Prefab = Save(piece.Value, piece.Key) });
+                kit.PieceList = saved; kit.Pieces = null;
+                // the lantern is the FBX asset itself (not a scene clone), so it is referenced as is
+                BuilderUtil.WritePrefab(AssetPaths.CellarFloorSyncPrefab, root => BuilderUtil.GetOrAdd<CellarFloorSync>(root).Kit = kit);
+                Debug.Log("SC CELLARFLOOR runtime kit pieces=" + saved.Count + " floorTile=" + (kit.FloorTile != null) + " lantern=" + (kit.Lantern != null));
+            }
+            finally { Object.DestroyImmediate(holderRoot); }
         }
 
         static Material Marker(string name, Color c, float glow)

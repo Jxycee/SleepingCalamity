@@ -16,8 +16,9 @@ using UnityEngine;
 namespace SleepingCalamity.Presentation
 {
     // What the builder dresses with. Every field may be null; a null material falls back to a flat URP Lit colour.
+    // [Serializable] so CellarFloorSync can carry one on its prefab (the Editor builder saves the templates as prefab assets and fills it in).
     [System.Serializable]
-    public sealed class CellarFloorKit : ISerializationCallbackReceiver
+    public sealed class CellarFloorKit
     {
         public Material Floor, Wall, Pillar, Trim, Flame;
         public Material LockedGate, Chest, KeyChest, Carrier, EntryStart, StairExit, SpawnT1, SpawnT2;
@@ -30,20 +31,17 @@ namespace SleepingCalamity.Presentation
         public Material Ceiling, Limewash, Iron, Wax, Mote, Crate;   // vault stone, end-wall limewash, chains and hooks, candles, dust motes, crates
         // B5 CellarVault pieces by name (VaultSegment, ArchRib, Pillar, EndWall, NicheWall, LarderShelf, CoalChute, Barrels, Roots, BreathGrate): each a holder
         // whose child is the piece at its authored pivot, so the builder only moves, turns and scales the holder. Missing pieces fall back to boxes or nothing.
-        // Serialized as two parallel lists (a Dictionary does not serialize), so a prefab such as CellarFloorSync can carry the kit; the dictionary is rebuilt on load.
-        [System.NonSerialized] public Dictionary<string, GameObject> Pieces;
-        [SerializeField, HideInInspector] List<string> pieceNames = new List<string>();
-        [SerializeField, HideInInspector] List<GameObject> pieceObjects = new List<GameObject>();
-        public void OnBeforeSerialize()
+        [System.Serializable] public struct NamedPiece { public string Name; public GameObject Prefab; }
+        public List<NamedPiece> PieceList = new List<NamedPiece>();   // the serialized form (a prefab cannot hold a Dictionary)
+        private Dictionary<string, GameObject> _pieces;
+        public Dictionary<string, GameObject> Pieces
         {
-            pieceNames.Clear(); pieceObjects.Clear();
-            if (Pieces == null) return;
-            foreach (var kv in Pieces) { pieceNames.Add(kv.Key); pieceObjects.Add(kv.Value); }
-        }
-        public void OnAfterDeserialize()
-        {
-            Pieces = new Dictionary<string, GameObject>();
-            for (int i = 0; i < pieceNames.Count && i < pieceObjects.Count; i++) if (!string.IsNullOrEmpty(pieceNames[i])) Pieces[pieceNames[i]] = pieceObjects[i];
+            get
+            {
+                if (_pieces == null) { _pieces = new Dictionary<string, GameObject>(); foreach (NamedPiece n in PieceList) if (n.Prefab != null && !string.IsNullOrEmpty(n.Name)) _pieces[n.Name] = n.Prefab; }
+                return _pieces;
+            }
+            set { _pieces = value; }
         }
     }
 
@@ -138,7 +136,6 @@ namespace SleepingCalamity.Presentation
             if (layout == null) throw new System.ArgumentNullException(nameof(layout));
             kit = kit ?? new CellarFloorKit();
             var root = new GameObject("CellarFloor_s" + layout.Seed + "_f" + layout.Floor).transform;
-            root.SetParent(parent, false);
             var result = new CellarFloorBuild { Root = root };
             var grid = new Grid(layout);
             var mats = new Mats(kit);
@@ -219,6 +216,7 @@ namespace SleepingCalamity.Presentation
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
             Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
             ArtFinish(root, kit, result);   // art layer: lamp gold and fog colour from CellarArtTuning
+            ParentBuiltFloor(root, parent, result);
             return result;
         }
 

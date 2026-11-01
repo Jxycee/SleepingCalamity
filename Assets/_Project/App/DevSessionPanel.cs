@@ -71,6 +71,7 @@ namespace SleepingCalamity.App
                 DrawWorldPicker();
                 GUILayout.Space(6);
                 if (Debug.isDebugBuild) SceneFlow.DevCombatArena = GUILayout.Toggle(SceneFlow.DevCombatArena, " Start in the combat arena (M3)");
+                if (Debug.isDebugBuild) SceneFlow.DevDiveArena = GUILayout.Toggle(SceneFlow.DevDiveArena, " Start in the Cellars dive hub (M5; E on the stair, F7 start, F8 abandon)");
                 if (GUILayout.Button("Solo (opens the selected solo world)")) Run("Solo", () => session.StartLocalAsync(false, CancellationToken.None));
                 if (GUILayout.Button("Host online (Relay; selected online multiplayer world)")) Run("Host online", () => session.HostOnlineAsync(CancellationToken.None));
                 GUILayout.BeginHorizontal();

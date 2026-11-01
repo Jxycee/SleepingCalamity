@@ -43,6 +43,10 @@ def R_(s):
 # ----------------------------------------------------------------------------- materials (TW_ slots on the B1 tileables)
 EXTRA = {
     'rubble': lambda: FK.tile_mat('TW_Rubble', 'B1_town/sandstone', tint=(0.64, 0.61, 0.57), normal=1.4),
+    # polish 2: per-stone value / hue spread (dark cool, warm, pale) so the rubble reads as mixed field stone, not one batch
+    'rubble_d': lambda: FK.tile_mat('TW_RubbleDark', 'B1_town/sandstone', tint=(0.42, 0.42, 0.41), normal=1.4),
+    'rubble_w': lambda: FK.tile_mat('TW_RubbleWarm', 'B1_town/sandstone', tint=(0.76, 0.66, 0.54), normal=1.4),
+    'rubble_l': lambda: FK.tile_mat('TW_RubblePale', 'B1_town/sandstone', tint=(0.84, 0.80, 0.73), normal=1.3),
     'ochre': lambda: FK.tile_mat('TW_RubbleOchre', 'B1_town/sandstone', tint=(1.0, 0.89, 0.73), normal=1.4),
     'joint': lambda: FK.tile_mat('TW_Joint', 'B1_town/sandstone', tint=(0.66, 0.61, 0.54), normal=1.0),
     'coping': lambda: FK.tile_mat('TW_Coping', 'B1_town/sandstone', tint=(1.14, 1.09, 1.00), normal=0.9),
@@ -111,7 +115,8 @@ def RZ(a):
     return Matrix.Rotation(a, 4, 'Z')
 
 # ----------------------------------------------------------------------------- stones and masonry
-def stone(pc, key, O, U, Vv, N, ua, ub, va, vb, d, R, bat=None, twist=0.014, shape=0.0, jit=0.016, flush=(False, False), bulge=0.018):
+def stone(pc, key, O, U, Vv, N, ua, ub, va, vb, d, R, bat=None, twist=0.014, shape=0.0, jit=0.016, flush=(False, False), bulge=0.018,
+          vw=None, warp_top=True):
     """One face stone: an irregular, slightly twisted and pillowed slab d proud of the core plane, four skirts back to the
     plane (12 tris). Frame (U x V = N): point(u, v, depth) = O + U u + V v + N (bat(v) + depth)."""
     def P(u, v, dd):
@@ -119,6 +124,8 @@ def stone(pc, key, O, U, Vv, N, ua, ub, va, vb, d, R, bat=None, twist=0.014, sha
     jl = 0.0 if flush[0] else jit; jr = 0.0 if flush[1] else jit
     cs = [(ua + R.uniform(0, jl), va + R.uniform(0, jit)), (ub - R.uniform(0, jr), va + R.uniform(0, jit)),
           (ub - R.uniform(0, jr), vb - R.uniform(0, jit + shape)), (ua + R.uniform(0, jl), vb - R.uniform(0, jit + shape))]
+    if vw is not None:   # wandering course lines: the same warp field moves both stones that share a joint
+        cs = [(u, v + vw(u, v)) if (k < 2 or warp_top) else (u, v) for k, (u, v) in enumerate(cs)]
     front = [P(u, v, max(0.006, d + R.uniform(-twist, twist))) for u, v in cs]
     back = [P(u, v, 0.0) for u, v in cs]
     off = (R.random(), R.random())
@@ -130,12 +137,26 @@ def stone(pc, key, O, U, Vv, N, ua, ub, va, vb, d, R, bat=None, twist=0.014, sha
         add_face(pc, key, [back[i], back[j], front[j], front[i]], ref=c, off=off)
 
 def masonry(pc, O, U, Vv, N, u0, u1, v0, v1, R, key='rubble', vmax=None, skip=None, keyf=None, course=(0.20, 0.37),
-            length=(0.28, 0.70), dmax=0.06, joint=0.03, bat=None, shape=0.03, ochre=0.2, flush=True, clip=None):
+            length=(0.28, 0.70), dmax=0.06, joint=0.03, bat=None, shape=0.03, ochre=0.2, flush=True, clip=None, warp=0.035,
+            split=0.16, pin=0.12, mix=True):
     """Coursed rubble over the rectangle [u0,u1] x [v0,v1] of a face frame. vmax(u) caps stone tops (broken walls);
     skip(u, v, ua, ub, va, vb) drops a stone; keyf(u, v) overrides the material; flush: the first/last stones of a course
-    end exactly at u0/u1 (module seams, no joint)."""
+    end exactly at u0/u1 (module seams, no joint). Polish 2 (irregular rubble): warp bends the course lines (a smooth field,
+    tapered to 0 at v0/v1 and at the seams); split stacks two thinner stones in one course slot; pin drops in short pinning
+    stones; mix spreads plain rubble over four tints."""
     v = v0; ci = 0
     nseed = R.random() * 80
+    vw = None
+    if warp > 0:
+        def vw(u, vv):
+            tv = max(0.0, min(1.0, (vv - v0) / 0.2, (v1 - vv) / 0.2))
+            tu = max(0.0, min(1.0, (u - u0) / 0.3, (u1 - u) / 0.3)) if flush else 1.0
+            return warp * tv * tu * noise.noise(Vector((u * 0.75, vv * 1.6, nseed + 7.0)))
+    def tint(k):
+        if not (mix and k == 'rubble'):
+            return k
+        x = R.random()
+        return 'rubble_d' if x < 0.25 else 'rubble_w' if x < 0.42 else 'rubble_l' if x < 0.57 else 'rubble'
     while v < v1 - 0.06:
         h = R.uniform(*course)
         if v1 - (v + h) < 0.15:
@@ -146,6 +167,8 @@ def masonry(pc, O, U, Vv, N, u0, u1, v0, v1, R, key='rubble', vmax=None, skip=No
             ln = R.uniform(*length)
             if u == u0 and ci % 2:
                 ln = R.uniform(0.2, length[0] + 0.1)
+            elif R.random() < pin:
+                ln = R.uniform(0.15, 0.24)
             if u1 - (u + ln) < 0.28:
                 ln = u1 - u
             first = u == u0; last = abs(u + ln - u1) < 1e-6
@@ -174,8 +197,16 @@ def masonry(pc, O, U, Vv, N, u0, u1, v0, v1, R, key='rubble', vmax=None, skip=No
                         t = noise.noise(Vector((uc * 0.6, (va + vt) * 0.3, nseed)))
                         if (t > 0.1 and R.random() < 0.85) or R.random() < ochre * 0.3:
                             k = 'ochre'
-                stone(pc, k, O, U, Vv, N, ua, ub, va, vt, R.uniform(0.014, dmax), R, bat=bat, shape=shape if vt < vb else 0.0,
-                      flush=(fl_l, fl_r))
+                capped = vt < vb
+                if not capped and vt - va > 0.25 and ub - ua > 0.32 and R.random() < split:
+                    vs = va + (vt - va) * R.uniform(0.38, 0.62)
+                    stone(pc, tint(k), O, U, Vv, N, ua, ub, va, vs - joint / 2, R.uniform(0.014, dmax), R, bat=bat,
+                          flush=(fl_l, fl_r), vw=vw)
+                    stone(pc, tint(k), O, U, Vv, N, ua, ub, vs + joint / 2, vt, R.uniform(0.014, dmax), R, bat=bat,
+                          flush=(fl_l, fl_r), vw=vw)
+                else:
+                    stone(pc, tint(k), O, U, Vv, N, ua, ub, va, vt, R.uniform(0.014, dmax), R, bat=bat, shape=shape if capped else 0.0,
+                          flush=(fl_l, fl_r), vw=vw, warp_top=not capped)
             u += ln
         v += h; ci += 1
 
@@ -306,6 +337,8 @@ class WallSpec:
         self.foot = True
         self.mossy = 0.0
         self.spout = None
+        self.chip = 0.1                      # chance a merlon is chipped (sloped broken top, cap gone)
+        self.miss = 0.0                      # chance a merlon is gone (a low stub, its cap fallen on the walkway)
         self.__dict__.update(kw)
 
 def core_loft(S):
@@ -359,10 +392,10 @@ def wall_pc(S):
     for (face, pa, pb, qa, qb) in S.patches:
         if face == 'out':
             masonry(pc, O_out, Uo, Vz, No, pa, pb, qa, qb, R, key='patch', bat=bat_out, course=(0.25, 0.28), length=(0.36, 0.55),
-                    dmax=0.075, joint=0.03, ochre=0.0, shape=0.0, flush=False)
+                    dmax=0.075, joint=0.03, ochre=0.0, shape=0.0, flush=False, warp=0.0, split=0.0, pin=0.0)
         else:
             masonry(pc, Vector((0, 0, 0)), Ui, Vz, Ni, -pb, -pa, qa, qb, R, key='patch', bat=lambda v: TH, course=(0.25, 0.28),
-                    length=(0.36, 0.55), dmax=0.075, joint=0.03, ochre=0.0, shape=0.0, flush=False)
+                    length=(0.36, 0.55), dmax=0.075, joint=0.03, ochre=0.0, shape=0.0, flush=False, warp=0.0, split=0.0, pin=0.0)
     # --- string course (outer, pale) and corbel course (inner, pale)
     if S.string:
         zc = 2.15
@@ -396,17 +429,36 @@ def wall_pc(S):
         box(pc, 'coping', (0.2, 0.55, 0.2), T(S.spout, -0.9, 2.52) @ Matrix.Rotation(-0.12, 4, 'X'), cham=0.025, wob=0.003, seed=5.5)
         box(pc, 'foot', (0.1, 0.1, 0.1), T(S.spout, -1.19, 2.47), cham=0.0)
     if S.merlons:
+        # polish 2: no two merlons alike (width, height, a hair of offset and yaw); a few chipped, a few gone (Ruined)
+        Rm = R_(S.name + 'merlons' + str(S.seed))
         for i in range(4):
             xm = -1.5 + i
             if not (_on(S.merlons, i, xm) and S.tp(xm) >= PAR_TOP - 1e-3):
                 continue
             key = 'patch' if (i in S.patched_coping) else 'rubble'
             ck = 'patch' if (i in S.patched_coping) else 'coping'
-            box(pc, key, (0.62, 0.42, MER1 - MER0), T(xm, -0.36, (MER0 + MER1) / 2), cham=0.03, segs=1, wob=0.006, seed=R.random() * 30)
-            box(pc, ck, (0.76, 0.58, CAP1 - MER1), T(xm, -0.37, (MER1 + CAP1) / 2), cham=0.025, wob=0.004, seed=R.random() * 30)
+            w = 0.62 + Rm.uniform(-0.07, 0.05); top = MER1 + Rm.uniform(-0.06, 0.03)
+            dx = Rm.uniform(-0.04, 0.04); yaw = RZ(Rm.uniform(-0.025, 0.025))
+            roll = Rm.random(); repaired = i in S.patched_coping
+            if not repaired and roll < S.miss:
+                hs = Rm.uniform(0.08, 0.2)   # stub of the merlon, ragged top
+                box(pc, key, (w, 0.42, hs), T(xm + dx, -0.36, MER0 + hs / 2) @ yaw, cham=0.03, wob=0.02, seed=Rm.random() * 30)
+                if S.deck:
+                    rock(pc, 'coping', (xm + Rm.uniform(-0.3, 0.3), 0.3 + Rm.uniform(-0.15, 0.15), 2.27), (0.2, 0.14, 0.05), Rm, block=True)
+                continue
+            if not repaired and roll < S.miss + S.chip:
+                side = 1 if Rm.random() < 0.5 else -1; drop = Rm.uniform(0.12, 0.26); hh = top - MER0
+                def chip(p, side=side, drop=drop, w=w, hh=hh):   # the top falls away toward one side: a broken, sloped top
+                    t = max(0.0, min(1.0, 0.5 + side * p.x / w)) ** 1.3
+                    return Vector((0, 0, -drop * t * max(0.0, (p.z + hh / 2) / hh)))
+                box(pc, key, (w, 0.42, hh), T(xm + dx, -0.36, (MER0 + top) / 2) @ yaw, cham=0.03, wob=0.012, seed=Rm.random() * 30,
+                    cuts=(2, 0, 1), bend=chip)
+                continue
+            box(pc, key, (w, 0.42, top - MER0), T(xm + dx, -0.36, (MER0 + top) / 2) @ yaw, cham=0.03, segs=1, wob=0.006, seed=Rm.random() * 30)
+            box(pc, ck, (w + 0.14 + Rm.uniform(-0.02, 0.02), 0.58, CAP1 - MER1), T(xm + dx, -0.37, top + (CAP1 - MER1) / 2) @ yaw
+                @ Matrix.Rotation(Rm.uniform(-0.02, 0.02), 4, 'Y'), cham=0.025, wob=0.004, seed=Rm.random() * 30)
             if S.loops and i % 2 == 1:
-                for yy, sg in ((yo(3.1) - 0.006, 1), ):
-                    box(pc, 'glass', (0.07, 0.03, 0.36), T(xm, -0.575, 3.13), cham=0.0)
+                box(pc, 'glass', (0.07, 0.03, 0.36), T(xm + dx, -0.575, 3.13 + (top - MER1) / 2), cham=0.0)
     # --- walkway
     if S.deck == 'plank':
         npl = 22; pitch = (HALF * 2) / npl
@@ -507,6 +559,12 @@ def straight_a():
 def straight_b():
     return WallSpec(name='Wall_Straight_B', seed=2, deck='slab', loops=True, spout=-0.7)
 
+def straight_a_ruined():   # polish 2: the Ruined preset's A/B modules lose and chip more merlons
+    return WallSpec(name='Wall_Straight_A_Ruined', seed=21, deck='plank', spout=0.9, chip=0.3, miss=0.3)
+
+def straight_b_ruined():
+    return WallSpec(name='Wall_Straight_B_Ruined', seed=22, deck='slab', loops=True, spout=-0.7, chip=0.3, miss=0.3)
+
 def patched():
     return WallSpec(name='Wall_Patched', seed=3, deck='plank',
                     patches=[('out', -1.45, -0.35, 0.15, 1.25), ('out', 0.65, 1.65, 1.5, 2.8), ('in', -1.75, -0.85, 0.1, 1.6)],
@@ -559,9 +617,9 @@ def end_dressing(pc, S, R):
     Vz = Vector((0, 0, 1))
     # end face (+X normal at x = 0): U = +Y
     masonry(pc, Vector((0, 0, 0)), Vector((0, 1, 0)), Vz, Vector((1, 0, 0)), -0.76, TH, -0.5, 2.1, R, key='coping', bat=lambda v: 0.0,
-            course=(0.3, 0.4), length=(0.5, 0.7), dmax=0.06, ochre=0.0)
+            course=(0.3, 0.4), length=(0.5, 0.7), dmax=0.06, ochre=0.0, warp=0.0, split=0.0, pin=0.0)
     masonry(pc, Vector((0, 0, 0)), Vector((0, 1, 0)), Vz, Vector((1, 0, 0)), -0.76, PAR_IN, 2.1, 2.82, R, key='coping', bat=lambda v: 0.0,
-            course=(0.3, 0.4), length=(0.5, 0.7), dmax=0.06, ochre=0.0)
+            course=(0.3, 0.4), length=(0.5, 0.7), dmax=0.06, ochre=0.0, warp=0.0, split=0.0, pin=0.0)
     # quoins: alternating long and short stones up both corners
     z = -0.5; i = 0
     while z < 2.1:
@@ -1135,6 +1193,7 @@ def battlements(pc, G, R, ZT, broken=None):
         box(pc, 'rubble', (sx, sy, 0.7), T(cx, cy, zpar + 0.35), cham=0.03, wob=0.005, seed=R.random() * 20)
         box(pc, 'coping', (sx + 0.06, sy + 0.1, 0.1), T(cx, cy, zpar + 0.75), cham=0.025, wob=0.004, seed=R.random() * 20)
     # merlons
+    Rb = random.Random(R.random())
     for (nm, length, cx0, cy0, ax) in (('F', 2 * HX, 0, -HY + 0.3, 0), ('B', 2 * HX, 0, HY - 0.3, 0), ('L', 2 * HY, -HX + 0.3, 0, 1), ('R', 2 * HY, HX - 0.3, 0, 1)):
         nm_ = 8 if ax == 0 else 4
         p = length / nm_
@@ -1143,9 +1202,22 @@ def battlements(pc, G, R, ZT, broken=None):
             x, y = (cx0 + u, cy0) if ax == 0 else (cx0, cy0 + u)
             if broken and broken(x, y):
                 continue
-            wx, wy = (0.78, 0.5) if ax == 0 else (0.5, 0.78)
-            box(pc, 'rubble', (wx, wy, 0.45), T(x, y, zpar + 0.8 + 0.225 + 0.05), cham=0.03, wob=0.006, seed=R.random() * 20)
-            box(pc, 'coping', (wx + 0.12, wy + 0.12, 0.1), T(x, y, zpar + 0.8 + 0.5 + 0.1), cham=0.025, wob=0.004, seed=R.random() * 20)
+            # polish 2: width / height vary per merlon; on the ruined Shell about a third of the survivors are chipped, capless
+            ww = 0.78 + Rb.uniform(-0.08, 0.05); hh = 0.45 + Rb.uniform(-0.06, 0.04)
+            wx, wy = (ww, 0.5) if ax == 0 else (0.5, ww)
+            z0 = zpar + 0.8 + 0.05
+            if broken and Rb.random() < 0.35:
+                side = 1 if Rb.random() < 0.5 else -1; drop = Rb.uniform(0.12, 0.25)
+                def chip(p, side=side, drop=drop, ww=ww, hh=hh, ax=ax):
+                    q = p.x if ax == 0 else p.y
+                    t = max(0.0, min(1.0, 0.5 + side * q / ww)) ** 1.3
+                    return Vector((0, 0, -drop * t * max(0.0, (p.z + hh / 2) / hh)))
+                box(pc, 'rubble', (wx, wy, hh), T(x, y, z0 + hh / 2), cham=0.03, wob=0.012, seed=Rb.random() * 20,
+                    cuts=(2, 2, 1), bend=chip)
+                continue
+            box(pc, 'rubble', (wx, wy, hh), T(x, y, z0 + hh / 2), cham=0.03, wob=0.006, seed=Rb.random() * 20)
+            box(pc, 'coping', (wx + 0.12, wy + 0.12, 0.1), T(x, y, z0 + hh + 0.05) @ Matrix.Rotation(Rb.uniform(-0.02, 0.02), 4, 'X'),
+                cham=0.025, wob=0.004, seed=Rb.random() * 20)
 
 def east_turret(pc, G, R, broken):
     hw, D = G.hw, G.D
@@ -1373,6 +1445,8 @@ def build_gate(name):
 WALL_PIECES = {
     'Wall_Straight_A': lambda: make_obj(build_wall(straight_a()), seed=1),
     'Wall_Straight_B': lambda: make_obj(build_wall(straight_b()), seed=2),
+    'Wall_Straight_A_Ruined': lambda: make_obj(build_wall(straight_a_ruined()), seed=21, grime=1.2, moss=1.3),
+    'Wall_Straight_B_Ruined': lambda: make_obj(build_wall(straight_b_ruined()), seed=22, grime=1.2, moss=1.3),
     'Wall_Buttress': lambda: make_obj(build_buttress(), seed=5),
     'Wall_End': lambda: make_obj(build_wall(end_piece()), seed=4),
     'Wall_Stair': lambda: make_obj(build_stair(), seed=6),
@@ -1380,7 +1454,7 @@ WALL_PIECES = {
     'Wall_Crumbled': lambda: make_obj(build_wall(crumbled()), seed=12, grime=1.15, moss=1.4),
     'Wall_Patched': lambda: make_obj(build_wall(patched()), seed=3, grime=0.9),
 }
-BUDGET = {'Wall_Straight_A': 6000, 'Wall_Straight_B': 6000, 'Wall_Patched': 6500, 'Wall_Breach': 7000, 'Wall_Crumbled': 6000,
+BUDGET = {'Wall_Straight_A': 6000, 'Wall_Straight_B': 6000, 'Wall_Straight_A_Ruined': 6000, 'Wall_Straight_B_Ruined': 6000, 'Wall_Patched': 6500, 'Wall_Breach': 7000, 'Wall_Crumbled': 6000,
           'Wall_Buttress': 3000, 'Wall_End': 3000, 'Wall_Stair': 3000}
 
 def build_walls(only=None):

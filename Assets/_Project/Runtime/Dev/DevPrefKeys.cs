@@ -5,5 +5,6 @@ namespace SleepingCalamity.Runtime
     {
         public const string AutoSolo = "SleepingCalamity.AutoSolo";
         public const string CombatArena = "SleepingCalamity.CombatArena";   // M3: start sessions in Arena_Combat instead of Arena_Greybox
+        public const string DiveArena = "SleepingCalamity.DiveArena";   // M5: start sessions in Arena_Dive (the Cellars dive hub)
     }
 }

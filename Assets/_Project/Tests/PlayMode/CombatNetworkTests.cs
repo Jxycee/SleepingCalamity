@@ -16,6 +16,7 @@ using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Gameplay;
 using Unity.Multiplayer.Tools.NetworkSimulator.Runtime;
 using Unity.Netcode;
@@ -195,6 +196,42 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(c.HostCombat.ComboCount, Is.EqualTo(0), "the host hero swung at nothing");
         }
 
+        // Catches (M4): a hero ability looked up under the wrong client id, or a swing whose weapon never reaches the host. The CLIENT's hero sends the real
+        // SubmitHitServerRpc (private, called by reflection so the finisher needs no combo timing) for an axe finisher on two identical idle slimes: first
+        // with an empty book (control), then with axe_quake in the book the HOST keeps for that client (keyed by the client's OwnerClientId, not the host's).
+        // Crits are zeroed, so the host-applied damage differs by the ability alone (x1.30 at tier 2). Does not cover real input or the unlock itself.
+        [UnityTest]
+        public IEnumerator ClientFinisherHit_HostAppliesTheClientsUnlockedAbility()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+
+            ulong clientId = c.ClientNm.LocalClientId;
+            Vector3 pos = new Vector3(8f, 0f, 1.6f);
+            Enemy control = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, pos, ai: false);
+            Enemy boosted = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, pos, ai: false);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(control.NetworkObjectId)
+                                                         && c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(boosted.NetworkObjectId), Timeout, "the client never received the enemies");
+            Assert.That(c.Combat.Growth(clientId).Abilities.Has(AbilityEffects.Quake), Is.False);
+
+            System.Reflection.MethodInfo submit = typeof(HeroCombat).GetMethod("SubmitHitServerRpc", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(submit, Is.Not.Null, "HeroCombat.SubmitHitServerRpc");
+            byte axe = (byte)System.Array.IndexOf(AttackCatalog.Heirlooms, WeaponCatalog.Axe);
+            Vector3 from = new Vector3(8f, 0f, 0f);
+
+            submit.Invoke(c.ClientCombat, new object[] { 1, axe, (byte)AttackSet.Finisher, (byte)0, control.NetworkObjectId, (sbyte)-1, from, 0f });
+            yield return PlayModeHarness.WaitUntil(() => control.Model.Hp < control.Model.MaxHp, 3f, "the host never applied the control hit");
+            int plainDamage = control.Model.MaxHp - control.Model.Hp;
+
+            c.Combat.Growth(clientId).Abilities.Restore(new[] { AbilityEffects.Quake });
+            submit.Invoke(c.ClientCombat, new object[] { 2, axe, (byte)AttackSet.Finisher, (byte)0, boosted.NetworkObjectId, (sbyte)-1, from, 0f });
+            yield return PlayModeHarness.WaitUntil(() => boosted.Model.Hp < boosted.Model.MaxHp, 3f, "the host never applied the boosted hit");
+            int boostedDamage = boosted.Model.MaxHp - boosted.Model.Hp;
+
+            Assert.That(boostedDamage, Is.GreaterThan(plainDamage), "the client's axe_quake must raise the host-applied finisher damage");
+            Assert.That(boostedDamage, Is.EqualTo(Mathf.CeilToInt(plainDamage * 1.30f)).Within(2));
+        }
+
         // ---- 2. an enemy attack on the client: judged by the client's dodge ----
 
         [UnityTest]
@@ -319,6 +356,53 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(run.Latencies.Count, Is.EqualTo(run.Swings), "no hit was lost to the packet loss (reliable RPCs resend): " + report);
             Assert.That(run.Latencies[0], Is.GreaterThan(60.0), "the simulator is in effect: " + report);
             Assert.That(run.Latencies[run.Latencies.Count - 1], Is.LessThan(1500.0), "even a resent packet arrives well inside two seconds: " + report);
+        }
+
+        // ---- weapon tree (M4): a client's tree choices go to the host, which applies them to the Core weapon and pushes the snapshot back ----
+        // Catches: the owner->host TreeActionServerRpc and the host->owner SyncTreeOwnerRpc round trip (fit, build-up gate, build-up, re-route) over a real
+        // client connection. Does not catch: the IMGUI window itself (manual walk: B opens it, 1/2/3, F7, F8).
+        [UnityTest]
+        public IEnumerator WeaponTree_ClientChoices_RoundTripThroughTheHost()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+            ulong clientId = c.ClientNm.LocalClientId;
+            Core.Weapons.WeaponState hostAxe = c.Combat.Growth(clientId).Weapon(c.ClientCombat.WeaponKey);
+            while (hostAxe.Level < 3) hostAxe.AddAbs(hostAxe.LevelCostNow - hostAxe.Abs);   // ATK 28 of 27 needed
+            HeroCombat clientOnHost = c.ClientHeroOnHost.GetComponent<HeroCombat>();
+            c.Combat.ServerSyncGrowth(clientOnHost);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.Level == 3, Timeout, "the owner never got the tree snapshot");
+            Assert.That(c.ClientCombat.TreeMirror.BuildUpOpen, Is.False, "fire is still 0");
+
+            c.ClientCombat.OwnerTreeAction(TreeAction.Fit, (int)Core.Weapons.AttachmentKind.Ember);
+            c.ClientCombat.OwnerTreeAction(TreeAction.Fit, (int)Core.Weapons.AttachmentKind.Ember);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.Fitted.Length == 2, Timeout, "the host never fitted the embers");
+            Assert.That(hostAxe.Fitted.Count, Is.EqualTo(2), "the host's Core weapon holds them");
+
+            int pushesBefore = c.ClientCombat.TreePushes;
+            c.ClientCombat.OwnerTreeAction(TreeAction.BuildUp);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreePushes > pushesBefore, Timeout, "the refused build-up never re-pushed the tree");
+            Assert.That(hostAxe.DefinitionId, Is.EqualTo(Core.Weapons.WeaponCatalog.Axe), "build-up refused while the gate is closed (embers not yet absorbed)");
+
+            // A plain ABS tick changes nothing the tree shows beyond the growth mirror: no tree push, but the owner's tree still reads the new ABS.
+            pushesBefore = c.ClientCombat.TreePushes;
+            hostAxe.AddAbs(1f);
+            c.Combat.ServerSyncGrowth(clientOnHost);
+            yield return PlayModeHarness.WaitUntil(() => Mathf.Approximately(c.ClientCombat.TreeMirror.Abs, hostAxe.Abs), Timeout, "the growth mirror never refreshed the tree's ABS");
+            Assert.That(c.ClientCombat.TreePushes, Is.EqualTo(pushesBefore), "an ABS-only change must not push the tree");
+
+            hostAxe.AddAbs(hostAxe.LevelCostNow - hostAxe.Abs);   // level 4 absorbs the embers: fire 10 of 9
+            c.Combat.ServerSyncGrowth(clientOnHost);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.BuildUpOpen, Timeout, "the build-up never opened on the owner");
+
+            c.ClientCombat.OwnerTreeAction(TreeAction.BuildUp);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.DefinitionId == Core.Weapons.WeaponCatalog.CinderAxe, Timeout, "the build-up never came back");
+            Assert.That(hostAxe.DefinitionId, Is.EqualTo(Core.Weapons.WeaponCatalog.CinderAxe));
+            Assert.That(c.ClientCombat.TreeMirror.CanReroute, Is.True);
+
+            c.ClientCombat.OwnerTreeAction(TreeAction.Reroute);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.DefinitionId == Core.Weapons.WeaponCatalog.Axe, Timeout, "the re-route never came back");
+            Assert.That(hostAxe.Level, Is.EqualTo(4), "re-route returns the level it had");
         }
     }
 }
