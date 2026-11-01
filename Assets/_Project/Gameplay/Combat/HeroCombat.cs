@@ -5,6 +5,8 @@
 // Replicated: NetWeapon (the heirloom index; the HOST writes it when the owner asks through SetWeaponServerRpc, so it is in place before any later RPC of that
 // owner is handled) and NetSwing (owner writes: swing serial + attack index, for remote visuals). Everything else rides RPCs. Every hit intent carries the
 // weapon index and the chain's prior hits of its swing, so the host judges it against what the owner actually swung.
+// Hurt grace (combat-timings rows 1-4, 8): the grace timer lives here on the OWNER, the same place that already judges enemy hits (a hit inside the window is
+// dropped before EnemyHitMeServerRpc, so the host never applies damage for it); HurtPulse is local, for presentation.
 // Weapon tree (M4): the owner asks (TreeActionServerRpc: fit / remove / build-up / re-route); the HOST applies it in WeaponTreeHost and pushes the snapshot back (SyncTreeOwnerRpc).
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -55,6 +57,9 @@ namespace SleepingCalamity.Gameplay
         private float _guardStart, _reviveReport, _hurtLock, _dodgeBuffer;
         private float _guardEnd = -10f, _rollEndedAt = -10f, _rollGap = 10f;   // combat depth: the parry lockout and the perfect dodge's chain rule
         private bool _parryArmed = true;
+        private bool _hasHurt;   // owner: a hit has landed, so _hurtAge/_hurtKind describe a grace window
+        private float _hurtAge;
+        private HurtKind _hurtKind;
         private int _swingSerial, _published;
         private Vector3 _impulse;
 
@@ -113,6 +118,9 @@ namespace SleepingCalamity.Gameplay
         public bool HitboxOn => CurrentAttack != null && CurrentAttack.HitOn.Contains(AttackFrame);
 
         // ---- what HeroLocomotion asks (owner) ----
+        // 0..1 red tint for presentation: one sine half-cycle over the grace window (owner only; 0 elsewhere and when not hurt).
+        public float HurtPulse => HurtGrace.Pulse(_hasHurt, _hurtKind, _hurtAge);
+        public bool HurtGraceActive => HurtGrace.IsActive(_hasHurt, _hurtKind, _hurtAge);
         public bool AllowsDodge => IsUp && _machine.CanCancel && _hurtLock <= 0f && !_guarding;
         public float MoveScale => !IsUp ? 0f : _machine.Busy ? 0.0f : _hurtLock > 0f ? 0.2f : _guarding || _aiming ? 0.5f : 1f;
         public float LungeSpeed => _machine.LungeSpeed;
@@ -265,6 +273,7 @@ namespace SleepingCalamity.Gameplay
             if (HeroInput.IsPaused()) return;
             PlayerIntent intent = input.Intent;
             if (_hurtLock > 0f) _hurtLock -= dt;
+            if (_hasHurt) { _hurtAge += dt; if (!HurtGraceActive) _hasHurt = false; }
 
             if (!IsUp)
             {
@@ -544,6 +553,7 @@ namespace SleepingCalamity.Gameplay
         private void ResolveEnemyHit(Enemy e, AttackData a)
         {
             Vector3 me = transform.position;
+            if (HurtGraceActive) return;   // post-hit grace: the hit does nothing (and the host is never told)
             if (_loco.IsInvulnerable || _machine.Invulnerable)
             {
                 CombatEvents.RaiseCue(CombatCue.Dodge, me);
@@ -581,8 +591,9 @@ namespace SleepingCalamity.Gameplay
                 if (!_machine.SuperArmor)
                 {
                     if (_machine.Active) { PublishSwing(NoAttack); _machine.Interrupt(); }
-                    _hurtLock = HurtStagger;
+                    _hurtLock = HurtGrace.Knockdown(a.Knockback, false) ? HurtGrace.KnockdownSeconds : HurtStagger;   // killed: the host decides; a downed hero is not IsUp anyway
                 }
+                _hasHurt = true; _hurtAge = 0f; _hurtKind = HurtGrace.Classify(a.Knockback);
                 if (a.Knockback > 0f && toEnemy.sqrMagnitude > 1e-4f) AddImpulse(-toEnemy.normalized * Mathf.Min(8f, a.Knockback * 2.4f));
             }
             EnemyHitMeServerRpc(e.NetworkObjectId, e.Serial, guarded);

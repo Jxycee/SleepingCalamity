@@ -59,6 +59,39 @@ namespace SleepingCalamity.Core.Combat
             hitboxOpenSeconds <= elapsed + 1f / 60f;
     }
 
+    // Post-hit invulnerability grace (docs/research/combat-timings.md rows 1-4, 8): after a hit lands the hero ignores further hits for a window (DC1:
+    // 160 / 80 / 8 ticks at 60 Hz for heavy / light / one hit of a multi-hit attack), tinted red by one sine half-cycle over the same window. A heavy
+    // hit (knockback >= 3) that does not kill also knocks the hero down. Authority: owner (the victim's client judges enemy hits; see HeroCombat).
+    public enum HurtKind : byte { Light = 0, Heavy = 1, MultiHit = 2 }
+
+    public static class HurtGrace
+    {
+        public const float HeavyKnockback = 3f;                 // attack knockback at or above this is a heavy hit
+        public const float LightSeconds = 80f / 60f;            // 1.33 s
+        public const float HeavySeconds = 160f / 60f;           // 2.67 s
+        public const float MultiHitSeconds = 8f / 60f;          // 0.13 s
+        public const float KnockdownSeconds = 0.9f;             // research recommendation 3 (DC1's 2.2 s is too long for us)
+
+        // No data flag marks a multi-hit attack today (AttackData has none), so callers pass multiHit=false and get light / heavy only.
+        public static HurtKind Classify(float knockback, bool multiHit = false) =>
+            knockback >= HeavyKnockback ? HurtKind.Heavy : multiHit ? HurtKind.MultiHit : HurtKind.Light;
+
+        public static float Seconds(HurtKind kind) => kind == HurtKind.Heavy ? HeavySeconds : kind == HurtKind.MultiHit ? MultiHitSeconds : LightSeconds;
+
+        // True while `elapsed` seconds after a hit is still inside that hit's grace window (the window is [0, Seconds); the edge itself is open again).
+        public static bool IsActive(bool hasHit, HurtKind kind, float elapsed) => hasHit && elapsed >= 0f && elapsed < Seconds(kind);
+
+        // Red tint strength 0..1: one sine half-cycle over the window (0 at the start, 1 at the midpoint, 0 at the end); 0 outside it.
+        public static float Pulse(bool hasHit, HurtKind kind, float elapsed)
+        {
+            if (!IsActive(hasHit, kind, elapsed)) return 0f;
+            return MathF.Sin(MathF.PI * elapsed / Seconds(kind));
+        }
+
+        // A heavy hit that does not kill knocks the hero down.
+        public static bool Knockdown(float knockback, bool killed) => knockback >= HeavyKnockback && !killed;
+    }
+
     // The broom's bristle front (6.6): 80% of frontal damage is blocked unless the hit comes from the flank or behind or is a guard-breaker.
     public static class FrontalBlock
     {
