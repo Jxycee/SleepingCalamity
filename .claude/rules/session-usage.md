@@ -21,6 +21,6 @@ From the working sessions' own usage reviews (2026-10-31: bell tower, bakery and
 - Wait on Unity with one blocking command (`--timeout 90` or `120` for capture runs), never by polling in turns.
 
 ## Checks and merges (about 20%)
-- Merge origin/main, regenerate `Hollowmere.unity` with the builder (a `-nographics` build), commit, then run one `check` right before merging.
+- Merge origin/main, then run one `check` right before merging. Builds are deterministic since c4d19fa (two builds in a row, and graphics vs `-nographics`, write the same bytes; `Tools/cloud/sc_churn_check.sh` proves it), so a separate regenerate run is needed only when the merge conflicts in builder output (`.unity`/`.mat`): take main's side (`git checkout --theirs`), run one `build`, commit, then `check`. Never hand-merge those files.
 - If main then gains only commits outside `Assets/`, `Packages/` and `ProjectSettings/`, merge without re-checking. If it gains Asset changes, merge main once more and re-check.
-- Never commit materials or scenes written by a graphics capture run: they differ from `-nographics` builds (the MotionVectors pass flip) and break the check marker.
+- Graphics capture runs now write the same material and scene bytes as `-nographics` builds (BuildAll settles every material with URP's ShaderGUI validation; `MaterialValidationTests` fails on any material a graphics editor would rewrite). Verified for the graphics build and the DungeonCorner capture; Hollowmere and BeautyCorner captures were not re-run (Hollowmere OOMs in the cloud). If a capture still leaves `.mat`/`.unity` changes, don't commit them: run one `build` and report the file to the coordinator as a churn bug.
