@@ -67835,7 +67835,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 7139}
+  - {fileID: 7141}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -145244,7 +145244,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 7140}
+  - {fileID: 7139}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -145334,7 +145334,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 7141}
+  - {fileID: 7140}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -145424,7 +145424,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 7141}
+  - {fileID: 7140}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -146578,7 +146578,7 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.55, g: 1, b: 0.65, a: 1}
+    - _BaseColor: {r: 0.18431373, g: 0.2901961, b: 0.3529412, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
@@ -146700,7 +146700,7 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.18431373, g: 0.2901961, b: 0.3529412, a: 1}
+    - _BaseColor: {r: 0.2901961, g: 0.2509804, b: 0.21960784, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
@@ -146822,7 +146822,7 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.2901961, g: 0.2509804, b: 0.21960784, a: 1}
+    - _BaseColor: {r: 0.55, g: 1, b: 0.65, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}

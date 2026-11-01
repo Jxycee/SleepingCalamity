@@ -24,6 +24,16 @@ namespace SleepingCalamity.Tests.EditMode
         [Test] public void Pieces_Text() => Assert.AreEqual("Pieces: 3 unbanked / 2 banked", StirMeterText.Pieces(new DiveHaulSync.Summary { UnbankedPieces = 3, BankedPieces = 2 }));
 
         [Test]
+        public void PiecesLeftHere_FollowsTheCurrentFloor()
+        {
+            var s = new DiveHaulSync.Summary { CurrentFloor = 2, LeftFloor1 = 0, LeftFloor2 = 1, LeftFloor3 = 2 };
+            Assert.AreEqual("Pieces left on this floor: 1", StirMeterText.PiecesLeftHere(s));
+            s.CurrentFloor = 3; Assert.AreEqual("Pieces left on this floor: 2", StirMeterText.PiecesLeftHere(s));
+            s.CurrentFloor = 4; Assert.IsNull(StirMeterText.PiecesLeftHere(s));
+            s.CurrentFloor = 0; Assert.IsNull(StirMeterText.PiecesLeftHere(s));
+        }
+
+        [Test]
         public void Marks_FromTuning()
         {
             var t = StirTuning.Default;

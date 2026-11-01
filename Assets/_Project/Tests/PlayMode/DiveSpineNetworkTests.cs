@@ -10,6 +10,8 @@ using System.Threading;
 using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Gameplay;
 using SleepingCalamity.Presentation;
 using Unity.Netcode;
 using UnityEngine;
@@ -247,6 +249,41 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return AllBuilt(rig, 1);
         }
 
+        // Wipe: every hero is really downed through HeroVitals (the damage path), mid-dive. The dive must fail, the party must be home, and every hero must be up again.
+        [UnityTest]
+        public IEnumerator PartyWipe_AllHeroesDowned_FailsTheDive_SendsEveryoneHome_AndResetsTheHeroes()
+        {
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = 4242u;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, 1);
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
+            var hostVitals = rig.HostHero.GetComponent<HeroVitals>(); var clientVitals = rig.HeroesOnHost[0].GetComponent<HeroVitals>();
+            Assert.That(hostVitals.IsUp && clientVitals.IsUp, Is.True, "test premise: both heroes start up");
+
+            // One hero down is not a wipe.
+            hostVitals.ServerDamage(100000);
+            Assert.That(hostVitals.IsUp, Is.False);
+            yield return Seconds(1f);
+            Assert.That(rig.Host.NetActive.Value, Is.True, "one hero still stands: the dive goes on");
+
+            clientVitals.ServerDamage(100000);
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value, Timeout, "every hero down never failed the dive");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Peers[0].NetActive.Value, Timeout, "the client never saw the dive end");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(0), "the wiped dive failed the haul");
+            yield return NearOnHost(rig, Home, "home after the wipe");
+            yield return PlayModeHarness.WaitUntil(() => hostVitals.IsUp && clientVitals.IsUp, Timeout, "the heroes stayed down after the dive ended");
+            Assert.That(hostVitals.Hp, Is.EqualTo(hostVitals.MaxHp), "a wiped hero arrives home at full health");
+
+            // A new dive after the wipe starts with a standing party and is not failed at once.
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return AllBuilt(rig, 1);
+            yield return Seconds(1f);
+            Assert.That(rig.Host.NetActive.Value, Is.True, "the next dive survives its first second");
+        }
+
         [UnityTest]
         public IEnumerator Floor4_BankThenGoHome_EndsTheDive_BankedPiecesKept_NoGoHomeBeforeTheBank()
         {
@@ -310,6 +347,65 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return AllBuilt(rig, 3);
             Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(1));
             Assert.That(rig.HostFloor.BuiltSeed, Is.EqualTo(31337u), "one seed per session");
+        }
+
+        // Contents hook: the director spawns CellarContentsSync, arms it per built floor, opens the stair on the gate key (ExitUnlocked) and clears the enemies when the dive fails.
+        [UnityTest]
+        public IEnumerator Contents_ArmedByTheDirector_StairNeedsTheGateKey_FailedDiveClearsEnemies()
+        {
+            uint seed = 0;
+            for (uint sd = 1; sd < 400 && seed == 0; sd++)
+            {
+                CellarFloorLayout l = CellarFloorGenerator.Generate(sd, 1);
+                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) seed = sd;
+            }
+            Assert.That(seed, Is.Not.EqualTo(0u), "a seed with a carrier");
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = seed;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, 1);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.ContentsSync != null && rig.Host.ContentsSync.State.Seed == seed && rig.Host.ContentsSync.State.Floor == 1, Timeout, "the director never armed the contents for floor 1");
+            CellarContentsSync contents = rig.Host.ContentsSync;
+            Assert.That(rig.Host.RequireGateKey, Is.True, "contents gate the stair");
+            Assert.That(contents.AutoArm, Is.False, "the director arms the contents, not their own build watcher");
+            Assert.That(contents.State.ExitUnlocked, Is.False);
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
+
+            // Shut: in range of the stair, the press is refused until the key is taken.
+            Assert.That(CellarFloorBuilder.TryStairWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True);
+            DiveDirector peer = rig.Peers[0];
+            GateKeyCarrier car = rig.HostFloor.Layout.Carrier;
+            Vector3 carrierCell = rig.HostFloor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(car.X, car.Y));
+            Move(rig.OwnHeroes[0], carrierCell);
+            yield return PlayModeHarness.WaitUntil(() => contents.GateKeyCarrierEnemy != null, Timeout, "entering the carrier's room never spawned the carrier");
+            var hit = new EnemyHitInput { Attack = AttackCatalog.Axe.Attacks[0], Atk = 100000f, PartIndex = -1, CritChance = 0f };
+            Enemy carrier = contents.GateKeyCarrierEnemy;
+            for (int i = 0; i < 6 && carrier.Alive; i++) carrier.ServerApplyHit(hit, carrier.transform.position + Vector3.back, Time.timeAsDouble);
+            yield return PlayModeHarness.WaitUntil(() => contents.State.GateKey == 1, Timeout, "the carrier never dropped the gate key");
+            Move(rig.OwnHeroes[0], stair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair) < 3f, Timeout, "the client hero never reached the stair");
+            int handled = rig.Host.RequestsHandled;
+            peer.RequestStair(1);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the shut stair press never reached the host");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1), "the gate key is not taken yet: the stair stays shut");
+
+            // The key is picked up: ExitUnlocked opens the stair through the director.
+            Move(rig.OwnHeroes[0], contents.State.GateKeyPos + new Vector3(0.5f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => contents.State.ExitUnlocked, Timeout, "picking the key up never unlocked the exit");
+            Move(rig.OwnHeroes[0], stair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair) < 3f, Timeout, "the client hero never got back to the stair");
+            peer.RequestStair(1);
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CurrentFloor == 2, Timeout, "the opened stair never took the party down");
+            yield return PlayModeHarness.WaitUntil(() => contents.State.Floor == 2 && contents.State.Seed == rig.HostFloor.BuiltSeed, Timeout, "the contents were never re-armed for floor 2");
+
+            // A failed dive clears the contents (and their enemies).
+            Assert.That(rig.Host.ServerAbandonDive(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => contents.State.Floor == 0, Timeout, "the failed dive never cleared the contents");
+            int enemies = 0;
+            foreach (NetworkObject o in rig.HostNm.SpawnManager.SpawnedObjects.Values) { Enemy en = o.GetComponent<Enemy>(); if (en != null && en.Alive) enemies++; }   // the killed carrier's corpse may linger until its own despawn timer
+            Assert.That(enemies, Is.EqualTo(0), "no living enemy survives a failed dive");
         }
     }
 }

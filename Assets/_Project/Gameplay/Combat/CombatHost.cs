@@ -38,6 +38,7 @@ namespace SleepingCalamity.Gameplay
 
         public bool AiEnabled = true;
         public bool WavesEnabled = true;
+        public bool WipeResetsParty = true;   // false (the dive's contents host): a wipe clears the enemies but leaves the revive/fail flow to the dive director
         public float CritChance = DamageFormula.CritChance;
         public float ClearHeal = 20f;
 
@@ -379,6 +380,15 @@ namespace SleepingCalamity.Gameplay
             drop.Spawn(destroyWithScene: true);
         }
 
+        // Host (wipe): the dive director ended the dive after a party wipe, so the Wiped state goes back to Idle (a later wipe clears enemies again, and the clients' "PARTY DOWN" line is
+        // cleared at once by an immediate wave broadcast). No-op when not wiped or off the host.
+        public void ServerResetWipe()
+        {
+            if (_nm == null || !_nm.IsServer || _wave != WaveState.Wiped) return;
+            _wave = WavesEnabled ? WaveState.Countdown : WaveState.Idle;
+            _waveTimer = 3f; _broadcastTimer = 0f;
+        }
+
         public void ServerClearEnemies()
         {
             foreach (Enemy e in new List<Enemy>(_alive))
@@ -429,10 +439,11 @@ namespace SleepingCalamity.Gameplay
                 _wipeTimer = 4f;
                 ServerClearEnemies();
             }
+            if (_wave == WaveState.Wiped && !WipeResetsParty && !PlayerVitals.AllDown(_party)) ServerResetWipe();   // wipe: somebody stands again (the dive reset the party)
             if (_wave == WaveState.Wiped)
             {
                 _wipeTimer -= dt;
-                if (_wipeTimer <= 0f)
+                if (_wipeTimer <= 0f && WipeResetsParty)
                 {
                     for (int i = 0; i < heroes.Count; i++)
                     {
