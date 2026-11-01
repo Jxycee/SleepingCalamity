@@ -63,7 +63,10 @@ namespace SleepingCalamity.Core
                 }
             }
             var vigs = new List<PlacedVignette>(); int dropped = 0;
-            foreach (CellarVignette v in VignetteDive.Select(layout.Seed, layout.Floor).Chosen)
+            // Floor 4 is the hand-built bakery set-piece: it keeps its socket dressing and atmosphere but shows no vignettes. The selection itself is
+            // untouched (still a pure replay of floors 1..N), so floors 1-3 pick exactly as before.
+            IReadOnlyList<CellarVignette> chosen = layout.IsStub ? System.Array.Empty<CellarVignette>() : VignetteDive.Select(layout.Seed, layout.Floor).Chosen;
+            foreach (CellarVignette v in chosen)
             {
                 PlacedVignette pv = Place(layout, v, socks, vigs);
                 if (pv != null) vigs.Add(pv); else dropped++;
