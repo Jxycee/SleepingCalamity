@@ -39,8 +39,23 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Rebuilt_IsAtLeastThreeTimesAsDenseAsRuined()
         {
-            int rb = In(DecoPreset.Rebuilt).Count(), ru = In(DecoPreset.Ruined).Count();
+            // the broken twins at Rebuilt spots stay a third or less; polish 2's lane wreck groups (AddLaneWrecks) come on top, at most 4 groups of 3
+            int rb = In(DecoPreset.Rebuilt).Count(), ru = In(DecoPreset.Ruined).Count(r => !r.Id.StartsWith("Clutter_Ru_Wreck"));
+            int wr = In(DecoPreset.Ruined).Count(r => r.Id.StartsWith("Clutter_Ru_Wreck"));
             Assert.GreaterOrEqual(rb, 3 * ru, "Rebuilt " + rb + " rows vs Ruined " + ru);
+            Assert.LessOrEqual(wr, 3 * HollowmereClutter.LaneWreckGroups, "wreck rows");
+        }
+
+        [Test]
+        public void Ruined_HasLaneWreckGroups_WithATippedCartEach()
+        {
+            var wrecks = In(DecoPreset.Ruined).Where(r => r.Id.StartsWith("Clutter_Ru_Wreck")).ToList();
+            var carts = wrecks.Where(r => r.Asset == "Handcart_Broken").ToList();
+            TestContext.WriteLine("Ruined " + In(DecoPreset.Ruined).Count() + " rows, Rebuilt " + In(DecoPreset.Rebuilt).Count() + ", wreck rows " + wrecks.Count + " in " + carts.Count + " groups");
+            Assert.GreaterOrEqual(carts.Count, 3, "lane wreck groups");
+            Assert.IsTrue(carts.All(r => r.Tilted), "every wreck cart is tipped");
+            Assert.GreaterOrEqual(wrecks.Count, carts.Count * 2, "each cart has at least one partner");
+            Assert.AreEqual(wrecks.Count, wrecks.Select(r => r.Id).Distinct().Count(), "wreck ids are unique");
         }
 
         [Test]
