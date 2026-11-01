@@ -1,11 +1,11 @@
 Session: Polish 3 (cloud, resumed): scarecrow colour + StairFlight UVs
 Job: (1) scarecrow colour story in Cap_HM_Allotment; (2) StairFlight wall UV offset (StairEntry pattern, 522018d)
 Progress: 85%
-Status: ROUNDS DONE: waiting for the merge lock (merge after M5 contents and procgen)
-Blocker: merge lock (merge after M5 contents and procgen)
+Status: APPROVED: waiting to merge after the procgen and Cellars floor art sessions land (both regenerate scenes)
+Blocker: merge order (after procgen + Cellars floor art)
 Archive: no
 Branch: claude/vibrant-heisenberg-csgj6z (continues claude/admiring-brahmagupta-0jjuph)
-Score: ~27/40 scarecrow (floor 25); StairFlight UV fix proven (no mirrored stone between the two walls in Stair_Turn)
+Score: coordinator APPROVED the final sheet at ~25-26/40 (own read ~27); StairFlight UV fix proven
 Sheet: Reference/hollowmere/polish3/polish3_final.jpg (Richter PD painting beside round 1 / round 2 Allotment crops; Kassel cellar stair photo beside Stair_Turn)
 SC RESULT: -
 Merge commit: -
@@ -21,3 +21,4 @@ Merge commit: -
 - Round 2 Cap_HM_Allotment (first attempt OOM-killed at ~10.6 GB, retry ok): coat 0.56/0.29/0.22, hat 0.82/0.79/0.42, face 0.24/0.26/0.22 (was 0.16). Clear story: red coat, yellow straw hat, light ochre + dark umber patches against green beds and grey wall. Max 2 rounds reached.
 - Known follow-up (no round left): the face still sits in the hat brim's midday shadow; fix in sc_garden.py scarecrow() by raising/narrowing the brim or tipping the head forward (re-export, tris about equal).
 - Undercroft stair capture (UndercroftStairCapture, 3 cameras, small scene): Stair_Turn frames both StairFlight walls; stone layouts differ left/right, no mirrored repeat. Stone still stretches along the slope (separate from this job).
+- Coordinator notes, not now: the round 2 head still renders dark grey (sheet label corrected), and the forms read a bit smooth and plastic.
