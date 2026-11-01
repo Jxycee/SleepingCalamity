@@ -176,7 +176,7 @@ namespace SleepingCalamity.Tests.EditMode
             TownLayout t = HollowmereLayout.Create();
             foreach (ClutterRow r in HollowmereClutter.Rows)
             {
-                var pad = new Footprint(new TownPoint(r.X, r.Z), r.SizeX + 2f * HollowmereClutter.Clearance, r.SizeZ + 2f * HollowmereClutter.Clearance, r.Yaw);
+                var pad = new Footprint(new TownPoint(r.X, r.Z), r.SizeX + 2f * HollowmereClutter.PathClearance, r.SizeZ + 2f * HollowmereClutter.PathClearance, r.Yaw);
                 foreach (PathNode n in t.Nodes) Assert.IsFalse(pad.Contains(new TownPoint(n.Pos.X, n.Pos.Z)), r.Id + " covers node " + n.Id);
                 foreach (PathEdge e in t.Edges) Assert.IsFalse(pad.SegmentCrosses(t.Node(e.A).Pos, t.Node(e.B).Pos), r.Id + " blocks edge " + e.A + "-" + e.B);
             }

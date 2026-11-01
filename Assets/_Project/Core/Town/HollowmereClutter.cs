@@ -56,6 +56,7 @@ namespace SleepingCalamity.Core
     public static class HollowmereClutter
     {
         public const float Clearance = HollowmereDressing.Clearance;   // gap kept between a footprint and any path node / edge
+        public const float PathClearance = 0.8f;       // gap kept between a ground row and any path node / edge: the hero's 0.8 m fit (also keeps front doorsteps clear)
         public const float StallMargin = HollowmereDressing.StallMargin;
         public const float MaxSlope = 0.35f;            // corner ground heights of a footprint may differ by this much
         public const float LaneMargin = 4f;             // beside a lane: within half its width plus this
@@ -403,7 +404,7 @@ namespace SleepingCalamity.Core
             else if (w.Side == 'R') { o = b.Right; a = b.Dir; }
             else { o = Pt(-b.Right.X, -b.Right.Z); a = b.Dir; }
             float half = f.Side * 0.5f;
-            return SearchAround(c, s, f.Centre + o * (half + w.U) + a * w.V, o, a, YawOf(o) + w.Yaw, f.Ring, f.Id, Reach, accepted, id);
+            return SearchAround(c, s, f.Centre + o * (half + w.U) + a * w.V, o, a, YawOf(o) + w.Yaw, f.Ring, f.Id, w.Asset == "Handcart" ? Reach + 1.5f : w.Asset == "SackStack" ? Reach + 1.0f : Reach, accepted, id);   // the cart and the sacks search wider for a spot 0.8 m clear of the paths
         }
 
         // The first spot that passes the rules, searched outward (nearest first) from baseP in steps along o (outward) and a (along the edge).
@@ -566,12 +567,13 @@ namespace SleepingCalamity.Core
         {
             TownLayout t = c.T;
             Footprint fp = FootprintOf(r), pad = Inflated(r, Clearance);
-            // path graph: the key rule
-            foreach (PathNode n in t.Nodes) if (pad.Contains(Pt(n.Pos.X, n.Pos.Z))) { e.Add(r.Id + " covers path node " + n.Id); if (first) return; }
+            // path graph: the key rule (a hero-sized gap, not the dressing gap)
+            Footprint pathPad = Inflated(r, PathClearance);
+            foreach (PathNode n in t.Nodes) if (pathPad.Contains(Pt(n.Pos.X, n.Pos.Z))) { e.Add(r.Id + " covers path node " + n.Id); if (first) return; }
             foreach (PathEdge ed in t.Edges)
             {
                 PathNode a = t.Node(ed.A), b = t.Node(ed.B);
-                if (a != null && b != null && pad.SegmentCrosses(a.Pos, b.Pos)) { e.Add(r.Id + " blocks path edge " + ed.A + "-" + ed.B); if (first) return; }
+                if (a != null && b != null && pathPad.SegmentCrosses(a.Pos, b.Pos)) { e.Add(r.Id + " blocks path edge " + ed.A + "-" + ed.B); if (first) return; }
             }
             foreach (Foundation f in t.Foundations)
             {
