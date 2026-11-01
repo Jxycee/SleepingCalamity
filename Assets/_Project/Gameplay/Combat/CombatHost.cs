@@ -4,6 +4,8 @@
 //    costs a pip once per swing), then applying damage, reactions, revenge and rewards through the Core models and sending the results back;
 //  - validating an enemy-hits-player report from the victim's client (the enemy is alive and that attack serial is the one it is performing, one hit per
 //    serial), then applying damage to the host-held HP;
+//  - hero abilities (Core AbilityEffects, placeholder numbers) on both host-side damage paths: a player's hit on an enemy (damage, fire, crit chance) and an
+//    enemy's hit on a hero (damage taken); the riposte window is timed from the host's own record of the victim's last parry;
 //  - each player's growth (their heirlooms, style ledger, pips), the healing drops, and the wave director (waves 1-4 tier 1, then tier 2).
 // Test hooks: AiEnabled, WavesEnabled, CritChance, SpawnEnemy, ServerJumpToWave.
 using System.Collections.Generic;
@@ -61,6 +63,7 @@ namespace SleepingCalamity.Gameplay
         private sealed class HostPlayerState
         {
             public int LastSwing = -1, HitsInSwing;
+            public double LastParryAt = double.NegativeInfinity;   // host clock of the hero's last successful parry (dagger_riposte window)
             public bool Rejected;   // this swing is a spell the host could not pay for: its hits are dropped
             public readonly HashSet<ulong> Hit = new HashSet<ulong>();
         }
@@ -111,6 +114,9 @@ namespace SleepingCalamity.Gameplay
         {
             if (hero == null || !hero.IsSpawned) return;
             PlayerGrowth g = Growth(hero.OwnerClientId);
+            // Every growth change (hit ABS, kill ABS, spell pips, build-up) ends in this call, so unlocks are checked here, for all weapons: a kill can credit
+            // a weapon other than the one in hand. Unlocks only grow. Not saved yet (WeaponsSave restore is M6).
+            foreach (WeaponState owned in g.Weapons.Values) g.Abilities.Update(owned);
             WeaponState w = g.Weapon(hero.WeaponKey);
             hero.ServerPushGrowth(hero.WeaponKey, w.Level, w.Abs, w.LevelCostNow, w.Stats.Atk, w.Stats.Fire, w.Stats.Pest, g.Pips.Current, g.Pips.Cap);
             hero.ServerPushTree(WeaponTreeSnapshot.From(w, WeaponTreeHost.AtWorkbench(hero.OwnerClientId)));   // M4 weapon-tree UI
@@ -203,6 +209,11 @@ namespace SleepingCalamity.Gameplay
                 CritRoll = _rng.NextFloat(),
                 CritChance = CritChance,
             };
+            float sinceParry = ps.LastParryAt > double.NegativeInfinity ? (float)(now - ps.LastParryAt) : -1f;
+            AbilityHitMods mods = AbilityEffects.OutgoingHit(g.Abilities, WeaponStyle.FamilyOf(weaponKey), attack.Kind, e.Def.IsPest, sinceParry);
+            input.AbilityDamageBonus = mods.DamageMult - 1f;
+            input.AbilityFire = mods.Fire;
+            if (input.CritChance > 0f) input.CritChance += mods.CritChance;   // a test that zeroes crits stays zeroed
             EnemyHitResult r = e.ServerApplyHit(input, attackerPos, now);
             if (r.Damage <= 0) return;
 
@@ -291,6 +302,8 @@ namespace SleepingCalamity.Gameplay
 
             int dmg = e.Model.AttackDamage(a, vitals.Model.Def);
             if (guarded) dmg = Mathf.Max(1, Mathf.CeilToInt(dmg * GuardMath.GuardedDamage - 1e-4f));
+            float ward = AbilityEffects.IncomingMult(Growth(victim.OwnerClientId).Abilities, WeaponStyle.FamilyOf(victim.WeaponKey));
+            if (ward < 1f) dmg = Mathf.Max(1, Mathf.CeilToInt(dmg * ward - 1e-4f));
             int lost = vitals.ServerDamage(dmg);
             victim.ServerBroadcastHurt(lost, guarded);
         }
@@ -302,6 +315,7 @@ namespace SleepingCalamity.Gameplay
             if (!_enemyHitDedupe.Add(DedupeKey(victim, serial))) return;
             e.ServerParried();
             victim.ServerBroadcastParry();
+            StateOf(victim.OwnerClientId).LastParryAt = Time.timeAsDouble;
             string weaponKey = victim.WeaponKey;
             if (WeaponStyle.FamilyOf(weaponKey) != WeaponFamily.Dagger) return;   // only the dagger and shield guards (P46)
             AbsGain gain = CombatRewards.OnParry(Growth(victim.OwnerClientId), weaponKey, e.NetworkObjectId.ToString());

@@ -16,6 +16,7 @@ using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Gameplay;
 using Unity.Multiplayer.Tools.NetworkSimulator.Runtime;
 using Unity.Netcode;
@@ -193,6 +194,42 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(clientEnemy.NetHp.Value, Is.EqualTo(115), "the client's copy shows it");
             Assert.That(c.ClientCombat.ComboCount, Is.EqualTo(1), "the attacker's own combo counted the hit");
             Assert.That(c.HostCombat.ComboCount, Is.EqualTo(0), "the host hero swung at nothing");
+        }
+
+        // Catches (M4): a hero ability looked up under the wrong client id, or a swing whose weapon never reaches the host. The CLIENT's hero sends the real
+        // SubmitHitServerRpc (private, called by reflection so the finisher needs no combo timing) for an axe finisher on two identical idle slimes: first
+        // with an empty book (control), then with axe_quake in the book the HOST keeps for that client (keyed by the client's OwnerClientId, not the host's).
+        // Crits are zeroed, so the host-applied damage differs by the ability alone (x1.30 at tier 2). Does not cover real input or the unlock itself.
+        [UnityTest]
+        public IEnumerator ClientFinisherHit_HostAppliesTheClientsUnlockedAbility()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+
+            ulong clientId = c.ClientNm.LocalClientId;
+            Vector3 pos = new Vector3(8f, 0f, 1.6f);
+            Enemy control = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, pos, ai: false);
+            Enemy boosted = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, pos, ai: false);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(control.NetworkObjectId)
+                                                         && c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(boosted.NetworkObjectId), Timeout, "the client never received the enemies");
+            Assert.That(c.Combat.Growth(clientId).Abilities.Has(AbilityEffects.Quake), Is.False);
+
+            System.Reflection.MethodInfo submit = typeof(HeroCombat).GetMethod("SubmitHitServerRpc", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(submit, Is.Not.Null, "HeroCombat.SubmitHitServerRpc");
+            byte axe = (byte)System.Array.IndexOf(AttackCatalog.Heirlooms, WeaponCatalog.Axe);
+            Vector3 from = new Vector3(8f, 0f, 0f);
+
+            submit.Invoke(c.ClientCombat, new object[] { 1, axe, (byte)AttackSet.Finisher, (byte)0, control.NetworkObjectId, (sbyte)-1, from, 0f });
+            yield return PlayModeHarness.WaitUntil(() => control.Model.Hp < control.Model.MaxHp, 3f, "the host never applied the control hit");
+            int plainDamage = control.Model.MaxHp - control.Model.Hp;
+
+            c.Combat.Growth(clientId).Abilities.Restore(new[] { AbilityEffects.Quake });
+            submit.Invoke(c.ClientCombat, new object[] { 2, axe, (byte)AttackSet.Finisher, (byte)0, boosted.NetworkObjectId, (sbyte)-1, from, 0f });
+            yield return PlayModeHarness.WaitUntil(() => boosted.Model.Hp < boosted.Model.MaxHp, 3f, "the host never applied the boosted hit");
+            int boostedDamage = boosted.Model.MaxHp - boosted.Model.Hp;
+
+            Assert.That(boostedDamage, Is.GreaterThan(plainDamage), "the client's axe_quake must raise the host-applied finisher damage");
+            Assert.That(boostedDamage, Is.EqualTo(Mathf.CeilToInt(plainDamage * 1.30f)).Within(2));
         }
 
         // ---- 2. an enemy attack on the client: judged by the client's dodge ----
