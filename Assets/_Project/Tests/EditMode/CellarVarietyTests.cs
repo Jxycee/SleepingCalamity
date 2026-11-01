@@ -28,6 +28,18 @@ namespace SleepingCalamity.Tests.EditMode
         // ---------------------------------------------------------------- sockets: chance and alternatives
 
         [Test]
+        public void Floor4_BakeryShowsNoVignettes_ButKeepsItsDressing()
+        {
+            foreach (uint seed in new uint[] { 0, 1, 12345, 0xC0FFEE12, uint.MaxValue })
+            {
+                CellarFloorDressing d = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, 4));
+                Assert.AreEqual(0, d.Vignettes.Count, "seed " + seed);
+                Assert.AreEqual(0, d.DroppedVignettes, "seed " + seed);
+                Assert.Greater(d.Sockets.Count, 0, "seed " + seed);
+            }
+        }
+
+        [Test]
         public void Socket_ChanceAndAlternativesSurviveRotation()
         {
             CellarRoom r = Combat(Good, new SocketSpec(SocketKind.Shelf, 0, 0, CellSide.South, Variants).Chance(40).Alt((2, 0)));
