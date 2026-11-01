@@ -135,8 +135,8 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var got = new ulong[4];
             for (int f = 1; f <= 3; f++) got[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(12345, f)).DressingHash();
-            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // re-pinned 2026-10-31 (procgen item 2: presets moved the placement, deliberate)
-            Assert.AreEqual(7289301962720901386UL, got[1], "floor 1; actual " + all); Assert.AreEqual(16695276620330047160UL, got[2], "floor 2; actual " + all); Assert.AreEqual(5435435391175835042UL, got[3], "floor 3; actual " + all);
+            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // re-pinned 2026-10-31 (procgen item 2: presets moved the placement, deliberate); floors 2-3 re-pinned by procgen 5 vignettes, deliberate
+            Assert.AreEqual(7289301962720901386UL, got[1], "floor 1; actual " + all); Assert.AreEqual(11353760107766476320UL, got[2], "floor 2; actual " + all); Assert.AreEqual(771539410711550091UL, got[3], "floor 3; actual " + all);
         }
 
         // ---------------------------------------------------------------- dressing statistics
@@ -269,7 +269,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Vignettes_PoolIsAuthoredSensibly()
         {
-            Assert.That(CellarVignettePool.All.Count, Is.InRange(4, 8));
+            Assert.That(CellarVignettePool.All.Count, Is.InRange(12, 20));
             Assert.AreEqual(CellarVignettePool.All.Count, CellarVignettePool.All.Select(v => v.Id).Distinct().Count());
             foreach (VignetteCategory c in Enum.GetValues(typeof(VignetteCategory))) Assert.IsTrue(CellarVignettePool.All.Any(v => v.Category == c), c + " has a vignette");
             foreach (CellarVignette v in CellarVignettePool.All) { Assert.GreaterOrEqual(v.Rarity, 2, v.Id); Assert.Greater(v.Props.Count, 1, v.Id); Assert.GreaterOrEqual(v.MinFloor, 1); }
@@ -297,9 +297,27 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(mean, Is.InRange(0.9, 1.5), "vignettes per floor");
             Assert.AreEqual(0, bare, "dives of floors 1-3 with no vignette (pity)");
             Assert.LessOrEqual(dropped, n * 3 / 50, "chosen vignettes without a legal cell (spawn cells are never used, so a few rooms have none; pity above keeps every dive at one or more)");
-            Assert.Greater(forcedFloors, 0, "the floor-3 guarantee fires for some seeds");
             foreach (VignetteCategory c in Enum.GetValues(typeof(VignetteCategory))) Assert.Greater(perCategory.GetValueOrDefault(c), 0, c + " never shown");
             TestContext.WriteLine("vignette mean per floor " + mean.ToString("F3") + ", forced floors " + forcedFloors + ", per category " + string.Join(" ", perCategory.OrderBy(k => (int)k.Key).Select(k => k.Key + "=" + k.Value)));
+        }
+
+        [Test]
+        public void Vignettes_Floor3Guarantee_ForcesOneWhenTheDiveWouldBeBare()
+        {
+            // The guarantee is a rare fallback with the 16-vignette pool: scan for a dive whose floors 1-2 drew nothing and whose floor-3 rolls hit nothing.
+            int found = 0; uint firstSeed = 0;
+            for (uint seed = 0; seed < 400000 && found < 3; seed++)
+            {
+                if (VignetteDive.Select(seed, VignetteDive.GuaranteeFloor).Forced)
+                {
+                    if (found++ == 0) firstSeed = seed;
+                    Assert.AreEqual(0, VignetteDive.Select(seed, 1).Chosen.Count, "forced dive " + seed + " floor 1");
+                    Assert.AreEqual(0, VignetteDive.Select(seed, 2).Chosen.Count, "forced dive " + seed + " floor 2");
+                    Assert.AreEqual(1, VignetteDive.Select(seed, VignetteDive.GuaranteeFloor).Chosen.Count, "forced floor draws exactly one");
+                }
+            }
+            Assert.Greater(found, 0, "no seed under 400000 reached the floor-3 guarantee: the fallback is untested; widen the scan or add a test hook");
+            TestContext.WriteLine("guarantee fired for " + found + " seeds, first " + firstSeed);
         }
 
         [Test]
