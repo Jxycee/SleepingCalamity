@@ -3,7 +3,8 @@
 #
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <command> [-OutDir <abs dir>] [-Filter <regex>] [-TimeoutMinutes <int>] [-ProjectRoot <abs dir>] [-Method <Class.Method>]
-#   <command> = compile | build | test-edit | test-play | check | exec
+#   <command> = compile | build | test-edit | test-play | check | gate | exec
+#   gate = compile + EditMode tests (no PlayMode, no port lock); records a fast-gate marker (sc-gate-pass) that the branch-push guard accepts. check stays the merge gate.
 #
 # OutDir defaults to $env:SC_OUT. It must be absolute, must not contain '..', and must be outside the repo.
 # ProjectRoot defaults to the checkout this script lives in (Tools\..), so <worktree>\Tools\unity.ps1 tests that worktree;
@@ -41,8 +42,8 @@ $PortLockPath = Join-Path ([IO.Path]::GetTempPath()) 'sc-unity-playmode.lock'
 $PortWaitMinutes = 120
 $LockFile    = Join-Path $ProjectRoot 'Temp\UnityLockfile'
 $ErrPattern  = 'error CS|Exception|Scripts have compiler errors|Compilation failed'
-$Commands    = @('compile', 'build', 'test-edit', 'test-play', 'check', 'exec')
-$UsageLine   = 'usage: unity.ps1 <compile|build|test-edit|test-play|check|exec> -OutDir <absolute scratch dir outside the repo> (or set SC_OUT) [-ProjectRoot <dir>] [-Method <Class.Method>]'
+$Commands    = @('compile', 'build', 'test-edit', 'test-play', 'check', 'gate', 'exec')
+$UsageLine   = 'usage: unity.ps1 <compile|build|test-edit|test-play|check|gate|exec> -OutDir <absolute scratch dir outside the repo> (or set SC_OUT) [-ProjectRoot <dir>] [-Method <Class.Method>]'
 
 function Say([string]$Text) {
     [Console]::Out.WriteLine($Text)
@@ -320,8 +321,20 @@ try {
 } catch { Say 'SC LFS checkout skipped (git lfs unavailable)' }
 
 $code = 1
+# Tree key of a commit's Unity content: the Assets, Packages and ProjectSettings tree ids joined with '-'
+# (`git rev-parse <rev>:Assets <rev>:Packages <rev>:ProjectSettings`). Pipe-free on purpose: PowerShell 5.1 re-encodes
+# native-to-native pipes. Must match unity.sh (write_marker) and .claude/hooks/guard.sh. Returns $null when unavailable.
+function Get-UnityTreeKey([string]$Rev = 'HEAD') {
+    try {
+        $lines = @(& git -C $ProjectRoot rev-parse "${Rev}:Assets" "${Rev}:Packages" "${Rev}:ProjectSettings" 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $lines.Count -ne 3) { return $null }
+        $t = @($lines | ForEach-Object { ([string]$_).Trim() })
+        foreach ($l in $t) { if ($l -notmatch '^[0-9a-f]{40}$') { return $null } }
+        return ($t -join '-')
+    } catch { return $null }
+}
 # After a check PASS, record the tested commit for the merge gate (.claude/hooks/guard.sh).
-function Write-PassMarker {
+function Write-PassMarker([string]$MarkerDir = 'sc-check-pass') {
     try {
         $sha = & git -C $ProjectRoot rev-parse HEAD 2>$null
         $common = & git -C $ProjectRoot rev-parse --git-common-dir 2>$null
@@ -332,16 +345,16 @@ function Write-PassMarker {
         $sha = ([string]$sha).Trim()
         $common = ([string]$common).Trim()
         if (-not [IO.Path]::IsPathRooted($common)) { $common = Join-Path $ProjectRoot $common }
-        $dir = Join-Path $common 'sc-check-pass'
+        $dir = Join-Path $common $MarkerDir
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         Set-Content -LiteralPath (Join-Path $dir $sha) -Value (Get-Date -Format o) -Encoding ASCII
-        # Also key the marker on the tree under Assets/ Packages/ ProjectSettings/ (the merge guard accepts a content-identical commit).
-        $tkey = (& git -C $ProjectRoot ls-tree HEAD -- Assets Packages ProjectSettings 2>$null | & git -C $ProjectRoot hash-object --stdin 2>$null)
-        if (-not [string]::IsNullOrEmpty($tkey)) {
-            $tdir = Join-Path $common 'sc-check-pass-tree'
+        # Also key the marker on the Unity trees (the guards accept a content-identical commit): "<dir>-tree/<key>".
+        $tkey = Get-UnityTreeKey 'HEAD'
+        if ($tkey) {
+            $tdir = Join-Path $common ($MarkerDir + '-tree')
             New-Item -ItemType Directory -Force -Path $tdir | Out-Null
-            Set-Content -LiteralPath (Join-Path $tdir ([string]$tkey).Trim()) -Value (Get-Date -Format o) -Encoding ASCII
-            Say ('SC MARKER tree ' + ([string]$tkey).Trim())
+            Set-Content -LiteralPath (Join-Path $tdir $tkey) -Value (Get-Date -Format o) -Encoding ASCII
+            Say ('SC MARKER tree ' + $tkey)
         }
         $dirty = & git -C $ProjectRoot status --porcelain --untracked-files=no 2>$null
         if ($dirty) { Say ('SC MARKER ' + $sha + ' (uncommitted changes were present; the marker covers the commit only)') }
@@ -358,6 +371,16 @@ switch ($Command) {
     'test-edit' { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
     'test-play' { $code = Invoke-Tests 'test-play' 'PlayMode' 'playmode.xml' }
     'exec'      { $code = Invoke-Exec }
+    'gate' {
+        $code = Invoke-Compile
+        if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
+        switch ($code) {
+            0       { Say 'SC RESULT gate PASS'; Write-PassMarker 'sc-gate-pass' }
+            2       { Say 'SC RESULT gate LOCKED (close the Unity editor, then rerun)' }
+            3       { Say 'SC RESULT gate TIMEOUT' }
+            default { Say 'SC RESULT gate FAIL' }
+        }
+    }
     'check' {
         $code = Invoke-Build
         if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
