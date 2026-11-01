@@ -14,12 +14,6 @@ namespace SleepingCalamity.Gameplay
         // replace this body when the town workbench lands.
         public static bool AtWorkbench(ulong clientId) => true;
 
-        public static WeaponTreeSnapshot Snapshot(CombatHost host, HeroCombat hero)
-        {
-            WeaponState w = host.Growth(hero.OwnerClientId).Weapon(hero.WeaponKey);
-            return WeaponTreeSnapshot.From(w, AtWorkbench(hero.OwnerClientId));
-        }
-
         // Host only. `arg` is an AttachmentKind for Fit / Remove and ignored otherwise. Returns whether the weapon changed.
         public static bool Apply(CombatHost host, HeroCombat hero, TreeAction action, int arg)
         {
@@ -34,7 +28,7 @@ namespace SleepingCalamity.Gameplay
                 case TreeAction.Reroute: changed = AtWorkbench(hero.OwnerClientId) && w.TryReroute(); break;
                 default: changed = false; break;
             }
-            host.ServerSyncGrowth(hero);   // always re-push, so a refused click also refreshes a stale panel
+            host.ServerSyncGrowth(hero, force: true);   // always re-push, so a refused click also refreshes a stale panel
             return changed;
         }
     }

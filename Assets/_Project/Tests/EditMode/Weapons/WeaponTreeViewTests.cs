@@ -10,6 +10,23 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
         static WeaponTreeView View(WeaponState w, bool bench = true) => WeaponTreeView.Build(WeaponTreeSnapshot.From(w, bench));
         static void LevelTo(WeaponState w, int level) { while (w.Level < level) w.AddAbs(w.LevelCostNow - w.Abs); }
 
+        // Catches: the host pushing the tree on every hit. SyncKey must ignore a small ABS gain and change on level, fitting and weapon.
+        [Test]
+        public void SyncKey_IgnoresAbsTicks_ButTracksLevelFittedAndWeapon()
+        {
+            var w = Axe();
+            string k0 = WeaponTreeSnapshot.From(w, true).SyncKey("axe");
+            w.AddAbs(1f);
+            Assert.That(WeaponTreeSnapshot.From(w, true).SyncKey("axe"), Is.EqualTo(k0), "ABS alone is carried by the growth mirror");
+            Assert.That(WeaponTreeSnapshot.From(w, true).SyncKey("sword"), Is.Not.EqualTo(k0), "a weapon swap");
+            Assert.That(WeaponTreeSnapshot.From(w, false).SyncKey("axe"), Is.Not.EqualTo(k0), "the workbench flag");
+            w.Fit(AttachmentKind.Ember);
+            string kFit = WeaponTreeSnapshot.From(w, true).SyncKey("axe");
+            Assert.That(kFit, Is.Not.EqualTo(k0), "a fitted attachment");
+            LevelTo(w, 1);
+            Assert.That(WeaponTreeSnapshot.From(w, true).SyncKey("axe"), Is.Not.EqualTo(kFit), "a level");
+        }
+
         [Test]
         public void FreshAxe_ShowsLevelAbsStatsAndEmptySlots_NothingEnabled()
         {

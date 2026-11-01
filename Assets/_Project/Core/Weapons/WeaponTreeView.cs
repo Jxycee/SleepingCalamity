@@ -19,6 +19,18 @@ namespace SleepingCalamity.Core.Weapons
         public float ProgressAtk, ProgressFire, ProgressPest;   // value / target base capped at 1; 1 for a stat the target does not ask for
         public string RestoredDefinitionId;             // what a re-route would turn the weapon back into (null when it cannot)
 
+        // Host side: what the tree shows beyond the growth mirror (weapon, definition, level, fitted attachments, flags, progress fractions at 1%). ABS and stats
+        // are left out on purpose: the growth mirror already carries them (HeroCombat.SyncGrowthOwnerRpc refreshes TreeMirror's), so a plain ABS tick needs no tree push.
+        public string SyncKey(string weaponKey)
+        {
+            var sb = new System.Text.StringBuilder(64);
+            sb.Append(weaponKey).Append('|').Append(DefinitionId).Append('|').Append(Level).Append('|').Append(RestoredDefinitionId).Append('|');
+            foreach (int f in Fitted ?? Array.Empty<int>()) sb.Append(f).Append(',');
+            sb.Append('|').Append(HasTarget ? 1 : 0).Append(BuildUpOpen ? 1 : 0).Append(CanReroute ? 1 : 0).Append(AtWorkbench ? 1 : 0);
+            sb.Append('|').Append((int)Math.Round(ProgressAtk * 100f)).Append(',').Append((int)Math.Round(ProgressFire * 100f)).Append(',').Append((int)Math.Round(ProgressPest * 100f));
+            return sb.ToString();
+        }
+
         // Host side: reads a WeaponState. `atWorkbench` is the host's AtWorkbench predicate (re-route is only allowed there).
         public static WeaponTreeSnapshot From(WeaponState w, bool atWorkbench)
         {

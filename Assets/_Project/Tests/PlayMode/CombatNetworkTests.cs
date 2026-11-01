@@ -379,9 +379,17 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.Fitted.Length == 2, Timeout, "the host never fitted the embers");
             Assert.That(hostAxe.Fitted.Count, Is.EqualTo(2), "the host's Core weapon holds them");
 
+            int pushesBefore = c.ClientCombat.TreePushes;
             c.ClientCombat.OwnerTreeAction(TreeAction.BuildUp);
-            yield return Seconds(0.5f);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreePushes > pushesBefore, Timeout, "the refused build-up never re-pushed the tree");
             Assert.That(hostAxe.DefinitionId, Is.EqualTo(Core.Weapons.WeaponCatalog.Axe), "build-up refused while the gate is closed (embers not yet absorbed)");
+
+            // A plain ABS tick changes nothing the tree shows beyond the growth mirror: no tree push, but the owner's tree still reads the new ABS.
+            pushesBefore = c.ClientCombat.TreePushes;
+            hostAxe.AddAbs(1f);
+            c.Combat.ServerSyncGrowth(clientOnHost);
+            yield return PlayModeHarness.WaitUntil(() => Mathf.Approximately(c.ClientCombat.TreeMirror.Abs, hostAxe.Abs), Timeout, "the growth mirror never refreshed the tree's ABS");
+            Assert.That(c.ClientCombat.TreePushes, Is.EqualTo(pushesBefore), "an ABS-only change must not push the tree");
 
             hostAxe.AddAbs(hostAxe.LevelCostNow - hostAxe.Abs);   // level 4 absorbs the embers: fire 10 of 9
             c.Combat.ServerSyncGrowth(clientOnHost);

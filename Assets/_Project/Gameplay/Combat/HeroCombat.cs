@@ -243,7 +243,7 @@ namespace SleepingCalamity.Gameplay
             if (index >= AttackCatalog.Heirlooms.Length || NetWeapon.Value == index) return;
             NetWeapon.Value = index;
             CombatHost host = CombatHost.Current;
-            if (host != null) host.ServerSyncGrowth(this);
+            if (host != null) host.ServerSyncGrowth(this, force: true);
         }
 
         // =================================================================================================================================
@@ -651,7 +651,7 @@ namespace SleepingCalamity.Gameplay
         private void RequestSyncServerRpc()
         {
             CombatHost host = CombatHost.Current;
-            if (host != null) host.ServerSyncGrowth(this);
+            if (host != null) host.ServerSyncGrowth(this, force: true);
         }
 
         // Host -> this hero's owner.
@@ -672,11 +672,14 @@ namespace SleepingCalamity.Gameplay
             _mirror.Pest = pest;
             _mirror.Pips = pips;
             _mirror.PipCap = pipCap;
+            // The tree is pushed only when its shape changes, so keep its ABS and stats current from this mirror (same weapon state, same level).
+            if (TreeMirror.Level == level) { TreeMirror.Abs = abs; TreeMirror.Stats = new WeaponStats(atk, fire, pest); }
         }
 
         // ---- Weapon tree (M4 UI). Host -> owner: the snapshot the tree shows. Owner -> host: a choice, applied by WeaponTreeHost on the host. ----
 
         public WeaponTreeSnapshot TreeMirror { get; private set; } = new WeaponTreeSnapshot();
+        public int TreePushes { get; private set; }   // how many tree snapshots the owner has received (tests wait on it)
 
         // Owner only (the arena's weapon-tree window). The host decides; the snapshot comes back through SyncTreeOwnerRpc.
         public void OwnerTreeAction(TreeAction action, int arg = 0)
@@ -702,6 +705,7 @@ namespace SleepingCalamity.Gameplay
         private void SyncTreeOwnerRpc(string definitionId, int level, float abs, float atk, float fire, float pest, int[] fitted, byte flags,
                                       float progAtk, float progFire, float progPest, string restoredId)
         {
+            TreePushes++;
             TreeMirror = new WeaponTreeSnapshot
             {
                 DefinitionId = definitionId, Level = level, Abs = abs, Stats = new WeaponStats(atk, fire, pest), Fitted = fitted ?? new int[0],
