@@ -1,11 +1,11 @@
-State: WORKING
+State: DONE
 Session: Local next: M5 spine (dive flow, floor transitions, sync objects in game)
-Progress: 85% (review fixes + kit + gate-key API done; check PASS 250aff0; main gained Asset commits, so re-merging main + re-check running)
-Status: built, in review
-Archive: not ready
+Progress: 100% (spine MERGED main e525a51; walk steps in USER_TODO 5439ece)
+Status: DONE
+Archive: ready
 Branch: claude/m5-spine (merges to main on its own green check, risk-reviewed; merges BEFORE the contents session)
-Last check: PASS 250aff0 (edit 815/815, play 42 pass 0 fail 8 skip); re-check after merging main running now
-Next step: on green re-check merge spine to main, add walk start steps to USER_TODO.md, tell contents session
+Last check: PASS 0d8b4e9 (after merging main: edit 827/827, play 45 pass 0 fail 8 skip)
+Next step: none for this session; contents session merges next (hooks: DiveDirector.Instance, RequireGateKey, ServerOpenStair(int floor), DiveStarted, FloorChanged(int), DiveEnded(reason); DiveHaulSync.Banked, DiveFailed, EncounterPlan/EncounterChanged). M6: Hollowmere/Undercroft as the session entry.
 Sheet: none
 Needs: none (Hollowmere entry -> M6, coordinator)
 Blocker: none
@@ -28,4 +28,5 @@ Mine: DiveHaulSync, CellarFloorSync, DiveState, dive bootstrap/scene, stair/chec
 - Gaps: Hollowmere not a session scene (decision above); floors flat greybox (Kit null at runtime, fixing); no enemies/keys/loot (contents session); out-of-range stair press silent; interact key not in PlayMode tests.
 
 ## Handoff notes
+Done: spine merged e525a51 (check PASS 0d8b4e9). Nothing open here.
 If this session stops: risk review of claude/m5-spine is the open step; then wire the kit, merge origin/main, one check (wrapper with -ProjectRoot the spine worktree C:\Dev\SleepingCalamity\.claude\worktreesgent-a1996cefce57949ad, -TimeoutMinutes 30), merge commit to main, tell the contents session.
