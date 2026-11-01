@@ -26,7 +26,7 @@ Collision and layout bugs from the traversal scan (rebuilt buildings, chests and
    - Melee hit checks are range + cone + height only, with no wall test, both for the hero's swings (`HeroCombat.cs:382-412`) and for incoming hits (`HeroCombat.cs:525-542`, `HitGeometry.cs:43-52`). Only the bow checks walls.
    - Repro: open a room so it spawns, step into the corridor, and get hit through the doorframe.
    - Owner: enemy AI.
-3. **After the floor-2 checkpoint is banked, floors 1-2 are gone for the rest of the session** (major, seen + verified).
+3. **After the floor-2 checkpoint is banked, floors 1-2 are gone for good (the session, and since M6 S2 the world save: `DiveState.RestoreProgress` restores `CheckpointReached`)** (major, seen + verified).
    - In tough seed 7, the second dive after going home started on floor 3.
    - Cause: `DiveRoute.StartFloor(CheckpointReached)` (`DiveDirector.cs:106`, `DiveRoute.cs:11`). `CheckpointReached` is never cleared, and there is no floor choice.
    - This contradicts PHASE1 7.2 ("nothing is missable"; a return dive *may* start at the checkpoint). Any piece or chest missed on floors 1-2 is lost.
