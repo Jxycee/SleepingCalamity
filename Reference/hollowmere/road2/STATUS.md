@@ -2,15 +2,15 @@
 
 Session: Saltwake road 2 (Q15 follow-up) (resumed in cloud session claude/vibrant-bell-ujeedj)
 Job: fix Q15's three accepted gaps plus the low cameras' bare horizon: (1) RoadOut Rebuilt view blocked by a house; (2) flat haze strip behind the tree line; (3) low-sun ridges flat orange; (4) low town cameras (Cap_HM_Ruins) get a backdrop tree line
-Progress: 80% (r1 APPROVED by the coordinator ~26-27/40, final round; waiting for the merge turn)
-Status: CHECKING (merge turn: main merged incl. procgen 3; build + check running)
+Progress: 100%
+Status: DONE
 Blocker: none
-Archive: no
+Archive: ready
 Branch: claude/vibrant-bell-ujeedj (resumes claude/fervent-sagan-bzpbbq, WIP merged in cb750c1)
 Score: r1 APPROVED by the coordinator ~26-27/40 (my own read 27/40); no more rounds
 Sheet: Reference/hollowmere/road2/road2_final.jpg (reference column + RoadOut/RoadBack/Ruins, Ruined midday / Rebuilt midday / Rebuilt low sun)
-SC RESULT: -
-Merge commit: -
+SC RESULT: SC RESULT check PASS on fbc1f04 (build PASS; test-edit 904/904, test-play 61 passed / 8 skipped / 0 failed); merge tree == checked tip plus main's handoff-only commit dcdf91d (CURRENT.md, outside Assets)
+Merge commit: a6b72f2 (main, no-ff)
 
 ## Notes (2026-11-01)
 - The house in the RoadOut Rebuilt frame is R3_01 (M lot, 22 m along the Saltwake Road, south side, BuildingKind.Home), not R3_02 (already an allotment in RebuiltGardens). It sits on the camera's exact bearing (about 24 deg south of west from the camera).
@@ -23,3 +23,4 @@ Merge commit: -
 - r1 APPROVED by the coordinator (session 6), no more rounds; round 2 agent stopped before any commit. Final sheet road2_final.jpg. Noted, not now (PARKING_LOT): at low sun the R3_02 house face and the gate bank slab go saturated orange.
 - Next (my turn after procgen item 4 and Polish 3b): merge origin/main, regenerate Hollowmere with a -nographics build, one `unity.sh check`, merge on PASS, STATUS DONE + Archive: ready.
 - 08:44 UTC: origin/main merged once more (procgen item 3, 81e0281); scenes regenerating with the builder (-nographics), then one check.
+- DONE: merged to main as a6b72f2 after check PASS on fbc1f04 (main merged incl. procgen 1d and 3, scenes regenerated -nographics). Session stops; Archive: ready.
