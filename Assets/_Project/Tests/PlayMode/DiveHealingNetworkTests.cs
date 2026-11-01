@@ -100,6 +100,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => clientNm.SpawnManager.SpawnedObjects.ContainsKey(floorObj.NetworkObjectId) && clientNm.SpawnManager.SpawnedObjects.ContainsKey(haulObj.NetworkObjectId), Timeout, "the client never received the sync objects");
             DiveHaulSync peerHaul = clientNm.SpawnManager.SpawnedObjects[haulObj.NetworkObjectId].GetComponent<DiveHaulSync>();
             CellarFloorSync peerFloor = clientNm.SpawnManager.SpawnedObjects[floorObj.NetworkObjectId].GetComponent<CellarFloorSync>();
+            peerHaul.FloorSync = peerFloor;   // one process holds both peers' floor syncs: pin the client's so it never finds the host's
 
             const float Recharge = 3f;
             Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);

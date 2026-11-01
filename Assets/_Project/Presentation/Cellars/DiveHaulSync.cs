@@ -64,7 +64,15 @@ namespace SleepingCalamity.Presentation
         private HealingPointState _heal;                        // host only; the current floor's point
         private uint _healSeed; private int _healFloor;        // host only: which built floor _heal belongs to
 
-        public CellarFloorSync FloorSync;   // optional; found in the scene when null. Used only for the bank position check.
+        public CellarFloorSync FloorSync;   // optional; found in the scene when null. Used for the bank position check, the healing point and its orb.
+        private float _nextFloorLookup;     // the scene search runs at most once a second while no floor sync exists (town, haul-only tests)
+
+        private void ResolveFloorSync()
+        {
+            if (FloorSync != null || Time.unscaledTime < _nextFloorLookup) return;
+            _nextFloorLookup = Time.unscaledTime + 1f;
+            FloorSync = FindFirstObjectByType<CellarFloorSync>();
+        }
 
         public Summary Current => Net.Value;
         // Host only; null on clients.
@@ -89,9 +97,9 @@ namespace SleepingCalamity.Presentation
         // Host only: the stir countdown runs on the host clock, and the player factor follows who is connected right now.
         private void Update()
         {
+            if (Host) TickHealingPoint(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             if (IsSpawned) ShowHealingOrb();
             if (!Host) return;
-            TickHealingPoint(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             _state.Stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
             bool failed = _state.Tick(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             Publish();
@@ -170,7 +178,7 @@ namespace SleepingCalamity.Presentation
         private bool TryHealWorldPosition(out Vector3 pos)
         {
             pos = default;
-            if (FloorSync == null) FloorSync = FindFirstObjectByType<CellarFloorSync>();
+            ResolveFloorSync();
             CellarFloorSync fs = FloorSync;
             if (fs == null || fs.Built == null || fs.Built.Root == null || !fs.Built.HealingCell.HasValue || fs.BuiltFloor != _state.CurrentFloor) return false;
             CellPos cell = fs.Built.HealingCell.Value;
@@ -209,7 +217,7 @@ namespace SleepingCalamity.Presentation
         // Every peer: the orb over the healing point is lit while the point is ready.
         private void ShowHealingOrb()
         {
-            if (FloorSync == null) FloorSync = FindFirstObjectByType<CellarFloorSync>();
+            ResolveFloorSync();
             CellarFloorSync fs = FloorSync;
             if (fs == null || fs.Built == null || fs.Built.HealingOrb == null) return;
             bool ready = NetHealSecondsLeft.Value <= 0;
@@ -246,7 +254,7 @@ namespace SleepingCalamity.Presentation
         private bool TryBankWorldPosition(out Vector3 pos)
         {
             pos = default;
-            if (FloorSync == null) FloorSync = FindFirstObjectByType<CellarFloorSync>();
+            ResolveFloorSync();
             CellarFloorSync fs = FloorSync;
             if (fs == null || fs.Layout == null || fs.Built == null || fs.Built.Root == null || !fs.Layout.BankCell.HasValue) return false;
             if (fs.BuiltFloor != _state.CurrentFloor) return false;   // the built floor lags or leads the dive floor: no cell to trust, skip the range check
