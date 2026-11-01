@@ -1474,7 +1474,7 @@ if __name__ == '__main__':   # importable: sc_bell_tower.py and sc_townhouse.py 
         bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, (VARIANT or 'FacadeKit') + '.fbx'), use_selection=True, axis_forward='-Z',
                                  axis_up='Y', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,
                                  mesh_smooth_type='FACE', add_leaf_bones=False,
-                                 colors_type='LINEAR')   # 'wear' is a linear mask; the default SRGB would gamma-encode it
+                                 colors_type='LINEAR', path_mode='STRIP')   # 'wear' is a linear mask; the default SRGB would gamma-encode it
     if '--no-render' not in argv:
         cam = review_scene(root, variant=bool(VARIANT))
         if '--blend' in argv:

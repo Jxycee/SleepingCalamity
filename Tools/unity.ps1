@@ -313,6 +313,12 @@ if (-not (Test-Path -LiteralPath $UnityExe)) {
 $OutDir = $outFull
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
+# A fresh worktree holds LFS pointer stubs and the first Unity run fails on texture import: materialise them first.
+try {
+    & git -C $ProjectRoot lfs checkout *> $null
+    if ($LASTEXITCODE -eq 0) { Say 'SC LFS checkout done' } else { Say 'SC LFS checkout failed (LFS files may be pointers)' }
+} catch { Say 'SC LFS checkout skipped (git lfs unavailable)' }
+
 $code = 1
 # After a check PASS, record the tested commit for the merge gate (.claude/hooks/guard.sh).
 function Write-PassMarker {
@@ -329,6 +335,14 @@ function Write-PassMarker {
         $dir = Join-Path $common 'sc-check-pass'
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         Set-Content -LiteralPath (Join-Path $dir $sha) -Value (Get-Date -Format o) -Encoding ASCII
+        # Also key the marker on the tree under Assets/ Packages/ ProjectSettings/ (the merge guard accepts a content-identical commit).
+        $tkey = (& git -C $ProjectRoot ls-tree HEAD -- Assets Packages ProjectSettings 2>$null | & git -C $ProjectRoot hash-object --stdin 2>$null)
+        if (-not [string]::IsNullOrEmpty($tkey)) {
+            $tdir = Join-Path $common 'sc-check-pass-tree'
+            New-Item -ItemType Directory -Force -Path $tdir | Out-Null
+            Set-Content -LiteralPath (Join-Path $tdir ([string]$tkey).Trim()) -Value (Get-Date -Format o) -Encoding ASCII
+            Say ('SC MARKER tree ' + ([string]$tkey).Trim())
+        }
         $dirty = & git -C $ProjectRoot status --porcelain --untracked-files=no 2>$null
         if ($dirty) { Say ('SC MARKER ' + $sha + ' (uncommitted changes were present; the marker covers the commit only)') }
         else { Say ('SC MARKER ' + $sha) }

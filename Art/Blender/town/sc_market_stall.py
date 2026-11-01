@@ -77,7 +77,7 @@ if '--combine' in argv:
     for o in bpy.context.scene.objects: o.select_set(True)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, root.name + '.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
                              apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, object_types={'MESH'},
-                             mesh_smooth_type='FACE', add_leaf_bones=False)
+                             mesh_smooth_type='FACE', add_leaf_bones=False, path_mode='STRIP')
     print('COMBINED', os.path.join(OUT, root.name + '.fbx')); sys.exit(0)
 TEX = os.path.join(REPO, 'Art', 'Textures', 'B1_town')
 TILE = 2.0          # metres per tileable repeat (1024 px/m on a 2048 tile)
@@ -1467,7 +1467,7 @@ if '--export' in argv and STALL and VARIANT:
 elif '--export' in argv and STALL:
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, NAME + '.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
                              apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True,   # identity root in Unity, like B4/B6
-                             mesh_smooth_type='FACE', add_leaf_bones=False)
+                             mesh_smooth_type='FACE', add_leaf_bones=False, path_mode='STRIP')
 
 # ----------------------------------------------------------------------------- corner proxies, light, cameras
 if '--no-render' in argv:

@@ -102,6 +102,16 @@ while IFS= read -r seg; do
             last="${args[${#args[@]}-1]}"
             case " ${args[*]} " in *" -b "*|*" -c "*|*" -- "*) ;; *) [ -n "$last" ] && [ "${last#-}" = "$last" ] && branch="$last" ;; esac
             ;;
+        commit)
+            # A commit that touches only Reference/**/STATUS.md must be a milestone (session-usage.md: no STATUS-only commits).
+            files=$(git diff --cached --name-only 2>/dev/null)
+            case " ${args[*]} " in *" -a "*|*" -am "*|*" -a"[a-z]*|*" --all "*) files=$(printf '%s\n%s' "$files" "$(git diff --name-only 2>/dev/null)") ;; esac
+            files=$(printf '%s\n' "$files" | sed '/^$/d')
+            if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -Evq '^Reference/.*STATUS\.md$'; then
+                printf '%s' "$cmd" | grep -q 'STATUS milestone:' \
+                    || block "this commit touches only Reference/**/STATUS.md. Batch STATUS lines into real commits (.claude/rules/session-usage.md); a STATUS-only commit is allowed only at a milestone, with a message starting \"STATUS milestone:\"."
+            fi
+            ;;
         push)
             for word in "${args[@]}"; do
                 case "$word" in
@@ -125,11 +135,14 @@ while IFS= read -r seg; do
                 esac
                 sha=$(git rev-parse --verify --quiet "$word^{commit}" 2>/dev/null) || continue
                 [ -f "$common/sc-check-pass/$sha" ] && continue
+                # Same content under the Unity paths as a checked commit (tree-keyed marker, written by unity.sh/unity.ps1 check).
+                tkey=$(git ls-tree "$sha" -- Assets Packages ProjectSettings 2>/dev/null | git hash-object --stdin 2>/dev/null)
+                [ -n "$tkey" ] && [ -f "$common/sc-check-pass-tree/$tkey" ] && continue
                 # Art-only or docs-only merge: no check needed. A failed diff (no merge base in a shallow clone) falls through.
                 if unity=$(git diff --name-only "main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) && [ -z "$unity" ]; then
                     continue
                 fi
-                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Check out that commit in C:\\Dev\\SleepingCalamity (not a worktree) and run Tools/unity.ps1 check, or in the cloud run bash Tools/cloud/unity.sh check (both write $common/sc-check-pass/$sha), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
+                block "no passing 'Tools/unity.ps1 check' recorded for $word ($sha), and it changes files under Assets/, Packages/ or ProjectSettings/. Check out that commit in C:\\Dev\\SleepingCalamity (not a worktree) and run Tools/unity.ps1 check, or in the cloud run bash Tools/cloud/unity.sh check (both write $common/sc-check-pass/$sha and a tree-keyed marker in sc-check-pass-tree), then merge. If the user explicitly waives the check for this merge, create that marker file by hand and tell them."
             done
             ;;
     esac
