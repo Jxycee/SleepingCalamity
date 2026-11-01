@@ -165,7 +165,7 @@ namespace SleepingCalamity.EditorTools
             foreach (FloorChest c in l.Chests)
             {
                 Transform ct = CellarFloorBuilder.FindChest(root, c);
-                Target(CellarFloorBuilder.ChestName(c), c.HoldsKey ? "KeyChest" : "Chest", ct != null ? ct.position : Cell(c.X, c.Y), 1.6f, c.RoomIndex == lockedRoom);
+                Target(CellarFloorBuilder.ChestName(c), c.HoldsKey ? "KeyChest" : "Chest", ct != null ? ct.position : Cell(c.X, c.Y), 1.6f, lockedRoom >= 0 && c.RoomIndex == lockedRoom);
             }
             if (l.Carrier != null) Target("GateKeyCarrier", "GateKey", Cell(l.Carrier.X, l.Carrier.Y), 1.4f);
             Transform gate = CellarFloorBuilder.FindGate(root);

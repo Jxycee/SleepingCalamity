@@ -106,12 +106,13 @@ namespace SleepingCalamity.EditorTools
             NavMesh.RemoveAllNavMeshData();
             Physics.SyncTransforms();
 
+            WalkGrid open = null;
             // ---------------------------------------------------------------- reachability (open pass first, for targets behind a locked door)
             if (space.Locks.Count > 0 && space.Targets.Any(t => t.BehindLock))
             {
                 foreach (GameObject g in space.Locks) if (g != null) g.SetActive(false);
                 Physics.SyncTransforms();
-                WalkGrid open = BakeGrid(space, hero, opt, physMask, visLayer, out _);
+                open = BakeGrid(space, hero, opt, physMask, visLayer, out _);
                 foreach (TraversalTarget t in space.Targets.Where(t => t.BehindLock)) Reach(open, t);
                 foreach (GameObject g in space.Locks) if (g != null) g.SetActive(true);
                 Physics.SyncTransforms();
@@ -141,7 +142,7 @@ namespace SleepingCalamity.EditorTools
                 if (opt.Full)
                 {
                     GridPass(res, grid, hero, physMask, visMask);
-                    Islands(res, grid, hero, physMask);
+                    Islands(res, grid, open, hero, physMask);
                     Stairs(res, grid, hero);
                     KeepClearZones(res, hero, physMask, visMask);
                     Oversized(res, visLayer);
@@ -290,6 +291,8 @@ namespace SleepingCalamity.EditorTools
 
         public static bool IsSoft(Renderer r)
         {
+            // Cellars greybox markers (entry starts, stair exit, bank, healing point, carrier, baker, warden) are placeholders, not props; chests are real
+            if (r.transform.parent != null && r.transform.parent.name == "Markers" && !r.name.StartsWith("Chest_") && !r.name.StartsWith("KeyChest_")) return true;
             string path = TraversalSources.HierarchyPath(r.transform, 5).ToLowerInvariant();
             foreach (string t in SoftTokens) if (path.Contains(t)) return true;
             foreach (Material m in r.sharedMaterials)
@@ -499,37 +502,54 @@ namespace SleepingCalamity.EditorTools
                         continue;
                     }
                     // open space the NavMesh doesn't cover: a gap the eye reads as passable but the capsule can't fit (walkable ground on two opposite sides)
-                    if (OppositeMain(g, x, z, gp.y, hero.StepOffset, 4))
+                    int axis = OppositeMain(g, x, z, gp.y, hero.StepOffset, 4, gp, hero, physMask, out float tw);
+                    if (axis >= 0)
                     {
-                        float w = WidthAt(gp, hero, physMask);
-                        if (w < hero.Diameter && w > 0.3f)
+                        if (tw < hero.Diameter && tw > 0.3f)
                         {
                             g.Flags[i] |= WalkGrid.FTight;
-                            Issue(res, IssueKind.TightGap, gp, w, hero.Diameter, $"gap {w:0.00} m wide between walkable areas: looks passable, the capsule needs {hero.Diameter:0.00} m", BodyOverlap(gp, hero, 0.45f, physMask), "gap");
+                            Issue(res, IssueKind.TightGap, gp, tw, hero.Diameter, $"gap {tw:0.00} m wide between walkable areas: looks passable, the capsule needs {hero.Diameter:0.00} m", BodyOverlap(gp, hero, 0.45f, physMask), "gap");
                         }
                     }
                 }
         }
 
-        static bool OppositeMain(WalkGrid g, int x, int z, float y, float tol, int reach)
+        // An axis with walkable main-area floor on both sides of (x, z) whose perpendicular free width is the narrowest: a gap between two walkable areas
+        // (an inside corner has floor on both diagonal sides too, but open floor along the perpendicular, so it doesn't count). -1 when there is none.
+        static int OppositeMain(WalkGrid g, int x, int z, float y, float tol, int reach, Vector3 p, HeroCapsule hero, int mask, out float width)
         {
             int[,] axes = { { 1, 0 }, { 0, 1 }, { 1, 1 }, { 1, -1 } };
+            int[] perp = { 1, 0, 3, 2 };
+            width = float.PositiveInfinity; int best = -1;
             for (int a = 0; a < 4; a++)
             {
-                bool p = false, m = false;
-                for (int k = 1; k <= reach && !(p && m); k++)
+                bool pp = false, m = false;
+                for (int k = 1; k <= reach && !(pp && m); k++)
                 {
                     int px = x + axes[a, 0] * k, pz = z + axes[a, 1] * k, mx = x - axes[a, 0] * k, mz = z - axes[a, 1] * k;
-                    if (!p && g.In(px, pz) && g.LayerNear(g.Index(px, pz), y, tol + 0.5f, out _) == g.Main) p = true;
+                    if (!pp && g.In(px, pz) && g.LayerNear(g.Index(px, pz), y, tol + 0.5f, out _) == g.Main) pp = true;
                     if (!m && g.In(mx, mz) && g.LayerNear(g.Index(mx, mz), y, tol + 0.5f, out _) == g.Main) m = true;
                 }
-                if (p && m) return true;
+                if (!(pp && m)) continue;
+                int q = perp[a];
+                var dir = new Vector3(axes[q, 0], 0f, axes[q, 1]).normalized;
+                float w = WidthAlong(p, dir, hero, mask);
+                if (w < width) { width = w; best = a; }
             }
-            return false;
+            return best;
+        }
+
+        static float WidthAlong(Vector3 p, Vector3 dir, HeroCapsule hero, int mask)
+        {
+            const float rr = 0.05f, max = 3f;
+            Vector3 a = p + Vector3.up * (hero.StepOffset + rr), b = p + Vector3.up * (hero.Height - rr);
+            float d1 = Physics.CapsuleCast(a, b, rr, dir, out RaycastHit h1, max, mask, QueryTriggerInteraction.Ignore) ? h1.distance + rr : max;
+            float d2 = Physics.CapsuleCast(a, b, rr, -dir, out RaycastHit h2, max, mask, QueryTriggerInteraction.Ignore) ? h2.distance + rr : max;
+            return d1 + d2;
         }
 
         // ---------------------------------------------------------------------------------------------------------------- islands and stuck pockets
-        static void Islands(ScanResult res, WalkGrid g, HeroCapsule hero, int physMask)
+        static void Islands(ScanResult res, WalkGrid g, WalkGrid open, HeroCapsule hero, int physMask)
         {
             if (g.Main < 0) return;
             var cells = new Dictionary<int, List<(int x, int z, float y)>>();
@@ -588,6 +608,7 @@ namespace SleepingCalamity.EditorTools
                 }
                 if (stuck) { foreach (var c in list) g.Flags[g.Index(c.x, c.z)] |= WalkGrid.FStuck; continue; }
                 foreach (var c in list) g.Flags[g.Index(c.x, c.z)] |= WalkGrid.FIsland;
+                if (open != null && open.Main >= 0 && open.W == g.W && list.Count(c => open.HasMain(g.Index(c.x, c.z))) * 2 > list.Count) continue;   // behind a locked door: reachable once it opens
                 if (Mathf.Abs(medY - expG) < 0.35f && area >= 1.5f)
                 {
                     res.Islands++;
