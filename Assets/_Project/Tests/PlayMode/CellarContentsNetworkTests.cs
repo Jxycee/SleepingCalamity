@@ -70,7 +70,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
         }
 
-        private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default)
+        private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default, uint? seedOverride = null, int startFloor = 1)
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
@@ -95,11 +95,11 @@ namespace SleepingCalamity.Tests.PlayMode
             c.HostId = c.HostNm.LocalClientId; c.ClientId = client.NetworkManager.LocalClientId;
             c.Contents.PlayersOverride = list => { foreach (KeyValuePair<ulong, Vector3> kv in c.Players) list.Add(new CellarContentsSync.PlayerPos { ClientId = kv.Key, Position = kv.Value }); };
 
-            c.Seed = FindSeed();
+            c.Seed = seedOverride ?? FindSeed();
             Assert.That(c.Haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
-            Assert.That(c.Haul.ServerSetFloor(1), Is.True);
-            Assert.That(c.Floor.ServerSetFloor(c.Seed, 1), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => c.Peer.FloorSync.Built != null && c.Peer.FloorSync.BuiltFloor == 1 && c.Peer.PieceCount > 0 && c.Contents.PieceCount > 0, Timeout, "floors were not built");
+            Assert.That(c.Haul.ServerSetFloor(startFloor), Is.True);
+            Assert.That(c.Floor.ServerSetFloor(c.Seed, startFloor), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.FloorSync.Built != null && c.Peer.FloorSync.BuiltFloor == startFloor && c.Peer.PieceCount > 0 && c.Contents.PieceCount > 0, Timeout, "floors were not built");
             c.Layout = c.Floor.Layout;
             done(c);
         }
@@ -384,6 +384,49 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(c.Haul.ServerFailDive(), Is.True);
             yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.LeftFloor1 == 2, Timeout, "the failed dive did not return the piece");
             yield return PlayModeHarness.WaitUntil(() => c.Peer.PieceVisible(0), Timeout, "the piece did not reappear on the client");
+        }
+
+        private static bool NearRing(Ctx c, CellPos[] ring, Enemy e)
+        {
+            foreach (CellPos cell in ring)
+            {
+                Vector3 w = Cell(c, cell.X, cell.Y);
+                if (Vector2.Distance(new Vector2(e.transform.position.x, e.transform.position.z), new Vector2(w.x, w.z)) < 2.5f) return true;
+            }
+            return false;
+        }
+
+        // procgen 3b: on an Ambush floor the ambush room's enemies spring after FloorTwistTuning.AmbushDelaySeconds at CellarAmbush cells, and the client sees them.
+        [UnityTest]
+        public IEnumerator AmbushFloor_EnteringTheAmbushRoom_SpawnsAtRingCellsAfterTheDelay_ClientSeesThem()
+        {
+            uint seed = 0; int floor = 0;
+            for (uint s = 1; s < 3000 && floor == 0; s++)
+                for (int f = 2; f <= 3 && floor == 0; f++)
+                    if (CellarFloorRoster.TwistOf(s, f) == FloorTwist.Ambush) { seed = s; floor = f; }
+            Assert.That(floor, Is.Not.EqualTo(0), "no Ambush floor in 3000 seeds");
+            Ctx c = null; yield return Setup(x => c = x, default, seed, floor);
+            CellarFloorDressing dressing = c.Floor.Built.Dressing;
+            DiveHaulSync.Summary sum = c.Haul.Current;
+            CellarEncounterPlan plan = c.Haul.EncounterPlan ?? CellarEncounterPlan.BuildForDive(c.Layout, dressing, sum.ExtraEnemiesPerRoom, sum.HunterLatched);
+            Assert.That(plan.Twist, Is.EqualTo(FloorTwist.Ambush));
+            int room = plan.AmbushRoom; int expected = plan.CountIn(room);
+            Assert.That(expected, Is.GreaterThan(0));
+            CellPos[] ring = CellarAmbush.Cells(c.Layout, dressing, plan, room);
+            PlacedRoom pr = c.Layout.Rooms[room];
+
+            c.Players[c.HostId] = Cell(c, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].X : pr.X, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].Y : pr.Y) + Vector3.forward * 0.1f;
+            float t0 = Time.time;
+            for (int i = 0; i < 5; i++) yield return null;
+            Assert.That(Time.time - t0, Is.LessThan(FloorTwistTuning.AmbushDelaySeconds * 0.5f), "the frames before the delay check must stay well inside the delay");
+            Assert.That(c.Contents.EnterEnemyCount(room), Is.EqualTo(0), "nothing springs before the delay");
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected, Timeout, "the ambush enemies did not spring");
+            float springAt = Time.time;   // the host spawned them this frame or the one before: positions are still the spawn cells
+            Assert.That(springAt - t0, Is.GreaterThanOrEqualTo(FloorTwistTuning.AmbushDelaySeconds - 0.1f), "the ambush sprang before the delay ran out");
+            Assert.That(EnemiesOn(c.HostNm).Count, Is.EqualTo(expected));
+            foreach (Enemy e in EnemiesOn(c.HostNm)) Assert.That(NearRing(c, ring, e), Is.True, "a host ambush enemy stands near one of the ring cells right after the spawn");
+            yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.Client.NetworkManager).Count == expected, Timeout, "the client does not see the ambush enemies");
+            foreach (Enemy e in EnemiesOn(c.Client.NetworkManager)) Assert.That(NearRing(c, ring, e), Is.True, "a client ambush enemy stands near one of the ring cells");
         }
     }
 }
