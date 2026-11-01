@@ -162,6 +162,12 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || piecesPerFloor == null) return false;
             _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
+        // Host only: runs with a dive state rebuilt from the world save (banked haul, pieces already home, cleared floors; TownStock.Restore) instead of a fresh one.
+        public bool ServerAdopt(DiveState restored)
+        {
+            if (!IsServer || !IsSpawned || restored == null) return false;
+            _state = restored; _heal = null; Publish(); return true;
+        }
         public bool ServerAddPiece(int pieceId) { if (!Host || !_state.Haul.AddPiece(pieceId)) return false; Publish(); return true; }
         public bool ServerAddLoot(int itemId, int count) { if (!Host || !_state.Haul.AddLoot(itemId, count)) return false; Publish(); return true; }
         public bool ServerSetFloor(int floor) { if (!Host || !_state.SetFloor(floor)) return false; Publish(); return true; }

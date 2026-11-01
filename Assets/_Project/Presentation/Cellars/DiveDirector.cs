@@ -28,7 +28,7 @@ namespace SleepingCalamity.Presentation
 {
     public enum DiveEndReason : byte { Failed = 0, WentHome = 1, Abandoned = 2 }
 
-    public sealed class DiveDirector : NetworkBehaviour
+    public sealed class DiveDirector : NetworkBehaviour, HostWorld.ITownSource
     {
         public const float PromptRadius = 3.5f;       // a client shows the stair/descend prompt inside this; the host accepts DiveHaulSync.BankRadius (5 m)
         public const float PromptMargin = 0.5f;
@@ -65,6 +65,23 @@ namespace SleepingCalamity.Presentation
         public TownStock Town => _town ?? (_town = new TownStock(HollowmereLayout.Create()));
         public event System.Action<int> StockReceived;
         private TownStock _town;
+        private DiveState _savedDive;   // the dive state restored from the world save: captured while no dive has begun, adopted by the haul sync on the first dive
+        private HostWorld _world;
+
+        // HostWorld.ITownSource (M6 step 0), host only: the hub's town saves through the stock/town/residents/dive sections. Registered in OnNetworkSpawn, unregistered on despawn.
+        // The baker banked at the heart (not yet home) is written as a banked resident; residents are passed as unknown (null), so the host keeps its saved first-meet beats.
+        public TownSnapshot CaptureTown()
+        {
+            DiveState dive = _haulBegun && HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState : _savedDive;
+            return Town.Capture(dive, _heartBanked ? new[] { TownBuildings.BakerResident } : null);
+        }
+
+        public void RestoreTown(TownSnapshot loaded)
+        {
+            _savedDive = Town.Restore(loaded, PiecesPerFloor, DiveStir);
+            _heartBanked = false;
+            if (_haulBegun && HaulSync != null) HaulSync.ServerAdopt(_savedDive);
+        }
 
         public CellarFloorSync FloorSync { get; private set; }      // host: the spawned syncs; clients resolve their own through ResolveSyncs
         public DiveHaulSync HaulSync { get; private set; }
@@ -104,6 +121,7 @@ namespace SleepingCalamity.Presentation
             if (!_haulBegun)
             {
                 if (!HaulSync.ServerBegin(PiecesPerFloor, DiveStir)) return false;
+                if (_savedDive != null) HaulSync.ServerAdopt(_savedDive);   // the world save's banked haul, home pieces and progress
                 _haulBegun = true;
                 _seed = SeedOverride ?? PickSeed();
             }
@@ -489,6 +507,7 @@ namespace SleepingCalamity.Presentation
 
         public override void OnNetworkDespawn()
         {
+            if (_world != null) { _world.UnregisterTownSource(this); _world = null; }
             if (HaulSync != null) { HaulSync.Banked -= OnBanked; HaulSync.DiveFailed -= OnDiveFailed; }
             if (ContentsSync != null) ContentsSync.ExitUnlocked -= ServerOpenStair;
             FloorSync = null; HaulSync = null; ContentsSync = null; _haulBegun = false; _armedBuild = -1;   // a re-spawn re-creates and re-wires the syncs (EnsureSyncs)
@@ -499,6 +518,7 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkSpawn()
         {
             if (Instance == null || IsServer) Instance = this;   // one process can hold several peers' directors (tests): the host's wins
+            if (IsServer && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostWorld w)) { _world = w; w.RegisterTownSource(this); }
         }
 
         private void Update()
