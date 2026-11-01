@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Threading;
 using NUnit.Framework;
 using SleepingCalamity.App;
+using SleepingCalamity.Core;
 using SleepingCalamity.Presentation;
 using Unity.Netcode;
 using UnityEngine;
@@ -59,6 +60,64 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Assert.That(DiveHaulSync.InRange(new Vector3(1, 50, 1), new Vector3(0, 0, 0)), Is.True, "height is ignored");
             Assert.That(DiveHaulSync.InRange(new Vector3(DiveHaulSync.BankRadius + 0.5f, 0, 0), Vector3.zero), Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator Stir_HostOwnsIt_ClientsSeeValueLatchesAndCountdown_BankStopsIt_ZeroFailsTheDive()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            AppBootstrap app = AppBootstrap.Current;
+            yield return PlayModeHarness.StartDirectHostWithoutScenes();
+            NetworkManager hostNm = app.NetworkManager;
+
+            PlayModeHarness.TestClient a = null, b = null;
+            yield return Join(app, 8, c => a = c);
+            yield return Join(app, 9, c => b = c);
+
+            NetworkObject spawned = hostNm.SpawnManager.InstantiateAndSpawn(SyncPrefab(hostNm).GetComponent<NetworkObject>(), hostNm.LocalClientId, false, false, false, Vector3.zero, Quaternion.identity);
+            DiveHaulSync host = spawned.GetComponent<DiveHaulSync>();
+            ulong id = spawned.NetworkObjectId;
+            yield return PlayModeHarness.WaitUntil(() => a.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id) && b.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "clients never received the haul object");
+            DiveHaulSync peerA = On(a.NetworkManager, id), peerB = On(b.NetworkManager, id);
+
+            StirTuning tuning = StirTuning.Default; tuning.DeepClosesSeconds = 5f;   // short countdown, same thresholds
+            Assert.That(host.ServerBegin(new[] { 6, 6, 6 }, tuning), Is.True);
+            Assert.That(peerA.ServerBegin(new[] { 6, 6, 6 }, tuning), Is.False, "a client cannot restart the dive");
+            Assert.That(host.ServerSetFloor(1), Is.True);
+
+            // Three players present: factor 1.5. Six pieces = 30 x 1.5 = 45: past 40 only.
+            for (int i = 0; i < 6; i++) Assert.That(host.ServerAddPiece(DiveHaul.PieceId(1, i)), Is.True);
+            yield return WaitSummary(peerA, s => s.StirValue == 45 && s.ExtraEnemiesPerRoom == 1 && !s.HunterLatched && !s.DeepClosesLatched, "client A never saw stir 45 with the extra-enemy latch");
+            yield return WaitSummary(peerB, s => s.StirValue == 45 && s.ExtraEnemiesPerRoom == 1, "client B never saw stir 45");
+
+            // Two floors cleared: (20 + 30) x 1.5 = 75, hunter latched.
+            Assert.That(host.ServerMarkCleared(1), Is.True);
+            Assert.That(host.ServerMarkCleared(2), Is.True);
+            yield return WaitSummary(peerA, s => s.StirValue == 75 && s.HunterLatched && !s.DeepClosesLatched, "client A never saw the hunter latch");
+
+            // Past 100: the deep closes, clients see the seconds counting down.
+            Assert.That(host.ServerMarkCleared(3), Is.True);
+            Assert.That(host.ServerAddPiece(DiveHaul.PieceId(2, 0)), Is.True);
+            Assert.That(host.ServerAddPiece(DiveHaul.PieceId(2, 1)), Is.True);   // (30 + 40) x 1.5 = 105 -> 100
+            yield return WaitSummary(peerA, s => s.StirValue == 100 && s.DeepClosesLatched && s.DeepSecondsLeft > 0, "client A never saw the deep close");
+            yield return WaitSummary(peerB, s => s.DeepClosesLatched && s.DeepSecondsLeft > 0 && s.DeepSecondsLeft <= 5, "client B never saw the countdown");
+
+            // A bank at the checkpoint stops it; latches stay; the piece term drops.
+            Assert.That(host.ServerSetFloor(2), Is.True);
+            Assert.That(host.ServerBank(), Is.True);
+            yield return WaitSummary(peerA, s => s.DeepSecondsLeft == 0 && s.DeepClosesLatched && s.HunterLatched && s.StirValue == 45, "client A never saw the countdown stop after the bank");
+            yield return new WaitForSecondsRealtime(6f);   // longer than the countdown: the dive must survive
+            Assert.That(host.Current.CurrentFloor, Is.EqualTo(2), "a banked countdown must not fail the dive");
+            Assert.That(host.Current.BankedPieces, Is.EqualTo(8));
+
+            // Push past 100 again (re-armed once the value dropped), let it run out: the host fails the dive on every peer.
+            for (int i = 2; i < 6; i++) Assert.That(host.ServerAddPiece(DiveHaul.PieceId(2, i)), Is.True);
+            for (int i = 0; i < 4; i++) Assert.That(host.ServerAddPiece(DiveHaul.PieceId(3, i)), Is.True);   // 45 + 8 x 7.5 = 105
+            yield return WaitSummary(peerA, s => s.DeepSecondsLeft > 0, "client A never saw the second countdown");
+            yield return WaitSummary(peerA, s => s.CurrentFloor == 0 && s.StirValue == 0 && s.DeepSecondsLeft == 0 && !s.HunterLatched && !s.DeepClosesLatched && s.ExtraEnemiesPerRoom == 0 && s.UnbankedPieces == 0, "client A never saw the dive fail at 0");
+            yield return WaitSummary(peerB, s => s.CurrentFloor == 0 && s.LeftFloor3 == 6 && s.LeftFloor2 == 4, "client B never saw the pieces return");
+            Assert.That(peerA.Current, Is.EqualTo(host.Current));
+            Assert.That(peerB.Current, Is.EqualTo(host.Current));
         }
 
         [UnityTest]
@@ -121,7 +180,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => b.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "client B never received the haul object");
             DiveHaulSync peerB = On(b.NetworkManager, id);
             yield return WaitSummary(peerB, s => s.BankedPieces == 2 && s.CheckpointReached && s.ClearedMask == 1 && s.LeftFloor1 == 1 && s.LeftFloor2 == 1 && s.CurrentFloor == 2, "late client B never saw the current summary");
-            Assert.That(peerB.Current, Is.EqualTo(host.Current), "late joiner matches the host exactly");
+            // The player factor changed when B joined, so the host republishes the stir value; B converges on it.
+            yield return PlayModeHarness.WaitUntil(() => peerB.Current.Equals(host.Current), Timeout, "late joiner never matched the host exactly");
 
             // Failed dive: unbanked pieces return to their floors on every peer; banked stay; checkpoint and cleared floors stay.
             Assert.That(host.ServerAddPiece(300), Is.True);
