@@ -106,12 +106,12 @@ namespace SleepingCalamity.Core
                     float len = to.Length;
                     float tol = w.Limit > 0f ? w.Limit : DefaultFacingDeg;
                     float angle = len < 1e-4f ? 0f : (float)(Math.Acos(Math.Max(-1f, Math.Min(1f, (out_.X * to.X + out_.Z * to.Z) / len))) * 180.0 / Math.PI);
-                    return new WishResult(w, angle <= tol + 1e-3f, angle, tol, unit);
+                    return new WishResult(w, angle <= tol, angle, tol, unit);
                 }
             }
         }
 
-        static string UnitOf(PlacementWishKind k) => k == PlacementWishKind.Facing ? "deg" : k == PlacementWishKind.AtLot ? "m" : "m";
+        static string UnitOf(PlacementWishKind k) => k == PlacementWishKind.Facing ? "deg" : "m";
 
         // A wish target: a landmark or a foundation by id (its footprint), else the point X,Z.
         static bool Resolve(TownLayout layout, PlacementWish w, out Footprint? fp, out TownPoint pt)

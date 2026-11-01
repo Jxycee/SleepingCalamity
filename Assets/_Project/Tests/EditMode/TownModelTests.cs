@@ -332,6 +332,8 @@ namespace SleepingCalamity.Tests.EditMode
             WishResult r45 = One(t, PlacementWish.Facing(10f, -12.5f, 45f, ""));
             Assert.That(r45.Measured, Is.EqualTo(45f).Within(0.01f));
             Assert.That(r45.Met, Is.True, "exactly 45 degrees is within 45");
+            Assert.That(One(t, PlacementWish.Facing(10f, -12.5f, r45.Measured, "")).Met, Is.True, "a tolerance equal to the measured angle is met: same exact <= as the other kinds");
+            Assert.That(One(t, PlacementWish.Facing(10f, -12.5f, r45.Measured - 0.001f, "")).Met, Is.False, "no slack above the tolerance");
             WishResult r46 = One(t, PlacementWish.Facing(10f, -11.5f, 45f, ""));
             Assert.That(r46.Measured, Is.GreaterThan(45f));
             Assert.That(r46.Met, Is.False);
@@ -475,7 +477,14 @@ namespace SleepingCalamity.Tests.EditMode
                     {
                         bool placed = s.PlacedBuildingOf("bakery") != null;
                         if (rng.Next(2) == 0) Assert.That(s.PickUpBuilding("bakery"), Is.EqualTo(placed));
-                        else if (placed) s.PickUpPart("bakery", parts[rng.Next(parts.Length)]);
+                        else
+                        {
+                            string part = parts[rng.Next(parts.Length)];
+                            PlacedBuilding pb = s.PlacedBuildingOf("bakery");
+                            int pi = TownBuildings.Get("bakery").PartIndex(part);
+                            bool expectUp = placed && pi >= 0 && pb.PiecesByPart[pi] >= 0;
+                            Assert.That(s.PickUpPart("bakery", part), Is.EqualTo(expectUp), "step " + step + " pick up " + part);
+                        }
                         break;
                     }
                     default: s.PickUpResident("bakery"); break;
@@ -488,6 +497,11 @@ namespace SleepingCalamity.Tests.EditMode
             // Whatever state the fuzz reached, one pick-up returns the lot to stock: nothing is stuck.
             if (s.PlacedBuildingOf("bakery") != null) Assert.That(s.PickUpBuilding("bakery"), Is.True);
             Assert.That(s.Placed, Is.Empty);
+            if (!s.InStock(Frame)) { Assert.That(s.AddPiece(Frame), Is.EqualTo(PlaceResult.Ok)); expected.Add("piece:" + Frame); }
+            bool anyLot = false;
+            foreach (Foundation f in Hollow.Foundations)
+                for (int turn = 0; turn < 4 && !anyLot; turn++) anyLot = s.CanPlaceFrame("bakery", f.Id, turn) == PlaceResult.Ok;
+            Assert.That(anyLot, Is.True, "no soft-lock: with everything picked up and a frame in stock, some lot and turn takes it");
             var stock = new SortedSet<string>(StringComparer.Ordinal);
             foreach (int p in s.StockPieces) stock.Add("piece:" + p);
             foreach (string r in s.StockResidents) stock.Add("resident:" + r);
