@@ -107,16 +107,28 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Greater(rows, 1000, "the resolver produced clutter");
         }
 
-        // CellarEncounterPlan can put an extra enemy or the hunter on any free floor cell of a Combat room, at any stir level: clutter never stands on one.
+        // CellarEncounterPlan can put an extra enemy or the hunter on any free floor cell of a Combat room, at any stir level. The plan stores only the cell (no spawner yet), so the
+        // standing point is the cell centre: every footprint (jitter included) on such a cell keeps at least 1.0 m of horizontal clearance from it.
         [Test]
-        public void Rooms_NeverOnACellTheEncounterPlanCanUse()
+        public void Rooms_KeepOneMetreClearOfEveryEncounterStandingPoint()
         {
+            int onEncounterCells = 0; double min = double.MaxValue;
             foreach (var (l, d, c) in All())
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     var free = new HashSet<(int, int)>(CellarEncounterPlan.FreeCellsOf(l, d, r).Select(q => (q.X, q.Y)));
-                    foreach (CellarClutterRow row in c.Rows.Where(q => q.RoomIndex == r)) Assert.IsFalse(free.Contains((row.CellX, row.CellY)), "seed " + l.Seed + " floor " + l.Floor + " " + row.Id + " on an encounter cell");
+                    foreach (CellarClutterRow row in c.Rows.Where(q => q.RoomIndex == r && free.Contains((q.CellX, q.CellY))))
+                    {
+                        onEncounterCells++;
+                        double mx = row.CellX * 400 + 200, mz = -(row.CellY * 400 + 200);
+                        var (hx, hz) = Extent(row);
+                        double dx = Math.Max(0, Math.Abs(mx - row.XCm) - hx), dz = Math.Max(0, Math.Abs(mz - row.ZCm) - hz), dist = Math.Sqrt(dx * dx + dz * dz);
+                        min = Math.Min(min, dist);
+                        Assert.GreaterOrEqual(dist, 100.0, "seed " + l.Seed + " floor " + l.Floor + " " + row.Id + " is " + dist.ToString("0") + " cm from the encounter standing point");
+                    }
                 }
+            Report("encounter cells carry " + onEncounterCells + " rows, closest footprint " + min.ToString("0") + " cm from a standing point");
+            Assert.Greater(onEncounterCells, 1000, "combat rooms are dressed on their encounter cells");
         }
 
         [Test]
@@ -238,7 +250,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 8877616815583968620UL, GoldenClutter12345Floor2 = 8515750821942516149UL, GoldenClutter12345Floor3 = 2142417129372944810UL;
+        const ulong GoldenClutter12345Floor1 = 12434377020846033822UL, GoldenClutter12345Floor2 = 3470356462926828300UL, GoldenClutter12345Floor3 = 1615557534642611247UL;
 
         [Test]
         public void Golden_Seed12345_ClutterHash()
@@ -298,18 +310,21 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.GreaterOrEqual(avg, 1.5, "rooms should read dressed, got " + avg);
         }
 
-        // Without the encounter rule (avoidEncounterCells false) Combat rooms are dressed too.
+        // Combat rooms are the rooms that read empty: they must carry at least two rows on average.
         [Test]
-        public void WithoutEncounterAvoidance_CombatRoomsCarryMore()
+        public void CombatRooms_CarryAtLeastTwoRowsOnAverage()
         {
-            int a = 0, b = 0;
-            for (uint seed = 0; seed < 200; seed++)
-            {
-                var l = CellarFloorGenerator.Generate(seed, 1); var d = CellarFloorDressing.Resolve(l);
-                a += CellarFloorClutter.Resolve(l, d).Rows.Count; b += CellarFloorClutter.Resolve(l, d, false).Rows.Count;
-            }
-            Report("floor 1 rows over 200 seeds: with avoidance " + a + ", without " + b);
-            Assert.GreaterOrEqual(b, a);
+            int combat = 0, combatRows = 0; var perFloor = new int[5, 3];
+            foreach (var (l, d, c) in All())
+                for (int r = 0; r < l.Rooms.Count; r++)
+                {
+                    perFloor[l.Floor, 0]++; perFloor[l.Floor, 1] += c.CountInRoom(r);
+                    if (l.Rooms[r].Room.Kind == RoomKind.Combat) { combat++; combatRows += c.CountInRoom(r); perFloor[l.Floor, 2] += c.CountInRoom(r); }
+                }
+            Report("rows per room by floor: " + string.Join(", ", Enumerable.Range(1, 4).Select(f => f + ": " + (perFloor[f, 1] / (double)perFloor[f, 0]).ToString("0.00"))));
+            double avg = combatRows / (double)Math.Max(1, combat);
+            Report("combat rooms: " + avg.ToString("0.00") + " rows each (" + combat + " rooms)");
+            Assert.GreaterOrEqual(avg, 2.0, "combat rooms should read dressed, got " + avg);
         }
     }
 }
