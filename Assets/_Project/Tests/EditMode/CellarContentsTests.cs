@@ -143,6 +143,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void RoomClear_DespawnIsNotAKill_AndResetRoomAllowsAFreshSpawn()
+        {
+            var c = new CellarRoomClear();
+            c.Spawn(2); c.Spawn(2);
+            c.Despawned(2); Assert.AreEqual(1, c.Alive(2)); Assert.IsFalse(c.IsCleared(2), "a despawn never clears");
+            c.Despawned(2); Assert.AreEqual(0, c.Alive(2)); Assert.IsFalse(c.IsCleared(2), "all despawned: still not cleared");
+            Assert.IsFalse(c.Died(2), "nothing alive to die");
+            c.Spawn(2); c.ResetRoom(2); Assert.AreEqual(0, c.Spawned(2)); Assert.AreEqual(0, c.Alive(2));
+            c.Spawn(2); Assert.IsTrue(c.Died(2), "after a reset the room clears afresh");
+            c.ResetRoom(2); Assert.AreEqual(0UL, c.ClearedMask, "ResetRoom also forgets the cleared bit");
+        }
+
+        [Test]
         public void EnemyMix_IsDeterministic_AndFloor1IsAllSlimes_Floor3HasRats()
         {
             bool rat3 = false;

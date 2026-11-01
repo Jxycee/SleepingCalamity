@@ -39,14 +39,14 @@ namespace SleepingCalamity.Presentation
             return null;
         }
 
-        // One sphere per piece spot (index = piece index), parented under a "Contents" group of the floor root. World positions follow CellCenter like the other markers.
+        // One sphere per piece spot (index = piece index), parented under a "Contents" group of the floor root. Placed at floorRoot.TransformPoint(CellCenter) so they sit where the host checks them under any root.
         public static GameObject[] BuildPieces(Transform floorRoot, IReadOnlyList<CellPos> spots)
         {
             var result = new GameObject[spots.Count];
             if (floorRoot == null || spots.Count == 0) return result;
             Transform group = FindNamed(floorRoot, ContentsGroup) ?? Group(floorRoot, ContentsGroup);
             for (int i = 0; i < spots.Count; i++)
-                result[i] = Prim(group, "Piece_" + i, PrimitiveType.Sphere, CellCenter(spots[i].X, spots[i].Y) + new Vector3(0, 0.6f, 0), new Vector3(0.5f, 0.5f, 0.5f), ContentsMat(new Color(0.98f, 0.86f, 0.45f)));
+                result[i] = Prim(group, "Piece_" + i, PrimitiveType.Sphere, floorRoot.TransformPoint(CellCenter(spots[i].X, spots[i].Y) + new Vector3(0, 0.6f, 0)), new Vector3(0.5f, 0.5f, 0.5f), ContentsMat(new Color(0.98f, 0.86f, 0.45f)));
             return result;
         }
 
