@@ -30,7 +30,7 @@ namespace SleepingCalamity.EditorTools
     {
         const int Fps = 30, W = 1920, H = 1080;
         // Timeline (seconds). Ruined sweep 0..FDur, wipe CrossStart..CrossEnd (camera holds), Rebuilt sweep CrossEnd..CutLane (the same flight in reverse).
-        const float FDur = 12.2f, CrossStart = 12.2f, CrossEnd = 13.8f, CutLane = 26f, CutStair = 47f, CutCellar = 60f, CutRoom = 67f, Total = 74.5f;
+        const float FDur = 12.2f, CrossStart = 12.2f, CrossEnd = 13.8f, CutLane = 26f, CutStair = 47f, CutStairB = 51.2f, CutCellar = 60f, CutRoom = 67f, Total = 74.5f;
         const float DipHalf = 0.25f, FadeIn = 0.7f, FadeOut = 0.9f, WipeFeather = 0.35f;
         const string DownloadUrl = "https://github.com/BtbN/FFmpeg-Builds/releases (ffmpeg-master-latest-win64-gpl.zip) or https://www.gyan.dev/ffmpeg/builds/";
 
@@ -160,10 +160,10 @@ namespace SleepingCalamity.EditorTools
             Name = "lane+home", GroundRelative = true, Duration = CutStair - CutLane, Ramp = 0.12f, LookSigma = 1.2f,
             Pts = new[]
             {
-                new Wp(44f,   12.2f, 4.6f,  30f,   11.4f, 2.6f, 50f),
-                new Wp(36f,   11.0f, 4.0f,  22f,   10.5f, 2.4f, 50f),
-                new Wp(27f,   11.5f, 3.4f,  19.5f, 9f,    2.2f, 50f),
-                new Wp(21.5f, 9.5f,  3.0f,  15f,   4f,    2.0f, 52f),
+                new Wp(44f,   12.2f, 8.5f,  24f,   10.5f, 3.5f, 50f),
+                new Wp(36f,   12.0f, 7.4f,  20f,   10.0f, 3.0f, 50f),
+                new Wp(28.5f, 10.5f, 5.8f,  15f,   9.0f,  2.5f, 50f),
+                new Wp(23f,   7.5f,  4.2f,  14f,   6.5f,  2.0f, 52f),
                 new Wp(19.4f, 5.2f,  2.8f,  14f,   6.6f,  1.8f, 52f),
                 new Wp(17.0f, 5.3f,  2.3f,  12.9f, 7.4f,  1.6f, 54f),   // the "Body" figure stands at x 13.5-15.5, z 1.6-3.4: pass north of it
                 new Wp(14.8f, 5.6f,  1.6f,  12.85f, 7.4f, 1.5f, 56f),
@@ -174,11 +174,8 @@ namespace SleepingCalamity.EditorTools
         };
 
         // Stair scene (absolute positions): from inside the house through the doorway, down flight A, round the turns, down flight C, into the vault's entry tunnel.
-        static readonly Shot StairShot = new Shot
+        static readonly Wp[] StairPts = new[]   // computed offline: a clearance-maximising path (A* over a 0.15 m free-space grid of the stair scene, see DumpStairGrid), eye-level, look 4 m ahead
         {
-            Name = "stair", Duration = CutCellar - CutStair, Ramp = 0.12f, PosSigma = 0.08f, LookSigma = 1.4f,
-            Pts = new[]   // computed offline: a clearance-maximising path (A* over a 0.15 m free-space grid of the stair scene, see DumpStairGrid), eye-level, look 4 m ahead
-            {
                 new Wp(new Vector3(2.95f, 10.75f, 1.05f), new Vector3(3.25f, 9.55f, -2.65f), 62f),
                 new Wp(new Vector3(2.95f, 10.47f, 0.63f), new Vector3(3.25f, 9.55f, -3.15f), 62f),
                 new Wp(new Vector3(2.95f, 10.20f, 0.21f), new Vector3(3.25f, 9.55f, -3.66f), 62f),
@@ -224,8 +221,10 @@ namespace SleepingCalamity.EditorTools
                 new Wp(new Vector3(-0.05f, 1.45f, 1.10f), new Vector3(0.25f, 1.15f, 4.64f), 62f),
                 new Wp(new Vector3(0.01f, 1.39f, 1.58f), new Vector3(0.25f, 1.15f, 5.10f), 62f),
                 new Wp(new Vector3(0.25f, 1.15f, 1.95f), new Vector3(0.25f, 1.15f, 5.55f), 62f),
-            }
         };
+        // Two stretches, a dip between them (the turns in between are a 1.2 m shaft that only reads as wall): the door and first flight with the lantern at the turn, then the lower flight, the tunnel and out into the vault.
+        static readonly Shot StairAShot = new Shot { Name = "stair A", Duration = CutStairB - CutStair, Ramp = 0.18f, PosSigma = 0.08f, LookSigma = 1.0f, Pts = StairPts.Take(17).ToArray() };
+        static readonly Shot StairBShot = new Shot { Name = "stair B", Duration = CutCellar - CutStairB, Ramp = 0.14f, PosSigma = 0.08f, LookSigma = 1.2f, Pts = StairPts.Skip(28).ToArray() };
 
         sealed class Plan
         {
@@ -238,7 +237,7 @@ namespace SleepingCalamity.EditorTools
         static Plan BuildPlan(TownLayout town, CellarFloorLayout layout)
         {
             Func<float, float, float> ground = (x, z) => HollowmereLayout.Ground(town, x, z);
-            Pose[] sq = SquareShot.Bake(ground), home = HomeShot.Bake(ground), stair = StairShot.Bake(null);
+            Pose[] sq = SquareShot.Bake(ground), home = HomeShot.Bake(ground), stairA = StairAShot.Bake(null), stairB = StairBShot.Bake(null);
 
             var (cp, ct) = CellarFloorTestBuilder.CorridorView(layout);
             var (rp0, rt0) = CellarFloorTestBuilder.RoomView(layout);
@@ -246,20 +245,21 @@ namespace SleepingCalamity.EditorTools
             float cLen = Vector3.Distance(Flat3(cp), Flat3(ct)), rLen = Vector3.Distance(Flat3(rp0), Flat3(rt0));
             Vector3 side = Vector3.Cross(Vector3.up, rDir) * 0.6f;
             var corridor = new Shot { Name = "corridor", Duration = CutRoom - CutCellar, Ramp = 0.2f, Pts = new[] { new Wp(cp, ct, 70f), new Wp(cp + cDir * (cLen * 0.3f), ct, 70f), new Wp(cp + cDir * (cLen * 0.6f), ct, 68f) } };
-            var room = new Shot { Name = "room", Duration = Total - CutRoom, Ramp = 0.2f, Pts = new[] { new Wp(rp0, rt0, 78f), new Wp(rp0 + rDir * (rLen * 0.15f) + side, rt0, 76f), new Wp(rp0 + rDir * (rLen * 0.3f), rt0, 72f) } };
+            var room = new Shot { Name = "room", Duration = Total - CutRoom, Ramp = 0.2f, Pts = new[] { new Wp(rp0, rt0, 78f), new Wp(rp0 + rDir * (rLen * 0.2f) + side * 3f, rt0, 76f), new Wp(rp0 + rDir * (rLen * 0.42f) + side * 3f, rt0, 70f) } };
             Pose[] cor = corridor.Bake(null), rm = room.Bake(null);
             Debug.Log("SC TRAILER cellar corridor pos=" + cp + " target=" + ct + " room pos=" + rp0 + " target=" + rt0);
 
             int count = Mathf.RoundToInt(Total * Fps) + 1;
             var plan = new Plan { Poses = new Pose[count], Seg = new string[count], Count = count };
-            int fCross0 = Cut(CrossStart), fCross1 = Cut(CrossEnd), fLane = Cut(CutLane), fStair = Cut(CutStair), fCellar = Cut(CutCellar), fRoom = Cut(CutRoom);
+            int fCross0 = Cut(CrossStart), fCross1 = Cut(CrossEnd), fLane = Cut(CutLane), fStair = Cut(CutStair), fStairB = Cut(CutStairB), fCellar = Cut(CutCellar), fRoom = Cut(CutRoom);
             for (int f = 0; f < count; f++)
             {
                 if (f < fCross0) { plan.Poses[f] = sq[Mathf.Min(f, sq.Length - 1)]; plan.Seg[f] = "ruined sweep"; }
                 else if (f < fCross1) { plan.Poses[f] = sq[sq.Length - 1]; plan.Seg[f] = "wipe hold"; }
                 else if (f < fLane) { plan.Poses[f] = sq[Mathf.Clamp(sq.Length - 1 - (f - fCross1), 0, sq.Length - 1)]; plan.Seg[f] = "rebuilt sweep"; }
                 else if (f < fStair) { plan.Poses[f] = home[Mathf.Min(f - fLane, home.Length - 1)]; plan.Seg[f] = "lane+home"; }
-                else if (f < fCellar) { plan.Poses[f] = stair[Mathf.Min(f - fStair, stair.Length - 1)]; plan.Seg[f] = "stair"; }
+                else if (f < fStairB) { plan.Poses[f] = stairA[Mathf.Min(f - fStair, stairA.Length - 1)]; plan.Seg[f] = "stair A"; }
+                else if (f < fCellar) { plan.Poses[f] = stairB[Mathf.Min(f - fStairB, stairB.Length - 1)]; plan.Seg[f] = "stair B"; }
                 else if (f < fRoom) { plan.Poses[f] = cor[Mathf.Min(f - fCellar, cor.Length - 1)]; plan.Seg[f] = "cellar corridor"; }
                 else { plan.Poses[f] = rm[Mathf.Min(f - fRoom, rm.Length - 1)]; plan.Seg[f] = "cellar room"; }
             }
@@ -272,7 +272,8 @@ namespace SleepingCalamity.EditorTools
                     if (plan.Seg[f] != seg || plan.Seg[f - 1] != seg) continue;
                     if (first < 0) first = f - 1; last = f;
                     float d = Vector3.Distance(plan.Poses[f].Pos, plan.Poses[f - 1].Pos);
-                    float a = Quaternion.Angle(Rot(plan.Poses[f]), Rot(plan.Poses[f - 1]));
+                    Vector3 d0 = (plan.Poses[f - 1].Look - plan.Poses[f - 1].Pos).normalized, d1 = (plan.Poses[f].Look - plan.Poses[f].Pos).normalized;
+                    float a = Mathf.Atan2(Vector3.Cross(d0, d1).magnitude, Vector3.Dot(d0, d1)) * Mathf.Rad2Deg;
                     maxStep = Mathf.Max(maxStep, d); maxRot = Mathf.Max(maxRot, a); sumStep += d; n++;
                 }
                 Debug.Log("SC TRAILER SEGMENT " + seg + " t=" + (first / (float)Fps).ToString("0.0") + ".." + (last / (float)Fps).ToString("0.0") + " frames=" + n
@@ -308,8 +309,6 @@ namespace SleepingCalamity.EditorTools
             }
             finally { clear.Teardown(); }
         }
-
-        static Quaternion Rot(Pose p) => Quaternion.LookRotation(p.Look - p.Pos, Vector3.up);
 
         // ------------------------------------------------------------------------------------------------ entry
         [MenuItem("SleepingCalamity/Art/Render Map Trailer")]
@@ -410,6 +409,10 @@ namespace SleepingCalamity.EditorTools
             Camera cam = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault(c => c.name == "Cap_HM_Fountain")
                 ?? throw new InvalidOperationException("Cap_HM_Fountain camera not found: build the Hollowmere scene first");
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);
+            // Trailer-only interior fill: a warm point light that rides with the camera and fades in as it passes the door (runtime, never saved).
+            var lampGo = new GameObject("TrailerLamp") { hideFlags = HideFlags.DontSave };
+            var lampLight = lampGo.AddComponent<Light>();
+            lampLight.type = LightType.Point; lampLight.color = new Color(1f, 0.78f, 0.55f); lampLight.range = 7f; lampLight.shadows = LightShadows.None; lampLight.intensity = 0f;
 
             var tex = checkOnly ? null : new Texture2D(W, H, TextureFormat.RGB24, false, false);
             var rt = checkOnly ? null : new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 1 };
@@ -438,6 +441,9 @@ namespace SleepingCalamity.EditorTools
                             if (!clear.Check(t, ps.Pos, ps.Look)) stats.Warnings++;
                             if (checkOnly) continue;
                             Place(cam, ps.Pos, ps.Look, ps.Fov);
+                            float lamp = Mathf.Clamp01((t - 42.6f) / 1.4f) * Mathf.Clamp01((CutStair - t) / 0.2f); lamp = lamp * lamp * (3f - 2f * lamp);
+                            lampLight.intensity = 2.4f * lamp;
+                            lampGo.transform.position = ps.Pos + Vector3.up * 0.2f - cam.transform.forward * 0.4f;
                             RenderFrame(cam, rt, tex);
                             string path = FramePath(frameDir, f);
                             if (!ruined && t < CrossEnd)
@@ -467,6 +473,7 @@ namespace SleepingCalamity.EditorTools
             }
             finally
             {
+                UnityEngine.Object.DestroyImmediate(lampGo);
                 if (rt != null) { rt.Release(); UnityEngine.Object.DestroyImmediate(rt); }
                 if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
             }
@@ -572,7 +579,7 @@ namespace SleepingCalamity.EditorTools
         static float Fade(float t)
         {
             float f = Mathf.Clamp01(t / FadeIn) * Mathf.Clamp01((Total - t) / FadeOut);
-            foreach (float cut in new[] { CutLane, CutStair, CutCellar, CutRoom }) f = Mathf.Min(f, Mathf.Clamp01(Mathf.Abs(t - cut) / DipHalf));
+            foreach (float cut in new[] { CutLane, CutStair, CutStairB, CutCellar, CutRoom }) f = Mathf.Min(f, Mathf.Clamp01(Mathf.Abs(t - cut) / DipHalf));
             return f * f * (3f - 2f * f);
         }
 
