@@ -649,7 +649,7 @@ namespace SleepingCalamity.EditorTools
             string text = sha + "  " + date;   // no colon: drawtext would need it escaped
             string vf = "drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':text='" + text + "':fontcolor=white@0.9:fontsize=24:x=w-tw-28:y=h-th-24:box=1:boxcolor=black@0.35:boxborderw=8";
             var psi = new ProcessStartInfo(ffmpeg) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
-            foreach (string a in new[] { "-y", "-framerate", fps.ToString(), "-i", Path.Combine(seqDir, "s_%05d.png"), "-vf", vf, "-c:v", "libx264", "-preset", "slow", "-crf", "26", "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4 }) psi.ArgumentList.Add(a);
+            foreach (string a in new[] { "-y", "-framerate", fps.ToString(), "-i", Path.Combine(seqDir, "s_%05d.png"), "-vf", vf, "-c:v", "libx264", "-preset", "slow", "-crf", "31", "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4 }) psi.ArgumentList.Add(a);
             using (Process p = Process.Start(psi))
             {
                 string err = p.StandardError.ReadToEnd();

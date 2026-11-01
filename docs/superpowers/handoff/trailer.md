@@ -33,7 +33,7 @@ Every frame's camera is tested against temporary MeshColliders added to the scen
 
 ## ffmpeg
 
-Looked for in this order: `SC_FFMPEG`, `C:\Dev\_tools\ffmpeg\**\bin\ffmpeg.exe`, PATH. Installed from the official BtbN build (https://github.com/BtbN/FFmpeg-Builds/releases, `ffmpeg-master-latest-win64-gpl.zip`) into `C:\Dev\_tools\ffmpeg`. Encode: libx264, preset slow, crf 26 (about 30-60 MB for 75 s), yuv420p, faststart, drawtext with `C:/Windows/Fonts/arial.ttf`.
+Looked for in this order: `SC_FFMPEG`, `C:\Dev\_tools\ffmpeg\**\bin\ffmpeg.exe`, PATH. Installed from the official BtbN build (https://github.com/BtbN/FFmpeg-Builds/releases, `ffmpeg-master-latest-win64-gpl.zip`) into `C:\Dev\_tools\ffmpeg`. Encode: libx264, preset slow, crf 31 (about 38 MB for 74.5 s; crf 26 gave 93 MB on the dark, grainy Cellars), yuv420p, faststart, drawtext with `C:/Windows/Fonts/arial.ttf`.
 
 ## Notes
 
