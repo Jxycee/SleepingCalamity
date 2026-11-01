@@ -1,10 +1,10 @@
-Session: Polish 3 (cloud): scarecrow colour + StairFlight UVs
+Session: Polish 3 (cloud, resumed): scarecrow colour + StairFlight UVs
 Job: (1) scarecrow colour story in Cap_HM_Allotment; (2) StairFlight wall UV offset (StairEntry pattern, 522018d)
-Progress: 50%
-Status: PARKED (re-tasked to M1-M4 closeout)
+Progress: 60%
+Status: RESUMED: reduced captures running (re-exports already done in 095bb51)
 Blocker: none
 Archive: no
-Branch: claude/admiring-brahmagupta-0jjuph
+Branch: claude/vibrant-heisenberg-csgj6z (continues claude/admiring-brahmagupta-0jjuph)
 Score: -
 Sheet: -
 SC RESULT: -
