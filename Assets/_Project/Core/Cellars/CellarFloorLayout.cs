@@ -68,6 +68,8 @@ namespace SleepingCalamity.Core
         public const int GridSize = 14, CellMeters = 4;
 
         public readonly uint Seed; public readonly int Floor;
+        public bool LastResort { get; private set; }      // set only by CellarFloorGenerator.GenerateLastResort when it had to relax the exit bound; the validator then skips that one bound
+        public void MarkLastResort() { LastResort = true; }
         public readonly bool IsStub;                      // floor 4: the fixed bakery set-piece (the name is kept from the old placeholder), exempt from the count rules of floors 1-3
         public readonly SubTheme Theme;
         public readonly IReadOnlyList<PlacedRoom> Rooms;
@@ -131,6 +133,57 @@ namespace SleepingCalamity.Core
             PlacedRoom p = Rooms[roomIndex]; CellPos o = p.DoorOutside(doorIndex);
             PlacedCorridor c = CorridorAt(o.X, o.Y);
             return c != null && (c.Mask & CellarRoom.MaskBit(CellarRoom.Opposite(p.Room.Doors[doorIndex].Side))) != 0;
+        }
+
+        // Walking steps (4-neighbour, one cell each) from the first party start to the stair exit through open doors and corridor links, ignoring the locked
+        // door's lock (the exit is reachable without it anyway). -1 when there is no start, no exit or no route. Barrels and crates are not counted as blocks.
+        public int EntryToExitDistance()
+        {
+            if (EntryStarts.Count == 0 || !StairExit.HasValue) return -1;
+            var room = new int[GridSize, GridSize]; var corr = new PlacedCorridor[GridSize, GridSize];
+            for (int x = 0; x < GridSize; x++) for (int y = 0; y < GridSize; y++) room[x, y] = -1;
+            for (int i = 0; i < Rooms.Count; i++)
+            {
+                PlacedRoom p = Rooms[i];
+                for (int lx = 0; lx < p.Width; lx++) for (int ly = 0; ly < p.Height; ly++) if (p.Room.CellAt(lx, ly) == CellKind.Floor) room[p.X + lx, p.Y + ly] = i;
+            }
+            foreach (PlacedCorridor c in Corridors) corr[c.X, c.Y] = c;
+            bool In(int x, int y) => x >= 0 && y >= 0 && x < GridSize && y < GridSize;
+            bool DoorOnSide(int r, int x, int y, CellSide s)
+            {
+                PlacedRoom p = Rooms[r];
+                for (int d = 0; d < p.Room.Doors.Count; d++) { CellDoor dr = p.Room.Doors[d]; if (p.X + dr.X == x && p.Y + dr.Y == y && dr.Side == s) return DoorIsOpen(r, d); }
+                return false;
+            }
+            bool Step(int x, int y, CellSide s)   // can one walk out of (x, y) across side s into a walkable cell
+            {
+                var (dx, dy) = CellarRoom.Step(s); int nx = x + dx, ny = y + dy;
+                if (!In(nx, ny)) return false;
+                if (room[x, y] >= 0)
+                {
+                    if (room[nx, ny] == room[x, y]) return true;
+                    return corr[nx, ny] != null && DoorOnSide(room[x, y], x, y, s);
+                }
+                PlacedCorridor c = corr[x, y];
+                if (c == null || (c.Mask & CellarRoom.MaskBit(s)) == 0) return false;
+                if (corr[nx, ny] != null) return (corr[nx, ny].Mask & CellarRoom.MaskBit(CellarRoom.Opposite(s))) != 0;
+                return room[nx, ny] >= 0 && DoorOnSide(room[nx, ny], nx, ny, CellarRoom.Opposite(s));
+            }
+            var dist = new int[GridSize, GridSize];
+            for (int x = 0; x < GridSize; x++) for (int y = 0; y < GridSize; y++) dist[x, y] = -1;
+            var q = new Queue<CellPos>(); CellPos s0 = EntryStarts[0];
+            dist[s0.X, s0.Y] = 0; q.Enqueue(s0);
+            var sides = new[] { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
+            while (q.Count > 0)
+            {
+                CellPos c = q.Dequeue();
+                foreach (CellSide s in sides)
+                {
+                    CellPos n = c.Step(s);
+                    if (In(n.X, n.Y) && dist[n.X, n.Y] < 0 && Step(c.X, c.Y, s)) { dist[n.X, n.Y] = dist[c.X, c.Y] + 1; q.Enqueue(n); }
+                }
+            }
+            return dist[StairExit.Value.X, StairExit.Value.Y];
         }
 
         // ---- hashes ----

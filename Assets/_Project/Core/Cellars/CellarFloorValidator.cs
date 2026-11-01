@@ -186,6 +186,8 @@ namespace SleepingCalamity.Core
                         if (l.WardenCell.HasValue && !open[l.WardenCell.Value.X, l.WardenCell.Value.Y]) Err("the Dough Warden's spawn is not reachable from the entry");
                     }
                 }
+                if (!l.IsStub && !l.LastResort && l.StairExit.HasValue && l.EntryToExitDistance() < CellarFloorGenerator.MinExitDistance)
+                    Err("the stair exit is only " + l.EntryToExitDistance() + " steps from the entry, needs at least " + CellarFloorGenerator.MinExitDistance);
                 if (l.KeyChest != null && !open[l.KeyChest.X, l.KeyChest.Y]) Err("the key chest is not reachable without passing the locked door");
                 if (l.Carrier != null && !open[l.Carrier.X, l.Carrier.Y]) Err("the gate-key carrier is not reachable without passing the locked door");
             }

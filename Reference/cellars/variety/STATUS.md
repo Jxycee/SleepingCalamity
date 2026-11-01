@@ -1,17 +1,30 @@
 Session: Q12. Whole-town look pass (local PC)
 Job: Cellars variety foundations (asked by the user directly, 2026-10-31)
-Progress: 30%
-Status: implementer building on claude/cellar-variety (not pushed yet)
-Blocker: none
-Branch: claude/cellar-variety
-Last check: none yet (one check before merge)
-Next: reviewer pass, one check, merge, then DONE and the session is ready to archive
-Needs: none
-Archive: no
+Progress: 100%
+Status: DONE (foundations; refine later list below)
+Blocker: none (main merged; the art layer in CellarFloorBuilder.Art.cs now draws from the resolved dressing, the greybox socket dressing is gone; vignettes stay greybox; dust is still a marker/TODO)
+Branch: claude/variety-final2
+Last check: PASS at 85948eb (build PASS, test-edit 758/758, test-play 33 passed, 8 skipped, 0 failed)
+Next: refine later list below; user's three-run samey check on greybox
+Archive: ready
+Branch `cellar-variety` (pushed as `claude/cellar-variety`). Greybox foundations only: data, deterministic Core logic, builder hooks, tests. `check` not run. All new decisions are pure functions of (seed, floor) on their own Rng.Derive streams, so the room, placement and link streams are untouched; `LayoutHash()` stays geometry only (goldens for seed 12345 floors 1-3 unchanged).
 
-Session summary for the coordinator:
-- Job A, M5 Cellars floor generator: DONE, merged (28b3fde stage 1, 657a67f stage 2, 40a9c0c stage 3). Report: Reference/cellars/floors/STATUS.md.
-- Job B, art polish: DONE, merged 85d2c7e (fence, scarecrow, stair) and 4ada664 (weir foam parameter pass). Report: Reference/hollowmere/polish/STATUS.md. Q14 sacks skipped (Q14 not merged).
-- Research for the user: docs/research/procedural-dungeons.md merged (214e0c2, second pass ddb515b).
-- Now: Cellars variety foundations, greybox, refine later. Layers: optional dressing sockets (fill chance), socket placement jitter, per-floor atmosphere roll (rare dark floor ~1/12, never floor 1), vignettes with a per-floor budget and pity counter (4-6 starters), stair exit minimum distance from entry, sameness tests. All pure in (seed, floor), so CellarFloorSync needs no change.
-- Next: review (reviewer), one check, merge, then this file goes DONE and the session is ready to archive.
+## Layers
+1. Optional sockets: `DressingSocket.Chance` (default 100) in `CellarRoom.cs`; the pool sets Barrel 70, Crate 65, Roots 60, Shelf 85, the rest 100 (`CellarRoomPool.Fill`). Resolution can yield empty. 1,000-seed fill rates match the configured chance within 5 points (measured Barrel 69.7, Crate 65.0, Shelf 84.7, Roots 60.3). Barrel got a third variant ("Tipped").
+2. Placement jitter: `DressingSocket.Alternatives` (at most 3 extra cells; wall-mounted keep their facing, so the same wall). Authored on 8 pool rooms (cold store, hanging hall, smoke gallery, press hall, aisles, boiler hall, entry, exit; see `.Alt(...)` in the pool). Validator rules: alternative cells are Floor, free of door/spawn/chest/feature, need a wall for wall-mounted kinds, are never a candidate of another socket (so a pick never collides), and all barrel/crate candidate cells count as blocking in the reachability check.
+3. `CellarFloorDressing.Resolve(layout)`: per placed room (stream "cellars.dressing", floor<<32|room) a fill roll, variant and cell per socket, world cell coords after rotation. `DressingHash()` covers sockets, atmosphere and vignettes; `RoomSignature(room)` is for the sameness metric. Lantern sockets fill at chance x lamp percent (entry, exit and checkpoint lanterns always stand).
+4. `CellarAtmosphere.Roll(layout)`: lamp 75-110 %, fog 85-135 %, warm fog tint 0-100 (red/green rise, blue never), dust 0-100 (motes from 40), one odd-light combat room (amber, ember or candle, all warm). Dark floor 1 in 12 (lamp 30, fog 170, dust >= 60), never floor 1, never twice in a dive (earlier floors replayed). Measured over 6,000 seeds by the test: floor 2 rate within 1/12 +- 2 points.
+5. Vignettes (`CellarVignette.cs`): 6 greybox prop groups (abandoned camp, toppled wine rack with rats, child's drawing [must-see, wall], collapsed shelf over a cache [wall], sleeping elite [floor 2+], lantern-oil cache [floor 2+]); categories fluff/reward/risk-reward/danger; rarities 3-8; once-per-dive on camp, drawing, elite. `VignetteDive.Select(seed, floor)` replays floors 1..N: odds 1/(Rarity - misses), must-see 1/4,1/3,1/2,1, cap 2 per floor, floor 3 forces one if the dive has none. Placed in combat rooms away from doors/chests/features/barrel cells with a connectivity check (strict pass then relaxed, because the rooms are dense). Measured: mean 1.077 per floor over 1,000 seeds x floors 1-3; 0 bare dives; 5 forced floors; 0 dropped; category counts fluff 1412, reward 289, risk-reward 660, danger 871.
+6. Exit distance: `CellarFloorGenerator.MinExitDistance = 12` (BFS steps from the first party start to the stair, `CellarFloorLayout.EntryToExitDistance()`); a shorter floor is rejected like any failed attempt (about 14 % of attempts re-roll). Validator checks it. Measured over 10,000 seeds x floors 1-3: min 12, 43 distinct values, no fallback needed. Floor 4 stub exempt. Layouts that were already long enough are unchanged, so the seed-12345 goldens did not move; other seeds' layouts changed where the exit was too close (no hard-coded expectation elsewhere; the PlayMode network test compares against the generator).
+
+## Review fixes (variety-final)
+Last-resort floors now validate: `CellarFloorLayout.LastResort` is set only by `GenerateLastResort` when it relaxed the exit bound, and the validator skips that one bound for it (two bounded streams, then relaxed at once). 900 forced last-resort floors: exit 12-51, mean 18.6, none needed the relaxed pass. Order test now compares fresh-layout `DressingHash()` in different orders; goldens pinned for seed 12345 floors 1-3. Vignette placement keeps enemy spawn cells clear in every pass: mean 1.066 per floor, 0 bare dives, 35 of 3,000 floors drop a chosen vignette (test allows 2 %). Validator indentation fixed.
+
+## Presentation (`CellarFloorBuilder`)
+Greybox shapes per filled socket (empty skipped), vignette prop groups, lamp count and intensity scaled by the atmosphere (corridor lamps thinned by position, not RNG), odd-light point light, fog density and tint through `CellarFloorKit.FogBaseDensity/FogBaseColor` (the test-scene builder now passes its old fog numbers instead of setting RenderSettings), dust: an empty `DustMotes_*` marker object (TODO: particle prefab, none exists in the dungeon corner kit).
+
+## Tests
+EditMode `CellarVarietyTests` (24 new) plus all existing: 736 passed, 0 failed. PlayMode `CellarFloorNetworkTests`: 1 passed.
+
+## Refine later
+Real art props per vignette (swap by vignette id); more vignettes (target 12-20) and state-conditioned odds (healing vignette when hurt); swappable chunk regions inside room grids; layout presets (spine/ring/hub/wing) and a far-dead-end exit; per-floor enemy roster subset and ambush/thin/crowded twists; floor 4 variation (stub is fixed); a socket on the pantry (single barrel keeps it near 70 % different); dust particle prefab; vignette pity counters in the world save section (note under `sc-netcode`); tuning by the user's three-run check (constants: Fill chances, MinExitDistance 12, MaxPerFloor 2, rarities, dark-floor 1 in 12). Phase 1 cheap items from the research addenda: a planned entry-to-exit loop with arc roles; a reward icon on exit doors; one capped special room per floor; loot mix steered to target shares.

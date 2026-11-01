@@ -52,19 +52,37 @@ namespace SleepingCalamity.Core
         public CellDoor(int x, int y, CellSide side, bool locked = false) { X = x; Y = y; Side = side; Locked = locked; }
     }
 
+    // Chance is the percent of visits on which the socket is filled at all (100 = always; a miss leaves the spot empty). Alternatives are extra cells the
+    // socket may sit in (the cell X, Y is the first option); a wall-mounted socket keeps its facing, so its alternatives sit against the same wall.
+    // CellarFloorDressing picks among them per floor. No two sockets of one room share any candidate cell, so a pick never collides.
     public sealed class DressingSocket
     {
+        public const int MaxAlternatives = 3;
         public readonly string Id; public readonly SocketKind Kind; public readonly int X, Y; public readonly CellSide Facing; public readonly IReadOnlyList<string> Variants;
+        public readonly int Chance;
+        public readonly IReadOnlyList<CellPos> Alternatives;
         public DressingSocket(string id, SocketKind kind, int x, int y, CellSide facing, params string[] variants)
-        { Id = id; Kind = kind; X = x; Y = y; Facing = facing; Variants = (variants ?? new string[0]).ToArray(); }
+            : this(id, kind, x, y, facing, 100, null, variants) { }
+        public DressingSocket(string id, SocketKind kind, int x, int y, CellSide facing, int chance, IEnumerable<CellPos> alternatives, params string[] variants)
+        {
+            Id = id; Kind = kind; X = x; Y = y; Facing = facing; Variants = (variants ?? new string[0]).ToArray();
+            Chance = chance; Alternatives = (alternatives ?? new CellPos[0]).ToList();
+        }
         public bool WallMounted => Kind == SocketKind.Shelf || Kind == SocketKind.Rack || Kind == SocketKind.Chute || Kind == SocketKind.Lantern || Kind == SocketKind.Roots;
+        public int CellOptions => 1 + Alternatives.Count;
+        // Option 0 is the authored cell, then the alternatives in order.
+        public CellPos OptionCell(int option) => option == 0 ? new CellPos(X, Y) : Alternatives[option - 1];
     }
 
-    // A socket as authored beside the ASCII rows; the room gives it its id.
+    // A socket as authored beside the ASCII rows; the room gives it its id. Chance and Alt return a changed copy: Sk(...).Chance(70).Alt((2, 3), (3, 3)).
     public readonly struct SocketSpec
     {
         public readonly SocketKind Kind; public readonly int X, Y; public readonly CellSide Facing; public readonly string[] Variants;
-        public SocketSpec(SocketKind kind, int x, int y, CellSide facing, params string[] variants) { Kind = kind; X = x; Y = y; Facing = facing; Variants = variants; }
+        public readonly int FillChance; public readonly CellPos[] Alternatives;
+        public SocketSpec(SocketKind kind, int x, int y, CellSide facing, params string[] variants) : this(kind, x, y, facing, 100, null, variants) { }
+        SocketSpec(SocketKind kind, int x, int y, CellSide facing, int chance, CellPos[] alts, string[] variants) { Kind = kind; X = x; Y = y; Facing = facing; Variants = variants; FillChance = chance; Alternatives = alts ?? new CellPos[0]; }
+        public SocketSpec Chance(int percent) => new SocketSpec(Kind, X, Y, Facing, percent, Alternatives, Variants);
+        public SocketSpec Alt(params (int x, int y)[] cells) => new SocketSpec(Kind, X, Y, Facing, FillChance, cells.Select(c => new CellPos(c.x, c.y)).ToArray(), Variants);
     }
 
     public sealed class CellarSpawn
@@ -171,7 +189,7 @@ namespace SleepingCalamity.Core
             }
             var socks = new List<DressingSocket>();
             for (int i = 0; i < sockets.Length; i++)
-                socks.Add(new DressingSocket(id + ".s" + (i + 1), sockets[i].Kind, sockets[i].X, sockets[i].Y, sockets[i].Facing, sockets[i].Variants));
+                socks.Add(new DressingSocket(id + ".s" + (i + 1), sockets[i].Kind, sockets[i].X, sockets[i].Y, sockets[i].Facing, sockets[i].FillChance, sockets[i].Alternatives, sockets[i].Variants));
             return new CellarRoom(id, name, kind, theme, silhouette, cells, doors, socks, spawns, chests, feats, CorridorShape.None, 0, rows);
         }
 
@@ -180,7 +198,7 @@ namespace SleepingCalamity.Core
         {
             var doors = new List<CellDoor>();
             foreach (CellSide s in new[] { CellSide.North, CellSide.East, CellSide.South, CellSide.West }) if ((mask & MaskBit(s)) != 0) doors.Add(new CellDoor(0, 0, s));
-            var socks = sockets.Select((sp, i) => new DressingSocket(id + ".s" + (i + 1), sp.Kind, sp.X, sp.Y, sp.Facing, sp.Variants)).ToList();
+            var socks = sockets.Select((sp, i) => new DressingSocket(id + ".s" + (i + 1), sp.Kind, sp.X, sp.Y, sp.Facing, sp.FillChance, sp.Alternatives, sp.Variants)).ToList();
             return new CellarRoom(id, name, RoomKind.Corridor, SubTheme.Any, "", new CellKind[1, 1], doors, socks, null, null, null, shape, mask);
         }
 
@@ -210,7 +228,7 @@ namespace SleepingCalamity.Core
             for (int x = 0; x < Width; x++) for (int y = 0; y < Height; y++) { var p = At(x, y); nc[p.x, p.y] = cells[x, y]; }
             return new CellarRoom(Id, Name, Kind, Theme, Silhouette, nc,
                 Doors.Select(d => { var p = At(d.X, d.Y); return new CellDoor(p.x, p.y, Rotate(d.Side, q), d.Locked); }),
-                Sockets.Select(k => { var p = At(k.X, k.Y); return new DressingSocket(k.Id, k.Kind, p.x, p.y, Rotate(k.Facing, q), k.Variants.ToArray()); }),
+                Sockets.Select(k => { var p = At(k.X, k.Y); return new DressingSocket(k.Id, k.Kind, p.x, p.y, Rotate(k.Facing, q), k.Chance, k.Alternatives.Select(a => { var pa = At(a.X, a.Y); return new CellPos(pa.x, pa.y); }), k.Variants.ToArray()); }),
                 Spawns.Select(k => { var p = At(k.X, k.Y); return new CellarSpawn(p.x, p.y, k.Tier); }),
                 Chests.Select(k => { var p = At(k.X, k.Y); return new ChestSlot(p.x, p.y, k.KeyCandidate); }),
                 Features.Select(k => { var p = At(k.X, k.Y); return new RoomFeature(p.x, p.y, k.Kind); }),
@@ -306,7 +324,10 @@ namespace SleepingCalamity.Core
             List<string> Unreached(bool blockProps, out bool noStart)
             {
                 var blocked = new bool[Width, Height];
-                if (blockProps) foreach (DressingSocket k in Sockets) if ((k.Kind == SocketKind.Barrel || k.Kind == SocketKind.Crate) && InBounds(k.X, k.Y)) blocked[k.X, k.Y] = true;
+                if (blockProps)   // every candidate cell of a free-standing prop counts, so any pick the dressing makes leaves the room walkable
+                    foreach (DressingSocket k in Sockets)
+                        if (k.Kind == SocketKind.Barrel || k.Kind == SocketKind.Crate)
+                            for (int o = 0; o < k.CellOptions; o++) { CellPos c = k.OptionCell(o); if (InBounds(c.X, c.Y)) blocked[c.X, c.Y] = true; }
                 CellDoor start = Doors.FirstOrDefault(d => InBounds(d.X, d.Y) && cells[d.X, d.Y] == CellKind.Floor && !blocked[d.X, d.Y]);
                 noStart = start == null;
                 var lost = new List<string>();
@@ -338,12 +359,27 @@ namespace SleepingCalamity.Core
                 if (string.IsNullOrEmpty(k.Id) || !ids.Add(k.Id)) Err("socket id '" + k.Id + "' is empty or duplicated");
                 if (k.Variants.Count < MinVariants || k.Variants.Count > MaxVariants) Err("socket " + k.Id + " has " + k.Variants.Count + " variants, needs " + MinVariants + " to " + MaxVariants);
                 if (k.Variants.Any(string.IsNullOrWhiteSpace) || k.Variants.Distinct(StringComparer.OrdinalIgnoreCase).Count() != k.Variants.Count) Err("socket " + k.Id + " has an empty or repeated variant name");
-                if (k.WallMounted && InBounds(k.X, k.Y))
+                if (k.Chance < 0 || k.Chance > 100) Err("socket " + k.Id + " fill chance " + k.Chance + " is outside 0..100");
+                if (k.Alternatives.Count > DressingSocket.MaxAlternatives) Err("socket " + k.Id + " has " + k.Alternatives.Count + " alternative cells, at most " + DressingSocket.MaxAlternatives);
+                for (int o = 0; o < k.CellOptions; o++)
                 {
-                    var (dx, dy) = Step(Opposite(k.Facing)); int bx = k.X + dx, by = k.Y + dy;
-                    // out of the room: the edge is the wall unless this cell has a door on that side (only a corridor cell can, since other rooms keep sockets off door cells)
-                    bool wall = InBounds(bx, by) ? cells[bx, by] != CellKind.Floor : !Doors.Any(d => d.X == k.X && d.Y == k.Y && d.Side == Opposite(k.Facing));
-                    if (!wall) Err("wall-mounted socket " + k.Id + " (" + k.Kind + ") at (" + k.X + "," + k.Y + ") has no wall behind it");
+                    CellPos c = k.OptionCell(o);
+                    if (!InBounds(c.X, c.Y)) continue;   // the primary cell was reported by Mark above; an alternative is reported here
+                    if (o > 0)
+                    {
+                        if (cells[c.X, c.Y] != CellKind.Floor) Err("socket " + k.Id + " alternative " + c + " is on a " + cells[c.X, c.Y] + " cell");
+                        if (used.TryGetValue((c.X, c.Y), out string other) && !other.StartsWith("socket ")) Err("socket " + k.Id + " alternative " + c + " shares its cell with a " + other);
+                        if (Sockets.Any(j => j != k && Enumerable.Range(0, j.CellOptions).Any(p => j.OptionCell(p).X == c.X && j.OptionCell(p).Y == c.Y)))
+                            Err("socket " + k.Id + " alternative " + c + " is also a candidate cell of another socket");
+                        for (int p = 0; p < o; p++) if (k.OptionCell(p).X == c.X && k.OptionCell(p).Y == c.Y) Err("socket " + k.Id + " lists cell " + c + " twice");
+                    }
+                    if (k.WallMounted)
+                    {
+                        var (dx, dy) = Step(Opposite(k.Facing)); int bx = c.X + dx, by = c.Y + dy;
+                        // out of the room: the edge is the wall unless this cell has a door on that side (only a corridor cell can, since other rooms keep sockets off door cells)
+                        bool wall = InBounds(bx, by) ? cells[bx, by] != CellKind.Floor : !Doors.Any(d => d.X == c.X && d.Y == c.Y && d.Side == Opposite(k.Facing));
+                        if (!wall) Err("wall-mounted socket " + k.Id + " (" + k.Kind + ") at " + c + " has no wall behind it");
+                    }
                 }
             }
 
