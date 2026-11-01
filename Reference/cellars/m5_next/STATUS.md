@@ -1,11 +1,11 @@
 State: WORKING
 Session: Local next: M5 floor 4 set-piece + banking (+ stir meter)
-Progress: 45% (floor 4 done + reviewed, waits for claude/cellar-variety to land; banking done + risk-reviewed; stir implementer running)
-Status: items 1-2 code done, merges queued behind the variety branch
+Progress: 60% (floor 4 MERGED df109f2; banking check running; stir reviewed + fixed, queued)
+Status: item 1 merged; item 2 in its check; item 3 waits
 Archive: not ready
 Branch: claude/m5-next-639689 (floor 4 on a subagent worktree branch, merges back here)
-Last check: PASS baaba42 (floor 4, edit 718/718, play 33 pass 0 fail 8 skip) - stale after main moved
-Next step: after variety merges: merge main, rerun floor EditMode tests, check, merge floor 4; then banking (claude/m5-banking 6e30325) check + merge; then stir
+Last check: PASS d40fe81 (floor 4 + variety merged: edit 765/765, play 33 pass 0 fail 8 skip)
+Next step: banking check on claude/m5-banking aa1fa5a then merge; then stir (claude/m5-stir e6b17dc) merge main, check, merge
 Sheet: none yet
 Needs: none
 Blocker: none
@@ -26,10 +26,11 @@ Blocker: none
 All Q1-Q5 proposals OK. Stir values/thresholds are P21 placeholders kept in one data/config spot; only pieces add the +5 term (chest loot rides in the haul, no stir); host owns meter and haul; bank RPC + DiveState get a risk-reviewer pass.
 
 ## Results
-- Item 1 floor 4 oven maze: worktree-agent-adcba4d63b883e0ab a838e67, merged into this branch. 7 rooms (entry, ring of 4 oven rooms, antechamber, heart with Bank + baker), Dough Warden Tier2 on the approach, 7 chests, no stair/lock/key. New CellarBakeryPool.cs; enums appended (SubTheme.Bakery, RoomKind.Heart, FeatureKind.Baker). Golden floor 4 = 8894238083671442472 (all seeds). reviewer: approve, no blockers. Check PASS baaba42; merge waits for claude/cellar-variety (coordinator order). Main art pass 0bc51ae merged in cleanly (fda3b8d).
-- Item 2 banking: claude/m5-banking 0111014 + review fix 6e30325. Core DiveHaul/DiveState, Presentation DiveHaulSync (host-written summary NV, RequestBankRpc SendTo.Server, host checks floor has bank + 5 m XZ range when a PlayerObject and the matching built floor exist). risk-reviewer: approve; should-fix (bank cell from a stale floor) and the floor-3 refusal test nit fixed in 6e30325. Not done: P47 healing; nothing spawns DiveHaulSync in game yet; banked state not saved (M6).
+- Item 1 floor 4 oven maze: worktree-agent-adcba4d63b883e0ab a838e67, merged into this branch. 7 rooms (entry, ring of 4 oven rooms, antechamber, heart with Bank + baker), Dough Warden Tier2 on the approach, 7 chests, no stair/lock/key. New CellarBakeryPool.cs; enums appended (SubTheme.Bakery, RoomKind.Heart, FeatureKind.Baker). Golden floor 4 = 8894238083671442472 (all seeds). reviewer: approve, no blockers. SC RESULT check PASS d40fe81 after merging main with Cellars variety dbc8996 (conflicts in Layout/Validator resolved keeping LastResort + exit-distance rule beside the bakery checks). MERGED to main df109f2. Main art pass 0bc51ae merged in cleanly (fda3b8d).
+- Item 2 banking: claude/m5-banking 0111014 + review fix 6e30325. Core DiveHaul/DiveState, Presentation DiveHaulSync (host-written summary NV, RequestBankRpc SendTo.Server, host checks floor has bank + 5 m XZ range when a PlayerObject and the matching built floor exist). risk-reviewer: approve; should-fix (bank cell from a stale floor) and the floor-3 refusal test nit fixed in 6e30325. Floor 4 vignettes: off on the bakery (aa1fa5a, rides with banking; dressing + atmosphere stay; selection replay untouched). Not done: P47 healing; nothing spawns DiveHaulSync in game yet; banked state not saved (M6).
 
 ## Usage waste
 - The wrapper's -ProjectRoot defaults to the main checkout: a subagent's first test-edit tested main (one wasted run). Briefs now always pass -ProjectRoot.
 - First check in a fresh worktree hit the default 5 min build timeout during import, then LOCKED on its own leftover Unity: 2 wasted runs. Use -TimeoutMinutes 30 on a worktree's first run.
 - The first check (baaba42) went stale when main gained the floor art pass and the variety branch was queued ahead: one full check to be repeated.
+- Item 3 stir meter: claude/m5-stir 09ecf7a + review fixes e6b17dc (DiveFailed host event, countdown dt clamped to 0.25 s, floor bound from MaxFloor). Core StirMeter + StirTuning.Default (all P21 numbers in one spot), owned by DiveState, host-ticked in DiveHaulSync, fields in the synced Summary (seconds left CeilToInt so one update per second). test-edit 732/732, test-play 36 pass 0 fail 8 skip (pre-fix). risk-reviewer: approve with notes (HUD should read latch flags, not compare StirValue).
