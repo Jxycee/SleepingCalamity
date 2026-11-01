@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tools/cloud/unity.sh - SleepingCalamity wrapper for Unity batchmode runs on LINUX (cloud sessions). The same interface and checks as Tools/unity.ps1 (Windows).
 #
-#   bash Tools/cloud/unity.sh <compile|build|test-edit|test-play|check|exec> [--out DIR] [--filter REGEX] [--timeout MIN] [--project DIR] [--method Class.Method] [--graphics]
+#   bash Tools/cloud/unity.sh <compile|build|test-edit|test-play|check|gate|exec> [--out DIR] [--filter REGEX] [--timeout MIN] [--project DIR] [--method Class.Method] [--graphics]
 #
 # --out defaults to $SC_OUT; it must be absolute, contain no '..' and sit outside the project (use the session scratchpad).
 # --project defaults to the repo this script is in. --graphics drops -nographics (renders need a graphics device; runs under xvfb-run).
@@ -10,7 +10,7 @@
 # Prints `SC RESULT <command> PASS|FAIL|...` lines like unity.ps1, and after a `check` PASS records the commit for the merge gate (<git-common-dir>/sc-check-pass/<sha>).
 # First Linux run 2026-10-29: the editor exited 198 (no valid licence) before any project work; the script itself has not been tested past launch.
 set -u
-USAGE='usage: unity.sh <compile|build|test-edit|test-play|check|exec> --out <absolute scratch dir outside the project> (or set SC_OUT) [--project DIR] [--filter REGEX] [--timeout MIN] [--method Class.Method] [--graphics]'
+USAGE='usage: unity.sh <compile|build|test-edit|test-play|check|gate|exec> --out <absolute scratch dir outside the project> (or set SC_OUT) [--project DIR] [--filter REGEX] [--timeout MIN] [--method Class.Method] [--graphics]'
 say() { printf '%s\n' "$*"; }
 usage() { say "$USAGE"; [ -n "${1:-}" ] && say "usage: $1"; exit 4; }
 
@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
         *) usage "unknown argument $1" ;;
     esac
 done
-case "$COMMAND" in compile|build|test-edit|test-play|check|exec) ;; *) usage "unknown or missing command '$COMMAND'" ;; esac
+case "$COMMAND" in compile|build|test-edit|test-play|check|gate|exec) ;; *) usage "unknown or missing command '$COMMAND'" ;; esac
 UNITY="${SC_UNITY:-$HOME/unity/ed/Editor/Unity}"
 [ -d "$PROJECT/ProjectSettings" ] || usage "project must be an absolute Unity project path: $PROJECT"
 PROJECT="$(cd "$PROJECT" && pwd)"
@@ -140,11 +140,11 @@ PY
     return 1
 }
 write_marker() {
-    local sha common dir
+    local sha common dir mdir="${1:-sc-check-pass}"
     sha="$(git -C "$PROJECT" rev-parse HEAD 2>/dev/null)"; common="$(git -C "$PROJECT" rev-parse --git-common-dir 2>/dev/null)"
     [ -n "$sha" ] && [ -n "$common" ] || { say 'SC MARKER skipped (git rev-parse failed)'; return; }
     case "$common" in /*) ;; *) common="$PROJECT/$common" ;; esac
-    dir="$common/sc-check-pass"; mkdir -p "$dir" && date -Iseconds > "$dir/$sha"
+    dir="$common/$mdir"; mkdir -p "$dir" && date -Iseconds > "$dir/$sha"
     if [ -n "$(git -C "$PROJECT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
         say "SC MARKER $sha (uncommitted changes were present; the marker covers the commit only)"
     else
@@ -159,6 +159,15 @@ case "$COMMAND" in
     test-edit) do_tests test-edit EditMode editmode.xml; code=$? ;;
     test-play) do_tests test-play PlayMode playmode.xml; code=$? ;;
     exec) do_exec; code=$? ;;
+    gate)
+        do_compile; code=$?
+        [ "$code" = 0 ] && { do_tests test-edit EditMode editmode.xml; code=$?; }
+        case "$code" in
+            0) say 'SC RESULT gate PASS'; write_marker sc-gate-pass ;;
+            2) say 'SC RESULT gate LOCKED' ;;
+            3) say 'SC RESULT gate TIMEOUT' ;;
+            *) say 'SC RESULT gate FAIL' ;;
+        esac ;;
     check)
         do_build; code=$?
         [ "$code" = 0 ] && { do_tests test-edit EditMode editmode.xml; code=$?; }

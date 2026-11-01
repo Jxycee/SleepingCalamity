@@ -3,7 +3,8 @@
 #
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <command> [-OutDir <abs dir>] [-Filter <regex>] [-TimeoutMinutes <int>] [-ProjectRoot <abs dir>] [-Method <Class.Method>]
-#   <command> = compile | build | test-edit | test-play | check | exec
+#   <command> = compile | build | test-edit | test-play | check | gate | exec
+#   gate = compile + EditMode tests (no PlayMode, no port lock); records a fast-gate marker (sc-gate-pass) that the branch-push guard accepts. check stays the merge gate.
 #
 # OutDir defaults to $env:SC_OUT. It must be absolute, must not contain '..', and must be outside the repo.
 # ProjectRoot defaults to the checkout this script lives in (Tools\..), so <worktree>\Tools\unity.ps1 tests that worktree;
@@ -41,8 +42,8 @@ $PortLockPath = Join-Path ([IO.Path]::GetTempPath()) 'sc-unity-playmode.lock'
 $PortWaitMinutes = 120
 $LockFile    = Join-Path $ProjectRoot 'Temp\UnityLockfile'
 $ErrPattern  = 'error CS|Exception|Scripts have compiler errors|Compilation failed'
-$Commands    = @('compile', 'build', 'test-edit', 'test-play', 'check', 'exec')
-$UsageLine   = 'usage: unity.ps1 <compile|build|test-edit|test-play|check|exec> -OutDir <absolute scratch dir outside the repo> (or set SC_OUT) [-ProjectRoot <dir>] [-Method <Class.Method>]'
+$Commands    = @('compile', 'build', 'test-edit', 'test-play', 'check', 'gate', 'exec')
+$UsageLine   = 'usage: unity.ps1 <compile|build|test-edit|test-play|check|gate|exec> -OutDir <absolute scratch dir outside the repo> (or set SC_OUT) [-ProjectRoot <dir>] [-Method <Class.Method>]'
 
 function Say([string]$Text) {
     [Console]::Out.WriteLine($Text)
@@ -315,7 +316,7 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $code = 1
 # After a check PASS, record the tested commit for the merge gate (.claude/hooks/guard.sh).
-function Write-PassMarker {
+function Write-PassMarker([string]$MarkerDir = 'sc-check-pass') {
     try {
         $sha = & git -C $ProjectRoot rev-parse HEAD 2>$null
         $common = & git -C $ProjectRoot rev-parse --git-common-dir 2>$null
@@ -326,7 +327,7 @@ function Write-PassMarker {
         $sha = ([string]$sha).Trim()
         $common = ([string]$common).Trim()
         if (-not [IO.Path]::IsPathRooted($common)) { $common = Join-Path $ProjectRoot $common }
-        $dir = Join-Path $common 'sc-check-pass'
+        $dir = Join-Path $common $MarkerDir
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         Set-Content -LiteralPath (Join-Path $dir $sha) -Value (Get-Date -Format o) -Encoding ASCII
         $dirty = & git -C $ProjectRoot status --porcelain --untracked-files=no 2>$null
@@ -344,6 +345,16 @@ switch ($Command) {
     'test-edit' { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
     'test-play' { $code = Invoke-Tests 'test-play' 'PlayMode' 'playmode.xml' }
     'exec'      { $code = Invoke-Exec }
+    'gate' {
+        $code = Invoke-Compile
+        if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
+        switch ($code) {
+            0       { Say 'SC RESULT gate PASS'; Write-PassMarker 'sc-gate-pass' }
+            2       { Say 'SC RESULT gate LOCKED (close the Unity editor, then rerun)' }
+            3       { Say 'SC RESULT gate TIMEOUT' }
+            default { Say 'SC RESULT gate FAIL' }
+        }
+    }
     'check' {
         $code = Invoke-Build
         if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }

@@ -92,6 +92,12 @@ while IFS= read -r seg; do
     fi
 
     read -r -a words <<< "$seg"
+    # Leading VAR=value words (env prefix): remember SC_GATE_SKIP=1, then drop them so words[0] is the command.
+    gate_skip=0
+    while [ "${#words[@]}" -gt 0 ] && [[ "${words[0]}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; do
+        [ "${words[0]}" = "SC_GATE_SKIP=1" ] && gate_skip=1
+        words=("${words[@]:1}")
+    done
     [ "${words[0]}" = "git" ] || continue
     sub="${words[1]}"
     args=("${words[@]:2}")
@@ -110,6 +116,49 @@ while IFS= read -r seg; do
                     -*f*) block "never force-push (CLAUDE.md)." ;;
                 esac
             done
+            # Fast gate: a branch push that changes Unity-imported files needs a passing 'unity gate' (or 'check')
+            # for the pushed commit. Pushes to main follow a checked merge; deletes and tag pushes are exempt.
+            [ "$gate_skip" = 1 ] && continue
+            positional=(); skipgate=0
+            for word in "${args[@]}"; do
+                case "$word" in
+                    --delete|-d|--tags|--mirror|--all) skipgate=1 ;;
+                    -*) ;;
+                    *) positional+=("$word") ;;
+                esac
+            done
+            [ "$skipgate" = 1 ] && continue
+            if [ "${#positional[@]}" -ge 2 ]; then refspec="${positional[${#positional[@]}-1]}"; else refspec=""; fi
+            if [ -z "$refspec" ]; then src="HEAD"; dst="$branch"
+            else
+                refspec="${refspec#+}"
+                case "$refspec" in *:*) src="${refspec%%:*}"; dst="${refspec#*:}" ;; *) src="$refspec"; dst="$refspec" ;; esac
+                [ "$src" = "HEAD" ] && [ "$dst" = "HEAD" ] && dst="$branch"
+            fi
+            dst="${dst#refs/heads/}"
+            [ -z "$src" ] && continue
+            [ "$dst" = "main" ] && continue
+            sha=$(git rev-parse --verify --quiet "$src^{commit}" 2>/dev/null) || continue
+            unity=$(git diff --name-only "origin/main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) || continue
+            [ -z "$unity" ] && continue
+            tree=$(git rev-parse --verify --quiet "$sha^{tree}" 2>/dev/null)
+            ok=0
+            for d in sc-gate-pass sc-check-pass; do
+                [ -f "$common/$d/$sha" ] && ok=1
+                [ -n "$tree" ] && [ -f "$common/$d/$tree" ] && ok=1
+            done
+            if [ "$ok" = 0 ]; then
+                # A gated ancestor with no Unity-file changes since (docs/STATUS commits on top) still counts.
+                for anc in $(git rev-list -n 30 "$sha" 2>/dev/null); do
+                    for d in sc-gate-pass sc-check-pass; do
+                        [ -f "$common/$d/$anc" ] || continue
+                        if [ -z "$(git diff --name-only "$anc" "$sha" -- Assets Packages ProjectSettings 2>/dev/null)" ]; then ok=1; break; fi
+                    done
+                    [ "$ok" = 1 ] && break
+                done
+            fi
+            [ "$ok" = 1 ] && continue
+            block "branch push changes Assets/Packages/ProjectSettings but no fast gate passed for $sha. Run Tools/unity.ps1 gate (PC) or bash Tools/cloud/unity.sh gate (cloud) from this worktree, or prefix SC_GATE_SKIP=1 when no Unity licence is available (say so in the push report)."
             ;;
         merge)
             # Merge gate: merging into main needs a passing Tools/unity.ps1 check on each merged commit,
