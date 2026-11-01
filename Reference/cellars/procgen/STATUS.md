@@ -2,8 +2,8 @@
 Status: IN PROGRESS (item 1a-c merging; 1d and 3 deferred to the M5 contents session's chests/spawner)
 Blocker: none. Coordinator 2026-10-31: Core-only items first (1, 2, 4); hold procgen merges while a spine or contents STATUS says "check running"; builder hooks only in CellarFloorBuilder.Procgen.cs
 Branch: claude/cellar-procgen
-Last check: PASS at d7403e2 (build PASS, EditMode 811/811, PlayMode 37 passed, 8 skipped, 0 failed) before the partial move; tip eb4efc0 needs scene regen + check
-Next: item 2 and item 4 should-fixes running (Sonnet implementers); merges wait on the lock (M5 contents, then M1-M4 closeout), then 1, 2, 4
+Last check: PASS at 9c7a8040 (EditMode 855/855, PlayMode 58 passed 8 skipped); item 1 merged to main 49dfca96
+Next: item 2 check running at 65013614 (main 94f4c3d0 merged in, scenes regenerated); then item 4 (54e3bd9a, has item 2 in it, ChunksHash re-pinned); then 1d, 3 (unblocked by M5 contents), 5
 Session: Procgen next (successor, worktree procgen-next-73e90d)
 Archive: no
 
@@ -56,3 +56,6 @@ Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/
   - 1b: a hint per open door with something beyond it, over the whole corridor network behind the door (a T junction shows every room on it; union of flags). Because networks are big, 97% of hints carry a flag (key 32%, special 33%, reward vignette 19% of hints): too noisy to read as a choice. Refine later: hint only the next room on the route, or only the nearest room per branch.
 - 2026-10-31: door hints now cover only the rooms reached FIRST through a door (corridor BFS stops at another room's door; own room excluded). Flagged share 97% -> 92.0% (1200 seeds x floors 1-3, 34771 hints): key 23.6%, special 22.5%, reward vignette 14.0%. Still above 80%: most doors sit one corridor hop from a chest room, the stair/bank room or a vignette. HintsHash goldens re-pinned (deliberate); route/special hashes unchanged.
 - 2026-10-31: successor took over on GO. Merged origin/main into cellar-procgen (4bd9500d, clean; scenes not regenerated yet). Item 2 and item 4 should-fixes sent to Sonnet implementers on their branches.
+- 2026-10-31: item 2 should-fixes done (afc69465, EditMode 847/847): ExitAdjacentToEntry is one corridor flood (no CellarRoomGraph per attempt), ~5 ms/floor, 373 retries / 0 fallbacks in 16000 floors; timeouts 900 s -> 300 s with seed counts 20000->4000, 10000->2000; Wing loop endpoint test; stale golden names renamed.
+- 2026-10-31: item 4 heal fix done (7715779d): CellarRoomChunks marks CellarHealing.PointFor's cell as taken; Chunks_NeverCoverTheHealPoint (1000 seeds x floors 1-3); hash test reworded; spread 59.1% / 61.5% unchanged. Item 2 merged into item 4 (54e3bd9a, 856/856), ChunksHash floors 1-3 re-pinned (deliberate, layout moved).
+- 2026-10-31: item 1 merged to main 49dfca96 (check PASS 9c7a8040).
