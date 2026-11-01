@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Core.Weapons;
 using UnityEngine;
 
 namespace SleepingCalamity.Runtime
@@ -33,6 +36,53 @@ namespace SleepingCalamity.Runtime
         // Raised when Players is created, replaced or recorded a new player (persist it). Main thread.
         public event Action Changed;
 
+        // ---- weapon growth (the world save's "weapons" section; M6 S0) ----
+        // The host's copy of every recorded player's growth, by OwnerId (PlayerKey.Id). Live CombatHosts register as sources and write their
+        // players' growth into it at capture time (the save flush) and when they go away, so a player who left this session keeps their growth.
+
+        public interface IGrowthSource { void CaptureGrowth(WeaponsSave into); }
+
+        private WeaponsSave _weapons = new WeaponsSave();
+        private readonly List<IGrowthSource> _sources = new List<IGrowthSource>();
+
+        // The section as last loaded or captured (never null). Read-only use: CombatHost restores a player's growth from it.
+        public WeaponsSave Weapons => _weapons;
+
+        // The saved section (cleaned) or null for an older save; does not raise Changed: it came from disk.
+        public void LoadWeapons(WeaponsSave saved) { _weapons = saved ?? new WeaponsSave(); }
+
+        public void RegisterGrowthSource(IGrowthSource source) { if (source != null && !_sources.Contains(source)) _sources.Add(source); }
+
+        // The source goes away (its CombatHost is leaving): its players' growth is kept first.
+        public void UnregisterGrowthSource(IGrowthSource source)
+        {
+            if (source == null || !_sources.Remove(source)) return;
+            source.CaptureGrowth(_weapons);
+        }
+
+        // The restored growth of a recorded player (their saved weapons, abilities and pips), or null when the world has nothing for them.
+        public PlayerGrowth RestoreGrowth(string playerId, PlayerKey key) => GrowthSaves.Restore(playerId, key.Id, _weapons);
+
+        // Brings the live sources' growth into the section and returns it.
+        public WeaponsSave CaptureWeapons()
+        {
+            foreach (IGrowthSource s in _sources) s.CaptureGrowth(_weapons);
+            return _weapons;
+        }
+
+        // Captures and copies the section into `save` (the file's value) when it differs. An empty section is not written for a save that has none
+        // (old saves stay as they were). True when the save changed (mark the file dirty).
+        public bool CaptureWeaponsInto(WorldSave save)
+        {
+            if (save == null) return false;
+            WeaponsSave copy = WeaponsSaveRules.Clean(CaptureWeapons(), null, null);   // a copy: the live section keeps changing
+            bool empty = copy.Weapons.Count == 0 && copy.Heroes.Count == 0 && copy.Extra == null;
+            if (empty && save.Weapons == null) return false;
+            if (save.Weapons != null && JsonConvert.SerializeObject(copy) == JsonConvert.SerializeObject(save.Weapons)) return false;
+            save.Weapons = copy;
+            return true;
+        }
+
         // Loads a world (from the save), or null for "no world yet". Does not raise Changed: it came from disk.
         public void Load(WorldPlayers players)
         {
@@ -64,8 +114,10 @@ namespace SleepingCalamity.Runtime
 
             if (isHost)
             {
+                PlayerKey previousOwner = world.Recorded.Count > 0 ? world.Recorded[0] : default;
                 if (world.Kind == WorldKind.Solo && !world.IsRecorded(key) && world.RebindSoloOwner(key))
                 {
+                    if (previousOwner.Id != null) GrowthSaves.Rename(_weapons, previousOwner.Id, key.Id);   // the Solo world's weapons follow its owner (A32)
                     Debug.LogWarning("HostWorld: the Solo world's owner key did not match this machine's key; the owner is now " + key + ".");
                     RaiseChanged();
                 }
