@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Core.Weapons;
+using SleepingCalamity.Runtime;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -87,6 +88,8 @@ namespace SleepingCalamity.Gameplay
             if (nm == null || !nm.IsServer || _begun) return false;
             _nm = nm;
             _begun = true;
+            // A CombatHost made without an Identity (CellarContentsSync.EnsureCombat) takes the session's roster, so its growth is keyed per recorded player.
+            if (Identity == null && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostRoster roster)) Identity = roster;
             _wave = WavesEnabled ? WaveState.Countdown : WaveState.Idle;
             _waveTimer = 4f;
             _waveNumber = 1;
@@ -95,9 +98,19 @@ namespace SleepingCalamity.Gameplay
 
         // ---- growth ----
 
+        // Growth is kept per recorded player (the HostRoster's PlayerKey, the same identity the world records), not per NGO client id: a client that
+        // drops and rejoins gets a new client id but the same key, so it gets its growth back. Without an Identity (tests, no session) the client id
+        // is the id, as before. Per-connection swing state (_states, dedupe) stays keyed by client id.
+        public IJoinContextProvider Identity { get; set; }
+
+        public string PlayerIdOf(ulong clientId)
+        {
+            return Identity != null && Identity.TryGetKey(clientId, out PlayerKey key) ? key.ToString() : clientId.ToString();
+        }
+
         public PlayerGrowth Growth(ulong clientId)
         {
-            string id = clientId.ToString();
+            string id = PlayerIdOf(clientId);
             if (!_growth.TryGetValue(id, out PlayerGrowth g))
             {
                 g = new PlayerGrowth(id);
@@ -119,7 +132,7 @@ namespace SleepingCalamity.Gameplay
             if (hero == null || !hero.IsSpawned) return;
             PlayerGrowth g = Growth(hero.OwnerClientId);
             // Every growth change (hit ABS, kill ABS, spell pips, build-up) ends in this call, so unlocks are checked here, for all weapons: a kill can credit
-            // a weapon other than the one in hand. Unlocks only grow. Not saved yet (WeaponsSave restore is M6).
+            // a weapon other than the one in hand. Unlocks only grow. Kept per recorded player for the life of this CombatHost instance (the arena and the Cellars each own one); not saved yet (WeaponsSave restore is M6).
             foreach (WeaponState owned in g.Weapons.Values) g.Abilities.Update(owned);
             WeaponState w = g.Weapon(hero.WeaponKey);
             hero.ServerPushGrowth(hero.WeaponKey, w.Level, w.Abs, w.LevelCostNow, w.Stats.Atk, w.Stats.Fire, w.Stats.Pest, g.Pips.Current, g.Pips.Cap);
@@ -225,7 +238,7 @@ namespace SleepingCalamity.Gameplay
             if (r.Damage <= 0) return;
 
             ps.HitsInSwing++;
-            e.HitLog.Add(new HitRecord(cid.ToString(), weaponKey, now));
+            e.HitLog.Add(new HitRecord(g.PlayerId, weaponKey, now));
 
             AbsGain gain = CombatRewards.OnHit(g, weaponKey, e.NetworkObjectId.ToString(), attack, r, ps.HitsInSwing, attack.Kind == AttackKind.Shot && part >= 0);
             if (gain.Abs > 0f) attacker.ServerReportAbs(weaponKey, gain.Abs, gain.TechPop, gain.LevelsGained, Why(attack, r));
@@ -257,11 +270,10 @@ namespace SleepingCalamity.Gameplay
         private void OnEnemyKilled(Enemy e, ulong killerClient, bool finisher, double now)
         {
             _alive.Remove(e);
-            List<AbsGain> gains = CombatRewards.OnKill(_growth, e.HitLog, now, e.Def.Species, killerClient.ToString(), finisher);
+            List<AbsGain> gains = CombatRewards.OnKill(_growth, e.HitLog, now, e.Def.Species, PlayerIdOf(killerClient), finisher);
             foreach (AbsGain gain in gains)
             {
-                if (!ulong.TryParse(gain.PlayerId, out ulong cid)) continue;
-                HeroCombat hero = FindHero(cid);
+                HeroCombat hero = FindHeroByPlayerId(gain.PlayerId);   // null when that player has left: the credit stays in their growth
                 if (hero == null) continue;
                 hero.ServerReportAbs(gain.WeaponKey, gain.Abs, gain.TechPop, gain.LevelsGained, "kill: " + e.Def.Name);
                 ServerSyncGrowth(hero);
@@ -283,6 +295,14 @@ namespace SleepingCalamity.Gameplay
         }
 
         private static long DedupeKey(HeroCombat victim, int serial) => ((long)victim.OwnerClientId << 32) | (uint)serial;
+
+        private HeroCombat FindHeroByPlayerId(string playerId)
+        {
+            if (_nm == null) return null;
+            foreach (KeyValuePair<ulong, NetworkClient> kv in _nm.ConnectedClients)
+                if (kv.Value.PlayerObject != null && PlayerIdOf(kv.Key) == playerId) return kv.Value.PlayerObject.GetComponent<HeroCombat>();
+            return null;
+        }
 
         private HeroCombat FindHero(ulong clientId)
         {
