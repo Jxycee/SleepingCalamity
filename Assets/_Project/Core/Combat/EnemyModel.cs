@@ -34,11 +34,14 @@ namespace SleepingCalamity.Core.Combat
         public readonly bool Ripostes;          // its blocked front hits count toward the bristle riposte (GuardCounter)
         public readonly AttackData[] Attacks;
         public readonly PartDefinition[] Parts;
+        public readonly TokenCategory TokenCategory;   // which of a hero's attack-token pools its attacks draw from (docs/research/enemy-ai.md 2.3, 5)
 
         public EnemyDefinition(EnemyKind kind, string id, string name, Species species, int hp, float atk, float def, float moveSpeed, float radius, float height,
             AttackData[] attacks, bool isElite = false, bool canRage = true, bool frontalBlock = false, bool superArmorAlways = false, bool weakToFire = false,
-            bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null, float visualReach = 1f, float poiseThreshold = 0f, bool ripostes = false)
+            bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null, float visualReach = 1f, float poiseThreshold = 0f, bool ripostes = false,
+            TokenCategory tokenCategory = TokenCategory.Melee)
         {
+            TokenCategory = tokenCategory;
             VisualReach = visualReach;
             PoiseThreshold = poiseThreshold;
             Ripostes = ripostes;
@@ -65,13 +68,13 @@ namespace SleepingCalamity.Core.Combat
         // Combat depth (2026-10-30, "fewer, tougher enemies"): small-enemy life roughly doubles so each takes a few openings (a rat-king about three with
         // the axe): slime 40 -> 80, rat-king 90 -> 180, broom 60 -> 160; the Warden stays 600. Poise thresholds: slime 2, rat-king 4, broom 5.
         public static readonly EnemyDefinition Slime = new EnemyDefinition(EnemyKind.Slime, "slime", "Jam-jar slime", Species.Slime, 80, 12f, 5f, 2.6f, 0.55f, 1.0f,
-            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f, poiseThreshold: 2f);
+            new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f, poiseThreshold: 2f, tokenCategory: TokenCategory.Ranged);
         public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 180, 18f, 10f, 4.6f, 0.5f, 1.2f,
             new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f, poiseThreshold: 4f);
         public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 160, 15f, 15f, 2.3f, 0.55f, 1.9f,
             new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f, poiseThreshold: 5f, ripostes: true);
         public static readonly EnemyDefinition DoughWarden = new EnemyDefinition(EnemyKind.DoughWarden, "dough_warden", "Dough Warden", Species.Elite, 600, 30f, 20f, 2.4f, 1.0f, 2.8f,
-            new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound, AttackCatalog.WardenQuake }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f,
+            new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound, AttackCatalog.WardenQuake }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f, tokenCategory: TokenCategory.Heavy,
             parts: new[]
             {
                 new PartDefinition("rolling_pin", 70, 1.5f, 1.4f, 0.5f, 0.2f, 1.3f),    // the arm that slams: reached from its right flank

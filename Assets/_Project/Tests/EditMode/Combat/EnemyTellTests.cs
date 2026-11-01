@@ -197,7 +197,7 @@ namespace SleepingCalamity.Tests.EditMode
             AttackData q = AttackCatalog.WardenQuake;
             Assert.That(t.TryAcquire(Hero, 10, 0.0, q, P, exclusive: true), Is.True);
             Assert.That(t.TryAcquire(Hero, 11, 0.0, AttackCatalog.RatLunge, P), Is.False, "its strike would be far from the quake's, but the tell plays alone");
-            Assert.That(t.TryAcquire(Hero, 11, q.HitOn.End / 60.0, AttackCatalog.RatLunge, P), Is.True, "after the quake lands");
+            Assert.That(t.TryAcquire(Hero, 11, q.HitOn.End / 60.0 + P.MinStrikeGapSeconds, AttackCatalog.RatLunge, P), Is.True, "after the quake lands and its gap (a closed window stays on record for the gap, stage 2)");
         }
 
         [Test]

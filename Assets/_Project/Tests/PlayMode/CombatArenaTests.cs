@@ -139,6 +139,43 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(minGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "two strikes opened " + minGap.ToString("F2") + " s apart");
         }
 
+        // Enemy AI stage 2 (token categories): a slime (ranged pool) and a rat-king (melee pool) work the same hero, so neither blocks the other's token.
+        // Both are under way together at some point, and the hits still land a gap apart.
+        [UnityTest, Timeout(60000)]
+        public IEnumerator Solo_SlimeAndRat_AttackTheSameHeroTogether_WithoutBlockingEachOther()
+        {
+            yield return StartCombatSolo();
+            var hero = AppBootstrap.Current.NetworkManager.LocalClient.PlayerObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            yield return Seconds(0.3f);
+            Enemy slime = combat.SpawnEnemy(EnemyKind.Slime, 1, hero.transform.position + new Vector3(2.4f, 0f, 0f));
+            Enemy rat = combat.SpawnEnemy(EnemyKind.RatKing, 1, hero.transform.position + new Vector3(-2.4f, 0f, 0f));
+            Assert.That(slime.Crowd, Is.SameAs(rat.Crowd), "one room, one crowd");
+            bool together = false;
+            int slimeStrikes = 0, ratStrikes = 0;
+            float minGap = float.MaxValue, lastStrike = -1f;
+            var seen = new System.Collections.Generic.HashSet<(ulong, int)>();
+            double until = Time.realtimeSinceStartupAsDouble + 14.0;
+            while (Time.realtimeSinceStartupAsDouble < until)
+            {
+                if (slime.Attacking && rat.Attacking) together = true;
+                foreach (Enemy e in new[] { slime, rat })
+                {
+                    if (!e.IsSpawned || !e.Alive || !e.HitboxOn || !seen.Add((e.NetworkObjectId, e.Serial))) continue;
+                    if (lastStrike >= 0f) minGap = Mathf.Min(minGap, Time.time - lastStrike);
+                    lastStrike = Time.time;
+                    if (e == slime) slimeStrikes++; else ratStrikes++;
+                }
+                yield return null;
+            }
+            Assert.That(slimeStrikes, Is.GreaterThanOrEqualTo(1), "the slime attacked");
+            Assert.That(ratStrikes, Is.GreaterThanOrEqualTo(1), "the rat attacked");
+            Assert.That(together, Is.True, "a slime and a rat were never under way at the same time: one pool is blocking the other");
+            Assert.That(minGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "two strikes opened " + minGap.ToString("F2") + " s apart");
+        }
+
         [UnityTest]
         public IEnumerator Solo_WaveOne_Spawns_AndTheEnemiesChaseAndHurtAnIdleHero()
         {

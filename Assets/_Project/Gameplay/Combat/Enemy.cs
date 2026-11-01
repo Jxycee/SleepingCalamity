@@ -54,9 +54,11 @@ namespace SleepingCalamity.Gameplay
         // after 120 s): the victim's judged-set and the host's dedupe key on (enemy id, serial) and must never meet a stale pair.
         private static int s_nextAttackSerial;
 
-        // Host: who may attack which hero right now (Core AttackTokens; keys are the Unity objects' hash codes, their instance ids, unique across the NetworkManagers of a test process).
-        private static readonly AttackTokens s_tokens = new AttackTokens();
-        public static AttackTokens Tokens => s_tokens;
+        // Host: the room's crowd (CombatHost owns it) holds who may attack which hero right now (Core AttackTokens; keys are the Unity objects' hash codes,
+        // their instance ids, unique across the NetworkManagers of a test process). An enemy spawned outside CombatHost gets a private crowd of its own.
+        public EnemyCrowd Crowd { get; private set; }
+        private AttackTokens Tokens => (Crowd ??= new EnemyCrowd()).Tokens;
+        public void ServerJoinCrowd(EnemyCrowd crowd) { Crowd = crowd; }
 
         private Targetable _targetable;
         private float _staggerLeft, _recoverLeft, _cooldown, _despawnIn = -1f;
@@ -72,7 +74,7 @@ namespace SleepingCalamity.Gameplay
         private readonly AiContext _ctx = new AiContext();
         private readonly List<HeroVitals> _heroBuf = new List<HeroVitals>();   // parallel to _ctx.Heroes
         private static readonly System.Func<float> s_rand = () => Random.value;
-        private AiBrain Brain => _brain ??= new AiBrain(s_tokens, s_rand);
+        private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand);
         private float _bracedLeft;                       // host: seconds the broom still shows its brace after a blocked hit
         public const float BracedShowSeconds = 0.35f;
 
@@ -153,7 +155,7 @@ namespace SleepingCalamity.Gameplay
         private void OnDisable() { s_all.Remove(this); }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { s_all.Clear(); s_nextAttackSerial = 0; s_tokens.Clear(); }
+        private static void ResetStatics() { s_all.Clear(); s_nextAttackSerial = 0; }
 
         // Host only, BEFORE Spawn: the kind, tier and party size ride in the spawn message.
         public void ServerSeed(EnemyKind kind, int tier, int players)
@@ -177,6 +179,7 @@ namespace SleepingCalamity.Gameplay
             NetPhase.OnValueChanged += OnPhaseChanged;
             if (IsServer)
             {
+                Crowd?.Register(this);
                 if (Model == null) Model = new EnemyModel(Def, Tier, 1);
                 _targetable.Alive = true;
                 _cooldown = _initialCooldown;
@@ -191,7 +194,7 @@ namespace SleepingCalamity.Gameplay
             _targetable.Alive = false;
             if (IsServer)
             {
-                s_tokens.Release(GetHashCode());
+                Crowd?.Unregister(this);
                 ServerDespawned?.Invoke(this);
             }
         }
@@ -402,7 +405,7 @@ namespace SleepingCalamity.Gameplay
             {
                 _attackEndedAt = Time.timeAsDouble;
                 NetAttackIdx.Value = -1;
-                s_tokens.Release(GetHashCode());
+                Tokens.Release(GetHashCode());
                 _cooldown = AttackPacing.CooldownSeconds(Def.Kind, Tier);
                 _recoverLeft = AttackPacing.RecoverSeconds(Def.Kind, Tier) + (a == AttackCatalog.WardenQuake ? AttackPacing.SignatureExtraRecoverSeconds : 0f);
                 Vector3 away = target != null ? transform.position - target.transform.position : -transform.forward;
@@ -455,7 +458,7 @@ namespace SleepingCalamity.Gameplay
 
             if (r.Killed)
             {
-                s_tokens.Release(GetHashCode());
+                Crowd?.Unregister(this);
                 _lastAttackData = null;
                 NetAttackIdx.Value = -1;
                 SetPhase(EnemyPhase.Dead);
@@ -478,8 +481,8 @@ namespace SleepingCalamity.Gameplay
                 // The broom's guard was hammered: it answers whatever the tokens say (like the break-free), recording a forced hold on its nearest hero so
                 // later attacks keep their gap from it.
                 HeroVitals near = PickTarget();
-                if (near != null) s_tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.BroomRiposte);
-                else s_tokens.Release(GetHashCode());
+                if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.BroomRiposte, Def.TokenCategory);
+                else Tokens.Release(GetHashCode());
                 ServerStartAttack(AttackCatalog.BroomRiposte, transform.position);
             }
             if (r.Knockback > 0f) _knock += away * r.Knockback;
@@ -488,8 +491,8 @@ namespace SleepingCalamity.Gameplay
                 // Break free: a quick circle that clears everyone off it (the elite's answer to being chained). It answers the heroes hitting it, so it
                 // starts whatever the tokens say, but records a forced hold on its nearest hero so the next attacks keep their gap from it.
                 HeroVitals near = PickTarget();
-                if (near != null) s_tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.WardenBreakFree);
-                else s_tokens.Release(GetHashCode());
+                if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.WardenBreakFree, Def.TokenCategory);
+                else Tokens.Release(GetHashCode());
                 ServerStartAttack(AttackCatalog.WardenBreakFree, transform.position);
             }
             return r;
@@ -501,7 +504,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (Phase == EnemyPhase.Attack) _attackEndedAt = Time.timeAsDouble;
             NetAttackIdx.Value = -1;
-            s_tokens.Release(GetHashCode());
+            Tokens.Release(GetHashCode());
         }
 
         // Host: the enemy is open (x1.5, double poise): flinching or stunned, recovering after its attack, or past the hitbox of the attack it is in.

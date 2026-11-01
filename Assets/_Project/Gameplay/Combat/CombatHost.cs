@@ -49,6 +49,13 @@ namespace SleepingCalamity.Gameplay
         private readonly Dictionary<ulong, HostPlayerState> _states = new Dictionary<ulong, HostPlayerState>();
         private readonly HashSet<long> _enemyHitDedupe = new HashSet<long>();   // (victim client << 32) | enemy attack serial; serials are unique per host (Enemy)
         private readonly List<Enemy> _alive = new List<Enemy>();
+        // Host: one crowd (enemies + attack tokens) per room, so rooms never share a token table (docs/research/enemy-ai.md 10.4).
+        private readonly Dictionary<int, EnemyCrowd> _crowds = new Dictionary<int, EnemyCrowd>();
+        public EnemyCrowd CrowdFor(int room)
+        {
+            if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd();
+            return c;
+        }
         private readonly List<PlayerVitals> _party = new List<PlayerVitals>();   // scratch for Update (no per-frame allocation)
 
         private WaveState _wave = WaveState.Idle;
@@ -370,7 +377,7 @@ namespace SleepingCalamity.Gameplay
         // Spawning
         // =================================================================================================================================
 
-        public Enemy SpawnEnemy(EnemyKind kind, int tier, Vector3 position, bool ai = true)
+        public Enemy SpawnEnemy(EnemyKind kind, int tier, Vector3 position, bool ai = true, int room = EnemyCrowd.ArenaRoom)
         {
             if (_nm == null || !_nm.IsServer) return null;
             NetworkObject prefab = kind == EnemyKind.Slime ? slimePrefab : kind == EnemyKind.RatKing ? ratPrefab : kind == EnemyKind.Broom ? broomPrefab : wardenPrefab;
@@ -381,6 +388,7 @@ namespace SleepingCalamity.Gameplay
             NetworkObject instance = Instantiate(prefab, position, rot);
             Enemy e = instance.GetComponent<Enemy>();
             e.ServerSeed(kind, tier, PlayerCount());
+            e.ServerJoinCrowd(CrowdFor(room));
             e.AiEnabled = AiEnabled && ai;
             instance.Spawn(destroyWithScene: true);
             _alive.Add(e);
@@ -439,6 +447,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (!_begun || _nm == null || !_nm.IsServer || !_nm.IsListening) return;
             float dt = Time.deltaTime;
+            foreach (EnemyCrowd crowd in _crowds.Values) crowd.Tick(dt, Time.timeAsDouble);
             for (int i = _alive.Count - 1; i >= 0; i--)
             {
                 Enemy x = _alive[i];
