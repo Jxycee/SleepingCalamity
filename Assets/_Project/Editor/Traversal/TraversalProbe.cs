@@ -99,10 +99,10 @@ namespace SleepingCalamity.EditorTools
         {
             float t0 = Time.realtimeSinceStartup;
             var res = new ScanResult { Space = space, Hero = hero };
-            int visLayer = SpareLayer();
+            int visLayer = SpareLayer(-1), softLayer = SpareLayer(visLayer);
             int physMask = 0;
-            for (int l = 0; l < 32; l++) if (l != visLayer && l != 2 && !Physics.GetIgnoreLayerCollision(hero.Layer, l)) physMask |= 1 << l;
-            int visMask = 1 << visLayer;
+            for (int l = 0; l < 32; l++) if (l != visLayer && l != softLayer && l != 2 && !Physics.GetIgnoreLayerCollision(hero.Layer, l)) physMask |= 1 << l;
+            int visMask = 1 << visLayer, anyVisMask = visMask | (1 << softLayer);
             NavMesh.RemoveAllNavMeshData();
             Physics.SyncTransforms();
 
@@ -133,7 +133,7 @@ namespace SleepingCalamity.EditorTools
             var visuals = new List<GameObject>();
             try
             {
-                if (opt.Full) res.VisualMeshes = AddVisuals(space.Root, visLayer, visuals);
+                if (opt.Full) res.VisualMeshes = AddVisuals(space.Root, visLayer, softLayer, visuals);
                 Physics.SyncTransforms();
 
                 // ------------------------------------------------------------ intended paths
@@ -141,11 +141,11 @@ namespace SleepingCalamity.EditorTools
 
                 if (opt.Full)
                 {
-                    GridPass(res, grid, hero, physMask, visMask);
+                    GridPass(res, grid, hero, physMask, visMask, anyVisMask);
                     Islands(res, grid, open, hero, physMask);
                     Stairs(res, grid, hero);
                     KeepClearZones(res, hero, physMask, visMask);
-                    Oversized(res, visLayer);
+                    Oversized(res, visLayer, softLayer);
                 }
             }
             finally
@@ -161,9 +161,9 @@ namespace SleepingCalamity.EditorTools
             return res;
         }
 
-        static int SpareLayer()
+        static int SpareLayer(int not)
         {
-            for (int l = 31; l >= 8; l--) if (string.IsNullOrEmpty(LayerMask.LayerToName(l))) return l;
+            for (int l = 31; l >= 8; l--) if (l != not && string.IsNullOrEmpty(LayerMask.LayerToName(l))) return l;
             throw new InvalidOperationException("TraversalScan: no spare layer for the visual probe");
         }
 
@@ -262,7 +262,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ---------------------------------------------------------------------------------------------------------------- visual probe
-        static int AddVisuals(Transform root, int layer, List<GameObject> made)
+        static int AddVisuals(Transform root, int layer, int softLayer, List<GameObject> made)
         {
             if (root == null) return 0;
             var skip = new HashSet<Renderer>();
@@ -276,11 +276,11 @@ namespace SleepingCalamity.EditorTools
             {
                 if (!mr.enabled || !mr.gameObject.activeInHierarchy || skip.Contains(mr)) continue;
                 if (mr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
-                if (IsSoft(mr)) continue;
+                bool soft = IsSoft(mr);
                 MeshFilter mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null || mf.sharedMesh.vertexCount > 400000) continue;
                 if (mr.bounds.size.y < 0.12f) continue;
-                var go = new GameObject(VisualName) { layer = layer, hideFlags = HideFlags.DontSave };
+                var go = new GameObject(VisualName) { layer = soft ? softLayer : layer, hideFlags = HideFlags.DontSave };   // soft dressing: seen by the invisible-collider check only
                 go.transform.SetParent(mr.transform, false);
                 MeshCollider mc = go.AddComponent<MeshCollider>();
                 mc.sharedMesh = mf.sharedMesh;
@@ -446,7 +446,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ---------------------------------------------------------------------------------------------------------------- grid pass
-        static void GridPass(ScanResult res, WalkGrid g, HeroCapsule hero, int physMask, int visMask)
+        static void GridPass(ScanResult res, WalkGrid g, HeroCapsule hero, int physMask, int visMask, int anyVisMask)
         {
             ScanSpace s = res.Space;
             float rc = hero.Radius + HeroCapsule.ComfortMargin * 0.5f;
@@ -495,7 +495,7 @@ namespace SleepingCalamity.EditorTools
                     if (blocker != null)
                     {
                         if (blocker is TerrainCollider) continue;
-                        if (!BodyBlocked(gp, hero, 0.3f, visMask))
+                        if (!BodyBlocked(gp, hero, 0.3f, anyVisMask))
                         {
                             g.Flags[i] |= WalkGrid.FInvisible;
                             Issue(res, IssueKind.InvisibleBlocker, gp, 0f, 0f, "collider with nothing visible within 0.3 m", blocker, null);
@@ -758,13 +758,13 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        static void Oversized(ScanResult res, int visLayer)
+        static void Oversized(ScanResult res, int visLayer, int softLayer)
         {
             Transform root = res.Space.Root;
             if (root == null) return;
             foreach (Collider col in root.GetComponentsInChildren<Collider>())
             {
-                if (!col.enabled || col.isTrigger || col is TerrainCollider || col.gameObject.layer == visLayer || !col.gameObject.activeInHierarchy) continue;
+                if (!col.enabled || col.isTrigger || col is TerrainCollider || col.gameObject.layer == visLayer || col.gameObject.layer == softLayer || !col.gameObject.activeInHierarchy) continue;
                 res.Colliders++;
                 Renderer r = col.GetComponent<Renderer>();
                 if (r == null || !r.enabled) continue;
