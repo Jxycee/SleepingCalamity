@@ -3,7 +3,7 @@
 Session: Saltwake road 2 (Q15 follow-up) (resumed in cloud session claude/vibrant-bell-ujeedj)
 Job: fix Q15's three accepted gaps plus the low cameras' bare horizon: (1) RoadOut Rebuilt view blocked by a house; (2) flat haze strip behind the tree line; (3) low-sun ridges flat orange; (4) low town cameras (Cap_HM_Ruins) get a backdrop tree line
 Progress: 80% (r1 APPROVED by the coordinator ~26-27/40, final round; waiting for the merge turn)
-Status: WAITING (merge turn: after procgen item 4 and Polish 3b)
+Status: CHECKING (merge turn: main merged incl. procgen 3; build + check running)
 Blocker: none
 Archive: no
 Branch: claude/vibrant-bell-ujeedj (resumes claude/fervent-sagan-bzpbbq, WIP merged in cb750c1)
@@ -22,3 +22,4 @@ Merge commit: -
 - r1 read: strip gone, ridges read as rolling layers with lit/shadow sides; low sun now steps warm trees / grey-blue mid / violet far. Weak: RoadOut's right edge is a gate-pier slab; the far ridge's low-sun violet too lilac; midday layers still pale; from Cap_HM_Ruins the belt sits below the far ground (west fall) and barely reads. Round 2 targets those.
 - r1 APPROVED by the coordinator (session 6), no more rounds; round 2 agent stopped before any commit. Final sheet road2_final.jpg. Noted, not now (PARKING_LOT): at low sun the R3_02 house face and the gate bank slab go saturated orange.
 - Next (my turn after procgen item 4 and Polish 3b): merge origin/main, regenerate Hollowmere with a -nographics build, one `unity.sh check`, merge on PASS, STATUS DONE + Archive: ready.
+- 08:44 UTC: origin/main merged once more (procgen item 3, 81e0281); scenes regenerating with the builder (-nographics), then one check.
