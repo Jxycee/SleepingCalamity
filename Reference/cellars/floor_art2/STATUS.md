@@ -1,15 +1,15 @@
-State: IN PROGRESS
+State: DONE
 Session: Cellars floor art 2: dense dressing and the corner's grade
 Job: dress the generated Cellars rooms to the approved corner's density (B5 kit shelves, barrels, crates, rubble, jars) and match the corner's grade, lamp colour and fog (less orange)
-Progress: 85% - 3 rounds done (cap), final sheet on claude/floor-art2-code ab973e2; merging origin/main (spine + contents) into the code branch; waits for Q12 procgen to merge first (coordinator order), then one check and merge
-Status: APPROVED to merge by the coordinator (round 3 about 24-25/40); waiting for Q12 procgen's merge (in check), then main merge, -nographics regen, one check, merge. Null-kit fix kept (default (a), no other answer). Follow-ups go to the procgen successor.
-Blocker: none (one coordinator decision below, not blocking the rounds)
-Archive: no
+Progress: 100% - merged to main in a0132c7
+Status: DONE (merged)
+Blocker: none
+Archive: ready
 Branch: claude/happy-ramanujan-41karq
 Score: self round 3 about 25/40 (silhouette 3, proportion 3.5, form 3, surface 3.5, colour 4, wear 3, set/density 2.5, emissive 3); r2 24; floor 25 met, cap reached
-Sheet: Reference/cellars/floor_art2/SHEET_floor_art2.jpg (corner reference wide/mid above floor_room, floor_corridor, floor_overview; on the code branch until merge)
-SC RESULT: -
-Merge commit: -
+Sheet: Reference/cellars/floor_art2/SHEET_floor_art2.jpg (corner reference wide/mid above floor_room, floor_corridor, floor_overview)
+SC RESULT: check PASS on 6327539 (build PASS, test-edit 866/866, test-play 61 passed / 8 skipped / 0 failed); main then gained only docs commits (31f5782, c068c43), merge Assets/Packages/ProjectSettings tree == checked tip
+Merge commit: a0132c7 (main)
 
 ## Coordination with Q12 (claude/cellar-procgen)
 - This job does NOT edit the room pool sockets or `CellarFloorDressing.Resolve`: Q12 pins `LayoutHash`/`DressingHash` for floors 1-3. Density comes from a new Core resolver `CellarFloorClutter` (own `Rng.Derive` stream, own hash, new file only) read by the Presentation art layer. Q12: please don't add a file of that name; tell us here if your layer must reserve cells clutter should avoid.
@@ -70,3 +70,12 @@ Read: colour now sits with the corner (no orange cast, grey-brown darks, paler g
 - Density beyond wall clutter needs room-pool socket data (more Shelf/Barrel sockets in bare rooms) - Q12's pinned DressingHash territory; or a camera on a less crowded room to judge. Wall/overhead dressing (hanging herbs, wall racks) would add density without floor cost.
 - Gameplay markers (chest boxes, spawn discs) are still greybox and read as clutter-free floor in captures.
 - Light share: add the corner's secondary warm sources (niche candle glow, larder light) to room sockets.
+
+## Merge
+Merged origin/main 94f4c3d0 (M5 spine + contents + Q12 procgen item 1) into the code branch; main's own CellarFloorKit serialization (PieceList + SaveRuntimeKit) replaced this branch's null-kit fix, so the decision above is moot; SaveRuntimeKit now carries the 5 clutter pieces to CellarFloorSync. CellarFloorBuilder.cs diff vs main: one ArtFinish call line. Procgen special-room marker (room centre) and door hints (above doors) don't meet wall clutter; no goldens repinned at the merge.
+
+## Usage waste
+- Disk filled mid-job (four 2.9 GB agent worktrees + the 600 MB Unity archive): one fix agent bounced. Lesson: one persistent worktree per job shared by step agents (saves the Library import too).
+- The background Unity setup job had died at session start (stale RUNNING flag); re-ran setup --wait.
+- Round 1 room view showed no clutter (camera room crowded by sockets/spawns + a reachability rule that counted wall clutter as a blocked cell): one round spent on diagnosis.
+- A cross-session message to the coordinator was refused (cloud -> local needs the owner's trust approval); STATUS carried it instead.
