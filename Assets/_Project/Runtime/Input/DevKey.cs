@@ -6,6 +6,8 @@ namespace SleepingCalamity.Runtime
     {
         ToggleOverlay = 0,          // F3
         SwapWeapon = 1,             // F5: cycle the four heirlooms (M3 arena)
-        SkipWave = 2                // F6: the host clears the arena wave (M3 arena)
+        SkipWave = 2,               // F6: the host clears the arena wave (M3 arena)
+        StartDive = 3,              // F7: the host starts a Cellars dive from anywhere (M5 spine)
+        AbandonDive = 4             // F8: the host abandons the running dive (M5 spine)
     }
 }
