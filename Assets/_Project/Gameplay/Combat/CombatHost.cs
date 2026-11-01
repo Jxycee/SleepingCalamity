@@ -134,7 +134,11 @@ namespace SleepingCalamity.Gameplay
             {
                 PlayerKey key = default;
                 bool keyed = Identity != null && Identity.TryGetKey(clientId, out key) && !string.IsNullOrEmpty(key.Id);
-                if (keyed) g = World()?.RestoreGrowth(id, key);
+                if (keyed)
+                {
+                    HostWorld w = World();
+                    if (w != null) { w.CaptureWeapons(); g = w.RestoreGrowth(id, key); }   // capture first: another live host's newer growth is in the section before we restore
+                }
                 if (g == null) g = new PlayerGrowth(id);
                 _growth[id] = g;
                 if (keyed) _ownerIds[id] = key.Id;

@@ -128,6 +128,7 @@ namespace SleepingCalamity.App
             if (store == null)
             {
                 bus.Publish(new ToastRequested("world.library_full", kind.ToString(), 6f));   // 10 worlds of this kind: pick one or delete one
+                world.LoadWeapons(null);   // no stale section from an earlier world
                 return;
             }
             SelectedWorldId = store.Current.WorldId;
@@ -189,7 +190,8 @@ namespace SleepingCalamity.App
             if (now >= nextFlush)
             {
                 nextFlush = now + FlushSeconds;
-                if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty();
+                try { if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty(); }
+                catch (Exception e) { Debug.LogException(e); }   // keep the old section; the rest of the flush still runs
                 if (store.IsDirty) Write();
             }
         }

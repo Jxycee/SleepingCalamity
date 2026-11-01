@@ -49,9 +49,23 @@ namespace SleepingCalamity.Runtime
         public WeaponsSave Weapons => _weapons;
 
         // The saved section (cleaned) or null for an older save; does not raise Changed: it came from disk.
-        public void LoadWeapons(WeaponsSave saved) { _weapons = saved ?? new WeaponsSave(); }
+        // The section is always a separate copy (never the file's own object, or capture would compare the save with itself). Sources are cleared:
+        // a new world means the old world's CombatHosts must not write into it.
+        public void LoadWeapons(WeaponsSave saved)
+        {
+            _sources.Clear();
+            _weapons = saved != null ? WeaponsSaveRules.Clean(saved, null, null) : new WeaponsSave();
+        }
 
-        public void RegisterGrowthSource(IGrowthSource source) { if (source != null && !_sources.Contains(source)) _sources.Add(source); }
+        // Only one live source at a time: a newer CombatHost (a scene change that overlaps the old one's teardown) takes over. The others'
+        // growth is captured first, and the newcomer restores from the section, so no increment is lost and a stale host cannot overwrite it.
+        public void RegisterGrowthSource(IGrowthSource source)
+        {
+            if (source == null || _sources.Contains(source)) return;
+            foreach (IGrowthSource other in _sources) other.CaptureGrowth(_weapons);
+            _sources.Clear();
+            _sources.Add(source);
+        }
 
         // The source goes away (its CombatHost is leaving): its players' growth is kept first.
         public void UnregisterGrowthSource(IGrowthSource source)

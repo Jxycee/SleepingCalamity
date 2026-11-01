@@ -159,6 +159,69 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(_world.CaptureWeaponsInto(new WorldSave()), Is.False, "nothing to write");
         }
 
+        // Catches: the world holding the file's own section object (WorldSaveFlow.Open passes store.Current.Weapons), so capture compared it with itself
+        // and never marked the file dirty from the second session on.
+        [Test]
+        public void LoadedByReference_StillCapturesNewGrowth()
+        {
+            _roster.Connect(new ApprovedJoin(0, K("host"), "host", 0, false));
+            _host.Growth(0).Weapon(Axe).AddAbs(10f);
+            var file = new WorldSave();
+            Assert.That(_world.CaptureWeaponsInto(file), Is.True);
+
+            var world = new HostWorld();
+            world.LoadWeapons(file.Weapons);   // by reference, as Open does
+            Assert.That(world.Weapons, Is.Not.SameAs(file.Weapons), "a separate copy");
+            var go = new GameObject("CombatHostWeaponsSaveTests.byref");
+            try
+            {
+                var host = go.AddComponent<CombatHost>();
+                host.Identity = _roster;
+                host.GrowthWorld = world;
+                world.RegisterGrowthSource(host);
+                WeaponState axe = host.Growth(0).Weapon(Axe);
+                float before = axe.Abs;
+                axe.AddAbs(20f);
+                Assert.That(axe.Abs, Is.Not.EqualTo(before));
+                Assert.That(world.CaptureWeaponsInto(file), Is.True, "growth since the load is seen");
+                Assert.That(GrowthSaves.Restore("Local:host", "host", file.Weapons).Weapon(Axe).Abs, Is.EqualTo(axe.Abs));
+                Assert.That(world.CaptureWeaponsInto(file), Is.False, "and nothing more to write after");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // Catches: two CombatHosts alive at once (a scene change overlapping the old host's teardown) losing growth to whichever captures last.
+        [Test]
+        public void TwoLiveHosts_LoseNoGrowth()
+        {
+            _roster.Connect(new ApprovedJoin(0, K("host"), "host", 0, false));
+            _roster.Connect(new ApprovedJoin(1, K("a"), "a", 1, false));
+            _host.Growth(0).Weapon(Axe).AddAbs(10f);
+            _host.Growth(1).Weapon(Axe).AddAbs(10f);
+            float aAbs = _host.Growth(1).Weapon(Axe).Abs;
+            float firstHostAbs = _host.Growth(0).Weapon(Axe).Abs;
+
+            var go = new GameObject("CombatHostWeaponsSaveTests.second");
+            try
+            {
+                var b = go.AddComponent<CombatHost>();
+                b.Identity = _roster;
+                b.GrowthWorld = _world;
+                _world.RegisterGrowthSource(b);   // host B is enabled while A is still alive
+                WeaponState bAxe = b.Growth(0).Weapon(Axe);
+                Assert.That(bAxe.Abs, Is.EqualTo(firstHostAbs), "B started from A's growth");
+                bAxe.AddAbs(5f);
+                float bAbs = bAxe.Abs;
+                Assert.That(bAbs, Is.Not.EqualTo(firstHostAbs));
+
+                var file = new WorldSave();
+                Assert.That(_world.CaptureWeaponsInto(file), Is.True);
+                Assert.That(GrowthSaves.Restore("Local:host", "host", file.Weapons).Weapon(Axe).Abs, Is.EqualTo(bAbs), "B's increment on top of A's");
+                Assert.That(GrowthSaves.Restore("Local:a", "a", file.Weapons).Weapon(Axe).Abs, Is.EqualTo(aAbs), "A's player B never touched");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         private static WorldSave Roundtrip(WorldSave s)
         {
             return Newtonsoft.Json.JsonConvert.DeserializeObject<WorldSave>(Newtonsoft.Json.JsonConvert.SerializeObject(s));
