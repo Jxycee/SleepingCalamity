@@ -169,7 +169,8 @@ namespace SleepingCalamity.EditorTools
             VisitAllObjects(errors, prefabsFolder, (assetPath, go) =>
             {
                 MeshFilter filter = go.GetComponent<MeshFilter>();
-                if (filter != null && filter.sharedMesh == null) errors.Add(assetPath + ": " + HierarchyPath(go) + " MeshFilter has no mesh");
+                // LookTestGeometry builds its mesh on enable and the scene stores none (so an inactive greybox, like Hollowmere's Rebuilt preset or the town view's hidden parts, reads null here).
+                if (filter != null && filter.sharedMesh == null && !(go.GetComponent<Presentation.LookTestGeometry>() is Presentation.LookTestGeometry lookGeo && lookGeo.enabled)) errors.Add(assetPath + ": " + HierarchyPath(go) + " MeshFilter has no mesh");
                 foreach (MeshCollider collider in go.GetComponents<MeshCollider>())
                     if (collider.sharedMesh == null) errors.Add(assetPath + ": " + HierarchyPath(go) + " MeshCollider has no mesh");
                 SkinnedMeshRenderer skinned = go.GetComponent<SkinnedMeshRenderer>();
@@ -232,7 +233,7 @@ namespace SleepingCalamity.EditorTools
             if (count == 0 && errors.Count > 0) return errors; // the play-mode guard fired; nothing was visited
             if (count != 1) errors.Add("Bootstrap has " + count + " AppBootstrap components, expected 1");
 
-            foreach (string arenaPath in new[] { AssetPaths.ArenaScene, AssetPaths.CombatArenaScene })
+            foreach (string arenaPath in new[] { AssetPaths.ArenaScene, AssetPaths.CombatArenaScene, HollowmereBuilder.ScenePath })
             {
                 if (!File.Exists(BuilderUtil.Abs(arenaPath))) continue;
                 int spawnPoints = 0;

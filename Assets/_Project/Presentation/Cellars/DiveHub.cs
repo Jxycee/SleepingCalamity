@@ -16,7 +16,9 @@ namespace SleepingCalamity.Presentation
 
         public DiveDirector Director => _director;
 
-        public void Configure(Transform entrance, Transform origin) { Entrance = entrance; Origin = origin; }
+        public Transform Landing;    // M6 S3 (Hollowmere): where the party stands after go-home or fail (the stair top); null = the SpawnPoint (Arena_Dive)
+
+        public void Configure(Transform entrance, Transform origin, Transform landing = null) { Entrance = entrance; Origin = origin; Landing = landing; }
 
         private void Update()
         {
@@ -34,7 +36,7 @@ namespace SleepingCalamity.Presentation
             NetworkObject spawned = nm.SpawnManager.InstantiateAndSpawn(prefab, nm.LocalClientId, true, false, false, Vector3.zero, Quaternion.identity);
             _director = spawned.GetComponent<DiveDirector>();
             SpawnPoint spawn = FindFirstObjectByType<SpawnPoint>();
-            _director.ServerConfigure(spawn != null ? spawn.transform.position : Vector3.zero,
+            _director.ServerConfigure(Landing != null ? Landing.position : spawn != null ? spawn.transform.position : Vector3.zero,
                 Entrance != null ? Entrance.position : Vector3.zero, Origin != null ? Origin.position : new Vector3(200f, 0f, 0f));
         }
     }
