@@ -45,7 +45,7 @@ namespace SleepingCalamity.Presentation
         }
     }
 
-    public sealed class CellarFloorBuild
+    public sealed partial class CellarFloorBuild
     {
         public Transform Root;
         public Bounds Bounds;                   // world bounds of the occupied cells (floor level)
@@ -136,7 +136,6 @@ namespace SleepingCalamity.Presentation
             if (layout == null) throw new System.ArgumentNullException(nameof(layout));
             kit = kit ?? new CellarFloorKit();
             var root = new GameObject("CellarFloor_s" + layout.Seed + "_f" + layout.Floor).transform;
-            root.SetParent(parent, false);
             var result = new CellarFloorBuild { Root = root };
             var grid = new Grid(layout);
             var mats = new Mats(kit);
@@ -215,7 +214,9 @@ namespace SleepingCalamity.Presentation
             Lamps(layout, dressing, grid, lamps, kit, mats, result);
             Dress(layout, dressing, grid, root, kit, mats, result);
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
+            Procgen(layout, dressing, Group(root, ProcgenGroup), mats, result);
             Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
+            ParentBuiltFloor(root, parent, result);
             return result;
         }
 
