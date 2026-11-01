@@ -94,7 +94,7 @@ namespace SleepingCalamity.Presentation
             }
             int extra = stir.ExtraEnemiesPerRoom; bool hunter = stir.HunterLatched;
             if (EncounterPlan != null && _planSeed == fs.BuiltSeed && _planFloor == fs.BuiltFloor && _planExtra == extra && _planHunter == hunter) return;
-            EncounterPlan = CellarEncounterPlan.Build(fs.Layout, fs.Built.Dressing, extra, hunter);
+            EncounterPlan = CellarEncounterPlan.BuildForDive(fs.Layout, fs.Built.Dressing, extra, hunter);
             _planSeed = fs.BuiltSeed; _planFloor = fs.BuiltFloor; _planExtra = extra; _planHunter = hunter;
             EncounterChanged?.Invoke();
         }

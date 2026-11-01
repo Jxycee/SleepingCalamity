@@ -173,7 +173,7 @@ namespace SleepingCalamity.Presentation
                     }
                 }
 
-            CellarFloorClutter clutter = CellarFloorClutter.Resolve(layout, resolved);
+            CellarFloorClutter clutter = CellarFloorClutter.Resolve(layout, resolved, CellarRoomChunks.Resolve(layout, resolved));   // clutter yields to chunk solid cells
             Sockets(resolved, grid, kit, mats, ceiling, dressing, result);
             Corners(layout, resolved, grid, kit, mats, dressing, result, clutter);
             Clutter(clutter, kit, mats, dressing);
