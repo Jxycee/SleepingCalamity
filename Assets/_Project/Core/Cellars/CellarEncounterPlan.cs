@@ -10,8 +10,8 @@
 //   - floor 4 (the bakery set-piece) is treated like any floor: its Combat rooms take extras and the hunter may roam it. Its fixed rooms keep every authored cell, so a legal cell
 //     is simply the room's remaining free floor.
 //   - procgen 3: the plan also carries the floor's roster (RosterMask, CellarFloorRoster) and, from BuildForDive only, its twist: Thin drops one spawn per room that has more than
-//     one (an authored spawn first, never the gate-key carrier or the warden; extras survive), Crowded adds one extra in about half the Combat rooms (at least one), Ambush only names AmbushRoom (plan
-//     data; the runtime behaviour is not built yet). Build() (no twist) stays the plain plan the older tests and the carrier check use.
+//     one (an authored spawn first, never the gate-key carrier or the warden; extras survive), Crowded adds one extra in about half the Combat rooms (at least one), Ambush names AmbushRoom (plan data; CellarAmbush picks the ring cells and CellarContentsSync springs them after a short delay).
+//   - procgen 3b: no spawn stands on a chunk solid cell (CellarRoomChunks): extras and the hunter skip them, an authored spawn on one moves to the nearest free non-solid cell (never the gate-key carrier or the warden, whose logic is keyed to their cell). Build() (no twist) stays the plain plan the older tests and the carrier check use.
 // Own Rng stream, never touches the layout/dressing goldens. No float, no string hashing for decisions.
 // Authority: none (static data); the host consumes it.
 using System.Collections.Generic;
@@ -67,6 +67,7 @@ namespace SleepingCalamity.Core
             int extra = extraEnemiesPerRoom < 0 ? 0 : extraEnemiesPerRoom;
             int n = CellarFloorLayout.GridSize;
             bool[,] blocked = BlockedCells(layout, dressing);
+            bool[,] solid = SolidCells(layout, dressing);
             int firstCombat = -1;   // Crowded: the guaranteed room is the first Combat room that has a free cell, so the twist always adds one
             if (twist == FloorTwist.Crowded)
             {
@@ -80,16 +81,31 @@ namespace SleepingCalamity.Core
             {
                 PlacedRoom p = layout.Rooms[r];
                 if (p.Room.Kind != RoomKind.Combat) continue;
+                List<CellPos> freeNow = null;   // free non-solid cells of this room, built only when an authored spawn sits on a chunk solid
                 foreach (CellarSpawn sp in p.Room.Spawns)
                 {
                     CellPos w = p.Cell(sp.X, sp.Y); taken[w.X, w.Y] = true;
+                    // procgen 3b: spawns avoid chunk solids, deliberate. An authored spawn on one moves to the nearest free non-solid cell; the carrier and the warden keep theirs (their logic is keyed to the cell).
+                    bool keyed = (layout.Carrier != null && layout.Carrier.X == w.X && layout.Carrier.Y == w.Y) || (layout.WardenCell.HasValue && layout.WardenCell.Value.X == w.X && layout.WardenCell.Value.Y == w.Y);
+                    if (!keyed && solid[w.X, w.Y])
+                    {
+                        if (freeNow == null) freeNow = FreeCells(p, blocked);
+                        int best = -1; long bestD = long.MaxValue;
+                        for (int k = 0; k < freeNow.Count; k++)
+                        {
+                            if (taken[freeNow[k].X, freeNow[k].Y]) continue;
+                            long dx = freeNow[k].X - w.X, dy = freeNow[k].Y - w.Y, dd = dx * dx + dy * dy;
+                            if (dd < bestD) { bestD = dd; best = k; }   // free cells are row-major, so ties keep the first
+                        }
+                        if (best >= 0) { w = freeNow[best]; taken[w.X, w.Y] = true; }
+                    }
                     spawns.Add(new EncounterSpawn(w.X, w.Y, r, sp.Tier, EncounterKind.Authored));
                 }
                 int roomExtra = extra;
                 if (twist == FloorTwist.Crowded && (r == firstCombat || new Pcg32(Rng.Derive(layout.Seed, "cellars.twist.rooms", ((ulong)layout.Floor << 32) | (uint)r)).Range(0, 2) == 0)) roomExtra++;
                 if (roomExtra > 0)
                 {
-                    List<CellPos> free = FreeCells(p, blocked);
+                    List<CellPos> free = FreeCells(p, blocked); free.RemoveAll(c => taken[c.X, c.Y]);
                     var rng = new Pcg32(Rng.Derive(layout.Seed, "cellars.encounter", ((ulong)layout.Floor << 32) | (uint)r));
                     for (int k = 0; k < roomExtra && free.Count > 0; k++)
                     {
@@ -152,6 +168,15 @@ namespace SleepingCalamity.Core
             taken[spawns[pick].X, spawns[pick].Y] = false; spawns.RemoveAt(pick);
         }
 
+        static bool[,] SolidCells(CellarFloorLayout layout, CellarFloorDressing dressing)
+        {
+            int n = CellarFloorLayout.GridSize; var solid = new bool[n, n];
+            if (dressing == null) return solid;
+            foreach (ResolvedChunk c in CellarRoomChunks.Resolve(layout, dressing).Chunks)
+                foreach (var sc in CellarRoomChunks.SolidCells(layout, c)) solid[sc.cell.X, sc.cell.Y] = true;
+            return solid;
+        }
+
         static bool[,] BlockedCells(CellarFloorLayout layout, CellarFloorDressing dressing)
         {
             int n = CellarFloorLayout.GridSize;
@@ -170,6 +195,8 @@ namespace SleepingCalamity.Core
             if (layout.StairExit.HasValue) Ban(layout.StairExit.Value.X, layout.StairExit.Value.Y);
             if (layout.BankCell.HasValue) Ban(layout.BankCell.Value.X, layout.BankCell.Value.Y);
             if (layout.BakerCell.HasValue) Ban(layout.BakerCell.Value.X, layout.BakerCell.Value.Y);
+            bool[,] sol = SolidCells(layout, dressing);   // procgen 3b: chunk solid cells (CellarRoomChunks) are never a spawn cell
+            for (int x = 0; x < n; x++) for (int y = 0; y < n; y++) if (sol[x, y]) blocked[x, y] = true;
             return blocked;
         }
 

@@ -50,6 +50,8 @@ namespace SleepingCalamity.Presentation
         private AudioBus _bus;
         private int _soundSerial;
         private float _prevFrame = -1f;
+        private float _prevFlash;
+        private bool _flashAllowed = true;
 
         private sealed class Marker
         {
@@ -135,7 +137,11 @@ namespace SleepingCalamity.Presentation
                 _prevFrame = -1f;
             }
 
-            if (_enemy.Flash > 0f) tint = Color.Lerp(tint, Color.white, _enemy.Flash);
+            // Reduce flashes: a new flash may be refused (3 a second at most) and any flash is capped at half brightness (FlashLimiter).
+            float flash = _enemy.Flash;
+            if (flash > 0f && _prevFlash <= 0f) _flashAllowed = FeedbackDirector.Flash.Allow(Time.unscaledTime);
+            _prevFlash = flash;
+            if (flash > 0f && _flashAllowed) tint = Color.Lerp(tint, Color.white, FeedbackDirector.Flash.Brightness(flash));
             _block.SetColor(BaseColor, tint);
 
             // The attacking part: glows hotter through a charge hold, then flashes white-hot at the commit (the glint).
