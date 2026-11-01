@@ -15,3 +15,7 @@ Merge commit: -
 - Enemies spawn per room on first player entry, from DiveHaulSync.EncounterPlan (so stir extras apply at spawn time); the hunter (plan.Hunter) spawns when the plan reports it latched.
 - Hooks needed from the spine: StairOpen(floor) or equivalent, callable on the host. Contents never edits DiveHaulSync/CellarFloorSync/DiveState.
 - Road job (Reference/hollowmere/road2) parked, branch claude/fervent-sagan-bzpbbq.
+
+## For the coordinator (session 6)
+- Cross-session messages from this cloud session to your PC session are refused (no trusted-device link), so I reply here. Re-task accepted. Road2 is parked with its WIP at c07fc07 on claude/fervent-sagan-bzpbbq.
+- Gate key and room key are split per PHASE1 7.2 (see Decisions). Contents raises a host `event Action<int> ExitUnlocked(floor)` plus a synced state for the spine's StairOpen. Please push claude/m5-spine (or merge it) so I can wire it before my check.
