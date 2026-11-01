@@ -163,9 +163,9 @@ namespace SleepingCalamity.EditorTools
                 new Wp(44f,   12.2f, 8.5f,  24f,   10.5f, 3.5f, 50f),
                 new Wp(36f,   12.0f, 7.4f,  20f,   10.0f, 3.0f, 50f),
                 new Wp(28.5f, 10.5f, 5.8f,  15f,   9.0f,  2.5f, 50f),
-                new Wp(23f,   7.5f,  4.2f,  14f,   6.5f,  2.0f, 52f),
-                new Wp(19.4f, 5.2f,  2.8f,  14f,   6.6f,  1.8f, 52f),
-                new Wp(17.0f, 5.3f,  2.3f,  12.9f, 7.4f,  1.6f, 54f),   // the "Body" figure stands at x 13.5-15.5, z 1.6-3.4: pass north of it
+                new Wp(24.5f, 5.0f,  4.6f,  14f,   6.5f,  2.0f, 52f),
+                new Wp(20.4f, 3.4f,  3.0f,  14f,   6.6f,  1.8f, 52f),
+                new Wp(17.6f, 4.6f,  2.4f,  12.9f, 7.4f,  1.6f, 54f),   // the "Body" figure stands at x 13.5-15.5, z 1.6-3.4: pass north of it
                 new Wp(14.8f, 5.6f,  1.6f,  12.85f, 7.4f, 1.5f, 56f),
                 new Wp(13.2f, 6.0f,  1.4f, 12.85f, 8.0f, 1.4f, 58f),
                 new Wp(12.85f, 8.8f, 1.4f,  14.2f, 12.0f, 1.0f, 58f),
@@ -412,7 +412,7 @@ namespace SleepingCalamity.EditorTools
             // Trailer-only interior fill: a warm point light that rides with the camera and fades in as it passes the door (runtime, never saved).
             var lampGo = new GameObject("TrailerLamp") { hideFlags = HideFlags.DontSave };
             var lampLight = lampGo.AddComponent<Light>();
-            lampLight.type = LightType.Point; lampLight.color = new Color(1f, 0.78f, 0.55f); lampLight.range = 7f; lampLight.shadows = LightShadows.None; lampLight.intensity = 0f;
+            lampLight.type = LightType.Point; lampLight.color = new Color(1f, 0.78f, 0.55f); lampLight.range = 9f; lampLight.shadows = LightShadows.None; lampLight.intensity = 0f;
 
             var tex = checkOnly ? null : new Texture2D(W, H, TextureFormat.RGB24, false, false);
             var rt = checkOnly ? null : new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 1 };
@@ -442,7 +442,7 @@ namespace SleepingCalamity.EditorTools
                             if (checkOnly) continue;
                             Place(cam, ps.Pos, ps.Look, ps.Fov);
                             float lamp = Mathf.Clamp01((t - 42.6f) / 1.4f) * Mathf.Clamp01((CutStair - t) / 0.2f); lamp = lamp * lamp * (3f - 2f * lamp);
-                            lampLight.intensity = 2.4f * lamp;
+                            lampLight.intensity = 9f * lamp;
                             lampGo.transform.position = ps.Pos + Vector3.up * 0.2f - cam.transform.forward * 0.4f;
                             RenderFrame(cam, rt, tex);
                             string path = FramePath(frameDir, f);
