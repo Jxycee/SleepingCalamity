@@ -58,14 +58,14 @@ namespace SleepingCalamity.EditorTools
             Cards(country, plan, t);
             Ring(country, t);
             Debug.Log("SC HOLLOWMERE road: " + placed + " roadside pieces (" + greybox + " greybox stand-ins), " + cards + " cards (trees "
-                + plan.Count(i => i.Kind == RoadItemKind.Tree && !i.OnRing) + " terrain / " + plan.Count(i => i.Kind == RoadItemKind.Tree && i.OnRing) + " ring, hedgerow cards "
+                + plan.Count(i => i.Kind == RoadItemKind.Tree && !i.OnRing) + " terrain / " + plan.Count(i => i.Kind == RoadItemKind.Tree && i.OnRing) + " ring (" + plan.Count(i => i.Belt) + " in the horizon belt), hedgerow cards "
                 + plan.Count(i => i.Kind == RoadItemKind.FieldHedge) + ")");
         }
 
         // Cameras for the road (absolute targets, eye height over the ground as the town's other cameras).
         public static readonly (string Name, Vector3 Pos, Vector3 Target, float Fov)[] Cameras =
         {
-            ("Cap_HM_RoadOut", new Vector3(-28f, 1.7f, -71f), new Vector3(-85f, -12f, -82f), 56f),    // from the north verge just outside the Lower Gate, down the road into the valley (lot R3_01 on the south side sits at the left edge, off the road)
+            ("Cap_HM_RoadOut", new Vector3(-28f, 1.7f, -71f), new Vector3(-84f, -12f, -73f), 56f),    // from the north verge just outside the Lower Gate, down the road into the valley; aimed so the road holds the centre and R3_01 (centre (-43.3,-84.7), 8 m, to the south) falls into the left quarter (NDC x -1.5..-0.5 at 16:9, 56 deg)
             ("Cap_HM_RoadBack", new Vector3(-97f, 1.7f, -87.6f), new Vector3(-32f, -3.5f, -60f), 55f),         // from the road below the first bend, back up at the gate, wall and keep
         };
 
@@ -353,16 +353,22 @@ namespace SleepingCalamity.EditorTools
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
             RoadRibbon(ring, t);
             // the mid hill ridge and the far ridge: annuli rising out of the ring's edge (their feet tucked under the layer in front)
-            Annulus(ring, "MidHills", 640f, 1150f, 1500f, 20, 256, 45f, 55f, 7f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
+            Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 256, 45f, 55f, 7f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
             Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 256, 150f, 120f, 23f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
         }
 
         // The three haze layers (SleepingCalamity/Backdrop): haze at DistNear, haze at DistFar, the distances, the tint on the fog colour.
-        struct Haze { public float Near, Far, D0, D1; public Color Tint; public float Mist, Noise, NoiseLit; public Haze(float n, float f, float d0, float d1, Color tint, float mist, float noise, float noiseLit) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; Mist = mist; Noise = noise; NoiseLit = noiseLit; } }
-        static readonly Haze NearHaze = new Haze(0.62f, 0.84f, 150f, 700f, Color.white, 0.10f, 0.05f, 0.03f);     // the ring trees: the nearest silhouette layer
-        static readonly Haze GroundHaze = new Haze(0.76f, 0.9f, 150f, 700f, Color.white, 0.12f, 0.10f, 0.05f);   // the ring ground: matches the scene fog at the terrain edge (no seam)
-        static readonly Haze MidHaze = new Haze(0.78f, 0.85f, 900f, 1500f, new Color(0.98f, 1.0f, 1.03f), 0.03f, 0.03f, 0.02f);
-        static readonly Haze FarHaze = new Haze(0.88f, 0.91f, 1800f, 2700f, new Color(0.95f, 1.0f, 1.08f), 0.02f, 0f, 0f);
+        struct Haze
+        {
+            public float Near, Far, D0, D1, Mist, Noise, NoiseLit, CoolAmt; public Color Tint, Cool;
+            public Haze(float n, float f, float d0, float d1, Color tint, float mist, float noise, float noiseLit, Color cool, float coolAmt) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; Mist = mist; Noise = noise; NoiseLit = noiseLit; Cool = cool; CoolAmt = coolAmt; }
+        }
+        // Value steps near < mid < far at midday and at low sun (haze 0.6 / 0.75 / 0.87 at the crests); at low sun the layers also step in hue: trees warm-green, mid hills a cool grey-blue,
+        // the far ridge a blue-violet (Cool is luminance-normalised in the shader, so cooling changes hue, not value).
+        static readonly Haze NearHaze = new Haze(0.56f, 0.76f, 150f, 700f, new Color(0.97f, 1.0f, 0.93f), 0.10f, 0.05f, 0.03f, new Color(0.95f, 1.0f, 1.05f), 0.25f);     // the ring trees: the nearest silhouette layer
+        static readonly Haze GroundHaze = new Haze(0.88f, 0.78f, 150f, 700f, Color.white, 0.03f, 0.08f, 0.05f, new Color(0.9f, 0.97f, 1.1f), 0.35f);   // the ring ground: matches the scene fog at the terrain edge (no seam); full fog at the terrain edge (no seam), easing to the hills-foot haze by 700 m so the far ground no longer sits pale against the dark hills (that was the flat cyan strip behind the tree line)
+        static readonly Haze MidHaze = new Haze(0.72f, 0.70f, 560f, 1500f, new Color(0.98f, 1.0f, 1.03f), 0.22f, 0.06f, 0.03f, new Color(0.70f, 0.88f, 1.30f), 0.8f);       // foot mist (up to +0.15) takes it to the ground's haze, thinning toward the crest
+        static readonly Haze FarHaze = new Haze(0.84f, 0.90f, 1400f, 2700f, new Color(0.97f, 1.0f, 1.05f), 0.06f, 0.02f, 0.01f, new Color(0.62f, 0.76f, 1.45f), 1.0f);
 
         static Material Backdrop(string name, Texture2D tex, Color tint, Haze h, bool cards)
         {
@@ -375,7 +381,7 @@ namespace SleepingCalamity.EditorTools
             m.SetColor("_HazeTint", h.Tint);
             m.SetFloat("_GroundMist", h.Mist); m.SetFloat("_MistTop", -8f); m.SetFloat("_MistScale", 30f);   // smooth exp foot mist; subtle on the hills (an earlier hard ramp read as a pale water band)
             m.SetFloat("_NoiseAmp", h.Noise); m.SetFloat("_NoiseLit", h.NoiseLit);
-            m.SetColor("_ShadowTint", new Color(0.30f, 0.38f, 0.48f)); m.SetColor("_HazeCool", new Color(0.80f, 0.92f, 1.12f)); m.SetFloat("_HazeCoolAmt", 0.7f);
+            m.SetColor("_ShadowTint", new Color(0.30f, 0.38f, 0.48f)); m.SetColor("_HazeCool", h.Cool); m.SetFloat("_HazeCoolAmt", h.CoolAmt);
             m.SetFloat("_AlphaClip", cards ? 1f : 0f); m.SetFloat("_Cutoff", 0.5f);
             if (cards) m.EnableKeyword("_ALPHATEST_ON"); else m.DisableKeyword("_ALPHATEST_ON");
             m.SetFloat("_Cull", (float)(cards ? CullMode.Off : CullMode.Back));
@@ -409,7 +415,7 @@ namespace SleepingCalamity.EditorTools
                 for (int i = 0; i < segs; i++)
                 {
                     int a = j * w + i, b = a + 1, d = a + w, e = d + 1;
-                    idx.AddRange(new[] { a, d, e, a, e, b });
+                    idx.AddRange(new[] { a, e, d, a, b, e });   // faces up: the polar winding is the mirror of the ring ground's grid, and the old order culled every slope below the camera (the sky strip behind the tree line)
                 }
             var mesh = new Mesh { name = "RD_" + name, indexFormat = IndexFormat.UInt32 };
             mesh.SetVertices(v); mesh.SetUVs(0, uv); mesh.SetTriangles(idx, 0);
