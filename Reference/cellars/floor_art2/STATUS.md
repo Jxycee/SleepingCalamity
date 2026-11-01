@@ -1,8 +1,8 @@
 State: IN PROGRESS
 Session: Cellars floor art 2: dense dressing and the corner's grade
 Job: dress the generated Cellars rooms to the approved corner's density (B5 kit shelves, barrels, crates, rubble, jars) and match the corner's grade, lamp colour and fog (less orange)
-Progress: 25% - clutter kit merged (6058730); floor code agent running; Unity editor re-downloading (setup job had died)
-Status: round 0 measured
+Progress: 30% - clutter kit merged (6058730); Core CellarFloorClutter resolver + tests WIP on claude/floor-art2-code a488068 (unverified)
+Status: paused for usage (coordinator, 01:5x). Next step: resume the floor-code step from a488068 (finish resolver + tests, Presentation placement from CellarClutter pieces, light/grade tuning block, compile + Core tests), merge into this branch, then round 1 captures (SC_CAPTURE_ONLY room/corridor). Unity editor re-download running (setup job had died).
 Blocker: none
 Archive: no
 Branch: claude/happy-ramanujan-41karq
