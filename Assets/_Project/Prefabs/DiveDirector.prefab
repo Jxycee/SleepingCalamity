@@ -73,4 +73,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SleepingCalamity.Presentation::SleepingCalamity.Presentation.DiveDirector
   ShowTopMostFoldoutHeaderGroup: 1
+  RequireGateKey: 0
   PiecesPerFloor: 020000000200000002000000i
