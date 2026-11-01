@@ -15,6 +15,7 @@ namespace SleepingCalamity.Core.Combat
         public int Id;          // opaque key (the host uses the hero's hash code); also the token key
         public float X, Y, Z;
         public bool Up;         // alive and not downed
+        public bool InRoom;     // inside the enemy's own room (room enemies only; the host fills it): always noticed, never leashed
         public int Load;        // OTHER enemies already targeting this hero (host-wide TargetLedger); the load-balance input of ThreatTable
     }
 
@@ -64,9 +65,10 @@ namespace SleepingCalamity.Core.Combat
         public AiBrain(AttackTokens tokens, Func<float> rand, EnemyDefinition def = null, bool hunts = false) { _tokens = tokens; _rand = rand; _def = def; _hunts = hunts; }
 
         // Who this enemy goes for (stage 3). Created on first use from the enemy's own ranges.
-        public ThreatTable Threat => _threat ??= _hunts ? new ThreatTable(1e9f, 1e9f, _def != null ? _def.RetargetInterval : ThreatTuning.DefaultRetargetInterval) : _def != null
-            ? new ThreatTable(_def.AggroRange, _def.LeashRange, _def.RetargetInterval)
-            : new ThreatTable();
+        // Hunters keep the normal distance scale (their near/role terms still differ per hero) and only skip the range filter.
+        public ThreatTable Threat => _threat ??= _def != null
+            ? new ThreatTable(_def.AggroRange, _def.LeashRange, _def.RetargetInterval, unlimitedRange: _hunts)
+            : new ThreatTable(unlimitedRange: _hunts);
 
         // Threat-based pick: sets c.TargetIndex. locked = in Tell or Strike (no switch). Ranged enemies prefer the farthest hero.
         public int PickTarget(AiContext c, bool locked)

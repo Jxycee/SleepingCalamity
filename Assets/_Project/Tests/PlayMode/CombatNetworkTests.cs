@@ -388,6 +388,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(worst, Is.LessThanOrEqualTo(3), "never all four on one hero");
             Assert.That(c.Combat.Targets.CountOn(hostHeroId, -1), Is.InRange(1, 3));
             Assert.That(c.Combat.Targets.CountOn(clientHeroId, -1), Is.InRange(1, 3));
+            Assert.That(maxStrikes, Is.GreaterThanOrEqualTo(1), "the cap was exercised: at least one strike was actually open");
             Assert.That(maxStrikes, Is.LessThanOrEqualTo(3), "no more than the two-player cap of strikes open at once");
         }
 

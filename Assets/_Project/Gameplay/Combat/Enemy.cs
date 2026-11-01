@@ -79,6 +79,11 @@ namespace SleepingCalamity.Gameplay
         private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand, Def, Hunts);
         // Host: true for enemies spawned without a room (arena waves, the hunter): they chase from anywhere. Room enemies use their aggro/leash ranges. Set before the first tick.
         public bool Hunts;
+        private CombatHost _host; private int _room = EnemyCrowd.ArenaRoom;   // host: the room this enemy belongs to (room scope of its aggro, doc 6.4)
+        public void ServerBindRoom(CombatHost host, int room) { _host = host; _room = room; }
+        public int Room => _room;
+        private Vector3 _home; private bool _homeSet;   // host: where it spawned; after a leash it walks back here
+        private const float HomeArrive = 1f;
         private float _bracedLeft;                       // host: seconds the broom still shows its brace after a blocked hit
         public const float BracedShowSeconds = 0.35f;
 
@@ -187,6 +192,7 @@ namespace SleepingCalamity.Gameplay
                 if (Model == null) Model = new EnemyModel(Def, Tier, 1);
                 _targetable.Alive = true;
                 _cooldown = _initialCooldown;
+                _home = transform.position; _homeSet = true;
             }
         }
 
@@ -267,15 +273,16 @@ namespace SleepingCalamity.Gameplay
                     Model.Poise.BeginSteady();   // one flinch per exchange: steady for a moment, so flinch loops cannot stunlock it
                     SetPhase(AiEnabled ? EnemyPhase.Chase : EnemyPhase.Idle);
                 }
+                DropTarget();   // a flinching enemy is not on anyone: its load no longer counts against the hero
                 return;
             }
-            if (!AiEnabled) { if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
+            if (!AiEnabled) { DropTarget(); if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
 
             // Threat targeting (stage 3): locked while telling or striking, so a target switch never happens mid-attack.
             HeroVitals target = PickTarget(dt, locked: Phase == EnemyPhase.Attack);
             if (_cooldown > 0f) _cooldown -= dt;
             if (Phase == EnemyPhase.Attack) { ServerAdvanceAttack(dt, target); return; }
-            if (target == null) { SetPhase(EnemyPhase.Idle); return; }
+            if (target == null) { ServerReturnHome(dt); return; }
 
             // The brain decides (Core AiBrain); this applies its action. PickTarget just filled the context's hero snapshot.
             FillContext(dt);
@@ -293,6 +300,21 @@ namespace SleepingCalamity.Gameplay
             FaceToward(new Vector3(act.FaceX, 0f, act.FaceZ), act.FaceDegPerSec, dt);
             if (act.StartAttack != null) { ServerStartAttack(act.StartAttack, target.transform.position); return; }
             if (act.MoveSpeed > 0f) MoveHorizontal(new Vector3(act.MoveX, 0f, act.MoveZ), act.MoveSpeed, dt);
+        }
+
+        // Host: forget the current target and its ledger entry.
+        private void DropTarget() { Targets.Remove(GetHashCode()); _brain?.Threat.ClearCurrent(); }
+
+        // Host: nobody in range (leashed, or all down). Room enemies walk back to where they spawned (target = home), then idle there within 1 m.
+        private void ServerReturnHome(float dt)
+        {
+            Vector3 p = transform.position;
+            float dx = _home.x - p.x, dz = _home.z - p.z;
+            if (Hunts || !_homeSet || dx * dx + dz * dz <= HomeArrive * HomeArrive) { SetPhase(EnemyPhase.Idle); return; }
+            SetPhase(EnemyPhase.Chase);
+            Vector3 dir = new Vector3(dx, 0f, dz).normalized;
+            FaceToward(dir, 420f, dt);
+            MoveHorizontal(dir, Def.MoveSpeed * 0.7f, dt);
         }
 
         private void FillContext(float dt)
@@ -328,7 +350,8 @@ namespace SleepingCalamity.Gameplay
                 if (v == null || v.NetworkManager != NetworkManager || !v.IsUp) continue;
                 Vector3 hp = v.transform.position;
                 int id = v.GetHashCode();
-                _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, Load = Targets.CountOn(id, self) });
+                bool inRoom = _room >= 0 && _host != null && _host.RoomOf != null && _host.RoomOf(hp) == _room;
+                _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, InRoom = inRoom, Load = Targets.CountOn(id, self) });
                 _heroBuf.Add(v);
             }
             Vector3 p = transform.position;

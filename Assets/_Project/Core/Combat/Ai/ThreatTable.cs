@@ -16,12 +16,13 @@ namespace SleepingCalamity.Core.Combat
         public const float DefaultAggroRange = 12f, DefaultLeashRange = 20f, DefaultRetargetInterval = 0.75f;
 
         public float WDist = 1.0f;       // nearer is higher
-        public float WHit = 0.8f;        // damage this hero dealt to this enemy lately (share of the recent total)
+        public float WHit = 0.8f;        // damage this hero dealt to this enemy lately (decayed damage / HitReference, capped at 1)
         public float WStick = 0.6f;      // bonus for the current target: a rival must beat it by this much to take over
         public float WLoad = 0.7f;       // heroes with fewer enemies already on them score higher (the fairness term)
         public float WRole = 0.3f;       // ranged enemies prefer the farthest hero
         public float LoadCap = 3f;       // load term reaches 0 at this many other enemies on the hero
-        public float HitDecaySeconds = 6f;
+        public float HitHalfLifeSeconds = 6f;   // recent damage halves every this many seconds (exponential, so a lone attacker's pull fades too)
+        public float HitReference = 20f;        // decayed damage that gives the full hit pull; pull = min(1, decayed / HitReference)
 
         public static readonly ThreatTuning Default = new ThreatTuning();
     }
@@ -49,6 +50,7 @@ namespace SleepingCalamity.Core.Combat
     {
         private readonly ThreatTuning _t;
         private readonly float _aggro, _leash, _retarget;
+        private readonly bool _unlimited;   // hunters: no range FILTER (they always know where the heroes are); the distance scale stays at the normal aggro range
         private readonly List<int> _hitIds = new List<int>();
         private readonly List<float> _hitAmounts = new List<float>();
         private int _current;
@@ -56,8 +58,9 @@ namespace SleepingCalamity.Core.Combat
         private float _sinceSwitch;
 
         public ThreatTable(float aggroRange = ThreatTuning.DefaultAggroRange, float leashRange = ThreatTuning.DefaultLeashRange,
-            float retargetInterval = ThreatTuning.DefaultRetargetInterval, ThreatTuning tuning = null)
+            float retargetInterval = ThreatTuning.DefaultRetargetInterval, ThreatTuning tuning = null, bool unlimitedRange = false)
         {
+            _unlimited = unlimitedRange;
             _t = tuning ?? ThreatTuning.Default;
             _aggro = Math.Max(0.01f, aggroRange);
             _leash = Math.Max(_aggro, leashRange);
@@ -66,6 +69,9 @@ namespace SleepingCalamity.Core.Combat
 
         public bool HasCurrent => _hasCurrent;
         public int CurrentId => _current;
+
+        // The current target is forgotten (the enemy was staggered or its AI was switched off): it picks afresh next time.
+        public void ClearCurrent() { _hasCurrent = false; }
 
         // A hero hurt this enemy (host: after a damaging hit). Recent damage pulls the enemy toward that hero.
         public void RecordHit(int heroId, float damage)
@@ -90,9 +96,6 @@ namespace SleepingCalamity.Core.Combat
                 for (int i = 0; i < heroes.Count; i++) if (heroes[i].Up && heroes[i].Id == _current) { cur = i; break; }
             if (locked && cur >= 0) return cur;
 
-            float total = 0f;
-            for (int i = 0; i < _hitAmounts.Count; i++) total += _hitAmounts[i];
-
             int best = -1;
             float bestScore = float.NegativeInfinity, curScore = float.NegativeInfinity;
             for (int i = 0; i < heroes.Count; i++)
@@ -102,12 +105,14 @@ namespace SleepingCalamity.Core.Combat
                 float dx = h.X - x, dy = h.Y - y, dz = h.Z - z;
                 float dist = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
                 bool isCur = i == cur;
-                if (dist > (isCur ? _leash : _aggro)) continue;   // not noticed yet / left behind
+                // Room scope (doc 6.4): a hero inside this enemy's own room is always noticed and kept, whatever the distance (the room is the aggro
+                // range). Everyone else: noticed within AggroRange, kept until LeashRange. Hunters skip the filter, never the distance scale below.
+                if (!h.InRoom && !_unlimited && dist > (isCur ? _leash : _aggro)) continue;
 
                 float near = Clamp01(1f - dist / _aggro);
                 float share = 0f;
-                int hi = total > 0f ? _hitIds.IndexOf(h.Id) : -1;
-                if (hi >= 0) share = _hitAmounts[hi] / total;
+                int hi = _hitIds.IndexOf(h.Id);
+                if (hi >= 0) share = Clamp01(_hitAmounts[hi] / Math.Max(0.01f, _t.HitReference));
                 float load = Clamp01(1f - h.Load / Math.Max(1f, _t.LoadCap));
                 float role = rangedBias ? Clamp01(dist / _aggro) : 0f;
                 float score = _t.WDist * near + _t.WHit * share + (isCur ? _t.WStick : 0f) + _t.WLoad * load + _t.WRole * role;
@@ -130,7 +135,7 @@ namespace SleepingCalamity.Core.Combat
         private void DecayHits(float dt)
         {
             if (_hitIds.Count == 0) return;
-            float f = Math.Max(0f, 1f - dt / Math.Max(0.01f, _t.HitDecaySeconds));
+            float f = (float)Math.Pow(0.5, dt / Math.Max(0.01f, _t.HitHalfLifeSeconds));
             for (int i = _hitAmounts.Count - 1; i >= 0; i--)
             {
                 _hitAmounts[i] *= f;

@@ -168,6 +168,78 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(switches, Is.EqualTo(0));
         }
 
+        // ---- review fixes: hunters keep the distance scale, absolute hit decay, room scope, starvation ----
+
+        static List<AiHero> One(params (int id, float x, bool inRoom)[] hs)
+        {
+            var l = new List<AiHero>();
+            foreach (var h in hs) l.Add(new AiHero { Id = h.id, X = h.x, Up = true, InRoom = h.inRoom });
+            return l;
+        }
+
+        [Test]
+        public void Hunter_HasNoRangeFilter_ButStillPrefersTheNearerHero()
+        {
+            var t = new ThreatTable(unlimitedRange: true);
+            Assert.That(t.Pick(One((10, 90f, false)), 0f, 0f, 0f, Dt, false), Is.EqualTo(0), "far beyond any leash, yet a candidate");
+            var t2 = new ThreatTable(unlimitedRange: true);
+            Assert.That(t2.Pick(One((10, 5f, false), (11, 100f, false)), 0f, 0f, 0f, Dt, false), Is.EqualTo(0));
+            Assert.That(new ThreatTable().Pick(One((10, 90f, false)), 0f, 0f, 0f, Dt, false), Is.EqualTo(-1), "a normal enemy still ignores them");
+        }
+
+        [Test]
+        public void HitPull_DecaysByHalfLife_SoALoneAttackersPullFades()
+        {
+            // Hero 11 is the farther one (near 0.33 vs 0.67 for hero 10); a fresh hit of 20 gives it pull 0.8 and the pick.
+            var heroes = One((10, 4f, false), (11, 8f, false));
+            var fresh = new ThreatTable();
+            fresh.RecordHit(11, 20f);
+            Assert.That(fresh.Pick(heroes, 0f, 0f, 0f, Dt, false), Is.EqualTo(1));
+
+            var half = new ThreatTable();   // one half-life (6 s): pull 0.4, still enough
+            half.RecordHit(11, 20f);
+            half.Pick(new List<AiHero>(), 0f, 0f, 0f, 6f, false);
+            Assert.That(half.Pick(heroes, 0f, 0f, 0f, 0.01f, false), Is.EqualTo(1));
+
+            var two = new ThreatTable();    // two half-lives (12 s): pull 0.2 < the 0.33 distance gap, the nearer hero wins
+            two.RecordHit(11, 20f);
+            two.Pick(new List<AiHero>(), 0f, 0f, 0f, 12f, false);
+            Assert.That(two.Pick(heroes, 0f, 0f, 0f, 0.01f, false), Is.EqualTo(0), "a lone attacker's pull no longer holds for 40 s");
+        }
+
+        [Test]
+        public void RoomScope_AHeroInMyRoomIsNoticedAtAnyDistance_AndNeverLeashed()
+        {
+            var t = new ThreatTable();
+            Assert.That(t.Pick(One((10, 30f, false)), 0f, 0f, 0f, Dt, false), Is.EqualTo(-1), "outside the room and beyond aggro: ignored");
+            Assert.That(t.Pick(One((10, 30f, true)), 0f, 0f, 0f, Dt, false), Is.EqualTo(0), "inside the room: engaged from the far wall");
+            Assert.That(t.Pick(One((10, 40f, true)), 0f, 0f, 0f, Dt, false), Is.EqualTo(0), "and kept past the leash while still in the room");
+            Assert.That(t.Pick(One((10, 40f, false)), 0f, 0f, 0f, Dt, false), Is.EqualTo(-1), "once out of the room the leash applies");
+        }
+
+        [Test]
+        public void Starvation_ALoneDistantEnemyUnderTheGlobalCapStillGetsAnAttackWithinTenSeconds()
+        {
+            var tokens = new AttackTokens { GlobalStrikeCap = CoopScaling.GlobalStrikeCap(2) };
+            // Other enemies hold the whole cap at the start (three strikes on other heroes).
+            for (int h = 0; h < 3; h++) tokens.TryAcquire(200 + h, 300 + h, 0.0, AttackCatalog.RatLunge, Pool2NoGap);
+            var def = EnemyCatalog.RatKing;
+            var brain = new AiBrain(tokens, () => 0.1f, def);
+            float x = 0f; const float heroX = 10f; double time = 0.0; double attackAt = -1.0;
+            for (int i = 0; i < 400 && attackAt < 0.0; i++)   // 20 s at 0.05
+            {
+                time += 0.05;
+                var c = new AiContext { SelfId = 1, Def = def, Tier = 1, Dt = 0.05f, Time = time, Phase = AiState.Approach, SelfX = x };
+                c.Heroes.Add(new AiHero { Id = 100, X = heroX, Up = true });
+                c.TargetIndex = 0;
+                AiAction a = brain.Tick(c);
+                if (a.StartAttack != null) { attackAt = time; break; }
+                x += a.MoveX * a.MoveSpeed * 0.05f;
+            }
+            Assert.That(attackAt, Is.GreaterThan(0.0), "it must get an attack");
+            Assert.That(attackAt, Is.LessThan(10.0));
+        }
+
         // ---- the global strike cap ----
 
         static readonly PacingProfile Pool2NoGap = new PacingProfile(2, 0f, 1f, 1f, 0.3f);

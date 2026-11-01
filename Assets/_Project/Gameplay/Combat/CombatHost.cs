@@ -60,6 +60,9 @@ namespace SleepingCalamity.Gameplay
         public readonly TargetLedger Targets = new TargetLedger();   // host-wide too: a hero's load counts every room's enemies
         private readonly Dictionary<int, EnemyCrowd> _crowds = new Dictionary<int, EnemyCrowd>();
         private float _auditIn = EnemyCrowd.AuditSeconds;
+        // Host: which room a world position is in (-1 outside every room). Set by the dive's room owner (CellarContentsSync); room enemies use it to notice
+        // any hero inside their own room whatever the distance (doc 6.4). Null: no room scope, ranges only.
+        public System.Func<Vector3, int> RoomOf;
         public EnemyCrowd CrowdFor(int room)
         {
             if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd(Tokens, Targets);
@@ -437,6 +440,7 @@ namespace SleepingCalamity.Gameplay
             e.ServerSeed(kind, tier, PlayerCount());
             e.ServerJoinCrowd(CrowdFor(room));
             e.Hunts = room == EnemyCrowd.ArenaRoom;
+            e.ServerBindRoom(this, room);
             e.AiEnabled = AiEnabled && ai;
             instance.Spawn(destroyWithScene: true);
             _alive.Add(e);
