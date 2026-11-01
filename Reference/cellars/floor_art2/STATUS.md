@@ -2,7 +2,7 @@ State: IN PROGRESS
 Session: Cellars floor art 2: dense dressing and the corner's grade
 Job: dress the generated Cellars rooms to the approved corner's density (B5 kit shelves, barrels, crates, rubble, jars) and match the corner's grade, lamp colour and fog (less orange)
 Progress: 85% - 3 rounds done (cap), final sheet on claude/floor-art2-code ab973e2; merging origin/main (spine + contents) into the code branch; waits for Q12 procgen to merge first (coordinator order), then one check and merge
-Status: rounds done; merge prep (main merge + test-edit/test-play), then wait for Q12's merge
+Status: APPROVED to merge by the coordinator (round 3 about 24-25/40); waiting for Q12 procgen's merge (in check), then main merge, -nographics regen, one check, merge. Null-kit fix kept (default (a), no other answer). Follow-ups go to the procgen successor.
 Blocker: none (one coordinator decision below, not blocking the rounds)
 Archive: no
 Branch: claude/happy-ramanujan-41karq
