@@ -12,6 +12,11 @@ These are the steps only the user can take. Claude keeps this list current: when
    3. When both players show, press "Start session" on the host. Both players should land in Arena_Greybox.
 
    Tell Claude what happened.
+3b. **The M5 Cellars walk, floors 1-4 (2 players; spine merged `e525a51`).** The town and the Undercroft stair are not wired in yet (M6), so the dive starts from the Arena_Dive hub:
+   1. Turn on the dev panel toggle "Start in the Cellars dive hub" (or the editor menu `SleepingCalamity/Dev/Dive Hub`, or launch a build with `-dev-dive`), then host (solo or "Host online (Relay)") and have the second player join by code.
+   2. In the hub, walk to the violet column in the stair mouth and press **E** to start the dive (host picks the seed). Debug keys, host only, dev builds: **F7** starts a dive from anywhere, **F8** abandons it.
+   3. On floors 1-3 press **E** at the stair column to go down; on floor 2 press **E** at the bank column (checkpoint: banks the haul and heals); on floor 4 press **E** at the bank in the baker's room, then **E** at the green column to go home.
+   4. Expect: both players land on each floor's entry together and see the same floor. Enemies, keys and chest loot come with the contents session's merge; until it lands the stairs are always open. Tell Claude what felt wrong or samey.
 
 ## Cloud sessions (so a cloud session can work like the PC)
 - **Set up the cloud environment** (title-bar environment menu > Edit; details in `docs/superpowers/handoff/cloud-environment.md`):

@@ -34,6 +34,8 @@ namespace SleepingCalamity.EditorTools
         public const bool ShowDoorLeaves = false;   // Part_Door stays off: the gates are open passages (the leaves would close the arch with no collider behind them)
         public const string GateShell = "Shell", GateFrame = "Frame", GateDoor = "Part_Door", GateSocketDoor = "SOCKET_Door", GateFootprint = "FOOTPRINT";
 
+        public const string RuinedSuffix = "_Ruined";   // Wall_Straight_A_Ruined / _B_Ruined: the Ruined preset's straight modules
+
         public static string FileFor(WallPiece p)
         {
             switch (p)
@@ -60,6 +62,9 @@ namespace SleepingCalamity.EditorTools
         static readonly (string Slot, string Source, Color Tint, float Bump)[] TwSlots =
         {
             ("TW_Rubble", "sandstone", new Color(0.64f, 0.61f, 0.57f), 1.4f),
+            ("TW_RubbleDark", "sandstone", new Color(0.42f, 0.42f, 0.41f), 1.4f),    // polish 2: per-stone value / hue spread
+            ("TW_RubbleWarm", "sandstone", new Color(0.76f, 0.66f, 0.54f), 1.4f),
+            ("TW_RubblePale", "sandstone", new Color(0.84f, 0.80f, 0.73f), 1.3f),
             ("TW_RubbleOchre", "sandstone", new Color(1.00f, 0.89f, 0.73f), 1.4f),
             ("TW_Coping", "sandstone", new Color(1.14f, 1.09f, 1.00f), 0.9f),
             ("TW_Patch", "sandstone", new Color(1.30f, 1.16f, 0.94f), 1.0f),
@@ -142,6 +147,14 @@ namespace SleepingCalamity.EditorTools
             if (!ArtPresent) return false;
             Dictionary<string, Material> slots = BuildMaterials();
             var cache = new Dictionary<WallPiece, GameObject>();
+            var ruinedCache = new Dictionary<WallPiece, GameObject>();
+            // Ruined preset: the straight modules come as their _Ruined variants (more chipped and missing merlons) when exported.
+            GameObject PieceFor(WallPiece p, bool rebuilt)
+            {
+                if (rebuilt || (p != WallPiece.StraightA && p != WallPiece.StraightB)) return Piece(p);
+                if (!ruinedCache.TryGetValue(p, out GameObject g)) ruinedCache[p] = g = Load(FileFor(p) + RuinedSuffix);
+                return g != null ? g : Piece(p);
+            }
             GameObject Piece(WallPiece p)
             {
                 if (cache.TryGetValue(p, out GameObject g)) return g;
@@ -162,7 +175,7 @@ namespace SleepingCalamity.EditorTools
                 int placed = 0;
                 foreach (WallSlot s in plan)
                 {
-                    GameObject prefab = Piece(s.Piece);
+                    GameObject prefab = PieceFor(s.Piece, isRebuilt);
                     if (prefab == null) continue;
                     var obj = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
                     obj.name = (s.Piece == WallPiece.End ? "End" : "M" + s.Index.ToString("000")) + "_" + s.Piece;

@@ -68,3 +68,12 @@ Claude adds lines here as it works.
 | A29 | Call | M3 arena: heroes who bled out come back at each wave clear, so nobody spectates the whole arena. Dives keep the PHASE1 rule. |
 | A30 | Call | PCSX2 free cam (PINE memory writes to the DC1 camera, plus savestates and cheats for unlocks) is built at M9 look work, not now (user). |
 | A31 | Call | After the first arena play (user, 2026-10-30: "very hard to progress", "not sure when I'm hitting", "how they hit me from distance", "the bow doesn't fire sometimes", "not sure what I'm testing"), the M3 gate is retested only after a readability pass (hit flash and knockback, ground telegraphs matching real reach, directional hurt flash, gentler waves 1-2, bow fix) and the hero animation branch land, with a yes/no playtest checklist instead of "is the feel right". |
+
+## Session 6 (2026-10-31 night, coordinator; PHASE1 scope amendments)
+| # | Kind | Decision | Where |
+|---|---|---|---|
+| A32 | Call | M1 world rules are stricter than PHASE1 wrote (one identity kind per world, solo world rebinds to its owner). Keep. | PHASE1 2, amendments |
+| A33 | Call | Section 6 combat numbers are starting values; the playtest-approved Core tuning (hitstop 6/14 cap 16, enemy HP 80/180/160, tier-1 attack x0.65) is the source of truth. | PHASE1 2, amendments |
+| A34 | Call | M4 keeps the weapon-tree UI and hero-ability effects (being closed out tonight). `WeaponsSave` wiring and keying growth by persistent player id (now session client id, so growth is lost on rejoin) move to M6 as a must-fix before M7. | PHASE1 2, amendments |
+| A35 | Call | M5 adds the variety layer, P47 healing, the stir HUD and the floor art pass. "Walkable" covers dive flow, room contents and stir effects (placeholder rat-king hunter). The banked-haul save moves to M6. Procgen extensions are stretch work, not part of the gate. | PHASE1 2, amendments |
+| A36 | Call | The Hollowmere mass-production town (Q1-Q15, Ruined and Rebuilt) replaces the greybox square as M6's base. | PHASE1 2, amendments |

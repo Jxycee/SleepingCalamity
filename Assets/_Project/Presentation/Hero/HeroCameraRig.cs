@@ -77,6 +77,14 @@ namespace SleepingCalamity.Presentation
             if (Local == null) Local = this;
         }
 
+        // The followed hero was teleported by `delta` (a floor change): tell Cinemachine so the cameras jump with it instead of damping across the map.
+        public void NotifyWarped(Vector3 delta)
+        {
+            if (_pivot == null || delta == Vector3.zero) return;
+            CinemachineCore.OnTargetObjectWarped(_pivot, delta);
+            if (lockGroup != null) CinemachineCore.OnTargetObjectWarped(lockGroup.transform, delta);
+        }
+
         private void Unbind()
         {
             SetHeroVisible(true);

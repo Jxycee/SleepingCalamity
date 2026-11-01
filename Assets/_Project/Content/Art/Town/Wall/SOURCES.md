@@ -11,8 +11,9 @@ Bounds are Blender metres from the re-imported FBX (x run, y thickness or passag
 
 | Piece (FBX) | Tris | Bounds | Pivot and axes |
 |---|---|---|---|
-| `Wall_Straight_A` | 3,808 | x -2.2..2.2, y -1.24..0.86, z -1.5..3.4 | module centre, wall centre line, local ground 0; run along +X (core spans -2..2, coping and footing overshoot 6 to 10 cm); OUTSIDE is -Y. Timber walkway, merlons all along, spout at x 0.9 |
-| `Wall_Straight_B` | 3,448 | same | same; stone-flag walkway, loopholes in every second merlon, spout at x -0.7 |
+| `Wall_Straight_A` | 4,080 | x -2.2..2.2, y -1.24..0.86, z -1.5..3.4 | module centre, wall centre line, local ground 0; run along +X (core spans -2..2, coping and footing overshoot 6 to 10 cm); OUTSIDE is -Y. Timber walkway, merlons all along, spout at x 0.9 |
+| `Wall_Straight_B` | 3,796 | same | same; stone-flag walkway, loopholes in every second merlon, spout at x -0.7 |
+| `Wall_Straight_A_Ruined` / `_B_Ruined` (Ruined) | 4,060 / 3,912 | same | same as A / B (polish 2): about a third of the merlons chipped (sloped broken top, cap gone) and a third gone (a low stub, the cap fallen on the walkway); the builder uses them for StraightA / B in the Ruined preset |
 | `Wall_Patched` (Rebuilt) | 3,816 | same | same; three tidy paler patches (two outside, one inside) and a repaired coping slab and merlon |
 | `Wall_Breach` (Ruined) | 5,994 | x -2.6..2.7, y -3.5..3.0 | same; both ends full height with merlons (join straight modules), stubs 0.3 to 1.8 m in the gap, rubble spilled to -Y and +Y |
 | `Wall_Crumbled` (Ruined) | 3,700 | y -2.7..2.5, z top 2.66 | same; ragged parapet 2.2 to 2.7 m, no merlons, two gaps in the boards, two slumped planks |
@@ -65,6 +66,9 @@ Every slot is a shared B1 tileable (2048 px at most) sampled with the UV0 metre 
 |---|---|---|---|---|
 | `TW_Rubble` | sandstone | (0.64, 0.61, 0.57) | 1.4 | grey rubble face stones, merlon bodies, rock heaps, gate vault |
 | `TW_RubbleOchre` | sandstone | (1.00, 0.89, 0.73) | 1.4 | warm ochre face stones (coherent patches plus strays) |
+| `TW_RubbleDark` | sandstone | (0.42, 0.42, 0.41) | 1.4 | polish 2: dark cool face stones (about 25 percent of the plain rubble) |
+| `TW_RubbleWarm` | sandstone | (0.76, 0.66, 0.54) | 1.4 | polish 2: warm brown face stones (about 17 percent) |
+| `TW_RubblePale` | sandstone | (0.84, 0.80, 0.73) | 1.3 | polish 2: pale weathered face stones (about 15 percent) |
 | `TW_Coping` | sandstone | (1.14, 1.09, 1.00) | 0.9 | dressed pale stone: coping, string and corbel courses, quoins, voussoirs, stair, flags |
 | `TW_Patch` | sandstone | (1.30, 1.16, 0.94) | 1.0 | newer repair stone (Wall_Patched) |
 | `TW_Footing` | sandstone | (0.46, 0.43, 0.39) | 1.2 | the deep footing and dark base blocks |
@@ -104,3 +108,7 @@ Round 1 plus two fix rounds (jamb gaps closed, patchy ochre, shell battlements, 
 - Pivot Y is the highest ground along the centre line minus 0.1 m, as above. Buttresses: every 3 or 4 modules on straight modules where the ground falls at least 0.35 m across 6 m toward the outside (the corner rule is not needed: the line bends about 6 degrees per module). Stairs: every 40 to 60 m where the inside strip is level (0.3 m), plus one at each gate.
 - Colliders: a box per module, buttress and End; the stair uses its own mesh; `Wall_Breach` has none. Gatehouses: a box per pier, the passage stays open, `FOOTPRINT` is never a collider and `Part_Door` stays hidden (`ShowDoorLeaves`).
 - `TW_Walkway`'s 2.7 x tint is not applied (a plain colour cannot brighten); the stone tints above 1 are passed unclamped.
+
+## Polish 2 (2026-10-31)
+
+Coordinator notes on the even stone tone, the even coursing and the exact merlon rhythm. `masonry()` now bends course lines through a smooth warp field (about 3 cm, tapered to 0 at the face edges and seams), stacks two thinner stones in about 16 percent of slots, drops in short pinning stones (12 percent) and spreads plain rubble over four tints. Patches and dressed ends stay regular. Every merlon differs in width (0.55 to 0.67 m), height (-6 to +3 cm), offset and yaw. Rebuilt modules chip about one merlon in ten, and the Ruined A / B modules chip or lose about two in three. Gate battlements vary the same way, and the ruined Shell chips about a third of its surviving merlons.

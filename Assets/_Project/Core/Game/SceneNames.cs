@@ -11,8 +11,9 @@ namespace SleepingCalamity.Core
         public const string Lobby = "Lobby";
         public const string ArenaGreybox = "Arena_Greybox";
         public const string ArenaCombat = "Arena_Combat";   // M3: the combat test arena (waves of the three enemies and the elite)
+        public const string ArenaDive = "Arena_Dive";   // M5: the Cellars dive hub (Undercroft stair stand-in); the dive floors are built far from it
         public const string ArenaPrefix = "Arena_";
-        public static readonly string[] BuildOrder = { Bootstrap, Lobby, ArenaGreybox, ArenaCombat };
+        public static readonly string[] BuildOrder = { Bootstrap, Lobby, ArenaGreybox, ArenaCombat, ArenaDive };
 
         // True when sceneName starts with ArenaPrefix (ordinal, case-sensitive). Null -> false. Later milestones add their own gameplay prefixes here.
         public static bool IsGameplay(string sceneName)
