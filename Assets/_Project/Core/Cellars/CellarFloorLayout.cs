@@ -139,7 +139,16 @@ namespace SleepingCalamity.Core
         // door's lock (the exit is reachable without it anyway). -1 when there is no start, no exit or no route. Barrels and crates are not counted as blocks.
         public int EntryToExitDistance()
         {
-            if (EntryStarts.Count == 0 || !StairExit.HasValue) return -1;
+            if (!StairExit.HasValue) return -1;
+            int[,] dist = WalkDistances();
+            return dist == null ? -1 : dist[StairExit.Value.X, StairExit.Value.Y];
+        }
+
+        // Walking steps from the first party start to every grid cell (same rules as EntryToExitDistance: open doors, corridor masks, the lock ignored);
+        // -1 for cells that cannot be reached; null when there is no start.
+        public int[,] WalkDistances()
+        {
+            if (EntryStarts.Count == 0) return null;
             var room = new int[GridSize, GridSize]; var corr = new PlacedCorridor[GridSize, GridSize];
             for (int x = 0; x < GridSize; x++) for (int y = 0; y < GridSize; y++) room[x, y] = -1;
             for (int i = 0; i < Rooms.Count; i++)
@@ -183,7 +192,7 @@ namespace SleepingCalamity.Core
                     if (In(n.X, n.Y) && dist[n.X, n.Y] < 0 && Step(c.X, c.Y, s)) { dist[n.X, n.Y] = dist[c.X, c.Y] + 1; q.Enqueue(n); }
                 }
             }
-            return dist[StairExit.Value.X, StairExit.Value.Y];
+            return dist;
         }
 
         // ---- hashes ----
