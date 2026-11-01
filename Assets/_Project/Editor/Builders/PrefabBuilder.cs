@@ -42,6 +42,13 @@ namespace SleepingCalamity.EditorTools
                 BuilderUtil.GetOrAdd<NetworkObject>(root);
                 BuilderUtil.GetOrAdd<DiveDirector>(root);   // host owns the dive flow; peers read its variables and ask by RPC
             });
+            BuilderUtil.WritePrefab(AssetPaths.CellarContentsSyncPrefab, root =>
+            {
+                BuilderUtil.GetOrAdd<NetworkObject>(root);
+                CellarContentsSync contents = BuilderUtil.GetOrAdd<CellarContentsSync>(root);   // host spawns room enemies, chests, keys, door, pieces; peers show the state
+                contents.Configure(BuilderUtil.LoadNetworkPrefab(AssetPaths.SlimePrefab), BuilderUtil.LoadNetworkPrefab(AssetPaths.RatPrefab),
+                    BuilderUtil.LoadNetworkPrefab(AssetPaths.BroomPrefab), BuilderUtil.LoadNetworkPrefab(AssetPaths.WardenPrefab), BuilderUtil.LoadNetworkPrefab(AssetPaths.HealPrefab));
+            });
             foreach (string path in NetworkPrefabsBuilder.Prefabs) BuilderUtil.RefreshNetworkObjectHash(path);
         }
 

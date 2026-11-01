@@ -136,7 +136,6 @@ namespace SleepingCalamity.Presentation
             if (layout == null) throw new System.ArgumentNullException(nameof(layout));
             kit = kit ?? new CellarFloorKit();
             var root = new GameObject("CellarFloor_s" + layout.Seed + "_f" + layout.Floor).transform;
-            root.SetParent(parent, false);
             var result = new CellarFloorBuild { Root = root };
             var grid = new Grid(layout);
             var mats = new Mats(kit);
@@ -217,6 +216,8 @@ namespace SleepingCalamity.Presentation
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
             Procgen(layout, dressing, Group(root, ProcgenGroup), mats, result);
             Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
+            ArtFinish(root, kit, result);   // art layer: lamp gold and fog colour from CellarArtTuning
+            ParentBuiltFloor(root, parent, result);
             return result;
         }
 

@@ -21,7 +21,9 @@ namespace SleepingCalamity.EditorTools
         public const string ScenePath = "Assets/_Project/Scenes/CellarFloorTest.unity";
         public const uint Seed = 12345;
         public const int FloorNumber = 1;
-        const float Ambient = 0.8f;
+        const float Ambient = CellarArtTuning.Ambient;   // the colour tuning block lives in CellarFloorBuilder.Art.cs (was 0.8)
+        const string ClutterFolder = "Assets/_Project/Content/Art/Cellar/B5/CellarClutter";
+        static readonly string[] ClutterPieces = { "Crate", "CrateStack", "JarCluster", "Rubble", "SackPile" };
         const string MaterialsFolder = "Assets/_Project/Content/Materials/CellarFloor";
         const string LanternFolder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
         static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate" };
@@ -32,15 +34,10 @@ namespace SleepingCalamity.EditorTools
             CellarFloorLayout layout = CellarFloorGenerator.Generate(Seed, FloorNumber);
             Scene scene = DungeonCornerBuilder.NewRoomScene();
             DungeonCornerBuilder.BuildProfile();
-            BeautyCornerArt.EnsureCellarLantern();
-            Dictionary<string, Material> own = DungeonCornerBuilder.BuildOwnMaterials();
-            Dictionary<string, Material> slots = DungeonCornerBuilder.SlotMaterials(own);
-            BuilderUtil.EnsureFolder(MaterialsFolder);
 
             var root = new GameObject("CellarFloorTest").transform;
             var templates = new GameObject("KitTemplates").transform; templates.SetParent(root, false); templates.gameObject.SetActive(false);
-            CellarFloorKit kit = BuildKit(templates, slots, own);
-
+            CellarFloorKit kit = BuildKit(templates);
             CellarFloorBuild built = CellarFloorBuilder.Build(layout, root, kit);
             Object.DestroyImmediate(templates.gameObject);
 
@@ -74,6 +71,62 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
         }
 
+        // The art-layer kit of the real Cellars floor: floor tile, B5 vault pieces, the floor-art-2 clutter (Crate, CrateStack, JarCluster, Rubble, SackPile), lantern, materials
+        // and fog. `templates` (an inactive child of whatever carries the kit) holds the piece holders. Shared by this scene and the CellarFloorSync prefab (SaveRuntimeKit).
+        internal static CellarFloorKit BuildKit(Transform templates)
+        {
+            BeautyCornerArt.EnsureCellarLantern();
+            Dictionary<string, Material> own = DungeonCornerBuilder.BuildOwnMaterials();
+            Dictionary<string, Material> slots = DungeonCornerBuilder.SlotMaterials(own);
+            BuilderUtil.EnsureFolder(MaterialsFolder);
+            var kit = new CellarFloorKit
+            {
+                Floor = slots["CV_Flagstone"], Wall = slots["CV_Brick"], Pillar = slots["CV_VaultStone"], Trim = slots["CV_Oak"], Flame = own["flame"],
+                LockedGate = Marker("CF_LockedGate", new Color(0.70f, 0.20f, 0.08f), 0.6f), Chest = Marker("CF_Chest", new Color(0.42f, 0.24f, 0.09f), 0f),
+                KeyChest = Marker("CF_KeyChest", new Color(0.95f, 0.72f, 0.12f), 0.8f), Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
+                EntryStart = Marker("CF_Entry", new Color(0.30f, 0.58f, 0.18f), 0.5f), StairExit = Marker("CF_Stair", new Color(0.55f, 0.30f, 0.70f), 0.6f),
+                SpawnT1 = Marker("CF_SpawnT1", new Color(0.60f, 0.58f, 0.52f), 0.2f), SpawnT2 = Marker("CF_SpawnT2", new Color(0.85f, 0.42f, 0.08f), 0.5f),
+                FogBaseDensity = 0.007f, FogBaseColor = new Color(0.16f, 0.13f, 0.11f),   // the corner's fog; the floor's atmosphere roll scales and warms this
+                Ceiling = slots["CV_VaultStone"], Limewash = slots["CV_Limewash"], Iron = slots["CV_Iron"], Crate = slots["CV_BarrelOak"],
+                Wax = own["wax"], Mote = own["mote"],
+                Pieces = new Dictionary<string, GameObject>(),
+            };
+            GameObject vault = BeautyCornerArt.LoadModel(DungeonCornerBuilder.KitFolder, DungeonCornerBuilder.KitFbx, keepMaterialSlots: true);
+            Transform tileSrc = vault != null ? vault.transform.Find("FloorTile") : null;
+            if (tileSrc != null)
+            {
+                var holder = new GameObject("FloorTile").transform; holder.SetParent(templates, false);
+                DungeonCornerBuilder.Clone(tileSrc, holder, slots, "FloorTile");
+                kit.FloorTile = holder.GetChild(0).gameObject;
+            }
+            // the art layer's B5 pieces: one holder per piece, the clone keeps its authored transform inside it
+            foreach (string piece in ArtPieces)
+            {
+                Transform src = vault != null ? vault.transform.Find(piece) : null;
+                if (src == null) continue;
+                var holder = new GameObject(piece).transform; holder.SetParent(templates, false);
+                DungeonCornerBuilder.Clone(src, holder, slots, piece);
+                kit.Pieces[piece] = holder.gameObject;
+            }
+            // the floor-art-2 clutter kit (Crate, CrateStack, JarCluster, Rubble, SackPile): same CV_* material slots, loaded by path; a missing FBX leaves the greybox fallback
+            GameObject clutterFbx = BeautyCornerArt.LoadModel(ClutterFolder, "CellarClutter.fbx", keepMaterialSlots: true);
+            foreach (string piece in ClutterPieces)
+            {
+                Transform src = clutterFbx != null ? clutterFbx.transform.Find(piece) : null;
+                if (src == null) continue;
+                var holder = new GameObject(piece).transform; holder.SetParent(templates, false);
+                DungeonCornerBuilder.Clone(src, holder, slots, piece);
+                kit.Pieces[piece] = holder.gameObject;
+            }
+            Debug.Log("SC CELLARFLOOR art pieces " + kit.Pieces.Count + "/" + (ArtPieces.Length + ClutterPieces.Length) + ": " + string.Join(",", kit.Pieces.Keys));
+            GameObject lantern = BeautyCornerArt.LoadModel(LanternFolder, "CellarLantern.fbx");
+            string[] guids = AssetDatabase.FindAssets("M_CellarLantern t:Material");
+            Material lanternMat = guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
+            if (lantern != null && lanternMat != null) { kit.Lantern = lantern; kit.LanternMaterial = lanternMat; }
+            Debug.Log("SC CELLARFLOOR kit floorTile=" + (kit.FloorTile != null ? "B5 art" : "greybox slab") + " lantern=" + (kit.Lantern != null ? "B11 art" : "flame sphere"));
+            return kit;
+        }
+
         // The largest combat room (first on a tie): the camera stands at play height in its south-west corner cell and looks at its far north-east cell.
         internal static (Vector3 Pos, Vector3 Target) RoomView(CellarFloorLayout layout)
         {
@@ -89,7 +142,7 @@ namespace SleepingCalamity.EditorTools
                 if (sx < 0 || ly > sy || (ly == sy && lx < sx)) { sx = lx; sy = ly; }                    // southernmost, then westernmost
                 if (tx < 0 || ly < ty || (ly == ty && lx > tx)) { tx = lx; ty = ly; }                    // northernmost, then easternmost
             }
-            Vector3 pos = CellarFloorBuilder.CellCenter(p.X + sx, p.Y + sy) + new Vector3(-1.2f, 1.7f, -1.2f);
+            Vector3 pos = CellarFloorBuilder.CellCenter(p.X + sx, p.Y + sy) + new Vector3(-0.7f, 1.7f, -0.7f);   // 0.99 m from the cell centre: the clutter keeps 1.0 m clear of it, so the camera never sits inside a piece
             Vector3 target = CellarFloorBuilder.CellCenter(p.X + tx, p.Y + ty) + new Vector3(0, 1.2f, 0);
             if ((target - pos).sqrMagnitude < 9f) target = pos + new Vector3(1f, -0.1f, 1f) * 5f;
             return (pos, target);
@@ -129,61 +182,17 @@ namespace SleepingCalamity.EditorTools
             return (pos, target);
         }
 
-        // The dressing kit: materials, the B5 vault pieces and the B11 lantern as templates cloned under `templates` (scene objects).
-        static CellarFloorKit BuildKit(Transform templates, Dictionary<string, Material> slots, Dictionary<string, Material> own)
-        {
-            var kit = new CellarFloorKit
-            {
-                Floor = slots["CV_Flagstone"], Wall = slots["CV_Brick"], Pillar = slots["CV_VaultStone"], Trim = slots["CV_Oak"], Flame = own["flame"],
-                LockedGate = Marker("CF_LockedGate", new Color(0.70f, 0.20f, 0.08f), 0.6f), Chest = Marker("CF_Chest", new Color(0.42f, 0.24f, 0.09f), 0f),
-                KeyChest = Marker("CF_KeyChest", new Color(0.95f, 0.72f, 0.12f), 0.8f), Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
-                EntryStart = Marker("CF_Entry", new Color(0.30f, 0.58f, 0.18f), 0.5f), StairExit = Marker("CF_Stair", new Color(0.55f, 0.30f, 0.70f), 0.6f),
-                SpawnT1 = Marker("CF_SpawnT1", new Color(0.60f, 0.58f, 0.52f), 0.2f), SpawnT2 = Marker("CF_SpawnT2", new Color(0.85f, 0.42f, 0.08f), 0.5f),
-                FogBaseDensity = 0.007f, FogBaseColor = new Color(0.16f, 0.13f, 0.11f),   // the corner's fog; the floor's atmosphere roll scales and warms this
-                Ceiling = slots["CV_VaultStone"], Limewash = slots["CV_Limewash"], Iron = slots["CV_Iron"], Crate = slots["CV_BarrelOak"],
-                Wax = own["wax"], Mote = own["mote"],
-                Pieces = new Dictionary<string, GameObject>(),
-            };
-            GameObject vault = BeautyCornerArt.LoadModel(DungeonCornerBuilder.KitFolder, DungeonCornerBuilder.KitFbx, keepMaterialSlots: true);
-            Transform tileSrc = vault != null ? vault.transform.Find("FloorTile") : null;
-            if (tileSrc != null)
-            {
-                var holder = new GameObject("FloorTile").transform; holder.SetParent(templates, false);
-                DungeonCornerBuilder.Clone(tileSrc, holder, slots, "FloorTile");
-                kit.FloorTile = holder.GetChild(0).gameObject;
-            }
-            // the art layer's B5 pieces: one holder per piece, the clone keeps its authored transform inside it
-            foreach (string piece in ArtPieces)
-            {
-                Transform src = vault != null ? vault.transform.Find(piece) : null;
-                if (src == null) continue;
-                var holder = new GameObject(piece).transform; holder.SetParent(templates, false);
-                DungeonCornerBuilder.Clone(src, holder, slots, piece);
-                kit.Pieces[piece] = holder.gameObject;
-            }
-            Debug.Log("SC CELLARFLOOR art pieces " + kit.Pieces.Count + "/" + ArtPieces.Length + ": " + string.Join(",", kit.Pieces.Keys));
-            GameObject lantern = BeautyCornerArt.LoadModel(LanternFolder, "CellarLantern.fbx");
-            string[] guids = AssetDatabase.FindAssets("M_CellarLantern t:Material");
-            Material lanternMat = guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
-            if (lantern != null && lanternMat != null) { kit.Lantern = lantern; kit.LanternMaterial = lanternMat; }
-            Debug.Log("SC CELLARFLOOR kit floorTile=" + (kit.FloorTile != null ? "B5 art" : "greybox slab") + " lantern=" + (kit.Lantern != null ? "B11 art" : "flame sphere"));
-            return kit;
-        }
-
         const string RuntimeKitFolder = "Assets/_Project/Content/Art/Cellar/FloorKit";
 
         // The same kit for the game: every template saved as a prefab asset (so a prefab can reference it) and the result written into the CellarFloorSync prefab's Kit,
         // which makes every peer's runtime floor the dressed one. Idempotent (SaveAsPrefabAsset overwrites).
         public static void SaveRuntimeKit()
         {
-            Dictionary<string, Material> own = DungeonCornerBuilder.BuildOwnMaterials();
-            Dictionary<string, Material> slots = DungeonCornerBuilder.SlotMaterials(own);
-            BuilderUtil.EnsureFolder(MaterialsFolder);
             BuilderUtil.EnsureFolder(RuntimeKitFolder);
             var holderRoot = new GameObject("CellarFloorKitTemplates");
             try
             {
-                CellarFloorKit kit = BuildKit(holderRoot.transform, slots, own);
+                CellarFloorKit kit = BuildKit(holderRoot.transform);
                 GameObject Save(GameObject template, string name)
                 {
                     template.SetActive(true);   // a saved prefab is a plain active asset (the builder also activates its clones)
