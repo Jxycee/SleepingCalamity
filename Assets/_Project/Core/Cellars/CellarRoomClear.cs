@@ -56,12 +56,19 @@ namespace SleepingCalamity.Core
         // weights for Slime, Broom, RatKing per floor 1-4
         static readonly int[][] Weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 20, 50, 30 }, new[] { 30, 40, 30 } };
 
-        public static EnemyKind Tier1Kind(uint seed, int floor, int room, int index)
+        public static int[] WeightsFor(int floor) => Weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
+
+        public static EnemyKind Tier1Kind(uint seed, int floor, int room, int index) => Tier1Kind(seed, floor, room, index, CellarFloorRoster.EligibleMask(floor));
+
+        // The same stream, restricted to the floor's roster (bit mask, CellarFloorRoster): a kind off the roster is never rolled. A full roster gives the unrestricted pick.
+        public static EnemyKind Tier1Kind(uint seed, int floor, int room, int index, int rosterMask)
         {
-            int[] w = Weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
+            int[] w = WeightsFor(floor);
+            int ws = (rosterMask & CellarFloorRoster.SlimeBit) != 0 ? w[0] : 0, wb = (rosterMask & CellarFloorRoster.BroomBit) != 0 ? w[1] : 0, wr = (rosterMask & CellarFloorRoster.RatKingBit) != 0 ? w[2] : 0;
+            if (ws + wb + wr == 0) { ws = w[0]; wb = w[1]; wr = w[2]; }   // an empty/foreign roster never empties the floor
             var rng = new Pcg32(Rng.Derive(seed, "cellars.mix", ((ulong)floor << 32) | ((uint)room << 8) | (uint)index));
-            int roll = rng.Range(0, w[0] + w[1] + w[2]);
-            return roll < w[0] ? EnemyKind.Slime : roll < w[0] + w[1] ? EnemyKind.Broom : EnemyKind.RatKing;
+            int roll = rng.Range(0, ws + wb + wr);
+            return roll < ws ? EnemyKind.Slime : roll < ws + wb ? EnemyKind.Broom : EnemyKind.RatKing;
         }
     }
 }
