@@ -28,3 +28,6 @@ Density: rooms show 1-2 socket pieces and greybox crate cubes; the corner frame 
 
 ## Clutter kit (merged 6058730)
 `Art/Blender/cellars/sc_cellar_clutter.py` -> `Content/Art/Cellar/B5/CellarClutter/CellarClutter.fbx`: Crate 1.6k, CrateStack 4.0k, JarCluster 1.4k, Rubble 1.4k, SackPile 0.9k (9.3k tris), CV_* materials only (all mapped), pivot bottom centre, front +X, wall side -X. SackPile reads stony (limewash stand-in): use sparingly.
+
+## Merge order (coordinator)
+Cellars branches touching CellarFloorBuilder.cs merge in order: M5 spine, M5 contents, Q12 procgen, then this job LAST. Builder edits stay in CellarFloorBuilder.Art.cs with at most one call line in CellarFloorBuilder.cs (code tip 8c5f174 has three one-liners: Clutter field, GoldLamp tuning, fog colour; to be folded into one call). Before the check: merge origin/main after those land, regenerate scenes with a -nographics build, never hand-merge .unity.
