@@ -102,7 +102,9 @@ namespace SleepingCalamity.Runtime
         // stand now (TownSaves.Capture does the work from a TownState and DiveState); it must not hand out the live objects. At load the cleaned, conserved sections are
         // in Town (never null; empty sections for an older save): the provider builds its state from them with TownSaves.ToState / RestoreHaul /
         // DiveState.RestoreProgress, once, when it starts. A mid-dive quit has already been turned into a failed dive (InDive false).
-        public interface ITownSource { TownSnapshot CaptureTown(); }
+        // RestoreTown is called by RegisterTownSource, before the source is live (so a save flush can never capture its still-empty state over the loaded town): it gets its
+        // own cleaned copy of the loaded sections (sections an older save lacks are null) and builds TownState / DiveHaul / DiveState / resident state from it.
+        public interface ITownSource { TownSnapshot CaptureTown(); void RestoreTown(TownSnapshot loaded); }
 
         private TownSnapshot _town = new TownSnapshot();
         private ITownSource _townSource;
@@ -124,6 +126,7 @@ namespace SleepingCalamity.Runtime
         {
             if (source == null || source == _townSource) return;
             CaptureTownFromSource();
+            source.RestoreTown(TownSaveRules.CleanSnapshot(_town, null, null, false));   // restore first, then go live
             _townSource = source;
         }
 

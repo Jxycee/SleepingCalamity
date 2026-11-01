@@ -462,8 +462,10 @@ namespace SleepingCalamity.Tests.EditMode
         // ---------------------------------------------------------------- HostWorld's provider
         sealed class FakeTown : HostWorld.ITownSource
         {
-            public TownSnapshot Next; public int Calls;
+            public TownSnapshot Next; public int Calls; public TownSnapshot Restored;
             public TownSnapshot CaptureTown() { Calls++; return Next; }
+            public bool Adopt;   // true: like a real hub, it rebuilds its state from the loaded sections and captures that afterwards
+            public void RestoreTown(TownSnapshot loaded) { Restored = loaded; if (Adopt) Next = loaded; }
         }
 
         static TownSnapshot Fresh() => TownSaves.Capture(new TownState(Hollow), new DiveState(new DiveHaul(PerFloor)), null, null, null);
@@ -515,6 +517,25 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Town.Town, Is.Null);
             Assert.That(world.CaptureTownInto(WorldSaveRules.New(2UL)), Is.False);
             Assert.That(src.Calls, Is.EqualTo(calls), "the dropped source is not asked again");
+        }
+
+        // Catches: a hub that registers (still empty) and is captured by a save flush before it has rebuilt its state wiping the loaded town out of the file.
+        [Test]
+        public void Host_RegisteringASource_RestoresItBeforeItCanBeCaptured()
+        {
+            (TownState town, DiveState dive) = Live();
+            TownSnapshot snap = TownSaves.Capture(town, dive, null, null, null);
+            var saved = new WorldSave { Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive };
+            var world = new HostWorld();
+            world.LoadTown(saved);
+            var hub = new FakeTown { Next = Fresh(), Adopt = true };   // empty until RestoreTown is called
+            world.RegisterTownSource(hub);
+            Assert.That(hub.Restored.Town.Buildings.Count, Is.EqualTo(1));
+            Assert.That(hub.Restored.Dive.ClearedMask, Is.EqualTo(3));
+            Assert.That(hub.Restored, Is.Not.SameAs(world.Town), "the provider gets its own copy");
+            Assert.That(world.CaptureTownInto(saved), Is.False, "the loaded town is still the town");
+            Assert.That(saved.Town.Buildings.Count, Is.EqualTo(1));
+            Assert.That(saved.Dive.BankedPieces, Is.EqualTo(new[] { SpareFrame }));
         }
 
         // Catches: a loaded mid-dive file reaching the provider still in the dive, or the loaded sections aliasing the file's value.
