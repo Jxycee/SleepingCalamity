@@ -495,6 +495,35 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => hero.Mirror.Pips == SpellPips.StartCap - 1, 3f, "the owner's mirror shows the host's count");
         }
 
+        // Catches (M4): an unlocked hero ability that never reaches the host's damage path. Two identical idle slimes take the same axe finisher from the host
+        // entry point (ServerPlayerHitsEnemy): once without axe_quake (plain), once with it unlocked (x1.30 at tier 2 with the axe in hand). Direct host call, so
+        // there is no input timing or random crit: the damage must differ by the ability alone. Does not cover a remote client's own swing path.
+        [UnityTest]
+        public IEnumerator Solo_UnlockedAbility_ChangesHostAppliedDamage()
+        {
+            CombatHost combat = null;
+            HeroCombat hero = null;
+            GameObject heroObject = null;
+            yield return ArenaWithoutWave((c, h, hc, v, i) => { combat = c; hero = hc; heroObject = h; });
+            Vector3 pos = heroObject.transform.position + heroObject.transform.forward * 1.6f;
+            Enemy plain = combat.SpawnEnemy(EnemyKind.Slime, 1, pos, ai: false);
+            Enemy boosted = combat.SpawnEnemy(EnemyKind.Slime, 1, pos, ai: false);
+            yield return null;
+            Assert.That(hero.WeaponKey, Is.EqualTo(WeaponCatalog.Axe));
+            Vector3 from = heroObject.transform.position;
+            float yaw = heroObject.transform.eulerAngles.y;
+
+            combat.ServerPlayerHitsEnemy(hero, 1, AttackSet.Finisher, plain, -1, from, yaw);
+            int plainDamage = plain.Model.MaxHp - plain.Model.Hp;
+            Assert.That(plainDamage, Is.GreaterThan(0), "the baseline finisher landed");
+
+            combat.Growth(AppBootstrap.Current.NetworkManager.LocalClientId).Abilities.Restore(new[] { AbilityEffects.Quake });
+            combat.ServerPlayerHitsEnemy(hero, 2, AttackSet.Finisher, boosted, -1, from, yaw);
+            int boostedDamage = boosted.Model.MaxHp - boosted.Model.Hp;
+            Assert.That(boostedDamage, Is.GreaterThan(plainDamage), "axe_quake must raise the host-applied finisher damage");
+            Assert.That(boostedDamage, Is.EqualTo(Mathf.CeilToInt(plainDamage * 1.30f)).Within(2));
+        }
+
         // Catches: a finisher bonus that counts hits of earlier combos. A combo started within the 1.2 s grace rebases like AttackMachine.Begin: the second
         // finisher has the same two prior hits as the first.
         [UnityTest]
