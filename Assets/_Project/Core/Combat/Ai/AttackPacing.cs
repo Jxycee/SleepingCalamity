@@ -21,6 +21,9 @@ namespace SleepingCalamity.Core.Combat
 
         public PacingProfile(int maxAttackers, float minGap, float cooldownScale, float recoverScale, float retry)
         { MaxAttackersPerHero = maxAttackers; MinStrikeGapSeconds = minGap; CooldownScale = cooldownScale; RecoverScale = recoverScale; RetrySeconds = retry; }
+
+        // Holders one hero allows per token category: melee and ranged each get the tier cap, heavy is the one elite (docs/research/enemy-ai.md 2.3).
+        public int PoolSize(TokenCategory c) => c == TokenCategory.Heavy ? 1 : MaxAttackersPerHero;
     }
 
     public static class AttackPacing
@@ -98,22 +101,39 @@ namespace SleepingCalamity.Core.Combat
         }
     }
 
+    // Which of a hero's token pools an attack draws from (docs/research/enemy-ai.md 2.3): a full melee pool does not block a slime's glob. Heavy is the
+    // elite's pool; its signature is still exclusive on top of that.
+    public enum TokenCategory : byte { Melee = 0, Ranged = 1, Heavy = 2 }
+
     // The host's attack tokens: who may attack which hero right now. Keys are opaque ids (the host uses the Unity objects' hash codes, their instance
     // ids, unique across every NetworkManager in one process). A token is held from the attack's start until its hit window closes and then lapses by
-    // itself, so a missed Release can never leak one; the host still releases early when an attack is cut short (stagger, parry, death, despawn).
+    // itself, so a missed Release can never leak one; the host still releases early when an attack is cut short (stagger, parry, death, despawn), and
+    // Audit frees any hold whose holder is gone or that outlived a timeout.
+    //
+    // Pools are per hero AND per category (PacingProfile.PoolSize); the gap between hit windows is per hero across every category, so a rat's lunge and a
+    // slime's glob can wind up together but never land together. ONE AttackTokens serves the whole CombatHost (every room's crowd shares it), so a hero's pools
+    // and gap hold however many rooms its attackers come from. A window that has closed stays on record for the gap (a "tail"), so the next attack
+    // cannot open inside it either.
     //
     // The elite's signature is EXCLUSIVE: its tell plays alone on that hero. When others still hold tokens it cannot start yet, so it RESERVES the hero:
     // from then on nobody new gets a token there, the current holders' tokens lapse within one hit window, and the signature takes the hero on its next
     // ask. A reservation lapses after ReserveSeconds (the elite walked off or chose something else), so it can never block a hero for good.
+    //
+    // Swap: a hold taken with begin=false is provisional (the holder has not started its wind-up). A nearer enemy may take it over (TrySwap); once the
+    // holder calls Begin, or took the token with the default begin=true, nobody can take it.
     public sealed class AttackTokens
     {
         public const double ReserveSeconds = 2.5;
+        public const double DefaultAuditMaxAgeSeconds = 6.0;   // no attack runs this long; an older hold is stuck
 
         private struct Hold
         {
             public int Target, Holder;
-            public double StrikeStart, StrikeEnd;
-            public bool Exclusive;
+            public double Acquired, StrikeStart, StrikeEnd;
+            public double Gap;
+            public bool Exclusive, Started;
+            public float Distance;
+            public TokenCategory Category;
         }
 
         private struct Reservation
@@ -123,17 +143,20 @@ namespace SleepingCalamity.Core.Combat
         }
 
         private readonly List<Hold> _holds = new List<Hold>();
+        private readonly List<Hold> _tails = new List<Hold>();   // closed hit windows still inside their gap
         private readonly List<Reservation> _reserved = new List<Reservation>();
 
         // Ask to start `attack` on `target` now. False: wait and ask again (AttackPacing RetrySeconds). An earlier hold by the same holder is replaced.
-        public bool TryAcquire(int target, int holder, double now, AttackData attack, in PacingProfile pacing, bool exclusive = false)
+        // begin=false: the hold is provisional and may be swapped away until Begin(holder); distance (holder to target) ranks swappers.
+        public bool TryAcquire(int target, int holder, double now, AttackData attack, in PacingProfile pacing, bool exclusive = false,
+            TokenCategory category = TokenCategory.Melee, bool begin = true, float distance = 0f)
         {
             if (attack == null) return false;
             Expire(now);
             int reservedBy = ReservedBy(target);
             if (reservedBy != 0 && reservedBy != holder) return false;   // someone's signature is waiting for this hero
             double s = now + attack.HitOn.Start / (double)AttackData.FrameRate, e = now + attack.HitOn.End / (double)AttackData.FrameRate;
-            int others = 0;
+            int others = 0, inPool = 0;
             bool clash = false;
             for (int i = 0; i < _holds.Count; i++)
             {
@@ -141,46 +164,134 @@ namespace SleepingCalamity.Core.Combat
                 if (h.Target != target || h.Holder == holder) continue;
                 if (h.Exclusive) return false;
                 others++;
-                if (s < h.StrikeEnd + pacing.MinStrikeGapSeconds && h.StrikeStart < e + pacing.MinStrikeGapSeconds) clash = true;
+                if (h.Category == category) inPool++;
+                if (Clashes(s, e, h.StrikeStart, h.StrikeEnd, pacing.MinStrikeGapSeconds)) clash = true;
+            }
+            for (int i = 0; i < _tails.Count; i++)
+            {
+                Hold h = _tails[i];
+                if (h.Target == target && h.Holder != holder && Clashes(s, e, h.StrikeStart, h.StrikeEnd, pacing.MinStrikeGapSeconds)) clash = true;
             }
             if (exclusive && others > 0)
             {
                 if (reservedBy == 0) _reserved.Add(new Reservation { Target = target, Holder = holder, Until = now + ReserveSeconds });
                 return false;
             }
-            if (clash || others >= pacing.MaxAttackersPerHero) return false;
-            Release(holder);
-            _holds.Add(new Hold { Target = target, Holder = holder, StrikeStart = s, StrikeEnd = e, Exclusive = exclusive });
+            if (clash || inPool >= pacing.PoolSize(category)) return false;
+            Release(holder, now);
+            _holds.Add(new Hold
+            {
+                Target = target, Holder = holder, Acquired = now, StrikeStart = s, StrikeEnd = e, Gap = pacing.MinStrikeGapSeconds,
+                Exclusive = exclusive, Started = begin, Distance = distance, Category = category,
+            });
             return true;
         }
 
+        private static bool Clashes(double s, double e, double hs, double he, double gap) => s < he + gap && hs < e + gap;
+
+        // A nearer enemy takes the token of a provisional holder (one that has not begun its wind-up) on the same hero and category. The old holder loses
+        // its hold and must ask again. False when there is nobody to take it from, the swapper is not strictly nearer, or the token would still be refused
+        // (gap, exclusive signature, reservation).
+        public bool TrySwap(int target, int holder, double now, AttackData attack, in PacingProfile pacing, TokenCategory category, float distance, bool exclusive = false)
+        {
+            if (attack == null) return false;
+            Expire(now);
+            int at = -1;
+            float far = distance;
+            for (int i = 0; i < _holds.Count; i++)
+            {
+                Hold h = _holds[i];
+                if (h.Target != target || h.Category != category || h.Started || h.Exclusive || h.Holder == holder) continue;
+                if (h.Distance > far) { far = h.Distance; at = i; }
+            }
+            if (at < 0) return false;
+            Hold saved = _holds[at];
+            _holds.RemoveAt(at);
+            int reservedBefore = _reserved.Count;
+            if (TryAcquire(target, holder, now, attack, pacing, exclusive, category, begin: true, distance: distance)) return true;
+            // Refused anyway: the old holder keeps it, and an exclusive swapper's refused ask must not leave its reservation behind (it would block the hero).
+            if (_reserved.Count > reservedBefore) _reserved.RemoveRange(reservedBefore, _reserved.Count - reservedBefore);
+            _holds.Insert(Math.Min(at, _holds.Count), saved);
+            return false;
+        }
+
+        // The holder's wind-up has started: its token can no longer be swapped away.
+        public void Begin(int holder)
+        {
+            for (int i = 0; i < _holds.Count; i++)
+            {
+                if (_holds[i].Holder != holder) continue;
+                Hold h = _holds[i];
+                h.Started = true;
+                _holds[i] = h;
+            }
+        }
+
         // An attack that must start now whatever the tokens say (the elite's revenge break-free answers being chained): it is recorded without checking the
-        // cap, the gap or a reservation, so the attacks that come after it still keep their gap from it.
-        public void ForceAcquire(int target, int holder, double now, AttackData attack)
+        // cap, the gap or a reservation, so the attacks that come after it still keep their gap from it: it leaves the normal tail (pacing's gap) once its
+        // hit window closes, like any other hold.
+        public void ForceAcquire(int target, int holder, double now, AttackData attack, in PacingProfile pacing, TokenCategory category = TokenCategory.Melee)
         {
             if (attack == null) return;
-            Expire(now);
-            Release(holder);
+            Release(holder, now);
             _holds.Add(new Hold
             {
-                Target = target, Holder = holder,
+                Target = target, Holder = holder, Acquired = now, Started = true, Category = category, Gap = pacing.MinStrikeGapSeconds,
                 StrikeStart = now + attack.HitOn.Start / (double)AttackData.FrameRate, StrikeEnd = now + attack.HitOn.End / (double)AttackData.FrameRate,
             });
         }
 
-        public void Release(int holder)
+        // Frees the holder's hold and reservation at once (stagger, parry, death, despawn, a normal attack end). If its hit window had already opened, the
+        // window closes now (or at its own end, if that came first) and stays on record for the gap, so Release itself leaves the tail; it does not depend
+        // on Expire having run in between. A hold released before its window opened leaves no tail (no hit ever landed or was due).
+        public void Release(int holder, double now)
         {
-            for (int i = _holds.Count - 1; i >= 0; i--) if (_holds[i].Holder == holder) _holds.RemoveAt(i);
+            Expire(now);
+            for (int i = _holds.Count - 1; i >= 0; i--)
+            {
+                Hold h = _holds[i];
+                if (h.Holder != holder) continue;
+                _holds.RemoveAt(i);
+                if (h.Gap > 0.0 && now >= h.StrikeStart)
+                {
+                    h.StrikeEnd = Math.Min(h.StrikeEnd, now);
+                    _tails.Add(h);
+                }
+            }
             for (int i = _reserved.Count - 1; i >= 0; i--) if (_reserved[i].Holder == holder) _reserved.RemoveAt(i);
         }
 
-        public void Clear() { _holds.Clear(); _reserved.Clear(); }
+        // Periodic safety net (the host calls it about every 2 s): frees the holds and reservations of holders that no longer exist, and any hold older than
+        // maxAge. Time already lapses a hold at StrikeEnd, so this only matters for a hold whose clock cannot lapse (a stuck StrikeEnd). Returns how many it freed.
+        public int Audit(double now, Func<int, bool> isAlive, double maxAge = DefaultAuditMaxAgeSeconds)
+        {
+            Expire(now);
+            int freed = 0;
+            for (int i = _holds.Count - 1; i >= 0; i--)
+            {
+                Hold h = _holds[i];
+                if ((isAlive != null && !isAlive(h.Holder)) || now - h.Acquired > maxAge) { _holds.RemoveAt(i); freed++; }
+            }
+            for (int i = _reserved.Count - 1; i >= 0; i--)
+                if (isAlive != null && !isAlive(_reserved[i].Holder)) { _reserved.RemoveAt(i); freed++; }
+            return freed;
+        }
+
+        public void Clear() { _holds.Clear(); _tails.Clear(); _reserved.Clear(); }
 
         public int HoldersOn(int target, double now)
         {
             Expire(now);
             int n = 0;
             for (int i = 0; i < _holds.Count; i++) if (_holds[i].Target == target) n++;
+            return n;
+        }
+
+        public int HoldersOn(int target, TokenCategory category, double now)
+        {
+            Expire(now);
+            int n = 0;
+            for (int i = 0; i < _holds.Count; i++) if (_holds[i].Target == target && _holds[i].Category == category) n++;
             return n;
         }
 
@@ -207,7 +318,14 @@ namespace SleepingCalamity.Core.Combat
 
         private void Expire(double now)
         {
-            for (int i = _holds.Count - 1; i >= 0; i--) if (_holds[i].StrikeEnd <= now) _holds.RemoveAt(i);
+            for (int i = _holds.Count - 1; i >= 0; i--)
+            {
+                Hold h = _holds[i];
+                if (h.StrikeEnd > now) continue;
+                _holds.RemoveAt(i);
+                if (h.Gap > 0.0) _tails.Add(h);   // its window closed by time: keep it on record for the gap
+            }
+            for (int i = _tails.Count - 1; i >= 0; i--) if (_tails[i].StrikeEnd + _tails[i].Gap <= now) _tails.RemoveAt(i);
             for (int i = _reserved.Count - 1; i >= 0; i--) if (_reserved[i].Until <= now) _reserved.RemoveAt(i);
         }
     }

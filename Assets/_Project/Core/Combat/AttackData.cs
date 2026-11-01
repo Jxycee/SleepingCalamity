@@ -69,12 +69,13 @@ namespace SleepingCalamity.Core.Combat
         public readonly int SpellPips;                // pips it costs
         public readonly EnemyTell Tell;               // enemy attacks: how the body stages the wind-up (EnemyTell); null for hero attacks
         public readonly float Poise;                  // hero attacks: what a hit adds to the enemy's poise count (PoiseMeter); defaults to Revenge
+        public readonly TokenCategory? TokenPool;     // enemy attacks: which attack-token pool this attack draws from; null = the enemy's own default (EnemyDefinition.CategoryOf)
 
         public AttackData(string id, string name, AttackKind kind, int totalFrames, FrameWindow hitOn, float multiplier, HitShape shape, float range,
             float halfAngleDeg, FrameWindow comboOpen = default, FrameWindow finisherAllowed = default, int cancelFrom = -1, FrameWindow iFrames = default,
             FrameWindow superArmor = default, FrameWindow turn = default, float turnDegPerSec = 0f, FrameWindow lunge = default, float lungeMeters = 0f,
             float heightBand = 2f, float knockback = 0f, float revenge = 1f, int hitstopFrames = 4, float cameraKick = 0.3f, bool guardBreak = false,
-            bool guardable = true, bool fire = false, int spellPips = 0, HitOrigin origin = HitOrigin.Self, EnemyTell tell = null, float poise = -1f)
+            bool guardable = true, bool fire = false, int spellPips = 0, HitOrigin origin = HitOrigin.Self, EnemyTell tell = null, float poise = -1f, TokenCategory? tokenPool = null)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("an attack needs an id", nameof(id));
             Id = id;
@@ -107,6 +108,7 @@ namespace SleepingCalamity.Core.Combat
             SpellPips = spellPips;
             Tell = tell;
             Poise = poise >= 0f ? poise : revenge;
+            TokenPool = tokenPool;
         }
 
         public float TotalSeconds => TotalFrames / (float)FrameRate;
