@@ -71,6 +71,9 @@ namespace SleepingCalamity.Presentation
             freeCam.Priority.Value = FreePriority;
             lockCam.Priority.Value = 0;
             if (_locomotion != null) ApplyAxes();
+            AttachShake(freeCam);
+            AttachShake(lockCam);
+            FeedbackDirector.EnsureExists();
 
             if (_lockController != null) _lockController.LockChanged += OnLockChanged;
             OnLockChanged(_lockController != null ? _lockController.Locked : null);
@@ -102,6 +105,7 @@ namespace SleepingCalamity.Presentation
 
         private void Update()
         {
+            TickShake();
             if (_hero == null || _locomotion == null) return;
             ApplyAxes();
             UpdateIndicator();
@@ -113,6 +117,31 @@ namespace SleepingCalamity.Presentation
         private const float KickFovDegrees = 4.5f, KickDecayPerSecond = 4.5f;
 
         public void Kick(float strength) { _kick = Mathf.Max(_kick, Mathf.Clamp01(strength)); }
+
+        // Trauma shake (hit-feedback.md section 3): FeedbackDirector adds trauma, the rig samples smooth noise once a frame (unscaled time, so hitstop and
+        // pauses do not freeze it) and CameraShakeExtension applies the rotation to both cameras after Cinemachine's own pipeline. Owner side only.
+        private readonly SleepingCalamity.Core.Feedback.TraumaShake _shake = new SleepingCalamity.Core.Feedback.TraumaShake();
+        private int _shakeSeed;
+
+        public Vector3 ShakeEuler { get; private set; }   // yaw, pitch, roll in degrees
+        public float Trauma => _shake.Trauma;
+
+        public void AddTrauma(float amount, float scale = 1f) { _shake.Add(amount, scale); }
+
+        private void TickShake()
+        {
+            _shake.Tick(Time.unscaledDeltaTime);
+            _shake.Sample(Time.unscaledTime, _shakeSeed, out float yaw, out float pitch, out float roll);
+            ShakeEuler = new Vector3(yaw, pitch, roll);
+        }
+
+        private void AttachShake(CinemachineCamera cam)
+        {
+            if (cam == null) return;
+            var ext = cam.GetComponent<CameraShakeExtension>();
+            if (ext == null) ext = cam.gameObject.AddComponent<CameraShakeExtension>();
+            ext.Rig = this;
+        }
 
         private void OnEnable() { CombatEvents.CameraKick += OnKick; }
         private void OnDisable() { CombatEvents.CameraKick -= OnKick; }
