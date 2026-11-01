@@ -205,7 +205,6 @@ namespace SleepingCalamity.EditorTools
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + name + ".mat", Shader.Find("Universal Render Pipeline/Lit") ?? throw new System.InvalidOperationException("URP Lit not found"));
             m.SetColor("_BaseColor", c); m.SetColor("_Color", c); m.SetFloat("_Smoothness", 0.25f);
             if (glow > 0f) { m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", c * glow); m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; }
-            m.SetShaderPassEnabled("MotionVectors", true);
             EditorUtility.SetDirty(m);
             return m;
         }

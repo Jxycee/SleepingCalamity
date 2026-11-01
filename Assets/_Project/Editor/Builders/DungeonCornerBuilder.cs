@@ -163,11 +163,11 @@ namespace SleepingCalamity.EditorTools
             var d = new Dictionary<string, Material>();
             Material breath = Lit("CV_Breath");   // faint warm emissive under the grate bars (the town's tithe-gate breath motif)
             breath.SetColor("_BaseColor", new Color(0.10f, 0.04f, 0.02f)); breath.EnableKeyword("_EMISSION"); breath.SetColor("_EmissionColor", new Color(1.0f, 0.30f, 0.05f) * 2.2f);
-            breath.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; breath.SetShaderPassEnabled("MotionVectors", true);
+            breath.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             d["CV_Breath"] = breath;
             Material day = Lit("CV_Daylight");   // the coal hatch opening
             day.SetColor("_BaseColor", new Color(0.2f, 0.2f, 0.18f)); day.EnableKeyword("_EMISSION"); day.SetColor("_EmissionColor", new Color(1.0f, 0.97f, 0.90f) * 6f);
-            day.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; day.SetShaderPassEnabled("MotionVectors", true);
+            day.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             d["CV_Daylight"] = day;
             Material dark = Lit("DC_Dark"); dark.SetColor("_BaseColor", new Color(0.03f, 0.022f, 0.016f)); dark.SetFloat("_Smoothness", 0.1f); d["dark"] = dark;
             Material wax = Lit("DC_Wax"); wax.SetColor("_BaseColor", new Color(0.62f, 0.55f, 0.42f)); wax.SetFloat("_Smoothness", 0.3f); d["wax"] = wax;
@@ -180,10 +180,10 @@ namespace SleepingCalamity.EditorTools
             lampCone.SetColor("_Color", new Color(1.0f, 0.72f, 0.36f)); lampCone.SetFloat("_Intensity", 0.09f); lampCone.renderQueue = 3100; d["lampcone"] = lampCone;
             Shader pu = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new InvalidOperationException("URP Particles/Unlit not found");
             Material mote = LookTestBuilder.Ensure(MaterialsFolder + "/M_DC_Mote.mat", pu);
-            mote.SetFloat("_Surface", 1f); mote.SetFloat("_Blend", 2f); mote.SetFloat("_SrcBlend", 1f); mote.SetFloat("_DstBlend", 1f); mote.SetFloat("_SrcBlendAlpha", 1f); mote.SetFloat("_DstBlendAlpha", 1f);
+            mote.SetFloat("_Surface", 1f); mote.SetFloat("_Blend", 2f); mote.SetFloat("_SrcBlend", 5f); mote.SetFloat("_DstBlend", 1f); mote.SetFloat("_SrcBlendAlpha", 1f); mote.SetFloat("_DstBlendAlpha", 1f);
             mote.SetFloat("_ZWrite", 0f); mote.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); mote.SetOverrideTag("RenderType", "Transparent"); mote.renderQueue = 3000;
             mote.SetColor("_BaseColor", new Color(1.0f, 0.75f, 0.4f)); d["mote"] = mote;
-            foreach (Material m in d.Values) { if (m.HasProperty("_BaseColor")) m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true); EditorUtility.SetDirty(m); }
+            foreach (Material m in d.Values) { if (m.HasProperty("_BaseColor")) m.SetColor("_Color", m.GetColor("_BaseColor")); EditorUtility.SetDirty(m); }
             AssetDatabase.SaveAssets();
             return d;
         }
