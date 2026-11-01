@@ -156,19 +156,26 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Density_EveryRoomReadsDressed_AfterThePoolSocketsAndTheTrim()
         {
-            var floorOnly = new Dictionary<string, (double sum, int n)>(); var withTrim = new Dictionary<string, (double sum, int n)>();
+            // per room id: sums of (floor pieces, wall trim, overhead trim) per floor cell, and the room count
+            var acc = new Dictionary<string, (double floor, double wall, double over, int n)>();
             foreach (var (l, d, ch, c, t, w) in All(3))
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     PlacedRoom p = l.Rooms[r]; if (p.Room.Kind == RoomKind.Corridor) continue;
                     int fc = p.Room.FloorCount, pieces = d.SocketsOf(r).Count(s => s.Filled && s.Kind != SocketKind.Lantern) + c.CountInRoom(r);
-                    floorOnly.TryGetValue(p.Room.Id, out var a); floorOnly[p.Room.Id] = (a.sum + (double)pieces / fc, a.n + 1);
-                    withTrim.TryGetValue(p.Room.Id, out var b); withTrim[p.Room.Id] = (b.sum + (double)(pieces + t.CountInRoom(r)) / fc, b.n + 1);
+                    int wallN = t.Rows.Count(x => x.RoomIndex == r && x.Layer == TrimLayer.Wall), overN = t.Rows.Count(x => x.RoomIndex == r && x.Layer == TrimLayer.Overhead);
+                    acc.TryGetValue(p.Room.Id, out var a);
+                    acc[p.Room.Id] = (a.floor + (double)pieces / fc, a.wall + (double)wallN / fc, a.over + (double)overN / fc, a.n + 1);
                 }
-            var sb = new StringBuilder("density per floor cell (room: floor pieces / with trim)\n");
-            foreach (var k in floorOnly.Keys.OrderBy(x => x)) sb.AppendLine(k + ": " + (floorOnly[k].sum / floorOnly[k].n).ToString("F3") + " / " + (withTrim[k].sum / withTrim[k].n).ToString("F3"));
+            var sb = new StringBuilder("density per floor cell (room: floor pieces + wall trim + overhead = total)\n");
+            var totals = new Dictionary<string, double>();
+            foreach (var k in acc.Keys.OrderBy(x => x))
+            {
+                var v = acc[k]; double f = v.floor / v.n, wl = v.wall / v.n, ov = v.over / v.n; totals[k] = f + wl + ov;
+                sb.AppendLine(k + ": " + f.ToString("F3") + " + " + wl.ToString("F3") + " + " + ov.ToString("F3") + " = " + (f + wl + ov).ToString("F3"));
+            }
             TestContext.WriteLine(sb.ToString());
-            foreach (var k in withTrim.Keys) Assert.GreaterOrEqual(withTrim[k].sum / withTrim[k].n, 0.55, "room " + k + " still reads bare\n" + sb);
+            foreach (var k in totals.Keys) Assert.GreaterOrEqual(totals[k], 0.55, "room " + k + " still reads bare\n" + sb);
         }
     }
 }

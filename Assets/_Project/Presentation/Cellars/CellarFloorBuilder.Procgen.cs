@@ -16,6 +16,7 @@ namespace SleepingCalamity.Presentation
         public CellarFloorTrim Trim;            // procgen item 6b: wall-mounted and overhead dressing (greybox primitives in the Trim subgroup)
         public CellarFloorWarmLights WarmLights; // procgen item 6c: secondary warm lights, placed only for the rows the resolver returned (room light cap)
         public int TrimPieces, WarmLightCount;
+        public CellarFloorClutter Clutter;      // the floor clutter the art layer resolved (procgen item 6 reuses it instead of resolving again)
     }
 
     public static partial class CellarFloorBuilder
@@ -59,7 +60,7 @@ namespace SleepingCalamity.Presentation
         // "Trim" subgroup named "Trim_<id>_<kind>", and a small warm light (cube sconce + point light) for every row of CellarFloorWarmLights, "WarmLight_<id>". Primitives only.
         static void ProcgenTrim(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, Mats mats, CellarFloorBuild result)
         {
-            CellarFloorClutter clutter = CellarFloorClutter.Resolve(layout, dressing, result.Chunks);
+            CellarFloorClutter clutter = result.Clutter ?? CellarFloorClutter.Resolve(layout, dressing, result.Chunks);
             CellarFloorTrim trim = CellarFloorTrim.Resolve(layout, dressing, result.Chunks); result.Trim = trim;
             CellarFloorWarmLights lights = CellarFloorWarmLights.Resolve(layout, dressing, result.Chunks, clutter, trim); result.WarmLights = lights;
             if (trim.Rows.Count == 0 && lights.Rows.Count == 0) return;
@@ -81,11 +82,12 @@ namespace SleepingCalamity.Presentation
                 }
                 result.TrimPieces++;
             }
+            int[] real = RoomLightCounts(group.parent, layout); if (dressing.Atmosphere.OddLightRoom >= 0) real[dressing.Atmosphere.OddLightRoom]++;   // the odd light is built after this pass
             var perRoom = new System.Collections.Generic.Dictionary<int, int>();
             foreach (WarmLightRow l in lights.Rows)
             {
                 perRoom.TryGetValue(l.RoomIndex, out int placed);
-                if (CellarFloorWarmLights.ExistingLights(layout, dressing, l.RoomIndex) + placed >= CellarFloorWarmLights.RoomLightCap) continue;   // never past the room's light cap
+                if (real[l.RoomIndex] + placed >= CellarFloorWarmLights.RoomLightCap) continue;   // never past the room's light cap: the builder's real light count decides (the Core ExistingLights only plans)
                 perRoom[l.RoomIndex] = placed + 1;
                 Vector3 w = SideDir(l.Wall);
                 Vector3 pos = CellCenter(l.CellX, l.CellY) + w * (CellSize * 0.5f - WallThickness * 0.5f - 0.1f) + new Vector3(0, l.HeightCm / 100f, 0);
@@ -94,6 +96,22 @@ namespace SleepingCalamity.Presentation
                 FillLight(go, "Light", pos - w * 0.25f + new Vector3(0, 0.1f, 0), CandleGold, 1.2f, 3.2f);
                 result.WarmLightCount++;
             }
+        }
+
+        // Lights under a built floor root per room (a light belongs to the room whose cell rectangle holds its position on the ground plane; corridor lamps belong to none).
+        public static int[] RoomLightCounts(Transform root, CellarFloorLayout layout)
+        {
+            var n = new int[layout.Rooms.Count];
+            foreach (Light l in root.GetComponentsInChildren<Light>(true))
+            {
+                Vector3 q = l.transform.position;
+                for (int r = 0; r < layout.Rooms.Count; r++)
+                {
+                    PlacedRoom p = layout.Rooms[r];
+                    if (q.x >= p.X * CellSize && q.x <= (p.X + p.Width) * CellSize && q.z <= -p.Y * CellSize && q.z >= -(p.Y + p.Height) * CellSize) { n[r]++; break; }
+                }
+            }
+            return n;
         }
 
         // Procgen item 4: every blocking cell of a resolved chunk is a full-height block, every cover cell a low block, in a "Chunks" subgroup, named

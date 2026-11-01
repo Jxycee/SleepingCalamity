@@ -32,6 +32,32 @@ namespace SleepingCalamity.Tests.EditMode
 
         static IEnumerable<Transform> Children(Transform t) { for (int i = 0; i < t.childCount; i++) yield return t.GetChild(i); }
 
+        // Procgen item 6: the lights the builder really creates stay under the room cap, and the Core plan (ExistingLights + the warm lights placed) matches the real count
+        // (no kit here, so the kit-only niche / barrel / corner candles are absent; the builder's own check counts the real lights and is what holds the cap with a kit).
+        [Test]
+        public void RoomLights_RealCountMatchesThePlan_AndStaysUnderTheCap()
+        {
+            int warmPlaced = 0;
+            for (uint seed = 0; seed < 25; seed++)
+                for (int floor = 1; floor <= 4; floor++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                    CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
+                    int[] real = CellarFloorBuilder.RoomLightCounts(b.Root, l);
+                    for (int r = 0; r < l.Rooms.Count; r++)
+                    {
+                        int warm = b.WarmLights.CountInRoom(r), planned = CellarFloorWarmLights.ExistingLights(l, b.Dressing, r) + warm;
+                        string at = "seed " + seed + " floor " + floor + " room " + r;
+                        Assert.AreEqual(warm, b.Root.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("WarmLight_r" + r + "_")), at + " warm lights built");
+                        warmPlaced += warm;
+                        if (warm > 0) Assert.LessOrEqual(real[r], CellarFloorWarmLights.RoomLightCap, at);
+                        if (l.Rooms[r].Room.Kind != RoomKind.Corridor) Assert.AreEqual(planned, real[r], at + ": ExistingLights drifted from the builder");
+                    }
+                    Object.DestroyImmediate(b.Root.gameObject);
+                }
+            Assert.Greater(warmPlaced, 0);
+        }
+
         [Test]
         public void OneFloorTilePerOccupiedCell()
         {
