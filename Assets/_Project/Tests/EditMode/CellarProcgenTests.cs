@@ -44,9 +44,9 @@ namespace SleepingCalamity.Tests.EditMode
             // Fresh goldens (new layers, no earlier value to move). LayoutHash/DressingHash stay pinned by CellarFloorGeneratorTests / CellarVarietyTests.
             ulong[][] expect =
             {
-                new ulong[] { 6953842550523460259UL, 8845299293798975808UL, 3007781364789904690UL },     // route, special, hints (hints re-pinned 2026-10-31: first-reached rooms only, deliberate change; route and special unchanged)
-                new ulong[] { 6927223471848255729UL, 8103913021369237331UL, 6651676963127450526UL },
-                new ulong[] { 13414999220360951603UL, 9026194201199058082UL, 2601345680961567774UL },
+                new ulong[] { 690935452282621397UL, 8845299293798975808UL, 13704606209555056737UL },     // route, special, hints (hints re-pinned 2026-10-31: first-reached rooms only, deliberate change; route/hints goldens moved with item 2 layout presets, deliberate)
+                new ulong[] { 12317519853489886730UL, 8103913021369237331UL, 8535885715987663944UL },
+                new ulong[] { 10929967913840331367UL, 9026194201199058082UL, 7482022743495240998UL },
             };
             var sb = new StringBuilder();
             for (int f = 1; f <= 3; f++) { ulong[] g = Hashes(12345, f); sb.Append("floor " + f + ": " + g[0] + "UL, " + g[1] + "UL, " + g[2] + "UL\n"); }

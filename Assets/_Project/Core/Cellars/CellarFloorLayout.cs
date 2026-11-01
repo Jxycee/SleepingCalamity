@@ -72,6 +72,7 @@ namespace SleepingCalamity.Core
         public void MarkLastResort() { LastResort = true; }
         public readonly bool IsStub;                      // floor 4: the fixed bakery set-piece (the name is kept from the old placeholder), exempt from the count rules of floors 1-3
         public readonly SubTheme Theme;
+        public readonly LayoutPreset? Preset;             // the layout preset the floor was steered by (floors 1-3; null on the fixed bakery). Part of LayoutHash on floors 1-3. A floor that needed a fallback (Generate's out value >= 1) may carry Spine instead of PresetFor(seed, floor).
         public readonly IReadOnlyList<PlacedRoom> Rooms;
         public readonly IReadOnlyList<PlacedCorridor> Corridors;   // row-major (y, then x)
         public readonly IReadOnlyList<FloorLink> Links;
@@ -90,8 +91,9 @@ namespace SleepingCalamity.Core
 
         public CellarFloorLayout(uint seed, int floor, bool isStub, SubTheme theme, IEnumerable<PlacedRoom> rooms, IEnumerable<PlacedCorridor> corridors,
             IEnumerable<FloorLink> links, IEnumerable<CellPos> deadEnds, IEnumerable<FloorChest> chests, int lockedRoomIndex, int lockedLinkIndex,
-            int keyChestIndex, GateKeyCarrier carrier)
+            int keyChestIndex, GateKeyCarrier carrier, LayoutPreset? preset = null)
         {
+            Preset = preset;
             Seed = seed; Floor = floor; IsStub = isStub; Theme = theme;
             Rooms = rooms.ToList(); Corridors = corridors.ToList(); Links = links.ToList(); DeadEnds = deadEnds.ToList(); Chests = chests.ToList();
             LockedRoomIndex = lockedRoomIndex; LockedLinkIndex = lockedLinkIndex; KeyChestIndex = keyChestIndex; Carrier = carrier;
@@ -142,6 +144,68 @@ namespace SleepingCalamity.Core
             if (!StairExit.HasValue) return -1;
             int[,] dist = WalkDistances();
             return dist == null ? -1 : dist[StairExit.Value.X, StairExit.Value.Y];
+        }
+
+        // Index of the stair-exit room, or -1 (floor 4 has none).
+        public int ExitRoomIndex()
+        {
+            for (int i = 0; i < Rooms.Count; i++) if (Rooms[i].Room.Kind == RoomKind.StairExit) return i;
+            return -1;
+        }
+
+        // Far-dead-end rule (procgen item 2): the stair exit room has exactly one open door.
+        public bool ExitIsLeaf()
+        {
+            int e = ExitRoomIndex();
+            if (e < 0) return false;
+            int open = 0;
+            for (int d = 0; d < Rooms[e].Room.Doors.Count; d++) if (DoorIsOpen(e, d)) open++;
+            return open == 1;
+        }
+
+        // True when the exit's door opens onto the same corridor network as a door of the entry room (so the two are next to each other).
+        // Same answer as CellarRoomGraph.DoorNeighbours(...).Contains(entry) (a test pins that), but one flood over the corridor cells from the exit's doors instead of a whole
+        // graph, because the generator asks it once per attempt. The locked room joins no network; only its gate pair counts, as the graph reports it.
+        public bool ExitAdjacentToEntry()
+        {
+            int e = ExitRoomIndex(), en = -1;
+            for (int i = 0; i < Rooms.Count; i++) if (Rooms[i].Room.Kind == RoomKind.Entry) en = i;
+            if (e < 0 || en < 0) return false;
+            const int G = GridSize;
+            if (LockedLinkIndex >= 0)
+            {
+                FloorLink l = Links[LockedLinkIndex];
+                if ((l.RoomA == e && l.RoomB == en && DoorIsOpen(e, l.DoorA)) || (l.RoomB == e && l.RoomA == en && DoorIsOpen(e, l.DoorB))) return true;
+            }
+            if (e == LockedRoomIndex || en == LockedRoomIndex) return false;
+            var corr = new PlacedCorridor[G, G]; foreach (PlacedCorridor c in Corridors) corr[c.X, c.Y] = c;
+            bool InGrid(CellPos c) => c.X >= 0 && c.Y >= 0 && c.X < G && c.Y < G;
+            var seen = new bool[G, G]; var queue = new Queue<CellPos>();
+            var sides = new[] { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
+            for (int d = 0; d < Rooms[e].Room.Doors.Count; d++)
+            {
+                if (!DoorIsOpen(e, d)) continue;
+                CellPos o = Rooms[e].DoorOutside(d);
+                if (InGrid(o) && corr[o.X, o.Y] != null && !seen[o.X, o.Y]) { seen[o.X, o.Y] = true; queue.Enqueue(o); }
+            }
+            while (queue.Count > 0)
+            {
+                CellPos c = queue.Dequeue();
+                foreach (CellSide s in sides)
+                {
+                    if ((corr[c.X, c.Y].Mask & CellarRoom.MaskBit(s)) == 0) continue;
+                    CellPos m = c.Step(s);
+                    if (!InGrid(m) || corr[m.X, m.Y] == null || seen[m.X, m.Y]) continue;
+                    seen[m.X, m.Y] = true; queue.Enqueue(m);
+                }
+            }
+            for (int d = 0; d < Rooms[en].Room.Doors.Count; d++)
+            {
+                if (!DoorIsOpen(en, d)) continue;
+                CellPos o = Rooms[en].DoorOutside(d);
+                if (InGrid(o) && seen[o.X, o.Y]) return true;
+            }
+            return false;
         }
 
         // Walking steps from the first party start to every grid cell (same rules as EntryToExitDistance: open doors, corridor masks, the lock ignored);
@@ -202,6 +266,7 @@ namespace SleepingCalamity.Core
         {
             var h = Fnv1a64.Create();
             h.AppendInt32LE(Floor); h.AppendInt32LE(IsStub ? 1 : 0);
+            if (Preset.HasValue) h.AppendInt32LE((int)Preset.Value);   // floors 1-3 only: the bakery's hash stays as it was
             h.AppendInt32LE(Rooms.Count);
             foreach (PlacedRoom p in Rooms) { h.Append(p.RoomId); h.AppendInt32LE(p.Rotation); h.AppendInt32LE(p.X); h.AppendInt32LE(p.Y); }
             h.AppendInt32LE(Corridors.Count);

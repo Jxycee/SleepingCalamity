@@ -333,8 +333,18 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(room, Is.GreaterThanOrEqualTo(0), "[stir 40] the plan has an extra enemy in some room");
 
             // The contents spawn the plan's enemies (authored + extras) when a player enters that room.
-            Vector3 roomCell = default;
-            foreach (EncounterSpawn sp in plan.Spawns) if (sp.RoomIndex == room) { roomCell = rig.HostFloor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(sp.X, sp.Y)); break; }
+            // Stand on a free cell of the room that is not a spawn cell and is as far from every spawn as the room allows: a hero dropped onto a spawn cell is shoved out by the enemy
+            // that spawns there (and can be pushed off the floor edge), so the host copy never settles within the arrival radius.
+            CellarFloorLayout stirLayout = rig.HostFloor.Layout;
+            CellPos enterCell = default; float bestGap = -1f;
+            foreach (CellPos c in CellarEncounterPlan.FreeCellsOf(stirLayout, CellarFloorDressing.Resolve(stirLayout), room))
+            {
+                float gap = float.MaxValue;
+                foreach (EncounterSpawn sp in plan.Spawns) if (sp.RoomIndex == room) gap = Mathf.Min(gap, Mathf.Abs(sp.X - c.X) + Mathf.Abs(sp.Y - c.Y));
+                if (gap > bestGap) { bestGap = gap; enterCell = c; }
+            }
+            Assert.That(bestGap, Is.GreaterThan(0f), "[stir 40] the room has a free cell that is not a spawn cell");
+            Vector3 roomCell = rig.HostFloor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(enterCell.X, enterCell.Y));
             int rats0 = CountAlive(rig.HostNm, EnemyKind.RatKing);
             yield return ClientTo(rig, roomCell, "[stir 40 enter room]");
             int expected = plan.CountIn(room);
