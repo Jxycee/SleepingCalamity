@@ -9,6 +9,8 @@
 //   - a floor shows at most MaxPerFloor vignettes (the extra hits are dropped by a priority draw and count as misses; a must-see at certain odds outranks the draw),
 //     so the average stays near the budget;
 //   - floor GuaranteeFloor shows one by force if the dive has seen none yet, so no dive of floors 1-3 is bare.
+//   - state-conditioned odds (procgen 5): each draw's probability is scaled by CellarVignetteTuning.Percent, a function of the floor depth, the floor's special-room kind
+//     (SpecialRoomDive.KindFor: seed and floor only) and what earlier floors of this dive showed (family spacing, category fatigue); never of runtime player state.
 // Placement is CellarFloorDressing's job (it needs the layout). Authority: none (static data; every peer picks the same).
 using System;
 using System.Collections.Generic;
@@ -57,22 +59,60 @@ namespace SleepingCalamity.Core
                 new CellarVignette("abandoned_camp", "Abandoned adventurer camp", VignetteCategory.Fluff, 4, 1, true, false, false,
                     P("Bedroll", B, -0.9f, 0.1f, 0.5f, 1.8f, 0.2f, 0.8f, 0x6B5B45, 12f), P("FireRing", Cy, 0.7f, 0.1f, -0.2f, 0.9f, 0.2f, 0.9f, 0x3A3532),
                     P("Embers", Sp, 0.7f, 0.2f, -0.2f, 0.3f, 0.12f, 0.3f, 0x7A3B1E), P("Pack", B, -0.5f, 0.3f, -0.9f, 0.6f, 0.6f, 0.4f, 0x7C6A3E, -20f)),
-                new CellarVignette("toppled_wine_rack", "Toppled wine rack with rats", VignetteCategory.Danger, 5, 1, false, false, false,
+                // Note: toppled_wine_rack, collapsed_shelf and lantern_cache are OncePerDive on purpose (procgen 5: every vignette shows once per dive).
+                new CellarVignette("toppled_wine_rack", "Toppled wine rack with rats", VignetteCategory.Danger, 5, 1, true, false, false,
                     P("RackFrame", B, 0f, 0.35f, 0f, 2.6f, 0.3f, 0.9f, 0x5A3E26, 8f), P("Bottle1", Ca, 0.9f, 0.12f, 0.8f, 0.14f, 0.5f, 0.14f, 0x3E5A32, 80f),
                     P("Bottle2", Ca, -0.4f, 0.12f, 0.9f, 0.14f, 0.5f, 0.14f, 0x3E5A32, 100f), P("Bottle3", Ca, 0.3f, 0.12f, -0.9f, 0.14f, 0.5f, 0.14f, 0x2F4A5A, 70f),
                     P("Rat1", Ca, -1.0f, 0.1f, -0.6f, 0.18f, 0.22f, 0.18f, 0x4A4038, 90f), P("Rat2", Ca, 1.1f, 0.1f, 0.2f, 0.18f, 0.22f, 0.18f, 0x4A4038, 75f)),
                 new CellarVignette("childs_drawing", "Child's drawing on the wall", VignetteCategory.Fluff, 3, 1, true, true, true,
                     P("Panel", B, 0f, 1.2f, -1.85f, 1.3f, 1.0f, 0.04f, 0xCDBE9A), P("Sun", Sp, -0.3f, 1.4f, -1.82f, 0.22f, 0.22f, 0.02f, 0xE0B040),
                     P("House", B, 0.25f, 1.05f, -1.82f, 0.34f, 0.3f, 0.02f, 0xA8503A), P("Stool", Cy, 0f, 0.2f, -1.2f, 0.4f, 0.4f, 0.4f, 0x6A5236)),
-                new CellarVignette("collapsed_shelf", "Collapsed shelf over a cache", VignetteCategory.RiskReward, 5, 1, false, false, true,
+                new CellarVignette("collapsed_shelf", "Collapsed shelf over a cache", VignetteCategory.RiskReward, 5, 1, true, false, true,
                     P("Plank1", B, -0.3f, 0.45f, 0f, 2.2f, 0.12f, 0.5f, 0x5A3E26, 20f), P("Plank2", B, 0.4f, 0.3f, 0.2f, 1.9f, 0.12f, 0.5f, 0x5A3E26, -35f),
                     P("Jars", Cy, 1.1f, 0.15f, -0.9f, 0.3f, 0.3f, 0.3f, 0x8A7A58), P("Cache", B, 0f, 0.15f, 0f, 0.7f, 0.3f, 0.5f, 0xD6A24A)),
                 new CellarVignette("sleeping_elite", "Sleeping elite", VignetteCategory.Danger, 8, 2, true, false, false,
                     P("Body", Ca, 0f, 0.35f, 0f, 0.6f, 1.8f, 0.6f, 0x8C2A22, 90f), P("Marker", Cy, 0f, 0.03f, 0f, 2.6f, 0.03f, 2.6f, 0xB84A2A),
                     P("Horn", Cy, 0.9f, 0.7f, 0f, 0.15f, 0.3f, 0.15f, 0xD8CFA8)),
-                new CellarVignette("lantern_cache", "Lantern-oil cache", VignetteCategory.Reward, 7, 2, false, false, false,
+                new CellarVignette("lantern_cache", "Lantern-oil cache", VignetteCategory.Reward, 7, 2, true, false, false,
                     P("Crate", B, 0f, 0.3f, 0f, 0.9f, 0.6f, 0.7f, 0x6A4A28), P("Oil1", Cy, 0.8f, 0.2f, 0.5f, 0.3f, 0.4f, 0.3f, 0xC8A040), P("Oil2", Cy, -0.8f, 0.2f, -0.4f, 0.3f, 0.4f, 0.3f, 0xC8A040),
                     P("Glint", Sp, 0f, 0.8f, 0f, 0.2f, 0.2f, 0.2f, 0xF2D58A)),
+
+                // ---- procgen item 5: ten more greybox vignettes (premises are ours; one 4 m cell each; any combat room, WallHug ones need a wall cell). Premises that imply behaviour (rats that come out, the alarm bell, the idol's curse, sleeping monsters) are greybox only; behaviour later. ----
+                // A seep has pooled where the vault floor sagged; a leaking cask drips into it.
+                new CellarVignette("flooded_alcove", "Flooded alcove", VignetteCategory.Fluff, 10, 1, true, false, false,
+                    P("Puddle", Cy, 0f, 0.02f, 0f, 2.4f, 0.03f, 2.4f, 0x2F4650), P("Cask", Cy, 1.1f, 0.35f, -1.0f, 0.7f, 0.7f, 0.7f, 0x5A3E26), P("Drip", Sp, 1.1f, 0.05f, -0.4f, 0.12f, 0.12f, 0.12f, 0x6A8EA0)),
+                // A burial-keeper's lectern still holds the ledger of names it was never allowed to finish.
+                new CellarVignette("keepers_lectern", "Keeper's lectern", VignetteCategory.Fluff, 12, 1, true, false, true,
+                    P("Stand", B, 0f, 0.6f, -1.3f, 0.5f, 1.2f, 0.5f, 0x4E3A28), P("Ledger", B, 0f, 1.25f, -1.3f, 0.7f, 0.08f, 0.5f, 0xC9B98E, 15f), P("Candle", Cy, 0.45f, 0.15f, -1.3f, 0.1f, 0.3f, 0.1f, 0xE8DFC0)),
+                // A ring of pale caps glows where the cellar's roots came through; harmless, and pretty.
+                new CellarVignette("pale_cap_ring", "Ring of pale caps", VignetteCategory.Fluff, 10, 1, true, false, false,
+                    P("Cap1", Sp, 0.8f, 0.14f, 0f, 0.35f, 0.25f, 0.35f, 0xB9C8B0), P("Cap2", Sp, -0.8f, 0.12f, 0.2f, 0.3f, 0.22f, 0.3f, 0xB9C8B0), P("Cap3", Sp, 0.1f, 0.1f, 0.9f, 0.25f, 0.2f, 0.25f, 0xB9C8B0),
+                    P("Cap4", Sp, -0.2f, 0.12f, -0.9f, 0.3f, 0.22f, 0.3f, 0xB9C8B0)),
+                // A hand-cart lost a wheel on the way down and was left where it tipped.
+                new CellarVignette("broken_handcart", "Broken handcart", VignetteCategory.Fluff, 12, 1, true, false, false,
+                    P("Bed", B, 0f, 0.45f, 0f, 1.8f, 0.2f, 1.0f, 0x6A4A28, 10f), P("Wheel", Cy, 1.1f, 0.4f, 0.5f, 0.8f, 0.08f, 0.8f, 0x3A3028, 90f), P("Spill", Sp, -0.9f, 0.1f, -0.6f, 0.4f, 0.2f, 0.4f, 0x7C6A3E)),
+                // A stack of crates hides a nest of cellar rats; one nudge brings them out.
+                new CellarVignette("crate_stack_nest", "Crate stack with a nest", VignetteCategory.Danger, 14, 1, true, false, true,
+                    P("CrateA", B, -0.5f, 0.35f, -1.2f, 0.9f, 0.7f, 0.9f, 0x6A4A28), P("CrateB", B, 0.5f, 0.35f, -1.2f, 0.9f, 0.7f, 0.9f, 0x5A3E26, 6f), P("CrateC", B, 0f, 1.05f, -1.2f, 0.9f, 0.7f, 0.9f, 0x6A4A28, -8f),
+                    P("Nest", Sp, 0f, 0.1f, -0.4f, 0.5f, 0.2f, 0.5f, 0x4A4038)),
+                // A cord across the passage runs to a bell; whoever trips it tells every sleeper on the floor. (Greybox only; behaviour later: no tripwire or alarm exists yet.)
+                new CellarVignette("tripwire_bell", "Tripwire bell", VignetteCategory.Danger, 16, 2, true, false, false,
+                    P("PostA", Cy, -1.5f, 0.4f, 0f, 0.12f, 0.8f, 0.12f, 0x4A4038), P("PostB", Cy, 1.5f, 0.4f, 0f, 0.12f, 0.8f, 0.12f, 0x4A4038), P("Cord", B, 0f, 0.2f, 0f, 3.0f, 0.02f, 0.02f, 0xA8987A),
+                    P("Bell", Sp, 1.5f, 0.9f, 0f, 0.22f, 0.22f, 0.22f, 0xB89040)),
+                // A pile of gnawed bones in a hollow; something large sleeps lightly nearby.
+                new CellarVignette("bone_nest", "Nest of bones", VignetteCategory.Danger, 14, 3, true, false, false,
+                    P("Hollow", Cy, 0f, 0.05f, 0f, 2.0f, 0.1f, 2.0f, 0x3A3532), P("BoneA", Ca, -0.4f, 0.2f, 0.2f, 0.12f, 0.7f, 0.12f, 0xD8CFA8, 70f), P("BoneB", Ca, 0.5f, 0.2f, -0.3f, 0.12f, 0.8f, 0.12f, 0xD8CFA8, 100f),
+                    P("Skull", Sp, 0f, 0.25f, 0f, 0.3f, 0.3f, 0.3f, 0xE0D8B8)),
+                // A cracked idol the old keepers feared: take the offering at its feet and it may not stay quiet about it.
+                new CellarVignette("cracked_idol", "Cracked idol and offering", VignetteCategory.RiskReward, 16, 2, true, false, true,
+                    P("Plinth", B, 0f, 0.3f, -1.3f, 0.8f, 0.6f, 0.8f, 0x6E6A60), P("Idol", Ca, 0f, 1.0f, -1.3f, 0.4f, 0.9f, 0.4f, 0x8A8470), P("Offering", B, 0f, 0.08f, -0.6f, 0.6f, 0.16f, 0.4f, 0xD6A24A)),
+                // A larder hook line with cured joints, still good in the cold; the hooks are rusted shut around them.
+                new CellarVignette("hanging_larder", "Hanging larder", VignetteCategory.Reward, 18, 2, true, false, true,
+                    P("Rail", B, 0f, 1.7f, -1.7f, 2.4f, 0.08f, 0.08f, 0x3A3532), P("Joint1", Ca, -0.7f, 1.2f, -1.7f, 0.25f, 0.6f, 0.25f, 0x8C4A3A), P("Joint2", Ca, 0f, 1.2f, -1.7f, 0.25f, 0.6f, 0.25f, 0x8C4A3A),
+                    P("Joint3", Ca, 0.7f, 1.2f, -1.7f, 0.25f, 0.6f, 0.25f, 0x8C4A3A)),
+                // A mender's bench with a half-sewn kit: somebody meant to come back for it.
+                new CellarVignette("menders_bench", "Mender's bench", VignetteCategory.Reward, 14, 2, true, false, true,
+                    P("Bench", B, 0f, 0.45f, -1.4f, 1.6f, 0.1f, 0.6f, 0x6A4A28), P("Kit", B, -0.3f, 0.55f, -1.4f, 0.4f, 0.12f, 0.3f, 0x7C6A3E), P("Thread", Cy, 0.4f, 0.55f, -1.4f, 0.12f, 0.12f, 0.12f, 0xA83A3A)),
             };
         }
     }
@@ -89,14 +129,19 @@ namespace SleepingCalamity.Core
         public const int MaxPerFloor = 2, GuaranteeFloor = 3, MustSeeStart = 4, PityStep = 1;
 
         // The pick for floor `floor` (1-based) of the dive `seed`: replays floors 1..floor. Pure.
-        public static VignetteFloor Select(uint seed, int floor)
+        public static VignetteFloor Select(uint seed, int floor) => Select(seed, floor, true);
+
+        // conditioned=false skips the state-conditioned weights (CellarVignetteTuning) so a test can measure how far they shift the odds.
+        public static VignetteFloor Select(uint seed, int floor, bool conditioned)
         {
             if (floor < 1) throw new ArgumentOutOfRangeException(nameof(floor));
             IReadOnlyList<CellarVignette> pool = CellarVignettePool.All;
             int n = pool.Count;
             var misses = new int[n]; var seen = new bool[n]; int total = 0; VignetteFloor last = null;
+            var catSeen = new int[4]; var prevFamilies = new HashSet<string>();   // dive state, all from earlier floors of this seed
             for (int f = 1; f <= floor; f++)
             {
+                SpecialKind special = conditioned ? SpecialRoomDive.KindFor(seed, f, out _) : SpecialKind.None;
                 var rng = new Pcg32(Rng.Derive(seed, "cellars.vignette", (ulong)f));
                 var roll = new uint[n]; var prio = new uint[n];
                 for (int i = 0; i < n; i++) { roll[i] = rng.NextUInt(); prio[i] = rng.NextUInt(); }
@@ -109,7 +154,10 @@ namespace SleepingCalamity.Core
                     int odds = v.MustSee ? MustSeeStart - misses[i] : v.Rarity - misses[i] * PityStep;
                     if (odds < 1) odds = 1;
                     certain[i] = v.MustSee && odds == 1;
-                    if ((uint)(((ulong)roll[i] * (ulong)odds) >> 32) == 0) hit.Add(i);   // multiply-shift: true with probability 1/odds
+                    // probability = percent / (100 * odds) as a threshold on the 32-bit roll; percent 100 is 1/odds. A certain must-see ignores the percent.
+                    int pct = conditioned && !certain[i] ? CellarVignetteTuning.Percent(v, f, special, catSeen, prevFamilies) : 100;
+                    ulong threshold = ((1UL << 32) * (ulong)pct) / ((ulong)odds * 100UL);
+                    if ((ulong)roll[i] < threshold) hit.Add(i);
                 }
                 bool forced = false;
                 if (hit.Count == 0 && f == GuaranteeFloor && total == 0)
@@ -128,6 +176,8 @@ namespace SleepingCalamity.Core
                     else if (eligible[i]) misses[i]++;
                 }
                 total += chosen.Count;
+                prevFamilies.Clear();
+                foreach (CellarVignette c in chosen) { catSeen[(int)c.Category]++; prevFamilies.Add(CellarVignetteTuning.FamilyOf(c.Id)); }
                 last = new VignetteFloor(f, chosen, forced);
             }
             return last;
