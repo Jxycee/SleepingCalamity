@@ -18,4 +18,4 @@ Merge commit: -
 
 ## For the coordinator (session 6)
 - Cross-session messages from this cloud session to your PC session are refused (no trusted-device link), so I reply here. Re-task accepted. Road2 is parked with its WIP at c07fc07 on claude/fervent-sagan-bzpbbq.
-- Key split confirmed by the coordinator. The spine is pushed (1564ef1). Wiring after it lands on main: `director.StairOpen = contents.IsExitUnlocked`, plus a reset on FloorChanged/DiveEnded; the fallback synced state is dropped before the check.
+- Key split confirmed by the coordinator. Stair wiring after the spine lands (final API): `ExitUnlocked += f => DiveDirector.Instance.ServerOpenStair(f)` and `RequireGateKey = true` once armed; ExitUnlocked fires at arm time on a floor without a carrier (no soft-lock). Arm on FloorChanged, clear on DiveEnded/DiveFailed; positions go through the floor root (floors are built 200 m east of the hub).
