@@ -1,13 +1,13 @@
 State: WORKING
 Session: Local next: M5 spine (dive flow, floor transitions, sync objects in game)
-Progress: 55% (spine built on claude/m5-spine 1564ef1; risk review running; then kit fix + check + merge)
+Progress: 85% (review fixes + kit + gate-key API done; check PASS 250aff0; main gained Asset commits, so re-merging main + re-check running)
 Status: built, in review
 Archive: not ready
 Branch: claude/m5-spine (merges to main on its own green check, risk-reviewed; merges BEFORE the contents session)
-Last check: none yet
-Next step: apply risk-review fixes + wire CellarFloorKit into the CellarFloorSync prefab (walk shows flat greybox otherwise); one check; merge; tell contents session via coordinator
+Last check: PASS 250aff0 (edit 815/815, play 42 pass 0 fail 8 skip); re-check after merging main running now
+Next step: on green re-check merge spine to main, add walk start steps to USER_TODO.md, tell contents session
 Sheet: none
-Needs: coordinator - wire Hollowmere/Undercroft as a session scene now, or leave to M6 (proposal: M6; walk uses Arena_Dive)
+Needs: none (Hollowmere entry -> M6, coordinator)
 Blocker: none
 
 ## Scope (coordinator, 2026-10-31; user walks floors 1-4 in 2-player tomorrow)
@@ -24,6 +24,7 @@ Mine: DiveHaulSync, CellarFloorSync, DiveState, dive bootstrap/scene, stair/chec
 - Spine (claude/m5-spine 1564ef1, not merged): test-edit 814/814, test-play 42 pass 0 fail 8 skip (5 new DiveSpineNetworkTests). New session scene Arena_Dive (pad, stair-mouth stand-in, DiveHub) in SceneNames.BuildOrder; floors built in place 200 m east (no scene load in a dive). DiveDirector (host) spawns CellarFloorSync + DiveHaulSync once per session, seed per session, floor 1; interacts (E) at the stair (floors 1-3), bank (2, 4) and go-home (4) are range-checked client RPCs; teleport = owner RPC after its floor built (seed, floor), CharacterController off, NetworkTransform.Teleport; host placement pass every 0.2 s; dive end keeps the syncs (banked + checkpoint survive); return dive from floor 3 after the checkpoint; DiveFailed / F8 return to the pad; F7 debug start (dev only).
 - How to start: dev panel "Start in the Cellars dive hub" / menu SleepingCalamity/Dev/Dive Hub / -dev-dive; solo or host; violet column in the stair mouth, E.
 - Contents hooks: DiveDirector.StairOpen (Func<int,bool>, default open), DiveStarted, FloorChanged(int), DiveEnded(DiveEndReason); DiveHaulSync.Banked, DiveFailed, EncounterPlan/EncounterChanged.
+- Review fixes 250aff0: prompts hidden until the owner's teleport matches its built floor (no floor skip); range refusals send "You are too far away."; bank/go-home prompt 4.5 m (< host 5 m); contents API: DiveDirector.Instance, RequireGateKey (default false), ServerOpenStair(int floor) (StairOpen Func removed); runtime CellarFloorKit saved as prefabs (Content/Art/Cellar/FloorKit) and set on the CellarFloorSync prefab; camera warp via CinemachineCore.OnTargetObjectWarped. Arena_Dive still has no CombatHost (built inline in SceneBuilder).
 - Gaps: Hollowmere not a session scene (decision above); floors flat greybox (Kit null at runtime, fixing); no enemies/keys/loot (contents session); out-of-range stair press silent; interact key not in PlayMode tests.
 
 ## Handoff notes
