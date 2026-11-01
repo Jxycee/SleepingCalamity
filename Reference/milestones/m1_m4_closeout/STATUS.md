@@ -1,15 +1,15 @@
 Session: M1-M4 closeout: weapon-tree UI, abilities, captures
 Job: (1) M4 greybox weapon-tree UI + host path; (2) M4 ability effects in CombatHost; (3) M2 HeroCaptureTests evidence images
-Progress: 60%
-Status: IN PROGRESS
-  (1) weapon-tree UI: implemented (claude/m4-ui ee201b2), compiles; risk review: no blockers, 3 should-fix (HUD buttons unclickable with locked cursor -> push Menu context; key-repeat spams Fit -> edge-trigger + CanFit; tree RPC on every growth sync -> send on change). Fixes + merge origin/main + check running in the shared worktree.
-  (2) ability effects: DONE, merged ef7aced (check PASS d8c5b0d: edit 824/824, play 40/0/8). Host unlocks abilities in ServerSyncGrowth (all weapons); 2-peer test covers a client finisher hit using the client's ability.
-  (3) M2 capture: first attempt died on a full disk (three worktrees importing Unity at once); runs after (1) in the single shared worktree.
-Blocker: none now. Session disk allowance fits only one Unity Library, so (1)-(3) run one after another in one worktree.
-Archive: no
+Progress: 100%
+Status: DONE
+  (1) weapon-tree UI: DONE, merged ded7cd2 (check PASS 5170431: edit 836/836, play 46/0/8). Review fixes: Menu context while open (cursor free, clicks not attacks), edge-triggered keys respecting CanFit/CanBuildUp/CanReroute, tree push deduped by SyncKey (forced on spawn, swap, click). Needs a manual walk (B, 1/2/3, Shift+1/2/3, F7, F8). Gaps by design: no attachment inventory (fit always in stock, returned attachments dropped), AtWorkbench stub true.
+  (2) ability effects: DONE, merged ef7aced (check PASS d8c5b0d).
+  (3) M2 capture: DONE, 7 images in Reference/milestones/m2/ (HeroCaptureTests PASS 1/1, --graphics, on 5170431).
+Blocker: none
+Archive: ready
 Branch: claude/m4-ui, claude/m4-ab, claude/m4-cap (local worktrees, merged to main one by one)
-Last check: PASS d8c5b0d (claude/m4-ab)
-Merge commits: ef7aced (2)
+Last check: PASS 5170431 (claude/m4-ui)
+Merge commits: ef7aced (2), ded7cd2 (1)
 
 - Previous job (polish 3) parked: Reference/hollowmere/polish3/STATUS.md on branch claude/admiring-brahmagupta-0jjuph (1d28819).
 - (1) finding: no host path existed for build-up / re-route / attach / detach; the implementer adds owner->host ServerRpcs on HeroCombat that call Core on the host and re-push growth. Re-route's "home workbench" rule sits behind a named host predicate (true in the arena greybox) until a workbench exists.
