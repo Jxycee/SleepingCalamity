@@ -25,6 +25,7 @@ namespace SleepingCalamity.EditorTools
             BuildLobby();
             BuildArena();
             BuildCombatArena();
+            DiveArenaBuilder.Build();
         }
 
         public static void BuildBootstrap()

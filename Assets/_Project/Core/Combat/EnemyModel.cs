@@ -98,6 +98,8 @@ namespace SleepingCalamity.Core.Combat
         public bool EnemyOpen;               // the enemy is open (recovering after its strike, stunned, flinching): x1.5 damage, double poise
         public bool EnemyStaggered;          // the enemy is already flinching: the hit cannot flinch it again (and adds no poise)
         public bool EnemyAttacking;          // the enemy is inside one of its own attacks: blocked hits do not count toward a riposte it could not start
+        public float AbilityDamageBonus;     // hero abilities (AbilityEffects): the whole hit x(1 + this); 0 = none
+        public float AbilityFire;            // hero abilities: added to Fire
     }
 
     public struct EnemyHitResult
@@ -178,7 +180,7 @@ namespace SleepingCalamity.Core.Combat
             r.GuardBreakHit = Def.FrontalBlock && a.GuardBreak && MathF.Abs(h.BearingToAttackerDeg) <= FrontalBlock.HalfAngleDeg;
 
             bool crit = DamageFormula.RollCrit(h.CritRoll, h.CritChance > 0f ? h.CritChance : 0f);
-            float fire = h.Fire + (a.Fire ? SpellFireValue : 0f);
+            float fire = h.Fire + h.AbilityFire + (a.Fire ? SpellFireValue : 0f);
             float element = DamageFormula.ElementBonus(fire, Def.WeakToFire);
             r.ElementMatch = element > 0f;
             var input = new DamageInput
@@ -190,7 +192,7 @@ namespace SleepingCalamity.Core.Combat
                 Tag = DamageFormula.TagMultiplier(h.Pest, Def.IsPest),
                 Part = partMult,
                 Crit = crit,
-                Other = block * (h.EnemyOpen ? EnemyWindows.OpeningDamage : 1f),
+                Other = block * (h.EnemyOpen ? EnemyWindows.OpeningDamage : 1f) * (1f + h.AbilityDamageBonus),
             };
             int dmg = DamageFormula.Compute(input);
             r.Crit = crit;

@@ -31,7 +31,7 @@ namespace SleepingCalamity.Presentation
         private uint _builtSeed;
         private int _builtFloor = NoFloor;
 
-        public CellarFloorKit Kit;   // optional; null builds the flat-colour greybox
+        public CellarFloorKit Kit = new CellarFloorKit();   // the dressing kit (the Editor builder fills it on the prefab); an empty kit builds the flat-colour greybox
 
         public int BuildCount { get; private set; }
         public CellarFloorLayout Layout => _layout;
