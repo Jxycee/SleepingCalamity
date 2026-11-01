@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using SleepingCalamity.Core.Weapons;
 
 namespace SleepingCalamity.Core
 {
@@ -22,6 +23,7 @@ namespace SleepingCalamity.Core
         public string WorldSeed = "";             // 16 hex digits (WorldSaveRules.SeedToHex): a full 64-bit value survives any JSON reader
         public string WorldId = "";               // WorldIds.NewId(); also the file's name. Empty or malformed: the store fills it from the file name
         public string CreatedAtUtc = "";          // informational (ISO 8601); shown in the world picker
+        public WeaponsSave Weapons;               // null: no weapon growth saved yet (older saves); every player then starts with fresh heirlooms
         public WorldPlayersSave Players;          // null: no world created yet (the host flow creates its kind and players on the first start)
 
         [JsonExtensionData] public Dictionary<string, object> Extra;   // unknown top-level members, round-tripped untouched

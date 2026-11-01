@@ -5,6 +5,7 @@
 // played world of the session's kind and identity kind, or makes one. Local worlds (solo, dev-direct) and online worlds never cross.
 // While hosting it saves:
 //  - at once when the world is created or a player is recorded (HostWorld.Changed), so a crash right after never loses who the world belongs to,
+//  - weapon growth (the "weapons" section) is captured from the live CombatHosts at every save below and marks the file dirty only when it changed,
 //  - on the first session start (last-played time) and then at most every FlushSeconds when anything else marks the file dirty,
 //  - when the session ends: on ShuttingDown or Failed (before NGO shuts down), again on Ended, and on quit.
 // A client never opens a world file. A newer build's world loads read-only (a toast says so). One-time migration: the old single
@@ -127,10 +128,12 @@ namespace SleepingCalamity.App
             if (store == null)
             {
                 bus.Publish(new ToastRequested("world.library_full", kind.ToString(), 6f));   // 10 worlds of this kind: pick one or delete one
+                world.LoadWeapons(null);   // no stale section from an earlier world
                 return;
             }
             SelectedWorldId = store.Current.WorldId;
             world.Load(RestoreWorld(store.Current.Players));
+            world.LoadWeapons(store.Current.Weapons);   // each returning player's growth is seeded from it when the CombatHost first needs them
             Write();   // stamps the last-played time at once
             nextFlush = Time.unscaledTime + FlushSeconds;
             if (store.IsReadOnly)
@@ -187,6 +190,8 @@ namespace SleepingCalamity.App
             if (now >= nextFlush)
             {
                 nextFlush = now + FlushSeconds;
+                try { if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty(); }
+                catch (Exception e) { Debug.LogException(e); }   // keep the old section; the rest of the flush still runs
                 if (store.IsDirty) Write();
             }
         }
@@ -197,6 +202,7 @@ namespace SleepingCalamity.App
             if (store == null) return;
             try
             {
+                if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty();   // weapon growth changes constantly, so it is compared at each save, not marked per hit
                 if (store.IsDirty) Write();
             }
             catch (Exception e)
