@@ -524,6 +524,29 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(boostedDamage, Is.EqualTo(Mathf.CeilToInt(plainDamage * 1.30f)).Within(2));
         }
 
+        // Catches (M4): hero abilities that nothing ever unlocks. The axe sits just short of level 3; a real finisher hit (ServerPlayerHitsEnemy ->
+        // CombatRewards.OnHit -> ServerSyncGrowth) takes it over, and axe_quake must then be in the host's book. Does not cover saving the unlock.
+        [UnityTest]
+        public IEnumerator Solo_RewardPathLevelUpToThree_UnlocksAxeQuake()
+        {
+            CombatHost combat = null;
+            HeroCombat hero = null;
+            GameObject heroObject = null;
+            yield return ArenaWithoutWave((c, h, hc, v, i) => { combat = c; hero = hc; heroObject = h; });
+            Enemy slime = combat.SpawnEnemy(EnemyKind.Slime, 1, heroObject.transform.position + heroObject.transform.forward * 1.6f, ai: false);
+            yield return null;
+            PlayerGrowth g = combat.Growth(AppBootstrap.Current.NetworkManager.LocalClientId);
+            WeaponState axe = g.Weapon(hero.WeaponKey);
+            while (axe.Level < 2) axe.AddAbs(axe.LevelCostNow);
+            axe.AddAbs(axe.LevelCostNow - 0.01f);
+            Assert.That(axe.Level, Is.EqualTo(2));
+            Assert.That(g.Abilities.Has(AbilityEffects.Quake), Is.False, "not yet: level 2");
+
+            combat.ServerPlayerHitsEnemy(hero, 1, AttackSet.Finisher, slime, -1, heroObject.transform.position, heroObject.transform.eulerAngles.y);
+            Assert.That(axe.Level, Is.EqualTo(3), "the finisher's ABS crossed the level");
+            Assert.That(g.Abilities.Has(AbilityEffects.Quake), Is.True, "level 3 through the reward path unlocks axe_quake");
+        }
+
         // Catches: a finisher bonus that counts hits of earlier combos. A combo started within the 1.2 s grace rebases like AttackMachine.Begin: the second
         // finisher has the same two prior hits as the first.
         [UnityTest]
