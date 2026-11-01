@@ -56,7 +56,7 @@ namespace SleepingCalamity.Core
         // weights for Slime, Broom, RatKing per floor 1-4
         static readonly int[][] Weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 20, 50, 30 }, new[] { 30, 40, 30 } };
 
-        public static int[] WeightsFor(int floor) => Weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
+        public static int[] WeightsFor(int floor) => (int[])Weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1].Clone();
 
         public static EnemyKind Tier1Kind(uint seed, int floor, int room, int index) => Tier1Kind(seed, floor, room, index, CellarFloorRoster.EligibleMask(floor));
 

@@ -10,7 +10,7 @@
 //   - floor 4 (the bakery set-piece) is treated like any floor: its Combat rooms take extras and the hunter may roam it. Its fixed rooms keep every authored cell, so a legal cell
 //     is simply the room's remaining free floor.
 //   - procgen 3: the plan also carries the floor's roster (RosterMask, CellarFloorRoster) and, from BuildForDive only, its twist: Thin drops one spawn per room that has more than
-//     one (an extra first, never the gate-key carrier or the warden), Crowded adds one extra in about half the Combat rooms (at least one), Ambush only names AmbushRoom (plan
+//     one (an authored spawn first, never the gate-key carrier or the warden; extras survive), Crowded adds one extra in about half the Combat rooms (at least one), Ambush only names AmbushRoom (plan
 //     data; the runtime behaviour is not built yet). Build() (no twist) stays the plain plan the older tests and the carrier check use.
 // Own Rng stream, never touches the layout/dressing goldens. No float, no string hashing for decisions.
 // Authority: none (static data); the host consumes it.
@@ -132,21 +132,22 @@ namespace SleepingCalamity.Core
             return new CellarEncounterPlan(layout.Seed, layout.Floor, extra, hunterLatched, spawns, hunter, CellarFloorRoster.RosterMask(layout.Seed, layout.Floor), twist, ambushRoom);
         }
 
-        // Thin twist: -1 spawn in a room that has more than one: the last extra, else the last authored spawn that is not the gate-key carrier or the warden.
+        // Thin twist: -1 spawn in a room that has more than one: the last authored spawn that is not the gate-key carrier or the warden (so stir extras survive);
+        // only when none qualifies, the last extra. Never below one spawn per room.
         static void ThinRoom(CellarFloorLayout layout, List<EncounterSpawn> spawns, bool[,] taken, int room)
         {
             int count = 0; for (int i = 0; i < spawns.Count; i++) if (spawns[i].RoomIndex == room) count++;
             if (count <= 1) return;
             int pick = -1;
-            for (int i = spawns.Count - 1; i >= 0 && pick < 0; i--) if (spawns[i].RoomIndex == room && spawns[i].Kind == EncounterKind.Extra) pick = i;
             for (int i = spawns.Count - 1; i >= 0 && pick < 0; i--)
             {
                 EncounterSpawn s = spawns[i];
-                if (s.RoomIndex != room) continue;
+                if (s.RoomIndex != room || s.Kind != EncounterKind.Authored) continue;
                 if (layout.Carrier != null && layout.Carrier.X == s.X && layout.Carrier.Y == s.Y) continue;
                 if (layout.WardenCell.HasValue && layout.WardenCell.Value.X == s.X && layout.WardenCell.Value.Y == s.Y) continue;
                 pick = i;
             }
+            for (int i = spawns.Count - 1; i >= 0 && pick < 0; i--) if (spawns[i].RoomIndex == room && spawns[i].Kind == EncounterKind.Extra) pick = i;
             if (pick < 0) return;
             taken[spawns[pick].X, spawns[pick].Y] = false; spawns.RemoveAt(pick);
         }

@@ -48,6 +48,16 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
+        // The pre-roster pick, copied from origin/main (CellarEnemyMix.Tier1Kind before procgen 3): weights and stream pinned here so a drift in the new code fails.
+        static EnemyKind OldPick(uint seed, int floor, int room, int index)
+        {
+            int[][] weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 20, 50, 30 }, new[] { 30, 40, 30 } };
+            int[] w = weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
+            var rng = new Pcg32(Rng.Derive(seed, "cellars.mix", ((ulong)floor << 32) | ((uint)room << 8) | (uint)index));
+            int roll = rng.Range(0, w[0] + w[1] + w[2]);
+            return roll < w[0] ? EnemyKind.Slime : roll < w[0] + w[1] ? EnemyKind.Broom : EnemyKind.RatKing;
+        }
+
         [Test]
         public void Mix_NeverRollsOffRoster_AndFullRosterMatchesTheOldPick()
         {
@@ -60,7 +70,8 @@ namespace SleepingCalamity.Tests.EditMode
                         {
                             EnemyKind k = CellarEnemyMix.Tier1Kind(seed, floor, room, i, mask);
                             Assert.AreNotEqual(0, CellarFloorRoster.BitOf(k) & mask, "kind " + k + " off roster " + mask);
-                            Assert.AreEqual(CellarEnemyMix.Tier1Kind(seed, floor, room, i), CellarEnemyMix.Tier1Kind(seed, floor, room, i, CellarFloorRoster.EligibleMask(floor)));
+                            Assert.AreEqual(OldPick(seed, floor, room, i), CellarEnemyMix.Tier1Kind(seed, floor, room, i), "old pick, seed " + seed + " floor " + floor);
+                            Assert.AreEqual(OldPick(seed, floor, room, i), CellarEnemyMix.Tier1Kind(seed, floor, room, i, CellarFloorRoster.EligibleMask(floor)));
                         }
                 }
         }
@@ -81,7 +92,8 @@ namespace SleepingCalamity.Tests.EditMode
                 }
             }
             // Floor 2 sits at the placeholders; floor 3 loses the repeats, so the overall share is a little under.
-            Assert.That(count[(int)FloorTwist.Ambush] / (double)floors, Is.InRange(0.08, 0.14), "ambush");
+            Assert.AreEqual(0, count[(int)FloorTwist.Ambush], "ambush is inert (AmbushPercent 0) until the runtime behaviour exists");
+            Assert.That(count[(int)FloorTwist.None] / (double)floors, Is.InRange(0.72, 0.84), "none");
             Assert.That(count[(int)FloorTwist.Thin] / (double)floors, Is.InRange(0.08, 0.14), "thin");
             Assert.That(count[(int)FloorTwist.Crowded] / (double)floors, Is.InRange(0.08, 0.14), "crowded");
             TestContext.WriteLine("twist shares of floors 2-3: none " + count[0] / (double)floors + " ambush " + count[1] / (double)floors + " thin " + count[2] / (double)floors + " crowded " + count[3] / (double)floors);
@@ -142,6 +154,25 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Plan_Thin_WithStirExtras_KeepsEveryExtra()
+        {
+            int checkedRooms = 0;
+            foreach (var (seed, floor) in TwistedFloors(FloorTwist.Thin))
+            {
+                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarEncounterPlan thin = CellarEncounterPlan.BuildForDive(l, d, 1, false), plain = CellarEncounterPlan.Build(l, d, 1, false);
+                for (int r = 0; r < l.Rooms.Count; r++)
+                {
+                    int pe = plain.Spawns.Count(s => s.RoomIndex == r && s.Kind == EncounterKind.Extra), te = thin.Spawns.Count(s => s.RoomIndex == r && s.Kind == EncounterKind.Extra);
+                    bool removableAuthored = plain.Spawns.Any(s => s.RoomIndex == r && s.Kind == EncounterKind.Authored
+                        && !(l.Carrier != null && l.Carrier.X == s.X && l.Carrier.Y == s.Y) && !(l.WardenCell.HasValue && l.WardenCell.Value.X == s.X && l.WardenCell.Value.Y == s.Y));
+                    if (pe > 0 && plain.CountIn(r) > 1 && removableAuthored) { Assert.AreEqual(pe, te, "extras lost, room " + r + " seed " + seed + " floor " + floor); checkedRooms++; }
+                }
+            }
+            Assert.Greater(checkedRooms, 10);
+        }
+
+        [Test]
         public void Plan_Crowded_AddsAtLeastOneExtra_NoSharedCells()
         {
             int checkedFloors = 0;
@@ -161,6 +192,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Plan_Ambush_NamesACombatRoom_SpawnsUnchanged()
         {
             int checkedFloors = 0;
+            if (FloorTwistTuning.AmbushPercent == 0) { Assert.AreEqual(0, TwistedFloors(FloorTwist.Ambush).Count, "no Ambush while inert"); return; }
             foreach (var (seed, floor) in TwistedFloors(FloorTwist.Ambush))
             {
                 CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
