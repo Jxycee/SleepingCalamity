@@ -142,6 +142,10 @@ namespace SleepingCalamity.Core.Combat
             public double Until;
         }
 
+        // Most attacks under way (wind-up to the end of the hit window) at once across ALL heroes (CoopScaling.GlobalStrikeCap; the host sets it from the
+        // player count). An attack that would be one more is refused (ForceAcquire, the answer to a break-free, is exempt). Default: no cap.
+        public int GlobalStrikeCap = int.MaxValue;
+
         private readonly List<Hold> _holds = new List<Hold>();
         private readonly List<Hold> _tails = new List<Hold>();   // closed hit windows still inside their gap
         private readonly List<Reservation> _reserved = new List<Reservation>();
@@ -178,6 +182,14 @@ namespace SleepingCalamity.Core.Combat
                 return false;
             }
             if (clash || inPool >= pacing.PoolSize(category)) return false;
+            if (GlobalStrikeCap != int.MaxValue)
+            {
+                // Attacks under way (wind-up through hit window; a hold lapses at its StrikeEnd) on any hero, any category. Per hero the strike gap already
+                // keeps hit windows apart, so the cap bounds the wind-ups and strikes on screen together, which is what the pools of several heroes add up to.
+                int underWay = 0;
+                for (int i = 0; i < _holds.Count; i++) if (_holds[i].Holder != holder) underWay++;
+                if (underWay >= GlobalStrikeCap) return false;
+            }
             Release(holder, now);
             _holds.Add(new Hold
             {
@@ -309,6 +321,14 @@ namespace SleepingCalamity.Core.Combat
         }
 
         public int Count => _holds.Count;
+
+        // How many attacks are under way at instant t, from acquisition to the end of the hit window (all heroes). For the cap's tests and debugging.
+        public int StrikesAt(double t)
+        {
+            int n = 0;
+            for (int i = 0; i < _holds.Count; i++) if (_holds[i].Acquired <= t && t < _holds[i].StrikeEnd) n++;
+            return n;
+        }
 
         private int ReservedBy(int target)
         {

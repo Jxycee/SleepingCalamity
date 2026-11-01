@@ -358,6 +358,40 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(run.Latencies[run.Latencies.Count - 1], Is.LessThan(1500.0), "even a resent packet arrives well inside two seconds: " + report);
         }
 
+        // ---- enemy AI stage 3: threat load balance over a real host + client ----
+        // Four rat-kings stand between two heroes 8 m apart (4 m from each). With plain "nearest hero" targeting they would all pick whichever is a hair
+        // nearer; the ThreatTable's load term must split them, and the global strike cap for two players (3) must hold while they fight.
+        // Catches: all enemies piling on one hero, the host-wide TargetLedger not being shared or fed, the cap not reaching the shared AttackTokens.
+        [UnityTest, Timeout(60000)]
+        public IEnumerator TwoHeroes_EnemiesSplitBetweenThem_AndTheStrikeCapHolds()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+            c.Combat.AiEnabled = true;
+            foreach (Enemy stray in new List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            int hostHeroId = c.HostHero.GetComponent<HeroVitals>().GetHashCode();
+            int clientHeroId = c.ClientHeroOnHost.GetComponent<HeroVitals>().GetHashCode();
+            for (int i = 0; i < 4; i++)
+                c.Combat.SpawnEnemy(EnemyKind.RatKing, 1, new Vector3(4f, 0f, (i - 1.5f) * 0.8f));
+            yield return PlayModeHarness.WaitUntil(() => c.Combat.Tokens.GlobalStrikeCap == 3, 3f, "two players: the host's token table never carried the cap of 3");
+
+            int worst = 0, maxStrikes = 0, samples = 0;
+            double until = Time.realtimeSinceStartupAsDouble + 4.0;
+            while (Time.realtimeSinceStartupAsDouble < until)
+            {
+                int a = c.Combat.Targets.CountOn(hostHeroId, -1), b = c.Combat.Targets.CountOn(clientHeroId, -1);
+                if (a + b == 4) { samples++; worst = Mathf.Max(worst, Mathf.Max(a, b)); }
+                maxStrikes = Mathf.Max(maxStrikes, c.Combat.Tokens.StrikesAt(Time.timeAsDouble));
+                yield return null;
+            }
+            Assert.That(samples, Is.GreaterThan(30), "all four enemies had a target");
+            Assert.That(worst, Is.LessThanOrEqualTo(3), "never all four on one hero");
+            Assert.That(c.Combat.Targets.CountOn(hostHeroId, -1), Is.InRange(1, 3));
+            Assert.That(c.Combat.Targets.CountOn(clientHeroId, -1), Is.InRange(1, 3));
+            Assert.That(maxStrikes, Is.GreaterThanOrEqualTo(1), "the cap was exercised: at least one strike was actually open");
+            Assert.That(maxStrikes, Is.LessThanOrEqualTo(3), "no more than the two-player cap of strikes open at once");
+        }
+
         // ---- weapon tree (M4): a client's tree choices go to the host, which applies them to the Core weapon and pushes the snapshot back ----
         // Catches: the owner->host TreeActionServerRpc and the host->owner SyncTreeOwnerRpc round trip (fit, build-up gate, build-up, re-route) over a real
         // client connection. Does not catch: the IMGUI window itself (manual walk: B opens it, 1/2/3, F7, F8).
