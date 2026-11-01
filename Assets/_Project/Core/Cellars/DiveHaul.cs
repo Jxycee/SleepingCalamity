@@ -14,6 +14,7 @@ namespace SleepingCalamity.Core
         private readonly int[] _assigned = new int[PieceFloors + 1];   // index = floor
         private readonly Dictionary<int, int> _originOf = new Dictionary<int, int>();
         private readonly SortedSet<int> _unbanked = new SortedSet<int>(), _banked = new SortedSet<int>();
+        private readonly SortedSet<int> _home = new SortedSet<int>();   // restored from a save as already in the town; never banked, never lost to FailDive
         private readonly SortedDictionary<int, int> _lootUnbanked = new SortedDictionary<int, int>(), _lootBanked = new SortedDictionary<int, int>();
 
         // piecesPerFloor[0..2] = pieces assigned to floors 1-3. Ids are deterministic: PieceId(floor, index).
@@ -35,11 +36,12 @@ namespace SleepingCalamity.Core
         public int UnbankedLootCount { get { int t = 0; foreach (int c in _lootUnbanked.Values) t += c; return t; } }   // never counts for stir
         public int BankedLootCount { get { int t = 0; foreach (int c in _lootBanked.Values) t += c; return t; } }
         public int OriginFloor(int pieceId) => _originOf.TryGetValue(pieceId, out int f) ? f : 0;
-        public bool IsCollected(int pieceId) => _unbanked.Contains(pieceId) || _banked.Contains(pieceId);
+        public bool IsCollected(int pieceId) => _unbanked.Contains(pieceId) || _banked.Contains(pieceId) || _home.Contains(pieceId);
         public bool IsBanked(int pieceId) => _banked.Contains(pieceId);
         public IEnumerable<int> UnbankedPieces => _unbanked;
         public IEnumerable<int> BankedPieces => _banked;
-        public IEnumerable<KeyValuePair<int, int>> BankedLootItems => _lootBanked;   // item id -> running banked total for the session (the town stock moves the difference)
+        public IEnumerable<KeyValuePair<int, int>> BankedLoot => _lootBanked;   // item id -> count, ascending (the world save reads it)
+        public IEnumerable<KeyValuePair<int, int>> BankedLootItems => _lootBanked;   // same as BankedLoot; the town stock reads it (running banked total for the session)
         public int LootUnbanked(int itemId) => _lootUnbanked.TryGetValue(itemId, out int c) ? c : 0;
         public int LootBanked(int itemId) => _lootBanked.TryGetValue(itemId, out int c) ? c : 0;
 
@@ -50,6 +52,7 @@ namespace SleepingCalamity.Core
             int collected = 0;
             foreach (int id in _unbanked) if (OriginFloor(id) == floor) collected++;
             foreach (int id in _banked) if (OriginFloor(id) == floor) collected++;
+            foreach (int id in _home) if (OriginFloor(id) == floor) collected++;
             return _assigned[floor] - collected;
         }
 
@@ -58,6 +61,15 @@ namespace SleepingCalamity.Core
         {
             if (!_originOf.ContainsKey(pieceId) || IsCollected(pieceId)) return false;
             _unbanked.Add(pieceId);
+            return true;
+        }
+
+        // A world load: this piece is already in the town (stock or placed), so it counts as collected (the cellar must not spawn it again) without being banked or
+        // carried. False for an unknown piece or one already collected.
+        public bool MarkHome(int pieceId)
+        {
+            if (!_originOf.ContainsKey(pieceId) || IsCollected(pieceId)) return false;
+            _home.Add(pieceId);
             return true;
         }
 

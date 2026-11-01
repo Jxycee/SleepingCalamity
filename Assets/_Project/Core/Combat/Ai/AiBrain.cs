@@ -15,6 +15,8 @@ namespace SleepingCalamity.Core.Combat
         public int Id;          // opaque key (the host uses the hero's hash code); also the token key
         public float X, Y, Z;
         public bool Up;         // alive and not downed
+        public bool InRoom;     // inside the enemy's own room (room enemies only; the host fills it): always noticed, never leashed
+        public int Load;        // OTHER enemies already targeting this hero (host-wide TargetLedger); the load-balance input of ThreatTable
     }
 
     // What the host fills each tick. Heroes are the ones in the enemy's own world (already filtered by the host).
@@ -55,12 +57,31 @@ namespace SleepingCalamity.Core.Combat
         private float _strafeSign = 1f;
         private int _attacksSinceSignature;     // elite: its signature comes after AttackPacing.SignatureEvery other attacks
 
-        public AiBrain(AttackTokens tokens, Func<float> rand) { _tokens = tokens; _rand = rand; }
+        private readonly EnemyDefinition _def;
+        private ThreatTable _threat;
+
+        private readonly bool _hunts;   // always knows where the heroes are (arena waves, the hunter): no aggro or leash limit
+
+        public AiBrain(AttackTokens tokens, Func<float> rand, EnemyDefinition def = null, bool hunts = false) { _tokens = tokens; _rand = rand; _def = def; _hunts = hunts; }
+
+        // Who this enemy goes for (stage 3). Created on first use from the enemy's own ranges.
+        // Hunters keep the normal distance scale (their near/role terms still differ per hero) and only skip the range filter.
+        public ThreatTable Threat => _threat ??= _def != null
+            ? new ThreatTable(_def.AggroRange, _def.LeashRange, _def.RetargetInterval, unlimitedRange: _hunts)
+            : new ThreatTable(unlimitedRange: _hunts);
+
+        // Threat-based pick: sets c.TargetIndex. locked = in Tell or Strike (no switch). Ranged enemies prefer the farthest hero.
+        public int PickTarget(AiContext c, bool locked)
+        {
+            bool ranged = c.Def != null && c.Def.TokenCategory == TokenCategory.Ranged;
+            c.TargetIndex = Threat.Pick(c.Heroes, c.SelfX, c.SelfY, c.SelfZ, c.Dt, locked, ranged);
+            return c.TargetIndex;
+        }
 
         public bool WaitingForToken => _waiting;
         public AiState State { get; private set; }
 
-        // Nearest living hero (3D distance, first wins a tie); -1 when none is up.
+        // Stateless nearest living hero (3D distance, first wins a tie); -1 when none is up. Fallback for callers with no threat state (force-attacks).
         public static int PickTarget(IReadOnlyList<AiHero> heroes, float x, float y, float z)
         {
             int best = -1;

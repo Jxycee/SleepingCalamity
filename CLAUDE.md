@@ -17,7 +17,9 @@ The main (controller) session opens with the `sc-steward` skill, which reads `do
 - Run Unity only through the wrapper: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <compile|build|test-edit|test-play|check|exec> -OutDir <scratchpad dir>` on the PC, `bash Tools/cloud/unity.sh <same command> --out <scratchpad dir>` in the cloud. Exit codes: 0 PASS, 1 FAIL, 2 LOCKED, 3 TIMEOUT, 4 usage. It reads the log (exit 0 alone is not proof), adds `-dev-profile sctest` to test runs, and records a PASS marker that the merge gate checks.
 - The Unity plugin's `unity-cli` / `unity run` launch commands don't apply here; the wrapper rule wins.
 - `LOCKED` means the user has the editor open: ask them to close it. Never kill Unity processes and never delete `Temp/UnityLockfile`.
-- PlayMode runs in different worktrees collide on the same UDP port: before `test-play` or `check`, look for another Unity process with `-testPlatform PlayMode` and wait for it.
+- PlayMode runs in different worktrees collide on the same UDP port (7790). The PC wrapper queues them for you: its PlayMode stage takes a machine-wide lock and waits for any other PlayMode run, printing `SC WAIT`. Run a worktree through its own `<worktree>\Tools\unity.ps1`, which defaults `-ProjectRoot` to that checkout. Check that `SC MARKER` equals your HEAD.
+- The wrapper ends only the Unity process it started itself, and only when a stage times out (default 30 min per stage). Never end any other Unity process yourself.
+- PlayMode tests must never wait on `WaitForEndOfFrame` under `-nographics`: it never resumes. Put a timeout inside every wait loop.
 - Editor scripts build scenes and prefabs (`SleepingCalamity.EditorTools.*`, wired into `ProjectBuilder.RunAll`); never edit `.unity`/`.prefab` YAML by hand (a hook blocks it).
 - Logs and test results go in the session scratchpad, never in the repo.
 

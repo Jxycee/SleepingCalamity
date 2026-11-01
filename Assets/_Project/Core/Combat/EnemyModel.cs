@@ -34,14 +34,17 @@ namespace SleepingCalamity.Core.Combat
         public readonly bool Ripostes;          // its blocked front hits count toward the bristle riposte (GuardCounter)
         public readonly AttackData[] Attacks;
         public readonly PartDefinition[] Parts;
+        public readonly float AggroRange, LeashRange, RetargetInterval;   // threat targeting (ThreatTable; docs/research/enemy-ai.md 10.2): notice within Aggro, drop beyond Leash, re-score at most this often
         public readonly TokenCategory TokenCategory;   // the attack-token pool its attacks draw from unless an attack names its own (AttackData.TokenPool; docs/research/enemy-ai.md 2.3, 5)
 
         public EnemyDefinition(EnemyKind kind, string id, string name, Species species, int hp, float atk, float def, float moveSpeed, float radius, float height,
             AttackData[] attacks, bool isElite = false, bool canRage = true, bool frontalBlock = false, bool superArmorAlways = false, bool weakToFire = false,
             bool isPest = false, float staggerSeconds = 0.4f, PartDefinition[] parts = null, float visualReach = 1f, float poiseThreshold = 0f, bool ripostes = false,
-            TokenCategory tokenCategory = TokenCategory.Melee)
+            TokenCategory tokenCategory = TokenCategory.Melee, float aggroRange = ThreatTuning.DefaultAggroRange, float leashRange = ThreatTuning.DefaultLeashRange,
+            float retargetInterval = ThreatTuning.DefaultRetargetInterval)
         {
             TokenCategory = tokenCategory;
+            AggroRange = aggroRange; LeashRange = leashRange; RetargetInterval = retargetInterval;
             VisualReach = visualReach;
             PoiseThreshold = poiseThreshold;
             Ripostes = ripostes;

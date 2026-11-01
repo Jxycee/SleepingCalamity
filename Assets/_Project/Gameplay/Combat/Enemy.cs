@@ -59,6 +59,7 @@ namespace SleepingCalamity.Gameplay
         // spawned outside CombatHost gets a private crowd (and tokens) of its own.
         public EnemyCrowd Crowd { get; private set; }
         private AttackTokens Tokens => (Crowd ??= new EnemyCrowd(new AttackTokens())).Tokens;
+        private TargetLedger Targets => (Crowd ??= new EnemyCrowd(new AttackTokens())).Targets;
         public void ServerJoinCrowd(EnemyCrowd crowd) { Crowd = crowd; }
 
         private Targetable _targetable;
@@ -75,7 +76,16 @@ namespace SleepingCalamity.Gameplay
         private readonly AiContext _ctx = new AiContext();
         private readonly List<HeroVitals> _heroBuf = new List<HeroVitals>();   // parallel to _ctx.Heroes
         private static readonly System.Func<float> s_rand = () => Random.value;
-        private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand);
+        private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand, Def, Hunts);
+        // Host: true for enemies spawned without a room (arena waves, the hunter): they chase from anywhere. Room enemies use their aggro/leash ranges. Set before the first tick.
+        public bool Hunts;
+        private CombatHost _host; private int _room = EnemyCrowd.ArenaRoom;   // host: the room this enemy belongs to (room scope of its aggro, doc 6.4)
+        public void ServerBindRoom(CombatHost host, int room) { _host = host; _room = room; }
+        public int Room => _room;
+        private Vector3 _home; private bool _homeSet;   // host: where it spawned; after a leash it walks back here
+        private const float HomeArrive = 1f;
+        private const float HomeGiveUp = 8f;   // host: a walk home blocked by a corner stops here and idles instead of grinding the wall
+        private float _homeWalk;
         private float _bracedLeft;                       // host: seconds the broom still shows its brace after a blocked hit
         public const float BracedShowSeconds = 0.35f;
 
@@ -184,6 +194,7 @@ namespace SleepingCalamity.Gameplay
                 if (Model == null) Model = new EnemyModel(Def, Tier, 1);
                 _targetable.Alive = true;
                 _cooldown = _initialCooldown;
+                _home = transform.position; _homeSet = true;
             }
         }
 
@@ -264,14 +275,17 @@ namespace SleepingCalamity.Gameplay
                     Model.Poise.BeginSteady();   // one flinch per exchange: steady for a moment, so flinch loops cannot stunlock it
                     SetPhase(AiEnabled ? EnemyPhase.Chase : EnemyPhase.Idle);
                 }
+                DropTarget();   // a flinching enemy is not on anyone: its load no longer counts against the hero
                 return;
             }
-            if (!AiEnabled) { if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
+            if (!AiEnabled) { DropTarget(); if (Phase == EnemyPhase.Attack) ServerAdvanceAttack(dt, null); return; }
 
-            HeroVitals target = PickTarget();
+            // Threat targeting (stage 3): locked while telling or striking, so a target switch never happens mid-attack.
+            HeroVitals target = PickTarget(dt, locked: Phase == EnemyPhase.Attack);
             if (_cooldown > 0f) _cooldown -= dt;
             if (Phase == EnemyPhase.Attack) { ServerAdvanceAttack(dt, target); return; }
-            if (target == null) { SetPhase(EnemyPhase.Idle); return; }
+            if (target == null) { ServerReturnHome(dt); return; }
+            _homeWalk = 0f;
 
             // The brain decides (Core AiBrain); this applies its action. PickTarget just filled the context's hero snapshot.
             FillContext(dt);
@@ -291,6 +305,22 @@ namespace SleepingCalamity.Gameplay
             if (act.MoveSpeed > 0f) MoveHorizontal(new Vector3(act.MoveX, 0f, act.MoveZ), act.MoveSpeed, dt);
         }
 
+        // Host: forget the current target and its ledger entry.
+        private void DropTarget() { Targets.Remove(GetHashCode()); _brain?.Threat.ClearCurrent(); }
+
+        // Host: nobody in range (leashed, or all down). Room enemies walk back to where they spawned (target = home), then idle there within 1 m.
+        private void ServerReturnHome(float dt)
+        {
+            Vector3 p = transform.position;
+            float dx = _home.x - p.x, dz = _home.z - p.z;
+            if (Hunts || !_homeSet || dx * dx + dz * dz <= HomeArrive * HomeArrive || _homeWalk >= HomeGiveUp) { SetPhase(EnemyPhase.Idle); return; }
+            _homeWalk += dt;
+            SetPhase(EnemyPhase.Chase);
+            Vector3 dir = new Vector3(dx, 0f, dz).normalized;
+            FaceToward(dir, 420f, dt);
+            MoveHorizontal(dir, Def.MoveSpeed * 0.7f, dt);
+        }
+
         private void FillContext(float dt)
         {
             AiContext c = _ctx;
@@ -308,23 +338,53 @@ namespace SleepingCalamity.Gameplay
             c.ScatterX = _scatterDir.x; c.ScatterZ = _scatterDir.z;
         }
 
-        // Nearest living hero in this world: the host snapshots the heroes into the context and Core AiBrain.PickTarget applies the rule.
-        private HeroVitals PickTarget()
+        // Host: record that `heroId` (a HeroVitals hash code) hurt this enemy; recent damage pulls its attention (ThreatTable).
+        public void ServerRecordThreat(int heroId, float damage) { Brain.Threat.RecordHit(heroId, damage); }
+
+        // Snapshots the living heroes of this world into the context, each with the number of OTHER enemies already on it (host-wide ledger).
+        private void SnapshotHeroes()
         {
             _ctx.Heroes.Clear();
             _heroBuf.Clear();
+            int self = GetHashCode();
+            // the room override (always noticed, never leashed) holds only while this enemy is itself inside its room: one that followed a hero into a corridor leashes normally
+            bool selfInRoom = _room >= 0 && _host != null && _host.RoomOf != null && _host.RoomOf(transform.position) == _room;
             IReadOnlyList<HeroVitals> all = HeroVitals.All;
             for (int i = 0; i < all.Count; i++)
             {
                 HeroVitals v = all[i];
                 if (v == null || v.NetworkManager != NetworkManager || !v.IsUp) continue;
                 Vector3 hp = v.transform.position;
-                _ctx.Heroes.Add(new AiHero { Id = v.GetHashCode(), X = hp.x, Y = hp.y, Z = hp.z, Up = true });
+                int id = v.GetHashCode();
+                bool inRoom = selfInRoom && _host.RoomOf(hp) == _room;
+                _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, InRoom = inRoom, Load = Targets.CountOn(id, self) });
                 _heroBuf.Add(v);
             }
             Vector3 p = transform.position;
-            _ctx.TargetIndex = AiBrain.PickTarget(_ctx.Heroes, p.x, p.y, p.z);
+            _ctx.SelfX = p.x; _ctx.SelfY = p.y; _ctx.SelfZ = p.z;
+        }
+
+        // The target for this tick by Core ThreatTable (aggro/leash, load balance, stickiness, no switch while locked); null when nobody is in range.
+        private HeroVitals PickTarget(float dt, bool locked)
+        {
+            SnapshotHeroes();
+            _ctx.Def = Def;
+            _ctx.Dt = dt;
+            Brain.PickTarget(_ctx, locked);
+            int self = GetHashCode();
+            if (_ctx.TargetIndex >= 0) Targets.Set(self, _ctx.Heroes[_ctx.TargetIndex].Id); else Targets.Remove(self);
             return _ctx.TargetIndex >= 0 ? _heroBuf[_ctx.TargetIndex] : null;
+        }
+
+        // For forced attacks (riposte, break-free): the hero this enemy is already on, else the nearest one. Does not advance the threat clock.
+        private HeroVitals CurrentOrNearestHero()
+        {
+            SnapshotHeroes();
+            int idx = -1;
+            if (Brain.Threat.HasCurrent)
+                for (int i = 0; i < _ctx.Heroes.Count; i++) if (_ctx.Heroes[i].Id == Brain.Threat.CurrentId) { idx = i; break; }
+            if (idx < 0) idx = AiBrain.PickTarget(_ctx.Heroes, _ctx.SelfX, _ctx.SelfY, _ctx.SelfZ);
+            return idx >= 0 ? _heroBuf[idx] : null;
         }
 
         // How far a glob can be lobbed (m): Core EnemyAttackChooser.LobReach (was 8.5; the glob is drawn in flight, EnemyVisual).
@@ -481,7 +541,7 @@ namespace SleepingCalamity.Gameplay
             {
                 // The broom's guard was hammered: it answers whatever the tokens say (like the break-free), recording a forced hold on its nearest hero so
                 // later attacks keep their gap from it.
-                HeroVitals near = PickTarget();
+                HeroVitals near = CurrentOrNearestHero();
                 if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.BroomRiposte, AttackPacing.ForTier(Tier), Def.CategoryOf(AttackCatalog.BroomRiposte));
                 else Tokens.Release(GetHashCode(), Time.timeAsDouble);
                 ServerStartAttack(AttackCatalog.BroomRiposte, transform.position);
@@ -491,7 +551,7 @@ namespace SleepingCalamity.Gameplay
             {
                 // Break free: a quick circle that clears everyone off it (the elite's answer to being chained). It answers the heroes hitting it, so it
                 // starts whatever the tokens say, but records a forced hold on its nearest hero so the next attacks keep their gap from it.
-                HeroVitals near = PickTarget();
+                HeroVitals near = CurrentOrNearestHero();
                 if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.WardenBreakFree, AttackPacing.ForTier(Tier), Def.CategoryOf(AttackCatalog.WardenBreakFree));
                 else Tokens.Release(GetHashCode(), Time.timeAsDouble);
                 ServerStartAttack(AttackCatalog.WardenBreakFree, transform.position);
