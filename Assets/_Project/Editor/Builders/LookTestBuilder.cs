@@ -205,9 +205,9 @@ namespace SleepingCalamity.EditorTools
         // URP Lit alpha-blended surface (what the Lit inspector writes for Surface Type = Transparent, Blend = Alpha), no shadow casting.
         static void MakeTransparent(Material m)
         {
-            // Premultiply blend (_Blend 1): URP multiplies the colour by alpha in the shader, which equals alpha blending for these straight-alpha decals,
-            // and it is the state Unity's own material validation settles on (any other value flips back and forth between builds and dirties the .mat).
-            m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 1f); m.SetFloat("_SrcBlend", 1f); m.SetFloat("_DstBlend", 10f);
+            // Alpha blend (_Blend 0). Unity's material validation (MaterialValidation.SettleAll) fills in the matching src/dst factors and the
+            // _ALPHAPREMULTIPLY_ON keyword (preserve-specular path: colour premultiplied in the shader, which equals alpha blending for these straight-alpha decals).
+            m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f); m.SetFloat("_SrcBlend", 1f); m.SetFloat("_DstBlend", 10f);
             m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 10f); m.SetFloat("_ZWrite", 0f); m.SetFloat("_AlphaClip", 0f);
             m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.EnableKeyword("_ALPHAPREMULTIPLY_ON"); m.SetOverrideTag("RenderType", "Transparent");
             m.SetShaderPassEnabled("ShadowCaster", false); m.renderQueue = 3000;

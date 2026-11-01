@@ -22,7 +22,7 @@ namespace SleepingCalamity.Tests.EditMode
                 {
                     CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
                     CellarFloorDressing d = CellarFloorDressing.Resolve(l);
-                    yield return (l, d, CellarFloorClutter.Resolve(l, d));
+                    yield return (l, d, CellarFloorClutter.Resolve(l, d, CellarRoomChunks.Resolve(l, d)));
                 }
         }
 
@@ -280,12 +280,26 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 7084911976074808467UL, GoldenClutter12345Floor3 = 3584408126852206761UL;   // floor 3 re-pinned 2026-11-01: procgen 5 vignettes, deliberate (floors 1-2 unchanged; earlier: procgen item 2)
+        const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 10253269401699159736UL, GoldenClutter12345Floor3 = 15205057022095673752UL;   // re-pinned 2026-11-01: procgen items 4 (chunks) + 5 (vignettes), deliberate
+
+        [Test]
+        public void Clutter_NeverStandsOnChunkSolidCells()
+        {
+            for (uint seed = 0; seed < 1000; seed++)
+                for (int floor = 1; floor <= 3; floor++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarRoomChunks chunks = CellarRoomChunks.Resolve(l, d); CellarFloorClutter c = CellarFloorClutter.Resolve(l, d, chunks);
+                    var solid = new HashSet<(int, int)>();
+                    foreach (ResolvedChunk ch in chunks.Chunks) if (!ch.IsOpen) foreach (var (cell, _) in CellarRoomChunks.SolidCells(l, ch)) solid.Add((cell.X, cell.Y));
+                    foreach (CellarClutterRow row in c.Rows) Assert.IsFalse(solid.Contains((row.CellX, row.CellY)), "seed " + seed + " floor " + floor + ": " + row.Id + " stands on a chunk solid cell " + row.CellX + "," + row.CellY);
+                }
+        }
 
         [Test]
         public void Golden_Seed12345_ClutterHash()
         {
-            ulong H(int f) { var l = CellarFloorGenerator.Generate(12345, f); return CellarFloorClutter.Resolve(l, CellarFloorDressing.Resolve(l)).ClutterHash(); }
+            ulong H(int f) { var l = CellarFloorGenerator.Generate(12345, f); var d = CellarFloorDressing.Resolve(l); return CellarFloorClutter.Resolve(l, d, CellarRoomChunks.Resolve(l, d)).ClutterHash(); }
             Assert.That(H(1) == GoldenClutter12345Floor1 && H(2) == GoldenClutter12345Floor2 && H(3) == GoldenClutter12345Floor3,
                 "golden changed; actual floor 1 = " + H(1) + "UL, floor 2 = " + H(2) + "UL, floor 3 = " + H(3) + "UL");
         }

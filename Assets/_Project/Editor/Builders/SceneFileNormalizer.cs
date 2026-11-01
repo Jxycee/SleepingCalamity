@@ -134,6 +134,24 @@ namespace SleepingCalamity.EditorTools
             foreach (Doc d in docs)
                 if (d.Class == SceneRootsClass)
                     foreach (string root in AllRefs(d, ListRef)) Walk(root);
+            // Objects embedded in the scene but outside the hierarchy (meshes and materials a builder created with new): Unity writes them in an order that changes
+            // from run to run, so a second build swapped their contents between ids. Number them in the order the hierarchy first references them instead:
+            // documents in new-id order, each one's references in line order, depth first.
+            void AssignReferenced(Doc from)
+            {
+                foreach (string line in from.Lines)
+                    foreach (Match m in LocalRef.Matches(line))
+                    {
+                        string id = m.Groups[1].Value;
+                        if (id == "0" || map.ContainsKey(id) || !byId.TryGetValue(id, out Doc target) || target.Fixed || target.Suffix.Length > 0) continue;
+                        Assign(id);
+                        AssignReferenced(target);
+                    }
+            }
+            var walked = new List<KeyValuePair<long, Doc>>();
+            foreach (Doc d in docs) if (map.TryGetValue(d.Id, out long walkedId)) walked.Add(new KeyValuePair<long, Doc>(walkedId, d));
+            walked.Sort((x, y) => x.Key.CompareTo(y.Key));
+            foreach (var kv in walked) AssignReferenced(kv.Value);
             var rest = new List<Doc>();
             foreach (Doc d in docs) if (!d.Fixed && !map.ContainsKey(d.Id)) rest.Add(d);
             // Stripped documents the walk did not reach go last, keyed by their instance's new id and their source object; everything else in old-id order.

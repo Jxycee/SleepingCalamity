@@ -24,6 +24,7 @@ namespace SleepingCalamity.Core
         public int Variant;         // card items: atlas cell (trees 0..3) or hedge cell; roadside pieces: 0
         public RoadPresets Presets;
         public bool OnRing;         // past the terrain's edge (the backdrop ring), else on the terrain
+        public bool Belt;           // a tree of the horizon belt (large clumped backdrop trees just outside the terrain edge)
         public override string ToString() => Kind + " " + Piece + " (" + X.ToString("0.0") + ", " + Z.ToString("0.0") + ") " + Presets;
     }
 
@@ -43,6 +44,15 @@ namespace SleepingCalamity.Core
         public const float TerrainMinX = -150f, TerrainMaxX = 150f, TerrainMinZ = -170f, TerrainMaxZ = 130f;   // HollowmereTerrain.Origin / Size
         public const float RingRadius = 620f, RingHedgeRadius = 300f, CopseChance = 0.035f;           // the backdrop ring's trees and fields stop here (fogged out long before)
         public static readonly TownPoint RingCentre = new TownPoint(0f, -20f);
+        // The horizon belt (low cameras need a real tree line past the terrain edge): clumps of large trees 165-270 m from RingCentre, all round except a gap over the lake's view.
+        public const float BeltMinRadius = 165f, BeltMaxRadius = 270f, BeltRoadClear = 14f, BeltMinScale = 1.4f, BeltMaxScale = 2.4f;
+        public const float BeltGapCentreDeg = -95f, BeltGapHalfDeg = 48f;     // azimuth (atan2(dz, dx) from RingCentre) left open: south, over the lake and its far shore
+        public static bool InBeltGap(float x, float z)
+        {
+            float a = Deg(Math.Atan2(z - RingCentre.Z, x - RingCentre.X)) - BeltGapCentreDeg;
+            a = (a + 540f) % 360f - 180f;
+            return Math.Abs(a) < BeltGapHalfDeg;
+        }
 
         // ------------------------------------------------------------------------------------------------ fields
         static readonly float Ca = (float)Math.Cos(FieldAngleDeg * Math.PI / 180.0), Sa = (float)Math.Sin(FieldAngleDeg * Math.PI / 180.0);
@@ -100,6 +110,7 @@ namespace SleepingCalamity.Core
             Lane road = HollowmereLayout.FindLane(t, RoadLane);
             Roadside(t, road, items);
             FieldEdges(t, road, items);
+            Belt(road, items);
             return items;
         }
 
@@ -255,6 +266,37 @@ namespace SleepingCalamity.Core
                     if (cOn != onTerrain) continue;
                     if (cOn && (FieldWeight(t, cx, cz) < 0.8f || HollowmereLayout.DistanceToPolyline(new TownPoint(cx, cz), road.Points) < 30f)) continue;
                     items.Add(new RoadItem { Kind = RoadItemKind.Tree, X = cx, Z = cz, Yaw = Hash01(key + i, 83) * 360f, Scale = 0.85f + 0.6f * Hash01(key + i, 85), Variant = (int)(Hash01(key + i, 87) * 4f) % 4, Presets = RoadPresets.Both, OnRing = !cOn });
+                }
+            }
+        }
+
+        // Clumps of 7-13 large trees (1.4-2.4x) round the terrain, a clump every ~8 m of arc at a radius that clears the terrain edge, so the skyline past the
+        // town wall reads as wood, not a row of specks. Never in the lake gap, never within BeltRoadClear of the road or the ring road.
+        static void Belt(Lane road, List<RoadItem> items)
+        {
+            const float arcStep = 8f;
+            int clumps = (int)(2f * Math.PI * 215f / arcStep);
+            for (int c = 0; c < clumps; c++)
+            {
+                float a = (c + Hash01(c, 201) * 0.8f) / clumps * 2f * (float)Math.PI;
+                float ca = (float)Math.Cos(a), sa = (float)Math.Sin(a);
+                // radius where the ray from the centre leaves the terrain rectangle, then 18-78 m beyond it (capped by BeltMaxRadius)
+                float exit = 0f;
+                while (exit < BeltMaxRadius && OnTerrain(RingCentre.X + ca * exit, RingCentre.Z + sa * exit, -1f)) exit += 1f;
+                float r = Math.Min(BeltMaxRadius - 12f, Math.Max(BeltMinRadius + 6f, exit + 18f + 60f * Hash01(c, 203)));
+                float cx = RingCentre.X + ca * r, cz = RingCentre.Z + sa * r;
+                int n = 7 + (int)(Hash01(c, 205) * 7f);
+                float baseScale = BeltMinScale + 0.6f * Hash01(c, 207);
+                for (int i = 0; i < n; i++)
+                {
+                    float b = Hash01(c * 31 + i, 209) * 6.2832f, rr = 1f + 11f * (float)Math.Sqrt(Hash01(c * 31 + i, 211));
+                    float x = cx + rr * (float)Math.Cos(b), z = cz + rr * (float)Math.Sin(b);
+                    float dc = TownPoint.Distance(new TownPoint(x, z), RingCentre);
+                    if (dc < BeltMinRadius || dc > BeltMaxRadius || OnTerrain(x, z, -10f) || InBeltGap(x, z)) continue;
+                    var p = new TownPoint(x, z);
+                    if (HollowmereLayout.DistanceToPolyline(p, road.Points) < BeltRoadClear || RingRoadDistance(x, z) < BeltRoadClear) continue;
+                    float sc = Math.Min(BeltMaxScale, Math.Max(BeltMinScale, baseScale + 0.9f * (Hash01(c * 31 + i, 213) - 0.3f)));
+                    items.Add(new RoadItem { Kind = RoadItemKind.Tree, X = x, Z = z, Yaw = Hash01(c * 31 + i, 215) * 360f, Scale = sc, Variant = (int)(Hash01(c * 31 + i, 217) * 4f) % 4, Presets = RoadPresets.Both, OnRing = true, Belt = true });
                 }
             }
         }

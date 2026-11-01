@@ -275,7 +275,6 @@ namespace SleepingCalamity.EditorTools
             m.CopyPropertiesFromMaterial(LookTestBuilder.Mat("canvas"));
             Color c = new Color(r, g, b).gamma;
             m.SetColor("_BaseColor", c); m.SetColor("_Color", c);
-            m.SetShaderPassEnabled("MotionVectors", true);
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -294,7 +293,6 @@ namespace SleepingCalamity.EditorTools
         {
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_GD_" + slot + ".mat", lit);
             m.SetColor("_BaseColor", srgb); m.SetColor("_Color", srgb); m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", 0f);
-            m.SetShaderPassEnabled("MotionVectors", true);
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -311,7 +309,6 @@ namespace SleepingCalamity.EditorTools
             if (nrm != null) { m.SetTexture("_BumpMap", nrm); m.SetFloat("_BumpScale", 1f); m.EnableKeyword("_NORMALMAP"); }
             if (ms != null) { m.SetTexture("_MetallicGlossMap", ms); m.SetFloat("_Metallic", 1f); m.SetFloat("_Smoothness", 1f); m.EnableKeyword("_METALLICSPECGLOSSMAP"); }
             if (occ != null) { m.SetTexture("_OcclusionMap", occ); m.SetFloat("_OcclusionStrength", 1f); m.EnableKeyword("_OCCLUSIONMAP"); }
-            m.SetShaderPassEnabled("MotionVectors", true);
             EditorUtility.SetDirty(m);
             return m;
         }
