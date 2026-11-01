@@ -20,4 +20,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/Arena_Dive.unity
     guid: 60eecb34f7f08bb44883bcec7918b547
+  - enabled: 1
+    path: Assets/_Project/Scenes/Hollowmere.unity
+    guid: 3defc5dfd29e16084af26439af1ee94b
   m_configObjects: {}
