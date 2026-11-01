@@ -1,7 +1,7 @@
 // Core/Tuning/TuningSections.cs: the current values of the tunables that were constants, and their knob tables. Defaults live here; PoiseMeter, WeaponGrowth,
 // TargetingConfig and HeroCombat read them (their old constant names are properties now). Pure C#. Authority: none (read at startup, same on every peer).
 using System;
-using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 using SleepingCalamity.Core.Combat;
 
 namespace SleepingCalamity.Core.Tuning
@@ -36,6 +36,14 @@ namespace SleepingCalamity.Core.Tuning
     {
         public static float SoftConeHalfAngleDeg = 60f, SoftRange = 6f, HeightBand = 2f, AcquireRange = 10f, ReleaseRange = 13f, LosGraceSeconds = 1.0f,
             HardHeightBand = 4f, FacingWeight = 0.6f, FlickOn = 0.75f, FlickOff = 0.35f, FlickConeHalfAngleDeg = 60f;
+        // Ordered pairs: a target is picked up at AcquireRange and kept out to ReleaseRange (release must not be nearer); the flick switches on above FlickOn
+        // and off below FlickOff (off must not be higher).
+        public static string Validate()
+        {
+            if (ReleaseRange < AcquireRange) return "releaseRange (" + ReleaseRange + ") must not be less than acquireRange (" + AcquireRange + ")";
+            if (FlickOff > FlickOn) return "flickOff (" + FlickOff + ") must not be greater than flickOn (" + FlickOn + ")";
+            return null;
+        }
         public static Knob[] Knobs() => new[]
         {
             new Knob("softConeHalfAngleDeg", () => SoftConeHalfAngleDeg, v => SoftConeHalfAngleDeg = (float)v, 1, 180),
@@ -79,7 +87,7 @@ namespace SleepingCalamity.Core.Tuning
 
         public static void Reset() { foreach (var s in Sets()) s.RestoreDefaults(); }
 
-        public static void Apply(Dictionary<string, object> body, string source)
+        public static void Apply(JObject body, string source)
         {
             foreach (var kv in body)
             {
@@ -88,7 +96,7 @@ namespace SleepingCalamity.Core.Tuning
                     for (int i = 0; i <= AttackSet.Special && slot < 0; i++)
                         if (s.Attacks[i] != null && string.Equals(s.Attacks[i].Id, kv.Key, StringComparison.Ordinal)) { set = s; slot = i; }
                 if (slot < 0) { TuningStore.Warn(source + ": unknown attack '" + kv.Key + "'"); continue; }
-                var fields = kv.Value as Dictionary<string, object>;
+                var fields = kv.Value as JObject;
                 if (fields == null) { TuningStore.Warn(source + ": attack '" + kv.Key + "' must be an object"); continue; }
                 AttackData cur = set.Attacks[slot];
                 AttackData next = Tuned(cur, kv.Key, fields, source);
@@ -96,7 +104,7 @@ namespace SleepingCalamity.Core.Tuning
             }
         }
 
-        static AttackData Tuned(AttackData a, string id, Dictionary<string, object> f, string source)
+        static AttackData Tuned(AttackData a, string id, JObject f, string source)
         {
             int total = a.TotalFrames, cancel = a.CancelFrom, stop = a.HitstopFrames;
             FrameWindow hitOn = a.HitOn, combo = a.ComboOpen, fin = a.FinisherAllowed, ifr = a.IFrames, armor = a.SuperArmor, turn = a.Turn, lunge = a.Lunge;
@@ -118,7 +126,7 @@ namespace SleepingCalamity.Core.Tuning
                 key = Array.Find(Windows, x => string.Equals(x, kv.Key, StringComparison.OrdinalIgnoreCase));
                 if (key != null)
                 {
-                    var arr = kv.Value as List<object>;
+                    var arr = kv.Value as JArray;
                     double s = 0, e = 0;
                     if (arr == null || arr.Count != 2 || !Number(arr[0], path, source, 0, 100000, true, out s) || !Number(arr[1], path, source, 0, 100000, true, out e))
                     {
@@ -149,21 +157,34 @@ namespace SleepingCalamity.Core.Tuning
                 key = Array.Find(Bools, x => string.Equals(x, kv.Key, StringComparison.OrdinalIgnoreCase));
                 if (key != null)
                 {
-                    if (!(kv.Value is bool b)) { TuningStore.Warn(source + ": '" + path + "' must be true or false, keeping the default"); continue; }
+                    if (kv.Value == null || kv.Value.Type != JTokenType.Boolean) { TuningStore.Warn(source + ": '" + path + "' must be true or false, keeping the default"); continue; }
+                    bool b = kv.Value.Value<bool>();
                     if (key == "guardBreak") gb = b; else if (key == "guardable") guardable = b; else fire = b;
                     changed = true; continue;
                 }
                 TuningStore.Warn(source + ": unknown key '" + path + "'");
             }
             if (!changed) return a;
+            string problem = Check(total, cancel, hitOn, combo, fin, ifr, armor, turn, lunge);
+            if (problem != null) { TuningStore.Warn(source + ": attack '" + id + "' ignored, " + problem); return a; }
             return new AttackData(a.Id, a.Name, a.Kind, total, hitOn, mult, a.Shape, range, half, combo, fin, cancel, ifr, armor, turn, turnSpeed, lunge, lungeM, band,
                 kb, rev, stop, kick, gb, guardable, fire, a.SpellPips, a.Origin, a.Tell, poise, a.TokenPool);
         }
 
-        static bool Number(object raw, string path, string source, double min, double max, bool integer, out double v)
+        // Ordered pairs of one attack after the override: each window runs start..end, and the cancel point lies inside the animation.
+        // windows must be in the order of the Windows array.
+        static string Check(int total, int cancel, params FrameWindow[] windows)
+        {
+            for (int i = 0; i < windows.Length; i++)
+                if (windows[i].Start > windows[i].End) return Windows[i] + " starts (" + windows[i].Start + ") after it ends (" + windows[i].End + ")";
+            if (cancel > total) return "cancelFrom (" + cancel + ") is after totalFrames (" + total + ")";
+            return null;
+        }
+
+        static bool Number(JToken raw, string path, string source, double min, double max, bool integer, out double v)
         {
             v = 0;
-            if (!(raw is double d) || double.IsNaN(d) || double.IsInfinity(d)) { TuningStore.Warn(source + ": '" + path + "' is not a number, keeping the default"); return false; }
+            if (!TuningStore.TryNumber(raw, out double d)) { TuningStore.Warn(source + ": '" + path + "' is not a number, keeping the default"); return false; }
             if (integer && Math.Floor(d) != d) { TuningStore.Warn(source + ": '" + path + "' must be a whole number, keeping the default"); return false; }
             if (d < min || d > max) { TuningStore.Warn(source + ": '" + path + "' = " + d + " is outside " + min + ".." + max + ", keeping the default"); return false; }
             v = d;

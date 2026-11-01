@@ -138,7 +138,7 @@ the hands (grip to fix). The ground footprints helped, but the real game should 
 
 ## Tuning files (branch `tuning-loader`, 2026-11-01)
 Every number is still a P9 Placeholder, but the hero-side ones can now be changed without a rebuild. Optional `*.json` files are read once at startup
-(`TuningBootstrap`, Runtime) and laid over the code defaults by Core `TuningStore` (strict parser `MiniJson`, since Core cannot reference Newtonsoft).
+(`TuningBootstrap`, Runtime) and laid over the code defaults by Core `TuningStore` (parsed with Newtonsoft; a repeated key or invalid JSON ignores the whole file).
 - **Folders, later wins:** `<StreamingAssets>/Tuning/` first, then `<persistentDataPath>/Tuning/` (the mod folder). Inside a folder files load in name order, so
   `b.json` beats `a.json`. A missing folder or no files changes nothing: behaviour is identical to the code defaults.
 - **File shape:** one JSON object; each top-level key is a section, and only the keys you give are changed. Key names are case-insensitive.
@@ -154,11 +154,11 @@ Every number is still a P9 Placeholder, but the hero-side ones can now be change
     flags `guardBreak`, `guardable`, `fire`. The air versions are derived from the ground ones again.
   - Example: `{ "poise": { "steadySeconds": 3 }, "attacks": { "axe_1": { "range": 2.6, "hitOn": [10, 16] } } }`
 - **Bad input:** a file that is not a JSON object is ignored whole; an unknown section or key, a wrong type, a fractional value where a whole number is needed, or a
-  value outside its range is skipped and the default stays. Each message goes to `TuningStore.Log` (Unity's warning log) once, however often it repeats.
+  value outside its range is skipped and the default stays. Inconsistent pairs reject the whole item (that attack, or that file's `targeting` section): `releaseRange` below `acquireRange`, `flickOff` above `flickOn`, a window with start after end, `cancelFrom` after `totalFrames`. Each message goes to `TuningStore.Log` (Unity's warning log) once, however often it repeats.
 - **Not covered yet:** enemy tables (`EnemyModel`, `EnemyRules`, `Core/Combat/Ai`, enemy attacks); another session owns them. `TuningStore.RegisterSection` is the
   hook for an `enemies` section (marked TODO in `TuningStore.cs`). Enemy attack ids in `attacks` are logged as unknown.
 - **Multiplayer:** host and clients must load the same files; nothing is replicated.
-- Tests: `TuningStoreTests` (defaults unchanged, override, bad JSON, invalid values, unknown key once, folder order).
+- Tests: `TuningStoreTests` (defaults unchanged, override, bad JSON, invalid values, ordered-pair rejections, integer-valued numbers, empty file, BOM, duplicate keys, unknown key once, folder order).
 
 ## Enemy polish: tells from the body, pacing (branch `m3-enemy-polish`, 2026-10-30)
 User notes after the retest: enemy attacks must read without ground indicators (wind-up pose, anticipation, sound, glint); retune the wave 4 to 5 step with

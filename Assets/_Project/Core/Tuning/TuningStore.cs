@@ -10,6 +10,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace SleepingCalamity.Core.Tuning
 {
@@ -34,7 +36,7 @@ namespace SleepingCalamity.Core.Tuning
 
     public static class TuningStore
     {
-        public delegate void SectionApply(Dictionary<string, object> body, string source);
+        public delegate void SectionApply(JObject body, string source);
 
         sealed class Section { public SectionApply Apply; public Action Reset; }
 
@@ -48,29 +50,47 @@ namespace SleepingCalamity.Core.Tuning
         {
             RegisterKnobSection("poise", PoiseTuning.Knobs());
             RegisterKnobSection("weaponGrowth", WeaponGrowthTuning.Knobs());
-            RegisterKnobSection("targeting", TargetingTuning.Knobs());
+            RegisterKnobSection("targeting", TargetingTuning.Knobs(), TargetingTuning.Validate);
             RegisterKnobSection("heroCombat", HeroCombatTuning.Knobs());
             RegisterSection("attacks", AttackTuning.Apply, AttackTuning.Reset);
         }
 
         public static void RegisterSection(string name, SectionApply apply, Action reset) => s_sections[name] = new Section { Apply = apply, Reset = reset };
 
-        static void RegisterKnobSection(string name, Knob[] knobs)
+        // validate (optional) checks ordered pairs on the values after a section is applied; it returns a message when they are inconsistent, and then the
+        // whole section from that file is rolled back (the earlier values stay).
+        static void RegisterKnobSection(string name, Knob[] knobs, Func<string> validate = null)
         {
             RegisterSection(name, (body, source) =>
             {
+                double[] before = new double[knobs.Length];
+                for (int i = 0; i < knobs.Length; i++) before[i] = knobs[i].Value;
                 foreach (var kv in body)
                 {
                     Knob k = Array.Find(knobs, x => string.Equals(x.Name, kv.Key, StringComparison.OrdinalIgnoreCase));
                     if (k == null) { Warn(source + ": unknown key '" + name + "." + kv.Key + "'"); continue; }
                     ApplyKnob(k, name + "." + kv.Key, kv.Value, source);
                 }
+                string problem = validate?.Invoke();
+                if (problem == null) return;
+                for (int i = 0; i < knobs.Length; i++) knobs[i].Set(before[i]);
+                Warn(source + ": section '" + name + "' ignored, " + problem);
             }, () => { foreach (var k in knobs) k.Restore(); });
         }
 
-        static bool ApplyKnob(Knob k, string path, object raw, string source)
+        // A JSON integer or decimal as a double. False for anything else (string, bool, null, object, array) and for NaN / Infinity.
+        public static bool TryNumber(JToken t, out double d)
         {
-            if (!(raw is double d) || double.IsNaN(d) || double.IsInfinity(d)) { Warn(source + ": '" + path + "' is not a number, keeping " + k.Value); return false; }
+            d = 0;
+            if (t == null || (t.Type != JTokenType.Integer && t.Type != JTokenType.Float)) return false;
+            try { d = t.Value<double>(); }
+            catch (Exception e) when (e is FormatException || e is InvalidCastException || e is OverflowException) { return false; }
+            return !double.IsNaN(d) && !double.IsInfinity(d);
+        }
+
+        static bool ApplyKnob(Knob k, string path, JToken raw, string source)
+        {
+            if (!TryNumber(raw, out double d)) { Warn(source + ": '" + path + "' is not a number, keeping " + k.Value); return false; }
             if (k.Integer && Math.Floor(d) != d) { Warn(source + ": '" + path + "' must be a whole number, keeping " + k.Value); return false; }
             if (d < k.Min || d > k.Max) { Warn(source + ": '" + path + "' = " + d + " is outside " + k.Min + ".." + k.Max + ", keeping " + k.Value); return false; }
             k.Set(d);
@@ -93,15 +113,20 @@ namespace SleepingCalamity.Core.Tuning
         // Applies one file's text. False when it is not a valid JSON object (nothing from it is applied).
         public static bool ApplyJson(string json, string source)
         {
-            object root;
-            try { root = MiniJson.Parse(json); }
-            catch (FormatException e) { Warn(source + ": not valid JSON (" + e.Message + "), ignored"); return false; }
-            var top = root as Dictionary<string, object>;
+            JToken root;
+            try
+            {
+                if (json != null) json = json.TrimStart('﻿');   // a BOM that survived decoding
+                // A repeated key in one object is an error (which of the two values was meant?), so the whole file is ignored.
+                root = JToken.Parse(json ?? "", new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            }
+            catch (JsonException e) { Warn(source + ": not valid JSON (" + e.Message + "), ignored"); return false; }
+            var top = root as JObject;
             if (top == null) { Warn(source + ": the top level must be a JSON object, ignored"); return false; }
             foreach (var kv in top)
             {
                 if (!s_sections.TryGetValue(kv.Key, out Section sec)) { Warn(source + ": unknown section '" + kv.Key + "'"); continue; }
-                var body = kv.Value as Dictionary<string, object>;
+                var body = kv.Value as JObject;
                 if (body == null) { Warn(source + ": section '" + kv.Key + "' must be an object"); continue; }
                 sec.Apply(body, source);
             }

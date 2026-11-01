@@ -123,6 +123,133 @@ namespace SleepingCalamity.Core.Tuning.Tests
         }
 
         [Test]
+        public void TargetingPairs_ReleaseBelowAcquire_RejectsTheWholeSection()
+        {
+            TuningStore.ApplyJson(@"{ ""targeting"": { ""softRange"": 9, ""acquireRange"": 12, ""releaseRange"": 11 } }", "p.json");
+            Assert.AreEqual(10f, TargetingConfig.AcquireRange);
+            Assert.AreEqual(13f, TargetingConfig.ReleaseRange);
+            Assert.AreEqual(6f, TargetingConfig.SoftRange);   // the valid key in the same section is rolled back too
+            Assert.AreEqual(1, _log.Count);
+            StringAssert.Contains("releaseRange", _log[0]);
+            // Lowering only acquireRange, or raising only releaseRange, is consistent with the defaults and applies.
+            TuningStore.ApplyJson(@"{ ""targeting"": { ""acquireRange"": 8 } }", "q.json");
+            Assert.AreEqual(8f, TargetingConfig.AcquireRange);
+            // Raising acquireRange past the (default) release range alone is rejected too.
+            TuningStore.ApplyJson(@"{ ""targeting"": { ""acquireRange"": 20 } }", "r.json");
+            Assert.AreEqual(8f, TargetingConfig.AcquireRange);
+        }
+
+        [Test]
+        public void TargetingPairs_FlickOffAboveOn_Rejected()
+        {
+            TuningStore.ApplyJson(@"{ ""targeting"": { ""flickOn"": 0.5, ""flickOff"": 0.6 } }", "f.json");
+            Assert.AreEqual(0.75f, TargetingConfig.FlickOn);
+            Assert.AreEqual(0.35f, TargetingConfig.FlickOff);
+            Assert.AreEqual(1, _log.Count);
+            StringAssert.Contains("flickOff", _log[0]);
+        }
+
+        [Test]
+        public void AttackPairs_WindowStartAfterEnd_RejectsTheAttack()
+        {
+            TuningStore.ApplyJson(@"{ ""attacks"": { ""axe_1"": { ""range"": 3.1, ""hitOn"": [18, 12] } } }", "w.json");
+            Combat.AttackData a = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1];
+            Assert.AreEqual(2.3f, a.Range, "the valid range in the same attack is not applied either");
+            Assert.AreEqual(11, a.HitOn.Start);
+            Assert.AreEqual(1, _log.Count);
+            StringAssert.Contains("hitOn", _log[0]);
+        }
+
+        [Test]
+        public void AttackPairs_CancelFromAfterTotalFrames_RejectsTheAttack()
+        {
+            TuningStore.ApplyJson(@"{ ""attacks"": { ""axe_1"": { ""totalFrames"": 20, ""cancelFrom"": 25 }, ""axe_2"": { ""range"": 2.9 } } }", "c.json");
+            Combat.AttackData a = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1];
+            Assert.AreEqual(34, a.TotalFrames);
+            Assert.AreEqual(1, _log.Count);
+            StringAssert.Contains("cancelFrom", _log[0]);
+            Assert.AreEqual(2.9f, Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit2].Range, "another attack in the file still applies");
+            // Shortening totalFrames below the existing cancelFrom is rejected as well.
+            TuningStore.ApplyJson(@"{ ""attacks"": { ""axe_1"": { ""totalFrames"": 1 } } }", "d.json");
+            Assert.AreEqual(34, Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1].TotalFrames);
+            Assert.AreEqual(2, _log.Count);
+        }
+
+        [Test]
+        public void AttackOverride_KeepsAirAttacksConsistent_ResetRestoresBoth()
+        {
+            Combat.AttackData groundBefore = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1];
+            Combat.AttackData airBefore = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.AirHit1];
+            TuningStore.ApplyJson(@"{ ""attacks"": { ""axe_1"": { ""totalFrames"": 40, ""multiplier"": 2 } } }", "a.json");
+            Combat.AttackData ground = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1];
+            Combat.AttackData air = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.AirHit1];
+            Assert.AreEqual(40, ground.TotalFrames);
+            Assert.AreEqual(40, air.TotalFrames);
+            Assert.AreEqual(2f, ground.Multiplier);
+            Assert.AreEqual(2f, air.Multiplier);
+            Assert.AreEqual(ground.Range, air.Range);
+
+            TuningStore.Reset();
+            Assert.AreEqual(groundBefore.TotalFrames, Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1].TotalFrames);
+            Assert.AreEqual(airBefore.TotalFrames, Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.AirHit1].TotalFrames);
+            Assert.AreEqual(groundBefore.Multiplier, Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1].Multiplier);
+            Assert.AreEqual(airBefore.Multiplier, Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.AirHit1].Multiplier);
+        }
+
+        [Test]
+        public void IntegerValuedNumbers_Apply()
+        {
+            TuningStore.ApplyJson(@"{ ""poise"": { ""steadySeconds"": 3 }, ""weaponGrowth"": { ""flatAtkFromLevel"": 7 },
+                ""targeting"": { ""softRange"": 8 },
+                ""attacks"": { ""axe_1"": { ""range"": 3, ""hitOn"": [12, 18], ""totalFrames"": 36 } } }", "i.json");
+            Assert.AreEqual(3f, Combat.PoiseMeter.SteadySeconds);
+            Assert.AreEqual(7, Weapons.WeaponGrowth.FlatAtkFromLevel);
+            Assert.AreEqual(8f, TargetingConfig.SoftRange);
+            Combat.AttackData a = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1];
+            Assert.AreEqual(3f, a.Range);
+            Assert.AreEqual(12, a.HitOn.Start);
+            Assert.AreEqual(36, a.TotalFrames);
+            Assert.AreEqual(0, _log.Count);
+        }
+
+        [Test]
+        public void EmptyFile_IsIgnoredWithoutThrowing()
+        {
+            Assert.DoesNotThrow(() => Assert.IsFalse(TuningStore.ApplyJson("", "empty.json")));
+            Assert.DoesNotThrow(() => Assert.IsFalse(TuningStore.ApplyJson("   \n", "blank.json")));
+            Assert.DoesNotThrow(() => Assert.IsFalse(TuningStore.ApplyJson(null, "null.json")));
+            Assert.AreEqual(2.0f, Combat.PoiseMeter.SteadySeconds);
+        }
+
+        [Test]
+        public void Utf8Bom_IsToleratedWithoutThrowing()
+        {
+            Directory.CreateDirectory(_dir);
+            File.WriteAllText(Path.Combine(_dir, "bom.json"), @"{ ""poise"": { ""steadySeconds"": 4 } }", new System.Text.UTF8Encoding(true));
+            Assert.DoesNotThrow(() => Assert.AreEqual(1, TuningStore.LoadFolders(_dir)));
+            Assert.AreEqual(4f, Combat.PoiseMeter.SteadySeconds);
+            // A BOM left in the string by a caller that decoded the bytes itself.
+            Assert.DoesNotThrow(() => TuningStore.ApplyJson("﻿" + @"{ ""poise"": { ""resetSeconds"": 2 } }", "bom2.json"));
+            Assert.AreEqual(2f, Combat.PoiseMeter.ResetSeconds);
+        }
+
+        [Test]
+        public void DuplicateKeys_IgnoreTheWholeFileWithoutThrowing()
+        {
+            Assert.DoesNotThrow(() => Assert.IsFalse(TuningStore.ApplyJson(@"{ ""poise"": { ""steadySeconds"": 3, ""steadySeconds"": 5 } }", "dup.json")));
+            Assert.AreEqual(2.0f, Combat.PoiseMeter.SteadySeconds);
+            Assert.AreEqual(1, _log.Count);
+        }
+
+        [Test]
+        public void MalformedJson_NeverThrows()
+        {
+            foreach (string bad in new[] { "{", "}", "{\"poise\":}", "{\"poise\":{\"steadySeconds\":1,}}x", "nul", "{'a':", "\0\0\0", "{} {}" })
+                Assert.DoesNotThrow(() => TuningStore.ApplyJson(bad, "m.json"), bad);
+            Assert.AreEqual(2.0f, Combat.PoiseMeter.SteadySeconds);
+        }
+
+        [Test]
         public void Folders_LaterFolderAndLaterFileWin_BadFileDoesNotBlockOthers()
         {
             string baseDir = Path.Combine(_dir, "base"), modDir = Path.Combine(_dir, "mod");
