@@ -391,6 +391,10 @@ namespace SleepingCalamity.Presentation
         public static float LastFogDensity { get; private set; }
         public static Color LastFogColor { get; private set; }
 
+        // Domain reload may be off: a stale fog from an earlier play session must not seed the next one.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetLastFog() { HasLastFog = false; LastFogDensity = 0f; LastFogColor = default; }
+
         // A kit piece standing on the floor at pos, turned by the wall-facing rotation plus a yaw jitter (degrees); null when the piece is missing.
         static GameObject PlaceAtWall(CellarFloorKit kit, string piece, Transform parent, string name, Vector3 pos, Quaternion facing, float yawJitter)
             => PlacePiece(kit, piece, parent, name, new Vector3(pos.x, 0f, pos.z), facing * Quaternion.Euler(0f, yawJitter, 0f), Vector3.one);

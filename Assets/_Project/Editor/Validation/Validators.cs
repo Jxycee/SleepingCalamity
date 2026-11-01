@@ -170,7 +170,7 @@ namespace SleepingCalamity.EditorTools
             {
                 MeshFilter filter = go.GetComponent<MeshFilter>();
                 // LookTestGeometry builds its mesh on enable and the scene stores none (so an inactive greybox, like Hollowmere's Rebuilt preset or the town view's hidden parts, reads null here).
-                if (filter != null && filter.sharedMesh == null && go.GetComponent<Presentation.LookTestGeometry>() == null) errors.Add(assetPath + ": " + HierarchyPath(go) + " MeshFilter has no mesh");
+                if (filter != null && filter.sharedMesh == null && !(go.GetComponent<Presentation.LookTestGeometry>() is Presentation.LookTestGeometry lookGeo && lookGeo.enabled)) errors.Add(assetPath + ": " + HierarchyPath(go) + " MeshFilter has no mesh");
                 foreach (MeshCollider collider in go.GetComponents<MeshCollider>())
                     if (collider.sharedMesh == null) errors.Add(assetPath + ": " + HierarchyPath(go) + " MeshCollider has no mesh");
                 SkinnedMeshRenderer skinned = go.GetComponent<SkinnedMeshRenderer>();

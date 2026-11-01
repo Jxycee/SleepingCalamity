@@ -58,6 +58,59 @@ namespace SleepingCalamity.Tests.PlayMode
             while (Time.realtimeSinceStartupAsDouble < until) yield return null;
         }
 
+        // At the end of every frame until `done`: the global look matches the area the camera is in (the camera is what is rendered), weights included. Fails on the first frame it does not.
+        private static IEnumerator WatchLook(System.Func<bool> done, string what)
+        {
+            double until = Time.realtimeSinceStartupAsDouble + Timeout;
+            while (true)
+            {
+                yield return new WaitForEndOfFrame();
+                AreaLook look = AreaLook.Current;
+                bool cellar = Camera.main.transform.position.y < look.CellarBelowY;
+                Assert.That(look.CurrentArea, Is.EqualTo(cellar ? AreaLook.Area.Cellar : AreaLook.Area.Town), "the look lags the camera (camera y " + Camera.main.transform.position.y + ")");
+                Assert.That(RenderSettings.skybox == null, Is.EqualTo(cellar), "the sky matches the area the camera is in");
+                Assert.That(look.CellarWeight, Is.EqualTo(cellar ? 1f : 0f).Within(0.001f), "the grade matches the area the camera is in");
+                Assert.That(look.TownWeight, Is.EqualTo(cellar ? 0f : 1f).Within(0.001f));
+                if (done()) yield break;
+                if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail(what);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator GoHome_AfterTheHeartBank_LandsAtTheStairTop_TownStockHoldsTheBankedPieces_BakerReceived()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            yield return PlayModeHarness.StartSoloAndWaitForPlayer(SceneNames.Hollowmere);
+            AppBootstrap app = AppBootstrap.Current;
+            NetworkObject hero = app.NetworkManager.LocalClient.PlayerObject;
+            Transform top = Find("StairTop");
+            yield return PlayModeHarness.WaitUntil(() => DiveDirector.Instance != null && DiveDirector.Instance.NetHubStair.Value != Vector3.zero, Timeout, "the hub never spawned the director");
+            DiveDirector director = DiveDirector.Instance;
+
+            director.SeedOverride = 777u;
+            Assert.That(director.ServerStartDive(4), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => director.FloorSync != null && director.FloorSync.Built != null && director.FloorSync.BuiltFloor == 4, Timeout, "floor 4 never built");
+            yield return PlayModeHarness.WaitUntil(() => hero.transform.position.y < AreaLook.Current.CellarBelowY, Timeout, "the hero never arrived under the town");
+            yield return Seconds(1f);   // the arrival teleports have landed before the test moves the hero
+
+            // Bank at the heart: the hero stands at the bank point (the go-home range check), a piece is in the haul.
+            Assert.That(CellarFloorBuilder.TryBankWorld(director.FloorSync.Layout, director.FloorSync.Built, out Vector3 bank), Is.True);
+            var cc = hero.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            hero.transform.position = bank + new Vector3(0.5f, 0.1f, 0f);
+            if (cc != null) cc.enabled = true;
+            Assert.That(director.HaulSync.ServerAddPiece(DiveHaul.PieceId(3, 0)), Is.True);
+            Assert.That(director.HaulSync.ServerBank(), Is.True, "floor 4 is a bank point");
+            yield return PlayModeHarness.WaitUntil(() => director.NetHeartBanked.Value, Timeout, "the heart bank never registered");
+
+            Assert.That(director.ServerTryGoHome(app.NetworkManager.LocalClientId), Is.True, "the party can go home after the heart bank");
+            yield return PlayModeHarness.WaitUntil(() => !director.NetActive.Value, Timeout, "go home never ended the dive");
+            yield return PlayModeHarness.WaitUntil(() => Flat(hero.transform.position, top.position) < 3f, Timeout, "the party never landed at the stair top");
+            Assert.That(hero.transform.position.y, Is.GreaterThan(AreaLook.Current.CellarBelowY));
+            Assert.That(director.Town.State.InStock(DiveHaul.PieceId(3, 0)), Is.True, "the banked piece is in the town stock");
+            Assert.That(director.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "the heart bank brought the baker home");
+        }
+
         [UnityTest]
         public IEnumerator Solo_StartsInTheTown_HubAtTheCisternStair_FailLandsAtTheStairTop_BankedPiecesReachTheTownStock_LookSeparatesByArea()
         {
@@ -95,9 +148,10 @@ namespace SleepingCalamity.Tests.PlayMode
             director.SeedOverride = 4242u;
             Assert.That(director.ServerStartDive(2), Is.True);
             yield return PlayModeHarness.WaitUntil(() => director.FloorSync != null && director.FloorSync.Built != null && director.FloorSync.BuiltFloor == 2, Timeout, "floor 2 never built");
-            yield return PlayModeHarness.WaitUntil(() => hero.transform.position.y < AreaLook.Current.CellarBelowY, Timeout, "the hero never arrived under the town");
-            yield return PlayModeHarness.WaitUntil(() => AreaLook.Current.CurrentArea == AreaLook.Area.Cellar, Timeout, "the look never switched to the cellar");
-            yield return Seconds(1f);   // the volume blend (0.4 s) finishes
+            // The look is right on every rendered frame of the teleport (checked at the end of each frame, once the camera is down there too).
+            yield return WatchLook(() => hero.transform.position.y < AreaLook.Current.CellarBelowY && Camera.main.transform.position.y < AreaLook.Current.CellarBelowY, "the hero and camera never arrived under the town");
+            Assert.That(AreaLook.Current.CurrentArea, Is.EqualTo(AreaLook.Area.Cellar), "the look is already the cellar's on the first frame the camera is down there");
+            yield return Seconds(0.2f);
 
             // In the cellar: none of the town's look is on.
             Assert.That(RenderSettings.skybox, Is.Null, "no town sky in the cellar");
@@ -111,10 +165,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(director.HaulSync.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
             Assert.That(director.HaulSync.ServerBank(), Is.True, "floor 2 is a bank point");
             Assert.That(director.ServerAbandonDive(), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => AreaLook.Current.CurrentArea == AreaLook.Area.Town, Timeout, "the look never came back to the town");
-            yield return PlayModeHarness.WaitUntil(() => Flat(hero.transform.position, top.position) < 3f, Timeout, "the party never landed at the stair top");
+            yield return WatchLook(() => Flat(hero.transform.position, top.position) < 3f && Camera.main.transform.position.y > AreaLook.Current.CellarBelowY, "the party never landed at the stair top");
+            Assert.That(AreaLook.Current.CurrentArea, Is.EqualTo(AreaLook.Area.Town), "the look is already the town's on the first frame the camera is back up");
             Assert.That(hero.transform.position.y, Is.GreaterThan(AreaLook.Current.CellarBelowY));
-            yield return Seconds(1f);
+            yield return Seconds(0.2f);
 
             // Back in the town: the town's look, exactly (the floor build wrote the cellar fog into the global settings meanwhile).
             Assert.That(RenderSettings.skybox, Is.EqualTo(townSky));

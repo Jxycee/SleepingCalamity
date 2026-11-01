@@ -2,7 +2,7 @@
 // built far under it in the same scene, so the town's grade, fog, sky, ambient and sun must not reach the cellar and the cellar's fog must not reach the town. Fog, ambient, skybox,
 // reflection mode and the sun are GLOBAL render state (a local post volume cannot carry them), so this switcher owns all of it: it watches the local camera's height, and below
 // CellarBelowY it is in the Cellar area, else the Town area. Per area it sets
-//   - the two global post volumes' weights (town profile 1/0, cellar DungeonCorner profile 0/1, blended over BlendSeconds, so a profile never bleeds through an overlay),
+//   - the two global post volumes' weights (town profile 1/0, cellar DungeonCorner profile 0/1, snapped at once on an area change, so a profile never bleeds through an overlay),
 //   - the town's directional lights and town-only atmosphere roots (off in the cellar), the camera clear (solid dark in the cellar),
 //   - RenderSettings: skybox, ambient trilight and intensity, reflection mode and fog (the town's are snapshotted from the scene at Awake; the cellar's fog is the last floor build's
 //     CellarFloorBuilder.LastFog, which the build writes into RenderSettings at once, even while the viewer is still in the town: the Town area re-asserts its own fog every frame).
@@ -12,6 +12,7 @@ using UnityEngine.Rendering;
 
 namespace SleepingCalamity.Presentation
 {
+    [DefaultExecutionOrder(1000)]   // after CinemachineBrain (200)
     public sealed class AreaLook : MonoBehaviour
     {
         public enum Area : byte { Town = 0, Cellar = 1 }
@@ -20,7 +21,7 @@ namespace SleepingCalamity.Presentation
         public Light[] TownLights = new Light[0];          // the town's sun and shade fill
         public GameObject[] TownOnly = new GameObject[0];  // town-only atmosphere roots (pollen, god-ray shafts)
         public float CellarBelowY = -60f;                  // a viewer lower than this is in the cellar
-        public float BlendSeconds = 0.4f;
+        public float BlendSeconds = 0.4f;                  // unused: weights snap on an area change (kept so the stored scene value stays valid)
         public Transform ObserverOverride;                 // tests: stands in for the main camera
 
         public static AreaLook Current { get; private set; }
@@ -61,7 +62,9 @@ namespace SleepingCalamity.Presentation
             _snap = true;
         }
 
-        private void Update()
+        // LateUpdate with a late execution order: the Cinemachine brain moves the camera in its own LateUpdate, so reading the camera any earlier sees last frame's position and the
+        // teleport frame would render with the old area's sky, sun, fog and grade. Running after the brain, the look is right on the first rendered frame.
+        private void LateUpdate()
         {
             if (!_snap) Snapshot();
             Transform observer = ObserverOverride;
@@ -74,7 +77,6 @@ namespace SleepingCalamity.Presentation
             else if (_first) Apply(Area.Town);
             _first = false;
             if (CurrentArea == Area.Town) HoldTownFog();   // a floor build may have written the cellar fog while the viewer is still up here
-            BlendVolumes();
         }
 
         private void HoldTownFog()
@@ -107,7 +109,9 @@ namespace SleepingCalamity.Presentation
             foreach (Light l in TownLights) if (l != null) l.enabled = town;
             foreach (GameObject g in TownOnly) if (g != null) g.SetActive(town);
             SetCameraClear(town);
-            if (_first) { if (TownVolume != null) TownVolume.weight = town ? 1f : 0f; if (CellarVolume != null) CellarVolume.weight = town ? 0f : 1f; }
+            // The grade snaps with the area (a teleport is a cut, so a blend would show the old area's grade for a moment).
+            if (TownVolume != null) TownVolume.weight = town ? 1f : 0f;
+            if (CellarVolume != null) CellarVolume.weight = town ? 0f : 1f;
             DynamicGI.UpdateEnvironment();
         }
 
@@ -122,14 +126,6 @@ namespace SleepingCalamity.Presentation
             }
             if (_clearCamera == null) { _clearCamera = cam; _clearFlags = cam.clearFlags; _background = cam.backgroundColor; }
             cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.02f, 0.015f, 0.012f);
-        }
-
-        private void BlendVolumes()
-        {
-            float step = BlendSeconds > 0f ? Time.unscaledDeltaTime / BlendSeconds : 1f;
-            bool town = CurrentArea == Area.Town;
-            if (TownVolume != null) TownVolume.weight = Mathf.MoveTowards(TownVolume.weight, town ? 1f : 0f, step);
-            if (CellarVolume != null) CellarVolume.weight = Mathf.MoveTowards(CellarVolume.weight, town ? 0f : 1f, step);
         }
     }
 }

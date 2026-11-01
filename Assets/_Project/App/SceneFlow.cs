@@ -38,7 +38,8 @@ namespace SleepingCalamity.App
         // The scene the first start loads (M6 S3: the town). Precedence: -dev-dive, -dev-combat, the test override, Hollowmere.
         public string FirstGameplayScene => DevDiveArena ? SceneNames.ArenaDive : DevCombatArena ? SceneNames.ArenaCombat : (StartSceneOverride ?? SceneNames.Hollowmere);
 
-        // Tests only: the scene a start loads when no dev flag is set (the PlayMode harness pins the greybox arena so most tests stay fast). Null = the real default, Hollowmere.
+        // Tests only: the scene a start loads when no dev flag is set (the PlayMode harness pins the greybox arena so most tests stay fast; a Hollowmere test passes SceneNames.Hollowmere
+        // to StartSoloAndWaitForPlayer, which clears the override). Null = the real default, Hollowmere.
         public static string StartSceneOverride { get; set; }
 
         // Dev only (-dev-combat, the editor menu, the dev panel toggle): start in the M3 combat arena. Off by default, so every test and normal start

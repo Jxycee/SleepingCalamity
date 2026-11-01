@@ -50,7 +50,8 @@ namespace SleepingCalamity.EditorTools
             var entrance = new GameObject("DiveEntrance"); entrance.transform.SetParent(hub, false);
             entrance.transform.position = new Vector3(HollowmereLayout.UndercroftStair.X, home.Y, HollowmereLayout.UndercroftStair.Z);
             var landing = new GameObject("StairTop"); landing.transform.SetParent(hub, false);
-            landing.transform.position = entrance.transform.position + new Vector3(-1.2f, 0.1f, -1.6f);
+            Vector3 landXZ = entrance.transform.position + new Vector3(-1.2f, 0f, -1.6f);
+            landing.transform.position = new Vector3(landXZ.x, LandingY(t, landXZ, home.Y), landXZ.z);
             var origin = new GameObject("DiveOrigin"); origin.transform.SetParent(hub, false);
             origin.transform.position = HubOrigin;
             var diveHub = new GameObject("DiveHub"); diveHub.transform.SetParent(hub, false);
@@ -69,6 +70,15 @@ namespace SleepingCalamity.EditorTools
             look.TownOnly = shafts != null ? new[] { shafts } : new GameObject[0];
 
             BuildTownView(root, t);
+        }
+
+        // The stair top stands on whatever is really there (floor, step or terrain): a ground raycast from above, falling back to the layout ground, then the house floor.
+        static float LandingY(TownLayout t, Vector3 xz, float homeY)
+        {
+            Physics.SyncTransforms();
+            if (Physics.Raycast(new Vector3(xz.x, homeY + 6f, xz.z), Vector3.down, out RaycastHit hit, 40f, ~0, QueryTriggerInteraction.Ignore)) return hit.point.y + 0.1f;
+            float g = Ground(t, xz.x, xz.z);
+            return (float.IsNaN(g) ? homeY : g) + 0.1f;
         }
 
         static float Ground(TownLayout t, float x, float z) => HollowmereLayout.Ground(t, x, z);
