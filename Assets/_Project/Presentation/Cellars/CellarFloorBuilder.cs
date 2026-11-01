@@ -123,7 +123,8 @@ namespace SleepingCalamity.Presentation
             if (layout == null) throw new System.ArgumentNullException(nameof(layout));
             kit = kit ?? new CellarFloorKit();
             var root = new GameObject("CellarFloor_s" + layout.Seed + "_f" + layout.Floor).transform;
-            root.SetParent(parent, false);
+            // Every part is placed by WORLD position (CellCenter), so the root is built unparented at the world origin (world == root-local) and moved under `parent` at the end:
+            // the whole floor then sits at parent.TransformPoint(CellCenter), wherever the parent is, and root.TransformPoint(CellCenter) is where each cell really is.
             var result = new CellarFloorBuild { Root = root };
             var grid = new Grid(layout);
             var mats = new Mats(kit);
@@ -203,6 +204,12 @@ namespace SleepingCalamity.Presentation
             Dress(layout, dressing, grid, root, kit, mats, result);
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
             Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
+            root.SetParent(parent, false);
+            if (parent != null)
+            {
+                result.Bounds = new Bounds(root.TransformPoint(result.Bounds.center), result.Bounds.size);
+                result.EntryCenter = root.TransformPoint(result.EntryCenter);
+            }
             return result;
         }
 

@@ -33,6 +33,20 @@ namespace SleepingCalamity.Core
             return true;
         }
 
+        // An enemy left without dying (wipe, clear, despawn): it counts neither as alive nor as a kill and never clears the room.
+        public void Despawned(int room)
+        {
+            if (room < 0 || room >= 64 || Alive(room) <= 0) return;
+            _alive[room] = Alive(room) - 1; _spawned[room] = System.Math.Max(0, Spawned(room) - 1);
+        }
+
+        // Forget one room (its enemies were all removed without being killed): it can be spawned and cleared afresh.
+        public void ResetRoom(int room)
+        {
+            if (room < 0 || room >= 64) return;
+            _spawned.Remove(room); _alive.Remove(room); _cleared &= ~(1UL << room);
+        }
+
         public void Reset() { _spawned.Clear(); _alive.Clear(); _cleared = 0; }
     }
 

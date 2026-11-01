@@ -4,6 +4,8 @@
 // Catches: enemies not spawning on first room entry / not appearing on the client, a room not clearing, a chest opening out of range or twice, a client not seeing the mask, loot
 // not reaching the haul, the carrier not dropping the gate key, the pickup not unlocking the exit on every peer, the door staying shut with the key held, pieces not reaching
 // the haul or not reappearing after a failed dive.
+// Also: a party wipe (CombatHost.ServerClearEnemies) drops no key and clears no room, and the room respawns on re-entry; a floor built under a root at (200,0,0) has chests, pieces
+// and room spawns where the host checks them; a player still at its pre-floor-change position is ignored until it has moved.
 // NOT covered: the real Interact input path (rising edge of the local hero's intent), real player-object positions, three or more clients.
 using System.Collections;
 using System.Collections.Generic;
@@ -51,9 +53,9 @@ namespace SleepingCalamity.Tests.PlayMode
             return null;
         }
 
-        private static T Spawn<T>(NetworkManager host) where T : Component
+        private static T Spawn<T>(NetworkManager host, Vector3 at = default) where T : Component
         {
-            NetworkObject o = host.SpawnManager.InstantiateAndSpawn(PrefabWith<T>(host).GetComponent<NetworkObject>(), host.LocalClientId, false, false, false, Vector3.zero, Quaternion.identity);
+            NetworkObject o = host.SpawnManager.InstantiateAndSpawn(PrefabWith<T>(host).GetComponent<NetworkObject>(), host.LocalClientId, false, false, false, at, Quaternion.identity);
             return o.GetComponent<T>();
         }
 
@@ -68,7 +70,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
         }
 
-        private IEnumerator Setup(System.Action<Ctx> done)
+        private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default)
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
@@ -81,7 +83,7 @@ namespace SleepingCalamity.Tests.PlayMode
             cts.Dispose();
             yield return PlayModeHarness.WaitUntil(() => client.NetworkManager.IsConnectedClient, Timeout, "client never connected");
 
-            c.Floor = Spawn<CellarFloorSync>(c.HostNm); c.Haul = Spawn<DiveHaulSync>(c.HostNm); c.Contents = Spawn<CellarContentsSync>(c.HostNm);
+            c.Floor = Spawn<CellarFloorSync>(c.HostNm, floorOrigin); c.Haul = Spawn<DiveHaulSync>(c.HostNm); c.Contents = Spawn<CellarContentsSync>(c.HostNm);
             ulong id = c.Contents.NetworkObjectId;
             yield return PlayModeHarness.WaitUntil(() => client.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "client never received the contents object");
             c.Peer = client.NetworkManager.SpawnManager.SpawnedObjects[id].GetComponent<CellarContentsSync>();
@@ -189,7 +191,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.ExitUnlocked, Timeout, "picking the key up did not unlock the exit");
             Assert.That(unlockedFloor, Is.EqualTo(1));
             Assert.That(c.Peer.State.GateKey, Is.EqualTo((byte)2));
-            Assert.That(c.Haul.HostState.Haul.LootUnbanked(CellarLoot.GateKeyId), Is.EqualTo(1));
+            Assert.That(c.Haul.HostState.Haul.LootUnbanked(CellarLoot.GateKeyId), Is.EqualTo(0), "keys are not loot");
             yield return PlayModeHarness.WaitUntil(() => !c.Peer.GateKeyMarkerShown, Timeout, "the key marker stayed");
 
             // the locked door
@@ -205,13 +207,109 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Players[c.ClientId] = keyAt + new Vector3(1.0f, 0f, 0f);
             c.Peer.RequestOpenChest(c.Layout.KeyChestIndex);
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.RoomKeyHeld, Timeout, "the key chest gave no room key");
-            Assert.That(c.Haul.HostState.Haul.LootUnbanked(CellarLoot.RoomKeyId), Is.EqualTo(1));
+            Assert.That(c.Haul.HostState.Haul.LootUnbanked(CellarLoot.RoomKeyId), Is.EqualTo(0), "keys are not loot");
+            Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(0), "the key chest adds nothing to the haul");
             Assert.That(c.Peer.State.DoorOpen, Is.False);
 
             c.Players[c.ClientId] = gate + new Vector3(1.0f, 0f, 0f);
             c.Peer.RequestOpenDoor();
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.DoorOpen, Timeout, "the door never opened");
             yield return PlayModeHarness.WaitUntil(() => !c.Peer.GateBlocking && !c.Contents.GateBlocking, Timeout, "the gate stayed solid");
+        }
+
+        [UnityTest]
+        public IEnumerator PartyWipe_ClearEnemies_DropsNoKey_DoesNotClearTheRoom_AndTheRoomRespawnsOnReentry()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            GateKeyCarrier car = c.Layout.Carrier; int room = car.RoomIndex;
+            int expected = CellarEncounterPlan.Build(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
+            c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected && c.Contents.GateKeyCarrierEnemy != null, Timeout, "the room's enemies were not spawned");
+
+            CombatHost.Current.ServerClearEnemies();   // what a party wipe does
+            yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.HostNm).Count == 0 || c.Contents.GateKeyCarrierEnemy == null, Timeout, "the wipe did not despawn the enemies");
+            Assert.That(c.Contents.State.GateKey, Is.EqualTo((byte)0), "a wipe is not a kill: no gate key");
+            Assert.That(c.Contents.State.Cleared & (1UL << room), Is.EqualTo(0UL), "a wiped room is not cleared");
+
+            // the player is still standing in the room: it spawns afresh
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected && c.Contents.AliveInRoom(room) == expected, Timeout, "the room did not respawn after the wipe");
+            yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.HostNm).Count >= expected, Timeout, "no enemies after the respawn");
+            Assert.That(c.Contents.State.GateKey, Is.EqualTo((byte)0));
+            Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(0));
+        }
+
+        [UnityTest]
+        public IEnumerator FloorUnderARootAt200_ChestsPiecesAndRoomSpawnsAreWhereTheHostChecks()
+        {
+            var origin = new Vector3(200f, 0f, 0f);
+            Ctx c = null; yield return Setup(x => c = x, origin);
+            Transform root = c.Floor.Built.Root;
+            Assert.That(root.position.x, Is.EqualTo(200f).Within(0.01f), "the floor root sits at the sync object");
+            Bounds b = c.Floor.Built.Bounds;
+            Assert.That(b.center.x, Is.GreaterThan(190f), "Built.Bounds is in world space");
+
+            // chest: visual at TransformPoint(local); opening works from 1 m away and not from 30 m
+            int idx = -1; for (int i = 0; i < c.Layout.Chests.Count; i++) if (!c.Layout.Chests[i].HoldsKey) { idx = i; break; }
+            FloorChest fc = c.Layout.Chests[idx];
+            Vector3 expectChest = root.TransformPoint(CellarFloorBuilder.CellCenter(fc.X, fc.Y));
+            Assert.That(c.Contents.TryChestPosition(idx, out Vector3 at), Is.True);
+            Assert.That(Mathf.Abs(at.x - expectChest.x), Is.LessThan(0.05f)); Assert.That(Mathf.Abs(at.z - expectChest.z), Is.LessThan(0.05f));
+            c.Players[c.ClientId] = at + new Vector3(30f, 0f, 0f);
+            int handled = c.Contents.ChestRequestsHandled;
+            c.Peer.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.ChestRequestsHandled > handled, Timeout, "request not handled");
+            Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL));
+            c.Players[c.ClientId] = at + new Vector3(1f, 0f, 0f);
+            c.Peer.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Chests & (1UL << idx)) != 0, Timeout, "the chest did not open at x=200");
+
+            // piece: the sphere sits inside the floor's bounds and stepping on it collects it
+            Assert.That(c.Peer.TryPiecePosition(0, out Vector3 piece), Is.True);
+            Assert.That(piece.x, Is.InRange(b.min.x - 1f, b.max.x + 1f)); Assert.That(piece.z, Is.InRange(b.min.z - 1f, b.max.z + 1f));
+            c.Players[c.HostId] = piece;
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.LeftFloor1 == 1, Timeout, "the piece at x=200 was not collected");
+
+            // room spawns land on their cell
+            GateKeyCarrier car = c.Layout.Carrier;
+            Vector3 carCell = Cell(c, car.X, car.Y);
+            c.Players[c.HostId] = carCell + Vector3.forward * 0.1f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.GateKeyCarrierEnemy != null, Timeout, "no carrier enemy at x=200");
+            Vector3 ep = c.Contents.GateKeyCarrierEnemy.transform.position;
+            Assert.That(Mathf.Sqrt((ep.x - carCell.x) * (ep.x - carCell.x) + (ep.z - carCell.z) * (ep.z - carCell.z)), Is.LessThan(3f), "the carrier spawned at its cell under the offset root");
+        }
+
+        [UnityTest]
+        public IEnumerator StalePlayerPosition_IsIgnoredUntilThePlayerHasMoved()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            c.Contents.AutoArm = false;
+            Assert.That(c.Peer.TryPiecePosition(0, out Vector3 piece), Is.True);
+            GateKeyCarrier car = c.Layout.Carrier;
+            // a point inside the floor, more than 3 m from the piece
+            Vector3[] cands = { Cell(c, car.X, car.Y), c.Floor.Built.EntryCenter, c.Peer.TryChestPosition(0, out Vector3 ch) ? ch : piece };
+            Vector3 elsewhere = default; bool found = false;
+            foreach (Vector3 v in cands) if (new Vector2(v.x - piece.x, v.z - piece.z).magnitude > 5f) { elsewhere = v; found = true; break; }
+            Assert.That(found, Is.True, "a second spot on the floor");
+
+            // the host "sees" the player standing on the piece when the floor is armed (the teleport has not landed yet)
+            c.Players[c.HostId] = piece;
+            Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True);
+            yield return new WaitForSeconds(0.6f);
+            Assert.That(c.Haul.Current.LeftFloor1, Is.EqualTo(2), "a stale position collects nothing");
+            Assert.That(c.Contents.EnterEnemyCount(car.RoomIndex), Is.EqualTo(0));
+
+            // the teleport lands: the player moves, then steps on the piece
+            c.Players[c.HostId] = elsewhere;
+            yield return new WaitForSeconds(0.3f);
+            c.Players[c.HostId] = piece;
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.LeftFloor1 == 1, Timeout, "after moving, the piece is collected");
+
+            // a player outside the floor never counts, even when far from the recorded position
+            c.Players.Clear();
+            Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True);
+            c.Players[c.ClientId] = c.Floor.Built.Bounds.center + new Vector3(500f, 0f, 0f);
+            yield return new WaitForSeconds(0.4f);
+            Assert.That(c.Contents.EnterEnemyCount(car.RoomIndex), Is.EqualTo(0));
         }
 
         [UnityTest]

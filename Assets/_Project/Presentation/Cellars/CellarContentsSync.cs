@@ -8,11 +8,13 @@
 // Host logic (Update, host only): (1) floor change or DiveFailed resets per-floor state and despawns the floor's enemies; (2) a player stepping into a Combat room for the
 // first time spawns that room's CellarEncounterPlan spawns (DiveHaulSync.EncounterPlan, extras at that moment included) through CombatHost.SpawnEnemy: Tier1 = floor-banded
 // Slime/Broom/RatKing (CellarEnemyMix), Tier2 = RatKing tier 2, the bakery's WardenCell = DoughWarden; (3) when the plan's Hunter appears one tier-2 RatKing spawns at its cell;
-// (4) the enemy spawned for layout.Carrier drops the GATE key where it falls: a player within GateKeyRange picks it up (ServerAddLoot GateKeyId) and ExitUnlocked is raised;
+// (4) the enemy spawned for layout.Carrier drops the GATE key where it falls (only on death: a wipe/clear despawn drops nothing, resets the room and it respawns on re-entry): a player within GateKeyRange picks it up and ExitUnlocked is raised; keys live only in this state (GateKey, RoomKeyHeld), never in the haul's loot;
 // (5) pieces: a player within PieceRange of an uncollected piece spot adds it to the haul (ServerAddPiece), the collected mask follows the haul every frame so a failed
 // dive shows the pieces again; (6) the room key (key chest) lets the host open the locked gate, by Interact or by walking up to it.
 // Spine hooks: subscribe to the host event ExitUnlocked(int floor) (fired once per floor when the gate key is picked up; State.ExitUnlocked stays true on every peer until the
 // floor changes) to open the stair. Room clearing is kept here (ClearedRooms mask): DiveHaulSync.ServerMarkCleared marks a whole FLOOR cleared and is not called from here.
+// Players are ignored for room entry and piece pickup until they are inside the armed floor's bounds and have moved over StaleMoveDistance from where they stood at arm time
+// (the owner teleport after a floor change may not have landed yet).
 // Known limits: players come from NetworkManager.ConnectedClients player objects (PlayersOverride replaces that in tests); enemies of a room whose stir extras latch after
 // entry are not topped up; the greybox CombatHost this creates (when the scene has none) runs with waves off.
 using System.Collections.Generic;
@@ -26,6 +28,7 @@ namespace SleepingCalamity.Presentation
 {
     public sealed class CellarContentsSync : NetworkBehaviour
     {
+        public const float StaleMoveDistance = 3f;
         public const float ChestRange = 2.5f, GateRange = 3f, GateKeyRange = 1.5f, PieceRange = 1.2f;
 
         public struct PlayerPos { public ulong ClientId; public Vector3 Position; }
@@ -34,15 +37,16 @@ namespace SleepingCalamity.Presentation
         {
             public uint Seed; public int Floor;
             public ulong Chests, Pieces, Cleared;
+            public int PieceCount;      // pieces assigned to this floor by the haul (host-set at arm time; peers place that many spots)
             public bool RoomKeyHeld, DoorOpen, ExitUnlocked;
             public byte GateKey;        // 0 none yet, 1 lying at GateKeyPos, 2 taken
             public Vector3 GateKeyPos;
             public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
             {
-                s.SerializeValue(ref Seed); s.SerializeValue(ref Floor); s.SerializeValue(ref Chests); s.SerializeValue(ref Pieces); s.SerializeValue(ref Cleared);
+                s.SerializeValue(ref Seed); s.SerializeValue(ref Floor); s.SerializeValue(ref Chests); s.SerializeValue(ref Pieces); s.SerializeValue(ref Cleared); s.SerializeValue(ref PieceCount);
                 s.SerializeValue(ref RoomKeyHeld); s.SerializeValue(ref DoorOpen); s.SerializeValue(ref ExitUnlocked); s.SerializeValue(ref GateKey); s.SerializeValue(ref GateKeyPos);
             }
-            public bool Equals(ContentsState o) => Seed == o.Seed && Floor == o.Floor && Chests == o.Chests && Pieces == o.Pieces && Cleared == o.Cleared
+            public bool Equals(ContentsState o) => Seed == o.Seed && Floor == o.Floor && Chests == o.Chests && Pieces == o.Pieces && Cleared == o.Cleared && PieceCount == o.PieceCount
                 && RoomKeyHeld == o.RoomKeyHeld && DoorOpen == o.DoorOpen && ExitUnlocked == o.ExitUnlocked && GateKey == o.GateKey && GateKeyPos == o.GateKeyPos;
             public override bool Equals(object obj) => obj is ContentsState o && Equals(o);
             public override int GetHashCode() => unchecked((int)Chests * 31 + (int)Pieces * 7 + Floor);
@@ -91,14 +95,22 @@ namespace SleepingCalamity.Presentation
         private int _hostBuild = -1; private bool _resetRequested;
         private DiveHaulSync _subscribedHaul;
         private readonly List<PlayerPos> _players = new List<PlayerPos>();
+        private readonly Dictionary<ulong, Vector3> _armPos = new Dictionary<ulong, Vector3>();   // host: where each player stood when the floor was armed
+        private readonly HashSet<ulong> _live = new HashSet<ulong>();                              // host: players seen inside the floor after moving away from _armPos
+        private Bounds _armBounds; private bool _hasBounds;
+        private int _handledPieces = -2;
 
         public override void OnNetworkSpawn() { _handledBuild = -1; _hostBuild = -1; }
 
         public override void OnNetworkDespawn()
         {
             if (_subscribedHaul != null) { _subscribedHaul.DiveFailed -= OnDiveFailed; _subscribedHaul = null; }
-            UntrackAll();
-            if (_ownsCombat && _combat != null) Destroy(_combat.gameObject);
+            UntrackAll();   // unhooked first, so clearing the enemies below is not read as a wipe
+            if (_ownsCombat && _combat != null)
+            {
+                if (NetworkManager != null && NetworkManager.IsServer) _combat.ServerClearEnemies();
+                Destroy(_combat.gameObject);
+            }
             _combat = null; _ownsCombat = false;
             DestroyHandles();
         }
@@ -106,7 +118,7 @@ namespace SleepingCalamity.Presentation
         private void DestroyHandles()
         {
             if (_gateKeyMarker != null) Destroy(_gateKeyMarker);
-            _gateKeyMarker = null; _chests = new Transform[0]; _gate = null; _pieces = new GameObject[0]; _pieceSpots = new CellPos[0]; _handledBuild = -1;
+            _gateKeyMarker = null; _chests = new Transform[0]; _gate = null; _pieces = new GameObject[0]; _pieceSpots = new CellPos[0]; _handledBuild = -1; _handledPieces = -2;
         }
 
         private void OnDiveFailed() { _resetRequested = true; }
@@ -138,21 +150,34 @@ namespace SleepingCalamity.Presentation
         private void RefreshHandles(CellarFloorSync fs)
         {
             int key = fs.Built == null ? 0 : fs.BuildCount;
-            if (key == _handledBuild) return;
+            if (key != _handledBuild)
+            {
+                DestroyPieceMarkers();
+                _handledBuild = key; _handledPieces = -2;
+                if (fs.Built == null || fs.Layout == null) { _chests = new Transform[0]; _gate = null; return; }
+                CellarFloorLayout l = fs.Layout;
+                _chests = new Transform[l.Chests.Count];
+                for (int i = 0; i < l.Chests.Count; i++) _chests[i] = CellarFloorBuilder.FindChest(fs.Built.Root, l.Chests[i]);
+                _gate = CellarFloorBuilder.FindGate(fs.Built.Root);
+            }
+            if (fs.Built == null || fs.Layout == null) return;
+            // the piece count comes from the haul via the host state; wait until the state of THIS floor has arrived
+            ContentsState s = IsServer ? _st : Net.Value;
+            int want = StateMatches(fs, s) ? s.PieceCount : -1;
+            if (want == _handledPieces || want < 0) return;
             DestroyPieceMarkers();
-            _handledBuild = key;
-            if (fs.Built == null || fs.Layout == null) { _chests = new Transform[0]; _gate = null; return; }
-            CellarFloorLayout l = fs.Layout;
-            _chests = new Transform[l.Chests.Count];
-            for (int i = 0; i < l.Chests.Count; i++) _chests[i] = CellarFloorBuilder.FindChest(fs.Built.Root, l.Chests[i]);
-            _gate = CellarFloorBuilder.FindGate(fs.Built.Root);
-            int count = l.Floor >= 1 && l.Floor <= DiveHaul.PieceFloors ? DiveHaulSync.DefaultPiecesPerFloor[l.Floor - 1] : 0;
-            var spots = CellarPieceSpots.Choose(l, fs.Built.Dressing, count);
+            _handledPieces = want;
+            var spots = CellarPieceSpots.Choose(fs.Layout, fs.Built.Dressing, want);
+            if (spots.Count < want) Debug.LogWarning("CellarContentsSync: floor " + fs.Layout.Floor + " has room for " + spots.Count + " of " + want + " pieces; the rest cannot be collected.");
             _pieceSpots = new CellPos[spots.Count]; for (int i = 0; i < spots.Count; i++) _pieceSpots[i] = spots[i];
             _pieces = CellarFloorBuilder.BuildPieces(fs.Built.Root, spots);
         }
 
-        private void DestroyPieceMarkers() { _pieces = new GameObject[0]; _pieceSpots = new CellPos[0]; }   // they are children of the floor root, destroyed with it
+        private void DestroyPieceMarkers()
+        {
+            foreach (GameObject g in _pieces) if (g != null) Destroy(g);
+            _pieces = new GameObject[0]; _pieceSpots = new CellPos[0];
+        }
 
         private bool StateMatches(CellarFloorSync fs, in ContentsState s) => fs.Built != null && s.Floor == fs.BuiltFloor && s.Seed == fs.BuiltSeed;
 
@@ -220,7 +245,26 @@ namespace SleepingCalamity.Presentation
         private void CollectPlayers()
         {
             _players.Clear();
-            if (PlayersOverride != null) { PlayersOverride(_players); return; }
+            if (PlayersOverride != null) PlayersOverride(_players);
+            else CollectFromNetwork();
+            FilterStale();
+        }
+
+        // Drops players the host cannot trust yet: still at their pre-floor-change position, or outside the armed floor.
+        private void FilterStale()
+        {
+            for (int i = _players.Count - 1; i >= 0; i--)
+            {
+                PlayerPos p = _players[i];
+                if (_live.Contains(p.ClientId)) continue;
+                bool inside = !_hasBounds || (p.Position.x >= _armBounds.min.x && p.Position.x <= _armBounds.max.x && p.Position.z >= _armBounds.min.z && p.Position.z <= _armBounds.max.z);
+                bool moved = !_armPos.TryGetValue(p.ClientId, out Vector3 was) || FlatSqr(p.Position, was) > StaleMoveDistance * StaleMoveDistance;
+                if (inside && moved) _live.Add(p.ClientId); else _players.RemoveAt(i);
+            }
+        }
+
+        private void CollectFromNetwork()
+        {
             foreach (KeyValuePair<ulong, NetworkClient> kv in NetworkManager.ConnectedClients)
             {
                 NetworkObject po = kv.Value.PlayerObject;
@@ -272,7 +316,13 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || layout == null || floorRoot == null) return false;
             ServerClearFloor();
             _layout = layout; _root = floorRoot; _dressing = CellarFloorDressing.Resolve(layout);
-            _st = new ContentsState { Seed = layout.Seed, Floor = layout.Floor };
+            _st = new ContentsState { Seed = layout.Seed, Floor = layout.Floor, PieceCount = PiecesForFloor(layout.Floor) };
+            _armPos.Clear(); _live.Clear(); _hasBounds = false;
+            CellarFloorSync afs = FloorSync;
+            if (afs != null && afs.Built != null && afs.Built.Root == floorRoot) { _armBounds = afs.Built.Bounds; _armBounds.Expand(new Vector3(2f, 0f, 2f)); _hasBounds = true; }
+            _players.Clear();
+            if (PlayersOverride != null) PlayersOverride(_players); else CollectFromNetwork();
+            foreach (PlayerPos p in _players) _armPos[p.ClientId] = p.Position;
             if (layout.Floor >= 1 && layout.Floor <= DiveHaul.PieceFloors && !CarrierIsValid(layout, _dressing)) _st.ExitUnlocked = true;
             Publish();
             if (_st.ExitUnlocked) ExitUnlocked?.Invoke(layout.Floor);
@@ -286,9 +336,21 @@ namespace SleepingCalamity.Presentation
             UntrackAll();
             if (_combat != null) _combat.ServerClearEnemies();
             _clear.Reset(); _entered.Clear(); _carrierEnemy = null; _hunter = null; _hunterSpawned = false;
-            _layout = null; _root = null; _dressing = null;
+            _layout = null; _root = null; _dressing = null; _armPos.Clear(); _live.Clear(); _hasBounds = false;
             _st = new ContentsState();
             if (IsSpawned) Publish();
+        }
+
+        // Pieces the haul assigned to `floor`: still to find plus already collected (banked or not). Falls back to the default counts without a running haul.
+        private int PiecesForFloor(int floor)
+        {
+            if (floor < 1 || floor > DiveHaul.PieceFloors) return 0;
+            DiveHaul h = HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState.Haul : null;
+            if (h == null) return DiveHaulSync.DefaultPiecesPerFloor[floor - 1];
+            int n = h.PiecesLeft(floor);
+            foreach (int id in h.UnbankedPieces) if (h.OriginFloor(id) == floor) n++;
+            foreach (int id in h.BankedPieces) if (h.OriginFloor(id) == floor) n++;
+            return n;
         }
 
         // The carrier is usable when its room exists, it stands in that room and an authored spawn of a Combat room sits on its cell.
@@ -321,7 +383,7 @@ namespace SleepingCalamity.Presentation
             if (_hunter != null) Unhook(_hunter);
         }
 
-        private void Unhook(Enemy e) { if (e == null) return; e.ServerDied -= OnEnemyDied; e.ServerDespawned -= OnEnemyDespawned; }
+        private void Unhook(Enemy e) { if (e == null) return; e.ServerDied -= OnEnemyDied; e.ServerDespawned -= OnEnemyDespawned; e.ServerDied -= OnHunterDied; e.ServerDespawned -= OnHunterDespawned; }
 
         private CombatHost EnsureCombat()
         {
@@ -367,6 +429,8 @@ namespace SleepingCalamity.Presentation
             foreach (EncounterSpawn sp in plan.Spawns)
             {
                 if (sp.RoomIndex != room || sp.Kind == EncounterKind.Hunter) continue;
+                bool carrierSpawn = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
+                if (carrierSpawn && _st.GateKey != 0) { index++; continue; }   // its key already dropped (or was taken): a re-entered room does not bring the carrier back
                 bool warden = l.WardenCell.HasValue && l.WardenCell.Value.X == sp.X && l.WardenCell.Value.Y == sp.Y;
                 EnemyKind kind = warden ? EnemyKind.DoughWarden : sp.Tier == SpawnTier.Tier2 ? EnemyKind.RatKing : CellarEnemyMix.Tier1Kind(l.Seed, l.Floor, room, index);
                 int tier = sp.Tier == SpawnTier.Tier2 ? 2 : 1;
@@ -393,16 +457,31 @@ namespace SleepingCalamity.Presentation
             if (plan == null || plan.Hunter == null || plan.Floor != _layout.Floor || plan.Seed != _layout.Seed) return;
             _hunterSpawned = true;
             _hunter = EnsureCombat().SpawnEnemy(EnemyKind.RatKing, 2, World(fs, plan.Hunter.Cell));
+            if (_hunter != null) { _hunter.ServerDied += OnHunterDied; _hunter.ServerDespawned += OnHunterDespawned; }
         }
+
+        private void OnHunterDied(Enemy e) { Unhook(e); }   // dead stays dead: no respawn
+        private void OnHunterDespawned(Enemy e) { Unhook(e); if (e == _hunter) { _hunter = null; _hunterSpawned = false; } }   // wiped/cleared while alive: it comes back
 
         private void OnEnemyDied(Enemy e) { Gone(e, true); }
         private void OnEnemyDespawned(Enemy e) { Gone(e, false); }
 
-        // An enemy left the world (death or any other despawn). The carrier always leaves the gate key where it was, so a despawned carrier cannot soft-lock the floor.
+        // An enemy left the world. A DEATH counts toward the room and the carrier's death drops the gate key. Any other despawn (party wipe, floor clear) is not a kill: no key, no
+        // clear; once the room has no tracked enemy left it is forgotten (entered flag and counts), so it spawns afresh when a player walks in again.
         private void Gone(Enemy e, bool died)
         {
             if (e == null || !_tracked.TryGetValue(e, out Tracked t)) return;
             _tracked.Remove(e); Unhook(e);
+            if (!died)
+            {
+                if (e == _carrierEnemy) _carrierEnemy = null;
+                bool roomLeft = false;
+                foreach (Tracked o in _tracked.Values) if (o.Room == t.Room) { roomLeft = true; break; }
+                if (roomLeft) _clear.Despawned(t.Room);
+                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); }
+                _st.Cleared = _clear.ClearedMask; Publish();
+                return;
+            }
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = e.transform.position; }
             if (_clear.Died(t.Room)) { _st.Cleared = _clear.ClearedMask; RoomCleared?.Invoke(t.Room); }
             Publish();
@@ -415,7 +494,6 @@ namespace SleepingCalamity.Presentation
             {
                 if (FlatSqr(p.Position, _st.GateKeyPos) > GateKeyRange * GateKeyRange) continue;
                 _st.GateKey = 2; _st.ExitUnlocked = true;
-                if (HaulSync != null) HaulSync.ServerAddLoot(CellarLoot.GateKeyId, 1);
                 Publish();
                 ExitUnlocked?.Invoke(_st.Floor);
                 return;
@@ -461,7 +539,7 @@ namespace SleepingCalamity.Presentation
             _st.Chests |= 1UL << chestIndex;
             if (fc.HoldsKey) _st.RoomKeyHeld = true;
             LastLootItem = item;
-            if (HaulSync != null) HaulSync.ServerAddLoot(item, 1);
+            if (!fc.HoldsKey && HaulSync != null) HaulSync.ServerAddLoot(item, 1);   // the room key lives in State.RoomKeyHeld, not in the haul
             Publish();
             ChestOpened?.Invoke(chestIndex, item);
             return true;
