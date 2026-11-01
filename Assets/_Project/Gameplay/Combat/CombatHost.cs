@@ -64,6 +64,7 @@ namespace SleepingCalamity.Gameplay
         private sealed class HostPlayerState
         {
             public int LastSwing = -1, HitsInSwing;
+            public string TreeKey;   // WeaponTreeSnapshot.SyncKey of the last tree snapshot pushed to this player
             public double LastParryAt = double.NegativeInfinity;   // host clock of the hero's last successful parry (dagger_riposte window)
             public bool Rejected;   // this swing is a spell the host could not pay for: its hits are dropped
             public readonly HashSet<ulong> Hit = new HashSet<ulong>();
@@ -111,7 +112,9 @@ namespace SleepingCalamity.Gameplay
             return s;
         }
 
-        public void ServerSyncGrowth(HeroCombat hero)
+        // The tree snapshot is pushed only when what it shows beyond the growth mirror changed (WeaponTreeSnapshot.SyncKey), or when `force` is set
+        // (spawn / RequestSync, weapon swap, a tree click).
+        public void ServerSyncGrowth(HeroCombat hero, bool force = false)
         {
             if (hero == null || !hero.IsSpawned) return;
             PlayerGrowth g = Growth(hero.OwnerClientId);
@@ -120,6 +123,10 @@ namespace SleepingCalamity.Gameplay
             foreach (WeaponState owned in g.Weapons.Values) g.Abilities.Update(owned);
             WeaponState w = g.Weapon(hero.WeaponKey);
             hero.ServerPushGrowth(hero.WeaponKey, w.Level, w.Abs, w.LevelCostNow, w.Stats.Atk, w.Stats.Fire, w.Stats.Pest, g.Pips.Current, g.Pips.Cap);
+            WeaponTreeSnapshot tree = WeaponTreeSnapshot.From(w, WeaponTreeHost.AtWorkbench(hero.OwnerClientId));   // M4 weapon-tree UI
+            HostPlayerState st = StateOf(hero.OwnerClientId);
+            string key = tree.SyncKey(hero.WeaponKey);
+            if (force || key != st.TreeKey) { st.TreeKey = key; hero.ServerPushTree(tree); }
         }
 
         public int PlayerCount()
