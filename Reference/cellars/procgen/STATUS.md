@@ -3,8 +3,9 @@ Status: IN PROGRESS (item 1a-c merging; 1d and 3 deferred to the M5 contents ses
 Blocker: none. Coordinator 2026-10-31: Core-only items first (1, 2, 4); hold procgen merges while a spine or contents STATUS says "check running"; builder hooks only in CellarFloorBuilder.Procgen.cs
 Branch: claude/cellar-procgen
 Last check: PASS at d7403e2 (build PASS, EditMode 811/811, PlayMode 37 passed, 8 skipped, 0 failed) before the partial move; tip eb4efc0 needs scene regen + check
-Next: see Handoff below
-Archive: ready (variety session handed off; successor continues)
+Next: item 2 and item 4 should-fixes running (Sonnet implementers); merges wait on the lock (M5 contents, then M1-M4 closeout), then 1, 2, 4
+Session: Procgen next (successor, worktree procgen-next-73e90d)
+Archive: no
 
 Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/procedural-dungeons.md` (3, takeaways). Coordinator order, 2026-10-31.
 
@@ -54,3 +55,4 @@ Source: `Reference/cellars/variety/STATUS.md` "Refine later" and `docs/research/
   - 1c: kinds EliteDen (floor 2+), Treasury, Shrine, Quiet; per-floor chance 40/55/55 (placeholders in `SpecialRoomDive`); a kind is spent when drawn even if the floor has no eligible room (keeps floor N independent of earlier layouts). Measured: special on 44/52/57% of floors 1/2/3, 11% of dives have none, 1.5 per dive, never a repeat kind, never locked / elite-vignette room / non-combat / floor 4; Spine room only when no off-path room is eligible (2% of specials).
   - 1b: a hint per open door with something beyond it, over the whole corridor network behind the door (a T junction shows every room on it; union of flags). Because networks are big, 97% of hints carry a flag (key 32%, special 33%, reward vignette 19% of hints): too noisy to read as a choice. Refine later: hint only the next room on the route, or only the nearest room per branch.
 - 2026-10-31: door hints now cover only the rooms reached FIRST through a door (corridor BFS stops at another room's door; own room excluded). Flagged share 97% -> 92.0% (1200 seeds x floors 1-3, 34771 hints): key 23.6%, special 22.5%, reward vignette 14.0%. Still above 80%: most doors sit one corridor hop from a chest room, the stair/bank room or a vignette. HintsHash goldens re-pinned (deliberate); route/special hashes unchanged.
+- 2026-10-31: successor took over on GO. Merged origin/main into cellar-procgen (4bd9500d, clean; scenes not regenerated yet). Item 2 and item 4 should-fixes sent to Sonnet implementers on their branches.
