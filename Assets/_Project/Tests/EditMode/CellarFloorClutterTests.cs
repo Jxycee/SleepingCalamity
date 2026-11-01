@@ -280,7 +280,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 10253269401699159736UL, GoldenClutter12345Floor3 = 15205057022095673752UL;   // re-pinned 2026-11-01: procgen items 4 (chunks) + 5 (vignettes), deliberate
+        const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 10253269401699159736UL, GoldenClutter12345Floor3 = 5831406759042979402UL;   // re-pinned 2026-11-01: procgen items 4 (chunks) + 5 (vignettes), deliberate
 
         [Test]
         public void Clutter_NeverStandsOnChunkSolidCells()
