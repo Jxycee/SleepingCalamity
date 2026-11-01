@@ -409,7 +409,7 @@ namespace SleepingCalamity.Presentation
             }
             foreach (DoorHint h in hints.Hints)
             {
-                if (h.Flags == DoorHintFlags.None) continue;
+                if (!h.Notable) continue;   // chests-only doors get no icon
                 PlacedRoom p = layout.Rooms[h.RoomIndex]; CellPos cell = p.DoorCell(h.DoorIndex);
                 Vector3 mid = CellCenter(cell.X, cell.Y) + SideDir(p.Room.Doors[h.DoorIndex].Side) * (CellSize * 0.5f);
                 Color c = h.Has(DoorHintFlags.Key) ? new Color(1.0f, 0.78f, 0.15f) : h.Has(DoorHintFlags.Special) ? new Color(0.85f, 0.25f, 0.85f)

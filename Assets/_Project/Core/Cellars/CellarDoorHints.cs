@@ -21,6 +21,8 @@ namespace SleepingCalamity.Core
         public DoorHint(int room, int door, IReadOnlyList<int> neighbours, DoorHintFlags flags, int chestCount, SpecialKind special)
         { RoomIndex = room; DoorIndex = door; Neighbours = neighbours; Flags = flags; ChestCount = chestCount; SpecialKind = special; }
         public bool Has(DoorHintFlags f) => (Flags & f) == f;
+        // Worth an icon: anything beyond plain chests (most doors sit one hop from a chest room, so a chests-only hint is no choice; ~92% of doors carry Chests).
+        public bool Notable => (Flags & ~DoorHintFlags.Chests) != DoorHintFlags.None;
     }
 
     public sealed class CellarDoorHints

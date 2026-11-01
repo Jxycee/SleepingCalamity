@@ -166,7 +166,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void DoorHints_AgreeWithTheLayout()
         {
-            int hints = 0, withFlag = 0, keyHints = 0, specialHints = 0, rewardHints = 0;
+            int hints = 0, withFlag = 0, notable = 0, keyHints = 0, specialHints = 0, rewardHints = 0;
             for (uint seed = 0; seed < Seeds; seed++)
                 for (int f = 1; f <= 3; f++)
                 {
@@ -196,12 +196,13 @@ namespace SleepingCalamity.Tests.EditMode
                         Assert.AreEqual(x.Neighbours.Any(n => l.Rooms[n].Room.Kind == RoomKind.StairExit), x.Has(DoorHintFlags.Exit), at);
                         Assert.AreEqual(x.Neighbours.Any(n => l.Rooms[n].Room.Kind == RoomKind.Checkpoint), x.Has(DoorHintFlags.Checkpoint), at);
                         if (x.Has(DoorHintFlags.Locked)) { lockedHints++; Assert.IsTrue(x.Neighbours.Contains(l.LockedRoomIndex), at + " locked hint points at the locked room"); }
-                        hints++; if (x.Flags != DoorHintFlags.None) withFlag++; if (x.Has(DoorHintFlags.Key)) keyHints++; if (x.Has(DoorHintFlags.Special)) specialHints++; if (x.Has(DoorHintFlags.RewardVignette)) rewardHints++;
+                        hints++; if (x.Flags != DoorHintFlags.None) withFlag++; if (x.Notable) notable++; if (x.Has(DoorHintFlags.Key)) keyHints++; if (x.Has(DoorHintFlags.Special)) specialHints++; if (x.Has(DoorHintFlags.RewardVignette)) rewardHints++;
                     }
                     Assert.AreEqual(l.HasLockedRoom ? 1 : 0, lockedHints, at + " exactly one locked-door hint");
                 }
+            Assert.Less(notable * 100.0 / hints, 75.0, "door icons (notable hints) must not mark nearly every door");
             Assert.Less(withFlag * 100.0 / hints, 95.0, "first-reached hints must flag clearly fewer doors than the whole-network version (97%)");
-            Report("HINTS (" + Seeds + " seeds x floors 1-3): " + hints + " door hints, flagged " + Pct(withFlag, hints) + ", key " + Pct(keyHints, hints) + ", special " + Pct(specialHints, hints) + ", reward vignette " + Pct(rewardHints, hints) + "\n");
+            Report("HINTS (" + Seeds + " seeds x floors 1-3): " + hints + " door hints, flagged " + Pct(withFlag, hints) + ", notable (icon) " + Pct(notable, hints) + ", key " + Pct(keyHints, hints) + ", special " + Pct(specialHints, hints) + ", reward vignette " + Pct(rewardHints, hints) + "\n");
         }
 
         [Test]
@@ -213,9 +214,9 @@ namespace SleepingCalamity.Tests.EditMode
             {
                 CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 Transform g = b.Root.Find(CellarFloorBuilder.ProcgenGroup);
-                int icons = b.DoorHints.Hints.Count(x => x.Flags != DoorHintFlags.None);
+                int icons = b.DoorHints.Hints.Count(x => x.Notable);
                 Assert.AreEqual(icons, b.DoorHintIcons); Assert.AreEqual(icons, Enumerable.Range(0, g.childCount).Count(i => g.GetChild(i).name.StartsWith("DoorHint_")));
-                foreach (DoorHint x in b.DoorHints.Hints.Where(x => x.Flags != DoorHintFlags.None)) Assert.IsNotNull(g.Find("DoorHint_r" + x.RoomIndex + "_d" + x.DoorIndex));
+                foreach (DoorHint x in b.DoorHints.Hints.Where(x => x.Notable)) Assert.IsNotNull(g.Find("DoorHint_r" + x.RoomIndex + "_d" + x.DoorIndex));
                 Assert.AreEqual(b.Special.Exists ? 1 : 0, b.SpecialMarkers);
                 if (b.Special.Exists) { specials++; Assert.IsNotNull(g.Find("SpecialRoom_" + b.Special.Kind + "_r" + b.Special.RoomIndex)); }
                 if (floor == 4) { Assert.AreEqual(0, b.DoorHintIcons); Assert.AreEqual(0, b.SpecialMarkers); }
