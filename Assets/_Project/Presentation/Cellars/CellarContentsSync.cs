@@ -419,7 +419,7 @@ namespace SleepingCalamity.Presentation
             CellarEncounterPlan p = HaulSync != null ? HaulSync.EncounterPlan : null;
             if (p != null && p.Floor == _layout.Floor && p.Seed == _layout.Seed) return p;
             DiveHaulSync.Summary s = HaulSync != null ? HaulSync.Current : default;
-            return CellarEncounterPlan.Build(_layout, _dressing, s.ExtraEnemiesPerRoom, s.HunterLatched);
+            return CellarEncounterPlan.BuildForDive(_layout, _dressing, s.ExtraEnemiesPerRoom, s.HunterLatched);
         }
 
         private void EnterRooms(CellarFloorSync fs)
@@ -446,7 +446,7 @@ namespace SleepingCalamity.Presentation
                 bool carrierSpawn = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
                 if (carrierSpawn && _st.GateKey != 0) { index++; continue; }   // its key already dropped (or was taken): a re-entered room does not bring the carrier back
                 bool warden = l.WardenCell.HasValue && l.WardenCell.Value.X == sp.X && l.WardenCell.Value.Y == sp.Y;
-                EnemyKind kind = warden ? EnemyKind.DoughWarden : sp.Tier == SpawnTier.Tier2 ? EnemyKind.RatKing : CellarEnemyMix.Tier1Kind(l.Seed, l.Floor, room, index);
+                EnemyKind kind = warden ? EnemyKind.DoughWarden : sp.Tier == SpawnTier.Tier2 ? EnemyKind.RatKing : CellarEnemyMix.Tier1Kind(l.Seed, l.Floor, room, index, plan.RosterMask);
                 int tier = sp.Tier == SpawnTier.Tier2 ? 2 : 1;
                 index++;
                 Enemy e = combat.SpawnEnemy(kind, tier, World(fs, sp.Cell));
