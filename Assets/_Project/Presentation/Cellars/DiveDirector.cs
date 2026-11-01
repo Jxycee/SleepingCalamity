@@ -3,13 +3,16 @@
 // and kept: ending a dive sets the floor to NoFloor, it never despawns them, so banked pieces, the checkpoint and the cleared floors survive a return dive).
 // Host-written NetworkVariables (late joiners get them with the spawn): NetActive, NetHeartBanked, NetCheckpoint, and the three world points NetHome / NetHubStair / NetOrigin.
 // Clients ask by RPC and the host re-checks everything: RequestDescendRpc (hub stair; range), RequestStairRpc(fromFloor) (current floor must equal fromFloor, so two presses in one
-// tick advance once; range; StairOpen hook), RequestGoHomeRpc (floor 4, banked, range). Banking itself stays DiveHaulSync.RequestBank.
+// tick advance once; range; gate key), RequestGoHomeRpc (floor 4, banked, range), RequestBankRpc (range, then DiveHaulSync.ServerTryBankFor). A refusal for range or a shut stair sends the asker a short notice (NoticeRpc).
+// The client prompts use a radius at least 0.5 m under the host's accept radius (DiveHaulSync.BankRadius), so a shown prompt is never refused for range. An owner hides the stair/bank/go-home prompts (so no press goes out) until the floor it
+// stands on, the last teleport it applied (seed, floor), matches its built floor: a press between a floor rebuild and the teleport landing would otherwise skip a floor.
 // Players move themselves (owner-authoritative NetworkTransform), so the host never writes a player transform: it sends TeleportRpc to the OWNER (SendTo.SpecifiedInParams), carrying the
 // target plus the (seed, floor) it needs. The owner parks it as pending and applies it only once ITS OWN floor sync has built that (seed, floor) (an RPC can outrun the NetworkVariable that
 // triggers the build), then disables the CharacterController, sets the pose and calls NetworkTransform.Teleport (remote copies do not interpolate across the map). A host-side placement pass
 // (every 0.2 s) sends a teleport to every connected player that has not been placed for the current floor generation, which covers the first placement, floor changes, late joiners, a
 // player that fell out of the world, and the trip home.
-// Contents hooks (host): StairOpen (Func<int,bool>, null = open; the gate key gates floors 1-3 there), events DiveStarted, FloorChanged(floor), DiveEnded(reason); DiveHaulSync.Banked/DiveFailed stay.
+// Contents API (host, stable): Instance (set on spawn, cleared on despawn), RequireGateKey (default false: every stair is open; true: a stair needs ServerOpenStair(floor) first, the gate key opens floors 1-3),
+// ServerOpenStair(floor) (idempotent; the opened set lives for the current dive and is cleared on dive start, end and fail), events DiveStarted, FloorChanged(floor), DiveEnded(reason); DiveHaulSync.Banked/DiveFailed stay.
 // Debug (dev build, host): F7 starts a dive from anywhere, F8 abandons it (fails the dive like the stir countdown does).
 // Host disconnect: NGO shuts the session down and everything despawns (no host migration in Phase 1).
 using System.Collections.Generic;
@@ -26,7 +29,15 @@ namespace SleepingCalamity.Presentation
 
     public sealed class DiveDirector : NetworkBehaviour
     {
-        public const float PromptRadius = 3.5f;       // a client shows the prompt inside this; the host accepts DiveHaulSync.BankRadius
+        public const float PromptRadius = 3.5f;       // a client shows the stair/descend prompt inside this; the host accepts DiveHaulSync.BankRadius (5 m)
+        public const float PromptMargin = 0.5f;
+        public const float BankPromptRadius = DiveHaulSync.BankRadius - PromptMargin;   // bank / go-home prompt: covers the way-home column 1.8 m off the bank cell, still inside the host's range
+
+        // The director of this process's host when it has one (a client-only process gets its own). Set on spawn, cleared on despawn.
+        public static DiveDirector Instance { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { Instance = null; }
         public const float PlacementInterval = 0.2f;
         public const float FloorClearDelay = 0.75f;   // after the party was sent home, the floor stays this long so nobody drops through it first
         public const float PendingTimeout = 10f;      // an owner applies a teleport after this long even when its floor never built
@@ -39,7 +50,8 @@ namespace SleepingCalamity.Presentation
         public readonly NetworkVariable<Vector3> NetOrigin = new NetworkVariable<Vector3>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         // ---- host-only configuration and hooks ----
-        public System.Func<int, bool> StairOpen;                    // contents hook: false keeps the stair on `floor` shut (null = open)
+        public bool RequireGateKey;                                 // host: true keeps every stair shut until ServerOpenStair(floor) (the gate key); false = all stairs open
+        private readonly HashSet<int> _openedStairs = new HashSet<int>();
         public int[] PiecesPerFloor = DiveHaulSync.DefaultPiecesPerFloor;
         public StirTuning DiveStir = StirTuning.Default;            // tests shorten the countdown
         public uint? SeedOverride;                                  // tests and the debug start may pin the dive seed
@@ -60,6 +72,7 @@ namespace SleepingCalamity.Presentation
 
         // owner side: a teleport waiting for the local floor
         private bool _hasPending; private Vector3 _pendPos; private float _pendYaw; private uint _pendSeed; private int _pendFloor; private float _pendSince;
+        private uint _appliedSeed; private int _appliedFloor;   // owner: the (seed, floor) of the last teleport applied (0 = none / home)
         private float _nextLookup;
         private string _notice; private float _noticeUntil;
 
@@ -89,7 +102,7 @@ namespace SleepingCalamity.Presentation
             else if (SeedOverride.HasValue) _seed = SeedOverride.Value;
             int floor = forceFloor > 0 ? forceFloor : DiveRoute.StartFloor(HaulSync.Current.CheckpointReached);
             if (floor < DiveRoute.FirstFloor || floor > DiveRoute.LastFloor) return false;
-            _clearAt = -1f;
+            _clearAt = -1f; _openedStairs.Clear();
             _heartBanked = false; NetHeartBanked.Value = false;
             HaulSync.ServerSetFloor(floor);
             FloorSync.ServerSetFloor(_seed, floor);
@@ -110,7 +123,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerTryDescend(ulong clientId)
         {
             if (!IsServer || !IsSpawned || NetActive.Value) return false;
-            if (!NearPlayer(clientId, NetHubStair.Value)) return false;
+            if (!NearPlayer(clientId, NetHubStair.Value)) { NoticeTo(clientId, TooFar); return false; }
             return ServerStartDive();
         }
 
@@ -120,7 +133,7 @@ namespace SleepingCalamity.Presentation
             int floor = HaulSync.Current.CurrentFloor;
             if (fromFloor != floor || !DiveRoute.HasStair(floor) || FloorSync.BuiltFloor != floor) return false;
             if (!StairIsOpen(floor)) { NoticeTo(clientId, "The way down is shut."); return false; }
-            if (CellarFloorBuilder.TryStairWorld(FloorSync.Layout, FloorSync.Built, out Vector3 stair) && !NearPlayer(clientId, stair)) return false;
+            if (CellarFloorBuilder.TryStairWorld(FloorSync.Layout, FloorSync.Built, out Vector3 stair) && !NearPlayer(clientId, stair)) { NoticeTo(clientId, TooFar); return false; }
             int next = DiveRoute.NextFloor(floor);
             HaulSync.ServerMarkCleared(floor);
             HaulSync.ServerSetFloor(next);
@@ -136,7 +149,7 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || !NetActive.Value || HaulSync == null || FloorSync == null) return false;
             int floor = HaulSync.Current.CurrentFloor;
             if (!DiveRoute.CanGoHome(floor, _heartBanked) || FloorSync.BuiltFloor != floor) return false;
-            if (CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && !NearPlayer(clientId, bank)) return false;
+            if (CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && !NearPlayer(clientId, bank)) { NoticeTo(clientId, TooFar); return false; }
             return EndDive(DiveEndReason.WentHome);
         }
 
@@ -148,7 +161,22 @@ namespace SleepingCalamity.Presentation
             return EndDive(DiveEndReason.Abandoned);
         }
 
-        private bool StairIsOpen(int floor) => StairOpen == null || StairOpen(floor);
+        private const string TooFar = "You are too far away.";
+
+        // Host: a bank press with the range refusal told to the asker (the rules themselves stay DiveHaulSync.ServerTryBankFor).
+        public bool ServerTryBank(ulong clientId)
+        {
+            if (!IsServer || !IsSpawned || !NetActive.Value || HaulSync == null || FloorSync == null) return false;
+            int floor = HaulSync.Current.CurrentFloor;
+            if (DiveState.FloorHasBank(floor) && FloorSync.BuiltFloor == floor && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && !NearPlayer(clientId, bank))
+            { NoticeTo(clientId, TooFar); return false; }
+            return HaulSync.ServerTryBankFor(clientId);
+        }
+
+        private bool StairIsOpen(int floor) => !RequireGateKey || _openedStairs.Contains(floor);
+
+        // Host: opens the stair on `floor` for the current dive (idempotent; cleared when a dive starts, ends or fails).
+        public void ServerOpenStair(int floor) { if (IsServer) _openedStairs.Add(floor); }
 
         // Ends the dive: the party is sent home at once, the floor is cleared a moment later. Failed/abandoned: the haul already failed the dive (floor 0, stir reset).
         private bool EndDive(DiveEndReason reason)
@@ -159,7 +187,7 @@ namespace SleepingCalamity.Presentation
                 HaulSync.ServerSetFloor(DiveState.Town);
                 HaulSync.ServerBankInTown();   // the stir reset of a finished dive (the heart bank already banked the haul)
             }
-            NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false;
+            NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false; _openedStairs.Clear();
             _gen++; _needsPlacement = true;
             _clearAt = Time.unscaledTime + FloorClearDelay;
             DiveEnded?.Invoke(reason);
@@ -285,14 +313,17 @@ namespace SleepingCalamity.Presentation
                 if (FloorSync == null || FloorSync.Built == null || FloorSync.BuiltFloor != _pendFloor || FloorSync.BuiltSeed != _pendSeed) return;
             }
             _hasPending = false;
+            _appliedSeed = _pendSeed; _appliedFloor = _pendFloor;
             var cc = player.GetComponent<CharacterController>();
             bool ccOn = cc != null && cc.enabled;
             if (ccOn) cc.enabled = false;
             Quaternion rot = Quaternion.Euler(0f, _pendYaw, 0f);
+            Vector3 before = player.transform.position;
             player.transform.SetPositionAndRotation(_pendPos, rot);
             var nt = player.GetComponent<NetworkTransform>();
             if (nt != null && nt.CanCommitToTransform) nt.Teleport(_pendPos, rot, player.transform.localScale);
             if (ccOn) cc.enabled = true;
+            if (HeroCameraRig.Local != null) HeroCameraRig.Local.NotifyWarped(_pendPos - before);   // the camera jumps with the hero instead of gliding 200 m
             var loco = player.GetComponent<HeroLocomotion>();
             if (loco != null && loco.enabled) loco.SetView(_pendYaw, HeroLocomotion.FreePitchDownDeg);
         }
@@ -318,12 +349,16 @@ namespace SleepingCalamity.Presentation
         public void RequestDescend() { RequestDescendRpc(); }
         public void RequestStair(int fromFloor) { RequestStairRpc(fromFloor); }
         public void RequestGoHome() { RequestGoHomeRpc(); }
+        public void RequestBank() { RequestBankRpc(); }
 
         [Rpc(SendTo.Server)]
         private void RequestDescendRpc(RpcParams rpcParams = default) { RequestsHandled++; ServerTryDescend(rpcParams.Receive.SenderClientId); }
 
         [Rpc(SendTo.Server)]
         private void RequestStairRpc(int fromFloor, RpcParams rpcParams = default) { RequestsHandled++; ServerTryStair(rpcParams.Receive.SenderClientId, fromFloor); }
+
+        [Rpc(SendTo.Server)]
+        private void RequestBankRpc(RpcParams rpcParams = default) { RequestsHandled++; ServerTryBank(rpcParams.Receive.SenderClientId); }
 
         [Rpc(SendTo.Server)]
         private void RequestGoHomeRpc(RpcParams rpcParams = default) { RequestsHandled++; ServerTryGoHome(rpcParams.Receive.SenderClientId); }
@@ -348,9 +383,10 @@ namespace SleepingCalamity.Presentation
                 ResolveSyncs();
                 if (FloorSync == null || FloorSync.Built == null || FloorSync.Layout == null) return;
                 floor = FloorSync.BuiltFloor;
+                if (_appliedFloor != floor || _appliedSeed != FloorSync.BuiltSeed) return;   // not yet teleported onto this floor: standing where the last one's stair was
                 if (DiveRoute.HasStair(floor) && CellarFloorBuilder.TryStairWorld(FloorSync.Layout, FloorSync.Built, out Vector3 stair) && Flat(me, stair, PromptRadius))
                 { Prompt = PromptKind.Stair; PromptText = "Take the stair down"; }
-                else if (DiveState.FloorHasBank(floor) && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && Flat(me, bank, PromptRadius + CellarFloorBuilder.HomeMarkerOffset))
+                else if (DiveState.FloorHasBank(floor) && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && Flat(me, bank, BankPromptRadius))
                 {
                     if (DiveRoute.CanGoHome(floor, NetHeartBanked.Value)) { Prompt = PromptKind.GoHome; PromptText = "Take the party home"; }
                     else { Prompt = PromptKind.Bank; PromptText = floor == DiveState.HeartFloor ? "Bank the haul with the baker" : "Bank the haul at the checkpoint"; }
@@ -363,7 +399,7 @@ namespace SleepingCalamity.Presentation
             {
                 case PromptKind.Descend: RequestDescend(); break;
                 case PromptKind.Stair: RequestStair(floor); break;
-                case PromptKind.Bank: if (HaulSync != null) HaulSync.RequestBank(); break;
+                case PromptKind.Bank: RequestBank(); break;
                 case PromptKind.GoHome: RequestGoHome(); break;
             }
         }
@@ -385,7 +421,13 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             if (HaulSync != null) { HaulSync.Banked -= OnBanked; HaulSync.DiveFailed -= OnDiveFailed; }
-            _hasPending = false; _placed.Clear();
+            _hasPending = false; _placed.Clear(); _appliedFloor = 0; _appliedSeed = 0u;
+            if (Instance == this) Instance = null;
+        }
+
+        public override void OnNetworkSpawn()
+        {
+            if (Instance == null || IsServer) Instance = this;   // one process can hold several peers' directors (tests): the host's wins
         }
 
         private void Update()

@@ -173,6 +173,9 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return ResolvePeers(rig);
             yield return AllBuilt(rig, 1);
             Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1));
+            Assert.That(DiveDirector.Instance, Is.SameAs(rig.Host), "the host's director is the static Instance");
+            Assert.That(rig.HostFloor.Kit.PieceList.Count, Is.GreaterThan(0), "the CellarFloorSync prefab carries the dressing kit");
+            Assert.That(rig.HostFloor.Built.Vaults, Is.GreaterThan(0), "the art layer built vaults");
             DiveDirector peer = rig.Peers[0];
             Assert.That(peer.ServerStartDive(), Is.False, "a client cannot start a dive");
             Assert.That(peer.ServerTryStair(rig.Clients[0].NetworkManager.LocalClientId, 1), Is.False, "a client cannot run the host rule");
@@ -189,15 +192,15 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the far stair press never reached the host");
             Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1), "out of range: no advance");
 
-            // StairOpen hook closed: refused even in range; then open.
+            // Gate key required: refused even in range until ServerOpenStair(1) (the contents session's API); opening is idempotent.
             Move(rig.OwnHeroes[0], stair1 + new Vector3(1f, 0.1f, 0f));
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair1) < 3f, Timeout, "the client hero never arrived at the stair on the host");
-            bool open = false; rig.Host.StairOpen = f => open;
+            rig.Host.RequireGateKey = true;
             handled = rig.Host.RequestsHandled;
             peer.RequestStair(1);
             yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the shut stair press never reached the host");
-            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1), "the StairOpen hook keeps it shut");
-            open = true;
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1), "RequireGateKey keeps it shut until the stair is opened");
+            rig.Host.ServerOpenStair(1); rig.Host.ServerOpenStair(1);
 
             // In range and open: the client's press takes everyone down.
             peer.RequestStair(1);
