@@ -320,5 +320,44 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(run.Latencies[0], Is.GreaterThan(60.0), "the simulator is in effect: " + report);
             Assert.That(run.Latencies[run.Latencies.Count - 1], Is.LessThan(1500.0), "even a resent packet arrives well inside two seconds: " + report);
         }
+
+        // ---- weapon tree (M4): a client's tree choices go to the host, which applies them to the Core weapon and pushes the snapshot back ----
+        // Catches: the owner->host TreeActionServerRpc and the host->owner SyncTreeOwnerRpc round trip (fit, build-up gate, build-up, re-route) over a real
+        // client connection. Does not catch: the IMGUI window itself (manual walk: B opens it, 1/2/3, F7, F8).
+        [UnityTest]
+        public IEnumerator WeaponTree_ClientChoices_RoundTripThroughTheHost()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+            ulong clientId = c.ClientNm.LocalClientId;
+            Core.Weapons.WeaponState hostAxe = c.Combat.Growth(clientId).Weapon(c.ClientCombat.WeaponKey);
+            while (hostAxe.Level < 3) hostAxe.AddAbs(hostAxe.LevelCostNow - hostAxe.Abs);   // ATK 28 of 27 needed
+            HeroCombat clientOnHost = c.ClientHeroOnHost.GetComponent<HeroCombat>();
+            c.Combat.ServerSyncGrowth(clientOnHost);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.Level == 3, Timeout, "the owner never got the tree snapshot");
+            Assert.That(c.ClientCombat.TreeMirror.BuildUpOpen, Is.False, "fire is still 0");
+
+            c.ClientCombat.OwnerTreeAction(TreeAction.Fit, (int)Core.Weapons.AttachmentKind.Ember);
+            c.ClientCombat.OwnerTreeAction(TreeAction.Fit, (int)Core.Weapons.AttachmentKind.Ember);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.Fitted.Length == 2, Timeout, "the host never fitted the embers");
+            Assert.That(hostAxe.Fitted.Count, Is.EqualTo(2), "the host's Core weapon holds them");
+
+            c.ClientCombat.OwnerTreeAction(TreeAction.BuildUp);
+            yield return Seconds(0.5f);
+            Assert.That(hostAxe.DefinitionId, Is.EqualTo(Core.Weapons.WeaponCatalog.Axe), "build-up refused while the gate is closed (embers not yet absorbed)");
+
+            hostAxe.AddAbs(hostAxe.LevelCostNow - hostAxe.Abs);   // level 4 absorbs the embers: fire 10 of 9
+            c.Combat.ServerSyncGrowth(clientOnHost);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.BuildUpOpen, Timeout, "the build-up never opened on the owner");
+
+            c.ClientCombat.OwnerTreeAction(TreeAction.BuildUp);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.DefinitionId == Core.Weapons.WeaponCatalog.CinderAxe, Timeout, "the build-up never came back");
+            Assert.That(hostAxe.DefinitionId, Is.EqualTo(Core.Weapons.WeaponCatalog.CinderAxe));
+            Assert.That(c.ClientCombat.TreeMirror.CanReroute, Is.True);
+
+            c.ClientCombat.OwnerTreeAction(TreeAction.Reroute);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientCombat.TreeMirror.DefinitionId == Core.Weapons.WeaponCatalog.Axe, Timeout, "the re-route never came back");
+            Assert.That(hostAxe.Level, Is.EqualTo(4), "re-route returns the level it had");
+        }
     }
 }

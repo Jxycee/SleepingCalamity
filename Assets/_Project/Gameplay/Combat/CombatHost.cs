@@ -113,6 +113,7 @@ namespace SleepingCalamity.Gameplay
             PlayerGrowth g = Growth(hero.OwnerClientId);
             WeaponState w = g.Weapon(hero.WeaponKey);
             hero.ServerPushGrowth(hero.WeaponKey, w.Level, w.Abs, w.LevelCostNow, w.Stats.Atk, w.Stats.Fire, w.Stats.Pest, g.Pips.Current, g.Pips.Cap);
+            hero.ServerPushTree(WeaponTreeSnapshot.From(w, WeaponTreeHost.AtWorkbench(hero.OwnerClientId)));   // M4 weapon-tree UI
         }
 
         public int PlayerCount()

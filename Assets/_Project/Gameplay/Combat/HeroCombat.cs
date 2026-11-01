@@ -5,6 +5,7 @@
 // Replicated: NetWeapon (the heirloom index; the HOST writes it when the owner asks through SetWeaponServerRpc, so it is in place before any later RPC of that
 // owner is handled) and NetSwing (owner writes: swing serial + attack index, for remote visuals). Everything else rides RPCs. Every hit intent carries the
 // weapon index and the chain's prior hits of its swing, so the host judges it against what the owner actually swung.
+// Weapon tree (M4): the owner asks (TreeActionServerRpc: fit / remove / build-up / re-route); the HOST applies it in WeaponTreeHost and pushes the snapshot back (SyncTreeOwnerRpc).
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
@@ -671,6 +672,43 @@ namespace SleepingCalamity.Gameplay
             _mirror.Pest = pest;
             _mirror.Pips = pips;
             _mirror.PipCap = pipCap;
+        }
+
+        // ---- Weapon tree (M4 UI). Host -> owner: the snapshot the tree shows. Owner -> host: a choice, applied by WeaponTreeHost on the host. ----
+
+        public WeaponTreeSnapshot TreeMirror { get; private set; } = new WeaponTreeSnapshot();
+
+        // Owner only (the arena's weapon-tree window). The host decides; the snapshot comes back through SyncTreeOwnerRpc.
+        public void OwnerTreeAction(TreeAction action, int arg = 0)
+        {
+            if (!IsOwner) return;
+            TreeActionServerRpc((byte)action, (byte)arg);
+        }
+
+        [Rpc(SendTo.Server)]
+        private void TreeActionServerRpc(byte action, byte arg)
+        {
+            WeaponTreeHost.Apply(CombatHost.Current, this, (TreeAction)action, arg);
+        }
+
+        public void ServerPushTree(WeaponTreeSnapshot s)
+        {
+            byte flags = (byte)((s.HasTarget ? 1 : 0) | (s.BuildUpOpen ? 2 : 0) | (s.CanReroute ? 4 : 0) | (s.AtWorkbench ? 8 : 0));
+            SyncTreeOwnerRpc(s.DefinitionId, s.Level, s.Abs, s.Stats.Atk, s.Stats.Fire, s.Stats.Pest, s.Fitted ?? new int[0], flags,
+                s.ProgressAtk, s.ProgressFire, s.ProgressPest, s.RestoredDefinitionId ?? "");
+        }
+
+        [Rpc(SendTo.Owner)]
+        private void SyncTreeOwnerRpc(string definitionId, int level, float abs, float atk, float fire, float pest, int[] fitted, byte flags,
+                                      float progAtk, float progFire, float progPest, string restoredId)
+        {
+            TreeMirror = new WeaponTreeSnapshot
+            {
+                DefinitionId = definitionId, Level = level, Abs = abs, Stats = new WeaponStats(atk, fire, pest), Fitted = fitted ?? new int[0],
+                HasTarget = (flags & 1) != 0, BuildUpOpen = (flags & 2) != 0, CanReroute = (flags & 4) != 0, AtWorkbench = (flags & 8) != 0,
+                ProgressAtk = progAtk, ProgressFire = progFire, ProgressPest = progPest,
+                RestoredDefinitionId = restoredId.Length == 0 ? null : restoredId,
+            };
         }
 
         // Host -> everyone: a hit on an enemy resolved (the number, the sounds, the part break).
