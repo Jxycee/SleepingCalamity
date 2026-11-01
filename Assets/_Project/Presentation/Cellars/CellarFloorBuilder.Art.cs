@@ -218,7 +218,7 @@ namespace SleepingCalamity.Presentation
                     case SocketKind.Shelf:   // left-wall piece, back at local x -2.5, z 0..2
                         if (wallClosed)
                         {
-                            g = PlacePiece(kit, "LarderShelf", dressing, "LarderShelf_" + id, c - w * 0.7f - faceLeft * new Vector3(0, 0, 1f), faceLeft, Vector3.one);
+                            g = PlacePiece(kit, "LarderShelf", dressing, "LarderShelf_" + id, c - w * 0.7f - faceLeft * new Vector3(0, 0, 1f), faceLeft, Vector3.one, true);
                             if (g != null && s.Variant == "Sacks")
                                 Prim(g.transform, "Sack", PrimitiveType.Sphere, c - w * 0.2f + Vector3.Cross(w, Vector3.up) * 0.9f + new Vector3(0, 0.3f, 0), new Vector3(0.7f, 0.6f, 0.6f), mats.Limewash);
                         }
@@ -226,17 +226,17 @@ namespace SleepingCalamity.Presentation
                     case SocketKind.Chute:   // right-wall piece at local x +2.5
                         if (wallClosed)
                         {
-                            g = PlacePiece(kit, "CoalChute", dressing, "CoalChute_" + id, c - w * 0.7f, faceRight, Vector3.one);
+                            g = PlacePiece(kit, "CoalChute", dressing, "CoalChute_" + id, c - w * 0.7f, faceRight, Vector3.one);   // no collider: the chute is a sloped wall alcove, its box bounds stand far from the visible mesh
                             if (g != null && s.Variant == "Heaped") Prim(g.transform, "Coal", PrimitiveType.Sphere, c + w * 0.9f + new Vector3(0, 0.25f, 0), new Vector3(1.4f, 0.6f, 1.4f), mats.Iron);
                         }
                         break;
                     case SocketKind.Barrel:  // cradle axes across the wall (heads to the room), the standing barrel toward the room
                     {
                         Quaternion rot = s.Variant == "Tipped" ? Quaternion.AngleAxis(180f, Vector3.up) * faceLeft : faceLeft;   // tipped: the cradle turned the other way
-                        g = PlacePiece(kit, "Barrels", dressing, "Barrels_" + id, c + w * 1.3f, rot, Vector3.one);
+                        g = PlacePiece(kit, "Barrels", dressing, "Barrels_" + id, c + w * 1.3f, rot, Vector3.one, true);
                         if (g != null)
                         {
-                            if (s.Variant == "Stacked") Prim(g.transform, "BarrelTop", PrimitiveType.Cylinder, c + w * 0.4f + new Vector3(0, 0.55f, 0), new Vector3(0.9f, 0.5f, 0.9f), mats.Trim);
+                            if (s.Variant == "Stacked") Prim(g.transform, "BarrelTop", PrimitiveType.Cylinder, c + w * 0.4f + new Vector3(0, 0.55f, 0), new Vector3(0.9f, 0.5f, 0.9f), mats.Trim).AddComponent<CapsuleCollider>();
                             CandleCluster(dressing, mats, c + w * 1.3f - w * 0.95f + new Vector3(0, 1.0f, 0), "barrel_" + id, new Vector3(0, 0.3f, 0)); result.Candles++;
                         }
                         break;
@@ -262,11 +262,11 @@ namespace SleepingCalamity.Presentation
                             break;
                         }
                         var crate = new GameObject("Crates_" + id).transform; crate.SetParent(dressing, false); crate.position = at;
-                        Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw, 0);
-                        GameObject cb = Box(crate, "CrateB", at + Vector3.Cross(w, Vector3.up) * 0.85f + new Vector3(0, 0.3f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false);
+                        Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, true).transform.rotation = Quaternion.Euler(0, yaw, 0);
+                        GameObject cb = Box(crate, "CrateB", at + Vector3.Cross(w, Vector3.up) * 0.85f + new Vector3(0, 0.3f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, true);
                         cb.transform.rotation = s.Variant == "Broken" ? Quaternion.Euler(0, -yaw * 1.5f, 35f) : Quaternion.Euler(0, -yaw * 1.5f, 0);
                         if (s.Variant != "Open")
-                            Box(crate, "CrateC", at + new Vector3(0, 1.1f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw + 25f, 0);
+                            Box(crate, "CrateC", at + new Vector3(0, 1.1f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, true).transform.rotation = Quaternion.Euler(0, yaw + 25f, 0);
                         g = crate.gameObject;
                         break;
                     }
@@ -314,7 +314,7 @@ namespace SleepingCalamity.Presentation
                             if ((h & 1u) == 0 && HasPiece(kit, "Barrels"))
                             {
                                 // the cradle along wall a, heads toward the room
-                                PlacePiece(kit, "Barrels", dressing, "CornerBarrels_" + id, c + da * 1.3f + db * 0.6f, Quaternion.LookRotation(Vector3.Cross(-da, Vector3.up), Vector3.up), Vector3.one);
+                                PlacePiece(kit, "Barrels", dressing, "CornerBarrels_" + id, c + da * 1.3f + db * 0.6f, Quaternion.LookRotation(Vector3.Cross(-da, Vector3.up), Vector3.up), Vector3.one, true);
                                 CandleCluster(dressing, mats, c + da * 1.3f + db * 0.6f - da * 0.95f + new Vector3(0, 1.0f, 0), "corner_" + id, new Vector3(0, 0.3f, 0)); result.Candles++;
                             }
                             else
@@ -332,9 +332,9 @@ namespace SleepingCalamity.Presentation
                                     break;
                                 }
                                 var crate = new GameObject("CornerCrates_" + id).transform; crate.SetParent(dressing, false); crate.position = at;
-                                Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw, 0);
-                                Box(crate, "CrateB", at - da * 0.9f + new Vector3(0, 0.35f, 0), new Vector3(0.7f, 0.7f, 0.7f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, -yaw, 0);
-                                Box(crate, "CrateC", at + new Vector3(0, 1.1f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw + 20f, 0);
+                                Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, true).transform.rotation = Quaternion.Euler(0, yaw, 0);
+                                Box(crate, "CrateB", at - da * 0.9f + new Vector3(0, 0.35f, 0), new Vector3(0.7f, 0.7f, 0.7f), mats.Crate, 1f, true).transform.rotation = Quaternion.Euler(0, -yaw, 0);
+                                Box(crate, "CrateC", at + new Vector3(0, 1.1f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, true).transform.rotation = Quaternion.Euler(0, yaw + 20f, 0);
                             }
                             result.Props++; placed++;
                             break;
@@ -353,12 +353,13 @@ namespace SleepingCalamity.Presentation
             Transform group = Group(dressing, ClutterGroup);
             foreach (CellarClutterRow r in clutter.Rows)
             {
+                bool solid = r.Piece == "Crate" || r.Piece == "CrateStack";   // jars, sack piles and rubble are low, small or irregular: no collider (the scan flagged them as invisible blockers)
                 Vector3 pos = new Vector3(r.X, 0f, r.Z); Quaternion rot = Quaternion.Euler(0f, r.Yaw - 90f, 0f);
-                GameObject go = PlacePiece(kit, r.Piece, group, r.Piece + "_" + r.Id, pos, rot, Vector3.one);
+                GameObject go = PlacePiece(kit, r.Piece, group, r.Piece + "_" + r.Id, pos, rot, Vector3.one, solid);
                 if (go == null)
                 {
                     Material m = r.Piece == CellarFloorClutter.Rubble ? mats.Wall : r.Piece == CellarFloorClutter.SackPile ? mats.Limewash : r.Piece == CellarFloorClutter.JarCluster ? mats.Trim : mats.Crate;
-                    go = Box(group, r.Piece + "_" + r.Id, pos + new Vector3(0, r.Height * 0.5f, 0), new Vector3(r.Depth, r.Height, r.Width), m, 1f, false);   // x = off the wall, z = along it
+                    go = Box(group, r.Piece + "_" + r.Id, pos + new Vector3(0, r.Height * 0.5f, 0), new Vector3(r.Depth, r.Height, r.Width), m, 1f, solid);   // x = off the wall, z = along it
                     go.transform.rotation = rot;
                 }
             }
@@ -386,7 +387,7 @@ namespace SleepingCalamity.Presentation
 
         // A kit piece standing on the floor at pos, turned by the wall-facing rotation plus a yaw jitter (degrees); null when the piece is missing.
         static GameObject PlaceAtWall(CellarFloorKit kit, string piece, Transform parent, string name, Vector3 pos, Quaternion facing, float yawJitter)
-            => PlacePiece(kit, piece, parent, name, new Vector3(pos.x, 0f, pos.z), facing * Quaternion.Euler(0f, yawJitter, 0f), Vector3.one);
+            => PlacePiece(kit, piece, parent, name, new Vector3(pos.x, 0f, pos.z), facing * Quaternion.Euler(0f, yawJitter, 0f), Vector3.one, true);
 
         // ------------------------------------------------------------------------------------------------ classification
         static Bay BayOf(CellarFloorLayout layout, Grid grid, int x, int y)
@@ -424,13 +425,37 @@ namespace SleepingCalamity.Presentation
         // A box size from a length along the edge, a height and a depth into the cell.
         static Vector3 Size(Vector3 alongEdge, float height, float depth, bool ns) => ns ? new Vector3(alongEdge.x, height, depth) : new Vector3(depth, height, alongEdge.z);
 
-        static GameObject PlacePiece(CellarFloorKit kit, string piece, Transform parent, string name, Vector3 pos, Quaternion rot, Vector3 scale)
+        static GameObject PlacePiece(CellarFloorKit kit, string piece, Transform parent, string name, Vector3 pos, Quaternion rot, Vector3 scale, bool solid = false)
         {
             if (!HasPiece(kit, piece)) return null;
             GameObject go = Object.Instantiate(kit.Pieces[piece], parent, false);
             go.name = name; go.SetActive(true);
             go.transform.SetPositionAndRotation(pos, rot); go.transform.localScale = scale;
+            if (solid) AddSolidBox(go);
             return go;
+        }
+
+        // Floor-standing dressing blocks the hero: one BoxCollider from the combined mesh bounds of the piece's renderers in its own local space. Candles, flames and lanterns
+        // (small hanging or lit bits) are left out of the bounds. Walls, vaults, ribs, piers and overhead pieces never call this.
+        static void AddSolidBox(GameObject go)
+        {
+            if (go.GetComponent<Collider>() != null) return;
+            Matrix4x4 toLocal = go.transform.worldToLocalMatrix;
+            bool any = false; Bounds b = default;
+            foreach (MeshRenderer mr in go.GetComponentsInChildren<MeshRenderer>(false))
+            {
+                string n = mr.name;
+                if (n.Contains("Candle") || n.Contains("Flame") || n.Contains("Lantern") || n.Contains("Lamp") || n.Contains("Light")) continue;
+                MeshFilter mf = mr.GetComponent<MeshFilter>(); if (mf == null || mf.sharedMesh == null) continue;
+                Bounds mb = mf.sharedMesh.bounds; Matrix4x4 m = toLocal * mr.transform.localToWorldMatrix;
+                for (int i = 0; i < 8; i++)
+                {
+                    Vector3 corner = m.MultiplyPoint3x4(mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
+                    if (!any) { b = new Bounds(corner, Vector3.zero); any = true; } else b.Encapsulate(corner);
+                }
+            }
+            if (!any) return;
+            BoxCollider col = go.AddComponent<BoxCollider>(); col.center = b.center; col.size = b.size;
         }
 
         static GameObject Shape(Transform parent, string name, Vector3 pos, Quaternion rot, Vector3 scale, LookTestGeometry.Shape shape, Vector3 size, Material mat, int segments)
