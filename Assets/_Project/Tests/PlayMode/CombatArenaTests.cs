@@ -110,33 +110,120 @@ namespace SleepingCalamity.Tests.PlayMode
                 float a = i * Mathf.PI * 0.5f;
                 combat.SpawnEnemy(EnemyKind.Slime, 1, hero.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 2.6f);
             }
-            int maxWindUps = 0, strikes = 0;
             bool someoneWaited = false;
-            float minGap = float.MaxValue, lastStrike = -1f;
-            var seen = new System.Collections.Generic.HashSet<(ulong, int)>();
+            var tracker = new StrikeTracker();
             double until = Time.realtimeSinceStartupAsDouble + 8.0;
             while (Time.realtimeSinceStartupAsDouble < until)
             {
-                int windUps = 0;
-                foreach (Enemy e in Enemy.All)
-                {
-                    if (!e.IsSpawned || !e.Alive) continue;
-                    if (e.WindingUp) windUps++;
-                    if (e.WaitingForToken) someoneWaited = true;
-                    if (e.HitboxOn && seen.Add((e.NetworkObjectId, e.Serial)))
-                    {
-                        if (lastStrike >= 0f) minGap = Mathf.Min(minGap, Time.time - lastStrike);
-                        lastStrike = Time.time;
-                        strikes++;
-                    }
-                }
-                maxWindUps = Mathf.Max(maxWindUps, windUps);
+                foreach (Enemy e in Enemy.All) if (e.IsSpawned && e.Alive && e.WaitingForToken) someoneWaited = true;
+                tracker.Frame(Enemy.All);
                 yield return null;
             }
-            Assert.That(strikes, Is.GreaterThanOrEqualTo(3), "the crowd attacked");
-            Assert.That(maxWindUps, Is.LessThanOrEqualTo(AttackPacing.Tier1.MaxAttackersPerHero), "never more than two winding up at the hero");
+            Assert.That(tracker.Strikes, Is.GreaterThanOrEqualTo(3), "the crowd attacked");
+            // a slime's hop draws the melee pool and its glob the ranged pool, so up to one of each (tier 1) may be under way
+            for (int c = 0; c < 3; c++)
+                Assert.That(tracker.MaxWindUps[c], Is.LessThanOrEqualTo(AttackPacing.Tier1.PoolSize((TokenCategory)c)), "pool " + (TokenCategory)c + " held more than its cap");
             Assert.That(someoneWaited, Is.True, "with four in reach, some had to wait for a token");
-            Assert.That(minGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "two strikes opened " + minGap.ToString("F2") + " s apart");
+            Assert.That(tracker.MinGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "a strike opened " + tracker.MinGap.ToString("F2") + " s after the last one closed");
+        }
+
+        // Enemy AI stage 2 risk-review fix: the attack tokens are ONE set per CombatHost, not one per room. Targeting is world-wide, so two rooms' enemies can
+        // work the same hero; four rat-kings (all melee) split over two rooms must still honour the hero's melee cap and the strike gap between hit windows.
+        [UnityTest, Timeout(60000)]
+        public IEnumerator Solo_TwoRoomsOfRats_ShareOneHeroTokenTable_CapAndGapHold()
+        {
+            yield return StartCombatSolo();
+            var hero = AppBootstrap.Current.NetworkManager.LocalClient.PlayerObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            yield return Seconds(0.3f);
+            Enemy first = null, second = null;
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * Mathf.PI * 0.5f;
+                Enemy e = combat.SpawnEnemy(EnemyKind.RatKing, 1, hero.transform.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 2.4f, room: i % 2);
+                if (i == 0) first = e; else if (i == 1) second = e;
+            }
+            Assert.That(first.Crowd, Is.Not.SameAs(second.Crowd), "two rooms, two crowds (membership)");
+            Assert.That(first.Crowd.Tokens, Is.SameAs(second.Crowd.Tokens), "but one token table");
+            Assert.That(first.Crowd.Tokens, Is.SameAs(combat.Tokens));
+            var tracker = new StrikeTracker();
+            double until = Time.realtimeSinceStartupAsDouble + 10.0;
+            while (Time.realtimeSinceStartupAsDouble < until)
+            {
+                tracker.Frame(Enemy.All);
+                yield return null;
+            }
+            Assert.That(tracker.Strikes, Is.GreaterThanOrEqualTo(2), "the rats attacked");
+            Assert.That(tracker.MaxWindUps[(int)TokenCategory.Melee], Is.LessThanOrEqualTo(AttackPacing.Tier1.PoolSize(TokenCategory.Melee)), "more rats under way at the hero than the melee cap");
+            Assert.That(tracker.MinGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "a strike opened " + tracker.MinGap.ToString("F2") + " s after the last one closed");
+        }
+
+        // Frame sampler for the token tests: how many enemies are winding up per token pool at the most, how many strikes opened, and the smallest time from
+        // one hit window closing to the next opening (end to start; 0 when two windows were open together).
+        sealed class StrikeTracker
+        {
+            public readonly int[] MaxWindUps = new int[3];
+            public int Strikes;
+            private readonly System.Collections.Generic.Dictionary<ulong, int> _by = new System.Collections.Generic.Dictionary<ulong, int>();
+            public int StrikesBy(ulong id) => _by.TryGetValue(id, out int n) ? n : 0;
+            public float MinGap = float.MaxValue;
+            private readonly System.Collections.Generic.HashSet<(ulong, int)> _seen = new System.Collections.Generic.HashSet<(ulong, int)>();
+            private float _lastOn = -1f;
+
+            public void Frame(System.Collections.Generic.IEnumerable<Enemy> all)
+            {
+                var winding = new int[3];
+                int on = 0;
+                foreach (Enemy e in all)
+                {
+                    if (!e.IsSpawned || !e.Alive) continue;
+                    if (e.WindingUp || e.HitboxOn) winding[(int)e.Def.CategoryOf(e.CurrentAttack)]++;
+                    if (!e.HitboxOn) continue;
+                    on++;
+                    if (_seen.Add((e.NetworkObjectId, e.Serial)))
+                    {
+                        Strikes++;
+                        _by[e.NetworkObjectId] = StrikesBy(e.NetworkObjectId) + 1;
+                        if (_lastOn >= 0f) MinGap = Mathf.Min(MinGap, Time.time - _lastOn);
+                    }
+                }
+                if (on > 1) MinGap = 0f;
+                if (on > 0) _lastOn = Time.time;
+                for (int c = 0; c < 3; c++) MaxWindUps[c] = Mathf.Max(MaxWindUps[c], winding[c]);
+            }
+        }
+
+        // Enemy AI stage 2 (token categories): a slime (ranged pool) and a rat-king (melee pool) work the same hero, so neither blocks the other's token.
+        // Both are under way together at some point, and the hits still land a gap apart.
+        [UnityTest, Timeout(60000)]
+        public IEnumerator Solo_SlimeAndRat_AttackTheSameHeroTogether_WithoutBlockingEachOther()
+        {
+            yield return StartCombatSolo();
+            var hero = AppBootstrap.Current.NetworkManager.LocalClient.PlayerObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            yield return Seconds(0.3f);
+            Enemy slime = combat.SpawnEnemy(EnemyKind.Slime, 1, hero.transform.position + new Vector3(2.4f, 0f, 0f));
+            Enemy rat = combat.SpawnEnemy(EnemyKind.RatKing, 1, hero.transform.position + new Vector3(-2.4f, 0f, 0f));
+            Assert.That(slime.Crowd, Is.SameAs(rat.Crowd), "one room, one crowd");
+            ulong slimeId = slime.NetworkObjectId, ratId = rat.NetworkObjectId;
+            bool together = false;
+            var tracker = new StrikeTracker();
+            double until = Time.realtimeSinceStartupAsDouble + 14.0;
+            while (Time.realtimeSinceStartupAsDouble < until)
+            {
+                if (slime.Attacking && rat.Attacking) together = true;
+                tracker.Frame(Enemy.All);
+                yield return null;
+            }
+            int slimeStrikes = tracker.StrikesBy(slimeId), ratStrikes = tracker.StrikesBy(ratId);
+            Assert.That(slimeStrikes, Is.GreaterThanOrEqualTo(1), "the slime attacked");
+            Assert.That(ratStrikes, Is.GreaterThanOrEqualTo(1), "the rat attacked");
+            Assert.That(together, Is.True, "a slime and a rat were never under way at the same time: one pool is blocking the other");
+            Assert.That(tracker.MinGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "a strike opened " + tracker.MinGap.ToString("F2") + " s after the last one closed");
         }
 
         [UnityTest]

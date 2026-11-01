@@ -54,6 +54,23 @@ namespace SleepingCalamity.Gameplay
         private readonly Dictionary<ulong, HostPlayerState> _states = new Dictionary<ulong, HostPlayerState>();
         private readonly HashSet<long> _enemyHitDedupe = new HashSet<long>();   // (victim client << 32) | enemy attack serial; serials are unique per host (Enemy)
         private readonly List<Enemy> _alive = new List<Enemy>();
+        // Host: ONE set of attack tokens for the whole host (pools are keyed per hero, and targeting is world-wide, so a hero's caps and strike gap must hold
+        // across every room's enemies) and one crowd (membership) per room that shares it (docs/research/enemy-ai.md 10.4).
+        public readonly AttackTokens Tokens = new AttackTokens();
+        private readonly Dictionary<int, EnemyCrowd> _crowds = new Dictionary<int, EnemyCrowd>();
+        private float _auditIn = EnemyCrowd.AuditSeconds;
+        public EnemyCrowd CrowdFor(int room)
+        {
+            if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd(Tokens);
+            return c;
+        }
+
+        // Frees tokens whose holder is not a living member of any crowd (a missed Release can never shrink a pool for good).
+        private bool IsLiveHolder(int id)
+        {
+            foreach (EnemyCrowd c in _crowds.Values) if (c.IsLive(id)) return true;
+            return false;
+        }
         private readonly List<PlayerVitals> _party = new List<PlayerVitals>();   // scratch for Update (no per-frame allocation)
 
         private WaveState _wave = WaveState.Idle;
@@ -404,7 +421,7 @@ namespace SleepingCalamity.Gameplay
         // Spawning
         // =================================================================================================================================
 
-        public Enemy SpawnEnemy(EnemyKind kind, int tier, Vector3 position, bool ai = true)
+        public Enemy SpawnEnemy(EnemyKind kind, int tier, Vector3 position, bool ai = true, int room = EnemyCrowd.ArenaRoom)
         {
             if (_nm == null || !_nm.IsServer) return null;
             NetworkObject prefab = kind == EnemyKind.Slime ? slimePrefab : kind == EnemyKind.RatKing ? ratPrefab : kind == EnemyKind.Broom ? broomPrefab : wardenPrefab;
@@ -415,6 +432,7 @@ namespace SleepingCalamity.Gameplay
             NetworkObject instance = Instantiate(prefab, position, rot);
             Enemy e = instance.GetComponent<Enemy>();
             e.ServerSeed(kind, tier, PlayerCount());
+            e.ServerJoinCrowd(CrowdFor(room));
             e.AiEnabled = AiEnabled && ai;
             instance.Spawn(destroyWithScene: true);
             _alive.Add(e);
@@ -448,6 +466,9 @@ namespace SleepingCalamity.Gameplay
             foreach (Enemy e in new List<Enemy>(_alive))
                 if (e != null && e.NetworkObject != null && e.NetworkObject.IsSpawned) e.NetworkObject.Despawn(true);
             _alive.Clear();
+            // Wipe, floor change, F6: every room is over. Drop the crowds and the shared tokens so none outlives its enemies (a new room gets a fresh crowd).
+            _crowds.Clear();
+            Tokens.Clear();
         }
 
         // Test hook (the bot playtester): clear the arena and count down into `wave` (e.g. 5, the first tier-2 wave).
@@ -473,6 +494,12 @@ namespace SleepingCalamity.Gameplay
         {
             if (!_begun || _nm == null || !_nm.IsServer || !_nm.IsListening) return;
             float dt = Time.deltaTime;
+            _auditIn -= dt;
+            if (_auditIn <= 0f)
+            {
+                _auditIn = EnemyCrowd.AuditSeconds;
+                Tokens.Audit(Time.timeAsDouble, IsLiveHolder);
+            }
             for (int i = _alive.Count - 1; i >= 0; i--)
             {
                 Enemy x = _alive[i];
