@@ -94,7 +94,7 @@ Shader "SleepingCalamity/Backdrop"
                 n = IS_FRONT_VFACE(face, n, -n);
                 Light l = GetMainLight();
                 float ndl = dot(n, l.direction);
-                half sun = saturate(ndl * 0.55 + 0.2);                      // less wrap than before: faces turned from the sun fall darker
+                half sun = saturate(ndl * 0.7 + 0.15);                      // less wrap than before: faces turned from the sun fall darker
                 half3 sky = SampleSH(float3(0, 1, 0));
                 half3 lit = c.rgb * (l.color * sun + SampleSH(n) + _ShadowTint.rgb * sky * (1.0 - sun));
                 float3 V = normalize(i.positionWS - GetCameraPositionWS());
@@ -107,10 +107,11 @@ Shader "SleepingCalamity/Backdrop"
                 h = saturate(h + nz * 2.0 * _NoiseAmp);
                 lit *= 1.0 + nz * 2.0 * _NoiseLit;
                 // haze hue: warm fog colour looking toward a low sun, cooler sky haze looking away or sideways (midday sun stays as it was)
-                half lowSun = 1.0 - saturate(l.direction.y * 2.5);
+                half lowSun = 1.0 - saturate(l.direction.y * 1.5);
                 half toSun = pow(saturate(dot(V, l.direction)), 2.0) * 0.7 + 0.3;
                 half3 haze = unity_FogColor.rgb * _HazeTint.rgb;
-                haze = lerp(haze, lerp(haze * _HazeCool.rgb, haze, toSun), _HazeCoolAmt * lowSun);
+                half3 cool = _HazeCool.rgb / max(0.2, dot(_HazeCool.rgb, half3(0.299, 0.587, 0.114)));   // luminance-normalised: hue only
+                haze = lerp(haze, lerp(haze * cool, haze, toSun), _HazeCoolAmt * lowSun);
                 return half4(lerp(lit, haze, h), 1.0);
             }
             ENDHLSL
