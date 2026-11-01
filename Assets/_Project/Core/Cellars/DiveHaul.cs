@@ -41,6 +41,7 @@ namespace SleepingCalamity.Core
         public IEnumerable<int> UnbankedPieces => _unbanked;
         public IEnumerable<int> BankedPieces => _banked;
         public IEnumerable<KeyValuePair<int, int>> BankedLoot => _lootBanked;   // item id -> count, ascending (the world save reads it)
+        public IEnumerable<KeyValuePair<int, int>> BankedLootItems => _lootBanked;   // same as BankedLoot; the town stock reads it (running banked total for the session)
         public int LootUnbanked(int itemId) => _lootUnbanked.TryGetValue(itemId, out int c) ? c : 0;
         public int LootBanked(int itemId) => _lootBanked.TryGetValue(itemId, out int c) ? c : 0;
 

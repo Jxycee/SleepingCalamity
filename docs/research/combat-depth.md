@@ -6,15 +6,20 @@ notes, **[doc]** developer interview or official text, **[wiki]** fan wiki, **[f
 no number found this session. Where a number was not found it says so; our proposals are P9 Placeholders, not borrowed values.
 
 ## Why ours mashes today (the diagnosis)
-Read from the code on `main` (`8e8eefb`):
+Read from the code on `main` (`8e8eefb`). Status checked 2026-11-01 at `fd261abe`; each bullet ends with what has changed since.
 - `EnemyModel.ApplyHit` sets `Staggered = !armoured` for every non-elite hit, and small-enemy attacks have no armour window. **Every hit flinches every
   slime, rat-king and broom, and a flinch cancels the attack in progress.** Hitting an enemy during its wind-up is therefore the safest thing to do: the
-  tell we built in the enemy-polish pass is erased by pressing attack.
+  tell we built in the enemy-polish pass is erased by pressing attack. **Fixed:** poise threshold with a 1 s reset (`PoiseMeter`, `Core/Combat/Poise.cs`),
+  and committed attacks (glint to hitbox end) never flinch (`EnemyModel.ApplyHit`).
 - Enemy life is low against the heirlooms: a rat-king (90 HP, DEF 10) takes about 80 damage from one axe combo (20 + 22 + 38) and 37 from one dagger
-  combo, so it dies inside one or two uninterrupted chains.
+  combo, so it dies inside one or two uninterrupted chains. **Changed:** rat-king is now 180 HP, slime 80, broom 160 (`EnemyModel.cs`); the combo figures
+  above are from the old 90.
 - The dagger's parry restarts on every press (`HeroCombat` sets `_guardStart` whenever the guard goes up), so tapping RMB repeatedly also parries.
-- Rage (+30% attack after 7 hits) exists but never matters, because the enemy never gets to act.
-- Nothing pays the player more for hitting at the right moment than at any moment.
+  **Shipped:** a re-raise within 0.5 s guards but cannot parry (`GuardMath.ParryLockoutSeconds`, `HeroCombat` `_parryArmed`).
+- Rage (+30% attack after 7 hits) exists but never matters, because the enemy never gets to act. **Changed:** enemies act now, and rage counts only hits
+  outside openings (`EnemyModel.cs`).
+- Nothing pays the player more for hitting at the right moment than at any moment. **Shipped:** openings deal x1.5 and double poise (`EnemyWindows`), and a
+  last-moment dodge opens the attacker (`DodgeTiming.IsPerfect`, `HeroCombat.ResolveEnemyHit`).
 
 Every game below solves the same problem the same way at heart: **an enemy must be able to keep acting while being hit, and the player must earn the
 moments when it cannot.**
@@ -105,6 +110,14 @@ Ranked by how much each fixes "mindless mashing" for what it costs us (Core code
 | 10 | **Rage from chip hits** (only hits outside openings count toward rage) | Makes the mash itself dangerous, reuses DC2 rage | DC2 | **Tiny** once 3 exists. |
 | 11 | **Stun / posture meter with an execution** | A long-run reward for good play | GoW, Sekiro | **Medium-large** (UI, execution animation). Later, maybe for bosses. |
 | 12 | **Stamina** | Gates the player's mashing directly | Souls | **Medium**, and off-genre for Dark Cloud. Not recommended. |
+
+Status (checked 2026-11-01 at `fd261abe`):
+- **Shipped:** 1 poise (`Poise.cs`, `PoiseMeter`); 2 committed windows (`EnemyWindows.Committed`); 3 openings (`EnemyWindows`; the spark and sound were not checked);
+  4 steadiness (`PoiseMeter.BeginSteady`, called from `Enemy.cs`); 5 one attacker per hero in tier 1, two in tier 2 (`AttackPacing`), two to three enemies
+  per wave with about twice the life (`ArenaWaves`); 6 the broom's guard riposte only (`GuardCounter`, the broom's `Ripostes` flag); 8 perfect dodge
+  (`DodgeTiming`, 0.15 s window); 9 parry lockout (`GuardMath`); 10 rage ignores openings (`EnemyModel.cs`).
+- **Partly:** 7 revenge exists only on the elite (`RevengeGauge`, the Warden); regular enemies have rage, not revenge.
+- **Not started:** 11 stun meter. 12 stamina is not recommended.
 
 ## Gaps
 - No frame windows found for BotW flurry rush, TotK perfect guard, NieR perfect evade, Sekiro deflect or posture regeneration; our windows are proposals.

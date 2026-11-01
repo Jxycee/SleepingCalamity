@@ -462,7 +462,7 @@ if __name__ == '__main__':
     for o in bpy.context.selected_objects: o.select_set(False)
     bed.select_set(True)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'SquareBed.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
-                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE', colors_type='LINEAR')
+                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE', colors_type='LINEAR', path_mode='STRIP')
     if '--export' in C.argv:
         os.makedirs(DEST, exist_ok=True)
         for fn in ('square_placements.json', 'SquareBed.fbx'):

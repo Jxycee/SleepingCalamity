@@ -1,6 +1,7 @@
 ﻿Title: Combat polish: post-hit grace, libraries, JSON tuning loader
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-01T21:48Z (cloud launcher)
 Model: sonnet
 From: coordinator session 6, user decisions 2026-11-01 (docs/PHASE1.md change log)
 Status file: Reference/sessions/combat-polish/STATUS.md
