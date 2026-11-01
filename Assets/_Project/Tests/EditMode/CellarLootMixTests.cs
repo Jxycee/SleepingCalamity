@@ -38,7 +38,7 @@ namespace SleepingCalamity.Tests.EditMode
                     {
                         if (d[f - 1][i]) continue;
                         got[(int)cats[f - 1][i]]++; total++;
-                        float[] row = CellarLootMix.TargetRow(f); for (int c = 0; c < 3; c++) want[c] += row[c];
+                        int[] row = CellarLootMix.TargetRow(f); for (int c = 0; c < 3; c++) want[c] += (double)row[c] / CellarLootMixTuning.Scale;
                     }
             }
             string msg = "";
@@ -58,7 +58,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 600; seed++)
             {
                 bool[][] d = Dive(seed);
-                with += Deviation(CellarLootMix.Replay(seed, d), d); without += Deviation(CellarLootMix.Replay(seed, d, 0f), d);
+                with += Deviation(CellarLootMix.Replay(seed, d), d); without += Deviation(CellarLootMix.Replay(seed, d, 0), d);
             }
             Assert.That(with, Is.LessThan(without * 0.9), "with feedback " + with + " vs none " + without);
         }
@@ -70,7 +70,7 @@ namespace SleepingCalamity.Tests.EditMode
                 for (int i = 0; i < cats[f - 1].Length; i++)
                 {
                     if (keys[f - 1][i]) continue;
-                    count[(int)cats[f - 1][i]]++; float[] row = CellarLootMix.TargetRow(f); for (int c = 0; c < 3; c++) exp[c] += row[c];
+                    count[(int)cats[f - 1][i]]++; int[] row = CellarLootMix.TargetRow(f); for (int c = 0; c < 3; c++) exp[c] += (double)row[c] / CellarLootMixTuning.Scale;
                 }
             double dev = 0; for (int c = 0; c < 3; c++) dev += Math.Abs(count[c] - exp[c]); return dev;
         }
@@ -78,7 +78,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Roll_StaysInsideTheSteeredBand_AndTargetsAreSane()
         {
-            foreach (float[] row in CellarLootMixTuning.Targets) Assert.AreEqual(1f, row[0] + row[1] + row[2], 1e-4f);
+            foreach (int[] row in CellarLootMixTuning.Targets) Assert.AreEqual(CellarLootMixTuning.Scale, row[0] + row[1] + row[2]);
             for (uint seed = 0; seed < 80; seed++)
                 for (int floor = 1; floor <= 4; floor++)
                 {
@@ -99,9 +99,9 @@ namespace SleepingCalamity.Tests.EditMode
             var sb = new System.Text.StringBuilder();
             var got = new ulong[5];
             for (int f = 1; f <= 4; f++) { got[f] = CellarLootMix.LootMixHash(12345, Dive(12345, f)); sb.Append(got[f]).Append("UL, "); }
-            string all = sb.ToString();   // pinned 2026-11-01 (procgen 1d loot mix, deliberate)
-            Assert.AreEqual(1851538259201835552UL, got[1], "floor 1; actual " + all); Assert.AreEqual(4329466706751892866UL, got[2], "floor 2; actual " + all);
-            Assert.AreEqual(9255764883638739905UL, got[3], "floor 3; actual " + all); Assert.AreEqual(1524621441387033425UL, got[4], "floor 4; actual " + all);
+            string all = sb.ToString();   // pinned 2026-11-01 (procgen 1d loot mix, integer form, deliberate; was the float form 1851538259201835552 ...)
+            Assert.AreEqual(5686594895284728819UL, got[1], "floor 1; actual " + all); Assert.AreEqual(9935741248512517506UL, got[2], "floor 2; actual " + all);
+            Assert.AreEqual(2709122302315985379UL, got[3], "floor 3; actual " + all); Assert.AreEqual(12947464770208806370UL, got[4], "floor 4; actual " + all);
         }
     }
 }

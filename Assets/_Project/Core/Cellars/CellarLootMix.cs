@@ -16,15 +16,17 @@ namespace SleepingCalamity.Core
     public static class CellarLootMixTuning
     {
         // Target share per category (Common, Fine, Rare) for a chest rolled on floor 1..4 (index = floor - 1; later floors use the last row). Each row sums to 1.
-        public static readonly float[][] Targets =
+        // Integer arithmetic only (no float in a decision): shares are per-10000 ints, each row sums to Scale.
+        public const int Scale = 10000;
+        public static readonly int[][] Targets =
         {
-            new[] { 0.90f, 0.10f, 0.00f },
-            new[] { 0.60f, 0.35f, 0.05f },
-            new[] { 0.30f, 0.45f, 0.25f },
-            new[] { 0.15f, 0.40f, 0.45f },
+            new[] { 9000, 1000, 0 },
+            new[] { 6000, 3500, 500 },
+            new[] { 3000, 4500, 2500 },
+            new[] { 1500, 4000, 4500 },
         };
-        public const float K = 2f;               // feedback strength (Hades uses 10: nearly forced; this is a gentle nudge)
-        public const float MinWeight = 0.02f;    // no category ever drops below this weight (a 0-target category stays possible but rare)
+        public const int K = 2;                  // feedback strength (Hades uses 10: nearly forced; this is a gentle nudge)
+        public const int MinWeight = 200;        // per-10000: no category ever drops below this weight (a 0-target category stays possible but rare)
         // Inclusive rank band of each category.
         public static readonly int[] BandLo = { 1, 3, 4 };
         public static readonly int[] BandHi = { 2, 3, 5 };
@@ -34,31 +36,34 @@ namespace SleepingCalamity.Core
     {
         public const int CategoryCount = 3;
 
-        public static float[] TargetRow(int floor) =>
+        // Per-10000 target shares of a floor's row (sums to CellarLootMixTuning.Scale).
+        public static int[] TargetRow(int floor) =>
             CellarLootMixTuning.Targets[Math.Max(1, Math.Min(CellarLootMixTuning.Targets.Length, floor)) - 1];
 
         // The category of every chest of the dive, floors 1..keyFlags.Length in order; keyFlags[f-1][i] = chest i of floor f holds the room key. Key chests get Common and are not counted.
-        public static LootCategory[][] Replay(uint seed, IReadOnlyList<bool[]> keyFlags, float k = CellarLootMixTuning.K)
+        // Integer form: with T chests rolled so far, weight(c) x T = max(MinWeight x T, row[c] x T + k x (expected[c] - count[c] x Scale)), where expected[c] is the sum of the earlier chests' rows;
+        // the pick is rng.Range(0, sum of weights) walked over the categories. The first chest (T = 0) weighs the row itself.
+        public static LootCategory[][] Replay(uint seed, IReadOnlyList<bool[]> keyFlags, int k = CellarLootMixTuning.K)
         {
             var result = new LootCategory[keyFlags.Count][];
-            var count = new int[CategoryCount]; var expected = new float[CategoryCount]; int total = 0;
-            var w = new float[CategoryCount];
+            var count = new long[CategoryCount]; var expected = new long[CategoryCount]; long total = 0;
+            var w = new long[CategoryCount];
             for (int f = 1; f <= keyFlags.Count; f++)
             {
                 bool[] keys = keyFlags[f - 1]; result[f - 1] = new LootCategory[keys.Length];
-                float[] row = TargetRow(f);
+                int[] row = TargetRow(f);
                 for (int i = 0; i < keys.Length; i++)
                 {
                     if (keys[i]) continue;
                     var rng = new Pcg32(Rng.Derive(seed, "cellars.lootmix", ((ulong)f << 32) | (uint)i));
-                    float sum = 0f;
+                    long sum = 0;
                     for (int c = 0; c < CategoryCount; c++)
                     {
-                        float share = total == 0 ? row[c] : (float)count[c] / total;
-                        float exp = total == 0 ? row[c] : expected[c] / total;
-                        w[c] = Math.Max(CellarLootMixTuning.MinWeight, row[c] + k * (exp - share)); sum += w[c];
+                        w[c] = total == 0 ? row[c]
+                            : Math.Max(CellarLootMixTuning.MinWeight * total, row[c] * total + k * (expected[c] - count[c] * CellarLootMixTuning.Scale));
+                        sum += w[c];
                     }
-                    float x = rng.NextFloat() * sum; int pick = CategoryCount - 1;
+                    long x = rng.Range(0, (int)sum); int pick = CategoryCount - 1;
                     for (int c = 0; c < CategoryCount; c++) { if (x < w[c]) { pick = c; break; } x -= w[c]; }
                     result[f - 1][i] = (LootCategory)pick;
                     count[pick]++; total++;
@@ -69,7 +74,7 @@ namespace SleepingCalamity.Core
         }
 
         // The category of chest `chestIndex` on `floor` (floor >= 1; keyFlags must cover floors 1..floor). A key chest answers Common.
-        public static LootCategory CategoryFor(uint seed, int floor, int chestIndex, IReadOnlyList<bool[]> keyFlags, float k = CellarLootMixTuning.K)
+        public static LootCategory CategoryFor(uint seed, int floor, int chestIndex, IReadOnlyList<bool[]> keyFlags, int k = CellarLootMixTuning.K)
         {
             if (floor < 1 || floor > keyFlags.Count) throw new ArgumentOutOfRangeException(nameof(floor));
             var upTo = new bool[floor][];
@@ -79,7 +84,7 @@ namespace SleepingCalamity.Core
         }
 
         // Cross-peer proof of the whole dive's category sequence.
-        public static ulong LootMixHash(uint seed, IReadOnlyList<bool[]> keyFlags, float k = CellarLootMixTuning.K)
+        public static ulong LootMixHash(uint seed, IReadOnlyList<bool[]> keyFlags, int k = CellarLootMixTuning.K)
         {
             LootCategory[][] all = Replay(seed, keyFlags, k);
             var h = Fnv1a64.Create();

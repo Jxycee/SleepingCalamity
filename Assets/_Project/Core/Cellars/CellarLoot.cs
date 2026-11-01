@@ -39,6 +39,7 @@ namespace SleepingCalamity.Core
 
         public static float PeakRank(int floor) => Peak[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
 
+        // Callers must skip key chests (Roll handles them first): a key chest has no category and would fall into the Common band here.
         // The rank drawn for this chest (1-5): the category comes from the dive-wide loot-mix steering (CellarLootMix, procgen 1d), the rank is the floor's triangular draw clamped into its band.
         public static int RollRank(uint seed, int floor, int chestIndex)
         {
