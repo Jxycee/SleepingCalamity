@@ -243,17 +243,25 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Seconds(0.6f);
             vitals.ServerFullReset();
             int serial = slime.Serial;
-            slime.ServerForceAttack(AttackCatalog.TestNova, heroObject.transform.position);
-            yield return PlayModeHarness.WaitUntil(() => slime.Serial != serial && slime.Attacking, 2f, "the second attack never started");
-            yield return Seconds(0.1f);
-            input.Frame.SecondaryHeld = true;
-            input.Frame.SecondaryPressed = true;
-            yield return null;
-            input.Frame.SecondaryPressed = false;
             bool stunned = false;
-            double until = Time.realtimeSinceStartupAsDouble + 1.2;
-            while (Time.realtimeSinceStartupAsDouble < until) { stunned |= slime.Phase == EnemyPhase.Stagger; yield return null; }
-            input.Frame.SecondaryHeld = false;
+            // Deterministic: game time steps at exactly 1/60 s (a real-time 0.1 s sleep left about one frame of margin and flaked on a hitch), and the raise
+            // is keyed to the attack's own frame counter (3 frames before the hitbox), not to a wall-clock wait.
+            Time.captureDeltaTime = 1f / AttackData.FrameRate;
+            try
+            {
+                slime.ServerForceAttack(AttackCatalog.TestNova, heroObject.transform.position);
+                yield return PlayModeHarness.WaitUntil(() => slime.Serial != serial && slime.Attacking, 2f, "the second attack never started");
+                float raiseAt = AttackCatalog.TestNova.HitOn.Start - 3;
+                for (int guardLoop = 0; slime.AttackFrame < raiseAt && guardLoop < 600; guardLoop++) yield return null;
+                Assert.That(slime.AttackFrame, Is.LessThan(AttackCatalog.TestNova.HitOn.Start), "still winding up when the shield goes up");
+                input.Frame.SecondaryHeld = true;
+                input.Frame.SecondaryPressed = true;
+                yield return null;
+                input.Frame.SecondaryPressed = false;
+                for (int f = 0; f < 72; f++) { stunned |= slime.Phase == EnemyPhase.Stagger; yield return null; }
+                input.Frame.SecondaryHeld = false;
+            }
+            finally { Time.captureDeltaTime = 0f; }
             Assert.That(vitals.Model.Hp, Is.EqualTo(100), "a parry takes no damage");
             Assert.That(stunned, Is.True, "the parried enemy is stunned");
             Assert.That(combat.Growth(app.NetworkManager.LocalClientId).Weapon(WeaponCatalog.DaggerShield).Abs, Is.EqualTo(4.5f).Within(1e-4f), "the dagger's parry (3) with the tech bonus x1.5");
