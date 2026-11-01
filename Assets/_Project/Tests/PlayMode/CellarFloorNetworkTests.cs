@@ -124,6 +124,15 @@ namespace SleepingCalamity.Tests.PlayMode
             AssertSame(host, peerB, seedB, 2, "late client B");
             Assert.That(peerB.BuildCount, Is.EqualTo(1), "the late joiner builds once");
 
+            // Floor 4, the fixed bakery set-piece: both peers build it from (seed, floor) and agree with the Core layout hash (the stair-less floor has a Bank, a baker and a Warden marker).
+            Assert.That(host.ServerSetFloor(seedB, 4), Is.True);
+            yield return WaitBuilt(peerA, seedB, 4, "client A");
+            yield return WaitBuilt(peerB, seedB, 4, "late client B");
+            AssertSame(host, peerA, seedB, 4, "client A f4");
+            AssertSame(host, peerB, seedB, 4, "late client B f4");
+            Assert.That(host.BuiltLayoutHash, Is.EqualTo(CellarFloorGenerator.Generate(0u, 4).LayoutHash()), "floor 4 is the same fixed layout whatever the seed");
+            Assert.That(host.Built.Root.Find(CellarFloorBuilder.MarkerGroup).Find("Baker"), Is.Not.Null, "the baker marker is built on floor 4");
+
             // Back to no floor: all peers clear.
             GameObject[] oldRoots = { host.Built.Root.gameObject, peerA.Built.Root.gameObject, peerB.Built.Root.gameObject };
             Assert.That(host.ServerSetFloor(seedB, 0), Is.True);

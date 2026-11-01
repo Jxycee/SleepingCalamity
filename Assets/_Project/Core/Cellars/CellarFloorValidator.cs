@@ -1,7 +1,8 @@
 // Core/Cellars/CellarFloorValidator.cs: the rule set the EditMode tests (and a later host-side assert) run over a generated floor (PHASE1 7.2, M5).
 // Pure C#. Validate(layout) returns a list of error strings, empty when the floor is sound. It reads only the layout's public data (never the
-// generator's internals), so a bug in the generator cannot hide from it. Floor 4 is the fixed placeholder stub: it is checked for geometry and
-// connectivity but not for the floors-1-3 counts (rooms, chests, loops, dead ends, carrier).
+// generator's internals), so a bug in the generator cannot hide from it. Floor 4 (l.IsStub) is the fixed bakery set-piece with its own rules: no stair
+// exit, no locked room, no key or carrier; one heart room whose Bank cell and baker are reachable from the entry only through the antechamber (the
+// room with the Dough Warden's Tier2 spawn); a loop through the maze; 6-8 chests. It skips the floors-1-3 room, dead-end and checkpoint counts.
 // Walking model: cells are walkable room Floor cells and corridor cells; neighbours join inside a room, along corridor mask bits, and through a door
 // whose outside corridor cell points back at it. The locked door is the only edge the "no lock" search refuses. Authority: none.
 using System.Collections.Generic;
@@ -42,13 +43,22 @@ namespace SleepingCalamity.Core
             if (l.Rooms.Select(r => r.RoomId).Distinct().Count() != l.Rooms.Count) Err("a room appears twice");
             int entries = l.Rooms.Count(r => r.Room.Kind == RoomKind.Entry), exits = l.Rooms.Count(r => r.Room.Kind == RoomKind.StairExit);
             if (entries != 1) Err("needs exactly one entry room, has " + entries);
-            if (exits != 1) Err("needs exactly one stair-exit room, has " + exits);
+            if (l.IsStub)
+            {
+                if (exits != 0 || l.StairExit.HasValue) Err("the bakery floor has a stair exit (the rescue replaces it)");
+                int hearts = l.Rooms.Count(r => r.Room.Kind == RoomKind.Heart);
+                if (hearts != 1) Err("needs exactly one heart room, has " + hearts);
+                if (!l.BankCell.HasValue) Err("no rescue bank cell");
+                if (!l.BakerCell.HasValue) Err("no baker cell");
+                if (!l.WardenCell.HasValue) Err("no Dough Warden spawn (a Tier2 spawn in the antechamber)");
+            }
+            else if (exits != 1) Err("needs exactly one stair-exit room, has " + exits);
             if (l.EntryStarts.Count != 4) Err("entry has " + l.EntryStarts.Count + " start cells, needs 4");
-            if (!l.StairExit.HasValue) Err("no stair exit cell");
+            if (!l.IsStub && !l.StairExit.HasValue) Err("no stair exit cell");
             int checkpoints = l.Rooms.Count(r => r.Room.Kind == RoomKind.Checkpoint);
             if (!l.IsStub && checkpoints != (l.Floor == 2 ? 1 : 0)) Err("floor " + l.Floor + " has " + checkpoints + " checkpoint room(s)");
             if (!l.IsStub && (l.Rooms.Count < 4 || l.Rooms.Count > 6)) Err("has " + l.Rooms.Count + " rooms, needs 4 to 6");
-            if (!l.IsStub) foreach (PlacedRoom p in l.Rooms) { string e = p.Room.Validate().FirstOrDefault(); if (e != null) Err("room data: " + e); }
+            foreach (PlacedRoom p in l.Rooms) { string e = p.Room.Validate().FirstOrDefault(); if (e != null) Err("room data: " + e); }
 
             // ---- corridors: masks, pieces, reciprocity ----
             var corr = new PlacedCorridor[G, G];
@@ -134,7 +144,7 @@ namespace SleepingCalamity.Core
                 return false;
             }
 
-            bool[,] Reach(CellPos from, bool refuseLock)
+            bool[,] Reach(CellPos from, bool refuseLock, int blockRoom = -1)
             {
                 var seen = new bool[G, G]; var q = new Queue<CellPos>();
                 if (!InGrid(from.X, from.Y) || !walk[from.X, from.Y]) return seen;
@@ -145,7 +155,7 @@ namespace SleepingCalamity.Core
                     foreach (CellSide s in Sides)
                     {
                         CellPos n = c.Step(s);
-                        if (InGrid(n.X, n.Y) && !seen[n.X, n.Y] && Step(c.X, c.Y, s, refuseLock)) { seen[n.X, n.Y] = true; q.Enqueue(n); }
+                        if (InGrid(n.X, n.Y) && !seen[n.X, n.Y] && (blockRoom < 0 || roomAt[n.X, n.Y] != blockRoom) && Step(c.X, c.Y, s, refuseLock)) { seen[n.X, n.Y] = true; q.Enqueue(n); }
                     }
                 }
                 return seen;
@@ -159,6 +169,25 @@ namespace SleepingCalamity.Core
                 for (int x = 0; x < G; x++) for (int y = 0; y < G; y++) if (walk[x, y] && !all[x, y]) lost++;
                 if (lost > 0) Err(lost + " walkable cell(s) cannot be reached from the entry (rooms not all connected)");
                 if (l.StairExit.HasValue && !open[l.StairExit.Value.X, l.StairExit.Value.Y]) Err("the stair exit is not reachable from the entry without passing the locked door");
+                if (l.IsStub && l.BankCell.HasValue)
+                {
+                    if (!open[l.BankCell.Value.X, l.BankCell.Value.Y]) Err("the rescue bank cell is not reachable from the entry");
+                    if (l.BakerCell.HasValue && !open[l.BakerCell.Value.X, l.BakerCell.Value.Y]) Err("the baker is not reachable from the entry");
+                    int ante = -1;
+                    for (int i = 0; i < l.Rooms.Count; i++) if (l.Rooms[i].RoomId == CellarBakeryPool.AntechamberId) ante = i;
+                    int heart = l.BankCell.HasValue ? roomAt[l.BankCell.Value.X, l.BankCell.Value.Y] : -1;
+                    if (ante < 0) Err("no antechamber room");
+                    else
+                    {
+                        bool[,] around = Reach(start, true, ante);
+                        if (l.BankCell.HasValue && around[l.BankCell.Value.X, l.BankCell.Value.Y]) Err("the heart can be reached without passing the antechamber");
+                        if (heart >= 0 && l.Links.Count(k => k.Touches(heart)) != 1) Err("the heart room must have exactly one connection");
+                        if (heart >= 0 && l.Links.Any(k => k.Touches(heart) && !k.Touches(ante))) Err("the heart room's only connection must be the antechamber");
+                        if (l.WardenCell.HasValue && !open[l.WardenCell.Value.X, l.WardenCell.Value.Y]) Err("the Dough Warden's spawn is not reachable from the entry");
+                    }
+                }
+                if (!l.IsStub && !l.LastResort && l.StairExit.HasValue && l.EntryToExitDistance() < CellarFloorGenerator.MinExitDistance)
+                    Err("the stair exit is only " + l.EntryToExitDistance() + " steps from the entry, needs at least " + CellarFloorGenerator.MinExitDistance);
                 if (l.KeyChest != null && !open[l.KeyChest.X, l.KeyChest.Y]) Err("the key chest is not reachable without passing the locked door");
                 if (l.Carrier != null && !open[l.Carrier.X, l.Carrier.Y]) Err("the gate-key carrier is not reachable without passing the locked door");
             }
@@ -196,6 +225,7 @@ namespace SleepingCalamity.Core
                 else if (l.Rooms[l.Carrier.RoomIndex].Room.Spawns.Count <= l.Carrier.SpawnIndex) Err("the gate-key carrier names a missing spawn");
             }
             else if (!l.IsStub) Err("no gate-key carrier");
+            if (l.IsStub && (l.Carrier != null || l.HasLockedRoom || l.KeyChest != null)) Err("the bakery floor has no key, carrier or locked room");
 
             // ---- chests, loops, dead ends (floors 1-3) ----
             var chestCells = new HashSet<(int, int)>();
@@ -205,9 +235,14 @@ namespace SleepingCalamity.Core
                 if (c.RoomIndex >= 0) { if (!walk[c.X, c.Y] || roomAt[c.X, c.Y] != c.RoomIndex) Err("chest " + c.X + "," + c.Y + " is not on a floor cell of its room"); }
                 else if (corr[c.X, c.Y] == null || !l.DeadEnds.Any(e => e.X == c.X && e.Y == c.Y)) Err("chest " + c.X + "," + c.Y + " is not at a dead end");
             }
-            if (!l.IsStub)
+            if (l.Chests.Count < 6 || l.Chests.Count > 8) Err("has " + l.Chests.Count + " chests, needs 6 to 8");
+            if (l.IsStub)
             {
-                if (l.Chests.Count < 6 || l.Chests.Count > 8) Err("has " + l.Chests.Count + " chests, needs 6 to 8");
+                int loops = l.Links.Count - (l.Rooms.Count - 1);
+                if (loops < 1) Err("the oven maze has no loop (two routes through it)");
+            }
+            else
+            {
                 int loops = l.Links.Count - (l.Rooms.Count - 1);
                 if (loops < 1 || loops > 3) Err("has " + loops + " loop corridor(s), needs 1 to 3");
                 int ends = l.Corridors.Count(c => c.Piece.Shape == CorridorShape.DeadEnd);

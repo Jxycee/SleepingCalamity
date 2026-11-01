@@ -4,6 +4,8 @@ Research for the Undercroft Cellars floors (PHASE1 7.2). Written 2026-10-31 in o
 
 Reading method (second pass, 2026-10-31): sources were downloaded as raw text into a scratchpad directory outside the repo (nothing built or run) and read after stripping markup; Spelunky Classic's GameMaker project was unpacked with a Python script that only decompresses text blocks. First-pass items read through a summarising fetch tool were re-read raw where marked. Tags: [P] = primary (source code, developer file, or developer/community symbol documentation read directly); "read raw" = a third party's or developer's page read as raw text; "secondary" = a description by someone else or a search-engine summary. Licences recorded per source; no code or text is copied.
 
+**Our lineage: DC1/DC2.** Our floors descend from Dark Cloud's. DC1's floors are procedural with a few small rooms and a gate key carried by one monster (`dc1-rea.md`). DC2 builds most floors at load from 4 to 6 hand-made room presets on a 14x14 grid, joined by corridors (`dc2-dungeons-town.md`, section 1). `Core/Cellars` follows the DC2 model: authored room presets placed on a 14x14 grid and joined by corridors. What Dark Cloud lacked, and what this document is about, is variety on top of the layout: dressing that changes, per-floor atmosphere and rare authored vignettes, so the same preset does not look the same twice.
+
 ## 1. Per source
 
 ### 1.1 Brogue Community Edition (primary, source code)
