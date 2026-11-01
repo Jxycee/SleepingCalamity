@@ -17,6 +17,7 @@
 // Host disconnect: NGO shuts the session down and everything despawns (no host migration in Phase 1).
 using System.Collections.Generic;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Runtime;
 using Unity.Netcode;
@@ -62,6 +63,7 @@ namespace SleepingCalamity.Presentation
 
         public CellarFloorSync FloorSync { get; private set; }      // host: the spawned syncs; clients resolve their own through ResolveSyncs
         public DiveHaulSync HaulSync { get; private set; }
+        public CellarContentsSync ContentsSync { get; private set; }   // contents hook: host-spawned with the other two; the host arms it per built floor (ContentsTick)
         public uint Seed => _seed;
 
         private uint _seed;
@@ -74,6 +76,7 @@ namespace SleepingCalamity.Presentation
         private bool _hasPending; private Vector3 _pendPos; private float _pendYaw; private uint _pendSeed; private int _pendFloor; private float _pendSince;
         private uint _appliedSeed; private int _appliedFloor;   // owner: the (seed, floor) of the last teleport applied (0 = none / home)
         private float _nextLookup;
+        private int _armedBuild = -1;   // contents hook: the FloorSync build the contents were last armed for
         private string _notice; private float _noticeUntil;
 
         // =================================================================================================================================
@@ -190,6 +193,8 @@ namespace SleepingCalamity.Presentation
             NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false; _openedStairs.Clear();
             _gen++; _needsPlacement = true;
             _clearAt = Time.unscaledTime + FloorClearDelay;
+            ContentsClear();   // contents hook: the dive is over (ended, failed or abandoned): its enemies go
+            ResetParty();      // wipe: every hero arrives home up and moving, and the combat host forgets the wipe
             DiveEnded?.Invoke(reason);
             return true;
         }
@@ -206,8 +211,8 @@ namespace SleepingCalamity.Presentation
 
         private bool EnsureSyncs()
         {
-            if (FloorSync != null && HaulSync != null) return true;
-            NetworkObject floorPrefab = FindPrefab<CellarFloorSync>(), haulPrefab = FindPrefab<DiveHaulSync>();
+            if (FloorSync != null && HaulSync != null && ContentsSync != null) return true;
+            NetworkObject floorPrefab = FindPrefab<CellarFloorSync>(), haulPrefab = FindPrefab<DiveHaulSync>(), contentsPrefab = FindPrefab<CellarContentsSync>();
             if (floorPrefab == null || haulPrefab == null) { Debug.LogError("DiveDirector: CellarFloorSync / DiveHaulSync are not in the network prefab list (run the project builder)."); return false; }
             Vector3 at = NetOrigin.Value;
             if (FloorSync == null)
@@ -219,8 +224,58 @@ namespace SleepingCalamity.Presentation
                 HaulSync.Banked += OnBanked;
                 HaulSync.DiveFailed += OnDiveFailed;
             }
+            // Contents hook: the host-authoritative floor contents (chests, enemies, gate key). The director arms it per built floor and opens the stair on its ExitUnlocked.
+            if (ContentsSync == null && contentsPrefab != null)
+            {
+                ContentsSync = NetworkManager.SpawnManager.InstantiateAndSpawn(contentsPrefab, NetworkManager.LocalClientId, true, false, false, Vector3.zero, Quaternion.identity).GetComponent<CellarContentsSync>();
+                ContentsSync.FloorSync = FloorSync; ContentsSync.HaulSync = HaulSync;
+                ContentsSync.AutoArm = false;
+                ContentsSync.ExitUnlocked += ServerOpenStair;
+                RequireGateKey = true;
+            }
             return true;
         }
+
+        // Contents hook (host, every frame): arm the contents once per finished floor build, using the same build the dive markers wait for.
+        private void ContentsTick()
+        {
+            if (ContentsSync == null || !ContentsSync.IsSpawned || !NetActive.Value || FloorSync == null || FloorSync.Built == null || FloorSync.Layout == null) return;
+            if (FloorSync.BuiltFloor != HaulSync.Current.CurrentFloor || FloorSync.BuiltSeed != _seed || FloorSync.BuildCount == _armedBuild) return;
+            _armedBuild = FloorSync.BuildCount;
+            ContentsSync.ServerArmFloor(FloorSync.Layout, FloorSync.Built.Root);
+        }
+
+        // Wipe (host, every frame): every connected hero down or out during a dive ends it as a failure (PHASE1 P24). Also covers the last standing player disconnecting (their hero
+        // leaves HeroVitals.All, the rest are all down). The haul fails first, which routes through OnDiveFailed to EndDive(Failed); the direct EndDive is then a no-op.
+        private readonly List<PlayerVitals> _wipeScratch = new List<PlayerVitals>();
+        private void WipeTick()
+        {
+            if (!NetActive.Value || HaulSync == null) return;
+            _wipeScratch.Clear();
+            IReadOnlyList<HeroVitals> heroes = HeroVitals.All;
+            for (int i = 0; i < heroes.Count; i++)
+            {
+                HeroVitals v = heroes[i];
+                if (v != null && v.IsSpawned && v.NetworkManager == NetworkManager) _wipeScratch.Add(v.Model);
+            }
+            if (!PlayerVitals.AllDown(_wipeScratch)) return;
+            HaulSync.ServerFailDive();
+            EndDive(DiveEndReason.Failed);
+        }
+
+        // Wipe (host): full reset of every hero of this session (up, full HP) and the combat host's wipe state, on every dive end.
+        private void ResetParty()
+        {
+            IReadOnlyList<HeroVitals> heroes = HeroVitals.All;
+            for (int i = 0; i < heroes.Count; i++)
+            {
+                HeroVitals v = heroes[i];
+                if (v != null && v.IsSpawned && v.NetworkManager == NetworkManager) v.ServerFullReset();
+            }
+            if (CombatHost.Current != null) CombatHost.Current.ServerResetWipe();
+        }
+
+        private void ContentsClear() { _armedBuild = -1; if (ContentsSync != null && ContentsSync.IsSpawned) ContentsSync.ServerClearFloor(); }
 
         private NetworkObject FindPrefab<T>() where T : Component
         {
@@ -332,10 +387,11 @@ namespace SleepingCalamity.Presentation
         private void ResolveSyncs()
         {
             if (IsServer) return;
-            if ((FloorSync != null && HaulSync != null) || Time.unscaledTime < _nextLookup) return;
+            if ((FloorSync != null && HaulSync != null && ContentsSync != null) || Time.unscaledTime < _nextLookup) return;
             _nextLookup = Time.unscaledTime + 0.5f;
             if (FloorSync == null) foreach (CellarFloorSync s in FindObjectsByType<CellarFloorSync>(FindObjectsSortMode.None)) if (s.IsSpawned && s.NetworkManager == NetworkManager) { FloorSync = s; break; }
             if (HaulSync == null) foreach (DiveHaulSync s in FindObjectsByType<DiveHaulSync>(FindObjectsSortMode.None)) if (s.IsSpawned && s.NetworkManager == NetworkManager) { HaulSync = s; HaulSync.FloorSync = FloorSync; break; }
+            if (ContentsSync == null) foreach (CellarContentsSync s in FindObjectsByType<CellarContentsSync>(FindObjectsSortMode.None)) if (s.IsSpawned && s.NetworkManager == NetworkManager) { ContentsSync = s; break; }
         }
 
         // =================================================================================================================================
@@ -392,6 +448,7 @@ namespace SleepingCalamity.Presentation
                     else { Prompt = PromptKind.Bank; PromptText = floor == DiveState.HeartFloor ? "Bank the haul with the baker" : "Bank the haul at the checkpoint"; }
                 }
             }
+            if (ContentsSync != null && Prompt != PromptKind.None && ContentsSync.WouldUseInteract(me)) Prompt = PromptKind.None;   // contents hook: a chest or the door in reach takes the press, so one press does one thing
             if (Prompt == PromptKind.None) return;
             IInputService input = HeroInput.ResolveDefault();
             if (input == null || !input.Intent.InteractPressed) return;
@@ -421,6 +478,8 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             if (HaulSync != null) { HaulSync.Banked -= OnBanked; HaulSync.DiveFailed -= OnDiveFailed; }
+            if (ContentsSync != null) ContentsSync.ExitUnlocked -= ServerOpenStair;
+            FloorSync = null; HaulSync = null; ContentsSync = null; _haulBegun = false; _armedBuild = -1;   // a re-spawn re-creates and re-wires the syncs (EnsureSyncs)
             _hasPending = false; _placed.Clear(); _appliedFloor = 0; _appliedSeed = 0u;
             if (Instance == this) Instance = null;
         }
@@ -438,6 +497,8 @@ namespace SleepingCalamity.Presentation
             LocalInteract();
             if (!IsServer) return;
             DevKeys();
+            ContentsTick();
+            WipeTick();
             if (_clearAt >= 0f && Time.unscaledTime >= _clearAt)
             {
                 _clearAt = -1f;

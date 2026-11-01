@@ -1744,6 +1744,7 @@ MonoBehaviour:
   arenaRadius: 14
   AiEnabled: 1
   WavesEnabled: 1
+  WipeResetsParty: 1
   CritChance: 0.05
   ClearHeal: 20
 --- !u!114 &1073

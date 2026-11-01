@@ -244,7 +244,14 @@ namespace SleepingCalamity.Core
             else
             {
                 int loops = l.Links.Count - (l.Rooms.Count - 1);
-                if (loops < 1 || loops > 3) Err("has " + loops + " loop corridor(s), needs 1 to 3");
+                int minLoops = l.Preset == LayoutPreset.Spine ? 0 : 1;   // a Spine floor may be a plain chain (procgen item 2)
+                if (loops < minLoops || loops > 3) Err("has " + loops + " loop corridor(s), needs " + minLoops + " to 3");
+                // far dead-end exit (procgen item 2); the last resort keeps these rules (only the distance bound may relax)
+                if (l.StairExit.HasValue)
+                {
+                    if (!l.ExitIsLeaf()) Err("the stair exit room does not have exactly one open door");
+                    if (l.ExitAdjacentToEntry()) Err("the stair exit is next to the entry room");
+                }
                 int ends = l.Corridors.Count(c => c.Piece.Shape == CorridorShape.DeadEnd);
                 if (ends < 1 || ends > 3 || l.DeadEnds.Count != ends) Err("has " + ends + " dead end corridor cell(s) (" + l.DeadEnds.Count + " recorded), needs 1 to 3");
             }

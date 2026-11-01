@@ -13,7 +13,7 @@ namespace SleepingCalamity.EditorTools
         {
             AssetPaths.PlayerPrefab, AssetPaths.DummyPrefab,
             AssetPaths.SlimePrefab, AssetPaths.RatPrefab, AssetPaths.BroomPrefab, AssetPaths.WardenPrefab, AssetPaths.HealPrefab,
-            AssetPaths.CellarFloorSyncPrefab, AssetPaths.DiveHaulSyncPrefab, AssetPaths.DiveDirectorPrefab,
+            AssetPaths.CellarFloorSyncPrefab, AssetPaths.DiveHaulSyncPrefab, AssetPaths.DiveDirectorPrefab, AssetPaths.CellarContentsSyncPrefab,
         };
 
         public static void Build()
