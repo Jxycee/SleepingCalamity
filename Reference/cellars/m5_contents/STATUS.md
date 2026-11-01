@@ -2,8 +2,8 @@
 
 Session: M5 floor contents: enemies, chests, key + door, pieces
 Job: coordinator (session 6) re-task 2026-11-01: per-room enemy spawning from CellarEncounterPlan, chests with a rank-filtered Core loot roll, the gate key from the carrier enemy, the locked room's key + door, bakery piece spots on floors 1-3 with pieces-left, stir effects consumed (extras at 40, placeholder hunter at 70). Host-authoritative, EditMode + PlayMode host/client tests.
-Progress: 80%
-Status: IN PROGRESS (review fixes in at 434cfc0; Unity suites running; waiting for the spine on main)
+Progress: 85%
+Status: IN PROGRESS (green on the branch; waiting for the spine on main, then merge main + wiring + check)
 Blocker: none
 Archive: no
 Branch: claude/m5-contents
@@ -42,3 +42,5 @@ Merge commit: -
   - CellarFloorBuilder.Build now respects the floor root's offset: it builds at the origin, then parents the root, and Bounds/EntryCenter are in world space. Before this, the geometry ignored a parent at 200 m while the spine's WorldCell/TransformPoint markers did not, so the spine needs this fix too.
 - For the spine merge: expect conflicts in NetworkPrefabsBuilder.cs, PrefabBuilder.cs and the NetworkPrefabs asset; I keep both entries and regenerate the asset with the builder.
 - Disk: the session allowance filled with three worktree Libraries; two merged worktrees were removed.
+- Branch runs on f0cedfb: build PASS; test-edit PASS 822/822; test-play PASS 46 passed / 8 skipped / 0 failed (the 8 skips predate this job). Not the merge check.
+- CellarFloorBuilder.cs now differs from main by one removed line and one call line (ParentBuiltFloor lives in CellarFloorBuilder.Contents.cs), per the coordinator's merge-order ask (spine, contents, Q12 procgen, floor art).

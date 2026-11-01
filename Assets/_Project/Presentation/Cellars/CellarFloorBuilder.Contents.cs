@@ -11,6 +11,17 @@ namespace SleepingCalamity.Presentation
 {
     public static partial class CellarFloorBuilder
     {
+        // Build() places every part by WORLD position (CellCenter), so it builds the root unparented at the world origin (world == root-local) and calls this last:
+        // the floor then sits at parent.TransformPoint(CellCenter) wherever the parent is (the spine builds 200 m east of the hub), root.TransformPoint(CellCenter) is
+        // where each cell really is, and Bounds / EntryCenter are moved to world space with it.
+        static void ParentBuiltFloor(Transform root, Transform parent, CellarFloorBuild result)
+        {
+            root.SetParent(parent, false);
+            if (parent == null) return;
+            result.Bounds = new Bounds(root.TransformPoint(result.Bounds.center), result.Bounds.size);
+            result.EntryCenter = root.TransformPoint(result.EntryCenter);
+        }
+
         public const string ContentsGroup = "Contents", GateName = "LockedGate", GateKeyName = "GateKeyPickup";
         static readonly Dictionary<Color, Material> s_contentsMats = new Dictionary<Color, Material>();
 
