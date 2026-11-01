@@ -733,7 +733,7 @@ def prism_ax(profile, axis, a0, a1):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     return bm
 
-def solid(pc, bm, key, cham=0.025):
+def solid(pc, bm, key, cham=0.025, off=(0, 0)):
     """Chamfer the sharp edges of a closed bmesh, project world metre UVs and merge it into pc (key = material key or fn(face))."""
     bm.normal_update()
     if cham > 0:
@@ -741,7 +741,7 @@ def solid(pc, bm, key, cham=0.025):
         bmesh.ops.bevel(bm, geom=edges, offset=cham, segments=1, affect='EDGES', profile=0.5)
     bm.normal_update()
     uvl = bm.loops.layers.uv.new('UVMap')
-    FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0, 0))
+    FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, off)
     merge_faces(pc, bm, uvl, key if callable(key) else (lambda f: key))
 
 def band_profile(cx, cz, r_in, r_out, n=16):
@@ -792,7 +792,8 @@ def p_stair_flight():
     top = lambda y: s_nose(y) + 1.9                        # wall tops stay above every ring's springing (contract: nosing + 1.75)
     for sx in (-1, 1):                                     # sloped brick side walls
         bm = prism_ax([(0.0, -1.8), (2.0, -1.8), (2.0, top(2.0)), (0.0, top(0.0))], 'x', 0.6 if sx > 0 else -1.0, 1.0 if sx > 0 else -0.6)
-        solid(pc, bm, 'vault', cham=0.0)                   # grey-brown rubble side walls (unchamfered: no dark seam at piece joins)
+        # both walls projected the same (y, z) metre UVs, so the relief read mirrored left/right (as StairEntry, 522018d); the +x wall gets its own tile offset
+        solid(pc, bm, 'vault', cham=0.0, off=(0.413, 0.271) if sx > 0 else (0, 0))   # grey-brown rubble side walls (unchamfered: no dark seam at piece joins)
     for i in range(4):                                     # vault: stepped rings (0.4 down per 0.5 m) on a continuous mortar backing
         sp = 1.5 - 0.4 * i
         solid(pc, prism_ax(band_profile(0.0, sp, 0.64, 1.0), 'y', 0.5 * i - 0.01, 0.5 * (i + 1) + 0.01), 'mortar', cham=0.0)
