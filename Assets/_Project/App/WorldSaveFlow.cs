@@ -129,11 +129,13 @@ namespace SleepingCalamity.App
             {
                 bus.Publish(new ToastRequested("world.library_full", kind.ToString(), 6f));   // 10 worlds of this kind: pick one or delete one
                 world.LoadWeapons(null);   // no stale section from an earlier world
+                world.LoadTown(null);
                 return;
             }
             SelectedWorldId = store.Current.WorldId;
             world.Load(RestoreWorld(store.Current.Players));
             world.LoadWeapons(store.Current.Weapons);   // each returning player's growth is seeded from it when the CombatHost first needs them
+            world.LoadTown(store.Current);   // the town, stock, residents and dive sections for the hub's ITownSource to restore from
             Write();   // stamps the last-played time at once
             nextFlush = Time.unscaledTime + FlushSeconds;
             if (store.IsReadOnly)
@@ -190,8 +192,7 @@ namespace SleepingCalamity.App
             if (now >= nextFlush)
             {
                 nextFlush = now + FlushSeconds;
-                try { if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty(); }
-                catch (Exception e) { Debug.LogException(e); }   // keep the old section; the rest of the flush still runs
+                CaptureSections();
                 if (store.IsDirty) Write();
             }
         }
@@ -202,13 +203,22 @@ namespace SleepingCalamity.App
             if (store == null) return;
             try
             {
-                if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty();   // weapon growth changes constantly, so it is compared at each save, not marked per hit
+                CaptureSections();   // weapon growth and the town change constantly, so they are compared at each save, not marked per change
                 if (store.IsDirty) Write();
             }
             catch (Exception e)
             {
                 Debug.LogException(e);
             }
+        }
+
+        // Brings the live weapons and town into the file's value. Each is guarded alone: a failing one keeps its old section and the other still runs.
+        private void CaptureSections()
+        {
+            try { if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty(); }
+            catch (Exception e) { Debug.LogException(e); }
+            try { if (world.CaptureTownInto(store.Current)) store.MarkDirty(); }
+            catch (Exception e) { Debug.LogException(e); }
         }
 
         private void Write()
