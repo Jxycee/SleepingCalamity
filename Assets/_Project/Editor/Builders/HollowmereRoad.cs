@@ -65,7 +65,7 @@ namespace SleepingCalamity.EditorTools
         // Cameras for the road (absolute targets, eye height over the ground as the town's other cameras).
         public static readonly (string Name, Vector3 Pos, Vector3 Target, float Fov)[] Cameras =
         {
-            ("Cap_HM_RoadOut", new Vector3(-24.5f, 1.7f, -74.2f), new Vector3(-94f, -18.5f, -106f), 56f),    // from just outside the Lower Gate, down the road into the valley (R3_02 kept to the right edge)
+            ("Cap_HM_RoadOut", new Vector3(-28f, 1.7f, -71f), new Vector3(-85f, -12f, -82f), 56f),    // from the north verge just outside the Lower Gate, down the road into the valley (lot R3_01 on the south side sits at the left edge, off the road)
             ("Cap_HM_RoadBack", new Vector3(-97f, 1.7f, -87.6f), new Vector3(-32f, -3.5f, -60f), 55f),         // from the road below the first bend, back up at the gate, wall and keep
         };
 
@@ -358,11 +358,11 @@ namespace SleepingCalamity.EditorTools
         }
 
         // The three haze layers (SleepingCalamity/Backdrop): haze at DistNear, haze at DistFar, the distances, the tint on the fog colour.
-        struct Haze { public float Near, Far, D0, D1; public Color Tint; public Haze(float n, float f, float d0, float d1, Color tint) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; } }
-        static readonly Haze NearHaze = new Haze(0.62f, 0.84f, 150f, 700f, Color.white);     // the ring trees: the nearest silhouette layer
-        static readonly Haze GroundHaze = new Haze(0.86f, 0.9f, 150f, 700f, Color.white);   // the ring ground: matches the scene fog at the terrain edge (no seam)
-        static readonly Haze MidHaze = new Haze(0.78f, 0.85f, 900f, 1500f, new Color(0.98f, 1.0f, 1.03f));
-        static readonly Haze FarHaze = new Haze(0.88f, 0.91f, 1800f, 2700f, new Color(0.95f, 1.0f, 1.08f));
+        struct Haze { public float Near, Far, D0, D1; public Color Tint; public float Mist, Noise, NoiseLit; public Haze(float n, float f, float d0, float d1, Color tint, float mist, float noise, float noiseLit) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; Mist = mist; Noise = noise; NoiseLit = noiseLit; } }
+        static readonly Haze NearHaze = new Haze(0.62f, 0.84f, 150f, 700f, Color.white, 0.10f, 0.05f, 0.03f);     // the ring trees: the nearest silhouette layer
+        static readonly Haze GroundHaze = new Haze(0.76f, 0.9f, 150f, 700f, Color.white, 0.12f, 0.10f, 0.05f);   // the ring ground: matches the scene fog at the terrain edge (no seam)
+        static readonly Haze MidHaze = new Haze(0.78f, 0.85f, 900f, 1500f, new Color(0.98f, 1.0f, 1.03f), 0.03f, 0.03f, 0.02f);
+        static readonly Haze FarHaze = new Haze(0.88f, 0.91f, 1800f, 2700f, new Color(0.95f, 1.0f, 1.08f), 0.02f, 0f, 0f);
 
         static Material Backdrop(string name, Texture2D tex, Color tint, Haze h, bool cards)
         {
@@ -373,7 +373,9 @@ namespace SleepingCalamity.EditorTools
             m.SetColor("_BaseColor", tint);
             m.SetFloat("_HazeNear", h.Near); m.SetFloat("_HazeFar", h.Far); m.SetFloat("_DistNear", h.D0); m.SetFloat("_DistFar", h.D1);
             m.SetColor("_HazeTint", h.Tint);
-            m.SetFloat("_GroundMist", h.Near < 0.75f ? 0.06f : 0f); m.SetFloat("_MistTop", -8f);   // foot mist only on the near layer (on the hills it read as a pale water band)
+            m.SetFloat("_GroundMist", h.Mist); m.SetFloat("_MistTop", -8f); m.SetFloat("_MistScale", 30f);   // smooth exp foot mist; subtle on the hills (an earlier hard ramp read as a pale water band)
+            m.SetFloat("_NoiseAmp", h.Noise); m.SetFloat("_NoiseLit", h.NoiseLit);
+            m.SetColor("_ShadowTint", new Color(0.30f, 0.38f, 0.48f)); m.SetColor("_HazeCool", new Color(0.80f, 0.92f, 1.12f)); m.SetFloat("_HazeCoolAmt", 0.7f);
             m.SetFloat("_AlphaClip", cards ? 1f : 0f); m.SetFloat("_Cutoff", 0.5f);
             if (cards) m.EnableKeyword("_ALPHATEST_ON"); else m.DisableKeyword("_ALPHATEST_ON");
             m.SetFloat("_Cull", (float)(cards ? CullMode.Off : CullMode.Back));
