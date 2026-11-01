@@ -4,7 +4,7 @@
 //   - every room draws from its own stream Rng.Derive(seed, "cellars.clutter", floor << 32 | roomIndex), the corridors from index floor << 32 | 0xFFFF; every roll of
 //     a candidate is always drawn, so changing one rule never shifts another cell's pick. No string.GetHashCode, no float in a decision (positions are whole centimetres).
 //   - rooms: only floor cells that touch a closed wall side carry clutter, pushed to the wall face. Never on a door cell; the cell in front of a door takes clutter only where every footprint stays DoorLaneClearCm (1.2 m) from the door's axis (the 2.4 m opening's lane stays free). Never on a
-//     chest, key, entry start, stair exit, bank, baker, warden, carrier, the healing point, a vignette cell, a feature cell or a filled socket cell (Lantern and
+//     chest, key, entry start, stair exit, bank, baker, warden, carrier, the healing point, a vignette cell, a feature cell, a chunk solid cell (block or cover, procgen item 4: clutter is dressing and yields to the room's structure) or a filled socket cell (Lantern and
 //     Roots sockets hang overhead and leave the floor free), and not on the cell orthogonally beside the entry start or the stair exit. A piece hugs the wall inside its own
 //     4 m cell, so it is always 1.9 m or more from the centre of any marker in a neighbouring cell ("adjacent" is met by that clearance, which the tests measure). A spawn cell and
 //     every encounter cell take clutter only where the footprint (nearest point) keeps EncounterClearCm (1.0 m) from the cell centre. The cell nearest the room's centre stays open.
@@ -81,7 +81,8 @@ namespace SleepingCalamity.Core
             return h.Value;
         }
 
-        public static CellarFloorClutter Resolve(CellarFloorLayout layout, CellarFloorDressing dressing)
+        // chunks: the resolved procgen item 4 chunk regions of the same (seed, floor) (they never read clutter, so there is no cycle); null = chunk-unaware (older callers).
+        public static CellarFloorClutter Resolve(CellarFloorLayout layout, CellarFloorDressing dressing, CellarRoomChunks chunks = null)
         {
             if (layout == null) throw new ArgumentNullException(nameof(layout));
             if (dressing == null) throw new ArgumentNullException(nameof(dressing));
@@ -104,6 +105,9 @@ namespace SleepingCalamity.Core
             if (heal.HasValue) Ban(onlyBan, heal.Value.X, heal.Value.Y);
             foreach (PlacedVignette v in dressing.Vignettes) Ban(onlyBan, v.Cell.X, v.Cell.Y);
             foreach (DressedSocket s in dressing.Sockets) if (s.Filled && s.Kind != SocketKind.Lantern && s.Kind != SocketKind.Roots) Ban(onlyBan, s.Cell.X, s.Cell.Y);   // lanterns and roots hang overhead: nothing on the floor
+            if (chunks != null)
+                foreach (ResolvedChunk ch in chunks.Chunks)
+                    if (!ch.IsOpen) foreach (var (cell, _) in CellarRoomChunks.SolidCells(layout, ch)) Ban(onlyBan, cell.X, cell.Y);   // block and cover cells
             var spawnCell = new bool[n, n];
             var doorOutside = new bool[n, n];   // the corridor cell in front of any door
             var lanes = new Dictionary<(int, int), List<(bool xAxis, int axisCm)>>();   // cells inside, in front of a door: the lanes their clutter must keep clear of
