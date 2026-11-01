@@ -37,6 +37,12 @@ namespace SleepingCalamity.Runtime
         public int windowMode = DefaultWindowMode();   // 0..2 = WindowModeKind (Fullscreen, Borderless, Windowed); default Borderless (the project default), Windowed for a secondary local instance
         public int resolutionWidth = 0, resolutionHeight = 0;   // 0 x 0 = native (leave the desktop resolution alone); otherwise 640x480 and up
 
+        // Hit feedback (hit-feedback.md section 12). Added without a version bump like the Graphics rows: an older settings.json lacks these keys and keeps
+        // the defaults (full shake and rumble, flashes as designed). Read by Presentation's FeedbackDirector.
+        public float shakeScale = 1f;              // 0..1: camera shake from hits (0 = none)
+        public float rumbleScale = 1f;             // 0..1: controller rumble (0 = none)
+        public bool reduceFlashes = false;         // caps the hit flash at half brightness and three flashes a second
+
         // A second local instance (-dev-profile / MPPM clone, settings suffix not empty) starts Windowed so two built instances on one
         // machine do not cover each other. The main instance keeps the project's full-screen window.
         private static int DefaultWindowMode()
@@ -60,6 +66,8 @@ namespace SleepingCalamity.Runtime
             fieldOfView = ClampFloat(fieldOfView, 80f, 110f, 90f);
             cameraMotion = ClampFloat(cameraMotion, 0f, 1f, 1f);
             uiScalePercent = ClampInt(uiScalePercent, 80, 150);
+            shakeScale = ClampFloat(shakeScale, 0f, 1f, 1f);
+            rumbleScale = ClampFloat(rumbleScale, 0f, 1f, 1f);
             ClampGraphics();
             if (bindingOverridesJson == null) bindingOverridesJson = "";
             localPlayerId = SleepingCalamity.Core.PlayerKey.NormalizeLocalId(localPlayerId);   // a lowercase GUID "N" id, else "" (a fresh one is made)
