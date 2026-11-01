@@ -16,6 +16,8 @@ using UnityEngine;
 namespace SleepingCalamity.Presentation
 {
     // What the builder dresses with. Every field may be null; a null material falls back to a flat URP Lit colour.
+    // [Serializable] so CellarFloorSync can carry one on its prefab (the Editor builder saves the templates as prefab assets and fills it in).
+    [System.Serializable]
     public sealed class CellarFloorKit
     {
         public Material Floor, Wall, Pillar, Trim, Flame;
@@ -29,7 +31,18 @@ namespace SleepingCalamity.Presentation
         public Material Ceiling, Limewash, Iron, Wax, Mote, Crate;   // vault stone, end-wall limewash, chains and hooks, candles, dust motes, crates
         // B5 CellarVault pieces by name (VaultSegment, ArchRib, Pillar, EndWall, NicheWall, LarderShelf, CoalChute, Barrels, Roots, BreathGrate): each a holder
         // whose child is the piece at its authored pivot, so the builder only moves, turns and scales the holder. Missing pieces fall back to boxes or nothing.
-        public Dictionary<string, GameObject> Pieces;
+        [System.Serializable] public struct NamedPiece { public string Name; public GameObject Prefab; }
+        public List<NamedPiece> PieceList = new List<NamedPiece>();   // the serialized form (a prefab cannot hold a Dictionary)
+        private Dictionary<string, GameObject> _pieces;
+        public Dictionary<string, GameObject> Pieces
+        {
+            get
+            {
+                if (_pieces == null) { _pieces = new Dictionary<string, GameObject>(); foreach (NamedPiece n in PieceList) if (n.Prefab != null && !string.IsNullOrEmpty(n.Name)) _pieces[n.Name] = n.Prefab; }
+                return _pieces;
+            }
+            set { _pieces = value; }
+        }
     }
 
     public sealed class CellarFloorBuild

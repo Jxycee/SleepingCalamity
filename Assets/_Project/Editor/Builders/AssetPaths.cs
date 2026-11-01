@@ -15,11 +15,13 @@ namespace SleepingCalamity.EditorTools
         public const string CellarFloorSyncPrefab = "Assets/_Project/Prefabs/CellarFloorSync.prefab"; // M5 stage 3: host-spawned holder of the dive seed and floor id (NetworkObject)
         public const string CellarContentsSyncPrefab = "Assets/_Project/Prefabs/CellarContentsSync.prefab"; // M5 contents: host-spawned room enemies, chests, keys, locked door, pieces (NetworkObject)
         public const string DiveHaulSyncPrefab = "Assets/_Project/Prefabs/DiveHaulSync.prefab"; // M5 banking: host-spawned holder of the shared haul summary (NetworkObject)
+        public const string DiveDirectorPrefab = "Assets/_Project/Prefabs/DiveDirector.prefab"; // M5 spine: host-spawned dive flow owner (NetworkObject)
         public const string ScenesFolder = "Assets/_Project/Scenes";
         public const string BootstrapScene = "Assets/_Project/Scenes/Bootstrap.unity";
         public const string LobbyScene = "Assets/_Project/Scenes/Lobby.unity";
         public const string ArenaScene = "Assets/_Project/Scenes/Arena_Greybox.unity";
         public const string CombatArenaScene = "Assets/_Project/Scenes/Arena_Combat.unity";   // M3: the combat arena
+        public const string DiveArenaScene = "Assets/_Project/Scenes/Arena_Dive.unity";   // M5: the Cellars dive hub
         public const string SlimePrefab = "Assets/_Project/Prefabs/EnemySlime.prefab";       // M3: host-spawned enemies (NetworkObject)
         public const string RatPrefab = "Assets/_Project/Prefabs/EnemyRatKing.prefab";
         public const string BroomPrefab = "Assets/_Project/Prefabs/EnemyBroom.prefab";
