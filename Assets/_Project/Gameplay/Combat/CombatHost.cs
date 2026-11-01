@@ -30,7 +30,7 @@ namespace SleepingCalamity.Gameplay
         private static void Reset() { Wave = 0; EnemiesLeft = 0; Tier = 1; State = WaveState.Idle; }
     }
 
-    public sealed class CombatHost : MonoBehaviour
+    public sealed class CombatHost : MonoBehaviour, HostWorld.IGrowthSource
     {
         public static CombatHost Current { get; private set; }
 
@@ -46,9 +46,31 @@ namespace SleepingCalamity.Gameplay
         private NetworkManager _nm;
         private Pcg32 _rng = Rng.Stream(0x5CA11UL, "combat.crit", 0UL);
         private readonly Dictionary<string, PlayerGrowth> _growth = new Dictionary<string, PlayerGrowth>();
+        private readonly Dictionary<string, string> _ownerIds = new Dictionary<string, string>();   // growth id -> PlayerKey.Id, for the players whose key is known (the saved ones)
+        private HostWorld _world;
+        // The world that holds the saved weapons section. Set by tests; otherwise found in the app services (null with no session).
+        public HostWorld GrowthWorld { get { return World(); } set { _world = value; } }
+        private bool _growthRegistered;
         private readonly Dictionary<ulong, HostPlayerState> _states = new Dictionary<ulong, HostPlayerState>();
         private readonly HashSet<long> _enemyHitDedupe = new HashSet<long>();   // (victim client << 32) | enemy attack serial; serials are unique per host (Enemy)
         private readonly List<Enemy> _alive = new List<Enemy>();
+        // Host: ONE set of attack tokens for the whole host (pools are keyed per hero, and targeting is world-wide, so a hero's caps and strike gap must hold
+        // across every room's enemies) and one crowd (membership) per room that shares it (docs/research/enemy-ai.md 10.4).
+        public readonly AttackTokens Tokens = new AttackTokens();
+        private readonly Dictionary<int, EnemyCrowd> _crowds = new Dictionary<int, EnemyCrowd>();
+        private float _auditIn = EnemyCrowd.AuditSeconds;
+        public EnemyCrowd CrowdFor(int room)
+        {
+            if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd(Tokens);
+            return c;
+        }
+
+        // Frees tokens whose holder is not a living member of any crowd (a missed Release can never shrink a pool for good).
+        private bool IsLiveHolder(int id)
+        {
+            foreach (EnemyCrowd c in _crowds.Values) if (c.IsLive(id)) return true;
+            return false;
+        }
         private readonly List<PlayerVitals> _party = new List<PlayerVitals>();   // scratch for Update (no per-frame allocation)
 
         private WaveState _wave = WaveState.Idle;
@@ -77,7 +99,12 @@ namespace SleepingCalamity.Gameplay
         }
 
         private void OnEnable() { Current = this; }
-        private void OnDisable() { if (Current == this) Current = null; }
+        private void OnDisable()
+        {
+            if (Current == this) Current = null;
+            if (_growthRegistered && _world != null) _world.UnregisterGrowthSource(this);   // keeps these players' growth in the world for the next CombatHost and the save
+            _growthRegistered = false;
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { Current = null; }
@@ -90,6 +117,7 @@ namespace SleepingCalamity.Gameplay
             _begun = true;
             // A CombatHost made without an Identity (CellarContentsSync.EnsureCombat) takes the session's roster, so its growth is keyed per recorded player.
             if (Identity == null && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostRoster roster)) Identity = roster;
+            if (World() != null) { _world.RegisterGrowthSource(this); _growthRegistered = true; }
             _wave = WavesEnabled ? WaveState.Countdown : WaveState.Idle;
             _waveTimer = 4f;
             _waveNumber = 1;
@@ -108,15 +136,38 @@ namespace SleepingCalamity.Gameplay
             return Identity != null && Identity.TryGetKey(clientId, out PlayerKey key) ? key.ToString() : clientId.ToString();
         }
 
+        // The session's HostWorld (holds the saved weapons section), or null in tests with no session.
+        private HostWorld World()
+        {
+            if (_world == null && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostWorld w)) _world = w;
+            return _world;
+        }
+
+        // A recorded player's first call restores their saved growth (weapons, abilities, pips) from the world; a player with no entry starts fresh.
         public PlayerGrowth Growth(ulong clientId)
         {
             string id = PlayerIdOf(clientId);
             if (!_growth.TryGetValue(id, out PlayerGrowth g))
             {
-                g = new PlayerGrowth(id);
+                PlayerKey key = default;
+                bool keyed = Identity != null && Identity.TryGetKey(clientId, out key) && !string.IsNullOrEmpty(key.Id);
+                if (keyed)
+                {
+                    HostWorld w = World();
+                    if (w != null) { w.CaptureWeapons(); g = w.RestoreGrowth(id, key); }   // capture first: another live host's newer growth is in the section before we restore
+                }
+                if (g == null) g = new PlayerGrowth(id);
                 _growth[id] = g;
+                if (keyed) _ownerIds[id] = key.Id;
             }
             return g;
+        }
+
+        // HostWorld.IGrowthSource: writes every keyed player's growth into the world save section. Authority: host.
+        public void CaptureGrowth(WeaponsSave into)
+        {
+            foreach (KeyValuePair<string, string> kv in _ownerIds)
+                if (_growth.TryGetValue(kv.Key, out PlayerGrowth g)) GrowthSaves.Capture(g, kv.Value, into);
         }
 
         private HostPlayerState StateOf(ulong clientId)
@@ -132,7 +183,7 @@ namespace SleepingCalamity.Gameplay
             if (hero == null || !hero.IsSpawned) return;
             PlayerGrowth g = Growth(hero.OwnerClientId);
             // Every growth change (hit ABS, kill ABS, spell pips, build-up) ends in this call, so unlocks are checked here, for all weapons: a kill can credit
-            // a weapon other than the one in hand. Unlocks only grow. Kept per recorded player for the life of this CombatHost instance (the arena and the Cellars each own one); not saved yet (WeaponsSave restore is M6).
+            // a weapon other than the one in hand. Unlocks only grow. Kept per recorded player; saved in the world's weapons section (HostWorld, WorldSaveFlow) and restored when the player's growth is first needed.
             foreach (WeaponState owned in g.Weapons.Values) g.Abilities.Update(owned);
             WeaponState w = g.Weapon(hero.WeaponKey);
             hero.ServerPushGrowth(hero.WeaponKey, w.Level, w.Abs, w.LevelCostNow, w.Stats.Atk, w.Stats.Fire, w.Stats.Pest, g.Pips.Current, g.Pips.Cap);
@@ -370,7 +421,7 @@ namespace SleepingCalamity.Gameplay
         // Spawning
         // =================================================================================================================================
 
-        public Enemy SpawnEnemy(EnemyKind kind, int tier, Vector3 position, bool ai = true)
+        public Enemy SpawnEnemy(EnemyKind kind, int tier, Vector3 position, bool ai = true, int room = EnemyCrowd.ArenaRoom)
         {
             if (_nm == null || !_nm.IsServer) return null;
             NetworkObject prefab = kind == EnemyKind.Slime ? slimePrefab : kind == EnemyKind.RatKing ? ratPrefab : kind == EnemyKind.Broom ? broomPrefab : wardenPrefab;
@@ -381,6 +432,7 @@ namespace SleepingCalamity.Gameplay
             NetworkObject instance = Instantiate(prefab, position, rot);
             Enemy e = instance.GetComponent<Enemy>();
             e.ServerSeed(kind, tier, PlayerCount());
+            e.ServerJoinCrowd(CrowdFor(room));
             e.AiEnabled = AiEnabled && ai;
             instance.Spawn(destroyWithScene: true);
             _alive.Add(e);
@@ -414,6 +466,9 @@ namespace SleepingCalamity.Gameplay
             foreach (Enemy e in new List<Enemy>(_alive))
                 if (e != null && e.NetworkObject != null && e.NetworkObject.IsSpawned) e.NetworkObject.Despawn(true);
             _alive.Clear();
+            // Wipe, floor change, F6: every room is over. Drop the crowds and the shared tokens so none outlives its enemies (a new room gets a fresh crowd).
+            _crowds.Clear();
+            Tokens.Clear();
         }
 
         // Test hook (the bot playtester): clear the arena and count down into `wave` (e.g. 5, the first tier-2 wave).
@@ -439,6 +494,12 @@ namespace SleepingCalamity.Gameplay
         {
             if (!_begun || _nm == null || !_nm.IsServer || !_nm.IsListening) return;
             float dt = Time.deltaTime;
+            _auditIn -= dt;
+            if (_auditIn <= 0f)
+            {
+                _auditIn = EnemyCrowd.AuditSeconds;
+                Tokens.Audit(Time.timeAsDouble, IsLiveHolder);
+            }
             for (int i = _alive.Count - 1; i >= 0; i--)
             {
                 Enemy x = _alive[i];

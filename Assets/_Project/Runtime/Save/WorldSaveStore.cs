@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Weapons;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -35,6 +36,7 @@ namespace SleepingCalamity.Runtime
             ("worldId", typeof(string), WorldSaveRules.SectionWorldId),
             ("createdAtUtc", typeof(string), WorldSaveRules.SectionCreatedAt),
             ("players", typeof(WorldPlayersSave), WorldSaveRules.SectionPlayers),
+            ("weapons", typeof(WeaponsSave), WorldSaveRules.SectionWeapons),
         };   // every optional WorldSave section needs its row here, or one misfit value costs the whole file (WorldSaveStoreTests checks)
 
         // The sections every field of WorldSave maps to (by its JSON key), for the test that no section is missing from the table.
@@ -46,6 +48,8 @@ namespace SleepingCalamity.Runtime
         static readonly (string section, string array, Type element)[] ArraySections =
         {
             ("players", "recorded", typeof(WorldPlayerSave)),
+            ("weapons", "weapons", typeof(WeaponSave)),
+            ("weapons", "heroes", typeof(HeroSave)),
         };
 
         // Members of a section that are checked one by one: a member that does not fit is dropped alone (section key, member key, type). A dropped
