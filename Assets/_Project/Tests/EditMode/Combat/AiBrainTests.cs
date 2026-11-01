@@ -87,7 +87,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(a.MoveSpeed, Is.EqualTo(0f), "starting an attack ends the tick without moving");
             Assert.That(tokens.Holds(1, 10.0), Is.True);
             Assert.That(tokens.HoldersOn(100, 10.0), Is.EqualTo(1));
-            tokens.Release(1);   // what a stagger, parry, death or despawn does
+            tokens.Release(1, 10.0);   // what a stagger, parry, death or despawn does
             Assert.That(tokens.Holds(1, 10.0), Is.False);
         }
 
@@ -166,13 +166,13 @@ namespace SleepingCalamity.Tests.EditMode
             {
                 AiAction a = brain.Tick(Ctx(def, 2f, tier: 1, time: t));
                 Assert.That(a.StartAttack, Is.Not.Null.And.Not.SameAs(AttackCatalog.WardenQuake), "attack " + i);
-                tokens.Release(1);
+                tokens.Release(1, t);
                 t += 5.0;
             }
             AiAction sig = brain.Tick(Ctx(def, 2f, tier: 1, time: t));
             Assert.That(sig.StartAttack, Is.SameAs(AttackCatalog.WardenQuake));
             // The counter restarts: the next one is an ordinary attack again.
-            tokens.Release(1);
+            tokens.Release(1, t);
             AiAction after = brain.Tick(Ctx(def, 2f, tier: 1, time: t + 8.0));
             Assert.That(after.StartAttack, Is.Not.SameAs(AttackCatalog.WardenQuake));
         }

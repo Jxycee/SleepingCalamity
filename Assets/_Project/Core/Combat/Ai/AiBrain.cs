@@ -104,7 +104,7 @@ namespace SleepingCalamity.Core.Combat
             else if (c.CooldownLeft <= 0f && _tokenRetry <= 0f)
             {
                 PacingProfile pacing = AttackPacing.ForTier(c.Tier);
-                if (_tokens.TryAcquire(t.Id, c.SelfId, c.Time, next, pacing, exclusive: next == AttackCatalog.WardenQuake, category: c.Def.TokenCategory))
+                if (_tokens.TryAcquire(t.Id, c.SelfId, c.Time, next, pacing, exclusive: next == AttackCatalog.WardenQuake, category: c.Def.CategoryOf(next)))
                 {
                     _waiting = false;
                     a.StartAttack = next;

@@ -34,7 +34,7 @@ namespace SleepingCalamity.Core.Combat
         public readonly bool Ripostes;          // its blocked front hits count toward the bristle riposte (GuardCounter)
         public readonly AttackData[] Attacks;
         public readonly PartDefinition[] Parts;
-        public readonly TokenCategory TokenCategory;   // which of a hero's attack-token pools its attacks draw from (docs/research/enemy-ai.md 2.3, 5)
+        public readonly TokenCategory TokenCategory;   // the attack-token pool its attacks draw from unless an attack names its own (AttackData.TokenPool; docs/research/enemy-ai.md 2.3, 5)
 
         public EnemyDefinition(EnemyKind kind, string id, string name, Species species, int hp, float atk, float def, float moveSpeed, float radius, float height,
             AttackData[] attacks, bool isElite = false, bool canRage = true, bool frontalBlock = false, bool superArmorAlways = false, bool weakToFire = false,
@@ -49,6 +49,9 @@ namespace SleepingCalamity.Core.Combat
             Attacks = attacks; IsElite = isElite; CanRage = canRage; FrontalBlock = frontalBlock; SuperArmorAlways = superArmorAlways; WeakToFire = weakToFire;
             IsPest = isPest; StaggerSeconds = staggerSeconds; Parts = parts ?? Array.Empty<PartDefinition>();
         }
+
+        // The pool one attack draws from: its own, else the enemy's default.
+        public TokenCategory CategoryOf(AttackData attack) => attack != null && attack.TokenPool.HasValue ? attack.TokenPool.Value : TokenCategory;
     }
 
     public static class EnemyCatalog

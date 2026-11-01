@@ -1,20 +1,23 @@
 // Gameplay/Combat/EnemyCrowd.cs: the enemies of one room and the attack tokens they share (docs/research/enemy-ai.md 2.3, 10.4).
 // Authority: host only. CombatHost owns one crowd per room (EnemyCrowd.ArenaRoom for the arena and anything spawned without a room); nothing here is
-// replicated. Enemies Register on spawn and Unregister on death or despawn, so a room's table never holds a dead enemy's token and two rooms never
-// share one table.
+// replicated. A crowd is the room's MEMBERSHIP (Register on spawn, Unregister on death or despawn; room planners later). The attack tokens are NOT per
+// room: every crowd of one CombatHost shares the host's single AttackTokens, because a hero's pools and strike gap must hold across every enemy that can
+// target it, whichever room it spawned in (targeting is world-wide). Only an enemy spawned outside CombatHost gets a private crowd with its own tokens.
 using System.Collections.Generic;
 using SleepingCalamity.Core.Combat;
+using UnityEngine;
 
 namespace SleepingCalamity.Gameplay
 {
     public sealed class EnemyCrowd
     {
         public const int ArenaRoom = -1;                 // the single default crowd (arena, hunter, anything spawned without a room index)
-        public const float AuditSeconds = 2f;
+        public const float AuditSeconds = 2f;   // how often CombatHost audits the shared tokens
 
-        public readonly AttackTokens Tokens = new AttackTokens();
+        public readonly AttackTokens Tokens;
         private readonly Dictionary<int, Enemy> _members = new Dictionary<int, Enemy>();
-        private float _auditIn = AuditSeconds;
+
+        public EnemyCrowd(AttackTokens tokens) { Tokens = tokens ?? new AttackTokens(); }
 
         public int Count => _members.Count;
         public bool Contains(Enemy e) => e != null && _members.ContainsKey(e.GetHashCode());
@@ -30,18 +33,11 @@ namespace SleepingCalamity.Gameplay
             if (e == null) return;
             int id = e.GetHashCode();
             _members.Remove(id);
-            Tokens.Release(id);
+            Tokens.Release(id, Time.timeAsDouble);
         }
 
-        // Host, every frame: about every AuditSeconds frees tokens whose holder is no longer a living member (a missed Release can never shrink a pool for good).
-        public void Tick(float dt, double now)
-        {
-            _auditIn -= dt;
-            if (_auditIn > 0f) return;
-            _auditIn = AuditSeconds;
-            Tokens.Audit(now, IsLive);
-        }
-
-        private bool IsLive(int id) => _members.TryGetValue(id, out Enemy e) && e != null && e.Alive;
+        // True while `id` is a living member of this room. The shared tokens are audited once by CombatHost against every crowd (a crowd alone would free
+        // the other rooms' holds).
+        public bool IsLive(int id) => _members.TryGetValue(id, out Enemy e) && e != null && e.Alive;
     }
 }

@@ -55,9 +55,10 @@ namespace SleepingCalamity.Gameplay
         private static int s_nextAttackSerial;
 
         // Host: the room's crowd (CombatHost owns it) holds who may attack which hero right now (Core AttackTokens; keys are the Unity objects' hash codes,
-        // their instance ids, unique across the NetworkManagers of a test process). An enemy spawned outside CombatHost gets a private crowd of its own.
+        // their instance ids, unique across the NetworkManagers of a test process). The tokens are the host's single set, shared by every room's crowd; an enemy
+        // spawned outside CombatHost gets a private crowd (and tokens) of its own.
         public EnemyCrowd Crowd { get; private set; }
-        private AttackTokens Tokens => (Crowd ??= new EnemyCrowd()).Tokens;
+        private AttackTokens Tokens => (Crowd ??= new EnemyCrowd(new AttackTokens())).Tokens;
         public void ServerJoinCrowd(EnemyCrowd crowd) { Crowd = crowd; }
 
         private Targetable _targetable;
@@ -405,7 +406,7 @@ namespace SleepingCalamity.Gameplay
             {
                 _attackEndedAt = Time.timeAsDouble;
                 NetAttackIdx.Value = -1;
-                Tokens.Release(GetHashCode());
+                Tokens.Release(GetHashCode(), Time.timeAsDouble);
                 _cooldown = AttackPacing.CooldownSeconds(Def.Kind, Tier);
                 _recoverLeft = AttackPacing.RecoverSeconds(Def.Kind, Tier) + (a == AttackCatalog.WardenQuake ? AttackPacing.SignatureExtraRecoverSeconds : 0f);
                 Vector3 away = target != null ? transform.position - target.transform.position : -transform.forward;
@@ -481,8 +482,8 @@ namespace SleepingCalamity.Gameplay
                 // The broom's guard was hammered: it answers whatever the tokens say (like the break-free), recording a forced hold on its nearest hero so
                 // later attacks keep their gap from it.
                 HeroVitals near = PickTarget();
-                if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.BroomRiposte, Def.TokenCategory);
-                else Tokens.Release(GetHashCode());
+                if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.BroomRiposte, AttackPacing.ForTier(Tier), Def.CategoryOf(AttackCatalog.BroomRiposte));
+                else Tokens.Release(GetHashCode(), Time.timeAsDouble);
                 ServerStartAttack(AttackCatalog.BroomRiposte, transform.position);
             }
             if (r.Knockback > 0f) _knock += away * r.Knockback;
@@ -491,8 +492,8 @@ namespace SleepingCalamity.Gameplay
                 // Break free: a quick circle that clears everyone off it (the elite's answer to being chained). It answers the heroes hitting it, so it
                 // starts whatever the tokens say, but records a forced hold on its nearest hero so the next attacks keep their gap from it.
                 HeroVitals near = PickTarget();
-                if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.WardenBreakFree, Def.TokenCategory);
-                else Tokens.Release(GetHashCode());
+                if (near != null) Tokens.ForceAcquire(near.GetHashCode(), GetHashCode(), Time.timeAsDouble, AttackCatalog.WardenBreakFree, AttackPacing.ForTier(Tier), Def.CategoryOf(AttackCatalog.WardenBreakFree));
+                else Tokens.Release(GetHashCode(), Time.timeAsDouble);
                 ServerStartAttack(AttackCatalog.WardenBreakFree, transform.position);
             }
             return r;
@@ -504,7 +505,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (Phase == EnemyPhase.Attack) _attackEndedAt = Time.timeAsDouble;
             NetAttackIdx.Value = -1;
-            Tokens.Release(GetHashCode());
+            Tokens.Release(GetHashCode(), Time.timeAsDouble);
         }
 
         // Host: the enemy is open (x1.5, double poise): flinching or stunned, recovering after its attack, or past the hitbox of the attack it is in.

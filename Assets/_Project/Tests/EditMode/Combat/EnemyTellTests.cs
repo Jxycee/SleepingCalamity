@@ -174,7 +174,7 @@ namespace SleepingCalamity.Tests.EditMode
             var wide = new PacingProfile(1, 0f, 1f, 1f, 0.3f);
             Assert.That(t.TryAcquire(Hero, 10, 0.0, AttackCatalog.WardenSlam, wide), Is.True);
             Assert.That(t.TryAcquire(Hero, 11, 0.1, AttackCatalog.SlimeHop, wide), Is.False);
-            t.Release(10);
+            t.Release(10, 0.1);
             Assert.That(t.TryAcquire(Hero, 11, 0.1, AttackCatalog.SlimeHop, wide), Is.True);
             t.Clear();
             Assert.That(t.Count, Is.EqualTo(0));
@@ -227,7 +227,7 @@ namespace SleepingCalamity.Tests.EditMode
             var u = new AttackTokens();
             Assert.That(u.TryAcquire(Hero, 11, 0.0, AttackCatalog.WardenSlam, P), Is.True);
             Assert.That(u.TryAcquire(Hero, 10, 0.0, AttackCatalog.WardenQuake, P, exclusive: true), Is.False);
-            u.Release(10);   // the elite died or despawned
+            u.Release(10, 0.0);   // the elite died or despawned
             Assert.That(u.IsReserved(Hero, 0.0), Is.False);
         }
 
@@ -237,12 +237,14 @@ namespace SleepingCalamity.Tests.EditMode
             var t = new AttackTokens();
             var one = new PacingProfile(1, 0.5f, 1f, 1f, 0.3f);
             Assert.That(t.TryAcquire(Hero, 11, 0.0, AttackCatalog.WardenPound, one), Is.True);
-            t.ForceAcquire(Hero, 10, 0.0, AttackCatalog.WardenBreakFree);   // past the cap of one
+            t.ForceAcquire(Hero, 10, 0.0, AttackCatalog.WardenBreakFree, one);   // past the cap of one
             Assert.That(t.HoldersOn(Hero, 0.0), Is.EqualTo(2), "recorded although the cap was full");
-            t.Release(11);
+            t.Release(11, 0.0);
             Assert.That(t.TryAcquire(Hero, 12, 0.0, AttackCatalog.SlimeHop, one), Is.False, "the break-free's hold still counts");
-            double after = AttackCatalog.WardenBreakFree.HitOn.End / 60.0 + 0.01;
-            Assert.That(t.TryAcquire(Hero, 12, after, AttackCatalog.SlimeHop, one), Is.True);
+            double windowEnd = AttackCatalog.WardenBreakFree.HitOn.End / 60.0;
+            // a lunge started just after the window closed would strike 0.477 s after it: inside the gap tail the forced hold leaves (0.5 s)
+            Assert.That(t.TryAcquire(Hero, 12, windowEnd + 0.01, AttackCatalog.RatLunge, one), Is.False, "the forced hold leaves the normal gap tail");
+            Assert.That(t.TryAcquire(Hero, 12, windowEnd + 0.04, AttackCatalog.RatLunge, one), Is.True, "strike 0.507 s after the window");
         }
 
         [Test]

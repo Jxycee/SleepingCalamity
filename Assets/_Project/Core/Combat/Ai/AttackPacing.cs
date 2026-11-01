@@ -111,7 +111,8 @@ namespace SleepingCalamity.Core.Combat
     // Audit frees any hold whose holder is gone or that outlived a timeout.
     //
     // Pools are per hero AND per category (PacingProfile.PoolSize); the gap between hit windows is per hero across every category, so a rat's lunge and a
-    // slime's glob can wind up together but never land together. A window that has closed stays on record for the gap (a "tail"), so the next attack
+    // slime's glob can wind up together but never land together. ONE AttackTokens serves the whole CombatHost (every room's crowd shares it), so a hero's pools
+    // and gap hold however many rooms its attackers come from. A window that has closed stays on record for the gap (a "tail"), so the next attack
     // cannot open inside it either.
     //
     // The elite's signature is EXCLUSIVE: its tell plays alone on that hero. When others still hold tokens it cannot start yet, so it RESERVES the hero:
@@ -177,7 +178,7 @@ namespace SleepingCalamity.Core.Combat
                 return false;
             }
             if (clash || inPool >= pacing.PoolSize(category)) return false;
-            Release(holder);
+            Release(holder, now);
             _holds.Add(new Hold
             {
                 Target = target, Holder = holder, Acquired = now, StrikeStart = s, StrikeEnd = e, Gap = pacing.MinStrikeGapSeconds,
@@ -206,8 +207,11 @@ namespace SleepingCalamity.Core.Combat
             if (at < 0) return false;
             Hold saved = _holds[at];
             _holds.RemoveAt(at);
+            int reservedBefore = _reserved.Count;
             if (TryAcquire(target, holder, now, attack, pacing, exclusive, category, begin: true, distance: distance)) return true;
-            _holds.Insert(Math.Min(at, _holds.Count), saved);   // refused anyway: the old holder keeps it
+            // Refused anyway: the old holder keeps it, and an exclusive swapper's refused ask must not leave its reservation behind (it would block the hero).
+            if (_reserved.Count > reservedBefore) _reserved.RemoveRange(reservedBefore, _reserved.Count - reservedBefore);
+            _holds.Insert(Math.Min(at, _holds.Count), saved);
             return false;
         }
 
@@ -224,22 +228,36 @@ namespace SleepingCalamity.Core.Combat
         }
 
         // An attack that must start now whatever the tokens say (the elite's revenge break-free answers being chained): it is recorded without checking the
-        // cap, the gap or a reservation, so the attacks that come after it still keep their gap from it.
-        public void ForceAcquire(int target, int holder, double now, AttackData attack, TokenCategory category = TokenCategory.Melee)
+        // cap, the gap or a reservation, so the attacks that come after it still keep their gap from it: it leaves the normal tail (pacing's gap) once its
+        // hit window closes, like any other hold.
+        public void ForceAcquire(int target, int holder, double now, AttackData attack, in PacingProfile pacing, TokenCategory category = TokenCategory.Melee)
         {
             if (attack == null) return;
-            Expire(now);
-            Release(holder);
+            Release(holder, now);
             _holds.Add(new Hold
             {
-                Target = target, Holder = holder, Acquired = now, Started = true, Category = category,
+                Target = target, Holder = holder, Acquired = now, Started = true, Category = category, Gap = pacing.MinStrikeGapSeconds,
                 StrikeStart = now + attack.HitOn.Start / (double)AttackData.FrameRate, StrikeEnd = now + attack.HitOn.End / (double)AttackData.FrameRate,
             });
         }
 
-        public void Release(int holder)
+        // Frees the holder's hold and reservation at once (stagger, parry, death, despawn, a normal attack end). If its hit window had already opened, the
+        // window closes now (or at its own end, if that came first) and stays on record for the gap, so Release itself leaves the tail; it does not depend
+        // on Expire having run in between. A hold released before its window opened leaves no tail (no hit ever landed or was due).
+        public void Release(int holder, double now)
         {
-            for (int i = _holds.Count - 1; i >= 0; i--) if (_holds[i].Holder == holder) _holds.RemoveAt(i);
+            Expire(now);
+            for (int i = _holds.Count - 1; i >= 0; i--)
+            {
+                Hold h = _holds[i];
+                if (h.Holder != holder) continue;
+                _holds.RemoveAt(i);
+                if (h.Gap > 0.0 && now >= h.StrikeStart)
+                {
+                    h.StrikeEnd = Math.Min(h.StrikeEnd, now);
+                    _tails.Add(h);
+                }
+            }
             for (int i = _reserved.Count - 1; i >= 0; i--) if (_reserved[i].Holder == holder) _reserved.RemoveAt(i);
         }
 
