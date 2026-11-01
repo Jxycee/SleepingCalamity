@@ -116,7 +116,6 @@ namespace SleepingCalamity.EditorTools
             breath.SetFloat("_Smoothness", 0.1f); breath.SetFloat("_Metallic", 0f);
             breath.SetColor("_EmissionColor", BreathColor * BreathEmission); breath.EnableKeyword("_EMISSION");
             breath.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-            breath.SetShaderPassEnabled("MotionVectors", true);
             EditorUtility.SetDirty(breath);
             map["TG_Breath"] = breath;
             map["TG_Clay"] = Flat(lit, "TG_Clay", new Color(0.254f, 0.069f, 0.030f), 0.2f);
@@ -133,7 +132,7 @@ namespace SleepingCalamity.EditorTools
         {
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_" + key + ".mat", lit);
             m.SetColor("_BaseColor", linear.gamma); m.SetColor("_Color", m.GetColor("_BaseColor"));
-            m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", 0f); m.SetShaderPassEnabled("MotionVectors", true);
+            m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", 0f);
             EditorUtility.SetDirty(m);
             return m;
         }

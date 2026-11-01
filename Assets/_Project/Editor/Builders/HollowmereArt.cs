@@ -198,7 +198,7 @@ namespace SleepingCalamity.EditorTools
             ember.SetColor("_BaseColor", new Color(0.35f, 0.08f, 0.01f).gamma); ember.SetFloat("_Smoothness", 0.2f);
             ember.SetColor("_EmissionColor", new Color(1.0f, 0.36f, 0.06f) * 3f); ember.EnableKeyword("_EMISSION");
             ember.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-            ember.SetColor("_Color", ember.GetColor("_BaseColor")); ember.SetShaderPassEnabled("MotionVectors", true);
+            ember.SetColor("_Color", ember.GetColor("_BaseColor"));
             EditorUtility.SetDirty(ember); map["BK_Ember"] = ember;
             AssetDatabase.SaveAssets();
             return map;
