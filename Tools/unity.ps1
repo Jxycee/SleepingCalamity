@@ -6,8 +6,14 @@
 #   <command> = compile | build | test-edit | test-play | check | exec
 #
 # OutDir defaults to $env:SC_OUT. It must be absolute, must not contain '..', and must be outside the repo.
-# ProjectRoot defaults to C:\Dev\SleepingCalamity. Pass a worktree (with its own Library) to test it instead; the check PASS
-# marker lands in the shared git common dir, so the merge guard sees it either way.
+# ProjectRoot defaults to the checkout this script lives in (Tools\..), so <worktree>\Tools\unity.ps1 tests that worktree;
+# pass -ProjectRoot to test another one. The check PASS marker lands in the shared git common dir, so the merge guard sees
+# it either way. (Until 2026-11-01 it defaulted to C:\Dev\SleepingCalamity, and worktree runs silently tested main's checkout.)
+# PlayMode runs (test-play, and check's PlayMode stage) take a machine-wide lock first: NGO tests share UDP port 7790, so two
+# at once fail with 'address already in use'. The lock is an open file handle, so the OS frees it if this script dies; the
+# wait also covers PlayMode runs started without the lock (an older copy of this script).
+# TimeoutMinutes is per stage (default 30). On a timeout the wrapper ends the Unity process it started itself (only that
+# one), so a hung run can't hold the port for hours. Never end any other Unity process (the editor, another session's run).
 # exec runs -executeMethod <Method> (e.g. SleepingCalamity.EditorTools.FishIconBaker.Bake) and passes on its exit code.
 # -Graphics drops -nographics (renders such as Bake Fish Icons need a graphics device).
 # Exit codes: 0 PASS, 1 FAIL, 2 LOCKED, 3 TIMEOUT, 4 usage error.
@@ -20,16 +26,19 @@ param(
 
     [string]$Filter = '',
 
-    [int]$TimeoutMinutes = 5,
+    [int]$TimeoutMinutes = 30,
 
-    [string]$ProjectRoot = 'C:\Dev\SleepingCalamity',
+    [string]$ProjectRoot = '',
 
     [string]$Method = '',
 
     [switch]$Graphics
 )
 
+if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 $UnityExe    = 'C:\Program Files\Unity\Hub\Editor\6000.6.5f1\Editor\Unity.exe'
+$PortLockPath = Join-Path ([IO.Path]::GetTempPath()) 'sc-unity-playmode.lock'
+$PortWaitMinutes = 120
 $LockFile    = Join-Path $ProjectRoot 'Temp\UnityLockfile'
 $ErrPattern  = 'error CS|Exception|Scripts have compiler errors|Compilation failed'
 $Commands    = @('compile', 'build', 'test-edit', 'test-play', 'check', 'exec')
@@ -84,11 +93,63 @@ function Test-CompileClean([string]$Log) {
     return (($text -match 'Exiting batchmode successfully') -and ($text -notmatch 'error CS'))
 }
 
-function Invoke-UnityRun([string]$Name, [string]$Extra) {
+# Another Unity PlayMode run on this machine (any checkout), not counting $Except.
+function Test-OtherPlayMode([int]$Except) {
+    $procs = Get-CimInstance Win32_Process -Filter "Name = 'Unity.exe'" -ErrorAction SilentlyContinue
+    foreach ($p in $procs) {
+        if ($p.ProcessId -eq $Except) { continue }
+        if ([string]$p.CommandLine -match '-testPlatform PlayMode') { return $true }
+    }
+    return $false
+}
+
+# Takes the machine-wide PlayMode lock (an exclusively opened file) and waits until no other PlayMode run is alive.
+# Returns the open stream (close it to release) or $null after $PortWaitMinutes.
+function Get-PortLock {
+    $deadline = (Get-Date).AddMinutes($PortWaitMinutes)
+    $nextNote = Get-Date
+    while ((Get-Date) -lt $deadline) {
+        $stream = $null
+        try { $stream = [IO.File]::Open($PortLockPath, 'OpenOrCreate', 'ReadWrite', 'None') } catch { $stream = $null }
+        if ($null -ne $stream) {
+            if (-not (Test-OtherPlayMode 0)) {
+                $bytes = [Text.Encoding]::ASCII.GetBytes(('pid ' + $PID + ' ' + $ProjectRoot + ' ' + (Get-Date -Format o)))
+                $stream.SetLength(0); $stream.Write($bytes, 0, $bytes.Length); $stream.Flush()
+                return $stream
+            }
+            $stream.Close()
+        }
+        if ((Get-Date) -ge $nextNote) {
+            Say 'SC WAIT PlayMode port busy (another PlayMode run holds it); waiting'
+            $nextNote = (Get-Date).AddMinutes(5)
+        }
+        Start-Sleep -Seconds 20
+    }
+    return $null
+}
+
+function Invoke-UnityRun([string]$Name, [string]$Extra, [switch]$NeedsPort) {
     $log = Join-Path $OutDir ($Name + '.log')
     if (Test-UnityLocked) {
         return [pscustomobject]@{ Status = 'LOCKED'; ProcId = 0; ExitCode = -1; Log = $log }
     }
+    $portLock = $null
+    if ($NeedsPort) {
+        $portLock = Get-PortLock
+        if ($null -eq $portLock) {
+            Say ('SC LOG PlayMode port still busy after ' + $PortWaitMinutes + ' min')
+            return [pscustomobject]@{ Status = 'TIMEOUT'; ProcId = 0; ExitCode = -1; Log = $log }
+        }
+    }
+    try {
+        return (Invoke-UnityProcess $log $Extra)
+    }
+    finally {
+        if ($null -ne $portLock) { $portLock.Close() }
+    }
+}
+
+function Invoke-UnityProcess([string]$log, [string]$Extra) {
     if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force }
     $noGfx = '-nographics '
     if ($Graphics) { $noGfx = '' }
@@ -103,6 +164,9 @@ function Invoke-UnityRun([string]$Name, [string]$Extra) {
     $null = $proc.Handle
     $finished = $proc.WaitForExit($TimeoutMinutes * 60 * 1000)
     if (-not $finished) {
+        # Our own child only: a hung run otherwise keeps the PlayMode port (and its project's Library) for hours.
+        try { $proc.Kill(); $null = $proc.WaitForExit(30000); Say ('SC LOG ended the timed-out Unity run pid=' + $proc.Id) }
+        catch { Say ('SC LOG could not end the timed-out Unity run pid=' + $proc.Id + ': ' + $_.Exception.Message) }
         return [pscustomobject]@{ Status = 'TIMEOUT'; ProcId = $proc.Id; ExitCode = -1; Log = $log }
     }
     return [pscustomobject]@{ Status = 'DONE'; ProcId = $proc.Id; ExitCode = $proc.ExitCode; Log = $log }
@@ -168,7 +232,7 @@ function Invoke-Tests([string]$Name, [string]$Platform, [string]$XmlName) {
     # Never pass -quit with -runTests.
     $extra = '-runTests -testPlatform ' + $Platform + ' -testResults "' + $xml + '" -dev-profile sctest'
     if (-not [string]::IsNullOrEmpty($Filter)) { $extra = $extra + ' -testFilter "' + $Filter + '"' }
-    $run = Invoke-UnityRun $Name $extra
+    $run = Invoke-UnityRun $Name $extra -NeedsPort:($Platform -eq 'PlayMode')
     switch ($run.Status) {
         'LOCKED'  { Say ('SC RESULT ' + $Name + ' LOCKED (close the Unity editor, then rerun)'); return 2 }
         'TIMEOUT' { Say ('SC RESULT ' + $Name + ' TIMEOUT pid=' + $run.ProcId + ' log=' + $run.Log); return 3 }
