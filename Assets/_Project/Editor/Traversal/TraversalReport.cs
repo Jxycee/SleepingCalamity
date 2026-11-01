@@ -76,6 +76,7 @@ namespace SleepingCalamity.EditorTools
             sb.AppendLine();
             sb.AppendLine($"Hero capsule (from `{HeroCapsule.PrefabPath}`'s CharacterController): {hero}.");
             sb.AppendLine($"Spaces: Hollowmere {string.Join(" + ", townVariants)}; Cellars floors 1-4 x {cellarFloors} seeds ({string.Join(", ", Seeds)}).");
+            sb.AppendLine("Judged fix list for the owning sessions (what is real, what to change, where): [`FIXLIST.md`](FIXLIST.md). This file is the raw scan output.");
             if (Coverage.Count > 0) sb.AppendLine("Seed coverage: " + string.Join("; ", Coverage) + ".");
             sb.AppendLine();
 
@@ -119,7 +120,7 @@ namespace SleepingCalamity.EditorTools
                 sb.AppendLine();
                 sb.AppendLine($"Map: `maps/Hollowmere_{v}.png`.");
                 sb.AppendLine();
-                Table(sb, list, 250, false);
+                Table(sb, list, 800, false);
             }
 
             // ------------------------------------------------------------ cellar tables

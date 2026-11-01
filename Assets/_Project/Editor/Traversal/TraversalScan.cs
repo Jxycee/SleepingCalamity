@@ -180,6 +180,42 @@ namespace SleepingCalamity.EditorTools
             return File.Exists(path) ? JsonUtility.FromJson<Baseline>(File.ReadAllText(path)) : null;
         }
 
+        // Evidence for one object (SC_TRAVERSAL_PROBE=<object name>, SC_TRAVERSAL_PRESET=Ruined|Rebuilt): the ground profile along its longest horizontal axis
+        // through its centre (0.1 m steps) and the free width across it at body height, so a stair's risers and treads can be read off.
+        public static void ProbeObject()
+        {
+            string name = Environment.GetEnvironmentVariable("SC_TRAVERSAL_PROBE");
+            var preset = Environment.GetEnvironmentVariable("SC_TRAVERSAL_PRESET") == "Rebuilt" ? HollowmereBuilder.Preset.Rebuilt : HollowmereBuilder.Preset.Ruined;
+            EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Single);
+            HollowmereBuilder.ApplyPreset(preset);
+            Physics.SyncTransforms();
+            HeroCapsule hero = HeroCapsule.FromPrefab();
+            foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                if (t.name != name) continue;
+                Bounds b = default; bool any = false;
+                foreach (Renderer r in t.GetComponentsInChildren<Renderer>()) { if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds); }
+                if (!any) continue;
+                bool alongX = b.size.x >= b.size.z;
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"SC PROBE {TraversalSources.HierarchyPath(t)} bounds centre {b.center} size {b.size} colliders: " + string.Join(", ", t.GetComponentsInChildren<Collider>().Select(c => c.GetType().Name + (c is MeshCollider mc && mc.sharedMesh != null ? "(" + mc.sharedMesh.name + ", convex " + mc.convex + ")" : ""))));
+                foreach (float off in new[] { -0.6f, 0f, 0.6f })
+                {
+                    sb.Append($"SC PROBE profile offset {off:+0.0;-0.0} m across: ");
+                    float prev = float.NaN;
+                    for (float u = -0.5f; u <= 0.5f + 1e-4f; u += 0.1f / Mathf.Max(b.size.x, b.size.z))
+                    {
+                        float x = alongX ? b.center.x + u * b.size.x : b.center.x + off, z = alongX ? b.center.z + off : b.center.z + u * b.size.z;
+                        float y = Physics.Raycast(new Vector3(x, b.max.y + 2f, z), Vector3.down, out RaycastHit h, b.size.y + 6f) ? h.point.y : float.NaN;
+                        if (float.IsNaN(prev) || Mathf.Abs(y - prev) > 0.05f) sb.Append($"[{(u + 0.5f) * Mathf.Max(b.size.x, b.size.z):0.0}m y{y:0.00} {(h.collider != null ? h.collider.name : "-")}] ");
+                        prev = y;
+                    }
+                    sb.AppendLine();
+                }
+                Debug.Log(sb.ToString());
+            }
+        }
+
         static string Git(string args)
         {
             try

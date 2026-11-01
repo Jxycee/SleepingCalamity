@@ -469,7 +469,8 @@ namespace SleepingCalamity.EditorTools
                             g.Flags[i] |= WalkGrid.FWalkThrough;
                             Issue(res, IssueKind.WalkThrough, p, 0f, 0f, "visible mesh with no collider where the hero walks", owner, null);
                         }
-                        if (planned && BodyBlocked(p, hero, rc, physMask))
+                        bool atGround = s.ExpectedGround == null || Mathf.Abs(y - s.ExpectedGround(c2.x, c2.y)) < 0.5f;   // not on top of a wall or crate
+                        if (planned && atGround && BodyBlocked(p, hero, rc, physMask))
                         {
                             float w = WidthAt(p, hero, physMask);
                             if (w < hero.FitWidth)
@@ -518,10 +519,10 @@ namespace SleepingCalamity.EditorTools
         // (an inside corner has floor on both diagonal sides too, but open floor along the perpendicular, so it doesn't count). -1 when there is none.
         static int OppositeMain(WalkGrid g, int x, int z, float y, float tol, int reach, Vector3 p, HeroCapsule hero, int mask, out float width)
         {
-            int[,] axes = { { 1, 0 }, { 0, 1 }, { 1, 1 }, { 1, -1 } };
-            int[] perp = { 1, 0, 3, 2 };
+            int[,] axes = { { 1, 0 }, { 0, 1 } };
+            int[] perp = { 1, 0 };
             width = float.PositiveInfinity; int best = -1;
-            for (int a = 0; a < 4; a++)
+            for (int a = 0; a < 2; a++)   // straight axes only: around a wall corner the diagonals see floor on both sides of solid wall
             {
                 bool pp = false, m = false;
                 for (int k = 1; k <= reach && !(pp && m); k++)
@@ -626,13 +627,15 @@ namespace SleepingCalamity.EditorTools
         {
             Transform root = res.Space.Root;
             if (root == null) return;
+            // a stair is one object named like a stair, at most 12 m across (a group such as Lanes/Steps holding every lane step is not one stair: its children are)
             var stairs = new List<Transform>();
+            bool Candidate(Transform t) => IsStairName(t.name) && t.gameObject.activeInHierarchy && RendererBounds(t, out Bounds rb) && Mathf.Max(rb.size.x, rb.size.z) <= 12f;
             foreach (Transform t in root.GetComponentsInChildren<Transform>())
             {
-                if (!IsStairName(t.name) || !t.gameObject.activeInHierarchy) continue;
+                if (!Candidate(t)) continue;
                 bool nested = false;
-                for (Transform p = t.parent; p != null; p = p.parent) if (IsStairName(p.name)) { nested = true; break; }
-                if (!nested && t.GetComponentsInChildren<Renderer>().Any(r => r.enabled && !(r is ParticleSystemRenderer))) stairs.Add(t);
+                for (Transform p = t.parent; p != null; p = p.parent) if (Candidate(p)) { nested = true; break; }
+                if (!nested) stairs.Add(t);
             }
             res.Stairs = stairs.Count;
             foreach (Transform st in stairs)
@@ -681,6 +684,17 @@ namespace SleepingCalamity.EditorTools
                 if (lowOut < 1.5f && top - low > hero.StepOffset)
                     Issue(res, IssueKind.StairToNowhere, new Vector3(b.center.x, low, b.center.z), lowOut, 1.5f, $"bottom landing leads nowhere: {lowOut:0.0} m² of walkable floor beyond the stair's foot", st, "stair", "m²");
             }
+        }
+
+        static bool RendererBounds(Transform t, out Bounds b)
+        {
+            b = default; bool any = false;
+            foreach (Renderer r in t.GetComponentsInChildren<Renderer>())
+            {
+                if (!r.enabled || r is ParticleSystemRenderer) continue;
+                if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+            }
+            return any;
         }
 
         static bool IsStairName(string n)
