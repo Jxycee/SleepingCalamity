@@ -39,6 +39,7 @@ namespace SleepingCalamity.Core
         public bool IsBanked(int pieceId) => _banked.Contains(pieceId);
         public IEnumerable<int> UnbankedPieces => _unbanked;
         public IEnumerable<int> BankedPieces => _banked;
+        public IEnumerable<KeyValuePair<int, int>> BankedLootItems => _lootBanked;   // item id -> running banked total for the session (the town stock moves the difference)
         public int LootUnbanked(int itemId) => _lootUnbanked.TryGetValue(itemId, out int c) ? c : 0;
         public int LootBanked(int itemId) => _lootBanked.TryGetValue(itemId, out int c) ? c : 0;
 
