@@ -47,6 +47,7 @@ namespace SleepingCalamity.EditorTools
             Step(errors, "CellarFloorTest", CellarFloorTestBuilder.Build);   // after DungeonCorner: reuses its profile, materials and lamp look; builds the generated floor for seed 12345
             Step(errors, "CellarFloorKit", CellarFloorTestBuilder.SaveRuntimeKit);   // after CellarFloorTest: saves its kit as prefabs and assigns it to the CellarFloorSync prefab (the dive floors are dressed at runtime)
             Step(errors, "BuildSettings", SceneBuilder.ApplyBuildSettings);
+            Step(errors, "MaterialValidation", () => Debug.Log("SC BUILDALL materials settled by ShaderGUI validation: " + MaterialValidation.SettleAll()));   // same bytes in graphics and -nographics editors
             Step(errors, "Save", AssetDatabase.SaveAssets);
             Step(errors, "Validate", () => errors.AddRange(ValidationRunner.Run()));   // after Save: the validators read what is on disk
             return errors.Count == 0;

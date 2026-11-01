@@ -35,6 +35,28 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(b, Is.EqualTo(a));
         }
 
+        // Two objects each referencing an embedded (outside the hierarchy) mesh; Unity writes the embedded documents in an order that changes per run.
+        static string SceneWithEmbeddedMeshes(long meshForA, long meshForB, bool bFirst)
+        {
+            string Obj(string name, long go, long tf, long mf, long mesh) =>
+                $"--- !u!1 &{go}\nGameObject:\n  m_Name: {name}\n  m_Component:\n  - component: {{fileID: {tf}}}\n  - component: {{fileID: {mf}}}\n" +
+                $"--- !u!4 &{tf}\nTransform:\n  m_GameObject: {{fileID: {go}}}\n  m_Children: []\n  m_Father: {{fileID: 0}}\n" +
+                $"--- !u!33 &{mf}\nMeshFilter:\n  m_GameObject: {{fileID: {go}}}\n  m_Mesh: {{fileID: {mesh}}}\n";
+            string meshA = $"--- !u!43 &{meshForA}\nMesh:\n  m_Name: MeshOfA\n", meshB = $"--- !u!43 &{meshForB}\nMesh:\n  m_Name: MeshOfB\n";
+            return "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n--- !u!29 &1\nOcclusionCullingSettings:\n  m_SceneGUID: 0\n" +
+                Obj("A", 100, 101, 102, meshForA) + Obj("B", 200, 201, 202, meshForB) + (bFirst ? meshB + meshA : meshA + meshB) +
+                "--- !u!1660057539 &9223372036854775807\nSceneRoots:\n  m_Roots:\n  - {fileID: 101}\n  - {fileID: 201}\n";
+        }
+
+        [Test]
+        public void Normalize_NumbersEmbeddedObjectsByFirstReference_NotByTheirOldIds()
+        {
+            string a = SceneFileNormalizer.Normalize(SceneWithEmbeddedMeshes(5000, 6000, false));
+            string b = SceneFileNormalizer.Normalize(SceneWithEmbeddedMeshes(6000, 5000, true));
+            Assert.That(b, Is.EqualTo(a), "the mesh each object uses must get the same id however Unity ordered the embedded documents");
+            Assert.That(a.IndexOf("m_Name: MeshOfA"), Is.LessThan(a.IndexOf("m_Name: MeshOfB")));
+        }
+
         [Test]
         public void Normalize_IsIdempotent_KeepsFixedDocsAndGuidReferences_AndTheTrailingNewline()
         {
