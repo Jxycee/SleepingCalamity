@@ -73,3 +73,62 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SleepingCalamity.Presentation::SleepingCalamity.Presentation.CellarFloorSync
   ShowTopMostFoldoutHeaderGroup: 1
+  Kit:
+    Floor: {fileID: 2100000, guid: 14677949c75e282eb98822bd46dd2453, type: 2}
+    Wall: {fileID: 2100000, guid: 7107de37d6928c307bf76e8478e4c58e, type: 2}
+    Pillar: {fileID: 2100000, guid: f79a81b322869d7d499326e12b26055a, type: 2}
+    Trim: {fileID: 2100000, guid: 2d2fa4b7bd74d157896e253c2acbc94f, type: 2}
+    Flame: {fileID: 2100000, guid: 597aa1277c8e278b687e4643543b49ca, type: 2}
+    LockedGate: {fileID: 2100000, guid: 57e548696d070d145b6a4c7c5085fd87, type: 2}
+    Chest: {fileID: 2100000, guid: bdc03bf7d3832b34880d65709cd11b80, type: 2}
+    KeyChest: {fileID: 2100000, guid: 4683e549d32164e44869ae4935ab9a12, type: 2}
+    Carrier: {fileID: 2100000, guid: 4cf62a371617c324da56d1393a97cf91, type: 2}
+    EntryStart: {fileID: 2100000, guid: b41b50440814cf94589bf8b4e131341d, type: 2}
+    StairExit: {fileID: 2100000, guid: e219c02b3aa436e4f90248974f81a439, type: 2}
+    SpawnT1: {fileID: 2100000, guid: 18d847f2428fc8d4b9b154a0b4543234, type: 2}
+    SpawnT2: {fileID: 2100000, guid: 090a2489ddbb2ba4985108f21a1c8b73, type: 2}
+    Bank: {fileID: 0}
+    Baker: {fileID: 0}
+    Warden: {fileID: 0}
+    FloorTile: {fileID: 2493167989009820204, guid: 5e97d27a00279ec4eb34266fb5822538, type: 3}
+    Lantern: {fileID: 919132149155446097, guid: 4993c77ef6856264791d22235f961025, type: 3}
+    LanternMaterial: {fileID: 2100000, guid: ff5e14df04ddf7d4c86d4eec9230f3c4, type: 2}
+    FogBaseDensity: 0.007
+    FogBaseColor: {r: 0.16, g: 0.13, b: 0.11, a: 1}
+    Ceiling: {fileID: 2100000, guid: f79a81b322869d7d499326e12b26055a, type: 2}
+    Limewash: {fileID: 2100000, guid: 43c90514fd6733e649345a973e7ddbfe, type: 2}
+    Iron: {fileID: 2100000, guid: 6e6fb957345f8db1796ae5a9f8e50122, type: 2}
+    Wax: {fileID: 2100000, guid: 33249babc8ac5e915b67bf1f042525d8, type: 2}
+    Mote: {fileID: 2100000, guid: a3c08ecc6626e0125a3c52c3fa84aa5b, type: 2}
+    Crate: {fileID: 2100000, guid: 022aa393025481b619deb2bb9b17a03b, type: 2}
+    PieceList:
+    - Name: VaultSegment
+      Prefab: {fileID: 880581048538914928, guid: 186ca05dd5d50e9498ff1be84f230606, type: 3}
+    - Name: ArchRib
+      Prefab: {fileID: 3939623682314808085, guid: 1793a83e432f3c44e95830b3a51104e0, type: 3}
+    - Name: Pillar
+      Prefab: {fileID: 220339671320203007, guid: 8f1ceeaa0c33f99458d6e995342b7bd9, type: 3}
+    - Name: EndWall
+      Prefab: {fileID: 3430429139360926126, guid: 8ae6e0dc5927d4b479d09785960cda27, type: 3}
+    - Name: NicheWall
+      Prefab: {fileID: 4387528971091802510, guid: 8fc53a4c055377540ac43ebb06d3f35a, type: 3}
+    - Name: LarderShelf
+      Prefab: {fileID: 7100048157170069038, guid: b9b38ef84144f4f46a1b562c21fa85fb, type: 3}
+    - Name: CoalChute
+      Prefab: {fileID: 4941523007215705482, guid: edd655f43eb0041428b2622bf11dd920, type: 3}
+    - Name: Barrels
+      Prefab: {fileID: 3210329847530673947, guid: 976fc53472c9fc4488ff26c775c28c94, type: 3}
+    - Name: Roots
+      Prefab: {fileID: 7702254243505710654, guid: 6e950a6ecdfc24a4ea3c2dbd3e019844, type: 3}
+    - Name: BreathGrate
+      Prefab: {fileID: 853013468221079726, guid: 8f1dc79eaf0afeb4fbad257744898d16, type: 3}
+    - Name: Crate
+      Prefab: {fileID: 6458253713029912029, guid: 7ee70508cc765c908ab5528ddbe27aa0, type: 3}
+    - Name: CrateStack
+      Prefab: {fileID: 2909552802730312708, guid: 30f7a52d3429fa2f4b48a92d41fe33cd, type: 3}
+    - Name: JarCluster
+      Prefab: {fileID: 6222716541392744269, guid: 251456743cab1d6d3ae46128205f842d, type: 3}
+    - Name: Rubble
+      Prefab: {fileID: 6508633923054619584, guid: 1b52cdc32e4073db4864e5f52d938905, type: 3}
+    - Name: SackPile
+      Prefab: {fileID: 6021016450455666633, guid: 6763c08a47de1e015b67d24ce8668ca7, type: 3}

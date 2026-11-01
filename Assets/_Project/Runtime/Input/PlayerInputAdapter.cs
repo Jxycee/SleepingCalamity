@@ -333,6 +333,8 @@ namespace SleepingCalamity.Runtime
                 case DevKey.ToggleOverlay: k = Key.F3; return true;
                 case DevKey.SwapWeapon: k = Key.F5; return true;
                 case DevKey.SkipWave: k = Key.F6; return true;
+                case DevKey.StartDive: k = Key.F7; return true;
+                case DevKey.AbandonDive: k = Key.F8; return true;
                 default: return false;
             }
         }
