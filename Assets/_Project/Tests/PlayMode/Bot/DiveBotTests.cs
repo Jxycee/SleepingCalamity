@@ -101,23 +101,23 @@ namespace SleepingCalamity.Tests.PlayMode
             input.Frame = default;
             if (!bot.WentHome) bot.Note("Run", $"the dive didn't finish within {limit:0} s of play (deepest floor {maxFloor})");
 
-            // dive 2: the hub stair again, then look at floor 1's fresh state
+            // dive 2: the hub stair again, then look at the first floor's fresh state (floor 3 once the checkpoint is banked)
             string second = "not reached";
             if (bot.WentHome)
             {
                 DiveHaulSync.Summary banked = DiveDirector.Instance.HaulSync != null ? DiveDirector.Instance.HaulSync.Current : default;
                 bot.WentHome = false;   // let the bot take the hub stair again
                 float t0 = bot.Seconds;
-                while (bot.Seconds - t0 < 120f && bot.Floor != 1) { bot.Tick(1f / 60f); yield return null; }
+                while (bot.Seconds - t0 < 120f && bot.Floor == 0) { bot.Tick(1f / 60f); yield return null; }
                 for (int i = 0; i < 90; i++) { bot.Tick(1f / 60f); yield return null; }   // let contents arm
                 input.Frame = default;
-                if (bot.Floor == 1)
+                if (bot.Floor > 0)
                 {
                     DiveDirector d = DiveDirector.Instance;
                     CellarContentsSync c = d.ContentsSync;
                     var s = c.State;
                     var h = d.HaulSync.Current;
-                    second = $"second dive floor 1: chests open mask {s.Chests}, pieces {c.PieceCount} (visible {Enumerable.Range(0, c.PieceCount).Count(c.PieceVisible)}), unbanked pieces {h.UnbankedPieces}, banked {h.BankedPieces} (after dive 1: {banked.BankedPieces}), gate key {s.GateKey}, exit unlocked {s.ExitUnlocked}, heart banked {d.NetHeartBanked.Value}";
+                    second = $"second dive starts on floor {bot.Floor}: chests open mask {s.Chests}, pieces {c.PieceCount} (visible {Enumerable.Range(0, c.PieceCount).Count(c.PieceVisible)}), unbanked pieces {h.UnbankedPieces}, banked {h.BankedPieces} (after dive 1: {banked.BankedPieces}), gate key {s.GateKey}, exit unlocked {s.ExitUnlocked}, heart banked {d.NetHeartBanked.Value}";
                     if (s.Chests != 0 && s.Seed == d.FloorSync.Layout.Seed) bot.Note("State", "second dive: floor 1 chests start open (state leaked from the first dive)");
                     if (s.GateKey != 0 || s.ExitUnlocked) bot.Note("State", "second dive: floor 1 starts with the gate key out or the exit unlocked");
                     if (d.NetHeartBanked.Value) bot.Note("State", "second dive: the heart still reads banked");

@@ -39,6 +39,8 @@ namespace SleepingCalamity.Tests.PlayMode
         public bool Tough;                                 // test-only: the host tops the hero up below 50% HP, so the run explores floors 3-4 instead of measuring difficulty
         public int DiveFails, Deaths;
         float _teleportCheckAt = -1f; Bounds _teleportBounds;
+        float _bakeAt = -1f; Bounds _bakeArea; bool _fellThisFloor;
+        readonly Queue<string> _trail = new Queue<string>(); float _trailClock;
         public float Seconds;
 
         NavMeshDataInstance _nav;
@@ -93,6 +95,8 @@ namespace SleepingCalamity.Tests.PlayMode
             if (!_vitals.IsUp || d.HasPendingTeleport) { _input.Frame = f; return; }
 
             SyncFloor(d);
+            if (_bakeAt > 0f && Seconds >= _bakeAt) { _bakeAt = -1f; Bake(_bakeArea); _corners.Clear(); EntryProbe(); }
+            if (_bakeAt > 0f) { _input.Frame = f; return; }
             if (_teleportCheckAt > 0f && Seconds >= _teleportCheckAt)
             {
                 _teleportCheckAt = -1f;
@@ -141,7 +145,8 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 Bounds b = fs.Built.Bounds;
                 _teleportCheckAt = Seconds + 3f; _teleportBounds = b;
-                Bake(new Bounds(new Vector3(b.center.x, 2f, b.center.z), new Vector3(b.size.x + 4f, 12f, b.size.z + 4f)));
+                _bakeAt = Seconds + 0.5f; _bakeArea = new Bounds(new Vector3(b.center.x, 2f, b.center.z), new Vector3(b.size.x + 4f, 12f, b.size.z + 4f));   // after the old floor's objects are gone
+                _fellThisFloor = false;
                 _navDoorOpen = Contents(d) != null && Contents(d).State.DoorOpen;
                 Say($"floor {built} seed {fs.Layout.Seed} preset {fs.Layout.Preset} rooms {fs.Layout.Rooms.Count} chests {fs.Layout.Chests.Count} locked {fs.Layout.HasLockedRoom}");
             }
@@ -182,6 +187,18 @@ namespace SleepingCalamity.Tests.PlayMode
             NavMeshData data = NavMeshBuilder.BuildNavMeshData(st, sources, area, Vector3.zero, Quaternion.identity);
             if (data == null) { Note("Bot", "runtime NavMesh bake failed"); return; }
             _nav = NavMesh.AddNavMeshData(data); _hasNav = true;
+        }
+
+        // Right after the floor's NavMesh: is the hero (at its entry start) on walkable ground, and what is around it?
+        void EntryProbe()
+        {
+            if (Floor <= 0) return;
+            bool onNav = NavMesh.SamplePosition(_hero.position, out NavMeshHit h, 2f, NavMesh.AllAreas);
+            if (onNav) return;
+            float r = _cc.radius;
+            var around = Physics.OverlapSphere(_hero.position + Vector3.up * 1f, 1.5f, ~((1 << 6) | (1 << 7) | (1 << 11)), QueryTriggerInteraction.Ignore).Where(c => c.transform.root != _hero.root).Select(c => Path(c.transform) + " " + c.GetType().Name).Take(8);
+            bool ground = Physics.Raycast(_hero.position + Vector3.up * 0.5f, Vector3.down, out RaycastHit gh, 3f, ~((1 << 6) | (1 << 7) | (1 << 11)), QueryTriggerInteraction.Ignore);
+            Note("Entry", $"0.5 s after arriving on floor {Floor}, no walkable ground within 2 m of the hero at {V(_hero.position)}; ground below: {(ground ? Path(gh.collider.transform) + " at y " + gh.point.y.ToString("0.00") : "none")}; colliders within 1.5 m: {string.Join(", ", around)}", PlanWhere());
         }
 
         public void Dispose() { if (_hasNav) { _nav.Remove(); _hasNav = false; } }
@@ -447,8 +464,20 @@ namespace SleepingCalamity.Tests.PlayMode
             else if (_downedAt >= 0f) { Say($"back up after {Seconds - _downedAt:0} s, floor {Floor}, dive active {Dir?.NetActive.Value}"); _downedAt = -1f; }
 
             CellarFloorSync fs = Dir != null ? Dir.FloorSync : null;
-            if (Floor > 0 && fs != null && fs.Built != null && _hero.position.y < fs.Built.Root.position.y - 3f)
-                Note("Fall", $"the hero fell out of the floor (y {_hero.position.y:0.0})", PlanWhere());
+            _trailClock += dt;
+            if (_trailClock >= 0.25f)
+            {
+                _trailClock = 0f;
+                _trail.Enqueue($"{Seconds:0.00}s {V(_hero.position)} cc {(_cc.enabled ? "on" : "OFF")} grounded {_cc.isGrounded} up {_vitals.IsUp} tp {Dir?.HasPendingTeleport} stick {_input.Frame.MoveX:0.0},{_input.Frame.MoveY:0.0} goal {_target?.Name}");
+                while (_trail.Count > 40) _trail.Dequeue();
+            }
+            if (Floor > 0 && fs != null && fs.Built != null && _hero.position.y < fs.Built.Root.position.y - 1.5f && !_fellThisFloor)
+            {
+                _fellThisFloor = true;
+                bool floorBelowStart = false;
+                Note("Fall", $"the hero dropped below the floor (y {_hero.position.y:0.0}); last 10 s: " + string.Join(" | ", _trail), PlanWhere());
+                _ = floorBelowStart;
+            }
 
             // embedded: the capsule overlaps solid geometry (not itself, not enemies) for over a second
             float r = _cc.radius - 0.08f;
