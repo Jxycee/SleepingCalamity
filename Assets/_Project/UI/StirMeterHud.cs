@@ -22,6 +22,10 @@ namespace SleepingCalamity.UI
 
         public static string Pieces(DiveHaulSync.Summary s) => "Pieces: " + s.UnbankedPieces + " unbanked / " + s.BankedPieces + " banked";
 
+        // "Pieces left on this floor: N" for floors 1-3; null on the bakery floor, in town or before a floor is set.
+        public static string PiecesLeftHere(DiveHaulSync.Summary s) =>
+            s.CurrentFloor >= 1 && s.CurrentFloor <= DiveHaul.PieceFloors ? "Pieces left on this floor: " + s.Left(s.CurrentFloor) : null;
+
         public static float Fill(float value, float max) => max <= 0f ? 0f : Mathf.Clamp01(value / max);
 
         public static float[] MarkFractions(StirTuning t)
@@ -72,6 +76,8 @@ namespace SleepingCalamity.UI
             _label.fontSize = Mathf.Max(14, Mathf.RoundToInt(20 * scale));
             float ly = y + h + 8f;
             GUI.Label(new Rect(x, ly, w, 28 * scale), "Stir " + s.StirValue + " / " + (int)tuning.Max + "    " + StirMeterText.Pieces(s), _label);
+            string here = StirMeterText.PiecesLeftHere(s);
+            if (here != null) { ly += 26 * scale; GUI.Label(new Rect(x, ly, w, 28 * scale), here, _label); }
             foreach (string line in StirMeterText.Labels(s)) { ly += 26 * scale; GUI.Label(new Rect(x, ly, w, 28 * scale), line, _label); }
         }
     }
