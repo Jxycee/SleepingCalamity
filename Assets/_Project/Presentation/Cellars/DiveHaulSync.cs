@@ -108,7 +108,7 @@ namespace SleepingCalamity.Presentation
             if (IsServer) { _state = new DiveState(new DiveHaul(DefaultPiecesPerFloor)); Publish(); }
         }
 
-        public override void OnNetworkDespawn() { _state = null; EncounterPlan = null; }
+        public override void OnNetworkDespawn() { _state = null; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } }
 
         // Host only: raised when the deep-closes countdown ran out and the dive was failed (the dive flow sends the party home).
         public event System.Action DiveFailed;
@@ -160,7 +160,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerBegin(int[] piecesPerFloor, StirTuning tuning)
         {
             if (!IsServer || !IsSpawned || piecesPerFloor == null) return false;
-            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; EncounterPlan = null; Publish(); return true;
+            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
         public bool ServerAddPiece(int pieceId) { if (!Host || !_state.Haul.AddPiece(pieceId)) return false; Publish(); return true; }
         public bool ServerAddLoot(int itemId, int count) { if (!Host || !_state.Haul.AddLoot(itemId, count)) return false; Publish(); return true; }

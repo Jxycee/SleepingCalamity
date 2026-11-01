@@ -45,21 +45,7 @@ namespace SleepingCalamity.Core
             if (layout == null) throw new System.ArgumentNullException(nameof(layout));
             int extra = extraEnemiesPerRoom < 0 ? 0 : extraEnemiesPerRoom;
             int n = CellarFloorLayout.GridSize;
-            var blocked = new bool[n, n];
-            void Ban(int x, int y) { if (x >= 0 && y >= 0 && x < n && y < n) blocked[x, y] = true; }
-            foreach (FloorChest c in layout.Chests) Ban(c.X, c.Y);
-            if (layout.Carrier != null) Ban(layout.Carrier.X, layout.Carrier.Y);
-            if (dressing != null)
-            {
-                foreach (PlacedVignette v in dressing.Vignettes) Ban(v.Cell.X, v.Cell.Y);
-                CellPos? heal = CellarHealing.PointFor(layout, dressing);
-                if (heal.HasValue) Ban(heal.Value.X, heal.Value.Y);
-            }
-            foreach (CellPos d in layout.DeadEnds) Ban(d.X, d.Y);
-            foreach (CellPos s in layout.EntryStarts) Ban(s.X, s.Y);
-            if (layout.StairExit.HasValue) Ban(layout.StairExit.Value.X, layout.StairExit.Value.Y);
-            if (layout.BankCell.HasValue) Ban(layout.BankCell.Value.X, layout.BankCell.Value.Y);
-            if (layout.BakerCell.HasValue) Ban(layout.BakerCell.Value.X, layout.BakerCell.Value.Y);
+            bool[,] blocked = BlockedCells(layout, dressing);
 
             var spawns = new List<EncounterSpawn>();
             var taken = new bool[n, n];
@@ -112,6 +98,35 @@ namespace SleepingCalamity.Core
                 }
             }
             return new CellarEncounterPlan(layout.Seed, layout.Floor, extra, hunterLatched, spawns, hunter);
+        }
+
+        static bool[,] BlockedCells(CellarFloorLayout layout, CellarFloorDressing dressing)
+        {
+            int n = CellarFloorLayout.GridSize;
+            var blocked = new bool[n, n];
+            void Ban(int x, int y) { if (x >= 0 && y >= 0 && x < n && y < n) blocked[x, y] = true; }
+            foreach (FloorChest c in layout.Chests) Ban(c.X, c.Y);
+            if (layout.Carrier != null) Ban(layout.Carrier.X, layout.Carrier.Y);
+            if (dressing != null)
+            {
+                foreach (PlacedVignette v in dressing.Vignettes) Ban(v.Cell.X, v.Cell.Y);
+                CellPos? heal = CellarHealing.PointFor(layout, dressing);
+                if (heal.HasValue) Ban(heal.Value.X, heal.Value.Y);
+            }
+            foreach (CellPos d in layout.DeadEnds) Ban(d.X, d.Y);
+            foreach (CellPos s in layout.EntryStarts) Ban(s.X, s.Y);
+            if (layout.StairExit.HasValue) Ban(layout.StairExit.Value.X, layout.StairExit.Value.Y);
+            if (layout.BankCell.HasValue) Ban(layout.BankCell.Value.X, layout.BankCell.Value.Y);
+            if (layout.BakerCell.HasValue) Ban(layout.BakerCell.Value.X, layout.BakerCell.Value.Y);
+            return blocked;
+        }
+
+        // The free-cell rule the plan uses (before any spawn is taken): free floor cells of one room, row-major. Empty for a non-Combat room.
+        public static IReadOnlyList<CellPos> FreeCellsOf(CellarFloorLayout layout, CellarFloorDressing dressing, int roomIndex)
+        {
+            PlacedRoom p = layout.Rooms[roomIndex];
+            if (p.Room.Kind != RoomKind.Combat) return new List<CellPos>();
+            return FreeCells(p, BlockedCells(layout, dressing));
         }
 
         // Free floor cells of a combat room in row-major order: floor, not a door, not a room-authored object, not a banned world cell.

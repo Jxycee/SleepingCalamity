@@ -110,6 +110,47 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Hunter_IsAtLeastAsFarAsEveryUntakenFreeCellOfAnEligibleRoom()
+        {
+            int checkedPlans = 0;
+            for (uint seed = 0; seed < 40; seed++)
+                for (int floor = 1; floor <= 4; floor++)
+                {
+                    var p = Plan(seed, floor, 1, true, out CellarFloorLayout l);
+                    if (p.Hunter == null) continue;
+                    CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    int[,] dist = l.WalkDistances();
+                    int hd = dist[p.Hunter.X, p.Hunter.Y];
+                    var taken = new System.Collections.Generic.HashSet<(int, int)>(p.Spawns.Where(s => s.Kind != EncounterKind.Hunter).Select(s => (s.X, s.Y)));
+                    for (int r = 0; r < l.Rooms.Count; r++)
+                    {
+                        if (r == l.LockedRoomIndex) continue;
+                        foreach (CellPos c in CellarEncounterPlan.FreeCellsOf(l, d, r))
+                            if (!taken.Contains((c.X, c.Y)) && dist[c.X, c.Y] >= 0)
+                                Assert.LessOrEqual(dist[c.X, c.Y], hd, "farther free cell, seed " + seed + " floor " + floor);
+                    }
+                    checkedPlans++;
+                }
+            Assert.Greater(checkedPlans, 50);
+        }
+
+        [Test]
+        public void HugeExtraPerRoom_FillsEveryFreeCell_NoSharedCells()
+        {
+            for (uint seed = 0; seed < 20; seed++)
+                for (int floor = 1; floor <= 4; floor++)
+                {
+                    CellarEncounterPlan p = null; CellarFloorLayout l = null;
+                    Assert.DoesNotThrow(() => p = Plan(seed, floor, 99, false, out l));
+                    CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    var seen = new System.Collections.Generic.HashSet<(int, int)>();
+                    foreach (EncounterSpawn s in p.Spawns) Assert.IsTrue(seen.Add((s.X, s.Y)), "shared cell, seed " + seed + " floor " + floor);
+                    for (int r = 0; r < l.Rooms.Count; r++)
+                        Assert.AreEqual(CellarEncounterPlan.FreeCellsOf(l, d, r).Count, p.CountIn(r, EncounterKind.Extra), "room " + r + " seed " + seed + " floor " + floor);
+                }
+        }
+
+        [Test]
         public void PlanDoesNotMoveGoldens()
         {
             for (uint seed = 0; seed < 10; seed++)
