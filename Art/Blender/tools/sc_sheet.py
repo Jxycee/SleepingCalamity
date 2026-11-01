@@ -1,10 +1,3 @@
-"""python sheet.py out.png cols w img1 img2 ... -> grid contact sheet"""
-import sys
-from PIL import Image
-out, cols, w = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-ims = [Image.open(p).convert('RGB') for p in sys.argv[4:]]
-ims = [i.resize((w, int(i.height * w / i.width))) for i in ims]
-h = max(i.height for i in ims); rows = (len(ims) + cols - 1) // cols
-S = Image.new('RGB', (cols * w, rows * h), (20, 20, 20))
-for k, i in enumerate(ims): S.paste(i, ((k % cols) * w, (k // cols) * h))
-S.save(out)
+"""python sheet.py out.png cols w img1 img2 ... -> grid contact sheet (now sc_ab_sheet.py --grid; this entry point still works)"""
+import os, subprocess, sys
+sys.exit(subprocess.call([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sc_ab_sheet.py'), sys.argv[1], '--grid'] + sys.argv[2:]))

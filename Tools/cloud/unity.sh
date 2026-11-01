@@ -145,12 +145,20 @@ write_marker() {
     [ -n "$sha" ] && [ -n "$common" ] || { say 'SC MARKER skipped (git rev-parse failed)'; return; }
     case "$common" in /*) ;; *) common="$PROJECT/$common" ;; esac
     dir="$common/sc-check-pass"; mkdir -p "$dir" && date -Iseconds > "$dir/$sha"
+    # Also key the marker on the tree under Assets/ Packages/ ProjectSettings/, so the merge guard accepts a content-identical commit.
+    local tkey; tkey="$(git -C "$PROJECT" ls-tree HEAD -- Assets Packages ProjectSettings 2>/dev/null | git -C "$PROJECT" hash-object --stdin 2>/dev/null)"
+    [ -n "$tkey" ] && { mkdir -p "$common/sc-check-pass-tree" && date -Iseconds > "$common/sc-check-pass-tree/$tkey"; say "SC MARKER tree $tkey"; }
     if [ -n "$(git -C "$PROJECT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
         say "SC MARKER $sha (uncommitted changes were present; the marker covers the commit only)"
     else
         say "SC MARKER $sha"
     fi
 }
+
+# A fresh worktree holds LFS pointer stubs and the first Unity run fails on texture import: materialise them first.
+if command -v git-lfs >/dev/null 2>&1 && git -C "$PROJECT" lfs ls-files >/dev/null 2>&1; then
+    git -C "$PROJECT" lfs checkout >/dev/null 2>&1 && say 'SC LFS checkout done' || say 'SC LFS checkout failed (LFS files may be pointers)'
+fi
 
 code=1
 case "$COMMAND" in
