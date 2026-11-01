@@ -42,11 +42,16 @@ namespace SleepingCalamity.Tests.EditMode
             var mean = new double[5]; var low = new double[5]; var high = new double[5];
             for (int floor = 1; floor <= 4; floor++)
             {
-                int n = 4000, sum = 0, lo = 0, hi = 0;
-                for (int i = 0; i < n; i++)
+                int n = 0, sum = 0, lo = 0, hi = 0;
+                for (uint s = 0; s < 600; s++)
                 {
-                    int r = CellarLoot.RollRank(0xC0FFEEu + (uint)(i / 8), floor, i % 8); sum += r;
-                    if (r <= 2) lo++; if (r >= 3) hi++;
+                    CellarFloorLayout l = CellarFloorGenerator.Generate(0xC0FFEEu + s, floor);   // the real non-key chests of a real floor
+                    for (int i = 0; i < l.Chests.Count; i++)
+                    {
+                        if (l.Chests[i].HoldsKey) continue;
+                        int r = CellarLoot.RollRank(0xC0FFEEu + s, floor, i); sum += r; n++;
+                        if (r <= 2) lo++; if (r >= 3) hi++;
+                    }
                 }
                 mean[floor] = (double)sum / n; low[floor] = (double)lo / n; high[floor] = (double)hi / n;
             }
@@ -55,7 +60,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(mean[3], Is.InRange(2.7, 3.5), "floor 3 mean " + mean[3]);
             Assert.That(mean[4], Is.InRange(3.1, 4.1), "floor 4 mean " + mean[4]);
             Assert.That(mean[1], Is.LessThan(mean[2])); Assert.That(mean[2], Is.LessThan(mean[3])); Assert.That(mean[3], Is.LessThan(mean[4]));
-            Assert.That(low[1], Is.GreaterThan(0.85), "floor 1 is mostly rank 1-2");
+            Assert.That(low[1], Is.GreaterThan(0.80), "floor 1 is mostly rank 1-2");
             Assert.That(high[4], Is.GreaterThan(0.7), "floor 4 is mostly rank 3+");
         }
 

@@ -11,6 +11,8 @@ namespace SleepingCalamity.Presentation
         public SpecialRoom Special;             // procgen item 1c: the floor's special room tag (greybox marker built when it exists)
         public CellarDoorHints DoorHints;       // procgen item 1b: the door reward hints (an icon per hinted door)
         public int SpecialMarkers, DoorHintIcons;
+        public CellarRoomChunks Chunks;         // procgen item 4: the resolved chunk regions (blocking / cover cells drawn as primitives in the Chunks subgroup)
+        public int ChunkPieces;
     }
 
     public static partial class CellarFloorBuilder
@@ -35,6 +37,7 @@ namespace SleepingCalamity.Presentation
                 Prim(root, "Banner", PrimitiveType.Cube, root.position + new Vector3(0, 2.6f, 0), new Vector3(1.2f, 0.6f, 0.05f), mats.Flat(c));
                 result.SpecialMarkers++;
             }
+            ProcgenChunks(layout, dressing, group, mats, result);
             foreach (DoorHint h in hints.Hints)
             {
                 if (!h.Notable) continue;   // chests-only doors get no icon
@@ -45,6 +48,28 @@ namespace SleepingCalamity.Presentation
                     : h.Has(DoorHintFlags.RewardVignette) ? new Color(0.25f, 0.75f, 0.55f) : new Color(0.55f, 0.35f, 0.15f);
                 Prim(group, "DoorHint_r" + h.RoomIndex + "_d" + h.DoorIndex, PrimitiveType.Sphere, mid + new Vector3(0, DoorHeight + 0.35f, 0), new Vector3(0.3f, 0.3f, 0.3f), mats.Flat(c));
                 result.DoorHintIcons++;
+            }
+        }
+
+        // Procgen item 4: every blocking cell of a resolved chunk is a full-height block, every cover cell a low block, in a "Chunks" subgroup, named
+        // "Chunk_r<room>_<region>_<variant>" (region = its 1-based number in the room; one object per cell, the cell column is appended).
+        static void ProcgenChunks(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, Mats mats, CellarFloorBuild result)
+        {
+            CellarRoomChunks chunks = CellarRoomChunks.Resolve(layout, dressing); result.Chunks = chunks;
+            if (chunks.Chunks.Count == 0) return;
+            var sub = new GameObject("Chunks").transform; sub.SetParent(group, false);
+            foreach (ResolvedChunk c in chunks.Chunks)
+            {
+                if (c.IsOpen) continue;
+                string name = "Chunk_r" + c.RoomIndex + "_" + (c.RegionIndex + 1) + "_" + c.Variant.Name;
+                foreach (var (cell, kind) in CellarRoomChunks.SolidCells(layout, c))
+                {
+                    bool block = kind == ChunkCell.Block; float h = block ? 1.6f : 0.55f;
+                    Color col = block ? new Color(0.36f, 0.32f, 0.28f) : new Color(0.52f, 0.42f, 0.30f);
+                    Vector3 pos = CellCenter(cell.X, cell.Y);
+                    Prim(sub, name + "_" + cell.X + "x" + cell.Y, PrimitiveType.Cube, pos + new Vector3(0, h * 0.5f, 0), new Vector3(CellSize * 0.8f, h, CellSize * 0.8f), mats.Flat(col));
+                    result.ChunkPieces++;
+                }
             }
         }
     }
