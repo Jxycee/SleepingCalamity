@@ -1,6 +1,6 @@
 // Core/Weapons/WeaponsSave.cs: the save shape of the weapons section and its clean rule (PHASE1 6.3). Follows the WorldSave pattern: plain
 // public fields, no Unity types, [JsonExtensionData] Extra on every type so an older build writes back what a newer one added, and a clean
-// rule that costs only the bad entry. NOT wired into WorldSave yet (M6); today it is only round-trip tested.
+// rule that costs only the bad entry. Wired into WorldSave as the optional "weapons" section (M6 S0).
 // Authority: host only (part of the host's world save).
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,18 @@ namespace SleepingCalamity.Core.Weapons
     public sealed class WeaponsSave
     {
         public List<WeaponSave> Weapons = new List<WeaponSave>();
+        public List<HeroSave> Heroes = new List<HeroSave>();   // per player: unlocked abilities and spell pips (M6 S0)
+
+        [JsonExtensionData] public Dictionary<string, object> Extra;
+    }
+
+    // One player's non-weapon growth, keyed by OwnerId (PlayerKey.Id) like their weapons.
+    [Serializable]
+    public sealed class HeroSave
+    {
+        public string OwnerId = "";
+        public HeroAbilitiesSave Abilities = new HeroAbilitiesSave();
+        public SpellPipsSave Pips = new SpellPipsSave();
 
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }
@@ -128,6 +140,19 @@ namespace SleepingCalamity.Core.Weapons
                     if (fixedUp) repaired?.Add(c.Key);
                     clean.Weapons.Add(c);
                 }
+            if (save.Heroes != null)
+            {
+                var owners = new HashSet<string>();
+                foreach (var h in save.Heroes)
+                {
+                    if (h == null || string.IsNullOrEmpty(h.OwnerId) || !owners.Add(h.OwnerId)) continue;   // a bad hero entry costs only itself
+                    clean.Heroes.Add(new HeroSave
+                    {
+                        OwnerId = h.OwnerId, Abilities = CleanAbilities(h.Abilities), Pips = CleanPips(h.Pips),
+                        Extra = h.Extra != null ? new Dictionary<string, object>(h.Extra) : null,
+                    });
+                }
+            }
             if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);
             return clean;
         }

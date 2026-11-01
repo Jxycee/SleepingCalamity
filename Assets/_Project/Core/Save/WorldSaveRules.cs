@@ -6,12 +6,13 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using SleepingCalamity.Core.Weapons;
 
 namespace SleepingCalamity.Core
 {
     public static class WorldSaveRules
     {
-        public const string SectionSeed = "worldSeed", SectionPlayers = "players", SectionWorldId = "worldId", SectionCreatedAt = "createdAtUtc";
+        public const string SectionSeed = "worldSeed", SectionPlayers = "players", SectionWorldId = "worldId", SectionWeapons = "weapons", SectionCreatedAt = "createdAtUtc";
 
         // A new world: the given seed, nothing else yet.
         public static WorldSave New(ulong seed) => new WorldSave { WorldSeed = SeedToHex(seed) };
@@ -55,6 +56,13 @@ namespace SleepingCalamity.Core
                     if (droppedEntry) rejected?.Add(SectionPlayers);   // the good players kept; the original file kept as .corrupt for the bad entry
                 }
                 else rejected?.Add(SectionPlayers);
+            }
+            if (save.Weapons != null)
+            {
+                // A weapon that does not fit is dropped alone; the section keeps the rest. A dropped entry still keeps the original file as .corrupt.
+                var droppedWeapons = new List<string>();
+                clean.Weapons = WeaponsSaveRules.Clean(save.Weapons, null, droppedWeapons);
+                if (droppedWeapons.Count > 0) rejected?.Add(SectionWeapons);
             }
             if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);   // a newer build's members, written back as read
             return clean;
