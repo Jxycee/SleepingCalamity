@@ -72,7 +72,7 @@ namespace SleepingCalamity.Core
         {
             const SubTheme L = SubTheme.Larder, WV = SubTheme.WineVault, CC = SubTheme.CoalCellar;
             const SocketKind Shelf = SocketKind.Shelf, Rack = SocketKind.Rack, Barrel = SocketKind.Barrel, Crate = SocketKind.Crate, Chute = SocketKind.Chute, Lantern = SocketKind.Lantern, Roots = SocketKind.Roots;
-            return new List<CellarRoom>
+            var rooms = new List<CellarRoom>
             {
                 // ---- floor 1: larders ----
                 Combat("larder_pantry", "Pantry closet", L, "closet", new[] {
@@ -178,7 +178,24 @@ namespace SleepingCalamity.Core
                 CellarRoom.Corridor("corridor_dead_end", "Dead end", CorridorShape.DeadEnd, CellarRoom.MaskN, Sk(Lantern, 0, 0, N)),
                 CellarRoom.Corridor("corridor_door", "Door piece", CorridorShape.Door, CellarRoom.MaskN | CellarRoom.MaskS, Sk(Lantern, 0, 0, E)),
             };
+            var regionTable = RegionTable();   // a method, not a static field: All (above) is initialised before any later static field
+            for (int i = 0; i < rooms.Count; i++)
+                if (regionTable.TryGetValue(rooms[i].Id, out (ChunkKind kind, int x, int y, int w, int h)[] specs))
+                    rooms[i] = rooms[i].WithRegions(specs.Select((s, n) => ChunkRegion.Author(rooms[i].Id + ".c" + (n + 1), s.kind, s.x, s.y, s.w, s.h)));
+            return rooms;
         }
+
+        // Chunk regions (procgen item 4), by room id: kind, x, y, width, height (a vertical line has width 1). Cells are free of doors, spawns, chests and features; a region may
+        // sit over socket cells (the resolver skips variants that hit a dressed socket or a vignette). 6 combat rooms, 8 regions (the other combat rooms have no cell that a dressed prop or a vignette does not usually take).
+        static Dictionary<string, (ChunkKind kind, int x, int y, int w, int h)[]> RegionTable() => new Dictionary<string, (ChunkKind, int, int, int, int)[]>
+        {
+            ["larder_cold_store"] = new[] { (ChunkKind.Clutter, 1, 1, 1, 2) },
+            ["larder_hanging_hall"] = new[] { (ChunkKind.Clutter, 2, 1, 1, 1) },
+            ["larder_smoke_gallery"] = new[] { (ChunkKind.Clutter, 1, 0, 1, 2), (ChunkKind.Clutter, 3, 1, 1, 1) },
+            ["wine_press_hall"] = new[] { (ChunkKind.Casks, 3, 1, 2, 1) },
+            ["wine_aisles"] = new[] { (ChunkKind.Casks, 0, 0, 1, 2) },
+            ["coal_boiler_hall"] = new[] { (ChunkKind.Rubble, 1, 1, 1, 3), (ChunkKind.Arch, 2, 1, 1, 1) },
+        };
 
         public static List<string> Validate() => ValidatePool(All);
 

@@ -119,11 +119,13 @@ namespace SleepingCalamity.Core
         public readonly IReadOnlyList<ChestSlot> Chests;
         public readonly IReadOnlyList<RoomFeature> Features;
         public readonly IReadOnlyList<string> AuthoredRows;   // the ASCII this room was parsed from (null for rooms built by hand)
+        public readonly IReadOnlyList<ChunkRegion> Regions;   // swappable chunk regions (procgen item 4; CellarRoomChunks picks a variant per region)
 
         public CellarRoom(string id, string name, RoomKind kind, SubTheme theme, string silhouette, CellKind[,] cells,
             IEnumerable<CellDoor> doors, IEnumerable<DressingSocket> sockets, IEnumerable<CellarSpawn> spawns, IEnumerable<ChestSlot> chests,
-            IEnumerable<RoomFeature> features = null, CorridorShape shape = CorridorShape.None, int mask = 0, string[] authoredRows = null)
+            IEnumerable<RoomFeature> features = null, CorridorShape shape = CorridorShape.None, int mask = 0, string[] authoredRows = null, IEnumerable<ChunkRegion> regions = null)
         {
+            Regions = (regions ?? new ChunkRegion[0]).ToList();
             AuthoredRows = authoredRows == null ? null : Array.AsReadOnly((string[])authoredRows.Clone());
             Id = id; Name = name; Kind = kind; Theme = theme; Silhouette = silhouette ?? "";
             this.cells = cells; Width = cells.GetLength(0); Height = cells.GetLength(1);
@@ -193,6 +195,10 @@ namespace SleepingCalamity.Core
             return new CellarRoom(id, name, kind, theme, silhouette, cells, doors, socks, spawns, chests, feats, CorridorShape.None, 0, rows);
         }
 
+        // The same room with chunk regions (the pool authors them after the ASCII rows).
+        public CellarRoom WithRegions(IEnumerable<ChunkRegion> regions) =>
+            new CellarRoom(Id, Name, Kind, Theme, Silhouette, cells, Doors, Sockets, Spawns, Chests, Features, Shape, Mask, AuthoredRows == null ? null : AuthoredRows.ToArray(), regions);
+
         // A 1 x 1 corridor piece: one door on cell (0,0) per bit of the neighbour mask.
         public static CellarRoom Corridor(string id, string name, CorridorShape shape, int mask, params SocketSpec[] sockets)
         {
@@ -232,7 +238,7 @@ namespace SleepingCalamity.Core
                 Spawns.Select(k => { var p = At(k.X, k.Y); return new CellarSpawn(p.x, p.y, k.Tier); }),
                 Chests.Select(k => { var p = At(k.X, k.Y); return new ChestSlot(p.x, p.y, k.KeyCandidate); }),
                 Features.Select(k => { var p = At(k.X, k.Y); return new RoomFeature(p.x, p.y, k.Kind); }),
-                Shape, RotateMask(Mask, q));
+                Shape, RotateMask(Mask, q), null, Regions.Select(r => r.Rotated(q, (x, y) => At(x, y))));
         }
 
         // The ASCII rows back (sockets are not in the ASCII). Parse(ToAscii()) gives the same grid, doors, spawns, chests and features.
@@ -318,6 +324,28 @@ namespace SleepingCalamity.Core
             foreach (ChestSlot c in Chests) Mark(c.X, c.Y, "chest");
             foreach (RoomFeature f in Features) Mark(f.X, f.Y, f.Kind.ToString());
             foreach (DressingSocket k in Sockets) Mark(k.X, k.Y, "socket " + k.Id);
+
+            // chunk regions: Floor cells only, off doors, spawns, chests and features (sockets may sit under a region: the resolver skips variants that hit a dressed socket)
+            if (Regions.Count > 0 && Kind != RoomKind.Combat) Err(Kind + " room has chunk regions");
+            var regionCells = new HashSet<(int, int)>(); var regionIds = new HashSet<string>();
+            foreach (ChunkRegion rg in Regions)
+            {
+                string at = "chunk region " + rg.Id;
+                if (string.IsNullOrEmpty(rg.Id) || !regionIds.Add(rg.Id)) Err(at + " has an empty or duplicated id");
+                if (rg.Variants.Count < ChunkRegion.MinVariants || rg.Variants.Count > ChunkRegion.MaxVariants) Err(at + " has " + rg.Variants.Count + " variants, needs " + ChunkRegion.MinVariants + " to " + ChunkRegion.MaxVariants);
+                if (rg.OpenIndex < 0) Err(at + " has no open variant");
+                if (rg.Variants.Select(v => v.Name).Distinct().Count() != rg.Variants.Count) Err(at + " repeats a variant name");
+                if (!CellarChunkLibrary.HasFootprint(rg.Width, rg.Height)) Err(at + " is " + rg.Width + "x" + rg.Height + ", no variants are authored for that size");
+                foreach (ChunkVariant v in rg.Variants) if (v.Width != rg.Width || v.Height != rg.Height) Err(at + " variant " + v.Name + " is " + v.Width + "x" + v.Height + ", expected " + rg.Width + "x" + rg.Height);
+                for (int x = rg.X; x < rg.X + rg.Width; x++)
+                    for (int y = rg.Y; y < rg.Y + rg.Height; y++)
+                    {
+                        if (!InBounds(x, y)) { Err(at + " cell (" + x + "," + y + ") is outside the grid"); continue; }
+                        if (cells[x, y] != CellKind.Floor) Err(at + " cell (" + x + "," + y + ") is on a " + cells[x, y] + " cell");
+                        if (used.TryGetValue((x, y), out string other) && !other.StartsWith("socket ")) Err(at + " cell (" + x + "," + y + ") covers a " + other);
+                        if (!regionCells.Add((x, y))) Err(at + " cell (" + x + "," + y + ") overlaps another region");
+                    }
+            }
 
             // reachability: flood fill over Floor from the first door that sits on a Floor cell; every Floor cell and every door must be reached
             // (a second pass blocks the Barrel and Crate socket cells, which stand in the way)
