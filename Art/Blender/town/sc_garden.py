@@ -390,10 +390,10 @@ def trellis(a):
 
 def scarecrow(a):
     r = a.r; b = a.body; E = 'oak_timber'
-    COAT = (0.58, 0.64, 0.72); BURLAP = (0.95, 0.80, 0.55)
+    COAT = (0.80, 0.36, 0.50); BURLAP = (1.0, 0.96, 0.86)   # faded madder red coat, light burlap (match HollowmereGarden.Slots)
     b.cyl(E, (0, 0, 1.05), 0.045, 2.1, segs=6, r2=0.04)
     b.beam(E, (-0.8, 0.0, 1.5), (0.8, 0.0, 1.43), 0.055, 0.055, bev=0.014)
-    # canvas coat: smooth lathe (canvas tileable, faded-blue tint), ragged hem tabs, two patches
+    # canvas coat: smooth lathe (canvas tileable, faded-red tint), ragged hem tabs, two patches
     prof = [(0.23, 0.92), (0.262, 0.98), (0.285, 1.05), (0.288, 1.15), (0.272, 1.27), (0.238, 1.38), (0.19, 1.46), (0.135, 1.53), (0.1, 1.57)]
     b.lathe('coat', prof, segs=16, smooth=True, tint=COAT)
     def coat_r(z):
@@ -415,8 +415,8 @@ def scarecrow(a):
                 rr = coat_r(z) + off
                 return Vector((math.cos(q) * rr, math.sin(q) * rr, z))
             b.grid(sl, fn, 4, 4, radial, half=0.003, tint=tt)
-    patch(-82, 1.22, 40, 0.17, (0.93, 0.72, 0.42), (0.55, 0.42, 0.28), 'patch_ochre')
-    patch(-128, 1.05, 30, 0.12, (0.74, 0.42, 0.34), (0.45, 0.3, 0.26), 'patch_rust')
+    patch(-82, 1.22, 40, 0.17, (1.0, 0.85, 0.45), (0.35, 0.28, 0.25), 'patch_ochre')
+    patch(-128, 1.05, 30, 0.12, (0.30, 0.30, 0.45), (0.35, 0.28, 0.25), 'patch_rust')
     for sx in (-1, 1):
         sh = Vector((sx * 0.12, 0, 1.46)); cuff = Vector((sx * 0.64, 0.0, 1.39 if sx < 0 else 1.40))
         d = cuff - sh
