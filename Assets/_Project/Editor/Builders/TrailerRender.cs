@@ -157,39 +157,73 @@ namespace SleepingCalamity.EditorTools
         // Starts over the lane's far end (not the square), so the square is never revisited.
         static readonly Shot HomeShot = new Shot
         {
-            Name = "lane+home", GroundRelative = true, Duration = CutStair - CutLane, Ramp = 0.12f,
+            Name = "lane+home", GroundRelative = true, Duration = CutStair - CutLane, Ramp = 0.12f, LookSigma = 1.2f,
             Pts = new[]
             {
                 new Wp(44f,   12.2f, 4.6f,  30f,   11.4f, 2.6f, 50f),
                 new Wp(36f,   11.0f, 4.0f,  22f,   10.5f, 2.4f, 50f),
                 new Wp(27f,   11.5f, 3.4f,  19.5f, 9f,    2.2f, 50f),
                 new Wp(21.5f, 9.5f,  3.0f,  15f,   4f,    2.0f, 52f),
-                new Wp(19.4f, 5.0f,  2.8f,  13.5f, 6.5f,  1.8f, 52f),
-                new Wp(16.2f, 1.6f,  2.2f,  12.8f, 7.2f,  1.6f, 54f),
-                new Wp(13.4f, 3.4f,  1.7f,  12.85f, 7.4f, 1.5f, 56f),
-                new Wp(12.85f, 5.9f, 1.55f, 12.85f, 9.0f, 1.4f, 58f),
-                new Wp(12.85f, 8.8f, 1.5f,  14.2f, 12.0f, 1.0f, 58f),
-                new Wp(13.4f, 10.6f, 1.45f, 15.0f, 12.5f, 0.2f, 58f),
+                new Wp(19.4f, 5.2f,  2.8f,  14f,   6.6f,  1.8f, 52f),
+                new Wp(17.0f, 5.3f,  2.3f,  12.9f, 7.4f,  1.6f, 54f),   // the "Body" figure stands at x 13.5-15.5, z 1.6-3.4: pass north of it
+                new Wp(14.8f, 5.6f,  1.6f,  12.85f, 7.4f, 1.5f, 56f),
+                new Wp(13.2f, 6.0f,  1.4f, 12.85f, 8.0f, 1.4f, 58f),
+                new Wp(12.85f, 8.8f, 1.4f,  14.2f, 12.0f, 1.0f, 58f),
+                new Wp(13.4f, 10.6f, 1.4f, 15.0f, 12.5f, 0.2f, 58f),
             }
         };
 
         // Stair scene (absolute positions): from inside the house through the doorway, down flight A, round the turns, down flight C, into the vault's entry tunnel.
         static readonly Shot StairShot = new Shot
         {
-            Name = "stair", Duration = CutCellar - CutStair, Ramp = 0.14f, LookSigma = 1.0f,
-            Pts = new[]
+            Name = "stair", Duration = CutCellar - CutStair, Ramp = 0.12f, PosSigma = 0.08f, LookSigma = 1.4f,
+            Pts = new[]   // computed offline: a clearance-maximising path (A* over a 0.15 m free-space grid of the stair scene, see DumpStairGrid), eye-level, look 4 m ahead
             {
-                new Wp(new Vector3(3.0f, 10.7f, 1.0f),  new Vector3(3.2f, 8.9f, -4.2f), 62f),
-                new Wp(new Vector3(3.1f, 10.6f, -1.8f), new Vector3(3.2f, 8.0f, -6.0f), 62f),
-                new Wp(new Vector3(3.2f, 10.4f, -3.9f), new Vector3(3.0f, 7.2f, -6.4f), 62f),
-                new Wp(new Vector3(3.2f, 9.5f, -5.2f),  new Vector3(2.2f, 6.7f, -6.6f), 62f),
-                new Wp(new Vector3(2.9f, 8.7f, -6.3f),  new Vector3(0.8f, 6.3f, -6.6f), 62f),
-                new Wp(new Vector3(1.9f, 7.6f, -6.6f),  new Vector3(0.0f, 5.2f, -6.1f), 62f),
-                new Wp(new Vector3(0.6f, 6.5f, -6.5f),  new Vector3(0.1f, 4.3f, -4.6f), 62f),
-                new Wp(new Vector3(0.0f, 5.6f, -5.6f),  new Vector3(0.1f, 2.6f, -2.5f), 62f),
-                new Wp(new Vector3(0.0f, 4.3f, -4.0f),  new Vector3(0.2f, 2.2f, 2.0f),  62f),
-                new Wp(new Vector3(0.0f, 2.8f, -2.4f),  new Vector3(0.2f, 1.8f, 4.0f),  62f),
-                new Wp(new Vector3(0.15f, 2.1f, -0.6f), new Vector3(0.2f, 1.5f, 5.0f),  62f),
+                new Wp(new Vector3(2.95f, 10.75f, 1.05f), new Vector3(3.25f, 9.55f, -2.65f), 62f),
+                new Wp(new Vector3(2.95f, 10.47f, 0.63f), new Vector3(3.25f, 9.55f, -3.15f), 62f),
+                new Wp(new Vector3(2.95f, 10.20f, 0.21f), new Vector3(3.25f, 9.55f, -3.66f), 62f),
+                new Wp(new Vector3(2.95f, 10.15f, -0.29f), new Vector3(3.25f, 9.55f, -4.16f), 62f),
+                new Wp(new Vector3(3.04f, 10.06f, -0.77f), new Vector3(3.25f, 9.46f, -4.65f), 62f),
+                new Wp(new Vector3(3.10f, 9.99f, -1.26f), new Vector3(3.25f, 9.15f, -5.05f), 62f),
+                new Wp(new Vector3(3.10f, 9.82f, -1.74f), new Vector3(3.25f, 8.80f, -5.40f), 62f),
+                new Wp(new Vector3(3.18f, 9.62f, -2.19f), new Vector3(3.25f, 8.44f, -5.76f), 62f),
+                new Wp(new Vector3(3.25f, 9.55f, -2.68f), new Vector3(3.23f, 8.08f, -6.12f), 62f),
+                new Wp(new Vector3(3.25f, 9.55f, -3.19f), new Vector3(3.04f, 7.76f, -6.44f), 62f),
+                new Wp(new Vector3(3.25f, 9.55f, -3.69f), new Vector3(2.61f, 7.59f, -6.60f), 62f),
+                new Wp(new Vector3(3.25f, 9.55f, -4.19f), new Vector3(2.15f, 7.38f, -6.60f), 62f),
+                new Wp(new Vector3(3.25f, 9.44f, -4.68f), new Vector3(1.79f, 7.04f, -6.60f), 62f),
+                new Wp(new Vector3(3.25f, 9.13f, -5.07f), new Vector3(1.43f, 6.68f, -6.60f), 62f),
+                new Wp(new Vector3(3.25f, 8.77f, -5.43f), new Vector3(1.05f, 6.35f, -6.60f), 62f),
+                new Wp(new Vector3(3.25f, 8.42f, -5.78f), new Vector3(0.66f, 6.04f, -6.60f), 62f),
+                new Wp(new Vector3(3.22f, 8.06f, -6.14f), new Vector3(0.30f, 5.70f, -6.52f), 62f),
+                new Wp(new Vector3(3.02f, 7.74f, -6.46f), new Vector3(0.05f, 5.43f, -6.18f), 62f),
+                new Wp(new Vector3(2.58f, 7.59f, -6.60f), new Vector3(-0.03f, 5.14f, -5.79f), 62f),
+                new Wp(new Vector3(2.13f, 7.36f, -6.60f), new Vector3(-0.05f, 4.78f, -5.43f), 62f),
+                new Wp(new Vector3(1.77f, 7.02f, -6.60f), new Vector3(-0.05f, 4.43f, -5.07f), 62f),
+                new Wp(new Vector3(1.41f, 6.66f, -6.60f), new Vector3(-0.05f, 4.18f, -4.64f), 62f),
+                new Wp(new Vector3(1.03f, 6.33f, -6.60f), new Vector3(-0.05f, 4.10f, -4.14f), 62f),
+                new Wp(new Vector3(0.63f, 6.02f, -6.60f), new Vector3(-0.05f, 3.87f, -3.70f), 62f),
+                new Wp(new Vector3(0.28f, 5.68f, -6.51f), new Vector3(-0.05f, 3.57f, -3.29f), 62f),
+                new Wp(new Vector3(0.04f, 5.41f, -6.16f), new Vector3(-0.05f, 3.26f, -2.90f), 62f),
+                new Wp(new Vector3(-0.04f, 5.11f, -5.76f), new Vector3(-0.05f, 2.96f, -2.49f), 62f),
+                new Wp(new Vector3(-0.05f, 4.76f, -5.41f), new Vector3(-0.05f, 2.67f, -2.08f), 62f),
+                new Wp(new Vector3(-0.05f, 4.41f, -5.05f), new Vector3(-0.05f, 2.35f, -1.69f), 62f),
+                new Wp(new Vector3(-0.05f, 4.17f, -4.61f), new Vector3(-0.05f, 2.06f, -1.28f), 62f),
+                new Wp(new Vector3(-0.05f, 4.09f, -4.11f), new Vector3(-0.05f, 1.76f, -0.88f), 62f),
+                new Wp(new Vector3(-0.05f, 3.85f, -3.67f), new Vector3(-0.05f, 1.51f, -0.44f), 62f),
+                new Wp(new Vector3(-0.05f, 3.55f, -3.27f), new Vector3(-0.05f, 1.45f, 0.05f), 62f),
+                new Wp(new Vector3(-0.05f, 3.24f, -2.87f), new Vector3(-0.05f, 1.45f, 0.56f), 62f),
+                new Wp(new Vector3(-0.05f, 2.94f, -2.47f), new Vector3(-0.05f, 1.45f, 1.06f), 62f),
+                new Wp(new Vector3(-0.05f, 2.65f, -2.06f), new Vector3(0.00f, 1.40f, 1.55f), 62f),
+                new Wp(new Vector3(-0.05f, 2.33f, -1.66f), new Vector3(0.23f, 1.17f, 1.93f), 62f),
+                new Wp(new Vector3(-0.05f, 2.04f, -1.26f), new Vector3(0.25f, 1.15f, 2.37f), 62f),
+                new Wp(new Vector3(-0.05f, 1.74f, -0.85f), new Vector3(0.25f, 1.15f, 2.83f), 62f),
+                new Wp(new Vector3(-0.05f, 1.50f, -0.41f), new Vector3(0.25f, 1.15f, 3.28f), 62f),
+                new Wp(new Vector3(-0.05f, 1.45f, 0.09f), new Vector3(0.25f, 1.15f, 3.74f), 62f),
+                new Wp(new Vector3(-0.05f, 1.45f, 0.59f), new Vector3(0.25f, 1.15f, 4.19f), 62f),
+                new Wp(new Vector3(-0.05f, 1.45f, 1.10f), new Vector3(0.25f, 1.15f, 4.64f), 62f),
+                new Wp(new Vector3(0.01f, 1.39f, 1.58f), new Vector3(0.25f, 1.15f, 5.10f), 62f),
+                new Wp(new Vector3(0.25f, 1.15f, 1.95f), new Vector3(0.25f, 1.15f, 5.55f), 62f),
             }
         };
 
@@ -245,6 +279,34 @@ namespace SleepingCalamity.EditorTools
                     + " maxStep=" + maxStep.ToString("0.000") + " m (" + (maxStep * Fps).ToString("0.00") + " m/s) maxRot=" + maxRot.ToString("0.000") + " deg (" + (maxRot * Fps).ToString("0.0") + " deg/s) pathMetres=" + sumStep.ToString("0.0"));
             }
             return plan;
+        }
+
+        // Route-design helper (exec, no graphics): writes a clearance grid of the stair scene to the file in SC_TRAILER_GRIDFILE (one byte per cell, x fastest then z then y;
+        // 0 = a 0.25 m sphere touches a mesh, 1..4 = free with radius >= 0.25 / 0.4 / 0.55 / 0.7). Origin (-2,1,-9), step 0.15, size 47 x 71 x 74 (x, y, z).
+        public static void DumpStairGrid()
+        {
+            string file = Env("SC_TRAILER_GRIDFILE"); if (string.IsNullOrEmpty(file)) throw new InvalidOperationException("Set SC_TRAILER_GRIDFILE");
+            EditorSceneManager.OpenScene(UndercroftStairBuilder.ScenePath, OpenSceneMode.Single);
+            var clear = new Clearance(); clear.Setup();
+            try
+            {
+                const int nx = 47, ny = 71, nz = 74; const float step = 0.15f;
+                var data = new byte[nx * ny * nz]; var hits = new Collider[16];
+                float[] radii = { 0.7f, 0.55f, 0.4f, 0.25f };
+                for (int iy = 0; iy < ny; iy++)
+                    for (int iz = 0; iz < nz; iz++)
+                        for (int ix = 0; ix < nx; ix++)
+                        {
+                            var c = new Vector3(-2f + ix * step, 1f + iy * step, -9f + iz * step);
+                            byte v = 0;
+                            for (int r = 0; r < radii.Length && v == 0; r++) if (!clear.Touches(c, radii[r])) v = (byte)(4 - r);
+                            // v: the largest free radius class (a bigger sphere free implies the smaller ones are)
+                            data[(iy * nz + iz) * nx + ix] = v;
+                        }
+                File.WriteAllBytes(file, data);
+                Debug.Log("SC TRAILER GRID written " + file + " bytes=" + data.Length);
+            }
+            finally { clear.Teardown(); }
         }
 
         static Quaternion Rot(Pose p) => Quaternion.LookRotation(p.Look - p.Pos, Vector3.up);
@@ -537,6 +599,8 @@ namespace SleepingCalamity.EditorTools
                 Physics.SyncTransforms();
                 Debug.Log("SC TRAILER clearance colliders=" + added.Count);
             }
+
+            public bool Touches(Vector3 c, float r) { foreach (Collider k in Physics.OverlapSphere(c, r)) if (mine.Contains(k)) return true; return false; }
 
             public void Teardown() { foreach (MeshCollider mc in added) if (mc != null) UnityEngine.Object.DestroyImmediate(mc); added.Clear(); mine.Clear(); }
 
