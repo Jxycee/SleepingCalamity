@@ -12,11 +12,18 @@ These are the steps only the user can take. Claude keeps this list current: when
    3. When both players show, press "Start session" on the host. Both players should land in Arena_Greybox.
 
    Tell Claude what happened.
-3b. **The M5 Cellars walk, floors 1-4 (2 players; spine merged `e525a51`).** The town and the Undercroft stair are not wired in yet (M6), so the dive starts from the Arena_Dive hub:
-   1. Turn on the dev panel toggle "Start in the Cellars dive hub" (or the editor menu `SleepingCalamity/Dev/Dive Hub`, or launch a build with `-dev-dive`), then host (solo or "Host online (Relay)") and have the second player join by code.
-   2. In the hub, walk to the violet column in the stair mouth and press **E** to start the dive (host picks the seed). Debug keys, host only, dev builds: **F7** starts a dive from anywhere, **F8** abandons it.
-   3. On floors 1-3 press **E** at the stair column to go down; on floor 2 press **E** at the bank column (checkpoint: banks the haul and heals); on floor 4 press **E** at the bank in the baker's room, then **E** at the green column to go home.
-   4. Expect: both players land on each floor's entry together and see the same floor. Enemies, keys and chest loot come with the contents session's merge; until it lands the stairs are always open. Tell Claude what felt wrong or samey.
+3b. **The M5 Cellars walk, floors 1-4 (2 players; spine `e525a51` + contents `c75c33f8`; an automated host+client run of this script passes).** About 20-30 minutes. The town and the Undercroft stair come in M6, so the dive starts from the Arena_Dive hub. The bottom of the screen shows `[E] ...` whenever an action is in reach; the stir meter sits on screen during a dive.
+   1. Both machines: turn on the dev panel toggle "Start in the Cellars dive hub" (or editor menu `SleepingCalamity/Dev/Dive Hub`, or a build with `-dev-dive`).
+   2. Host: press "Host online (Relay)" and read out the join code. Second player: "Join by code", enter it. Host: "Start session". Both land on the hub pad.
+   3. Walk into the stair mouth to the violet column: `[E] Go down the Undercroft stair`. Either player presses E. Both of you appear at floor 1's entry.
+   4. Floor 1: walk into rooms (enemies spawn when someone first steps into a combat room). One enemy carries the gate key: kill it and a gold cube drops; walk over it. Only now does the stair open.
+   5. On the way: press E at chests (loot goes into the shared haul; a key chest gives the room key, then walk up to the locked gate or press E there to open it). Walk over the bakery pieces (spheres) to pick them up; the "pieces left" count drops for both of you.
+   6. At the stair column: `[E] Take the stair down`. Repeat 4-6 on floors 2 and 3.
+   7. Floor 2 checkpoint (lamp nook): `[E] Bank the haul at the checkpoint`. Banked pieces are safe and the party heals. A healing point may also stand on some floors (walk onto it; 30 s recharge).
+   8. Watch the stir meter climb as you clear floors and carry pieces: at 40 rooms get one extra enemy, at 70 a big rat-king hunts you, at 100 you have 90 s to reach a bank point.
+   9. Floor 4, the bakery: fight past the Dough Warden in the antechamber to the baker's room. `[E] Bank the haul with the baker`, then `[E] Take the party home` at the green column. You are back on the hub pad.
+   10. Optional fail test: start a second dive (the stair offers floor 3 now, as a return dive), pick up a piece, and let the party fall (or host presses F8 to abandon). You return to the hub and the unbanked piece is back on its floor next time.
+   Debug keys (host, dev builds): F7 starts a dive from anywhere, F8 abandons it. Tell Claude what broke, what felt wrong, and whether floors felt samey.
 
 ## Cloud sessions (so a cloud session can work like the PC)
 - **Set up the cloud environment** (title-bar environment menu > Edit; details in `docs/superpowers/handoff/cloud-environment.md`):
