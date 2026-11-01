@@ -321,6 +321,18 @@ try {
 } catch { Say 'SC LFS checkout skipped (git lfs unavailable)' }
 
 $code = 1
+# Tree key of a commit's Unity content: the Assets, Packages and ProjectSettings tree ids joined with '-'
+# (`git rev-parse <rev>:Assets <rev>:Packages <rev>:ProjectSettings`). Pipe-free on purpose: PowerShell 5.1 re-encodes
+# native-to-native pipes. Must match unity.sh (write_marker) and .claude/hooks/guard.sh. Returns $null when unavailable.
+function Get-UnityTreeKey([string]$Rev = 'HEAD') {
+    try {
+        $lines = @(& git -C $ProjectRoot rev-parse "${Rev}:Assets" "${Rev}:Packages" "${Rev}:ProjectSettings" 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $lines.Count -ne 3) { return $null }
+        $t = @($lines | ForEach-Object { ([string]$_).Trim() })
+        foreach ($l in $t) { if ($l -notmatch '^[0-9a-f]{40}$') { return $null } }
+        return ($t -join '-')
+    } catch { return $null }
+}
 # After a check PASS, record the tested commit for the merge gate (.claude/hooks/guard.sh).
 function Write-PassMarker([string]$MarkerDir = 'sc-check-pass') {
     try {
@@ -336,13 +348,13 @@ function Write-PassMarker([string]$MarkerDir = 'sc-check-pass') {
         $dir = Join-Path $common $MarkerDir
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         Set-Content -LiteralPath (Join-Path $dir $sha) -Value (Get-Date -Format o) -Encoding ASCII
-        # Also key the marker on the tree under Assets/ Packages/ ProjectSettings/ (the merge guard accepts a content-identical commit).
-        $tkey = (& git -C $ProjectRoot ls-tree HEAD -- Assets Packages ProjectSettings 2>$null | & git -C $ProjectRoot hash-object --stdin 2>$null)
-        if (-not [string]::IsNullOrEmpty($tkey)) {
-            $tdir = Join-Path $common 'sc-check-pass-tree'
+        # Also key the marker on the Unity trees (the guards accept a content-identical commit): "<dir>-tree/<key>".
+        $tkey = Get-UnityTreeKey 'HEAD'
+        if ($tkey) {
+            $tdir = Join-Path $common ($MarkerDir + '-tree')
             New-Item -ItemType Directory -Force -Path $tdir | Out-Null
-            Set-Content -LiteralPath (Join-Path $tdir ([string]$tkey).Trim()) -Value (Get-Date -Format o) -Encoding ASCII
-            Say ('SC MARKER tree ' + ([string]$tkey).Trim())
+            Set-Content -LiteralPath (Join-Path $tdir $tkey) -Value (Get-Date -Format o) -Encoding ASCII
+            Say ('SC MARKER tree ' + $tkey)
         }
         $dirty = & git -C $ProjectRoot status --porcelain --untracked-files=no 2>$null
         if ($dirty) { Say ('SC MARKER ' + $sha + ' (uncommitted changes were present; the marker covers the commit only)') }

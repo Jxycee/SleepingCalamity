@@ -18,6 +18,15 @@ block() {
     exit 2
 }
 
+# Tree key of a commit's Unity content: the Assets, Packages and ProjectSettings tree ids joined with '-'
+# (git rev-parse <rev>:Assets <rev>:Packages <rev>:ProjectSettings). Pipe-free; must match Tools/unity.ps1 and Tools/cloud/unity.sh.
+# Prints nothing when a path is missing or rev-parse fails.
+unity_tree_key() {
+    local out; out=$(git rev-parse "$1:Assets" "$1:Packages" "$1:ProjectSettings" 2>/dev/null | tr -d '\r') || return 0
+    [ "$(printf '%s\n' "$out" | grep -Ecx '[0-9a-f]{40}')" = 3 ] || return 0
+    printf '%s' "$out" | tr '\n' '-'
+}
+
 tool=$(json_field tool_name)
 cwd=$(json_field cwd)
 [ -n "$cwd" ] && cd "$cwd" 2>/dev/null
@@ -151,11 +160,11 @@ while IFS= read -r seg; do
             sha=$(git rev-parse --verify --quiet "$src^{commit}" 2>/dev/null) || continue
             unity=$(git diff --name-only "origin/main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) || continue
             [ -z "$unity" ] && continue
-            tree=$(git rev-parse --verify --quiet "$sha^{tree}" 2>/dev/null)
+            tkey=$(unity_tree_key "$sha")
             ok=0
             for d in sc-gate-pass sc-check-pass; do
                 [ -f "$common/$d/$sha" ] && ok=1
-                [ -n "$tree" ] && [ -f "$common/$d/$tree" ] && ok=1
+                [ -n "$tkey" ] && [ -f "$common/$d-tree/$tkey" ] && ok=1
             done
             if [ "$ok" = 0 ]; then
                 # A gated ancestor with no Unity-file changes since (docs/STATUS commits on top) still counts.
@@ -185,7 +194,7 @@ while IFS= read -r seg; do
                 sha=$(git rev-parse --verify --quiet "$word^{commit}" 2>/dev/null) || continue
                 [ -f "$common/sc-check-pass/$sha" ] && continue
                 # Same content under the Unity paths as a checked commit (tree-keyed marker, written by unity.sh/unity.ps1 check).
-                tkey=$(git ls-tree "$sha" -- Assets Packages ProjectSettings 2>/dev/null | git hash-object --stdin 2>/dev/null)
+                tkey=$(unity_tree_key "$sha")
                 [ -n "$tkey" ] && [ -f "$common/sc-check-pass-tree/$tkey" ] && continue
                 # Art-only or docs-only merge: no check needed. A failed diff (no merge base in a shallow clone) falls through.
                 if unity=$(git diff --name-only "main...$sha" -- Assets Packages ProjectSettings 2>/dev/null) && [ -z "$unity" ]; then

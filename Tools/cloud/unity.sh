@@ -139,14 +139,23 @@ PY
     [ -n "$faillines" ] && say "$faillines"
     return 1
 }
+# Tree key of a commit's Unity content: the Assets, Packages and ProjectSettings tree ids joined with '-'
+# (git rev-parse <rev>:Assets <rev>:Packages <rev>:ProjectSettings). Pipe-free; must match unity.ps1 and .claude/hooks/guard.sh. Empty when unavailable.
+unity_tree_key() {
+    local out; out="$(git -C "$PROJECT" rev-parse "$1:Assets" "$1:Packages" "$1:ProjectSettings" 2>/dev/null | tr -d '\r')" || return 0
+    [ "$(printf '%s\n' "$out" | wc -l)" = 3 ] || return 0
+    printf '%s\n' "$out" | grep -Eqx '[0-9a-f]{40}' || return 0
+    [ "$(printf '%s\n' "$out" | grep -Ecx '[0-9a-f]{40}')" = 3 ] || return 0
+    printf '%s' "$out" | tr '\n' '-'
+}
 write_marker() {
     local sha common dir mdir="${1:-sc-check-pass}"
     sha="$(git -C "$PROJECT" rev-parse HEAD 2>/dev/null)"; common="$(git -C "$PROJECT" rev-parse --git-common-dir 2>/dev/null)"
     [ -n "$sha" ] && [ -n "$common" ] || { say 'SC MARKER skipped (git rev-parse failed)'; return; }
     case "$common" in /*) ;; *) common="$PROJECT/$common" ;; esac
     dir="$common/$mdir"; mkdir -p "$dir" && date -Iseconds > "$dir/$sha"
-    # Also key the marker on the tree under Assets/ Packages/ ProjectSettings/, so the merge guard accepts a content-identical commit.
-    local tkey; tkey="$(git -C "$PROJECT" ls-tree HEAD -- Assets Packages ProjectSettings 2>/dev/null | git -C "$PROJECT" hash-object --stdin 2>/dev/null)"
+    # Also key the marker on the Unity trees, so the guards accept a content-identical commit.
+    local tkey; tkey="$(unity_tree_key HEAD)"
     [ -n "$tkey" ] && { mkdir -p "$common/$mdir-tree" && date -Iseconds > "$common/$mdir-tree/$tkey"; say "SC MARKER tree $tkey"; }
     if [ -n "$(git -C "$PROJECT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
         say "SC MARKER $sha (uncommitted changes were present; the marker covers the commit only)"
