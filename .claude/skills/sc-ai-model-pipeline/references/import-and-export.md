@@ -1,0 +1,7 @@
+<!-- Covers: URP Lit import rules, 4K import settings and the final GLB/FBX export tool. Moved from SKILL.md section 3. -->
+
+## 3. Import into Unity (URP Lit)
+- The material is URP Lit with the repaired base colour, plus normal, metallic-smoothness and occlusion when they help (packed with `sc_pack_unity.py`; sc-asset-craft 0b). Tripo's metallic and roughness are guesses: check them against the material (cloth and leather aren't metallic) and the review render.
+- FishGame's importer cleaned every Tripo texture (Kuwahara smoothing, dark lift, dirty-brown desaturation) for its toon look. **Don't port that cleaning:** Kuwahara blobbed planks and brick edges (P9), and the lift and desaturation hit fur hard (C1). Grade colour toward PHASE1 3.1 by hand, per asset, and compare in Unity before and after.
+- Import settings for 4K: max size 4096, high-quality compression, aniso 4. Don't change them to fix blur.
+- **Final export:** the GLB plus the repaired maps, at real size, base on z 0, moving parts separated with their pivot on the axis, GLB and FBX, no armature. Tool: `blender -b --factory-startup --python Art/Blender/tools/experimental/sc_tripo_finalize.py -- <model.glb> <basecolor.png> <out dir> <stem> --config <model.json> [--uv <rwork>/mesh.npz <dwork>/out/UV.npy]`. The JSON config names the moving parts, the pivot axis and the real-scale factor; `tripo_detail/configs/mill.json` is the worked example.
