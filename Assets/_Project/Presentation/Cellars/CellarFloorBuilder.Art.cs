@@ -17,13 +17,40 @@ using UnityEngine.Rendering;
 
 namespace SleepingCalamity.Presentation
 {
+    // ---------------------------------------------------------------------------------------------------------------------------------------------------
+    // COLOUR TUNING BLOCK (floor art round 2). Round 0 measured the floor at 48-58% mid-tones against the dungeon corner's 38%, fewer deep darks and more saturated
+    // lamp pools (light saturation .57 vs .42-.53): too much flat orange fill. Everything below pulls it toward DungeonCornerBuilder (deep grey-brown darks, paler gold pools).
+    // Round 2: ambient 0.35 -> 0.28 | fill 1.8 -> 1.0 | lamp x1.2 -> x1.0, corridor lamps a further x0.8 | lamp gold (1.0,0.85,0.66).
+    // Round 1, old -> new:  ambient 0.8 -> 0.35 | per-room fill 4.0 -> 1.8 and (1.0,0.76,0.52) -> (1.0,0.86,0.70) | lamp gold (1.0,0.80,0.54) -> (1.0,0.82,0.58), lamp intensity x1.2
+    // (wall 18 -> 21.6, centre 18 -> 21.6, corridor 11 -> 13.2) | candle gold stays the corner's (1.0,0.72,0.44) | fog warm offset x0.5, each channel held within 0.03 of the base.
+    // The volume stays DungeonCorner_Profile with no extra warm grade. Applies to every floor built by CellarFloorBuilder (lamps, fills, candles, fog) and, for ambient,
+    // to whichever scene builder sets RenderSettings (CellarFloorTestBuilder today; a real dive scene should read CellarArtTuning.Ambient too).
+    // ---------------------------------------------------------------------------------------------------------------------------------------------------
+    public static class CellarArtTuning
+    {
+        public const float Ambient = 0.28f;                         // trilight ambient intensity (was 0.8, round 1 0.35; the corner uses 0.23)
+        public const float FillIntensity = 1.0f;                    // per-room fill light (was 4.0, round 1 1.8)
+        public const float LampBoost = 1.0f, CorridorLampScale = 0.8f, CorridorLampRangeScale = 0.7f, CentreLampScale = 1.15f;   // wall, centre and corridor lamp intensity multiplier (round 1 1.2), corridor lamps a further x0.8
+        public const float FogWarmScale = 0.5f, FogWarmClamp = 0.03f;   // the per-floor fog warm offset: halved, then within this of the base colour per channel
+        public static readonly Color FillGold = new Color(1.0f, 0.86f, 0.70f);
+        public static readonly Color LampGold = new Color(1.0f, 0.85f, 0.66f);
+        public static readonly Color CandleGold = new Color(1.0f, 0.72f, 0.44f);
+
+        // Fog colour for a floor: the base (the corner's ~(0.16, 0.13, 0.11)) plus the floor's warm offset, halved and clamped so it stays grey-brown.
+        public static Color FogColor(Color baseColor, float dr, float dg, float db)
+        {
+            float C(float b, float d) => Mathf.Clamp01(b + Mathf.Clamp(d * FogWarmScale, -FogWarmClamp, FogWarmClamp));
+            return new Color(C(baseColor.r, dr), C(baseColor.g, dg), C(baseColor.b, db));
+        }
+    }
+
     public static partial class CellarFloorBuilder
     {
-        public const string VaultGroup = "Vaults", CeilingGroup = "Ceiling", FaceGroup = "Faces", DressingGroup = "Dressing";
+        public const string VaultGroup = "Vaults", CeilingGroup = "Ceiling", FaceGroup = "Faces", DressingGroup = "Dressing", ClutterGroup = "Clutter";
         public const float RoomSpring = 2.6f, CorridorSpring = 1.6f, VaultHalfSpan = 2.0f, VaultRise = 2.5f;
-        public const float WallLampIntensity = 18f, CentreLampIntensity = 18f, CorridorLampIntensity = 11f;
+        public const float WallLampIntensity = 18f * CellarArtTuning.LampBoost, CentreLampIntensity = 18f * CellarArtTuning.LampBoost, CorridorLampIntensity = 11f * CellarArtTuning.LampBoost * CellarArtTuning.CorridorLampScale;
         const float FaceDepth = 0.2f, KitAcross = 0.725f;   // VaultSegment / ArchRib (5 m inside, 6 m outside): 0.725 keeps the outer wall face 2.175 m from the axis, just behind a neighbour's 0.2 m face, inner face 1.83 m (on the wall colliders)
-        static readonly Color CandleGold = new Color(1.0f, 0.72f, 0.44f), FillGold = new Color(1.0f, 0.76f, 0.52f);
+        static readonly Color CandleGold = CellarArtTuning.CandleGold, FillGold = CellarArtTuning.FillGold;
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
         enum Edge { Closed, Door, Through }
@@ -146,8 +173,10 @@ namespace SleepingCalamity.Presentation
                     }
                 }
 
+            CellarFloorClutter clutter = CellarFloorClutter.Resolve(layout, resolved);
             Sockets(resolved, grid, kit, mats, ceiling, dressing, result);
-            Corners(layout, resolved, grid, kit, mats, dressing, result);
+            Corners(layout, resolved, grid, kit, mats, dressing, result, clutter);
+            Clutter(clutter, kit, mats, dressing);
 
             // a candle cluster on every chest (the chest marker is 0.8 m tall), and a warm fill per room
             foreach (FloorChest ch in layout.Chests)
@@ -159,7 +188,7 @@ namespace SleepingCalamity.Presentation
                 PlacedRoom p = layout.Rooms[r];
                 Vector3 a = CellCenter(p.X, p.Y), b = CellCenter(p.X + p.Width - 1, p.Y + p.Height - 1);
                 float span = Mathf.Max(p.Width, p.Height) * CellSize;
-                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, 1.8f, 0), FillGold, 4f, span * 0.75f + 2f);
+                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, 1.8f, 0), FillGold, CellarArtTuning.FillIntensity, span * 0.75f + 2f);
             }
             if (kit.Mote != null)
                 foreach (Transform lamp in root.Find(LampGroup))
@@ -215,6 +244,22 @@ namespace SleepingCalamity.Presentation
                     {
                         float yaw = ((x * 7 + y * 13) % 21) - 10;
                         Vector3 at = c + w * 1.25f;
+                        if (HasPiece(kit, "CrateStack") && HasPiece(kit, "Crate"))
+                        {
+                            // kit crates against the wall (local +x into the room, wall at -x): Stacked = the big stack, Open = two crates, Broken = a crate and one tipped over
+                            Vector3 wallPos = c + w * (CellSize * 0.5f - 0.2f), side = Vector3.Cross(w, Vector3.up);
+                            var kc = new GameObject("Crates_" + id).transform; kc.SetParent(dressing, false); kc.position = wallPos;
+                            if (s.Variant == "Open") { PlaceAtWall(kit, "Crate", kc, "CrateA", wallPos - w * 0.36f + side * 0.5f, faceLeft, yaw); PlaceAtWall(kit, "Crate", kc, "CrateB", wallPos - w * 0.36f - side * 0.5f, faceLeft, -yaw * 1.5f); }
+                            else if (s.Variant == "Broken")
+                            {
+                                PlaceAtWall(kit, "Crate", kc, "CrateA", wallPos - w * 0.36f + side * 0.55f, faceLeft, yaw);
+                                GameObject tip = PlaceAtWall(kit, "Crate", kc, "CrateB", wallPos - w * 0.36f - side * 0.55f + new Vector3(0, 0.3f, 0), faceLeft, -yaw * 1.5f);
+                                if (tip != null) tip.transform.rotation = tip.transform.rotation * Quaternion.Euler(0, 0, 35f);
+                            }
+                            else PlaceAtWall(kit, "CrateStack", kc, "CrateStack", wallPos - w * 0.405f, faceLeft, yaw * 0.5f);
+                            g = kc.gameObject;
+                            break;
+                        }
                         var crate = new GameObject("Crates_" + id).transform; crate.SetParent(dressing, false); crate.position = at;
                         Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw, 0);
                         GameObject cb = Box(crate, "CrateB", at + Vector3.Cross(w, Vector3.up) * 0.85f + new Vector3(0, 0.3f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false);
@@ -234,11 +279,12 @@ namespace SleepingCalamity.Presentation
         }
 
         // ------------------------------------------------------------------------------------------------ corner dressing
-        // Up to two free inside corners per room (a floor cell closed on two adjacent sides, holding no chest, start, stair, spawn, carrier or socket) get
+        // Up to four (every one that passes) free inside corners per room (a floor cell closed on two adjacent sides, holding no chest, start, stair, spawn, carrier or socket) get
         // barrels with a candle or a crate stack, picked by a hash of (seed, cell), so sparse combat rooms gain storage at their edges without new data.
-        static void Corners(CellarFloorLayout layout, CellarFloorDressing resolved, Grid grid, CellarFloorKit kit, Mats mats, Transform dressing, CellarFloorBuild result)
+        static void Corners(CellarFloorLayout layout, CellarFloorDressing resolved, Grid grid, CellarFloorKit kit, Mats mats, Transform dressing, CellarFloorBuild result, CellarFloorClutter clutter)
         {
             var busy = new HashSet<(int, int)>();
+            foreach (CellarClutterRow cr in clutter.Rows) busy.Add((cr.CellX, cr.CellY));   // a clutter cell keeps its own pieces
             foreach (FloorChest ch in layout.Chests) busy.Add((ch.X, ch.Y));
             foreach (CellPos s in layout.EntryStarts) busy.Add((s.X, s.Y));
             if (layout.StairExit.HasValue) busy.Add((layout.StairExit.Value.X, layout.StairExit.Value.Y));
@@ -252,8 +298,8 @@ namespace SleepingCalamity.Presentation
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r]; int placed = 0;
-                for (int ly = 0; ly < p.Height && placed < 2; ly++)
-                    for (int lx = 0; lx < p.Width && placed < 2; lx++)
+                for (int ly = 0; ly < p.Height && placed < 4; ly++)
+                    for (int lx = 0; lx < p.Width && placed < 4; lx++)
                     {
                         int x = p.X + lx, y = p.Y + ly;
                         if (p.Room.CellAt(lx, ly) != CellKind.Floor || busy.Contains((x, y))) continue;
@@ -273,6 +319,17 @@ namespace SleepingCalamity.Presentation
                             else
                             {
                                 Vector3 at = c + (da + db) * 1.2f; float yaw = (h >> 3) % 30;
+                                if (HasPiece(kit, "CrateStack") && HasPiece(kit, "Crate"))
+                                {
+                                    // a stack tucked into the corner along wall a (1.49 m long, pushed 0.95 m toward wall b) and a single crate beside it
+                                    Vector3 wp = c + da * (CellSize * 0.5f - 0.2f);
+                                    var kc = new GameObject("CornerCrates_" + id).transform; kc.SetParent(dressing, false); kc.position = wp;
+                                    Quaternion fl = Quaternion.LookRotation(Vector3.Cross(-da, Vector3.up), Vector3.up);
+                                    PlaceAtWall(kit, "CrateStack", kc, "CrateStack", wp - da * 0.405f + db * 0.95f, fl, yaw * 0.2f - 3f);
+                                    PlaceAtWall(kit, "Crate", kc, "Crate", wp - da * 0.36f - db * 0.4f, fl, -yaw * 0.3f);
+                                    result.Props++; placed++;
+                                    break;
+                                }
                                 var crate = new GameObject("CornerCrates_" + id).transform; crate.SetParent(dressing, false); crate.position = at;
                                 Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw, 0);
                                 Box(crate, "CrateB", at - da * 0.9f + new Vector3(0, 0.35f, 0), new Vector3(0.7f, 0.7f, 0.7f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, -yaw, 0);
@@ -284,6 +341,51 @@ namespace SleepingCalamity.Presentation
                     }
             }
         }
+
+        // ------------------------------------------------------------------------------------------------ wall clutter
+        // Core CellarFloorClutter rows (whole centimetres in this builder's frame; yaw clockwise from above, the piece's front into the room) become kit pieces under
+        // Dressing/Clutter. The Blender pieces stand with the pivot bottom centre, front +X, wall side -X, +Z along the wall, so a row turns by yaw - 90 degrees.
+        // A missing kit piece falls back to a primitive of the row's footprint in the kit's materials. Pure function of (seed, floor): no Random, no Time.
+        static void Clutter(CellarFloorClutter clutter, CellarFloorKit kit, Mats mats, Transform dressing)
+        {
+            if (clutter.Rows.Count == 0) return;
+            Transform group = Group(dressing, ClutterGroup);
+            foreach (CellarClutterRow r in clutter.Rows)
+            {
+                Vector3 pos = new Vector3(r.X, 0f, r.Z); Quaternion rot = Quaternion.Euler(0f, r.Yaw - 90f, 0f);
+                GameObject go = PlacePiece(kit, r.Piece, group, r.Piece + "_" + r.Id, pos, rot, Vector3.one);
+                if (go == null)
+                {
+                    Material m = r.Piece == CellarFloorClutter.Rubble ? mats.Wall : r.Piece == CellarFloorClutter.SackPile ? mats.Limewash : r.Piece == CellarFloorClutter.JarCluster ? mats.Trim : mats.Crate;
+                    go = Box(group, r.Piece + "_" + r.Id, pos + new Vector3(0, r.Height * 0.5f, 0), new Vector3(r.Depth, r.Height, r.Width), m, 1f, false);   // x = off the wall, z = along it
+                    go.transform.rotation = rot;
+                }
+            }
+        }
+
+        // The one hook the main builder calls after its own pass (lamps, atmosphere): recolours every lamp light to CellarArtTuning.LampGold and sets the fog colour from the
+        // tuning block (the base plus the floor's warm offset, halved and clamped), so the colour tuning lives in this file only.
+        static void ArtFinish(Transform root, CellarFloorKit kit, CellarFloorBuild result)
+        {
+            Transform lamps = root != null ? root.Find(LampGroup) : null;
+            if (lamps != null)
+                foreach (Light l in lamps.GetComponentsInChildren<Light>(true))
+                {
+                    l.color = CellarArtTuning.LampGold;
+                    string owner = l.transform.parent != null ? l.transform.parent.name : "";
+                    if (owner.StartsWith("Lamp_c")) l.range *= CellarArtTuning.CorridorLampRangeScale;                 // corridor pools fall off into darker walls between lamps
+                    else if (owner.StartsWith("Lamp_r") && owner.EndsWith("_c")) l.intensity *= CellarArtTuning.CentreLampScale;   // the room's hanging centre lamp
+                }
+            if (kit != null && kit.FogBaseDensity > 0f && result.Dressing != null)
+            {
+                result.Dressing.Atmosphere.FogTintOffset(out float fr, out float fg, out float fb);
+                RenderSettings.fogColor = CellarArtTuning.FogColor(kit.FogBaseColor, fr, fg, fb);
+            }
+        }
+
+        // A kit piece standing on the floor at pos, turned by the wall-facing rotation plus a yaw jitter (degrees); null when the piece is missing.
+        static GameObject PlaceAtWall(CellarFloorKit kit, string piece, Transform parent, string name, Vector3 pos, Quaternion facing, float yawJitter)
+            => PlacePiece(kit, piece, parent, name, new Vector3(pos.x, 0f, pos.z), facing * Quaternion.Euler(0f, yawJitter, 0f), Vector3.one);
 
         // ------------------------------------------------------------------------------------------------ classification
         static Bay BayOf(CellarFloorLayout layout, Grid grid, int x, int y)

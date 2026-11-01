@@ -216,6 +216,7 @@ namespace SleepingCalamity.Presentation
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
             Procgen(layout, dressing, Group(root, ProcgenGroup), mats, result);
             Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
+            ArtFinish(root, kit, result);   // art layer: lamp gold and fog colour from CellarArtTuning
             ParentBuiltFloor(root, parent, result);
             return result;
         }
