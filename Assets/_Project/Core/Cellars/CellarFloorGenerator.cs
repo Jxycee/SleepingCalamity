@@ -26,6 +26,11 @@
 // Exit distance (variety layer 7, research 3.7a): a built floor whose walk from the first party start to the stair exit is shorter than MinExitDistance
 // steps is thrown away like any failed attempt (the attempt loop rolls again on the same stream), so the way down is never right next to the way in.
 // Floors that were already long enough keep their layout; only the short ones re-roll. The last resort relaxes the bound only after every stream failed it.
+// Layout presets (procgen item 2, CellarLayoutPreset.cs): floors 1-3 carry a LayoutPreset (Spine / Ring / Hub / Wing, own stream, never the same twice in a row) that steers
+// the placement order, which earlier room each new room links to, and the loop rules inside TryBuild. The stair exit is placed LAST (before the locked room), links to exactly
+// one earlier room that is not the entry, and is never offered a second door (FreeDoors, dead ends, loops and the locked room all skip it), so it is a far dead end: a leaf
+// that is not next to the entry (an attempt whose exit door shares a corridor network with an entry door is thrown away). The last resort keeps the leaf rules but tries its
+// first streams with the real preset and the rest with Spine (fewest constraints). Before it, two retry streams build the PICKED plan as Spine, so a stubborn preset keeps the floor's rooms; the layout reports the preset it really used.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -46,7 +51,7 @@ namespace SleepingCalamity.Core
 
     public static class CellarFloorGenerator
     {
-        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16, MinExitDistance = 12;
+        public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16, LastResortPresetStreams = 8, SpinePlanRetries = 2, MinExitDistance = 12;
         const int G = CellarFloorLayout.GridSize;
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
@@ -166,11 +171,18 @@ namespace SleepingCalamity.Core
             if (floor == 4) return BuildBakery(seed);
             if (floor < 1 || floor > 4) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-4");
             CellarFloorPlan plan = PickRooms(seed, floor, out fallback);
+            LayoutPreset preset = CellarLayoutPresets.PresetFor(seed, floor);
             for (int retry = 0; retry <= BuildRetries; retry++)
             {
                 ulong stream = retry == 0 ? FloorSeed(seed, floor) : Rng.Derive(seed, "cellars.retry", ((ulong)floor << 32) | (uint)(0x10000 + retry));
-                CellarFloorLayout l = BuildWith(seed, plan, stream, MaxAttempts, MinExitDistance);
+                CellarFloorLayout l = BuildWith(seed, plan, stream, MaxAttempts, MinExitDistance, preset);
                 if (l != null) { if (retry > 0 && fallback == 0) fallback = 1; return l; }
+            }
+            // The picked rooms did not place under the preset: keep the rooms (so consecutive floors still share no combat room) and relax the preset to Spine, the loosest.
+            for (int n = 0; n < SpinePlanRetries; n++)
+            {
+                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.retry", ((ulong)floor << 32) | (uint)(0x20000 + n)), MaxAttempts, MinExitDistance, LayoutPreset.Spine);
+                if (l != null) { fallback = 1; return l; }
             }
             fallback = 2;
             return GenerateLastResort(seed, floor);
@@ -182,11 +194,13 @@ namespace SleepingCalamity.Core
         {
             if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-3");
             CellarFloorPlan plan = MinimalPlan(seed, floor);
+            LayoutPreset real = CellarLayoutPresets.PresetFor(seed, floor);
             // Two streams get the full exit bound; the minimal plan rarely reaches it, so the rest relax it at once instead of burning every stream first.
             for (int n = 0; n < LastResortStreams; n++)
             {
                 int bound = n < 2 ? MinExitDistance : 0;
-                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, bound);
+                LayoutPreset preset = n < LastResortPresetStreams ? real : LayoutPreset.Spine;
+                CellarFloorLayout l = BuildWith(seed, plan, Rng.Derive(seed, "cellars.lastresort", ((ulong)floor << 32) | (uint)n), MaxAttempts, bound, preset);
                 if (l == null) continue;
                 if (l.EntryToExitDistance() < MinExitDistance) l.MarkLastResort();   // a floor with a short exit beats no floor
                 return l;
@@ -194,9 +208,9 @@ namespace SleepingCalamity.Core
             throw new InvalidOperationException("CellarFloorGenerator: even the minimal plan did not place for seed " + seed + " floor " + floor);
         }
 
-        static CellarFloorLayout BuildWith(uint seed, CellarFloorPlan plan, ulong stream, int attempts, int minExit)
+        static CellarFloorLayout BuildWith(uint seed, CellarFloorPlan plan, ulong stream, int attempts, int minExit, LayoutPreset preset)
         {
-            var b = new Builder(new Pcg32(stream)) { MinExit = minExit };
+            var b = new Builder(new Pcg32(stream)) { MinExit = minExit, Preset = preset };
             for (int attempt = 0; attempt < attempts; attempt++)
             {
                 b.Reset();
@@ -231,7 +245,7 @@ namespace SleepingCalamity.Core
             b.LinkFixed(flour, CellSide.East, knead, CellSide.West);
             b.LinkFixed(knead, CellSide.South, ante, CellSide.North);
             b.LinkFixed(ante, CellSide.West, heart, CellSide.East);
-            return b.Assemble(seed, 4, true, SubTheme.Bakery, null);
+            return b.Assemble(seed, 4, true, SubTheme.Bakery, null, preset: null);
         }
 
         // All mutable placement state for one attempt. rng is a mutable struct kept in this field and never copied.
@@ -247,15 +261,19 @@ namespace SleepingCalamity.Core
             readonly bool[,] corr = new bool[G, G];
             readonly int[] parent = new int[G * G];
             readonly int[] queue = new int[G * G];
-            int lockedIndex = -1, lockedLink = -1;
+            int lockedIndex = -1, lockedLink = -1, exitIndex = -1;
+            readonly int[] roomLink = new int[8];       // per room: index of the link made when it was placed (-1 for the entry)
+            public LayoutPreset Preset;
+            int ringSrc = -1, ringJoin = -1, wingFrom = -1, wingTo = -1, reserveA = -1, reserveB = -1;   // preset bookkeeping set by TryBuild: ring (loop source, join room), wing (first and last room of the loop's branch)
             public int MinExit;                          // least entry-to-exit walking distance a built floor may have (0 = no bound)
-            public readonly int[] Fails = new int[5];   // attempts lost per stage: room placement, loops, dead ends, carriers, exit too close; shown when Generate gives up
+            public readonly int[] Fails = new int[6];   // attempts lost per stage: room placement, loops, dead ends, carriers, exit too close, exit not a far leaf; shown when Generate gives up
 
             public Builder(Pcg32 rng) { this.rng = rng; }
 
             public void Reset()
             {
-                rooms.Clear(); doorUsed.Clear(); links.Clear(); deadEnds.Clear(); lockedIndex = -1; lockedLink = -1;
+                rooms.Clear(); doorUsed.Clear(); links.Clear(); deadEnds.Clear(); lockedIndex = -1; lockedLink = -1; exitIndex = -1; ringSrc = -1; ringJoin = -1; wingFrom = -1; wingTo = -1; reserveA = -1; reserveB = -1;
+                for (int i = 0; i < roomLink.Length; i++) roomLink[i] = -1;
                 for (int x = 0; x < G; x++) for (int y = 0; y < G; y++) { roomAt[x, y] = -1; mask[x, y] = 0; corr[x, y] = false; }
             }
 
@@ -367,20 +385,22 @@ namespace SleepingCalamity.Core
             List<int> FreeDoors(int r)
             {
                 tmp.Clear();
-                if (r == lockedIndex) return tmp;
+                if (r == lockedIndex || r == exitIndex) return tmp;   // both are leaves
                 for (int d = 0; d < doorUsed[r].Length; d++) if (!doorUsed[r][d]) tmp.Add(d);
                 return tmp;
             }
 
-            // Link the newest room (index k > 0) to a random earlier room.
-            bool LinkNewest(int k, bool isLocked)
+            // Link the newest room (index k > 0) to an earlier room: the preset's preferred parent on the first PreferredTries attempts (when it still has a free door),
+            // else a random one. noEntry (the stair exit) never links to the entry room.
+            const int PreferredTries = 3;
+            bool LinkNewest(int k, bool isLocked, int preferred = -1, bool noEntry = false)
             {
                 for (int attempt = 0; attempt < LinkTries; attempt++)
                 {
                     var avail = new List<int>();
-                    for (int j = 0; j < k; j++) if (FreeDoors(j).Count > 0) avail.Add(j);
+                    for (int j = noEntry ? 1 : 0; j < k; j++) if (FreeDoors(j).Count > (isLocked ? (j == reserveA ? 1 : 0) + (j == reserveB ? 1 : 0) : 0)) avail.Add(j);
                     if (avail.Count == 0) return false;
-                    int rj = avail[rng.Range(0, avail.Count)];
+                    int rj = preferred >= 0 && attempt < PreferredTries && avail.Contains(preferred) ? preferred : avail[rng.Range(0, avail.Count)];
                     List<int> fj = FreeDoors(rj); int dj = fj[rng.Range(0, fj.Count)];
                     int dk;
                     if (isLocked) { dk = -1; for (int d = 0; d < rooms[k].Room.Doors.Count; d++) if (rooms[k].Room.Doors[d].Locked) dk = d; if (dk < 0) return false; }
@@ -392,10 +412,52 @@ namespace SleepingCalamity.Core
 
             bool Linked(int a, int b) { foreach (FloorLink l in links) if (l.Touches(a) && l.Touches(b)) return true; return false; }
 
-            // 1-3 extra corridors between rooms that already connect, so the map has loops. True if at least one was made.
-            bool AddLoops()
+            // A loop corridor from a free door of room a back onto the corridor cell `target` (a T junction). False when no free door of a routes there.
+            bool LoopToCell(int a, CellPos target)
             {
-                int want = rng.Range(1, 4), made = 0;
+                List<int> fa = new List<int>(FreeDoors(a));
+                Shuffle(fa, ref rng);
+                foreach (int da in fa)
+                {
+                    List<CellPos> path = Route(rooms[a].DoorOutside(da), target, true);
+                    if (path == null) continue;
+                    Commit(a, da, -1, -1, false, path);
+                    return true;
+                }
+                return false;
+            }
+
+            // Ring: the second arc. The loop runs from the end of the second chain (the entry when that chain is empty) onto the corridor just outside the join room's door,
+            // so the join room keeps its second door for the exit. Then at most one extra generic loop.
+            bool AddRingLoops()
+            {
+                if (ringSrc < 0 || ringJoin < 0 || roomLink[ringJoin] < 0) return false;
+                IReadOnlyList<CellPos> jp = links[roomLink[ringJoin]].Path;
+                if (!LoopToCell(ringSrc, jp[jp.Count - 1])) return false;
+                return AddLoops(rng.Range(0, 2), 0);
+            }
+
+            // Wing: one loop that stays inside the dead branch (rooms wingFrom..wingTo): from a branch room with a free door onto a corridor cell of the link that
+            // placed one of the branch's rooms, so it never joins the two halves of the path.
+            bool AddWingLoop()
+            {
+                if (wingFrom < 0) return false;
+                for (int t = 0; t < 12; t++)
+                {
+                    int a = rng.Range(wingFrom, wingTo + 1);
+                    if (FreeDoors(a).Count == 0) { if (wingFrom == wingTo) a = 0; else continue; }   // a one-room branch loops from the entry's spare door onto that room's own link
+                    int b = rng.Range(wingFrom, wingTo + 1);
+                    if (roomLink[b] < 0) continue;
+                    IReadOnlyList<CellPos> p = links[roomLink[b]].Path;
+                    if (LoopToCell(a, p[rng.Range(0, p.Count)])) return true;
+                }
+                return false;
+            }
+
+            // Extra corridors between rooms that already connect, so the map has loops. True if at least `min` were made (`want` tried for).
+            bool AddLoops(int want, int min)
+            {
+                int made = 0;
                 for (int t = 0; t < 30 && made < want; t++)
                 {
                     var avail = new List<int>();
@@ -422,7 +484,7 @@ namespace SleepingCalamity.Core
                         Commit(a, da, -1, -1, false, path); made++;
                     }
                 }
-                return made >= 1;
+                return made >= min;
             }
 
             // A straight stub of 1-3 corridor cells off an unused door or off a corridor cell. Returns the end cell, or null when nothing fits.
@@ -431,7 +493,7 @@ namespace SleepingCalamity.Core
                 var cands = new List<(CellPos start, CellSide dir, bool fromDoor, CellPos from, int room, int door)>();
                 for (int r = 0; r < rooms.Count; r++)
                 {
-                    if (r == lockedIndex) continue;
+                    if (r == lockedIndex || r == exitIndex) continue;
                     for (int d = 0; d < doorUsed[r].Length; d++)
                     {
                         if (doorUsed[r][d]) continue;
@@ -473,18 +535,62 @@ namespace SleepingCalamity.Core
                 var order = new List<CellarRoom>();
                 var middle = new List<CellarRoom>();
                 foreach (CellarRoom r in plan.Combat) if (r != plan.LockedRoom) middle.Add(r);
-                middle.Add(Special(RoomKind.StairExit));
                 if (plan.HasCheckpoint) middle.Add(Special(RoomKind.Checkpoint));
                 Shuffle(middle, ref rng);
                 if (attempt >= PackFirstAfter)   // a crowded floor: place the big rooms first (stable sort, so the shuffle still breaks ties)
                     for (int i = 1; i < middle.Count; i++)
                         for (int j = i; j > 0 && middle[j].Width * middle[j].Height > middle[j - 1].Width * middle[j - 1].Height; j--) { CellarRoom t = middle[j]; middle[j] = middle[j - 1]; middle[j - 1] = t; }
+                if (Preset == LayoutPreset.Hub)   // the hub is the biggest combat room (ties by id), placed right after the entry
+                {
+                    int best = -1;
+                    for (int i = 0; i < middle.Count; i++)
+                        if (middle[i].Kind == RoomKind.Combat && (best < 0 || middle[i].Width * middle[i].Height > middle[best].Width * middle[best].Height
+                            || (middle[i].Width * middle[i].Height == middle[best].Width * middle[best].Height && string.CompareOrdinal(middle[i].Id, middle[best].Id) < 0))) best = i;
+                    if (best > 0) { CellarRoom h = middle[best]; middle.RemoveAt(best); middle.Insert(0, h); }
+                }
                 order.Add(Special(RoomKind.Entry)); order.AddRange(middle);
                 if (plan.Locked) order.Add(plan.LockedRoom);
+                order.Add(Special(RoomKind.StairExit));   // placed LAST: nothing links to it afterwards, so it is a far dead end (the locked leaf goes just before it)
+
+                // Preset steering: pref[i] is the preferred parent (a room index = placement position) of the room placed i-th, -1 = any. Positions 1..m are the middle rooms,
+                // the locked room (when there is one) m + 1, the exit last.
+                int m = middle.Count, lockedPos = plan.Locked ? m + 1 : -1, exitPos = order.Count - 1;
+                var pref = new int[order.Count];
+                for (int i = 0; i < pref.Length; i++) pref[i] = -1;
+                pref[exitPos] = m; reserveA = m;   // the exit's parent keeps a door for it; the preset's loop source keeps one for the loop (the locked room may not take them)
+                switch (Preset)
+                {
+                    case LayoutPreset.Spine:
+                        for (int i = 1; i <= m; i++) pref[i] = rng.Range(0, 4) < 3 ? i - 1 : -1;   // mostly the newest room
+                        break;
+                    case LayoutPreset.Hub:
+                        pref[1] = 0;
+                        for (int i = 2; i <= m; i++) pref[i] = rng.Range(0, 10) < 7 ? 1 : -1;      // most rooms link to the hub
+                        break;
+                    case LayoutPreset.Ring:
+                    {
+                        int p = m / 2;   // chain A = rooms 1..p, chain B = p+1..m-1, the join room is m (the exit hangs off it)
+                        for (int i = 1; i <= p; i++) pref[i] = i == 1 ? 0 : i - 1;
+                        for (int i = p + 1; i < m; i++) pref[i] = i == p + 1 ? 0 : i - 1;
+                        pref[m] = p >= 1 ? p : 0;
+                        ringJoin = m; ringSrc = m - 1 >= p + 1 ? m - 1 : 0; reserveB = ringSrc;
+                        break;
+                    }
+                    case LayoutPreset.Wing:
+                    {
+                        int ny = m / 2;  // branch Y = rooms 1..ny (a dead branch), branch X = ny+1..m (ends in the exit); X is never the smaller one
+                        for (int i = 1; i <= ny; i++) pref[i] = i == 1 ? 0 : i - 1;
+                        for (int i = ny + 1; i <= m; i++) pref[i] = i == ny + 1 ? 0 : i - 1;
+                        wingFrom = 1; wingTo = ny >= 1 ? ny : 1;   // the loop lives in the dead branch Y (never bypasses the spine); with no Y the single room's own link
+                        reserveB = ny >= 1 ? ny : 0;
+                        break;
+                    }
+                }
 
                 for (int i = 0; i < order.Count; i++)
                 {
-                    bool isLocked = plan.Locked && i == order.Count - 1;
+                    bool isLocked = i == lockedPos;
+                    bool isExit = i == exitPos;
                     bool placed = false;
                     List<(int q, int x, int y)> every = null;   // built only when random positions keep failing (a crowded floor)
                     for (int t = 0; t < RoomTries + ScanTries && !placed; t++)
@@ -514,13 +620,26 @@ namespace SleepingCalamity.Core
                         }
                         int idx = Add(rot, q, x, y);
                         if (isLocked) lockedIndex = idx;
-                        if (i == 0 || LinkNewest(idx, isLocked)) placed = true;
+                        if (i == 0 || LinkNewest(idx, isLocked, pref[i], isExit))
+                        {
+                            placed = true;
+                            if (i > 0) roomLink[idx] = links.Count - 1;
+                            if (isExit) exitIndex = idx;
+                        }
                         else { RemoveLast(); if (isLocked) lockedIndex = -1; }
                     }
                     if (!placed) { Fails[0]++; return null; }
                 }
 
-                if (!AddLoops()) { Fails[1]++; return null; }
+                bool loopsOk;
+                switch (Preset)
+                {
+                    case LayoutPreset.Spine: loopsOk = AddLoops(rng.Range(0, 2), 0); break;
+                    case LayoutPreset.Ring: loopsOk = AddRingLoops(); break;
+                    case LayoutPreset.Hub: loopsOk = AddLoops(rng.Range(1, 3), 1); break;
+                    default: loopsOk = AddWingLoop(); break;
+                }
+                if (!loopsOk) { Fails[1]++; return null; }
 
                 // chests from the rooms' own slots, then dead ends make up the rest of the target
                 int roomChests = 0;
@@ -544,7 +663,8 @@ namespace SleepingCalamity.Core
                 }
                 if (carriers.Count == 0) { Fails[3]++; return null; }
                 GateKeyCarrier carrier = carriers[rng.Range(0, carriers.Count)];
-                CellarFloorLayout built = Assemble(seed, plan.Floor, false, plan.Theme, carrier, keyRoom, need);
+                CellarFloorLayout built = Assemble(seed, plan.Floor, false, plan.Theme, carrier, keyRoom, need, Preset);
+                if (!built.ExitIsLeaf() || built.ExitAdjacentToEntry()) { Fails[5]++; return null; }
                 if (MinExit > 0 && built.EntryToExitDistance() < MinExit) { Fails[4]++; return null; }
                 return built;
             }
@@ -571,7 +691,7 @@ namespace SleepingCalamity.Core
                 throw new InvalidOperationException("room " + rooms[r].RoomId + " has no " + s + " door");
             }
 
-            public CellarFloorLayout Assemble(uint seed, int floor, bool stub, SubTheme theme, GateKeyCarrier carrier, int keyRoom = -1, int deadChests = 0)
+            public CellarFloorLayout Assemble(uint seed, int floor, bool stub, SubTheme theme, GateKeyCarrier carrier, int keyRoom = -1, int deadChests = 0, LayoutPreset? preset = null)
             {
                 var corridors = new List<PlacedCorridor>();
                 for (int y = 0; y < G; y++) for (int x = 0; x < G; x++)
@@ -590,7 +710,7 @@ namespace SleepingCalamity.Core
                         chests.Add(new FloorChest(w.X, w.Y, r, key));
                     }
                 for (int i = 0; i < deadChests && i < deadEnds.Count; i++) chests.Add(new FloorChest(deadEnds[i].X, deadEnds[i].Y, -1, false));
-                return new CellarFloorLayout(seed, floor, stub, theme, rooms, corridors, links, deadEnds, chests, lockedIndex, lockedLink, keyIdx, carrier);
+                return new CellarFloorLayout(seed, floor, stub, theme, rooms, corridors, links, deadEnds, chests, lockedIndex, lockedLink, keyIdx, carrier, preset);
             }
         }
     }

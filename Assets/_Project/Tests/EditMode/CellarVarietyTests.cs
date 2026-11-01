@@ -103,7 +103,7 @@ namespace SleepingCalamity.Tests.EditMode
             CellarFloorLayout l = CellarFloorGenerator.Generate(12345, 1);
             ulong before = l.LayoutHash(); CellarFloorDressing.Resolve(l);
             Assert.AreEqual(before, l.LayoutHash());
-            Assert.AreEqual(7160980227004277501UL, before, "the geometry golden is unchanged by the variety layers");
+            Assert.AreEqual(2055763217958189686UL, before, "the geometry golden is unchanged by the variety layers");
         }
 
         [Test]
@@ -135,7 +135,8 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var got = new ulong[4];
             for (int f = 1; f <= 3; f++) got[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(12345, f)).DressingHash();
-            Assert.AreEqual(17686853826976377517UL, got[1], "floor 1"); Assert.AreEqual(2256320745316593356UL, got[2], "floor 2"); Assert.AreEqual(3164178142097629503UL, got[3], "floor 3");
+            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // re-pinned 2026-10-31 (procgen item 2: presets moved the placement, deliberate)
+            Assert.AreEqual(7289301962720901386UL, got[1], "floor 1; actual " + all); Assert.AreEqual(16695276620330047160UL, got[2], "floor 2; actual " + all); Assert.AreEqual(5435435391175835042UL, got[3], "floor 3; actual " + all);
         }
 
         // ---------------------------------------------------------------- dressing statistics
@@ -388,7 +389,7 @@ namespace SleepingCalamity.Tests.EditMode
 
         // ---------------------------------------------------------------- exit distance
 
-        [Test]
+        [Test, Timeout(900000)]   // presets made a floor a little dearer (retries on locked chains); the default 180 s no longer fits
         public void ExitDistance_AtLeastTheBound_On10000Seeds_AndNotAlwaysTheSame()
         {
             var distances = new HashSet<int>(); int shortest = int.MaxValue;

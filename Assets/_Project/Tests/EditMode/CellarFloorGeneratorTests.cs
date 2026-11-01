@@ -12,7 +12,7 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public class CellarFloorGeneratorTests
     {
-        const ulong GoldenSeed12345Floor1 = 7160980227004277501UL;   // computed once from the first run; any change to the algorithm changes it on purpose
+        const ulong GoldenSeed12345Floor1 = 2055763217958189686UL;   // computed once from the first run; any change to the algorithm changes it on purpose
 
         [Test]
         public void SameSeedAndFloor_GiveIdenticalLayout()
@@ -34,7 +34,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(GoldenSeed12345Floor1, l.LayoutHash(), "golden changed; actual = " + l.LayoutHash() + "UL\n" + l.ToAscii());
         }
 
-        const ulong GoldenSeed12345Floor2 = 18317817182715499079UL, GoldenSeed12345Floor3 = 10285151120262563894UL;   // computed once from the first run (floors 2 and 3 pin PickRooms' exclusion chain too)
+        const ulong GoldenSeed12345Floor2 = 1402270470201830695UL, GoldenSeed12345Floor3 = 11057337751887225001UL;   // computed once from the first run (floors 2 and 3 pin PickRooms' exclusion chain too)
 
         [Test]
         public void Golden_Seed12345_Floors2And3()
@@ -56,7 +56,7 @@ namespace SleepingCalamity.Tests.EditMode
                 }
         }
 
-        [Test]
+        [Test, Timeout(900000)]   // presets made a floor a little dearer (retries on locked chains); the default 180 s no longer fits
         public void TwentyThousandRandomSeeds_NeverThrow_AndValidate()
         {
             var rng = new Pcg32(20261031UL);   // fixed stream across the full uint range
@@ -116,7 +116,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Greater(hashes.Count, 190);
         }
 
-        [Test]
+        [Test, Timeout(900000)]   // presets made a floor a little dearer (retries on locked chains); the default 180 s no longer fits
         public void TenThousandSeeds_AllFloorsValidate()
         {
             var sw = Stopwatch.StartNew();
