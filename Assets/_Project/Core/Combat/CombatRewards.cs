@@ -13,7 +13,7 @@ namespace SleepingCalamity.Core.Combat
         public readonly string PlayerId;
         public readonly Dictionary<string, WeaponState> Weapons = new Dictionary<string, WeaponState>();
         public readonly StyleAbsLedger Ledger = new StyleAbsLedger();
-        public readonly SpellPips Pips = new SpellPips();
+        public SpellPips Pips { get; private set; } = new SpellPips();   // replaced only by GrowthSaves.Restore
         public readonly HeroAbilityBook Abilities = new HeroAbilityBook();
 
         public PlayerGrowth(string playerId)
@@ -21,6 +21,8 @@ namespace SleepingCalamity.Core.Combat
             PlayerId = playerId;
             foreach (string id in AttackCatalog.Heirlooms) Weapons[id] = WeaponState.NewHeirloom(id);
         }
+
+        internal void ReplacePips(SpellPips pips) { Pips = pips ?? new SpellPips(); }
 
         readonly Dictionary<string, float> _techPaid = new Dictionary<string, float>();
         public const float TechBaseValue = 1f, TechBasePerEnemyCap = 3f;   // Placeholder: a tech with no style ABS is worth 1 base point, at most 3 per enemy

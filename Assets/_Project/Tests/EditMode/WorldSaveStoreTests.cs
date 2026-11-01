@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Runtime;
 
 namespace SleepingCalamity.Tests.EditMode
@@ -369,6 +371,77 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(store.Current.WorldId, Is.EqualTo(id), "the file name wins over a copied id");
             Assert.That(store.Current.CreatedAtUtc, Is.EqualTo("2026-10-01T09:00:00Z"));
             Assert.That(store.Rejected, Is.Empty);
+        }
+
+        // ---- the weapons section (M6 S0) ----
+
+        static WeaponsSave OneWeapon(string owner, int level)
+        {
+            WeaponState w = WeaponState.NewHeirloom(AttackCatalog.Heirlooms[0]);
+            w.AddAbs(level * 100f);
+            var save = new WeaponsSave();
+            save.Weapons.Add(w.ToSave(owner + "/" + AttackCatalog.Heirlooms[0], owner));
+            save.Heroes.Add(new HeroSave { OwnerId = owner, Abilities = new HeroAbilitiesSave { Unlocked = { "axe_quake" } } });
+            return save;
+        }
+
+        // Catches: the weapons section not surviving a save and load, or its unknown members (a newer build's) being dropped.
+        [Test]
+        public void Weapons_RoundTrip()
+        {
+            WorldSaveStore store = Load();
+            WorldSave w = WorldSaveRules.New(7UL);
+            w.Weapons = OneWeapon("me", 1);
+            w.Weapons.Extra = new Dictionary<string, object> { { "futureField", 3L } };
+            store.Replace(w);
+            Assert.That(store.FlushIfDirty(), Is.True);
+            Assert.That(File.ReadAllText(_path), Does.Contain("\"weapons\""));
+
+            WorldSaveStore again = Load();
+            Assert.That(again.Rejected, Is.Empty);
+            Assert.That(again.Current.Weapons.Weapons.Count, Is.EqualTo(1));
+            Assert.That(again.Current.Weapons.Weapons[0].OwnerId, Is.EqualTo("me"));
+            Assert.That(again.Current.Weapons.Weapons[0].Level, Is.EqualTo(w.Weapons.Weapons[0].Level));
+            Assert.That(again.Current.Weapons.Heroes[0].Abilities.Unlocked, Is.EqualTo(new[] { "axe_quake" }));
+            Assert.That(again.Current.Weapons.Extra, Does.ContainKey("futureField"));
+        }
+
+        // Catches: the v1 golden file no longer loading, or an old save (no weapons section) loading with a half-made one.
+        [Test]
+        public void OldSaveWithoutWeapons_LoadsWithNone()
+        {
+            File.WriteAllText(_path, GoldenV1);
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.Empty);
+            Assert.That(store.Current.Weapons, Is.Null, "no section: every player starts with fresh heirlooms");
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // Catches: a damaged weapons section costing the players or the seed (a bad section resets only itself).
+        [Test]
+        public void BadWeaponsSection_KeepsTheRest()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("\"players\"", "\"weapons\": 5, \"players\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionWeapons }));
+            Assert.That(store.Current.Weapons, Is.Null, "the weapons reset");
+            Assert.That(store.Current.WorldSeed, Is.EqualTo("00000000F15F15F1"));
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // Catches: one mistyped or invalid weapon costing the player's other weapons.
+        [Test]
+        public void OneBadWeapon_IsDroppedAlone()
+        {
+            WeaponsSave good = OneWeapon("me", 1);
+            string goodJson = Newtonsoft.Json.JsonConvert.SerializeObject(good.Weapons[0]);
+            string weapons = "{ \"weapons\": [ " + goodJson + ", { \"key\": 7, \"level\": \"x\" }, { \"key\": \"bad\", \"definitionId\": \"no_such_weapon\" } ] }";
+            File.WriteAllText(_path, GoldenV1.Replace("\"players\"", "\"weapons\": " + weapons + ", \"players\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionWeapons }), "named so the original is kept");
+            Assert.That(store.Current.Weapons.Weapons.Count, Is.EqualTo(1));
+            Assert.That(store.Current.Weapons.Weapons[0].OwnerId, Is.EqualTo("me"));
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
         }
     }
 }

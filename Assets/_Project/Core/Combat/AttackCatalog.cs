@@ -85,16 +85,17 @@ namespace SleepingCalamity.Core.Combat
         // turning at the glint, small enemies wind up for at least 27 frames and the elite for 54 (research recommendation 4).
         static AttackData E(string id, string name, int total, int hitOnA, int hitOnB, float mult, HitShape shape, float range, float half,
             float knockback = 1f, bool guardBreak = false, bool guardable = true, FrameWindow lunge = default, float lunges = 0f,
-            FrameWindow superArmor = default, HitOrigin origin = HitOrigin.Self, FrameWindow turn = default, float turnSpeed = 0f, EnemyTell tell = null) =>
+            FrameWindow superArmor = default, HitOrigin origin = HitOrigin.Self, FrameWindow turn = default, float turnSpeed = 0f, EnemyTell tell = null, TokenCategory? pool = null) =>
             new AttackData(id, name, AttackKind.Enemy, total, W(hitOnA, hitOnB), mult, shape, range, half, knockback: knockback, guardBreak: guardBreak, guardable: guardable,
-                lunge: lunge, lungeMeters: lunges, superArmor: superArmor, origin: origin, turn: turn, turnDegPerSec: turnSpeed, heightBand: 2.5f, revenge: 0f, tell: tell);
+                lunge: lunge, lungeMeters: lunges, superArmor: superArmor, origin: origin, turn: turn, turnDegPerSec: turnSpeed, heightBand: 2.5f, revenge: 0f, tell: tell, tokenPool: pool);
 
         static EnemyTell T(TellPart part, int poseEnd, int commit, float lean = 0f, float crouch = 0f, float rise = 0f, float twist = 0f, float tremble = 0f,
             string sfx = null, float pitch = 1f, string hold = null, bool charge = false) =>
             new EnemyTell(part, poseEnd, commit, lean, crouch, rise, twist, tremble, sfx, pitch, hold, charge);
 
         // Slime: squashes down into the jar and shivers, the lid flashes, then it springs.
-        public static readonly AttackData SlimeHop = E("slime_hop", "Hop", 60, 34, 40, 1.0f, HitShape.Circle, 1.1f, 180f, lunge: W(16, 34), lunges: 2.2f, turn: W(0, 14), turnSpeed: 360f,
+        // The hop is a light melee attack (Melee pool); the glob below is the slime's ranged one (its enemy default).
+        public static readonly AttackData SlimeHop = E("slime_hop", "Hop", 60, 34, 40, 1.0f, HitShape.Circle, 1.1f, 180f, lunge: W(16, 34), lunges: 2.2f, turn: W(0, 14), turnSpeed: 360f, pool: TokenCategory.Melee,
             tell: T(TellPart.Lid, 10, 16, crouch: 0.35f, tremble: 0.6f, sfx: CombatSfx.WindUp, pitch: 1.25f));
         // Leans back with the glob swelling on its lid; the lid flashes as it throws (the glob flies from the glint to the strike frame).
         public static readonly AttackData SlimeGlob = E("slime_glob", "Glob lob", 66, 46, 52, 0.8f, HitShape.Circle, 1.3f, 180f, origin: HitOrigin.GroundAtTarget,
