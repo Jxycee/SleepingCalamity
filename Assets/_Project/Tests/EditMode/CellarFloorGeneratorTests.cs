@@ -83,17 +83,22 @@ namespace SleepingCalamity.Tests.EditMode
         public void LastResort_IsDeterministic_AndValid()
         {
             var rng = new Pcg32(77UL);
+            int min = int.MaxValue, max = 0, marked = 0, n = 0; long sum = 0;
             for (int i = 0; i < 300; i++)
             {
                 uint seed = rng.NextUInt();
                 for (int floor = 1; floor <= 3; floor++)
                 {
                     CellarFloorLayout a = CellarFloorGenerator.GenerateLastResort(seed, floor), b = CellarFloorGenerator.GenerateLastResort(seed, floor);
+                    int ex = a.EntryToExitDistance(); min = Math.Min(min, ex); max = Math.Max(max, ex); sum += ex; n++; if (a.LastResort) marked++;
+                    if (!a.LastResort) Assert.GreaterOrEqual(ex, CellarFloorGenerator.MinExitDistance, "an unmarked last resort meets the exit bound");
                     Assert.AreEqual(a.LayoutHash(), b.LayoutHash());
+                    Assert.AreEqual(a.LastResort, b.LastResort);
                     Assert.IsEmpty(CellarFloorValidator.Validate(a), "seed " + seed + " floor " + floor + "\n" + a.ToAscii());
                     if (floor > 1) Assert.IsFalse(CellarFloorGenerator.MinimalPlan(seed, floor).Combat.Any(r => CellarFloorGenerator.PickRooms(seed, floor - 1).Combat.Contains(r)));
                 }
             }
+            TestContext.WriteLine("last resort exit distance: min " + min + ", mean " + (sum / (double)n).ToString("F1") + ", max " + max + ", relaxed (marked) " + marked + " of " + n);
         }
 
         [Test]

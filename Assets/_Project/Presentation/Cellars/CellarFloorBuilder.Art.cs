@@ -31,15 +31,19 @@ namespace SleepingCalamity.Presentation
 
         static bool HasPiece(CellarFloorKit kit, string name) => kit != null && kit.Pieces != null && kit.Pieces.TryGetValue(name, out GameObject g) && g != null;
 
-        static void Dress(CellarFloorLayout layout, Grid grid, Transform root, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
+        static void Dress(CellarFloorLayout layout, CellarFloorDressing resolved, Grid grid, Transform root, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
         {
             Transform vaults = Group(root, VaultGroup), ceiling = Group(root, CeilingGroup), faces = Group(root, FaceGroup), dressing = Group(root, DressingGroup);
 
             // racks claim their wall face (the niche wall replaces the plain end wall or brick)
             var rackFaces = new HashSet<(int, int, CellSide)>();
-            for (int r = 0; r < layout.Rooms.Count; r++)
-                foreach (DressingSocket s in layout.Rooms[r].Room.Sockets)
-                    if (s.Kind == SocketKind.Rack) rackFaces.Add((layout.Rooms[r].X + s.X, layout.Rooms[r].Y + s.Y, CellarRoom.Opposite(s.Facing)));
+            var rackEmpty = new HashSet<(int, int, CellSide)>();
+            foreach (DressedSocket s in resolved.Sockets)
+                if (s.Filled && s.Kind == SocketKind.Rack)
+                {
+                    rackFaces.Add((s.Cell.X, s.Cell.Y, CellarRoom.Opposite(s.Facing)));
+                    if (s.Variant == "Empty") rackEmpty.Add((s.Cell.X, s.Cell.Y, CellarRoom.Opposite(s.Facing)));
+                }
 
             for (int y = 0; y < CellarFloorLayout.GridSize; y++)
                 for (int x = 0; x < CellarFloorLayout.GridSize; x++)
@@ -111,7 +115,7 @@ namespace SleepingCalamity.Presentation
                             {
                                 // a candle cluster on a row-1 niche sill (authored at local (1.3, 1.31, -0.08)), lit toward the room
                                 Vector3 sill = facePlane + inward * Vector3.Scale(kitScale, new Vector3(1.3f, 1.31f, -0.08f));
-                                CandleCluster(dressing, mats, sill, "niche_" + sid, -d * 0.12f + new Vector3(0, 0.25f, 0)); result.Candles++;
+                                if (!rackEmpty.Contains((x, y, s))) { CandleCluster(dressing, mats, sill, "niche_" + sid, -d * 0.12f + new Vector3(0, 0.25f, 0)); result.Candles++; }   // an empty rack keeps its niche but not its candle
                             }
                             else if (room && across) face = PlacePiece(kit, "EndWall", faces, "EndWall_" + sid, facePlane, inward, kitScale);
                             if (face != null)   // the B5 end walls are arch-topped (the 6 m vault's profile): a limewash backing fills the spandrels to 3.6 m
@@ -142,8 +146,8 @@ namespace SleepingCalamity.Presentation
                     }
                 }
 
-            Sockets(layout, grid, kit, mats, ceiling, dressing, result);
-            Corners(layout, grid, kit, mats, dressing, result);
+            Sockets(resolved, grid, kit, mats, ceiling, dressing, result);
+            Corners(layout, resolved, grid, kit, mats, dressing, result);
 
             // a candle cluster on every chest (the chest marker is 0.8 m tall), and a warm fill per room
             foreach (FloorChest ch in layout.Chests)
@@ -163,58 +167,76 @@ namespace SleepingCalamity.Presentation
         }
 
         // ------------------------------------------------------------------------------------------------ socket dressing
-        static void Sockets(CellarFloorLayout layout, Grid grid, CellarFloorKit kit, Mats mats, Transform ceiling, Transform dressing, CellarFloorBuild result)
+        // Walks the resolved dressing (Core CellarFloorDressing): empty sockets draw nothing, filled ones stand at their chosen cell and the chosen variant picks the
+        // look (Barrels: full, a second barrel stacked on top, or the cradle turned the other way; Crates: stacked, open (two crates) or broken (one tipped); Shelf:
+        // jars, hams or a sack at the foot; Chute: clear or a heap of coal; Roots: thin or thick). Rack faces are handled with the wall faces (a filled Rack).
+        static void Sockets(CellarFloorDressing resolved, Grid grid, CellarFloorKit kit, Mats mats, Transform ceiling, Transform dressing, CellarFloorBuild result)
         {
-            for (int r = 0; r < layout.Rooms.Count; r++)
+            foreach (DressedSocket s in resolved.Sockets)
             {
-                PlacedRoom p = layout.Rooms[r];
-                for (int i = 0; i < p.Room.Sockets.Count; i++)
+                if (!s.Filled || s.Kind == SocketKind.Lantern) continue;
+                int x = s.Cell.X, y = s.Cell.Y, r = s.RoomIndex;
+                if (!Grid.In(x, y) || !grid.Occ[x, y]) continue;
+                Vector3 c = CellCenter(x, y), w = SideDir(CellarRoom.Opposite(s.Facing));   // the wall behind the socket
+                bool wallClosed = EdgeOf(grid, x, y, CellarRoom.Opposite(s.Facing)) == Edge.Closed;
+                string id = "r" + r + "_" + s.Socket.Id + "_" + s.Variant;
+                Quaternion faceLeft = Quaternion.LookRotation(Vector3.Cross(-w, Vector3.up), Vector3.up);    // local +x points into the room (left-wall pieces)
+                Quaternion faceRight = Quaternion.LookRotation(Vector3.Cross(w, Vector3.up), Vector3.up);    // local +x points at the wall (right-wall pieces)
+                GameObject g = null;
+                switch (s.Kind)
                 {
-                    DressingSocket s = p.Room.Sockets[i];
-                    int x = p.X + s.X, y = p.Y + s.Y;
-                    if (!Grid.In(x, y) || !grid.Occ[x, y]) continue;
-                    Vector3 c = CellCenter(x, y), w = SideDir(CellarRoom.Opposite(s.Facing));   // the wall behind the socket
-                    bool wallClosed = EdgeOf(grid, x, y, CellarRoom.Opposite(s.Facing)) == Edge.Closed;
-                    string id = "r" + r + "_" + i;
-                    Quaternion faceLeft = Quaternion.LookRotation(Vector3.Cross(-w, Vector3.up), Vector3.up);    // local +x points into the room (left-wall pieces)
-                    Quaternion faceRight = Quaternion.LookRotation(Vector3.Cross(w, Vector3.up), Vector3.up);    // local +x points at the wall (right-wall pieces)
-                    GameObject g = null;
-                    switch (s.Kind)
-                    {
-                        case SocketKind.Shelf:   // left-wall piece, back at local x -2.5, z 0..2
-                            if (wallClosed) g = PlacePiece(kit, "LarderShelf", dressing, "LarderShelf_" + id, c - w * 0.7f - faceLeft * new Vector3(0, 0, 1f), faceLeft, Vector3.one);
-                            break;
-                        case SocketKind.Chute:   // right-wall piece at local x +2.5
-                            if (wallClosed) g = PlacePiece(kit, "CoalChute", dressing, "CoalChute_" + id, c - w * 0.7f, faceRight, Vector3.one);
-                            break;
-                        case SocketKind.Barrel:  // cradle axes across the wall (heads to the room), the standing barrel toward the room
-                            g = PlacePiece(kit, "Barrels", dressing, "Barrels_" + id, c + w * 1.3f, faceLeft, Vector3.one);
-                            if (g != null) { CandleCluster(dressing, mats, c + w * 1.3f - w * 0.95f + new Vector3(0, 1.0f, 0), "barrel_" + id, new Vector3(0, 0.3f, 0)); result.Candles++; }
-                            break;
-                        case SocketKind.Crate:
+                    case SocketKind.Shelf:   // left-wall piece, back at local x -2.5, z 0..2
+                        if (wallClosed)
                         {
-                            float yaw = ((x * 7 + y * 13) % 21) - 10;
-                            Vector3 at = c + w * 1.25f;
-                            var crate = new GameObject("Crates_" + id).transform; crate.SetParent(dressing, false); crate.position = at;
-                            Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw, 0);
-                            Box(crate, "CrateB", at + Vector3.Cross(w, Vector3.up) * 0.85f + new Vector3(0, 0.3f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, -yaw * 1.5f, 0);
-                            Box(crate, "CrateC", at + new Vector3(0, 1.1f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw + 25f, 0);
-                            g = crate.gameObject;
-                            break;
+                            g = PlacePiece(kit, "LarderShelf", dressing, "LarderShelf_" + id, c - w * 0.7f - faceLeft * new Vector3(0, 0, 1f), faceLeft, Vector3.one);
+                            if (g != null && s.Variant == "Sacks")
+                                Prim(g.transform, "Sack", PrimitiveType.Sphere, c - w * 0.2f + Vector3.Cross(w, Vector3.up) * 0.9f + new Vector3(0, 0.3f, 0), new Vector3(0.7f, 0.6f, 0.6f), mats.Limewash);
                         }
-                        case SocketKind.Roots:   // hangs from the crown of the room bay (authored with its origin on a 4.1 m crown)
-                            g = PlacePiece(kit, "Roots", ceiling, "Roots_" + id, c + w * 0.4f + new Vector3(0, RoomSpring + VaultRise - 0.05f, 0), Quaternion.Euler(0, (x * 37 + y * 11) % 360, 0), Vector3.one);
-                            break;
+                        break;
+                    case SocketKind.Chute:   // right-wall piece at local x +2.5
+                        if (wallClosed)
+                        {
+                            g = PlacePiece(kit, "CoalChute", dressing, "CoalChute_" + id, c - w * 0.7f, faceRight, Vector3.one);
+                            if (g != null && s.Variant == "Heaped") Prim(g.transform, "Coal", PrimitiveType.Sphere, c + w * 0.9f + new Vector3(0, 0.25f, 0), new Vector3(1.4f, 0.6f, 1.4f), mats.Iron);
+                        }
+                        break;
+                    case SocketKind.Barrel:  // cradle axes across the wall (heads to the room), the standing barrel toward the room
+                    {
+                        Quaternion rot = s.Variant == "Tipped" ? Quaternion.AngleAxis(180f, Vector3.up) * faceLeft : faceLeft;   // tipped: the cradle turned the other way
+                        g = PlacePiece(kit, "Barrels", dressing, "Barrels_" + id, c + w * 1.3f, rot, Vector3.one);
+                        if (g != null)
+                        {
+                            if (s.Variant == "Stacked") Prim(g.transform, "BarrelTop", PrimitiveType.Cylinder, c + w * 0.4f + new Vector3(0, 0.55f, 0), new Vector3(0.9f, 0.5f, 0.9f), mats.Trim);
+                            CandleCluster(dressing, mats, c + w * 1.3f - w * 0.95f + new Vector3(0, 1.0f, 0), "barrel_" + id, new Vector3(0, 0.3f, 0)); result.Candles++;
+                        }
+                        break;
                     }
-                    if (g != null) result.Props++;
+                    case SocketKind.Crate:
+                    {
+                        float yaw = ((x * 7 + y * 13) % 21) - 10;
+                        Vector3 at = c + w * 1.25f;
+                        var crate = new GameObject("Crates_" + id).transform; crate.SetParent(dressing, false); crate.position = at;
+                        Box(crate, "CrateA", at + new Vector3(0, 0.4f, 0), new Vector3(0.8f, 0.8f, 0.8f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw, 0);
+                        GameObject cb = Box(crate, "CrateB", at + Vector3.Cross(w, Vector3.up) * 0.85f + new Vector3(0, 0.3f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false);
+                        cb.transform.rotation = s.Variant == "Broken" ? Quaternion.Euler(0, -yaw * 1.5f, 35f) : Quaternion.Euler(0, -yaw * 1.5f, 0);
+                        if (s.Variant != "Open")
+                            Box(crate, "CrateC", at + new Vector3(0, 1.1f, 0), new Vector3(0.6f, 0.6f, 0.6f), mats.Crate, 1f, false).transform.rotation = Quaternion.Euler(0, yaw + 25f, 0);
+                        g = crate.gameObject;
+                        break;
+                    }
+                    case SocketKind.Roots:   // hangs from the crown of the room bay (authored with its origin on a 4.1 m crown)
+                        g = PlacePiece(kit, "Roots", ceiling, "Roots_" + id, c + w * 0.4f + new Vector3(0, RoomSpring + VaultRise - 0.05f, 0), Quaternion.Euler(0, (x * 37 + y * 11) % 360, 0),
+                            s.Variant == "Thick" ? new Vector3(1.3f, 1f, 1.3f) : Vector3.one);
+                        break;
                 }
+                if (g != null) result.Props++;
             }
         }
 
         // ------------------------------------------------------------------------------------------------ corner dressing
         // Up to two free inside corners per room (a floor cell closed on two adjacent sides, holding no chest, start, stair, spawn, carrier or socket) get
         // barrels with a candle or a crate stack, picked by a hash of (seed, cell), so sparse combat rooms gain storage at their edges without new data.
-        static void Corners(CellarFloorLayout layout, Grid grid, CellarFloorKit kit, Mats mats, Transform dressing, CellarFloorBuild result)
+        static void Corners(CellarFloorLayout layout, CellarFloorDressing resolved, Grid grid, CellarFloorKit kit, Mats mats, Transform dressing, CellarFloorBuild result)
         {
             var busy = new HashSet<(int, int)>();
             foreach (FloorChest ch in layout.Chests) busy.Add((ch.X, ch.Y));
@@ -224,8 +246,9 @@ namespace SleepingCalamity.Presentation
             foreach (PlacedRoom p in layout.Rooms)
             {
                 foreach (CellarSpawn sp in p.Room.Spawns) busy.Add((p.X + sp.X, p.Y + sp.Y));
-                foreach (DressingSocket so in p.Room.Sockets) busy.Add((p.X + so.X, p.Y + so.Y));
             }
+            foreach (DressedSocket so in resolved.Sockets) if (so.Filled) busy.Add((so.Cell.X, so.Cell.Y));   // the chosen cells, empties leave their cell free
+            foreach (PlacedVignette pv in resolved.Vignettes) busy.Add((pv.Cell.X, pv.Cell.Y));
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r]; int placed = 0;
