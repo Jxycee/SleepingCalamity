@@ -199,13 +199,13 @@ if __name__ == '__main__':
             for o in bpy.context.selected_objects: o.select_set(False)
             low.select_set(True)
             bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'FlagRing.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
-                                     apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE')
+                                     apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE', path_mode='STRIP')
             bed = bpy.data.objects.get('RingBed')       # PlazaBed stops at r 2.8: the ring's joints need this bed under them
             if bed:
                 low.select_set(False); bed.select_set(True)
                 bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'RingBed.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
                                          apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE',
-                                         colors_type='LINEAR')
+                                         colors_type='LINEAR', path_mode='STRIP')
     if '--no-render' not in argv:
         P.standins()
         P.render_cams(sc, OUT, f'FlagRing_{STAGE}', arg('--views', 'wide,mid,close').split(','), int(arg('--rres', '960')), int(arg('--samples', '48')), arg('--mood', 'midday'))

@@ -560,11 +560,11 @@ def export(meshes, bed):
         for o in (lo0, lo1):
             if o: o.location = (0, 0, 0); o.hide_render = False; o.select_set(True)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'CobbleFamily.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
-                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE')
+                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE', path_mode='STRIP')
     for o in bpy.context.selected_objects: o.select_set(False)
     bed.select_set(True)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, 'PlazaBed.fbx'), use_selection=True, axis_forward='-Z', axis_up='Y',
-                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE', colors_type='LINEAR')
+                             apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, mesh_smooth_type='FACE', colors_type='LINEAR', path_mode='STRIP')
 
 def ground_cam():
     """A low look at the cobbles south-east of the fountain (not a capture camera: a material check)."""
