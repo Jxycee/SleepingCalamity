@@ -1549,6 +1549,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: SleepingCalamity.Presentation::SleepingCalamity.Presentation.DiveHub
   Entrance: {fileID: 1060}
   Origin: {fileID: 1062}
+  Landing: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
