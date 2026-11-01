@@ -2,13 +2,13 @@
 
 Session: M5 floor contents: enemies, chests, key + door, pieces
 Job: coordinator (session 6) re-task 2026-11-01: per-room enemy spawning from CellarEncounterPlan, chests with a rank-filtered Core loot roll, the gate key from the carrier enemy, the locked room's key + door, bakery piece spots on floors 1-3 with pieces-left, stir effects consumed (extras at 40, placeholder hunter at 70). Host-authoritative, EditMode + PlayMode host/client tests.
-Progress: 93%
-Status: IN PROGRESS (wired into DiveDirector, branch runs green; risk review of fixes + wiring running; then check)
+Progress: 100%
+Status: DONE
 Blocker: none
-Archive: no
+Archive: ready
 Branch: claude/m5-contents
-SC RESULT: -
-Merge commit: -
+SC RESULT: SC RESULT check PASS on be260ca (build PASS; test-edit 838/838; test-play 57 passed / 8 skipped / 0 failed); merge tree == checked tip
+Merge commit: c75c33f (main, no-ff)
 
 ## Decisions
 - Keys follow PHASE1 7.2 (source of truth): the carrier enemy drops the GATE key, which opens the floor's exit (the spine's StairOpen hook once claude/m5-spine is on main; until then our own synced "exit unlocked" state). The LOCKED ROOM's key lies in its key chest (layout.KeyChestIndex); any player carries it; it opens the locked room's door (LockedGate blocker). Coordinator's brief folded both into one key; tell me if you want that instead.
@@ -56,3 +56,11 @@ Merge commit: -
   - ContentsTick arms once per floor build; ContentsClear runs in EndDive;
   - LocalInteract defers to CellarContentsSync.WouldUseInteract.
   Contents creates a waves-off CombatHost on the host, with the new CombatHost.WipeResetsParty=false. Runs: build PASS, test-edit 838/838, test-play 55 passed / 8 skipped / 0 failed; scenes regenerated with -nographics.
+- Second risk review (c65962b) found one blocker: a full-party wipe soft-locked the session (heroes stayed Out, and the stir has no time term). Fixed: DiveDirector.WipeTick fails the dive once every hero is down (PHASE1 P24), including when the last player standing disconnects. EndDive then fully resets the heroes and the combat host's wipe state. Also fixed: the locked gate takes the Interact press only when someone holds the room key; arming checks the seed too; a carrier lost alive respawns; the director nulls its syncs on despawn. New tests: PartyWipe_AllHeroesDowned_FailsTheDive_..., CarrierDespawnedAlive_....
+- Merged main again (M4 weapon tree, clean), regenerated the scenes with -nographics, then one check: PASS on be260ca. Merged to main as c75c33f; its tree equals be260ca's.
+- Left for later:
+  - the Interact path has no dedicated test (PlayMode drives positions);
+  - a room entered before stir passes 40 doesn't get topped up with extras;
+  - chests refill with the same loot every dive (design question above);
+  - CombatHost.WipeResetsParty is false only on the CombatHost that contents creates.
+- Walk: start with -dev-dive or F7 in Arena_Dive (USER_TODO has the steps).
