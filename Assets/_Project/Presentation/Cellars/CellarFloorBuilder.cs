@@ -45,7 +45,7 @@ namespace SleepingCalamity.Presentation
         }
     }
 
-    public sealed class CellarFloorBuild
+    public sealed partial class CellarFloorBuild
     {
         public Transform Root;
         public Bounds Bounds;                   // world bounds of the occupied cells (floor level)
@@ -214,6 +214,7 @@ namespace SleepingCalamity.Presentation
             Lamps(layout, dressing, grid, lamps, kit, mats, result);
             Dress(layout, dressing, grid, root, kit, mats, result);
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
+            Procgen(layout, dressing, Group(root, ProcgenGroup), mats, result);
             Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
             ParentBuiltFloor(root, parent, result);
             return result;
