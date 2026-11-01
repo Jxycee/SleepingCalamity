@@ -58,22 +58,35 @@ namespace SleepingCalamity.Tests.PlayMode
             while (Time.realtimeSinceStartupAsDouble < until) yield return null;
         }
 
-        // At the end of every frame until `done`: the global look matches the area the camera is in (the camera is what is rendered), weights included. Fails on the first frame it does not.
-        private static IEnumerator WatchLook(System.Func<bool> done, string what)
+        // Runs in LateUpdate after both the camera brain and AreaLook: the point just before rendering. Records the first frame where the global look does not match the area the camera
+        // is in. (WaitForEndOfFrame is not an option: it never resumes in a -nographics run.)
+        [DefaultExecutionOrder(2000)]
+        private sealed class LookProbe : MonoBehaviour
+        {
+            public string Failure;
+            private void LateUpdate()
+            {
+                if (Failure != null) return;
+                AreaLook look = AreaLook.Current; Camera cam = Camera.main;
+                if (look == null || cam == null) return;
+                bool cellar = cam.transform.position.y < look.CellarBelowY;
+                if (look.CurrentArea != (cellar ? AreaLook.Area.Cellar : AreaLook.Area.Town)) Failure = "the look lags the camera (camera y " + cam.transform.position.y + ", area " + look.CurrentArea + ")";
+                else if ((RenderSettings.skybox == null) != cellar) Failure = "the sky does not match the area the camera is in";
+                else if (Mathf.Abs(look.CellarWeight - (cellar ? 1f : 0f)) > 0.001f || Mathf.Abs(look.TownWeight - (cellar ? 0f : 1f)) > 0.001f) Failure = "the grade does not match the area the camera is in";
+            }
+        }
+
+        // Waits (bounded) until `done`, failing on the first rendered frame whose look does not match the camera's area.
+        private static IEnumerator WatchLook(LookProbe probe, System.Func<bool> done, string what)
         {
             double until = Time.realtimeSinceStartupAsDouble + Timeout;
-            while (true)
+            while (!done())
             {
-                yield return new WaitForEndOfFrame();
-                AreaLook look = AreaLook.Current;
-                bool cellar = Camera.main.transform.position.y < look.CellarBelowY;
-                Assert.That(look.CurrentArea, Is.EqualTo(cellar ? AreaLook.Area.Cellar : AreaLook.Area.Town), "the look lags the camera (camera y " + Camera.main.transform.position.y + ")");
-                Assert.That(RenderSettings.skybox == null, Is.EqualTo(cellar), "the sky matches the area the camera is in");
-                Assert.That(look.CellarWeight, Is.EqualTo(cellar ? 1f : 0f).Within(0.001f), "the grade matches the area the camera is in");
-                Assert.That(look.TownWeight, Is.EqualTo(cellar ? 0f : 1f).Within(0.001f));
-                if (done()) yield break;
-                if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail(what);
+                Assert.That(probe.Failure, Is.Null);
+                if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail("Timed out after " + Timeout + " s: " + what);
+                yield return null;
             }
+            Assert.That(probe.Failure, Is.Null);
         }
 
         [UnityTest]
@@ -149,7 +162,8 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(director.ServerStartDive(2), Is.True);
             yield return PlayModeHarness.WaitUntil(() => director.FloorSync != null && director.FloorSync.Built != null && director.FloorSync.BuiltFloor == 2, Timeout, "floor 2 never built");
             // The look is right on every rendered frame of the teleport (checked at the end of each frame, once the camera is down there too).
-            yield return WatchLook(() => hero.transform.position.y < AreaLook.Current.CellarBelowY && Camera.main.transform.position.y < AreaLook.Current.CellarBelowY, "the hero and camera never arrived under the town");
+            var probe = new GameObject("LookProbe").AddComponent<LookProbe>();
+            yield return WatchLook(probe, () => hero.transform.position.y < AreaLook.Current.CellarBelowY && Camera.main.transform.position.y < AreaLook.Current.CellarBelowY, "the hero and camera never arrived under the town");
             Assert.That(AreaLook.Current.CurrentArea, Is.EqualTo(AreaLook.Area.Cellar), "the look is already the cellar's on the first frame the camera is down there");
             yield return Seconds(0.2f);
 
@@ -165,7 +179,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(director.HaulSync.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
             Assert.That(director.HaulSync.ServerBank(), Is.True, "floor 2 is a bank point");
             Assert.That(director.ServerAbandonDive(), Is.True);
-            yield return WatchLook(() => Flat(hero.transform.position, top.position) < 3f && Camera.main.transform.position.y > AreaLook.Current.CellarBelowY, "the party never landed at the stair top");
+            yield return WatchLook(probe, () => Flat(hero.transform.position, top.position) < 3f && Camera.main.transform.position.y > AreaLook.Current.CellarBelowY, "the party never landed at the stair top");
             Assert.That(AreaLook.Current.CurrentArea, Is.EqualTo(AreaLook.Area.Town), "the look is already the town's on the first frame the camera is back up");
             Assert.That(hero.transform.position.y, Is.GreaterThan(AreaLook.Current.CellarBelowY));
             yield return Seconds(0.2f);
