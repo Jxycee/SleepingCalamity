@@ -30,7 +30,7 @@ namespace SleepingCalamity.Presentation
     {
         public const float Ambient = 0.28f;                         // trilight ambient intensity (was 0.8, round 1 0.35; the corner uses 0.23)
         public const float FillIntensity = 1.0f;                    // per-room fill light (was 4.0, round 1 1.8)
-        public const float LampBoost = 1.0f, CorridorLampScale = 0.8f;   // wall, centre and corridor lamp intensity multiplier (round 1 1.2), corridor lamps a further x0.8
+        public const float LampBoost = 1.0f, CorridorLampScale = 0.8f, CorridorLampRangeScale = 0.7f, CentreLampScale = 1.15f;   // wall, centre and corridor lamp intensity multiplier (round 1 1.2), corridor lamps a further x0.8
         public const float FogWarmScale = 0.5f, FogWarmClamp = 0.03f;   // the per-floor fog warm offset: halved, then within this of the base colour per channel
         public static readonly Color FillGold = new Color(1.0f, 0.86f, 0.70f);
         public static readonly Color LampGold = new Color(1.0f, 0.85f, 0.66f);
@@ -279,7 +279,7 @@ namespace SleepingCalamity.Presentation
         }
 
         // ------------------------------------------------------------------------------------------------ corner dressing
-        // Up to two free inside corners per room (a floor cell closed on two adjacent sides, holding no chest, start, stair, spawn, carrier or socket) get
+        // Up to four (every one that passes) free inside corners per room (a floor cell closed on two adjacent sides, holding no chest, start, stair, spawn, carrier or socket) get
         // barrels with a candle or a crate stack, picked by a hash of (seed, cell), so sparse combat rooms gain storage at their edges without new data.
         static void Corners(CellarFloorLayout layout, CellarFloorDressing resolved, Grid grid, CellarFloorKit kit, Mats mats, Transform dressing, CellarFloorBuild result, CellarFloorClutter clutter)
         {
@@ -298,8 +298,8 @@ namespace SleepingCalamity.Presentation
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r]; int placed = 0;
-                for (int ly = 0; ly < p.Height && placed < 2; ly++)
-                    for (int lx = 0; lx < p.Width && placed < 2; lx++)
+                for (int ly = 0; ly < p.Height && placed < 4; ly++)
+                    for (int lx = 0; lx < p.Width && placed < 4; lx++)
                     {
                         int x = p.X + lx, y = p.Y + ly;
                         if (p.Room.CellAt(lx, ly) != CellKind.Floor || busy.Contains((x, y))) continue;
@@ -368,7 +368,14 @@ namespace SleepingCalamity.Presentation
         static void ArtFinish(Transform root, CellarFloorKit kit, CellarFloorBuild result)
         {
             Transform lamps = root != null ? root.Find(LampGroup) : null;
-            if (lamps != null) foreach (Light l in lamps.GetComponentsInChildren<Light>(true)) l.color = CellarArtTuning.LampGold;
+            if (lamps != null)
+                foreach (Light l in lamps.GetComponentsInChildren<Light>(true))
+                {
+                    l.color = CellarArtTuning.LampGold;
+                    string owner = l.transform.parent != null ? l.transform.parent.name : "";
+                    if (owner.StartsWith("Lamp_c")) l.range *= CellarArtTuning.CorridorLampRangeScale;                 // corridor pools fall off into darker walls between lamps
+                    else if (owner.StartsWith("Lamp_r") && owner.EndsWith("_c")) l.intensity *= CellarArtTuning.CentreLampScale;   // the room's hanging centre lamp
+                }
             if (kit != null && kit.FogBaseDensity > 0f && result.Dressing != null)
             {
                 result.Dressing.Atmosphere.FogTintOffset(out float fr, out float fg, out float fb);

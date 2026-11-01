@@ -3,12 +3,12 @@
 // CellarFloorLayout and the resolved CellarFloorDressing and changes neither (LayoutHash and DressingHash are untouched; nothing here feeds back into room data).
 //   - every room draws from its own stream Rng.Derive(seed, "cellars.clutter", floor << 32 | roomIndex), the corridors from index floor << 32 | 0xFFFF; every roll of
 //     a candidate is always drawn, so changing one rule never shifts another cell's pick. No string.GetHashCode, no float in a decision (positions are whole centimetres).
-//   - rooms: only floor cells that touch a closed wall side carry clutter, pushed to the wall face. Never on a door cell or the cell in front of a door, never on a
+//   - rooms: only floor cells that touch a closed wall side carry clutter, pushed to the wall face. Never on a door cell; the cell in front of a door takes clutter only where every footprint stays DoorLaneClearCm (1.2 m) from the door's axis (the 2.4 m opening's lane stays free). Never on a
 //     chest, key, entry start, stair exit, bank, baker, warden, carrier, the healing point, a vignette cell, a feature cell or a filled socket cell (Lantern and
 //     Roots sockets hang overhead and leave the floor free), and not on the cell orthogonally beside the entry start or the stair exit. A piece hugs the wall inside its own
 //     4 m cell, so it is always 1.9 m or more from the centre of any marker in a neighbouring cell ("adjacent" is met by that clearance, which the tests measure). A spawn cell and
 //     every encounter cell take clutter only where the footprint (nearest point) keeps EncounterClearCm (1.0 m) from the cell centre. The cell nearest the room's centre stays open.
-//     A group (primary piece plus an optional companion) hugs one wall of its cell (at most 1.06 m deep of the 3.6 m between the wall faces, so a lane of
+//     A group (primary piece plus a companion, most of the time) is one cluster toward one end of the wall run and hugs one wall of its cell (at most 1.06 m deep of the 3.6 m between the wall faces, so a lane of
 //     2.5 m or more stays walkable and no cell is ever cut off); groups never cover more than two fifths of the room's floor cells. Cells beside a filled barrel, shelf, chute or crate socket are tried first, so storage clusters.
 //     0-2 Rubble per room go on other wall cells (low, they never block).
 //   - corridors: only straight cells, not the cell in front of a door, a dead end, the locked link, the bank or the healing cell; about one in eight gets one small
@@ -46,6 +46,8 @@ namespace SleepingCalamity.Core
         public const string Crate = "Crate", CrateStack = "CrateStack", JarCluster = "JarCluster", Rubble = "Rubble", SackPile = "SackPile";
         public const int CellCm = CellarFloorLayout.CellMeters * 100, WallFaceCm = 180, WallGapCm = 10;   // the wall face stands 1.8 m from the cell centre
         public const int CorridorChancePercent = 12, MaxRubblePerRoom = 2, BlockedPercentCap = 40, EncounterClearCm = 100;
+        public const int ClusterEndCm = 165, ClusterGapCm = 10;   // a pair stands toward one end of the wall run: its far edge 1.65 m (less jitter) from the cell centre, 10 cm between the two
+        public const int DoorLaneClearCm = 120;   // a door opening is 2.4 m wide: a front-of-door footprint stays at least 1.2 m from the door's axis, so it never narrows the opening's lane
 
         // Footprints (cm) of CellarClutter.fbx (Assets/_Project/Content/Art/Cellar/B5/CellarClutter/; pivot bottom centre, front local +X, wall side -X): width along the wall, depth off it, height.
         static readonly string[] Names = { Crate, CrateStack, JarCluster, Rubble, SackPile };
@@ -104,6 +106,7 @@ namespace SleepingCalamity.Core
             foreach (DressedSocket s in dressing.Sockets) if (s.Filled && s.Kind != SocketKind.Lantern && s.Kind != SocketKind.Roots) Ban(onlyBan, s.Cell.X, s.Cell.Y);   // lanterns and roots hang overhead: nothing on the floor
             var spawnCell = new bool[n, n];
             var doorOutside = new bool[n, n];   // the corridor cell in front of any door
+            var lanes = new Dictionary<(int, int), List<(bool xAxis, int axisCm)>>();   // cells inside, in front of a door: the lanes their clutter must keep clear of
             foreach (PlacedRoom p in layout.Rooms)
             {
                 foreach (CellarSpawn sp in p.Room.Spawns) Ban(spawnCell, p.X + sp.X, p.Y + sp.Y);   // a spawn cell takes wall clutter only where its footprints keep EncounterClearCm from the spawn point (like the encounter cells below)
@@ -115,7 +118,14 @@ namespace SleepingCalamity.Core
                     CellDoor door = p.Room.Doors[d];
                     Ban(onlyBan, p.X + door.X, p.Y + door.Y);   // the door cell
                     CellPos inFront = new CellPos(p.X + door.X, p.Y + door.Y).Step(CellarRoom.Opposite(door.Side));   // the cell inside, in front of the door
-                    Ban(onlyBan, inFront.X, inFront.Y);
+                    if (inFront.X >= 0 && inFront.Y >= 0 && inFront.X < n && inFront.Y < n)
+                    {
+                        // the cell in front of the door may carry wall clutter that stays clear of the door's lane (a strip straight into the room, through the door cell's centre)
+                        bool ns = door.Side == CellSide.North || door.Side == CellSide.South;
+                        int axis = ns ? (p.X + door.X) * CellCm + CellCm / 2 : -((p.Y + door.Y) * CellCm + CellCm / 2);
+                        if (!lanes.TryGetValue((inFront.X, inFront.Y), out var ll)) lanes[(inFront.X, inFront.Y)] = ll = new List<(bool, int)>();
+                        ll.Add((ns, axis));
+                    }
                 }
             }
 
@@ -126,7 +136,7 @@ namespace SleepingCalamity.Core
             for (int r = 0; r < layout.Rooms.Count; r++)
                 foreach (CellPos c in CellarEncounterPlan.FreeCellsOf(layout, dressing, r)) enc[c.X, c.Y] = true;
 
-            for (int r = 0; r < layout.Rooms.Count; r++) ResolveRoom(layout, dressing, r, onlyBan, nearBan, enc, rows);
+            for (int r = 0; r < layout.Rooms.Count; r++) ResolveRoom(layout, dressing, r, onlyBan, nearBan, enc, lanes, rows);
             ResolveCorridors(layout, onlyBan, nearBan, doorOutside, heal, rows);
             return new CellarFloorClutter(layout.Seed, layout.Floor, rows);
         }
@@ -141,7 +151,7 @@ namespace SleepingCalamity.Core
             return true;
         }
 
-        static void ResolveRoom(CellarFloorLayout layout, CellarFloorDressing dressing, int r, bool[,] onlyBan, bool[,] nearBan, bool[,] enc, List<CellarClutterRow> rows)
+        static void ResolveRoom(CellarFloorLayout layout, CellarFloorDressing dressing, int r, bool[,] onlyBan, bool[,] nearBan, bool[,] enc, Dictionary<(int, int), List<(bool xAxis, int axisCm)>> lanes, List<CellarClutterRow> rows)
         {
             PlacedRoom p = layout.Rooms[r]; CellarRoom room = p.Room;
             var rng = new Pcg32(Rng.Derive(layout.Seed, StreamName, ((ulong)layout.Floor << 32) | (uint)r));
@@ -180,7 +190,7 @@ namespace SleepingCalamity.Core
             }
             Shuffle(tier0, ref rng); Shuffle(tier1, ref rng);
             var cands = new List<(int x, int y)>(tier0); cands.AddRange(tier1);
-            int cap = Math.Min(room.Kind == RoomKind.Combat ? cands.Count : (cands.Count + 1) / 2, floorCount * BlockedPercentCap / 100);   // one group per two free wall cells at most (the rooms are crowded with markers, so the free ones are few); Combat rooms, the ones that read empty, may fill every free wall cell up to the cover cap
+            int cap = Math.Min(room.Kind == RoomKind.Combat ? cands.Count : (cands.Count * 2 + 2) / 3, floorCount * BlockedPercentCap / 100);   // one group per two free wall cells at most (the rooms are crowded with markers, so the free ones are few); Combat rooms, the ones that read empty, may fill every free wall cell up to the cover cap
 
             var taken = new bool[p.Width, p.Height]; int groups = 0;
             foreach (var c in cands)
@@ -191,48 +201,52 @@ namespace SleepingCalamity.Core
                 if (groups >= cap) continue;
                 bool nearGroup = false;
                 foreach (CellSide sd in AllSides) { var (dx, dy) = CellarRoom.Step(sd); int nx = c.x + dx, ny = c.y + dy; if (room.InBounds(nx, ny) && taken[nx, ny]) nearGroup = true; }
-                int threshold = bulky[c.x, c.y] ? 100 : nearGroup ? 90 : 75;
+                int threshold = bulky[c.x, c.y] ? 100 : nearGroup ? 92 : 88;
                 if (accept >= threshold) continue;
                 var walls = new List<CellSide>(); foreach (CellSide sd in AllSides) if (WallSide(p, c.x, c.y, sd)) walls.Add(sd);
                 CellSide wall = walls[sideRoll % walls.Count];
 
-                string primary = pieceRoll < 35 ? CrateStack : pieceRoll < 60 ? Crate : pieceRoll < 80 ? JarCluster : SackPile;
+                string primary = pieceRoll < 30 ? CrateStack : pieceRoll < 55 ? Crate : pieceRoll < 75 ? JarCluster : pieceRoll < 90 ? SackPile : Rubble;
                 string companion = null;
                 switch (primary)
                 {
-                    case CrateStack: companion = companionRoll < 50 ? JarCluster : companionRoll < 80 ? Crate : null; break;
-                    case Crate: companion = companionRoll < 50 ? JarCluster : companionRoll < 75 ? Crate : null; break;
-                    case JarCluster: companion = companionRoll < 60 ? Crate : null; break;
-                    default: companion = companionRoll < 40 ? Crate : null; break;
+                    case CrateStack: companion = companionRoll < 45 ? JarCluster : companionRoll < 70 ? Crate : companionRoll < 85 ? SackPile : null; break;
+                    case Crate: companion = companionRoll < 40 ? JarCluster : companionRoll < 60 ? SackPile : companionRoll < 80 ? Crate : null; break;
+                    case JarCluster: companion = companionRoll < 45 ? Crate : companionRoll < 70 ? SackPile : companionRoll < 85 ? Rubble : null; break;
+                    case SackPile: companion = companionRoll < 40 ? Crate : companionRoll < 65 ? JarCluster : companionRoll < 80 ? Rubble : null; break;
+                    default: companion = companionRoll < 60 ? Crate : companionRoll < 85 ? JarCluster : null; break;
                 }
-                int jl = jit - 10;   // -10..10 cm
+                // a pair is one cluster grouped toward one end of the wall run (EndCm - jitter from the cell centre to the far edge of the first piece), WallRunGapCm between the two
+                int wA = SizeOf(primary).w, wB = companion == null ? 0 : SizeOf(companion).w, end = ClusterEndCm - jit;
+                int latA = sign * (end - wA / 2), latB = companion == null ? 0 : sign * (end - wA - ClusterGapCm - wB / 2);
                 string id = "r" + r + "_" + (p.X + c.x) + "_" + (p.Y + c.y);
+                int cellX = p.X + c.x, cellY = p.Y + c.y;
+                lanes.TryGetValue((cellX, cellY), out List<(bool xAxis, int axisCm)> laneList);
                 var made = new List<CellarClutterRow>();
-                if (!enc[p.X + c.x, p.Y + c.y])
+                if (!enc[cellX, cellY] && laneList == null)
                 {
-                    if (companion == null)
-                        made.Add(Make(id + "_0", primary, r, p.X + c.x, p.Y + c.y, groups + 1, wall, (jit - 10) * 6, yawJit));
+                    if (companion == null) made.Add(Make(id + "_0", primary, r, cellX, cellY, groups + 1, wall, (jit - 10) * 6, yawJit));
                     else
                     {
-                        made.Add(Make(id + "_0", primary, r, p.X + c.x, p.Y + c.y, groups + 1, wall, -sign * 92 + jl, yawJit));
-                        made.Add(Make(id + "_1", companion, r, p.X + c.x, p.Y + c.y, groups + 1, wall, sign * 70 - jl, -yawJit));
+                        made.Add(Make(id + "_0", primary, r, cellX, cellY, groups + 1, wall, latA, yawJit));
+                        made.Add(Make(id + "_1", companion, r, cellX, cellY, groups + 1, wall, latB, -yawJit));
                     }
                 }
                 else
                 {
-                    // an encounter-candidate cell: slide each piece along the wall until it keeps EncounterClearCm from the cell centre; a pair that cannot, falls back to the primary
-                    // alone, then to a single JarCluster, SackPile or Crate, then to nothing (the cell stays bare)
-                    CellarClutterRow a = null, b = null;
-                    if (companion != null)
+                    // an encounter-candidate or front-of-door cell: slide each piece along the wall until it keeps EncounterClearCm from the cell centre (encounter cells) and clear of the
+                    // door lane (front-of-door cells); a second piece that cannot is skipped, a primary that cannot falls back to a single JarCluster, SackPile or Crate, then to nothing
+                    int minCentre = enc[cellX, cellY] ? EncounterClearCm : 0;
+                    int jl = jit - 10, spreadA = -sign * 92 + jl, spreadB = sign * 70 - jl;   // these cells keep their middle clear, so the pair stands one piece to each side of it
+                    CellarClutterRow a = Fit(id + "_0", primary, r, cellX, cellY, groups + 1, wall, companion != null ? spreadA : (jit - 10) * 6, yawJit, minCentre, laneList), b = null;
+                    if (a != null && companion != null)
                     {
-                        a = Fit(id + "_0", primary, r, p.X + c.x, p.Y + c.y, groups + 1, wall, -sign * 92 + jl, yawJit);
-                        b = Fit(id + "_1", companion, r, p.X + c.x, p.Y + c.y, groups + 1, wall, sign * 70 - jl, -yawJit);
-                        if (a == null || b == null || Math.Abs(LateralOf(a, wall) - LateralOf(b, wall)) * 2 < a.WidthCm + b.WidthCm + 10) a = b = null;
+                        b = Fit(id + "_1", companion, r, cellX, cellY, groups + 1, wall, spreadB, -yawJit, minCentre, laneList);
+                        if (b != null && Math.Abs(LateralOf(a, wall) - LateralOf(b, wall)) * 2 < a.WidthCm + b.WidthCm + 10) b = null;
                     }
-                    if (a == null) a = Fit(id + "_0", primary, r, p.X + c.x, p.Y + c.y, groups + 1, wall, (jit - 10) * 6, yawJit);
-                    if (a == null) a = Fit(id + "_0", JarCluster, r, p.X + c.x, p.Y + c.y, groups + 1, wall, (jit - 10) * 6, yawJit);
-                    if (a == null) a = Fit(id + "_0", SackPile, r, p.X + c.x, p.Y + c.y, groups + 1, wall, (jit - 10) * 6, yawJit);
-                    if (a == null) a = Fit(id + "_0", Crate, r, p.X + c.x, p.Y + c.y, groups + 1, wall, (jit - 10) * 6, yawJit);
+                    if (a == null) a = Fit(id + "_0", JarCluster, r, cellX, cellY, groups + 1, wall, (jit - 10) * 6, yawJit, minCentre, laneList);
+                    if (a == null) a = Fit(id + "_0", SackPile, r, cellX, cellY, groups + 1, wall, (jit - 10) * 6, yawJit, minCentre, laneList);
+                    if (a == null) a = Fit(id + "_0", Crate, r, cellX, cellY, groups + 1, wall, (jit - 10) * 6, yawJit, minCentre, laneList);
                     if (a == null) continue;
                     made.Add(a); if (b != null) made.Add(b);
                 }
@@ -251,8 +265,9 @@ namespace SleepingCalamity.Core
                 var c2 = free[pick % free.Count];
                 var walls = new List<CellSide>(); foreach (CellSide sd in AllSides) if (WallSide(p, c2.x, c2.y, sd)) walls.Add(sd);
                 string rid = "r" + r + "_" + (p.X + c2.x) + "_" + (p.Y + c2.y) + "_R";
-                CellarClutterRow heap = enc[p.X + c2.x, p.Y + c2.y]
-                    ? Fit(rid, Rubble, r, p.X + c2.x, p.Y + c2.y, 1000 + i, walls[sideRoll % walls.Count], (jit - 10) * 6, yawJit)
+                lanes.TryGetValue((p.X + c2.x, p.Y + c2.y), out List<(bool xAxis, int axisCm)> heapLanes);
+                CellarClutterRow heap = enc[p.X + c2.x, p.Y + c2.y] || heapLanes != null
+                    ? Fit(rid, Rubble, r, p.X + c2.x, p.Y + c2.y, 1000 + i, walls[sideRoll % walls.Count], (jit - 10) * 6, yawJit, enc[p.X + c2.x, p.Y + c2.y] ? EncounterClearCm : 0, heapLanes)
                     : Make(rid, Rubble, r, p.X + c2.x, p.Y + c2.y, 1000 + i, walls[sideRoll % walls.Count], (jit - 10) * 6, yawJit);
                 if (heap == null) continue;   // a heap is too deep to keep clear of an encounter cell's centre
                 taken[c2.x, c2.y] = true;   // one rubble heap per cell; later heaps pick another
@@ -323,8 +338,24 @@ namespace SleepingCalamity.Core
             switch (wall) { case CellSide.North: return -dx; case CellSide.East: return dz; case CellSide.South: return dx; default: return -dz; }
         }
 
-        // Make, but slid along the wall (nearest offset to the wanted one first, 5 cm steps) until the footprint keeps EncounterClearCm from the cell centre and stays inside the cell; null when none does.
-        static CellarClutterRow Fit(string id, string piece, int room, int cx, int cy, int group, CellSide wall, int lateralCm, int yawJitter)
+        // Exact distance (cm) from the door lane's axis to the row's yawed footprint along the lane's lateral axis (x for a door in a north or south wall, z for east or west);
+        // 0 when the footprint straddles the axis. A convex footprint's extent is its corners' extent, so this is exact.
+        public static double DoorLaneDistanceCm(CellarClutterRow r, bool xAxis, int axisCm)
+        {
+            double a = r.YawDeg * Math.PI / 180.0, fx = Math.Sin(a), fz = Math.Cos(a), rx = fz, rz = -fx, hw = r.WidthCm / 2.0, hd = r.DepthCm / 2.0;
+            double lo = double.MaxValue, hi = double.MinValue;
+            for (int i = 0; i < 4; i++)
+            {
+                double u = (i & 1) == 0 ? -hw : hw, v = (i & 2) == 0 ? -hd : hd;
+                double q = xAxis ? r.XCm + rx * u + fx * v : r.ZCm + rz * u + fz * v;
+                lo = Math.Min(lo, q); hi = Math.Max(hi, q);
+            }
+            return axisCm >= lo && axisCm <= hi ? 0 : Math.Min(Math.Abs(lo - axisCm), Math.Abs(hi - axisCm));
+        }
+
+        // Make, but slid along the wall (nearest offset to the wanted one first, 5 cm steps) until the footprint keeps minCentreCm from the cell centre, DoorLaneClearCm from every
+        // door lane given, and stays inside the cell; null when none does.
+        static CellarClutterRow Fit(string id, string piece, int room, int cx, int cy, int group, CellSide wall, int lateralCm, int yawJitter, int minCentreCm, List<(bool xAxis, int axisCm)> lanes)
         {
             for (int step = 0; step <= 2 * (WallFaceCm / 5); step++)
                 for (int sgn = -1; sgn <= 1; sgn += 2)
@@ -334,7 +365,10 @@ namespace SleepingCalamity.Core
                     double ang = row.YawDeg * Math.PI / 180.0, co = Math.Abs(Math.Cos(ang)), si = Math.Abs(Math.Sin(ang));
                     double hx = (row.WidthCm * co + row.DepthCm * si) / 2.0, hz = (row.WidthCm * si + row.DepthCm * co) / 2.0;
                     if (Math.Abs(row.XCm - (cx * CellCm + CellCm / 2)) + hx > WallFaceCm || Math.Abs(row.ZCm + (cy * CellCm + CellCm / 2)) + hz > WallFaceCm) continue;
-                    if (CentreClearanceCm(row) >= EncounterClearCm) return row;
+                    if (minCentreCm > 0 && CentreClearanceCm(row) < minCentreCm) continue;
+                    bool clear = true;
+                    if (lanes != null) foreach (var l in lanes) if (DoorLaneDistanceCm(row, l.xAxis, l.axisCm) < DoorLaneClearCm) clear = false;
+                    if (clear) return row;
                 }
             return null;
         }

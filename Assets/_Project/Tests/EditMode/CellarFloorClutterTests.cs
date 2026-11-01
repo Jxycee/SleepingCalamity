@@ -68,7 +68,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Rooms_RulesHoldOver1000SeedsAndFloors1To4()
         {
-            int rows = 0;
+            int rows = 0, frontOfDoorRows = 0;
             foreach (var (l, d, c) in All())
             {
                 string tag = "seed " + l.Seed + " floor " + l.Floor;
@@ -86,7 +86,14 @@ namespace SleepingCalamity.Tests.EditMode
                     {
                         Assert.IsFalse(dr.X == lx && dr.Y == ly, who + ": on a door cell");
                         var (sx, sy) = CellarRoom.Step(CellarRoom.Opposite(dr.Side));
-                        Assert.IsFalse(dr.X + sx == lx && dr.Y + sy == ly, who + ": in front of a door");
+                        if (dr.X + sx == lx && dr.Y + sy == ly)
+                        {
+                            // in front of a door: every footprint stays 1.2 m (measured on the four corners) from the door lane's axis
+                            bool ns = dr.Side == CellSide.North || dr.Side == CellSide.South;
+                            double axis = ns ? (p.X + dr.X) * 400 + 200 : -((p.Y + dr.Y) * 400 + 200);
+                            Assert.GreaterOrEqual(LaneDistance(r, ns, axis), 120.0, who + ": inside a door's lane");
+                            frontOfDoorRows++;
+                        }
                     }
                     Assert.IsFalse(filled.Contains((r.CellX, r.CellY)), who + ": on a filled socket cell");
                     foreach (var m in markers) Assert.IsFalse(Near(r.CellX, r.CellY, m.x, m.y, m.beside), who + ": on or beside " + m.what);
@@ -105,6 +112,32 @@ namespace SleepingCalamity.Tests.EditMode
                 }
             }
             Assert.Greater(rows, 1000, "the resolver produced clutter");
+            Report("rows on front-of-door cells: " + frontOfDoorRows);
+        }
+
+        // Distance (cm) from the lane axis to the yawed footprint's nearest corner/edge along the lane's lateral axis; 0 when it straddles the axis.
+        static double LaneDistance(CellarClutterRow r, bool xAxis, double axis)
+        {
+            double a = r.YawDeg * Math.PI / 180.0, fx = Math.Sin(a), fz = Math.Cos(a), rx = fz, rz = -fx;
+            var qs = new List<double>();
+            foreach (int u in new[] { -1, 1 }) foreach (int v in new[] { -1, 1 })
+                qs.Add(xAxis ? r.XCm + rx * u * r.WidthCm / 2.0 + fx * v * r.DepthCm / 2.0 : r.ZCm + rz * u * r.WidthCm / 2.0 + fz * v * r.DepthCm / 2.0);
+            double lo = qs.Min(), hi = qs.Max();
+            return axis >= lo && axis <= hi ? 0 : Math.Min(Math.Abs(lo - axis), Math.Abs(hi - axis));
+        }
+
+        [Test]
+        public void DoorLane_DistanceIsMeasuredExactly()
+        {
+            // a crate against the south wall of cell (0,0), 72 x 72, centre 36 cm off the wall: lane through x = 200 is straddled; one on axis 600 is 400 - 36 away
+            var straddle = new CellarClutterRow("t", CellarFloorClutter.Crate, 0, 0, 0, 1, CellSide.South, 200, -30, 0, 72, 72, 75);
+            Assert.AreEqual(0.0, CellarFloorClutter.DoorLaneDistanceCm(straddle, true, 200), 1e-6);
+            Assert.AreEqual(600 - (200 + 36), CellarFloorClutter.DoorLaneDistanceCm(straddle, true, 600), 1e-6);
+            Assert.AreEqual((200 - 36) - 0, CellarFloorClutter.DoorLaneDistanceCm(straddle, true, 0), 1e-6);
+            var turned = new CellarClutterRow("t", CellarFloorClutter.Crate, 0, 0, 0, 1, CellSide.East, 200, -30, 90, 100, 40, 75);   // yaw 90: the 100 cm width runs along z
+            Assert.AreEqual(Math.Abs(200 - 20 - 100.0), CellarFloorClutter.DoorLaneDistanceCm(turned, true, 100), 1e-6);
+            Assert.AreEqual(CellarFloorClutter.DoorLaneDistanceCm(turned, false, -30), 0.0, 1e-6);
+            Assert.AreEqual(CellarFloorClutter.DoorLaneDistanceCm(turned, false, -100), 20.0, 1e-6);
         }
 
         // Distance (cm) from the row's cell centre to its yawed footprint rectangle, by corners and edges (independent of CellarFloorClutter.CentreClearanceCm); 0 inside.
@@ -247,7 +280,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 6667249822921251674UL, GoldenClutter12345Floor2 = 16591471619076685582UL, GoldenClutter12345Floor3 = 7994937135666888102UL;
+        const ulong GoldenClutter12345Floor1 = 2850147991725104214UL, GoldenClutter12345Floor2 = 4782008884309582705UL, GoldenClutter12345Floor3 = 79306669354946077UL;
 
         [Test]
         public void Golden_Seed12345_ClutterHash()
