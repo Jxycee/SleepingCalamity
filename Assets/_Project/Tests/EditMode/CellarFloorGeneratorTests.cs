@@ -56,13 +56,13 @@ namespace SleepingCalamity.Tests.EditMode
                 }
         }
 
-        [Test, Timeout(300000)]   // presets made a floor a little dearer (retries on locked chains); the seed count is sized to fit well inside this
-        public void FourThousandRandomSeeds_NeverThrow_AndValidate()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(4000, Category = "Soak"), Timeout(300000)]   // presets made a floor a little dearer (retries on locked chains); the seed count is sized to fit well inside this
+        public void RandomSeeds_NeverThrow_AndValidate(int count)
         {
             var rng = new Pcg32(20261031UL);   // fixed stream across the full uint range
             var errs = new List<string>();
             int retry = 0, lastResort = 0, total = 0;
-            for (int i = 0; i < 4000 && errs.Count < 8; i++)
+            for (int i = 0; i < count && errs.Count < 8; i++)
             {
                 uint seed = rng.NextUInt();
                 for (int floor = 1; floor <= 4; floor++)
@@ -116,21 +116,21 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Greater(hashes.Count, 190);
         }
 
-        [Test, Timeout(300000)]   // presets made a floor a little dearer (retries on locked chains); the seed count is sized to fit well inside this
-        public void TwoThousandSeeds_AllFloorsValidate()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(2000, Category = "Soak"), Timeout(300000)]   // presets made a floor a little dearer (retries on locked chains); the seed count is sized to fit well inside this
+        public void ManySeeds_AllFloorsValidate(int seeds)
         {
             var sw = Stopwatch.StartNew();
             var errs = new List<string>();
-            for (uint seed = 0; seed < 2000 && errs.Count < 8; seed++)
+            for (uint seed = 0; seed < seeds && errs.Count < 8; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
                     CellarFloorLayout l;
-                    try { l = CellarFloorGenerator.Generate(seed, floor); }
+                    try { l = CellarTestFloors.Layout(seed, floor); }
                     catch (Exception e) { errs.Add("seed " + seed + " floor " + floor + " threw " + e.Message); continue; }
                     List<string> v = CellarFloorValidator.Validate(l);
                     if (v.Count > 0) errs.Add(string.Join("; ", v) + "\n" + l.ToAscii());
                 }
-            TestContext.WriteLine("2,000 seeds x 3 floors: " + sw.Elapsed.TotalSeconds.ToString("F1") + " s");
+            TestContext.WriteLine(seeds + " seeds x 3 floors: " + sw.Elapsed.TotalSeconds.ToString("F1") + " s");
             Assert.IsEmpty(errs, string.Join("\n", errs));
         }
 
@@ -358,15 +358,15 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(errs.Any(e => e.Contains("carrier is not reachable without passing the locked door")), string.Join("\n", errs));
         }
 
-        [Test]
-        public void RepetitionMetric_Over1000Seeds()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void RepetitionMetric(int seeds)
         {
             int locked = 0, floors = 0, combatSlots = 0, ownTheme = 0;
-            for (uint seed = 0; seed < 1000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
             {
                 var layouts = new CellarFloorLayout[4];
                 var plans = new CellarFloorPlan[4];
-                for (int f = 1; f <= 3; f++) { layouts[f] = CellarFloorGenerator.Generate(seed, f); plans[f] = CellarFloorGenerator.PickRooms(seed, f); }
+                for (int f = 1; f <= 3; f++) { layouts[f] = CellarTestFloors.Layout(seed, f); plans[f] = CellarFloorGenerator.PickRooms(seed, f); }
 
                 for (int f = 1; f <= 3; f++)
                 {
@@ -390,8 +390,9 @@ namespace SleepingCalamity.Tests.EditMode
             }
             double lockedShare = (double)locked / floors, ownShare = (double)ownTheme / combatSlots;
             TestContext.WriteLine("locked share " + lockedShare.ToString("F3") + ", own sub-theme share " + ownShare.ToString("F3") + " over " + floors + " floors");
-            Assert.That(lockedShare, Is.InRange(0.40, 0.60), "about half the floors have a locked room");
-            Assert.That(ownShare, Is.InRange(0.60, 0.80), "about 70% of combat rooms come from the floor's sub-theme");
+            double slack = seeds >= 1000 ? 0 : 0.12;   // the share bands are statistical: the fast twin's few fixed seeds get a wider band
+            Assert.That(lockedShare, Is.InRange(0.40 - slack, 0.60 + slack), "about half the floors have a locked room");
+            Assert.That(ownShare, Is.InRange(0.60 - slack, 0.80 + slack), "about 70% of combat rooms come from the floor's sub-theme");
         }
 
         [Test]
