@@ -62,9 +62,9 @@ namespace SleepingCalamity.EditorTools
                 imp.SaveAndReimport();
             }
             _blob = AssetDatabase.LoadAssetAtPath<Texture2D>(TexPath);
-            _damp = DecalMat("HM_Surf_Damp", new Color(0.02f, 0.017f, 0.012f), 0.34f);
-            _sand = DecalMat("HM_Surf_Wear", new Color(0.62f, 0.52f, 0.38f), 0.20f);
-            _moss = DecalMat("HM_Surf_Moss", new Color(0.18f, 0.22f, 0.13f), 0.17f);
+            _damp = DecalMat("HM_Surf_Damp", new Color(0.02f, 0.017f, 0.012f), 0.42f);
+            _sand = DecalMat("HM_Surf_Wear", new Color(0.55f, 0.50f, 0.42f), 0.22f);
+            _moss = DecalMat("HM_Surf_Moss", new Color(0.18f, 0.22f, 0.13f), 0.24f);
             _stain = DecalMat("HM_Surf_Stain", new Color(0.04f, 0.03f, 0.02f), 0.24f);
             _wear = DecalMat("HM_Surf_WornRun", new Color(0.66f, 0.56f, 0.42f), 0.12f);
             _ao = DecalMat("HM_Surf_ContactAO", new Color(0.015f, 0.012f, 0.01f), 0.6f);
@@ -129,7 +129,7 @@ namespace SleepingCalamity.EditorTools
             {
                 int cz = 0;
                 for (float cellZ = z0; cellZ < z1; cellZ += 8f, cz++)
-                    for (int k = 0; k < 2; k++)
+                    for (int k = 0; k < 3; k++)
                     {
                         float px = cellX + 8f * H(cx, cz, 10 + k), pz = cellZ + 8f * H(cx, cz, 20 + k);
                         float pick = H(cx, cz, 30 + k);
@@ -139,7 +139,7 @@ namespace SleepingCalamity.EditorTools
                     }
             }
             // small stains and a few pale scuffs, 1.2-3 m, scattered over the whole square
-            for (int i = 0; i < 46; i++)
+            for (int i = 0; i < 90; i++)
             {
                 float px = Mathf.Lerp(x0, x1, H(i, 1, 70)), pz = Mathf.Lerp(z0, z1, H(i, 2, 71));
                 float s = 1.2f + 1.8f * H(i, 3, 72);
