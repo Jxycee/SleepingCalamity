@@ -32,10 +32,10 @@ namespace SleepingCalamity.Gameplay
         // These four are not readonly: ServerSeed replaces them BEFORE Spawn with instances built with the seeded initial value. Writing .Value on a
         // NetworkVariable that has no NetworkBehaviour yet logs an NGO warning (318 per 25 minutes in the alpha playtest, item 16); an initial value
         // rides in the spawn message just the same.
-        public NetworkVariable<int> NetHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public NetworkVariable<int> NetMaxHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public NetworkVariable<byte> NetKind = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public NetworkVariable<byte> NetTier = new NetworkVariable<byte>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        [System.NonSerialized] public NetworkVariable<int> NetHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        [System.NonSerialized] public NetworkVariable<int> NetMaxHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        [System.NonSerialized] public NetworkVariable<byte> NetKind = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        [System.NonSerialized] public NetworkVariable<byte> NetTier = new NetworkVariable<byte>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<byte> NetPhase = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<int> NetAttackSerial = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<short> NetAttackIdx = new NetworkVariable<short>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
