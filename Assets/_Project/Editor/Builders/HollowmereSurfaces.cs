@@ -86,10 +86,24 @@ namespace SleepingCalamity.EditorTools
         }
 
         // A flat quad lying on the ground at world (x, y, z), w by d metres, yawed; visual only.
-        static GameObject Flat(Transform parent, string name, Material m, float x, float y, float z, float w, float d, float yaw, int order)
+        // ground = the lifted surface height at (x, z). Given, the quad is fitted to the four corner heights (H5): tilted along the slope, and raised by the corner twist so no corner sinks in.
+        static GameObject Flat(Transform parent, string name, Material m, float x, float y, float z, float w, float d, float yaw, int order, System.Func<float, float, float> ground = null)
         {
             GameObject go = LookTestBuilder.Prim(parent, name, PrimitiveType.Quad, Vector3.zero, new Vector3(w, d, 1f), m);
-            go.transform.SetPositionAndRotation(new Vector3(x, y, z), Quaternion.Euler(90f, yaw, 0f));
+            Quaternion rot = Quaternion.Euler(90f, yaw, 0f);
+            if (ground != null)
+            {
+                float c = Mathf.Cos(yaw * Mathf.Deg2Rad), sn = Mathf.Sin(yaw * Mathf.Deg2Rad);
+                Vector3 ex = new Vector3(c, 0f, -sn), ey = new Vector3(sn, 0f, c);   // the flat quad's local x and y axes in the world
+                float Hc(float sx, float sy) { Vector3 q = ex * (sx * w * 0.5f) + ey * (sy * d * 0.5f); return ground(x + q.x, z + q.z); }
+                float hpp = Hc(1, 1), hpm = Hc(1, -1), hmp = Hc(-1, 1), hmm = Hc(-1, -1);
+                float slopeX = (hpp + hpm - hmp - hmm) / (2f * w), slopeY = (hpp - hpm + hmp - hmm) / (2f * d);
+                float twist = Mathf.Abs(hpp - hpm - hmp + hmm) * 0.25f;
+                y = (hpp + hpm + hmp + hmm) * 0.25f + twist;
+                Vector3 ax = new Vector3(c, slopeX, -sn).normalized, ay = new Vector3(sn, slopeY, c).normalized;
+                rot = Quaternion.LookRotation(Vector3.Cross(ax, ay), ay);
+            }
+            go.transform.SetPositionAndRotation(new Vector3(x, y, z), rot);
             go.transform.localScale = new Vector3(w, d, 1f);
             var r = go.GetComponent<MeshRenderer>();
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
@@ -134,7 +148,7 @@ namespace SleepingCalamity.EditorTools
                         float px = cellX + 8f * H(cx, cz, 10 + k), pz = cellZ + 8f * H(cx, cz, 20 + k);
                         float pick = H(cx, cz, 30 + k);
                         Material m = pick < 0.45f ? _damp : pick < 0.75f ? _sand : _moss;
-                        Flat(g, "Tone" + n, m, px, Y(px, pz), pz, 5f + 6f * H(cx, cz, 40 + k), 3f + 4f * H(cx, cz, 50 + k), 360f * H(cx, cz, 60 + k), 1);
+                        Flat(g, "Tone" + n, m, px, Y(px, pz), pz, 5f + 6f * H(cx, cz, 40 + k), 3f + 4f * H(cx, cz, 50 + k), 360f * H(cx, cz, 60 + k), 1, Y);
                         n++;
                     }
             }
@@ -143,7 +157,7 @@ namespace SleepingCalamity.EditorTools
             {
                 float px = Mathf.Lerp(x0, x1, H(i, 1, 70)), pz = Mathf.Lerp(z0, z1, H(i, 2, 71));
                 float s = 1.2f + 1.8f * H(i, 3, 72);
-                Flat(g, "Stain" + i, i % 4 == 0 ? _sand : _stain, px, Y(px, pz), pz, s * (1f + H(i, 4, 73)), s, 360f * H(i, 5, 74), 2);
+                Flat(g, "Stain" + i, i % 4 == 0 ? _sand : _stain, px, Y(px, pz), pz, s * (1f + H(i, 4, 73)), s, 360f * H(i, 5, 74), 2, Y);
                 n++;
             }
             // damp strips along the edges (where the buildings and walls stand): 1.1-1.9 m wide, 3-6 m long, with gaps
@@ -160,7 +174,7 @@ namespace SleepingCalamity.EditorTools
                     float mid = s + seg * 0.5f, off = 0.55f + 0.3f * H(e, k, 83);
                     float px = ax + dx * mid + nx * off, pz = az + dz * mid + nz * off;
                     float yaw = Mathf.Atan2(dx, dz) * Mathf.Rad2Deg + 90f;   // the quad's long (local x) axis along the edge
-                    if (H(e, k, 84) > 0.2f) { Flat(g, "Damp" + e + "_" + k, _damp, px, Y(px, pz), pz, seg, wid, yaw, 3); n++; }
+                    if (H(e, k, 84) > 0.2f) { Flat(g, "Damp" + e + "_" + k, _damp, px, Y(px, pz), pz, seg, wid, yaw, 3, Y); n++; }
                     s += seg + gap; k++;
                 }
                 e++;
@@ -172,7 +186,7 @@ namespace SleepingCalamity.EditorTools
             {
                 float len = Mathf.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
                 float mx = (ax + bx) * 0.5f, mz = (az + bz) * 0.5f, yaw = Mathf.Atan2(bx - ax, bz - az) * Mathf.Rad2Deg + 90f;
-                Flat(g, "Run" + r, _wear, mx, Y(mx, mz), mz, len, 2.4f + 0.6f * H(r, 0, 90), yaw, 2);
+                Flat(g, "Run" + r, _wear, mx, Y(mx, mz), mz, len, 2.4f + 0.6f * H(r, 0, 90), yaw, 2, Y);
                 n++; r++;
             }
             return n;
