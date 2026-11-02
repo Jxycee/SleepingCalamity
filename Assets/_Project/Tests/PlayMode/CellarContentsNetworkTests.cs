@@ -412,10 +412,11 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(plan.Twist, Is.EqualTo(FloorTwist.Ambush));
             int room = plan.AmbushRoom; int expected = plan.CountIn(room);
             Assert.That(expected, Is.GreaterThan(0));
-            CellPos[] ring = CellarAmbush.Cells(c.Layout, dressing, plan, room);
             PlacedRoom pr = c.Layout.Rooms[room];
 
             c.Players[c.HostId] = Cell(c, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].X : pr.X, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].Y : pr.Y) + Vector3.forward * 0.1f;
+            Vector3 pl = c.Floor.Built.Root.InverseTransformPoint(c.Players[c.HostId]);
+            CellPos[] ring = CellarAmbush.Cells(c.Layout, dressing, plan, room, new[] { new PlanePoint(pl.x, -pl.z) });   // the host keeps the ring 4 m clear of the entering player
             float t0 = Time.time;
             for (int i = 0; i < 5; i++) yield return null;
             Assert.That(Time.time - t0, Is.LessThan(FloorTwistTuning.AmbushDelaySeconds * 0.5f), "the frames before the delay check must stay well inside the delay");
@@ -427,6 +428,86 @@ namespace SleepingCalamity.Tests.PlayMode
             foreach (Enemy e in EnemiesOn(c.HostNm)) Assert.That(NearRing(c, ring, e), Is.True, "a host ambush enemy stands near one of the ring cells right after the spawn");
             yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.Client.NetworkManager).Count == expected, Timeout, "the client does not see the ambush enemies");
             foreach (Enemy e in EnemiesOn(c.Client.NetworkManager)) Assert.That(NearRing(c, ring, e), Is.True, "a client ambush enemy stands near one of the ring cells");
+        }
+
+        // ---- playtest 12 / 13 ----
+
+        private static GameObject TestWall(Ctx c, Vector3 center, Vector3 size)
+        {
+            Transform walls = c.Floor.Built.Root.Find(CellarFloorBuilder.WallGroup);
+            Assert.That(walls, Is.Not.Null, "the floor has a Walls group");
+            var go = new GameObject("TestWall"); go.transform.SetParent(walls, false); go.transform.position = center;
+            go.AddComponent<BoxCollider>().size = size;
+            Physics.SyncTransforms();
+            return go;
+        }
+
+        private static void RemoveWall(GameObject wall) { Object.DestroyImmediate(wall); Physics.SyncTransforms(); }
+
+        // Catches: a chest opening through a wall (flat 2.5 m range only). Host-only physics; the RPC path is the same ServerTryOpenChest.
+        [UnityTest]
+        public IEnumerator Chest_WallBetweenPlayerAndChest_Refused_OpensOnceTheWallIsGone()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            int idx = -1; for (int i = 0; i < c.Layout.Chests.Count; i++) if (!c.Layout.Chests[i].HoldsKey) { idx = i; break; }
+            Assert.That(idx, Is.GreaterThanOrEqualTo(0));
+            Assert.That(c.Peer.TryChestPosition(idx, out Vector3 at), Is.True);
+            GameObject wall = TestWall(c, at + new Vector3(0.5f, 0f, 0f), new Vector3(0.2f, 3f, 6f));
+            c.Players[c.ClientId] = at + new Vector3(1.0f, 0f, 0f);
+            int handled = c.Contents.ChestRequestsHandled;
+            c.Peer.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.ChestRequestsHandled > handled, Timeout, "the request never reached the host");
+            Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL), "a wall between the player and the chest: refused");
+            RemoveWall(wall);
+            c.Peer.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Chests & (1UL << idx)) != 0, Timeout, "the chest never opened once the wall was gone");
+        }
+
+        // Catches: the locked door opening (by press or by the held-key auto open) for a player on the far side of a wall.
+        [UnityTest]
+        public IEnumerator Door_HeldKey_WallBetweenPlayerAndGate_StaysShut_OpensOnceClear()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            Assert.That(c.Peer.TryGatePosition(out Vector3 gate), Is.True, "the floor built its gate");
+            Assert.That(c.Peer.TryChestPosition(c.Layout.KeyChestIndex, out Vector3 keyAt), Is.True);
+            c.Players[c.ClientId] = keyAt + new Vector3(1.0f, 0f, 0f);
+            c.Peer.RequestOpenChest(c.Layout.KeyChestIndex);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.RoomKeyHeld, Timeout, "the key chest gave no room key");
+            Assert.That(c.Peer.State.DoorOpen, Is.False);
+
+            GameObject wall = TestWall(c, gate + new Vector3(0.5f, 0f, 0f), new Vector3(0.2f, 3f, 6f));
+            c.Players[c.HostId] = gate + new Vector3(1.0f, 0f, 0f);   // in auto-open range, but behind the wall
+            c.Players[c.ClientId] = c.Players[c.HostId];
+            c.Peer.RequestOpenDoor();
+            yield return new WaitForSeconds(0.6f);
+            Assert.That(c.Contents.State.DoorOpen, Is.False, "a wall between the player and the gate: neither the press nor the auto open works");
+            RemoveWall(wall);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.DoorOpen, Timeout, "the door never auto-opened once the wall was gone");
+        }
+
+        // Catches: the ambush springing on an empty room when the only player left during the delay (it must re-arm), and then springing once someone is inside.
+        [UnityTest]
+        public IEnumerator AmbushFloor_PlayerLeavesDuringTheDelay_NothingSprings_ThenSpringsWhenSomeoneIsInside()
+        {
+            uint seed = 0; int floor = 0;
+            for (uint s = 1; s < 3000 && floor == 0; s++)
+                for (int f = 2; f <= 3 && floor == 0; f++)
+                    if (CellarFloorRoster.TwistOf(s, f) == FloorTwist.Ambush) { seed = s; floor = f; }
+            Assert.That(floor, Is.Not.EqualTo(0));
+            Ctx c = null; yield return Setup(x => c = x, default, seed, floor);
+            DiveHaulSync.Summary sum = c.Haul.Current;
+            CellarEncounterPlan plan = c.Haul.EncounterPlan ?? CellarEncounterPlan.BuildForDive(c.Layout, c.Floor.Built.Dressing, sum.ExtraEnemiesPerRoom, sum.HunterLatched);
+            int room = plan.AmbushRoom; int expected = plan.CountIn(room); PlacedRoom pr = c.Layout.Rooms[room];
+            Vector3 inside = Cell(c, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].X : pr.X, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].Y : pr.Y) + Vector3.forward * 0.1f;
+
+            c.Players[c.HostId] = inside;
+            for (int i = 0; i < 5; i++) yield return null;
+            c.Players[c.HostId] = inside + Vector3.right * 80f;   // far outside every room, still a known player
+            yield return new WaitForSeconds(FloorTwistTuning.AmbushDelaySeconds + 0.6f);
+            Assert.That(c.Contents.EnterEnemyCount(room), Is.EqualTo(0), "nobody was in the room when the delay ended: no spring");
+            Assert.That(EnemiesOn(c.HostNm).Count, Is.EqualTo(0));
+            c.Players[c.HostId] = inside;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected, Timeout, "the re-armed ambush never sprang once a player was inside");
         }
     }
 }

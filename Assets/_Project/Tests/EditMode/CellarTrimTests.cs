@@ -13,17 +13,15 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarTrimTests
     {
-        const int Seeds = 1000;
+        // an "at least N" count measured over 1000 seeds, scaled down for the fast twin (the Soak case keeps N exactly)
+        static int Scale(int atLeast, int seeds) => seeds >= 1000 ? atLeast : Math.Max(1, atLeast * seeds / 1000);
 
-        static IEnumerable<(CellarFloorLayout l, CellarFloorDressing d, CellarRoomChunks ch, CellarFloorClutter c, CellarFloorTrim t, CellarFloorWarmLights w)> All(int maxFloor = 4)
+        static IEnumerable<(CellarFloorLayout l, CellarFloorDressing d, CellarRoomChunks ch, CellarFloorClutter c, CellarFloorTrim t, CellarFloorWarmLights w)> All(int seeds, int maxFloor = 4)
         {
-            for (uint seed = 0; seed < Seeds; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= maxFloor; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
-                    CellarRoomChunks ch = CellarRoomChunks.Resolve(l, d); CellarFloorClutter c = CellarFloorClutter.Resolve(l, d, ch);
-                    CellarFloorTrim t = CellarFloorTrim.Resolve(l, d, ch);
-                    yield return (l, d, ch, c, t, CellarFloorWarmLights.Resolve(l, d, ch, c, t));
+                    yield return (CellarTestFloors.Layout(seed, floor), CellarTestFloors.Dressing(seed, floor), CellarTestFloors.ChunkPlan(seed, floor), CellarTestFloors.Clutter(seed, floor), CellarTestFloors.Trim(seed, floor), CellarTestFloors.WarmLights(seed, floor));
                 }
         }
 
@@ -51,11 +49,11 @@ namespace SleepingCalamity.Tests.EditMode
             return !p.Room.Doors.Any(dr => dr.X == lx && dr.Y == ly && dr.Side == s);
         }
 
-        [Test]
-        public void Trim_NeverOnDoorLaneChestHealVignetteOrChunkSolid_AndNeverReachesTheWalkingLane()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Trim_NeverOnDoorLaneChestHealVignetteOrChunkSolid_AndNeverReachesTheWalkingLane(int seeds)
         {
             int wall = 0, over = 0;
-            foreach (var (l, d, ch, c, t, w) in All())
+            foreach (var (l, d, ch, c, t, w) in All(seeds))
             {
                 var ban = Banned(l, d, ch);
                 if (l.IsStub) Assert.AreEqual(0, t.Rows.Count, "floor 4 stub takes no trim");
@@ -86,14 +84,14 @@ namespace SleepingCalamity.Tests.EditMode
                 var seen = new HashSet<(int, int, TrimLayer)>();
                 foreach (TrimRow r in t.Rows) Assert.IsTrue(seen.Add((r.CellX, r.CellY, r.Layer)), "two " + r.Layer + " pieces in cell " + r.CellX + "," + r.CellY);
             }
-            Assert.Greater(wall, 5000); Assert.Greater(over, 3000);
+            Assert.Greater(wall, Scale(5000, seeds)); Assert.Greater(over, Scale(3000, seeds));
         }
 
-        [Test]
-        public void WarmLights_RespectTheRoomCapAndTheLegalityRules()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void WarmLights_RespectTheRoomCapAndTheLegalityRules(int seeds)
         {
             int total = 0, rooms = 0, withLight = 0;
-            foreach (var (l, d, ch, c, t, w) in All())
+            foreach (var (l, d, ch, c, t, w) in All(seeds))
             {
                 var ban = Banned(l, d, ch);
                 if (l.IsStub) Assert.AreEqual(0, w.Rows.Count);
@@ -114,7 +112,7 @@ namespace SleepingCalamity.Tests.EditMode
                     foreach (WarmLightRow o in w.Rows) if (o != r && o.RoomIndex == r.RoomIndex) Assert.GreaterOrEqual(Math.Abs(o.CellX - r.CellX) + Math.Abs(o.CellY - r.CellY), 2, at + " touches " + o.Id);
                 }
             }
-            Assert.Greater(total, 2000, "the rule places lights");
+            Assert.Greater(total, Scale(2000, seeds), "the rule places lights");
             Assert.Greater(withLight * 100 / rooms, 30, "a good share of rooms get a secondary light");
             TestContext.WriteLine("warm lights: " + total + " rows, " + withLight + " of " + rooms + " rooms lit");
         }
@@ -153,12 +151,12 @@ namespace SleepingCalamity.Tests.EditMode
 
         // 6a/6b density (pool sockets: the free cells of the barest rooms are the piece-spot and clutter cells, so adding sockets there starved CellarPieceSpots and lowered cellar_entry; the density comes from trim instead): pieces per floor cell = filled non-lantern sockets + wall clutter (the floor pieces) [+ trim rows]. Before this item the pool's barest rooms read (floor pieces per
         // floor cell, 1,000 seeds x floors 1-3): wine_press_hall .394, wine_vault_l .449, coal_boiler_hall .476, cellar_entry .503, larder_pantry .539. The band is 0.55 and up for every room once trim counts.
-        [Test]
-        public void Density_EveryRoomReadsDressed_AfterThePoolSocketsAndTheTrim()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Density_EveryRoomReadsDressed_AfterThePoolSocketsAndTheTrim(int seeds)
         {
             // per room id: sums of (floor pieces, wall trim, overhead trim) per floor cell, and the room count
             var acc = new Dictionary<string, (double floor, double wall, double over, int n)>();
-            foreach (var (l, d, ch, c, t, w) in All(3))
+            foreach (var (l, d, ch, c, t, w) in All(seeds, 3))
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     PlacedRoom p = l.Rooms[r]; if (p.Room.Kind == RoomKind.Corridor) continue;

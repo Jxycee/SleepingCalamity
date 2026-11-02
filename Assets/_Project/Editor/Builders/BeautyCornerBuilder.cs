@@ -212,6 +212,11 @@ namespace SleepingCalamity.EditorTools
                     }
                     else art.Fbx = BeautyCornerArt.Prepare(found, asset ?? row.Id, row.Foliage, out art.Mat);
                     if (row.Id == "CrackWeeds" && asset == null) art.Mat = BeautyCornerArt.CrackWeedsMaterial() ?? art.Mat;   // M_CrackWeeds is shared with the square: one fixed texture source
+                    if (art.Mat != null && (row.Id == "Ivy" || row.Id == "LintelIvy"))   // A4: wall ivy in the muted 3.1 palette, lower value and saturation than the atlas's lime
+                    {
+                        art.Mat.SetColor("_BaseColor", new Color(0.62f, 0.68f, 0.50f, 1f)); art.Mat.SetColor("_Color", art.Mat.GetColor("_BaseColor"));
+                        EditorUtility.SetDirty(art.Mat);
+                    }
                     if (art.Fbx == null) art = null;
                 }
                 catch (System.Exception e) { Debug.LogWarning("SC BEAUTY art for " + row.Id + (asset != null ? "/" + asset : "") + " failed, using placeholder: " + e.Message); art = null; }

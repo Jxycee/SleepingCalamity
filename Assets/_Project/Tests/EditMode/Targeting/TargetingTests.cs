@@ -166,18 +166,27 @@ namespace SleepingCalamity.Tests.EditMode
 
         // ---- elite / boss ----
 
-        // Catches: an elite lock dropping to distance or to a wall. The player's own toggle, death and despawn still end it.
+        // Catches: an elite lock that never drops (alpha playtest item 8). It holds past the normal release range and sight grace, but ends at the elite ones.
         [Test]
-        public void Lock_Elite_NeverDropsToRangeOrSight()
+        public void Lock_Elite_HoldsLongerButDrops()
         {
             var lockOn = new TargetLock();
             Assert.That(lockOn.TryAcquire(AtOrigin, List(At(1, 9f, elite: true))), Is.True);
 
-            Assert.That(lockOn.Tick(0.016f, AtOrigin, List(At(1, 40f, elite: true))), Is.EqualTo(LockDrop.None), "40 m away");
-            for (int i = 0; i < 20; i++)
-                Assert.That(lockOn.Tick(0.5f, AtOrigin, List(At(1, 40f, elite: true, sight: false))), Is.EqualTo(LockDrop.None), "10 s behind a wall");
-            Assert.That(lockOn.IsLocked, Is.True);
+            Assert.That(lockOn.Tick(0.016f, AtOrigin, List(At(1, 20f, elite: true))), Is.EqualTo(LockDrop.None), "20 m: past the normal 13 m, inside the elite range");
+            Assert.That(lockOn.Tick(2f, AtOrigin, List(At(1, 20f, elite: true, sight: false))), Is.EqualTo(LockDrop.None), "2 s behind a wall: past the normal 1 s grace");
+            Assert.That(lockOn.Tick(0.016f, AtOrigin, List(At(1, 20f, elite: true))), Is.EqualTo(LockDrop.None));
+            Assert.That(lockOn.Tick(0.016f, AtOrigin, List(At(1, 40f, elite: true))), Is.EqualTo(LockDrop.OutOfRange), "40 m away");
+            Assert.That(lockOn.IsLocked, Is.False);
 
+            var walled = new TargetLock();
+            walled.TryAcquire(AtOrigin, List(At(1, 9f, elite: true)));
+            LockDrop drop = LockDrop.None;
+            for (int i = 0; i < 20 && drop == LockDrop.None; i++) drop = walled.Tick(0.5f, AtOrigin, List(At(1, 9f, elite: true, sight: false)));
+            Assert.That(drop, Is.EqualTo(LockDrop.LostSight), "10 s behind a wall no longer holds");
+
+            lockOn = new TargetLock();
+            lockOn.TryAcquire(AtOrigin, List(At(1, 9f, elite: true)));
             lockOn.Release();
             Assert.That(lockOn.IsLocked, Is.False, "the player's toggle still releases an elite");
             Assert.That(lockOn.LastDrop, Is.EqualTo(LockDrop.Released));

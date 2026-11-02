@@ -260,6 +260,8 @@ namespace SleepingCalamity.Gameplay
             string weaponKey = WeaponKeyOf(attacker, weaponIndex);
             AttackData attack = AttackCatalog.ForFamily(WeaponStyle.FamilyOf(weaponKey)).Get(attackIndex);
             if (attack == null) return;
+            // Host re-check of the owner's swing: a melee hit may not pass through a wall (rays raycast for themselves on the owner).
+            if (attack.Shape != HitShape.Ray && !MeleeSight.Clear(attackerPos, e.transform.position)) return;
 
             ulong cid = attacker.OwnerClientId;
             HostPlayerState ps = StateOf(cid);

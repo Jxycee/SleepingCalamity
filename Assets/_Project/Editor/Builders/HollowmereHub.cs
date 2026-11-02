@@ -3,7 +3,7 @@
 //   - One SpawnPoint in the square by the heroes' home door; the DiveHub at the cistern house's cellar stair (HollowmereLayout.UndercroftStair), its Landing a step in front of the stair
 //     (go-home and fail land the party there). The dive floors are built far under the town at HubOrigin by every peer; no scene loads during play.
 //   - The look separation: a second global post volume with the dungeon corner's profile (weight 0) and an AreaLook that swaps volumes, sky, fog, ambient and the sun by camera height.
-//   - TownView: the bakery's frame and parts as greybox groups on lot F02, hidden until TownState says they stand (the lot's ruin hides while the frame is up).
+//   - TownView: the bakery greybox on every L lot, hidden until the replicated town (TownSync) says a building stands there; PlacementStation (M6 S4): build point, placement camera, ghost.
 // Everything is emitted here; never hand-edit the scene.
 using System.Linq;
 using SleepingCalamity.Core;
@@ -83,11 +83,46 @@ namespace SleepingCalamity.EditorTools
 
         static float Ground(TownLayout t, float x, float z) => HollowmereLayout.Ground(t, x, z);
 
-        // The bakery on lot F02, split into the frame and its three parts (TownBuildings.Bakery order), plus the baker at his door.
+        // The bakery greybox on EVERY L lot (the ghost snaps to any free foundation of its size class), each split into the frame and its parts (TownBuildings.Bakery order) plus the
+        // baker at his door, hidden until the replicated town says a building stands there; and the placement station at the bakery lot's doorstep.
         static void BuildTownView(Transform root, TownLayout t)
         {
-            Foundation f = t.Foundations.First(x => x.Id == BakeryLotId);
             Transform view = Child(root, "TownView");
+            var lots = new System.Collections.Generic.List<TownView.Lot>();
+            foreach (Foundation f in t.Foundations.Where(x => x.Size == FoundationSize.L)) lots.Add(BuildBakeryLot(root, view, f));
+            view.gameObject.AddComponent<TownView>().Lots = lots.ToArray();
+            BuildPlacementStation(root, t);
+        }
+
+        // The build point by the bakery lot's doorstep, the placement camera (off until placing) and the ghost (a slab plus a door nub, hidden).
+        static void BuildPlacementStation(Transform root, TownLayout t)
+        {
+            Foundation f = t.Foundations.First(x => x.Id == BakeryLotId);
+            Transform station = Child(root, "PlacementStation");
+            var point = new GameObject("BuildPoint").transform; point.SetParent(station, false);
+            TownPoint step = f.DoorstepPoint(f.Facing);
+            point.position = new Vector3(step.X, Ground(t, step.X, step.Z) + 0.1f, step.Z);
+
+            var camGo = new GameObject("PlacementCam"); camGo.transform.SetParent(station, false);
+            CinemachineCamera cam = camGo.AddComponent<CinemachineCamera>();
+            cam.Priority.Value = 0;
+            camGo.transform.SetPositionAndRotation(new Vector3(f.Centre.X, f.Y + PlacementMode.CamHeight, f.Centre.Z - PlacementMode.CamBack), Quaternion.Euler(PlacementMode.CamPitch, 0f, 0f));
+            camGo.SetActive(false);
+
+            var ghost = new GameObject("Ghost").transform; ghost.SetParent(station, false);
+            GameObject slab = LookTestBuilder.Prim(ghost, "Slab", PrimitiveType.Cube, new Vector3(0f, 0.3f, 0f), new Vector3(1f, 0.6f, 1f), M("label"));
+            GameObject nub = LookTestBuilder.Prim(ghost, "DoorNub", PrimitiveType.Cube, new Vector3(0f, 0.9f, -0.5f), new Vector3(0.2f, 1.2f, 0.12f), M("label"));
+            foreach (Collider c in ghost.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            ghost.gameObject.SetActive(false);
+
+            var mode = station.gameObject.AddComponent<PlacementMode>();
+            mode.BuildPoint = point; mode.PlacementCam = cam; mode.Ghost = ghost;
+            mode.GhostRenderers = new[] { slab.GetComponent<Renderer>(), nub.GetComponent<Renderer>() };
+        }
+
+        // One lot's bakery: the frame and its three parts (TownBuildings.Bakery order) as hidden groups under a root turned to the door side, plus the baker.
+        static TownView.Lot BuildBakeryLot(Transform root, Transform view, Foundation f)
+        {
             var lotRoot = new GameObject("Bakery_" + f.Id).transform; lotRoot.SetParent(view, false);
             lotRoot.localPosition = new Vector3(f.Centre.X, f.Y, f.Centre.Z);
             lotRoot.localRotation = Quaternion.Euler(0f, f.FacingYaw, 0f);
@@ -114,12 +149,8 @@ namespace SleepingCalamity.EditorTools
             lotRoot.gameObject.SetActive(false);
 
             Transform ruins = root.Find(RuinedRoot + "/Foundations");
-            Transform ruin = ruins != null ? ruins.Cast<Transform>().FirstOrDefault(c => c.name.StartsWith(BakeryLotId + "_", System.StringComparison.Ordinal)) : null;
-            var townView = view.gameObject.AddComponent<TownView>();
-            townView.Lots = new[]
-            {
-                new TownView.Lot { FoundationId = f.Id, Ruin = ruin != null ? ruin.gameObject : null, Root = lotRoot, Parts = parts, Resident = baker, LotYaw = f.Yaw, LotFacing = f.Facing },
-            };
+            Transform ruin = ruins != null ? ruins.Cast<Transform>().FirstOrDefault(c => c.name.StartsWith(f.Id + "_", System.StringComparison.Ordinal)) : null;
+            return new TownView.Lot { FoundationId = f.Id, Ruin = ruin != null ? ruin.gameObject : null, Root = lotRoot, Parts = parts, Resident = baker, LotYaw = f.Yaw, LotFacing = f.Facing };
         }
     }
 }

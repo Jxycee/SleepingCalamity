@@ -116,9 +116,10 @@ namespace SleepingCalamity.Core.Combat
         {
             var gain = new AbsGain { PlayerId = p.PlayerId, WeaponKey = weaponKey };
             float abs = p.Ledger.Award(enemyId, weaponKey, StyleEvent.Parry);
-            TechResult t = TechBonus.Apply(abs > 0f ? abs : 1f, TechKind.Parry);
+            // Once the ledger's parry cap is spent the parry is worth the capped tech base (like every other tech), then nothing: no endless farm.
+            TechResult t = TechBonus.Apply(abs > 0f ? abs : p.TechBase(enemyId), TechKind.Parry);
             gain.Abs = t.Abs;
-            gain.TechPop = t.Pop;
+            gain.TechPop = t.Pop && t.Abs > 0f;
             gain.LevelsGained = p.Weapon(weaponKey).AddAbs(t.Abs);
             return gain;
         }

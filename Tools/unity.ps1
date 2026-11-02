@@ -3,8 +3,9 @@
 #
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <command> [-OutDir <abs dir>] [-Filter <regex>] [-TimeoutMinutes <int>] [-ProjectRoot <abs dir>] [-Method <Class.Method>]
-#   <command> = compile | build | test-edit | test-play | check | gate | exec
+#   <command> = compile | build | test-edit | test-play | check | gate | soak | exec
 #   gate = compile + EditMode tests (no PlayMode, no port lock); records a fast-gate marker (sc-gate-pass) that the branch-push guard accepts. check stays the merge gate.
+#   test-edit, gate and check run the fast EditMode tier (-testCategory "!Soak"). soak = only the [Category("Soak")] EditMode tests (the 1000+ seed sweeps); it prints its own `SC RESULT soak` line and records no merge marker. Run it before merging anything under Core/Cellars (floor generation); a failing soak seed becomes a fixed fast-tier case.
 #
 # OutDir defaults to $env:SC_OUT. It must be absolute, must not contain '..', and must be outside the repo.
 # ProjectRoot defaults to the checkout this script lives in (Tools\..), so <worktree>\Tools\unity.ps1 tests that worktree;
@@ -42,8 +43,8 @@ $PortLockPath = Join-Path ([IO.Path]::GetTempPath()) 'sc-unity-playmode.lock'
 $PortWaitMinutes = 120
 $LockFile    = Join-Path $ProjectRoot 'Temp\UnityLockfile'
 $ErrPattern  = 'error CS|Exception|Scripts have compiler errors|Compilation failed'
-$Commands    = @('compile', 'build', 'test-edit', 'test-play', 'check', 'gate', 'exec')
-$UsageLine   = 'usage: unity.ps1 <compile|build|test-edit|test-play|check|gate|exec> -OutDir <absolute scratch dir outside the repo> (or set SC_OUT) [-ProjectRoot <dir>] [-Method <Class.Method>]'
+$Commands    = @('compile', 'build', 'test-edit', 'test-play', 'check', 'gate', 'soak', 'exec')
+$UsageLine   = 'usage: unity.ps1 <compile|build|test-edit|test-play|check|gate|soak|exec> -OutDir <absolute scratch dir outside the repo> (or set SC_OUT) [-ProjectRoot <dir>] [-Method <Class.Method>]'
 
 function Say([string]$Text) {
     [Console]::Out.WriteLine($Text)
@@ -227,12 +228,13 @@ function Invoke-Exec {
     return 1
 }
 
-function Invoke-Tests([string]$Name, [string]$Platform, [string]$XmlName) {
+function Invoke-Tests([string]$Name, [string]$Platform, [string]$XmlName, [string]$Category = '') {
     $xml = Join-Path $OutDir $XmlName
     if (Test-Path -LiteralPath $xml) { Remove-Item -LiteralPath $xml -Force }
     # Never pass -quit with -runTests.
     $extra = '-runTests -testPlatform ' + $Platform + ' -testResults "' + $xml + '" -dev-profile sctest'
     if (-not [string]::IsNullOrEmpty($Filter)) { $extra = $extra + ' -testFilter "' + $Filter + '"' }
+    if (-not [string]::IsNullOrEmpty($Category)) { $extra = $extra + ' -testCategory "' + $Category + '"' }
     $run = Invoke-UnityRun $Name $extra -NeedsPort:($Platform -eq 'PlayMode')
     switch ($run.Status) {
         'LOCKED'  { Say ('SC RESULT ' + $Name + ' LOCKED (close the Unity editor, then rerun)'); return 2 }
@@ -368,12 +370,13 @@ function Write-PassMarker([string]$MarkerDir = 'sc-check-pass') {
 switch ($Command) {
     'compile'   { $code = Invoke-Compile }
     'build'     { $code = Invoke-Build }
-    'test-edit' { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
+    'test-edit' { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' '!Soak' }
+    'soak'      { $code = Invoke-Tests 'soak' 'EditMode' 'soak.xml' 'Soak' }
     'test-play' { $code = Invoke-Tests 'test-play' 'PlayMode' 'playmode.xml' }
     'exec'      { $code = Invoke-Exec }
     'gate' {
         $code = Invoke-Compile
-        if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
+        if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' '!Soak' }
         switch ($code) {
             0       { Say 'SC RESULT gate PASS'; Write-PassMarker 'sc-gate-pass' }
             2       { Say 'SC RESULT gate LOCKED (close the Unity editor, then rerun)' }
@@ -383,7 +386,7 @@ switch ($Command) {
     }
     'check' {
         $code = Invoke-Build
-        if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' }
+        if ($code -eq 0) { $code = Invoke-Tests 'test-edit' 'EditMode' 'editmode.xml' '!Soak' }
         if ($code -eq 0) { $code = Invoke-Tests 'test-play' 'PlayMode' 'playmode.xml' }
         switch ($code) {
             0       { Say 'SC RESULT check PASS'; Write-PassMarker }

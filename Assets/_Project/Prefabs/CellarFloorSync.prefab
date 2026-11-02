@@ -79,8 +79,8 @@ MonoBehaviour:
     Pillar: {fileID: 2100000, guid: f79a81b322869d7d499326e12b26055a, type: 2}
     Trim: {fileID: 2100000, guid: 2d2fa4b7bd74d157896e253c2acbc94f, type: 2}
     Flame: {fileID: 2100000, guid: 597aa1277c8e278b687e4643543b49ca, type: 2}
-    LockedGate: {fileID: 2100000, guid: 57e548696d070d145b6a4c7c5085fd87, type: 2}
-    Chest: {fileID: 2100000, guid: bdc03bf7d3832b34880d65709cd11b80, type: 2}
+    LockedGate: {fileID: 2100000, guid: 2d2fa4b7bd74d157896e253c2acbc94f, type: 2}
+    Chest: {fileID: 2100000, guid: 022aa393025481b619deb2bb9b17a03b, type: 2}
     KeyChest: {fileID: 2100000, guid: 4683e549d32164e44869ae4935ab9a12, type: 2}
     Carrier: {fileID: 2100000, guid: 4cf62a371617c324da56d1393a97cf91, type: 2}
     EntryStart: {fileID: 2100000, guid: b41b50440814cf94589bf8b4e131341d, type: 2}

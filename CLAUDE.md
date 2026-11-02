@@ -22,6 +22,7 @@ The main (controller) session opens with the `sc-steward` skill, which reads `do
 - PlayMode tests must never wait on `WaitForEndOfFrame` under `-nographics`: it never resumes. Put a timeout inside every wait loop.
 - Editor scripts build scenes and prefabs (`SleepingCalamity.EditorTools.*`, wired into `ProjectBuilder.RunAll`); never edit `.unity`/`.prefab` YAML by hand (a hook blocks it).
 - Logs and test results go in the session scratchpad, never in the repo.
+- `test-edit`, `gate` and `check` run the fast EditMode tier (`-testCategory "!Soak"`); the 1000+ seed sweeps are `[Category("Soak")]`. Run `unity.ps1 soak` (cloud: `unity.sh soak`) before merging anything under Core/Cellars (floor generation); it records no merge marker, and a failing soak seed becomes a fixed fast-tier case.
 
 ## Cloud sessions (Linux)
 A cloud session works like a PC session (user, 2026-10-30): it can be the controller (`sc-steward`, `CURRENT.md`, push to `main`) and merge on its own green `unity.sh check`, which records the same PASS marker. Only one controller at a time, PC or cloud: if `CURRENT.md` or `main`'s log shows another controller active today, ask the user before taking over. Setup and tool details: `docs/superpowers/handoff/cloud-environment.md` (`bash Tools/cloud/setup.sh --check` shows what is ready). PC to cloud:

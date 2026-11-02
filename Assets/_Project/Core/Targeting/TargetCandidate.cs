@@ -7,7 +7,7 @@ namespace SleepingCalamity.Core
         public int Id;                  // stable per target (Gameplay uses the instance id)
         public float X, Y, Z;           // world position of the target's feet (Y is used for the height band)
         public bool Alive;
-        public bool IsElite;            // elites and bosses never lose a lock to range or line of sight
+        public bool IsElite;            // elites and bosses hold a lock longer (wider range, longer sight grace)
         public bool HasLineOfSight;     // from the seeker's eye to the target's aim point, computed by Gameplay
 
         public TargetCandidate(int id, float x, float y, float z, bool alive = true, bool isElite = false, bool hasLineOfSight = true)
