@@ -1,6 +1,7 @@
 Title: Cellars and Undercroft visual fixes (review B2-B6)
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-02T16:31Z (cloud launcher)
 Model: sonnet
 From: coordinator session 7 (user offered cloud sessions, 2026-11-02)
 Status file: Reference/sessions/cellars-visual-b/STATUS.md
