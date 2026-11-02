@@ -160,6 +160,7 @@ namespace SleepingCalamity.Presentation
             HeroFlinch f = hero.GetComponent<HeroFlinch>();
             if (f == null) f = hero.gameObject.AddComponent<HeroFlinch>();
             f.Trigger();
+            if (hero.GetComponent<HeroHurtPulse>() == null) hero.gameObject.AddComponent<HeroHurtPulse>();   // the red grace pulse, on every peer
         }
 
         private void Update()

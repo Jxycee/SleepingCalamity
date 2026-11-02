@@ -59,22 +59,25 @@ namespace SleepingCalamity.Core.Combat
             hitboxOpenSeconds <= elapsed + 1f / 60f;
     }
 
-    // Post-hit invulnerability grace (docs/research/combat-timings.md rows 1-4, 8): after a hit lands the hero ignores further hits for a window (DC1:
-    // 160 / 80 / 8 ticks at 60 Hz for heavy / light / one hit of a multi-hit attack), tinted red by one sine half-cycle over the same window. A heavy
-    // hit (knockback >= 3) that does not kill also knocks the hero down. Authority: owner (the victim's client judges enemy hits; see HeroCombat).
+    // Post-hit invulnerability grace (docs/research/combat-timings.md "Recommended M3 values" 1-3): after a hit lands the hero ignores further hits for a
+    // window (light 0.8 s; heavy 1.2 s = the 0.9 s knockdown + 0.3 s; one hit of a multi-hit attack 0.15 s), tinted red by one sine half-cycle over the same
+    // window. A heavy hit (knockback >= 3, or a guard break on a raised guard) also knocks the hero down. Authority: owner (the victim's client judges grace
+    // and enemy hits, GuardMath.cs:3; the host applies the damage). Other peers run a cosmetic GraceTimer only, started by HurtClientRpc.
     public enum HurtKind : byte { Light = 0, Heavy = 1, MultiHit = 2 }
 
     public static class HurtGrace
     {
         public const float HeavyKnockback = 3f;                 // attack knockback at or above this is a heavy hit
-        public const float LightSeconds = 80f / 60f;            // 1.33 s
-        public const float HeavySeconds = 160f / 60f;           // 2.67 s
-        public const float MultiHitSeconds = 8f / 60f;          // 0.13 s
+        public const float LightSeconds = 0.8f;
+        public const float HeavySeconds = 1.2f;                 // 0.9 s knockdown + 0.3 s
+        public const float MultiHitSeconds = 0.15f;
         public const float KnockdownSeconds = 0.9f;             // research recommendation 3 (DC1's 2.2 s is too long for us)
+        public const float FlickerSeconds = 0.4f;               // recommendation 2: the red pulse plus a flicker for this long
 
         // No data flag marks a multi-hit attack today (AttackData has none), so callers pass multiHit=false and get light / heavy only.
-        public static HurtKind Classify(float knockback, bool multiHit = false) =>
-            knockback >= HeavyKnockback ? HurtKind.Heavy : multiHit ? HurtKind.MultiHit : HurtKind.Light;
+        // A guard break (on a raised guard) counts as heavy.
+        public static HurtKind Classify(float knockback, bool multiHit = false, bool guardBreak = false) =>
+            knockback >= HeavyKnockback || guardBreak ? HurtKind.Heavy : multiHit ? HurtKind.MultiHit : HurtKind.Light;
 
         public static float Seconds(HurtKind kind) => kind == HurtKind.Heavy ? HeavySeconds : kind == HurtKind.MultiHit ? MultiHitSeconds : LightSeconds;
 
@@ -88,8 +91,50 @@ namespace SleepingCalamity.Core.Combat
             return MathF.Sin(MathF.PI * elapsed / Seconds(kind));
         }
 
+        // A heavy hit: knockback >= 3 or a guard-breaker. The host sends this to every peer so all of them play the same reaction.
+        public static bool IsHeavyHit(float knockback, bool guardBreak) => knockback >= HeavyKnockback || guardBreak;
+
         // A heavy hit that does not kill knocks the hero down.
         public static bool Knockdown(float knockback, bool killed) => knockback >= HeavyKnockback && !killed;
+    }
+
+    // The grace window as a countdown (not a sum of floats), so expiry is frame-accurate: 0.8 s at 60 Hz ends on exactly tick 48.
+    public sealed class GraceTimer
+    {
+        private const float Epsilon = 1e-4f;   // float slack: 48 ticks of 1/60 s leave ~1e-7, not a whole extra frame
+
+        private float _remaining;
+        private HurtKind _kind;
+
+        public HurtKind Kind => _kind;
+        public bool Active => _remaining > Epsilon;
+        public float Remaining => Active ? _remaining : 0f;
+        public float Elapsed => Active ? HurtGrace.Seconds(_kind) - _remaining : 0f;
+
+        // Begins a window. A hit during a running window is ignored (it neither restarts nor lengthens it, whatever its kind). True when it began.
+        public bool Start(HurtKind kind)
+        {
+            if (Active) return false;
+            _kind = kind;
+            _remaining = HurtGrace.Seconds(kind);
+            return true;
+        }
+
+        public void Tick(float dt)
+        {
+            if (_remaining <= 0f) return;
+            _remaining -= dt;
+            if (_remaining <= Epsilon) _remaining = 0f;
+        }
+
+        public void Clear() => _remaining = 0f;
+
+        // Red tint strength 0..1 (a half sine over the window), 0 when not active.
+        public float Pulse => Active ? MathF.Sin(MathF.PI * Elapsed / HurtGrace.Seconds(_kind)) : 0f;
+
+        // True during the first FlickerSeconds of the window, on alternate 1/30 s steps (the on/off beat of the flicker).
+        public bool FlickerOn => Active && Elapsed < HurtGrace.FlickerSeconds && ((int)(Elapsed * 30f) & 1) == 0;
+        public bool Flickering => Active && Elapsed < HurtGrace.FlickerSeconds;
     }
 
     // The broom's bristle front (6.6): 80% of frontal damage is blocked unless the hit comes from the flank or behind or is a guard-breaker.
