@@ -1,5 +1,5 @@
 // Core/Cellars/CellarPieceSpots.cs: where the bakery pieces lie on floors 1-3 (PHASE1 7.2). Pure C#, no engine references.
-// Piece index i of floor f is DiveHaul.PieceId(f, i) and lies on the i-th returned cell. Cells come from the free cells of combat rooms that are neither the locked room nor
+// The i-th returned cell holds the i-th piece of floor f that is not already home (DiveHaul.PieceId(f, i) when none is home). Cells come from the free cells of combat rooms that are neither the locked room nor
 // an entry room (CellarEncounterPlan.FreeCellsOf already excludes doors, authored spawns, chests, features, barrels and crates, vignettes, the healing point, the carrier,
 // dead ends, entry/stair/bank/baker cells), spread over the eligible rooms round-robin from a room order shuffled on the stream Rng.Derive(seed, "cellars.pieces", floor).
 // Floor 4 (the bakery) and a floor with no eligible cell return none. Fewer cells than asked returns fewer (never an illegal cell). Own stream, no golden moves.
