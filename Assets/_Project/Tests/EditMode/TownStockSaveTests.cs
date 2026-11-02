@@ -59,6 +59,61 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(r2.LootCount(7), Is.EqualTo(5), "only the new 2 arrive");
         }
 
+        // Catches: spent loot coming back after a reload (the saved stock count was topped up from the haul's running banked total).
+        [Test]
+        public void Reload_SpentLoot_StaysSpent_AndOnlyUnmovedLootIsSavedAsBanked()
+        {
+            var stock = new TownStock(HollowmereLayout.Create());
+            DiveState dive = NewDive();
+            dive.Haul.AddLoot(7, 3); dive.Haul.Bank();
+            stock.Receive(dive.Haul, false);
+            TownSnapshot snap = stock.Capture(dive, null);
+            Assert.That(snap.Dive.BankedLoot, Is.Empty, "loot already in the town is not saved as banked again");
+            Assert.That(snap.Stock.Loot.Single().Count, Is.EqualTo(3));
+            snap.Stock.Loot.Single().Count = 1;   // two spent
+            var fresh = new TownStock(HollowmereLayout.Create());
+            DiveState d = fresh.Restore(TownSaveRules.CleanSnapshot(snap, null, null, false), PerFloor, StirTuning.Default);
+            Assert.That(fresh.LootCount(7), Is.EqualTo(1));
+            d.Haul.AddLoot(7, 2); d.Haul.Bank();
+            fresh.Receive(d.Haul, false);
+            Assert.That(fresh.LootCount(7), Is.EqualTo(3), "only the new 2 arrive");
+        }
+
+        // Catches: partly moved loot saving its whole running total (the moved part would arrive twice).
+        [Test]
+        public void Capture_PartlyMovedLoot_SavesOnlyTheUnmovedPart()
+        {
+            var stock = new TownStock(HollowmereLayout.Create());
+            DiveState dive = NewDive();
+            dive.Haul.AddLoot(7, 3); dive.Haul.Bank();
+            stock.Receive(dive.Haul, false);
+            dive.Haul.AddLoot(7, 2); dive.Haul.Bank();   // 2 more banked, not yet received
+            TownSnapshot snap = stock.Capture(dive, null);
+            Assert.That(snap.Dive.BankedLoot.Single().Count, Is.EqualTo(2));
+            (TownStock r, _) = Reload(stock, dive);
+            Assert.That(r.LootCount(7), Is.EqualTo(5));
+        }
+
+        // Catches: the dive state built at the first dive start ignoring the current piece counts, or losing progress/checkpoint (the hub prompt reads the checkpoint).
+        [Test]
+        public void BuildDive_UsesGivenFloorCounts_KeepsProgress_AndLeavesTheStockAlone()
+        {
+            var stock = new TownStock(HollowmereLayout.Create());
+            DiveState dive = NewDive();
+            dive.Haul.AddPiece(100); dive.Haul.Bank();
+            stock.Receive(dive.Haul, false);
+            dive.RestoreProgress(5, true);
+            TownSnapshot loaded = TownSaveRules.CleanSnapshot(stock.Capture(dive, null), null, null, false);
+            var fresh = new TownStock(HollowmereLayout.Create());
+            fresh.Restore(loaded, PerFloor, StirTuning.Default);
+            int before = fresh.State.StockPieces.Count();
+            DiveState d = fresh.BuildDive(loaded, PerFloor, StirTuning.Default);
+            Assert.That(d.CheckpointReached, Is.True);
+            Assert.That(d.ClearedMask, Is.EqualTo(5));
+            Assert.That(d.Haul.IsCollected(100), Is.True);
+            Assert.That(fresh.State.StockPieces.Count(), Is.EqualTo(before));
+        }
+
         // Catches: loot banked mid-dive and not yet home being lost when the quit turned the dive into a failed one.
         [Test]
         public void Reload_BankedButUnmovedLoot_ComesHomeOnce()
