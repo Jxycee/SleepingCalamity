@@ -35,7 +35,7 @@ namespace SleepingCalamity.Presentation
         private string _lot = "";
         private int _turn;
         private bool _wantLock;
-        private float _lockAskedAt, _messageUntil, _nextGhostSend, _flickReleased = 1f;
+        private float _nextRelease, _lockAskedAt, _messageUntil, _nextGhostSend, _flickReleased = 1f;
         private string _message = "", _sentSig = "";
         private TownSync _hooked;
         private MaterialPropertyBlock _block;
@@ -70,16 +70,29 @@ namespace SleepingCalamity.Presentation
             if (Active)
             {
                 if (!sync.IsBuilder) { Leave(false); return; }   // the lock is gone (host released it, or this peer is no longer the holder)
+                if (!StillAtBuildPoint()) { Leave(true); return; }   // a dive teleported the party away: hand the lock back
                 TickBuilder(sync);
             }
             else
             {
                 if (_wantLock && sync.IsBuilder) Enter(sync);
+                else if (!_wantLock && sync.IsBuilder) { if (Time.unscaledTime >= _nextRelease) { _nextRelease = Time.unscaledTime + 1f; sync.ReleaseBuildLock(); } }   // a grant that arrived after the wait gave up: never sit on the lock without the mode
                 else if (_wantLock && Time.unscaledTime > _lockAskedAt + 5f) _wantLock = false;
                 else if (!_wantLock) TickPrompt(sync);
             }
             UpdateGhost(sync);
             UpdateCamera();
+        }
+
+        // Far wider than the prompt radius: the hero is parked while placing, so only a teleport (a dive) puts it outside this.
+        private bool StillAtBuildPoint()
+        {
+            NetworkManager nm = NetworkManager.Singleton;
+            NetworkObject player = nm != null && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
+            if (player == null || BuildPoint == null) return true;   // nothing to measure against (a rig without a hero): stay
+            Vector3 d = player.transform.position - BuildPoint.position; d.y = 0f;
+            float r = PromptRadius * 4f;
+            return d.sqrMagnitude <= r * r;
         }
 
         private bool NearBuildPoint()

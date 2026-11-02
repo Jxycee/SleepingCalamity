@@ -242,6 +242,51 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => rig.Host.BuilderIsFree && !rig.Host.NetGhost.Value.Active, Timeout, "the lock stayed held by a client that left");
         }
 
+        // Review fixes (M6 S4): the dive's go-home stocks the town outside any request; the 0.2 s poll republishes it to clients. (The real EndDive needs a generated floor; this adds the piece to the host's
+        // TownState exactly as Town.Receive does, WITHOUT ServerRefresh.)
+        [UnityTest]
+        public IEnumerator GoHomeStock_ReachesTheClient_ThroughThePoll()
+        {
+            Rig rig = null; TownSync peer = null;
+            yield return Start(r => rig = r, Frame);
+            yield return Join(rig, 0, (c, t) => peer = t);
+            Assert.That(peer.View.InStock(Oven), Is.False);
+            Assert.That(rig.Director.Town.State.AddPiece(Oven), Is.EqualTo(PlaceResult.Ok));
+            yield return PlayModeHarness.WaitUntil(() => peer.View.InStock(Oven), Timeout, "the client never saw the piece the host stocked outside a request");
+        }
+
+        // A dive starting frees the builder lock whoever holds it (a guest cannot block a dive). PlacementMode itself reads local input and the scene, so it is not driven here: its reaction (not the holder
+        // any more -> Leave) is the existing Active && !IsBuilder branch.
+        [UnityTest]
+        public IEnumerator StartingADive_FreesTheBuilderLock()
+        {
+            Rig rig = null; TownSync peer = null;
+            yield return Start(r => rig = r, Frame);
+            yield return Join(rig, 0, (c, t) => peer = t);
+            yield return Take(peer, rig.Host);
+            rig.Director.ServerStartDive();
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.BuilderIsFree && !peer.IsBuilder, Timeout, "the dive left the lock with the client");
+        }
+
+        // A grant that arrives after the client gave up waiting: the peer holds the lock but its PlacementMode is not Active and not asking. It must hand the lock back.
+        [UnityTest]
+        public IEnumerator LateGrant_WithoutPlacementMode_IsReleased()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r, Frame);
+            var go = new GameObject("PlacementModeLeakTest");
+            go.AddComponent<PlacementMode>();   // TownSync.Local on the host peer is the host's sync
+            try
+            {
+                bool granted = false;
+                rig.Host.ResultReceived += (op, res) => { if (op == TownSync.Op.Lock && res == (byte)PlaceResult.Ok) granted = true; };
+                rig.Host.RequestBuildLock();   // the host peer is granted while its (inactive, not-waiting) mode looks on
+                yield return PlayModeHarness.WaitUntil(() => granted, Timeout, "no grant");
+                yield return PlayModeHarness.WaitUntil(() => rig.Host.BuilderIsFree, Timeout, "the idle holder never released the lock");
+            }
+            finally { Object.Destroy(go); }
+        }
+
         // (e) Solo: the host builds (its own request, sender = the host's client id) and leaving placement mode puts the bakery on DISK at once (not on the 10 s flush tick).
         [UnityTest]
         public IEnumerator Solo_LeavingPlacementMode_WritesTheTownToTheWorldFile()

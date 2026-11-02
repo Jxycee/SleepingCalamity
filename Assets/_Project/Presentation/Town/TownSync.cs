@@ -186,6 +186,9 @@ namespace SleepingCalamity.Presentation
             return true;
         }
 
+        // Host: frees the lock whoever holds it (a dive starting must not wait on a builder); same path as a release, so the town republishes and the world saves once.
+        public bool ServerForceRelease() => IsServer && NetBuilder.Value != NoBuilder && ServerRelease(NetBuilder.Value);
+
         private void OnClientDisconnected(ulong clientId)
         {
             if (IsServer && NetBuilder.Value == clientId) ServerRelease(clientId);   // a holder who drops frees the lock
@@ -222,6 +225,7 @@ namespace SleepingCalamity.Presentation
         {
             ulong who = rpcParams.Receive.SenderClientId;
             if (!ServerIsBuilder(who)) return;
+            if (HostState != null && Fits(buildingId) && HostState.PlacedBuildingOf(buildingId) != null) { NetGhost.Value = default; return; }   // a late ghost for a building the frame already placed
             if (!active || !Fits(buildingId) || !Fits(foundationId) || TownBuildings.Get(buildingId) == null || Layout.Foundation(foundationId) == null) { NetGhost.Value = default; return; }
             NetGhost.Value = new GhostNet { Active = true, Building = buildingId, Foundation = foundationId, Turn = WishEvaluator.NormalTurn(turn) };
         }

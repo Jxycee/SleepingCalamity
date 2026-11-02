@@ -121,6 +121,7 @@ namespace SleepingCalamity.Presentation
         {
             if (!IsServer || !IsSpawned || NetActive.Value) return false;
             if (!EnsureSyncs()) return false;
+            if (TownSync != null) TownSync.ServerForceRelease();   // a dive frees the builder lock (the holder's placement mode then leaves on its own)
             if (!_haulBegun)
             {
                 if (!HaulSync.ServerBegin(PiecesPerFloor, DiveStir)) return false;

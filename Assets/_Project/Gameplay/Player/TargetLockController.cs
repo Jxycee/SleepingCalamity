@@ -144,6 +144,7 @@ namespace SleepingCalamity.Gameplay
             _wroteContext = false;
             IInputService input = Input;
             if (input == null || (input is UnityEngine.Object o && o == null)) return;
+            if (input.GameplayContext == InputContext.Placement) return;   // placement mode owns the context (same guard as WriteContext)
             if (input.GameplayContext != InputContext.Free) input.GameplayContext = InputContext.Free;
         }
     }
