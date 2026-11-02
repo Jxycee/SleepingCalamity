@@ -31,7 +31,7 @@ Honest take: our hit detection (frame-window hitboxes via overlap/cast), enemy m
 ## Animation
 | Option | Gives us | Licence | Unity 6 / URP | Maintenance | NGO | Risk | Verdict |
 |---|---|---|---|---|---|---|---|
-| [Animation Rigging](https://docs.unity3d.com/Packages/com.unity.animation.rigging@1.2/manual/index) (`com.unity.animation.rigging`) | Two-bone IK, chain IK, multi-aim, override transform; runtime rigs | Unity package licence (free) | Official | Unity | Pure client-side cosmetics; run on every client from replicated state | Chain IK is limited; not full-body | **Adopt** (hands on weapon, look-at, M3/M10) |
+| [Animation Rigging](https://docs.unity3d.com/6/Documentation/Manual/com.unity.animation.rigging.html) (`com.unity.animation.rigging`) | Two-bone IK, chain IK, multi-aim, override transform; runtime rigs | Unity package licence (free) | Official | Unity | Pure client-side cosmetics; run on every client from replicated state | Chain IK is limited; not full-body | **Adopt** (hands on weapon, look-at, M3/M10) |
 | [Animancer](https://kybernetik.com.au/animancer/docs/download) Lite | Code-driven playback, state machine utilities | Lite free but most Pro features only work in the Editor, not in builds; Pro is $90 | Yes (v8.x) | Active | Fine | Lite is not a shipping-grade subset (source/features gated) | **Skip** (Mecanim + Playables are enough; our attack windows are data) |
 | Final IK / Puppet Master (Root Motion) | Full-body IK | Paid | Yes | Active | n/a | Paid | Skip (no free equivalent; need not arise in Phase 1) |
 | Fast IK, FABRIK/CCD GitHub snippets | Chain IK | Mixed/unvetted | Unknown | Unknown | n/a | Licence unclear | Skip |
@@ -153,10 +153,16 @@ Honest take: our hit detection (frame-window hitboxes via overlap/cast), enemy m
 - Edgar free: terms forbid redistribution or resale; irrelevant since skipped.
 - No LGPL libraries were found in the shortlist.
 
+## Installed (2026-11-01, branch claude/packages)
+- **Animation Rigging** `com.unity.animation.rigging` 6.6.0: a core package embedded in the editor since 6.6 (no registry fetch; the old @1.2 doc link is gone). No gameplay use yet; for hand IK and look-at at M3/M10.
+- **Unity Behavior** `com.unity.behavior` 1.0.16. No gameplay use (enemy AI stays a Core state machine; this is the boss option).
+- **PrimeTween** `com.kyrylokuzyk.primetween` 1.5.2 via the npm scoped registry (`https://registry.npmjs.org`, scope `com.kyrylokuzyk`). Licence resolved: custom grant, commercial binary use OK; the free version must be installed as an NPM package; never redistribute its source or tgz (so do not ship it in mod kits). Smoke use: the stir meter bar eases to new values (`StirMeterHud`); `SleepingCalamity.UI` references `PrimeTween.Runtime`.
+- **CristianQiu Unity-URP-Volumetric-Light** `com.cqf.urpvolumetricfog`, git URL pinned to tag 0.5.91 (354ebc5). MIT. Not enabled in any renderer or volume yet (quality-toggle work comes later); installed so its shaders compile in the gate run (watch issue #25, Shader Error X8000).
+
 ## Sources
 - Jolt: https://github.com/seep/JoltPhysicsUnity , https://openupm.com/packages/com.seep.jolt/
 - Animancer: https://kybernetik.com.au/animancer/docs/download
-- Animation Rigging: https://docs.unity3d.com/Packages/com.unity.animation.rigging@1.2/manual/index
+- Animation Rigging: https://docs.unity3d.com/6/Documentation/Manual/com.unity.animation.rigging.html
 - Unity Behavior: https://docs.unity3d.com/6/Documentation/Manual/com.unity.behavior.html
 - Edgar: https://github.com/OndrejNepozitek/Edgar-Unity
 - Volumetric light: https://github.com/CristianQiu/Unity-URP-Volumetric-Light
