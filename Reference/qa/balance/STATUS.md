@@ -1,4 +1,4 @@
-Status: BLOCKED (run 7: deaths mostly gone, 0 of 5 home only because the bot runs out of its 1500 s; user decides the next step)
+Status: DONE (survival target met at soloAtk 1.0 / soloLife 1.0 with an all-tier-1 Cellars; DiveBot still does not reach home inside its time cap: bot pace and floor navigation, not balance)
 Archive: ready
 
 # Solo normal dive balance (2026-11-02)
@@ -50,7 +50,29 @@ Compared with run 6 (806 hits, 4-14 fails per seed) hits fell to 214 and fails t
 
 **The remaining gap is time, not death:** every seed was alive at the 1500 s cap, still on chests of F3/F4 (the bot clears every chest, ~400-500 s per floor). Four floors plus heart plus the way home need roughly 2000-2500 s of bot play at this pace.
 
-## Recommendation (replaces the earlier one)
+## Recommendation of run 7 (superseded by the decision below)
 1. Do not touch the numbers yet. Let the bot play to the end: raise the normal limit to ~3000 s (one run of 5 seeds is then ~25 min of PlayMode lock; run 2-3 seeds first) or make it skip optional chests on floors 3-4 and head for the stair/heart. That settles whether solo normal is winnable at soloAtk 0.55 / soloLife 0.75.
 2. If it then wins nearly always, the solo numbers can be eased back toward 1.0 to keep it a fight; if it still loses on F3/F4, the user's options are the tier-2 rat-king on F3 (`tier2Life` 3 -> 2, `tier2Def` 3.3 -> 2.2; global, co-op too) or a solo hero HP / clear-heal change.
 3. Separate bugs seen: falls through the floor on F2/F3, no walkable ground on stair arrival (traversal), checkpoint bank prompt None at ~3 m on F2.
+
+## User decision (2026-11-02) and runs 8-10
+**Rule:** the Cellars (the first dungeon, floors 1-4) are a rougher tutorial like DC1: every regular enemy is **tier 1**. The hero does not have tier-2 gear, weapon upgrades or later areas yet; tier 2 belongs to later dungeons once those exist. The Dough Warden (floor-4 set-piece guard) keeps its tier-2 stats. Implemented as the tunable `enemies.cellarsMaxTier` (default 1; 2 restores the tier-2 rat-kings from `Tier2MinFloor` 3 and the stir hunter), see `EnemyCatalog.CappedTier/AuthoredTier`.
+**Knobs:** `10-balance.json` now holds `soloAtk 1.0`, `soloLife 1.0`, `cellarsMaxTier 1`. Solo and co-op use the same enemy numbers again (CoopScaling untouched), so the 55 % / 75 % solo cut is no longer needed.
+
+| run | change | what happened |
+|---|---|---|
+| 8 | bot opens only key chests + 2 optional chests per floor, heads for pieces/key/stair; tier 2 on F3+ (soloAtk 0.55) | 0/5 home, 0 deaths; 4 seeds ended with the exit locked and the gate key 0: the bot never visited the carrier's room (optional chests used to lead it there) |
+| 9 | not run (superseded by the tier decision; stopped while queued) | |
+| 10 | + bot walks to the gate-key carrier; **all tier 1, solo knobs 1.0** | 0/5 home at the 1500 s cap; dive fails 0 / 3 / 1 / 2 / 0 (seeds 12345 / 7 / 31 / 404 / 2024), lowest HP 54 / 2 / 4 / 4 / 86 %, hits 5 / 40 / 25 / 55 / 1, no fails near a floor fault; rat_king did 98 of 136 hits (F3 51); broom 14 hits, slime 14, **no Dough Warden hit** (nobody got past F4). Seeds 12345 and 2024 stalled at the carrier goal on F1 (bot stood 4 m from the cell, fixed below). Seeds 7/31/404 spent 430-1047 s on single F3 visits (falls through the floor, embedded walls, "fought 60 s without the room going quiet", exit locked for 700 s) |
+
+Runs 7-10 in one line: with the smarter bot and tier-1 enemies the hero hardly dies (0-3 fails per seed, 1-55 hits per run, down from 806-925 hits and 4-21 fails in runs 4-6). What stops the bot is pace and navigation.
+
+## Bot faults fixed (test-only)
+Loaf eating, healing-point retreat that waits for 90 %, broom flanking, floor-fault death tags (Fall/Entry/Nav/Embedded within 20 s), hits per floor and visits in the summary, optional-chest cap (2 per floor, key chests always), gate-key carrier goal (walks onto the carrier's cell, gives up after 90 s with a Flow finding), normal-mode limit 2100 s.
+
+## Follow-ups (not started)
+1. **Bot pace.** Re-run `DiveBot_Seed*` (SC_BOT=1) with the carrier fix to see how many seeds reach the heart and home inside 2100 s. Floors 3-4 eat the time: falls through the floor (y -1.6 / -150), no walkable ground on stair arrival, embedded walls, the checkpoint bank prompt `None` at 3 m (traversal list in Reference/qa/traversal). Fix those, then judge pace.
+2. **The Dough Warden is untested** by the bot (never reached). The user's playtest tonight is the real check of the floor-4 guard at its tier-2 stats; if it alone blocks runs, tune it via `tier2Atk/tier2Life/tier2Def` (global) or give the Warden its own entry.
+3. Tough mode is unchanged (host heals below 50 %): still easier than normal by construction; the "tough harder than normal" rule is not meaningful for the bot until normal gets home.
+
+Archive: ready
