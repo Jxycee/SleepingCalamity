@@ -182,7 +182,7 @@ def main(argv):
     for o in bpy.data.objects: o.select_set(o.type == 'MESH')
     bpy.ops.export_scene.fbx(filepath=out, use_selection=True, object_types={'MESH'}, use_mesh_modifiers=True, mesh_smooth_type='FACE',
                              colors_type='LINEAR', apply_scale_options='FBX_SCALE_UNITS', bake_space_transform=True, add_leaf_bones=False,
-                             bake_anim=False, use_custom_props=False)
+                             bake_anim=False, use_custom_props=False, path_mode='STRIP')
     print('PAINTPASS', out, p)
 
 if __name__ == '__main__':

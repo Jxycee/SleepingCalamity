@@ -28,7 +28,7 @@ namespace SleepingCalamity.Core
         public static readonly TownPoint UndercroftStair = new TownPoint(15f, 12.5f); // inside the cistern house, the way down (P25)
         public static readonly TownPoint LakeCentre = new TownPoint(10f, -102f);
         public const float LakeRadiusX = 70f, LakeRadiusZ = 24f;
-        const float LotSetback = 1.0f;   // lane edge to lot edge
+        const float LotSetback = 1.0f, NarrowSetback = 0.2f;   // lane edge to lot edge (NarrowSetback: the one lot that has to clear the town wall behind it)
         public const float MaxLaneGrade = 0.30f;   // lanes are relaxed to this rise per metre (about 17 deg), under TownLayout.MaxGrade (20 deg)
 
         // Plateau (ring 1 shelf) for the ground: x -34..34, south to z -36, open to the north, south corners rounded (radius 10).
@@ -506,7 +506,8 @@ namespace SleepingCalamity.Core
                 var right = new TownPoint(dir.Z, -dir.X);
                 TownPoint n = right * r.Side;   // from the lane toward the lot
                 float half = Foundation.SideLength(r.Size) * 0.5f;
-                TownPoint c = p + n * (lane.Width * 0.5f + LotSetback + half);
+                float setback = r.Id == "R2_16" ? NarrowSetback : LotSetback;   // R2_16's back doorstep stood against the town wall: the lot sits 0.8 m closer to its lane
+                TownPoint c = p + n * (lane.Width * 0.5f + setback + half);
                 float yaw = (float)(Math.Atan2(n.X, n.Z) * 180.0 / Math.PI);   // lot +Z points away from the lane, so its South side faces it
                 t.Foundations.Add(new Foundation { Id = r.Id, Ring = r.Ring, Size = r.Size, Centre = c, Yaw = (float)Math.Round(yaw, 2), Facing = LotSide.South, RuinVariant = Variant(r.Size, variants[vi++ % 3]) });
             }

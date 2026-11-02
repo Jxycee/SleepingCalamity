@@ -31,29 +31,13 @@ Nothing else here is a gate. Approval is the user's, on captures (3.7).
 
 ## 3. Which review (PHASE1 section 9)
 - **Batch review (T1-T3 families):** one contact sheet per batch with the reference row. The controller scores it and names the worst three; a fix agent fixes those three; the sheet is re-scored once.
-- **Blind A/B (T4 heroes and the first item of a new family, e.g. the first B4 facade):**
-  - Working heuristics from FishGame's rounds, not rules: run `sc_imgdiff.py a.png b.png` first (under about 0.5 on 0-255 the pair looked identical at review size and reviewers invented a preference); treat margins of about 2 points as ties; use a third reviewer to break a split.
-  - Two fresh reviewers, one sheet: real references in the top row, the candidates shuffled and unlabelled below. The reviewer opens only the sheet: no repo files, no prior scores.
-  - A result is more trustworthy when the stated reason matches the change.
-  - Self-judged and one-reviewer results are weak evidence (the cottage's A/B was self-judged: treat it as unconfirmed).
-  - Compare scores only within one rubric version and one reference row.
-- **Lessons from the stand's A/B rounds:**
-  - A defect named in a review is not a preference: removing it can still lose. Improve the features reviewers credit instead of replacing them. Visible beats correct.
-  - Reviewers punish whatever is labelled "candidate": KCD2's own art scored 21/40 blind. A same-sheet A/B of two candidates removes most of that noise.
-  - **Parity test:** to ask "is it at the target's level", show our render beside a crop of a similar subject from the target game (private frames, scratchpad only), shuffled, and ask which is the shipped game. Parity is picks near 50%.
-  - Snapshot the baked asset with `sc_snap.py` (the .blend and its maps) before rebaking anything you will A/B.
+- **Blind A/B (T4 heroes and the first item of a new family, e.g. the first B4 facade):** two fresh reviewers, one sheet: real references in the top row, candidates shuffled and unlabelled below; run `sc_imgdiff.py a.png b.png` first; self-judged results are weak evidence; snapshot with `sc_snap.py` before rebaking.
+- `references/blind-ab.md` - read before setting up a blind A/B or parity test (heuristics and lessons from the stand's rounds).
 
 ## 4. Rubric (score each line 1-5)
-| # | Line | 5 looks like | 3 looks like | 1 looks like |
-|---|---|---|---|---|
-| 1 | **Silhouette and read** (thumbnail, play distance) | identifiable instantly, 2-4 characteristic outline breaks, reads at 20 m | identifiable as its category, not as this thing | a blob or a box; reads as something else |
-| 2 | **Storybook proportion** (PHASE1 3.4 / 3.6) | real dimensions pushed chunky on purpose (timber ~1.4x, props ~10% over); right beside the figure and door | plausible, one part off (a thin rail, an undersized door) | toy-like or chibi, stretched, or merely real-scale |
-| 3 | **Form and edges** | chamfers on every play-distance edge, square-arris spalls, no straight old work, turned parts smooth | rounded where it shows most, machined elsewhere | razor edges, melted rims, faceted cylinders, dome-bite chips |
-| 4 | **Surface: micro-detail and roughness** | detail at several scales; roughness varies with wear and material | one convincing scale; roughness mostly uniform | procedural noise at one scale ("sandpaper", "foam"), waxy single roughness |
-| 5 | **Colour and value** (PHASE1 3.1) | 3-4 clear masses, key hues per the palette summary in sc-asset-craft, no pure black; Cellars warm with no teal | right families, one material off (grey photo-dull plaster, a blue cast, teal in a Cellar) | candy or neon, or photo-desaturated mush |
-| 6 | **Wear story** | every wear word in the brief delivered and visible from three-quarter; tidy, placed, where weather and hands go | the right wear, only visible up close | uniform grime, or showroom-new where the brief says worn |
-| 7 | **Fits the set** | matches its kit and neighbours in scale, texel density and colour | one mismatch (texel density, a material's hue) | looks imported from another game |
-| 8 | **Glass, liquid, emissive, metal** (where present; else score efficiency against PHASE1 3.3) | glass and liquid read through fake refraction, glow sits in the right place, metals reflect | readable but flat | murky shells, neon liquids, black metal |
+Eight lines: 1 silhouette and read; 2 storybook proportion; 3 form and edges; 4 surface micro-detail and roughness; 5 colour and value (PHASE1 3.1); 6 wear story; 7 fits the set; 8 glass, liquid, emissive, metal (else efficiency).
+- `references/rubric.md` - read when scoring: what a 5, a 3 and a 1 look like for each line.
+
 
 **Side-by-side, always (user, 2026-10-30):** every review round builds one image with the reference pasted right next to the render (reference left, render right, same height, labelled) and scores from that sheet. For in-engine work, pair the Unity capture with the reference frame the same way.
 
@@ -70,26 +54,14 @@ Top fixes: 1) ... 2) ... 3) ...   (each: what, where, which line it should move)
 ```
 
 ## 5. Common defects and their fix
-| Seen in the render | Cause | Fix |
-|---|---|---|
-| "sandpaper" or "foam": one scale of noise | scan tiled too fine, fine normal too strong, low value contrast | coarser scan tile, weaker fine normal, more contrast (the mortar: tile 0.12 -> 0.25, normal strength 1.8 -> 0.8, contrast 0.45 -> 0.9) |
-| micro-detail invisible | bump too weak for review scale | detail normals 0.5-0.8 plus a fine noise layer |
-| every rim melted | smoothing the whole mesh | fillet only the concave seams where parts meet |
-| chip "islands" all over smooth faces, moon craters | ungated noise chips, dome bites | gate by curvature (convex rims), cut planar flakes with a square arris |
-| stripes along a cylinder | planar facets on a turned part | clean source low, Catmull-resampled profile |
-| metal renders black | nothing to reflect | environment plus a probe in the review scene; reflection probe in Unity |
-| glaze reads as modern plastic | full glossy glaze | mostly bare clay, glaze over the shoulder ending in runs |
-| streaks look airbrushed or like teeth | 1D-Voronoi runs on metal | noise stretched along gravity |
-| liquid reads neon | bright liquid colour | dark saturated colour (linear 0.1-0.15 on the main channel) |
-| pillow-puffy stones with black gaps | big bevel, no mortar | smaller bevel plus a recessed lime-mortar bed |
-| photo-dull colour | scan albedo used as is | grade toward the PHASE1 3.1 key hues (sc-asset-craft palette summary); +10-15% chroma only on foliage, painted wood, cloth and accents, none on stone, plaster or roofs |
-| a material change has no effect | a light is doing it (the brazier's light inside its wall) | switch lights off one at a time first |
-| contour bands in the sheet | big PNG posterised by the viewer | JPEG, 2000 px or less |
+- `references/common-defects.md` - read when a render shows sandpaper or foam noise, melted rims, chip islands, stripes, black metal, neon liquid, plastic glaze or contour bands.
 
 ## 6. The engine is the final judge
 Blender renders are proxies until a Unity capture agrees. Before calling a set of assets "matching the reference", ask the PC session for one round of captures (the fixed capture cameras of PHASE1 3.7 once their builder exists) and batch it. Report results to the controller with the numbers.
 
+
 ## Maintaining these skills
-After editing any sc-* skill or renaming a tool, check that every path the skills mention exists:
-`grep -rhoE '(Art|Assets|docs|Tools|Reference)/[^ )\`,]+' .claude/skills | sort -u | while read p; do [ -e "$p" ] || echo MISSING $p; done` (placeholders in `<...>` will show; check the rest).
-**Evals:** `.claude/skills/sc-asset-craft/evals/evals.json` holds 3 held-out briefs (B7 barrel, B4 facade panel, B11 lantern). Re-run them after a big skill change, and revert an edit that loses to the previous version.
+- `references/maintaining.md` - read after editing any sc-* skill or renaming a tool (path check command and the eval briefs).
+
+## References
+- `references/rubric.md`, `references/blind-ab.md`, `references/common-defects.md`, `references/maintaining.md`.

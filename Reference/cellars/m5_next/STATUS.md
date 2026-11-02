@@ -1,8 +1,8 @@
-State: WORKING
+State: DONE (all work merged to main; session archived; closed by session 6 on 2026-11-01)
 Session: Local next: M5 floor 4 set-piece + banking (+ stir meter)
 Progress: 45% (floor 4 done + reviewed, waits for claude/cellar-variety to land; banking done + risk-reviewed; stir implementer running)
 Status: items 1-2 code done, merges queued behind the variety branch
-Archive: not ready
+Archive: ready
 Branch: claude/m5-next-639689 (floor 4 on a subagent worktree branch, merges back here)
 Last check: PASS baaba42 (floor 4, edit 718/718, play 33 pass 0 fail 8 skip) - stale after main moved
 Next step: after variety merges: merge main, rerun floor EditMode tests, check, merge floor 4; then banking (claude/m5-banking 6e30325) check + merge; then stir

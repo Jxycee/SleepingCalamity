@@ -57,11 +57,16 @@ namespace SleepingCalamity.Gameplay
         // Host: ONE set of attack tokens for the whole host (pools are keyed per hero, and targeting is world-wide, so a hero's caps and strike gap must hold
         // across every room's enemies) and one crowd (membership) per room that shares it (docs/research/enemy-ai.md 10.4).
         public readonly AttackTokens Tokens = new AttackTokens();
+        public readonly TargetLedger Targets = new TargetLedger();   // host-wide too: a hero's load counts every room's enemies
+        public readonly RingPlanner Rings = new RingPlanner();       // host-wide: shared hover slots per hero and enemy separation (enemy AI stage 4)
         private readonly Dictionary<int, EnemyCrowd> _crowds = new Dictionary<int, EnemyCrowd>();
         private float _auditIn = EnemyCrowd.AuditSeconds;
+        // Host: which room a world position is in (-1 outside every room). Set by the dive's room owner (CellarContentsSync); room enemies use it to notice
+        // any hero inside their own room whatever the distance (doc 6.4). Null: no room scope, ranges only.
+        public System.Func<Vector3, int> RoomOf;
         public EnemyCrowd CrowdFor(int room)
         {
-            if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd(Tokens);
+            if (!_crowds.TryGetValue(room, out EnemyCrowd c)) _crowds[room] = c = new EnemyCrowd(Tokens, Targets, Rings);
             return c;
         }
 
@@ -287,6 +292,8 @@ namespace SleepingCalamity.Gameplay
             if (input.CritChance > 0f) input.CritChance += mods.CritChance;   // a test that zeroes crits stays zeroed
             EnemyHitResult r = e.ServerApplyHit(input, attackerPos, now);
             if (r.Damage <= 0) return;
+            HeroVitals attackerVitals = attacker.GetComponent<HeroVitals>();
+            if (attackerVitals != null) e.ServerRecordThreat(attackerVitals.GetHashCode(), r.Damage);   // hitting an enemy pulls it (ThreatTable)
 
             ps.HitsInSwing++;
             e.HitLog.Add(new HitRecord(g.PlayerId, weaponKey, now));
@@ -383,7 +390,7 @@ namespace SleepingCalamity.Gameplay
             float ward = AbilityEffects.IncomingMult(Growth(victim.OwnerClientId).Abilities, WeaponStyle.FamilyOf(victim.WeaponKey));
             if (ward < 1f) dmg = Mathf.Max(1, Mathf.CeilToInt(dmg * ward - 1e-4f));
             int lost = vitals.ServerDamage(dmg);
-            victim.ServerBroadcastHurt(lost, guarded);
+            victim.ServerBroadcastHurt(lost, guarded, !guarded && HurtGrace.IsHeavyHit(a.Knockback, a.GuardBreak));
         }
 
         public void ServerParry(HeroCombat victim, Enemy e, int serial)
@@ -433,6 +440,8 @@ namespace SleepingCalamity.Gameplay
             Enemy e = instance.GetComponent<Enemy>();
             e.ServerSeed(kind, tier, PlayerCount());
             e.ServerJoinCrowd(CrowdFor(room));
+            e.Hunts = room == EnemyCrowd.ArenaRoom;
+            e.ServerBindRoom(this, room);
             e.AiEnabled = AiEnabled && ai;
             instance.Spawn(destroyWithScene: true);
             _alive.Add(e);
@@ -469,6 +478,8 @@ namespace SleepingCalamity.Gameplay
             // Wipe, floor change, F6: every room is over. Drop the crowds and the shared tokens so none outlives its enemies (a new room gets a fresh crowd).
             _crowds.Clear();
             Tokens.Clear();
+            Targets.Clear();
+            Rings.Clear();
         }
 
         // Test hook (the bot playtester): clear the arena and count down into `wave` (e.g. 5, the first tier-2 wave).
@@ -494,6 +505,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (!_begun || _nm == null || !_nm.IsServer || !_nm.IsListening) return;
             float dt = Time.deltaTime;
+            Tokens.GlobalStrikeCap = CoopScaling.GlobalStrikeCap(PlayerCount());
             _auditIn -= dt;
             if (_auditIn <= 0f)
             {

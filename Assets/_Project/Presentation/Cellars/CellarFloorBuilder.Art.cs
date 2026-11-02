@@ -382,8 +382,19 @@ namespace SleepingCalamity.Presentation
             {
                 result.Dressing.Atmosphere.FogTintOffset(out float fr, out float fg, out float fb);
                 RenderSettings.fogColor = CellarArtTuning.FogColor(kit.FogBaseColor, fr, fg, fb);
+                HasLastFog = true; LastFogDensity = RenderSettings.fogDensity; LastFogColor = RenderSettings.fogColor;   // the town area look re-applies these when the viewer is in the cellar
             }
         }
+
+        // M6 S3: the fog of the last floor built in this process. The build writes the global RenderSettings fog at once, even while the viewer is still in the town above, so
+        // AreaLook (Presentation/Town) keeps its own copy of each area's fog and applies the cellar's from here.
+        public static bool HasLastFog { get; private set; }
+        public static float LastFogDensity { get; private set; }
+        public static Color LastFogColor { get; private set; }
+
+        // Domain reload may be off: a stale fog from an earlier play session must not seed the next one.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetLastFog() { HasLastFog = false; LastFogDensity = 0f; LastFogColor = default; }
 
         // A kit piece standing on the floor at pos, turned by the wall-facing rotation plus a yaw jitter (degrees); null when the piece is missing.
         static GameObject PlaceAtWall(CellarFloorKit kit, string piece, Transform parent, string name, Vector3 pos, Quaternion facing, float yawJitter)

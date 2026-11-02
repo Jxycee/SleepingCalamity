@@ -35,8 +35,12 @@ namespace SleepingCalamity.App
             SceneManager.activeSceneChanged += HandleActiveSceneChanged;
         }
 
-        // The scene the first start loads.
-        public string FirstGameplayScene => DevDiveArena ? SceneNames.ArenaDive : DevCombatArena ? SceneNames.ArenaCombat : SceneNames.ArenaGreybox;
+        // The scene the first start loads (M6 S3: the town). Precedence: -dev-dive, -dev-combat, the test override, Hollowmere.
+        public string FirstGameplayScene => DevDiveArena ? SceneNames.ArenaDive : DevCombatArena ? SceneNames.ArenaCombat : (StartSceneOverride ?? SceneNames.Hollowmere);
+
+        // Tests only: the scene a start loads when no dev flag is set (the PlayMode harness pins the greybox arena so most tests stay fast; a Hollowmere test passes SceneNames.Hollowmere
+        // to StartSoloAndWaitForPlayer, which clears the override). Null = the real default, Hollowmere.
+        public static string StartSceneOverride { get; set; }
 
         // Dev only (-dev-combat, the editor menu, the dev panel toggle): start in the M3 combat arena. Off by default, so every test and normal start
         // still lands in the greybox arena.
@@ -46,7 +50,7 @@ namespace SleepingCalamity.App
         public static bool DevDiveArena { get; set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { DevCombatArena = false; DevDiveArena = false; }
+        private static void ResetStatics() { DevCombatArena = false; DevDiveArena = false; StartSceneOverride = null; }
 
         // The verdict of the last start attempt (Ok after a start); read by the dev panel to say why a start was refused.
         public WorldPlayerVerdict LastStartVerdict { get; private set; } = WorldPlayerVerdict.Ok;

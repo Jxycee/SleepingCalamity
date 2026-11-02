@@ -6,19 +6,17 @@
             "space": "Hollowmere_Ruined",
             "unreachable": [
                 "R2_03_C3",
-                "R2_16_North",
-                "SaltwakeRoad_9"
+                "R2_08_C3"
             ],
-            "blocked": 29,
+            "blocked": 22,
             "narrow": 0
         },
         {
             "space": "Hollowmere_Rebuilt",
             "unreachable": [
-                "R2_03_C3",
-                "SaltwakeRoad_9"
+                "R2_03_C3"
             ],
-            "blocked": 39,
+            "blocked": 20,
             "narrow": 0
         },
         {

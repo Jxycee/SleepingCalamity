@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Presentation;
+using PrimeTween;
 using UnityEngine;
 
 namespace SleepingCalamity.UI
@@ -39,6 +40,8 @@ namespace SleepingCalamity.UI
         private DiveHaulSync _sync;
         private float _nextFind;
         private GUIStyle _label;
+        private float _shownFill = -1f, _targetFill;
+        private Tween _fillTween;
 
         public bool Visible => _sync != null && _sync.IsSpawned;
 
@@ -67,7 +70,16 @@ namespace SleepingCalamity.UI
             var tuning = StirTuning.Default;
             float scale = Screen.height / 1440f;
             float w = 420f * scale, h = 26f * scale, x = (Screen.width - w) * 0.5f, y = 12f * scale;
-            float fill = StirMeterText.Fill(s.StirValue, tuning.Max);
+            float target = StirMeterText.Fill(s.StirValue, tuning.Max);
+            if (_shownFill < 0f) _shownFill = _targetFill = target;
+            else if (!Mathf.Approximately(target, _targetFill))
+            {
+                // PrimeTween smoke use: ease the bar to the new replicated value instead of snapping.
+                _targetFill = target;
+                if (_fillTween.isAlive) _fillTween.Stop();
+                _fillTween = Tween.Custom(this, _shownFill, target, 0.25f, (self, v) => self._shownFill = v, Ease.OutQuad, useUnscaledTime: true);
+            }
+            float fill = _shownFill;
             GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(new Rect(x - 4, y - 4, w + 8, h + 8), white);
             GUI.color = Color.Lerp(new Color(0.9f, 0.8f, 0.3f), new Color(0.85f, 0.2f, 0.15f), fill);
             GUI.DrawTexture(new Rect(x, y, w * fill, h), white);

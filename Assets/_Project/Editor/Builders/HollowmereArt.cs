@@ -111,6 +111,23 @@ namespace SleepingCalamity.EditorTools
             return true;
         }
 
+        static readonly string[] SolidParts = { "Part_Porch", "Part_Oven", "Part_Forge", "Part_Anvil", "Part_Wheel" };
+
+        // Wall colliders for a placed building export: a MeshCollider on every mesh of the Shell/Frame and the solid parts (porch, oven, forge, anvil, wheel). The door leaf,
+        // shutters, signs, lanterns, decals and glow stay without (the doorway is the threshold), and so does FOOTPRINT. Colliders on the hidden variant are inert.
+        internal static void AddWallColliders(GameObject obj)
+        {
+            foreach (MeshFilter mf in obj.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null || mf.GetComponent<Collider>() != null || mf.name == "FOOTPRINT" || mf.name == "Decals" || mf.name == "Glow") continue;
+                bool solid = true;
+                for (Transform t = mf.transform; t != null && t != obj.transform; t = t.parent)
+                    if (t.name.StartsWith("Part_", StringComparison.Ordinal) && Array.IndexOf(SolidParts, t.name) < 0) solid = false;
+                if (!solid) continue;
+                mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+            }
+        }
+
         static GameObject Instantiate(Spec spec, Transform g, float y)
         {
             GameObject fbx = BeautyCornerArt.LoadModel(spec.Folder, spec.Fbx, keepMaterialSlots: true);
@@ -134,6 +151,7 @@ namespace SleepingCalamity.EditorTools
             }
             foreach (string p in spec.Parts)
                 if (obj.transform.Find(p) == null) throw new InvalidOperationException(spec.Fbx + " has no " + p);
+            AddWallColliders(obj);
             return obj;
         }
 

@@ -93,6 +93,31 @@ namespace SleepingCalamity.EditorTools
 
             var box = root.gameObject.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, r.Height * 0.5f, 0f); box.size = new Vector3(r.SizeX, r.Height, r.SizeZ);
+            // Fit the box to the visible mesh (in the row's frame) when the art is in, never larger than the planned footprint: the plan's box stood 0.3 m or more off the props.
+            if (art != null && VisibleBounds(root, out Bounds vb))
+            {
+                Vector3 lo = Vector3.Max(vb.min, new Vector3(-r.SizeX * 0.5f, 0f, -r.SizeZ * 0.5f)), hi = Vector3.Min(vb.max, new Vector3(r.SizeX * 0.5f, r.Height, r.SizeZ * 0.5f));
+                if (hi.x > lo.x && hi.y > lo.y && hi.z > lo.z) { box.center = (lo + hi) * 0.5f; box.size = hi - lo; }
+            }
+        }
+
+        // The union of the visible meshes' bounds (FOOTPRINT left out) in root's local frame, from each mesh's eight bounds corners.
+        internal static bool VisibleBounds(Transform root, out Bounds result)
+        {
+            result = default; bool any = false;
+            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(false))
+            {
+                var mr = mf.GetComponent<MeshRenderer>();
+                if (mf.sharedMesh == null || mr == null || !mr.enabled || mf.name == "FOOTPRINT") continue;
+                Bounds mb = mf.sharedMesh.bounds;
+                for (int c = 0; c < 8; c++)
+                {
+                    Vector3 corner = new Vector3((c & 1) == 0 ? mb.min.x : mb.max.x, (c & 2) == 0 ? mb.min.y : mb.max.y, (c & 4) == 0 ? mb.min.z : mb.max.z);
+                    Vector3 p = root.InverseTransformPoint(mf.transform.TransformPoint(corner));
+                    if (!any) { result = new Bounds(p, Vector3.zero); any = true; } else result.Encapsulate(p);
+                }
+            }
+            return any;
         }
 
         // A toppled prop: tilt the art about its base, then drop it onto the ground and centre it on the footprint.

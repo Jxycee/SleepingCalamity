@@ -89,6 +89,10 @@ namespace SleepingCalamity.Core.Combat
         public static int ClampPlayers(int players) => Math.Max(1, Math.Min(4, players));
         public static float LifeMultiplier(int players) => Life[ClampPlayers(players)];
         public static int ExtraEnemiesPerRoom(int players) => ClampPlayers(players) - 1;   // +1 per extra player; attack is unchanged
+        // Most attacks (wind-up to the end of the hit window) under way at once across ALL heroes (docs/research/enemy-ai.md 6.3): keeps four heroes' per-hero pools from putting 8 on screen.
+        // Solo has no cap (per-hero pool and gap already bound it). PLACEHOLDER values: tune here.
+        static readonly int[] StrikeCap = { 0, int.MaxValue, 3, 4, 5 };   // index = players
+        public static int GlobalStrikeCap(int players) => StrikeCap[ClampPlayers(players)];
         public static int EnemyCount(int baseCount, int players) => Math.Max(0, baseCount) + ExtraEnemiesPerRoom(players);
     }
 

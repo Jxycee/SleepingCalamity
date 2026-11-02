@@ -105,26 +105,24 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void RefusedToken_HoversAndStrafes_DrawingRetryJitterThenStrafeSide_InThatOrder()
+        public void RefusedToken_HoversAndStrafes_DrawingRetryJitter_AndTheSeededPlannerPicksTheStrafeSide()
         {
             var tokens = new AttackTokens();
             var def = EnemyCatalog.Broom;
             // Another enemy (id 2) holds the only tier-1 token on the hero.
             Assert.That(tokens.TryAcquire(100, 2, 10.0, AttackCatalog.BroomSweep, AttackPacing.Tier1), Is.True);
-            // roll 0 (pick), jitter 1.0 (retry = 0.3 * 1.5), side 0.2 (< 0.5: -1)
+            // roll 0 (pick), jitter 1.0 (retry = 0.3 * 1.5); the strafe side comes from the ring planner's own seeded stream, not from the roll
             var r = new Rolls(0f, 1f, 0.2f);
             var brain = new AiBrain(tokens, r.Next);
             var c = Ctx(def, 1.5f);   // 1.5 m: inside the hover distance (radius + 0.55 + 1.2 = 2.3), so it drifts out while circling
             AiAction a = brain.Tick(c);
-            Assert.That(r.Drawn, Is.EqualTo(3));
+            Assert.That(r.Drawn, Is.EqualTo(2));
             Assert.That(a.StartAttack, Is.Null);
             Assert.That(a.State, Is.EqualTo(AiState.Hover));
             Assert.That(brain.WaitingForToken, Is.True);
-            Assert.That(a.MoveSpeed, Is.EqualTo(def.MoveSpeed * 0.45f).Within(1e-5f));
-            // dir = (1,0), side = cross(up, dir) * -1 = (0,0,+1)... cross(up,(1,0,0)) = (0,0,-1), times -1 = (0,0,1); radial = -dir*0.6 = (-0.6,0)
-            float len = (float)System.Math.Sqrt(0.6 * 0.6 + 1.0);
-            Assert.That(a.MoveX, Is.EqualTo(-0.6f / len).Within(1e-5f));
-            Assert.That(a.MoveZ, Is.EqualTo(1f / len).Within(1e-5f));
+            // Stage 4: it heads for its slot on the hero's ring (the hero is at +x, so out to -x).
+            Assert.That(a.MoveSpeed, Is.GreaterThan(def.MoveSpeed * def.CircleSpeedScale - 1e-4f));
+            Assert.That(a.MoveX, Is.LessThan(-0.5f), "out to the ring, away from the hero");
         }
 
         [Test]
@@ -134,13 +132,12 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(tokens.TryAcquire(100, 2, 10.0, AttackCatalog.BroomSweep, AttackPacing.Tier1), Is.True);
             var r = new Rolls(0f, 0f, 0.9f, 0f, 0f);
             var brain = new AiBrain(tokens, r.Next);
-            AiAction first = brain.Tick(Ctx(EnemyCatalog.Broom, 2.5f));   // refused: draws roll, jitter 0 (retry 0.3), side 0.9 (+1)
-            Assert.That(r.Drawn, Is.EqualTo(3));
+            AiAction first = brain.Tick(Ctx(EnemyCatalog.Broom, 2.5f));   // refused: draws roll, jitter 0 (retry 0.3)
+            Assert.That(r.Drawn, Is.EqualTo(2));
             Assert.That(brain.WaitingForToken, Is.True);
             AiAction second = brain.Tick(Ctx(EnemyCatalog.Broom, 2.5f));  // retry still running: only the roll is drawn
-            Assert.That(r.Drawn, Is.EqualTo(4));
-            Assert.That(second.MoveX, Is.EqualTo(first.MoveX).Within(1e-6f));
-            Assert.That(second.MoveZ, Is.EqualTo(first.MoveZ).Within(1e-6f), "same strafe side");
+            Assert.That(r.Drawn, Is.EqualTo(3));
+            Assert.That(System.Math.Sign(second.MoveZ), Is.EqualTo(System.Math.Sign(first.MoveZ)), "same strafe side");
         }
 
         [Test]

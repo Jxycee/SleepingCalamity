@@ -42,6 +42,7 @@ namespace SleepingCalamity.EditorTools
     public enum IssueKind
     {
         Unreachable,        // a target the hero can't walk to from the spawn
+        VoidEdge,           // walkable floor that ends with no wall and no ground below: the hero can walk off the level
         StairToNowhere,     // a stair whose top or bottom landing has nowhere to go, or that isn't walkable at all
         Stuck,              // a pocket the hero can drop into but not climb (or jump) out of
         Blocked,            // an intended path the capsule doesn't fit through at all
@@ -71,6 +72,7 @@ namespace SleepingCalamity.EditorTools
             switch (k)
             {
                 case IssueKind.Unreachable: return 100;
+                case IssueKind.VoidEdge: return 96;
                 case IssueKind.StairToNowhere: return 92;
                 case IssueKind.Stuck: return 90;
                 case IssueKind.Blocked: return 85;

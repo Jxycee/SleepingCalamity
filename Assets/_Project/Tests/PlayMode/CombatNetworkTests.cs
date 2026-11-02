@@ -276,6 +276,165 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(clientVitalsOnClient.Hp, Is.EqualTo(100), "and its own copy agrees");
         }
 
+        // ---- 2b. post-hit grace (combat-timings "Recommended M3 values" 1-3): judged by the victim's owner, damage by the host ----
+
+        // Counts the HeroHurt events (one per HurtClientRpc execution per peer copy) for the victim's two copies.
+        private sealed class HurtCounter
+        {
+            public int OnOwnerCopy, OnHostCopy;
+            public bool OwnerHeavy, HostHeavy;
+            private readonly HeroCombat _ownerCopy, _hostCopy;
+            public HurtCounter(HeroCombat ownerCopy, HeroCombat hostCopy)
+            {
+                _ownerCopy = ownerCopy;
+                _hostCopy = hostCopy;
+                CombatEvents.HeroHurt += OnHurt;
+            }
+            public void Dispose() => CombatEvents.HeroHurt -= OnHurt;
+            private void OnHurt(HeroCombat hero, bool guarded)
+            {
+                if (guarded) return;
+                if (hero == _ownerCopy) { OnOwnerCopy++; OwnerHeavy = hero.HurtWasHeavy; }
+                else if (hero == _hostCopy) { OnHostCopy++; HostHeavy = hero.HurtWasHeavy; }
+            }
+        }
+
+        // Catches: a second enemy hit inside the grace window that still costs HP or sends a second HurtClientRpc, two enemies landing in the same frame that
+        // both hurt, and a grace window that never ends (a hit just after it must land). Does not catch: real network latency (manual 2-player walk).
+        [UnityTest]
+        public IEnumerator Grace_SecondHitInsideTheWindow_IsIgnored_AHitAfterItLands_TwoAtOnceGiveOne()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+            HeroVitals vOwner = c.ClientHeroOnClient.GetComponent<HeroVitals>();
+            HeroVitals vHost = c.ClientHeroOnHost.GetComponent<HeroVitals>();
+            HeroCombat hostCopy = c.ClientHeroOnHost.GetComponent<HeroCombat>();
+            var hurts = new HurtCounter(c.ClientCombat, hostCopy);
+            try
+            {
+                Vector3 at = c.ClientHeroOnHost.transform.position;
+                Enemy a = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, new Vector3(8f, 0f, 3f), ai: false);
+                Enemy b = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, new Vector3(9f, 0f, 3f), ai: false);
+                Enemy d = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, new Vector3(7f, 0f, 3f), ai: false);
+                yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(d.NetworkObjectId), Timeout, "the client never received the enemies");
+
+                // 1. A hits (8 damage: slime atk 12 x 0.65 x 100/110 = 7.09 -> 8). B attacks while the grace is running: nothing.
+                a.ServerForceAttack(AttackCatalog.TestNova, at);
+                yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 100, 3f, "the first hit never landed");
+                Assert.That(c.ClientCombat.HurtGraceActive, Is.True, "the owner's window is running");
+                b.ServerForceAttack(AttackCatalog.TestNova, at);
+                yield return Seconds(0.5f);   // B's hitbox opens 0.2 s after it starts, so it is judged inside the 0.8 s window
+                Assert.That(c.ClientCombat.HurtGraceActive, Is.True, "still inside the window when B was judged");
+                Assert.That(vHost.Model.Hp, Is.EqualTo(92), "exactly one ServerDamage: the second hit inside the window did nothing");
+                Assert.That(hurts.OnOwnerCopy, Is.EqualTo(1), "exactly one HurtClientRpc (owner's copy)");
+                Assert.That(hurts.OnHostCopy, Is.EqualTo(1), "exactly one HurtClientRpc (host's copy)");
+                Assert.That(vOwner.Hp, Is.EqualTo(92));
+
+                // 2. After the window a new hit lands.
+                yield return PlayModeHarness.WaitUntil(() => !c.ClientCombat.HurtGraceActive, 3f, "the grace window never ended");
+                yield return Seconds(0.8f);   // let A and B finish their attacks
+                d.ServerForceAttack(AttackCatalog.TestNova, at);
+                yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 92, 3f, "a hit after the window never landed");
+                Assert.That(vHost.Model.Hp, Is.EqualTo(84));
+                yield return PlayModeHarness.WaitUntil(() => hurts.OnOwnerCopy == 2, 3f, "the second hurt never reached the owner's copy");
+                yield return Seconds(1.0f);
+                vHost.ServerFullReset();
+                yield return PlayModeHarness.WaitUntil(() => vOwner.Hp == 100 && !c.ClientCombat.HurtGraceActive, 3f, "reset");
+                yield return Seconds(0.8f);
+
+                // 3. Two enemies attack in the same frame: one damage, one HurtClientRpc.
+                int before = hurts.OnOwnerCopy;
+                a.ServerForceAttack(AttackCatalog.TestNova, at);
+                b.ServerForceAttack(AttackCatalog.TestNova, at);
+                yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 100, 3f, "the same-frame hit never landed");
+                yield return Seconds(1.0f);
+                Assert.That(vHost.Model.Hp, Is.EqualTo(92), "two enemies in the same frame give one damage");
+                Assert.That(hurts.OnOwnerCopy - before, Is.EqualTo(1));
+            }
+            finally { hurts.Dispose(); }
+        }
+
+        // Catches: a knockdown/heavy flag that differs between peers (the old 25%-HP rule on the host copy vs the owner), a knockdown that lets the hero creep,
+        // a non-owner peer with no cosmetic grace (no pulse). A knockback >= 3 hit is a knockdown for the victim and for every viewer.
+        [UnityTest]
+        public IEnumerator Grace_KnockbackHit_KnocksDownTheSameOnBothPeers_AndTheHeroCannotMove()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+            HeroVitals vHost = c.ClientHeroOnHost.GetComponent<HeroVitals>();
+            HeroCombat hostCopy = c.ClientHeroOnHost.GetComponent<HeroCombat>();
+            var hurts = new HurtCounter(c.ClientCombat, hostCopy);
+            try
+            {
+                Vector3 at = c.ClientHeroOnHost.transform.position;
+                Enemy a = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, new Vector3(8f, 0f, 1.2f), ai: false);
+                yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(a.NetworkObjectId), Timeout, "the client never received the enemy");
+
+                // Control: knockback 0 is a light hit on both peers.
+                a.ServerForceAttack(AttackCatalog.TestNova, at);
+                yield return PlayModeHarness.WaitUntil(() => hurts.OnOwnerCopy == 1 && hurts.OnHostCopy == 1, 3f, "the control hit never reached both peers");
+                Assert.That(hurts.OwnerHeavy, Is.False);
+                Assert.That(hurts.HostHeavy, Is.False);
+                Assert.That(c.ClientCombat.KnockedDown, Is.False);
+                Assert.That(hostCopy.HurtGraceActive, Is.True, "the non-owner peer runs a cosmetic grace for the pulse");
+                yield return Seconds(1.6f);
+                vHost.ServerFullReset();
+                yield return PlayModeHarness.WaitUntil(() => !c.ClientCombat.HurtGraceActive && !hostCopy.HurtGraceActive, 3f, "grace never ended");
+
+                // Knockback 6 (and a guard break): heavy on both peers, the owner is down and cannot move.
+                a.ServerForceAttack(AttackCatalog.WardenBreakFree, at);
+                yield return PlayModeHarness.WaitUntil(() => hurts.OnOwnerCopy == 2 && hurts.OnHostCopy == 2, 4f, "the knockback hit never reached both peers");
+                Assert.That(hurts.OwnerHeavy, Is.True, "heavy flag on the owner's copy");
+                Assert.That(hurts.HostHeavy, Is.True, "heavy flag on the host's copy: the same reaction");
+                Assert.That(c.ClientCombat.KnockedDown, Is.True, "the owner is knocked down");
+                Assert.That(c.ClientCombat.MoveScale, Is.EqualTo(0f), "no creep during the knockdown");
+                Assert.That(hostCopy.HurtGraceActive, Is.True);
+                yield return Seconds(HurtGrace.KnockdownSeconds + 0.2f);
+                Assert.That(c.ClientCombat.KnockedDown, Is.False, "the knockdown ends after 0.9 s");
+            }
+            finally { hurts.Dispose(); }
+        }
+
+        // Catches: the grace check sitting above the roll branch, so a perfect dodge inside the window played nothing and never told the host (the enemy was
+        // not opened). Parry shares the same ordering but needs the dagger; its branch is covered by the code order and the CombatArena parry test.
+        [UnityTest]
+        public IEnumerator Grace_APerfectDodgeInsideTheWindow_StillReachesTheHost()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+            HeroVitals vHost = c.ClientHeroOnHost.GetComponent<HeroVitals>();
+            Vector3 at = c.ClientHeroOnHost.transform.position;
+            Enemy a = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, new Vector3(8f, 0f, 3f), ai: false);
+            Enemy b = c.Combat.SpawnEnemy(EnemyKind.Slime, 1, new Vector3(9f, 0f, 3f), ai: false);
+            yield return PlayModeHarness.WaitUntil(() => c.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(b.NetworkObjectId), Timeout, "the client never received the enemies");
+            Enemy bOnClient = ClientCopy(c, b);
+            Time.captureDeltaTime = 1f / AttackData.FrameRate;
+            try
+            {
+                a.ServerForceAttack(AttackCatalog.TestNova, at);
+                yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 100, 3f, "the first hit never landed");
+                Assert.That(c.ClientCombat.HurtGraceActive, Is.True);
+                int hpAfterFirst = vHost.Model.Hp;
+                // Let the hurt stagger (0.25 s) pass so a roll is allowed, then B attacks and the client rolls just before B's hitbox opens.
+                for (int i = 0; i < 20; i++) yield return null;
+                int serial = b.Serial;
+                b.ServerForceAttack(AttackCatalog.TestNova, at);
+                yield return PlayModeHarness.WaitUntil(() => b.Serial != serial && bOnClient.Attacking, 2f, "the client never saw B's attack");
+                float rollAt = AttackCatalog.TestNova.HitOn.Start - 4;
+                for (int guard = 0; bOnClient.AttackFrame < rollAt && guard < 300; guard++) yield return null;
+                Assert.That(c.ClientCombat.HurtGraceActive, Is.True, "B is judged inside the first hit's window");
+                c.ClientInput.Frame.MoveX = 1f;
+                c.ClientInput.Frame.DodgePressed = true;
+                yield return null;
+                c.ClientInput.Frame.DodgePressed = false;
+                bool stunned = false;
+                for (int f = 0; f < 90 && !stunned; f++) { stunned = b.Phase == EnemyPhase.Stagger; yield return null; }
+                Assert.That(stunned, Is.True, "the perfect dodge made during grace reached the host and opened the attacker");
+                Assert.That(vHost.Model.Hp, Is.EqualTo(hpAfterFirst), "no damage from the dodged hit");
+            }
+            finally { Time.captureDeltaTime = 0f; c.ClientInput.Frame = default; }
+        }
+
         // ---- 3. the network simulator: 150 ms RTT ----
 
         private sealed class NetsimRun
@@ -356,6 +515,40 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(run.Latencies.Count, Is.EqualTo(run.Swings), "no hit was lost to the packet loss (reliable RPCs resend): " + report);
             Assert.That(run.Latencies[0], Is.GreaterThan(60.0), "the simulator is in effect: " + report);
             Assert.That(run.Latencies[run.Latencies.Count - 1], Is.LessThan(1500.0), "even a resent packet arrives well inside two seconds: " + report);
+        }
+
+        // ---- enemy AI stage 3: threat load balance over a real host + client ----
+        // Four rat-kings stand between two heroes 8 m apart (4 m from each). With plain "nearest hero" targeting they would all pick whichever is a hair
+        // nearer; the ThreatTable's load term must split them, and the global strike cap for two players (3) must hold while they fight.
+        // Catches: all enemies piling on one hero, the host-wide TargetLedger not being shared or fed, the cap not reaching the shared AttackTokens.
+        [UnityTest, Timeout(60000)]
+        public IEnumerator TwoHeroes_EnemiesSplitBetweenThem_AndTheStrikeCapHolds()
+        {
+            var c = new Ctx();
+            yield return Setup(c);
+            c.Combat.AiEnabled = true;
+            foreach (Enemy stray in new List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            int hostHeroId = c.HostHero.GetComponent<HeroVitals>().GetHashCode();
+            int clientHeroId = c.ClientHeroOnHost.GetComponent<HeroVitals>().GetHashCode();
+            for (int i = 0; i < 4; i++)
+                c.Combat.SpawnEnemy(EnemyKind.RatKing, 1, new Vector3(4f, 0f, (i - 1.5f) * 0.8f));
+            yield return PlayModeHarness.WaitUntil(() => c.Combat.Tokens.GlobalStrikeCap == 3, 3f, "two players: the host's token table never carried the cap of 3");
+
+            int worst = 0, maxStrikes = 0, samples = 0;
+            double until = Time.realtimeSinceStartupAsDouble + 4.0;
+            while (Time.realtimeSinceStartupAsDouble < until)
+            {
+                int a = c.Combat.Targets.CountOn(hostHeroId, -1), b = c.Combat.Targets.CountOn(clientHeroId, -1);
+                if (a + b == 4) { samples++; worst = Mathf.Max(worst, Mathf.Max(a, b)); }
+                maxStrikes = Mathf.Max(maxStrikes, c.Combat.Tokens.StrikesAt(Time.timeAsDouble));
+                yield return null;
+            }
+            Assert.That(samples, Is.GreaterThan(30), "all four enemies had a target");
+            Assert.That(worst, Is.LessThanOrEqualTo(3), "never all four on one hero");
+            Assert.That(c.Combat.Targets.CountOn(hostHeroId, -1), Is.InRange(1, 3));
+            Assert.That(c.Combat.Targets.CountOn(clientHeroId, -1), Is.InRange(1, 3));
+            Assert.That(maxStrikes, Is.GreaterThanOrEqualTo(1), "the cap was exercised: at least one strike was actually open");
+            Assert.That(maxStrikes, Is.LessThanOrEqualTo(3), "no more than the two-player cap of strikes open at once");
         }
 
         // ---- weapon tree (M4): a client's tree choices go to the host, which applies them to the Core weapon and pushes the snapshot back ----

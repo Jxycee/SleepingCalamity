@@ -37,6 +37,10 @@ namespace SleepingCalamity.Runtime
             ("createdAtUtc", typeof(string), WorldSaveRules.SectionCreatedAt),
             ("players", typeof(WorldPlayersSave), WorldSaveRules.SectionPlayers),
             ("weapons", typeof(WeaponsSave), WorldSaveRules.SectionWeapons),
+            ("stock", typeof(StockSave), TownSaveRules.SectionStock),
+            ("town", typeof(TownSave), TownSaveRules.SectionTown),
+            ("residents", typeof(ResidentsSave), TownSaveRules.SectionResidents),
+            ("dive", typeof(DiveSave), TownSaveRules.SectionDive),
         };   // every optional WorldSave section needs its row here, or one misfit value costs the whole file (WorldSaveStoreTests checks)
 
         // The sections every field of WorldSave maps to (by its JSON key), for the test that no section is missing from the table.
@@ -50,6 +54,16 @@ namespace SleepingCalamity.Runtime
             ("players", "recorded", typeof(WorldPlayerSave)),
             ("weapons", "weapons", typeof(WeaponSave)),
             ("weapons", "heroes", typeof(HeroSave)),
+            ("stock", "pieces", typeof(int)),
+            ("stock", "residents", typeof(string)),
+            ("stock", "loot", typeof(LootCountSave)),
+            ("town", "buildings", typeof(PlacedBuildingSave)),
+            ("residents", "residents", typeof(ResidentSave)),
+            ("dive", "bankedPieces", typeof(int)),
+            ("dive", "bankedResidents", typeof(string)),
+            ("dive", "bankedLoot", typeof(LootCountSave)),
+            ("dive", "onFloorPieces", typeof(int)),
+            ("dive", "onFloorResidents", typeof(string)),
         };
 
         // Members of a section that are checked one by one: a member that does not fit is dropped alone (section key, member key, type). A dropped
@@ -59,6 +73,9 @@ namespace SleepingCalamity.Runtime
             ("players", "kind", typeof(int)),
             ("players", "identity", typeof(int)),
             ("players", "recorded", typeof(List<WorldPlayerSave>)),
+            ("dive", "inDive", typeof(bool)),
+            ("dive", "clearedMask", typeof(int)),
+            ("dive", "checkpointReached", typeof(bool)),
         };
 
         public WorldSaveStore(string filePath, ulong defaultSeed)

@@ -10,6 +10,13 @@ From the working sessions' own usage reviews (2026-10-31: bell tower, bakery and
 - Run subagents in their own git worktree, so the controller checkout stays clean and the stop hook doesn't loop on uncommitted changes.
 - Read files by grep and line range, never whole. Read long Unity logs through a subagent summary.
 - Batch STATUS lines into real commits; no STATUS-only commits between milestones.
+- Report status through the session board, not by message: `board` action `profile` (state, tip, check, next, waitingOn, holdsPort, needs). A message to the coordinator starts a turn on its large context. Message only when a decision is needed.
+- Context handoff (user, 2026-11-01). At 90-95% context (local: `get_usage` self; cloud: the compaction warning):
+  1. Finish the current step and push your branch.
+  2. Write the successor's request in `sessions/requests/` from the template in its README, with the full handoff in the brief.
+  3. Set your STATUS to `Archive: ready` and `Handoff: <request file>`.
+  4. Start the successor with the launcher routine (`RemoteTrigger run trig_01Rj58EHgmhr5QziTTwy2zee`), or report "handoff request <file> pushed" to the coordinator if you can't run it.
+  5. Stop. The user archives the old session.
 
 ## Captures and renders (about 25-30%)
 - Iterate with `SC_CAPTURE_ONLY=<cameras>` (only the cameras that show the change). Shoot the full capture set once, for the final sheet, when the code is final for that round.

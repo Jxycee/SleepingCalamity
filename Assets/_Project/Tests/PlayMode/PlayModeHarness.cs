@@ -48,6 +48,7 @@ namespace SleepingCalamity.Tests.PlayMode
             }
 
             AppBootstrap.SuppressDevAutoStart = true;
+            SceneFlow.StartSceneOverride = SceneNames.ArenaGreybox;   // M6 S3: a real start loads the town; most tests stay on the small arena (a town test sets it to null)
             SceneManager.LoadScene(SceneNames.Bootstrap, LoadSceneMode.Single);
             yield return WaitUntil(
                 () => AppBootstrap.Current != null && SceneManager.GetActiveScene().name == SceneNames.Lobby,
@@ -59,6 +60,7 @@ namespace SleepingCalamity.Tests.PlayMode
         // A solo session: host on loopback, the world created at once, the arena loaded, this peer's player spawned.
         public static IEnumerator StartSoloAndWaitForPlayer(string expectedScene = SceneNames.ArenaGreybox)
         {
+            if (expectedScene != SceneNames.ArenaGreybox) SceneFlow.StartSceneOverride = expectedScene == SceneNames.Hollowmere ? null : expectedScene;
             AppBootstrap app = AppBootstrap.Current;
             Assert.That(app, Is.Not.Null, "StartSolo: no App; call LoadBootstrapAndWaitForLobby first");
             var local = app.Services.Get<LocalNetworkSession>();
@@ -176,6 +178,7 @@ namespace SleepingCalamity.Tests.PlayMode
             finally
             {
                 AppBootstrap.SuppressDevAutoStart = false;
+                SceneFlow.StartSceneOverride = null;
                 WorldSaveFlow.Enabled = true;
             }
         }
