@@ -64,6 +64,13 @@ namespace SleepingCalamity.Core
             CurrentFloor = Town;
         }
 
+        // Save restore (M6 S2): the cleared floors and the checkpoint come back as saved. The party is in town, so the stir meter is not touched.
+        public void RestoreProgress(int clearedMask, bool checkpointReached)
+        {
+            ClearedMask = clearedMask & ((1 << MaxFloor) - 1);
+            CheckpointReached = checkpointReached;
+        }
+
         // Host clock: advances the stir countdown. True when the deep closed and the dive was failed.
         public bool Tick(float dt)
         {

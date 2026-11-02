@@ -148,6 +148,7 @@ namespace SleepingCalamity.EditorTools
                 if (opt.Full)
                 {
                     GridPass(res, grid, hero, physMask, visMask, anyVisMask);
+                    VoidEdges(res, grid, hero, physMask);
                     Islands(res, grid, open, hero, physMask);
                     Stairs(res, grid, hero);
                     KeepClearZones(res, hero, physMask, visMask);
@@ -553,6 +554,36 @@ namespace SleepingCalamity.EditorTools
             float d1 = Physics.CapsuleCast(a, b, rr, dir, out RaycastHit h1, max, mask, QueryTriggerInteraction.Ignore) ? h1.distance + rr : max;
             float d2 = Physics.CapsuleCast(a, b, rr, -dir, out RaycastHit h2, max, mask, QueryTriggerInteraction.Ignore) ? h2.distance + rr : max;
             return d1 + d2;
+        }
+
+        // ---------------------------------------------------------------------------------------------------------------- edges into the void
+        // From every main-area cell on the NavMesh's rim, step 0.6 m outward in each straight direction: if the capsule can move there unblocked and no ground
+        // lies within 4 m below, the hero can walk off the level (a missing outer wall, an open corridor end, a gap in the floor).
+        static void VoidEdges(ScanResult res, WalkGrid g, HeroCapsule hero, int physMask)
+        {
+            if (g.Main < 0) return;
+            int[,] dirs = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+            for (int z = 0; z < g.H; z++)
+                for (int x = 0; x < g.W; x++)
+                {
+                    int i = g.Index(x, z);
+                    if (!g.HasMain(i)) continue;
+                    float y = g.C0[i] == g.Main ? g.Y0[i] : g.Y1[i];
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int nx = x + dirs[k, 0], nz = z + dirs[k, 1];
+                        if (g.In(nx, nz) && g.HasMain(g.Index(nx, nz))) continue;   // only the rim
+                        Vector2 c = g.CellCentre(x, z);
+                        var from = new Vector3(c.x, y, c.y);
+                        var dir = new Vector3(dirs[k, 0], 0f, dirs[k, 1]);
+                        const float step = 0.6f;
+                        if (Physics.CapsuleCast(from + Vector3.up * (hero.StepOffset + hero.Radius), from + Vector3.up * (hero.Height - hero.Radius), hero.Radius - 0.05f, dir, step, physMask, QueryTriggerInteraction.Ignore)) continue;
+                        Vector3 to = from + dir * (step + hero.Radius);
+                        if (Physics.Raycast(to + Vector3.up * 0.5f, Vector3.down, 4.5f, physMask, QueryTriggerInteraction.Ignore)) continue;
+                        if (g.ToCell(to, out int tx, out int tz)) g.Flags[g.Index(tx, tz)] |= WalkGrid.FHole;
+                        Issue(res, IssueKind.VoidEdge, to, 4f, 0f, "the walkable floor ends with no wall and no ground within 4 m below: the hero can walk off the level", ColliderBelow(from, physMask), "void");
+                    }
+                }
         }
 
         // ---------------------------------------------------------------------------------------------------------------- islands and stuck pockets

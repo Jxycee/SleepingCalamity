@@ -24,7 +24,11 @@ namespace SleepingCalamity.Core
         public string WorldId = "";               // WorldIds.NewId(); also the file's name. Empty or malformed: the store fills it from the file name
         public string CreatedAtUtc = "";          // informational (ISO 8601); shown in the world picker
         public WeaponsSave Weapons;               // null: no weapon growth saved yet (older saves); every player then starts with fresh heirlooms
-        public WorldPlayersSave Players;          // null: no world created yet (the host flow creates its kind and players on the first start)
+        public StockSave Stock;                   // null: no town stock saved yet (M6 S2 sections stock/town/residents/dive; see TownSaves.cs)
+        public TownSave Town;                     // null: nothing placed yet
+        public ResidentsSave Residents;           // null: no resident state yet
+        public DiveSave Dive;                     // null: no dive progress yet
+        public WorldPlayersSave Players;        // null: no world created yet (the host flow creates its kind and players on the first start)
 
         [JsonExtensionData] public Dictionary<string, object> Extra;   // unknown top-level members, round-tripped untouched
     }

@@ -14,10 +14,12 @@ Sources of truth: `docs/STORY.md` (once locked), `docs/PHASE1.md` (once written)
 The main (controller) session opens with the `sc-steward` skill, which reads `docs/superpowers/handoff/CURRENT.md`. The controller keeps it current after every meaningful step with `sc-handoff`, then commits and pushes it to `main`. Feature branches never edit it.
 
 ## Unity
-- Run Unity only through the wrapper: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <compile|build|test-edit|test-play|check|exec> -OutDir <scratchpad dir>` on the PC, `bash Tools/cloud/unity.sh <same command> --out <scratchpad dir>` in the cloud. Exit codes: 0 PASS, 1 FAIL, 2 LOCKED, 3 TIMEOUT, 4 usage. It reads the log (exit 0 alone is not proof), adds `-dev-profile sctest` to test runs, and records a PASS marker that the merge gate checks.
+- Run Unity only through the wrapper: `powershell -NoProfile -ExecutionPolicy Bypass -File C:\Dev\SleepingCalamity\Tools\unity.ps1 <compile|build|test-edit|test-play|check|gate|exec> -OutDir <scratchpad dir>` on the PC, `bash Tools/cloud/unity.sh <same command> --out <scratchpad dir>` in the cloud. Exit codes: 0 PASS, 1 FAIL, 2 LOCKED, 3 TIMEOUT, 4 usage. It reads the log (exit 0 alone is not proof), adds `-dev-profile sctest` to test runs, and records a PASS marker that the merge gate checks. `gate` (compile + EditMode, no PlayMode) is the fast gate a branch push of Assets/Packages/ProjectSettings changes needs (guard.sh; waive with `SC_GATE_SKIP=1` when no licence); full `check` stays required for merges into main.
 - The Unity plugin's `unity-cli` / `unity run` launch commands don't apply here; the wrapper rule wins.
 - `LOCKED` means the user has the editor open: ask them to close it. Never kill Unity processes and never delete `Temp/UnityLockfile`.
-- PlayMode runs in different worktrees collide on the same UDP port: before `test-play` or `check`, look for another Unity process with `-testPlatform PlayMode` and wait for it.
+- PlayMode runs in different worktrees collide on the same UDP port (7790). The PC wrapper queues them for you: its PlayMode stage takes a machine-wide lock and waits for any other PlayMode run, printing `SC WAIT`. Run a worktree through its own `<worktree>\Tools\unity.ps1`, which defaults `-ProjectRoot` to that checkout. Check that `SC MARKER` equals your HEAD.
+- The wrapper ends only the Unity process it started itself, and only when a stage times out (default 30 min per stage). Never end any other Unity process yourself.
+- PlayMode tests must never wait on `WaitForEndOfFrame` under `-nographics`: it never resumes. Put a timeout inside every wait loop.
 - Editor scripts build scenes and prefabs (`SleepingCalamity.EditorTools.*`, wired into `ProjectBuilder.RunAll`); never edit `.unity`/`.prefab` YAML by hand (a hook blocks it).
 - Logs and test results go in the session scratchpad, never in the repo.
 

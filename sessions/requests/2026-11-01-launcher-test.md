@@ -1,6 +1,7 @@
 ﻿Title: Launcher test
 Target: cloud
-Status: pending
+Status: done - launcher smoke test passed, STATUS.md written
+Started: 2026-11-01 21:09 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 6 (testing the launcher routine)
 Status file: Reference/sessions/launcher-test/STATUS.md
