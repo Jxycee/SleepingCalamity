@@ -115,7 +115,7 @@ namespace SleepingCalamity.Gameplay
             if (wish.sqrMagnitude > 1f) wish.Normalize();
             float stick = wish.magnitude;
 
-            bool grounded = _cc.isGrounded;
+            bool grounded = _cc.isGrounded || HoldVertical;   // a floor hand-over hold moves dy = 0 (isGrounded reads false then): dodge and sprint still see a grounded hero
             IsGrounded = grounded;
 
             // ---- dodge: a direction and a duration; HeroCombat gates when it may start and its machine owns the i-frames ----
