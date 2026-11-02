@@ -1,6 +1,7 @@
 Title: Hollowmere stairs + traversal 3
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-02T08:03:36Z (cloud launcher)
 Model: sonnet
 From: coordinator session 7 (board queue qwr9ux), follow-ups of town-surfaces 5a910999 and traversal-2 db3d88bb
 Status file: Reference/sessions/stairs-traversal-3/STATUS.md
