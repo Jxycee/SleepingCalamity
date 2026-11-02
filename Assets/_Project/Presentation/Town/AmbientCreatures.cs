@@ -128,7 +128,7 @@ namespace SleepingCalamity.Presentation
                 if (_hero == null && Time.unscaledTime >= _nextFind)
                 {
                     _nextFind = Time.unscaledTime + 2f;
-                    foreach (var h in FindObjectsByType<SleepingCalamity.Gameplay.HeroLocomotion>(FindObjectsSortMode.None))
+                    foreach (var h in FindObjectsByType<SleepingCalamity.Gameplay.HeroLocomotion>())
                         if (_hero == null || h.gameObject.layer == SleepingCalamity.Core.Layers.Player) _hero = h.transform;
                 }
                 if (_hero != null) { hero = _hero.position; haveHero = true; }
