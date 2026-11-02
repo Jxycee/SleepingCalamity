@@ -4,19 +4,14 @@
     "entries": [
         {
             "space": "Hollowmere_Ruined",
-            "unreachable": [
-                "R2_03_C3",
-                "R2_08_C3"
-            ],
-            "blocked": 25,
+            "unreachable": [],
+            "blocked": 10,
             "narrow": 0
         },
         {
             "space": "Hollowmere_Rebuilt",
-            "unreachable": [
-                "R2_03_C3"
-            ],
-            "blocked": 23,
+            "unreachable": [],
+            "blocked": 8,
             "narrow": 0
         },
         {
