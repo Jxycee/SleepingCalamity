@@ -267,7 +267,8 @@ namespace SleepingCalamity.Gameplay
             float dt = Time.deltaTime;
             if (_remoteClock < 999f) _remoteClock += dt;
             if (!IsSpawned || dt <= 0f) return;
-            _grace.Tick(dt);   // every peer: the owner's gameplay window, the others' cosmetic one
+            // Every peer: the owner's gameplay window (stops during pause, like the knockdown it covers), the others' cosmetic one.
+            if (!IsOwner || !HeroInput.IsPaused()) _grace.Tick(dt);
             if (!IsOwner) return;
             OwnerUpdate(dt);
         }
@@ -600,7 +601,7 @@ namespace SleepingCalamity.Gameplay
                     if (HurtGrace.IsHeavyHit(a.Knockback, a.GuardBreak)) _hurtLock = _knockdownLeft = HurtGrace.KnockdownSeconds;   // killed: the host decides; a downed hero is not IsUp anyway
                     else _hurtLock = HurtStagger;
                 }
-                _grace.Start(HurtGrace.Classify(a.Knockback, false, a.GuardBreak && _guarding));
+                _grace.Start(HurtGrace.Classify(a.Knockback, false, a.GuardBreak));
                 if (a.Knockback > 0f && toEnemy.sqrMagnitude > 1e-4f) AddImpulse(-toEnemy.normalized * Mathf.Min(8f, a.Knockback * 2.4f));
             }
             EnemyHitMeServerRpc(e.NetworkObjectId, e.Serial, guarded);
