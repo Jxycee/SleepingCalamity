@@ -100,6 +100,9 @@ function Test-OtherPlayMode([int]$Except) {
     $procs = Get-CimInstance Win32_Process -Filter "Name = 'Unity.exe'" -ErrorAction SilentlyContinue
     foreach ($p in $procs) {
         if ($p.ProcessId -eq $Except) { continue }
+        # A zombie Unity (exited, but a leaked handle keeps it listed) is not a live run.
+        $live = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue
+        if ($null -eq $live -or $live.HasExited) { continue }
         if ([string]$p.CommandLine -match '-testPlatform PlayMode') { return $true }
     }
     return $false
@@ -130,6 +133,22 @@ function Get-PortLock {
     return $null
 }
 
+# Inside the port lock: if something outside our control holds UDP 7790 (a zombie Unity), give the child run a free port in
+# 7791..7799 through SC_TEST_PORT (NetworkConstants.TestPort reads it). Otherwise SC_TEST_PORT stays unset.
+function Set-TestPortOverride {
+    $env:SC_TEST_PORT = $null
+    $held = @(Get-NetUDPEndpoint -LocalPort 7790 -ErrorAction SilentlyContinue)
+    if ($held.Count -eq 0) { return }
+    foreach ($port in 7791..7799) {
+        if (@(Get-NetUDPEndpoint -LocalPort $port -ErrorAction SilentlyContinue).Count -eq 0) {
+            $env:SC_TEST_PORT = [string]$port
+            Say ('SC LOG PlayMode test port ' + $port + ' (7790 held by PID ' + $held[0].OwningProcess + ')')
+            return
+        }
+    }
+    Say ('SC LOG 7790 held by PID ' + $held[0].OwningProcess + ' and 7791-7799 are busy; PlayMode will likely fail')
+}
+
 function Invoke-UnityRun([string]$Name, [string]$Extra, [switch]$NeedsPort) {
     $log = Join-Path $OutDir ($Name + '.log')
     if (Test-UnityLocked) {
@@ -144,9 +163,11 @@ function Invoke-UnityRun([string]$Name, [string]$Extra, [switch]$NeedsPort) {
         }
     }
     try {
+        if ($NeedsPort) { Set-TestPortOverride }
         return (Invoke-UnityProcess $log $Extra)
     }
     finally {
+        if ($NeedsPort) { $env:SC_TEST_PORT = $null }
         if ($null -ne $portLock) { $portLock.Close() }
     }
 }

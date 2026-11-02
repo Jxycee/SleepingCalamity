@@ -39,6 +39,10 @@ CACHE = os.path.join(HOME, "cache")
 LANG_VERSION = "9.0"
 # References the editor resolves to assemblies under another name (Unity 6 folds ugui into these).
 ALIASES = {"Unity.ugui": ["UnityEngine.UI", "UnityEditor.UI"]}
+# References the editor adds that the asmdef doesn't list. Unity 6000.6's built-in ugui 2.6.0 ships Unity.TextMeshPro(.Editor) asmdefs that name only
+# an internal bridge, yet the editor's own builds of them reference UnityEngine.UI / UnityEditor.UI (read from the compiled DLLs in the editor's
+# ProjectTemplates libcache). Without these, TMP fails, and PrimeTween, UI, App, Editor and the test assemblies fail behind it.
+IMPLIED = {"Unity.TextMeshPro": ["UnityEngine.UI"], "Unity.TextMeshPro.Editor": ["UnityEngine.UI", "UnityEditor.UI"]}
 
 
 def die(msg, code=2):
@@ -180,6 +184,9 @@ def unity_defines():
           "PLATFORM_STANDALONE", "UNITY_64", "ENABLE_MONO", "ENABLE_INPUT_SYSTEM", "UNITY_ASSERTIONS", "DEBUG", "TRACE",
           "UNITY_INCLUDE_TESTS", "CSHARP_7_3_OR_NEWER", "CSHARP_7_OR_LATER", "ENABLE_UNITY_COLLECTIONS_CHECKS", "ENABLE_BURST_AOT",
           "UNITY_PRO_LICENSE", "ENABLE_PROFILER", "ENABLE_CLOUD_SERVICES", "UNITY_TEAM_LICENSE", "UNITY_PHYSICS_FUNCTIONALITY"}
+    # The editor's own TextCore version defines: built-in ugui 2.6.0's TMP picks the TextCore 1.5+/1.6+ FontEngine API with these, and the
+    # older branch calls overloads this engine no longer has (CS1501 in TMP_FontAsset.cs).
+    d |= {"TEXTCORE_1_0_OR_NEWER", "TEXTCORE_FONT_ENGINE_1_5_OR_NEWER", "TEXTCORE_FONT_ENGINE_1_6_OR_NEWER"}
     return d
 
 
@@ -346,6 +353,7 @@ def compile_all(project, only, warnings, csproj=False):
     if only:
         project_asms = [a for a in project_asms if a.name in only]
     built, failed, skipped = {}, {}, {}
+    closure = {}  # assembly name -> its full reference closure (dll paths)
     order = []
 
     def visit(a, stack=()):
@@ -365,6 +373,7 @@ def compile_all(project, only, warnings, csproj=False):
         refs = []
         for r in a.data.get("references", []):
             refs += ALIASES.get(r, [r])
+        refs += [r for r in IMPLIED.get(a.name, []) if r not in refs]
         for r in refs:
             t = resolve(r)
             if t is None:
@@ -375,10 +384,13 @@ def compile_all(project, only, warnings, csproj=False):
                 return
             if t.name in built:
                 deps.append(built[t.name])
+                if a.package is not None:  # package code only: project code keeps direct references, so the cloud is never more lenient than the editor
+                    deps += [d for d in closure.get(t.name, []) if d not in deps]
         out = compile_one(a, defines, deps, plugins, engine, gens, csc, warnings)
         order.append(a.name)
         if out[0]:
             built[a.name] = out[1]
+            closure[a.name] = list(deps)  # PrimeTween uses UnityEngine.UI through Unity.TextMeshPro, which the editor accepts
         else:
             failed[a.name] = out[1]
 

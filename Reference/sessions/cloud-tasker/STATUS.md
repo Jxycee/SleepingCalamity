@@ -1,10 +1,10 @@
-Status: IDLE (waiting for next task; 3 branches need PC check)
+Status: IN PROGRESS (cloud checks: the PC port is stuck, so checks run here)
 Session: Cloud Tasker (cloud, session_01RaNwcfvALfNsnFMLqaHdFr)
 Branch: claude/dazzling-tesla-m54kg2 (docs on main; fix on claude/overlay-heal-count)
-Tip: claude/overlay-heal-count 18a20f7; claude/lit-guard aadc3b9; claude/stall-lods 2486f8a
-Check: needs PC check on all three (cloud Editor/UI/Test assemblies fail on TextMeshPro/PrimeTween packages, same on main); stall-lods also needs a PC capture
-Now: idle
-Next: coordinator to route; remaining AAA items (H1,H2,H4,H5) need GPU captures
-WaitingOn: PC checks + next task
+Tip: merged today: lit-guard f05a7fd, overlay-heal-count 2ff6e1f (cloud check PASS each); stair-hold-3 e1eebd0 (main merged in, pushed) under test
+Check: cloud unity.sh check PASS on 2522c96 (= main Unity trees): build PASS, EditMode 1211/1211, PlayMode 116/0 fail/19 skip. lit-guard + overlay-heal-count compile 11/11 in the cloud
+Now: stair-hold-3: full check + 4 more full PlayMode runs (StairHandover x5 under load); dive-flow merges after its risk review
+Next: cellars-visual-b 9f121b10 cloud check, merge on PASS; then F3 CoopDiveFastTests asserts and F5 overlay room times; stall-lods waits on a PC capture
+WaitingOn: PC capture for claude/stall-lods
 HoldsPort: no
-Needs: nothing
+Needs: nothing (no environment or secret change needed)

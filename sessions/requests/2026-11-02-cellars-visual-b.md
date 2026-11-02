@@ -1,6 +1,6 @@
 Title: Cellars and Undercroft visual fixes (review B2-B6)
 Target: cloud
-Status: started
+Status: blocked: B2-B6 coded on branch cellars-visual-b (check green) but cloud renders black so look unverified; needs PC capture then merge
 Started: 2026-11-02T16:31Z (cloud launcher)
 Model: sonnet
 From: coordinator session 7 (user offered cloud sessions, 2026-11-02)
