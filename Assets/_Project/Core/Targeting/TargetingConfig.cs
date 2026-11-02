@@ -15,6 +15,10 @@ namespace SleepingCalamity.Core
         public static float ReleaseRange => Tuning.TargetingTuning.ReleaseRange;
         public static float LosGraceSeconds => Tuning.TargetingTuning.LosGraceSeconds;
 
+        // Elites and bosses: a wider release range (26 m) and a longer sight grace (4 s) instead of never dropping.
+        public static float EliteReleaseRange => Tuning.TargetingTuning.EliteReleaseRange;
+        public static float EliteLosGraceSeconds => Tuning.TargetingTuning.EliteLosGraceSeconds;
+
         // Not in 6.5 (added in M2): a locked target may sit on a ledge, so the lock's height band is wider than the soft target's (4 m).
         public static float HardHeightBand => Tuning.TargetingTuning.HardHeightBand;
 

@@ -29,10 +29,13 @@ namespace SleepingCalamity.Gameplay
         public static IReadOnlyList<Enemy> All => s_all;
 
         // ---- replicated (host writes) ----
-        public readonly NetworkVariable<int> NetHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public readonly NetworkVariable<int> NetMaxHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public readonly NetworkVariable<byte> NetKind = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public readonly NetworkVariable<byte> NetTier = new NetworkVariable<byte>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        // These four are not readonly: ServerSeed replaces them BEFORE Spawn with instances built with the seeded initial value. Writing .Value on a
+        // NetworkVariable that has no NetworkBehaviour yet logs an NGO warning (318 per 25 minutes in the alpha playtest, item 16); an initial value
+        // rides in the spawn message just the same.
+        public NetworkVariable<int> NetHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<int> NetMaxHp = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<byte> NetKind = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<byte> NetTier = new NetworkVariable<byte>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<byte> NetPhase = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<int> NetAttackSerial = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<short> NetAttackIdx = new NetworkVariable<short>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -174,10 +177,20 @@ namespace SleepingCalamity.Gameplay
         public void ServerSeed(EnemyKind kind, int tier, int players)
         {
             Model = new EnemyModel(EnemyCatalog.Get(kind), tier, players);
-            NetKind.Value = (byte)kind;
-            NetTier.Value = (byte)Model.Tier;
-            NetMaxHp.Value = Model.MaxHp;
-            NetHp.Value = Model.Hp;
+            if (IsSpawned)
+            {
+                NetKind.Value = (byte)kind;
+                NetTier.Value = (byte)Model.Tier;
+                NetMaxHp.Value = Model.MaxHp;
+                NetHp.Value = Model.Hp;
+                return;
+            }
+            const NetworkVariableReadPermission read = NetworkVariableReadPermission.Everyone;
+            const NetworkVariableWritePermission write = NetworkVariableWritePermission.Server;
+            NetKind = new NetworkVariable<byte>((byte)kind, read, write);
+            NetTier = new NetworkVariable<byte>((byte)Model.Tier, read, write);
+            NetMaxHp = new NetworkVariable<int>(Model.MaxHp, read, write);
+            NetHp = new NetworkVariable<int>(Model.Hp, read, write);
         }
 
         public override void OnNetworkSpawn()
