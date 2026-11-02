@@ -19,7 +19,13 @@ namespace SleepingCalamity.Core
         public static CellPos[] Cells(CellarFloorLayout layout, CellarFloorDressing dressing, CellarEncounterPlan plan, int room) => Cells(layout, dressing, plan, room, out _);
 
         // `fallbacks`: movable spawns that found no candidate cell (cand.Count < movable) and kept or swapped plan cells instead. Zero means every movable spawn got a ring/candidate pick.
-        public static CellPos[] Cells(CellarFloorLayout layout, CellarFloorDressing dressing, CellarEncounterPlan plan, int room, out int fallbacks)
+        public static CellPos[] Cells(CellarFloorLayout layout, CellarFloorDressing dressing, CellarEncounterPlan plan, int room, out int fallbacks) => Cells(layout, dressing, plan, room, null, out fallbacks);
+
+        public static CellPos[] Cells(CellarFloorLayout layout, CellarFloorDressing dressing, CellarEncounterPlan plan, int room, IReadOnlyList<PlanePoint> players) => Cells(layout, dressing, plan, room, players, out _);
+
+        // `players` (layout metres, may be null): movable spawns keep CellarSpawnSafety.AmbushMinPlayerMeters from every player. Candidates closer than that are dropped; when fewer than
+        // the movable count qualify, the pool is the movable-count cells farthest from the players instead (playtest 12). Carrier and warden keep their authored cell regardless.
+        public static CellPos[] Cells(CellarFloorLayout layout, CellarFloorDressing dressing, CellarEncounterPlan plan, int room, IReadOnlyList<PlanePoint> players, out int fallbacks)
         {
             fallbacks = 0;
             var mine = new List<EncounterSpawn>();
@@ -50,6 +56,16 @@ namespace SleepingCalamity.Core
             long Dist(CellPos c) { long dx = 2L * c.X - cx2, dy = 2L * c.Y - cy2; return dx * dx + dy * dy; }
             cand.Sort((a, b) => { int d = Dist(b).CompareTo(Dist(a)); if (d != 0) return d; d = a.Y.CompareTo(b.Y); return d != 0 ? d : a.X.CompareTo(b.X); });
             int ring = System.Math.Min(cand.Count, System.Math.Max(movable, cand.Count / 2));
+            if (players != null && players.Count > 0)
+            {
+                var far = cand.FindAll(c => CellarSpawnSafety.FarFromAll(c, players, CellarSpawnSafety.AmbushMinPlayerMeters));
+                if (far.Count >= movable) { cand = far; ring = System.Math.Min(cand.Count, System.Math.Max(movable, cand.Count / 2)); }   // still farthest-from-centre first (cand stayed sorted)
+                else
+                {
+                    cand.Sort((a, b) => { int d = CellarSpawnSafety.NearestPlayer(b, players).CompareTo(CellarSpawnSafety.NearestPlayer(a, players)); if (d != 0) return d; d = a.Y.CompareTo(b.Y); return d != 0 ? d : a.X.CompareTo(b.X); });
+                    ring = System.Math.Min(cand.Count, movable);
+                }
+            }
             var pool = cand.GetRange(0, ring);
             var rest = cand.GetRange(ring, cand.Count - ring);   // farthest-first, used only when the ring runs out
 
