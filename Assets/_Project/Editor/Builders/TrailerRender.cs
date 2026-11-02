@@ -395,6 +395,27 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC TRAILER DONE " + mp4 + " frames=" + k + " seconds=" + (k * skip / (float)Fps));
         }
 
+        // Still frames of the stair and Cellars shots only (never opens Hollowmere): SC_TRAILER_STILLS="47.5,49.2,62" (trailer seconds), written as frame_<n>.png into
+        // SC_TRAILER_FRAMEDIR. Builds the stair and Cellars scenes first unless SC_CAPTURE_NOBUILD is set. For before/after checks of the undercroft items.
+        public static void RenderStills()
+        {
+            string dir = Env("SC_TRAILER_FRAMEDIR"); if (string.IsNullOrEmpty(dir)) throw new InvalidOperationException("Set SC_TRAILER_FRAMEDIR");
+            Directory.CreateDirectory(dir);
+            var frames = new List<int>();
+            foreach (string s in (Env("SC_TRAILER_STILLS") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)) frames.Add(Mathf.RoundToInt(float.Parse(s, System.Globalization.CultureInfo.InvariantCulture) * Fps));
+            Plan plan = BuildPlan(HollowmereLayout.Create(), CellarFloorGenerator.Generate(CellarFloorTestBuilder.Seed, CellarFloorTestBuilder.FloorNumber));
+            if (string.IsNullOrEmpty(Env("SC_CAPTURE_NOBUILD"))) { UndercroftStairBuilder.Build(); CellarFloorTestBuilder.Build(); }
+            var stats = new Stats();
+            RenderPipelineAsset savedQuality = QualitySettings.renderPipeline;
+            try
+            {
+                RenderSimple("stair", UndercroftStairBuilder.ScenePath, "Cap_Stair_Top", Cut(CutStair), Cut(CutCellar), true, frames, dir, false, stats, plan);
+                RenderSimple("cellars", CellarFloorTestBuilder.ScenePath, "Floor_Room", Cut(CutCellar), int.MaxValue, false, frames, dir, false, stats, plan);
+            }
+            finally { QualitySettings.renderPipeline = savedQuality; LookTestCapture.CleanProbes(); }
+            Debug.Log("SC TRAILER STILLS rendered " + stats.Rendered);
+        }
+
         sealed class Stats { public int Rendered, Warnings; }
 
         static string FramePath(string dir, int f) => Path.Combine(dir, "frame_" + f.ToString("00000") + ".png");
@@ -496,7 +517,7 @@ namespace SleepingCalamity.EditorTools
             {
                 lampGo = new GameObject("TrailerLamp") { hideFlags = HideFlags.DontSave };
                 var l = lampGo.AddComponent<Light>();
-                l.type = LightType.Point; l.color = new Color(1f, 0.76f, 0.5f); l.intensity = 2.2f; l.range = 6.5f; l.shadows = LightShadows.None;
+                l.type = LightType.Point; l.color = new Color(1f, 0.76f, 0.5f); l.intensity = 1.5f; l.range = 5.5f; l.shadows = LightShadows.None;
             }
             var tex = checkOnly ? null : new Texture2D(W, H, TextureFormat.RGB24, false, false);
             var rt = checkOnly ? null : new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 1 };

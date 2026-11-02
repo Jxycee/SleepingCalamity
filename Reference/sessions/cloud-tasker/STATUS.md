@@ -1,10 +1,10 @@
-Status: IN PROGRESS (cloud checks: the PC port is stuck, so checks run here)
+Status: IN PROGRESS (running cloud checks; not stalled)
 Session: Cloud Tasker (cloud, session_01RaNwcfvALfNsnFMLqaHdFr)
 Branch: claude/dazzling-tesla-m54kg2 (docs on main; fix on claude/overlay-heal-count)
-Tip: merged today: lit-guard f05a7fd, overlay-heal-count 2ff6e1f (cloud check PASS each); stair-hold-3 e1eebd0 (main merged in, pushed) under test
-Check: cloud unity.sh check PASS on 2522c96 (= main Unity trees): build PASS, EditMode 1211/1211, PlayMode 116/0 fail/19 skip. lit-guard + overlay-heal-count compile 11/11 in the cloud
-Now: stair-hold-3: full check + 4 more full PlayMode runs (StairHandover x5 under load); dive-flow merges after its risk review
-Next: cellars-visual-b 9f121b10 cloud check, merge on PASS; then F3 CoopDiveFastTests asserts and F5 overlay room times; stall-lods waits on a PC capture
+Tip: merged today: lit-guard f05a7fd, overlay-heal-count 2ff6e1f, cellars-visual-b (this merge). Pushed, waiting: claude/review-lows b327e4b (F3 + F5), claude/cloud-port-fallback ae1982a (tools), claude/stall-lods 2486f8a (PC capture)
+Check: cellars-visual-b b802d7d cloud PASS (edit 1219, play 116/0 fail) merged into fresh main (clean; main had gained aaa-palette + divebot-coop-b, dirty-merge rule). stair-hold-3 e1eebd0 PASS + Rtt150Loss2 5/5
+Now: port-fallback end-to-end proof (networked PlayMode with UDP 7790 held)
+Next: merge claude/cloud-port-fallback; claude/review-lows check + merge
 WaitingOn: PC capture for claude/stall-lods
 HoldsPort: no
 Needs: nothing (no environment or secret change needed)

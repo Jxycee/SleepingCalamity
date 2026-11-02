@@ -62,12 +62,12 @@ namespace SleepingCalamity.EditorTools
                 imp.SaveAndReimport();
             }
             _blob = AssetDatabase.LoadAssetAtPath<Texture2D>(TexPath);
-            _damp = DecalMat("HM_Surf_Damp", new Color(0.02f, 0.017f, 0.012f), 0.42f);
-            _sand = DecalMat("HM_Surf_Wear", new Color(0.55f, 0.50f, 0.42f), 0.22f);
-            _moss = DecalMat("HM_Surf_Moss", new Color(0.18f, 0.22f, 0.13f), 0.24f);
-            _stain = DecalMat("HM_Surf_Stain", new Color(0.04f, 0.03f, 0.02f), 0.24f);
-            _wear = DecalMat("HM_Surf_WornRun", new Color(0.66f, 0.56f, 0.42f), 0.12f);
-            _ao = DecalMat("HM_Surf_ContactAO", new Color(0.015f, 0.012f, 0.01f), 0.6f);
+            _damp = DecalMat("HM_Surf_Damp", TownGround.Damp, 0.42f);          // all tints from TownGround (one ground palette, H2)
+            _sand = DecalMat("HM_Surf_Wear", TownGround.Dry, 0.22f);
+            _moss = DecalMat("HM_Surf_Moss", TownGround.Moss, 0.24f);
+            _stain = DecalMat("HM_Surf_Stain", TownGround.Stain, 0.24f);
+            _wear = DecalMat("HM_Surf_WornRun", TownGround.Worn, 0.12f);
+            _ao = DecalMat("HM_Surf_ContactAO", TownGround.ContactAo, 0.6f);
             AssetDatabase.SaveAssets();
         }
 

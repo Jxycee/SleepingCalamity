@@ -85,8 +85,8 @@ MonoBehaviour:
     Carrier: {fileID: 2100000, guid: 4cf62a371617c324da56d1393a97cf91, type: 2}
     EntryStart: {fileID: 2100000, guid: b41b50440814cf94589bf8b4e131341d, type: 2}
     StairExit: {fileID: 2100000, guid: e219c02b3aa436e4f90248974f81a439, type: 2}
-    SpawnT1: {fileID: 2100000, guid: 18d847f2428fc8d4b9b154a0b4543234, type: 2}
-    SpawnT2: {fileID: 2100000, guid: 090a2489ddbb2ba4985108f21a1c8b73, type: 2}
+    SpawnT1: {fileID: 2100000, guid: d26f0064909864657a2082794a5476a5, type: 2}
+    SpawnT2: {fileID: 2100000, guid: 541fd6a8c7e1a65b0a47e734d01869b3, type: 2}
     Bank: {fileID: 0}
     Baker: {fileID: 0}
     Warden: {fileID: 0}
