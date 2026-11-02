@@ -2,6 +2,7 @@
 // Host + two clients in one process (scene management off; the sync object is a dynamically spawned network prefab from the owned list).
 // Catches: a floor that differs between peers (LayoutHash and built object counts compared with each other and with the Core generator),
 // a floor change (floor 1 -> 2, new seed) not reaching a connected client, and a late joiner not getting the current (seed, floor) with the spawn.
+// Also: a built floor whose colliders PhysX still holds at the origin in the build frame (Auto Sync Transforms is off; the stair sink of 2026-11-02).
 // NOT covered by a one-process test: real relay latency, scene loads with the floor in the dungeon scene (the manual 2-player walk).
 using System.Collections;
 using System.Collections.Generic;
@@ -71,6 +72,33 @@ namespace SleepingCalamity.Tests.PlayMode
             foreach (string g in new[] { CellarFloorBuilder.FloorGroup, CellarFloorBuilder.WallGroup, CellarFloorBuilder.DoorGroup, CellarFloorBuilder.PillarGroup, CellarFloorBuilder.MarkerGroup, CellarFloorBuilder.LampGroup })
                 Assert.That(Children(p, g), Is.EqualTo(Children(h, g)), who + " objects in group " + g);
             Assert.That(h.FloorTiles, Is.GreaterThan(0), "a floor was actually built");
+        }
+
+        // Catches: a floor built under a parent away from the origin whose colliders PhysX still holds at the origin (Auto Sync Transforms is off), so a hero
+        // teleported onto it in the build frame finds no ground (the stair F2 -> F3 sink, 2026-11-02). Queries in the same frame, before any physics step.
+        [UnityTest]
+        public IEnumerator BuiltFloor_CollidersAreWhereTheFloorIs_InTheBuildFrame()
+        {
+            yield return null;
+            var parent = new GameObject("FloorParentTest").transform;
+            parent.position = new Vector3(200f, 0f, 0f);
+            CellarFloorBuild built = null;
+            try
+            {
+                CellarFloorLayout layout = CellarFloorGenerator.Generate(12345u, 2);
+                built = CellarFloorBuilder.Build(layout, parent);
+                Vector3 entry = built.EntryCenter;
+                Assert.That(entry.x, Is.GreaterThan(100f), "the entry is in world space under the parent");
+                bool hit = Physics.Raycast(entry + Vector3.up * 2f, Vector3.down, out RaycastHit h, 5f, ~0, QueryTriggerInteraction.Ignore);
+                Assert.That(hit, Is.True, "a downward ray at the entry hits the floor in the build frame (colliders synced to the parent's position)");
+                Assert.That(h.collider.transform.IsChildOf(built.Root), Is.True, "the ground hit is this floor, not something else: " + h.collider.name);
+            }
+            finally
+            {
+                if (built != null && built.Root != null) Object.Destroy(built.Root.gameObject);
+                Object.Destroy(parent.gameObject);
+            }
+            yield return null;
         }
 
         // Catches: seed/floor not reaching connected clients, a floor change not rebuilding, a late joiner missing the state.
