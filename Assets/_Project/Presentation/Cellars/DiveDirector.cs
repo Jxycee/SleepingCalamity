@@ -183,6 +183,7 @@ namespace SleepingCalamity.Presentation
                 _seed = SeedOverride ?? PickSeed();
             }
             else _seed = SeedOverride ?? PickSeed();   // every dive gets fresh floors: chests and healing points do not replay (piece ids are per floor, so pieces stay collectable)
+            if (HaulSync.HostState != null) _savedDive = HaulSync.HostState;   // the live state is also the fallback a save captures once the haul sync despawns first (NGO's shutdown order is not fixed)
             int floor = forceFloor > 0 ? forceFloor : HaulSync.HostState.StartFloor;
             if (floor < DiveRoute.FirstFloor || floor > DiveRoute.LastFloor) return false;
             _clearAt = -1f; _openedStairs.Clear();
