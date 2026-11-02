@@ -335,14 +335,14 @@ namespace SleepingCalamity.EditorTools
         {
             var g = new GameObject("PLACEHOLDER_" + r.Asset).transform; g.SetParent(root, false);
             float sx = r.SizeX, sz = r.SizeZ, h = r.Height;
-            Material W() => r.Broken ? BeautyCornerBuilder.PlaceholderMat("dark") : LookTestBuilder.Mat("oak_timber");
+            Material W() => r.Broken ? TownSurface.Dark() : TownSurface.Timber();
             switch (r.Kind)
             {
                 case ClutterKind.RainBarrel:
-                    LookTestBuilder.Prim(g, "Barrel", PrimitiveType.Cylinder, new Vector3(0f, h * 0.5f, 0f), new Vector3(sx, h * 0.5f, sz), LookTestBuilder.Mat("oak_timber"));
+                    LookTestBuilder.Prim(g, "Barrel", PrimitiveType.Cylinder, new Vector3(0f, h * 0.5f, 0f), new Vector3(sx, h * 0.5f, sz), TownSurface.Timber());
                     break;
                 case ClutterKind.Well:
-                    LookTestBuilder.Prim(g, "Ring", PrimitiveType.Cylinder, new Vector3(0f, 0.4f, 0f), new Vector3(1.6f, 0.4f, 1.6f), LookTestBuilder.Mat("sandstone"));
+                    LookTestBuilder.Prim(g, "Ring", PrimitiveType.Cylinder, new Vector3(0f, 0.4f, 0f), new Vector3(1.6f, 0.4f, 1.6f), TownSurface.Stone());
                     if (!r.Broken)
                     {
                         LookTestBuilder.Box(g, "PostL", new Vector3(-0.7f, 1.5f, 0f), new Vector3(0.15f, 3f, 0.15f), W());
@@ -356,7 +356,7 @@ namespace SleepingCalamity.EditorTools
                     break;
                 case ClutterKind.FlowerBox:
                     LookTestBuilder.Box(g, "Trough", new Vector3(0f, h * 0.35f, 0f), new Vector3(sx, h * 0.7f, sz), W());
-                    LookTestBuilder.Box(g, "Flowers", new Vector3(0f, h * 0.75f, 0f), new Vector3(sx * 0.9f, h * 0.3f, sz * 0.8f), BeautyCornerBuilder.PlaceholderMat("green"));
+                    LookTestBuilder.Box(g, "Flowers", new Vector3(0f, h * 0.75f, 0f), new Vector3(sx * 0.9f, h * 0.3f, sz * 0.8f), TownSurface.Green());
                     break;
                 case ClutterKind.Handcart:
                     LookTestBuilder.Box(g, "Bed", new Vector3(0f, h * 0.5f, -sz * 0.1f), new Vector3(sx, 0.35f, sz * 0.65f), W());
