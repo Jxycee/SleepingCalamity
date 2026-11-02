@@ -36,6 +36,9 @@ namespace SleepingCalamity.Gameplay
 
         public float ViewYawDeg { get; private set; }        // where the camera looks (0 = +Z); movement is relative to this
         public float ViewPitchDownDeg { get; private set; }  // how far the camera looks down; + = down
+        // Owner copy only; set by the DiveDirector while a dive-floor hand-over is unresolved (the floor under the hero was swapped, the arrival teleport has not landed).
+        // Zeroes vertical velocity and the vertical step so the hero hangs instead of sinking through the missing cells. The director clears it on teleport, timeout and despawn.
+        public bool HoldVertical { get; set; }
         public bool IsGrounded { get; private set; }
         public bool IsSprinting { get; private set; }
         public bool IsDodging => _dodge.Active;
@@ -176,11 +179,12 @@ namespace SleepingCalamity.Gameplay
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
             // ---- vertical ----
-            if (grounded && _vy < 0f) _vy = MovementMath.GroundedPush(dt);
+            if (HoldVertical) _vy = 0f;   // floor hand-over: no gravity, no jump until the arrival teleport lands
+            else if (grounded && _vy < 0f) _vy = MovementMath.GroundedPush(dt);
             bool frozen = _combat != null && _combat.Frozen;   // a downed or out hero cannot jump
-            if (_jump.Tick(dt, grounded, intent.JumpPressed && !dodging && !frozen))
+            if (_jump.Tick(dt, grounded, intent.JumpPressed && !dodging && !frozen && !HoldVertical))
                 _vy = MovementMath.JumpVelocity(MovementMath.JumpHeight, MovementMath.Gravity);
-            float dy = MovementMath.VerticalStep(ref _vy, MovementMath.Gravity, MovementMath.TerminalVelocity, dt);
+            float dy = HoldVertical ? 0f : MovementMath.VerticalStep(ref _vy, MovementMath.Gravity, MovementMath.TerminalVelocity, dt);
 
             Vector3 push = _combat != null ? _combat.ConsumeImpulse(dt) : Vector3.zero;   // knockback and guard pushback
             CollisionFlags flags = _cc.Move(new Vector3((_vx + push.x) * dt, dy, (_vz + push.z) * dt));

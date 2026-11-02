@@ -149,6 +149,9 @@ namespace SleepingCalamity.Presentation
         private int _gen;
         private readonly Dictionary<ulong, int> _placed = new Dictionary<ulong, int>();
         private float _nextPlace, _clearAt = -1f;
+        private bool _placeRetry;   // host: a placement is still waiting for the built floor; PlacementPass runs every frame until it is done
+        // owner side: the gravity hold while a floor hand-over is unresolved (see UpdateHold)
+        private bool _holdActive; private int _holdKey; private float _holdSince;
 
         // owner side: a teleport waiting for the local floor
         private bool _hasPending; private Vector3 _pendPos; private float _pendYaw; private uint _pendSeed; private int _pendFloor; private float _pendSince;
@@ -193,7 +196,7 @@ namespace SleepingCalamity.Presentation
             FloorSync.ServerSetFloor(_seed, floor);
             NetActive.Value = true;
             GrantLoaves();
-            _gen++; _needsPlacement = true;
+            MarkPlacementNow();
             DiveStarted?.Invoke();
             FloorChanged?.Invoke(floor);
             return true;
@@ -228,7 +231,7 @@ namespace SleepingCalamity.Presentation
             RefreshStairOpen(next);
             FloorSync.ServerSetFloor(_seed, next);
             _heartBanked = false; NetHeartBanked.Value = false;
-            _gen++; _needsPlacement = true;
+            MarkPlacementNow();
             FloorChanged?.Invoke(next);
             return true;
         }
@@ -298,7 +301,7 @@ namespace SleepingCalamity.Presentation
             _loafLedger.End();
             NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
             RefreshStartFloor();
-            _gen++; _needsPlacement = true;
+            _gen++; _needsPlacement = true; _placeRetry = true;   // placed home on the next frame (after ResetParty below), not up to 0.2 s later
             _clearAt = Time.unscaledTime + FloorClearDelay;
             ContentsClear();   // contents hook: the dive is over (ended, failed or abandoned): its enemies go
             ResetParty();      // wipe: every hero arrives home up and moving, and the combat host forgets the wipe
@@ -404,8 +407,18 @@ namespace SleepingCalamity.Presentation
         // Host: placement pass
         // =================================================================================================================================
 
+        // Host: a floor was just swapped (the new floor is already built here): every hero is placed in this same frame instead of at the next 0.2 s tick,
+        // and PlacementPass keeps retrying every frame until each hero was sent (it defers while FloorSync has not built the requested floor).
+        private void MarkPlacementNow()
+        {
+            _gen++; _needsPlacement = true; _placeRetry = true;
+            PlacementPass();
+            UpdateHold();
+        }
+
         private void PlacementPass()
         {
+            _placeRetry = false;
             if (!_needsPlacement) return;
             bool pending = false;
             int slot = -1;
@@ -427,6 +440,7 @@ namespace SleepingCalamity.Presentation
                     TeleportRpc(HomeFor(slot), 0f, 0u, 0, RpcTarget.Single(id, RpcTargetUse.Temp));
                 }
             }
+            _placeRetry = pending;
             if (!NetActive.Value && !pending) _needsPlacement = false;   // home: everyone present was sent; later joiners spawn on the hub's spawn point anyway
         }
 
@@ -489,6 +503,38 @@ namespace SleepingCalamity.Presentation
             if (HeroCameraRig.Local != null) HeroCameraRig.Local.NotifyWarped(_pendPos - before);   // the camera jumps with the hero instead of gliding 200 m
             var loco = player.GetComponent<HeroLocomotion>();
             if (loco != null && loco.enabled) loco.SetView(_pendYaw, HeroLocomotion.FreePitchDownDeg);
+        }
+
+        // Owner side (host-as-owner and clients): while the dive floor this peer sees (0 = home) differs from the floor of the last teleport applied, the floor under the local hero was
+        // swapped but the arrival teleport has not landed, so the hero would sink through cells the new floor lacks. HeroLocomotion.HoldVertical freezes its gravity for that window only:
+        // released when the teleport applies (the keys match again), after PendingTimeout (a lost teleport never freezes a hero), and on despawn. Never touches other heroes (owner copy only).
+        private void UpdateHold()
+        {
+            NetworkObject player = NetworkManager != null && NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
+            HeroLocomotion loco = player != null ? player.GetComponent<HeroLocomotion>() : null;
+            if (loco == null) { _holdActive = false; return; }
+            int key = 0;
+            if (NetActive.Value)
+            {
+                ResolveSyncs();
+                key = HaulSync != null ? HaulSync.Current.CurrentFloor : -1;   // -1: the dive is on but this peer has not resolved the floor yet
+            }
+            bool hold = false;
+            if (key != _appliedFloor)
+            {
+                if (!_holdActive || key != _holdKey) { _holdActive = true; _holdKey = key; _holdSince = Time.unscaledTime; }
+                hold = Time.unscaledTime - _holdSince < PendingTimeout;
+            }
+            else _holdActive = false;
+            if (loco.HoldVertical != hold) loco.HoldVertical = hold;
+        }
+
+        private void ReleaseHold()
+        {
+            _holdActive = false;
+            NetworkObject player = NetworkManager != null && NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
+            HeroLocomotion loco = player != null ? player.GetComponent<HeroLocomotion>() : null;
+            if (loco != null) loco.HoldVertical = false;
         }
 
         // On a client the syncs are found in the scene by this peer's NetworkManager (one process can hold several peers' copies).
@@ -599,6 +645,7 @@ namespace SleepingCalamity.Presentation
 
         public override void OnNetworkDespawn()
         {
+            ReleaseHold();
             HeroVitals.ServerHeroSpawned -= OnHeroSpawned;
             _loafLedger.End();
             if (_world != null)
@@ -638,6 +685,7 @@ namespace SleepingCalamity.Presentation
         {
             if (!IsSpawned) return;
             ApplyPending();
+            UpdateHold();
             MarkFloor();
             LocalInteract();
             LocalEat();
@@ -650,6 +698,7 @@ namespace SleepingCalamity.Presentation
                 _clearAt = -1f;
                 if (!NetActive.Value && FloorSync != null) FloorSync.ServerSetFloor(_seed, CellarFloorSync.NoFloor);
             }
+            if (_placeRetry) PlacementPass();
             if (Time.unscaledTime >= _nextPlace)
             {
                 _nextPlace = Time.unscaledTime + PlacementInterval;
