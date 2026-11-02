@@ -31,7 +31,8 @@ namespace SleepingCalamity.Tests.EditMode
                     float d = HollowmereLayout.PlateauDistance(k.X, k.Z);
                     inner = Math.Min(inner, d); outer = Math.Max(outer, d);
                 }
-                if (inner < HollowmereLayout.TownWallOffset)   // a lot wholly outside the wall is not held to the inner limit
+                // a lot wholly outside the wall is not held to the inner limit; a lot straddling the wall line is a gate lot (the lower gate's R2_23) that no setback can clear
+                if (inner < HollowmereLayout.TownWallOffset && outer <= HollowmereLayout.TownWallOffset)
                     Assert.That(outer, Is.LessThanOrEqualTo(HollowmereLayout.LotWallLimit + 0.05f), f.Id + " reaches the town wall bank");
                 n++;
             }
@@ -47,7 +48,7 @@ namespace SleepingCalamity.Tests.EditMode
                 if (f.Ring != 2) continue;
                 foreach (Lane lane in t.Lanes)
                 {
-                    if (lane.Ring != 2) continue;
+                    if (lane.Ring != 2 || lane.Id.EndsWith("Stub", StringComparison.Ordinal)) continue;   // stubs branch off the lane the lots stand on
                     for (int i = 1; i < lane.Points.Length; i++)
                         foreach (TownPoint k in f.Footprint.Corners())
                             Assert.That(DistToSegment(k, lane.Points[i - 1], lane.Points[i]), Is.GreaterThanOrEqualTo(lane.Width * 0.5f - 0.05f), f.Id + " on lane " + lane.Id);

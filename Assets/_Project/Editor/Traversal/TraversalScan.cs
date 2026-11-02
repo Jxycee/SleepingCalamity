@@ -51,6 +51,8 @@ namespace SleepingCalamity.EditorTools
                     ScanResult r = TraversalProbe.Scan(s, hero, new ScanOptions());
                     Debug.Log($"SC TRAVERSAL {s.Name} issues={r.Issues.Count} targets={s.Targets.Count} reached={s.Targets.Count(x => x.Reached)} paths={s.Paths.Count} stairs={r.Stairs} visual={r.VisualMeshes} {r.Seconds:0}s");
                     report.Add(r);
+                    string dump = Environment.GetEnvironmentVariable("SC_TRAVERSAL_DUMP");   // every issue of the town spaces, one line each (REPORT.md keeps only the worst 10 per kind)
+                    if (!string.IsNullOrEmpty(dump)) File.WriteAllLines(Path.Combine(dump, s.Name + "_issues.txt"), r.Issues.Select(i => $"{i.Kind} ({i.Pos.x:0.0}, {i.Pos.y:0.0}, {i.Pos.z:0.0}) {i.Measured:0.00}/{i.Limit:0.00} [{i.Object}] {i.Detail}"));
                     TraversalReport.WriteMap(r, Path.Combine(outDir, "maps", s.Name + ".png"));
                 }
             }
