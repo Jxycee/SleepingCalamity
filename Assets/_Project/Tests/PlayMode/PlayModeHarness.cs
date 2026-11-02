@@ -30,6 +30,8 @@ namespace SleepingCalamity.Tests.PlayMode
         public static IEnumerator LoadBootstrapAndWaitForLobby()
         {
             WorldSaveFlow.Enabled = false;
+            // The shipped StreamingAssets/Tuning files (solo balance) must not move the number expectations of the regression tests: they run on the code defaults. The dive bot (SC_BOT=1) plays the tuned game.
+            if (Environment.GetEnvironmentVariable("SC_BOT") != "1") SleepingCalamity.Core.Tuning.TuningStore.Reset();
             // AppBootstrap's duplicate guard would destroy the NEW App if a stale one survived, so refuse to continue on a leak.
             string leak = null;
             if (AppBootstrap.Current != null) leak = "A previous test leaked the App (AppBootstrap.Current is not null); fix the first failing test's teardown first";

@@ -72,11 +72,20 @@ namespace SleepingCalamity.Core.Combat
         // hit, typically 25% (docs/research/combat-timings.md row 22). Now x1.0, a x1.54 step: slime hop 8 -> 11, rat-king spin 14 -> 22, broom sweep 11 -> 19,
         // Warden slam 27 -> 41 and pound 32 -> 50 (the elite's big hits sit at the top of DC1's band). Tier 2 presses through pacing instead: faster
         // cooldowns, a tighter strike gap (AttackPacing.Tier2) and mixed rosters (ArenaWaves). P9 Placeholder.
-        public const float Tier2Life = 3f, Tier2Atk = 1.0f, Tier2Def = 3.3f;
+        public static float Tier2Life = 3f, Tier2Atk = 1.0f, Tier2Def = 3.3f;   // not const: the "enemies" tuning section (EnemyTuning) overrides them at startup
 
         // First playtest (2026-10-30): tier 1 hit too hard to read the fight. Tier 1 attack is x0.65 of the 6.6 table (slime 12 -> 7.8, rat-king 18 -> 11.7,
         // broom 15 -> 9.75, Warden 30 -> 19.5). P9 Placeholder.
-        public const float Tier1Atk = 0.65f;
+        public static float Tier1Atk = 0.65f;
+
+        // The authored 'S' room spawns are rat-kings, tier 2 (life x3, defence x3.3) from this floor down. Above it they spawn as tier 1 rat-kings: the alpha
+        // bot met a 540 HP, DEF 33 rat-king in nearly every floor 1 combat room and died there. The Warden and the stir-meter hunter stay tier 2 on every floor.
+        public static int Tier2MinFloor = 3;
+
+        // Solo only (one hero present): multipliers on enemy attack and life, 1 = the table. The 1-player cut for the alpha bot's solo normal dives; 2-4 players
+        // keep CoopScaling and the tier tables untouched, so co-op does not get easier.
+        public static float SoloAtk = 1f, SoloLife = 1f;
+        public static int AuthoredTier(bool tier2Marker, bool warden, int floor) => warden || (tier2Marker && floor >= Tier2MinFloor) ? 2 : 1;
 
         // 6.6 tier 1 stats. Placeholder: which are weak to fire (the jam, the wooden broom) and which are pests (the rat-king).
         // Combat depth (2026-10-30, "fewer, tougher enemies"): small-enemy life roughly doubles so each takes a few openings (a rat-king about three with
@@ -162,8 +171,8 @@ namespace SleepingCalamity.Core.Combat
             Tier = tier >= 2 ? 2 : 1;
             Players = CoopScaling.ClampPlayers(players);
             float life = Tier == 2 ? EnemyCatalog.Tier2Life : 1f;
-            MaxHp = (int)MathF.Ceiling(def.Hp * life * CoopScaling.LifeMultiplier(Players) - 1e-4f);
-            Atk = def.Atk * (Tier == 2 ? EnemyCatalog.Tier2Atk : EnemyCatalog.Tier1Atk);   // attack is unchanged by the party size (P23)
+            MaxHp = (int)MathF.Ceiling(def.Hp * life * CoopScaling.LifeMultiplier(Players) * (Players == 1 ? EnemyCatalog.SoloLife : 1f) - 1e-4f);
+            Atk = def.Atk * (Tier == 2 ? EnemyCatalog.Tier2Atk : EnemyCatalog.Tier1Atk) * (Players == 1 ? EnemyCatalog.SoloAtk : 1f);   // attack is unchanged by the party size (P23)
             DefStat = def.Def * (Tier == 2 ? EnemyCatalog.Tier2Def : 1f);
             Hp = MaxHp;
             Revenge = new RevengeGauge(Players);
