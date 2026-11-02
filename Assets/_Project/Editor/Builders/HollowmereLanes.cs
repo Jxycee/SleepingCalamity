@@ -113,10 +113,10 @@ namespace SleepingCalamity.EditorTools
             if (_nosing == null)
             {
                 Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
-                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.42f, 0.39f, 0.33f), 0.15f, wear);
+                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.62f, 0.58f, 0.49f), 0.15f, wear);
                 _nosing.SetColor("_Color", _nosing.GetColor("_BaseColor")); _nosing.SetShaderPassEnabled("MotionVectors", true);
             }
-            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.045f), new Vector3(2f, 0.03f, 0.1f), _nosing);
+            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.156f, 0.05f), new Vector3(2f, 0.04f, 0.14f), _nosing);
             n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 

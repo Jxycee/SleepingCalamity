@@ -164,7 +164,9 @@ namespace SleepingCalamity.Presentation
                         else Face(c, d);
                     }
                     c.position = p;
-                    c.localScale = new Vector3(scale, scale, scale);
+                    // a card within 3 m of the camera would read as a huge wing: hide it there
+                    float s = cam != null && (cam.transform.position - p).sqrMagnitude < 9f ? 0f : scale;
+                    c.localScale = new Vector3(s, s, s);
                 }
             }
         }

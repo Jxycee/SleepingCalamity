@@ -36,10 +36,10 @@ namespace SleepingCalamity.Presentation
         public const int PathButterflies = 7;              // the extra flock on the lane side of each garden lot, where the paths are
 
         // ---- smoke
-        public const float SmokeRate = 3.2f;               // particles per second per chimney
+        public const float SmokeRate = 8f;              // particles per second per chimney
         public const float SmokeLifetime = 9f;
-        public const float SmokeAlpha = 0.45f;             // peak alpha of a puff
-        public static readonly Color SmokeColour = new Color(0.68f, 0.66f, 0.62f);   // light warm grey
+        public const float SmokeAlpha = 0.22f;            // peak alpha of a puff
+        public static readonly Color SmokeColour = new Color(0.58f, 0.57f, 0.56f);   // neutral warm grey
 
         // ---- fish rings
         public const float FishRingRate = 0.22f;           // rings per second per patch

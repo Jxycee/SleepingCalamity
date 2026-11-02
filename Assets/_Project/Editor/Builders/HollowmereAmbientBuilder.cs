@@ -385,7 +385,7 @@ namespace SleepingCalamity.EditorTools
             var main = ps.main;
             float life = HollowmereAmbientLife.SmokeLifetime;
             main.duration = 10f; main.loop = true; main.prewarm = true; main.startLifetime = life; main.startSpeed = 0.7f;
-            main.startSize = new ParticleSystem.MinMaxCurve(0.8f, 1.2f); main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.2832f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.3f, 0.5f); main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.2832f);
             main.startColor = Color.white; main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = Mathf.CeilToInt(HollowmereAmbientLife.SmokeRate * life) + 4; main.gravityModifier = 0f;
             var em = ps.emission; em.rateOverTime = HollowmereAmbientLife.SmokeRate;
@@ -395,11 +395,11 @@ namespace SleepingCalamity.EditorTools
             vel.x = new ParticleSystem.MinMaxCurve(1.2f * w.x, AnimationCurve.Linear(0f, 0f, 1f, 1f));
             vel.y = new ParticleSystem.MinMaxCurve(0.45f, AnimationCurve.Linear(0f, 0f, 1f, 1f));
             vel.z = new ParticleSystem.MinMaxCurve(1.2f * w.y, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 3f)));
+            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 4f)));
             var rot = ps.rotationOverLifetime; rot.enabled = true; rot.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
             var col = ps.colorOverLifetime; col.enabled = true;
             var g = new Gradient();
-            g.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.96f, 0.9f), 0f), new GradientColorKey(new Color(0.94f, 0.94f, 0.96f), 1f) },
+            g.SetKeys(new[] { new GradientColorKey(new Color(0.9f, 0.9f, 0.9f), 0f), new GradientColorKey(new Color(0.85f, 0.85f, 0.87f), 1f) },
                 new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(0.7f, 0.6f), new GradientAlphaKey(0f, 1f) });
             col.color = g;
             var noise = ps.noise; noise.enabled = true; noise.strength = 0.35f; noise.frequency = 0.3f; noise.scrollSpeed = 0.15f;
@@ -433,7 +433,7 @@ namespace SleepingCalamity.EditorTools
                 {
                     float x = (i + 0.5f) / R * 2f - 1f, y = (j + 0.5f) / R * 2f - 1f, d = Mathf.Sqrt(x * x + y * y);
                     float n = 0.6f * VN((i + 0.5f) / R, (j + 0.5f) / R, 4, 9) + 0.4f * VN((i + 0.5f) / R, (j + 0.5f) / R, 8, 10);
-                    float a = Mathf.Clamp01(1f - d); a = a * a * (3f - 2f * a) * Mathf.Lerp(0.55f, 1.25f, n);
+                    float a = Mathf.Clamp01((0.85f - d) / 0.85f); a = a * a * (3f - 2f * a) * Mathf.Lerp(0.6f, 1.1f, n);   // radial falloff reaches 0 well inside the quad: no square edges
                     smoke[j * R + i] = new Color32(255, 255, 255, (byte)Mathf.Clamp(Mathf.RoundToInt(a * 255f), 0, 255));
                     float k = (d - 0.72f) / 0.07f, edge = Mathf.Clamp01((1f - d) / 0.12f);
                     float ra = Mathf.Exp(-k * k) * edge * Mathf.Lerp(0.55f, 1f, VN((i + 0.5f) / R, (j + 0.5f) / R, 5, 11));
