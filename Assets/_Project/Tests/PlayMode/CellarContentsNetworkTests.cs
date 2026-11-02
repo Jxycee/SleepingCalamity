@@ -426,6 +426,12 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(springAt - t0, Is.GreaterThanOrEqualTo(FloorTwistTuning.AmbushDelaySeconds - 0.1f), "the ambush sprang before the delay ran out");
             Assert.That(EnemiesOn(c.HostNm).Count, Is.EqualTo(expected));
             foreach (Enemy e in EnemiesOn(c.HostNm)) Assert.That(NearRing(c, ring, e), Is.True, "a host ambush enemy stands near one of the ring cells right after the spawn");
+            Vector3 playerAt = c.Players[c.HostId];
+            foreach (Enemy e in EnemiesOn(c.HostNm))
+            {
+                Vector3 d = e.transform.position - playerAt; d.y = 0f;
+                Assert.That(d.magnitude, Is.GreaterThanOrEqualTo(CellarSpawnSafety.AmbushMinPlayerMeters - 0.5f), "a host ambush enemy spawns at least the safety distance from the player");
+            }
             yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.Client.NetworkManager).Count == expected, Timeout, "the client does not see the ambush enemies");
             foreach (Enemy e in EnemiesOn(c.Client.NetworkManager)) Assert.That(NearRing(c, ring, e), Is.True, "a client ambush enemy stands near one of the ring cells");
         }
@@ -508,6 +514,45 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(EnemiesOn(c.HostNm).Count, Is.EqualTo(0));
             c.Players[c.HostId] = inside;
             yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected, Timeout, "the re-armed ambush never sprang once a player was inside");
+        }
+
+        // Catches: the hunter respawning on top of a player the host's filtered list dropped (downed heroes, players not yet live). A player standing on the hunter cell who has not
+        // moved since the floor armed is "stale" in the filtered list; the guard must still see him.
+        [UnityTest]
+        public IEnumerator Hunter_PlayerOnItsCell_NoRespawn_RespawnsOnceThePlayerLeaves()
+        {
+            Ctx c = null; yield return Setup(x => c = x, default, null, 3);
+            DiveState ds = c.Haul.HostState;
+            ds.Stir.PlayersPresent = 4;
+            for (int f = 1; f <= 3; f++) Assert.That(c.Haul.ServerMarkCleared(f), Is.True);
+            foreach (int id in new[] { 100, 101, 200, 201 }) Assert.That(c.Haul.ServerAddPiece(id), Is.True);
+            Assert.That(ds.Stir.HunterLatched, Is.True, "the stir meter latched the hunter");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.EncounterPlan != null && c.Haul.EncounterPlan.Hunter != null && c.Haul.EncounterPlan.HunterLatched, Timeout, "the encounter plan has no hunter");
+            EncounterSpawn h = c.Haul.EncounterPlan.Hunter;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.HunterEnemy != null, Timeout, "the hunter never spawned the first time");
+            Enemy first = c.Contents.HunterEnemy;
+            c.Players[c.HostId] = Cell(c, h.X, h.Y);
+            Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True, "re-arm with the player already standing on the hunter cell (stale in the filtered list)");
+            for (int i = 0; i < 30; i++) yield return null;
+            yield return new WaitForSeconds(0.5f);
+            Assert.That(c.Contents.HunterEnemy, Is.Null, "a player stands on the hunter cell: no respawn");
+            c.Players[c.HostId] = Cell(c, h.X, h.Y) + Vector3.right * 80f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.HunterEnemy != null, Timeout, "the hunter never respawned once the player left");
+        }
+
+        // Catches: BUGS 18, a save with piece 0 already home left piece id 101 without a collectible sphere (spot i was mapped to PieceId(floor, i), the spot count to the remaining count).
+        [UnityTest]
+        public IEnumerator Pieces_PieceZeroAlreadyHome_EveryRemainingPieceStillGetsASphere()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            int home = DiveHaul.PieceId(1, 0), left = DiveHaul.PieceId(1, 1);
+            Assert.That(c.Haul.HostState.Haul.MarkHome(home), Is.True);
+            Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.PieceCount == 1 && c.Peer.PieceCount == 1, Timeout, "the floor did not rebuild with one piece sphere");
+            Assert.That(c.Contents.TryPiecePosition(0, out Vector3 at), Is.True);
+            Assert.That(c.Haul.HostState.Haul.IsCollected(left), Is.False);
+            c.Players[c.HostId] = at;
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.HostState.Haul.IsCollected(left), Timeout, "the remaining piece (101) has no collectible sphere");
         }
     }
 }

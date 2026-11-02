@@ -38,6 +38,8 @@ namespace SleepingCalamity.Core
         public int OriginFloor(int pieceId) => _originOf.TryGetValue(pieceId, out int f) ? f : 0;
         public bool IsCollected(int pieceId) => _unbanked.Contains(pieceId) || _banked.Contains(pieceId) || _home.Contains(pieceId);
         public bool IsBanked(int pieceId) => _banked.Contains(pieceId);
+        public bool IsHome(int pieceId) => _home.Contains(pieceId);   // restored from a save as already in the town
+        public int AssignedOn(int floor) => floor >= 1 && floor <= PieceFloors ? _assigned[floor] : 0;   // pieces assigned to the floor (ids PieceId(floor, 0..n-1))
         public IEnumerable<int> UnbankedPieces => _unbanked;
         public IEnumerable<int> BankedPieces => _banked;
         public IEnumerable<KeyValuePair<int, int>> BankedLoot => _lootBanked;   // item id -> count, ascending (the world save reads it)

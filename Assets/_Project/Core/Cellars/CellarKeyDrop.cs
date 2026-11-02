@@ -11,12 +11,13 @@ namespace SleepingCalamity.Core
         {
             int n = CellarFloorLayout.GridSize;
             var ok = new bool[n, n];
+            var resolved = CellarRoomChunks.Resolve(layout, dressing);
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r];
                 for (int x = 0; x < p.Width; x++) for (int y = 0; y < p.Height; y++)
                     if (p.Room.CellAt(x, y) == CellKind.Floor) ok[p.X + x, p.Y + y] = true;
-                foreach (ResolvedChunk c in CellarRoomChunks.Resolve(layout, dressing).ChunksOf(r))
+                foreach (ResolvedChunk c in resolved.ChunksOf(r))
                     foreach (var sc in CellarRoomChunks.SolidCells(layout, c)) ok[sc.cell.X, sc.cell.Y] = false;
             }
             return ok;
