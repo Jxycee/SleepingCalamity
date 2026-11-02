@@ -28,7 +28,11 @@ namespace SleepingCalamity.Core
         public static readonly TownPoint UndercroftStair = new TownPoint(15f, 12.5f); // inside the cistern house, the way down (P25)
         public static readonly TownPoint LakeCentre = new TownPoint(10f, -102f);
         public const float LakeRadiusX = 70f, LakeRadiusZ = 24f;
-        const float LotSetback = 1.0f, NarrowSetback = 0.2f;   // lane edge to lot edge (NarrowSetback: the one lot that has to clear the town wall behind it)
+        const float LotSetback = 1.0f, MinLotSetback = 0.2f;   // lane edge to lot edge: the default, and the least a lot may be pulled in to clear the town wall behind it
+        // The town wall (TownWallOffset, on its bank) is a hard limit for every lot: the farthest lot corner stays LotWallClearance inside the wall's inner face.
+        public const float WallHalfThickness = 0.4f, LotWallClearance = 1.0f;
+        public const float LotWallLimit = TownWallOffset - WallHalfThickness - LotWallClearance;   // max PlateauDistance of any lot corner (26.6)
+        public const float MinLotLaneClearance = MinLotSetback;                                  // lane edge to lot edge, the floor
         public const float MaxLaneGrade = 0.30f;   // lanes are relaxed to this rise per metre (about 17 deg), under TownLayout.MaxGrade (20 deg)
 
         // Plateau (ring 1 shelf) for the ground: x -34..34, south to z -36, open to the north, south corners rounded (radius 10).
@@ -506,9 +510,20 @@ namespace SleepingCalamity.Core
                 var right = new TownPoint(dir.Z, -dir.X);
                 TownPoint n = right * r.Side;   // from the lane toward the lot
                 float half = Foundation.SideLength(r.Size) * 0.5f;
-                float setback = r.Id == "R2_16" ? NarrowSetback : LotSetback;   // R2_16's back doorstep stood against the town wall: the lot sits 0.8 m closer to its lane
+                // General clearance rule: the default setback, then pulled toward the lane by whatever shortfall the town wall behind the lot leaves (never under MinLotSetback).
+                float setback = LotSetback;
                 TownPoint c = p + n * (lane.Width * 0.5f + setback + half);
                 float yaw = (float)(Math.Atan2(n.X, n.Z) * 180.0 / Math.PI);   // lot +Z points away from the lane, so its South side faces it
+                for (int pass = 0; pass < 6 && setback > MinLotSetback; pass++)
+                {
+                    float outer = 0f, inner = float.MaxValue;
+                    foreach (TownPoint k in new Footprint(c, half * 2f, half * 2f, yaw).Corners()) { float d = PlateauDistance(k.X, k.Z); outer = Math.Max(outer, d); inner = Math.Min(inner, d); }
+                    float excess = outer - LotWallLimit;
+                    if (excess <= 0.001f || inner >= TownWallOffset) break;   // clear already, or a lot wholly outside the wall (ring 3)
+                    float step = Math.Min(excess, setback - MinLotSetback);
+                    setback -= step;
+                    c = c - n * step;
+                }
                 t.Foundations.Add(new Foundation { Id = r.Id, Ring = r.Ring, Size = r.Size, Centre = c, Yaw = (float)Math.Round(yaw, 2), Facing = LotSide.South, RuinVariant = Variant(r.Size, variants[vi++ % 3]) });
             }
 
