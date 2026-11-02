@@ -1,6 +1,6 @@
 Title: Town visual polish: the cheap, high-read batch from the trailer review
 Target: cloud
-Status: started (Target local)
+Status: done (fd8c29a5)
 Model: sonnet
 From: the user, via the World traversal scan session (claude/great-lovelace-r22yqw); review on main 8e434b3
 Status file: Reference/sessions/town-visual-polish/STATUS.md
