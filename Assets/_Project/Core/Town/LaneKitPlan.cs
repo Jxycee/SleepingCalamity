@@ -227,7 +227,7 @@ namespace SleepingCalamity.Core
                 if (len < 0.8f) continue;
                 int n = Math.Max(1, (int)Math.Ceiling(len / 2f - 1e-3f));
                 float scale = len / n / 2f, tilt = (float)(Math.Atan(s.Grade) * 180.0 / Math.PI), yaw = YawAlong(s.Dir);
-                bool kerb = Math.Abs(s.Grade) >= RampGrade;
+                bool kerb = Math.Abs(s.Grade) >= RampGrade && !s.Flight;   // round 3: the tilted kerb bars read as a black ribbon beside the stepped flight
                 for (int i = 0; i < n; i++)
                 {
                     float sm = a + (i + 0.5f) * len / n, h = s.H(sm);
