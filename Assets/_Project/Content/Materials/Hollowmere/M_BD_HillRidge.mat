@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_BD_HillRidge
+  m_Shader: {fileID: 4800000, guid: 03b8ebfdc7fd1f0c1932a9872a1821cd, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DistFar: 2200
+    - _DistNear: 1200
+    - _GroundMist: 0.1
+    - _HazeCoolAmt: 0.6
+    - _HazeFar: 0.82
+    - _HazeNear: 0.72
+    - _MistScale: 40
+    - _MistTop: -8
+    - _NoiseAmp: 0.04
+    - _NoiseLit: 0.03
+    m_Colors:
+    - _BaseColor: {r: 0.17, g: 0.24, b: 0.19, a: 1}
+    - _HazeCool: {r: 0.68200004, g: 0.8, b: 1.32, a: 1}
+    - _HazeTint: {r: 0.98, g: 1, b: 1.03, a: 1}
+    - _ShadowTint: {r: 0.3, g: 0.38, b: 0.48, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

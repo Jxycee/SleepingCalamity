@@ -68,6 +68,7 @@ namespace SleepingCalamity.Tests.PlayMode
             public readonly FakeInputService HostInput = new FakeInputService(), ClientInput = new FakeInputService();
             // Per-frame Y sampling of every hero copy.
             public float MinY = float.MaxValue; public string MinWhere = ""; public int Frames;
+            public bool ClientHoldSeen; public int ClientHeldFrames, HeldNotGrounded;   // the client owner copy's gravity hold, per leg (HeldNotGrounded: held 3+ frames yet IsGrounded false)
             public NetworkObject[] Copies => new[] { HostHero, ClientHeroOnHost, ClientHeroOwn };
             public readonly string[] Names = { "host hero (host copy)", "client hero (host copy)", "client hero (owner copy)" };
         }
@@ -110,6 +111,13 @@ namespace SleepingCalamity.Tests.PlayMode
         private static void Sample(Rig r)
         {
             r.Frames++;
+            var ownLoco = r.ClientHeroOwn.GetComponent<HeroLocomotion>();
+            if (ownLoco.HoldVertical)
+            {
+                r.ClientHoldSeen = true; r.ClientHeldFrames++;
+                if (r.ClientHeldFrames >= 3 && !ownLoco.IsGrounded) r.HeldNotGrounded++;
+            }
+            else r.ClientHeldFrames = 0;
             NetworkObject[] copies = r.Copies;
             for (int i = 0; i < copies.Length; i++)
             {
@@ -154,8 +162,12 @@ namespace SleepingCalamity.Tests.PlayMode
         private static readonly List<string> Failures = new List<string>();
 
         // Logs the leg's min Y, records a failure when a hero sank, and starts a fresh leg. The failures are asserted together at the end so one run reports every leg.
-        private static void AssertNoSink(Rig r, string leg)
+        private static void AssertNoSink(Rig r, string leg, bool expectClientHold = false, NetCondition net = NetCondition.None)
         {
+            Debug.Log("SC_STAIR " + leg + ": client hold seen " + r.ClientHoldSeen);
+            if (expectClientHold && !r.ClientHoldSeen && leg.Contains("F1")) Failures.Add(leg + ": the client owner copy's HoldVertical was never true between the floor change and the teleport");
+            if (r.HeldNotGrounded > 0) Failures.Add(leg + ": IsGrounded was false for " + r.HeldNotGrounded + " frames while HoldVertical was held (dodge/sprint need a grounded hero)");
+            r.ClientHoldSeen = false; r.ClientHeldFrames = 0; r.HeldNotGrounded = 0;
             string line = leg + ": min Y " + r.MinY.ToString("F2") + " (" + r.MinWhere + ", " + r.Frames + " frames sampled)";
             Debug.Log("SC_STAIR " + line);
             if (!(r.MinY > Origin.y - MaxSink)) Failures.Add("a hero sank: " + line);
@@ -197,13 +209,21 @@ namespace SleepingCalamity.Tests.PlayMode
                 yield return Track(r, () => Flat(r.ClientHeroOnHost.transform.position, stair) < 3f, "the client hero reaching the floor-" + floor + " stair on the host");
                 int f = floor;
                 r.Host.ServerOpenStair(floor);   // the gate key is on by default once the contents spawn
+                r.ClientHoldSeen = false; r.ClientHeldFrames = 0; r.HeldNotGrounded = 0;
+                r.Host.TestDelayPlacement(5f);   // the 0.2 s tick can never place anyone in time now: only the swap-frame placement can
+                if (floor == 1) r.Peer.TestDelayApply(1f);   // the client owner copy holds its arrival teleport back 1 s: the gravity-hold window is open for real
                 if (floor == 1) r.Peer.RequestStair(1);   // the real client request path
-                else Assert.That(r.Host.ServerTryStair(r.HostNm.LocalClientId, 2), Is.True, "host stair press F2");   // the host hero presses, through the host rule directly
+                else
+                {
+                    Assert.That(r.Host.ServerTryStair(r.HostNm.LocalClientId, 2), Is.True, "host stair press F2");   // the host hero presses, through the host rule directly
+                    Assert.That(r.Host.TestPlacedThisGen(r.HostNm.LocalClientId) && r.Host.TestPlacedThisGen(r.Client.NetworkManager.LocalClientId), Is.True, "every hero was placed in the swap frame (before the call returned)");
+                    Assert.That(r.Host.HasPendingTeleport, Is.True, "the host-owner copy has its arrival teleport in hand in the swap frame");
+                }
                 yield return Track(r, () => r.HostHaul.Current.CurrentFloor == f + 1, "the host advancing to floor " + (f + 1));
                 yield return AllBuilt(r, f + 1);
                 yield return Landed(r, f + 1);
                 yield return Seconds(0.3f);
-                AssertNoSink(r, "stair F" + floor + " -> F" + (floor + 1));
+                AssertNoSink(r, "stair F" + floor + " -> F" + (floor + 1), true, net);
             }
 
             // Go home (the abandon path ends the dive like a fail): both heroes are sent to the hub; the floor stays up for the clear delay.
