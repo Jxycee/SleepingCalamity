@@ -227,6 +227,9 @@ namespace SleepingCalamity.Core
                 if (len < 0.8f) continue;
                 int n = Math.Max(1, (int)Math.Ceiling(len / 2f - 1e-3f));
                 float scale = len / n / 2f, tilt = (float)(Math.Atan(s.Grade) * 180.0 / Math.PI), yaw = YawAlong(s.Dir);
+                // A10: the segment that runs into a flight has no gutter bar: it dips under the terrain beside the treads
+                // and show only as black wedges along the flight edge (Cap_HM_TerraceSteps).
+                bool nearFlight = s.Flight || c.Segs.Exists(o => o.Flight && o.LaneIdx == s.LaneIdx && Math.Abs(o.I - s.I) == 1);
                 bool kerb = Math.Abs(s.Grade) >= RampGrade && !s.Flight;   // round 3: the tilted kerb bars read as a black ribbon beside the stepped flight
                 for (int i = 0; i < n; i++)
                 {
@@ -236,9 +239,9 @@ namespace SleepingCalamity.Core
                         Add(c, LanePiece.LaneKerb, LanePreset.Both, s.Lane.Id, s.P(sm, -(s.Hw + 0.15f)), h, yaw, scale, tilt);
                         Add(c, LanePiece.LaneKerb, LanePreset.Both, s.Lane.Id, s.P(sm, s.Hw + 0.15f), h, yaw, scale, tilt);
                     }
-                    if (!s.Flight) AddPair(c, LanePiece.GutterChoked, LanePiece.Gutter, s.Lane.Id, s.P(sm, s.Hw - GutterWidth * 0.5f), h, yaw, scale, tilt);
+                    if (!nearFlight) AddPair(c, LanePiece.GutterChoked, LanePiece.Gutter, s.Lane.Id, s.P(sm, s.Hw - GutterWidth * 0.5f), h, yaw, scale, tilt);
                 }
-                if (s.Flight) continue;
+                if (nearFlight) continue;
                 // A run ends where the next segment of the lane does not continue it (square, junction, wall line): a grate at its downhill end.
                 bool downIsB = s.Grade >= 0f;
                 bool endsHere = downIsB ? (s.JB || s.S1 < s.Len - 0.15f || !HasNext(c, s)) : (s.JA || s.S0 > 0.05f || !HasPrev(c, s));
