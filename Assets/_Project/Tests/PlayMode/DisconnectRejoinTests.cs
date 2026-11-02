@@ -131,6 +131,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
         private IEnumerator StartDive(Rig rig)
         {
+            rig.Host.SeedOverride = 12345u;   // every dive draws a fresh random seed otherwise; the bank point and walk positions below must be the same floors every run
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[dive] the host starts the dive");
             yield return FloorBuilt(rig, 1, "[dive F1]");
         }
