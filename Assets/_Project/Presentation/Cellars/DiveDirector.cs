@@ -76,11 +76,62 @@ namespace SleepingCalamity.Presentation
         public TownSnapshot CaptureTown()
         {
             DiveState dive = _haulBegun && HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState : _savedDive;
-            return Town.Capture(dive, _heartBanked ? new[] { TownBuildings.BakerResident } : null);
+            return Town.Capture(dive, _heartBanked ? new[] { TownBuildings.BakerResident } : null, _residents);
+        }
+
+        // M6 S5, host only: the baker's first-meet beat (Q4 C). Latched by BakerTick the first time he stands in his complete bakery, kept in _residents (written into the residents
+        // save section by CaptureTown, restored by RestoreTown; null until a latch exists or one was loaded, so an unknown copy never overwrites the saved one) and mirrored to
+        // every peer through TownSync.NetBakerMet. It never goes back to false.
+        private ResidentsSave _residents;
+        private bool _bakerMet;
+        public bool BakerMet => _bakerMet;
+
+        // Host: latches the beat from the host town (idempotent), publishes it, and saves the world once when it flips.
+        public void BakerTick()
+        {
+            if (!IsServer || !IsSpawned) return;
+            if (!_bakerMet && BakerService.NextFirstMeet(false, Town.State))
+            {
+                _bakerMet = true;
+                if (_residents == null) _residents = new ResidentsSave();
+                ResidentSave r = _residents.Residents.Find(x => x != null && x.Id == TownBuildings.BakerResident);
+                if (r == null) _residents.Residents.Add(new ResidentSave { Id = TownBuildings.BakerResident, FirstMeetBeat = true }); else r.FirstMeetBeat = true;
+                if (_world != null) _world.RequestSave();
+            }
+            if (TownSync != null && TownSync.IsSpawned && TownSync.NetBakerMet.Value != _bakerMet) TownSync.NetBakerMet.Value = _bakerMet;
+        }
+
+        // Host, at dive start: every connected player's hero gets the baker's loaves (BakerService decides; the count REPLACES last dive's leftovers, so loaves are one dive's bread).
+        // A player is told when the baker is housed but his wishes are unmet.
+        private readonly DiveLoafLedger _loafLedger = new DiveLoafLedger();   // host: the dive-start loaf decision, replayed to a hero that spawns mid-dive
+
+        private void OnHeroSpawned(HeroVitals v)
+        {
+            if (!IsServer || v == null || v.NetworkManager != NetworkManager) return;
+            int? n = _loafLedger.ForSpawn();
+            if (n.HasValue) v.ServerSetLoaves(n.Value);
+        }
+
+        private void GrantLoaves()
+        {
+            BakerTick();
+            BakerLoaves loaves = BakerService.Evaluate(Town.State);
+            _loafLedger.Begin(loaves.PerPlayer);
+            IReadOnlyList<HeroVitals> heroes = HeroVitals.All;
+            for (int i = 0; i < heroes.Count; i++)
+            {
+                HeroVitals v = heroes[i];
+                if (v == null || !v.IsSpawned || v.NetworkManager != NetworkManager) continue;
+                v.ServerSetLoaves(loaves.PerPlayer);
+                if (loaves.Notify) NoticeTo(v.OwnerClientId, BakerService.WishesUnmetNotice);
+                else if (loaves.Granted) NoticeTo(v.OwnerClientId, "The baker packed " + loaves.PerPlayer + " loaves for you.");
+            }
         }
 
         public void RestoreTown(TownSnapshot loaded)
         {
+            _residents = loaded?.Residents != null ? TownSaveRules.MergeLatches(null, loaded.Residents) : null;
+            _bakerMet = TownSaves.FirstMeetBeat(_residents, TownBuildings.BakerResident);
             _savedDive = Town.Restore(loaded, PiecesPerFloor, DiveStir);   // capture-only until the first dive (spawn-time counts); the dive that runs is built from the snapshot at its start
             _loadedTown = loaded;
             _heartBanked = false;
@@ -140,6 +191,7 @@ namespace SleepingCalamity.Presentation
             RefreshStairOpen(floor);
             FloorSync.ServerSetFloor(_seed, floor);
             NetActive.Value = true;
+            GrantLoaves();
             _gen++; _needsPlacement = true;
             DiveStarted?.Invoke();
             FloorChanged?.Invoke(floor);
@@ -242,6 +294,7 @@ namespace SleepingCalamity.Presentation
                 int stocked = Town.Receive(HaulSync.HostState.Haul, _heartBanked);
                 if (stocked > 0 || _heartBanked) StockReceived?.Invoke(stocked);
             }
+            _loafLedger.End();
             NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
             RefreshStartFloor();
             _gen++; _needsPlacement = true;
@@ -528,6 +581,15 @@ namespace SleepingCalamity.Presentation
             if (dev.WasPressed(DevKey.AbandonDive)) ServerAbandonDive();
         }
 
+        // Owner (any peer): H eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf).
+        private void LocalEat()
+        {
+            if (!(HeroInput.ResolveDefault() is IDevInput dev) || !dev.WasPressed(DevKey.EatLoaf)) return;
+            NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
+            HeroVitals v = player != null ? player.GetComponent<HeroVitals>() : null;
+            if (v != null) v.RequestEatLoaf();
+        }
+
         private void MarkFloor()
         {
             ResolveSyncs();
@@ -536,6 +598,8 @@ namespace SleepingCalamity.Presentation
 
         public override void OnNetworkDespawn()
         {
+            HeroVitals.ServerHeroSpawned -= OnHeroSpawned;
+            _loafLedger.End();
             if (_world != null)
             {
                 try { _world.UnregisterTownSource(this); } catch (System.Exception e) { Debug.LogException(e); }
@@ -554,7 +618,7 @@ namespace SleepingCalamity.Presentation
         {
             if (Instance == null || IsServer) Instance = this;   // one process can hold several peers' directors (tests): the host's wins
             if (IsServer && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostWorld w)) { _world = w; try { w.RegisterTownSource(this); } catch (System.Exception e) { Debug.LogException(e); } }   // a save-layer fault must not stop the spawn
-            if (IsServer) SpawnTownSync();
+            if (IsServer) { HeroVitals.ServerHeroSpawned += OnHeroSpawned; SpawnTownSync(); }
         }
 
         // Host (M6 S4): the town's replication object, a dynamic network prefab spawned beside the director so a late joiner gets it with the spawn. The town it publishes is Town.State.
@@ -565,6 +629,7 @@ namespace SleepingCalamity.Presentation
             if (prefab == null) { Debug.LogError("DiveDirector: TownSync is not in the network prefab list (run the project builder)."); return; }
             TownSync = NetworkManager.SpawnManager.InstantiateAndSpawn(prefab, NetworkManager.LocalClientId, true, false, false, Vector3.zero, Quaternion.identity).GetComponent<TownSync>();
             TownSync.Director = this;
+            TownSync.ServerSeedBakerMet(_bakerMet);   // a latch restored from the save: published without the first-meet line
             TownSync.ServerRefresh();
         }
 
@@ -574,6 +639,7 @@ namespace SleepingCalamity.Presentation
             ApplyPending();
             MarkFloor();
             LocalInteract();
+            LocalEat();
             if (!IsServer) return;
             DevKeys();
             ContentsTick();
@@ -588,6 +654,7 @@ namespace SleepingCalamity.Presentation
                 _nextPlace = Time.unscaledTime + PlacementInterval;
                 FallNet();
                 PlacementPass();
+                BakerTick();
             }
         }
 
