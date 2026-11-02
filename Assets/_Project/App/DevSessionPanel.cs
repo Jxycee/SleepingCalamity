@@ -101,6 +101,7 @@ namespace SleepingCalamity.App
                 if (GUILayout.Button("Leave")) Run("Leave", () => session.LeaveAsync());
             }
 
+            if (Debug.isDebugBuild || Application.isEditor) GUILayout.Label("F4: dive stats overlay (dev, read-only)");
             if (!string.IsNullOrEmpty(status)) GUILayout.Label(status);
             if (Time.unscaledTime < toastUntil) GUILayout.Label("Message: " + toast);
             GUILayout.EndArea();
