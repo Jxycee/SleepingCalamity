@@ -1,6 +1,6 @@
 Title: Hollowmere stairs + traversal 3
 Target: cloud
-Status: started
+Status: blocked: partial. Job 2 fixed on branch claude/stairs-traversal-3 (38c5eb5, unmerged, needs PC build+check); job 1 shade tweak only, job 3 not done. See STATUS.md
 Started: 2026-11-02T08:03:36Z (cloud launcher)
 Model: sonnet
 From: coordinator session 7 (board queue qwr9ux), follow-ups of town-surfaces 5a910999 and traversal-2 db3d88bb
