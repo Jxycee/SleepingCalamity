@@ -130,6 +130,7 @@ namespace SleepingCalamity.EditorTools
             go.transform.localScale = Vector3.one * i.Scale;
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
             if (i.Kind == RoadItemKind.Shrine || i.Kind == RoadItemKind.Cart || i.Kind == RoadItemKind.Milestone) Collider(go, i.Kind);
+            else if (i.Kind == RoadItemKind.Fence && prefab != null) AddMeshColliders(go);   // the rails along the road were walk-through
             placed++;
         }
 
@@ -502,6 +503,78 @@ namespace SleepingCalamity.EditorTools
             var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = RoadMaterial();
             r.shadowCastingMode = ShadowCastingMode.Off;
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+            RoadEnd(ring, line, t);
+        }
+
+        // The Saltwake road's last node stands 2 m past the terrain edge, where the ring road ribbon has no collider: the hero could not reach it, and walked on to the void.
+        // A collider pad under the ribbon's first EndPad metres (rising from the terrain edge's height to the ribbon's) carries the road end, and fence rails close it.
+        const float EndPad = 12f, EndHalf = 2.4f;
+        static void RoadEnd(Transform ring, List<Vector2> line, TownLayout t)
+        {
+            var pad = new List<Vector2> { line[0] };
+            float len = 0f;
+            for (int i = 1; i < line.Count && len < EndPad; i++) { len += Vector2.Distance(line[i], line[i - 1]); pad.Add(line[i]); }
+            if (pad.Count < 2) return;
+            float edgeY = HollowmereLayout.Ground(t, SaltwakeRoadPlan.TerrainMinX + 0.5f, pad[0].y);   // the layout's ground, which the terrain heights are built from
+            pad.Insert(0, new Vector2(SaltwakeRoadPlan.TerrainMinX + 2f, pad[0].y));   // starts on the terrain so the two colliders overlap
+            Debug.Log("SC HOLLOWMERE road end pad: edgeY=" + edgeY.ToString("0.00") + " ringY=" + RingHeight(pad[1].x, pad[1].y).ToString("0.00") + " points=" + pad.Count);
+            var v = new List<Vector3>(); var idx = new List<int>();
+            float along = 0f;
+            for (int i = 0; i < pad.Count; i++)
+            {
+                Vector2 d = (i < pad.Count - 1 ? pad[i + 1] - pad[i] : pad[i] - pad[i - 1]).normalized, nrm = new Vector2(-d.y, d.x);
+                if (i > 0) along += Vector2.Distance(pad[i], pad[i - 1]);
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    Vector2 p = pad[i] + nrm * (EndHalf * s);
+                    v.Add(new Vector3(p.x, Mathf.Lerp(edgeY, RingHeight(p.x, p.y) + 0.12f, Mathf.Clamp01(along / 6f)), p.y));
+                }
+                if (i > 0) { int b = v.Count - 4; idx.AddRange(new[] { b, b + 2, b + 3, b, b + 3, b + 1, b, b + 3, b + 2, b, b + 1, b + 3 }); }   // both windings: a collider is one-sided
+            }
+            var mesh = new Mesh { name = "RD_RingRoadEnd" };
+            mesh.SetVertices(v); mesh.SetTriangles(idx, 0);
+            mesh.RecalculateNormals(); mesh.RecalculateBounds();
+            var go = new GameObject("RingRoadEnd");
+            go.transform.SetParent(ring, false);
+            go.AddComponent<MeshCollider>().sharedMesh = mesh;   // under the drawn ribbon, no renderer of its own
+
+            // the barrier: fence rails across the road at the pad's end
+            Vector2 last = pad[pad.Count - 1], dirEnd = (pad[pad.Count - 1] - pad[pad.Count - 2]).normalized;
+            GameObject prefab = Model("Fence_Rail");
+            float yawAcross = Mathf.Atan2(dirEnd.x, dirEnd.y) * Mathf.Rad2Deg;   // local Z along the road, so the rail's run (local X) lies across it
+            float y = v[v.Count - 1].y;
+            if (prefab != null)
+            {
+                float railLen = 3f;
+                var probe = (GameObject)PrefabUtility.InstantiatePrefab(prefab, ring);
+                probe.transform.rotation = Quaternion.identity;
+                if (HollowmereClutter.VisibleBounds(probe.transform, out Bounds pb)) railLen = Mathf.Max(0.5f, pb.size.x);
+                Object.DestroyImmediate(probe);
+                int n = Mathf.CeilToInt(2f * EndHalf / railLen);
+                Vector2 across = new Vector2(-dirEnd.y, dirEnd.x);
+                for (int k = 0; k < n; k++)
+                {
+                    Vector2 p = last + across * ((k + 0.5f - n * 0.5f) * railLen);
+                    var rail = (GameObject)PrefabUtility.InstantiatePrefab(prefab, ring);
+                    rail.name = "RoadEnd_Fence_Rail" + k;
+                    HollowmereTownWall.ApplyMaterials(rail, Slots(), "Fence_Rail");
+                    foreach (Renderer r in rail.GetComponentsInChildren<Renderer>(true)) if (r.name == "FOOTPRINT") Object.DestroyImmediate(r);
+                    rail.transform.SetPositionAndRotation(new Vector3(p.x, y, p.y), Quaternion.Euler(0f, yawAcross, 0f));
+                    AddMeshColliders(rail);
+                }
+            }
+            else
+            {
+                var bar = new GameObject("RoadEnd_Barrier"); bar.transform.SetParent(ring, false);
+                bar.transform.SetPositionAndRotation(new Vector3(last.x, y + 0.6f, last.y), Quaternion.Euler(0f, yawAcross, 0f));
+                bar.AddComponent<BoxCollider>().size = new Vector3(2f * EndHalf, 1.2f, 0.2f);
+            }
+        }
+
+        static void AddMeshColliders(GameObject go)
+        {
+            foreach (MeshFilter mf in go.GetComponentsInChildren<MeshFilter>(true))
+                if (mf.sharedMesh != null && mf.name != "FOOTPRINT" && mf.GetComponent<Collider>() == null) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
         }
     }
 }

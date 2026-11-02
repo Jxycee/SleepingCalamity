@@ -308,8 +308,8 @@ namespace SleepingCalamity.EditorTools
                 Debug.Log("SC HOLLOWMERE keep art=missing, greybox wall=" + run.Count + " pieces");
                 return;
             }
-            int steps = KitStair(kit, keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, run, kz);
-            steps += KitStair(kit, keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, run, kz);
+            int steps = KitStair(kit, keep, "EastStair", t.Node("Keep_StairFoot"), t.Node("Keep_StairHead"), 2.2f, run, kz, t);
+            steps += KitStair(kit, keep, "WestStair", t.Node("Keep_WStairFoot"), t.Node("Keep_WStairHead"), 1.8f, run, kz, t);
             // Benches on the terrace by the parapet, clear of the walk edges, the hall, the tower and the annex.
             int benches = 0;
             foreach (float bx in new[] { -15.5f, -11.5f, 22.0f })
@@ -323,11 +323,12 @@ namespace SleepingCalamity.EditorTools
 
         // One flight from the kit: StairStep treads stacked foot to head (scaled to the width and the real rise and run), a stone core under them, raked balustrades on the
         // open sides (not where the retaining wall stands) and newels at the foot and the head. Returns the step count.
-        static int KitStair(HollowmereKeepArt kit, Transform parent, string name, PathNode foot, PathNode head, float width, List<(TownPoint A, TownPoint B)> run, float kz)
+        static int KitStair(HollowmereKeepArt kit, Transform parent, string name, PathNode foot, PathNode head, float width, List<(TownPoint A, TownPoint B)> run, float kz, TownLayout t)
         {
             Transform g = Child(parent, name);
             TownPoint d = head.Pos - foot.Pos;
-            float len = d.Length, yaw = Mathf.Atan2(d.X, d.Z) * Mathf.Rad2Deg, rise = head.Y - foot.Y;
+            float footY = Mathf.Min(foot.Y, HollowmereLayout.Ground(t, foot.Pos.X, foot.Pos.Z));   // the west flight's foot node is 0.3 m above the ground there: the first tread would be a 0.5 m step
+            float len = d.Length, yaw = Mathf.Atan2(d.X, d.Z) * Mathf.Rad2Deg, rise = head.Y - footY;
             int n = Mathf.Max(6, Mathf.RoundToInt(rise / 0.222f));
             n = Mathf.Max(6, (n / 6) * 6);   // whole balustrade blocks of 6 steps
             float pitch = len / n, r = rise / n;
@@ -337,13 +338,14 @@ namespace SleepingCalamity.EditorTools
             for (int s = 0; s < n; s++)
             {
                 Vector3 start = new Vector3(foot.Pos.X, 0f, foot.Pos.Z) + dir * (pitch * s);
-                float top = foot.Y + r * (s + 1);
+                float top = footY + r * (s + 1);
                 kit.Clone("StairStep", g, "Step" + s, new Vector3(start.x, top - r, start.z), yaw, new Vector3(width / 2f, r / 0.222f, pitch / 0.367f));
-                float bottom = foot.Y - 0.3f, h = top - r - bottom;
+                float bottom = footY - 0.3f, h = top - r - bottom;
                 if (h > 0.01f)
                 {
                     var box = LookTestBuilder.Box(g, "Core" + s, start + dir * (pitch * 0.5f) + Vector3.up * (bottom + h * 0.5f), new Vector3(width - 0.2f, h, pitch + 0.02f),
                         core ?? (core = kit.CoreMaterial()), new Vector3(0f, yaw, 0f), 2f);
+                    box.AddComponent<BoxCollider>().size = new Vector3(width - 0.2f, h, pitch + 0.02f);   // the solid under the treads
                 }
             }
             float rake = kit.RakeSign();
@@ -351,7 +353,7 @@ namespace SleepingCalamity.EditorTools
             for (int k = 0; k < blocks; k++)
             {
                 Vector3 mid = new Vector3(foot.Pos.X, 0f, foot.Pos.Z) + dir * (pitch * (6 * k + 3));
-                float y = foot.Y + r * (6 * k + 3.5f);
+                float y = footY + r * (6 * k + 3.5f);
                 foreach (float sd in new[] { -1f, 1f })
                 {
                     Vector3 p = mid + side * (sd * (width * 0.5f - 0.12f));
@@ -363,7 +365,7 @@ namespace SleepingCalamity.EditorTools
             }
             foreach (float sd in new[] { -1f, 1f })
             {
-                Vector3 fp = new Vector3(foot.Pos.X, foot.Y, foot.Pos.Z) + dir * 0.2f + side * (sd * (width * 0.5f - 0.12f));
+                Vector3 fp = new Vector3(foot.Pos.X, footY, foot.Pos.Z) + dir * 0.2f + side * (sd * (width * 0.5f - 0.12f));
                 kit.Clone("Newel", g, "NewelFoot" + (sd < 0 ? "L" : "R"), fp, yaw, Vector3.one);
                 Vector3 hp = new Vector3(head.Pos.X, head.Y, head.Pos.Z) - dir * 0.2f + side * (sd * (width * 0.5f - 0.12f));
                 if (!InWall(run, hp, kz)) kit.Clone("Newel", g, "NewelHead" + (sd < 0 ? "L" : "R"), hp, yaw, Vector3.one);
@@ -458,6 +460,28 @@ namespace SleepingCalamity.EditorTools
                     Building(g, f, kind);
                     HollowmereGarden.Yard(g, f, kind);   // Q6: a bed, a water butt and a back fence on deep-yard ring 2 homes
                     break;
+            }
+            SolidLotMasses(g);
+        }
+
+        // The lot's own masses were drawn with no collider (footing slab, ruin kit footing and wall stubs, greybox plinth/walls/gables/oven/chimney, rubble): the hero walked
+        // through them. A kit mesh gets a MeshCollider, a generated box a BoxCollider of its size. The doorstep slab, the foliage and the building art (own colliders) are left out.
+        static void SolidLotMasses(Transform g)
+        {
+            foreach (MeshFilter mf in g.GetComponentsInChildren<MeshFilter>(true))
+            {
+                string n = mf.name;
+                bool solid = n == "Footing" || n == "Plinth" || n == "Walls" || n == "OvenBay" || n == "Chimney" || n.StartsWith("Stub_", StringComparison.Ordinal)
+                    || n.StartsWith("Rubble", StringComparison.Ordinal) || n.StartsWith("Gable", StringComparison.Ordinal);
+                if (!solid || mf.sharedMesh == null || mf.GetComponent<Collider>() != null) continue;
+                bool inArt = false;
+                for (Transform t = mf.transform.parent; t != null && t != g; t = t.parent) if (t.name.StartsWith("Art_", StringComparison.Ordinal)) inArt = true;
+                if (inArt) continue;
+                if (mf.GetComponent<SleepingCalamity.Presentation.LookTestGeometry>() != null)
+                {
+                    var box = mf.gameObject.AddComponent<BoxCollider>(); box.center = mf.sharedMesh.bounds.center; box.size = mf.sharedMesh.bounds.size;
+                }
+                else mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
             }
         }
 
@@ -614,6 +638,13 @@ namespace SleepingCalamity.EditorTools
         }
 
         // --------------------------------------------------------------------------------------------- landmarks
+        // The landmark's door node in the landmark frame g (NaN when it has none).
+        static Vector3 DoorLocal(Transform g, TownLayout t, Landmark l)
+        {
+            PathNode n = t.Node(l.Id + "_Door");
+            return n == null ? new Vector3(float.NaN, float.NaN, float.NaN) : g.InverseTransformPoint(new Vector3(n.Pos.X, l.Y, n.Pos.Z));
+        }
+
         static void BuildLandmark(Transform parent, Landmark l, Preset preset, TownLayout t)
         {
             var go = new GameObject(l.Id);
@@ -657,7 +688,7 @@ namespace SleepingCalamity.EditorTools
                     LookTestBuilder.Box(g, "Rail", new Vector3(0f, 2.6f, 0f), new Vector3(3.7f, 0.12f, 0.12f), iron, new Vector3(0f, 0f, 4f), 2f);   // cracked: the crossbar hangs askew
                     break;
                 case LandmarkKind.HeroesHome:
-                    if (HeroesHomeArt.Place(g, l.Id))
+                    if (HeroesHomeArt.Place(g, l.Id, DoorLocal(g, t, l)))
                     {
                         if (l.Id == "HeroesHome_Cistern")
                         {

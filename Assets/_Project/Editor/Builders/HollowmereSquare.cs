@@ -305,6 +305,11 @@ namespace SleepingCalamity.EditorTools
                 if (soil == DefaultSoilHeight) soil = PotSoilHeight;
                 soil *= PotScale;
             }
+            if (real && HollowmereClutter.VisibleBounds(root, out Bounds vb))   // fit the box to the visible mesh (never beyond the footprint): the footprint box stood 0.3 m+ off pots, lamps and banners
+            {
+                Vector3 lo = Vector3.Max(vb.min, new Vector3(-r.SizeX * 0.5f, 0f, -r.SizeZ * 0.5f)), hi = Vector3.Min(vb.max, new Vector3(r.SizeX * 0.5f, vb.max.y, r.SizeZ * 0.5f));
+                if (hi.x > lo.x && hi.y > lo.y && hi.z > lo.z) { box.center = (lo + hi) * 0.5f; box.size = hi - lo; }
+            }
             if (r.Plants > 0) plants.Stand(root, r, soil);
             if (r.Light) HangLantern(root, r);
             return real;

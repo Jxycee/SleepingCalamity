@@ -57,6 +57,7 @@ namespace SleepingCalamity.EditorTools
                 throw new InvalidOperationException("Inn FOOTPRINT " + size.x.ToString("0.00") + " x " + size.z.ToString("0.00") + " m is larger than the " + f.Size + " class allows (" + max + " m)");
             foreach (string p in InnParts)
                 if (obj.transform.Find(p) == null) throw new InvalidOperationException("Inn.fbx has no " + p);
+            HollowmereArt.AddWallColliders(obj);
             Debug.Log("SC HOLLOWMERE inn on " + f.Id + " footprint=" + size.x.ToString("0.00") + "x" + size.z.ToString("0.00") + " class=" + f.Size + " parts=" + InnParts.Length);
             return true;
         }
