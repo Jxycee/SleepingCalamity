@@ -19,6 +19,8 @@ namespace SleepingCalamity.Core
         private double _diveStart, _diveEnd, _floorStart;
         private int _lastHp, _lastLoaves, _floor;
         private ulong _lastMask;
+        private const double HealWindow = 0.5;   // NetHp and NetLoaves replicate in different frames: a loaf drop and an HP rise this close are one heal
+        private double _hpPendingUntil = -1, _loafAbsorbUntil = -1;
         private readonly Dictionary<int, double> _roomEntered = new Dictionary<int, double>();
         private readonly List<RoomClear> _clears = new List<RoomClear>();
 
@@ -50,15 +52,24 @@ namespace SleepingCalamity.Core
             {
                 // A new dive (or the first sight of one in progress): reset.
                 _active = true; _have = true; _diveStart = now; _diveEnd = now;
-                DamageTaken = 0; HealsUsed = 0; LoavesEaten = 0;
+                DamageTaken = 0; HealsUsed = 0; LoavesEaten = 0; _hpPendingUntil = -1; _loafAbsorbUntil = -1;
                 _lastHp = hp; _lastLoaves = loaves;
                 StartFloor(floor, now, clearedMask);
                 return;
             }
 
-            if (loaves < _lastLoaves) { int ate = _lastLoaves - loaves; LoavesEaten += ate; HealsUsed += ate; }
+            if (loaves < _lastLoaves)
+            {
+                int ate = _lastLoaves - loaves; LoavesEaten += ate;
+                if (now <= _hpPendingUntil) { HealsUsed += ate - 1; _hpPendingUntil = -1; }   // the HP rise already counted is this loaf's heal
+                else { HealsUsed += ate; _loafAbsorbUntil = now + HealWindow; }
+            }
             if (hp < _lastHp) DamageTaken += _lastHp - hp;
-            else if (hp > _lastHp && loaves >= _lastLoaves) HealsUsed++;   // a jump up with no loaf eaten: bank heal, healing point, revive
+            else if (hp > _lastHp)
+            {
+                if (now <= _loafAbsorbUntil) _loafAbsorbUntil = -1;   // the loaf heal already counted covers this rise
+                else { HealsUsed++; _hpPendingUntil = now + HealWindow; }   // no loaf yet: counted as a bank/point heal unless a loaf drop lands within the window
+            }
             _lastHp = hp; _lastLoaves = loaves;
 
             if (floor != _floor) { StartFloor(floor, now, clearedMask); return; }
