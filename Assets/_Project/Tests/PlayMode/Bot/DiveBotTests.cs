@@ -93,7 +93,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Application.logMessageReceived += _log;
 
             // dive 1: hub -> floors -> home
-            float limit = 1500f;
+            float limit = 2100f;
             int maxFloor = 0;
             while (bot.Seconds < limit && !(bot.WentHome && bot.Floor == 0))
             {

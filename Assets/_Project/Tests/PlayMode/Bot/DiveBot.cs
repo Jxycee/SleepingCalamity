@@ -20,7 +20,7 @@ namespace SleepingCalamity.Tests.PlayMode
         public sealed class Finding { public string Kind, Where, Text; public int Floor; public Vector3 Pos; public override string ToString() => $"**{Kind}** F{Floor} at ({Pos.x:0.0}, {Pos.y:0.0}, {Pos.z:0.0}){(string.IsNullOrEmpty(Where) ? "" : " " + Where)}: {Text}"; }
 
         enum Goal { None, Heal, Kill, GateKey, Chest, Door, Piece, Bank, Stair, GoHome, HubStair }
-        sealed class Target { public Goal Goal; public int Index; public Vector3 Pos; public float Range; public string Name; public int Attempts; public float GaveUpAt = -1f; }
+        sealed class Target { public Goal Goal; public int Index; public Vector3 Pos; public float Range; public string Name; public int Attempts; public float GaveUpAt = -1f, Started; }
 
         readonly FakeInputService _input;
         readonly Transform _hero;
@@ -135,7 +135,8 @@ namespace SleepingCalamity.Tests.PlayMode
             _fightClock = 0f;
 
             if (_target != null && Done(_target) && _target.Goal == Goal.Piece) PiecesTaken++;
-            if (_target == null || Done(_target)) { _target = NextTarget(d); _corners.Clear(); _stuckOnTarget = 0; if (_target != null) Say($"goal: {_target.Name} at {V(_target.Pos)}"); }
+            if (_target != null && _target.Goal == Goal.Kill && Seconds - _target.Started > 90f) { Note("Flow", "stood at the gate-key carrier's cell for 90 s and the key did not drop"); GiveUp(_target); }
+            if (_target == null || Done(_target)) { _target = NextTarget(d); _corners.Clear(); _stuckOnTarget = 0; if (_target != null) _target.Started = Seconds; if (_target != null) Say($"goal: {_target.Name} at {V(_target.Pos)}"); }
             if (_target == null) { _input.Frame = f; return; }
 
             float flat = Flat(_target.Pos - _hero.position).magnitude;
@@ -254,7 +255,7 @@ namespace SleepingCalamity.Tests.PlayMode
             // the exit stays locked until the gate-key carrier dies: a player heads for its room (the room spawns when you walk in)
             if (stateOk && s.GateKey == 0 && !s.ExitUnlocked && l.Carrier != null && fs.Built != null && fs.Built.Root != null
                 && !(l.HasLockedRoom && l.Carrier.RoomIndex == l.LockedRoomIndex && !s.DoorOpen))
-                list.Add(new Target { Goal = Goal.Kill, Pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(l.Carrier.X, l.Carrier.Y)), Range = 5f, Name = "gate-key carrier" });
+                list.Add(new Target { Goal = Goal.Kill, Pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(l.Carrier.X, l.Carrier.Y)), Range = 1.5f, Name = "gate-key carrier" });
             if (stateOk && s.RoomKeyHeld && !s.DoorOpen && c.TryGatePosition(out Vector3 gp)) list.Add(new Target { Goal = Goal.Door, Pos = gp, Range = CellarContentsSync.GateRange, Name = "locked door" });
             for (int i = 0; i < c.PieceCount; i++)
                 if (c.PieceVisible(i) && c.TryPiecePosition(i, out Vector3 pp)) list.Add(new Target { Goal = Goal.Piece, Index = i, Pos = pp, Range = CellarContentsSync.PieceRange, Name = "piece " + i });
