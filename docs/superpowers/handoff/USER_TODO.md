@@ -25,6 +25,28 @@ These are the steps only the user can take. Claude keeps this list current: when
    10. Optional fail test: start a second dive (the stair offers floor 3 now, as a return dive), pick up a piece, and let the party fall (or host presses F8 to abandon). You return to the hub and the unbanked piece is back on its floor next time.
    Debug keys (host, dev builds): F7 starts a dive from anywhere, F8 abandons it. Tell Claude what broke, what felt wrong, and whether floors felt samey.
 
+3c. **The M6 square-loop walk (S6), solo then 2 players.** About 30-40 minutes each. An automated host+client run of this loop (`SquareLoopWalkQaTests`) passes; this walk checks what it cannot: keys, prompts, camera, look and feel. Hollowmere is the default start scene now, so do NOT turn on the dive-hub dev toggle. Bottom-of-screen prompts read `[E] ...`; key names below are the defaults (check yours in the controls screen).
+   **Solo**
+   1. Press Solo / Auto Solo. You spawn in Hollowmere by the cistern house. Check the town stands as saved (rebuilt buildings, the ruined bakery lot) and nothing blocks you at the start.
+   2. Walk to the cistern-house stair. `[E] Go down the Undercroft stair` appears. Press E: you land on floor 1.
+   3. Dive as in 3b (steps 4-9): collect bakery pieces (floors 1-3), bank at the floor-2 checkpoint, fight to the floor-4 heart, `[E] Bank the haul with the baker`, then `[E] Take the party home` (green column).
+   4. You are back at the stair top in Hollowmere. The haul should now be town stock: the bakery pieces, loot and the baker. Note anything missing.
+   5. Walk to the bakery lot's build point. `[E] Open placement mode`. Press E: the camera lifts to a top-down view, the hero stands still.
+   6. Choose a lot (move keys / stick move to the neighbouring lot; E cycles to the next free lot). Ghost is green when allowed, red when not. Space turns it a quarter turn. Put it where it would cut a lane or block the path: it must read red and left-click (primary) must do nothing.
+   7. Put it on a legal lot and left-click: the frame appears. Read the three baker wishes in plain words; they tick live as you move the ghost between lots. Try one lot where a wish fails, then settle on one where all three tick.
+   8. Left-click again for each part: oven, door, sign (each appears as it lands). Right-click (secondary) picks up the last thing placed; place it again.
+   9. Left-click once more to place the baker. He appears at his door. All wishes ticked: the service opens.
+   10. Esc leaves placement mode (the world saves). Walk away; the lock is released.
+   11. Go to the stair again and start a dive: you should carry **3 loaves**. Take some damage, eat one (check the key in the controls), HP rises.
+   12. Quit to the main menu, start Solo again (same world). The bakery and baker still stand, the banked stock is the same, the loaves/dive state are sane.
+   **2 players** (two editors with Multiplayer Play Mode, or editor + dev build; Relay as in item 3)
+   13. Host + join by code, Start session. Both land in Hollowmere by the cistern house.
+   14. Host places the bakery frame; the client must see the same ghost, the wish ticks and the placed building live (a "Someone is building" prompt shows for the other player). The client cannot start placing while the host holds the lock.
+   15. Client builds the parts and places the baker; host watches. Try placing the frame in a path-blocking spot from the client: refused.
+   16. Both dive: each gets 3 loaves. Go through bank and home with both. A downed player must not be able to take the stair.
+   17. Host quits; restart as host with the same world and let the client rejoin: town, stock, baker and both players' weapon growth survive.
+   Tell Claude every step that surprised you, any prompt that lied, and whether placement felt clear.
+
 ## Cloud sessions (so a cloud session can work like the PC)
 - **Set up the cloud environment** (title-bar environment menu > Edit; details in `docs/superpowers/handoff/cloud-environment.md`):
   1. Setup script: paste the whole of `Tools/cloud/setup.sh`.
