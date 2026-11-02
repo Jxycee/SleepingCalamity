@@ -175,16 +175,16 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // procgen 3b: no plan spawn (authored, extra, hunter; with or without a twist) stands on a chunk solid cell.
-        [Test]
-        public void NoSpawn_StandsOnAChunkSolidCell()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void NoSpawn_StandsOnAChunkSolidCell(int seeds)
         {
             int checkedSpawns = 0;
-            for (uint seed = 0; seed < 1000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     var solid = new System.Collections.Generic.HashSet<(int, int)>();
-                    foreach (ResolvedChunk c in CellarRoomChunks.Resolve(l, d).Chunks) foreach (var sc in CellarRoomChunks.SolidCells(l, c)) solid.Add((sc.cell.X, sc.cell.Y));
+                    foreach (ResolvedChunk c in CellarTestFloors.ChunkPlan(seed, floor).Chunks) foreach (var sc in CellarRoomChunks.SolidCells(l, c)) solid.Add((sc.cell.X, sc.cell.Y));
                     foreach (CellarEncounterPlan plan in new[] { CellarEncounterPlan.Build(l, d, 2, true), CellarEncounterPlan.BuildForDive(l, d, 1, true) })
                         foreach (EncounterSpawn s in plan.Spawns)
                         {
@@ -192,7 +192,7 @@ namespace SleepingCalamity.Tests.EditMode
                             Assert.IsFalse(solid.Contains((s.X, s.Y)), "spawn on a chunk solid: seed " + seed + " floor " + floor + " " + s.Kind + " @" + s.Cell);
                         }
                 }
-            Assert.Greater(checkedSpawns, 1000);
+            Assert.Greater(checkedSpawns, seeds >= 1000 ? 1000 : seeds);
         }
     }
 }

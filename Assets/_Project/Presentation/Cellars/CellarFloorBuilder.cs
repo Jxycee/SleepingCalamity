@@ -248,7 +248,7 @@ namespace SleepingCalamity.Presentation
             {
                 FloorChest ch = layout.Chests[i]; Vector3 c = CellCenter(ch.X, ch.Y);
                 Material m = ch.HoldsKey ? mats.Marker(kit.KeyChest, new Color(1.0f, 0.78f, 0.15f)) : mats.Marker(kit.Chest, new Color(0.45f, 0.26f, 0.10f));
-                Box(group, (ch.HoldsKey ? "KeyChest_" : "Chest_") + ch.X + "_" + ch.Y, c + new Vector3(0, 0.4f, 0), new Vector3(1.1f, 0.8f, 0.7f), m, 1f, false);
+                Box(group, (ch.HoldsKey ? "KeyChest_" : "Chest_") + ch.X + "_" + ch.Y, c + new Vector3(0, 0.4f, 0), new Vector3(1.1f, 0.8f, 0.7f), m, 1f, true);   // solid: the hero cannot walk through a chest (interaction is by proximity, not a trigger)
             }
             if (layout.Carrier != null)
             {
@@ -395,6 +395,13 @@ namespace SleepingCalamity.Presentation
                     g.transform.localPosition = new Vector3(pr.X, pr.Y, pr.Z);
                     // a capsule lies on its side (its length runs along the yaw); everything else turns about the vertical
                     g.transform.localRotation = pr.Shape == PropShape.Capsule ? Quaternion.Euler(0, pr.YawDegrees, 90) : Quaternion.Euler(0, pr.YawDegrees, 0);
+                    // floor-standing props block the hero: not spheres (caps, drips, embers), nothing under 0.25 m across, nothing flat on the floor (top under 0.3 m: puddles, rings, bedrolls, markers),
+                    // nothing hanging above the knee (bottom over 0.5 m: wall panels, ledgers)
+                    float top = pr.Y + pr.SizeY * 0.5f, bottom = pr.Y - pr.SizeY * 0.5f;
+                    if (pr.Shape != PropShape.Sphere && Mathf.Min(pr.SizeX, pr.SizeZ) >= 0.25f && top >= 0.3f && bottom <= 0.5f)
+                    {
+                        if (pr.Shape == PropShape.Box) g.AddComponent<BoxCollider>(); else g.AddComponent<CapsuleCollider>();
+                    }
                 }
                 result.VignetteGroups++;
             }

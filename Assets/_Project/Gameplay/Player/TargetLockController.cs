@@ -1,7 +1,7 @@
 // Authority: owner only, and local to the owner. PlayerNetState-style: HeroNetState enables this component on the owning peer and nowhere else.
 // Nothing here is networked: which target a player has soft- or hard-locked is that player's own state (docs/PHASE1.md 6.4; the attacker's client
 // will send the host a hit intent in M3). Runs the Core TargetLock / SoftTargeting on candidates built from the live Targetable registry, with
-// line of sight from a raycast against Ground and Structure. The only writer of IInputService.GameplayContext (Free <-> LockOn).
+// line of sight from a raycast against Ground and Structure. The writer of IInputService.GameplayContext for Free <-> LockOn; it never overwrites Placement (M6 S4 placement mode owns the context while it is set).
 using System;
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -133,6 +133,7 @@ namespace SleepingCalamity.Gameplay
 
         private void WriteContext(IInputService input, InputContext context)
         {
+            if (input.GameplayContext == InputContext.Placement) return;   // M6 S4: placement mode owns the context until it hands it back to Free (the lock must not overwrite it)
             if (input.GameplayContext != context) input.GameplayContext = context;
             _wroteContext = true;
         }
@@ -143,6 +144,7 @@ namespace SleepingCalamity.Gameplay
             _wroteContext = false;
             IInputService input = Input;
             if (input == null || (input is UnityEngine.Object o && o == null)) return;
+            if (input.GameplayContext == InputContext.Placement) return;   // placement mode owns the context (same guard as WriteContext)
             if (input.GameplayContext != InputContext.Free) input.GameplayContext = InputContext.Free;
         }
     }

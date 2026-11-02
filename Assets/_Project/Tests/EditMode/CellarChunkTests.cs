@@ -15,7 +15,6 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarChunkTests
     {
-        const int Seeds = 1000;
 
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
@@ -101,23 +100,23 @@ namespace SleepingCalamity.Tests.EditMode
                 }
         }
 
-        [Test]
-        public void Chunks_NeverCoverTheHealPoint()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Chunks_NeverCoverTheHealPoint(int seeds)
         {
             int withHeal = 0;
             for (int f = 1; f <= 3; f++)
-                for (uint seed = 1; seed <= Seeds; seed++)
+                for (uint seed = 1; seed <= seeds; seed++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     CellPos? heal = CellarHealing.PointFor(l, d);
                     if (!heal.HasValue) continue;
                     withHeal++;
-                    CellarRoomChunks c = CellarRoomChunks.Resolve(l, d);
+                    CellarRoomChunks c = CellarTestFloors.ChunkPlan(seed, f);
                     foreach (ResolvedChunk ch in c.Chunks)
                         foreach (var (cell, kind) in CellarRoomChunks.SolidCells(l, ch))
                             Assert.IsFalse(cell.X == heal.Value.X && cell.Y == heal.Value.Y, "seed " + seed + " floor " + f + ": " + ch.Region.Id + " " + kind + " sits on the heal point");
                 }
-            Assert.Greater(withHeal, 500);
+            Assert.Greater(withHeal, seeds >= 1000 ? 500 : seeds / 4);
         }
 
         [Test]
@@ -126,16 +125,16 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 1; seed <= 20; seed++) Assert.AreEqual(0, CellarRoomChunks.Resolve(CellarFloorGenerator.Generate(seed, 4)).Chunks.Count);
         }
 
-        [Test]
-        public void Chunks_Spread_Connectivity_AndNoOverlap_Over1000Seeds()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Chunks_Spread_Connectivity_AndNoOverlap(int seeds)
         {
             var variantCounts = new Dictionary<string, int[]>();            // "roomId|regionId" -> picks per variant
             var combos = new Dictionary<string, Dictionary<string, int>>(); // roomId -> chunk combination -> visits
             var why = new Dictionary<string, int[]>(); int visits = 0, regionPicks = 0, nonOpen = 0, skippedPicks = 0, roomsWithRegions = 0;
             for (int f = 1; f <= 3; f++)
-                for (uint seed = 1; seed <= Seeds; seed++)
+                for (uint seed = 1; seed <= seeds; seed++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l); CellarRoomChunks c = CellarRoomChunks.Resolve(l, d);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f); CellarRoomChunks c = CellarTestFloors.ChunkPlan(seed, f);
                     ulong dh = d.DressingHash();
                     for (int r = 0; r < l.Rooms.Count; r++)
                     {
@@ -196,7 +195,7 @@ namespace SleepingCalamity.Tests.EditMode
                 }
 
             var sb = new StringBuilder();
-            sb.Append("chunks: " + Seeds + " seeds x floors 1-3: " + visits + " room visits with regions, " + regionPicks + " region picks, " + (100.0 * nonOpen / regionPicks).ToString("0.0") + "% non-open, "
+            sb.Append("chunks: " + seeds + " seeds x floors 1-3: " + visits + " room visits with regions, " + regionPicks + " region picks, " + (100.0 * nonOpen / regionPicks).ToString("0.0") + "% non-open, "
                 + (100.0 * skippedPicks / regionPicks).ToString("0.0") + "% picks had to skip a variant\n");
             double worst = 0; var over = new List<string>();
             foreach (var kv in variantCounts.OrderBy(k => k.Key, System.StringComparer.Ordinal))
@@ -215,7 +214,7 @@ namespace SleepingCalamity.Tests.EditMode
             sb.Append("chunks: " + (100.0 * different / all).ToString("0.0") + "% of room visits with regions look different from the room's most common chunk combination; worst variant share " + worst.ToString("0.0") + "%");
             Report(sb.ToString());
             Assert.IsEmpty(over, "variants above 60%");
-            Assert.Greater(100.0 * different / all, 40.0);
+            Assert.Greater(100.0 * different / all, seeds >= 1000 ? 40.0 : 20.0);   // statistical: lower bar for the fast twin
         }
 
         [Test]

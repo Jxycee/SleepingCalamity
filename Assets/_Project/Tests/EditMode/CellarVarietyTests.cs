@@ -15,6 +15,9 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarVarietyTests
     {
+        // an "at least N" count measured over `full` seeds, scaled down for the fast twin (the Soak case keeps N exactly)
+        static int Scale(int atLeast, int seeds, int full = 1000) => seeds >= full ? atLeast : Math.Max(1, atLeast * seeds / full);
+
         static readonly string[] Variants = { "A", "B" };
         static CellarRoom Combat(string[] rows, params SocketSpec[] socks) => CellarRoom.Parse("t", "Test", RoomKind.Combat, SubTheme.Larder, "box", rows, socks);
         static string[] Good => new[] { ".D.", "s.s", "CD." };   // free floor: (0,0) (2,0) (1,1) (2,2)
@@ -141,14 +144,14 @@ namespace SleepingCalamity.Tests.EditMode
 
         // ---------------------------------------------------------------- dressing statistics
 
-        [Test]
-        public void Sockets_FillRatesMatchTheConfiguredChances_Over1000Seeds()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Sockets_FillRatesMatchTheConfiguredChances(int seeds)
         {
             var filled = new Dictionary<SocketKind, int>(); var total = new Dictionary<SocketKind, int>(); var chance = new Dictionary<SocketKind, double>();
             int jittered = 0, empty = 0;
-            for (uint seed = 0; seed < 1000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
-                    foreach (DressedSocket s in CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, floor)).Sockets)
+                    foreach (DressedSocket s in CellarTestFloors.Dressing(seed, floor).Sockets)
                     {
                         if (s.Kind == SocketKind.Lantern) continue;   // lantern chance also follows the floor's lamp percent
                         total[s.Kind] = total.GetValueOrDefault(s.Kind) + 1; chance[s.Kind] = chance.GetValueOrDefault(s.Kind) + s.Socket.Chance / 100.0;
@@ -158,20 +161,20 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (SocketKind k in total.Keys.OrderBy(k => (int)k))
             {
                 double want = chance[k] / total[k], got = filled.GetValueOrDefault(k) / (double)total[k];
-                Assert.That(Math.Abs(got - want), Is.LessThan(0.05), k + " fill rate " + got + " vs configured " + want + " over " + total[k] + " sockets");
+                Assert.That(Math.Abs(got - want), Is.LessThan(seeds >= 1000 ? 0.05 : 0.15), k + " fill rate " + got + " vs configured " + want + " over " + total[k] + " sockets");
             }
-            Assert.Greater(empty, 1000, "optional sockets do come up empty");
-            Assert.Greater(jittered, 500, "sockets with alternative cells do move");
+            Assert.Greater(empty, Scale(1000, seeds), "optional sockets do come up empty");
+            Assert.Greater(jittered, Scale(500, seeds), "sockets with alternative cells do move");
             Assert.Less(total.Keys.Count(k => Math.Abs(chance[k] / total[k] - 1.0) > 0.01), total.Count, "not every kind is optional");
         }
 
-        [Test]
-        public void Sockets_NeverShareACell_AndStayOnTheRoom()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(300, Category = "Soak")]
+        public void Sockets_NeverShareACell_AndStayOnTheRoom(int seeds)
         {
-            for (uint seed = 0; seed < 300; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     var seen = new HashSet<(int, int)>();
                     foreach (DressedSocket s in d.Sockets)
                     {
@@ -225,14 +228,14 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(dark3 / (double)n, Is.InRange(1.0 / 12 * 11 / 12 - 0.02, 1.0 / 12 * 11 / 12 + 0.02), "floor 3 dark rate (no second dark floor in a dive)");
         }
 
-        [Test]
-        public void Atmosphere_RollsStayInRange_AndWarmOnly()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(500, Category = "Soak")]
+        public void Atmosphere_RollsStayInRange_AndWarmOnly(int seeds)
         {
             int dark = 0;
-            for (uint seed = 0; seed < 500; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 4; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarAtmosphere a = CellarAtmosphere.Roll(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarAtmosphere a = CellarAtmosphere.Roll(l);
                     if (a.Dark) { dark++; Assert.AreEqual(CellarAtmosphere.DarkLamp, a.LampPercent); Assert.AreEqual(CellarAtmosphere.DarkFog, a.FogPercent); }
                     else
                     {
@@ -275,17 +278,17 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (CellarVignette v in CellarVignettePool.All) { Assert.GreaterOrEqual(v.Rarity, 2, v.Id); Assert.Greater(v.Props.Count, 1, v.Id); Assert.GreaterOrEqual(v.MinFloor, 1); }
         }
 
-        [Test]
-        public void Vignettes_BudgetNearOnePointTwo_AndNoDiveGoesWithoutOne()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Vignettes_BudgetNearOnePointTwo_AndNoDiveGoesWithoutOne(int n)
         {
-            const int n = 1000; int total = 0, bare = 0, dropped = 0, forcedFloors = 0;
+            int total = 0, bare = 0, dropped = 0, forcedFloors = 0;
             var perCategory = new Dictionary<VignetteCategory, int>();
             for (uint seed = 0; seed < n; seed++)
             {
                 int dive = 0;
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorDressing d = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, floor));
+                    CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     dive += d.Vignettes.Count; dropped += d.DroppedVignettes;
                     Assert.LessOrEqual(d.Vignettes.Count, VignetteDive.MaxPerFloor);
                     if (VignetteDive.Select(seed, floor).Forced) forcedFloors++;
@@ -294,10 +297,11 @@ namespace SleepingCalamity.Tests.EditMode
                 total += dive; if (dive == 0) bare++;
             }
             double mean = total / (n * 3.0);
-            Assert.That(mean, Is.InRange(0.9, 1.5), "vignettes per floor");
+            double slack = n >= 1000 ? 0 : 0.3;   // statistical band: wider for the fast twin
+            Assert.That(mean, Is.InRange(0.9 - slack, 1.5 + slack), "vignettes per floor");
             Assert.AreEqual(0, bare, "dives of floors 1-3 with no vignette (pity)");
-            Assert.LessOrEqual(dropped, n * 3 / 50, "chosen vignettes without a legal cell (spawn cells are never used, so a few rooms have none; pity above keeps every dive at one or more)");
-            foreach (VignetteCategory c in Enum.GetValues(typeof(VignetteCategory))) Assert.Greater(perCategory.GetValueOrDefault(c), 0, c + " never shown");
+            Assert.LessOrEqual(dropped, Math.Max(3, n * 3 / 50), "chosen vignettes without a legal cell (spawn cells are never used, so a few rooms have none; pity above keeps every dive at one or more)");
+            if (n >= 1000) foreach (VignetteCategory c in Enum.GetValues(typeof(VignetteCategory))) Assert.Greater(perCategory.GetValueOrDefault(c), 0, c + " never shown");
             TestContext.WriteLine("vignette mean per floor " + mean.ToString("F3") + ", forced floors " + forcedFloors + ", per category " + string.Join(" ", perCategory.OrderBy(k => (int)k.Key).Select(k => k.Key + "=" + k.Value)));
         }
 
@@ -350,13 +354,13 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.GreaterOrEqual(seenIt / (double)n, 0.97, must.Id + " is a must-see within " + VignetteDive.MustSeeStart + " floors");
         }
 
-        [Test]
-        public void Vignettes_StandInCombatRooms_AwayFromDoors_WithoutCuttingTheRoom()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(500, Category = "Soak")]
+        public void Vignettes_StandInCombatRooms_AwayFromDoors_WithoutCuttingTheRoom(int seeds)
         {
-            for (uint seed = 0; seed < 500; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     foreach (PlacedVignette v in d.Vignettes)
                     {
                         PlacedRoom p = l.Rooms[v.RoomIndex]; int lx = v.Cell.X - p.X, ly = v.Cell.Y - p.Y;
@@ -386,15 +390,15 @@ namespace SleepingCalamity.Tests.EditMode
                 }
         }
 
-        [Test]
-        public void Vignettes_WallHuggersStandAgainstAWall()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(400, Category = "Soak")]
+        public void Vignettes_WallHuggersStandAgainstAWall(int seeds)
         {
             int seen = 0;
-            for (uint seed = 0; seed < 400; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
-                    foreach (PlacedVignette v in CellarFloorDressing.Resolve(l).Vignettes.Where(v => v.Vignette.WallHug))
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor);
+                    foreach (PlacedVignette v in CellarTestFloors.Dressing(seed, floor).Vignettes.Where(v => v.Vignette.WallHug))
                     {
                         PlacedRoom p = l.Rooms[v.RoomIndex]; var (dx, dy) = CellarRoom.Step(CellarRoom.Rotate(CellSide.South, v.Turns));
                         int nx = v.Cell.X - p.X + dx, ny = v.Cell.Y - p.Y + dy;
@@ -402,23 +406,23 @@ namespace SleepingCalamity.Tests.EditMode
                         seen++;
                     }
                 }
-            Assert.Greater(seen, 50);
+            Assert.GreaterOrEqual(seen, Scale(50, seeds, 400) + (seeds >= 400 ? 1 : 0));
         }
 
         // ---------------------------------------------------------------- exit distance
 
-        [Test, Timeout(300000)]   // presets made a floor a little dearer (retries on locked chains); the seed count is sized to fit well inside this
-        public void ExitDistance_AtLeastTheBound_On2000Seeds_AndNotAlwaysTheSame()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(2000, Category = "Soak"), Timeout(300000)]   // presets made a floor a little dearer (retries on locked chains); the seed count is sized to fit well inside this
+        public void ExitDistance_AtLeastTheBound_AndNotAlwaysTheSame(int seeds)
         {
             var distances = new HashSet<int>(); int shortest = int.MaxValue;
-            for (uint seed = 0; seed < 2000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    int dist = CellarFloorGenerator.Generate(seed, floor).EntryToExitDistance();
+                    int dist = CellarTestFloors.Layout(seed, floor).EntryToExitDistance();
                     Assert.GreaterOrEqual(dist, CellarFloorGenerator.MinExitDistance, "seed " + seed + " floor " + floor);
                     distances.Add(dist); shortest = Math.Min(shortest, dist);
                 }
-            Assert.GreaterOrEqual(distances.Count, 15, "the exit distance varies");
+            Assert.GreaterOrEqual(distances.Count, seeds >= 1000 ? 15 : 8, "the exit distance varies");
             TestContext.WriteLine("exit distance: min " + shortest + ", " + distances.Count + " distinct values, bound " + CellarFloorGenerator.MinExitDistance);
         }
 
