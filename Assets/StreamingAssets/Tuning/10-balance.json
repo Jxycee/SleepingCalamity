@@ -1,0 +1,6 @@
+{
+  "enemies": {
+    "soloAtk": 0.55,
+    "soloLife": 0.75
+  }
+}

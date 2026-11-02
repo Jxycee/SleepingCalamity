@@ -80,6 +80,22 @@ namespace SleepingCalamity.Core.Tuning
         };
     }
 
+    // The enemy tier multipliers (EnemyCatalog): tier 1 is floors 1-2, tier 2 floors 3-4. Applied on top of each enemy's base table; the party-size life
+    // scaling (CoopScaling) multiplies after them, so a change here moves solo and co-op together.
+    public static class EnemyTuning
+    {
+        public static Knob[] Knobs() => new[]
+        {
+            new Knob("tier1Atk", () => EnemyCatalog.Tier1Atk, v => EnemyCatalog.Tier1Atk = (float)v, 0.01, 20),
+            new Knob("tier2Atk", () => EnemyCatalog.Tier2Atk, v => EnemyCatalog.Tier2Atk = (float)v, 0.01, 20),
+            new Knob("tier2Life", () => EnemyCatalog.Tier2Life, v => EnemyCatalog.Tier2Life = (float)v, 0.1, 50),
+            new Knob("tier2Def", () => EnemyCatalog.Tier2Def, v => EnemyCatalog.Tier2Def = (float)v, 0.1, 50),
+            new Knob("soloAtk", () => EnemyCatalog.SoloAtk, v => EnemyCatalog.SoloAtk = (float)v, 0.01, 20),
+            new Knob("soloLife", () => EnemyCatalog.SoloLife, v => EnemyCatalog.SoloLife = (float)v, 0.05, 20),
+            new Knob("tier2MinFloor", () => EnemyCatalog.Tier2MinFloor, v => EnemyCatalog.Tier2MinFloor = (int)v, 1, 5, true),
+        };
+    }
+
     // "attacks": { "axe_1": { "range": 2.5, "hitOn": [10, 15] } }. Ids are the hero ground attacks (hit 1, hit 2, finisher, charge, special) of the four
     // heirloom sets; the air versions follow from the ground ones. Enemy attack ids are not tunable yet (see the TODO in TuningStore.cs).
     public static class AttackTuning

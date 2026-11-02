@@ -113,7 +113,7 @@ namespace SleepingCalamity.EditorTools
             if (_nosing == null)
             {
                 Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
-                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.80f, 0.76f, 0.66f), 0.15f, wear);   // round 3: lighter, deeper nosing
+                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.22f, 0.20f, 0.16f), 0.10f, wear);   // stairs-traversal-3 r3: linear 0.22 (reads ~0.5 gamma), matte; the 0.906 in the old .mat was never rebuilt, so r1/r2 frames still showed the blown-out white
                 _nosing.SetColor("_Color", _nosing.GetColor("_BaseColor")); _nosing.SetShaderPassEnabled("MotionVectors", true);
                 _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.13f, 0.12f, 0.10f), 0.1f, wear);
                 _treadShade.SetColor("_Color", _treadShade.GetColor("_BaseColor")); _treadShade.SetShaderPassEnabled("MotionVectors", true);
@@ -121,7 +121,10 @@ namespace SleepingCalamity.EditorTools
             GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), new Vector3(2f, 0.04f, 0.24f), _nosing);
             n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // dark shade line at the back of the tread (under the next riser): sits wholly on the tread top, so it cannot float at the flight's edges
-            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.50f), new Vector3(2f, 0.04f, 0.09f), _treadShade);
+            // round 1 of stairs-traversal-3: a dark riser face limited to the visible 0.15 m above the tread below and inset from both flight edges (no skirt below, so no wedges)
+            GameObject ri = LookTestBuilder.Prim(step, "RiserFace", PrimitiveType.Cube, new Vector3(0f, 0.085f, -0.004f), new Vector3(1.92f, 0.15f, 0.012f), _treadShade);
+            ri.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.48f), new Vector3(2f, 0.04f, 0.14f), _treadShade);
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
