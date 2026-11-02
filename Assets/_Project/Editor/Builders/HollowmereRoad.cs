@@ -522,12 +522,16 @@ namespace SleepingCalamity.EditorTools
             float along = 0f;
             for (int i = 0; i < pad.Count; i++)
             {
-                Vector2 d = (i < pad.Count - 1 ? pad[i + 1] - pad[i] : pad[i] - pad[i - 1]).normalized, nrm = new Vector2(-d.y, d.x);
+                // The first quad (the inserted terrain-edge point to the road's first node) must be planar: both ends use the road's own direction (pad[1] -> pad[2]),
+                // so the two edges are parallel, and each end's height comes from the centreline, so both sides of a cross-section are level.
+                Vector2 seg = i == 0 && pad.Count > 2 ? pad[2] - pad[1] : i < pad.Count - 1 ? pad[i + 1] - pad[i] : pad[i] - pad[i - 1];
+                Vector2 d = seg.sqrMagnitude > 1e-8f ? seg.normalized : Vector2.right, nrm = new Vector2(-d.y, d.x);
                 if (i > 0) along += Vector2.Distance(pad[i], pad[i - 1]);
+                float yc = Mathf.Lerp(edgeY, RingHeight(pad[i].x, pad[i].y) + 0.12f, Mathf.Clamp01(along / 6f));
                 for (int s = -1; s <= 1; s += 2)
                 {
                     Vector2 p = pad[i] + nrm * (EndHalf * s);
-                    v.Add(new Vector3(p.x, Mathf.Lerp(edgeY, RingHeight(p.x, p.y) + 0.12f, Mathf.Clamp01(along / 6f)), p.y));
+                    v.Add(new Vector3(p.x, yc, p.y));
                 }
                 if (i > 0) { int b = v.Count - 4; idx.AddRange(new[] { b, b + 2, b + 3, b, b + 3, b + 1, b, b + 3, b + 2, b, b + 1, b + 3 }); }   // both windings: a collider is one-sided
             }
@@ -537,6 +541,8 @@ namespace SleepingCalamity.EditorTools
             var go = new GameObject("RingRoadEnd");
             go.transform.SetParent(ring, false);
             go.AddComponent<MeshCollider>().sharedMesh = mesh;   // under the drawn ribbon, no renderer of its own
+
+            EdgeBounds(ring, pad, edgeY);
 
             // the barrier: fence rails across the road at the pad's end
             Vector2 last = pad[pad.Count - 1], dirEnd = (pad[pad.Count - 1] - pad[pad.Count - 2]).normalized;
@@ -568,6 +574,42 @@ namespace SleepingCalamity.EditorTools
                 var bar = new GameObject("RoadEnd_Barrier"); bar.transform.SetParent(ring, false);
                 bar.transform.SetPositionAndRotation(new Vector3(last.x, y + 0.6f, last.y), Quaternion.Euler(0f, yawAcross, 0f));
                 bar.AddComponent<BoxCollider>().size = new Vector3(2f * EndHalf, 1.2f, 0.2f);
+            }
+        }
+
+        // BUGS 17 / traversal FIXLIST 10: the terrain's west edge (x = TerrainMinX) drops into nothing, and the road-end pad has open sides. A natural bound seals them: a thick,
+        // tall, invisible wall along the terrain's west rim (as if the ground rose into a hedge-grown bank there), with a gap exactly where the road pad crosses the rim, and a
+        // wall along each pad edge so the hero stays on the road to its end (the fence rails). The road itself and its nodes stay inside the pad's width: no wall touches it.
+        const float BoundThick = 1.0f, BoundHeight = 80f;
+        static void EdgeBounds(Transform ring, List<Vector2> pad, float edgeY)
+        {
+            float rimX = SaltwakeRoadPlan.TerrainMinX, cross = pad[0].y;
+            for (int i = 1; i < pad.Count; i++)   // where the pad's centreline crosses the rim
+                if ((pad[i - 1].x - rimX) * (pad[i].x - rimX) <= 0f && !Mathf.Approximately(pad[i].x, pad[i - 1].x))
+                { cross = Mathf.Lerp(pad[i - 1].y, pad[i].y, (rimX - pad[i - 1].x) / (pad[i].x - pad[i - 1].x)); break; }
+            float gap = EndHalf + BoundThick - 0.1f;   // half-width of the opening: the pad plus its side walls (the rim wall ends inside them, so no slit)
+            var root = new GameObject("EdgeBounds"); root.transform.SetParent(ring, false);
+            void Bar(string name, Vector3 centre, Vector3 size, float yawDeg)
+            {
+                var go = new GameObject(name); go.transform.SetParent(root.transform, false);
+                go.transform.SetPositionAndRotation(centre, Quaternion.Euler(0f, yawDeg, 0f));
+                go.AddComponent<BoxCollider>().size = size;
+            }
+            float zMin = SaltwakeRoadPlan.TerrainMinZ - 4f, zMax = SaltwakeRoadPlan.TerrainMaxZ + 4f, x = rimX;
+            float s0 = cross - gap, s1 = cross + gap;   // south part: zMin..s0, north part: s1..zMax
+            Bar("Rim_S", new Vector3(x, edgeY, (zMin + s0) * 0.5f), new Vector3(BoundThick, BoundHeight, s0 - zMin), 0f);
+            Bar("Rim_N", new Vector3(x, edgeY, (s1 + zMax) * 0.5f), new Vector3(BoundThick, BoundHeight, zMax - s1), 0f);
+            for (int i = 0; i < pad.Count - 1; i++)   // along both pad edges (outer face of the wall = EndHalf + BoundThick from the centreline)
+            {
+                Vector2 seg = pad[i + 1] - pad[i];
+                if (seg.sqrMagnitude < 1e-6f) continue;
+                Vector2 d = seg.normalized, nrm = new Vector2(-d.y, d.x), mid = (pad[i] + pad[i + 1]) * 0.5f;
+                float yaw = Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg;
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    Vector2 c = mid + nrm * ((EndHalf + BoundThick * 0.5f) * s);
+                    Bar("Pad_" + (s < 0 ? "L" : "R") + i, new Vector3(c.x, edgeY, c.y), new Vector3(BoundThick, BoundHeight, seg.magnitude + BoundThick), yaw);
+                }
             }
         }
 
