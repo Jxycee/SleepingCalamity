@@ -1,6 +1,6 @@
 Title: Ambient life for Hollowmere, effects first (no animal models yet)
 Target: cloud
-Status: started (Target local, PC)
+Status: done (merged b8b2c4cc)
 Model: sonnet
 From: the user, via the World traversal scan session (claude/great-lovelace-r22yqw); decisions on main 8e434b3
 Status file: Reference/sessions/ambient-life/STATUS.md
