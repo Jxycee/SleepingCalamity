@@ -127,7 +127,7 @@ namespace SleepingCalamity.Gameplay
         public bool HurtFlickering => _grace.Flickering;
         public bool HurtGraceActive => _grace.Active;
         public bool KnockedDown => _knockdownLeft > 0f;
-        public bool AllowsDodge => IsUp && _machine.CanCancel && _hurtLock <= 0f && !_guarding;
+        public bool AllowsDodge => IsUp && _machine.CanCancel && _hurtLock <= 0f;   // a raised guard does not eat the press: the roll lowers it (alpha playtest item 15)
         public float MoveScale => !IsUp ? 0f : _machine.Busy || _knockdownLeft > 0f ? 0.0f : _hurtLock > 0f ? 0.2f : _guarding || _aiming ? 0.5f : 1f;
         public float LungeSpeed => _machine.LungeSpeed;
         public bool Frozen => !IsUp;
@@ -424,6 +424,7 @@ namespace SleepingCalamity.Gameplay
                 Vector3 ep = e.transform.position;
                 bool body = HitGeometry.Hits(a, o.x, o.y, o.z, yaw, ep.x, ep.y, ep.z, d.Radius, d.Height);
                 if (part < 0 && !body) continue;
+                if (!MeleeSight.Clear(o, ep)) continue;   // a wall between the two: the swing does not reach through it (alpha playtest item 2)
                 Vector3 point = part >= 0 ? e.PartWorldPosition(part) : ep + Vector3.up * (d.Height * 0.55f);
                 RegisterHit(a, e, part, point);
             }
@@ -556,6 +557,7 @@ namespace SleepingCalamity.Gameplay
                 AttackData a = e.CurrentAttack;
                 Vector3 c = e.AttackCentre;
                 if (!HitGeometry.Hits(a, c.x, c.y, c.z, e.YawDeg, me.x, me.y, me.z, MovementMath.CapsuleRadius, MovementMath.CapsuleHeight)) continue;
+                if (!MeleeSight.Clear(e.transform.position, me)) continue;   // through a doorframe or wall: no hit (not marked judged, so it can still land once the line clears)
                 if (_judged.Count > 256) _judged.Clear();
                 _judged.Add(key);
                 ResolveEnemyHit(e, a);

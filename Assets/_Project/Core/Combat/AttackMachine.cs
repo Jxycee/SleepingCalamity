@@ -103,6 +103,7 @@ namespace SleepingCalamity.Core.Combat
             _chargeQueued = false;
             _frozenFrames = 0f;
             _specialBuffered = 0f;
+            _buffered = 0f;   // a press made before the dodge / stagger must not start a swing when it ends
             _sinceEnd = 0f;
         }
 
