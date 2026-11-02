@@ -74,6 +74,7 @@ namespace SleepingCalamity.Presentation
         public int ChestRequestsHandled { get; private set; }   // host only: RPCs received, accepted or refused
         public int LastLootItem { get; private set; }            // host only
         public Enemy GateKeyCarrierEnemy => _carrierEnemy;       // host only (tests)
+        public Enemy HunterEnemy => _hunter;                     // host only (tests)
 
         // ---- per-peer built-floor handles ----
         private int _handledBuild = -1;
@@ -97,6 +98,8 @@ namespace SleepingCalamity.Presentation
         private int _hostBuild = -1; private bool _resetRequested;
         private DiveHaulSync _subscribedHaul;
         private readonly List<PlayerPos> _players = new List<PlayerPos>();
+        private readonly List<PlayerPos> _rawPlayers = new List<PlayerPos>();   // unfiltered player positions for the spawn-safety guards
+        private readonly List<int> _pieceIds = new List<int>();                  // host: piece id of each spot (the floor's non-home pieces, ascending)
         private readonly Dictionary<ulong, Vector3> _armPos = new Dictionary<ulong, Vector3>();   // host: where each player stood when the floor was armed
         private readonly HashSet<ulong> _live = new HashSet<ulong>();                              // host: players seen inside the floor after moving away from _armPos
         private Bounds _armBounds; private bool _hasBounds;
@@ -259,8 +262,12 @@ namespace SleepingCalamity.Presentation
         private static bool IsWallCollider(Transform t, Transform root)
         {
             if (t.name == "LockedGate") return false;
-            for (Transform c = t; c != null && c != root; c = c.parent)
-                if (c.name == CellarFloorBuilder.WallGroup || c.name == CellarFloorBuilder.PillarGroup || c.name == CellarFloorBuilder.DoorGroup) return true;
+            bool group = false;
+            for (Transform c = t; c != null; c = c.parent)
+            {
+                if (c == root) return group;   // only colliders under the built floor's root count
+                if (c.name == CellarFloorBuilder.WallGroup || c.name == CellarFloorBuilder.PillarGroup || c.name == CellarFloorBuilder.DoorGroup) group = true;
+            }
             return false;
         }
 
@@ -283,10 +290,20 @@ namespace SleepingCalamity.Presentation
             return false;
         }
 
+        // Spawn-safety points: EVERY connected player's position, ignoring the downed (IsUp) and not-yet-live (FilterStale) filters of _players. A hunter that despawns during a wipe,
+        // or an ambush that springs while a hero is down or still loading in, must not appear on top of one. (The carrier/warden spawns and the plan-cell fallback ignore players.)
         private List<PlanePoint> PlanePoints()
         {
-            var list = new List<PlanePoint>(_players.Count);
-            foreach (PlayerPos p in _players) { Vector3 l = _root.InverseTransformPoint(p.Position); list.Add(new PlanePoint(l.x, -l.z)); }
+            _rawPlayers.Clear();
+            if (PlayersOverride != null) PlayersOverride(_rawPlayers);
+            else
+                foreach (KeyValuePair<ulong, NetworkClient> kv in NetworkManager.ConnectedClients)
+                {
+                    NetworkObject po = kv.Value.PlayerObject;
+                    if (po != null) _rawPlayers.Add(new PlayerPos { ClientId = kv.Key, Position = po.transform.position });
+                }
+            var list = new List<PlanePoint>(_rawPlayers.Count);
+            foreach (PlayerPos p in _rawPlayers) { Vector3 l = _root.InverseTransformPoint(p.Position); list.Add(new PlanePoint(l.x, -l.z)); }
             return list;
         }
 
@@ -596,20 +613,34 @@ namespace SleepingCalamity.Presentation
             }
         }
 
+        // Spot i belongs to the i-th piece of the floor that is not already home (a save marks some home: PiecesForFloor excludes them, so spots 0..n-1 must map to the remaining ids,
+        // not to PieceId(floor, i)). Ids and the save format are unchanged. Without a haul the plain indices stand.
+        private void RefreshPieceIds(DiveHaul haul, int floor)
+        {
+            _pieceIds.Clear();
+            int assigned = haul != null ? haul.AssignedOn(floor) : _pieceSpots.Length;
+            for (int i = 0; i < assigned; i++)
+            {
+                int id = DiveHaul.PieceId(floor, i);
+                if (haul == null || !haul.IsHome(id)) _pieceIds.Add(id);
+            }
+        }
+
         private void TickPieces(CellarFloorSync fs)
         {
             DiveHaul haul = HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState.Haul : null;
             int floor = _layout.Floor;
-            for (int i = 0; i < _pieceSpots.Length; i++)
+            RefreshPieceIds(haul, floor);
+            for (int i = 0; i < _pieceSpots.Length && i < _pieceIds.Count; i++)
             {
-                int id = DiveHaul.PieceId(floor, i);
+                int id = _pieceIds[i];
                 if (haul == null || haul.IsCollected(id)) continue;
                 Vector3 at = World(fs, _pieceSpots[i]);
                 foreach (PlayerPos p in _players)
                     if (FlatSqr(p.Position, at) <= PieceRange * PieceRange) { HaulSync.ServerAddPiece(id); break; }
             }
             ulong mask = 0;
-            for (int i = 0; i < _pieceSpots.Length && haul != null; i++) if (haul.IsCollected(DiveHaul.PieceId(floor, i))) mask |= 1UL << i;
+            for (int i = 0; i < _pieceSpots.Length && i < _pieceIds.Count && haul != null; i++) if (haul.IsCollected(_pieceIds[i])) mask |= 1UL << i;
             _st.Pieces = mask;
         }
 

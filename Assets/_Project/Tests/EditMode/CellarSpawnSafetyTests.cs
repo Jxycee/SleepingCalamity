@@ -90,6 +90,28 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.AreEqual(count, cells.Length);
                 var seen = new HashSet<(int, int)>();
                 foreach (CellPos c in cells) Assert.IsTrue(seen.Add((c.X, c.Y)), "distinct cells seed " + seed + " floor " + floor);
+                // the chosen movable cells are the farthest from the players: no walkable, unfixed room cell that was left out is farther than a chosen one
+                // (carrier/warden keep their authored cell and the plan-cell fallback ignores players, so they are not part of this ordering)
+                bool[,] walk = CellarKeyDrop.Walkable(l, d);
+                float minChosen = float.PositiveInfinity, maxLeft = 0f; int moved = 0;
+                var spawns = new List<EncounterSpawn>();
+                foreach (EncounterSpawn s in plan.Spawns) if (s.RoomIndex == room && s.Kind != EncounterKind.Hunter) spawns.Add(s);
+                var chosen = new HashSet<(int, int)>();
+                for (int i = 0; i < spawns.Count; i++)
+                {
+                    bool carrier = spawns[i].Kind == EncounterKind.Authored && l.Carrier != null && l.Carrier.X == spawns[i].X && l.Carrier.Y == spawns[i].Y;
+                    bool warden = l.WardenCell.HasValue && l.WardenCell.Value.X == spawns[i].X && l.WardenCell.Value.Y == spawns[i].Y;
+                    if (carrier || warden) { chosen.Add((spawns[i].X, spawns[i].Y)); continue; }
+                    chosen.Add((cells[i].X, cells[i].Y)); moved++;
+                    minChosen = System.Math.Min(minChosen, CellarSpawnSafety.NearestPlayer(cells[i], players));
+                }
+                for (int x = 0; x < p.Width; x++) for (int y = 0; y < p.Height; y++)
+                {
+                    var cell = new CellPos(p.X + x, p.Y + y);
+                    if (!walk[cell.X, cell.Y] || chosen.Contains((cell.X, cell.Y))) continue;
+                    maxLeft = System.Math.Max(maxLeft, CellarSpawnSafety.NearestPlayer(cell, players));
+                }
+                if (moved > 0) Assert.GreaterOrEqual(minChosen, maxLeft - 0.001f, "the fallback picks the farthest cells, seed " + seed + " floor " + floor);
                 floors++;
             }
             Assert.Greater(floors, 10);
