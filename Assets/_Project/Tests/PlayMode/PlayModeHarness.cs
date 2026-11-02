@@ -157,9 +157,62 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return null;
         }
 
+        // ---- N clients (M7 S1) ----
+
+        private static readonly List<TestClient> StartedClients = new List<TestClient>();
+
+        // Joins `count` extra TestClients (PlayerId(firstIndex) ... PlayerId(firstIndex + count - 1)) to the running direct host and waits until each is connected.
+        // They are added to `into` (if given) and disposed by TearDownApp, so the test needs no teardown of its own for them. A multiplayer world holds 4 players: host + 3 clients is the most.
+        public static IEnumerator StartClients(AppBootstrap host, int count, bool declineScenes, List<TestClient> into = null, int firstIndex = 20, float timeoutSeconds = 40f)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                var client = new TestClient(host, PlayerId(firstIndex + i), declineScenes);
+                StartedClients.Add(client);
+                if (into != null) into.Add(client);
+                var cts = new CancellationTokenSource();
+                yield return Await(client.JoinAsync(cts.Token), timeoutSeconds, cts);
+                cts.Dispose();
+                yield return WaitUntil(() => client.NetworkManager.IsConnectedClient, timeoutSeconds, "StartClients: client " + i + " never connected");
+            }
+        }
+
+        // A client that must be refused (full world, closed joins): returns the reason the client saw. Registered for teardown like StartClients.
+        public static IEnumerator JoinExpectingRefusal(AppBootstrap host, int index, Action<EndReason> reason, float timeoutSeconds = 40f)
+        {
+            var client = new TestClient(host, PlayerId(index));
+            StartedClients.Add(client);
+            var cts = new CancellationTokenSource();
+            yield return AwaitRefusal(client.JoinAsync(cts.Token), timeoutSeconds, reason);
+            cts.Dispose();
+        }
+
+        private static IEnumerator DisposeStartedClients()
+        {
+            var list = new List<TestClient>(StartedClients);
+            StartedClients.Clear();
+            foreach (TestClient c in list)
+            {
+                bool ok = true;
+                IEnumerator leave = null;
+                try { leave = c.LeaveAndDestroy(); } catch (Exception e) { ok = false; TestContext.WriteLine("client teardown threw: " + e.GetBaseException().Message); }
+                if (ok && leave != null)
+                {
+                    while (true)
+                    {
+                        bool more;
+                        try { more = leave.MoveNext(); } catch (Exception e) { TestContext.WriteLine("client teardown threw: " + e.GetBaseException().Message); try { c.Dispose(); } catch (Exception) { } break; }
+                        if (!more) break;
+                        yield return leave.Current;
+                    }
+                }
+            }
+        }
+
         // Never asserts before DestroyForTests: a failing teardown must still remove the App, or every later test is poisoned.
         public static IEnumerator TearDownApp()
         {
+            yield return DisposeStartedClients();
             try
             {
                 string problem = null;

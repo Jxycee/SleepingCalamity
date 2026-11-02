@@ -2,6 +2,15 @@
 
 These are the steps only the user can take. Claude keeps this list current: when you finish an item, tick it or tell Claude.
 
+## Tonight (2026-11-02): manual test plan, in order
+Main will be checked and quiet before you start (the coordinator holds Asset merges while you test).
+1. **3c solo, the M6 square loop** (~40 min). Covers the dive too (3b's floors 1-4), now with **tier 1 enemies only** in the Cellars. Note how the solo dive feels: too hard, too easy, too long.
+2. **Look while you walk:** Terrace and Keep stair flights (should read as steps, no black strip), butterflies/bees, chimney smoke, the square.
+3. **2-player items with Multiplayer Play Mode** (two editors, no second person needed): 3c steps 13-17, then 3b's netcode-only checks. Item 3 (real Relay with a friend) can wait.
+4. **Read and answer:** the 6 open questions in `docs/design/m7-proposal.md` section 3 (they shape M7 S2-S8).
+5. **If time:** the Mixamo clips (item 1).
+Tell the coordinator every surprise, a lying prompt, a stuck spot or a crash (paste the console line).
+
 ## Now (unblocks Phase 1 work)
 1. **Download the remaining Mixamo clips** for M2/M3 (Y Bot and 4 idles done; Quaternius CC0 and the Kevin Iglesias packs cover most). The list and settings are in `docs/design/mixamo-clips.md`: about 12 clips left (the Kevin Iglesias packs cover the rest), saved into `C:\Dev\_private\mixamo\`. Needs your Adobe account. *Unblocks: M2 animation (movement code can start without it).*
 2. ~~Link Unity Gaming Services~~ (done 2026-10-30, `7e9c6c7`).
