@@ -41,6 +41,9 @@ namespace SleepingCalamity.Tests.PlayMode
             while (diff != null && waited < 8f) { yield return run.Quiesce(0.5f); waited += 0.5f; diff = run.Mismatch(); }
 
             Debug.Log($"[COOP] fast twin: {run.Seconds:0} s, deepest floor {run.MaxFloor}, hash samples {run.HashSamples} agreed {run.HashPassed} mismatches {run.HashMismatches}, errors {run.ErrorCount}, warnings {run.WarningCount} [{string.Join(" | ", run.Warnings)}]; {run.Followers[0].Summary()}");
+            // Without these the test passed vacuously when the host bot never left the hub or the real-time limit cut the run short (review 2026-11-02 F3).
+            Assert.That(run.Seconds, Is.GreaterThanOrEqualTo(90f - CoopDiveRun.Step), "the run reached 90 s of game time (Play stops early at its real-time limit)");
+            Assert.That(run.MaxFloor, Is.GreaterThanOrEqualTo(1), "the host bot never got into the dive");
             Assert.That(run.Errors, Is.Empty, "no error or exception in the log:\n" + string.Join("\n", run.Errors));
             string[] netWarnings = run.Warnings.Where(w => w.Contains("Netcode") || w.Contains("Network")).ToArray();
             Assert.That(netWarnings, Is.Empty, "no Netcode warning in the log:\n" + string.Join("\n", netWarnings));
