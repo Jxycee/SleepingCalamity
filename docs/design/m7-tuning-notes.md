@@ -18,8 +18,8 @@ Values below are the code defaults; `10-balance.json` currently sets `enemies.so
 |---|---|---|---|
 | `enemies.soloAtk` | 1.0 | Multiplier on enemy attack damage when ONE hero is present (co-op untouched). Lower = less damage taken solo. | hard |
 | `enemies.soloLife` | 1.0 | Multiplier on enemy life when ONE hero is present. Lower = fights end sooner solo. | hard, flow |
-| `enemies.tier1Atk` | 0.65 | Attack multiplier of tier 1 enemies (floors 1-2, and all Cellars regulars) on top of the base table. | hard |
-| `enemies.tier2Atk` | 1.0 | Attack multiplier of tier 2 (Warden, hunter, rat-kings from `tier2MinFloor`). | hard |
+| `enemies.tier1Atk` | 0.65 | Attack multiplier of tier 1 enemies (every regular Cellars enemy by default, since `cellarsMaxTier` is 1) on top of the base table. | hard |
+| `enemies.tier2Atk` | 1.0 | Attack multiplier of tier 2 (the Warden by default; hunter and rat-kings from `tier2MinFloor` only when `cellarsMaxTier` is 2). | hard |
 | `enemies.tier2Life` | 3.0 | Life multiplier of tier 2. | hard, flow |
 | `enemies.tier2Def` | 3.3 | Defence multiplier of tier 2 (how much of your hit is soaked). | hard, flow |
 | `enemies.cellarsMaxTier` | 1 | Highest tier a regular Cellars enemy may be; 2 brings back tier-2 rat-kings. The Warden stays tier 2 regardless. | hard |

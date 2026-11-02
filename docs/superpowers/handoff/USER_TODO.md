@@ -10,6 +10,7 @@ Main will be checked and quiet before you start (the coordinator holds Asset mer
 4. **Read and answer:** the 6 open questions in `docs/design/m7-proposal.md` section 3 (they shape M7 S2-S8).
 5. **If time:** the Mixamo clips (item 1).
 Also check (stair hand-over fix, just merged): take the F1->F2->F3 stairs as host and as client, go home, abandon at F8, a wipe, and a client joining mid-dive. Nobody should sink or fall at a stair; dodge/sprint may be blocked for a split second right after arriving.
+In the 2-player run, also try standing on the other hero's head: if you can perch there, say whether that's fine or should be blocked.
 Tip: **F4** toggles the dev overlay (dive time, damage taken, heals, loaves, stir, per-room clear times; editor/dev builds only). Note anything it shows that feels off.
 Tell the coordinator every surprise, a lying prompt, a stuck spot or a crash (paste the console line).
 
