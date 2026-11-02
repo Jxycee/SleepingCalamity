@@ -13,6 +13,17 @@ Confidence labels:
 
 Collision and layout bugs from the traversal scan (rebuilt buildings, chests and dressing with no colliders, the town-wall stairs to nowhere, and so on) are in `Reference/qa/traversal/FIXLIST.md` and are not repeated here.
 
+## Status on main (triaged 2026-11-02)
+
+- **FIXED, combat 76038dd7:** 6 parry farm, 7 buffered attack after dodge, 8 elite lock release, 15 dodge while guarding, 16 pre-Spawn NetworkVariable warnings, and the wall half of 2 (melee line of sight, owner + victim + host).
+- **FIXED, enemy AI stages 3-4 (53890ee8, 5263d4c7):** the aggro/leash half of 2 (room-scoped aggro 12 m, leash 20 m, walk home).
+- **FIXED, Cellars interaction 64bc2e99 + e8771574:** 12 ambush spawns, 13 range checks through walls, 18 gate key reachability, piece spheres vs piece ids, hunter respawn distance.
+- **FIXED, dive flow d6154e73:** 3 floors 1-2 lost, 4 bank spam, 5 downed hero actions, 9 chest farming (fresh seed per dive), 10 same seed, 11 locked stair prompt, 14 short revive.
+- **MITIGATED:** 18 healing point spent on a same-seed retry: every dive now draws a fresh seed and the point is keyed on (seed, floor), so a retry gets a ready point. Only a fixed `SeedOverride` (tests) replays the old case.
+- **FIXED, Hollowmere traversal 056f80bd / 575d3e90:** 17 world edge (Saltwake road end collider, VoidEdge probe now measures real void). Re-confirm on the next scan.
+- **OPEN:** 1 solo balance (solo-balance session, DiveBot still shows normal solo unwinnable). The dive-flow review's piece-spot cap worry is theoretical: `CellarContentsTests.PieceSpots_CountMatchesDefaults_AndCellsAreLegalAndDistinct` asserts every default floor gets all its spots across seeds; only a test that adds extra pieces beyond the defaults can hit it.
+- **Left by design:** 18 one press teleports the whole party.
+
 ## Blocker / major
 
 1. **Solo dives are close to unwinnable without help: the bot fails a dive every 40-70 s and never gets past floor 2** (major, seen).
