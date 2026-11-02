@@ -85,7 +85,11 @@ namespace SleepingCalamity.Core.Combat
         // Solo only (one hero present): multipliers on enemy attack and life, 1 = the table. The 1-player cut for the alpha bot's solo normal dives; 2-4 players
         // keep CoopScaling and the tier tables untouched, so co-op does not get easier.
         public static float SoloAtk = 1f, SoloLife = 1f;
-        public static int AuthoredTier(bool tier2Marker, bool warden, int floor) => warden || (tier2Marker && floor >= Tier2MinFloor) ? 2 : 1;
+        // The Cellars (the first dungeon, floors 1-4) are a rougher tutorial (user, 2026-11-02): every regular enemy is tier 1 until the hero has the weapon upgrades and
+        // gear of later dungeons; tier 2 belongs to them. The Dough Warden, the floor-4 set-piece guard, keeps its tier-2 stats. Tunable: "cellarsMaxTier": 2 restores them.
+        public static int CellarsMaxTier = 1;
+        public static int CappedTier(int tier) => Math.Min(tier, CellarsMaxTier);
+        public static int AuthoredTier(bool tier2Marker, bool warden, int floor) => warden ? 2 : CappedTier(tier2Marker && floor >= Tier2MinFloor ? 2 : 1);
 
         // 6.6 tier 1 stats. Placeholder: which are weak to fire (the jam, the wooden broom) and which are pests (the rat-king).
         // Combat depth (2026-10-30, "fewer, tougher enemies"): small-enemy life roughly doubles so each takes a few openings (a rat-king about three with

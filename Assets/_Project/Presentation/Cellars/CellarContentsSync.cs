@@ -566,7 +566,7 @@ namespace SleepingCalamity.Presentation
             if (plan == null || plan.Hunter == null || plan.Floor != _layout.Floor || plan.Seed != _layout.Seed) return;
             if (!CellarSpawnSafety.FarFromAll(plan.Hunter.Cell, PlanePoints(), CellarSpawnSafety.HunterMinPlayerMeters)) return;   // never (re)appear on top of a player: wait until the cell is clear
             _hunterSpawned = true;
-            _hunter = EnsureCombat().SpawnEnemy(EnemyKind.RatKing, 2, World(fs, plan.Hunter.Cell));
+            _hunter = EnsureCombat().SpawnEnemy(EnemyKind.RatKing, EnemyCatalog.CappedTier(2), World(fs, plan.Hunter.Cell));
             if (_hunter != null) { _hunter.ServerDied += OnHunterDied; _hunter.ServerDespawned += OnHunterDespawned; }
         }
 

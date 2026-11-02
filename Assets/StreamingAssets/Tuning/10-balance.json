@@ -1,6 +1,7 @@
 {
   "enemies": {
-    "soloAtk": 0.55,
-    "soloLife": 0.75
+    "soloAtk": 1.0,
+    "soloLife": 1.0,
+    "cellarsMaxTier": 1
   }
 }
