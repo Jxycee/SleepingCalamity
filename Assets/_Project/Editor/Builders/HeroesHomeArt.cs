@@ -24,7 +24,7 @@ namespace SleepingCalamity.EditorTools
         };
         static readonly (string Slot, Color Paint)[] Paints =
         {
-            ("HH_PaintRed", new Color(0.130f, 0.045f, 0.032f)), ("HH_PaintBlue", new Color(0.055f, 0.095f, 0.150f)), ("HH_PaintOchre", new Color(0.4342f, 0.2542f, 0.0423f)),
+            ("HH_PaintRed", new Color(0.075f, 0.040f, 0.034f)), ("HH_PaintBlue", new Color(0.050f, 0.066f, 0.085f)), ("HH_PaintOchre", new Color(0.4342f, 0.2542f, 0.0423f)),
         };
 
         static Dictionary<string, Material> Materials()
