@@ -23,6 +23,10 @@ namespace SleepingCalamity.EditorTools
         public const string CellarSyncPrefab = "Assets/_Project/Prefabs/CellarFloorSync.prefab";
 
         // ---------------------------------------------------------------------------------------------------------------- Hollowmere
+        // R2_08_C3 (NW corner of the workshop lot): the pad is 3.5 m below the F09 terrace, so a retaining wall (LK0975-LK0978) stands 1 m west of the lot edge and the
+        // ground 1.5 m north of the corner climbs 1.6 m; the corner is a 0.5 m crack between lot edge and wall, with no route leading into it.
+        static readonly HashSet<string> WedgedCorners = new HashSet<string> { "R2_08_C3" };
+
         public static ScanSpace Hollowmere(HollowmereBuilder.Preset preset)
         {
             HollowmereBuilder.ApplyPreset(preset);
@@ -42,8 +46,22 @@ namespace SleepingCalamity.EditorTools
             SpawnPoint sp = Object.FindObjectsByType<SpawnPoint>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).FirstOrDefault();
             if (sp != null) s.Spawn = sp.transform.position;
 
+            // Lot corner nodes that are not places a player can stand are not targets and their ring edges are not intended paths (traversal-4):
+            //  - a corner buried in solid geometry (the terrain bulging up in a neighbour's yard, a town-wall piece or gate pier): the capsule probe at the node hits a collider;
+            //  - a corner wedged between a lot edge and a terrace retaining wall (WedgedCorners), a crack under 0.8 m wide that no route leads into.
+            Physics.SyncTransforms();
+            var dropped = new HashSet<string>();
+            foreach (PathNode n in t.Nodes)
+            {
+                if (n.Kind != PathNodeKind.Corner) continue;
+                Vector3 p = P(n);
+                if (Physics.CheckCapsule(p + Vector3.up * 0.75f, p + Vector3.up * 1.45f, 0.3f, ~0, QueryTriggerInteraction.Ignore) || WedgedCorners.Contains(n.Id)) dropped.Add(n.Id);
+            }
+            Debug.Log($"SC TRAVERSAL {preset}: {dropped.Count} lot corner nodes dropped as non-places: {string.Join(", ", dropped.OrderBy(x => x, System.StringComparer.Ordinal))}");
+
             var doorNodes = new HashSet<string>(t.Nodes.Where(n => n.Kind == PathNodeKind.Door).Select(n => n.Id));
             foreach (PathNode n in t.Nodes)
+                if (!dropped.Contains(n.Id))
                 s.Targets.Add(new TraversalTarget { Name = n.Id, Kind = n.Kind.ToString(), Pos = P(n), Reach = n.Kind == PathNodeKind.Door ? 1.5f : n.Kind == PathNodeKind.Stair ? 1.2f : 1.0f });
             foreach (Landmark l in t.Landmarks)
             {
@@ -60,7 +78,7 @@ namespace SleepingCalamity.EditorTools
             foreach (PathEdge e in t.Edges)
             {
                 PathNode a = t.Node(e.A), b = t.Node(e.B);
-                if (a == null || b == null) continue;
+                if (a == null || b == null || dropped.Contains(a.Id) || dropped.Contains(b.Id)) continue;
                 s.Paths.Add(new IntendedPath
                 {
                     Name = e.A + " -> " + e.B, A = P(a), B = P(b),

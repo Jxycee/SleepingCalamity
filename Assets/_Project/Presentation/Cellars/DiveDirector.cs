@@ -151,7 +151,8 @@ namespace SleepingCalamity.Presentation
         private float _nextPlace, _clearAt = -1f;
         private bool _placeRetry;   // host: a placement is still waiting for the built floor; PlacementPass runs every frame until it is done
         // owner side: the gravity hold while a floor hand-over is unresolved (see UpdateHold)
-        private bool _holdActive; private int _holdKey; private float _holdSince;
+        private HandoverHoldState _hold;
+        private NetworkManager _dcMgr;   // host: the manager whose disconnect callback prunes _placed
 
         // owner side: a teleport waiting for the local floor
         private bool _hasPending; private Vector3 _pendPos; private float _pendYaw; private uint _pendSeed; private int _pendFloor; private float _pendSince;
@@ -409,6 +410,14 @@ namespace SleepingCalamity.Presentation
 
         // Host: a floor was just swapped (the new floor is already built here): every hero is placed in this same frame instead of at the next 0.2 s tick,
         // and PlacementPass keeps retrying every frame until each hero was sent (it defers while FloorSync has not built the requested floor).
+        // Tests: pushes the 0.2 s placement tick out so only the swap-frame placement (MarkPlacementNow) can place anyone in time.
+        internal void TestDelayPlacement(float seconds) { _nextPlace = Time.unscaledTime + seconds; }
+        internal bool TestPlacedHas(ulong clientId) => _placed.ContainsKey(clientId);
+        internal bool TestPlacedThisGen(ulong clientId) => _placed.TryGetValue(clientId, out int g) && g == _gen;
+
+        // Host: a dropped client's placement record goes (the map would otherwise grow with every join; client ids are never reused).
+        private void OnClientGone(ulong clientId) { _placed.Remove(clientId); }
+
         private void MarkPlacementNow()
         {
             _gen++; _needsPlacement = true; _placeRetry = true;
@@ -479,9 +488,12 @@ namespace SleepingCalamity.Presentation
         /// <summary>Owner side: whether a teleport is still waiting for the local floor (tests).</summary>
         public bool HasPendingTeleport => _hasPending;
 
+        private float _testApplyAfter;   // tests: the owner holds back an arrival teleport until this time (opens the gravity-hold window deterministically)
+        internal void TestDelayApply(float seconds) { _testApplyAfter = Time.unscaledTime + seconds; }
+
         private void ApplyPending()
         {
-            if (!_hasPending) return;
+            if (!_hasPending || Time.unscaledTime < _testApplyAfter) return;
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             if (player == null) return;
             if (_pendFloor > 0 && Time.unscaledTime - _pendSince < PendingTimeout)
@@ -512,26 +524,23 @@ namespace SleepingCalamity.Presentation
         {
             NetworkObject player = NetworkManager != null && NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             HeroLocomotion loco = player != null ? player.GetComponent<HeroLocomotion>() : null;
-            if (loco == null) { _holdActive = false; return; }
+            if (loco == null) { _hold.Active = false; return; }
             int key = 0;
             if (NetActive.Value)
             {
                 ResolveSyncs();
-                key = HaulSync != null ? HaulSync.Current.CurrentFloor : -1;   // -1: the dive is on but this peer has not resolved the floor yet
+                int haulFloor = HaulSync != null ? HaulSync.Current.CurrentFloor : 0;
+                int syncFloor = 0; uint syncSeed = 0u;
+                if (FloorSync != null) { var n = FloorSync.Net.Value; syncFloor = n.Floor; syncSeed = n.Seed; }
+                key = HandoverHold.Key(true, haulFloor, syncFloor, syncSeed, _appliedFloor, _appliedSeed);   // whichever variable changed first (-1: neither resolved yet)
             }
-            bool hold = false;
-            if (key != _appliedFloor)
-            {
-                if (!_holdActive || key != _holdKey) { _holdActive = true; _holdKey = key; _holdSince = Time.unscaledTime; }
-                hold = Time.unscaledTime - _holdSince < PendingTimeout;
-            }
-            else _holdActive = false;
+            bool hold = HandoverHold.Decide(ref _hold, key, _appliedFloor, Time.unscaledTime, PendingTimeout);
             if (loco.HoldVertical != hold) loco.HoldVertical = hold;
         }
 
         private void ReleaseHold()
         {
-            _holdActive = false;
+            _hold.Active = false;
             NetworkObject player = NetworkManager != null && NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             HeroLocomotion loco = player != null ? player.GetComponent<HeroLocomotion>() : null;
             if (loco != null) loco.HoldVertical = false;
@@ -646,6 +655,7 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             ReleaseHold();
+            if (_dcMgr != null) { _dcMgr.OnClientDisconnectCallback -= OnClientGone; _dcMgr = null; }
             HeroVitals.ServerHeroSpawned -= OnHeroSpawned;
             _loafLedger.End();
             if (_world != null)
@@ -666,7 +676,7 @@ namespace SleepingCalamity.Presentation
         {
             if (Instance == null || IsServer) Instance = this;   // one process can hold several peers' directors (tests): the host's wins
             if (IsServer && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostWorld w)) { _world = w; try { w.RegisterTownSource(this); } catch (System.Exception e) { Debug.LogException(e); } }   // a save-layer fault must not stop the spawn
-            if (IsServer) { HeroVitals.ServerHeroSpawned += OnHeroSpawned; SpawnTownSync(); }
+            if (IsServer) { HeroVitals.ServerHeroSpawned += OnHeroSpawned; _dcMgr = NetworkManager; _dcMgr.OnClientDisconnectCallback += OnClientGone; SpawnTownSync(); }
         }
 
         // Host (M6 S4): the town's replication object, a dynamic network prefab spawned beside the director so a late joiner gets it with the spawn. The town it publishes is Town.State.

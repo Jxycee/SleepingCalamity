@@ -264,6 +264,33 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Consistent(rig, "case1 home");
         }
 
+        // Catches: the host's placement map growing with every join (a dropped client's id kept in DiveDirector._placed), and a later joiner not being sent to the dive floor.
+        [UnityTest]
+        public IEnumerator Case1b_DroppedClient_IsPrunedFromPlacement_LaterJoinerIsPlacedOnTheDiveFloor()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r, 1);
+            yield return StartDive(rig);
+            ulong gone = rig.ClientId(0);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.TestPlacedHas(gone) && rig.Host.TestPlacedHas(rig.HostNm.LocalClientId), Timeout, "case1b: the party was never placed on floor 1");
+            yield return Drop(rig, 0, "case1b");
+            Assert.That(rig.Host.TestPlacedHas(gone), Is.False, "the dropped client's placement record was pruned");
+            Assert.That(rig.Host.TestPlacedHas(rig.HostNm.LocalClientId), Is.True, "the host's record stays");
+
+            yield return PlayModeHarness.StartClients(rig.App, 1, false, rig.Clients, 31);
+            int back = rig.Clients.Count - 1;
+            ulong late = rig.ClientId(back);
+            NetworkManager cnm = rig.ClientNm(back);
+            rig.HostNm.SpawnManager.InstantiateAndSpawn(rig.App.PlayerPrefab, late, false, true, false, Home + new Vector3(4f, 0f, 0f), Quaternion.identity);
+            yield return PlayModeHarness.WaitUntil(() => cnm.LocalClient != null && cnm.LocalClient.PlayerObject != null, Timeout, "case1b: the late joiner never received its hero");
+            yield return FloorBuilt(rig, 1, "[case1b late]");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.TestPlacedHas(late), Timeout, "case1b: the late joiner was never placed");
+            NetworkObject onHost = null;
+            foreach (NetworkObject o in rig.HostNm.SpawnManager.SpawnedObjects.Values) if (o != null && o.IsPlayerObject && o.OwnerClientId == late) onHost = o;
+            Assert.That(onHost, Is.Not.Null);
+            yield return PlayModeHarness.WaitUntil(() => Flat(onHost.transform.position, Home) > 50f, Timeout, "case1b: the late joiner was not teleported to the dive floor (at " + onHost.transform.position + ")");
+        }
+
         // ================================================================ case 2
 
         public enum Request { Bank, Stair, GoHome }

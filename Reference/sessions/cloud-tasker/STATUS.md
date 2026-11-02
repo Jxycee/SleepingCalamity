@@ -1,10 +1,10 @@
 Status: IN PROGRESS
 Session: Cloud Tasker (cloud, session_01RaNwcfvALfNsnFMLqaHdFr)
 Branch: claude/dazzling-tesla-m54kg2 (docs on main; fix on claude/overlay-heal-count)
-Tip: none yet
-Check: none yet
-Now: task 1, read-only review of today's merges (M6 S6, M7 S0-S3, S5 overlay, stair hand-over, solo balance) -> Reference/qa/review-2026-11-02.md
-Next: 2 overlay heal-count fix; 3 PHASE1 M5/M6/M7 rows + PARKING_LOT
-WaitingOn: nothing
+Tip: claude/overlay-heal-count 18a20f7 (Core DiveStats tests 10/10 PASS; Unity check not run: disk full in cloud)
+Check: needs PC check (claude/overlay-heal-count 18a20f7)
+Now: H6/H7 stall decimate + LODs on claude/stall-lods (agent running, cloud disk tight ~4 GB)
+Next: overlay fix check (or needs PC check); H6/H7 stall decimate + LODs on claude/stall-lods; H3 Lit-fallback guard after the freeze
+WaitingOn: PC check of claude/overlay-heal-count
 HoldsPort: no
 Needs: nothing
