@@ -1,4 +1,4 @@
-Status: IN PROGRESS
+Status: DONE after check+merge (3/3 art rounds, ~22/40; traversal job 3 NOT fixed, see open items)
 Branch: claude/stairs-traversal-3
 Tip: see git log (commit "stairs-traversal-3: nosing material actually rebuilt")
 
