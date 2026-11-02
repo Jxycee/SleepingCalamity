@@ -45,6 +45,17 @@ namespace SleepingCalamity.EditorTools
                 Tint = new Color(0.22f, 0.28f, 0.31f), HazeNear = 0.84f, HazeFar = 0.90f, D0 = 1800f, D1 = 2900f, Mist = 0.05f, Cool = 1.4f, CoolAmt = 1.0f },
         };
 
+        // Midday sun (BeautyCornerBuilder Midday: Euler(54, -32, 0)), direction TOWARD the sun. The vertex colours below bake a gentle warm-lit / cool-shade split on top of the
+        // shader's own lighting (its wrapped Lambert is weak at this distance), so a mass reads as a lit face and a shade side.
+        static readonly Vector3 SunDir = new Vector3(0.311f, 0.809f, -0.498f);
+        static Color LitShade(Vector3 n, float strength)
+        {
+            float t = Mathf.Clamp01(Vector3.Dot(n, SunDir) * 0.9f + 0.25f);
+            Color lit = new Color(1.10f, 1.04f, 0.90f), shade = new Color(0.74f, 0.82f, 1.0f);
+            Color c = Color.Lerp(shade, lit, t);
+            return Color.Lerp(Color.white, c, strength);
+        }
+
         public static void Build(Transform ring)
         {
             Transform old = ring.Find("Landmarks");
@@ -124,7 +135,15 @@ namespace SleepingCalamity.EditorTools
                     idx.AddRange(new[] { a, e, d, a, b, e });
                 }
             Material m = Mat("M_BD_" + L.Name, L.Tint, L.HazeNear, L.HazeFar, L.D0, L.D1, L.Mist, L.Cool, L.CoolAmt);
-            MakeObject(parent, L.Name, v, idx, m);
+            float hi = L.Base + L.Big;
+            MakeObject(parent, L.Name, v, idx, m, null, (p, n) =>
+            {
+                float g = Mathf.Clamp01((p.y - L.Foot) / Mathf.Max(1f, hi - L.Foot));
+                float band = Mathf.PerlinNoise(p.x * 0.013f + L.Seed, p.z * 0.013f) - 0.5f;   // patches of lighter meadow and darker wood along the ridge
+                float k = Mathf.Lerp(0.74f, 1.10f, g) * (1f + 0.22f * band);
+                Color sh = LitShade(n, 0.45f);
+                return new Color(k * sh.r, k * sh.g, k * sh.b, 1f);
+            });
             return idx.Count / 3;
         }
 
@@ -137,7 +156,7 @@ namespace SleepingCalamity.EditorTools
             float cx = c.X + HollowmereBackdropTuning.MountainDist * Mathf.Cos(az), cz = c.Z + HollowmereBackdropTuning.MountainDist * Mathf.Sin(az);
             // local axes: radial (away from the town) and tangential (along the horizon)
             Vector2 rad = new Vector2(Mathf.Cos(az), Mathf.Sin(az)), tan = new Vector2(-rad.y, rad.x);
-            const int N = 64; const float Half = 700f;
+            const int N = 128; const float Half = 700f;
             float[] hs = new float[(N + 1) * (N + 1)];
             var v = new List<Vector3>();
             float best = 0f;
@@ -150,6 +169,7 @@ namespace SleepingCalamity.EditorTools
                     float x = cx + tan.x * lt + rad.x * lr, z = cz + tan.y * lt + rad.y * lr;
                     float ridged = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.004f + 2f, z * 0.004f + 8f) * 2f - 1f);
                     h *= 0.72f + 0.45f * ridged + 0.06f * (Mathf.PerlinNoise(x * 0.02f, z * 0.02f) - 0.5f);
+                    h *= 1f + 0.16f * (Mathf.PerlinNoise(x * 0.012f + 31f, z * 0.012f + 7f) - 0.5f) + 0.06f * (Mathf.PerlinNoise(x * 0.045f + 5f, z * 0.045f + 19f) - 0.5f);   // craggy silhouette
                     hs[j * (N + 1) + i] = h;
                     if (h > best) { best = h; mountainPeak = new Vector3(x, h - 30f, z); }
                     v.Add(new Vector3(x, h - 30f, z));
@@ -162,8 +182,19 @@ namespace SleepingCalamity.EditorTools
                     if (hs[a] <= 0f && hs[b] <= 0f && hs[d] <= 0f && hs[e] <= 0f) continue;
                     idx.AddRange(new[] { a, d, e, a, e, b });
                 }
-            Material m = Mat("M_BD_Mawrrow", new Color(0.07f, 0.08f, 0.11f), 0.50f, 0.64f, 2000f, 3000f, 0.04f, 1.3f, 0.8f);
-            MakeObject(parent, "MawrrowMountain", v, idx, m);
+            Material m = Mat("M_BD_Mawrrow", new Color(0.30f, 0.27f, 0.27f), 0.40f, 0.58f, 2000f, 3000f, 0.04f, 1.3f, 0.8f);
+            MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
+            {
+                float y = p.y + 30f;
+                float up = Mathf.Clamp01(y / H);
+                float strata = 0.5f + 0.5f * Mathf.Sin(y * 0.07f + Mathf.PerlinNoise(p.x * 0.009f + 4f, p.z * 0.009f + 2f) * 7f);   // rock bands
+                float fleck = Mathf.PerlinNoise(p.x * 0.05f, p.z * 0.05f) - 0.5f;
+                float k = Mathf.Lerp(0.62f, 1.05f, up) * (0.86f + 0.14f * strata) * (1f + 0.25f * fleck);
+                Color sh = LitShade(n, 1f);
+                // the foot dissolves into haze (alpha < 1 adds haze in the shader): fully misted at the base, clear by about a third of the way up
+                float a = Mathf.Lerp(0.05f, 1f, Smooth(8f, 0.34f * H, y));
+                return new Color(k * sh.r, k * sh.g, k * sh.b, a);
+            });
             int tris = idx.Count / 3;
             if (HollowmereBackdropTuning.Wisp) BuildWisp(parent);
             return tris;
@@ -225,9 +256,15 @@ namespace SleepingCalamity.EditorTools
                 mb.Box(new Vector3(0f, 18.2f, 4.3f) + q * new Vector3(0f, len * 0.5f, 0f), new Vector3(0.7f, len, 0.5f), q);
                 if (!broken) mb.Box(new Vector3(0f, 18.2f, 4.1f) + q * new Vector3(k == 3 ? 0.9f : 1.2f, 9.5f, 0f), new Vector3(k == 3 ? 1.4f : 2.4f, 8.5f, 0.25f), q);   // the lattice sail (one half gone)
             }
-            var go = MakeObject(parent, "RuinedWindmill", mb.V.Select(p => p * s).ToList(), mb.I, Mat("M_BD_Windmill", new Color(0.06f, 0.065f, 0.07f), 0.55f, 0.66f, 500f, 1300f, 0.05f, 1.0f, 0.3f));
+            Quaternion rot = Quaternion.Euler(0f, 90f - (a * Mathf.Rad2Deg + 180f), 0f);   // local +Z faces the town centre
+            var go = MakeObject(parent, "RuinedWindmill", mb.V.Select(p => p * s).ToList(), mb.I, Mat("M_BD_Windmill", new Color(0.24f, 0.22f, 0.21f), 0.50f, 0.62f, 500f, 1300f, 0.05f, 1.0f, 0.3f), null, (p, n) =>
+            {
+                Color sh = LitShade(rot * n, 1f);
+                float k = Mathf.Lerp(0.50f, 1f, Smooth(0f, 8f * s, p.y)) * (p.y > 16f * s ? 0.85f : 1f);   // darker base in the hill's shadow, sails and cap a touch darker than the walls
+                return new Color(k * sh.r, k * sh.g, k * sh.b, 1f);
+            });
             go.transform.position = pos;
-            go.transform.rotation = Quaternion.Euler(0f, 90f - (a * Mathf.Rad2Deg + 180f), 0f);   // local +Z faces the town centre
+            go.transform.rotation = rot;
             return mb.I.Count / 3;
         }
 
@@ -305,13 +342,19 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        static GameObject MakeObject(Transform parent, string name, List<Vector3> v, List<int> idx, Material m, List<Vector2> uv = null)
+        static GameObject MakeObject(Transform parent, string name, List<Vector3> v, List<int> idx, Material m, List<Vector2> uv = null, System.Func<Vector3, Vector3, Color> colour = null)
         {
             var mesh = new Mesh { name = "BD_" + name, indexFormat = IndexFormat.UInt32 };
             mesh.SetVertices(v);
             if (uv != null) mesh.SetUVs(0, uv);
             mesh.SetTriangles(idx, 0);
             mesh.RecalculateNormals(); mesh.RecalculateBounds();
+            if (colour != null)   // vertex colours (the shader multiplies rgb into the tint, alpha adds haze): colour(position, normal)
+            {
+                var nrm = mesh.normals; var cols = new Color[v.Count];
+                for (int i = 0; i < cols.Length; i++) cols[i] = colour(v[i], nrm[i]);
+                mesh.SetColors(cols);
+            }
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
