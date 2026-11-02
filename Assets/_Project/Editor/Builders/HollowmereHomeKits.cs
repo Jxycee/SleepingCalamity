@@ -79,15 +79,7 @@ namespace SleepingCalamity.EditorTools
             string dir = folder + "/" + variant;
             GameObject fbx = BeautyCornerArt.LoadModel(dir, variant + ".fbx", keepMaterialSlots: true);
             if (fbx == null) { Debug.LogWarning("SC HOLLOWMERE " + label + " art missing: " + dir); return false; }
-            // A model's first import (no .meta yet) can hand back the prefab built before LoadModel's importer settings applied: every slot is then the default "Lit"
-            // material and the slot names are lost. Reimport once so the slots carry the FBX material names.
-            Renderer probe = fbx.GetComponentInChildren<Renderer>(true);
-            if (probe != null && probe.sharedMaterials.Length > 0 && probe.sharedMaterials[0] != null && probe.sharedMaterials[0].name == "Lit")
-            {
-                string path = dir + "/" + variant + ".fbx";
-                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-                fbx = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            }
+            fbx = HollowmereClutter.ReimportIfDefaultLit(fbx, dir + "/" + variant + ".fbx", label + " " + variant);
             Dictionary<string, Material> slots = materials();
 
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(fbx, g);
