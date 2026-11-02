@@ -12,9 +12,10 @@ namespace SleepingCalamity.Core.Combat
     // a flinch, break, flinch loop cannot stunlock. The threshold grows with the party like the revenge cap: x (1 + 0.5 per extra player).
     public sealed class PoiseMeter
     {
-        public const float ResetSeconds = 1.0f;
-        public const float SteadySeconds = 2.0f;
-        public const float PerExtraPlayer = 0.5f;
+        // Tunable (Core/Tuning, "poise"); the defaults (1.0, 2.0, 0.5) are in PoiseTuning.
+        public static float ResetSeconds => Tuning.PoiseTuning.ResetSeconds;
+        public static float SteadySeconds => Tuning.PoiseTuning.SteadySeconds;
+        public static float PerExtraPlayer => Tuning.PoiseTuning.PerExtraPlayer;
 
         public float Threshold { get; }
         public float Value { get; private set; }
