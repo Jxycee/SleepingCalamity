@@ -152,6 +152,7 @@ namespace SleepingCalamity.EditorTools
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
             HollowmereClutter.Build(ruined, rebuilt, t);   // Q14: market and lane clutter, shop signs and washing lines
+            HollowmereSurfaces.Build(set, ruined, rebuilt, t);   // town surfaces: square macro variation and contact AO under props (decals, no colliders)
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
             HollowmereRoad.Build(set, ruined, rebuilt, t);   // Q15: the Saltwake road's dressing, the field hedgerows and trees, the backdrop ring
             BuildPathDebug(root, t);
@@ -181,6 +182,7 @@ namespace SleepingCalamity.EditorTools
             foreach (var c in HollowmereRoad.Cameras)   // Q15: from the gate looking out, from the road looking back (Target absolute)
                 LookTestBuilder.AddCapture(cams, c.Name, new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z), c.Target, c.Fov).farClipPlane = HollowmereRoad.FarClip;
             HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
+            HollowmereAmbientBuilder.BakeAvoid(root);   // cards kept clear of every capture camera
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);   // the corner's light with the town-scale haze, sky and grade (Q12)
             BuildHub(root, lighting, t);   // M6 S3: gameplay camera, spawn point, the cistern-stair DiveHub, the area look switcher (after Look.Apply: it finds the town's one Volume) and the TownView
             ApplyPreset(Preset.Ruined);
