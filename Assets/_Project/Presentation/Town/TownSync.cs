@@ -95,7 +95,7 @@ namespace SleepingCalamity.Presentation
         // Host-written, everyone reads it; a peer that watches it flip to true shows the baker's first line (a late joiner sees it already true: no line replays).
         public const string FirstMeetLine = "Baker: \"Oven's warm at last. Come by before you dive and I'll send you down with bread.\"";
         public readonly NetworkVariable<bool> NetBakerMet = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        private string _toast; private float _toastUntil, _spawnedAt;
+        private string _toast; private float _toastUntil;
 
         public DiveDirector Director;   // host only (set by the director that spawned this)
 
@@ -120,15 +120,25 @@ namespace SleepingCalamity.Presentation
             if (Local == null || IsServer) Local = this;
             NetTown.OnValueChanged += OnTownChanged;
             NetBakerMet.OnValueChanged += OnBakerMetChanged;
-            _spawnedAt = Time.unscaledTime;
             if (IsServer) NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
             EnsureView();
         }
 
         private void OnBakerMetChanged(bool previous, bool current)
         {
-            // a latch restored from the save is written right after the spawn: only a flip that happens later is "the first meeting"
-            if (!previous && current && Time.unscaledTime - _spawnedAt > 3f) { _toast = FirstMeetLine; _toastUntil = Time.unscaledTime + 7f; }
+            // any false->true flip is "the first meeting", except the host seeding a latch restored from the save (ServerSeedBakerMet). A peer that joins with the latch already
+            // true never sees a flip (it never goes back to false).
+            if (!previous && current && !_seededMet) { _toast = FirstMeetLine; _toastUntil = Time.unscaledTime + 7f; }
+        }
+
+        private bool _seededMet;
+        // Host: publishes the latch loaded from the save without the first-meet line. Called once, right after the spawn.
+        public void ServerSeedBakerMet(bool met)
+        {
+            if (!IsServer) return;
+            _seededMet = met;
+            NetBakerMet.Value = met;
+            _seededMet = false;
         }
 
         private void OnGUI()

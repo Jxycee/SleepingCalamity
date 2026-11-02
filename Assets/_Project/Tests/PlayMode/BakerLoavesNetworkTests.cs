@@ -136,6 +136,43 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Director.BakerMet, Is.True, "he is housed in a complete bakery, so the first meeting still happened");
         }
 
+        // Catches: a non-owner eating another hero's loaf (the host must compare the RPC sender to the owner), eating while downed, and a hero spawned mid-dive (late joiner / reconnect) with no loaves.
+        [UnityTest]
+        public IEnumerator EatRpc_WrongSenderRefused_DownedRefused_MidDiveSpawnGetsTheDiveLoaves()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r, "F02", 0);
+            Assert.That(rig.Director.ServerStartDive(), Is.True);
+            Assert.That(rig.HostHero.Loaves, Is.EqualTo(3));
+            yield return PlayModeHarness.WaitUntil(() => rig.ClientHero.Loaves == 3, Timeout, "the client never read its loaves");
+
+            // The client calls the RPC on the HOST's hero (a hurt hero with loaves): the sender is not the owner, so nothing is eaten.
+            Assert.That(rig.HostHero.ServerDamage(50), Is.EqualTo(50));
+            ulong hostHeroId = rig.HostHero.NetworkObjectId;
+            yield return PlayModeHarness.WaitUntil(() => rig.ClientNm.SpawnManager.SpawnedObjects.ContainsKey(hostHeroId), Timeout, "the client never saw the host hero");
+            HeroVitals hostHeroOnClient = rig.ClientNm.SpawnManager.SpawnedObjects[hostHeroId].GetComponent<HeroVitals>();
+            System.Reflection.MethodInfo rpc = typeof(HeroVitals).GetMethod("EatLoafRpc", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(rpc, Is.Not.Null, "EatLoafRpc was renamed: update this test");
+            rpc.Invoke(hostHeroOnClient, new object[] { default(RpcParams) });
+            yield return Seconds(0.8f);
+            Assert.That(rig.HostHero.Loaves, Is.EqualTo(3), "a non-owner cannot eat another hero's loaf");
+            Assert.That(rig.HostHero.Hp, Is.EqualTo(rig.HostHero.MaxHp - 50));
+            rig.HostHero.RequestEatLoaf();   // the owner can: proves the refusal above was the sender check
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHero.Loaves == 2, Timeout, "the owner's own request never ate");
+
+            // Downed: refused.
+            rig.ClientHeroOnHost.ServerDamage(rig.ClientHeroOnHost.MaxHp * 4);
+            Assert.That(rig.ClientHeroOnHost.IsUp, Is.False, "the hero is down");
+            Assert.That(rig.ClientHeroOnHost.Loaves, Is.EqualTo(3));
+            rig.ClientHero.RequestEatLoaf();
+            yield return Seconds(0.8f);
+            Assert.That(rig.ClientHeroOnHost.Loaves, Is.EqualTo(3), "a downed hero cannot eat");
+
+            // A hero that spawns while the dive runs gets the dive's loaves.
+            NetworkObject late = rig.HostNm.SpawnManager.InstantiateAndSpawn(AppBootstrap.Current.PlayerPrefab, rig.HostNm.LocalClientId, false, false, false, new Vector3(420f, 0f, 400f), Quaternion.identity);
+            Assert.That(late.GetComponent<HeroVitals>().Loaves, Is.EqualTo(3), "a hero spawned mid-dive gets the dive's loaves");
+        }
+
         private static IEnumerator Seconds(float seconds)
         {
             double until = Time.realtimeSinceStartupAsDouble + seconds;

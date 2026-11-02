@@ -24,6 +24,20 @@ namespace SleepingCalamity.Tests.EditMode
             return s;
         }
 
+        // Catches: a mid-dive spawn (late joiner, reconnect) with no loaves, or a stale decision carried into town / the next dive.
+        [Test]
+        public void LoafLedger_ReplaysTheDiveDecisionToMidDiveSpawns_ClearedWhenTheDiveEnds()
+        {
+            var l = new DiveLoafLedger();
+            Assert.That(l.ForSpawn(), Is.Null, "no dive: leave the count alone");
+            l.Begin(3);
+            Assert.That(l.ForSpawn(), Is.EqualTo(3));
+            l.End();
+            Assert.That(l.ForSpawn(), Is.Null);
+            l.Begin(0);
+            Assert.That(l.ForSpawn(), Is.EqualTo(0), "a dive where the baker granted none");
+        }
+
         [Test]
         public void AllMet_GrantsThreePerPlayer()
         {

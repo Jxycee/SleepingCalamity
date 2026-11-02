@@ -13,6 +13,18 @@ namespace SleepingCalamity.Core
         public bool Granted => PerPlayer > 0;
     }
 
+    // The host's memory of the loaf decision made at dive start (loaves per player, 0 when not granted), so a hero that spawns mid-dive (late joiner, reconnect) gets the same number.
+    // Cleared when the dive ends. Authority: host only.
+    public sealed class DiveLoafLedger
+    {
+        public bool DiveActive { get; private set; }
+        public int PerPlayer { get; private set; }
+        public void Begin(int perPlayer) { DiveActive = true; PerPlayer = perPlayer < 0 ? 0 : perPlayer; }
+        public void End() { DiveActive = false; PerPlayer = 0; }
+        // Loaves for a hero spawning now: the remembered number during a dive, null (leave the count alone) otherwise.
+        public int? ForSpawn() { return DiveActive ? PerPlayer : (int?)null; }
+    }
+
     public static class BakerService
     {
         public const int LoavesPerPlayer = 3;

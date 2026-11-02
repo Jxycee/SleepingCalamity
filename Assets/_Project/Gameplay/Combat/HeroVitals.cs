@@ -39,7 +39,9 @@ namespace SleepingCalamity.Gameplay
         private void OnDisable() { s_all.Remove(this); }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { s_all.Clear(); }
+        private static void ResetStatics() { s_all.Clear(); ServerHeroSpawned = null; }
+
+        public static event System.Action<HeroVitals> ServerHeroSpawned;   // host: a hero finished spawning (the dive director gives a mid-dive joiner the dive's loaves)
 
         public override void OnNetworkSpawn()
         {
@@ -47,6 +49,7 @@ namespace SleepingCalamity.Gameplay
             {
                 Model = new PlayerVitals();
                 Push();
+                ServerHeroSpawned?.Invoke(this);
             }
         }
 
