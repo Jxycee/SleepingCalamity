@@ -31,3 +31,8 @@ Totals include Step 5 / 5 and Slope 18 / 18 (not itemised above). WalkThrough fe
 ## Known not fixed
 - Blocked still 25 / 23 vs 22 / 20 at 056f80bd: 3 come from the pass-1 lots near the lower gate and R2_16 wall (R2_23, R2_16 piers/walls).
 - Islands, stuck pockets, R2_03_C3 / R2_08_C3 corner Unreachable/Hole, Narrow, remaining TightGap: not touched this pass (scan rounds spent on the ruin seal).
+
+## Reviewer follow-ups (no blockers; for a later job)
+- TraversalProbe VoidEdges ray reaches 42 m: a missing outer wall above lower geometry no longer raises VoidEdge. Require walkable ground at the hit (NavMesh sample / upward normal) or report a separate Cliff kind.
+- HollowmereLotClearanceTests: lane test tolerance 0.7 m is looser than the layout's 0.2 m rule (MinLotLaneClearance unused); wall test silently skips every straddling lot (assert an allowlist of R2_23 only).
+- No EditMode guard for HollowmereRuinSeal (TightGap 59/14 -> 53/12 comes from the scan baseline only).
