@@ -502,6 +502,7 @@ namespace SleepingCalamity.EditorTools
                     if (blocker != null)
                     {
                         if (blocker is TerrainCollider) continue;
+                        if (IsWorldBound(blocker.transform)) continue;   // the invisible world-edge colliders are meant to be invisible
                         if (!BodyBlocked(gp, hero, 0.3f, anyVisMask))
                         {
                             g.Flags[i] |= WalkGrid.FInvisible;
@@ -516,7 +517,7 @@ namespace SleepingCalamity.EditorTools
                         if (tw < hero.Diameter && tw > 0.3f)
                         {
                             g.Flags[i] |= WalkGrid.FTight;
-                            Issue(res, IssueKind.TightGap, gp, tw, hero.Diameter, $"gap {tw:0.00} m wide between walkable areas: looks passable, the capsule needs {hero.Diameter:0.00} m", BodyOverlap(gp, hero, 0.45f, physMask), "gap");
+                            Issue(res, IssueKind.TightGap, gp, tw, hero.Diameter, $"gap {tw:0.00} m wide between walkable areas: looks passable, the capsule needs {hero.Diameter:0.00} m; bounded by {GapSides}", BodyOverlap(gp, hero, 0.45f, physMask), "gap");
                         }
                     }
                 }
@@ -541,24 +542,31 @@ namespace SleepingCalamity.EditorTools
                 if (!(pp && m)) continue;
                 int q = perp[a];
                 var dir = new Vector3(axes[q, 0], 0f, axes[q, 1]).normalized;
-                float w = WidthAlong(p, dir, hero, mask);
-                if (w < width) { width = w; best = a; }
+                float w = WidthAlong(p, dir, hero, mask, out string sides);
+                if (w < width) { width = w; best = a; GapSides = sides; }
             }
             return best;
         }
 
-        static float WidthAlong(Vector3 p, Vector3 dir, HeroCapsule hero, int mask)
+        static string Path(Transform t) { string n = t.name; for (int i = 0; i < 3 && t.parent != null; i++) { t = t.parent; n = t.name + "/" + n; } return n; }
+
+        static string GapSides = "";   // the two colliders bounding the narrowest gap found by OppositeMain (for the issue detail)
+
+        static float WidthAlong(Vector3 p, Vector3 dir, HeroCapsule hero, int mask, out string sides)
         {
             const float rr = 0.05f, max = 3f;
             Vector3 a = p + Vector3.up * (hero.StepOffset + rr), b = p + Vector3.up * (hero.Height - rr);
             float d1 = Physics.CapsuleCast(a, b, rr, dir, out RaycastHit h1, max, mask, QueryTriggerInteraction.Ignore) ? h1.distance + rr : max;
             float d2 = Physics.CapsuleCast(a, b, rr, -dir, out RaycastHit h2, max, mask, QueryTriggerInteraction.Ignore) ? h2.distance + rr : max;
+            sides = (d1 < max ? Path(h1.collider.transform) : "-") + " | " + (d2 < max ? Path(h2.collider.transform) : "-");
             return d1 + d2;
         }
 
+        static bool IsWorldBound(Transform t) { for (; t != null; t = t.parent) if (t.name == "EdgeBounds") return true; return false; }
+
         // ---------------------------------------------------------------------------------------------------------------- edges into the void
         // From every main-area cell on the NavMesh's rim, step 0.6 m outward in each straight direction: if the capsule can move there unblocked and no ground
-        // lies within 4 m below, the hero can walk off the level (a missing outer wall, an open corridor end, a gap in the floor).
+        // lies within 40 m below (a drop to lower ground is a cliff, not the void), the hero can walk off the level (a missing outer wall, an open corridor end, a gap in the floor).
         static void VoidEdges(ScanResult res, WalkGrid g, HeroCapsule hero, int physMask)
         {
             if (g.Main < 0) return;
@@ -579,9 +587,9 @@ namespace SleepingCalamity.EditorTools
                         const float step = 0.6f;
                         if (Physics.CapsuleCast(from + Vector3.up * (hero.StepOffset + hero.Radius), from + Vector3.up * (hero.Height - hero.Radius), hero.Radius - 0.05f, dir, step, physMask, QueryTriggerInteraction.Ignore)) continue;
                         Vector3 to = from + dir * (step + hero.Radius);
-                        if (Physics.Raycast(to + Vector3.up * 0.5f, Vector3.down, 4.5f, physMask, QueryTriggerInteraction.Ignore)) continue;
+                        if (Physics.Raycast(to + Vector3.up * 2f, Vector3.down, 42f, physMask, QueryTriggerInteraction.Ignore)) continue;
                         if (g.ToCell(to, out int tx, out int tz)) g.Flags[g.Index(tx, tz)] |= WalkGrid.FHole;
-                        Issue(res, IssueKind.VoidEdge, to, 4f, 0f, "the walkable floor ends with no wall and no ground within 4 m below: the hero can walk off the level", ColliderBelow(from, physMask), "void");
+                        Issue(res, IssueKind.VoidEdge, to, 40f, 0f, "the walkable floor ends with no wall and no ground within 40 m below: the hero can walk off the level", ColliderBelow(from, physMask), "void");
                     }
                 }
         }
