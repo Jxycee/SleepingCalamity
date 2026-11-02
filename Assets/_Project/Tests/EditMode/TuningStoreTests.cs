@@ -293,14 +293,18 @@ namespace SleepingCalamity.Core.Tuning.Tests
         }
 
         [Test]
-        public void AuthoredTier_RatKingsAreTier1AboveTheMinFloor_WardenAlwaysTier2()
+        public void AuthoredTier_CellarsAreTier1ByDefault_WardenAlwaysTier2_MaxTierRestoresTier2()
         {
+            Assert.AreEqual(1, Combat.EnemyCatalog.CellarsMaxTier);
             Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(true, false, 1));
-            Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(true, false, 2));
+            Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(true, false, 3), "cellars: every regular enemy is tier 1");
+            Assert.AreEqual(2, Combat.EnemyCatalog.AuthoredTier(true, true, 4), "the Warden keeps tier 2");
+            Assert.AreEqual(1, Combat.EnemyCatalog.CappedTier(2));
+            Assert.IsTrue(TuningStore.ApplyJson(@"{ ""enemies"": { ""cellarsMaxTier"": 2 } }", "t.json"));
             Assert.AreEqual(2, Combat.EnemyCatalog.AuthoredTier(true, false, 3));
-            Assert.AreEqual(2, Combat.EnemyCatalog.AuthoredTier(true, true, 1));
-            Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(false, false, 4));
-            Assert.IsTrue(TuningStore.ApplyJson(@"{ ""enemies"": { ""tier2MinFloor"": 1 } }", "e.json"));
+            Assert.AreEqual(1, Combat.EnemyCatalog.AuthoredTier(true, false, 2), "tier2MinFloor still applies");
+            Assert.AreEqual(2, Combat.EnemyCatalog.CappedTier(2));
+            Assert.IsTrue(TuningStore.ApplyJson(@"{ ""enemies"": { ""tier2MinFloor"": 1 } }", "t2.json"));
             Assert.AreEqual(2, Combat.EnemyCatalog.AuthoredTier(true, false, 1));
         }
     }

@@ -60,6 +60,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 bool _navDoorOpen;
         int _lastHp = -1;
         float _healSince, _healGiveUpAt = -999f, _lastFaultAt = -999f, _loafAt = -999f;
+        public int MaxChestsPerFloor = 2;   // optional (non-key) chests opened per floor
         public int HealTrips, LoavesEaten, FaultDeaths, HealsReached;
         public readonly Dictionary<int, int> HitsByFloor = new Dictionary<int, int>(), VisitsByFloor = new Dictionary<int, int>();
 
@@ -239,14 +240,21 @@ namespace SleepingCalamity.Tests.PlayMode
             var s = c.State;
             bool stateOk = s.Seed == l.Seed && s.Floor == l.Floor;
             if (stateOk && s.GateKey == 1) list.Add(new Target { Goal = Goal.GateKey, Pos = s.GateKeyPos, Range = CellarContentsSync.GateKeyRange, Name = "gate key" });
+            int opened = 0;
+            if (stateOk) for (ulong m = s.Chests; m != 0; m &= m - 1) opened++;
             for (int i = 0; i < l.Chests.Count; i++)
             {
                 bool open = stateOk && (s.Chests & (1UL << i)) != 0;
                 if (open) continue;
                 bool locked = l.HasLockedRoom && l.Chests[i].RoomIndex == l.LockedRoomIndex;
                 if (locked && !(stateOk && s.DoorOpen)) continue;
+                if (!l.Chests[i].HoldsKey && opened >= MaxChestsPerFloor) continue;   // a player heading for the goal opens the chests on the way, not all of them
                 if (c.TryChestPosition(i, out Vector3 p)) list.Add(new Target { Goal = Goal.Chest, Index = i, Pos = p, Range = CellarContentsSync.ChestRange, Name = (l.Chests[i].HoldsKey ? "key chest " : "chest ") + i + (locked ? " (locked room)" : "") });
             }
+            // the exit stays locked until the gate-key carrier dies: a player heads for its room (the room spawns when you walk in)
+            if (stateOk && s.GateKey == 0 && !s.ExitUnlocked && l.Carrier != null && fs.Built != null && fs.Built.Root != null
+                && !(l.HasLockedRoom && l.Carrier.RoomIndex == l.LockedRoomIndex && !s.DoorOpen))
+                list.Add(new Target { Goal = Goal.Kill, Pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(l.Carrier.X, l.Carrier.Y)), Range = 5f, Name = "gate-key carrier" });
             if (stateOk && s.RoomKeyHeld && !s.DoorOpen && c.TryGatePosition(out Vector3 gp)) list.Add(new Target { Goal = Goal.Door, Pos = gp, Range = CellarContentsSync.GateRange, Name = "locked door" });
             for (int i = 0; i < c.PieceCount; i++)
                 if (c.PieceVisible(i) && c.TryPiecePosition(i, out Vector3 pp)) list.Add(new Target { Goal = Goal.Piece, Index = i, Pos = pp, Range = CellarContentsSync.PieceRange, Name = "piece " + i });
@@ -276,7 +284,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
         readonly HashSet<int> _bankedOn = new HashSet<int>();
 
-        static int Order(Goal g) => g switch { Goal.GateKey => 0, Goal.Chest => 1, Goal.Door => 2, Goal.Piece => 3, Goal.Bank => 4, Goal.Stair => 5, Goal.GoHome => 6, _ => 9 };
+        static int Order(Goal g) => g switch { Goal.GateKey => 0, Goal.Chest => 1, Goal.Kill => 2, Goal.Door => 2, Goal.Piece => 3, Goal.Bank => 4, Goal.Stair => 5, Goal.GoHome => 6, _ => 9 };
 
         bool Done(Target t)
         {
@@ -284,6 +292,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var s = c != null ? c.State : default;
             switch (t.Goal)
             {
+                case Goal.Kill: return s.GateKey != 0 || s.ExitUnlocked;
                 case Goal.Heal: return _vitals.Hp >= _vitals.MaxHp * 0.9f;
                 case Goal.Chest: return (s.Chests & (1UL << t.Index)) != 0;
                 case Goal.GateKey: return s.GateKey != 1;

@@ -92,6 +92,7 @@ namespace SleepingCalamity.Core.Tuning
             new Knob("tier2Def", () => EnemyCatalog.Tier2Def, v => EnemyCatalog.Tier2Def = (float)v, 0.1, 50),
             new Knob("soloAtk", () => EnemyCatalog.SoloAtk, v => EnemyCatalog.SoloAtk = (float)v, 0.01, 20),
             new Knob("soloLife", () => EnemyCatalog.SoloLife, v => EnemyCatalog.SoloLife = (float)v, 0.05, 20),
+            new Knob("cellarsMaxTier", () => EnemyCatalog.CellarsMaxTier, v => EnemyCatalog.CellarsMaxTier = (int)v, 1, 2, true),
             new Knob("tier2MinFloor", () => EnemyCatalog.Tier2MinFloor, v => EnemyCatalog.Tier2MinFloor = (int)v, 1, 5, true),
         };
     }
