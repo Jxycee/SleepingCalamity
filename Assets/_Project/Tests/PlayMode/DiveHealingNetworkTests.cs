@@ -163,6 +163,8 @@ namespace SleepingCalamity.Tests.PlayMode
             // A downed hero is not healed by a bank (the revive rule stands).
             clientV.ServerDamage(500);
             Assert.That(clientV.IsDowned, Is.True);
+            Assert.That(haul.ServerBank(), Is.False, "bank spam at a spent point is refused");
+            Assert.That(haul.ServerAddPiece(200), Is.True);   // something new waits to bank
             Assert.That(haul.ServerBank(), Is.True);
             Assert.That(clientV.IsDowned, Is.True, "a bank does not revive");
         }
