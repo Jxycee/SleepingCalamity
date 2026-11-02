@@ -32,8 +32,18 @@ namespace SleepingCalamity.EditorTools
 
         public static void Build(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
         {
-            BuildGround(set, t);
+            BuildGround(set, ruined, t);
             BuildDressing(set, ruined, rebuilt, t);
+        }
+
+        static uint Hash(uint a, uint b)
+        {
+            unchecked
+            {
+                uint h = a * 73856093u ^ b * 19349663u ^ 0x9E3779B9u;
+                h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;
+                return h;
+            }
         }
 
         static Transform Child(Transform parent, string name)
@@ -45,7 +55,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ---------------------------------------------------------------------------------------------------- ground
-        static void BuildGround(Transform set, TownLayout t)
+        static void BuildGround(Transform set, Transform ruined, TownLayout t)
         {
             string folder = BeautyCornerArt.FindFolder("B6", "SquareCobbles");
             string json = folder != null ? folder + "/square_placements.json" : null;
@@ -102,7 +112,7 @@ namespace SleepingCalamity.EditorTools
             if (bedFbx != null)
             {
                 var bedGo = (GameObject)PrefabUtility.InstantiatePrefab(bedFbx, holder); bedGo.name = "Art_SquareBed";
-                BeautyCornerGround.Assign(bedGo, bed);
+                BeautyCornerGround.Assign(bedGo, SquareBedMaterial(bed));   // A7: the bed shows where the setts stop; the olive tileable read as a hard green rectangle, so the square gets a warm grey-brown copy
                 DrapeBed(bedGo, holder, folder, drop, origin, step, nx, nz);
             }
             else Debug.LogWarning("SC HOLLOWMERE square ground: SquareBed.fbx is missing");
@@ -115,7 +125,22 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC HOLLOWMERE square ground: spawner with " + data.stones.Length + " stones from " + prefabs.Count + " variant prefabs");
 
             PlaceDrains(holder, data.drains, t, shelf);
-            ScatterEdges(holder, data.weed_slots, drop, origin, step, nx, nz);
+            ScatterEdges(holder, ruined, data.weed_slots, drop, origin, step, nx, nz);
+        }
+
+        // A copy of the shared CobbleBed material (the beauty corner keeps its own) tinted from olive to a dark warm brown like the mortar between the setts.
+        static Material SquareBedMaterial(Material bed)
+        {
+            const string folder = "Assets/_Project/Content/Materials/Hollowmere";
+            BuilderUtil.EnsureFolder(folder);
+            Material m = LookTestBuilder.Ensure(folder + "/M_SquareBed.mat", bed.shader);
+            m.CopyPropertiesFromMaterial(bed);
+            foreach (var k in bed.enabledKeywords) m.EnableKeyword(k.name);
+            Color tint = new Color(0.92f, 0.76f, 1.0f, 1f);
+            m.SetColor("_BaseColor", tint); m.SetColor("_Color", tint);
+            m.enableInstancing = true;
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         // Inside the square proper the bed sinks 2.5 cm so the square's paving slab (HollowmereBuilder's SquarePaving, top -0.02) shows in the joints like the approved
@@ -128,7 +153,7 @@ namespace SleepingCalamity.EditorTools
 
         // B9 tufts on the json's weed slots, like BeautyCornerGround.Weeds does for the corner: lot_edge / edge_grass (the worn grass-to-cobble edges) get a dense mix of
         // moss tufts and grass clumps, missing_sett gets weeds and moss, joint gets small tufts. One shared foliage material, seeded scale and yaw, heights capped.
-        static void ScatterEdges(Transform holder, PSlot[] slots, float[] drop, Vector2 origin, float step, int nx, int nz)
+        static void ScatterEdges(Transform holder, Transform ruined, PSlot[] slots, float[] drop, Vector2 origin, float step, int nx, int nz)
         {
             if (slots == null || slots.Length == 0) return;
             var moss = new List<GameObject>(); var grass = new List<GameObject>(); var weeds = new List<GameObject>();
@@ -151,12 +176,27 @@ namespace SleepingCalamity.EditorTools
             var heights = new Dictionary<GameObject, float>();
             foreach (var l in new[] { moss, grass, weeds }) foreach (GameObject g in l) heights[g] = Height(g);
 
+            // A3: the weeds cluster (value noise over the slot positions, ~3 m blobs) and thin out on the joints of the open centre; the shared "EdgeTufts" group is what a tended
+            // (Rebuilt) square keeps (about a fifth), "EdgeTufts_RuinedOnly" under the Ruined root holds the rest. Keep tests use a per-slot hash, so builds are identical.
             Transform group = Child(holder, "EdgeTufts");
+            Transform ruinedGroup = new GameObject("EdgeTufts_RuinedOnly").transform;
+            ruinedGroup.SetParent(ruined, false); ruinedGroup.position = holder.position; ruinedGroup.rotation = holder.rotation;
             var rnd = new System.Random(23);
             int n = 0, nEdge = 0, nMissing = 0, nJoint = 0;
             foreach (PSlot s in slots)
             {
                 if (s.p == null || s.p.Length < 3) continue;
+                float blob = Mathf.PerlinNoise(s.p[0] * 0.33f + 17.3f, s.p[2] * 0.33f + 5.1f);
+                float cluster = 0.02f + 0.98f * Mathf.SmoothStep(0.48f, 0.66f, blob);   // blobs along the edges, hardly any stray between them (round 2: steeper)
+                float baseKeep = s.kind == "joint" ? 0.08f : s.kind == "missing_sett" ? 0.9f : 1f;   // the open-centre joints thin hardest, cracks (missing setts) and wall edges keep theirs
+                float keepRoll = (float)(Hash((uint)Mathf.RoundToInt(s.p[0] * 50f + 50000f), (uint)Mathf.RoundToInt(s.p[2] * 50f + 50000f)) % 10007u) / 10007f;
+                // round 2: weeds belong at walls and kerbs. Distance from the slot to the square's border (the lots' fronts and kerbs): inside 1.2 m everything stays, beyond 3.5 m only strays.
+                Vector3 wp = holder.TransformPoint(new Vector3(s.p[0], 0f, s.p[2]));
+                float dEdge = Mathf.Min(Mathf.Min(wp.x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - wp.x), Mathf.Min(wp.z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - wp.z));
+                float near = Mathf.SmoothStep(1f, 0f, Mathf.InverseLerp(1.2f, 3.5f, dEdge));
+                float pKeep = baseKeep * cluster * (0.03f + 0.97f * near);
+                if (keepRoll >= pKeep) continue;
+                bool tended = keepRoll < pKeep * 0.1f;   // survives into Rebuilt
                 List<GameObject> pool; float lo, hi, cap;
                 switch (s.kind)
                 {
@@ -170,7 +210,7 @@ namespace SleepingCalamity.EditorTools
                 }
                 if (pool.Count == 0) continue;
                 GameObject model = pool[rnd.Next(pool.Count)];
-                var w = (GameObject)PrefabUtility.InstantiatePrefab(model, group);
+                var w = (GameObject)PrefabUtility.InstantiatePrefab(model, tended ? group : ruinedGroup);
                 w.name = s.kind + "_" + n;
                 foreach (Renderer rd in w.GetComponentsInChildren<Renderer>(true))
                 {
@@ -396,6 +436,7 @@ namespace SleepingCalamity.EditorTools
                     if (go == null) continue;
                     _ivy.Add(go);
                     if (_ivyMat == null) _ivyMat = BeautyCornerArt.MaterialFromSet(folder, "T_B9_Foliage", "IvyPatch", foliage: true);
+                    if (_ivyMat != null) { _ivyMat.SetColor("_BaseColor", new Color(0.62f, 0.68f, 0.50f, 1f)); EditorUtility.SetDirty(_ivyMat); }   // A4 palette
                 }
             }
 

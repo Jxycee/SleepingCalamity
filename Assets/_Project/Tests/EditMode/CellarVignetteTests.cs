@@ -2,6 +2,7 @@
 // Catches: a pool outside 12-20, a vignette that is never shown or dominates (> 25% of placements), a repeat inside one dive, conditions that do not move the odds (or that read
 // anything but seed and floor), a selection that depends on the order floors are asked in, a vignette that does not fit its rooms or lands on a chest, key, stair, heal point,
 // door, chunk solid cell or clutter, and a vignette-layer golden that drifts. Spread numbers go to the test log.
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -101,14 +102,14 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Less(CellarVignetteTuning.Percent(first, 2, SpecialKind.None, cats, new HashSet<string> { CellarVignetteTuning.FamilyOf(first.Id) }), CellarVignetteTuning.Percent(first, 2, SpecialKind.None, cats, none));
         }
 
-        [Test]
-        public void Placement_EveryVignetteFitsItsRoomAndAvoidsReservedCells_Over1000Seeds()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Placement_EveryVignetteFitsItsRoomAndAvoidsReservedCells(int seeds)
         {
             var placed = new Dictionary<string, int>(); int dropped = 0, total = 0;
-            for (uint seed = 0; seed < 1000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int f = 1; f <= 3; f++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     dropped += d.DroppedVignettes;
                     foreach (PlacedVignette v in d.Vignettes)
                     {
@@ -122,18 +123,18 @@ namespace SleepingCalamity.Tests.EditMode
                     }
                 }
             TestContext.WriteLine("placed " + total + ", dropped " + dropped + ": " + string.Join(" ", placed.OrderBy(k => k.Key).Select(k => k.Key + "=" + k.Value)));
-            foreach (CellarVignette v in CellarVignettePool.All) Assert.Greater(placed.GetValueOrDefault(v.Id), 0, v.Id + " never placed");
-            Assert.LessOrEqual(dropped, 3000 * 3 / 100, "chosen vignettes without a legal cell");
-            foreach (var kv in placed) Assert.LessOrEqual(kv.Value, total / 4, kv.Key + " dominates placements");
+            if (seeds >= 1000) foreach (CellarVignette v in CellarVignettePool.All) Assert.Greater(placed.GetValueOrDefault(v.Id), 0, v.Id + " never placed");   // coverage of every vignette needs the full sweep
+            Assert.LessOrEqual(dropped, Math.Max(3, seeds * 9 / 100), "chosen vignettes without a legal cell");
+            foreach (var kv in placed) Assert.LessOrEqual(kv.Value, seeds >= 1000 ? total / 4 : total / 2, kv.Key + " dominates placements");
         }
 
-        [Test]
-        public void Placement_ClearOfHealPoint_StairExit_AndEntry()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(300, Category = "Soak")]
+        public void Placement_ClearOfHealPoint_StairExit_AndEntry(int seeds)
         {
-            for (uint seed = 0; seed < 300; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int f = 1; f <= 3; f++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     var heal = CellarHealing.PointFor(l, d);
                     foreach (PlacedVignette v in d.Vignettes)
                     {
@@ -144,28 +145,28 @@ namespace SleepingCalamity.Tests.EditMode
                 }
         }
 
-        [Test]
-        public void Placement_NoVignetteOnChunkSolidCells_Over1000Seeds()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Placement_NoVignetteOnChunkSolidCells(int seeds)
         {
-            for (uint seed = 0; seed < 1000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int f = 1; f <= 3; f++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     if (d.Vignettes.Count == 0) continue;
                     var solid = new HashSet<(int, int)>();
-                    foreach (ResolvedChunk c in CellarRoomChunks.Resolve(l, d).Chunks)
+                    foreach (ResolvedChunk c in CellarTestFloors.ChunkPlan(seed, f).Chunks)
                         foreach (var sc in CellarRoomChunks.SolidCells(l, c)) solid.Add((sc.cell.X, sc.cell.Y));
                     foreach (PlacedVignette v in d.Vignettes) Assert.IsFalse(solid.Contains((v.Cell.X, v.Cell.Y)), v.Vignette.Id + " on a chunk block/cover cell, seed " + seed + " floor " + f);
                 }
         }
 
-        [Test]
-        public void Placement_NoVignetteOnClutterCells_Over1000Seeds()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Placement_NoVignetteOnClutterCells(int seeds)
         {
-            for (uint seed = 0; seed < 1000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int f = 1; f <= 3; f++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     if (d.Vignettes.Count == 0) continue;
                     var clutter = new HashSet<(int, int)>();
                     foreach (CellarClutterRow r in CellarFloorClutter.Resolve(l, d).Rows) clutter.Add((r.CellX, r.CellY));

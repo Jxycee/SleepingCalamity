@@ -15,6 +15,7 @@
 // floor changes) to open the stair. Room clearing is kept here (ClearedRooms mask): DiveHaulSync.ServerMarkCleared marks a whole FLOOR cleared and is not called from here.
 // Players are ignored for room entry and piece pickup until they are inside the armed floor's bounds and have moved over StaleMoveDistance from where they stood at arm time
 // (the owner teleport after a floor change may not have landed yet).
+// Range checks also need line of sight (WallBetween: a horizontal ray at eye height against the floor's Walls/Pillars/Doors colliders; the floor's colliders are on the default layer, not Structure). Ambush springs keep 4 m from every player and wait for someone in the room; the hunter (re)spawns only with no player within 8 m; the dropped gate key settles on a walkable cell.
 // Known limits: players come from NetworkManager.ConnectedClients player objects (PlayersOverride replaces that in tests); enemies of a room whose stir extras latch after
 // entry are not topped up; the greybox CombatHost this creates (when the scene has none) runs with waves off.
 using System.Collections.Generic;
@@ -227,10 +228,10 @@ namespace SleepingCalamity.Presentation
             {
                 if (_chests[i] == null || (ok && (s.Chests & (1UL << i)) != 0)) continue;
                 float d = FlatSqr(p, _chests[i].position);
-                if (d <= bestD) { bestD = d; best = i; }
+                if (d <= bestD && !WallBetween(fs.Built.Root, p, _chests[i].position)) { bestD = d; best = i; }
             }
             if (best >= 0) return best;
-            gate = _gate != null && !(ok && s.DoorOpen) && FlatSqr(p, _gate.position) <= GateRange * GateRange;
+            gate = _gate != null && !(ok && s.DoorOpen) && FlatSqr(p, _gate.position) <= GateRange * GateRange && !WallBetween(fs.Built.Root, p, _gate.position);
             return -1;
         }
 
@@ -251,6 +252,53 @@ namespace SleepingCalamity.Presentation
         // =================================================================================================================================
 
         private bool HostReady(CellarFloorSync fs) => IsServer && IsSpawned && _layout != null && _root != null && _st.Floor == _layout.Floor && _st.Seed == _layout.Seed;
+
+        // Playtest 13: range alone ignored walls. A wall (Walls/Pillars/Doors group collider of the built floor; the locked gate itself does not count: it sits in the opening) between
+        // `a` and `b` on a horizontal ray at eye height blocks the interaction. The floor's colliders are on the default layer, not Structure, so the filter is by group, which also keeps
+        // props (crates, barrels) from blocking. `root` is the built floor's root.
+        private static bool IsWallCollider(Transform t, Transform root)
+        {
+            if (t.name == "LockedGate") return false;
+            for (Transform c = t; c != null && c != root; c = c.parent)
+                if (c.name == CellarFloorBuilder.WallGroup || c.name == CellarFloorBuilder.PillarGroup || c.name == CellarFloorBuilder.DoorGroup) return true;
+            return false;
+        }
+
+        private static bool WallBetween(Transform root, Vector3 a, Vector3 b)
+        {
+            if (root == null) return false;
+            float y = root.position.y + 1f;
+            a.y = y; b.y = y;
+            Vector3 d = b - a; float len = d.magnitude;
+            if (len < 0.01f) return false;
+            RaycastHit[] hits = Physics.RaycastAll(a, d / len, len, ~0, QueryTriggerInteraction.Ignore);
+            foreach (RaycastHit h in hits) if (IsWallCollider(h.collider.transform, root)) return true;
+            return false;
+        }
+
+        private static bool InsideWall(Transform root, Vector3 p)
+        {
+            if (root == null) return false;
+            foreach (Collider c in Physics.OverlapSphere(p + Vector3.up * 0.5f, 0.15f, ~0, QueryTriggerInteraction.Ignore)) if (IsWallCollider(c.transform, root)) return true;
+            return false;
+        }
+
+        private List<PlanePoint> PlanePoints()
+        {
+            var list = new List<PlanePoint>(_players.Count);
+            foreach (PlayerPos p in _players) { Vector3 l = _root.InverseTransformPoint(p.Position); list.Add(new PlanePoint(l.x, -l.z)); }
+            return list;
+        }
+
+        // Where the gate key lies when its carrier died at `at`: the same spot unless that is inside a wall or off the walkable cells, then the nearest walkable cell's centre.
+        private Vector3 SettledKeyPos(Vector3 at)
+        {
+            if (_layout == null || _root == null || _dressing == null) return at;
+            Vector3 l = _root.InverseTransformPoint(at);
+            var cell = new CellPos(Mathf.FloorToInt(l.x / CellarFloorBuilder.CellSize), Mathf.FloorToInt(-l.z / CellarFloorBuilder.CellSize));
+            CellPos pick = CellarKeyDrop.Settle(_layout, _dressing, cell, InsideWall(_root, at), out bool moved);
+            return moved ? World(null, pick) : at;
+        }
 
         private static float FlatSqr(Vector3 a, Vector3 b) { float dx = a.x - b.x, dz = a.z - b.z; return dx * dx + dz * dz; }
 
@@ -451,6 +499,9 @@ namespace SleepingCalamity.Presentation
             if (_ambushRoom < 0 || Time.time < _ambushDue) return;
             int room = _ambushRoom; _ambushRoom = -1;
             if (_players.Count == 0) { _entered.Remove(room); return; }   // party wipe during the delay: no spring now, re-entering the room triggers it again
+            bool inRoom = false;
+            foreach (PlayerPos p in _players) if (RoomOfWorld(p.Position) == room) { inRoom = true; break; }
+            if (!inRoom) { _ambushRoom = room; _ambushDue = Time.time + FloorTwistTuning.AmbushDelaySeconds; return; }   // everyone left during the delay: re-arm, nothing springs on an empty room
             SpawnRoom(fs, room, true);
         }
 
@@ -464,7 +515,7 @@ namespace SleepingCalamity.Presentation
             if (plan.Twist == FloorTwist.Ambush && room == plan.AmbushRoom)   // host-only twist: the room's enemies spring from the ring cells after a short delay
             {
                 if (!ambushNow) { _ambushRoom = room; _ambushDue = Time.time + FloorTwistTuning.AmbushDelaySeconds; return; }
-                ambush = CellarAmbush.Cells(l, _dressing, plan, room);
+                ambush = CellarAmbush.Cells(l, _dressing, plan, room, PlanePoints());
             }
             foreach (EncounterSpawn sp in plan.Spawns)
             {
@@ -496,6 +547,7 @@ namespace SleepingCalamity.Presentation
             if (_hunterSpawned) return;
             CellarEncounterPlan plan = HaulSync != null ? HaulSync.EncounterPlan : null;
             if (plan == null || plan.Hunter == null || plan.Floor != _layout.Floor || plan.Seed != _layout.Seed) return;
+            if (!CellarSpawnSafety.FarFromAll(plan.Hunter.Cell, PlanePoints(), CellarSpawnSafety.HunterMinPlayerMeters)) return;   // never (re)appear on top of a player: wait until the cell is clear
             _hunterSpawned = true;
             _hunter = EnsureCombat().SpawnEnemy(EnemyKind.RatKing, 2, World(fs, plan.Hunter.Cell));
             if (_hunter != null) { _hunter.ServerDied += OnHunterDied; _hunter.ServerDespawned += OnHunterDespawned; }
@@ -522,7 +574,7 @@ namespace SleepingCalamity.Presentation
                 _st.Cleared = _clear.ClearedMask; Publish();
                 return;
             }
-            if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = e.transform.position; }
+            if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = SettledKeyPos(e.transform.position); }
             if (_clear.Died(t.Room)) { _st.Cleared = _clear.ClearedMask; RoomCleared?.Invoke(t.Room); }
             if (_carrierLostRoom == t.Room && _st.GateKey == 0 && !RoomHasTracked(t.Room))   // its carrier was lost without a drop: reset the room so the carrier comes back on entry
             { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _carrierLostRoom = -1; _st.Cleared = _clear.ClearedMask; }
@@ -536,7 +588,7 @@ namespace SleepingCalamity.Presentation
             if (_st.GateKey != 1) return;
             foreach (PlayerPos p in _players)
             {
-                if (FlatSqr(p.Position, _st.GateKeyPos) > GateKeyRange * GateKeyRange) continue;
+                if (FlatSqr(p.Position, _st.GateKeyPos) > GateKeyRange * GateKeyRange || WallBetween(_root, p.Position, _st.GateKeyPos)) continue;
                 _st.GateKey = 2; _st.ExitUnlocked = true;
                 Publish();
                 ExitUnlocked?.Invoke(_st.Floor);
@@ -565,7 +617,7 @@ namespace SleepingCalamity.Presentation
         {
             if (_gate == null || !_st.RoomKeyHeld || _st.DoorOpen) return;
             foreach (PlayerPos p in _players)
-                if (FlatSqr(p.Position, _gate.position) <= GateRange * GateRange) { _st.DoorOpen = true; return; }
+                if (FlatSqr(p.Position, _gate.position) <= GateRange * GateRange && !WallBetween(_root, p.Position, _gate.position)) { _st.DoorOpen = true; return; }
         }
 
         // Host: a client (or a test) asks to open chest `chestIndex`. Refused off the host, for a bad or already open chest, or out of range.
@@ -577,7 +629,7 @@ namespace SleepingCalamity.Presentation
             if (!TryPlayerPos(clientId, out Vector3 pos)) return false;
             Transform chest = chestIndex < _chests.Length ? _chests[chestIndex] : null;
             Vector3 at = chest != null ? chest.position : World(fs, new CellPos(_layout.Chests[chestIndex].X, _layout.Chests[chestIndex].Y));
-            if (FlatSqr(pos, at) > ChestRange * ChestRange) return false;
+            if (FlatSqr(pos, at) > ChestRange * ChestRange || WallBetween(_root, pos, at)) return false;
             FloorChest fc = _layout.Chests[chestIndex];
             int item = CellarLoot.Roll(_layout.Seed, _layout.Floor, chestIndex, fc.HoldsKey);
             _st.Chests |= 1UL << chestIndex;
@@ -593,7 +645,7 @@ namespace SleepingCalamity.Presentation
         {
             CellarFloorSync fs = FloorSync;
             if (!HostReady(fs) || _gate == null || !_st.RoomKeyHeld || _st.DoorOpen) return false;
-            if (!TryPlayerPos(clientId, out Vector3 pos) || FlatSqr(pos, _gate.position) > GateRange * GateRange) return false;
+            if (!TryPlayerPos(clientId, out Vector3 pos) || FlatSqr(pos, _gate.position) > GateRange * GateRange || WallBetween(_root, pos, _gate.position)) return false;
             _st.DoorOpen = true; Publish(); return true;
         }
 

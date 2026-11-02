@@ -14,21 +14,27 @@ namespace SleepingCalamity.Tests.EditMode
     public sealed class CellarPresetTests
     {
         const int Seeds = 2000;
+        const int FullSeeds = Seeds;   // the Soak case of every sample-based test; the fast twin takes the first FastSeeds seeds
+        static int Scale(int atLeast, int seeds) => seeds >= FullSeeds ? atLeast : System.Math.Max(1, atLeast * seeds / FullSeeds);
 
         sealed class Sample { public uint Seed; public int Floor, Fallback; public CellarFloorLayout Layout; }
 
-        static List<Sample> all;
-        static List<Sample> All()
+        // One generated sample per (seed, floor) for the whole run (the old single 2,000-seed list cost 43 s in whichever test ran first); All(n) is the first n seeds.
+        static readonly Dictionary<(uint, int), Sample> samples = new Dictionary<(uint, int), Sample>();
+        static List<Sample> All(int seeds)
         {
-            if (all != null) return all;
             var list = new List<Sample>();
-            for (uint seed = 0; seed < Seeds; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor, out int fb);
-                    list.Add(new Sample { Seed = seed, Floor = floor, Fallback = fb, Layout = l });
+                    if (!samples.TryGetValue((seed, floor), out Sample sm))
+                    {
+                        CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor, out int fb);
+                        samples[(seed, floor)] = sm = new Sample { Seed = seed, Floor = floor, Fallback = fb, Layout = l };
+                    }
+                    list.Add(sm);
                 }
-            return all = list;
+            return list;
         }
 
         static void Stat(string text)
@@ -85,11 +91,11 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Greater(count[(int)LayoutPreset.Spine], count[(int)LayoutPreset.Hub] * 0.9, sb.ToString());
         }
 
-        [Test]
-        public void Exit_IsAFarLeaf_NotNextToTheEntry_AndEveryFloorValidates()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(FullSeeds, Category = "Soak")]
+        public void Exit_IsAFarLeaf_NotNextToTheEntry_AndEveryFloorValidates(int seeds)
         {
             int fb1 = 0, fb2 = 0, lastResortShort = 0;
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 CellarFloorLayout l = s.Layout;
                 Assert.IsEmpty(CellarFloorValidator.Validate(l), "seed " + s.Seed + " floor " + s.Floor + "\n" + l.ToAscii());
@@ -102,16 +108,16 @@ namespace SleepingCalamity.Tests.EditMode
                 else Assert.GreaterOrEqual(l.EntryToExitDistance(), CellarFloorGenerator.MinExitDistance, "seed " + s.Seed + " floor " + s.Floor);
                 if (s.Fallback == 1) fb1++; else if (s.Fallback == 2) fb2++;
             }
-            double n = All().Count;
+            double n = All(seeds).Count;
             Stat("fallback over " + n + " floors: retry " + fb1 + " (" + (100.0 * fb1 / n).ToString("F2") + "%), last resort " + fb2 + " (" + (100.0 * fb2 / n).ToString("F2") + "%), last resort with a short exit " + lastResortShort);
             Assert.Less(fb2 / n, 0.01, "fallback 2 must stay rare");
         }
 
-        [Test]
-        public void Presets_LoopCountsFollowTheirRules()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(FullSeeds, Category = "Soak")]
+        public void Presets_LoopCountsFollowTheirRules(int seeds)
         {
             var hist = new Dictionary<string, int>();
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 if (s.Fallback > 0) continue;   // a retry may have relaxed the preset to Spine
                 int loops = Loops(s.Layout); LayoutPreset p = s.Layout.Preset.Value;
@@ -129,11 +135,11 @@ namespace SleepingCalamity.Tests.EditMode
 
         // Wing: the one loop stays inside branch Y (rooms 1..m/2, m = the middle rooms, which are placed in index order) or the entry. With no Y (m == 1) the generator uses room 1 (branch X's
         // single room, the exit's parent) as the branch, so the allowed set is the entry plus room 1 and the loop still cannot join the two halves of the path.
-        [Test]
-        public void Wing_LoopEndpoints_StayInsideBranchY_OrTheEntry()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(FullSeeds, Category = "Soak")]
+        public void Wing_LoopEndpoints_StayInsideBranchY_OrTheEntry(int seeds)
         {
             int wings = 0;
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 CellarFloorLayout l = s.Layout;
                 if (l.Preset != LayoutPreset.Wing || s.Fallback != 0) continue;
@@ -150,14 +156,14 @@ namespace SleepingCalamity.Tests.EditMode
                 bool onBranchLink = l.Links.Any(k => !ReferenceEquals(k, loop) && Inside(k.RoomA) && Inside(k.RoomB) && k.Path.Any(c => c.X == end.X && c.Y == end.Y));
                 Assert.IsTrue(onBranchLink, "loop lands outside branch Y: " + who);
             }
-            Assert.Greater(wings, 50, "too few Wing floors to prove anything");
+            Assert.Greater(wings, Scale(50, seeds), "too few Wing floors to prove anything");
         }
 
-        [Test]
-        public void ExitAdjacentToEntry_FloodMatchesTheRoomGraph()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(FullSeeds, Category = "Soak")]
+        public void ExitAdjacentToEntry_FloodMatchesTheRoomGraph(int seeds)
         {
             int adjacent = 0;
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 CellarFloorLayout l = s.Layout;
                 int e = l.ExitRoomIndex(), en = l.Rooms.ToList().FindIndex(r => r.Room.Kind == RoomKind.Entry);
@@ -169,32 +175,32 @@ namespace SleepingCalamity.Tests.EditMode
             Stat("generated floors with the exit next to the entry (must be 0): " + adjacent);
         }
 
-        [Test]
-        public void Ring_Floors_HaveAnArc_AtLeast95Percent()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(FullSeeds, Category = "Soak")]
+        public void Ring_Floors_HaveAnArc_AtLeast95Percent(int seeds)
         {
             int ring = 0, withArc = 0;
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 if (s.Layout.Preset != LayoutPreset.Ring) continue;
                 ring++;
                 if (CellarFloorRoute.Resolve(s.Layout).Cycle != CycleRole.None) withArc++;
             }
             var other = new Dictionary<LayoutPreset, (int n, int arc)>();
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 LayoutPreset p = s.Layout.Preset.Value; other.TryGetValue(p, out var v);
                 other[p] = (v.n + 1, v.arc + (CellarFloorRoute.Resolve(s.Layout).Cycle != CycleRole.None ? 1 : 0));
             }
             Stat("route arc rate per preset: " + string.Join(" ", other.OrderBy(kv => (int)kv.Key).Select(kv => kv.Key + " " + (100.0 * kv.Value.arc / kv.Value.n).ToString("F1") + "% of " + kv.Value.n)));
-            Assert.Greater(ring, 100);
+            Assert.Greater(ring, Scale(100, seeds));
             Assert.GreaterOrEqual(100.0 * withArc / ring, 95.0, "Ring floors with CycleRole != None: " + withArc + " of " + ring);
         }
 
-        [Test]
-        public void Spine_Floors_AreLongerThanHubFloors_OnAverage()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(FullSeeds, Category = "Soak")]
+        public void Spine_Floors_AreLongerThanHubFloors_OnAverage(int seeds)
         {
             var sum = new double[4]; var n = new int[4];
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 int p = (int)s.Layout.Preset.Value; sum[p] += s.Layout.EntryToExitDistance(); n[p]++;
             }
@@ -204,11 +210,11 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Greater(sum[(int)LayoutPreset.Spine] / n[(int)LayoutPreset.Spine], sum[(int)LayoutPreset.Hub] / n[(int)LayoutPreset.Hub], sb.ToString());
         }
 
-        [Test]
-        public void Spread_DistinctFootprintsAndRouteSequences()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(FullSeeds, Category = "Soak")]
+        public void Spread_DistinctFootprintsAndRouteSequences(int seeds)
         {
             var foot = new HashSet<ulong>(); var seqs = new HashSet<string>(); var seqNoPreset = new HashSet<string>(); int total = 0;
-            foreach (Sample s in All())
+            foreach (Sample s in All(seeds))
             {
                 total++; foot.Add(s.Layout.FootprintHash());
                 CellarFloorRoute r = CellarFloorRoute.Resolve(s.Layout);

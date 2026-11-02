@@ -36,16 +36,17 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreNotEqual(CellarLoot.RoomKeyId, CellarLoot.GateKeyId);
         }
 
-        [Test]
-        public void Loot_RankBandsRiseWithTheFloor()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(600, Category = "Soak")]
+        public void Loot_RankBandsRiseWithTheFloor(int seeds)
         {
+            double slack = seeds >= 600 ? 0 : 0.35;   // statistical bands: wider for the fast twin
             var mean = new double[5]; var low = new double[5]; var high = new double[5];
             for (int floor = 1; floor <= 4; floor++)
             {
                 int n = 0, sum = 0, lo = 0, hi = 0;
-                for (uint s = 0; s < 600; s++)
+                for (uint s = 0; s < seeds; s++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(0xC0FFEEu + s, floor);   // the real non-key chests of a real floor
+                    CellarFloorLayout l = CellarTestFloors.Layout(0xC0FFEEu + s, floor);   // the real non-key chests of a real floor
                     for (int i = 0; i < l.Chests.Count; i++)
                     {
                         if (l.Chests[i].HoldsKey) continue;
@@ -55,13 +56,13 @@ namespace SleepingCalamity.Tests.EditMode
                 }
                 mean[floor] = (double)sum / n; low[floor] = (double)lo / n; high[floor] = (double)hi / n;
             }
-            Assert.That(mean[1], Is.InRange(1.2, 2.0), "floor 1 mean " + mean[1]);
-            Assert.That(mean[2], Is.InRange(1.9, 2.8), "floor 2 mean " + mean[2]);
-            Assert.That(mean[3], Is.InRange(2.7, 3.5), "floor 3 mean " + mean[3]);
-            Assert.That(mean[4], Is.InRange(3.1, 4.1), "floor 4 mean " + mean[4]);
+            Assert.That(mean[1], Is.InRange(1.2 - slack, 2.0 + slack), "floor 1 mean " + mean[1]);
+            Assert.That(mean[2], Is.InRange(1.9 - slack, 2.8 + slack), "floor 2 mean " + mean[2]);
+            Assert.That(mean[3], Is.InRange(2.7 - slack, 3.5 + slack), "floor 3 mean " + mean[3]);
+            Assert.That(mean[4], Is.InRange(3.1 - slack, 4.1 + slack), "floor 4 mean " + mean[4]);
             Assert.That(mean[1], Is.LessThan(mean[2])); Assert.That(mean[2], Is.LessThan(mean[3])); Assert.That(mean[3], Is.LessThan(mean[4]));
-            Assert.That(low[1], Is.GreaterThan(0.80), "floor 1 is mostly rank 1-2");
-            Assert.That(high[4], Is.GreaterThan(0.7), "floor 4 is mostly rank 3+");
+            Assert.That(low[1], Is.GreaterThan(0.80 - slack), "floor 1 is mostly rank 1-2");
+            Assert.That(high[4], Is.GreaterThan(0.7 - slack), "floor 4 is mostly rank 3+");
         }
 
         [Test]
@@ -87,8 +88,8 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 120; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
-                    CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor);
+                    CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     IReadOnlyList<CellPos> spots = CellarPieceSpots.Choose(l, d, Defaults[floor - 1]);
                     string tag = " seed " + seed + " floor " + floor;
                     Assert.AreEqual(Defaults[floor - 1], spots.Count, "count" + tag);
