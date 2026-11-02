@@ -1,6 +1,6 @@
 Status: PARTIAL (pass 3 merged with origin/main, rebuilt and rescanned; islands, stuck pockets, lot corners, door thresholds still open)
 Branch: claude/silly-bose-9d8d93
-Last check: full check PASS at 86f35452 (compile, EditMode 1174/1174, PlayMode 84 passed 15 skipped; SC MARKER = HEAD)
+Last check: PASS at 87b0a20b (EditMode 1182, PlayMode 85 passed 15 skipped); merged to main as db3d88bb without re-check (merge-rule 11-01)
 Next: islands (largest (26.9,-12.0,-68.1) by the lake path), stuck pockets (-35.6,-2.8,-1.4) and (33.9,-1.6,-8.4), R2_03_C3 / R2_08_C3 corners (0.68 m terrain step, LK0010_LaneStep, LK1050/LK1053 retaining walls, LK1024 breach), Blocked +3 near lower gate / R2_16 / R2_23, door thresholds unchecked
 Archive: ready
 
@@ -36,3 +36,7 @@ Totals include Step 5 / 5 and Slope 18 / 18 (not itemised above). WalkThrough fe
 - TraversalProbe VoidEdges ray reaches 42 m: a missing outer wall above lower geometry no longer raises VoidEdge. Require walkable ground at the hit (NavMesh sample / upward normal) or report a separate Cliff kind.
 - HollowmereLotClearanceTests: lane test tolerance 0.7 m is looser than the layout's 0.2 m rule (MinLotLaneClearance unused); wall test silently skips every straddling lot (assert an allowlist of R2_23 only).
 - No EditMode guard for HollowmereRuinSeal (TightGap 59/14 -> 53/12 comes from the scan baseline only).
+
+## Final
+Merged to main as db3d88bb. Counts Ruined/Rebuilt 436/401 -> 372/357 (Island 15/17, WalkThrough 215/238). Open: islands, stuck pockets, R2_03_C3/R2_08_C3 corners, Blocked +3 near lower gate/R2_16/R2_23, door thresholds unchecked in scan.
+Archive: ready
