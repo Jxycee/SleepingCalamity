@@ -185,6 +185,22 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void RoomClamp_HeroOutsideTheRoom_SlotsStayOnTheRingFloor_NotCollapsed()
+        {
+            // The room is x > 20; the hero stands at the origin, outside it. Pulling toward the hero cannot help, so no clamp runs.
+            var p = new RingPlanner(1);
+            for (int id = 1; id <= 4; id++)
+            {
+                var q = new RingRequest { SelfId = id, HeroId = 100, HeroX = 0f, HeroZ = 0f, SelfX = 25f, SelfZ = id, Ring = 3f, CircleSpeed = 1f, FlipMin = 1.5f, FlipMax = 3f,
+                    SeparationRadius = 1f, InitialSign = 1f, Now = 1.0, Dt = 0.05f, InBounds = (x, z) => x > 20f, MinSlotRadius = 1.05f };
+                RingResult r = p.Plan(in q);
+                float d = (float)Math.Sqrt(r.SlotX * r.SlotX + r.SlotZ * r.SlotZ);
+                Assert.That(d, Is.GreaterThanOrEqualTo(1.05f), "slot " + id + " collapsed onto the hero");
+                Assert.That(r.RingRadius, Is.GreaterThanOrEqualTo(1.05f));
+            }
+        }
+
+        [Test]
         public void MoreThanOneRing_SpillsOutward()
         {
             var s = new Sim(8, 3);

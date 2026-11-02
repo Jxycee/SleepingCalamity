@@ -329,12 +329,16 @@ namespace SleepingCalamity.Gameplay
                 float min = Def.Radius + o.Def.Radius + 0.04f;
                 float m2 = d.sqrMagnitude;
                 if (m2 >= min * min) continue;
-                if (m2 < 1e-6f) { float a = GetHashCode() * 2.399963f; d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)); m2 = 1f; }
+                if (m2 < 1e-6f) { float a = GetHashCode() * 2.399963f; d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)); m2 = min * min; }
                 float mag = Mathf.Sqrt(m2);
                 push += d / mag * ((min - mag) * (o.Phase == EnemyPhase.Attack ? 1f : 0.5f));
             }
-            if (push.sqrMagnitude < 1e-8f || Blocked(p + push)) return;
-            transform.position = p + push;
+            if (push.sqrMagnitude < 1e-8f) return;
+            if (push.sqrMagnitude > Def.Radius * Def.Radius) push = push.normalized * Def.Radius;
+            Vector3 np = p + push;
+            if (Blocked(np)) return;
+            if (_inRoom != null && _inRoom(p.x, p.z) && !_inRoom(np.x, np.z)) return;   // never shove an in-room enemy out of its room
+            transform.position = np;
         }
 
         // Host: forget the current target and its ledger entry.

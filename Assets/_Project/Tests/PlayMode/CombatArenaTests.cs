@@ -204,7 +204,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 + " samples, min any chase pair " + worstChase.ToString("F2") + " m, contact " + contact.ToString("F2") + " m, farthest hover outside room " + farthestOut.ToString("F2") + " m " + outInfo);
             Assert.That(hoverSamples, Is.GreaterThan(0), "no two enemies were hovering together in the last 2 s, so the bar measured nothing");
             Assert.That(worstHover, Is.GreaterThanOrEqualTo(contact - 0.02f), "two hovering enemies overlapped");
-            if (inRoom) Assert.That(farthestOut, Is.LessThanOrEqualTo(1.0f), "a hovering enemy left the room (the box moves with the hero, so a body width of slack)");
+            if (inRoom) Assert.That(farthestOut, Is.LessThanOrEqualTo(0.6f), "a hovering enemy left the room (the box moves with the hero, so some slack)");
         }
 
         // Enemy AI stage 2 risk-review fix: the attack tokens are ONE set per CombatHost, not one per room. Targeting is world-wide, so two rooms' enemies can

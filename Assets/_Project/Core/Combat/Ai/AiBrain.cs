@@ -171,7 +171,7 @@ namespace SleepingCalamity.Core.Combat
                 {
                     SelfId = c.SelfId, HeroId = t.Id, HeroX = t.X, HeroZ = t.Z, FrontX = t.FaceX, FrontZ = t.FaceZ, SelfX = c.SelfX, SelfZ = c.SelfZ,
                     Ring = ring, MaxRing = _maxRing, CircleSpeed = speed * c.Def.CircleSpeedScale, FlipMin = c.Def.StrafeFlipMin, FlipMax = c.Def.StrafeFlipMax,
-                    SeparationRadius = sepR, InitialSign = 0f, Now = c.Time, Dt = c.Dt, InBounds = c.InBounds,
+                    SeparationRadius = sepR, InitialSign = 0f, Now = c.Time, Dt = c.Dt, InBounds = c.InBounds, MinSlotRadius = stop,
                 };
                 RingResult r = _rings.Plan(in q);
                 float tx = r.SlotX - c.SelfX, tz = r.SlotZ - c.SelfZ;

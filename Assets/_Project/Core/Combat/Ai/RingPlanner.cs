@@ -49,6 +49,7 @@ namespace SleepingCalamity.Core.Combat
         public double Now;
         public float Dt;
         public Func<float, float, bool> InBounds;   // optional: is (x, z) inside the enemy's room? A slot outside is pulled in toward the hero
+        public float MinSlotRadius;         // floor for the in-room fallback pull (the enemy's stop distance); 0: 0.3 m
     }
 
     public struct RingResult
@@ -208,7 +209,8 @@ namespace SleepingCalamity.Core.Combat
             // Slot point, pulled toward the hero until it is inside the room (when the room is known).
             float r = ring;
             float px = q.HeroX + (float)Math.Cos(m.Angle) * r, pz = q.HeroZ + (float)Math.Sin(m.Angle) * r;
-            if (q.InBounds != null)
+            // Skipped when the hero itself is outside the room: every pull toward the hero would collapse the crowd onto it.
+            if (q.InBounds != null && q.InBounds(q.HeroX, q.HeroZ))
             {
                 for (int i = 0; i < 4 && !q.InBounds(px, pz) && r > _t.MinRingMeters; i++)
                 {
@@ -216,9 +218,10 @@ namespace SleepingCalamity.Core.Combat
                     px = q.HeroX + (float)Math.Cos(m.Angle) * r; pz = q.HeroZ + (float)Math.Sin(m.Angle) * r;
                 }
                 // Still outside (a corner, a bay): the nearest in-room point on the line toward the hero, even closer than the minimum ring.
-                for (int i = 0; i < 12 && !q.InBounds(px, pz) && r > 0.3f; i++)
+                float floor = q.MinSlotRadius > 0.3f ? q.MinSlotRadius : 0.3f;
+                for (int i = 0; i < 12 && !q.InBounds(px, pz) && r > floor; i++)
                 {
-                    r = Math.Max(0.3f, r - 0.3f);
+                    r = Math.Max(floor, r - 0.3f);
                     px = q.HeroX + (float)Math.Cos(m.Angle) * r; pz = q.HeroZ + (float)Math.Sin(m.Angle) * r;
                 }
             }
