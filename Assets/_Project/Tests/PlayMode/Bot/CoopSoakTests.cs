@@ -49,6 +49,8 @@ namespace SleepingCalamity.Tests.PlayMode
 
             yield return CoopDiveRun.Boot(3, seed, r => _run = r);
             CoopDiveRun run = _run;
+            // SC_SOAK_TOUGH=1: heal the party below 50% HP so the run keeps cycling (bank, go-home, next dive); without it the quad party wipes on floors 3-4 and the soak measures that instead
+            if (System.Environment.GetEnvironmentVariable("SC_SOAK_TOUGH") == "1") { run.ToughParty = true; run.Bot.Tough = true; }
 
             var phases = new SortedDictionary<int, Phase>();
             var samples = new List<Sample>();
