@@ -275,7 +275,7 @@ namespace SleepingCalamity.Core
             ("R2_20", 2, "RingLane", 172f, 1, FoundationSize.L),
             ("R2_21", 2, "RingLane", 187f, 1, FoundationSize.M),
             ("R2_22", 2, "LowerLane", 12f, 1, FoundationSize.S),
-            ("R2_23", 2, "LowerLane", 10f, -1, FoundationSize.M),
+            ("R2_23", 2, "LowerLane", 5f, -1, FoundationSize.M),   // traversal-5: was s 10, a 125 deg diamond squeezed into the 8.8 m gap between the Lower Gate east pier and the town wall (corners through both); s 5 clears the pier by 6 m, keeps the full 1 m setback and the farthest corner 1 m inside the wall limit
             ("R3_01", 3, "SaltwakeRoad", 22f, -1, FoundationSize.M),
             ("R3_02", 3, "SaltwakeRoad", 34f, 1, FoundationSize.S),
             ("R3_03", 3, "MillLane", 10f, -1, FoundationSize.S),

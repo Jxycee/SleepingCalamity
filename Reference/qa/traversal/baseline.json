@@ -5,13 +5,13 @@
         {
             "space": "Hollowmere_Ruined",
             "unreachable": [],
-            "blocked": 10,
+            "blocked": 7,
             "narrow": 0
         },
         {
             "space": "Hollowmere_Rebuilt",
             "unreachable": [],
-            "blocked": 8,
+            "blocked": 4,
             "narrow": 0
         },
         {
