@@ -389,7 +389,7 @@ namespace SleepingCalamity.Gameplay
             float ward = AbilityEffects.IncomingMult(Growth(victim.OwnerClientId).Abilities, WeaponStyle.FamilyOf(victim.WeaponKey));
             if (ward < 1f) dmg = Mathf.Max(1, Mathf.CeilToInt(dmg * ward - 1e-4f));
             int lost = vitals.ServerDamage(dmg);
-            victim.ServerBroadcastHurt(lost, guarded);
+            victim.ServerBroadcastHurt(lost, guarded, !guarded && HurtGrace.IsHeavyHit(a.Knockback, a.GuardBreak));
         }
 
         public void ServerParry(HeroCombat victim, Enemy e, int serial)

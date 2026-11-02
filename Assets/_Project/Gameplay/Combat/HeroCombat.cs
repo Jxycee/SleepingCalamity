@@ -5,6 +5,10 @@
 // Replicated: NetWeapon (the heirloom index; the HOST writes it when the owner asks through SetWeaponServerRpc, so it is in place before any later RPC of that
 // owner is handled) and NetSwing (owner writes: swing serial + attack index, for remote visuals). Everything else rides RPCs. Every hit intent carries the
 // weapon index and the chain's prior hits of its swing, so the host judges it against what the owner actually swung.
+// Hurt grace (combat-timings "Recommended M3 values" 1-3). AUTHORITY: the victim's OWNER client judges grace (the same place that judges enemy hits, GuardMath.cs:3):
+// a guarded or hurt outcome inside the window is dropped before EnemyHitMeServerRpc, so the host never applies damage for it; a roll or parry inside the
+// window still plays its cue and reports to the host. The HOST applies damage and tells every peer how the hit looked (HurtClientRpc: heavy/knockdown flag);
+// non-owner peers run a cosmetic GraceTimer from it (the pulse, no gameplay). No NetworkVariable.
 // Weapon tree (M4): the owner asks (TreeActionServerRpc: fit / remove / build-up / re-route); the HOST applies it in WeaponTreeHost and pushes the snapshot back (SyncTreeOwnerRpc).
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -57,6 +61,8 @@ namespace SleepingCalamity.Gameplay
         private float _guardStart, _reviveReport, _hurtLock, _dodgeBuffer;
         private float _guardEnd = -10f, _rollEndedAt = -10f, _rollGap = 10f;   // combat depth: the parry lockout and the perfect dodge's chain rule
         private bool _parryArmed = true;
+        private readonly GraceTimer _grace = new GraceTimer();   // owner: gameplay grace; other peers: cosmetic, started by HurtClientRpc
+        private float _knockdownLeft;                             // owner: the hero is down for this long (no movement at all)
         private int _swingSerial, _published;
         private Vector3 _impulse;
 
@@ -115,8 +121,14 @@ namespace SleepingCalamity.Gameplay
         public bool HitboxOn => CurrentAttack != null && CurrentAttack.HitOn.Contains(AttackFrame);
 
         // ---- what HeroLocomotion asks (owner) ----
+        // 0..1 red tint for presentation: one sine half-cycle over the grace window (owner only; 0 elsewhere and when not hurt).
+        public float HurtPulse => _grace.Pulse;
+        public bool HurtFlickerOn => _grace.FlickerOn;
+        public bool HurtFlickering => _grace.Flickering;
+        public bool HurtGraceActive => _grace.Active;
+        public bool KnockedDown => _knockdownLeft > 0f;
         public bool AllowsDodge => IsUp && _machine.CanCancel && _hurtLock <= 0f && !_guarding;
-        public float MoveScale => !IsUp ? 0f : _machine.Busy ? 0.0f : _hurtLock > 0f ? 0.2f : _guarding || _aiming ? 0.5f : 1f;
+        public float MoveScale => !IsUp ? 0f : _machine.Busy || _knockdownLeft > 0f ? 0.0f : _hurtLock > 0f ? 0.2f : _guarding || _aiming ? 0.5f : 1f;
         public float LungeSpeed => _machine.LungeSpeed;
         public bool Frozen => !IsUp;
 
@@ -256,7 +268,10 @@ namespace SleepingCalamity.Gameplay
         {
             float dt = Time.deltaTime;
             if (_remoteClock < 999f) _remoteClock += dt;
-            if (!IsSpawned || !IsOwner || dt <= 0f) return;
+            if (!IsSpawned || dt <= 0f) return;
+            // Every peer: the owner's gameplay window (stops during pause, like the knockdown it covers), the others' cosmetic one.
+            if (!IsOwner || !HeroInput.IsPaused()) _grace.Tick(dt);
+            if (!IsOwner) return;
             OwnerUpdate(dt);
         }
 
@@ -267,6 +282,7 @@ namespace SleepingCalamity.Gameplay
             if (HeroInput.IsPaused()) return;
             PlayerIntent intent = input.Intent;
             if (_hurtLock > 0f) _hurtLock -= dt;
+            if (_knockdownLeft > 0f) _knockdownLeft -= dt;
 
             if (!IsUp)
             {
@@ -572,6 +588,7 @@ namespace SleepingCalamity.Gameplay
                 ParryServerRpc(e.NetworkObjectId, e.Serial);
                 return;
             }
+            if (HurtGraceActive) return;   // post-hit grace: a guarded or hurt outcome does nothing (and the host is never told); rolls and parries above still count
             bool guarded = g == GuardOutcome.Guarded;
             if (guarded)
             {
@@ -586,8 +603,10 @@ namespace SleepingCalamity.Gameplay
                 if (!_machine.SuperArmor)
                 {
                     if (_machine.Active) { PublishSwing(NoAttack); _machine.Interrupt(); }
-                    _hurtLock = HurtStagger;
+                    if (HurtGrace.IsHeavyHit(a.Knockback, a.GuardBreak)) _hurtLock = _knockdownLeft = HurtGrace.KnockdownSeconds;   // killed: the host decides; a downed hero is not IsUp anyway
+                    else _hurtLock = HurtStagger;
                 }
+                _grace.Start(HurtGrace.Classify(a.Knockback, false, a.GuardBreak));
                 if (a.Knockback > 0f && toEnemy.sqrMagnitude > 1e-4f) AddImpulse(-toEnemy.normalized * Mathf.Min(8f, a.Knockback * 2.4f));
             }
             EnemyHitMeServerRpc(e.NetworkObjectId, e.Serial, guarded);
@@ -741,15 +760,22 @@ namespace SleepingCalamity.Gameplay
         }
 
         // Host -> everyone: this hero was hurt (HP number over the hero, a sound).
-        public void ServerBroadcastHurt(int damage, bool guarded)
+        public void ServerBroadcastHurt(int damage, bool guarded, bool heavy = false)
         {
-            HurtClientRpc(damage, guarded);
+            HurtClientRpc(damage, guarded, heavy);
         }
 
         [Rpc(SendTo.Everyone)]
-        private void HurtClientRpc(int damage, bool guarded)
+        private void HurtClientRpc(int damage, bool guarded, bool heavy)
         {
-            if (!guarded) { HurtSerial++; HurtWasHeavy = HeroAnimMap.IsHeavyHurt(damage, _vitals != null ? _vitals.MaxHp : 0); }
+            // Same reaction on every peer: `heavy` (knockback >= 3 or a guard break) comes from the host, which has the attack. The owner's own window is already
+            // running from its judging; the other peers start a cosmetic one for the pulse.
+            if (!guarded)
+            {
+                HurtSerial++;
+                HurtWasHeavy = heavy;
+                if (!IsOwner) _grace.Start(heavy ? HurtKind.Heavy : HurtKind.Light);
+            }
             Vector3 at = transform.position + Vector3.up * 2.1f;
             CombatEvents.RaiseNumber(new DamageNumber(at, damage, false, guarded, true, false, false));
             CombatEvents.RaiseHeroHurt(this, guarded);
