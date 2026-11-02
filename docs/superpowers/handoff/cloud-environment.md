@@ -22,7 +22,7 @@ Cloud environment menu in the session's title bar > **Edit**.
 
 If `unity.sh` logs exit 198 / "No valid Unity Editor license found", the activation didn't happen: `~/.sc-setup/unity-license.log` says why.
 
-The first Unity launch in a new container imports the whole project into an empty `Library/` (about 7 minutes on 2026-10-30; later launches take 1-2 minutes). `unity.sh` sees the missing `Library/ArtifactDB` and raises its default timeout from 5 to 20 minutes for that run; an explicit `--timeout` still wins.
+The first Unity launch in a new container imports the whole project into an empty `Library/` and then builds; on 2026-11-02 that ran past 20 minutes. Later stages take about build 6, EditMode 6, PlayMode 11 minutes (a full warm `check` is about 23 minutes). `unity.sh` defaults every stage to 30 minutes, or 45 when `Library/ArtifactDB` is missing; an explicit `--timeout` still wins. Details in section 5.
 
 **Starting a cloud session from the controller (user, 2026-10-30):** always pass `environment: "SleepingCalamity Cloud"` to `start_session` (the repo-connected environment with this setup script and the Unity secrets), never `Default`, even while it is the default.
 
@@ -66,6 +66,31 @@ Anything a session installs is gone when the container is reclaimed. To make it 
 
 ## 4. What still needs the PC
 
-- Any Unity launch until `UNITY_EMAIL` + `UNITY_PASSWORD` are set and the activation works: build, EditMode/PlayMode tests and `check`. With it, `unity.sh check` is a full merge gate (same marker as the PC).
+- Any Unity launch until `UNITY_EMAIL` + `UNITY_PASSWORD` are set and the activation works: build, EditMode/PlayMode tests and `check`. With it, `unity.sh check` is a full merge gate (same marker as the PC): proven 2026-11-02 (section 5).
 - The Unity MCP and `sc-walk` (they drive a windowed editor; on CPU rendering it would be too slow to use), AssetRipper/REA, `Reference/private/` (copyrighted frames never leave the PC), a real GPU (cloud renders are CPU-only and slower).
 - Committed bakes and FBX exports: cloud Blender writes different bytes from the PC's, so art sessions commit generators and the PC rebakes (sc-asset-craft, sc-texture-paint).
+
+## 5. Passing `check` in the cloud (findings 2026-11-02, Cloud Tasker)
+
+Proof: `bash Tools/cloud/unity.sh check` PASSED on `claude/cloud-check` `2522c96` (Unity trees identical to main `edaf3f1`): build PASS, EditMode 1211/1211, PlayMode 116 passed, 0 failed, 19 skipped.
+
+**1. `sc_cloud_compile.py` failed UI, App, Editor and both test assemblies.** This was not a missing package or a network problem: all 32 registry packages were on disk, and the real editor compiled fine. Three gaps in the script's model of the editor:
+- Unity 6000.6's built-in ugui 2.6.0 ships `Unity.TextMeshPro` and `Unity.TextMeshPro.Editor` asmdefs that name only an internal bridge. Yet the editor's own builds of them reference `UnityEngine.UI` and `UnityEditor.UI` (read from the compiled DLLs in the editor's `ProjectTemplates/libcache`). The script now adds these as implied references (`IMPLIED`).
+- The editor defines `TEXTCORE_1_0_OR_NEWER` and `TEXTCORE_FONT_ENGINE_1_5/1_6_OR_NEWER`. Without them TMP takes an old FontEngine branch, giving CS1501 in `TMP_FontAsset.cs`. They are added to `unity_defines()`.
+- PrimeTween uses `UnityEngine.UI` through its `Unity.TextMeshPro` reference. Package assemblies now get their references' references. Project assemblies keep direct references only, so the cloud compile is never more lenient than the editor.
+- Result: 11/11 project assemblies OK on main, `claude/lit-guard` and `claude/overlay-heal-count`. TMP and everything behind it broke when PrimeTween (which references TMP) arrived on 2026-11-01.
+
+**2. The disk filled.** The allowance is about 39 GB (`df` shows the whole host; "Avail" is what is left of the allowance). Measured costs:
+- the Unity editor in `~/unity`: 9.2 GB
+- the checkout with LFS objects: 5.3 GB (`.git/lfs` 2.3 GB)
+- each extra git worktree: about 3 GB
+- a project `Library/` after build and tests: 3.7 GB
+
+Two agents running Unity in two worktrees at once (about 6.7 GB each) plus a spare worktree filled it. One Unity project at a time fits comfortably: the full check stayed above 5.6 GB free. `unity.sh` now warns before a launch when less than 3 GB (6 GB cold) is free, and lists the other worktrees' `Library/` dirs. Free space by removing finished worktrees (`git worktree remove`, after checking their branch is pushed), never by deleting a `Library/` another run is using.
+
+**3. The first check timed out.** The old defaults were 20 minutes cold and 5 minutes warm. The cold import plus `BuildAll` hit 20 minutes mid-build, and the warm default could never fit a build (about 6 minutes). The defaults are now 30 minutes (45 cold), the same per stage as the PC wrapper.
+
+**4. Still open:**
+- Every cloud build rewrites last-digit floats in three scenes (`Hollowmere.unity`, `BeautyCorner_Hollowmere.unity`, `CellarFloorTest.unity`; for example a rotation `w` 0.7372774 to 0.7372773, BoxCollider sizes). This is probably Linux vs Windows float maths in the builders. Don't commit it: `git checkout -- Assets/_Project/Scenes` after a cloud build. It is a cross-platform churn bug for the builder owners.
+- Two PlayMode tests flaked once each in a full cloud run and passed alone twice: `StairHandoverTests (Rtt150Loss2)` (a client hero sank at stair F1 to F2, matching review finding F4, routed to dive-flow) and `DisconnectRejoinTests.Case1` (40 s walk timeout, slow CPU). If a cloud check fails only on these, re-run `test-play` with `--filter` and say so in the report.
+- Run one cloud Unity project at a time. Subagents doing Unity work should share the session's checkout in turn rather than each importing their own worktree.

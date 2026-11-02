@@ -34,9 +34,20 @@ case "$COMMAND" in compile|build|test-edit|test-play|check|gate|soak|exec) ;; *)
 UNITY="${SC_UNITY:-$HOME/unity/ed/Editor/Unity}"
 [ -d "$PROJECT/ProjectSettings" ] || usage "project must be an absolute Unity project path: $PROJECT"
 PROJECT="$(cd "$PROJECT" && pwd)"
-# a fresh container has no Library/: the first launch imports the whole project (~7 min measured), so the default grows
+# Per-stage timeout (it only ends a hung run). Measured 2026-11-02 on main: a fresh Library/ import plus BuildAll ran past 20 min (the old default
+# timed out mid-build); with a Library/ the stages take about build 6, EditMode 6, PlayMode 11 min. Same 30 min as the PC wrapper, 45 cold.
 if [ -z "$TIMEOUT_MIN" ]; then
-    if [ -f "$PROJECT/Library/ArtifactDB" ]; then TIMEOUT_MIN=5; else TIMEOUT_MIN=20; say "SC NOTE no Library/ yet: first run imports the project, timeout raised to 20 min"; fi
+    if [ -f "$PROJECT/Library/ArtifactDB" ]; then TIMEOUT_MIN=30; else TIMEOUT_MIN=45; say "SC NOTE no Library/ yet: first run imports the project (20+ min), timeout raised to 45 min"; fi
+fi
+# Disk preflight. The session's disk allowance is about 39 GB: editor 9.2 GB + checkout with LFS 5.3 GB + Library/ 3.7 GB per Unity project. Each
+# extra worktree with its own Library/ costs about 7 GB more, and two at once filled the disk on 2026-11-02. Warn, and name what can be freed.
+need_mb=3000; [ -f "$PROJECT/Library/ArtifactDB" ] || need_mb=6000
+free_mb="$(df -Pm "$PROJECT" 2>/dev/null | awk 'NR==2{print $4}')"
+if [ -n "$free_mb" ] && [ "$free_mb" -lt "$need_mb" ]; then
+    say "SC WARN disk: ${free_mb} MB free, this run wants about ${need_mb} MB. Free space first (other worktrees' Library/ dirs below can go once nothing runs Unity in them):"
+    git -C "$PROJECT" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' | while read -r wt; do
+        [ "$wt" != "$PROJECT" ] && [ -d "$wt/Library" ] && say "SC WARN   $(du -sh "$wt/Library" 2>/dev/null | cut -f1)  $wt/Library"
+    done
 fi
 [ "$COMMAND" = exec ] && { printf '%s' "$METHOD" | grep -Eq '^[A-Za-z_][A-Za-z0-9_.]*$' || usage 'exec needs --method <Namespace.Class.Method>'; }
 [ -n "$OUT" ] || usage 'no --out given and SC_OUT is not set'
