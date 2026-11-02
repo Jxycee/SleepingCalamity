@@ -129,13 +129,13 @@ namespace SleepingCalamity.EditorTools
                 bool meadow = s.Name.StartsWith("Meadow"), pathSpot = s.Name.StartsWith("Path_");
                 if (HollowmereAmbientLife.Butterflies)
                 {
-                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Seed = seed++ };
+                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Hover = HollowmereAmbientLife.ButterflyHover, Seed = seed++ };
                     f.Cards = Cards(life, f.Name, (seed % 3) == 0 ? _butterflyOrange : (seed % 3) == 1 ? _butterfly : _butterflyYellow, pathSpot ? HollowmereAmbientLife.PathButterflies : meadow ? HollowmereAmbientLife.ButterfliesPerFlock + 2 : HollowmereAmbientLife.ButterfliesPerFlock);
                     common.Add(f);
                 }
                 if (HollowmereAmbientLife.Bees && !pathSpot)
                 {
-                    var f = new AmbientCreatures.Flock { Name = "Bees_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = 1.3f, Height = 1.1f, Speed = 3.2f, Spread = 3f, Wingspan = HollowmereAmbientLife.BeeSpan, Tilt = 40f, Seed = seed++ };
+                    var f = new AmbientCreatures.Flock { Name = "Bees_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = 1.3f, Height = 1.1f, Speed = 3.2f, Spread = 4f, Wingspan = HollowmereAmbientLife.BeeSpan, Tilt = 40f, Jitter = HollowmereAmbientLife.BeeJitter, Seed = seed++ };
                     f.Cards = Cards(life, f.Name, _bee, HollowmereAmbientLife.BeesPerFlock);
                     common.Add(f);
                 }
@@ -218,16 +218,16 @@ namespace SleepingCalamity.EditorTools
             _crow = CardMat("M_HM_Bird_Crow", sh, new Color(0.15f, 0.15f, 0.17f), 1.15f, 13f, 0.5f);
             _swallow = CardMat("M_HM_Bird_Swallow", sh, new Color(0.17f, 0.18f, 0.23f), 1.3f, 26f, 0.4f);
             _gull = CardMat("M_HM_Bird_Gull", sh, new Color(0.80f, 0.81f, 0.80f), 0.8f, 7f, 0.3f);
-            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(1.5f, 1.46f, 1.28f), 0.85f, 38f, 0.9f);
-            _butterflyYellow = CardMat("M_HM_Butterfly_Yellow", sh, new Color(1.7f, 1.4f, 0.3f), 0.85f, 38f, 0.9f);
-            _butterflyOrange = CardMat("M_HM_Butterfly_Orange", sh, new Color(1.7f, 0.72f, 0.12f), 0.85f, 38f, 0.9f);
-            _bee = CardMat("M_HM_Bee", sh, new Color(0.85f, 0.55f, 0.07f), 1.0f, 140f, 0.3f);
+            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(1.6f, 1.55f, 1.35f), 0.8f, 22f, 0.95f, new Color(0.35f, 0.5f, 1.1f, 1f));
+            _butterflyYellow = CardMat("M_HM_Butterfly_Yellow", sh, new Color(1.8f, 1.5f, 0.3f), 0.8f, 22f, 0.95f, new Color(0.9f, 0.35f, 0.08f, 1f));
+            _butterflyOrange = CardMat("M_HM_Butterfly_Orange", sh, new Color(1.8f, 0.8f, 0.12f), 0.8f, 22f, 0.95f, new Color(0.25f, 0.1f, 0.05f, 1f));
+            _bee = CardMat("M_HM_Bee", sh, new Color(0.55f, 0.36f, 0.05f), 1.0f, 140f, 0.3f, new Color(0.14f, 0.1f, 0.04f, 1f));
         }
 
-        static Material CardMat(string name, Shader sh, Color c, float belly, float flapSpeed, float flapAmp)
+        static Material CardMat(string name, Shader sh, Color c, float belly, float flapSpeed, float flapAmp, Color? tip = null)
         {
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/" + name + ".mat", sh);
-            m.SetColor("_Color", c); m.SetFloat("_Belly", belly); m.SetFloat("_FlapSpeed", flapSpeed); m.SetFloat("_FlapAmp", flapAmp); m.SetFloat("_Fold", 0f);
+            m.SetColor("_Color", c); m.SetFloat("_Belly", belly); m.SetFloat("_FlapSpeed", flapSpeed); m.SetFloat("_FlapAmp", flapAmp); m.SetFloat("_Fold", 0f); m.SetColor("_TipColor", tip ?? new Color(0f, 0f, 0f, 0f));
             m.enableInstancing = false;
             EditorUtility.SetDirty(m);
             return m;

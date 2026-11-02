@@ -7,6 +7,7 @@ Shader "SleepingCalamity/BirdCard"
     Properties
     {
         _Color ("Colour", Color) = (0.08, 0.08, 0.09, 1)
+        _TipColor ("Wing-tip colour (outer wings; alpha 0 = same as Colour)", Color) = (0, 0, 0, 0)
         _Belly ("Underside tone (multiplies Colour at the wing roots)", Range(0, 1.5)) = 1.0
         _FlapSpeed ("Flap speed (rad/s)", Float) = 14
         _FlapAmp ("Flap amplitude (fraction of the wing length)", Float) = 0.45
@@ -28,6 +29,7 @@ Shader "SleepingCalamity/BirdCard"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
+                half4 _TipColor;
                 half _Belly;
                 float _FlapSpeed;
                 float _FlapAmp;
@@ -57,7 +59,8 @@ Shader "SleepingCalamity/BirdCard"
 
             half4 frag(Varyings i) : SV_Target
             {
-                half3 c = _Color.rgb * lerp(1.0h, _Belly, saturate(i.uv.x));   // wings a touch lighter or darker than the body
+                half3 base = lerp(_Color.rgb, _TipColor.rgb, _TipColor.a * smoothstep(0.35h, 0.95h, i.uv.x));   // two-tone wings: body and inner wing in Colour, outer wing in the tip colour
+                half3 c = base * lerp(1.0h, _Belly, saturate(i.uv.x));   // wings a touch lighter or darker than the body
                 c = MixFog(c, i.fogFactor);
                 return half4(c, 1);
             }

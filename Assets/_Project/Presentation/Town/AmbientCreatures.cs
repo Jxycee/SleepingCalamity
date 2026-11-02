@@ -24,6 +24,8 @@ namespace SleepingCalamity.Presentation
             public float Spread;        // Wander: how far the creatures' anchors lie apart. Perch: perch scatter
             public float Clump = 6.28f; // Circle: angle (rad) the flock is spread over
             public float Wingspan = 0.5f;
+            public float Hover;         // Wander: metres of slow vertical bob (butterfly flutter)
+            public float Jitter;        // Wander: metres of fast hover jitter (bees)
             public float Tilt;          // degrees the card pitches up from its heading (butterflies and bees tilt so their wings show to a camera at eye height)
             public float AloftRadius = 34f, AloftHeight = 30f;   // Perch: the wheel after a lift
             public int Seed;
@@ -165,6 +167,12 @@ namespace SleepingCalamity.Presentation
                         Vector3 d = p - f.Last[i]; f.Last[i] = p;
                         if (f.Mode[i] == Perched) c.rotation = Quaternion.Euler(0f, H(f.Seed, i, 8) * 360f, 0f);
                         else Face(c, d);
+                    }
+                    if (f.Move == Motion.Wander && (f.Hover > 0f || f.Jitter > 0f))
+                    {
+                        float ph = H(f.Seed, i, 14) * 6.28f;
+                        p.y += Mathf.Sin(t * 2.6f + ph) * f.Hover;
+                        if (f.Jitter > 0f) { p.x += Mathf.Sin(t * 41f + ph) * f.Jitter; p.y += Mathf.Sin(t * 53f + ph * 2f) * f.Jitter; p.z += Mathf.Sin(t * 47f + ph * 3f) * f.Jitter; }
                     }
                     c.position = p;
                     // a card within 3 m of the camera would read as a huge wing: hide it there

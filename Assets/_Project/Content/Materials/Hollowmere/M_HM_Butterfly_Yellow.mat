@@ -25,11 +25,12 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Belly: 0.85
-    - _FlapAmp: 0.9
-    - _FlapSpeed: 38
+    - _Belly: 0.8
+    - _FlapAmp: 0.95
+    - _FlapSpeed: 22
     - _Fold: 0
     m_Colors:
-    - _Color: {r: 1.7, g: 1.4, b: 0.3, a: 1}
+    - _Color: {r: 1.8, g: 1.5, b: 0.3, a: 1}
+    - _TipColor: {r: 0.9, g: 0.35, b: 0.08, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
