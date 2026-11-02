@@ -18,9 +18,37 @@ using UnityEngine.SceneManagement;
 
 namespace SleepingCalamity.Tests.PlayMode
 {
+    // Simulated link conditions for the QA walks (Multiplayer Tools NetworkSimulator, applied to the host's transport; the delay is per direction).
+    public enum NetCondition { None, Rtt150Loss2, Rtt300Loss5 }
+
     public static class PlayModeHarness
     {
         public const float DefaultTimeoutSeconds = 10f;
+        private static GameObject _simObject;
+
+        // True while a NetworkSimulator is installed: the wait loops then sleep ~16 ms a frame like a real client, instead of spinning at ~1 ms
+        // frames under -nographics (which would burn the CPU and shrink a 300 ms round trip into hundreds of frames).
+        public static bool Simulating => _simObject != null;
+
+        // Adds the NetworkSimulator BEFORE the host starts. Destroyed by TearDownApp. Returns the object (null for None).
+        public static GameObject AddNetworkSimulator(NetCondition condition)
+        {
+            if (_simObject != null) { UnityEngine.Object.Destroy(_simObject); _simObject = null; }
+            if (condition == NetCondition.None) return null;
+            int delayMs = condition == NetCondition.Rtt150Loss2 ? 37 : 75;
+            int loss = condition == NetCondition.Rtt150Loss2 ? 2 : 5;
+            _simObject = new GameObject("NetSim_" + condition);
+            var sim = _simObject.AddComponent<Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulator>();
+            sim.ConnectionPreset = Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulatorPreset.Create(
+                "walk " + condition, "M7 S0", packetDelayMs: delayMs, packetJitterMs: 0, packetLossInterval: 0, packetLossPercent: loss);
+            return _simObject;
+        }
+
+        public static void Pace()
+        {
+            if (_simObject != null) Thread.Sleep(16);
+        }
+
         private const float SessionTimeoutSeconds = 20f;
         private const float TeardownTimeoutSeconds = 20f;
         private const float RecoveryTimeoutSeconds = 10f;
@@ -179,6 +207,7 @@ namespace SleepingCalamity.Tests.PlayMode
             }
             finally
             {
+                if (_simObject != null) { UnityEngine.Object.Destroy(_simObject); _simObject = null; }
                 AppBootstrap.SuppressDevAutoStart = false;
                 SceneFlow.StartSceneOverride = null;
                 WorldSaveFlow.Enabled = true;
@@ -210,6 +239,7 @@ namespace SleepingCalamity.Tests.PlayMode
             while (!condition())
             {
                 if (Time.realtimeSinceStartupAsDouble > deadline) Assert.Fail("Timed out after " + timeoutSeconds + " s: " + failMessage);
+                Pace();
                 yield return null;
             }
         }
@@ -225,6 +255,7 @@ namespace SleepingCalamity.Tests.PlayMode
                     cts?.Cancel();
                     Assert.Fail("Timed out after " + timeoutSeconds + " s waiting for a network task");
                 }
+                Pace();
                 yield return null;
             }
             if (task.IsFaulted) Assert.Fail("The task faulted: " + task.Exception.GetBaseException());

@@ -132,7 +132,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private static IEnumerator Seconds(float s)
         {
             double until = Time.realtimeSinceStartupAsDouble + s;
-            while (Time.realtimeSinceStartupAsDouble < until) yield return null;
+            while (Time.realtimeSinceStartupAsDouble < until) { PlayModeHarness.Pace(); yield return null; }
         }
 
         private static IEnumerator ClientTo(Rig rig, Vector3 pos, string step)
@@ -283,11 +283,12 @@ namespace SleepingCalamity.Tests.PlayMode
         // ---------------------------------------------------------------------------------------------------------------------------------
 
         [UnityTest, Timeout(1500000)]
-        public IEnumerator Walk_Hollowmere_Dive_Rescue_GoHome_Place_Baker_Loaves_SaveReload()
+        public IEnumerator Walk_Hollowmere_Dive_Rescue_GoHome_Place_Baker_Loaves_SaveReload([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
             uint seed = FindSeed();
             Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed with a gate-key carrier on floors 1-3");
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            PlayModeHarness.AddNetworkSimulator(net);   // before the host starts
             _dir = PlayModeHarness.BeginSaveTest();
             AppBootstrap app = AppBootstrap.Current;
             (int seedLevel, float seedAbs, float seedGuestAbs) = SeedWorld(app, out string worldId);
