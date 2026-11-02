@@ -25,7 +25,7 @@ namespace SleepingCalamity.EditorTools
         // LK_* slots (LaneKit/SOURCES.md, slots table): shared B1 tileable, linear tint, normal scale. LK_Earth and LK_GlassLit are flat (see BuildMaterials).
         static readonly (string Slot, string Source, Color Tint, float Bump)[] LkSlots =
         {
-            ("LK_Rubble", "sandstone", new Color(0.57f, 0.60f, 0.66f), 1.5f), ("LK_Dressed", "sandstone", new Color(1.00f, 0.95f, 0.86f), 1.3f),
+            ("LK_Rubble", "sandstone", new Color(0.57f, 0.60f, 0.66f), 0.8f), ("LK_Dressed", "sandstone", new Color(1.00f, 0.95f, 0.86f), 0.8f),   // A6: flatter relief (were 1.5, 1.3)
             ("LK_Mortar", "sandstone", new Color(0.26f, 0.245f, 0.21f), 0.6f), ("LK_Oak", "oak_timber", new Color(0.80f, 0.76f, 0.72f), 1.2f),
             ("LK_GatePaint", "painted_wood", new Color(0.66f, 0.72f, 0.28f), 1.0f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
             ("LK_GutterStone", "sandstone", new Color(0.50f, 0.48f, 0.44f), 1.5f),   // gutter channel: LK_Mortar read as a near-black ribbon
@@ -95,12 +95,30 @@ namespace SleepingCalamity.EditorTools
                     obj.transform.rotation = Quaternion.Euler(0f, r.Yaw, r.Tilt);
                     obj.transform.localScale = new Vector3(r.ScaleX, 1f, 1f);
                     if (HasCollider(r.Piece)) { var b = obj.AddComponent<BoxCollider>(); (Vector3 c, Vector3 s) = BoxOf(r.Piece); b.center = c; b.size = s; }
+                    if (r.Piece == LanePiece.LaneStep) AddStepReadability(obj.transform);
                     if (isRebuilt && r.Piece == LanePiece.WallLantern) AddLanternLight(obj.transform);
                     placed++;
                 }
                 tally.Add((isRebuilt ? "Rebuilt " : "Ruined ") + placed + " (art " + art + ")");
             }
             Debug.Log("SC HOLLOWMERE lane kit placed: " + string.Join(", ", tally) + " rows=" + rows.Count + (fbx == null ? " [greybox]" : ""));
+        }
+
+        // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
+        // z = 0 face. A pale nosing along the tread's front edge and a dark shadow band hanging on the riser; both visual only (no collider, no shadow casting).
+        static Material _nosing, _riserShade;
+        static void AddStepReadability(Transform step)
+        {
+            if (_nosing == null)
+            {
+                Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
+                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.42f, 0.39f, 0.33f), 0.15f, wear);
+                _riserShade = BeautyCornerArt.Flat("LK_RiserShade", new Color(0.018f, 0.016f, 0.014f), 0.05f, wear);
+                foreach (Material m in new[] { _nosing, _riserShade }) { m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true); }
+            }
+            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.045f), new Vector3(2f, 0.03f, 0.1f), _nosing);
+            GameObject r = LookTestBuilder.Prim(step, "RiserShade", PrimitiveType.Cube, new Vector3(0f, 0.045f, -0.006f), new Vector3(2f, 0.2f, 0.012f), _riserShade);
+            foreach (GameObject go in new[] { n, r }) go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         static string Family(LaneKitRow r)

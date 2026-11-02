@@ -40,6 +40,11 @@ namespace SleepingCalamity.EditorTools
                 foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
                 m.SetColor("_BaseColor", new Color(Mathf.Clamp01(s.Tint.r), Mathf.Clamp01(s.Tint.g), Mathf.Clamp01(s.Tint.b), 1f).gamma);
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
+                if (s.Slot == "HH_OldStone")   // A6: the stone read as pillows: flatter relief and smaller stones
+                {
+                    m.SetFloat("_BumpScale", src.GetFloat("_BumpScale") * 0.55f);
+                    foreach (string prop in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" }) m.SetTextureScale(prop, src.GetTextureScale(prop) * 1.5f);
+                }
                 EditorUtility.SetDirty(m); map[s.Slot] = m;
             }
             foreach (var s in Paints)

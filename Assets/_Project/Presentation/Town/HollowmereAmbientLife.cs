@@ -30,8 +30,10 @@ namespace SleepingCalamity.Presentation
         public const float FlockCullDistance = 260f;       // a flock further than this from the camera is not animated
 
         public const float BirdScale = 2.3f;               // wingspan multiplier for every bird card (cards, no models: they must read at distance)
-        public const float ButterflySpan = 0.15f;          // metres wing to wing
-        public const float BeeSpan = 0.06f;
+        public const float ButterflySpan = 0.34f;          // metres wing to wing (0.15 was a speck at 10 m eye height; Q town-surfaces round 1)
+        public const float BeeSpan = 0.12f;
+        public const int ButterfliesPerFlock = 9, BeesPerFlock = 7;   // town corners and garden lots (meadows add 2 butterflies)
+        public const int PathButterflies = 7;              // the extra flock on the lane side of each garden lot, where the paths are
 
         // ---- smoke
         public const float SmokeRate = 3.2f;               // particles per second per chimney

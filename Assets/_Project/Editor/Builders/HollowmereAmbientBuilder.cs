@@ -117,6 +117,8 @@ namespace SleepingCalamity.EditorTools
         {
             var spots = new List<(string Name, Vector2 P)>();
             foreach (string id in GardenLots) { Foundation f = t.Foundations.FirstOrDefault(x => x.Id == id); if (f != null) spots.Add(("Garden_" + id, new Vector2(f.Centre.X, f.Centre.Z))); }
+            // the lane side of each garden lot (door side, just outside the gate), where the paths run: a second flock that reads from the lane
+            foreach (string id in GardenLots) { Foundation f = t.Foundations.FirstOrDefault(x => x.Id == id); if (f == null) continue; Vector3 o = Quaternion.Euler(0f, f.FacingYaw, 0f) * new Vector3(0f, 0f, -(f.Side * 0.5f + 2.5f)); spots.Add(("Path_" + id, new Vector2(f.Centre.X + o.x, f.Centre.Z + o.z))); }
             spots.Add(("SquareSW", new Vector2(-15f, -17f))); spots.Add(("KeepStairs", new Vector2(-24f, 14f))); spots.Add(("LakeShore", new Vector2(-18f, -84f)));
             int m = 0;
             foreach (Vector2 p in MeadowSpots(5)) spots.Add(("Meadow" + m++, p));
@@ -124,17 +126,17 @@ namespace SleepingCalamity.EditorTools
             foreach (var s in spots)
             {
                 float y = HollowmereLayout.Ground(t, s.P.x, s.P.y);
-                bool meadow = s.Name.StartsWith("Meadow");
+                bool meadow = s.Name.StartsWith("Meadow"), pathSpot = s.Name.StartsWith("Path_");
                 if (HollowmereAmbientLife.Butterflies)
                 {
                     var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Seed = seed++ };
-                    f.Cards = Cards(life, f.Name, (seed % 3) == 0 ? _butterflyOrange : (seed % 3) == 1 ? _butterfly : _butterflyYellow, meadow ? 6 : 5);
+                    f.Cards = Cards(life, f.Name, (seed % 3) == 0 ? _butterflyOrange : (seed % 3) == 1 ? _butterfly : _butterflyYellow, pathSpot ? HollowmereAmbientLife.PathButterflies : meadow ? HollowmereAmbientLife.ButterfliesPerFlock + 2 : HollowmereAmbientLife.ButterfliesPerFlock);
                     common.Add(f);
                 }
-                if (HollowmereAmbientLife.Bees)
+                if (HollowmereAmbientLife.Bees && !pathSpot)
                 {
                     var f = new AmbientCreatures.Flock { Name = "Bees_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = 1.3f, Height = 1.1f, Speed = 3.2f, Spread = 3f, Wingspan = HollowmereAmbientLife.BeeSpan, Tilt = 40f, Seed = seed++ };
-                    f.Cards = Cards(life, f.Name, _bee, 4);
+                    f.Cards = Cards(life, f.Name, _bee, HollowmereAmbientLife.BeesPerFlock);
                     common.Add(f);
                 }
             }
@@ -205,10 +207,10 @@ namespace SleepingCalamity.EditorTools
             _crow = CardMat("M_HM_Bird_Crow", sh, new Color(0.15f, 0.15f, 0.17f), 1.15f, 13f, 0.5f);
             _swallow = CardMat("M_HM_Bird_Swallow", sh, new Color(0.17f, 0.18f, 0.23f), 1.3f, 26f, 0.4f);
             _gull = CardMat("M_HM_Bird_Gull", sh, new Color(0.80f, 0.81f, 0.80f), 0.8f, 7f, 0.3f);
-            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(0.95f, 0.93f, 0.82f), 0.85f, 38f, 0.9f);
-            _butterflyYellow = CardMat("M_HM_Butterfly_Yellow", sh, new Color(0.98f, 0.85f, 0.25f), 0.85f, 38f, 0.9f);
-            _butterflyOrange = CardMat("M_HM_Butterfly_Orange", sh, new Color(0.96f, 0.5f, 0.12f), 0.85f, 38f, 0.9f);
-            _bee = CardMat("M_HM_Bee", sh, new Color(0.30f, 0.20f, 0.04f), 1.0f, 140f, 0.3f);
+            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(1.5f, 1.46f, 1.28f), 0.85f, 38f, 0.9f);
+            _butterflyYellow = CardMat("M_HM_Butterfly_Yellow", sh, new Color(1.7f, 1.4f, 0.3f), 0.85f, 38f, 0.9f);
+            _butterflyOrange = CardMat("M_HM_Butterfly_Orange", sh, new Color(1.7f, 0.72f, 0.12f), 0.85f, 38f, 0.9f);
+            _bee = CardMat("M_HM_Bee", sh, new Color(0.85f, 0.55f, 0.07f), 1.0f, 140f, 0.3f);
         }
 
         static Material CardMat(string name, Shader sh, Color c, float belly, float flapSpeed, float flapAmp)

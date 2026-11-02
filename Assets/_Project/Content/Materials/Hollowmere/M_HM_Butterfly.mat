@@ -30,6 +30,6 @@ Material:
     - _FlapSpeed: 38
     - _Fold: 0
     m_Colors:
-    - _Color: {r: 0.95, g: 0.93, b: 0.82, a: 1}
+    - _Color: {r: 1.5, g: 1.46, b: 1.28, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
