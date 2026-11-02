@@ -192,7 +192,7 @@ namespace SleepingCalamity.EditorTools
                 EditorUtility.SetDirty(m);
                 map[s.Slot] = m;
             }
-            map["LK_Earth"] = BeautyCornerArt.Flat("LK_Earth", new Color(0.034f, 0.025f, 0.017f), 0.05f, wear);
+            map["LK_Earth"] = BeautyCornerArt.Flat("LK_Earth", new Color(0.20f, 0.15f, 0.10f), 0.05f, wear);   // round 2: silt in GutterChoked read as a black ribbon down the Terrace flight
             Material glass = BeautyCornerArt.Flat("LK_GlassLit", new Color(0.9f, 0.55f, 0.2f), 0.7f, wear);   // warm lit glass: emissive linear (1, 0.62, 0.28) x 3
             glass.SetColor("_EmissionColor", new Color(1f, 0.62f, 0.28f) * 3f); glass.EnableKeyword("_EMISSION");
             glass.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; EditorUtility.SetDirty(glass);

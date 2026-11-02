@@ -112,6 +112,9 @@ namespace SleepingCalamity.Presentation
             return new Vector3(x, y, z);
         }
 
+        /// <summary>Edit-time only: camera positions (the capture cameras) that the baked pose keeps clear, 3 m radius.</summary>
+        public static Vector3[] BakedAvoid;
+
         void Update()
         {
             if (Flocks.Length == 0) return;
@@ -165,7 +168,9 @@ namespace SleepingCalamity.Presentation
                     }
                     c.position = p;
                     // a card within 3 m of the camera would read as a huge wing: hide it there
-                    float s = cam != null && (cam.transform.position - p).sqrMagnitude < 9f ? 0f : scale;
+                    bool near = cam != null && (cam.transform.position - p).sqrMagnitude < 9f;
+                    if (!live && BakedAvoid != null) foreach (Vector3 a in BakedAvoid) if ((a - p).sqrMagnitude < 9f) { near = true; break; }
+                    float s = near ? 0f : scale;
                     c.localScale = new Vector3(s, s, s);
                 }
             }

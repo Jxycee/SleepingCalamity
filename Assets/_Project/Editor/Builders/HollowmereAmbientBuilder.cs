@@ -187,6 +187,7 @@ namespace SleepingCalamity.EditorTools
             if (flocks.Count == 0) return;
             var c = owner.AddComponent<AmbientCreatures>();
             c.Flocks = flocks.ToArray();
+            AmbientCreatures.BakedAvoid = System.Array.ConvertAll(HollowmereBuilder.Cameras, k => k.Pos);
             c.Pose(37f, 0f, false);   // a settled frame for edit-mode captures
         }
 
