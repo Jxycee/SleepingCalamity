@@ -58,6 +58,7 @@ namespace SleepingCalamity.Tests.PlayMode
         System.Action _pressCheck;
         int _builtFloorSeen = -1;
                 bool _navDoorOpen;
+        float _doorSeenAt = -1f;
         int _lastHp = -1;
         float _healSince, _healGiveUpAt = -999f, _lastFaultAt = -999f, _loafAt = -999f;
         public int MaxChestsPerFloor = 2;   // optional (non-key) chests opened per floor
@@ -185,11 +186,15 @@ namespace SleepingCalamity.Tests.PlayMode
             if (Floor <= 0 || c == null || fs == null || fs.Built == null) return;
             if (c.State.DoorOpen && !_navDoorOpen)
             {
-                _navDoorOpen = true;
+                // CellarContentsSync hides the gate in its own Update, a frame after DoorOpen flips: wait (up to 2 s) until the gate stops blocking, then bake once.
+                if (_doorSeenAt < 0f) _doorSeenAt = Seconds;
+                bool timedOut = Seconds - _doorSeenAt > 2f;
+                if (c.GateBlocking && !timedOut) return;
+                _navDoorOpen = true; _doorSeenAt = -1f;
                 Bounds b = fs.Built.Bounds;
                 Bake(new Bounds(new Vector3(b.center.x, 2f, b.center.z), new Vector3(b.size.x + 4f, 12f, b.size.z + 4f)));
                 Say("locked door opened: NavMesh re-baked");
-                if (c.GateBlocking) Note("Door", "the door reads open (DoorOpen) but its gate object still blocks");
+                if (c.GateBlocking) Note("Door", "the door reads open (DoorOpen) but its gate object still blocks after 2 s");
             }
         }
 
