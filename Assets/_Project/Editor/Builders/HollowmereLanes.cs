@@ -86,23 +86,107 @@ namespace SleepingCalamity.EditorTools
                 foreach (LaneKitRow r in rows)
                 {
                     if (!r.In(isRebuilt)) continue;
+                    float rowY = r.Y, contactY = float.NaN;
+                    bool stepBottom = false;
+                    if (r.Piece == LanePiece.LaneStep) { stepBottom = !HasStepNeighbour(rows, r, -1); SeatStepEnds(r, t, stepBottom, !HasStepNeighbour(rows, r, 1), out float sink, out contactY); rowY -= sink; }
                     string family = Family(r);
                     if (!sub.TryGetValue(family, out Transform parent)) sub[family] = parent = ChildGroup(group, family);
                     GameObject obj = TryClone(fbx, r.Piece, slots, parent);
                     if (obj != null) art++; else obj = Greybox(r.Piece, parent);
                     obj.name = r.Id;
                     bool isGutter = r.Piece == LanePiece.Gutter || r.Piece == LanePiece.GutterChoked || r.Piece == LanePiece.GutterGrate;
-                    obj.transform.position = new Vector3(r.X, r.Y - (isGutter ? 0.02f : 0f), r.Z);
+                    obj.transform.position = new Vector3(r.X, rowY - (isGutter ? 0.02f : 0f), r.Z);
                     obj.transform.rotation = Quaternion.Euler(0f, r.Yaw, r.Tilt);
                     obj.transform.localScale = new Vector3(r.ScaleX, 1f, 1f);
                     if (HasCollider(r.Piece)) { var b = obj.AddComponent<BoxCollider>(); (Vector3 c, Vector3 s) = BoxOf(r.Piece); b.center = c; b.size = s; }
-                    if (r.Piece == LanePiece.LaneStep) AddStepReadability(obj.transform);
+                    if (r.Piece == LanePiece.LaneStep) { AddStepSkirt(obj.transform, r, t, rowY); AddStepReadability(obj.transform); if (stepBottom) AddContactStrip(obj.transform, contactY - rowY); }
                     if (isRebuilt && r.Piece == LanePiece.WallLantern) AddLanternLight(obj.transform);
                     placed++;
                 }
                 tally.Add((isRebuilt ? "Rebuilt " : "Ruined ") + placed + " (art " + art + ")");
             }
             Debug.Log("SC HOLLOWMERE lane kit placed: " + string.Join(", ", tally) + " rows=" + rows.Count + (fbx == null ? " [greybox]" : ""));
+        }
+
+        // stairs seat: the step box hangs 0.8 m under its tread; where the ground beside or under the flight is lower (cross slope, a drop beside the lane) the
+        // sides and the front stood in the air with the underside showing. A collider-free stone foot from the step's bottom down to the lowest ground under its footprint
+        // (plus 0.25 m of burial), same width and depth, so the flight is seated into the terrain on every side.
+        // Stairs seat 2: the step is a solid dressed-stone block from just under its tread down to the lowest ground under its footprint (+0.1 m), full width and run,
+        // collider-free (the art step's own box collider stays the walk surface). Its front is the stone riser face (a 1 cm lip past the art mesh's riser plane).
+        static Material _dressed, _contact;
+        static void AddStepSkirt(Transform step, LaneKitRow r, TownLayout t, float rowY)
+        {
+            float yaw = r.Yaw * Mathf.Deg2Rad, hw = r.ScaleX + 0.2f;
+            Vector3 f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)), rt = new Vector3(Mathf.Cos(yaw), 0f, -Mathf.Sin(yaw)), p = new Vector3(r.X, 0f, r.Z);
+            float low = float.MaxValue;
+            foreach (float lx in new[] { -hw, -hw * 0.5f, 0f, hw * 0.5f, hw })
+                foreach (float lz in new[] { -0.1f, 0.275f, 0.55f })
+                {
+                    Vector3 q = p + rt * lx + f * lz;
+                    low = Mathf.Min(low, HollowmereLayout.Ground(t, q.x, q.z));
+                }
+            float bottom = low - 0.1f - rowY, top = 0.10f;   // local y; the tread top is 0.16
+            if (bottom >= top - 0.05f) return;
+            if (_dressed == null) _dressed = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LK_Dressed.mat") ?? LookTestBuilder.Mat("sandstone");
+            float h = top - bottom;
+            GameObject blk = LookTestBuilder.Box(step, "StoneBlock", new Vector3(0f, bottom + h * 0.5f, 0.2695f), new Vector3(2f, h, 0.563f), _dressed, default, 2f);
+            Object.DestroyImmediate(blk.GetComponent<Collider>());
+            blk.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        // is there a LaneStep of the same lane one run downhill (dir -1) or uphill (dir +1) of this one, in the same column
+        static bool HasStepNeighbour(List<LaneKitRow> rows, LaneKitRow r, int dir)
+        {
+            float yaw = r.Yaw * Mathf.Deg2Rad;
+            float ex = r.X + Mathf.Sin(yaw) * LaneKitPlan.StepRun * dir, ez = r.Z + Mathf.Cos(yaw) * LaneKitPlan.StepRun * dir;
+            foreach (LaneKitRow o in rows)
+                if (o.Piece == LanePiece.LaneStep && o != r && o.Lane == r.Lane && Mathf.Abs(Mathf.DeltaAngle(o.Yaw, r.Yaw)) < 2f && (o.X - ex) * (o.X - ex) + (o.Z - ez) * (o.Z - ez) < 0.0225f) return true;
+            return false;
+        }
+
+        // The bottom step: its tread top may stand at most 0.04 m over the paving in front of it (sunk up to 0.17 m, so the rise to the next tread, at most 0.33 m, stays under the 0.4 m step offset;
+        // the collider moves with it). The top step: measured only (the tread meets the landing at the lane height). contactY: the ground level in front of the bottom riser.
+        static void SeatStepEnds(LaneKitRow r, TownLayout t, bool bottom, bool top, out float sink, out float contactY)
+        {
+            sink = 0f; contactY = float.NaN;
+            float yaw = r.Yaw * Mathf.Deg2Rad;
+            Vector3 f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)), rt = new Vector3(Mathf.Cos(yaw), 0f, -Mathf.Sin(yaw)), p = new Vector3(r.X, 0f, r.Z);
+            float tread = r.Y + 0.16f;
+            if (bottom)
+            {
+                float g = float.MinValue;
+                foreach (float lx in new[] { -0.8f, 0f, 0.8f }) { Vector3 q = p + rt * (lx * r.ScaleX) - f * 0.15f; g = Mathf.Max(g, HollowmereLayout.Ground(t, q.x, q.z)); }
+                contactY = g;
+                sink = Mathf.Clamp(tread - (g + 0.04f), 0f, 0.17f);
+                Debug.Log("SC HOLLOWMERE step bottom " + r.Id + " lane=" + r.Lane + " at=" + r.X.ToString("0.0") + "," + r.Y.ToString("0.00") + "," + r.Z.ToString("0.0") + " yaw=" + r.Yaw.ToString("0") + " treadAboveGround=" + (tread - g).ToString("0.000") + " sink=" + sink.ToString("0.000"));
+            }
+            if (top)
+            {
+                float g = float.MinValue;
+                foreach (float lx in new[] { -0.8f, 0f, 0.8f }) { Vector3 q = p + rt * (lx * r.ScaleX) + f * 0.75f; g = Mathf.Max(g, HollowmereLayout.Ground(t, q.x, q.z)); }
+                Debug.Log("SC HOLLOWMERE step top " + r.Id + " treadVsLanding=" + (tread - g).ToString("0.000"));
+            }
+        }
+
+        // soft dark contact strip on the ground where the bottom riser meets the paving: three stacked translucent quads (no collider, no shadows)
+        static void AddContactStrip(Transform step, float localGroundY)
+        {
+            if (_contact == null)
+            {
+                _contact = LookTestBuilder.Ensure(MaterialsFolder + "/M_LK_StepContact.mat", Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Universal Render Pipeline/Lit"));
+                _contact.SetColor("_BaseColor", new Color(0.05f, 0.04f, 0.03f, 0.15f));
+                _contact.SetFloat("_Surface", 1f); _contact.SetFloat("_Blend", 0f); _contact.SetFloat("_SrcBlend", 5f); _contact.SetFloat("_DstBlend", 10f);
+                _contact.SetFloat("_SrcBlendAlpha", 1f); _contact.SetFloat("_DstBlendAlpha", 10f); _contact.SetFloat("_ZWrite", 0f);
+                _contact.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); _contact.SetOverrideTag("RenderType", "Transparent"); _contact.renderQueue = 3000;
+                EditorUtility.SetDirty(_contact);
+            }
+            float[] depth = { 0.14f, 0.28f, 0.45f };
+            for (int i = 0; i < depth.Length; i++)
+            {
+                GameObject q = LookTestBuilder.Prim(step, "ContactStrip" + i, PrimitiveType.Quad, new Vector3(0f, localGroundY + 0.012f + i * 0.001f, -depth[i] * 0.5f - 0.01f), new Vector3(1.96f, depth[i], 1f), _contact);
+                q.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                q.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
         }
 
         // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
@@ -115,7 +199,7 @@ namespace SleepingCalamity.EditorTools
             {
                 Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
                 _nosing = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LK_StepNosing.mat") ?? LookTestBuilder.Mat("sandstone");
-                _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.13f, 0.12f, 0.10f), 0.1f, wear);
+                _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.025f, 0.022f, 0.018f), 0f, wear);
                 _treadShade.SetColor("_Color", _treadShade.GetColor("_BaseColor")); _treadShade.SetShaderPassEnabled("MotionVectors", true);
             }
             GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), Vector3.one, _nosing);
@@ -123,7 +207,7 @@ namespace SleepingCalamity.EditorTools
             n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // dark shade line at the back of the tread (under the next riser): sits wholly on the tread top, so it cannot float at the flight's edges
             // round 1 of stairs-traversal-3: a dark riser face limited to the visible 0.15 m above the tread below and inset from both flight edges (no skirt below, so no wedges)
-            GameObject ri = LookTestBuilder.Prim(step, "RiserFace", PrimitiveType.Cube, new Vector3(0f, 0.085f, -0.004f), new Vector3(1.92f, 0.15f, 0.012f), _treadShade);
+            GameObject ri = LookTestBuilder.Prim(step, "RiserFace", PrimitiveType.Cube, new Vector3(0f, 0.115f, -0.016f), new Vector3(1.96f, 0.045f, 0.006f), _treadShade);   // stairs seat 2: only a dark shade line under the nosing; the riser itself is the StoneBlock
             ri.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.48f), new Vector3(2f, 0.04f, 0.14f), _treadShade);
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;

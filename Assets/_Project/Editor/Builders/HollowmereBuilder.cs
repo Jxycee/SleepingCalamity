@@ -76,6 +76,9 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_PX_Cottage", new Vector3(3.0f, 1.65f, 8.5f), new Vector3(8f, 2.3f, 11.5f), 55f),     // A5: the cistern house's west front (door, shutters, the bar over the window), like b1
             ("Cap_HM_PX_Ivy", new Vector3(-8f, 0.8f, 6f), new Vector3(0f, 3.5f, 19.6f), 55f),             // A4: low, from the square's north-west corner along the keep wall's ivy
             ("Cap_HM_PX_Weeds", new Vector3(-9f, 0.9f, -6f), new Vector3(3f, 0.8f, 12f), 62f),            // A3: low and wide over the open square, the weeds at the walls and kerbs
+            ("Cap_HM_StairSide1", new Vector3(-41.2f, 0.8f, -33.5f), new Vector3(-45.6f, -5.0f, -31.0f), 60f),   // stairs seat: the Ring Lane south-west flight from its east side at 0.8 m (cheek, terrain meeting the treads)
+            ("Cap_HM_StairSide3", new Vector3(-40.0f, 0.8f, -37.5f), new Vector3(-45.0f, -5.0f, -30.0f), 60f),   // stairs seat 2: the same flight's foot from the south-east at 0.8 m, looking up it (bottom step meeting the paving, stone under the treads) (stone mass under the treads, bottom step meeting the paving)
+            ("Cap_HM_StairSide2", new Vector3(24.5f, 0.8f, 11.5f), new Vector3(19.2f, 1.2f, 16.0f), 60f),        // stairs seat: the keep's east flight from the east side at 0.8 m
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -381,12 +384,20 @@ namespace SleepingCalamity.EditorTools
                 Vector3 start = new Vector3(foot.Pos.X, 0f, foot.Pos.Z) + dir * (pitch * s);
                 float top = footY + r * (s + 1);
                 kit.Clone("StairStep", g, "Step" + s, new Vector3(start.x, top - r, start.z), yaw, new Vector3(width / 2f, r / 0.222f, pitch / 0.367f));
-                float bottom = footY - 0.3f, h = top - r - bottom;
+                float bottom = footY - 0.3f;
+                {   // stairs seat: carry the core down to the lowest ground under the flight's footprint (the west flight stands on a slope), 0.25 m buried
+                    float low = float.MaxValue;
+                    Vector3 sd2 = new Vector3(dir.z, 0f, -dir.x);
+                    foreach (float lx in new[] { -0.5f, 0f, 0.5f }) foreach (float lz in new[] { 0f, 0.5f, 1f })
+                    { Vector3 q = start + dir * (pitch * lz) + sd2 * (lx * (width + 0.4f)); low = Mathf.Min(low, HollowmereLayout.Ground(t, q.x, q.z)); }
+                    bottom = Mathf.Min(bottom, low - 0.25f);
+                }
+                float h = top - r - bottom;
                 if (h > 0.01f)
                 {
-                    var box = LookTestBuilder.Box(g, "Core" + s, start + dir * (pitch * 0.5f) + Vector3.up * (bottom + h * 0.5f), new Vector3(width - 0.2f, h, pitch + 0.02f),
+                    var box = LookTestBuilder.Box(g, "Core" + s, start + dir * (pitch * 0.5f) + Vector3.up * (bottom + h * 0.5f), new Vector3(width - 0.02f, h, pitch + 0.02f),
                         core ?? (core = kit.CoreMaterial()), new Vector3(0f, yaw, 0f), 2f);
-                    box.AddComponent<BoxCollider>().size = new Vector3(width - 0.2f, h, pitch + 0.02f);   // the solid under the treads
+                    box.AddComponent<BoxCollider>().size = new Vector3(width - 0.02f, h, pitch + 0.02f);   // the solid under the treads
                 }
             }
             float rake = kit.RakeSign();
