@@ -38,7 +38,7 @@ namespace SleepingCalamity.Presentation
         {
             public uint Seed; public int Floor;
             public ulong Chests, Pieces, Cleared;
-            public int PieceCount;      // pieces assigned to this floor by the haul (host-set at arm time; peers place that many spots)
+            public int PieceCount;      // this floor's pieces not already home (host-set at arm time; peers place that many spots; spot i = the i-th such piece id, not PieceId(floor, i))
             public bool RoomKeyHeld, DoorOpen, ExitUnlocked;
             public byte GateKey;        // 0 none yet, 1 lying at GateKeyPos, 2 taken
             public Vector3 GateKeyPos;
@@ -99,6 +99,7 @@ namespace SleepingCalamity.Presentation
         private DiveHaulSync _subscribedHaul;
         private readonly List<PlayerPos> _players = new List<PlayerPos>();
         private readonly List<PlayerPos> _rawPlayers = new List<PlayerPos>();   // unfiltered player positions for the spawn-safety guards
+        private readonly List<PlanePoint> _planePoints = new List<PlanePoint>();   // PlanePoints() cache (no per-frame allocation while the hunter waits to respawn)
         private readonly List<int> _pieceIds = new List<int>();                  // host: piece id of each spot (the floor's non-home pieces, ascending)
         private readonly Dictionary<ulong, Vector3> _armPos = new Dictionary<ulong, Vector3>();   // host: where each player stood when the floor was armed
         private readonly HashSet<ulong> _live = new HashSet<ulong>();                              // host: players seen inside the floor after moving away from _armPos
@@ -292,9 +293,9 @@ namespace SleepingCalamity.Presentation
 
         // Spawn-safety points: EVERY connected player's position, ignoring the downed (IsUp) and not-yet-live (FilterStale) filters of _players. A hunter that despawns during a wipe,
         // or an ambush that springs while a hero is down or still loading in, must not appear on top of one. (The carrier/warden spawns and the plan-cell fallback ignore players.)
-        private List<PlanePoint> PlanePoints()
+        private List<PlanePoint> PlanePoints()   // returns the shared cache: use it before the next call, never keep it
         {
-            _rawPlayers.Clear();
+            _rawPlayers.Clear(); _planePoints.Clear();
             if (PlayersOverride != null) PlayersOverride(_rawPlayers);
             else
                 foreach (KeyValuePair<ulong, NetworkClient> kv in NetworkManager.ConnectedClients)
@@ -302,9 +303,8 @@ namespace SleepingCalamity.Presentation
                     NetworkObject po = kv.Value.PlayerObject;
                     if (po != null) _rawPlayers.Add(new PlayerPos { ClientId = kv.Key, Position = po.transform.position });
                 }
-            var list = new List<PlanePoint>(_rawPlayers.Count);
-            foreach (PlayerPos p in _rawPlayers) { Vector3 l = _root.InverseTransformPoint(p.Position); list.Add(new PlanePoint(l.x, -l.z)); }
-            return list;
+            foreach (PlayerPos p in _rawPlayers) { Vector3 l = _root.InverseTransformPoint(p.Position); _planePoints.Add(new PlanePoint(l.x, -l.z)); }
+            return _planePoints;
         }
 
         // Where the gate key lies when its carrier died at `at`: the same spot unless that is inside a wall or off the walkable cells, then the nearest walkable cell's centre.
@@ -421,7 +421,7 @@ namespace SleepingCalamity.Presentation
             if (IsSpawned) Publish();
         }
 
-        // Pieces the haul assigned to `floor`: still to find plus already collected (banked or not). Falls back to the default counts without a running haul.
+        // Pieces the haul assigned to `floor` that are not already home: still to find plus already collected this run (banked or not). Falls back to the default counts without a running haul.
         private int PiecesForFloor(int floor)
         {
             if (floor < 1 || floor > DiveHaul.PieceFloors) return 0;
