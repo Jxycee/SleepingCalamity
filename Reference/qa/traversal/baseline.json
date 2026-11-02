@@ -22,19 +22,19 @@
         {
             "space": "Cellars_F1_s12345",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s12345",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 1,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s12345",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 2,
             "narrow": 0
         },
         {
@@ -46,19 +46,19 @@
         {
             "space": "Cellars_F1_s1",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 2,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s1",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s1",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 2,
             "narrow": 0
         },
         {
@@ -70,19 +70,19 @@
         {
             "space": "Cellars_F1_s2",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s2",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s2",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
@@ -94,7 +94,7 @@
         {
             "space": "Cellars_F1_s3",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
@@ -106,7 +106,7 @@
         {
             "space": "Cellars_F3_s3",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
@@ -118,19 +118,19 @@
         {
             "space": "Cellars_F1_s4",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s4",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 1,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s4",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
@@ -142,19 +142,19 @@
         {
             "space": "Cellars_F1_s5",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 1,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s5",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 1,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s5",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
@@ -166,19 +166,19 @@
         {
             "space": "Cellars_F1_s6",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s6",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s6",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 2,
             "narrow": 0
         },
         {
@@ -190,19 +190,19 @@
         {
             "space": "Cellars_F1_s7",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 1,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s7",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s7",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 2,
             "narrow": 0
         },
         {
@@ -214,13 +214,13 @@
         {
             "space": "Cellars_F1_s8",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s8",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 1,
             "narrow": 0
         },
         {
@@ -238,19 +238,19 @@
         {
             "space": "Cellars_F1_s9",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 3,
             "narrow": 0
         },
         {
             "space": "Cellars_F2_s9",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 2,
             "narrow": 0
         },
         {
             "space": "Cellars_F3_s9",
             "unreachable": [],
-            "blocked": 0,
+            "blocked": 2,
             "narrow": 0
         },
         {

@@ -37,7 +37,7 @@ namespace SleepingCalamity.Presentation
                     : special.Kind == SpecialKind.Shrine ? new Color(0.35f, 0.55f, 0.95f) : new Color(0.60f, 0.85f, 0.65f);
                 var root = new GameObject("SpecialRoom_" + special.Kind + "_r" + special.RoomIndex).transform; root.SetParent(group, false);
                 root.position = CellCenter(p.X + p.Width / 2, p.Y + p.Height / 2);
-                Prim(root, "Pillar", PrimitiveType.Cylinder, root.position + new Vector3(0, 1.5f, 0), new Vector3(0.5f, 1.5f, 0.5f), mats.Flat(c));
+                Prim(root, "Pillar", PrimitiveType.Cylinder, root.position + new Vector3(0, 1.5f, 0), new Vector3(0.5f, 1.5f, 0.5f), mats.Flat(c));   // greybox marker at the room centre: no collider (a 0.5 m post in line with a door narrows it to 0.5 m)
                 Prim(root, "Banner", PrimitiveType.Cube, root.position + new Vector3(0, 2.6f, 0), new Vector3(1.2f, 0.6f, 0.05f), mats.Flat(c));
                 result.SpecialMarkers++;
             }
@@ -130,7 +130,7 @@ namespace SleepingCalamity.Presentation
                     bool block = kind == ChunkCell.Block; float h = block ? 1.6f : 0.55f;
                     Color col = block ? new Color(0.36f, 0.32f, 0.28f) : new Color(0.52f, 0.42f, 0.30f);
                     Vector3 pos = CellCenter(cell.X, cell.Y);
-                    Prim(sub, name + "_" + cell.X + "x" + cell.Y, PrimitiveType.Cube, pos + new Vector3(0, h * 0.5f, 0), new Vector3(CellSize * 0.8f, h, CellSize * 0.8f), mats.Flat(col));
+                    Prim(sub, name + "_" + cell.X + "x" + cell.Y, PrimitiveType.Cube, pos + new Vector3(0, h * 0.5f, 0), new Vector3(CellSize * 0.8f, h, CellSize * 0.8f), mats.Flat(col)).AddComponent<BoxCollider>();   // floor-standing greybox: solid
                     result.ChunkPieces++;
                 }
             }
