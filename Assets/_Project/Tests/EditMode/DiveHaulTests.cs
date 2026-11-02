@@ -94,6 +94,31 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(s.SetFloor(5), Is.False); Assert.That(s.SetFloor(-1), Is.False);
         }
 
+        [Test] public void DiveState_BankPointHealsOncePerDive_UnlessSomethingNewWaits()
+        {
+            var s = new DiveState(Haul());
+            s.SetFloor(2);
+            Assert.That(s.BankAtPoint(), Is.True, "the first press banks (and heals)");
+            Assert.That(s.CanBankHere, Is.False);
+            Assert.That(s.BankAtPoint(), Is.False, "bank spam with nothing new is refused");
+            s.Haul.AddPiece(DiveHaul.PieceId(2, 0));
+            Assert.That(s.BankAtPoint(), Is.True, "a new piece can be banked");
+            Assert.That(s.BankAtPoint(), Is.False);
+            s.FailDive(); s.SetFloor(2);
+            Assert.That(s.BankAtPoint(), Is.True, "a new dive re-arms the bank point");
+        }
+
+        [Test] public void DiveState_StartFloor_ReturnDiveOnlyWhenFloors1And2AreDone()
+        {
+            var s = new DiveState(Haul());
+            s.SetFloor(2); s.BankAtPoint();
+            Assert.That(s.CheckpointReached, Is.True);
+            Assert.That(s.StartFloor, Is.EqualTo(1), "pieces are still on floors 1-2");
+            foreach (int f in new[] { 1, 2 }) for (int i = 0; i < s.Haul.PiecesLeft(f) + 10; i++) s.Haul.AddPiece(DiveHaul.PieceId(f, i));
+            Assert.That(s.Haul.PiecesLeft(1) + s.Haul.PiecesLeft(2), Is.EqualTo(0));
+            Assert.That(s.StartFloor, Is.EqualTo(3));
+        }
+
         [Test] public void DiveState_BankInTownNeedsTown()
         {
             var s = new DiveState(Haul());

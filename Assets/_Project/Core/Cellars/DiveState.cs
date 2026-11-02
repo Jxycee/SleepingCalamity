@@ -13,6 +13,13 @@ namespace SleepingCalamity.Core
         public bool CheckpointReached { get; private set; }
         public int ClearedMask { get; private set; }
 
+        private int _bankedMask;   // bank points used in the current dive (bit f-1); cleared when a dive starts or ends
+        public bool BankUsed(int floor) => floor >= 1 && floor <= MaxFloor && (_bankedMask & (1 << (floor - 1))) != 0;
+        // A bank press is free to heal and reset the stir only once per bank point per dive, unless something new waits to be banked.
+        public bool CanBankHere => FloorHasBank(CurrentFloor) && (!BankUsed(CurrentFloor) || Haul.UnbankedPieceCount > 0 || Haul.UnbankedLootCount > 0);
+        // The floor a new dive starts on: the checkpoint floor only once floors 1-2 are fully collected.
+        public int StartFloor => DiveRoute.StartFloor(CheckpointReached, Haul.PiecesLeft(1) + Haul.PiecesLeft(2));
+
         public StirMeter Stir { get; }   // floors cleared / unbanked pieces / banks feed it; town bank and failed dive reset it
 
         public DiveState(DiveHaul haul) : this(haul, StirTuning.Default) { }
@@ -23,6 +30,7 @@ namespace SleepingCalamity.Core
         public bool SetFloor(int floor)
         {
             if (floor < Town || floor > MaxFloor) return false;
+            if (CurrentFloor == Town || floor == Town) _bankedMask = 0;   // a dive starts or ends
             CurrentFloor = floor;
             return true;
         }
@@ -40,7 +48,8 @@ namespace SleepingCalamity.Core
         // Banks at the current floor's bank point. False (nothing changes) when this floor has none.
         public bool BankAtPoint()
         {
-            if (!FloorHasBank(CurrentFloor)) return false;
+            if (!CanBankHere) return false;
+            _bankedMask |= 1 << (CurrentFloor - 1);
             Haul.Bank();
             Stir.OnBank();
             if (CurrentFloor == CheckpointFloor) CheckpointReached = true;
@@ -62,6 +71,7 @@ namespace SleepingCalamity.Core
             Haul.FailDive();
             Stir.ResetAll();
             CurrentFloor = Town;
+            _bankedMask = 0;
         }
 
         // Save restore (M6 S2): the cleared floors and the checkpoint come back as saved. The party is in town, so the stir meter is not touched.

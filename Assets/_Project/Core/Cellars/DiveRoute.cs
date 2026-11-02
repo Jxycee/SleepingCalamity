@@ -9,6 +9,9 @@ namespace SleepingCalamity.Core
         // A fresh dive starts on floor 1; once the floor-2 checkpoint was reached in this session a return dive may start on floor 3.
         public static int StartFloor(bool checkpointReached) => checkpointReached ? ReturnFloor : FirstFloor;
 
+        // Nothing is missable (PHASE1 7.2): the return dive skips floors 1-2 only once the checkpoint was reached and every piece on them is collected; otherwise the dive starts on floor 1.
+        public static int StartFloor(bool checkpointReached, int piecesLeftOnFloors1And2) => StartFloor(checkpointReached && piecesLeftOnFloors1And2 <= 0);
+
         // The floor below `floor`, or 0 when there is none (the heart, the town, a bad id).
         public static int NextFloor(int floor) => floor >= FirstFloor && floor < LastFloor ? floor + 1 : 0;
 

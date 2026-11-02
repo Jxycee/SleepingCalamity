@@ -179,7 +179,7 @@ namespace SleepingCalamity.Core.Combat
         public bool Tick(float dt, bool reviverHolding)
         {
             if (State != VitalState.Downed) return false;
-            DownedLeft -= dt;
+            if (!reviverHolding) DownedLeft -= dt;   // an ally holding the revive pauses the countdown, so a hold started late still finishes
             if (reviverHolding)
             {
                 ReviveProgress += dt;

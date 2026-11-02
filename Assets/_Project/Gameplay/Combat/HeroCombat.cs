@@ -648,15 +648,18 @@ namespace SleepingCalamity.Gameplay
             _reviveReport -= dt;
             if (!intent.InteractHeld || _reviveReport > 0f) return;
             IReadOnlyList<HeroVitals> all = HeroVitals.All;
+            HeroVitals best = null; float bestSq = HeroVitals.ReviveReach * HeroVitals.ReviveReach;
             for (int i = 0; i < all.Count; i++)
             {
                 HeroVitals v = all[i];
                 if (v == null || !v.IsSpawned || v == _vitals || v.NetworkManager != NetworkManager || !v.IsDowned) continue;
-                if ((v.transform.position - transform.position).sqrMagnitude > HeroVitals.ReviveReach * HeroVitals.ReviveReach) continue;
-                _reviveReport = 0.2f;
-                ReviveHoldServerRpc(v.NetworkObjectId);
-                return;
+                float sq = (v.transform.position - transform.position).sqrMagnitude;
+                if (sq > bestSq) continue;
+                best = v; bestSq = sq;   // the nearest downed hero in reach, not the first in the list
             }
+            if (best == null) return;
+            _reviveReport = 0.2f;
+            ReviveHoldServerRpc(best.NetworkObjectId);
         }
 
         [Rpc(SendTo.Server)]

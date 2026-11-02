@@ -14,6 +14,14 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void StartFloor_ReturnDiveNeedsFloors1And2FullyCollected()
+        {
+            Assert.That(DiveRoute.StartFloor(true, 0), Is.EqualTo(3));
+            Assert.That(DiveRoute.StartFloor(true, 1), Is.EqualTo(1), "a piece left on floors 1-2 sends the dive back to floor 1");
+            Assert.That(DiveRoute.StartFloor(false, 0), Is.EqualTo(1));
+        }
+
+        [Test]
         public void NextFloor_StairsRunOneToFour_NoneBelowTheHeartOrOutsideTheDive()
         {
             Assert.That(DiveRoute.NextFloor(1), Is.EqualTo(2));

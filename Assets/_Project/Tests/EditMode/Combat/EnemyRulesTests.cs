@@ -118,6 +118,18 @@ namespace SleepingCalamity.Tests.EditMode
         // ---- downed and revive ----
 
         [Test]
+        public void Downed_HoldStartedWithUnderThreeSecondsLeft_StillRevives()
+        {
+            var v = new PlayerVitals();
+            v.Damage(100, out _);
+            for (int i = 0; i < 19 * 60 + 30; i++) v.Tick(1f / 60f, false);   // 19.5 s down, about 0.5 s left
+            Assert.That(v.State, Is.EqualTo(VitalState.Downed));
+            bool revived = false;
+            for (int i = 0; i < 4 * 60 && !revived; i++) revived = v.Tick(1f / 60f, true);
+            Assert.That(revived, Is.True, "the countdown waits while an ally holds the revive");
+        }
+
+        [Test]
         public void Downed_AtZeroHp_RevivesAfterAThreeSecondHold()
         {
             var v = new PlayerVitals();
