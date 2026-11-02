@@ -56,7 +56,6 @@ namespace SleepingCalamity.Core.Combat
         private readonly Func<float> _rand;     // 0..1, the host's Random.value
         private float _tokenRetry;              // seconds before asking for a token again after a refusal
         private bool _waiting;                  // refused last time: hover and strafe instead of closing in
-        private float _strafeSign = 1f;
         private int _attacksSinceSignature;     // elite: its signature comes after AttackPacing.SignatureEvery other attacks
 
         private readonly EnemyDefinition _def;
@@ -86,14 +85,15 @@ namespace SleepingCalamity.Core.Combat
         }
 
         // The hover ring, held inside the enemy's own reach so a waiting enemy never drifts out of range of every attack (it would drop "waiting", close in, be refused and drift out again).
-        private float _ringFor = float.NaN;
+        private float _ringFor = float.NaN, _maxRing;
         private float RingFor(EnemyDefinition def)
         {
             if (float.IsNaN(_ringFor))
             {
                 float reach = 0f;
                 for (int i = 0; i < def.Attacks.Length; i++) reach = Math.Max(reach, EnemyAttackChooser.Reach(def.Attacks[i]));
-                _ringFor = Math.Min(def.PreferredRing, Math.Max(def.Radius + 1.0f, reach - 0.3f));
+                _maxRing = Math.Max(def.Radius + 1.0f, reach - 0.3f);
+                _ringFor = Math.Min(def.PreferredRing, _maxRing);
             }
             return _ringFor;
         }
@@ -156,7 +156,6 @@ namespace SleepingCalamity.Core.Combat
                     return a;
                 }
                 _tokenRetry = pacing.RetrySeconds * (1f + 0.5f * _rand());
-                if (!_waiting) _strafeSign = _rand() < 0.5f ? -1f : 1f;
                 _waiting = true;
             }
             float denom = Math.Max(0.001f, dist);
@@ -171,8 +170,8 @@ namespace SleepingCalamity.Core.Combat
                 var q = new RingRequest
                 {
                     SelfId = c.SelfId, HeroId = t.Id, HeroX = t.X, HeroZ = t.Z, FrontX = t.FaceX, FrontZ = t.FaceZ, SelfX = c.SelfX, SelfZ = c.SelfZ,
-                    Ring = ring, CircleSpeed = speed * c.Def.CircleSpeedScale, FlipMin = c.Def.StrafeFlipMin, FlipMax = c.Def.StrafeFlipMax,
-                    SeparationRadius = sepR, InitialSign = _strafeSign, Now = c.Time, Dt = c.Dt, InBounds = c.InBounds,
+                    Ring = ring, MaxRing = _maxRing, CircleSpeed = speed * c.Def.CircleSpeedScale, FlipMin = c.Def.StrafeFlipMin, FlipMax = c.Def.StrafeFlipMax,
+                    SeparationRadius = sepR, InitialSign = 0f, Now = c.Time, Dt = c.Dt, InBounds = c.InBounds,
                 };
                 RingResult r = _rings.Plan(in q);
                 float tx = r.SlotX - c.SelfX, tz = r.SlotZ - c.SelfZ;

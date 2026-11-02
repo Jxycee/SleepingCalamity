@@ -479,6 +479,7 @@ namespace SleepingCalamity.Gameplay
             _crowds.Clear();
             Tokens.Clear();
             Targets.Clear();
+            Rings.Clear();
         }
 
         // Test hook (the bot playtester): clear the arena and count down into `wave` (e.g. 5, the first tier-2 wave).

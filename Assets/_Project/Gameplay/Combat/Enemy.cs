@@ -285,7 +285,14 @@ namespace SleepingCalamity.Gameplay
             // Threat targeting (stage 3): locked while telling or striking, so a target switch never happens mid-attack.
             HeroVitals target = PickTarget(dt, locked: Phase == EnemyPhase.Attack);
             if (_cooldown > 0f) _cooldown -= dt;
-            if (Phase == EnemyPhase.Attack) { ServerAdvanceAttack(dt, target); return; }
+            if (Phase == EnemyPhase.Attack)
+            {
+                // a striker keeps reporting where it is, so the others do not hover around a ghost at its last chase position
+                Vector3 sp = transform.position;
+                Rings.Observe(GetHashCode(), sp.x, sp.z, Def.SeparationRadius, Time.timeAsDouble, out _, out _);
+                ServerAdvanceAttack(dt, target);
+                return;
+            }
             if (target == null) { ServerReturnHome(dt); return; }
             _homeWalk = 0f;
 
@@ -305,6 +312,29 @@ namespace SleepingCalamity.Gameplay
             FaceToward(new Vector3(act.FaceX, 0f, act.FaceZ), act.FaceDegPerSec, dt);
             if (act.StartAttack != null) { ServerStartAttack(act.StartAttack, target.transform.position); return; }
             if (act.MoveSpeed > 0f) MoveHorizontal(new Vector3(act.MoveX, 0f, act.MoveZ), act.MoveSpeed, dt);
+            ServerResolveOverlap();
+        }
+
+        // Host: a hard floor under the soft separation. Another enemy closer than the two bodies touching (radius sum) is pushed out by half the overlap (the
+        // other pushes the rest on its own tick); a strike in progress is never shoved. Skips a push that would end inside a wall.
+        private void ServerResolveOverlap()
+        {
+            Vector3 p = transform.position;
+            Vector3 push = Vector3.zero;
+            for (int i = 0; i < s_all.Count; i++)
+            {
+                Enemy o = s_all[i];
+                if (o == this || o == null || !o.IsSpawned || !o.Alive || o.NetworkManager != NetworkManager) continue;
+                Vector3 d = p - o.transform.position; d.y = 0f;
+                float min = Def.Radius + o.Def.Radius + 0.04f;
+                float m2 = d.sqrMagnitude;
+                if (m2 >= min * min) continue;
+                if (m2 < 1e-6f) { float a = GetHashCode() * 2.399963f; d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)); m2 = 1f; }
+                float mag = Mathf.Sqrt(m2);
+                push += d / mag * ((min - mag) * (o.Phase == EnemyPhase.Attack ? 1f : 0.5f));
+            }
+            if (push.sqrMagnitude < 1e-8f || Blocked(p + push)) return;
+            transform.position = p + push;
         }
 
         // Host: forget the current target and its ledger entry.

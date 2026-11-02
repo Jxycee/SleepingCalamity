@@ -27,7 +27,9 @@ namespace SleepingCalamity.Core.Combat
         public float StaleSeconds = 1.0f;       // an enemy that stopped reporting for this long no longer holds a slot
         public float SlotFollowRange = 1.5f;    // the slot only drifts (circles) while its enemy is within this of it, so it never runs away
         public float SeparationGain = 3.0f;     // weight of the separation push against the move toward the slot
-        public float MinRingMeters = 1.8f;      // a room-clamped ring never shrinks below this
+        public float MinRingMeters = 1.8f;      // a room-clamped ring never shrinks below this (unless the room needs less to hold the slot)
+        public float BlockedSeconds = 0.5f;     // an enemy that moved less than BlockedMeters over this long counts as blocked (a collider on the way)
+        public float BlockedMeters = 0.15f;
 
         public static readonly RingTuning Default = new RingTuning();
     }
@@ -39,6 +41,7 @@ namespace SleepingCalamity.Core.Combat
         public float FrontX, FrontZ;        // the hero's facing (flat); zero: no front arc rule
         public float SelfX, SelfZ;
         public float Ring;                  // preferred ring radius (m)
+        public float MaxRing;               // outermost ring a spill may reach (the enemy's attack reach); 0: no cap. Past it the slots pack tighter instead
         public float CircleSpeed;           // m/s along the ring
         public float FlipMin, FlipMax;      // strafe flip interval (s)
         public float SeparationRadius;      // m
@@ -67,6 +70,7 @@ namespace SleepingCalamity.Core.Combat
             public double Seen = double.NegativeInfinity;       // last report of any kind (separation)
             public double SlotSeen = double.NegativeInfinity;   // last report as a hoverer (holds a slot)
             public float Angle, Pref, Eff, Sign = 1f;
+            public float ChkX, ChkZ; public double ChkAt = double.NegativeInfinity; public bool Blocked;   // progress check: no movement for BlockedSeconds frees the slot to drift
             public double FlipAt;
             public Pcg32 Rng;
         }
@@ -134,6 +138,7 @@ namespace SleepingCalamity.Core.Combat
                 m.Hero = q.HeroId;
                 m.Order = ++_seq;
                 m.Angle = (float)Math.Atan2(q.SelfZ - q.HeroZ, q.SelfX - q.HeroX);   // the free slot nearest where it came from
+                m.ChkAt = q.Now; m.ChkX = q.SelfX; m.ChkZ = q.SelfZ; m.Blocked = false;
                 m.Sign = q.InitialSign != 0f ? (q.InitialSign < 0f ? -1f : 1f) : (m.Rng.NextFloat() < 0.5f ? -1f : 1f);
                 m.FlipAt = q.Now + m.Rng.Range(q.FlipMin, Math.Max(q.FlipMin + 0.001f, q.FlipMax));
             }
@@ -155,12 +160,19 @@ namespace SleepingCalamity.Core.Combat
                 if (Math.Abs(o.Pref - m.Pref) < _t.RingStep * 0.5f) rank++;
             }
             float ring = m.Pref + (rank / Math.Max(1, _t.MaxPerRing)) * _t.RingStep;
+            if (q.MaxRing > 0f) ring = Math.Max(m.Pref, Math.Min(ring, q.MaxRing));   // out of reach there is no point: the ring packs tighter (smaller gap below) instead
             m.Eff = ring;
 
             // Circle: the slot drifts along the ring while its enemy keeps up.
             float sx = q.HeroX + (float)Math.Cos(m.Angle) * ring, sz = q.HeroZ + (float)Math.Sin(m.Angle) * ring;
             float fx = sx - q.SelfX, fz = sz - q.SelfZ;
-            if (fx * fx + fz * fz <= _t.SlotFollowRange * _t.SlotFollowRange)
+            if (q.Now - m.ChkAt >= _t.BlockedSeconds)
+            {
+                float cx = q.SelfX - m.ChkX, cz = q.SelfZ - m.ChkZ;
+                m.Blocked = cx * cx + cz * cz < _t.BlockedMeters * _t.BlockedMeters && fx * fx + fz * fz > 0.09f;   // not moving and not yet at the slot
+                m.ChkAt = q.Now; m.ChkX = q.SelfX; m.ChkZ = q.SelfZ;
+            }
+            if (m.Blocked || fx * fx + fz * fz <= _t.SlotFollowRange * _t.SlotFollowRange)   // a blocked enemy keeps its slot drifting so it finds another way round
                 m.Angle = Wrap(m.Angle + m.Sign * (q.CircleSpeed / Math.Max(0.5f, ring)) * q.Dt);
 
             // Peers on this ring band.
@@ -201,6 +213,12 @@ namespace SleepingCalamity.Core.Combat
                 for (int i = 0; i < 4 && !q.InBounds(px, pz) && r > _t.MinRingMeters; i++)
                 {
                     r = Math.Max(_t.MinRingMeters, r * 0.8f);
+                    px = q.HeroX + (float)Math.Cos(m.Angle) * r; pz = q.HeroZ + (float)Math.Sin(m.Angle) * r;
+                }
+                // Still outside (a corner, a bay): the nearest in-room point on the line toward the hero, even closer than the minimum ring.
+                for (int i = 0; i < 12 && !q.InBounds(px, pz) && r > 0.3f; i++)
+                {
+                    r = Math.Max(0.3f, r - 0.3f);
                     px = q.HeroX + (float)Math.Cos(m.Angle) * r; pz = q.HeroZ + (float)Math.Sin(m.Angle) * r;
                 }
             }
