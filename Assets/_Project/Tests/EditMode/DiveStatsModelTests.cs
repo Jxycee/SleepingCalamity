@@ -29,6 +29,64 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Heal_HpFirstThenLoaf_IsOne()
+        {
+            var m = new DiveStatsModel();
+            m.Observe(0, true, 1, 50, 2, 0);
+            m.Observe(1.0, true, 1, 80, 2, 0);
+            m.Observe(1.1, true, 1, 80, 1, 0);
+            Assert.That(m.HealsUsed, Is.EqualTo(1));
+            Assert.That(m.LoavesEaten, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Heal_LoafFirstThenHp_IsOne()
+        {
+            var m = new DiveStatsModel();
+            m.Observe(0, true, 1, 50, 2, 0);
+            m.Observe(1.0, true, 1, 50, 1, 0);
+            m.Observe(1.1, true, 1, 80, 1, 0);
+            Assert.That(m.HealsUsed, Is.EqualTo(1));
+            Assert.That(m.LoavesEaten, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Heal_SameFrame_IsOne()
+        {
+            var m = new DiveStatsModel();
+            m.Observe(0, true, 1, 50, 2, 0);
+            m.Observe(1.0, true, 1, 80, 1, 0);
+            m.Observe(2.0, true, 1, 80, 1, 0);
+            Assert.That(m.HealsUsed, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Heal_LoneHpRise_StaysNonLoafAfterWindow()
+        {
+            var m = new DiveStatsModel();
+            m.Observe(0, true, 1, 50, 2, 0);
+            m.Observe(1.0, true, 1, 80, 2, 0);
+            m.Observe(3.0, true, 1, 80, 2, 0);
+            Assert.That(m.HealsUsed, Is.EqualTo(1));
+            Assert.That(m.LoavesEaten, Is.EqualTo(0));
+            m.Observe(3.1, true, 1, 80, 1, 0);   // a later loaf drop is its own heal
+            Assert.That(m.HealsUsed, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Heal_TwoLoafHealsTwoSecondsApart_AreTwo()
+        {
+            var m = new DiveStatsModel();
+            m.Observe(0, true, 1, 40, 3, 0);
+            m.Observe(1.0, true, 1, 40, 2, 0);
+            m.Observe(1.1, true, 1, 70, 2, 0);
+            m.Observe(3.0, true, 1, 70, 1, 0);
+            m.Observe(3.1, true, 1, 100, 1, 0);
+            Assert.That(m.HealsUsed, Is.EqualTo(2));
+            Assert.That(m.LoavesEaten, Is.EqualTo(2));
+        }
+
+        [Test]
         public void NewDive_Resets()
         {
             var m = new DiveStatsModel();

@@ -216,14 +216,7 @@ namespace SleepingCalamity.EditorTools
             string folder = Folder + "/" + asset;
             GameObject fbx = BeautyCornerArt.LoadModel(folder, asset + ".fbx", keepMaterialSlots: true);
             if (fbx == null) return null;
-            // A first import can hand back the prefab built before the importer settings applied (every slot the default "Lit"): reimport once.
-            Renderer probe = fbx.GetComponentInChildren<Renderer>(true);
-            if (probe != null && probe.sharedMaterials.Length > 0 && probe.sharedMaterials[0] != null && probe.sharedMaterials[0].name == "Lit")
-            {
-                string path = folder + "/" + asset + ".fbx";
-                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-                fbx = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            }
+            fbx = HollowmereClutter.ReimportIfDefaultLit(fbx, folder + "/" + asset + ".fbx", "garden " + asset);
             Loaded[asset] = fbx;
             return fbx;
         }
