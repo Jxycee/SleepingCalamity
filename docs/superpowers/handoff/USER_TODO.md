@@ -9,6 +9,7 @@ Main will be checked and quiet before you start (the coordinator holds Asset mer
 3. **2-player items with Multiplayer Play Mode** (two editors, no second person needed): 3c steps 13-17, then 3b's netcode-only checks. Item 3 (real Relay with a friend) can wait.
 4. **Read and answer:** the 6 open questions in `docs/design/m7-proposal.md` section 3 (they shape M7 S2-S8).
 5. **If time:** the Mixamo clips (item 1).
+Tip: **F4** toggles the dev overlay (dive time, damage taken, heals, loaves, stir, per-room clear times; editor/dev builds only). Note anything it shows that feels off.
 Tell the coordinator every surprise, a lying prompt, a stuck spot or a crash (paste the console line).
 
 ## Now (unblocks Phase 1 work)
