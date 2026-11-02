@@ -131,13 +131,13 @@ namespace SleepingCalamity.EditorTools
             go.transform.SetParent(parent, false);
             go.transform.position = pos; go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
             go.transform.localScale = new Vector3(mirror ? -scale.x : scale.x, scale.y, scale.z);
-            if (k.Meshes.Length == 1 && k.Local[0].isIdentity) Attach(go, k.Meshes[0]);
+            if (k.Meshes.Length == 1 && k.Local[0].isIdentity) Attach(go, k.Meshes[0], kit);
             else
                 for (int i = 0; i < k.Meshes.Length; i++)
                 {
                     var c = new GameObject("m" + i); c.transform.SetParent(go.transform, false);
                     c.transform.localPosition = k.Local[i].GetColumn(3); c.transform.localRotation = k.Local[i].rotation; c.transform.localScale = k.Local[i].lossyScale;
-                    Attach(c, k.Meshes[i]);
+                    Attach(c, k.Meshes[i], kit);
                 }
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
             cur.Objects++; cur.Tris += k.Tris;
@@ -146,10 +146,10 @@ namespace SleepingCalamity.EditorTools
 
         static GameObject Put(Transform parent, string kit, Vector3 pos, float yaw, float scale, bool mirror = false) => Put(parent, kit, pos, yaw, Vector3.one * scale, mirror);
 
-        static void Attach(GameObject go, Mesh mesh)
+        static void Attach(GameObject go, Mesh mesh, string kit)
         {
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = mat;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = kit.Contains("Ivy") ? IvyMaterial() : mat;
             r.shadowCastingMode = ShadowCastingMode.On; r.receiveShadows = true;
         }
 
@@ -389,6 +389,20 @@ namespace SleepingCalamity.EditorTools
             cur = null;
         }
 
+        // A4: the wall ivy in the muted 3.1 palette (the atlas's lime young-leaf tone read as flat bright cards): a tinted copy of the foliage material, one shared asset so the ring still
+        // instances. Lower value and saturation: sage-olive (0.62, 0.68, 0.50) multiplies the atlas.
+        static Material ivyMat;
+        static Material IvyMaterial()
+        {
+            if (ivyMat != null) return ivyMat;
+            ivyMat = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/Hollowmere/M_HM_WallIvy.mat", mat.shader);
+            ivyMat.CopyPropertiesFromMaterial(mat);
+            ivyMat.SetColor("_BaseColor", new Color(0.62f, 0.68f, 0.50f, 1f));
+            ivyMat.enableInstancing = true;
+            EditorUtility.SetDirty(ivyMat);
+            return ivyMat;
+        }
+
         // The far hedge's leaf cards in a darker, deeper green than the wall ivy (the ivy atlas's bright young-leaf tone read as a light strip at 120 m):
         // a copy of the foliage material with a tint, one shared asset so the ring still instances.
         static Material hedgeMat;
@@ -442,10 +456,11 @@ namespace SleepingCalamity.EditorTools
                     if (Blocked(t, p.X, p.Z, f, 0.1f)) continue;
                     Put(g, "Grass_Strip", new Vector3(p.X, y, p.Z), yaw + R(rng, -5f, 5f), ruined ? R(rng, 0.95f, 1.25f) : R(rng, 0.85f, 1.0f));
                 }
-                int weeds = Mathf.RoundToInt(f.Side / (ruined ? 2.2f : 4.5f) * (ruined ? 0.85f : 0.6f));
+                int weeds = Mathf.RoundToInt(f.Side / (ruined ? 2.2f : 4.5f) * (ruined ? 0.85f : 0.3f));   // A3: a tended (Rebuilt) lot keeps about a third of the weeds it had
+                float c1 = R(rng, -half + 0.8f, half - 0.8f), c2 = R(rng, -half + 0.8f, half - 0.8f);       // A3: weeds grow in a clump or two along the wall foot, not evenly
                 for (int k = 0; k < weeds; k++)
                 {
-                    float u = R(rng, -half + 0.4f, half - 0.4f);
+                    float u = Mathf.Clamp((k % 2 == 0 ? c1 : c2) + R(rng, -0.7f, 0.7f), -half + 0.4f, half - 0.4f);
                     if (door && Mathf.Abs(u) < 1.5f) continue;
                     TownPoint p = At(u, R(rng, 0.1f, ruined ? 0.35f : 0.22f));
                     if (Blocked(t, p.X, p.Z, f, 0.1f)) continue;
@@ -567,7 +582,17 @@ namespace SleepingCalamity.EditorTools
             float localYaw = YawFacing(n.x, n.z);
             Vector3 right = Quaternion.Euler(0f, localYaw, 0f) * Vector3.right;
             bool mirror = denseToward != Vector3.zero && Vector3.Dot(right, denseToward) > 0f;
-            Put(parent, kit, pos, l.Footprint.Yaw + localYaw, scale, mirror);
+            // A4: size, width and lean vary per placement (a position hash, so builds match); a facade climber also lets a trailing strand hang from its top.
+            uint h = Hash((uint)Mathf.RoundToInt(pos.x * 37f + 40000f), (uint)Mathf.RoundToInt(pos.z * 37f + 40000f + ly * 11f));
+            float v1 = (h % 1000u) / 1000f, v2 = ((h >> 10) % 1000u) / 1000f, v3 = ((h >> 20) % 1000u) / 1000f;
+            float s1 = scale * (0.8f + 0.5f * v1);
+            Put(parent, kit, pos, l.Footprint.Yaw + localYaw + (v3 - 0.5f) * 14f, new Vector3(s1 * (0.8f + 0.45f * v2), s1 * (0.9f + 0.3f * v3), s1), mirror);
+            if (kit == "Ivy_Facade" && kits.ContainsKey("Lintel_Ivy"))
+            {
+                float top = kits["Ivy_Facade"].Bounds.max.y * s1;
+                Vector3 hang = pos + lr * (Vector3.Cross(Vector3.up, n).normalized * ((v2 - 0.5f) * 1.2f)) + Vector3.up * (top * (0.85f + 0.12f * v1)) + lr * (n * 0.06f);
+                Put(parent, "Lintel_Ivy", hang, l.Footprint.Yaw + localYaw + (v1 - 0.5f) * 20f, new Vector3(0.55f + 0.35f * v3, 0.9f + 0.7f * v2, 0.7f), v1 > 0.5f);
+            }
         }
 
         static void LandmarkIvy(Transform parent, TownLayout t, Landmark l, bool ruined)
