@@ -1,10 +1,10 @@
-Status: IN PROGRESS (cloud check fix)
+Status: IDLE (cloud check fixed and merged; waiting for next task)
 Session: Cloud Tasker (cloud, session_01RaNwcfvALfNsnFMLqaHdFr)
 Branch: claude/dazzling-tesla-m54kg2 (docs on main; fix on claude/overlay-heal-count)
-Tip: claude/overlay-heal-count 18a20f7; claude/lit-guard aadc3b9; claude/stall-lods 2486f8a
-Check: needs PC check on all three (cloud Editor/UI/Test assemblies fail on TextMeshPro/PrimeTween packages, same on main); stall-lods also needs a PC capture
-Now: cloud check: sc_cloud_compile fixed (11/11 OK; was 5 FAIL on TMP/PrimeTween) on claude/cloud-check 1ba4aae; proof unity.sh check on main content running; measuring Library/disk
-Next: disk preflight in unity.sh + cloud-environment.md findings; merge claude/cloud-check (tools only)
-WaitingOn: PC checks (overlay merging; lit-guard + stall-lods after the test). lit-guard and overlay-heal-count compile 11/11 with the fixed script
+Tip: main (claude/cloud-check merged); waiting branches: claude/lit-guard aadc3b9, claude/stall-lods 2486f8a
+Check: cloud unity.sh check PASS on 2522c96 (= main Unity trees): build PASS, EditMode 1211/1211, PlayMode 116/0 fail/19 skip. lit-guard + overlay-heal-count compile 11/11 in the cloud
+Now: idle
+Next: coordinator to route. Open from cloud check: builder float churn in 3 scenes on Linux builds; StairHandover Rtt150Loss2 flake (= F4, dive-flow); see cloud-environment.md section 5
+WaitingOn: PC check + capture for lit-guard and stall-lods after the test
 HoldsPort: no
-Needs: nothing
+Needs: nothing (no environment or secret change needed)
