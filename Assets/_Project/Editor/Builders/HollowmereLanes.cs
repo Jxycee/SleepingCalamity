@@ -28,7 +28,8 @@ namespace SleepingCalamity.EditorTools
             ("LK_Rubble", "sandstone", new Color(0.57f, 0.60f, 0.66f), 0.8f), ("LK_Dressed", "sandstone", new Color(1.00f, 0.95f, 0.86f), 0.8f),   // A6: flatter relief (were 1.5, 1.3)
             ("LK_Mortar", "sandstone", new Color(0.26f, 0.245f, 0.21f), 0.6f), ("LK_Oak", "oak_timber", new Color(0.80f, 0.76f, 0.72f), 1.2f),
             ("LK_GatePaint", "painted_wood", new Color(0.66f, 0.72f, 0.28f), 1.0f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
-            ("LK_GutterStone", "sandstone", new Color(0.50f, 0.48f, 0.44f), 1.5f),   // gutter channel: LK_Mortar read as a near-black ribbon
+            ("LK_GutterStone", "sandstone", new Color(0.50f, 0.48f, 0.44f), 1.5f),
+            ("LK_StepNosing", "sandstone", new Color(0.60f, 0.56f, 0.48f), 0.5f),   // stair nosing: the sandstone PBR set, lighter and worn against the tread (tint lifted, soft relief), metres UVs from NosingMesh   // gutter channel: LK_Mortar read as a near-black ribbon
         };
 
         // Local box (centre, size) of each piece at the contract extents: the greybox mesh, and the collider of walls, piers and steps.
@@ -113,12 +114,12 @@ namespace SleepingCalamity.EditorTools
             if (_nosing == null)
             {
                 Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
-                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.22f, 0.20f, 0.16f), 0.10f, wear);   // stairs-traversal-3 r3: linear 0.22 (reads ~0.5 gamma), matte; the 0.906 in the old .mat was never rebuilt, so r1/r2 frames still showed the blown-out white
-                _nosing.SetColor("_Color", _nosing.GetColor("_BaseColor")); _nosing.SetShaderPassEnabled("MotionVectors", true);
+                _nosing = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LK_StepNosing.mat") ?? LookTestBuilder.Mat("sandstone");
                 _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.13f, 0.12f, 0.10f), 0.1f, wear);
                 _treadShade.SetColor("_Color", _treadShade.GetColor("_BaseColor")); _treadShade.SetShaderPassEnabled("MotionVectors", true);
             }
-            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), new Vector3(2f, 0.04f, 0.24f), _nosing);
+            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), Vector3.one, _nosing);
+            n.GetComponent<MeshFilter>().sharedMesh = NosingMesh();
             n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // dark shade line at the back of the tread (under the next riser): sits wholly on the tread top, so it cannot float at the flight's edges
             // round 1 of stairs-traversal-3: a dark riser face limited to the visible 0.15 m above the tread below and inset from both flight edges (no skirt below, so no wedges)
@@ -126,6 +127,30 @@ namespace SleepingCalamity.EditorTools
             ri.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.48f), new Vector3(2f, 0.04f, 0.14f), _treadShade);
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        // 2 x 0.04 x 0.24 m box, five faces (no underside), UVs in metres (one tile per NosingTileMetres) so the stone is not stretched across the thin strip.
+        const float NosingTileMetres = 1f;
+        static Mesh _nosingMesh;
+        static Mesh NosingMesh()
+        {
+            if (_nosingMesh != null) return _nosingMesh;
+            const float hx = 1f, hy = 0.02f, hz = 0.12f, t = NosingTileMetres;
+            var v = new List<Vector3>(); var uv = new List<Vector2>(); var tri = new List<int>();
+            void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 n, Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud)
+            {
+                int i = v.Count; v.Add(a); v.Add(b); v.Add(c); v.Add(d); uv.Add(ua / t); uv.Add(ub / t); uv.Add(uc / t); uv.Add(ud / t);
+                Vector3 cr = Vector3.Cross(b - a, c - a);
+                if (Vector3.Dot(cr, n) >= 0f) tri.AddRange(new[] { i, i + 1, i + 2, i, i + 2, i + 3 }); else tri.AddRange(new[] { i, i + 2, i + 1, i, i + 3, i + 2 });
+            }
+            Quad(new Vector3(-hx, hy, -hz), new Vector3(-hx, hy, hz), new Vector3(hx, hy, hz), new Vector3(hx, hy, -hz), Vector3.up, new Vector2(0, 0), new Vector2(0, 2 * hz), new Vector2(2 * hx, 2 * hz), new Vector2(2 * hx, 0));
+            Quad(new Vector3(-hx, -hy, -hz), new Vector3(-hx, hy, -hz), new Vector3(hx, hy, -hz), new Vector3(hx, -hy, -hz), Vector3.back, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hx, 2 * hy), new Vector2(2 * hx, 0));
+            Quad(new Vector3(-hx, -hy, hz), new Vector3(-hx, hy, hz), new Vector3(hx, hy, hz), new Vector3(hx, -hy, hz), Vector3.forward, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hx, 2 * hy), new Vector2(2 * hx, 0));
+            Quad(new Vector3(-hx, -hy, -hz), new Vector3(-hx, hy, -hz), new Vector3(-hx, hy, hz), new Vector3(-hx, -hy, hz), Vector3.left, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hz, 2 * hy), new Vector2(2 * hz, 0));
+            Quad(new Vector3(hx, -hy, -hz), new Vector3(hx, hy, -hz), new Vector3(hx, hy, hz), new Vector3(hx, -hy, hz), Vector3.right, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hz, 2 * hy), new Vector2(2 * hz, 0));
+            _nosingMesh = new Mesh { name = "LK_StepNosingBox", vertices = v.ToArray(), uv = uv.ToArray(), triangles = tri.ToArray() };
+            _nosingMesh.RecalculateNormals(); _nosingMesh.RecalculateTangents(); _nosingMesh.RecalculateBounds();
+            return _nosingMesh;
         }
 
         static string Family(LaneKitRow r)
