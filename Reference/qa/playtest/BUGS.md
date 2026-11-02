@@ -21,7 +21,7 @@ Collision and layout bugs from the traversal scan (rebuilt buildings, chests and
 - **FIXED, dive flow d6154e73:** 3 floors 1-2 lost, 4 bank spam, 5 downed hero actions, 9 chest farming (fresh seed per dive), 10 same seed, 11 locked stair prompt, 14 short revive.
 - **MITIGATED:** 18 healing point spent on a same-seed retry: every dive now draws a fresh seed and the point is keyed on (seed, floor), so a retry gets a ready point. Only a fixed `SeedOverride` (tests) replays the old case.
 - **FIXED, Hollowmere traversal 056f80bd / 575d3e90:** 17 world edge (Saltwake road end collider, VoidEdge probe now measures real void). Re-confirm on the next scan.
-- **OPEN:** 1 solo balance (solo-balance session, DiveBot still shows normal solo unwinnable). Follow-up from the dive-flow review: `CellarContentsSync.cs` piece-spot cap (pieces beyond the floor's spots can never be picked up, which would also block the floor-3 return dive).
+- **OPEN:** 1 solo balance (solo-balance session, DiveBot still shows normal solo unwinnable). The dive-flow review's piece-spot cap worry is theoretical: `CellarContentsTests.PieceSpots_CountMatchesDefaults_AndCellsAreLegalAndDistinct` asserts every default floor gets all its spots across seeds; only a test that adds extra pieces beyond the defaults can hit it.
 - **Left by design:** 18 one press teleports the whole party.
 
 ## Blocker / major
