@@ -175,10 +175,13 @@ namespace SleepingCalamity.EditorTools
                 int placed = 0;
                 foreach (WallSlot s in plan)
                 {
-                    GameObject prefab = PieceFor(s.Piece, isRebuilt);
+                    // Wall_Stair is a fitting beside a straight module and leads nowhere (its steps stop 1.2 m under the wall-walk): left out.
+                    if (s.Piece == WallPiece.Stair) continue;
+                    WallPiece piece = s.Piece;
+                    GameObject prefab = PieceFor(piece, isRebuilt);
                     if (prefab == null) continue;
                     var obj = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
-                    obj.name = (s.Piece == WallPiece.End ? "End" : "M" + s.Index.ToString("000")) + "_" + s.Piece;
+                    obj.name = (piece == WallPiece.End ? "End" : "M" + s.Index.ToString("000")) + "_" + piece;
                     // Pivot Y: the highest ground under the piece's centre line minus 0.1 m; the 1.5 m footing covers the fall on the low side.
                     float y = float.MinValue;
                     TownPoint along = s.Piece == WallPiece.End ? s.Close * -1f : s.Chord;   // an End's body runs away from the opening, 2 m
@@ -197,9 +200,8 @@ namespace SleepingCalamity.EditorTools
                         float d = ex.X * s.Close.X + ex.Z * s.Close.Z;
                         sx = (d >= 0f) == EndClosesPlusX ? 1f : -1f;   // the body must run away from the opening
                     }
-                    else if (s.Piece == WallPiece.Stair && s.Mirror) sx = -sx;
                     obj.transform.localScale = new Vector3(sx, 1f, 1f);
-                    AddColliders(obj, s.Piece);
+                    AddColliders(obj, piece);
                     ApplyMaterials(obj, slots, obj.name);
                     placed++;
                 }
@@ -222,6 +224,37 @@ namespace SleepingCalamity.EditorTools
                 case WallPiece.Stair:
                     foreach (MeshFilter mf in obj.GetComponentsInChildren<MeshFilter>(true)) if (mf.sharedMesh != null) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
                     break;
+            }
+        }
+
+        // Boxes per 1 m height band over the variant's vertices on one side of the passage (|x| from halfPassage out), in the gate's frame. Active with the variant.
+        static void PierColliders(Transform gate, Transform variant, float side, float halfPassage, float halfWidth, float halfDepth, string name)
+        {
+            const float band = 1f;
+            var bands = new Dictionary<int, (Vector3 Min, Vector3 Max)>();
+            foreach (MeshFilter mf in variant.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                foreach (Vector3 vtx in mf.sharedMesh.vertices)
+                {
+                    Vector3 p = gate.InverseTransformPoint(mf.transform.TransformPoint(vtx));
+                    if (side * p.x < halfPassage - 0.05f || side * p.x > halfWidth || Mathf.Abs(p.z) > halfDepth) continue;
+                    int k = Mathf.FloorToInt(p.y / band);
+                    if (bands.TryGetValue(k, out var bb)) bands[k] = (Vector3.Min(bb.Min, p), Vector3.Max(bb.Max, p));
+                    else bands[k] = (p, p);
+                }
+            }
+            if (bands.Count == 0) return;
+            var holder = new GameObject(name); holder.transform.SetParent(gate, false);
+            holder.SetActive(variant.gameObject.activeSelf);
+            foreach (var kv in bands)
+            {
+                Vector3 mn = kv.Value.Min, mx = kv.Value.Max;
+                float x0 = side > 0f ? Mathf.Max(mn.x, halfPassage - 0.05f) : mn.x, x1 = side > 0f ? mx.x : Mathf.Min(mx.x, -halfPassage + 0.05f);
+                if (x1 - x0 < 0.05f || mx.y - mn.y < 0.05f || mx.z - mn.z < 0.05f) continue;
+                var b = holder.AddComponent<BoxCollider>();
+                b.center = new Vector3((x0 + x1) * 0.5f, (mn.y + mx.y) * 0.5f, (mn.z + mx.z) * 0.5f);
+                b.size = new Vector3(x1 - x0, mx.y - mn.y, mx.z - mn.z);
             }
         }
 
@@ -278,14 +311,14 @@ namespace SleepingCalamity.EditorTools
             }
             Transform fp = obj.transform.Find(GateFootprint);
             if (fp != null) { var r = fp.GetComponent<MeshRenderer>(); if (r != null) r.enabled = false; }   // the footprint is never a collider: it would close the passage
-            // Colliders: one box per pier, the passage between them stays open (SOURCES: clear half widths and block depths).
+            // Colliders: stacked boxes fitted to each pier's own mesh (1 m bands; the old two tall boxes stood up to 0.3 m off the stone and blocked the lanes). The passage between
+            // the piers stays open as the art leaves it. One compound per side and variant, active with its variant.
             var (halfPassage, depth) = def.Name == "LowerGate" ? (2.1f, 4.4f) : (2.02f, 4.6f);
-            float halfWidth = TownWallPlan.GateDefs.First(d => d.Name == def.Name).HalfWidth, mid = (halfPassage + halfWidth) * 0.5f;
-            foreach (float side in new[] { -1f, 1f })
-            {
-                var pierBox = new GameObject("Collider_Pier" + (side < 0f ? "W" : "E")); pierBox.transform.SetParent(obj.transform, false);
-                Box(pierBox, new Vector3(side * mid, 2.95f, 0f), new Vector3(halfWidth - halfPassage, 5.9f, depth));
-            }
+            float halfWidth = TownWallPlan.GateDefs.First(d => d.Name == def.Name).HalfWidth;   // the old boxes' extent: rubble past it (the Ruined shell) stays walk-through
+            foreach (var (variant, tag) in new[] { (shell, "Shell"), (frame, "Frame") })
+                if (variant != null)
+                    foreach (float side in new[] { -1f, 1f })
+                        PierColliders(obj.transform, variant, side, halfPassage, halfWidth, depth * 0.5f, "Collider_Pier" + (side < 0f ? "W" : "E") + "_" + tag);
             ApplyMaterials(obj, BuildMaterials(), def.Name);
             Debug.Log("SC HOLLOWMERE gate " + def.Name + " placed " + (rebuilt ? "Rebuilt" : "Ruined") + " centre=" + centre + " yaw=" + yaw.ToString("0.0") + " groundY=" + gy.ToString("0.00") + " pierY=" + ((a.Y + b.Y) * 0.5f).ToString("0.00"));
             return true;

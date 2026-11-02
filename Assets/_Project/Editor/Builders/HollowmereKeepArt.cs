@@ -62,6 +62,9 @@ namespace SleepingCalamity.EditorTools
                 }
                 r.sharedMaterials = mats;
             }
+            if (piece == "StairStep")   // the treads are solid like they look (the terrain under them carried the climb with a 1.35 m step and 47 degree slopes)
+                foreach (MeshFilter mf in go.GetComponentsInChildren<MeshFilter>(true))
+                    if (mf.sharedMesh != null && mf.GetComponent<Collider>() == null) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
             return go;
         }
 

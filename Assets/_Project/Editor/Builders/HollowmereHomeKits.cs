@@ -110,14 +110,14 @@ namespace SleepingCalamity.EditorTools
             if (fp == null) throw new System.InvalidOperationException("SC HOLLOWMERE " + label + " " + variant + ": no FOOTPRINT child");
             var fpr = fp.GetComponent<MeshRenderer>(); if (fpr != null) fpr.enabled = false;
             Mesh m = fp.GetComponent<MeshFilter>().sharedMesh;
-            var box = fp.gameObject.AddComponent<BoxCollider>();
-            box.center = m.bounds.center; box.size = m.bounds.size;
+            // No FOOTPRINT box collider: it stood 2 m+ off the eaves and filled the doorway; HollowmereArt.AddWallColliders gives the Frame its own mesh colliders.
             Vector3 world = Vector3.Scale(m.bounds.size, fp.lossyScale);
             float sx = Mathf.Abs(world.x), sz = Mathf.Abs(world.z), max = Foundation.MaxBuilding(f.Size);
             if (sx > max + 0.01f || sz > max + 0.01f)
                 throw new System.InvalidOperationException("SC HOLLOWMERE " + label + " " + variant + " FOOTPRINT " + sx.ToString("0.00") + " x " + sz.ToString("0.00") + " exceeds class " + f.Size + " (" + max + " m)");
             foreach (string s in new[] { "Frame", "Part_Door", "Part_Shutters", "SOCKET_Door", "SOCKET_Shutters" })
                 if (obj.transform.Find(s) == null) throw new System.InvalidOperationException("SC HOLLOWMERE " + label + " " + variant + ": missing " + s);
+            HollowmereArt.AddWallColliders(obj);
             Debug.Log("SC HOLLOWMERE " + label + " lot=" + f.Id + " variant=" + variant + " class=" + f.Size + " footprint=" + sx.ToString("0.00") + "x" + sz.ToString("0.00") + " padY=" + f.Y.ToString("0.00"));
             return true;
         }
