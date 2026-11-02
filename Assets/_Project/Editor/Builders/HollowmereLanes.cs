@@ -113,7 +113,7 @@ namespace SleepingCalamity.EditorTools
             if (_nosing == null)
             {
                 Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
-                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.80f, 0.76f, 0.66f), 0.15f, wear);   // round 3: lighter, deeper nosing
+                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.50f, 0.46f, 0.38f), 0.15f, wear);   // round 3: lighter, deeper nosing; stairs-traversal-3 r2: 0.80 blew out to a white slab at midday (Cap_HM_TerraceSteps)
                 _nosing.SetColor("_Color", _nosing.GetColor("_BaseColor")); _nosing.SetShaderPassEnabled("MotionVectors", true);
                 _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.13f, 0.12f, 0.10f), 0.1f, wear);
                 _treadShade.SetColor("_Color", _treadShade.GetColor("_BaseColor")); _treadShade.SetShaderPassEnabled("MotionVectors", true);
