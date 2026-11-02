@@ -4,7 +4,15 @@ namespace SleepingCalamity.Core
     {
         public const ushort DefaultPort = 7777;          // solo first try; dev-direct host + clients
         public const ushort SoloPortRetryCount = 10;     // solo tries Port .. Port+9 (7777..7786 by default)
-        public const ushort TestPort = 7790;             // PlayMode tests set LocalNetworkSession.Port = TestPort
+        public const ushort DefaultTestPort = 7790;
+        public const string TestPortEnvVar = "SC_TEST_PORT";
+        // PlayMode tests set LocalNetworkSession.Port = TestPort. Tools/unity.ps1 sets SC_TEST_PORT when 7790 is held by a stuck process.
+        public static readonly ushort TestPort = ParseTestPort(System.Environment.GetEnvironmentVariable(TestPortEnvVar));
+
+        public static ushort ParseTestPort(string value)
+        {
+            return ushort.TryParse(value, out ushort port) && port != 0 ? port : DefaultTestPort;
+        }
         public const string LoopbackAddress = "127.0.0.1";
         public const uint TickRate = 30;
         public const int MaxPlayers = 4;
