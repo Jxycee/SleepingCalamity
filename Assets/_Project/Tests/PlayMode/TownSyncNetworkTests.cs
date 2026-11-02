@@ -301,6 +301,8 @@ namespace SleepingCalamity.Tests.PlayMode
             foreach (int p in new[] { Frame, Oven, Door, Sign }) director.Town.State.AddPiece(p);
             sync.ServerRefresh();
 
+            // The scene's real PlacementMode hands back a lock it is not using (the late-grant fix); this test drives the requests itself.
+            foreach (PlacementMode mode in Object.FindObjectsByType<PlacementMode>(FindObjectsInactive.Include)) mode.enabled = false;
             yield return Take(sync, sync);
             sync.RequestPlaceFrame("bakery", "F02", 0);
             yield return PlayModeHarness.WaitUntil(() => director.Town.State.PlacedBuildingOf("bakery") != null, Timeout, "the host never placed its own frame");
