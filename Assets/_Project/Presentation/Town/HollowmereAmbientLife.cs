@@ -29,9 +29,15 @@ namespace SleepingCalamity.Presentation
         public const float AloftSeconds = 28f;             // how long a lifted flock wheels before it settles again
         public const float FlockCullDistance = 260f;       // a flock further than this from the camera is not animated
 
+        public const float BirdScale = 2.3f;               // wingspan multiplier for every bird card (cards, no models: they must read at distance)
+        public const float ButterflySpan = 0.15f;          // metres wing to wing
+        public const float BeeSpan = 0.06f;
+
         // ---- smoke
-        public const float SmokeRate = 2.6f;               // particles per second per chimney
+        public const float SmokeRate = 3.2f;               // particles per second per chimney
         public const float SmokeLifetime = 9f;
+        public const float SmokeAlpha = 0.45f;             // peak alpha of a puff
+        public static readonly Color SmokeColour = new Color(0.68f, 0.66f, 0.62f);   // light warm grey
 
         // ---- fish rings
         public const float FishRingRate = 0.22f;           // rings per second per patch

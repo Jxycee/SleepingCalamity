@@ -29,7 +29,7 @@ namespace SleepingCalamity.EditorTools
         const string MeshPath = TexFolder + "/AmbientCard.asset";
         static readonly string[] GardenLots = { "R2_07", "R2_18", "R2_22", "R3_02" };
 
-        static Mesh _card; static Material _crow, _swallow, _gull, _butterfly, _bee;
+        static Mesh _card; static Material _crow, _swallow, _gull, _butterfly, _butterflyYellow, _butterflyOrange, _bee;
         static Texture2D _smokeTex, _ringTex;
 
         public static void Build(Transform root, TownLayout t)
@@ -58,7 +58,13 @@ namespace SleepingCalamity.EditorTools
             float sq = HollowmereLayout.Ground(t, 0f, -7f);
             common.Add(Circle("SquareSwallows", life, _swallow, new Vector3(0f, sq, -7f), 7, 20f, 9f, 12f, 0.34f, 6.28f, 102));
             common.Add(Circle("LakeGulls", life, _gull, new Vector3(HollowmereLayout.LakeCentre.X, HollowmereLayout.WaterY, HollowmereLayout.LakeCentre.Z), 6, 38f, 22f, 7f, 1.2f, 6.28f, 103));
-            Vector3 valley = new Vector3(-95f, HollowmereLayout.Ground(t, -95f, 20f), 20f);
+            // close flocks so the fixed cameras (heroes' home, lake shore, overview) always have birds in frame
+            float home = HollowmereLayout.Ground(t, 12f, 10f);
+            common.Add(Circle("HomeSwallows", life, _swallow, new Vector3(12f, home, 10f), 6, 10f, 13f, 9f, 0.34f, 6.28f, 108));
+            common.Add(Circle("HomeCrows", life, _crow, new Vector3(2f, home, 14f), 3, 14f, 18f, 6f, 0.9f, 6.28f, 109));
+            common.Add(Circle("ShoreGulls", life, _gull, new Vector3(-14f, HollowmereLayout.WaterY, -66f), 5, 16f, 9f, 6f, 1.2f, 6.28f, 110));
+            common.Add(Circle("OverviewGulls", life, _gull, new Vector3(HollowmereLayout.LakeCentre.X + 6f, HollowmereLayout.WaterY, HollowmereLayout.LakeCentre.Z + 4f), 5, 22f, 20f, 6f, 1.2f, 6.28f, 111));
+            Vector3 valley =new Vector3(-95f, HollowmereLayout.Ground(t, -95f, 20f), 20f);
             common.Add(Circle("ValleyCrows", life, _crow, valley, 8, 50f, 46f, 8f, 0.9f, 2.4f, 104));
 
             // rooks sitting in a ploughed field in the west and a hay field in the east: they lift when the hero comes within ScatterDistance
@@ -77,7 +83,7 @@ namespace SleepingCalamity.EditorTools
 
         static AmbientCreatures.Flock Circle(string name, Transform parent, Material mat, Vector3 centre, int count, float radius, float height, float speed, float span, float clump, int seed)
         {
-            var f = new AmbientCreatures.Flock { Name = name, Move = AmbientCreatures.Motion.Circle, Centre = centre, Radius = radius, Height = height, Speed = speed, Wingspan = span, Clump = clump, Seed = seed };
+            var f = new AmbientCreatures.Flock { Name = name, Move = AmbientCreatures.Motion.Circle, Centre = centre, Radius = radius, Height = height, Speed = speed, Wingspan = span * HollowmereAmbientLife.BirdScale, Clump = clump, Seed = seed };
             f.Cards = Cards(parent, name, mat, count);
             return f;
         }
@@ -99,7 +105,7 @@ namespace SleepingCalamity.EditorTools
             Vector2 p = hits.OrderBy(h => SaltwakeRoadPlan.Hash01((int)(h.x * 7f + h.y * 131f), seed)).First();
             var f = new AmbientCreatures.Flock
             {
-                Name = name, Move = AmbientCreatures.Motion.Perch, Centre = new Vector3(p.x, HollowmereLayout.Ground(t, p.x, p.y), p.y), Spread = 7f, Wingspan = 0.9f,
+                Name = name, Move = AmbientCreatures.Motion.Perch, Centre = new Vector3(p.x, HollowmereLayout.Ground(t, p.x, p.y), p.y), Spread = 7f, Wingspan = 0.9f * HollowmereAmbientLife.BirdScale,
                 AloftRadius = 36f, AloftHeight = 32f, Speed = 9f, Clump = 1.6f, Seed = seed,
             };
             f.Cards = Cards(parent, name, _crow, count);
@@ -121,13 +127,13 @@ namespace SleepingCalamity.EditorTools
                 bool meadow = s.Name.StartsWith("Meadow");
                 if (HollowmereAmbientLife.Butterflies)
                 {
-                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 3.2f, Height = 1.7f, Speed = 0.9f, Spread = meadow ? 8f : 5f, Wingspan = 0.1f, Seed = seed++ };
-                    f.Cards = Cards(life, f.Name, _butterfly, meadow ? 6 : 4);
+                    var f = new AmbientCreatures.Flock { Name = "Butterflies_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = meadow ? 4.5f : 2.6f, Height = 1.3f, Speed = 0.9f, Spread = meadow ? 8f : 3.5f, Wingspan = HollowmereAmbientLife.ButterflySpan, Tilt = 40f, Seed = seed++ };
+                    f.Cards = Cards(life, f.Name, (seed % 3) == 0 ? _butterflyOrange : (seed % 3) == 1 ? _butterfly : _butterflyYellow, meadow ? 6 : 5);
                     common.Add(f);
                 }
                 if (HollowmereAmbientLife.Bees)
                 {
-                    var f = new AmbientCreatures.Flock { Name = "Bees_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = 1.3f, Height = 1.2f, Speed = 3.2f, Spread = 3.5f, Wingspan = 0.05f, Seed = seed++ };
+                    var f = new AmbientCreatures.Flock { Name = "Bees_" + s.Name, Move = AmbientCreatures.Motion.Wander, Centre = new Vector3(s.P.x, y, s.P.y), Radius = 1.3f, Height = 1.1f, Speed = 3.2f, Spread = 3f, Wingspan = HollowmereAmbientLife.BeeSpan, Tilt = 40f, Seed = seed++ };
                     f.Cards = Cards(life, f.Name, _bee, 4);
                     common.Add(f);
                 }
@@ -196,11 +202,13 @@ namespace SleepingCalamity.EditorTools
         static void EnsureCardMaterials()
         {
             Shader sh = Shader.Find("SleepingCalamity/BirdCard") ?? throw new System.InvalidOperationException("Shader not found: SleepingCalamity/BirdCard");
-            _crow = CardMat("M_HM_Bird_Crow", sh, new Color(0.075f, 0.075f, 0.085f), 1.15f, 13f, 0.5f);
-            _swallow = CardMat("M_HM_Bird_Swallow", sh, new Color(0.10f, 0.11f, 0.15f), 1.3f, 26f, 0.4f);
-            _gull = CardMat("M_HM_Bird_Gull", sh, new Color(0.62f, 0.63f, 0.62f), 0.8f, 7f, 0.3f);
-            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(0.60f, 0.56f, 0.40f), 0.85f, 38f, 0.9f);
-            _bee = CardMat("M_HM_Bee", sh, new Color(0.17f, 0.12f, 0.05f), 1.0f, 140f, 0.3f);
+            _crow = CardMat("M_HM_Bird_Crow", sh, new Color(0.15f, 0.15f, 0.17f), 1.15f, 13f, 0.5f);
+            _swallow = CardMat("M_HM_Bird_Swallow", sh, new Color(0.17f, 0.18f, 0.23f), 1.3f, 26f, 0.4f);
+            _gull = CardMat("M_HM_Bird_Gull", sh, new Color(0.80f, 0.81f, 0.80f), 0.8f, 7f, 0.3f);
+            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(0.95f, 0.93f, 0.82f), 0.85f, 38f, 0.9f);
+            _butterflyYellow = CardMat("M_HM_Butterfly_Yellow", sh, new Color(0.98f, 0.85f, 0.25f), 0.85f, 38f, 0.9f);
+            _butterflyOrange = CardMat("M_HM_Butterfly_Orange", sh, new Color(0.96f, 0.5f, 0.12f), 0.85f, 38f, 0.9f);
+            _bee = CardMat("M_HM_Bee", sh, new Color(0.30f, 0.20f, 0.04f), 1.0f, 140f, 0.3f);
         }
 
         static Material CardMat(string name, Shader sh, Color c, float belly, float flapSpeed, float flapAmp)
@@ -309,7 +317,7 @@ namespace SleepingCalamity.EditorTools
         static void BuildSmoke(Transform ruined, Transform rebuilt, TownLayout t)
         {
             EnsureParticleTextures();
-            Material mat = ParticleMat("M_HM_Smoke", _smokeTex, new Color(0.60f, 0.58f, 0.56f, 0.34f));
+            Material mat = ParticleMat("M_HM_Smoke", _smokeTex, new Color(HollowmereAmbientLife.SmokeColour.r, HollowmereAmbientLife.SmokeColour.g, HollowmereAmbientLife.SmokeColour.b, HollowmereAmbientLife.SmokeAlpha));
             // the heroes' home chimney: both presets
             foreach (Transform preset in new[] { ruined, rebuilt })
             {
@@ -374,23 +382,23 @@ namespace SleepingCalamity.EditorTools
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
             float life = HollowmereAmbientLife.SmokeLifetime;
-            main.duration = 10f; main.loop = true; main.prewarm = true; main.startLifetime = life; main.startSpeed = 0.35f;
-            main.startSize = new ParticleSystem.MinMaxCurve(0.45f, 0.8f); main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.2832f);
+            main.duration = 10f; main.loop = true; main.prewarm = true; main.startLifetime = life; main.startSpeed = 0.7f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.8f, 1.2f); main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.2832f);
             main.startColor = Color.white; main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = Mathf.CeilToInt(HollowmereAmbientLife.SmokeRate * life) + 4; main.gravityModifier = 0f;
             var em = ps.emission; em.rateOverTime = HollowmereAmbientLife.SmokeRate;
             var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 5f; shape.radius = 0.12f;
             var vel = ps.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World;
             Vector2 w = HollowmereAmbientLife.WindDirection;
-            vel.x = new ParticleSystem.MinMaxCurve(1.1f * w.x, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            vel.y = new ParticleSystem.MinMaxCurve(0.2f, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            vel.z = new ParticleSystem.MinMaxCurve(1.1f * w.y, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.35f), new Keyframe(1f, 3.2f)));
+            vel.x = new ParticleSystem.MinMaxCurve(1.2f * w.x, AnimationCurve.Linear(0f, 0f, 1f, 1f));
+            vel.y = new ParticleSystem.MinMaxCurve(0.45f, AnimationCurve.Linear(0f, 0f, 1f, 1f));
+            vel.z = new ParticleSystem.MinMaxCurve(1.2f * w.y, AnimationCurve.Linear(0f, 0f, 1f, 1f));
+            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 3f)));
             var rot = ps.rotationOverLifetime; rot.enabled = true; rot.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
             var col = ps.colorOverLifetime; col.enabled = true;
             var g = new Gradient();
-            g.SetKeys(new[] { new GradientColorKey(new Color(0.80f, 0.78f, 0.76f), 0f), new GradientColorKey(new Color(0.55f, 0.55f, 0.56f), 1f) },
-                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.12f), new GradientAlphaKey(0.55f, 0.6f), new GradientAlphaKey(0f, 1f) });
+            g.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.96f, 0.9f), 0f), new GradientColorKey(new Color(0.94f, 0.94f, 0.96f), 1f) },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(0.7f, 0.6f), new GradientAlphaKey(0f, 1f) });
             col.color = g;
             var noise = ps.noise; noise.enabled = true; noise.strength = 0.35f; noise.frequency = 0.3f; noise.scrollSpeed = 0.15f;
             ps.useAutoRandomSeed = false; ps.randomSeed = (uint)seed;

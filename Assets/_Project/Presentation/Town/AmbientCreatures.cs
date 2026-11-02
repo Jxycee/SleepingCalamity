@@ -24,6 +24,7 @@ namespace SleepingCalamity.Presentation
             public float Spread;        // Wander: how far the creatures' anchors lie apart. Perch: perch scatter
             public float Clump = 6.28f; // Circle: angle (rad) the flock is spread over
             public float Wingspan = 0.5f;
+            public float Tilt;          // degrees the card pitches up from its heading (butterflies and bees tilt so their wings show to a camera at eye height)
             public float AloftRadius = 34f, AloftHeight = 30f;   // Perch: the wheel after a lift
             public int Seed;
             public Transform[] Cards = new Transform[0];
@@ -154,6 +155,7 @@ namespace SleepingCalamity.Presentation
                     {
                         Vector3 ahead = f.Move == Motion.Circle ? CirclePos(f, i, t + 0.1f, f.Radius, f.Height) : WanderPos(f, i, t + 0.1f);
                         Face(c, ahead - p);
+                        if (f.Tilt != 0f) c.rotation = c.rotation * Quaternion.Euler(-f.Tilt, 0f, 0f);
                     }
                     else
                     {
