@@ -256,19 +256,32 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ------------------------------------------------------------------------------------------------ art and materials
+        // A model's first import (no .meta yet) can hand back the prefab built before LoadModel's importer settings applied: every slot is then the default
+        // "Lit" material and the slot names are lost. Reimport once; if any slot on any renderer is still "Lit", say so loudly (AAA_CONSISTENCY H3) so default
+        // grey never ships silently. Shared by the clutter, garden and home-kit builders.
+        internal static GameObject ReimportIfDefaultLit(GameObject fbx, string path, string label)
+        {
+            if (fbx == null || !HasDefaultLit(fbx)) return fbx;
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            fbx = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (fbx != null && HasDefaultLit(fbx)) Debug.LogError("SC HOLLOWMERE " + label + ": default \"Lit\" material slot still present after reimport: " + path);
+            return fbx;
+        }
+
+        static bool HasDefaultLit(GameObject fbx)
+        {
+            foreach (Renderer r in fbx.GetComponentsInChildren<Renderer>(true))
+                foreach (Material m in r.sharedMaterials)
+                    if (m != null && m.name == "Lit") return true;
+            return false;
+        }
+
         static GameObject Model(string asset)
         {
             if (Loaded.TryGetValue(asset, out GameObject cached) && cached != null) return cached;
             GameObject fbx = BeautyCornerArt.LoadModel(Folder + "/" + asset, asset + ".fbx", keepMaterialSlots: true);
             if (fbx == null) return null;
-            // A first import can hand back the prefab built before the importer settings applied (every slot the default "Lit"): reimport once.
-            Renderer probe = fbx.GetComponentInChildren<Renderer>(true);
-            if (probe != null && probe.sharedMaterials.Length > 0 && probe.sharedMaterials[0] != null && probe.sharedMaterials[0].name == "Lit")
-            {
-                string path = Folder + "/" + asset + "/" + asset + ".fbx";
-                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-                fbx = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            }
+            fbx = ReimportIfDefaultLit(fbx, Folder + "/" + asset + "/" + asset + ".fbx", "clutter " + asset);
             Loaded[asset] = fbx;
             return fbx;
         }
