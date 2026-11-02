@@ -491,6 +491,40 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.DoorOpen, Timeout, "the door never auto-opened once the wall was gone");
         }
 
+        // Soak finding 2026-11-02 (floor 3, seed 12345): "DoorOpen but the gate still blocks". Pinned seed and floor. Once the door is open on the host AND on the client's copy, NO active
+        // LockedGate collider is left anywhere in the scene (host and client floors share one process and one physics world here), and a CharacterController walks through the opening.
+        [UnityTest]
+        public IEnumerator Door_Floor3Seed12345_OpenLeavesNoGateColliderOnAnyPeer_AndAHeroWalksThrough()
+        {
+            Ctx c = null; yield return Setup(x => c = x, default, 12345u, 3);
+            Assert.That(c.Layout.HasLockedRoom, Is.True, "seed 12345 floor 3 has a locked room");
+            Assert.That(c.Peer.TryGatePosition(out Vector3 gate), Is.True);
+            Assert.That(c.Peer.TryChestPosition(c.Layout.KeyChestIndex, out Vector3 keyAt), Is.True);
+            c.Players[c.HostId] = c.Players[c.ClientId] = keyAt + new Vector3(1.0f, 0f, 0f);
+            c.Peer.RequestOpenChest(c.Layout.KeyChestIndex);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.RoomKeyHeld, Timeout, "the key chest gave no room key");
+            Collider gateCol = CellarFloorBuilder.FindGate(c.Floor.Built.Root).GetComponent<Collider>();
+            Assert.That(gateCol, Is.Not.Null, "the gate has a collider");
+            Vector3 ext = gateCol.bounds.size; bool throughX = ext.x < ext.z;   // the thin axis is the walking direction
+            Vector3 through = throughX ? Vector3.right : Vector3.forward;
+            c.Players[c.HostId] = c.Players[c.ClientId] = gate - through * 2.0f;
+            c.Peer.RequestOpenDoor();
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.DoorOpen && c.Contents.State.DoorOpen, Timeout, "the door never opened");
+            yield return PlayModeHarness.WaitUntil(() => !c.Peer.GateBlocking && !c.Contents.GateBlocking, Timeout, "a gate stayed solid");
+            Physics.SyncTransforms();
+            foreach (Collider col in Physics.OverlapBox(gate + Vector3.up * 1.4f, new Vector3(2f, 1.4f, 2f), Quaternion.identity, ~0, QueryTriggerInteraction.Ignore))
+                Assert.That(col.name, Is.Not.EqualTo("LockedGate"), "an active gate collider is left at " + gate);
+
+            var hero = new GameObject("ProbeHero"); hero.transform.position = gate - through * 3f + Vector3.up * 0.1f;
+            var cc = hero.AddComponent<CharacterController>(); cc.height = 1.8f; cc.radius = 0.4f; cc.center = new Vector3(0f, 0.9f, 0f);
+            Physics.SyncTransforms();
+            float start = Vector3.Dot(hero.transform.position, through);
+            for (int i = 0; i < 60; i++) { cc.Move(through * 0.1f + Vector3.down * 0.05f); yield return null; }
+            float moved = Vector3.Dot(hero.transform.position, through) - start;
+            Object.Destroy(hero);
+            Assert.That(moved, Is.GreaterThan(5.0f), "a hero walks 6 m through the opened doorway (moved " + moved + ")");
+        }
+
         // Catches: the ambush springing on an empty room when the only player left during the delay (it must re-arm), and then springing once someone is inside.
         [UnityTest]
         public IEnumerator AmbushFloor_PlayerLeavesDuringTheDelay_NothingSprings_ThenSpringsWhenSomeoneIsInside()
