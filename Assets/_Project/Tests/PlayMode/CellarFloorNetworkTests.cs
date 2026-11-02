@@ -74,6 +74,33 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         // Catches: seed/floor not reaching connected clients, a floor change not rebuilding, a late joiner missing the state.
+        // Catches: a floor built under a parent away from the origin whose colliders PhysX still holds at the origin (Auto Sync Transforms is off), so a hero
+        // teleported onto it in the build frame finds no ground (the stair F2 -> F3 sink, 2026-11-02). Queries in the same frame, before any physics step.
+        [UnityTest]
+        public IEnumerator BuiltFloor_CollidersAreWhereTheFloorIs_InTheBuildFrame()
+        {
+            yield return null;
+            var parent = new GameObject("FloorParentTest").transform;
+            parent.position = new Vector3(200f, 0f, 0f);
+            CellarFloorBuild built = null;
+            try
+            {
+                CellarFloorLayout layout = CellarFloorGenerator.Generate(12345u, 2);
+                built = CellarFloorBuilder.Build(layout, parent);
+                Vector3 entry = built.EntryCenter;
+                Assert.That(entry.x, Is.GreaterThan(100f), "the entry is in world space under the parent");
+                bool hit = Physics.Raycast(entry + Vector3.up * 2f, Vector3.down, out RaycastHit h, 5f, ~0, QueryTriggerInteraction.Ignore);
+                Assert.That(hit, Is.True, "a downward ray at the entry hits the floor in the build frame (colliders synced to the parent's position)");
+                Assert.That(h.collider.transform.IsChildOf(built.Root), Is.True, "the ground hit is this floor, not something else: " + h.collider.name);
+            }
+            finally
+            {
+                if (built != null && built.Root != null) Object.Destroy(built.Root.gameObject);
+                Object.Destroy(parent.gameObject);
+            }
+            yield return null;
+        }
+
         [UnityTest]
         public IEnumerator HostSetsSeedAndFloor_EveryPeerBuildsTheSameFloor_IncludingLateJoin()
         {

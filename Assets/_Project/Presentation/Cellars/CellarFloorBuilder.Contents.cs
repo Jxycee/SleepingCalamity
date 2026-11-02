@@ -17,6 +17,11 @@ namespace SleepingCalamity.Presentation
         static void ParentBuiltFloor(Transform root, Transform parent, CellarFloorBuild result)
         {
             root.SetParent(parent, false);
+            // Auto Sync Transforms is off (ProjectSettings/DynamicsManager), so PhysX would keep every collider of this floor at the world origin, where it was
+            // built, until the next physics step. A hero teleported onto the new floor in that window (the swap-frame placement, a client's arrival teleport
+            // landing the frame its floor builds) stood over nothing and fell (StairHandoverTests Rtt150Loss2, F2 -> F3 at -0.17 m, 2026-11-02).
+            // One sync per floor build puts the colliders where the floor really is for every consumer at once.
+            Physics.SyncTransforms();
             if (parent == null) return;
             result.Bounds = new Bounds(root.TransformPoint(result.Bounds.center), result.Bounds.size);
             result.EntryCenter = root.TransformPoint(result.EntryCenter);
