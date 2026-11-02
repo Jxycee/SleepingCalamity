@@ -69,6 +69,11 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_LakeJetty", new Vector3(-13.5f, 1.9f, -76.5f), new Vector3(-16f, -12.2f, -100f), 55f),   // Q10: from the north bank beside the jetty (root ~(-22,-82), deck heading SE), looking over it and the lake to the far shore
             ("Cap_HM_Ravine", new Vector3(107.8f, 1.7f, -21.4f), new Vector3(91f, -11.5f, -43f), 55f),    // from the ravine's bank at s ~22 downstream along the pools and weirs W1, W2
             ("Cap_HM_MillLane", new Vector3(60.5f, 1.65f, -51.5f), new Vector3(72f, -5f, -64f), 65f),         // on Mill Lane toward the mill and the stream
+            ("Cap_HM_PX_Annex", new Vector3(9.0f, 1.65f, 0.5f), new Vector3(14f, 8.5f, 22f), 55f),         // town polish r2 (A5, A7): cistern-house gable, the ground patch in front and the annex's upper storey, like trailer frame a3
+            ("Cap_HM_PX_Patch", new Vector3(10.0f, 1.65f, 2.0f), new Vector3(12.5f, 0.8f, 8.0f), 55f),    // A7: the ground in front of the cistern house's south gable, close
+            ("Cap_HM_PX_Cottage", new Vector3(3.0f, 1.65f, 8.5f), new Vector3(8f, 2.3f, 11.5f), 55f),     // A5: the cistern house's west front (door, shutters, the bar over the window), like b1
+            ("Cap_HM_PX_Ivy", new Vector3(-8f, 0.8f, 6f), new Vector3(0f, 3.5f, 19.6f), 55f),             // A4: low, from the square's north-west corner along the keep wall's ivy
+            ("Cap_HM_PX_Weeds", new Vector3(-9f, 0.9f, -6f), new Vector3(3f, 0.8f, 12f), 62f),            // A3: low and wide over the open square, the weeds at the walls and kerbs
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 

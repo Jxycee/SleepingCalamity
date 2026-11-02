@@ -187,12 +187,12 @@ namespace SleepingCalamity.EditorTools
             {
                 if (s.p == null || s.p.Length < 3) continue;
                 float blob = Mathf.PerlinNoise(s.p[0] * 0.33f + 17.3f, s.p[2] * 0.33f + 5.1f);
-                float cluster = 0.10f + 0.90f * Mathf.SmoothStep(0.38f, 0.68f, blob);   // blobs along the edges, the odd stray between them
-                float baseKeep = s.kind == "joint" ? 0.30f : s.kind == "missing_sett" ? 0.95f : 1f;   // the open-centre joints thin hardest, cracks (missing setts) and wall edges keep theirs
+                float cluster = 0.02f + 0.98f * Mathf.SmoothStep(0.48f, 0.66f, blob);   // blobs along the edges, hardly any stray between them (round 2: steeper)
+                float baseKeep = s.kind == "joint" ? 0.08f : s.kind == "missing_sett" ? 0.9f : 1f;   // the open-centre joints thin hardest, cracks (missing setts) and wall edges keep theirs
                 float keepRoll = (float)(Hash((uint)Mathf.RoundToInt(s.p[0] * 50f + 50000f), (uint)Mathf.RoundToInt(s.p[2] * 50f + 50000f)) % 10007u) / 10007f;
                 float pKeep = baseKeep * cluster;
                 if (keepRoll >= pKeep) continue;
-                bool tended = keepRoll < pKeep * 0.2f;   // survives into Rebuilt
+                bool tended = keepRoll < pKeep * 0.1f;   // survives into Rebuilt
                 List<GameObject> pool; float lo, hi, cap;
                 switch (s.kind)
                 {
