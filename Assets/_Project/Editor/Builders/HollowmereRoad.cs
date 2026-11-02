@@ -356,6 +356,7 @@ namespace SleepingCalamity.EditorTools
             // the mid hill ridge and the far ridge: annuli rising out of the ring's edge (their feet tucked under the layer in front)
             Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 256, 45f, 55f, 7f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
             Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 256, 150f, 120f, 23f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
+            HollowmereBackdrop.Build(ring);   // A12/C3: ragged ridge layers, the Mawrrow mountain, a ruined windmill, a far lighthouse (HollowmereBackdrop.cs)
         }
 
         // The three haze layers (SleepingCalamity/Backdrop): haze at DistNear, haze at DistFar, the distances, the tint on the fog colour.
