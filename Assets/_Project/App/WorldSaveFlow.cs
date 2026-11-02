@@ -50,7 +50,11 @@ namespace SleepingCalamity.App
             session.StateChanged += HandleStateChanged;
             session.Ended += HandleEnded;
             world.Changed += HandleWorldChanged;
+            world.SaveRequested += HandleSaveRequested;
         }
+
+        // The town builder left placement mode (TownSync): the finished build goes to disk now.
+        private void HandleSaveRequested() { if (!disposed) SaveNow(); }
 
         // The attached store while hosting (tests read it), else null.
         public WorldSaveStore Store => store;
@@ -81,6 +85,7 @@ namespace SleepingCalamity.App
             if (disposed) return;
             disposed = true;
             world.Changed -= HandleWorldChanged;
+            world.SaveRequested -= HandleSaveRequested;
             session.StateChanged -= HandleStateChanged;
             session.Ended -= HandleEnded;
         }

@@ -1,7 +1,7 @@
 // Authority: owner only, and local to the owner. PlayerNetState-style: HeroNetState enables this component on the owning peer and nowhere else.
 // Nothing here is networked: which target a player has soft- or hard-locked is that player's own state (docs/PHASE1.md 6.4; the attacker's client
 // will send the host a hit intent in M3). Runs the Core TargetLock / SoftTargeting on candidates built from the live Targetable registry, with
-// line of sight from a raycast against Ground and Structure. The only writer of IInputService.GameplayContext (Free <-> LockOn).
+// line of sight from a raycast against Ground and Structure. The writer of IInputService.GameplayContext for Free <-> LockOn; it never overwrites Placement (M6 S4 placement mode owns the context while it is set).
 using System;
 using System.Collections.Generic;
 using SleepingCalamity.Core;

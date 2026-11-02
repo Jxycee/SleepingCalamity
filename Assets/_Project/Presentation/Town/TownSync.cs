@@ -84,6 +84,9 @@ namespace SleepingCalamity.Presentation
 
         public static TownSync Local { get; private set; }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { Local = null; }   // Enter Play Mode with the domain reload off keeps statics
+
         public readonly NetworkVariable<TownNet> NetTown = new NetworkVariable<TownNet>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<ulong> NetBuilder = new NetworkVariable<ulong>(NoBuilder, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<GhostNet> NetGhost = new NetworkVariable<GhostNet>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);

@@ -2,11 +2,12 @@
 // owned network prefab list). Requests go through the same Request* wrappers the placement UI calls, so they take the real [Rpc(SendTo.Server)] path with the sender taken from RpcParams.
 // Catches: a client placement that host and client disagree on, a host that does not re-validate (path-blocking frame accepted), a request from a peer without the lock applied, the lock granted
 // twice, not freed by release or by the holder's disconnect, a late joiner that sees an empty town (state replayed by RPC instead of living in the NetworkVariable), a ghost pose that does not
-// reach the host and watchers, leaving placement mode not asking the world to save.
+// reach the host and watchers, leaving placement mode not asking the world to save (d) or not WRITING the town to the world file (e), the resident and pick-up RPCs.
 // NOT covered by a one-process test: the placement KEYS, camera and wish panel on screen (PlacementMode reads the scene and local input; the router row is an EditMode test), the real
 // Hollowmere scene on a client that loads it (a declined-scene peer has no scene), relay latency.
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using NUnit.Framework;
 using SleepingCalamity.App;
@@ -24,6 +25,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private const float Timeout = 25f;
         private const int Frame = 100, Oven = 101, Door = 200, Sign = 201;
         private readonly List<PlayModeHarness.TestClient> _clients = new List<PlayModeHarness.TestClient>();
+        private string _dir;
 
         [UnityTearDown]
         public IEnumerator TearDown()
@@ -31,6 +33,7 @@ namespace SleepingCalamity.Tests.PlayMode
             foreach (PlayModeHarness.TestClient client in _clients) yield return client.LeaveAndDestroy();
             _clients.Clear();
             yield return PlayModeHarness.TearDownApp();
+            if (_dir != null) { PlayModeHarness.EndSaveTest(_dir); _dir = null; }
         }
 
         private sealed class Rig
@@ -118,6 +121,19 @@ namespace SleepingCalamity.Tests.PlayMode
             peer.RequestPickUpPart("bakery", "oven");
             yield return PlayModeHarness.WaitUntil(() => peer.View.InStock(Oven) && peer.View.PlacedBuildingOf("bakery").PiecesByPart[1] < 0, Timeout, "the pick-up never came back to stock");
             Assert.That(Sig(peer.View), Is.EqualTo(Sig(rig.Director.Town.State)));
+
+            // The baker: oven, door and sign slotted, then he moves in (resident RPCs), and moves out again.
+            peer.RequestPlacePart("bakery", "oven"); peer.RequestPlacePart("bakery", "door"); peer.RequestPlacePart("bakery", "sign");
+            yield return PlayModeHarness.WaitUntil(() => peer.View.IsComplete("bakery"), Timeout, "the bakery never completed on the client");
+            peer.RequestPlaceResident("bakery");
+            yield return PlayModeHarness.WaitUntil(() => peer.View.PlacedBuildingOf("bakery").Resident == "baker" && !peer.View.ResidentInStock("baker"), Timeout, "the baker never moved in");
+            Assert.That(rig.Director.Town.State.PlacedBuildingOf("bakery").Resident, Is.EqualTo("baker"), "on the host too");
+            peer.RequestPickUpResident("bakery");
+            yield return PlayModeHarness.WaitUntil(() => peer.View.ResidentInStock("baker") && peer.View.PlacedBuildingOf("bakery").Resident == null, Timeout, "the baker never moved out");
+            Assert.That(Sig(peer.View), Is.EqualTo(Sig(rig.Director.Town.State)));
+            peer.RequestPickUpBuilding("bakery");
+            yield return PlayModeHarness.WaitUntil(() => peer.View.PlacedBuildingOf("bakery") == null && peer.View.InStock(Frame), Timeout, "the building never came back to stock");
+            Assert.That(rig.Director.Town.State.Conservation(), Is.EqualTo(peer.View.Conservation()), "nothing was lost or made");
         }
 
         // (b) The host re-validates: a path-blocking frame is refused (S1's F02 + turn 2), and a peer without the lock is refused.
@@ -187,7 +203,9 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Join(rig, 1, (c, t) => b = t);
             int saves = 0;
             HostWorld world = null;
-            if (ServiceRoots.App != null && ServiceRoots.App.TryGet(out world)) world.Changed += () => saves++;
+            bool haveWorld = ServiceRoots.App != null && ServiceRoots.App.TryGet(out world);
+            Assert.That(haveWorld, Is.True, "the app has its HostWorld");
+            world.SaveRequested += () => saves++;
 
             yield return Take(a, rig.Host);
             var bResults = new List<byte>();
@@ -203,7 +221,7 @@ namespace SleepingCalamity.Tests.PlayMode
             int before = saves;
             a.ReleaseBuildLock();
             yield return PlayModeHarness.WaitUntil(() => rig.Host.BuilderIsFree && b.BuilderIsFree, Timeout, "the release never freed the lock");
-            if (world != null) Assert.That(saves, Is.GreaterThan(before), "leaving placement mode asked the world to save");
+            Assert.That(saves, Is.GreaterThan(before), "leaving placement mode asked the world to save");
 
             yield return Take(b, rig.Host);
             Assert.That(a.IsBuilder, Is.False);
@@ -222,6 +240,36 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return holder.LeaveAndDestroy();
             _clients.Remove(holder);
             yield return PlayModeHarness.WaitUntil(() => rig.Host.BuilderIsFree && !rig.Host.NetGhost.Value.Active, Timeout, "the lock stayed held by a client that left");
+        }
+
+        // (e) Solo: the host builds (its own request, sender = the host's client id) and leaving placement mode puts the bakery on DISK at once (not on the 10 s flush tick).
+        [UnityTest]
+        public IEnumerator Solo_LeavingPlacementMode_WritesTheTownToTheWorldFile()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            _dir = PlayModeHarness.BeginSaveTest();
+            AppBootstrap app = AppBootstrap.Current;
+            yield return PlayModeHarness.StartSoloAndWaitForPlayer(SceneNames.Hollowmere);
+            yield return PlayModeHarness.WaitUntil(() => DiveDirector.Instance != null && DiveDirector.Instance.TownSync != null && DiveDirector.Instance.TownSync.IsSpawned, 40f, "the hub never spawned the director and its TownSync");
+            DiveDirector director = DiveDirector.Instance;
+            TownSync sync = director.TownSync;
+            foreach (int p in new[] { Frame, Oven, Door, Sign }) director.Town.State.AddPiece(p);
+            sync.ServerRefresh();
+
+            yield return Take(sync, sync);
+            sync.RequestPlaceFrame("bakery", "F02", 0);
+            yield return PlayModeHarness.WaitUntil(() => director.Town.State.PlacedBuildingOf("bakery") != null, Timeout, "the host never placed its own frame");
+            string worldId = app.WorldSaveFlow.SelectedWorldId;
+            Assert.That(worldId, Is.Not.Null);
+            sync.ReleaseBuildLock();   // leaving placement mode
+            yield return PlayModeHarness.WaitUntil(() => sync.BuilderIsFree, Timeout, "the lock never freed");
+
+            WorldSave saved = JsonSaveFile<WorldSave>.DeserializeOrNull(File.ReadAllText(Path.Combine(_dir, worldId + ".json")), w => w.SchemaVersion);
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved.Town, Is.Not.Null, "the town section was written on release");
+            Assert.That(saved.Town.Buildings.Count, Is.EqualTo(1));
+            Assert.That(saved.Town.Buildings[0].BuildingId, Is.EqualTo("bakery"));
+            Assert.That(saved.Town.Buildings[0].FoundationId, Is.EqualTo("F02"));
         }
 
         private static IEnumerator Wait(float s)

@@ -154,20 +154,20 @@ namespace SleepingCalamity.Presentation
             if (placed == null)
             {
                 if (_lot == "" || town.OccupantOf(_lot) != null) _lot = FirstFree(town, 0);
-                float sx = i.SwitchX, sy = i.SwitchY;
+                float sx = i.PlaceMoveX, sy = i.PlaceMoveY;
                 float mag = Mathf.Max(Mathf.Abs(sx), Mathf.Abs(sy));
                 if (mag < 0.3f) _flickReleased = 1f;
                 else if (mag > 0.6f && _flickReleased > 0f) { _flickReleased = 0f; _lot = Neighbour(town, def, _lot, sx, sy); }
-                if (i.InteractPressed) _lot = NextFree(town, def, _lot);
-                if (i.JumpPressed) _turn = WishEvaluator.NormalTurn(_turn + 1);
+                if (i.NextLotPressed) _lot = NextFree(town, def, _lot);
+                if (i.TurnPressed) _turn = WishEvaluator.NormalTurn(_turn + 1);
             }
             else
             {
                 _lot = placed.FoundationId; _turn = placed.Turn;
-                if (i.JumpPressed) sync.RequestSetTurn(BuildingId, placed.Turn + 1);
+                if (i.TurnPressed) sync.RequestSetTurn(BuildingId, placed.Turn + 1);
             }
 
-            if (i.PrimaryPressed)
+            if (i.PlacePressed)
             {
                 PlaceStep step = PlacementSteps.Next(town, BuildingId);
                 if (step.Kind == PlaceStepKind.Frame) sync.RequestPlaceFrame(BuildingId, _lot, _turn);
@@ -175,7 +175,7 @@ namespace SleepingCalamity.Presentation
                 else if (step.Kind == PlaceStepKind.Resident) sync.RequestPlaceResident(BuildingId);
                 else Say(placed == null ? "No frame in stock" : "Nothing left to place");
             }
-            if (i.SecondaryPressed)
+            if (i.PickUpPressed)
             {
                 PlaceStep up = PlacementSteps.NextPickUp(town, BuildingId);
                 if (up.Kind == PlaceStepKind.Resident) sync.RequestPickUpResident(BuildingId);

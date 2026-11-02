@@ -78,19 +78,25 @@ namespace SleepingCalamity.Tests.EditMode
         // Catches: a Placement row that lets the hero walk or the camera turn while a building is being placed (Move/Look/Sprint/Dodge/Lock leaking), or one that drops a placement
         // button (switch input, place, pick up, next lot, turn, leave).
         [Test]
-        public void InputContextRouter_Placement_ZeroesMoveLookAndCombat_PassesThePlacementButtons()
+        public void InputContextRouter_Placement_ZeroesEveryGameplayField_PassesThePlacementButtonsOnTheirOwnFields()
         {
             PlayerIntent i = InputContextRouter.Route(InputContext.Placement, AllActive());
+            // Nothing the hero acts on gets through: a place press must not swing, a turn press must not jump, the stick must not flick a lock target.
             Assert.AreEqual(0f, i.MoveX); Assert.AreEqual(0f, i.MoveY);
             Assert.AreEqual(0f, i.LookYawDeg); Assert.AreEqual(0f, i.LookPitchDeg);
-            Assert.IsFalse(i.SprintHeld || i.DodgePressed || i.LockPressed || i.InteractHeld);
-            Assert.IsFalse(i.PrimaryHeld || i.PrimaryReleased || i.SecondaryHeld || i.SecondaryReleased);
-            Assert.AreEqual(1f, i.SwitchX, 1e-6f); Assert.AreEqual(-0.5f, i.SwitchY, 1e-6f);
-            Assert.IsTrue(i.PrimaryPressed, "place");
-            Assert.IsTrue(i.SecondaryPressed, "pick up");
-            Assert.IsTrue(i.InteractPressed, "next lot");
-            Assert.IsTrue(i.JumpPressed, "turn");
+            Assert.AreEqual(0f, i.SwitchX); Assert.AreEqual(0f, i.SwitchY);
+            Assert.IsFalse(i.JumpPressed || i.SprintHeld || i.DodgePressed || i.LockPressed || i.InteractPressed || i.InteractHeld);
+            Assert.IsFalse(i.PrimaryHeld || i.PrimaryPressed || i.PrimaryReleased || i.SecondaryHeld || i.SecondaryPressed || i.SecondaryReleased);
+            Assert.AreEqual(1f, i.PlaceMoveX, 1e-6f); Assert.AreEqual(-0.5f, i.PlaceMoveY, 1e-6f);
+            Assert.IsTrue(i.PlacePressed, "place");
+            Assert.IsTrue(i.PickUpPressed, "pick up");
+            Assert.IsTrue(i.NextLotPressed, "next lot");
+            Assert.IsTrue(i.TurnPressed, "turn");
             Assert.IsTrue(i.PausePressed, "leave");
+            // And no other context leaks the placement fields.
+            PlayerIntent free = InputContextRouter.Route(InputContext.Free, AllActive());
+            Assert.IsFalse(free.PlacePressed || free.PickUpPressed || free.NextLotPressed || free.TurnPressed);
+            Assert.AreEqual(0f, free.PlaceMoveX);
             Assert.AreEqual(InputMaps.Player, InputContextRouter.EnabledMaps(InputContext.Placement));
             Assert.IsFalse(InputContextRouter.InteractLive(InputContext.Placement), "world interactables are off while placing");
         }
