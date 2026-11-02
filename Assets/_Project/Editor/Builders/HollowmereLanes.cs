@@ -174,7 +174,7 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        // soft dark contact strip on the ground where the bottom riser meets the paving: three stacked translucent quads (no collider, no shadows)
+        // soft dark contact strip on the ground where the bottom riser meets the paving: three stacked translucent quads 4 mm apart (H4: 1 mm risked z-fight at distance; no collider, no shadows)
         static void AddContactStrip(Transform step, float localGroundY)
         {
             if (_contact == null)
@@ -189,7 +189,7 @@ namespace SleepingCalamity.EditorTools
             float[] depth = { 0.14f, 0.28f, 0.45f };
             for (int i = 0; i < depth.Length; i++)
             {
-                GameObject q = LookTestBuilder.Prim(step, "ContactStrip" + i, PrimitiveType.Quad, new Vector3(0f, localGroundY + 0.012f + i * 0.001f, -depth[i] * 0.5f - 0.01f), new Vector3(1.96f, depth[i], 1f), _contact);
+                GameObject q = LookTestBuilder.Prim(step, "ContactStrip" + i, PrimitiveType.Quad, new Vector3(0f, localGroundY + 0.012f + i * 0.004f, -depth[i] * 0.5f - 0.01f), new Vector3(1.96f, depth[i], 1f), _contact);
                 q.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 q.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
