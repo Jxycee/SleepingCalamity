@@ -184,9 +184,10 @@ namespace SleepingCalamity.Core.Tuning.Tests
             Combat.AttackData ground = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.Hit1];
             Combat.AttackData air = Combat.AttackCatalog.Axe.Attacks[Combat.AttackSet.AirHit1];
             Assert.AreEqual(40, ground.TotalFrames);
-            Assert.AreEqual(40, air.TotalFrames);
+            Assert.AreEqual(ground.AsAir().TotalFrames, air.TotalFrames, "the air version is derived from the tuned ground attack");
+            Assert.AreEqual(34, air.TotalFrames);   // 40 scaled by the air factor 0.85
             Assert.AreEqual(2f, ground.Multiplier);
-            Assert.AreEqual(2f, air.Multiplier);
+            Assert.AreEqual(1.8f, air.Multiplier, 1e-4f);   // air hits deal 0.9x
             Assert.AreEqual(ground.Range, air.Range);
 
             TuningStore.Reset();
