@@ -121,7 +121,7 @@ namespace SleepingCalamity.EditorTools
             GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), new Vector3(2f, 0.04f, 0.24f), _nosing);
             n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // dark shade line at the back of the tread (under the next riser): sits wholly on the tread top, so it cannot float at the flight's edges
-            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.50f), new Vector3(2f, 0.04f, 0.09f), _treadShade);
+            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.48f), new Vector3(2f, 0.04f, 0.14f), _treadShade);
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 

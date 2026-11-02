@@ -71,7 +71,8 @@ namespace SleepingCalamity.EditorTools
                         string onlyPreset = System.Environment.GetEnvironmentVariable("SC_CAPTURE_PRESET");   // e.g. "Rebuilt": skip the other preset
                         if (!string.IsNullOrEmpty(onlyPreset) && onlyPreset != preset.ToString()) continue;
                         HollowmereBuilder.ApplyPreset(preset);
-                        foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
+                        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("SC_CAPTURE_NOPROBES")))   // cloud (software GL) crashes baking probes: stair/geometry frames do not need them
+                            foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
                         foreach (ParticleSystem ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None)) ps.Simulate(14f, true, true);   // particles do not run in edit mode: a settled pollen cloud (fixed seeds)
                         LookTestCapture.WarmUp(cams);
                         foreach (Camera cam in cams)
