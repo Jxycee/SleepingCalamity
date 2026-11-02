@@ -178,6 +178,15 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => { Move(rig.ClientHeroes[i], pos); return onHost != null && Flat(onHost.transform.position, pos) < 1.5f; }, Timeout, step + ": client hero never arrived on the host");
         }
 
+        // A client's bank press is one RPC; the host refuses it while the hero's replicated position is still short of the bank point, and a refusal is not retried. Ask again every
+        // second until the bank lands (a second bank at a spent point is refused, so re-asking is safe).
+        private static bool AskBankUntil(Rig rig, int i, ref float askedAt, System.Func<bool> done)
+        {
+            if (done()) return true;
+            if (Time.realtimeSinceStartup - askedAt >= 1f) { askedAt = Time.realtimeSinceStartup; rig.PeerDirector(i).RequestBank(); }
+            return false;
+        }
+
         // Leaves with a graceful shutdown and waits until the host, the roster and every remaining peer have forgotten the client and its hero.
         private IEnumerator Drop(Rig rig, int i, string step)
         {
@@ -240,8 +249,8 @@ namespace SleepingCalamity.Tests.PlayMode
 
             // The dive can still bank (the remaining client asks, in range) ...
             yield return ClientTo(rig, 1, BankPos(rig), "case1 walk to the bank");
-            rig.PeerDirector(1).RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.Haul.Current.BankedPieces == 2 && rig.Haul.Current.UnbankedPieces == 0, Timeout, "case1: the remaining client could not bank the carried pieces");
+            float askedAt1 = -10f;
+            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 1, ref askedAt1, () => rig.Haul.Current.BankedPieces == 2 && rig.Haul.Current.UnbankedPieces == 0), Timeout, "case1: the remaining client could not bank the carried pieces");
             yield return Consistent(rig, "case1 banked");
             Assert.That(rig.Haul.ServerBank(), Is.False, "banking again with nothing new is refused (no duplicate bank)");
 
@@ -521,8 +530,8 @@ namespace SleepingCalamity.Tests.PlayMode
             float earned = combat.Growth(rig.ClientId(0)).Weapon(Axe).Abs;
             Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
             yield return ClientTo(rig, 0, BankPos(rig), "case6 walk to the bank");
-            rig.PeerDirector(0).RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.Haul.Current.BankedPieces == 1, Timeout, "case6: the present client could not bank");
+            float askedAt6 = -10f;
+            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 0, ref askedAt6, () => rig.Haul.Current.BankedPieces == 1), Timeout, "case6: the present client could not bank");
 
             // Leave: the session saves; the absent two must be exactly as seeded.
             yield return PlayModeHarness.Await(rig.App.Services.Get<INetworkSession>().LeaveAsync(), Timeout);
