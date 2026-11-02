@@ -127,6 +127,86 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(tracker.MinGap, Is.GreaterThanOrEqualTo(AttackPacing.Tier1.MinStrikeGapSeconds - 0.05f), "a strike opened " + tracker.MinGap.ToString("F2") + " s after the last one closed");
         }
 
+        // Enemy AI stage 4: six rat-kings on one idle hero spread over the shared hover slots instead of piling on one spot. After the first seconds, any two
+        // that are both hovering (waiting for a token) stay at least their body contact apart (2 x Def.Radius), sampled every frame for the last 2 s.
+        // The all-pairs Chase minimum (a lunging or closing-in neighbour may touch) is logged as info only.
+        [UnityTest, Timeout(90000)]
+        public IEnumerator Solo_SixRatsOnOneHero_DoNotStack()
+        {
+            yield return StartCombatSolo();
+            yield return SixRatsOnOneHero(inRoom: false);
+        }
+
+        // Same crowd inside a small walled room (mocked room lookup: a 7 m box around the hero), so the slots on the diagonals fall outside and the room clamp
+        // has to pull them in. Hovering enemies stay in the room and still do not overlap.
+        [UnityTest, Timeout(90000)]
+        public IEnumerator Solo_SixRatsOnOneHero_InsideARoom_StayInRoomAndApart()
+        {
+            yield return StartCombatSolo();
+            yield return SixRatsOnOneHero(inRoom: true);
+        }
+
+        private static IEnumerator SixRatsOnOneHero(bool inRoom)
+        {
+            var heroObject = AppBootstrap.Current.NetworkManager.LocalClient.PlayerObject;
+            HeroVitals vitals = heroObject.GetComponent<HeroVitals>();
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            yield return Seconds(0.3f);
+            Vector3 centre = heroObject.transform.position;
+            const float RoomHalf = 3.5f;
+            // the box follows the hero (rat hits knock an idle hero around, and the hero must stay inside the room)
+            if (inRoom) combat.RoomOf = p => { Vector3 h = heroObject.transform.position; return Mathf.Abs(p.x - h.x) <= RoomHalf && Mathf.Abs(p.z - h.z) <= RoomHalf ? 0 : -1; };
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * Mathf.PI * 2f / 6f + 0.3f;
+                float dist = inRoom ? 3.0f : 4.5f;
+                combat.SpawnEnemy(EnemyKind.RatKing, 1, centre + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * dist, room: inRoom ? 0 : EnemyCrowd.ArenaRoom);
+            }
+            float contact = 2f * EnemyCatalog.RatKing.Radius;
+            float worstHover = float.MaxValue, worstChase = float.MaxValue, farthestOut = 0f;
+            int hoverSamples = 0; string outInfo = "";
+            var chase = new System.Collections.Generic.List<Enemy>();
+            double start = Time.realtimeSinceStartupAsDouble;
+            const double Total = 14.0;
+            try
+            {
+                while (Time.realtimeSinceStartupAsDouble < start + Total)
+                {
+                    vitals.ServerHeal(1000);   // an idle hero must stay up so the crowd keeps working on it
+                    double t = Time.realtimeSinceStartupAsDouble - start;
+                    if (t > 5.0)
+                    {
+                        chase.Clear();
+                        foreach (Enemy e in Enemy.All) if (e.IsSpawned && e.Alive && e.Phase == EnemyPhase.Chase) chase.Add(e);
+                        for (int i = 0; i < chase.Count; i++)
+                        {
+                            if (inRoom && chase[i].WaitingForToken)
+                            {
+                                Vector3 o = chase[i].transform.position - heroObject.transform.position;
+                                float outBy = Mathf.Max(Mathf.Abs(o.x), Mathf.Abs(o.z)) - RoomHalf;
+                                if (outBy > farthestOut) { farthestOut = outBy; outInfo = "t=" + t.ToString("F1") + " off=" + o ; }
+                            }
+                            for (int j = i + 1; j < chase.Count; j++)
+                            {
+                                Vector3 d = chase[i].transform.position - chase[j].transform.position; d.y = 0f;
+                                worstChase = Mathf.Min(worstChase, d.magnitude);
+                                if (t > Total - 2.0 && chase[i].WaitingForToken && chase[j].WaitingForToken) { worstHover = Mathf.Min(worstHover, d.magnitude); hoverSamples++; }
+                            }
+                        }
+                    }
+                    yield return null;
+                }
+            }
+            finally { if (inRoom) combat.RoomOf = null; }
+            Debug.Log("[RingPlanner] six rats (" + (inRoom ? "room" : "open") + "): min hover-hover " + worstHover.ToString("F3") + " m over " + hoverSamples
+                + " samples, min any chase pair " + worstChase.ToString("F2") + " m, contact " + contact.ToString("F2") + " m, farthest hover outside room " + farthestOut.ToString("F2") + " m " + outInfo);
+            Assert.That(hoverSamples, Is.GreaterThan(0), "no two enemies were hovering together in the last 2 s, so the bar measured nothing");
+            Assert.That(worstHover, Is.GreaterThanOrEqualTo(contact - 0.02f), "two hovering enemies overlapped");
+            if (inRoom) Assert.That(farthestOut, Is.LessThanOrEqualTo(0.6f), "a hovering enemy left the room (the box moves with the hero, so some slack)");
+        }
+
         // Enemy AI stage 2 risk-review fix: the attack tokens are ONE set per CombatHost, not one per room. Targeting is world-wide, so two rooms' enemies can
         // work the same hero; four rat-kings (all melee) split over two rooms must still honour the hero's melee cap and the strike gap between hit windows.
         [UnityTest, Timeout(60000)]

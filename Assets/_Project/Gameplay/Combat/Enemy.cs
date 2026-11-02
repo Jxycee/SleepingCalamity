@@ -76,7 +76,9 @@ namespace SleepingCalamity.Gameplay
         private readonly AiContext _ctx = new AiContext();
         private readonly List<HeroVitals> _heroBuf = new List<HeroVitals>();   // parallel to _ctx.Heroes
         private static readonly System.Func<float> s_rand = () => Random.value;
-        private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand, Def, Hunts);
+        private RingPlanner Rings => (Crowd ??= new EnemyCrowd(new AttackTokens())).Rings;
+        private AiBrain Brain => _brain ??= new AiBrain(Tokens, s_rand, Def, Hunts, Rings);
+        private System.Func<float, float, bool> _inRoom;   // cached: hover slots must lie in this enemy's room (null for roomless enemies or no room lookup)
         // Host: true for enemies spawned without a room (arena waves, the hunter): they chase from anywhere. Room enemies use their aggro/leash ranges. Set before the first tick.
         public bool Hunts;
         private CombatHost _host; private int _room = EnemyCrowd.ArenaRoom;   // host: the room this enemy belongs to (room scope of its aggro, doc 6.4)
@@ -283,7 +285,14 @@ namespace SleepingCalamity.Gameplay
             // Threat targeting (stage 3): locked while telling or striking, so a target switch never happens mid-attack.
             HeroVitals target = PickTarget(dt, locked: Phase == EnemyPhase.Attack);
             if (_cooldown > 0f) _cooldown -= dt;
-            if (Phase == EnemyPhase.Attack) { ServerAdvanceAttack(dt, target); return; }
+            if (Phase == EnemyPhase.Attack)
+            {
+                // a striker keeps reporting where it is, so the others do not hover around a ghost at its last chase position
+                Vector3 sp = transform.position;
+                Rings.Observe(GetHashCode(), sp.x, sp.z, Def.SeparationRadius, Time.timeAsDouble, out _, out _);
+                ServerAdvanceAttack(dt, target);
+                return;
+            }
             if (target == null) { ServerReturnHome(dt); return; }
             _homeWalk = 0f;
 
@@ -303,6 +312,33 @@ namespace SleepingCalamity.Gameplay
             FaceToward(new Vector3(act.FaceX, 0f, act.FaceZ), act.FaceDegPerSec, dt);
             if (act.StartAttack != null) { ServerStartAttack(act.StartAttack, target.transform.position); return; }
             if (act.MoveSpeed > 0f) MoveHorizontal(new Vector3(act.MoveX, 0f, act.MoveZ), act.MoveSpeed, dt);
+            ServerResolveOverlap();
+        }
+
+        // Host: a hard floor under the soft separation. Another enemy closer than the two bodies touching (radius sum) is pushed out by half the overlap (the
+        // other pushes the rest on its own tick); a strike in progress is never shoved. Skips a push that would end inside a wall.
+        private void ServerResolveOverlap()
+        {
+            Vector3 p = transform.position;
+            Vector3 push = Vector3.zero;
+            for (int i = 0; i < s_all.Count; i++)
+            {
+                Enemy o = s_all[i];
+                if (o == this || o == null || !o.IsSpawned || !o.Alive || o.NetworkManager != NetworkManager) continue;
+                Vector3 d = p - o.transform.position; d.y = 0f;
+                float min = Def.Radius + o.Def.Radius + 0.04f;
+                float m2 = d.sqrMagnitude;
+                if (m2 >= min * min) continue;
+                if (m2 < 1e-6f) { float a = GetHashCode() * 2.399963f; d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)); m2 = min * min; }
+                float mag = Mathf.Sqrt(m2);
+                push += d / mag * ((min - mag) * (o.Phase == EnemyPhase.Attack ? 1f : 0.5f));
+            }
+            if (push.sqrMagnitude < 1e-8f) return;
+            if (push.sqrMagnitude > Def.Radius * Def.Radius) push = push.normalized * Def.Radius;
+            Vector3 np = p + push;
+            if (Blocked(np)) return;
+            if (_inRoom != null && _inRoom(p.x, p.z) && !_inRoom(np.x, np.z)) return;   // never shove an in-room enemy out of its room
+            transform.position = np;
         }
 
         // Host: forget the current target and its ledger entry.
@@ -357,11 +393,15 @@ namespace SleepingCalamity.Gameplay
                 Vector3 hp = v.transform.position;
                 int id = v.GetHashCode();
                 bool inRoom = selfInRoom && _host.RoomOf(hp) == _room;
-                _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, InRoom = inRoom, Load = Targets.CountOn(id, self) });
+                Vector3 fwd = v.transform.forward;
+                _ctx.Heroes.Add(new AiHero { Id = id, X = hp.x, Y = hp.y, Z = hp.z, Up = true, InRoom = inRoom, FaceX = fwd.x, FaceZ = fwd.z, Load = Targets.CountOn(id, self) });
                 _heroBuf.Add(v);
             }
             Vector3 p = transform.position;
             _ctx.SelfX = p.x; _ctx.SelfY = p.y; _ctx.SelfZ = p.z;
+            if (_room >= 0 && _host != null && _host.RoomOf != null)
+                _ctx.InBounds = _inRoom ??= (x, z) => _host.RoomOf(new Vector3(x, transform.position.y, z)) == _room;
+            else _ctx.InBounds = null;
         }
 
         // The target for this tick by Core ThreatTable (aggro/leash, load balance, stickiness, no switch while locked); null when nobody is in range.

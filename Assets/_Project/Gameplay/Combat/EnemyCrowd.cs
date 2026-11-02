@@ -16,9 +16,11 @@ namespace SleepingCalamity.Gameplay
 
         public readonly AttackTokens Tokens;
         public readonly TargetLedger Targets;   // who targets whom, host-wide like the tokens (ThreatTable load balance)
+        public readonly RingPlanner Rings;      // hover slots and separation, host-wide like the tokens (a hero's ring is shared by every room's enemies on it)
         private readonly Dictionary<int, Enemy> _members = new Dictionary<int, Enemy>();
 
-        public EnemyCrowd(AttackTokens tokens, TargetLedger targets = null) { Tokens = tokens ?? new AttackTokens(); Targets = targets ?? new TargetLedger(); }
+        public EnemyCrowd(AttackTokens tokens, TargetLedger targets = null, RingPlanner rings = null)
+        { Tokens = tokens ?? new AttackTokens(); Targets = targets ?? new TargetLedger(); Rings = rings ?? new RingPlanner(); }
 
         public int Count => _members.Count;
         public bool Contains(Enemy e) => e != null && _members.ContainsKey(e.GetHashCode());
@@ -35,6 +37,7 @@ namespace SleepingCalamity.Gameplay
             int id = e.GetHashCode();
             _members.Remove(id);
             Targets.Remove(id);
+            Rings.Remove(id);
             Tokens.Release(id, Time.timeAsDouble);
         }
 
