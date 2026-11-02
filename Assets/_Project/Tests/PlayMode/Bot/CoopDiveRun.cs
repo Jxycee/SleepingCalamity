@@ -134,7 +134,11 @@ namespace SleepingCalamity.Tests.PlayMode
             SceneFlow.DevDiveArena = false;
         }
 
-        public int Count(string kind) => _issueCounts.Where(k => k.Key.StartsWith(kind + "|")).Sum(k => k.Value);
+        // M7 S4: per-frame hook (after the bots ticked, before the frame yields) and read access to the grouped log counts ("Type|first line" -> count).
+        public System.Action<CoopDiveRun> EveryFrame;
+        public IEnumerable<KeyValuePair<string, int>> IssueCounts => _issueCounts;
+
+        public int Count(string kind) =>_issueCounts.Where(k => k.Key.StartsWith(kind + "|")).Sum(k => k.Value);
 
         // ------------------------------------------------------------------------------------------------ the run
         // Plays `seconds` of game time. A second dive is started whenever the first one is over (the bot walks the hub stair again).
@@ -152,6 +156,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 MaxFloor = Mathf.Max(MaxFloor, Bot.Floor);
                 if (Bot.WentHome && Bot.Floor == 0) { DivesHome++; Bot.WentHome = false; }   // another dive
                 ObserveVitals(Step);
+                EveryFrame?.Invoke(this);
                 if (Seconds >= nextSecond) { nextSecond += 1f; IgnoreOwnCopies(); everySecond?.Invoke(this); }
 
                 if (!hashPending && Seconds >= nextHash) { hashPending = true; hashStart = Seconds; HashSamples++; }
