@@ -105,20 +105,19 @@ namespace SleepingCalamity.EditorTools
         }
 
         // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
-        // z = 0 face. A pale nosing along the tread's front edge and a dark shadow band hanging on the riser; both visual only (no collider, no shadow casting).
-        static Material _nosing, _riserShade;
+        // z = 0 face. A pale nosing along the tread's front edge (visual only, no collider, no shadow casting). A dark riser band was tried in round 1 and floated black wedges over the
+        // terrain at the flight's edges (Cap_HM_TerraceSteps), so it is gone.
+        static Material _nosing;
         static void AddStepReadability(Transform step)
         {
             if (_nosing == null)
             {
                 Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
                 _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.42f, 0.39f, 0.33f), 0.15f, wear);
-                _riserShade = BeautyCornerArt.Flat("LK_RiserShade", new Color(0.018f, 0.016f, 0.014f), 0.05f, wear);
-                foreach (Material m in new[] { _nosing, _riserShade }) { m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true); }
+                _nosing.SetColor("_Color", _nosing.GetColor("_BaseColor")); _nosing.SetShaderPassEnabled("MotionVectors", true);
             }
             GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.045f), new Vector3(2f, 0.03f, 0.1f), _nosing);
-            GameObject r = LookTestBuilder.Prim(step, "RiserShade", PrimitiveType.Cube, new Vector3(0f, 0.045f, -0.006f), new Vector3(2f, 0.2f, 0.012f), _riserShade);
-            foreach (GameObject go in new[] { n, r }) go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         static string Family(LaneKitRow r)

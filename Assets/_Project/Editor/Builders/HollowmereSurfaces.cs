@@ -66,7 +66,7 @@ namespace SleepingCalamity.EditorTools
             _sand = DecalMat("HM_Surf_Wear", new Color(0.62f, 0.52f, 0.38f), 0.20f);
             _moss = DecalMat("HM_Surf_Moss", new Color(0.18f, 0.22f, 0.13f), 0.17f);
             _stain = DecalMat("HM_Surf_Stain", new Color(0.04f, 0.03f, 0.02f), 0.24f);
-            _wear = DecalMat("HM_Surf_WornRun", new Color(0.66f, 0.56f, 0.42f), 0.26f);
+            _wear = DecalMat("HM_Surf_WornRun", new Color(0.66f, 0.56f, 0.42f), 0.12f);
             _ao = DecalMat("HM_Surf_ContactAO", new Color(0.015f, 0.012f, 0.01f), 0.6f);
             AssetDatabase.SaveAssets();
         }
@@ -173,8 +173,7 @@ namespace SleepingCalamity.EditorTools
                 float len = Mathf.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
                 float mx = (ax + bx) * 0.5f, mz = (az + bz) * 0.5f, yaw = Mathf.Atan2(bx - ax, bz - az) * Mathf.Rad2Deg + 90f;
                 Flat(g, "Run" + r, _wear, mx, Y(mx, mz), mz, len, 2.4f + 0.6f * H(r, 0, 90), yaw, 2);
-                Flat(g, "RunCore" + r, _wear, mx, Y(mx, mz), mz, len * 0.7f, 1.0f, yaw, 3);
-                n += 2; r++;
+                n++; r++;
             }
             return n;
         }
