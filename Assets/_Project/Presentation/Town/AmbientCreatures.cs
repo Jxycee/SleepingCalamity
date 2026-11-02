@@ -169,7 +169,7 @@ namespace SleepingCalamity.Presentation
                     c.position = p;
                     // a card within 3 m of the camera would read as a huge wing: hide it there
                     bool near = cam != null && (cam.transform.position - p).sqrMagnitude < 9f;
-                    if (!live && BakedAvoid != null) foreach (Vector3 a in BakedAvoid) if ((a - p).sqrMagnitude < 9f) { near = true; break; }
+                    if (!live && BakedAvoid != null) foreach (Vector3 a in BakedAvoid) if ((a - p).sqrMagnitude < 16f) { near = true; break; }
                     float s = near ? 0f : scale;
                     c.localScale = new Vector3(s, s, s);
                 }

@@ -187,8 +187,18 @@ namespace SleepingCalamity.EditorTools
             if (flocks.Count == 0) return;
             var c = owner.AddComponent<AmbientCreatures>();
             c.Flocks = flocks.ToArray();
-            AmbientCreatures.BakedAvoid = System.Array.ConvertAll(HollowmereBuilder.Cameras, k => k.Pos);
             c.Pose(37f, 0f, false);   // a settled frame for edit-mode captures
+        }
+
+        /// <summary>Called once every capture camera exists (round 3: the avoid list used the cameras' relative heights and missed the road and garden cameras): re-poses the baked cards clear of all of them.</summary>
+        public static void BakeAvoid(Transform root)
+        {
+            Transform cams = root.Find("CaptureCameras");
+            if (cams == null) return;
+            var pos = new List<Vector3>();
+            foreach (Camera cam in cams.GetComponentsInChildren<Camera>(true)) pos.Add(cam.transform.position);
+            AmbientCreatures.BakedAvoid = pos.ToArray();
+            foreach (AmbientCreatures c in root.GetComponentsInChildren<AmbientCreatures>(true)) { c.Pose(37f, 0f, false); EditorUtility.SetDirty(c); }
         }
 
         static Mesh EnsureCardMesh()
@@ -385,18 +395,18 @@ namespace SleepingCalamity.EditorTools
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
             float life = HollowmereAmbientLife.SmokeLifetime;
-            main.duration = 10f; main.loop = true; main.prewarm = true; main.startLifetime = life; main.startSpeed = 0.7f;
-            main.startSize = new ParticleSystem.MinMaxCurve(0.3f, 0.5f); main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.2832f);
+            main.duration = 10f; main.loop = true; main.prewarm = true; main.startLifetime = life; main.startSpeed = 1.2f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.25f, 0.35f); main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.2832f);
             main.startColor = Color.white; main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = Mathf.CeilToInt(HollowmereAmbientLife.SmokeRate * life) + 4; main.gravityModifier = 0f;
             var em = ps.emission; em.rateOverTime = HollowmereAmbientLife.SmokeRate;
-            var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 5f; shape.radius = 0.12f;
+            var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 4f; shape.radius = 0.08f;
             var vel = ps.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World;
             Vector2 w = HollowmereAmbientLife.WindDirection;
-            vel.x = new ParticleSystem.MinMaxCurve(1.2f * w.x, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            vel.y = new ParticleSystem.MinMaxCurve(0.45f, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            vel.z = new ParticleSystem.MinMaxCurve(1.2f * w.y, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 4f)));
+            vel.x = new ParticleSystem.MinMaxCurve(0.6f * w.x, AnimationCurve.Linear(0f, 0f, 1f, 1f));
+            vel.y = new ParticleSystem.MinMaxCurve(0.0f, AnimationCurve.Linear(0f, 0f, 1f, 1f));
+            vel.z = new ParticleSystem.MinMaxCurve(0.6f * w.y, AnimationCurve.Linear(0f, 0f, 1f, 1f));
+            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 5.6f)));   // size 0.25-0.35 m -> about 1.4-2 m
             var rot = ps.rotationOverLifetime; rot.enabled = true; rot.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
             var col = ps.colorOverLifetime; col.enabled = true;
             var g = new Gradient();

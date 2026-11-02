@@ -37,7 +37,7 @@ namespace SleepingCalamity.Presentation
 
         // ---- smoke
         public const float SmokeRate = 8f;              // particles per second per chimney
-        public const float SmokeLifetime = 9f;
+        public const float SmokeLifetime = 12f;
         public const float SmokeAlpha = 0.22f;            // peak alpha of a puff
         public static readonly Color SmokeColour = new Color(0.58f, 0.57f, 0.56f);   // neutral warm grey
 

@@ -107,17 +107,22 @@ namespace SleepingCalamity.EditorTools
         // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
         // z = 0 face. A pale nosing along the tread's front edge (visual only, no collider, no shadow casting). A dark riser band was tried in round 1 and floated black wedges over the
         // terrain at the flight's edges (Cap_HM_TerraceSteps), so it is gone.
-        static Material _nosing;
+        static Material _nosing, _treadShade;
         static void AddStepReadability(Transform step)
         {
             if (_nosing == null)
             {
                 Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
-                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.62f, 0.58f, 0.49f), 0.15f, wear);
+                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.80f, 0.76f, 0.66f), 0.15f, wear);   // round 3: lighter, deeper nosing
                 _nosing.SetColor("_Color", _nosing.GetColor("_BaseColor")); _nosing.SetShaderPassEnabled("MotionVectors", true);
+                _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.13f, 0.12f, 0.10f), 0.1f, wear);
+                _treadShade.SetColor("_Color", _treadShade.GetColor("_BaseColor")); _treadShade.SetShaderPassEnabled("MotionVectors", true);
             }
-            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.156f, 0.05f), new Vector3(2f, 0.04f, 0.14f), _nosing);
+            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), new Vector3(2f, 0.04f, 0.24f), _nosing);
             n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // dark shade line at the back of the tread (under the next riser): sits wholly on the tread top, so it cannot float at the flight's edges
+            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.50f), new Vector3(2f, 0.04f, 0.09f), _treadShade);
+            sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         static string Family(LaneKitRow r)
