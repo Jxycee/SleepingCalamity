@@ -149,7 +149,7 @@ namespace SleepingCalamity.EditorTools
         static void Attach(GameObject go, Mesh mesh, string kit)
         {
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = kit == "Lintel_Ivy" ? StrandMaterial() : kit.Contains("Ivy") ? IvyMaterial() : mat;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = kit.Contains("Ivy") ? IvyMaterial() : mat;
             r.shadowCastingMode = ShadowCastingMode.On; r.receiveShadows = true;
         }
 
@@ -401,19 +401,6 @@ namespace SleepingCalamity.EditorTools
             ivyMat.enableInstancing = true;
             EditorUtility.SetDirty(ivyMat);
             return ivyMat;
-        }
-
-        // A4 round 3: hanging strands in a dark, muted green (the lime of the atlas's young leaves read as caps).
-        static Material strandMat;
-        static Material StrandMaterial()
-        {
-            if (strandMat != null) return strandMat;
-            strandMat = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/Hollowmere/M_HM_IvyStrand.mat", mat.shader);
-            strandMat.CopyPropertiesFromMaterial(mat);
-            strandMat.SetColor("_BaseColor", new Color(0.30f, 0.36f, 0.24f, 1f));
-            strandMat.enableInstancing = true;
-            EditorUtility.SetDirty(strandMat);
-            return strandMat;
         }
 
         // The far hedge's leaf cards in a darker, deeper green than the wall ivy (the ivy atlas's bright young-leaf tone read as a light strip at 120 m):
@@ -704,14 +691,7 @@ namespace SleepingCalamity.EditorTools
                 {
                     float x = R(rng, a + 1f, b - 1f);
                     if (NearButtress(x, 0.7f) || Taken(x, 1.8f)) continue;
-                    bool pa = rng.Next(2) == 0; float py = G(t, x, face - 0.3f) + R(rng, 0.3f, rng.NextDouble() < 0.35 ? 4.2f : 2.6f), ps = R(rng, 0.8f, 1.5f);
-                    Put(g, pa ? "Ivy_Patch_A" : "Ivy_Patch_B", new Vector3(x, py, face - 0.03f), 180f + R(rng, -10f, 10f), ps, rng.Next(2) == 0);
-                    // A4 round 3: a thin, dark strand hangs from some mid-wall patches (sparse, varied; never at the parapet). Lintel_Ivy's pivot is its top centre.
-                    if (kits.ContainsKey("Lintel_Ivy") && rng.NextDouble() < (ruined ? 0.5 : 0.3))
-                    {
-                        float sy = R(rng, 1.2f, 2.2f), sx = R(rng, 0.25f, 0.5f);
-                        Put(g, "Lintel_Ivy", new Vector3(x + R(rng, -0.35f, 0.35f), py + (pa ? 1.4f : 0.6f) * ps * R(rng, 0.35f, 0.6f), face - 0.06f), 180f + R(rng, -8f, 8f), new Vector3(sx, sy, 0.7f), rng.Next(2) == 0);
-                    }
+                    Put(g, rng.Next(2) == 0 ? "Ivy_Patch_A" : "Ivy_Patch_B", new Vector3(x, G(t, x, face - 0.3f) + R(rng, 0.3f, rng.NextDouble() < 0.35 ? 4.2f : 2.6f), face - 0.03f), 180f + R(rng, -10f, 10f), R(rng, 0.8f, 1.5f), rng.Next(2) == 0);
                 }
                 for (float x = a + 0.75f; x < b - 0.75f; x += 1.5f)
                 {
