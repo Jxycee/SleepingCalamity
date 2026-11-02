@@ -62,7 +62,15 @@ namespace SleepingCalamity.Presentation
 
             bool active = dd != null && dd.NetActive.Value && _hero != null && _haveSum;
             _model.Observe(Time.unscaledTimeAsDouble, active, _haveSum ? _sum.CurrentFloor : 0, _hero != null ? _hero.Hp : 0,
-                _hero != null ? _hero.Loaves : 0, _haveSum ? (ulong)(uint)_sum.ClearedMask : 0UL);
+                _hero != null ? _hero.Loaves : 0, RoomMask(contents, _haveSum ? _sum.CurrentFloor : 0));
+        }
+
+        // The per-room cleared mask of the floor being played (the haul summary's ClearedMask is the cleared-FLOOR mask). Zero until the contents state of this floor has arrived.
+        private static ulong RoomMask(CellarContentsSync contents, int floor)
+        {
+            if (contents == null || floor <= 0) return 0UL;
+            CellarContentsSync.ContentsState st = contents.State;
+            return st.Floor == floor ? st.Cleared : 0UL;
         }
 
         private void OnGUI()
