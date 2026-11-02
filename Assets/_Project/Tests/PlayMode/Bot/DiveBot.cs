@@ -59,20 +59,22 @@ namespace SleepingCalamity.Tests.PlayMode
         int _builtFloorSeen = -1;
                 bool _navDoorOpen;
         int _lastHp = -1;
-        float _healSince, _healGiveUpAt = -999f;
-        public int HealTrips;
+        float _healSince, _healGiveUpAt = -999f, _lastFaultAt = -999f, _loafAt = -999f;
+        public int HealTrips, LoavesEaten, FaultDeaths, HealsReached;
+        public readonly Dictionary<int, int> HitsByFloor = new Dictionary<int, int>(), VisitsByFloor = new Dictionary<int, int>();
 
         public DiveBot(FakeInputService input, Transform hero)
         {
             _input = input; _hero = hero;
             _loco = hero.GetComponent<HeroLocomotion>(); _combat = hero.GetComponent<HeroCombat>(); _vitals = hero.GetComponent<HeroVitals>();
             _cc = hero.GetComponent<CharacterController>();
-            _fighter = new ArenaBot(input, hero) { Dodges = true };
+            _fighter = new ArenaBot(input, hero) { Dodges = true, FlankFrontalBlockers = true };
             _progressPos = hero.position;
         }
 
         public void Note(string kind, string text, string where = "")
         {
+            if (kind == "Fall" || kind == "Entry" || kind == "Nav" || kind == "Embedded") _lastFaultAt = Seconds;   // a floor/traversal fault, not a balance problem
             string key = kind + "|" + Floor + "|" + text;
             if (!_seen.Add(key)) return;
             Findings.Add(new Finding { Kind = kind, Floor = Floor, Pos = _hero.position, Where = where, Text = text });
@@ -107,7 +109,10 @@ namespace SleepingCalamity.Tests.PlayMode
                     Note("Flow", $"3 s after floor {Floor} built, the hero is still {Flat(_hero.position - _teleportBounds.center).magnitude:0} m from it (not teleported)");
             }
 
+            // a loaf (H) when hurt, at most one per second; the host re-checks everything
+            if (_vitals.Loaves > 0 && _vitals.Hp < _vitals.MaxHp * 0.5f && Seconds - _loafAt > 1f) { _loafAt = Seconds; _vitals.RequestEatLoaf(); LoavesEaten++; }
             // hurt: walk to this floor's healing point (a player does) and stand in it; it heals to full for free
+            if (_target != null && _target.Goal == Goal.Heal && Done(_target)) { HealsReached++; Say($"healed to {_vitals.Hp}/{_vitals.MaxHp}"); }
             if (_target != null && _target.Goal == Goal.Heal && (Done(_target) || Seconds - _healSince > 25f)) { if (!Done(_target)) _healGiveUpAt = Seconds; _target = null; _corners.Clear(); }
             if ((_target == null || _target.Goal != Goal.Heal) && Floor >= 1 && Seconds - _healGiveUpAt > 60f && _vitals.Hp < _vitals.MaxHp * 0.45f
                 && d.HaulSync != null && d.HaulSync.TryHealingPoint(out Vector3 healPos, out bool healReady) && healReady)
@@ -153,6 +158,7 @@ namespace SleepingCalamity.Tests.PlayMode
             if (built > 0 && Floor > 0 && built != Floor + 1 && built != Floor)
                 Note("Flow", $"floor jumped from {Floor} to {built}");
             if (Floor > 0 && built != Floor) { FloorsCleared++; Say($"left floor {Floor} after {_floorClock:0} s"); }
+            if (built > 0) VisitsByFloor[built] = (VisitsByFloor.TryGetValue(built, out int vis) ? vis : 0) + 1;
             _builtFloorSeen = built; Floor = built; _floorClock = 0f; _given.Clear(); _target = null; _corners.Clear();
             if (built > 0)
             {
@@ -465,7 +471,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             DiveDirector dd = Dir;
             bool active = dd != null && dd.NetActive.Value;
-            if (_wasActive && !active && !WentHome) { DiveFails++; Say($"the dive ended without going home (fail #{DiveFails}); HP {_vitals.Hp}, last HP {_lastHp}"); if (_lastHp >= 0 && _lastHp < _vitals.MaxHp * 0.35f) Deaths++; }
+            if (_wasActive && !active && !WentHome) { DiveFails++; if (Seconds - _lastFaultAt < 20f) FaultDeaths++; Say($"the dive ended without going home (fail #{DiveFails}{(Seconds - _lastFaultAt < 20f ? ", floor/traversal fault in the last 20 s: not a balance death" : "")}); HP {_vitals.Hp}, last HP {_lastHp}"); if (_lastHp >= 0 && _lastHp < _vitals.MaxHp * 0.35f) Deaths++; }
             _wasActive = active;
             if (Tough && _vitals.IsUp && _vitals.Hp < _vitals.MaxHp / 2 && _vitals.IsServer) _vitals.ServerHeal(_vitals.MaxHp);
             if (_lastHp >= 0 && _vitals.Hp < _lastHp && !EnemyNear(4f)) Note("Combat", $"took {_lastHp - _vitals.Hp} damage with no enemy within 4 m");
@@ -474,6 +480,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 Enemy near = null; float best = 8f;
                 foreach (Enemy e in Object.FindObjectsByType<Enemy>(FindObjectsSortMode.None))
                 { float d = Flat(e.transform.position - _hero.position).magnitude; if (d < best) { best = d; near = e; } }
+                HitsByFloor[Floor] = (HitsByFloor.TryGetValue(Floor, out int hf) ? hf : 0) + 1;
                 HitLog.Add($"F{Floor} -{_lastHp - _vitals.Hp} ({_vitals.Hp}/{_vitals.MaxHp}) by {(near != null ? near.Def.Id + " tier " + near.Model?.Tier + " at " + best.ToString("0.0") + " m" : "nothing within 8 m")}");
             }
             _lastHp = _vitals.Hp;
@@ -523,7 +530,7 @@ namespace SleepingCalamity.Tests.PlayMode
         static string V(Vector3 p) => $"({p.x:0.0}, {p.y:0.0}, {p.z:0.0})";
 
         public string Summary() =>
-            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared}, chests {ChestsOpened}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips}, stuck spells {StuckEvents}, downed {Downed}, heart banked {HeartBanked}, went home {WentHome}, findings {Findings.Count}";
+            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared}, chests {ChestsOpened}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips} (reached {HealsReached}), loaves eaten {LoavesEaten}, fails near a floor fault {FaultDeaths}, hits per floor {string.Join(", ", HitsByFloor.OrderBy(k => k.Key).Select(k => "F" + k.Key + " " + k.Value + " in " + (VisitsByFloor.TryGetValue(k.Key, out int vv) ? vv : 0) + " visits"))}, stuck spells {StuckEvents}, downed {Downed}, heart banked {HeartBanked}, went home {WentHome}, findings {Findings.Count}";
 
         public BotReport Fight => _fighter.Report;
     }

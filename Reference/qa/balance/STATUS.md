@@ -1,4 +1,4 @@
-Status: BLOCKED (partial: wins committed, target not met; the user decides the next balance step)
+Status: BLOCKED (run 7: deaths mostly gone, 0 of 5 home only because the bot runs out of its 1500 s; user decides the next step)
 Archive: ready
 
 # Solo normal dive balance (2026-11-02)
@@ -34,3 +34,23 @@ Not reached: no seed gets home. Do not cut attack further (0.55 is near the floo
 1. **Fix the bot before more numbers**: loaf use (`H`), retreat to the nearest healing point/checkpoint bank at low HP and *wait* until healed, guard against brooms. A player takes far fewer than 30 hits per floor. Also the floor falls/entry findings (Reference/qa/traversal) kill runs.
 2. **Floor 3 is the cliff.** Candidates, in order: broom tier 1 on floors 3 (284 hits: its sweep reach 1.9 m and frontal block; check bot approach before changing numbers); tier-2 'S' rat-kings first appearing on floor 3 at x3 life/x3.3 DEF: `tier2Life` 3 -> 2 and `tier2Def` 3.3 -> 2.2 is a global tuning option (run 4 had it; it affects co-op).
 3. A solo hero-side option if numbers must carry it: more max HP or a free heal on room clear solo (HeroVitals.BaseMaxHp is a const 100; ClearHeal 20).
+
+## Run 7 (2026-11-02, smarter bot, soloAtk 0.55 / soloLife 0.75, numbers unchanged)
+Bot changes (test-only): eats loaves (H) below 50% HP (none were in the dev dive: 0 eaten), retreats to the floor's healing point below 45% and waits until 90%, walks to a broom's side instead of its blocking front, tags dive fails within 20 s of a Fall/Entry/Nav/Embedded finding as floor faults, prints hits per floor and per visit.
+
+| seed | fails (floor-fault) | deepest | hits / dmg | lowest HP | heal trips (reached) | hits per floor (visits) | ended |
+|---|---|---|---|---|---|---|---|
+| 12345 | 2 (1) | F3 | 56 / 376 | 1% | 0 | F1 7, F2 14, F3 35 (3) | cap, on F3 chests |
+| 7 | 3 (1) | F3 | 66 / 440 | 1% | 0 | F1 9, F2 1, F3 56 (4) | cap, on F3 chests |
+| 31 | 0 | F3 | 28 / 164 | 47% | 2 (2) | F1 3, F2 7, F3 22 | cap, 2 floors cleared |
+| 404 | 1 | F4 | 50 / 362 | 5% | 2 (2) | F1 1, F2 12, F3 25 (2), F4 17 | cap, on F3 chests |
+| 2024 | 0 | F4 | 14 / 80 | 65% | 0 | F1 2, F2 6, F3 3, F4 3 | cap, just entered F4 |
+
+Compared with run 6 (806 hits, 4-14 fails per seed) hits fell to 214 and fails to 0-3: the earlier 0/5 was mostly the bot. Damage now: rat_king tier 2 F3 80 hits / 660 dmg (largest), broom F3 42 / 236 (3.8 per F3 visit, was ~25), rat_king t1 F1-F4 62 / 395. Heart never reached, nobody went home.
+
+**The remaining gap is time, not death:** every seed was alive at the 1500 s cap, still on chests of F3/F4 (the bot clears every chest, ~400-500 s per floor). Four floors plus heart plus the way home need roughly 2000-2500 s of bot play at this pace.
+
+## Recommendation (replaces the earlier one)
+1. Do not touch the numbers yet. Let the bot play to the end: raise the normal limit to ~3000 s (one run of 5 seeds is then ~25 min of PlayMode lock; run 2-3 seeds first) or make it skip optional chests on floors 3-4 and head for the stair/heart. That settles whether solo normal is winnable at soloAtk 0.55 / soloLife 0.75.
+2. If it then wins nearly always, the solo numbers can be eased back toward 1.0 to keep it a fight; if it still loses on F3/F4, the user's options are the tier-2 rat-king on F3 (`tier2Life` 3 -> 2, `tier2Def` 3.3 -> 2.2; global, co-op too) or a solo hero HP / clear-heal change.
+3. Separate bugs seen: falls through the floor on F2/F3, no walkable ground on stair arrival (traversal), checkpoint bank prompt None at ~3 m on F2.
