@@ -10,6 +10,7 @@ namespace SleepingCalamity.Core
             {
                 case InputContext.Menu: return RouteMenu(in frame);
                 case InputContext.LockOn: return RouteLockOn(in frame);
+                case InputContext.Placement: return RoutePlacement(in frame);
                 default: return RouteFree(in frame);
             }
         }
@@ -35,6 +36,23 @@ namespace SleepingCalamity.Core
             i.SwitchX = f.SwitchX;
             i.SwitchY = f.SwitchY;
             return i;
+        }
+
+        // Placement: every gameplay field is zeroed (the hero stands still; nothing swings, jumps, locks or interacts with the world) and the same buttons arrive on the placement-only
+        // fields instead: switch input -> PlaceMoveX/Y (to the neighbouring lot), Primary -> PlacePressed, Secondary -> PickUpPressed, Interact -> NextLotPressed, Jump -> TurnPressed.
+        // Pause passes so the menu still opens (placement mode leaves when it does).
+        private static PlayerIntent RoutePlacement(in PlayerInputFrame f)
+        {
+            return new PlayerIntent
+            {
+                PlaceMoveX = f.SwitchX,
+                PlaceMoveY = f.SwitchY,
+                PlacePressed = f.PrimaryPressed,
+                PickUpPressed = f.SecondaryPressed,
+                NextLotPressed = f.InteractPressed,
+                TurnPressed = f.JumpPressed,
+                PausePressed = f.PausePressed,
+            };
         }
 
         // Free: the switch input is zeroed (the same stick is the camera's Look).

@@ -13,6 +13,7 @@ namespace SleepingCalamity.EditorTools
         public const string DummyPrefab = "Assets/_Project/Prefabs/TargetDummy.prefab";      // M2: a host-spawned target dummy (NetworkObject)
         public const string CameraRigPrefab = "Assets/_Project/Prefabs/HeroCameraRig.prefab"; // M2: the owner's Cinemachine rig (not networked)
         public const string CellarFloorSyncPrefab = "Assets/_Project/Prefabs/CellarFloorSync.prefab"; // M5 stage 3: host-spawned holder of the dive seed and floor id (NetworkObject)
+        public const string TownSyncPrefab = "Assets/_Project/Prefabs/TownSync.prefab"; // M6 S4: host-spawned town replication, builder lock and placement requests (NetworkObject)
         public const string CellarContentsSyncPrefab = "Assets/_Project/Prefabs/CellarContentsSync.prefab"; // M5 contents: host-spawned room enemies, chests, keys, locked door, pieces (NetworkObject)
         public const string DiveHaulSyncPrefab = "Assets/_Project/Prefabs/DiveHaulSync.prefab"; // M5 banking: host-spawned holder of the shared haul summary (NetworkObject)
         public const string DiveDirectorPrefab = "Assets/_Project/Prefabs/DiveDirector.prefab"; // M5 spine: host-spawned dive flow owner (NetworkObject)

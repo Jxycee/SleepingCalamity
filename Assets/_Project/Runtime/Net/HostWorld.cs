@@ -293,6 +293,11 @@ namespace SleepingCalamity.Runtime
             }
         }
 
+        // M6 S4: asks the save flow to write the world now (TownSync calls it when the builder leaves placement mode, so a finished build is on disk even if the host then crashes).
+        // Its own event, not Changed (Changed means "the players changed"). WorldSaveFlow answers with SaveNow(), which captures the town sections from the live ITownSource.
+        public event Action SaveRequested;
+        public void RequestSave() => EventIsolation.Invoke(SaveRequested);
+
         private void RaiseChanged() => EventIsolation.Invoke(Changed);
     }
 }

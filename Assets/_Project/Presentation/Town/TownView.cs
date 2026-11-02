@@ -1,10 +1,9 @@
-// Authority: none (presentation). M6 S3 minimal runtime town view: the builder emits the bakery's frame and parts as greybox groups hidden on lot F02 (HollowmereBuilder/HollowmereHub),
+// Authority: none (presentation). M6 S3 minimal runtime town view: the builder emits the bakery's frame and parts as greybox groups on every L lot (HollowmereBuilder/HollowmereHub),
 // and this component shows them from a TownState: the frame when a building stands on the lot (turned to its door side), each part when its piece is slotted, the baker when he has moved
-// in, and it hides the lot's ruin while a building stands there. The state source is the host's town stock (DiveDirector.Instance.Town); a client has none until S4's TownSync replicates
-// placements, so a client shows the default town (nothing placed), which is the town every peer starts from. Nothing can be placed before S4, so the views agree.
+// in, and it hides the lot's ruin while a building stands there. M6 S4: the state is the REPLICATED town (TownSync.View, built from the host-written NetTown), the same shape on the host
+// and every client, so a late joiner sees the placed town and nobody reads the host-only DiveDirector.
 using System;
 using SleepingCalamity.Core;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace SleepingCalamity.Presentation
@@ -24,7 +23,7 @@ namespace SleepingCalamity.Presentation
         }
 
         public Lot[] Lots = new Lot[0];
-        public Func<TownState> Source;      // tests; null = the host's DiveDirector town stock
+        public Func<TownState> Source;      // tests; null = the replicated town (TownSync.Local.View)
         private string _shown = "";
         private float _next;
 
@@ -32,14 +31,8 @@ namespace SleepingCalamity.Presentation
         {
             if (Time.unscaledTime < _next) return;
             _next = Time.unscaledTime + 0.25f;
-            TownState state = null;
-            if (Source != null) state = Source();
-            else
-            {
-                NetworkManager nm = NetworkManager.Singleton;
-                DiveDirector director = DiveDirector.Instance;
-                if (nm != null && nm.IsServer && director != null && director.IsSpawned) state = director.Town.State;
-            }
+            // One source on every peer: the replicated town (TownSync.View, rebuilt from the host-written NetTown). Null until the sync has spawned = the default town.
+            TownState state = Source != null ? Source() : TownSync.Local != null && TownSync.Local.IsSpawned ? TownSync.Local.View : null;
             Show(state);
         }
 
