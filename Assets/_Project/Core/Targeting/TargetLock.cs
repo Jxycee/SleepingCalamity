@@ -1,7 +1,7 @@
 // Core, no engine references, unit-tested. The hard lock (docs/PHASE1.md 6.1/6.5): one locked target, owner-local (never networked).
 //   Acquire: the best target inside 10 m (SoftTargeting.PickAcquire).  Hold: until the target is over 13 m away (hysteresis), or has been
-//   out of sight for 1.0 s in a row, or died or vanished.  Elites and bosses (IsElite) never lose the lock to range or sight; only the
-//   player's own toggle, their death or their removal ends it.  Flick: switches to the nearest target in a stick direction.
+//   out of sight for 1.0 s in a row, or died or vanished.  Elites and bosses (IsElite) hold longer (EliteReleaseRange 26 m, EliteLosGraceSeconds 4 s)
+//   but do drop: a lock glued through walls and rooms was a playtest bug.  Flick: switches to the nearest target in a stick direction.
 using System;
 using System.Collections.Generic;
 
@@ -53,14 +53,10 @@ namespace SleepingCalamity.Core
 
             TargetCandidate c = candidates[index];
             if (!c.Alive) return Clear(LockDrop.Dead);
-            if (c.IsElite)
-            {
-                SecondsWithoutSight = 0f;
-                return LockDrop.None;
-            }
-
+            float release = c.IsElite ? TargetingConfig.EliteReleaseRange : TargetingConfig.ReleaseRange;
+            float grace = c.IsElite ? TargetingConfig.EliteLosGraceSeconds : TargetingConfig.LosGraceSeconds;
             float distance = SoftTargeting.FlatDistance(c.X - seeker.X, c.Z - seeker.Z);
-            if (distance > TargetingConfig.ReleaseRange) return Clear(LockDrop.OutOfRange);
+            if (distance > release) return Clear(LockDrop.OutOfRange);
 
             if (c.HasLineOfSight)
             {
@@ -69,7 +65,7 @@ namespace SleepingCalamity.Core
             else
             {
                 SecondsWithoutSight += dt;
-                if (SecondsWithoutSight >= TargetingConfig.LosGraceSeconds) return Clear(LockDrop.LostSight);
+                if (SecondsWithoutSight >= grace) return Clear(LockDrop.LostSight);
             }
             return LockDrop.None;
         }

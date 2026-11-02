@@ -69,6 +69,13 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_LakeJetty", new Vector3(-13.5f, 1.9f, -76.5f), new Vector3(-16f, -12.2f, -100f), 55f),   // Q10: from the north bank beside the jetty (root ~(-22,-82), deck heading SE), looking over it and the lake to the far shore
             ("Cap_HM_Ravine", new Vector3(107.8f, 1.7f, -21.4f), new Vector3(91f, -11.5f, -43f), 55f),    // from the ravine's bank at s ~22 downstream along the pools and weirs W1, W2
             ("Cap_HM_MillLane", new Vector3(60.5f, 1.65f, -51.5f), new Vector3(72f, -5f, -64f), 65f),         // on Mill Lane toward the mill and the stream
+            ("Cap_HM_PX_Annex", new Vector3(9.0f, 1.65f, 0.5f), new Vector3(14f, 8.5f, 22f), 55f),         // town polish r2 (A5, A7): cistern-house gable, the ground patch in front and the annex's upper storey, like trailer frame a3
+            ("Cap_HM_PX_AnnexW", new Vector3(3.0f, 1.65f, 13.0f), new Vector3(12f, 9.5f, 24f), 58f),       // A5: the bell-loft annex's upper storey from the west, past the cistern house's gable
+            ("Cap_HM_PX_AnnexE", new Vector3(24.0f, 1.65f, 8.0f), new Vector3(12f, 9.5f, 24f), 58f),       // A5: the same from the south-east
+            ("Cap_HM_PX_Patch", new Vector3(10.0f, 1.65f, 2.0f), new Vector3(12.5f, 0.8f, 8.0f), 55f),    // A7: the ground in front of the cistern house's south gable, close
+            ("Cap_HM_PX_Cottage", new Vector3(3.0f, 1.65f, 8.5f), new Vector3(8f, 2.3f, 11.5f), 55f),     // A5: the cistern house's west front (door, shutters, the bar over the window), like b1
+            ("Cap_HM_PX_Ivy", new Vector3(-8f, 0.8f, 6f), new Vector3(0f, 3.5f, 19.6f), 55f),             // A4: low, from the square's north-west corner along the keep wall's ivy
+            ("Cap_HM_PX_Weeds", new Vector3(-9f, 0.9f, -6f), new Vector3(3f, 0.8f, 12f), 62f),            // A3: low and wide over the open square, the weeds at the walls and kerbs
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
 
@@ -140,6 +147,7 @@ namespace SleepingCalamity.EditorTools
                 BeautyCornerTable.Row placed = StallFolder("Stall_1") != null ? WithoutStallDressing(row) : row;   // the produce stall art carries its own goods and lantern
                 if (placed != null) BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, placed);
             }
+            ThinCornerWeeds(both, ruined, t);
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
@@ -192,6 +200,36 @@ namespace SleepingCalamity.EditorTools
                 return;
             }
             throw new InvalidOperationException("No Hollowmere root in the open scene");
+        }
+
+        // A3 round 2: the corner's CrackWeeds row is laid for the corner's own plaza (its "edge" is x +-6, z -4.5..6.2), so in the town it sprinkled tufts evenly over the open
+        // cobbles of both presets. Keep the ones at the square's border or against a building (85%), a rare stray (7%) elsewhere; about 40% of the keepers stay in Rebuilt (a tended
+        // town), the rest move under the Ruined root. Position-hashed, so two builds match.
+        static void ThinCornerWeeds(Transform both, Transform ruined, TownLayout t)
+        {
+            Transform g = both.Find("CrackWeeds");
+            if (g == null) return;
+            if (g.childCount == 0) return;
+            Transform holder = g.GetChild(0);   // BeautyCornerGround.Holder: the tufts are its children
+            Transform ruinedOnly = Child(Child(ruined, "Corner"), "CrackWeeds");
+            ruinedOnly.position = holder.position; ruinedOnly.rotation = holder.rotation; ruinedOnly.localScale = holder.lossyScale;
+            var list = new List<Transform>();
+            foreach (Transform c in holder) list.Add(c);
+            int dropped = 0, moved = 0;
+            foreach (Transform c in list)
+            {
+                Vector3 p = c.position; var tp = new TownPoint(p.x, p.z);
+                float dEdge = Mathf.Min(Mathf.Min(p.x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - p.x), Mathf.Min(p.z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - p.z));
+                bool atWall = dEdge < 2.2f;
+                if (!atWall) foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(tp, 1.8f)) { atWall = true; break; }
+                if (!atWall) foreach (Landmark l in t.Landmarks) if (l.Footprint.Contains(tp, 1.8f)) { atWall = true; break; }
+                uint h = unchecked((uint)Mathf.RoundToInt(p.x * 50f + 50000f) * 73856093u ^ (uint)Mathf.RoundToInt(p.z * 50f + 50000f) * 19349663u);
+                h ^= h >> 15; h *= 0x2c1b3c6du; h ^= h >> 12; h *= 0x297a2d39u; h ^= h >> 15;
+                float roll = (h % 1000u) / 1000f;
+                if (roll >= (atWall ? 0.85f : 0.07f)) { UnityEngine.Object.DestroyImmediate(c.gameObject); dropped++; }
+                else if (roll > 0.4f) { c.SetParent(ruinedOnly, true); moved++; }
+            }
+            Debug.Log("SC HOLLOWMERE corner weeds thinned: " + dropped + " removed, " + moved + " ruined-only, " + (list.Count - dropped - moved) + " in both presets");
         }
 
         static Transform Child(Transform parent, string name)
