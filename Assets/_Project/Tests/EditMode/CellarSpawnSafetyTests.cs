@@ -83,16 +83,23 @@ namespace SleepingCalamity.Tests.EditMode
                 CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(l, d, 1, false);
                 int room = plan.AmbushRoom; PlacedRoom p = l.Rooms[room];
-                var players = new List<PlanePoint>();   // a player on every cell of the room: nothing is 4 m clear
-                for (int x = 0; x < p.Width; x++) for (int y = 0; y < p.Height; y++) players.Add(new PlanePoint(CellarSpawnSafety.CellCenterX(p.X + x), CellarSpawnSafety.CellCenterY(p.Y + y)));
-                int count = 0; foreach (EncounterSpawn s in plan.Spawns) if (s.RoomIndex == room && s.Kind != EncounterKind.Hunter) count++;
+                int count = 0, movableCount = 0;
+                foreach (EncounterSpawn s in plan.Spawns) if (s.RoomIndex == room && s.Kind != EncounterKind.Hunter) { count++; if (!IsFixed(l, s)) movableCount++; }
+                if (movableCount < 2) continue;
+                bool[,] walk = CellarKeyDrop.Walkable(l, d);
+                // players stand on every room cell except (movable - 1) walkable free cells: those few are 4 m clear (one short of the movable count, so no pool qualifies) while the rest are 0 m, so distances differ
+                var leftOut = new HashSet<(int, int)>();
+                var free = new List<CellPos>(CellarEncounterPlan.FreeCellsOf(l, d, room));
+                for (int i = free.Count - 1; i >= 0 && leftOut.Count < movableCount - 1; i--) if (walk[free[i].X, free[i].Y]) leftOut.Add((free[i].X, free[i].Y));
+                if (leftOut.Count < movableCount - 1) continue;
+                var players = new List<PlanePoint>();
+                for (int x = 0; x < p.Width; x++) for (int y = 0; y < p.Height; y++) if (!leftOut.Contains((p.X + x, p.Y + y))) players.Add(new PlanePoint(CellarSpawnSafety.CellCenterX(p.X + x), CellarSpawnSafety.CellCenterY(p.Y + y)));
                 CellPos[] cells = CellarAmbush.Cells(l, d, plan, room, players);
                 Assert.AreEqual(count, cells.Length);
                 var seen = new HashSet<(int, int)>();
                 foreach (CellPos c in cells) Assert.IsTrue(seen.Add((c.X, c.Y)), "distinct cells seed " + seed + " floor " + floor);
                 // the chosen movable cells are the farthest from the players: no walkable, unfixed room cell that was left out is farther than a chosen one
                 // (carrier/warden keep their authored cell and the plan-cell fallback ignores players, so they are not part of this ordering)
-                bool[,] walk = CellarKeyDrop.Walkable(l, d);
                 float minChosen = float.PositiveInfinity, maxLeft = 0f; int moved = 0;
                 var spawns = new List<EncounterSpawn>();
                 foreach (EncounterSpawn s in plan.Spawns) if (s.RoomIndex == room && s.Kind != EncounterKind.Hunter) spawns.Add(s);
@@ -111,10 +118,12 @@ namespace SleepingCalamity.Tests.EditMode
                     if (!walk[cell.X, cell.Y] || chosen.Contains((cell.X, cell.Y))) continue;
                     maxLeft = System.Math.Max(maxLeft, CellarSpawnSafety.NearestPlayer(cell, players));
                 }
-                if (moved > 0) Assert.GreaterOrEqual(minChosen, maxLeft - 0.001f, "the fallback picks the farthest cells, seed " + seed + " floor " + floor);
+                Assert.Greater(moved, 0, "the fallback moved a spawn, seed " + seed + " floor " + floor);
+                Assert.GreaterOrEqual(minChosen, maxLeft - 0.001f, "the fallback picks the farthest cells, seed " + seed + " floor " + floor);
+                foreach (var lo in leftOut) Assert.IsTrue(chosen.Contains(lo), "the 4 m clear cell " + lo + " is chosen over the 0 m cells, seed " + seed + " floor " + floor);
                 floors++;
             }
-            Assert.Greater(floors, 10);
+            Assert.Greater(floors, 5);
         }
 
         [Test]
