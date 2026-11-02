@@ -395,6 +395,16 @@ namespace SleepingCalamity.Tests.PlayMode
             finally { hurts.Dispose(); }
         }
 
+        // One frame at the fixed capture rate, paced in real time: -nographics frames take about a millisecond, so without the sleep the 0.8 s grace window (48 captured
+        // frames) would be spent in a few real milliseconds of network latency and the test would be racing the transport, not the rule.
+        private static IEnumerator PacedFrame() { System.Threading.Thread.Sleep(16); yield return null; }
+
+        private static IEnumerator PacedWait(System.Func<bool> done, float timeoutSeconds, string failMessage)
+        {
+            double until = Time.realtimeSinceStartupAsDouble + timeoutSeconds;
+            while (!done()) { if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail(failMessage); yield return PacedFrame(); }
+        }
+
         // Catches: the grace check sitting above the roll branch, so a perfect dodge inside the window played nothing and never told the host (the enemy was
         // not opened). Parry shares the same ordering but needs the dagger; its branch is covered by the code order and the CombatArena parry test.
         [UnityTest]
@@ -412,18 +422,18 @@ namespace SleepingCalamity.Tests.PlayMode
             try
             {
                 a.ServerForceAttack(AttackCatalog.TestNova, at);
-                yield return PlayModeHarness.WaitUntil(() => vHost.Model.Hp < 100, 3f, "the first hit never landed");
+                yield return PacedWait(() => vHost.Model.Hp < 100, 3f, "the first hit never landed");
                 Assert.That(c.ClientCombat.HurtGraceActive, Is.True);
                 int hpAfterFirst = vHost.Model.Hp;
                 // Let the hurt stagger (0.25 s) pass so a roll is allowed, then B attacks and the client rolls just before B's hitbox opens.
                 // Wait only until the roll is allowed (not a fixed 20 frames): every frame spent here eats the 0.8 s grace window, and under load the client takes longer to see B's attack.
-                for (int guard = 0; !c.ClientCombat.AllowsDodge && guard < 60; guard++) yield return null;
+                for (int guard = 0; !c.ClientCombat.AllowsDodge && guard < 60; guard++) yield return PacedFrame();
                 Assert.That(c.ClientCombat.AllowsDodge, Is.True, "the hurt stagger ended");
                 int serial = b.Serial;
                 b.ServerForceAttack(AttackCatalog.TestNova, at);
-                yield return PlayModeHarness.WaitUntil(() => b.Serial != serial && bOnClient.Attacking, 2f, "the client never saw B's attack");
+                yield return PacedWait(() => b.Serial != serial && bOnClient.Attacking, 2f, "the client never saw B's attack");
                 float rollAt = AttackCatalog.TestNova.HitOn.Start - 4;
-                for (int guard = 0; bOnClient.AttackFrame < rollAt && guard < 300; guard++) yield return null;
+                for (int guard = 0; bOnClient.AttackFrame < rollAt && guard < 300; guard++) yield return PacedFrame();
                 Assert.That(c.ClientCombat.HurtGraceActive, Is.True, "B is judged inside the first hit's window");
                 c.ClientInput.Frame.MoveX = 1f;
                 c.ClientInput.Frame.DodgePressed = true;
