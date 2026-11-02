@@ -121,6 +121,35 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void RoomEntered_ForTheNextFloor_BeforeTheFloorChangeIsSeen_IsKept()
+        {
+            // review 2026-11-02 F5: the host fires RoomEntered for floor 2's first room before the overlay's Observe sees floor 2.
+            var m = new DiveStatsModel();
+            m.Observe(0, true, 1, 100, 0, 0);
+            m.NoteRoomEntered(0, 10, floor: 2);
+            m.Observe(11, true, 2, 100, 0, 0);
+            m.Observe(25, true, 2, 100, 0, 1UL);
+            Assert.That(m.RoomClears.Count, Is.EqualTo(1));
+            Assert.That(m.RoomClears[0].FromFirstSpawn, Is.True);
+            Assert.That(m.RoomClears[0].Seconds, Is.EqualTo(15).Within(1e-6));
+        }
+
+        [Test]
+        public void ClearedMask_ArrivingLate_IsABaseline_NotFreshClears()
+        {
+            // review 2026-11-02 F5: on a revisited floor the contents state (with rooms already cleared) arrives a few frames after the floor change.
+            var m = new DiveStatsModel();
+            m.Observe(0, true, 1, 100, 0, 0);
+            m.Observe(5, true, 2, 100, 0, null);                       // floor 2, contents state not here yet
+            m.Observe(6, true, 2, 100, 0, (1UL << 1) | (1UL << 3));    // arrives with two rooms already cleared
+            Assert.That(m.RoomClears.Count, Is.EqualTo(0));
+            m.Observe(20, true, 2, 100, 0, (1UL << 1) | (1UL << 3) | (1UL << 4));
+            Assert.That(m.RoomClears.Count, Is.EqualTo(1));
+            Assert.That(m.RoomClears[0].Room, Is.EqualTo(4));
+            Assert.That(m.RoomClears[0].Seconds, Is.EqualTo(15).Within(1e-6));   // from the floor start at 5 s
+        }
+
+        [Test]
         public void FormatTime_MinutesAndSeconds()
         {
             Assert.That(DiveStatsModel.FormatTime(0), Is.EqualTo("0:00"));

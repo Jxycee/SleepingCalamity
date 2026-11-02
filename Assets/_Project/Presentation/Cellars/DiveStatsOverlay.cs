@@ -38,7 +38,7 @@ namespace SleepingCalamity.Presentation
             _hooked = null;
         }
 
-        private void OnRoomEntered(int room) { _model.NoteRoomEntered(room, Time.unscaledTimeAsDouble); }
+        private void OnRoomEntered(int room) { _model.NoteRoomEntered(room, Time.unscaledTimeAsDouble, _hooked != null ? _hooked.State.Floor : -1); }
 
         private void Update()
         {
@@ -66,12 +66,12 @@ namespace SleepingCalamity.Presentation
                 _lastLoaves, RoomMask(contents, _haveSum ? _sum.CurrentFloor : 0));
         }
 
-        // The per-room cleared mask of the floor being played (the haul summary's ClearedMask is the cleared-FLOOR mask). Zero until the contents state of this floor has arrived.
-        private static ulong RoomMask(CellarContentsSync contents, int floor)
+        // The per-room cleared mask of the floor being played (the haul summary's ClearedMask is the cleared-FLOOR mask). Null until the contents state of this floor has arrived.
+        private static ulong? RoomMask(CellarContentsSync contents, int floor)
         {
-            if (contents == null || floor <= 0) return 0UL;
+            if (contents == null || floor <= 0) return null;
             CellarContentsSync.ContentsState st = contents.State;
-            return st.Floor == floor ? st.Cleared : 0UL;
+            return st.Floor == floor ? st.Cleared : (ulong?)null;
         }
 
         private void OnGUI()
