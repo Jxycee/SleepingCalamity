@@ -658,19 +658,10 @@ namespace SleepingCalamity.EditorTools
             void Facade(float x, bool mirror, float s)
             {
                 float y = G(t, x, face - 0.3f);
-                // A4 round 2: height, width and lean vary (the climbers stop at different heights), and one or two strands hang from the parapet over some of them.
+                // A4 round 2: height, width and lean vary (the climbers stop at different heights). (Parapet strands from Lintel_Ivy read as bright lime caps in the round-2 capture: dropped.)
                 float sv = s * R(rng, 0.5f, 1.05f), wv = R(rng, 0.7f, 1.3f);
                 Put(g, "Ivy_Facade", new Vector3(x, y, face - 0.03f), 180f + R(rng, -7f, 7f), new Vector3(sv * wv, sv, sv), !mirror);   // yaw 180: leaves to -Z, so local -x (dense side) is world +x
                 taken.Add(x);
-                if (kits.ContainsKey("Lintel_Ivy") && rng.NextDouble() < 0.75)
-                {
-                    int strands = 1 + rng.Next(2);
-                    for (int si = 0; si < strands; si++)
-                    {
-                        float sy = R(rng, 1.4f, 2.4f);   // the strand's top edge sits at the parapet whichever end its pivot is on, so it always hangs down the wall
-                        Put(g, "Lintel_Ivy", new Vector3(x + R(rng, -0.9f, 0.9f), y + 4.95f - kits["Lintel_Ivy"].Bounds.max.y * sy, face - 0.06f), 180f + R(rng, -12f, 12f), new Vector3(R(rng, 0.7f, 1.2f), sy, 0.8f), rng.Next(2) == 0);
-                    }
-                }
             }
 
             foreach (var (a, b) in iv)
@@ -700,7 +691,7 @@ namespace SleepingCalamity.EditorTools
                 {
                     float x = R(rng, a + 1f, b - 1f);
                     if (NearButtress(x, 0.7f) || Taken(x, 1.8f)) continue;
-                    Put(g, rng.Next(2) == 0 ? "Ivy_Patch_A" : "Ivy_Patch_B", new Vector3(x, G(t, x, face - 0.3f) + R(rng, 0.3f, 2.6f), face - 0.03f), 180f, R(rng, 1.0f, 1.4f), rng.Next(2) == 0);
+                    Put(g, rng.Next(2) == 0 ? "Ivy_Patch_A" : "Ivy_Patch_B", new Vector3(x, G(t, x, face - 0.3f) + R(rng, 0.3f, rng.NextDouble() < 0.35 ? 4.2f : 2.6f), face - 0.03f), 180f + R(rng, -10f, 10f), R(rng, 0.8f, 1.5f), rng.Next(2) == 0);
                 }
                 for (float x = a + 0.75f; x < b - 0.75f; x += 1.5f)
                 {

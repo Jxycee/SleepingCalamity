@@ -147,6 +147,7 @@ namespace SleepingCalamity.EditorTools
                 BeautyCornerTable.Row placed = StallFolder("Stall_1") != null ? WithoutStallDressing(row) : row;   // the produce stall art carries its own goods and lantern
                 if (placed != null) BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, placed);
             }
+            ThinCornerWeeds(both, ruined, t);
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
@@ -198,6 +199,36 @@ namespace SleepingCalamity.EditorTools
                 return;
             }
             throw new InvalidOperationException("No Hollowmere root in the open scene");
+        }
+
+        // A3 round 2: the corner's CrackWeeds row is laid for the corner's own plaza (its "edge" is x +-6, z -4.5..6.2), so in the town it sprinkled tufts evenly over the open
+        // cobbles of both presets. Keep the ones at the square's border or against a building (85%), a rare stray (7%) elsewhere; about 40% of the keepers stay in Rebuilt (a tended
+        // town), the rest move under the Ruined root. Position-hashed, so two builds match.
+        static void ThinCornerWeeds(Transform both, Transform ruined, TownLayout t)
+        {
+            Transform g = both.Find("CrackWeeds");
+            if (g == null) return;
+            if (g.childCount == 0) return;
+            Transform holder = g.GetChild(0);   // BeautyCornerGround.Holder: the tufts are its children
+            Transform ruinedOnly = Child(Child(ruined, "Corner"), "CrackWeeds");
+            ruinedOnly.position = holder.position; ruinedOnly.rotation = holder.rotation; ruinedOnly.localScale = holder.lossyScale;
+            var list = new List<Transform>();
+            foreach (Transform c in holder) list.Add(c);
+            int dropped = 0, moved = 0;
+            foreach (Transform c in list)
+            {
+                Vector3 p = c.position; var tp = new TownPoint(p.x, p.z);
+                float dEdge = Mathf.Min(Mathf.Min(p.x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - p.x), Mathf.Min(p.z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - p.z));
+                bool atWall = dEdge < 2.2f;
+                if (!atWall) foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(tp, 1.8f)) { atWall = true; break; }
+                if (!atWall) foreach (Landmark l in t.Landmarks) if (l.Footprint.Contains(tp, 1.8f)) { atWall = true; break; }
+                uint h = unchecked((uint)Mathf.RoundToInt(p.x * 50f + 50000f) * 73856093u ^ (uint)Mathf.RoundToInt(p.z * 50f + 50000f) * 19349663u);
+                h ^= h >> 15; h *= 0x2c1b3c6du; h ^= h >> 12; h *= 0x297a2d39u; h ^= h >> 15;
+                float roll = (h % 1000u) / 1000f;
+                if (roll >= (atWall ? 0.85f : 0.07f)) { UnityEngine.Object.DestroyImmediate(c.gameObject); dropped++; }
+                else if (roll > 0.4f) { c.SetParent(ruinedOnly, true); moved++; }
+            }
+            Debug.Log("SC HOLLOWMERE corner weeds thinned: " + dropped + " removed, " + moved + " ruined-only, " + (list.Count - dropped - moved) + " in both presets");
         }
 
         static Transform Child(Transform parent, string name)
