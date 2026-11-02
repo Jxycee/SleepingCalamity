@@ -106,7 +106,7 @@ namespace SleepingCalamity.EditorTools
             TerrainLayer[] layers = { Ground("Grass", "meadow_grass", 3f), Ground("Dirt", "packed_soil", 3f), Ground("Path", "worn_path", 2.5f), CobbleLayer() };
             layers[0].diffuseRemapMax = new Vector4(0.97f, 0.93f, 0.88f, 1f);   // a little less saturated green (round 3)
             layers[1].normalScale = 1.8f;                                        // a coarser read on the earth banks (round 3)
-            layers[1].tileSize = new Vector2(2.1f, 2.1f);                         // A8: more texels on the steep banks (was 3 m)
+            layers[1].tileSize = new Vector2(1.7f, 1.7f);                         // A8: more texels on the steep banks (was 3 m)
             EditorUtility.SetDirty(layers[0]); EditorUtility.SetDirty(layers[1]);
             var data = AssetDatabase.LoadAssetAtPath<TerrainData>(DataPath);
             if (data == null) { data = new TerrainData(); AssetDatabase.CreateAsset(data, DataPath); }
@@ -208,7 +208,7 @@ namespace SleepingCalamity.EditorTools
                         grass = Mathf.Max(0f, 1f - soil - path);
                         // A8 (town surfaces): a raw earth slope stretched one low-res soil tile over 3 m. Steep ground takes half its weight in the cobble layer (grey rubble
                         // flecks in the earth, its own mask map) and the earth tile is smaller (layers[1] below), so banks read as stony earth, not a stretched brown sheet.
-                        float rock = 0.5f * Smooth(26f, 38f, steep) * (1f - Smooth(0.2f, 1.2f, -lane));
+                        float rock = 0.65f * Smooth(22f, 36f, steep) * (1f - Smooth(0.2f, 1.2f, -lane));
                         grass *= 1f - rock; soil *= 1f - rock; path *= 1f - rock; cobble = rock;
                     }
                     a[j, i, 0] = grass; a[j, i, 1] = soil; a[j, i, 2] = path; a[j, i, 3] = cobble;
