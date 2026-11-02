@@ -111,10 +111,10 @@ namespace SleepingCalamity.EditorTools
         {
             BuilderUtil.EnsureFolder(MaterialsFolder);
             Shader lit = Shader.Find("Universal Render Pipeline/Lit");
-            Flat(lit, "meadow", new Color(0.36f, 0.42f, 0.20f), 0.08f, 0f);    // sunlit grass, a little drier than the foliage green
-            Flat(lit, "water", new Color(0.07f, 0.16f, 0.18f), 0.92f, 0f);     // deep lake green-blue, glossy (greybox, not the water shader)
-            Flat(lit, "bed", new Color(0.24f, 0.18f, 0.12f), 0.05f, 0f);       // turned garden soil
-            Flat(lit, "label", new Color(0.85f, 0.25f, 0.18f), 0.2f, 0f);      // door markers on greybox blocks
+            Flat(lit, "meadow", TownGround.Meadow, 0.08f, 0f);    // sunlit grass, a little drier than the foliage green (palette: TownGround)
+            Flat(lit, "water", TownGround.Water, 0.92f, 0f);     // deep lake green-blue, glossy (greybox, not the water shader)
+            Flat(lit, "bed", TownGround.Soil, 0.05f, 0f);       // turned garden soil
+            Flat(lit, "label", TownGround.Label, 0.2f, 0f);      // door markers on greybox blocks
             AssetDatabase.SaveAssets();
         }
 
@@ -272,7 +272,7 @@ namespace SleepingCalamity.EditorTools
         // highest, so a terrace wall retains its whole step and a free-standing wall gets its parapet height.
         static void Wall(Transform parent, TownLayout t, List<(TownPoint A, TownPoint B)> run, float height, float thick)
         {
-            Material stone = LookTestBuilder.Mat("sandstone");
+            Material stone = TownSurface.Stone();
             int i = 0;
             foreach (var (a, b) in run)
             {
@@ -298,7 +298,7 @@ namespace SleepingCalamity.EditorTools
         {
             Transform keep = Child(set, "Keep");
             HollowmereKeepArt kit = HollowmereKeepArt.Load();
-            Material stone = LookTestBuilder.Mat("sandstone"), green = BeautyCornerBuilder.PlaceholderMat("green");
+            Material stone = TownSurface.Stone(), green = TownSurface.Green();
             float kh = HollowmereLayout.KeepHeight, kz = HollowmereLayout.KeepWallZ;
             int i = 0;
             var run = HollowmereLayout.WallRun(t, HollowmereLayout.KeepWallLine(1f), 0.3f);
@@ -472,7 +472,7 @@ namespace SleepingCalamity.EditorTools
             go.transform.localRotation = Quaternion.Euler(0f, f.FacingYaw, 0f);
             Transform g = go.transform;
             float side = f.Side, half = side * 0.5f;
-            Material stone = LookTestBuilder.Mat("sandstone");
+            Material stone = TownSurface.Stone();
             HollowmereLayout.BuildingKind kind = preset == Preset.Ruined ? HollowmereLayout.BuildingKind.Empty : HollowmereLayout.RebuiltBuilding(f.Id);
 
             // An empty lot shows its ruin (the ruin kit, or the greybox stubs when the art is missing); a placed building or garden switches the ruin off
@@ -595,7 +595,7 @@ namespace SleepingCalamity.EditorTools
                 {
                     string slot = k < r.sharedMaterials.Length && r.sharedMaterials[k] != null ? r.sharedMaterials[k].name : "";
                     int dot = slot.IndexOf('.'); if (dot > 0) slot = slot.Substring(0, dot);
-                    if (!art.Slots.TryGetValue(slot, out mats[k])) { Debug.LogWarning("SC HOLLOWMERE ruin: no material for slot '" + slot + "' on " + r.name); mats[k] = LookTestBuilder.Mat("sandstone"); }
+                    if (!art.Slots.TryGetValue(slot, out mats[k])) { Debug.LogWarning("SC HOLLOWMERE ruin: no material for slot '" + slot + "' on " + r.name); mats[k] = TownSurface.Stone(); }
                 }
                 r.sharedMaterials = mats;
             }
@@ -635,7 +635,7 @@ namespace SleepingCalamity.EditorTools
         {
             if (HollowmereGarden.Allotment(g, f)) return;   // Q6 art (Garden/); the greybox below is the fallback
             float half = f.Side * 0.5f;
-            Material oak = LookTestBuilder.Mat("oak_timber");
+            Material oak = TownSurface.Timber();
             for (int i = 0; i < 3; i++)
                 LookTestBuilder.Box(g, "Bed" + i, new Vector3(0f, 0.32f, -half + 1.2f + i * (f.Side - 2f) / 3f + 0.5f), new Vector3(f.Side - 1.6f, 0.15f, 1.1f), M("bed"), default, 2f);
             LookTestBuilder.Box(g, "FenceBack", new Vector3(0f, 0.75f, half - 0.15f), new Vector3(f.Side, 0.9f, 0.08f), oak, default, 2f);
@@ -656,7 +656,7 @@ namespace SleepingCalamity.EditorTools
             float pitch = 36f + 10f * Rand(f.Id, 4);
             float zc = kind == HollowmereLayout.BuildingKind.Inn ? max * 0.5f - d * 0.5f : -(max - d) * 0.35f;   // the block sits toward the door side, the yard behind it; the inn sits back behind its porch
             const float plinth = 0.55f;
-            Material plaster = LookTestBuilder.Mat("plaster"), roof = LookTestBuilder.Mat("roof_tile"), stone = LookTestBuilder.Mat("sandstone"), wood = LookTestBuilder.Mat("painted_wood"), oak = LookTestBuilder.Mat("oak_timber");
+            Material plaster = LookTestBuilder.Mat("plaster"), roof = LookTestBuilder.Mat("roof_tile"), stone = TownSurface.Stone(), wood = LookTestBuilder.Mat("painted_wood"), oak = TownSurface.Timber();
 
             LookTestBuilder.Box(g, "Plinth", new Vector3(0f, 0.25f + plinth * 0.5f, zc), new Vector3(w + 0.2f, plinth, d + 0.2f), stone, default, 2f);
             LookTestBuilder.Box(g, "Walls", new Vector3(0f, 0.25f + plinth + (eave - plinth) * 0.5f, zc), new Vector3(w, eave - plinth, d), plaster, default, 2f);
@@ -711,7 +711,7 @@ namespace SleepingCalamity.EditorTools
             go.transform.localRotation = Quaternion.Euler(0f, l.Footprint.Yaw, 0f);
             Transform g = go.transform;
             float sx = l.Footprint.HalfX * 2f, sz = l.Footprint.HalfZ * 2f;
-            Material stone = LookTestBuilder.Mat("sandstone"), roof = LookTestBuilder.Mat("roof_tile"), oak = LookTestBuilder.Mat("oak_timber"), iron = LookTestBuilder.Mat("iron"), wood = LookTestBuilder.Mat("painted_wood");
+            Material stone = TownSurface.Stone(), roof = LookTestBuilder.Mat("roof_tile"), oak = TownSurface.Timber(), iron = LookTestBuilder.Mat("iron"), wood = LookTestBuilder.Mat("painted_wood");
             bool rebuilt = preset == Preset.Rebuilt;
             switch (l.Kind)
             {
@@ -816,7 +816,7 @@ namespace SleepingCalamity.EditorTools
                 BeautyCornerBuilder.PlaceRow(g, row);
                 return;
             }
-            Material stone = LookTestBuilder.Mat("sandstone"), oak = LookTestBuilder.Mat("oak_timber"), roof = LookTestBuilder.Mat("roof_tile");
+            Material stone = TownSurface.Stone(), oak = TownSurface.Timber(), roof = LookTestBuilder.Mat("roof_tile");
             LookTestBuilder.Box(g, "Base", new Vector3(0f, 0.5f, 0f), new Vector3(6.5f, 1.0f, 6.5f), stone, default, 2f);
             LookTestBuilder.Box(g, "Shaft", new Vector3(0f, 6.3f, 0f), new Vector3(4.4f, 11.6f, 4.4f), stone, default, 2f);
             foreach (float x in new[] { -2.2f, 2.2f }) foreach (float z in new[] { -2.2f, 2.2f })   // open belfry: corner posts under the spire

@@ -128,7 +128,7 @@ namespace SleepingCalamity.EditorTools
             lotRoot.localPosition = new Vector3(f.Centre.X, f.Y, f.Centre.Z);
             lotRoot.localRotation = Quaternion.Euler(0f, f.FacingYaw, 0f);
             Transform g = new GameObject("Greybox").transform; g.SetParent(lotRoot, false);
-            LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(f.Side, 0.4f, f.Side), LookTestBuilder.Mat("sandstone"), default, 2f);
+            LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(f.Side, 0.4f, f.Side), TownSurface.Stone(), default, 2f);
             Building(g, f, HollowmereLayout.BuildingKind.Bakery);
 
             BuildingDef def = TownBuildings.Get(TownBuildings.Bakery);

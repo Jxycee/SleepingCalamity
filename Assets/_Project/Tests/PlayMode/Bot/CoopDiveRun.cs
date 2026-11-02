@@ -29,6 +29,7 @@ namespace SleepingCalamity.Tests.PlayMode
         public readonly List<NetworkManager> Peers = new List<NetworkManager>();   // host first
         public readonly List<FollowerBot> Followers = new List<FollowerBot>();
         public DiveBot Bot;
+        public bool ToughParty;   // heal every host-side hero below 50% HP once a second (test-only, see Run loop)
         public FakeInputService HostInput;
         public NetworkObject HostHero;
         public uint Seed;
@@ -157,7 +158,12 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (Bot.WentHome && Bot.Floor == 0) { DivesHome++; Bot.WentHome = false; }   // another dive
                 ObserveVitals(Step);
                 EveryFrame?.Invoke(this);
-                if (Seconds >= nextSecond) { nextSecond += 1f; IgnoreOwnCopies(); everySecond?.Invoke(this); }
+                if (Seconds >= nextSecond)
+                {
+                    nextSecond += 1f; IgnoreOwnCopies(); everySecond?.Invoke(this);
+                    // test-only top-up (like DiveBot.Tough): the party is healed below 50% so a soak reaches bank, go-home and further dives instead of wiping on floors 3-4
+                    if (ToughParty) foreach (HeroVitals v in HostVitals()) if (v.IsUp && v.Hp < v.MaxHp / 2) v.ServerHeal(v.MaxHp);
+                }
 
                 if (!hashPending && Seconds >= nextHash) { hashPending = true; hashStart = Seconds; HashSamples++; }
                 if (hashPending)
@@ -234,7 +240,9 @@ namespace SleepingCalamity.Tests.PlayMode
                 for (int j = i + 1; j < all.Count; j++)
                 {
                     HeroVitals a = all[i], b = all[j];
-                    if (a == null || b == null || !a.IsSpawned || !b.IsSpawned || a.OwnerClientId != b.OwnerClientId || a.NetworkManager == b.NetworkManager) continue;
+                    // Harness only: every hero-vs-hero pair ignores collision (own copies AND different heroes), so a bot never perches on or is walled by a friend's capsule
+                    // (FLOOR3_DOOR.md: dive-2 stuck at y 1.6 on a PlayerCapsule(Clone)). The real game keeps hero-vs-hero collision; the "stand on a friend's head" question stays open.
+                    if (a == null || b == null || !a.IsSpawned || !b.IsSpawned) continue;
                     if (!_ignored.Add((a, b))) continue;
                     foreach (Collider ca in a.GetComponentsInChildren<Collider>(true))
                     {

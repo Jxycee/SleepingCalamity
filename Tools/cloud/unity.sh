@@ -109,13 +109,34 @@ do_exec() {
     if [ "$RUN_EXIT" = 0 ] && compile_clean "$RUN_LOG"; then say "SC RESULT exec PASS method=$METHOD log=$RUN_LOG"; return 0; fi
     excerpt "$RUN_LOG" "$ERR_PATTERN"; say "SC RESULT exec FAIL method=$METHOD exit=$RUN_EXIT log=$RUN_LOG"; return 1
 }
+# UDP ports bound on this machine, from /proc (the container has no ss/netstat). Mirrors Tools/unity.ps1 Set-TestPortOverride: if something
+# outside this run holds 7790 (a zombie Unity, another worktree's PlayMode run), give the child a free port in 7791-7799 through SC_TEST_PORT
+# (NetworkConstants.TestPort reads it); otherwise SC_TEST_PORT stays unset.
+udp_port_held() {   # some containers have no /proc/net/udp6, and awk aborts on a missing file
+    local f files=(); for f in /proc/net/udp /proc/net/udp6; do [ -r "$f" ] && files+=("$f"); done
+    [ "${#files[@]}" -gt 0 ] || return 1
+    awk -v p="$(printf '%04X' "$1")" 'FNR>1 { split($2, a, ":"); if (a[2] == p) found=1 } END { exit !found }' "${files[@]}"
+}
+set_test_port() {
+    unset SC_TEST_PORT
+    udp_port_held 7790 || return 0
+    local port
+    for port in 7791 7792 7793 7794 7795 7796 7797 7798 7799; do
+        if ! udp_port_held "$port"; then export SC_TEST_PORT="$port"; say "SC LOG PlayMode test port $port (7790 is held)"; return 0; fi
+    done
+    say 'SC LOG 7790 and 7791-7799 are all held; PlayMode will likely fail'
+}
+
 do_tests() { # NAME PLATFORM XML [CATEGORY]
     local name="$1" platform="$2" xml="$OUT/$3" category="${4:-}"
     rm -f "$xml"
     local extra=(-runTests -testPlatform "$platform" -testResults "$xml" -dev-profile sctest)   # never -quit with -runTests
     [ -n "$FILTER" ] && extra+=(-testFilter "$FILTER")
     [ -n "$category" ] && extra+=(-testCategory "$category")
-    run_unity "$name" "${extra[@]}"; gate "$name" || return $?
+    [ "$platform" = PlayMode ] && set_test_port
+    run_unity "$name" "${extra[@]}"; local g=0; gate "$name" || g=$?
+    unset SC_TEST_PORT
+    [ "$g" = 0 ] || return "$g"
     local total=0 passed=0 failed=0 skipped=0 faillines=""
     if [ -f "$xml" ]; then
         read -r total passed failed skipped < <(python3 - "$xml" <<'PY'

@@ -28,6 +28,9 @@ namespace SleepingCalamity.Presentation
 {
     public enum DiveEndReason : byte { Failed = 0, WentHome = 1, Abandoned = 2 }
 
+    // Runs before HeroLocomotion (order 0): the gravity hold must be decided in the same frame a replicated floor swap lands, or the owner hero takes one gravity step over cells the new floor lacks
+    // (a long frame under load sank a client hero 1.3 m once). ApplyPending also lands the arrival teleport before the hero moves.
+    [DefaultExecutionOrder(-30)]
     public sealed class DiveDirector : NetworkBehaviour, HostWorld.ITownSource
     {
         public const float PromptRadius = 3.5f;       // a client shows the stair/descend prompt inside this; the host accepts DiveHaulSync.BankRadius (5 m)

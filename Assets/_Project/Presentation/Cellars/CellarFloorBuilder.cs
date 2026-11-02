@@ -259,7 +259,7 @@ namespace SleepingCalamity.Presentation
             for (int i = 0; i < layout.EntryStarts.Count; i++)
             {
                 CellPos s = layout.EntryStarts[i];
-                Prim(group, "EntryStart_" + i, PrimitiveType.Cylinder, CellCenter(s.X, s.Y) + new Vector3(0, 0.03f, 0), new Vector3(1.4f, 0.03f, 1.4f), mats.Marker(kit.EntryStart, new Color(0.35f, 0.62f, 0.22f)));
+                DebugOnly(Prim(group, "EntryStart_" + i, PrimitiveType.Cylinder, CellCenter(s.X, s.Y) + new Vector3(0, 0.03f, 0), new Vector3(1.4f, 0.03f, 1.4f), mats.Marker(kit.EntryStart, new Color(0.35f, 0.62f, 0.22f))));
                 if (i == 0) result.EntryCenter = CellCenter(s.X, s.Y);
             }
             if (layout.StairExit.HasValue)
@@ -297,8 +297,8 @@ namespace SleepingCalamity.Presentation
                 {
                     CellarSpawn sp = p.Room.Spawns[i]; Vector3 c = CellCenter(p.X + sp.X, p.Y + sp.Y);
                     bool t2 = sp.Tier == SpawnTier.Tier2;
-                    Prim(group, "Spawn_r" + r + "_" + i + (t2 ? "_t2" : "_t1"), PrimitiveType.Cylinder, c + new Vector3(0, 0.02f, 0), new Vector3(t2 ? 0.9f : 0.6f, 0.02f, t2 ? 0.9f : 0.6f),
-                        t2 ? mats.Marker(kit.SpawnT2, new Color(0.85f, 0.45f, 0.10f)) : mats.Marker(kit.SpawnT1, new Color(0.62f, 0.60f, 0.55f)));
+                    DebugOnly(Prim(group, "Spawn_r" + r + "_" + i + (t2 ? "_t2" : "_t1"), PrimitiveType.Cylinder, c + new Vector3(0, 0.02f, 0), new Vector3(t2 ? 0.9f : 0.6f, 0.02f, t2 ? 0.9f : 0.6f),
+                        t2 ? mats.Marker(kit.SpawnT2, new Color(0.85f, 0.45f, 0.10f)) : mats.Marker(kit.SpawnT1, new Color(0.62f, 0.60f, 0.55f))));
                 }
             }
         }
@@ -441,6 +441,15 @@ namespace SleepingCalamity.Presentation
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.position = worldPos;
             go.AddComponent<MeshFilter>(); var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = mat;
             go.AddComponent<LookTestGeometry>().Configure(LookTestGeometry.Shape.Box, size, tile, 24, collider);
+            return go;
+        }
+
+        // B2: QA-only greybox markers (spawn discs, entry discs, special-room post and banner, door-hint spheres) stay in the hierarchy for tests and tools but draw
+        // nothing unless a debug tool sets ShowDebugMarkers before the build; a player never sees a flat disc on the floor.
+        public static bool ShowDebugMarkers;
+        static GameObject DebugOnly(GameObject go)
+        {
+            if (go != null && !ShowDebugMarkers) { MeshRenderer r = go.GetComponent<MeshRenderer>(); if (r != null) r.enabled = false; }
             return go;
         }
 
