@@ -159,6 +159,21 @@ namespace SleepingCalamity.EditorTools
         static Material RoundMote()
         {
             const string folder = "Assets/_Project/Content/Materials/UndercroftStair";
+            string texPath = RoundMoteTexturePath();
+            Shader pu = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new InvalidOperationException("URP Particles/Unlit not found");
+            Material m = LookTestBuilder.Ensure(folder + "/M_US_Mote.mat", pu);
+            m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 2f); m.SetFloat("_SrcBlend", 5f); m.SetFloat("_DstBlend", 1f); m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 1f);
+            m.SetFloat("_ZWrite", 0f); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.SetOverrideTag("RenderType", "Transparent"); m.renderQueue = 3000;
+            m.SetColor("_BaseColor", new Color(1.0f, 0.80f, 0.54f));
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
+            EditorUtility.SetDirty(m); AssetDatabase.SaveAssets();
+            return m;
+        }
+
+        // The soft radial-falloff mote texture (generated once, shared with the dungeon room's M_DC_Mote: B1, no more hard white squares).
+        internal static string RoundMoteTexturePath()
+        {
+            const string folder = "Assets/_Project/Content/Materials/UndercroftStair";
             if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets/_Project/Content/Materials", "UndercroftStair");
             string texPath = folder + "/T_US_MoteRound.png";
             if (!File.Exists(texPath))   // generated once; rewriting it every build would churn the import
@@ -175,14 +190,7 @@ namespace SleepingCalamity.EditorTools
             var imp = (TextureImporter)AssetImporter.GetAtPath(texPath);
             imp.alphaIsTransparency = true; imp.mipmapEnabled = false; imp.wrapMode = TextureWrapMode.Clamp; imp.SaveAndReimport();
             }
-            Shader pu = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new InvalidOperationException("URP Particles/Unlit not found");
-            Material m = LookTestBuilder.Ensure(folder + "/M_US_Mote.mat", pu);
-            m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 2f); m.SetFloat("_SrcBlend", 5f); m.SetFloat("_DstBlend", 1f); m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 1f);
-            m.SetFloat("_ZWrite", 0f); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.SetOverrideTag("RenderType", "Transparent"); m.renderQueue = 3000;
-            m.SetColor("_BaseColor", new Color(1.0f, 0.80f, 0.54f));
-            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texPath));
-            EditorUtility.SetDirty(m); AssetDatabase.SaveAssets();
-            return m;
+            return texPath;
         }
 
         static void AddZoneProbe(Transform lighting, string name, Vector3 pos, Vector3 size)
