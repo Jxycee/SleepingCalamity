@@ -17,6 +17,7 @@ namespace SleepingCalamity.Tests.PlayMode
         public float SwingEvery = 0.3f;       // seconds between attack presses (the combo buffer takes the rest)
         public float DodgeMargin = 0.6f;      // roll when inside an attack's range plus this
         public bool Dodges = true;
+        public bool FlankFrontalBlockers;     // walk to a broom's side instead of straight at its blocking front (a player does); off for the arena bot's old baseline
 
         private readonly FakeInputService _input;
         private readonly HeroLocomotion _loco;
@@ -68,7 +69,17 @@ namespace SleepingCalamity.Tests.PlayMode
                 {
                     Vector3 to = Flat(target.transform.position - _hero.position);
                     float reach = AttackReach + target.Def.Radius;
-                    if (dist > reach) Steer(ref f, AroundObstacles(to.normalized, target.transform.position));
+                    Vector3 goal = target.transform.position;
+                    bool flank = FlankFrontalBlockers && target.Def.FrontalBlock;
+                    if (flank)
+                    {
+                        // the point beside the blocker (its right or left, whichever is nearer), at swing reach: outside the frontal cone
+                        Vector3 right = target.transform.right * (Vector3.Dot(target.transform.right, _hero.position - target.transform.position) >= 0f ? 1f : -1f);
+                        goal = target.transform.position + Flat(right).normalized * (reach * 0.9f);
+                    }
+                    float goalDist = flank ? Flat(goal - _hero.position).magnitude : dist;
+                    if (flank && goalDist > 0.6f && dist > 0.7f) Steer(ref f, AroundObstacles(Flat(goal - _hero.position).normalized, goal));
+                    else if (dist > reach) Steer(ref f, AroundObstacles(to.normalized, target.transform.position));
                     else
                     {
                         Steer(ref f, to.normalized * 0.25f);   // a nudge keeps the hero facing its target
