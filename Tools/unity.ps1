@@ -100,6 +100,9 @@ function Test-OtherPlayMode([int]$Except) {
     $procs = Get-CimInstance Win32_Process -Filter "Name = 'Unity.exe'" -ErrorAction SilentlyContinue
     foreach ($p in $procs) {
         if ($p.ProcessId -eq $Except) { continue }
+        # A zombie Unity (exited, but a leaked handle keeps it listed) is not a live run.
+        $live = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue
+        if ($null -eq $live -or $live.HasExited) { continue }
         if ([string]$p.CommandLine -match '-testPlatform PlayMode') { return $true }
     }
     return $false
