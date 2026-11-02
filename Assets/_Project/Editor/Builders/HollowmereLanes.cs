@@ -96,13 +96,38 @@ namespace SleepingCalamity.EditorTools
                     obj.transform.rotation = Quaternion.Euler(0f, r.Yaw, r.Tilt);
                     obj.transform.localScale = new Vector3(r.ScaleX, 1f, 1f);
                     if (HasCollider(r.Piece)) { var b = obj.AddComponent<BoxCollider>(); (Vector3 c, Vector3 s) = BoxOf(r.Piece); b.center = c; b.size = s; }
-                    if (r.Piece == LanePiece.LaneStep) AddStepReadability(obj.transform);
+                    if (r.Piece == LanePiece.LaneStep) { AddStepSkirt(obj.transform, r, t); AddStepReadability(obj.transform); }
                     if (isRebuilt && r.Piece == LanePiece.WallLantern) AddLanternLight(obj.transform);
                     placed++;
                 }
                 tally.Add((isRebuilt ? "Rebuilt " : "Ruined ") + placed + " (art " + art + ")");
             }
             Debug.Log("SC HOLLOWMERE lane kit placed: " + string.Join(", ", tally) + " rows=" + rows.Count + (fbx == null ? " [greybox]" : ""));
+        }
+
+        // stairs seat: the step box hangs 0.8 m under its tread; where the ground beside or under the flight is lower (cross slope, a drop beside the lane) the
+        // sides and the front stood in the air with the underside showing. A collider-free stone foot from the step's bottom down to the lowest ground under its footprint
+        // (plus 0.25 m of burial), same width and depth, so the flight is seated into the terrain on every side.
+        static void AddStepSkirt(Transform step, LaneKitRow r, TownLayout t)
+        {
+            float yaw = r.Yaw * Mathf.Deg2Rad, hw = r.ScaleX + 0.2f;
+            Vector3 f = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)), rt = new Vector3(Mathf.Cos(yaw), 0f, -Mathf.Sin(yaw)), p = new Vector3(r.X, 0f, r.Z);
+            float low = float.MaxValue;
+            foreach (float lx in new[] { -hw, -hw * 0.5f, 0f, hw * 0.5f, hw })
+                foreach (float lz in new[] { -0.1f, 0.275f, 0.55f })
+                {
+                    Vector3 q = p + rt * lx + f * lz;
+                    low = Mathf.Min(low, HollowmereLayout.Ground(t, q.x, q.z));
+                }
+            float bottom = low - 0.25f - r.Y, top = -0.75f;   // local y; the box itself ends at -0.8
+            if (bottom >= top) return;
+            Material mat = null;
+            foreach (MeshRenderer mr in step.GetComponentsInChildren<MeshRenderer>(true)) if (mr.sharedMaterial != null) { mat = mr.sharedMaterial; break; }
+            if (mat == null) mat = LookTestBuilder.Mat("sandstone");
+            float h = top - bottom;
+            GameObject foot = LookTestBuilder.Box(step, "Foot", new Vector3(0f, bottom + h * 0.5f, 0.275f), new Vector3(2f, h, 0.55f), mat, default, 2f);
+            Object.DestroyImmediate(foot.GetComponent<Collider>());
+            foot.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
