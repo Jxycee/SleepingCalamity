@@ -496,6 +496,49 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(save.Dive.ClearedMask, Is.EqualTo(7));
         }
 
+        // The DiveDirector's path: RestoreTown copies the loaded residents (MergeLatches(null, loaded)), the baker latches, CaptureTown hands the section back, the host merges and writes it.
+        sealed class DirectorLike : HostWorld.ITownSource
+        {
+            public ResidentsSave Residents;
+            public TownSnapshot CaptureTown() { TownSnapshot f = Fresh(); return new TownSnapshot { Stock = f.Stock, Town = f.Town, Dive = f.Dive, Residents = Residents }; }
+            public void RestoreTown(TownSnapshot loaded) { Residents = loaded?.Residents != null ? TownSaveRules.MergeLatches(null, loaded.Residents) : null; }
+        }
+
+        // Catches: the director's residents copy dropping the section-level (or a resident's) unknown fields from a newer build, or the first-meet latch not reaching the file.
+        [Test]
+        public void Residents_SectionAndEntryExtra_SurviveTheDirectorsPath_WithTheFirstMeetLatch()
+        {
+            var loaded = new ResidentsSave { Extra = new Dictionary<string, object> { { "sectionFuture", 7L } } };
+            loaded.Residents.Add(new ResidentSave { Id = TownBuildings.BakerResident, FirstMeetBeat = false, Extra = new Dictionary<string, object> { { "entryFuture", "x" } } });
+            var saved = new WorldSave { Residents = loaded };
+            var world = new HostWorld();
+            world.LoadTown(saved);
+            var dir = new DirectorLike();
+            world.RegisterTownSource(dir);
+            Assert.That(dir.Residents.Extra, Does.ContainKey("sectionFuture"), "RestoreTown keeps the section-level Extra");
+
+            dir.Residents.Residents.Find(r => r.Id == TownBuildings.BakerResident).FirstMeetBeat = true;   // BakerTick's latch
+            Assert.That(world.CaptureTownInto(saved), Is.True);
+            Assert.That(saved.Residents.Extra, Does.ContainKey("sectionFuture"), "the file keeps the section-level Extra");
+            ResidentSave baker = saved.Residents.Residents.Find(r => r.Id == TownBuildings.BakerResident);
+            Assert.That(baker.FirstMeetBeat, Is.True, "the latch reached the file");
+            Assert.That(baker.Extra, Does.ContainKey("entryFuture"), "the resident's Extra survives");
+        }
+
+        // Catches: MergeLatches (live given, previous has Extra) overwriting nothing / dropping previous' unknown fields.
+        [Test]
+        public void MergeLatches_FillsMissingExtraFromPrevious()
+        {
+            var prev = new ResidentsSave { Extra = new Dictionary<string, object> { { "a", 1L } } };
+            prev.Residents.Add(new ResidentSave { Id = TownBuildings.BakerResident, FirstMeetBeat = true, Extra = new Dictionary<string, object> { { "b", 2L } } });
+            var live = new ResidentsSave();
+            live.Residents.Add(new ResidentSave { Id = TownBuildings.BakerResident });
+            ResidentsSave r = TownSaveRules.MergeLatches(live, prev);
+            Assert.That(r.Extra, Does.ContainKey("a"));
+            Assert.That(r.Residents[0].FirstMeetBeat, Is.True);
+            Assert.That(r.Residents[0].Extra, Does.ContainKey("b"));
+        }
+
         // Catches: a hub that goes away (a scene change) taking the town with it before the next save, or a stale source writing into a new world.
         [Test]
         public void Host_UnregisterKeepsTheTown_LoadTownDropsTheSource()

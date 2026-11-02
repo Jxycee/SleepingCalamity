@@ -38,8 +38,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(GoldenCount, Rows.Count, "row count (hash " + LaneKitPlan.Hash(sig) + ")");
             Assert.AreEqual(GoldenHash, LaneKitPlan.Hash(sig), "signature hash");
         }
-        const int GoldenCount = 1326;
-        const uint GoldenHash = 3608286068u;
+        const int GoldenCount = 1201;
+        const uint GoldenHash = 2541824950u;
 
         [Test]
         public void BothPresetsArePopulated_WithEveryFamily()

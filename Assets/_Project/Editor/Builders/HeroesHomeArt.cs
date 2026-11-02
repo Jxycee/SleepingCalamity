@@ -19,12 +19,12 @@ namespace SleepingCalamity.EditorTools
         static readonly (string Slot, string Source, Color Tint)[] Tinted =
         {
             ("HH_OldStone", "sandstone", new Color(0.86f, 0.76f, 0.60f)), ("HH_Mortar", "sandstone", new Color(0.46f, 0.41f, 0.34f)), ("HH_Slate", "sandstone", new Color(0.50f, 0.47f, 0.43f)),
-            ("HH_PlankGrey", "oak_timber", Color.white), ("HH_Canvas", "canvas", Color.white), ("HH_ClothMadder", "canvas", new Color(0.85f, 0.30f, 0.22f)),
-            ("HH_ClothBlue", "canvas", new Color(0.45f, 0.58f, 0.80f)), ("HH_ClothLinen", "canvas", Color.white),
+            ("HH_PlankGrey", "oak_timber", Color.white), ("HH_Canvas", "canvas", Color.white), ("HH_ClothMadder", "canvas", new Color(0.40f, 0.22f, 0.18f)),
+            ("HH_ClothBlue", "canvas", new Color(0.26f, 0.31f, 0.40f)), ("HH_ClothLinen", "canvas", Color.white),
         };
         static readonly (string Slot, Color Paint)[] Paints =
         {
-            ("HH_PaintRed", new Color(0.2542f, 0.0423f, 0.0232f)), ("HH_PaintBlue", new Color(0.0742f, 0.1499f, 0.2623f)), ("HH_PaintOchre", new Color(0.4342f, 0.2542f, 0.0423f)),
+            ("HH_PaintRed", new Color(0.075f, 0.040f, 0.034f)), ("HH_PaintBlue", new Color(0.050f, 0.066f, 0.085f)), ("HH_PaintOchre", new Color(0.4342f, 0.2542f, 0.0423f)),
         };
 
         static Dictionary<string, Material> Materials()
@@ -40,6 +40,11 @@ namespace SleepingCalamity.EditorTools
                 foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
                 m.SetColor("_BaseColor", new Color(Mathf.Clamp01(s.Tint.r), Mathf.Clamp01(s.Tint.g), Mathf.Clamp01(s.Tint.b), 1f).gamma);
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
+                if (s.Slot == "HH_OldStone")   // A6: the stone read as pillows: flatter relief and smaller stones
+                {
+                    m.SetFloat("_BumpScale", src.GetFloat("_BumpScale") * 0.55f);
+                    foreach (string prop in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" }) m.SetTextureScale(prop, src.GetTextureScale(prop) * 1.5f);
+                }
                 EditorUtility.SetDirty(m); map[s.Slot] = m;
             }
             foreach (var s in Paints)
@@ -136,7 +141,7 @@ namespace SleepingCalamity.EditorTools
             {
                 if (!doorWall) { Box(root.transform, name, centre, size); return; }
                 float lo = (alongX ? centre.x - size.x * 0.5f : centre.z - size.z * 0.5f), hi = lo + (alongX ? size.x : size.z);
-                float door = alongX ? doorLocal.x : doorLocal.z, a = Mathf.Clamp(door - gap * 0.5f, lo, hi), c = Mathf.Clamp(door + gap * 0.5f, lo, hi);
+                DoorSpan(alongX ? doorLocal.x : doorLocal.z, lo, hi, gap, out float a, out float c);
                 if (a - lo > 0.05f) Box(root.transform, name + "_A", alongX ? new Vector3((lo + a) * 0.5f, centre.y, centre.z) : new Vector3(centre.x, centre.y, (lo + a) * 0.5f), alongX ? new Vector3(a - lo, size.y, size.z) : new Vector3(size.x, size.y, a - lo));
                 if (hi - c > 0.05f) Box(root.transform, name + "_B", alongX ? new Vector3((c + hi) * 0.5f, centre.y, centre.z) : new Vector3(centre.x, centre.y, (c + hi) * 0.5f), alongX ? new Vector3(hi - c, size.y, size.z) : new Vector3(size.x, size.y, hi - c));
             }
@@ -144,6 +149,13 @@ namespace SleepingCalamity.EditorTools
             Wall("WallN", new Vector3(cx, h * 0.5f, z1 - t * 0.5f), new Vector3(x1 - x0, h, t), true, m == dN);
             Wall("WallW", new Vector3(x0 + t * 0.5f, h * 0.5f, cz), new Vector3(t, h, z1 - z0), false, m == dW);
             Wall("WallE", new Vector3(x1 - t * 0.5f, h * 0.5f, cz), new Vector3(t, h, z1 - z0), false, m == dE);
+        }
+
+        // The door opening [a, c] inside a wall run [lo, hi]. A NaN or infinite door coordinate (a degenerate door direction) falls back to the wall's middle, so no NaN reaches a collider.
+        internal static void DoorSpan(float door, float lo, float hi, float gap, out float a, out float c)
+        {
+            if (float.IsNaN(door) || float.IsInfinity(door)) door = (lo + hi) * 0.5f;
+            a = Mathf.Clamp(door - gap * 0.5f, lo, hi); c = Mathf.Clamp(door + gap * 0.5f, lo, hi);
         }
 
         static void Box(Transform parent, string name, Vector3 centre, Vector3 size)

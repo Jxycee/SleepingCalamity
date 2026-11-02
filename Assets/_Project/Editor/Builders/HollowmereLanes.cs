@@ -25,7 +25,7 @@ namespace SleepingCalamity.EditorTools
         // LK_* slots (LaneKit/SOURCES.md, slots table): shared B1 tileable, linear tint, normal scale. LK_Earth and LK_GlassLit are flat (see BuildMaterials).
         static readonly (string Slot, string Source, Color Tint, float Bump)[] LkSlots =
         {
-            ("LK_Rubble", "sandstone", new Color(0.57f, 0.60f, 0.66f), 1.5f), ("LK_Dressed", "sandstone", new Color(1.00f, 0.95f, 0.86f), 1.3f),
+            ("LK_Rubble", "sandstone", new Color(0.57f, 0.60f, 0.66f), 0.8f), ("LK_Dressed", "sandstone", new Color(1.00f, 0.95f, 0.86f), 0.8f),   // A6: flatter relief (were 1.5, 1.3)
             ("LK_Mortar", "sandstone", new Color(0.26f, 0.245f, 0.21f), 0.6f), ("LK_Oak", "oak_timber", new Color(0.80f, 0.76f, 0.72f), 1.2f),
             ("LK_GatePaint", "painted_wood", new Color(0.66f, 0.72f, 0.28f), 1.0f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
             ("LK_GutterStone", "sandstone", new Color(0.50f, 0.48f, 0.44f), 1.5f),   // gutter channel: LK_Mortar read as a near-black ribbon
@@ -95,12 +95,34 @@ namespace SleepingCalamity.EditorTools
                     obj.transform.rotation = Quaternion.Euler(0f, r.Yaw, r.Tilt);
                     obj.transform.localScale = new Vector3(r.ScaleX, 1f, 1f);
                     if (HasCollider(r.Piece)) { var b = obj.AddComponent<BoxCollider>(); (Vector3 c, Vector3 s) = BoxOf(r.Piece); b.center = c; b.size = s; }
+                    if (r.Piece == LanePiece.LaneStep) AddStepReadability(obj.transform);
                     if (isRebuilt && r.Piece == LanePiece.WallLantern) AddLanternLight(obj.transform);
                     placed++;
                 }
                 tally.Add((isRebuilt ? "Rebuilt " : "Ruined ") + placed + " (art " + art + ")");
             }
             Debug.Log("SC HOLLOWMERE lane kit placed: " + string.Join(", ", tally) + " rows=" + rows.Count + (fbx == null ? " [greybox]" : ""));
+        }
+
+        // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
+        // z = 0 face. A pale nosing along the tread's front edge (visual only, no collider, no shadow casting). A dark riser band was tried in round 1 and floated black wedges over the
+        // terrain at the flight's edges (Cap_HM_TerraceSteps), so it is gone.
+        static Material _nosing, _treadShade;
+        static void AddStepReadability(Transform step)
+        {
+            if (_nosing == null)
+            {
+                Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
+                _nosing = BeautyCornerArt.Flat("LK_StepNosing", new Color(0.80f, 0.76f, 0.66f), 0.15f, wear);   // round 3: lighter, deeper nosing
+                _nosing.SetColor("_Color", _nosing.GetColor("_BaseColor")); _nosing.SetShaderPassEnabled("MotionVectors", true);
+                _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.13f, 0.12f, 0.10f), 0.1f, wear);
+                _treadShade.SetColor("_Color", _treadShade.GetColor("_BaseColor")); _treadShade.SetShaderPassEnabled("MotionVectors", true);
+            }
+            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), new Vector3(2f, 0.04f, 0.24f), _nosing);
+            n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // dark shade line at the back of the tread (under the next riser): sits wholly on the tread top, so it cannot float at the flight's edges
+            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.50f), new Vector3(2f, 0.04f, 0.09f), _treadShade);
+            sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         static string Family(LaneKitRow r)
@@ -175,7 +197,7 @@ namespace SleepingCalamity.EditorTools
                 EditorUtility.SetDirty(m);
                 map[s.Slot] = m;
             }
-            map["LK_Earth"] = BeautyCornerArt.Flat("LK_Earth", new Color(0.034f, 0.025f, 0.017f), 0.05f, wear);
+            map["LK_Earth"] = BeautyCornerArt.Flat("LK_Earth", new Color(0.20f, 0.15f, 0.10f), 0.05f, wear);   // round 2: silt in GutterChoked read as a black ribbon down the Terrace flight
             Material glass = BeautyCornerArt.Flat("LK_GlassLit", new Color(0.9f, 0.55f, 0.2f), 0.7f, wear);   // warm lit glass: emissive linear (1, 0.62, 0.28) x 3
             glass.SetColor("_EmissionColor", new Color(1f, 0.62f, 0.28f) * 3f); glass.EnableKeyword("_EMISSION");
             glass.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; EditorUtility.SetDirty(glass);

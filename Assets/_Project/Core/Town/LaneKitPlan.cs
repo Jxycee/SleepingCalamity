@@ -71,7 +71,7 @@ namespace SleepingCalamity.Core
         // ------------------------------------------------------------------------------------------------ geometry helpers
         sealed class Seg
         {
-            public Lane Lane; public int LaneIdx, I; public TownPoint A, B, Dir, Right; public float Len, HA, HB, Grade, Hw, S0, S1, Cum; public bool JA, JB;
+            public Lane Lane; public int LaneIdx, I; public TownPoint A, B, Dir, Right; public float Len, HA, HB, Grade, Hw, S0, S1, Cum; public bool JA, JB, Flight;
             public float H(float s) => HA + (HB - HA) * (s / Len);
             public TownPoint P(float s, float lat = 0f) => A + Dir * s + Right * lat;
         }
@@ -196,9 +196,10 @@ namespace SleepingCalamity.Core
                 float a = RangeA(s, JunctionClip), b = RangeB(s, JunctionClip);
                 int n = (int)Math.Floor((b - a - 2f * Landing) / StepRun);
                 if (n < 2) continue;
+                s.Flight = true;   // round 3: no gutter runs along a stair flight
                 int su = s.Grade > 0f ? 1 : -1;
                 TownPoint u = s.Dir * su;
-                float width = 2f * s.Hw - GutterWidth, left = -s.Hw;
+                float width = 2f * s.Hw, left = -s.Hw;
                 int cols = (int)Math.Ceiling(width / 2f - 1e-3f);
                 float scale = width / cols / 2f, rise = Math.Abs(s.Grade) * StepRun;
                 for (int k = 0; k < n; k++)
@@ -226,7 +227,7 @@ namespace SleepingCalamity.Core
                 if (len < 0.8f) continue;
                 int n = Math.Max(1, (int)Math.Ceiling(len / 2f - 1e-3f));
                 float scale = len / n / 2f, tilt = (float)(Math.Atan(s.Grade) * 180.0 / Math.PI), yaw = YawAlong(s.Dir);
-                bool kerb = Math.Abs(s.Grade) >= RampGrade;
+                bool kerb = Math.Abs(s.Grade) >= RampGrade && !s.Flight;   // round 3: the tilted kerb bars read as a black ribbon beside the stepped flight
                 for (int i = 0; i < n; i++)
                 {
                     float sm = a + (i + 0.5f) * len / n, h = s.H(sm);
@@ -235,8 +236,9 @@ namespace SleepingCalamity.Core
                         Add(c, LanePiece.LaneKerb, LanePreset.Both, s.Lane.Id, s.P(sm, -(s.Hw + 0.15f)), h, yaw, scale, tilt);
                         Add(c, LanePiece.LaneKerb, LanePreset.Both, s.Lane.Id, s.P(sm, s.Hw + 0.15f), h, yaw, scale, tilt);
                     }
-                    AddPair(c, LanePiece.GutterChoked, LanePiece.Gutter, s.Lane.Id, s.P(sm, s.Hw - GutterWidth * 0.5f), h, yaw, scale, tilt);
+                    if (!s.Flight) AddPair(c, LanePiece.GutterChoked, LanePiece.Gutter, s.Lane.Id, s.P(sm, s.Hw - GutterWidth * 0.5f), h, yaw, scale, tilt);
                 }
+                if (s.Flight) continue;
                 // A run ends where the next segment of the lane does not continue it (square, junction, wall line): a grate at its downhill end.
                 bool downIsB = s.Grade >= 0f;
                 bool endsHere = downIsB ? (s.JB || s.S1 < s.Len - 0.15f || !HasNext(c, s)) : (s.JA || s.S0 > 0.05f || !HasPrev(c, s));

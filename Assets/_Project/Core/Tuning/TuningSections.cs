@@ -35,12 +35,16 @@ namespace SleepingCalamity.Core.Tuning
     public static class TargetingTuning
     {
         public static float SoftConeHalfAngleDeg = 60f, SoftRange = 6f, HeightBand = 2f, AcquireRange = 10f, ReleaseRange = 13f, LosGraceSeconds = 1.0f,
-            HardHeightBand = 4f, FacingWeight = 0.6f, FlickOn = 0.75f, FlickOff = 0.35f, FlickConeHalfAngleDeg = 60f;
+            HardHeightBand = 4f, FacingWeight = 0.6f, FlickOn = 0.75f, FlickOff = 0.35f, FlickConeHalfAngleDeg = 60f,
+            // Elites and bosses keep a lock longer (a wider release range and a longer sight grace) but no longer forever: a hard lock that never dropped
+            // glued the camera to the Dough Warden through walls and rooms (alpha playtest item 8).
+            EliteReleaseRange = 26f, EliteLosGraceSeconds = 4f;
         // Ordered pairs: a target is picked up at AcquireRange and kept out to ReleaseRange (release must not be nearer); the flick switches on above FlickOn
         // and off below FlickOff (off must not be higher).
         public static string Validate()
         {
             if (ReleaseRange < AcquireRange) return "releaseRange (" + ReleaseRange + ") must not be less than acquireRange (" + AcquireRange + ")";
+            if (EliteReleaseRange < ReleaseRange) return "eliteReleaseRange (" + EliteReleaseRange + ") must not be less than releaseRange (" + ReleaseRange + ")";
             if (FlickOff > FlickOn) return "flickOff (" + FlickOff + ") must not be greater than flickOn (" + FlickOn + ")";
             return null;
         }
@@ -57,6 +61,8 @@ namespace SleepingCalamity.Core.Tuning
             new Knob("flickOn", () => FlickOn, v => FlickOn = (float)v, 0, 1),
             new Knob("flickOff", () => FlickOff, v => FlickOff = (float)v, 0, 1),
             new Knob("flickConeHalfAngleDeg", () => FlickConeHalfAngleDeg, v => FlickConeHalfAngleDeg = (float)v, 1, 180),
+            new Knob("eliteReleaseRange", () => EliteReleaseRange, v => EliteReleaseRange = (float)v, 0.1, 400),
+            new Knob("eliteLosGraceSeconds", () => EliteLosGraceSeconds, v => EliteLosGraceSeconds = (float)v, 0, 120),
         };
     }
 

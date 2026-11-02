@@ -183,6 +183,7 @@ namespace SleepingCalamity.EditorTools
             mote.SetFloat("_Surface", 1f); mote.SetFloat("_Blend", 2f); mote.SetFloat("_SrcBlend", 5f); mote.SetFloat("_DstBlend", 1f); mote.SetFloat("_SrcBlendAlpha", 1f); mote.SetFloat("_DstBlendAlpha", 1f);
             mote.SetFloat("_ZWrite", 0f); mote.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); mote.SetOverrideTag("RenderType", "Transparent"); mote.renderQueue = 3000;
             mote.SetColor("_BaseColor", new Color(1.0f, 0.75f, 0.4f)); d["mote"] = mote;
+            mote.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(UndercroftStairBuilder.RoundMoteTexturePath()));   // B1: untextured, the particles drew as hard squares
             foreach (Material m in d.Values) { if (m.HasProperty("_BaseColor")) m.SetColor("_Color", m.GetColor("_BaseColor")); EditorUtility.SetDirty(m); }
             AssetDatabase.SaveAssets();
             return d;

@@ -25,7 +25,7 @@ namespace SleepingCalamity.EditorTools
         static Shader Wear => Shader.Find(WearShaderName) ?? throw new System.InvalidOperationException("Shader not found: " + WearShaderName);
 
         // A tinted B1 tileable slot. Material name M_<matName>. normalScale multiplies the source's bump scale; roughAdd lowers the smoothness by that much.
-        public static Material Tinted(string matName, string source, Color tint, float normalScale, float roughAdd = 0f)
+        public static Material Tinted(string matName, string source, Color tint, float normalScale, float roughAdd = 0f, float tiling = 1f)
         {
             BuilderUtil.EnsureFolder(MaterialsFolder);
             Material src = LookTestBuilder.Mat(source) ?? throw new System.InvalidOperationException("LookTest material missing: " + source);
@@ -37,6 +37,7 @@ namespace SleepingCalamity.EditorTools
             m.SetColor("_Color", m.GetColor("_BaseColor"));
             if (m.HasProperty("_BumpScale")) m.SetFloat("_BumpScale", src.GetFloat("_BumpScale") * normalScale);
             if (roughAdd > 0f && m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", Mathf.Clamp01(src.GetFloat("_Smoothness") - roughAdd));
+            if (tiling != 1f) foreach (string prop in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" }) m.SetTextureScale(prop, src.GetTextureScale(prop) * tiling);   // smaller stones
             m.SetShaderPassEnabled("MotionVectors", true);
             EditorUtility.SetDirty(m);
             return m;
@@ -133,7 +134,7 @@ namespace SleepingCalamity.EditorTools
         {
             { "StoneCottage_A", (new Color(0.56f, 0.64f, 0.80f), Color.white, new Color(0.0482f, 0.0931f, 0.162f)) },     // slate blue, red tile roof (no thatch)
             { "StoneCottage_B", (new Color(0.60f, 0.65f, 0.74f), new Color(2.55f, 2.35f, 1.20f), new Color(0.0685f, 0.1441f, 0.0648f)) },   // sage green
-            { "StoneCottage_C", (new Color(0.58f, 0.63f, 0.78f), new Color(2.05f, 1.92f, 1.30f), new Color(0.1441f, 0.0273f, 0.0222f)) },   // oxblood
+            { "StoneCottage_C", (new Color(0.58f, 0.63f, 0.78f), new Color(2.05f, 1.92f, 1.30f), new Color(0.095f, 0.040f, 0.032f)) },   // muted oxblood
         };
 
         public static bool Place(Transform g, Foundation f)
@@ -147,7 +148,7 @@ namespace SleepingCalamity.EditorTools
         {
             Dictionary<string, Material> map = BeautyCornerArt.BuildFacadeMaterials();
             var look = Looks[variant];
-            map["SC_Rubble"] = HomeKitBuild.Tinted(variant + "_SC_Rubble", "sandstone", look.Rubble, 1.4f);
+            map["SC_Rubble"] = HomeKitBuild.Tinted(variant + "_SC_Rubble", "sandstone", look.Rubble, 0.5f, 0f, 1.7f);   // A6: flatter relief (was 1.4) and smaller stones (1.7x the texel scale): the rubble read as bread rolls
             if (variant != "StoneCottage_A") map["SC_Thatch"] = HomeKitBuild.Tinted(variant + "_SC_Thatch", "oak_timber", look.Thatch, 1.1f, 0.2f);
             map["FK_Shutter"] = HomeKitBuild.Paint(map, variant + "_FK_Shutter", look.Paint);
             map["FK_DoorPaint"] = HomeKitBuild.Paint(map, variant + "_FK_DoorPaint", look.Paint);
@@ -168,7 +169,7 @@ namespace SleepingCalamity.EditorTools
         // Linear paint (SOURCES.md): A sage, B oxblood, C slate blue.
         static readonly Dictionary<string, Color> PaintLinear = new Dictionary<string, Color>
         {
-            { "Workshop_A", new Color(0.0685f, 0.1441f, 0.0648f) }, { "Workshop_B", new Color(0.1441f, 0.0273f, 0.0222f) }, { "Workshop_C", new Color(0.0482f, 0.0931f, 0.1620f) },
+            { "Workshop_A", new Color(0.0685f, 0.1441f, 0.0648f) }, { "Workshop_B", new Color(0.095f, 0.040f, 0.032f) }, { "Workshop_C", new Color(0.0482f, 0.0931f, 0.1620f) },
         };
 
         // Class per variant: only A fits an S lot.
