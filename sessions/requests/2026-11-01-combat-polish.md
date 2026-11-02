@@ -1,6 +1,6 @@
 ﻿Title: Combat polish: post-hit grace, libraries, JSON tuning loader
 Target: cloud
-Status: started
+Status: done - all three pieces merged to main (packages 660a026f, tuning loader a1488aea, post-hit grace ea542cbd) by a local session that took over; see STATUS.md
 Started: 2026-11-01T21:48Z (cloud launcher)
 Model: sonnet
 From: coordinator session 6, user decisions 2026-11-01 (docs/PHASE1.md change log)
