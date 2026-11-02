@@ -28,8 +28,9 @@ namespace SleepingCalamity.Presentation
     // ---------------------------------------------------------------------------------------------------------------------------------------------------
     public static class CellarArtTuning
     {
-        public const float Ambient = 0.28f;                         // trilight ambient intensity (was 0.8, round 1 0.35; the corner uses 0.23)
-        public const float FillIntensity = 1.0f;                    // per-room fill light (was 4.0, round 1 1.8)
+        public const float Ambient = 0.36f;                         // trilight ambient intensity (was 0.8, round 1 0.35, round 2 0.28; the corner uses 0.23 but its lamps sit closer together). Round 3 (B6): 0.28 -> 0.36, so unlit pillar sides keep warm stone value
+        public const float FillIntensity = 1.6f;                    // per-room fill light (was 4.0, round 1 1.8, round 2 1.0; round 3 (B6) 1.6)
+        public const float PierGlowIntensity = 1.5f, PierGlowRange = 3.4f;   // round 3 (B6): a warm unshadowed uplight at the foot of every kit pier, so a pillar between lamp and camera is not a black silhouette
         public const float LampBoost = 1.0f, CorridorLampScale = 0.8f, CorridorLampRangeScale = 0.7f, CentreLampScale = 1.15f;   // wall, centre and corridor lamp intensity multiplier (round 1 1.2), corridor lamps a further x0.8
         public const float FogWarmScale = 0.5f, FogWarmClamp = 0.03f;   // the per-floor fog warm offset: halved, then within this of the base colour per channel
         public static readonly Color FillGold = new Color(1.0f, 0.86f, 0.70f);
@@ -169,6 +170,7 @@ namespace SleepingCalamity.Presentation
                         const float pierH = 1.61f; float sy = (crown + 0.15f) / (3f * pierH);
                         for (int k = 0; k < 3; k++)
                             PlacePiece(kit, "Pillar", dressing, "Pier_" + id + "_" + k, c + new Vector3(0, k * pierH * sy, 0), Quaternion.identity, new Vector3(1.35f, sy, 1.35f));
+                        FillLight(dressing, "PierGlow_" + id, c + new Vector3(0, 0.7f, 0), FillGold, CellarArtTuning.PierGlowIntensity, CellarArtTuning.PierGlowRange);
                         result.Props++;
                     }
                 }

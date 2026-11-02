@@ -45,7 +45,7 @@ namespace SleepingCalamity.EditorTools
 
             GameObject kit = BeautyCornerArt.LoadModel(KitFolder, KitFbx, keepMaterialSlots: true);
             Debug.Log("SC STAIR kit " + (kit != null ? KitFolder + "/" + KitFbx : "FBX missing, greybox for every piece"));
-            Dictionary<string, Material> slots = kit != null ? room.SlotMap() : null;
+            Dictionary<string, Material> slots = kit != null ? StairSlots(room.SlotMap()) : null;
 
             Transform stair = new GameObject("Stair").transform; stair.SetParent(root, false);
             var report = new SortedDictionary<string, string>();
@@ -64,14 +64,14 @@ namespace SleepingCalamity.EditorTools
 
             Transform lighting = new GameObject("StairLighting").transform; lighting.SetParent(root, false);
             // The heroes' home (cistern-house) around the top camera: a 4 x 4 m shell, door wall's house face at world z -2.4, lit by broad cool window light from the east wall.
-            HouseShell(stair, room.SlotMap());
+            HouseShell(stair, StairSlots(room.SlotMap()));
             // Broad soft daylight from a window out of frame (east wall): a wide spot with soft shadows plus a shadowless cool fill, so walls, floor, leaf and jambs all read.
             Vector3 winPos = new Vector3(4.9f, 11.0f, 0.5f), winAim = new Vector3(2.8f, 9.4f, -2.0f);
             Light day = LookTestBuilder.AddLight(lighting, "HouseDaylight", LightType.Spot, winPos, Quaternion.LookRotation(winAim - winPos, Vector3.up),
                 new Color(0.86f, 0.89f, 0.96f), HouseSpot, 12f, LightShadows.Soft);
             day.spotAngle = 110f; day.innerSpotAngle = 70f;
             // Cool daylight spilling out of the door onto the landing and the first steps.
-            LookTestBuilder.AddLight(lighting, "DoorSpill", LightType.Point, new Vector3(3.2f, 9.9f, -3.1f), Quaternion.identity, new Color(0.86f, 0.89f, 0.96f), 1.6f, 3.6f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "DoorSpill", LightType.Point, new Vector3(3.2f, 9.9f, -3.1f), Quaternion.identity, new Color(0.86f, 0.89f, 0.96f), 1.0f, 3.0f, LightShadows.None);   // B5: 1.6 / 3.6 washed the door-passage limewash to near-white
             LookTestBuilder.AddLight(lighting, "HouseFill", LightType.Point, new Vector3(3.2f, 11.2f, -0.6f), Quaternion.identity, new Color(0.86f, 0.89f, 0.96f), HouseFill, 8f, LightShadows.None);
             // Few, small motes well down the stair (none within 2 m of a capture camera).
             DungeonCornerBuilder.Motes(lighting, "Motes_Stair", new Vector3(3.2f, 8.2f, -5.2f), new Vector3(0.8f, 0.9f, 1.2f), 24, own);
@@ -116,6 +116,37 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC STAIR scene built " + ScenePath);
         }
 
+
+        // Stair-only variants of the vault kit's slot materials (the dungeon room keeps the approved ones):
+        //  B4  CV_VaultStone / CV_Mortar tile 2x (the kit's metre UVs put one 2 m tile of big rubble across the shaft walls: stones read 0.6 m and the shaft looked stretched);
+        //  B5  CV_Limewash 14% darker, so the door passage does not blow out under the lamp and door spill;
+        //  B3  CV_Oak lighter and warmer, so the door leaf and beams read as oak planks, not a dark slab.
+        static Dictionary<string, Material> StairSlots(Dictionary<string, Material> room)
+        {
+            var map = new Dictionary<string, Material>(room);
+            map["CV_VaultStone"] = Variant(room["CV_VaultStone"], "M_US_VaultStone", m => m.mainTextureScale = new Vector2(2f, 2f));
+            map["CV_Mortar"] = Variant(room["CV_Mortar"], "M_US_Mortar", m => m.mainTextureScale = new Vector2(2f, 2f));
+            map["CV_Limewash"] = Variant(room["CV_Limewash"], "M_US_Limewash", m => m.SetColor("_BaseColor", Scale(room["CV_Limewash"].GetColor("_BaseColor"), 0.86f)));
+            map["CV_Oak"] = Variant(room["CV_Oak"], "M_US_Oak", m => m.SetColor("_BaseColor", Scale(room["CV_Oak"].GetColor("_BaseColor"), 1.45f)));
+            return map;
+        }
+
+        static Color Scale(Color c, float k) => new Color(Mathf.Min(1f, c.r * k), Mathf.Min(1f, c.g * k), Mathf.Min(1f, c.b * k), 1f);
+
+        static Material Variant(Material src, string name, Action<Material> tweak)
+        {
+            const string folder = "Assets/_Project/Content/Materials/UndercroftStair";
+            if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets/_Project/Content/Materials", "UndercroftStair");
+            Material m = LookTestBuilder.Ensure(folder + "/" + name + ".mat", src.shader);
+            m.CopyPropertiesFromMaterial(src);
+            foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
+            tweak(m);
+            if (m.HasProperty("_BaseColor")) m.SetColor("_Color", m.GetColor("_BaseColor"));
+            m.SetShaderPassEnabled("MotionVectors", src.GetShaderPassEnabled("MotionVectors"));   // the source's validated state: same bytes with and without graphics
+            EditorUtility.SetDirty(m); AssetDatabase.SaveAssets();
+            return m;
+        }
+
         static void TopVignetteVolume(Transform parent)
         {
             const string path = "Assets/_Project/Content/Materials/UndercroftStair/US_TopVolume.asset";
@@ -131,21 +162,45 @@ namespace SleepingCalamity.EditorTools
             var vol = go.AddComponent<UnityEngine.Rendering.Volume>(); vol.isGlobal = false; vol.priority = 2f; vol.blendDistance = 1f; vol.sharedProfile = profile;
         }
 
-        // House interior: limewashed stone walls, flagstone floor, two oak beams, a faint cool window quad on the east wall (the light itself comes from HouseDaylight).
+        // House interior (B3): the heroes' home hall. Warm town plaster in two tones, split into panels with different tiling so no wall is one flat blotch, over an oak
+        // dado with a rail and skirting, a flagstone floor, two oak beams, and a faint cool window quad on the east wall (the light itself comes from HouseDaylight).
         static void HouseShell(Transform parent, Dictionary<string, Material> slots)
         {
             Material M(string k, string fallback) => slots != null && slots.TryGetValue(k, out Material m) ? m : LookTestBuilder.Mat(fallback);
-            Material lime = M("CV_Limewash", "limewash"), flag = M("CV_Flagstone", "flagstone"), oak = M("CV_Oak", "oak_timber");
+            Material flag = M("CV_Flagstone", "flagstone"), oak = M("CV_Oak", "oak_timber"), lime = M("CV_Limewash", "limewash");
+            Material plasterA = Variant(LookTestBuilder.Mat("plaster"), "M_US_PlasterA", m => m.SetColor("_BaseColor", Scale(m.GetColor("_BaseColor"), 0.9f) * new Color(1.0f, 0.93f, 0.82f)));
+            Material plasterB = Variant(LookTestBuilder.Mat("plaster"), "M_US_PlasterB", m => m.SetColor("_BaseColor", Scale(m.GetColor("_BaseColor"), 0.74f) * new Color(1.0f, 0.90f, 0.78f)));
             Transform h = new GameObject("House").transform; h.SetParent(parent, false);
-            const float x0 = 1.2f, x1 = 5.2f, zN = -2.4f, zS = 1.6f, y0 = 9.0f, y1 = 11.8f, t = 0.2f;
+            const float x0 = 1.2f, x1 = 5.2f, zN = -2.4f, zS = 1.6f, y0 = 9.0f, y1 = 11.8f, t = 0.2f, dado = 1.0f;
             LookTestBuilder.Box(h, "Floor", new Vector3((x0 + x1) / 2, y0 - 0.115f, (zN + zS) / 2), new Vector3(x1 - x0 + 0.4f, 0.2f, zS - zN + 0.2f), flag);
             LookTestBuilder.Box(h, "Ceiling", new Vector3((x0 + x1) / 2, y1 + t / 2, (zN + zS) / 2), new Vector3(x1 - x0 + 0.4f, t, zS - zN + 0.4f), lime);
-            LookTestBuilder.Box(h, "WallW", new Vector3(x0 - t / 2, (y0 + y1) / 2, (zN + zS) / 2), new Vector3(t, y1 - y0, zS - zN + 0.4f), lime);
-            LookTestBuilder.Box(h, "WallE", new Vector3(x1 + t / 2, (y0 + y1) / 2, (zN + zS) / 2), new Vector3(t, y1 - y0, zS - zN + 0.4f), lime);
-            LookTestBuilder.Box(h, "WallS", new Vector3((x0 + x1) / 2, (y0 + y1) / 2, zS + t / 2), new Vector3(x1 - x0 + 0.4f, y1 - y0, t), lime);
+            // plaster walls in two panels each (different tone and tile size)
+            void Wall(string n, Vector3 c, Vector3 size, bool alongX)
+            {
+                Vector3 half = alongX ? new Vector3(size.x * 0.5f, size.y, size.z) : new Vector3(size.x, size.y, size.z * 0.5f);
+                Vector3 off = alongX ? new Vector3(size.x * 0.25f, 0, 0) : new Vector3(0, 0, size.z * 0.25f);
+                LookTestBuilder.Box(h, n + "_a", c - off, half, plasterA, default, 1.6f);
+                LookTestBuilder.Box(h, n + "_b", c + off, half, plasterB, default, 2.3f);
+            }
+            Wall("WallW", new Vector3(x0 - t / 2, (y0 + y1) / 2, (zN + zS) / 2), new Vector3(t, y1 - y0, zS - zN + 0.4f), false);
+            Wall("WallE", new Vector3(x1 + t / 2, (y0 + y1) / 2, (zN + zS) / 2), new Vector3(t, y1 - y0, zS - zN + 0.4f), false);
+            Wall("WallS", new Vector3((x0 + x1) / 2, (y0 + y1) / 2, zS + t / 2), new Vector3(x1 - x0 + 0.4f, y1 - y0, t), true);
             // door wall shoulders beyond the piece's x 1.6..4.8 (the piece's wall is z -2.8..-2.4)
-            LookTestBuilder.Box(h, "DoorWallShoulderW", new Vector3((x0 + 1.6f) / 2, (y0 + y1) / 2, -2.6f), new Vector3(1.6f - x0, y1 - y0, 0.4f), lime);
-            LookTestBuilder.Box(h, "DoorWallShoulderE", new Vector3((4.8f + x1) / 2, (y0 + y1) / 2, -2.6f), new Vector3(x1 - 4.8f, y1 - y0, 0.4f), lime);
+            LookTestBuilder.Box(h, "DoorWallShoulderW", new Vector3((x0 + 1.6f) / 2, (y0 + y1) / 2, -2.6f), new Vector3(1.6f - x0, y1 - y0, 0.4f), plasterB, default, 1.6f);
+            LookTestBuilder.Box(h, "DoorWallShoulderE", new Vector3((4.8f + x1) / 2, (y0 + y1) / 2, -2.6f), new Vector3(x1 - 4.8f, y1 - y0, 0.4f), plasterA, default, 1.6f);
+            // oak dado: boards up to 1 m on the three side walls, a rail on top, a skirting at the foot
+            void Dado(string n, Vector3 inner, bool alongX, float len, float inward)
+            {
+                Vector3 dir = alongX ? new Vector3(0, 0, inward) : new Vector3(inward, 0, 0);
+                Vector3 span(float thick, float height) => alongX ? new Vector3(len, height, thick) : new Vector3(thick, height, len);
+                LookTestBuilder.Box(h, n + "_Boards", inner + dir * 0.03f + new Vector3(0, y0 + dado * 0.5f, 0), span(0.06f, dado), oak, default, 1.0f);
+                LookTestBuilder.Box(h, n + "_Rail", inner + dir * 0.05f + new Vector3(0, y0 + dado + 0.03f, 0), span(0.11f, 0.06f), oak, default, 1.0f);
+                LookTestBuilder.Box(h, n + "_Skirting", inner + dir * 0.045f + new Vector3(0, y0 + 0.09f, 0), span(0.09f, 0.18f), oak, default, 1.0f);
+            }
+            float zMid = (zN + zS) / 2, xMid = (x0 + x1) / 2;
+            Dado("DadoW", new Vector3(x0, 0, zMid), false, zS - zN, 1f);
+            Dado("DadoE", new Vector3(x1, 0, zMid), false, zS - zN, -1f);
+            Dado("DadoS", new Vector3(xMid, 0, zS), true, x1 - x0, -1f);
             float[] beams = { -1.0f, 0.6f };
             for (int i = 0; i < beams.Length; i++)
                 LookTestBuilder.Box(h, "Beam_" + i, new Vector3((x0 + x1) / 2, y1 - 0.14f, beams[i]), new Vector3(x1 - x0, 0.28f, 0.22f), oak);
