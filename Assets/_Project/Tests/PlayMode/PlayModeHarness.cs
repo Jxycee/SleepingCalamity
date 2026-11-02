@@ -18,9 +18,37 @@ using UnityEngine.SceneManagement;
 
 namespace SleepingCalamity.Tests.PlayMode
 {
+    // Simulated link conditions for the QA walks (Multiplayer Tools NetworkSimulator, applied to the host's transport; the delay is per direction).
+    public enum NetCondition { None, Rtt150Loss2, Rtt300Loss5 }
+
     public static class PlayModeHarness
     {
         public const float DefaultTimeoutSeconds = 10f;
+        private static GameObject _simObject;
+
+        // True while a NetworkSimulator is installed: the wait loops then sleep ~16 ms a frame like a real client, instead of spinning at ~1 ms
+        // frames under -nographics (which would burn the CPU and shrink a 300 ms round trip into hundreds of frames).
+        public static bool Simulating => _simObject != null;
+
+        // Adds the NetworkSimulator BEFORE the host starts. Destroyed by TearDownApp. Returns the object (null for None).
+        public static GameObject AddNetworkSimulator(NetCondition condition)
+        {
+            if (_simObject != null) { UnityEngine.Object.Destroy(_simObject); _simObject = null; }
+            if (condition == NetCondition.None) return null;
+            int delayMs = condition == NetCondition.Rtt150Loss2 ? 37 : 75;
+            int loss = condition == NetCondition.Rtt150Loss2 ? 2 : 5;
+            _simObject = new GameObject("NetSim_" + condition);
+            var sim = _simObject.AddComponent<Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulator>();
+            sim.ConnectionPreset = Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulatorPreset.Create(
+                "walk " + condition, "M7 S0", packetDelayMs: delayMs, packetJitterMs: 0, packetLossInterval: 0, packetLossPercent: loss);
+            return _simObject;
+        }
+
+        public static void Pace()
+        {
+            if (_simObject != null) Thread.Sleep(16);
+        }
+
         private const float SessionTimeoutSeconds = 20f;
         private const float TeardownTimeoutSeconds = 20f;
         private const float RecoveryTimeoutSeconds = 10f;
@@ -129,9 +157,62 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return null;
         }
 
+        // ---- N clients (M7 S1) ----
+
+        private static readonly List<TestClient> StartedClients = new List<TestClient>();
+
+        // Joins `count` extra TestClients (PlayerId(firstIndex) ... PlayerId(firstIndex + count - 1)) to the running direct host and waits until each is connected.
+        // They are added to `into` (if given) and disposed by TearDownApp, so the test needs no teardown of its own for them. A multiplayer world holds 4 players: host + 3 clients is the most.
+        public static IEnumerator StartClients(AppBootstrap host, int count, bool declineScenes, List<TestClient> into = null, int firstIndex = 20, float timeoutSeconds = 40f)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                var client = new TestClient(host, PlayerId(firstIndex + i), declineScenes);
+                StartedClients.Add(client);
+                if (into != null) into.Add(client);
+                var cts = new CancellationTokenSource();
+                yield return Await(client.JoinAsync(cts.Token), timeoutSeconds, cts);
+                cts.Dispose();
+                yield return WaitUntil(() => client.NetworkManager.IsConnectedClient, timeoutSeconds, "StartClients: client " + i + " never connected");
+            }
+        }
+
+        // A client that must be refused (full world, closed joins): returns the reason the client saw. Registered for teardown like StartClients.
+        public static IEnumerator JoinExpectingRefusal(AppBootstrap host, int index, Action<EndReason> reason, float timeoutSeconds = 40f)
+        {
+            var client = new TestClient(host, PlayerId(index));
+            StartedClients.Add(client);
+            var cts = new CancellationTokenSource();
+            yield return AwaitRefusal(client.JoinAsync(cts.Token), timeoutSeconds, reason);
+            cts.Dispose();
+        }
+
+        private static IEnumerator DisposeStartedClients()
+        {
+            var list = new List<TestClient>(StartedClients);
+            StartedClients.Clear();
+            foreach (TestClient c in list)
+            {
+                bool ok = true;
+                IEnumerator leave = null;
+                try { leave = c.LeaveAndDestroy(); } catch (Exception e) { ok = false; TestContext.WriteLine("client teardown threw: " + e.GetBaseException().Message); }
+                if (ok && leave != null)
+                {
+                    while (true)
+                    {
+                        bool more;
+                        try { more = leave.MoveNext(); } catch (Exception e) { TestContext.WriteLine("client teardown threw: " + e.GetBaseException().Message); try { c.Dispose(); } catch (Exception) { } break; }
+                        if (!more) break;
+                        yield return leave.Current;
+                    }
+                }
+            }
+        }
+
         // Never asserts before DestroyForTests: a failing teardown must still remove the App, or every later test is poisoned.
         public static IEnumerator TearDownApp()
         {
+            yield return DisposeStartedClients();
             try
             {
                 string problem = null;
@@ -179,6 +260,7 @@ namespace SleepingCalamity.Tests.PlayMode
             }
             finally
             {
+                if (_simObject != null) { UnityEngine.Object.Destroy(_simObject); _simObject = null; }
                 AppBootstrap.SuppressDevAutoStart = false;
                 SceneFlow.StartSceneOverride = null;
                 WorldSaveFlow.Enabled = true;
@@ -210,6 +292,7 @@ namespace SleepingCalamity.Tests.PlayMode
             while (!condition())
             {
                 if (Time.realtimeSinceStartupAsDouble > deadline) Assert.Fail("Timed out after " + timeoutSeconds + " s: " + failMessage);
+                Pace();
                 yield return null;
             }
         }
@@ -225,6 +308,7 @@ namespace SleepingCalamity.Tests.PlayMode
                     cts?.Cancel();
                     Assert.Fail("Timed out after " + timeoutSeconds + " s waiting for a network task");
                 }
+                Pace();
                 yield return null;
             }
             if (task.IsFaulted) Assert.Fail("The task faulted: " + task.Exception.GetBaseException());

@@ -40,9 +40,10 @@ namespace SleepingCalamity.Tests.PlayMode
             public CellarContentsSync Contents, PeerContents;
         }
 
-        private IEnumerator Start(System.Action<Rig> done)
+        private IEnumerator Start(NetCondition net, System.Action<Rig> done)
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            PlayModeHarness.AddNetworkSimulator(net);   // before the host starts
             var rig = new Rig { App = AppBootstrap.Current };
             yield return PlayModeHarness.StartDirectHostWithoutScenes();
             rig.HostNm = rig.App.NetworkManager;
@@ -113,7 +114,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private static IEnumerator Seconds(float s)
         {
             double until = Time.realtimeSinceStartupAsDouble + s;
-            while (Time.realtimeSinceStartupAsDouble < until) yield return null;
+            while (Time.realtimeSinceStartupAsDouble < until) { PlayModeHarness.Pace(); yield return null; }
         }
 
         // The client hero walks (teleports its own copy) to `pos` and the host sees it there.
@@ -208,13 +209,13 @@ namespace SleepingCalamity.Tests.PlayMode
         // ---------------------------------------------------------------------------------------------------------------------------------
 
         [UnityTest]
-        public IEnumerator Walk_Floors1To3_GateKey_Chest_Piece_LockedDoor_Checkpoint_Descend()
+        public IEnumerator Walk_Floors1To3_GateKey_Chest_Piece_LockedDoor_Checkpoint_Descend([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
             uint seed = FindSeed(true);
             if (seed == 0) seed = FindSeed(false);
             Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed with a carrier and a locked room");
             Rig rig = null;
-            yield return Start(r => rig = r);
+            yield return Start(net, r => rig = r);
             rig.Host.SeedOverride = seed;
             Assert.That(rig.Peer.ServerStartDive(), Is.False, "[F1 start] a client cannot start a dive");
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[F1 start] the host starts the dive");
@@ -306,12 +307,12 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Stir_PastFortyAndSeventy_AddsExtraEnemiesAndTheHunter()
+        public IEnumerator Stir_PastFortyAndSeventy_AddsExtraEnemiesAndTheHunter([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
             uint seed = FindSeed(false);
             Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed");
             Rig rig = null;
-            yield return Start(r => rig = r);
+            yield return Start(net, r => rig = r);
             rig.Host.SeedOverride = seed; rig.Host.PiecesPerFloor = new[] { 14, 2, 2 };
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[stir start]");
             yield return ResolvePeers(rig);
@@ -360,12 +361,12 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Floor4_ClientBanksAtTheHeart_GoHome_BankedSurvives_ThenSecondDiveFails_PiecesReturn()
+        public IEnumerator Floor4_ClientBanksAtTheHeart_GoHome_BankedSurvives_ThenSecondDiveFails_PiecesReturn([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
             uint seed = FindSeed(false);
             Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed");
             Rig rig = null;
-            yield return Start(r => rig = r);
+            yield return Start(net, r => rig = r);
             rig.Host.SeedOverride = seed;
             Assert.That(rig.Host.ServerStartDive(4), Is.True, "[F4 start]");
             yield return ResolvePeers(rig);
