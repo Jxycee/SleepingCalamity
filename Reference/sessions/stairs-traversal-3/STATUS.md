@@ -1,4 +1,4 @@
-Status: DONE after check+merge (3/3 art rounds, ~22/40; traversal job 3 NOT fixed, see open items)
+Status: DONE (merged d51aec7c; traversal job 3 handed to Hollowmere traversal 4)
 Branch: claude/stairs-traversal-3
 Tip: see git log (commit "stairs-traversal-3: nosing material actually rebuilt")
 
@@ -21,3 +21,5 @@ No traversal change landed. Tried: stone corner-fill pier (1.8 m, solid) under l
 - R2_03_C3, R2_08_C3 unreachable corners and their Holes; 2 big islands (17.7 m2 at 26.9,-12,-68.1; 32.5 m2 pocket at -38.4,-2.8,-1.6; KeepHall 24.7 m2).
 - Blocked +3 near lower gate (R2_23 pier W / End_End wall, R2_16 M026 wall): needs lot/wall clearance moves in HollowmereLayout.
 - Cellars not rescanned (town only).
+Archive: ready
+Open items also: textured stone nosing (nosings are flat grey-brown planks).
