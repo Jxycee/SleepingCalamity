@@ -18,7 +18,7 @@ namespace SleepingCalamity.Presentation
         private HeroVitals _hero;
         private DiveHaulSync.Summary _sum;
         private bool _haveSum;
-        private int _players;
+        private int _players, _lastHp, _lastLoaves;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Create()
@@ -58,11 +58,12 @@ namespace SleepingCalamity.Presentation
             _haveSum = haul != null;
             if (_haveSum) _sum = haul.Current;
             NetworkManager nm = NetworkManager.Singleton;
-            _players = nm != null && nm.IsListening ? nm.ConnectedClientsIds.Count : 1;
+            _players = nm != null && nm.IsListening ? (nm.IsServer ? nm.ConnectedClientsIds.Count : HeroVitals.All.Count) : 1;   // ConnectedClientsIds is host-only in NGO; a client counts the heroes it sees
 
-            bool active = dd != null && dd.NetActive.Value && _hero != null && _haveSum;
-            _model.Observe(Time.unscaledTimeAsDouble, active, _haveSum ? _sum.CurrentFloor : 0, _hero != null ? _hero.Hp : 0,
-                _hero != null ? _hero.Loaves : 0, RoomMask(contents, _haveSum ? _sum.CurrentFloor : 0));
+            bool active = dd != null && dd.NetActive.Value && _haveSum;
+            if (_hero != null) { _lastHp = _hero.Hp; _lastLoaves = _hero.Loaves; }   // hero briefly missing (respawn, reconnect): keep the last numbers, don't reset the dive
+            _model.Observe(Time.unscaledTimeAsDouble, active, _haveSum ? _sum.CurrentFloor : 0, _lastHp,
+                _lastLoaves, RoomMask(contents, _haveSum ? _sum.CurrentFloor : 0));
         }
 
         // The per-room cleared mask of the floor being played (the haul summary's ClearedMask is the cleared-FLOOR mask). Zero until the contents state of this floor has arrived.
