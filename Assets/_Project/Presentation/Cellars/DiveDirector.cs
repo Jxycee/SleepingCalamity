@@ -46,6 +46,8 @@ namespace SleepingCalamity.Presentation
         public readonly NetworkVariable<bool> NetActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<bool> NetHeartBanked = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<bool> NetCheckpoint = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public readonly NetworkVariable<int> NetStartFloor = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the floor the next dive starts on (hub prompt)
+        public readonly NetworkVariable<bool> NetStairOpen = new NetworkVariable<bool>(true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the current floor's stair can be used (gate key taken or not required)
         public readonly NetworkVariable<Vector3> NetHome = new NetworkVariable<Vector3>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<Vector3> NetHubStair = new NetworkVariable<Vector3>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<Vector3> NetOrigin = new NetworkVariable<Vector3>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -82,7 +84,7 @@ namespace SleepingCalamity.Presentation
             _savedDive = Town.Restore(loaded, PiecesPerFloor, DiveStir);   // capture-only until the first dive (spawn-time counts); the dive that runs is built from the snapshot at its start
             _loadedTown = loaded;
             _heartBanked = false;
-            if (IsServer && IsSpawned && _savedDive != null) NetCheckpoint.Value = _savedDive.CheckpointReached;   // the hub prompt must agree with the start floor
+            if (IsServer && IsSpawned && _savedDive != null) { NetCheckpoint.Value = _savedDive.CheckpointReached; NetStartFloor.Value = _savedDive.StartFloor; }   // the hub prompt must agree with the start floor
         }
 
         public CellarFloorSync FloorSync { get; private set; }      // host: the spawned syncs; clients resolve their own through ResolveSyncs
@@ -129,12 +131,13 @@ namespace SleepingCalamity.Presentation
                 _haulBegun = true;
                 _seed = SeedOverride ?? PickSeed();
             }
-            else if (SeedOverride.HasValue) _seed = SeedOverride.Value;
-            int floor = forceFloor > 0 ? forceFloor : DiveRoute.StartFloor(HaulSync.Current.CheckpointReached);
+            else _seed = SeedOverride ?? PickSeed();   // every dive gets fresh floors: chests and healing points do not replay (piece ids are per floor, so pieces stay collectable)
+            int floor = forceFloor > 0 ? forceFloor : HaulSync.HostState.StartFloor;
             if (floor < DiveRoute.FirstFloor || floor > DiveRoute.LastFloor) return false;
             _clearAt = -1f; _openedStairs.Clear();
             _heartBanked = false; NetHeartBanked.Value = false;
             HaulSync.ServerSetFloor(floor);
+            RefreshStairOpen(floor);
             FloorSync.ServerSetFloor(_seed, floor);
             NetActive.Value = true;
             _gen++; _needsPlacement = true;
@@ -153,6 +156,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerTryDescend(ulong clientId)
         {
             if (!IsServer || !IsSpawned || NetActive.Value) return false;
+            if (!DiveHaulSync.AskerIsUp(NetworkManager, clientId)) return false;
             if (!NearPlayer(clientId, NetHubStair.Value)) { NoticeTo(clientId, TooFar); return false; }
             return ServerStartDive();
         }
@@ -160,6 +164,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerTryStair(ulong clientId, int fromFloor)
         {
             if (!IsServer || !IsSpawned || !NetActive.Value || HaulSync == null || FloorSync == null) return false;
+            if (!DiveHaulSync.AskerIsUp(NetworkManager, clientId)) return false;   // a downed hero cannot take the stair
             int floor = HaulSync.Current.CurrentFloor;
             if (fromFloor != floor || !DiveRoute.HasStair(floor) || FloorSync.BuiltFloor != floor) return false;
             if (!StairIsOpen(floor)) { NoticeTo(clientId, "The way down is shut."); return false; }
@@ -167,6 +172,7 @@ namespace SleepingCalamity.Presentation
             int next = DiveRoute.NextFloor(floor);
             HaulSync.ServerMarkCleared(floor);
             HaulSync.ServerSetFloor(next);
+            RefreshStairOpen(next);
             FloorSync.ServerSetFloor(_seed, next);
             _heartBanked = false; NetHeartBanked.Value = false;
             _gen++; _needsPlacement = true;
@@ -177,6 +183,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerTryGoHome(ulong clientId)
         {
             if (!IsServer || !IsSpawned || !NetActive.Value || HaulSync == null || FloorSync == null) return false;
+            if (!DiveHaulSync.AskerIsUp(NetworkManager, clientId)) return false;   // a downed hero cannot call the party home
             int floor = HaulSync.Current.CurrentFloor;
             if (!DiveRoute.CanGoHome(floor, _heartBanked) || FloorSync.BuiltFloor != floor) return false;
             if (CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && !NearPlayer(clientId, bank)) { NoticeTo(clientId, TooFar); return false; }
@@ -197,16 +204,27 @@ namespace SleepingCalamity.Presentation
         public bool ServerTryBank(ulong clientId)
         {
             if (!IsServer || !IsSpawned || !NetActive.Value || HaulSync == null || FloorSync == null) return false;
+            if (!DiveHaulSync.AskerIsUp(NetworkManager, clientId)) return false;
             int floor = HaulSync.Current.CurrentFloor;
             if (DiveState.FloorHasBank(floor) && FloorSync.BuiltFloor == floor && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && !NearPlayer(clientId, bank))
             { NoticeTo(clientId, TooFar); return false; }
+            if (HaulSync.HostState != null && DiveState.FloorHasBank(floor) && !HaulSync.HostState.CanBankHere) { NoticeTo(clientId, "Nothing new to bank here."); return false; }
             return HaulSync.ServerTryBankFor(clientId);
         }
 
         private bool StairIsOpen(int floor) => !RequireGateKey || _openedStairs.Contains(floor);
 
         // Host: opens the stair on `floor` for the current dive (idempotent; cleared when a dive starts, ends or fails).
-        public void ServerOpenStair(int floor) { if (IsServer) _openedStairs.Add(floor); }
+        public void ServerOpenStair(int floor) { if (!IsServer) return; _openedStairs.Add(floor); if (HaulSync != null && HaulSync.Current.CurrentFloor == floor) NetStairOpen.Value = true; }
+
+        private void RefreshStairOpen(int floor) { NetStairOpen.Value = StairIsOpen(floor); }
+
+        // Host: the floor the next dive starts on, from the live dive state (or the saved one while no dive has begun).
+        private void RefreshStartFloor()
+        {
+            DiveState s = _haulBegun && HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState : _savedDive;
+            if (s != null) NetStartFloor.Value = s.StartFloor;
+        }
 
         // Ends the dive: the party is sent home at once, the floor is cleared a moment later. Failed/abandoned: the haul already failed the dive (floor 0, stir reset).
         private bool EndDive(DiveEndReason reason)
@@ -224,7 +242,8 @@ namespace SleepingCalamity.Presentation
                 int stocked = Town.Receive(HaulSync.HostState.Haul, _heartBanked);
                 if (stocked > 0 || _heartBanked) StockReceived?.Invoke(stocked);
             }
-            NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false; _openedStairs.Clear();
+            NetActive.Value = false; _heartBanked = false; NetHeartBanked.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
+            RefreshStartFloor();
             _gen++; _needsPlacement = true;
             _clearAt = Time.unscaledTime + FloorClearDelay;
             ContentsClear();   // contents hook: the dive is over (ended, failed or abandoned): its enemies go
@@ -238,6 +257,7 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || HaulSync == null) return;
             int floor = HaulSync.Current.CurrentFloor;
             if (floor == DiveState.CheckpointFloor && !NetCheckpoint.Value) NetCheckpoint.Value = true;
+            RefreshStartFloor();
             if (floor == DiveState.HeartFloor) { _heartBanked = true; NetHeartBanked.Value = true; }
         }
 
@@ -466,7 +486,7 @@ namespace SleepingCalamity.Presentation
             if (!NetActive.Value)
             {
                 if (Flat(me, NetHubStair.Value, PromptRadius))
-                { Prompt = PromptKind.Descend; PromptText = NetCheckpoint.Value ? "Go down the Undercroft stair (return dive, floor 3)" : "Go down the Undercroft stair"; }
+                { Prompt = PromptKind.Descend; PromptText = NetStartFloor.Value >= DiveRoute.ReturnFloor ? "Go down the Undercroft stair (return dive, floor " + NetStartFloor.Value + ")" : "Go down the Undercroft stair"; }
             }
             else
             {
@@ -475,10 +495,11 @@ namespace SleepingCalamity.Presentation
                 floor = FloorSync.BuiltFloor;
                 if (_appliedFloor != floor || _appliedSeed != FloorSync.BuiltSeed) return;   // not yet teleported onto this floor: standing where the last one's stair was
                 if (DiveRoute.HasStair(floor) && CellarFloorBuilder.TryStairWorld(FloorSync.Layout, FloorSync.Built, out Vector3 stair) && Flat(me, stair, PromptRadius))
-                { Prompt = PromptKind.Stair; PromptText = "Take the stair down"; }
+                { Prompt = PromptKind.Stair; PromptText = NetStairOpen.Value ? "Take the stair down" : "The way down is shut (find the gate key)"; }
                 else if (DiveState.FloorHasBank(floor) && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && Flat(me, bank, BankPromptRadius))
                 {
                     if (DiveRoute.CanGoHome(floor, NetHeartBanked.Value)) { Prompt = PromptKind.GoHome; PromptText = "Take the party home"; }
+                    else if (HaulSync != null && HaulSync.Current.BankSpent) { }   // already banked here and nothing new to bank: no prompt
                     else { Prompt = PromptKind.Bank; PromptText = floor == DiveState.HeartFloor ? "Bank the haul with the baker" : "Bank the haul at the checkpoint"; }
                 }
             }
@@ -486,6 +507,8 @@ namespace SleepingCalamity.Presentation
             if (Prompt == PromptKind.None) return;
             IInputService input = HeroInput.ResolveDefault();
             if (input == null || !input.Intent.InteractPressed) return;
+            if (Prompt == PromptKind.Stair && !NetStairOpen.Value) return;   // the locked stair only explains itself
+            if (LocalHeroIsDown(player)) return;   // a downed hero presses nothing (the host refuses it too)
             switch (Prompt)
             {
                 case PromptKind.Descend: RequestDescend(); break;
@@ -494,6 +517,8 @@ namespace SleepingCalamity.Presentation
                 case PromptKind.GoHome: RequestGoHome(); break;
             }
         }
+
+        private static bool LocalHeroIsDown(NetworkObject player) { HeroVitals v = player.GetComponent<HeroVitals>(); return v != null && !v.IsUp; }
 
         private void DevKeys()
         {

@@ -32,7 +32,7 @@ namespace SleepingCalamity.Presentation
         public struct Summary : INetworkSerializable, System.IEquatable<Summary>
         {
             public int UnbankedPieces, BankedPieces, UnbankedLoot, LeftFloor1, LeftFloor2, LeftFloor3, ClearedMask, CurrentFloor;
-            public bool CheckpointReached;
+            public bool CheckpointReached, BankSpent;   // BankSpent: the current floor's bank point was used this dive and nothing new waits to bank
             // Stir meter (host-computed): value rounded to a whole point 0-100, extra enemies per room (latched), hunter and deep-closes latches, whole seconds left (rounded up, 0 = not running).
             public int StirValue, ExtraEnemiesPerRoom, DeepSecondsLeft;
             public bool HunterLatched, DeepClosesLatched;
@@ -41,13 +41,13 @@ namespace SleepingCalamity.Presentation
             {
                 s.SerializeValue(ref UnbankedPieces); s.SerializeValue(ref BankedPieces); s.SerializeValue(ref UnbankedLoot);
                 s.SerializeValue(ref LeftFloor1); s.SerializeValue(ref LeftFloor2); s.SerializeValue(ref LeftFloor3);
-                s.SerializeValue(ref ClearedMask); s.SerializeValue(ref CurrentFloor); s.SerializeValue(ref CheckpointReached);
+                s.SerializeValue(ref ClearedMask); s.SerializeValue(ref CurrentFloor); s.SerializeValue(ref CheckpointReached); s.SerializeValue(ref BankSpent);
                 s.SerializeValue(ref StirValue); s.SerializeValue(ref ExtraEnemiesPerRoom); s.SerializeValue(ref DeepSecondsLeft);
                 s.SerializeValue(ref HunterLatched); s.SerializeValue(ref DeepClosesLatched);
             }
             public bool Equals(Summary o) => UnbankedPieces == o.UnbankedPieces && BankedPieces == o.BankedPieces && UnbankedLoot == o.UnbankedLoot
                 && LeftFloor1 == o.LeftFloor1 && LeftFloor2 == o.LeftFloor2 && LeftFloor3 == o.LeftFloor3 && ClearedMask == o.ClearedMask
-                && CurrentFloor == o.CurrentFloor && CheckpointReached == o.CheckpointReached
+                && CurrentFloor == o.CurrentFloor && CheckpointReached == o.CheckpointReached && BankSpent == o.BankSpent
                 && StirValue == o.StirValue && ExtraEnemiesPerRoom == o.ExtraEnemiesPerRoom && DeepSecondsLeft == o.DeepSecondsLeft
                 && HunterLatched == o.HunterLatched && DeepClosesLatched == o.DeepClosesLatched;
             public override bool Equals(object obj) => obj is Summary o && Equals(o);
@@ -143,7 +143,7 @@ namespace SleepingCalamity.Presentation
                 HunterLatched = stir.HunterLatched, DeepClosesLatched = stir.DeepClosesLatched,
                 UnbankedPieces = h.UnbankedPieceCount, BankedPieces = h.BankedPieceCount, UnbankedLoot = h.UnbankedLootCount,
                 LeftFloor1 = h.PiecesLeft(1), LeftFloor2 = h.PiecesLeft(2), LeftFloor3 = h.PiecesLeft(3),
-                ClearedMask = _state.ClearedMask, CurrentFloor = _state.CurrentFloor, CheckpointReached = _state.CheckpointReached,
+                ClearedMask = _state.ClearedMask, CurrentFloor = _state.CurrentFloor, CheckpointReached = _state.CheckpointReached, BankSpent = _state.BankUsed(_state.CurrentFloor) && !_state.CanBankHere,
             };
             if (!next.Equals(Net.Value)) Net.Value = next;   // the countdown ticks every frame; only send when something a peer can see changed
         }
@@ -271,9 +271,18 @@ namespace SleepingCalamity.Presentation
         public bool ServerTryBankFor(ulong clientId)
         {
             if (!Host || !DiveState.FloorHasBank(_state.CurrentFloor)) return false;
+            if (!AskerIsUp(NetworkManager, clientId)) return false;   // a downed hero cannot bank
             if (TryBankWorldPosition(out Vector3 bank) && NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient c)
                 && c.PlayerObject != null && !InRange(c.PlayerObject.transform.position, bank)) return false;
             return ServerBank();
+        }
+
+        // Host: false when the asker's hero is downed or out (no player object or no vitals passes, like the range checks).
+        public static bool AskerIsUp(NetworkManager nm, ulong clientId)
+        {
+            if (nm == null || !nm.ConnectedClients.TryGetValue(clientId, out NetworkClient c) || c.PlayerObject == null) return true;
+            HeroVitals v = c.PlayerObject.GetComponent<HeroVitals>();
+            return v == null || v.IsUp;
         }
 
         public static bool InRange(Vector3 player, Vector3 bank)

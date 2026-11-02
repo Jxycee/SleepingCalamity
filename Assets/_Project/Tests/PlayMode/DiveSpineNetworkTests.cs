@@ -220,6 +220,34 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(2));
         }
 
+        // Playtest 5: a downed hero cannot take the stair, bank or call the party home (the host checks the asker is up); up again, the same press works.
+        [UnityTest]
+        public IEnumerator DownedHero_CannotUseTheStair_UntilRevived()
+        {
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = 5150u;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, 1);
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
+            Assert.That(CellarFloorBuilder.TryStairWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True);
+            Move(rig.OwnHeroes[0], stair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair) < 3f, Timeout, "the client hero never arrived at the stair on the host");
+            rig.Host.RequireGateKey = false;
+            ulong clientId = rig.Clients[0].NetworkManager.LocalClientId;
+            HeroVitals vitals = rig.HeroesOnHost[0].GetComponent<HeroVitals>();
+            vitals.ServerDamage(100000);
+            Assert.That(vitals.IsUp, Is.False, "test premise: the client hero is down");
+            Assert.That(rig.Host.ServerTryStair(clientId, 1), Is.False, "a downed hero cannot take the stair");
+            Assert.That(rig.Host.ServerTryBank(clientId), Is.False, "a downed hero cannot bank");
+            Assert.That(rig.Host.ServerTryGoHome(clientId), Is.False, "a downed hero cannot call the party home");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1), "the party stayed on floor 1");
+            vitals.ServerFullReset();
+            Assert.That(vitals.IsUp, Is.True);
+            Assert.That(rig.Host.ServerTryStair(clientId, 1), Is.True, "up again, the same press takes the party down");
+        }
+
         [UnityTest]
         public IEnumerator DiveFailed_ReturnsEveryoneToTheStart_EndsTheDive_AndKeepsTheSession()
         {
@@ -329,7 +357,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return ResolvePeers(rig);
             yield return AllBuilt(rig, 2);
             yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-2 entry"); yield return Seconds(1f);   // the arrival teleports must all have landed before the test moves a hero
-            Assert.That(rig.HostHaul.ServerAddPiece(100), Is.True);
+            foreach (int piece in new[] { 100, 101, 200, 201 }) Assert.That(rig.HostHaul.ServerAddPiece(piece), Is.True);   // every piece on floors 1-2: only then does the return dive skip them
             Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
             Move(rig.HostHero, bank + new Vector3(0.5f, 0.1f, 0f));
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) < 3f, Timeout, "the host hero never reached the checkpoint");
@@ -339,13 +367,13 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.ServerAbandonDive(), Is.True);
             Assert.That(rig.Host.NetActive.Value, Is.False);
             yield return NearOnHost(rig, Home, "home after abandoning");
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(1), "the banked piece survives an abandoned dive");
+            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(4), "the banked pieces survive an abandoned dive");
 
             yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "the floor was never cleared");
             Assert.That(rig.Host.ServerStartDive(), Is.True);
-            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(3), "a return dive starts on floor 3 once the checkpoint was reached this session");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(3), "a return dive starts on floor 3 once the checkpoint was reached and floors 1-2 are fully collected");
             yield return AllBuilt(rig, 3);
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(1));
+            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(4));
             Assert.That(rig.HostFloor.BuiltSeed, Is.EqualTo(31337u), "one seed per session");
         }
 
