@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Tools/cloud/unity.sh - SleepingCalamity wrapper for Unity batchmode runs on LINUX (cloud sessions). The same interface and checks as Tools/unity.ps1 (Windows).
 #
-#   bash Tools/cloud/unity.sh <compile|build|test-edit|test-play|check|gate|exec> [--out DIR] [--filter REGEX] [--timeout MIN] [--project DIR] [--method Class.Method] [--graphics]
+#   bash Tools/cloud/unity.sh <compile|build|test-edit|test-play|check|gate|soak|exec> [--out DIR] [--filter REGEX] [--timeout MIN] [--project DIR] [--method Class.Method] [--graphics]
+#
+# test-edit, gate and check run the fast EditMode tier (-testCategory '!Soak'); `soak` runs only [Category("Soak")] (the 1000+ seed sweeps), prints its own SC RESULT soak line and records no merge marker.
 #
 # --out defaults to $SC_OUT; it must be absolute, contain no '..' and sit outside the project (use the session scratchpad).
 # --project defaults to the repo this script is in. --graphics drops -nographics (renders need a graphics device; runs under xvfb-run).
@@ -10,7 +12,7 @@
 # Prints `SC RESULT <command> PASS|FAIL|...` lines like unity.ps1, and after a `check` PASS records the commit for the merge gate (<git-common-dir>/sc-check-pass/<sha>).
 # First Linux run 2026-10-29: the editor exited 198 (no valid licence) before any project work; the script itself has not been tested past launch.
 set -u
-USAGE='usage: unity.sh <compile|build|test-edit|test-play|check|gate|exec> --out <absolute scratch dir outside the project> (or set SC_OUT) [--project DIR] [--filter REGEX] [--timeout MIN] [--method Class.Method] [--graphics]'
+USAGE='usage: unity.sh <compile|build|test-edit|test-play|check|gate|soak|exec> --out <absolute scratch dir outside the project> (or set SC_OUT) [--project DIR] [--filter REGEX] [--timeout MIN] [--method Class.Method] [--graphics]'
 say() { printf '%s\n' "$*"; }
 usage() { say "$USAGE"; [ -n "${1:-}" ] && say "usage: $1"; exit 4; }
 
@@ -28,7 +30,7 @@ while [ $# -gt 0 ]; do
         *) usage "unknown argument $1" ;;
     esac
 done
-case "$COMMAND" in compile|build|test-edit|test-play|check|gate|exec) ;; *) usage "unknown or missing command '$COMMAND'" ;; esac
+case "$COMMAND" in compile|build|test-edit|test-play|check|gate|soak|exec) ;; *) usage "unknown or missing command '$COMMAND'" ;; esac
 UNITY="${SC_UNITY:-$HOME/unity/ed/Editor/Unity}"
 [ -d "$PROJECT/ProjectSettings" ] || usage "project must be an absolute Unity project path: $PROJECT"
 PROJECT="$(cd "$PROJECT" && pwd)"
@@ -96,11 +98,12 @@ do_exec() {
     if [ "$RUN_EXIT" = 0 ] && compile_clean "$RUN_LOG"; then say "SC RESULT exec PASS method=$METHOD log=$RUN_LOG"; return 0; fi
     excerpt "$RUN_LOG" "$ERR_PATTERN"; say "SC RESULT exec FAIL method=$METHOD exit=$RUN_EXIT log=$RUN_LOG"; return 1
 }
-do_tests() { # NAME PLATFORM XML
-    local name="$1" platform="$2" xml="$OUT/$3"
+do_tests() { # NAME PLATFORM XML [CATEGORY]
+    local name="$1" platform="$2" xml="$OUT/$3" category="${4:-}"
     rm -f "$xml"
     local extra=(-runTests -testPlatform "$platform" -testResults "$xml" -dev-profile sctest)   # never -quit with -runTests
     [ -n "$FILTER" ] && extra+=(-testFilter "$FILTER")
+    [ -n "$category" ] && extra+=(-testCategory "$category")
     run_unity "$name" "${extra[@]}"; gate "$name" || return $?
     local total=0 passed=0 failed=0 skipped=0 faillines=""
     if [ -f "$xml" ]; then
@@ -173,12 +176,13 @@ code=1
 case "$COMMAND" in
     compile) do_compile; code=$? ;;
     build) do_build; code=$? ;;
-    test-edit) do_tests test-edit EditMode editmode.xml; code=$? ;;
+    test-edit) do_tests test-edit EditMode editmode.xml '!Soak'; code=$? ;;
+    soak) do_tests soak EditMode soak.xml Soak; code=$? ;;   # only the [Category("Soak")] seed sweeps; no merge marker
     test-play) do_tests test-play PlayMode playmode.xml; code=$? ;;
     exec) do_exec; code=$? ;;
     gate)
         do_compile; code=$?
-        [ "$code" = 0 ] && { do_tests test-edit EditMode editmode.xml; code=$?; }
+        [ "$code" = 0 ] && { do_tests test-edit EditMode editmode.xml '!Soak'; code=$?; }
         case "$code" in
             0) say 'SC RESULT gate PASS'; write_marker sc-gate-pass ;;
             2) say 'SC RESULT gate LOCKED' ;;
@@ -187,7 +191,7 @@ case "$COMMAND" in
         esac ;;
     check)
         do_build; code=$?
-        [ "$code" = 0 ] && { do_tests test-edit EditMode editmode.xml; code=$?; }
+        [ "$code" = 0 ] && { do_tests test-edit EditMode editmode.xml '!Soak'; code=$?; }
         [ "$code" = 0 ] && { do_tests test-play PlayMode playmode.xml; code=$?; }
         case "$code" in
             0) say 'SC RESULT check PASS'; write_marker ;;

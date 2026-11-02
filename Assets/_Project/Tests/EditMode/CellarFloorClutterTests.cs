@@ -12,18 +12,15 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarFloorClutterTests
     {
-        const int Seeds = 1000;
+        const int FullSeeds = 1000;   // the Soak case; Scale() shrinks the "at least N" counts for the fast twin
+        static int Scale(int atLeast, int seeds) => Math.Max(1, atLeast * seeds / FullSeeds);
         static readonly CellSide[] Sides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
-        static IEnumerable<(CellarFloorLayout l, CellarFloorDressing d, CellarFloorClutter c)> All()
+        static IEnumerable<(CellarFloorLayout l, CellarFloorDressing d, CellarFloorClutter c)> All(int seeds)
         {
-            for (uint seed = 0; seed < Seeds; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 4; floor++)
-                {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
-                    CellarFloorDressing d = CellarFloorDressing.Resolve(l);
-                    yield return (l, d, CellarFloorClutter.Resolve(l, d, CellarRoomChunks.Resolve(l, d)));
-                }
+                    yield return (CellarTestFloors.Layout(seed, floor), CellarTestFloors.Dressing(seed, floor), CellarTestFloors.Clutter(seed, floor));
         }
 
         static bool Near(int x, int y, int ox, int oy, bool orthogonalToo) => (x == ox && y == oy) || (orthogonalToo && Math.Abs(x - ox) + Math.Abs(y - oy) == 1);
@@ -65,11 +62,11 @@ namespace SleepingCalamity.Tests.EditMode
             return ((r.WidthCm * c + r.DepthCm * s) / 2.0, (r.WidthCm * s + r.DepthCm * c) / 2.0);
         }
 
-        [Test]
-        public void Rooms_RulesHoldOver1000SeedsAndFloors1To4()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Rooms_RulesHoldOverSeedsAndFloors1To4(int seeds)
         {
             int rows = 0, frontOfDoorRows = 0;
-            foreach (var (l, d, c) in All())
+            foreach (var (l, d, c) in All(seeds))
             {
                 string tag = "seed " + l.Seed + " floor " + l.Floor;
                 var markers = Markers(l, d);
@@ -111,7 +108,7 @@ namespace SleepingCalamity.Tests.EditMode
                     }
                 }
             }
-            Assert.Greater(rows, 1000, "the resolver produced clutter");
+            Assert.Greater(rows, Scale(1000, seeds), "the resolver produced clutter");
             Report("rows on front-of-door cells: " + frontOfDoorRows);
         }
 
@@ -158,11 +155,11 @@ namespace SleepingCalamity.Tests.EditMode
 
         // CellarEncounterPlan can put an extra enemy or the hunter on any free floor cell of a Combat room, at any stir level. The plan stores only the cell (no spawner yet), so the
         // standing point is the cell centre: every footprint (jitter included) on such a cell keeps at least 1.0 m of horizontal clearance from it.
-        [Test]
-        public void Rooms_KeepOneMetreClearOfEveryEncounterStandingPoint()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Rooms_KeepOneMetreClearOfEveryEncounterStandingPoint(int seeds)
         {
             int onEncounterCells = 0; double min = double.MaxValue;
-            foreach (var (l, d, c) in All())
+            foreach (var (l, d, c) in All(seeds))
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     var free = new HashSet<(int, int)>(CellarEncounterPlan.FreeCellsOf(l, d, r).Select(q => (q.X, q.Y)));
@@ -176,13 +173,13 @@ namespace SleepingCalamity.Tests.EditMode
                     }
                 }
             Report("encounter cells carry " + onEncounterCells + " rows, closest footprint " + min.ToString("0") + " cm from a standing point");
-            Assert.Greater(onEncounterCells, 1000, "combat rooms are dressed on their encounter cells");
+            Assert.Greater(onEncounterCells, Scale(1000, seeds), "combat rooms are dressed on their encounter cells");
         }
 
-        [Test]
-        public void Rooms_KeepEveryDoorAndCellReachable_AndTheCentreOpen()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Rooms_KeepEveryDoorAndCellReachable_AndTheCentreOpen(int seeds)
         {
-            foreach (var (l, d, c) in All())
+            foreach (var (l, d, c) in All(seeds))
             {
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
@@ -217,11 +214,11 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
-        [Test]
-        public void Corridors_OnlySparseSmallPieces_AndTheyNeverNarrowTheWalk()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Corridors_OnlySparseSmallPieces_AndTheyNeverNarrowTheWalk(int seeds)
         {
             int corridorRows = 0;
-            foreach (var (l, d, c) in All())
+            foreach (var (l, d, c) in All(seeds))
             {
                 var outside = new HashSet<(int, int)>();
                 foreach (PlacedRoom p in l.Rooms) for (int i = 0; i < p.Room.Doors.Count; i++) { CellPos o = p.DoorOutside(i); outside.Add((o.X, o.Y)); }
@@ -251,13 +248,13 @@ namespace SleepingCalamity.Tests.EditMode
                     Assert.GreaterOrEqual(360.0 - across, 250.0, who + ": the corridor narrows below 2.5 m");
                 }
             }
-            Assert.Greater(corridorRows, 50, "some corridors carry a piece");
+            Assert.Greater(corridorRows, Scale(50, seeds), "some corridors carry a piece");
         }
 
-        [Test]
-        public void SameSeedAndFloor_GiveIdenticalClutter()
+        [TestCase(20), TestCase(200, Category = "Soak")]   // regenerates on purpose (determinism), so it does not share the cache
+        public void SameSeedAndFloor_GiveIdenticalClutter(int seeds)
         {
-            for (uint seed = 0; seed < 200; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 4; floor++)
                 {
                     CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
@@ -282,14 +279,13 @@ namespace SleepingCalamity.Tests.EditMode
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
         const ulong GoldenClutter12345Floor1 = 16011374251828274625UL, GoldenClutter12345Floor2 = 10253269401699159736UL, GoldenClutter12345Floor3 = 5831406759042979402UL;   // re-pinned 2026-11-01: procgen items 4 (chunks) + 5 (vignettes), deliberate
 
-        [Test]
-        public void Clutter_NeverStandsOnChunkSolidCells()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Clutter_NeverStandsOnChunkSolidCells(int seeds)
         {
-            for (uint seed = 0; seed < 1000; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
-                    CellarRoomChunks chunks = CellarRoomChunks.Resolve(l, d); CellarFloorClutter c = CellarFloorClutter.Resolve(l, d, chunks);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarRoomChunks chunks = CellarTestFloors.ChunkPlan(seed, floor); CellarFloorClutter c = CellarTestFloors.Clutter(seed, floor);
                     var solid = new HashSet<(int, int)>();
                     foreach (ResolvedChunk ch in chunks.Chunks) if (!ch.IsOpen) foreach (var (cell, _) in CellarRoomChunks.SolidCells(l, ch)) solid.Add((cell.X, cell.Y));
                     foreach (CellarClutterRow row in c.Rows) Assert.IsFalse(solid.Contains((row.CellX, row.CellY)), "seed " + seed + " floor " + floor + ": " + row.Id + " stands on a chunk solid cell " + row.CellX + "," + row.CellY);
@@ -332,13 +328,12 @@ namespace SleepingCalamity.Tests.EditMode
             if (!string.IsNullOrEmpty(f)) System.IO.File.AppendAllText(f, line + "\n");
         }
 
-        [Test]
-        public void RoomsAndCorridorsCarryClutter_Stats()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(300, Category = "Soak")]
+        public void RoomsAndCorridorsCarryClutter_Stats(int seeds)
         {
             int rooms = 0, rows = 0, combat = 0, combatRows = 0, corr = 0, corrRows = 0, floors = 0; var perPiece = new Dictionary<string, int>();
-            foreach (var (l, d, c) in All())
+            foreach (var (l, d, c) in All(seeds))
             {
-                if (l.Seed >= 300) continue;
                 floors++; corr += l.Corridors.Count; corrRows += c.Rows.Count(q => q.InCorridor);
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
@@ -355,11 +350,11 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         // Combat rooms are the rooms that read empty: they must carry at least two rows on average.
-        [Test]
-        public void CombatRooms_CarryAtLeastTwoRowsOnAverage()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void CombatRooms_CarryAtLeastTwoRowsOnAverage(int seeds)
         {
             int combat = 0, combatRows = 0; var perFloor = new int[5, 3];
-            foreach (var (l, d, c) in All())
+            foreach (var (l, d, c) in All(seeds))
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     perFloor[l.Floor, 0]++; perFloor[l.Floor, 1] += c.CountInRoom(r);

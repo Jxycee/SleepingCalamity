@@ -10,7 +10,9 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarHealingTests
     {
-        static CellPos? Point(uint seed, int floor)
+        static CellPos? Point(uint seed, int floor) => CellarHealing.PointFor(CellarTestFloors.Layout(seed, floor), CellarTestFloors.Dressing(seed, floor));
+
+        static CellPos? PointFresh(uint seed, int floor)   // regenerates on purpose (determinism), so it does not share the cache
         {
             CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
             return CellarHealing.PointFor(l, CellarFloorDressing.Resolve(l));
@@ -29,30 +31,32 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 60; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellPos? a = Point(seed, floor), b = Point(seed, floor);
+                    CellPos? a = PointFresh(seed, floor), b = Point(seed, floor);
                     Assert.AreEqual(a.HasValue, b.HasValue, "seed " + seed + " floor " + floor);
                     if (a.HasValue) { Assert.AreEqual(a.Value.X, b.Value.X); Assert.AreEqual(a.Value.Y, b.Value.Y); }
                 }
         }
 
-        [Test]
-        public void Share_OverAThousandSeeds_IsAboutHalf()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void Share_IsAboutHalf(int seeds)
         {
             int with = 0, total = 0;
-            for (uint seed = 1; seed <= 1000; seed++)
+            for (uint seed = 1; seed <= seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++) { total++; if (Point(seed, floor).HasValue) with++; }
             double share = (double)with / total;
-            Assert.That(share, Is.InRange(0.45, 0.57), "share " + share + " (" + with + "/" + total + ")");
+            double slack = seeds >= 1000 ? 0 : 0.15;   // statistical band: wider for the fast twin
+            Assert.That(share, Is.InRange(0.45 - slack, 0.57 + slack), "share " + share + " (" + with + "/" + total + ")");
         }
 
-        [Test]
-        public void EachFloor_1To3_HasItsOwnShareAboutHalf()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
+        public void EachFloor_1To3_HasItsOwnShareAboutHalf(int seeds)
         {
             for (int floor = 1; floor <= 3; floor++)
             {
                 int with = 0;
-                for (uint seed = 1; seed <= 1000; seed++) if (Point(seed, floor).HasValue) with++;
-                Assert.That(with / 1000.0, Is.InRange(0.44, 0.58), "floor " + floor + ": " + with + "/1000");
+                for (uint seed = 1; seed <= seeds; seed++) if (Point(seed, floor).HasValue) with++;
+                double slack = seeds >= 1000 ? 0 : 0.2;   // statistical band: wider for the fast twin
+                Assert.That(with / (double)seeds, Is.InRange(0.44 - slack, 0.58 + slack), "floor " + floor + ": " + with + "/" + seeds);
             }
         }
 
@@ -70,7 +74,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 1; seed <= 100; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     Assert.IsFalse(CellarHealing.PointFor(l, d, none).HasValue);
                     Assert.IsTrue(CellarHealing.PointFor(l, d, all).HasValue, "seed " + seed + " floor " + floor + ": no legal cell");
                 }
@@ -83,20 +87,20 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 1; seed <= 200; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     CellPos? a = CellarHealing.PointFor(l, d), b = CellarHealing.PointFor(l, d, lo);
                     if (a.HasValue) { Assert.IsTrue(b.HasValue); Assert.AreEqual(a.Value.X, b.Value.X); Assert.AreEqual(a.Value.Y, b.Value.Y); }
                 }
         }
 
-        [Test]
-        public void Cell_IsLegal_Reachable_AndClearOfEverythingElse()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(300, Category = "Soak")]
+        public void Cell_IsLegal_Reachable_AndClearOfEverythingElse(int seeds)
         {
             int checkedPoints = 0;
-            for (uint seed = 1; seed <= 300; seed++)
+            for (uint seed = 1; seed <= seeds; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     CellPos? p = CellarHealing.PointFor(l, d);
                     if (!p.HasValue) continue;
                     checkedPoints++;
@@ -135,7 +139,7 @@ namespace SleepingCalamity.Tests.EditMode
                             Assert.IsFalse(o.X == p.Value.X && o.Y == p.Value.Y, who + ": outside a door");
                         }
                 }
-            Assert.Greater(checkedPoints, 300, "too few points to prove anything");
+            Assert.Greater(checkedPoints, seeds >= 300 ? 300 : seeds / 3, "too few points to prove anything");
         }
 
         [Test]

@@ -8,7 +8,13 @@ namespace SleepingCalamity.Tests.EditMode
     // Procgen item 1d: the loot-mix steering (CellarLootMix). Placeholder targets, so the tests prove the mechanism (determinism, convergence, no starvation), not feel.
     public sealed class CellarLootMixTests
     {
-        static bool[][] Dive(uint seed, int floors = 4) => CellarLootMix.KeyFlagsOfDive(seed, floors);
+        // KeyFlagsOfDive generates the dive's floors; the flags are read-only here, so each (seed, floors) is computed once for the whole run
+        static readonly System.Collections.Generic.Dictionary<(uint, int), bool[][]> Dives = new System.Collections.Generic.Dictionary<(uint, int), bool[][]>();
+        static bool[][] Dive(uint seed, int floors = 4)
+        {
+            if (!Dives.TryGetValue((seed, floors), out bool[][] d)) Dives[(seed, floors)] = d = CellarLootMix.KeyFlagsOfDive(seed, floors);
+            return d;
+        }
 
         [Test]
         public void Replay_IsDeterministic_AndFloorNDoesNotDependOnLaterFloors()
@@ -26,11 +32,11 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
-        [Test]
-        public void Shares_ConvergeToTheTargets_OverManySeeds_AndNoCategoryStarves()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(1500, Category = "Soak")]
+        public void Shares_ConvergeToTheTargets_OverManySeeds_AndNoCategoryStarves(int seeds)
         {
             var got = new double[3]; var want = new double[3]; double total = 0;
-            for (uint seed = 0; seed < 1500; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
             {
                 bool[][] d = Dive(seed); LootCategory[][] cats = CellarLootMix.Replay(seed, d);
                 for (int f = 1; f <= 4; f++)
@@ -43,24 +49,25 @@ namespace SleepingCalamity.Tests.EditMode
             }
             string msg = "";
             for (int c = 0; c < 3; c++) { got[c] /= total; want[c] /= total; msg += (LootCategory)c + " got " + got[c].ToString("F3") + " want " + want[c].ToString("F3") + "; "; }
-            UnityEngine.Debug.Log("LootMix shares over 1500 dives, " + total + " chests: " + msg);
+            UnityEngine.Debug.Log("LootMix shares over " + seeds + " dives, " + total + " chests: " + msg);
             for (int c = 0; c < 3; c++)
             {
-                Assert.That(Math.Abs(got[c] - want[c]), Is.LessThan(0.04), msg);
+                Assert.That(Math.Abs(got[c] - want[c]), Is.LessThan(seeds >= 1500 ? 0.04 : 0.12), msg);   // statistical band: wider for the fast twin
+
                 Assert.That(got[c], Is.GreaterThan(0.05), "no category starves: " + msg);
             }
         }
 
-        [Test]
-        public void Feedback_PullsEachDiveCloserToItsTargets_ThanNoFeedback()
+        [TestCase(CellarTestFloors.FastSeeds), TestCase(600, Category = "Soak")]
+        public void Feedback_PullsEachDiveCloserToItsTargets_ThanNoFeedback(int seeds)
         {
             double with = 0, without = 0;
-            for (uint seed = 0; seed < 600; seed++)
+            for (uint seed = 0; seed < seeds; seed++)
             {
                 bool[][] d = Dive(seed);
                 with += Deviation(CellarLootMix.Replay(seed, d), d); without += Deviation(CellarLootMix.Replay(seed, d, 0), d);
             }
-            Assert.That(with, Is.LessThan(without * 0.9), "with feedback " + with + " vs none " + without);
+            Assert.That(with, Is.LessThan(without * (seeds >= 600 ? 0.9 : 1.0)), "with feedback " + with + " vs none " + without);
         }
 
         static double Deviation(LootCategory[][] cats, bool[][] keys)
