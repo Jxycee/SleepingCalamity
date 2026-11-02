@@ -91,6 +91,12 @@ namespace SleepingCalamity.Presentation
         public readonly NetworkVariable<ulong> NetBuilder = new NetworkVariable<ulong>(NoBuilder, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<GhostNet> NetGhost = new NetworkVariable<GhostNet>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+        // M6 S5: the baker's first-meet beat (Q4 C), latched by the host the first time he stands in his complete bakery (DiveDirector.BakerTick) and saved in the residents section.
+        // Host-written, everyone reads it; a peer that watches it flip to true shows the baker's first line (a late joiner sees it already true: no line replays).
+        public const string FirstMeetLine = "Baker: \"Oven's warm at last. Come by before you dive and I'll send you down with bread.\"";
+        public readonly NetworkVariable<bool> NetBakerMet = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        private string _toast; private float _toastUntil, _spawnedAt;
+
         public DiveDirector Director;   // host only (set by the director that spawned this)
 
         private TownLayout _layout;
@@ -113,13 +119,28 @@ namespace SleepingCalamity.Presentation
         {
             if (Local == null || IsServer) Local = this;
             NetTown.OnValueChanged += OnTownChanged;
+            NetBakerMet.OnValueChanged += OnBakerMetChanged;
+            _spawnedAt = Time.unscaledTime;
             if (IsServer) NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
             EnsureView();
+        }
+
+        private void OnBakerMetChanged(bool previous, bool current)
+        {
+            // a latch restored from the save is written right after the spawn: only a flip that happens later is "the first meeting"
+            if (!previous && current && Time.unscaledTime - _spawnedAt > 3f) { _toast = FirstMeetLine; _toastUntil = Time.unscaledTime + 7f; }
+        }
+
+        private void OnGUI()
+        {
+            if (_toast != null && Time.unscaledTime < _toastUntil)
+                GUI.Box(new Rect(Screen.width * 0.5f - 280f, Screen.height - 230f, 560f, 30f), _toast);
         }
 
         public override void OnNetworkDespawn()
         {
             NetTown.OnValueChanged -= OnTownChanged;
+            NetBakerMet.OnValueChanged -= OnBakerMetChanged;
             if (NetworkManager != null) NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
             if (Local == this) Local = null;
         }

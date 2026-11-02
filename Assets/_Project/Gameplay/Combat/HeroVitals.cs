@@ -79,6 +79,35 @@ namespace SleepingCalamity.Gameplay
             return gain;
         }
 
+        // M6 S5: the baker's loaves (healing items). Host-written count, everyone reads it (HUD). The host sets it at dive start from BakerService; the owner asks to eat one
+        // (RequestEatLoaf, owner only) and the host re-checks: up, hurt, a loaf left. Eating heals through ServerHeal, the same path as a healing drop.
+        public const int LoafHeal = 30;
+        public readonly NetworkVariable<int> NetLoaves = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public int Loaves => NetLoaves.Value;
+
+        public void ServerSetLoaves(int count) { if (IsServer) NetLoaves.Value = count < 0 ? 0 : count; }
+
+        // Host: eats one loaf if this hero is up, hurt and has one. Returns the HP gained (0 when nothing was eaten).
+        public int ServerEatLoaf()
+        {
+            if (!IsServer || !IsSpawned || NetLoaves.Value <= 0 || !IsUp || Model.Hp >= MaxHp) return 0;
+            int gain = ServerHeal(LoafHeal);
+            if (gain <= 0) return 0;
+            NetLoaves.Value--;
+            HeroCombat c = GetComponent<HeroCombat>();
+            if (c != null) c.ServerBroadcastHeal(gain);
+            return gain;
+        }
+
+        public void RequestEatLoaf() { if (IsOwner) EatLoafRpc(); }
+
+        [Rpc(SendTo.Server)]
+        private void EatLoafRpc(RpcParams rpcParams = default)
+        {
+            if (rpcParams.Receive.SenderClientId != OwnerClientId) return;
+            ServerEatLoaf();
+        }
+
         // Host: an out hero stands up with the revive HP (the arena only; a dive keeps its out rule).
         public bool ServerReviveFromOut()
         {
