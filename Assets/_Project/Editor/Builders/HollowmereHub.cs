@@ -67,7 +67,8 @@ namespace SleepingCalamity.EditorTools
             look.TownVolume = town; look.CellarVolume = cellar; look.CellarBelowY = CellarBelowY;
             look.TownLights = lighting.GetComponentsInChildren<Light>(true).Where(l => l.type == LightType.Directional).ToArray();
             GameObject shafts = GameObject.Find(HollowmereLook.ShaftsRoot);
-            look.TownOnly = shafts != null ? new[] { shafts } : new GameObject[0];
+            GameObject ambient = GameObject.Find(HollowmereAmbientBuilder.RootName);   // birds, insects, rings, reeds: off in the cellar
+            look.TownOnly = new[] { shafts, ambient }.Where(g => g != null).ToArray();
 
             BuildTownView(root, t);
         }

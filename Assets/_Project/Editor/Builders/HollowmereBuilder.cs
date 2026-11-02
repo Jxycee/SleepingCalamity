@@ -159,6 +159,7 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.sun = sun;
 
             HollowmereLook.BuildAtmosphere(root, t);   // Q12: town-wide pollen and god-ray shafts
+            HollowmereAmbientBuilder.Build(root, t);   // phase-1 ambient life: birds, butterflies, bees, fish rings, reed sway, wind waves, chimney smoke (tuning: HollowmereAmbientLife)
 
             Transform cams = Child(root, "CaptureCameras");
             foreach (var c in BeautyCornerTable.Cameras) LookTestBuilder.AddCapture(cams, c.Name, c.Pos, c.Target, c.Fov);
