@@ -19,9 +19,10 @@ namespace SleepingCalamity.Core
         private double _diveStart, _diveEnd, _floorStart;
         private int _lastHp, _lastLoaves, _floor;
         private ulong _lastMask;
+        private bool _maskKnown;   // false until this floor's cleared mask has arrived; the first known mask is a baseline, not fresh clears
         private const double HealWindow = 0.5;   // NetHp and NetLoaves replicate in different frames: a loaf drop and an HP rise this close are one heal
         private double _hpPendingUntil = -1, _loafAbsorbUntil = -1;
-        private readonly Dictionary<int, double> _roomEntered = new Dictionary<int, double>();
+        private readonly Dictionary<(int floor, int room), double> _roomEntered = new Dictionary<(int floor, int room), double>();   // keyed by floor: the host can hear the new floor's first RoomEntered before Observe sees the floor change
         private readonly List<RoomClear> _clears = new List<RoomClear>();
 
         public bool Active => _active;
@@ -35,13 +36,16 @@ namespace SleepingCalamity.Core
         public double DiveSeconds(double now) => !_have ? 0 : Math.Max(0, (_active ? now : _diveEnd) - _diveStart);
 
         // Host only: the first enemy of a room spawned (CellarContentsSync.RoomEntered). Later calls for the same room on the same floor keep the first time.
-        public void NoteRoomEntered(int room, double now)
+        // floor: the floor that room is on (the contents state's floor); -1 means the floor this model is on now.
+        public void NoteRoomEntered(int room, double now, int floor = -1)
         {
-            if (!_roomEntered.ContainsKey(room)) _roomEntered[room] = now;
+            var key = (floor < 0 ? _floor : floor, room);
+            if (!_roomEntered.ContainsKey(key)) _roomEntered[key] = now;
         }
 
-        // Call every frame. active: a dive is running; hp: the local hero's life; loaves: the local hero's loaves.
-        public void Observe(double now, bool active, int floor, int hp, int loaves, ulong clearedMask)
+        // Call every frame. active: a dive is running; hp: the local hero's life; loaves: the local hero's loaves;
+        // clearedMask: the floor's cleared-room mask, or null while this floor's contents state hasn't arrived.
+        public void Observe(double now, bool active, int floor, int hp, int loaves, ulong? clearedMask)
         {
             if (!active)
             {
@@ -73,22 +77,27 @@ namespace SleepingCalamity.Core
             _lastHp = hp; _lastLoaves = loaves;
 
             if (floor != _floor) { StartFloor(floor, now, clearedMask); return; }
-            ulong gained = clearedMask & ~_lastMask;
+            if (clearedMask == null) return;
+            if (!_maskKnown) { _maskKnown = true; _lastMask = clearedMask.Value; return; }   // baseline: rooms already cleared (a revisited floor) are not fresh clears
+            ulong gained = clearedMask.Value & ~_lastMask;
             for (int room = 0; room < 64 && gained != 0; room++)
             {
                 ulong bit = 1UL << room;
                 if ((gained & bit) == 0) continue;
                 gained &= ~bit;
-                bool spawned = _roomEntered.TryGetValue(room, out double t0);
+                bool spawned = _roomEntered.TryGetValue((_floor, room), out double t0);
                 _clears.Add(new RoomClear { Room = room, Seconds = Math.Max(0, now - (spawned ? t0 : _floorStart)), FromFirstSpawn = spawned });
             }
-            _lastMask = clearedMask;
+            _lastMask = clearedMask.Value;
         }
 
-        private void StartFloor(int floor, double now, ulong mask)
+        private void StartFloor(int floor, double now, ulong? mask)
         {
-            _floor = floor; _floorStart = now; _lastMask = mask;
-            _clears.Clear(); _roomEntered.Clear();
+            _floor = floor; _floorStart = now; _maskKnown = mask != null; _lastMask = mask ?? 0UL;
+            _clears.Clear();
+            var stale = new List<(int floor, int room)>();
+            foreach (var k in _roomEntered.Keys) if (k.floor != floor) stale.Add(k);
+            foreach (var k in stale) _roomEntered.Remove(k);
         }
 
         // "m:ss" (minutes unbounded); negative is shown as 0:00.
