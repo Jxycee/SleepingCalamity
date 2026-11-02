@@ -99,7 +99,13 @@ namespace SleepingCalamity.EditorTools
                     obj.transform.rotation = Quaternion.Euler(0f, r.Yaw, r.Tilt);
                     obj.transform.localScale = new Vector3(r.ScaleX, 1f, 1f);
                     if (HasCollider(r.Piece)) { var b = obj.AddComponent<BoxCollider>(); (Vector3 c, Vector3 s) = BoxOf(r.Piece); b.center = c; b.size = s; }
-                    if (r.Piece == LanePiece.LaneStep) { AddStepSkirt(obj.transform, r, t, rowY); AddStepReadability(obj.transform); if (stepBottom) AddContactStrip(obj.transform, contactY - rowY); }
+                    if (r.Piece == LanePiece.LaneStep)
+                    {
+                        // stairs seat 3: a bottom step whose tread lies below the paving in front of it (contactY above its tread) is buried: it is only a walk collider, no visible piece
+                        // (its visible stub stuck out beside the next column's sunk first step in Cap_HM_StairSide1)
+                        if (stepBottom && contactY > rowY + 0.16f + 0.02f) { foreach (Renderer rend in obj.GetComponentsInChildren<Renderer>()) rend.enabled = false; }
+                        else { AddStepSkirt(obj.transform, r, t, rowY); AddStepReadability(obj.transform); if (stepBottom) AddContactStrip(obj.transform, contactY - rowY); }
+                    }
                     if (isRebuilt && r.Piece == LanePiece.WallLantern) AddLanternLight(obj.transform);
                     placed++;
                 }
@@ -192,25 +198,52 @@ namespace SleepingCalamity.EditorTools
         // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
         // z = 0 face. A pale nosing along the tread's front edge (visual only, no collider, no shadow casting). A dark riser band was tried in round 1 and floated black wedges over the
         // terrain at the flight's edges (Cap_HM_TerraceSteps), so it is gone.
-        static Material _nosing, _treadShade;
+        static Material _nosing;
         static void AddStepReadability(Transform step)
         {
             if (_nosing == null)
             {
-                Shader wear = Shader.Find(WearShaderName) ?? Shader.Find("Universal Render Pipeline/Lit");
                 _nosing = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LK_StepNosing.mat") ?? LookTestBuilder.Mat("sandstone");
-                _treadShade = BeautyCornerArt.Flat("LK_StepShade", new Color(0.025f, 0.022f, 0.018f), 0f, wear);
-                _treadShade.SetColor("_Color", _treadShade.GetColor("_BaseColor")); _treadShade.SetShaderPassEnabled("MotionVectors", true);
             }
             GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), Vector3.one, _nosing);
             n.GetComponent<MeshFilter>().sharedMesh = NosingMesh();
             n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            // dark shade line at the back of the tread (under the next riser): sits wholly on the tread top, so it cannot float at the flight's edges
-            // round 1 of stairs-traversal-3: a dark riser face limited to the visible 0.15 m above the tread below and inset from both flight edges (no skirt below, so no wedges)
-            GameObject ri = LookTestBuilder.Prim(step, "RiserFace", PrimitiveType.Cube, new Vector3(0f, 0.115f, -0.016f), new Vector3(1.96f, 0.045f, 0.006f), _treadShade);   // stairs seat 2: only a dark shade line under the nosing; the riser itself is the StoneBlock
+            // stairs seat 3: soft contact gradients instead of black bars. A thin quad under the nosing on the riser and one on the back of the tread, vertex alpha fading
+            // from ~38% dark (30-40% darker than the stone under it) to clear over 5 cm / 14 cm. Translucent, no collider, no shadows, so nothing reads as a black slot.
+            if (_shade == null)
+            {
+                _shade = LookTestBuilder.Ensure(MaterialsFolder + "/M_LK_StepShade.mat", Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Universal Render Pipeline/Lit"));
+                _shade.SetColor("_BaseColor", new Color(0.04f, 0.03f, 0.02f, 1f));
+                _shade.SetFloat("_Surface", 1f); _shade.SetFloat("_Blend", 0f); _shade.SetFloat("_SrcBlend", 5f); _shade.SetFloat("_DstBlend", 10f);
+                _shade.SetFloat("_SrcBlendAlpha", 1f); _shade.SetFloat("_DstBlendAlpha", 10f); _shade.SetFloat("_ZWrite", 0f);
+                _shade.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); _shade.SetOverrideTag("RenderType", "Transparent"); _shade.renderQueue = 3000;
+                EditorUtility.SetDirty(_shade);
+            }
+            GameObject ri = LookTestBuilder.Prim(step, "RiserShade", PrimitiveType.Quad, new Vector3(0f, 0.1375f - 0.025f, -0.016f), new Vector3(1.96f, 0.05f, 1f), _shade);
+            ri.GetComponent<MeshFilter>().sharedMesh = ShadeMesh();
             ri.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.48f), new Vector3(2f, 0.04f, 0.14f), _treadShade);
+            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Quad, new Vector3(0f, 0.162f, 0.55f - 0.07f), new Vector3(1.96f, 0.14f, 1f), _shade);
+            sh.GetComponent<MeshFilter>().sharedMesh = ShadeMesh();
+            sh.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        // unit quad in XY facing -Z, y 0..1 (centred on 0.5): vertex alpha 0 at the bottom edge, 0.38 at the top edge
+        static Material _shade;
+        static Mesh _shadeMesh;
+        static Mesh ShadeMesh()
+        {
+            if (_shadeMesh != null) return _shadeMesh;
+            _shadeMesh = new Mesh
+            {
+                name = "LK_StepShadeGradient",
+                vertices = new[] { new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f) },
+                uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1), new Vector2(1, 1) },
+                colors = new[] { new Color(1, 1, 1, 0f), new Color(1, 1, 1, 0f), new Color(1, 1, 1, 0.38f), new Color(1, 1, 1, 0.38f) },
+                triangles = new[] { 0, 2, 1, 2, 3, 1 }
+            };
+            _shadeMesh.RecalculateNormals(); _shadeMesh.RecalculateBounds();
+            return _shadeMesh;
         }
 
         // 2 x 0.04 x 0.24 m box, five faces (no underside), UVs in metres (one tile per NosingTileMetres) so the stone is not stretched across the thin strip.

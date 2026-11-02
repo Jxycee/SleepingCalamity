@@ -78,6 +78,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_PX_Weeds", new Vector3(-9f, 0.9f, -6f), new Vector3(3f, 0.8f, 12f), 62f),            // A3: low and wide over the open square, the weeds at the walls and kerbs
             ("Cap_HM_StairSide1", new Vector3(-41.2f, 0.8f, -33.5f), new Vector3(-45.6f, -5.0f, -31.0f), 60f),   // stairs seat: the Ring Lane south-west flight from its east side at 0.8 m (cheek, terrain meeting the treads)
             ("Cap_HM_StairSide3", new Vector3(-40.0f, 0.8f, -37.5f), new Vector3(-45.0f, -5.0f, -30.0f), 60f),   // stairs seat 2: the same flight's foot from the south-east at 0.8 m, looking up it (bottom step meeting the paving, stone under the treads) (stone mass under the treads, bottom step meeting the paving)
+            ("Cap_HM_StairSide4", new Vector3(-41.0f, 0.8f, -29.0f), new Vector3(-45.5f, -5.3f, -31.5f), 60f),   // stairs seat 3: the Terrace / Ring Lane flight from its west side at 1 m (stone cores under the treads, contact strip at the foot)
             ("Cap_HM_StairSide2", new Vector3(24.5f, 0.8f, 11.5f), new Vector3(19.2f, 1.2f, 16.0f), 60f),        // stairs seat: the keep's east flight from the east side at 0.8 m
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
         };
