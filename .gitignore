@@ -128,3 +128,7 @@ __pycache__/
 # Tools/town dump build output
 Tools/town/bin/
 Tools/town/obj/
+
+# Microsoft GDK package writes this on every editor start in a fresh checkout
+/Assets/Resources/GDKEditionAutoGen/
+/Assets/Resources/GDKEditionAutoGen.meta
