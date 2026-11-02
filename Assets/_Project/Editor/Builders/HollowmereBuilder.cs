@@ -481,7 +481,12 @@ namespace SleepingCalamity.EditorTools
                 {
                     var box = mf.gameObject.AddComponent<BoxCollider>(); box.center = mf.sharedMesh.bounds.center; box.size = mf.sharedMesh.bounds.size;
                 }
-                else mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                else
+                {
+                    mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                    if (n == "Footing" && mf.transform.parent != null && mf.transform.parent.name.StartsWith("Ruin_", StringComparison.Ordinal))
+                        HollowmereRuinSeal.Seal(g, mf);   // slots between the ruin's wall stubs that look passable but are narrower than the hero
+                }
             }
         }
 

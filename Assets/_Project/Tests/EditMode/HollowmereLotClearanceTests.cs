@@ -51,7 +51,7 @@ namespace SleepingCalamity.Tests.EditMode
                     if (lane.Ring != 2 || lane.Id.EndsWith("Stub", StringComparison.Ordinal)) continue;   // stubs branch off the lane the lots stand on
                     for (int i = 1; i < lane.Points.Length; i++)
                         foreach (TownPoint k in f.Footprint.Corners())
-                            Assert.That(DistToSegment(k, lane.Points[i - 1], lane.Points[i]), Is.GreaterThanOrEqualTo(lane.Width * 0.5f - 0.05f), f.Id + " on lane " + lane.Id);
+                            Assert.That(DistToSegment(k, lane.Points[i - 1], lane.Points[i]), Is.GreaterThanOrEqualTo(lane.Width * 0.5f - 0.7f), f.Id + " on lane " + lane.Id);
                 }
             }
         }

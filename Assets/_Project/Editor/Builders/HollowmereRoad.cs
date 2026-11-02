@@ -540,7 +540,17 @@ namespace SleepingCalamity.EditorTools
             mesh.RecalculateNormals(); mesh.RecalculateBounds();
             var go = new GameObject("RingRoadEnd");
             go.transform.SetParent(ring, false);
-            go.AddComponent<MeshCollider>().sharedMesh = mesh;   // under the drawn ribbon, no renderer of its own
+            go.AddComponent<MeshCollider>().sharedMesh = mesh;   // under the drawn ribbon
+            // The first quad (terrain edge to the road's first node) has no ribbon over it: draw it, so the floor collider has a visible floor (FloorMismatch).
+            var vis = new Mesh { name = "RD_RingRoadEndVisible" };
+            vis.SetVertices(new List<Vector3> { v[0], v[1], v[2], v[3] });
+            vis.SetUVs(0, new List<Vector2> { new Vector2(-EndHalf / 2.5f, 0f), new Vector2(EndHalf / 2.5f, 0f), new Vector2(-EndHalf / 2.5f, Vector3.Distance(v[0], v[2]) / 2.5f), new Vector2(EndHalf / 2.5f, Vector3.Distance(v[0], v[2]) / 2.5f) });
+            vis.SetTriangles(new[] { 0, 2, 3, 0, 3, 1 }, 0);
+            vis.RecalculateNormals(); vis.RecalculateBounds();
+            var visGo = new GameObject("RingRoadEndFloor");
+            visGo.transform.SetParent(ring, false);
+            visGo.AddComponent<MeshFilter>().sharedMesh = vis;
+            var visR = visGo.AddComponent<MeshRenderer>(); visR.sharedMaterial = RoadMaterial(); visR.shadowCastingMode = ShadowCastingMode.Off;
 
             EdgeBounds(ring, pad, edgeY);
 

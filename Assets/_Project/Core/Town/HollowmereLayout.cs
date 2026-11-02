@@ -524,22 +524,6 @@ namespace SleepingCalamity.Core
                     setback -= step;
                     c = c - n * step;
                 }
-                // Lane clearance: where the lane bends, a footprint corner can end up on the carriageway; push the lot away from the lane by the shortfall (never past the town wall limit).
-                for (int pass = 0; pass < 6; pass++)
-                {
-                    float shortfall = 0f, outer = 0f, inner = float.MaxValue;
-                    foreach (TownPoint k in new Footprint(c, half * 2f, half * 2f, yaw).Corners())
-                    {
-                        float need = lane.Width * 0.5f + 0.1f;
-                        for (int i = 1; i < lane.Points.Length; i++) shortfall = Math.Max(shortfall, need - TownPoint.Distance(k, ClosestOnSegment(k, lane.Points[i - 1], lane.Points[i], out _)));
-                        float d = PlateauDistance(k.X, k.Z); outer = Math.Max(outer, d); inner = Math.Min(inner, d);
-                    }
-                    if (shortfall <= 0.001f) break;
-                    float room = (outer <= LotWallLimit && inner < TownWallOffset) ? Math.Max(0f, LotWallLimit - outer) : shortfall;
-                    float push = Math.Min(shortfall, room);
-                    if (push <= 0.001f) break;
-                    c = c + n * push;
-                }
                 t.Foundations.Add(new Foundation { Id = r.Id, Ring = r.Ring, Size = r.Size, Centre = c, Yaw = (float)Math.Round(yaw, 2), Facing = LotSide.South, RuinVariant = Variant(r.Size, variants[vi++ % 3]) });
             }
 

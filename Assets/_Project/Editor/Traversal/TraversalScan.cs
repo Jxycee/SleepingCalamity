@@ -58,6 +58,7 @@ namespace SleepingCalamity.EditorTools
             }
 
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            if (Environment.GetEnvironmentVariable("SC_TRAVERSAL_SKIP_CELLARS") == "1") { Debug.Log("SC TRAVERSAL town only (SC_TRAVERSAL_SKIP_CELLARS)"); return; }   // quick town-only dump runs; REPORT.md is not written
             List<uint> seeds = SeedSet(seedCount, out List<string> coverage);
             report.Coverage = coverage; report.Seeds = seeds;
             var worst = new Dictionary<int, (int score, string path)>();
