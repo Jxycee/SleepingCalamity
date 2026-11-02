@@ -37,8 +37,8 @@ namespace SleepingCalamity.Presentation
                     : special.Kind == SpecialKind.Shrine ? new Color(0.35f, 0.55f, 0.95f) : new Color(0.60f, 0.85f, 0.65f);
                 var root = new GameObject("SpecialRoom_" + special.Kind + "_r" + special.RoomIndex).transform; root.SetParent(group, false);
                 root.position = CellCenter(p.X + p.Width / 2, p.Y + p.Height / 2);
-                Prim(root, "Pillar", PrimitiveType.Cylinder, root.position + new Vector3(0, 1.5f, 0), new Vector3(0.5f, 1.5f, 0.5f), mats.Flat(c));   // greybox marker at the room centre: no collider (a 0.5 m post in line with a door narrows it to 0.5 m)
-                Prim(root, "Banner", PrimitiveType.Cube, root.position + new Vector3(0, 2.6f, 0), new Vector3(1.2f, 0.6f, 0.05f), mats.Flat(c));
+                DebugOnly(Prim(root, "Pillar", PrimitiveType.Cylinder, root.position + new Vector3(0, 1.5f, 0), new Vector3(0.5f, 1.5f, 0.5f), mats.Flat(c)));   // greybox marker at the room centre: no collider (a 0.5 m post in line with a door narrows it to 0.5 m)
+                DebugOnly(Prim(root, "Banner", PrimitiveType.Cube, root.position + new Vector3(0, 2.6f, 0), new Vector3(1.2f, 0.6f, 0.05f), mats.Flat(c)));
                 result.SpecialMarkers++;
             }
             ProcgenChunks(layout, dressing, group, mats, result);
@@ -51,7 +51,7 @@ namespace SleepingCalamity.Presentation
                 Color c = h.Has(DoorHintFlags.Key) ? new Color(1.0f, 0.78f, 0.15f) : h.Has(DoorHintFlags.Special) ? new Color(0.85f, 0.25f, 0.85f)
                     : h.Has(DoorHintFlags.Exit) ? new Color(0.55f, 0.30f, 0.70f) : h.Has(DoorHintFlags.Checkpoint) ? new Color(0.30f, 0.85f, 0.90f)
                     : h.Has(DoorHintFlags.RewardVignette) ? new Color(0.25f, 0.75f, 0.55f) : new Color(0.55f, 0.35f, 0.15f);
-                Prim(group, "DoorHint_r" + h.RoomIndex + "_d" + h.DoorIndex, PrimitiveType.Sphere, mid + new Vector3(0, DoorHeight + 0.35f, 0), new Vector3(0.3f, 0.3f, 0.3f), mats.Flat(c));
+                DebugOnly(Prim(group, "DoorHint_r" + h.RoomIndex + "_d" + h.DoorIndex, PrimitiveType.Sphere, mid + new Vector3(0, DoorHeight + 0.35f, 0), new Vector3(0.3f, 0.3f, 0.3f), mats.Flat(c)));
                 result.DoorHintIcons++;
             }
         }

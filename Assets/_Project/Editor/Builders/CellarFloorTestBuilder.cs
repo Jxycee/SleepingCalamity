@@ -82,11 +82,11 @@ namespace SleepingCalamity.EditorTools
             var kit = new CellarFloorKit
             {
                 Floor = slots["CV_Flagstone"], Wall = slots["CV_Brick"], Pillar = slots["CV_VaultStone"], Trim = slots["CV_Oak"], Flame = own["flame"],
-                // B2: the locked gate and plain chests wear the cellar oak instead of glowing red / flat brown greybox blocks; the spawn-point discs are not drawn (they read as white discs on the floor)
+                // B2: the locked gate and plain chests wear the cellar oak instead of glowing red / flat brown greybox blocks; the spawn, entry, special-room and door-hint markers are QA-only and draw nothing (CellarFloorBuilder.ShowDebugMarkers; the spawn discs read as white discs on the floor)
                 LockedGate = slots["CV_Oak"], Chest = slots["CV_BarrelOak"],
                 KeyChest = Marker("CF_KeyChest", new Color(0.95f, 0.72f, 0.12f), 0.8f), Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
                 EntryStart = Marker("CF_Entry", new Color(0.30f, 0.58f, 0.18f), 0.5f), StairExit = Marker("CF_Stair", new Color(0.55f, 0.30f, 0.70f), 0.6f),
-                SpawnT1 = HiddenMarker("CF_SpawnT1"), SpawnT2 = HiddenMarker("CF_SpawnT2"),
+                SpawnT1 = Marker("CF_SpawnT1", new Color(0.62f, 0.60f, 0.55f), 0f), SpawnT2 = Marker("CF_SpawnT2", new Color(0.85f, 0.45f, 0.10f), 0f),
                 FogBaseDensity = 0.007f, FogBaseColor = new Color(0.16f, 0.13f, 0.11f),   // the corner's fog; the floor's atmosphere roll scales and warms this
                 Ceiling = slots["CV_VaultStone"], Limewash = slots["CV_Limewash"], Iron = slots["CV_Iron"], Crate = slots["CV_BarrelOak"],
                 Wax = own["wax"], Mote = own["mote"],
@@ -208,19 +208,6 @@ namespace SleepingCalamity.EditorTools
                 Debug.Log("SC CELLARFLOOR runtime kit pieces=" + saved.Count + " floorTile=" + (kit.FloorTile != null) + " lantern=" + (kit.Lantern != null));
             }
             finally { Object.DestroyImmediate(holderRoot); }
-        }
-
-        // A fully transparent URP Lit surface: the marker mesh stays (the generator still builds it) but draws nothing.
-        static Material HiddenMarker(string name)
-        {
-            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + name + ".mat", Shader.Find("Universal Render Pipeline/Lit") ?? throw new System.InvalidOperationException("URP Lit not found"));
-            Color c = new Color(0f, 0f, 0f, 0f);
-            m.SetColor("_BaseColor", c); m.SetColor("_Color", c); m.DisableKeyword("_EMISSION");
-            m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f); m.SetFloat("_SrcBlend", 1f); m.SetFloat("_DstBlend", 10f); m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 10f);
-            m.SetFloat("_ZWrite", 0f); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.EnableKeyword("_ALPHAPREMULTIPLY_ON"); m.SetOverrideTag("RenderType", "Transparent"); m.renderQueue = 3000;
-            m.SetShaderPassEnabled("ShadowCaster", false);
-            EditorUtility.SetDirty(m);
-            return m;
         }
 
         static Material Marker(string name, Color c, float glow)
