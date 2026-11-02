@@ -416,7 +416,9 @@ namespace SleepingCalamity.Tests.PlayMode
                 Assert.That(c.ClientCombat.HurtGraceActive, Is.True);
                 int hpAfterFirst = vHost.Model.Hp;
                 // Let the hurt stagger (0.25 s) pass so a roll is allowed, then B attacks and the client rolls just before B's hitbox opens.
-                for (int i = 0; i < 20; i++) yield return null;
+                // Wait only until the roll is allowed (not a fixed 20 frames): every frame spent here eats the 0.8 s grace window, and under load the client takes longer to see B's attack.
+                for (int guard = 0; !c.ClientCombat.AllowsDodge && guard < 60; guard++) yield return null;
+                Assert.That(c.ClientCombat.AllowsDodge, Is.True, "the hurt stagger ended");
                 int serial = b.Serial;
                 b.ServerForceAttack(AttackCatalog.TestNova, at);
                 yield return PlayModeHarness.WaitUntil(() => b.Serial != serial && bOnClient.Attacking, 2f, "the client never saw B's attack");
