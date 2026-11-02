@@ -255,12 +255,13 @@ namespace SleepingCalamity.Core
         {
             if (previous == null) return live;
             if (live == null) live = new ResidentsSave { Extra = CopyExtra(previous.Extra) };
+            if (live.Extra == null) live.Extra = CopyExtra(previous.Extra);   // unknown section-level fields from a newer build survive
             foreach (ResidentSave p in previous.Residents)
             {
                 if (p == null || string.IsNullOrEmpty(p.Id)) continue;
                 ResidentSave have = live.Residents.Find(x => x != null && x.Id == p.Id);
                 if (have == null) live.Residents.Add(new ResidentSave { Id = p.Id, FirstMeetBeat = p.FirstMeetBeat, Extra = CopyExtra(p.Extra) });
-                else have.FirstMeetBeat |= p.FirstMeetBeat;
+                else { have.FirstMeetBeat |= p.FirstMeetBeat; if (have.Extra == null) have.Extra = CopyExtra(p.Extra); }
             }
             return live;
         }

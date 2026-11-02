@@ -141,7 +141,7 @@ namespace SleepingCalamity.EditorTools
             {
                 if (!doorWall) { Box(root.transform, name, centre, size); return; }
                 float lo = (alongX ? centre.x - size.x * 0.5f : centre.z - size.z * 0.5f), hi = lo + (alongX ? size.x : size.z);
-                float door = alongX ? doorLocal.x : doorLocal.z, a = Mathf.Clamp(door - gap * 0.5f, lo, hi), c = Mathf.Clamp(door + gap * 0.5f, lo, hi);
+                DoorSpan(alongX ? doorLocal.x : doorLocal.z, lo, hi, gap, out float a, out float c);
                 if (a - lo > 0.05f) Box(root.transform, name + "_A", alongX ? new Vector3((lo + a) * 0.5f, centre.y, centre.z) : new Vector3(centre.x, centre.y, (lo + a) * 0.5f), alongX ? new Vector3(a - lo, size.y, size.z) : new Vector3(size.x, size.y, a - lo));
                 if (hi - c > 0.05f) Box(root.transform, name + "_B", alongX ? new Vector3((c + hi) * 0.5f, centre.y, centre.z) : new Vector3(centre.x, centre.y, (c + hi) * 0.5f), alongX ? new Vector3(hi - c, size.y, size.z) : new Vector3(size.x, size.y, hi - c));
             }
@@ -149,6 +149,13 @@ namespace SleepingCalamity.EditorTools
             Wall("WallN", new Vector3(cx, h * 0.5f, z1 - t * 0.5f), new Vector3(x1 - x0, h, t), true, m == dN);
             Wall("WallW", new Vector3(x0 + t * 0.5f, h * 0.5f, cz), new Vector3(t, h, z1 - z0), false, m == dW);
             Wall("WallE", new Vector3(x1 - t * 0.5f, h * 0.5f, cz), new Vector3(t, h, z1 - z0), false, m == dE);
+        }
+
+        // The door opening [a, c] inside a wall run [lo, hi]. A NaN or infinite door coordinate (a degenerate door direction) falls back to the wall's middle, so no NaN reaches a collider.
+        internal static void DoorSpan(float door, float lo, float hi, float gap, out float a, out float c)
+        {
+            if (float.IsNaN(door) || float.IsInfinity(door)) door = (lo + hi) * 0.5f;
+            a = Mathf.Clamp(door - gap * 0.5f, lo, hi); c = Mathf.Clamp(door + gap * 0.5f, lo, hi);
         }
 
         static void Box(Transform parent, string name, Vector3 centre, Vector3 size)

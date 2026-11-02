@@ -51,9 +51,12 @@ namespace SleepingCalamity.Core
         // passed as null ("not known": the host keeps its saved first-meet beats).
         // The saved dive section holds only the banked loot the town has not received yet (banked minus moved): the stock's own counts already include the rest, and the
         // stock can shrink (loot spent), so the haul's running banked total must never be saved or the spent loot would come back.
-        public TownSnapshot Capture(DiveState dive, IEnumerable<string> bankedResidents)
+        public TownSnapshot Capture(DiveState dive, IEnumerable<string> bankedResidents) => Capture(dive, bankedResidents, null);
+
+        // M6 S5: residents = the host's latched first-meet beats (null: not known, the saved copy is kept).
+        public TownSnapshot Capture(DiveState dive, IEnumerable<string> bankedResidents, ResidentsSave residents)
         {
-            TownSnapshot snap = TownSaves.Capture(State, dive, _loot, bankedResidents, null);
+            TownSnapshot snap = TownSaves.Capture(State, dive, _loot, bankedResidents, residents);
             if (snap.Dive != null && dive != null)
             {
                 snap.Dive.BankedLoot.Clear();
