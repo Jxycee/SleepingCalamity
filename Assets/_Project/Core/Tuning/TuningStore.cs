@@ -1,12 +1,10 @@
 // Core/Tuning/TuningStore.cs: optional JSON tuning files laid over the code defaults (docs/design/m3-combat-greybox.md, "Tuning files"). Pure C#, no engine.
 // Files: *.json in each folder given to LoadFolders, folders in order (StreamingAssets/Tuning first, the user's mod folder last), files in ordinal name order;
 // a later value wins over an earlier one. Each file is one JSON object whose top-level keys are sections: "attacks", "poise", "weaponGrowth", "targeting",
-// "heroCombat". An unknown section or key, a value of the wrong type or out of range, or a file that is not valid JSON is skipped (the default stays) and
+// "heroCombat", "enemies" (tier multipliers). An unknown section or key, a value of the wrong type or out of range, or a file that is not valid JSON is skipped (the default stays) and
 // logged once through TuningStore.Log. With no files nothing changes.
 // Authority: none. Tuning is read at startup, before any scene runs, on every peer alike (host and clients must load the same files).
-// TODO(enemy tuning): the enemy tables (EnemyModel, EnemyRules, Core/Combat/Ai, enemy attacks) belong to another session. When that lands, add an "enemies"
-// section with TuningStore.RegisterSection("enemies", apply, reset) from their own class; nothing here touches them. Enemy attack ids in "attacks" are logged
-// as unknown.
+// Enemy base tables and enemy attack ids are not tunable yet (only the "enemies" tier multipliers); enemy attack ids in "attacks" are logged as unknown.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -52,6 +50,7 @@ namespace SleepingCalamity.Core.Tuning
             RegisterKnobSection("weaponGrowth", WeaponGrowthTuning.Knobs());
             RegisterKnobSection("targeting", TargetingTuning.Knobs(), TargetingTuning.Validate);
             RegisterKnobSection("heroCombat", HeroCombatTuning.Knobs());
+            RegisterKnobSection("enemies", EnemyTuning.Knobs());
             RegisterSection("attacks", AttackTuning.Apply, AttackTuning.Reset);
         }
 

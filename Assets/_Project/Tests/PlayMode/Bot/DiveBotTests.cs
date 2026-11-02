@@ -50,6 +50,9 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator DiveBot_Seed404() { yield return Play(404u); }
 
         [UnityTest, Timeout(1800000)]
+        public IEnumerator DiveBot_Seed2024() { yield return Play(2024u); }
+
+        [UnityTest, Timeout(1800000)]
         public IEnumerator DiveBot_Tough_Seed12345() { yield return Play(12345u, tough: true); }
 
         [UnityTest, Timeout(1800000)]
@@ -90,7 +93,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Application.logMessageReceived += _log;
 
             // dive 1: hub -> floors -> home
-            float limit = tough ? 1500f : 600f;
+            float limit = 1500f;
             int maxFloor = 0;
             while (bot.Seconds < limit && !(bot.WentHome && bot.Floor == 0))
             {
@@ -141,6 +144,10 @@ namespace SleepingCalamity.Tests.PlayMode
             sb.AppendLine();
             foreach (DiveBot.Finding f in bot.Findings) sb.AppendLine("- " + f);
             foreach (string f in bot.Fight.Findings) sb.AppendLine("- **Combat (ArenaBot)** " + f);
+            sb.AppendLine();
+            sb.AppendLine("## Hits taken");
+            sb.AppendLine();
+            foreach (string l in bot.HitLog) sb.AppendLine("    " + l);
             sb.AppendLine();
             sb.AppendLine("## Log");
             sb.AppendLine();

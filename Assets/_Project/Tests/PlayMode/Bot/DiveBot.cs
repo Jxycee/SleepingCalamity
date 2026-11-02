@@ -19,7 +19,7 @@ namespace SleepingCalamity.Tests.PlayMode
     {
         public sealed class Finding { public string Kind, Where, Text; public int Floor; public Vector3 Pos; public override string ToString() => $"**{Kind}** F{Floor} at ({Pos.x:0.0}, {Pos.y:0.0}, {Pos.z:0.0}){(string.IsNullOrEmpty(Where) ? "" : " " + Where)}: {Text}"; }
 
-        enum Goal { None, Kill, GateKey, Chest, Door, Piece, Bank, Stair, GoHome, HubStair }
+        enum Goal { None, Heal, Kill, GateKey, Chest, Door, Piece, Bank, Stair, GoHome, HubStair }
         sealed class Target { public Goal Goal; public int Index; public Vector3 Pos; public float Range; public string Name; public int Attempts; public float GaveUpAt = -1f; }
 
         readonly FakeInputService _input;
@@ -31,6 +31,7 @@ namespace SleepingCalamity.Tests.PlayMode
         readonly ArenaBot _fighter;
         public readonly List<Finding> Findings = new List<Finding>();
         public readonly List<string> Log = new List<string>();
+        public readonly List<string> HitLog = new List<string>();   // every hit the hero took: floor, damage, HP left, nearest enemy
         readonly HashSet<string> _seen = new HashSet<string>();
 
         public int Floor { get; private set; }            // the floor the bot is playing (0 = hub)
@@ -58,6 +59,8 @@ namespace SleepingCalamity.Tests.PlayMode
         int _builtFloorSeen = -1;
                 bool _navDoorOpen;
         int _lastHp = -1;
+        float _healSince, _healGiveUpAt = -999f;
+        public int HealTrips;
 
         public DiveBot(FakeInputService input, Transform hero)
         {
@@ -104,8 +107,18 @@ namespace SleepingCalamity.Tests.PlayMode
                     Note("Flow", $"3 s after floor {Floor} built, the hero is still {Flat(_hero.position - _teleportBounds.center).magnitude:0} m from it (not teleported)");
             }
 
+            // hurt: walk to this floor's healing point (a player does) and stand in it; it heals to full for free
+            if (_target != null && _target.Goal == Goal.Heal && (Done(_target) || Seconds - _healSince > 25f)) { if (!Done(_target)) _healGiveUpAt = Seconds; _target = null; _corners.Clear(); }
+            if ((_target == null || _target.Goal != Goal.Heal) && Floor >= 1 && Seconds - _healGiveUpAt > 60f && _vitals.Hp < _vitals.MaxHp * 0.45f
+                && d.HaulSync != null && d.HaulSync.TryHealingPoint(out Vector3 healPos, out bool healReady) && healReady)
+            {
+                _target = new Target { Goal = Goal.Heal, Pos = healPos, Range = 1.2f, Name = "healing point" }; _corners.Clear(); _healSince = Seconds; HealTrips++;
+                Say($"hurt ({_vitals.Hp}/{_vitals.MaxHp}): heading for the healing point at {V(healPos)}");
+            }
+            bool healing = _target != null && _target.Goal == Goal.Heal;
+
             // fight anything in sight first (ArenaBot writes the frame itself)
-            if (EnemyInSight(9f))
+            if (!healing && EnemyInSight(9f))
             {
                 _fightClock += dt;
                 _fighter.Tick(dt, Seconds);
@@ -265,6 +278,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var s = c != null ? c.State : default;
             switch (t.Goal)
             {
+                case Goal.Heal: return _vitals.Hp >= _vitals.MaxHp * 0.9f;
                 case Goal.Chest: return (s.Chests & (1UL << t.Index)) != 0;
                 case Goal.GateKey: return s.GateKey != 1;
                 case Goal.Door: return s.DoorOpen;
@@ -455,6 +469,13 @@ namespace SleepingCalamity.Tests.PlayMode
             _wasActive = active;
             if (Tough && _vitals.IsUp && _vitals.Hp < _vitals.MaxHp / 2 && _vitals.IsServer) _vitals.ServerHeal(_vitals.MaxHp);
             if (_lastHp >= 0 && _vitals.Hp < _lastHp && !EnemyNear(4f)) Note("Combat", $"took {_lastHp - _vitals.Hp} damage with no enemy within 4 m");
+            if (_lastHp >= 0 && _vitals.Hp < _lastHp)
+            {
+                Enemy near = null; float best = 8f;
+                foreach (Enemy e in Object.FindObjectsByType<Enemy>(FindObjectsSortMode.None))
+                { float d = Flat(e.transform.position - _hero.position).magnitude; if (d < best) { best = d; near = e; } }
+                HitLog.Add($"F{Floor} -{_lastHp - _vitals.Hp} ({_vitals.Hp}/{_vitals.MaxHp}) by {(near != null ? near.Def.Id + " tier " + near.Model?.Tier + " at " + best.ToString("0.0") + " m" : "nothing within 8 m")}");
+            }
             _lastHp = _vitals.Hp;
             if (!_vitals.IsUp)
             {
@@ -502,7 +523,7 @@ namespace SleepingCalamity.Tests.PlayMode
         static string V(Vector3 p) => $"({p.x:0.0}, {p.y:0.0}, {p.z:0.0})";
 
         public string Summary() =>
-            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared}, chests {ChestsOpened}, pieces {PiecesTaken}, presses {Presses}, stuck spells {StuckEvents}, downed {Downed}, heart banked {HeartBanked}, went home {WentHome}, findings {Findings.Count}";
+            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared}, chests {ChestsOpened}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips}, stuck spells {StuckEvents}, downed {Downed}, heart banked {HeartBanked}, went home {WentHome}, findings {Findings.Count}";
 
         public BotReport Fight => _fighter.Report;
     }

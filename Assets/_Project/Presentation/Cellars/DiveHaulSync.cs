@@ -207,6 +207,10 @@ namespace SleepingCalamity.Presentation
             for (int i = 0; i < all.Count; i++) if (IsMine(all[i])) HealOne(all[i]);
         }
 
+        // Authority: read-only, no state change, any peer (the cell comes from the replicated floor, the recharge from NetHealSecondsLeft, which only the host writes).
+        // For tests/bots: where this floor's healing point is and whether it is ready (no recharge left).
+        public bool TryHealingPoint(out Vector3 pos, out bool ready) { ready = NetHealSecondsLeft.Value <= 0; return TryHealWorldPosition(out pos); }
+
         private bool TryHealWorldPosition(out Vector3 pos)
         {
             pos = default;
