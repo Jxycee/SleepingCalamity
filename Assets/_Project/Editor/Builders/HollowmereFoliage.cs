@@ -666,7 +666,10 @@ namespace SleepingCalamity.EditorTools
                 {
                     int strands = 1 + rng.Next(2);
                     for (int si = 0; si < strands; si++)
-                        Put(g, "Lintel_Ivy", new Vector3(x + R(rng, -0.9f, 0.9f), y + 4.85f, face - 0.06f), 180f + R(rng, -12f, 12f), new Vector3(R(rng, 0.7f, 1.2f), R(rng, 1.4f, 2.4f), 0.8f), rng.Next(2) == 0);
+                    {
+                        float sy = R(rng, 1.4f, 2.4f);   // the strand's top edge sits at the parapet whichever end its pivot is on, so it always hangs down the wall
+                        Put(g, "Lintel_Ivy", new Vector3(x + R(rng, -0.9f, 0.9f), y + 4.95f - kits["Lintel_Ivy"].Bounds.max.y * sy, face - 0.06f), 180f + R(rng, -12f, 12f), new Vector3(R(rng, 0.7f, 1.2f), sy, 0.8f), rng.Next(2) == 0);
+                    }
                 }
             }
 

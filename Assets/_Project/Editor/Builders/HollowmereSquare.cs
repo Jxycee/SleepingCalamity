@@ -190,7 +190,11 @@ namespace SleepingCalamity.EditorTools
                 float cluster = 0.02f + 0.98f * Mathf.SmoothStep(0.48f, 0.66f, blob);   // blobs along the edges, hardly any stray between them (round 2: steeper)
                 float baseKeep = s.kind == "joint" ? 0.08f : s.kind == "missing_sett" ? 0.9f : 1f;   // the open-centre joints thin hardest, cracks (missing setts) and wall edges keep theirs
                 float keepRoll = (float)(Hash((uint)Mathf.RoundToInt(s.p[0] * 50f + 50000f), (uint)Mathf.RoundToInt(s.p[2] * 50f + 50000f)) % 10007u) / 10007f;
-                float pKeep = baseKeep * cluster;
+                // round 2: weeds belong at walls and kerbs. Distance from the slot to the square's border (the lots' fronts and kerbs): inside 1.2 m everything stays, beyond 3.5 m only strays.
+                Vector3 wp = holder.TransformPoint(new Vector3(s.p[0], 0f, s.p[2]));
+                float dEdge = Mathf.Min(Mathf.Min(wp.x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - wp.x), Mathf.Min(wp.z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - wp.z));
+                float near = Mathf.SmoothStep(1f, 0f, Mathf.InverseLerp(1.2f, 3.5f, dEdge));
+                float pKeep = baseKeep * cluster * (0.03f + 0.97f * near);
                 if (keepRoll >= pKeep) continue;
                 bool tended = keepRoll < pKeep * 0.1f;   // survives into Rebuilt
                 List<GameObject> pool; float lo, hi, cap;

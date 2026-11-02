@@ -19,8 +19,8 @@ namespace SleepingCalamity.EditorTools
         static readonly (string Slot, string Source, Color Tint)[] Tinted =
         {
             ("HH_OldStone", "sandstone", new Color(0.86f, 0.76f, 0.60f)), ("HH_Mortar", "sandstone", new Color(0.46f, 0.41f, 0.34f)), ("HH_Slate", "sandstone", new Color(0.50f, 0.47f, 0.43f)),
-            ("HH_PlankGrey", "oak_timber", Color.white), ("HH_Canvas", "canvas", Color.white), ("HH_ClothMadder", "canvas", new Color(0.55f, 0.30f, 0.25f)),
-            ("HH_ClothBlue", "canvas", new Color(0.40f, 0.48f, 0.60f)), ("HH_ClothLinen", "canvas", Color.white),
+            ("HH_PlankGrey", "oak_timber", Color.white), ("HH_Canvas", "canvas", Color.white), ("HH_ClothMadder", "canvas", new Color(0.40f, 0.22f, 0.18f)),
+            ("HH_ClothBlue", "canvas", new Color(0.26f, 0.31f, 0.40f)), ("HH_ClothLinen", "canvas", Color.white),
         };
         static readonly (string Slot, Color Paint)[] Paints =
         {
