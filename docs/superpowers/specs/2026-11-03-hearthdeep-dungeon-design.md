@@ -72,7 +72,7 @@ Success:
 37. **Momentum accepted (user, 2026-11-03):** better chest luck in the second half for a party that pushed on, and an extra chest room at the end of an unbroken dive. It rewards players who don't need the safety and still satisfies those who do.
 38. **Checkpoint floor pick (user, 2026-11-03):** a party holding the checkpoint may start on any floor from 1 up to the halfway bank, for example to go back for a sleeper they missed. Starting the dive uses the checkpoint up, whichever floor they pick. Without a checkpoint, the dive starts at floor 1.
 39. **Each player keeps their own loot (F6, user 2026-11-03).** Chests and enemy drops are per player: each player sees and picks up only what dropped on their side, a random roll of the same item type for each player. Story and progress items (gate and boss keys, pieces, people) are not split: one copy, held by the host for the whole party. Individual progression then helps the group's progression. Section 4.7.
-40. **Mixed-power parties (F10, user 2026-11-03):** boost weak weapons up and never scale strong ones down, catch-up growth, and need-weighted drops are accepted (section 4.7, items 1-3). Item 4 (helping pays) is waiting for the user's answer.
+40. **Mixed-power parties (F10, user 2026-11-03):** boost weak weapons up and never scale strong ones down, catch-up growth, and need-weighted drops are accepted (section 4.7, items 1-3). Item 4 (helping pays) is accepted with limits so it can't be farmed to max out a weapon (user, 2026-11-03).
 41. **Co-op recap (user, 2026-11-03):** a simple "while you were away" or "the adventure so far" recap when a recorded player rejoins.
 42. **Map pings while building (user, 2026-11-03):** other players can point on the overhead map so the builder sees where they want something placed.
 43. **Town permissions (user, 2026-11-03):** a host setting lets everyone move and build in town; it is **on by default**. If someone griefs, the host turns it off, and then only the host moves things or does other town actions; the others can still send move requests.
@@ -201,11 +201,16 @@ Collapse timer (*proposal*): path time to the current floor's stair (or the bank
 - **Leaving a floor:** the stair works as a gather-to-leave ring that ignores fallen players.
 - **Pings:** a small set of party marks.
 - **Loot is per player** (decision 39). The host rolls a separate result for each present player for every chest and drop of the same item type; each client shows and lets its player pick up only its own. Gold earned, bread, boots and other gear, bank slots, momentum rolls and the lost satchel are all per player (each player has at most one satchel). Keys, pieces and people stay single shared items held by the host. Host-authoritative as before; risk-reviewer. This replaces the host-held shared haul (PHASE1 P22).
-- **Mixed-power parties** (decision 40; items 1-3 accepted, item 4 *proposal*; adapted from Monster Hunter, Borderlands 3, FFXIV level sync, Remnant 2 and rested-XP catch-up; `docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md` section 5):
+- **Mixed-power parties** (decision 40, accepted; adapted from Monster Hunter, Borderlands 3, FFXIV level sync, Remnant 2 and rested-XP catch-up; `docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md` section 5):
   1. **Boost up, never down.** Each floor band has an expected weapon power. A weapon below it fights at a floor of about 85% of the expected power for damage maths, for that player only. Nobody is scaled down: a strong weapon is earned, and carrying a friend is a normal part of co-op (Monster Hunter's norm).
   2. **Catch-up growth.** A weapon below the party's median weapon grows at about 2x until it reaches the median (Path of Exile and rested-XP style). It narrows the gap without slowing the leader.
   3. **Need-weighted rolls.** A player's own weapon drops lean toward their weakest slot, so the friend without a good weapon finds one sooner (works with decision 39).
-  4. **Helping pays.** The stronger player loses nothing for diving with a weaker friend (no reduced growth), and revives and assists add a little growth (Monster Hunter's helper rewards).
+  4. **Helping pays.** The stronger player loses nothing for diving with a weaker friend (no reduced growth), and revives and assists add a little growth (Monster Hunter's helper rewards). Limits, so it can't be farmed (numbers *proposal*):
+     - it only counts while the helped player's weapon is below the party median, so two equal friends earn nothing from it;
+     - a revive counts only when an enemy downed the player in an uncleared room, and only once per helped player per 60 s;
+     - it is capped per floor (at most 10% of the helper's current level cost) and per dive;
+     - it stops once the helper's weapon is well above the floor band's expected power (about 1.5x), so farming easy early floors with a friend gives nothing;
+     - it never completes a build-up step or the heirloom's final form on its own; those still need the weapon's own use.
 
 ### 4.8 Bread and healing (decision 27)
 Bread is the free heal you can always count on and can upgrade. It is never the strongest heal.
