@@ -12,6 +12,8 @@ description: Brief template and routing for delegating SleepingCalamity work to 
 | Review: everything else (gameplay, Core, data, art, presentation, docs) | `reviewer` (Sonnet, medium) | |
 | Fix of 30 lines or fewer in one area | no agent: read the diff yourself | |
 | Milestone branch before merging into `main` | `branch-reviewer` (Opus, high) | never raise it to xhigh or max (user, 2026-11-03: usage) |
+
+**When the branch review can be skipped (user, 2026-11-03: usage).** Skip `branch-reviewer` when the branch only touches pure Core logic with its EditMode tests, docs, tuning data, test-only code or art, every task passed its own review, and `check` is green on the tip. Always run it when the branch touches networking or host sync, save data, or wires systems together across assemblies (Presentation, Gameplay, App, Networking, builders and scenes): those break at the seams between tasks, which per-task reviews don't see. For the dive roadmap that means plans 1 and 4 skip it, plans 2 and 3 get it. Say in the merge commit which applied.
 | Locate symbols, inventories, counts | `scanner` (Haiku) | |
 | Fails twice, or nobody can find the root cause | `fixer` (Fable) | |
 | Plan section | write it yourself or one Opus author at `medium`; `high` for networking, save-schema and state-machine sections | |
