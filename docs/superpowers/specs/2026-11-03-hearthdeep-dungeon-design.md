@@ -50,7 +50,7 @@ Success:
 
 **Answers to the red-team review (user, 2026-11-03, later):**
 
-23. **Failure costs time, and that is intended (F1 declined).** Players are meant to learn the systems and beat them: get better at combat, at when to leave or stay, and at what is really worth banking. Dark Souls is the model: little hand-holding, a real boss early, and death mostly costs time. There is no "start the dive at the bank" option. A dive leaves the dungeon only at the halfway bank, at completion, or by failing.
+23. **Failure costs time, and that is intended (F1 declined).** Players are meant to learn the systems and beat them: get better at combat, at when to leave or stay, and at what is really worth banking. Dark Souls is the model: little hand-holding, a real boss early, and death mostly costs time. There is no standing "start the dive at the bank" option, only the one-time checkpoint of decision 31. A dive leaves the dungeon only at the halfway bank, at completion, or by failing.
 24. **Save and quit at every floor is standard (F5 accepted).** At each stair the party can save and quit; loading resumes at the start of the next floor. It is a pause, not an exit: the dive continues as it was. Section 4.6.
 25. **A second try at the boss, for a price.** One retry per dive from the boss door. It must cost something: an item, some gold, or a secret idol the party found and activated in the dungeon. Which cost (or which mix) is open (section 11).
 26. **The baker is rescued earlier** than the halfway floor, so baking and crafting open early. A party that wipes on floor 5 then feels the relief that the baker and every piece already found stay found. Section 5 places him on floor 3 (*proposal*).
@@ -63,6 +63,9 @@ Success:
 28. **Phase 1 scope (F3 accepted):** build to the halfway bank, plus two rough floors past it and a stand-in dungeon ending, so the push-on choice can be played.
 29. **Dive length is set by time, not floors (F9 accepted).** With the right scaling, later dungeons don't need more floors; extra floors would just be waves of fodder. A dungeon gets longer only when a larger puzzle or set piece needs the room. Later dungeons and variants get richer floors, not more of them.
 30. **The opening five minutes** get a story session with the user (pending). Building the mechanics and the base world first, so there is something to judge, was the right order.
+31. **The halfway bank is a one-time checkpoint (user, 2026-11-03).** When the party goes home from the bank, the next dive into that dungeon starts at the bank, and starting there uses the checkpoint up. If that dive fails, the dive after it starts at floor 1 again. A party that pushes on from the bank and then fails also starts at floor 1. Once the boss is beaten, the permanent shortcut of decision 13 replaces this.
+32. **No retry for the Dough Warden** (user, 2026-11-03). The paid retry (decision 25) is for the boss only.
+33. **The lost satchel (user, 2026-11-03).** A failed dive's unbanked haul waits as one lost satchel on the floor depth where the party fell. It is a single item that turns back into the real items only once it leaves the dungeon (going home from the bank, or finishing the dive). Only one satchel exists at a time. Section 4.3.
 
 ## 3. The Hearthdeep: one demon, six dungeons
 Each town's dungeon is a region of Mawrrow's dream digesting that town (STORY 2, 6).
@@ -103,7 +106,8 @@ Two cautions follow from putting water first in the Undercroft:
 ### 4.1 Shape of a dive
 Every dive starts at the dungeon entrance. It runs from the entrance to the halfway set piece and the bank room, then on to the boss or the end, then home. There is no floor select. After the boss is beaten, the shortcut to the halfway bank opens (decision 13).
 
-The way out of the dungeon is only the halfway bank, the end, or failure (decision 23). Two things soften the cost without adding an exit:
+The way out of the dungeon is only the halfway bank, the end, or failure (decision 23). Three things soften the cost without adding an exit:
+- **The one-time checkpoint** (decision 31): after going home from the bank, the next dive starts at the bank (empty haul, stir 0, fresh floors past it), and that uses the checkpoint up.
 - **Save and quit at any stair** (decision 24): a pause between floors, resumed at the next floor's start (section 4.6).
 - **One paid boss retry per dive** (decision 25): after a wipe at the boss, the party may pay the price and restart from the boss door with the haul they carried in. Without paying, the dive fails as normal.
 
@@ -127,7 +131,15 @@ The dive fails when every present player is down (as built), or when the deep cl
 - pieces and people found stay found (section 4.4);
 - weapon growth earned in the dive is kept (*proposal*: the research found that no game players liked deletes long-term growth).
 
-Time is the main stake, on purpose (decision 23): a wipe sends the party back to the entrance with fresh floors. A wipe at the boss can be bought back once per dive (decision 25).
+Time is the main stake, on purpose (decision 23): a wipe sends the party back to the entrance with fresh floors. A wipe at the boss can be bought back once per dive (decision 25); the Dough Warden has no retry (decision 32).
+
+**The lost satchel** (decision 33; details *proposal*):
+- On failure, the unbanked haul (not pieces, people, gold or bread) is packed into one lost satchel and left at the floor depth where the party fell. The next dive that generates that depth places it on that floor, marked on the floor map.
+- The satchel is one item in one carry slot. It can't be opened in the dungeon, so recovering it never fills the bag.
+- It turns back into the real items when it leaves the dungeon: going home from the bank, or finishing the dive. They go into the town's storage, not a hero's bag, so a full inventory never forces a choice.
+- It can be put in a bank slot like any other bankable item (*proposal*): one slot for the whole satchel, against banking something new, is a fair choice at the bank.
+- Failing again while carrying it loses it for good, and the new failure leaves its own satchel. Only one satchel exists at a time; a new one replaces an unrecovered old one.
+- Co-op: the satchel belongs to the party's shared haul (open with F6).
 
 ### 4.4 Pieces and people (Dark Cloud style)
 - When the world is created, each of a dungeon's pieces and people is assigned to a fixed floor, or to a random floor in the first or second half of the dungeon. The assignment is stored in the world save, the way DC1 does it (`dc1-rea.md`, Atla).
@@ -281,17 +293,14 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 ## 11. Open questions
 1. Is the tension right with time as the main stake? Check in the M7 walk, with the overlay's dive and floor times.
 2. Verify the crash check (section 4.6) in a Windows build.
-3. **The boss retry price** (decision 25; settled by the user 2026-11-03): a secret idol hidden on one second-half floor, with a tell, that the party activates; gold is the fallback when the idol wasn't found (a big gold purse mostly comes from many dives or many failures anyway). Still open: does the floor-5 guardian (the Dough Warden) get the same paid retry?
-4. **The lost-haul echo** (accepted by the user 2026-11-03; details *proposal*): when a dive fails, the unbanked haul waits on the floor depth where the party fell, and the next dive that reaches that depth can pick it up.
-   - *Proposal:* it comes back as **one lost satchel** that fills a single carry slot, so recovering it never overflows the inventory mid-dive. The satchel can't be opened in the dungeon except at the bank. At the bank the party unpacks what fits (inventory and bank slots) and leaves the rest in the satchel. The satchel comes home whole if the party goes home or finishes; it can't be banked itself, and failing again while carrying it loses it for good.
-   - Only one echo exists at a time: a new failure replaces the old echo.
-   - *Fallback* (the user's own rule, if the satchel proves fiddly): everything comes back loose, and a full inventory means choosing what to keep and what to leave.
+3. **The boss retry price** (decision 25; settled by the user 2026-11-03): a secret idol hidden on one second-half floor, with a tell, that the party activates; gold is the fallback when the idol wasn't found (a big gold purse mostly comes from many dives or many failures anyway). The Dough Warden gets no retry (decision 32).
+4. **The lost satchel** is settled (decision 33, section 4.3). Open: may it take a bank slot (recommended yes), and does the checkpoint dive (decision 31) let the party choose the entrance instead and keep the checkpoint for later?
 5. Red-team items still open: F6 (one bag per player instead of the host-held shared haul), F10 (catch-up for absent players' weapons). F2 is folded into section 4.5; F7 (validator checks every gimmick state) and room data v2 before room 13 stay as the previous session proposed.
 6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. Still open: a recap for absent recorded players, co-op-shaped town time, and bank slots that shrink per player in a 4-player party.
 7. The floor-5 second sleeper and the Warden's story reason: for the story session (decision 30).
 
 ## 12. Phase 1 build order (after sign-off)
-1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style, the stair suspend, the paid boss retry, the bread ladder.
+1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style, the stair suspend, the paid boss retry, the one-time checkpoint, the lost satchel, the bread ladder.
 2. Floor map; co-op locks and the gather-to-leave stair.
 3. Authored floor 1; floor 3 as the drowned bakery set piece; floor 5 as the halfway set piece with the Dough Warden; floors 6-7 in rough greybox and the stand-in ending.
 4. Objective variety (two-valve seal, hold the pump) and the named floor card with two modifiers.
