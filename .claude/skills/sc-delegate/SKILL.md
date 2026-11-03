@@ -11,7 +11,7 @@ description: Brief template and routing for delegating SleepingCalamity work to 
 | Review: networking/host sync, save data | `risk-reviewer` (Opus, high) | |
 | Review: everything else (gameplay, Core, data, art, presentation, docs) | `reviewer` (Sonnet, medium) | |
 | Fix of 30 lines or fewer in one area | no agent: read the diff yourself | |
-| Milestone branch before merging into `main` | `branch-reviewer` (Opus, xhigh) | |
+| Milestone branch before merging into `main` | `branch-reviewer` (Opus, high) | never raise it to xhigh or max (user, 2026-11-03: usage) |
 | Locate symbols, inventories, counts | `scanner` (Haiku) | |
 | Fails twice, or nobody can find the root cause | `fixer` (Fable) | |
 | Plan section | write it yourself or one Opus author at `medium`; `high` for networking, save-schema and state-machine sections | |
