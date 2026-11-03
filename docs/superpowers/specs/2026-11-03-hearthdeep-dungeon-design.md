@@ -164,7 +164,7 @@ Collapse timer (*proposal*): path time to the nearest bank point or boss stair, 
 1. Wren's list.
 2. The authored floor 1.
 3. The first weapon level-up on floors 2-3.
-4. The push decision on floor 4 while carrying loot.
+4. Floor 4: carrying loot through the bubbling floor toward the guarded bank. There is no exit yet, so this is tension, not a decision.
 5. The oven maze.
 6. The baker wakes.
 7. Go home, or push on.
@@ -237,7 +237,7 @@ Each later dungeon is longer than the Undercroft (for example 12-16 floors plus 
 ## 11. Open questions
 1. Is the tension enough now that only loot and half the dive gold are at risk? Check in the M7 walk.
 2. Verify the crash check (section 4.6) in a Windows build.
-3. The adversarial review (2026-11-03) may add more here.
+3. The adversarial review (`docs/research/dungeon-deep-dive/10-red-team.md`, 2026-11-03) raised findings F1-F10 for the user to decide. Most important: failure costing time rather than loot (F1), stir maths over 10+ floors (F2), Phase 1 ending before the bank decision can be tested (F3), suspend in the second half (F5), loot ownership (F6), and room data v2 before more rooms are authored.
 
 ## 12. Phase 1 build order (after sign-off)
 1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style.
