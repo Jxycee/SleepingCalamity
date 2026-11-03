@@ -62,7 +62,7 @@ Success:
     - bread is never the best healing: potions and healing places (hot springs, fairy lights) do more, but a basic potion is never better than the best bread.
 28. **Phase 1 scope (F3 accepted):** build to the halfway bank, plus two rough floors past it and a stand-in dungeon ending, so the push-on choice can be played.
 29. **Dive length is set by time, not floors (F9 accepted).** With the right scaling, later dungeons don't need more floors; extra floors would just be waves of fodder. A dungeon gets longer only when a larger puzzle or set piece needs the room. Later dungeons and variants get richer floors, not more of them.
-30. **The opening five minutes** get a story session with the user (pending). Building the mechanics and the base world first, so there is something to judge, was the right order.
+30. **The opening** is written (story session, user 2026-11-03; STORY 8.5): the heroes enter the Undercroft through the church cellar trapdoor, not the cistern house. Building the mechanics and the base world first, so there is something to judge, was the right order.
 31. **The halfway bank is a one-time checkpoint (user, 2026-11-03).** When the party goes home from the bank, the next dive into that dungeon starts at the bank, and starting there uses the checkpoint up. If that dive fails, the dive after it starts at floor 1 again. A party that pushes on from the bank and then fails also starts at floor 1. Once the boss is beaten, the permanent shortcut of decision 13 replaces this.
 32. **No retry for the Dough Warden** (user, 2026-11-03). The paid retry (decision 25) is for the boss only.
 33. **The lost satchel (user, 2026-11-03).** A failed dive's unbanked haul waits as one lost satchel on the floor depth where the party fell. It is a single item that turns back into the real items only once it leaves the dungeon (going home from the bank, or finishing the dive). Only one satchel exists at a time. Section 4.3.
@@ -76,6 +76,8 @@ Success:
 41. **Co-op recap (user, 2026-11-03):** a simple "while you were away" or "the adventure so far" recap when a recorded player rejoins.
 42. **Map pings while building (user, 2026-11-03):** other players can point on the overhead map so the builder sees where they want something placed.
 43. **Town permissions (user, 2026-11-03):** a host setting lets everyone move and build in town; it is **on by default**. If someone griefs, the host turns it off, and then only the host moves things or does other town actions; the others can still send move requests.
+44. **The entrance is the church cellar trapdoor (user, 2026-11-03).** The church and the bell tower are one building; the outdoor tithe gate is the shortcut to the halfway bank once the boss is beaten (decision 13). The heroes' homes are separate places (STORY 8.2).
+45. **Enemies look demon-made (user, 2026-11-03):** DOOM, God of War, Devil May Cry, Bayonetta, Demise, Tekken's devils and Diablo as the reference family (STORY 4). *Proposal:* the creature's idea still comes from the town's lost things; its make is demonic, and more demon shows the deeper the floor.
 
 ## 3. The Hearthdeep: one demon, six dungeons
 Each town's dungeon is a region of Mawrrow's dream digesting that town (STORY 2, 6).
@@ -244,7 +246,7 @@ Bread is the free heal you can always count on and can upgrade. It is never the 
 **Phase 1 builds floors 1-5 and the bank room, then floors 6-7 as rough greybox and a stand-in ending** (decision 28). The stand-in ending is a door on floor 7 that ends the dive as a success and brings the haul home, so "push on" can be played and measured. Phase 1's bankable item class is **simple footwear** (user, 2026-11-03): a pair of worn boots that raises run speed by about 5%. *Proposal:* it is the first item of a small stat-gear slot, separate from outfits (STORY 3 keeps outfits cosmetic), one pair per player; chests on floors 2-7 can roll it, rarer before the bank and likelier past it, so pushing on pays. The bonus raises run and sprint speed only, never jump distance, so traversal gaps stay tuned.
 
 **The first session it should give** (the hook):
-1. The opening in Hollowmere (story session pending, decision 30) and Wren's list.
+1. The opening (STORY 8.5): the lanterns, the cat, the storm and the church trapdoor.
 2. The authored floor 1.
 3. Floor 2: the first weapon level-up. The survivors' poor bread heals only a little, so the player learns to dodge.
 4. Floor 3: the drowned bakery. **The baker wakes**, and from here on he is safe whatever happens.
@@ -308,6 +310,8 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 - **PHASE1 section 1 and P1:** Phase 1 ends at the Undercroft's halfway bank (floor 5), plus floors 6-7 in rough greybox and a stand-in ending (decision 28), followed by a refinement pass.
 - **PHASE1 7.2 and P19:** "floors stay cleared" becomes "fresh floors every dive; found pieces and people stay found". Pieces use Atla-style assignment (section 4.4).
 - **PHASE1 7.2 and P20:** the checkpoint after floor 2 and the floor-4 bank point are replaced by the single halfway bank with slots (section 4.2). The failure rule becomes section 4.3.
+- **PHASE1 P25:** the Undercroft's entrance moves from the cistern-house cellar stair to the church cellar trapdoor (decision 44); `DiveHub` and the go-home landing move with it.
+- **PHASE1 section 3 (style bible) and 6.6:** enemies get the demon-made look (decision 45); they are still greybox, so nothing built is lost.
 - **PHASE1 P22:** the shared host-held haul becomes per-player loot (decision 39); keys, pieces and people stay shared.
 - **PHASE1 / M6 S4 placement:** the single builder lock becomes the town-permissions setting (decision 43): everyone may build by default (a lock per placed item instead of one global lock, *proposal*), the host can restrict it, and others can send move requests and map pings (decision 42).
 - **PHASE1 P21 and P49:** stir inputs and the collapse timer as in section 4.5.
@@ -326,7 +330,7 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 4. **The lost satchel** is settled (decisions 33-35, section 4.3). The checkpoint floor pick (decision 38) and momentum (decision 37) are settled.
 5. Red-team items: F6 settled (decision 39). F10 waits for the user's OK on the section 4.7 proposal (decision 40). F2 is folded into section 4.5; F7 (validator checks every gimmick state) and room data v2 before room 13 stay as the previous session proposed.
 6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. The recap (decision 41), map pings (42) and town permissions (43) are settled. Still open: bank slots that shrink per player in a 4-player party.
-7. The floor-5 second sleeper and the Warden's story reason: for the story session (decision 30).
+7. Still open from the story session: the floor-5 second sleeper (proposal: the innkeeper, who cooked the Tithe Feast and opens cooking) and the Warden's story reason (proposal: the baker's last batch, risen in the dome's heat into a guard). Names for the cat, the baker and the innkeeper are placeholders.
 
 ## 12. Phase 1 build order (after sign-off)
 1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style, the stair suspend, the paid boss retry, the one-time checkpoint, the lost satchel, the bread ladder.

@@ -48,7 +48,7 @@ Then, gorged for the first time, it fell into a deep, heavy, glutted sleep. That
 
 The dungeons are the Hearthdeep's regions, one beneath each town.
 
-**Why the four were spared.** The pact bound everyone who ate at the Tithe Feast, and that year four children skipped it. They had found a way into the founders' old tunnels under the town and were exploring when the feast began. They never ate, so they were never counted, and the Long Night passed over them. They climbed out at dawn into silence. *(draft)* Nobody else can explain why they're unclaimed: the answer is found on floor 8 of the Undercroft (section 8.4), and it is why Mawrrow's servants want them most of all.
+**Why the four were spared.** The pact bound everyone who ate at the Tithe Feast, and that year four children slipped away before the meal. Pip had heard spooky tales about the founders' old tunnels under the town and talked the others into going to look. The tunnels turned out to be nothing special, until every lantern but one went out at once (the moment the town was taken). Wren's lantern stayed lit. She wasn't using magic, and nothing ever explains it: a red herring and an easter egg. They never ate, so they were never counted, and the Long Night passed over them. They climbed out at dawn into silence. *(draft)* Nobody else can explain why they're unclaimed: the answer is found on floor 8 of the Undercroft (section 8.4), and it is why Mawrrow's servants want them most of all.
 
 **Starving the demon: stirring.** Every piece carried out of the Hearthdeep is food taken back from Mawrrow, and the less it holds, the lighter it sleeps.
 - **During a dive:** the deeper the heroes go and the more they carry, the more it stirs. Floors shift, nightmares hunt, the deep starts to close.
@@ -69,7 +69,7 @@ Four friends who survived the Long Night as children. They grew up together in e
 
 | Hero (default name) | Age | Who | Heirloom | Wants |
 |---|---|---|---|---|
-| **Wren Hale** | 18 | The planner. For ten years she has kept a painted list of every resident's name. Steady and stubborn, and secretly sure she has forgotten her mother's face. | A staff: her mother's surveyor's staff | To bring everyone back, exactly as they were |
+| **Wren Hale** | 18 | The planner, and the group's magic user: a self-taught enchanter who learned from her mother's handiwork to wake her cat (8.5). For ten years she has kept a painted list of every resident's name. Steady and stubborn, and secretly sure she has forgotten her mother's face. | A staff: her mother's surveyor's staff | To bring everyone back, exactly as they were |
 | **Tobin Marsh** | 20 | The eldest. He became the others' parent too young. Big, gentle, a builder, and tired. | A beefy logging axe: his father's, from the timber yard | Permission to stop being the grown-up |
 | **Pip Ostrander** | 17 | The youngest and loudest. She found the tunnels, so she's the reason they're alive. Her jokes are armour. | A dagger and shield: her grandmother's, from her years in the town watch | To prove she isn't just the kid |
 | **Ash Calder** | 19 | The scavenger who goes furthest out alone. Curious about the demon, not just angry at it. | A bow and sword: an older brother's hunting kit | To find out who made the Bargain, and why |
@@ -82,7 +82,7 @@ The four default heirlooms cover reach (staff), weight (axe), speed and guard (d
   - **Then:** Mawrrow kept him alive and unsleeping as its steward. The demon took his heart as surety, and he can't die while the pact stands.
   - **Now:** he leads the **Gleaners**, the taken who were turned to its service. They gather what the heroes miss, undo the heroes' work, and hunt the four "uncounted" children so the debt can be paid in full.
   - **Story role:** the human villain who lets the story ask what people do when they're desperate. He's revealed across chapters 2 to 5 and fought in chapter 5.
-- **The nightmares.** Each dungeon's monsters grow from what that region lost (section 6).
+- **The nightmares.** Each dungeon's monsters grow from what that region lost (section 6). They are **demon-made and look it** (user, 2026-11-03): the reference family is DOOM, God of War, Devil May Cry, Bayonetta, Demise from Zelda, Tekken's devils and Diablo. *(draft, how the two fit together)* The idea of each creature still comes from the town's lost things (a jam jar, a broom, a rat-king), but its make is demonic: horns, bone, scorched or obsidian hide, ember-cracked skin glowing with Mawrrow's breath from inside, burning eyes, sigils. The deeper the floor, the stronger the breath and the more demon shows through; Gleaners, elites and bosses are fully demonic.
 
 ## 5. How the story drives the loop
 - **Why dive.** The taken are down there, asleep. Every person carried home is someone the heroes knew, and Wren's list gets a name ticked.
@@ -148,9 +148,11 @@ The more of the Vale that is rebuilt, the more help the player gets in stage 2. 
 
 ### 8.2 Hollowmere at the start of the game
 Ten years empty.
-- **The town:** bare plots where houses were pulled away, with only foundations and doorsteps left. The fountain is dry, the banners are bleached, and the bell is gone from its tower. The tithe ramp is sealed with a cracked iron gate that breathes warm air.
-- **The heroes' home:** the three buildings the night missed, all old stone from before the Bargain: the bell-loft annex, the cistern house, and the mill's undercroft. The four have patched them into a home.
-- **Wren's list:** every resident's name, painted on the cistern-house wall.
+- **The town:** every building was wiped: bare plots with only foundations and doorsteps left. The fountain is dry, the banners are bleached, and the bell is gone from its tower. The tithe ramp, where the feast carts rolled down, is sealed with a cracked iron gate that breathes warm air.
+- **The church and the bell tower are one building** (user, 2026-11-03). Its cellar trapdoor is the way into the Undercroft, its bell is the Bell-Warden, and the outdoor tithe gate becomes the shortcut to the halfway bank once the boss is beaten.
+- **The heroes' homes** (user, 2026-11-03). After the Long Night the four rebuilt Wren's house first and lived in it together. As they grew older and more independent, each rebuilt their own family's house and moved in, and they still meet every night to talk, whether or not there's a project on. Their houses look shabby beside the rest of the rebuilt town until a builder is woken; then the heroes get restored houses as a reward, and that unlocks town decoration.
+- **Wren's list:** every resident's name, painted on the wall of Wren's house.
+- **Wren's cat** (placeholder name) was the first sleeper they ever found: frozen as if in stone in the tall grass by the pond, where you can fish. Only his collar wasn't frozen: a necklace Wren's mother enchanted, she said, "to really give the cat nine lives". It was a simple protection charm against wild animals in the fields, and it kept the cat from being dragged down with everyone else.
 
 ### 8.3 What the player rebuilds
 Rebuilding happens in three rings, and Undercroft progress opens each one.
@@ -176,7 +178,19 @@ It has three floor bands, about 12 floors in all, plus a boss floor.
 - **Floor 4:** the first person carried home, the baker.
 - **Floor 8:** the feast tally lists every name in Hollowmere, with four names left blank. The heroes learn they were never counted, and that this is why Mawrrow couldn't take them.
 - **Floor 12:** Tobin's father is the first sleeper the heroes can't yet carry out. He is rescued after the boss.
-- **After the boss:** the bell comes home. When it rings over Hollowmere, the whole Vale shakes as Mawrrow stirs for the first time in ten years, and somewhere a man who should be dead opens his eyes.
+- **After the boss:** the bell comes home. When it rings over Hollowmere, the whole Vale shakes: Mawrrow's first great stirring in ten years (the cat's waking was only a turn in its sleep, section 8.5), and somewhere a man who should be dead opens his eyes.
+
+### 8.5 The opening (user, 2026-11-03)
+About 8-10 minutes, playable where marked.
+1. **The prologue** *(playable)*: the four as children slip out of the Tithe Feast before the meal and explore Pip's tunnels with lanterns. It's nothing special, until every lantern but Wren's goes out. They climb out at dawn into an empty town.
+2. **Ten years** *(montage)*: the four raise each other in Wren's house and learn what they can. Wren finds her cat frozen in the grass by the pond with the enchanted necklace, and spends years learning magic, enchantments and her own spells from her mother's handiwork, to restore him.
+3. **The spell:** it finally works and the cat wakes. Freeing him from the demon's sleep prison makes Mawrrow turn in its sleep, the first stir in a decade, and the weather turns at once.
+4. **The storm:** it worsens through the night until lightning strikes and an explosion is heard. Then it dies down, and the four go to look.
+5. **The church** *(playable, teaches the controls)*: every lantern in the church is burning and the cellar trapdoor is open. The four joke that it's a portal to hell, then hear unnatural sounds and see sigils plastered over the underside of the trapdoor. Wren can read a few, because they're written in the same script as her mother's charm on the cat's necklace: warding spells to keep something locked in. (This seeds Wren's chapter 4 truth without giving it away.)
+6. **The descent** *(playable)*: "Who goes down first?" The chosen hero takes their heirloom and leads the way to floor 1. In co-op, each player's hero steps forward.
+
+**Wren's cat** follows Wren around town. Any hero can ask Wren to watch him for a while; from then on the cat follows the player in town and other safe areas outside the dungeon.
 
 ## 9. Change log
 - 2026-10-29: locked (user). Claude kept the survivors on the road between towns (2.); see decisions-for-review.
+- 2026-11-03 (user, story session): the opening (new 8.5): the lanterns going out, Wren's lantern staying lit, Wren's cat and her mother's necklace, Wren's magic, the cat's waking as the first small stir, the storm and the church trapdoor with her mother's wards. All buildings were wiped; the four rebuilt Wren's house first, then their own houses, shabby until a builder is woken (8.2). The church and the bell tower are one building; its cellar trapdoor is the Undercroft entrance and the tithe gate becomes the post-boss shortcut. The bell is the first great stir (8.4). The nightmares look demon-made (4). Names for the cat, the baker and the innkeeper are placeholders. The Undercroft floor plan (8.4) is still waiting on the dungeon spec's amendment (`docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` section 10).
