@@ -239,6 +239,8 @@ Each later dungeon is longer than the Undercroft (for example 12-16 floors plus 
 2. Verify the crash check (section 4.6) in a Windows build.
 3. The adversarial review (`docs/research/dungeon-deep-dive/10-red-team.md`, 2026-11-03) raised findings F1-F10 for the user to decide. Most important: failure costing time rather than loot (F1), stir maths over 10+ floors (F2), Phase 1 ending before the bank decision can be tested (F3), suspend in the second half (F5), loot ownership (F6), and room data v2 before more rooms are authored.
 
+4. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): dive length against a shared evening (aim for about 40-50 min per half, with F1 and F5), a recap for absent recorded players, co-op-shaped town time, and bank slots that shrink per player in a 4-player party.
+
 ## 12. Phase 1 build order (after sign-off)
 1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style.
 2. Floor map; co-op locks and the gather-to-leave stair.
