@@ -66,6 +66,9 @@ Success:
 31. **The halfway bank is a one-time checkpoint (user, 2026-11-03).** When the party goes home from the bank, the next dive into that dungeon starts at the bank, and starting there uses the checkpoint up. If that dive fails, the dive after it starts at floor 1 again. A party that pushes on from the bank and then fails also starts at floor 1. Once the boss is beaten, the permanent shortcut of decision 13 replaces this.
 32. **No retry for the Dough Warden** (user, 2026-11-03). The paid retry (decision 25) is for the boss only.
 33. **The lost satchel (user, 2026-11-03).** A failed dive's unbanked haul waits as one lost satchel on the floor depth where the party fell. It is a single item that turns back into the real items only once it leaves the dungeon (going home from the bank, or finishing the dive). Only one satchel exists at a time. Section 4.3.
+34. **The satchel can be banked** (user, 2026-11-03): it takes one bank slot like any other bankable item.
+35. **Emptying the satchel** happens in town: into town storage, or at a spot in the heroes' home (user, 2026-11-03).
+36. **Pushing on must pay (user, 2026-11-03).** The bank slots are only for a party that continues without leaving. Because going home leaves a checkpoint (decision 31), pushing on needs its own clear reward, or nobody would bank and continue. Section 4.2 (*proposal*: momentum).
 
 ## 3. The Hearthdeep: one demon, six dungeons
 Each town's dungeon is a region of Mawrrow's dream digesting that town (STORY 2, 6).
@@ -120,6 +123,13 @@ Steps, in order:
 3. The party chooses: **go home** (everything carried comes home and the dive ends) or **push on**.
 4. If they push on, the bank is locked and the game saves (decision 6). That save is the save-and-quit point.
 
+**Why push on (decision 36; *proposal*: momentum).** Going home is the safe choice: everything carried comes home and the checkpoint is left (decision 31), but the second half then starts cold. Pushing on keeps the dive's **momentum**:
+- the second half's chests roll one rank higher, and the higher-stir reward bonus starts where the first half left it (stir's dangers still reset at the bank, section 4.5);
+- the boss drops an **unbroken-dive chest** only for a party that went from the entrance to the boss in one dive: rarer gear and a material the best build-ups need;
+- what the party found in the first half (bombs, potions, extra bread, boots) stays in hand for the second half.
+
+So the bank decision is safety now against a better haul later. The overlay records go-home vs push-on rates by party size (M7) to check the trade holds.
+
 The 3-player extra slot is picked by the host from the dive seed. The previous pick is stored in the world save so the same player is never picked twice in a row.
 
 ### 4.3 Failure
@@ -136,8 +146,8 @@ Time is the main stake, on purpose (decision 23): a wipe sends the party back to
 **The lost satchel** (decision 33; details *proposal*):
 - On failure, the unbanked haul (not pieces, people, gold or bread) is packed into one lost satchel and left at the floor depth where the party fell. The next dive that generates that depth places it on that floor, marked on the floor map.
 - The satchel is one item in one carry slot. It can't be opened in the dungeon, so recovering it never fills the bag.
-- It turns back into the real items when it leaves the dungeon: going home from the bank, or finishing the dive. They go into the town's storage, not a hero's bag, so a full inventory never forces a choice.
-- It can be put in a bank slot like any other bankable item (*proposal*): one slot for the whole satchel, against banking something new, is a fair choice at the bank.
+- It turns back into the real items when it leaves the dungeon: going home from the bank, finishing the dive, or banked in a slot. It is emptied in town, into town storage or at a spot in the heroes' home (decision 35), so a full inventory never forces a choice.
+- It can be put in a bank slot like any other bankable item (decision 34): one slot for the whole satchel, against banking something new.
 - Failing again while carrying it loses it for good, and the new failure leaves its own satchel. Only one satchel exists at a time; a new one replaces an unrecovered old one.
 - Co-op: the satchel belongs to the party's shared haul (open with F6).
 
@@ -294,7 +304,7 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 1. Is the tension right with time as the main stake? Check in the M7 walk, with the overlay's dive and floor times.
 2. Verify the crash check (section 4.6) in a Windows build.
 3. **The boss retry price** (decision 25; settled by the user 2026-11-03): a secret idol hidden on one second-half floor, with a tell, that the party activates; gold is the fallback when the idol wasn't found (a big gold purse mostly comes from many dives or many failures anyway). The Dough Warden gets no retry (decision 32).
-4. **The lost satchel** is settled (decision 33, section 4.3). Open: may it take a bank slot (recommended yes), and does the checkpoint dive (decision 31) let the party choose the entrance instead and keep the checkpoint for later?
+4. **The lost satchel** is settled (decisions 33-35, section 4.3). Open: does the checkpoint dive (decision 31) start at the bank automatically, or may the party choose the entrance and keep the checkpoint for later? And the push-on reward (decision 36): is momentum the right one?
 5. Red-team items still open: F6 (one bag per player instead of the host-held shared haul), F10 (catch-up for absent players' weapons). F2 is folded into section 4.5; F7 (validator checks every gimmick state) and room data v2 before room 13 stay as the previous session proposed.
 6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. Still open: a recap for absent recorded players, co-op-shaped town time, and bank slots that shrink per player in a 4-player party.
 7. The floor-5 second sleeper and the Warden's story reason: for the story session (decision 30).
