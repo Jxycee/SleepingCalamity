@@ -47,7 +47,7 @@ A cloud session works like a PC session (user, 2026-10-30): it can be the contro
 - Never commit `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `.vscode/`, `*.csproj`, `*.slnx`. Binaries (`.blend`, FBX, PNG, JPG) go through Git LFS (`.gitattributes`).
 
 ## Agents and review
-- Delegate with `sc-delegate` (brief template and routing). Roles, models and effort are pinned in `.claude/agents/`; don't set `CLAUDE_CODE_EFFORT_LEVEL`.
+- Delegate with `sc-delegate` (brief template and routing). Roles, models and effort are pinned in `.claude/agents/`; don't set `CLAUDE_CODE_EFFORT_LEVEL`. Subagents never inherit the coordinator's model or effort: delegate only to the pinned agent types, never `fork` or the built-in general-purpose/Explore/Plan agents (`sc-delegate`).
 - Review scaled to risk: `risk-reviewer` (Opus) for networking, host sync and save data; `branch-reviewer` before a big merge; `reviewer` (Sonnet) otherwise; a fix of 30 lines or fewer gets the controller's own diff read. Reviewers follow `REVIEW.md`.
 - Plan big features in a short design session with the user before code. Multi-agent workflows only with the user's go-ahead and a stated agent count.
 - Long research reads, Unity runs and walks go to subagents that return short summaries; the controller keeps its own context small. Walk recipes: `sc-walk`.

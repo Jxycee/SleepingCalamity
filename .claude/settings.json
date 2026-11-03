@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  },
   "enabledPlugins": {
     "csharp-lsp@claude-plugins-official": true,
     "playwright@claude-plugins-official": false,
@@ -15,12 +18,24 @@
     "unity@claude-plugins-official": true
   },
   "deniedMcpServers": [
-    { "serverName": "nvidia-app" },
-    { "serverName": "blender" },
-    { "serverName": "Blender" },
-    { "serverName": "Shadcn_UI" },
-    { "serverName": "claude-in-chrome" },
-    { "serverName": "UnityMCP" }
+    {
+      "serverName": "nvidia-app"
+    },
+    {
+      "serverName": "blender"
+    },
+    {
+      "serverName": "Blender"
+    },
+    {
+      "serverName": "Shadcn_UI"
+    },
+    {
+      "serverName": "claude-in-chrome"
+    },
+    {
+      "serverName": "UnityMCP"
+    }
   ],
   "hooks": {
     "PreToolUse": [

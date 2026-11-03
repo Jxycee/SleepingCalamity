@@ -16,6 +16,8 @@ description: Brief template and routing for delegating SleepingCalamity work to 
 | Fails twice, or nobody can find the root cause | `fixer` (Fable) | |
 | Plan section | write it yourself or one Opus author at `medium`; `high` for networking, save-schema and state-machine sections | |
 
+**Models never come from the coordinator (user, 2026-11-03).** Every delegated task names one of the agent types above, whose model and effort are pinned in `.claude/agents/`. Never delegate through `fork` (it always runs on the coordinator's model and effort) or through the built-in `general-purpose`, `Explore`, `Plan` or `claude` agents (no pin, so they would inherit the coordinator). Pass `model` or `effort` only as the "Override per call" column says. Safety net: `.claude/settings.json` sets `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`, the default for any agent without a pinned model.
+
 Do it yourself when it takes a handful of tool calls. Batch small same-area tasks into one implementer run and one review. One implementer touches Unity at a time (the project lock); reviewers are read-only and can run alongside. Continue an agent with SendMessage instead of spawning a fresh one, but never SendMessage a running workflow agent.
 
 ## Brief template
