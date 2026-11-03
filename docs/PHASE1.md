@@ -6,15 +6,15 @@ Sources: `CLAUDE.md`, the handoff (`docs/superpowers/handoff/2026-10-29-new-proj
 
 ## 1. Scope: what Phase 1 delivers
 
-Phase 1 proves the core loop in greybox and the art target at final quality, in the first area. It ends at **Undercroft floor 4, the baker's rescue**. That is the story's first "someone comes home" beat (STORY 8.4), and the bakery is in rebuild ring 1 (STORY 8.3). [P1]
+Phase 1 proves the core loop in greybox and the art target at final quality, in the first area. It ends at **the Undercroft's halfway bank (floor 5)**, plus floors 6-7 in rough greybox and a stand-in ending, followed by a refinement pass (amended 2026-11-03; see the dungeon design amendment in section 2). The baker's rescue on floor 3 is the story's first "someone comes home" beat (STORY 8.4), and the bakery is in rebuild ring 1 (STORY 8.3). [P1]
 
 **A. A networked greybox vertical loop, 2-player co-op from day one** (solo is the same code as a local host):
 1. Pick a hero, move, camera, soft target and hard lock-on.
 2. Combat with all four heirlooms: Tobin's axe and Pip's dagger and shield tuned deep; Wren's staff and Ash's bow and sword playable at base depth. [P3] Only the four heirlooms exist in Phase 1. [P4]
-3. Three Cellars enemy types (jam-jar slime, rat-king, sweeping broom) in two tiers each, plus one floor-4 elite. [P5]
+3. Three Cellars enemy types (jam-jar slime, rat-king, sweeping broom) in two tiers each, plus the floor-5 guardian, the Brazen Ox (formerly the floor-4 Dough Warden). [P5]
 4. Weapon growth in Core: experience, level-ups, attachments, one build-up step per heirloom, and a visible weapon tree, with EditMode tests.
-5. The Cellars band, floors 1-4: floors 1-3 generated from hand-authored room pools, floor 4 a fixed bakery set-piece. Gate keys, chests, a checkpoint, banking, and the stir meter.
-6. Carrying the bakery's pieces and the baker home, placing them in a greybox Hollowmere square with a live wish preview, and the baker's wish check. The world save holds it all.
+5. The Undercroft's first half, floors 1-5, plus floors 6-7 rough: an authored floor 1, generated floors 2, 4, 6 and 7, the drowned-bakery set piece on floor 3 and the cistern dome on floor 5. Gate keys, chests, the halfway bank with slots, the stir meter, and a stand-in ending after floor 7 (amended 2026-11-03).
+6. Carrying the bakery's pieces and the baker home (safe the moment they're found), placing them in a greybox Hollowmere square with a live wish preview, and the baker's wish check. The world save holds it all.
 
 **B. One beauty corner of the Hollowmere square at final quality,** approved by the user on captures (section 3.7).
 
@@ -42,6 +42,16 @@ There are two tracks plus the character test. Each milestone is "done" on the ev
 | **M10** | **Tobin through the character pipeline** (section 5) | Turntable and in-game captures in the beauty corner; idle, locomotion and axe combo play in-game on the mannequin's controller; **the user approves Tobin**; hours and usage are logged so the next three heroes can be costed | Concept stage from M1; rig and import after M2 |
 
 Order: M1 first, because all code depends on it. M8 and the M10 concept stage start the same day. M4 is pure Core and can run beside M2 and M3. Room-pool authoring for M5 can start during M3. M6 needs M5's haul and M4's save shapes. M9 needs M8. M7 closes the phase. The OoT remake launches on 5 Nov 2026 (decisions A2): before the M9 captures, compare the targets against its official screens in `Reference/private/`. That is a check, not a blocker.
+
+**Dungeon design amendment (user sign-off, 2026-11-03).** The dungeon design spec `docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` (decisions 1-47) replaces this plan wherever they conflict. In short:
+- **Shape:** the Undercroft is 10 floors with one bank halfway (floor 5). Phase 1 builds floors 1-5, the bank room, floors 6-7 in rough greybox and a stand-in ending. The entrance is the church cellar trapdoor, not the cistern-house stair (P25).
+- **Dive rules:** every dive starts at the entrance on fresh floors. The only ways out are the halfway bank, the end, or failure. Save and quit at any stair. Going home from the bank leaves a one-time checkpoint (any floor up to the bank). One paid boss retry per dive (a secret idol, gold as the fallback); none for the floor-5 guardian. Pushing on earns momentum: better chest luck and an extra chest room after the boss.
+- **Banking and failure:** bank slots by party size (1p 3; 2p 2 each; 3p 4 in total; 4p 1 each); keys and progress items are never bankable. A failed dive loses unbanked loot (left as one lost satchel, recoverable once), halves the dive's gold, and keeps bread, weapon growth, and every piece and person found (safe on pickup, Atla-style floor depths).
+- **Loot is per player** (replaces the shared host-held haul, P22): each player rolls their own chests and drops; keys, pieces and people stay shared and host-held. Mixed-power parties: weak weapons boosted up to about 85% of the band's expected power, catch-up growth, need-weighted drops, and a capped helper bonus.
+- **Healing is a bread ladder** (P27, P47, P48): 3-5 free loaves of the survivors' poor bread before the baker, his bread at the default value after, stacks of up to 10, baker upgrades; potions and healing places stay stronger, but a basic potion never beats the best bread.
+- **Stir** builds per half and resets at the bank; inputs are floors cleared and unbanked valuables, with square-root player scaling; higher stir raises rewards too (P21, P49).
+- **Co-op:** exits-only room locks, a gather-to-leave stair, pings, a "story so far" recap, town permissions (everyone may build by default, the host can restrict it), and the spec's scaling table (P23).
+- **Story and art:** the baker is rescued on floor 3; the Brazen Ox guards the floor-5 cistern dome with the innkeeper; enemies look demon-made (STORY 4 and 8.4). Enemies are still greybox, so nothing built is lost.
 
 **Scope amendments (2026-10-31, coordinator session 6; listed for sign-off as A32-A36 in `docs/superpowers/handoff/decisions-for-review.md`).** Status lives in `CURRENT.md`, not here.
 - **M1:** the world rules shipped stricter than written: one identity kind per world, and a solo world rebinds to its owner. The rules above still hold. [A32]
@@ -207,11 +217,11 @@ The tiers follow handoff 3.5: **T1** tileable or trim, **T2** modular kit (no un
 | Hitstop | 4 frames (60 Hz) on normal hits, 10 on finishers; capped at 12 per 0.5 s |
 | Dodge | 0.5 s roll with i-frames on frames 5-18 of 30; owner window leniency 100 ms |
 | Guard [P46] | dagger and shield only: frontal 120 degrees, guarded damage x0.2; a parry window of 6 frames |
-| Healing in the dive [P47] | the checkpoint room and the floor-4 bank point heal fully; about half of floors 1-3 hold a healing point (DC2: 51%) with a 30 s recharge |
+| Healing in the dive [P47] | *(amended 2026-11-03)* bread first (the bread ladder); the halfway bank room heals fully; healing points become an elective dead-end room (the mending spring) |
 | Revenge (elite) | opener 1, finisher 3, charge 4; cap 12 x (1 + 0.5 x (players - 1)) |
 | Rage | after 7 hits, +30% attack for 15 s, telegraphed (DC2) |
 | Enemy tier 2 (floors 3-4) | life x3, attack x2.3, defence x3.3 (DC2 family ratios) |
-| Co-op scaling [P23] | enemy life x1.0 / 1.7 / 2.3 / 2.8 for 1-4 players, plus 1 extra enemy per room per extra player; attack unchanged |
+| Co-op scaling [P23] | *(amended 2026-11-03)* enemy count x1.0 / 1.45 / 1.85 / 2.2 and enemy HP x1.0 / 1.15 / 1.3 / 1.45 for 1-4 players; damage flat; bosses mostly HP; solo gets one self-revive per dive |
 | Downed (co-op) [P24] | 20 s downed; an ally revives with a 3 s hold; all players down ends the dive |
 
 ### 6.6 Enemies (Cellars, M3) [P5] [P6]
@@ -220,7 +230,7 @@ The tiers follow handoff 3.5: **T1** tileable or trim, **T2** modular kit (no un
 | Jam-jar slime | 40 / 12 / 5 | Hopping swarm, lobs slow globs | Wide sweeps (staff, axe) |
 | Rat-king | 90 / 18 / 10 | Fast lunges, scatters and regroups, telegraphed spin | Lock-on and speed (dagger), guard |
 | Sweeping broom | 60 / 15 / 15 | Bristle front blocks 80% of frontal damage; knock-down sweeps | Flank, dodge behind, or the axe's guard-breaking finisher |
-| **Dough Warden** (floor 4 elite) | 600 / 30 / 20 | Big telegraphed slams, super armour, revenge gauge | Dodge timing, co-op flanking |
+| **Brazen Ox** (floor 5 guardian; was the floor-4 Dough Warden) | 600 / 30 / 20 | Charges, horn sweeps and telegraphed slams, super armour, revenge gauge | Dodge timing, co-op flanking; open the sluices to quench its fire and crack its hide |
 
 Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), because hit sound is half of combat feel. [P42]
 
@@ -229,7 +239,7 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
 ### 7.1 Hollowmere square (greybox in M6) [P25] [P26] [P27] [P28]
 - **Built by an Editor builder from a layout file** (no hand-edited scenes).
 - **The square:** about 40 x 30 m around the dry fountain on the hilltop above the lake. Lanes leave it as stubs, and the bell tower and the sealed tithe gate show on its north side.
-- **The heroes' home** (the cistern house, the bell-loft annex) sits on the square's edge. Its cellar stair is the way into the Undercroft.
+- **The heroes' homes** (amended 2026-11-03, STORY 8.2): Wren's house, where the four first lived together, and each hero's own family house, shabby until a builder is woken. **The way into the Undercroft is the church cellar trapdoor;** the church and the bell tower are one building, and the tithe gate becomes the post-boss shortcut.
 - **Buildings go on old foundations** (user, 2026-10-30; design `docs/superpowers/specs/2026-10-30-hollowmere-mass-production-design.md`): a building snaps onto any empty foundation of its size class (S 6 m, M 8 m, L 11 m square) on any opened ring, in four turns, frame first and then its parts. A building that would block an NPC path is refused. Anything placed can always be picked back up. Fixed in place: bell tower, heroes' home, fountain, mill, tithe gate, market stalls.
 - **Decorations** stay free on a 0.5 m snap grid with 15-degree rotation anywhere in town, with an undo, a free camera, and a live wish preview (lessons); one that blocks an NPC path breaks and returns to the player.
 - **Wishes are deterministic predicates,** extending FishGame's `PlacementWish` kinds (AtLot, NearPoint, FarFrom) with Facing, NextTo and InArea, after DC1's vocabulary. Wishes carry equal weight (DC1) and are shown in plain words with a live tick.
@@ -237,6 +247,8 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
 - **The baker's wishes:** "near the fountain, so folk pass my door" (within 12 m), "door facing the square", and "not right against the inn" (8 m or more from it). Meeting all three opens his service: healing loaves for the next dive. [P48]
 
 ### 7.2 Undercroft Cellars floors 1-4 (greybox in M5) [P16] [P17] [P18] [P19] [P20] [P21] [P22]
+*As built in M5. The dungeon design amendment (section 2, 2026-11-03) changes the floor plan, checkpoint, banking, haul and stir rules below; the build order is in the spec, section 12.*
+
 - **Two layers, after DC2.** A hand-authored floor graph decides what each floor is. Phase 1's graph is linear: floor 1, 2, 3, 4.
   - A Core generator builds floors 1-3 from a seed: 32-bit seed plus floor id, sent by the host, so every client builds the same floor. The grid is 14 x 14 cells of 4 m.
   - Each floor has 4-6 rooms from the pool. Each room's rectangle plus a one-cell margin must be clear. Each new room links to a random earlier one, then 1-3 extra corridors make loops, and 1-3 side dead ends are added. Corridor tiles are matched by a 4-bit neighbour mask.
@@ -311,11 +323,11 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 | 3-4 player scale | 2-player is the tuned case; 3-4 get a smoke run, and the scaling numbers are data | M7 |
 
 ## 11. Decisions in this plan
-1. **P1 Call:** Phase 1 ends at Undercroft floor 4 with the baker's rescue; the Cisterns, Tithe Roots and the Bell-Warden come after.
+1. **P1 Call:** Phase 1 ends at Undercroft floor 4 with the baker's rescue; the Cisterns, Tithe Roots and the Bell-Warden come after. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 2. **P2 Call:** Phase 1 delivers the greybox loop, two corners and Tobin; dressing the whole square at final quality is the vertical slice.
 3. **P3 Call:** all four heirlooms are playable; the axe and the dagger and shield are tuned deep, the staff and the bow and sword stay at base depth.
 4. **P4 Call:** only the four heirlooms exist in Phase 1; no other weapons.
-5. **P5 Call:** three story enemies in two tiers each, plus one floor-4 elite.
+5. **P5 Call:** three story enemies in two tiers each, plus one floor-4 elite. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 6. **P6 Placeholder:** the elite's name, "Dough Warden"; the attachment names Ember, Pest-bane and Heartwood.
 7. **P7 Call:** no weapon wear in Phase 1; revisit after the M7 playtest, with the DC1 curve on output as the starting point.
 8. **P8 Call:** the ratio damage formula `ATK x move x 100/(100+DEF)` with named multipliers, minimum 1.
@@ -329,15 +341,15 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 16. **P16 Call:** floors use DC2's two-layer method; Phase 1's floor graph is linear 1-4; floor 4 is a fixed set-piece.
 17. **P17 Placeholder:** the grid (14 x 14, 4 m cells), 4-6 rooms per floor, the pool sizes, 70% sub-theme share, and the repetition metric thresholds.
 18. **P18 Call:** rooms are authored as data grids and built by an Editor builder; art swaps into the same sockets.
-19. **P19 Call:** the floor loop: a gate-key carrier, a 50% locked room whose key any player can carry, rank-filtered chests, and floors stay cleared.
-20. **P20 Call:** a checkpoint after floor 2 and a bank point at floor 4; a failed dive loses only the unbanked haul, and lost pieces return to their floors.
-21. **P21 Placeholder:** the stir meter values (+10 per floor, +5 per piece, the player factor) and thresholds (40, 70, 100, 90 s); the effects themselves are P49.
-22. **P22 Call:** the party shares one haul, held by the host.
-23. **P23 Call:** co-op scales enemy life (x1.7, 2.3, 2.8) and enemy count, not attack.
+19. **P19 Call:** the floor loop: a gate-key carrier, a 50% locked room whose key any player can carry, rank-filtered chests, and floors stay cleared. *Amended 2026-11-03 (dungeon design amendment, section 2).*
+20. **P20 Call:** a checkpoint after floor 2 and a bank point at floor 4; a failed dive loses only the unbanked haul, and lost pieces return to their floors. *Amended 2026-11-03 (dungeon design amendment, section 2).*
+21. **P21 Placeholder:** the stir meter values (+10 per floor, +5 per piece, the player factor) and thresholds (40, 70, 100, 90 s); the effects themselves are P49. *Amended 2026-11-03 (dungeon design amendment, section 2).*
+22. **P22 Call:** the party shares one haul, held by the host. *Amended 2026-11-03 (dungeon design amendment, section 2).*
+23. **P23 Call:** co-op scales enemy life (x1.7, 2.3, 2.8) and enemy count, not attack. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 24. **P24 Call:** co-op players are downed for 20 s and revived by an ally; all down ends the dive.
-25. **P25 Call:** the Undercroft's entrance is the cellar stair of the heroes' cistern house.
+25. **P25 Call:** the Undercroft's entrance is the cellar stair of the heroes' cistern house. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 26. **P26 Call (amended by the user 2026-10-30):** buildings snap onto old foundations by size class with four turns; decorations stay free on a 0.5 m snap grid; undo and equal-weight wishes shown live.
-27. **P27 Placeholder:** the baker's three wishes (12 m, facing the square, 8 m from the inn) and the loaf count (three per dive); the service itself is P48.
+27. **P27 Placeholder:** the baker's three wishes (12 m, facing the square, 8 m from the inn) and the loaf count (three per dive); the service itself is P48. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 28. **P28 Call:** the bakery is 4 pieces plus the baker and counts only when all are placed.
 29. **P29 Call:** the character pipeline is a hybrid: an MPFB2 base body, Tripo-made head, hair and outfit parts, and Mixamo animation retargeted through Unity Humanoid.
 30. **P30 Call:** Tobin is the first hero through the pipeline.
@@ -357,9 +369,9 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 44. **P44 Call:** 2-player is the tuned co-op case in Phase 1; 3-4 players get a smoke run in M7.
 45. **P45 Call:** Phase 1 defers three features the user decided in STORY 3: hero renaming, outfit customisation, and the solo town jobs of the three heroes not diving.
 46. **P46 Call:** only the dagger and shield can guard; the other heirlooms rely on dodge.
-47. **P47 Call:** the dive heals at the checkpoint room, the floor-4 bank point, and healing points on about half of floors 1-3 (30 s recharge is a placeholder).
-48. **P48 Call:** meeting the baker's wishes opens a service: healing loaves for the next dive.
-49. **P49 Call:** the stir effects: one more enemy per room, then a roaming tier-2 rat-king hunter, then "the deep closes" (reach a bank point in time or the dive fails).
+47. **P47 Call:** the dive heals at the checkpoint room, the floor-4 bank point, and healing points on about half of floors 1-3 (30 s recharge is a placeholder). *Amended 2026-11-03 (dungeon design amendment, section 2).*
+48. **P48 Call:** meeting the baker's wishes opens a service: healing loaves for the next dive. *Amended 2026-11-03 (dungeon design amendment, section 2).*
+49. **P49 Call:** the stir effects: one more enemy per room, then a roaming tier-2 rat-king hunter, then "the deep closes" (reach a bank point in time or the dive fails). *Amended 2026-11-03 (dungeon design amendment, section 2).*
 50. **P50 Call:** the controller (Opus) scores the art contact sheets itself; the pinned Sonnet `reviewer` does not.
 51. **P51 Call:** at most 3 art-batch agents run at once, after the user's go-ahead.
 
@@ -382,3 +394,4 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 - 2026-11-01 (user): **Adopt the libraries.** Animation Rigging, PrimeTween (after its LICENSE check) and Unity Behavior (elite and bosses; normal enemies keep the Core state machine), plus the rest of the libraries.md "Adopt now" list as each milestone needs it.
 - 2026-11-01 (user): **Combat tuning as data.** Core reads optional JSON tuning files over the code defaults (Newtonsoft, already in the project), so tuning and modding need no recompile. The C# values stay as the defaults and the tests' baseline.
 - 2026-11-02 (user, via coordinator session 7): NieR Replicant's opening village added as the starting-area quality and cohesion reference (section 3 intro); ideas and common practice may be borrowed, our own look stays.
+- 2026-11-03 (user sign-off): the dungeon design spec `docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` amends the plan: Phase 1 ends at the halfway bank plus two rough floors and a stand-in ending; 10-floor Undercroft with one bank; per-player loot; the bread ladder; the church trapdoor entrance; the Brazen Ox; demon-made enemies (section 2 amendment; P1, P5, P19-P23, P25, P27, P47-P49).
