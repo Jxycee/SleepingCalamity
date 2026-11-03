@@ -64,7 +64,7 @@ Success:
 29. **Dive length is set by time, not floors (F9 accepted).** With the right scaling, later dungeons don't need more floors; extra floors would just be waves of fodder. A dungeon gets longer only when a larger puzzle or set piece needs the room. Later dungeons and variants get richer floors, not more of them.
 30. **The opening** is written (story session, user 2026-11-03; STORY 8.5): the heroes enter the Undercroft through the church cellar trapdoor, not the cistern house. Building the mechanics and the base world first, so there is something to judge, was the right order.
 31. **The halfway bank is a one-time checkpoint (user, 2026-11-03).** When the party goes home from the bank, the next dive into that dungeon starts at the bank, and starting there uses the checkpoint up. If that dive fails, the dive after it starts at floor 1 again. A party that pushes on from the bank and then fails also starts at floor 1. Once the boss is beaten, the permanent shortcut of decision 13 replaces this.
-32. **No retry for the Dough Warden** (user, 2026-11-03). The paid retry (decision 25) is for the boss only.
+32. **No retry for the floor-5 guardian** (user, 2026-11-03; now the Brazen Ox, decision 46). The paid retry (decision 25) is for the boss only.
 33. **The lost satchel (user, 2026-11-03).** A failed dive's unbanked haul waits as one lost satchel on the floor depth where the party fell. It is a single item that turns back into the real items only once it leaves the dungeon (going home from the bank, or finishing the dive). Only one satchel exists at a time. Section 4.3.
 34. **The satchel can be banked** (user, 2026-11-03): it takes one bank slot like any other bankable item.
 35. **Emptying the satchel** happens in town: into town storage, or at a spot in the heroes' home (user, 2026-11-03).
@@ -78,6 +78,8 @@ Success:
 43. **Town permissions (user, 2026-11-03):** a host setting lets everyone move and build in town; it is **on by default**. If someone griefs, the host turns it off, and then only the host moves things or does other town actions; the others can still send move requests.
 44. **The entrance is the church cellar trapdoor (user, 2026-11-03).** The church and the bell tower are one building; the outdoor tithe gate is the shortcut to the halfway bank once the boss is beaten (decision 13). The heroes' homes are separate places (STORY 8.2).
 45. **Enemies look demon-made (user, 2026-11-03):** DOOM, God of War, Devil May Cry, Bayonetta, Demise, Tekken's devils and Diablo as the reference family (STORY 4). *Proposal:* the creature's idea still comes from the town's lost things; its make is demonic, and more demon shows the deeper the floor.
+46. **The Brazen Ox replaces the Dough Warden (user, 2026-11-03).** The floor-5 guardian is the tithe-cart oxen remade by the dream into one huge hollow brass ox with a fire in its belly: glowing seams, steam breath, bull-demon horns. It stands in the cistern dome and is what boils the water. Fight: dodge charges and horn sweeps; open the sluices to flood its fire, and the quench cracks its hide for a damage window. The old Warden's fight shape carries over (telegraphed slams, super armour, revenge gauge, the placeholder stats). No retry (decision 32).
+47. **The floor-5 sleeper is the innkeeper (user, 2026-11-03),** who cooked the Tithe Feast. Waking her opens cooking (the food and water craftables, decision 9). Placeholder names (user will rename): the cat **Tuppence**, the baker **Hollis Rye**, the innkeeper **Marta Fenn**.
 
 ## 3. The Hearthdeep: one demon, six dungeons
 Each town's dungeon is a region of Mawrrow's dream digesting that town (STORY 2, 6).
@@ -150,7 +152,7 @@ The dive fails when every present player is down (as built), or when the deep cl
 - pieces and people found stay found (section 4.4);
 - weapon growth earned in the dive is kept (*proposal*: the research found that no game players liked deletes long-term growth).
 
-Time is the main stake, on purpose (decision 23): a wipe sends the party back to the entrance with fresh floors. A wipe at the boss can be bought back once per dive (decision 25); the Dough Warden has no retry (decision 32).
+Time is the main stake, on purpose (decision 23): a wipe sends the party back to the entrance with fresh floors. A wipe at the boss can be bought back once per dive (decision 25); the Brazen Ox has no retry (decision 32).
 
 **The lost satchel** (decision 33; details *proposal*):
 - On failure, the unbanked haul (not pieces, people, gold or bread) is packed into one lost satchel and left at the floor depth where the party fell. The next dive that generates that depth places it on that floor, marked on the floor map.
@@ -237,7 +239,7 @@ Bread is the free heal you can always count on and can upgrade. It is never the 
 | 2 | Generated larders and cold rooms | Water | Varied (section 6) |
 | **3** | **The drowned bakery set piece (decision 26):** the taken bakery, flooded and cold, its ovens drowned. Route the water to reach the sleeping baker. A short set piece with a lighter guard than a boss. **The baker wakes** and is safe from here on (section 4.4). | Water exam | Rescue |
 | 4 | Generated wine vaults and upper cistern channels; **the water starts bubbling**: steam vents, warm pools that hurt | Water, bubbling | Varied |
-| **5** | **Halfway set piece:** the cistern dome, boiling from below. The **Dough Warden** (grown from the bakery's stolen dough, risen in the heat) guards it. A second sleeper to rescue (*proposal*: the innkeeper, ring 1; for the story session). **Then the bank room (section 4.2).** | Water exam, heat foreshadowed | Rescue and guardian |
+| **5** | **Halfway set piece:** the cistern dome, boiled from below by the **Brazen Ox** (decision 46). Flood its fire through the sluices to crack its hide. The innkeeper, who cooked the feast, sleeps here (decision 47). **Then the bank room (section 4.2).** | Water exam, heat foreshadowed | Rescue and guardian |
 | 6-7 | Generated coal cellars and flues, near the demon's breath; the bellows; dampers and ovens | Heat | Varied |
 | 8 | **Feast hall set piece:** the sunk feast laid out under braziers that never go out; work the dampers and flames to reach the tally with four blank names (STORY 8.4) | Heat exam | Story |
 | 9 | **The root wall:** the Tithe Roots as one authored floor; Tobin's father can't be carried out yet | Roots and light | Cut through |
@@ -251,7 +253,7 @@ Bread is the free heal you can always count on and can upgrade. It is never the 
 3. Floor 2: the first weapon level-up. The survivors' poor bread heals only a little, so the player learns to dodge.
 4. Floor 3: the drowned bakery. **The baker wakes**, and from here on he is safe whatever happens.
 5. Floor 4: carrying loot through the bubbling floor toward the guarded bank. There is no exit yet, so this is tension, not a decision.
-6. Floor 5: the Dough Warden in the boiling dome, a second sleeper, then the bank room.
+6. Floor 5: the Brazen Ox in the boiling dome, the innkeeper, then the bank room.
 7. Go home, or push on into the two rough heat floors.
 8. Back in town, the bakery is rebuilt in view, and the baker's bread is better than anything the heroes could bake.
 
@@ -306,12 +308,12 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
   - Each resident's routine is short: home, one task place, home.
 
 ## 10. Proposed amendments (not applied; for sign-off)
-- **STORY 8.4:** the Undercroft becomes 10 floors, as in section 5. Its story beats move: baker on floor 3 (the drowned bakery), the Dough Warden and a second sleeper on floor 5, the tally on floor 8, Tobin's father on floor 9, the boss on floor 10. The bands become water first (cellars and cisterns, floors 1-5), then heat (coal cellars, flues and the breath, floors 6-8), then the roots (floor 9). The band enemy lists are redistributed to match: drip-spirits and eels move up, and new heat creatures come in below.
+- **STORY 8.4:** the Undercroft becomes 10 floors, as in section 5. Its story beats move: baker on floor 3 (the drowned bakery), the Brazen Ox and the innkeeper on floor 5, the tally on floor 8, Tobin's father on floor 9, the boss on floor 10. The bands become water first (cellars and cisterns, floors 1-5), then heat (coal cellars, flues and the breath, floors 6-8), then the roots (floor 9). The band enemy lists are redistributed to match: drip-spirits and eels move up, and new heat creatures come in below.
 - **PHASE1 section 1 and P1:** Phase 1 ends at the Undercroft's halfway bank (floor 5), plus floors 6-7 in rough greybox and a stand-in ending (decision 28), followed by a refinement pass.
 - **PHASE1 7.2 and P19:** "floors stay cleared" becomes "fresh floors every dive; found pieces and people stay found". Pieces use Atla-style assignment (section 4.4).
 - **PHASE1 7.2 and P20:** the checkpoint after floor 2 and the floor-4 bank point are replaced by the single halfway bank with slots (section 4.2). The failure rule becomes section 4.3.
 - **PHASE1 P25:** the Undercroft's entrance moves from the cistern-house cellar stair to the church cellar trapdoor (decision 44); `DiveHub` and the go-home landing move with it.
-- **PHASE1 section 3 (style bible) and 6.6:** enemies get the demon-made look (decision 45); they are still greybox, so nothing built is lost.
+- **PHASE1 section 3 (style bible) and 6.6:** enemies get the demon-made look (decision 45), and the Dough Warden becomes the Brazen Ox (decision 46; code and tuning keys renamed in the build); they are still greybox, so nothing built is lost.
 - **PHASE1 P22:** the shared host-held haul becomes per-player loot (decision 39); keys, pieces and people stay shared.
 - **PHASE1 / M6 S4 placement:** the single builder lock becomes the town-permissions setting (decision 43): everyone may build by default (a lock per placed item instead of one global lock, *proposal*), the host can restrict it, and others can send move requests and map pings (decision 42).
 - **PHASE1 P21 and P49:** stir inputs and the collapse timer as in section 4.5.
@@ -326,16 +328,16 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 ## 11. Open questions
 1. Is the tension right with time as the main stake? Check in the M7 walk, with the overlay's dive and floor times.
 2. Verify the crash check (section 4.6) in a Windows build.
-3. **The boss retry price** (decision 25; settled by the user 2026-11-03): a secret idol hidden on one second-half floor, with a tell, that the party activates; gold is the fallback when the idol wasn't found (a big gold purse mostly comes from many dives or many failures anyway). The Dough Warden gets no retry (decision 32).
+3. **The boss retry price** (decision 25; settled by the user 2026-11-03): a secret idol hidden on one second-half floor, with a tell, that the party activates; gold is the fallback when the idol wasn't found (a big gold purse mostly comes from many dives or many failures anyway). The Brazen Ox gets no retry (decision 32).
 4. **The lost satchel** is settled (decisions 33-35, section 4.3). The checkpoint floor pick (decision 38) and momentum (decision 37) are settled.
 5. Red-team items: F6 settled (decision 39). F10 waits for the user's OK on the section 4.7 proposal (decision 40). F2 is folded into section 4.5; F7 (validator checks every gimmick state) and room data v2 before room 13 stay as the previous session proposed.
 6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. The recap (decision 41), map pings (42) and town permissions (43) are settled. Still open: bank slots that shrink per player in a 4-player party.
-7. Still open from the story session: the floor-5 second sleeper (proposal: the innkeeper, who cooked the Tithe Feast and opens cooking) and the Warden's story reason (proposal: the baker's last batch, risen in the dome's heat into a guard). Names for the cat, the baker and the innkeeper are placeholders.
+7. The story session's floor-5 questions are settled (decisions 46-47). Names are placeholders until the user renames them.
 
 ## 12. Phase 1 build order (after sign-off)
 1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style, the stair suspend, the paid boss retry, the one-time checkpoint, the lost satchel, the bread ladder.
 2. Floor map; co-op locks and the gather-to-leave stair.
-3. Authored floor 1; floor 3 as the drowned bakery set piece; floor 5 as the halfway set piece with the Dough Warden; floors 6-7 in rough greybox and the stand-in ending.
+3. Authored floor 1; floor 3 as the drowned bakery set piece; floor 5 as the halfway set piece with the Brazen Ox and the innkeeper; floors 6-7 in rough greybox and the stand-in ending.
 4. Objective variety (two-valve seal, hold the pump) and the named floor card with two modifiers.
 5. The water gimmick on the 12 rooms (bubbling variants for floor 4); encounter templates; music stems.
 6. Jobs for dead ends; collapse fairness; the crash saver if it stays simple.
