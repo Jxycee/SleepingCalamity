@@ -51,6 +51,18 @@ Puzzles (valves, sluices, dampers) are a smaller fourth point. If one player tur
 4. **Bank slots should not shrink per player as the party grows.** At 4 players with 1 slot each, a full party takes home the same 4 items as a pair. That's the "loot divided by players" complaint. Either keep 2 per player at every size, or accept 1 each but make the per-player chest rolls (spec 4.7) rich enough that nobody feels short-changed. Decision 5 is settled; this note raises the risk for the user to weigh in the M7 playtest, not as a change.
 5. **Keep co-op, and make solo first-class.** Solo has to be fun with no compromise: the self-revive (spec 4.7), solo enemy counts, and every puzzle solvable alone. Then co-op is a bonus, not a requirement. Most players who buy a co-op game play much of it alone.
 
+## 5. Mixed-power parties (F10 follow-up, 2026-11-03)
+How other co-op games handle a weak player beside strong ones:
+- **Monster Hunter (World, Rise, Wilds)** has no XP levels. Power is gear, and hunter rank only shows story progress. Quest ranks gate who can join (a low-rank player can't join a high-rank quest). Strong hunters joining weaker players' hunts and winning fast is normal and accepted. Iceborne added helper rewards (a pendant and an achievement) to encourage it.
+- **Borderlands 3** scales enemies to each player's own level in its co-op mode and gives each player their own loot. The older, harder host-level mode stays as an option.
+- **FFXIV level sync** scales an over-levelled player down to the content's level. Guild Wars 2 scales players down to the zone's level; players note that the stronger one still pulls ahead through extra rewards.
+- **Remnant 2** clamps the world's difficulty to the party's average power (note 05).
+- **Catch-up XP** (World of Warcraft-style rested XP, Path of Exile's lower XP for players far above the content) speeds up whoever is behind without slowing the leader.
+
+*For us:* our power is the weapon (level and build-ups) plus small gear, with no character level, so it's closest to Monster Hunter. Shared enemies held by the host rule out Borderlands-style per-player enemy levels. The spec (section 4.7) proposes boosting weak weapons up to a floor, never scaling strong ones down, plus catch-up growth, need-weighted rolls and small helper rewards.
+
+Sources: [MH World SoS discussion](https://steamcommunity.com/app/582010/discussions/0/1642045003586901618/?ctp=2), [Iceborne Hunter Helper](https://www.thesixthaxis.com/2019/09/07/monster-hunter-world-iceborne-hunter-helper-dlc/), [MH Wilds ranks](https://deltiasgaming.com/how-to-switch-between-low-and-high-rank-in-monster-hunter-wilds), [Borderlands 3 co-op scaling](https://www.androidcentral.com/how-does-co-op-level-scaling-work-borderlands-3), [FFXIV level sync](https://ffxiv.consolegameswiki.com/wiki/Level_Sync), [Path of Exile party levels](https://steamcommunity.com/app/238960/discussions/0/1326718197224186794), [Guild Wars 2 co-op levels](https://en-forum.guildwars2.com/topic/121891-character-adventure-guide-frustrating-for-co-op).
+
 ## 4. Sources
 - [Game Informer: Redfall progress tied to host](https://gameinformer.com/2022/06/15/redfall-campaign-progress-tied-to-host-in-co-op)
 - [Stevivor: Saints Row co-op progress](https://stevivor.com/features/in-depth/saints-row-co-op-drop-in-drop-out-and-progress/)

@@ -71,6 +71,11 @@ Success:
 36. **Pushing on must pay (user, 2026-11-03).** The bank slots are only for a party that continues without leaving. Because going home leaves a checkpoint (decision 31), pushing on needs its own clear reward, or nobody would bank and continue. Section 4.2 (*proposal*: momentum).
 37. **Momentum accepted (user, 2026-11-03):** better chest luck in the second half for a party that pushed on, and an extra chest room at the end of an unbroken dive. It rewards players who don't need the safety and still satisfies those who do.
 38. **Checkpoint floor pick (user, 2026-11-03):** a party holding the checkpoint may start on any floor from 1 up to the halfway bank, for example to go back for a sleeper they missed. Starting the dive uses the checkpoint up, whichever floor they pick. Without a checkpoint, the dive starts at floor 1.
+39. **Each player keeps their own loot (F6, user 2026-11-03).** Chests and enemy drops are per player: each player sees and picks up only what dropped on their side, a random roll of the same item type for each player. Story and progress items (gate and boss keys, pieces, people) are not split: one copy, held by the host for the whole party. Individual progression then helps the group's progression. Section 4.7.
+40. **Mixed-power parties (F10):** adapt how other co-op games handle under-levelled players to our weapon growth; *proposal* in section 4.7, waiting for the user's OK.
+41. **Co-op recap (user, 2026-11-03):** a simple "while you were away" or "the adventure so far" recap when a recorded player rejoins.
+42. **Map pings while building (user, 2026-11-03):** other players can point on the overhead map so the builder sees where they want something placed.
+43. **Town permissions (user, 2026-11-03):** a host setting lets everyone move and build in town; it is **on by default**. If someone griefs, the host turns it off, and then only the host moves things or does other town actions; the others can still send move requests.
 
 ## 3. The Hearthdeep: one demon, six dungeons
 Each town's dungeon is a region of Mawrrow's dream digesting that town (STORY 2, 6).
@@ -195,7 +200,12 @@ Collapse timer (*proposal*): path time to the current floor's stair (or the bank
 - **Locks:** combat rooms lock their exits only, with a short "wait for the party" ring at the door. Downed or disconnected players aren't needed for the clear. Dead ends never lock.
 - **Leaving a floor:** the stair works as a gather-to-leave ring that ignores fallen players.
 - **Pings:** a small set of party marks.
-- **Chest loot** is rolled per player, so nobody races to open chests.
+- **Loot is per player** (decision 39). The host rolls a separate result for each present player for every chest and drop of the same item type; each client shows and lets its player pick up only its own. Gold earned, bread, boots and other gear, bank slots, momentum rolls and the lost satchel are all per player (each player has at most one satchel). Keys, pieces and people stay single shared items held by the host. Host-authoritative as before; risk-reviewer. This replaces the host-held shared haul (PHASE1 P22).
+- **Mixed-power parties** (decision 40, *proposal*, adapted from Monster Hunter, Borderlands 3, FFXIV level sync, Remnant 2 and rested-XP catch-up; `docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md` section 5):
+  1. **Boost up, never down.** Each floor band has an expected weapon power. A weapon below it fights at a floor of about 85% of the expected power for damage maths, for that player only. Nobody is scaled down: a strong weapon is earned, and carrying a friend is a normal part of co-op (Monster Hunter's norm).
+  2. **Catch-up growth.** A weapon below the party's median weapon grows at about 2x until it reaches the median (Path of Exile and rested-XP style). It narrows the gap without slowing the leader.
+  3. **Need-weighted rolls.** A player's own weapon drops lean toward their weakest slot, so the friend without a good weapon finds one sooner (works with decision 39).
+  4. **Helping pays.** The stronger player loses nothing for diving with a weaker friend (no reduced growth), and revives and assists add a little growth (Monster Hunter's helper rewards).
 
 ### 4.8 Bread and healing (decision 27)
 Bread is the free heal you can always count on and can upgrade. It is never the strongest heal.
@@ -293,6 +303,8 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 - **PHASE1 section 1 and P1:** Phase 1 ends at the Undercroft's halfway bank (floor 5), plus floors 6-7 in rough greybox and a stand-in ending (decision 28), followed by a refinement pass.
 - **PHASE1 7.2 and P19:** "floors stay cleared" becomes "fresh floors every dive; found pieces and people stay found". Pieces use Atla-style assignment (section 4.4).
 - **PHASE1 7.2 and P20:** the checkpoint after floor 2 and the floor-4 bank point are replaced by the single halfway bank with slots (section 4.2). The failure rule becomes section 4.3.
+- **PHASE1 P22:** the shared host-held haul becomes per-player loot (decision 39); keys, pieces and people stay shared.
+- **PHASE1 / M6 S4 placement:** the single builder lock becomes the town-permissions setting (decision 43): everyone may build by default (a lock per placed item instead of one global lock, *proposal*), the host can restrict it, and others can send move requests and map pings (decision 42).
 - **PHASE1 P21 and P49:** stir inputs and the collapse timer as in section 4.5.
 - **PHASE1 P27, P47 and P48:** healing is bread first, as the ladder in section 4.8 (survivors' bread before the baker, the baker's bread after, stacks of 10, upgrades). Healing points become an elective dead-end room. The bank room heals fully.
 - **Code** (later, after sign-off):
@@ -307,8 +319,8 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 2. Verify the crash check (section 4.6) in a Windows build.
 3. **The boss retry price** (decision 25; settled by the user 2026-11-03): a secret idol hidden on one second-half floor, with a tell, that the party activates; gold is the fallback when the idol wasn't found (a big gold purse mostly comes from many dives or many failures anyway). The Dough Warden gets no retry (decision 32).
 4. **The lost satchel** is settled (decisions 33-35, section 4.3). The checkpoint floor pick (decision 38) and momentum (decision 37) are settled.
-5. Red-team items still open: F6 (one bag per player instead of the host-held shared haul), F10 (catch-up for absent players' weapons). F2 is folded into section 4.5; F7 (validator checks every gimmick state) and room data v2 before room 13 stay as the previous session proposed.
-6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. Still open: a recap for absent recorded players, co-op-shaped town time, and bank slots that shrink per player in a 4-player party.
+5. Red-team items: F6 settled (decision 39). F10 waits for the user's OK on the section 4.7 proposal (decision 40). F2 is folded into section 4.5; F7 (validator checks every gimmick state) and room data v2 before room 13 stay as the previous session proposed.
+6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. The recap (decision 41), map pings (42) and town permissions (43) are settled. Still open: bank slots that shrink per player in a 4-player party.
 7. The floor-5 second sleeper and the Warden's story reason: for the story session (decision 30).
 
 ## 12. Phase 1 build order (after sign-off)
