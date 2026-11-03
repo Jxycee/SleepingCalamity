@@ -202,7 +202,7 @@ Bread is the free heal you can always count on and can upgrade. It is never the 
 | 9 | **The root wall:** the Tithe Roots as one authored floor; Tobin's father can't be carried out yet | Roots and light | Cut through |
 | 10 | **The Bell-Warden** (STORY 8.4) | All | Boss (paid retry, decision 25) |
 
-**Phase 1 builds floors 1-5 and the bank room, then floors 6-7 as rough greybox and a stand-in ending** (decision 28). The stand-in ending is a door on floor 7 that ends the dive as a success and brings the haul home, so "push on" can be played and measured. Phase 1 also needs one bankable item class that matters (a non-heirloom weapon drop, or attachments counted as bankable; *open*).
+**Phase 1 builds floors 1-5 and the bank room, then floors 6-7 as rough greybox and a stand-in ending** (decision 28). The stand-in ending is a door on floor 7 that ends the dive as a success and brings the haul home, so "push on" can be played and measured. Phase 1's bankable item class is **simple footwear** (user, 2026-11-03): a pair of worn boots that raises run speed by about 5%. *Proposal:* it is the first item of a small stat-gear slot, separate from outfits (STORY 3 keeps outfits cosmetic), one pair per player; chests on floors 2-7 can roll it, rarer before the bank and likelier past it, so pushing on pays. The bonus raises run and sprint speed only, never jump distance, so traversal gaps stay tuned.
 
 **The first session it should give** (the hook):
 1. The opening in Hollowmere (story session pending, decision 30) and Wren's list.
@@ -281,8 +281,11 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 ## 11. Open questions
 1. Is the tension right with time as the main stake? Check in the M7 walk, with the overlay's dive and floor times.
 2. Verify the crash check (section 4.6) in a Windows build.
-3. **The boss retry price** (decision 25): an item, gold, or a secret idol activated in the dungeon. *Recommendation:* the idol, hidden on one second-half floor with a tell, because it rewards exploring and skill rather than a full wallet; gold as the fallback when the idol wasn't found. Also open: does the floor-5 guardian (the Dough Warden) get the same paid retry?
-4. *Proposal, Dark Souls style:* when a dive fails, the lost haul waits as an echo on the floor depth where the party fell; the next dive that reaches that depth can pick it up once. It keeps "failure costs time" but gives the run back a goal. For the user to accept or drop.
+3. **The boss retry price** (decision 25; settled by the user 2026-11-03): a secret idol hidden on one second-half floor, with a tell, that the party activates; gold is the fallback when the idol wasn't found (a big gold purse mostly comes from many dives or many failures anyway). Still open: does the floor-5 guardian (the Dough Warden) get the same paid retry?
+4. **The lost-haul echo** (accepted by the user 2026-11-03; details *proposal*): when a dive fails, the unbanked haul waits on the floor depth where the party fell, and the next dive that reaches that depth can pick it up.
+   - *Proposal:* it comes back as **one lost satchel** that fills a single carry slot, so recovering it never overflows the inventory mid-dive. The satchel can't be opened in the dungeon except at the bank. At the bank the party unpacks what fits (inventory and bank slots) and leaves the rest in the satchel. The satchel comes home whole if the party goes home or finishes; it can't be banked itself, and failing again while carrying it loses it for good.
+   - Only one echo exists at a time: a new failure replaces the old echo.
+   - *Fallback* (the user's own rule, if the satchel proves fiddly): everything comes back loose, and a full inventory means choosing what to keep and what to leave.
 5. Red-team items still open: F6 (one bag per player instead of the host-held shared haul), F10 (catch-up for absent players' weapons). F2 is folded into section 4.5; F7 (validator checks every gimmick state) and room data v2 before room 13 stay as the previous session proposed.
 6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. Still open: a recap for absent recorded players, co-op-shaped town time, and bank slots that shrink per player in a 4-player party.
 7. The floor-5 second sleeper and the Warden's story reason: for the story session (decision 30).
