@@ -42,6 +42,11 @@ Success:
     - **variants as the dungeon's hard mode**: longer, with harder enemies and enemies from later dungeons once the player has met them there; variants unlock somewhat later in the game, not right away.
 16. **Residents who travel between towns** once they're awake (to shops, to see friends, for the day's tasks), then home again. It must be seamless and must never get in the player's way: no closed shop because its owner is out (the Stardew annoyance). Town-side, section 9.
 17. **Phase 1 ends at the halfway point** (the baker's rescue and the first bank). The end of Phase 1 includes a pass to refine everything built so far, so Phase 2 is smooth.
+18. **Water first, heat second (2026-11-03).** The Undercroft's floors 1-5 use water; the later floors use heat. The water starts bubbling on floors 4 and 5, foreshadowing the heat below.
+19. **Stir inputs** as in section 4.5: floors cleared plus unbanked valuables carried, square-root player scaling, rewards rising with stir.
+20. **Bread at the start of a dive** before the baker is rescued: 3 to 5 loaves, to be tuned.
+21. **Keep the crash saver**, with a cheap check that tells a real crash from a force-close (section 4.6).
+22. **The gimmick and tool table** (section 3.2) and **the root network** (3.3 item 5) are approved.
 
 ## 3. The Hearthdeep: one demon, six dungeons
 Each town's dungeon is a region of Mawrrow's dream digesting that town (STORY 2, 6).
@@ -56,14 +61,18 @@ Each town's dungeon is a region of Mawrrow's dream digesting that town (STORY 2,
 ### 3.2 Unique per dungeon (*proposal*; gimmick and tool names are placeholders)
 | Dungeon | Gimmick (one host-owned state, changed by a single interaction) | Shared tool it gives | Its own dive rule |
 |---|---|---|---|
-| Undercroft (Hollowmere) | Heat: dampers, ovens, flour dust; then water level in its lower half | Bellows | The baseline rules |
-| Drowned Arcade (Saltwake) | Tides that rise and fall on a cycle | Sluice hook | The tide is a second clock; some rooms exist only at low tide |
+| Undercroft (Hollowmere) | Water first: still water levels set by valves and sluices (floors 1-5, bubbling on 4-5); then heat: ovens, flues, dampers, flour dust (floors 6-9) | Sluice key (first half), bellows (second half) | The baseline rules |
+| Drowned Arcade (Saltwake) | Tides that rise and fall on a cycle | Tide bell (placeholder) | The tide is a second clock; some rooms exist only at low tide |
 | Glow Seams | Pressure and minecart routing | Blasting charge | Heat raises stir faster |
 | Hive Choir | Wax that hardens and melts; sweetness | Smoker | Sweetness lures enemies toward whoever carries the haul |
 | Orrery | Rotating rooms | Star key | The floor turns between dives |
 | Hearthdeep | All of the above | none | Fully authored, no generated floors (STORY 6) |
 
 Each dungeon also gets 3-4 enemy species born from what its town lost, its own music, and its own set-piece endings.
+
+Two cautions follow from putting water first in the Undercroft:
+- **Keep it apart from Saltwake.** Hollowmere's water is still, set by valves (plumbing). Saltwake's is tidal, moving on a cycle (time). That's why the sluice tool moved to Hollowmere and Saltwake's tool is now a placeholder.
+- **No teal in the Cellars** (PHASE1 P34). Flooded cellar floors read warm under lamplight; teal stays for the Cisterns' deeper water (`sc-water-look`).
 
 ### 3.3 How the dungeons connect
 1. **Tools work both ways across dungeons.**
@@ -121,7 +130,11 @@ Collapse timer (*proposal*): path time to the nearest bank point or boss stair, 
   - A **menu "abandon dive"** counts as a failure.
   - Quitting at the halfway bank is the normal save-and-quit.
 - If the game starts and finds a dive snapshot with no clean-exit marker, it offers **"resume at the start of floor N"**: gold kept, haul as it was at that floor's start.
-- Force-closing the game looks like a crash, and that's accepted (the project adds no anti-cheat). Menu quitting can't be used to cheese.
+- **Telling a crash from a force-close** (to verify in a Windows build):
+  1. Write the clean-exit marker in `Application.quitting`. That callback runs for a menu quit and also for closing the window or Alt-F4, which send a normal close request. All of those count as a quit: during a dive (outside the halfway bank), that is an abandon.
+  2. A real crash, or a process kill from Task Manager's Details tab, skips `Application.quitting`. To tell those two apart, the next launch checks whether the Unity player left crash evidence newer than the snapshot: a crash report folder or a crash marker in `Player-prev.log`. Crash evidence means resume; no evidence means the run is treated as abandoned.
+  3. A plain process kill can't be told from a crash with certainty. Treating it as abandoned is the fair default, since a real crash leaves evidence. Never block a resume because of a doubtful check, and log the decision for support.
+- Menu quitting can't be used to cheese.
 - Co-op: the host's snapshot is the dive's snapshot. Resuming after a host crash rebuilds the floor from the seed with whichever recorded players join. A client who crashed rejoins the running dive; mid-dive join is later work.
 
 ### 4.7 Co-op rules (*proposal*, from the research)
@@ -136,11 +149,12 @@ Collapse timer (*proposal*): path time to the nearest bank point or boss stair, 
 
 | Floor | What | Gimmick | Objective |
 |---|---|---|---|
-| 1 | **Authored teaching floor:** bellows, dampers, the key carrier; the oven glow seen through a grate; a sealed alcove with a sigil the player doesn't know yet | Heat | Key carrier (taught) |
-| 2-4 | Generated cellars (larders, wine vaults, coal cellars) | Heat | A different objective each floor (section 6) |
-| **5** | **Oven maze set piece:** route the heat through dampers to the sleeping baker; the Dough Warden. **Then the bank room (section 4.2).** | Heat exam | Rescue |
-| 6-7 | Generated cisterns; water level from one wheel per floor | Water | Varied |
-| 8 | **Feast hall set piece:** drain it in stages; the tally with four blank names (STORY 8.4) | Water exam | Story |
+| 1 | **Authored teaching floor:** the sluice key, a valve that raises and lowers a flooded cellar, the key carrier; a warm red glow seen through a drain grate; a sealed alcove with a sigil the player doesn't know yet | Water | Key carrier (taught) |
+| 2-3 | Generated cellars and cold rooms (larders, wine vaults, cisterns' upper channels) | Water | A different objective each floor (section 6) |
+| 4 | Generated; **the water starts bubbling**: steam vents, warm pools that hurt, the first hint of heat | Water, bubbling | Varied |
+| **5** | **Oven maze set piece:** the taken bakery is half flooded and the ovens are boiling it. Route the water (flood, drain, quench) to reach the sleeping baker; the Dough Warden. **Then the bank room (section 4.2).** | Water exam, heat foreshadowed | Rescue |
+| 6-7 | Generated coal cellars and flues, near the demon's breath; the bellows; dampers and ovens | Heat | Varied |
+| 8 | **Feast hall set piece:** the sunk feast laid out under braziers that never go out; work the dampers and flames to reach the tally with four blank names (STORY 8.4) | Heat exam | Story |
 | 9 | **The root wall:** the Tithe Roots as one authored floor; Tobin's father can't be carried out yet | Roots and light | Cut through |
 | 10 | **The Bell-Warden** (STORY 8.4) | All | Boss |
 
@@ -162,8 +176,8 @@ Built in this order from the host seed:
 1. **Bundle.** Sub-theme, light, roster subset and hazard flavour. Most of this exists; what's new is giving the bundle a name (for example "The Smoking Larder").
 2. **Objective.** Never the same type twice in a row:
    - key carrier (exists), now telegraphed;
-   - **damper seal:** two dampers in different rooms open the stair (the link between rooms that Chamber Dungeons lacked);
-   - **hold the hearth:** defend an oven while it heats;
+   - **two-valve seal** (water half) or **damper seal** (heat half): two controls in different rooms open the stair (the link between rooms that Chamber Dungeons lacked);
+   - **hold the pump** (water half) or **hold the hearth** (heat half): defend a point while it works;
    - **swarm:** clear every room.
 3. **Layout preset** (exists), then the rooms are placed.
 4. **Jobs for dead ends, farthest first:** vault (the locked room), mending spring (likelier when the party is hurt), challenge hall (offered when the party is healthy), stir altar. These give the existing special-room kinds real effects.
@@ -175,7 +189,7 @@ Built in this order from the host seed:
 
 ## 7. Rooms and encounters (*proposal*)
 - **Room card:** one idea, a teach/use/twist beat, a landmark, a loop around a central obstacle, and a cover foothold inside the door.
-- **Gimmick states:** each pool room has state A and state B (dampers open or shut, water up or down), so one room plays two ways.
+- **Gimmick states:** each pool room has state A and state B (water up or down in the first half; dampers open or shut in the second), so one room plays two ways.
 - **Pool size:** 12 combat rooms are enough for Phase 1. Grow to 20+ per gimmick half before a dungeon ships, adding dressing variants of existing geometry first.
 - **Encounters:**
   - one enemy type for a breather, two for a normal fight, three for a complex one;
@@ -207,7 +221,7 @@ Each later dungeon is longer than the Undercroft (for example 12-16 floors plus 
   - Each resident's routine is short: home, one task place, home.
 
 ## 10. Proposed amendments (not applied; for sign-off)
-- **STORY 8.4:** the Undercroft becomes 10 floors, as in section 5. Its story beats move: baker on floor 5, the tally on floor 8, Tobin's father on floor 9, the boss on floor 10.
+- **STORY 8.4:** the Undercroft becomes 10 floors, as in section 5. Its story beats move: baker on floor 5, the tally on floor 8, Tobin's father on floor 9, the boss on floor 10. The bands become water first (cellars and cisterns, floors 1-5), then heat (coal cellars, flues and the breath, floors 6-8), then the roots (floor 9). The band enemy lists are redistributed to match: drip-spirits and eels move up, and new heat creatures come in below.
 - **PHASE1 section 1 and P1:** Phase 1 ends at Undercroft floor 5 (the baker's rescue) and the bank room, followed by a refinement pass.
 - **PHASE1 7.2 and P19:** "floors stay cleared" becomes "fresh floors every dive; found pieces and people stay found". Pieces use Atla-style assignment (section 4.4).
 - **PHASE1 7.2 and P20:** the checkpoint after floor 2 and the floor-4 bank point are replaced by the single halfway bank with slots (section 4.2). The failure rule becomes section 4.3.
@@ -221,17 +235,15 @@ Each later dungeon is longer than the Undercroft (for example 12-16 floors plus 
   - generator (an authored floor 1, floor 5 as the set piece).
 
 ## 11. Open questions
-1. Stir inputs now that pieces are safe (section 4.5): is "unbanked valuables carried" right?
-2. Is the tension enough now that only loot and half the dive gold are at risk? Check in the M7 walk.
-3. The crash saver as written (section 4.6), or skip it.
-4. How much bread a dive starts with before the baker is rescued.
-5. The gimmick and tool table (section 3.2) and the root network (3.3 item 5).
+1. Is the tension enough now that only loot and half the dive gold are at risk? Check in the M7 walk.
+2. Verify the crash check (section 4.6) in a Windows build.
+3. The adversarial review (2026-11-03) may add more here.
 
 ## 12. Phase 1 build order (after sign-off)
 1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style.
 2. Floor map; co-op locks and the gather-to-leave stair.
-3. Authored floor 1; floor 5 rebuilt as the damper-puzzle set piece.
-4. Objective variety (damper seal, hold the hearth) and the named floor card with two modifiers.
-5. The heat gimmick on the 12 rooms; encounter templates; music stems.
+3. Authored floor 1; floor 5 rebuilt as the flooded oven maze set piece.
+4. Objective variety (two-valve seal, hold the pump) and the named floor card with two modifiers.
+5. The water gimmick on the 12 rooms (bubbling variants for floor 4); encounter templates; music stems.
 6. Jobs for dead ends; collapse fairness; the crash saver if it stays simple.
 7. Refinement pass (decision 17).
