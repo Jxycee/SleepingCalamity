@@ -109,7 +109,7 @@ Each chapter has a town to rebuild, a dungeon to dive, a boss, a hero's arc, and
    - Dungeon: **the Drowned Arcade**, flooded streets, sunken warehouses and kelp-hung piers.
    - Boss: the lighthouse keeper's lamp, grown into a deep-sea lure.
    - Arc: Pip.
-   - Truth: Saltwake's ledgers show the tithe growing year by year, and the elders' cheating. The Gleaners first appear here.
+   - Truth: Saltwake's ledgers show the tithe growing year by year, and the elders' cheating. The heroes first learn who the Gleaners are and where they come from.
    - Fishing opens here.
 3. **Cinderholt**: a mining town in red cliffs, its furnaces cold.
    - Dungeon: **the Glow Seams**, mines and foundries near the demon's heat.
@@ -162,22 +162,30 @@ Rebuilding happens in three rings, and Undercroft progress opens each one.
 
 Each resident states their wishes plainly. Meeting a resident's wishes opens their service, their story and their gifts.
 
-### 8.4 The Undercroft *(draft: floor counts to fit the Phase 1 plan)*
-The cellars and roots beneath Hollowmere, half digested by the demon's dream: wine vaults, cisterns, bakers' cold rooms and coal cellars, knotted together and lit by the warm red glow of Mawrrow's breath coming up from below.
+### 8.4 The Undercroft (amended 2026-11-03, dungeon design spec)
+The cellars, cisterns and roots beneath Hollowmere, half digested by the demon's dream: larders, wine vaults, cisterns, the drowned bakery and coal cellars, knotted together and lit by the warm red glow of Mawrrow's breath coming up from below. The way in is the trapdoor in the church cellar (8.2).
 
-It has three floor bands, about 12 floors in all, plus a boss floor.
+Ten floors, shorter than every later dungeon, in two halves around one bank: **water first** (still water set by valves and sluices; it starts bubbling on floors 4-5), **then heat**. Floors 2, 4, 6 and 7 are generated fresh every dive; the others are authored.
 
-| Band | Floors | Theme | Enemies | Set-piece |
-|---|---|---|---|---|
-| The Cellars | 1-4 | Barrel vaults, larders, coal chutes; warm lamplight | Pantry nightmares: jam-jar slimes, rat-kings, a broom that sweeps | Floor 4: the taken bakery, a maze of ovens; the baker sleeps at its heart |
-| The Cisterns | 5-8 | Flooded brick channels, sluices, echoing domes; teal light | Drip-spirits, eels in the dark water, lantern-moths | Floor 8: the feast tables, sunk and laid for the dead; the tally of who ate |
-| The Tithe Roots | 9-12 | The old tithe ramp; roots and grain-ropes grown through crypts and foundations; amber glow | Root-crawlers, the first Gleaners, nightmare hounds | Floor 12: the root wall the heroes must cut through to reach the boss |
-| Boss | 13 | The bell chamber beneath the tower | **The Bell-Warden** | Its tolling slows time; the heroes fight between the rings |
+| Floor | What | Enemies | Story |
+|---|---|---|---|
+| 1 | Authored teaching floor: the sluice key, a flooding cellar, the key carrier, a red glow through a drain grate, a sealed alcove with a sigil | Pantry nightmares: jam-jar slimes, rat-kings, a broom that sweeps (demon-made, section 4) | |
+| 2 | Larders and cold rooms | Pantry nightmares | |
+| 3 | **The drowned bakery:** flooded and cold, its ovens drowned | Pantry nightmares | **The baker** (Hollis Rye, placeholder), the first person carried home |
+| 4 | Wine vaults and upper cistern channels; the water starts bubbling | Pantry nightmares, drip-spirits, eels in the dark water | |
+| 5 | **The cistern dome**, boiled from below by **the Brazen Ox**: the tithe-cart oxen remade as a hollow brass demon with a fire in its belly. Then the halfway bank | Lantern-moths, eels; the Brazen Ox | **The innkeeper** (Marta Fenn, placeholder), who cooked the Tithe Feast |
+| 6-7 | Coal cellars and flues near the demon's breath; dampers and ovens | New heat creatures (to design) | |
+| 8 | **The feast hall:** the sunk feast under braziers that never go out | Heat creatures | The tally lists every name in Hollowmere, with four left blank: the heroes were never counted, and that is why Mawrrow couldn't take them |
+| 9 | **The root wall:** the Tithe Roots grown through crypts and foundations | Root-crawlers, nightmare hounds, the Gleaners hunting | Tobin's father is the first sleeper the heroes can't yet carry out; he is rescued after the boss |
+| 10 | **The bell chamber** beneath the church tower | **The Bell-Warden**: its tolling slows time; the heroes fight between the rings | |
+
+The Gleaners, the demon's servants, can turn up on any floor once the stir runs high; floor 9 is where they first hunt the heroes in earnest.
 
 **Story beats**
-- **Floor 4:** the first person carried home, the baker.
-- **Floor 8:** the feast tally lists every name in Hollowmere, with four names left blank. The heroes learn they were never counted, and that this is why Mawrrow couldn't take them.
-- **Floor 12:** Tobin's father is the first sleeper the heroes can't yet carry out. He is rescued after the boss.
+- **Floor 3:** the first person carried home, the baker. His bread replaces the survivors' poor bread.
+- **Floor 5:** the innkeeper comes home; cooking opens in town.
+- **Floor 8:** the feast tally and the four blank names.
+- **Floor 9:** Tobin's father, out of reach until the boss falls.
 - **After the boss:** the bell comes home. When it rings over Hollowmere, the whole Vale shakes: Mawrrow's first great stirring in ten years (the cat's waking was only a turn in its sleep, section 8.5), and somewhere a man who should be dead opens his eyes.
 
 ### 8.5 The opening (user, 2026-11-03)
@@ -193,4 +201,5 @@ About 8-10 minutes, playable where marked.
 
 ## 9. Change log
 - 2026-10-29: locked (user). Claude kept the survivors on the road between towns (2.); see decisions-for-review.
-- 2026-11-03 (user, story session): the opening (new 8.5): the lanterns going out, Wren's lantern staying lit, Wren's cat and her mother's necklace, Wren's magic, the cat's waking as the first small stir, the storm and the church trapdoor with her mother's wards. All buildings were wiped; the four rebuilt Wren's house first, then their own houses, shabby until a builder is woken (8.2). The church and the bell tower are one building; its cellar trapdoor is the Undercroft entrance and the tithe gate becomes the post-boss shortcut. The bell is the first great stir (8.4). The nightmares look demon-made (4). Names for the cat, the baker and the innkeeper are placeholders (Tuppence, Hollis Rye, Marta Fenn). Floor 5's guardian is the Brazen Ox (the tithe-cart oxen as a hollow brass demon) and its sleeper the innkeeper, who cooked the feast; both go into 8.4 with the floor-plan amendment. The Undercroft floor plan (8.4) is still waiting on the dungeon spec's amendment (`docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` section 10).
+- 2026-11-03 (user, story session): the opening (new 8.5): the lanterns going out, Wren's lantern staying lit, Wren's cat and her mother's necklace, Wren's magic, the cat's waking as the first small stir, the storm and the church trapdoor with her mother's wards. All buildings were wiped; the four rebuilt Wren's house first, then their own houses, shabby until a builder is woken (8.2). The church and the bell tower are one building; its cellar trapdoor is the Undercroft entrance and the tithe gate becomes the post-boss shortcut. The bell is the first great stir (8.4). The nightmares look demon-made (4). Names for the cat, the baker and the innkeeper are placeholders (Tuppence, Hollis Rye, Marta Fenn). Floor 5's guardian is the Brazen Ox (the tithe-cart oxen as a hollow brass demon) and its sleeper the innkeeper, who cooked the feast; both are in 8.4. The Undercroft floor plan (8.4) is still waiting on the dungeon spec's amendment (`docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` section 10).
+- 2026-11-03 (user sign-off of the dungeon design spec): 8.4 rewritten as the 10-floor Undercroft (water first, then heat; baker on floor 3, the Brazen Ox and the innkeeper on floor 5, the tally on 8, Tobin's father on 9, the Bell-Warden on 10). The Gleaners can hunt in any dungeon once the stir runs high, so Saltwake (6) becomes where the heroes learn who they are rather than where they first appear.

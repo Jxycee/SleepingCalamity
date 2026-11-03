@@ -1,6 +1,6 @@
 # Hearthdeep dungeons: design (2026-11-03)
 
-Status: **DRAFT.** The user's decisions (section 2) are settled; decisions 23-30 (2026-11-03, the user's answers to the red-team review) replace older wording where they conflict. Everything marked *proposal* waits for the user's sign-off, and so do the PHASE1 and STORY amendments in section 10, which are listed but **not applied**.
+Status: **SIGNED OFF (user, 2026-11-03).** Section 10's amendments are applied to `docs/PHASE1.md` and `docs/STORY.md`. Previously: DRAFT. The user's decisions (section 2) are settled; decisions 23-30 (2026-11-03, the user's answers to the red-team review) replace older wording where they conflict. Everything marked *proposal* waits for the user's sign-off, and so do the PHASE1 and STORY amendments in section 10, which are listed but **not applied**.
 
 Research behind this: `docs/research/dungeon-design-deep-dive.md` and its notes in `docs/research/dungeon-deep-dive/`. Design session in the cloud, 2026-11-02 to 11-03.
 
@@ -307,7 +307,7 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
   - Most travel happens while the party is diving. Back in town, the player sees what changed (gossip, things bought, a visit paid).
   - Each resident's routine is short: home, one task place, home.
 
-## 10. Proposed amendments (not applied; for sign-off)
+## 10. Amendments (applied 2026-11-03)
 - **STORY 8.4:** the Undercroft becomes 10 floors, as in section 5. Its story beats move: baker on floor 3 (the drowned bakery), the Brazen Ox and the innkeeper on floor 5, the tally on floor 8, Tobin's father on floor 9, the boss on floor 10. The bands become water first (cellars and cisterns, floors 1-5), then heat (coal cellars, flues and the breath, floors 6-8), then the roots (floor 9). The band enemy lists are redistributed to match: drip-spirits and eels move up, and new heat creatures come in below.
 - **PHASE1 section 1 and P1:** Phase 1 ends at the Undercroft's halfway bank (floor 5), plus floors 6-7 in rough greybox and a stand-in ending (decision 28), followed by a refinement pass.
 - **PHASE1 7.2 and P19:** "floors stay cleared" becomes "fresh floors every dive; found pieces and people stay found". Pieces use Atla-style assignment (section 4.4).
@@ -334,7 +334,7 @@ Each later dungeon targets the same time per half as the Undercroft (decision 29
 6. Co-op fit (`docs/research/dungeon-deep-dive/11-coop-fit-and-dive-flow.md`, 2026-11-03): the time target per half (decision 29) and the stair suspend (decision 24) answer most of it. The recap (decision 41), map pings (42) and town permissions (43) are settled. Still open: bank slots that shrink per player in a 4-player party.
 7. The story session's floor-5 questions are settled (decisions 46-47). Names are placeholders until the user renames them.
 
-## 12. Phase 1 build order (after sign-off)
+## 12. Phase 1 build order
 1. Dive rules: start at the entrance, the halfway bank room with slots and the save, the failure rule, pieces Atla-style, the stair suspend, the paid boss retry, the one-time checkpoint, the lost satchel, the bread ladder.
 2. Floor map; co-op locks and the gather-to-leave stair.
 3. Authored floor 1; floor 3 as the drowned bakery set piece; floor 5 as the halfway set piece with the Brazen Ox and the innkeeper; floors 6-7 in rough greybox and the stand-in ending.
