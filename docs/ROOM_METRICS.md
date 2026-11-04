@@ -17,7 +17,7 @@ One page. Read it before you author a room. The table at the end is generated fr
 - Doors stay on level 0.
 
 ## Height
-- One level is 2 m. A level up is a wall to a jumping hero, so it needs a stair.
+- One level is 2 m. A level up is a wall to a jumping hero, so it needs a stair. The highest ledge a running jump climbs is 1.5 m, measured with the real controller (`HeroClimbMetricsTests`; the table's 1.6 m is the jump-plus-step bound).
 - A stair is one cell: 10 steps, each 20 cm up and 40 cm deep.
 - A balcony is a lobber's dais. Reach it by the stair, or leave it for the gimmick.
 - The validator allows levels 0 and 1 for now.
