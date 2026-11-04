@@ -74,6 +74,14 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Throws<ArgumentException>(() => RoomDataV2.Author(Grid3(), new[] { "0x0", "000", "000" }, null, w, null, null, null, RoomAffordance.None));   // unknown character
         }
 
+        [Test] public void Author_ThrowsOnBadRegionLetters()
+        {
+            var a = new GimmickRegion("a", 'x', GimmickKind.Water, 0, 80); var b = new GimmickRegion("b", 'x', GimmickKind.Heat, 0, 1);
+            Assert.Throws<ArgumentException>(() => RoomDataV2.Author(Grid3(), null, null, new[] { a, b }, null, null, null, RoomAffordance.None));   // repeated letter
+            var dot = new GimmickRegion("d", '.', GimmickKind.Water, 0, 80);
+            Assert.Throws<ArgumentException>(() => RoomDataV2.Author(Grid3(), null, null, new[] { dot }, null, null, null, RoomAffordance.None));      // '.' means "no region"
+        }
+
         [Test] public void Affordances_AreDerived()
         {
             RoomDataV2 hand = RoomDataV2.Author(Grid3(), new[] { "001", "000", "000" }, new[] { ".ww", "...", "..." }, new[] { Water(0, 80) }, null, null, null, RoomAffordance.HighCeiling);

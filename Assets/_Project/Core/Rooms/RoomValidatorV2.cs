@@ -111,9 +111,12 @@ namespace SleepingCalamity.Core
                 if (toolMarks.TryGetValue((t.X, t.Y), out string other) && other != "tool socket " + t.Id) Err(at + " shares its cell with a " + other);
                 if (t.Purpose == SocketPurpose.Control && (t.Region == null || room.RegionIndex(t.Region) < 0)) Err(at + " is a control for region '" + t.Region + "', which this room does not have");
                 var (bx, by) = CellarRoom.Step(CellarRoom.Opposite(t.Facing)); bx += t.X; by += t.Y;
-                bool wall = b.InBounds(bx, by) ? b.CellAt(bx, by) != CellKind.Floor : !b.Doors.Any(d => d.X == t.X && d.Y == t.Y && d.Side == CellarRoom.Opposite(t.Facing));
+                bool wall = !b.InBounds(bx, by) || b.CellAt(bx, by) != CellKind.Floor;   // a door on that cell was already reported as a shared cell
                 if (!wall) Err(at + " has no wall behind it");
             }
+
+            // rules 6-9 index state values; stop here when a region's state count (or the region count) is outside what rule 3 allows
+            if (room.Regions.Count > MaxRegions || room.Regions.Any(r => r.StateCount < MinRegionStates || r.StateCount > MaxRegionStates)) return errs;
 
             int states = StateCount(room);
             var vectors = new int[states][];
