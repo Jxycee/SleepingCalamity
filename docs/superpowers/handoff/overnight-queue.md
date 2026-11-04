@@ -4,7 +4,7 @@ The coordinator hands these out when the user is away (user, 2026-11-03: "keep l
 
 ## Running now
 - Plan 2 per-player loot: MERGED `ee9435ef`.
-- Story (session `story-bible`, started 2026-11-03 night): the book in chapters (`docs/story/book/`, any length, the user reads and annotates it like a novel) plus the game-facing bible draft (`docs/superpowers/specs/2026-11-04-story-bible-draft.md`) for sign-off. Tone: Abercrombie's *The Devils* maturity, Dark Cloud 1 engagement. What the game doesn't use becomes lore and reference.
+- Story: MERGED `7490abe0` (book 7 chapters + bible draft; waits on the user's read and sign-off). Was: the book in chapters (`docs/story/book/`, any length, the user reads and annotates it like a novel) plus the game-facing bible draft (`docs/superpowers/specs/2026-11-04-story-bible-draft.md`) for sign-off. Tone: Abercrombie's *The Devils* maturity, Dark Cloud 1 engagement. What the game doesn't use becomes lore and reference.
 - Town art junctions pass: MERGED `a421ceb3`; wide join survey deferred.
 
 ## Next (take from the top)
