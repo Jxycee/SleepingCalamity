@@ -130,7 +130,7 @@ Target length (decision 29, *proposal* for the numbers): about 40-50 minutes fro
 ### 4.2 The bank room (halfway)
 Steps, in order:
 1. The party rests: full heal.
-2. Each player assigns their bank slots (section 2, decision 5) from the shared haul.
+2. Each player assigns their bank slots (section 2, decision 5) from their own bag (decision 39).
 3. The party chooses: **go home** (everything carried comes home and the dive ends) or **push on**.
 4. If they push on, the bank is locked and the game saves (decision 6). That save is the save-and-quit point.
 
@@ -160,7 +160,7 @@ Time is the main stake, on purpose (decision 23): a wipe sends the party back to
 - It turns back into the real items when it leaves the dungeon: going home from the bank, finishing the dive, or banked in a slot. It is emptied in town, into town storage or at a spot in the heroes' home (decision 35), so a full inventory never forces a choice.
 - It can be put in a bank slot like any other bankable item (decision 34): one slot for the whole satchel, against banking something new.
 - Failing again while carrying it loses it for good, and the new failure leaves its own satchel. Only one satchel exists at a time; a new one replaces an unrecovered old one.
-- Co-op: the satchel belongs to the party's shared haul (open with F6).
+- Co-op: each player has their own satchel (decision 39, section 4.7); it is theirs to open (F6).
 
 ### 4.4 Pieces and people (Dark Cloud style)
 - When the world is created, each of a dungeon's pieces and people is assigned to a fixed floor, or to a random floor in the first or second half of the dungeon. The assignment is stored in the world save, the way DC1 does it (`dc1-rea.md`, Atla).

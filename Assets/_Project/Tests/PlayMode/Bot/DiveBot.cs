@@ -247,10 +247,10 @@ namespace SleepingCalamity.Tests.PlayMode
             bool stateOk = s.Seed == l.Seed && s.Floor == l.Floor;
             if (stateOk && s.GateKey == 1) list.Add(new Target { Goal = Goal.GateKey, Pos = s.GateKeyPos, Range = CellarContentsSync.GateKeyRange, Name = "gate key" });
             int opened = 0;
-            if (stateOk) for (ulong m = s.Chests; m != 0; m &= m - 1) opened++;
+            if (stateOk) for (int i = 0; i < l.Chests.Count; i++) if (c.ChestOpenForLocal(i)) opened++;   // per player: a loot chest is open once THIS player (the bot) opened it (plan 2 task 6)
             for (int i = 0; i < l.Chests.Count; i++)
             {
-                bool open = stateOk && (s.Chests & (1UL << i)) != 0;
+                bool open = stateOk && c.ChestOpenForLocal(i);
                 if (open) continue;
                 bool locked = l.HasLockedRoom && l.Chests[i].RoomIndex == l.LockedRoomIndex;
                 if (locked && !(stateOk && s.DoorOpen)) continue;
@@ -300,7 +300,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 case Goal.Kill: return s.GateKey != 0 || s.ExitUnlocked;
                 case Goal.Heal: return _vitals.Hp >= _vitals.MaxHp * 0.9f;
-                case Goal.Chest: return (s.Chests & (1UL << t.Index)) != 0;
+                case Goal.Chest: return c != null && c.ChestOpenForLocal(t.Index);
                 case Goal.GateKey: return s.GateKey != 1;
                 case Goal.Door: return s.DoorOpen;
                 case Goal.Piece: return c == null || !c.PieceVisible(t.Index);
@@ -338,14 +338,14 @@ namespace SleepingCalamity.Tests.PlayMode
                     Press(t, () => { if (!Done(t)) { Note("Interact", $"held the room key, pressed interact at the locked door ({Flat(t.Pos - _hero.position).magnitude:0.0} m) and it stayed shut"); GiveUp(t); } });
                     return;
                 case Goal.Bank:
-                    int before = d.HaulSync != null ? d.HaulSync.Current.BankedPieces : 0, unbanked = d.HaulSync != null ? d.HaulSync.Current.UnbankedPieces : 0;
+                    bool wasSpent = d.HaulSync != null && d.HaulSync.Current.BankSpent;   // pieces are safe on pickup (plan 2): a bank press shows up as the bank point being used up
                     if (d.Prompt != DiveDirector.PromptKind.Bank) { Note("Prompt", $"standing {Flat(t.Pos - _hero.position).magnitude:0.0} m from the {t.Name} but the prompt is '{d.Prompt}' ('{d.PromptText}')"); }
                     Press(t, () =>
                     {
-                        int after = d.HaulSync != null ? d.HaulSync.Current.BankedPieces : 0;
-                        bool ok = after > before || unbanked == 0 && d.Prompt != DiveDirector.PromptKind.Bank;
+                        bool spent = d.HaulSync != null && d.HaulSync.Current.BankSpent;
+                        bool ok = spent || wasSpent || d.Prompt != DiveDirector.PromptKind.Bank;
                         if (Floor == DiveState.HeartFloor) { HeartBanked = d.NetHeartBanked.Value; if (!HeartBanked) Note("Interact", "pressed interact at the heart bank and the heart isn't banked"); }
-                        else if (!ok) Note("Interact", $"pressed interact at the checkpoint with {unbanked} unbanked pieces and nothing was banked");
+                        else if (!ok) Note("Interact", "pressed interact at the checkpoint and the bank point was not used");
                         _bankedOn.Add(Floor);
                     });
                     return;

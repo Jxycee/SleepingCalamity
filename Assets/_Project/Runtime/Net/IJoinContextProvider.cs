@@ -9,5 +9,6 @@ namespace SleepingCalamity.Runtime
         bool JoinsOpen { get; }
         void GetRoster(List<RosterEntry> into);   // clears `into`, then adds every slot (connected or not)
         bool TryGetKey(ulong clientId, out PlayerKey key);
+        bool TryGetSlot(ulong clientId, out byte slot);   // the roster slot of a connected client
     }
 }

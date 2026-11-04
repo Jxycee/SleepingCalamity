@@ -91,6 +91,7 @@ namespace SleepingCalamity.EditorTools
                 BuilderUtil.GetOrAdd<HeroNetState>(root);
                 BuilderUtil.GetOrAdd<HeroVitals>(root);      // M3: host-held HP and the downed state
                 BuilderUtil.GetOrAdd<HeroCombat>(root);      // M3: the owner's attack controller and the hit flow (on every peer, acts on the owner)
+                BuilderUtil.GetOrAdd<PlayerBagSync>(root);   // plan 2: host-written, owner-only view of this player's loot bag (pick requests by RPC)
                 BuilderUtil.GetOrAdd<HeroLocomotion>(root).enabled = false;
                 BuilderUtil.GetOrAdd<TargetLockController>(root).enabled = false;
                 BuilderUtil.GetOrAdd<HeroAnimationFeeder>(root);

@@ -93,7 +93,7 @@ namespace SleepingCalamity.Presentation
                     GUILayout.Label("Stir: " + _sum.StirValue + "/100   extra enemies per room: " + _sum.ExtraEnemiesPerRoom
                         + (_sum.HunterLatched ? "   hunter" : "") + (_sum.DeepSecondsLeft > 0 ? "   deep closes in " + _sum.DeepSecondsLeft + "s" : ""));
                     GUILayout.Label("Floor: " + _sum.CurrentFloor);
-                    GUILayout.Label("Pieces: banked " + _sum.BankedPieces + ", carried (unbanked) " + _sum.UnbankedPieces);
+                    GUILayout.Label("Pieces: found " + _sum.FoundPieces + " this dive, home " + _sum.BankedPieces);   // safe on pickup and in the town stock at once (plan 2 task 4)
                 }
                 GUILayout.Label("Players: " + _players);
                 GUILayout.Label("Room clear times (this floor)" + (_hooked != null ? ", from first spawn" : ", from floor entry"));

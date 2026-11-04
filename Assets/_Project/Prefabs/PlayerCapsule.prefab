@@ -52,6 +52,7 @@ GameObject:
   - component: {fileID: 8313695930635833332}
   - component: {fileID: 2873352655021868268}
   - component: {fileID: 8025425756674670403}
+  - component: {fileID: 4635769129455872970}
   m_Layer: 6
   m_Name: PlayerCapsule
   m_TagString: Untagged
@@ -313,6 +314,19 @@ MonoBehaviour:
     rotation: {x: -0.7071061, y: 0.70710737, z: -0.00000016858739, w: 0.00000029502795}
     position: {x: 0.00000032040555, y: 0.12000013, z: -0.099999964}
     valid: 1
+--- !u!114 &4635769129455872970
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2483212395992155055}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc763050f30445342b6ca3fc68cd1ddb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SleepingCalamity.Presentation::SleepingCalamity.Presentation.PlayerBagSync
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &8256300386794387276
 GameObject:
   m_ObjectHideFlags: 0

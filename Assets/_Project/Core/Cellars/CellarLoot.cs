@@ -75,6 +75,31 @@ namespace SleepingCalamity.Core
             return Items[0].Id;
         }
 
+        // One player's copy of a loot chest (spec decision 39; never for the key chest): the category band is the chest's, the same for every player,
+        // but the rank draw and the item pick come from a stream of their own per player slot (0-3), so no other stream moves.
+        public static int RollFor(uint seed, int floor, int chestIndex, int playerSlot)
+        {
+            if (playerSlot < 0 || playerSlot > 3) throw new System.ArgumentOutOfRangeException(nameof(playerSlot), playerSlot, "player slot 0-3");
+            var rng = new Pcg32(Rng.Derive(seed, "cellars.loot.player", ((ulong)floor << 32) | ((ulong)(uint)chestIndex << 2) | (uint)playerSlot));
+            LootCategory cat = CellarLootMix.CategoryFor(seed, floor, chestIndex, CellarLootMix.KeyFlagsOfDive(seed, floor));
+            int lo = CellarLootMixTuning.BandLo[(int)cat], hi = CellarLootMixTuning.BandHi[(int)cat];
+            int drawn = DrawRank(ref rng, floor);
+            int rank = drawn < lo ? lo : drawn > hi ? hi : drawn;
+            int n = 0; foreach (LootItem i in Items) if (i.Rank == rank) n++;
+            int pick = rng.Range(0, n);
+            foreach (LootItem i in Items) if (i.Rank == rank && pick-- == 0) return i.Id;
+            return Items[0].Id;
+        }
+
+        // 0 for an unknown id or a key.
         public static int RankOf(int id) { foreach (LootItem i in Items) if (i.Id == id) return i.Rank; return 0; }
+
+        // What a loot id is for the bag and the bank (placeholder: every table item is Large; keys are Keys; an unknown id is Usable).
+        public static DiveItemKind KindOf(int itemId)
+        {
+            if (itemId == RoomKeyId || itemId == GateKeyId) return DiveItemKind.Key;
+            foreach (LootItem i in Items) if (i.Id == itemId) return DiveItemKind.Large;
+            return DiveItemKind.Usable;
+        }
     }
 }

@@ -21,7 +21,19 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(StirMeterText.Labels(s).Count, Is.EqualTo(2));
         }
 
-        [Test] public void Pieces_Text() => Assert.AreEqual("Pieces: 3 unbanked / 2 banked", StirMeterText.Pieces(new DiveHaulSync.Summary { UnbankedPieces = 3, BankedPieces = 2 }));
+        // The HUD line of the local player's own bag: carried count, items safe this dive, and gold = home gold + this dive's gold.
+        [Test]
+        public void Bag_LineShowsCarriedSafeAndGold()
+        {
+            var v = new BagView { Gold = 5, DiveGold = 7, BankedThisDive = 2 };
+            v.Carried.Add(101); v.Carried.Add(104); v.Carried.Add(110);
+            Assert.AreEqual("Bag: 3 carried, 2 safe, 12 gold", StirMeterText.Bag(v));
+            Assert.AreEqual("Bag: 0 carried, 0 safe, 0 gold", StirMeterText.Bag(default));
+        }
+
+        // Pieces are safe on pickup and go to the town stock at once (per-player loot plan task 4): the line says how many this dive found and how many are home.
+        [Test] public void Pieces_Text() => Assert.AreEqual("Pieces: 1 found this dive, 3 home", StirMeterText.Pieces(new DiveHaulSync.Summary { FoundPieces = 1, BankedPieces = 3 }));
+        [Test] public void Pieces_TextWithNothingFoundYet() => Assert.AreEqual("Pieces: 0 found this dive, 2 home", StirMeterText.Pieces(new DiveHaulSync.Summary { BankedPieces = 2 }));
 
         [Test]
         public void PiecesLeftHere_FollowsTheCurrentFloor()

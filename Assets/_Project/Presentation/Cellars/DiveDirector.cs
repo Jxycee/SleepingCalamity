@@ -66,7 +66,7 @@ namespace SleepingCalamity.Presentation
         public event System.Action<DiveEndReason> DiveEnded;
         public int RequestsHandled { get; private set; }            // host: RPCs received, accepted or refused (a test waits for refusals to land)
 
-        // M6 S3, host only: the town's stock, held in memory (no save yet: S2). Created on first use from the Hollowmere layout. StockReceived(newPieces) fires when a dive end moved the banked haul in.
+        // M6 S3, host only: the town's stock, held in memory (no save yet: S2). Created on first use from the Hollowmere layout. A piece goes into the stock the moment it is picked up (HaulSync.PieceAdded); StockReceived(newPieces) fires at a dive end only for what that end moved in (pieces not stocked yet, plus the heart-bank rescue), so it is often 0 or not raised.
         public TownStock Town => _town ?? (_town = new TownStock(HollowmereLayout.Create()));
         public event System.Action<int> StockReceived;
         private TownStock _town;
@@ -195,6 +195,7 @@ namespace SleepingCalamity.Presentation
             if (floor < DiveRoute.FirstFloor || floor > DiveRoute.LastFloor) return false;
             _clearAt = -1f; _openedStairs.Clear();
             _heartBanked = false; NetHeartBanked.Value = false;
+            HaulSync.DiveSeed = _seed;   // the 3-player extra bank slot owner is picked from it when a bank floor opens its visits
             HaulSync.ServerSetFloor(floor);
             RefreshStairOpen(floor);
             FloorSync.ServerSetFloor(_seed, floor);
@@ -250,7 +251,7 @@ namespace SleepingCalamity.Presentation
             return EndDive(DiveEndReason.WentHome);
         }
 
-        // Host: the debug "abandon dive" (F8): the dive fails exactly like the stir countdown running out (unbanked pieces go back to their floors), the party goes home.
+        // Host: the debug "abandon dive" (F8): the dive fails exactly like the stir countdown running out (every bag fails; collected pieces stay safe), the party goes home.
         public bool ServerAbandonDive()
         {
             if (!IsServer || !IsSpawned || !NetActive.Value || HaulSync == null) return false;
@@ -324,6 +325,14 @@ namespace SleepingCalamity.Presentation
 
         private void OnDiveFailed() { if (NetActive.Value) EndDive(DiveEndReason.Failed); }
 
+        // Host: a piece is safe the moment it is picked up (spec 4.4), so it goes into the town stock at once, not at the dive's end. The baker (heart) still comes home with the party
+        // at EndDive. Receive is idempotent (State.AddPiece refuses a piece already stocked), so the EndDive receive stays.
+        private void OnPieceAdded(int pieceId)
+        {
+            if (!IsServer || HaulSync == null || HaulSync.HostState == null) return;
+            Town.Receive(HaulSync.HostState.Haul, false);
+        }
+
         private bool EnsureSyncs()
         {
             if (FloorSync != null && HaulSync != null && ContentsSync != null) return true;
@@ -338,6 +347,7 @@ namespace SleepingCalamity.Presentation
                 HaulSync.FloorSync = FloorSync;
                 HaulSync.Banked += OnBanked;
                 HaulSync.DiveFailed += OnDiveFailed;
+                HaulSync.PieceAdded += OnPieceAdded;
             }
             // Contents hook: the host-authoritative floor contents (chests, enemies, gate key). The director arms it per built floor and opens the stair on its ExitUnlocked.
             if (ContentsSync == null && contentsPrefab != null)
@@ -668,7 +678,7 @@ namespace SleepingCalamity.Presentation
             }
             if (TownSync != null && IsServer && TownSync.IsSpawned) TownSync.NetworkObject.Despawn(true);
             TownSync = null;
-            if (HaulSync != null) { HaulSync.Banked -= OnBanked; HaulSync.DiveFailed -= OnDiveFailed; }
+            if (HaulSync != null) { HaulSync.Banked -= OnBanked; HaulSync.DiveFailed -= OnDiveFailed; HaulSync.PieceAdded -= OnPieceAdded; }
             if (ContentsSync != null) ContentsSync.ExitUnlocked -= ServerOpenStair;
             FloorSync = null; HaulSync = null; ContentsSync = null; _haulBegun = false; _armedBuild = -1;   // a re-spawn re-creates and re-wires the syncs (EnsureSyncs)
             _hasPending = false; _placed.Clear(); _appliedFloor = 0; _appliedSeed = 0u;

@@ -10,17 +10,19 @@ namespace SleepingCalamity.Tests.EditMode
         static DiveHaul Haul() => new DiveHaul(new[] { 2, 2, 2 });
 
         [Test]
-        public void Receive_MovesBankedPiecesToStock_AndLeavesUnbankedAlone()
+        public void Receive_MovesEveryPickedUpPieceToStock_AtOnce()
         {
             var stock = new TownStock(HollowmereLayout.Create());
             DiveHaul haul = Haul();
             haul.AddPiece(DiveHaul.PieceId(1, 0)); haul.AddPiece(DiveHaul.PieceId(1, 1));
-            haul.Bank();
-            haul.AddPiece(DiveHaul.PieceId(2, 0));   // carried, not banked
-            Assert.That(stock.Receive(haul, bakerRescued: false), Is.EqualTo(2));
+            Assert.That(stock.Receive(haul, bakerRescued: false), Is.EqualTo(2), "no bank press needed: a piece is safe on pickup");
+            haul.AddPiece(DiveHaul.PieceId(2, 0));
+            Assert.That(stock.Receive(haul, bakerRescued: false), Is.EqualTo(1), "only the new one arrives");
+            haul.FailDive();
+            Assert.That(stock.Receive(haul, bakerRescued: false), Is.EqualTo(0), "a failed dive keeps the pieces and moves nothing twice");
             Assert.That(stock.State.InStock(100), Is.True);
             Assert.That(stock.State.InStock(101), Is.True);
-            Assert.That(stock.State.InStock(200), Is.False, "an unbanked piece never reaches the town");
+            Assert.That(stock.State.InStock(200), Is.True);
             Assert.That(stock.State.ResidentInStock(TownBuildings.BakerResident), Is.False);
         }
 

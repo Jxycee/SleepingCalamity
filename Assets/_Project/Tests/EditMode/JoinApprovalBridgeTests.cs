@@ -104,6 +104,12 @@ namespace SleepingCalamity.Tests.EditMode
                 key = default;
                 return false;
             }
+
+            public bool TryGetSlot(ulong clientId, out byte slot)
+            {
+                slot = 0;
+                return false;
+            }
         }
     
         // Catches: the online session not learning an approved player's service id before the client connects (a client that drops during

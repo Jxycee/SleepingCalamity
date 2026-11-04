@@ -1,7 +1,11 @@
 // Authority: host. M5 contents of the built Cellars floor: enemies, chests, keys, the locked door, bakery pieces. The host alone decides everything and writes ONE
-// host-written NetworkVariable (State: opened-chest mask, collected-piece mask, cleared-room mask, key/door/exit flags, the dropped gate key) tagged with the (seed, floor) it
+// host-written NetworkVariable (State: opened-KEY-chest mask, collected-piece mask, cleared-room mask, key/door/exit flags, the dropped gate key) tagged with the (seed, floor) it
 // belongs to, so a late joiner receives it with the spawn and a peer ignores a state from another floor. Every peer builds the floor LOCALLY (CellarFloorSync) and this
 // object only shows state on it: chests lowered when opened, the gate hidden when the door is open, piece spheres hidden when collected, a gold cube where the gate key lies.
+// Chests are PER PLAYER (plan 2, spec decision 39): a loot chest opens once for each player, who rolls their own item (CellarLoot.RollFor with the roster slot) into their own bag
+// (DiveHaulSync.ServerAddItem; a full bag still opens the chest and the item is lost). Which loot chests a player opened lives in that player's PlayerBag (host-owned) and rides on that
+// player's owner-only PlayerBagSync, so a peer draws a loot chest lowered only for its own local player; the shared State.Chests bit is never set for a loot chest. The KEY chest and the
+// keys stay in the shared State (one room key for the party: State.Chests bit + RoomKeyHeld).
 // Clients never write. They ask: RequestOpenChestRpc(chestIndex) / RequestOpenDoorRpc (SendTo.Server); the host re-checks index, not-already-open, key held and the
 // requesting player's XZ range (ChestRange / GateRange) from its own copy of the player object, so a client gate is only a prompt. The owner-side Interact prompt (rising
 // edge of the local hero's InteractPressed/Held) picks the nearest chest or the gate in range and sends the RPC.
@@ -79,6 +83,8 @@ namespace SleepingCalamity.Presentation
         // ---- per-peer built-floor handles ----
         private int _handledBuild = -1;
         private Transform[] _chests = new Transform[0];
+        private bool[] _chestHoldsKey = new bool[0];   // per chest: the key chest (shared bit) rather than a per-player loot chest
+        private PlayerBagSync _localBag;               // this peer's own player's bag view (per NetworkManager, see PlayerBagSync.ForLocalPlayer)
         private Transform _gate;
         private CellPos[] _pieceSpots = new CellPos[0];
         private GameObject[] _pieces = new GameObject[0];
@@ -160,10 +166,10 @@ namespace SleepingCalamity.Presentation
             {
                 DestroyPieceMarkers();
                 _handledBuild = key; _handledPieces = -2;
-                if (fs.Built == null || fs.Layout == null) { _chests = new Transform[0]; _gate = null; return; }
+                if (fs.Built == null || fs.Layout == null) { _chests = new Transform[0]; _chestHoldsKey = new bool[0]; _gate = null; return; }
                 CellarFloorLayout l = fs.Layout;
-                _chests = new Transform[l.Chests.Count];
-                for (int i = 0; i < l.Chests.Count; i++) _chests[i] = CellarFloorBuilder.FindChest(fs.Built.Root, l.Chests[i]);
+                _chests = new Transform[l.Chests.Count]; _chestHoldsKey = new bool[l.Chests.Count];
+                for (int i = 0; i < l.Chests.Count; i++) { _chests[i] = CellarFloorBuilder.FindChest(fs.Built.Root, l.Chests[i]); _chestHoldsKey[i] = l.Chests[i].HoldsKey; }
                 _gate = CellarFloorBuilder.FindGate(fs.Built.Root);
             }
             if (fs.Built == null || fs.Layout == null) return;
@@ -191,14 +197,41 @@ namespace SleepingCalamity.Presentation
         {
             ContentsState s = IsServer ? _st : Net.Value;
             bool ok = StateMatches(fs, s);
+            ulong mine = ok ? LocalOpenedMask(s) : 0UL;
             for (int i = 0; i < _chests.Length; i++)
-                if (_chests[i] != null) CellarFloorBuilder.SetChestOpened(_chests[i], ok && (s.Chests & (1UL << i)) != 0);
+                if (_chests[i] != null) CellarFloorBuilder.SetChestOpened(_chests[i], ok && ChestIsOpen(i, s, mine));
             if (_gate != null) { bool open = ok && s.DoorOpen; if (_gate.gameObject.activeSelf == open) _gate.gameObject.SetActive(!open); }
             for (int i = 0; i < _pieces.Length; i++)
                 if (_pieces[i] != null) { bool show = !(ok && (s.Pieces & (1UL << i)) != 0); if (_pieces[i].activeSelf != show) _pieces[i].SetActive(show); }
             bool keyLies = ok && s.GateKey == 1;
             if (keyLies && _gateKeyMarker == null) _gateKeyMarker = CellarFloorBuilder.BuildGateKey(transform, s.GateKeyPos);
             else if (!keyLies && _gateKeyMarker != null) { Destroy(_gateKeyMarker); _gateKeyMarker = null; }
+        }
+
+        // The loot chests the local player opened on the state's (seed, floor), from the owner-only PlayerBagSync view of THIS peer's local player object (0 before it exists, or when the view
+        // is of another floor). Resolved per NetworkManager, not through PlayerBagSync.Local: several peers in one process (tests) would all see the last spawned one.
+        private ulong LocalOpenedMask(in ContentsState s)
+        {
+            if (_localBag == null || !_localBag.IsSpawned || !_localBag.IsOwner) _localBag = PlayerBagSync.ForLocalPlayer(NetworkManager);
+            if (_localBag == null) return 0UL;
+            BagView v = _localBag.View;
+            return v.ChestSeed == s.Seed && v.ChestFloor == s.Floor ? v.OpenedChests : 0UL;
+        }
+
+        // The key chest is shared (State.Chests); a loot chest is open only for the player who opened it (`mine` from LocalOpenedMask).
+        private bool ChestIsOpen(int i, in ContentsState s, ulong mine)
+        {
+            ulong bit = 1UL << i;
+            return i < _chestHoldsKey.Length && _chestHoldsKey[i] ? (s.Chests & bit) != 0 : (mine & bit) != 0;
+        }
+
+        /// <summary>This peer's view: is chest `i` open for the local player (a loot chest after they opened it, the key chest once anyone opened it)? False until a floor of this state is built.</summary>
+        public bool ChestOpenForLocal(int i)
+        {
+            CellarFloorSync fs = FloorSync;
+            if (fs == null || i < 0 || i >= _chests.Length || i >= 64) return false;
+            ContentsState s = IsServer ? _st : Net.Value;
+            return StateMatches(fs, s) && ChestIsOpen(i, s, LocalOpenedMask(s));
         }
 
         // =================================================================================================================================
@@ -227,10 +260,11 @@ namespace SleepingCalamity.Presentation
             gate = false;
             if (fs == null || fs.Built == null) return -1;
             ContentsState s = Net.Value; bool ok = StateMatches(fs, s);
+            ulong mine = ok ? LocalOpenedMask(s) : 0UL;
             int best = -1; float bestD = ChestRange * ChestRange;
             for (int i = 0; i < _chests.Length; i++)
             {
-                if (_chests[i] == null || (ok && (s.Chests & (1UL << i)) != 0)) continue;
+                if (_chests[i] == null || (ok && ChestIsOpen(i, s, mine))) continue;   // a chest already open for the local player takes no press
                 float d = FlatSqr(p, _chests[i].position);
                 if (d <= bestD && !WallBetween(fs.Built.Root, p, _chests[i].position)) { bestD = d; best = i; }
             }
@@ -428,7 +462,6 @@ namespace SleepingCalamity.Presentation
             DiveHaul h = HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState.Haul : null;
             if (h == null) return DiveHaulSync.DefaultPiecesPerFloor[floor - 1];
             int n = h.PiecesLeft(floor);
-            foreach (int id in h.UnbankedPieces) if (h.OriginFloor(id) == floor) n++;
             foreach (int id in h.BankedPieces) if (h.OriginFloor(id) == floor) n++;
             return n;
         }
@@ -656,17 +689,37 @@ namespace SleepingCalamity.Presentation
         {
             CellarFloorSync fs = FloorSync;
             if (!HostReady(fs) || chestIndex < 0 || chestIndex >= _layout.Chests.Count || chestIndex >= 64) return false;
-            if ((_st.Chests & (1UL << chestIndex)) != 0) return false;
+            FloorChest fc = _layout.Chests[chestIndex];
+            PlayerBag bag = null;
+            if (fc.HoldsKey)
+            {
+                if ((_st.Chests & (1UL << chestIndex)) != 0) return false;   // the key chest is one for the whole party
+            }
+            else
+            {
+                // A loot chest is the opener's own: refused with no haul sync (no bag to fill), for a client without a bag, and when this player's bag already opened it.
+                // HaulSync is the host's DiveHaulSync; a null one refuses every loot chest (production wires it in DiveDirector).
+                bag = HaulSync != null ? HaulSync.ServerBagOf(clientId) : null;
+                if (bag == null || bag.ChestOpened(_layout.Seed, _layout.Floor, chestIndex)) return false;
+            }
             if (!TryPlayerPos(clientId, out Vector3 pos)) return false;
             Transform chest = chestIndex < _chests.Length ? _chests[chestIndex] : null;
             Vector3 at = chest != null ? chest.position : World(fs, new CellPos(_layout.Chests[chestIndex].X, _layout.Chests[chestIndex].Y));
             if (FlatSqr(pos, at) > ChestRange * ChestRange || WallBetween(_root, pos, at)) return false;
-            FloorChest fc = _layout.Chests[chestIndex];
-            int item = CellarLoot.Roll(_layout.Seed, _layout.Floor, chestIndex, fc.HoldsKey);
-            _st.Chests |= 1UL << chestIndex;
-            if (fc.HoldsKey) _st.RoomKeyHeld = true;
+            int item;
+            if (fc.HoldsKey)
+            {
+                item = CellarLoot.Roll(_layout.Seed, _layout.Floor, chestIndex, true);   // CellarLoot.RoomKeyId
+                _st.Chests |= 1UL << chestIndex;
+                _st.RoomKeyHeld = true;
+            }
+            else
+            {
+                item = CellarLoot.RollFor(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId));
+                bag.MarkChestOpened(_layout.Seed, _layout.Floor, chestIndex);
+                HaulSync.ServerAddItem(clientId, item);   // a full bag still opens the chest; the item is lost (spec silent: proposal). LastLootItem records it
+            }
             LastLootItem = item;
-            if (!fc.HoldsKey && HaulSync != null) HaulSync.ServerAddLoot(item, 1);   // the room key lives in State.RoomKeyHeld, not in the haul
             Publish();
             ChestOpened?.Invoke(chestIndex, item);
             return true;

@@ -253,19 +253,19 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Rig rig = null;
             yield return Start(1, r => rig = r);
-            StirTuning tuning = StirTuning.Default; tuning.DeepClosesSeconds = 3f;
+            StirTuning tuning = StirTuning.Default; tuning.DeepClosesSeconds = 3f; tuning.PerFloorCleared = 30f;   // pieces no longer feed the stir (plan 2): three cleared floors x 30 x 1.25 pass 100
             rig.Host.DiveStir = tuning; rig.Host.PiecesPerFloor = new[] { 6, 6, 6 }; rig.Host.SeedOverride = 777u;
             Assert.That(rig.Host.ServerStartDive(), Is.True);
             yield return ResolvePeers(rig);
             yield return AllBuilt(rig, 1);
             yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
 
-            // Push the stir past 100 with the whole haul and every floor cleared; the countdown runs out and the host fails the dive.
+            // Collect the whole haul and clear every floor to push the stir past 100; the countdown runs out and the host fails the dive.
             for (int f = 1; f <= 3; f++) for (int i = 0; i < 6; i++) rig.HostHaul.ServerAddPiece(DiveHaul.PieceId(f, i));
             for (int f = 1; f <= 3; f++) rig.HostHaul.ServerMarkCleared(f);
             yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value, Timeout, "the stir countdown never ended the dive");
             Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(0));
-            Assert.That(rig.HostHaul.Current.UnbankedPieces, Is.EqualTo(0), "the failed dive returned the unbanked pieces");
+            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(18), "the failed dive keeps every collected piece (safe on pickup)");
             yield return PlayModeHarness.WaitUntil(() => !rig.Peers[0].NetActive.Value, Timeout, "the client never saw the dive end");
             yield return NearOnHost(rig, Home, "home after the failed dive");
             Assert.That(Flat(rig.OwnHeroes[0].transform.position, Home), Is.LessThan(8f), "the client's own copy went home");
