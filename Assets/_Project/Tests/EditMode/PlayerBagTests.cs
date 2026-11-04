@@ -154,6 +154,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void ChestMask_ClearsWhenTheDiveEnds_FailOrGoHome()
+        {
+            foreach (bool fail in new[] { true, false })
+            {
+                var b = new PlayerBag();
+                b.MarkChestOpened(5, 1, 3);
+                if (fail) b.Fail(1); else b.GoHome();
+                Assert.That(b.ChestOpened(5, 1, 3), Is.False, fail ? "Fail" : "GoHome");
+                Assert.That(b.MarkChestOpened(5, 1, 3), Is.True);
+            }
+        }
+
+        [Test]
         public void ChestMask_ResetsOnANewFloor_RefusesTwice()
         {
             var b = new PlayerBag();

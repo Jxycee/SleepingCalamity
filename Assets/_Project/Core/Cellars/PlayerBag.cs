@@ -124,6 +124,7 @@ namespace SleepingCalamity.Core
             foreach (int item in Satchel.EmptyOutsideTheDungeon()) Bump(_stash, item);
             Gold = (int)System.Math.Min((long)Gold + DiveGold, int.MaxValue);
             DiveGold = 0;
+            OpenedChests = 0;   // the dive is over: a re-armed floor with the same seed offers its loot chests again
             CloseBank();
             Version++;
         }
@@ -137,6 +138,7 @@ namespace SleepingCalamity.Core
             DiveGold = 0;
             Satchel.OnFail(floor, _carried);
             _carried.Clear();
+            OpenedChests = 0;
             CloseBank();
             Version++;
         }
