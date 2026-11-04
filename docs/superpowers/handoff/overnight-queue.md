@@ -9,6 +9,11 @@ The coordinator hands these out when the user is away (user, 2026-11-03: "keep l
 - Town art junctions pass: MERGED `a421ceb3`; wide join survey deferred.
 
 ## Next (take from the top)
+A. **M7 open questions triage** (docs only): sort the M7 open questions by whether plan 3 needs them; list what blocks, what can wait.
+B. **Story bible open questions sorted by plan 3 need** (docs only): from `docs/superpowers/specs/2026-11-04-story-bible-draft.md` (20 open questions); flag the ones touching floor names, NPCs or text the dive build will show.
+C. **PARKING_LOT plan 2 follow-ups + DiveBot pace notes** (docs only): per-player gold source design note (placeholder numbers), and DiveBot pace notes for the 7-floor dive.
+
+(Older items below; items 2 and 3 done, 1 and 4-6 merged.)
 1. **Plan 3 detailed plan** (writing-plans only, no code): `docs/superpowers/plans/2026-11-0X-new-dive.md` from roadmap row 3 (plan 2 merged `ee9435ef`: ready). Fold in the reviewer notes plan 1 and plan 2 left for plan 3.
 2. **Floor card and modifiers design** (spec section 12 step 4, docs): the named floor card with two modifiers, the two-valve seal and hold-the-pump objectives, as a short design note with numbers marked placeholder.
 3. **Encounter templates and water-gimmick room plan** (spec step 5, docs): which of the 12 rooms get which water states, using `docs/ROOM_METRICS.md` and `CellarRoomsV2`.
