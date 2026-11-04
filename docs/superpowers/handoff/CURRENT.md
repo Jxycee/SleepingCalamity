@@ -35,5 +35,6 @@
   - The ISOs are in `C:\Users\jayce\Desktop\Games\ps2\`.
 
 ## Inbox
+- Bank screen needs real push-on / go-home input: plan 3's `Y`/`N` keys are dev-build only, so a non-dev build can't leave the floor-5 bank (plan 3 session, 2026-11-04; needed before a non-dev playtest build).
 - Builder bug (bakery session's usage review, 2026-10-31): materials flip their MotionVectors pass between graphics captures and `-nographics` builds, so post-check commits break the check marker. Fix in the builders (write identical bytes both modes).
 - Trial ramenvr/autopilot (AI playtester in the editor) as an automated smoke tester once M3 combat settles; evaluated 2026-10-30 by a side session, nothing installed.
