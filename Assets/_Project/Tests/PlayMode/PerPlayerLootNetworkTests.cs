@@ -477,7 +477,8 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
             Assert.That(haul.ServerSetFloor(2), Is.True);
-            Assert.That(haul.PlayerIdOf(host), Is.Not.Null, "the host always has a bag key");
+            Assert.That(app.Roster.TryGetKey(host, out PlayerKey hostKey), Is.True, "the host is in its own roster (else a solo player's bag would be keyed by client id and never saved)");
+            Assert.That(haul.PlayerIdOf(host), Is.EqualTo(hostKey.ToString()), "the host's bag key is its roster PlayerKey string, not the client-id fallback");
             Assert.That(haul.ServerAddItem(oldId, 104), Is.True);
             int bags = CountBags(haul);
 
@@ -597,8 +598,8 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (first < 0) first = i;
                 if (CellarLoot.RollFor(r.Seed, 1, i, slotA) != CellarLoot.RollFor(r.Seed, 1, i, slotB)) return i;
             }
-            Assert.That(first, Is.GreaterThanOrEqualTo(0), "the floor has a loot chest");
-            return first;
+            Assert.Fail("premise: no loot chest on floor 1 of seed " + r.Seed + " rolls different items for slots " + slotA + " and " + slotB + " (first loot chest " + first + ")");
+            return -1;
         }
 
         [UnityTest]
@@ -609,6 +610,7 @@ namespace SleepingCalamity.Tests.PlayMode
             int i = PickLootChest(r), key = r.Layout.KeyChestIndex;
             Assert.That(key, Is.GreaterThanOrEqualTo(0));
             int rollA = CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.A)), rollB = CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.B));
+            Assert.That(rollA, Is.Not.EqualTo(rollB), "premise: the chosen chest rolls different items for A and B");
 
             yield return Ask(r, r.PeerA, i);
             Assert.That(r.Haul.ServerBagOf(r.A).Carried, Is.EqualTo(new[] { rollA }), "A's bag holds A's own roll");
@@ -654,6 +656,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var clients = new List<PlayModeHarness.TestClient>();
             ChestRig r = null; yield return StartChestRig(clients, x => r = x);
             int i = PickLootChest(r), key = r.Layout.KeyChestIndex;
+            Assert.That(CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.A)), Is.Not.EqualTo(CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.B))), "premise: the chosen chest rolls different items for A and B");
             Assert.That(r.Contents.TryChestPosition(i, out Vector3 at), Is.True);
             Assert.That(r.PeerA.ChestShownOpen(i) || r.PeerB.ChestShownOpen(i), Is.False, "premise: closed everywhere");
 

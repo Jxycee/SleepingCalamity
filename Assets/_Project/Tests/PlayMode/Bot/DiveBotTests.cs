@@ -122,6 +122,8 @@ namespace SleepingCalamity.Tests.PlayMode
                     var h = d.HaulSync.Current;
                     second = $"second dive starts on floor {bot.Floor}: chests open mask {s.Chests}, pieces {c.PieceCount} (visible {Enumerable.Range(0, c.PieceCount).Count(c.PieceVisible)}), found pieces {h.FoundPieces}, safe {h.BankedPieces} (after dive 1: {banked.BankedPieces}), gate key {s.GateKey}, exit unlocked {s.ExitUnlocked}, heart banked {d.NetHeartBanked.Value}";
                     if (s.Chests != 0 && s.Seed == d.FloorSync.Layout.Seed) bot.Note("State", "second dive: floor 1 chests start open (state leaked from the first dive)");
+                    for (int ci = 0; ci < d.FloorSync.Layout.Chests.Count && ci < 64; ci++)
+                        if (!d.FloorSync.Layout.Chests[ci].HoldsKey && c.ChestOpenForLocal(ci)) { bot.Note("State", $"second dive: floor 1 loot chest {ci} starts open for the bot (state leaked from the first dive)"); break; }
                     if (s.GateKey != 0 || s.ExitUnlocked) bot.Note("State", "second dive: floor 1 starts with the gate key out or the exit unlocked");
                     if (d.NetHeartBanked.Value) bot.Note("State", "second dive: the heart still reads banked");
                     if (h.FoundPieces != 0) bot.Note("State", $"second dive: starts with {h.FoundPieces} pieces already found this dive");

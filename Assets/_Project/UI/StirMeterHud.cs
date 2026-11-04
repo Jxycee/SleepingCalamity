@@ -25,7 +25,7 @@ namespace SleepingCalamity.UI
         public static string Pieces(DiveHaulSync.Summary s) => "Pieces: " + s.FoundPieces + " found this dive, " + s.BankedPieces + " home";
 
         // The local player's own bag (owner-only PlayerBagSync view): items carried, items safe in the bank this dive, and all their gold (home + this dive's).
-        public static string Bag(BagView v) => "Bag: " + v.Carried.Length + " carried, " + v.BankedThisDive + " safe, " + (v.Gold + v.DiveGold) + " gold";
+        public static string Bag(BagView v) => "Bag: " + v.Carried.Length + " carried, " + v.BankedThisDive + " safe, " + (int)System.Math.Min((long)v.Gold + v.DiveGold, int.MaxValue) + " gold";
 
         // "Pieces left on this floor: N" for floors 1-3; null on the bakery floor, in town or before a floor is set.
         public static string PiecesLeftHere(DiveHaulSync.Summary s) =>

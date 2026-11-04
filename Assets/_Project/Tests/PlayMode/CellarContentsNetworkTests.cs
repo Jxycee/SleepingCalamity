@@ -151,7 +151,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Chest_ClientRpcOpensIt_MaskSyncs_LootInHaul_OutOfRangeRefused()
+        public IEnumerator Chest_ClientRpcOpensIt_LootInHaul_OutOfRangeRefused()
         {
             Ctx c = null; yield return Setup(x => c = x);
             int idx = -1; for (int i = 0; i < c.Layout.Chests.Count; i++) if (!c.Layout.Chests[i].HoldsKey) { idx = i; break; }

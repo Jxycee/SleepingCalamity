@@ -298,7 +298,8 @@ namespace SleepingCalamity.Presentation
         // Entering a bank floor: every connected client's bag gets a bank visit with BankSlots.SlotsFor capacity; the 3-player extra slot goes to a seeded pick that skips the previous owner.
         private void OpenBankVisits()
         {
-            var ids = new System.Collections.Generic.List<ulong>(NetworkManager.ConnectedClientsIds);
+            var ids = new System.Collections.Generic.List<ulong>();
+            foreach (ulong cid in NetworkManager.ConnectedClientsIds) if (PlayerIdOf(cid) != null) ids.Add(cid);   // an unkeyed client (not in the roster yet) takes no slot and does not count
             int n = Mathf.Clamp(ids.Count, 1, 4);
             var slots = new System.Collections.Generic.List<int>();
             foreach (ulong id in ids) slots.Add(PlayerSlotOf(id));
@@ -320,7 +321,9 @@ namespace SleepingCalamity.Presentation
             if (!DiveState.FloorHasBank(floor) || _state.BankUsed(floor)) return;
             PlayerBag bag = ServerBagOf(clientId);
             if (bag == null || bag.BankOpen) return;
-            int n = Mathf.Clamp(NetworkManager.ConnectedClientsIds.Count, 1, 4);
+            int keyed = 0;
+            foreach (ulong cid in NetworkManager.ConnectedClientsIds) if (PlayerIdOf(cid) != null) keyed++;   // unkeyed clients do not count toward the party
+            int n = Mathf.Clamp(keyed, 1, 4);
             bag.OpenBank(BankSlots.SlotsFor(n, PlayerSlotOf(clientId), _visitExtraOwner));
         }
 

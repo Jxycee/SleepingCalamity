@@ -698,6 +698,7 @@ namespace SleepingCalamity.Presentation
             else
             {
                 // A loot chest is the opener's own: refused with no haul sync (no bag to fill), for a client without a bag, and when this player's bag already opened it.
+                // HaulSync is the host's DiveHaulSync; a null one refuses every loot chest (production wires it in DiveDirector).
                 bag = HaulSync != null ? HaulSync.ServerBagOf(clientId) : null;
                 if (bag == null || bag.ChestOpened(_layout.Seed, _layout.Floor, chestIndex)) return false;
             }
