@@ -5,7 +5,7 @@ The coordinator hands these out when the user is away (user, 2026-11-03: "keep l
 ## Running now
 - Plan 2 per-player loot: MERGED `ee9435ef`.
 - Story: MERGED `7490abe0` (book 7 chapters + bible draft; waits on the user's read and sign-off). Was: the book in chapters (`docs/story/book/`, any length, the user reads and annotates it like a novel) plus the game-facing bible draft (`docs/superpowers/specs/2026-11-04-story-bible-draft.md`) for sign-off. Tone: Abercrombie's *The Devils* maturity, Dark Cloud 1 engagement. What the game doesn't use becomes lore and reference.
-- Plan 2 session (Sonnet medium, 2026-11-04 day, user's word): taking items 5, 4, 2, 3 below in that order; item 1 left for the next coordinator. Done: item 5 triage `e78852e4`; item 4 flaky spine test `38f9be2a` (check PASS on `3194f4c0`).
+- Plan 2 session (Sonnet medium, 2026-11-04 day, user's word): taking items 5, 4, 2, 3 below in that order; item 1 left for the next coordinator. Done: item 5 triage `e78852e4`; item 4 flaky spine test `38f9be2a` (check PASS on `3194f4c0`; reasoned fix, not reproduced); items 2 and 3 docs merged (last `41ff7736`). Queue now down to items 1 and 6: refill before the next quiet hours.
 - Town art junctions pass: MERGED `a421ceb3`; wide join survey deferred.
 
 ## Next (take from the top)
