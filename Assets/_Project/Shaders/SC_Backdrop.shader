@@ -28,6 +28,7 @@ Shader "SleepingCalamity/Backdrop"
         _KeyBias ("Key light bias (wrapped Lambert)", Range(-0.3, 0.5)) = 0.15
         _KeyBoost ("Key light boost", Range(0, 3)) = 1
         _SkyFillDir ("Cool directional sky fill (0 = SH as before)", Range(0, 1)) = 0
+        _FillBoost ("Sky fill multiplier (shade side of a tall mass)", Range(0, 8)) = 1
         _HazeTop ("Haze reduction at the top of a tall mass (0 = off)", Range(0, 1)) = 0
         _HazeTopHeight ("Height (world y) where that reduction is full (0 = off)", Float) = 0
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha clip", Float) = 0
@@ -52,7 +53,7 @@ Shader "SleepingCalamity/Backdrop"
             half _NoiseAmp, _NoiseLit;
             half4 _ShadowTint, _HazeCool;
             half _HazeCoolAmt;
-            half _KeyWrap, _KeyBias, _KeyBoost, _SkyFillDir, _HazeTop;
+            half _KeyWrap, _KeyBias, _KeyBoost, _SkyFillDir, _FillBoost, _HazeTop;
             float _HazeTopHeight;
             half _AlphaClip, _Cull;
         CBUFFER_END
@@ -73,6 +74,7 @@ Shader "SleepingCalamity/Backdrop"
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; half4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; half4 color : COLOR0; float2 uv : TEXCOORD0; float3 positionWS : TEXCOORD1; float3 normalWS : TEXCOORD2; UNITY_VERTEX_INPUT_INSTANCE_ID };
 
+            float _SC_BackdropDebug;
             float Hash21(float2 p) { p = frac(p * float2(123.34, 456.21)); p += dot(p, p + 45.32); return frac(p.x * p.y); }
             float VNoise(float2 p)
             {
@@ -110,7 +112,7 @@ Shader "SleepingCalamity/Backdrop"
                 half3 fill = SampleSH(n);
                 // cool sky fill by the normal's up component (up-facing lighter, steep faces darker); 0 keeps the plain SH fill
                 half3 skyDir = sky * half3(0.62, 0.78, 1.1) * lerp(0.45, 1.1, smoothstep(0.1, 0.9, n.y));
-                fill = lerp(fill, skyDir, _SkyFillDir);
+                fill = lerp(fill, skyDir, _SkyFillDir) * _FillBoost;
                 half3 lit = c.rgb * (l.color * (sun * _KeyBoost) + fill + _ShadowTint.rgb * sky * (1.0 - sun));
                 float3 V = normalize(i.positionWS - GetCameraPositionWS());
                 float d = distance(i.positionWS, GetCameraPositionWS());
@@ -129,6 +131,11 @@ Shader "SleepingCalamity/Backdrop"
                 half3 haze = unity_FogColor.rgb * _HazeTint.rgb;
                 half3 cool = _HazeCool.rgb / max(0.2, dot(_HazeCool.rgb, half3(0.299, 0.587, 0.114)));   // luminance-normalised: hue only
                 haze = lerp(haze, lerp(haze * cool, haze, toSun), _HazeCoolAmt * lowSun);
+                if (_SC_BackdropDebug > 0.5)   // capture-only debug (BackdropDebugCapture): 1 albedo, 2 key, 3 fill, 4 normal, 5 haze, 6 lit
+                {
+                    half3 dbg = _SC_BackdropDebug < 1.5 ? c.rgb : _SC_BackdropDebug < 2.5 ? l.color * sun : _SC_BackdropDebug < 3.5 ? fill : _SC_BackdropDebug < 4.5 ? n * 0.5 + 0.5 : _SC_BackdropDebug < 5.5 ? h.xxx : lit;
+                    return half4(dbg, 1.0);
+                }
                 return half4(lerp(lit, haze, h), 1.0);
             }
             ENDHLSL

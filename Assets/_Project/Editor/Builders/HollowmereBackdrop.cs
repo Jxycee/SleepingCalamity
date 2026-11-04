@@ -184,10 +184,10 @@ namespace SleepingCalamity.EditorTools
                 {
                     int a = j * (N + 1) + i, b = a + 1, d = a + N + 1, e = d + 1;
                     if (hs[a] <= 0f && hs[b] <= 0f && hs[d] <= 0f && hs[e] <= 0f) continue;
-                    idx.AddRange(new[] { a, d, e, a, e, b });
+                    idx.AddRange(new[] { a, e, d, a, b, e });   // the local (tangent, radial) frame is left-handed against world (x, z): this winding faces up (the old one gave downward normals, so the key light never reached the mountain)
                 }
-            // A12 r1 (town-art-leftovers): lighter base tint, sharper terminator (slope 0.95 / bias 0.02), key x1.3, cool directional sky fill, haze 30% lower on the upper 60% (full at 530 m).
-            Material m = Mat("M_BD_Mawrrow", new Color(0.36f, 0.33f, 0.31f), 0.38f, 0.56f, 2000f, 3000f, 0.04f, 1.3f, 0.8f, 0.95f, 0.02f, 1.3f, 1f, 0.22f, H - 30f);
+            // A12 r2 (town-art-leftovers): ROOT CAUSE of the flat dark mountain was inverted winding (downward normals, no key light). With it fixed the mountain is backlit (sun south-east, camera looks south): wide wrap, key x2.6, fill x2, light haze 0.15-0.25 (30% less on the upper 60%) give spurs a p10-p90 spread of 0.3 at a mean 0.34 (mist band 0.57).
+            Material m = Mat("M_BD_Mawrrow", new Color(0.40f, 0.367f, 0.344f), 0.15f, 0.25f, 2000f, 3000f, 0.04f, 1.3f, 0.8f, 1.0f, 0.10f, 2.6f, 1f, 0.30f, H - 30f, 2f);
             MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
             {
                 float y = p.y + 30f;
@@ -304,7 +304,7 @@ namespace SleepingCalamity.EditorTools
                 Color b = mb.Tags[i] == 0 ? plaster * foot : timber;
                 wc[i] = new Color(b.r, b.g, b.b, 1f);
             }
-            var go = MakeObject(parent, "RuinedWindmill", wv, mb.I, Mat("M_BD_Windmill", Color.white, 0.40f, 0.55f, 500f, 1300f, 0.05f, 1.0f, 0.3f, 0.85f, 0.10f, 1.3f, 1f), null, null, wc);
+            var go = MakeObject(parent, "RuinedWindmill", wv, mb.I, Mat("M_BD_Windmill", Color.white, 0.25f, 0.38f, 500f, 1300f, 0.05f, 1.0f, 0.3f, 1.2f, 0.35f, 1.3f, 1f, 0f, 0f, 4f), null, null, wc);
             go.transform.position = pos;
             go.transform.rotation = rot;
             return mb.I.Count / 3;
@@ -410,7 +410,7 @@ namespace SleepingCalamity.EditorTools
         // A SleepingCalamity/Backdrop material (same property set as HollowmereRoad.Backdrop; no texture, a flat tint).
         // A12 r1 (town-art-leftovers): the trailing key/fill args default to the shader's old behaviour, so ridges, cards and road are unchanged; always written so a regenerated .mat is never stale.
         static Material Mat(string name, Color tint, float hazeNear, float hazeFar, float d0, float d1, float mist, float cool, float coolAmt,
-            float keyWrap = 0.7f, float keyBias = 0.15f, float keyBoost = 1f, float skyFillDir = 0f, float hazeTop = 0f, float hazeTopHeight = 0f)
+            float keyWrap = 0.7f, float keyBias = 0.15f, float keyBoost = 1f, float skyFillDir = 0f, float hazeTop = 0f, float hazeTopHeight = 0f, float fillBoost = 1f)
         {
             Shader sh = Shader.Find("SleepingCalamity/Backdrop") ?? Shader.Find("Universal Render Pipeline/Lit");
             BuilderUtil.EnsureFolder(MaterialsFolder);
@@ -424,7 +424,7 @@ namespace SleepingCalamity.EditorTools
             m.SetColor("_ShadowTint", new Color(0.30f, 0.38f, 0.48f));
             m.SetColor("_HazeCool", new Color(0.62f * cool, 0.8f, 1.2f * cool)); m.SetFloat("_HazeCoolAmt", coolAmt);
             m.SetFloat("_KeyWrap", keyWrap); m.SetFloat("_KeyBias", keyBias); m.SetFloat("_KeyBoost", keyBoost); m.SetFloat("_SkyFillDir", skyFillDir);
-            m.SetFloat("_HazeTop", hazeTop); m.SetFloat("_HazeTopHeight", hazeTopHeight);
+            m.SetFloat("_FillBoost", fillBoost); m.SetFloat("_HazeTop", hazeTop); m.SetFloat("_HazeTopHeight", hazeTopHeight);
             m.SetFloat("_AlphaClip", 0f); m.DisableKeyword("_ALPHATEST_ON"); m.SetFloat("_Cull", (float)CullMode.Back);
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);
