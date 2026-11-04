@@ -6,6 +6,8 @@
 - Nov 2 evening state (from `41639c00`): final main check PASS on `5d87a82b` (build, EditMode 1221/1221, PlayMode 117 passed 0 failed 19 skipped, port 7791); PC port unblocked by test-port-fallback `6f94e48b`. Parked, unmerged: `claude/backdrop-shade` (`aa70f707`, check PASS, ~20/40, no clear gain), `claude/stall-lods` (needs a PC capture). Reboot sometime to clear zombie Unity 33336 (harmless).
 - Older entries: `docs/superpowers/handoff/history-2026-11-02.md` (Oct 31 evening to Nov 2) and `history-2026-10-31.md`.
 
+- **Coordinator handoff (2026-11-04 ~10am CST):** this coordinator stopped for the user's workday; the user starts a fresh coordinator after 1:00pm CST (board `claim`, note in `~/.claude/coordinator/_handoff.md`). Everything idle, queue empty. Model routing tightened in `sc-delegate` (session base Sonnet 5.5 medium; Opus only for pinned reviewers and the listed overrides).
+
 ## Next
 1. ~~Plan 1~~ **DONE**: dive rules in Core merged `e27a9608` (check PASS on tip `cd68aa67`, soak 44/44, 38 new tests, final review MERGE-OK; reviewer notes kept for plan 3). Unwired: the live dive still runs the old 4-floor rules. `Tools/cloud/sc_core_tests.py` now also runs on Windows (`33d6ff6a`, tools only).
 2. ~~Plan 4~~ **DONE**: metrics gym + room data v2 merged `71fd4f4b` (check PASS on `ba7444e5`: EditMode 1330/1330, PlayMode 120 + 19 skipped). New `Core/Rooms` (GameMetrics, MovementProbe, FightSpace, RoomDataV2, RoomValidatorV2 with gimmick-state checks), `MetricsGym` scene builder, pilot room hanging hall v2; measurements in `docs/ROOM_METRICS.md` (dodge 3.5 m, run-jump 3.58 m, max ledge 1.5 m; a 4-hero + 8-enemy fight needs 13 cells / 3x5, so the 2x3 pantry is too small for full co-op). Plan: `docs/superpowers/plans/2026-11-03-metrics-gym.md`.

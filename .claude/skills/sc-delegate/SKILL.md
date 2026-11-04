@@ -12,11 +12,14 @@ description: Brief template and routing for delegating SleepingCalamity work to 
 | Review: everything else (gameplay, Core, data, art, presentation, docs) | `reviewer` (Sonnet, medium) | |
 | Fix of 30 lines or fewer in one area | no agent: read the diff yourself | |
 | Milestone branch before merging into `main` | `branch-reviewer` (Opus, high) | never raise it to xhigh or max (user, 2026-11-03: usage) |
-
-**When the branch review can be skipped (user, 2026-11-03: usage).** Skip `branch-reviewer` when the branch only touches pure Core logic with its EditMode tests, docs, tuning data, test-only code or art, every task passed its own review, and `check` is green on the tip. Always run it when the branch touches networking or host sync, save data, or wires systems together across assemblies (Presentation, Gameplay, App, Networking, builders and scenes): those break at the seams between tasks, which per-task reviews don't see. For the dive roadmap that means plans 1 and 4 skip it, plans 2 and 3 get it. Say in the merge commit which applied.
 | Locate symbols, inventories, counts | `scanner` (Haiku) | |
 | Fails twice, or nobody can find the root cause | `fixer` (Fable) | |
-| Plan section | write it yourself or one Opus author at `medium`; `high` for networking, save-schema and state-machine sections | |
+| Docs, design notes, triage, plan drafts | `implementer` (Sonnet, medium) | model `opus`, effort `medium` for a plan section on networking, save schema or a state machine (`high` only if the first draft failed review) |
+| Story and book prose | `implementer` | model `opus`, effort `high` (prose only; the bible assembly and fixes stay Sonnet) |
+
+**When the branch review can be skipped (user, 2026-11-03: usage).** Skip `branch-reviewer` when the branch only touches pure Core logic with its EditMode tests, docs, tuning data, test-only code or art, every task passed its own review, and `check` is green on the tip. Always run it when the branch touches networking or host sync, save data, or wires systems together across assemblies (Presentation, Gameplay, App, Networking, builders and scenes): those break at the seams between tasks, which per-task reviews don't see. For the dive roadmap that means plans 1 and 4 skip it, plans 2 and 3 get it. Say in the merge commit which applied.
+
+**Session base model (user, 2026-11-04).** Every working session runs Sonnet 5.5 at medium effort: pass `model: "claude-sonnet-5-5"` and `effort: "medium"` to `start_session`, and fix a proposal card (it inherits the coordinator's model) with `set_session_model` / `set_session_effort` right after it starts. Opus belongs in the pinned reviewers and the Opus overrides above, never in a session's base. The board flags any other session whose base is Opus.
 
 **Models never come from the coordinator (user, 2026-11-03).** Every delegated task names one of the agent types above, whose model and effort are pinned in `.claude/agents/`. Never delegate through `fork` (it always runs on the coordinator's model and effort) or through the built-in `general-purpose`, `Explore`, `Plan` or `claude` agents (no pin, so they would inherit the coordinator). Pass `model` or `effort` only as the "Override per call" column says. Safety net: `.claude/settings.json` sets `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`, the default for any agent without a pinned model.
 
