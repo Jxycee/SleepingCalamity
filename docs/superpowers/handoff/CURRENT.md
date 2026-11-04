@@ -14,8 +14,8 @@
 
 ## Branches and worktrees
 - `main` at `e6dc7114` + this handoff; last main check PASS on `5d87a82b` (EditMode 1221, PlayMode 117 + 19 skipped).
-- Parked: `claude/backdrop-shade` (`aa70f707`, check PASS), `claude/stall-lods` (needs a PC capture).
-- Starting 2026-11-03: plan 1 (dive rules core) and plan 4 (metrics gym) sessions, each in its own worktree; branches named in their board profiles.
+- 2026-11-03 sessions, each in its own worktree: plan 1 `claude/dive-rules-core-ef7cd2` (on task 6 of 9), plan 4 `claude/metrics-gym-aac07e` (writing its plan), town art leftovers (backdrop shading, Terrace stairs, stall LODs; takes over `claude/backdrop-shade` and `claude/stall-lods`; user asked 2026-11-03).
+- Board STATUS for cellars-visual-b, traversal-4, ambient-polish corrected to DONE (`7172621b`; merges `ec29e0d1`, `40de7684`, `0c02367a`).
 
 ## Blockers and open questions
 - The asset skills were rewritten on 2026-10-30. Some legacy FishGame tools still need rework before the art batches; see the tool table in `sc-asset-craft` section 0b.
