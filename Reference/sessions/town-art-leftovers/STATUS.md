@@ -1,5 +1,5 @@
-Status: WORKING (polish round 4, resumed)
-Archive: no
+Status: DONE 98732f3c (polish round 4 merged to main; check PASS on 57354a73: EditMode 1340/1340, PlayMode 120 passed 0 failed 19 skipped)
+Archive: ready
 Branch: claude/hollowmere-polish-4 (worktree m5-next-639689)
 Parked branches: claude/stall-lods 2486f8a6 and claude/backdrop-shade aa70f707 merged in full (via this branch); nothing retired.
 Rounds: 3 art rounds (GPU, SC_CAPTURE_ONLY), then one full set (126 Hollowmere PNGs, both presets + LowSun) and stall LOD frames. No capture churn.
@@ -16,3 +16,8 @@ Follow-ups (low): StallLodCapture restore in finally + hide terrain in transitio
 
 ## Polish round 4 (2026-11-03, branch claude/hollowmere-polish-4, Sonnet medium)
 Fix list: found (scan, both presets) float 8, sunk 2, interpenetration 7 (likely contact), foliage-vs-building 462 (unfiltered), uv_density 4, uv_stretch 33, z-fight 2 / fixed 0 / deferred 0. Ranked: scan_ranked_round4.md. PAUSED (usage pace) before captures and fixes.
+Round 4 result (1 round used of 3, then stopped for pacing): sheet polish4_before_after.jpg (Ravine, LakeShore, Mill; ~19\/40 -> ~22\/40 on the one visible fix: weir boulders were floating above the lip).
+- Found (scan, both presets): float 8, sunk 2, z-fight 2, interpenetration 7, foliage-vs-building 462 raw, uv_density 4, uv_stretch 33.
+- Fixed: float 8 -> 0, sunk 2 -> 0 (Rock_Stream_B weir boulders seated on terrain), z-fight 2 -> 0 (ContactAO lifted 3.6 cm), lot-edge weeds skipped within 0.5 m of paving (foliage 462 -> 461).
+- Deferred: UV stretch x33 (kit FBX meshes; needs Blender regen: Workshop_C frame 7.5x, Bakery sign 6.8x, BellTower spire 5.9x, Smithy sign 5.4x ...), ivy/moss embedding #13-15,#18 (per-asset normal offsets), wall-breach weeds #17 (wall code), stall-prop overlaps #25 (probably contact), uv_density x4, clipping not confirmed by capture beyond the rocks.
+- Tool: HollowmereFaultScan (exec -Method SleepingCalamity.EditorTools.HollowmereFaultScan.Scan, SC_CAPTURE_NOBUILD=1, SC_SCAN_DIR) lists these in ~7 s.
