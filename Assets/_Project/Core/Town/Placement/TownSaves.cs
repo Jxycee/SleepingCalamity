@@ -7,7 +7,8 @@
 // dropped alone by WorldSaveStore. Then the CONSERVATION pass (Reconcile) makes every known piece and resident (PieceCatalog, TownBuildings) sit in exactly ONE place:
 // placed, else stock, else banked in the haul, else left on its floor. A duplicate keeps its highest place; a thing in no place goes to stock (only when the dive section is
 // present: it is the authority on what is still on the floors, so a save without one never hands out free pieces). Quitting mid-dive is a failed dive (DiveState.FailDive):
-// nothing unbanked is ever saved (those pieces are written as left on their floors), the banked haul, the cleared floors and the checkpoint stay, InDive is cleared on load.
+// pieces are safe on pickup (DiveHaul.AddPiece banks at once), so a piece found mid-dive is saved as banked and never goes back to its floor; the banked haul, the cleared floors
+// and the checkpoint stay, InDive is cleared on load. Player loot is not here: the optional "bags" section holds it (BagsSave), a mid-dive bag written as the failed copy.
 // Authority: host only (the host's world save). The live town and haul reach it through HostWorld.ITownSource.
 using System;
 using System.Collections.Generic;
@@ -82,13 +83,15 @@ namespace SleepingCalamity.Core
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }
 
-    // The four sections as one value (any may be null: an older save, or a section that was reset).
+    // The four sections as one value (any may be null: an older save, or a section that was reset), plus the per-player bags section (Core/Save/BagsSave.cs; null: no bags saved).
+    // Bags is not part of the piece/resident conservation pass (Reconcile): bag items are not pieces.
     public sealed class TownSnapshot
     {
         public StockSave Stock;
         public TownSave Town;
         public ResidentsSave Residents;
         public DiveSave Dive;
+        public BagsSave Bags;
     }
 
     public static class TownSaveRules
@@ -245,6 +248,7 @@ namespace SleepingCalamity.Core
             if (s.Town != null) { d.Clear(); clean.Town = CleanTown(s.Town, d); if (d.Count > 0) rejected?.Add(SectionTown); }
             if (s.Residents != null) { d.Clear(); clean.Residents = CleanResidents(s.Residents, d); if (d.Count > 0) rejected?.Add(SectionResidents); }
             if (s.Dive != null) { d.Clear(); clean.Dive = CleanDive(s.Dive, d); if (d.Count > 0) rejected?.Add(SectionDive); }
+            if (s.Bags != null) { d.Clear(); clean.Bags = BagsSaveRules.Clean(s.Bags, d); if (d.Count > 0) rejected?.Add(WorldSaveRules.SectionBags); }
             Reconcile(clean, repaired, failMidDive);
             return clean;
         }
@@ -281,7 +285,7 @@ namespace SleepingCalamity.Core
                 stock.LootUnknown = false;
             }
             ResidentsSave res = live.Residents == null ? null : CleanResidents(live.Residents, d);
-            return new TownSnapshot { Stock = stock ?? previous.Stock, Town = live.Town ?? previous.Town, Dive = live.Dive ?? previous.Dive, Residents = MergeLatches(res, previous.Residents) };
+            return new TownSnapshot { Stock = stock ?? previous.Stock, Town = live.Town ?? previous.Town, Dive = live.Dive ?? previous.Dive, Residents = MergeLatches(res, previous.Residents), Bags = live.Bags ?? previous.Bags };
         }
 
         // ---------------------------------------------------------------- the conservation pass (operates on cleaned sections, in place)
@@ -377,8 +381,8 @@ namespace SleepingCalamity.Core
     public static class TownSaves
     {
         // The sections for the host's live town and dive. dive may be null (no dive state yet); bankedResidents is the baker (or any resident) banked in the haul and not yet
-        // home; stockLoot is the town's loot counts (TownState keeps none); residents is the host's resident state. Everything not in stock, placed or banked (an unbanked
-        // haul piece included: a quit mid-dive loses it) is written as left on its floor. The result is cleaned and conserved. A null stockLoot or residents means "the source
+        // home; stockLoot is the town's loot counts (TownState keeps none); residents is the host's resident state. Everything not in stock, placed or banked is written as left on its
+        // floor. The bags section is not captured here (TownStock.Capture adds it: it needs the bag ids). The result is cleaned and conserved. A null stockLoot or residents means "the source
         // does not know": the snapshot says so (Stock.LootUnknown, Residents null) and HostWorld keeps its saved copy instead of writing an empty one.
         public static TownSnapshot Capture(TownState town, DiveState dive, IReadOnlyDictionary<int, int> stockLoot, IEnumerable<string> bankedResidents, ResidentsSave residents)
         {
@@ -465,7 +469,7 @@ namespace SleepingCalamity.Core
         {
             var haul = new DiveHaul(piecesPerFloor);
             if (dive == null) return haul;
-            foreach (int p in dive.BankedPieces) haul.AddPiece(p);
+            foreach (int p in dive.BankedPieces) haul.RestoreBankedPiece(p);   // restored, not "found this dive"
             foreach (LootCountSave l in dive.BankedLoot) haul.AddLoot(l.ItemId, l.Count);
             haul.Bank();
             // Every other known piece that is not left on its floor is already in the town (stock or placed): collected, so the cellar does not spawn it again.

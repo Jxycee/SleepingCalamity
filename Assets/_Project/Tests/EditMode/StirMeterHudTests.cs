@@ -21,7 +21,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(StirMeterText.Labels(s).Count, Is.EqualTo(2));
         }
 
-        [Test] public void Pieces_Text() => Assert.AreEqual("Pieces: 3 unbanked / 2 banked", StirMeterText.Pieces(new DiveHaulSync.Summary { UnbankedPieces = 3, BankedPieces = 2 }));
+        // Pieces are safe on pickup (per-player loot plan task 3): the line shows the safe count only. Task 4 reworks it to "found this dive" / "home".
+        [Test] public void Pieces_Text() => Assert.AreEqual("Pieces: 2 safe", StirMeterText.Pieces(new DiveHaulSync.Summary { UnbankedPieces = 0, BankedPieces = 2 }));
 
         [Test]
         public void PiecesLeftHere_FollowsTheCurrentFloor()

@@ -12,7 +12,7 @@ namespace SleepingCalamity.Core
 {
     public static class WorldSaveRules
     {
-        public const string SectionSeed = "worldSeed", SectionPlayers = "players", SectionWorldId = "worldId", SectionWeapons = "weapons", SectionCreatedAt = "createdAtUtc";
+        public const string SectionSeed = "worldSeed", SectionPlayers = "players", SectionWorldId = "worldId", SectionWeapons = "weapons", SectionCreatedAt = "createdAtUtc", SectionBags = "bags";
 
         // A new world: the given seed, nothing else yet.
         public static WorldSave New(ulong seed) => new WorldSave { WorldSeed = SeedToHex(seed) };
@@ -64,13 +64,14 @@ namespace SleepingCalamity.Core
                 clean.Weapons = WeaponsSaveRules.Clean(save.Weapons, null, droppedWeapons);
                 if (droppedWeapons.Count > 0) rejected?.Add(SectionWeapons);
             }
-            if (save.Stock != null || save.Town != null || save.Residents != null || save.Dive != null)
+            if (save.Stock != null || save.Town != null || save.Residents != null || save.Dive != null || save.Bags != null)
             {
                 // Each town section is cleaned on its own (a bad entry is dropped alone, named for the .corrupt copy), then the conservation pass
                 // (TownSaveRules.Reconcile) puts every piece and resident in exactly one place; a mid-dive quit counts as a failed dive.
+                // The per-player bags section is cleaned the same way (an entry that does not fit is dropped alone) and is outside the piece conservation.
                 var town = new List<string>();
-                TownSnapshot snap = TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = save.Stock, Town = save.Town, Residents = save.Residents, Dive = save.Dive }, town);
-                clean.Stock = snap.Stock; clean.Town = snap.Town; clean.Residents = snap.Residents; clean.Dive = snap.Dive;
+                TownSnapshot snap = TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = save.Stock, Town = save.Town, Residents = save.Residents, Dive = save.Dive, Bags = save.Bags }, town);
+                clean.Stock = snap.Stock; clean.Town = snap.Town; clean.Residents = snap.Residents; clean.Dive = snap.Dive; clean.Bags = snap.Bags;
                 foreach (string section in town) if (!(rejected?.Contains(section) ?? true)) rejected.Add(section);
             }
             if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);   // a newer build's members, written back as read

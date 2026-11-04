@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
@@ -442,6 +443,127 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(store.Current.Weapons.Weapons.Count, Is.EqualTo(1));
             Assert.That(store.Current.Weapons.Weapons[0].OwnerId, Is.EqualTo("me"));
             Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // ---- per-player loot plan task 3: the optional "bags" section ----
+
+        // Catches: bags lost or altered through the real file path, a world with no bags writing a "bags" key, the golden v1 file gaining a bags section on load.
+        [Test]
+        public void Bags_RoundTripsThroughTheStore()
+        {
+            File.WriteAllText(_path, GoldenV1);
+            WorldSaveStore store = Load();
+            Assert.That(store.Current.Bags, Is.Null, "the golden v1 file has no bags");
+            store.MarkDirty(); store.FlushIfDirty();
+            Assert.That(File.ReadAllText(_path), Does.Not.Contain("\"bags\""), "a world with no bags writes no bags key");
+
+            var bags = new BagsSave();
+            var p = new PlayerBagSave { Identity = 1, Id = "aaa", Gold = 7, Satchel = new SatchelSave { Floor = 2, Items = new List<int> { 110, 111 } } };
+            p.Stash.Add(new LootCountSave { ItemId = 104, Count = 3 });
+            bags.Players.Add(p);
+            WorldSave w = store.Current;
+            w.Bags = bags;
+            store.Replace(w);
+            Assert.That(store.FlushIfDirty(), Is.True);
+            Assert.That(File.ReadAllText(_path), Does.Contain("\"bags\""));
+
+            WorldSaveStore again = Load();
+            Assert.That(again.Rejected, Is.Empty);
+            PlayerBagSave back = again.Current.Bags.Players.Single();
+            Assert.That(back.Identity, Is.EqualTo(1)); Assert.That(back.Id, Is.EqualTo("aaa")); Assert.That(back.Gold, Is.EqualTo(7));
+            Assert.That(back.Stash.Single().ItemId, Is.EqualTo(104)); Assert.That(back.Stash.Single().Count, Is.EqualTo(3));
+            Assert.That(back.Satchel.Floor, Is.EqualTo(2)); Assert.That(back.Satchel.Items, Is.EqualTo(new[] { 110, 111 }));
+            Assert.That(again.Current.Players.Recorded.Count, Is.EqualTo(2), "the rest of the file is untouched");
+        }
+
+        // Catches (sc-netcode "World save"): a mistyped bags section failing the whole WorldSave parse so the world rolls back to .bak.
+        [Test]
+        public void Bags_MistypedSectionKeepsTheRestOfTheFile()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("\"players\"", "\"bags\": \"oops\", \"players\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }), "the rejection label");
+            Assert.That(store.Current.Bags, Is.Null);
+            Assert.That(store.Current.WorldSeed, Is.EqualTo("00000000F15F15F1"));
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // Catches: one mistyped or invalid player entry costing the other players' bags.
+        [Test]
+        public void Bags_OneBadEntry_IsDroppedAlone()
+        {
+            string bags = "{ \"players\": [ { \"identity\": 1, \"id\": \"aaa\", \"gold\": 5 }, { \"identity\": 1, \"id\": \"bbb\", \"gold\": \"lots\" }, { \"identity\": 77, \"id\": \"ccc\", \"gold\": 1 } ] }";
+            File.WriteAllText(_path, GoldenV1.Replace("\"players\"", "\"bags\": " + bags + ", \"players\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }), "named so the original is kept");
+            Assert.That(store.Current.Bags.Players.Select(e => e.Id), Is.EqualTo(new[] { "aaa" }));
+            Assert.That(store.Current.Bags.Players[0].Gold, Is.EqualTo(5));
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // Catches: HostWorld dropping the bags section, writing a pristine one into a file that has none, or writing bags of players the world does not record.
+        [Test]
+        public void HostWorld_CarriesBagsOfRecordedPlayersOnly()
+        {
+            var host = new HostWorld();
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { new PlayerKey(IdentityKind.Ugs, "aaa"), new PlayerKey(IdentityKind.Ugs, "bbb") }, out WorldPlayers players);
+            host.Load(players);
+            var saved = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL), Bags = new BagsSave() };
+            saved.Bags.Players.Add(new PlayerBagSave { Identity = 1, Id = "aaa", Gold = 4 });
+            host.LoadTown(saved);
+            Assert.That(host.Town.Bags.Players.Single().Gold, Is.EqualTo(4));
+
+            var target = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL) };
+            host.CaptureTownInto(target);
+            Assert.That(target.Bags.Players.Single().Id, Is.EqualTo("aaa"), "what was loaded is written back");
+
+            // a world that never had bags: nothing to write
+            var fresh = new HostWorld();
+            fresh.Load(players);
+            var empty = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL) };
+            fresh.LoadTown(empty);
+            fresh.CaptureTownInto(empty);
+            Assert.That(empty.Bags, Is.Null, "no bags key for a world without bags");
+        }
+
+        sealed class BagsSource : HostWorld.ITownSource
+        {
+            public BagsSave Live;
+            public TownSnapshot CaptureTown() => new TownSnapshot { Bags = Live };
+            public void RestoreTown(TownSnapshot loaded) { }
+        }
+
+        // Catches: a client-id fallback bag or an unrecorded player's bag reaching the file, or a recorded player's live bag not being written.
+        [Test]
+        public void HostWorld_WritesLiveBags_OfRecordedPlayersOnly()
+        {
+            var host = new HostWorld();
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { new PlayerKey(IdentityKind.Ugs, "aaa"), new PlayerKey(IdentityKind.Ugs, "bbb") }, out WorldPlayers players);
+            host.Load(players);
+            host.LoadTown(new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL) });
+            var live = new BagsSave();
+            live.Players.Add(new PlayerBagSave { Identity = 1, Id = "aaa", Gold = 4 });
+            live.Players.Add(new PlayerBagSave { Identity = 1, Id = "stranger", Gold = 99 });   // not recorded
+            host.RegisterTownSource(new BagsSource { Live = live });
+            var target = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL) };
+            Assert.That(host.CaptureTownInto(target), Is.True);
+            Assert.That(target.Bags.Players.Select(e => e.Id), Is.EqualTo(new[] { "aaa" }));
+            Assert.That(target.Bags.Players[0].Gold, Is.EqualTo(4));
+        }
+
+        // Catches: a Solo world's owner losing their gold, stash and satchel when the world rebinds to the owner's new key (the weapons already follow, A32).
+        [Test]
+        public void BagsRename_MovesTheOwnersEntryToTheNewKey()
+        {
+            var bags = new BagsSave();
+            bags.Players.Add(new PlayerBagSave { Identity = 0, Id = "old", Gold = 9 });
+            bags.Players.Add(new PlayerBagSave { Identity = 0, Id = "new", Gold = 1 });
+            BagsSaveRules.Rename(bags, new PlayerKey(IdentityKind.Local, "old"), new PlayerKey(IdentityKind.Ugs, "new2"));
+            Assert.That(bags.Players.Select(e => e.Identity + ":" + e.Id + ":" + e.Gold), Is.EqualTo(new[] { "1:new2:9", "0:new:1" }));
+            BagsSaveRules.Rename(bags, new PlayerKey(IdentityKind.Local, "nobody"), new PlayerKey(IdentityKind.Local, "x"));
+            Assert.That(bags.Players.Count, Is.EqualTo(2));
+            BagsSaveRules.Rename(null, new PlayerKey(IdentityKind.Local, "a"), new PlayerKey(IdentityKind.Local, "b"));
         }
     }
 }

@@ -428,7 +428,6 @@ namespace SleepingCalamity.Presentation
             DiveHaul h = HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState.Haul : null;
             if (h == null) return DiveHaulSync.DefaultPiecesPerFloor[floor - 1];
             int n = h.PiecesLeft(floor);
-            foreach (int id in h.UnbankedPieces) if (h.OriginFloor(id) == floor) n++;
             foreach (int id in h.BankedPieces) if (h.OriginFloor(id) == floor) n++;
             return n;
         }

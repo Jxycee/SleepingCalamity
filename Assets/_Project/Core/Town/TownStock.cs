@@ -66,7 +66,18 @@ namespace SleepingCalamity.Core
                     if (kv.Value - moved > 0) snap.Dive.BankedLoot.Add(new LootCountSave { ItemId = kv.Key, Count = kv.Value - moved });
                 }
             }
+            // The players' bags (the optional "bags" section): a mid-dive bag is written as the failed copy, the live bags are not changed. The host (HostWorld) keeps only the
+            // recorded players' entries; here every bag whose id is a PlayerKey string is captured (a client-id fallback bag is not).
+            if (dive != null) snap.Bags = BagsSaveRules.Capture(dive.Bags, BagKeys(dive.Bags), dive.CurrentFloor != DiveState.Town, dive.CurrentFloor);
             return snap;
+        }
+
+        static Dictionary<string, PlayerKey> BagKeys(PartyBags bags)
+        {
+            var keys = new Dictionary<string, PlayerKey>();
+            foreach (KeyValuePair<string, PlayerBag> kv in bags.All)
+                if (BagsSaveRules.TryParseBagId(kv.Key, out PlayerKey key)) keys[kv.Key] = key;
+            return keys;
         }
 
         // Rebuilds the stock from loaded (cleaned, conserved) sections and returns the dive state to run with (see BuildDive). A mid-dive quit has already become a failed dive,
@@ -83,7 +94,7 @@ namespace SleepingCalamity.Core
             return dive;
         }
 
-        // The dive state for a loaded snapshot: haul with its banked pieces and loot, every piece the town holds marked home (RestoreHaul), cleared floors and checkpoint.
+        // The dive state for a loaded snapshot: haul with its banked pieces and loot, every piece the town holds marked home (RestoreHaul), cleared floors and checkpoint, and the saved bags.
         // Pure: leaves the stock, the town and the loot counts alone, so the host can call it again at the first dive start with the piece counts and stir tuning as they
         // are then (they can change after the director spawns).
         public DiveState BuildDive(TownSnapshot snap, IReadOnlyList<int> piecesPerFloor, StirTuning tuning)
@@ -91,6 +102,7 @@ namespace SleepingCalamity.Core
             DiveHaul haul = TownSaves.RestoreHaul(snap?.Dive, piecesPerFloor);
             var dive = new DiveState(haul, tuning);
             if (snap?.Dive != null) dive.RestoreProgress(snap.Dive.ClearedMask, snap.Dive.CheckpointReached);
+            BagsSaveRules.Restore(snap?.Bags, dive.Bags);   // each recorded player's gold, home stash and waiting satchel (no dive in progress)
             return dive;
         }
     }

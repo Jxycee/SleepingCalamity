@@ -1,5 +1,7 @@
-// M5 banking: the Core haul and dive state. Catches: loot counted as stir, failed dives losing banked goods or not returning pieces to their floors,
-// floors un-clearing, banking at a floor with no bank point, two identical runs diverging.
+// M5 banking: the Core haul and dive state. Per-player loot plan task 3: pieces are safe on pickup (a failed dive keeps them, they never return to a floor) and DiveState owns the
+// party's bags. Catches: loot counted as stir, a failed dive losing a collected piece or sending it back to its floor, floors un-clearing, banking at a floor with no bank point,
+// a bag not failed / pushed on / brought home with the dive, two identical runs diverging.
+using System.Collections.Generic;
 using NUnit.Framework;
 using SleepingCalamity.Core;
 
@@ -34,37 +36,60 @@ namespace SleepingCalamity.Tests.EditMode
             DiveHaul h = Haul();
             h.AddLoot(7, 5);
             Assert.That(h.UnbankedLootCount, Is.EqualTo(5));
-            Assert.That(h.UnbankedPieceCount, Is.EqualTo(0));
+            Assert.That(h.BankedPieceCount, Is.EqualTo(0));
             h.AddPiece(DiveHaul.PieceId(1, 1));
-            Assert.That(h.UnbankedPieceCount, Is.EqualTo(1));
+            Assert.That(h.BankedPieceCount, Is.EqualTo(1), "a piece is safe the moment it is picked up");
             Assert.That(h.AddLoot(7, 0), Is.False);
         }
 
-        [Test] public void Bank_MovesAllUnbankedToBanked()
+        [Test] public void Bank_MovesTheLegacyUnbankedLootToBanked_PiecesAreAlreadySafe()
         {
             DiveHaul h = Haul();
             h.AddPiece(DiveHaul.PieceId(1, 0)); h.AddLoot(7, 2); h.AddLoot(7, 1); h.AddLoot(9, 4);
+            Assert.That(h.BankedPieceCount, Is.EqualTo(1));
             h.Bank();
-            Assert.That(h.UnbankedPieceCount, Is.EqualTo(0)); Assert.That(h.BankedPieceCount, Is.EqualTo(1));
+            Assert.That(h.BankedPieceCount, Is.EqualTo(1));
             Assert.That(h.UnbankedLootCount, Is.EqualTo(0)); Assert.That(h.BankedLootCount, Is.EqualTo(7));
             Assert.That(h.LootBanked(7), Is.EqualTo(3));
             h.AddLoot(7, 2); h.Bank();
             Assert.That(h.LootBanked(7), Is.EqualTo(5), "banking accumulates");
         }
 
-        [Test] public void FailDive_DropsUnbankedAndReturnsPiecesToTheirFloors()
+        [Test] public void AddPiece_IsSafeAtOnce_FailDiveKeepsIt()
         {
             DiveHaul h = Haul();
-            h.AddPiece(DiveHaul.PieceId(1, 0)); h.Bank(); h.AddLoot(7, 2); h.Bank();
+            int assigned = h.PiecesLeft(1);
+            Assert.That(h.AddPiece(DiveHaul.PieceId(1, 0)), Is.True);
+            h.FailDive();
+            Assert.That(h.IsCollected(DiveHaul.PieceId(1, 0)), Is.True);
+            Assert.That(h.IsBanked(DiveHaul.PieceId(1, 0)), Is.True);
+            Assert.That(h.PiecesLeft(1), Is.EqualTo(assigned - 1));
+            Assert.That(h.AddPiece(DiveHaul.PieceId(1, 0)), Is.False, "a kept piece cannot be found twice");
+        }
+
+        [Test] public void FailDive_DropsTheLegacyUnbankedLoot_KeepsEveryPieceAndTheBankedLoot()
+        {
+            DiveHaul h = Haul();
+            h.AddPiece(DiveHaul.PieceId(1, 0)); h.AddLoot(7, 2); h.Bank();
             h.AddPiece(DiveHaul.PieceId(2, 0)); h.AddPiece(DiveHaul.PieceId(3, 0)); h.AddLoot(7, 9);
             Assert.That(h.PiecesLeft(2), Is.EqualTo(2));
             h.FailDive();
-            Assert.That(h.UnbankedPieceCount, Is.EqualTo(0)); Assert.That(h.UnbankedLootCount, Is.EqualTo(0));
-            Assert.That(h.PiecesLeft(2), Is.EqualTo(3), "unbanked piece is back on floor 2");
-            Assert.That(h.PiecesLeft(3), Is.EqualTo(1));
-            Assert.That(h.PiecesLeft(1), Is.EqualTo(1), "banked piece stays collected");
-            Assert.That(h.BankedPieceCount, Is.EqualTo(1)); Assert.That(h.LootBanked(7), Is.EqualTo(2));
-            Assert.That(h.AddPiece(DiveHaul.PieceId(2, 0)), Is.True, "a returned piece can be found again");
+            Assert.That(h.UnbankedLootCount, Is.EqualTo(0));
+            Assert.That(h.PiecesLeft(2), Is.EqualTo(2), "the piece found on floor 2 stays found");
+            Assert.That(h.PiecesLeft(3), Is.EqualTo(0));
+            Assert.That(h.PiecesLeft(1), Is.EqualTo(1));
+            Assert.That(h.BankedPieceCount, Is.EqualTo(3)); Assert.That(h.LootBanked(7), Is.EqualTo(2));
+        }
+
+        [Test] public void RestoreBankedPiece_IsSafeButNotFoundThisDive()
+        {
+            DiveHaul h = Haul();
+            Assert.That(h.RestoreBankedPiece(DiveHaul.PieceId(1, 0)), Is.True);
+            Assert.That(h.RestoreBankedPiece(DiveHaul.PieceId(1, 0)), Is.False);
+            Assert.That(h.RestoreBankedPiece(999), Is.False);
+            Assert.That(h.BankedPieceCount, Is.EqualTo(1)); Assert.That(h.FoundThisDive, Is.EqualTo(0));
+            h.AddPiece(DiveHaul.PieceId(1, 1));
+            Assert.That(h.FoundThisDive, Is.EqualTo(1));
         }
 
         [Test] public void DiveState_ClearedFloorsStayCleared()
@@ -83,7 +108,7 @@ namespace SleepingCalamity.Tests.EditMode
             var s = new DiveState(Haul());
             s.Haul.AddPiece(DiveHaul.PieceId(1, 0));
             foreach (int f in new[] { 0, 1, 3 }) { s.SetFloor(f); Assert.That(s.BankAtPoint(), Is.False, "floor " + f); }
-            Assert.That(s.Haul.UnbankedPieceCount, Is.EqualTo(1));
+            Assert.That(s.Haul.BankedPieceCount, Is.EqualTo(1), "safe on pickup, whether or not a bank was pressed");
             Assert.That(s.CheckpointReached, Is.False);
             s.SetFloor(2); Assert.That(s.BankAtPoint(), Is.True);
             Assert.That(s.CheckpointReached, Is.True); Assert.That(s.Haul.BankedPieceCount, Is.EqualTo(1));
@@ -102,10 +127,50 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(s.CanBankHere, Is.False);
             Assert.That(s.BankAtPoint(), Is.False, "bank spam with nothing new is refused");
             s.Haul.AddPiece(DiveHaul.PieceId(2, 0));
-            Assert.That(s.BankAtPoint(), Is.True, "a new piece can be banked");
+            Assert.That(s.BankAtPoint(), Is.False, "a piece is safe on pickup: it gives no second bank press");
+            s.Bags.For("a").Add(104);
+            Assert.That(s.BankAtPoint(), Is.True, "a player carrying something can bank again");
+            Assert.That(s.Bags.For("a").Carried, Is.EqualTo(new[] { 104 }), "no bank visit was open, so nothing was picked");
+            Assert.That(s.BankAtPoint(), Is.True, "still carrying: still allowed");
+            s.Bags.For("a").GoHome();
             Assert.That(s.BankAtPoint(), Is.False);
             s.FailDive(); s.SetFloor(2);
             Assert.That(s.BankAtPoint(), Is.True, "a new dive re-arms the bank point");
+        }
+
+        [Test] public void FailDive_FailsEveryBagAtTheCurrentFloor()
+        {
+            var s = new DiveState(Haul());
+            s.SetFloor(3);
+            s.Bags.For("a").Add(104);
+            s.Bags.For("b").Add(110); s.Bags.For("b").AddGold(8);
+            s.FailDive();
+            Assert.That(s.CurrentFloor, Is.EqualTo(DiveState.Town));
+            PlayerBag a = s.Bags.For("a");
+            Assert.That(a.Satchel.Waiting.Floor, Is.EqualTo(3), "the floor before it reset");
+            Assert.That(a.Satchel.Waiting.Items, Is.EqualTo(new[] { 104 }));
+            Assert.That(a.Carried, Is.Empty);
+            Assert.That(s.Bags.For("b").Gold, Is.EqualTo(4)); Assert.That(s.Bags.For("b").Satchel.Waiting.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test] public void BankAtPoint_PushesOnOpenBags_BankInTownBringsAllHome()
+        {
+            var s = new DiveState(Haul());
+            s.SetFloor(2);
+            PlayerBag a = s.Bags.For("a"), b = s.Bags.For("b");
+            a.Add(101); a.Add(112); b.Add(104);
+            a.OpenBank(1);                                   // b has no open visit
+            Assert.That(s.BankAtPoint(), Is.True);
+            Assert.That(a.BankedThisDive.ContainsKey(112) && a.BankedThisDive.Count == 1, Is.True, "the best item fills the free slot");
+            Assert.That(a.Carried, Is.EqualTo(new[] { 101 }));
+            Assert.That(b.Carried, Is.EqualTo(new[] { 104 }), "a bag with no open visit is untouched");
+            a.AddGold(6);
+            s.SetFloor(DiveState.Town);
+            Assert.That(s.BankInTown(), Is.True);
+            Assert.That(a.Carried, Is.Empty); Assert.That(b.Carried, Is.Empty);
+            Assert.That(a.Stash, Is.EqualTo(new Dictionary<int, int> { { 101, 1 }, { 112, 1 } }));
+            Assert.That(b.Stash, Is.EqualTo(new Dictionary<int, int> { { 104, 1 } }));
+            Assert.That(a.Gold, Is.EqualTo(6));
         }
 
         [Test] public void DiveState_StartFloor_ReturnDiveOnlyWhenFloors1And2AreDone()
@@ -138,7 +203,7 @@ namespace SleepingCalamity.Tests.EditMode
                 return string.Join(",", s.Haul.BankedPieces) + "|" + s.Haul.PiecesLeft(1) + s.Haul.PiecesLeft(2) + s.Haul.PiecesLeft(3) + "|" + s.ClearedMask + s.CheckpointReached;
             }
             Assert.That(Run(), Is.EqualTo(Run()));
-            Assert.That(Run(), Is.EqualTo("100,200|112|1True"));
+            Assert.That(Run(), Is.EqualTo("100,200,300|111|1True"));
         }
     }
 }

@@ -1,6 +1,7 @@
 // Core/Cellars/StirMeter.cs: the dive's stir meter (PHASE1 7.2 "The stir meter"). Pure C#, deterministic, no engine references; time comes in as Tick(dt).
-// Value = clamp((PerFloorCleared x floorsClearedThisDive + PerUnbankedPiece x unbankedPieces) x (1 + PerExtraPlayer x (playersPresent - 1)), 0, Max).
-// The piece term reads the haul live, so a checkpoint bank lowers it; the floor term only goes back to 0 on ResetAll (town bank or failed dive). Chest loot never counts.
+// Value = clamp((PerFloorCleared x floorsClearedThisDive) x (1 + PerExtraPlayer x (playersPresent - 1)), 0, Max).
+// Since the per-player loot plan (spec 4.5) pieces no longer feed the meter: they are safe on pickup. Stir comes from floors cleared only; the floor term goes back to 0 on
+// ResetAll (town bank or failed dive). Loot never counts. Valuables-driven stir is plan 3 (DiveStir).
 // Thresholds latch for the dive (stay on if the value drops): extra enemy, hunter, deep closes. Deep closes also starts a countdown; Tick returns true when it
 // hits 0 (the owner fails the dive); OnBank stops it. After a stop it re-arms only once the value has dropped below the threshold again.
 // Owned by DiveState (host). Numbers: StirTuning.
@@ -10,7 +11,6 @@ namespace SleepingCalamity.Core
 {
     public sealed class StirMeter
     {
-        private readonly DiveHaul _haul;
         private int _floorMask;      // floors counted this dive (bit f-1)
         private int _players = 1;
         private bool _armed = true, _running;
@@ -23,7 +23,8 @@ namespace SleepingCalamity.Core
         public bool DeepClosesLatched { get { Refresh(); return _deep; } }
         public event Action HunterReleased;   // fires once per latch; the real hunter enemy is later work
 
-        public StirMeter(DiveHaul haul, StirTuning tuning) { _haul = haul; Tuning = tuning; }
+        // haul stays in the signature (callers pass it; plan 3 deletes DiveHaul's loot path) but the meter no longer reads it.
+        public StirMeter(DiveHaul haul, StirTuning tuning) { Tuning = tuning; }
 
         public int PlayersPresent { get => _players; set { _players = Math.Max(1, value); Refresh(); } }
         public int FloorsCleared { get { int n = 0; for (int m = _floorMask; m != 0; m >>= 1) n += m & 1; return n; } }
@@ -35,13 +36,13 @@ namespace SleepingCalamity.Core
         {
             get
             {
-                float raw = Tuning.PerFloorCleared * FloorsCleared + Tuning.PerUnbankedPiece * _haul.UnbankedPieceCount;
+                float raw = Tuning.PerFloorCleared * FloorsCleared;
                 float v = raw * (1f + Tuning.PerExtraPlayer * (_players - 1));
                 return Math.Max(0f, Math.Min(Tuning.Max, v));
             }
         }
 
-        // Re-evaluates latches after anything that can move the value (piece added, floor cleared, player count, tick).
+        // Re-evaluates latches after anything that can move the value (floor cleared, player count, tick).
         public void Refresh()
         {
             float v = Value;
@@ -64,7 +65,7 @@ namespace SleepingCalamity.Core
             _floorMask |= bit; Refresh(); return true;
         }
 
-        // Any successful bank (checkpoint, heart or town): the countdown stops. The haul has already moved its pieces.
+        // Any successful bank (checkpoint, heart or town): the countdown stops.
         public void OnBank() { _running = false; _secondsLeft = 0f; Refresh(); }
 
         // Town bank and failed dive: floor term, latches and countdown all clear.

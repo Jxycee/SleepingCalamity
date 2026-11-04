@@ -5,7 +5,7 @@ namespace SleepingCalamity.Core
     public struct StirTuning
     {
         public float PerFloorCleared;       // meter points per floor cleared this dive
-        public float PerUnbankedPiece;      // meter points per bakery piece currently carried unbanked
+        public float PerUnbankedPiece;      // unused since plan 2 (spec 4.5); DiveStir replaces it in plan 3
         public float PerExtraPlayer;        // added to the multiplier per player beyond the first (0.25 = +25% each)
         public float Max;                   // clamp ceiling
         public float ExtraEnemyThreshold;   // latch: one extra enemy per room

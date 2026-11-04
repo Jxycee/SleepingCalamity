@@ -141,7 +141,7 @@ namespace SleepingCalamity.Presentation
             {
                 StirValue = Mathf.RoundToInt(stir.Value), ExtraEnemiesPerRoom = stir.ExtraEnemiesPerRoom, DeepSecondsLeft = Mathf.CeilToInt(stir.DeepClosesSecondsLeft),
                 HunterLatched = stir.HunterLatched, DeepClosesLatched = stir.DeepClosesLatched,
-                UnbankedPieces = h.UnbankedPieceCount, BankedPieces = h.BankedPieceCount, UnbankedLoot = h.UnbankedLootCount,
+                UnbankedPieces = 0 /* pieces are safe on pickup (plan 2 task 3); Task 4 replaces this field with FoundPieces */, BankedPieces = h.BankedPieceCount, UnbankedLoot = h.UnbankedLootCount,
                 LeftFloor1 = h.PiecesLeft(1), LeftFloor2 = h.PiecesLeft(2), LeftFloor3 = h.PiecesLeft(3),
                 ClearedMask = _state.ClearedMask, CurrentFloor = _state.CurrentFloor, CheckpointReached = _state.CheckpointReached, BankSpent = _state.BankUsed(_state.CurrentFloor) && !_state.CanBankHere,
             };

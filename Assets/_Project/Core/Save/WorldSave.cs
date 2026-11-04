@@ -29,6 +29,8 @@ namespace SleepingCalamity.Core
         public ResidentsSave Residents;           // null: no resident state yet
         public DiveSave Dive;                     // null: no dive progress yet
         public WorldPlayersSave Players;        // null: no world created yet (the host flow creates its kind and players on the first start)
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public BagsSave Bags;                   // null: no player has gold, home stash or a waiting satchel yet (per-player loot, BagsSave.cs); a world with none writes no "bags" key
 
         [JsonExtensionData] public Dictionary<string, object> Extra;   // unknown top-level members, round-tripped untouched
     }

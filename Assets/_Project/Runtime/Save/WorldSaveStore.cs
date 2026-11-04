@@ -41,6 +41,7 @@ namespace SleepingCalamity.Runtime
             ("town", typeof(TownSave), TownSaveRules.SectionTown),
             ("residents", typeof(ResidentsSave), TownSaveRules.SectionResidents),
             ("dive", typeof(DiveSave), TownSaveRules.SectionDive),
+            ("bags", typeof(BagsSave), WorldSaveRules.SectionBags),
         };   // every optional WorldSave section needs its row here, or one misfit value costs the whole file (WorldSaveStoreTests checks)
 
         // The sections every field of WorldSave maps to (by its JSON key), for the test that no section is missing from the table.
@@ -64,6 +65,7 @@ namespace SleepingCalamity.Runtime
             ("dive", "bankedLoot", typeof(LootCountSave)),
             ("dive", "onFloorPieces", typeof(int)),
             ("dive", "onFloorResidents", typeof(string)),
+            ("bags", "players", typeof(PlayerBagSave)),
         };
 
         // Members of a section that are checked one by one: a member that does not fit is dropped alone (section key, member key, type). A dropped

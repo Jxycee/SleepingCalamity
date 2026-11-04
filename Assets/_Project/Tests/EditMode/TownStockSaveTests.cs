@@ -146,14 +146,63 @@ namespace SleepingCalamity.Tests.EditMode
             var stock = new TownStock(HollowmereLayout.Create());
             DiveState dive = NewDive();
             dive.Haul.AddPiece(100); dive.Haul.Bank();
-            dive.Haul.AddPiece(201);   // carried, unbanked: lost to a quit
+            dive.Haul.AddPiece(201);   // picked up mid-dive: safe at once, so a quit keeps it
             stock.Receive(dive.Haul, false);
             (TownStock r, DiveState rd) = Reload(stock, dive);
             Assert.That(rd.Haul.IsCollected(100), Is.True);
             Assert.That(rd.Haul.PiecesLeft(1), Is.EqualTo(1), "floor 1 holds one piece fewer");
-            Assert.That(rd.Haul.IsCollected(201), Is.False, "an unbanked piece is back on its floor");
+            Assert.That(rd.Haul.IsCollected(201), Is.True, "a piece picked up mid-dive never goes back to its floor");
+            Assert.That(r.State.InStock(201), Is.True);
             Assert.That(rd.Haul.AddPiece(100), Is.False, "never picked up twice");
             Assert.That(r.State.InStock(100), Is.True);
+        }
+
+        static readonly PlayerKey KeyA = new PlayerKey(IdentityKind.Ugs, "aaa");
+
+        // Catches: bags dropped on the way through TownStock.Capture/Restore, a client-id fallback bag written, a mid-dive bag written as anything but the failed copy (items in the
+        // stash and in the satchel at once, or lost), the live bag changed by the capture.
+        [Test]
+        public void Reload_BagsComeBack_AMidDiveBagAsTheFailedCopy()
+        {
+            var stock = new TownStock(HollowmereLayout.Create());
+            DiveState dive = NewDive();
+            PlayerBag a = dive.Bags.For(KeyA.ToString());
+            a.Add(101); a.OpenBank(1); a.Pick(0); a.PushOn();   // banked this dive
+            a.Add(104); a.AddGold(7);                            // carried
+            dive.Bags.For("3").AddGold(5);                       // a client-id fallback bag
+            dive.SetFloor(2);
+            (TownStock r, DiveState rd) = Reload(stock, dive);
+            PlayerBag back = rd.Bags.For(KeyA.ToString());
+            Assert.That(back.Gold, Is.EqualTo(3));
+            Assert.That(back.Stash, Is.EqualTo(new Dictionary<int, int> { { 101, 1 } }));
+            Assert.That(back.Satchel.Waiting.Floor, Is.EqualTo(2)); Assert.That(back.Satchel.Waiting.Items, Is.EqualTo(new[] { 104 }));
+            Assert.That(back.Carried, Is.Empty);
+            Assert.That(rd.Bags.All.Select(kv => kv.Key), Is.EqualTo(new[] { KeyA.ToString() }), "the fallback bag was not saved");
+            Assert.That(a.Carried, Is.EqualTo(new[] { 104 }), "capturing leaves the live bag alone"); Assert.That(a.DiveGold, Is.EqualTo(7));
+        }
+
+        // Catches: bags written into a world that has none, or a snapshot with no dive state inventing a bags section.
+        [Test]
+        public void Capture_WithNoBagsWithLoot_WritesAPristineSection()
+        {
+            var stock = new TownStock(HollowmereLayout.Create());
+            DiveState dive = NewDive();
+            dive.Bags.For(KeyA.ToString());
+            TownSnapshot snap = stock.Capture(dive, null);
+            Assert.That(BagsSaveRules.IsPristine(snap.Bags), Is.True);
+            Assert.That(stock.Capture(null, null).Bags, Is.Null, "no dive state: the source says nothing");
+        }
+
+        // Catches: BuildDive (called again at the first dive start) losing the saved bags.
+        [Test]
+        public void BuildDive_RestoresTheSavedBags()
+        {
+            var stock = new TownStock(HollowmereLayout.Create());
+            var snap = new TownSnapshot { Bags = new BagsSave() };
+            snap.Bags.Players.Add(new PlayerBagSave { Identity = 1, Id = "aaa", Gold = 8 });
+            DiveState d = stock.BuildDive(snap, PerFloor, StirTuning.Default);
+            Assert.That(d.Bags.For(KeyA.ToString()).Gold, Is.EqualTo(8));
+            Assert.That(stock.BuildDive(null, PerFloor, StirTuning.Default).Bags.All, Is.Empty);
         }
     }
 }

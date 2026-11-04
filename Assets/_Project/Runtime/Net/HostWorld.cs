@@ -119,7 +119,7 @@ namespace SleepingCalamity.Runtime
         {
             _townSource = null;
             _town = saved == null ? new TownSnapshot()
-                : TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = saved.Stock, Town = saved.Town, Residents = saved.Residents, Dive = saved.Dive }, null);
+                : TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = saved.Stock, Town = saved.Town, Residents = saved.Residents, Dive = saved.Dive, Bags = saved.Bags }, null);
         }
 
         // One live source at a time (a newer hub takes over); the old one is captured first so nothing is lost.
@@ -143,7 +143,18 @@ namespace SleepingCalamity.Runtime
         {
             if (_townSource == null) return;
             TownSnapshot live = _townSource.CaptureTown();
+            if (live != null) live.Bags = RecordedBagsOnly(live.Bags);   // only the world's recorded players' bags reach the file (a client-id fallback or unrecorded player's never do)
             if (live != null) _town = TownSaveRules.CleanSnapshot(TownSaveRules.MergeLive(live, _town), null, null, false);   // what the source did not say (null) keeps the previous copy
+        }
+
+        // The bags of the recorded players only; null (the previous copy is kept) when the source said nothing or the world has no players yet.
+        private BagsSave RecordedBagsOnly(BagsSave bags)
+        {
+            if (bags == null || Players == null) return null;
+            var kept = new BagsSave { Extra = bags.Extra };
+            foreach (PlayerBagSave p in bags.Players)
+                if (p != null && Players.IsRecorded(new PlayerKey((IdentityKind)p.Identity, p.Id))) kept.Players.Add(p);
+            return kept;
         }
 
         // Captures and copies each town section into `save` when it differs. A fresh-world (pristine) section is not written for a save that has none, so old saves stay as
@@ -159,6 +170,7 @@ namespace SleepingCalamity.Runtime
             changed |= SyncSection(ref save.Town, copy.Town, TownSaveRules.IsPristine(copy.Town));
             changed |= SyncSection(ref save.Residents, copy.Residents, TownSaveRules.IsPristine(copy.Residents));
             changed |= SyncSection(ref save.Dive, copy.Dive, TownSaveRules.IsPristine(copy.Dive));
+            changed |= SyncSection(ref save.Bags, copy.Bags, BagsSaveRules.IsPristine(copy.Bags));   // a world with no bags writes no "bags" key
             return changed;
         }
 
@@ -205,7 +217,11 @@ namespace SleepingCalamity.Runtime
                 PlayerKey previousOwner = world.Recorded.Count > 0 ? world.Recorded[0] : default;
                 if (world.Kind == WorldKind.Solo && !world.IsRecorded(key) && world.RebindSoloOwner(key))
                 {
-                    if (previousOwner.Id != null) GrowthSaves.Rename(_weapons, previousOwner.Id, key.Id);   // the Solo world's weapons follow its owner (A32)
+                    if (previousOwner.Id != null)
+                    {
+                        GrowthSaves.Rename(_weapons, previousOwner.Id, key.Id);   // the Solo world's weapons follow its owner (A32)
+                        BagsSaveRules.Rename(_town.Bags, previousOwner, key);     // so do the owner's gold, stash and waiting satchel
+                    }
                     Debug.LogWarning("HostWorld: the Solo world's owner key did not match this machine's key; the owner is now " + key + ".");
                     RaiseChanged();
                 }
