@@ -734,7 +734,7 @@ namespace SleepingCalamity.Tests.PlayMode
             string unrecorded = PlayerKey.Local(PlayModeHarness.PlayerId(30)).ToString();
             haul.Bags.For("777").AddGold(3);
             haul.Bags.For(unrecorded).AddGold(4);
-            Assert.That(haul.ServerSetFloor(DiveState.Town), Is.True, "the same two steps as the dive's go-home");
+            haul.Bags.GoHomeAll();   // the bags come home the way the bank room's go-home does (plan 3 task 12 ports this test to the real flow)
             Assert.That(dir.ServerAbandonDive(), Is.True, "closes the dive (nothing is carried and no dive gold is left, so it changes no bag)");
             PlayerBag a = haul.ServerBagOf(ca);
             Assert.That(a.Gold, Is.EqualTo(5));
@@ -742,11 +742,11 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(a.Satchel.Waiting, Is.Null, "premise: no satchel yet");
 
             dir.SeedOverride = 6102u;
-            Assert.That(dir.ServerStartDive(2), Is.True);
+            Assert.That(dir.ServerStartDive(), Is.True);
             Assert.That(haul.ServerAddItem(ca, 110), Is.True);
-            Assert.That(dir.ServerAbandonDive(), Is.True, "the dive fails on floor 2 with 110 carried");
+            Assert.That(dir.ServerAbandonDive(), Is.True, "the dive fails on floor 1 with 110 carried");
             Assert.That(a.Satchel.Waiting, Is.Not.Null);
-            Assert.That(a.Satchel.Waiting.Floor, Is.EqualTo(2));
+            Assert.That(a.Satchel.Waiting.Floor, Is.EqualTo(1));
             Assert.That(a.Satchel.Waiting.Items, Is.EqualTo(new[] { 110 }));
 
             app.WorldSaveFlow.SaveNow();
@@ -771,7 +771,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(back.Gold, Is.EqualTo(5), "A's gold");
             Assert.That(back.Stash, Is.EqualTo(new Dictionary<int, int> { { 104, 1 } }), "A's stash");
             Assert.That(back.Satchel.Waiting, Is.Not.Null, "A's waiting satchel");
-            Assert.That(back.Satchel.Waiting.Floor, Is.EqualTo(2));
+            Assert.That(back.Satchel.Waiting.Floor, Is.EqualTo(1));
             Assert.That(back.Satchel.Waiting.Items, Is.EqualTo(new[] { 110 }));
             Assert.That(back.Carried, Is.Empty);
             Assert.That(haul2.Bags.TryGet("777", out _), Is.False, "the fallback bag was not saved");
@@ -792,7 +792,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(p.Stash.Count, Is.EqualTo(1), when);
             Assert.That((p.Stash[0].ItemId, p.Stash[0].Count), Is.EqualTo((104, 1)), when);
             Assert.That(p.Satchel, Is.Not.Null, when + ": the waiting satchel");
-            Assert.That(p.Satchel.Floor, Is.EqualTo(2), when);
+            Assert.That(p.Satchel.Floor, Is.EqualTo(1), when);
             Assert.That(p.Satchel.Items, Is.EqualTo(new[] { 110 }), when);
         }
     }
