@@ -59,5 +59,19 @@ namespace SleepingCalamity.Tests.EditMode
             for (ulong seed = 1; seed <= 200; seed++) seen.Add(BankSlots.PickExtraSlotOwner(seed, present, -1));
             Assert.That(seen, Is.EquivalentTo(present));
         }
+
+        [Test]
+        public void PickExtraSlotOwner_EmptyList_ReturnsMinusOne()
+        {
+            Assert.That(BankSlots.PickExtraSlotOwner(7UL, new List<int>(), -1), Is.EqualTo(-1));
+            Assert.That(BankSlots.PickExtraSlotOwner(7UL, new List<int>(), 2), Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void IsStirValuable_OnlyWeaponAndLarge()
+        {
+            foreach (DiveItemKind k in Enum.GetValues(typeof(DiveItemKind)))
+                Assert.That(BankSlots.IsStirValuable(k), Is.EqualTo(k == DiveItemKind.Weapon || k == DiveItemKind.Large), k.ToString());
+        }
     }
 }

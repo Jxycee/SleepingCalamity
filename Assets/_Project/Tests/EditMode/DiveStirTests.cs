@@ -86,5 +86,81 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(s.RewardValue, Is.EqualTo(0f));
             Assert.That(s.Value, Is.EqualTo(0f));
         }
+
+        [Test]
+        public void PushOn_WithValuablesCarried_DoesNotRelatch()
+        {
+            var s = new DiveStir();
+            s.PlayersPresent = 4;
+            s.UnbankedValuables = 10;
+            s.OnPushOn();
+            Assert.That(s.Value, Is.EqualTo(0f));
+            Assert.That(s.ExtraEnemyLatched, Is.False);
+            Assert.That(s.HunterLatched, Is.False);
+            s.UnbankedValuables = 12;
+            Assert.That(s.Value, Is.EqualTo(2 * 5 * 2f).Within(0.001f), "only the 2 above the baseline stir the second half");
+        }
+
+        [Test]
+        public void PushOn_RewardCountsCarriedValuablesOnce()
+        {
+            var s = new DiveStir();
+            s.OnFloorCleared(1);
+            s.OnFloorCleared(2);
+            s.UnbankedValuables = 4;
+            Assert.That(s.RewardValue, Is.EqualTo(40f).Within(0.001f));
+            s.OnPushOn();
+            Assert.That(s.RewardValue, Is.EqualTo(40f).Within(0.001f), "not 80");
+        }
+
+        [Test]
+        public void OnFloorCleared_RespectsTheHalf()
+        {
+            var s = new DiveStir();
+            Assert.That(s.OnFloorCleared(6), Is.False, "second-half floor before push-on");
+            s.OnPushOn();
+            Assert.That(s.OnFloorCleared(5), Is.False, "first-half floor after push-on");
+            Assert.That(s.OnFloorCleared(6), Is.True);
+        }
+
+        [Test]
+        public void ResetForNewDive_ClearsTheHalfAndBaseline()
+        {
+            var s = new DiveStir();
+            s.UnbankedValuables = 6;
+            s.OnPushOn();
+            s.ResetForNewDive();
+            Assert.That(s.OnFloorCleared(1), Is.True);
+            s.UnbankedValuables = 3;
+            Assert.That(s.Value, Is.EqualTo(25f).Within(0.001f), "baseline is gone");
+        }
+
+        [Test]
+        public void CaptureRestore_RoundTrips()
+        {
+            var s = new DiveStir();
+            s.PlayersPresent = 2;
+            for (int f = 1; f <= 5; f++) s.OnFloorCleared(f);
+            s.UnbankedValuables = 6;
+            s.OnPushOn();
+            s.UnbankedValuables = 20;
+            s.OnFloorCleared(6);
+            s.BeginCollapse(100f);
+            s.Tick(10f);
+            DiveStir.State st = s.Capture();
+
+            var r = new DiveStir();
+            r.PlayersPresent = 2;
+            r.Restore(st);
+            Assert.That(r.CollapseRunning, Is.True);
+            Assert.That(r.CollapseSecondsLeft, Is.EqualTo(s.CollapseSecondsLeft).Within(0.001f));
+            Assert.That(r.Value, Is.EqualTo(s.Value).Within(0.001f));
+            Assert.That(r.RewardValue, Is.EqualTo(s.RewardValue).Within(0.001f));
+            Assert.That(r.ExtraEnemyLatched, Is.EqualTo(s.ExtraEnemyLatched));
+            Assert.That(r.HunterLatched, Is.EqualTo(s.HunterLatched));
+            Assert.That(r.CollapsePending, Is.EqualTo(s.CollapsePending));
+            Assert.That(r.OnFloorCleared(5), Is.False, "the half is restored");
+            Assert.That(r.Capture(), Is.EqualTo(st));
+        }
     }
 }
