@@ -80,3 +80,10 @@ From `docs/superpowers/plans/2026-11-03-per-player-loot.md` (decisions and revie
 - 2026-11-03: HUD 'N home' undercounts pieces after a reload (restored pieces are _home, which BankedPieceCount does not count); Summary.BankedPieces comment is wrong.
 - 2026-11-03: an absent (disconnected) player's bag follows the party through push-on, go-home and fail (DisconnectRejoinTests case 1 pins it); spec silent.
 - 2026-11-03: test gap: the host's own bag is never saved and reloaded in a test (Save_BagsSurviveAWorldReload covers a client's bag); the code path is the same.
+
+## Triage 2026-11-04 (against merges since Nov 1)
+- Per-player loot section above: all items stay open and are owned by plan 3 (`docs/superpowers/plans/` roadmap row 3). Nothing closed by the plan 2 merge `ee9435ef`; the 8 stale "shared haul" comments still exist (grep "shared haul" in `Assets/_Project`).
+- 2026-11-01 far tree line / hedgerow for the low Hollowmere cameras: the backdrop form merged in `894b46df` (visual review A12) may have covered it. Re-check on the next Hollowmere capture round before building anything.
+- 2026-11-02 F7 (`StairHandoverTests` leaves `TestHubGround`, line 230): still open, a one-line teardown fix for the next test cleanup.
+- Re-filed nowhere else: Art, Tooling and Town life items are unaffected by the Nov 1-4 merges (Hollowmere polish, junctions, rooms v2, story bible).
+
