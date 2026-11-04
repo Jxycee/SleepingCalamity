@@ -75,6 +75,15 @@ namespace SleepingCalamity.Core
             return Items[0].Id;
         }
 
+        // 0 for an unknown id or a key.
         public static int RankOf(int id) { foreach (LootItem i in Items) if (i.Id == id) return i.Rank; return 0; }
+
+        // What a loot id is for the bag and the bank (placeholder: every table item is Large; keys are Keys; an unknown id is Usable).
+        public static DiveItemKind KindOf(int itemId)
+        {
+            if (itemId == RoomKeyId || itemId == GateKeyId) return DiveItemKind.Key;
+            foreach (LootItem i in Items) if (i.Id == itemId) return DiveItemKind.Large;
+            return DiveItemKind.Usable;
+        }
     }
 }
