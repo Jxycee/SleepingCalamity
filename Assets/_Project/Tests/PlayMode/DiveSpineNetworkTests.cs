@@ -410,10 +410,13 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => contents.GateKeyCarrierEnemy != null, Timeout, "entering the carrier's room never spawned the carrier");
             var hit = new EnemyHitInput { Attack = AttackCatalog.Axe.Attacks[0], Atk = 100000f, PartIndex = -1, CritChance = 0f };
             Enemy carrier = contents.GateKeyCarrierEnemy;
-            for (int i = 0; i < 6 && carrier.Alive; i++) carrier.ServerApplyHit(hit, carrier.transform.position + Vector3.back, Time.timeAsDouble);
-            yield return PlayModeHarness.WaitUntil(() => contents.State.GateKey == 1, Timeout, "the carrier never dropped the gate key");
+            // The hero steps back to the stair before the kill: a carrier that chased the hero would otherwise die inside GateKeyRange and the key would be picked up at once (the stair would not stay shut).
             Move(rig.OwnHeroes[0], stair + new Vector3(1f, 0.1f, 0f));
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair) < 3f, Timeout, "the client hero never reached the stair");
+            for (int i = 0; i < 6 && carrier.Alive; i++) carrier.ServerApplyHit(hit, carrier.transform.position + Vector3.back, Time.timeAsDouble);
+            yield return PlayModeHarness.WaitUntil(() => contents.State.GateKey != 0, Timeout, "the carrier never dropped the gate key");
+            Assert.That(Flat(contents.State.GateKeyPos, stair), Is.GreaterThan(CellarContentsSync.GateKeyRange + 1f), "the key lies out of reach of the hero at the stair, so the exit stays shut");
+            Assert.That(contents.State.GateKey, Is.EqualTo(1), "the key waits on the floor");
             int handled = rig.Host.RequestsHandled;
             peer.RequestStair(1);
             yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the shut stair press never reached the host");
