@@ -37,11 +37,16 @@ One page. Read it before you author a room. The table at the end is generated fr
 
 ## Fight space
 - A full party (4 heroes, up to 8 enemies) needs 13 floor cells and a short side of 3 cells. The smallest room is 3 x 5 cells.
-- Five pool rooms fit a full party: Hanging hall, Smoke gallery, Press hall, Rack aisles and Boiler hall. The rest are solo or duo rooms.
+- Every pool combat room fits a full party except the stoke chicane (2 x 5, two heroes). The bakery combat rooms fit four heroes with their own spawns only. The lists live in `CellarRoomsV2.SmallParty` (Core/Rooms/CellarRoomsV2.cs) and a test keeps them honest.
 - This is a computed tag (`FullParty`), not an error. A small room is legal.
+- Grow a room by a row or column before adding solids.
+- A lockable or key-chest room must fit a full party: a locked floor always draws one of each.
+- A room left small is listed with the party size it fits, and encounter code must respect that size.
+- More room area means fewer six-room floors. Seeds 0-999, floors 1-3, floors with 4 / 5 / 6 rooms, before then after the pool resize: floor 1 274 / 383 / 343 then 371 / 578 / 51; floor 2 148 / 377 / 475 then 221 / 657 / 122; floor 3 215 / 395 / 390 then 269 / 620 / 111. Retry-stream floors fell (12 to 4, 52 to 20, 25 to 9); nulls, throws and last-resort floors stayed at 0. MaxFootprint (92) now binds, so plan 3 should expect 4 or 5 room floors or raise MaxFootprint on purpose.
+- Rooms resized to fit a full party: larder_pantry 2x3 to 3x5, larder_cold_store 3x4 to 3x5, wine_cask_row 4x3 to 5x3, coal_bunker 3x3 to 3x5; wine_vault_l and coal_furnace_ring stay 4x4 with one solid cell opened.
 
 ## Room data v2
-A v2 room wraps the old `CellarRoom` and adds level rows, gimmick regions (water or heat, each with its state values), stair cells, tool sockets and typed doors. The schema version is 2. `RoomDataV2.FromV1` upgrades an old room with no extras. `RoomValidatorV2` checks every reachable (cell, state) pair. The pilot is `PilotRoomsV2.HangingHall`: two levels and two water states. The floor generator still reads the old rooms.
+A v2 room wraps the old `CellarRoom` and adds level rows, gimmick regions (water or heat, each with its state values), stair cells, tool sockets and typed doors. The schema version is 2. `RoomDataV2.FromV1` upgrades an old room with no extras. `RoomValidatorV2` checks every reachable (cell, state) pair. The pilot is `PilotRoomsV2.HangingHall`: two levels and two water states. `CellarRoomsV2` wraps every pool and bakery room by reference. The floor generator still reads the old (v1) rooms until plan 3. Corridors carry no rotation in v2.
 
 ## The gym
 The gym scene is `Assets/_Project/Scenes/MetricsGym.unity` (built by `MetricsGymBuilder`; not in Build Settings). Walk it to feel a number before you use it.

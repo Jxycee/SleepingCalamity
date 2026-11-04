@@ -16,7 +16,8 @@ namespace SleepingCalamity.Tests.EditMode
         [Test] public void PoolRoomsThatFitAFullParty()
         {
             var fit = CellarRoomPool.All.Where(r => r.Kind == RoomKind.Combat && FightSpace.Fits(r, 4, 8)).Select(r => r.Id).OrderBy(s => s);
-            Assert.That(fit, Is.EqualTo(new[] { "coal_boiler_hall", "larder_hanging_hall", "larder_smoke_gallery", "wine_aisles", "wine_press_hall" }));
+            // eleven after rooms-v2 (pool resize); the stoke chicane is the small-party room
+            Assert.That(fit, Is.EqualTo(new[] { "coal_boiler_hall", "coal_bunker", "coal_furnace_ring", "larder_cold_store", "larder_hanging_hall", "larder_pantry", "larder_smoke_gallery", "wine_aisles", "wine_cask_row", "wine_press_hall", "wine_vault_l" }));
         }
 
         [Test] public void EveryPoolCombatRoom_FitsSolo()

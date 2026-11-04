@@ -255,7 +255,7 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
   - Floor 4 is a fixed layout: the taken bakery's oven maze, with the baker asleep at its heart and the Dough Warden on guard.
 - **Rooms are authored as data grids** (cells, doors, dressing sockets, spawn points) and built into greybox prefabs by an Editor builder. The art pass later swaps kit pieces into the same sockets.
 - **The Phase 1 pool:**
-  - 12 combat rooms (2x3 to 5x4 cells), 1 entry, 1 stair-exit and 1 checkpoint room;
+  - 12 combat rooms (2x5 to 5x4 cells), 1 entry, 1 stair-exit and 1 checkpoint room;
   - 6 corridor pieces (straight, corner, T, cross, dead end, door);
   - a sub-theme per floor (floor 1 larders, floor 2 wine vaults, floor 3 coal cellars), with about 70% of each floor's rooms drawn from its own sub-theme;
   - each room has 2-3 dressing variants per socket.
