@@ -72,6 +72,83 @@ namespace SleepingCalamity.Core
             return snap;
         }
 
+        // ---- plan 3 task 7: the new dive's world state (DiveSession + the director's persistent bags, checkpoint and pieces) ----
+        // A piece or person found in the dive is safe at once (spec 4.4): it goes straight into stock, so "found" is exactly "in stock or placed". False for an id already home.
+        public bool ReceiveFound(int id)
+        {
+            if (PieceCatalog.IsPerson(id)) { string r = PieceCatalog.ResidentOf(id); return r != null && State.AddResident(r) == PlaceResult.Ok; }
+            return State.AddPiece(id) == PlaceResult.Ok;
+        }
+
+        // True when the town holds the piece or person (stock or placed).
+        public bool Holds(int id)
+        {
+            if (PieceCatalog.IsPerson(id))
+            {
+                string r = PieceCatalog.ResidentOf(id);
+                if (r == null) return false;
+                if (State.ResidentInStock(r)) return true;
+                foreach (PlacedBuilding b in State.Placed) if (b.Resident == r) return true;
+                return false;
+            }
+            if (State.InStock(id)) return true;
+            foreach (PlacedBuilding b in State.Placed) foreach (int p in b.PiecesByPart) if (p == id) return true;
+            return false;
+        }
+
+        // The sections for the world save from the live session. The session's bags, checkpoint and pieces are the director's persistent ones. Found pieces are already in stock (ReceiveFound), so the
+        // dive section's on-floor lists come out right without the old haul. depths: the world's piece depths (written into the dive section so a later save keeps them); extraSlotOwner: the saved
+        // previous owner of the 3-player extra slot (a bag id or null). The dive section is marked V2Known so the saved CheckpointHeld, BossBeaten and ExtraSlotOwner never carry over a live value.
+        public TownSnapshot CaptureWorld(DiveSession session, bool bossBeaten, string extraSlotOwner, IReadOnlyDictionary<int, int> depths, ResidentsSave residents)
+        {
+            TownSnapshot snap = TownSaves.Capture(State, null, _loot, null, residents);
+            bool inDive = session != null && (session.Phase == DivePhase.Floor || session.Phase == DivePhase.BankRoom);
+            if (snap.Dive != null)
+            {
+                snap.Dive.InDive = inDive;
+                snap.Dive.ClearedMask = inDive ? session.Snapshot().ClearedMask : 0;   // fresh floors every dive: a mask only matters while the party is below
+                snap.Dive.CheckpointHeld = session != null && session.Checkpoint.Held;
+                snap.Dive.BossBeaten = bossBeaten;
+                snap.Dive.ExtraSlotOwner = extraSlotOwner;
+                snap.Dive.V2Known = true;
+                if (depths != null && depths.Count > 0)
+                {
+                    snap.Dive.PieceDepths = new List<PieceDepthSave>();
+                    foreach (KeyValuePair<int, int> kv in depths) snap.Dive.PieceDepths.Add(new PieceDepthSave { Id = kv.Key, Floor = kv.Value });
+                }
+            }
+            if (session != null) snap.Bags = BagsSaveRules.Capture(session.Bags, BagKeys(session.Bags), inDive, session.Floor);
+            return snap;
+        }
+
+        public sealed class WorldRestore
+        {
+            public PartyBags Bags = new PartyBags();
+            public DiveCheckpoint Checkpoint = new DiveCheckpoint();
+            public DivePieces Pieces;
+            public bool BossBeaten;
+            public string ExtraSlotOwner;
+        }
+
+        // Rebuilds the stock and the town from loaded (cleaned, conserved) sections and returns what the director runs with: each recorded player's gold, stash and waiting satchel, the checkpoint,
+        // and the pieces with every one the town holds marked found. An old save's banked haul comes home here (Receive), exactly as Restore did. depths: the world's piece depths.
+        public WorldRestore RestoreWorld(TownSnapshot snap, IReadOnlyDictionary<int, int> depths)
+        {
+            State = TownSaves.ToState(snap, _layout);
+            _loot.Clear(); _lootMoved.Clear();
+            foreach (KeyValuePair<int, int> kv in TownSaves.StockLoot(snap)) _loot[kv.Key] = kv.Value;
+            DiveHaul haul = TownSaves.RestoreHaul(snap?.Dive, new[] { 2, 2, 2 });
+            bool baker = snap?.Dive != null && snap.Dive.BankedResidents.Contains(TownBuildings.BakerResident);
+            Receive(haul, baker);
+            var w = new WorldRestore { Pieces = new DivePieces(depths) };
+            BagsSaveRules.Restore(snap?.Bags, w.Bags);
+            if (snap?.Dive != null) { w.Checkpoint.Restore(snap.Dive.CheckpointHeld); w.BossBeaten = snap.Dive.BossBeaten; w.ExtraSlotOwner = snap.Dive.ExtraSlotOwner; }
+            var found = new List<int>();
+            if (depths != null) foreach (int id in depths.Keys) if (Holds(id)) found.Add(id);
+            w.Pieces.Restore(found);
+            return w;
+        }
+
         static Dictionary<string, PlayerKey> BagKeys(PartyBags bags)
         {
             var keys = new Dictionary<string, PlayerKey>();
