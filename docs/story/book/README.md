@@ -5,7 +5,7 @@ Draft for the user's sign-off, to be read like a novel and annotated. Not canon 
 ## Contents
 1. [Before the Meal](01-before-the-meal.md): the feast, the lanterns, ten years, the church, the Undercroft floors 1-3 (done)
 2. [The Tally](02-the-tally.md): floors 4-10, the Brazen Ox, the feast tally, the Bell-Warden (done)
-3. Saltwake, the Drowned Arcade (planned)
+3. [Short Weight](03-short-weight.md): Saltwake, the Drowned Arcade, Pip (done)
 4. Cinderholt, the Glow Seams (planned)
 5. Thistledown, the Hive Choir (planned)
 6. Stillhollow, the Orrery (planned)
@@ -16,3 +16,5 @@ Draft for the user's sign-off, to be read like a novel and annotated. Not canon 
 - Sigils on sealed alcoves are town marks, not script letters.
 - Unticked names at the end of the Undercroft: 28 (children were never in it), not 3.
 - Tobin's first spoken lies are earlier than Part A says (chapter 1).
+- Ch2 slip to fix on annotation pass: Pip banks her boots (2.4) but wears "her new boots" on floor 7 (2.6).
+- Ch3: Saltwake's confession comes after the boss (Part B had it before); people-left line is glass net-floats.
