@@ -1,6 +1,6 @@
-Status: WORKING (polish round 4: clipping, texture stretching, minor faults)
+Status: WORKING (polish round 4, resumed)
 Archive: no
-Branch: claude/town-art-leftovers-85fa01 (worktree m5-next-639689)
+Branch: claude/hollowmere-polish-4 (worktree m5-next-639689)
 Parked branches: claude/stall-lods 2486f8a6 and claude/backdrop-shade aa70f707 merged in full (via this branch); nothing retired.
 Rounds: 3 art rounds (GPU, SC_CAPTURE_ONLY), then one full set (126 Hollowmere PNGs, both presets + LowSun) and stall LOD frames. No capture churn.
 
