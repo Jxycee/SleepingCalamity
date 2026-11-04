@@ -27,12 +27,19 @@
 // the other two (a seeded pick, BankSlotsTests), saving the previous owner (plan 3).
 // Catches (ClientWithoutARosterKey_GetsNoBag): an RPC in flight from a client the roster just dropped (or never knew) creating a throwaway bag, adding loot or gold to it, or throwing on a pick. NOT covered:
 // the no-roster fallback to the client id (tests without a session; there is no way to remove the roster in this rig).
+// Catches (Save_BagsSurviveAWorldReload): a bag's gold, stash or waiting satchel not reaching the world file through the real host flow (DiveDirector.CaptureTown -> HostWorld -> WorldSaveFlow), the
+// final save on leaving overwriting the file with a load-time copy, the restore on the next start not handing the bags back to the same PlayerKey (rejoining with a new client id), and a client-id
+// fallback bag or an unrecorded player's bag reaching the file. NOT covered: a mid-dive save (EditMode BagsSave tests and TownSaves.Reconcile), a hand-edited or damaged file (BagsSaveTests), the
+// real Hollowmere scene with its town hub, or a save-and-quit at a stair (plan 3).
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
+using SleepingCalamity.Networking;
 using SleepingCalamity.Presentation;
+using SleepingCalamity.Runtime;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -43,8 +50,15 @@ namespace SleepingCalamity.Tests.PlayMode
     {
         private const float Timeout = 25f;
 
+        private string _dir;   // the throwaway world library of a save test
+
         [UnityTearDown]
-        public IEnumerator TearDown() => PlayModeHarness.TearDownApp();
+        public IEnumerator TearDown()
+        {
+            yield return PlayModeHarness.TearDownApp();
+            WorldSaveStore.PathOverrideForTests = null;
+            if (_dir != null) { PlayModeHarness.EndSaveTest(_dir); _dir = null; }
+        }
 
         private static NetworkObject Prefab<T>(NetworkManager nm) where T : Component
         {
@@ -667,6 +681,117 @@ namespace SleepingCalamity.Tests.PlayMode
             // The key chest is shared: once anyone opens it, every client shows it lowered.
             yield return Ask(r, r.PeerA, key);
             yield return PlayModeHarness.WaitUntil(() => r.PeerA.ChestShownOpen(key) && r.PeerB.ChestShownOpen(key), Timeout, "the key chest did not lower on both clients");
+        }
+
+        // ---- save round trip (task 7) ----
+
+        private static string Stamp(string path) => File.Exists(path) ? new FileInfo(path).Length + ":" + File.GetLastWriteTimeUtc(path).Ticks : "absent";
+
+        private static WorldSave ReadWorld(string dir, string worldId)
+            => JsonSaveFile<WorldSave>.DeserializeOrNull(File.ReadAllText(Path.Combine(dir, worldId + ".json")), w => w.SchemaVersion);
+
+        // A direct host (no scenes), one client with PlayerId(clientIndex), and a configured director.
+        private static IEnumerator StartSavedHost(int clientIndex, List<PlayModeHarness.TestClient> clients, System.Action<AppBootstrap, DiveDirector> done)
+        {
+            AppBootstrap app = AppBootstrap.Current;
+            yield return PlayModeHarness.StartDirectHostWithoutScenes();
+            yield return PlayModeHarness.StartClients(app, 1, false, clients, clientIndex);
+            NetworkManager hostNm = app.NetworkManager;
+            NetworkObject o = hostNm.SpawnManager.InstantiateAndSpawn(Prefab<DiveDirector>(hostNm), hostNm.LocalClientId, false, false, false, Vector3.zero, Quaternion.identity);
+            DiveDirector dir = o.GetComponent<DiveDirector>();
+            Assert.That(dir.ServerConfigure(new Vector3(0f, 0f, -6f), new Vector3(0f, 0f, 9f), new Vector3(200f, 0f, 0f)), Is.True);
+            done(app, dir);
+        }
+
+        [UnityTest]
+        public IEnumerator Save_BagsSurviveAWorldReload()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            _dir = PlayModeHarness.BeginSaveTest();
+            string realPath = WorldSaveStore.PathForThisInstance();
+            string realBefore = Stamp(realPath);
+            WorldSaveStore.PathOverrideForTests = Path.Combine(_dir, "legacy-single-file", "world.json");   // the old single file: never the user's real world.json
+
+            // ---- session 1: A banks 5 gold and item 104 at home, then fails a dive on floor 2 carrying item 110
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveDirector dir = null;
+            yield return StartSavedHost(20, clients, (a, d) => { app = a; dir = d; });
+            string worldId = app.WorldSaveFlow.SelectedWorldId;
+            Assert.That(worldId, Is.Not.Null, "the session opened a world in the throwaway library");
+            ulong ca = clients[0].NetworkManager.LocalClientId;
+            string aKey = clients[0].Key.ToString();
+
+            dir.SeedOverride = 6101u;
+            Assert.That(dir.ServerStartDive(), Is.True);
+            DiveHaulSync haul = dir.HaulSync;
+            Assert.That(haul.PlayerIdOf(ca), Is.EqualTo(aKey), "premise: A's bag is keyed by the roster's PlayerKey");
+            Assert.That(haul.ServerAddGold(ca, 5), Is.True);
+            Assert.That(haul.ServerAddItem(ca, 104), Is.True);
+            // Two bags that must never reach the file: a client-id fallback id, and a well-formed key of a player the world does not record.
+            string unrecorded = PlayerKey.Local(PlayModeHarness.PlayerId(30)).ToString();
+            haul.HostState.Bags.For("777").AddGold(3);
+            haul.HostState.Bags.For(unrecorded).AddGold(4);
+            Assert.That(haul.ServerSetFloor(DiveState.Town), Is.True, "the same two steps as the dive's go-home");
+            Assert.That(haul.ServerBankInTown(), Is.True);
+            Assert.That(dir.ServerAbandonDive(), Is.True, "closes the dive (nothing is carried and no dive gold is left, so it changes no bag)");
+            PlayerBag a = haul.ServerBagOf(ca);
+            Assert.That(a.Gold, Is.EqualTo(5));
+            Assert.That(a.Stash, Is.EqualTo(new Dictionary<int, int> { { 104, 1 } }));
+            Assert.That(a.Satchel.Waiting, Is.Null, "premise: no satchel yet");
+
+            dir.SeedOverride = 6102u;
+            Assert.That(dir.ServerStartDive(2), Is.True);
+            Assert.That(haul.ServerAddItem(ca, 110), Is.True);
+            Assert.That(dir.ServerAbandonDive(), Is.True, "the dive fails on floor 2 with 110 carried");
+            Assert.That(a.Satchel.Waiting, Is.Not.Null);
+            Assert.That(a.Satchel.Waiting.Floor, Is.EqualTo(2));
+            Assert.That(a.Satchel.Waiting.Items, Is.EqualTo(new[] { 110 }));
+
+            app.WorldSaveFlow.SaveNow();
+            AssertFileHoldsOnlyA(ReadWorld(_dir, worldId), "after SaveNow");
+
+            // ---- the world is closed (the final save on leaving must not undo it) and reopened
+            yield return PlayModeHarness.LeaveAndWaitForLobby();
+            if (clients[0].Session.State != ConnState.Offline) yield return PlayModeHarness.Await(clients[0].Session.LeaveAsync(), Timeout);
+            AssertFileHoldsOnlyA(ReadWorld(_dir, worldId), "after leaving");
+
+            // ---- session 2: the same world, the same player under a new connection
+            var again = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app2 = null; DiveDirector dir2 = null;
+            yield return StartSavedHost(20, again, (x, d) => { app2 = x; dir2 = d; });
+            Assert.That(app2.WorldSaveFlow.SelectedWorldId, Is.EqualTo(worldId), "the same world reopened");
+            ulong ca2 = again[0].NetworkManager.LocalClientId;
+            dir2.SeedOverride = 6103u;
+            Assert.That(dir2.ServerStartDive(), Is.True);
+            DiveHaulSync haul2 = dir2.HaulSync;
+            Assert.That(haul2.PlayerIdOf(ca2), Is.EqualTo(aKey), "the rejoined player has the same bag key");
+            PlayerBag back = haul2.ServerBagOf(ca2);
+            Assert.That(back.Gold, Is.EqualTo(5), "A's gold");
+            Assert.That(back.Stash, Is.EqualTo(new Dictionary<int, int> { { 104, 1 } }), "A's stash");
+            Assert.That(back.Satchel.Waiting, Is.Not.Null, "A's waiting satchel");
+            Assert.That(back.Satchel.Waiting.Floor, Is.EqualTo(2));
+            Assert.That(back.Satchel.Waiting.Items, Is.EqualTo(new[] { 110 }));
+            Assert.That(back.Carried, Is.Empty);
+            Assert.That(haul2.HostState.Bags.TryGet("777", out _), Is.False, "the fallback bag was not saved");
+            Assert.That(haul2.HostState.Bags.TryGet(unrecorded, out _), Is.False, "the unrecorded player's bag was not saved");
+
+            Assert.That(Stamp(realPath), Is.EqualTo(realBefore), "the real world.json was not touched");
+        }
+
+        private static void AssertFileHoldsOnlyA(WorldSave file, string when)
+        {
+            Assert.That(file, Is.Not.Null, when + ": the world file reads");
+            Assert.That(file.Bags, Is.Not.Null, when + ": the bags section was written");
+            Assert.That(file.Bags.Players.Count, Is.EqualTo(1), when + ": only the recorded player with something to keep (no fallback or unrecorded bag, no empty host bag)");
+            PlayerBagSave p = file.Bags.Players[0];
+            Assert.That(p.Identity, Is.EqualTo((int)IdentityKind.Local), when);
+            Assert.That(p.Id, Is.EqualTo(PlayModeHarness.PlayerId(20)), when);
+            Assert.That(p.Gold, Is.EqualTo(5), when);
+            Assert.That(p.Stash.Count, Is.EqualTo(1), when);
+            Assert.That((p.Stash[0].ItemId, p.Stash[0].Count), Is.EqualTo((104, 1)), when);
+            Assert.That(p.Satchel, Is.Not.Null, when + ": the waiting satchel");
+            Assert.That(p.Satchel.Floor, Is.EqualTo(2), when);
+            Assert.That(p.Satchel.Items, Is.EqualTo(new[] { 110 }), when);
         }
     }
 }

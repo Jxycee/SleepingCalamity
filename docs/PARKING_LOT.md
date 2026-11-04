@@ -58,3 +58,17 @@ Sources: `docs/research/kh1-sweep.md` and `docs/research/kh2-sweep.md`.
 ## Town life (2026-11-03)
 - 2026-11-03 (user): awake residents travel between towns (shops, friends, the day's task), then home. Seamless: a service is never closed because its owner is out (the Stardew annoyance); most travel happens while the party dives. Design notes in `docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` section 9.
 - 2026-11-03 (user): food and water as craftables with simple buffs and a cooking animation, separate from bread (basic healing); cooking opens when the innkeeper is rescued on Undercroft floor 5 (spec decision 47).
+
+## Per-player loot, for plan 3 (2026-11-03)
+From `docs/superpowers/plans/2026-11-03-per-player-loot.md` (decisions and review amendments). Plan 3 owns floor content, the bank room and `DiveStir`.
+- 2026-11-03: **Per-player enemy drops.** No enemy drops loot today (only healing orbs and the shared gate key). The bag API takes any source; a drop plugs in at `DiveHaulSync.ServerAddItem(clientId, itemId)`.
+- 2026-11-03: **Place the lost satchel on its floor and pick it up** (plan 3, floor content). Today the satchel is stored and saved only (`PlayerBag.Satchel.Waiting`); `SatchelSlot.ShouldPlaceOn(floor)` and `PickUp` are ready in Core.
+- 2026-11-03: **Save the 3-player extra-slot owner** (plan 3). `DiveHaulSync._previousExtraOwner` lives in host memory for the session only, so a restart can give the extra bank slot to the same player twice in a row.
+- 2026-11-03: **Bank room UI for picks, and the decision-4 auto-fill.** Picks work by RPC (`PlayerBagSync.RequestPick`) but no screen drives them. The party bank action fills a player's empty slots with their highest-ranked bankable items so a player with no UI still banks something; plan 3's bank room may drop that auto-fill.
+- 2026-11-03: **Retire `DiveHaul`'s legacy loot and the world-wide `stock.loot` / `dive.bankedLoot`.** They stay only so old saves keep their shared loot as town storage; no new loot enters them. Plan 3 deletes them with `DiveHaul`.
+- 2026-11-03: **A chest opened with a full bag loses the item.** The chest still counts as opened for that player and the roll is reported (`LastLootItem`), but nothing lands in the bag. Decide on a drop-at-feet, a swap prompt, or refusing the open.
+- 2026-11-03: **One mistyped value inside a bag entry loses that player's whole bag** (a hand-edited file only: that entry is dropped, never the file). Could keep the parts that parse.
+- 2026-11-03: **The satchel is not counted against `PlayerBag.MaxCarried`.** A player carrying a full bag plus a picked-up satchel can hold more than the cap.
+- 2026-11-03: **Save-and-quit at a stair needs its own bag save rule** (spec decision 24). Today a mid-dive save writes every bag as a failed dive at the current floor, which is wrong for a player who quit between floors on purpose.
+- 2026-11-03: **Floors-only stir cannot reach the hunter (70) or deep-closes (100) thresholds.** Pieces no longer feed stir, so floors alone cap it at 52.5 in the live 4-floor dive. Valuables-driven stir is plan 3's `DiveStir`; PlayMode tests that need the high thresholds pass a `StirTuning` with a high `PerFloorCleared`.
+- 2026-11-03: **A late joiner's bank visit can lift the party's slots above `BankSlots.TotalSlots`.** `EnsureVisit` sizes the joiner's visit for the party as it now stands and leaves the others' visits as they were (the spec is silent).
