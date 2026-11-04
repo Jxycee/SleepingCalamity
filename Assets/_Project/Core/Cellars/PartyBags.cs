@@ -24,6 +24,11 @@ namespace SleepingCalamity.Core
             get { foreach (var kv in _bags) if (kv.Value.Carried.Count > 0) return true; return false; }
         }
 
+        public bool AnyBankOpen
+        {
+            get { foreach (var kv in _bags) if (kv.Value.BankOpen) return true; return false; }
+        }
+
         public void PushOnAll() { foreach (var kv in _bags) if (kv.Value.BankOpen) kv.Value.PushOn(); }
 
         public void GoHomeAll() { foreach (var kv in _bags) kv.Value.GoHome(); }

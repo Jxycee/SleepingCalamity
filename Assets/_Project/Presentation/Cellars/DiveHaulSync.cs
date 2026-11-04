@@ -1,6 +1,13 @@
-// Authority: host. The host owns the one DiveState (shared party haul, checkpoint flag, cleared floors, current floor; Core/Cellars/DiveState) and writes a
+// Authority: host. The host owns the one DiveState (shared pieces haul, checkpoint flag, cleared floors, current floor; Core/Cellars/DiveState) and writes a
 // compact summary to ONE host-written NetworkVariable, so every peer (and a late joiner, with the spawn) can display it without an RPC replay. Clients never
-// write: ServerAddPiece / ServerAddLoot / ServerBank / ServerFailDive / ServerSetFloor / ServerMarkCleared / ServerBegin all refuse (return false) off the host.
+// write: ServerAddPiece / ServerAddItem / ServerAddGold / ServerPick / ServerUnpick / ServerBank / ServerFailDive / ServerSetFloor / ServerMarkCleared / ServerBegin
+// all refuse (return false) off the host.
+// Per-player loot (plan 2, spec decision 39): the host owns one PlayerBag per recorded player inside DiveState.Bags (Core/Cellars/PartyBags), keyed like CombatHost growth:
+// the roster's PlayerKey string, or the client id when there is no roster, so a rejoin gets the same bag back. NO bag data rides on Net (everyone can read Net); each owner's
+// own view of their bag is the owner-only PlayerBagSync on the player prefab (plan 2 task 5). Keys, pieces and people stay one shared copy: a piece is safe on pickup
+// (PieceAdded -> the dive director moves it into the town stock at once) and never enters a bag. A client asks to pick items into bank slots by RPC (PlayerBagSync);
+// ServerPick / ServerUnpick re-check everything (the asker is up, the floor has a bank, the asker stands in range of it) and the bag re-checks capacity and item kinds.
+// Entering a floor with a bank point opens a bank visit for every connected client's bag; the party bank action (ServerBank) pushes every open visit on.
 // A client banks by asking: RequestBankRpc (SendTo.Server) -> ServerTryBankFor(sender), which the host validates before banking:
 //   1. the dive's current floor has a bank point (floor 2 checkpoint or floor 4 heart; DiveState.FloorHasBank);
 //   2. when the sender has a player object and the built floor's bank cell is known, the player is within BankRadius metres (XZ) of the bank cell centre
@@ -20,6 +27,7 @@ using Unity.Netcode;
 using UnityEngine;
 using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
+using SleepingCalamity.Runtime;
 
 namespace SleepingCalamity.Presentation
 {
@@ -31,27 +39,27 @@ namespace SleepingCalamity.Presentation
         // Everything a peer needs to draw the haul and the pieces-left counters, in one value so a client never sees a half-updated haul.
         public struct Summary : INetworkSerializable, System.IEquatable<Summary>
         {
-            public int UnbankedPieces, BankedPieces, UnbankedLoot, LeftFloor1, LeftFloor2, LeftFloor3, ClearedMask, CurrentFloor;
-            public bool CheckpointReached, BankSpent;   // BankSpent: the current floor's bank point was used this dive and nothing new waits to bank
+            public int FoundPieces, BankedPieces, LeftFloor1, LeftFloor2, LeftFloor3, ClearedMask, CurrentFloor;   // FoundPieces: picked up this dive; BankedPieces: every piece safe (found, plus home from earlier dives or a save)
+            public bool CheckpointReached, BankSpent;   // BankSpent: the current floor's bank point was used this dive and no bank visit waits to be pushed on
             // Stir meter (host-computed): value rounded to a whole point 0-100, extra enemies per room (latched), hunter and deep-closes latches, whole seconds left (rounded up, 0 = not running).
             public int StirValue, ExtraEnemiesPerRoom, DeepSecondsLeft;
             public bool HunterLatched, DeepClosesLatched;
             public int Left(int floor) => floor == 1 ? LeftFloor1 : floor == 2 ? LeftFloor2 : floor == 3 ? LeftFloor3 : 0;
             public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
             {
-                s.SerializeValue(ref UnbankedPieces); s.SerializeValue(ref BankedPieces); s.SerializeValue(ref UnbankedLoot);
+                s.SerializeValue(ref FoundPieces); s.SerializeValue(ref BankedPieces);
                 s.SerializeValue(ref LeftFloor1); s.SerializeValue(ref LeftFloor2); s.SerializeValue(ref LeftFloor3);
                 s.SerializeValue(ref ClearedMask); s.SerializeValue(ref CurrentFloor); s.SerializeValue(ref CheckpointReached); s.SerializeValue(ref BankSpent);
                 s.SerializeValue(ref StirValue); s.SerializeValue(ref ExtraEnemiesPerRoom); s.SerializeValue(ref DeepSecondsLeft);
                 s.SerializeValue(ref HunterLatched); s.SerializeValue(ref DeepClosesLatched);
             }
-            public bool Equals(Summary o) => UnbankedPieces == o.UnbankedPieces && BankedPieces == o.BankedPieces && UnbankedLoot == o.UnbankedLoot
+            public bool Equals(Summary o) => FoundPieces == o.FoundPieces && BankedPieces == o.BankedPieces
                 && LeftFloor1 == o.LeftFloor1 && LeftFloor2 == o.LeftFloor2 && LeftFloor3 == o.LeftFloor3 && ClearedMask == o.ClearedMask
                 && CurrentFloor == o.CurrentFloor && CheckpointReached == o.CheckpointReached && BankSpent == o.BankSpent
                 && StirValue == o.StirValue && ExtraEnemiesPerRoom == o.ExtraEnemiesPerRoom && DeepSecondsLeft == o.DeepSecondsLeft
                 && HunterLatched == o.HunterLatched && DeepClosesLatched == o.DeepClosesLatched;
             public override bool Equals(object obj) => obj is Summary o && Equals(o);
-            public override int GetHashCode() => unchecked(((UnbankedPieces * 31 + BankedPieces) * 31 + UnbankedLoot) * 31 + ClearedMask * 7 + CurrentFloor);
+            public override int GetHashCode() => unchecked((FoundPieces * 31 + BankedPieces) * 31 + ClearedMask * 7 + CurrentFloor);
         }
 
         public readonly NetworkVariable<Summary> Net = new NetworkVariable<Summary>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -141,7 +149,7 @@ namespace SleepingCalamity.Presentation
             {
                 StirValue = Mathf.RoundToInt(stir.Value), ExtraEnemiesPerRoom = stir.ExtraEnemiesPerRoom, DeepSecondsLeft = Mathf.CeilToInt(stir.DeepClosesSecondsLeft),
                 HunterLatched = stir.HunterLatched, DeepClosesLatched = stir.DeepClosesLatched,
-                UnbankedPieces = 0 /* pieces are safe on pickup (plan 2 task 3); Task 4 replaces this field with FoundPieces */, BankedPieces = h.BankedPieceCount, UnbankedLoot = h.UnbankedLootCount,
+                FoundPieces = h.FoundThisDive, BankedPieces = h.BankedPieceCount,
                 LeftFloor1 = h.PiecesLeft(1), LeftFloor2 = h.PiecesLeft(2), LeftFloor3 = h.PiecesLeft(3),
                 ClearedMask = _state.ClearedMask, CurrentFloor = _state.CurrentFloor, CheckpointReached = _state.CheckpointReached, BankSpent = _state.BankUsed(_state.CurrentFloor) && !_state.CanBankHere,
             };
@@ -168,9 +176,125 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || restored == null) return false;
             _state = restored; _heal = null; Publish(); return true;
         }
-        public bool ServerAddPiece(int pieceId) { if (!Host || !_state.Haul.AddPiece(pieceId)) return false; Publish(); return true; }
-        public bool ServerAddLoot(int itemId, int count) { if (!Host || !_state.Haul.AddLoot(itemId, count)) return false; Publish(); return true; }
-        public bool ServerSetFloor(int floor) { if (!Host || !_state.SetFloor(floor)) return false; Publish(); return true; }
+        // A piece is safe the moment it is picked up: PieceAdded (host) lets the dive director move it into the town stock at once.
+        public bool ServerAddPiece(int pieceId)
+        {
+            if (!Host || !_state.Haul.AddPiece(pieceId)) return false;
+            Publish();
+            PieceAdded?.Invoke(pieceId);
+            return true;
+        }
+        // Host only: raised after a piece was added (its id).
+        public event System.Action<int> PieceAdded;
+
+        public bool ServerSetFloor(int floor)
+        {
+            if (!Host) return false;
+            int before = _state.CurrentFloor;
+            if (!_state.SetFloor(floor)) return false;
+            if (floor != before && DiveState.FloorHasBank(floor)) OpenBankVisits();
+            Publish();
+            return true;
+        }
+
+        // ---- per-player bags (host only) ----
+        // The identity source for bag keys and slots (the session's HostRoster); resolved from ServiceRoots.App when null, like CombatHost.ServerBegin.
+        public IJoinContextProvider Identity { get; set; }
+
+        // The dive seed the 3-player extra bank slot owner is picked from; the dive director sets it when a dive starts.
+        public uint DiveSeed { get; set; }
+
+        private IJoinContextProvider ResolveIdentity()
+        {
+            if (Identity == null && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostRoster roster)) Identity = roster;
+            return Identity;
+        }
+
+        // The bag key of a client: the same rule as CombatHost.PlayerIdOf (the roster's PlayerKey string, else the client id), so a rejoin gets the same bag back.
+        public string PlayerIdOf(ulong clientId)
+        {
+            IJoinContextProvider id = ResolveIdentity();
+            return id != null && id.TryGetKey(clientId, out PlayerKey key) ? key.ToString() : clientId.ToString();
+        }
+
+        private readonly System.Collections.Generic.Dictionary<ulong, int> _seenOrder = new System.Collections.Generic.Dictionary<ulong, int>();   // no roster: client id -> order first seen
+        private readonly System.Collections.Generic.List<RosterEntry> _rosterScratch = new System.Collections.Generic.List<RosterEntry>();
+
+        // 0-3, used for the chest roll stream and the 3-player extra slot. The roster slot (stable across a rejoin); with no roster, the order the host first saw each client id
+        // (the host first, so 0), clamped to 3 because RollFor throws above it (tests with more than four ids share slot 3).
+        public int PlayerSlotOf(ulong clientId)
+        {
+            IJoinContextProvider id = ResolveIdentity();
+            if (id != null && id.TryGetKey(clientId, out PlayerKey key))
+            {
+                id.GetRoster(_rosterScratch);
+                for (int i = 0; i < _rosterScratch.Count; i++) if (_rosterScratch[i].Key == key) return Mathf.Clamp(_rosterScratch[i].Slot, 0, 3);
+            }
+            if (!_seenOrder.TryGetValue(clientId, out int order))
+            {
+                if (NetworkManager != null && clientId == NetworkManager.LocalClientId) order = 0;
+                else { order = 1; foreach (int o in _seenOrder.Values) if (o >= order) order = o + 1; }
+                _seenOrder[clientId] = order;
+            }
+            return Mathf.Clamp(order, 0, 3);
+        }
+
+        // The client's bag (created on first use); null off the host.
+        public PlayerBag ServerBagOf(ulong clientId) => Host ? _state.Bags.For(PlayerIdOf(clientId)) : null;
+
+        public bool ServerAddItem(ulong clientId, int itemId)
+        {
+            PlayerBag bag = ServerBagOf(clientId);
+            return bag != null && bag.Add(itemId);
+        }
+
+        public bool ServerAddGold(ulong clientId, int amount)
+        {
+            PlayerBag bag = ServerBagOf(clientId);
+            return bag != null && bag.AddGold(amount);
+        }
+
+        // The asker may touch the bank: the floor has a bank point, the hero is up, and (when the built floor's bank cell is known) the hero stands within BankRadius of it.
+        private bool BankAskerOk(ulong clientId)
+        {
+            if (!Host || !DiveState.FloorHasBank(_state.CurrentFloor)) return false;
+            if (!AskerIsUp(NetworkManager, clientId)) return false;   // a downed hero cannot bank
+            if (TryBankWorldPosition(out Vector3 bank) && NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient c)
+                && c.PlayerObject != null && !InRange(c.PlayerObject.transform.position, bank)) return false;
+            return true;
+        }
+
+        // Puts carried item `carriedIndexOrSatchel` (PlayerBag.SatchelPick = the carried satchel) into one of the asker's bank slots. The bag refuses with no open visit, a full
+        // slot set, a bad or repeated index and a non-bankable kind.
+        public bool ServerPick(ulong clientId, int carriedIndexOrSatchel)
+        {
+            if (!BankAskerOk(clientId)) return false;
+            return ServerBagOf(clientId).Pick(carriedIndexOrSatchel);
+        }
+
+        public bool ServerUnpick(ulong clientId, int carriedIndexOrSatchel)
+        {
+            if (!BankAskerOk(clientId)) return false;
+            return ServerBagOf(clientId).Unpick(carriedIndexOrSatchel);
+        }
+
+        private int _previousExtraOwner = -1;   // in memory for this host session only (saving it is plan 3)
+
+        // Entering a bank floor: every connected client's bag gets a bank visit with BankSlots.SlotsFor capacity; the 3-player extra slot goes to a seeded pick that skips the previous owner.
+        private void OpenBankVisits()
+        {
+            var ids = new System.Collections.Generic.List<ulong>(NetworkManager.ConnectedClientsIds);
+            int n = Mathf.Clamp(ids.Count, 1, 4);
+            var slots = new System.Collections.Generic.List<int>();
+            foreach (ulong id in ids) slots.Add(PlayerSlotOf(id));
+            int extraOwner = -1;
+            if (n == 3 && slots.Count > 0)
+            {
+                extraOwner = BankSlots.PickExtraSlotOwner(DiveSeed, slots, _previousExtraOwner);
+                _previousExtraOwner = extraOwner;
+            }
+            for (int i = 0; i < ids.Count; i++) ServerBagOf(ids[i]).OpenBank(BankSlots.SlotsFor(n, slots[i], extraOwner));
+        }
         public bool ServerMarkCleared(int floor) { if (!Host || !_state.MarkCleared(floor)) return false; Publish(); return true; }
         public bool ServerFailDive() { if (!Host) return false; _state.FailDive(); Publish(); return true; }
         // Banks at the current floor's bank point with no position check (host logic, e.g. a scripted bank).
@@ -274,11 +398,7 @@ namespace SleepingCalamity.Presentation
 
         public bool ServerTryBankFor(ulong clientId)
         {
-            if (!Host || !DiveState.FloorHasBank(_state.CurrentFloor)) return false;
-            if (!AskerIsUp(NetworkManager, clientId)) return false;   // a downed hero cannot bank
-            if (TryBankWorldPosition(out Vector3 bank) && NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient c)
-                && c.PlayerObject != null && !InRange(c.PlayerObject.transform.position, bank)) return false;
-            return ServerBank();
+            return BankAskerOk(clientId) && ServerBank();
         }
 
         // Host: false when the asker's hero is downed or out (no player object or no vitals passes, like the range checks).

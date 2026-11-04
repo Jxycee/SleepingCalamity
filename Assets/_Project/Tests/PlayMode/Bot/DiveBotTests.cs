@@ -120,11 +120,11 @@ namespace SleepingCalamity.Tests.PlayMode
                     CellarContentsSync c = d.ContentsSync;
                     var s = c.State;
                     var h = d.HaulSync.Current;
-                    second = $"second dive starts on floor {bot.Floor}: chests open mask {s.Chests}, pieces {c.PieceCount} (visible {Enumerable.Range(0, c.PieceCount).Count(c.PieceVisible)}), unbanked pieces {h.UnbankedPieces}, banked {h.BankedPieces} (after dive 1: {banked.BankedPieces}), gate key {s.GateKey}, exit unlocked {s.ExitUnlocked}, heart banked {d.NetHeartBanked.Value}";
+                    second = $"second dive starts on floor {bot.Floor}: chests open mask {s.Chests}, pieces {c.PieceCount} (visible {Enumerable.Range(0, c.PieceCount).Count(c.PieceVisible)}), found pieces {h.FoundPieces}, safe {h.BankedPieces} (after dive 1: {banked.BankedPieces}), gate key {s.GateKey}, exit unlocked {s.ExitUnlocked}, heart banked {d.NetHeartBanked.Value}";
                     if (s.Chests != 0 && s.Seed == d.FloorSync.Layout.Seed) bot.Note("State", "second dive: floor 1 chests start open (state leaked from the first dive)");
                     if (s.GateKey != 0 || s.ExitUnlocked) bot.Note("State", "second dive: floor 1 starts with the gate key out or the exit unlocked");
                     if (d.NetHeartBanked.Value) bot.Note("State", "second dive: the heart still reads banked");
-                    if (h.UnbankedPieces != 0) bot.Note("State", $"second dive: starts with {h.UnbankedPieces} unbanked pieces");
+                    if (h.FoundPieces != 0) bot.Note("State", $"second dive: starts with {h.FoundPieces} pieces already found this dive");
                     if (c.PieceCount == 0) bot.Note("State", "second dive: floor 1 has no bakery pieces (all banked last dive? pieces are meant to stay collectable until the town gets them)");
                 }
                 else bot.Note("Flow", "after going home, the hub stair didn't start a second dive within 120 s");

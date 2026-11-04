@@ -329,22 +329,22 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Contents.TryChestPosition(chest, out Vector3 chestPos), Is.True, "[S2 F1 chest] the chest object exists");
             yield return ClientTo(rig, chestPos + new Vector3(0.5f, 0.1f, 0f), "[S2 F1 chest walk]");
             KillAll(rig.HostNm);
-            int loot0 = rig.HostHaul.Current.UnbankedLoot;
+            int loot0 = rig.HostHaul.ServerBagOf(guestId).Carried.Count;   // chest loot goes into the opener's bag (plan 2 task 4)
             rig.PeerContents.RequestOpenChest(chest);
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.UnbankedLoot > loot0, Timeout, "[S2 F1 chest] the client's chest never put loot in the shared haul");
-            int chestLoot = rig.HostHaul.Current.UnbankedLoot - loot0;
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.ServerBagOf(guestId).Carried.Count > loot0, Timeout, "[S2 F1 chest] the client's chest never put loot in its bag");
             yield return CollectPieces(rig, 1);
-            Assert.That(rig.PeerHaul.Current.UnbankedPieces, Is.EqualTo(2), "[S2 F1 pieces] both floor-1 pieces are carried unbanked on the client too");
+            Assert.That(rig.PeerHaul.Current.FoundPieces, Is.EqualTo(2), "[S2 F1 pieces] both floor-1 pieces are found (and safe) on the client too");
 
             // F2: pieces, then the checkpoint bank (pieces and loot become safe).
             yield return Descend(rig, 1);
             yield return TakeGateKey(rig, 2);
             yield return CollectPieces(rig, 2);
-            Assert.That(rig.HostHaul.Current.StirValue, Is.GreaterThan(0), "[S2 F2 pieces] carrying four pieces raises the stir meter");
+            Assert.That(rig.HostHaul.Current.StirValue, Is.GreaterThan(0), "[S2 F2 pieces] a cleared floor raises the stir meter (pieces no longer do)");
             yield return ClientBanks(rig, "[S2 F2 bank]");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.BankedPieces == 4 && rig.HostHaul.Current.UnbankedPieces == 0, Timeout, "[S2 F2 bank] the client's bank never banked the four carried pieces (banked " + rig.HostHaul.Current.BankedPieces + ", unbanked " + rig.HostHaul.Current.UnbankedPieces + ")");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.BankedPieces == 4 && rig.HostHaul.HostState.BankUsed(2), Timeout, "[S2 F2 bank] the client's bank press never used the checkpoint with the four pieces safe (safe " + rig.HostHaul.Current.BankedPieces + ")");
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CheckpointReached && rig.Peer.NetCheckpoint.Value, Timeout, "[S2 F2 bank] the checkpoint never reached the client");
-            Assert.That(rig.HostHaul.Current.UnbankedLoot, Is.EqualTo(0), "[S2 F2 bank] the chest loot was banked too");
+            Assert.That(rig.HostHaul.ServerBagOf(guestId).Carried.Count, Is.EqualTo(0), "[S2 F2 bank] the party bank action pushed the client's chest loot into its bank slot");
+            Assert.That(rig.HostHaul.ServerBagOf(guestId).BankedThisDive.Count, Is.EqualTo(1), "[S2 F2 bank] and it is safe in the bag");
             // Weapon growth earned on the dive (what a kill's reward ends in): the save must keep it.
             yield return WaitCombat("[S2 weapons]");
             CombatHost combat = CombatHost.Current;
@@ -358,7 +358,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Descend(rig, 2);
             yield return TakeGateKey(rig, 3);
             yield return CollectPieces(rig, 3);
-            Assert.That(rig.HostHaul.Current.StirValue, Is.GreaterThan(0), "[S2 F3 pieces] carrying the floor-3 pieces raises the stir meter");
+            Assert.That(rig.HostHaul.Current.StirValue, Is.GreaterThan(0), "[S2 F3 pieces] the cleared floors keep the stir meter up");
             yield return Descend(rig, 3);
             Assert.That(rig.HostFloor.Layout.Floor, Is.EqualTo(4), "[S2 F4 arrive] the heart");
 
@@ -383,7 +383,8 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Pieces(stock.State), Is.EqualTo("100,101,200,201,300,301"), "[S3 stock] the six banked pieces are in the town stock");
             Assert.That(stock.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "[S3 stock] the baker is in the town stock");
             Assert.That(stock.LootCount(SeedLootItem), Is.EqualTo(SeedLootCount), "[S3 stock] the saved loot is untouched");
-            Assert.That(stock.TotalLoot, Is.EqualTo(SeedLootCount + chestLoot), "[S3 stock] the chest loot came home exactly once");
+            Assert.That(stock.TotalLoot, Is.EqualTo(SeedLootCount), "[S3 stock] chest loot no longer enters the world stock (it is the opener's own, plan 2)");
+            Assert.That(rig.HostHaul.ServerBagOf(guestId).Stash.Count, Is.EqualTo(1), "[S3 stock] the chest loot came home into the opener's own stash, exactly once");
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.StirValue == 0 && rig.PeerHaul.Current.StirValue == 0, Timeout, "[S3 stir] the stir meter never reset (host " + rig.HostHaul.Current.StirValue + ")");
             yield return PlayModeHarness.WaitUntil(() => rig.PeerTown.View.InStock(100) && rig.PeerTown.View.ResidentInStock(TownBuildings.BakerResident), Timeout, "[S3 stock] the client never saw the new stock");
             Assert.That(Sig(rig.PeerTown.View), Is.EqualTo(Sig(stock.State)), "[S3 stock] the client's town view equals the host's");
@@ -488,7 +489,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Sig(again.Host.Town.State), Is.EqualTo(preSig), "[S7 reload] the town, stock and residents are exactly as saved");
             Assert.That(Pieces(again.Host.Town.State), Is.EqualTo("300,301"), "[S7 reload] the stock pieces survived");
             Assert.That(again.Host.Town.LootCount(SeedLootItem), Is.EqualTo(SeedLootCount), "[S7 reload] the loot survived");
-            Assert.That(again.Host.Town.TotalLoot, Is.EqualTo(SeedLootCount + chestLoot), "[S7 reload] the banked chest loot survived exactly once");
+            Assert.That(again.Host.Town.TotalLoot, Is.EqualTo(SeedLootCount), "[S7 reload] the world stock loot survived exactly once");
             Assert.That(again.Host.Town.State.IsComplete(TownBuildings.Bakery), Is.True, "[S7 reload] the bakery is complete");
             Assert.That(again.Host.Town.State.PlacedBuildingOf(TownBuildings.Bakery).Resident, Is.EqualTo(TownBuildings.BakerResident), "[S7 reload] the baker still lives in it");
             Assert.That(again.Host.BakerMet, Is.True, "[S7 reload] the first-meet beat stayed latched");

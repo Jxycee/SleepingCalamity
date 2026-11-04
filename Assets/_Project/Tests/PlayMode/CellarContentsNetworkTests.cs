@@ -70,7 +70,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
         }
 
-        private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default, uint? seedOverride = null, int startFloor = 1)
+        // Chest loot goes into the opener's bag (plan 2 task 4; task 6 makes the chests per player): the client's carried item count.
+        private static int Loot(Ctx c) => c.Haul.ServerBagOf(c.ClientId).Carried.Count;
+
+        private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default, uint? seedOverride = null, int startFloor = 1, StirTuning? stir = null)
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
@@ -96,7 +99,7 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Contents.PlayersOverride = list => { foreach (KeyValuePair<ulong, Vector3> kv in c.Players) list.Add(new CellarContentsSync.PlayerPos { ClientId = kv.Key, Position = kv.Value }); };
 
             c.Seed = seedOverride ?? FindSeed();
-            Assert.That(c.Haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(c.Haul.ServerBegin(new[] { 2, 2, 2 }, stir ?? StirTuning.Default), Is.True);
             Assert.That(c.Haul.ServerSetFloor(startFloor), Is.True);
             Assert.That(c.Floor.ServerSetFloor(c.Seed, startFloor), Is.True);
             yield return PlayModeHarness.WaitUntil(() => c.Peer.FloorSync.Built != null && c.Peer.FloorSync.BuiltFloor == startFloor && c.Peer.PieceCount > 0 && c.Contents.PieceCount > 0, Timeout, "floors were not built");
@@ -157,20 +160,20 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Peer.RequestOpenChest(idx);
             yield return PlayModeHarness.WaitUntil(() => c.Contents.ChestRequestsHandled > handled, Timeout, "the request never reached the host");
             Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL), "out of range: refused");
-            Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(0));
+            Assert.That(Loot(c), Is.EqualTo(0));
 
             c.Players[c.ClientId] = at + new Vector3(1.0f, 0f, 0f);
             c.Peer.RequestOpenChest(idx);
             yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Chests & (1UL << idx)) != 0, Timeout, "the client never saw the chest open");
             yield return PlayModeHarness.WaitUntil(() => c.Peer.ChestShownOpen(idx), Timeout, "the client does not show the chest opened");
-            Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(1), "the loot reached the haul");
+            Assert.That(Loot(c), Is.EqualTo(1), "the loot reached the opener's bag");
             Assert.That(CellarLoot.RankOf(c.Contents.LastLootItem), Is.InRange(1, 5));
             Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.Roll(c.Seed, 1, idx, false)));
 
             handled = c.Contents.ChestRequestsHandled;
             c.Peer.RequestOpenChest(idx);
             yield return PlayModeHarness.WaitUntil(() => c.Contents.ChestRequestsHandled > handled, Timeout, "second request not handled");
-            Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(1), "an open chest does not pay twice");
+            Assert.That(Loot(c), Is.EqualTo(1), "an open chest does not pay twice");
         }
 
         [UnityTest]
@@ -191,7 +194,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.ExitUnlocked, Timeout, "picking the key up did not unlock the exit");
             Assert.That(unlockedFloor, Is.EqualTo(1));
             Assert.That(c.Peer.State.GateKey, Is.EqualTo((byte)2));
-            Assert.That(c.Haul.HostState.Haul.LootUnbanked(CellarLoot.GateKeyId), Is.EqualTo(0), "keys are not loot");
+            Assert.That(System.Linq.Enumerable.Contains(c.Haul.ServerBagOf(c.HostId).Carried, CellarLoot.GateKeyId), Is.False, "keys are not loot");
             yield return PlayModeHarness.WaitUntil(() => !c.Peer.GateKeyMarkerShown, Timeout, "the key marker stayed");
 
             // the locked door
@@ -207,8 +210,8 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Players[c.ClientId] = keyAt + new Vector3(1.0f, 0f, 0f);
             c.Peer.RequestOpenChest(c.Layout.KeyChestIndex);
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.RoomKeyHeld, Timeout, "the key chest gave no room key");
-            Assert.That(c.Haul.HostState.Haul.LootUnbanked(CellarLoot.RoomKeyId), Is.EqualTo(0), "keys are not loot");
-            Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(0), "the key chest adds nothing to the haul");
+            Assert.That(System.Linq.Enumerable.Contains(c.Haul.ServerBagOf(c.ClientId).Carried, CellarLoot.RoomKeyId), Is.False, "keys are not loot");
+            Assert.That(Loot(c), Is.EqualTo(0), "the key chest adds nothing to a bag");
             Assert.That(c.Peer.State.DoorOpen, Is.False);
 
             c.Players[c.ClientId] = gate + new Vector3(1.0f, 0f, 0f);
@@ -235,7 +238,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected && c.Contents.AliveInRoom(room) == expected, Timeout, "the room did not respawn after the wipe");
             yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.HostNm).Count >= expected, Timeout, "no enemies after the respawn");
             Assert.That(c.Contents.State.GateKey, Is.EqualTo((byte)0));
-            Assert.That(c.Haul.Current.UnbankedLoot, Is.EqualTo(0));
+            Assert.That(Loot(c), Is.EqualTo(0));
         }
 
         // The carrier leaves without dying (despawned) while room-mates live: no key, but once the room-mates are dead the room resets and the carrier is back on the next entry.
@@ -370,7 +373,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Pieces_StepOverAddsToHaul_HiddenOnClient_ReappearAfterAFailedDive()
+        public IEnumerator Pieces_StepOverAddsToHaul_HiddenOnClient_StayGoneAfterAFailedDive()
         {
             Ctx c = null; yield return Setup(x => c = x);
             Assert.That(c.Peer.TryPiecePosition(0, out Vector3 at), Is.True);
@@ -382,8 +385,9 @@ namespace SleepingCalamity.Tests.PlayMode
 
             c.Players[c.HostId] = Cell(c, 0, 0) + new Vector3(60f, 0f, 0f);
             Assert.That(c.Haul.ServerFailDive(), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.LeftFloor1 == 2, Timeout, "the failed dive did not return the piece");
-            yield return PlayModeHarness.WaitUntil(() => c.Peer.PieceVisible(0), Timeout, "the piece did not reappear on the client");
+            yield return new WaitForSeconds(0.6f);
+            Assert.That(c.Haul.Current.LeftFloor1, Is.EqualTo(1), "the failed dive keeps the piece: pieces are safe on pickup");
+            Assert.That(c.Peer.PieceVisible(0), Is.False, "and the piece does not reappear on the client");
         }
 
         private static bool NearRing(Ctx c, CellPos[] ring, Enemy e)
@@ -555,11 +559,12 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator Hunter_PlayerOnItsCell_NoRespawn_RespawnsOnceThePlayerLeaves()
         {
-            Ctx c = null; yield return Setup(x => c = x, default, null, 3);
+            // Pieces no longer feed the stir (plan 2, spec 4.5) and floors alone cap it at 52.5, so the test raises the per-floor term: 3 x 14 x 1.75 (four players) = 73.5, past the hunter mark only.
+            StirTuning tuning = StirTuning.Default; tuning.PerFloorCleared = 14f;
+            Ctx c = null; yield return Setup(x => c = x, default, null, 3, tuning);
             DiveState ds = c.Haul.HostState;
             ds.Stir.PlayersPresent = 4;
             for (int f = 1; f <= 3; f++) Assert.That(c.Haul.ServerMarkCleared(f), Is.True);
-            foreach (int id in new[] { 100, 101, 200, 201 }) Assert.That(c.Haul.ServerAddPiece(id), Is.True);
             Assert.That(ds.Stir.HunterLatched, Is.True, "the stir meter latched the hunter");
             yield return PlayModeHarness.WaitUntil(() => c.Haul.EncounterPlan != null && c.Haul.EncounterPlan.Hunter != null && c.Haul.EncounterPlan.HunterLatched, Timeout, "the encounter plan has no hunter");
             EncounterSpawn h = c.Haul.EncounterPlan.Hunter;

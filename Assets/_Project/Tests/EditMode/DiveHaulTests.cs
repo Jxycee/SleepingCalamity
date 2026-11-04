@@ -129,13 +129,41 @@ namespace SleepingCalamity.Tests.EditMode
             s.Haul.AddPiece(DiveHaul.PieceId(2, 0));
             Assert.That(s.BankAtPoint(), Is.False, "a piece is safe on pickup: it gives no second bank press");
             s.Bags.For("a").Add(104);
-            Assert.That(s.BankAtPoint(), Is.True, "a player carrying something can bank again");
-            Assert.That(s.Bags.For("a").Carried, Is.EqualTo(new[] { 104 }), "no bank visit was open, so nothing was picked");
-            Assert.That(s.BankAtPoint(), Is.True, "still carrying: still allowed");
-            s.Bags.For("a").GoHome();
-            Assert.That(s.BankAtPoint(), Is.False);
+            Assert.That(s.BankAtPoint(), Is.False, "carrying something does not reopen a used bank point (it healed without limit)");
+            Assert.That(s.CanBankHere, Is.False);
             s.FailDive(); s.SetFloor(2);
             Assert.That(s.BankAtPoint(), Is.True, "a new dive re-arms the bank point");
+        }
+
+        [Test] public void DiveState_AnOpenBankVisit_LetsThePointBankOnce_AnyBankOpen()
+        {
+            var s = new DiveState(Haul());
+            s.SetFloor(2);
+            Assert.That(s.BankAtPoint(), Is.True);
+            Assert.That(s.Bags.AnyBankOpen, Is.False);
+            PlayerBag a = s.Bags.For("a"); a.Add(104);
+            a.OpenBank(1);                                       // a visit opens (a new bank room entry) after the point was used
+            Assert.That(s.Bags.AnyBankOpen, Is.True);
+            Assert.That(s.CanBankHere, Is.True, "an open visit has not been pushed on yet");
+            Assert.That(s.BankAtPoint(), Is.True);
+            Assert.That(a.BankedThisDive.ContainsKey(104), Is.True);
+            Assert.That(s.Bags.AnyBankOpen, Is.False);
+            Assert.That(s.BankAtPoint(), Is.False, "the visit is closed: nothing new waits");
+        }
+
+        [Test] public void FoundThisDive_ResetsWhenADiveStarts_NotWhenItEnds()
+        {
+            var s = new DiveState(Haul());
+            s.SetFloor(1);
+            s.Haul.AddPiece(DiveHaul.PieceId(1, 0));
+            Assert.That(s.Haul.FoundThisDive, Is.EqualTo(1));
+            s.SetFloor(DiveState.Town);
+            Assert.That(s.Haul.FoundThisDive, Is.EqualTo(1), "the dive's summary still shows what it found");
+            s.SetFloor(1);
+            Assert.That(s.Haul.FoundThisDive, Is.EqualTo(0), "a new dive starts at 0 (the piece itself stays collected)");
+            Assert.That(s.Haul.IsCollected(DiveHaul.PieceId(1, 0)), Is.True);
+            s.Haul.AddPiece(DiveHaul.PieceId(1, 1)); s.SetFloor(2);
+            Assert.That(s.Haul.FoundThisDive, Is.EqualTo(1), "moving between floors does not reset it");
         }
 
         [Test] public void FailDive_FailsEveryBagAtTheCurrentFloor()

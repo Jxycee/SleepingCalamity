@@ -665,7 +665,7 @@ namespace SleepingCalamity.Presentation
             _st.Chests |= 1UL << chestIndex;
             if (fc.HoldsKey) _st.RoomKeyHeld = true;
             LastLootItem = item;
-            if (!fc.HoldsKey && HaulSync != null) HaulSync.ServerAddLoot(item, 1);   // the room key lives in State.RoomKeyHeld, not in the haul
+            if (!fc.HoldsKey && HaulSync != null) HaulSync.ServerAddItem(clientId, item);   // into the opener's bag (plan 2 task 4 interim; task 6 makes chests per player); the room key lives in State.RoomKeyHeld
             Publish();
             ChestOpened?.Invoke(chestIndex, item);
             return true;

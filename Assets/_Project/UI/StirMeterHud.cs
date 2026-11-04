@@ -21,7 +21,8 @@ namespace SleepingCalamity.UI
             return l;
         }
 
-        public static string Pieces(DiveHaulSync.Summary s) => "Pieces: " + s.BankedPieces + " safe";   // plan 2 task 3: pieces are safe on pickup; Task 4 reworks the line ("found this dive" / "home")
+        // Pieces are safe on pickup and go to the town stock at once (plan 2 task 4): found this dive, and every piece already home.
+        public static string Pieces(DiveHaulSync.Summary s) => "Pieces: " + s.FoundPieces + " found this dive, " + s.BankedPieces + " home";
 
         // "Pieces left on this floor: N" for floors 1-3; null on the bakery floor, in town or before a floor is set.
         public static string PiecesLeftHere(DiveHaulSync.Summary s) =>

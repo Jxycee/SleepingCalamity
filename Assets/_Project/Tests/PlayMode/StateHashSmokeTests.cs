@@ -104,8 +104,8 @@ namespace SleepingCalamity.Tests.PlayMode
             // A piece and the loot, then the bank: the haul summary changes and replicates to everyone.
             DiveHaulSync haul = rig.Host.HaulSync;
             Assert.That(haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True, "[F1 piece]");
-            Assert.That(haul.ServerAddLoot(1, 2), Is.True, "[F1 loot]");
-            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F1 piece and loot carried");
+            Assert.That(haul.ServerAddItem(rig.HostNm.LocalClientId, 101), Is.True, "[F1 loot]");   // a bag is host-only state: nothing of it replicates (the owner view is PlayerBagSync, plan 2 task 5)
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F1 piece found and an item in the host bag");
 
             // A hero takes damage: HeroVitals replicates.
             var vitals = rig.HostHero.GetComponent<SleepingCalamity.Gameplay.HeroVitals>();

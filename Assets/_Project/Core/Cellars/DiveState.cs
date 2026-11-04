@@ -18,8 +18,9 @@ namespace SleepingCalamity.Core
 
         private int _bankedMask;   // bank points used in the current dive (bit f-1); cleared when a dive starts or ends
         public bool BankUsed(int floor) => floor >= 1 && floor <= MaxFloor && (_bankedMask & (1 << (floor - 1))) != 0;
-        // A bank press is free to heal and reset the stir only once per bank point per dive, unless a player carries something new (pieces are safe on pickup and never wait).
-        public bool CanBankHere => FloorHasBank(CurrentFloor) && (!BankUsed(CurrentFloor) || Bags.AnyCarried);
+        // A bank press is free to heal and reset the stir only once per bank point per dive, unless a bank visit is still open (some bag has not been pushed on yet).
+        // Pieces are safe on pickup and never wait. Carrying items alone does not reopen a used bank point (it healed without limit).
+        public bool CanBankHere => FloorHasBank(CurrentFloor) && (!BankUsed(CurrentFloor) || Bags.AnyBankOpen);
         // The floor a new dive starts on: the checkpoint floor only once floors 1-2 are fully collected.
         public int StartFloor => DiveRoute.StartFloor(CheckpointReached, Haul.PiecesLeft(1) + Haul.PiecesLeft(2));
 
@@ -33,6 +34,7 @@ namespace SleepingCalamity.Core
         public bool SetFloor(int floor)
         {
             if (floor < Town || floor > MaxFloor) return false;
+            if (CurrentFloor == Town && floor != Town) Haul.ResetFoundThisDive();   // a dive starts
             if (CurrentFloor == Town || floor == Town) _bankedMask = 0;   // a dive starts or ends
             CurrentFloor = floor;
             return true;

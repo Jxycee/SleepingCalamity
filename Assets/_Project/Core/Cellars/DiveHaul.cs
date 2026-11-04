@@ -65,6 +65,9 @@ namespace SleepingCalamity.Core
             return true;
         }
 
+        // A new dive starts: the found-this-dive counter goes back to 0 (the pieces themselves stay collected).
+        public void ResetFoundThisDive() { FoundThisDive = 0; }
+
         // A world load: this piece was banked in the saved haul. Same as AddPiece without counting as found this dive. False for an unknown piece or one already collected.
         public bool RestoreBankedPiece(int pieceId)
         {

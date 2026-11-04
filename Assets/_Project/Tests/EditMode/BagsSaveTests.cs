@@ -41,6 +41,22 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(save.Players[0].Gold, Is.EqualTo(4));
         }
 
+        [Test] public void Capture_DoesNotCap_SoTheHostFiltersToRecordedPlayersBeforeTheCap()
+        {
+            // Five parseable bags (the host filters to the world's recorded players afterwards): all five are written, none is dropped by the 4-entry cap before that filter.
+            var bags = new PartyBags();
+            var keys = new List<PlayerKey>();
+            foreach (string id in new[] { "aaaa", "bbbb", "cccc", "dddd", "eeee" })
+            {
+                var k = new PlayerKey(IdentityKind.Local, id);
+                keys.Add(k);
+                bags.For(k.ToString()).AddGold(3); bags.For(k.ToString()).GoHome();
+            }
+            BagsSave save = BagsSaveRules.Capture(bags, Keys(keys.ToArray()), false, 0);
+            Assert.That(save.Players.Count, Is.EqualTo(5));
+            Assert.That(BagsSaveRules.Clean(save, null).Players.Count, Is.EqualTo(WorldPlayers.MaxRecorded), "Clean still caps (the file never holds more than the world records)");
+        }
+
         [Test] public void Capture_SkipsEmptyBags_SoAWorldWithoutLootWritesNoEntries()
         {
             var bags = new PartyBags();

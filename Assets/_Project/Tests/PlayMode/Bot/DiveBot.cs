@@ -338,14 +338,14 @@ namespace SleepingCalamity.Tests.PlayMode
                     Press(t, () => { if (!Done(t)) { Note("Interact", $"held the room key, pressed interact at the locked door ({Flat(t.Pos - _hero.position).magnitude:0.0} m) and it stayed shut"); GiveUp(t); } });
                     return;
                 case Goal.Bank:
-                    int before = d.HaulSync != null ? d.HaulSync.Current.BankedPieces : 0, unbanked = d.HaulSync != null ? d.HaulSync.Current.UnbankedPieces : 0;
+                    bool wasSpent = d.HaulSync != null && d.HaulSync.Current.BankSpent;   // pieces are safe on pickup (plan 2): a bank press shows up as the bank point being used up
                     if (d.Prompt != DiveDirector.PromptKind.Bank) { Note("Prompt", $"standing {Flat(t.Pos - _hero.position).magnitude:0.0} m from the {t.Name} but the prompt is '{d.Prompt}' ('{d.PromptText}')"); }
                     Press(t, () =>
                     {
-                        int after = d.HaulSync != null ? d.HaulSync.Current.BankedPieces : 0;
-                        bool ok = after > before || unbanked == 0 && d.Prompt != DiveDirector.PromptKind.Bank;
+                        bool spent = d.HaulSync != null && d.HaulSync.Current.BankSpent;
+                        bool ok = spent || wasSpent || d.Prompt != DiveDirector.PromptKind.Bank;
                         if (Floor == DiveState.HeartFloor) { HeartBanked = d.NetHeartBanked.Value; if (!HeartBanked) Note("Interact", "pressed interact at the heart bank and the heart isn't banked"); }
-                        else if (!ok) Note("Interact", $"pressed interact at the checkpoint with {unbanked} unbanked pieces and nothing was banked");
+                        else if (!ok) Note("Interact", "pressed interact at the checkpoint and the bank point was not used");
                         _bankedOn.Add(Floor);
                     });
                     return;

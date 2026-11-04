@@ -39,6 +39,19 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void AnyBankOpen_TracksOpenVisits()
+        {
+            var p = new PartyBags();
+            Assert.That(p.AnyBankOpen, Is.False);
+            p.For("a").Add(101); p.For("b");
+            Assert.That(p.AnyBankOpen, Is.False, "carrying alone is not an open visit");
+            p.For("b").OpenBank(2);
+            Assert.That(p.AnyBankOpen, Is.True);
+            p.PushOnAll();
+            Assert.That(p.AnyBankOpen, Is.False);
+        }
+
+        [Test]
         public void PushOnAll_OnlyTouchesBagsWithAnOpenVisit()
         {
             var p = new PartyBags();

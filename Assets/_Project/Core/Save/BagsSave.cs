@@ -154,14 +154,16 @@ namespace SleepingCalamity.Core
                 PlayerBag bag = inDive ? kv.Value.CopyAsFailed(currentFloor) : kv.Value;
                 LostSatchel waiting = bag.Satchel.Waiting;
                 if (bag.Gold <= 0 && bag.Stash.Count == 0 && waiting == null) continue;
-                var p = new PlayerBagSave { Identity = (int)key.Kind, Id = key.Id, Gold = bag.Gold };
+                var p = new PlayerBagSave { Identity = (int)key.Kind, Id = key.Id, Gold = Math.Min(TownSaveRules.MaxLootCount, bag.Gold) };
                 var ids = new List<int>(bag.Stash.Keys);
                 ids.Sort();
                 foreach (int id in ids) if (bag.Stash[id] > 0) p.Stash.Add(new LootCountSave { ItemId = id, Count = bag.Stash[id] });
                 if (waiting != null) p.Satchel = new SatchelSave { Floor = waiting.Floor, Items = new List<int>(waiting.Items) };
                 save.Players.Add(p);
             }
-            return BagsSaveRules.Clean(save, null);
+            // No WorldPlayers.MaxRecorded cap here (Clean applies it): the host keeps only the world's recorded players' entries first (HostWorld), and the cap comes after that
+            // filter, so a bag of an unrecorded player can never push a recorded player's bag out of the file. Every entry above is valid by construction (a parsed key, positive rows).
+            return save;
         }
 
         // Puts the (cleaned) saved bags into `into`, keyed by PlayerKey.ToString(). An entry that does not clean is skipped. No dive is in progress: carried items, picks and dive gold are empty.
