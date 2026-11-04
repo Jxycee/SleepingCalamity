@@ -180,6 +180,10 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (f == UndercroftPlan.BankFloor)
                 {
                     Assert.That(rig.HostHaul.ServerMarkCleared(f), Is.True, "the guardian's floor is cleared");
+                    Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True, "floor 5 has a bank room");
+                    Move(rig.HostHero, bank + new Vector3(0.5f, 0.1f, 0f));
+                    foreach (NetworkObject own in rig.OwnHeroes) Move(own, bank + new Vector3(0.5f, 0.1f, 0.8f));
+                    yield return NearOnHost(rig, bank, "the party in the bank room");   // the host checks the asker stands at the bank
                     Assert.That(rig.HostHaul.ServerEnterBankRoom(), Is.True, "the bank press enters the bank room");
                     Assert.That(rig.HostHaul.PushOnNow(), Is.True, "every present player's push-on press confirms the choice");
                 }

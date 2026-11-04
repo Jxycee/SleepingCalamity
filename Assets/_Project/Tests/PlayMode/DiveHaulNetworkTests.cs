@@ -357,6 +357,7 @@ namespace SleepingCalamity.Tests.PlayMode
             host.ChoiceWindowSeconds = 120f;   // the window must still be open when the late client arrives
             Assert.That(host.BankRoomNow(), Is.True);
             ulong id = host.NetworkObjectId;
+            yield return PlayModeHarness.WaitUntil(() => cl[0].NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "client A never received the haul object");
             DiveHaulSync peerA = On(cl[0].NetworkManager, id);
             yield return WaitSummary(peerA, s => s.DivePhase == DivePhase.BankRoom && s.CurrentFloor == 5, "client A never saw the bank room");
             int slotA = host.PlayerSlotOf(cl[0].NetworkManager.LocalClientId);

@@ -141,7 +141,6 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerAddPiece(piece), Is.True);
             Assert.That(dir.Town.State.InStock(piece), Is.True, "the piece is in the town stock right after the pickup, not at the dive's end");
             Assert.That(haul.Current.FoundPieces, Is.EqualTo(1));
-            Assert.That(haul.Current.FoundPieces, Is.EqualTo(1));
 
             Assert.That(dir.ServerAbandonDive(), Is.True, "the dive fails through the director's own end-of-dive path");
             Assert.That(dir.NetActive.Value, Is.False);
@@ -150,11 +149,10 @@ namespace SleepingCalamity.Tests.PlayMode
             int stocked = 0; foreach (int p in dir.Town.State.StockPieces) if (p == piece) stocked++;
             Assert.That(stocked, Is.EqualTo(1));
 
-            // A new dive: the found counter starts again, the piece stays home.
+            // A new dive: the piece stays home and stays counted as found.
             dir.SeedOverride = 5151u;
             Assert.That(dir.ServerStartDive(), Is.True);
-            Assert.That(haul.Current.FoundPieces, Is.EqualTo(0), "FoundPieces counts this dive only");
-            Assert.That(haul.Current.FoundPieces, Is.EqualTo(1));
+            Assert.That(haul.Current.FoundPieces, Is.EqualTo(1), "found pieces stay found: the counter counts every dive's finds (plan 3 task 7)");
         }
 
         [UnityTest]
@@ -529,12 +527,14 @@ namespace SleepingCalamity.Tests.PlayMode
             public readonly List<(int Chest, int Item)> Opened = new List<(int, int)>();
         }
 
-        // A seed whose floor 1 has a locked room with a gate, a key chest and a carrier (the same premise as CellarContentsNetworkTests).
+        private const int ChestFloor = 2;   // floor 1 is the authored floor (no locked room, carrier or key chest since plan 3 task 4); floor 2 is the first generated one
+
+        // A seed whose floor 2 has a locked room with a gate, a key chest and a carrier (the same premise as CellarContentsNetworkTests).
         private static uint FindSeed()
         {
             for (uint s = 1; s < 400; s++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Layout(s, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(s, ChestFloor);
                 if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return s;
             }
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
@@ -577,9 +577,9 @@ namespace SleepingCalamity.Tests.PlayMode
             r.Contents.ChestOpened += (chest, item) => r.Opened.Add((chest, item));
             r.Seed = FindSeed();
             Assert.That(haul.ServerBegin(), Is.True);
-            Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(r.Floor.ServerSetFloor(r.Seed, 1), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => r.PeerA.FloorSync.Built != null && r.PeerA.FloorSync.BuiltFloor == 1 && r.PeerB.FloorSync.Built != null && r.PeerB.FloorSync.BuiltFloor == 1
+            Assert.That(haul.ServerSetFloor(ChestFloor), Is.True);
+            Assert.That(r.Floor.ServerSetFloor(r.Seed, ChestFloor), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => r.PeerA.FloorSync.Built != null && r.PeerA.FloorSync.BuiltFloor == ChestFloor && r.PeerB.FloorSync.Built != null && r.PeerB.FloorSync.BuiltFloor == ChestFloor
                 && r.Floor.Built != null && r.Contents.PieceCount > 0, Timeout * 2, "the floors were not built");
             r.Layout = r.Floor.Layout;
             done(r);
@@ -603,9 +603,9 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 if (r.Layout.Chests[i].HoldsKey) continue;
                 if (first < 0) first = i;
-                if (CellarLoot.RollChest(r.Seed, 1, i, slotA) != CellarLoot.RollChest(r.Seed, 1, i, slotB)) return i;
+                if (CellarLoot.RollChest(r.Seed, ChestFloor, i, slotA) != CellarLoot.RollChest(r.Seed, ChestFloor, i, slotB)) return i;
             }
-            Assert.Fail("premise: no loot chest on floor 1 of seed " + r.Seed + " rolls different items for slots " + slotA + " and " + slotB + " (first loot chest " + first + ")");
+            Assert.Fail("premise: no loot chest on floor " + ChestFloor + " of seed " + r.Seed + " rolls different items for slots " + slotA + " and " + slotB + " (first loot chest " + first + ")");
             return -1;
         }
 
@@ -616,7 +616,7 @@ namespace SleepingCalamity.Tests.PlayMode
             ChestRig r = null; yield return StartChestRig(clients, x => r = x);
             int i = PickLootChest(r), key = r.Layout.KeyChestIndex;
             Assert.That(key, Is.GreaterThanOrEqualTo(0));
-            int rollA = CellarLoot.RollChest(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.A)), rollB = CellarLoot.RollChest(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.B));
+            int rollA = CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.A)), rollB = CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.B));
             Assert.That(rollA, Is.Not.EqualTo(rollB), "premise: the chosen chest rolls different items for A and B");
 
             yield return Ask(r, r.PeerA, i);
@@ -649,9 +649,9 @@ namespace SleepingCalamity.Tests.PlayMode
 
             // A full bag still opens the chest; the item is lost and LastLootItem records it (the host player, who has not opened chest i yet).
             for (int n = 0; n < PlayerBag.MaxCarried; n++) Assert.That(r.Haul.ServerAddItem(r.Host, 101), Is.True);
-            int rollHost = CellarLoot.RollChest(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.Host));
+            int rollHost = CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.Host));
             yield return Ask(r, r.Contents, i);
-            Assert.That(r.Haul.ServerBagOf(r.Host).ChestOpened(r.Seed, 1, i), Is.True, "a full bag still opens the chest");
+            Assert.That(r.Haul.ServerBagOf(r.Host).ChestOpened(r.Seed, ChestFloor, i), Is.True, "a full bag still opens the chest");
             Assert.That(r.Haul.ServerBagOf(r.Host).Carried.Count, Is.EqualTo(PlayerBag.MaxCarried), "the item was lost");
             Assert.That(r.Contents.LastLootItem, Is.EqualTo(rollHost));
             Assert.That(r.Opened[r.Opened.Count - 1], Is.EqualTo((i, rollHost)));
@@ -663,7 +663,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var clients = new List<PlayModeHarness.TestClient>();
             ChestRig r = null; yield return StartChestRig(clients, x => r = x);
             int i = PickLootChest(r), key = r.Layout.KeyChestIndex;
-            Assert.That(CellarLoot.RollChest(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.A)), Is.Not.EqualTo(CellarLoot.RollChest(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.B))), "premise: the chosen chest rolls different items for A and B");
+            Assert.That(CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.A)), Is.Not.EqualTo(CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.B))), "premise: the chosen chest rolls different items for A and B");
             Assert.That(r.Contents.TryChestPosition(i, out Vector3 at), Is.True);
             Assert.That(r.PeerA.ChestShownOpen(i) || r.PeerB.ChestShownOpen(i), Is.False, "premise: closed everywhere");
 
