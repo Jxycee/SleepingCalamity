@@ -157,6 +157,7 @@ namespace SleepingCalamity.Presentation
         private void CacheLiveParty()
         {
             if (HaulSync == null || !HaulSync.IsSpawned || !HaulSync.IsServer) return;
+            if (NetworkManager == null || NetworkManager.ShutdownInProgress) return;   // the shutdown is dropping the clients: what the party looked like before it is what the quit saves
             string[] bySlot = HaulSync.IdsBySlot();
             _cachedIdsBySlot = bySlot;
             var slots = new List<int>(); var present = new List<string>();
