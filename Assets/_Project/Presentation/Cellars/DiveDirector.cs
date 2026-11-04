@@ -18,7 +18,7 @@
 // (every 0.2 s) sends a teleport to every connected player that has not been placed for the current floor generation, which covers the first placement, floor changes, late joiners, a
 // player that fell out of the world, and the trip home.
 // Contents API (host, stable): Instance (set on spawn, cleared on despawn), RequireGateKey (default false: every stair is open; true: a gate-key stair needs ServerOpenStair(floor) first, the gate key opens floors 1-4 and 6),
-// ServerOpenStair(floor) (idempotent; the opened set lives for the current dive and is cleared on dive start, end and fail), events DiveStarted, FloorChanged(floor), DiveEnded(reason); DiveHaulSync.Banked/DiveFailed stay.
+// ServerOpenStair(floor) (idempotent; the opened set lives for the current dive and is cleared on dive start, end and fail), events DiveStarted, FloorChanged(floor), DiveFailedOn(floor), DiveEnded(reason); DiveHaulSync.Banked/DiveFailed stay.
 // Debug (dev build, host): F7 starts a dive from anywhere (always floor 1), F8 abandons it (fails the dive like the stir countdown does); G cycles the hub prompt's floor pick.
 // Bank room (plan 3 task 8, 8a): the bank press enters the room (DiveHaulSync.ServerEnterBankRoom); inside it a minimal IMGUI bank screen (dev keys [ ] P Y N) asks for picks, push-on and go-home; the
 // shared choice confirms in DiveHaulSync, which raises PushedOn (saved at once) / WentHome (EndDive). Every capture says what it knows about the bank suspend (TownStock.CaptureWorld): a quit in the bank
@@ -71,6 +71,7 @@ namespace SleepingCalamity.Presentation
         public event System.Action DiveStarted;
         public event System.Action<int> FloorChanged;
         public event System.Action<DiveEndReason> DiveEnded;
+        public event System.Action<int> DiveFailedOn;               // host: a failed or abandoned dive ended on this floor (the dev overlay's fail floor); raised just before DiveEnded
         public int RequestsHandled { get; private set; }            // host: RPCs received, accepted or refused (a test waits for refusals to land)
 
         // M6 S3, host only: the town's stock, held in memory and saved through HostWorld (RestoreTown / CaptureTown). Created on first use from the Hollowmere layout. A piece or person goes into the stock the
@@ -440,6 +441,7 @@ namespace SleepingCalamity.Presentation
             if (_session != null && _session.Phase != DivePhase.Ended && (reason == DiveEndReason.Failed || reason == DiveEndReason.Abandoned)) HaulSync.ServerFailDive();
             _loafLedger.End();
             ForgetLiveParty();
+            int endFloor = _session != null ? _session.Floor : 0;   // the dive's last floor, before the Town-phase session below replaces it
             NetActive.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
             _session = NewSession();
             if (HaulSync != null) HaulSync.ServerAdopt(_session);
@@ -448,6 +450,7 @@ namespace SleepingCalamity.Presentation
             _clearAt = Time.unscaledTime + FloorClearDelay;
             ContentsClear();   // contents hook: the dive is over (ended, failed or abandoned): its enemies go
             ResetParty();      // wipe: every hero arrives home up and moving, and the combat host forgets the wipe
+            if (reason == DiveEndReason.Failed || reason == DiveEndReason.Abandoned) DiveFailedOn?.Invoke(endFloor);
             DiveEnded?.Invoke(reason);
             return true;
         }
