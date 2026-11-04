@@ -123,8 +123,8 @@ namespace SleepingCalamity.Tests.PlayMode
             if (DiveState.FloorHasBank(floor) && CellarFloorBuilder.TryBankWorld(fs.Layout, fs.Built, out Vector3 bank) && Flat(me - bank).magnitude <= DiveDirector.BankPromptRadius
                 && Flat(lead - bank).magnitude <= DiveDirector.BankPromptRadius + 2.5f)
             {
-                if (DiveRoute.CanGoHome(floor, _dir.NetHeartBanked.Value)) { _dir.RequestGoHome(); GoHomeRequests++; _nextRequest = Seconds + 2.5f; Say("asked to take the party home"); }
-                else if (!(_dir.HaulSync != null && _dir.HaulSync.Current.BankSpent)) { _dir.RequestBank(); BankRequests++; _nextRequest = Seconds + 2.5f; Say($"asked to bank on floor {floor}"); }
+                if (DiveRoute.CanGoHome(floor, _dir.BankChosenNow())) { _dir.RequestGoHome(); GoHomeRequests++; _nextRequest = Seconds + 2.5f; Say("asked to take the party home"); }
+                else if (!(_dir.HaulSync != null && _dir.HaulSync.Current.BankChosen)) { _dir.RequestBank(); BankRequests++; _nextRequest = Seconds + 2.5f; Say($"asked to bank on floor {floor}"); }
             }
         }
 

@@ -164,7 +164,7 @@ namespace SleepingCalamity.Tests.PlayMode
             if (bankHeart)
             {
                 Assert.That(rig.Haul.ServerBank(), Is.True, "[heart] the host-side bank");
-                Assert.That(rig.Host.NetHeartBanked.Value, Is.True, "[heart] the heart bank is the way home");
+                Assert.That(rig.Host.BankChosenNow(), Is.True, "[heart] the heart bank is the way home");
             }
         }
 
@@ -236,23 +236,23 @@ namespace SleepingCalamity.Tests.PlayMode
             PlayerBag leaverBag = rig.Haul.ServerBagOf(leaverId);   // the bag object itself: after the drop the roster no longer maps the client id to its key
             yield return Consistent(rig, "case1 before the drop");
             Assert.That(rig.HostNm.ConnectedClientsIds.Count, Is.EqualTo(3), "host + 2 clients");
-            Assert.That(rig.Haul.HostState.Stir.PlayersPresent, Is.EqualTo(3), "the stir meter counts the three");
+            Assert.That(rig.Haul.Session.Stir.PlayersPresent, Is.EqualTo(3), "the stir meter counts the three");
             var before = rig.Haul.Current;
 
             yield return Drop(rig, 0, "case1");
             yield return Consistent(rig, "case1 after the drop");
             Assert.That(rig.HostNm.ConnectedClientsIds.Count, Is.EqualTo(2), "party count: host + 1 client");
-            yield return PlayModeHarness.WaitUntil(() => rig.Haul.HostState.Stir.PlayersPresent == 2, Timeout, "case1: the stir meter's player factor never followed the drop");
+            yield return PlayModeHarness.WaitUntil(() => rig.Haul.Session.Stir.PlayersPresent == 2, Timeout, "case1: the stir meter's player factor never followed the drop");
             Assert.That(rig.Host.NetActive.Value && rig.PeerDirector(1).NetActive.Value, Is.True, "the dive carries on for host and the other client");
             Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(before.FoundPieces), "the pieces found stay in the party haul (not lost, not duplicated)");
             Assert.That(leaverBag.Carried, Is.EqualTo(new[] { 101 }), "the leaver's own bag keeps its item (not lost, not duplicated)");
-            Assert.That(rig.Haul.Current.BankedPieces, Is.EqualTo(2), "pieces are safe on pickup");
+            Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(2), "pieces are safe on pickup");
             Assert.That(rig.Haul.Current.CurrentFloor, Is.EqualTo(2));
 
             // The dive can still bank (the remaining client asks, in range) ...
             yield return ClientTo(rig, 1, BankPos(rig), "case1 walk to the bank");
             float askedAt1 = -10f;
-            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 1, ref askedAt1, () => rig.Haul.HostState.BankUsed(2)), Timeout, "case1: the remaining client could not bank");
+            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 1, ref askedAt1, () => rig.Haul.Session.BankChosenThisDive), Timeout, "case1: the remaining client could not bank");
             Assert.That(leaverBag.BankedThisDive.ContainsKey(101) && leaverBag.Carried.Count == 0, Is.True, "case1: the bank pushed the leaver's open visit on: its item is safe");
             yield return Consistent(rig, "case1 banked");
             Assert.That(rig.Haul.ServerBank(), Is.False, "banking again with nothing new is refused (no duplicate bank)");
@@ -338,8 +338,8 @@ namespace SleepingCalamity.Tests.PlayMode
                 case Request.Bank:
                     {
                         var s = rig.Haul.Current;
-                        bool handled = rig.Haul.HostState.BankUsed(2);   // pieces are safe on pickup, so the bank point itself is what a handled request leaves behind
-                        Assert.That(s.BankedPieces, Is.EqualTo(2), "case2 bank: the pieces are safe either way");
+                        bool handled = rig.Haul.Session.BankChosenThisDive;   // pieces are safe on pickup, so the bank point itself is what a handled request leaves behind
+                        Assert.That(s.FoundPieces, Is.EqualTo(2), "case2 bank: the pieces are safe either way");
                         if (!handled) Assert.That(rig.Haul.ServerBank(), Is.True, "case2 bank: the refused request left the bank usable");
                         Assert.That(rig.Haul.ServerBank(), Is.False, "case2 bank: no duplicate bank");
                         break;
@@ -432,7 +432,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
             Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(2, 0)), Is.True);
             yield return ToHeart(rig, true);   // the heart bank banks the two pieces
-            Assert.That(rig.Haul.Current.BankedPieces, Is.EqualTo(2));
+            Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(2));
             yield return Drop(rig, 1, "case4");
             yield return Consistent(rig, "case4 after the drop");
             yield return PlayModeHarness.WaitUntil(() => { Move(rig.HostHero, BankPos(rig)); return rig.Host.ServerTryGoHome(rig.HostNm.LocalClientId); }, 5f, "case4: the host-driven go-home was refused");
@@ -550,7 +550,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(CoopScaling.ExtraEnemiesPerRoom(scale), Is.EqualTo(1));
             yield return StartDive(rig);
             yield return Descend(rig, 1);
-            Assert.That(rig.Haul.HostState.Stir.PlayersPresent, Is.EqualTo(2), "the stir meter counts the present players");
+            Assert.That(rig.Haul.Session.Stir.PlayersPresent, Is.EqualTo(2), "the stir meter counts the present players");
             yield return Consistent(rig, "case6 two present, floor 2");
 
             // The present players' growth is restored from the save; they earn some; the absent two are never loaded.
@@ -561,7 +561,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
             yield return ClientTo(rig, 0, BankPos(rig), "case6 walk to the bank");
             float askedAt6 = -10f;
-            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 0, ref askedAt6, () => rig.Haul.HostState.BankUsed(2)), Timeout, "case6: the present client could not bank");
+            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 0, ref askedAt6, () => rig.Haul.Session.BankChosenThisDive), Timeout, "case6: the present client could not bank");
 
             // Leave: the session saves; the absent two must be exactly as seeded.
             yield return PlayModeHarness.Await(rig.App.Services.Get<INetworkSession>().LeaveAsync(), Timeout);

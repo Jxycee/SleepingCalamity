@@ -1,7 +1,7 @@
-// Authority: test-only. M5 banking: the host owns the shared haul (DiveHaulSync); every peer reads the same summary.
+// Authority: test-only. The shared dive session (plan 3 task 7): the host owns the DiveSession (DiveHaulSync); every peer reads the same summary.
 // Host + two clients in one process (scene management off; the sync object is a dynamically spawned network prefab from the owned list).
-// Catches: a client mutating the haul, a bank request from a client not reaching the host or not reaching the other peers, banking on a floor with no
-// bank point, a failed dive not returning pieces on every peer, a late joiner missing the current summary.
+// Catches: a client mutating the session, a bank request from a client not reaching the host or not reaching the other peers, banking off the bank floor, a failed dive not keeping the
+// pieces and leaving the satchel, a late joiner missing the current summary, the stir not following the clears.
 // NOT covered by a one-process test: the player-position check against a real built bank cell (these clients have no player objects; the range rule
 // itself is asserted through DiveHaulSync.InRange), real relay latency.
 using System.Collections;
@@ -62,8 +62,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(DiveHaulSync.InRange(new Vector3(DiveHaulSync.BankRadius + 0.5f, 0, 0), Vector3.zero), Is.False);
         }
 
+        // Catches: the stir value or a latch computed on one peer and not another, a clear that does not feed the stir, the first-half latches (extra enemies at 40, the hunter at 70) at the wrong
+        // value, the player factor not following who is connected. NOT covered (plan 3 task 10): the collapse countdown and its fail (DiveStir needs the path time and has a 60 s minimum), valuables.
         [UnityTest]
-        public IEnumerator Stir_HostOwnsIt_ClientsSeeValueLatchesAndCountdown_BankStopsIt_ZeroFailsTheDive()
+        public IEnumerator Stir_HostOwnsIt_ClientsSeeValueAndLatches_FloorsFeedItPerHalf()
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
@@ -80,49 +82,45 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => a.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id) && b.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "clients never received the haul object");
             DiveHaulSync peerA = On(a.NetworkManager, id), peerB = On(b.NetworkManager, id);
 
-            StirTuning tuning = StirTuning.Default; tuning.DeepClosesSeconds = 5f; tuning.PerFloorCleared = 30f;   // short countdown; pieces no longer feed the stir (plan 2), so the floor term is raised
-            Assert.That(host.ServerBegin(new[] { 6, 6, 6 }, tuning), Is.True);
-            Assert.That(peerA.ServerBegin(new[] { 6, 6, 6 }, tuning), Is.False, "a client cannot restart the dive");
-            Assert.That(host.ServerSetFloor(1), Is.True);
+            Assert.That(host.ServerBegin(), Is.True);
+            Assert.That(peerA.ServerBegin(), Is.False, "a client cannot restart the dive");
+            Assert.That(host.ServerStart(1, false), Is.True);
 
             // Pieces are safe on pickup and never move the stir.
-            Assert.That(host.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True); Assert.That(host.ServerAddPiece(DiveHaul.PieceId(1, 1)), Is.True);
-            yield return WaitSummary(peerA, s => s.FoundPieces == 2 && s.BankedPieces == 2 && s.StirValue == 0 && !s.DeepClosesLatched, "client A never saw two safe pieces with the stir still at 0");
+            Assert.That(host.ServerAddPiece(100), Is.True); Assert.That(host.ServerAddPiece(101), Is.True);
+            yield return WaitSummary(peerA, s => s.FoundPieces == 2 && s.StirValue == 0 && !s.DeepClosesLatched, "client A never saw two safe pieces with the stir still at 0");
 
-            // Three players present: factor 1.5. One floor cleared = 30 x 1.5 = 45: past 40 only.
+            // Three players present: factor sqrt(3) = 1.73. One floor cleared = 10 x 1.73 = 17.3; two = 34.6.
             Assert.That(host.ServerMarkCleared(1), Is.True);
-            yield return WaitSummary(peerA, s => s.StirValue == 45 && s.ExtraEnemiesPerRoom == 1 && !s.HunterLatched && !s.DeepClosesLatched, "client A never saw stir 45 with the extra-enemy latch");
-            yield return WaitSummary(peerB, s => s.StirValue == 45 && s.ExtraEnemiesPerRoom == 1, "client B never saw stir 45");
-
-            // Two floors cleared: 60 x 1.5 = 90, hunter latched.
+            yield return WaitSummary(peerA, s => s.StirValue == 17 && s.ExtraEnemiesPerRoom == 0 && !s.HunterLatched, "client A never saw stir 17");
+            Assert.That(host.ServerMarkCleared(1), Is.False, "a floor clears once");
+            Assert.That(host.ServerEnterFloor(2), Is.True);
             Assert.That(host.ServerMarkCleared(2), Is.True);
-            yield return WaitSummary(peerA, s => s.StirValue == 90 && s.HunterLatched && !s.DeepClosesLatched, "client A never saw the hunter latch");
+            yield return WaitSummary(peerB, s => s.StirValue == 35 && s.ExtraEnemiesPerRoom == 0, "client B never saw stir 35");
 
-            // Past 100: the deep closes, clients see the seconds counting down.
-            Assert.That(host.ServerMarkCleared(3), Is.True);   // 90 x 1.5 = 135 -> 100
-            yield return WaitSummary(peerA, s => s.StirValue == 100 && s.DeepClosesLatched && s.DeepSecondsLeft > 0, "client A never saw the deep close");
-            yield return WaitSummary(peerB, s => s.DeepClosesLatched && s.DeepSecondsLeft > 0 && s.DeepSecondsLeft <= 5, "client B never saw the countdown");
+            // Three floors: 52, past the extra-enemy mark only.
+            Assert.That(host.ServerEnterFloor(3), Is.True);
+            Assert.That(host.ServerMarkCleared(3), Is.True);
+            yield return WaitSummary(peerA, s => s.StirValue == 52 && s.ExtraEnemiesPerRoom == 1 && !s.HunterLatched, "client A never saw the extra-enemy latch");
 
-            // A bank at the checkpoint stops it; latches stay.
-            Assert.That(host.ServerSetFloor(2), Is.True);
-            Assert.That(host.ServerBank(), Is.True);
-            yield return WaitSummary(peerA, s => s.DeepSecondsLeft == 0 && s.DeepClosesLatched && s.HunterLatched, "client A never saw the countdown stop after the bank");
-            yield return new WaitForSecondsRealtime(6f);   // longer than the countdown: the dive must survive
-            Assert.That(host.Current.CurrentFloor, Is.EqualTo(2), "a banked countdown must not fail the dive");
-            Assert.That(host.Current.BankedPieces, Is.EqualTo(2));
-
-            // A fresh dive (new state, stir re-armed): carry two pieces, push past 100 again and let it run out. The host fails the dive on every peer; the pieces stay safe.
-            Assert.That(host.ServerBegin(new[] { 6, 6, 6 }, tuning), Is.True);
-            Assert.That(host.ServerSetFloor(1), Is.True);
-            Assert.That(host.ServerAddPiece(DiveHaul.PieceId(2, 0)), Is.True); Assert.That(host.ServerAddPiece(DiveHaul.PieceId(3, 0)), Is.True);
-            for (int f = 1; f <= 3; f++) Assert.That(host.ServerMarkCleared(f), Is.True);
-            yield return WaitSummary(peerA, s => s.DeepSecondsLeft > 0, "client A never saw the second countdown");
-            yield return WaitSummary(peerA, s => s.CurrentFloor == 0 && s.StirValue == 0 && s.DeepSecondsLeft == 0 && !s.HunterLatched && !s.DeepClosesLatched && s.ExtraEnemiesPerRoom == 0, "client A never saw the dive fail at 0");
-            yield return WaitSummary(peerB, s => s.CurrentFloor == 0 && s.BankedPieces == 2 && s.LeftFloor3 == 5 && s.LeftFloor2 == 5, "client B never saw the pieces stay safe");
+            // Four floors: 69, just short of the hunter; five: 87 with the hunter latched. A cleared mask of five floors rides along.
+            Assert.That(host.ServerEnterFloor(4), Is.True);
+            Assert.That(host.ServerMarkCleared(4), Is.True);
+            yield return WaitSummary(peerA, s => s.StirValue == 69 && !s.HunterLatched, "client A never saw stir 69");
+            host.Session.Restore(new DiveSession.SnapshotData(DivePhase.Floor, 5, host.Session.Snapshot().ClearedMask, false, false, -1, host.Session.Stir.Capture(), host.Session.Momentum.Capture(), host.Session.Retry.Capture()));   // the bank floor: the guardian is the stand-in for the stair here
+            Assert.That(host.ServerMarkCleared(5), Is.True);
+            yield return WaitSummary(peerA, s => s.StirValue == 87 && s.HunterLatched && s.ClearedMask == 0b11111 && s.CurrentFloor == 5, "client A never saw the hunter latch");
             Assert.That(peerA.Current, Is.EqualTo(host.Current));
             Assert.That(peerB.Current, Is.EqualTo(host.Current));
+
+            // A fresh dive (new session over the same pieces): the stir starts again from 0, the found pieces stay found.
+            Assert.That(host.ServerBegin(), Is.True);
+            Assert.That(host.ServerStart(1, false), Is.True);
+            yield return WaitSummary(peerA, s => s.StirValue == 0 && !s.HunterLatched && s.ExtraEnemiesPerRoom == 0 && s.ClearedMask == 0 && s.FoundPieces == 2, "client A never saw the fresh dive start clean");
         }
 
+        // Catches: a client mutating the session, a bank request from a client not reaching the host or not reaching the other peers, a bank press off the bank floor, a failed dive not leaving the
+        // satchel and the pieces on every peer, a late joiner missing the current summary. NOT covered: the bank room's picks and confirm window (plan 3 task 8).
         [UnityTest]
         public IEnumerator Haul_HostOwnsIt_ClientsBankByRpc_AllPeersAgree_LateJoinerSyncs()
         {
@@ -140,67 +138,76 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => a.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "client A never received the haul object");
             DiveHaulSync peerA = On(a.NetworkManager, id);
 
-            // Fresh dive: 2 pieces on each of floors 1-3.
-            yield return WaitSummary(peerA, s => s.LeftFloor1 == 2 && s.LeftFloor2 == 2 && s.LeftFloor3 == 2, "client A never saw the starting pieces-left");
+            // At home: nothing found, nothing left to find, no phase.
+            yield return WaitSummary(peerA, s => s.FoundPieces == 0 && s.PiecesLeft == 0 && s.PeopleLeft == 0 && s.DivePhase == DivePhase.Town && s.CurrentFloor == 0, "client A never saw the home summary");
 
-            // A client cannot mutate the haul.
+            // A client cannot mutate the session.
             Assert.That(peerA.ServerAddPiece(100), Is.False);
             Assert.That(peerA.ServerAddItem(a.NetworkManager.LocalClientId, 101), Is.False);
             Assert.That(peerA.ServerAddGold(a.NetworkManager.LocalClientId, 3), Is.False);
             Assert.That(peerA.ServerBank(), Is.False);
             Assert.That(peerA.ServerFailDive(), Is.False);
-            Assert.That(peerA.ServerSetFloor(2), Is.False);
+            Assert.That(peerA.ServerStart(1, false), Is.False);
+            Assert.That(peerA.ServerEnterFloor(2), Is.False);
             Assert.That(peerA.ServerMarkCleared(1), Is.False);
-            Assert.That(peerA.ServerBegin(new[] { 9, 9, 9 }), Is.False);
-            Assert.That(peerA.ServerBankInTown(), Is.False);
+            Assert.That(peerA.ServerGoHome(), Is.False);
+            Assert.That(peerA.ServerFinish(), Is.False);
+            Assert.That(peerA.ServerBegin(), Is.False);
 
-            // Host collects on floor 1 and 2, then stands on floor 3 (no bank there).
-            Assert.That(host.ServerSetFloor(1), Is.True);
+            // Host: the checkpoint rule decides the start; floor 1 always starts.
+            Assert.That(host.ServerStart(3, false), Is.False, "no checkpoint: floor 3 is refused");
+            Assert.That(host.ServerStart(1, false), Is.True);
+            Assert.That(host.ServerStart(1, false), Is.False, "a dive that runs cannot start again");
             Assert.That(host.ServerAddPiece(100), Is.True);
             Assert.That(host.ServerAddPiece(100), Is.False, "the same piece twice");
             ulong hostId = hostNm.LocalClientId;
             Assert.That(host.ServerAddItem(hostId, 105), Is.True);
             Assert.That(host.ServerMarkCleared(1), Is.True);
-            Assert.That(host.ServerSetFloor(3), Is.True);
-            Assert.That(host.ServerAddPiece(200), Is.True);   // piece ids are floor*100+n; 200 is a floor-2 piece found while passing
-            yield return WaitSummary(peerA, s => s.FoundPieces == 2 && s.BankedPieces == 2 && s.LeftFloor1 == 1 && s.LeftFloor2 == 1 && s.ClearedMask == 1 && s.CurrentFloor == 3, "client A never saw the found pieces");
+            Assert.That(host.ServerEnterFloor(3), Is.False, "the stair only leads to the next floor");
+            Assert.That(host.ServerEnterFloor(2), Is.True);
+            yield return WaitSummary(peerA, s => s.FoundPieces == 1 && s.ClearedMask == 1 && s.CurrentFloor == 2 && s.DivePhase == DivePhase.Floor, "client A never saw the found piece and floor 2");
 
-            // A bank request on floor 3 (no bank point) changes nothing.
+            // A bank request off the bank floor changes nothing.
             peerA.RequestBank();
             float until = Time.realtimeSinceStartup + 10f;
             while (host.BankRequestsHandled < 1 && Time.realtimeSinceStartup < until) yield return null;
-            Assert.That(host.BankRequestsHandled, Is.EqualTo(1), "the floor-3 bank request never reached the host");
-            Assert.That(host.HostState.CanBankHere, Is.False, "no bank point on floor 3");
-            Assert.That(host.Current.BankedPieces, Is.EqualTo(2), "pieces are safe on pickup, bank or no bank");
+            Assert.That(host.BankRequestsHandled, Is.EqualTo(1), "the floor-2 bank request never reached the host");
+            Assert.That(host.Current.DivePhase, Is.EqualTo(DivePhase.Floor), "no bank on floor 2");
             Assert.That(host.ServerBagOf(hostId).Carried, Is.EqualTo(new[] { 105 }), "the host's bag still carries its item");
 
-            // On floor 2 (checkpoint) the client's request banks everything, and every peer sees it.
-            Assert.That(host.ServerSetFloor(2), Is.True);
+            // On the bank floor (jumped to by the test hook) the cleared guardian lets a client's request open the bank room, then push on; every peer sees both.
+            Assert.That(host.ServerSetFloor(5), Is.True);
             peerA.RequestBank();
-            yield return WaitSummary(host, s => s.CheckpointReached, "the host never banked on the client's request");
-            yield return WaitSummary(peerA, s => s.BankedPieces == 2 && s.CheckpointReached && s.BankSpent, "client A never saw the banked summary");
-            Assert.That(host.ServerBagOf(hostId).BankedThisDive.ContainsKey(105), Is.True, "the bank push-on made the bag item safe (free slot auto-fill)");
+            float until2 = Time.realtimeSinceStartup + 3f;
+            while (host.BankRequestsHandled < 2 && Time.realtimeSinceStartup < until2) yield return null;
+            Assert.That(host.Current.DivePhase, Is.EqualTo(DivePhase.Floor), "the guardian is not down: the bank room stays shut");
+            Assert.That(host.ServerMarkCleared(5), Is.True);
+            peerA.RequestBank();
+            yield return WaitSummary(peerA, s => s.DivePhase == DivePhase.BankRoom && s.CurrentFloor == 5, "client A never saw the bank room open");
+            Assert.That(host.ServerBagOf(hostId).BankOpen, Is.True, "the host's bag has a bank visit");
+            peerA.RequestBank();
+            yield return WaitSummary(peerA, s => s.BankChosen && s.DivePhase == DivePhase.Floor, "client A never saw the push-on");
+            Assert.That(host.ServerBagOf(hostId).BankOpen, Is.False, "the push-on closed the visit");
 
             // Late joiner gets the current summary with the spawn.
             PlayModeHarness.TestClient b = null;
             yield return Join(app, 9, c => b = c);
             yield return PlayModeHarness.WaitUntil(() => b.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "client B never received the haul object");
             DiveHaulSync peerB = On(b.NetworkManager, id);
-            yield return WaitSummary(peerB, s => s.BankedPieces == 2 && s.CheckpointReached && s.ClearedMask == 1 && s.LeftFloor1 == 1 && s.LeftFloor2 == 1 && s.CurrentFloor == 2, "late client B never saw the current summary");
+            yield return WaitSummary(peerB, s => s.FoundPieces == 1 && s.BankChosen && s.CurrentFloor == 5 && s.DivePhase == DivePhase.Floor, "late client B never saw the current summary");
             // The player factor changed when B joined, so the host republishes the stir value; B converges on it.
             yield return PlayModeHarness.WaitUntil(() => peerB.Current.Equals(host.Current), Timeout, "late joiner never matched the host exactly");
 
-            // Failed dive: every collected piece stays collected (safe on pickup) on every peer; checkpoint and cleared floors stay; a carried bag item waits in the satchel.
-            Assert.That(host.ServerAddPiece(300), Is.True);
+            // Failed dive: the found piece stays found on every peer; a carried bag item waits in a satchel at the floor the party fell on.
             Assert.That(host.ServerAddPiece(101), Is.True);
             Assert.That(host.ServerAddItem(hostId, 106), Is.True);
-            yield return WaitSummary(peerB, s => s.FoundPieces == 4 && s.BankedPieces == 4 && s.LeftFloor3 == 1 && s.LeftFloor1 == 0, "client B never saw the new pieces");
+            yield return WaitSummary(peerB, s => s.FoundPieces == 2, "client B never saw the new piece");
             Assert.That(host.ServerFailDive(), Is.True);
-            yield return WaitSummary(peerA, s => s.BankedPieces == 4 && s.LeftFloor3 == 1 && s.LeftFloor1 == 0 && s.CurrentFloor == 0, "client A never saw the failed dive keep the pieces");
+            yield return WaitSummary(peerA, s => s.FoundPieces == 2 && s.CurrentFloor == 0 && s.DivePhase == DivePhase.Ended, "client A never saw the failed dive keep the pieces");
             Assert.That(host.ServerBagOf(hostId).Satchel.Waiting, Is.Not.Null, "the carried bag item waits in a satchel");
-            Assert.That(host.ServerBagOf(hostId).Satchel.Waiting.Floor, Is.EqualTo(2), "at the floor the party fell on");
-            Assert.That(host.ServerBagOf(hostId).Satchel.Waiting.Items, Is.EqualTo(new[] { 106 }));
-            yield return WaitSummary(peerB, s => s.LeftFloor3 == 1 && s.LeftFloor1 == 0 && s.CheckpointReached && s.ClearedMask == 1, "client B never saw the failed dive");
+            Assert.That(host.ServerBagOf(hostId).Satchel.Waiting.Floor, Is.EqualTo(5), "at the floor the party fell on");
+            Assert.That(host.ServerBagOf(hostId).Satchel.Waiting.Items, Does.Contain(106));
+            yield return WaitSummary(peerB, s => s.FoundPieces == 2 && s.DivePhase == DivePhase.Ended, "client B never saw the failed dive");
             Assert.That(peerA.Current, Is.EqualTo(host.Current));
             Assert.That(peerB.Current, Is.EqualTo(host.Current));
         }

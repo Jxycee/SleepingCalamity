@@ -103,7 +103,7 @@ namespace SleepingCalamity.Tests.PlayMode
             peerHaul.FloorSync = peerFloor;   // one process holds both peers' floor syncs: pin the client's so it never finds the host's
 
             const float Recharge = 3f;
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetHealTuning(new HealTuning { ChancePercent = 51, RechargeSeconds = Recharge, RadiusMeters = 1.6f }), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
             Assert.That(floor.ServerSetFloor(seed, 1), Is.True);
@@ -153,7 +153,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerSetFloor(2), Is.True);
             int banked = 0; haul.Banked += () => banked++;
             peerHaul.RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => haul.Current.CheckpointReached, Timeout, "the bank request never banked");
+            yield return PlayModeHarness.WaitUntil(() => haul.Current.CheckpointHeld, Timeout, "the bank request never banked");
             Assert.That(banked, Is.EqualTo(1), "Banked was raised once");
             Assert.That(hostV.Hp, Is.EqualTo(100), "the bank healed the host hero");
             Assert.That(clientV.Hp, Is.EqualTo(100), "the bank healed the client hero on the host");

@@ -9,6 +9,7 @@ namespace SleepingCalamity.Runtime
         SkipWave = 2,               // F6: the host clears the arena wave (M3 arena)
         StartDive = 3,              // F7: the host starts a Cellars dive from anywhere (M5 spine)
         AbandonDive = 4,            // F8: the host abandons the running dive (M5 spine)
-        EatLoaf = 5                 // H: eat one of the baker's loaves (M6 S5; a placeholder until the input asset gets an item action)
+        EatLoaf = 5,                // H: eat one of the baker's loaves (M6 S5; a placeholder until the input asset gets an item action)
+        CycleFloor = 6              // G: the hub trapdoor prompt's next pickable floor while the checkpoint is held (plan 3 task 7; minimum UI)
     }
 }

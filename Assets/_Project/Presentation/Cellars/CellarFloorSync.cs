@@ -12,7 +12,7 @@ namespace SleepingCalamity.Presentation
 {
     public sealed class CellarFloorSync : NetworkBehaviour
     {
-        public const int NoFloor = 0, MaxFloor = 4;
+        public const int NoFloor = 0, MaxFloor = DiveFloorTable.LastBuiltFloor;   // floors 1-7 are built (plan 3); CellarFloorGenerator.Layout builds them
 
         // One variable holding both values, so a client never sees a new seed with the old floor (NGO applies variables one at a time).
         public struct DiveFloor : INetworkSerializable, System.IEquatable<DiveFloor>

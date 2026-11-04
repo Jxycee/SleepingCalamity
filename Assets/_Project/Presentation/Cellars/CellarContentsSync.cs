@@ -69,6 +69,8 @@ namespace SleepingCalamity.Presentation
 
         // Host only: raised once per floor when the gate key is picked up (the spine opens the stair).
         public event System.Action<int> ExitUnlocked;
+        // Host only: the floor's guardian (the bank floor's Dough Warden) died: the director clears the floor so the bank room opens.
+        public event System.Action<int> GuardianDefeated;
         // Host only: a chest was opened (chest index, item id; RoomKeyId for the key chest).
         public event System.Action<int, int> ChestOpened;
         // Host only: a room was entered / cleared (room index).
@@ -96,7 +98,7 @@ namespace SleepingCalamity.Presentation
         private ContentsState _st;
         private readonly CellarRoomClear _clear = new CellarRoomClear();
         private readonly HashSet<int> _entered = new HashSet<int>();
-        private sealed class Tracked { public int Room; public bool Carrier; }
+        private sealed class Tracked { public int Room; public bool Carrier, Guardian; }
         private readonly Dictionary<Enemy, Tracked> _tracked = new Dictionary<Enemy, Tracked>();
         private Enemy _carrierEnemy, _hunter; private bool _hunterSpawned;
         private int _carrierLostRoom = -1;   // the carrier despawned without dying while room-mates lived: its room resets once no tracked enemy is left, so the key stays obtainable
@@ -179,10 +181,18 @@ namespace SleepingCalamity.Presentation
             if (want == _handledPieces || want < 0) return;
             DestroyPieceMarkers();
             _handledPieces = want;
-            var spots = CellarPieceSpots.Choose(fs.Layout, fs.Built.Dressing, want);
+            var spots = PieceSpotsFor(fs.Layout, fs.Built.Dressing, want);
             if (spots.Count < want) Debug.LogWarning("CellarContentsSync: floor " + fs.Layout.Floor + " has room for " + spots.Count + " of " + want + " pieces; the rest cannot be collected.");
             _pieceSpots = new CellPos[spots.Count]; for (int i = 0; i < spots.Count; i++) _pieceSpots[i] = spots[i];
             _pieces = CellarFloorBuilder.BuildPieces(fs.Built.Root, spots);
+        }
+
+        // Where the floor's pieces lie: the generated floors' free combat-room cells (CellarPieceSpots.Choose), or the baker's own cell on the bakery floor (plan 3 decision 10).
+        private static IReadOnlyList<CellPos> PieceSpotsFor(CellarFloorLayout layout, CellarFloorDressing dressing, int count)
+        {
+            CellPos? baker = CellarPieceSpots.BakerSpot(layout);
+            if (baker.HasValue) return count > 0 ? new[] { baker.Value } : new CellPos[0];
+            return CellarPieceSpots.Choose(layout, dressing, count);
         }
 
         private void DestroyPieceMarkers()
@@ -430,14 +440,14 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || layout == null || floorRoot == null) return false;
             ServerClearFloor();
             _layout = layout; _root = floorRoot; _dressing = CellarFloorDressing.Resolve(layout);
-            _st = new ContentsState { Seed = layout.Seed, Floor = layout.Floor, PieceCount = PiecesForFloor(layout.Floor) };
+            _st = new ContentsState { Seed = layout.Seed, Floor = layout.Floor, PieceCount = ArmPieces(layout.Floor) };
             _armPos.Clear(); _live.Clear(); _hasBounds = false;
             CellarFloorSync afs = FloorSync;
             if (afs != null && afs.Built != null && afs.Built.Root == floorRoot) { _armBounds = afs.Built.Bounds; _armBounds.Expand(new Vector3(2f, 0f, 2f)); _hasBounds = true; }
             _players.Clear();
             if (PlayersOverride != null) PlayersOverride(_players); else CollectFromNetwork();
             foreach (PlayerPos p in _players) _armPos[p.ClientId] = p.Position;
-            if (layout.Floor >= 1 && layout.Floor <= DiveHaul.PieceFloors && !CarrierIsValid(layout, _dressing)) _st.ExitUnlocked = true;
+            if (HasGateKeyStair(layout.Floor) && !CarrierIsValid(layout, _dressing)) _st.ExitUnlocked = true;
             Publish();
             if (_st.ExitUnlocked) ExitUnlocked?.Invoke(layout.Floor);
             return true;
@@ -455,16 +465,18 @@ namespace SleepingCalamity.Presentation
             if (IsSpawned) Publish();
         }
 
-        // Pieces the haul assigned to `floor` that are not already home: still to find plus already collected this run (banked or not). Falls back to the default counts without a running haul.
-        private int PiecesForFloor(int floor)
+        // The pieces and people not yet found on `floor` (DivePieces.OnFloor), frozen now: spot i belongs to the i-th such id (ascending) for the whole visit, so finding spot 0 never shifts the
+        // next piece into it. A person (the baker) counts as a spot too. Without a running session there are none.
+        private int ArmPieces(int floor)
         {
-            if (floor < 1 || floor > DiveHaul.PieceFloors) return 0;
-            DiveHaul h = HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState.Haul : null;
-            if (h == null) return DiveHaulSync.DefaultPiecesPerFloor[floor - 1];
-            int n = h.PiecesLeft(floor);
-            foreach (int id in h.BankedPieces) if (h.OriginFloor(id) == floor) n++;
-            return n;
+            _pieceIds.Clear();
+            DivePieces p = HaulSync != null && HaulSync.Session != null ? HaulSync.Session.Pieces : null;
+            if (p != null) foreach (int id in p.OnFloor(floor)) _pieceIds.Add(id);
+            return _pieceIds.Count;
         }
+
+        // Only the floors whose way down needs the gate key (1-4 and 6: DiveFloorTable.HasStair) have a carrier; the bank floor and the ending floor have none.
+        public static bool HasGateKeyStair(int floor) => UndercroftPlan.IsFloor(floor) && DiveFloorTable.HasStair(floor, true);
 
         // The carrier is usable when its room exists, it stands in that room and an authored spawn of a Combat room sits on its cell.
         private static bool CarrierIsValid(CellarFloorLayout l, CellarFloorDressing dressing)
@@ -476,11 +488,11 @@ namespace SleepingCalamity.Presentation
             return false;
         }
 
-        // Host: may the stair of `floor` be used? True on floor 4 and beyond (no stair gate), on any floor 1-3 whose carrier is missing/invalid, and once the gate key was picked.
-        // False for a floor 1-3 that is not the armed one. The spine's wiring: ExitUnlocked += f => DiveDirector.Instance.ServerOpenStair(f).
+        // Host: may the stair of `floor` be used? True on a floor with no gate-key stair (the bank floor, the ending floor), on any other floor whose carrier is missing/invalid, and once the gate key was picked.
+        // False for a gate-key floor that is not the armed one. The spine's wiring: ExitUnlocked += f => DiveDirector.Instance.ServerOpenStair(f).
         public bool IsExitUnlocked(int floor)
         {
-            if (floor < 1 || floor > DiveHaul.PieceFloors) return true;
+            if (!HasGateKeyStair(floor)) return true;
             return _layout != null && _layout.Floor == floor && _st.ExitUnlocked;
         }
 
@@ -574,6 +586,7 @@ namespace SleepingCalamity.Presentation
                 bool carrierSpawn = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
                 if (carrierSpawn && _st.GateKey != 0) { index++; continue; }   // its key already dropped (or was taken): a re-entered room does not bring the carrier back
                 bool warden = l.WardenCell.HasValue && l.WardenCell.Value.X == sp.X && l.WardenCell.Value.Y == sp.Y;
+                if (warden && HaulSync != null && HaulSync.Session != null && HaulSync.Session.StartedAtBank) { index++; continue; }   // a party that started at the bank (decision 2) never meets the guardian
                 int tier = EnemyCatalog.AuthoredTier(sp.Tier == SpawnTier.Tier2, warden, l.Floor);
                 EnemyKind kind = warden ? EnemyKind.DoughWarden : sp.Tier == SpawnTier.Tier2 ? EnemyKind.RatKing : CellarEnemyMix.Tier1Kind(l.Seed, l.Floor, room, index, plan.RosterMask);
                 index++;
@@ -584,7 +597,7 @@ namespace SleepingCalamity.Presentation
                     if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
                     continue;
                 }
-                _tracked[e] = new Tracked { Room = room, Carrier = carrier };
+                _tracked[e] = new Tracked { Room = room, Carrier = carrier, Guardian = warden };
                 if (carrier) _carrierEnemy = e;
                 _clear.Spawn(room);
                 e.ServerDied += OnEnemyDied; e.ServerDespawned += OnEnemyDespawned;
@@ -625,6 +638,7 @@ namespace SleepingCalamity.Presentation
                 return;
             }
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = SettledKeyPos(e.transform.position); }
+            if (t.Guardian) GuardianDefeated?.Invoke(_st.Floor);
             if (_clear.Died(t.Room)) { _st.Cleared = _clear.ClearedMask; RoomCleared?.Invoke(t.Room); }
             if (_carrierLostRoom == t.Room && _st.GateKey == 0 && !RoomHasTracked(t.Room))   // its carrier was lost without a drop: reset the room so the carrier comes back on entry
             { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _carrierLostRoom = -1; _st.Cleared = _clear.ClearedMask; }
@@ -646,34 +660,21 @@ namespace SleepingCalamity.Presentation
             }
         }
 
-        // Spot i belongs to the i-th piece of the floor that is not already home (a save marks some home: PiecesForFloor excludes them, so spots 0..n-1 must map to the remaining ids,
-        // not to PieceId(floor, i)). Ids and the save format are unchanged. Without a haul the plain indices stand.
-        private void RefreshPieceIds(DiveHaul haul, int floor)
-        {
-            _pieceIds.Clear();
-            int assigned = haul != null ? haul.AssignedOn(floor) : _pieceSpots.Length;
-            for (int i = 0; i < assigned; i++)
-            {
-                int id = DiveHaul.PieceId(floor, i);
-                if (haul == null || !haul.IsHome(id)) _pieceIds.Add(id);
-            }
-        }
-
         private void TickPieces(CellarFloorSync fs)
         {
-            DiveHaul haul = HaulSync != null && HaulSync.HostState != null ? HaulSync.HostState.Haul : null;
-            int floor = _layout.Floor;
-            RefreshPieceIds(haul, floor);
-            for (int i = 0; i < _pieceSpots.Length && i < _pieceIds.Count; i++)
+            DivePieces pieces = HaulSync != null && HaulSync.Session != null ? HaulSync.Session.Pieces : null;
+            ulong mask = 0;
+            for (int i = 0; i < _pieceSpots.Length && i < _pieceIds.Count && pieces != null; i++)
             {
                 int id = _pieceIds[i];
-                if (haul == null || haul.IsCollected(id)) continue;
-                Vector3 at = World(fs, _pieceSpots[i]);
-                foreach (PlayerPos p in _players)
-                    if (FlatSqr(p.Position, at) <= PieceRange * PieceRange) { HaulSync.ServerAddPiece(id); break; }
+                if (!pieces.IsFound(id))
+                {
+                    Vector3 at = World(fs, _pieceSpots[i]);
+                    foreach (PlayerPos p in _players)
+                        if (FlatSqr(p.Position, at) <= PieceRange * PieceRange) { HaulSync.ServerAddPiece(id); break; }
+                }
+                if (pieces.IsFound(id)) mask |= 1UL << i;
             }
-            ulong mask = 0;
-            for (int i = 0; i < _pieceSpots.Length && i < _pieceIds.Count && haul != null; i++) if (haul.IsCollected(_pieceIds[i])) mask |= 1UL << i;
             _st.Pieces = mask;
         }
 
@@ -715,9 +716,9 @@ namespace SleepingCalamity.Presentation
             }
             else
             {
-                item = CellarLoot.RollFor(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId));
+                item = CellarLoot.RollChest(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId));   // may be GoldId: the purse goes to ServerAddGold in plan 3 task 9, never to Add
                 bag.MarkChestOpened(_layout.Seed, _layout.Floor, chestIndex);
-                HaulSync.ServerAddItem(clientId, item);   // a full bag still opens the chest; the item is lost (spec silent: proposal). LastLootItem records it
+                if (item > 0) HaulSync.ServerAddItem(clientId, item);   // a full bag still opens the chest; the item is lost (spec silent: proposal). LastLootItem records it
             }
             LastLootItem = item;
             Publish();

@@ -102,10 +102,10 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Contents.PlayersOverride = list => { foreach (KeyValuePair<ulong, Vector3> kv in c.Players) list.Add(new CellarContentsSync.PlayerPos { ClientId = kv.Key, Position = kv.Value }); };
 
             c.Seed = seedOverride ?? FindSeed();
-            Assert.That(c.Haul.ServerBegin(new[] { 2, 2, 2 }, stir ?? StirTuning.Default), Is.True);
+            Assert.That(c.Haul.ServerBegin(), Is.True);
             Assert.That(c.Haul.ServerSetFloor(startFloor), Is.True);
             Assert.That(c.Floor.ServerSetFloor(c.Seed, startFloor), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => c.Peer.FloorSync.Built != null && c.Peer.FloorSync.BuiltFloor == startFloor && c.Peer.PieceCount > 0 && c.Contents.PieceCount > 0, Timeout, "floors were not built");
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.FloorSync.Built != null && c.Peer.FloorSync.BuiltFloor == startFloor, Timeout, "floors were not built");
             c.Layout = c.Floor.Layout;
             done(c);
         }
@@ -128,7 +128,17 @@ namespace SleepingCalamity.Tests.PlayMode
         [Test]
         public void DefaultPieceCounts_MatchTheCoreTestConstant()
         {
-            Assert.That(DiveHaulSync.DefaultPiecesPerFloor, Is.EqualTo(new[] { 2, 2, 2 }));
+            Assert.That(DiveHaulSync.DefaultPiecesPerFloor, Is.EqualTo(new[] { 2, 2, 2 }));   // legacy until plan 3 task 12 (EditMode tests still read it)
+        }
+
+        // A haul sync spawned alone deals its pieces from DefaultWorldSeed with the Core table: none on the authored floor 1, the baker on floor 3, the rest on the generated floors.
+        [Test]
+        public void DefaultPieces_AreDealtFromTheFallbackWorldSeed_NoneOnFloor1()
+        {
+            var pieces = DivePieces.ForWorld(DiveHaulSync.DefaultWorldSeed);
+            Assert.That(pieces.PiecesLeft(1) + pieces.PeopleLeft(1), Is.EqualTo(0), "random pieces never land on the authored floor");
+            Assert.That(pieces.PeopleLeft(3), Is.EqualTo(1), "the baker sleeps on floor 3");
+            Assert.That(pieces.PiecesLeft(2) + pieces.PiecesLeft(4) + pieces.PiecesLeft(6) + pieces.PiecesLeft(7), Is.EqualTo(6));
         }
 
         [UnityTest]
@@ -171,7 +181,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Loot(c), Is.EqualTo(1), "the loot reached the opener's bag");
             Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL), "a loot chest never sets the shared opened bit (the visual lives in the opener's own PlayerBagSync view: PerPlayerLootNetworkTests)");
             Assert.That(CellarLoot.RankOf(c.Contents.LastLootItem), Is.InRange(1, 5));
-            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.RollFor(c.Seed, 1, idx, c.Haul.PlayerSlotOf(c.ClientId))), "the opener's own roll");
+            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.RollChest(c.Seed, 1, idx, c.Haul.PlayerSlotOf(c.ClientId))), "the opener's own roll");
             Assert.That(c.Haul.ServerBagOf(c.ClientId).Carried, Is.EqualTo(new[] { c.Contents.LastLootItem }));
 
             handled = c.Contents.ChestRequestsHandled;
@@ -297,7 +307,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(c.Peer.TryPiecePosition(0, out Vector3 piece), Is.True);
             Assert.That(piece.x, Is.InRange(b.min.x - 1f, b.max.x + 1f)); Assert.That(piece.z, Is.InRange(b.min.z - 1f, b.max.z + 1f));
             c.Players[c.HostId] = piece;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.LeftFloor1 == 1, Timeout, "the piece at x=200 was not collected");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == 1, Timeout, "the piece at x=200 was not collected");
 
             // room spawns land on their cell
             GateKeyCarrier car = c.Layout.Carrier;
@@ -325,14 +335,14 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Players[c.HostId] = piece;
             Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True);
             yield return new WaitForSeconds(0.6f);
-            Assert.That(c.Haul.Current.LeftFloor1, Is.EqualTo(2), "a stale position collects nothing");
+            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(2), "a stale position collects nothing");
             Assert.That(c.Contents.EnterEnemyCount(car.RoomIndex), Is.EqualTo(0));
 
             // the teleport lands: the player moves, then steps on the piece
             c.Players[c.HostId] = elsewhere;
             yield return new WaitForSeconds(0.3f);
             c.Players[c.HostId] = piece;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.LeftFloor1 == 1, Timeout, "after moving, the piece is collected");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == 1, Timeout, "after moving, the piece is collected");
 
             // a player outside the floor never counts, even when far from the recorded position
             c.Players.Clear();
@@ -381,16 +391,16 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Ctx c = null; yield return Setup(x => c = x);
             Assert.That(c.Peer.TryPiecePosition(0, out Vector3 at), Is.True);
-            Assert.That(c.Haul.Current.LeftFloor1, Is.EqualTo(2));
+            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(2));
             c.Players[c.HostId] = at;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.LeftFloor1 == 1, Timeout, "the piece was not collected");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == 1, Timeout, "the piece was not collected");
             yield return PlayModeHarness.WaitUntil(() => !c.Peer.PieceVisible(0) && c.Peer.PieceVisible(1), Timeout, "the client did not hide the collected piece");
-            Assert.That(c.Haul.HostState.Haul.IsCollected(DiveHaul.PieceId(1, 0)), Is.True);
+            Assert.That(c.Haul.Session.Pieces.IsFound(DiveHaul.PieceId(1, 0)), Is.True);
 
             c.Players[c.HostId] = Cell(c, 0, 0) + new Vector3(60f, 0f, 0f);
             Assert.That(c.Haul.ServerFailDive(), Is.True);
             yield return new WaitForSeconds(0.6f);
-            Assert.That(c.Haul.Current.LeftFloor1, Is.EqualTo(1), "the failed dive keeps the piece: pieces are safe on pickup");
+            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(1), "the failed dive keeps the piece: pieces are safe on pickup");
             Assert.That(c.Peer.PieceVisible(0), Is.False, "and the piece does not reappear on the client");
         }
 
@@ -563,13 +573,10 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator Hunter_PlayerOnItsCell_NoRespawn_RespawnsOnceThePlayerLeaves()
         {
-            // Pieces no longer feed the stir (plan 2, spec 4.5) and floors alone cap it at 52.5, so the test raises the per-floor term: 3 x 14 x 1.75 (four players) = 73.5, past the hunter mark only.
-            StirTuning tuning = StirTuning.Default; tuning.PerFloorCleared = 14f;
-            Ctx c = null; yield return Setup(x => c = x, default, null, 3, tuning);
-            DiveState ds = c.Haul.HostState;
-            ds.Stir.PlayersPresent = 4;
-            for (int f = 1; f <= 3; f++) Assert.That(c.Haul.ServerMarkCleared(f), Is.True);
-            Assert.That(ds.Stir.HunterLatched, Is.True, "the stir meter latched the hunter");
+            Ctx c = null; yield return Setup(x => c = x, default, null, 3);
+            DiveStir stir = c.Haul.Session.Stir;
+            stir.PlayersPresent = 4; stir.UnbankedValuables = 8;   // floors alone cannot reach the hunter any more (a session clears only its own floor): 8 carried valuables x 5 x 2 = 80
+            Assert.That(stir.HunterLatched, Is.True, "the stir latched the hunter");
             yield return PlayModeHarness.WaitUntil(() => c.Haul.EncounterPlan != null && c.Haul.EncounterPlan.Hunter != null && c.Haul.EncounterPlan.HunterLatched, Timeout, "the encounter plan has no hunter");
             EncounterSpawn h = c.Haul.EncounterPlan.Hunter;
             yield return PlayModeHarness.WaitUntil(() => c.Contents.HunterEnemy != null, Timeout, "the hunter never spawned the first time");
@@ -588,14 +595,14 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator Pieces_PieceZeroAlreadyHome_EveryRemainingPieceStillGetsASphere()
         {
             Ctx c = null; yield return Setup(x => c = x);
-            int home = DiveHaul.PieceId(1, 0), left = DiveHaul.PieceId(1, 1);
-            Assert.That(c.Haul.HostState.Haul.MarkHome(home), Is.True);
+            int home = 100, left = 101;
+            Assert.That(c.Haul.Session.Pieces.Found(home), Is.True);
             Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True);
             yield return PlayModeHarness.WaitUntil(() => c.Contents.PieceCount == 1 && c.Peer.PieceCount == 1, Timeout, "the floor did not rebuild with one piece sphere");
             Assert.That(c.Contents.TryPiecePosition(0, out Vector3 at), Is.True);
-            Assert.That(c.Haul.HostState.Haul.IsCollected(left), Is.False);
+            Assert.That(c.Haul.Session.Pieces.IsFound(left), Is.False);
             c.Players[c.HostId] = at;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.HostState.Haul.IsCollected(left), Timeout, "the remaining piece (101) has no collectible sphere");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Session.Pieces.IsFound(left), Timeout, "the remaining piece (101) has no collectible sphere");
         }
     }
 }

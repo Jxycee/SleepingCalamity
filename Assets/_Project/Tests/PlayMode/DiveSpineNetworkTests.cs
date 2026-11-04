@@ -1,9 +1,10 @@
-// Authority: test-only. M5 dive spine: the host-owned DiveDirector (start, stair, bank, go home, fail) over the real CellarFloorSync + DiveHaulSync + player prefab.
-// Host + clients in one process (scene management off; the director, the syncs and the heroes are spawned from the owned network prefab list / the app's player prefab).
+// Authority: test-only. The dive spine (plan 3 task 7): the host-owned DiveDirector (start with the checkpoint pick, stairs 1-6, the bank floor, the floor-7 ending, go home, fail) over the real CellarFloorSync +
+// DiveHaulSync + player prefab. Host + clients in one process (scene management off; the director, the syncs and the heroes are spawned from the owned network prefab list / the app's player prefab).
 // Catches: peers building different floors, a stair press that does not advance every peer to the same floor, a stale or out-of-range stair press advancing (or double-advancing) the dive,
-// players not teleported to the new entry through their owner (owner-authoritative NetworkTransform), a failed / finished dive that leaves the party on the floor or the dive running,
-// the checkpoint / banked pieces lost between dives, a go-home before the heart bank.
-// NOT covered by a one-process test: the interact KEY and its prompt (the tests call the same Request* wrappers the key calls), the greybox look, real relay latency.
+// players not teleported to the new entry through their owner (owner-authoritative NetworkTransform), a failed / finished dive that leaves the party on the floor or the dive running, a floor pick the
+// checkpoint does not allow being accepted, the checkpoint or found pieces lost between dives, a lost satchel at the wrong depth, a late joiner missing the floor and phase.
+// NOT covered by a one-process test: the interact KEY and its prompt text on screen (the tests call the same Request* wrappers the key calls), the greybox look, real relay latency, the bank room's picks and
+// confirm window (plan 3 task 8: the floor-5 bank press here is the stand-in the haul sync still has), a client rejoin to a dive in progress.
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -148,21 +149,92 @@ namespace SleepingCalamity.Tests.PlayMode
         // ---------------------------------------------------------------------------------------------------------------------------------
 
         [UnityTest]
-        public IEnumerator Floor4_HostAndTwoClients_BuildTheIdenticalBakeryFloor()
+        public IEnumerator Floor1_HostAndTwoClients_BuildTheIdenticalAuthoredFloor_WithItsMarkers()
         {
             Rig rig = null;
             yield return Start(2, r => rig = r, withHeroes: false);
             rig.Host.SeedOverride = 424242u;
-            Assert.That(rig.Host.ServerStartDive(4), Is.True);
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
             yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 4);
-            Assert.That(rig.HostFloor.Layout.Floor, Is.EqualTo(4));
-            Assert.That(rig.HostFloor.Layout.BankCell.HasValue, Is.True, "the heart floor has the baker's bank point");
+            yield return AllBuilt(rig, 1);
+            Assert.That(rig.HostFloor.Layout.Floor, Is.EqualTo(1));
             Assert.That(rig.HostFloor.BuiltSeed, Is.EqualTo(424242u));
             foreach (CellarFloorSync p in rig.PeerFloors) Assert.That(p.BuiltSeed, Is.EqualTo(424242u));
-            // Every peer drew the dive markers on its own build (the way-home column only exists on floor 4).
-            Assert.That(rig.HostFloor.Built.Root.Find(CellarFloorBuilder.DiveMarkerGroup + "/HomeColumn"), Is.Not.Null);
+            // Every peer drew the dive markers on its own build (floor 1 has a stair and no bank).
+            Assert.That(rig.HostFloor.Built.Root.Find(CellarFloorBuilder.DiveMarkerGroup + "/StairColumn"), Is.Not.Null);
+            Assert.That(rig.HostFloor.Built.Root.Find(CellarFloorBuilder.DiveMarkerGroup + "/BankColumn"), Is.Null);
             Assert.That(rig.Peers[0].NetActive.Value, Is.True);
+        }
+
+        // Walks the host hero up the stairs from the session's floor to `floor` (host rule, gate key off; floor 5 is cleared and pushed on through the haul sync's bank stand-in).
+        private static IEnumerator ToFloor(Rig rig, int floor)
+        {
+            ulong hostId = rig.HostNm.LocalClientId;
+            rig.Host.RequireGateKey = false;
+            while (rig.Host.Session.Floor < floor)
+            {
+                int f = rig.Host.Session.Floor;
+                yield return AllBuilt(rig, f);
+                yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-" + f + " entry");
+                if (f == UndercroftPlan.BankFloor)
+                {
+                    Assert.That(rig.HostHaul.ServerMarkCleared(f), Is.True, "the guardian's floor is cleared");
+                    Assert.That(rig.HostHaul.ServerBank(), Is.True, "the first bank press enters the bank room");
+                    Assert.That(rig.HostHaul.ServerBank(), Is.True, "the second pushes on");
+                }
+                Assert.That(CellarFloorBuilder.TryDescentWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True, "floor " + f + " has a way down");
+                Move(rig.HostHero, stair + new Vector3(1f, 0.1f, 0f));
+                yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, stair) < 3f, Timeout, "the host hero never reached the way down of floor " + f);
+                Assert.That(rig.Host.ServerTryStair(hostId, f), Is.True, "the stair from floor " + f);
+            }
+            yield return AllBuilt(rig, floor);
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-" + floor + " entry");
+            yield return Seconds(0.5f);   // the arrival teleports must all have landed before the test moves a hero
+        }
+
+        [UnityTest]
+        public IEnumerator Spine_Floors1To7_StairsInOrder_FinishBringsHaulHome()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r);
+            rig.Host.SeedOverride = 12345u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            DiveEndReason? ended = null; rig.Host.DiveEnded += r => ended = r;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, 1);
+            Assert.That(rig.HostHaul.Current.DivePhase, Is.EqualTo(DivePhase.Floor));
+            // Each clear feeds the stir; the stair then takes the party one floor down.
+            for (int f = 1; f <= 4; f++)
+            {
+                Assert.That(rig.HostHaul.ServerMarkCleared(f), Is.True, "floor " + f + " clears");
+                yield return ToFloor(rig, f + 1);
+                Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(f + 1));
+            }
+            Assert.That(rig.HostHaul.Current.ClearedMask, Is.EqualTo(0b1111), "floors 1-4 are cleared");
+            Assert.That(rig.Host.ServerTryStair(hostId, 5), Is.False, "floor 5 has no way down before the bank choice");
+            Assert.That(rig.HostHaul.ServerEnterFloor(6), Is.False, "and the session refuses it too");
+            // Something to carry home: a loot item in the host's bag.
+            Assert.That(rig.HostHaul.ServerAddItem(hostId, CellarLoot.Items[0].Id), Is.True);
+            yield return ToFloor(rig, 6);   // clears floor 5 (its guardian), enters the bank room, pushes on, takes the stair
+            Assert.That(rig.HostHaul.Current.BankChosen, Is.True);
+            Assert.That((rig.HostHaul.Current.ClearedMask & 0b10000) != 0, Is.True, "floor 5 was cleared before the bank room");
+            Assert.That(rig.HostHaul.ServerMarkCleared(6), Is.True);
+            yield return ToFloor(rig, 7);
+            Assert.That(rig.Host.ServerTryStair(hostId, 7), Is.False, "floor 7 has no stair: it ends through its end door");
+            Assert.That(rig.HostFloor.Built.Root.Find(CellarFloorBuilder.DiveMarkerGroup + "/EndColumn"), Is.Not.Null, "the end door is marked");
+            Assert.That(rig.Host.ServerTryFinish(hostId), Is.False, "the hero stands at the entry, far from the end door");
+            Assert.That(CellarFloorBuilder.TryEndWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 end), Is.True);
+            Move(rig.HostHero, end + new Vector3(0.5f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, end) < 3f, Timeout, "the host hero never reached the end door");
+            Assert.That(rig.Host.ServerTryFinish(hostId), Is.True, "the finish");
+            Assert.That(ended, Is.EqualTo(DiveEndReason.Finished));
+            Assert.That(rig.Host.NetActive.Value, Is.False);
+            Assert.That(rig.Host.Checkpoint.Held, Is.False, "finishing is not a trip home from the bank: no checkpoint");
+            Assert.That(rig.HostHaul.ServerBagOf(hostId).Carried, Is.Empty, "everything carried came home");
+            Assert.That(rig.HostHaul.ServerBagOf(hostId).Stash.ContainsKey(CellarLoot.Items[0].Id), Is.True, "and sits in the stash");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CurrentFloor == 0 && rig.HostHaul.Current.DivePhase == DivePhase.Town, Timeout, "the summary never went home");
+            yield return NearOnHost(rig, Home, "home after the ending");
         }
 
         [UnityTest]
@@ -249,32 +321,147 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator DiveFailed_ReturnsEveryoneToTheStart_EndsTheDive_AndKeepsTheSession()
+        public IEnumerator Fail_AtFloor4_LeavesSatchelAtDepth4_NextDiveStartsFloor1_PiecesStayFound()
         {
             Rig rig = null;
             yield return Start(1, r => rig = r);
-            StirTuning tuning = StirTuning.Default; tuning.DeepClosesSeconds = 3f; tuning.PerFloorCleared = 30f;   // pieces no longer feed the stir (plan 2): three cleared floors x 30 x 1.25 pass 100
-            rig.Host.DiveStir = tuning; rig.Host.PiecesPerFloor = new[] { 6, 6, 6 }; rig.Host.SeedOverride = 777u;
+            rig.Host.SeedOverride = 777u;
+            ulong hostId = rig.HostNm.LocalClientId;
             Assert.That(rig.Host.ServerStartDive(), Is.True);
             yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 1);
-            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
+            yield return ToFloor(rig, 4);
+            Assert.That(rig.HostHaul.ServerAddItem(hostId, CellarLoot.Items[0].Id), Is.True);
+            Assert.That(rig.HostHaul.ServerAddPiece(100), Is.True, "a piece found on the way");
+            Assert.That(rig.Host.ServerAbandonDive(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value && !rig.Peers[0].NetActive.Value, Timeout, "the failed dive never ended on every peer");
+            PlayerBag bag = rig.HostHaul.ServerBagOf(hostId);
+            Assert.That(bag.Satchel.Waiting, Is.Not.Null, "the carried item waits in a satchel");
+            Assert.That(bag.Satchel.Waiting.Floor, Is.EqualTo(4), "at the depth the party fell on");
+            Assert.That(rig.Host.Pieces.IsFound(100), Is.True, "a found piece is safe at once and stays found");
+            Assert.That(rig.Host.Town.State.InStock(100), Is.True, "and it is in the town stock");
+            Assert.That(rig.Host.ServerStartDive(3), Is.False, "no checkpoint after a failure: floor 3 is refused");
+            Assert.That(rig.Host.ServerStartDive(), Is.True, "the next dive starts at floor 1");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1));
+            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "the new dive still knows the piece");
+        }
 
-            // Collect the whole haul and clear every floor to push the stir past 100; the countdown runs out and the host fails the dive.
-            for (int f = 1; f <= 3; f++) for (int i = 0; i < 6; i++) rig.HostHaul.ServerAddPiece(DiveHaul.PieceId(f, i));
-            for (int f = 1; f <= 3; f++) rig.HostHaul.ServerMarkCleared(f);
-            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value, Timeout, "the stir countdown never ended the dive");
-            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(0));
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(18), "the failed dive keeps every collected piece (safe on pickup)");
-            yield return PlayModeHarness.WaitUntil(() => !rig.Peers[0].NetActive.Value, Timeout, "the client never saw the dive end");
-            yield return NearOnHost(rig, Home, "home after the failed dive");
-            Assert.That(Flat(rig.OwnHeroes[0].transform.position, Home), Is.LessThan(8f), "the client's own copy went home");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor && rig.PeerFloors[0].BuiltFloor == CellarFloorSync.NoFloor, Timeout, "the floor was never cleared on every peer");
-            Assert.That(rig.HostFloor, Is.Not.Null, "the sync objects stay for the session");
+        // RPC path: the hub trapdoor's floor pick. Without the checkpoint only floor 1 starts; the host decides, not the asker.
+        [UnityTest]
+        public IEnumerator StartDive_WithoutCheckpoint_PickingFloor3_IsRefused_WithCheckpoint_Allowed_AndSpendsIt()
+        {
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = 31337u;
+            DiveDirector peer = rig.Peers[0];
+            Move(rig.OwnHeroes[0], HubStair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, HubStair) < 3f, Timeout, "the client hero never reached the trapdoor on the host");
+            int handled = rig.Host.RequestsHandled;
+            peer.RequestStartDive(3);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the floor-3 press never reached the host");
+            Assert.That(rig.Host.NetActive.Value, Is.False, "without the checkpoint floor 3 is refused");
+            Assert.That(peer.PickableFloors(), Is.EqualTo(new[] { 1 }));
 
-            // A new dive starts clean on the same syncs.
+            rig.Host.TestHoldCheckpoint(true);
+            yield return PlayModeHarness.WaitUntil(() => peer.NetCheckpointHeld.Value && peer.NetPickableMaxFloor.Value == UndercroftPlan.BankFloor, Timeout, "the client never saw the checkpoint");
+            Assert.That(peer.PickableFloors(), Is.EqualTo(new[] { 1, 2, 3, 4, 5 }));
+            handled = rig.Host.RequestsHandled;
+            peer.RequestStartDive(3);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled && rig.Host.NetActive.Value, Timeout, "the allowed floor-3 press never started the dive");
+            Assert.That(rig.Host.Session.Floor, Is.EqualTo(3));
+            Assert.That(rig.Host.Checkpoint.Held, Is.False, "starting on a picked floor spends the checkpoint");
+            yield return PlayModeHarness.WaitUntil(() => !peer.NetCheckpointHeld.Value && peer.NetPickableMaxFloor.Value == 1, Timeout, "the client never saw the checkpoint spent");
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, 3);
+            Assert.That(rig.HostFloor.Layout.BakerCell.HasValue, Is.True, "floor 3 is the bakery");
+        }
+
+        // Going home from the cleared bank floor sets the checkpoint (decision 31); the bank floor is floor 5.
+        [UnityTest]
+        public IEnumerator BankFloor_GoHome_HoldsTheCheckpoint_AndFloor5IsPickable_StartingThereSpendsIt()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r);
+            rig.Host.SeedOverride = 99u;
+            ulong hostId = rig.HostNm.LocalClientId;
             Assert.That(rig.Host.ServerStartDive(), Is.True);
-            yield return AllBuilt(rig, 1);
+            yield return ResolvePeers(rig);
+            yield return ToFloor(rig, 5);
+            Assert.That(rig.Host.ServerTryGoHome(hostId), Is.False, "the guardian is not down: no way home yet");
+            Assert.That(rig.HostHaul.ServerMarkCleared(5), Is.True);
+            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
+            Move(rig.HostHero, bank + new Vector3(0.5f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) < 3f, Timeout, "the host hero never reached the bank room");
+            Assert.That(rig.Host.ServerTryGoHome(hostId), Is.True);
+            Assert.That(rig.Host.NetActive.Value, Is.False);
+            Assert.That(rig.Host.Checkpoint.Held, Is.True, "going home from the bank holds the one-time checkpoint");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.NetCheckpointHeld.Value && rig.Host.NetPickableMaxFloor.Value == 5, Timeout, "the hub never offered the pick");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "the floor was never cleared");
+            Assert.That(rig.Host.ServerStartDive(5), Is.True, "start at the bank (decision 2)");
+            Assert.That(rig.Host.Session.StartedAtBank, Is.True);
+            Assert.That(rig.Host.Checkpoint.Held, Is.False, "starting on a picked floor spends it");
+            yield return AllBuilt(rig, 5);
+            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank2), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank2) < 4f, Timeout, "the party did not arrive at the bank room");
+        }
+
+        // The baker is a person on floor 3: walking onto him finds him, he is safe and in the town stock at once.
+        [UnityTest]
+        public IEnumerator Floor3_Baker_IsFoundByWalkingOnHim_AndComesHomeAtOnce()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r);
+            rig.Host.SeedOverride = 4040u;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return ToFloor(rig, 3);
+            Assert.That(rig.HostHaul.Current.PeopleLeft, Is.EqualTo(1), "the baker is still on floor 3");
+            Assert.That(rig.Host.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.False);
+            CellPos baker = rig.HostFloor.Layout.BakerCell.Value;
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.ContentsSync != null && rig.Host.ContentsSync.State.Floor == 3 && rig.Host.ContentsSync.PieceCount == 1, Timeout, "the baker's spot never appeared");
+            Move(rig.HostHero, rig.HostFloor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(baker.X, baker.Y)) + new Vector3(0f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.Pieces.IsFound(PieceCatalog.BakerId), Timeout, "walking onto the baker never found him");
+            Assert.That(rig.Host.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "he is in the town stock at once");
+            Assert.That(rig.HostHaul.Current.PeopleLeft, Is.EqualTo(0));
+        }
+
+        [UnityTest]
+        public IEnumerator DiveInProgress_LateJoiner_GetsFloorAndPhase_NoNotice()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r);
+            rig.Host.SeedOverride = 2468u;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return ToFloor(rig, 2);
+            Assert.That(rig.HostHaul.ServerAddPiece(101), Is.True);
+            var late = new PlayModeHarness.TestClient(rig.App, PlayModeHarness.PlayerId(9));
+            _clients.Add(late);
+            var cts = new CancellationTokenSource();
+            yield return PlayModeHarness.Await(late.JoinAsync(cts.Token), Timeout, cts);
+            cts.Dispose();
+            yield return PlayModeHarness.WaitUntil(() => late.NetworkManager.IsConnectedClient, Timeout, "the late client never connected");
+            ulong hid = rig.HostHaul.NetworkObjectId, did = rig.Host.NetworkObjectId;
+            yield return PlayModeHarness.WaitUntil(() => late.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(hid) && late.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(did), Timeout, "the late client never received the dive");
+            DiveHaulSync peerHaul = late.NetworkManager.SpawnManager.SpawnedObjects[hid].GetComponent<DiveHaulSync>();
+            DiveDirector peerDirector = late.NetworkManager.SpawnManager.SpawnedObjects[did].GetComponent<DiveDirector>();
+            yield return PlayModeHarness.WaitUntil(() => peerHaul.Current.CurrentFloor == 2 && peerHaul.Current.DivePhase == DivePhase.Floor && peerHaul.Current.FoundPieces == 1 && peerDirector.NetActive.Value, Timeout, "the late joiner never saw the floor, the phase and the found piece");
+            Assert.That(peerHaul.Current.ClearedMask, Is.EqualTo(1), "floor 1 was cleared on the way");
+            yield return Seconds(0.5f);
+            Assert.That(peerDirector.Notice, Is.Null, "joining a running dive replays no notice");
+        }
+
+        [UnityTest]
+        public IEnumerator HubPrompt_WithCheckpoint_ListsPickableFloors()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r);
+            Move(rig.HostHero, HubStair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.Prompt == DiveDirector.PromptKind.Descend, Timeout, "the hub prompt never appeared at the trapdoor");
+            Assert.That(rig.Host.PromptText, Is.EqualTo("Go down the Undercroft"), "no checkpoint: one floor, no list");
+            rig.Host.TestHoldCheckpoint(true);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.NetCheckpointHeld.Value && rig.Host.PromptText.Contains("pickable: 1, 2, 3, 4, 5"), Timeout, "the prompt never listed the pickable floors: " + rig.Host.PromptText);
+            Assert.That(rig.Host.PromptText, Does.Contain("start on floor 1"));
+            Assert.That(DiveDirector.HubPromptText(true, rig.Host.PickableFloors(), 3), Does.Contain("start on floor 3"));
         }
 
         // Wipe: every hero is really downed through HeroVitals (the damage path), mid-dive. The dive must fail, the party must be home, and every hero must be up again.
@@ -312,71 +499,6 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.NetActive.Value, Is.True, "the next dive survives its first second");
         }
 
-        [UnityTest]
-        public IEnumerator Floor4_BankThenGoHome_EndsTheDive_BankedPiecesKept_NoGoHomeBeforeTheBank()
-        {
-            Rig rig = null;
-            yield return Start(1, r => rig = r);
-            rig.Host.SeedOverride = 99u;
-            Assert.That(rig.Host.ServerStartDive(4), Is.True);
-            yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 4);
-            DiveDirector peer = rig.Peers[0];
-            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-4 entry"); yield return Seconds(1f);   // the arrival teleports must all have landed before the test moves a hero
-            Assert.That(rig.HostHaul.ServerAddPiece(100), Is.True);
-            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
-            Move(rig.OwnHeroes[0], bank + new Vector3(0.5f, 0.1f, 0f));
-            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, bank) < 3f, Timeout, "the client hero never reached the baker on the host");
-
-            // Going home before the bank is refused.
-            int handled = rig.Host.RequestsHandled;
-            peer.RequestGoHome();
-            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the early go-home never reached the host");
-            Assert.That(rig.Host.NetActive.Value, Is.True, "no way home before banking at the heart");
-
-            // Bank by RPC, every peer sees the heart banked, then go home.
-            rig.PeerHauls[0].RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.BankedPieces == 1 && rig.Host.NetHeartBanked.Value, Timeout, "the heart bank never landed");
-            yield return PlayModeHarness.WaitUntil(() => peer.NetHeartBanked.Value, Timeout, "the client never saw the heart banked");
-            peer.RequestGoHome();
-            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value, Timeout, "go home never ended the dive");
-            yield return PlayModeHarness.WaitUntil(() => !peer.NetActive.Value, Timeout, "the client never saw the dive end");
-            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(0));
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(1), "the banked piece is kept in memory");
-            yield return NearOnHost(rig, Home, "home after the rescue");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "the floor was never cleared");
-        }
-
-        [UnityTest]
-        public IEnumerator Checkpoint_ReachedOnFloor2_LetsTheNextDiveStartOnFloor3_AbandonGoesHome()
-        {
-            Rig rig = null;
-            yield return Start(1, r => rig = r);
-            rig.Host.SeedOverride = 31337u;
-            Assert.That(rig.Host.ServerStartDive(2), Is.True);
-            yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 2);
-            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-2 entry"); yield return Seconds(1f);   // the arrival teleports must all have landed before the test moves a hero
-            foreach (int piece in new[] { 100, 101, 200, 201 }) Assert.That(rig.HostHaul.ServerAddPiece(piece), Is.True);   // every piece on floors 1-2: only then does the return dive skip them
-            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
-            Move(rig.HostHero, bank + new Vector3(0.5f, 0.1f, 0f));
-            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) < 3f, Timeout, "the host hero never reached the checkpoint");
-            rig.HostHaul.RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CheckpointReached && rig.Host.NetCheckpoint.Value, Timeout, "the checkpoint was never reached");
-
-            Assert.That(rig.Host.ServerAbandonDive(), Is.True);
-            Assert.That(rig.Host.NetActive.Value, Is.False);
-            yield return NearOnHost(rig, Home, "home after abandoning");
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(4), "the banked pieces survive an abandoned dive");
-
-            yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "the floor was never cleared");
-            Assert.That(rig.Host.ServerStartDive(), Is.True);
-            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(3), "a return dive starts on floor 3 once the checkpoint was reached and floors 1-2 are fully collected");
-            yield return AllBuilt(rig, 3);
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(4));
-            Assert.That(rig.HostFloor.BuiltSeed, Is.EqualTo(31337u), "one seed per session");
-        }
-
         // Contents hook: the director spawns CellarContentsSync, arms it per built floor, opens the stair on the gate key (ExitUnlocked) and clears the enemies when the dive fails.
         [UnityTest]
         public IEnumerator Contents_ArmedByTheDirector_StairNeedsTheGateKey_FailedDiveClearsEnemies()
@@ -384,7 +506,7 @@ namespace SleepingCalamity.Tests.PlayMode
             uint seed = 0;
             for (uint sd = 1; sd < 400 && seed == 0; sd++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Layout(sd, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(sd, 2);   // floor 1 is the authored teaching floor: no locked room, no carrier
                 if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) seed = sd;
             }
             Assert.That(seed, Is.Not.EqualTo(0u), "a seed with a carrier");
@@ -393,13 +515,14 @@ namespace SleepingCalamity.Tests.PlayMode
             rig.Host.SeedOverride = seed;
             Assert.That(rig.Host.ServerStartDive(), Is.True);
             yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 1);
-            yield return PlayModeHarness.WaitUntil(() => rig.Host.ContentsSync != null && rig.Host.ContentsSync.State.Seed == seed && rig.Host.ContentsSync.State.Floor == 1, Timeout, "the director never armed the contents for floor 1");
+            yield return ToFloor(rig, 2);   // gate key off for the walk down
+            rig.Host.RequireGateKey = true;
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.ContentsSync != null && rig.Host.ContentsSync.State.Seed == seed && rig.Host.ContentsSync.State.Floor == 2, Timeout, "the director never armed the contents for floor 2");
             CellarContentsSync contents = rig.Host.ContentsSync;
             Assert.That(rig.Host.RequireGateKey, Is.True, "contents gate the stair");
             Assert.That(contents.AutoArm, Is.False, "the director arms the contents, not their own build watcher");
             Assert.That(contents.State.ExitUnlocked, Is.False);
-            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-2 entry");
 
             // Shut: in range of the stair, the press is refused until the key is taken.
             Assert.That(CellarFloorBuilder.TryStairWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True);
@@ -418,18 +541,18 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Flat(contents.State.GateKeyPos, stair), Is.GreaterThan(CellarContentsSync.GateKeyRange + 1f), "the key lies out of reach of the hero at the stair, so the exit stays shut");
             Assert.That(contents.State.GateKey, Is.EqualTo(1), "the key waits on the floor");
             int handled = rig.Host.RequestsHandled;
-            peer.RequestStair(1);
+            peer.RequestStair(2);
             yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the shut stair press never reached the host");
-            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1), "the gate key is not taken yet: the stair stays shut");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(2), "the gate key is not taken yet: the stair stays shut");
 
             // The key is picked up: ExitUnlocked opens the stair through the director.
             Move(rig.OwnHeroes[0], contents.State.GateKeyPos + new Vector3(0.5f, 0.1f, 0f));
             yield return PlayModeHarness.WaitUntil(() => contents.State.ExitUnlocked, Timeout, "picking the key up never unlocked the exit");
             Move(rig.OwnHeroes[0], stair + new Vector3(1f, 0.1f, 0f));
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair) < 3f, Timeout, "the client hero never got back to the stair");
-            peer.RequestStair(1);
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CurrentFloor == 2, Timeout, "the opened stair never took the party down");
-            yield return PlayModeHarness.WaitUntil(() => contents.State.Floor == 2 && contents.State.Seed == rig.HostFloor.BuiltSeed, Timeout, "the contents were never re-armed for floor 2");
+            peer.RequestStair(2);
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CurrentFloor == 3, Timeout, "the opened stair never took the party down");
+            yield return PlayModeHarness.WaitUntil(() => contents.State.Floor == 3 && contents.State.Seed == rig.HostFloor.BuiltSeed, Timeout, "the contents were never re-armed for floor 3");
 
             // A failed dive clears the contents (and their enemies).
             Assert.That(rig.Host.ServerAbandonDive(), Is.True);

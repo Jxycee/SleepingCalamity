@@ -225,7 +225,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Peer.NetActive.Value, Is.True, "[F1 start] the client sees the dive active");
             Assert.That(rig.Host.RequireGateKey, Is.True, "[F1 start] contents gate the stair");
             Assert.That(rig.Contents.State.ExitUnlocked, Is.False, "[F1 start] the exit starts shut when the floor has a carrier");
-            int piecesAssigned = rig.HostHaul.Current.LeftFloor1;
+            int piecesAssigned = rig.HostHaul.Current.PiecesLeft;
             Assert.That(piecesAssigned, Is.GreaterThan(0), "[F1 start] floor 1 has pieces left to find");
 
             // F1: stair refused while the carrier holds the key.
@@ -260,9 +260,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Contents.PieceCount, Is.GreaterThan(0), "[F1 piece] the contents placed piece spots");
             Assert.That(rig.Contents.TryPiecePosition(0, out Vector3 piecePos), Is.True, "[F1 piece] piece 0 exists");
             yield return ClientTo(rig, piecePos, "[F1 piece walk]");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.LeftFloor1 == piecesAssigned - 1, Timeout, "[F1 piece] walking onto the piece never took it (host left " + rig.HostHaul.Current.LeftFloor1 + ", was " + piecesAssigned + ")");
-            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.LeftFloor1 == piecesAssigned - 1, Timeout, "[F1 piece] pieces-left never dropped on the client");
-            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces == 1 && rig.PeerHaul.Current.BankedPieces == 1, Timeout, "[F1 piece] the piece is found and safe on both peers (client found " + rig.PeerHaul.Current.FoundPieces + ", safe " + rig.PeerHaul.Current.BankedPieces + ")");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.PiecesLeft == piecesAssigned - 1, Timeout, "[F1 piece] walking onto the piece never took it (host left " + rig.HostHaul.Current.PiecesLeft + ", was " + piecesAssigned + ")");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.PiecesLeft == piecesAssigned - 1, Timeout, "[F1 piece] pieces-left never dropped on the client");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces == 1 && rig.PeerHaul.Current.FoundPieces == 1, Timeout, "[F1 piece] the piece is found and safe on both peers (client found " + rig.PeerHaul.Current.FoundPieces + ", safe " + rig.PeerHaul.Current.FoundPieces + ")");
             Assert.That(System.Linq.Enumerable.Any(rig.Host.Town.State.StockPieces), Is.True, "[F1 piece] the piece reached the town stock at pickup, not at the dive's end");
             yield return PlayModeHarness.WaitUntil(() => !rig.PeerContents.PieceVisible(0), Timeout, "[F1 piece] the client still draws the collected piece");
 
@@ -298,9 +298,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank2), Is.True, "[F2 bank] floor 2 has the checkpoint bank point");
             yield return ClientTo(rig, bank2 + new Vector3(0.5f, 0.1f, 0f), "[F2 bank walk]");
             rig.PeerHaul.RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.HostState.BankUsed(2) && rig.HostHaul.Current.BankedPieces == 1, Timeout, "[F2 bank] the client's bank press never used the checkpoint (used " + rig.HostHaul.HostState.BankUsed(2) + ", safe pieces " + rig.HostHaul.Current.BankedPieces + ")");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CheckpointReached && rig.Host.NetCheckpoint.Value && rig.Peer.NetCheckpoint.Value, Timeout, "[F2 bank] checkpoint never reached / synced to the client");
-            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.BankedPieces == 1, Timeout, "[F2 bank] the client never saw the banked count");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Session.BankChosenThisDive && rig.HostHaul.Current.FoundPieces == 1, Timeout, "[F2 bank] the client's bank press never used the checkpoint (used " + rig.HostHaul.Session.BankChosenThisDive + ", safe pieces " + rig.HostHaul.Current.FoundPieces + ")");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CheckpointHeld && rig.Host.NetCheckpointHeld.Value && rig.Peer.NetCheckpointHeld.Value, Timeout, "[F2 bank] checkpoint never reached / synced to the client");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces == 1, Timeout, "[F2 bank] the client never saw the banked count");
             yield return PlayModeHarness.WaitUntil(() => hostVitals.Hp == hostVitals.MaxHp && clientVitals.Hp == clientVitals.MaxHp, Timeout, "[F2 bank] banking never healed the party (host " + hostVitals.Hp + "/" + hostVitals.MaxHp + ", client " + clientVitals.Hp + "/" + clientVitals.MaxHp + ")");
 
             // F2 -> F3.
@@ -320,7 +320,7 @@ namespace SleepingCalamity.Tests.PlayMode
             // Pieces no longer feed the stir (plan 2, spec 4.5) and floors alone cap it at 52.5 in the real 4-floor dive, so the test raises the per-floor term: 35 x 1.25 (two players) = 43.75 after one
             // floor cleared, 87.5 after two. The real hunter and deep-closes stir comes with plan 3's valuables stir.
             StirTuning tuning = StirTuning.Default; tuning.PerFloorCleared = 35f;
-            rig.Host.SeedOverride = seed; rig.Host.DiveStir = tuning;
+            rig.Host.SeedOverride = seed;
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[stir start]");
             yield return ResolvePeers(rig);
             yield return AllBuilt(rig, 1, "[stir start]");
@@ -379,7 +379,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return ResolvePeers(rig);
             yield return AllBuilt(rig, 4, "[F4 start]");
             yield return BothAtEntry(rig, "[F4 start]");
-            int left1 = rig.HostHaul.Current.LeftFloor1;
+            int left1 = rig.HostHaul.Current.PiecesLeft;
             Assert.That(rig.HostHaul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True, "[F4 bank] a carried piece");
             Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True, "[F4 bank] the heart has the baker");
             yield return ClientTo(rig, bank + new Vector3(0.5f, 0.1f, 0f), "[F4 bank walk]");
@@ -388,10 +388,10 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "[F4 early go-home] never reached the host");
             Assert.That(rig.Host.NetActive.Value, Is.True, "[F4 early go-home] no way home before the bank");
             rig.PeerHaul.RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.BankedPieces == 1 && rig.Host.NetHeartBanked.Value && rig.Peer.NetHeartBanked.Value, Timeout, "[F4 bank] the heart bank never landed on both peers");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.FoundPieces == 1 && rig.Host.BankChosenNow() && rig.Peer.BankChosenNow(), Timeout, "[F4 bank] the heart bank never landed on both peers");
             rig.Peer.RequestGoHome();
             yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value && !rig.Peer.NetActive.Value, Timeout, "[F4 go home] the dive never ended on both peers");
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(1), "[F4 go home] banked survives");
+            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[F4 go home] banked survives");
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, Home) < 6f && Flat(rig.ClientHeroOnHost.transform.position, Home) < 8f, Timeout, "[F4 go home] the party is not back in the hub");
             yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor && rig.PeerFloor.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "[F4 go home] the floor was never cleared on both peers");
             yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.Floor == 0, Timeout, "[F4 go home] the contents were never cleared");
@@ -400,12 +400,12 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[dive 2 start]");
             yield return AllBuilt(rig, 1, "[dive 2 start]");
             yield return BothAtEntry(rig, "[dive 2 start]");
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(1), "[dive 2 start] banked from dive 1 is still there");
-            int before = rig.HostHaul.Current.LeftFloor1;
+            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[dive 2 start] banked from dive 1 is still there");
+            int before = rig.HostHaul.Current.PiecesLeft;
             Assert.That(rig.Contents.PieceCount, Is.GreaterThan(1), "[dive 2 piece] floor 1 has a second piece spot");
             Assert.That(rig.Contents.TryPiecePosition(1, out Vector3 pp), Is.True, "[dive 2 piece]");
             yield return ClientTo(rig, pp, "[dive 2 piece walk]");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.LeftFloor1 == before - 1 && rig.PeerHaul.Current.LeftFloor1 == before - 1, Timeout, "[dive 2 piece] pieces-left never dropped on both peers");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.PiecesLeft == before - 1 && rig.PeerHaul.Current.PiecesLeft == before - 1, Timeout, "[dive 2 piece] pieces-left never dropped on both peers");
             KillAll(rig.HostNm);
 
             var hv = rig.HostHero.GetComponent<HeroVitals>(); var cv = rig.ClientHeroOnHost.GetComponent<HeroVitals>();
@@ -413,8 +413,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value && !rig.Peer.NetActive.Value, Timeout, "[dive 2 fail] the wipe never ended the dive on both peers");
             Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(0), "[dive 2 fail] floor reset");
             Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[dive 2 fail] the piece found in dive 2 is still counted for that dive");
-            Assert.That(rig.HostHaul.Current.BankedPieces, Is.EqualTo(2), "[dive 2 fail] pieces are safe on pickup: the failed dive keeps the one it found");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.LeftFloor1 == before - 1 && rig.PeerHaul.Current.LeftFloor1 == before - 1, Timeout, "[dive 2 fail] pieces-left on floor 1 went back up although the piece is safe (host " + rig.HostHaul.Current.LeftFloor1 + ", client " + rig.PeerHaul.Current.LeftFloor1 + ", wanted " + (before - 1) + ")");
+            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(2), "[dive 2 fail] pieces are safe on pickup: the failed dive keeps the one it found");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.PiecesLeft == before - 1 && rig.PeerHaul.Current.PiecesLeft == before - 1, Timeout, "[dive 2 fail] pieces-left on floor 1 went back up although the piece is safe (host " + rig.HostHaul.Current.PiecesLeft + ", client " + rig.PeerHaul.Current.PiecesLeft + ", wanted " + (before - 1) + ")");
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, Home) < 6f && Flat(rig.ClientHeroOnHost.transform.position, Home) < 8f, Timeout, "[dive 2 fail] the party is not back in the hub");
             yield return PlayModeHarness.WaitUntil(() => hv.IsUp && cv.IsUp, Timeout, "[dive 2 fail] the heroes stayed down");
             yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.Floor == 0, Timeout, "[dive 2 fail] the contents were never cleared");
@@ -422,7 +422,7 @@ namespace SleepingCalamity.Tests.PlayMode
             // A third dive starts clean: the piece found in dive 2 stays collected (never offered again) and the found counter restarts.
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[dive 3 start]");
             yield return AllBuilt(rig, 1, "[dive 3 start]");
-            Assert.That(rig.HostHaul.Current.LeftFloor1, Is.EqualTo(before - 1), "[dive 3 start] the collected piece is not offered again");
+            Assert.That(rig.HostHaul.Current.PiecesLeft, Is.EqualTo(before - 1), "[dive 3 start] the collected piece is not offered again");
             Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(0), "[dive 3 start] found counts this dive only");
         }
     }

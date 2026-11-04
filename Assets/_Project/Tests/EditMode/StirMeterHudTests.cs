@@ -31,18 +31,19 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual("Bag: 0 carried, 0 safe, 0 gold", StirMeterText.Bag(default));
         }
 
-        // Pieces are safe on pickup and go to the town stock at once (per-player loot plan task 4): the line says how many this dive found and how many are home.
-        [Test] public void Pieces_Text() => Assert.AreEqual("Pieces: 1 found this dive, 3 home", StirMeterText.Pieces(new DiveHaulSync.Summary { FoundPieces = 1, BankedPieces = 3 }));
-        [Test] public void Pieces_TextWithNothingFoundYet() => Assert.AreEqual("Pieces: 0 found this dive, 2 home", StirMeterText.Pieces(new DiveHaulSync.Summary { BankedPieces = 2 }));
+        // Pieces are safe on pickup and go to the town stock at once: the line says how many the party has found so far.
+        [Test] public void Pieces_Text() => Assert.AreEqual("Pieces found: 3", StirMeterText.Pieces(new DiveHaulSync.Summary { FoundPieces = 3 }));
+        [Test] public void Pieces_TextWithNothingFoundYet() => Assert.AreEqual("Pieces found: 0", StirMeterText.Pieces(new DiveHaulSync.Summary()));
 
         [Test]
         public void PiecesLeftHere_FollowsTheCurrentFloor()
         {
-            var s = new DiveHaulSync.Summary { CurrentFloor = 2, LeftFloor1 = 0, LeftFloor2 = 1, LeftFloor3 = 2 };
+            var s = new DiveHaulSync.Summary { CurrentFloor = 2, PiecesLeft = 1 };
             Assert.AreEqual("Pieces left on this floor: 1", StirMeterText.PiecesLeftHere(s));
-            s.CurrentFloor = 3; Assert.AreEqual("Pieces left on this floor: 2", StirMeterText.PiecesLeftHere(s));
-            s.CurrentFloor = 4; Assert.IsNull(StirMeterText.PiecesLeftHere(s));
-            s.CurrentFloor = 0; Assert.IsNull(StirMeterText.PiecesLeftHere(s));
+            s.PiecesLeft = 4; Assert.AreEqual("Pieces left on this floor: 4", StirMeterText.PiecesLeftHere(s));
+            s.PiecesLeft = 0; s.PeopleLeft = 1; Assert.AreEqual("Someone is waiting on this floor", StirMeterText.PiecesLeftHere(s));
+            s.PeopleLeft = 0; Assert.IsNull(StirMeterText.PiecesLeftHere(s));
+            s.PiecesLeft = 2; s.CurrentFloor = 0; Assert.IsNull(StirMeterText.PiecesLeftHere(s));
         }
 
         [Test]

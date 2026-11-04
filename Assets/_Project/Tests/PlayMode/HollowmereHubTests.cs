@@ -114,7 +114,7 @@ namespace SleepingCalamity.Tests.PlayMode
             if (cc != null) cc.enabled = true;
             Assert.That(director.HaulSync.ServerAddPiece(DiveHaul.PieceId(3, 0)), Is.True);
             Assert.That(director.HaulSync.ServerBank(), Is.True, "floor 4 is a bank point");
-            yield return PlayModeHarness.WaitUntil(() => director.NetHeartBanked.Value, Timeout, "the heart bank never registered");
+            yield return PlayModeHarness.WaitUntil(() => director.BankChosenNow(), Timeout, "the heart bank never registered");
 
             Assert.That(director.ServerTryGoHome(app.NetworkManager.LocalClientId), Is.True, "the party can go home after the heart bank");
             yield return PlayModeHarness.WaitUntil(() => !director.NetActive.Value, Timeout, "go home never ended the dive");

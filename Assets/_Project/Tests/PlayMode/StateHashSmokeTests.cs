@@ -141,9 +141,9 @@ namespace SleepingCalamity.Tests.PlayMode
 
             NetworkObject dirOnClient = rig.Peers[2].SpawnManager.SpawnedObjects[rig.Host.NetworkObjectId];
             var peerDirector = dirOnClient.GetComponent<DiveDirector>();
-            int real = peerDirector.NetStartFloor.Value;
-            ReplicatedStateHash.CorruptLocalCopy(peerDirector.NetStartFloor, real + 2);
-            Assert.That(peerDirector.NetStartFloor.Value, Is.EqualTo(real + 2), "test premise: the local copy was changed");
+            int real = peerDirector.NetPickableMaxFloor.Value;
+            ReplicatedStateHash.CorruptLocalCopy(peerDirector.NetPickableMaxFloor, real + 2);
+            Assert.That(peerDirector.NetPickableMaxFloor.Value, Is.EqualTo(real + 2), "test premise: the local copy was changed");
             Assert.That(ReplicatedStateHash.Hash(rig.Peers[2]), Is.Not.EqualTo(cleanHash), "the corrupted peer hashes differently");
 
             string message = null;
@@ -157,7 +157,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 yield return check.Current;
             }
             Assert.That(message, Is.Not.Null, "AssertAllEqual must fail when one peer's replicated state differs");
-            Assert.That(message, Does.Contain("NetStartFloor"), "the failure names the differing field");
+            Assert.That(message, Does.Contain("NetPickableMaxFloor"), "the failure names the differing field");
             Assert.That(message, Does.Contain("client " + rig.Peers[2].LocalClientId), "the failure names the corrupted peer");
         }
 

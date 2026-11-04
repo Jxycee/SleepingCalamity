@@ -336,6 +336,7 @@ namespace SleepingCalamity.Runtime
                 case DevKey.StartDive: k = Key.F7; return true;
                 case DevKey.AbandonDive: k = Key.F8; return true;
                 case DevKey.EatLoaf: k = Key.H; return true;
+                case DevKey.CycleFloor: k = Key.G; return true;
                 default: return false;
             }
         }

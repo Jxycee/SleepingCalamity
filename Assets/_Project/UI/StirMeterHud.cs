@@ -21,15 +21,15 @@ namespace SleepingCalamity.UI
             return l;
         }
 
-        // Pieces are safe on pickup and go to the town stock at once (plan 2 task 4): found this dive, and every piece already home.
-        public static string Pieces(DiveHaulSync.Summary s) => "Pieces: " + s.FoundPieces + " found this dive, " + s.BankedPieces + " home";
+        // Pieces are safe on pickup and go to the town stock at once: the line says how many the party has found so far (all dives).
+        public static string Pieces(DiveHaulSync.Summary s) => "Pieces found: " + s.FoundPieces;
 
         // The local player's own bag (owner-only PlayerBagSync view): items carried, items safe in the bank this dive, and all their gold (home + this dive's).
         public static string Bag(BagView v) => "Bag: " + v.Carried.Length + " carried, " + v.BankedThisDive + " safe, " + (int)System.Math.Min((long)v.Gold + v.DiveGold, int.MaxValue) + " gold";
 
-        // "Pieces left on this floor: N" for floors 1-3; null on the bakery floor, in town or before a floor is set.
+        // "Pieces left on this floor: N" while the floor holds a piece not found yet, "Someone is waiting on this floor" while it holds a person; null otherwise (town, nothing left).
         public static string PiecesLeftHere(DiveHaulSync.Summary s) =>
-            s.CurrentFloor >= 1 && s.CurrentFloor <= DiveHaul.PieceFloors ? "Pieces left on this floor: " + s.Left(s.CurrentFloor) : null;
+            s.CurrentFloor < 1 ? null : s.PiecesLeft > 0 ? "Pieces left on this floor: " + s.PiecesLeft : s.PeopleLeft > 0 ? "Someone is waiting on this floor" : null;
 
         public static float Fill(float value, float max) => max <= 0f ? 0f : Mathf.Clamp01(value / max);
 

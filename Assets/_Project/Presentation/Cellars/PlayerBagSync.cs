@@ -200,13 +200,13 @@ namespace SleepingCalamity.Presentation
         // it, it is resolved again (twice a second at most) in case the owner got a roster key after the first look.
         private PlayerBag FindBag(DiveHaulSync haul)
         {
-            DiveState state = haul.HostState;
-            if (state == null) return null;
-            if (_bagId != null && state.Bags.TryGet(_bagId, out PlayerBag bag)) return bag;
+            PartyBags bags = haul.Bags;   // the party's bags outlive every dive session
+            if (bags == null) return null;
+            if (_bagId != null && bags.TryGet(_bagId, out PlayerBag bag)) return bag;
             if (Time.unscaledTime < _nextIdResolve) return null;
             _nextIdResolve = Time.unscaledTime + 0.5f;
             _bagId = haul.PlayerIdOf(OwnerClientId);
-            return _bagId != null && state.Bags.TryGet(_bagId, out bag) ? bag : null;
+            return _bagId != null && bags.TryGet(_bagId, out bag) ? bag : null;
         }
     }
 }
