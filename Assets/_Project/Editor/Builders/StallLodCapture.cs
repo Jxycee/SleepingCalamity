@@ -110,6 +110,10 @@ namespace SleepingCalamity.EditorTools
             PlaceCamera(cam, stall, center, front, baseY, CloseDistance, out float closeAz);
             Show(lg, sets, broken, 0);
             LookTestCapture.Save(cam, Path.Combine(dir, type + "_" + preset + "_Close_LOD0.png"));
+            // the transition frames hide every other renderer (walls, terrain and falling leaves hid or polluted the far pairs; town-art-leftovers r3), restored below
+            var hidden = new List<Renderer>();
+            foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+                if (r.enabled && !r.transform.IsChildOf(stall)) { r.enabled = false; hidden.Add(r); }
             for (int i = 0; i < lods.Length - 1; i++)
             {
                 PlaceCamera(cam, stall, center, front, baseY, dists[i], out float az);
@@ -119,6 +123,7 @@ namespace SleepingCalamity.EditorTools
                 Show(lg, sets, broken, i + 1);
                 LookTestCapture.Save(cam, Path.Combine(dir, type + "_" + preset + "_T" + i + "_LOD" + (i + 1) + ".png"));
             }
+            foreach (Renderer r in hidden) if (r != null) r.enabled = true;
             lg.ForceLOD(-1);
             foreach (Renderer[] set in sets) foreach (Renderer r in set) r.enabled = true;
         }
