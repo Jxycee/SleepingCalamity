@@ -44,6 +44,7 @@ namespace SleepingCalamity.EditorTools
             Step(errors, "Hollowmere", HollowmereBuilder.Build);   // after BeautyCorner: reuses its look assets and rows; throws on an invalid town layout
             Step(errors, "DungeonCorner", DungeonCornerBuilder.Build);   // after LookTest: shares its B2 materials, rendering stack and volume helpers
             Step(errors, "UndercroftStair", UndercroftStairBuilder.Build);   // after DungeonCorner: builds the same room plus the stair down to it
+            Step(errors, "MetricsGym", MetricsGymBuilder.Build);   // plan 4: the metrics gym scene (not in Build Settings)
             Step(errors, "CellarFloorTest", CellarFloorTestBuilder.Build);   // after DungeonCorner: reuses its profile, materials and lamp look; builds the generated floor for seed 12345
             Step(errors, "CellarFloorKit", CellarFloorTestBuilder.SaveRuntimeKit);   // after CellarFloorTest: saves its kit as prefabs and assigns it to the CellarFloorSync prefab (the dive floors are dressed at runtime)
             Step(errors, "BuildSettings", SceneBuilder.ApplyBuildSettings);
