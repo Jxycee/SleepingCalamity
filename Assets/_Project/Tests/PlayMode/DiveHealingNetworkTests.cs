@@ -164,7 +164,9 @@ namespace SleepingCalamity.Tests.PlayMode
             clientV.ServerDamage(500);
             Assert.That(clientV.IsDowned, Is.True);
             Assert.That(haul.ServerBank(), Is.False, "bank spam at a spent point is refused");
-            Assert.That(haul.ServerAddPiece(200), Is.True);   // something new waits to bank
+            Assert.That(haul.ServerAddPiece(200), Is.True);   // a piece is safe at once: it does not reopen a spent bank point
+            Assert.That(haul.ServerBank(), Is.False, "a piece no longer waits to bank");
+            Assert.That(haul.ServerSetFloor(4), Is.True);   // the next bank point
             Assert.That(haul.ServerBank(), Is.True);
             Assert.That(clientV.IsDowned, Is.True, "a bank does not revive");
         }
