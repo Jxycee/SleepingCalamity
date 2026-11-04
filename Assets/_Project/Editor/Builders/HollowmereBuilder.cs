@@ -81,7 +81,12 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_StairSide4", new Vector3(-41.0f, 0.8f, -29.0f), new Vector3(-45.5f, -5.3f, -31.5f), 60f),   // stairs seat 3: the Terrace / Ring Lane flight from its west side at 1 m (stone cores under the treads, contact strip at the foot)
             ("Cap_HM_StairSide2", new Vector3(24.5f, 0.8f, 11.5f), new Vector3(19.2f, 1.2f, 16.0f), 60f),        // stairs seat: the keep's east flight from the east side at 0.8 m
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
+            ("Cap_HM_TerraceDown", new Vector3(-45.951f, -1.686f, -25.159f), new Vector3(-45.101f, -2.980f, -29.913f), 50f),   // play rig (pivot = feet + 1.5, boom 5.0, pitch 15 down, FOV 50), hero on the Ring Lane SW flight's middle tread facing downhill (LK0012/LK0013 LaneStep: X -44.068/-46.037, Y -4.640, Z -30.008/-30.360, yaw -10.13, tread centre +0.275 uphill, top Y+0.16); absolute position
+            ("Cap_HM_TerraceUp", new Vector3(-44.251f, -1.686f, -34.668f), new Vector3(-45.101f, -2.980f, -29.913f), 50f),     // same tread, hero facing uphill (camera downhill of him); absolute position
         };
+
+        // Cameras whose Pos is an absolute world position (not ground + eye height).
+        static readonly HashSet<string> AbsolutePosCameras = new HashSet<string> { "Cap_HM_Overview", "Cap_HM_TerraceDown", "Cap_HM_TerraceUp" };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]
         public static void BuildMenu()
@@ -178,7 +183,7 @@ namespace SleepingCalamity.EditorTools
             foreach (var c in BeautyCornerTable.Cameras) LookTestBuilder.AddCapture(cams, c.Name, c.Pos, c.Target, c.Fov);
             foreach (var c in Cameras)
             {
-                Vector3 pos = c.Name == "Cap_HM_Overview" ? c.Pos : new Vector3(c.Pos.x, Mathf.Max(HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z), HollowmereLayout.WaterY) + c.Pos.y, c.Pos.z);   // never under the lake
+                Vector3 pos = AbsolutePosCameras.Contains(c.Name) ? c.Pos : new Vector3(c.Pos.x, Mathf.Max(HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z), HollowmereLayout.WaterY) + c.Pos.y, c.Pos.z);   // never under the lake
                 Camera cam = LookTestBuilder.AddCapture(cams, c.Name, pos, c.Target, c.Fov);
                 cam.farClipPlane = c.Name == "Cap_HM_Overview" ? 400f : HollowmereRoad.FarClip;   // Q15: the low cameras see the backdrop ridges
             }
@@ -852,8 +857,14 @@ namespace SleepingCalamity.EditorTools
             PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             foreach (Transform c in go.transform.Cast<Transform>().ToList())
             {
-                if (c.name != keep) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }
-                c.GetComponent<MeshRenderer>().sharedMaterial = m;
+                if (!c.name.StartsWith(keep)) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }   // the LOD import names the state node "<State>.001" (children <State>_LOD0..2), not "<State>"
+                foreach (MeshRenderer r in c.GetComponentsInChildren<MeshRenderer>(true)) r.sharedMaterial = m;   // <State>_LOD0..2 children under the state's LODGroup node
+            }
+            foreach (LODGroup lg in go.GetComponentsInChildren<LODGroup>(true))   // the other state's renderers are gone: drop them from the LOD rows so the group keeps only live ones
+            {
+                LOD[] lods = lg.GetLODs();
+                for (int i = 0; i < lods.Length; i++) lods[i].renderers = (lods[i].renderers ?? new Renderer[0]).Where(r => r != null).ToArray();
+                lg.SetLODs(lods);
             }
             var col = go.AddComponent<BoxCollider>();   // counter and frame (B8 header); the awning overhang has none
             col.center = new Vector3(0f, 0.8f, 0f); col.size = new Vector3(2.7f, 1.6f, 1.6f);

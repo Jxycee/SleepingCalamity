@@ -23,6 +23,14 @@ Shader "SleepingCalamity/Backdrop"
         _ShadowTint ("Shadow side sky tint", Color) = (0.30, 0.38, 0.48, 1)
         _HazeCool ("Cool sky haze (x fog colour)", Color) = (0.80, 0.92, 1.12, 1)
         _HazeCoolAmt ("Cool haze away from a low sun", Range(0, 1)) = 0.7
+        // A12 r1 (town-art-leftovers): per-material key/fill controls for the tall masses (mountain, windmill). The defaults reproduce the old look exactly.
+        _KeyWrap ("Key light slope (wrapped Lambert)", Range(0, 1.5)) = 0.7
+        _KeyBias ("Key light bias (wrapped Lambert)", Range(-0.3, 0.5)) = 0.15
+        _KeyBoost ("Key light boost", Range(0, 3)) = 1
+        _SkyFillDir ("Cool directional sky fill (0 = SH as before)", Range(0, 1)) = 0
+        _FillBoost ("Sky fill multiplier (shade side of a tall mass)", Range(0, 8)) = 1
+        _HazeTop ("Haze reduction at the top of a tall mass (0 = off)", Range(0, 1)) = 0
+        _HazeTopHeight ("Height (world y) where that reduction is full (0 = off)", Float) = 0
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha clip", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
@@ -45,6 +53,8 @@ Shader "SleepingCalamity/Backdrop"
             half _NoiseAmp, _NoiseLit;
             half4 _ShadowTint, _HazeCool;
             half _HazeCoolAmt;
+            half _KeyWrap, _KeyBias, _KeyBoost, _SkyFillDir, _FillBoost, _HazeTop;
+            float _HazeTopHeight;
             half _AlphaClip, _Cull;
         CBUFFER_END
         ENDHLSL
@@ -61,9 +71,10 @@ Shader "SleepingCalamity/Backdrop"
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
-            struct Varyings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 positionWS : TEXCOORD1; float3 normalWS : TEXCOORD2; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; half4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Varyings { float4 positionCS : SV_POSITION; half4 color : COLOR0; float2 uv : TEXCOORD0; float3 positionWS : TEXCOORD1; float3 normalWS : TEXCOORD2; UNITY_VERTEX_INPUT_INSTANCE_ID };
 
+            float _SC_BackdropDebug;
             float Hash21(float2 p) { p = frac(p * float2(123.34, 456.21)); p += dot(p, p + 45.32); return frac(p.x * p.y); }
             float VNoise(float2 p)
             {
@@ -80,6 +91,7 @@ Shader "SleepingCalamity/Backdrop"
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.normalWS = TransformObjectToWorldNormal(i.normalOS);
                 o.uv = TRANSFORM_TEX(i.uv, _BaseMap);
+                o.color = i.color;   // vertex colour: rgb multiplies the tint (strata, lit/shade bake), alpha < 1 adds haze (foot fade); meshes without colours read white
                 return o;
             }
 
@@ -90,21 +102,28 @@ Shader "SleepingCalamity/Backdrop"
                 #if defined(_ALPHATEST_ON)
                 clip(c.a - _Cutoff);
                 #endif
+                c.rgb *= i.color.rgb;
                 float3 n = normalize(i.normalWS);
                 n = IS_FRONT_VFACE(face, n, -n);
                 Light l = GetMainLight();
                 float ndl = dot(n, l.direction);
-                half sun = saturate(ndl * 0.7 + 0.15);                      // less wrap than before: faces turned from the sun fall darker
+                half sun = saturate(ndl * _KeyWrap + _KeyBias);             // default 0.7/0.15: less wrap than before, faces turned from the sun fall darker
                 half3 sky = SampleSH(float3(0, 1, 0));
-                half3 lit = c.rgb * (l.color * sun + SampleSH(n) + _ShadowTint.rgb * sky * (1.0 - sun));
+                half3 fill = SampleSH(n);
+                // cool sky fill by the normal's up component (up-facing lighter, steep faces darker); 0 keeps the plain SH fill
+                half3 skyDir = sky * half3(0.62, 0.78, 1.1) * lerp(0.45, 1.1, smoothstep(0.1, 0.9, n.y));
+                fill = lerp(fill, skyDir, _SkyFillDir) * _FillBoost;
+                half3 lit = c.rgb * (l.color * (sun * _KeyBoost) + fill + _ShadowTint.rgb * sky * (1.0 - sun));
                 float3 V = normalize(i.positionWS - GetCameraPositionWS());
                 float d = distance(i.positionWS, GetCameraPositionWS());
                 half h = lerp(_HazeNear, _HazeFar, saturate((d - _DistNear) / max(1.0, _DistFar - _DistNear)));
                 // vertical gradient: mist holds at the foot and thins smoothly with height, so ridge and tree tops stand crisper against the sky
                 h += _GroundMist * (exp(-clamp((i.positionWS.y - _MistTop) / max(1.0, _MistScale), -1.0, 6.0)) - 0.3);
                 // two octaves of world-XZ value noise (~150 m and ~40 m) break the ring fields into patches of light and mist
+                if (_HazeTopHeight > 0.0)   // less haze on the upper 60% of a tall mass (the foot keeps its vertex-alpha mist)
+                    h *= 1.0 - _HazeTop * saturate((i.positionWS.y - 0.4 * _HazeTopHeight) / (0.6 * _HazeTopHeight));
                 float nz = VNoise(i.positionWS.xz / 150.0) * 0.6 + VNoise(i.positionWS.xz / 40.0 + 17.0) * 0.4 - 0.5;
-                h = saturate(h + nz * 2.0 * _NoiseAmp);
+                h = saturate(h + nz * 2.0 * _NoiseAmp + (1.0 - i.color.a) * 0.7);
                 lit *= 1.0 + nz * 2.0 * _NoiseLit;
                 // haze hue: warm fog colour looking toward a low sun, cooler sky haze looking away or sideways (midday sun stays as it was)
                 half lowSun = 1.0 - saturate(l.direction.y * 1.5);
@@ -112,6 +131,11 @@ Shader "SleepingCalamity/Backdrop"
                 half3 haze = unity_FogColor.rgb * _HazeTint.rgb;
                 half3 cool = _HazeCool.rgb / max(0.2, dot(_HazeCool.rgb, half3(0.299, 0.587, 0.114)));   // luminance-normalised: hue only
                 haze = lerp(haze, lerp(haze * cool, haze, toSun), _HazeCoolAmt * lowSun);
+                if (_SC_BackdropDebug > 0.5)   // capture-only debug (BackdropDebugCapture): 1 albedo, 2 key, 3 fill, 4 normal, 5 haze, 6 lit
+                {
+                    half3 dbg = _SC_BackdropDebug < 1.5 ? c.rgb : _SC_BackdropDebug < 2.5 ? l.color * sun : _SC_BackdropDebug < 3.5 ? fill : _SC_BackdropDebug < 4.5 ? n * 0.5 + 0.5 : _SC_BackdropDebug < 5.5 ? h.xxx : lit;
+                    return half4(dbg, 1.0);
+                }
                 return half4(lerp(lit, haze, h), 1.0);
             }
             ENDHLSL
