@@ -591,6 +591,9 @@ namespace SleepingCalamity.Tests.EditMode
 
         string WithSection(string name, string json) => GoldenV1.Replace("\"players\"", "\"" + name + "\": " + json + ", \"players\"");
 
+        // A suspend section in a world whose dive is in progress (plan 3 task 8a: a suspend without a dive in progress is stale and the clean drops it).
+        string WithSuspend(string json) => WithSection("suspend", json).Replace("\"players\"", "\"dive\": { \"inDive\": true }, \"players\"");
+
         // Catches: a build that can no longer read the v1 format because of the plan 3 fields, or the golden file gaining a suspend or dive section on load and save.
         [Test]
         public void GoldenV1Fixture_StillPassesUnchanged()
@@ -614,6 +617,7 @@ namespace SleepingCalamity.Tests.EditMode
             WorldSaveStore store = Load();
             WorldSave w = WorldSaveRules.New(7UL);
             w.Players = WorldSaveStoreTestsPlayers();
+            w.Dive = new DiveSave { InDive = true };   // a suspend belongs to a dive in progress
             w.Suspend = FullSuspend();
             store.Replace(w);
             Assert.That(store.FlushIfDirty(), Is.True);
@@ -675,7 +679,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Suspend_OneMistypedBag_KeepsTheOthers()
         {
             string section = "{ \"seed\": 5, \"floor\": 5, \"phase\": 2, \"presentIds\": [\"Ugs:aaa\", 7, \"Ugs:bbb\"], \"bags\": [ " + GoodBagJson + ", { \"identity\": 1, \"id\": \"bbb\", \"diveGold\": \"lots\" }, { \"identity\": 1, \"id\": \"ccc\", \"carried\": [110] } ] }";
-            File.WriteAllText(_path, WithSection("suspend", section));
+            File.WriteAllText(_path, WithSuspend(section));
             WorldSaveStore store = Load();
             Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }), "named so the original file is kept");
             SuspendSave s = store.Current.Suspend;
@@ -731,7 +735,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(store.Current.Dive.BankedPieces, Is.EqualTo(new[] { 100 }));
             Assert.That(store.Current.Dive.PieceDepths, Is.Null);
 
-            File.WriteAllText(_path, WithSection("suspend", "{ \"seed\": 5, \"floor\": 5, \"phase\": 2, \"presentIds\": \"oops\", \"bags\": 7 }"));
+            File.WriteAllText(_path, WithSuspend("{ \"seed\": 5, \"floor\": 5, \"phase\": 2, \"presentIds\": \"oops\", \"bags\": 7 }"));
             store = Load();
             Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }));
             Assert.That(store.Current.Suspend, Is.Not.Null, "the suspend section stays");
@@ -815,9 +819,10 @@ namespace SleepingCalamity.Tests.EditMode
             WorldSave file = OldDiveWorld(1UL);
             file.Dive.CheckpointHeld = true; file.Dive.BossBeaten = true; file.Dive.ExtraSlotOwner = "Ugs:bbb";
             file.Suspend = FullSuspend();
+            file.Dive.InDive = true;   // a suspend belongs to a dive in progress
             host.LoadTown(file);
             Assert.That(host.Town.Suspend, Is.Not.Null);
-            var source = new SnapshotSource { Live = new TownSnapshot { Dive = new DiveSave { ClearedMask = 7 } } };   // the hub's capture: no suspend, no v2 fields
+            var source = new SnapshotSource { Live = new TownSnapshot { Dive = new DiveSave { ClearedMask = 7, InDive = true } } };   // the hub's capture: no suspend, no v2 fields, the party still below
             host.RegisterTownSource(source);
             Assert.That(source.Restored.Suspend, Is.Not.Null, "the restoring source sees the loaded suspend");
             Assert.That(source.Restored.Dive.PieceDepths, Is.Not.Null.And.Count.EqualTo(PieceCatalog.Specs.Count), "and the depths");
@@ -829,8 +834,13 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(target.Dive.BossBeaten, Is.True);
             Assert.That(target.Dive.ExtraSlotOwner, Is.EqualTo("Ugs:bbb"));
             Assert.That(target.Dive.PieceDepths.Count, Is.EqualTo(PieceCatalog.Specs.Count));
-            Assert.That(target.Suspend, Is.Not.Null, "a source that says nothing about the suspend keeps the saved one");
+            Assert.That(target.Suspend, Is.Not.Null, "a source that says nothing about the suspend keeps the saved one while its dive is in progress");
             Assert.That(target.Suspend.Bags.Count, Is.EqualTo(2));
+
+            // the same source once the dive is over (plan 3 task 8a): a source that never says "known, none" can no longer keep a stale suspend alive
+            source.Live = new TownSnapshot { Dive = new DiveSave { ClearedMask = 0, InDive = false } };
+            host.CaptureTownInto(target);
+            Assert.That(target.Suspend, Is.Null, "no dive in progress: the saved suspend is stale and goes");
         }
 
         // Catches: the suspend section not reaching the file from a live source, an unrecorded player's record reaching it, a used suspend never being cleared, or being cleared by a source
@@ -843,7 +853,7 @@ namespace SleepingCalamity.Tests.EditMode
             SuspendSave live = FullSuspend();
             live.Bags.Add(new SuspendedBag { Identity = 1, Id = "stranger", Carried = { 104 } });
             live.PresentIds.Add("Ugs:stranger");
-            var source = new SnapshotSource { Live = new TownSnapshot { Suspend = live, SuspendKnown = true } };
+            var source = new SnapshotSource { Live = new TownSnapshot { Suspend = live, SuspendKnown = true, Dive = new DiveSave { InDive = true } } };
             host.RegisterTownSource(source);
 
             var target = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL) };
@@ -870,7 +880,7 @@ namespace SleepingCalamity.Tests.EditMode
             var host = new HostWorld();
             WorldPlayers.TryCreate(WorldKind.Solo, new[] { new PlayerKey(IdentityKind.Local, "old") }, out WorldPlayers players);
             host.Load(players);
-            var file = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL), Dive = new DiveSave { ExtraSlotOwner = "Local:old" } };
+            var file = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL), Dive = new DiveSave { ExtraSlotOwner = "Local:old", InDive = true } };
             file.Suspend = new SuspendSave
             {
                 Seed = 1u, Floor = 5, Phase = (int)DivePhase.BankRoom, PresentIds = { "Local:old" }, ExtraSlotOwner = "Local:old",

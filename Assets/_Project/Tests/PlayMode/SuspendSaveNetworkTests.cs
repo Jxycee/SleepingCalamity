@@ -1,14 +1,20 @@
 // Authority: test-only. The bank-room suspend section on the real save stack (plan 3 task 6): a real solo host, its HostWorld and WorldSaveFlow, a throwaway world library.
 // Catches: the `suspend` section not being wired through HostWorld.CaptureTownInto / WorldSaveFlow.SaveNow into the world file (the Core tests cannot see that), the dive section's saved
 // piece depths not reaching the file, a bank suspend being read back as a failed dive, a restored party that is not the one that was saved, and a used suspend never leaving the file.
-// Does NOT catch: a client rejoining the suspended party (one process, one local player), the director's own capture and resume (task 7 and 8a), or the manual 2-PC walk.
+// Does NOT catch: a client rejoining the suspended party (one process, one local player), or the manual 2-PC walk.
+// Catches (Director_*): the REAL director's capture and resume on the real stack (plan 3 tasks 8 and 8a): an autosave between the load and the trapdoor wiping the loaded suspend (and the carried items with
+// it), a resume that does not bring the bags, picks, seed and phase back, a push-on suspend that outlives the stair, a stale suspend surviving a failed dive.
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
+using SleepingCalamity.Presentation;
 using SleepingCalamity.Runtime;
+using Unity.Netcode;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace SleepingCalamity.Tests.PlayMode
@@ -141,6 +147,116 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(ReadWorld(_dir, worldId).Suspend, Is.Null, "a used suspend is cleared from the file");
             Assert.That(File.ReadAllText(Path.Combine(_dir, worldId + ".json")), Does.Not.Contain("\"suspend\""));
             Assert.That(ReadWorld(_dir, worldId).Dive.PieceDepths.Count, Is.EqualTo(PieceCatalog.Specs.Count), "the depths stay");
+        }
+
+        private static NetworkObject Prefab<T>(NetworkManager nm) where T : Component
+        {
+            foreach (NetworkPrefabsList list in nm.NetworkConfig.Prefabs.NetworkPrefabsLists)
+                foreach (NetworkPrefab entry in list.PrefabList)
+                    if (entry.Prefab != null && entry.Prefab.GetComponent<T>() != null) return entry.Prefab.GetComponent<NetworkObject>();
+            Assert.Fail(typeof(T).Name + " is not in the network prefab list (run the project builder)");
+            return null;
+        }
+
+        // A direct host (no scenes), one client with PlayerId(clientIndex), and a configured director that registers with the real HostWorld.
+        private static IEnumerator StartSavedHost(int clientIndex, List<PlayModeHarness.TestClient> clients, System.Action<AppBootstrap, DiveDirector> done)
+        {
+            AppBootstrap app = AppBootstrap.Current;
+            yield return PlayModeHarness.StartDirectHostWithoutScenes();
+            yield return PlayModeHarness.StartClients(app, 1, false, clients, clientIndex);
+            NetworkManager hostNm = app.NetworkManager;
+            NetworkObject o = hostNm.SpawnManager.InstantiateAndSpawn(Prefab<DiveDirector>(hostNm), hostNm.LocalClientId, false, false, false, Vector3.zero, Quaternion.identity);
+            DiveDirector dir = o.GetComponent<DiveDirector>();
+            Assert.That(dir.ServerConfigure(new Vector3(0f, 0f, -6f), new Vector3(0f, 0f, 9f), new Vector3(200f, 0f, 0f)), Is.True);
+            done(app, dir);
+        }
+
+        [UnityTest]
+        public IEnumerator Director_BankRoomQuit_SurvivesAnAutosaveBeforeTheTrapdoor_ResumesAfterRestart_StairAndFailureWipeIt()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            _dir = PlayModeHarness.BeginSaveTest();
+            WorldSaveStore.PathOverrideForTests = Path.Combine(_dir, "legacy-single-file", "world.json");
+
+            // ---- session 1: A and the host are in the bank room, A carrying two items with one picked; the host saves (the quit)
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveDirector dir = null;
+            yield return StartSavedHost(20, clients, (a, d) => { app = a; dir = d; });
+            string worldId = app.WorldSaveFlow.SelectedWorldId;
+            ulong ca = clients[0].NetworkManager.LocalClientId;
+            string aId = clients[0].Key.Id;
+            dir.SeedOverride = 6201u;
+            Assert.That(dir.ServerStartDive(), Is.True);
+            DiveHaulSync haul = dir.HaulSync;
+            Assert.That(haul.ServerAddItem(ca, 104) && haul.ServerAddItem(ca, 105), Is.True);
+            Assert.That(haul.ServerAddGold(ca, 7), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            Assert.That(haul.ServerPick(ca, 0), Is.True);
+            app.WorldSaveFlow.SaveNow();
+            WorldSave w1 = ReadWorld(_dir, worldId);
+            Assert.That(w1.Suspend, Is.Not.Null, "the quit in the bank room wrote a suspend");
+            Assert.That(w1.Suspend.Phase, Is.EqualTo((int)DivePhase.BankRoom));
+            Assert.That(w1.Suspend.BankChosen, Is.False);
+            Assert.That(w1.Suspend.Seed, Is.EqualTo(6201u));
+            SuspendedBag rec = w1.Suspend.Bags.Single(b => b.Id == aId);
+            Assert.That(rec.Carried, Is.EqualTo(new[] { 104, 105 }));
+            Assert.That(rec.Picks, Is.EqualTo(new[] { 0 }));
+            Assert.That(rec.DiveGold, Is.EqualTo(7));
+            Assert.That(w1.Dive.InDive, Is.True);
+
+            yield return PlayModeHarness.LeaveAndWaitForLobby();
+            if (clients[0].Session.State != ConnState.Offline) yield return PlayModeHarness.Await(clients[0].Session.LeaveAsync(), Timeout);
+            Assert.That(ReadWorld(_dir, worldId).Suspend, Is.Not.Null, "the final save on leaving kept it");
+
+            // ---- session 2: the same world. An autosave before anyone enters the trapdoor must not lose the suspend
+            var again = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app2 = null; DiveDirector dir2 = null;
+            yield return StartSavedHost(20, again, (x, d) => { app2 = x; dir2 = d; });
+            Assert.That(app2.WorldSaveFlow.SelectedWorldId, Is.EqualTo(worldId));
+            ulong ca2 = again[0].NetworkManager.LocalClientId;
+            Assert.That(dir2.NetSuspendedDive.Value, Is.True, "the director holds the loaded suspend for the trapdoor");
+            app2.WorldSaveFlow.SaveNow();
+            WorldSave w2 = ReadWorld(_dir, worldId);
+            Assert.That(w2.Suspend, Is.Not.Null, "an autosave between the load and the trapdoor did not wipe the suspend");
+            Assert.That(w2.Suspend.Bags.Single(b => b.Id == aId).Carried, Is.EqualTo(new[] { 104, 105 }), "nor the carried items");
+            Assert.That(w2.Dive.InDive, Is.True);
+
+            dir2.SeedOverride = 9999u;   // a resume ignores it: the saved seed rules
+            Assert.That(dir2.ServerStartDive(), Is.True, "the trapdoor resumes the suspended dive");
+            DiveHaulSync haul2 = dir2.HaulSync;
+            Assert.That(dir2.Session.Phase, Is.EqualTo(DivePhase.BankRoom));
+            Assert.That(dir2.Session.Floor, Is.EqualTo(5));
+            Assert.That(dir2.Seed, Is.EqualTo(6201u));
+            Assert.That(dir2.Checkpoint.Held, Is.False, "a resume neither sets nor spends the checkpoint");
+            PlayerBag back = haul2.ServerBagOf(ca2);
+            Assert.That(back.Carried, Is.EqualTo(new[] { 104, 105 }));
+            Assert.That(back.DiveGold, Is.EqualTo(7));
+            Assert.That(back.BankOpen, Is.True, "the visit is open again");
+            Assert.That(back.Picks, Is.EqualTo(new[] { 0 }), "with the saved pick");
+            Assert.That(dir2.NetSuspendedDive.Value, Is.False);
+            app2.WorldSaveFlow.SaveNow();
+            Assert.That(ReadWorld(_dir, worldId).Suspend, Is.Not.Null, "back in the bank room, a quit is a suspend again");
+
+            Assert.That(haul2.PushOnNow(), Is.True);
+            app2.WorldSaveFlow.SaveNow();
+            SuspendSave afterPush = ReadWorld(_dir, worldId).Suspend;
+            Assert.That(afterPush, Is.Not.Null);
+            Assert.That(afterPush.BankChosen, Is.True, "push-on writes the suspend");
+            Assert.That(afterPush.Bags.Single(b => b.Id == aId).BankedThisDive.Single().ItemId, Is.EqualTo(104));
+
+            Assert.That(haul2.ServerEnterFloor(6), Is.True);
+            app2.WorldSaveFlow.SaveNow();
+            WorldSave w4 = ReadWorld(_dir, worldId);
+            Assert.That(w4.Suspend, Is.Null, "taking the stair wipes the suspend");
+            Assert.That(File.ReadAllText(Path.Combine(_dir, worldId + ".json")), Does.Not.Contain("\"suspend\""));
+            Assert.That(w4.Dive.InDive, Is.True, "a quit on floor 6 is the old failed-dive rule");
+
+            Assert.That(dir2.ServerAbandonDive(), Is.True);
+            app2.WorldSaveFlow.SaveNow();
+            WorldSave w5 = ReadWorld(_dir, worldId);
+            Assert.That(w5.Suspend, Is.Null);
+            Assert.That(w5.Dive.InDive, Is.False, "a failed dive is over");
+            Assert.That(w5.Bags.Players.Single(p => p.Id == aId).Satchel, Is.Not.Null, "its carried item waits in a satchel");
         }
     }
 }

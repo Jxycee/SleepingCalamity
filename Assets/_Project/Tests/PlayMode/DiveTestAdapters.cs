@@ -10,6 +10,29 @@ namespace SleepingCalamity.Tests.PlayMode
         // The old "heart banked" flag, now: this dive pushed on at the bank room.
         public static bool BankChosenNow(this DiveDirector d) => d.HaulSync != null && d.HaulSync.Current.BankChosen;
 
+        // The bank room, the way the party gets there: floor 5 cleared (its guardian), then the bank press. False when the session refuses.
+        public static bool BankRoomNow(this DiveHaulSync haul)
+        {
+            if (!haul.ServerSetFloor(UndercroftPlan.BankFloor)) return false;
+            haul.ServerMarkCleared(UndercroftPlan.BankFloor);
+            return haul.ServerEnterBankRoom();
+        }
+
+        // Every connected player presses "push on" (the real choice, one press each): a solo party confirms at once, a larger one on the second press. True once the choice stands.
+        public static bool PushOnNow(this DiveHaulSync haul)
+        {
+            if (!haul.IsServer || haul.Session == null) return false;
+            foreach (ulong id in new System.Collections.Generic.List<ulong>(haul.NetworkManager.ConnectedClientsIds)) haul.ServerChoosePushOn(id);
+            return haul.Session.BankChosenThisDive;
+        }
+
+        // The old stand-in press of tests that predate plan 3 task 8: the first one entered the bank room, the next pushed on. Delete with the last caller (task 12).
+        public static bool ServerBank(this DiveHaulSync haul)
+        {
+            if (!haul.IsServer || !haul.IsSpawned || haul.Session == null) return false;
+            return haul.Session.Phase == DivePhase.BankRoom ? haul.PushOnNow() : haul.ServerEnterBankRoom();
+        }
+
         // Puts the host's session on `floor` (0 = home, a fresh Town-phase session over the same bags, checkpoint and pieces) without walking there. Cleared floors, stir and the bank state are
         // kept; the call starts a dive on floor 1 first when none runs. Floors may be jumped (the rules of EnterFloor do not apply: this is a test hook).
         public static bool ServerSetFloor(this DiveHaulSync haul, int floor)

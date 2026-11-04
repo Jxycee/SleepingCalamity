@@ -136,8 +136,9 @@ namespace SleepingCalamity.Presentation
 
         private DiveHaulSync _haul;          // host only; the haul sync of this object's own NetworkManager
         private float _nextHaulLookup;       // the scene search runs at most once a second while no haul sync is known (town, haul-less tests)
-        private string _bagId;               // host only; the owner's bag key (PlayerKey.ToString allocates, so it is resolved rarely, never per frame)
-        private float _nextIdResolve;        // while no bag is found under _bagId the key is re-resolved at most twice a second
+        private string _bagId;               // host only; the owner's bag key (PlayerKey.ToString allocates, so it is resolved when the roster key changes, never per frame)
+        private float _nextIdResolve;        // the roster key is looked at most twice a second
+        private bool _hasKey; private PlayerKey _key;   // host only; the roster key _bagId was resolved from (PlayerKey compare allocates nothing)
         private PlayerBag _shownBag; private int _shownVersion = -1;   // host only; the bag and Version Net was last built from: an unchanged bag costs nothing per frame
 
         public override void OnNetworkSpawn()
@@ -148,7 +149,7 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             if (Local == this) Local = null;
-            _haul = null; _bagId = null; _shownBag = null; _shownVersion = -1;
+            _haul = null; _bagId = null; _hasKey = false; _key = default; _nextIdResolve = 0f; _shownBag = null; _shownVersion = -1;
         }
 
         // Asks the host to move carried item `index` (PlayerBag.SatchelPick = -1 for the carried satchel) into a bank slot. The host decides.
@@ -196,17 +197,19 @@ namespace SleepingCalamity.Presentation
             if (!next.Equals(Net.Value)) Net.Value = next;   // only send when something the owner can see changed
         }
 
-        // The owner's bag if it exists (a new dive state or an adopted bag shows up here, since the lookup runs every frame). The bag key is resolved once and cached; with no bag found under
-        // it, it is resolved again (twice a second at most) in case the owner got a roster key after the first look.
+        // The owner's bag if it exists (a new dive state or an adopted bag shows up here, since the lookup runs every frame). The bag key is resolved from the roster at most twice a second and again
+        // whenever the roster's key for the owner changes (a Solo world rebinding its owner, a key arriving after the first look): a cached key must not keep showing a stale bag (plan 3 task 8).
         private PlayerBag FindBag(DiveHaulSync haul)
         {
             PartyBags bags = haul.Bags;   // the party's bags outlive every dive session
             if (bags == null) return null;
-            if (_bagId != null && bags.TryGet(_bagId, out PlayerBag bag)) return bag;
-            if (Time.unscaledTime < _nextIdResolve) return null;
-            _nextIdResolve = Time.unscaledTime + 0.5f;
-            _bagId = haul.PlayerIdOf(OwnerClientId);
-            return _bagId != null && bags.TryGet(_bagId, out bag) ? bag : null;
+            if (Time.unscaledTime >= _nextIdResolve)
+            {
+                _nextIdResolve = Time.unscaledTime + 0.5f;
+                bool has = haul.TryRosterKey(OwnerClientId, out PlayerKey key);
+                if (_bagId == null || has != _hasKey || (has && key != _key)) { _hasKey = has; _key = key; _bagId = haul.PlayerIdOf(OwnerClientId); }
+            }
+            return _bagId != null && bags.TryGet(_bagId, out PlayerBag bag) ? bag : null;
         }
     }
 }

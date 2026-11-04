@@ -18,6 +18,8 @@ namespace SleepingCalamity.Core
 
         readonly List<string> _pressers = new List<string>();
 
+        public float Window { get; set; } = WindowSeconds;   // the seconds a new window waits (tests shorten or lengthen it)
+
         public BankChoiceKind Kind { get; private set; }
         public float SecondsLeft { get; private set; }
         public IReadOnlyList<string> Pressers => _pressers;
@@ -36,7 +38,7 @@ namespace SleepingCalamity.Core
                 return Confirm(choice);   // a second distinct presser confirms
             }
             bool swapped = Kind != BankChoiceKind.None;
-            Kind = choice; SecondsLeft = WindowSeconds;
+            Kind = choice; SecondsLeft = Window;
             _pressers.Clear(); _pressers.Add(presser);
             return swapped ? BankChoicePress.Swapped : BankChoicePress.Opened;
         }

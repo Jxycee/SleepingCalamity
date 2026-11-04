@@ -120,7 +120,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         // Catches: a client mutating the session, a bank request from a client not reaching the host or not reaching the other peers, a bank press off the bank floor, a failed dive not leaving the
-        // satchel and the pieces on every peer, a late joiner missing the current summary. NOT covered: the bank room's picks and confirm window (plan 3 task 8).
+        // satchel and the pieces on every peer, a late joiner missing the current summary, a push-on press that confirms alone. NOT covered: the bank screen (IMGUI) and a real built bank cell.
         [UnityTest]
         public IEnumerator Haul_HostOwnsIt_ClientsBankByRpc_AllPeersAgree_LateJoinerSyncs()
         {
@@ -145,7 +145,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(peerA.ServerAddPiece(100), Is.False);
             Assert.That(peerA.ServerAddItem(a.NetworkManager.LocalClientId, 101), Is.False);
             Assert.That(peerA.ServerAddGold(a.NetworkManager.LocalClientId, 3), Is.False);
-            Assert.That(peerA.ServerBank(), Is.False);
+            Assert.That(peerA.ServerEnterBankRoom(), Is.False);
+            Assert.That(peerA.ServerChoosePushOn(a.NetworkManager.LocalClientId), Is.False);
+            Assert.That(peerA.ServerChooseGoHome(a.NetworkManager.LocalClientId), Is.False);
+            Assert.That(peerA.ServerResizeVisits(), Is.False);
             Assert.That(peerA.ServerFailDive(), Is.False);
             Assert.That(peerA.ServerStart(1, false), Is.False);
             Assert.That(peerA.ServerEnterFloor(2), Is.False);
@@ -185,8 +188,13 @@ namespace SleepingCalamity.Tests.PlayMode
             peerA.RequestBank();
             yield return WaitSummary(peerA, s => s.DivePhase == DivePhase.BankRoom && s.CurrentFloor == 5, "client A never saw the bank room open");
             Assert.That(host.ServerBagOf(hostId).BankOpen, Is.True, "the host's bag has a bank visit");
-            peerA.RequestBank();
-            yield return WaitSummary(peerA, s => s.BankChosen && s.DivePhase == DivePhase.Floor, "client A never saw the push-on");
+            ulong clientA = a.NetworkManager.LocalClientId;
+            int slotA = host.PlayerSlotOf(clientA);
+            peerA.RequestBank();   // inside the room the bank press is a push-on press: one of two players opens the confirm window
+            yield return WaitSummary(peerA, s => s.ChoiceKind == BankChoiceKind.PushOn && s.ChoiceMask == (1 << slotA) && s.ChoiceSecondsLeft > 0, "client A never saw its push-on press open the window");
+            Assert.That(host.Current.BankChosen, Is.False, "one press of two players is not the party's choice");
+            Assert.That(host.ServerChoosePushOn(hostId), Is.True, "the second player's press confirms");
+            yield return WaitSummary(peerA, s => s.BankChosen && s.DivePhase == DivePhase.Floor && s.ChoiceKind == BankChoiceKind.None, "client A never saw the push-on");
             Assert.That(host.ServerBagOf(hostId).BankOpen, Is.False, "the push-on closed the visit");
 
             // Late joiner gets the current summary with the spawn.
@@ -210,6 +218,158 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return WaitSummary(peerB, s => s.FoundPieces == 2 && s.DivePhase == DivePhase.Ended, "client B never saw the failed dive");
             Assert.That(peerA.Current, Is.EqualTo(host.Current));
             Assert.That(peerB.Current, Is.EqualTo(host.Current));
+        }
+
+        // ================================================================================================================================
+        // Plan 3 task 8: the bank room's rules on the host (haul sync alone, real clients joining and leaving).
+        // Catches: capacity that does not follow who is present (a joiner without a visit, a leaver's picks banked behind their back, excess picks not dropped from the end), the extra-slot owner repeating its
+        // previous owner or PreviousExtraOwner being overwritten by a re-pick, a push-on window that never times out, a late joiner not seeing the window and the phase with the spawn.
+        // NOT covered: the downed-hero quorum (PerPlayerLootNetworkTests, which has heroes), the director's save and resume (DiveSpineNetworkTests), the bank screen, a real built bank cell.
+        // ================================================================================================================================
+
+        private IEnumerator StartRoom(int clientCount, System.Action<AppBootstrap, DiveHaulSync, PlayModeHarness.TestClient[]> done)
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            AppBootstrap app = AppBootstrap.Current;
+            yield return PlayModeHarness.StartDirectHostWithoutScenes();
+            NetworkManager hostNm = app.NetworkManager;
+            var joined = new PlayModeHarness.TestClient[clientCount];
+            for (int i = 0; i < clientCount; i++) { int at = i; yield return Join(app, 8 + i, c => joined[at] = c); }
+            NetworkObject spawned = hostNm.SpawnManager.InstantiateAndSpawn(SyncPrefab(hostNm).GetComponent<NetworkObject>(), hostNm.LocalClientId, false, false, false, Vector3.zero, Quaternion.identity);
+            DiveHaulSync host = spawned.GetComponent<DiveHaulSync>();
+            Assert.That(host.ServerBegin(), Is.True);
+            done(app, host, joined);
+        }
+
+        private IEnumerator Leave(AppBootstrap app, PlayModeHarness.TestClient client)
+        {
+            ulong id = client.NetworkManager.LocalClientId;
+            yield return PlayModeHarness.Await(client.Session.LeaveAsync(), Timeout);
+            yield return PlayModeHarness.WaitUntil(() => !app.NetworkManager.ConnectedClients.ContainsKey(id), Timeout, "the host still lists the dropped client");
+        }
+
+        [UnityTest]
+        public IEnumerator BankRoom_PartyChanges_CapacityFollowsPresence_PicksDropFromTheEnd_RejoinerGetsAVisit()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(1, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId, idA = cl[0].NetworkManager.LocalClientId;
+            foreach (int item in new[] { 101, 102, 103, 104 }) Assert.That(host.ServerAddItem(hostId, item), Is.True);
+            Assert.That(host.BankRoomNow(), Is.True);
+            Assert.That(host.ServerBagOf(hostId).SlotCapacity, Is.EqualTo(2), "two players: two slots each");
+            Assert.That(host.ServerPick(hostId, 0) && host.ServerPick(hostId, 1), Is.True);
+
+            // C joins: three players, {2,1,1}; the host resizes by itself; picks beyond the new capacity drop from the end
+            PlayModeHarness.TestClient c = null;
+            yield return Join(app, 9, x => c = x);
+            ulong idC = c.NetworkManager.LocalClientId;
+            Assert.That(host.ServerAddItem(idC, 106), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => host.ServerBagOf(idC).BankOpen, Timeout, "the room never gave the joiner a visit");
+            int total = 0;
+            foreach (ulong id in new[] { hostId, idA, idC }) total += host.ServerBagOf(id).SlotCapacity;
+            Assert.That(total, Is.EqualTo(BankSlots.TotalSlots(3)), "three players: the same four slots, shared out as {2,1,1}");
+            int capHost = host.ServerBagOf(hostId).SlotCapacity;
+            Assert.That(host.ServerBagOf(hostId).Picks.Count, Is.EqualTo(capHost), "the host's picks fit the new capacity");
+            for (int i = 0; i < capHost; i++) Assert.That(host.ServerBagOf(hostId).Picks[i], Is.EqualTo(i), "and what was kept is the start of what was picked");
+            Assert.That(host.ServerPick(idC, 0), Is.True);
+
+            // C leaves: their visit is cancelled (the pick is not banked behind their back), the others' capacity grows back
+            string keyC = c.Key.ToString();
+            yield return Leave(app, c);
+            yield return PlayModeHarness.WaitUntil(() => host.Bags.TryGet(keyC, out PlayerBag cb) && !cb.BankOpen && host.ServerBagOf(hostId).SlotCapacity == 2 && host.ServerBagOf(idA).SlotCapacity == 2, Timeout, "the room never shrank back to two players");
+            host.Bags.TryGet(keyC, out PlayerBag leaver);
+            Assert.That(leaver.Picks, Is.Empty, "the leaver's pick was dropped");
+            Assert.That(leaver.Carried, Is.EqualTo(new[] { 106 }), "their item stays carried");
+            Assert.That(leaver.BankedThisDive, Is.Empty);
+
+            // C comes back (same player, a new connection): a visit again, the item still theirs
+            PlayModeHarness.TestClient back = null;
+            yield return Join(app, 9, x => back = x);
+            ulong idBack = back.NetworkManager.LocalClientId;
+            yield return PlayModeHarness.WaitUntil(() => host.ServerBagOf(idBack).BankOpen, Timeout, "the rejoiner never got a visit");
+            Assert.That(host.ServerBagOf(idBack).Carried, Is.EqualTo(new[] { 106 }));
+            Assert.That(host.ServerPick(idBack, 0), Is.True, "and can pick");
+        }
+
+        [UnityTest]
+        public IEnumerator BankRoom_ExtraOwnerLeaves_RepicksButKeepsPreviousOwner()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(2, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId, idA = cl[0].NetworkManager.LocalClientId, idB = cl[1].NetworkManager.LocalClientId;
+            int slotHost = host.PlayerSlotOf(hostId), slotA = host.PlayerSlotOf(idA), slotB = host.PlayerSlotOf(idB);
+            // the previous visit's owner was the host; look for a dive seed whose extra slot goes to B (a client, who can leave)
+            bool found = false;
+            for (uint seed = 1; seed < 80 && !found; seed++)
+            {
+                host.DiveSeed = seed;
+                host.PreviousExtraOwner = slotHost;
+                Assert.That(host.BankRoomNow(), Is.True);
+                found = host.Session.ExtraSlotOwner == slotB;
+            }
+            Assert.That(found, Is.True, "premise: some seed gives B the extra slot");
+            Assert.That(host.PreviousExtraOwner, Is.EqualTo(slotB), "set once, when the owner was first picked this visit");
+
+            string keyB = cl[1].Key.ToString();
+            yield return Leave(app, cl[1]);
+            yield return PlayModeHarness.WaitUntil(() => host.Bags.TryGet(keyB, out PlayerBag bb) && !bb.BankOpen && host.Session.ExtraSlotOwner == -1, Timeout, "the room never resized to two players");
+            Assert.That(host.ServerBagOf(hostId).SlotCapacity, Is.EqualTo(2));
+            Assert.That(host.ServerBagOf(idA).SlotCapacity, Is.EqualTo(2));
+            Assert.That(host.PreviousExtraOwner, Is.EqualTo(slotB), "a resize does not overwrite it");
+
+            // a new player takes the seat: three again, the extra slot is picked again (not the previous visit's owner, the host)
+            PlayModeHarness.TestClient c = null;
+            yield return Join(app, 10, x => c = x);
+            ulong idC = c.NetworkManager.LocalClientId;
+            yield return PlayModeHarness.WaitUntil(() => host.ServerBagOf(idC).BankOpen && host.Session.ExtraSlotOwner >= 0, Timeout, "the extra slot was never picked again");
+            int slotC = host.PlayerSlotOf(idC);
+            Assert.That(host.Session.ExtraSlotOwner == slotA || host.Session.ExtraSlotOwner == slotC, Is.True, "re-picked among the players present");
+            Assert.That(host.Session.ExtraSlotOwner, Is.Not.EqualTo(slotHost), "still never the owner the visit started from");
+            Assert.That(host.PreviousExtraOwner, Is.EqualTo(slotB), "and PreviousExtraOwner still names the first pick of this visit");
+            int twos = 0; foreach (ulong id in new[] { hostId, idA, idC }) if (host.ServerBagOf(id).SlotCapacity == 2) twos++;
+            Assert.That(twos, Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator BankRoom_ConfirmWindow_TimerConfirmsWhenNobodyElsePresses()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(1, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId;
+            host.ChoiceWindowSeconds = 1.5f;
+            Assert.That(host.ServerAddItem(hostId, 104), Is.True);
+            Assert.That(host.BankRoomNow(), Is.True);
+            Assert.That(host.ServerPick(hostId, 0), Is.True);
+            Assert.That(host.ServerChoosePushOn(hostId), Is.True);
+            Assert.That(host.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.PushOn), "two players: one press opens the window");
+            Assert.That(host.ServerChoosePushOn(hostId), Is.False, "the same player pressing again changes nothing");
+            Assert.That(host.Session.BankChosenThisDive, Is.False);
+            yield return PlayModeHarness.WaitUntil(() => host.Session.BankChosenThisDive, Timeout, "the timer never confirmed the push-on");
+            Assert.That(host.ServerBagOf(hostId).BankedThisDive.ContainsKey(104), Is.True);
+            Assert.That(host.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.None));
+        }
+
+        [UnityTest]
+        public IEnumerator BankRoom_LateJoiner_SeesWindowAndPhase_NoToast()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(1, (x, h, c) => { app = x; host = h; cl = c; });
+            host.ChoiceWindowSeconds = 120f;   // the window must still be open when the late client arrives
+            Assert.That(host.BankRoomNow(), Is.True);
+            ulong id = host.NetworkObjectId;
+            DiveHaulSync peerA = On(cl[0].NetworkManager, id);
+            yield return WaitSummary(peerA, s => s.DivePhase == DivePhase.BankRoom && s.CurrentFloor == 5, "client A never saw the bank room");
+            int slotA = host.PlayerSlotOf(cl[0].NetworkManager.LocalClientId);
+            peerA.RequestPushOn();
+            yield return WaitSummary(host, s => s.ChoiceKind == BankChoiceKind.PushOn && s.ChoiceMask == (1 << slotA), "the host never saw A's push-on press");
+
+            PlayModeHarness.TestClient b = null;
+            yield return Join(app, 9, c => b = c);
+            yield return PlayModeHarness.WaitUntil(() => b.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "client B never received the haul object");
+            DiveHaulSync peerB = On(b.NetworkManager, id);
+            yield return WaitSummary(peerB, s => s.DivePhase == DivePhase.BankRoom && s.ChoiceKind == BankChoiceKind.PushOn && s.ChoiceMask == (1 << slotA) && s.ChoiceSecondsLeft > 100, "the late joiner never saw the open window and the phase");
+            Assert.That(host.Current.BankChosen, Is.False, "joining confirmed nothing");
+            Assert.That(host.ChoiceRequestsHandled, Is.EqualTo(1), "only A's one press ever reached the host: joining replays no request or toast (the sync has no one-shot to send)");
         }
     }
 }

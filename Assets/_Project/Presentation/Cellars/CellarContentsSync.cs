@@ -586,7 +586,7 @@ namespace SleepingCalamity.Presentation
                 bool carrierSpawn = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
                 if (carrierSpawn && _st.GateKey != 0) { index++; continue; }   // its key already dropped (or was taken): a re-entered room does not bring the carrier back
                 bool warden = l.WardenCell.HasValue && l.WardenCell.Value.X == sp.X && l.WardenCell.Value.Y == sp.Y;
-                if (warden && HaulSync != null && HaulSync.Session != null && HaulSync.Session.StartedAtBank) { index++; continue; }   // a party that started at the bank (decision 2) never meets the guardian
+                if (warden && HaulSync != null && HaulSync.Session != null && (HaulSync.Session.StartedAtBank || HaulSync.Session.IsCleared(l.Floor))) { index++; continue; }   // a party that started at the bank (decision 2), or returns to a cleared bank floor (a resumed suspend), never meets the guardian
                 int tier = EnemyCatalog.AuthoredTier(sp.Tier == SpawnTier.Tier2, warden, l.Floor);
                 EnemyKind kind = warden ? EnemyKind.DoughWarden : sp.Tier == SpawnTier.Tier2 ? EnemyKind.RatKing : CellarEnemyMix.Tier1Kind(l.Seed, l.Floor, room, index, plan.RosterMask);
                 index++;

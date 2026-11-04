@@ -37,6 +37,7 @@ using System.IO;
 using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
+using SleepingCalamity.Gameplay;
 using SleepingCalamity.Networking;
 using SleepingCalamity.Presentation;
 using SleepingCalamity.Runtime;
@@ -172,7 +173,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerPick(ca, 0), Is.False, "no bank floor, no pick");
             Assert.That(haul.ServerBagOf(ca).BankOpen, Is.False);
 
-            Assert.That(haul.ServerSetFloor(2), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True, "the cleared bank floor's bank press enters the bank room");
             foreach (ulong c in new[] { host, ca })
             {
                 Assert.That(haul.ServerBagOf(c).BankOpen, Is.True, "a bank visit opens for every connected player");
@@ -187,7 +188,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerBagOf(ca).Picks, Is.EqualTo(new[] { 1, 2 }));
             Assert.That(haul.ServerPick(ca, 0), Is.False, "the slots are full");
 
-            Assert.That(haul.ServerBank(), Is.True, "the party pushes on");
+            Assert.That(haul.ServerChoosePushOn(host), Is.True, "one press opens the confirm window");
+            Assert.That(haul.Session.BankChosenThisDive, Is.False, "two players: one press is not the party's choice");
+            Assert.That(haul.ServerChoosePushOn(ca), Is.True, "the second player's press confirms");
+            Assert.That(haul.Session.BankChosenThisDive, Is.True, "the party pushes on");
             PlayerBag a = haul.ServerBagOf(ca);
             Assert.That(a.BankOpen, Is.False);
             Assert.That(a.BankedThisDive.ContainsKey(112) && a.BankedThisDive.ContainsKey(104), Is.True, "the picked items are safe");
@@ -195,7 +199,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerPick(ca, 0), Is.False, "the visit is closed");
 
             Assert.That(haul.ServerAddItem(ca, 105), Is.True);
-            Assert.That(haul.ServerBank(), Is.False, "carrying something does not reopen a used bank point");
+            Assert.That(haul.ServerEnterBankRoom(), Is.False, "carrying something does not reopen a used bank point");
+            Assert.That(haul.ServerBagOf(host).Carried, Is.Empty, "the host had nothing to carry");
+            Assert.That(haul.ServerBagOf(host).BankedThisDive, Is.Empty, "and the free slots stayed empty (plan 3 task 8: no auto-fill)");
         }
 
         // ---- PlayerBagSync (task 5) ----
@@ -291,11 +297,11 @@ namespace SleepingCalamity.Tests.PlayMode
 
             Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True, "floor 2 has a bank");
             Assert.That(haul.ServerAddItem(ca, 101), Is.True);
             Assert.That(haul.ServerAddItem(ca, 112), Is.True);
             Assert.That(haul.ServerAddItem(ca, 104), Is.True);
             Assert.That(haul.ServerAddItem(host, 103), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True, "the bank floor has a bank room");
             Assert.That(haul.ServerBagOf(ca).SlotCapacity, Is.EqualTo(2));
 
             PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
@@ -324,7 +330,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => hostSideA.RequestsHandled >= 5, Timeout, "the host never handled the unpick and the pick");
             Assert.That(haul.ServerBagOf(ca).Picks, Is.EqualTo(new[] { 1, 2 }));
 
-            Assert.That(haul.ServerBank(), Is.True, "the party pushes on");
+            Assert.That(haul.PushOnNow(), Is.True, "the party pushes on");
             yield return PlayModeHarness.WaitUntil(() => ownA.View.BankedThisDive == 2 && !ownA.View.BankOpen, Timeout, "A's view never showed the two banked items");
             Assert.That(Shows(ownA, 101), Is.True, "the unpicked item is still carried");
             Assert.That(ownA.View.Picks.Length, Is.EqualTo(0));
@@ -367,36 +373,35 @@ namespace SleepingCalamity.Tests.PlayMode
         // ---- bank visits (task 4-5 review fixes) ----
 
         [UnityTest]
-        public IEnumerator BankFloor_LateJoiner_GetsAVisitOnItsFirstPick_AndWhenThePartyBanks()
+        public IEnumerator BankFloor_LateJoiner_GetsAVisitWhenThePartyChanges_AndNothingIsFilledAtThePushOn()
         {
             var clients = new List<PlayModeHarness.TestClient>();
             AppBootstrap app = null; DiveHaulSync haul = null;
             yield return StartHaul(1, clients, (a, h) => { app = a; haul = h; });
+            ulong hostId = app.NetworkManager.LocalClientId;
             Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True, "the visits open for the host and A");
-            yield return PlayModeHarness.StartClients(app, 1, false, clients, 30);   // C joins after the floor was entered
+            Assert.That(haul.BankRoomNow(), Is.True, "the visits open for the host and A");
+            yield return PlayModeHarness.StartClients(app, 1, false, clients, 30);   // C joins after the room was entered
             yield return PlayModeHarness.StartClients(app, 1, false, clients, 31);   // and D (another player id: the same id would take C's seat over)
             ulong cc = clients[1].NetworkManager.LocalClientId, cd = clients[2].NetworkManager.LocalClientId;
 
             Assert.That(haul.ServerAddItem(cc, 101), Is.True);
             Assert.That(haul.ServerAddItem(cc, 112), Is.True);
             Assert.That(haul.ServerAddItem(cd, 104), Is.True);
-            Assert.That(haul.ServerBagOf(cc).BankOpen, Is.False, "premise: nothing opened a visit for a client who joined after the floor was entered");
-            Assert.That(haul.ServerBagOf(cd).BankOpen, Is.False);
-
-            Assert.That(haul.ServerPick(cc, 0), Is.True, "the first pick opens C's visit");
+            yield return PlayModeHarness.WaitUntil(() => haul.ServerBagOf(cc).BankOpen && haul.ServerBagOf(cd).BankOpen, Timeout, "the room never gave the joiners a visit (the host resizes when the party changes)");
+            Assert.That(haul.ServerBagOf(cc).SlotCapacity, Is.EqualTo(1), "four players now: one slot each");
+            Assert.That(haul.ServerBagOf(hostId).SlotCapacity, Is.EqualTo(1), "and the others' visits shrank with the party");
+            Assert.That(haul.ServerPick(cc, 0), Is.True);
+            Assert.That(haul.ServerPick(cc, 1), Is.False, "the visit holds one pick");
             PlayerBag c = haul.ServerBagOf(cc);
-            Assert.That(c.BankOpen, Is.True);
-            Assert.That(c.SlotCapacity, Is.EqualTo(1), "four players now: one slot each");
-            Assert.That(haul.ServerPick(cc, 1), Is.False, "and it holds one pick");
-            Assert.That(haul.ServerBagOf(cd).BankOpen, Is.False, "D has not asked yet");
 
-            Assert.That(haul.ServerBank(), Is.True, "the party pushes on");
+            Assert.That(haul.PushOnNow(), Is.True, "the party pushes on");
             Assert.That(c.BankedThisDive.ContainsKey(101), Is.True, "C's pick is safe");
             Assert.That(c.Carried, Is.EqualTo(new[] { 112 }));
             PlayerBag d = haul.ServerBagOf(cd);
-            Assert.That(d.BankedThisDive.ContainsKey(104), Is.True, "D never asked, yet the push-on opened its visit and filled the free slot");
+            Assert.That(d.BankedThisDive, Is.Empty, "D never picked: its free slot stayed empty (no auto-fill)");
+            Assert.That(d.Carried, Is.EqualTo(new[] { 104 }));
             Assert.That(d.BankOpen, Is.False);
             Assert.That(haul.ServerAddItem(cc, 105), Is.True);
             Assert.That(haul.ServerPick(cc, 1), Is.False, "the bank point is used: a joiner cannot reopen it");
@@ -413,13 +418,13 @@ namespace SleepingCalamity.Tests.PlayMode
             ulong host = app.NetworkManager.LocalClientId, ca = nmA.LocalClientId;
             Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True);
             Assert.That(haul.ServerAddItem(ca, 101), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
             Assert.That(haul.ServerPick(ca, 0), Is.True);
             PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
             yield return PlayModeHarness.WaitUntil(() => ownA.View.BankOpen && ownA.View.Picks.Length == 1, Timeout, "A's view never showed the open visit and its pick");
 
-            Assert.That(haul.ServerSetFloor(3), Is.True, "floor 3 has no bank point");
+            Assert.That(haul.ServerSetFloor(6), Is.True, "floor 6 has no bank room");
             foreach (ulong id in new[] { host, ca })
             {
                 Assert.That(haul.ServerBagOf(id).BankOpen, Is.False, "the visit closed for " + id);
@@ -430,8 +435,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => !ownA.View.BankOpen && ownA.View.Picks.Length == 0 && ownA.View.SlotCapacity == 0, Timeout, "A's view still showed a bank visit on a floor without a bank");
             Assert.That(haul.ServerPick(ca, 0), Is.False, "no bank here");
 
-            Assert.That(haul.ServerSetFloor(4), Is.True, "the heart floor has a bank point");
-            Assert.That(haul.ServerBagOf(ca).BankOpen, Is.True, "the visit opens again on arrival");
+            Assert.That(haul.BankRoomNow(), Is.True, "the bank room opens again when the party returns and presses the bank");
+            Assert.That(haul.ServerBagOf(ca).BankOpen, Is.True);
             yield return PlayModeHarness.WaitUntil(() => ownA.View.BankOpen, Timeout, "A's view never showed the reopened visit");
         }
 
@@ -446,11 +451,13 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerBegin(), Is.True);
 
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True);
-            int owner1 = ExtraSlotOwner(haul, ids, "first bank floor");
-            Assert.That(haul.ServerSetFloor(3), Is.True);
-            Assert.That(haul.ServerSetFloor(4), Is.True);
-            int owner2 = ExtraSlotOwner(haul, ids, "next bank floor");
+            Assert.That(haul.BankRoomNow(), Is.True);
+            int owner1 = ExtraSlotOwner(haul, ids, "first bank room");
+            Assert.That(haul.ServerSetFloor(6), Is.True);
+            haul.Session.Restore(new DiveSession.SnapshotData(DivePhase.Floor, 5, 0b11111, false, false, -1, haul.Session.Stir.Capture(), haul.Session.Momentum.Capture(), haul.Session.Retry.Capture()));   // back on the cleared bank floor, the choice not made
+            haul.DiveSeed = 424243u;
+            Assert.That(haul.ServerEnterBankRoom(), Is.True);
+            int owner2 = ExtraSlotOwner(haul, ids, "next bank room");
             Assert.That(owner2, Is.Not.EqualTo(owner1), "the extra slot never goes to the previous owner twice in a row");
         }
 
@@ -476,7 +483,7 @@ namespace SleepingCalamity.Tests.PlayMode
             ulong host = hostNm.LocalClientId, oldId = clients[0].NetworkManager.LocalClientId;
             Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
             Assert.That(app.Roster.TryGetKey(host, out PlayerKey hostKey), Is.True, "the host is in its own roster (else a solo player's bag would be keyed by client id and never saved)");
             Assert.That(haul.PlayerIdOf(host), Is.EqualTo(hostKey.ToString()), "the host's bag key is its roster PlayerKey string, not the client-id fallback");
             Assert.That(haul.ServerAddItem(oldId, 104), Is.True);
@@ -794,6 +801,86 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(p.Satchel, Is.Not.Null, when + ": the waiting satchel");
             Assert.That(p.Satchel.Floor, Is.EqualTo(1), when);
             Assert.That(p.Satchel.Items, Is.EqualTo(new[] { 110 }), when);
+        }
+
+        // ---- plan 3 task 8: the shared choice with real heroes, and the owner's view following a roster key ----
+        // Catches (BankRoom_ConfirmWindow_SecondPressConfirms_OtherChoiceSwaps_DownedNotCounted): one press confirming alone in a party of three, a second player's press not confirming, the other choice not
+        // swapping the window (or keeping the old presser), a downed hero's press being accepted, a downed hero keeping the quorum from one living player. NOT covered: the window timer (DiveHaulNetworkTests),
+        // the bank cell range (no built floor in this rig).
+        // Catches (PlayerBagSync_BagId_FollowsRosterKeyChange): the owner's view staying on the bag of the key it first resolved after the roster's key for it changed. NOT covered: a real Solo-world rebind.
+
+        [UnityTest]
+        public IEnumerator BankRoom_ConfirmWindow_SecondPressConfirms_OtherChoiceSwaps_DownedNotCounted()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartParty(2, clients, (a, h) => { app = a; haul = h; });
+            NetworkManager hostNm = app.NetworkManager;
+            ulong host = hostNm.LocalClientId, ca = clients[0].NetworkManager.LocalClientId, cb = clients[1].NetworkManager.LocalClientId;
+            haul.ChoiceWindowSeconds = 120f;
+            int wentHome = 0; haul.WentHome += () => wentHome++;
+            Assert.That(haul.ServerSetFloor(1), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+
+            Assert.That(haul.ServerChoosePushOn(host), Is.True);
+            Assert.That(haul.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.PushOn));
+            Assert.That(haul.Current.ChoiceMask, Is.EqualTo(1 << haul.PlayerSlotOf(host)));
+            Assert.That(haul.Session.BankChosenThisDive, Is.False, "three players: one press opens a window, it does not decide");
+
+            Assert.That(haul.ServerChooseGoHome(ca), Is.True, "A presses the other choice: the window swaps");
+            Assert.That(haul.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.GoHome));
+            Assert.That(haul.Current.ChoiceMask, Is.EqualTo(1 << haul.PlayerSlotOf(ca)), "the old presser's press is gone");
+            Assert.That(haul.ServerChooseGoHome(ca), Is.False, "the same player again");
+            Assert.That(wentHome, Is.EqualTo(0));
+
+            Assert.That(haul.ServerChooseGoHome(host), Is.True, "a second player's press for the same choice confirms");
+            Assert.That(wentHome, Is.EqualTo(1));
+            Assert.That(haul.Session.Ended, Is.EqualTo(DiveEnd.WentHome));
+            Assert.That(haul.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.None));
+
+            // a new dive in the bank room: B and A are down, only the host is alive
+            Assert.That(haul.ServerBegin(), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            HeroVitals hvA = BagSyncOwnedBy(hostNm, ca).GetComponent<HeroVitals>(), hvB = BagSyncOwnedBy(hostNm, cb).GetComponent<HeroVitals>();
+            hvA.ServerDamage(100000); hvB.ServerDamage(100000);
+            Assert.That(hvA.IsUp || hvB.IsUp, Is.False, "premise: both clients' heroes are down");
+            Assert.That(haul.ServerChoosePushOn(ca), Is.False, "a downed hero's press is refused");
+            Assert.That(haul.ServerChoosePushOn(host), Is.True);
+            Assert.That(haul.Session.BankChosenThisDive, Is.True, "one living player is the whole quorum: the downed are not counted");
+        }
+
+        private sealed class FakeIdentity : IJoinContextProvider
+        {
+            public readonly Dictionary<ulong, PlayerKey> Keys = new Dictionary<ulong, PlayerKey>();
+            public bool JoinsOpen => true;
+            public void GetRoster(List<RosterEntry> into) { into.Clear(); }
+            public bool TryGetKey(ulong clientId, out PlayerKey key) => Keys.TryGetValue(clientId, out key);
+            public bool TryGetSlot(ulong clientId, out byte slot) { slot = 0; return false; }
+        }
+
+        [UnityTest]
+        public IEnumerator PlayerBagSync_BagId_FollowsRosterKeyChange()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartParty(1, clients, (a, h) => { app = a; haul = h; });
+            NetworkManager nmA = clients[0].NetworkManager;
+            ulong ca = nmA.LocalClientId;
+            var identity = new FakeIdentity();
+            PlayerKey first = PlayerKey.Local(PlayModeHarness.PlayerId(40)), second = PlayerKey.Local(PlayModeHarness.PlayerId(41));
+            identity.Keys[ca] = first;
+            haul.Identity = identity;
+            Assert.That(haul.PlayerIdOf(ca), Is.EqualTo(first.ToString()));
+            Assert.That(haul.ServerAddItem(ca, 104), Is.True);
+            PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 104), Timeout, "A's view never showed its bag under the first key");
+
+            identity.Keys[ca] = second;   // the roster now knows the owner under another key (a Solo world rebinding its owner, say)
+            Assert.That(haul.PlayerIdOf(ca), Is.EqualTo(second.ToString()));
+            Assert.That(haul.ServerAddItem(ca, 105), Is.True, "the host now fills the bag of the new key");
+            Assert.That(haul.Bags.TryGet(first.ToString(), out PlayerBag oldBag) && oldBag.Carried.Count == 1, Is.True, "premise: the old key's bag is a different bag");
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 105), Timeout, "A's view stayed on the old key's bag after the roster key changed");
+            haul.Identity = null;
         }
     }
 }

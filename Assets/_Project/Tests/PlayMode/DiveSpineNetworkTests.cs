@@ -3,10 +3,11 @@
 // Catches: peers building different floors, a stair press that does not advance every peer to the same floor, a stale or out-of-range stair press advancing (or double-advancing) the dive,
 // players not teleported to the new entry through their owner (owner-authoritative NetworkTransform), a failed / finished dive that leaves the party on the floor or the dive running, a floor pick the
 // checkpoint does not allow being accepted, the checkpoint or found pieces lost between dives, a lost satchel at the wrong depth, a late joiner missing the floor and phase.
-// NOT covered by a one-process test: the interact KEY and its prompt text on screen (the tests call the same Request* wrappers the key calls), the greybox look, real relay latency, the bank room's picks and
-// confirm window (plan 3 task 8: the floor-5 bank press here is the stand-in the haul sync still has), a client rejoin to a dive in progress.
+// NOT covered by a one-process test: the interact KEY and its prompt text on screen (the tests call the same Request* wrappers the key calls), the greybox look, real relay latency, the bank screen
+// (IMGUI), a client rejoin to a dive in progress or to a resumed suspend (the manual 2-PC walk). The bank room's own rules are DiveHaulNetworkTests and PerPlayerLootNetworkTests.
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using NUnit.Framework;
 using SleepingCalamity.App;
@@ -166,7 +167,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Peers[0].NetActive.Value, Is.True);
         }
 
-        // Walks the host hero up the stairs from the session's floor to `floor` (host rule, gate key off; floor 5 is cleared and pushed on through the haul sync's bank stand-in).
+        // Walks the host hero up the stairs from the session's floor to `floor` (host rule, gate key off; floor 5 is cleared, the bank room entered and every player's push-on pressed).
         private static IEnumerator ToFloor(Rig rig, int floor)
         {
             ulong hostId = rig.HostNm.LocalClientId;
@@ -179,8 +180,8 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (f == UndercroftPlan.BankFloor)
                 {
                     Assert.That(rig.HostHaul.ServerMarkCleared(f), Is.True, "the guardian's floor is cleared");
-                    Assert.That(rig.HostHaul.ServerBank(), Is.True, "the first bank press enters the bank room");
-                    Assert.That(rig.HostHaul.ServerBank(), Is.True, "the second pushes on");
+                    Assert.That(rig.HostHaul.ServerEnterBankRoom(), Is.True, "the bank press enters the bank room");
+                    Assert.That(rig.HostHaul.PushOnNow(), Is.True, "every present player's push-on press confirms the choice");
                 }
                 Assert.That(CellarFloorBuilder.TryDescentWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True, "floor " + f + " has a way down");
                 Move(rig.HostHero, stair + new Vector3(1f, 0.1f, 0f));
@@ -560,6 +561,232 @@ namespace SleepingCalamity.Tests.PlayMode
             int enemies = 0;
             foreach (NetworkObject o in rig.HostNm.SpawnManager.SpawnedObjects.Values) { Enemy en = o.GetComponent<Enemy>(); if (en != null && en.Alive) enemies++; }   // the killed carrier's corpse may linger until its own despawn timer
             Assert.That(enemies, Is.EqualTo(0), "no living enemy survives a failed dive");
+        }
+
+        // ================================================================================================================================
+        // Plan 3 task 8 / 8a: the bank room through the director (capture, go home, extra-slot owner across a restart, resume of a loaded suspend).
+        // Catches: a quit in the bank room not writing the suspend (or writing it as a failed dive's satchel), the push-on leaving a suspend that the next floor must wipe, the auto-fill of empty slots, the extra
+        // slot owner repeating across dives and across a restart, the checkpoint not held after a go home, a loaded suspend resuming on the wrong floor or phase, losing its stir / momentum / bags, or spending
+        // the checkpoint, a used suspend staying in the next capture. They jump the session to the bank floor with DiveTestAdapters (the floors 1-4 walk is the spine test) and call the same host methods the
+        // RPCs call. NOT covered: a client rejoining the resumed dive (manual 2-PC walk), the bank screen (IMGUI), real disk I/O (SuspendSaveNetworkTests).
+        // ================================================================================================================================
+
+        private static PlayerKey KeyOf(Rig rig, ulong clientId)
+        {
+            Assert.That(rig.App.Roster.TryGetKey(clientId, out PlayerKey key), Is.True, "premise: the client is in the host's roster");
+            return key;
+        }
+
+        private static TownSnapshot AsLoaded(TownSnapshot captured)
+            => TownSaveRules.CleanSnapshot(TownSaveRules.CleanSnapshot(captured, null, null, false), null, null, true);   // the file's clean, then the load's (the failed-dive rule applies)
+
+        [UnityTest]
+        public IEnumerator BankRoom_PushOn_LocksBank_SavesSuspend_AutoFillGone_StairWipesIt()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r, withHeroes: false);
+            rig.Host.SeedOverride = 5252u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            PlayerKey hostKey = KeyOf(rig, hostId);
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            DiveHaulSync haul = rig.HostHaul;
+            Assert.That(haul.ServerAddItem(hostId, 104) && haul.ServerAddItem(hostId, 105) && haul.ServerAddItem(hostId, 110), Is.True);
+            int pushed = 0; haul.PushedOn += () => pushed++;
+
+            TownSnapshot below = rig.Host.CaptureTown();
+            Assert.That(below.SuspendKnown, Is.True, "every director capture says what it knows about the suspend");
+            Assert.That(below.Suspend, Is.Null, "a dive on floor 1 is not a suspend");
+
+            Assert.That(haul.BankRoomNow(), Is.True);
+            TownSnapshot inRoom = rig.Host.CaptureTown();
+            Assert.That(inRoom.Suspend, Is.Not.Null, "quitting in the bank room is a normal save-and-quit");
+            Assert.That(inRoom.Suspend.Phase, Is.EqualTo((int)DivePhase.BankRoom));
+            Assert.That(inRoom.Suspend.BankChosen, Is.False, "push-on not chosen yet");
+            Assert.That(inRoom.Suspend.Seed, Is.EqualTo(5252u));
+            Assert.That(inRoom.Dive.InDive, Is.True);
+            Assert.That(inRoom.Suspend.Bags.Single(b => b.Id == hostKey.Id).Carried, Is.EqualTo(new[] { 104, 105, 110 }), "carried, not a failed dive's satchel");
+            Assert.That(inRoom.Bags == null || inRoom.Bags.Players.All(p => p.Satchel == null), Is.True);
+
+            Assert.That(haul.ServerPick(hostId, 2), Is.True);
+            Assert.That(haul.ServerBagOf(hostId).SlotCapacity, Is.EqualTo(3), "solo: three slots");
+            Assert.That(haul.ServerChoosePushOn(hostId), Is.True, "solo: the first press confirms");
+            Assert.That(pushed, Is.EqualTo(1));
+            Assert.That(haul.Current.BankChosen, Is.True, "the bank is locked");
+            PlayerBag bag = haul.ServerBagOf(hostId);
+            Assert.That(bag.BankedThisDive.Keys, Is.EquivalentTo(new[] { 110 }), "only the pick is banked");
+            Assert.That(bag.Carried, Is.EqualTo(new[] { 104, 105 }), "the two empty slots stayed empty: nothing was picked for the player");
+            Assert.That(haul.ServerEnterBankRoom(), Is.False);
+
+            TownSnapshot afterPush = rig.Host.CaptureTown();
+            Assert.That(afterPush.Suspend, Is.Not.Null, "push-on writes the suspend section");
+            Assert.That(afterPush.Suspend.BankChosen, Is.True);
+            Assert.That(afterPush.Suspend.Phase, Is.EqualTo((int)DivePhase.Floor));
+            Assert.That(afterPush.Suspend.Floor, Is.EqualTo(5));
+            Assert.That(afterPush.Suspend.Bags.Single().Carried, Is.EqualTo(new[] { 104, 105 }), "bags saved as carried");
+            Assert.That(afterPush.Suspend.Bags.Single().BankedThisDive.Single().ItemId, Is.EqualTo(110));
+
+            // the party takes the stair: the suspend must not outlive the bank, or a later mid-dive quit would resume from it
+            Assert.That(haul.ServerEnterFloor(6), Is.True);
+            TownSnapshot deeper = rig.Host.CaptureTown();
+            Assert.That(deeper.SuspendKnown, Is.True);
+            Assert.That(deeper.Suspend, Is.Null, "known, none: the stair wipes it");
+            Assert.That(deeper.Dive.InDive, Is.True, "a quit on floor 6 is the old failed-dive rule");
+            TownSnapshot merged = TownSaveRules.MergeLive(deeper, afterPush);
+            Assert.That(TownSaveRules.CleanSnapshot(merged, null, null, false).Suspend, Is.Null, "and merged over the older file copy it stays gone");
+        }
+
+        [UnityTest]
+        public IEnumerator BankRoom_GoHome_BringsEverythingHome_SetsCheckpoint_NextDiveStartsAtPick()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r, withHeroes: false);
+            rig.Host.SeedOverride = 6363u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            DiveHaulSync haul = rig.HostHaul;
+            Assert.That(haul.ServerAddItem(hostId, 104) && haul.ServerAddItem(hostId, 110), Is.True);
+            Assert.That(haul.ServerAddGold(hostId, 12), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            Assert.That(haul.ServerPick(hostId, 0), Is.True);
+            DiveEndReason? ended = null; rig.Host.DiveEnded += r => ended = r;
+            Assert.That(haul.ServerChooseGoHome(hostId), Is.True, "solo: the first press confirms and the dive ends");
+            Assert.That(ended, Is.EqualTo(DiveEndReason.WentHome));
+            Assert.That(rig.Host.NetActive.Value, Is.False);
+            PlayerBag bag = haul.ServerBagOf(hostId);
+            Assert.That(bag.Carried, Is.Empty);
+            Assert.That(bag.Stash.Keys, Is.EquivalentTo(new[] { 104, 110 }), "everything came home, picked or not");
+            Assert.That(bag.Gold, Is.EqualTo(12), "dive gold is kept in full");
+            Assert.That(rig.Host.Checkpoint.Held, Is.True, "going home from the bank holds the one-time checkpoint");
+            Assert.That(rig.Host.CaptureTown().Suspend, Is.Null, "a finished dive leaves no suspend");
+            rig.Host.SeedOverride = 6364u;
+            Assert.That(rig.Host.ServerStartDive(3), Is.True, "the next dive may start on the picked floor");
+            Assert.That(rig.Host.Session.Floor, Is.EqualTo(3));
+            Assert.That(rig.Host.Checkpoint.Held, Is.False, "and spends the checkpoint");
+        }
+
+        [UnityTest]
+        public IEnumerator BankRoom_ThreePlayers_ExtraSlotNeverRepeats_AcrossRestart()
+        {
+            Rig rig = null;
+            yield return Start(2, r => rig = r, withHeroes: false);
+            var ids = new[] { rig.HostNm.LocalClientId, rig.Clients[0].NetworkManager.LocalClientId, rig.Clients[1].NetworkManager.LocalClientId };
+            var owners = new List<int>();
+            for (int dive = 0; dive < 3; dive++)
+            {
+                rig.Host.SeedOverride = 7100u + (uint)dive * 17u;
+                Assert.That(rig.Host.ServerStartDive(), Is.True, "dive " + dive);
+                if (dive == 0) yield return ResolvePeers(rig);
+                DiveHaulSync haul = rig.HostHaul;
+                Assert.That(haul.BankRoomNow(), Is.True, "dive " + dive);
+                int owner = haul.Session.ExtraSlotOwner;
+                Assert.That(owner, Is.InRange(0, 3), "three players: one has the extra slot");
+                int twos = 0; foreach (ulong id in ids) if (haul.ServerBagOf(id).SlotCapacity == 2) twos++;
+                Assert.That(twos, Is.EqualTo(1));
+                if (dive > 0) Assert.That(owner, Is.Not.EqualTo(owners[dive - 1]), "never the previous owner (dive " + dive + (dive == 2 ? ", after the restart" : "") + ")");
+                owners.Add(owner);
+                foreach (ulong id in ids) haul.ServerChooseGoHome(id);   // two presses confirm; the third is refused (the dive is over)
+                Assert.That(rig.Host.NetActive.Value, Is.False, "the party went home");
+                if (dive == 1)
+                {
+                    // the restart: what the host wrote is what the next host loads
+                    TownSnapshot saved = rig.Host.CaptureTown();
+                    Assert.That(saved.Dive.ExtraSlotOwner, Is.EqualTo(haul.IdsBySlot()[owner]), "the previous owner is saved as a bag id");
+                    rig.Host.RestoreTown(AsLoaded(saved));
+                }
+            }
+            Assert.That(owners[2], Is.Not.EqualTo(owners[1]));
+        }
+
+        // The quit-and-reload shared by the two resume tests: the dive state as captured, as the file's clean and the load's clean leave it, the dive thrown away, the loaded world restored into the director.
+        private static TownSnapshot QuitAndReload(Rig rig)
+        {
+            TownSnapshot loaded = AsLoaded(rig.Host.CaptureTown());
+            Assert.That(rig.Host.ServerAbandonDive(), Is.True, "(the dive ends with the old process)");
+            rig.Host.RestoreTown(loaded);
+            Assert.That(rig.Host.NetActive.Value, Is.False);
+            return loaded;
+        }
+
+        [UnityTest]
+        public IEnumerator LoadedSuspend_ResumesAtFloor6_WithStirMomentumAndBags_ClearsTheSection()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r, withHeroes: false);
+            rig.Host.SeedOverride = 8181u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            DiveHaulSync haul = rig.HostHaul;
+            Assert.That(haul.ServerAddItem(hostId, 104) && haul.ServerAddItem(hostId, 105) && haul.ServerAddItem(hostId, 110), Is.True);
+            Assert.That(haul.ServerAddGold(hostId, 9), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            Assert.That(haul.ServerPick(hostId, 0), Is.True);
+            Assert.That(haul.ServerChoosePushOn(hostId), Is.True);
+            haul.Session.Stir.UnbankedValuables = haul.Session.Stir.UnbankedValuables + 6;   // six more valuables than the baseline: the second half's stir is above 0
+            float stirSaved = haul.Session.Stir.Value;
+            Assert.That(stirSaved, Is.GreaterThan(0f), "premise: a stir value worth keeping");
+            bool heldBefore = rig.Host.Checkpoint.Held;
+
+            TownSnapshot loaded = QuitAndReload(rig);
+            Assert.That(loaded.Suspend, Is.Not.Null, "premise: the load kept the suspend");
+            Assert.That(loaded.Dive.InDive, Is.True, "and did not count a failed dive");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.NetSuspendedDive.Value, Timeout, "the hub never offered the suspended dive");
+            Assert.That(rig.Host.ServerStartDive(2), Is.True, "the trapdoor resumes it, whatever floor the pick says");
+
+            DiveSession s = rig.Host.Session;
+            Assert.That(s.Floor, Is.EqualTo(6), "push-on chosen: the start of the NEXT floor");
+            Assert.That(s.Phase, Is.EqualTo(DivePhase.Floor));
+            Assert.That(s.BankChosenThisDive, Is.True, "the bank is locked");
+            Assert.That(s.Momentum.PushedOn, Is.True);
+            Assert.That(s.Stir.Capture().SecondHalf, Is.True);
+            Assert.That(s.Stir.Value, Is.EqualTo(stirSaved).Within(0.01f), "the stir value is kept");
+            Assert.That(rig.Host.Seed, Is.EqualTo(8181u), "the saved dive seed (chest masks match their seed)");
+            Assert.That(rig.Host.Checkpoint.Held, Is.EqualTo(heldBefore), "a resume neither spends nor sets the checkpoint");
+            PlayerBag bag = rig.Host.HaulSync.ServerBagOf(hostId);
+            Assert.That(bag.Carried, Is.EqualTo(new[] { 105, 110 }), "carried items are back");
+            Assert.That(bag.BankedThisDive.Keys, Is.EquivalentTo(new[] { 104 }));
+            Assert.That(bag.DiveGold, Is.EqualTo(9));
+            Assert.That(rig.Host.NetSuspendedDive.Value, Is.False);
+            TownSnapshot after = rig.Host.CaptureTown();
+            Assert.That(after.SuspendKnown && after.Suspend == null, Is.True, "using the section clears it from the live copy");
+            Assert.That(rig.Host.ServerStartDive(), Is.False, "the dive runs");
+            yield return AllBuilt(rig, 6);
+        }
+
+        [UnityTest]
+        public IEnumerator LoadedSuspend_BeforePushOn_ReturnsToBankRoom_WithItsPicks()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r, withHeroes: false);
+            rig.Host.SeedOverride = 8282u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            DiveHaulSync haul = rig.HostHaul;
+            Assert.That(haul.ServerAddItem(hostId, 104) && haul.ServerAddItem(hostId, 105), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            Assert.That(haul.ServerPick(hostId, 1), Is.True);
+            bool heldBefore = rig.Host.Checkpoint.Held;
+
+            TownSnapshot loaded = QuitAndReload(rig);
+            Assert.That(loaded.Suspend.BankChosen, Is.False);
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            DiveSession s = rig.Host.Session;
+            Assert.That(s.Phase, Is.EqualTo(DivePhase.BankRoom), "push-on not chosen: back in the bank room");
+            Assert.That(s.Floor, Is.EqualTo(5));
+            Assert.That(s.BankChosenThisDive, Is.False);
+            Assert.That(rig.Host.Checkpoint.Held, Is.EqualTo(heldBefore));
+            PlayerBag bag = rig.Host.HaulSync.ServerBagOf(hostId);
+            Assert.That(bag.BankOpen, Is.True, "visits reopened");
+            Assert.That(bag.SlotCapacity, Is.EqualTo(3));
+            Assert.That(bag.Picks, Is.EqualTo(new[] { 1 }), "the saved pick is still picked");
+            Assert.That(bag.Carried, Is.EqualTo(new[] { 104, 105 }));
+            yield return AllBuilt(rig, 5);
+            Assert.That(rig.Host.HaulSync.Current.DivePhase, Is.EqualTo(DivePhase.BankRoom));
+            Assert.That(rig.Host.HaulSync.ServerChoosePushOn(hostId), Is.True, "and the choice is still to be made");
+            Assert.That(bag.BankedThisDive.Keys, Is.EquivalentTo(new[] { 105 }));
         }
     }
 }

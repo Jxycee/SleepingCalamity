@@ -1,14 +1,19 @@
 // Authority: host. The host owns the one DiveSession (Core/Cellars/DiveSession: floor, phase, stir, momentum, retry; it holds the director's PartyBags, DiveCheckpoint and DivePieces, which outlive a
 // dive) and writes a compact summary to ONE host-written NetworkVariable, so every peer (and a late joiner, with the spawn) can display it without an RPC replay. Clients never write:
-// ServerAddPiece / ServerAddItem / ServerAddGold / ServerPick / ServerUnpick / ServerBank / ServerFailDive / ServerStart / ServerEnterFloor / ServerMarkCleared / ServerGoHome / ServerFinish /
+// ServerAddPiece / ServerAddItem / ServerAddGold / ServerPick / ServerUnpick / ServerEnterBankRoom / ServerChoosePushOn / ServerChooseGoHome / ServerResizeVisits / ServerFailDive / ServerStart / ServerEnterFloor / ServerMarkCleared / ServerGoHome / ServerFinish /
 // ServerBegin / ServerAdopt all refuse (return false) off the host. The dive director builds a fresh session per dive and adopts it here (ServerAdopt); a haul sync spawned alone (tests) makes its own.
 // Pieces and people (DivePieces): a find is safe at once (never banked, never lost on failure); ServerAddPiece marks it found and PieceAdded (host) lets the director move it into the town stock.
 // Per-player loot (plan 2, spec decision 39): the host owns one PlayerBag per recorded player inside the session's PartyBags, keyed like CombatHost growth:
 // the roster's PlayerKey string, or the client id when there is no roster, so a rejoin gets the same bag back. NO bag data rides on Net (everyone can read Net); each owner's
 // own view of their bag is the owner-only PlayerBagSync on the player prefab (plan 2 task 5). Keys, pieces and people stay one shared copy. A client asks to pick items into bank slots by RPC
 // (PlayerBagSync); ServerPick / ServerUnpick re-check everything (the asker is up, the session is in the bank room, the asker stands in range of it) and the bag re-checks capacity and item kinds.
-// Bank (stand-in until plan 3 task 8): on the bank floor (5, once its guardian is cleared) the first bank press enters the bank room (DiveSession.EnterBankRoom: every connected client's bag gets a
-// visit sized by BankSlots.SlotsFor, the 3-player extra slot goes to a seeded pick that skips the previous owner, and everyone is healed), the second pushes on (DiveSession.PushOn).
+// Bank room (plan 3 task 8): on the bank floor (5, once its guardian is cleared) a bank press enters the bank room (ServerEnterBankRoom: every present, keyed client's bag gets a visit sized by
+// BankSlots.SlotsFor, the 3-player extra slot goes to a seeded pick that never repeats the previous owner (PreviousExtraOwner, saved by the director), and everyone is healed). Inside the room the
+// party picks (ServerPick / ServerUnpick) and chooses once: push on or go home (ServerChoosePushOn / ServerChooseGoHome). The choice is shared (decision 11, a proposal needing the user's
+// sign-off): a living present player's press opens a BankChoice window (10 s placeholder); a second player's press for the same choice, or the timer, confirms it; solo is instant; the other
+// choice swaps the window; downed or absent players are not counted. The window (choice, who pressed as a slot mask, whole seconds left) and the phase ride in Summary, so a late joiner sees them.
+// Capacity follows presence (ServerResizeVisits, re-run when a client connects, leaves or its roster key arrives): the leaver's visit is cancelled, a rejoiner gets one, excess picks drop from the end.
+// The empty slots stay empty at the push-on (no auto-fill). A confirmed push-on raises PushedOn and a confirmed go-home WentHome (host events; the director ends the dive and saves).
 // A client the roster has no key for (an RPC in flight from one that just disconnected) has no bag: ServerBagOf, ServerAddItem, ServerAddGold, ServerPick and ServerUnpick refuse it.
 // A client banks by asking: RequestBankRpc (SendTo.Server) -> ServerTryBankFor(sender), which the host validates before banking:
 //   1. the dive is on the bank floor; 2. when the sender has a player object and the built floor's bank cell is known, the player is within BankRadius metres (XZ) of the bank cell centre
@@ -42,24 +47,29 @@ namespace SleepingCalamity.Presentation
             // ClearedMask: floors cleared this dive (bit floor-1, ten bits). CurrentFloor: the dive's floor, 0 at home. Phase: (int)DivePhase.
             public int FoundPieces, PiecesLeft, PeopleLeft, ClearedMask, CurrentFloor, Phase;
             public bool CheckpointHeld, BankChosen;   // CheckpointHeld: the next dive may pick a floor; BankChosen: this dive pushed on at the bank
+            // The bank choice's confirm window (BankChoice): Choice = (int)BankChoiceKind (0 = none open), ChoiceMask = the roster slots that pressed (bit per slot), ChoiceSecondsLeft = whole seconds (rounded up).
+            public int Choice, ChoiceMask, ChoiceSecondsLeft;
             // Stir (host-computed): value rounded to a whole point 0-100, extra enemies per room (latched), hunter latch, collapse state and whole seconds left (rounded up, 0 = not running).
             public int StirValue, ExtraEnemiesPerRoom, DeepSecondsLeft;
             public bool HunterLatched, DeepClosesLatched;
             public DivePhase DivePhase => (DivePhase)Phase;
+            public BankChoiceKind ChoiceKind => (BankChoiceKind)Choice;
             public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
             {
                 s.SerializeValue(ref FoundPieces); s.SerializeValue(ref PiecesLeft); s.SerializeValue(ref PeopleLeft);
                 s.SerializeValue(ref ClearedMask); s.SerializeValue(ref CurrentFloor); s.SerializeValue(ref Phase);
                 s.SerializeValue(ref CheckpointHeld); s.SerializeValue(ref BankChosen);
+                s.SerializeValue(ref Choice); s.SerializeValue(ref ChoiceMask); s.SerializeValue(ref ChoiceSecondsLeft);
                 s.SerializeValue(ref StirValue); s.SerializeValue(ref ExtraEnemiesPerRoom); s.SerializeValue(ref DeepSecondsLeft);
                 s.SerializeValue(ref HunterLatched); s.SerializeValue(ref DeepClosesLatched);
             }
             public bool Equals(Summary o) => FoundPieces == o.FoundPieces && PiecesLeft == o.PiecesLeft && PeopleLeft == o.PeopleLeft && ClearedMask == o.ClearedMask
                 && CurrentFloor == o.CurrentFloor && Phase == o.Phase && CheckpointHeld == o.CheckpointHeld && BankChosen == o.BankChosen
                 && StirValue == o.StirValue && ExtraEnemiesPerRoom == o.ExtraEnemiesPerRoom && DeepSecondsLeft == o.DeepSecondsLeft
-                && HunterLatched == o.HunterLatched && DeepClosesLatched == o.DeepClosesLatched;
+                && HunterLatched == o.HunterLatched && DeepClosesLatched == o.DeepClosesLatched
+                && Choice == o.Choice && ChoiceMask == o.ChoiceMask && ChoiceSecondsLeft == o.ChoiceSecondsLeft;
             public override bool Equals(object obj) => obj is Summary o && Equals(o);
-            public override int GetHashCode() => unchecked((FoundPieces * 31 + PiecesLeft) * 31 + ClearedMask * 7 + CurrentFloor);
+            public override int GetHashCode() => unchecked(((FoundPieces * 31 + PiecesLeft) * 31 + ClearedMask * 7 + CurrentFloor) * 31 + Choice * 5 + ChoiceMask);
         }
 
         public readonly NetworkVariable<Summary> Net = new NetworkVariable<Summary>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -123,10 +133,24 @@ namespace SleepingCalamity.Presentation
 
         public override void OnNetworkSpawn()
         {
-            if (IsServer) { _session = new DiveSession(new PartyBags(), new DiveCheckpoint(), DivePieces.ForWorld(DefaultWorldSeed)); Publish(); }
+            if (!IsServer) return;
+            _session = new DiveSession(new PartyBags(), new DiveCheckpoint(), DivePieces.ForWorld(DefaultWorldSeed));
+            _presenceManager = NetworkManager;
+            _presenceManager.OnClientConnectedCallback += OnPresenceChanged;
+            _presenceManager.OnClientDisconnectCallback += OnPresenceChanged;
+            Publish();
         }
 
-        public override void OnNetworkDespawn() { _session = null; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } }
+        public override void OnNetworkDespawn()
+        {
+            if (_presenceManager != null) { _presenceManager.OnClientConnectedCallback -= OnPresenceChanged; _presenceManager.OnClientDisconnectCallback -= OnPresenceChanged; _presenceManager = null; }
+            _session = null; _choice.Cancel();
+            if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); }
+        }
+
+        private NetworkManager _presenceManager;   // host: the manager whose connect / disconnect callbacks mark the bank room's visits stale
+        private bool _presenceDirty;
+        private void OnPresenceChanged(ulong clientId) { _presenceDirty = true; }
 
         // Host only: raised when the deep-closes countdown ran out and the dive was failed (the dive flow sends the party home).
         public event System.Action DiveFailed;
@@ -146,6 +170,7 @@ namespace SleepingCalamity.Presentation
             _session.Stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
             bool failed = _session.Phase == DivePhase.Floor && _session.Stir.Tick(Mathf.Min(Time.deltaTime, MaxTickSeconds));   // a collapse that ran out (plan 3 task 10 starts the collapse)
             if (failed) _session.Fail();
+            TickBankRoom(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             Publish();
             RefreshEncounterPlan();
             if (failed) DiveFailed?.Invoke();
@@ -158,8 +183,16 @@ namespace SleepingCalamity.Presentation
             int floor = DiveFloor;
             int found = 0;
             foreach (int id in s.Pieces.FoundIds) if (!PieceCatalog.IsPerson(id)) found++;
+            int choice = 0, choiceMask = 0, choiceSeconds = 0;
+            if (_choice.IsOpen)
+            {
+                choice = (int)_choice.Kind; choiceSeconds = Mathf.CeilToInt(_choice.SecondsLeft);
+                BuildPresence();
+                foreach (string presser in _choice.Pressers) { int at = _presentIds.IndexOf(presser); if (at >= 0) choiceMask |= 1 << _presentSlots[at]; }
+            }
             var next = new Summary
             {
+                Choice = choice, ChoiceMask = choiceMask, ChoiceSecondsLeft = choiceSeconds,
                 StirValue = Mathf.RoundToInt(stir.Value), ExtraEnemiesPerRoom = stir.ExtraEnemyLatched ? ExtraEnemiesPerRoomOnLatch : 0, DeepSecondsLeft = Mathf.CeilToInt(stir.CollapseSecondsLeft),
                 HunterLatched = stir.HunterLatched, DeepClosesLatched = stir.CollapseRunning,
                 FoundPieces = found, PiecesLeft = floor > 0 ? s.Pieces.PiecesLeft(floor) : 0, PeopleLeft = floor > 0 ? s.Pieces.PeopleLeft(floor) : 0,
@@ -181,8 +214,30 @@ namespace SleepingCalamity.Presentation
         public bool ServerAdopt(DiveSession session)
         {
             if (!IsServer || !IsSpawned || session == null) return false;
-            _session = session; _heal = null; _visitExtraOwner = -1; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
+            _session = session; _heal = null; _visitExtraOwner = -1; _choice.Cancel(); if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
+        // Host only: adopts the session a resumed suspend rebuilt (DiveDirector.ServerResumeSuspended): the saved dive seed, and the bank room's extra-slot owner kept as it was (it was set
+        // before the quit, so PreviousExtraOwner is not written again this visit).
+        public bool ServerAdoptResumed(DiveSession session, uint diveSeed)
+        {
+            if (!ServerAdopt(session)) return false;
+            DiveSeed = diveSeed;
+            _visitPrior = PreviousExtraOwner; _previousSet = true;
+            _visitExtraOwner = session.ExtraSlotOwner;
+            _lastPresentIds.Clear();
+            Publish();
+            return true;
+        }
+
+        // Host only: the present players' roster slots and bag ids (the connected, keyed clients, at most four) into the two lists.
+        public bool GetPresence(System.Collections.Generic.List<int> slots, System.Collections.Generic.List<string> ids)
+        {
+            slots.Clear(); ids.Clear();
+            if (!Host || !BuildPresence()) return false;
+            slots.AddRange(_presentSlots); ids.AddRange(_presentIds);
+            return true;
+        }
+
         // A piece or person found is safe the moment it is picked up: PieceAdded (host) lets the dive director move it into the town stock at once. False for an unknown id or one already found.
         public bool ServerAddPiece(int pieceId)
         {
@@ -198,7 +253,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerStart(int floor, bool bossBeaten)
         {
             if (!Host || !_session.TryStart(floor, bossBeaten)) return false;
-            _visitExtraOwner = -1;
+            _visitExtraOwner = -1; _choice.Cancel();
             Publish();
             return true;
         }
@@ -207,21 +262,26 @@ namespace SleepingCalamity.Presentation
         public bool ServerEnterFloor(int floor)
         {
             if (!Host || !_session.EnterFloor(floor)) return false;
+            _visitExtraOwner = -1; _choice.Cancel();
             Publish();
             return true;
         }
 
-        // Host only: the party goes home from the bank room (the checkpoint is held afterwards) / finishes the Phase 1 stand-in ending after floor 7.
+        // Host only: the party goes home from the bank (the checkpoint is held afterwards); raises WentHome, which the director answers by ending the dive. The shared choice (ServerChooseGoHome)
+        // ends here once it is confirmed. Tests and host logic may call it directly (no confirm window).
         public bool ServerGoHome()
         {
             if (!Host || !_session.GoHome()) return false;
-            _visitExtraOwner = -1; Publish(); return true;
+            _visitExtraOwner = -1; _choice.Cancel(); Publish();
+            WentHome?.Invoke();
+            return true;
         }
 
+        // Host only: finishes the Phase 1 stand-in ending after floor 7.
         public bool ServerFinish()
         {
             if (!Host || !_session.Finish()) return false;
-            Publish(); return true;
+            _choice.Cancel(); Publish(); return true;
         }
 
         // ---- per-player bags (host only) ----
@@ -263,6 +323,14 @@ namespace SleepingCalamity.Presentation
                 _seenOrder[clientId] = order;
             }
             return Mathf.Clamp(order, 0, 3);
+        }
+
+        // Host only: the roster's key of a connected client, false when it has none (or there is no roster). A watcher compares it to notice the key changing.
+        public bool TryRosterKey(ulong clientId, out PlayerKey key)
+        {
+            key = default;
+            IJoinContextProvider id = ResolveIdentity();
+            return id != null && id.TryGetKey(clientId, out key);
         }
 
         // The client's bag (created on first use); null off the host, and null for a client the roster has no key for (PlayerIdOf).
@@ -313,42 +381,138 @@ namespace SleepingCalamity.Presentation
             return bag != null && bag.Unpick(carriedIndexOrSatchel);
         }
 
-        private int _previousExtraOwner = -1;   // in memory for this host session only (saving it is plan 3)
-        private int _visitExtraOwner = -1;      // the 3-player extra slot's owner picked when this floor's visits opened (-1 = none); a late joiner's visit reuses it
+        // ---- the bank room (plan 3 task 8) ----
+        // The roster slot of the previous visit's 3-player extra-slot owner (-1 = none known). The director loads it from the saved bag id (DiveSave.ExtraSlotOwner) and saves it back from here.
+        // Set ONCE per visit, when the extra owner is first picked; a resize that picks a new owner (the owner left) does not overwrite it again, and the re-pick still skips the owner the visit
+        // started from (_visitPrior). It outlives every dive session (ServerAdopt leaves it alone).
+        public int PreviousExtraOwner { get; set; } = -1;
+        private int _visitPrior = -1;           // PreviousExtraOwner as this visit opened: what a re-pick must skip
+        private bool _previousSet;              // PreviousExtraOwner was written for this visit already
+        private int _visitExtraOwner = -1;      // the 3-player extra slot's owner of this visit (-1 = none)
+
+        private readonly BankChoice _choice = new BankChoice();
+        // Host only: the seconds a push-on / go-home window waits for a second player (BankChoice.WindowSeconds, a placeholder). Tests set it.
+        public float ChoiceWindowSeconds { get => _choice.Window; set => _choice.Window = value; }
+        private const float PresencePollSeconds = 0.25f;
+        private float _nextPresencePoll;
+        private readonly System.Collections.Generic.List<int> _presentSlots = new System.Collections.Generic.List<int>();
+        private readonly System.Collections.Generic.List<string> _presentIds = new System.Collections.Generic.List<string>();
+        private readonly System.Collections.Generic.List<string> _livingIds = new System.Collections.Generic.List<string>();
+        private readonly System.Collections.Generic.List<string> _lastPresentIds = new System.Collections.Generic.List<string>();
+
+        // The connected, keyed clients (at most four): their roster slots and bag ids, in client order. An unkeyed client (not in the roster yet) takes no slot and does not count.
+        private bool BuildPresence()
+        {
+            _presentSlots.Clear(); _presentIds.Clear();
+            if (NetworkManager == null) return false;
+            foreach (ulong cid in NetworkManager.ConnectedClientsIds)
+            {
+                string id = PlayerIdOf(cid);
+                if (id == null || _presentIds.Count >= 4) continue;
+                _presentSlots.Add(PlayerSlotOf(cid)); _presentIds.Add(id);
+            }
+            return _presentIds.Count > 0;
+        }
+
+        // The bag ids of the present players whose hero is up (the confirm window's quorum). A rig with no hero objects counts everyone as living (AskerIsUp).
+        private void BuildLiving()
+        {
+            _livingIds.Clear();
+            foreach (ulong cid in NetworkManager.ConnectedClientsIds)
+            {
+                string id = PlayerIdOf(cid);
+                if (id != null && _livingIds.Count < 4 && AskerIsUp(NetworkManager, cid)) _livingIds.Add(id);
+            }
+        }
+
+        // The bag id of each roster slot (index = slot, null for an empty one): the roster's keys, overlaid with the connected clients. The director names the extra-slot owner with it.
+        public string[] IdsBySlot()
+        {
+            var ids = new string[4];
+            IJoinContextProvider provider = ResolveIdentity();
+            if (provider != null)
+            {
+                var roster = new System.Collections.Generic.List<RosterEntry>();
+                provider.GetRoster(roster);
+                foreach (RosterEntry e in roster) if (e.Slot >= 0 && e.Slot < 4) ids[e.Slot] = e.Key.ToString();
+            }
+            if (NetworkManager != null)
+                foreach (ulong cid in NetworkManager.ConnectedClientsIds)
+                {
+                    string id = PlayerIdOf(cid);
+                    if (id != null) ids[PlayerSlotOf(cid)] = id;
+                }
+            return ids;
+        }
+
+        // The roster slot of a bag id (-1 when it has none).
+        public int SlotOfBagId(string id)
+        {
+            string[] ids = IdsBySlot();
+            for (int i = 0; i < ids.Length; i++) if (ids[i] != null && ids[i] == id) return i;
+            return -1;
+        }
+
+        private void LockPreviousOwner()
+        {
+            if (_previousSet || _session.ExtraSlotOwner < 0) return;
+            PreviousExtraOwner = _session.ExtraSlotOwner; _previousSet = true;
+        }
 
         // Entering the bank room (DiveSession.EnterBankRoom): every connected, keyed client's bag gets a bank visit with BankSlots.SlotsFor capacity; the 3-player extra slot goes to a seeded pick that
         // skips the previous owner. False when the session refuses (not on the cleared bank floor, or already chosen).
         private bool OpenBankVisits()
         {
-            var ids = new System.Collections.Generic.List<ulong>();
-            foreach (ulong cid in NetworkManager.ConnectedClientsIds) if (PlayerIdOf(cid) != null) ids.Add(cid);   // an unkeyed client (not in the roster yet) takes no slot and does not count
-            if (ids.Count == 0) return false;
-            if (ids.Count > 4) ids.RemoveRange(4, ids.Count - 4);
-            var slots = new System.Collections.Generic.List<int>();
-            var bagIds = new System.Collections.Generic.List<string>();
-            foreach (ulong id in ids) { slots.Add(PlayerSlotOf(id)); ServerBagOf(id); bagIds.Add(PlayerIdOf(id)); }   // ServerBagOf makes the bag a visit opens on
-            if (!_session.EnterBankRoom(slots, DiveSeed, _previousExtraOwner, bagIds)) return false;
+            if (!BuildPresence()) return false;
+            foreach (string id in _presentIds) _session.Bags.For(id);   // a bag exists for every visit it opens on
+            int prior = PreviousExtraOwner;
+            if (!_session.EnterBankRoom(_presentSlots, DiveSeed, prior, _presentIds)) return false;
+            _visitPrior = prior; _previousSet = false;
             _visitExtraOwner = _session.ExtraSlotOwner;
-            if (_visitExtraOwner >= 0) _previousExtraOwner = _visitExtraOwner;
+            LockPreviousOwner();
+            _lastPresentIds.Clear(); _lastPresentIds.AddRange(_presentIds);
             return true;
         }
 
-        // The party is in the bank room and this client's bag has no visit (it joined after the room opened): open one now, sized for the party as it stands.
-        // Decision (plan 2 task 6): a late joiner can lift the party's total slots above BankSlots.TotalSlots (the spec is silent); the others' visits keep their size.
+        // Host only: the bank room's visits follow who is present right now (decision 7): the leaver's visit is cancelled, a rejoiner or late joiner gets one, capacity and the 3-player extra slot are
+        // recomputed, excess picks drop from the end. Runs by itself when the party changes; a pick from a client with no visit also runs it. False outside the bank room.
+        public bool ServerResizeVisits()
+        {
+            if (!Host || _session.Phase != DivePhase.BankRoom || !BuildPresence()) return false;
+            if (!_session.ResizeBankRoom(_presentSlots, _presentIds, DiveSeed, _visitPrior)) return false;
+            _visitExtraOwner = _session.ExtraSlotOwner;
+            LockPreviousOwner();
+            _lastPresentIds.Clear(); _lastPresentIds.AddRange(_presentIds);
+            Publish();
+            return true;
+        }
+
+        // The party is in the bank room and this client's bag has no visit (it joined after the room opened): resize now.
         private void EnsureVisit(ulong clientId)
         {
             if (_session.Phase != DivePhase.BankRoom) return;
             PlayerBag bag = ServerBagOf(clientId);
-            if (bag == null || bag.BankOpen) return;
-            int keyed = 0;
-            foreach (ulong cid in NetworkManager.ConnectedClientsIds) if (PlayerIdOf(cid) != null) keyed++;   // unkeyed clients do not count toward the party
-            int n = Mathf.Clamp(keyed, 1, 4);
-            bag.OpenBank(BankSlots.SlotsFor(n, PlayerSlotOf(clientId), _visitExtraOwner));
+            if (bag != null && !bag.BankOpen) ServerResizeVisits();
         }
 
-        private void EnsureVisitsForEveryone()
+        // Update (host): while the room is open, resize when the party changed (a connect or disconnect marked it, or the keyed players differ from the last resize), and run the confirm window's timer.
+        private void TickBankRoom(float dt)
         {
-            foreach (ulong id in NetworkManager.ConnectedClientsIds) EnsureVisit(id);
+            bool inRoom = _session.Phase == DivePhase.BankRoom;
+            bool atBank = inRoom || (_session.Phase == DivePhase.Floor && OnBankFloor && _session.IsCleared(DiveFloor) && !_session.BankChosenThisDive);
+            if (!atBank) { if (_choice.IsOpen) _choice.Cancel(); return; }
+            if (inRoom && (_presenceDirty || Time.unscaledTime >= _nextPresencePoll))
+            {
+                _presenceDirty = false; _nextPresencePoll = Time.unscaledTime + PresencePollSeconds;
+                BuildPresence();
+                bool same = _presentIds.Count == _lastPresentIds.Count;
+                for (int i = 0; same && i < _presentIds.Count; i++) same = _presentIds[i] == _lastPresentIds[i];
+                if (!same) ServerResizeVisits();
+            }
+            if (!_choice.IsOpen) return;
+            BuildLiving();
+            BankChoiceKind confirmed = _choice.Tick(dt, _livingIds);
+            if (confirmed != BankChoiceKind.None) ApplyChoice(confirmed);
         }
 
         // Host only: marks `floor` cleared (DiveSession.ClearFloor: the party's current floor only; feeds the stir). False when nothing changed.
@@ -360,25 +524,56 @@ namespace SleepingCalamity.Presentation
             if (_session.Snapshot().ClearedMask == before) return false;
             Publish(); return true;
         }
-        public bool ServerFailDive() { if (!Host) return false; _session.Fail(); Publish(); return true; }
-        // The bank press, a stand-in until plan 3 task 8 gives the room its picks and the confirm window: on the cleared bank floor the first press enters the bank room (visits open, everyone is
-        // healed), the second pushes on (picks leave the bag, the bank locks, the stair opens). No position check (host logic, e.g. a scripted bank).
-        public bool ServerBank()
+        public bool ServerFailDive() { if (!Host) return false; _session.Fail(); _choice.Cancel(); Publish(); return true; }
+
+        // Host only: enters the bank room from the cleared bank floor (visits open, everyone is healed). No position check (host logic, e.g. a scripted bank); the RPC path is ServerTryBankFor.
+        public bool ServerEnterBankRoom()
         {
-            if (!Host) return false;
-            if (_session.Phase == DivePhase.BankRoom)
-            {
-                EnsureVisitsForEveryone();   // a mid-room joiner who never picked still gets the push-on with the party
-                if (!_session.PushOn()) return false;
-                _visitExtraOwner = -1;
-                Publish();
-                Banked?.Invoke();
-                return true;
-            }
-            if (!OpenBankVisits()) return false;
+            if (!Host || !OpenBankVisits()) return false;
+            _choice.Cancel();
             Publish();
             HealEveryone();
             Banked?.Invoke();
+            return true;
+        }
+
+        // Host only: the shared choice was confirmed. PushedOn: the bank is locked and the picks are safe (the director saves the suspend); WentHome: see ServerGoHome.
+        public event System.Action PushedOn;
+        public event System.Action WentHome;
+
+        // A player's press for "push on" / "go home" (decision 11). The host re-checks everything: the asker is up and keyed, the party is at the bank (push on: in the bank room; go home: in the room or
+        // on the cleared bank floor, the choice not made yet), and the asker is in range of the bank cell. The press opens, joins or swaps the confirm window; a confirm applies at once. False for a
+        // refused press and for a repeated press by the same player.
+        public bool ServerChoosePushOn(ulong clientId) => ServerPressChoice(clientId, BankChoiceKind.PushOn);
+        public bool ServerChooseGoHome(ulong clientId) => ServerPressChoice(clientId, BankChoiceKind.GoHome);
+
+        private bool ServerPressChoice(ulong clientId, BankChoiceKind kind)
+        {
+            if (!Host || _session.BankChosenThisDive || kind == BankChoiceKind.None) return false;
+            bool inRoom = _session.Phase == DivePhase.BankRoom;
+            bool atBank = inRoom || (_session.Phase == DivePhase.Floor && OnBankFloor && _session.IsCleared(DiveFloor));
+            if (kind == BankChoiceKind.PushOn ? !inRoom : !atBank) return false;
+            if (!BankAskerOk(clientId, false)) return false;
+            string presser = PlayerIdOf(clientId);
+            if (presser == null) return false;
+            BuildLiving();
+            BankChoicePress result = _choice.Press(presser, kind, Mathf.Max(1, _livingIds.Count));
+            if (result == BankChoicePress.Ignored) return false;
+            if (result == BankChoicePress.Confirmed) return ApplyChoice(_choice.ConfirmedKind);
+            Publish();
+            return true;
+        }
+
+        // The confirmed choice takes effect (host).
+        private bool ApplyChoice(BankChoiceKind kind)
+        {
+            if (kind == BankChoiceKind.GoHome) return ServerGoHome();
+            if (kind != BankChoiceKind.PushOn || _session.Phase != DivePhase.BankRoom) return false;
+            ServerResizeVisits();   // a player who joined since the last resize is in the push-on too
+            if (!_session.PushOn()) return false;
+            _visitExtraOwner = -1; _choice.Cancel();
+            Publish();
+            PushedOn?.Invoke();
             return true;
         }
 
@@ -468,10 +663,21 @@ namespace SleepingCalamity.Presentation
         [Rpc(SendTo.Server)]
         private void RequestBankRpc(RpcParams rpcParams = default) { BankRequestsHandled++; ServerTryBankFor(rpcParams.Receive.SenderClientId); }
 
+        // The world's bank press (the director's prompt): outside the room it enters it; inside the room it is a "push on" press (the picks are made on the bank screen).
         public bool ServerTryBankFor(ulong clientId)
         {
-            return BankAskerOk(clientId, false) && ServerBank();
+            if (!BankAskerOk(clientId, false)) return false;
+            return _session.Phase == DivePhase.BankRoom ? ServerChoosePushOn(clientId) : ServerEnterBankRoom();
         }
+
+        // Any player may press "push on" (the bank screen's key); the host validates (ServerChoosePushOn).
+        public void RequestPushOn() { RequestPushOnRpc(); }
+
+        // Host only: push-on requests received over the RPC, accepted or refused.
+        public int ChoiceRequestsHandled { get; private set; }
+
+        [Rpc(SendTo.Server)]
+        private void RequestPushOnRpc(RpcParams rpcParams = default) { ChoiceRequestsHandled++; ServerChoosePushOn(rpcParams.Receive.SenderClientId); }
 
         // Host: false when the asker's hero is downed or out (no player object or no vitals passes, like the range checks).
         public static bool AskerIsUp(NetworkManager nm, ulong clientId)
