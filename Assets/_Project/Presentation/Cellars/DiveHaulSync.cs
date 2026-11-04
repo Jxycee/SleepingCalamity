@@ -19,8 +19,11 @@
 //   1. the dive is on the bank floor; 2. when the sender has a player object and the built floor's bank cell is known, the player is within BankRadius metres (XZ) of the bank cell centre
 //      (cell origin math from CellarFloorBuilder.CellCenter, via CellarFloorSync). Known gap: with no player object or no built floor on the host the
 //      position check is skipped (floor-has-bank only); no anti-cheat by design, so a modded client standing elsewhere is not a concern.
-// Stir (Core/Cellars/DiveStir, owned by the session): the host feeds it the connected player count every frame and ticks a running collapse with Time.deltaTime; value, extra-enemy, hunter and
-// collapse state ride in the same Summary. Valuables and the collapse start are wired in plan 3 task 10. Clients never write. No auto-bank on walk-in.
+// Stir (Core/Cellars/DiveStir, owned by the session; plan 3 task 10): every host frame it is fed the connected player count and the valuables still carried across all bags (PartyBags.CarriedValuables:
+// weapons and large items, never usables, gear, keys or the satchel). A collapse that is pending (value 100) begins with the walk time from the party start to this floor's collapse target
+// (DiveFloorTable.PathSecondsToTarget; target = the stair, the bank cell on floor 5, the end cell on floor 7) and is ticked with Time.deltaTime; it closes early when every living hero stands at that
+// target (CollapseTargetRadius), and running out fails the dive (DiveFailed). Value, reward rank bonus, latches and collapse seconds ride in the same Summary. Clients never write. No auto-bank on walk-in.
+// The world bank press only ENTERS the bank room (ServerTryBankFor); inside the room it does nothing, so a stray Interact press can never push a solo party on: only RequestPushOn / RequestGoHome decide.
 // Healing (P47, host-authoritative): entering the bank room fully heals every living connected hero (HeroVitals.ServerHeal + HeroCombat.ServerBroadcastHeal, like HealingDrop) and raises Banked.
 // The floor's healing point (Core/Cellars/CellarHealing, cell from the built floor's CellarFloorBuild.HealingCell) is walked onto: the host's Update heals every hurt living hero within
 // HealTuning.RadiusMeters of its cell centre in one tick, then the point recharges HealTuning.RechargeSeconds on the host clock. Peers see only NetHealSecondsLeft (0 = ready, else whole
@@ -50,7 +53,7 @@ namespace SleepingCalamity.Presentation
             // The bank choice's confirm window (BankChoice): Choice = (int)BankChoiceKind (0 = none open), ChoiceMask = the roster slots that pressed (bit per slot), ChoiceSecondsLeft = whole seconds (rounded up).
             public int Choice, ChoiceMask, ChoiceSecondsLeft;
             // Stir (host-computed): value rounded to a whole point 0-100, extra enemies per room (latched), hunter latch, collapse state and whole seconds left (rounded up, 0 = not running).
-            public int StirValue, ExtraEnemiesPerRoom, DeepSecondsLeft;
+            public int StirValue, ExtraEnemiesPerRoom, DeepSecondsLeft, RewardRankBonus;   // RewardRankBonus: DiveStir.RewardRankBonus (the reward side of the stir, carried across the push-on)
             public bool HunterLatched, DeepClosesLatched;
             public DivePhase DivePhase => (DivePhase)Phase;
             public BankChoiceKind ChoiceKind => (BankChoiceKind)Choice;
@@ -60,12 +63,12 @@ namespace SleepingCalamity.Presentation
                 s.SerializeValue(ref ClearedMask); s.SerializeValue(ref CurrentFloor); s.SerializeValue(ref Phase);
                 s.SerializeValue(ref CheckpointHeld); s.SerializeValue(ref BankChosen);
                 s.SerializeValue(ref Choice); s.SerializeValue(ref ChoiceMask); s.SerializeValue(ref ChoiceSecondsLeft);
-                s.SerializeValue(ref StirValue); s.SerializeValue(ref ExtraEnemiesPerRoom); s.SerializeValue(ref DeepSecondsLeft);
+                s.SerializeValue(ref StirValue); s.SerializeValue(ref ExtraEnemiesPerRoom); s.SerializeValue(ref DeepSecondsLeft); s.SerializeValue(ref RewardRankBonus);
                 s.SerializeValue(ref HunterLatched); s.SerializeValue(ref DeepClosesLatched);
             }
             public bool Equals(Summary o) => FoundPieces == o.FoundPieces && PiecesLeft == o.PiecesLeft && PeopleLeft == o.PeopleLeft && ClearedMask == o.ClearedMask
                 && CurrentFloor == o.CurrentFloor && Phase == o.Phase && CheckpointHeld == o.CheckpointHeld && BankChosen == o.BankChosen
-                && StirValue == o.StirValue && ExtraEnemiesPerRoom == o.ExtraEnemiesPerRoom && DeepSecondsLeft == o.DeepSecondsLeft
+                && StirValue == o.StirValue && ExtraEnemiesPerRoom == o.ExtraEnemiesPerRoom && DeepSecondsLeft == o.DeepSecondsLeft && RewardRankBonus == o.RewardRankBonus
                 && HunterLatched == o.HunterLatched && DeepClosesLatched == o.DeepClosesLatched
                 && Choice == o.Choice && ChoiceMask == o.ChoiceMask && ChoiceSecondsLeft == o.ChoiceSecondsLeft;
             public override bool Equals(object obj) => obj is Summary o && Equals(o);
@@ -167,13 +170,79 @@ namespace SleepingCalamity.Presentation
             if (Host) TickHealingPoint(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             if (IsSpawned) ShowHealingOrb();
             if (!Host) return;
-            _session.Stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
-            bool failed = _session.Phase == DivePhase.Floor && _session.Stir.Tick(Mathf.Min(Time.deltaTime, MaxTickSeconds));   // a collapse that ran out (plan 3 task 10 starts the collapse)
+            DiveStir stir = _session.Stir;
+            FeedStir();
+            TickCollapseStart();
+            bool failed = _session.Phase == DivePhase.Floor && stir.Tick(Mathf.Min(Time.deltaTime, MaxTickSeconds));   // a collapse that ran out fails the dive
+            if (!failed) TickCollapseClose();
             if (failed) _session.Fail();
             TickBankRoom(Mathf.Min(Time.deltaTime, MaxTickSeconds));
             Publish();
             RefreshEncounterPlan();
             if (failed) DiveFailed?.Invoke();
+        }
+
+        // The stir's two inputs, set every host frame and again the moment an item is added: who is connected, and the valuables still carried in every bag (the push-on takes the count after the picks as
+        // its baseline, so the same feed after it measures only what was found since).
+        private void FeedStir()
+        {
+            DiveStir stir = _session.Stir;
+            stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
+            if (_session.Phase == DivePhase.Floor || _session.Phase == DivePhase.BankRoom) stir.UnbankedValuables = _session.Bags.CarriedValuables();
+        }
+
+        // ---- the collapse (plan 3 task 10; host) ----
+        public const float CollapseTargetRadius = 4f;     // placeholder: every living hero within this many metres (flat) of the target cell closes the timer early
+        public const float CollapseFloorWaitSeconds = 3f; // a built floor that lags the dive floor is waited for this long before the collapse begins with no path
+        private float _collapseWaitSince = -1f;
+
+        // The collapse is pending (stir 100, once per half) on a floor of the dive: it begins with the walk time to this floor's target. With a floor sync in the scene it waits for the layout of
+        // this floor (a few seconds at most); with none (haul-only tests) it begins at once with no path, so the minimum applies.
+        private void TickCollapseStart()
+        {
+            DiveStir stir = _session.Stir;
+            if (_session.Phase != DivePhase.Floor || !stir.CollapsePending) { _collapseWaitSince = -1f; return; }
+            ResolveFloorSync();
+            CellarFloorSync fs = FloorSync;
+            bool built = fs != null && fs.Layout != null && fs.Built != null && fs.BuiltFloor == DiveFloor;
+            if (fs != null && !built)
+            {
+                if (_collapseWaitSince < 0f) _collapseWaitSince = Time.unscaledTime;
+                if (Time.unscaledTime - _collapseWaitSince < CollapseFloorWaitSeconds) return;
+            }
+            _collapseWaitSince = -1f;
+            stir.BeginCollapse(built ? DiveFloorTable.PathSecondsToTarget(fs.Layout) : 0f);
+        }
+
+        // A running collapse closes when every living hero (at least one) is at the target: the party is leaving, so the host treats it like the stair (DiveStir.OnStairTaken).
+        private void TickCollapseClose()
+        {
+            DiveStir stir = _session.Stir;
+            if (!stir.CollapseRunning || _session.Phase != DivePhase.Floor || !TryCollapseTargetWorld(out Vector3 target)) return;
+            int living = 0;
+            var all = HeroVitals.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                HeroVitals v = all[i];
+                if (!IsMine(v)) continue;
+                living++;
+                float dx = v.transform.position.x - target.x, dz = v.transform.position.z - target.z;
+                if (dx * dx + dz * dz > CollapseTargetRadius * CollapseTargetRadius) return;
+            }
+            if (living > 0) stir.OnStairTaken();
+        }
+
+        // World position of this floor's collapse target cell (the stair, the bank cell, the end cell), when this peer has built the floor.
+        public bool TryCollapseTargetWorld(out Vector3 pos)
+        {
+            pos = default;
+            ResolveFloorSync();
+            CellarFloorSync fs = FloorSync;
+            if (fs == null || fs.Layout == null || fs.Built == null || fs.Built.Root == null || fs.BuiltFloor != DiveFloor) return false;
+            CellPos? cell = DiveFloorTable.CollapseTargetCell(fs.Layout);
+            if (!cell.HasValue) return false;
+            pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(cell.Value.X, cell.Value.Y));
+            return true;
         }
 
         private void Publish()
@@ -193,7 +262,7 @@ namespace SleepingCalamity.Presentation
             var next = new Summary
             {
                 Choice = choice, ChoiceMask = choiceMask, ChoiceSecondsLeft = choiceSeconds,
-                StirValue = Mathf.RoundToInt(stir.Value), ExtraEnemiesPerRoom = stir.ExtraEnemyLatched ? ExtraEnemiesPerRoomOnLatch : 0, DeepSecondsLeft = Mathf.CeilToInt(stir.CollapseSecondsLeft),
+                StirValue = Mathf.RoundToInt(stir.Value), ExtraEnemiesPerRoom = stir.ExtraEnemyLatched ? ExtraEnemiesPerRoomOnLatch : 0, DeepSecondsLeft = Mathf.CeilToInt(stir.CollapseSecondsLeft), RewardRankBonus = stir.RewardRankBonus,
                 HunterLatched = stir.HunterLatched, DeepClosesLatched = stir.CollapseRunning,
                 FoundPieces = found, PiecesLeft = floor > 0 ? s.Pieces.PiecesLeft(floor) : 0, PeopleLeft = floor > 0 ? s.Pieces.PeopleLeft(floor) : 0,
                 ClearedMask = floor > 0 ? s.Snapshot().ClearedMask : 0, CurrentFloor = floor, Phase = (int)s.Phase, CheckpointHeld = s.Checkpoint.Held, BankChosen = s.BankChosenThisDive,
@@ -344,7 +413,9 @@ namespace SleepingCalamity.Presentation
         public bool ServerAddItem(ulong clientId, int itemId)
         {
             PlayerBag bag = ServerBagOf(clientId);
-            return bag != null && bag.Add(itemId);
+            if (bag == null || !bag.Add(itemId)) return false;
+            FeedStir();   // a valuable found is in the stir at once, not a frame later
+            return true;
         }
 
         public bool ServerAddGold(ulong clientId, int amount)
@@ -672,11 +743,11 @@ namespace SleepingCalamity.Presentation
         [Rpc(SendTo.Server)]
         private void RequestBankRpc(RpcParams rpcParams = default) { BankRequestsHandled++; ServerTryBankFor(rpcParams.Receive.SenderClientId); }
 
-        // The world's bank press (the director's prompt): outside the room it enters it; inside the room it is a "push on" press (the picks are made on the bank screen).
+        // The world's bank press (the director's prompt): outside the room it enters it; inside the room it does nothing (the picks and the choice are made on the bank screen: RequestPushOn / RequestGoHome).
         public bool ServerTryBankFor(ulong clientId)
         {
             if (!BankAskerOk(clientId, false)) return false;
-            return _session.Phase == DivePhase.BankRoom ? ServerChoosePushOn(clientId) : ServerEnterBankRoom();
+            return _session.Phase != DivePhase.BankRoom && ServerEnterBankRoom();   // inside the room a world press does nothing (no stray push-on); the bank screen keys decide
         }
 
         // Any player may press "push on" (the bank screen's key); the host validates (ServerChoosePushOn).

@@ -317,9 +317,8 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed");
             Rig rig = null;
             yield return Start(net, r => rig = r);
-            // Pieces no longer feed the stir (plan 2, spec 4.5) and floors alone cap it at 52.5 in the real 4-floor dive, so the test raises the per-floor term: 35 x 1.25 (two players) = 43.75 after one
-            // floor cleared, 87.5 after two. The real hunter and deep-closes stir comes with plan 3's valuables stir.
-            StirTuning tuning = StirTuning.Default; tuning.PerFloorCleared = 35f;
+            // The stir is the valuables the party carries (plan 3 task 10; pieces and floors alone cannot reach the hunter): two players, so each valuable is worth 5 x sqrt 2 = 7.07.
+            ulong stirHost = rig.HostNm.LocalClientId;
             rig.Host.SeedOverride = seed;
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[stir start]");
             yield return ResolvePeers(rig);
@@ -329,8 +328,8 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.HostHaul.EncounterPlan.ExtraPerRoom, Is.EqualTo(0), "[stir] no extras at the start");
             Assert.That(rig.HostHaul.EncounterPlan.Hunter, Is.Null, "[stir] no hunter at the start");
 
-            // 40: one floor cleared = 43.75.
-            Assert.That(rig.HostHaul.ServerMarkCleared(1), Is.True);
+            // 40: eight valuables = 56.6.
+            for (int n = 0; n < 8; n++) Assert.That(rig.HostHaul.ServerAddItem(stirHost, 101), Is.True);
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.ExtraEnemiesPerRoom >= 1, Timeout, "[stir 40] the meter never latched an extra enemy (value " + rig.HostHaul.Current.StirValue + ")");
             yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.ExtraEnemiesPerRoom >= 1, Timeout, "[stir 40] the client never saw the extra-enemy latch");
             Assert.That(rig.HostHaul.Current.HunterLatched, Is.False, "[stir 40] the hunter waits for 70");
@@ -359,8 +358,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => rig.Contents.EnterEnemyCount(room) == expected, Timeout, "[stir 40] entering room " + room + " spawned " + rig.Contents.EnterEnemyCount(room) + " enemies, the plan says " + expected + " (extras " + plan.CountIn(room, EncounterKind.Extra) + ")");
             KillAll(rig.HostNm);
 
-            // 70: two floors cleared = 87.5.
-            Assert.That(rig.HostHaul.ServerMarkCleared(2), Is.True);
+            // 70: thirteen valuables = 92.
+            for (int n = 0; n < 5; n++) Assert.That(rig.HostHaul.ServerAddItem(stirHost, 101), Is.True);
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.HunterLatched && rig.PeerHaul.Current.HunterLatched, Timeout, "[stir 70] the hunter never latched on both peers (value " + rig.HostHaul.Current.StirValue + ")");
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.EncounterPlan != null && rig.HostHaul.EncounterPlan.Hunter != null, Timeout, "[stir 70] the encounter plan has no hunter");
             yield return PlayModeHarness.WaitUntil(() => CountAlive(rig.HostNm, EnemyKind.RatKing) > 0, Timeout, "[stir 70] the contents never spawned the hunter enemy (rat kings alive before: " + rats0 + ")");

@@ -806,8 +806,9 @@ namespace SleepingCalamity.Presentation
                 else if (DiveFloorTable.HasBank(floor) && !chosen && bankCleared && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && Flat(me, bank, BankPromptRadius))
                 {
                     bool inRoom = HaulSync != null && HaulSync.Current.DivePhase == DivePhase.BankRoom;
-                    if (Flat(me, bank + new Vector3(CellarFloorBuilder.HomeMarkerOffset, 0f, 0f), 1.0f)) { Prompt = PromptKind.GoHome; PromptText = "Take the party home"; }   // the green column beside the lamp
-                    else { Prompt = PromptKind.Bank; PromptText = inRoom ? "Push on" : "Rest in the bank room"; }
+                    if (inRoom) { }   // inside the bank room Interact does nothing (a stray press must never push a solo party on): only the bank screen keys (Y push on, N go home) decide
+                    else if (Flat(me, bank + new Vector3(CellarFloorBuilder.HomeMarkerOffset, 0f, 0f), 1.0f)) { Prompt = PromptKind.GoHome; PromptText = "Take the party home"; }   // the green column beside the lamp
+                    else { Prompt = PromptKind.Bank; PromptText = "Rest in the bank room"; }
                 }
             }
             if (ContentsSync != null && Prompt != PromptKind.None && ContentsSync.WouldUseInteract(me)) Prompt = PromptKind.None;   // contents hook: a chest or the door in reach takes the press, so one press does one thing

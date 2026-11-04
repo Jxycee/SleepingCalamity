@@ -41,5 +41,36 @@ namespace SleepingCalamity.Tests.EditMode
         {
             Assert.That(DiveFloorTable.CollapseTargetCell(null), Is.Null);
         }
+
+        // Catches: a collapse that never learns the walk (0 s on every floor), or a path shorter than the straight line / a target the walk cannot reach.
+        [Test]
+        public void PathSecondsToTarget_IsTheCellWalkOverJogSpeed_OnEveryBuiltFloor()
+        {
+            foreach (int floor in new[] { 1, 2, 3, 4, 5, 6, 7 })
+                for (uint seed = 1; seed <= 5; seed++)
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
+                    CellPos start = l.EntryStarts[0], target = DiveFloorTable.CollapseTargetCell(l).Value;
+                    float seconds = DiveFloorTable.PathSecondsToTarget(l);
+                    int manhattan = System.Math.Abs(start.X - target.X) + System.Math.Abs(start.Y - target.Y);
+                    string tag = " floor " + floor + " seed " + seed;
+                    Assert.That(seconds, Is.GreaterThan(0f), "a real walk" + tag);
+                    Assert.That(seconds, Is.GreaterThanOrEqualTo(manhattan * CellarFloorLayout.CellMeters / DiveFloorTable.CollapseWalkSpeed - 0.001f), "never shorter than the straight line" + tag);
+                    Assert.That(seconds, Is.LessThan(CellarFloorLayout.GridSize * CellarFloorLayout.GridSize * CellarFloorLayout.CellMeters / DiveFloorTable.CollapseWalkSpeed), "and reachable" + tag);
+                    Assert.That(DiveFloorTable.PathSecondsToTarget(l), Is.EqualTo(seconds), "deterministic" + tag);
+                }
+            Assert.That(DiveFloorTable.PathSecondsToTarget(null), Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void CollapseTimer_IsTheMinimumForAShortWalk_AndOneAndAHalfTimesALongOne()
+        {
+            Assert.That(DiveStir.CollapseSeconds(0f), Is.EqualTo(DiveStir.CollapseMinSeconds));
+            Assert.That(DiveStir.CollapseSeconds(100f), Is.EqualTo(150f), "1.5 x a long walk");
+            var stir = new DiveStir { UnbankedValuables = 30 };
+            Assert.That(stir.CollapsePending, Is.True);
+            stir.BeginCollapse(DiveFloorTable.PathSecondsToTarget(CellarFloorGenerator.Layout(7, 2)));
+            Assert.That(stir.CollapseSecondsLeft, Is.GreaterThanOrEqualTo(DiveStir.CollapseMinSeconds));
+        }
     }
 }

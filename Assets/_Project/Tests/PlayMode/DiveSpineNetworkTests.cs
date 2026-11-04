@@ -728,7 +728,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.BankRoomNow(), Is.True);
             Assert.That(haul.ServerPick(hostId, 0), Is.True);
             Assert.That(haul.ServerChoosePushOn(hostId), Is.True);
-            haul.Session.Stir.UnbankedValuables = haul.Session.Stir.UnbankedValuables + 6;   // six more valuables than the baseline: the second half's stir is above 0
+            for (int n = 0; n < 6; n++) Assert.That(haul.ServerAddItem(hostId, 101), Is.True);   // six more valuables than the baseline (the carried ones at the push-on): the second half's stir is above 0
             float stirSaved = haul.Session.Stir.Value;
             Assert.That(stirSaved, Is.GreaterThan(0f), "premise: a stir value worth keeping");
             bool heldBefore = rig.Host.Checkpoint.Held;
@@ -749,7 +749,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.Seed, Is.EqualTo(8181u), "the saved dive seed (chest masks match their seed)");
             Assert.That(rig.Host.Checkpoint.Held, Is.EqualTo(heldBefore), "a resume neither spends nor sets the checkpoint");
             PlayerBag bag = rig.Host.HaulSync.ServerBagOf(hostId);
-            Assert.That(bag.Carried, Is.EqualTo(new[] { 105, 110 }), "carried items are back");
+            Assert.That(bag.Carried, Is.EqualTo(new[] { 105, 110, 101, 101, 101, 101, 101, 101 }), "carried items are back");
             Assert.That(bag.BankedThisDive.Keys, Is.EquivalentTo(new[] { 104 }));
             Assert.That(bag.DiveGold, Is.EqualTo(9));
             Assert.That(rig.Host.NetSuspendedDive.Value, Is.False);
@@ -791,6 +791,109 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.HaulSync.Current.DivePhase, Is.EqualTo(DivePhase.BankRoom));
             Assert.That(rig.Host.HaulSync.ServerChoosePushOn(hostId), Is.True, "and the choice is still to be made");
             Assert.That(bag.BankedThisDive.Keys, Is.EquivalentTo(new[] { 105 }));
+        }
+
+        // ================================================================================================================================
+        // Plan 3 task 10 on the real floors: the collapse's path time, its target (stair / bank cell / end cell) and its early close. Valuables, halves and the timeout are in DiveHaulNetworkTests.
+        // Catches: a collapse begun with no path (always the minimum), a target that is not this floor's stair (floor 5: the bank cell; floor 7: the end cell), the timer closing while a living hero is still away,
+        // a downed hero keeping it open, the party at the target not closing it, a closed collapse starting again. NOT covered: the "deep closes" countdown on the HUD (the walk); the 60 s wait itself.
+        // ================================================================================================================================
+
+        private static Vector3 CellWorld(CellarFloorSync floor, CellPos cell) => floor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(cell.X, cell.Y));
+
+        private static void AddValuables(Rig rig, ulong who, int count)
+        {
+            for (int n = 0; n < count; n++) Assert.That(rig.HostHaul.ServerAddItem(who, 101), Is.True, "valuable " + (n + 1));
+        }
+
+        [UnityTest]
+        public IEnumerator Collapse_StartsWithPathTime_StaysOpenWhileALivingHeroIsAway_ClosesWhenOnlyTheDownedAreAway()
+        {
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = 6161u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return ToFloor(rig, 2);
+            AddValuables(rig, hostId, 20);   // 20 x 5 x sqrt 2 = 141: past 100
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.DeepClosesLatched, Timeout, "the collapse never began (stir " + rig.HostHaul.Current.StirValue + ")");
+
+            float path = DiveFloorTable.PathSecondsToTarget(rig.HostFloor.Layout);
+            Assert.That(path, Is.GreaterThan(0f), "premise: the floor has a walk to the stair");
+            int expected = Mathf.CeilToInt(DiveStir.CollapseSeconds(path));
+            Assert.That(rig.HostHaul.Current.DeepSecondsLeft, Is.InRange(expected - 3, expected), "the timer is the floor's walk time (x 1.5, at least the minimum), not a fixed number");
+            Assert.That(rig.HostHaul.TryCollapseTargetWorld(out Vector3 target), Is.True);
+            Vector3 stairCell = CellWorld(rig.HostFloor, rig.HostFloor.Layout.StairExit.Value);
+            Assert.That(Flat(target, stairCell), Is.LessThan(0.1f), "the target on floors 1-4 is the stair's cell");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerHauls[0].Current.DeepClosesLatched, Timeout, "the client never saw the timer");
+
+            // The host hero arrives, the client hero does not: still running.
+            Move(rig.HostHero, target + new Vector3(1f, 0.1f, 0f));
+            yield return Seconds(0.8f);
+            Assert.That(rig.HostHaul.Current.DeepClosesLatched, Is.True, "a living hero is still away: the timer keeps running");
+
+            // The away hero goes down: only the living count, and the living are all at the target.
+            HeroVitals away = rig.HeroesOnHost[0].GetComponent<HeroVitals>();
+            away.ServerDamage(10000);
+            Assert.That(away.IsUp, Is.False, "premise: the away hero is down");
+            yield return PlayModeHarness.WaitUntil(() => !rig.HostHaul.Current.DeepClosesLatched, Timeout, "the timer never closed with every living hero at the target");
+            Assert.That(rig.Host.NetActive.Value, Is.True, "closing early is not a failure");
+            Assert.That(rig.HostHaul.Session.Phase, Is.EqualTo(DivePhase.Floor));
+            yield return Seconds(0.5f);
+            Assert.That(rig.HostHaul.Current.DeepClosesLatched, Is.False, "and it does not begin a second time");
+        }
+
+        [UnityTest]
+        public IEnumerator Collapse_ClosesEarly_WhenAllLivingPlayersAreAtTheTarget()
+        {
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = 6162u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return ToFloor(rig, 2);
+            AddValuables(rig, hostId, 20);
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.DeepClosesLatched, Timeout, "the collapse never began");
+            Assert.That(rig.HostHaul.TryCollapseTargetWorld(out Vector3 target), Is.True);
+            Move(rig.HostHero, target + new Vector3(1f, 0.1f, 0f));
+            Move(rig.OwnHeroes[0], target + new Vector3(-1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, target) < 3f, Timeout, "the client hero never arrived on the host");
+            yield return PlayModeHarness.WaitUntil(() => !rig.HostHaul.Current.DeepClosesLatched, Timeout, "both heroes stand at the stair and the timer never closed");
+            yield return PlayModeHarness.WaitUntil(() => !rig.PeerHauls[0].Current.DeepClosesLatched, Timeout, "the client never saw the timer close");
+            Assert.That(rig.Host.NetActive.Value, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator Collapse_TargetIsBankCellOnFloor5_EndCellOnFloor7()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r);
+            rig.Host.SeedOverride = 6163u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+
+            // Floor 5: the bank cell. The guardian is not down, so the party is on the floor (Phase Floor) and the collapse runs.
+            yield return ToFloor(rig, 5);
+            AddValuables(rig, hostId, 20);
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.DeepClosesLatched, Timeout, "floor 5: the collapse never began");
+            Assert.That(rig.HostHaul.TryCollapseTargetWorld(out Vector3 target5), Is.True);
+            Assert.That(Flat(target5, CellWorld(rig.HostFloor, rig.HostFloor.Layout.BankRoomCell.Value)), Is.LessThan(0.1f), "floor 5: the bank cell, not a stair (it has none until the choice)");
+            Move(rig.HostHero, target5 + new Vector3(0.5f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => !rig.HostHaul.Current.DeepClosesLatched, Timeout, "floor 5: the party at the bank cell never closed the timer");
+            Move(rig.HostHero, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0));
+
+            // Floor 7: the end cell (second half: the valuables carried at the push-on are the baseline, so 20 more are needed).
+            yield return ToFloor(rig, 7);
+            Assert.That(rig.HostHaul.Current.DeepClosesLatched, Is.False, "the push-on reset the danger side");
+            AddValuables(rig, hostId, 20);
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.DeepClosesLatched, Timeout, "floor 7: the collapse never began (stir " + rig.HostHaul.Current.StirValue + ")");
+            Assert.That(rig.HostHaul.TryCollapseTargetWorld(out Vector3 target7), Is.True);
+            Assert.That(Flat(target7, CellWorld(rig.HostFloor, rig.HostFloor.Layout.EndCell.Value)), Is.LessThan(0.1f), "floor 7: the end cell (it has no stair)");
+            Move(rig.HostHero, target7 + new Vector3(0.5f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => !rig.HostHaul.Current.DeepClosesLatched, Timeout, "floor 7: the party at the end cell never closed the timer");
         }
     }
 }

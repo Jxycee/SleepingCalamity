@@ -606,8 +606,9 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator Hunter_PlayerOnItsCell_NoRespawn_RespawnsOnceThePlayerLeaves()
         {
             Ctx c = null; yield return Setup(x => c = x, default, null, 4);
+            // The host feeds the stir itself (players connected, valuables carried): two players here, so 13 carried valuables = 13 x 5 x sqrt 2 = 92 (floors alone cannot reach the hunter).
+            for (int n = 0; n < 13; n++) Assert.That(c.Haul.ServerAddItem(c.HostId, 101), Is.True);
             DiveStir stir = c.Haul.Session.Stir;
-            stir.PlayersPresent = 4; stir.UnbankedValuables = 8;   // floors alone cannot reach the hunter any more (a session clears only its own floor): 8 carried valuables x 5 x 2 = 80
             Assert.That(stir.HunterLatched, Is.True, "the stir latched the hunter");
             yield return PlayModeHarness.WaitUntil(() => c.Haul.EncounterPlan != null && c.Haul.EncounterPlan.Hunter != null && c.Haul.EncounterPlan.HunterLatched, Timeout, "the encounter plan has no hunter");
             EncounterSpawn h = c.Haul.EncounterPlan.Hunter;

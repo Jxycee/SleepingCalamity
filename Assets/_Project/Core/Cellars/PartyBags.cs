@@ -29,6 +29,18 @@ namespace SleepingCalamity.Core
             get { foreach (var kv in _bags) if (kv.Value.BankOpen) return true; return false; }
         }
 
+        // Carried items that stir the dive (BankSlots.IsStirValuable: weapons and large items) across every bag; usables, gear, keys and the satchel do not count. Allocation free.
+        public int CarriedValuables()
+        {
+            int n = 0;
+            foreach (var kv in _bags)
+            {
+                IReadOnlyList<int> carried = kv.Value.Carried;
+                for (int i = 0; i < carried.Count; i++) if (BankSlots.IsStirValuable(CellarLoot.KindOf(carried[i]))) n++;
+            }
+            return n;
+        }
+
         public void CancelBankVisits() { foreach (var kv in _bags) kv.Value.CancelBank(); }
 
         public void PushOnAll() { foreach (var kv in _bags) if (kv.Value.BankOpen) kv.Value.PushOn(); }

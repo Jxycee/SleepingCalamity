@@ -47,13 +47,29 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Marks_FromTuning()
+        public void Marks_FromDiveStir()
         {
-            var t = StirTuning.Default;
-            var m = StirMeterText.MarkFractions(t);
-            Assert.AreEqual(t.ExtraEnemyThreshold / t.Max, m[0], 1e-4f);
-            Assert.AreEqual(t.HunterThreshold / t.Max, m[1], 1e-4f);
-            Assert.AreEqual(t.DeepClosesThreshold / t.Max, m[2], 1e-4f);
+            var m = StirMeterText.MarkFractions();
+            Assert.AreEqual(DiveStir.ExtraEnemyThreshold / DiveStir.Max, m[0], 1e-4f);
+            Assert.AreEqual(DiveStir.HunterThreshold / DiveStir.Max, m[1], 1e-4f);
+            Assert.AreEqual(DiveStir.DeepClosesThreshold / DiveStir.Max, m[2], 1e-4f);
+        }
+
+        // Catches: the HUD bar still drawn from the retired StirTuning (its Max, its marks) instead of the DiveStir the host runs: the fill is Value / DiveStir.Max and a full bar is the collapse threshold.
+        [Test]
+        public void Fill_IsDiveStirValueOverItsMax()
+        {
+            var stir = new DiveStir { PlayersPresent = 1, UnbankedValuables = 8 };   // 8 x 5 = 40: the extra-enemy mark
+            Assert.AreEqual(0.4f, StirMeterText.Fill(stir.Value, DiveStir.Max), 1e-4f);
+            Assert.AreEqual(1f, StirMeterText.Fill(StirMeterText.MarkFractions()[2] * DiveStir.Max, DiveStir.Max), 1e-4f, "the third mark is a full bar: the collapse");
+        }
+
+        [Test]
+        public void Summary_CarriesTheRewardRankBonus_AndTheCollapseSeconds()
+        {
+            var s = new DiveHaulSync.Summary { RewardRankBonus = 2, DeepSecondsLeft = 9 };
+            Assert.That(s.Equals(new DiveHaulSync.Summary { RewardRankBonus = 2, DeepSecondsLeft = 9 }), Is.True);
+            Assert.That(s.Equals(new DiveHaulSync.Summary { RewardRankBonus = 1, DeepSecondsLeft = 9 }), Is.False, "a changed reward bonus republishes");
         }
 
         [Test]

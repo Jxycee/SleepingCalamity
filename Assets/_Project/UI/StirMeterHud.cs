@@ -1,6 +1,6 @@
 // Authority: none (local, read-only). M5 greybox stir meter HUD (IMGUI, like CombatHud). Self-creates at runtime; shows only while a spawned DiveHaulSync
 // exists, reading its replicated Summary (DiveHaulSync.Current). Never writes network state. Labels come from the latch flags, not value-vs-threshold
-// (the replicated value is rounded). Mark positions come from StirTuning.Default.
+// (the replicated value is rounded). The value is DiveStir's (plan 3 task 10); mark positions come from DiveStir's thresholds.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Presentation;
@@ -33,9 +33,9 @@ namespace SleepingCalamity.UI
 
         public static float Fill(float value, float max) => max <= 0f ? 0f : Mathf.Clamp01(value / max);
 
-        public static float[] MarkFractions(StirTuning t)
+        public static float[] MarkFractions()
         {
-            return new[] { Fill(t.ExtraEnemyThreshold, t.Max), Fill(t.HunterThreshold, t.Max), Fill(t.DeepClosesThreshold, t.Max) };
+            return new[] { Fill(DiveStir.ExtraEnemyThreshold, DiveStir.Max), Fill(DiveStir.HunterThreshold, DiveStir.Max), Fill(DiveStir.DeepClosesThreshold, DiveStir.Max) };
         }
     }
 
@@ -71,10 +71,9 @@ namespace SleepingCalamity.UI
             Texture2D white = Texture2D.whiteTexture;
             if (_label == null) _label = new GUIStyle(GUI.skin.label) { normal = { textColor = Color.white } };
             var s = _sync.Current;
-            var tuning = StirTuning.Default;
             float scale = Screen.height / 1440f;
             float w = 420f * scale, h = 26f * scale, x = (Screen.width - w) * 0.5f, y = 12f * scale;
-            float target = StirMeterText.Fill(s.StirValue, tuning.Max);
+            float target = StirMeterText.Fill(s.StirValue, DiveStir.Max);
             if (_shownFill < 0f) _shownFill = _targetFill = target;
             else if (!Mathf.Approximately(target, _targetFill))
             {
@@ -88,10 +87,10 @@ namespace SleepingCalamity.UI
             GUI.color = Color.Lerp(new Color(0.9f, 0.8f, 0.3f), new Color(0.85f, 0.2f, 0.15f), fill);
             GUI.DrawTexture(new Rect(x, y, w * fill, h), white);
             GUI.color = Color.white;
-            foreach (float f in StirMeterText.MarkFractions(tuning)) GUI.DrawTexture(new Rect(x + w * f - 1, y - 3, 2, h + 6), white);
+            foreach (float f in StirMeterText.MarkFractions()) GUI.DrawTexture(new Rect(x + w * f - 1, y - 3, 2, h + 6), white);
             _label.fontSize = Mathf.Max(14, Mathf.RoundToInt(20 * scale));
             float ly = y + h + 8f;
-            GUI.Label(new Rect(x, ly, w, 28 * scale), "Stir " + s.StirValue + " / " + (int)tuning.Max + "    " + StirMeterText.Pieces(s), _label);
+            GUI.Label(new Rect(x, ly, w, 28 * scale), "Stir " + s.StirValue + " / " + (int)DiveStir.Max + "    " + StirMeterText.Pieces(s), _label);
             string here = StirMeterText.PiecesLeftHere(s);
             if (here != null) { ly += 26 * scale; GUI.Label(new Rect(x, ly, w, 28 * scale), here, _label); }
             PlayerBagSync bag = PlayerBagSync.Local;   // one peer per process in play; tests with several peers do not read this line

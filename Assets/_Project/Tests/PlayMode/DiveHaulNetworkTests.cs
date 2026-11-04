@@ -190,7 +190,13 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(host.ServerBagOf(hostId).BankOpen, Is.True, "the host's bag has a bank visit");
             ulong clientA = a.NetworkManager.LocalClientId;
             int slotA = host.PlayerSlotOf(clientA);
-            peerA.RequestBank();   // inside the room the bank press is a push-on press: one of two players opens the confirm window
+            int stray = host.BankRequestsHandled;
+            peerA.RequestBank();   // inside the room the world's bank press does nothing (no stray push-on): only the bank screen's push-on key counts
+            float untilStray = Time.realtimeSinceStartup + 10f;
+            while (host.BankRequestsHandled <= stray && Time.realtimeSinceStartup < untilStray) yield return null;
+            Assert.That(host.BankRequestsHandled, Is.GreaterThan(stray), "the stray press reached the host");
+            Assert.That(host.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.None), "an Interact press in the bank room opens no push-on window");
+            peerA.RequestPushOn();
             yield return WaitSummary(peerA, s => s.ChoiceKind == BankChoiceKind.PushOn && s.ChoiceMask == (1 << slotA) && s.ChoiceSecondsLeft > 0, "client A never saw its push-on press open the window");
             Assert.That(host.Current.BankChosen, Is.False, "one press of two players is not the party's choice");
             Assert.That(host.ServerChoosePushOn(hostId), Is.True, "the second player's press confirms");
@@ -371,6 +377,144 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return WaitSummary(peerB, s => s.DivePhase == DivePhase.BankRoom && s.ChoiceKind == BankChoiceKind.PushOn && s.ChoiceMask == (1 << slotA) && s.ChoiceSecondsLeft > 100, "the late joiner never saw the open window and the phase");
             Assert.That(host.Current.BankChosen, Is.False, "joining confirmed nothing");
             Assert.That(host.ChoiceRequestsHandled, Is.EqualTo(1), "only A's one press ever reached the host: joining replays no request or toast (the sync has no one-shot to send)");
+        }
+
+        // ================================================================================================================================
+        // Plan 3 task 10: the stir wiring on the host (valuables, halves, player count, the collapse). A haul sync alone (no floor sync, no heroes): the collapse begins with no path, so its minimum applies.
+        // Catches: valuables not reaching the stir, usables / boots / the satchel stirring, a push-on that does not reset the danger side (or lets the carried valuables stir the second half again), a replayed
+        // second half that cannot latch again, the player factor not following who is connected, a collapse that never begins at 100, begins twice, or does not fail the dive when it runs out, and a world
+        // bank press inside the room acting as a push-on. NOT covered here (DiveSpineNetworkTests): the path time from a real layout and the early close at the target; the HUD draw (the walk).
+        // ================================================================================================================================
+
+        private const int Large = 101;   // a table item: a stir valuable
+
+        private static IEnumerator Seconds(float s)
+        {
+            double until = Time.realtimeSinceStartupAsDouble + s;
+            while (Time.realtimeSinceStartupAsDouble < until) yield return null;
+        }
+
+        private static void AddItems(DiveHaulSync host, ulong id, int count, int item = Large)
+        {
+            for (int i = 0; i < count; i++) Assert.That(host.ServerAddItem(id, item), Is.True, "item " + (i + 1));
+        }
+
+        [UnityTest]
+        public IEnumerator BankRoom_WorldBankPress_EntersTheRoom_ThenDoesNothing_SoAStrayPressNeverPushesASoloPartyOn()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(0, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId;
+            Assert.That(host.ServerSetFloor(UndercroftPlan.BankFloor), Is.True);
+            Assert.That(host.ServerTryBankFor(hostId), Is.False, "the guardian is not down: no bank room");
+            Assert.That(host.ServerMarkCleared(UndercroftPlan.BankFloor), Is.True);
+            Assert.That(host.ServerTryBankFor(hostId), Is.True, "outside the room the press enters it");
+            Assert.That(host.Session.Phase, Is.EqualTo(DivePhase.BankRoom));
+            for (int i = 0; i < 3; i++) Assert.That(host.ServerTryBankFor(hostId), Is.False, "inside the room a world press does nothing");
+            Assert.That(host.Session.BankChosenThisDive, Is.False, "a solo party is not pushed on by a stray Interact press");
+            Assert.That(host.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.None));
+            Assert.That(host.ServerChoosePushOn(hostId), Is.True, "the bank screen's push-on key decides");
+            Assert.That(host.Session.BankChosenThisDive, Is.True);
+            yield break;
+        }
+
+        [UnityTest]
+        public IEnumerator Stir_ReachesHunter_WithValuablesCarried()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(0, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId;
+            Assert.That(host.ServerStart(1, false), Is.True);
+            Assert.That(host.ServerMarkCleared(1), Is.True); Assert.That(host.ServerEnterFloor(2), Is.True);
+            Assert.That(host.ServerMarkCleared(2), Is.True); Assert.That(host.ServerEnterFloor(3), Is.True);
+            Assert.That(host.ServerMarkCleared(3), Is.True);
+            yield return WaitSummary(host, s => s.StirValue == 30 && !s.HunterLatched, "three floors alone: 30");
+            AddItems(host, hostId, 7);   // 3 floors + 7 valuables = 65: the extra-enemy latch only
+            yield return WaitSummary(host, s => s.StirValue == 65 && s.ExtraEnemiesPerRoom == 1 && !s.HunterLatched, "65 never showed");
+            AddItems(host, hostId, 1);   // the 8th: 70
+            yield return WaitSummary(host, s => s.StirValue == 70 && s.HunterLatched && !s.DeepClosesLatched, "the hunter never latched at 70");
+            Assert.That(host.Session.Stir.Value, Is.GreaterThanOrEqualTo(DiveStir.HunterThreshold));
+        }
+
+        [UnityTest]
+        public IEnumerator Stir_UsablesAndSatchelDoNotStir()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(0, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId;
+            Assert.That(host.ServerStart(1, false), Is.True);
+            AddItems(host, hostId, 10, 424242);                 // an unknown id is a usable
+            Assert.That(host.ServerAddItem(hostId, CellarLoot.BootsId), Is.True);   // gear
+            PlayerBag bag = host.ServerBagOf(hostId);
+            bag.Satchel.Restore(new LostSatchel(1, new[] { 101, 102, 103, 104, 105, 106, 107, 108 }));
+            Assert.That(bag.PickUpSatchel(), Is.True);          // a carried satchel full of valuables
+            yield return Seconds(0.4f);
+            Assert.That(host.Current.StirValue, Is.EqualTo(0), "usables, boots and a satchel's items are not valuables");
+            Assert.That(host.Session.Stir.Capture().Valuables, Is.EqualTo(0));
+            Assert.That(host.ServerAddItem(hostId, 112), Is.True);
+            yield return WaitSummary(host, s => s.StirValue == 5, "one large item should stir 5");
+        }
+
+        [UnityTest]
+        public IEnumerator Stir_ResetsAtPushOn_ReplayableSecondHalf()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(0, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId;
+            Assert.That(host.ServerStart(1, false), Is.True);
+            AddItems(host, hostId, 15);
+            yield return WaitSummary(host, s => s.StirValue == 75 && s.HunterLatched && s.ExtraEnemiesPerRoom == 1 && s.RewardRankBonus == 2, "the first half never reached 75 with a reward bonus of 2");
+
+            Assert.That(host.BankRoomNow(), Is.True);
+            Assert.That(host.PushOnNow(), Is.True, "a solo party confirms at once");
+            yield return WaitSummary(host, s => s.BankChosen && s.StirValue == 0 && !s.HunterLatched && s.ExtraEnemiesPerRoom == 0 && s.RewardRankBonus == 2,
+                "the push-on did not reset the danger side (valuables carried over must not stir again) while keeping the reward side");
+            Assert.That(host.ServerBagOf(hostId).Carried.Count, Is.EqualTo(15), "nothing was picked: all 15 stay carried");
+
+            AddItems(host, hostId, 8);   // 8 new valuables in the second half: 40
+            yield return WaitSummary(host, s => s.StirValue == 40 && s.ExtraEnemiesPerRoom == 1 && !s.HunterLatched, "the second half's extra-enemy latch never replayed");
+            AddItems(host, hostId, 6);   // 14 new: 70
+            yield return WaitSummary(host, s => s.StirValue == 70 && s.HunterLatched, "the second half's hunter never latched");
+        }
+
+        [UnityTest]
+        public IEnumerator Stir_PlayerCountChange_Recomputes()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(1, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId;
+            Assert.That(host.ServerStart(1, false), Is.True);
+            AddItems(host, hostId, 8);
+            yield return WaitSummary(host, s => s.StirValue == 57, "two players: 40 x sqrt 2 = 56.6");
+            yield return Leave(app, cl[0]);
+            yield return WaitSummary(host, s => s.StirValue == 40, "the leaver took the player factor with them");
+            PlayModeHarness.TestClient back = null;
+            yield return Join(app, 9, c => back = c);
+            yield return WaitSummary(host, s => s.StirValue == 57, "a joiner never raised the factor again");
+        }
+
+        [UnityTest]
+        public IEnumerator Collapse_StartsAt100_OnceOnly_TimesOutAndFailsTheDive()
+        {
+            AppBootstrap app = null; DiveHaulSync host = null; PlayModeHarness.TestClient[] cl = null;
+            yield return StartRoom(0, (x, h, c) => { app = x; host = h; cl = c; });
+            ulong hostId = app.NetworkManager.LocalClientId;
+            int failed = 0; host.DiveFailed += () => failed++;
+            Assert.That(host.ServerStart(1, false), Is.True);
+            AddItems(host, hostId, 19);   // 95: not yet
+            yield return Seconds(0.4f);
+            Assert.That(host.Current.DeepClosesLatched, Is.False, "below 100 the deep has not closed");
+            AddItems(host, hostId, 1);    // 100
+            yield return WaitSummary(host, s => s.DeepClosesLatched && s.DeepSecondsLeft >= 58 && s.DeepSecondsLeft <= 60, "the collapse never began with its 60 s minimum (no floor sync: no path)");
+            Assert.That(host.Session.Stir.CollapsePending, Is.False, "once per half");
+
+            DiveStir.State st = host.Session.Stir.Capture();   // the minimum is 60 s: cut the clock to under a second (the test's tuning override; production keeps the const)
+            host.Session.Stir.Restore(new DiveStir.State(st.FloorMask, st.Valuables, st.ValuablesBaseline, st.SecondHalf, st.Extra, st.Hunter, st.CollapseUsed, st.Running, 0.6f, st.RewardCarry));
+            yield return PlayModeHarness.WaitUntil(() => failed == 1, Timeout, "the collapse ran out but never failed the dive");
+            yield return WaitSummary(host, s => s.DivePhase == DivePhase.Ended && !s.DeepClosesLatched, "the failed dive did not end the session");
+            Assert.That(host.ServerBagOf(hostId).Satchel.Waiting, Is.Not.Null, "the carried haul waits in a satchel");
+            Assert.That(host.ServerBagOf(hostId).Satchel.Waiting.Floor, Is.EqualTo(1));
+            Assert.That(failed, Is.EqualTo(1), "failed once");
         }
     }
 }

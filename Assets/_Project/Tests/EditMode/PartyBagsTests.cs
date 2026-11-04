@@ -84,5 +84,18 @@ namespace SleepingCalamity.Tests.EditMode
             p.Adopt("a", fresh);
             Assert.That(p.For("a"), Is.SameAs(fresh));
         }
+
+        // Catches: the stir counting usables, boots, the satchel or keys as valuables (decision: weapons and large items only), or missing a second player's bag.
+        [Test]
+        public void CarriedValuables_CountsLargeItemsInEveryBag_NotBootsNorTheSatchel()
+        {
+            var p = new PartyBags();
+            Assert.That(p.CarriedValuables(), Is.EqualTo(0));
+            p.For("a").Add(101); p.For("a").Add(CellarLoot.BootsId);
+            p.For("b").Add(112); p.For("b").Add(104);
+            p.For("c").Satchel.Restore(new LostSatchel(3, new[] { 101, 102, 103 }));
+            p.For("c").PickUpSatchel();
+            Assert.That(p.CarriedValuables(), Is.EqualTo(3), "101, 112, 104 are large; boots are gear; the satchel's items are not counted");
+        }
     }
 }

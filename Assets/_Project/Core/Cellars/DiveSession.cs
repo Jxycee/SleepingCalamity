@@ -123,11 +123,7 @@ namespace SleepingCalamity.Core
         {
             if (Phase != DivePhase.BankRoom || BankChosenThisDive) return false;
             Bags.PushOnAll();   // picks leave Carried
-            int valuables = 0;
-            foreach (var kv in Bags.All)
-                foreach (int item in kv.Value.Carried)
-                    if (BankSlots.IsStirValuable(CellarLoot.KindOf(item))) valuables++;
-            Stir.UnbankedValuables = valuables;   // the caller orders this: OnPushOn takes it as the baseline
+            Stir.UnbankedValuables = Bags.CarriedValuables();   // the caller orders this: OnPushOn takes it as the baseline
             Stir.OnPushOn();
             Momentum.OnPushOn();
             BankChosenThisDive = true;
