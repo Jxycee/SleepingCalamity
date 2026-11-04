@@ -85,6 +85,7 @@ namespace SleepingCalamity.Runtime
             ("dive", "checkpointHeld", typeof(bool)),
             ("dive", "bossBeaten", typeof(bool)),
             ("dive", "extraSlotOwner", typeof(string)),
+            ("dive", "pieceDepths", typeof(List<PieceDepthSave>)),   // a scalar where the list should be loses only that member (the array rows cover bad elements)
             ("suspend", "seed", typeof(uint)),
             ("suspend", "floor", typeof(int)),
             ("suspend", "phase", typeof(int)),
@@ -95,6 +96,8 @@ namespace SleepingCalamity.Runtime
             ("suspend", "stir", typeof(SuspendStirSave)),
             ("suspend", "momentum", typeof(SuspendMomentumSave)),
             ("suspend", "retry", typeof(SuspendRetrySave)),
+            ("suspend", "bags", typeof(List<SuspendedBag>)),
+            ("suspend", "presentIds", typeof(List<string>)),
         };
 
         public WorldSaveStore(string filePath, ulong defaultSeed)

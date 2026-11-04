@@ -719,6 +719,27 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(d.PieceDepths.Select(x => x.Id), Is.EqualTo(new[] { 100, 400 }));
         }
 
+        // Catches: a scalar where a new list belongs ("pieceDepths": "oops") deleting the whole dive section (its banked pieces and cleared floors with it), or the suspend section.
+        [Test]
+        public void NewListFields_HoldingAScalar_CostOnlyThatField()
+        {
+            File.WriteAllText(_path, WithSection("dive", "{ \"clearedMask\": 3, \"bankedPieces\": [100], \"pieceDepths\": \"oops\" }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionDive }));
+            Assert.That(store.Current.Dive, Is.Not.Null, "the dive section stays");
+            Assert.That(store.Current.Dive.ClearedMask, Is.EqualTo(3));
+            Assert.That(store.Current.Dive.BankedPieces, Is.EqualTo(new[] { 100 }));
+            Assert.That(store.Current.Dive.PieceDepths, Is.Null);
+
+            File.WriteAllText(_path, WithSection("suspend", "{ \"seed\": 5, \"floor\": 5, \"phase\": 2, \"presentIds\": \"oops\", \"bags\": 7 }"));
+            store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }));
+            Assert.That(store.Current.Suspend, Is.Not.Null, "the suspend section stays");
+            Assert.That(store.Current.Suspend.Floor, Is.EqualTo(5));
+            Assert.That(store.Current.Suspend.Bags, Is.Empty);
+            Assert.That(store.Current.Suspend.PresentIds, Is.Empty);
+        }
+
         static WorldPlayersSave WorldSaveStoreTestsPlayers()
         {
             WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { new PlayerKey(IdentityKind.Ugs, "aaa"), new PlayerKey(IdentityKind.Ugs, "bbb") }, out WorldPlayers players);
