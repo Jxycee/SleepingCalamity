@@ -162,7 +162,7 @@ namespace SleepingCalamity.Tests.EditMode
             p.Stash.Add(new LootCountSave { ItemId = 107, Count = TownSaveRules.MaxLootCount + 50 });   // clamped
             p.Satchel = new SatchelSave { Floor = 2, Items = new List<int> { 110, 0, -4, 111 } };
             raw.Players.Add(p);
-            var neg = new PlayerBagSave { Identity = 0, Id = "neg", Gold = -9, Satchel = new SatchelSave { Floor = 9, Items = new List<int> { 110 } } };
+            var neg = new PlayerBagSave { Identity = 0, Id = "neg", Gold = -9, Satchel = new SatchelSave { Floor = 11, Items = new List<int> { 110 } } };
             raw.Players.Add(neg);
             var empty = new PlayerBagSave { Identity = 0, Id = "empty", Satchel = new SatchelSave { Floor = 1, Items = new List<int> { 0 } }, Stash = null };
             raw.Players.Add(empty);
@@ -175,10 +175,24 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(c.Satchel.Items, Is.EqualTo(new[] { 110, 111 }));
             Assert.That(c.Satchel.Floor, Is.EqualTo(2));
             Assert.That(clean.Players[1].Gold, Is.EqualTo(0));
-            Assert.That(clean.Players[1].Satchel, Is.Null, "floor 9 is not a floor");
+            Assert.That(clean.Players[1].Satchel, Is.Null, "floor 11 is not a floor");
             Assert.That(clean.Players[2].Satchel, Is.Null, "an empty satchel is no satchel");
             Assert.That(clean.Players[2].Stash, Is.Not.Null.And.Empty);
             Assert.That(dropped.Count, Is.GreaterThan(0));
+        }
+
+        // Catches: the satchel's floor range still stopping at the old 4 floors (a satchel lost on floor 7 or 9 would be dropped on load), or no floor being refused.
+        [Test] public void Satchel_AtFloor9_IsKept()
+        {
+            var kept = new List<int>();
+            foreach (int floor in new[] { 0, 1, 7, 9, UndercroftPlan.BossFloor, 11, -2 })
+            {
+                var raw = new BagsSave();   // one entry per clean: Clean keeps at most WorldPlayers.MaxRecorded
+                raw.Players.Add(new PlayerBagSave { Identity = 0, Id = "p", Gold = 1, Satchel = new SatchelSave { Floor = floor, Items = new List<int> { 110 } } });
+                PlayerBagSave p = BagsSaveRules.Clean(raw, null).Players.Single();
+                kept.Add(p.Satchel == null ? 0 : p.Satchel.Floor);
+            }
+            Assert.That(kept, Is.EqualTo(new[] { 0, 1, 7, 9, 10, 0, 0 }));
         }
 
         [Test] public void Clean_KeepsUnknownMembers_AndNullStaysEmpty()

@@ -217,7 +217,8 @@ namespace SleepingCalamity.App
             }
         }
 
-        // Brings the live weapons and town into the file's value. Each is guarded alone: a failing one keeps its old section and the other still runs.
+        // Brings the live weapons and town into the file's value. Each is guarded alone: a failing one keeps its old section and the other still runs. "Town" here is every HostWorld town
+        // section: stock, town, residents, dive, bags and the bank-room suspend (plan 3 task 6; HostWorld.CaptureTownInto writes it, or clears it once it was used).
         private void CaptureSections()
         {
             try { if (world.CaptureWeaponsInto(store.Current)) store.MarkDirty(); }

@@ -175,6 +175,73 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(clean.Players.Recorded[0].Extra["colour"], Is.EqualTo("red"));
         }
     
+        static SuspendedBag SuspBag(string id, params int[] carried)
+        {
+            var b = new SuspendedBag { Identity = 0, Id = id };
+            b.Carried.AddRange(carried);
+            return b;
+        }
+
+        static WorldSave WithSuspend(int floor = 5, int phase = (int)DivePhase.BankRoom)
+        {
+            WorldSave w = Good();
+            w.Dive = new DiveSave { InDive = true, ClearedMask = 0b11111 };
+            w.Bags = new BagsSave { Players = { new PlayerBagSave { Identity = 0, Id = "a", Gold = 6 } } };
+            w.Suspend = new SuspendSave { Seed = 9u, Floor = floor, Phase = phase, PresentIds = { "Local:a" }, Bags = { SuspBag("a", 101, 102) } };
+            return w;
+        }
+
+        // Catches: the suspend section being dropped by Clean, rejected when it is good, or counted as a failed dive; a bad bag record costing the section.
+        [Test]
+        public void Clean_Suspend_IsKept_AndIsNotAFailedDive()
+        {
+            var rejected = new List<string>();
+            WorldSave clean = WorldSaveRules.Clean(WithSuspend(), DefaultSeed, rejected);
+            Assert.That(rejected, Is.Empty);
+            Assert.That(clean.Suspend, Is.Not.Null);
+            Assert.That(clean.Suspend.Bags[0].Carried, Is.EqualTo(new[] { 101, 102 }));
+            Assert.That(clean.Dive.InDive, Is.True, "a bank suspend is not a failed dive");
+            Assert.That(clean.Bags.Players[0].Gold, Is.EqualTo(6), "the home bags stay beside it");
+
+            WorldSave oneBad = WithSuspend();
+            oneBad.Suspend.Bags.Add(SuspBag("a", 101));   // a repeated id
+            rejected.Clear();
+            clean = WorldSaveRules.Clean(oneBad, DefaultSeed, rejected);
+            Assert.That(clean.Suspend.Bags.Count, Is.EqualTo(1));
+            Assert.That(rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }), "named so the original file is kept");
+        }
+
+        // Catches: a bad floor or phase in the suspend section taking the dive, bags or the rest of the file with it.
+        [Test]
+        public void BadSuspendFloor_DropsOnlySuspend()
+        {
+            foreach (WorldSave bad in new[] { WithSuspend(floor: 99), WithSuspend(phase: 7) })
+            {
+                var rejected = new List<string>();
+                WorldSave clean = WorldSaveRules.Clean(bad, DefaultSeed, rejected);
+                Assert.That(clean.Suspend, Is.Null);
+                Assert.That(rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }));
+                Assert.That(clean.Dive.ClearedMask, Is.EqualTo(0b11111), "the dive section is untouched");
+                Assert.That(clean.Dive.InDive, Is.False, "and with no valid suspend the quit is the old failed dive");
+                Assert.That(clean.Bags.Players[0].Gold, Is.EqualTo(6));
+                Assert.That(clean.Players.Recorded.Count, Is.EqualTo(3));
+            }
+        }
+
+        // Catches: an old save's dive section (no new fields) being rejected, so every old world would keep a .corrupt copy.
+        [Test]
+        public void OldDiveSection_WithoutTheNewFields_IsNotRejected()
+        {
+            WorldSave old = Good();
+            old.Dive = new DiveSave { ClearedMask = 3, CheckpointReached = true };
+            var rejected = new List<string>();
+            WorldSave clean = WorldSaveRules.Clean(old, DefaultSeed, rejected);
+            Assert.That(rejected, Is.Empty);
+            Assert.That(clean.Dive.CheckpointHeld, Is.False);
+            Assert.That(clean.Dive.PieceDepths, Is.Null);
+            Assert.That(clean.Suspend, Is.Null);
+        }
+
         // Catches (risk review): a section without a kind being read as Solo (the zero default) and the world quietly changing kind.
         [Test]
         public void Players_AMissingKindIsRejected_NeverReadAsSolo()

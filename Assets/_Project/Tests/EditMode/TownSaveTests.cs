@@ -174,13 +174,13 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(dropped.Count, Is.EqualTo(2));
         }
 
-        // Catches: a cleared mask with bits past floor 4 reaching DiveState, or unknown banked ids surviving.
+        // Catches: a cleared mask with bits past floor 10 reaching DiveSession (the mask holds the ten Undercroft floors since plan 3 task 6), or unknown banked ids surviving.
         [Test]
         public void CleanDive_MasksTheFloors_AndDropsUnknownIds()
         {
-            var d = new DiveSave { ClearedMask = 0xFF, BankedPieces = { Frame, 5, Frame }, BankedResidents = { "ghost" }, OnFloorPieces = { 12345 } };
+            var d = new DiveSave { ClearedMask = 0xFFF, BankedPieces = { Frame, 5, Frame }, BankedResidents = { "ghost" }, OnFloorPieces = { 12345 } };
             DiveSave c = TownSaveRules.CleanDive(d, new List<string>());
-            Assert.That(c.ClearedMask, Is.EqualTo(0b1111));
+            Assert.That(c.ClearedMask, Is.EqualTo(0x3FF));
             Assert.That(c.BankedPieces, Is.EqualTo(new[] { Frame })); Assert.That(c.BankedResidents, Is.Empty); Assert.That(c.OnFloorPieces, Is.Empty);
         }
 

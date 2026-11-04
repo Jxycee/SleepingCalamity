@@ -183,6 +183,51 @@ namespace SleepingCalamity.Core
             return b;
         }
 
+        // A bag from a bank-room suspend (plan 3 task 6, decision 9): the home part (gold, stash, waiting satchel) from the bags section and the mid-dive part (carried, banked this dive, dive gold,
+        // opened-chest mask, carried satchel, bank picks) from the suspend record. Either may be null. Both are cleaned by the rules first; this stays tolerant (it skips what does not fit)
+        // and shares nothing with the records. The bank visit is NOT opened here: the host opens it with ReopenBank(capacity) once it knows who is present, and the picks stay.
+        public static PlayerBag RestoreSuspended(PlayerBagSave home, SuspendedBag dive)
+        {
+            var b = new PlayerBag();
+            LostSatchel waiting = null;
+            if (home != null)
+            {
+                b.Gold = System.Math.Max(0, home.Gold);
+                if (home.Stash != null)
+                    foreach (LootCountSave r in home.Stash) if (r != null && r.ItemId > 0 && r.Count > 0) Bump(b._stash, r.ItemId, r.Count);
+                if (home.Satchel != null && home.Satchel.Items != null && home.Satchel.Items.Count > 0) waiting = new LostSatchel(home.Satchel.Floor, home.Satchel.Items);
+            }
+            b.Satchel.Restore(waiting);
+            if (dive == null) return b;
+            if (dive.Carried != null)
+                foreach (int id in dive.Carried) if (id > 0 && b._carried.Count < MaxCarried) b._carried.Add(id);
+            if (dive.BankedThisDive != null)
+                foreach (LootCountSave r in dive.BankedThisDive) if (r != null && r.ItemId > 0 && r.Count > 0) Bump(b._banked, r.ItemId, r.Count);
+            b.DiveGold = System.Math.Max(0, dive.DiveGold);
+            b.ChestSeed = dive.ChestSeed; b.ChestFloor = dive.ChestFloor; b.OpenedChests = dive.OpenedChests;
+            if (dive.CarriedSatchel != null && dive.CarriedSatchel.Items != null && dive.CarriedSatchel.Items.Count > 0)
+            {
+                b.Satchel.Restore(new LostSatchel(dive.CarriedSatchel.Floor, dive.CarriedSatchel.Items));   // a carried satchel and a waiting one never coexist: the carried one wins
+                b.Satchel.PickUp();
+            }
+            if (dive.Picks != null)
+                foreach (int p in dive.Picks)
+                {
+                    bool ok = p == SatchelPick ? b.Satchel.Carried != null : p >= 0 && p < b._carried.Count;
+                    if (ok && !b._picks.Contains(p)) b._picks.Add(p);
+                }
+            return b;
+        }
+
+        // Opens the bank visit again after a restore, keeping the picks that were made (a smaller party than before drops the excess from the end).
+        public void ReopenBank(int capacity)
+        {
+            SlotCapacity = System.Math.Max(0, capacity);
+            BankOpen = true;
+            while (_picks.Count > SlotCapacity) _picks.RemoveAt(_picks.Count - 1);
+            Version++;
+        }
+
         void CloseBank() { _picks.Clear(); SlotCapacity = 0; BankOpen = false; }
 
         static int Sum(Dictionary<int, int> d)

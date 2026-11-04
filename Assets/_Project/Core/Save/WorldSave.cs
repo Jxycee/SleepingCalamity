@@ -31,6 +31,8 @@ namespace SleepingCalamity.Core
         public WorldPlayersSave Players;        // null: no world created yet (the host flow creates its kind and players on the first start)
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public BagsSave Bags;                   // null: no player has gold, home stash or a waiting satchel yet (per-player loot, BagsSave.cs); a world with none writes no "bags" key
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public SuspendSave Suspend;             // null: no bank-room suspend (plan 3 task 6, SuspendSave.cs); a world with none writes no "suspend" key
 
         [JsonExtensionData] public Dictionary<string, object> Extra;   // unknown top-level members, round-tripped untouched
     }

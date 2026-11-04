@@ -64,14 +64,15 @@ namespace SleepingCalamity.Core
                 clean.Weapons = WeaponsSaveRules.Clean(save.Weapons, null, droppedWeapons);
                 if (droppedWeapons.Count > 0) rejected?.Add(SectionWeapons);
             }
-            if (save.Stock != null || save.Town != null || save.Residents != null || save.Dive != null || save.Bags != null)
+            if (save.Stock != null || save.Town != null || save.Residents != null || save.Dive != null || save.Bags != null || save.Suspend != null)
             {
                 // Each town section is cleaned on its own (a bad entry is dropped alone, named for the .corrupt copy), then the conservation pass
                 // (TownSaveRules.Reconcile) puts every piece and resident in exactly one place; a mid-dive quit counts as a failed dive.
                 // The per-player bags section is cleaned the same way (an entry that does not fit is dropped alone) and is outside the piece conservation.
+                // So is the bank-room suspend (a bad floor or phase drops only it; a bad bag record only that record), and a valid one keeps the dive from counting as failed.
                 var town = new List<string>();
-                TownSnapshot snap = TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = save.Stock, Town = save.Town, Residents = save.Residents, Dive = save.Dive, Bags = save.Bags }, town);
-                clean.Stock = snap.Stock; clean.Town = snap.Town; clean.Residents = snap.Residents; clean.Dive = snap.Dive; clean.Bags = snap.Bags;
+                TownSnapshot snap = TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = save.Stock, Town = save.Town, Residents = save.Residents, Dive = save.Dive, Bags = save.Bags, Suspend = save.Suspend }, town);
+                clean.Stock = snap.Stock; clean.Town = snap.Town; clean.Residents = snap.Residents; clean.Dive = snap.Dive; clean.Bags = snap.Bags; clean.Suspend = snap.Suspend;
                 foreach (string section in town) if (!(rejected?.Contains(section) ?? true)) rejected.Add(section);
             }
             if (save.Extra != null) clean.Extra = new Dictionary<string, object>(save.Extra);   // a newer build's members, written back as read

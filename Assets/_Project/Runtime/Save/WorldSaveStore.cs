@@ -42,6 +42,7 @@ namespace SleepingCalamity.Runtime
             ("residents", typeof(ResidentsSave), TownSaveRules.SectionResidents),
             ("dive", typeof(DiveSave), TownSaveRules.SectionDive),
             ("bags", typeof(BagsSave), WorldSaveRules.SectionBags),
+            ("suspend", typeof(SuspendSave), TownSaveRules.SectionSuspend),
         };   // every optional WorldSave section needs its row here, or one misfit value costs the whole file (WorldSaveStoreTests checks)
 
         // The sections every field of WorldSave maps to (by its JSON key), for the test that no section is missing from the table.
@@ -66,6 +67,9 @@ namespace SleepingCalamity.Runtime
             ("dive", "onFloorPieces", typeof(int)),
             ("dive", "onFloorResidents", typeof(string)),
             ("bags", "players", typeof(PlayerBagSave)),
+            ("dive", "pieceDepths", typeof(PieceDepthSave)),
+            ("suspend", "bags", typeof(SuspendedBag)),
+            ("suspend", "presentIds", typeof(string)),
         };
 
         // Members of a section that are checked one by one: a member that does not fit is dropped alone (section key, member key, type). A dropped
@@ -78,6 +82,19 @@ namespace SleepingCalamity.Runtime
             ("dive", "inDive", typeof(bool)),
             ("dive", "clearedMask", typeof(int)),
             ("dive", "checkpointReached", typeof(bool)),
+            ("dive", "checkpointHeld", typeof(bool)),
+            ("dive", "bossBeaten", typeof(bool)),
+            ("dive", "extraSlotOwner", typeof(string)),
+            ("suspend", "seed", typeof(uint)),
+            ("suspend", "floor", typeof(int)),
+            ("suspend", "phase", typeof(int)),
+            ("suspend", "bankChosen", typeof(bool)),
+            ("suspend", "startedAtBank", typeof(bool)),
+            ("suspend", "clearedMask", typeof(int)),
+            ("suspend", "extraSlotOwner", typeof(string)),
+            ("suspend", "stir", typeof(SuspendStirSave)),
+            ("suspend", "momentum", typeof(SuspendMomentumSave)),
+            ("suspend", "retry", typeof(SuspendRetrySave)),
         };
 
         public WorldSaveStore(string filePath, ulong defaultSeed)

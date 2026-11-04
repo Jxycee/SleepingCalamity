@@ -97,14 +97,15 @@ namespace SleepingCalamity.Runtime
             return true;
         }
 
-        // ---- the town sections (stock, town, residents, dive; M6 S2) ----
+        // ---- the town sections (stock, town, residents, dive; M6 S2) and the bank-room suspend (plan 3 task 6) ----
         // The host's live town and haul (M6 S3/S4: the hub's TownState, DiveState and the resident state) implement ITownSource. CaptureTown returns the sections as they
         // stand now (TownSaves.Capture does the work from a TownState and DiveState); it must not hand out the live objects. A section the source returns as null (or
         // loot counts / residents it passes as null to Capture) means "I do not know": the host keeps its previous copy of it, and a first-meet beat never goes back to false.
         // RestoreTown is called by RegisterTownSource, before the source is live (so a save flush can never capture its still-empty state over the loaded town): it gets its
         // own cleaned, conserved copy of the loaded sections and builds TownState / DiveHaul / DiveState / resident state from it, once, with TownSaves.ToState /
         // RestoreHaul / DiveState.RestoreProgress. Sections an older save lacks are null in that copy (the Town property itself is a snapshot whose sections may be null).
-        // A mid-dive quit has already been turned into a failed dive (InDive false).
+        // A mid-dive quit has already been turned into a failed dive (InDive false), unless the snapshot carries a valid suspend section (a bank-room save: Town.Suspend). A source that knows
+        // whether a suspend exists sets TownSnapshot.SuspendKnown (Suspend null then means none: the saved one was used and is cleared); one that says nothing keeps the saved section.
         public interface ITownSource { TownSnapshot CaptureTown(); void RestoreTown(TownSnapshot loaded); }
 
         private TownSnapshot _town = new TownSnapshot();
@@ -113,13 +114,29 @@ namespace SleepingCalamity.Runtime
         // The sections as last loaded or captured: separate copies, never the file's own objects. Sections an older save lacks are null.
         public TownSnapshot Town => _town;
 
+        // The floor of every piece and person (plan 3 decision 10), decided once per world: the saved depths where the dive section has them, else the world seed's assignment. Resolved by
+        // LoadTown and written back into the dive section at every capture, so a later save keeps them and nothing is recomputed. Empty before a world is loaded.
+        public IReadOnlyDictionary<int, int> PieceFloors { get; private set; } = new Dictionary<int, int>();
+
         // The saved sections (cleaned and conserved again) of `saved`, or none for null. Does not raise Changed: it came from disk. The old source is dropped: a new
         // world means the old world's town must not write into it.
         public void LoadTown(WorldSave saved)
         {
             _townSource = null;
             _town = saved == null ? new TownSnapshot()
-                : TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = saved.Stock, Town = saved.Town, Residents = saved.Residents, Dive = saved.Dive, Bags = saved.Bags }, null);
+                : TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = saved.Stock, Town = saved.Town, Residents = saved.Residents, Dive = saved.Dive, Bags = saved.Bags, Suspend = saved.Suspend }, null);
+            PieceFloors = saved != null && WorldSaveRules.TryParseSeed(saved.WorldSeed, out ulong seed) ? TownSaveRules.ResolvePieceDepths(_town.Dive, seed) : new Dictionary<int, int>();
+            StampPieceDepths();
+        }
+
+        // Writes PieceFloors into the host's dive section so the next save keeps them. Only when a dive section exists: creating one here would make Reconcile read every piece as lost
+        // (the dive section is the authority on what is still on the floors), and a fresh world without one gets its depths from the seed again, identically.
+        private void StampPieceDepths()
+        {
+            if (_town.Dive == null || PieceFloors.Count == 0) return;
+            var list = new List<PieceDepthSave>();
+            foreach (KeyValuePair<int, int> kv in PieceFloors) list.Add(new PieceDepthSave { Id = kv.Key, Floor = kv.Value });
+            _town.Dive.PieceDepths = list;
         }
 
         // One live source at a time (a newer hub takes over); the old one is captured first so nothing is lost.
@@ -144,7 +161,20 @@ namespace SleepingCalamity.Runtime
             if (_townSource == null) return;
             TownSnapshot live = _townSource.CaptureTown();
             if (live != null) live.Bags = RecordedBagsOnly(live.Bags);   // only the world's recorded players' bags reach the file (a client-id fallback or unrecorded player's never do)
-            if (live != null) _town = TownSaveRules.CleanSnapshot(TownSaveRules.MergeLive(live, _town), null, null, false);   // what the source did not say (null) keeps the previous copy
+            if (live != null) RecordedSuspendOnly(live);                 // and the same for the suspend section's bag records
+            if (live != null)
+            {
+                _town = TownSaveRules.CleanSnapshot(TownSaveRules.MergeLive(live, _town), null, null, false);   // what the source did not say (null) keeps the previous copy
+                StampPieceDepths();
+            }
+        }
+
+        // The suspend section with the recorded players' records only. Without a world yet the source's word cannot be checked: it is treated as saying nothing (the saved section stays).
+        private void RecordedSuspendOnly(TownSnapshot live)
+        {
+            if (live.Suspend == null) return;
+            if (Players == null) { live.Suspend = null; live.SuspendKnown = false; return; }
+            live.Suspend = SuspendSaveRules.OnlyRecorded(live.Suspend, key => Players.IsRecorded(key));
         }
 
         // The bags of the recorded players only; null (the previous copy is kept) when the source said nothing or the world has no players yet.
@@ -171,7 +201,16 @@ namespace SleepingCalamity.Runtime
             changed |= SyncSection(ref save.Residents, copy.Residents, TownSaveRules.IsPristine(copy.Residents));
             changed |= SyncSection(ref save.Dive, copy.Dive, TownSaveRules.IsPristine(copy.Dive));
             changed |= SyncSection(ref save.Bags, copy.Bags, BagsSaveRules.IsPristine(copy.Bags));   // a world with no bags writes no "bags" key
+            changed |= SyncOptional(ref save.Suspend, copy.Suspend);                                  // null means none: a used suspend is cleared from the file, and none writes no "suspend" key
             return changed;
+        }
+
+        private static bool SyncOptional<T>(ref T file, T captured) where T : class
+        {
+            if (captured == null && file == null) return false;
+            if (captured != null && file != null && JsonConvert.SerializeObject(captured) == JsonConvert.SerializeObject(file)) return false;
+            file = captured;
+            return true;
         }
 
         private static bool SyncSection<T>(ref T file, T captured, bool pristine) where T : class
@@ -221,6 +260,8 @@ namespace SleepingCalamity.Runtime
                     {
                         GrowthSaves.Rename(_weapons, previousOwner.Id, key.Id);   // the Solo world's weapons follow its owner (A32)
                         BagsSaveRules.Rename(_town.Bags, previousOwner, key);     // so do the owner's gold, stash and waiting satchel
+                        SuspendSaveRules.Rename(_town.Suspend, previousOwner, key);   // and a bank-room suspend's record of them
+                        if (_town.Dive != null) _town.Dive.ExtraSlotOwner = SuspendSaveRules.RenameId(_town.Dive.ExtraSlotOwner, previousOwner, key);
                     }
                     Debug.LogWarning("HostWorld: the Solo world's owner key did not match this machine's key; the owner is now " + key + ".");
                     RaiseChanged();

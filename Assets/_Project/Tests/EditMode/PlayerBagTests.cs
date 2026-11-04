@@ -253,6 +253,36 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(b.StashTotal, Is.EqualTo(3));
         }
 
+        // Catches: a bag restored from a bank-room suspend missing any part of its mid-dive state, or the restore opening a visit / sharing the record's lists.
+        [Test]
+        public void PlayerBag_RestoreSuspended_RebuildsCarriedBankedGoldChestsSatchelPicks()
+        {
+            var home = new PlayerBagSave { Identity = 0, Id = "aaaa", Gold = 5, Stash = { new LootCountSave { ItemId = 109, Count = 2 } }, Satchel = new SatchelSave { Floor = 2, Items = { 110 } } };
+            var dive = new SuspendedBag
+            {
+                Identity = 0, Id = "aaaa", Carried = { 104, 105, 106 }, BankedThisDive = { new LootCountSave { ItemId = 101, Count = 2 } },
+                DiveGold = 7, ChestSeed = 55u, ChestFloor = 3, OpenedChests = (1UL << 63) | 1UL, Picks = { 1, PlayerBag.SatchelPick },
+                CarriedSatchel = new SatchelSave { Floor = 4, Items = { 120, 121 } },
+            };
+            PlayerBag b = PlayerBag.RestoreSuspended(home, dive);
+            Assert.That(b.Carried, Is.EqualTo(new[] { 104, 105, 106 }));
+            Assert.That(b.BankedThisDive, Is.EqualTo(new Dictionary<int, int> { { 101, 2 } }));
+            Assert.That(b.DiveGold, Is.EqualTo(7));
+            Assert.That(b.Gold, Is.EqualTo(5));
+            Assert.That(b.Stash, Is.EqualTo(new Dictionary<int, int> { { 109, 2 } }));
+            Assert.That(b.ChestSeed, Is.EqualTo(55u)); Assert.That(b.ChestFloor, Is.EqualTo(3));
+            Assert.That(b.OpenedChests, Is.EqualTo((1UL << 63) | 1UL));
+            Assert.That(b.ChestOpened(55u, 3, 63), Is.True);
+            Assert.That(b.Satchel.Carried.Floor, Is.EqualTo(4)); Assert.That(b.Satchel.Carried.Items, Is.EqualTo(new[] { 120, 121 }));
+            Assert.That(b.Satchel.Waiting, Is.Null, "a carried satchel and a waiting one never exist together: the carried one wins");
+            Assert.That(b.Picks, Is.EqualTo(new[] { 1, PlayerBag.SatchelPick }));
+            Assert.That(b.BankOpen, Is.False);
+            dive.Carried.Add(999);
+            Assert.That(b.Carried.Count, Is.EqualTo(3), "the bag shares nothing with the record");
+            Assert.That(b.HasBoots, Is.False);
+            Assert.That(PlayerBag.RestoreSuspended(null, new SuspendedBag { Carried = { CellarLoot.BootsId } }).HasBoots, Is.True, "boots carried count after a restore too");
+        }
+
         [Test]
         public void KindOf_TableItemsAreLarge_KeysAreKeys()
         {
