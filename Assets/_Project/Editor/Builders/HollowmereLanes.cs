@@ -29,7 +29,6 @@ namespace SleepingCalamity.EditorTools
             ("LK_Mortar", "sandstone", new Color(0.26f, 0.245f, 0.21f), 0.6f), ("LK_Oak", "oak_timber", new Color(0.80f, 0.76f, 0.72f), 1.2f),
             ("LK_GatePaint", "painted_wood", new Color(0.66f, 0.72f, 0.28f), 1.0f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
             ("LK_GutterStone", "sandstone", new Color(0.50f, 0.48f, 0.44f), 1.5f),
-            ("LK_StepNosing", "sandstone", new Color(0.60f, 0.56f, 0.48f), 0.5f),   // stair nosing: the sandstone PBR set, lighter and worn against the tread (tint lifted, soft relief), metres UVs from NosingMesh   // gutter channel: LK_Mortar read as a near-black ribbon
         };
 
         // Local box (centre, size) of each piece at the contract extents: the greybox mesh, and the collider of walls, piers and steps.
@@ -75,6 +74,7 @@ namespace SleepingCalamity.EditorTools
         public static void Build(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
         {
             List<LaneKitRow> rows = LaneKitPlan.Plan(t);
+            _treadMeshes.Clear();
             GameObject fbx = ArtPresent ? BeautyCornerArt.LoadModel(Folder, FbxName, keepMaterialSlots: true) : null;
             Dictionary<string, Material> slots = fbx != null ? BuildMaterials() : null;
             var tally = new List<string>();
@@ -104,7 +104,7 @@ namespace SleepingCalamity.EditorTools
                         // stairs seat 3: a bottom step whose tread lies below the paving in front of it (contactY above its tread) is buried: it is only a walk collider, no visible piece
                         // (its visible stub stuck out beside the next column's sunk first step in Cap_HM_StairSide1)
                         if (stepBottom && contactY > rowY + 0.16f + 0.02f) { foreach (Renderer rend in obj.GetComponentsInChildren<Renderer>()) rend.enabled = false; }
-                        else { AddStepSkirt(obj.transform, r, t, rowY); AddStepReadability(obj.transform); if (stepBottom) AddContactStrip(obj.transform, contactY - rowY); }
+                        else { AddStoneTread(obj.transform, r); AddStepSkirt(obj.transform, r, t, rowY); AddStepReadability(obj.transform); if (stepBottom) AddContactStrip(obj.transform, contactY - rowY); }
                     }
                     if (isRebuilt && r.Piece == LanePiece.WallLantern) AddLanternLight(obj.transform);
                     placed++;
@@ -198,16 +198,9 @@ namespace SleepingCalamity.EditorTools
         // A9: tread and riser shapes read in the stone pattern. Local frame of a LaneStep (BoxOf): the tread top at y 0.16 spans z 0..0.55 uphill, the riser is the
         // z = 0 face. A pale nosing along the tread's front edge (visual only, no collider, no shadow casting). A dark riser band was tried in round 1 and floated black wedges over the
         // terrain at the flight's edges (Cap_HM_TerraceSteps), so it is gone.
-        static Material _nosing;
+        // Stairs stone r1 (town-art-leftovers): the pale Nosing strip is gone (it was one more plank band); the StoneTread slabs carry a real chamfered nosing instead.
         static void AddStepReadability(Transform step)
         {
-            if (_nosing == null)
-            {
-                _nosing = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LK_StepNosing.mat") ?? LookTestBuilder.Mat("sandstone");
-            }
-            GameObject n = LookTestBuilder.Prim(step, "Nosing", PrimitiveType.Cube, new Vector3(0f, 0.158f, 0.10f), Vector3.one, _nosing);
-            n.GetComponent<MeshFilter>().sharedMesh = NosingMesh();
-            n.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // stairs seat 3: soft contact gradients instead of black bars. A thin quad under the nosing on the riser and one on the back of the tread, vertex alpha fading
             // from ~38% dark (30-40% darker than the stone under it) to clear over 5 cm / 14 cm. Translucent, no collider, no shadows, so nothing reads as a black slot.
             if (_shade == null)
@@ -219,10 +212,10 @@ namespace SleepingCalamity.EditorTools
                 _shade.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); _shade.SetOverrideTag("RenderType", "Transparent"); _shade.renderQueue = 3000;
                 EditorUtility.SetDirty(_shade);
             }
-            GameObject ri = LookTestBuilder.Prim(step, "RiserShade", PrimitiveType.Quad, new Vector3(0f, 0.1375f - 0.025f, -0.016f), new Vector3(1.96f, 0.05f, 1f), _shade);
+            GameObject ri = LookTestBuilder.Prim(step, "RiserShade", PrimitiveType.Quad, new Vector3(0f, 0.1375f - 0.025f, -0.034f), new Vector3(1.96f, 0.05f, 1f), _shade);   // stairs stone r1: 4 mm in front of the slab riser face (z -0.03)
             ri.GetComponent<MeshFilter>().sharedMesh = ShadeMesh();
             ri.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Quad, new Vector3(0f, 0.162f, 0.55f - 0.07f), new Vector3(1.96f, 0.14f, 1f), _shade);
+            GameObject sh = LookTestBuilder.Prim(step, "TreadShade", PrimitiveType.Quad, new Vector3(0f, 0.168f, 0.55f - 0.07f), new Vector3(1.96f, 0.14f, 1f), _shade);
             sh.GetComponent<MeshFilter>().sharedMesh = ShadeMesh();
             sh.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             sh.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -246,28 +239,123 @@ namespace SleepingCalamity.EditorTools
             return _shadeMesh;
         }
 
-        // 2 x 0.04 x 0.24 m box, five faces (no underside), UVs in metres (one tile per NosingTileMetres) so the stone is not stretched across the thin strip.
-        const float NosingTileMetres = 1f;
-        static Mesh _nosingMesh;
-        static Mesh NosingMesh()
+        // stairs stone r1 (town-art-leftovers): three 0.19 m sett rows per tread read as planks from the play camera; full-depth slabs with staggered joints and a chamfered nosing.
+        // The art step's renderers are switched off (its BoxCollider stays the walk surface); a builder-made "StoneTread" child replaces them. Local frame of a LaneStep: tread top
+        // y 0.16 over z 0..0.55 uphill, riser at z 0. The child carries localScale.x = 1 / ScaleX, which cancels the step's X scale, so the mesh is authored in true metres
+        // (slab widths, bevels and normals are not stretched). Each slab is one piece front to back (z -0.03..0.55, a 3 cm overhanging nosing) from y 0.10 (the top of the
+        // StoneBlock skirt) to 0.16 +/- 4 mm, with a 2.5 cm front chamfer, 5 mm back chamfer, 8 mm side chamfers and a 3-5 mm worn dip. Submesh 1 is a dark mortar quad at y 0.145 under the 9 mm joints.
+        // Vertex colour is the WearLit mask (R grime, G moss, B polish); never (1,1,1). Meshes are built per (row Id, X scale), cached for the second preset, deterministic (System.Random
+        // seeded from the Id) and live in the scene like the other builder meshes. Joints are random per step (seeded by the Id), which staggers neighbours without needing the flight order.
+        static readonly Dictionary<string, Mesh> _treadMeshes = new Dictionary<string, Mesh>();
+        static Material _mortar;
+        static void AddStoneTread(Transform step, LaneKitRow r)
         {
-            if (_nosingMesh != null) return _nosingMesh;
-            const float hx = 1f, hy = 0.02f, hz = 0.12f, t = NosingTileMetres;
-            var v = new List<Vector3>(); var uv = new List<Vector2>(); var tri = new List<int>();
-            void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 n, Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud)
+            foreach (Renderer rend in step.GetComponentsInChildren<Renderer>(true)) rend.enabled = false;
+            if (_dressed == null) _dressed = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LK_Dressed.mat") ?? LookTestBuilder.Mat("sandstone");
+            if (_mortar == null) _mortar = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_LK_Mortar.mat") ?? _dressed;
+            string key = r.Id + "|" + r.ScaleX.ToString("0.###");
+            if (!_treadMeshes.TryGetValue(key, out Mesh mesh) || mesh == null) _treadMeshes[key] = mesh = BuildTreadMesh(r);
+            var go = new GameObject("StoneTread");
+            go.transform.SetParent(step, false);
+            go.transform.localScale = new Vector3(1f / Mathf.Max(0.01f, r.ScaleX), 1f, 1f);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterials = new[] { _dressed, _mortar };
+            mr.shadowCastingMode = ShadowCastingMode.On; mr.receiveShadows = true;
+        }
+
+        static int StableSeed(string s) { unchecked { uint h = 2166136261u; foreach (char ch in s ?? "") h = (h ^ ch) * 16777619u; return (int)(h & 0x7fffffff); } }
+
+        static Mesh BuildTreadMesh(LaneKitRow r)
+        {
+            var rnd = new System.Random(StableSeed(r.Id));
+            float Rnd() => (float)rnd.NextDouble();
+            var P = new List<Vector3>(); var N = new List<Vector3>(); var UVs = new List<Vector2>(); var C = new List<Color>();
+            var T0 = new List<int>(); var T1 = new List<int>();
+            int V(Vector3 p, Vector3 n, Vector2 uv, Color c) { P.Add(p); N.Add(n); UVs.Add(uv); C.Add(c); return P.Count - 1; }
+            void Tri(List<int> T, int a, int b, int c, Vector3 n)
             {
-                int i = v.Count; v.Add(a); v.Add(b); v.Add(c); v.Add(d); uv.Add(ua / t); uv.Add(ub / t); uv.Add(uc / t); uv.Add(ud / t);
-                Vector3 cr = Vector3.Cross(b - a, c - a);
-                if (Vector3.Dot(cr, n) >= 0f) tri.AddRange(new[] { i, i + 1, i + 2, i, i + 2, i + 3 }); else tri.AddRange(new[] { i, i + 2, i + 1, i, i + 3, i + 2 });
+                if (Vector3.Dot(Vector3.Cross(P[b] - P[a], P[c] - P[a]), n) >= 0f) { T.Add(a); T.Add(b); T.Add(c); } else { T.Add(a); T.Add(c); T.Add(b); }
             }
-            Quad(new Vector3(-hx, hy, -hz), new Vector3(-hx, hy, hz), new Vector3(hx, hy, hz), new Vector3(hx, hy, -hz), Vector3.up, new Vector2(0, 0), new Vector2(0, 2 * hz), new Vector2(2 * hx, 2 * hz), new Vector2(2 * hx, 0));
-            Quad(new Vector3(-hx, -hy, -hz), new Vector3(-hx, hy, -hz), new Vector3(hx, hy, -hz), new Vector3(hx, -hy, -hz), Vector3.back, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hx, 2 * hy), new Vector2(2 * hx, 0));
-            Quad(new Vector3(-hx, -hy, hz), new Vector3(-hx, hy, hz), new Vector3(hx, hy, hz), new Vector3(hx, -hy, hz), Vector3.forward, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hx, 2 * hy), new Vector2(2 * hx, 0));
-            Quad(new Vector3(-hx, -hy, -hz), new Vector3(-hx, hy, -hz), new Vector3(-hx, hy, hz), new Vector3(-hx, -hy, hz), Vector3.left, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hz, 2 * hy), new Vector2(2 * hz, 0));
-            Quad(new Vector3(hx, -hy, -hz), new Vector3(hx, hy, -hz), new Vector3(hx, hy, hz), new Vector3(hx, -hy, hz), Vector3.right, new Vector2(0, 0), new Vector2(0, 2 * hy), new Vector2(2 * hz, 2 * hy), new Vector2(2 * hz, 0));
-            _nosingMesh = new Mesh { name = "LK_StepNosingBox", vertices = v.ToArray(), uv = uv.ToArray(), triangles = tri.ToArray() };
-            _nosingMesh.RecalculateNormals(); _nosingMesh.RecalculateTangents(); _nosingMesh.RecalculateBounds();
-            return _nosingMesh;
+            void Quad(List<int> T, int a, int b, int c, int d, Vector3 n) { Tri(T, a, b, c, n); Tri(T, a, c, d, n); }
+
+            const float zf = -0.03f, zb = 0.55f, yb = 0.10f, cf = 0.025f, cb = 0.005f, cs = 0.008f, gap = 0.009f;
+            float W = 2f * r.ScaleX;
+            int count = Mathf.Max(2, Mathf.CeilToInt((W + 0.05f) / 0.95f));
+            var wd = new float[count]; float sum = 0f;
+            for (int i = 0; i < count; i++) { wd[i] = 0.8f + 0.4f * Rnd(); sum += wd[i]; }
+            float cursor = -W * 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                float sx0 = cursor, sx1 = cursor + wd[i] / sum * W; cursor = sx1;
+                bool leftOuter = i == 0, rightOuter = i == count - 1;
+                float x0 = sx0 + (leftOuter ? 0f : gap * 0.5f), x1 = sx1 - (rightOuter ? 0f : gap * 0.5f);
+                float yt = 0.16f + (Rnd() * 2f - 1f) * 0.004f, dip = 0.003f + 0.002f * Rnd(), rBase = 0.03f + 0.15f * Rnd();
+                float offU = Rnd(), offV = Rnd(); bool flip = Rnd() < 0.5f;
+                Vector2 UV(float a, float b) => flip ? new Vector2(-(a + offU), -(b + offV)) : new Vector2(a + offU, b + offV);
+                float Moss(float x)
+                {
+                    float m = 0.03f;
+                    if (leftOuter) m = Mathf.Max(m, 0.5f * Mathf.Clamp01(1f - (x - x0) / 0.06f)); else m = Mathf.Max(m, 0.14f * Mathf.Clamp01(1f - (x - x0) / 0.04f));
+                    if (rightOuter) m = Mathf.Max(m, 0.5f * Mathf.Clamp01(1f - (x1 - x) / 0.06f)); else m = Mathf.Max(m, 0.14f * Mathf.Clamp01(1f - (x1 - x) / 0.04f));
+                    return m;
+                }
+                Color Col(float x, float z, float polish) => new Color(Mathf.Min(0.2f, rBase * (1f + 0.5f * (z - zf) / (zb - zf))), Moss(x), Mathf.Clamp(polish, 0f, 0.8f), 1f);
+
+                float xa = x0 + cs, xb = x1 - cs, za = zf + cf, zc = zb - cb, yF = yt - cf, yB = yt - cb;
+                // top grid: 5 x 5 vertices, columns tight at the ends for the moss band, rows dense at the front; analytic smooth normals from the dip bump (1-u^2)(1-v^2)
+                float[] gx = { xa, Mathf.Min(x0 + 0.06f, (xa + xb) * 0.5f), (xa + xb) * 0.5f, Mathf.Max(x1 - 0.06f, (xa + xb) * 0.5f), xb };
+                float[] gz = { za, za + 0.1f, (za + zc) * 0.5f, zc - 0.1f, zc };
+                float xc = (xa + xb) * 0.5f, hx = (xb - xa) * 0.5f, zcen = (za + zc) * 0.5f, hz = (zc - za) * 0.5f;
+                var g = new int[5, 5];
+                for (int a = 0; a < 5; a++)
+                    for (int b = 0; b < 5; b++)
+                    {
+                        float u = (gx[a] - xc) / hx, v = (gz[b] - zcen) / hz, bump = (1f - u * u) * (1f - v * v);
+                        float dhdx = dip * 2f * u * (1f - v * v) / hx, dhdz = dip * 2f * v * (1f - u * u) / hz;
+                        g[a, b] = V(new Vector3(gx[a], yt - dip * bump, gz[b]), new Vector3(-dhdx, 1f, -dhdz).normalized, UV(gx[a], gz[b]), Col(gx[a], gz[b], 0.7f * bump + (b == 0 ? 0.6f : 0f)));
+                    }
+                for (int a = 0; a < 4; a++) for (int b = 0; b < 4; b++) Quad(T0, g[a, b], g[a, b + 1], g[a + 1, b + 1], g[a + 1, b], Vector3.up);
+
+                // chamfer ring: inner corners at the top grid's edge, outer corners at the slab outline (front 2.5 cm, back 5 mm, sides 8 mm wide)
+                Vector3 oFL = new Vector3(x0, yF, zf), oFR = new Vector3(x1, yF, zf), oBR = new Vector3(x1, yB, zb), oBL = new Vector3(x0, yB, zb);
+                Vector3 iFL = new Vector3(xa, yt, za), iFR = new Vector3(xb, yt, za), iBR = new Vector3(xb, yt, zc), iBL = new Vector3(xa, yt, zc);
+                void Bevel(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, bool sideUV, float pol0, float pol1)
+                {
+                    Vector3 n = Vector3.Cross(p2 - p0, p3 - p1).normalized; if (n.y < 0f) n = -n;
+                    Vector2 Map(Vector3 p) => sideUV ? UV(p.z, p.y) : UV(p.x, p.y);
+                    int a = V(p0, n, Map(p0), Col(p0.x, p0.z, pol0)), b = V(p1, n, Map(p1), Col(p1.x, p1.z, pol0));
+                    int c = V(p2, n, Map(p2), Col(p2.x, p2.z, pol1)), d = V(p3, n, Map(p3), Col(p3.x, p3.z, pol1));
+                    Quad(T0, a, b, c, d, n);
+                }
+                Bevel(oFL, oFR, iFR, iFL, false, 0.75f, 0.6f);   // front chamfer: 45 degrees, polished (the line that catches the light)
+                Bevel(oBR, oBL, iBL, iBR, false, 0.05f, 0.05f);
+                Bevel(oBL, oFL, iFL, iBL, true, 0.1f, 0.05f);
+                Bevel(oFR, oBR, iBR, iFR, true, 0.1f, 0.05f);
+                // walls (y 0.10 up to the chamfer outline); the underside sits on the StoneBlock skirt and is not built
+                void Wall(Vector3 lo0, Vector3 lo1, Vector3 hi1, Vector3 hi0, Vector3 n, bool sideUV)
+                {
+                    Vector2 Map(Vector3 p) => sideUV ? UV(p.z, p.y) : UV(p.x, p.y);
+                    float pol = n.z < -0.5f ? 0.2f : 0f;
+                    int a = V(lo0, n, Map(lo0), Col(lo0.x, lo0.z, 0f)), b = V(lo1, n, Map(lo1), Col(lo1.x, lo1.z, 0f));
+                    int c = V(hi1, n, Map(hi1), Col(hi1.x, hi1.z, pol)), d = V(hi0, n, Map(hi0), Col(hi0.x, hi0.z, pol));
+                    Quad(T0, a, b, c, d, n);
+                }
+                Wall(new Vector3(x0, yb, zf), new Vector3(x1, yb, zf), oFR, oFL, Vector3.back, false);
+                Wall(new Vector3(x1, yb, zb), new Vector3(x0, yb, zb), oBL, oBR, Vector3.forward, false);
+                Wall(new Vector3(x0, yb, zb), new Vector3(x0, yb, zf), oFL, oBL, Vector3.left, true);
+                Wall(new Vector3(x1, yb, zf), new Vector3(x1, yb, zb), oBR, oFR, Vector3.right, true);
+            }
+            // mortar: one dark quad under the joints, y 0.145, the full tread footprint (slabs hide all but the 9 mm gaps)
+            Color mc = new Color(0.55f, 0.1f, 0f, 1f);
+            int m0 = V(new Vector3(-W * 0.5f, 0.145f, zf), Vector3.up, new Vector2(-W * 0.5f, zf), mc), m1 = V(new Vector3(-W * 0.5f, 0.145f, zb), Vector3.up, new Vector2(-W * 0.5f, zb), mc);
+            int m2 = V(new Vector3(W * 0.5f, 0.145f, zb), Vector3.up, new Vector2(W * 0.5f, zb), mc), m3 = V(new Vector3(W * 0.5f, 0.145f, zf), Vector3.up, new Vector2(W * 0.5f, zf), mc);
+            Quad(T1, m0, m1, m2, m3, Vector3.up);
+
+            var mesh = new Mesh { name = "LK_StoneTread_" + r.Id, vertices = P.ToArray(), normals = N.ToArray(), uv = UVs.ToArray(), colors = C.ToArray(), subMeshCount = 2 };
+            mesh.SetTriangles(T0, 0); mesh.SetTriangles(T1, 1);
+            mesh.RecalculateBounds(); mesh.RecalculateTangents();
+            return mesh;
         }
 
         static string Family(LaneKitRow r)
