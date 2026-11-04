@@ -285,13 +285,14 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || session == null) return false;
             _session = session; _heal = null; _visitExtraOwner = -1; _choice.Cancel(); if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
-        // Host only: adopts the session a resumed suspend rebuilt (DiveDirector.ServerResumeSuspended): the saved dive seed, and the bank room's extra-slot owner kept as it was (it was set
-        // before the quit, so PreviousExtraOwner is not written again this visit).
+        // Host only: adopts the session a resumed suspend rebuilt (DiveDirector.ServerResumeSuspended): the saved dive seed, and the bank room's extra-slot owner kept as it was (when it had one it
+        // was set before the quit, so PreviousExtraOwner is not written again this visit).
         public bool ServerAdoptResumed(DiveSession session, uint diveSeed)
         {
             if (!ServerAdopt(session)) return false;
             DiveSeed = diveSeed;
-            _visitPrior = PreviousExtraOwner; _previousSet = true;
+            _visitPrior = PreviousExtraOwner;
+            _previousSet = session.ExtraSlotOwner >= 0;   // an owner picked before the quit is already recorded; a resumed room with none (fewer than three players) records the one picked later
             _visitExtraOwner = session.ExtraSlotOwner;
             _lastPresentIds.Clear();
             Publish();

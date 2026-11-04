@@ -159,11 +159,11 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         // A direct host (no scenes), one client with PlayerId(clientIndex), and a configured director that registers with the real HostWorld.
-        private static IEnumerator StartSavedHost(int clientIndex, List<PlayModeHarness.TestClient> clients, System.Action<AppBootstrap, DiveDirector> done)
+        private static IEnumerator StartSavedHost(int clientIndex, List<PlayModeHarness.TestClient> clients, System.Action<AppBootstrap, DiveDirector> done, int clientCount = 1)
         {
             AppBootstrap app = AppBootstrap.Current;
             yield return PlayModeHarness.StartDirectHostWithoutScenes();
-            yield return PlayModeHarness.StartClients(app, 1, false, clients, clientIndex);
+            yield return PlayModeHarness.StartClients(app, clientCount, false, clients, clientIndex);
             NetworkManager hostNm = app.NetworkManager;
             NetworkObject o = hostNm.SpawnManager.InstantiateAndSpawn(Prefab<DiveDirector>(hostNm), hostNm.LocalClientId, false, false, false, Vector3.zero, Quaternion.identity);
             DiveDirector dir = o.GetComponent<DiveDirector>();
@@ -257,6 +257,87 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(w5.Suspend, Is.Null);
             Assert.That(w5.Dive.InDive, Is.False, "a failed dive is over");
             Assert.That(w5.Bags.Players.Single(p => p.Id == aId).Satchel, Is.Not.Null, "its carried item waits in a satchel");
+        }
+
+        // Catches: the last capture of a real quit (DiveDirector.OnNetworkDespawn -> UnregisterTownSource) running after DiveHaulSync despawned, so a 3-player bank room was saved with ExtraSlotOwner null
+        // and no PresentIds, and the resumed visit picked the extra slot again (the owner lost it). Goes through the real shutdown (LeaveAndWaitForLobby), not SaveNow.
+        [UnityTest]
+        public IEnumerator Director_ThreePlayerBankRoomQuit_SavesTheExtraSlotOwner_ResumeKeepsIt()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            _dir = PlayModeHarness.BeginSaveTest();
+            WorldSaveStore.PathOverrideForTests = Path.Combine(_dir, "legacy-single-file", "world.json");
+
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveDirector dir = null;
+            yield return StartSavedHost(20, clients, (a, d) => { app = a; dir = d; }, 2);
+            string worldId = app.WorldSaveFlow.SelectedWorldId;
+            ulong[] ids = { app.NetworkManager.LocalClientId, clients[0].NetworkManager.LocalClientId, clients[1].NetworkManager.LocalClientId };
+            dir.SeedOverride = 6202u;
+            Assert.That(dir.ServerStartDive(), Is.True);
+            DiveHaulSync haul = dir.HaulSync;
+            foreach (ulong id in ids) Assert.That(haul.ServerAddItem(id, 104), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            int ownerSlot = haul.Session.ExtraSlotOwner;
+            Assert.That(ownerSlot, Is.InRange(0, 3), "premise: three players, one has the extra slot");
+            string ownerId = haul.IdsBySlot()[ownerSlot];
+            Assert.That(ownerId, Is.Not.Null);
+
+            // the quit: Leave runs the ShuttingDown save, then NGO despawns the director (its last capture), then the final save
+            yield return PlayModeHarness.LeaveAndWaitForLobby();
+            foreach (PlayModeHarness.TestClient c in clients) if (c.Session.State != ConnState.Offline) yield return PlayModeHarness.Await(c.Session.LeaveAsync(), Timeout);
+            WorldSave w1 = ReadWorld(_dir, worldId);
+            Assert.That(w1.Suspend, Is.Not.Null, "the quit in the bank room wrote a suspend");
+            Assert.That(w1.Suspend.ExtraSlotOwner, Is.EqualTo(ownerId), "the extra slot's owner survives the real shutdown");
+            Assert.That(w1.Suspend.PresentIds.Count, Is.EqualTo(3), "and so do the players present");
+            Assert.That(w1.Dive.ExtraSlotOwner, Is.EqualTo(ownerId), "the previous-owner mark too");
+
+            // session 2: the same three players; the resumed visit keeps the owner (it is not picked again)
+            var again = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app2 = null; DiveDirector dir2 = null;
+            yield return StartSavedHost(20, again, (x, d) => { app2 = x; dir2 = d; }, 2);
+            Assert.That(dir2.ServerStartDive(), Is.True, "the trapdoor resumes it");
+            DiveHaulSync haul2 = dir2.HaulSync;
+            Assert.That(dir2.Session.Phase, Is.EqualTo(DivePhase.BankRoom));
+            Assert.That(haul2.SlotOfBagId(ownerId), Is.EqualTo(dir2.Session.ExtraSlotOwner), "the same player still has the extra slot");
+            ulong[] ids2 = { app2.NetworkManager.LocalClientId, again[0].NetworkManager.LocalClientId, again[1].NetworkManager.LocalClientId };
+            int twos = 0;
+            foreach (ulong id in ids2) if (haul2.ServerBagOf(id).SlotCapacity == 2) { twos++; Assert.That(haul2.PlayerIdOf(id), Is.EqualTo(ownerId)); }
+            Assert.That(twos, Is.EqualTo(1));
+        }
+
+        // Catches: ServerAdoptResumed marking PreviousExtraOwner as already written for a resumed visit that had NO extra owner (two players), so a third player joining later picked an owner that was
+        // never recorded as the previous one (the same player could then have the extra slot on the next visit too).
+        [UnityTest]
+        public IEnumerator Director_ResumedTwoPlayerRoom_ThirdPlayerJoins_RecordsTheNewExtraOwner()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            _dir = PlayModeHarness.BeginSaveTest();
+            WorldSaveStore.PathOverrideForTests = Path.Combine(_dir, "legacy-single-file", "world.json");
+
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveDirector dir = null;
+            yield return StartSavedHost(20, clients, (a, d) => { app = a; dir = d; });
+            string worldId = app.WorldSaveFlow.SelectedWorldId;
+            dir.SeedOverride = 6203u;
+            Assert.That(dir.ServerStartDive(), Is.True);
+            Assert.That(dir.HaulSync.BankRoomNow(), Is.True);
+            Assert.That(dir.Session.ExtraSlotOwner, Is.EqualTo(-1), "premise: two players, no extra owner");
+            yield return PlayModeHarness.LeaveAndWaitForLobby();
+            foreach (PlayModeHarness.TestClient c in clients) if (c.Session.State != ConnState.Offline) yield return PlayModeHarness.Await(c.Session.LeaveAsync(), Timeout);
+            Assert.That(ReadWorld(_dir, worldId).Suspend, Is.Not.Null, "premise: the bank room quit wrote a suspend");
+
+            var again = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app2 = null; DiveDirector dir2 = null;
+            yield return StartSavedHost(20, again, (x, d) => { app2 = x; dir2 = d; });
+            Assert.That(dir2.ServerStartDive(), Is.True, "resumed");
+            DiveHaulSync haul2 = dir2.HaulSync;
+            Assert.That(haul2.Session.ExtraSlotOwner, Is.EqualTo(-1));
+            Assert.That(haul2.PreviousExtraOwner, Is.EqualTo(-1), "premise: nothing recorded yet");
+
+            yield return PlayModeHarness.StartClients(app2, 1, false, again, 22);   // a third player joins the open room
+            yield return PlayModeHarness.WaitUntil(() => haul2.Session.ExtraSlotOwner >= 0, Timeout, "the room never gave the three players an extra slot");
+            Assert.That(haul2.PreviousExtraOwner, Is.EqualTo(haul2.Session.ExtraSlotOwner), "the owner picked this visit is recorded as the previous one");
         }
     }
 }

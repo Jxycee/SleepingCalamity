@@ -807,6 +807,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Bags.For(IdA).SlotCapacity, Is.EqualTo(3));
             Assert.That(world.Bags.For(IdB).BankOpen, Is.False);
             Assert.That(world.Bags.For(IdB).Carried, Is.EqualTo(new[] { 110, 111 }), "the absent player's items wait for them");
+            Assert.That(world.Bags.For(IdB).Picks, Is.EqualTo(new[] { 0 }), "and so do their saved picks (the resize does not cancel a closed visit)");
             TownSnapshot again = NewStock().CaptureWorld(r, false, null, Depths, null, new TownStock.SuspendContext { Seed = 4242u, PresentIds = new[] { IdA }, IdsBySlot = BySlot() });
             Assert.That(again.Suspend.Bags.Single(b => b.Id == KeyB.Id).Carried, Is.EqualTo(new[] { 110, 111 }), "and their record stays in the section");
             Assert.That(again.Suspend.PresentIds, Is.EqualTo(new[] { IdA }));
@@ -815,6 +816,26 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(r.ResizeBankRoom(new List<int> { 0, 1 }, BySlot(), 4242UL, -1), Is.True);
             Assert.That(world.Bags.For(IdB).BankOpen, Is.True);
             Assert.That(world.Bags.For(IdB).Carried, Is.EqualTo(new[] { 110, 111 }));
+            Assert.That(world.Bags.For(IdB).Picks, Is.EqualTo(new[] { 0 }), "B's pick is still picked when B is back");
+        }
+
+        [Test]
+        public void AbsentPlayer_PushOnClearsTheirStalePicks_NothingIsBankedBehindTheirBack()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            bags.For(IdB).Add(110); bags.For(IdB).Add(111);
+            DiveSession s = AtBank(bags);
+            bags.For(IdB).Pick(0);
+            var (world, _) = Reload(s, NoPending);
+
+            DiveSession r = SuspendSaveRules.Resume(world.Suspend, world.Bags, new DiveCheckpoint(), world.Pieces, BySlot(), new[] { 0 }, new[] { IdA }, 4242UL, -1);
+            Assert.That(world.Bags.For(IdB).Picks, Is.EqualTo(new[] { 0 }), "premise: the absent player's pick waits");
+            Assert.That(r.PushOn(), Is.True);
+            Assert.That(world.Bags.For(IdB).Picks, Is.Empty, "the party moved on: the stale pick is dropped");
+            Assert.That(world.Bags.For(IdB).Carried, Is.EqualTo(new[] { 110, 111 }), "and their item was not banked for them");
+            Assert.That(world.Bags.For(IdB).BankedThisDive, Is.Empty);
         }
 
         static bool SameMap(IReadOnlyDictionary<int, int> a, IReadOnlyDictionary<int, int> b)

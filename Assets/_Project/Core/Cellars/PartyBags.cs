@@ -43,7 +43,8 @@ namespace SleepingCalamity.Core
 
         public void CancelBankVisits() { foreach (var kv in _bags) kv.Value.CancelBank(); }
 
-        public void PushOnAll() { foreach (var kv in _bags) if (kv.Value.BankOpen) kv.Value.PushOn(); }
+        // The party moves on: an open visit banks its picks; a bag with no open visit (absent from the room) drops any stale picks a restored suspend left, banking nothing for it.
+        public void PushOnAll() { foreach (var kv in _bags) { if (kv.Value.BankOpen) kv.Value.PushOn(); else kv.Value.CancelBank(); } }
 
         public void GoHomeAll() { foreach (var kv in _bags) kv.Value.GoHome(); }
 

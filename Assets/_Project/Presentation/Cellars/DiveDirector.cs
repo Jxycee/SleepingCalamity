@@ -143,19 +143,30 @@ namespace SleepingCalamity.Presentation
         public TownSnapshot CaptureTown()
         {
             EnsureWorldState();
-            var ctx = new TownStock.SuspendContext { Seed = _seed, Pending = _pendingSuspend };
-            if (HaulSync != null && HaulSync.IsSpawned && HaulSync.IsServer)
-            {
-                string[] bySlot = HaulSync.IdsBySlot();
-                ctx.IdsBySlot = bySlot;
-                var slots = new List<int>(); var present = new List<string>();
-                HaulSync.GetPresence(slots, present);
-                ctx.PresentIds = present;
-                int prev = HaulSync.PreviousExtraOwner;
-                if (prev >= 0 && prev < bySlot.Length && bySlot[prev] != null) _extraSlotOwner = bySlot[prev];
-            }
+            CacheLiveParty();
+            var ctx = new TownStock.SuspendContext { Seed = _seed, Pending = _pendingSuspend, IdsBySlot = _cachedIdsBySlot, PresentIds = _cachedPresentIds };
             return Town.CaptureWorld(_session, _bossBeaten, _extraSlotOwner, _depths, _residents, ctx);
         }
+
+        // The last party the live haul sync reported (roster ids by slot, the bag ids present) and the extra-slot owner it named. The final capture of a real quit (OnNetworkDespawn ->
+        // UnregisterTownSource) runs after the haul sync has despawned and the clients are gone, and would otherwise save the suspend with no extra owner and nobody present. Refreshed by
+        // every capture and every placement tick while the party is at the bank (SuspendsAtBank); a live read that finds nobody connected (the shutdown emptied the list) keeps the last present list.
+        private string[] _cachedIdsBySlot;
+        private List<string> _cachedPresentIds;
+
+        private void CacheLiveParty()
+        {
+            if (HaulSync == null || !HaulSync.IsSpawned || !HaulSync.IsServer) return;
+            string[] bySlot = HaulSync.IdsBySlot();
+            _cachedIdsBySlot = bySlot;
+            var slots = new List<int>(); var present = new List<string>();
+            HaulSync.GetPresence(slots, present);
+            if (present.Count > 0 || _cachedPresentIds == null) _cachedPresentIds = present;
+            int prev = HaulSync.PreviousExtraOwner;
+            if (prev >= 0 && prev < bySlot.Length && bySlot[prev] != null) _extraSlotOwner = bySlot[prev];
+        }
+
+        private void ForgetLiveParty() { _cachedIdsBySlot = null; _cachedPresentIds = null; }
 
         // M6 S5, host only: the baker's first-meet beat (Q4 C). Latched by BakerTick the first time he stands in his complete bakery, kept in _residents (written into the residents
         // save section by CaptureTown, restored by RestoreTown; null until a latch exists or one was loaded, so an unknown copy never overwrites the saved one) and mirrored to
@@ -215,6 +226,7 @@ namespace SleepingCalamity.Presentation
             _bags = w.Bags; _checkpoint = w.Checkpoint; _pieces = w.Pieces; _bossBeaten = w.BossBeaten; _extraSlotOwner = w.ExtraSlotOwner;
             _pendingSuspend = w.Suspend;   // a loaded bank suspend: the bags above already hold its mid-dive halves, the trapdoor resumes it (ServerResumeSuspended)
             _session = NewSession();
+            ForgetLiveParty();
             if (IsServer && IsSpawned) { if (HaulSync != null) { HaulSync.ServerAdopt(_session); HaulSync.PreviousExtraOwner = -1; } RefreshHub(); }   // the hub prompt must agree with the loaded checkpoint
         }
 
@@ -286,7 +298,9 @@ namespace SleepingCalamity.Presentation
         // the NEXT floor (floor 6) with the saved stir, momentum, retry and bank state, the bank locked; push-on not yet chosen => the bank room again, visits reopened with the saved picks. The saved
         // dive seed is used, so the chest masks still match their seed and floor. A resume is not a start: the checkpoint is neither spent nor set, no failure is counted, and the section is used up
         // (the next capture says "known, none"). The hero state (HP, loaves) is not saved: heroes arrive healed and the baker's loaves are packed again. A section that cannot resume (a damaged
-        // phase) settles as a failed dive so no carried item is lost. Players recorded but absent keep their suspended bag untouched (the bank visits follow who is present).
+        // phase) settles as a failed dive so no carried item is lost. Players recorded but absent keep their suspended bag (carried items and bank picks) while the room is open and have no visit (the
+        // bank visits follow who is present); when the dive ends their bag settles with everyone's: going home brings it home, a failed dive leaves a satchel, and a push-on drops their stale picks
+        // (nothing is banked for them).
         private bool ServerResumeSuspended()
         {
             SuspendSave s = _pendingSuspend;
@@ -333,7 +347,14 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || NetActive.Value) return false;
             if (!DiveHaulSync.AskerIsUp(NetworkManager, clientId)) return false;
             if (!NearPlayer(clientId, NetHubStair.Value)) { NoticeTo(clientId, TooFar); return false; }
-            if (!ServerStartDive(floor)) { NoticeTo(clientId, "You cannot start on that floor."); return false; }
+            bool resuming = _pendingSuspend != null;
+            if (!ServerStartDive(floor))
+            {
+                // A resume that failed after the bags were settled (ServerResumeSuspended) is not a bad floor pick: say what happened to the saved dive.
+                string why = !resuming ? "You cannot start on that floor." : _pendingSuspend == null ? "The saved dive could not be resumed; what you carried waits in a satchel." : "The saved dive is not ready yet.";
+                NoticeTo(clientId, why);
+                return false;
+            }
             return true;
         }
 
@@ -417,6 +438,7 @@ namespace SleepingCalamity.Presentation
             if (!NetActive.Value) return false;
             if (_session != null && _session.Phase != DivePhase.Ended && (reason == DiveEndReason.Failed || reason == DiveEndReason.Abandoned)) HaulSync.ServerFailDive();
             _loafLedger.End();
+            ForgetLiveParty();
             NetActive.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
             _session = NewSession();
             if (HaulSync != null) HaulSync.ServerAdopt(_session);
@@ -934,6 +956,7 @@ namespace SleepingCalamity.Presentation
                 try { _world.UnregisterTownSource(this); } catch (System.Exception e) { Debug.LogException(e); }
                 _world = null;
             }
+            ForgetLiveParty();   // after the last capture above
             if (TownSync != null && IsServer && TownSync.IsSpawned) TownSync.NetworkObject.Despawn(true);
             TownSync = null;
             if (HaulSync != null) { HaulSync.Banked -= OnBanked; HaulSync.PushedOn -= OnPushedOn; HaulSync.WentHome -= OnWentHome; HaulSync.DiveFailed -= OnDiveFailed; HaulSync.PieceAdded -= OnPieceAdded; }
@@ -986,6 +1009,7 @@ namespace SleepingCalamity.Presentation
                 _nextPlace = Time.unscaledTime + PlacementInterval;
                 FallNet();
                 PlacementPass();
+                if (NetActive.Value && _session != null && _session.SuspendsAtBank) CacheLiveParty();
                 BakerTick();
             }
         }

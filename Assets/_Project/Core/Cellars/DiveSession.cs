@@ -89,7 +89,7 @@ namespace SleepingCalamity.Core
 
         // The party changed while the bank room is open (a player joined, left or came back): capacity follows who is present (decision 7). playerIds[i] is the bag id of the player in
         // presentSlots[i]. A bag of anyone not listed has its visit cancelled (its picks are dropped, its items stay carried); a listed bag keeps its picks, the excess dropped from the end
-        // (PlayerBag.ReopenBank); a listed bag with no visit gets a fresh one. The 3-player extra slot keeps its owner while that owner is still present; otherwise it is picked again from the
+        // (PlayerBag.ReopenBank); a listed bag with no visit gets a fresh one. An absent bag whose visit is already closed (a restored suspend) keeps its picks until it is back or the party pushes on. The 3-player extra slot keeps its owner while that owner is still present; otherwise it is picked again from the
         // seed, never priorOwner (the owner of the previous visit), and a party of any other size has none.
         public bool ResizeBankRoom(IReadOnlyList<int> presentSlots, IReadOnlyList<string> playerIds, ulong diveSeed, int priorOwner)
         {
@@ -107,7 +107,7 @@ namespace SleepingCalamity.Core
             {
                 bool here = false;
                 foreach (string id in playerIds) if (id == kv.Key) { here = true; break; }
-                if (!here) kv.Value.CancelBank();
+                if (!here && kv.Value.BankOpen) kv.Value.CancelBank();   // a leaver's open visit ends; an absent bag whose visit is already closed keeps its saved picks (a restored suspend)
             }
             for (int i = 0; i < n; i++)
             {
