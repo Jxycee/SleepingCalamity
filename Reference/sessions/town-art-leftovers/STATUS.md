@@ -1,5 +1,5 @@
-Status: DONE 894b46df (merged to main; check PASS on 4020ebc6: build, EditMode 1330/1330, PlayMode 120 passed 0 failed 19 skipped)
-Archive: ready
+Status: WORKING (polish round 4: clipping, texture stretching, minor faults)
+Archive: no
 Branch: claude/town-art-leftovers-85fa01 (worktree m5-next-639689)
 Parked branches: claude/stall-lods 2486f8a6 and claude/backdrop-shade aa70f707 merged in full (via this branch); nothing retired.
 Rounds: 3 art rounds (GPU, SC_CAPTURE_ONLY), then one full set (126 Hollowmere PNGs, both presets + LowSun) and stall LOD frames. No capture churn.
@@ -13,3 +13,6 @@ Rounds: 3 art rounds (GPU, SC_CAPTURE_ONLY), then one full set (126 Hollowmere P
 3 Stall LODs: sheets stall_lods_sheet.jpg (switch-distance pairs; terrain hides 4 of 6 at switch 2) and stall_lods_close_sheet.jpg (each LOD forced at close range, front and back). Found: after the LOD FBX merge the builder built every stall empty (kept only an exact state-name child) - fixed 5bc66798. PC lodBias 2, heights 0.25/0.125/0.01: LOD1 at 25-37 m, LOD2 at 50-75 m. No holes; pair diffs tiny (the one outlier was falling leaves).
   Close forced-LOD frames: no holes (the LOD2 cloth-hole fix holds), no smears, no missing parts; LOD1/2 a touch darker on front faces (only seen from 25 m+). Not done: no change to the import heights.
 Follow-ups (low): StallLodCapture restore in finally + hide terrain in transition frames; stale M_LK_StepNosing.mat files are no longer produced (Hollowmere + BeautyCorner folders), delete after checking BeautyCorner; stairs could take moss/edge damage; mountain lit planes could take a warm/cool painted split.
+
+## Polish round 4 (2026-11-03, branch claude/hollowmere-polish-4, Sonnet medium)
+Fix list: found (scan, both presets) float 8, sunk 2, interpenetration 7 (likely contact), foliage-vs-building 462 (unfiltered), uv_density 4, uv_stretch 33, z-fight 2 / fixed 0 / deferred 0. Ranked: scan_ranked_round4.md. PAUSED (usage pace) before captures and fixes.
