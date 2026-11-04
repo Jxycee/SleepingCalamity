@@ -2,7 +2,7 @@
 // once with LOD i+1 forced from the same pose, so the pop between two LODs can be diffed. Also one LOD0 close frame per stall. Not wired into ProjectBuilder.RunAll; it
 // changes nothing in the scene file (the scene is opened, never saved).
 //   unity.ps1 exec -Graphics -Method SleepingCalamity.EditorTools.StallLodCapture.CaptureAll -OutDir <scratch>   (env SC_CAPTURE_DIR = PNG folder, SC_CAPTURE_NOBUILD=1 skips the build)
-// Transition distance (Unity's LODGroup maths): relative height h = worldSize / (2 d tan(fov/2)) * lodBias, so d = worldSize / (2 tan(fov/2) h) / lodBias,
+// Transition distance (Unity's LODGroup maths): relative height h = worldSize / (2 d tan(fov/2)) * lodBias, so d = worldSize * lodBias / (2 tan(fov/2) h) (lodBias > 1 switches farther),
 // worldSize = LODGroup.size * the group's largest lossy scale axis, fov = 50 (the vertical FOV; the 1920x1080 frame has the same vertical extent).
 // Files: <Type>_<Preset>_T<i>_LOD<i>.png, <Type>_<Preset>_T<i>_LOD<i+1>.png, <Type>_<Preset>_Close_LOD0.png.
 using System.Collections.Generic;
@@ -101,7 +101,7 @@ namespace SleepingCalamity.EditorTools
             Vector3 front = stall.forward; front.y = 0f; front.Normalize();   // the counter faces local +Z
             float baseY = stall.position.y;
             var dists = new List<float>();
-            for (int i = 0; i < lods.Length - 1; i++) dists.Add(worldSize / (2f * tanHalf * lods[i].screenRelativeTransitionHeight) / bias);
+            for (int i = 0; i < lods.Length - 1; i++) dists.Add(worldSize * bias / (2f * tanHalf * lods[i].screenRelativeTransitionHeight));
             Debug.Log("SC STALL LOD " + type + " " + preset + " size=" + lg.size.ToString("F2") + " worldSize=" + worldSize.ToString("F2")
                 + " heights=" + string.Join("/", lods.Select(l => l.screenRelativeTransitionHeight.ToString("F3"))) + " bias=" + bias.ToString("F2")
                 + " dist=" + string.Join("/", dists.Select(d => d.ToString("F1"))) + " tris=" + string.Join("/", sets.Select(x => Tris(x))));
