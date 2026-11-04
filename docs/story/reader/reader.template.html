@@ -1,0 +1,764 @@
+<title>Sleeping Calamity Book</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&display=swap">
+<style>
+/* Layout: a paged reader. Chrome (bar, footer) is quiet; the page is the star. Notes live in a bottom sheet and a side drawer. */
+:root {
+  --bg: #e9e7e1;
+  --paper: #f7f5ef;
+  --ink: #25262b;
+  --muted: #6d6e75;
+  --rule: #d6d3ca;
+  --accent: #3a5a8c;
+  --ui: #f1efe8;
+  --hl-y: rgba(240, 196, 52, .42);
+  --hl-g: rgba(104, 184, 120, .40);
+  --hl-p: rgba(226, 118, 154, .36);
+  --hl-b: rgba(92, 150, 224, .34);
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --ui-font: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fs: 19px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101216; --paper: #191c22; --ink: #d8d5cc; --muted: #8b8d96; --rule: #2c3038;
+    --accent: #90b2ea; --ui: #14161b;
+    --hl-y: rgba(220, 176, 40, .36); --hl-g: rgba(90, 170, 105, .34); --hl-p: rgba(214, 100, 140, .34); --hl-b: rgba(90, 140, 214, .34);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101216; --paper: #191c22; --ink: #d8d5cc; --muted: #8b8d96; --rule: #2c3038;
+  --accent: #90b2ea; --ui: #14161b;
+  --hl-y: rgba(220, 176, 40, .36); --hl-g: rgba(90, 170, 105, .34); --hl-p: rgba(214, 100, 140, .34); --hl-b: rgba(90, 140, 214, .34);
+  color-scheme: dark;
+}
+:root[data-tone="sepia"][data-theme="light"] {
+  --bg: #dccfb2; --paper: #efe3c8; --ink: #3a2f22; --muted: #7b6a54; --rule: #cdbd9b; --accent: #8a4b25; --ui: #e6d9bb;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--ui-font);
+  padding-block: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+#app { height: 100%; display: grid; grid-template-rows: auto 3px minmax(0, 1fr) auto; max-width: 1280px; margin: 0 auto; }
+#top { display: flex; align-items: center; gap: 4px; padding: 6px 0; min-width: 0; }
+#top .iconbtn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; color: var(--muted); position: relative; }
+#top .iconbtn:hover { color: var(--ink); background: var(--ui); }
+#crumb { flex: 1; min-width: 0; text-align: center; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
+#save { font-size: 12px; color: var(--muted); white-space: nowrap; padding: 0 6px; }
+#save.bad { color: #b4472f; }
+:root[data-theme="dark"] #save.bad { color: #f09a82; }
+#count { position: absolute; top: 3px; right: 1px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--accent); color: var(--paper); font-size: 10px; line-height: 16px; text-align: center; font-weight: 600; padding: 0 4px; }
+#prog { background: var(--rule); border-radius: 2px; overflow: hidden; }
+#prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+
+#reader { min-height: 0; display: flex; justify-content: center; padding: 14px 0; }
+#paper { width: 100%; max-width: 690px; min-height: 0; background: var(--paper); border-radius: 6px; box-shadow: 0 1px 0 var(--rule), 0 10px 30px rgba(0,0,0,.10); padding: 34px 40px; display: flex; }
+#paper.spread { max-width: 1180px; padding: 38px 54px; }
+@media (max-width: 560px) { #paper { padding: 22px 20px; border-radius: 0; } }
+#stage { flex: 1; min-width: 0; min-height: 0; overflow: hidden; position: relative; touch-action: pan-y; -webkit-user-select: text; user-select: text; }
+#meas { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; transition: none; }
+.flow { position: relative; transition: transform .26s cubic-bezier(.3,.7,.2,1), opacity .2s; font-family: var(--body); font-size: var(--fs); line-height: 1.62; color: var(--ink);
+  text-align: justify; hyphens: auto; -webkit-hyphens: auto; font-variation-settings: "opsz" 14; orphans: 2; widows: 2; }
+@media (prefers-reduced-motion: reduce) { .flow { transition: none; } }
+.flow p { margin: 0; text-indent: 1.4em; overflow-wrap: break-word; }
+.flow p.tag, .flow h3.scene + p, .flow p.first { text-indent: 0; }
+.flow p.tag { font-style: italic; color: var(--muted); font-size: .88em; margin: 0 0 .9em; text-align: left; }
+.flow p.tag em { font-style: normal; }
+.flow h1 { margin: .2em 0 1.4em; text-align: left; break-after: avoid; }
+.flow h1 .kick { display: block; font: 600 .62em/1 var(--ui-font); letter-spacing: .22em; text-transform: uppercase; color: var(--accent); margin-bottom: .9em; }
+.flow h1 .ttl { display: block; font-size: 2em; font-weight: 400; font-style: italic; line-height: 1.12; text-wrap: balance; }
+.flow h3.scene { margin: 1.6em 0 .5em; text-align: center; font: 600 .7em var(--ui-font); letter-spacing: .24em; color: var(--muted); break-after: avoid; }
+.flow .brk { height: 1.4em; break-inside: avoid; }
+.flow h2 { margin: 1.6em 0 .6em; font: 600 .78em var(--ui-font); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); text-align: left; break-after: avoid; }
+.flow p.li { text-indent: 0; padding-left: 1.2em; position: relative; margin: .5em 0; text-align: left; font-size: .94em; }
+.flow p.li::before { content: "–"; position: absolute; left: 0; color: var(--muted); }
+.flow p.q { text-indent: 0; padding-left: 1em; border-left: 2px solid var(--rule); font-style: italic; margin: .8em 0; }
+.flow strong { font-weight: 650; }
+mark[data-a] { color: inherit; border-radius: 2px; cursor: pointer; padding: 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+mark.y { background: var(--hl-y); } mark.g { background: var(--hl-g); } mark.p { background: var(--hl-p); } mark.b { background: var(--hl-b); }
+mark.n { box-shadow: inset 0 -2px 0 var(--muted); }
+mark.c { box-shadow: inset 0 -2px 0 var(--accent); }
+mark.done { opacity: .55; }
+mark.flash { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* cover */
+.flow .cover { text-align: left; }
+.flow .cover h1 { margin-top: 1.2em; }
+.flow .cover p { text-indent: 0; color: var(--muted); font-size: .92em; margin: 0 0 .8em; }
+.flow .cover ol { list-style: none; margin: 1.4em 0 0; padding: 0; }
+.flow .cover li { margin: 0; break-inside: avoid; }
+.flow .cover li button { width: 100%; display: flex; gap: .9em; align-items: baseline; text-align: left; padding: .55em 0; border-bottom: 1px solid var(--rule); font: inherit; font-size: .95em; color: var(--ink); }
+.flow .cover li button:hover .t { color: var(--accent); }
+.flow .cover li .nn { font: 600 .7em var(--ui-font); letter-spacing: .14em; color: var(--muted); min-width: 4.2em; }
+.flow .cover li .t { flex: 1; font-style: italic; }
+.flow .cover li .m { font: 500 .72em var(--ui-font); color: var(--muted); }
+
+#foot { display: flex; align-items: center; gap: 10px; padding: 4px 0 8px; }
+#foot .iconbtn { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; color: var(--muted); }
+#foot .iconbtn:hover:not(:disabled) { color: var(--ink); background: var(--ui); }
+#foot .iconbtn:disabled { opacity: .3; cursor: default; }
+#pg { flex: 1; min-width: 0; accent-color: var(--accent); }
+#where { font-size: 12px; color: var(--muted); min-width: 128px; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { #where { min-width: 0; font-size: 11px; } }
+
+/* floating panels */
+.float { position: fixed; z-index: 30; background: var(--ui); border: 1px solid var(--rule); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.25); color: var(--ink); }
+#sheet { left: 50%; transform: translateX(-50%); bottom: calc(60px + env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100vw - 32px)); padding: 12px 14px; display: grid; gap: 10px; }
+#sheet .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; }
+.dot.y { background: #e7bf34; } .dot.g { background: #62b476; } .dot.p { background: #de6f97; } .dot.b { background: #5b92dd; }
+.dot[aria-pressed="true"] { border-color: var(--ink); }
+.btn { padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 500; border: 1px solid var(--rule); background: var(--paper); }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+.btn.danger { color: #b4472f; }
+:root[data-theme="dark"] .btn.danger { color: #f09a82; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; }
+.seg button { padding: 6px 11px; font-size: 13px; background: var(--paper); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--paper); }
+#note { width: 100%; min-height: 84px; max-height: 40vh; resize: vertical; border: 1px solid var(--rule); border-radius: 9px; padding: 9px 10px; background: var(--paper); color: var(--ink); font: 15px/1.45 var(--ui-font); }
+#sheet .quote { font: italic 13px/1.4 var(--body); color: var(--muted); max-height: 3.9em; overflow: hidden; }
+#reply { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; font-size: 14px; line-height: 1.45; }
+#reply b { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+#sstat { font-size: 12px; color: var(--muted); margin-right: auto; }
+
+#scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.35); }
+#drawer { top: 0; bottom: 0; left: 0; width: min(400px, 92vw); border-radius: 0 14px 14px 0; display: grid; grid-template-rows: auto auto 1fr; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); transition: transform .22s; }
+#drawer[hidden] { display: grid !important; transform: translateX(-105%); visibility: hidden; }
+#drawer .tabs { display: flex; gap: 6px; padding: 12px 14px 8px; align-items: center; }
+#drawer .tabs .seg { flex: 1; }
+#drawer .tabs .seg button { flex: 1; }
+#drawer .x { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: var(--muted); }
+#filters { display: flex; gap: 6px; padding: 0 14px 8px; flex-wrap: wrap; }
+#filters button { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rule); font-size: 12px; background: var(--paper); }
+#filters button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+#dbody { overflow: auto; padding: 0 14px 14px; min-height: 0; }
+.toc button { display: flex; width: 100%; gap: 10px; align-items: baseline; text-align: left; padding: 11px 4px; border-bottom: 1px solid var(--rule); }
+.toc .nn { font-size: 11px; letter-spacing: .12em; color: var(--muted); min-width: 22px; font-weight: 600; }
+.toc .t { flex: 1; font: italic 16px var(--body); }
+.toc .m { font-size: 12px; color: var(--muted); }
+.toc button[aria-current="true"] .t { color: var(--accent); }
+.item { display: block; width: 100%; text-align: left; border-left: 4px solid var(--rule); background: var(--paper); border-radius: 4px 9px 9px 4px; padding: 9px 11px; margin-bottom: 9px; }
+.item.y { border-left-color: #e7bf34; } .item.g { border-left-color: #62b476; } .item.p { border-left-color: #de6f97; } .item.b { border-left-color: #5b92dd; }
+.item .meta { display: flex; gap: 8px; font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+.item .meta .tg { color: var(--accent); font-weight: 600; }
+.item .q { font: italic 13px/1.4 var(--body); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.item .nt { font-size: 14px; line-height: 1.4; margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.item .rp { font-size: 13px; line-height: 1.4; margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--accent); color: var(--ink); white-space: pre-wrap; }
+.item.dn { opacity: .6; }
+.empty { color: var(--muted); font-size: 14px; line-height: 1.5; padding: 18px 4px; }
+#aa { right: 12px; top: calc(52px + env(safe-area-inset-top, 0px)); width: min(320px, calc(100vw - 32px)); padding: 14px; display: grid; gap: 14px; }
+#aa label { font-size: 12px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+#aa input[type=range] { width: 100%; accent-color: var(--accent); }
+#aa .check { display: flex; gap: 8px; align-items: center; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+#toast { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--paper); font-size: 13px; padding: 8px 14px; border-radius: 9px; }
+#btnBm[aria-pressed="true"] svg { fill: var(--accent); stroke: var(--accent); }
+#btnBm[aria-pressed="true"] { color: var(--accent); }
+.item .pg { color: var(--ink); font-weight: 600; }
+.row2 { display: flex; gap: 6px; align-items: stretch; margin-bottom: 9px; }
+.row2 .item { margin-bottom: 0; flex: 1; min-width: 0; }
+.row2 .rm { width: 34px; border-radius: 9px; color: var(--muted); display: grid; place-items: center; border: 1px solid var(--rule); background: var(--paper); }
+.row2 .rm:hover { color: #b4472f; }
+</style>
+
+<div id="app">
+  <header id="top">
+    <button class="iconbtn" id="btnToc" aria-label="Chapters and notes"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+    <div id="crumb">Sleeping Calamity</div>
+    <span id="save" role="status" aria-live="polite"></span>
+    <button class="iconbtn" id="btnBm" aria-label="Bookmark this page" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-4-5 4z"/></svg></button>
+    <button class="iconbtn" id="btnNotes" aria-label="Notes"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 11h8M8 15h5"/></svg><span id="count" hidden>0</span></button>
+    <button class="iconbtn" id="btnAa" aria-label="Reading settings"><svg viewBox="0 0 24 24"><path d="M3 18 8 6l5 12M5 14h6M15 18l3.5-8L22 18M16.4 15h4.2"/></svg></button>
+  </header>
+  <div id="prog"><i></i></div>
+  <main id="reader"><div id="paper"><div id="stage"><div id="flow" class="flow"></div><div id="meas" class="flow" aria-hidden="true"></div></div></div></main>
+  <footer id="foot">
+    <button class="iconbtn" id="prev" aria-label="Previous page"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
+    <input id="pg" type="range" min="0" max="0" value="0" aria-label="Page in chapter">
+    <button class="iconbtn" id="next" aria-label="Next page"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button>
+    <span id="where"></span>
+  </footer>
+</div>
+
+<div id="sheet" class="float" hidden>
+  <div class="quote" id="squote"></div>
+  <div class="row" id="dots"></div>
+  <div class="row" id="newrow">
+    <button class="btn primary" id="bNote">Note for me</button>
+    <button class="btn" id="bClaude">Note for Claude</button>
+  </div>
+  <div id="editbox" hidden style="display:grid;gap:10px">
+    <div class="row"><div class="seg" id="tgt"><button data-t="me" aria-pressed="true">For me</button><button data-t="claude" aria-pressed="false">For Claude</button></div></div>
+    <textarea id="note" placeholder="Write a note. It saves as you type." aria-label="Note"></textarea>
+    <div id="reply" hidden><b>Claude</b><span id="replytxt"></span></div>
+    <div class="row"><span id="sstat"></span><button class="btn" id="bDone">Mark resolved</button><button class="btn danger" id="bDel">Delete</button><button class="btn" id="bClose">Close</button></div>
+  </div>
+</div>
+
+<aside id="drawer" class="float" hidden aria-label="Chapters and notes">
+  <div class="tabs"><div class="seg"><button id="tabToc" aria-pressed="true">Chapters</button><button id="tabBm" aria-pressed="false">Bookmarks</button><button id="tabNotes" aria-pressed="false">Notes</button></div><button class="x" id="dClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div id="filters" hidden></div>
+  <div id="dbody"></div>
+</aside>
+
+<div id="aa" class="float" hidden>
+  <div><label for="fs">Text size</label><input id="fs" type="range" min="15" max="27" step="1"></div>
+  <div><label>Page colour</label><div class="seg" id="themeSeg"><button data-th="auto">Auto</button><button data-th="light">Light</button><button data-th="sepia">Sepia</button><button data-th="dark">Dark</button></div></div>
+  <label class="check"><input type="checkbox" id="spread"> Two pages side by side on wide screens</label>
+</div>
+<div id="scrim" hidden></div>
+<div id="toast" hidden></div>
+
+<script type="application/json" id="book">__BOOK__</script>
+<script>
+(function () {
+  "use strict";
+  var BOOK = JSON.parse(document.getElementById("book").textContent).chapters;
+  var NCH = BOOK.length;
+  var $ = function (s) { return document.querySelector(s); };
+  var ls = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  var jparse = function (s, d) { try { return s ? JSON.parse(s) : d; } catch (e) { return d; } };
+  document.documentElement.lang = "en";
+
+  var settings = Object.assign({ fs: 19, theme: "auto", spread: true }, jparse(ls.get("sc.set"), {}));
+  var S = { ch: 0, page: 0, pages: 1, step: 1, cols: 1, anns: new Map(), bms: new Map(), db: null, loaded: false };
+  var stage = $("#stage"), flow = $("#flow"), paper = $("#paper");
+  var COLORS = ["y", "g", "p", "b"];
+
+  /* ---------- settings / theme ---------- */
+  function applySettings() {
+    var r = document.documentElement;
+    r.style.setProperty("--fs", settings.fs + "px");
+    r.removeAttribute("data-theme"); r.removeAttribute("data-tone");
+    if (settings.theme === "light") r.setAttribute("data-theme", "light");
+    if (settings.theme === "dark") r.setAttribute("data-theme", "dark");
+    if (settings.theme === "sepia") { r.setAttribute("data-theme", "light"); r.setAttribute("data-tone", "sepia"); }
+    $("#fs").value = settings.fs; $("#spread").checked = !!settings.spread;
+    document.querySelectorAll("#themeSeg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.th === settings.theme)); });
+  }
+  function saveSettings() { ls.set("sc.set", JSON.stringify(settings)); }
+
+  /* ---------- save status ---------- */
+  var statEl = $("#save");
+  function setStatus(k) {
+    var m = { saved: "Saved", saving: "Saving…", bad: "Not saved yet, retrying", local: "Saved on this device only", wait: "Connecting…", slow: "Notes may be out of date" };
+    statEl.textContent = m[k] || ""; statEl.className = k === "bad" ? "bad" : "";
+    var s = $("#sstat"); if (s) s.textContent = m[k] || "";
+  }
+
+  /* ---------- chapter content ---------- */
+  function words(ch) { var n = 0; BOOK[ch - 1].blocks.forEach(function (b) { n += b[1].replace(/<[^>]+>/g, "").split(/\s+/).length; }); return n; }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  function coverHTML() {
+    var li = BOOK.map(function (c, i) {
+      return '<li><button data-ch="' + (i + 1) + '"><span class="nn">CH ' + c.n + '</span><span class="t">' + c.title + '</span><span class="m">' + Math.round(words(i + 1) / 220) + ' min</span></button></li>';
+    }).join("");
+    return '<div class="cover"><h1><span class="kick">Draft for your sign-off</span><span class="ttl">Sleeping Calamity</span></h1>' +
+      "<p>The whole story as a book, in seven chapters. Turn pages with the arrows, a tap on the left or right of the page, a swipe, or the keyboard.</p>" +
+      "<p>Select any passage to highlight it and leave a note, either for yourself or for Claude. Notes marked <em>For Claude</em> are stored where Claude can read and answer them. Everything saves as you go, and the page remembers where you stopped.</p>" +
+      '<ol>' + li + "</ol></div>";
+  }
+  function renderFlow() {
+    if (S.ch === 0) { flow.innerHTML = coverHTML(); return; }
+    flow.innerHTML = chapterHTML(S.ch);
+    S.anns.forEach(function (a) {
+      if (a.ch !== S.ch || !a.segs) return;
+      var cls = a.color + (a.note ? " n" : "") + (a.target === "claude" ? " c" : "") + (a.status === "done" ? " done" : "");
+      a.segs.forEach(function (g) {
+        var el = flow.querySelector('[data-b="' + g.b + '"]');
+        if (el) wrap(el, g.s, g.e, a.id, cls);
+      });
+    });
+  }
+  function chapterHTML(ch) {
+    var c = BOOK[ch - 1], out = [];
+    c.blocks.forEach(function (b, i) {
+      var t = b[0], h = b[1];
+      if (t === "h1") out.push('<h1 data-b="' + i + '"><span class="kick">Chapter ' + c.n + '</span> <span class="ttl">' + h + "</span></h1>");
+      else if (t === "s") out.push('<h3 class="scene" data-b="' + i + '">' + h + "</h3>");
+      else if (t === "hr") out.push('<div class="brk" data-b="' + i + '" aria-hidden="true"></div>');
+      else if (t === "h2") out.push('<h2 data-b="' + i + '">' + h + "</h2>");
+      else if (t === "li") out.push('<p class="li" data-b="' + i + '">' + h + "</p>");
+      else if (t === "q") out.push('<p class="q" data-b="' + i + '">' + h + "</p>");
+      else if (t === "tag") out.push('<p class="tag" data-b="' + i + '">' + h + "</p>");
+      else out.push('<p data-b="' + i + '">' + h + "</p>");
+    });
+    return out.join("");
+  }
+  function wrap(el, s, e, id, cls) {
+    var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [], n;
+    while ((n = w.nextNode())) nodes.push(n);
+    var pos = 0;
+    nodes.forEach(function (t) {
+      var len = t.nodeValue.length, a = pos, b = pos + len;
+      pos = b;
+      var from = Math.max(s, a), to = Math.min(e, b);
+      if (from >= to) return;
+      var node = t;
+      if (from > a) node = node.splitText(from - a);
+      if (to < b) node.splitText(to - from);
+      var m = document.createElement("mark");
+      m.dataset.a = id; m.className = cls;
+      node.parentNode.insertBefore(m, node); m.appendChild(node);
+    });
+  }
+
+  /* ---------- pagination ---------- */
+  function layout() {
+    var W = stage.clientWidth, H = stage.clientHeight;
+    var two = !!settings.spread && paper.classList.contains("spread");
+    S.cols = two ? 2 : 1;
+    var gap = two ? 64 : 48;
+    flow.style.width = W + "px"; flow.style.height = H + "px";
+    flow.style.columnCount = S.cols; flow.style.columnGap = gap + "px"; flow.style.columnFill = "auto";
+    S.step = W + gap;
+    S.pages = Math.max(1, Math.ceil((flow.scrollWidth + gap - 3) / S.step));
+    $("#pg").max = S.pages - 1;
+  }
+  /* book-wide page numbers: lay every chapter out once, off screen, at the same page size */
+  S.m = null;
+  function measureAll() {
+    var W = stage.clientWidth, H = stage.clientHeight; if (!W || !H) return;
+    var gap = S.cols === 2 ? 64 : 48, step = W + gap;
+    var meas = $("#meas");
+    meas.style.width = W + "px"; meas.style.height = H + "px";
+    meas.style.columnCount = S.cols; meas.style.columnGap = gap + "px"; meas.style.columnFill = "auto";
+    var off = [0], pages = [1], bp = [null], total = 0;
+    for (var ch = 1; ch <= NCH; ch++) {
+      meas.innerHTML = chapterHTML(ch);
+      var mr = meas.getBoundingClientRect(), n = Math.max(1, Math.ceil((meas.scrollWidth + gap - 3) / step)), map = {};
+      meas.querySelectorAll("[data-b]").forEach(function (el) {
+        var rs = el.getClientRects();
+        map[el.dataset.b] = rs.length ? Math.max(0, Math.min(n - 1, Math.floor((rs[0].left - mr.left + 2) / step))) : 0;
+      });
+      pages[ch] = n; bp[ch] = map; off[ch] = total; total += n;
+    }
+    meas.innerHTML = "";
+    S.m = { off: off, pages: pages, bp: bp, total: total };
+    updateFoot(); updateBm(); renderPanel();
+  }
+  var mTimer = null;
+  function queueMeasure() { clearTimeout(mTimer); mTimer = setTimeout(measureAll, 120); }
+  function bookPage(ch, b) {
+    if (!S.m || ch < 1) return null;
+    var i = S.m.bp[ch][b]; return i == null ? null : S.m.off[ch] + i + 1;
+  }
+  function wantSpread() { paper.classList.toggle("spread", !!settings.spread && window.innerWidth >= 1000); }
+  function blockEls() { return flow.querySelectorAll("[data-b]"); }
+  function pageOf(el) {
+    var fr = flow.getBoundingClientRect(), rs = el.getClientRects();
+    if (!rs.length) return 0;
+    return Math.max(0, Math.min(S.pages - 1, Math.floor((rs[0].left - fr.left + 2) / S.step)));
+  }
+  function firstVisible() {
+    var els = blockEls(), fr = flow.getBoundingClientRect(), lim = S.page * S.step + 2;
+    for (var i = 0; i < els.length; i++) {
+      var rs = els[i].getClientRects();
+      if (rs.length && rs[rs.length - 1].right - fr.left > lim) return +els[i].dataset.b;
+    }
+    return 0;
+  }
+  function setPage(p) {
+    S.page = Math.max(0, Math.min(S.pages - 1, p));
+    flow.style.transform = "translateX(" + (-S.page * S.step) + "px)";
+    $("#pg").value = S.page; updateFoot(); updateBm(); queuePos();
+  }
+  function goBlock(b) {
+    var el = flow.querySelector('[data-b="' + b + '"]');
+    setPage(el ? pageOf(el) : 0);
+  }
+  function relayout() {
+    var anchor = S.loaded ? firstVisible() : 0;
+    wantSpread(); layout();
+    if (S.ch === 0) setPage(0); else goBlock(anchor);
+    queueMeasure();
+  }
+  function openChapter(ch, where) {
+    S.ch = Math.max(0, Math.min(NCH, ch));
+    wantSpread(); renderFlow(); layout();
+    flow.style.transition = "none";
+    if (where === "end") setPage(S.pages - 1);
+    else if (where && typeof where === "object") goBlock(where.b);
+    else setPage(0);
+    void flow.offsetWidth; flow.style.transition = "";
+    S.loaded = true;
+    updateCrumb(); updateToc(); updateBm();
+    if (!S.m) queueMeasure();
+  }
+  function next() { if (S.page < S.pages - 1) setPage(S.page + 1); else if (S.ch < NCH) openChapter(S.ch + 1); }
+  function prev() { if (S.page > 0) setPage(S.page - 1); else if (S.ch > 0) openChapter(S.ch - 1, "end"); }
+  function updateCrumb() { $("#crumb").textContent = S.ch === 0 ? "Sleeping Calamity" : "Chapter " + BOOK[S.ch - 1].n + ": " + BOOK[S.ch - 1].title; }
+  function updateFoot() {
+    var bk = S.m && S.ch > 0 ? (S.m.off[S.ch] + S.page + 1) + " / " + S.m.total : (S.page + 1) + " / " + S.pages;
+    $("#where").textContent = S.ch === 0 ? "Contents" : "Page " + bk + " \u00b7 Ch " + BOOK[S.ch - 1].n;
+    $("#prev").disabled = S.ch === 0 && S.page === 0;
+    $("#next").disabled = S.ch === NCH && S.page === S.pages - 1;
+    var f = (S.ch - 1 + (S.page + 1) / S.pages) / NCH;
+    $("#prog i").style.width = (S.ch === 0 ? 0 : Math.max(0, Math.min(1, f)) * 100) + "%";
+  }
+
+  /* ---------- reading position ---------- */
+  var posTimer = null, dbPosTimer = null;
+  function queuePos() {
+    clearTimeout(posTimer);
+    posTimer = setTimeout(function () {
+      var p = { ch: S.ch, b: S.ch === 0 ? 0 : firstVisible(), t: Date.now() };
+      ls.set("sc.pos", JSON.stringify(p));
+      if (S.db) { clearTimeout(dbPosTimer); dbPosTimer = setTimeout(function () { S.db.doc("state/progress").set(p).catch(function () {}); }, 2500); }
+    }, 500);
+  }
+
+  /* ---------- annotations: persistence ---------- */
+  var Q = new Map(), qTimer = null, qBusy = false;
+  function saveLocal() {
+    var arr = []; S.anns.forEach(function (a) { arr.push(a); }); ls.set("sc.anns", JSON.stringify(arr));
+    var bm = []; S.bms.forEach(function (a) { bm.push(a); }); ls.set("sc.bm", JSON.stringify(bm));
+  }
+  function persist(a, full, coll) {
+    coll = coll || "annotations";
+    var qk = coll + "/" + a.id, prevq = Q.get(qk);
+    Q.set(qk, { a: Object.assign({}, a), full: full || (prevq && prevq.full) || false, coll: coll });
+    setStatus("saving");
+    clearTimeout(qTimer); qTimer = setTimeout(flush, full ? 0 : 600);
+    saveLocal();
+  }
+  async function flush() {
+    if (qBusy) return;
+    qBusy = true;
+    try {
+      while (Q.size) {
+        var ent = Q.entries().next().value, id = ent[0], it = ent[1];
+        Q.delete(id);
+        if (!S.db) continue;
+        try {
+          var ref = S.db.collection(it.coll).doc(it.a.id);
+          if (it.a.deleted) await ref.delete();
+          else if (it.full || it.coll !== "annotations") { var c = Object.assign({}, it.a); delete c.id; await ref.set(c); }
+          else await ref.update({ note: it.a.note, color: it.a.color, target: it.a.target, status: it.a.status, updated: it.a.updated });
+        } catch (e) {
+          if (!Q.has(id)) Q.set(id, it);
+          setStatus("bad"); clearTimeout(qTimer); qTimer = setTimeout(flush, 4000);
+          qBusy = false; return;
+        }
+      }
+      setStatus(S.db ? "saved" : "local");
+    } finally { qBusy = false; }
+  }
+  function sig() { var s = []; S.anns.forEach(function (a) { s.push(a.id + a.color + a.status + a.target + (a.note ? 1 : 0) + JSON.stringify(a.segs)); }); return s.sort().join("|"); }
+
+  /* ---------- annotations: create/edit ---------- */
+  var pending = null, cur = null, sheetDown = false, lastColor = "y";
+  var sheet = $("#sheet");
+  function buildDots(onPick, active) {
+    var d = $("#dots"); d.textContent = "";
+    COLORS.forEach(function (c) {
+      var b = document.createElement("button"); b.className = "dot " + c; b.setAttribute("aria-label", "Colour " + c);
+      b.setAttribute("aria-pressed", String(c === active));
+      b.onclick = function () { onPick(c); }; d.appendChild(b);
+    });
+  }
+  function textOffset(el, node, off) {
+    var r = document.createRange(); r.selectNodeContents(el); r.setEnd(node, off); return r.toString().length;
+  }
+  function selectionSegs() {
+    if (S.ch === 0) return null;
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    var r = sel.getRangeAt(0);
+    if (!flow.contains(r.commonAncestorContainer)) return null;
+    var segs = [], quote = [];
+    blockEls().forEach(function (el) {
+      if (!r.intersectsNode(el)) return;
+      var txt = el.textContent, len = txt.length; if (!len) return;
+      var s = el.contains(r.startContainer) ? textOffset(el, r.startContainer, r.startOffset) : 0;
+      var e = el.contains(r.endContainer) ? textOffset(el, r.endContainer, r.endOffset) : len;
+      while (s < e && /\s/.test(txt[s])) s++;
+      while (e > s && /\s/.test(txt[e - 1])) e--;
+      if (e > s) { segs.push({ b: +el.dataset.b, s: s, e: e }); quote.push(txt.slice(s, e)); }
+    });
+    if (!segs.length) return null;
+    var q = quote.join(" … "); if (q.length > 420) q = q.slice(0, 417) + "…";
+    return { segs: segs, quote: q };
+  }
+  function showNew(p) {
+    pending = p; cur = null;
+    $("#squote").textContent = p.quote;
+    buildDots(function (c) { lastColor = c; create("me", c, false); }, null);
+    $("#newrow").hidden = false; $("#editbox").hidden = true; sheet.hidden = false;
+  }
+  function create(target, color, focus) {
+    if (!pending) return;
+    var a = { id: "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ch: S.ch, chTitle: BOOK[S.ch - 1].title,
+      segs: pending.segs, quote: pending.quote, color: color, target: target, note: "", status: "open", created: Date.now(), updated: Date.now() };
+    S.anns.set(a.id, a); persist(a, true);
+    pending = null;
+    var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+    rerenderKeep(); renderPanel(); updateCount();
+    if (focus) openEdit(a.id, true); else { sheet.hidden = true; }
+  }
+  function openEdit(id, focus) {
+    var a = S.anns.get(id); if (!a) return;
+    cur = id; pending = null;
+    $("#squote").textContent = a.quote;
+    buildDots(function (c) { var x = S.anns.get(cur); if (!x) return; x.color = c; x.updated = Date.now(); lastColor = c; persist(x, false); rerenderKeep(); openEdit(cur, false); renderPanel(); }, a.color);
+    $("#newrow").hidden = true; $("#editbox").hidden = false; sheet.hidden = false;
+    document.querySelectorAll("#tgt button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.t === a.target)); });
+    var n = $("#note"); if (document.activeElement !== n) n.value = a.note || "";
+    $("#reply").hidden = !a.reply; $("#replytxt").textContent = a.reply || "";
+    $("#bDone").textContent = a.status === "done" ? "Reopen" : "Mark resolved";
+    if (focus) setTimeout(function () { n.focus(); }, 30);
+  }
+  function closeSheet() { sheet.hidden = true; cur = null; pending = null; }
+  function rerenderKeep() {
+    if (S.ch === 0) return;
+    var anchor = firstVisible(); renderFlow(); layout(); goBlock(anchor);
+  }
+  function editCur(fn) { var a = S.anns.get(cur); if (!a) return; fn(a); a.updated = Date.now(); persist(a, false); renderPanel(); }
+
+  $("#bNote").onclick = function () { create("me", lastColor, true); };
+  $("#bClaude").onclick = function () { create("claude", lastColor, true); };
+  document.querySelectorAll("#tgt button").forEach(function (b) {
+    b.onclick = function () { editCur(function (a) { a.target = b.dataset.t; }); rerenderKeep(); openEdit(cur, false); };
+  });
+  var noteTimer = null;
+  $("#note").addEventListener("input", function () {
+    var v = this.value; setStatus("saving");
+    var a = S.anns.get(cur); if (!a) return;
+    var had = !!a.note; a.note = v; a.updated = Date.now(); persist(a, false); renderPanel();
+    if (had !== !!v) { clearTimeout(noteTimer); noteTimer = setTimeout(function () { var el = document.activeElement; rerenderKeep(); if (el && el.focus) el.focus(); }, 900); }
+  });
+  $("#bDone").onclick = function () { editCur(function (a) { a.status = a.status === "done" ? "open" : "done"; }); rerenderKeep(); openEdit(cur, false); };
+  $("#bDel").onclick = function () {
+    var a = S.anns.get(cur); if (!a) return;
+    S.anns.delete(cur); a.deleted = true; persist(a, false); saveLocal();
+    closeSheet(); rerenderKeep(); renderPanel(); updateCount(); toast("Deleted");
+  };
+  $("#bClose").onclick = closeSheet;
+  sheet.addEventListener("pointerdown", function () { sheetDown = true; setTimeout(function () { sheetDown = false; }, 600); });
+
+  var selTimer = null;
+  document.addEventListener("selectionchange", function () {
+    clearTimeout(selTimer);
+    selTimer = setTimeout(function () {
+      if (document.activeElement && document.activeElement.id === "note") return;
+      var p = selectionSegs();
+      if (p) { showNew(p); }
+      else if (pending && !sheetDown) { closeSheet(); }
+    }, 220);
+  });
+  flow.addEventListener("click", function (e) {
+    var t = e.target;
+    var cb = t.closest && t.closest("[data-ch]"); if (cb) { openChapter(+cb.dataset.ch); return; }
+    var m = t.closest && t.closest("mark[data-a]");
+    var sel = window.getSelection();
+    if (m && (!sel || sel.isCollapsed)) { openEdit(m.dataset.a, false); }
+  });
+
+  /* ---------- bookmarks ---------- */
+  function bmPageOf(b) { return b.ch > 0 && S.m ? S.m.bp[b.ch][b.b] : null; }
+  function bmHere() {
+    var hit = null;
+    S.bms.forEach(function (b) {
+      if (b.ch !== S.ch) return;
+      if (S.ch === 0) { hit = b; return; }
+      var p = bmPageOf(b); if (p === S.page || (p == null && b.b === firstVisible())) hit = b;
+    });
+    return hit;
+  }
+  function updateBm() { $("#btnBm").setAttribute("aria-pressed", String(!!bmHere())); }
+  function toggleBm() {
+    var h = bmHere();
+    if (h) { S.bms.delete(h.id); h.deleted = true; persist(h, true, "bookmarks"); toast("Bookmark removed"); }
+    else {
+      var b0 = S.ch === 0 ? 0 : firstVisible(), label = "Contents";
+      if (S.ch > 0) { var el = flow.querySelector('[data-b="' + b0 + '"]'); label = el ? el.textContent.trim().slice(0, 90) : ""; }
+      var b = { id: "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ch: S.ch, b: b0, label: label, created: Date.now() };
+      S.bms.set(b.id, b); persist(b, true, "bookmarks"); toast("Bookmarked");
+    }
+    saveLocal(); updateBm(); renderPanel();
+  }
+  $("#btnBm").onclick = toggleBm;
+
+  /* ---------- panel ---------- */
+  var tab = "toc", filter = "all", drawer = $("#drawer");
+  function pageLabel(ch, b) { var bp = bookPage(ch, b); return bp ? "p. " + bp : "Ch " + (BOOK[ch - 1] ? BOOK[ch - 1].n : "?"); }
+  function updateCount() {
+    var n = 0; S.anns.forEach(function (a) { if (a.status !== "done") n++; });
+    var c = $("#count"); c.hidden = n === 0; c.textContent = n > 99 ? "99+" : n;
+  }
+  function updateToc() { if (!drawer.hidden && tab === "toc") renderPanel(); }
+  function renderPanel() {
+    var body = $("#dbody"); body.textContent = "";
+    $("#tabToc").setAttribute("aria-pressed", String(tab === "toc")); $("#tabNotes").setAttribute("aria-pressed", String(tab === "notes")); $("#tabBm").setAttribute("aria-pressed", String(tab === "bm"));
+    $("#filters").hidden = tab !== "notes";
+    if (drawer.hidden) return;
+    if (tab === "toc") {
+      var wrapEl = document.createElement("div"); wrapEl.className = "toc";
+      var items = [{ ch: 0, nn: "", t: "Contents", m: "" }].concat(BOOK.map(function (c, i) { return { ch: i + 1, nn: String(c.n), t: c.title, m: Math.round(words(i + 1) / 220) + " min" }; }));
+      items.forEach(function (it) {
+        var b = document.createElement("button"); b.setAttribute("aria-current", String(it.ch === S.ch));
+        b.innerHTML = '<span class="nn"></span><span class="t"></span><span class="m"></span>';
+        b.children[0].textContent = it.nn; b.children[1].textContent = it.t; b.children[2].textContent = it.m;
+        b.onclick = function () { closeDrawer(); openChapter(it.ch); };
+        wrapEl.appendChild(b);
+      });
+      body.appendChild(wrapEl); return;
+    }
+    if (tab === "bm") {
+      var bl = []; S.bms.forEach(function (b) { bl.push(b); });
+      bl.sort(function (a, b) { return a.ch - b.ch || a.b - b.b; });
+      if (!bl.length) { var e0 = document.createElement("div"); e0.className = "empty"; e0.textContent = "No bookmarks yet. Tap the bookmark icon at the top to save your place on any page."; body.appendChild(e0); return; }
+      bl.forEach(function (b) {
+        var row = document.createElement("div"); row.className = "row2";
+        var it = document.createElement("button"); it.className = "item";
+        var meta = document.createElement("div"); meta.className = "meta";
+        var s1 = document.createElement("span"); s1.className = "pg"; s1.textContent = b.ch === 0 ? "Contents" : pageLabel(b.ch, b.b);
+        var s2 = document.createElement("span"); s2.textContent = b.ch === 0 ? "" : "Ch " + BOOK[b.ch - 1].n + ": " + BOOK[b.ch - 1].title;
+        meta.appendChild(s1); meta.appendChild(s2);
+        var q = document.createElement("div"); q.className = "q"; q.textContent = b.label || "";
+        it.appendChild(meta); it.appendChild(q);
+        it.onclick = function () { closeDrawer(); openChapter(b.ch, b.ch === 0 ? null : { b: b.b }); };
+        var rm = document.createElement("button"); rm.className = "rm"; rm.setAttribute("aria-label", "Remove bookmark"); rm.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+        rm.onclick = function () { S.bms.delete(b.id); b.deleted = true; persist(b, true, "bookmarks"); saveLocal(); updateBm(); renderPanel(); };
+        row.appendChild(it); row.appendChild(rm); body.appendChild(row);
+      });
+      return;
+    }
+    var f = $("#filters"); f.textContent = "";
+    [["all", "All"], ["notes", "With notes"], ["hl", "Highlights only"], ["me", "For me"], ["claude", "For Claude"], ["open", "Unresolved"], ["here", "This chapter"]].forEach(function (x) {
+      var b = document.createElement("button"); b.textContent = x[1]; b.setAttribute("aria-pressed", String(filter === x[0]));
+      b.onclick = function () { filter = x[0]; renderPanel(); }; f.appendChild(b);
+    });
+    var list = [];
+    S.anns.forEach(function (a) { list.push(a); });
+    list = list.filter(function (a) {
+      return filter === "all" || (filter === "me" && a.target === "me") || (filter === "claude" && a.target === "claude") ||
+        (filter === "notes" && !!a.note) || (filter === "hl" && !a.note) || (filter === "open" && a.status !== "done") || (filter === "here" && a.ch === S.ch);
+    }).sort(function (a, b) { return a.ch - b.ch || ((a.segs && a.segs[0] ? a.segs[0].b : 0) - (b.segs && b.segs[0] ? b.segs[0].b : 0)) || a.created - b.created; });
+    if (!list.length) {
+      var e = document.createElement("div"); e.className = "empty";
+      e.textContent = S.anns.size ? "Nothing matches this filter." : "No notes yet. Select a passage in the book to highlight it or leave a note.";
+      body.appendChild(e); return;
+    }
+    list.forEach(function (a) {
+      var b = document.createElement("button"); b.className = "item " + a.color + (a.status === "done" ? " dn" : "");
+      var meta = document.createElement("div"); meta.className = "meta";
+      var s1 = document.createElement("span"); s1.className = "pg"; s1.textContent = pageLabel(a.ch, a.segs && a.segs[0] ? a.segs[0].b : 0) + " · Ch " + (a.ch && BOOK[a.ch - 1] ? BOOK[a.ch - 1].n : "?");
+      var s2 = document.createElement("span"); s2.className = "tg"; s2.textContent = a.target === "claude" ? "For Claude" : "For me";
+      meta.appendChild(s1); meta.appendChild(s2);
+      if (a.status === "done") { var s3 = document.createElement("span"); s3.textContent = "Resolved"; meta.appendChild(s3); }
+      var q = document.createElement("div"); q.className = "q"; q.textContent = a.quote || "";
+      b.appendChild(meta); b.appendChild(q);
+      if (a.note) { var n = document.createElement("div"); n.className = "nt"; n.textContent = a.note; b.appendChild(n); }
+      if (a.reply) { var r = document.createElement("div"); r.className = "rp"; r.textContent = "Claude: " + a.reply; b.appendChild(r); }
+      b.onclick = function () { closeDrawer(); jumpTo(a); };
+      body.appendChild(b);
+    });
+  }
+  function jumpTo(a) {
+    openChapter(a.ch, { b: a.segs && a.segs[0] ? a.segs[0].b : 0 });
+    var m = flow.querySelector('mark[data-a="' + a.id + '"]');
+    if (m) { var rs = m.getClientRects(); if (rs.length) { var fr = flow.getBoundingClientRect(); setPage(Math.max(0, Math.min(S.pages - 1, Math.floor((rs[0].left - fr.left + 2) / S.step)))); } m.classList.add("flash"); setTimeout(function () { m.classList.remove("flash"); }, 1600); }
+  }
+  function openDrawer(t) { tab = t; drawer.hidden = false; $("#scrim").hidden = false; $("#aa").hidden = true; renderPanel(); }
+  function closeDrawer() { drawer.hidden = true; $("#scrim").hidden = true; }
+  $("#btnToc").onclick = function () { openDrawer("toc"); };
+  $("#btnNotes").onclick = function () { openDrawer("notes"); };
+  $("#tabToc").onclick = function () { tab = "toc"; renderPanel(); };
+  $("#tabNotes").onclick = function () { tab = "notes"; renderPanel(); };
+  $("#tabBm").onclick = function () { tab = "bm"; renderPanel(); };
+  $("#dClose").onclick = closeDrawer; $("#scrim").onclick = function () { closeDrawer(); $("#aa").hidden = true; };
+  $("#btnAa").onclick = function () { var a = $("#aa"); a.hidden = !a.hidden; };
+  $("#fs").oninput = function () { settings.fs = +this.value; saveSettings(); applySettings(); relayout(); };
+  $("#spread").onchange = function () { settings.spread = this.checked; saveSettings(); relayout(); };
+  document.querySelectorAll("#themeSeg button").forEach(function (b) { b.onclick = function () { settings.theme = b.dataset.th; saveSettings(); applySettings(); }; });
+
+  var toastT = null;
+  function toast(m) { var t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 1600); }
+
+  /* ---------- turning pages ---------- */
+  $("#next").onclick = next; $("#prev").onclick = prev;
+  $("#pg").oninput = function () { setPage(+this.value); };
+  document.addEventListener("keydown", function (e) {
+    var tg = e.target && e.target.tagName;
+    if (tg === "TEXTAREA" || tg === "INPUT") { if (e.key === "Escape") closeSheet(); return; }
+    if (e.key === "ArrowRight" || e.key === "PageDown" || (e.key === " " && !e.shiftKey)) { e.preventDefault(); next(); }
+    else if (e.key === "ArrowLeft" || e.key === "PageUp" || (e.key === " " && e.shiftKey)) { e.preventDefault(); prev(); }
+    else if (e.key === "Escape") { closeSheet(); closeDrawer(); $("#aa").hidden = true; }
+  });
+  var down = null;
+  stage.addEventListener("pointerdown", function (e) { down = { x: e.clientX, y: e.clientY, t: Date.now() }; });
+  stage.addEventListener("pointerup", function (e) {
+    if (!down) return; var d = down; down = null;
+    var dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (Math.abs(dx) > 60 && Math.abs(dy) < 50 && e.pointerType === "touch") { if (dx < 0) next(); else prev(); return; }
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && Date.now() - d.t < 400) {
+      var sel = window.getSelection(); if (sel && !sel.isCollapsed) return;
+      var t = e.target; if (t.closest && t.closest("mark,button,a")) return;
+      if (!sheet.hidden && !cur) return;
+      var r = stage.getBoundingClientRect(), f = (e.clientX - r.left) / r.width;
+      if (f < 0.33) prev(); else if (f > 0.67) next();
+    }
+  });
+  var rz = null;
+  window.addEventListener("resize", function () { clearTimeout(rz); rz = setTimeout(relayout, 150); });
+
+  /* ---------- boot ---------- */
+  applySettings();
+  var saved = jparse(ls.get("sc.pos"), null);
+  S.anns = new Map(); jparse(ls.get("sc.anns"), []).forEach(function (a) { if (a && a.id) S.anns.set(a.id, a); });
+  jparse(ls.get("sc.bm"), []).forEach(function (a) { if (a && a.id) S.bms.set(a.id, a); });
+  function boot() {
+    if (saved && saved.ch > 0 && saved.ch <= NCH) openChapter(saved.ch, { b: saved.b || 0 }); else openChapter(0);
+    updateCount();
+  }
+  function afterFonts() { boot(); }
+  if (document.fonts && document.fonts.ready) {
+    var done = false; var go = function () { if (!done) { done = true; afterFonts(); } };
+    setTimeout(go, 1500); document.fonts.ready.then(go);
+  } else afterFonts();
+  window.addEventListener("load", function () { if (S.loaded) setTimeout(relayout, 50); });
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", function () { if (S.loaded) relayout(); });
+
+  (async function connect() {
+    setStatus("wait");
+    var slow = setTimeout(function () { setStatus("slow"); }, 10000);
+    var db = null;
+    try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+    if (!db) { clearTimeout(slow); setStatus("local"); return; }
+    S.db = db;
+    try {
+      db.collection("annotations").onSnapshot(function (snap) {
+        clearTimeout(slow);
+        var m = new Map();
+        snap.docs.forEach(function (d) { var v = d.data(); if (v && !(Q.has("annotations/" + d.id) && Q.get("annotations/" + d.id).a.deleted)) m.set(d.id, Object.assign({}, v, { id: d.id })); });
+        Q.forEach(function (it) { if (it.coll === "annotations" && !it.a.deleted && !m.has(it.a.id)) m.set(it.a.id, it.a); });
+        var before = sig(); S.anns = m; saveLocal();
+        if (sig() !== before && S.loaded) rerenderKeep();
+        renderPanel(); updateCount();
+        if (cur && S.anns.get(cur) && !sheet.hidden) openEdit(cur, false);
+        if (!snap.metadata.fromCache && !Q.size) setStatus("saved"); else if (!Q.size && !statEl.textContent) setStatus("saved");
+      }, function () { clearTimeout(slow); setStatus("slow"); });
+      db.collection("bookmarks").onSnapshot(function (snap) {
+        var m = new Map();
+        snap.docs.forEach(function (d) { var v = d.data(); if (v && !(Q.has("bookmarks/" + d.id) && Q.get("bookmarks/" + d.id).a.deleted)) m.set(d.id, Object.assign({}, v, { id: d.id })); });
+        Q.forEach(function (it) { if (it.coll === "bookmarks" && !it.a.deleted && !m.has(it.a.id)) m.set(it.a.id, it.a); });
+        S.bms = m; saveLocal(); updateBm(); renderPanel();
+      }, function () {});
+      var pos = await db.doc("state/progress").get();
+      var lp = jparse(ls.get("sc.pos"), null);
+      if (pos.exists && !lp) { var v = pos.data(); if (v && v.ch) openChapter(v.ch, { b: v.b || 0 }); }
+    } catch (e) { setStatus("slow"); }
+  })();
+})();
+</script>
