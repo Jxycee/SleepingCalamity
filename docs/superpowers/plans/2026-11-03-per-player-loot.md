@@ -403,3 +403,14 @@ Bags_MistypedSectionKeepsTheRestOfTheFile      // "bags": "oops" -> other sectio
 - banking picks;
 - a wipe leaves a satchel for each player;
 - a rejoin keeps the bag.
+
+---
+
+## Amendments after the Task 1-3 risk review (2026-11-03)
+- **Task 4, bank reopen:** `DiveState.CanBankHere` is `FloorHasBank(CurrentFloor) && (!BankUsed(CurrentFloor) || Bags.AnyBankOpen)` (new `PartyBags.AnyBankOpen`: some bag has an open visit). The review found `AnyCarried` let a used bank point heal without limit. Restore the `DiveHaulTests` case to "refused while nothing new waits".
+- **Task 4, `FoundThisDive`:** reset when a dive starts (`DiveState.SetFloor` leaving Town).
+- **Task 4, slots:** `PlayerSlotOf` stays within 0-3 (clamp the no-roster order), because `RollFor` throws above 3.
+- **Task 4, stir fallout:** floors alone cap stir at 52.5 in the live 4-floor dive (hunter 70 and deep-closes 100 unreachable until plan 3's valuables stir). Accepted and parked. PlayMode tests that pushed stir with pieces (`CellarContentsNetworkTests.Hunter_*`, `DiveSpineNetworkTests.DiveFailed_*`, `DiveWalkQaTests` stir steps) pass a `StirTuning` with a high `PerFloorCleared` through `ServerBegin(pieces, tuning)` instead.
+- **Task 3 follow-up nits (take in Task 4):** `BagsSaveRules.Capture` filters to recorded players before the 4-entry cap.
+- **Parked:** one mistyped value inside a bag entry loses that player's bag (hand-edited files only); the satchel does not count against `MaxCarried`; save rule for a save-and-quit at a stair (decision 24) is plan 3's.
+- **Merge rule:** the branch must not merge before Task 6 (old chest loot still feeds the shared haul until then).
