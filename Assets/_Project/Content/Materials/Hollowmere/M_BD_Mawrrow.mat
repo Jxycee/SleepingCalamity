@@ -36,14 +36,14 @@ Material:
     - _DistNear: 2000
     - _GroundMist: 0.04
     - _HazeCoolAmt: 0.8
-    - _HazeFar: 0.64
-    - _HazeNear: 0.5
+    - _HazeFar: 0.58
+    - _HazeNear: 0.4
     - _MistScale: 40
     - _MistTop: -8
     - _NoiseAmp: 0.04
     - _NoiseLit: 0.03
     m_Colors:
-    - _BaseColor: {r: 0.07, g: 0.08, b: 0.11, a: 1}
+    - _BaseColor: {r: 0.3, g: 0.27, b: 0.27, a: 1}
     - _HazeCool: {r: 0.806, g: 0.8, b: 1.5600001, a: 1}
     - _HazeTint: {r: 0.98, g: 1, b: 1.03, a: 1}
     - _ShadowTint: {r: 0.3, g: 0.38, b: 0.48, a: 1}
