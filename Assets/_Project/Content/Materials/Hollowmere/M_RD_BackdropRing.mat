@@ -34,6 +34,7 @@ Material:
     - _Cutoff: 0.5
     - _DistFar: 700
     - _DistNear: 150
+    - _FillBoost: 1
     - _GroundMist: 0.03
     - _HazeCoolAmt: 0.35
     - _HazeFar: 0.78

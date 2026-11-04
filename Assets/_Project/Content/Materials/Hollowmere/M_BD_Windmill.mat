@@ -34,15 +34,16 @@ Material:
     - _Cutoff: 0.5
     - _DistFar: 1300
     - _DistNear: 500
+    - _FillBoost: 4
     - _GroundMist: 0.05
     - _HazeCoolAmt: 0.3
-    - _HazeFar: 0.55
-    - _HazeNear: 0.4
+    - _HazeFar: 0.38
+    - _HazeNear: 0.25
     - _HazeTop: 0
     - _HazeTopHeight: 0
-    - _KeyBias: 0.1
+    - _KeyBias: 0.35
     - _KeyBoost: 1.3
-    - _KeyWrap: 0.85
+    - _KeyWrap: 1.2
     - _MistScale: 40
     - _MistTop: -8
     - _NoiseAmp: 0.04
