@@ -8,6 +8,8 @@ launches Unity, and it doesn't cover tests that need UnityEngine, the editor, sc
 Run:  python3 Tools/cloud/sc_core_tests.py [--project <worktree>] [--where "test =~ WeirBoards"] [--list]
 Prints NUnitLite's summary; exit 0 when every test passes. The build goes to ~/sc_core_tests (about 20 s cold, a few seconds warm).
 Needs `dotnet` (8.x) and NuGet access for NUnit/NUnitLite 3.14 and Newtonsoft.Json 13.0.2 (Core's save types use it; Unity auto-references it).
+Also runs on the Windows PC (`python Tools/cloud/sc_core_tests.py`): a newer SDK (the PC has .NET 10) runs the net8.0 build through DOTNET_ROLL_FORWARD=Major,
+which the script sets unless you set it yourself; with an 8.x runtime installed it changes nothing.
 """
 import argparse, os, re, subprocess, sys
 
@@ -37,6 +39,7 @@ def main():
     ap.add_argument('--where', default=None, help='an NUnit --where filter')
     ap.add_argument('--list', action='store_true', help='list the test files picked and stop')
     a = ap.parse_args()
+    os.environ.setdefault('DOTNET_ROLL_FORWARD', 'Major')   # run the net8.0 build on a newer runtime (the PC has .NET 10 only)
     root = os.path.abspath(a.project)
     files = pure_tests(root)
     if a.list:
@@ -52,7 +55,9 @@ def main():
         b = build(work, core, files)
         if b.returncode == 0:
             break
-        bad = set(m for m in re.findall(r'(/[^\s(]+\.cs)\(\d+,\d+\): error', b.stdout) if m in files)
+        # compiler paths are POSIX in the cloud, C:\... on Windows (case and slashes may differ from ours): compare normalised
+        named = set(os.path.normcase(os.path.normpath(m)) for m in re.findall(r'((?:[A-Za-z]:)?[^\s(:]+\.cs)\(\d+,\d+\): error', b.stdout))
+        bad = set(f for f in files if os.path.normcase(os.path.normpath(f)) in named)
         if not bad:
             print(b.stdout[-4000:], b.stderr[-2000:])
             print('FAIL (build)')
