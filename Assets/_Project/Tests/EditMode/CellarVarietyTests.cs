@@ -106,7 +106,7 @@ namespace SleepingCalamity.Tests.EditMode
             CellarFloorLayout l = CellarFloorGenerator.Generate(12345, 1);
             ulong before = l.LayoutHash(); CellarFloorDressing.Resolve(l);
             Assert.AreEqual(before, l.LayoutHash());
-            Assert.AreEqual(2055763217958189686UL, before, "dressing leaves the geometry golden (re-pinned by procgen item 2) alone");
+            Assert.AreEqual(932123446153315579UL, before, "dressing leaves the geometry golden (re-pinned by rooms-v2 (pool resize)) alone");
         }
 
         [Test]
@@ -138,8 +138,8 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var got = new ulong[4];
             for (int f = 1; f <= 3; f++) got[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(12345, f)).DressingHash();
-            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // re-pinned 2026-10-31 (procgen item 2: presets moved the placement, deliberate); floors 2-3 re-pinned by procgen 5 vignettes, deliberate
-            Assert.AreEqual(7289301962720901386UL, got[1], "floor 1; actual " + all); Assert.AreEqual(11353760107766476320UL, got[2], "floor 2; actual " + all); Assert.AreEqual(771539410711550091UL, got[3], "floor 3; actual " + all);
+            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // re-pinned 2026-10-31 (procgen item 2: presets moved the placement, deliberate); floors 2-3 re-pinned by procgen 5 vignettes, deliberate; re-pinned by rooms-v2 (pool resize)
+            Assert.AreEqual(12105747063451063287UL, got[1], "floor 1; actual " + all); Assert.AreEqual(11472384894430338541UL, got[2], "floor 2; actual " + all); Assert.AreEqual(16417598171853309782UL, got[3], "floor 3; actual " + all);
         }
 
         // ---------------------------------------------------------------- dressing statistics

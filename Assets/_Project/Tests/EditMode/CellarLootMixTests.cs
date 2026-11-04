@@ -106,9 +106,9 @@ namespace SleepingCalamity.Tests.EditMode
             var sb = new System.Text.StringBuilder();
             var got = new ulong[5];
             for (int f = 1; f <= 4; f++) { got[f] = CellarLootMix.LootMixHash(12345, Dive(12345, f)); sb.Append(got[f]).Append("UL, "); }
-            string all = sb.ToString();   // pinned 2026-11-01 (procgen 1d loot mix, integer form, deliberate; was the float form 1851538259201835552 ...)
-            Assert.AreEqual(5686594895284728819UL, got[1], "floor 1; actual " + all); Assert.AreEqual(9935741248512517506UL, got[2], "floor 2; actual " + all);
-            Assert.AreEqual(2709122302315985379UL, got[3], "floor 3; actual " + all); Assert.AreEqual(12947464770208806370UL, got[4], "floor 4; actual " + all);
+            string all = sb.ToString();   // re-pinned by rooms-v2 (pool resize) for floors 2-4 (floor 4 reads floor 1-3 key placement); pinned 2026-11-01 (procgen 1d loot mix, integer form, deliberate; was the float form 1851538259201835552 ...)
+            Assert.AreEqual(5686594895284728819UL, got[1], "floor 1; actual " + all); Assert.AreEqual(15100023838846557714UL, got[2], "floor 2; actual " + all);
+            Assert.AreEqual(4183221175472423696UL, got[3], "floor 3; actual " + all); Assert.AreEqual(619776823002422690UL, got[4], "floor 4; actual " + all);
         }
     }
 }

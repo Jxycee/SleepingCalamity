@@ -145,9 +145,9 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Goldens_Seed12345_AfterItem2()
         {
-            Assert.AreEqual(2055763217958189686UL, CellarFloorGenerator.Generate(12345, 1).LayoutHash());
-            Assert.AreEqual(1402270470201830695UL, CellarFloorGenerator.Generate(12345, 2).LayoutHash());
-            Assert.AreEqual(11057337751887225001UL, CellarFloorGenerator.Generate(12345, 3).LayoutHash());
+            Assert.AreEqual(932123446153315579UL, CellarFloorGenerator.Generate(12345, 1).LayoutHash());
+            Assert.AreEqual(5927757008498482560UL, CellarFloorGenerator.Generate(12345, 2).LayoutHash());
+            Assert.AreEqual(10153009738242674868UL, CellarFloorGenerator.Generate(12345, 3).LayoutHash());
             Assert.AreEqual(8894238083671442472UL, CellarFloorGenerator.Generate(12345, 4).LayoutHash());
         }
 

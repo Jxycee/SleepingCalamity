@@ -80,7 +80,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Chunks_GoldenHashes_Seed12345()
         {
             // re-pinned after item 2 layout presets (deliberate: the seed-12345 layout moved); floor 4 has none
-            ulong[] expect = { 15269764869822355049UL, 1827858871628724571UL, 14701427894773662475UL, 3232700585171816769UL };   // floors 1-4
+            ulong[] expect = { 15269764869822355049UL, 15479631453779929986UL, 17792373417583517742UL, 3232700585171816769UL };   // floors 1-4; floors 2-3 re-pinned by rooms-v2 (pool resize)
             var sb = new StringBuilder();
             for (int f = 1; f <= 4; f++) sb.Append("floor " + f + ": " + Hash(12345, f) + "UL\n");
             for (int f = 1; f <= 4; f++) Assert.AreEqual(expect[f - 1], Hash(12345, f), "floor " + f + "\n" + sb);

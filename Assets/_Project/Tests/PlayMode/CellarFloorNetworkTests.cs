@@ -127,7 +127,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(host.ServerSetFloor(seedA, 1), Is.True);
             yield return WaitBuilt(peerA, seedA, 1, "client A");
             AssertSame(host, peerA, seedA, 1, "client A f1");
-            Assert.That(host.BuiltLayoutHash, Is.EqualTo(2055763217958189686UL), "the golden hash of seed 12345 floor 1");
+            Assert.That(host.BuiltLayoutHash, Is.EqualTo(932123446153315579UL), "the golden hash of seed 12345 floor 1 (re-pinned by rooms-v2 pool resize)");
 
             Assert.That(host.ServerSetFloor(seedA, 2), Is.True);
             yield return WaitBuilt(peerA, seedA, 2, "client A");
