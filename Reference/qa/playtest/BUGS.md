@@ -24,6 +24,13 @@ Collision and layout bugs from the traversal scan (rebuilt buildings, chests and
 - **OPEN:** 1 solo balance (solo-balance session, DiveBot still shows normal solo unwinnable). The dive-flow review's piece-spot cap worry is theoretical: `CellarContentsTests.PieceSpots_CountMatchesDefaults_AndCellsAreLegalAndDistinct` asserts every default floor gets all its spots across seeds; only a test that adds extra pieces beyond the defaults can hit it.
 - **Left by design:** 18 one press teleports the whole party.
 
+## Triage 2026-11-04
+
+- Nothing new fixed or opened by merges since 2026-11-02: they were Hollowmere art, rooms v2, per-player loot (plan 2), and story docs.
+- Item 9 (chest farming) gains a second guard from plan 2: each player's opened-chest mask clears only when the dive ends (`PlayerBag`), and loot rolls are per player. Fresh seed per dive still the main fix.
+- Item 4 (bank spam) now sits on `Bags.AnyBankOpen`: a spent bank point stays shut once everyone has banked. Pieces no longer reopen it.
+- OPEN still: 1 (solo balance), 17 re-confirm on the next traversal scan.
+
 ## Blocker / major
 
 1. **Solo dives are close to unwinnable without help: the bot fails a dive every 40-70 s and never gets past floor 2** (major, seen).
