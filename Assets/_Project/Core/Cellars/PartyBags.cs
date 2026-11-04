@@ -29,6 +29,8 @@ namespace SleepingCalamity.Core
             get { foreach (var kv in _bags) if (kv.Value.BankOpen) return true; return false; }
         }
 
+        public void CancelBankVisits() { foreach (var kv in _bags) kv.Value.CancelBank(); }
+
         public void PushOnAll() { foreach (var kv in _bags) if (kv.Value.BankOpen) kv.Value.PushOn(); }
 
         public void GoHomeAll() { foreach (var kv in _bags) kv.Value.GoHome(); }

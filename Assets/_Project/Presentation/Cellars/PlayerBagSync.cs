@@ -42,7 +42,7 @@ namespace SleepingCalamity.Presentation
                 else if (p >= 0 && p < SatchelPickByte) v.Picks.Add((byte)p);
             }
             v.Gold = bag.Gold; v.DiveGold = bag.DiveGold;
-            v.StashTotal = Total(bag.Stash); v.BankedThisDive = Total(bag.BankedThisDive);
+            v.StashTotal = bag.StashTotal; v.BankedThisDive = bag.BankedTotal;
             v.SlotCapacity = bag.SlotCapacity; v.BankOpen = bag.BankOpen;
             LostSatchel carried = bag.Satchel.Carried, waiting = bag.Satchel.Waiting;
             v.SatchelCarried = carried != null; v.SatchelWaiting = waiting != null;
@@ -50,13 +50,6 @@ namespace SleepingCalamity.Presentation
             v.SatchelFloor = shown == null ? (byte)0 : (byte)Mathf.Clamp(shown.Floor, 0, 255);
             v.ChestSeed = bag.ChestSeed; v.ChestFloor = bag.ChestFloor; v.OpenedChests = bag.OpenedChests;
             return v;
-        }
-
-        private static int Total(System.Collections.Generic.IReadOnlyDictionary<int, int> counts)
-        {
-            long sum = 0;
-            foreach (System.Collections.Generic.KeyValuePair<int, int> kv in counts) sum += kv.Value;
-            return (int)Math.Min(sum, int.MaxValue);
         }
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
@@ -127,11 +120,25 @@ namespace SleepingCalamity.Presentation
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { Local = null; }
 
+        // The owner's instance on THIS NetworkManager's peer: its local player object's PlayerBagSync. Unlike Local (last spawned wins) it is right with several peers in one process
+        // (PlayMode tests); null while the manager has no local player object yet.
+        public static PlayerBagSync ForLocalPlayer(NetworkManager nm)
+        {
+            if (nm == null) return null;
+            NetworkObject po = nm.LocalClient?.PlayerObject;
+            if (po == null || !po.IsSpawned) return null;
+            PlayerBagSync s = po.GetComponent<PlayerBagSync>();
+            return s != null && s.IsOwner ? s : null;
+        }
+
         // Host only: pick/unpick requests received over the RPC, accepted or refused (lets a test wait for a refusal to land).
         public int RequestsHandled { get; private set; }
 
         private DiveHaulSync _haul;          // host only; the haul sync of this object's own NetworkManager
         private float _nextHaulLookup;       // the scene search runs at most once a second while no haul sync is known (town, haul-less tests)
+        private string _bagId;               // host only; the owner's bag key (PlayerKey.ToString allocates, so it is resolved rarely, never per frame)
+        private float _nextIdResolve;        // while no bag is found under _bagId the key is re-resolved at most twice a second
+        private PlayerBag _shownBag; private int _shownVersion = -1;   // host only; the bag and Version Net was last built from: an unchanged bag costs nothing per frame
 
         public override void OnNetworkSpawn()
         {
@@ -141,7 +148,7 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             if (Local == this) Local = null;
-            _haul = null;
+            _haul = null; _bagId = null; _shownBag = null; _shownVersion = -1;
         }
 
         // Asks the host to move carried item `index` (PlayerBag.SatchelPick = -1 for the carried satchel) into a bank slot. The host decides.
@@ -182,8 +189,24 @@ namespace SleepingCalamity.Presentation
         {
             if (!IsServer || !IsSpawned) return;
             DiveHaulSync haul = ResolveHaul(false);
-            BagView next = haul == null ? default : BagView.From(haul.ServerBagIfAny(OwnerClientId));   // no bag yet shows as default and never creates one
+            PlayerBag bag = haul == null ? null : FindBag(haul);   // looking never creates a bag: no bag yet shows as default
+            if (bag != null && bag == _shownBag && bag.Version == _shownVersion) return;   // nothing changed since Net was last built from this bag
+            _shownBag = bag; _shownVersion = bag == null ? -1 : bag.Version;
+            BagView next = BagView.From(bag);
             if (!next.Equals(Net.Value)) Net.Value = next;   // only send when something the owner can see changed
+        }
+
+        // The owner's bag if it exists (a new dive state or an adopted bag shows up here, since the lookup runs every frame). The bag key is resolved once and cached; with no bag found under
+        // it, it is resolved again (twice a second at most) in case the owner got a roster key after the first look.
+        private PlayerBag FindBag(DiveHaulSync haul)
+        {
+            DiveState state = haul.HostState;
+            if (state == null) return null;
+            if (_bagId != null && state.Bags.TryGet(_bagId, out PlayerBag bag)) return bag;
+            if (Time.unscaledTime < _nextIdResolve) return null;
+            _nextIdResolve = Time.unscaledTime + 0.5f;
+            _bagId = haul.PlayerIdOf(OwnerClientId);
+            return _bagId != null && state.Bags.TryGet(_bagId, out bag) ? bag : null;
         }
     }
 }

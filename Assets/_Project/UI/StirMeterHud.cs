@@ -24,6 +24,9 @@ namespace SleepingCalamity.UI
         // Pieces are safe on pickup and go to the town stock at once (plan 2 task 4): found this dive, and every piece already home.
         public static string Pieces(DiveHaulSync.Summary s) => "Pieces: " + s.FoundPieces + " found this dive, " + s.BankedPieces + " home";
 
+        // The local player's own bag (owner-only PlayerBagSync view): items carried, items safe in the bank this dive, and all their gold (home + this dive's).
+        public static string Bag(BagView v) => "Bag: " + v.Carried.Length + " carried, " + v.BankedThisDive + " safe, " + (v.Gold + v.DiveGold) + " gold";
+
         // "Pieces left on this floor: N" for floors 1-3; null on the bakery floor, in town or before a floor is set.
         public static string PiecesLeftHere(DiveHaulSync.Summary s) =>
             s.CurrentFloor >= 1 && s.CurrentFloor <= DiveHaul.PieceFloors ? "Pieces left on this floor: " + s.Left(s.CurrentFloor) : null;
@@ -91,6 +94,8 @@ namespace SleepingCalamity.UI
             GUI.Label(new Rect(x, ly, w, 28 * scale), "Stir " + s.StirValue + " / " + (int)tuning.Max + "    " + StirMeterText.Pieces(s), _label);
             string here = StirMeterText.PiecesLeftHere(s);
             if (here != null) { ly += 26 * scale; GUI.Label(new Rect(x, ly, w, 28 * scale), here, _label); }
+            PlayerBagSync bag = PlayerBagSync.Local;   // one peer per process in play; tests with several peers do not read this line
+            if (bag != null && bag.IsSpawned) { ly += 26 * scale; GUI.Label(new Rect(x, ly, w, 28 * scale), StirMeterText.Bag(bag.View), _label); }
             foreach (string line in StirMeterText.Labels(s)) { ly += 26 * scale; GUI.Label(new Rect(x, ly, w, 28 * scale), line, _label); }
         }
     }

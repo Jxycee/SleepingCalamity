@@ -23,6 +23,14 @@ namespace SleepingCalamity.Core
         public int DiveGold { get; private set; }
         public SatchelSlot Satchel { get; private set; } = new SatchelSlot();
 
+        // Bumped by every mutation made through this class (Add, AddGold, bank visit, GoHome, Fail, chest mask), never by a refused call. A watcher that holds this bag (PlayerBagSync) rebuilds its
+        // snapshot only when the version moved. The Satchel is a public object, but only this class mutates it (the save restore builds a whole new bag), so it needs no version of its own.
+        public int Version { get; private set; }
+
+        // Item counts (not kinds) in the home stash / banked this dive; plain loops over the concrete dictionaries, so a per-frame caller allocates nothing.
+        public int StashTotal => Sum(_stash);
+        public int BankedTotal => Sum(_banked);
+
         // Bank visit.
         public IReadOnlyList<int> Picks => _picks;
         public int SlotCapacity { get; private set; }
@@ -37,6 +45,7 @@ namespace SleepingCalamity.Core
         {
             if (itemId <= 0 || _carried.Count >= MaxCarried || !BankSlots.IsBankable(CellarLoot.KindOf(itemId))) return false;
             _carried.Add(itemId);
+            Version++;
             return true;
         }
 
@@ -44,6 +53,7 @@ namespace SleepingCalamity.Core
         {
             if (amount <= 0) return false;
             DiveGold = (int)System.Math.Min((long)DiveGold + amount, int.MaxValue);
+            Version++;
             return true;
         }
 
@@ -52,6 +62,15 @@ namespace SleepingCalamity.Core
             _picks.Clear();
             SlotCapacity = System.Math.Max(0, capacity);
             BankOpen = true;
+            Version++;
+        }
+
+        // Closes the bank visit without banking anything (the party left the bank floor): picks are dropped, carried items stay carried.
+        public void CancelBank()
+        {
+            if (!BankOpen) return;
+            CloseBank();
+            Version++;
         }
 
         public bool Pick(int carriedIndexOrSatchel)
@@ -60,10 +79,16 @@ namespace SleepingCalamity.Core
             if (carriedIndexOrSatchel == SatchelPick) { if (Satchel.Carried == null) return false; }
             else if (carriedIndexOrSatchel < 0 || carriedIndexOrSatchel >= _carried.Count || !BankSlots.IsBankable(CellarLoot.KindOf(_carried[carriedIndexOrSatchel]))) return false;
             _picks.Add(carriedIndexOrSatchel);
+            Version++;
             return true;
         }
 
-        public bool Unpick(int carriedIndexOrSatchel) => BankOpen && _picks.Remove(carriedIndexOrSatchel);
+        public bool Unpick(int carriedIndexOrSatchel)
+        {
+            if (!BankOpen || !_picks.Remove(carriedIndexOrSatchel)) return false;
+            Version++;
+            return true;
+        }
 
         // The party moves on: free slots fill with the most valuable unpicked items (highest rank first, earlier pickup on a tie), picks become safe, the visit closes.
         public void PushOn()
@@ -86,6 +111,7 @@ namespace SleepingCalamity.Core
             foreach (int i in indexes) Bump(_banked, _carried[i]);
             for (int k = indexes.Count - 1; k >= 0; k--) _carried.RemoveAt(indexes[k]);
             CloseBank();
+            Version++;
         }
 
         // Out of the dungeon: everything carried or banked goes to the stash, dive gold is kept in full.
@@ -99,6 +125,7 @@ namespace SleepingCalamity.Core
             Gold = (int)System.Math.Min((long)Gold + DiveGold, int.MaxValue);
             DiveGold = 0;
             CloseBank();
+            Version++;
         }
 
         // The dive failed on `floor`: banked items are safe, half the dive gold is kept, the carried items wait in a satchel (a carried satchel is lost).
@@ -111,6 +138,7 @@ namespace SleepingCalamity.Core
             Satchel.OnFail(floor, _carried);
             _carried.Clear();
             CloseBank();
+            Version++;
         }
 
         // What Fail(floor) would leave, as a new bag; this bag is unchanged (used to save a mid-dive state as a failed dive).
@@ -133,6 +161,7 @@ namespace SleepingCalamity.Core
             ulong bit = 1UL << chestIndex;
             if ((OpenedChests & bit) != 0) return false;
             OpenedChests |= bit;
+            Version++;
             return true;
         }
 
@@ -149,6 +178,13 @@ namespace SleepingCalamity.Core
         }
 
         void CloseBank() { _picks.Clear(); SlotCapacity = 0; BankOpen = false; }
+
+        static int Sum(Dictionary<int, int> d)
+        {
+            long sum = 0;
+            foreach (int n in d.Values) sum += n;   // the concrete Dictionary's struct enumerator: no boxing
+            return (int)System.Math.Min(sum, int.MaxValue);
+        }
 
         static void Bump(Dictionary<int, int> d, int id, int n = 1) { d.TryGetValue(id, out int have); d[id] = have + n; }
     }

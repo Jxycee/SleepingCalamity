@@ -1,8 +1,8 @@
 // Authority: test-only. M5 contents: the host (CellarContentsSync) spawns room enemies, opens chests, drops and hands out the gate key, opens the locked door and hides pieces;
 // a client sees the replicated state. Host + one client in one process (scene management off; sync objects are dynamically spawned network prefabs from the owned list).
 // Players are simulated through CellarContentsSync.PlayersOverride (no hero objects exist here), so the RPC range rule is judged on those positions.
-// Catches: enemies not spawning on first room entry / not appearing on the client, a room not clearing, a chest opening out of range or twice, a client not seeing the mask, loot
-// not reaching the haul, the carrier not dropping the gate key, the pickup not unlocking the exit on every peer, the door staying shut with the key held, pieces not reaching
+// Catches: enemies not spawning on first room entry / not appearing on the client, a room not clearing, a chest opening out of range or twice, a loot chest not opening for the opener's
+// own bag (per player since plan 2 task 6; the lowered visual needs a hero and is judged in PerPlayerLootNetworkTests), loot not reaching the opener's bag, the carrier not dropping the gate key, the pickup not unlocking the exit on every peer, the door staying shut with the key held, pieces not reaching
 // the haul or not reappearing after a failed dive.
 // Also: a party wipe (CombatHost.ServerClearEnemies) drops no key and clears no room, and the room respawns on re-entry; a floor built under a root at (200,0,0) has chests, pieces
 // and room spawns where the host checks them; a player still at its pre-floor-change position is ignored until it has moved.
@@ -70,8 +70,11 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
         }
 
-        // Chest loot goes into the opener's bag (plan 2 task 4; task 6 makes the chests per player): the client's carried item count.
+        // Chest loot goes into the opener's bag (plan 2 task 6: loot chests are per player): the client's carried item count.
         private static int Loot(Ctx c) => c.Haul.ServerBagOf(c.ClientId).Carried.Count;
+
+        // Loot chests no longer set the shared State.Chests bit: "opened" is the opener's own bag mask on the host.
+        private static bool Opened(Ctx c, int idx) => c.Haul.ServerBagOf(c.ClientId).ChestOpened(c.Seed, c.Layout.Floor, idx);
 
         private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default, uint? seedOverride = null, int startFloor = 1, StirTuning? stir = null)
         {
@@ -159,16 +162,17 @@ namespace SleepingCalamity.Tests.PlayMode
             int handled = c.Contents.ChestRequestsHandled;
             c.Peer.RequestOpenChest(idx);
             yield return PlayModeHarness.WaitUntil(() => c.Contents.ChestRequestsHandled > handled, Timeout, "the request never reached the host");
-            Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL), "out of range: refused");
+            Assert.That(Opened(c, idx), Is.False, "out of range: refused");
             Assert.That(Loot(c), Is.EqualTo(0));
 
             c.Players[c.ClientId] = at + new Vector3(1.0f, 0f, 0f);
             c.Peer.RequestOpenChest(idx);
-            yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Chests & (1UL << idx)) != 0, Timeout, "the client never saw the chest open");
-            yield return PlayModeHarness.WaitUntil(() => c.Peer.ChestShownOpen(idx), Timeout, "the client does not show the chest opened");
+            yield return PlayModeHarness.WaitUntil(() => Opened(c, idx), Timeout, "the chest never opened for the client's bag");
             Assert.That(Loot(c), Is.EqualTo(1), "the loot reached the opener's bag");
+            Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL), "a loot chest never sets the shared opened bit (the visual lives in the opener's own PlayerBagSync view: PerPlayerLootNetworkTests)");
             Assert.That(CellarLoot.RankOf(c.Contents.LastLootItem), Is.InRange(1, 5));
-            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.Roll(c.Seed, 1, idx, false)));
+            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.RollFor(c.Seed, 1, idx, c.Haul.PlayerSlotOf(c.ClientId))), "the opener's own roll");
+            Assert.That(c.Haul.ServerBagOf(c.ClientId).Carried, Is.EqualTo(new[] { c.Contents.LastLootItem }));
 
             handled = c.Contents.ChestRequestsHandled;
             c.Peer.RequestOpenChest(idx);
@@ -284,10 +288,10 @@ namespace SleepingCalamity.Tests.PlayMode
             int handled = c.Contents.ChestRequestsHandled;
             c.Peer.RequestOpenChest(idx);
             yield return PlayModeHarness.WaitUntil(() => c.Contents.ChestRequestsHandled > handled, Timeout, "request not handled");
-            Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL));
+            Assert.That(Opened(c, idx), Is.False);
             c.Players[c.ClientId] = at + new Vector3(1f, 0f, 0f);
             c.Peer.RequestOpenChest(idx);
-            yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Chests & (1UL << idx)) != 0, Timeout, "the chest did not open at x=200");
+            yield return PlayModeHarness.WaitUntil(() => Opened(c, idx), Timeout, "the chest did not open at x=200");
 
             // piece: the sphere sits inside the floor's bounds and stepping on it collects it
             Assert.That(c.Peer.TryPiecePosition(0, out Vector3 piece), Is.True);
@@ -467,10 +471,10 @@ namespace SleepingCalamity.Tests.PlayMode
             int handled = c.Contents.ChestRequestsHandled;
             c.Peer.RequestOpenChest(idx);
             yield return PlayModeHarness.WaitUntil(() => c.Contents.ChestRequestsHandled > handled, Timeout, "the request never reached the host");
-            Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL), "a wall between the player and the chest: refused");
+            Assert.That(Opened(c, idx), Is.False, "a wall between the player and the chest: refused");
             RemoveWall(wall);
             c.Peer.RequestOpenChest(idx);
-            yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Chests & (1UL << idx)) != 0, Timeout, "the chest never opened once the wall was gone");
+            yield return PlayModeHarness.WaitUntil(() => Opened(c, idx), Timeout, "the chest never opened once the wall was gone");
         }
 
         // Catches: the locked door opening (by press or by the held-key auto open) for a player on the far side of a wall.

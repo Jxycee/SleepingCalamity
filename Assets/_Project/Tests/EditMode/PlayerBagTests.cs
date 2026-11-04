@@ -166,6 +166,80 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(b.MarkChestOpened(5, 2, -1), Is.False);
         }
 
+        // Version is what lets PlayerBagSync skip rebuilding its snapshot every frame: it must move on every mutation and stay put on a refusal.
+        [Test]
+        public void Version_MovesOnEveryMutation_NotOnRefusals()
+        {
+            var b = new PlayerBag();
+            int v = b.Version;
+            void Moved(string what) { Assert.That(b.Version, Is.GreaterThan(v), what); v = b.Version; }
+            void Same(string what) { Assert.That(b.Version, Is.EqualTo(v), what); }
+
+            Assert.That(b.Add(101), Is.True); Moved("Add");
+            Assert.That(b.Add(CellarLoot.RoomKeyId), Is.False); Same("a refused key");
+            Assert.That(b.Add(0), Is.False); Same("a refused id");
+            Assert.That(b.AddGold(5), Is.True); Moved("AddGold");
+            Assert.That(b.AddGold(0), Is.False); Same("zero gold");
+            Assert.That(b.Pick(0), Is.False); Same("a pick with no visit");
+            b.OpenBank(2); Moved("OpenBank");
+            Assert.That(b.Pick(0), Is.True); Moved("Pick");
+            Assert.That(b.Pick(0), Is.False); Same("the same pick twice");
+            Assert.That(b.Pick(7), Is.False); Same("a bad index");
+            Assert.That(b.Unpick(0), Is.True); Moved("Unpick");
+            Assert.That(b.Unpick(0), Is.False); Same("an unpick of nothing");
+            b.CancelBank(); Moved("CancelBank");
+            b.CancelBank(); Same("CancelBank with no visit");
+            b.PushOn(); Same("PushOn with no visit");
+            Assert.That(b.MarkChestOpened(5, 1, 3), Is.True); Moved("MarkChestOpened");
+            Assert.That(b.MarkChestOpened(5, 1, 3), Is.False); Same("an open chest again");
+            Assert.That(b.MarkChestOpened(5, 1, 64), Is.False); Same("a chest index out of range");
+            b.OpenBank(1); v = b.Version;
+            b.PushOn(); Moved("PushOn");
+            b.Fail(2); Moved("Fail");
+            b.GoHome(); Moved("GoHome");
+        }
+
+        [Test]
+        public void CancelBank_ClosesTheVisitAndKeepsEverythingCarried()
+        {
+            var b = BagWith(101, 102);
+            b.OpenBank(2);
+            Assert.That(b.Pick(1), Is.True);
+            b.CancelBank();
+            Assert.That(b.BankOpen, Is.False);
+            Assert.That(b.SlotCapacity, Is.EqualTo(0));
+            Assert.That(b.Picks, Is.Empty);
+            Assert.That(b.Carried, Is.EqualTo(new[] { 101, 102 }));
+            Assert.That(b.BankedThisDive, Is.Empty);
+            Assert.That(b.Pick(0), Is.False, "no visit, no pick");
+        }
+
+        [Test]
+        public void PartyBags_CancelBankVisits_ClosesEveryOpenVisit()
+        {
+            var p = new PartyBags();
+            p.For("a").Add(101); p.For("b").Add(102);
+            p.For("a").OpenBank(2); p.For("b").OpenBank(1);
+            Assert.That(p.AnyBankOpen, Is.True);
+            p.CancelBankVisits();
+            Assert.That(p.AnyBankOpen, Is.False);
+            Assert.That(p.For("a").Carried, Is.EqualTo(new[] { 101 }));
+        }
+
+        [Test]
+        public void StashTotal_AndBankedTotal_CountItemsNotKinds()
+        {
+            var b = BagWith(101, 101, 102);
+            b.OpenBank(3);
+            Assert.That(b.Pick(0), Is.True); Assert.That(b.Pick(1), Is.True); Assert.That(b.Pick(2), Is.True);
+            b.PushOn();
+            Assert.That(b.BankedTotal, Is.EqualTo(3));
+            Assert.That(b.StashTotal, Is.EqualTo(0));
+            b.GoHome();
+            Assert.That(b.BankedTotal, Is.EqualTo(0));
+            Assert.That(b.StashTotal, Is.EqualTo(3));
+        }
+
         [Test]
         public void KindOf_TableItemsAreLarge_KeysAreKeys()
         {

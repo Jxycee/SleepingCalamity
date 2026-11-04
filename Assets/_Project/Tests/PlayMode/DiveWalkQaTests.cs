@@ -247,10 +247,13 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return ClientTo(rig, chestPos + new Vector3(0.5f, 0.1f, 0f), "[F1 chest walk]");
             KillAll(rig.HostNm);
             ulong clientId = rig.Client.NetworkManager.LocalClientId;
-            int loot0 = rig.HostHaul.ServerBagOf(clientId).Carried.Count;   // chest loot goes into the opener's bag (plan 2 task 4); the bag is host-only until PlayerBagSync (task 5)
+            int loot0 = rig.HostHaul.ServerBagOf(clientId).Carried.Count;   // chest loot goes into the opener's bag (plan 2 task 6: loot chests are per player, no shared opened bit)
             rig.PeerContents.RequestOpenChest(chest);
-            yield return PlayModeHarness.WaitUntil(() => (rig.Contents.State.Chests & (1UL << chest)) != 0, Timeout, "[F1 chest] the client's open-chest request never opened it on the host (chests mask " + rig.Contents.State.Chests + ", requests handled " + rig.Contents.ChestRequestsHandled + ")");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.ServerBagOf(clientId).Carried.Count > loot0, Timeout, "[F1 chest] the chest loot never entered the opener's bag on the host");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.ServerBagOf(clientId).Carried.Count > loot0, Timeout, "[F1 chest] the client's open-chest request never put loot in the opener's bag on the host (requests handled " + rig.Contents.ChestRequestsHandled + ")");
+            Assert.That(rig.Contents.State.Chests & (1UL << chest), Is.EqualTo(0UL), "[F1 chest] a loot chest never sets the shared opened bit");
+            // the opener's own client sees its item through its owner-only bag view, and its own copy of the chest lowered (the per-NetworkManager lookup: the host's hero is the 'last spawned' Local)
+            NetworkManager clientNm = rig.Client.NetworkManager;
+            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync v = PlayerBagSync.ForLocalPlayer(clientNm); return v != null && v.View.Carried.Length == loot0 + 1; }, Timeout, "[F1 chest] the opener's client never saw the item in its own bag view");
             yield return PlayModeHarness.WaitUntil(() => rig.PeerContents.ChestShownOpen(chest), Timeout, "[F1 chest] the client never showed the chest open");
 
             // F1: bakery piece -> pieces-left drops on both peers.
