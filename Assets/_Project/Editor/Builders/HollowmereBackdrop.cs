@@ -186,8 +186,8 @@ namespace SleepingCalamity.EditorTools
                     if (hs[a] <= 0f && hs[b] <= 0f && hs[d] <= 0f && hs[e] <= 0f) continue;
                     idx.AddRange(new[] { a, e, d, a, b, e });   // the local (tangent, radial) frame is left-handed against world (x, z): this winding faces up (the old one gave downward normals, so the key light never reached the mountain)
                 }
-            // A12 r2 (town-art-leftovers): ROOT CAUSE of the flat dark mountain was inverted winding (downward normals, no key light). With it fixed the mountain is backlit (sun south-east, camera looks south): wide wrap, key x2.6, fill x2, light haze 0.15-0.25 (30% less on the upper 60%) give spurs a p10-p90 spread of 0.3 at a mean 0.34 (mist band 0.57).
-            Material m = Mat("M_BD_Mawrrow", new Color(0.40f, 0.367f, 0.344f), 0.15f, 0.25f, 2000f, 3000f, 0.04f, 1.3f, 0.8f, 1.0f, 0.10f, 2.6f, 1f, 0.30f, H - 30f, 2f);
+            // A12 r2 (town-art-leftovers): ROOT CAUSE of the flat dark mountain was inverted winding (downward normals, no key light). With it fixed the mountain is backlit (sun south-east, camera looks south): wide wrap, key x2.6, fill x2, light haze 0.15-0.25 (30% less on the upper 60%) give spurs a p10-p90 spread of 0.3 at a mean 0.34 (mist band 0.57). A12 r2b (controller): the 0.15-0.25 haze and warm tint read as a near clay model at 2.6 km; neutral cool rock, haze 0.32-0.42 and key x2.0 put it back behind the aerial perspective (Friedrich blue-grey distance).
+            Material m = Mat("M_BD_Mawrrow", new Color(0.35f, 0.345f, 0.36f), 0.32f, 0.42f, 2000f, 3000f, 0.04f, 1.3f, 0.8f, 1.0f, 0.10f, 2.0f, 1f, 0.30f, H - 30f, 2f);
             MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
             {
                 float y = p.y + 30f;
