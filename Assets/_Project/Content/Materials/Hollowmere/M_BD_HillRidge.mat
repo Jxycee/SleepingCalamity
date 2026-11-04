@@ -38,10 +38,16 @@ Material:
     - _HazeCoolAmt: 0.6
     - _HazeFar: 0.82
     - _HazeNear: 0.72
+    - _HazeTop: 0
+    - _HazeTopHeight: 0
+    - _KeyBias: 0.15
+    - _KeyBoost: 1
+    - _KeyWrap: 0.7
     - _MistScale: 40
     - _MistTop: -8
     - _NoiseAmp: 0.04
     - _NoiseLit: 0.03
+    - _SkyFillDir: 0
     m_Colors:
     - _BaseColor: {r: 0.17, g: 0.24, b: 0.19, a: 1}
     - _HazeCool: {r: 0.68200004, g: 0.8, b: 1.32, a: 1}
