@@ -853,7 +853,7 @@ namespace SleepingCalamity.EditorTools
             foreach (Transform c in go.transform.Cast<Transform>().ToList())
             {
                 if (c.name != keep) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }
-                c.GetComponent<MeshRenderer>().sharedMaterial = m;
+                foreach (MeshRenderer r in c.GetComponentsInChildren<MeshRenderer>(true)) r.sharedMaterial = m;   // <State>_LOD0..2 children under the state's LODGroup node
             }
             var col = go.AddComponent<BoxCollider>();   // counter and frame (B8 header); the awning overhang has none
             col.center = new Vector3(0f, 0.8f, 0f); col.size = new Vector3(2.7f, 1.6f, 1.6f);
