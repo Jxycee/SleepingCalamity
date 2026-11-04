@@ -631,6 +631,13 @@ namespace SleepingCalamity.Presentation
 
         private void NoticeTo(ulong clientId, string text) { NoticeRpc(text, RpcTarget.Single(clientId, RpcTargetUse.Temp)); }
 
+        /// <summary>Shows `text` as the notice on the director of this NetworkManager's peer (CellarContentsSync's owner-only refusals use it). A no-op when that peer has no director.</summary>
+        public static void ShowNoticeOnLocal(NetworkManager nm, string text)
+        {
+            foreach (DiveDirector d in FindObjectsByType<DiveDirector>(FindObjectsSortMode.None))
+                if (d.IsSpawned && d.NetworkManager == nm) { d._notice = text; d._noticeUntil = Time.unscaledTime + 3f; return; }
+        }
+
         /// <summary>Owner side: the notice shown right now (a refusal's reason, sent to the asker only), or null. Never set by joining or by a save restore.</summary>
         public string Notice => _notice != null && Time.unscaledTime < _noticeUntil ? _notice : null;
 

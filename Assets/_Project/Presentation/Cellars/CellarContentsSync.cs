@@ -2,10 +2,14 @@
 // host-written NetworkVariable (State: opened-KEY-chest mask, collected-piece mask, cleared-room mask, key/door/exit flags, the dropped gate key) tagged with the (seed, floor) it
 // belongs to, so a late joiner receives it with the spawn and a peer ignores a state from another floor. Every peer builds the floor LOCALLY (CellarFloorSync) and this
 // object only shows state on it: chests lowered when opened, the gate hidden when the door is open, piece spheres hidden when collected, a gold cube where the gate key lies.
-// Chests are PER PLAYER (plan 2, spec decision 39): a loot chest opens once for each player, who rolls their own item (CellarLoot.RollFor with the roster slot) into their own bag
-// (DiveHaulSync.ServerAddItem; a full bag still opens the chest and the item is lost). Which loot chests a player opened lives in that player's PlayerBag (host-owned) and rides on that
+// Chests are PER PLAYER (plan 2, spec decision 39): a loot chest opens once for each player, who rolls their own item (CellarLoot.RollChest with the roster slot, the dive's momentum rank bonus and
+// whether they already own boots) into their own bag (DiveHaulSync.ServerAddItem). A gold purse roll goes to DiveHaulSync.ServerAddGold and never to PlayerBag.Add. A chest opened with a FULL bag
+// (PlayerBag.IsFull, the carried satchel counts as a slot) is refused: it stays closed for that player and only that player is told, by an owner-only RPC (plan 3 decision 6). Which loot chests a player opened lives in that player's PlayerBag (host-owned) and rides on that
 // player's owner-only PlayerBagSync, so a peer draws a loot chest lowered only for its own local player; the shared State.Chests bit is never set for a loot chest. The KEY chest and the
 // keys stay in the shared State (one room key for the party: State.Chests bit + RoomKeyHeld).
+// The LOST SATCHEL (plan 3 task 9, decisions 33-35) is per player the same way: whether one waits on this floor rides on that player's owner-only PlayerBagSync view (BagView.SatchelWaiting + SatchelFloor, so a
+// late joiner or a restore gets it with the spawn and no toast ever replays), and each peer builds the prop locally, only when ITS OWN view says a satchel waits here, at CellarPieceSpots.SatchelSpot(layout, dive
+// seed). Another client's view has no such satchel, so it never draws one; the host's pick-up (a player within SatchelRange of the spot, DiveHaulSync.ServerPickUpSatchel) only ever finds the asker's own.
 // Clients never write. They ask: RequestOpenChestRpc(chestIndex) / RequestOpenDoorRpc (SendTo.Server); the host re-checks index, not-already-open, key held and the
 // requesting player's XZ range (ChestRange / GateRange) from its own copy of the player object, so a client gate is only a prompt. The owner-side Interact prompt (rising
 // edge of the local hero's InteractPressed/Held) picks the nearest chest or the gate in range and sends the RPC.
@@ -34,7 +38,8 @@ namespace SleepingCalamity.Presentation
     public sealed class CellarContentsSync : NetworkBehaviour
     {
         public const float StaleMoveDistance = 3f;
-        public const float ChestRange = 2.5f, GateRange = 3f, GateKeyRange = 1.5f, PieceRange = 1.2f;
+        public const float ChestRange = 2.5f, GateRange = 3f, GateKeyRange = 1.5f, PieceRange = 1.2f, SatchelRange = 1.5f;
+        public const string BagFullText = "Your bag is full.";
 
         public struct PlayerPos { public ulong ClientId; public Vector3 Position; }
 
@@ -71,14 +76,20 @@ namespace SleepingCalamity.Presentation
         public event System.Action<int> ExitUnlocked;
         // Host only: the floor's guardian (the bank floor's Dough Warden) died: the director clears the floor so the bank room opens.
         public event System.Action<int> GuardianDefeated;
-        // Host only: a chest was opened (chest index, item id; RoomKeyId for the key chest).
+        // Host only: a chest was opened (chest index, item id; RoomKeyId for the key chest; CellarLoot.GoldId for a purse).
         public event System.Action<int, int> ChestOpened;
+        // Host only: a loot chest stayed closed because the opener's bag was full (client id, chest index).
+        public event System.Action<ulong, int> ChestRefusedFull;
+        // Host only: a lost satchel was picked up (client id).
+        public event System.Action<ulong> SatchelPickedUp;
         // Host only: a room was entered / cleared (room index).
         public event System.Action<int> RoomEntered, RoomCleared;
 
         public ContentsState State => Net.Value;
         public int ChestRequestsHandled { get; private set; }   // host only: RPCs received, accepted or refused
         public int LastLootItem { get; private set; }            // host only
+        public int NoticeCount { get; private set; }             // any peer: owner-only notices this peer received (a joiner or a restore never gets one)
+        public string LastNotice { get; private set; }           // any peer: the text of the last one
         public Enemy GateKeyCarrierEnemy => _carrierEnemy;       // host only (tests)
         public Enemy HunterEnemy => _hunter;                     // host only (tests)
 
@@ -91,6 +102,8 @@ namespace SleepingCalamity.Presentation
         private CellPos[] _pieceSpots = new CellPos[0];
         private GameObject[] _pieces = new GameObject[0];
         private GameObject _gateKeyMarker;
+        private GameObject _satchel;                   // this peer's own player's lost-satchel prop (null when no satchel of theirs waits on this floor)
+        private int _satchelBuild = -1;
         private bool _prevInteract;
         private float _nextLookup;
 
@@ -132,7 +145,8 @@ namespace SleepingCalamity.Presentation
         private void DestroyHandles()
         {
             if (_gateKeyMarker != null) Destroy(_gateKeyMarker);
-            _gateKeyMarker = null; _chests = new Transform[0]; _gate = null; _pieces = new GameObject[0]; _pieceSpots = new CellPos[0]; _handledBuild = -1; _handledPieces = -2;
+            if (_satchel != null) Destroy(_satchel);
+            _gateKeyMarker = null; _satchel = null; _satchelBuild = -1; _chests = new Transform[0]; _gate = null; _pieces = new GameObject[0]; _pieceSpots = new CellPos[0]; _handledBuild = -1; _handledPieces = -2;
         }
 
         private void OnDiveFailed() { _resetRequested = true; }
@@ -216,6 +230,45 @@ namespace SleepingCalamity.Presentation
             bool keyLies = ok && s.GateKey == 1;
             if (keyLies && _gateKeyMarker == null) _gateKeyMarker = CellarFloorBuilder.BuildGateKey(transform, s.GateKeyPos);
             else if (!keyLies && _gateKeyMarker != null) { Destroy(_gateKeyMarker); _gateKeyMarker = null; }
+            ShowSatchel(fs, s, ok);
+        }
+
+        // The local player's own bag view (see LocalOpenedMask for the per-NetworkManager lookup); false before the hero exists.
+        private bool TryLocalView(out BagView v)
+        {
+            v = default;
+            if (_localBag == null || !_localBag.IsSpawned || !_localBag.IsOwner) _localBag = PlayerBagSync.ForLocalPlayer(NetworkManager);
+            if (_localBag == null) return false;
+            v = _localBag.View;
+            return true;
+        }
+
+        // The lost-satchel prop: drawn only while THIS peer's own player has one waiting on the state's floor; rebuilt when the floor is rebuilt.
+        private void ShowSatchel(CellarFloorSync fs, in ContentsState s, bool ok)
+        {
+            bool want = false;
+            if (ok && fs.Layout != null && TryLocalView(out BagView v)) want = v.SatchelWaiting && v.SatchelFloor == s.Floor;
+            if (_satchel != null && (!want || _satchelBuild != fs.BuildCount)) { Destroy(_satchel); _satchel = null; }
+            if (!want || _satchel != null) return;
+            if (!TrySatchelCell(fs.Layout, s.Seed, out CellPos cell)) return;
+            _satchel = CellarFloorBuilder.BuildSatchel(transform, fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(cell.X, cell.Y)));
+            _satchelBuild = fs.BuildCount;
+        }
+
+        // SatchelSpot resolves the floor's dressing and sorts its free cells: far too much for every frame, so the last answer is kept for its (layout, seed).
+        private CellarFloorLayout _spotLayout; private uint _spotSeed; private CellPos _spotCell; private bool _spotOk;
+
+        private bool TrySatchelCell(CellarFloorLayout layout, uint seed, out CellPos cell)
+        {
+            if (layout == null) { cell = default; return false; }
+            if (!ReferenceEquals(_spotLayout, layout) || _spotSeed != seed)
+            {
+                _spotLayout = layout; _spotSeed = seed;
+                try { _spotCell = CellarPieceSpots.SatchelSpot(layout, seed); _spotOk = true; }
+                catch (System.InvalidOperationException) { _spotCell = default; _spotOk = false; }   // a floor with no free cell: no prop (and no pick-up)
+            }
+            cell = _spotCell;
+            return _spotOk;
         }
 
         // The loot chests the local player opened on the state's (seed, floor), from the owner-only PlayerBagSync view of THIS peer's local player object (0 before it exists, or when the view
@@ -283,6 +336,10 @@ namespace SleepingCalamity.Presentation
             return -1;
         }
 
+        /// <summary>This peer's view: is the local player's lost satchel drawn on the floor right now? (Tests; a real renderer is judged on the walk.)</summary>
+        public bool SatchelShownForLocal => _satchel != null && _satchel.activeInHierarchy;
+        public bool TrySatchelPosition(out Vector3 pos) { pos = default; if (_satchel == null) return false; pos = _satchel.transform.position; return true; }
+
         /// <summary>Owner side: true when an Interact press at `p` would open a chest or the gate. The dive director then leaves that press to the contents (one press, one action).</summary>
         public bool WouldUseInteract(Vector3 p) { int c = FindLocalTarget(FloorSync, p, out bool gate); return c >= 0 || (gate && Net.Value.RoomKeyHeld); }   // the locked gate takes no press without the key
 
@@ -294,6 +351,16 @@ namespace SleepingCalamity.Presentation
 
         [Rpc(SendTo.Server)]
         private void RequestOpenDoorRpc(RpcParams rpcParams = default) { ServerTryOpenDoor(rpcParams.Receive.SenderClientId); }
+
+        // Host to ONE client: a short refusal (the bag is full). A one-shot: it is never resent to a late joiner and a save restore sends none.
+        private void NoticeOwner(ulong clientId, string text) { NoticeOwnerRpc(text, RpcTarget.Single(clientId, RpcTargetUse.Temp)); }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void NoticeOwnerRpc(string text, RpcParams rpcParams = default)
+        {
+            NoticeCount++; LastNotice = text;
+            DiveDirector.ShowNoticeOnLocal(NetworkManager, text);
+        }
 
         // =================================================================================================================================
         // host
@@ -427,6 +494,7 @@ namespace SleepingCalamity.Presentation
             SpawnHunter(fs);
             TickGateKey();
             TickPieces(fs);
+            TickSatchels(fs);
             TickAutoDoor(fs);
             Publish();
         }
@@ -678,6 +746,33 @@ namespace SleepingCalamity.Presentation
             _st.Pieces = mask;
         }
 
+        // Each player walking onto their own waiting satchel carries it (a full bag leaves it lying: PlayerBag.PickUpSatchel). Only the walker's own bag is looked at, so no one else's satchel can be taken.
+        private void TickSatchels(CellarFloorSync fs)
+        {
+            if (HaulSync == null || _layout == null || !TrySatchelCell(_layout, _layout.Seed, out CellPos cell)) return;
+            Vector3 at = World(fs, cell);
+            for (int i = 0; i < _players.Count; i++)
+                if (FlatSqr(_players[i].Position, at) <= SatchelRange * SatchelRange) PickUpSatchelOf(_players[i].ClientId);
+        }
+
+        private bool PickUpSatchelOf(ulong clientId)
+        {
+            PlayerBag bag = HaulSync.ServerBagOf(clientId);
+            if (bag == null || !bag.Satchel.ShouldPlaceOn(_layout.Floor) || !HaulSync.ServerPickUpSatchel(clientId)) return false;
+            SatchelPickedUp?.Invoke(clientId);
+            return true;
+        }
+
+        /// <summary>Host: `clientId` picks up its own lost satchel if one waits on this floor and they stand within SatchelRange of its spot (no wall check: the spot is a free room cell). False for a stranger
+        /// (no satchel of theirs here), out of range, a full bag, or off the host.</summary>
+        public bool ServerTryPickUpSatchel(ulong clientId)
+        {
+            CellarFloorSync fs = FloorSync;
+            if (!HostReady(fs) || HaulSync == null || !TrySatchelCell(_layout, _layout.Seed, out CellPos cell)) return false;
+            if (!TryPlayerPos(clientId, out Vector3 pos) || FlatSqr(pos, World(fs, cell)) > SatchelRange * SatchelRange) return false;
+            return PickUpSatchelOf(clientId);
+        }
+
         private void TickAutoDoor(CellarFloorSync fs)
         {
             if (_gate == null || !_st.RoomKeyHeld || _st.DoorOpen) return;
@@ -716,9 +811,17 @@ namespace SleepingCalamity.Presentation
             }
             else
             {
-                item = CellarLoot.RollChest(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId));   // may be GoldId: the purse goes to ServerAddGold in plan 3 task 9, never to Add
+                int bonus = HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(_layout.Floor) : 0;   // momentum: a second-half chest rolls one rank higher
+                item = CellarLoot.RollChest(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId), bonus, bag.HasBoots);   // may be GoldId
+                if (item != CellarLoot.GoldId && bag.IsFull)   // a full bag refuses the chest (decision 6): it stays closed for this player, who alone is told
+                {
+                    NoticeOwner(clientId, BagFullText);
+                    ChestRefusedFull?.Invoke(clientId, chestIndex);
+                    return false;
+                }
                 bag.MarkChestOpened(_layout.Seed, _layout.Floor, chestIndex);
-                if (item > 0) HaulSync.ServerAddItem(clientId, item);   // a full bag still opens the chest; the item is lost (spec silent: proposal). LastLootItem records it
+                if (item == CellarLoot.GoldId) HaulSync.ServerAddGold(clientId, CellarLoot.GoldPurse);   // a purse never reaches PlayerBag.Add (it rejects ids <= 0)
+                else HaulSync.ServerAddItem(clientId, item);
             }
             LastLootItem = item;
             Publish();

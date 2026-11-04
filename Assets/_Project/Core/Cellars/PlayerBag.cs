@@ -7,7 +7,7 @@ namespace SleepingCalamity.Core
 {
     public sealed class PlayerBag
     {
-        public const int MaxCarried = 60;     // placeholder: most items one player can carry at once
+        public const int MaxCarried = 60;     // placeholder: most items one player can carry at once; a carried satchel takes one of them (plan 3 decision 6)
         public const int SatchelPick = -1;    // the pick that means "the carried satchel"
         public const int MaxChests = 64;      // the opened-chest mask is one ulong
 
@@ -44,11 +44,22 @@ namespace SleepingCalamity.Core
         // The player's boots (+5% run speed, plan 3 decision 12): carried, banked this dive or in the home stash. A pair in the lost satchel does not count until recovered.
         public bool HasBoots => _carried.Contains(CellarLoot.BootsId) || _banked.ContainsKey(CellarLoot.BootsId) || _stash.ContainsKey(CellarLoot.BootsId);
 
+        // No room for another carried item: the carried list plus the carried satchel (one slot) fill MaxCarried.
+        public bool IsFull => _carried.Count + (Satchel.Carried != null ? 1 : 0) >= MaxCarried;
+
         public bool Add(int itemId)
         {
-            if (itemId <= 0 || _carried.Count >= MaxCarried || !BankSlots.IsBankable(CellarLoot.KindOf(itemId))) return false;
+            if (itemId <= 0 || IsFull || !BankSlots.IsBankable(CellarLoot.KindOf(itemId))) return false;
             if (itemId == CellarLoot.BootsId && HasBoots) return false;   // one pair per player
             _carried.Add(itemId);
+            Version++;
+            return true;
+        }
+
+        // The player walked onto the lost satchel waiting on this floor: it is carried now and takes one carry slot. False with no satchel waiting or no free slot (it stays on the floor).
+        public bool PickUpSatchel()
+        {
+            if (Satchel.Waiting == null || IsFull || !Satchel.PickUp()) return false;
             Version++;
             return true;
         }

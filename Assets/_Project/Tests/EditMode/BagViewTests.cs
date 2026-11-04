@@ -170,5 +170,17 @@ namespace SleepingCalamity.Tests.EditMode
             BagView big = BagView.From(full);
             Assert.That(RoundTrip(big).Equals(big), Is.True, "a full bag round trips");
         }
+
+        [Test]
+        public void HasBoots_RidesTheViewAndRoundTrips()
+        {
+            var bag = new PlayerBag();
+            Assert.That(BagView.From(bag).HasBoots, Is.False);
+            bag.Add(CellarLoot.BootsId);
+            BagView v = BagView.From(bag);
+            Assert.That(v.HasBoots, Is.True);
+            Assert.That(RoundTrip(v).HasBoots, Is.True);
+            Assert.That(v.Equals(BagView.From(new PlayerBag())), Is.False, "boots are a change the owner's view must see");
+        }
     }
 }

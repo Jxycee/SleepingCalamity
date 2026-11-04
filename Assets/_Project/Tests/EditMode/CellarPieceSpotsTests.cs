@@ -76,5 +76,21 @@ namespace SleepingCalamity.Tests.EditMode
                     Assert.That(again.X == s.X && again.Y == s.Y, "deterministic" + tag);
                 }
         }
+
+        // Catches: a floor with no cell for the lost satchel (the throw is caught and the satchel is never drawn or picked up, so a failed party would lose its haul for good), on the stand-in floors 1, 3, 5 too.
+        [Test]
+        public void SatchelSpot_ExistsOnEveryBuiltFloorIncludingTheStandIns()
+        {
+            for (uint seed = 0; seed < 12; seed++)
+                foreach (int floor in new[] { 1, 2, 3, 4, 5, 6, 7 })
+                {
+                    CellarFloorLayout l = CellarTestFloors.Layout(seed, floor);
+                    CellPos s = default;
+                    Assert.DoesNotThrow(() => s = CellarPieceSpots.SatchelSpot(l, seed), "floor " + floor + " seed " + seed);
+                    int room = l.RoomAt(s.X, s.Y);
+                    Assert.That(room, Is.GreaterThanOrEqualTo(0), "in a room, floor " + floor);
+                    Assert.That(l.Rooms[room].Room.CellAt(s.X - l.Rooms[room].X, s.Y - l.Rooms[room].Y), Is.EqualTo(CellKind.Floor), "floor " + floor);
+                }
+        }
     }
 }

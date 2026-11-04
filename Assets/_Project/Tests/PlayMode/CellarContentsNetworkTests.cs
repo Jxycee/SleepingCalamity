@@ -6,6 +6,7 @@
 // the haul or not reappearing after a failed dive.
 // Also: a party wipe (CombatHost.ServerClearEnemies) drops no key and clears no room, and the room respawns on re-entry; a floor built under a root at (200,0,0) has chests, pieces
 // and room spawns where the host checks them; a player still at its pre-floor-change position is ignored until it has moved.
+// Plan 3 task 9: a gold purse roll goes to the opener's dive gold (never PlayerBag.Add), momentum's rank bonus reaches the roll, and a FULL bag refuses the chest (it stays closed, only the opener is told).
 // NOT covered: the real Interact input path (rising edge of the local hero's intent), real player-object positions, three or more clients.
 using System.Collections;
 using System.Collections.Generic;
@@ -59,12 +60,19 @@ namespace SleepingCalamity.Tests.PlayMode
             return o.GetComponent<T>();
         }
 
-        // A seed whose floor 1 has a locked room with a gate, a key chest and a carrier.
-        private static uint FindSeed()
+        // The generated first-half floor (2 or 4) that holds the most pieces in the fallback world deal (floor 1 is authored with no locked room, carrier or key chest; 3 and 5 are set pieces).
+        private static int PiecefulFloor()
+        {
+            DivePieces p = DivePieces.ForWorld(DiveHaulSync.DefaultWorldSeed);
+            return p.PiecesLeft(2) >= p.PiecesLeft(4) ? 2 : 4;
+        }
+
+        // A seed whose floor has a locked room with a gate, a key chest and a carrier.
+        private static uint FindSeed(int floor)
         {
             for (uint s = 1; s < 400; s++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Layout(s, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(s, floor);
                 if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return s;
             }
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
@@ -76,8 +84,9 @@ namespace SleepingCalamity.Tests.PlayMode
         // Loot chests no longer set the shared State.Chests bit: "opened" is the opener's own bag mask on the host.
         private static bool Opened(Ctx c, int idx) => c.Haul.ServerBagOf(c.ClientId).ChestOpened(c.Seed, c.Layout.Floor, idx);
 
-        private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default, uint? seedOverride = null, int startFloor = 1, StirTuning? stir = null)
+        private IEnumerator Setup(System.Action<Ctx> done, Vector3 floorOrigin = default, uint? seedOverride = null, int startFloor = 0)
         {
+            if (startFloor == 0) startFloor = PiecefulFloor();
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
             yield return PlayModeHarness.StartDirectHostWithoutScenes();
@@ -101,13 +110,26 @@ namespace SleepingCalamity.Tests.PlayMode
             c.HostId = c.HostNm.LocalClientId; c.ClientId = client.NetworkManager.LocalClientId;
             c.Contents.PlayersOverride = list => { foreach (KeyValuePair<ulong, Vector3> kv in c.Players) list.Add(new CellarContentsSync.PlayerPos { ClientId = kv.Key, Position = kv.Value }); };
 
-            c.Seed = seedOverride ?? FindSeed();
+            c.Seed = seedOverride ?? FindSeed(startFloor);
             Assert.That(c.Haul.ServerBegin(), Is.True);
             Assert.That(c.Haul.ServerSetFloor(startFloor), Is.True);
             Assert.That(c.Floor.ServerSetFloor(c.Seed, startFloor), Is.True);
             yield return PlayModeHarness.WaitUntil(() => c.Peer.FloorSync.Built != null && c.Peer.FloorSync.BuiltFloor == startFloor, Timeout, "floors were not built");
             c.Layout = c.Floor.Layout;
+            // the contents state of this floor (with its piece count) has reached the peer and both peers built the piece spheres
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.Floor == startFloor && c.Contents.State.Floor == startFloor && c.Peer.PieceCount == c.Contents.PieceCount && c.Peer.PieceCount == c.Peer.State.PieceCount, Timeout, "the contents state / piece spheres never reached the client");
             done(c);
+        }
+
+        // Waits for the carrier room's enemies to be spawned and says what it saw when they are not (the count, the plan's twist, the standing players).
+        private static IEnumerator RoomSpawned(Ctx c, int room, int expected, bool needCarrier)
+        {
+            float until = Time.realtimeSinceStartup + Timeout;
+            while (Time.realtimeSinceStartup < until && !(c.Contents.EnterEnemyCount(room) == expected && (!needCarrier || c.Contents.GateKeyCarrierEnemy != null))) { PlayModeHarness.Pace(); yield return null; }
+            CellarEncounterPlan plan = c.Haul.EncounterPlan;
+            Assert.That(c.Contents.EnterEnemyCount(room), Is.EqualTo(expected), "the room's enemies were not spawned: floor " + c.Layout.Floor + " seed " + c.Seed + " room " + room + ", plan twist " + (plan == null ? "none" : plan.Twist + " ambush room " + plan.AmbushRoom + " count " + plan.CountIn(room))
+                + ", alive " + c.Contents.AliveInRoom(room) + ", enemies on host " + EnemiesOn(c.HostNm).Count + ", players " + c.Players.Count + ", carrier " + (c.Contents.GateKeyCarrierEnemy != null));
+            Assert.That(!needCarrier || c.Contents.GateKeyCarrierEnemy != null, Is.True, "no carrier enemy");
         }
 
         private static Vector3 Cell(Ctx c, int x, int y) => c.Floor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(x, y));
@@ -146,12 +168,12 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Ctx c = null; yield return Setup(x => c = x);
             GateKeyCarrier car = c.Layout.Carrier; int room = car.RoomIndex;
-            int expected = CellarEncounterPlan.Build(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
+            int expected = CellarEncounterPlan.BuildForDive(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
             Assert.That(expected, Is.GreaterThan(0));
             Assert.That(EnemiesOn(c.HostNm).Count, Is.EqualTo(0), "nothing spawns before a player enters");
 
             c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
-            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected, Timeout, "the room's enemies were not spawned");
+            yield return RoomSpawned(c, room, expected, false);
             yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.Client.NetworkManager).Count == expected, Timeout, "the client does not see the room's enemies");
             Assert.That(c.Contents.GateKeyCarrierEnemy, Is.Not.Null, "the carrier spawn became an enemy");
 
@@ -180,8 +202,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => Opened(c, idx), Timeout, "the chest never opened for the client's bag");
             Assert.That(Loot(c), Is.EqualTo(1), "the loot reached the opener's bag");
             Assert.That(c.Contents.State.Chests, Is.EqualTo(0UL), "a loot chest never sets the shared opened bit (the visual lives in the opener's own PlayerBagSync view: PerPlayerLootNetworkTests)");
-            Assert.That(CellarLoot.RankOf(c.Contents.LastLootItem), Is.InRange(1, 5));
-            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.RollChest(c.Seed, 1, idx, c.Haul.PlayerSlotOf(c.ClientId))), "the opener's own roll");
+            Assert.That(CellarLoot.RankOf(c.Contents.LastLootItem), Is.InRange(0, 5), "an item (0 only for boots, which are gear)");
+            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.RollChest(c.Seed, c.Layout.Floor, idx, c.Haul.PlayerSlotOf(c.ClientId))), "the opener's own roll");
             Assert.That(c.Haul.ServerBagOf(c.ClientId).Carried, Is.EqualTo(new[] { c.Contents.LastLootItem }));
 
             handled = c.Contents.ChestRequestsHandled;
@@ -206,7 +228,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
             c.Players[c.HostId] = c.Peer.State.GateKeyPos + new Vector3(0.5f, 0f, 0f);
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.ExitUnlocked, Timeout, "picking the key up did not unlock the exit");
-            Assert.That(unlockedFloor, Is.EqualTo(1));
+            Assert.That(unlockedFloor, Is.EqualTo(c.Layout.Floor));
             Assert.That(c.Peer.State.GateKey, Is.EqualTo((byte)2));
             Assert.That(System.Linq.Enumerable.Contains(c.Haul.ServerBagOf(c.HostId).Carried, CellarLoot.GateKeyId), Is.False, "keys are not loot");
             yield return PlayModeHarness.WaitUntil(() => !c.Peer.GateKeyMarkerShown, Timeout, "the key marker stayed");
@@ -239,9 +261,9 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Ctx c = null; yield return Setup(x => c = x);
             GateKeyCarrier car = c.Layout.Carrier; int room = car.RoomIndex;
-            int expected = CellarEncounterPlan.Build(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
+            int expected = CellarEncounterPlan.BuildForDive(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
             c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
-            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected && c.Contents.GateKeyCarrierEnemy != null, Timeout, "the room's enemies were not spawned");
+            yield return RoomSpawned(c, room, expected, true);
 
             CombatHost.Current.ServerClearEnemies();   // what a party wipe does
             yield return PlayModeHarness.WaitUntil(() => EnemiesOn(c.HostNm).Count == 0 || c.Contents.GateKeyCarrierEnemy == null, Timeout, "the wipe did not despawn the enemies");
@@ -261,10 +283,10 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Ctx c = null; yield return Setup(x => c = x);
             GateKeyCarrier car = c.Layout.Carrier; int room = car.RoomIndex;
-            int expected = CellarEncounterPlan.Build(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
+            int expected = CellarEncounterPlan.BuildForDive(c.Layout, c.Floor.Built.Dressing, 0, false).CountIn(room);
             Assume.That(expected, Is.GreaterThan(1), "premise: the carrier has room-mates");
             c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
-            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == expected && c.Contents.GateKeyCarrierEnemy != null, Timeout, "the room's enemies were not spawned");
+            yield return RoomSpawned(c, room, expected, true);
 
             Enemy carrier = c.Contents.GateKeyCarrierEnemy;
             carrier.NetworkObject.Despawn(true);
@@ -304,10 +326,12 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => Opened(c, idx), Timeout, "the chest did not open at x=200");
 
             // piece: the sphere sits inside the floor's bounds and stepping on it collects it
+            int pieces = c.Haul.Session.Pieces.PiecesLeft(c.Layout.Floor);
+            Assert.That(pieces, Is.GreaterThanOrEqualTo(2), "premise: the pieceful floor holds at least two pieces");
             Assert.That(c.Peer.TryPiecePosition(0, out Vector3 piece), Is.True);
             Assert.That(piece.x, Is.InRange(b.min.x - 1f, b.max.x + 1f)); Assert.That(piece.z, Is.InRange(b.min.z - 1f, b.max.z + 1f));
             c.Players[c.HostId] = piece;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == 1, Timeout, "the piece at x=200 was not collected");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == pieces - 1, Timeout, "the piece at x=200 was not collected");
 
             // room spawns land on their cell
             GateKeyCarrier car = c.Layout.Carrier;
@@ -323,6 +347,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Ctx c = null; yield return Setup(x => c = x);
             c.Contents.AutoArm = false;
+            int pieces = c.Haul.Session.Pieces.PiecesLeft(c.Layout.Floor);
             Assert.That(c.Peer.TryPiecePosition(0, out Vector3 piece), Is.True);
             GateKeyCarrier car = c.Layout.Carrier;
             // a point inside the floor, more than 3 m from the piece
@@ -335,14 +360,14 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Players[c.HostId] = piece;
             Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True);
             yield return new WaitForSeconds(0.6f);
-            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(2), "a stale position collects nothing");
+            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(pieces), "a stale position collects nothing");
             Assert.That(c.Contents.EnterEnemyCount(car.RoomIndex), Is.EqualTo(0));
 
             // the teleport lands: the player moves, then steps on the piece
             c.Players[c.HostId] = elsewhere;
             yield return new WaitForSeconds(0.3f);
             c.Players[c.HostId] = piece;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == 1, Timeout, "after moving, the piece is collected");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == pieces - 1, Timeout, "after moving, the piece is collected");
 
             // a player outside the floor never counts, even when far from the recorded position
             c.Players.Clear();
@@ -356,33 +381,34 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator ArmFloor_WithNoOrBadCarrier_UnlocksTheExitAtOnce_AndClearFloorForgets()
         {
             Ctx c = null; yield return Setup(x => c = x);
-            Assert.That(c.Contents.IsExitUnlocked(1), Is.False, "a normal floor 1 is locked until the gate key is picked");
-            Assert.That(c.Contents.IsExitUnlocked(4), Is.True, "floor 4 has no stair gate");
-            Assert.That(c.Contents.IsExitUnlocked(2), Is.False, "floor 2 is not the armed floor");
+            int fl = c.Layout.Floor, other = fl == 2 ? 4 : 2;
+            Assert.That(c.Contents.IsExitUnlocked(fl), Is.False, "a normal floor is locked until the gate key is picked");
+            Assert.That(c.Contents.IsExitUnlocked(UndercroftPlan.Phase1LastFloor), Is.True, "the ending floor has no stair gate");
+            Assert.That(c.Contents.IsExitUnlocked(other), Is.False, "the other generated floor is not the armed floor");
 
             c.Contents.AutoArm = false;
             CellarFloorLayout l = c.Layout;
-            var noCarrier = new CellarFloorLayout(l.Seed, 1, false, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, null);
-            var badCarrier = new CellarFloorLayout(l.Seed, 1, false, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, new GateKeyCarrier(99, 0, 0, 0));
+            var noCarrier = new CellarFloorLayout(l.Seed, fl, false, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, null);
+            var badCarrier = new CellarFloorLayout(l.Seed, fl, false, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, new GateKeyCarrier(99, 0, 0, 0));
             int fired = -1;
             c.Contents.ExitUnlocked += f => fired = f;
 
             Assert.That(c.Contents.ServerArmFloor(noCarrier, c.Floor.Built.Root), Is.True);
-            Assert.That(fired, Is.EqualTo(1), "the event fires inside ServerArmFloor");
-            Assert.That(c.Contents.IsExitUnlocked(1), Is.True);
+            Assert.That(fired, Is.EqualTo(fl), "the event fires inside ServerArmFloor");
+            Assert.That(c.Contents.IsExitUnlocked(fl), Is.True);
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.ExitUnlocked, Timeout, "the client never saw the unlocked exit");
 
             fired = -1;
             c.Contents.ServerClearFloor();
-            Assert.That(c.Contents.IsExitUnlocked(1), Is.False);
+            Assert.That(c.Contents.IsExitUnlocked(fl), Is.False);
             Assert.That(c.Contents.ServerArmFloor(badCarrier, c.Floor.Built.Root), Is.True);
-            Assert.That(fired, Is.EqualTo(1), "an invalid carrier also unlocks");
+            Assert.That(fired, Is.EqualTo(fl), "an invalid carrier also unlocks");
 
             fired = -1;
             c.Contents.ServerClearFloor();
             Assert.That(c.Contents.ServerArmFloor(l, c.Floor.Built.Root), Is.True);
             Assert.That(fired, Is.EqualTo(-1), "a valid carrier keeps the exit locked");
-            Assert.That(c.Contents.IsExitUnlocked(1), Is.False);
+            Assert.That(c.Contents.IsExitUnlocked(fl), Is.False);
             yield return PlayModeHarness.WaitUntil(() => !c.Peer.State.ExitUnlocked, Timeout, "the client kept the old unlocked flag");
         }
 
@@ -390,17 +416,21 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator Pieces_StepOverAddsToHaul_HiddenOnClient_StayGoneAfterAFailedDive()
         {
             Ctx c = null; yield return Setup(x => c = x);
+            var ids = new List<int>(c.Haul.Session.Pieces.OnFloor(c.Layout.Floor));
+            int n = ids.Count;
+            Assert.That(n, Is.GreaterThanOrEqualTo(2), "premise: the pieceful floor holds at least two pieces");
             Assert.That(c.Peer.TryPiecePosition(0, out Vector3 at), Is.True);
-            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(2));
+            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(n));
             c.Players[c.HostId] = at;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == 1, Timeout, "the piece was not collected");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.PiecesLeft == n - 1, Timeout, "the piece was not collected");
             yield return PlayModeHarness.WaitUntil(() => !c.Peer.PieceVisible(0) && c.Peer.PieceVisible(1), Timeout, "the client did not hide the collected piece");
-            Assert.That(c.Haul.Session.Pieces.IsFound(DiveHaul.PieceId(1, 0)), Is.True);
+            Assert.That(c.Haul.Session.Pieces.IsFound(ids[0]), Is.True, "spot 0 is the floor's lowest piece id");
 
             c.Players[c.HostId] = Cell(c, 0, 0) + new Vector3(60f, 0f, 0f);
             Assert.That(c.Haul.ServerFailDive(), Is.True);
             yield return new WaitForSeconds(0.6f);
-            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(1), "the failed dive keeps the piece: pieces are safe on pickup");
+            Assert.That(c.Haul.Current.PiecesLeft, Is.EqualTo(0), "after a failed dive the summary is the home one (no floor)");
+            Assert.That(c.Haul.Session.Pieces.IsFound(ids[0]), Is.True, "the failed dive keeps the piece: pieces are safe on pickup");
             Assert.That(c.Peer.PieceVisible(0), Is.False, "and the piece does not reappear on the client");
         }
 
@@ -509,13 +539,15 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => c.Peer.State.DoorOpen, Timeout, "the door never auto-opened once the wall was gone");
         }
 
-        // Soak finding 2026-11-02 (floor 3, seed 12345): "DoorOpen but the gate still blocks". Pinned seed and floor. Once the door is open on the host AND on the client's copy, NO active
+        // Soak finding 2026-11-02 (then floor 3, seed 12345; floor 3 is the bakery stand-in since plan 3 task 4, so the first seed from 12345 whose generated floor 4 has a locked room stands in): "DoorOpen but the gate still blocks". Once the door is open on the host AND on the client's copy, NO active
         // LockedGate collider is left anywhere in the scene (host and client floors share one process and one physics world here), and a CharacterController walks through the opening.
         [UnityTest]
-        public IEnumerator Door_Floor3Seed12345_OpenLeavesNoGateColliderOnAnyPeer_AndAHeroWalksThrough()
+        public IEnumerator Door_Floor4_OpenLeavesNoGateColliderOnAnyPeer_AndAHeroWalksThrough()
         {
-            Ctx c = null; yield return Setup(x => c = x, default, 12345u, 3);
-            Assert.That(c.Layout.HasLockedRoom, Is.True, "seed 12345 floor 3 has a locked room");
+            uint doorSeed = 12345u;
+            while (!CellarFloorGenerator.Layout(doorSeed, 4).HasLockedRoom) doorSeed++;
+            Ctx c = null; yield return Setup(x => c = x, default, doorSeed, 4);
+            Assert.That(c.Layout.HasLockedRoom, Is.True, "the chosen seed's floor 4 has a locked room");
             Assert.That(c.Peer.TryGatePosition(out Vector3 gate), Is.True);
             Assert.That(c.Peer.TryChestPosition(c.Layout.KeyChestIndex, out Vector3 keyAt), Is.True);
             c.Players[c.HostId] = c.Players[c.ClientId] = keyAt + new Vector3(1.0f, 0f, 0f);
@@ -573,7 +605,7 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator Hunter_PlayerOnItsCell_NoRespawn_RespawnsOnceThePlayerLeaves()
         {
-            Ctx c = null; yield return Setup(x => c = x, default, null, 3);
+            Ctx c = null; yield return Setup(x => c = x, default, null, 4);
             DiveStir stir = c.Haul.Session.Stir;
             stir.PlayersPresent = 4; stir.UnbankedValuables = 8;   // floors alone cannot reach the hunter any more (a session clears only its own floor): 8 carried valuables x 5 x 2 = 80
             Assert.That(stir.HunterLatched, Is.True, "the stir latched the hunter");
@@ -595,14 +627,132 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator Pieces_PieceZeroAlreadyHome_EveryRemainingPieceStillGetsASphere()
         {
             Ctx c = null; yield return Setup(x => c = x);
-            int home = 100, left = 101;
+            var ids = new List<int>(c.Haul.Session.Pieces.OnFloor(c.Layout.Floor));
+            Assert.That(ids.Count, Is.GreaterThanOrEqualTo(2), "premise: the pieceful floor holds at least two pieces");
+            int home = ids[0];
             Assert.That(c.Haul.Session.Pieces.Found(home), Is.True);
             Assert.That(c.Contents.ServerArmFloor(c.Layout, c.Floor.Built.Root), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => c.Contents.PieceCount == 1 && c.Peer.PieceCount == 1, Timeout, "the floor did not rebuild with one piece sphere");
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.PieceCount == ids.Count - 1 && c.Peer.PieceCount == ids.Count - 1, Timeout, "the floor did not rebuild with one piece sphere fewer");
             Assert.That(c.Contents.TryPiecePosition(0, out Vector3 at), Is.True);
+            int left = ids[1];
             Assert.That(c.Haul.Session.Pieces.IsFound(left), Is.False);
             c.Players[c.HostId] = at;
-            yield return PlayModeHarness.WaitUntil(() => c.Haul.Session.Pieces.IsFound(left), Timeout, "the remaining piece (101) has no collectible sphere");
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.Session.Pieces.IsFound(left), Timeout, "the remaining piece (" + left + ") has no collectible sphere");
+        }
+
+        // ================================================================================================================================
+        // Plan 3 task 9 on the chest: gold purse, momentum rank bonus, full bag. Host + one client, players simulated by PlayersOverride (no heroes here).
+        // Catches: a purse roll reaching PlayerBag.Add (which rejects it) or being lost, a purse blocked by a full bag (it needs no slot), the failed dive keeping the wrong share of the gold, momentum's rank
+        // bonus not reaching the chest roll, a full bag (the carried satchel counts as a slot) opening the chest and eating the item, the refusal toast reaching the wrong peer, the refused chest being spent.
+        // NOT covered: the toast's on-screen text (the walk); the Interact edge.
+        // ================================================================================================================================
+
+        private static (uint seed, int chest) FindGoldChest(int floor)
+        {
+            for (uint s = 1; s < 4000; s++)
+            {
+                CellarFloorLayout l = CellarFloorGenerator.Layout(s, floor);
+                for (int i = 0; i < l.Chests.Count && i < 64; i++)
+                {
+                    if (l.Chests[i].HoldsKey) continue;
+                    bool all = true;
+                    for (int slot = 0; slot < 4; slot++) all &= CellarLoot.RollChest(s, floor, i, slot) == CellarLoot.GoldId;
+                    if (all) return (s, i);
+                }
+            }
+            Assert.Fail("no floor-" + floor + " loot chest rolls a purse for every player slot in 4000 seeds"); return (0, 0);
+        }
+
+        [UnityTest]
+        public IEnumerator GoldPurse_AddsToDiveGold_EvenWithAFullBag_FailHalvesIt()
+        {
+            int floor = 2;
+            (uint seed, int idx) = FindGoldChest(floor);
+            Ctx c = null; yield return Setup(x => c = x, default, seed, floor);
+            PlayerBag bag = c.Haul.ServerBagOf(c.ClientId);
+            for (int n = 0; n < PlayerBag.MaxCarried; n++) Assert.That(c.Haul.ServerAddItem(c.ClientId, 101), Is.True);
+            Assert.That(bag.IsFull, Is.True, "premise: a full bag");
+            Assert.That(c.Peer.TryChestPosition(idx, out Vector3 at), Is.True);
+            c.Players[c.ClientId] = at + new Vector3(1f, 0f, 0f);
+            c.Peer.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => Opened(c, idx), Timeout, "the purse chest never opened (a purse needs no slot)");
+            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.GoldId));
+            Assert.That(bag.DiveGold, Is.EqualTo(CellarLoot.GoldPurse), "the purse went to the dive gold");
+            Assert.That(bag.Carried.Count, Is.EqualTo(PlayerBag.MaxCarried), "and never reached PlayerBag.Add");
+            Assert.That(bag.Gold, Is.EqualTo(0), "home gold waits for the dive's end");
+
+            Assert.That(c.Haul.ServerFailDive(), Is.True);
+            Assert.That(bag.Gold, Is.EqualTo(DiveGold.KeptOnFail(CellarLoot.GoldPurse)), "a failed dive keeps half the purse");
+            Assert.That(bag.DiveGold, Is.EqualTo(0));
+        }
+
+        [UnityTest]
+        public IEnumerator Chest_MomentumRankBonus_ReachesTheRoll()
+        {
+            const int floor = 6;
+            uint seed = 0; int idx = -1;
+            for (uint s = 1; s < 3000 && idx < 0; s++)
+            {
+                CellarFloorLayout l = CellarFloorGenerator.Layout(s, floor);
+                for (int i = 0; i < l.Chests.Count && i < 64 && idx < 0; i++)
+                {
+                    if (l.Chests[i].HoldsKey) continue;
+                    bool ok = true;
+                    for (int slot = 0; slot < 4 && ok; slot++)
+                    {
+                        int plain = CellarLoot.RollChest(s, floor, i, slot, 0, false), bonus = CellarLoot.RollChest(s, floor, i, slot, 1, false);
+                        ok = plain > 0 && bonus > 0 && plain != CellarLoot.BootsId && bonus != CellarLoot.BootsId && plain != bonus;
+                    }
+                    if (ok) { seed = s; idx = i; }
+                }
+            }
+            Assert.That(idx, Is.GreaterThanOrEqualTo(0), "premise: a floor-6 chest whose roll moves with the bonus for every slot");
+            Ctx c = null; yield return Setup(x => c = x, default, seed, floor);
+            c.Haul.Session.Momentum.OnPushOn();   // the dive started on floor 1 and walked to the bank: pushing on earns momentum
+            Assert.That(c.Haul.Session.Momentum.ChestRankBonus(floor), Is.EqualTo(1), "premise: the second half rolls one rank higher");
+            Assert.That(c.Peer.TryChestPosition(idx, out Vector3 at), Is.True);
+            c.Players[c.ClientId] = at + new Vector3(1f, 0f, 0f);
+            int slotC = c.Haul.PlayerSlotOf(c.ClientId);
+            c.Peer.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => Opened(c, idx), Timeout, "the chest never opened");
+            Assert.That(c.Contents.LastLootItem, Is.EqualTo(CellarLoot.RollChest(seed, floor, idx, slotC, 1, false)), "the roll carries momentum's bonus");
+            Assert.That(c.Contents.LastLootItem, Is.Not.EqualTo(CellarLoot.RollChest(seed, floor, idx, slotC, 0, false)), "and differs from the plain roll");
+        }
+
+        [UnityTest]
+        public IEnumerator Chest_FullBag_IsRefusedAndStaysClosedForThatPlayer()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            int floor = c.Layout.Floor, idx = -1;
+            for (int i = 0; i < c.Layout.Chests.Count && i < 64 && idx < 0; i++)
+                if (!c.Layout.Chests[i].HoldsKey && CellarLoot.RollChest(c.Seed, floor, i, c.Haul.PlayerSlotOf(c.ClientId)) != CellarLoot.GoldId && CellarLoot.RollChest(c.Seed, floor, i, c.Haul.PlayerSlotOf(c.HostId)) != CellarLoot.GoldId) idx = i;
+            Assert.That(idx, Is.GreaterThanOrEqualTo(0), "premise: a loot chest that pays the client and the host an item, not a purse");
+            Assert.That(c.Peer.TryChestPosition(idx, out Vector3 at), Is.True);
+            PlayerBag bag = c.Haul.ServerBagOf(c.ClientId);
+            for (int n = 0; n < PlayerBag.MaxCarried - 1; n++) Assert.That(c.Haul.ServerAddItem(c.ClientId, 101), Is.True);
+            bag.Satchel.Restore(new LostSatchel(floor, new[] { 102 }));
+            Assert.That(bag.PickUpSatchel(), Is.True, "59 items and a carried satchel: the bag is full");
+            var refused = new List<(ulong, int)>(); var opened = new List<int>();
+            c.Contents.ChestRefusedFull += (who, chest) => refused.Add((who, chest));
+            c.Contents.ChestOpened += (chest, item) => opened.Add(chest);
+
+            c.Players[c.ClientId] = at + new Vector3(1f, 0f, 0f);
+            c.Peer.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.NoticeCount == 1, Timeout, "the client was never told its bag is full");
+            Assert.That(c.Peer.LastNotice, Is.EqualTo(CellarContentsSync.BagFullText));
+            Assert.That(Opened(c, idx), Is.False, "the chest stays closed for that player");
+            Assert.That(bag.Carried.Count, Is.EqualTo(PlayerBag.MaxCarried - 1), "nothing was added");
+            Assert.That(refused, Is.EqualTo(new[] { (c.ClientId, idx) }));
+            Assert.That(opened, Is.Empty, "a refused open raises no ChestOpened");
+            Assert.That(c.Contents.NoticeCount, Is.EqualTo(0), "the host's own copy was not told: the notice is owner-only");
+
+            // The chest is still there for the next player, and still closed for the full one.
+            c.Players[c.HostId] = at + new Vector3(1f, 0f, 0f);
+            c.Contents.RequestOpenChest(idx);
+            yield return PlayModeHarness.WaitUntil(() => c.Haul.ServerBagOf(c.HostId).ChestOpened(c.Seed, floor, idx), Timeout, "the host's player could not open the same chest");
+            Assert.That(opened, Is.EqualTo(new[] { idx }));
+            Assert.That(Opened(c, idx), Is.False);
+            Assert.That(c.Peer.NoticeCount, Is.EqualTo(1), "no second toast for someone else's open");
         }
     }
 }

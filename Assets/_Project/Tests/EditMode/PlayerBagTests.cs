@@ -294,5 +294,46 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(CellarLoot.RankOf(CellarLoot.RoomKeyId), Is.EqualTo(0));
             Assert.That(CellarLoot.RankOf(424242), Is.EqualTo(0));
         }
+
+        // Catches: the carried satchel not counting toward MaxCarried (a full bag that also carries a satchel taking one item too many), a pick-up into a full bag eating a slot that is not there.
+        [Test]
+        public void PickedSatchel_TakesOneCarrySlot()
+        {
+            var b = new PlayerBag();
+            b.Satchel.Restore(new LostSatchel(4, new[] { 101, 102 }));
+            for (int i = 0; i < PlayerBag.MaxCarried - 1; i++) Assert.That(b.Add(103), Is.True);
+            int v = b.Version;
+            Assert.That(b.PickUpSatchel(), Is.True, "one slot left: the satchel takes it");
+            Assert.That(b.Version, Is.GreaterThan(v), "a pick-up is a change the owner's view must see");
+            Assert.That(b.Satchel.Carried, Is.Not.Null);
+            Assert.That(b.Satchel.Waiting, Is.Null);
+            Assert.That(b.IsFull, Is.True);
+            Assert.That(b.Add(104), Is.False, "59 items + the satchel = 60: no room");
+            Assert.That(b.Carried.Count, Is.EqualTo(PlayerBag.MaxCarried - 1));
+        }
+
+        [Test]
+        public void PickUpSatchel_FullBag_LeavesItWaiting_NoSatchel_IsRefused()
+        {
+            var b = new PlayerBag();
+            Assert.That(b.PickUpSatchel(), Is.False, "nothing waits");
+            b.Satchel.Restore(new LostSatchel(2, new[] { 101 }));
+            for (int i = 0; i < PlayerBag.MaxCarried; i++) b.Add(103);
+            int v = b.Version;
+            Assert.That(b.PickUpSatchel(), Is.False, "a full bag cannot carry it");
+            Assert.That(b.Satchel.Waiting, Is.Not.Null, "it stays where it lies");
+            Assert.That(b.Version, Is.EqualTo(v), "a refused call changes nothing");
+        }
+
+        [Test]
+        public void GoldPurse_NeverReachesAdd_AndAddGoldCounts()
+        {
+            var b = new PlayerBag();
+            Assert.That(b.Add(CellarLoot.GoldId), Is.False, "the sentinel is not an item");
+            Assert.That(b.AddGold(CellarLoot.GoldPurse), Is.True);
+            Assert.That(b.DiveGold, Is.EqualTo(CellarLoot.GoldPurse));
+            b.Fail(3);
+            Assert.That(b.Gold, Is.EqualTo(DiveGold.KeptOnFail(CellarLoot.GoldPurse)), "a failed dive keeps half the purse");
+        }
     }
 }

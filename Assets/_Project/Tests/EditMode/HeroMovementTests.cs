@@ -127,5 +127,25 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(still.Grounded, Is.False);
             Assert.That(still.Dodging, Is.True);
         }
+
+        // Catches: boots changing the jump (gravity, jump height, the run-jump gap the metrics gym is built on) instead of only the on-foot speed; the walk gait speeding up; a bonus without boots.
+        [Test]
+        public void Boots_RaiseRunSpeed5Percent_NotJumpDistance()
+        {
+            Assert.That(MovementMath.RunSpeedFor(false), Is.EqualTo(MovementMath.RunSpeed));
+            Assert.That(MovementMath.RunSpeedFor(true), Is.EqualTo(MovementMath.RunSpeed * 1.05f).Within(1e-4f));
+            Assert.That(MovementMath.TargetSpeed(1f, true, true), Is.EqualTo(MovementMath.RunSpeed * 1.05f).Within(1e-4f), "sprint with boots");
+            Assert.That(MovementMath.TargetSpeed(1f, false, true), Is.EqualTo(MovementMath.JogSpeed * 1.05f).Within(1e-4f), "jog with boots");
+            Assert.That(MovementMath.TargetSpeed(1f, true, false), Is.EqualTo(MovementMath.TargetSpeed(1f, true)), "no boots: unchanged");
+            Assert.That(MovementMath.TargetSpeed(0.5f, false, true), Is.EqualTo(MovementMath.WalkSpeed).Within(1e-4f), "walking is not faster");
+            Assert.That(MovementMath.TargetSpeed(0.05f, true, true), Is.EqualTo(0f), "the dead zone stays dead");
+            Assert.That(MovementMath.GaitOf(MovementMath.TargetSpeed(1f, false, true)), Is.EqualTo(Gait.Jog), "a booted jog is still a jog");
+            Assert.That(MovementMath.GaitOf(MovementMath.RunSpeedFor(true)), Is.EqualTo(Gait.Run));
+            // the jump: height and velocity come only from JumpHeight and gravity, and the run-jump gap grows by a few decimetres at most (the gym's gap stays the design number)
+            float gap = MovementProbe.RunJumpDistance(), booted = MovementProbe.RunJumpDistance(MovementMath.RunSpeedFor(true));
+            Assert.That(gap, Is.InRange(3.4f, 3.7f));
+            Assert.That(booted - gap, Is.InRange(0f, 0.25f), "boots do not open new gaps");
+            Assert.That(MovementMath.JumpVelocity(MovementMath.JumpHeight, MovementMath.Gravity), Is.EqualTo(7.266f).Within(0.01f));
+        }
     }
 }

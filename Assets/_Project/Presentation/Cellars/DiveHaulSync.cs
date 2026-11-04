@@ -353,6 +353,15 @@ namespace SleepingCalamity.Presentation
             return bag != null && bag.AddGold(amount);
         }
 
+        // Host only: the player picks up the lost satchel waiting on this floor (PlayerBag.PickUpSatchel: it takes one carry slot, so a full bag leaves it where it lies). The caller checks the
+        // range; this checks the dive is on that floor and the satchel waits there. The satchel is the owner's own: nobody else's bag ever has it.
+        public bool ServerPickUpSatchel(ulong clientId)
+        {
+            if (!Host || _session.Phase != DivePhase.Floor) return false;
+            PlayerBag bag = ServerBagOf(clientId);
+            return bag != null && bag.Satchel.ShouldPlaceOn(DiveFloor) && bag.PickUpSatchel();
+        }
+
         // The asker may touch the bank: the party is in the bank room, the hero is up, and (when the built floor's bank cell is known) the hero stands within BankRadius of it.
         private bool BankAskerOk(ulong clientId, bool needRoomOpen = true)
         {
