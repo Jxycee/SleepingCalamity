@@ -169,7 +169,11 @@ namespace SleepingCalamity.EditorTools
                     float x = cx + tan.x * lt + rad.x * lr, z = cz + tan.y * lt + rad.y * lr;
                     float ridged = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.004f + 2f, z * 0.004f + 8f) * 2f - 1f);
                     h *= 0.72f + 0.45f * ridged + 0.06f * (Mathf.PerlinNoise(x * 0.02f, z * 0.02f) - 0.5f);
-                    h *= 1f + 0.16f * (Mathf.PerlinNoise(x * 0.012f + 31f, z * 0.012f + 7f) - 0.5f) + 0.06f * (Mathf.PerlinNoise(x * 0.045f + 5f, z * 0.045f + 19f) - 0.5f);   // craggy silhouette
+                    // A12 r1 (town-art-leftovers): the 0.045 term made a row of summit "teeth" (a crown); gone. One dominant crag on the tall summit instead.
+                    h *= 1f + 0.16f * (Mathf.PerlinNoise(x * 0.012f + 31f, z * 0.012f + 7f) - 0.5f);
+                    h += H * 0.07f * Mathf.Exp(-(((lt - 150f) * (lt - 150f)) + lr * lr) / (2f * 55f * 55f)) * (h > 0f ? 1f : 0f);
+                    // radial erosion: spurs and gullies fan out from the summit, strongest at mid-slope; +/-7.5% of local height
+                    if (h > 0f) h *= 1f + 0.15f * (Spur(lt, lr) - 0.5f) * SpurFade(lt, lr);
                     hs[j * (N + 1) + i] = h;
                     if (h > best) { best = h; mountainPeak = new Vector3(x, h - 30f, z); }
                     v.Add(new Vector3(x, h - 30f, z));
@@ -182,22 +186,54 @@ namespace SleepingCalamity.EditorTools
                     if (hs[a] <= 0f && hs[b] <= 0f && hs[d] <= 0f && hs[e] <= 0f) continue;
                     idx.AddRange(new[] { a, d, e, a, e, b });
                 }
-            Material m = Mat("M_BD_Mawrrow", new Color(0.30f, 0.27f, 0.27f), 0.40f, 0.58f, 2000f, 3000f, 0.04f, 1.3f, 0.8f);
+            // A12 r1 (town-art-leftovers): lighter base tint, sharper terminator (slope 0.95 / bias 0.02), key x1.3, cool directional sky fill, haze 30% lower on the upper 60% (full at 530 m).
+            Material m = Mat("M_BD_Mawrrow", new Color(0.36f, 0.33f, 0.31f), 0.38f, 0.56f, 2000f, 3000f, 0.04f, 1.3f, 0.8f, 0.95f, 0.02f, 1.3f, 1f, 0.22f, H - 30f);
             MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
             {
                 float y = p.y + 30f;
                 float up = Mathf.Clamp01(y / H);
                 float strata = 0.5f + 0.5f * Mathf.Sin(y * 0.07f + Mathf.PerlinNoise(p.x * 0.009f + 4f, p.z * 0.009f + 2f) * 7f);   // rock bands
                 float fleck = Mathf.PerlinNoise(p.x * 0.05f, p.z * 0.05f) - 0.5f;
-                float k = Mathf.Lerp(0.62f, 1.05f, up) * (0.86f + 0.14f * strata) * (1f + 0.25f * fleck);
-                Color sh = LitShade(n, 1f);
+                // light-independent form term (no sun bake: the shader lights it): spur crests x1.13, gully floors x0.75, from the same spur function as the geometry
+                Vector2 d = new Vector2(p.x - cx, p.z - cz);
+                float lt = Vector2.Dot(d, tan), lr = Vector2.Dot(d, rad);
+                float form = Mathf.Lerp(1f, Mathf.Lerp(0.75f, 1.13f, Spur(lt, lr)), Mathf.Lerp(0.5f, 1f, SpurFade(lt, lr)));
+                float k = Mathf.Lerp(0.80f, 1.05f, up) * (0.90f + 0.10f * strata) * (1f + 0.18f * fleck) * form;
+                // volcanic ash on the summit (pale, cool), warmer brown-grey on the lower slopes
+                Color warm = new Color(1.06f, 0.96f, 0.88f), ash = new Color(1.06f, 1.07f, 1.10f);
+                Color tone = Color.Lerp(warm, ash, Smooth(0.55f, 0.92f, up));
                 // the foot dissolves into haze (alpha < 1 adds haze in the shader): fully misted at the base, clear by about a third of the way up
                 float a = Mathf.Lerp(0.05f, 1f, Smooth(8f, 0.34f * H, y));
-                return new Color(k * sh.r, k * sh.g, k * sh.b, a);
+                return new Color(k * tone.r, k * tone.g, k * tone.b, a);
             });
             int tris = idx.Count / 3;
             if (HollowmereBackdropTuning.Wisp) BuildWisp(parent);
             return tris;
+        }
+
+        // Spur ridges radiating from a summit: 1 on a spur crest, 0 in a gully. Polar (theta, r) around the summit; a low-frequency warp bends and forks them.
+        // Blended between the tall summit (150, 0) and the shoulder peak (-300, 40) by which one's mass dominates.
+        const float SpurCount = 11f;
+        static float SpurAround(float lt, float lr, float ct, float cr, float seed)
+        {
+            float dt = lt - ct, dr = lr - cr;
+            float theta = Mathf.Atan2(dr, dt), r = Mathf.Sqrt(dt * dt + dr * dr);
+            float ca = Mathf.Cos(theta), sa = Mathf.Sin(theta);   // periodic noise input, no seam at +/-pi
+            float warp = 2.4f * (Mathf.PerlinNoise(ca * 1.4f + r * 0.0045f + seed, sa * 1.4f + seed * 0.7f) - 0.5f)
+                       + 0.8f * (Mathf.PerlinNoise(ca * 3.1f + r * 0.012f + seed + 9f, sa * 3.1f + 4f) - 0.5f);
+            return 1f - Mathf.Pow(Mathf.Abs(Mathf.Sin(SpurCount * theta * 0.5f + warp)), 0.7f);
+        }
+        static float Spur(float lt, float lr)
+        {
+            float w1 = Bump(lt, lr, 150f, 0f, 430f, 260f), w2 = 0.58f * Bump(lt, lr, -300f, 40f, 360f, 240f);
+            float s1 = SpurAround(lt, lr, 150f, 0f, 3f), s2 = SpurAround(lt, lr, -300f, 40f, 17f);
+            return w1 + w2 < 1e-4f ? 0.5f : Mathf.Lerp(s2, s1, w1 / (w1 + w2));
+        }
+        // 0 at the summit crag and the foot, 1 at mid-slope: fade by the local mass (Bump) so it follows both peaks.
+        static float SpurFade(float lt, float lr)
+        {
+            float m = Mathf.Max(Bump(lt, lr, 150f, 0f, 430f, 260f), 0.58f * Bump(lt, lr, -300f, 40f, 360f, 240f));
+            return Smooth(0.06f, 0.30f, m) * (1f - Smooth(0.72f, 0.97f, m));
         }
 
         static float Bump(float t, float r, float ct, float cr, float rt, float rr)
@@ -245,6 +281,7 @@ namespace SleepingCalamity.EditorTools
             Vector3 pos = new Vector3(c.X + L.Rc * Mathf.Cos(a), Top(0, a) - 1.5f, c.Z + L.Rc * Mathf.Sin(a));
             var mb = new MeshBuilder();
             mb.Frustum(new Vector3(0f, 0f, 0f), 4.6f, 3.0f, 17f, 8, 0f);                       // the tower
+            mb.Tag = 1;                                                                        // A12 r1 (town-art-leftovers): cap, hub and sails are weathered timber, the tower whitewashed stone
             mb.Frustum(new Vector3(0f, 17f, 0f), 3.6f, 0.4f, 3.6f, 8, 0f);                     // the cap (cone), a little skewed by the ruin below
             mb.Box(new Vector3(0f, 18.2f, 3.0f), new Vector3(1.4f, 1.4f, 2.2f), Quaternion.identity);   // the hub housing
             float[] ang = { 18f, 108f, 198f, 288f };
@@ -257,12 +294,17 @@ namespace SleepingCalamity.EditorTools
                 if (!broken) mb.Box(new Vector3(0f, 18.2f, 4.1f) + q * new Vector3(k == 3 ? 0.9f : 1.2f, 9.5f, 0f), new Vector3(k == 3 ? 1.4f : 2.4f, 8.5f, 0.25f), q);   // the lattice sail (one half gone)
             }
             Quaternion rot = Quaternion.Euler(0f, 90f - (a * Mathf.Rad2Deg + 180f), 0f);   // local +Z faces the town centre
-            var go = MakeObject(parent, "RuinedWindmill", mb.V.Select(p => p * s).ToList(), mb.I, Mat("M_BD_Windmill", new Color(0.24f, 0.22f, 0.21f), 0.50f, 0.62f, 500f, 1300f, 0.05f, 1.0f, 0.3f), null, (p, n) =>
+            // A12 r1 (town-art-leftovers): it read as a near-black cut-out. Pale plaster tower, dark timber top, absolute vertex colours (white tint), no sun bake (the shader's key/sky fill lights it).
+            var wv = mb.V.Select(p => p * s).ToList();
+            var wc = new Color[wv.Count];
+            Color plaster = new Color(0.55f, 0.52f, 0.47f), timber = new Color(0.18f, 0.15f, 0.13f);
+            for (int i = 0; i < wc.Length; i++)
             {
-                Color sh = LitShade(rot * n, 1f);
-                float k = Mathf.Lerp(0.50f, 1f, Smooth(0f, 8f * s, p.y)) * (p.y > 16f * s ? 0.85f : 1f);   // darker base in the hill's shadow, sails and cap a touch darker than the walls
-                return new Color(k * sh.r, k * sh.g, k * sh.b, 1f);
-            });
+                float foot = Mathf.Lerp(0.75f, 1f, Smooth(0f, 8f * s, wv[i].y));   // a little darker at the foot in the hill's shade
+                Color b = mb.Tags[i] == 0 ? plaster * foot : timber;
+                wc[i] = new Color(b.r, b.g, b.b, 1f);
+            }
+            var go = MakeObject(parent, "RuinedWindmill", wv, mb.I, Mat("M_BD_Windmill", Color.white, 0.40f, 0.55f, 500f, 1300f, 0.05f, 1.0f, 0.3f, 0.85f, 0.10f, 1.3f, 1f), null, null, wc);
             go.transform.position = pos;
             go.transform.rotation = rot;
             return mb.I.Count / 3;
@@ -295,11 +337,13 @@ namespace SleepingCalamity.EditorTools
         sealed class MeshBuilder
         {
             public readonly List<Vector3> V = new List<Vector3>(); public readonly List<int> I = new List<int>(); public readonly List<Vector2> UV = new List<Vector2>();
+            public readonly List<int> Tags = new List<int>(); public int Tag;   // Tag = part id stamped on every vertex added after it is set (windmill: 0 tower, 1 timber)
 
             // Separate vertices per face (flat shading); winding counter-clockwise seen from outside.
             void Face(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
             {
                 int o = V.Count; V.Add(a); V.Add(b); V.Add(c); V.Add(d);
+                Tags.Add(Tag); Tags.Add(Tag); Tags.Add(Tag); Tags.Add(Tag);
                 UV.Add(new Vector2(0, 0)); UV.Add(new Vector2(1, 0)); UV.Add(new Vector2(1, 1)); UV.Add(new Vector2(0, 1));
                 I.AddRange(new[] { o, o + 1, o + 2, o, o + 2, o + 3 });
             }
@@ -342,7 +386,7 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        static GameObject MakeObject(Transform parent, string name, List<Vector3> v, List<int> idx, Material m, List<Vector2> uv = null, System.Func<Vector3, Vector3, Color> colour = null)
+        static GameObject MakeObject(Transform parent, string name, List<Vector3> v, List<int> idx, Material m, List<Vector2> uv = null, System.Func<Vector3, Vector3, Color> colour = null, Color[] vcols = null)
         {
             var mesh = new Mesh { name = "BD_" + name, indexFormat = IndexFormat.UInt32 };
             mesh.SetVertices(v);
@@ -355,6 +399,7 @@ namespace SleepingCalamity.EditorTools
                 for (int i = 0; i < cols.Length; i++) cols[i] = colour(v[i], nrm[i]);
                 mesh.SetColors(cols);
             }
+            else if (vcols != null) mesh.SetColors(vcols);   // per-vertex colours baked by the caller (the windmill's parts)
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -363,7 +408,9 @@ namespace SleepingCalamity.EditorTools
         }
 
         // A SleepingCalamity/Backdrop material (same property set as HollowmereRoad.Backdrop; no texture, a flat tint).
-        static Material Mat(string name, Color tint, float hazeNear, float hazeFar, float d0, float d1, float mist, float cool, float coolAmt)
+        // A12 r1 (town-art-leftovers): the trailing key/fill args default to the shader's old behaviour, so ridges, cards and road are unchanged; always written so a regenerated .mat is never stale.
+        static Material Mat(string name, Color tint, float hazeNear, float hazeFar, float d0, float d1, float mist, float cool, float coolAmt,
+            float keyWrap = 0.7f, float keyBias = 0.15f, float keyBoost = 1f, float skyFillDir = 0f, float hazeTop = 0f, float hazeTopHeight = 0f)
         {
             Shader sh = Shader.Find("SleepingCalamity/Backdrop") ?? Shader.Find("Universal Render Pipeline/Lit");
             BuilderUtil.EnsureFolder(MaterialsFolder);
@@ -376,6 +423,8 @@ namespace SleepingCalamity.EditorTools
             m.SetFloat("_NoiseAmp", 0.04f); m.SetFloat("_NoiseLit", 0.03f);
             m.SetColor("_ShadowTint", new Color(0.30f, 0.38f, 0.48f));
             m.SetColor("_HazeCool", new Color(0.62f * cool, 0.8f, 1.2f * cool)); m.SetFloat("_HazeCoolAmt", coolAmt);
+            m.SetFloat("_KeyWrap", keyWrap); m.SetFloat("_KeyBias", keyBias); m.SetFloat("_KeyBoost", keyBoost); m.SetFloat("_SkyFillDir", skyFillDir);
+            m.SetFloat("_HazeTop", hazeTop); m.SetFloat("_HazeTopHeight", hazeTopHeight);
             m.SetFloat("_AlphaClip", 0f); m.DisableKeyword("_ALPHATEST_ON"); m.SetFloat("_Cull", (float)CullMode.Back);
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);

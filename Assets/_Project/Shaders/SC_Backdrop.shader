@@ -23,6 +23,13 @@ Shader "SleepingCalamity/Backdrop"
         _ShadowTint ("Shadow side sky tint", Color) = (0.30, 0.38, 0.48, 1)
         _HazeCool ("Cool sky haze (x fog colour)", Color) = (0.80, 0.92, 1.12, 1)
         _HazeCoolAmt ("Cool haze away from a low sun", Range(0, 1)) = 0.7
+        // A12 r1 (town-art-leftovers): per-material key/fill controls for the tall masses (mountain, windmill). The defaults reproduce the old look exactly.
+        _KeyWrap ("Key light slope (wrapped Lambert)", Range(0, 1.5)) = 0.7
+        _KeyBias ("Key light bias (wrapped Lambert)", Range(-0.3, 0.5)) = 0.15
+        _KeyBoost ("Key light boost", Range(0, 3)) = 1
+        _SkyFillDir ("Cool directional sky fill (0 = SH as before)", Range(0, 1)) = 0
+        _HazeTop ("Haze reduction at the top of a tall mass (0 = off)", Range(0, 1)) = 0
+        _HazeTopHeight ("Height (world y) where that reduction is full (0 = off)", Float) = 0
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha clip", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
@@ -45,6 +52,8 @@ Shader "SleepingCalamity/Backdrop"
             half _NoiseAmp, _NoiseLit;
             half4 _ShadowTint, _HazeCool;
             half _HazeCoolAmt;
+            half _KeyWrap, _KeyBias, _KeyBoost, _SkyFillDir, _HazeTop;
+            float _HazeTopHeight;
             half _AlphaClip, _Cull;
         CBUFFER_END
         ENDHLSL
@@ -96,15 +105,21 @@ Shader "SleepingCalamity/Backdrop"
                 n = IS_FRONT_VFACE(face, n, -n);
                 Light l = GetMainLight();
                 float ndl = dot(n, l.direction);
-                half sun = saturate(ndl * 0.7 + 0.15);                      // less wrap than before: faces turned from the sun fall darker
+                half sun = saturate(ndl * _KeyWrap + _KeyBias);             // default 0.7/0.15: less wrap than before, faces turned from the sun fall darker
                 half3 sky = SampleSH(float3(0, 1, 0));
-                half3 lit = c.rgb * (l.color * sun + SampleSH(n) + _ShadowTint.rgb * sky * (1.0 - sun));
+                half3 fill = SampleSH(n);
+                // cool sky fill by the normal's up component (up-facing lighter, steep faces darker); 0 keeps the plain SH fill
+                half3 skyDir = sky * half3(0.62, 0.78, 1.1) * lerp(0.45, 1.1, smoothstep(0.1, 0.9, n.y));
+                fill = lerp(fill, skyDir, _SkyFillDir);
+                half3 lit = c.rgb * (l.color * (sun * _KeyBoost) + fill + _ShadowTint.rgb * sky * (1.0 - sun));
                 float3 V = normalize(i.positionWS - GetCameraPositionWS());
                 float d = distance(i.positionWS, GetCameraPositionWS());
                 half h = lerp(_HazeNear, _HazeFar, saturate((d - _DistNear) / max(1.0, _DistFar - _DistNear)));
                 // vertical gradient: mist holds at the foot and thins smoothly with height, so ridge and tree tops stand crisper against the sky
                 h += _GroundMist * (exp(-clamp((i.positionWS.y - _MistTop) / max(1.0, _MistScale), -1.0, 6.0)) - 0.3);
                 // two octaves of world-XZ value noise (~150 m and ~40 m) break the ring fields into patches of light and mist
+                if (_HazeTopHeight > 0.0)   // less haze on the upper 60% of a tall mass (the foot keeps its vertex-alpha mist)
+                    h *= 1.0 - _HazeTop * saturate((i.positionWS.y - 0.4 * _HazeTopHeight) / (0.6 * _HazeTopHeight));
                 float nz = VNoise(i.positionWS.xz / 150.0) * 0.6 + VNoise(i.positionWS.xz / 40.0 + 17.0) * 0.4 - 0.5;
                 h = saturate(h + nz * 2.0 * _NoiseAmp + (1.0 - i.color.a) * 0.7);
                 lit *= 1.0 + nz * 2.0 * _NoiseLit;
