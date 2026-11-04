@@ -219,7 +219,7 @@ namespace SleepingCalamity.EditorTools
                 if (!HollowmereTerrain.IsPaved(t, b.center.x, b.center.z)) continue;
                 Transform root = kv.Key; while (root.parent != null && !roots.Contains(root.parent)) root = root.parent;
                 Transform owner = root.parent != null ? root.parent : set;
-                Flat(Group(owner, "ContactAO"), "AO_" + kv.Key.name, _ao, b.center.x, b.min.y + 0.03f, b.center.z, Mathf.Min(6f, b.size.x * 1.35f + 0.4f), Mathf.Min(6f, b.size.z * 1.35f + 0.4f), 0f, 4);
+                Flat(Group(owner, "ContactAO"), "AO_" + kv.Key.name, _ao, b.center.x, b.min.y + 0.036f, b.center.z, Mathf.Min(6f, b.size.x * 1.35f + 0.4f), Mathf.Min(6f, b.size.z * 1.35f + 0.4f), 0f, 4);
                 count++;
             }
             return count;

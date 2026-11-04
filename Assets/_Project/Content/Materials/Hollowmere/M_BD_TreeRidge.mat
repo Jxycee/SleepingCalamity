@@ -34,14 +34,21 @@ Material:
     - _Cutoff: 0.5
     - _DistFar: 1300
     - _DistNear: 500
+    - _FillBoost: 1
     - _GroundMist: 0.1
     - _HazeCoolAmt: 0.3
     - _HazeFar: 0.74
     - _HazeNear: 0.62
+    - _HazeTop: 0
+    - _HazeTopHeight: 0
+    - _KeyBias: 0.15
+    - _KeyBoost: 1
+    - _KeyWrap: 0.7
     - _MistScale: 40
     - _MistTop: -8
     - _NoiseAmp: 0.04
     - _NoiseLit: 0.03
+    - _SkyFillDir: 0
     m_Colors:
     - _BaseColor: {r: 0.12, g: 0.18, b: 0.09, a: 1}
     - _HazeCool: {r: 0.589, g: 0.8, b: 1.14, a: 1}

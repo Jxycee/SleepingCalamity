@@ -110,7 +110,7 @@ namespace SleepingCalamity.Core
             public float G(TownPoint p) => HollowmereLayout.Ground(T, p.X, p.Z);
         }
         sealed class Mount { public int LaneIdx; public float S, Prio, Y, Yaw; public TownPoint Pos; }
-        sealed class Flight { public int LaneIdx; public float SHead, SFoot; }
+        sealed class Flight { public int LaneIdx; public float SHead, SFoot, Yaw; public List<LaneKitRow> Rows = new List<LaneKitRow>(); }
 
         static LaneKitRow Add(Ctx c, LanePiece piece, LanePreset preset, string lane, TownPoint p, float y, float yaw, float scale = 1f, float tilt = 0f, float rise = 0f)
         {
@@ -135,6 +135,8 @@ namespace SleepingCalamity.Core
             GardenWalls(c);
             TerraceWalls(c);
             LotWalls(c);
+            AlignFlights(c);
+            ResolveWallJunctions(c);
             Lanterns(c);
             return c.Rows;
         }
@@ -202,6 +204,7 @@ namespace SleepingCalamity.Core
                 float width = 2f * s.Hw, left = -s.Hw;
                 int cols = (int)Math.Ceiling(width / 2f - 1e-3f);
                 float scale = width / cols / 2f, rise = Math.Abs(s.Grade) * StepRun;
+                var flightRows = new List<LaneKitRow>();
                 for (int k = 0; k < n; k++)
                 {
                     float dUp = Landing + k * StepRun, dDn = dUp + StepRun;
@@ -210,11 +213,11 @@ namespace SleepingCalamity.Core
                     for (int j = 0; j < cols; j++)
                     {
                         float lat = left + (j + 0.5f) * width / cols;
-                        Add(c, LanePiece.LaneStep, LanePreset.Both, s.Lane.Id, s.P(sDn, lat), y, Yaw(u), scale, 0f, rise);
+                        flightRows.Add(Add(c, LanePiece.LaneStep, LanePreset.Both, s.Lane.Id, s.P(sDn, lat), y, Yaw(u), scale, 0f, rise));
                     }
                 }
                 float sHead = su > 0 ? b - Landing : a + Landing, sFoot = su > 0 ? a + Landing : b - Landing;
-                c.Flights.Add(new Flight { LaneIdx = s.LaneIdx, SHead = s.Cum + sHead, SFoot = s.Cum + sFoot });
+                c.Flights.Add(new Flight { LaneIdx = s.LaneIdx, SHead = s.Cum + sHead, SFoot = s.Cum + sFoot, Rows = flightRows, Yaw = Yaw(u) });
             }
         }
 
@@ -473,6 +476,236 @@ namespace SleepingCalamity.Core
             NearestLane(c, mid, out int li, out float ls, out float dist);
             if (li >= 0 && dist <= 3f + c.Lanes[li].Width * 0.5f)
                 AddMount(li, c, ls, 2f, mid - up * 0.35f, upperY - step + Math.Max(0.3f, Math.Min(1.6f, step * 0.8f)), yaw);
+        }
+
+        // ---- junction repairs (Hollowmere junction survey, 2026-11-03)
+        public const float FlightJoinGap = 2.5f, FlightMaxKink = 2f, FlightMargin = 0.3f, WallEmbed = 0.1f, WallMinStub = 0.5f, WallCrossMinAngle = 15f;
+
+        // Consecutive flights of one lane whose axes differ by more than FlightMaxKink degrees are turned toward each other about their own middles until they differ
+        // by at most that: a straight street reads as one stair, not two rectangles meeting at a corner. Treads keep their heights and stay about 0.25 m from the lane line.
+        static void AlignFlights(Ctx c)
+        {
+            for (int li = 0; li < c.Lanes.Count; li++)
+            {
+                var fl = c.Flights.FindAll(f => f.LaneIdx == li && f.Rows.Count > 0);
+                fl.Sort((a, b) => a.SHead.CompareTo(b.SHead));
+                var target = new float[fl.Count];
+                for (int i = 0; i < fl.Count; i++) target[i] = fl[i].Yaw;
+                for (int pass = 0; pass < 60; pass++)
+                {
+                    bool moved = false;
+                    for (int i = 0; i + 1 < fl.Count; i++)
+                    {
+                        if (FlightGap(fl[i], fl[i + 1]) > FlightJoinGap) continue;
+                        float d = DeltaAngle(target[i], target[i + 1]);
+                        if (d > 90f) d -= 180f; else if (d < -90f) d += 180f;   // opposite uphill directions on the same street are the same axis
+                        float ex = Math.Abs(d) - (FlightMaxKink - 0.05f);
+                        if (ex <= 0f) continue;
+                        float sgn = d > 0f ? 1f : -1f;
+                        target[i] += sgn * ex * 0.5f; target[i + 1] -= sgn * ex * 0.5f; moved = true;
+                    }
+                    if (!moved) break;
+                }
+                for (int i = 0; i < fl.Count; i++)
+                {
+                    float delta = DeltaAngle(fl[i].Yaw, target[i]);
+                    if (Math.Abs(delta) < 1e-4f) continue;
+                    double px = 0, pz = 0; foreach (LaneKitRow r in fl[i].Rows) { px += r.X; pz += r.Z; }
+                    px /= fl[i].Rows.Count; pz /= fl[i].Rows.Count;
+                    double ca = Math.Cos(delta * Math.PI / 180.0), sa = Math.Sin(delta * Math.PI / 180.0);
+                    foreach (LaneKitRow r in fl[i].Rows)
+                    {
+                        double dx = r.X - px, dz = r.Z - pz;
+                        r.X = Round((float)(px + dx * ca + dz * sa)); r.Z = Round((float)(pz - dx * sa + dz * ca)); r.Yaw = Round(r.Yaw + delta);
+                    }
+                }
+            }
+        }
+
+        static float DeltaAngle(float from, float to)
+        {
+            float d = (to - from) % 360f; if (d > 180f) d -= 360f; if (d < -180f) d += 360f; return d;
+        }
+
+        static float AxisAngle(float a, float b)
+        {
+            float d = Math.Abs(DeltaAngle(a, b)) % 180f; return d > 90f ? 180f - d : d;
+        }
+
+        static float FlightGap(Flight a, Flight b)
+        {
+            float best = float.MaxValue;
+            foreach (LaneKitRow p in a.Rows) foreach (LaneKitRow q in b.Rows) best = Math.Min(best, TownPoint.Distance(new TownPoint(p.X, p.Z), new TownPoint(q.X, q.Z)));
+            return best;
+        }
+
+        // Shared with the tests: a wall row is a thin box, half length ScaleX along local X, half thickness WallThickness, from the ground (or Y - 1) up to Y + WallTop.
+        public static bool IsGardenWall(LanePiece p) => p == LanePiece.GardenWall || p == LanePiece.GardenWallBroken;
+        public static float WallThickness(LanePiece p) => IsGardenWall(p) ? WallHalfThick : 0.35f;
+        public static float WallTop(LanePiece p) => IsGardenWall(p) ? 1.35f : Top(p);
+
+        /// <summary>The centre line of `w` (t in -ScaleX..ScaleX along its local X) against the box of half sizes halfAlong x halfNormal centred (ox, oz) with local X at oyaw: the entry and exit t, false on a miss.</summary>
+        public static bool ChordThrough(LaneKitRow w, float halfAlong, float halfNormal, float ox, float oz, float oyaw, out float t0, out float t1)
+        {
+            double a = w.Yaw * Math.PI / 180.0, b = oyaw * Math.PI / 180.0;
+            double lx = Math.Cos(a), lz = -Math.Sin(a), ax = Math.Cos(b), az = -Math.Sin(b), bx = Math.Sin(b), bz = Math.Cos(b);
+            double dx = w.X - ox, dz = w.Z - oz, lo = -1e9, hi = 1e9;
+            t0 = t1 = 0f;
+            if (!SlabClip(dx * ax + dz * az, lx * ax + lz * az, halfAlong, ref lo, ref hi) || !SlabClip(dx * bx + dz * bz, lx * bx + lz * bz, halfNormal, ref lo, ref hi)) return false;
+            t0 = (float)lo; t1 = (float)hi; return true;
+        }
+
+        static bool SlabClip(double o, double d, double h, ref double t0, ref double t1)
+        {
+            if (Math.Abs(d) < 1e-9) return Math.Abs(o) <= h;
+            double a = (-h - o) / d, b = (h - o) / d;
+            if (a > b) { double s = a; a = b; b = s; }
+            t0 = Math.Max(t0, a); t1 = Math.Min(t1, b);
+            return t0 <= t1;
+        }
+
+        sealed class WallGroup
+        {
+            public List<LaneKitRow> Rows = new List<LaneKitRow>(); public float X, Z, Yaw, Half, Thick, Top, Bottom; public int Mask, Order;
+            public bool Contains(float px, float pz, float m)
+            {
+                double a = Yaw * Math.PI / 180.0, dx = px - X, dz = pz - Z;
+                return Math.Abs(dx * Math.Cos(a) - dz * Math.Sin(a)) <= Half + m && Math.Abs(dx * Math.Sin(a) + dz * Math.Cos(a)) <= Thick + m;
+            }
+        }
+        struct Cut { public float A, B; public bool Pier; }
+        struct Keep { public float A, B; public bool PierA, PierB; }
+
+        static int MaskOf(LaneKitRow r) => r.Preset == LanePreset.Both ? 3 : r.Preset == LanePreset.Ruined ? 1 : 2;
+        static string PlaceKey(float x, float z) => x.ToString("0.###", CultureInfo.InvariantCulture) + "|" + z.ToString("0.###", CultureInfo.InvariantCulture);
+
+        // Walls meet walls and flights. The higher wall (coping), or on a tie the earlier one, runs on; any other wall that would cross its thick box is cut to end WallEmbed
+        // inside the face (no coping past it), and a wall that runs over a flight (flight footprint + FlightMargin) is cut at the flight edge, a garden wall closed with a pier.
+        // Stubs shorter than WallMinStub go. Ruined and rebuilt rows of one place share the cut; a retaining buttress follows the longest stub.
+        static void ResolveWallJunctions(Ctx c)
+        {
+            for (int pass = 0; pass < 8 && ResolveWallJunctionsOnce(c); pass++) { }   // a cut changes the box a neighbour was judged against: repeat until nothing moves
+        }
+
+        static bool ResolveWallJunctionsOnce(Ctx c)
+        {
+            bool changed = false;
+            var groups = new List<WallGroup>(); var byKey = new Dictionary<string, WallGroup>();
+            foreach (LaneKitRow r in c.Rows)
+            {
+                if (!r.IsWall) continue;
+                string key = PlaceKey(r.X, r.Z) + "|" + r.Yaw.ToString("0.###", CultureInfo.InvariantCulture) + "|" + r.ScaleX.ToString("0.###", CultureInfo.InvariantCulture);
+                if (!byKey.TryGetValue(key, out WallGroup g))
+                {
+                    g = new WallGroup { X = r.X, Z = r.Z, Yaw = r.Yaw, Half = r.ScaleX, Top = float.MinValue, Bottom = float.MaxValue, Order = groups.Count };
+                    byKey[key] = g; groups.Add(g);
+                }
+                g.Rows.Add(r); g.Mask |= MaskOf(r);
+                g.Thick = Math.Max(g.Thick, WallThickness(r.Piece));
+                g.Top = Math.Max(g.Top, r.Y + WallTop(r.Piece));
+                g.Bottom = Math.Min(g.Bottom, Math.Max(r.Y - 1f, c.G(new TownPoint(r.X, r.Z))));
+            }
+            if (groups.Count == 0) return false;
+            var originals = new List<WallGroup>(groups);
+            groups.Sort((a, b) => Math.Abs(a.Top - b.Top) > 0.02f ? b.Top.CompareTo(a.Top) : a.Order.CompareTo(b.Order));
+            var steps = c.Rows.FindAll(r => r.Piece == LanePiece.LaneStep);
+            var finals = new List<WallGroup>(); var dropped = new HashSet<LaneKitRow>(); var added = new List<LaneKitRow>(); var followers = new Dictionary<string, WallGroup>();
+            for (int gi = 0; gi < groups.Count; gi++)
+            {
+                WallGroup w = groups[gi];
+                string oldKey = PlaceKey(w.X, w.Z);
+                LaneKitRow probe = w.Rows[0];
+                var cuts = new List<Cut>();
+                foreach (WallGroup o in finals)
+                {
+                    if ((o.Mask & w.Mask) == 0 || Math.Min(w.Top, o.Top) - Math.Max(w.Bottom, o.Bottom) < 0.4f) continue;
+                    if (Math.Abs(w.X - o.X) > w.Half + o.Half + 1f || Math.Abs(w.Z - o.Z) > w.Half + o.Half + 1f) continue;
+                    if (AxisAngle(w.Yaw, o.Yaw) < WallCrossMinAngle) continue;
+                    if (!ChordThrough(probe, o.Half, o.Thick, o.X, o.Z, o.Yaw, out float t0, out float t1)) continue;
+                    if (t0 <= -w.Half || t1 >= w.Half) continue;   // an end inside the other wall is an embed, not a crossing
+                    if (t1 - t0 > 0.02f) { float e = Math.Min(WallEmbed, (t1 - t0) * 0.4f); cuts.Add(new Cut { A = t0 + e, B = t1 - e }); }   // a sliver is a corner clip: cut it all the same
+                }
+                // a short stub past the far face of a lower wall that ends inside this one (so it is never cut itself): trim this wall's tip back inside that face
+                for (int ui = gi + 1; ui < groups.Count; ui++)
+                {
+                    WallGroup u = groups[ui];
+                    if ((u.Mask & w.Mask) == 0 || Math.Min(w.Top, u.Top) - Math.Max(w.Bottom, u.Bottom) < 0.4f) continue;
+                    if (Math.Abs(w.X - u.X) > w.Half + u.Half + 1f || Math.Abs(w.Z - u.Z) > w.Half + u.Half + 1f || AxisAngle(w.Yaw, u.Yaw) < WallCrossMinAngle) continue;
+                    if (!ChordThrough(probe, u.Half, u.Thick, u.X, u.Z, u.Yaw, out float t0, out float t1) || t0 <= -w.Half || t1 >= w.Half) continue;
+                    float stubA = t0 + w.Half, stubB = w.Half - t1;
+                    if (stubB > 0.05f && stubB <= 0.4f && stubA > 0.4f) cuts.Add(new Cut { A = t1 - WallEmbed, B = w.Half });
+                    else if (stubA > 0.05f && stubA <= 0.4f && stubB > 0.4f) cuts.Add(new Cut { A = -w.Half, B = t0 + WallEmbed });
+                }
+                foreach (LaneKitRow st in steps)
+                {
+                    if (Math.Abs(st.X - w.X) > w.Half + st.ScaleX + 3f || Math.Abs(st.Z - w.Z) > w.Half + st.ScaleX + 3f) continue;
+                    double sb = st.Yaw * Math.PI / 180.0; float zc = StepRun * 0.5f;
+                    if (!ChordThrough(probe, st.ScaleX + FlightMargin, zc + FlightMargin, (float)(st.X + Math.Sin(sb) * zc), (float)(st.Z + Math.Cos(sb) * zc), st.Yaw, out float t0, out float t1)) continue;
+                    float a = Math.Max(t0, -w.Half), b = Math.Min(t1, w.Half);
+                    if (b - a > 0.02f) cuts.Add(new Cut { A = a, B = b, Pier = true });
+                }
+                if (cuts.Count == 0) { finals.Add(w); continue; }
+                changed = true;
+                cuts.Sort((p, q) => p.A.CompareTo(q.A));
+                var keeps = new List<Keep>(); float cursor = -w.Half; bool pending = false;
+                foreach (Cut cut in cuts)
+                {
+                    if (cut.A > cursor + 1e-3f) keeps.Add(new Keep { A = cursor, B = cut.A, PierA = pending, PierB = cut.Pier });
+                    if (cut.B > cursor) { cursor = cut.B; pending = cut.Pier; }
+                }
+                if (cursor < w.Half - 1e-3f) keeps.Add(new Keep { A = cursor, B = w.Half, PierA = pending });
+                keeps.RemoveAll(k => k.B - k.A < WallMinStub);
+                double ya = w.Yaw * Math.PI / 180.0; float lx = (float)Math.Cos(ya), lz = (float)-Math.Sin(ya);
+                bool garden = IsGardenWall(probe.Piece);
+                bool first = true; WallGroup longest = null;
+                foreach (Keep k in keeps)
+                {
+                    float mid = (k.A + k.B) * 0.5f, half = Round((k.B - k.A) * 0.5f), nx = Round(w.X + lx * mid), nz = Round(w.Z + lz * mid);
+                    var ng = new WallGroup { X = nx, Z = nz, Yaw = w.Yaw, Half = half, Thick = w.Thick, Top = w.Top, Bottom = w.Bottom, Mask = w.Mask, Order = w.Order };
+                    foreach (LaneKitRow r in w.Rows)
+                    {
+                        LaneKitRow t = r;
+                        if (!first)
+                        {
+                            t = new LaneKitRow { Id = "LK" + (c.Counter++).ToString("0000") + "_" + r.Piece, Piece = r.Piece, Preset = r.Preset, Lane = r.Lane, Y = r.Y, Yaw = r.Yaw, Tilt = r.Tilt, Rise = r.Rise };
+                            added.Add(t);
+                        }
+                        t.X = nx; t.Z = nz; t.ScaleX = half;
+                        ng.Rows.Add(t);
+                    }
+                    first = false; finals.Add(ng);
+                    if (longest == null || ng.Half > longest.Half) longest = ng;
+                    if (garden)
+                    {
+                        if (k.PierA) added.Add(PierRow(c, probe, w.X + lx * (k.A + 0.3f), w.Z + lz * (k.A + 0.3f), w.Yaw));
+                        if (k.PierB) added.Add(PierRow(c, probe, w.X + lx * (k.B - 0.3f), w.Z + lz * (k.B - 0.3f), w.Yaw));
+                    }
+                }
+                if (keeps.Count == 0) foreach (LaneKitRow r in w.Rows) dropped.Add(r);
+                followers[oldKey] = longest;
+            }
+            foreach (LaneKitRow r in c.Rows)
+                if (r.Piece == LanePiece.RetainButtress && followers.TryGetValue(PlaceKey(r.X, r.Z), out WallGroup lg))
+                {
+                    if (lg == null) dropped.Add(r); else { r.X = lg.X; r.Z = lg.Z; }
+                }
+            c.Rows.RemoveAll(r => dropped.Contains(r));
+            c.Rows.AddRange(added);
+            // a lantern mount that stood on wall that is gone goes with it
+            c.Mounts.RemoveAll(m =>
+            {
+                if (!originals.Exists(g => g.Contains(m.Pos.X, m.Pos.Z, 0.3f))) return false;
+                foreach (WallGroup g in finals) if (g.Contains(m.Pos.X, m.Pos.Z, 0.3f)) return false;
+                foreach (LaneKitRow r in c.Rows) if ((r.Piece == LanePiece.GardenWallEnd || r.Piece == LanePiece.GatePier) && TownPoint.Distance(new TownPoint(r.X, r.Z), m.Pos) <= 0.8f) return false;
+                return true;
+            });
+            return changed;
+        }
+
+        static LaneKitRow PierRow(Ctx c, LaneKitRow like, float x, float z, float yaw)
+        {
+            var p = new TownPoint(x, z);
+            return new LaneKitRow { Id = "LK" + (c.Counter++).ToString("0000") + "_" + LanePiece.GardenWallEnd, Piece = LanePiece.GardenWallEnd, Preset = LanePreset.Both, Lane = like.Lane, X = Round(x), Y = Round(c.G(p)), Z = Round(z), Yaw = Round(yaw) };
         }
 
         // ---- lanterns

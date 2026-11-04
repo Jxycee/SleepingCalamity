@@ -35,6 +35,9 @@ B1 = {
                        why='granite cobble with warm lights: 3.1 cobble #817a7b to #b7b0aa'),
     'sandstone':  dict(src='sandstone_blocks_05', target='#b9a07a', hue_keep=0.6, delight=0.7, contrast=1.1, rough=(0.8, 0.15), nrm=1.0,
                        why='dressed sandstone (the fountain): warm mid stone'),
+    # stairs stone r2 (town-art-leftovers, 2026-11-03): jointless worn sandstone for the Hollowmere lane step slabs (sandstone_blocks_05 is itself an ashlar pattern).
+    'step_stone': dict(src='worn_rock_natural_01', target='#a99a80', hue_keep=0.5, delight=0.8, contrast=0.95, chroma=0.9, rough=(0.8, 0.15), nrm=0.8, vary=0.06,
+                       why='lane step slabs: worn jointless sandstone/limestone, fine grain and no block joints or strata, a touch greyer than sandstone (#a99a80)'),
     'roof_tile':  dict(src='clay_roof_tiles', target='#92503c', hue_keep=0.35, delight=0.5, contrast=1.0, chroma=0.82, vary=0.20, soften=0.6, rough=(0.8, 0.12), nrm=1.0,
                        why='red clay roof tile: 3.1 roof #9c4a34'),
     'painted_wood': dict(src='blue_painted_planks', target='#62808c', hue_keep=0.3, delight=0.7, contrast=1.1, chroma=0.85, rough=(0.7, 0.2), nrm=1.0,

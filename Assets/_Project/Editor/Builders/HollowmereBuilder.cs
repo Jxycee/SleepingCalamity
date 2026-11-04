@@ -81,7 +81,25 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_StairSide4", new Vector3(-41.0f, 0.8f, -29.0f), new Vector3(-45.5f, -5.3f, -31.5f), 60f),   // stairs seat 3: the Terrace / Ring Lane flight from its west side at 1 m (stone cores under the treads, contact strip at the foot)
             ("Cap_HM_StairSide2", new Vector3(24.5f, 0.8f, 11.5f), new Vector3(19.2f, 1.2f, 16.0f), 60f),        // stairs seat: the keep's east flight from the east side at 0.8 m
             ("Cap_HM_Overview", new Vector3(30f, 95f, -98f), new Vector3(0f, -5f, -22f), 42f),          // absolute height, rendered without fog (HollowmereCapture)
+            ("Cap_HM_TerraceDown", new Vector3(-45.951f, -1.686f, -25.159f), new Vector3(-45.101f, -2.980f, -29.913f), 50f),   // play rig (pivot = feet + 1.5, boom 5.0, pitch 15 down, FOV 50), hero on the Ring Lane SW flight's middle tread facing downhill (LK0012/LK0013 LaneStep: X -44.068/-46.037, Y -4.640, Z -30.008/-30.360, yaw -10.13, tread centre +0.275 uphill, top Y+0.16); absolute position
+            ("Cap_HM_TerraceUp", new Vector3(-44.251f, -1.686f, -34.668f), new Vector3(-45.101f, -2.980f, -29.913f), 50f),     // same tread, hero facing uphill (camera downhill of him); absolute position
+            // junction survey (HollowmereJunctionScan): large pieces that do not meet. Pos y = height above ground, Target absolute; ~20 degrees down from 6 m.
+            ("Cap_HM_J01", new Vector3(-21.78f, 3.68f, 13.65f), new Vector3(-20.95f, 1.50f, 19.59f), 55f),   // keep wall 1 runs through the west stair's core (KeepWall1 / Core16)
+            ("Cap_HM_J02", new Vector3(38.88f, 3.86f, 10.84f), new Vector3(32.89f, -1.79f, 11.17f), 55f),   // NorthEastStub flight LK0185 foot: 0.9 m drop in front of the bottom tread
+            ("Cap_HM_J03", new Vector3(-0.55f, 3.38f, -52.13f), new Vector3(-0.30f, -5.12f, -46.14f), 55f),   // Market Street flight LK0143 foot: 0.8 m drop in front of the bottom tread
+            ("Cap_HM_J04", new Vector3(-22.98f, 6.68f, -43.56f), new Vector3(-22.58f, -3.20f, -37.57f), 55f),   // retaining walls LK0882/LK0799 cross at 60 degrees and overshoot
+            ("Cap_HM_J05", new Vector3(-36.02f, 3.35f, -35.69f), new Vector3(-31.00f, -4.50f, -32.41f), 55f),   // retaining walls LK0816/LK0787 cross at 66 degrees
+            ("Cap_HM_J06", new Vector3(-49.01f, 2.81f, 2.33f), new Vector3(-43.04f, -2.86f, 1.74f), 55f),   // RetainWallLow LK0753 through garden wall LK0486 beside the West Stub
+            ("Cap_HM_J07", new Vector3(18.68f, 4.20f, -42.74f), new Vector3(18.38f, -4.47f, -36.75f), 55f),   // retaining walls LK0930/LK0676 cross at 87 degrees (T becomes a cross)
+            ("Cap_HM_J08", new Vector3(-20.50f, 4.61f, -60.67f), new Vector3(-15.51f, -4.48f, -64.00f), 55f),   // town wall module M025 embedded 2.6 m in the Lower Gate shell (Ruined)
+            ("Cap_HM_J09", new Vector3(13.50f, 3.80f, 15.50f), new Vector3(19.70f, 2.50f, 19.68f), 55f),   // keep wall end 5 against the east stair core 15
+            ("Cap_HM_J10", new Vector3(-38.50f, 3.20f, -24.50f), new Vector3(-43.80f, -4.00f, -28.10f), 55f),   // retaining wall LK0797 into the Ring Lane SW flight's first treads
+            ("Cap_HM_OverviewW", new Vector3(-110f, 45f, -20f), new Vector3(-30f, -3f, -20f), 48f),   // high oblique over the west lane and wall ring
+            ("Cap_HM_OverviewE", new Vector3(100f, 45f, 35f), new Vector3(20f, -3f, -15f), 48f),     // high oblique over the east lane and wall ring and the keep terrace
         };
+
+        // Cameras whose Pos is an absolute world position (not ground + eye height).
+        static readonly HashSet<string> AbsolutePosCameras = new HashSet<string> { "Cap_HM_Overview", "Cap_HM_OverviewW", "Cap_HM_OverviewE", "Cap_HM_TerraceDown", "Cap_HM_TerraceUp" };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]
         public static void BuildMenu()
@@ -178,9 +196,9 @@ namespace SleepingCalamity.EditorTools
             foreach (var c in BeautyCornerTable.Cameras) LookTestBuilder.AddCapture(cams, c.Name, c.Pos, c.Target, c.Fov);
             foreach (var c in Cameras)
             {
-                Vector3 pos = c.Name == "Cap_HM_Overview" ? c.Pos : new Vector3(c.Pos.x, Mathf.Max(HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z), HollowmereLayout.WaterY) + c.Pos.y, c.Pos.z);   // never under the lake
+                Vector3 pos = AbsolutePosCameras.Contains(c.Name) ? c.Pos : new Vector3(c.Pos.x, Mathf.Max(HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z), HollowmereLayout.WaterY) + c.Pos.y, c.Pos.z);   // never under the lake
                 Camera cam = LookTestBuilder.AddCapture(cams, c.Name, pos, c.Target, c.Fov);
-                cam.farClipPlane = c.Name == "Cap_HM_Overview" ? 400f : HollowmereRoad.FarClip;   // Q15: the low cameras see the backdrop ridges
+                cam.farClipPlane = c.Name.StartsWith("Cap_HM_Overview") ? 400f : HollowmereRoad.FarClip;   // Q15: the low cameras see the backdrop ridges
             }
 
             foreach (var c in HollowmereRoad.Cameras)   // Q15: from the gate looking out, from the road looking back (Target absolute)
@@ -852,8 +870,14 @@ namespace SleepingCalamity.EditorTools
             PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             foreach (Transform c in go.transform.Cast<Transform>().ToList())
             {
-                if (c.name != keep) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }
-                c.GetComponent<MeshRenderer>().sharedMaterial = m;
+                if (!c.name.StartsWith(keep)) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }   // the LOD import names the state node "<State>.001" (children <State>_LOD0..2), not "<State>"
+                foreach (MeshRenderer r in c.GetComponentsInChildren<MeshRenderer>(true)) r.sharedMaterial = m;   // <State>_LOD0..2 children under the state's LODGroup node
+            }
+            foreach (LODGroup lg in go.GetComponentsInChildren<LODGroup>(true))   // the other state's renderers are gone: drop them from the LOD rows so the group keeps only live ones
+            {
+                LOD[] lods = lg.GetLODs();
+                for (int i = 0; i < lods.Length; i++) lods[i].renderers = (lods[i].renderers ?? new Renderer[0]).Where(r => r != null).ToArray();
+                lg.SetLODs(lods);
             }
             var col = go.AddComponent<BoxCollider>();   // counter and frame (B8 header); the awning overhang has none
             col.center = new Vector3(0f, 0.8f, 0f); col.size = new Vector3(2.7f, 1.6f, 1.6f);

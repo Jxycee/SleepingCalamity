@@ -16,6 +16,7 @@ the source scans live outside git in `C:\Dev\_private\textures_src\` (fetched wi
 | meadow_grass | [Grass004](https://ambientcg.com/view?id=Grass004) | CC0 1.0 | ambientCG (Lennart Demes) | 2026-10-31 | #6a7a3a | #67763e | 0.35 / 0.45 / 0.56 | 1.16 / 1.19 / 1.11 | hue_keep 0.45, delight 0.75, contrast 1.15, chroma 0.92, rough x0.35+0.62, normal x0.90 |
 | packed_soil | [brown_mud_dry](https://polyhaven.com/a/brown_mud_dry) | CC0 1.0 | Rob Tuytel | 2026-10-31 | #7a634b | #725d47 | 0.32 / 0.43 / 0.56 | 1.17 / 1.15 / 1.32 | hue_keep 0.45, delight 0.75, contrast 1.10, chroma 0.95, rough x0.60+0.38, normal x1.00 |
 | worn_path | [grass_path_2](https://polyhaven.com/a/grass_path_2) | CC0 1.0 | Rob Tuytel | 2026-10-31 | #8c7d63 | #897a60 | 0.41 / 0.53 / 0.64 | 1.24 / 1.14 / 1.18 | hue_keep 0.65, delight 0.75, contrast 1.10, chroma 1.00, rough x0.70+0.25, normal x1.00 |
+| step_stone | [worn_rock_natural_01](https://polyhaven.com/a/worn_rock_natural_01) | CC0 1.0 | Rob Tuytel, Dimitrios Savva | 2026-11-03 | #a99a80 | #a79982 | 0.60 / 0.65 / 0.70 | 1.04 / 1.15 / 1.02 | hue_keep 0.50, delight 0.80, contrast 0.95, chroma 0.90, rough x0.80+0.15, normal x0.80 |
 
 Used for:
 
@@ -30,3 +31,4 @@ Used for:
 - **meadow_grass**: HollowmereTerrain open ground: short meadow turf, yellow-green a step darker and drier than the foliage #6f8a34 (blades shade each other), with sunlit and darker clumps at 20-60 cm
 - **packed_soil**: HollowmereTerrain steep banks, the ditch, the lake shore and bare lots: dry packed earth with small clods, warm mid brown
 - **worn_path**: HollowmereTerrain lane edges and trodden ground by doorsteps: worn earth and grit with grass tufts surviving in it (the grass-soil blend)
+- **step_stone**: lane step slabs: worn jointless sandstone/limestone, fine grain and no block joints or strata, a touch greyer than sandstone (#a99a80)

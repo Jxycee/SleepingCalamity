@@ -303,7 +303,12 @@ namespace SleepingCalamity.EditorTools
                     if (!Allowed(p.x, p.z) || ground(p.x, p.z) > up + 1.2f) continue;
                     int k = rng.Next(1, 3);   // B or C on the lip; the big A stays in the pools
                     float sc = R(0.85f, 1.1f), rise = R(0.2f, 0.5f);
-                    Put(BoulderKinds[k], g, new Vector3(p.x, up + rise - BoulderHeight[k] * sc, p.z), R(0f, 360f), sc);
+                    // Seat on the real terrain (0.15 m in), growing the rock if the bed is lower than the lip so the top still reaches it.
+                    float gy = ground(p.x, p.z);
+                    float need = (up + rise - gy + 0.15f) / BoulderHeight[k];
+                    if (need > 1.5f) continue;
+                    sc = Mathf.Max(sc, need);
+                    Put(BoulderKinds[k], g, new Vector3(p.x, gy - 0.15f, p.z), R(0f, 360f), sc);
                     placed.Add(new Vector2(p.x, p.z));
                 }
             }

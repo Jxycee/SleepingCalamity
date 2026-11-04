@@ -38,8 +38,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(GoldenCount, Rows.Count, "row count (hash " + LaneKitPlan.Hash(sig) + ")");
             Assert.AreEqual(GoldenHash, LaneKitPlan.Hash(sig), "signature hash");
         }
-        const int GoldenCount = 1090;   // traversal-5: R2_23 moved up the Lower Lane (s 10 -> 5), so the lane plan beside it changes (was 1098, A10: no gutter bars beside a stair flight; was 1201)
-        const uint GoldenHash = 3206696715u;
+        const int GoldenCount = 1087;   // junction fixes 2026-11-03: walls cut at crossing walls and flights, flights aligned (was 1090); traversal-5: R2_23 moved up the Lower Lane (s 10 -> 5), so the lane plan beside it changes (was 1098, A10: no gutter bars beside a stair flight; was 1201)
+        const uint GoldenHash = 2080523462u;
 
         [Test]
         public void BothPresetsArePopulated_WithEveryFamily()
@@ -127,6 +127,64 @@ namespace SleepingCalamity.Tests.EditMode
             {
                 if (r.Lane.StartsWith("Terrace") || r.Lane.StartsWith("Lot:")) continue;
                 Assert.Contains(r.Lane, LaneKitPlan.InScope, r.Id);
+            }
+        }
+
+        // ---- junction invariants (Hollowmere junction survey 2026-11-03)
+        static bool Shares(LaneKitRow a, LaneKitRow b) => a.Preset == LanePreset.Both || b.Preset == LanePreset.Both || a.Preset == b.Preset;
+        static float WallBottom(LaneKitRow r) => Math.Max(r.Y - 1f, Ground(r));
+        static float WallTopY(LaneKitRow r) => r.Y + LaneKitPlan.WallTop(r.Piece);
+        static float AxisAngle(float a, float b) { float d = Math.Abs(a - b) % 180f; return d > 90f ? 180f - d : d; }
+
+        [Test]
+        public void NoWallRunsOverAFlight()
+        {
+            var steps = Rows.Where(r => r.Piece == LanePiece.LaneStep).ToList();
+            foreach (LaneKitRow w in Rows.Where(r => r.IsWall))
+                foreach (LaneKitRow st in steps)
+                {
+                    if (Math.Abs(st.X - w.X) > w.ScaleX + st.ScaleX + 3f || Math.Abs(st.Z - w.Z) > w.ScaleX + st.ScaleX + 3f) continue;
+                    double sb = st.Yaw * Math.PI / 180.0; float zc = LaneKitPlan.StepRun * 0.5f;
+                    if (!LaneKitPlan.ChordThrough(w, st.ScaleX + LaneKitPlan.FlightMargin, zc + LaneKitPlan.FlightMargin, (float)(st.X + Math.Sin(sb) * zc), (float)(st.Z + Math.Cos(sb) * zc), st.Yaw, out float t0, out float t1)) continue;
+                    float len = Math.Min(t1, w.ScaleX) - Math.Max(t0, -w.ScaleX);
+                    Assert.That(len, Is.LessThanOrEqualTo(0.05f), w.Id + " runs over the flight tread " + st.Id);
+                }
+        }
+
+        [Test]
+        public void NoWallPassesThroughOrPokesOutOfAnotherWall()
+        {
+            var walls = Rows.Where(r => r.IsWall).ToList();
+            foreach (LaneKitRow w in walls)
+                foreach (LaneKitRow o in walls)
+                {
+                    if (ReferenceEquals(w, o) || !Shares(w, o) || AxisAngle(w.Yaw, o.Yaw) < LaneKitPlan.WallCrossMinAngle) continue;
+                    if (Math.Min(WallTopY(w), WallTopY(o)) - Math.Max(WallBottom(w), WallBottom(o)) < 0.4f) continue;
+                    if (!LaneKitPlan.ChordThrough(w, o.ScaleX, LaneKitPlan.WallThickness(o.Piece), o.X, o.Z, o.Yaw, out float t0, out float t1)) continue;
+                    if (t0 <= -w.ScaleX || t1 >= w.ScaleX) continue;   // an end inside the other wall: embedded, not through
+                    float stubA = t0 + w.ScaleX, stubB = w.ScaleX - t1, ms = Math.Min(stubA, stubB), Ms = Math.Max(stubA, stubB);
+                    Assert.That(ms > 0.4f || (ms > 0.05f && Ms > 0.4f), Is.False, w.Id + " passes through " + o.Id + " (stubs " + stubA + ", " + stubB + ")");
+                }
+        }
+
+        [Test]
+        public void ConsecutiveFlightsOfOneLaneShareAnAxis()
+        {
+            // flights = runs of LaneStep rows with one yaw on one lane
+            var flights = new List<List<LaneKitRow>>();
+            foreach (LaneKitRow r in Rows.Where(x => x.Piece == LanePiece.LaneStep))
+            {
+                var last = flights.Count > 0 ? flights[flights.Count - 1] : null;
+                if (last != null && last[0].Lane == r.Lane && Math.Abs(last[0].Yaw - r.Yaw) < 0.01f) last.Add(r); else flights.Add(new List<LaneKitRow> { r });
+            }
+            Assert.That(flights.Count, Is.GreaterThan(5));
+            for (int i = 0; i + 1 < flights.Count; i++)
+            {
+                if (flights[i][0].Lane != flights[i + 1][0].Lane) continue;
+                float gap = float.MaxValue;
+                foreach (LaneKitRow p in flights[i]) foreach (LaneKitRow q in flights[i + 1]) gap = Math.Min(gap, TownPoint.Distance(P(p), P(q)));
+                if (gap > LaneKitPlan.FlightJoinGap) continue;
+                Assert.That(AxisAngle(flights[i][0].Yaw, flights[i + 1][0].Yaw), Is.LessThanOrEqualTo(LaneKitPlan.FlightMaxKink), flights[i][0].Id + " / " + flights[i + 1][0].Id + " meet at a kink");
             }
         }
     }

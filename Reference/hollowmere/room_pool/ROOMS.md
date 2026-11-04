@@ -6,15 +6,15 @@ Legend: `.` floor, `#` solid, `P` pillar, `D` door, `L` locked door, `s` tier-1 
 
 | id | kind | theme | size | silhouette | doors | sockets | spawns | chests | lock / key |
 |---|---|---|---|---|---|---|---|---|---|
-| larder_pantry | Combat | Larder | 2x3 | closet | 2 | 1 | 2 | 1 | - |
-| larder_cold_store | Combat | Larder | 3x4 | box | 2 | 4 | 2 | 1 | locked door |
+| larder_pantry | Combat | Larder | 3x5 | closet | 2 | 1 | 2 | 1 | - |
+| larder_cold_store | Combat | Larder | 3x5 | box | 2 | 4 | 2 | 1 | locked door |
 | larder_hanging_hall | Combat | Larder | 4x4 | pillared-hall | 2 | 4 | 3 | 2 | - |
 | larder_smoke_gallery | Combat | Larder | 5x3 | gallery | 2 | 4 | 3 | 2 | key chest |
-| wine_cask_row | Combat | WineVault | 4x3 | box | 2 | 6 | 3 | 1 | locked door |
+| wine_cask_row | Combat | WineVault | 5x3 | box | 2 | 6 | 3 | 1 | locked door |
 | wine_vault_l | Combat | WineVault | 4x4 | L-shape | 2 | 4 | 3 | 2 | key chest |
 | wine_press_hall | Combat | WineVault | 5x4 | cross | 3 | 6 | 2 | 2 | key chest |
 | wine_aisles | Combat | WineVault | 4x5 | aisles | 3 | 5 | 3 | 2 | - |
-| coal_bunker | Combat | CoalCellar | 3x3 | box | 2 | 4 | 2 | 1 | locked door |
+| coal_bunker | Combat | CoalCellar | 3x5 | box | 2 | 4 | 2 | 1 | locked door |
 | coal_furnace_ring | Combat | CoalCellar | 4x4 | ring | 2 | 5 | 3 | 2 | key chest |
 | coal_stoke_chicane | Combat | CoalCellar | 2x5 | chicane | 2 | 2 | 3 | 1 | - |
 | coal_boiler_hall | Combat | CoalCellar | 5x4 | stepped | 3 | 5 | 2 | 2 | - |

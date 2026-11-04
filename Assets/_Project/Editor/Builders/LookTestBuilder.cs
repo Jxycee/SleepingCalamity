@@ -137,7 +137,7 @@ namespace SleepingCalamity.EditorTools
         static readonly MatSpec[] Specs =
         {
             new MatSpec("plaster", "B1_town", "plaster"), new MatSpec("oak_timber", "B1_town", "oak_timber"), new MatSpec("cobble", "B1_town", "cobble"),
-            new MatSpec("sandstone", "B1_town", "sandstone"), new MatSpec("roof_tile", "B1_town", "roof_tile"), new MatSpec("painted_wood", "B1_town", "painted_wood"),
+            new MatSpec("sandstone", "B1_town", "sandstone"), new MatSpec("step_stone", "B1_town", "step_stone"), new MatSpec("roof_tile", "B1_town", "roof_tile"), new MatSpec("painted_wood", "B1_town", "painted_wood"),
             new MatSpec("canvas", "B1_town", "canvas"), new MatSpec("iron", "B1_town", "iron"),
             new MatSpec("old_brick", "B2_cellar", "old_brick"), new MatSpec("vault_stone", "B2_cellar", "vault_stone"), new MatSpec("limewash", "B2_cellar", "limewash"),
             new MatSpec("flagstone", "B2_cellar", "flagstone"), new MatSpec("barrel_oak", "B2_cellar", "barrel_oak"), new MatSpec("soot_coal", "B2_cellar", "soot_coal"),

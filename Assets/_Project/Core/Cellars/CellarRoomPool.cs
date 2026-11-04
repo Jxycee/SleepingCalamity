@@ -1,5 +1,5 @@
 // Core/Cellars/CellarRoomPool.cs: the Phase 1 room pool of the Undercroft Cellars (PHASE1 7.2), authored as ASCII rows (legend in CellarRoom.cs).
-// 12 combat rooms (4 per sub-theme, 2x3 to 5x4 cells, ten different silhouettes), 1 entry, 1 stair-exit, 1 checkpoint and the 6 corridor pieces.
+// 12 combat rooms (4 per sub-theme, 2x5 to 5x4 cells, ten different silhouettes; all but the stoke chicane fit a full party, see CellarRoomsV2.SmallParty), 1 entry, 1 stair-exit, 1 checkpoint and the 6 corridor pieces.
 // Row 0 is north. Authority: none (static data; the host builds a floor from a seed and clients rebuild the same one).
 //
 // Why four combat rooms per theme: a floor has 4-6 rooms and about 70% of them come from its own theme, so 3 of 4 (or 4 of 6) own-theme rooms; four own
@@ -76,16 +76,19 @@ namespace SleepingCalamity.Core
             {
                 // ---- floor 1: larders ----
                 Combat("larder_pantry", "Pantry closet", L, "closet", new[] {
-                    "sC",
-                    "DD",
-                    ".s" },
-                    Sk(Barrel, 0, 2, N)),
+                    ".C.",
+                    "s.s",
+                    "D.D",
+                    "...",
+                    "..." },
+                    Sk(Shelf, 0, 0, S), Sk(Shelf, 2, 0, S), Sk(Shelf, 0, 4, N), Sk(Barrel, 2, 4, N)),
                 Combat("larder_cold_store", "Cold store", L, "box", new[] {   // lockable: the south door
                     ".D.",
                     "s..",
                     "C.s",
+                    "...",
                     ".L." },
-                    Sk(Shelf, 0, 0, S), Sk(Shelf, 2, 0, S), Sk(Barrel, 0, 3, N), Sk(Crate, 2, 3, N).Alt((2, 1))),
+                    Sk(Shelf, 0, 0, S), Sk(Shelf, 2, 0, S), Sk(Barrel, 0, 4, N), Sk(Crate, 2, 4, N).Alt((2, 1))),
                 Combat("larder_hanging_hall", "Hanging hall", L, "pillared-hall", new[] {
                     "..DC",
                     ".P.s",
@@ -100,12 +103,12 @@ namespace SleepingCalamity.Core
 
                 // ---- floor 2: wine vaults ----
                 Combat("wine_cask_row", "Cask row", WV, "box", new[] {   // lockable: the north door
-                    "CL..",
-                    ".s.s",
-                    "..DS" },
-                    Sk(Rack, 2, 0, S), Sk(Rack, 3, 0, S), Sk(Barrel, 0, 1, N), Sk(Barrel, 2, 1, N), Sk(Barrel, 0, 2, N), Sk(Lantern, 1, 2, N)),
+                    "CL...",
+                    ".s.s.",
+                    "..DS." },
+                    Sk(Rack, 2, 0, S), Sk(Rack, 3, 0, S), Sk(Rack, 4, 0, S), Sk(Barrel, 0, 1, N), Sk(Barrel, 2, 1, N), Sk(Barrel, 0, 2, N), Sk(Lantern, 1, 2, N)),
                 Combat("wine_vault_l", "L vault", WV, "L-shape", new[] {   // key chest
-                    "..##",
+                    "...#",
                     "D.##",
                     "s.sD",
                     "SCK." },
@@ -128,12 +131,14 @@ namespace SleepingCalamity.Core
                 Combat("coal_bunker", "Coal bunker", CC, "box", new[] {   // lockable: the north door
                     ".L.",
                     "D.s",
-                    "SC." },
-                    Sk(Chute, 0, 0, S), Sk(Chute, 2, 0, S), Sk(Crate, 1, 1, N), Sk(Lantern, 2, 2, N)),
+                    "SC.",
+                    "...",
+                    "..." },
+                    Sk(Chute, 0, 0, S), Sk(Chute, 2, 0, S), Sk(Crate, 1, 1, N), Sk(Lantern, 2, 4, N)),
                 Combat("coal_furnace_ring", "Furnace ring", CC, "ring", new[] {   // key chest
                     "..D.",
                     ".##s",
-                    "s##.",
+                    "s#..",
                     "CDKS" },
                     Sk(Chute, 0, 0, S), Sk(Chute, 1, 0, S), Sk(Lantern, 3, 0, S), Sk(Lantern, 0, 1, E), Sk(Crate, 3, 2, N)),
                 Combat("coal_stoke_chicane", "Stoke chicane", CC, "chicane", new[] {

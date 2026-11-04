@@ -12,7 +12,7 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public class CellarFloorGeneratorTests
     {
-        const ulong GoldenSeed12345Floor1 = 2055763217958189686UL;   // deliberately re-pinned by procgen item 2 (layout presets + far-dead-end exit moved the seed-12345 layouts); any change to the algorithm changes it on purpose
+        const ulong GoldenSeed12345Floor1 = 932123446153315579UL;   // re-pinned by rooms-v2 (pool resize); was 2055763217958189686; earlier: deliberately re-pinned by procgen item 2 (layout presets + far-dead-end exit moved the seed-12345 layouts); any change to the algorithm changes it on purpose
 
         [Test]
         public void SameSeedAndFloor_GiveIdenticalLayout()
@@ -34,7 +34,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(GoldenSeed12345Floor1, l.LayoutHash(), "golden changed; actual = " + l.LayoutHash() + "UL\n" + l.ToAscii());
         }
 
-        const ulong GoldenSeed12345Floor2 = 1402270470201830695UL, GoldenSeed12345Floor3 = 11057337751887225001UL;   // computed once from the first run (floors 2 and 3 pin PickRooms' exclusion chain too)
+        const ulong GoldenSeed12345Floor2 = 5927757008498482560UL, GoldenSeed12345Floor3 = 10153009738242674868UL;   // re-pinned by rooms-v2 (pool resize); were 1402270470201830695 and 11057337751887225001;    // computed once from the first run (floors 2 and 3 pin PickRooms' exclusion chain too)
 
         [Test]
         public void Golden_Seed12345_Floors2And3()
