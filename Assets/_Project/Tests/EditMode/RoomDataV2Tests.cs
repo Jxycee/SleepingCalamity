@@ -91,7 +91,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(hand.Affordances & RoomAffordance.OpenFloor, Is.EqualTo(RoomAffordance.None), "the only 3x3 window holds a ledge and water");
             Assert.That(RoomDataV2.FromV1(Grid3()).Affordances & RoomAffordance.OpenFloor, Is.EqualTo(RoomAffordance.OpenFloor));
             Assert.That(RoomDataV2.FromV1(CellarRoomPool.Find("wine_press_hall")).Affordances & RoomAffordance.FullParty, Is.EqualTo(RoomAffordance.FullParty));
-            Assert.That(RoomDataV2.FromV1(CellarRoomPool.Find("larder_pantry")).Affordances & RoomAffordance.FullParty, Is.EqualTo(RoomAffordance.None));
+            Assert.That(RoomDataV2.FromV1(CellarRoomPool.Find("coal_stoke_chicane")).Affordances & RoomAffordance.FullParty, Is.EqualTo(RoomAffordance.None));
         }
 
         [Test] public void ToolVerbs_AreFrozen() =>

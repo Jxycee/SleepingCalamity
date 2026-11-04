@@ -184,8 +184,8 @@ namespace SleepingCalamity.Tests.EditMode
                 foreach (PlacedVignette v in CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(12345, f)).Vignettes) { h.Append(v.Vignette.Id); h.AppendInt32LE(v.RoomIndex); h.AppendInt32LE(v.Cell.X); h.AppendInt32LE(v.Cell.Y); h.AppendInt32LE(v.Turns); }
                 got[f] = h.Value;
             }
-            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // pinned by procgen 5 (vignettes), deliberate
-            Assert.AreEqual(14161550240035867889UL, got[1], "floor 1; actual " + all); Assert.AreEqual(14647063182628428874UL, got[2], "floor 2; actual " + all); Assert.AreEqual(9456521171575356991UL, got[3], "floor 3; actual " + all);
+            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // pinned by procgen 5 (vignettes), deliberate; re-pinned by rooms-v2 (pool resize)
+            Assert.AreEqual(14852248434877188158UL, got[1], "floor 1; actual " + all); Assert.AreEqual(6689960279117355483UL, got[2], "floor 2; actual " + all); Assert.AreEqual(6130115571227783347UL, got[3], "floor 3; actual " + all);
         }
     }
 }
