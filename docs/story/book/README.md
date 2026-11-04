@@ -7,7 +7,7 @@ Draft for the user's sign-off, to be read like a novel and annotated. Not canon 
 2. [The Tally](02-the-tally.md): floors 4-10, the Brazen Ox, the feast tally, the Bell-Warden (done)
 3. [Short Weight](03-short-weight.md): Saltwake, the Drowned Arcade, Pip (done)
 4. [The Old Seam](04-the-old-seam.md): Cinderholt, the Glow Seams, Jory, Wynn (done)
-5. Thistledown, the Hive Choir (planned)
+5. [Held in the Hand](05-held-in-the-hand.md): Thistledown, the Hive Choir, Isolde, Lisle, Vane in the orchard (done)
 6. Stillhollow, the Orrery (planned)
 7. The Hearth, the Hearthdeep and the end (planned)
 
@@ -22,3 +22,9 @@ Draft for the user's sign-off, to be read like a novel and annotated. Not canon 
 - Ch4: Ash learns he is Elder Vane's great-grandson here, through the Old Seam's ward word "Bettany" (Vane's daughter, Hester's mother, died PY 40, before Ash was born). He doesn't learn that Vane is alive or is the steward; the orchard scene (B10) keeps both.
 - Ch4: the first floor-8 visit ends in a failed dive on floor 9, so the trade falls between dives. Jory, Dagny and the Engine come in one later dive, so the steward speaks before Tobin's punch (Part B had it after).
 - Ch4: Jory's warm rock is the scree fissure (he covered it with a cairn), not a spot in the founders' tunnels. Cinderholt's furnaces survive the wipe because they're cut into the cliff. People-left line is pit checks. Dagny's end-of-shift whistle is new. Ebben's engine rises home with him.
+- Ch5: Wren's staff forms 1-2 (*Plumb Line*, Isolde laying out Thistledown's orchard; *The Collar*) fired off-page on the Arcade's floor 9 and the Glow Seams' floor 7, and Wren hid them. *The Vote* (Hive floor 7) is how she first sees her mother's hand go up; the last memory matches ch1 1.4 exactly; True North on floor 8.
+- Ch5: the script's cost: every written mark takes warmth from the writing hand, and a big one turns it to stone. Isolde's right forefinger greyed a little with each working (the step, the collar, the staff's foot) and the church ward took it to the second knuckle; Wren's goes grey to the first knuckle freeing Tobin on floor 10.
+- Ch5: Isolde studied the old tally pages in Thistledown's abbey scriptorium every spring for eleven years, which is why the dream sets her there. Her page lists the conspirators by initials (O.O., H.M., J.C., I.H.) with their children, the vote "carried five to two", and a script line burned off after "whoever stands at the table unbound". The clause stays unread until the Orrery dome.
+- Ch5: the orchard reveal builds on ch4. Vane is alive, the signer and the steward, and his voice is the one from beside the pit. He tells Ash the ward word was on the parish roll and that Amos or Odile would have given it free. The "bait" turn: the hook is the page Wren carries home.
+- Ch5: Lisle served "for everyone at the table" and asked nothing for himself (reconciles Part A 4.3 with Part B). The Queen is Mother Bounty, the abbey's gilt procession figure. The choir novices are adults and come home; children stay at the table. The people-left line is a capped comb frame (one bee out per rescue). Hep Lowe's grandson Dickon is at the table.
+- Ch5: seeds of Isolde and Hob, with neither Tobin nor Wren able to read them: Hep's "big fellow" who carried the ledger-keeper's books, Isolde's "He would", and the desk Hob builds unasked.
