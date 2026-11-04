@@ -2,7 +2,7 @@
 // Per-player loot plan (task 3, spec 4.4): a bakery piece (id + origin floor 1-3) is safe the moment it is picked up (AddPiece banks it at once) and a failed dive keeps
 // every collected piece, so pieces never return to a floor and never feed the stir meter. The piece set stays shared; keys, pieces and people are one copy per party.
 // The legacy chest-loot members (AddLoot, unbanked/banked counts, Bank, FailDive dropping unbanked loot) stay ONLY so old saves (stock.loot, dive.bankedLoot) restore;
-// chest loot still reaches them through DiveHaulSync.ServerAddLoot until plan 2 task 6 moves chests to the per-player bags; plan 3 deletes them together with this class's loot path. The host owns the instance; peers only see a summary
+// no new loot reaches them (chests fill the per-player bags, plan 2 task 6); plan 3 deletes them together with this class's loot path. The host owns the instance; peers only see a summary
 // (Presentation/Cellars/DiveHaulSync).
 using System.Collections.Generic;
 

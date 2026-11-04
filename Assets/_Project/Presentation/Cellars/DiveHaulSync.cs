@@ -7,7 +7,9 @@
 // own view of their bag is the owner-only PlayerBagSync on the player prefab (plan 2 task 5). Keys, pieces and people stay one shared copy: a piece is safe on pickup
 // (PieceAdded -> the dive director moves it into the town stock at once) and never enters a bag. A client asks to pick items into bank slots by RPC (PlayerBagSync);
 // ServerPick / ServerUnpick re-check everything (the asker is up, the floor has a bank, the asker stands in range of it) and the bag re-checks capacity and item kinds.
-// Entering a floor with a bank point opens a bank visit for every connected client's bag; the party bank action (ServerBank) pushes every open visit on.
+// Entering a floor with a bank point opens a bank visit for every connected client's bag; the party bank action (ServerBank) pushes every open visit on. Leaving for a floor with no bank
+// point cancels every open visit. A client who joined after the floor was entered gets a visit when it first picks (or when the party banks), while the floor's bank point is unused.
+// A client the roster has no key for (an RPC in flight from one that just disconnected) has no bag: ServerBagOf, ServerAddItem, ServerAddGold, ServerPick and ServerUnpick refuse it.
 // A client banks by asking: RequestBankRpc (SendTo.Server) -> ServerTryBankFor(sender), which the host validates before banking:
 //   1. the dive's current floor has a bank point (floor 2 checkpoint or floor 4 heart; DiveState.FloorHasBank);
 //   2. when the sender has a player object and the built floor's bank cell is known, the player is within BankRadius metres (XZ) of the bank cell centre
@@ -168,13 +170,13 @@ namespace SleepingCalamity.Presentation
         public bool ServerBegin(int[] piecesPerFloor, StirTuning tuning)
         {
             if (!IsServer || !IsSpawned || piecesPerFloor == null) return false;
-            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
+            _state = new DiveState(new DiveHaul(piecesPerFloor), tuning); _heal = null; _visitExtraOwner = -1; if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
         // Host only: runs with a dive state rebuilt from the world save (banked haul, pieces already home, cleared floors; TownStock.Restore) instead of a fresh one.
         public bool ServerAdopt(DiveState restored)
         {
             if (!IsServer || !IsSpawned || restored == null) return false;
-            _state = restored; _heal = null; Publish(); return true;
+            _state = restored; _heal = null; _visitExtraOwner = -1; Publish(); return true;
         }
         // A piece is safe the moment it is picked up: PieceAdded (host) lets the dive director move it into the town stock at once.
         public bool ServerAddPiece(int pieceId)
@@ -192,7 +194,11 @@ namespace SleepingCalamity.Presentation
             if (!Host) return false;
             int before = _state.CurrentFloor;
             if (!_state.SetFloor(floor)) return false;
-            if (floor != before && DiveState.FloorHasBank(floor)) OpenBankVisits();
+            if (floor != before)
+            {
+                if (DiveState.FloorHasBank(floor)) OpenBankVisits();
+                else { _state.Bags.CancelBankVisits(); _visitExtraOwner = -1; }   // the party left the bank floor: no visit may stay open (BagView.BankOpen must not lie)
+            }
             Publish();
             return true;
         }
@@ -210,26 +216,25 @@ namespace SleepingCalamity.Presentation
             return Identity;
         }
 
-        // The bag key of a client: the same rule as CombatHost.PlayerIdOf (the roster's PlayerKey string, else the client id), so a rejoin gets the same bag back.
+        // The bag key of a client, so a rejoin gets the same bag back: the roster's PlayerKey string (CombatHost.PlayerIdOf's rule). With NO roster (tests) the client id string.
+        // With a roster that has no key for the client, null: an RPC in flight from a client that just disconnected must not make a throwaway bag. The host's own client is the one
+        // exception (it never drops mid-session, and a solo dive must always have its bag): it falls back to the client id like the no-roster case.
         public string PlayerIdOf(ulong clientId)
         {
             IJoinContextProvider id = ResolveIdentity();
-            return id != null && id.TryGetKey(clientId, out PlayerKey key) ? key.ToString() : clientId.ToString();
+            if (id == null) return clientId.ToString();
+            if (id.TryGetKey(clientId, out PlayerKey key)) return key.ToString();
+            return NetworkManager != null && clientId == NetworkManager.LocalClientId ? clientId.ToString() : null;
         }
 
         private readonly System.Collections.Generic.Dictionary<ulong, int> _seenOrder = new System.Collections.Generic.Dictionary<ulong, int>();   // no roster: client id -> order first seen
-        private readonly System.Collections.Generic.List<RosterEntry> _rosterScratch = new System.Collections.Generic.List<RosterEntry>();
 
         // 0-3, used for the chest roll stream and the 3-player extra slot. The roster slot (stable across a rejoin); with no roster, the order the host first saw each client id
         // (the host first, so 0), clamped to 3 because RollFor throws above it (tests with more than four ids share slot 3).
         public int PlayerSlotOf(ulong clientId)
         {
             IJoinContextProvider id = ResolveIdentity();
-            if (id != null && id.TryGetKey(clientId, out PlayerKey key))
-            {
-                id.GetRoster(_rosterScratch);
-                for (int i = 0; i < _rosterScratch.Count; i++) if (_rosterScratch[i].Key == key) return Mathf.Clamp(_rosterScratch[i].Slot, 0, 3);
-            }
+            if (id != null && id.TryGetSlot(clientId, out byte rosterSlot)) return Mathf.Clamp(rosterSlot, 0, 3);
             if (!_seenOrder.TryGetValue(clientId, out int order))
             {
                 if (NetworkManager != null && clientId == NetworkManager.LocalClientId) order = 0;
@@ -239,11 +244,13 @@ namespace SleepingCalamity.Presentation
             return Mathf.Clamp(order, 0, 3);
         }
 
-        // The client's bag (created on first use); null off the host.
-        public PlayerBag ServerBagOf(ulong clientId) => Host ? _state.Bags.For(PlayerIdOf(clientId)) : null;
-
-        // The client's bag only if it already exists (never creates one; PlayerBagSync polls this every frame); null off the host.
-        public PlayerBag ServerBagIfAny(ulong clientId) => Host && _state.Bags.TryGet(PlayerIdOf(clientId), out PlayerBag bag) ? bag : null;
+        // The client's bag (created on first use); null off the host, and null for a client the roster has no key for (PlayerIdOf).
+        public PlayerBag ServerBagOf(ulong clientId)
+        {
+            if (!Host) return null;
+            string id = PlayerIdOf(clientId);
+            return id == null ? null : _state.Bags.For(id);
+        }
 
         public bool ServerAddItem(ulong clientId, int itemId)
         {
@@ -272,16 +279,21 @@ namespace SleepingCalamity.Presentation
         public bool ServerPick(ulong clientId, int carriedIndexOrSatchel)
         {
             if (!BankAskerOk(clientId)) return false;
-            return ServerBagOf(clientId).Pick(carriedIndexOrSatchel);
+            EnsureVisit(clientId);
+            PlayerBag bag = ServerBagOf(clientId);
+            return bag != null && bag.Pick(carriedIndexOrSatchel);
         }
 
         public bool ServerUnpick(ulong clientId, int carriedIndexOrSatchel)
         {
             if (!BankAskerOk(clientId)) return false;
-            return ServerBagOf(clientId).Unpick(carriedIndexOrSatchel);
+            EnsureVisit(clientId);
+            PlayerBag bag = ServerBagOf(clientId);
+            return bag != null && bag.Unpick(carriedIndexOrSatchel);
         }
 
         private int _previousExtraOwner = -1;   // in memory for this host session only (saving it is plan 3)
+        private int _visitExtraOwner = -1;      // the 3-player extra slot's owner picked when this floor's visits opened (-1 = none); a late joiner's visit reuses it
 
         // Entering a bank floor: every connected client's bag gets a bank visit with BankSlots.SlotsFor capacity; the 3-player extra slot goes to a seeded pick that skips the previous owner.
         private void OpenBankVisits()
@@ -296,14 +308,34 @@ namespace SleepingCalamity.Presentation
                 extraOwner = BankSlots.PickExtraSlotOwner(DiveSeed, slots, _previousExtraOwner);
                 _previousExtraOwner = extraOwner;
             }
-            for (int i = 0; i < ids.Count; i++) ServerBagOf(ids[i]).OpenBank(BankSlots.SlotsFor(n, slots[i], extraOwner));
+            _visitExtraOwner = extraOwner;
+            for (int i = 0; i < ids.Count; i++) ServerBagOf(ids[i])?.OpenBank(BankSlots.SlotsFor(n, slots[i], extraOwner));   // null: a client the roster has no key for
+        }
+
+        // The current floor's bank point is unused and this client's bag has no visit (it joined after the floor was entered): open one now, sized for the party as it stands.
+        // Decision (plan 2 task 6): a late joiner can lift the party's total slots above BankSlots.TotalSlots (the spec is silent); the others' visits keep their size.
+        private void EnsureVisit(ulong clientId)
+        {
+            int floor = _state.CurrentFloor;
+            if (!DiveState.FloorHasBank(floor) || _state.BankUsed(floor)) return;
+            PlayerBag bag = ServerBagOf(clientId);
+            if (bag == null || bag.BankOpen) return;
+            int n = Mathf.Clamp(NetworkManager.ConnectedClientsIds.Count, 1, 4);
+            bag.OpenBank(BankSlots.SlotsFor(n, PlayerSlotOf(clientId), _visitExtraOwner));
+        }
+
+        private void EnsureVisitsForEveryone()
+        {
+            foreach (ulong id in NetworkManager.ConnectedClientsIds) EnsureVisit(id);
         }
         public bool ServerMarkCleared(int floor) { if (!Host || !_state.MarkCleared(floor)) return false; Publish(); return true; }
         public bool ServerFailDive() { if (!Host) return false; _state.FailDive(); Publish(); return true; }
         // Banks at the current floor's bank point with no position check (host logic, e.g. a scripted bank).
         public bool ServerBank()
         {
-            if (!Host || !_state.BankAtPoint()) return false;
+            if (!Host) return false;
+            EnsureVisitsForEveryone();   // a mid-floor joiner who never picked still gets the push-on (auto-fill) with the party
+            if (!_state.BankAtPoint()) return false;
             Publish();
             HealEveryone();
             Banked?.Invoke();

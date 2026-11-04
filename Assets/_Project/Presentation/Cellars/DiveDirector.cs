@@ -66,7 +66,7 @@ namespace SleepingCalamity.Presentation
         public event System.Action<DiveEndReason> DiveEnded;
         public int RequestsHandled { get; private set; }            // host: RPCs received, accepted or refused (a test waits for refusals to land)
 
-        // M6 S3, host only: the town's stock, held in memory (no save yet: S2). Created on first use from the Hollowmere layout. StockReceived(newPieces) fires when a dive end moved the banked haul in.
+        // M6 S3, host only: the town's stock, held in memory (no save yet: S2). Created on first use from the Hollowmere layout. A piece goes into the stock the moment it is picked up (HaulSync.PieceAdded); StockReceived(newPieces) fires at a dive end only for what that end moved in (pieces not stocked yet, plus the heart-bank rescue), so it is often 0 or not raised.
         public TownStock Town => _town ?? (_town = new TownStock(HollowmereLayout.Create()));
         public event System.Action<int> StockReceived;
         private TownStock _town;
