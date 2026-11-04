@@ -23,6 +23,7 @@ namespace SleepingCalamity.EditorTools
         public const string ArenaScene = "Assets/_Project/Scenes/Arena_Greybox.unity";
         public const string CombatArenaScene = "Assets/_Project/Scenes/Arena_Combat.unity";   // M3: the combat arena
         public const string DiveArenaScene = "Assets/_Project/Scenes/Arena_Dive.unity";   // M5: the Cellars dive hub
+        public const string MetricsGymScene = ScenesFolder + "/MetricsGym.unity";   // plan 4: the metrics gym (not in Build Settings)
         public const string SlimePrefab = "Assets/_Project/Prefabs/EnemySlime.prefab";       // M3: host-spawned enemies (NetworkObject)
         public const string RatPrefab = "Assets/_Project/Prefabs/EnemyRatKing.prefab";
         public const string BroomPrefab = "Assets/_Project/Prefabs/EnemyBroom.prefab";
