@@ -7,6 +7,12 @@
 // found/home counters. NOT covered: a real pickup walk (the test calls the same ServerAddPiece the pickup sphere calls) and a save/reload of the stock (TownStockSaveTests).
 // Catches (BankFloor_OpensVisitsForEveryone_PicksAreValidated): a bank floor opening no visit or the wrong capacity, a pick without a visit, a repeated or surplus pick, a visit left open after
 // the party pushes on, the used bank point reopening for a player who merely carries something. NOT covered: the downed-hero and range checks of ServerPick (no player objects here; the same BankAskerOk as the bank press, whose tests cover them in DiveSpineNetworkTests).
+// Catches (View_OnlyOwnerAndHostSeeIt_LateJoinerGetsOwn): the owner read filter on PlayerBagSync.Net (a client reading another player's bag, or a late joiner getting every bag with the spawn), the host
+// not seeing every bag, the owner's own view not arriving (also for a late joiner). NOT covered: the contents of the view beyond the carried ids (BagView EditMode tests), a real player scene.
+// Catches (Pick_ByRpcFromTheOwner_HostValidatesCapacity): the pick RPC reaching the host and being re-validated there (capacity), a pick sent from a peer that does not own the object being applied,
+// the view following the host's picks and the bank. NOT covered: the bank-range and downed-hero checks (no built floor / vitals in this rig; DiveSpineNetworkTests), UI input.
+// Catches (Rejoin_GetsTheSameBagBack): a rejoin with the same PlayerId getting a new or empty bag, a changed player slot, the new owner's view missing the old bag. Runs with the host roster the app's
+// session installs, so the bag key is the PlayerKey; a host without a roster would key by client id and lose the bag. NOT covered: a world save in between (SaveFlowTests).
 using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -162,6 +168,172 @@ namespace SleepingCalamity.Tests.PlayMode
 
             Assert.That(haul.ServerAddItem(ca, 105), Is.True);
             Assert.That(haul.ServerBank(), Is.False, "carrying something does not reopen a used bank point");
+        }
+
+        // ---- PlayerBagSync (task 5) ----
+
+        private static PlayerBagSync BagSyncOwnedBy(NetworkManager viewer, ulong owner)
+        {
+            foreach (NetworkObject o in viewer.SpawnManager.SpawnedObjects.Values)
+                if (o != null && o.IsPlayerObject && o.OwnerClientId == owner) return o.GetComponent<PlayerBagSync>();
+            return null;
+        }
+
+        // The host spawns a hero for the client and waits until the client owns it.
+        private static IEnumerator SpawnHero(AppBootstrap app, PlayModeHarness.TestClient client, Vector3 pos)
+        {
+            NetworkManager hostNm = app.NetworkManager;
+            NetworkManager cnm = client.NetworkManager;
+            ulong id = cnm.LocalClientId;
+            hostNm.SpawnManager.InstantiateAndSpawn(app.PlayerPrefab, id, false, true, false, pos, Quaternion.identity);
+            yield return PlayModeHarness.WaitUntil(() => cnm.LocalClient != null && cnm.LocalClient.PlayerObject != null && BagSyncOwnedBy(cnm, id) != null, Timeout, "client " + id + " never received its hero");
+        }
+
+        // Host + `clients` TestClients, a spawned DiveHaulSync, and one hero per peer.
+        private static IEnumerator StartParty(int clients, List<PlayModeHarness.TestClient> into, System.Action<AppBootstrap, DiveHaulSync> done)
+        {
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartHaul(clients, into, (a, h) => { app = a; haul = h; });
+            NetworkManager hostNm = app.NetworkManager;
+            hostNm.SpawnManager.InstantiateAndSpawn(app.PlayerPrefab, hostNm.LocalClientId, false, true, false, Vector3.zero, Quaternion.identity);
+            for (int i = 0; i < into.Count; i++) yield return SpawnHero(app, into[i], new Vector3(2f * (i + 1), 0f, 0f));
+            done(app, haul);
+        }
+
+        private static bool Shows(PlayerBagSync s, params int[] ids)
+        {
+            if (s == null || s.View.Carried.Length != ids.Length) return false;
+            for (int i = 0; i < ids.Length; i++) if (s.View.Carried[i] != ids[i]) return false;
+            return true;
+        }
+
+        private static IEnumerator Settle(float seconds)
+        {
+            double until = Time.realtimeSinceStartupAsDouble + seconds;
+            while (Time.realtimeSinceStartupAsDouble < until) { PlayModeHarness.Pace(); yield return null; }
+        }
+
+        [UnityTest]
+        public IEnumerator View_OnlyOwnerAndHostSeeIt_LateJoinerGetsOwn()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartParty(2, clients, (a, h) => { app = a; haul = h; });
+            NetworkManager hostNm = app.NetworkManager;
+            NetworkManager nmA = clients[0].NetworkManager, nmB = clients[1].NetworkManager;
+            ulong ca = nmA.LocalClientId, cb = nmB.LocalClientId;
+
+            Assert.That(haul.ServerAddItem(ca, 104), Is.True);
+            Assert.That(haul.ServerAddItem(cb, 110), Is.True);
+
+            PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca), ownB = BagSyncOwnedBy(nmB, cb);
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 104), Timeout, "A's own view never showed [104]");
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownB, 110), Timeout, "B's own view never showed [110]");
+            yield return Settle(0.5f);   // let anything B's bag could leak to A arrive before asserting it did not
+            Assert.That(BagSyncOwnedBy(nmA, cb).View.Equals(default(BagView)), Is.True, "A's copy of B's view is default (owner-only read)");
+            Assert.That(BagSyncOwnedBy(nmB, ca).View.Equals(default(BagView)), Is.True, "B's copy of A's view is default");
+
+            Assert.That(Shows(BagSyncOwnedBy(hostNm, ca), 104), Is.True, "the host sees A's bag");
+            Assert.That(Shows(BagSyncOwnedBy(hostNm, cb), 110), Is.True, "the host sees B's bag");
+
+            // A late joiner gets its own bag with the spawn and nobody else's.
+            yield return PlayModeHarness.StartClients(app, 1, false, clients, 30);
+            PlayModeHarness.TestClient c = clients[2];
+            NetworkManager nmC = c.NetworkManager;
+            ulong cc = nmC.LocalClientId;
+            Assert.That(haul.ServerAddItem(cc, 105), Is.True);
+            yield return SpawnHero(app, c, new Vector3(8f, 0f, 0f));
+            PlayerBagSync ownC = BagSyncOwnedBy(nmC, cc);
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownC, 105), Timeout, "the late joiner's own view never showed [105]");
+            yield return PlayModeHarness.WaitUntil(() => BagSyncOwnedBy(nmC, ca) != null && BagSyncOwnedBy(nmC, cb) != null, Timeout, "the late joiner never saw the other heroes");
+            yield return Settle(0.5f);
+            Assert.That(BagSyncOwnedBy(nmC, ca).View.Equals(default(BagView)), Is.True, "C's copy of A's view is default");
+            Assert.That(BagSyncOwnedBy(nmC, cb).View.Equals(default(BagView)), Is.True, "C's copy of B's view is default");
+            Assert.That(Shows(BagSyncOwnedBy(nmA, ca), 104), Is.True, "A's own view is unchanged by the join");
+        }
+
+        [UnityTest]
+        public IEnumerator Pick_ByRpcFromTheOwner_HostValidatesCapacity()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartParty(1, clients, (a, h) => { app = a; haul = h; });   // two players: 4 slots, 2 each
+            NetworkManager hostNm = app.NetworkManager, nmA = clients[0].NetworkManager;
+            ulong host = hostNm.LocalClientId, ca = nmA.LocalClientId;
+
+            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(haul.ServerSetFloor(1), Is.True);
+            Assert.That(haul.ServerSetFloor(2), Is.True, "floor 2 has a bank");
+            Assert.That(haul.ServerAddItem(ca, 101), Is.True);
+            Assert.That(haul.ServerAddItem(ca, 112), Is.True);
+            Assert.That(haul.ServerAddItem(ca, 104), Is.True);
+            Assert.That(haul.ServerAddItem(host, 103), Is.True);
+            Assert.That(haul.ServerBagOf(ca).SlotCapacity, Is.EqualTo(2));
+
+            PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 101, 112, 104) && ownA.View.BankOpen && ownA.View.SlotCapacity == 2, Timeout, "A's view never showed the three items and the open visit");
+
+            PlayerBagSync hostSideA = BagSyncOwnedBy(hostNm, ca);
+            ownA.RequestPick(0); ownA.RequestPick(1); ownA.RequestPick(2);
+            yield return PlayModeHarness.WaitUntil(() => hostSideA.RequestsHandled >= 3, Timeout, "the host never handled the three pick requests");
+            Assert.That(haul.ServerBagOf(ca).Picks, Is.EqualTo(new[] { 0, 1 }), "the third pick is refused on the host: only two slots");
+            yield return PlayModeHarness.WaitUntil(() => ownA.View.Picks.Length == 2, Timeout, "A's view never showed two picks");
+            Assert.That(ownA.View.Picks[0], Is.EqualTo((byte)0));
+            Assert.That(ownA.View.Picks[1], Is.EqualTo((byte)1));
+
+            // A pick sent through an object the sender does not own (A, on the host hero's component) is refused: it must not touch either bag.
+            PlayerBagSync hostHeroOnA = BagSyncOwnedBy(nmA, host);
+            PlayerBagSync hostHeroOnHost = BagSyncOwnedBy(hostNm, host);
+            Assert.That(hostHeroOnA, Is.Not.Null);
+            hostHeroOnA.RequestPick(0);
+            yield return PlayModeHarness.WaitUntil(() => hostHeroOnHost.RequestsHandled >= 1, Timeout, "the host never handled the foreign pick request");
+            Assert.That(haul.ServerBagOf(host).Picks, Is.Empty, "a pick from a peer that does not own the object is refused");
+            Assert.That(haul.ServerBagOf(ca).Picks, Is.EqualTo(new[] { 0, 1 }), "and A's bag is untouched");
+
+            // Unpick by RPC, then pick the other one.
+            ownA.RequestUnpick(0);
+            ownA.RequestPick(2);
+            yield return PlayModeHarness.WaitUntil(() => hostSideA.RequestsHandled >= 5, Timeout, "the host never handled the unpick and the pick");
+            Assert.That(haul.ServerBagOf(ca).Picks, Is.EqualTo(new[] { 1, 2 }));
+
+            Assert.That(haul.ServerBank(), Is.True, "the party pushes on");
+            yield return PlayModeHarness.WaitUntil(() => ownA.View.BankedThisDive == 2 && !ownA.View.BankOpen, Timeout, "A's view never showed the two banked items");
+            Assert.That(Shows(ownA, 101), Is.True, "the unpicked item is still carried");
+            Assert.That(ownA.View.Picks.Length, Is.EqualTo(0));
+            Assert.That(haul.ServerBagOf(ca).BankedThisDive.ContainsKey(112) && haul.ServerBagOf(ca).BankedThisDive.ContainsKey(104), Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator Rejoin_GetsTheSameBagBack()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartParty(1, clients, (a, h) => { app = a; haul = h; });
+            NetworkManager hostNm = app.NetworkManager;
+            ulong oldId = clients[0].NetworkManager.LocalClientId;
+            Assert.That(haul.ServerAddItem(oldId, 104), Is.True);
+            Assert.That(haul.ServerAddGold(oldId, 9), Is.True);
+            string pid = haul.PlayerIdOf(oldId);
+            int slot = haul.PlayerSlotOf(oldId);
+            Assert.That(pid, Is.EqualTo(clients[0].Key.ToString()), "the bag key is the roster's PlayerKey");
+            PlayerBagSync own = BagSyncOwnedBy(clients[0].NetworkManager, oldId);
+            yield return PlayModeHarness.WaitUntil(() => Shows(own, 104), Timeout, "the view never showed [104] before the drop");
+
+            System.Threading.Tasks.Task leave = clients[0].Session.LeaveAsync();
+            yield return PlayModeHarness.Await(leave, Timeout);
+            yield return PlayModeHarness.WaitUntil(() => !hostNm.ConnectedClients.ContainsKey(oldId), Timeout, "the host still lists the dropped client");
+            yield return PlayModeHarness.WaitUntil(() => BagSyncOwnedBy(hostNm, oldId) == null, Timeout, "the dropped hero is still spawned on the host");
+
+            yield return PlayModeHarness.StartClients(app, 1, false, clients, 20);   // the same PlayerId, a new connection
+            PlayModeHarness.TestClient back = clients[1];
+            ulong newId = back.NetworkManager.LocalClientId;
+            Assert.That(newId, Is.Not.EqualTo(oldId), "the rejoin got a new client id");
+            Assert.That(haul.PlayerIdOf(newId), Is.EqualTo(pid), "same player key");
+            Assert.That(haul.PlayerSlotOf(newId), Is.EqualTo(slot), "same player slot");
+            Assert.That(haul.ServerBagOf(newId).Carried, Is.EqualTo(new[] { 104 }), "the host hands the old bag to the new connection");
+            yield return SpawnHero(app, back, new Vector3(2f, 0f, 0f));
+            PlayerBagSync ownBack = BagSyncOwnedBy(back.NetworkManager, newId);
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownBack, 104) && ownBack.View.DiveGold == 9, Timeout, "the rejoined player's view never showed the old bag");
         }
     }
 }

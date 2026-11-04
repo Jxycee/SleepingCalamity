@@ -242,6 +242,9 @@ namespace SleepingCalamity.Presentation
         // The client's bag (created on first use); null off the host.
         public PlayerBag ServerBagOf(ulong clientId) => Host ? _state.Bags.For(PlayerIdOf(clientId)) : null;
 
+        // The client's bag only if it already exists (never creates one; PlayerBagSync polls this every frame); null off the host.
+        public PlayerBag ServerBagIfAny(ulong clientId) => Host && _state.Bags.TryGet(PlayerIdOf(clientId), out PlayerBag bag) ? bag : null;
+
         public bool ServerAddItem(ulong clientId, int itemId)
         {
             PlayerBag bag = ServerBagOf(clientId);
