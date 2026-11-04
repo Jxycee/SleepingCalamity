@@ -1,4 +1,4 @@
-Status: PARTIAL
+Status: DONE (merged 40de7684 on 2026-11-02; follow-up traversal-5 merged 5d87a82b). Archive: ready
 Branch: claude/traversal-4 (from origin/main 66c4b595)
 
 ## Counts (Hollowmere Ruined / Rebuilt, TraversalScan.RunAll, town only)
