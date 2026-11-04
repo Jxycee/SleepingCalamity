@@ -76,17 +76,27 @@ namespace SleepingCalamity.EditorTools
             return p + "/";
         }
 
-        static int Tris(Renderer[] rs) => rs.Sum(r => r.TryGetComponent(out MeshFilter mf) && mf.sharedMesh != null ? mf.sharedMesh.triangles.Length / 3 : 0);
+        static int Tris(Renderer[] rs) => rs == null ? 0 : rs.Sum(r => r != null && r.TryGetComponent(out MeshFilter mf) && mf.sharedMesh != null ? mf.sharedMesh.triangles.Length / 3 : 0);
 
         static void CaptureStall(Camera cam, LODGroup lg, string type, string preset, string prefix, string dir)
         {
             LOD[] lods = lg.GetLODs();
             Transform stall = lg.transform.root == lg.transform ? lg.transform : FindStallRoot(lg.transform, prefix);
             Vector3 ls = lg.transform.lossyScale;
+            Debug.Log("SC STALL LOD " + type + " " + preset + " tree: lg=" + PathOf(lg.transform) + " stallRoot=" + PathOf(stall) + " nodes=" + string.Join(";", stall.GetComponentsInChildren<Transform>(true).Select(t => t.name + (t.GetComponent<Renderer>() != null ? "[R]" : "") + (t.GetComponent<LODGroup>() != null ? "[LG]" : "") + (t.gameObject.activeSelf ? "" : "[off]"))));
             float worldSize = lg.size * Mathf.Max(ls.x, Mathf.Max(ls.y, ls.z));
             float bias = QualitySettings.lodBias, tanHalf = Mathf.Tan(Fov * 0.5f * Mathf.Deg2Rad);
             Bounds b0 = default; bool hasB = false;
-            foreach (Renderer r in lods[0].renderers) if (r != null) { if (!hasB) { b0 = r.bounds; hasB = true; } else b0.Encapsulate(r.bounds); }
+            Renderer[][] sets = new Renderer[lods.Length][];
+            bool broken = false;   // the group's own renderer references are gone (null): ForceLOD then hides nothing, so the LOD children are switched by hand
+            for (int i = 0; i < lods.Length; i++)
+            {
+                Renderer[] own = lods[i].renderers == null ? new Renderer[0] : lods[i].renderers.Where(r => r != null).ToArray();
+                if (own.Length == 0) broken = true;
+                sets[i] = own.Length > 0 ? own : lg.GetComponentsInChildren<Renderer>(true).Where(r => r.name.EndsWith("_LOD" + i)).ToArray();
+            }
+            Debug.Log("SC STALL LOD " + type + " " + preset + " group renderers per LOD=" + string.Join("/", lods.Select(l => l.renderers == null ? -1 : l.renderers.Count(r => r != null))) + " children per LOD=" + string.Join("/", sets.Select(x => x.Length)) + " broken=" + broken);
+            foreach (Renderer r in sets[0]) if (r != null) { if (!hasB) { b0 = r.bounds; hasB = true; } else b0.Encapsulate(r.bounds); }
             Vector3 center = b0.center;
             Vector3 front = stall.forward; front.y = 0f; front.Normalize();   // the counter faces local +Z
             float baseY = stall.position.y;
@@ -94,22 +104,29 @@ namespace SleepingCalamity.EditorTools
             for (int i = 0; i < lods.Length - 1; i++) dists.Add(worldSize / (2f * tanHalf * lods[i].screenRelativeTransitionHeight) / bias);
             Debug.Log("SC STALL LOD " + type + " " + preset + " size=" + lg.size.ToString("F2") + " worldSize=" + worldSize.ToString("F2")
                 + " heights=" + string.Join("/", lods.Select(l => l.screenRelativeTransitionHeight.ToString("F3"))) + " bias=" + bias.ToString("F2")
-                + " dist=" + string.Join("/", dists.Select(d => d.ToString("F1"))) + " tris=" + string.Join("/", lods.Select(l => Tris(l.renderers))));
+                + " dist=" + string.Join("/", dists.Select(d => d.ToString("F1"))) + " tris=" + string.Join("/", sets.Select(x => Tris(x))));
 
             // close LOD0 frame
             PlaceCamera(cam, stall, center, front, baseY, CloseDistance, out float closeAz);
-            lg.ForceLOD(0);
+            Show(lg, sets, broken, 0);
             LookTestCapture.Save(cam, Path.Combine(dir, type + "_" + preset + "_Close_LOD0.png"));
             for (int i = 0; i < lods.Length - 1; i++)
             {
                 PlaceCamera(cam, stall, center, front, baseY, dists[i], out float az);
                 Debug.Log("SC STALL LOD " + type + " " + preset + " T" + i + " dist=" + dists[i].ToString("F1") + " azimuth=" + az.ToString("F0") + " cam=" + cam.transform.position.ToString("F2"));
-                lg.ForceLOD(i);
+                Show(lg, sets, broken, i);
                 LookTestCapture.Save(cam, Path.Combine(dir, type + "_" + preset + "_T" + i + "_LOD" + i + ".png"));
-                lg.ForceLOD(i + 1);
+                Show(lg, sets, broken, i + 1);
                 LookTestCapture.Save(cam, Path.Combine(dir, type + "_" + preset + "_T" + i + "_LOD" + (i + 1) + ".png"));
             }
             lg.ForceLOD(-1);
+            foreach (Renderer[] set in sets) foreach (Renderer r in set) r.enabled = true;
+        }
+
+        static void Show(LODGroup lg, Renderer[][] sets, bool broken, int lod)
+        {
+            lg.ForceLOD(lod);
+            if (broken) for (int k = 0; k < sets.Length; k++) foreach (Renderer r in sets[k]) r.enabled = k == lod;
         }
 
         static Transform FindStallRoot(Transform t, string prefix)

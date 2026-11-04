@@ -857,8 +857,14 @@ namespace SleepingCalamity.EditorTools
             PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             foreach (Transform c in go.transform.Cast<Transform>().ToList())
             {
-                if (c.name != keep) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }
+                if (!c.name.StartsWith(keep)) { UnityEngine.Object.DestroyImmediate(c.gameObject); continue; }   // the LOD import names the state node "<State>.001" (children <State>_LOD0..2), not "<State>"
                 foreach (MeshRenderer r in c.GetComponentsInChildren<MeshRenderer>(true)) r.sharedMaterial = m;   // <State>_LOD0..2 children under the state's LODGroup node
+            }
+            foreach (LODGroup lg in go.GetComponentsInChildren<LODGroup>(true))   // the other state's renderers are gone: drop them from the LOD rows so the group keeps only live ones
+            {
+                LOD[] lods = lg.GetLODs();
+                for (int i = 0; i < lods.Length; i++) lods[i].renderers = (lods[i].renderers ?? new Renderer[0]).Where(r => r != null).ToArray();
+                lg.SetLODs(lods);
             }
             var col = go.AddComponent<BoxCollider>();   // counter and frame (B8 header); the awning overhang has none
             col.center = new Vector3(0f, 0.8f, 0f); col.size = new Vector3(2.7f, 1.6f, 1.6f);
