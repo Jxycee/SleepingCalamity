@@ -1,14 +1,12 @@
 // Core/Cellars/DivePieces.cs: which bakery pieces and people the party has found, and the floor each one lives on (spec 4.4, decision 10). Pure C#.
-// Authority: host only (owned by DiveDirector; a DiveSession reads it). STUB: Task 5 of docs/superpowers/plans/2026-11-04-new-dive.md completes it (PieceCatalog.Specs, people table);
-// here a "person" is any id >= PersonIdStart (the baker, 400), a placeholder split until the catalogue exists.
+// Authority: host only (owned by DiveDirector; a DiveSession reads it). Depths come from PieceDepths.Assign(worldSeed, PieceCatalog.Specs), saved once per world; a person is a
+// PieceCatalog.IsPerson id (the baker). A found piece is safe at once: it is never banked and never lost on failure (it sits beside DiveHaul until plan 3 task 12 retires that).
 using System.Collections.Generic;
 
 namespace SleepingCalamity.Core
 {
     public sealed class DivePieces
     {
-        public const int PersonIdStart = 400;   // placeholder: ids from here up are people, below are pieces
-
         readonly SortedDictionary<int, int> _depth = new SortedDictionary<int, int>();   // id -> floor
         readonly SortedSet<int> _found = new SortedSet<int>();
 
@@ -16,6 +14,9 @@ namespace SleepingCalamity.Core
         {
             if (depths != null) foreach (var kv in depths) _depth[kv.Key] = kv.Value;
         }
+
+        // The pieces of a fresh world: depths assigned from the world seed (the save stores the result and never recomputes it).
+        public static DivePieces ForWorld(ulong worldSeed) => new DivePieces(PieceDepths.Assign(worldSeed, PieceCatalog.Specs));
 
         public bool IsFound(int id) => _found.Contains(id);
         public IEnumerable<int> FoundIds => _found;
@@ -28,7 +29,7 @@ namespace SleepingCalamity.Core
             return _found.Add(id);
         }
 
-        // A piece picked up: safe at once (never banked, never lost on failure). Same rule as Found for now.
+        // A piece picked up: safe at once (never banked, never lost on failure), so it is the same as Found.
         public bool Pick(int id) => Found(id);
 
         public int PiecesLeft(int floor) => Left(floor, false);
@@ -49,7 +50,7 @@ namespace SleepingCalamity.Core
         int Left(int floor, bool people)
         {
             int n = 0;
-            foreach (var kv in _depth) if (kv.Value == floor && (kv.Key >= PersonIdStart) == people && !_found.Contains(kv.Key)) n++;
+            foreach (var kv in _depth) if (kv.Value == floor && PieceCatalog.IsPerson(kv.Key) == people && !_found.Contains(kv.Key)) n++;
             return n;
         }
     }

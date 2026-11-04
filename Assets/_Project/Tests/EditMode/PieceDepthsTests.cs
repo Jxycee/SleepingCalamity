@@ -9,9 +9,9 @@ namespace SleepingCalamity.Tests.EditMode
     public class PieceDepthsTests
     {
         [Test]
-        public void Candidates_AreTheNonSetPieceFloorsOfEachHalf()
+        public void Candidates_AreTheGeneratedFloorsOfEachHalf()
         {
-            Assert.That(PieceDepths.CandidateFloors(false), Is.EqualTo(new[] { 1, 2, 4 }));
+            Assert.That(PieceDepths.CandidateFloors(false), Is.EqualTo(new[] { 2, 4 }), "floor 1 is authored, 3 and 5 are set pieces");
             Assert.That(PieceDepths.CandidateFloors(true), Is.EqualTo(new[] { 6, 7 }));
         }
 
@@ -41,7 +41,30 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(PieceDepths.Assign(42, pieces), Is.EqualTo(PieceDepths.Assign(42, pieces)));
             var floorsSeen = new HashSet<int>();
             for (ulong seed = 1; seed <= 50; seed++) foreach (int f in PieceDepths.Assign(seed, pieces).Values) floorsSeen.Add(f);
-            Assert.That(floorsSeen, Is.EquivalentTo(new[] { 1, 2, 4 }));
+            Assert.That(floorsSeen, Is.EquivalentTo(new[] { 2, 4 }));
+        }
+
+        [Test]
+        public void Assign_NeverPutsRandomPiecesOnFloor1()
+        {
+            for (ulong seed = 1; seed <= 200; seed++)
+                foreach (var kv in PieceDepths.Assign(seed, PieceCatalog.Specs))
+                    if (kv.Key != PieceCatalog.BakerId) Assert.That(kv.Value, Is.Not.EqualTo(1), $"seed {seed} piece {kv.Key}");
+        }
+
+        [Test]
+        public void Assign_FirstHalfRandomUsesFloors2And4Only()
+        {
+            var seen = new HashSet<int>();
+            for (ulong seed = 1; seed <= 200; seed++)
+                foreach (PieceSpec s in PieceCatalog.Specs)
+                {
+                    if (s.FixedFloor != 0 || s.SecondHalf) continue;
+                    int f = PieceDepths.Assign(seed, PieceCatalog.Specs)[s.Id];
+                    Assert.That(f, Is.EqualTo(2).Or.EqualTo(4), $"seed {seed} piece {s.Id}");
+                    seen.Add(f);
+                }
+            Assert.That(seen, Is.EquivalentTo(new[] { 2, 4 }));
         }
 
         [Test]

@@ -86,14 +86,13 @@ namespace SleepingCalamity.Tests.EditMode
         public void PieceSpots_CountMatchesDefaults_AndCellsAreLegalAndDistinct()
         {
             for (uint seed = 0; seed < 120; seed++)
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in new[] { 2, 4, 6, 7 })   // the generated floors (plan 3 task 5: pieces never lie on floor 1, 3 or 5)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, floor);
                     CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
-                    IReadOnlyList<CellPos> spots = CellarPieceSpots.Choose(l, d, Defaults[floor - 1]);
+                    IReadOnlyList<CellPos> spots = CellarPieceSpots.Choose(l, d, 2);
                     string tag = " seed " + seed + " floor " + floor;
-                    if (l.IsStub) { Assert.AreEqual(0, spots.Count, "floor 3 is the bakery stand-in now and holds no piece spots until plan 3 task 5" + tag); continue; }
-                    Assert.AreEqual(Defaults[floor - 1], spots.Count, "count" + tag);
+                    Assert.AreEqual(2, spots.Count, "count" + tag);
                     Assert.AreEqual(spots.Count, spots.Select(s => s.X * 100 + s.Y).Distinct().Count(), "distinct" + tag);
                     CellarEncounterPlan plan = CellarEncounterPlan.Build(l, d, 0, false);
                     CellPos? heal = CellarHealing.PointFor(l, d);
@@ -112,17 +111,17 @@ namespace SleepingCalamity.Tests.EditMode
                         if (l.Carrier != null) Assert.That(l.Carrier.X == s.X && l.Carrier.Y == s.Y, Is.False, "carrier" + tag);
                         Assert.That(l.Rooms[room].Room.CellAt(s.X - l.Rooms[room].X, s.Y - l.Rooms[room].Y), Is.EqualTo(CellKind.Floor), "floor cell" + tag);
                     }
-                    var again = CellarPieceSpots.Choose(l, d, Defaults[floor - 1]);
+                    var again = CellarPieceSpots.Choose(l, d, 2);
                     for (int i = 0; i < spots.Count; i++) { Assert.AreEqual(spots[i].X, again[i].X); Assert.AreEqual(spots[i].Y, again[i].Y); }
                 }
         }
 
         [Test]
-        public void PieceSpots_Floor4HasNone()
+        public void PieceSpots_Floor3HasNone()
         {
             for (uint seed = 0; seed < 10; seed++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 4);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 3);
                 Assert.AreEqual(0, CellarPieceSpots.Choose(l, CellarFloorDressing.Resolve(l), 2).Count);
             }
         }

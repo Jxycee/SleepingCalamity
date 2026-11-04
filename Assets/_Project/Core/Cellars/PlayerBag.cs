@@ -41,9 +41,13 @@ namespace SleepingCalamity.Core
         public int ChestFloor { get; private set; }
         public ulong OpenedChests { get; private set; }
 
+        // The player's boots (+5% run speed, plan 3 decision 12): carried, banked this dive or in the home stash. A pair in the lost satchel does not count until recovered.
+        public bool HasBoots => _carried.Contains(CellarLoot.BootsId) || _banked.ContainsKey(CellarLoot.BootsId) || _stash.ContainsKey(CellarLoot.BootsId);
+
         public bool Add(int itemId)
         {
             if (itemId <= 0 || _carried.Count >= MaxCarried || !BankSlots.IsBankable(CellarLoot.KindOf(itemId))) return false;
+            if (itemId == CellarLoot.BootsId && HasBoots) return false;   // one pair per player
             _carried.Add(itemId);
             Version++;
             return true;
