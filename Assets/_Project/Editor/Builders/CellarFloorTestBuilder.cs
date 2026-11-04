@@ -31,7 +31,7 @@ namespace SleepingCalamity.EditorTools
         [MenuItem("SleepingCalamity/Art/Build Cellar Floor Test")]
         public static void Build()
         {
-            CellarFloorLayout layout = CellarFloorGenerator.Generate(Seed, FloorNumber);
+            CellarFloorLayout layout = CellarFloorGenerator.Layout(Seed, FloorNumber);
             Scene scene = DungeonCornerBuilder.NewRoomScene();
             DungeonCornerBuilder.BuildProfile();
 

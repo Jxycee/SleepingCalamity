@@ -15,22 +15,22 @@ namespace SleepingCalamity.Tests.EditMode
         const int Seeds = 2000;
 
         [Test]
-        public void Roster_NeverEmpty_OnlyEligible_FullOnFloors1And4()
+        public void Roster_NeverEmpty_OnlyEligible_FullOnTheSetPieceFloors()
         {
             for (uint seed = 0; seed < Seeds; seed++)
-                for (int floor = 1; floor <= 4; floor++)
+                for (int floor = 1; floor <= 7; floor++)
                 {
                     int m = CellarFloorRoster.RosterMask(seed, floor), e = CellarFloorRoster.EligibleMask(floor);
                     Assert.AreNotEqual(0, m, "seed " + seed + " floor " + floor);
                     Assert.AreEqual(0, m & ~e, "off-eligible kind, seed " + seed + " floor " + floor);
-                    if (floor == 1 || floor == 4) Assert.AreEqual(e, m);
+                    if (floor == 1 || floor == 3 || floor == 5) Assert.AreEqual(e, m);
                 }
         }
 
         [Test]
         public void Roster_EachEligibleKindAppearsOnAReasonableShareOfFloors()
         {
-            for (int floor = 2; floor <= 3; floor++)
+            foreach (int floor in new[] { 2, 4, 6, 7 })
             {
                 int[] hits = new int[3]; int[] bits = { CellarFloorRoster.SlimeBit, CellarFloorRoster.BroomBit, CellarFloorRoster.RatKingBit };
                 for (uint seed = 0; seed < Seeds; seed++)
@@ -77,26 +77,26 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Twist_NeverOnFloor1Or4_AtMostOnePerKindPerDive_SharesNearPlaceholders()
+        public void Twist_NeverOnTheSetPieces_AtMostOnePerKindPerDive_SharesNearPlaceholders()
         {
             var count = new int[4]; int floors = 0;
             for (uint seed = 0; seed < 5000; seed++)
             {
                 var used = new HashSet<FloorTwist>();
-                for (int floor = 1; floor <= 4; floor++)
+                for (int floor = 1; floor <= 7; floor++)
                 {
                     FloorTwist t = CellarFloorRoster.TwistOf(seed, floor);
-                    if (floor == 1 || floor == 4) { Assert.AreEqual(FloorTwist.None, t); continue; }
+                    if (floor == 1 || floor == 3 || floor == 5) { Assert.AreEqual(FloorTwist.None, t); continue; }
                     floors++; count[(int)t]++;
                     if (t != FloorTwist.None) Assert.IsTrue(used.Add(t), "twist " + t + " twice in dive " + seed);
                 }
             }
-            // Floor 2 sits at the placeholders; floor 3 loses the repeats, so the overall share is a little under.
+            // The first generated floor sits at the placeholders; later ones lose the repeats, so the overall share is a little under.
             Assert.That(count[(int)FloorTwist.Ambush] / (double)floors, Is.InRange(0.08, 0.14), "ambush (procgen 3b ambush, deliberate)");
             Assert.That(count[(int)FloorTwist.None] / (double)floors, Is.InRange(0.58, 0.72), "none");
             Assert.That(count[(int)FloorTwist.Thin] / (double)floors, Is.InRange(0.08, 0.14), "thin");
             Assert.That(count[(int)FloorTwist.Crowded] / (double)floors, Is.InRange(0.08, 0.14), "crowded");
-            TestContext.WriteLine("twist shares of floors 2-3: none " + count[0] / (double)floors + " ambush " + count[1] / (double)floors + " thin " + count[2] / (double)floors + " crowded " + count[3] / (double)floors);
+            TestContext.WriteLine("twist shares of the generated floors: none " + count[0] / (double)floors + " ambush " + count[1] / (double)floors + " thin " + count[2] / (double)floors + " crowded " + count[3] / (double)floors);
         }
 
         [Test]
@@ -113,17 +113,18 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Layer_GoldenHashes_Seed12345()
         {
-            var got = new ulong[4];
-            for (int f = 1; f <= 3; f++) got[f] = CellarFloorRoster.LayerHash(12345, f);
-            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";
-            Assert.AreEqual(9929646806074584996UL, got[1], "floor 1; actual " + all); Assert.AreEqual(1000385178204227360UL, got[2], "floor 2; actual " + all); Assert.AreEqual(5465015992139406178UL, got[3], "floor 3; actual " + all);
+            var got = new ulong[8];
+            foreach (int f in new[] { 1, 2, 4, 6, 7 }) got[f] = CellarFloorRoster.LayerHash(12345, f);
+            string all = got[1] + "UL, " + got[2] + "UL, " + got[4] + "UL, " + got[6] + "UL, " + got[7] + "UL";
+            Assert.AreEqual(9929646806074584996UL, got[1], "floor 1; actual " + all); Assert.AreEqual(1000385178204227360UL, got[2], "floor 2; actual " + all); Assert.AreEqual(5465015992139406178UL, got[4], "floor 4; actual " + all);
+            Assert.AreEqual(12528100526218511281UL, got[6], "floor 6; actual " + all); Assert.AreEqual(856329369820389952UL, got[7], "floor 7; actual " + all);
         }
 
         static List<(uint seed, int floor)> TwistedFloors(FloorTwist want)
         {
             var list = new List<(uint, int)>();
             for (uint seed = 0; seed < 3000 && list.Count < 120; seed++)
-                for (int floor = 2; floor <= 3; floor++)
+                foreach (int floor in new[] { 2, 4, 6, 7 })
                     if (CellarFloorRoster.TwistOf(seed, floor) == want) list.Add((seed, floor));
             return list;
         }
@@ -134,7 +135,7 @@ namespace SleepingCalamity.Tests.EditMode
             int checkedFloors = 0;
             foreach (var (seed, floor) in TwistedFloors(FloorTwist.Thin))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 foreach (int extra in new[] { 0, 1 })
                 {
                     CellarEncounterPlan thin = CellarEncounterPlan.BuildForDive(l, d, extra, false), plain = CellarEncounterPlan.Build(l, d, extra, false);
@@ -159,7 +160,7 @@ namespace SleepingCalamity.Tests.EditMode
             int checkedRooms = 0;
             foreach (var (seed, floor) in TwistedFloors(FloorTwist.Thin))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan thin = CellarEncounterPlan.BuildForDive(l, d, 1, false), plain = CellarEncounterPlan.Build(l, d, 1, false);
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
@@ -178,7 +179,7 @@ namespace SleepingCalamity.Tests.EditMode
             int checkedFloors = 0;
             foreach (var (seed, floor) in TwistedFloors(FloorTwist.Crowded))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan crowd = CellarEncounterPlan.BuildForDive(l, d, 0, false), plain = CellarEncounterPlan.Build(l, d, 0, false);
                 Assert.Greater(crowd.Spawns.Count, plain.Spawns.Count, "seed " + seed + " floor " + floor);
                 Assert.AreEqual(crowd.Spawns.Count, crowd.Spawns.Select(s => (s.X, s.Y)).Distinct().Count());
@@ -194,7 +195,7 @@ namespace SleepingCalamity.Tests.EditMode
             int checkedFloors = 0;
             foreach (var (seed, floor) in TwistedFloors(FloorTwist.Ambush))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan a = CellarEncounterPlan.BuildForDive(l, d, 1, false), plain = CellarEncounterPlan.Build(l, d, 1, false);
                 Assert.AreEqual(plain.Spawns.Count, a.Spawns.Count);
                 Assert.AreEqual(FloorTwist.Ambush, a.Twist);
@@ -205,16 +206,16 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Plan_PlainBuildCarriesNoTwist_FloorsOneAndFourNone_PeersAgree()
+        public void Plan_PlainBuildCarriesNoTwist_SetPiecesNone_PeersAgree()
         {
             for (uint seed = 0; seed < 60; seed++)
-                for (int floor = 1; floor <= 4; floor++)
+                for (int floor = 1; floor <= 7; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                     CellarEncounterPlan a = CellarEncounterPlan.BuildForDive(l, d, 1, true), b = CellarEncounterPlan.BuildForDive(l, d, 1, true);
                     Assert.AreEqual(a.Spawns.Count, b.Spawns.Count); Assert.AreEqual(a.Twist, b.Twist); Assert.AreEqual(a.RosterMask, b.RosterMask); Assert.AreEqual(a.AmbushRoom, b.AmbushRoom);
                     Assert.AreEqual(FloorTwist.None, CellarEncounterPlan.Build(l, d, 1, true).Twist);
-                    if (floor == 1 || floor == 4) Assert.AreEqual(FloorTwist.None, a.Twist);
+                    if (floor == 1 || floor == 3 || floor == 5) Assert.AreEqual(FloorTwist.None, a.Twist);
                 }
         }
     }

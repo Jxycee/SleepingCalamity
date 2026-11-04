@@ -71,7 +71,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 60; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                     if (l.KeyChestIndex < 0) continue;
                     for (int i = 0; i < l.Chests.Count; i++)
                     {
@@ -92,6 +92,7 @@ namespace SleepingCalamity.Tests.EditMode
                     CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     IReadOnlyList<CellPos> spots = CellarPieceSpots.Choose(l, d, Defaults[floor - 1]);
                     string tag = " seed " + seed + " floor " + floor;
+                    if (l.IsStub) { Assert.AreEqual(0, spots.Count, "floor 3 is the bakery stand-in now and holds no piece spots until plan 3 task 5" + tag); continue; }
                     Assert.AreEqual(Defaults[floor - 1], spots.Count, "count" + tag);
                     Assert.AreEqual(spots.Count, spots.Select(s => s.X * 100 + s.Y).Distinct().Count(), "distinct" + tag);
                     CellarEncounterPlan plan = CellarEncounterPlan.Build(l, d, 0, false);
@@ -121,7 +122,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             for (uint seed = 0; seed < 10; seed++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 4);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 4);
                 Assert.AreEqual(0, CellarPieceSpots.Choose(l, CellarFloorDressing.Resolve(l), 2).Count);
             }
         }

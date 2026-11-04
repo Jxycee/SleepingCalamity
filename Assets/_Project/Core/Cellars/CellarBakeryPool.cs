@@ -1,6 +1,7 @@
-// Core/Cellars/CellarBakeryPool.cs: the rooms of the fixed floor-4 set-piece, the taken bakery's oven maze (PHASE1 7.2). Authored as ASCII like the pool
-// (legend in CellarRoom.cs) but kept OUT of CellarRoomPool.All, so floors 1-3 never draw them and their goldens cannot move. The floor is placed by
-// CellarFloorGenerator (BuildBakery): the pool's entry room, four oven-maze rooms joined in a ring (the loop), the antechamber and the heart.
+// Core/Cellars/CellarBakeryPool.cs: the rooms of the bakery set piece, the taken bakery's oven maze (PHASE1 7.2), now floor 3 of the dive. Authored as ASCII like the pool
+// (legend in CellarRoom.cs) but kept OUT of CellarRoomPool.All, so the generated floors never draw them. Floor 3 is placed by UndercroftSetPieces (CellarFloorGenerator.SetPieces.cs):
+// the pool's entry room, four oven-maze rooms joined in a ring (the loop), the calm antechamber (stair hall beside it) and the heart. Floor 5's guardian arena is the
+// original antechamber (its Tier2 spawn is the stand-in guardian).
 // Authority: none (static data).
 using System.Collections.Generic;
 
@@ -9,7 +10,7 @@ namespace SleepingCalamity.Core
     public static class CellarBakeryPool
     {
         public const string MouthId = "bakery_oven_mouth", ProofingId = "bakery_proofing", FlourId = "bakery_flour_store", KneadingId = "bakery_kneading_hall",
-            AntechamberId = "bakery_flue_antechamber", HeartId = "bakery_heart";
+            AntechamberId = "bakery_flue_antechamber", AntechamberCalmId = "bakery_flue_antechamber_calm", HeartId = "bakery_heart";
 
         public static readonly IReadOnlyList<CellarRoom> All = Build().AsReadOnly();
 
@@ -58,6 +59,12 @@ namespace SleepingCalamity.Core
                     "DS.",
                     "s.C" },
                     Sk(Lantern, 2, 0, S), Sk(Crate, 2, 1, W)),
+                // 3x3. The calm antechamber of floor 3 (plan 3 task 4): no guard, one Tier1 spawn, and an east door to the stair hall. North door from the kneading hall, west door to the hearth.
+                Oven(AntechamberCalmId, "Flue antechamber (calm)", "antechamber", new[] {
+                    ".D.",
+                    "DsD",
+                    "s.C" },
+                    Sk(Lantern, 2, 0, S), Sk(Crate, 1, 2, N)),
                 // 5x3. The baker's bed (Z) by the great oven (the solid blocks), the rescue bank point (B). One door, east.
                 CellarRoom.Parse(HeartId, "Baker's hearth", RoomKind.Heart, SubTheme.Bakery, "hearth", new[] {
                     "#...#",
@@ -80,6 +87,8 @@ namespace SleepingCalamity.Core
             }
             CellarRoom ante = Find(AntechamberId);
             if (ante == null || !System.Linq.Enumerable.Any(ante.Spawns, s => s.Tier == SpawnTier.Tier2)) errs.Add("bakery pool: the antechamber needs a Tier2 spawn for the Dough Warden");
+            CellarRoom calm = Find(AntechamberCalmId);
+            if (calm == null || System.Linq.Enumerable.Any(calm.Spawns, s => s.Tier == SpawnTier.Tier2)) errs.Add("bakery pool: the calm antechamber must exist and have no Tier2 spawn");
             if (Find(HeartId) == null) errs.Add("bakery pool: no heart room");
             return errs;
         }

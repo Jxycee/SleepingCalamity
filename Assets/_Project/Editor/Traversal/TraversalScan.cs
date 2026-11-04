@@ -1,9 +1,9 @@
 // World traversal scan: entry points. Run headless with
 //   bash Tools/cloud/unity.sh exec --method SleepingCalamity.EditorTools.TraversalScan.RunAll --out <scratch>
-// It scans Hollowmere (Ruined and Rebuilt presets) and Cellars floors 1-4 over the seed set (SC_TRAVERSAL_SEEDS, default 50: 12345 then 1, 2, ...; seeds
+// It scans Hollowmere (Ruined and Rebuilt presets) and Cellars floors 1-7 (the built dive floors) over the seed set (SC_TRAVERSAL_SEEDS, default 50: 12345 then 1, 2, ...; seeds
 // are added until every layout preset, every twist, the dark floor and a generator fallback appear), then writes Reference/qa/traversal/REPORT.md and one
 // top-down map per scene and floor (Cellars: the seed with the most issues). Every seed's map also goes to SC_TRAVERSAL_OUT when that is set.
-//   ...TraversalScan.WriteBaseline   rewrites Reference/qa/traversal/baseline.json from the regression set (Hollowmere both presets + 10 seeds x floors 1-4)
+//   ...TraversalScan.WriteBaseline   rewrites Reference/qa/traversal/baseline.json from the regression set (Hollowmere both presets + 10 seeds x floors 1-7)
 // The regression test (TraversalRegressionTests) runs the same RegressionRun and fails on a target that became unreachable or more blocked/narrow spots.
 // Nothing is saved to scenes or prefabs: the Hollowmere scene is opened read-only and closed with a fresh empty scene.
 using System;
@@ -63,7 +63,7 @@ namespace SleepingCalamity.EditorTools
             report.Coverage = coverage; report.Seeds = seeds;
             var worst = new Dictionary<int, (int score, string path)>();
             foreach (uint seed in seeds)
-                for (int floor = 1; floor <= 4; floor++)
+                for (int floor = 1; floor <= DiveFloorTable.LastBuiltFloor; floor++)
                 {
                     ScanSpace s = TraversalSpaces.Cellar(seed, floor, out TraversalSpaces.CellarBuild b);
                     ScanResult r;
@@ -98,7 +98,7 @@ namespace SleepingCalamity.EditorTools
             var seen = new Dictionary<string, int>();
             void Note(uint seed)
             {
-                for (int f = 1; f <= 4; f++)
+                for (int f = 1; f <= DiveFloorTable.LastBuiltFloor; f++)
                 {
                     foreach (string k in Features(seed, f)) seen[k] = seen.TryGetValue(k, out int c) ? c + 1 : 1;
                 }
@@ -107,7 +107,7 @@ namespace SleepingCalamity.EditorTools
             for (uint s = 1000; s < 4000 && want.Any(w => !seen.ContainsKey(w)); s++)
             {
                 bool adds = false;
-                for (int f = 1; f <= 4 && !adds; f++) foreach (string k in Features(s, f)) if (want.Contains(k) && !seen.ContainsKey(k)) adds = true;
+                for (int f = 1; f <= DiveFloorTable.LastBuiltFloor && !adds; f++) foreach (string k in Features(s, f)) if (want.Contains(k) && !seen.ContainsKey(k)) adds = true;
                 if (adds) { seeds.Add(s); Note(s); }
             }
             coverage = want.OrderBy(x => x).Select(w => w + ": " + (seen.TryGetValue(w, out int c) ? c + " floors" : "NOT COVERED")).ToList();
@@ -116,7 +116,7 @@ namespace SleepingCalamity.EditorTools
 
         static IEnumerable<string> Features(uint seed, int floor)
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor, out int fb);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor, out int fb);
             if (l.Preset.HasValue) yield return "preset " + l.Preset.Value;
             yield return "twist " + CellarFloorRoster.TwistOf(seed, floor);
             if (CellarAtmosphere.IsDarkFloor(seed, floor)) yield return "dark floor";
@@ -138,7 +138,7 @@ namespace SleepingCalamity.EditorTools
             }
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             foreach (uint seed in RegressionSeeds)
-                for (int floor = 1; floor <= 4; floor++)
+                for (int floor = 1; floor <= DiveFloorTable.LastBuiltFloor; floor++)
                 {
                     ScanSpace s = TraversalSpaces.Cellar(seed, floor, out TraversalSpaces.CellarBuild b);
                     try { list.Add(Quick(TraversalProbe.Scan(s, hero, ScanOptions.Quick))); }

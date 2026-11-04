@@ -12,6 +12,9 @@ namespace SleepingCalamity.Tests.EditMode
         /// <summary>Seed count of the fast twin of every Soak sweep (the Soak case keeps the original count).</summary>
         public const int FastSeeds = 60;
 
+        /// <summary>The built dive floors that are not stub set pieces: the ones the layered systems (dressing, vignettes, clutter, trim, healing) run on. Floors 3 and 5 are stubs.</summary>
+        public static readonly int[] DiveFloors = { 1, 2, 4, 6, 7 };
+
         static readonly Dictionary<(uint, int), CellarFloorLayout> Layouts = new Dictionary<(uint, int), CellarFloorLayout>();
         static readonly Dictionary<(uint, int), CellarFloorDressing> Dressings = new Dictionary<(uint, int), CellarFloorDressing>();
         static readonly Dictionary<(uint, int), CellarFloorClutter> Clutters = new Dictionary<(uint, int), CellarFloorClutter>();
@@ -21,7 +24,7 @@ namespace SleepingCalamity.Tests.EditMode
 
         public static CellarFloorLayout Layout(uint seed, int floor)
         {
-            if (!Layouts.TryGetValue((seed, floor), out CellarFloorLayout l)) Layouts[(seed, floor)] = l = CellarFloorGenerator.Generate(seed, floor);
+            if (!Layouts.TryGetValue((seed, floor), out CellarFloorLayout l)) Layouts[(seed, floor)] = l = CellarFloorGenerator.Layout(seed, floor);
             return l;
         }
 

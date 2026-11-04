@@ -49,7 +49,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             for (uint seed = 1; seed < 500; seed++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 1);
                 if (CellarHealing.PointFor(l, CellarFloorDressing.Resolve(l)).HasValue) return seed;
             }
             Assert.Fail("no seed below 500 has a healing point on floor 1"); return 0;

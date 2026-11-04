@@ -154,7 +154,7 @@ namespace SleepingCalamity.EditorTools
 
         public static ScanSpace Cellar(uint seed, int floor, out CellarBuild build)
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor, out int fallback);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor, out int fallback);
             CellarFloorBuild b = CellarFloorBuilder.Build(l, null, Kit());
             build = new CellarBuild { Layout = l, Built = b, Fallback = fallback };
             Transform root = b.Root;
@@ -177,7 +177,7 @@ namespace SleepingCalamity.EditorTools
 
             for (int i = 0; i < l.EntryStarts.Count; i++) Target("EntryStart_" + i, "EntryStart", CellarFloorBuilder.EntryWorld(l, b, i), 0.9f);
             if (CellarFloorBuilder.TryStairWorld(l, b, out Vector3 stair)) Target("StairExit", "Stair", stair, 2.0f);
-            if (CellarFloorBuilder.TryBankWorld(l, b, out Vector3 bank)) Target(floor == 4 ? "HeartBank" : "Checkpoint", floor == 4 ? "Heart" : "Checkpoint", bank, 2.0f);
+            if (CellarFloorBuilder.TryBankWorld(l, b, out Vector3 bank)) Target(floor == UndercroftPlan.BankFloor ? "BankRoom" : "Checkpoint", "Checkpoint", bank, 2.0f);
             if (l.BakerCell.HasValue) Target("Baker", "Heart", Cell(l.BakerCell.Value.X, l.BakerCell.Value.Y), 2.0f);
             if (l.WardenCell.HasValue) Target("WardenSpawn", "Enemy", Cell(l.WardenCell.Value.X, l.WardenCell.Value.Y), 2.0f);
             foreach (FloorChest c in l.Chests)

@@ -13,7 +13,7 @@ namespace SleepingCalamity.Core
 {
     public static class CellarHealing
     {
-        public const int FirstFloor = 1, LastFloor = 3;
+        public const int FirstFloor = 1, LastFloor = UndercroftPlan.Phase1LastFloor;   // plan 3 task 3: the built dive floors; the set pieces 3 and 5 are stubs and never roll one
 
         public static CellPos? PointFor(CellarFloorLayout layout, CellarFloorDressing dressing, HealTuning tuning)
         {

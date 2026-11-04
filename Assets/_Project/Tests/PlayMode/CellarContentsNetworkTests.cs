@@ -64,7 +64,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             for (uint s = 1; s < 400; s++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(s, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(s, 1);
                 if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return s;
             }
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;

@@ -72,7 +72,7 @@ namespace SleepingCalamity.Presentation
             if (floor == _builtFloor && (floor == NoFloor || seed == _builtSeed)) return;
             Clear();
             if (floor < 1 || floor > MaxFloor) return;
-            _layout = CellarFloorGenerator.Generate(seed, floor);
+            _layout = CellarFloorGenerator.Layout(seed, floor);
             _built = CellarFloorBuilder.Build(_layout, transform, Kit);
             _builtSeed = seed; _builtFloor = floor;
             BuildCount++;

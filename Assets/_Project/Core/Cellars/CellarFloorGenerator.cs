@@ -1,20 +1,19 @@
 // Core/Cellars/CellarFloorGenerator.cs: the M5 seeded floor generator for the Undercroft Cellars (PHASE1 7.2). Pure C#, no engine references.
-// Generate(seed, floor) builds floors 1-3 from the room pool; floor 4 is the fixed bakery oven maze (see BuildBakery, rooms in CellarBakeryPool). Authority: none (static; the host sends
+// Generate(seed, floor) builds the GENERATED Undercroft floors 2, 4, 6 and 7 from the room pool; floors 1, 3 and 5 are fixed stand-ins (CellarFloorGenerator.SetPieces.cs) and Layout(seed, floor)
+// is the one entry point that dispatches by DiveFloorTable.KindOf. Authority: none (static; the host sends
 // (seed, floor) and every client builds the same floor, so nothing here may depend on the machine).
 //
 // Determinism: only Pcg32 / Rng / Fnv1a64 are used. No string.GetHashCode, no iteration over a HashSet or Dictionary for a decision (those are only used
 // for lookups), no float math in placement; every list is walked in a fixed order. The floor seed is hash(seed, floor) (Rng.Derive), not seed + floor.
 //
 // Two layers, so a floor needs only (seed, floor):
-//   PickRooms(seed, floor)  which combat rooms the floor uses, whether it has a locked room, its chest target. Floor N leaves out the combat rooms
-//                           PickRooms(seed, N-1) returned, so consecutive floors never repeat a combat room (entry and exit are shared by design).
+//   PickRooms(seed, floor)  which combat rooms the floor uses, whether it has a locked room, its chest target. A generated floor leaves out the combat rooms
+//                           the previous GENERATED floor returned (4 after 2, 6 after 4, 7 after 6), so consecutive generated floors never repeat a combat room (entry and exit are shared by design).
 //   Generate(seed, floor)   places them: entry first, then the rest in a shuffled order with the locked room last, each new room on the 14 x 14 grid
 //                           (rectangle plus a one-cell margin clear of every other room; a margin cell off the grid counts as clear), linked to a random earlier room by a
 //                           corridor routed round the rooms; then 1-3 extra corridors (loops) and 1-3 side dead ends. A corridor cell's mask is built from
 //                           the links that pass through it (not from mere adjacency), then resolved to a piece by CellarRoomPool.FindCorridor.
-// Floor shape: 4-6 rooms (entry, stair exit, 2-4 combat rooms, plus the checkpoint on floor 2). The checkpoint ("after floor 2", PHASE1 7.2) is the lamp
-// nook placed ON floor 2 as one of its rooms, not a floor of its own: a dive that clears floor 2 banks there before floor 3, and floor 3 starts at its own
-// entry. Floor 2 therefore has one combat room fewer than 1 and 3 for the same room total.
+// Floor shape: 4-6 rooms (entry, stair exit, 2-4 combat rooms). Sub-themes: floor 2 larder, floor 4 wine vault (both draw larder and wine rooms), floors 6 and 7 coal (plan 3 task 3).
 // Locked room (50% of floors): a lockable combat room placed last as a LEAF; only its L door is linked, its other doors stay walled, so it never blocks
 // the exit. The key sits in a KeyCandidate chest of another combat room; the gate-key carrier is one random spawn of a non-locked combat room.
 // Chests: every chest slot of every room, plus a chest at the end of a side dead end when the rooms alone fall short of the 6-8 target (PickRooms keeps
@@ -26,7 +25,7 @@
 // Exit distance (variety layer 7, research 3.7a): a built floor whose walk from the first party start to the stair exit is shorter than MinExitDistance
 // steps is thrown away like any failed attempt (the attempt loop rolls again on the same stream), so the way down is never right next to the way in.
 // Floors that were already long enough keep their layout; only the short ones re-roll. The last resort relaxes the bound only after every stream failed it.
-// Layout presets (procgen item 2, CellarLayoutPreset.cs): floors 1-3 carry a LayoutPreset (Spine / Ring / Hub / Wing, own stream, never the same twice in a row) that steers
+// Layout presets (procgen item 2, CellarLayoutPreset.cs): generated floors carry a LayoutPreset (Spine / Ring / Hub / Wing, own stream, never the same twice in a row) that steers
 // the placement order, which earlier room each new room links to, and the loop rules inside TryBuild. The stair exit is placed LAST (before the locked room), links to exactly
 // one earlier room that is not the entry, and is never offered a second door (FreeDoors, dead ends, loops and the locked room all skip it), so it is a far dead end: a leaf
 // that is not next to the entry (an attempt whose exit door shares a corridor network with an entry door is thrown away). The last resort keeps the leaf rules but tries its
@@ -41,15 +40,15 @@ namespace SleepingCalamity.Core
     public sealed class CellarFloorPlan
     {
         public readonly int Floor; public readonly SubTheme Theme;
-        public readonly bool Locked, HasCheckpoint;
+        public readonly bool Locked;
         public readonly IReadOnlyList<CellarRoom> Combat;   // 2-4 distinct combat rooms
         public readonly CellarRoom LockedRoom, KeyRoom;      // null unless Locked
         public readonly int TargetChests;                    // 6-8
-        public CellarFloorPlan(int floor, SubTheme theme, bool locked, bool hasCheckpoint, IEnumerable<CellarRoom> combat, CellarRoom lockedRoom, CellarRoom keyRoom, int targetChests)
-        { Floor = floor; Theme = theme; Locked = locked; HasCheckpoint = hasCheckpoint; Combat = combat.ToList(); LockedRoom = lockedRoom; KeyRoom = keyRoom; TargetChests = targetChests; }
+        public CellarFloorPlan(int floor, SubTheme theme, bool locked, IEnumerable<CellarRoom> combat, CellarRoom lockedRoom, CellarRoom keyRoom, int targetChests)
+        { Floor = floor; Theme = theme; Locked = locked; Combat = combat.ToList(); LockedRoom = lockedRoom; KeyRoom = keyRoom; TargetChests = targetChests; }
     }
 
-    public static class CellarFloorGenerator
+    public static partial class CellarFloorGenerator
     {
         public const int MaxAttempts = 400, RoomTries = 60, ScanTries = 12, LinkTries = 6, PackFirstAfter = 100, MaxFootprint = 92, PlanRetries = 4, BuildRetries = 3, LastResortStreams = 16, LastResortPresetStreams = 8, SpinePlanRetries = 2, MinExitDistance = 12;
         const int G = CellarFloorLayout.GridSize;
@@ -65,20 +64,40 @@ namespace SleepingCalamity.Core
 
         static CellarRoom Special(RoomKind k) { foreach (CellarRoom r in CellarRoomPool.All) if (r.Kind == k) return r; throw new InvalidOperationException("pool has no " + k + " room"); }
 
+        // ---- which floors this generator builds ----
+
+        // Floors 2, 4, 6, 7 (UndercroftFloorKind.Generated) up to the last built floor.
+        public static bool IsGeneratedFloor(int floor) => floor >= UndercroftPlan.FirstFloor && floor <= DiveFloorTable.LastBuiltFloor && UndercroftPlan.KindOf(floor) == UndercroftFloorKind.Generated;
+
+        // The generated floor before this one (2 -> 0, 4 -> 2, 6 -> 4, 7 -> 6); 0 for the first.
+        public static int PreviousGeneratedFloor(int floor)
+        {
+            for (int f = floor - 1; f >= UndercroftPlan.FirstFloor; f--) if (IsGeneratedFloor(f)) return f;
+            return 0;
+        }
+
+        // Sub-theme table: floor 2 larder, floor 4 wine vault, floors 6 and 7 coal.
+        public static SubTheme ThemeOf(int floor) => floor <= 2 ? SubTheme.Larder : floor <= 4 ? SubTheme.WineVault : SubTheme.CoalCellar;
+
+        static void RequireGenerated(int floor, string what)
+        {
+            if (!IsGeneratedFloor(floor)) throw new ArgumentOutOfRangeException(nameof(floor), what + " is for the generated floors 2, 4, 6 and 7");
+        }
+
         // ---- room picking ----
 
-        // Pure in (seed, floor). Floors 1-3 only. Own-theme share of the combat rooms is 70% on average (count * 0.7, the fraction rounded by a coin), falling
+        // Pure in (seed, floor). Generated floors only. Own-theme share of the combat rooms is 70% on average (count * 0.7, the fraction rounded by a coin), falling
         // back to other themes when the own theme has nothing left after the previous floor's exclusion.
         public static CellarFloorPlan PickRooms(uint seed, int floor)
         {
-            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "PickRooms is for floors 1-3");
+            RequireGenerated(floor, "PickRooms");
             return PickRooms(seed, floor, out _);
         }
 
         // fallback: 0 = original stream, 1 = a retry stream, 2 = the minimal plan.
         public static CellarFloorPlan PickRooms(uint seed, int floor, out int fallback)
         {
-            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "PickRooms is for floors 1-3");
+            RequireGenerated(floor, "PickRooms");
             for (int retry = 0; retry <= PlanRetries; retry++)
             {
                 CellarFloorPlan p = TryPickRooms(seed, floor, retry);
@@ -88,31 +107,32 @@ namespace SleepingCalamity.Core
             return MinimalPlan(seed, floor);
         }
 
-        // The guaranteed fallback plan: the smallest combat rooms (area, then id) that the previous floor did not use, unlocked. 3 rooms (2 on floor 2, which
-        // also holds the checkpoint). Pure in (seed, floor).
+        // The guaranteed fallback plan: the 3 smallest combat rooms (area, then id) that the previous generated floor did not use, unlocked. Pure in (seed, floor).
         public static CellarFloorPlan MinimalPlan(uint seed, int floor)
         {
-            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "MinimalPlan is for floors 1-3");
+            RequireGenerated(floor, "MinimalPlan");
             var excluded = new HashSet<string>();   // lookups only
-            if (floor > 1) foreach (CellarRoom r in PickRooms(seed, floor - 1).Combat) excluded.Add(r.Id);
+            int prevFloor = PreviousGeneratedFloor(floor);
+            if (prevFloor > 0) foreach (CellarRoom r in PickRooms(seed, prevFloor).Combat) excluded.Add(r.Id);
             var cand = new List<CellarRoom>();
             foreach (CellarRoom r in CellarRoomPool.All) if (r.Kind == RoomKind.Combat && r.LockedDoor == null && !excluded.Contains(r.Id)) cand.Add(r);
             cand.Sort((a, b) => { int c = (a.Width * a.Height).CompareTo(b.Width * b.Height); return c != 0 ? c : string.CompareOrdinal(a.Id, b.Id); });
-            int count = floor == 2 ? 2 : 3;
-            return new CellarFloorPlan(floor, (SubTheme)floor, false, floor == 2, cand.GetRange(0, count), null, null, 6);
+            return new CellarFloorPlan(floor, ThemeOf(floor), false, cand.GetRange(0, 3), null, null, 6);
         }
 
         // One full pass of the room picking over its own RNG stream (retry 0 is the original stream, so existing seeds keep their plan). Null when the
         // 400 inner attempts all fail.
         static CellarFloorPlan TryPickRooms(uint seed, int floor, int retry)
         {
-            SubTheme theme = (SubTheme)floor;
+            SubTheme theme = ThemeOf(floor);
             var excluded = new HashSet<string>();   // lookups only
-            if (floor > 1) foreach (CellarRoom r in PickRooms(seed, floor - 1).Combat) excluded.Add(r.Id);
+            int prevFloor = PreviousGeneratedFloor(floor);
+            if (prevFloor > 0) foreach (CellarRoom r in PickRooms(seed, prevFloor).Combat) excluded.Add(r.Id);
             var all = new List<CellarRoom>();
             foreach (CellarRoom r in CellarRoomPool.All) if (r.Kind == RoomKind.Combat && !excluded.Contains(r.Id)) all.Add(r);
-            SubTheme[] others = new[] { SubTheme.Larder, SubTheme.WineVault, SubTheme.CoalCellar }.Where(t => t != theme).ToArray();
-            bool cp = floor == 2;
+            // floors 2 and 4 draw larder and wine rooms; floors 6 and 7 draw coal rooms (a floor falls back to any theme when its own pool runs dry)
+            SubTheme[] pool = floor <= 4 ? new[] { SubTheme.Larder, SubTheme.WineVault } : new[] { SubTheme.CoalCellar };
+            SubTheme[] others = pool.Where(t => t != theme).ToArray();
             var rng = new Pcg32(retry == 0 ? Rng.Derive(seed, "cellars.rooms", (ulong)floor) : Rng.Derive(seed, "cellars.retry", ((ulong)floor << 32) | (uint)retry));
             bool wantLocked = rng.Range(0, 2) == 1;             // the 50% coin is flipped once, so the room-set rejections below cannot skew it
             for (int attempt = 0; attempt < 400; attempt++)
@@ -120,12 +140,12 @@ namespace SleepingCalamity.Core
                 bool locked = wantLocked && attempt < 200;      // if no locked room set turns up in 200 tries, fall back to an unlocked floor
                 if (!locked && attempt == 200) wantLocked = false;
                 int total = rng.Range(4, 7);                    // 4-6 rooms on the floor
-                int count = total - 2 - (cp ? 1 : 0);           // minus entry, exit and the checkpoint
+                int count = total - 2;                          // minus entry and exit
                 if (locked && count < 2) count = 2;             // a locked floor needs a lockable room and a key room
                 int own = count * 7 / 10;
                 if (rng.Range(0, 10) < count * 7 % 10) own++;
                 var slotThemes = new List<SubTheme>();
-                for (int i = 0; i < count; i++) slotThemes.Add(i < own ? theme : others[rng.Range(0, 2)]);
+                for (int i = 0; i < count; i++) slotThemes.Add(i < own || others.Length == 0 ? theme : others[rng.Range(0, others.Length)]);
                 Shuffle(slotThemes, ref rng);
                 var picked = new List<CellarRoom>();
                 bool ok = true;
@@ -141,20 +161,20 @@ namespace SleepingCalamity.Core
                     if (cand.Count == 0) ok = false; else picked.Add(cand[rng.Range(0, cand.Count)]);
                 }
                 if (!ok) continue;
-                int slots = cp ? Special(RoomKind.Checkpoint).Chests.Count : 0;
+                int slots = 0;
                 foreach (CellarRoom r in picked) slots += r.Chests.Count;
                 if (slots < 3) continue;                        // dead ends can add at most 3
                 // door supply: a tree over the N non-locked rooms uses 2 (N-1) doors, the lock 1 more; a loop needs one spare door (it can run to an
                 // existing corridor), so keep 2 spare (a short chain of two-door rooms would otherwise leave none)
-                int doors = Special(RoomKind.Entry).Doors.Count + Special(RoomKind.StairExit).Doors.Count + (cp ? Special(RoomKind.Checkpoint).Doors.Count : 0), open = cp ? 3 : 2;
+                int doors = Special(RoomKind.Entry).Doors.Count + Special(RoomKind.StairExit).Doors.Count, open = 2;
                 foreach (CellarRoom r in picked) if (!locked || r != picked[0]) { doors += r.Doors.Count; open++; }
                 if (doors - (2 * (open - 1) + (locked ? 1 : 0)) < 2) continue;
                 // crowding: six big rooms leave the 14 x 14 grid no room for corridors, so cap the total footprint (the failures seen were 96-100 cells)
-                int area = Special(RoomKind.Entry).Width * Special(RoomKind.Entry).Height + Special(RoomKind.StairExit).Width * Special(RoomKind.StairExit).Height + (cp ? Special(RoomKind.Checkpoint).Width * Special(RoomKind.Checkpoint).Height : 0);
+                int area = Special(RoomKind.Entry).Width * Special(RoomKind.Entry).Height + Special(RoomKind.StairExit).Width * Special(RoomKind.StairExit).Height;
                 foreach (CellarRoom r in picked) area += r.Width * r.Height;
                 if (area > MaxFootprint) continue;
                 int target = rng.Range(6, 9);
-                return new CellarFloorPlan(floor, theme, locked, cp, picked, locked ? picked[0] : null, locked ? picked[1] : null, target);
+                return new CellarFloorPlan(floor, theme, locked, picked, locked ? picked[0] : null, locked ? picked[1] : null, target);
             }
             return null;
         }
@@ -163,13 +183,28 @@ namespace SleepingCalamity.Core
 
         public static CellarFloorLayout Generate(uint seed, int floor) => Generate(seed, floor, out _);
 
+        // The one entry point the runtime calls: floors 2, 4, 6, 7 are generated, 1, 3, 5 are the fixed stand-ins (UndercroftSetPieces). Floors past the last built floor throw.
+        public static CellarFloorLayout Layout(uint seed, int floor) => Layout(seed, floor, out _);
+
+        public static CellarFloorLayout Layout(uint seed, int floor, out int fallback)
+        {
+            fallback = 0;
+            if (floor > DiveFloorTable.LastBuiltFloor) throw new ArgumentOutOfRangeException(nameof(floor), "Phase 1 builds floors 1-" + DiveFloorTable.LastBuiltFloor);
+            switch (DiveFloorTable.KindOf(floor))
+            {
+                case UndercroftFloorKind.Generated: return Generate(seed, floor, out fallback);
+                case UndercroftFloorKind.Authored:
+                case UndercroftFloorKind.SetPiece: return UndercroftSetPieces.Build(seed, floor);
+                default: throw new ArgumentOutOfRangeException(nameof(floor), "floor " + floor + " is not built");
+            }
+        }
+
         // fallback: 0 = the primary stream worked, 1 = a retry stream (room picking or placement) was needed, 2 = the minimal-plan last resort was used.
         // Deterministic in (seed, floor) whatever the fallback.
         public static CellarFloorLayout Generate(uint seed, int floor, out int fallback)
         {
             fallback = 0;
-            if (floor == 4) return BuildBakery(seed);
-            if (floor < 1 || floor > 4) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-4");
+            RequireGenerated(floor, "Generate");
             CellarFloorPlan plan = PickRooms(seed, floor, out fallback);
             LayoutPreset preset = CellarLayoutPresets.PresetFor(seed, floor);
             for (int retry = 0; retry <= BuildRetries; retry++)
@@ -192,7 +227,7 @@ namespace SleepingCalamity.Core
         // the pool's small rooms; the throw is the unreachable end.
         public static CellarFloorLayout GenerateLastResort(uint seed, int floor)
         {
-            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "floors are 1-3");
+            RequireGenerated(floor, "GenerateLastResort");
             CellarFloorPlan plan = MinimalPlan(seed, floor);
             LayoutPreset real = CellarLayoutPresets.PresetFor(seed, floor);
             // Two streams get the full exit bound; the minimal plan rarely reaches it, so the rest relax it at once instead of burning every stream first.
@@ -218,34 +253,6 @@ namespace SleepingCalamity.Core
                 if (l != null) return l;
             }
             return null;
-        }
-
-        // Floor 4: the taken bakery's oven maze (PHASE1 7.2), a FIXED layout: the seed is ignored (every seed gives the same floor; only the layout's Seed
-        // field records it). Rooms and positions are hard-coded, all unrotated; only the corridor routes are computed (unshuffled BFS, so they are fixed too).
-        //   entry -> oven mouth -+-> proofing room -+-> kneading hall -> flue antechamber -> baker's hearth
-        //                        '-> flour store ---'
-        // The mouth, proofing room, kneading hall and flour store form a ring (the loop, two routes through the maze). The antechamber (the Dough Warden's
-        // Tier2 spawn) has the hearth's only door, so the heart (baker marker + the rescue Bank cell, a second bank point that leads home) is reached only
-        // through it. No stair exit, no locked room, no gate key; 7 chests in the maze rooms and the antechamber (PHASE1: 6-8 per floor).
-        static CellarFloorLayout BuildBakery(uint seed)
-        {
-            var b = new Builder(new Pcg32(4444));
-            b.Reset();
-            int entry = b.PlaceFixed(Special(RoomKind.Entry), 0, 0, 0);
-            int mouth = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.MouthId), 0, 5, 0);
-            int proof = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.ProofingId), 0, 9, 0);
-            int flour = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.FlourId), 0, 5, 5);
-            int knead = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.KneadingId), 0, 9, 5);
-            int ante = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.AntechamberId), 0, 9, 9);
-            int heart = b.PlaceFixed(CellarBakeryPool.Find(CellarBakeryPool.HeartId), 0, 2, 9);
-            b.LinkFixed(entry, CellSide.East, mouth, CellSide.West);
-            b.LinkFixed(mouth, CellSide.East, proof, CellSide.West);
-            b.LinkFixed(mouth, CellSide.South, flour, CellSide.North);
-            b.LinkFixed(proof, CellSide.South, knead, CellSide.North);
-            b.LinkFixed(flour, CellSide.East, knead, CellSide.West);
-            b.LinkFixed(knead, CellSide.South, ante, CellSide.North);
-            b.LinkFixed(ante, CellSide.West, heart, CellSide.East);
-            return b.Assemble(seed, 4, true, SubTheme.Bakery, null, preset: null);
         }
 
         // All mutable placement state for one attempt. rng is a mutable struct kept in this field and never copied.
@@ -488,7 +495,7 @@ namespace SleepingCalamity.Core
             }
 
             // A straight stub of 1-3 corridor cells off an unused door or off a corridor cell. Returns the end cell, or null when nothing fits.
-            CellPos? AddDeadEnd()
+            public CellPos? AddDeadEnd()
             {
                 var cands = new List<(CellPos start, CellSide dir, bool fromDoor, CellPos from, int room, int door)>();
                 for (int r = 0; r < rooms.Count; r++)
@@ -535,7 +542,6 @@ namespace SleepingCalamity.Core
                 var order = new List<CellarRoom>();
                 var middle = new List<CellarRoom>();
                 foreach (CellarRoom r in plan.Combat) if (r != plan.LockedRoom) middle.Add(r);
-                if (plan.HasCheckpoint) middle.Add(Special(RoomKind.Checkpoint));
                 Shuffle(middle, ref rng);
                 if (attempt >= PackFirstAfter)   // a crowded floor: place the big rooms first (stable sort, so the shuffle still breaks ties)
                     for (int i = 1; i < middle.Count; i++)
@@ -670,7 +676,16 @@ namespace SleepingCalamity.Core
                 return built;
             }
 
-            // Fixed placement for floor 4 (no rng, no checks beyond Fits).
+            // The gate-key carrier for a fixed floor: the first Tier-1 spawn of the room (the first spawn when it has none).
+            public GateKeyCarrier CarrierIn(int room)
+            {
+                var spawns = rooms[room].Room.Spawns; int pick = 0;
+                for (int s = 0; s < spawns.Count; s++) if (spawns[s].Tier == SpawnTier.Tier1) { pick = s; break; }
+                CellPos w = rooms[room].Cell(spawns[pick].X, spawns[pick].Y);
+                return new GateKeyCarrier(room, pick, w.X, w.Y);
+            }
+
+            // Fixed placement for the set-piece floors (no rng, no checks beyond Fits).
             public int PlaceFixed(CellarRoom room, int q, int x, int y)
             {
                 CellarRoom rot = Rot(room, q);

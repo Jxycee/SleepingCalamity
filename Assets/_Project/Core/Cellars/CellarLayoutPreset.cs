@@ -5,8 +5,8 @@
 //   Ring   a guaranteed entry-to-join loop with two arcs (rooms split across two routes that meet before the exit, which hangs off the join room as a leaf); at most 1 extra loop.
 //   Hub    a big combat room placed right after the entry that most rooms link to; 1-2 loops.
 //   Wing   two branches off the entry; the exit ends the larger one; one loop that stays inside the other (dead) branch, so it never joins the two halves of the path.
-// Floors 1-3 pick one on its own stream Rng.Derive(seed, "cellars.preset", floor), never the same as the floor before (the previous pick is replayed from the seed).
-// Floor 4 (the fixed bakery) has no preset.
+// Generated floors (2, 4, 6, 7) pick one on its own stream Rng.Derive(seed, "cellars.preset", floor), never the same as the generated floor before (the previous pick is replayed from the seed).
+// Floor 1 is built with Spine by hand; the set pieces 3 and 5 have no preset.
 using System;
 
 namespace SleepingCalamity.Core
@@ -18,11 +18,12 @@ namespace SleepingCalamity.Core
         // PLACEHOLDER (tuning, not tested for feel): relative weights in enum order (Spine, Ring, Hub, Wing). The previous floor's preset is dropped before drawing.
         public static readonly int[] Weights = { 30, 30, 20, 20 };
 
-        // Pure in (seed, floor); floors 1-3.
+        // Pure in (seed, floor); the generated floors 2, 4, 6, 7. "The floor before" is the previous GENERATED floor.
         public static LayoutPreset PresetFor(uint seed, int floor)
         {
-            if (floor < 1 || floor > 3) throw new ArgumentOutOfRangeException(nameof(floor), "presets are for floors 1-3");
-            int prev = floor > 1 ? (int)PresetFor(seed, floor - 1) : -1;
+            if (!CellarFloorGenerator.IsGeneratedFloor(floor)) throw new ArgumentOutOfRangeException(nameof(floor), "presets are for the generated floors 2, 4, 6 and 7");
+            int before = CellarFloorGenerator.PreviousGeneratedFloor(floor);
+            int prev = before > 0 ? (int)PresetFor(seed, before) : -1;
             var rng = new Pcg32(Rng.Derive(seed, "cellars.preset", (ulong)floor));
             int total = 0;
             for (int i = 0; i < Weights.Length; i++) if (i != prev) total += Weights[i];

@@ -11,7 +11,7 @@ namespace SleepingCalamity.Tests.EditMode
     {
         static CellarEncounterPlan Plan(uint seed, int floor, int extra, bool hunter, out CellarFloorLayout l)
         {
-            l = CellarFloorGenerator.Generate(seed, floor);
+            l = CellarFloorGenerator.Layout(seed, floor);
             return CellarEncounterPlan.Build(l, CellarFloorDressing.Resolve(l), extra, hunter);
         }
 
@@ -156,7 +156,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 10; seed++)
                 for (int floor = 1; floor <= 4; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                     CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                     ulong lh = l.LayoutHash(), dh = d.DressingHash();
                     CellarEncounterPlan.Build(l, d, 3, true);

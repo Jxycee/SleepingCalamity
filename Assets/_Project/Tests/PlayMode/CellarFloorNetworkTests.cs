@@ -59,7 +59,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
         private static void AssertSame(CellarFloorSync host, CellarFloorSync peer, uint seed, int floor, string who)
         {
-            ulong expected = CellarFloorGenerator.Generate(seed, floor).LayoutHash();
+            ulong expected = CellarFloorGenerator.Layout(seed, floor).LayoutHash();
             Assert.That(host.BuiltLayoutHash, Is.EqualTo(expected), "host hash vs generator");
             Assert.That(peer.BuiltLayoutHash, Is.EqualTo(expected), who + " hash vs generator");
             Assert.That(peer.BuiltLayoutHash, Is.EqualTo(host.BuiltLayoutHash), who + " hash vs host");
@@ -85,7 +85,7 @@ namespace SleepingCalamity.Tests.PlayMode
             CellarFloorBuild built = null;
             try
             {
-                CellarFloorLayout layout = CellarFloorGenerator.Generate(12345u, 2);
+                CellarFloorLayout layout = CellarFloorGenerator.Layout(12345u, 2);
                 built = CellarFloorBuilder.Build(layout, parent);
                 Vector3 entry = built.EntryCenter;
                 Assert.That(entry.x, Is.GreaterThan(100f), "the entry is in world space under the parent");
@@ -158,7 +158,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return WaitBuilt(peerB, seedB, 4, "late client B");
             AssertSame(host, peerA, seedB, 4, "client A f4");
             AssertSame(host, peerB, seedB, 4, "late client B f4");
-            Assert.That(host.BuiltLayoutHash, Is.EqualTo(CellarFloorGenerator.Generate(0u, 4).LayoutHash()), "floor 4 is the same fixed layout whatever the seed");
+            Assert.That(host.BuiltLayoutHash, Is.EqualTo(CellarFloorGenerator.Layout(0u, 4).LayoutHash()), "floor 4 is the same fixed layout whatever the seed");
             Assert.That(host.Built.Root.Find(CellarFloorBuilder.MarkerGroup).Find("Baker"), Is.Not.Null, "the baker marker is built on floor 4");
 
             // Back to no floor: all peers clear.

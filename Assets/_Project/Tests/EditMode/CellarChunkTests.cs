@@ -74,13 +74,13 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
-        static ulong Hash(uint seed, int floor) => CellarRoomChunks.Resolve(CellarFloorGenerator.Generate(seed, floor)).ChunksHash();
+        static ulong Hash(uint seed, int floor) => CellarRoomChunks.Resolve(CellarFloorGenerator.Layout(seed, floor)).ChunksHash();
 
         [Test]
         public void Chunks_GoldenHashes_Seed12345()
         {
             // re-pinned after item 2 layout presets (deliberate: the seed-12345 layout moved); floor 4 has none
-            ulong[] expect = { 15269764869822355049UL, 15479631453779929986UL, 17792373417583517742UL, 3232700585171816769UL };   // floors 1-4; floors 2-3 re-pinned by rooms-v2 (pool resize)
+            ulong[] expect = { 2942920586495807399UL, 4136337415366105277UL, 14394277620009763814UL, 12116672460147880033UL };   // re-pinned by plan 3 task 3/4: floor 3 is the bakery stub (no chunks, the empty hash), floor 4 a generated wine floor;   // floors 1-4; floors 2-3 re-pinned by rooms-v2 (pool resize)
             var sb = new StringBuilder();
             for (int f = 1; f <= 4; f++) sb.Append("floor " + f + ": " + Hash(12345, f) + "UL\n");
             for (int f = 1; f <= 4; f++) Assert.AreEqual(expect[f - 1], Hash(12345, f), "floor " + f + "\n" + sb);
@@ -93,7 +93,7 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (uint seed in new uint[] { 12345, 7, 99 })
                 for (int f = 1; f <= 4; f++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f); CellarFloorDressing d0 = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, f); CellarFloorDressing d0 = CellarFloorDressing.Resolve(l);
                     ulong lh = l.LayoutHash(), dh = d0.DressingHash();
                     CellarRoomChunks.Resolve(l, d0);
                     Assert.AreEqual(lh, l.LayoutHash()); Assert.AreEqual(dh, d0.DressingHash());
@@ -104,7 +104,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Chunks_NeverCoverTheHealPoint(int seeds)
         {
             int withHeal = 0;
-            for (int f = 1; f <= 3; f++)
+            foreach (int f in CellarTestFloors.DiveFloors)
                 for (uint seed = 1; seed <= seeds; seed++)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
@@ -120,9 +120,9 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Chunks_Floor4HasNone()
+        public void Chunks_StubFloors3And5HaveNone()
         {
-            for (uint seed = 1; seed <= 20; seed++) Assert.AreEqual(0, CellarRoomChunks.Resolve(CellarFloorGenerator.Generate(seed, 4)).Chunks.Count);
+            for (uint seed = 1; seed <= 20; seed++) foreach (int f in new[] { 3, 5 }) Assert.AreEqual(0, CellarRoomChunks.Resolve(CellarFloorGenerator.Layout(seed, f)).Chunks.Count);
         }
 
         [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
@@ -131,7 +131,7 @@ namespace SleepingCalamity.Tests.EditMode
             var variantCounts = new Dictionary<string, int[]>();            // "roomId|regionId" -> picks per variant
             var combos = new Dictionary<string, Dictionary<string, int>>(); // roomId -> chunk combination -> visits
             var why = new Dictionary<string, int[]>(); int visits = 0, regionPicks = 0, nonOpen = 0, skippedPicks = 0, roomsWithRegions = 0;
-            for (int f = 1; f <= 3; f++)
+            foreach (int f in CellarTestFloors.DiveFloors)
                 for (uint seed = 1; seed <= seeds; seed++)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f); CellarRoomChunks c = CellarTestFloors.ChunkPlan(seed, f);
@@ -222,7 +222,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (var (seed, floor) in new (uint, int)[] { (12345, 1), (12345, 2), (12345, 3), (7, 2), (99, 3), (4242, 1), (12345, 4) })
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 try
                 {
                     CellarRoomChunks c = CellarRoomChunks.Resolve(l);

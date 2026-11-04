@@ -30,7 +30,7 @@ namespace SleepingCalamity.Tests.EditMode
             int floors = 0, moved = 0, trueFallbacks = 0, fallbackFloors = 0, totalSpawns = 0;
             foreach (var (seed, floor) in AmbushFloors(60))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(l, d, 1, false);
                 Assert.AreEqual(FloorTwist.Ambush, plan.Twist);
                 int room = plan.AmbushRoom;
@@ -77,7 +77,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (var (seed, floor) in AmbushFloors(60))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(l, d, 1, false);
                 CellPos[] cells = CellarAmbush.Cells(l, d, plan, plan.AmbushRoom);
                 int i = 0;

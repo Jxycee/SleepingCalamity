@@ -1,6 +1,6 @@
 // Authority: none (pure EditMode tests). Procgen item 2: layout presets (Spine / Ring / Hub / Wing) and the far dead-end stair exit (Core/Cellars: CellarLayoutPreset, CellarFloorGenerator, CellarFloorLayout.ExitIsLeaf).
 // Catches: a preset that differs between peers or repeats on consecutive floors, a preset share that drifts from its weights, a stair exit that is not a leaf, sits next to the entry or is nearer than
-// MinExitDistance, a Ring floor with no arc, Spine floors that are not longer than Hub floors, loop counts outside a preset's rule, a fallback rate that climbs, and a floor-4 hash that moved.
+// MinExitDistance, a Ring floor with no arc, Spine floors that are not longer than Hub floors, loop counts outside a preset's rule, a fallback rate that climbs, and a set-piece layout that carries a preset.
 // Spread numbers are written to procgen_item2_stats.txt in the temp folder.
 using System.Collections.Generic;
 using System.IO;
@@ -14,6 +14,7 @@ namespace SleepingCalamity.Tests.EditMode
     public sealed class CellarPresetTests
     {
         const int Seeds = 2000;
+        static readonly int[] Generated = { 2, 4, 6, 7 };   // the floors that carry a generated preset (plan 3 task 3)
         const int FullSeeds = Seeds;   // the Soak case of every sample-based test; the fast twin takes the first FastSeeds seeds
         static int Scale(int atLeast, int seeds) => seeds >= FullSeeds ? atLeast : System.Math.Max(1, atLeast * seeds / FullSeeds);
 
@@ -25,11 +26,11 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var list = new List<Sample>();
             for (uint seed = 0; seed < seeds; seed++)
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in Generated)
                 {
                     if (!samples.TryGetValue((seed, floor), out Sample sm))
                     {
-                        CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor, out int fb);
+                        CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor, out int fb);
                         samples[(seed, floor)] = sm = new Sample { Seed = seed, Floor = floor, Fallback = fb, Layout = l };
                     }
                     list.Add(sm);
@@ -46,27 +47,29 @@ namespace SleepingCalamity.Tests.EditMode
         static int Loops(CellarFloorLayout l) => l.Links.Count - (l.Rooms.Count - 1);
 
         [Test]
-        public void Preset_IsPure_MatchesTheLayout_AndFloor4HasNone()
+        public void Preset_IsPure_MatchesTheLayout_AndTheSetPiecesHaveNone()
         {
             foreach (uint seed in new uint[] { 0, 1, 7, 12345, 99999, 0xC0FFEE12 })
             {
-                for (int f = 3; f >= 1; f--) Assert.AreEqual(CellarLayoutPresets.PresetFor(seed, f), CellarLayoutPresets.PresetFor(seed, f), "seed " + seed);
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in new[] { 7, 6, 4, 2 }) Assert.AreEqual(CellarLayoutPresets.PresetFor(seed, f), CellarLayoutPresets.PresetFor(seed, f), "seed " + seed);
+                foreach (int f in Generated)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f, out int fb);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, f, out int fb);
                     if (fb == 0) Assert.AreEqual(CellarLayoutPresets.PresetFor(seed, f), l.Preset, "seed " + seed + " floor " + f);
                     Assert.IsTrue(l.Preset.HasValue);
                 }
-                Assert.IsFalse(CellarFloorGenerator.Generate(seed, 4).Preset.HasValue);
+                Assert.AreEqual(LayoutPreset.Spine, CellarFloorGenerator.Layout(seed, 1).Preset, "floor 1 is built as a Spine");
+                Assert.IsFalse(CellarFloorGenerator.Layout(seed, 3).Preset.HasValue);
+                Assert.IsFalse(CellarFloorGenerator.Layout(seed, 5).Preset.HasValue);
             }
-            Assert.Throws<System.ArgumentOutOfRangeException>(() => CellarLayoutPresets.PresetFor(1, 4));
+            foreach (int f in new[] { 1, 3, 5, 8 }) Assert.Throws<System.ArgumentOutOfRangeException>(() => CellarLayoutPresets.PresetFor(1, f));
         }
 
         [Test]
         public void Preset_Seed12345_Golden()
         {
-            string got = string.Join(",", Enumerable.Range(1, 3).Select(f => CellarLayoutPresets.PresetFor(12345, f).ToString()));
-            Assert.AreEqual("Hub,Ring,Spine", got, "actual preset pick for seed 12345 floors 1-3 = " + got);
+            string got = string.Join(",", Generated.Select(f => CellarLayoutPresets.PresetFor(12345, f).ToString()));
+            Assert.AreEqual("Ring,Spine,Ring,Spine", got, "actual preset pick for seed 12345 floors 2, 4, 6, 7 = " + got);
         }
 
         [Test]
@@ -75,15 +78,15 @@ namespace SleepingCalamity.Tests.EditMode
             var count = new int[4]; int total = 0;
             for (uint seed = 0; seed < Seeds; seed++)
             {
-                LayoutPreset prev = LayoutPreset.Spine;
-                for (int f = 1; f <= 3; f++)
+                LayoutPreset prev = LayoutPreset.Spine; bool first = true;
+                foreach (int f in Generated)
                 {
                     LayoutPreset p = CellarLayoutPresets.PresetFor(seed, f);
-                    if (f > 1) Assert.AreNotEqual(prev, p, "seed " + seed + " floor " + f);
-                    prev = p; count[(int)p]++; total++;
+                    if (!first) Assert.AreNotEqual(prev, p, "seed " + seed + " floor " + f);
+                    first = false; prev = p; count[(int)p]++; total++;
                 }
             }
-            var sb = new StringBuilder("preset shares over " + Seeds + " seeds x floors 1-3 (weights " + string.Join("/", CellarLayoutPresets.Weights) + "):");
+            var sb = new StringBuilder("preset shares over " + Seeds + " seeds x generated floors (weights " + string.Join("/", CellarLayoutPresets.Weights) + "):");
             for (int i = 0; i < 4; i++) sb.Append(" " + (LayoutPreset)i + " " + (100.0 * count[i] / total).ToString("F1") + "%");
             Stat(sb.ToString());
             // floor 1 follows the weights exactly; later floors drop the previous pick, which pulls the shares a little toward each other
@@ -228,15 +231,17 @@ namespace SleepingCalamity.Tests.EditMode
         static string PresetName(CellarFloorLayout l) => l.Preset.HasValue ? l.Preset.Value.ToString() : "none";
 
         [Test]
-        public void Floor4_Hash_IsUnchanged_AndHasNoPreset()
+        public void Floor3And5_HaveNoPresetInTheirHash()
         {
-            Assert.AreEqual(8894238083671442472UL, CellarFloorGenerator.Generate(12345, 4).LayoutHash());
+            // the set pieces are built by hand (Preset null), so their hash carries no preset word; floor 3 is pinned by CellarFloorGeneratorTests.Golden_Floor3_Bakery
+            Assert.IsFalse(CellarFloorGenerator.Layout(12345, 3).Preset.HasValue);
+            Assert.IsFalse(CellarFloorGenerator.Layout(12345, 5).Preset.HasValue);
         }
 
         [Test]
         public void LayoutHash_IncludesThePreset()
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(12345, 1);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(12345, 1);
             var other = new CellarFloorLayout(l.Seed, l.Floor, l.IsStub, l.Theme, l.Rooms, l.Corridors, l.Links, l.DeadEnds, l.Chests, l.LockedRoomIndex, l.LockedLinkIndex, l.KeyChestIndex, l.Carrier,
                 (LayoutPreset)(((int)l.Preset.Value + 1) % 4));
             Assert.AreNotEqual(l.LayoutHash(), other.LayoutHash());

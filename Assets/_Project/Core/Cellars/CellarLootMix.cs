@@ -108,7 +108,7 @@ namespace SleepingCalamity.Core
                 {
                     if (!KeyCache.TryGetValue((seed, f), out bool[] flags))
                     {
-                        CellarFloorLayout l = CellarFloorGenerator.Generate(seed, f);
+                        CellarFloorLayout l = CellarFloorGenerator.Layout(seed, f);
                         flags = new bool[l.Chests.Count];
                         for (int i = 0; i < flags.Length; i++) flags[i] = l.Chests[i].HoldsKey;
                         KeyCache[(seed, f)] = flags;

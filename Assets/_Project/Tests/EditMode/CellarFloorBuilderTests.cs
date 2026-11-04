@@ -41,7 +41,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 25; seed++)
                 for (int floor = 1; floor <= 4; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                     CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                     int[] real = CellarFloorBuilder.RoomLightCounts(b.Root, l);
                     for (int r = 0; r < l.Rooms.Count; r++)
@@ -63,7 +63,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (var (seed, floor) in Cases)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                 CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 int expected = OccupiedCells(l);
                 Assert.AreEqual(expected, Group(b, CellarFloorBuilder.FloorGroup).childCount, "floor objects, seed " + seed + " floor " + floor);
@@ -77,7 +77,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (var (seed, floor) in Cases)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                 CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 Physics.SyncTransforms();
                 int open = 0;
@@ -115,7 +115,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (var (seed, floor) in Cases)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                 CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 List<Transform> m = Children(Group(b, CellarFloorBuilder.MarkerGroup)).ToList();
                 string at = "seed " + seed + " floor " + floor;
@@ -135,7 +135,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void EntryIsWalkableAndTheBuildIsDeterministic()
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(12345, 1);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(12345, 1);
             CellarFloorBuild a = CellarFloorBuilder.Build(l, null);
             Physics.SyncTransforms();
             Vector3 e = a.EntryCenter;
@@ -144,7 +144,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(0f, hit.point.y, 0.01f);
             List<string> first = a.Root.GetComponentsInChildren<Transform>().Select(t => t.name + "@" + t.position.ToString("F2")).ToList();
             Object.DestroyImmediate(a.Root.gameObject);
-            CellarFloorBuild b = CellarFloorBuilder.Build(CellarFloorGenerator.Generate(12345, 1), null);
+            CellarFloorBuild b = CellarFloorBuilder.Build(CellarFloorGenerator.Layout(12345, 1), null);
             CollectionAssert.AreEqual(first, b.Root.GetComponentsInChildren<Transform>().Select(t => t.name + "@" + t.position.ToString("F2")).ToList());
             Object.DestroyImmediate(b.Root.gameObject);
         }

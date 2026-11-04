@@ -20,11 +20,12 @@ namespace SleepingCalamity.Core
             return floor != UndercroftPlan.BankFloor || bankChosenThisDive;
         }
 
-        // Where a collapse timer measures its path to: the stair, the bank room on floor 5, the end cell on floor 7 (Task 3 adds EndCell; until then the exit feature).
+        // Where a collapse timer measures its path to: the stair, the bank room on floor 5, the end cell on floor 7.
         public static CellPos? CollapseTargetCell(CellarFloorLayout layout)
         {
             if (layout == null) return null;
-            if (layout.Floor == UndercroftPlan.BankFloor) return layout.BankCell ?? layout.StairExit;
+            if (layout.Floor == UndercroftPlan.BankFloor) return layout.BankRoomCell ?? layout.StairExit;
+            if (layout.Floor == LastBuiltFloor) return layout.EndCell ?? layout.StairExit;
             return layout.StairExit;
         }
     }

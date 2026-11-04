@@ -166,9 +166,9 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             for (uint sd = 1; sd < 2500; sd++)
             {
-                CellarFloorLayout l1 = CellarFloorGenerator.Generate(sd, 1);
+                CellarFloorLayout l1 = CellarFloorGenerator.Layout(sd, 1);
                 if (!(l1.HasLockedRoom && l1.Carrier != null && l1.KeyChestIndex >= 0)) continue;
-                if (need2and3 && (CellarFloorGenerator.Generate(sd, 2).Carrier == null || CellarFloorGenerator.Generate(sd, 3).Carrier == null)) continue;
+                if (need2and3 && (CellarFloorGenerator.Layout(sd, 2).Carrier == null || CellarFloorGenerator.Layout(sd, 3).Carrier == null)) continue;
                 return sd;
             }
             return 0;

@@ -10,11 +10,13 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarHealingTests
     {
+        static readonly int[] HealFloors = { 1, 2, 4, 6, 7 };   // every built floor except the stub set pieces 3 and 5
+
         static CellPos? Point(uint seed, int floor) => CellarHealing.PointFor(CellarTestFloors.Layout(seed, floor), CellarTestFloors.Dressing(seed, floor));
 
         static CellPos? PointFresh(uint seed, int floor)   // regenerates on purpose (determinism), so it does not share the cache
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
             return CellarHealing.PointFor(l, CellarFloorDressing.Resolve(l));
         }
 
@@ -29,7 +31,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Point_IsDeterministic()
         {
             for (uint seed = 0; seed < 60; seed++)
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in HealFloors)
                 {
                     CellPos? a = PointFresh(seed, floor), b = Point(seed, floor);
                     Assert.AreEqual(a.HasValue, b.HasValue, "seed " + seed + " floor " + floor);
@@ -42,16 +44,16 @@ namespace SleepingCalamity.Tests.EditMode
         {
             int with = 0, total = 0;
             for (uint seed = 1; seed <= seeds; seed++)
-                for (int floor = 1; floor <= 3; floor++) { total++; if (Point(seed, floor).HasValue) with++; }
+                foreach (int floor in HealFloors) { total++; if (Point(seed, floor).HasValue) with++; }
             double share = (double)with / total;
             double slack = seeds >= 1000 ? 0 : 0.15;   // statistical band: wider for the fast twin
             Assert.That(share, Is.InRange(0.45 - slack, 0.57 + slack), "share " + share + " (" + with + "/" + total + ")");
         }
 
         [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
-        public void EachFloor_1To3_HasItsOwnShareAboutHalf(int seeds)
+        public void EachHealFloor_HasItsOwnShareAboutHalf(int seeds)
         {
-            for (int floor = 1; floor <= 3; floor++)
+            foreach (int floor in HealFloors)
             {
                 int with = 0;
                 for (uint seed = 1; seed <= seeds; seed++) if (Point(seed, floor).HasValue) with++;
@@ -61,9 +63,9 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Floor4_NeverHasAHealingPoint_AndTheStubIsNotRolled()
+        public void TheStubSetPieces_NeverHaveAHealingPoint()
         {
-            for (uint seed = 1; seed <= 200; seed++) Assert.IsFalse(Point(seed, 4).HasValue, "seed " + seed);
+            for (uint seed = 1; seed <= 200; seed++) { Assert.IsFalse(Point(seed, 3).HasValue, "seed " + seed + " floor 3"); Assert.IsFalse(Point(seed, 5).HasValue, "seed " + seed + " floor 5"); }
         }
 
         [Test]
@@ -72,7 +74,7 @@ namespace SleepingCalamity.Tests.EditMode
             HealTuning none = HealTuning.Default; none.ChancePercent = 0;
             HealTuning all = HealTuning.Default; all.ChancePercent = 100;
             for (uint seed = 1; seed <= 100; seed++)
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in HealFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     Assert.IsFalse(CellarHealing.PointFor(l, d, none).HasValue);
@@ -85,7 +87,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             HealTuning lo = HealTuning.Default; lo.ChancePercent = 60;
             for (uint seed = 1; seed <= 200; seed++)
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in HealFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     CellPos? a = CellarHealing.PointFor(l, d), b = CellarHealing.PointFor(l, d, lo);
@@ -98,7 +100,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             int checkedPoints = 0;
             for (uint seed = 1; seed <= seeds; seed++)
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in HealFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, floor); CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     CellPos? p = CellarHealing.PointFor(l, d);
@@ -145,16 +147,17 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Goldens_Seed12345_AfterItem2()
         {
-            Assert.AreEqual(932123446153315579UL, CellarFloorGenerator.Generate(12345, 1).LayoutHash());
-            Assert.AreEqual(5927757008498482560UL, CellarFloorGenerator.Generate(12345, 2).LayoutHash());
-            Assert.AreEqual(10153009738242674868UL, CellarFloorGenerator.Generate(12345, 3).LayoutHash());
-            Assert.AreEqual(8894238083671442472UL, CellarFloorGenerator.Generate(12345, 4).LayoutHash());
+            // the layout goldens now live in CellarFloorGeneratorTests; here the floors are only checked to be the ones the healing point reads
+            Assert.AreEqual(8462212200985256396UL, CellarFloorGenerator.Layout(12345, 1).LayoutHash());
+            Assert.AreEqual(16607234616487640366UL, CellarFloorGenerator.Layout(12345, 2).LayoutHash());
+            Assert.AreEqual(3485229907679376271UL, CellarFloorGenerator.Layout(12345, 3).LayoutHash());
+            Assert.AreEqual(4666321676584969224UL, CellarFloorGenerator.Layout(12345, 4).LayoutHash());
         }
 
         [Test]
         public void ComputingThePoint_DoesNotChangeLayoutOrDressingHashes()
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(777, 2);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(777, 2);
             ulong lh = l.LayoutHash(); CellarFloorDressing d = CellarFloorDressing.Resolve(l); ulong dh = d.DressingHash();
             CellarHealing.PointFor(l, d);
             Assert.AreEqual(lh, l.LayoutHash());
@@ -166,7 +169,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             for (uint seed = 1; seed <= 40; seed++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 1);
                 Assert.AreEqual(l.EntryToExitDistance(), l.WalkDistances()[l.StairExit.Value.X, l.StairExit.Value.Y]);
             }
         }

@@ -384,7 +384,7 @@ namespace SleepingCalamity.Tests.PlayMode
             uint seed = 0;
             for (uint sd = 1; sd < 400 && seed == 0; sd++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(sd, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(sd, 1);
                 if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) seed = sd;
             }
             Assert.That(seed, Is.Not.EqualTo(0u), "a seed with a carrier");
