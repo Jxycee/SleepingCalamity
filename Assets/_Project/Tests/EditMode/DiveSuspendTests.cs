@@ -523,6 +523,300 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(SuspendSaveRules.RenameId(IdC, KeyA, to), Is.EqualTo(IdC));
         }
 
+        // ================================================================ plan 3 task 8a: resume, and the stale-suspend guard
+        // Catches (below): a stale suspend surviving a source that never says "known, none", an autosave between a load and the resume wiping the pending suspend, a used suspend living on, a party
+        // that resumes at the wrong floor, with its stir, momentum or bags lost, a resume that spends or sets the checkpoint, a quit in the bank room counted as a failed dive, an absent player's bag
+        // lost. Does NOT catch: the host wiring (DiveSpineNetworkTests / SuspendSaveNetworkTests), a client rejoining a resumed dive (manual 2-PC walk).
+        static readonly TownStock.SuspendContext NoPending = new TownStock.SuspendContext { Seed = 4242u, PresentIds = new[] { IdA, IdB }, IdsBySlot = new[] { IdA, IdB } };
+
+        static TownStock NewStock() => new TownStock(HollowmereLayout.Create());
+
+        static readonly IReadOnlyDictionary<int, int> Depths = PieceDepths.Assign(12345UL, PieceCatalog.Specs);
+
+        // The way the host reloads: a director capture, the clean the world file goes through, a fresh stock restores it.
+        static (TownStock.WorldRestore world, TownSnapshot loaded) Reload(DiveSession s, TownStock.SuspendContext ctx)
+        {
+            TownSnapshot saved = TownSaveRules.CleanSnapshot(NewStock().CaptureWorld(s, false, null, Depths, null, ctx), null, null, false);
+            TownSnapshot loaded = TownSaveRules.CleanSnapshot(saved, null, null, true);   // load: the failed-dive rule applies
+            return (NewStock().RestoreWorld(loaded, Depths), loaded);
+        }
+
+        [Test]
+        public void Reconcile_WithSuspendSection_IsNotAFailedDive()
+        {
+            var s = new TownSnapshot { Dive = new DiveSave { InDive = true }, Suspend = Section(GoodBag(KeyA.Id)) };
+            var repaired = new List<string>();
+            TownSnapshot c = TownSaveRules.CleanSnapshot(s, null, repaired, true);
+            TownSaveRules.Reconcile(c, repaired, true);
+            Assert.That(c.Dive.InDive, Is.True, "the section keeps the dive in progress: nobody counts a failure");
+            Assert.That(c.Suspend, Is.Not.Null);
+            Assert.That(repaired.Any(r => r.Contains("failed dive")), Is.False);
+        }
+
+        [Test]
+        public void CleanSnapshot_DropsAStaleSuspend_WhenNoDiveIsInProgress()
+        {
+            var repaired = new List<string>();
+            // the dive section says nothing is in progress, but a suspend section is still there: a used or left-over one
+            var stale = new TownSnapshot { Dive = new DiveSave { InDive = false }, Suspend = Section(GoodBag(KeyA.Id)) };
+            Assert.That(TownSaveRules.CleanSnapshot(stale, null, repaired, true).Suspend, Is.Null);
+            Assert.That(repaired.Any(r => r.Contains("suspend")), Is.True, "and the drop is reported");
+            // no dive section at all
+            Assert.That(TownSaveRules.CleanSnapshot(new TownSnapshot { Suspend = Section(GoodBag(KeyA.Id)) }, null, null, true).Suspend, Is.Null);
+            // the same on the capture path that only copies (failMidDive false)
+            Assert.That(TownSaveRules.CleanSnapshot(stale, null, null, false).Suspend, Is.Null);
+            // a dive in progress keeps it
+            var live = new TownSnapshot { Dive = new DiveSave { InDive = true }, Suspend = Section(GoodBag(KeyA.Id)) };
+            Assert.That(TownSaveRules.CleanSnapshot(live, null, null, true).Suspend, Is.Not.Null);
+        }
+
+        [Test]
+        public void StaleSuspend_IsWiped_WhenALaterSourceSaysNothingAndTheDiveIsOver()
+        {
+            // The file holds a suspend (from a used resume, say) and the party since failed and went home: the live capture is a source that never says "known, none" (SuspendKnown false)
+            // and its dive section says nothing is in progress. MergeLive keeps the previous suspend for such a source; the guard must still drop it, or a later quit mid-dive would resume from it.
+            var previous = new TownSnapshot { Dive = new DiveSave { InDive = true }, Suspend = Section(GoodBag(KeyA.Id)) };
+            var live = new TownSnapshot { Dive = new DiveSave { InDive = false } };
+            TownSnapshot merged = TownSaveRules.MergeLive(live, previous);
+            Assert.That(merged.Suspend, Is.Not.Null, "premise: MergeLive keeps the previous copy for a source that says nothing");
+            Assert.That(TownSaveRules.CleanSnapshot(merged, null, null, false).Suspend, Is.Null, "the host's clean after the merge drops it");
+        }
+
+        [Test]
+        public void CaptureWorld_AlwaysSaysWhatItKnowsAboutTheSuspend()
+        {
+            var bags = new PartyBags();
+            var s = new DiveSession(bags, new DiveCheckpoint(), new DivePieces(Depths));
+            TownSnapshot town = NewStock().CaptureWorld(s, false, null, Depths, null);
+            Assert.That(town.SuspendKnown, Is.True, "a Town-phase capture says 'none'");
+            Assert.That(town.Suspend, Is.Null);
+            Assert.That(NewStock().CaptureWorld(null, false, null, Depths, null).SuspendKnown, Is.True, "even with no session yet");
+
+            // the host's merge: the saved suspend is cleared by a known-none capture (it was used)
+            var previous = new TownSnapshot { Dive = new DiveSave { InDive = true }, Suspend = Section(GoodBag(KeyA.Id)) };
+            Assert.That(TownSaveRules.MergeLive(town, previous).Suspend, Is.Null);
+
+            // a dive on floor 3: also known-none (only floor 5's bank writes one)
+            Assert.That(s.TryStart(1, false), Is.True);
+            s.ClearFloor(1); Assert.That(s.EnterFloor(2), Is.True);
+            TownSnapshot below = NewStock().CaptureWorld(s, false, null, Depths, null);
+            Assert.That(below.SuspendKnown, Is.True);
+            Assert.That(below.Suspend, Is.Null);
+            Assert.That(below.Dive.InDive, Is.True, "the old rule: a quit on floor 2 loads as a failed dive");
+            Assert.That(TownSaveRules.MergeLive(below, previous).Suspend, Is.Null, "and a stale suspend does not outlive the party's trip down");
+        }
+
+        [Test]
+        public void CaptureWorld_InTheBankRoom_WritesTheSuspend_BagsAsCarried_PushedOnFalse()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            DiveSession s = AtBank(bags);
+            bags.For(IdA).Pick(0);
+            TownSnapshot snap = NewStock().CaptureWorld(s, false, null, Depths, null, NoPending);
+            Assert.That(snap.SuspendKnown, Is.True);
+            Assert.That(snap.Suspend, Is.Not.Null);
+            Assert.That(snap.Suspend.Phase, Is.EqualTo((int)DivePhase.BankRoom));
+            Assert.That(snap.Suspend.BankChosen, Is.False, "quitting before the choice: PushedOn == false");
+            Assert.That(snap.Suspend.Seed, Is.EqualTo(4242u));
+            Assert.That(snap.Suspend.Bags.Single(b => b.Id == KeyA.Id).Carried, Is.EqualTo(new[] { 104, 105 }));
+            Assert.That(snap.Suspend.Bags.Single(b => b.Id == KeyA.Id).Picks, Is.EqualTo(new[] { 0 }));
+            Assert.That(snap.Dive.InDive, Is.True);
+            Assert.That(snap.Bags.Players.Single(p => p.Id == KeyA.Id).Satchel, Is.Null, "carried, not packed into a waiting satchel as a failed dive would");
+        }
+
+        [Test]
+        public void QuitInBankRoomBeforePushOn_IsNormalSaveAndQuit_NoFailureCounted()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            DiveSession s = AtBank(bags);
+            bags.For(IdA).Pick(0);
+            var (world, loaded) = Reload(s, NoPending);
+            Assert.That(loaded.Dive.InDive, Is.True, "the load did not count a failed dive");
+            Assert.That(loaded.Suspend, Is.Not.Null);
+            Assert.That(world.Suspend, Is.Not.Null);
+            PlayerBag a = world.Bags.For(IdA);
+            Assert.That(a.Carried, Is.EqualTo(new[] { 104, 105 }));
+            Assert.That(a.Satchel.Waiting, Is.Null, "no failed-dive satchel was made");
+            Assert.That(a.BankedThisDive, Is.EqualTo(new Dictionary<int, int> { { 101, 1 } }));
+        }
+
+        [Test]
+        public void PendingSuspend_IsReEmitted_ByEveryCaptureUntilUsed_AutosaveBeforeTheTrapdoorKeepsIt()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            DiveSession s = AtBank(bags);
+            var (world, _) = Reload(s, NoPending);
+
+            // the party waits at the trapdoor in a Town-phase session over the restored bags; the director holds the loaded section as pending
+            var town = new DiveSession(world.Bags, world.Checkpoint, world.Pieces);
+            var ctx = new TownStock.SuspendContext { Seed = 4242u, PresentIds = new[] { IdA }, IdsBySlot = new[] { IdA, IdB }, Pending = world.Suspend };
+            TownSnapshot autosave = NewStock().CaptureWorld(town, false, null, Depths, null, ctx);
+            Assert.That(autosave.Suspend, Is.SameAs(world.Suspend), "re-emitted as it was loaded");
+            Assert.That(autosave.SuspendKnown, Is.True);
+            Assert.That(autosave.Dive.InDive, Is.True, "a dive is still in progress, or the guard would drop the section");
+
+            // the file written by that autosave still loads as a suspended dive with the carried items
+            TownSnapshot file = TownSaveRules.CleanSnapshot(autosave, null, null, false);
+            Assert.That(file.Suspend, Is.Not.Null, "the clean guard keeps it");
+            TownSnapshot merged = TownSaveRules.MergeLive(autosave, new TownSnapshot());
+            Assert.That(TownSaveRules.CleanSnapshot(merged, null, null, false).Suspend, Is.Not.Null);
+            var (world2, loaded2) = (NewStock().RestoreWorld(TownSaveRules.CleanSnapshot(file, null, null, true), Depths), file);
+            Assert.That(world2.Bags.For(IdA).Carried, Is.EqualTo(new[] { 104, 105 }), "the carried items were not lost by the autosave");
+            Assert.That(loaded2.Bags, Is.Not.Null);
+
+            // used: the capture without a pending section says known-none and the file loses it
+            TownSnapshot used = NewStock().CaptureWorld(town, false, null, Depths, null, new TownStock.SuspendContext { Seed = 4242u });
+            Assert.That(used.SuspendKnown, Is.True);
+            Assert.That(used.Suspend, Is.Null);
+            Assert.That(TownSaveRules.MergeLive(used, merged).Suspend, Is.Null);
+            Assert.That(used.Dive.InDive, Is.False);
+        }
+
+        [Test]
+        public void RestoreWorld_WithASuspend_RebuildsTheMidDiveBags_AndWithoutOneOnlyTheHomeHalf()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            DiveSession s = AtBank(bags);
+            var (world, _) = Reload(s, NoPending);
+            PlayerBag a = world.Bags.For(IdA);
+            Assert.That(a.Carried, Is.EqualTo(new[] { 104, 105 }));
+            Assert.That(a.DiveGold, Is.EqualTo(7));
+            Assert.That(a.Gold, Is.EqualTo(5));
+            Assert.That(a.Satchel.Carried.Items, Is.EqualTo(new[] { 106 }));
+            Assert.That(a.ChestOpened(55u, 3, 63), Is.True);
+
+            // a failed-dive save restores the home half only
+            var failedBags = new PartyBags();
+            failedBags.Adopt(IdA, MidDiveBagA());
+            var below = new DiveSession(failedBags, new DiveCheckpoint(), new DivePieces(Depths));
+            below.TryStart(1, false);
+            TownSnapshot snap = TownSaveRules.CleanSnapshot(NewStock().CaptureWorld(below, false, null, Depths, null), null, null, true);
+            Assert.That(snap.Dive.InDive, Is.False);
+            PlayerBag failed = NewStock().RestoreWorld(snap, Depths).Bags.For(IdA);
+            Assert.That(failed.Carried, Is.Empty);
+            Assert.That(failed.Satchel.Waiting.Items, Is.EqualTo(new[] { 104, 105 }));
+        }
+
+        [Test]
+        public void LoadedSuspend_ResumesAtFloor6_WithStirMomentumAndBags()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            DiveSession s = AtBank(bags);
+            bags.For(IdA).Pick(0);
+            s.Stir.PlayersPresent = 2; s.Stir.UnbankedValuables = 5;
+            Assert.That(s.PushOn(), Is.True);
+            Assert.That(s.SuspendsAtBank, Is.True, "floor 5 after the push-on is still a suspend state");
+            var (world, _) = Reload(s, NoPending);
+            Assert.That(world.Suspend.BankChosen, Is.True);
+
+            var cp = new DiveCheckpoint(); cp.Restore(false);
+            DiveSession r = SuspendSaveRules.Resume(world.Suspend, world.Bags, cp, world.Pieces, BySlot(), new[] { 0, 1 }, BySlot(), 4242UL, -1);
+            Assert.That(r, Is.Not.Null);
+            Assert.That(r.Floor, Is.EqualTo(6), "the next floor after the bank");
+            Assert.That(r.Phase, Is.EqualTo(DivePhase.Floor));
+            Assert.That(r.BankChosenThisDive, Is.True, "bank locked");
+            Assert.That(r.Momentum.PushedOn, Is.True);
+            Assert.That(r.Momentum.ChestRankBonus(6), Is.EqualTo(1));
+            Assert.That(r.Stir.Capture().SecondHalf, Is.True);
+            Assert.That(r.Stir.Value, Is.EqualTo(0f).Within(0.001f), "the second half starts clean");
+            Assert.That(r.PushOn(), Is.False);
+            Assert.That(r.EnterBankRoom(new List<int> { 0 }, 1UL, -1, new[] { IdA }), Is.False);
+            PlayerBag a = world.Bags.For(IdA);
+            Assert.That(a.BankedThisDive.ContainsKey(104), Is.True, "the pick banked at the push-on");
+            Assert.That(a.Carried, Is.EqualTo(new[] { 105 }));
+            Assert.That(a.DiveGold, Is.EqualTo(7));
+            Assert.That(cp.Held, Is.False, "a resume neither sets nor spends the checkpoint");
+            Assert.That(r.Ended, Is.Null);
+        }
+
+        [Test]
+        public void LoadedSuspend_BeforePushOn_ReturnsToBankRoom_VisitsReopenedWithPicks()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            bags.For(IdB).Add(110);
+            DiveSession s = AtBank(bags);
+            bags.For(IdA).Pick(0); bags.For(IdA).Pick(PlayerBag.SatchelPick);
+            bags.For(IdB).Pick(0);
+            var (world, _) = Reload(s, NoPending);
+            Assert.That(world.Suspend.BankChosen, Is.False);
+
+            DiveSession r = SuspendSaveRules.Resume(world.Suspend, world.Bags, new DiveCheckpoint(), world.Pieces, BySlot(), new[] { 0, 1 }, BySlot(), 4242UL, -1);
+            Assert.That(r.Phase, Is.EqualTo(DivePhase.BankRoom));
+            Assert.That(r.Floor, Is.EqualTo(5));
+            Assert.That(r.BankChosenThisDive, Is.False);
+            Assert.That(world.Bags.For(IdA).BankOpen, Is.True, "visits reopened");
+            Assert.That(world.Bags.For(IdA).SlotCapacity, Is.EqualTo(2));
+            Assert.That(world.Bags.For(IdA).Picks, Is.EqualTo(new[] { 0, PlayerBag.SatchelPick }), "the saved picks are still picked");
+            Assert.That(world.Bags.For(IdB).Picks, Is.EqualTo(new[] { 0 }));
+            Assert.That(r.PushOn(), Is.True, "the choice is still to be made");
+            Assert.That(world.Bags.For(IdA).BankedThisDive.ContainsKey(104) && world.Bags.For(IdA).BankedThisDive.ContainsKey(106), Is.True);
+        }
+
+        [Test]
+        public void Resume_BankRoomOnAnotherFloor_IsClampedToFloor5_AndAnUnresumablePhaseIsRefused()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            DiveSession s = AtBank(bags);
+            var (world, _) = Reload(s, NoPending);
+
+            SuspendSave odd = SuspendSaveRules.Clean(world.Suspend, null);
+            odd.Floor = 8; odd.ClearedMask = 0;   // damaged or hand-edited: the bank room on floor 8, nothing cleared
+            DiveSession r = SuspendSaveRules.Resume(odd, world.Bags, new DiveCheckpoint(), world.Pieces, BySlot(), new[] { 0, 1 }, BySlot(), 1UL, -1);
+            Assert.That(r, Is.Not.Null);
+            Assert.That(r.Floor, Is.EqualTo(UndercroftPlan.BankFloor), "clamped: the party returns to the bank room, items kept");
+            Assert.That(r.Phase, Is.EqualTo(DivePhase.BankRoom));
+            Assert.That(r.IsCleared(5), Is.True);
+            Assert.That(world.Bags.For(IdA).Carried, Is.EqualTo(new[] { 104, 105 }));
+
+            SuspendSave stairQuit = SuspendSaveRules.Clean(world.Suspend, null);
+            stairQuit.Phase = (int)DivePhase.Floor; stairQuit.Floor = 3; stairQuit.BankChosen = false;
+            Assert.That(SuspendSaveRules.IsResumable(stairQuit), Is.False, "the later stair quit is not built yet");
+            Assert.That(SuspendSaveRules.Resume(stairQuit, world.Bags, new DiveCheckpoint(), world.Pieces, BySlot(), null, null, 1UL, -1), Is.Null);
+            stairQuit.Floor = 5; stairQuit.BankChosen = false;
+            Assert.That(SuspendSaveRules.IsResumable(stairQuit), Is.False, "floor 5 in the Floor phase without the push-on is not a state a quit saves");
+            Assert.That(SuspendSaveRules.Resume(null, world.Bags, new DiveCheckpoint(), world.Pieces, null, null, null, 1UL, -1), Is.Null);
+        }
+
+        [Test]
+        public void AbsentPlayer_KeepsSuspendedBagUntilBack()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            bags.Adopt(IdB, new PlayerBag());
+            bags.For(IdB).Add(110); bags.For(IdB).Add(111);
+            DiveSession s = AtBank(bags);
+            bags.For(IdB).Pick(0);
+            var (world, _) = Reload(s, NoPending);
+
+            // only A is back; B is absent: the visit shrinks to A alone, B's bag is untouched (items still carried) and still in the next capture
+            DiveSession r = SuspendSaveRules.Resume(world.Suspend, world.Bags, new DiveCheckpoint(), world.Pieces, BySlot(), new[] { 0 }, new[] { IdA }, 4242UL, -1);
+            Assert.That(world.Bags.For(IdA).SlotCapacity, Is.EqualTo(3));
+            Assert.That(world.Bags.For(IdB).BankOpen, Is.False);
+            Assert.That(world.Bags.For(IdB).Carried, Is.EqualTo(new[] { 110, 111 }), "the absent player's items wait for them");
+            TownSnapshot again = NewStock().CaptureWorld(r, false, null, Depths, null, new TownStock.SuspendContext { Seed = 4242u, PresentIds = new[] { IdA }, IdsBySlot = BySlot() });
+            Assert.That(again.Suspend.Bags.Single(b => b.Id == KeyB.Id).Carried, Is.EqualTo(new[] { 110, 111 }), "and their record stays in the section");
+            Assert.That(again.Suspend.PresentIds, Is.EqualTo(new[] { IdA }));
+
+            // B comes back: a visit, nothing lost
+            Assert.That(r.ResizeBankRoom(new List<int> { 0, 1 }, BySlot(), 4242UL, -1), Is.True);
+            Assert.That(world.Bags.For(IdB).BankOpen, Is.True);
+            Assert.That(world.Bags.For(IdB).Carried, Is.EqualTo(new[] { 110, 111 }));
+        }
+
         static bool SameMap(IReadOnlyDictionary<int, int> a, IReadOnlyDictionary<int, int> b)
         {
             if (a.Count != b.Count) return false;

@@ -99,14 +99,30 @@ namespace SleepingCalamity.Core
         // The sections for the world save from the live session. The session's bags, checkpoint and pieces are the director's persistent ones. Found pieces are already in stock (ReceiveFound), so the
         // dive section's on-floor lists come out right without the old haul. depths: the world's piece depths (written into the dive section so a later save keeps them); extraSlotOwner: the saved
         // previous owner of the 3-player extra slot (a bag id or null). The dive section is marked V2Known so the saved CheckpointHeld, BossBeaten and ExtraSlotOwner never carry over a live value.
-        public TownSnapshot CaptureWorld(DiveSession session, bool bossBeaten, string extraSlotOwner, IReadOnlyDictionary<int, int> depths, ResidentsSave residents)
+        // What the director tells the capture about the bank-room suspend (plan 3 tasks 8 and 8a). Seed / PresentIds / IdsBySlot: the dive seed, the bag ids of the players present and the bag id of
+        // each roster slot (null for an empty one), written into a live suspend. Pending: a suspend loaded with the world that nobody has resumed yet (the party waits at the trapdoor); it is
+        // re-emitted verbatim until the director uses it, so an autosave in between cannot lose it.
+        public sealed class SuspendContext
+        {
+            public uint Seed;
+            public IReadOnlyList<string> PresentIds;
+            public IReadOnlyList<string> IdsBySlot;
+            public SuspendSave Pending;
+        }
+
+        // Every capture from the director says what it knows about the suspend (SuspendKnown is always true): a live bank-room or after-push-on session writes one with its bags saved as carried
+        // (BagsSaveRules.Capture suspended: true); no session in a dive but a pending loaded one re-emits it (and marks the dive in progress); anything else says "known, none", which clears
+        // the saved copy (a used suspend, a dive that ended, a party that left floor 5). The suspend is set after TownSaves.Capture's own clean (that one sees no dive yet).
+        public TownSnapshot CaptureWorld(DiveSession session, bool bossBeaten, string extraSlotOwner, IReadOnlyDictionary<int, int> depths, ResidentsSave residents, SuspendContext suspend = null)
         {
             TownSnapshot snap = TownSaves.Capture(State, null, _loot, null, residents);
-            bool inDive = session != null && (session.Phase == DivePhase.Floor || session.Phase == DivePhase.BankRoom);
+            bool inSession = session != null && (session.Phase == DivePhase.Floor || session.Phase == DivePhase.BankRoom);
+            SuspendSave pending = !inSession ? suspend?.Pending : null;
+            bool inDive = inSession || pending != null;
             if (snap.Dive != null)
             {
                 snap.Dive.InDive = inDive;
-                snap.Dive.ClearedMask = inDive ? session.Snapshot().ClearedMask : 0;   // fresh floors every dive: a mask only matters while the party is below
+                snap.Dive.ClearedMask = inSession ? session.Snapshot().ClearedMask : pending != null ? pending.ClearedMask : 0;   // fresh floors every dive: a mask only matters while the party is below
                 snap.Dive.CheckpointHeld = session != null && session.Checkpoint.Held;
                 snap.Dive.BossBeaten = bossBeaten;
                 snap.Dive.ExtraSlotOwner = extraSlotOwner;
@@ -117,7 +133,20 @@ namespace SleepingCalamity.Core
                     foreach (KeyValuePair<int, int> kv in depths) snap.Dive.PieceDepths.Add(new PieceDepthSave { Id = kv.Key, Floor = kv.Value });
                 }
             }
-            if (session != null) snap.Bags = BagsSaveRules.Capture(session.Bags, BagKeys(session.Bags), inDive, session.Floor);
+            snap.SuspendKnown = true;
+            if (session == null) return snap;
+            if (inSession && session.SuspendsAtBank)
+            {
+                var records = new List<SuspendedBag>();
+                snap.Bags = BagsSaveRules.Capture(session.Bags, BagKeys(session.Bags), true, session.Floor, true, records);
+                snap.Suspend = SuspendSaveRules.Build(session.Snapshot(), suspend != null ? suspend.Seed : 0u, suspend?.PresentIds, suspend?.IdsBySlot, records);
+            }
+            else if (pending != null)
+            {
+                snap.Bags = BagsSaveRules.Capture(session.Bags, BagKeys(session.Bags), false, 0);   // the home half; the mid-dive half rides in the pending section
+                snap.Suspend = pending;
+            }
+            else snap.Bags = BagsSaveRules.Capture(session.Bags, BagKeys(session.Bags), inSession, session.Floor);
             return snap;
         }
 
@@ -128,6 +157,7 @@ namespace SleepingCalamity.Core
             public DivePieces Pieces;
             public bool BossBeaten;
             public string ExtraSlotOwner;
+            public SuspendSave Suspend;   // a loaded bank-room suspend waiting to be resumed (the bags above hold its mid-dive halves); null: none
         }
 
         // Rebuilds the stock and the town from loaded (cleaned, conserved) sections and returns what the director runs with: each recorded player's gold, stash and waiting satchel, the checkpoint,
@@ -141,7 +171,8 @@ namespace SleepingCalamity.Core
             bool baker = snap?.Dive != null && snap.Dive.BankedResidents.Contains(TownBuildings.BakerResident);
             Receive(haul, baker);
             var w = new WorldRestore { Pieces = new DivePieces(depths) };
-            BagsSaveRules.Restore(snap?.Bags, w.Bags);
+            if (snap?.Suspend != null) { BagsSaveRules.RestoreSuspended(snap.Bags, snap.Suspend, w.Bags); w.Suspend = snap.Suspend; }   // carried items, picks, dive gold come back with the home half
+            else BagsSaveRules.Restore(snap?.Bags, w.Bags);
             if (snap?.Dive != null) { w.Checkpoint.Restore(snap.Dive.CheckpointHeld); w.BossBeaten = snap.Dive.BossBeaten; w.ExtraSlotOwner = snap.Dive.ExtraSlotOwner; }
             var found = new List<int>();
             if (depths != null) foreach (int id in depths.Keys) if (Holds(id)) found.Add(id);

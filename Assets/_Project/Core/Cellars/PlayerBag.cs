@@ -72,7 +72,7 @@ namespace SleepingCalamity.Core
         // Closes the bank visit without banking anything (the party left the bank floor): picks are dropped, carried items stay carried.
         public void CancelBank()
         {
-            if (!BankOpen) return;
+            if (!BankOpen && _picks.Count == 0) return;   // picks can outlive a closed visit in a restored suspend
             CloseBank();
             Version++;
         }
@@ -94,17 +94,10 @@ namespace SleepingCalamity.Core
             return true;
         }
 
-        // The party moves on: free slots fill with the most valuable unpicked items (highest rank first, earlier pickup on a tie), picks become safe, the visit closes.
+        // The party moves on: the picks become safe, the visit closes. Empty slots stay empty (plan 3 task 8: the player chooses, nothing is picked for them).
         public void PushOn()
         {
             if (!BankOpen) return;
-            if (_picks.Count < SlotCapacity)
-            {
-                var order = new List<int>();
-                for (int i = 0; i < _carried.Count; i++) if (!_picks.Contains(i) && BankSlots.IsBankable(CellarLoot.KindOf(_carried[i]))) order.Add(i);
-                order.Sort((a, b) => { int r = CellarLoot.RankOf(_carried[b]).CompareTo(CellarLoot.RankOf(_carried[a])); return r != 0 ? r : a.CompareTo(b); });
-                foreach (int i in order) { if (_picks.Count >= SlotCapacity) break; _picks.Add(i); }
-            }
             var indexes = new List<int>();
             foreach (int p in _picks)
             {

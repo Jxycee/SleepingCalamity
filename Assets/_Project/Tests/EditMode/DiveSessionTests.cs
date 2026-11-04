@@ -122,9 +122,12 @@ namespace SleepingCalamity.Tests.EditMode
             for (int i = 0; i < 10; i++) bags.For("a").Add(Large1);
             DiveSession s = AtBank(1, bags);
             Assert.That(bags.For("a").Pick(0), Is.True);
+            Assert.That(bags.For("a").Pick(1), Is.True);
+            Assert.That(bags.For("a").Pick(2), Is.True);
+            Assert.That(bags.For("a").Pick(3), Is.False, "solo bank has three slots");
             Assert.That(s.PushOn(), Is.True);
             Assert.That(bags.For("a").BankedThisDive.Count, Is.GreaterThan(0));
-            Assert.That(bags.For("a").BankedTotal, Is.EqualTo(3), "solo bank has three slots");
+            Assert.That(bags.For("a").BankedTotal, Is.EqualTo(3), "the three picks (plan 3 task 8: nothing is picked for the player)");
             Assert.That(s.PushOn(), Is.False, "twice");
             Assert.That(s.GoHome(), Is.False, "the choice is made");
             Assert.That(s.Momentum.PushedOn, Is.True);

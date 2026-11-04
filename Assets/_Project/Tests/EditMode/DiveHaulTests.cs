@@ -143,6 +143,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(s.Bags.AnyBankOpen, Is.False);
             PlayerBag a = s.Bags.For("a"); a.Add(104);
             a.OpenBank(1);                                       // a visit opens (a new bank room entry) after the point was used
+            Assert.That(a.Pick(0), Is.True);                     // plan 3 task 8: the push-on banks the picks only
             Assert.That(s.Bags.AnyBankOpen, Is.True);
             Assert.That(s.CanBankHere, Is.True, "an open visit has not been pushed on yet");
             Assert.That(s.BankAtPoint(), Is.True);
@@ -188,8 +189,9 @@ namespace SleepingCalamity.Tests.EditMode
             PlayerBag a = s.Bags.For("a"), b = s.Bags.For("b");
             a.Add(101); a.Add(112); b.Add(104);
             a.OpenBank(1);                                   // b has no open visit
+            Assert.That(a.Pick(1), Is.True);                 // plan 3 task 8: no auto-fill, the player picks
             Assert.That(s.BankAtPoint(), Is.True);
-            Assert.That(a.BankedThisDive.ContainsKey(112) && a.BankedThisDive.Count == 1, Is.True, "the best item fills the free slot");
+            Assert.That(a.BankedThisDive.ContainsKey(112) && a.BankedThisDive.Count == 1, Is.True, "the picked item is banked");
             Assert.That(a.Carried, Is.EqualTo(new[] { 101 }));
             Assert.That(b.Carried, Is.EqualTo(new[] { 104 }), "a bag with no open visit is untouched");
             a.AddGold(6);

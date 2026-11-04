@@ -44,16 +44,17 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void PushOn_BanksPicksAndAutoFillsByRank()
+        public void PushOn_BanksOnlyThePicks_EmptySlotsStayEmpty()
         {
+            // Plan 3 task 8: the old auto-fill (free slots took the highest-rank unpicked items) is gone; the player chooses.
             var b = BagWith(101, 112, 110);
             b.OpenBank(2);
             Assert.That(b.Pick(0), Is.True);
             b.PushOn();
-            Assert.That(b.BankedThisDive.Count, Is.EqualTo(2));
+            Assert.That(b.BankedThisDive.Count, Is.EqualTo(1));
             Assert.That(b.BankedThisDive[101], Is.EqualTo(1));
-            Assert.That(b.BankedThisDive[112], Is.EqualTo(1));
-            Assert.That(b.Carried, Is.EqualTo(new[] { 110 }));
+            Assert.That(b.BankedThisDive.ContainsKey(112), Is.False, "the free slot was not filled for the player");
+            Assert.That(b.Carried, Is.EqualTo(new[] { 112, 110 }));
             Assert.That(b.BankOpen, Is.False);
             Assert.That(b.Picks.Count, Is.EqualTo(0));
         }

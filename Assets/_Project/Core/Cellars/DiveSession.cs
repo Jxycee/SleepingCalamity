@@ -33,6 +33,9 @@ namespace SleepingCalamity.Core
         public DiveEnd? Ended { get; private set; }
         public int ExtraSlotOwner { get; private set; } = -1;   // the 3-player extra slot's owner for this visit (the director saves it, Task 6)
 
+        // The states a quit saves as a bank suspend instead of a failed dive (decision 9): the bank room, or floor 5 after the push-on (until the party takes the stair).
+        public bool SuspendsAtBank => Phase == DivePhase.BankRoom || (Phase == DivePhase.Floor && Floor == UndercroftPlan.BankFloor && BankChosenThisDive);
+
         public bool IsCleared(int floor) => UndercroftPlan.IsFloor(floor) && (_clearedMask & (1 << (floor - 1))) != 0;
 
         public bool TryStart(int floor, bool bossBeaten)
@@ -81,6 +84,38 @@ namespace SleepingCalamity.Core
             else foreach (var kv in Bags.All) ids.Add(kv.Key);
             for (int i = 0; i < n && i < ids.Count; i++) Bags.For(ids[i]).OpenBank(BankSlots.SlotsFor(n, presentSlots[i], ExtraSlotOwner));
             Phase = DivePhase.BankRoom;
+            return true;
+        }
+
+        // The party changed while the bank room is open (a player joined, left or came back): capacity follows who is present (decision 7). playerIds[i] is the bag id of the player in
+        // presentSlots[i]. A bag of anyone not listed has its visit cancelled (its picks are dropped, its items stay carried); a listed bag keeps its picks, the excess dropped from the end
+        // (PlayerBag.ReopenBank); a listed bag with no visit gets a fresh one. The 3-player extra slot keeps its owner while that owner is still present; otherwise it is picked again from the
+        // seed, never priorOwner (the owner of the previous visit), and a party of any other size has none.
+        public bool ResizeBankRoom(IReadOnlyList<int> presentSlots, IReadOnlyList<string> playerIds, ulong diveSeed, int priorOwner)
+        {
+            if (Phase != DivePhase.BankRoom || presentSlots == null || playerIds == null) return false;
+            int n = presentSlots.Count;
+            if (n < 1 || n > 4 || playerIds.Count != n) return false;
+            if (n == 3)
+            {
+                bool still = false;
+                foreach (int s in presentSlots) if (s == ExtraSlotOwner) { still = true; break; }
+                if (!still) ExtraSlotOwner = BankSlots.PickExtraSlotOwner(diveSeed, presentSlots, priorOwner);
+            }
+            else ExtraSlotOwner = -1;
+            foreach (var kv in Bags.All)
+            {
+                bool here = false;
+                foreach (string id in playerIds) if (id == kv.Key) { here = true; break; }
+                if (!here) kv.Value.CancelBank();
+            }
+            for (int i = 0; i < n; i++)
+            {
+                PlayerBag bag = Bags.For(playerIds[i]);
+                int capacity = BankSlots.SlotsFor(n, presentSlots[i], ExtraSlotOwner);
+                if (bag.BankOpen || bag.Picks.Count > 0) bag.ReopenBank(capacity);   // keeps the picks (a restored suspend holds picks with the visit closed)
+                else bag.OpenBank(capacity);
+            }
             return true;
         }
 

@@ -314,6 +314,13 @@ namespace SleepingCalamity.Core
             if (s.Bags != null) { d.Clear(); clean.Bags = BagsSaveRules.Clean(s.Bags, d); if (d.Count > 0) rejected?.Add(WorldSaveRules.SectionBags); }
             if (s.Suspend != null) { d.Clear(); clean.Suspend = SuspendSaveRules.Clean(s.Suspend, d); if (d.Count > 0) rejected?.Add(SectionSuspend); }
             clean.SuspendKnown = s.SuspendKnown;
+            // A suspend stands for a dive that is still in progress (the party is below, or waiting at the trapdoor to resume it: Dive.InDive). Without one it is stale (a source that never says
+            // "known, none" would otherwise keep a used suspend forever, and a later failed-dive quit would resume from it): dropped here, whoever wrote it.
+            if (clean.Suspend != null && (clean.Dive == null || !clean.Dive.InDive))
+            {
+                clean.Suspend = null;
+                repaired?.Add("suspend dropped: no dive is in progress");
+            }
             Reconcile(clean, repaired, failMidDive);
             return clean;
         }
@@ -474,6 +481,7 @@ namespace SleepingCalamity.Core
             var raw = new TownSnapshot { Stock = new StockSave { LootUnknown = stockLoot == null }, Town = new TownSave(), Residents = residents, Dive = new DiveSave(), Suspend = suspend, SuspendKnown = suspendKnown };
             raw.Dive.KnownPieces = new List<int>(TownSaveRules.KnownPieceIds());
             raw.Dive.KnownResidents = new List<string>(TownSaveRules.KnownResidentIds());
+            if (suspend != null) raw.Dive.InDive = true;   // a suspend is a dive still in progress (CleanSnapshot drops one without)
             var pieces = new HashSet<int>();
             var people = new HashSet<string>(StringComparer.Ordinal);
             if (town != null)
@@ -491,7 +499,7 @@ namespace SleepingCalamity.Core
                 foreach (KeyValuePair<int, int> kv in stockLoot) raw.Stock.Loot.Add(new LootCountSave { ItemId = kv.Key, Count = kv.Value });
             if (dive != null)
             {
-                raw.Dive.InDive = dive.CurrentFloor != DiveState.Town;
+                raw.Dive.InDive = dive.CurrentFloor != DiveState.Town || suspend != null;
                 raw.Dive.ClearedMask = dive.ClearedMask;
                 raw.Dive.CheckpointReached = dive.CheckpointReached;
                 foreach (int p in dive.Haul.BankedPieces) { raw.Dive.BankedPieces.Add(p); pieces.Add(p); }

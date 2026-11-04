@@ -57,6 +57,7 @@ namespace SleepingCalamity.Tests.EditMode
             var p = new PartyBags();
             p.For("a").Add(101); p.For("b").Add(102);
             p.For("a").OpenBank(1);
+            Assert.That(p.For("a").Pick(0), Is.True);   // plan 3 task 8: the push-on banks the picks only
             p.PushOnAll();
             Assert.That(p.For("a").BankedThisDive[101], Is.EqualTo(1));
             Assert.That(p.For("a").BankOpen, Is.False);

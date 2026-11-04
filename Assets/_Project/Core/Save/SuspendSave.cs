@@ -227,9 +227,24 @@ namespace SleepingCalamity.Core
         }
 
         // The session snapshot a (cleaned) section stands for; DiveSession.Restore takes it. idsBySlot as in Build.
+        // A bank-room save is clamped to what the room needs (plan 3 task 8a): floor 5, floor 5 cleared, the choice not made. A file that says BankRoom on another floor is damaged or
+        // hand-edited; the party still returns to the bank room with its items rather than losing them.
         public static DiveSession.SnapshotData ToSnapshot(SuspendSave s, IReadOnlyList<string> idsBySlot)
-            => new DiveSession.SnapshotData((DivePhase)s.Phase, s.Floor, s.ClearedMask, s.BankChosen, s.StartedAtBank, SlotOfId(s.ExtraSlotOwner, idsBySlot),
+        {
+            int floor = s.Floor, cleared = s.ClearedMask;
+            bool chosen = s.BankChosen;
+            if (s.Phase == (int)DivePhase.BankRoom)
+            {
+                floor = UndercroftPlan.BankFloor; cleared |= 1 << (UndercroftPlan.BankFloor - 1); chosen = false;
+            }
+            return new DiveSession.SnapshotData((DivePhase)s.Phase, floor, cleared, chosen, s.StartedAtBank, SlotOfId(s.ExtraSlotOwner, idsBySlot),
                 (s.Stir ?? new SuspendStirSave()).ToState(), (s.Momentum ?? new SuspendMomentumSave()).ToState(), (s.Retry ?? new SuspendRetrySave()).ToState());
+        }
+
+        // Whether the host can resume the (cleaned) section today: the bank room, or floor 5 after the push-on. A Phase == Floor save of anything else is the later stair quit (its own plan);
+        // until then it is not resumed and the host settles it as a failed dive (DiveSession.Fail) so the carried items are not lost.
+        public static bool IsResumable(SuspendSave s)
+            => s != null && (s.Phase == (int)DivePhase.BankRoom || (s.Phase == (int)DivePhase.Floor && s.Floor == UndercroftPlan.BankFloor && s.BankChosen));
 
         // The roster slot of a bag id (the index in idsBySlot), or -1 for none / not there. The saved extra-slot owner feeds BankSlots.PickExtraSlotOwner's previousOwner this way.
         public static int SlotOfId(string id, IReadOnlyList<string> idsBySlot)
@@ -240,6 +255,25 @@ namespace SleepingCalamity.Core
         }
 
         public static string IdOfSlot(int slot, IReadOnlyList<string> idsBySlot) => idsBySlot != null && slot >= 0 && slot < idsBySlot.Count ? idsBySlot[slot] : null;
+
+        // The session a (cleaned) section resumes as (plan 3 task 8a), over the party's restored bags, checkpoint and pieces; null when the section is not resumable (IsResumable) or the stair of the
+        // saved floor refuses. The checkpoint is neither spent nor set: a resume is not a start. Push-on already chosen: the saved floor-5 state is restored and the party takes floor 5's stair at once
+        // (DiveSession.EnterFloor re-checks it), so it stands at the start of floor 6 with the saved stir, momentum, retry and bank state. The bank room: restored as it was, the visits reopened for the
+        // players present now (their saved picks kept, the excess dropped from the end); with nobody present yet the visits stay closed and the host resizes when someone arrives.
+        // idsBySlot as in Build; presentSlots[i] / presentIds[i]: the roster slot and bag id of the players present; priorOwner: the 3-player extra slot's previous owner (a slot, -1 for none).
+        public static DiveSession Resume(SuspendSave s, PartyBags bags, DiveCheckpoint checkpoint, DivePieces pieces, IReadOnlyList<string> idsBySlot,
+            IReadOnlyList<int> presentSlots, IReadOnlyList<string> presentIds, ulong diveSeed, int priorOwner)
+        {
+            if (!IsResumable(s) || bags == null || checkpoint == null || pieces == null) return null;
+            var session = new DiveSession(bags, checkpoint, pieces);
+            session.Restore(ToSnapshot(s, idsBySlot));
+            if (session.Phase == DivePhase.BankRoom)
+            {
+                if (presentSlots != null && presentIds != null) session.ResizeBankRoom(presentSlots, presentIds, diveSeed, priorOwner);
+                return session;
+            }
+            return session.EnterFloor(UndercroftPlan.NextFloor(session.Floor, DiveFloorTable.LastBuiltFloor)) ? session : null;
+        }
 
         // ---------------------------------------------------------------- the host's views of the section
         // A copy that keeps only the recorded players' bag records and present ids (the world records at most four; an unrecorded player's never reaches the file).
