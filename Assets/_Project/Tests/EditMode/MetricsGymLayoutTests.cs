@@ -111,6 +111,13 @@ namespace SleepingCalamity.Tests.EditMode
                 }
         }
 
+        // MetricsGymBuilder reuses objects by "<name> | <label>", so two pieces with the same key in one lane would collapse into one.
+        [Test] public void PieceKeys_AreUniquePerLane()
+        {
+            var dup = MetricsGymLayout.Build().GroupBy(p => (p.Lane, p.Label.Length > 0 ? p.Name + " | " + p.Label : p.Name)).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            Assert.That(dup, Is.Empty);
+        }
+
         [Test] public void Build_IsDeterministic() => Assert.That(MetricsGymLayout.Build(), Is.EqualTo(MetricsGymLayout.Build()));
     }
 }
