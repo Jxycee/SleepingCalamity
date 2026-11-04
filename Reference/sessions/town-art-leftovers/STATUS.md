@@ -1,5 +1,5 @@
-Status: WORKING (junctions round: stairs/walls that meet unnaturally, user note 2026-11-03)
-Archive: no
+Status: DONE a421ceb3 (junctions round merged to main; check PASS on 33edf484: EditMode 1343/1343, PlayMode 120 passed 0 failed 19 skipped)
+Archive: ready
 Branch: claude/hollowmere-junctions (worktree m5-next-639689)
 Parked branches: claude/stall-lods 2486f8a6 and claude/backdrop-shade aa70f707 merged in full (via this branch); nothing retired.
 Rounds: 3 art rounds (GPU, SC_CAPTURE_ONLY), then one full set (126 Hollowmere PNGs, both presets + LowSun) and stall LOD frames. No capture churn.
@@ -24,3 +24,8 @@ Round 4 result (1 round used of 3, then stopped for pacing): sheet polish4_befor
 
 ## Junctions round (user, 2026-11-03)
 Brief: large things visible from outside a building that do not meet naturally: stair flights joining at an angle with no bend or landing, walls running through things instead of meeting them. Fix list below (found / fixed / deferred).
+Junctions result (sheet junctions_before_after.jpg): subtle, ~ +1 point; J10/J07 marginally cleaner, J05 and Market Street nearly unchanged, nothing worse.
+- Found (HollowmereJunctionScan, per preset): wall_through 16, wall_poke 18, wall_embed 7/4, stair_dead 2, Market Street flight kink 6.3 deg.
+- Fixed (Core/Town/LaneKitPlan.cs AlignFlights + ResolveWallJunctions; 3 EditMode tests; golden 1087 rows): retaining wall over the Ring Lane SW flight (cut at flight edge + pier), crossing wall pairs (lower wall ends 0.1 m inside the higher), Market Street flights aligned to <= 2 deg. wall_through 16 -> 4, wall_poke 18 -> 10 (all left are keep wall vs stair cores, by design).
+- Risks: cut wall ends use a stretched mesh without an end cap; bare bank where walls were removed beside flights; hero not walked on the realigned flights; J05/J07 frames too close to judge by eye.
+- DEFERRED for the next art session (user, 2026-11-03: widen scope to ANY unnatural join, "proper architecture, not smushed together"): the broad structure-intersection scan (buildings fused to each other or to walls, roofs/chimneys/lean-tos/annexes/porches intersecting their host, steps/signs/planters buried in facades, retaining walls and kerbs vanishing into terrain, gaps where parts should meet) plus a ~60-camera outside sweep (Cap_HM_S<NN> at every lot and wall/stair feature). Not started: the survey agent produced nothing. stair_dead 2 (not in scope of round). Round-4 deferrals still open: UV stretch x33 (kit FBX meshes, Blender regen), ivy/moss embedding, wall-breach weeds, stall-prop overlaps.
