@@ -1,6 +1,6 @@
 # Room metrics for room authors
 
-One page. Read it before you author a room. The table at the end is generated from `GameMetrics` and a test keeps it honest. The same numbers are laid out in the metrics gym scene (built by `MetricsGymLayout`, ten lanes you can walk).
+One page. Read it before you author a room. The table at the end is generated from `GameMetrics` and a test keeps it honest. The same numbers are laid out in the metrics gym scene (laid out by `MetricsGymLayout`, built by `MetricsGymBuilder`: ten lanes you can walk).
 
 ## The grid
 - A room is a grid of 4 m cells. A floor is 14 x 14 cells.
@@ -10,7 +10,7 @@ One page. Read it before you author a room. The table at the end is generated fr
 - Run is 7 m/s. A dodge covers 3.5 m.
 - A run-jump covers about 3.6 m. A 3 m gap can be jumped. A one-cell (4 m) pit never can.
 - Boots must not change this. If a boot changes the jump, change the room rules first.
-- The hero has no crouch, no vault and no fall damage. A drop is free.
+- The hero has no crouch, vault or swim, and no code deals fall damage, so this plan treats a drop of any height as free.
 
 ## Doors
 - A plain door is 2.4 m wide and 2.8 m tall. A wide arch is 3.6 m wide.
@@ -32,7 +32,7 @@ One page. Read it before you author a room. The table at the end is generated fr
 - Every state of a region must change something.
 - No softlock from any state: a party that left the room in the other state must still get out.
 - Chests, keys, doors, spawns and features may not go under water or fire in any state.
-- A hero on a cell that floods or ignites is moved to the nearest standable cell. The validator makes sure one is next to every such cell.
+- A hero on a cell that floods or ignites will be moved to the nearest standable cell (a runtime rule for the new dive, not built yet). The validator already makes sure one is next to every such cell.
 - A room file with a version this build does not know is rejected.
 
 ## Fight space

@@ -1,4 +1,5 @@
 // Tests/EditMode/PilotRoomsV2Tests.cs: the v2 pilot room (hanging hall) validates, keeps its pool seams and shows both water states (metrics gym plan, Task 5).
+using System.Linq;
 using NUnit.Framework;
 using SleepingCalamity.Core;
 
@@ -39,6 +40,26 @@ namespace SleepingCalamity.Tests.EditMode
         {
             Assert.That(FightSpace.Fits(PilotRoomsV2.HangingHall.Base, 4, 8), Is.True);
             Assert.That(PilotRoomsV2.HangingHall.Base.FloorCount, Is.EqualTo(14));
+        }
+
+        [Test] public void Pilot_KeepsThePoolRoomsMarks()
+        {
+            var b = PilotRoomsV2.HangingHall.Base;
+            Assert.That(b.Chests.Select(c => (c.X, c.Y)), Is.EquivalentTo(new[] { (3, 0), (1, 3) }));
+            Assert.That(b.Spawns.Count, Is.EqualTo(3));
+            Assert.That(Enumerable.Range(0, 16).Count(i => b.CellAt(i % 4, i / 4) == CellKind.Pillar), Is.EqualTo(2));
+        }
+
+        // The pool's variant names and fill chances are private there; the pilot copies them, so pin the copy to the pool room's own sockets.
+        [Test] public void Pilot_DressingMatchesThePool()
+        {
+            var pool = CellarRoomPool.Find("larder_hanging_hall");
+            foreach (DressingSocket s in PilotRoomsV2.HangingHall.Base.Sockets)
+            {
+                DressingSocket p = pool.Sockets.First(q => q.Kind == s.Kind);
+                Assert.That(s.Variants, Is.EqualTo(p.Variants), s.Id);
+                Assert.That(s.Chance, Is.EqualTo(p.Chance), s.Id);
+            }
         }
 
         [Test] public void All_ListsThePilot() => Assert.That(PilotRoomsV2.All, Is.EqualTo(new[] { PilotRoomsV2.HangingHall }));
