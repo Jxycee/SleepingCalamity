@@ -170,6 +170,9 @@ namespace SleepingCalamity.EditorTools
             return false;
         }
 
+        static bool NearPaved(TownLayout t, float x, float z, float r) =>
+            HollowmereTerrain.IsPaved(t, x + r, z) || HollowmereTerrain.IsPaved(t, x - r, z) || HollowmereTerrain.IsPaved(t, x, z + r) || HollowmereTerrain.IsPaved(t, x, z - r);
+
         // ------------------------------------------------------------------------------------------------ 1. terrain grass
         public static void TerrainGrass(Terrain terrain, TownLayout t)
         {
@@ -463,7 +466,7 @@ namespace SleepingCalamity.EditorTools
                     float u = Mathf.Clamp((k % 2 == 0 ? c1 : c2) + R(rng, -0.7f, 0.7f), -half + 0.4f, half - 0.4f);
                     if (door && Mathf.Abs(u) < 1.5f) continue;
                     TownPoint p = At(u, R(rng, 0.1f, ruined ? 0.35f : 0.22f));
-                    if (Blocked(t, p.X, p.Z, f, 0.1f)) continue;
+                    if (Blocked(t, p.X, p.Z, f, 0.1f) || NearPaved(t, p.X, p.Z, 0.5f)) continue;   // polish r4: not into a lane kerb (a kerb edge sits just outside the paved test)
                     float sc = ruined ? R(rng, 1.0f, 1.4f) : R(rng, 0.75f, 1.0f);
                     Put(g, Pick(rng, Weeds), new Vector3(p.X, y, p.Z), yaw + R(rng, -20f, 20f) + (rng.Next(2) == 0 ? 180f : 0f), new Vector3(sc, sc * (ruined ? R(rng, 1f, 1.25f) : 1f), sc));
                 }
