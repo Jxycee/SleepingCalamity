@@ -30,7 +30,7 @@ namespace SleepingCalamity.EditorTools
             ("LK_GatePaint", "painted_wood", new Color(0.66f, 0.72f, 0.28f), 1.0f), ("LK_Iron", "iron", new Color(1f, 1f, 1f), 1.0f),
             ("LK_GutterStone", "sandstone", new Color(0.50f, 0.48f, 0.44f), 1.5f),
             // stairs stone r2 (town-art-leftovers): the jointless step_stone scan for the StoneTread slabs; LK_StepRiser is the sandstone StoneBlock under them, tinted darker than the treads.
-            ("LK_StepStone", "step_stone", new Color(0.98f, 0.97f, 0.95f), 0.7f), ("LK_StepRiser", "sandstone", new Color(0.70f, 0.66f, 0.60f), 0.8f),
+            ("LK_StepStone", "step_stone", new Color(0.84f, 0.82f, 0.78f), 1.0f), ("LK_StepRiser", "sandstone", new Color(0.70f, 0.66f, 0.60f), 0.8f),
         };
 
         // Local box (centre, size) of each piece at the contract extents: the greybox mesh, and the collider of walls, piers and steps.
@@ -343,7 +343,7 @@ namespace SleepingCalamity.EditorTools
             }
             void Quad(List<int> T, int a, int b, int c, int d, Vector3 n) { Tri(T, a, b, c, n); Tri(T, a, c, d, n); }
 
-            const float UvScale = 1f / 1.75f, zf = -0.03f, zb = 0.55f, yb = 0.10f, cf = 0.025f, cb = 0.005f, cs = 0.008f, gap = 0.009f;
+            const float UvScale = 1f / 1.1f, zf = -0.03f, zb = 0.55f, yb = 0.10f, cf = 0.025f, cb = 0.005f, cs = 0.008f, gap = 0.009f;
             float W = 2f * r.ScaleX;
             float[] jx = JointsFor(r);
             int count = jx.Length + 1;
@@ -354,6 +354,7 @@ namespace SleepingCalamity.EditorTools
                 float x0 = sx0 + (leftOuter ? 0f : gap * 0.5f), x1 = sx1 - (rightOuter ? 0f : gap * 0.5f);
                 float yt = 0.16f + (Rnd() * 2f - 1f) * 0.004f, dip = 0.003f + 0.002f * Rnd(), rBase = 0.03f + 0.15f * Rnd();
                 float offU = Rnd(), offV = Rnd(); bool flip = Rnd() < 0.5f;
+                float stepVar = 0.12f * Rnd();   // stairs stone r3 (town-art-leftovers): per-step R offset 0..0.12 so neighbouring steps differ slightly
                 Vector2 UV(float a, float b) => flip ? new Vector2(-(a + offU), -(b + offV)) * UvScale : new Vector2(a + offU, b + offV) * UvScale;   // r2: 1 tile = 1.75 m, so no slab shows a repeat
                 float Moss(float x)
                 {
@@ -364,10 +365,14 @@ namespace SleepingCalamity.EditorTools
                 }
                 Color Col(float x, float z, float polish, float grime = -1f) => new Color(grime >= 0f ? grime : Mathf.Min(0.2f, rBase * (1f + 0.5f * (z - zf) / (zb - zf))), Moss(x), Mathf.Clamp(polish, 0f, 0.8f), 1f);
 
+                float TopGrime(float z) { float t = Mathf.Clamp01((z - 0.07f) / (zb - cb - 0.07f)); return Mathf.Min(0.6f, 0.40f * t + stepVar * t); }
                 float xa = x0 + cs, xb = x1 - cs, za = zf + cf, zc = zb - cb, yF = yt - cf, yB = yt - cb;
                 // top grid: 5 x 5 vertices, columns tight at the ends for the moss band, rows dense at the front; analytic smooth normals from the dip bump (1-u^2)(1-v^2)
                 float[] gx = { xa, Mathf.Min(x0 + 0.06f, (xa + xb) * 0.5f), (xa + xb) * 0.5f, Mathf.Max(x1 - 0.06f, (xa + xb) * 0.5f), xb };
-                float[] gz = { za, za + 0.1f, (za + zc) * 0.5f, zc - 0.1f, zc };
+                // stairs stone r3 (town-art-leftovers): from the descending camera only tread tops show and all read the same pale value (a flat paved floor). Tone, not geometry: rows at
+                // z 0.07 and 0.30 so the vertex mask ramps: front 7 cm of the top is polished (B 0.8, R 0, the light nosing line), then R grime ramps to ~0.40 at the back edge (the next riser's foot),
+                // plus stepVar per step. Seen from above that is a light nosing and a darker band behind it per step.
+                float[] gz = { za, 0.07f, 0.30f, zc - 0.1f, zc };
                 float xc = (xa + xb) * 0.5f, hx = (xb - xa) * 0.5f, zcen = (za + zc) * 0.5f, hz = (zc - za) * 0.5f;
                 var g = new int[5, 5];
                 for (int a = 0; a < 5; a++)
@@ -375,7 +380,7 @@ namespace SleepingCalamity.EditorTools
                     {
                         float u = (gx[a] - xc) / hx, v = (gz[b] - zcen) / hz, bump = (1f - u * u) * (1f - v * v);
                         float dhdx = dip * 2f * u * (1f - v * v) / hx, dhdz = dip * 2f * v * (1f - u * u) / hz;
-                        g[a, b] = V(new Vector3(gx[a], yt - dip * bump, gz[b]), new Vector3(-dhdx, 1f, -dhdz).normalized, UV(gx[a], gz[b]), Col(gx[a], gz[b], 0.7f * bump + (b == 0 ? 0.6f : 0f)));
+                        g[a, b] = V(new Vector3(gx[a], yt - dip * bump, gz[b]), new Vector3(-dhdx, 1f, -dhdz).normalized, UV(gx[a], gz[b]), Col(gx[a], gz[b], b <= 1 ? 0.8f : 0.7f * bump, TopGrime(gz[b])));
                     }
                 for (int a = 0; a < 4; a++) for (int b = 0; b < 4; b++) Quad(T0, g[a, b], g[a, b + 1], g[a + 1, b + 1], g[a + 1, b], Vector3.up);
 

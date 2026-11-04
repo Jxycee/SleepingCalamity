@@ -174,6 +174,13 @@ namespace SleepingCalamity.EditorTools
                     h += H * 0.07f * Mathf.Exp(-(((lt - 150f) * (lt - 150f)) + lr * lr) / (2f * 55f * 55f)) * (h > 0f ? 1f : 0f);
                     // radial erosion: spurs and gullies fan out from the summit, strongest at mid-slope; +/-7.5% of local height
                     if (h > 0f) h *= 1f + 0.15f * (Spur(lt, lr) - 0.5f) * SpurFade(lt, lr);
+                    // A12 r3 (town-art-leftovers): the eroded spurs read as smooth draped cloth. One fine ridged-noise crag octave (feature ~60 m, amplitude 2.5% of local height,
+                    // x(0.8..1.4) from gully to spur crest, faded out at the foot under the mist) breaks the faces into rock planes. Grid, winding, silhouette scale and materials unchanged.
+                    if (h > 0f)
+                    {
+                        float crag = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.0165f + 57f, z * 0.0165f + 13f) * 2f - 1f);
+                        h *= 1f + 0.05f * (crag - 0.5f) * (0.8f + 0.6f * Spur(lt, lr)) * Smooth(0.04f, 0.28f, h / H);
+                    }
                     hs[j * (N + 1) + i] = h;
                     if (h > best) { best = h; mountainPeak = new Vector3(x, h - 30f, z); }
                     v.Add(new Vector3(x, h - 30f, z));
