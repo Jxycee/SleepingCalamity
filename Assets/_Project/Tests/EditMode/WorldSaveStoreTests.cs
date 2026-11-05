@@ -703,7 +703,10 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.That(store.Rejected, Does.Contain(TownSaveRules.SectionSuspend), floor);
                 Assert.That(store.Current.Suspend, Is.Null, floor);
                 Assert.That(store.Current.Dive.ClearedMask, Is.EqualTo(3), floor);
-                Assert.That(store.Current.Bags.Players.Single().Gold, Is.EqualTo(6), floor);
+                // the dropped suspend's dive record is settled as a failed dive: half of its 3 dive gold (1) kept, the carried 104 waits in the satchel
+                PlayerBagSave bag = store.Current.Bags.Players.Single();
+                Assert.That(bag.Gold, Is.EqualTo(7), floor);
+                Assert.That(bag.Satchel.Items, Is.EqualTo(new[] { 104 }), floor);
                 Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2), floor);
             }
         }
