@@ -23,7 +23,9 @@ description: Brief template and routing for delegating SleepingCalamity work to 
 
 **Models never come from the coordinator (user, 2026-11-03).** Every delegated task names one of the agent types above, whose model and effort are pinned in `.claude/agents/`. Never delegate through `fork` (it always runs on the coordinator's model and effort) or through the built-in `general-purpose`, `Explore`, `Plan` or `claude` agents (no pin, so they would inherit the coordinator). Pass `model` or `effort` only as the "Override per call" column says. Safety net: `.claude/settings.json` sets `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`, the default for any agent without a pinned model.
 
-Do it yourself when it takes a handful of tool calls. Batch small same-area tasks into one implementer run and one review. One implementer touches Unity at a time (the project lock); reviewers are read-only and can run alongside. Continue an agent with SendMessage instead of spawning a fresh one, but never SendMessage a running workflow agent.
+**Risk reviews per milestone, not per task (user, 2026-11-04: usage).** On a plan with a final `branch-reviewer`, run `risk-reviewer` once per networking or save-data milestone (a batch of related tasks, typically the midpoint where the save schema or net spine lands), not after every task; other tasks get `reviewer` or the controller's own diff read. Without a final branch review, keep one risk review per networking or save-data task.
+
+Do it yourself when it takes a handful of tool calls. Batch 2-3 related same-area tasks into one implementer run and one review (each report costs a session turn on its whole context). One implementer touches Unity at a time (the project lock); reviewers are read-only and can run alongside. Continue an agent with SendMessage instead of spawning a fresh one, but never SendMessage a running workflow agent.
 
 ## Brief template
 ```

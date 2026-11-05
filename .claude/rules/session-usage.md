@@ -11,7 +11,8 @@ From the working sessions' own usage reviews (2026-10-31: bell tower, bakery and
 - Read files by grep and line range, never whole. Read long Unity logs through a subagent summary.
 - Batch STATUS lines into real commits; no STATUS-only commits between milestones.
 - Report status through the session board, not by message: `board` action `profile` (state, tip, check, next, waitingOn, holdsPort, needs). A message to the coordinator starts a turn on its large context. Message only when a decision is needed.
-- Context handoff (user, 2026-11-01). At 90-95% context (local: `get_usage` self; cloud: the compaction warning):
+- Every subagent report starts a turn on the session's whole context (plan 3, 2026-11-04: ~2,650 messages, a big Sonnet turn per "task N done"). So give each implementer run 2-3 related plan tasks with one report, and don't take a turn just to say "still waiting".
+- Context handoff (user, 2026-11-01; earlier from 2026-11-04). At 65% context or about 250k tokens, whichever comes first (local: `get_usage` self; cloud: the compaction warning, so hand off at the first milestone after a long run):
   1. Finish the current step and push your branch.
   2. Write the successor's request in `sessions/requests/` from the template in its README, with the full handoff in the brief.
   3. Set your STATUS to `Archive: ready` and `Handoff: <request file>`.
