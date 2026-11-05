@@ -197,6 +197,21 @@ namespace SleepingCalamity.Tests.PlayMode
             return (host.Weapon(Axe).Level, host.Weapon(Axe).Abs, guest.Weapon(Axe).Abs);
         }
 
+        private static int KillAll(NetworkManager nm)
+        {
+            var hit = new EnemyHitInput { Attack = AttackCatalog.Axe.Attacks[0], Atk = 100000f, PartIndex = -1, CritChance = 0f };
+            int n = 0;
+            foreach (NetworkObject o in new List<NetworkObject>(nm.SpawnManager.SpawnedObjects.Values))
+            {
+                if (o == null) continue;
+                Enemy e = o.GetComponent<Enemy>();
+                if (e == null || !e.Alive) continue;
+                for (int i = 0; i < 6 && e != null && e.Alive; i++) e.ServerApplyHit(hit, e.transform.position + Vector3.back, Time.timeAsDouble);
+                n++;
+            }
+            return n;
+        }
+
         // The client walks into a room whose plan has enemies, so the dive's contents begin the CombatHost (weapon growth is restored from the save there); everything in the room is then killed.
         private static IEnumerator EnterFightRoom(Rig rig, string step)
         {
@@ -254,11 +269,13 @@ namespace SleepingCalamity.Tests.PlayMode
             ulong hostId = rig.HostNm.LocalClientId, guestId = rig.ClientNm.LocalClientId;
             Assert.That(rig.HostHaul.Session.StartedAtBank, Is.True, "[S2 F5 arrive] the party starts at the bank room's floor");
             Assert.That(rig.HostHaul.ServerAddItem(guestId, 101), Is.True, "[S2 find] the client carries one item (a chest's loot goes to the opener's bag)");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.StirValue > 0, Timeout, "[S2 find] the carried item (a valuable) never stirred");
+            int stirWithItem = rig.HostHaul.Current.StirValue;
             foreach (int id in new[] { 100, 101, 200, 201, 300, 301 }) Assert.That(rig.HostHaul.ServerAddPiece(id), Is.True, "[S2 find] piece " + id);
             Assert.That(rig.HostHaul.ServerAddPiece(PieceCatalog.BakerId), Is.True, "[S2 find] the baker");
             yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces >= 6, Timeout, "[S2 find] the client never saw the six pieces found");
             Assert.That(rig.Host.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "[S2 find] the baker is safe in the town stock the moment he is found");
-            Assert.That(rig.HostHaul.Current.StirValue, Is.EqualTo(0), "[S2 find] pieces never stir");
+            Assert.That(rig.HostHaul.Current.StirValue, Is.EqualTo(stirWithItem), "[S2 find] pieces never stir (only the carried valuable does)");
             Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True, "[S2 F5 bank] the floor has a bank point");
             Move(rig.HostHero, bank + new Vector3(0.5f, 0.1f, 0f));
             yield return ClientTo(rig, bank + new Vector3(-0.5f, 0.1f, 0f), "[S2 F5 bank walk]");
