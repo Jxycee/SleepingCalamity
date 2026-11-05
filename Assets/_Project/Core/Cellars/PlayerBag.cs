@@ -1,5 +1,5 @@
 // Core/Cellars/PlayerBag.cs: one player's dive loot - carried items, gold, bank-visit picks, home stash, lost satchel, opened-chest mask (spec 4.3, decisions 33-35, 39). Pure C#.
-// Authority: the host owns one bag per recorded player (PartyBags in DiveState); nothing here is networked. Carried items are bankable at a bank room (picks, then PushOn);
+// Authority: the host owns one bag per recorded player (PartyBags in the DiveDirector); nothing here is networked. Carried items are bankable at a bank room (picks, then PushOn);
 // GoHome brings everything to the stash, Fail keeps banked items and half the dive gold and packs the rest into the player's one lost satchel.
 using System.Collections.Generic;
 
@@ -7,7 +7,7 @@ namespace SleepingCalamity.Core
 {
     public sealed class PlayerBag
     {
-        public const int MaxCarried = 60;     // placeholder: most items one player can carry at once
+        public const int MaxCarried = 60;     // placeholder: most items one player can carry at once; a carried satchel takes one of them (plan 3 decision 6)
         public const int SatchelPick = -1;    // the pick that means "the carried satchel"
         public const int MaxChests = 64;      // the opened-chest mask is one ulong
 
@@ -41,10 +41,36 @@ namespace SleepingCalamity.Core
         public int ChestFloor { get; private set; }
         public ulong OpenedChests { get; private set; }
 
+        // The player's boots (+5% run speed, plan 3 decision 12): carried, banked this dive or in the home stash. A pair in the lost satchel does not count until recovered.
+        public bool HasBoots => _carried.Contains(CellarLoot.BootsId) || _banked.ContainsKey(CellarLoot.BootsId) || _stash.ContainsKey(CellarLoot.BootsId);
+
+        // The one-pair gate (Add, the chest roll's ownsBoots): HasBoots plus a pair waiting in, or carried inside, the lost satchel. The speed bonus pauses while the pair is in the satchel
+        // (HasBoots), but no second pair may be picked or rolled meanwhile.
+        public bool OwnsBoots => HasBoots || SatchelHolds(Satchel.Waiting, CellarLoot.BootsId) || SatchelHolds(Satchel.Carried, CellarLoot.BootsId);
+
+        static bool SatchelHolds(LostSatchel s, int itemId)
+        {
+            if (s == null) return false;
+            for (int i = 0; i < s.Items.Count; i++) if (s.Items[i] == itemId) return true;
+            return false;
+        }
+
+        // No room for another carried item: the carried list plus the carried satchel (one slot) fill MaxCarried.
+        public bool IsFull => _carried.Count + (Satchel.Carried != null ? 1 : 0) >= MaxCarried;
+
         public bool Add(int itemId)
         {
-            if (itemId <= 0 || _carried.Count >= MaxCarried || !BankSlots.IsBankable(CellarLoot.KindOf(itemId))) return false;
+            if (itemId <= 0 || IsFull || !BankSlots.IsBankable(CellarLoot.KindOf(itemId))) return false;
+            if (itemId == CellarLoot.BootsId && OwnsBoots) return false;   // one pair per player
             _carried.Add(itemId);
+            Version++;
+            return true;
+        }
+
+        // The player walked onto the lost satchel waiting on this floor: it is carried now and takes one carry slot. False with no satchel waiting or no free slot (it stays on the floor).
+        public bool PickUpSatchel()
+        {
+            if (Satchel.Waiting == null || IsFull || !Satchel.PickUp()) return false;
             Version++;
             return true;
         }
@@ -68,7 +94,7 @@ namespace SleepingCalamity.Core
         // Closes the bank visit without banking anything (the party left the bank floor): picks are dropped, carried items stay carried.
         public void CancelBank()
         {
-            if (!BankOpen) return;
+            if (!BankOpen && _picks.Count == 0) return;   // picks can outlive a closed visit in a restored suspend
             CloseBank();
             Version++;
         }
@@ -90,17 +116,10 @@ namespace SleepingCalamity.Core
             return true;
         }
 
-        // The party moves on: free slots fill with the most valuable unpicked items (highest rank first, earlier pickup on a tie), picks become safe, the visit closes.
+        // The party moves on: the picks become safe, the visit closes. Empty slots stay empty (plan 3 task 8: the player chooses, nothing is picked for them).
         public void PushOn()
         {
             if (!BankOpen) return;
-            if (_picks.Count < SlotCapacity)
-            {
-                var order = new List<int>();
-                for (int i = 0; i < _carried.Count; i++) if (!_picks.Contains(i) && BankSlots.IsBankable(CellarLoot.KindOf(_carried[i]))) order.Add(i);
-                order.Sort((a, b) => { int r = CellarLoot.RankOf(_carried[b]).CompareTo(CellarLoot.RankOf(_carried[a])); return r != 0 ? r : a.CompareTo(b); });
-                foreach (int i in order) { if (_picks.Count >= SlotCapacity) break; _picks.Add(i); }
-            }
             var indexes = new List<int>();
             foreach (int p in _picks)
             {
@@ -177,6 +196,51 @@ namespace SleepingCalamity.Core
             if (stash != null) foreach (var kv in stash) if (kv.Value > 0) b._stash[kv.Key] = kv.Value;
             b.Satchel.Restore(waiting);
             return b;
+        }
+
+        // A bag from a bank-room suspend (plan 3 task 6, decision 9): the home part (gold, stash, waiting satchel) from the bags section and the mid-dive part (carried, banked this dive, dive gold,
+        // opened-chest mask, carried satchel, bank picks) from the suspend record. Either may be null. Both are cleaned by the rules first; this stays tolerant (it skips what does not fit)
+        // and shares nothing with the records. The bank visit is NOT opened here: the host opens it with ReopenBank(capacity) once it knows who is present, and the picks stay.
+        public static PlayerBag RestoreSuspended(PlayerBagSave home, SuspendedBag dive)
+        {
+            var b = new PlayerBag();
+            LostSatchel waiting = null;
+            if (home != null)
+            {
+                b.Gold = System.Math.Max(0, home.Gold);
+                if (home.Stash != null)
+                    foreach (LootCountSave r in home.Stash) if (r != null && r.ItemId > 0 && r.Count > 0) Bump(b._stash, r.ItemId, r.Count);
+                if (home.Satchel != null && home.Satchel.Items != null && home.Satchel.Items.Count > 0) waiting = new LostSatchel(home.Satchel.Floor, home.Satchel.Items);
+            }
+            b.Satchel.Restore(waiting);
+            if (dive == null) return b;
+            if (dive.Carried != null)
+                foreach (int id in dive.Carried) if (id > 0 && b._carried.Count < MaxCarried) b._carried.Add(id);
+            if (dive.BankedThisDive != null)
+                foreach (LootCountSave r in dive.BankedThisDive) if (r != null && r.ItemId > 0 && r.Count > 0) Bump(b._banked, r.ItemId, r.Count);
+            b.DiveGold = System.Math.Max(0, dive.DiveGold);
+            b.ChestSeed = dive.ChestSeed; b.ChestFloor = dive.ChestFloor; b.OpenedChests = dive.OpenedChests;
+            if (dive.CarriedSatchel != null && dive.CarriedSatchel.Items != null && dive.CarriedSatchel.Items.Count > 0)
+            {
+                b.Satchel.Restore(new LostSatchel(dive.CarriedSatchel.Floor, dive.CarriedSatchel.Items));   // a carried satchel and a waiting one never coexist: the carried one wins
+                b.Satchel.PickUp();
+            }
+            if (dive.Picks != null)
+                foreach (int p in dive.Picks)
+                {
+                    bool ok = p == SatchelPick ? b.Satchel.Carried != null : p >= 0 && p < b._carried.Count;
+                    if (ok && !b._picks.Contains(p)) b._picks.Add(p);
+                }
+            return b;
+        }
+
+        // Opens the bank visit again after a restore, keeping the picks that were made (a smaller party than before drops the excess from the end).
+        public void ReopenBank(int capacity)
+        {
+            SlotCapacity = System.Math.Max(0, capacity);
+            BankOpen = true;
+            while (_picks.Count > SlotCapacity) _picks.RemoveAt(_picks.Count - 1);
+            Version++;
         }
 
         void CloseBank() { _picks.Clear(); SlotCapacity = 0; BankOpen = false; }

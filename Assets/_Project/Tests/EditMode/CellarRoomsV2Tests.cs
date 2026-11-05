@@ -19,8 +19,8 @@ namespace SleepingCalamity.Tests.EditMode
             for (int i = 0; i < CellarRoomPool.All.Count; i++) Assert.That(ReferenceEquals(CellarRoomsV2.Pool[i].Base, CellarRoomPool.All[i]), Is.True, CellarRoomPool.All[i].Id);
             Assert.That(CellarRoomsV2.Bakery.Count, Is.EqualTo(CellarBakeryPool.All.Count));
             for (int i = 0; i < CellarBakeryPool.All.Count; i++) Assert.That(ReferenceEquals(CellarRoomsV2.Bakery[i].Base, CellarBakeryPool.All[i]), Is.True, CellarBakeryPool.All[i].Id);
-            Assert.That(CellarRoomsV2.All.Count, Is.EqualTo(27));
-            Assert.That(CellarRoomsV2.All.Select(r => r.Base.Id).Distinct().Count(), Is.EqualTo(27));
+            Assert.That(CellarRoomsV2.All.Count, Is.EqualTo(28));
+            Assert.That(CellarRoomsV2.All.Select(r => r.Base.Id).Distinct().Count(), Is.EqualTo(28));
         }
 
         [Test]

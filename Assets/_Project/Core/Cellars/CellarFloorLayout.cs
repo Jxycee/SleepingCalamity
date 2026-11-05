@@ -83,9 +83,12 @@ namespace SleepingCalamity.Core
         public readonly int KeyChestIndex = -1;           // index into Chests
         public readonly GateKeyCarrier Carrier;           // null on the stub
         public readonly IReadOnlyList<CellPos> EntryStarts;
-        public readonly CellPos? StairExit, BankCell;      // BankCell is the lamp nook on floor 2 and the baker's rescue bank point on floor 4
-        public readonly CellPos? BakerCell, WardenCell;   // floor 4: the sleeping baker, and the Dough Warden's spawn in the antechamber
-        public bool HasCheckpoint => BankCell.HasValue;
+        public readonly CellPos? StairExit, BankCell;      // BankCell is the bank point of the floor-5 bank room (the lamp nook); the bakery hearth's old rescue point is not a bank on floor 3
+        public readonly CellPos? BakerCell, WardenCell;   // floor 3: the sleeping baker. Floor 5: WardenCell is the Dough Warden's (stand-in guardian) spawn in the arena
+        public readonly CellPos? EndCell;                  // floor 7 only: the stand-in ending door, a plain cell of the exit room that is not the stair
+        public CellPos? BankRoomCell => Floor == UndercroftPlan.BankFloor ? BankCell : null;
+        public CellPos? GuardianCell => Floor == UndercroftPlan.BankFloor ? WardenCell : null;
+        public bool HasCheckpoint => BankRoomCell.HasValue;
         public bool HasLockedRoom => LockedRoomIndex >= 0;
         public FloorChest KeyChest => KeyChestIndex < 0 ? null : Chests[KeyChestIndex];
 
@@ -103,13 +106,36 @@ namespace SleepingCalamity.Core
                 {
                     if (f.Kind == FeatureKind.EntryStart) starts.Add(p.Cell(f.X, f.Y));
                     else if (f.Kind == FeatureKind.Stair) StairExit = p.Cell(f.X, f.Y);
-                    else if (f.Kind == FeatureKind.Bank) BankCell = p.Cell(f.X, f.Y);
+                    else if (f.Kind == FeatureKind.Bank && floor != UndercroftSetPieces.BakeryFloor) BankCell = p.Cell(f.X, f.Y);   // floor 3's hearth keeps its pool bank cell but it is no bank in the dive
                     else if (f.Kind == FeatureKind.Baker) BakerCell = p.Cell(f.X, f.Y);
                 }
             foreach (PlacedRoom p in Rooms)
                 if (p.RoomId == CellarBakeryPool.AntechamberId)
                     foreach (CellarSpawn sp in p.Room.Spawns) if (sp.Tier == SpawnTier.Tier2 && !WardenCell.HasValue) WardenCell = p.Cell(sp.X, sp.Y);
             EntryStarts = starts;
+            if (floor == UndercroftPlan.Phase1LastFloor) EndCell = PickEndCell();
+        }
+
+        // The stand-in ending door (floor 7): the plain floor cell of the stair-exit room nearest the stair (ties row by row), never a door cell or the stair itself.
+        CellPos? PickEndCell()
+        {
+            if (!StairExit.HasValue) return null;
+            int e = ExitRoomIndex();
+            if (e < 0) return null;
+            PlacedRoom p = Rooms[e]; CellPos? best = null; int bestD = int.MaxValue;
+            for (int y = 0; y < p.Height; y++)
+                for (int x = 0; x < p.Width; x++)
+                {
+                    if (p.Room.CellAt(x, y) != CellKind.Floor) continue;
+                    CellPos c = p.Cell(x, y);
+                    if (c.X == StairExit.Value.X && c.Y == StairExit.Value.Y) continue;
+                    bool door = false;
+                    for (int d = 0; d < p.Room.Doors.Count; d++) if (p.Room.Doors[d].X == x && p.Room.Doors[d].Y == y) door = true;
+                    if (door) continue;
+                    int dist = System.Math.Abs(c.X - StairExit.Value.X) + System.Math.Abs(c.Y - StairExit.Value.Y);
+                    if (dist < bestD) { bestD = dist; best = c; }
+                }
+            return best;
         }
 
         public PlacedCorridor CorridorAt(int x, int y)

@@ -1,5 +1,6 @@
-// M6 S3: the host-held town stock (Core/Town/TownStock): the banked haul moves into TownState stock, the baker joins when the heart was banked, loot is counted once,
-// and the move is idempotent so the haul and the town never double count. Pure Core + NUnit.
+// M6 S3 / plan 3 task 12: the host-held town stock (Core/Town/TownStock): found pieces move into TownState stock, the baker joins when rescued, and the move is idempotent so the
+// found set and the town never double count. Pure Core + NUnit.
+using System.Collections.Generic;
 using NUnit.Framework;
 using SleepingCalamity.Core;
 
@@ -7,19 +8,18 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class TownStockTests
     {
-        static DiveHaul Haul() => new DiveHaul(new[] { 2, 2, 2 });
+        static DivePieces Pieces() => new DivePieces(PieceDepths.Assign(12345UL, PieceCatalog.Specs));
 
         [Test]
         public void Receive_MovesEveryPickedUpPieceToStock_AtOnce()
         {
             var stock = new TownStock(HollowmereLayout.Create());
-            DiveHaul haul = Haul();
-            haul.AddPiece(DiveHaul.PieceId(1, 0)); haul.AddPiece(DiveHaul.PieceId(1, 1));
-            Assert.That(stock.Receive(haul, bakerRescued: false), Is.EqualTo(2), "no bank press needed: a piece is safe on pickup");
-            haul.AddPiece(DiveHaul.PieceId(2, 0));
-            Assert.That(stock.Receive(haul, bakerRescued: false), Is.EqualTo(1), "only the new one arrives");
-            haul.FailDive();
-            Assert.That(stock.Receive(haul, bakerRescued: false), Is.EqualTo(0), "a failed dive keeps the pieces and moves nothing twice");
+            DivePieces pieces = Pieces();
+            pieces.Pick(PieceCatalog.FrameId); pieces.Pick(PieceCatalog.OvenId);
+            Assert.That(stock.Receive(pieces, bakerRescued: false), Is.EqualTo(2), "no bank press needed: a piece is safe on pickup");
+            pieces.Pick(PieceCatalog.DoorId);
+            Assert.That(stock.Receive(pieces, bakerRescued: false), Is.EqualTo(1), "only the new one arrives");
+            Assert.That(stock.Receive(pieces, bakerRescued: false), Is.EqualTo(0), "moving again moves nothing twice");
             Assert.That(stock.State.InStock(100), Is.True);
             Assert.That(stock.State.InStock(101), Is.True);
             Assert.That(stock.State.InStock(200), Is.True);
@@ -27,56 +27,38 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Receive_IsIdempotent_AndPicksUpLaterBanks()
+        public void Receive_IsIdempotent_AndPicksUpLaterFinds()
         {
             var stock = new TownStock(HollowmereLayout.Create());
-            DiveHaul haul = Haul();
-            haul.AddPiece(100); haul.Bank();
-            Assert.That(stock.Receive(haul, false), Is.EqualTo(1));
-            Assert.That(stock.Receive(haul, false), Is.EqualTo(0), "the same banked piece is not stocked twice");
-            haul.AddPiece(201); haul.Bank();
-            Assert.That(stock.Receive(haul, false), Is.EqualTo(1));
-            Assert.That(new System.Collections.Generic.List<int>(stock.State.StockPieces), Is.EqualTo(new[] { 100, 201 }));
+            DivePieces pieces = Pieces();
+            pieces.Pick(100);
+            Assert.That(stock.Receive(pieces, false), Is.EqualTo(1));
+            Assert.That(stock.Receive(pieces, false), Is.EqualTo(0), "the same piece is not stocked twice");
+            pieces.Pick(201);
+            Assert.That(stock.Receive(pieces, false), Is.EqualTo(1));
+            Assert.That(new List<int>(stock.State.StockPieces), Is.EqualTo(new[] { 100, 201 }));
         }
 
         [Test]
-        public void Receive_AddsTheBakerOnce_WhenTheHeartWasBanked()
+        public void Receive_AddsTheBakerOnce_WhenRescued()
         {
             var stock = new TownStock(HollowmereLayout.Create());
-            DiveHaul haul = Haul();
-            stock.Receive(haul, bakerRescued: true);
-            stock.Receive(haul, bakerRescued: true);
+            DivePieces pieces = Pieces();
+            stock.Receive(pieces, bakerRescued: true);
+            stock.Receive(pieces, bakerRescued: true);
             Assert.That(stock.State.ResidentInStock(TownBuildings.BakerResident), Is.True);
-            Assert.That(new System.Collections.Generic.List<string>(stock.State.StockResidents), Has.Count.EqualTo(1));
-        }
-
-        [Test]
-        public void Receive_CountsBankedLootOnceAcrossDives()
-        {
-            var stock = new TownStock(HollowmereLayout.Create());
-            DiveHaul haul = Haul();
-            haul.AddLoot(7, 3); haul.AddLoot(9, 1); haul.Bank();
-            haul.AddLoot(7, 5);   // unbanked
-            stock.Receive(haul, false);
-            Assert.That(stock.LootCount(7), Is.EqualTo(3));
-            Assert.That(stock.LootCount(9), Is.EqualTo(1));
-            stock.Receive(haul, false);
-            Assert.That(stock.LootCount(7), Is.EqualTo(3), "a second move of the same bank adds nothing");
-            haul.Bank();   // the 5 are banked now (the haul keeps its running totals: 8)
-            stock.Receive(haul, false);
-            Assert.That(stock.LootCount(7), Is.EqualTo(8));
-            Assert.That(stock.TotalLoot, Is.EqualTo(9));
+            Assert.That(new List<string>(stock.State.StockResidents), Has.Count.EqualTo(1));
         }
 
         [Test]
         public void Receive_KeepsTheTownConservationSet_StableAcrossRepeats()
         {
             var stock = new TownStock(HollowmereLayout.Create());
-            DiveHaul haul = Haul();
-            haul.AddPiece(100); haul.AddPiece(300); haul.Bank();
-            stock.Receive(haul, true);
+            DivePieces pieces = Pieces();
+            pieces.Pick(100); pieces.Pick(300);
+            stock.Receive(pieces, true);
             var before = stock.State.Conservation();
-            stock.Receive(haul, true);
+            stock.Receive(pieces, true);
             Assert.That(stock.State.Conservation(), Is.EqualTo(before));
         }
     }

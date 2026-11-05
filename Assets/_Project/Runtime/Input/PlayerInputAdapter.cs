@@ -336,6 +336,12 @@ namespace SleepingCalamity.Runtime
                 case DevKey.StartDive: k = Key.F7; return true;
                 case DevKey.AbandonDive: k = Key.F8; return true;
                 case DevKey.EatLoaf: k = Key.H; return true;
+                case DevKey.CycleFloor: k = Key.G; return true;
+                case DevKey.BankPrev: k = Key.LeftBracket; return true;
+                case DevKey.BankNext: k = Key.RightBracket; return true;
+                case DevKey.BankPick: k = Key.P; return true;
+                case DevKey.BankPushOn: k = Key.Y; return true;
+                case DevKey.BankGoHome: k = Key.N; return true;
                 default: return false;
             }
         }

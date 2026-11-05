@@ -350,7 +350,7 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC TRAILER start sha=" + sha + " frames=" + frames.Count + " skip=" + skip + " checkOnly=" + checkOnly + " out=" + outDir);
 
             TownLayout town = HollowmereLayout.Create();
-            Plan plan = BuildPlan(town, CellarFloorGenerator.Generate(CellarFloorTestBuilder.Seed, CellarFloorTestBuilder.FloorNumber));   // the fixed seed
+            Plan plan = BuildPlan(town, CellarFloorGenerator.Layout(CellarFloorTestBuilder.Seed, CellarFloorTestBuilder.FloorNumber));   // the fixed seed
 
             bool noBuild = !string.IsNullOrEmpty(Env("SC_CAPTURE_NOBUILD"));
             if (!noBuild) { HollowmereBuilder.Build(); UndercroftStairBuilder.Build(); CellarFloorTestBuilder.Build(); }
@@ -403,7 +403,7 @@ namespace SleepingCalamity.EditorTools
             Directory.CreateDirectory(dir);
             var frames = new List<int>();
             foreach (string s in (Env("SC_TRAILER_STILLS") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)) frames.Add(Mathf.RoundToInt(float.Parse(s, System.Globalization.CultureInfo.InvariantCulture) * Fps));
-            Plan plan = BuildPlan(HollowmereLayout.Create(), CellarFloorGenerator.Generate(CellarFloorTestBuilder.Seed, CellarFloorTestBuilder.FloorNumber));
+            Plan plan = BuildPlan(HollowmereLayout.Create(), CellarFloorGenerator.Layout(CellarFloorTestBuilder.Seed, CellarFloorTestBuilder.FloorNumber));
             if (string.IsNullOrEmpty(Env("SC_CAPTURE_NOBUILD"))) { UndercroftStairBuilder.Build(); CellarFloorTestBuilder.Build(); }
             var stats = new Stats();
             RenderPipelineAsset savedQuality = QualitySettings.renderPipeline;

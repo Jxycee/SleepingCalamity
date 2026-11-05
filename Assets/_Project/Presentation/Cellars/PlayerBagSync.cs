@@ -8,6 +8,7 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using SleepingCalamity.Core;
+using SleepingCalamity.Gameplay;
 
 namespace SleepingCalamity.Presentation
 {
@@ -21,6 +22,7 @@ namespace SleepingCalamity.Presentation
         public FixedList32Bytes<byte> Picks;        // up to Capacity (30); the bank visit holds at most 3
         public int Gold, DiveGold, StashTotal, BankedThisDive, SlotCapacity;   // StashTotal and BankedThisDive count items, not kinds
         public bool BankOpen, SatchelWaiting, SatchelCarried;
+        public bool HasBoots;                       // PlayerBag.HasBoots: the owner's run bonus (plan 3 decision 12), read owner-side
         public byte SatchelFloor;                   // the floor of the carried satchel, else of the waiting one, else 0
         public uint ChestSeed;
         public int ChestFloor;
@@ -45,7 +47,7 @@ namespace SleepingCalamity.Presentation
             v.StashTotal = bag.StashTotal; v.BankedThisDive = bag.BankedTotal;
             v.SlotCapacity = bag.SlotCapacity; v.BankOpen = bag.BankOpen;
             LostSatchel carried = bag.Satchel.Carried, waiting = bag.Satchel.Waiting;
-            v.SatchelCarried = carried != null; v.SatchelWaiting = waiting != null;
+            v.SatchelCarried = carried != null; v.SatchelWaiting = waiting != null; v.HasBoots = bag.HasBoots;
             LostSatchel shown = carried ?? waiting;
             v.SatchelFloor = shown == null ? (byte)0 : (byte)Mathf.Clamp(shown.Floor, 0, 255);
             v.ChestSeed = bag.ChestSeed; v.ChestFloor = bag.ChestFloor; v.OpenedChests = bag.OpenedChests;
@@ -74,7 +76,7 @@ namespace SleepingCalamity.Presentation
             }
             s.SerializeValue(ref Gold); s.SerializeValue(ref DiveGold); s.SerializeValue(ref StashTotal);
             s.SerializeValue(ref BankedThisDive); s.SerializeValue(ref SlotCapacity);
-            s.SerializeValue(ref BankOpen); s.SerializeValue(ref SatchelWaiting); s.SerializeValue(ref SatchelCarried);
+            s.SerializeValue(ref BankOpen); s.SerializeValue(ref SatchelWaiting); s.SerializeValue(ref SatchelCarried); s.SerializeValue(ref HasBoots);
             s.SerializeValue(ref SatchelFloor);
             s.SerializeValue(ref ChestSeed); s.SerializeValue(ref ChestFloor); s.SerializeValue(ref OpenedChests);
         }
@@ -85,7 +87,7 @@ namespace SleepingCalamity.Presentation
             for (int i = 0; i < Carried.Length; i++) if (Carried[i] != o.Carried[i]) return false;
             for (int i = 0; i < Picks.Length; i++) if (Picks[i] != o.Picks[i]) return false;
             return Gold == o.Gold && DiveGold == o.DiveGold && StashTotal == o.StashTotal && BankedThisDive == o.BankedThisDive && SlotCapacity == o.SlotCapacity
-                && BankOpen == o.BankOpen && SatchelWaiting == o.SatchelWaiting && SatchelCarried == o.SatchelCarried && SatchelFloor == o.SatchelFloor
+                && BankOpen == o.BankOpen && SatchelWaiting == o.SatchelWaiting && SatchelCarried == o.SatchelCarried && HasBoots == o.HasBoots && SatchelFloor == o.SatchelFloor
                 && ChestSeed == o.ChestSeed && ChestFloor == o.ChestFloor && OpenedChests == o.OpenedChests;
         }
 
@@ -101,7 +103,7 @@ namespace SleepingCalamity.Presentation
                 for (int i = 0; i < Carried.Length; i++) h = h * 31 + Carried[i];
                 h = h * 31 + Picks.Length;
                 for (int i = 0; i < Picks.Length; i++) h = h * 31 + Picks[i];
-                h = h * 31 + (BankOpen ? 1 : 0) + (SatchelWaiting ? 2 : 0) + (SatchelCarried ? 4 : 0);
+                h = h * 31 + (BankOpen ? 1 : 0) + (SatchelWaiting ? 2 : 0) + (SatchelCarried ? 4 : 0) + (HasBoots ? 8 : 0);
                 h = h * 31 + SatchelFloor; h = h * 31 + (int)ChestSeed; h = h * 31 + ChestFloor; h = h * 31 + (int)OpenedChests;
                 return h;
             }
@@ -136,8 +138,9 @@ namespace SleepingCalamity.Presentation
 
         private DiveHaulSync _haul;          // host only; the haul sync of this object's own NetworkManager
         private float _nextHaulLookup;       // the scene search runs at most once a second while no haul sync is known (town, haul-less tests)
-        private string _bagId;               // host only; the owner's bag key (PlayerKey.ToString allocates, so it is resolved rarely, never per frame)
-        private float _nextIdResolve;        // while no bag is found under _bagId the key is re-resolved at most twice a second
+        private string _bagId;               // host only; the owner's bag key (PlayerKey.ToString allocates, so it is resolved when the roster key changes, never per frame)
+        private float _nextIdResolve;        // the roster key is looked at most twice a second
+        private bool _hasKey; private PlayerKey _key;   // host only; the roster key _bagId was resolved from (PlayerKey compare allocates nothing)
         private PlayerBag _shownBag; private int _shownVersion = -1;   // host only; the bag and Version Net was last built from: an unchanged bag costs nothing per frame
 
         public override void OnNetworkSpawn()
@@ -148,7 +151,7 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             if (Local == this) Local = null;
-            _haul = null; _bagId = null; _shownBag = null; _shownVersion = -1;
+            _haul = null; _bagId = null; _hasKey = false; _key = default; _nextIdResolve = 0f; _shownBag = null; _shownVersion = -1;
         }
 
         // Asks the host to move carried item `index` (PlayerBag.SatchelPick = -1 for the carried satchel) into a bank slot. The host decides.
@@ -185,8 +188,15 @@ namespace SleepingCalamity.Presentation
             return _haul;
         }
 
+        private HeroLocomotion _locomotion;
+
         private void Update()
         {
+            if (IsOwner && IsSpawned)   // the owner's boots (decision 12): read from the owner's own view, so a client predicts its speed with no host check
+            {
+                if (_locomotion == null) _locomotion = GetComponent<HeroLocomotion>();
+                if (_locomotion != null) _locomotion.BootsOn = Net.Value.HasBoots;
+            }
             if (!IsServer || !IsSpawned) return;
             DiveHaulSync haul = ResolveHaul(false);
             PlayerBag bag = haul == null ? null : FindBag(haul);   // looking never creates a bag: no bag yet shows as default
@@ -196,17 +206,19 @@ namespace SleepingCalamity.Presentation
             if (!next.Equals(Net.Value)) Net.Value = next;   // only send when something the owner can see changed
         }
 
-        // The owner's bag if it exists (a new dive state or an adopted bag shows up here, since the lookup runs every frame). The bag key is resolved once and cached; with no bag found under
-        // it, it is resolved again (twice a second at most) in case the owner got a roster key after the first look.
+        // The owner's bag if it exists (a new dive state or an adopted bag shows up here, since the lookup runs every frame). The bag key is resolved from the roster at most twice a second and again
+        // whenever the roster's key for the owner changes (a Solo world rebinding its owner, a key arriving after the first look): a cached key must not keep showing a stale bag (plan 3 task 8).
         private PlayerBag FindBag(DiveHaulSync haul)
         {
-            DiveState state = haul.HostState;
-            if (state == null) return null;
-            if (_bagId != null && state.Bags.TryGet(_bagId, out PlayerBag bag)) return bag;
-            if (Time.unscaledTime < _nextIdResolve) return null;
-            _nextIdResolve = Time.unscaledTime + 0.5f;
-            _bagId = haul.PlayerIdOf(OwnerClientId);
-            return _bagId != null && state.Bags.TryGet(_bagId, out bag) ? bag : null;
+            PartyBags bags = haul.Bags;   // the party's bags outlive every dive session
+            if (bags == null) return null;
+            if (Time.unscaledTime >= _nextIdResolve)
+            {
+                _nextIdResolve = Time.unscaledTime + 0.5f;
+                bool has = haul.TryRosterKey(OwnerClientId, out PlayerKey key);
+                if (_bagId == null || has != _hasKey || (has && key != _key)) { _hasKey = has; _key = key; _bagId = haul.PlayerIdOf(OwnerClientId); }
+            }
+            return _bagId != null && bags.TryGet(_bagId, out PlayerBag bag) ? bag : null;
         }
     }
 }

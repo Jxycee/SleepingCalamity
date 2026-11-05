@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using SleepingCalamity.Core;
 using SleepingCalamity.EditorTools;
 using UnityEditor.SceneManagement;
 
@@ -37,7 +38,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void RegressionSet_CoversTownAndTenSeeds()
         {
-            Assert.AreEqual(2 + TraversalScan.RegressionSeeds.Length * 4, s_run.Count);
+            Assert.AreEqual(2 + TraversalScan.RegressionSeeds.Length * DiveFloorTable.LastBuiltFloor, s_run.Count);
         }
 
         [Test]

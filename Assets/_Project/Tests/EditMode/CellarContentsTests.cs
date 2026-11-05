@@ -1,6 +1,6 @@
 // Authority: none (pure EditMode tests). M5 contents in Core: CellarLoot (rank roll + key chest), CellarPieceSpots, CellarRoomClear, CellarEnemyMix.
 // Catches: a roll that differs between peers, a rank band that does not rise with the floor, a key chest that yields loot, a piece on a chest / spawn / bank / healing /
-// locked-room / entry cell, a piece count that differs from DefaultPiecesPerFloor, a room that clears early or never.
+// locked-room / entry cell, a piece count that differs from the one asked for, a room that clears early or never.
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -10,8 +10,6 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarContentsTests
     {
-        static readonly int[] Defaults = { 2, 2, 2 };   // = DiveHaulSync.DefaultPiecesPerFloor (the PlayMode contents test asserts the equality)
-
         [Test]
         public void Loot_IsDeterministic_AndItemsMatchTheirRank()
         {
@@ -71,7 +69,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 60; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                     if (l.KeyChestIndex < 0) continue;
                     for (int i = 0; i < l.Chests.Count; i++)
                     {
@@ -83,16 +81,16 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void PieceSpots_CountMatchesDefaults_AndCellsAreLegalAndDistinct()
+        public void PieceSpots_CountMatchesTheRequest_AndCellsAreLegalAndDistinct()
         {
             for (uint seed = 0; seed < 120; seed++)
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in new[] { 2, 4, 6, 7 })   // the generated floors (plan 3 task 5: pieces never lie on floor 1, 3 or 5)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, floor);
                     CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
-                    IReadOnlyList<CellPos> spots = CellarPieceSpots.Choose(l, d, Defaults[floor - 1]);
+                    IReadOnlyList<CellPos> spots = CellarPieceSpots.Choose(l, d, 2);
                     string tag = " seed " + seed + " floor " + floor;
-                    Assert.AreEqual(Defaults[floor - 1], spots.Count, "count" + tag);
+                    Assert.AreEqual(2, spots.Count, "count" + tag);
                     Assert.AreEqual(spots.Count, spots.Select(s => s.X * 100 + s.Y).Distinct().Count(), "distinct" + tag);
                     CellarEncounterPlan plan = CellarEncounterPlan.Build(l, d, 0, false);
                     CellPos? heal = CellarHealing.PointFor(l, d);
@@ -111,27 +109,28 @@ namespace SleepingCalamity.Tests.EditMode
                         if (l.Carrier != null) Assert.That(l.Carrier.X == s.X && l.Carrier.Y == s.Y, Is.False, "carrier" + tag);
                         Assert.That(l.Rooms[room].Room.CellAt(s.X - l.Rooms[room].X, s.Y - l.Rooms[room].Y), Is.EqualTo(CellKind.Floor), "floor cell" + tag);
                     }
-                    var again = CellarPieceSpots.Choose(l, d, Defaults[floor - 1]);
+                    var again = CellarPieceSpots.Choose(l, d, 2);
                     for (int i = 0; i < spots.Count; i++) { Assert.AreEqual(spots[i].X, again[i].X); Assert.AreEqual(spots[i].Y, again[i].Y); }
                 }
         }
 
         [Test]
-        public void PieceSpots_Floor4HasNone()
+        public void PieceSpots_Floor3HasNone()
         {
             for (uint seed = 0; seed < 10; seed++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 4);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 3);
                 Assert.AreEqual(0, CellarPieceSpots.Choose(l, CellarFloorDressing.Resolve(l), 2).Count);
             }
         }
 
         [Test]
-        public void PieceId_MatchesDiveHaul()
+        public void PieceIds_AreTheCatalogsSevenIds_AndTheirDepthsAreAssignedOnce()
         {
-            var h = new DiveHaul(Defaults);
-            for (int f = 1; f <= 3; f++) for (int i = 0; i < 2; i++) Assert.IsTrue(h.AddPiece(DiveHaul.PieceId(f, i)));
-            Assert.AreEqual(0, h.PiecesLeft(1) + h.PiecesLeft(2) + h.PiecesLeft(3));
+            Assert.AreEqual(new[] { 100, 101, 200, 201, 300, 301, PieceCatalog.BakerId }, PieceCatalog.Specs.Select(p => p.Id).ToArray(), "the ids old saves hold");
+            var pieces = new DivePieces(PieceDepths.Assign(12345UL, PieceCatalog.Specs));
+            foreach (PieceSpec p in PieceCatalog.Specs) { Assert.Greater(pieces.DepthOf(p.Id), 0, "depth of " + p.Id); Assert.IsTrue(pieces.Pick(p.Id)); }
+            Assert.AreEqual(0, Enumerable.Range(1, UndercroftPlan.BossFloor).Sum(f => pieces.PiecesLeft(f) + pieces.PeopleLeft(f)));
         }
 
         [Test]

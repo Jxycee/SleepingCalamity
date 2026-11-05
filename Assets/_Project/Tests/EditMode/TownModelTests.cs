@@ -38,14 +38,14 @@ namespace SleepingCalamity.Tests.EditMode
         public void Catalog_EveryDefaultPieceMapsToAPartOfTheBakery()
         {
             var seen = new HashSet<string>();
-            for (int floor = 1; floor <= DiveHaul.PieceFloors; floor++)
-                for (int i = 0; i < 2; i++)   // M5 spawns 2 per floor by default (DiveHaulSync.DefaultPiecesPerFloor)
-                {
-                    Assert.That(PieceCatalog.TryGet(DiveHaul.PieceId(floor, i), out PieceInfo info), Is.True, "piece " + DiveHaul.PieceId(floor, i));
-                    Assert.That(info.Building, Is.EqualTo(TownBuildings.Bakery));
-                    Assert.That(TownBuildings.Get(info.Building).PartIndex(info.Part), Is.GreaterThanOrEqualTo(0));
-                    seen.Add(info.Part);
-                }
+            foreach (PieceSpec spec in PieceCatalog.Specs)   // every id the dive can place (the baker is a person, not a piece)
+            {
+                if (PieceCatalog.IsPerson(spec.Id)) continue;
+                Assert.That(PieceCatalog.TryGet(spec.Id, out PieceInfo info), Is.True, "piece " + spec.Id);
+                Assert.That(info.Building, Is.EqualTo(TownBuildings.Bakery));
+                Assert.That(TownBuildings.Get(info.Building).PartIndex(info.Part), Is.GreaterThanOrEqualTo(0));
+                seen.Add(info.Part);
+            }
             foreach (string part in TownBuildings.Get(TownBuildings.Bakery).Parts) Assert.That(seen, Does.Contain(part), "no piece for " + part);
         }
 

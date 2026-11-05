@@ -44,16 +44,17 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void PushOn_BanksPicksAndAutoFillsByRank()
+        public void PushOn_BanksOnlyThePicks_EmptySlotsStayEmpty()
         {
+            // Plan 3 task 8: the old auto-fill (free slots took the highest-rank unpicked items) is gone; the player chooses.
             var b = BagWith(101, 112, 110);
             b.OpenBank(2);
             Assert.That(b.Pick(0), Is.True);
             b.PushOn();
-            Assert.That(b.BankedThisDive.Count, Is.EqualTo(2));
+            Assert.That(b.BankedThisDive.Count, Is.EqualTo(1));
             Assert.That(b.BankedThisDive[101], Is.EqualTo(1));
-            Assert.That(b.BankedThisDive[112], Is.EqualTo(1));
-            Assert.That(b.Carried, Is.EqualTo(new[] { 110 }));
+            Assert.That(b.BankedThisDive.ContainsKey(112), Is.False, "the free slot was not filled for the player");
+            Assert.That(b.Carried, Is.EqualTo(new[] { 112, 110 }));
             Assert.That(b.BankOpen, Is.False);
             Assert.That(b.Picks.Count, Is.EqualTo(0));
         }
@@ -253,6 +254,36 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(b.StashTotal, Is.EqualTo(3));
         }
 
+        // Catches: a bag restored from a bank-room suspend missing any part of its mid-dive state, or the restore opening a visit / sharing the record's lists.
+        [Test]
+        public void PlayerBag_RestoreSuspended_RebuildsCarriedBankedGoldChestsSatchelPicks()
+        {
+            var home = new PlayerBagSave { Identity = 0, Id = "aaaa", Gold = 5, Stash = { new LootCountSave { ItemId = 109, Count = 2 } }, Satchel = new SatchelSave { Floor = 2, Items = { 110 } } };
+            var dive = new SuspendedBag
+            {
+                Identity = 0, Id = "aaaa", Carried = { 104, 105, 106 }, BankedThisDive = { new LootCountSave { ItemId = 101, Count = 2 } },
+                DiveGold = 7, ChestSeed = 55u, ChestFloor = 3, OpenedChests = (1UL << 63) | 1UL, Picks = { 1, PlayerBag.SatchelPick },
+                CarriedSatchel = new SatchelSave { Floor = 4, Items = { 120, 121 } },
+            };
+            PlayerBag b = PlayerBag.RestoreSuspended(home, dive);
+            Assert.That(b.Carried, Is.EqualTo(new[] { 104, 105, 106 }));
+            Assert.That(b.BankedThisDive, Is.EqualTo(new Dictionary<int, int> { { 101, 2 } }));
+            Assert.That(b.DiveGold, Is.EqualTo(7));
+            Assert.That(b.Gold, Is.EqualTo(5));
+            Assert.That(b.Stash, Is.EqualTo(new Dictionary<int, int> { { 109, 2 } }));
+            Assert.That(b.ChestSeed, Is.EqualTo(55u)); Assert.That(b.ChestFloor, Is.EqualTo(3));
+            Assert.That(b.OpenedChests, Is.EqualTo((1UL << 63) | 1UL));
+            Assert.That(b.ChestOpened(55u, 3, 63), Is.True);
+            Assert.That(b.Satchel.Carried.Floor, Is.EqualTo(4)); Assert.That(b.Satchel.Carried.Items, Is.EqualTo(new[] { 120, 121 }));
+            Assert.That(b.Satchel.Waiting, Is.Null, "a carried satchel and a waiting one never exist together: the carried one wins");
+            Assert.That(b.Picks, Is.EqualTo(new[] { 1, PlayerBag.SatchelPick }));
+            Assert.That(b.BankOpen, Is.False);
+            dive.Carried.Add(999);
+            Assert.That(b.Carried.Count, Is.EqualTo(3), "the bag shares nothing with the record");
+            Assert.That(b.HasBoots, Is.False);
+            Assert.That(PlayerBag.RestoreSuspended(null, new SuspendedBag { Carried = { CellarLoot.BootsId } }).HasBoots, Is.True, "boots carried count after a restore too");
+        }
+
         [Test]
         public void KindOf_TableItemsAreLarge_KeysAreKeys()
         {
@@ -262,6 +293,47 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(CellarLoot.KindOf(424242), Is.EqualTo(DiveItemKind.Usable));
             Assert.That(CellarLoot.RankOf(CellarLoot.RoomKeyId), Is.EqualTo(0));
             Assert.That(CellarLoot.RankOf(424242), Is.EqualTo(0));
+        }
+
+        // Catches: the carried satchel not counting toward MaxCarried (a full bag that also carries a satchel taking one item too many), a pick-up into a full bag eating a slot that is not there.
+        [Test]
+        public void PickedSatchel_TakesOneCarrySlot()
+        {
+            var b = new PlayerBag();
+            b.Satchel.Restore(new LostSatchel(4, new[] { 101, 102 }));
+            for (int i = 0; i < PlayerBag.MaxCarried - 1; i++) Assert.That(b.Add(103), Is.True);
+            int v = b.Version;
+            Assert.That(b.PickUpSatchel(), Is.True, "one slot left: the satchel takes it");
+            Assert.That(b.Version, Is.GreaterThan(v), "a pick-up is a change the owner's view must see");
+            Assert.That(b.Satchel.Carried, Is.Not.Null);
+            Assert.That(b.Satchel.Waiting, Is.Null);
+            Assert.That(b.IsFull, Is.True);
+            Assert.That(b.Add(104), Is.False, "59 items + the satchel = 60: no room");
+            Assert.That(b.Carried.Count, Is.EqualTo(PlayerBag.MaxCarried - 1));
+        }
+
+        [Test]
+        public void PickUpSatchel_FullBag_LeavesItWaiting_NoSatchel_IsRefused()
+        {
+            var b = new PlayerBag();
+            Assert.That(b.PickUpSatchel(), Is.False, "nothing waits");
+            b.Satchel.Restore(new LostSatchel(2, new[] { 101 }));
+            for (int i = 0; i < PlayerBag.MaxCarried; i++) b.Add(103);
+            int v = b.Version;
+            Assert.That(b.PickUpSatchel(), Is.False, "a full bag cannot carry it");
+            Assert.That(b.Satchel.Waiting, Is.Not.Null, "it stays where it lies");
+            Assert.That(b.Version, Is.EqualTo(v), "a refused call changes nothing");
+        }
+
+        [Test]
+        public void GoldPurse_NeverReachesAdd_AndAddGoldCounts()
+        {
+            var b = new PlayerBag();
+            Assert.That(b.Add(CellarLoot.GoldId), Is.False, "the sentinel is not an item");
+            Assert.That(b.AddGold(CellarLoot.GoldPurse), Is.True);
+            Assert.That(b.DiveGold, Is.EqualTo(CellarLoot.GoldPurse));
+            b.Fail(3);
+            Assert.That(b.Gold, Is.EqualTo(DiveGold.KeptOnFail(CellarLoot.GoldPurse)), "a failed dive keeps half the purse");
         }
     }
 }

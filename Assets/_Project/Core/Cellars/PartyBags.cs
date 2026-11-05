@@ -1,5 +1,5 @@
 // Core/Cellars/PartyBags.cs: the host's PlayerBag per recorded player, keyed by player id (spec decision 39; per-player loot plan task 1). Pure C#.
-// Authority: host only (owned by DiveState). The id is the PlayerKey string, or the client id when there is no roster, so a rejoin gets the same bag back.
+// Authority: host only (owned by the DiveDirector, handed to each DiveSession). The id is the PlayerKey string, or the client id when there is no roster, so a rejoin gets the same bag back.
 using System;
 using System.Collections.Generic;
 
@@ -29,9 +29,22 @@ namespace SleepingCalamity.Core
             get { foreach (var kv in _bags) if (kv.Value.BankOpen) return true; return false; }
         }
 
+        // Carried items that stir the dive (BankSlots.IsStirValuable: weapons and large items) across every bag; usables, gear, keys and the satchel do not count. Allocation free.
+        public int CarriedValuables()
+        {
+            int n = 0;
+            foreach (var kv in _bags)
+            {
+                IReadOnlyList<int> carried = kv.Value.Carried;
+                for (int i = 0; i < carried.Count; i++) if (BankSlots.IsStirValuable(CellarLoot.KindOf(carried[i]))) n++;
+            }
+            return n;
+        }
+
         public void CancelBankVisits() { foreach (var kv in _bags) kv.Value.CancelBank(); }
 
-        public void PushOnAll() { foreach (var kv in _bags) if (kv.Value.BankOpen) kv.Value.PushOn(); }
+        // The party moves on: an open visit banks its picks; a bag with no open visit (absent from the room) drops any stale picks a restored suspend left, banking nothing for it.
+        public void PushOnAll() { foreach (var kv in _bags) { if (kv.Value.BankOpen) kv.Value.PushOn(); else kv.Value.CancelBank(); } }
 
         public void GoHomeAll() { foreach (var kv in _bags) kv.Value.GoHome(); }
 

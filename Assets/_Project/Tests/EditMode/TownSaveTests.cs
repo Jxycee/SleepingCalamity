@@ -1,5 +1,6 @@
-// M6 S2: the town's world-save sections (stock, town, residents, dive; Core/Town/Placement/TownSaves.cs): per-entry clean, the conservation pass (missing, duplicate,
-// mid-dive quit), the live-state capture and restore, the store's round trip / bad section / bad entry for each section, an S0-era save, and the HostWorld provider.
+// M6 S2 / plan 3 task 12: the town's world-save sections (stock, town, residents, dive; Core/Town/Placement/TownSaves.cs): per-entry clean, the conservation pass (missing, duplicate,
+// mid-dive quit), the live-state capture and restore, the store's round trip / bad section / bad entry for each section, an S0-era save, the HostWorld provider, and an OLD four-floor
+// save (its loot, banked pieces and checkpoint) loading into the new dive.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,12 +17,12 @@ namespace SleepingCalamity.Tests.EditMode
         const int Frame = 100, Oven = 101, Door = 200, Sign = 201, SpareFrame = 300, SpareOven = 301;
         const string Baker = "baker";
         static readonly TownLayout Hollow = HollowmereLayout.Create();
-        static readonly int[] PerFloor = { 2, 2, 2 };
+        static readonly IReadOnlyDictionary<int, int> Depths = PieceDepths.Assign(12345UL, PieceCatalog.Specs);
 
         static StockSave Stock(params int[] pieces) { var s = new StockSave(); s.Pieces.AddRange(pieces); return s; }
 
-        // Everything the bakery needs placed, a spare frame banked in the haul (with 3 of loot 7), a spare oven collected but not banked, the baker in stock.
-        static (TownState town, DiveState dive) Live(int floor = 0)
+        // Everything the bakery needs placed and the baker with it; the spare frame and the spare oven were found in the dive and sit in stock (a found piece is safe at once).
+        static TownState Live()
         {
             var town = new TownState(Hollow);
             foreach (int p in new[] { Frame, Oven, Door, Sign }) town.AddPiece(p);
@@ -31,12 +32,8 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (string part in new[] { "oven", "door", "sign" }) Assert.That(town.PlacePart("bakery", part), Is.EqualTo(PlaceResult.Ok));
             Assert.That(town.PlaceResident("bakery"), Is.EqualTo(PlaceResult.Ok));
             town.AddResident(Baker);   // refused: already placed (a resident exists once)
-            var dive = new DiveState(new DiveHaul(PerFloor));
-            dive.Haul.AddPiece(SpareFrame); dive.Haul.AddLoot(7, 3); dive.Haul.Bank();
-            dive.Haul.AddPiece(SpareOven);   // picked up this dive: safe at once (per-player loot plan, spec 4.4), banked with the rest
-            dive.RestoreProgress(0b0011, true);
-            if (floor > 0) dive.SetFloor(floor);
-            return (town, dive);
+            town.AddPiece(SpareFrame); town.AddPiece(SpareOven);
+            return town;
         }
 
         static List<string> Places(TownSnapshot s)
@@ -65,11 +62,13 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void CaptureAndRestore_RoundTrip_ThroughTheJsonSections()
         {
-            (TownState town, DiveState dive) = Live();
-            TownSnapshot snap = TownSaves.Capture(town, dive, new Dictionary<int, int> { { 9, 4 } }, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
+            TownState town = Live();
+            TownSnapshot snap = TownSaves.Capture(town, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
             AssertExactlyOnce(snap);
             Assert.That(snap.Dive.OnFloorPieces, Is.Empty, "a piece picked up mid-dive is safe: it is not written back on its floor");
-            Assert.That(snap.Dive.BankedPieces, Is.EqualTo(new[] { SpareFrame, SpareOven }));
+            Assert.That(snap.Dive.BankedPieces, Is.Empty, "nothing waits banked any more: a found piece is in stock");
+            Assert.That(snap.Stock.Pieces, Is.EqualTo(new[] { SpareFrame, SpareOven }));
+            Assert.That(snap.Stock.Loot, Is.Empty); Assert.That(snap.Dive.BankedLoot, Is.Empty);
 
             var save = new WorldSave { Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive };
             var back = JsonConvert.DeserializeObject<WorldSave>(JsonConvert.SerializeObject(save));
@@ -80,11 +79,9 @@ namespace SleepingCalamity.Tests.EditMode
             PlacedBuilding b = town2.PlacedBuildingOf("bakery");
             Assert.That(b.FoundationId, Is.EqualTo("F02")); Assert.That(b.Turn, Is.EqualTo(town.PlacedBuildingOf("bakery").Turn)); Assert.That(b.Resident, Is.EqualTo(Baker));
             Assert.That(b.PiecesByPart, Is.EqualTo(town.PlacedBuildingOf("bakery").PiecesByPart));
-            Assert.That(TownSaves.StockLoot(new TownSnapshot { Stock = clean.Stock })[9], Is.EqualTo(4));
-            DiveHaul haul = TownSaves.RestoreHaul(clean.Dive, PerFloor);
-            Assert.That(haul.BankedPieces, Is.EqualTo(new[] { SpareFrame, SpareOven })); Assert.That(haul.LootBanked(7), Is.EqualTo(3)); Assert.That(haul.FoundThisDive, Is.EqualTo(0), "restored, not found this dive");
-            var dive2 = new DiveState(haul); dive2.RestoreProgress(clean.Dive.ClearedMask, clean.Dive.CheckpointReached);
-            Assert.That(dive2.ClearedMask, Is.EqualTo(0b0011)); Assert.That(dive2.CheckpointReached, Is.True);
+            TownStock.WorldRestore w = new TownStock(Hollow).RestoreWorld(new TownSnapshot { Stock = clean.Stock, Town = clean.Town, Dive = clean.Dive }, Depths);
+            foreach (int id in new[] { Frame, Oven, Door, Sign, SpareFrame, SpareOven }) Assert.That(w.Pieces.IsFound(id), Is.True, "piece " + id + " stays found");
+            Assert.That(w.Pieces.IsFound(PieceCatalog.BakerId), Is.True, "the baker (placed in the bakery) stays found");
             Assert.That(TownSaves.FirstMeetBeat(clean.Residents, Baker), Is.True);
         }
 
@@ -174,13 +171,13 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(dropped.Count, Is.EqualTo(2));
         }
 
-        // Catches: a cleared mask with bits past floor 4 reaching DiveState, or unknown banked ids surviving.
+        // Catches: a cleared mask with bits past floor 10 reaching DiveSession (the mask holds the ten Undercroft floors since plan 3 task 6), or unknown banked ids surviving.
         [Test]
         public void CleanDive_MasksTheFloors_AndDropsUnknownIds()
         {
-            var d = new DiveSave { ClearedMask = 0xFF, BankedPieces = { Frame, 5, Frame }, BankedResidents = { "ghost" }, OnFloorPieces = { 12345 } };
+            var d = new DiveSave { ClearedMask = 0xFFF, BankedPieces = { Frame, 5, Frame }, BankedResidents = { "ghost" }, OnFloorPieces = { 12345 } };
             DiveSave c = TownSaveRules.CleanDive(d, new List<string>());
-            Assert.That(c.ClearedMask, Is.EqualTo(0b1111));
+            Assert.That(c.ClearedMask, Is.EqualTo(0x3FF));
             Assert.That(c.BankedPieces, Is.EqualTo(new[] { Frame })); Assert.That(c.BankedResidents, Is.Empty); Assert.That(c.OnFloorPieces, Is.Empty);
         }
 
@@ -256,26 +253,25 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(c.Stock, Is.Null);
         }
 
-        // Catches: a quit mid-dive sending a picked-up piece back to its floor (pieces are safe on pickup), losing the banked haul, or forgetting the cleared floors and the checkpoint
-        // (DiveState.FailDive's rule).
+        // Catches: a quit mid-dive sending a picked-up piece back to its floor (pieces are safe on pickup), or forgetting the cleared floors (DiveSession.Fail's rule: the dive is over, what was
+        // found stays found).
         [Test]
         public void MidDiveQuit_LoadsAsAFailedDive()
         {
-            (TownState town, DiveState dive) = Live(floor: 2);
-            Assert.That(dive.Haul.BankedPieceCount, Is.EqualTo(2), "the picked-up piece is banked");
-            TownSnapshot snap = TownSaves.Capture(town, dive, null, null, null);
+            var stock = new TownStock(Hollow);
+            var session = new DiveSession(new PartyBags(), new DiveCheckpoint(), new DivePieces(Depths));
+            Assert.That(session.TryStart(1, false), Is.True);
+            session.ClearFloor(1);
+            stock.ReceiveFound(SpareOven);   // picked up mid-dive: safe at once
+            TownSnapshot snap = stock.CaptureWorld(session, false, null, Depths, null);
             Assert.That(snap.Dive.InDive, Is.True, "the file says the party was below");
-            Assert.That(snap.Dive.BankedPieces, Is.EqualTo(new[] { SpareFrame, SpareOven }));
-            Assert.That(snap.Dive.OnFloorPieces, Is.Empty);
+            Assert.That(snap.Dive.BankedPieces, Is.Empty);
+            Assert.That(snap.Dive.OnFloorPieces, Has.No.Member(SpareOven));
 
             TownSnapshot loaded = TownSaveRules.CleanSnapshot(snap, null);
             Assert.That(loaded.Dive.InDive, Is.False);
-            DiveHaul haul = TownSaves.RestoreHaul(loaded.Dive, PerFloor);
-            dive.FailDive();   // what the live game would have done
-            Assert.That(haul.BankedPieces, Is.EqualTo(dive.Haul.BankedPieces));
-            Assert.That(haul.LootBanked(7), Is.EqualTo(dive.Haul.LootBanked(7)));
-            Assert.That(haul.PiecesLeft(3), Is.EqualTo(dive.Haul.PiecesLeft(3)), "the piece found mid-dive stays found");
-            Assert.That(loaded.Dive.ClearedMask, Is.EqualTo(dive.ClearedMask)); Assert.That(loaded.Dive.CheckpointReached, Is.EqualTo(dive.CheckpointReached));
+            Assert.That(loaded.Stock.Pieces, Is.EqualTo(new[] { SpareOven }), "the piece found mid-dive stays found");
+            Assert.That(loaded.Dive.ClearedMask, Is.EqualTo(1));
             AssertExactlyOnce(loaded);
         }
 
@@ -306,13 +302,12 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
-        // Catches: the S2 additions to the pure Core pieces: every piece the default dive can assign is a known piece (the other half is TownPieceCatalogSpawnTests).
+        // Catches: the S2 additions to the pure Core pieces: every piece the dive can assign is a known piece (the other half is TownPieceCatalogSpawnTests).
         [Test]
         public void EveryAssignablePiece_IsKnown()
         {
-            var haul = new DiveHaul(PerFloor);
-            for (int f = 1; f <= 3; f++) for (int i = 0; i < 2; i++) Assert.That(TownSaveRules.KnownPieceIds(), Does.Contain(DiveHaul.PieceId(f, i)));
-            Assert.That(haul.TotalPieces, Is.EqualTo(TownSaveRules.KnownPieceIds().Count()));
+            foreach (PieceSpec spec in PieceCatalog.Specs) if (!PieceCatalog.IsPerson(spec.Id)) Assert.That(TownSaveRules.KnownPieceIds(), Does.Contain(spec.Id));
+            Assert.That(PieceCatalog.Specs.Count - 1, Is.EqualTo(TownSaveRules.KnownPieceIds().Count()));
             Assert.That(TownSaveRules.KnownResidentIds(), Is.EqualTo(new[] { Baker }));
         }
 
@@ -350,9 +345,11 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Sections_RoundTrip()
         {
-            (TownState town, DiveState dive) = Live();
-            TownSnapshot snap = TownSaves.Capture(town, dive, new Dictionary<int, int> { { 9, 4 } }, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
+            TownState town = Live();
+            TownSnapshot snap = TownSaves.Capture(town, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
             snap.Stock.Extra = new Dictionary<string, object> { { "futureField", 3L } };
+            snap.Stock.Loot.Add(new LootCountSave { ItemId = 9, Count = 4 });   // a legacy member: a file written by the old build still reads
+            snap.Dive.ClearedMask = 3;
             WorldSaveStore store = Load();
             WorldSave w = WorldSaveRules.New(7UL);
             w.Stock = snap.Stock; w.Town = snap.Town; w.Residents = snap.Residents; w.Dive = snap.Dive;
@@ -369,7 +366,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(again.Current.Town.Buildings[0].Parts, Is.EqualTo(snap.Town.Buildings[0].Parts));
             Assert.That(again.Current.Town.Buildings[0].Resident, Is.EqualTo(Baker));
             Assert.That(again.Current.Residents.Residents[0].FirstMeetBeat, Is.True);
-            Assert.That(again.Current.Dive.BankedPieces, Is.EqualTo(new[] { SpareFrame, SpareOven }));
+            Assert.That(again.Current.Dive.BankedPieces, Is.Empty);
             Assert.That(again.Current.Dive.ClearedMask, Is.EqualTo(3));
         }
 
@@ -410,7 +407,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(store.Current.Stock.Pieces, Has.Member(Frame).And.Member(Oven).And.Not.Member(999));
             Assert.That(store.Current.Stock.Loot.Single().Count, Is.EqualTo(3));
             Assert.That(store.Current.Town.Buildings, Is.Empty, "the one well-formed building has a door where its frame belongs: dropped by Clean");
-            Assert.That(store.Current.Dive.CheckpointReached, Is.True, "a mistyped member costs only itself");
+            Assert.That(store.Current.Dive.CheckpointReached, Is.False, "the old 4-floor checkpoint never reads as a plan 3 checkpoint");
             Assert.That(store.Current.Dive.ClearedMask, Is.EqualTo(0));
             Assert.That(store.Current.Dive.BankedPieces, Is.EqualTo(new[] { 201 }));
             Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
@@ -469,7 +466,7 @@ namespace SleepingCalamity.Tests.EditMode
             public void RestoreTown(TownSnapshot loaded) { Restored = loaded; if (Adopt) Next = loaded; }
         }
 
-        static TownSnapshot Fresh() => TownSaves.Capture(new TownState(Hollow), new DiveState(new DiveHaul(PerFloor)), null, null, null);
+        static TownSnapshot Fresh() => TownSaves.Capture(new TownState(Hollow), null, null);
 
         // Catches: a fresh world writing four sections nobody asked for (old saves must stay as they were), or a change not marking the save.
         [Test]
@@ -482,19 +479,18 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.CaptureTownInto(save), Is.False, "a pristine town is not written");
             Assert.That(save.Stock, Is.Null); Assert.That(save.Dive, Is.Null);
 
-            (TownState town, DiveState dive) = Live();
-            src.Next = TownSaves.Capture(town, dive, null, null, null);
+            TownState town = Live();
+            src.Next = TownSaves.Capture(town, null, null);
             Assert.That(world.CaptureTownInto(save), Is.True);
             Assert.That(save.Town.Buildings.Count, Is.EqualTo(1));
             Assert.That(world.CaptureTownInto(save), Is.False, "nothing changed");
             Assert.That(save.Dive, Is.Not.SameAs(world.Town.Dive));
             save.Dive.ClearedMask = 15;   // the file's value is its own: the host's copy is untouched
-            Assert.That(world.Town.Dive.ClearedMask, Is.EqualTo(3));
+            Assert.That(world.Town.Dive.ClearedMask, Is.EqualTo(0));
 
-            dive.RestoreProgress(7, true);
-            src.Next = TownSaves.Capture(town, dive, null, null, null);
+            src.Next = TownSaves.Capture(town, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
             Assert.That(world.CaptureTownInto(save), Is.True);
-            Assert.That(save.Dive.ClearedMask, Is.EqualTo(7));
+            Assert.That(TownSaves.FirstMeetBeat(save.Residents, Baker), Is.True);
         }
 
         // The DiveDirector's path: RestoreTown copies the loaded residents (MergeLatches(null, loaded)), the baker latches, CaptureTown hands the section back, the host merges and writes it.
@@ -545,8 +541,8 @@ namespace SleepingCalamity.Tests.EditMode
         public void Host_UnregisterKeepsTheTown_LoadTownDropsTheSource()
         {
             var world = new HostWorld();
-            (TownState town, DiveState dive) = Live();
-            var src = new FakeTown { Next = TownSaves.Capture(town, dive, null, null, null) };
+            TownState town = Live();
+            var src = new FakeTown { Next = TownSaves.Capture(town, null, null) };
             world.RegisterTownSource(src);
             world.UnregisterTownSource(src);
             Assert.That(world.Town.Town.Buildings.Count, Is.EqualTo(1));
@@ -567,8 +563,9 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Host_RegisteringASource_RestoresItBeforeItCanBeCaptured()
         {
-            (TownState town, DiveState dive) = Live();
-            TownSnapshot snap = TownSaves.Capture(town, dive, null, null, null);
+            TownState town = Live();
+            TownSnapshot snap = TownSaves.Capture(town, null, null);
+            snap.Dive.ClearedMask = 3;
             var saved = new WorldSave { Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive };
             var world = new HostWorld();
             world.LoadTown(saved);
@@ -579,7 +576,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(hub.Restored, Is.Not.SameAs(world.Town), "the provider gets its own copy");
             Assert.That(world.CaptureTownInto(saved), Is.False, "the loaded town is still the town");
             Assert.That(saved.Town.Buildings.Count, Is.EqualTo(1));
-            Assert.That(saved.Dive.BankedPieces, Is.EqualTo(new[] { SpareFrame, SpareOven }));
+            Assert.That(saved.Stock.Pieces, Is.EqualTo(new[] { SpareFrame, SpareOven }));
         }
 
         // Catches: a loaded mid-dive file reaching the provider still in the dive, or the loaded sections aliasing the file's value.
@@ -604,56 +601,150 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Host_FirstMeetBeat_NeverRollsBack_FalseOrNullFromTheSource()
         {
-            (TownState town, DiveState dive) = Live();
-            TownSnapshot snap = TownSaves.Capture(town, dive, null, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
+            TownState town = Live();
+            TownSnapshot snap = TownSaves.Capture(town, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = true } } });
             var saved = new WorldSave { Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive };
 
             var world = new HostWorld();
             world.LoadTown(saved);
-            var src = new FakeTown { Next = TownSaves.Capture(town, dive, null, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = false } } }) };
+            var src = new FakeTown { Next = TownSaves.Capture(town, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker, FirstMeetBeat = false } } }) };
             world.RegisterTownSource(src);
             world.CaptureTownInto(saved);
             Assert.That(TownSaves.FirstMeetBeat(saved.Residents, Baker), Is.True, "source says false");
 
-            src.Next = TownSaves.Capture(town, dive, null, null, null);
+            src.Next = TownSaves.Capture(town, null, null);
             world.CaptureTownInto(saved);
             Assert.That(TownSaves.FirstMeetBeat(saved.Residents, Baker), Is.True, "source says nothing");
             Assert.That(TownSaves.FirstMeetBeat(world.Town.Residents, Baker), Is.True, "the host's copy keeps it too");
 
             var fresh = new HostWorld();   // never loaded the file: the file's own latch still wins
-            fresh.RegisterTownSource(new FakeTown { Next = TownSaves.Capture(town, dive, null, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker } } }) });
+            fresh.RegisterTownSource(new FakeTown { Next = TownSaves.Capture(town, null, new ResidentsSave { Residents = { new ResidentSave { Id = Baker } } }) });
             fresh.CaptureTownInto(saved);
             Assert.That(TownSaves.FirstMeetBeat(saved.Residents, Baker), Is.True, "file's latch");
         }
 
-        // Catches: a source that does not know the loot counts (null) wiping the saved loot.
-        [Test]
-        public void Host_NullStockLoot_FromTheSource_KeepsTheSavedLoot()
+        static readonly PlayerKey First = new PlayerKey(IdentityKind.Ugs, "first"), Second = new PlayerKey(IdentityKind.Ugs, "second");
+
+        static WorldSave OldFourFloorWorld()
         {
-            (TownState town, DiveState dive) = Live();
-            TownSnapshot snap = TownSaves.Capture(town, dive, new Dictionary<int, int> { { 9, 4 } }, null, null);
-            var saved = new WorldSave { Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive };
-            var world = new HostWorld();
-            world.LoadTown(saved);
-            world.RegisterTownSource(new FakeTown { Next = TownSaves.Capture(town, dive, null, null, null) });
-            world.CaptureTownInto(saved);
-            Assert.That(TownSaves.StockLoot(new TownSnapshot { Stock = saved.Stock })[9], Is.EqualTo(4));
-            Assert.That(TownSaves.StockLoot(world.Town)[9], Is.EqualTo(4));
+            // The shape the 4-floor dive wrote: the bakery placed (frame, oven, door, sign) with the baker, the spare frame banked in the old haul, 3 of loot 7 in the town and 2 more banked, the
+            // floor-2 checkpoint reached, all four floors cleared, no piece depths, one stash entry (the second player's) already in the bags section.
+            TownState town = new TownState(Hollow);
+            foreach (int p in new[] { Frame, Oven, Door, Sign }) town.AddPiece(p);
+            town.AddResident(Baker);
+            int turn = Enumerable.Range(0, 4).First(t => town.CanPlaceFrame("bakery", "F02", t) == PlaceResult.Ok);
+            Assert.That(town.PlaceFrame("bakery", "F02", turn), Is.EqualTo(PlaceResult.Ok));
+            foreach (string part in new[] { "oven", "door", "sign" }) Assert.That(town.PlacePart("bakery", part), Is.EqualTo(PlaceResult.Ok));
+            Assert.That(town.PlaceResident("bakery"), Is.EqualTo(PlaceResult.Ok));
+            TownSnapshot snap = TownSaves.Capture(town, null, null);
+            snap.Dive.BankedPieces.Add(SpareFrame);
+            snap.Dive.OnFloorPieces.Remove(SpareFrame);
+            snap.Stock.Loot.Add(new LootCountSave { ItemId = 7, Count = 3 });
+            snap.Dive.BankedLoot.Add(new LootCountSave { ItemId = 7, Count = 2 });
+            snap.Dive.BankedLoot.Add(new LootCountSave { ItemId = 9, Count = 1 });
+            snap.Dive.ClearedMask = 0b1111; snap.Dive.CheckpointReached = true; snap.Dive.PieceDepths = null; snap.Dive.CheckpointHeld = false;
+            var w = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(777UL), Stock = snap.Stock, Town = snap.Town, Residents = snap.Residents, Dive = snap.Dive, Players = new WorldPlayersSave { Kind = 1, Identity = (int)IdentityKind.Ugs } };
+            w.Players.Recorded.Add(new WorldPlayerSave { Identity = (int)First.Kind, Id = First.Id, Name = "First" });
+            w.Players.Recorded.Add(new WorldPlayerSave { Identity = (int)Second.Kind, Id = Second.Id, Name = "Second" });
+            w.Bags = new BagsSave();
+            var second = new PlayerBagSave { Identity = (int)Second.Kind, Id = Second.Id, Gold = 40 };
+            second.Stash.Add(new LootCountSave { ItemId = 104, Count = 2 });
+            w.Bags.Players.Add(second);
+            return w;
         }
 
-        // Catches: a restored haul that treats stock and placed pieces as uncollected, so the cellar spawns them again after a load.
+        // Catches: an old four-floor save losing a piece, the baker, a stash or the town's loot on the way into the new dive, a checkpoint that carries over as held, depths recomputed on every load,
+        // or loot that is moved twice (the next capture must no longer carry it).
         [Test]
-        public void RestoreHaul_EveryKnownPieceNotOnItsFloor_IsCollected()
+        public void OldFourFloorSave_LoadsIntoNewDive()
         {
-            (TownState town, DiveState dive) = Live();
-            TownSnapshot loaded = TownSaveRules.CleanSnapshot(TownSaves.Capture(town, dive, null, null, null), null);
-            DiveHaul haul = TownSaves.RestoreHaul(loaded.Dive, PerFloor);
+            WorldSave old = OldFourFloorWorld();
+            var world = new HostWorld();
+            world.LoadTown(old);
+
+            Assert.That(world.Town.Stock.Loot, Is.Empty, "the town's old loot moved");
+            Assert.That(world.Town.Dive.BankedLoot, Is.Empty, "the banked old loot moved");
+            Assert.That(world.PieceFloors.Count, Is.EqualTo(PieceCatalog.Specs.Count), "depths assigned from the world seed");
+            Assert.That(world.PieceFloors, Is.EqualTo(PieceDepths.Assign(777UL, PieceCatalog.Specs)));
+            Assert.That(world.Town.Dive.PieceDepths.Count, Is.EqualTo(PieceCatalog.Specs.Count), "and saved, so a later load never recomputes them");
+            Assert.That(world.Town.Dive.CheckpointReached, Is.False);
+            Assert.That(world.Town.Dive.CheckpointHeld, Is.False);
+
+            var stock = new TownStock(Hollow);
+            TownStock.WorldRestore w = stock.RestoreWorld(world.Town, world.PieceFloors);
+            foreach (int id in new[] { Frame, Oven, Door, Sign, SpareFrame }) Assert.That(w.Pieces.IsFound(id), Is.True, "piece " + id + " stays found");
+            Assert.That(w.Pieces.IsFound(PieceCatalog.BakerId), Is.True, "the baker stays found");
+            Assert.That(w.Pieces.IsFound(SpareOven), Is.False, "a piece still on its floor stays there");
+            Assert.That(stock.State.InStock(SpareFrame), Is.True, "the old haul's banked piece came home");
+            Assert.That(stock.State.PlacedBuildingOf("bakery").Resident, Is.EqualTo(Baker));
+
+            PlayerBag firstBag = w.Bags.For(First.ToString());
+            Assert.That(firstBag.Stash, Is.EqualTo(new Dictionary<int, int> { { 7, 5 }, { 9, 1 } }), "old loot is the first recorded player's stash");
+            PlayerBag secondBag = w.Bags.For(Second.ToString());
+            Assert.That(secondBag.Stash, Is.EqualTo(new Dictionary<int, int> { { 104, 2 } }), "an existing stash is untouched");
+            Assert.That(secondBag.Gold, Is.EqualTo(40));
+            Assert.That(w.Checkpoint.Held, Is.False, "the old floor-2 checkpoint is not a plan 3 checkpoint");
+
+            var session = new DiveSession(w.Bags, w.Checkpoint, w.Pieces);
+            Assert.That(session.TryStart(3, false), Is.False, "without a held checkpoint only floor 1 starts");
+            Assert.That(session.TryStart(1, false), Is.True, "the next dive starts on floor 1");
+            Assert.That(session.IsCleared(1), Is.False, "the old cleared floors do not carry: fresh floors every dive");
+
+            // the next capture writes none of the legacy members, and a reload of it finds everything where it is
+            TownSnapshot next = stock.CaptureWorld(new DiveSession(w.Bags, w.Checkpoint, w.Pieces), false, null, world.PieceFloors, null);
+            Assert.That(next.Stock.Loot, Is.Empty); Assert.That(next.Dive.BankedLoot, Is.Empty); Assert.That(next.Dive.BankedPieces, Is.Empty);
+            Assert.That(next.Dive.ClearedMask, Is.EqualTo(0)); Assert.That(next.Dive.CheckpointReached, Is.False);
+            Assert.That(next.Bags.Players.Single(p => p.Id == First.Id).Stash.Select(l => l.ItemId + ":" + l.Count), Is.EqualTo(new[] { "7:5", "9:1" }));
+        }
+
+        // Catches: the same old loot arriving twice when the world is loaded again after a save (idempotent), and loot with no recorded player being thrown away silently.
+        [Test]
+        public void MigrateLegacyLoot_IsIdempotent_AndKeepsTheLootWhenNobodyIsRecorded()
+        {
+            WorldSave old = OldFourFloorWorld();
+            var world = new HostWorld();
+            world.LoadTown(old);
+            world.CaptureTownInto(old);
+            var again = new HostWorld();
+            again.LoadTown(old);
+            Assert.That(TownSnapshotStash(again.Town, First), Is.EqualTo(new[] { "7:5", "9:1" }), "loading the saved result moves nothing again");
+
+            WorldSave nobody = OldFourFloorWorld();
+            nobody.Players.Recorded.Clear();
+            var w2 = new HostWorld();
+            w2.LoadTown(nobody);
+            Assert.That(w2.Town.Stock.Loot.Single().Count, Is.EqualTo(3), "no recorded player: the loot stays in the file for a later load");
+        }
+
+        static string[] TownSnapshotStash(TownSnapshot snap, PlayerKey key) =>
+            snap.Bags.Players.Single(p => p.Id == key.Id).Stash.Select(l => l.ItemId + ":" + l.Count).ToArray();
+
+        // Catches: a legacy item id the bag stash cannot hold (0 or negative) or a damaged count poisoning the stash, and a stash entry that already exists being replaced instead of added to.
+        [Test]
+        public void MigrateLegacyLoot_AddsToAnExistingStash_AndSkipsBadEntries()
+        {
+            var snap = new TownSnapshot { Stock = new StockSave(), Dive = new DiveSave(), Bags = new BagsSave() };
+            var entry = new PlayerBagSave { Identity = (int)First.Kind, Id = First.Id };
+            entry.Stash.Add(new LootCountSave { ItemId = 7, Count = 4 });
+            snap.Bags.Players.Add(entry);
+            snap.Stock.Loot.Add(new LootCountSave { ItemId = 7, Count = 3 });
+            snap.Stock.Loot.Add(new LootCountSave { ItemId = 0, Count = 3 });
+            snap.Dive.BankedLoot.Add(new LootCountSave { ItemId = 7, Count = 2 });
+            Assert.That(TownSaves.MigrateLegacyLoot(snap, First), Is.EqualTo(5));
+            Assert.That(entry.Stash.Single().Count, Is.EqualTo(9));
+            Assert.That(snap.Stock.Loot, Is.Empty); Assert.That(snap.Dive.BankedLoot, Is.Empty);
+            Assert.That(TownSaves.MigrateLegacyLoot(snap, First), Is.EqualTo(0));
+        }
+
+        // Catches: a restored world that treats stock and placed pieces as uncollected, so the cellar spawns them again after a load.
+        [Test]
+        public void RestoreWorld_EveryKnownPieceNotOnItsFloor_IsFound()
+        {
+            TownSnapshot loaded = TownSaveRules.CleanSnapshot(TownSaves.Capture(Live(), null, null), null);
+            TownStock.WorldRestore w = new TownStock(Hollow).RestoreWorld(loaded, Depths);
             foreach (int id in TownSaveRules.KnownPieceIds())
-                Assert.That(haul.IsCollected(id), Is.EqualTo(!loaded.Dive.OnFloorPieces.Contains(id)), "piece " + id);
-            Assert.That(haul.IsCollected(SpareOven), Is.True, "the piece picked up mid-dive is safe: it never goes back to its floor");
-            Assert.That(haul.BankedPieces, Is.EqualTo(new[] { SpareFrame, SpareOven }), "the banked haul");
-            Assert.That(haul.PiecesLeft(1), Is.EqualTo(0));
-            Assert.That(haul.PiecesLeft(3), Is.EqualTo(0));
+                Assert.That(w.Pieces.IsFound(id), Is.EqualTo(!loaded.Dive.OnFloorPieces.Contains(id)), "piece " + id);
+            Assert.That(w.Pieces.IsFound(SpareOven), Is.True, "the piece picked up mid-dive is safe: it never goes back to its floor");
         }
 
         // Catches: a part-built building with a resident losing the resident when the retry without them succeeds.
@@ -694,8 +785,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(c.Dive.OnFloorPieces, Is.Empty);
 
             // a capture records what it knew
-            (TownState town, DiveState dv) = Live();
-            TownSnapshot cap = TownSaves.Capture(town, dv, null, null, null);
+            TownSnapshot cap = TownSaves.Capture(Live(), null, null);
             Assert.That(cap.Dive.KnownPieces, Is.EquivalentTo(TownSaveRules.KnownPieceIds()));
             Assert.That(cap.Dive.KnownResidents, Is.EquivalentTo(TownSaveRules.KnownResidentIds()));
         }

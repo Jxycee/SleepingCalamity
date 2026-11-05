@@ -1,4 +1,4 @@
-// Authority: test-only. Per-player loot (plan 2): the host keeps one PlayerBag per player inside DiveHaulSync (DiveState.Bags); pieces stay shared and go into the town stock the moment
+// Authority: test-only. Per-player loot (plan 2): the host keeps one PlayerBag per player inside DiveHaulSync (the session's PartyBags); pieces stay shared and go into the town stock the moment
 // they are picked up (DiveDirector listens to DiveHaulSync.PieceAdded).
 // Host + clients in one process (scene management off; the syncs and the director are dynamically spawned network prefabs from the owned list).
 // Catches (HostKeepsOneBagPerPlayer_ItemsGoToTheRightBag): items landing in the wrong player's bag, the host's own bag collecting a client's loot, a bag key that is not the roster's PlayerKey
@@ -15,7 +15,8 @@
 // Catches (Rejoin_GetsTheSameBagBack): a rejoin with the same PlayerId getting a new or empty bag, a changed player slot, the new owner's view missing the old bag. Runs with the host roster the app's
 // session installs, so the bag key is the PlayerKey; a host without a roster would key by client id and lose the bag. NOT covered: a world save in between (SaveFlowTests).
 // Catches (Chest_EachPlayerOpensOwnCopy_KeyChestStaysShared): a loot chest paying the first opener only, a second open by the same player paying again, the roll using the wrong player's slot, a loot chest
-// setting the shared opened bit, the key chest paying each player a key (or a key landing in a bag), ChestOpened not firing for the refused opens, a full bag blocking the open. Drives the real
+// setting the shared opened bit, the key chest paying each player a key (or a key landing in a bag), ChestOpened not firing for the refused opens, a full bag opening the chest and eating the item (plan 3: it is
+// refused and only that player is told). Drives the real
 // RequestOpenChestRpc path with PlayersOverride positions. NOT covered: the Interact input edge, real player positions and walls between players and chests (CellarContentsNetworkTests).
 // Catches (Chest_LoweredOnlyForThePlayerWhoOpenedIt): a peer drawing a chest lowered for everyone (the shared bit), the per-NetworkManager PlayerBagSync lookup picking the wrong peer's view (several peers
 // share this process), the Interact prompt (WouldUseInteract) still offering a chest the local player opened, the key chest not lowering for the whole party. NOT covered: a real renderer, the HUD line.
@@ -31,12 +32,16 @@
 // final save on leaving overwriting the file with a load-time copy, the restore on the next start not handing the bags back to the same PlayerKey (rejoining with a new client id), and a client-id
 // fallback bag or an unrecorded player's bag reaching the file. NOT covered: a mid-dive save (EditMode BagsSave tests and TownSaves.Reconcile), a hand-edited or damaged file (BagsSaveTests), the
 // real Hollowmere scene with its town hub, or a save-and-quit at a stair (plan 3).
+// Catches (Satchel_*, Boots_*; plan 3 task 9): the lost satchel drawn for anyone but its owner, on another depth, or never picked up; another player's pick-up taking it; a late joiner missing the prop or getting a
+// toast; the owner's boots not reaching its hero (HeroLocomotion.BootsOn) or reaching another hero. These prove the host's gating (the owner-only bag view each peer draws from, and the host's refusal), not the
+// renderer: the prop is a local cube whose look is judged on the walk.
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
+using SleepingCalamity.Gameplay;
 using SleepingCalamity.Networking;
 using SleepingCalamity.Presentation;
 using SleepingCalamity.Runtime;
@@ -135,25 +140,23 @@ namespace SleepingCalamity.Tests.PlayMode
             DiveHaulSync haul = dir.HaulSync;
             Assert.That(haul, Is.Not.Null);
 
-            int piece = DiveHaul.PieceId(1, 0);
+            int piece = PieceCatalog.FrameId;
             Assert.That(dir.Town.State.InStock(piece), Is.False, "test premise: not home yet");
             Assert.That(haul.ServerAddPiece(piece), Is.True);
             Assert.That(dir.Town.State.InStock(piece), Is.True, "the piece is in the town stock right after the pickup, not at the dive's end");
             Assert.That(haul.Current.FoundPieces, Is.EqualTo(1));
-            Assert.That(haul.Current.BankedPieces, Is.EqualTo(1));
 
             Assert.That(dir.ServerAbandonDive(), Is.True, "the dive fails through the director's own end-of-dive path");
             Assert.That(dir.NetActive.Value, Is.False);
             Assert.That(dir.Town.State.InStock(piece), Is.True, "still there after the failed dive (no double stocking, no loss)");
-            Assert.That(haul.HostState.Haul.IsCollected(piece), Is.True, "and the floors never spawn it again");
+            Assert.That(haul.Session.Pieces.IsFound(piece), Is.True, "and the floors never spawn it again");
             int stocked = 0; foreach (int p in dir.Town.State.StockPieces) if (p == piece) stocked++;
             Assert.That(stocked, Is.EqualTo(1));
 
-            // A new dive: the found counter starts again, the piece stays home.
+            // A new dive: the piece stays home and stays counted as found.
             dir.SeedOverride = 5151u;
             Assert.That(dir.ServerStartDive(), Is.True);
-            Assert.That(haul.Current.FoundPieces, Is.EqualTo(0), "FoundPieces counts this dive only");
-            Assert.That(haul.Current.BankedPieces, Is.EqualTo(1));
+            Assert.That(haul.Current.FoundPieces, Is.EqualTo(1), "found pieces stay found: the counter counts every dive's finds (plan 3 task 7)");
         }
 
         [UnityTest]
@@ -164,7 +167,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return StartHaul(1, clients, (a, h) => { app = a; haul = h; });
             ulong host = app.NetworkManager.LocalClientId, ca = clients[0].NetworkManager.LocalClientId;
 
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
             Assert.That(haul.ServerAddItem(ca, 101), Is.True);
             Assert.That(haul.ServerAddItem(ca, 112), Is.True);
@@ -172,7 +175,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerPick(ca, 0), Is.False, "no bank floor, no pick");
             Assert.That(haul.ServerBagOf(ca).BankOpen, Is.False);
 
-            Assert.That(haul.ServerSetFloor(2), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True, "the cleared bank floor's bank press enters the bank room");
             foreach (ulong c in new[] { host, ca })
             {
                 Assert.That(haul.ServerBagOf(c).BankOpen, Is.True, "a bank visit opens for every connected player");
@@ -187,7 +190,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerBagOf(ca).Picks, Is.EqualTo(new[] { 1, 2 }));
             Assert.That(haul.ServerPick(ca, 0), Is.False, "the slots are full");
 
-            Assert.That(haul.ServerBank(), Is.True, "the party pushes on");
+            Assert.That(haul.ServerChoosePushOn(host), Is.True, "one press opens the confirm window");
+            Assert.That(haul.Session.BankChosenThisDive, Is.False, "two players: one press is not the party's choice");
+            Assert.That(haul.ServerChoosePushOn(ca), Is.True, "the second player's press confirms");
+            Assert.That(haul.Session.BankChosenThisDive, Is.True, "the party pushes on");
             PlayerBag a = haul.ServerBagOf(ca);
             Assert.That(a.BankOpen, Is.False);
             Assert.That(a.BankedThisDive.ContainsKey(112) && a.BankedThisDive.ContainsKey(104), Is.True, "the picked items are safe");
@@ -195,7 +201,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerPick(ca, 0), Is.False, "the visit is closed");
 
             Assert.That(haul.ServerAddItem(ca, 105), Is.True);
-            Assert.That(haul.ServerBank(), Is.False, "carrying something does not reopen a used bank point");
+            Assert.That(haul.ServerEnterBankRoom(), Is.False, "carrying something does not reopen a used bank point");
+            Assert.That(haul.ServerBagOf(host).Carried, Is.Empty, "the host had nothing to carry");
+            Assert.That(haul.ServerBagOf(host).BankedThisDive, Is.Empty, "and the free slots stayed empty (plan 3 task 8: no auto-fill)");
         }
 
         // ---- PlayerBagSync (task 5) ----
@@ -289,13 +297,13 @@ namespace SleepingCalamity.Tests.PlayMode
             NetworkManager hostNm = app.NetworkManager, nmA = clients[0].NetworkManager;
             ulong host = hostNm.LocalClientId, ca = nmA.LocalClientId;
 
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True, "floor 2 has a bank");
             Assert.That(haul.ServerAddItem(ca, 101), Is.True);
             Assert.That(haul.ServerAddItem(ca, 112), Is.True);
             Assert.That(haul.ServerAddItem(ca, 104), Is.True);
             Assert.That(haul.ServerAddItem(host, 103), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True, "the bank floor has a bank room");
             Assert.That(haul.ServerBagOf(ca).SlotCapacity, Is.EqualTo(2));
 
             PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
@@ -324,7 +332,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => hostSideA.RequestsHandled >= 5, Timeout, "the host never handled the unpick and the pick");
             Assert.That(haul.ServerBagOf(ca).Picks, Is.EqualTo(new[] { 1, 2 }));
 
-            Assert.That(haul.ServerBank(), Is.True, "the party pushes on");
+            Assert.That(haul.PushOnNow(), Is.True, "the party pushes on");
             yield return PlayModeHarness.WaitUntil(() => ownA.View.BankedThisDive == 2 && !ownA.View.BankOpen, Timeout, "A's view never showed the two banked items");
             Assert.That(Shows(ownA, 101), Is.True, "the unpicked item is still carried");
             Assert.That(ownA.View.Picks.Length, Is.EqualTo(0));
@@ -367,36 +375,35 @@ namespace SleepingCalamity.Tests.PlayMode
         // ---- bank visits (task 4-5 review fixes) ----
 
         [UnityTest]
-        public IEnumerator BankFloor_LateJoiner_GetsAVisitOnItsFirstPick_AndWhenThePartyBanks()
+        public IEnumerator BankFloor_LateJoiner_GetsAVisitWhenThePartyChanges_AndNothingIsFilledAtThePushOn()
         {
             var clients = new List<PlayModeHarness.TestClient>();
             AppBootstrap app = null; DiveHaulSync haul = null;
             yield return StartHaul(1, clients, (a, h) => { app = a; haul = h; });
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            ulong hostId = app.NetworkManager.LocalClientId;
+            Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True, "the visits open for the host and A");
-            yield return PlayModeHarness.StartClients(app, 1, false, clients, 30);   // C joins after the floor was entered
+            Assert.That(haul.BankRoomNow(), Is.True, "the visits open for the host and A");
+            yield return PlayModeHarness.StartClients(app, 1, false, clients, 30);   // C joins after the room was entered
             yield return PlayModeHarness.StartClients(app, 1, false, clients, 31);   // and D (another player id: the same id would take C's seat over)
             ulong cc = clients[1].NetworkManager.LocalClientId, cd = clients[2].NetworkManager.LocalClientId;
 
             Assert.That(haul.ServerAddItem(cc, 101), Is.True);
             Assert.That(haul.ServerAddItem(cc, 112), Is.True);
             Assert.That(haul.ServerAddItem(cd, 104), Is.True);
-            Assert.That(haul.ServerBagOf(cc).BankOpen, Is.False, "premise: nothing opened a visit for a client who joined after the floor was entered");
-            Assert.That(haul.ServerBagOf(cd).BankOpen, Is.False);
-
-            Assert.That(haul.ServerPick(cc, 0), Is.True, "the first pick opens C's visit");
+            yield return PlayModeHarness.WaitUntil(() => haul.ServerBagOf(cc).BankOpen && haul.ServerBagOf(cd).BankOpen, Timeout, "the room never gave the joiners a visit (the host resizes when the party changes)");
+            Assert.That(haul.ServerBagOf(cc).SlotCapacity, Is.EqualTo(1), "four players now: one slot each");
+            Assert.That(haul.ServerBagOf(hostId).SlotCapacity, Is.EqualTo(1), "and the others' visits shrank with the party");
+            Assert.That(haul.ServerPick(cc, 0), Is.True);
+            Assert.That(haul.ServerPick(cc, 1), Is.False, "the visit holds one pick");
             PlayerBag c = haul.ServerBagOf(cc);
-            Assert.That(c.BankOpen, Is.True);
-            Assert.That(c.SlotCapacity, Is.EqualTo(1), "four players now: one slot each");
-            Assert.That(haul.ServerPick(cc, 1), Is.False, "and it holds one pick");
-            Assert.That(haul.ServerBagOf(cd).BankOpen, Is.False, "D has not asked yet");
 
-            Assert.That(haul.ServerBank(), Is.True, "the party pushes on");
+            Assert.That(haul.PushOnNow(), Is.True, "the party pushes on");
             Assert.That(c.BankedThisDive.ContainsKey(101), Is.True, "C's pick is safe");
             Assert.That(c.Carried, Is.EqualTo(new[] { 112 }));
             PlayerBag d = haul.ServerBagOf(cd);
-            Assert.That(d.BankedThisDive.ContainsKey(104), Is.True, "D never asked, yet the push-on opened its visit and filled the free slot");
+            Assert.That(d.BankedThisDive, Is.Empty, "D never picked: its free slot stayed empty (no auto-fill)");
+            Assert.That(d.Carried, Is.EqualTo(new[] { 104 }));
             Assert.That(d.BankOpen, Is.False);
             Assert.That(haul.ServerAddItem(cc, 105), Is.True);
             Assert.That(haul.ServerPick(cc, 1), Is.False, "the bank point is used: a joiner cannot reopen it");
@@ -411,15 +418,15 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return StartParty(1, clients, (a, h) => { app = a; haul = h; });
             NetworkManager nmA = clients[0].NetworkManager;
             ulong host = app.NetworkManager.LocalClientId, ca = nmA.LocalClientId;
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True);
             Assert.That(haul.ServerAddItem(ca, 101), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
             Assert.That(haul.ServerPick(ca, 0), Is.True);
             PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
             yield return PlayModeHarness.WaitUntil(() => ownA.View.BankOpen && ownA.View.Picks.Length == 1, Timeout, "A's view never showed the open visit and its pick");
 
-            Assert.That(haul.ServerSetFloor(3), Is.True, "floor 3 has no bank point");
+            Assert.That(haul.ServerSetFloor(6), Is.True, "floor 6 has no bank room");
             foreach (ulong id in new[] { host, ca })
             {
                 Assert.That(haul.ServerBagOf(id).BankOpen, Is.False, "the visit closed for " + id);
@@ -430,8 +437,8 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => !ownA.View.BankOpen && ownA.View.Picks.Length == 0 && ownA.View.SlotCapacity == 0, Timeout, "A's view still showed a bank visit on a floor without a bank");
             Assert.That(haul.ServerPick(ca, 0), Is.False, "no bank here");
 
-            Assert.That(haul.ServerSetFloor(4), Is.True, "the heart floor has a bank point");
-            Assert.That(haul.ServerBagOf(ca).BankOpen, Is.True, "the visit opens again on arrival");
+            Assert.That(haul.BankRoomNow(), Is.True, "the bank room opens again when the party returns and presses the bank");
+            Assert.That(haul.ServerBagOf(ca).BankOpen, Is.True);
             yield return PlayModeHarness.WaitUntil(() => ownA.View.BankOpen, Timeout, "A's view never showed the reopened visit");
         }
 
@@ -443,14 +450,16 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return StartHaul(2, clients, (a, h) => { app = a; haul = h; });
             ulong[] ids = { app.NetworkManager.LocalClientId, clients[0].NetworkManager.LocalClientId, clients[1].NetworkManager.LocalClientId };
             haul.DiveSeed = 424242u;
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(haul.ServerBegin(), Is.True);
 
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True);
-            int owner1 = ExtraSlotOwner(haul, ids, "first bank floor");
-            Assert.That(haul.ServerSetFloor(3), Is.True);
-            Assert.That(haul.ServerSetFloor(4), Is.True);
-            int owner2 = ExtraSlotOwner(haul, ids, "next bank floor");
+            Assert.That(haul.BankRoomNow(), Is.True);
+            int owner1 = ExtraSlotOwner(haul, ids, "first bank room");
+            Assert.That(haul.ServerSetFloor(6), Is.True);
+            haul.Session.Restore(new DiveSession.SnapshotData(DivePhase.Floor, 5, 0b11111, false, false, -1, haul.Session.Stir.Capture(), haul.Session.Momentum.Capture(), haul.Session.Retry.Capture()));   // back on the cleared bank floor, the choice not made
+            haul.DiveSeed = 424243u;
+            Assert.That(haul.ServerEnterBankRoom(), Is.True);
+            int owner2 = ExtraSlotOwner(haul, ids, "next bank room");
             Assert.That(owner2, Is.Not.EqualTo(owner1), "the extra slot never goes to the previous owner twice in a row");
         }
 
@@ -474,9 +483,9 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return StartHaul(1, clients, (a, h) => { app = a; haul = h; });
             NetworkManager hostNm = app.NetworkManager;
             ulong host = hostNm.LocalClientId, oldId = clients[0].NetworkManager.LocalClientId;
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
+            Assert.That(haul.ServerBegin(), Is.True);
             Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(haul.ServerSetFloor(2), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
             Assert.That(app.Roster.TryGetKey(host, out PlayerKey hostKey), Is.True, "the host is in its own roster (else a solo player's bag would be keyed by client id and never saved)");
             Assert.That(haul.PlayerIdOf(host), Is.EqualTo(hostKey.ToString()), "the host's bag key is its roster PlayerKey string, not the client-id fallback");
             Assert.That(haul.ServerAddItem(oldId, 104), Is.True);
@@ -506,7 +515,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private static int CountBags(DiveHaulSync haul)
         {
             int n = 0;
-            foreach (KeyValuePair<string, PlayerBag> kv in haul.HostState.Bags.All) n++;
+            foreach (KeyValuePair<string, PlayerBag> kv in haul.Bags.All) n++;
             return n;
         }
 
@@ -522,12 +531,14 @@ namespace SleepingCalamity.Tests.PlayMode
             public readonly List<(int Chest, int Item)> Opened = new List<(int, int)>();
         }
 
-        // A seed whose floor 1 has a locked room with a gate, a key chest and a carrier (the same premise as CellarContentsNetworkTests).
+        private const int ChestFloor = 2;   // floor 1 is the authored floor (no locked room, carrier or key chest since plan 3 task 4); floor 2 is the first generated one
+
+        // A seed whose floor 2 has a locked room with a gate, a key chest and a carrier (the same premise as CellarContentsNetworkTests).
         private static uint FindSeed()
         {
             for (uint s = 1; s < 400; s++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(s, 1);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(s, ChestFloor);
                 if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return s;
             }
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
@@ -569,10 +580,10 @@ namespace SleepingCalamity.Tests.PlayMode
             r.Contents.PlayersOverride = list => { foreach (KeyValuePair<ulong, Vector3> kv in r.Players) list.Add(new CellarContentsSync.PlayerPos { ClientId = kv.Key, Position = kv.Value }); };
             r.Contents.ChestOpened += (chest, item) => r.Opened.Add((chest, item));
             r.Seed = FindSeed();
-            Assert.That(haul.ServerBegin(new[] { 2, 2, 2 }), Is.True);
-            Assert.That(haul.ServerSetFloor(1), Is.True);
-            Assert.That(r.Floor.ServerSetFloor(r.Seed, 1), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => r.PeerA.FloorSync.Built != null && r.PeerA.FloorSync.BuiltFloor == 1 && r.PeerB.FloorSync.Built != null && r.PeerB.FloorSync.BuiltFloor == 1
+            Assert.That(haul.ServerBegin(), Is.True);
+            Assert.That(haul.ServerSetFloor(ChestFloor), Is.True);
+            Assert.That(r.Floor.ServerSetFloor(r.Seed, ChestFloor), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => r.PeerA.FloorSync.Built != null && r.PeerA.FloorSync.BuiltFloor == ChestFloor && r.PeerB.FloorSync.Built != null && r.PeerB.FloorSync.BuiltFloor == ChestFloor
                 && r.Floor.Built != null && r.Contents.PieceCount > 0, Timeout * 2, "the floors were not built");
             r.Layout = r.Floor.Layout;
             done(r);
@@ -596,20 +607,20 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 if (r.Layout.Chests[i].HoldsKey) continue;
                 if (first < 0) first = i;
-                if (CellarLoot.RollFor(r.Seed, 1, i, slotA) != CellarLoot.RollFor(r.Seed, 1, i, slotB)) return i;
+                if (CellarLoot.RollChest(r.Seed, ChestFloor, i, slotA) != CellarLoot.RollChest(r.Seed, ChestFloor, i, slotB)) return i;
             }
-            Assert.Fail("premise: no loot chest on floor 1 of seed " + r.Seed + " rolls different items for slots " + slotA + " and " + slotB + " (first loot chest " + first + ")");
+            Assert.Fail("premise: no loot chest on floor " + ChestFloor + " of seed " + r.Seed + " rolls different items for slots " + slotA + " and " + slotB + " (first loot chest " + first + ")");
             return -1;
         }
 
         [UnityTest]
-        public IEnumerator Chest_EachPlayerOpensOwnCopy_KeyChestStaysShared()
+        public IEnumerator Chest_EachPlayerOpensOwnCopy_KeyChestStaysShared_FullBagIsRefused()
         {
             var clients = new List<PlayModeHarness.TestClient>();
             ChestRig r = null; yield return StartChestRig(clients, x => r = x);
             int i = PickLootChest(r), key = r.Layout.KeyChestIndex;
             Assert.That(key, Is.GreaterThanOrEqualTo(0));
-            int rollA = CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.A)), rollB = CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.B));
+            int rollA = CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.A)), rollB = CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.B));
             Assert.That(rollA, Is.Not.EqualTo(rollB), "premise: the chosen chest rolls different items for A and B");
 
             yield return Ask(r, r.PeerA, i);
@@ -640,14 +651,22 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(r.Haul.ServerBagOf(r.A).Carried, Is.EqualTo(new[] { rollA }), "no key in A's bag");
             Assert.That(r.Haul.ServerBagOf(r.B).Carried, Is.EqualTo(new[] { rollB }), "no key in B's bag");
 
-            // A full bag still opens the chest; the item is lost and LastLootItem records it (the host player, who has not opened chest i yet).
+            // A FULL bag refuses the chest (plan 3 decision 6): it stays closed for that player, nothing is lost, and only that player is told (an owner-only RPC). A purse would still be taken (no slot),
+            // so the chest is one whose host roll is an item.
+            int hostSlot = r.Haul.PlayerSlotOf(r.Host), full = -1;
+            for (int k = 0; k < r.Layout.Chests.Count && k < 64 && full < 0; k++)
+                if (!r.Layout.Chests[k].HoldsKey && k != i && CellarLoot.RollChest(r.Seed, ChestFloor, k, hostSlot) != CellarLoot.GoldId) full = k;
+            Assert.That(full, Is.GreaterThanOrEqualTo(0), "premise: a second loot chest that pays the host an item");
             for (int n = 0; n < PlayerBag.MaxCarried; n++) Assert.That(r.Haul.ServerAddItem(r.Host, 101), Is.True);
-            int rollHost = CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.Host));
-            yield return Ask(r, r.Contents, i);
-            Assert.That(r.Haul.ServerBagOf(r.Host).ChestOpened(r.Seed, 1, i), Is.True, "a full bag still opens the chest");
-            Assert.That(r.Haul.ServerBagOf(r.Host).Carried.Count, Is.EqualTo(PlayerBag.MaxCarried), "the item was lost");
-            Assert.That(r.Contents.LastLootItem, Is.EqualTo(rollHost));
-            Assert.That(r.Opened[r.Opened.Count - 1], Is.EqualTo((i, rollHost)));
+            int openedBefore = r.Opened.Count;
+            yield return Ask(r, r.Contents, full);
+            Assert.That(r.Haul.ServerBagOf(r.Host).ChestOpened(r.Seed, ChestFloor, full), Is.False, "a full bag leaves the chest closed");
+            Assert.That(r.Haul.ServerBagOf(r.Host).Carried.Count, Is.EqualTo(PlayerBag.MaxCarried));
+            Assert.That(r.Opened.Count, Is.EqualTo(openedBefore), "a refused open raises no ChestOpened");
+            yield return PlayModeHarness.WaitUntil(() => r.Contents.NoticeCount == 1, Timeout, "the host's player was never told its bag is full");
+            Assert.That(r.Contents.LastNotice, Is.EqualTo(CellarContentsSync.BagFullText));
+            yield return Settle(0.5f);
+            Assert.That(r.PeerA.NoticeCount + r.PeerB.NoticeCount, Is.EqualTo(0), "the other players' peers heard nothing");
         }
 
         [UnityTest]
@@ -656,7 +675,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var clients = new List<PlayModeHarness.TestClient>();
             ChestRig r = null; yield return StartChestRig(clients, x => r = x);
             int i = PickLootChest(r), key = r.Layout.KeyChestIndex;
-            Assert.That(CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.A)), Is.Not.EqualTo(CellarLoot.RollFor(r.Seed, 1, i, r.Haul.PlayerSlotOf(r.B))), "premise: the chosen chest rolls different items for A and B");
+            Assert.That(CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.A)), Is.Not.EqualTo(CellarLoot.RollChest(r.Seed, ChestFloor, i, r.Haul.PlayerSlotOf(r.B))), "premise: the chosen chest rolls different items for A and B");
             Assert.That(r.Contents.TryChestPosition(i, out Vector3 at), Is.True);
             Assert.That(r.PeerA.ChestShownOpen(i) || r.PeerB.ChestShownOpen(i), Is.False, "premise: closed everywhere");
 
@@ -732,10 +751,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(haul.ServerAddItem(ca, 104), Is.True);
             // Two bags that must never reach the file: a client-id fallback id, and a well-formed key of a player the world does not record.
             string unrecorded = PlayerKey.Local(PlayModeHarness.PlayerId(30)).ToString();
-            haul.HostState.Bags.For("777").AddGold(3);
-            haul.HostState.Bags.For(unrecorded).AddGold(4);
-            Assert.That(haul.ServerSetFloor(DiveState.Town), Is.True, "the same two steps as the dive's go-home");
-            Assert.That(haul.ServerBankInTown(), Is.True);
+            haul.Bags.For("777").AddGold(3);
+            haul.Bags.For(unrecorded).AddGold(4);
+            haul.Bags.GoHomeAll();   // the bags come home the way the bank room's go-home does (plan 3 task 12 ports this test to the real flow)
             Assert.That(dir.ServerAbandonDive(), Is.True, "closes the dive (nothing is carried and no dive gold is left, so it changes no bag)");
             PlayerBag a = haul.ServerBagOf(ca);
             Assert.That(a.Gold, Is.EqualTo(5));
@@ -743,11 +761,11 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(a.Satchel.Waiting, Is.Null, "premise: no satchel yet");
 
             dir.SeedOverride = 6102u;
-            Assert.That(dir.ServerStartDive(2), Is.True);
+            Assert.That(dir.ServerStartDive(), Is.True);
             Assert.That(haul.ServerAddItem(ca, 110), Is.True);
-            Assert.That(dir.ServerAbandonDive(), Is.True, "the dive fails on floor 2 with 110 carried");
+            Assert.That(dir.ServerAbandonDive(), Is.True, "the dive fails on floor 1 with 110 carried");
             Assert.That(a.Satchel.Waiting, Is.Not.Null);
-            Assert.That(a.Satchel.Waiting.Floor, Is.EqualTo(2));
+            Assert.That(a.Satchel.Waiting.Floor, Is.EqualTo(1));
             Assert.That(a.Satchel.Waiting.Items, Is.EqualTo(new[] { 110 }));
 
             app.WorldSaveFlow.SaveNow();
@@ -772,11 +790,11 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(back.Gold, Is.EqualTo(5), "A's gold");
             Assert.That(back.Stash, Is.EqualTo(new Dictionary<int, int> { { 104, 1 } }), "A's stash");
             Assert.That(back.Satchel.Waiting, Is.Not.Null, "A's waiting satchel");
-            Assert.That(back.Satchel.Waiting.Floor, Is.EqualTo(2));
+            Assert.That(back.Satchel.Waiting.Floor, Is.EqualTo(1));
             Assert.That(back.Satchel.Waiting.Items, Is.EqualTo(new[] { 110 }));
             Assert.That(back.Carried, Is.Empty);
-            Assert.That(haul2.HostState.Bags.TryGet("777", out _), Is.False, "the fallback bag was not saved");
-            Assert.That(haul2.HostState.Bags.TryGet(unrecorded, out _), Is.False, "the unrecorded player's bag was not saved");
+            Assert.That(haul2.Bags.TryGet("777", out _), Is.False, "the fallback bag was not saved");
+            Assert.That(haul2.Bags.TryGet(unrecorded, out _), Is.False, "the unrecorded player's bag was not saved");
 
             Assert.That(Stamp(realPath), Is.EqualTo(realBefore), "the real world.json was not touched");
         }
@@ -793,8 +811,229 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(p.Stash.Count, Is.EqualTo(1), when);
             Assert.That((p.Stash[0].ItemId, p.Stash[0].Count), Is.EqualTo((104, 1)), when);
             Assert.That(p.Satchel, Is.Not.Null, when + ": the waiting satchel");
-            Assert.That(p.Satchel.Floor, Is.EqualTo(2), when);
+            Assert.That(p.Satchel.Floor, Is.EqualTo(1), when);
             Assert.That(p.Satchel.Items, Is.EqualTo(new[] { 110 }), when);
+        }
+
+        // ---- plan 3 task 8: the shared choice with real heroes, and the owner's view following a roster key ----
+        // Catches (BankRoom_ConfirmWindow_SecondPressConfirms_OtherChoiceSwaps_DownedNotCounted): one press confirming alone in a party of three, a second player's press not confirming, the other choice not
+        // swapping the window (or keeping the old presser), a downed hero's press being accepted, a downed hero keeping the quorum from one living player. NOT covered: the window timer (DiveHaulNetworkTests),
+        // the bank cell range (no built floor in this rig).
+        // Catches (PlayerBagSync_BagId_FollowsRosterKeyChange): the owner's view staying on the bag of the key it first resolved after the roster's key for it changed. NOT covered: a real Solo-world rebind.
+
+        [UnityTest]
+        public IEnumerator BankRoom_ConfirmWindow_SecondPressConfirms_OtherChoiceSwaps_DownedNotCounted()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartParty(2, clients, (a, h) => { app = a; haul = h; });
+            NetworkManager hostNm = app.NetworkManager;
+            ulong host = hostNm.LocalClientId, ca = clients[0].NetworkManager.LocalClientId, cb = clients[1].NetworkManager.LocalClientId;
+            haul.ChoiceWindowSeconds = 120f;
+            int wentHome = 0; haul.WentHome += () => wentHome++;
+            Assert.That(haul.ServerSetFloor(1), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+
+            Assert.That(haul.ServerChoosePushOn(host), Is.True);
+            Assert.That(haul.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.PushOn));
+            Assert.That(haul.Current.ChoiceMask, Is.EqualTo(1 << haul.PlayerSlotOf(host)));
+            Assert.That(haul.Session.BankChosenThisDive, Is.False, "three players: one press opens a window, it does not decide");
+
+            Assert.That(haul.ServerChooseGoHome(ca), Is.True, "A presses the other choice: the window swaps");
+            Assert.That(haul.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.GoHome));
+            Assert.That(haul.Current.ChoiceMask, Is.EqualTo(1 << haul.PlayerSlotOf(ca)), "the old presser's press is gone");
+            Assert.That(haul.ServerChooseGoHome(ca), Is.False, "the same player again");
+            Assert.That(wentHome, Is.EqualTo(0));
+
+            Assert.That(haul.ServerChooseGoHome(host), Is.True, "a second player's press for the same choice confirms");
+            Assert.That(wentHome, Is.EqualTo(1));
+            Assert.That(haul.Session.Ended, Is.EqualTo(DiveEnd.WentHome));
+            Assert.That(haul.Current.ChoiceKind, Is.EqualTo(BankChoiceKind.None));
+
+            // a new dive in the bank room: B and A are down, only the host is alive
+            Assert.That(haul.ServerBegin(), Is.True);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            HeroVitals hvA = BagSyncOwnedBy(hostNm, ca).GetComponent<HeroVitals>(), hvB = BagSyncOwnedBy(hostNm, cb).GetComponent<HeroVitals>();
+            hvA.ServerDamage(100000); hvB.ServerDamage(100000);
+            Assert.That(hvA.IsUp || hvB.IsUp, Is.False, "premise: both clients' heroes are down");
+            Assert.That(haul.ServerChoosePushOn(ca), Is.False, "a downed hero's press is refused");
+            Assert.That(haul.ServerChoosePushOn(host), Is.True);
+            Assert.That(haul.Session.BankChosenThisDive, Is.True, "one living player is the whole quorum: the downed are not counted");
+        }
+
+        private sealed class FakeIdentity : IJoinContextProvider
+        {
+            public readonly Dictionary<ulong, PlayerKey> Keys = new Dictionary<ulong, PlayerKey>();
+            public bool JoinsOpen => true;
+            public void GetRoster(List<RosterEntry> into) { into.Clear(); }
+            public bool TryGetKey(ulong clientId, out PlayerKey key) => Keys.TryGetValue(clientId, out key);
+            public bool TryGetSlot(ulong clientId, out byte slot) { slot = 0; return false; }
+        }
+
+        [UnityTest]
+        public IEnumerator PlayerBagSync_BagId_FollowsRosterKeyChange()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveHaulSync haul = null;
+            yield return StartParty(1, clients, (a, h) => { app = a; haul = h; });
+            NetworkManager nmA = clients[0].NetworkManager;
+            ulong ca = nmA.LocalClientId;
+            var identity = new FakeIdentity();
+            PlayerKey first = PlayerKey.Local(PlayModeHarness.PlayerId(40)), second = PlayerKey.Local(PlayModeHarness.PlayerId(41));
+            identity.Keys[ca] = first;
+            haul.Identity = identity;
+            Assert.That(haul.PlayerIdOf(ca), Is.EqualTo(first.ToString()));
+            Assert.That(haul.ServerAddItem(ca, 104), Is.True);
+            PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 104), Timeout, "A's view never showed its bag under the first key");
+
+            identity.Keys[ca] = second;   // the roster now knows the owner under another key (a Solo world rebinding its owner, say)
+            Assert.That(haul.PlayerIdOf(ca), Is.EqualTo(second.ToString()));
+            Assert.That(haul.ServerAddItem(ca, 105), Is.True, "the host now fills the bag of the new key");
+            Assert.That(haul.Bags.TryGet(first.ToString(), out PlayerBag oldBag) && oldBag.Carried.Count == 1, Is.True, "premise: the old key's bag is a different bag");
+            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 105), Timeout, "A's view stayed on the old key's bag after the roster key changed");
+            haul.Identity = null;
+        }
+
+        // ---- lost satchel and boots (plan 3 task 9) ----
+
+        // What a failed dive leaves: the unbanked haul waits in a satchel at the depth where `who` fell.
+        private static void LoseSatchel(ChestRig r, ulong who, int floor, params int[] items)
+        {
+            foreach (int item in items) Assert.That(r.Haul.ServerAddItem(who, item), Is.True);
+            r.Haul.ServerBagOf(who).Fail(floor);
+            Assert.That(r.Haul.ServerBagOf(who).Satchel.Waiting, Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator Satchel_PlacedOnItsDepth_OnlyOwnerCanPickUp()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            LoseSatchel(r, r.A, ChestFloor, 101, 104);
+            yield return PlayModeHarness.WaitUntil(() => r.PeerA.SatchelShownForLocal, Timeout, "A's client never drew its satchel on its depth");
+            Assert.That(r.PeerA.TrySatchelPosition(out Vector3 at), Is.True);
+            yield return Settle(0.5f);
+            Assert.That(r.PeerB.SatchelShownForLocal || r.Contents.SatchelShownForLocal, Is.False, "nobody else draws it");
+
+            // B and the host's player stand on it: they have no satchel here, so nothing happens. A is far away.
+            PlayerBag bagA = r.Haul.ServerBagOf(r.A);
+            r.Players[r.A] = at + new Vector3(30f, 0f, 0f); r.Players[r.B] = at; r.Players[r.Host] = at;
+            Assert.That(r.Contents.ServerTryPickUpSatchel(r.B), Is.False, "a stranger cannot take A's satchel");
+            Assert.That(r.Contents.ServerTryPickUpSatchel(r.Host), Is.False);
+            Assert.That(r.Contents.ServerTryPickUpSatchel(r.A), Is.False, "A is out of range");
+            yield return Settle(0.5f);   // the host's tick runs with B and the host on the spot
+            Assert.That(bagA.Satchel.Waiting, Is.Not.Null, "still lying there");
+            Assert.That(bagA.Satchel.Carried, Is.Null);
+
+            // A walks onto it.
+            int carriedBefore = bagA.Carried.Count;
+            var picked = new List<ulong>(); r.Contents.SatchelPickedUp += who => picked.Add(who);
+            r.Players[r.A] = at;
+            yield return PlayModeHarness.WaitUntil(() => bagA.Satchel.Carried != null, Timeout, "A walking onto its satchel never picked it up");
+            Assert.That(bagA.Satchel.Waiting, Is.Null);
+            Assert.That(bagA.Satchel.Carried.Items, Is.EqualTo(new[] { 101, 104 }));
+            Assert.That(bagA.Carried.Count, Is.EqualTo(carriedBefore), "the satchel is carried as one item (a slot), not unpacked");
+            Assert.That(picked, Is.EqualTo(new[] { r.A }));
+            yield return PlayModeHarness.WaitUntil(() => !r.PeerA.SatchelShownForLocal, Timeout, "the prop stayed after the pick-up");
+        }
+
+        [UnityTest]
+        public IEnumerator Satchel_HiddenFromOtherClients()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            NetworkManager nmA = clients[0].NetworkManager, nmB = clients[1].NetworkManager;
+            LoseSatchel(r, r.A, ChestFloor, 105);
+            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync v = BagSyncOwnedBy(nmA, r.A); return v != null && v.View.SatchelWaiting && v.View.SatchelFloor == ChestFloor; }, Timeout, "A's own view never showed the waiting satchel");
+            yield return Settle(0.5f);
+            Assert.That(BagSyncOwnedBy(nmB, r.A).View.SatchelWaiting, Is.False, "B's copy of A's view is the default one: B is never told A has a satchel (the owner-only read)");
+            Assert.That(BagSyncOwnedBy(r.HostNm, r.A).View.SatchelWaiting, Is.True, "the host sees every bag");
+            Assert.That(r.PeerB.SatchelShownForLocal, Is.False);
+            Assert.That(r.PeerA.SatchelShownForLocal, Is.True);
+            Assert.That(r.PeerA.TrySatchelPosition(out Vector3 at), Is.True);
+            r.Players[r.B] = at; r.Players[r.A] = at + new Vector3(30f, 0f, 0f); r.Players[r.Host] = at + new Vector3(30f, 0f, 0f);
+            Assert.That(r.Contents.ServerTryPickUpSatchel(r.B), Is.False, "the host refuses B's pick-up of A's satchel");
+            Assert.That(r.Haul.ServerPickUpSatchel(r.B), Is.False, "and the haul sync has no satchel of B's to pick up");
+            Assert.That(r.Haul.ServerBagOf(r.A).Satchel.Waiting, Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator Satchel_NotOnOtherDepths()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            const int otherDepth = 4;
+            LoseSatchel(r, r.A, otherDepth, 101);
+            NetworkManager nmA = clients[0].NetworkManager;
+            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync v = BagSyncOwnedBy(nmA, r.A); return v != null && v.View.SatchelWaiting && v.View.SatchelFloor == otherDepth; }, Timeout, "A's view never showed the satchel waiting on floor " + otherDepth);
+            yield return Settle(0.5f);
+            Assert.That(r.PeerA.SatchelShownForLocal, Is.False, "it waits on floor " + otherDepth + ", the party is on floor " + ChestFloor);
+            // Standing on the cell where it would lie on THIS floor changes nothing either.
+            CellPos cell = CellarPieceSpots.SatchelSpot(r.Layout, r.Seed);
+            r.Players[r.A] = r.Floor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(cell.X, cell.Y));
+            Assert.That(r.Contents.ServerTryPickUpSatchel(r.A), Is.False);
+            yield return Settle(0.5f);
+            Assert.That(r.Haul.ServerBagOf(r.A).Satchel.Waiting, Is.Not.Null, "not picked up on the wrong depth");
+            Assert.That(r.Haul.ServerBagOf(r.A).Satchel.Carried, Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator Satchel_LateJoiner_NoToast_StateCorrect()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            LoseSatchel(r, r.A, ChestFloor, 101);
+            yield return PlayModeHarness.WaitUntil(() => r.PeerA.SatchelShownForLocal, Timeout, "A's client never drew its satchel");
+
+            // C joins late with a satchel of its own waiting on this depth (its bag is filled before its hero spawns, like a rejoin).
+            yield return PlayModeHarness.StartClients(r.App, 1, false, clients, 30);
+            PlayModeHarness.TestClient c = clients[2];
+            NetworkManager nmC = c.NetworkManager;
+            ulong cc = nmC.LocalClientId;
+            LoseSatchel(r, cc, ChestFloor, 102);
+            yield return SpawnHero(r.App, c, new Vector3(8f, 0f, 0f));
+            ulong contentsId = r.Contents.NetworkObjectId;
+            yield return PlayModeHarness.WaitUntil(() => nmC.SpawnManager.SpawnedObjects.ContainsKey(contentsId), Timeout, "C never received the contents object");
+            CellarContentsSync peerC = ContentsOf(nmC, contentsId);
+            CellarFloorSync own = null;
+            float until = Time.realtimeSinceStartup + Timeout;
+            while (own == null && Time.realtimeSinceStartup < until)
+            {
+                foreach (CellarFloorSync f in Object.FindObjectsByType<CellarFloorSync>(FindObjectsSortMode.None)) if (f.NetworkManager == nmC) own = f;
+                if (own == null) { PlayModeHarness.Pace(); yield return null; }
+            }
+            Assert.That(own, Is.Not.Null, "C has its own floor sync");
+            peerC.FloorSync = own;
+            yield return PlayModeHarness.WaitUntil(() => peerC.SatchelShownForLocal, Timeout * 2, "the late joiner never saw its own satchel on this depth");
+            yield return Settle(0.5f);
+            Assert.That(peerC.NoticeCount, Is.EqualTo(0), "a late join replays no toast");
+            Assert.That(r.PeerA.NoticeCount + r.PeerB.NoticeCount, Is.EqualTo(0));
+            Assert.That(r.PeerA.SatchelShownForLocal, Is.True, "A's own prop is unchanged by the join");
+            Assert.That(r.PeerB.SatchelShownForLocal, Is.False);
+            Assert.That(peerC.TrySatchelPosition(out Vector3 cAt) && r.PeerA.TrySatchelPosition(out Vector3 aAt) && (cAt - aAt).sqrMagnitude < 0.01f, Is.True, "the same spot for everyone's own satchel");
+        }
+
+        [UnityTest]
+        public IEnumerator Boots_OwnerHeroFollowsItsBag_NoOtherHeroDoes()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            NetworkManager nmA = clients[0].NetworkManager, nmB = clients[1].NetworkManager;
+            HeroLocomotion heroA = nmA.LocalClient.PlayerObject.GetComponent<HeroLocomotion>(), heroB = nmB.LocalClient.PlayerObject.GetComponent<HeroLocomotion>();
+            HeroLocomotion heroHost = r.HostNm.LocalClient.PlayerObject.GetComponent<HeroLocomotion>();
+            Assert.That(heroA, Is.Not.Null);
+            Assert.That(heroA.BootsOn || heroB.BootsOn || heroHost.BootsOn, Is.False, "premise: no boots yet");
+
+            Assert.That(r.Haul.ServerAddItem(r.A, CellarLoot.BootsId), Is.True);
+            Assert.That(r.Haul.ServerAddItem(r.A, CellarLoot.BootsId), Is.False, "one pair per player");
+            yield return PlayModeHarness.WaitUntil(() => heroA.BootsOn, Timeout, "A's own hero never put the boots on");
+            yield return Settle(0.5f);
+            Assert.That(heroB.BootsOn || heroHost.BootsOn, Is.False, "nobody else's hero is faster");
+            Assert.That(MovementMath.TargetSpeed(1f, true, heroA.BootsOn), Is.EqualTo(MovementMath.RunSpeed * 1.05f).Within(1e-4f));
+
+            Assert.That(r.Haul.ServerFailDive(), Is.True, "a failed dive keeps what the boots were banked as: here they were only carried, so they wait in the satchel");
+            yield return PlayModeHarness.WaitUntil(() => !heroA.BootsOn, Timeout, "the boots stayed on after they went into the satchel");
         }
     }
 }

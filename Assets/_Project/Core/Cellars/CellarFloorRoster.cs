@@ -1,9 +1,9 @@
 // Core/Cellars/CellarFloorRoster.cs: per-floor enemy roster subset and one floor twist of the Undercroft Cellars (procgen item 3; research procedural-dungeons takeaways).
 // Pure function of (seed, floor) on its own streams "cellars.roster" / "cellars.twist" / "cellars.twist.rooms": no layout, dressing, mix, atmosphere or encounter stream moves.
-//   - Roster: the Tier1 kinds a floor may use are those CellarEnemyMix weights above zero. Floors 2-3 draw a subset (all eligible, or all but one); floor 1 (one kind) and floor 4
-//     (bakery set piece: boss/hunter/elite vignette untouched) keep the full set. Never empty. Spawners remap a rolled kind that is not on the roster to one that is.
-//   - Twist: at most one of None / Ambush / Thin / Crowded per floor, floors 2-3 only (never floor 1 or 4), and one twist kind repeats at most once per dive
-//     (earlier floors are replayed from the seed, as CellarAtmosphere.IsDarkFloor does).
+//   - Roster: the Tier1 kinds a floor may use are those CellarEnemyMix weights above zero (floors past 4 use the floor-4 band). The generated floors (2, 4, 6, 7) draw a subset (all eligible, or all but one);
+//     the authored and set-piece floors (1, 3, 5) keep the full set. Never empty. Spawners remap a rolled kind that is not on the roster to one that is.
+//   - Twist: at most one of None / Ambush / Thin / Crowded per floor, on the generated floors only (never 1, 3, 5), and one twist kind repeats at most once per dive
+//     (earlier generated floors are replayed from the seed, as CellarAtmosphere.IsDarkFloor does).
 // Authority: none (static data derived from the dive seed; every peer computes the same answer).
 using System;
 using SleepingCalamity.Core.Combat;
@@ -19,7 +19,7 @@ namespace SleepingCalamity.Core
         public const float AmbushDelaySeconds = 0.75f;   // placeholder: how long after a player enters the ambush room its enemies spring at the ring cells
         public const int ThinPercent = 12;
         public const int CrowdedPercent = 12;
-        public const int FirstTwistFloor = 2, LastTwistFloor = 3;
+        public const int FirstTwistFloor = 2;   // twists run on the generated floors (2, 4, 6, 7), from here on
     }
 
     public static class CellarFloorRoster
@@ -39,7 +39,7 @@ namespace SleepingCalamity.Core
         {
             int eligible = EligibleMask(floor);
             int count = 0; for (int b = 1; b <= 4; b <<= 1) if ((eligible & b) != 0) count++;
-            if (floor < 2 || floor > 3 || count < 2) return eligible;
+            if (!CellarFloorGenerator.IsGeneratedFloor(floor) || count < 2) return eligible;
             var rng = new Pcg32(Rng.Derive(seed, "cellars.roster", (ulong)floor));
             if (rng.Range(0, 2) == 0) return eligible;          // the full set
             int drop = rng.Range(0, count), seen = 0;            // all but one: which one goes
@@ -62,10 +62,11 @@ namespace SleepingCalamity.Core
         // The twist of a floor: a pure function of (seed, floor); a kind already used by an earlier floor of the dive becomes None.
         public static FloorTwist TwistOf(uint seed, int floor)
         {
-            if (floor < FloorTwistTuning.FirstTwistFloor || floor > FloorTwistTuning.LastTwistFloor) return FloorTwist.None;
+            if (!CellarFloorGenerator.IsGeneratedFloor(floor)) return FloorTwist.None;
             int used = 0;
             for (int f = FloorTwistTuning.FirstTwistFloor; f <= floor; f++)
             {
+                if (!CellarFloorGenerator.IsGeneratedFloor(f)) continue;
                 FloorTwist t = RollTwist(seed, f);
                 if (t != FloorTwist.None && (used & (1 << (int)t)) != 0) t = FloorTwist.None;
                 if (f == floor) return t;

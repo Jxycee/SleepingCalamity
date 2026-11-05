@@ -39,6 +39,8 @@ namespace SleepingCalamity.Gameplay
         // Owner copy only; set by the DiveDirector while a dive-floor hand-over is unresolved (the floor under the hero was swapped, the arrival teleport has not landed).
         // Zeroes vertical velocity and the vertical step so the hero hangs instead of sinking through the missing cells. The director clears it on teleport, timeout and despawn.
         public bool HoldVertical { get; set; }
+        // Owner copy only: the hero wears boots (plan 3 decision 12): jog and sprint are 5% faster (MovementMath.TargetSpeed). Set from the owner's own bag view (PlayerBagSync); client-predicted, no host check.
+        public bool BootsOn { get; set; }
         public bool IsGrounded { get; private set; }
         public bool IsSprinting { get; private set; }
         public bool IsDodging => _dodge.Active;
@@ -135,7 +137,7 @@ namespace SleepingCalamity.Gameplay
             // ---- horizontal velocity ----
             bool sprint = grounded && intent.SprintHeld && !dodging;
             IsSprinting = sprint && stick > MovementMath.MoveDeadZone;
-            float speed = MovementMath.TargetSpeed(stick, sprint) * moveScale;
+            float speed = MovementMath.TargetSpeed(stick, sprint, BootsOn) * moveScale;
             float lunge = _combat != null && !dodging ? _combat.LungeSpeed : 0f;
             float targetX, targetZ;
             if (dodging)

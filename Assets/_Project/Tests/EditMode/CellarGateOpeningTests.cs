@@ -34,7 +34,7 @@ namespace SleepingCalamity.Tests.EditMode
             int checkedFloors = 0;
             foreach (var (seed, floor) in Cases)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                 if (!GateMid(l, out Vector3 mid, out Vector3 along, out Vector3 through)) continue;
                 CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 try

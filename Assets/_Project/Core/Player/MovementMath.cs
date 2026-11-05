@@ -11,6 +11,7 @@ namespace SleepingCalamity.Core
     {
         // Gaits (m/s). A half-tilted stick walks, a full stick jogs, sprint runs. Tune in M3 and M7.
         public const float WalkSpeed = 2.2f, JogSpeed = 4.8f, RunSpeed = 7.0f;
+        public const float BootsRunBonus = 1.05f;   // placeholder (plan 3 decision 12): boots raise the jog and the sprint by 5%; jump height and gravity are untouched
         public const float WalkStickMax = 0.5f;    // stick magnitude up to which the hero walks
         public const float MoveDeadZone = 0.1f;
         public const float GroundAccel = 40f, AirAccel = 6f;
@@ -26,14 +27,21 @@ namespace SleepingCalamity.Core
         public static float JumpVelocity(float jumpHeight, float gravity) => MathF.Sqrt(2f * MathF.Abs(gravity) * jumpHeight);
 
         // Wish speed from the stick magnitude (0..1) and the sprint button. Zero inside the dead zone.
-        public static float TargetSpeed(float stickMagnitude, bool sprint)
+        public static float TargetSpeed(float stickMagnitude, bool sprint) => TargetSpeed(stickMagnitude, sprint, false);
+
+        // The sprint speed, with or without the boots' bonus.
+        public static float RunSpeedFor(bool boots) => boots ? RunSpeed * BootsRunBonus : RunSpeed;
+
+        // With boots the jog (a full stick) and the sprint are 5% faster; walking is not. Read owner-side (the speed is client-predicted); there is no host check.
+        public static float TargetSpeed(float stickMagnitude, bool sprint, bool boots)
         {
             if (!(stickMagnitude > MoveDeadZone)) return 0f;
-            if (sprint) return RunSpeed;
+            if (sprint) return RunSpeedFor(boots);
+            float jog = boots ? JogSpeed * BootsRunBonus : JogSpeed;
             float m = stickMagnitude > 1f ? 1f : stickMagnitude;
             if (m <= WalkStickMax) return WalkSpeed * (m / WalkStickMax);
             float t = (m - WalkStickMax) / (1f - WalkStickMax);
-            return WalkSpeed + (JogSpeed - WalkSpeed) * t;
+            return WalkSpeed + (jog - WalkSpeed) * t;
         }
 
         public static Gait GaitOf(float speed)

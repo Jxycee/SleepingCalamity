@@ -1,6 +1,6 @@
 // M6 S3: what turns the Hollowmere art scene into the session (hub) scene (docs/design/m6-square-loop-proposal.md, Q1 A). Called from HollowmereBuilder.BuildScene.
 //   - A MainCamera with a Cinemachine Brain and a listener (the hero's rig drives it), like the arenas.
-//   - One SpawnPoint in the square by the heroes' home door; the DiveHub at the cistern house's cellar stair (HollowmereLayout.UndercroftStair), its Landing a step in front of the stair
+//   - One SpawnPoint in the square by the heroes' home door; the DiveHub at the church cellar trapdoor on the keep walk (HollowmereLayout.ChurchTrapdoor), its Landing a few steps along the walk
 //     (go-home and fail land the party there). The dive floors are built far under the town at HubOrigin by every peer; no scene loads during play.
 //   - The look separation: a second global post volume with the dungeon corner's profile (weight 0) and an AreaLook that swaps volumes, sky, fog, ambient and the sun by camera height.
 //   - TownView: the bakery greybox on every L lot, hidden until the replicated town (TownSync) says a building stands there; PlacementStation (M6 S4): build point, placement camera, ghost.
@@ -46,12 +46,14 @@ namespace SleepingCalamity.EditorTools
             spawn.transform.position = new Vector3(door.Pos.X, Ground(t, door.Pos.X, door.Pos.Z - 3.0f) + 0.1f, door.Pos.Z - 3.0f);
             spawn.AddComponent<SpawnPoint>();
 
-            // The stair: the marker the home art already carries (inside the house), the landing a step in front of it (stair top), the floors' origin far below.
+            // The way down: the church cellar trapdoor on the keep walk in front of the bell tower's door (plan 3 task 7; STORY: the church and the bell tower are one building). The cistern house keeps its
+            // stair marker as art only. DiveEntrance / StairTop keep their names: go-home and fail land the party at StairTop, a few steps along the walk.
             var entrance = new GameObject("DiveEntrance"); entrance.transform.SetParent(hub, false);
-            entrance.transform.position = new Vector3(HollowmereLayout.UndercroftStair.X, home.Y, HollowmereLayout.UndercroftStair.Z);
+            entrance.transform.position = new Vector3(HollowmereLayout.ChurchTrapdoor.X, HollowmereLayout.KeepHeight, HollowmereLayout.ChurchTrapdoor.Z);
             var landing = new GameObject("StairTop"); landing.transform.SetParent(hub, false);
-            Vector3 landXZ = entrance.transform.position + new Vector3(-1.2f, 0f, -1.6f);
-            landing.transform.position = new Vector3(landXZ.x, LandingY(t, landXZ, home.Y), landXZ.z);
+            Vector3 landXZ = new Vector3(HollowmereLayout.ChurchTrapdoorLanding.X, HollowmereLayout.KeepHeight, HollowmereLayout.ChurchTrapdoorLanding.Z);
+            landing.transform.position = new Vector3(landXZ.x, LandingY(t, landXZ, HollowmereLayout.KeepHeight), landXZ.z);
+            BuildTrapdoor(entrance.transform);
             var origin = new GameObject("DiveOrigin"); origin.transform.SetParent(hub, false);
             origin.transform.position = HubOrigin;
             var diveHub = new GameObject("DiveHub"); diveHub.transform.SetParent(hub, false);
@@ -71,6 +73,14 @@ namespace SleepingCalamity.EditorTools
             look.TownOnly = new[] { shafts, ambient }.Where(g => g != null).ToArray();
 
             BuildTownView(root, t);
+        }
+
+        // The hatch: a dark slab with an iron ring in the keep walk's paving, flush with the ground, no collider (nothing to trip on; the prompt is the DiveHub's).
+        static void BuildTrapdoor(Transform entrance)
+        {
+            GameObject slab = LookTestBuilder.Prim(entrance, "Trapdoor", PrimitiveType.Cube, new Vector3(0f, 0.04f, 0f), new Vector3(1.6f, 0.08f, 1.2f), M("label"));
+            GameObject ring = LookTestBuilder.Prim(entrance, "TrapdoorRing", PrimitiveType.Cylinder, new Vector3(0f, 0.1f, 0.25f), new Vector3(0.28f, 0.02f, 0.28f), M("label"));
+            foreach (Collider c in entrance.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
         }
 
         // The stair top stands on whatever is really there (floor, step or terrain): a ground raycast from above, falling back to the layout ground, then the house floor.

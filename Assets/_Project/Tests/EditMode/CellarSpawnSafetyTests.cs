@@ -39,7 +39,7 @@ namespace SleepingCalamity.Tests.EditMode
             int checkedFloors = 0, movedClear = 0;
             foreach (var (seed, floor) in AmbushFloors(60))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(l, d, 1, false);
                 int room = plan.AmbushRoom; PlacedRoom p = l.Rooms[room];
                 CellDoor door = p.Room.Doors[0];
@@ -68,7 +68,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             foreach (var (seed, floor) in AmbushFloors(20))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(l, d, 1, false);
                 CollectionAssert.AreEqual(CellarAmbush.Cells(l, d, plan, plan.AmbushRoom), CellarAmbush.Cells(l, d, plan, plan.AmbushRoom, new PlanePoint[0]));
             }
@@ -80,7 +80,7 @@ namespace SleepingCalamity.Tests.EditMode
             int floors = 0;
             foreach (var (seed, floor) in AmbushFloors(40))
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(l, d, 1, false);
                 int room = plan.AmbushRoom; PlacedRoom p = l.Rooms[room];
                 int count = 0, movableCount = 0;
@@ -132,7 +132,7 @@ namespace SleepingCalamity.Tests.EditMode
             int tested = 0;
             for (uint seed = 1; seed < 200 && tested < 30; seed++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 1); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 1); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 bool[,] ok = CellarKeyDrop.Walkable(l, d);
                 int n = CellarFloorLayout.GridSize; CellPos walk = default, wall = default; bool hw = false, hx = false;
                 for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) { if (ok[x, y] && !hw) { walk = new CellPos(x, y); hw = true; } if (!ok[x, y] && !hx) { wall = new CellPos(x, y); hx = true; } }

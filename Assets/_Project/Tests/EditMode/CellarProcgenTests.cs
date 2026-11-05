@@ -18,7 +18,7 @@ namespace SleepingCalamity.Tests.EditMode
     {
         static ulong[] Hashes(uint seed, int floor)
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
             CellarFloorRoute r = CellarFloorRoute.Resolve(l); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
             SpecialRoom s = SpecialRoomDive.Resolve(l, r, d); CellarDoorHints h = CellarDoorHints.Resolve(l, s, d);
             return new[] { r.RouteHash(), s.SpecialHash(), h.HintsHash() };
@@ -42,26 +42,29 @@ namespace SleepingCalamity.Tests.EditMode
             // Fresh goldens (new layers, no earlier value to move). LayoutHash/DressingHash stay pinned by CellarFloorGeneratorTests / CellarVarietyTests.
             ulong[][] expect =
             {
-                new ulong[] { 14624528245116842936UL, 8845299293798975808UL, 4472881448122838529UL },   // re-pinned by rooms-v2 (pool resize) (floors 1-3 route and hints)
-                    // route, special, hints (hints re-pinned 2026-10-31: first-reached rooms only, deliberate change; route/hints goldens moved with item 2 layout presets, deliberate)
-                new ulong[] { 9391404672710403583UL, 8103913021369237331UL, 3438387268155540719UL },
-                new ulong[] { 15599787280079326938UL, 9026194201199058082UL, 16107167216787938696UL },   // floor 3 hints re-pinned: procgen 5 vignettes, deliberate
+                new ulong[] { 16115348283186528704UL, 8845299293798975808UL, 9336733838086179042UL },   // floor 1 (route, special, hints); re-pinned by plan 3 task 3/4 for the dive floors 1, 2, 4, 6, 7 (route/hints goldens moved with item 2 layout presets, deliberate)
+                new ulong[] { 11141503586665770219UL, 8103913021369237331UL, 524040940601852323UL },   // floor 2
+                new ulong[] { 2018004949045211120UL, 8818840162485564717UL, 3256357446080040850UL },   // floor 4
+                new ulong[] { 13773291009353983559UL, 8999735069885646991UL, 9189194684516193120UL },   // floor 6
+                new ulong[] { 7740221859262382947UL, 9154170845972318174UL, 4455209182888988811UL },   // floor 7
             };
             var sb = new StringBuilder();
-            for (int f = 1; f <= 3; f++) { ulong[] g = Hashes(12345, f); sb.Append("floor " + f + ": " + g[0] + "UL, " + g[1] + "UL, " + g[2] + "UL\n"); }
-            for (int f = 1; f <= 3; f++)
+            foreach (int f in CellarTestFloors.DiveFloors) { ulong[] g = Hashes(12345, f); sb.Append("floor " + f + ": " + g[0] + "UL, " + g[1] + "UL, " + g[2] + "UL\n"); }
+            for (int n = 0; n < CellarTestFloors.DiveFloors.Length; n++)
             {
+                int f = CellarTestFloors.DiveFloors[n];
                 ulong[] g = Hashes(12345, f);
-                for (int k = 0; k < 3; k++) Assert.AreEqual(expect[f - 1][k], g[k], "floor " + f + " hash " + k + "\n" + sb);
+                for (int k = 0; k < 3; k++) Assert.AreEqual(expect[n][k], g[k], "floor " + f + " hash " + k + "\n" + sb);
             }
         }
 
         [Test]
-        public void Floor4_AllLayersEmpty()
+        public void StubFloors3And5_AllLayersEmpty()
         {
             foreach (uint seed in new uint[] { 1, 12345, 777 })
+              foreach (int stub in new[] { 3, 5 })
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 4);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, stub);
                 CellarFloorRoute r = CellarFloorRoute.Resolve(l);
                 Assert.IsTrue(r.IsEmpty); Assert.AreEqual(CycleRole.None, r.Cycle); Assert.AreEqual(0, r.Spine.Count);
                 Assert.IsFalse(SpecialRoomDive.Resolve(l).Exists);
@@ -72,9 +75,9 @@ namespace SleepingCalamity.Tests.EditMode
         [TestCase(CellarTestFloors.FastSeeds), TestCase(1200, Category = "Soak")]
         public void Route_Invariants_AndArcRoleMix(int seeds)
         {
-            var cycle = new int[4, 4]; var floors = new int[4]; int arcsTotal = 0, spineTotal = 0, bad = 0;
+            var cycle = new int[8, 4]; var floors = new int[8]; int arcsTotal = 0, spineTotal = 0, bad = 0;
             for (uint seed = 0; seed < seeds; seed++)
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorRoute r = CellarFloorRoute.Resolve(l);
                     string at = "seed " + seed + " floor " + f;
@@ -100,20 +103,20 @@ namespace SleepingCalamity.Tests.EditMode
                     cycle[f, (int)r.Cycle]++; floors[f]++; arcsTotal += r.Arcs.Count; spineTotal += r.Spine.Count; if (r.Cycle == CycleRole.None) bad++;
                 }
             var sb = new StringBuilder("ROUTE (" + seeds + " seeds)\n");
-            for (int f = 1; f <= 3; f++)
+            foreach (int f in CellarTestFloors.DiveFloors)
                 sb.AppendLine("floor " + f + ": None " + Pct(cycle[f, 0], floors[f]) + " Plain " + Pct(cycle[f, 1], floors[f]) + " KeyArc " + Pct(cycle[f, 2], floors[f]) + " ShortcutBack " + Pct(cycle[f, 3], floors[f]));
-            sb.AppendLine("mean arcs/floor " + (arcsTotal / (3.0 * seeds)).ToString("F2") + " mean spine rooms " + (spineTotal / (3.0 * seeds)).ToString("F2") + " None overall " + Pct(bad, 3 * seeds));
+            sb.AppendLine("mean arcs/floor " + (arcsTotal / (CellarTestFloors.DiveFloors.Length * (double)seeds)).ToString("F2") + " mean spine rooms " + (spineTotal / (CellarTestFloors.DiveFloors.Length * (double)seeds)).ToString("F2") + " None overall " + Pct(bad, CellarTestFloors.DiveFloors.Length * seeds));
             Report(sb.ToString());
         }
 
         [TestCase(CellarTestFloors.FastSeeds), TestCase(1200, Category = "Soak")]
         public void SpecialRoom_Spread(int seeds)
         {
-            var has = new int[4]; var kinds = new int[4, 5]; int spineOnly = 0, dives = 0, none = 0, dived = 0;
+            var has = new int[8]; var kinds = new int[8, 5]; int spineOnly = 0, dives = 0, none = 0, dived = 0;
             for (uint seed = 0; seed < seeds; seed++)
             {
                 var seen = new List<SpecialKind>();
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorRoute r = CellarFloorRoute.Resolve(l); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     SpecialRoom s = SpecialRoomDive.Resolve(l, r, d); string at = "seed " + seed + " floor " + f;
@@ -135,11 +138,11 @@ namespace SleepingCalamity.Tests.EditMode
                 dived++; dives += seen.Count; if (seen.Count == 0) none++;
             }
             var sb = new StringBuilder("SPECIAL (" + seeds + " seeds)\n");
-            for (int f = 1; f <= 3; f++)
+            foreach (int f in CellarTestFloors.DiveFloors)
                 sb.AppendLine("floor " + f + ": has special " + Pct(has[f], seeds) + " EliteDen " + Pct(kinds[f, 1], seeds) + " Treasury " + Pct(kinds[f, 2], seeds) + " Shrine " + Pct(kinds[f, 3], seeds) + " Quiet " + Pct(kinds[f, 4], seeds));
-            sb.AppendLine("specials per dive " + (dives / (double)dived).ToString("F2") + ", dives with none " + Pct(none, dived) + ", placed on a Spine room " + Pct(spineOnly, has[1] + has[2] + has[3]));
+            sb.AppendLine("specials per dive " + (dives / (double)dived).ToString("F2") + ", dives with none " + Pct(none, dived) + ", placed on a Spine room " + Pct(spineOnly, has.Sum()));
             Report(sb.ToString());
-            Assert.Greater(has[1] + has[2] + has[3], seeds / 2, "some specials appear");
+            Assert.Greater(has.Sum(), seeds / 2, "some specials appear");
         }
 
         [Test]
@@ -166,7 +169,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             int hints = 0, withFlag = 0, notable = 0, keyHints = 0, specialHints = 0, rewardHints = 0;
             for (uint seed = 0; seed < seeds; seed++)
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     SpecialRoom s = SpecialRoomDive.Resolve(l, null, d); CellarDoorHints h = CellarDoorHints.Resolve(l, s, d); string at = "seed " + seed + " floor " + f;
@@ -208,16 +211,16 @@ namespace SleepingCalamity.Tests.EditMode
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             int specials = 0;
-            foreach (var (seed, floor) in new (uint, int)[] { (12345, 1), (12345, 2), (12345, 3), (7, 2), (99, 3), (4242, 1), (12345, 4) })
+            foreach (var (seed, floor) in new (uint, int)[] { (12345, 1), (12345, 2), (12345, 3), (7, 2), (99, 3), (4242, 1), (12345, 4), (12345, 5), (12345, 7) })
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 Transform g = b.Root.Find(CellarFloorBuilder.ProcgenGroup);
                 int icons = b.DoorHints.Hints.Count(x => x.Notable);
                 Assert.AreEqual(icons, b.DoorHintIcons); Assert.AreEqual(icons, Enumerable.Range(0, g.childCount).Count(i => g.GetChild(i).name.StartsWith("DoorHint_")));
                 foreach (DoorHint x in b.DoorHints.Hints.Where(x => x.Notable)) Assert.IsNotNull(g.Find("DoorHint_r" + x.RoomIndex + "_d" + x.DoorIndex));
                 Assert.AreEqual(b.Special.Exists ? 1 : 0, b.SpecialMarkers);
                 if (b.Special.Exists) { specials++; Assert.IsNotNull(g.Find("SpecialRoom_" + b.Special.Kind + "_r" + b.Special.RoomIndex)); }
-                if (floor == 4) { Assert.AreEqual(0, b.DoorHintIcons); Assert.AreEqual(0, b.SpecialMarkers); }
+                if (l.IsStub) { Assert.AreEqual(0, b.DoorHintIcons); Assert.AreEqual(0, b.SpecialMarkers); }
                 Object.DestroyImmediate(b.Root.gameObject);
             }
             Assert.Greater(specials, 0, "at least one sample floor shows a special room");

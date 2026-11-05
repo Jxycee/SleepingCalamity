@@ -57,6 +57,7 @@ namespace SleepingCalamity.Tests.EditMode
             var p = new PartyBags();
             p.For("a").Add(101); p.For("b").Add(102);
             p.For("a").OpenBank(1);
+            Assert.That(p.For("a").Pick(0), Is.True);   // plan 3 task 8: the push-on banks the picks only
             p.PushOnAll();
             Assert.That(p.For("a").BankedThisDive[101], Is.EqualTo(1));
             Assert.That(p.For("a").BankOpen, Is.False);
@@ -82,6 +83,19 @@ namespace SleepingCalamity.Tests.EditMode
             var fresh = new PlayerBag(); fresh.Add(103);
             p.Adopt("a", fresh);
             Assert.That(p.For("a"), Is.SameAs(fresh));
+        }
+
+        // Catches: the stir counting usables, boots, the satchel or keys as valuables (decision: weapons and large items only), or missing a second player's bag.
+        [Test]
+        public void CarriedValuables_CountsLargeItemsInEveryBag_NotBootsNorTheSatchel()
+        {
+            var p = new PartyBags();
+            Assert.That(p.CarriedValuables(), Is.EqualTo(0));
+            p.For("a").Add(101); p.For("a").Add(CellarLoot.BootsId);
+            p.For("b").Add(112); p.For("b").Add(104);
+            p.For("c").Satchel.Restore(new LostSatchel(3, new[] { 101, 102, 103 }));
+            p.For("c").PickUpSatchel();
+            Assert.That(p.CarriedValuables(), Is.EqualTo(3), "101, 112, 104 are large; boots are gear; the satchel's items are not counted");
         }
     }
 }

@@ -26,6 +26,9 @@ namespace SleepingCalamity.Core
         public const float KeepWallZ = 19.6f, KeepHeight = 4f, KeepHalfWidth = 24f;   // the keep terrace: north of KeepWallZ, |x| < KeepHalfWidth
         public const float WaterY = -12f;                                              // the lake surface, 12 m below the square
         public static readonly TownPoint UndercroftStair = new TownPoint(15f, 12.5f); // inside the cistern house, the way down (P25)
+        // The way into the Undercroft since plan 3 (STORY: the church and the bell tower are one building, its cellar trapdoor is the way down): a hatch on the keep walk in front of the bell tower's door,
+        // and the landing (go home, fail) a few steps east along the walk. Both on the keep terrace (KeepHeight).
+        public static readonly TownPoint ChurchTrapdoor = new TownPoint(5.6f, 29.2f), ChurchTrapdoorLanding = new TownPoint(8.4f, 29.2f);
         public static readonly TownPoint LakeCentre = new TownPoint(10f, -102f);
         public const float LakeRadiusX = 70f, LakeRadiusZ = 24f;
         const float LotSetback = 1.0f, MinLotSetback = 0.2f;   // lane edge to lot edge: the default, and the least a lot may be pulled in to clear the town wall behind it

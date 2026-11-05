@@ -31,11 +31,12 @@ namespace SleepingCalamity.Tests.EditMode
         // ---------------------------------------------------------------- sockets: chance and alternatives
 
         [Test]
-        public void Floor4_BakeryShowsNoVignettes_ButKeepsItsDressing()
+        public void StubSetPieces_ShowNoVignettes_ButKeepTheirDressing()
         {
             foreach (uint seed in new uint[] { 0, 1, 12345, 0xC0FFEE12, uint.MaxValue })
+              foreach (int stub in new[] { 3, 5 })
             {
-                CellarFloorDressing d = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, 4));
+                CellarFloorDressing d = CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(seed, stub));
                 Assert.AreEqual(0, d.Vignettes.Count, "seed " + seed);
                 Assert.AreEqual(0, d.DroppedVignettes, "seed " + seed);
                 Assert.Greater(d.Sockets.Count, 0, "seed " + seed);
@@ -90,8 +91,8 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (uint seed in new uint[] { 0, 1, 7, 12345, 99999, 0xFFFFFFFF })
                 for (int floor = 1; floor <= 4; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
-                    CellarFloorDressing a = CellarFloorDressing.Resolve(l), b = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, floor));
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
+                    CellarFloorDressing a = CellarFloorDressing.Resolve(l), b = CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(seed, floor));
                     Assert.AreEqual(a.DressingHash(), b.DressingHash(), "seed " + seed + " floor " + floor);
                     Assert.AreEqual(a.Atmosphere.LampPercent, b.Atmosphere.LampPercent);
                     Assert.AreEqual(a.Atmosphere.FogPercent, b.Atmosphere.FogPercent);
@@ -103,19 +104,19 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Dressing_DoesNotTouchTheLayoutHash()
         {
-            CellarFloorLayout l = CellarFloorGenerator.Generate(12345, 1);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(12345, 1);
             ulong before = l.LayoutHash(); CellarFloorDressing.Resolve(l);
             Assert.AreEqual(before, l.LayoutHash());
-            Assert.AreEqual(932123446153315579UL, before, "dressing leaves the geometry golden (re-pinned by rooms-v2 (pool resize)) alone");
+            Assert.AreEqual(8462212200985256396UL, before, "dressing leaves the geometry golden (re-pinned by rooms-v2 (pool resize)) alone");
         }
 
         [Test]
         public void Dressing_DiffersBetweenSeeds_AndBetweenFloors()
         {
             var hashes = new HashSet<ulong>();
-            for (uint s = 0; s < 200; s++) hashes.Add(CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(s, 1)).DressingHash());
+            for (uint s = 0; s < 200; s++) hashes.Add(CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(s, 1)).DressingHash());
             Assert.Greater(hashes.Count, 195);
-            Assert.AreNotEqual(CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(5, 1)).DressingHash(), CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(5, 2)).DressingHash());
+            Assert.AreNotEqual(CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(5, 1)).DressingHash(), CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(5, 2)).DressingHash());
         }
 
         [Test]
@@ -124,10 +125,10 @@ namespace SleepingCalamity.Tests.EditMode
             // fresh layouts resolved floor 3 first, or after floors 1 and 2, give the same dressing: the pity state is a pure function of the seed
             foreach (uint seed in new uint[] { 3, 44, 555, 12345 })
             {
-                ulong cold = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, 3)).DressingHash();
+                ulong cold = CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(seed, 3)).DressingHash();
                 var forward = new ulong[4]; var backward = new ulong[4];
-                for (int f = 1; f <= 3; f++) forward[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, f)).DressingHash();
-                for (int f = 3; f >= 1; f--) backward[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, f)).DressingHash();
+                for (int f = 1; f <= 3; f++) forward[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(seed, f)).DressingHash();
+                for (int f = 3; f >= 1; f--) backward[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(seed, f)).DressingHash();
                 Assert.AreEqual(cold, forward[3], "seed " + seed); Assert.AreEqual(forward[3], backward[3]);
                 Assert.AreEqual(forward[1], backward[1]); Assert.AreEqual(forward[2], backward[2]);
             }
@@ -137,9 +138,9 @@ namespace SleepingCalamity.Tests.EditMode
         public void Dressing_GoldenHashes_Seed12345()
         {
             var got = new ulong[4];
-            for (int f = 1; f <= 3; f++) got[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(12345, f)).DressingHash();
+            for (int f = 1; f <= 3; f++) got[f] = CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(12345, f)).DressingHash();   // floors 1-3 only: floor 1 authored, floor 2 generated, floor 3 the bakery stub (re-pinned by plan 3 task 3/4)
             string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // re-pinned 2026-10-31 (procgen item 2: presets moved the placement, deliberate); floors 2-3 re-pinned by procgen 5 vignettes, deliberate; re-pinned by rooms-v2 (pool resize)
-            Assert.AreEqual(12105747063451063287UL, got[1], "floor 1; actual " + all); Assert.AreEqual(11472384894430338541UL, got[2], "floor 2; actual " + all); Assert.AreEqual(16417598171853309782UL, got[3], "floor 3; actual " + all);
+            Assert.AreEqual(6216606645011355897UL, got[1], "floor 1; actual " + all); Assert.AreEqual(3374501565731090695UL, got[2], "floor 2; actual " + all); Assert.AreEqual(4220592361639226623UL, got[3], "floor 3; actual " + all);
         }
 
         // ---------------------------------------------------------------- dressing statistics
@@ -192,7 +193,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 100; seed++)
                 for (int floor = 1; floor <= 3; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                     for (int r = 0; r < l.Rooms.Count; r++)
                     {
                         if (!sig.TryGetValue(l.Rooms[r].RoomId, out List<ulong> list)) sig[l.Rooms[r].RoomId] = list = new List<ulong>();
@@ -259,7 +260,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < 3000; seed++)
             {
                 if (!CellarAtmosphere.IsDarkFloor(seed, 2)) continue;
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 2); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 2); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 var entry = l.Rooms.Select((p, i) => (p, i)).First(x => x.p.Room.Kind == RoomKind.Entry).i;
                 Assert.IsTrue(d.SocketsOf(entry).Where(s => s.Kind == SocketKind.Lantern).All(s => s.Filled), "entry lanterns always stand");
                 return;
@@ -286,7 +287,7 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < n; seed++)
             {
                 int dive = 0;
-                for (int floor = 1; floor <= 3; floor++)
+                foreach (int floor in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorDressing d = CellarTestFloors.Dressing(seed, floor);
                     dive += d.Vignettes.Count; dropped += d.DroppedVignettes;
@@ -296,7 +297,7 @@ namespace SleepingCalamity.Tests.EditMode
                 }
                 total += dive; if (dive == 0) bare++;
             }
-            double mean = total / (n * 3.0);
+            double mean = total / (n * (double)CellarTestFloors.DiveFloors.Length);
             double slack = n >= 1000 ? 0 : 0.3;   // statistical band: wider for the fast twin
             Assert.That(mean, Is.InRange(0.9 - slack, 1.5 + slack), "vignettes per floor");
             Assert.AreEqual(0, bare, "dives of floors 1-3 with no vignette (pity)");
@@ -430,10 +431,10 @@ namespace SleepingCalamity.Tests.EditMode
         public void ExitDistance_ValidatorRejectsAnExitBesideTheEntry()
         {
             // the fixed floor 4 stub is exempt, but a generated floor given an exit too close must fail: use the distance helper on a stub-shaped check
-            CellarFloorLayout l = CellarFloorGenerator.Generate(12345, 1);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(12345, 1);
             Assert.GreaterOrEqual(l.EntryToExitDistance(), CellarFloorGenerator.MinExitDistance);
             Assert.IsEmpty(CellarFloorValidator.Validate(l));
-            CellarFloorLayout stub = CellarFloorGenerator.Generate(1, 4);
+            CellarFloorLayout stub = CellarFloorGenerator.Layout(1, 3);
             Assert.IsTrue(stub.IsStub); Assert.IsEmpty(CellarFloorValidator.Validate(stub), "the stub is exempt from the bound");
         }
 
@@ -445,7 +446,7 @@ namespace SleepingCalamity.Tests.EditMode
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             foreach (var (seed, floor) in new (uint, int)[] { (12345, 1), (12345, 2), (7, 3), (99, 2) })
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                 CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 Assert.AreEqual(d.DressingHash(), b.Dressing.DressingHash());
@@ -478,7 +479,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Builder_SameLayoutBuildsTheSameHierarchy()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            CellarFloorLayout l = CellarFloorGenerator.Generate(4242, 3);
+            CellarFloorLayout l = CellarFloorGenerator.Layout(4242, 3);
             string Names(CellarFloorBuild b) => string.Join("|", b.Root.GetComponentsInChildren<Transform>(true).Select(t => t.name));
             CellarFloorBuild x = CellarFloorBuilder.Build(l, null), y = CellarFloorBuilder.Build(l, null);
             Assert.AreEqual(Names(x), Names(y));
@@ -492,7 +493,7 @@ namespace SleepingCalamity.Tests.EditMode
             int darkLamps = 0, darkFloors = 0, litLamps = 0, litFloors = 0;
             for (uint seed = 0; seed < 600 && darkFloors < 6; seed++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(seed, 2); bool dark = CellarAtmosphere.IsDarkFloor(seed, 2);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(seed, 2); bool dark = CellarAtmosphere.IsDarkFloor(seed, 2);
                 if (!dark && litFloors >= 6) continue;
                 CellarFloorBuild b = CellarFloorBuilder.Build(l, null);
                 if (dark) { darkLamps += b.Lamps; darkFloors++; } else { litLamps += b.Lamps; litFloors++; }

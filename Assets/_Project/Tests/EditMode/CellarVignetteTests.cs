@@ -107,7 +107,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var placed = new Dictionary<string, int>(); int dropped = 0, total = 0;
             for (uint seed = 0; seed < seeds; seed++)
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     dropped += d.DroppedVignettes;
@@ -132,7 +132,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Placement_ClearOfHealPoint_StairExit_AndEntry(int seeds)
         {
             for (uint seed = 0; seed < seeds; seed++)
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     var heal = CellarHealing.PointFor(l, d);
@@ -149,7 +149,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Placement_NoVignetteOnChunkSolidCells(int seeds)
         {
             for (uint seed = 0; seed < seeds; seed++)
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     if (d.Vignettes.Count == 0) continue;
@@ -164,7 +164,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Placement_NoVignetteOnClutterCells(int seeds)
         {
             for (uint seed = 0; seed < seeds; seed++)
-                for (int f = 1; f <= 3; f++)
+                foreach (int f in CellarTestFloors.DiveFloors)
                 {
                     CellarFloorLayout l = CellarTestFloors.Layout(seed, f); CellarFloorDressing d = CellarTestFloors.Dressing(seed, f);
                     if (d.Vignettes.Count == 0) continue;
@@ -177,15 +177,16 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void VignetteLayer_Golden_Seed12345()
         {
-            var got = new ulong[4];
-            for (int f = 1; f <= 3; f++)
+            var got = new ulong[8];
+            foreach (int f in CellarTestFloors.DiveFloors)
             {
                 var h = Fnv1a64.Create();
-                foreach (PlacedVignette v in CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(12345, f)).Vignettes) { h.Append(v.Vignette.Id); h.AppendInt32LE(v.RoomIndex); h.AppendInt32LE(v.Cell.X); h.AppendInt32LE(v.Cell.Y); h.AppendInt32LE(v.Turns); }
+                foreach (PlacedVignette v in CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(12345, f)).Vignettes) { h.Append(v.Vignette.Id); h.AppendInt32LE(v.RoomIndex); h.AppendInt32LE(v.Cell.X); h.AppendInt32LE(v.Cell.Y); h.AppendInt32LE(v.Turns); }
                 got[f] = h.Value;
             }
-            string all = got[1] + "UL, " + got[2] + "UL, " + got[3] + "UL";   // pinned by procgen 5 (vignettes), deliberate; re-pinned by rooms-v2 (pool resize)
-            Assert.AreEqual(14852248434877188158UL, got[1], "floor 1; actual " + all); Assert.AreEqual(6689960279117355483UL, got[2], "floor 2; actual " + all); Assert.AreEqual(6130115571227783347UL, got[3], "floor 3; actual " + all);
+            string all = got[1] + "UL, " + got[2] + "UL, " + got[4] + "UL, " + got[6] + "UL, " + got[7] + "UL";   // pinned by procgen 5 (vignettes), deliberate; re-pinned by rooms-v2 and by plan 3 task 3 (the dive floors are 1, 2, 4, 6, 7)
+            Assert.AreEqual(1912106121001027624UL, got[1], "floor 1; actual " + all); Assert.AreEqual(16908555656275810401UL, got[2], "floor 2; actual " + all); Assert.AreEqual(3617152541879621164UL, got[4], "floor 4; actual " + all);
+            Assert.AreEqual(1977110918901667070UL, got[6], "floor 6; actual " + all); Assert.AreEqual(14695981039346656037UL, got[7], "floor 7; actual " + all);
         }
     }
 }

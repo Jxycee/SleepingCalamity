@@ -155,7 +155,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 Bot.Tick(Step);
                 foreach (FollowerBot f in Followers) f.Tick(Step);
                 MaxFloor = Mathf.Max(MaxFloor, Bot.Floor);
-                if (Bot.WentHome && Bot.Floor == 0) { DivesHome++; Bot.WentHome = false; }   // another dive
+                if (Bot.Finished && Bot.Floor == 0) { DivesHome++; Bot.Finished = false; }   // another dive
                 ObserveVitals(Step);
                 EveryFrame?.Invoke(this);
                 if (Seconds >= nextSecond)
@@ -265,7 +265,7 @@ namespace SleepingCalamity.Tests.PlayMode
             sb.AppendLine();
             sb.AppendLine("## Headline");
             sb.AppendLine();
-            sb.AppendLine($"- Deepest floor reached: {MaxFloor}; floors left (host bot): {Bot.FloorsCleared}; dives taken home: {DivesHome + (Bot.WentHome ? 1 : 0)}");
+            sb.AppendLine($"- Deepest floor reached: {MaxFloor}; floors left (host bot): {Bot.FloorsCleared}; dives finished: {DivesHome + (Bot.Finished ? 1 : 0)}");
             sb.AppendLine($"- Dives failed: {Bot.DiveFails} (host bot: after low HP {Bot.Deaths}, near a floor/traversal fault {Bot.FaultDeaths})");
             sb.AppendLine($"- Hero downs: {Downs.Values.Sum()} ({string.Join(", ", Downs.OrderBy(k => k.Key).Select(k => "client " + k.Key + ": " + k.Value))}); out: {Outs.Values.Sum()}; revives (downed back up): {Revives.Values.Sum()}");
             sb.AppendLine($"- Time downed: {DownedSeconds.Values.Sum():0} s total ({string.Join(", ", DownedSeconds.OrderBy(k => k.Key).Select(k => "client " + k.Key + ": " + k.Value.ToString("0") + " s"))})");

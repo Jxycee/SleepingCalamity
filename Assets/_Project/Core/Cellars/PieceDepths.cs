@@ -1,5 +1,5 @@
 // Core/Cellars/PieceDepths.cs: which floor depth each piece and person lives on, decided once per world (spec decision 10, section 4.4; DC1 Atla style). Pure C#.
-// Fixed floors are kept; random ones land on an authored or generated floor of their half (never a set piece or the boss). Deterministic per world seed.
+// Fixed floors are kept; random ones land on a generated floor of their half (floors 2 and 4, or 6 and 7; never the authored floor 1, a set piece or the boss). Deterministic per world seed.
 using System;
 using System.Collections.Generic;
 
@@ -25,7 +25,7 @@ namespace SleepingCalamity.Core
             {
                 if (UndercroftPlan.IsFirstHalf(f) == secondHalf) continue;
                 UndercroftFloorKind kind = UndercroftPlan.KindOf(f);
-                if (kind == UndercroftFloorKind.Authored || kind == UndercroftFloorKind.Generated) floors.Add(f);
+                if (kind == UndercroftFloorKind.Generated) floors.Add(f);   // floor 1 is authored and 3/5 are set pieces: random pieces only land on generated floors (decision 10)
             }
             return floors;
         }

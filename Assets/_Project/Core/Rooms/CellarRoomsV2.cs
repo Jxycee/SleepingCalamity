@@ -31,6 +31,7 @@ namespace SleepingCalamity.Core
             new SmallPartyRoom(CellarBakeryPool.FlourId, 4, BakeryReason),
             new SmallPartyRoom(CellarBakeryPool.KneadingId, 4, BakeryReason),
             new SmallPartyRoom(CellarBakeryPool.AntechamberId, 4, BakeryReason),
+            new SmallPartyRoom(CellarBakeryPool.AntechamberCalmId, 4, BakeryReason),
         }.AsReadOnly());
 
         public static RoomDataV2 Find(string id) { foreach (RoomDataV2 r in All) if (r.Base.Id == id) return r; return null; }

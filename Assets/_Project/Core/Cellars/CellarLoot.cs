@@ -17,6 +17,14 @@ namespace SleepingCalamity.Core
     {
         public const int RoomKeyId = 9001, GateKeyId = 9002;   // reserved ids, never in the table
         public const int MinRank = 1, MaxRank = 5;
+        // Plan 3 task 5 (decisions 4, 5, 12-14). GoldId is a negative sentinel: a purse roll is diverted to the player's dive gold before PlayerBag.Add ever sees it (Add rejects ids <= 0). BootsId is the one
+        // Gear item (+5% run speed, read by the owner), one pair per player. PLACEHOLDERS: the purse size and the roll odds.
+        public const int GoldId = -1, BootsId = 120;
+        public const int GoldPurse = 25;          // placeholder: gold in one purse
+        public const int GoldOneIn = 4;           // placeholder: a purse replaces one chest roll in four
+        public const int BootsOneIn = 12;         // placeholder: boots replace one eligible roll in twelve ...
+        public const int DeepBootsFactor = 3;     // placeholder: ... three times as often on the deep floors (BootsDeepFloor and below)
+        public const int BootsDeepFloor = 6;
         const float Spread = 1.5f;                              // half-width of the triangle around the floor's peak rank
         static readonly float[] Peak = { 1.5f, 2.2f, 3.0f, 3.6f };   // floors 1-4
 
@@ -31,6 +39,8 @@ namespace SleepingCalamity.Core
 
         public static string NameOf(int id)
         {
+            if (id == BootsId) return "Sprinter's Boots";
+            if (id == GoldId) return "Gold Purse";
             if (id == RoomKeyId) return "Room Key";
             if (id == GateKeyId) return "Gate Key";
             foreach (LootItem i in Items) if (i.Id == id) return i.Name;
@@ -77,7 +87,11 @@ namespace SleepingCalamity.Core
 
         // One player's copy of a loot chest (spec decision 39; never for the key chest): the category band is the chest's, the same for every player,
         // but the rank draw and the item pick come from a stream of their own per player slot (0-3), so no other stream moves.
-        public static int RollFor(uint seed, int floor, int chestIndex, int playerSlot)
+        public static int RollFor(uint seed, int floor, int chestIndex, int playerSlot) => RollFor(seed, floor, chestIndex, playerSlot, 0);
+
+        // rankBonus (momentum, plan 3 decision 13) lifts the rolled rank after the band clamp, capped at MaxRank; 0 (or less) is exactly the roll of before, so no seed's pick moves.
+        // The gold purse and the boots are NOT rolled here (that would move every existing pick): RollChest layers them on top.
+        public static int RollFor(uint seed, int floor, int chestIndex, int playerSlot, int rankBonus)
         {
             if (playerSlot < 0 || playerSlot > 3) throw new System.ArgumentOutOfRangeException(nameof(playerSlot), playerSlot, "player slot 0-3");
             var rng = new Pcg32(Rng.Derive(seed, "cellars.loot.player", ((ulong)floor << 32) | ((ulong)(uint)chestIndex << 2) | (uint)playerSlot));
@@ -85,10 +99,26 @@ namespace SleepingCalamity.Core
             int lo = CellarLootMixTuning.BandLo[(int)cat], hi = CellarLootMixTuning.BandHi[(int)cat];
             int drawn = DrawRank(ref rng, floor);
             int rank = drawn < lo ? lo : drawn > hi ? hi : drawn;
+            if (rankBonus > 0) rank = System.Math.Min(MaxRank, rank + rankBonus);
             int n = 0; foreach (LootItem i in Items) if (i.Rank == rank) n++;
             int pick = rng.Range(0, n);
             foreach (LootItem i in Items) if (i.Rank == rank && pick-- == 0) return i.Id;
             return Items[0].Id;
+        }
+
+        // What one player's loot chest holds (never for the key chest): GoldId (a purse, one roll in GoldOneIn), else BootsId (a separate roll, only in a Fine or Rare chest, only for a player without
+        // boots, more often on the deep floors), else RollFor. Each roll has its own stream per (floor, chest, player slot), so no other stream moves.
+        public static int RollChest(uint seed, int floor, int chestIndex, int playerSlot, int rankBonus = 0, bool ownsBoots = false)
+        {
+            if (playerSlot < 0 || playerSlot > 3) throw new System.ArgumentOutOfRangeException(nameof(playerSlot), playerSlot, "player slot 0-3");
+            ulong key = ((ulong)floor << 32) | ((ulong)(uint)chestIndex << 2) | (uint)playerSlot;
+            var gold = new Pcg32(Rng.Derive(seed, "cellars.loot.gold", key));
+            if (gold.Range(0, GoldOneIn) == 0) return GoldId;
+            var boots = new Pcg32(Rng.Derive(seed, "cellars.loot.boots", key));
+            int roll = boots.Range(0, BootsOneIn * DeepBootsFactor);   // drawn either way so the stream does not depend on the floor
+            if (!ownsBoots && roll < (floor >= BootsDeepFloor ? DeepBootsFactor : 1)
+                && CellarLootMix.CategoryFor(seed, floor, chestIndex, CellarLootMix.KeyFlagsOfDive(seed, floor)) != LootCategory.Common) return BootsId;
+            return RollFor(seed, floor, chestIndex, playerSlot, rankBonus);
         }
 
         // 0 for an unknown id or a key.
@@ -98,6 +128,7 @@ namespace SleepingCalamity.Core
         public static DiveItemKind KindOf(int itemId)
         {
             if (itemId == RoomKeyId || itemId == GateKeyId) return DiveItemKind.Key;
+            if (itemId == BootsId) return DiveItemKind.Gear;
             foreach (LootItem i in Items) if (i.Id == itemId) return DiveItemKind.Large;
             return DiveItemKind.Usable;
         }

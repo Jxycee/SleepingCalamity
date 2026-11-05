@@ -72,5 +72,45 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(r.IdolActivated, Is.False, "the idol is found again each dive");
             Assert.That(r.PriceFor(UndercroftPlan.BossFloor, BossRetry.GoldPrice - 1), Is.EqualTo(RetryPrice.None), "too little gold and no idol");
         }
+
+        [Test]
+        public void Momentum_CaptureRestore_RoundTrips()
+        {
+            var m = new DiveMomentum();
+            m.OnDiveStart(UndercroftPlan.FirstFloor);
+            m.OnPushOn();
+            DiveMomentum.State st = m.Capture();
+            Assert.That(st.Unbroken, Is.True);
+            Assert.That(st.PushedOn, Is.True);
+            Assert.That(st.WalkedToBank, Is.True);
+
+            var r = new DiveMomentum();
+            r.Restore(st);
+            Assert.That(r.Unbroken, Is.True);
+            Assert.That(r.PushedOn, Is.True);
+            Assert.That(r.ChestRankBonus(6), Is.EqualTo(1));
+            Assert.That(r.EndChestRoomOpens(true), Is.True);
+            Assert.That(r.Capture(), Is.EqualTo(st));
+        }
+
+        [Test]
+        public void BossRetry_CaptureRestore_RoundTrips()
+        {
+            var r = new BossRetry();
+            r.OnDiveStart();
+            r.ActivateIdol();
+            int gold = 0;
+            r.TryRetry(UndercroftPlan.BossFloor, ref gold);
+            r.ActivateIdol();
+            BossRetry.State st = r.Capture();
+            Assert.That(st.UsedThisDive, Is.True);
+            Assert.That(st.IdolActivated, Is.True);
+
+            var q = new BossRetry();
+            q.Restore(st);
+            Assert.That(q.UsedThisDive, Is.True);
+            Assert.That(q.IdolActivated, Is.True);
+            Assert.That(q.PriceFor(UndercroftPlan.BossFloor, 9999), Is.EqualTo(RetryPrice.None), "already used");
+        }
     }
 }

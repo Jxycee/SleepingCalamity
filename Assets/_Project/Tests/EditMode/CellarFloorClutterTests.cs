@@ -257,9 +257,9 @@ namespace SleepingCalamity.Tests.EditMode
             for (uint seed = 0; seed < seeds; seed++)
                 for (int floor = 1; floor <= 4; floor++)
                 {
-                    CellarFloorLayout l = CellarFloorGenerator.Generate(seed, floor);
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor);
                     CellarFloorDressing d = CellarFloorDressing.Resolve(l);
-                    CellarFloorClutter a = CellarFloorClutter.Resolve(l, d), b = CellarFloorClutter.Resolve(CellarFloorGenerator.Generate(seed, floor), CellarFloorDressing.Resolve(CellarFloorGenerator.Generate(seed, floor)));
+                    CellarFloorClutter a = CellarFloorClutter.Resolve(l, d), b = CellarFloorClutter.Resolve(CellarFloorGenerator.Layout(seed, floor), CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(seed, floor)));
                     Assert.AreEqual(a.ClutterHash(), b.ClutterHash(), "seed " + seed + " floor " + floor);
                     Assert.AreEqual(a.Rows.Count, b.Rows.Count);
                     Assert.AreEqual(string.Join("|", a.Rows.Select(r => r.Id)), string.Join("|", b.Rows.Select(r => r.Id)));
@@ -270,14 +270,14 @@ namespace SleepingCalamity.Tests.EditMode
         public void ClutterVariesWithSeedAndFloor()
         {
             var hashes = new HashSet<ulong>();
-            for (uint s = 0; s < 200; s++) { var l = CellarFloorGenerator.Generate(s, 1); hashes.Add(CellarFloorClutter.Resolve(l, CellarFloorDressing.Resolve(l)).ClutterHash()); }
+            for (uint s = 0; s < 200; s++) { var l = CellarFloorGenerator.Layout(s, 1); hashes.Add(CellarFloorClutter.Resolve(l, CellarFloorDressing.Resolve(l)).ClutterHash()); }
             Assert.Greater(hashes.Count, 150, "different seeds should rarely share clutter");
-            var l1 = CellarFloorGenerator.Generate(12345, 1); var l2 = CellarFloorGenerator.Generate(12345, 2);
+            var l1 = CellarFloorGenerator.Layout(12345, 1); var l2 = CellarFloorGenerator.Layout(12345, 2);
             Assert.AreNotEqual(CellarFloorClutter.Resolve(l1, CellarFloorDressing.Resolve(l1)).ClutterHash(), CellarFloorClutter.Resolve(l2, CellarFloorDressing.Resolve(l2)).ClutterHash());
         }
 
         // Pinned from the first run, like the layout goldens: any change to the placement rules changes it on purpose (the round-2 look needs a new capture then).
-        const ulong GoldenClutter12345Floor1 = 9758590380791923540UL, GoldenClutter12345Floor2 = 9804857279854483198UL, GoldenClutter12345Floor3 = 17968869055869715529UL;   // re-pinned by rooms-v2 (pool resize);  re-pinned 2026-11-01: procgen items 4 (chunks) + 5 (vignettes), deliberate
+        const ulong GoldenClutter12345Floor1 = 17208095036457535932UL, GoldenClutter12345Floor2 = 6865881545623823293UL, GoldenClutter12345Floor3 = 8405009567747678778UL;   // re-pinned by plan 3 task 3/4 (floor 1 authored, floor 2 without the lamp nook, floor 3 the bakery);   // re-pinned by rooms-v2 (pool resize);  re-pinned 2026-11-01: procgen items 4 (chunks) + 5 (vignettes), deliberate
 
         [TestCase(CellarTestFloors.FastSeeds), TestCase(1000, Category = "Soak")]
         public void Clutter_NeverStandsOnChunkSolidCells(int seeds)
@@ -295,14 +295,14 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Golden_Seed12345_ClutterHash()
         {
-            ulong H(int f) { var l = CellarFloorGenerator.Generate(12345, f); var d = CellarFloorDressing.Resolve(l); return CellarFloorClutter.Resolve(l, d, CellarRoomChunks.Resolve(l, d)).ClutterHash(); }
+            ulong H(int f) { var l = CellarFloorGenerator.Layout(12345, f); var d = CellarFloorDressing.Resolve(l); return CellarFloorClutter.Resolve(l, d, CellarRoomChunks.Resolve(l, d)).ClutterHash(); }
             Assert.That(H(1) == GoldenClutter12345Floor1 && H(2) == GoldenClutter12345Floor2 && H(3) == GoldenClutter12345Floor3,
                 "golden changed; actual floor 1 = " + H(1) + "UL, floor 2 = " + H(2) + "UL, floor 3 = " + H(3) + "UL");
         }
 
         // The layout and dressing goldens belong to the room pool and Q12; the clutter pass must not move them (it only reads them).
-        const ulong GoldenLayout12345Floor1 = 932123446153315579UL, GoldenLayout12345Floor2 = 5927757008498482560UL, GoldenLayout12345Floor3 = 10153009738242674868UL;   // re-pinned by rooms-v2 (pool resize);  re-pinned by procgen item 2 (layout presets, deliberate)
-        const ulong GoldenDressing12345Floor1 = 12105747063451063287UL;   // re-pinned by rooms-v2 (pool resize); was 7289301962720901386
+        const ulong GoldenLayout12345Floor1 = 8462212200985256396UL, GoldenLayout12345Floor2 = 16607234616487640366UL, GoldenLayout12345Floor3 = 3485229907679376271UL;   // re-pinned by plan 3 task 3/4;   // re-pinned by rooms-v2 (pool resize);  re-pinned by procgen item 2 (layout presets, deliberate)
+        const ulong GoldenDressing12345Floor1 = 6216606645011355897UL;   // re-pinned by rooms-v2 (pool resize); was 7289301962720901386
 
         [Test]
         public void Resolving_DoesNotMoveLayoutOrDressingHashes()
@@ -310,7 +310,7 @@ namespace SleepingCalamity.Tests.EditMode
             var expect = new[] { GoldenLayout12345Floor1, GoldenLayout12345Floor2, GoldenLayout12345Floor3 };
             for (int f = 1; f <= 3; f++)
             {
-                CellarFloorLayout l = CellarFloorGenerator.Generate(12345, f);
+                CellarFloorLayout l = CellarFloorGenerator.Layout(12345, f);
                 CellarFloorDressing d = CellarFloorDressing.Resolve(l);
                 ulong lh = l.LayoutHash(), dh = d.DressingHash();
                 Assert.AreEqual(expect[f - 1], lh, "layout golden, floor " + f);

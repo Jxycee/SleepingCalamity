@@ -13,6 +13,9 @@ namespace SleepingCalamity.Core
 
         public static bool IsBankable(DiveItemKind kind) => kind != DiveItemKind.Key && kind != DiveItemKind.Progress;
 
+        // Spec 4.5: weapons and large items stir the dive; usables, gear, the satchel, keys and progress items do not.
+        public static bool IsStirValuable(DiveItemKind kind) => kind == DiveItemKind.Weapon || kind == DiveItemKind.Large;
+
         public static int TotalSlots(int players) => players switch
         {
             1 => 3,
@@ -32,6 +35,7 @@ namespace SleepingCalamity.Core
         // The 3-player extra slot's owner: a seeded pick among the present players, skipping the previous owner (-1 = none).
         public static int PickExtraSlotOwner(ulong diveSeed, IReadOnlyList<int> presentSlots, int previousOwner)
         {
+            if (presentSlots == null || presentSlots.Count == 0) return -1;
             var candidates = new List<int>();
             foreach (int s in presentSlots) if (s != previousOwner) candidates.Add(s);
             if (candidates.Count == 0) candidates.AddRange(presentSlots);

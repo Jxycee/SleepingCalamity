@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Newtonsoft.Json;
 using NUnit.Framework;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
@@ -564,6 +565,336 @@ namespace SleepingCalamity.Tests.EditMode
             BagsSaveRules.Rename(bags, new PlayerKey(IdentityKind.Local, "nobody"), new PlayerKey(IdentityKind.Local, "x"));
             Assert.That(bags.Players.Count, Is.EqualTo(2));
             BagsSaveRules.Rename(null, new PlayerKey(IdentityKind.Local, "a"), new PlayerKey(IdentityKind.Local, "b"));
+        }
+
+        // ---- plan 3 task 6: the dive section's v2 fields and the optional "suspend" section ----
+
+        static SuspendSave FullSuspend() => new SuspendSave
+        {
+            Seed = uint.MaxValue, Floor = 5, Phase = (int)DivePhase.BankRoom, BankChosen = false, StartedAtBank = true, ClearedMask = 0b11111, ExtraSlotOwner = "Ugs:bbb",
+            Stir = new SuspendStirSave { FloorMask = 0b1111, Valuables = 6, ValuablesBaseline = 2, SecondHalf = true, ExtraEnemy = true, Hunter = true, CollapseUsed = true, Running = true, SecondsLeft = 41.5f, RewardCarry = 12.25f },
+            Momentum = new SuspendMomentumSave { Unbroken = true, PushedOn = false, WalkedToBank = true },
+            Retry = new SuspendRetrySave { UsedThisDive = true, IdolActivated = true },
+            PresentIds = { "Ugs:aaa", "Ugs:bbb" },
+            Bags =
+            {
+                new SuspendedBag
+                {
+                    Identity = 1, Id = "aaa", Carried = { 104, 105 }, BankedThisDive = { new LootCountSave { ItemId = 101, Count = 2 } }, DiveGold = 17,
+                    OpenedChests = (1UL << 63) | 5UL, ChestSeed = uint.MaxValue, ChestFloor = 3, CarriedSatchel = new SatchelSave { Floor = 3, Items = { 106 } }, Picks = { 1, PlayerBag.SatchelPick },
+                },
+                new SuspendedBag { Identity = 1, Id = "bbb", Carried = { 110 } },
+            },
+        };
+
+        const string GoodBagJson = "{ \"identity\": 1, \"id\": \"aaa\", \"carried\": [104], \"diveGold\": 3 }";
+
+        string WithSection(string name, string json) => GoldenV1.Replace("\"players\"", "\"" + name + "\": " + json + ", \"players\"");
+
+        // A suspend section in a world whose dive is in progress (plan 3 task 8a: a suspend without a dive in progress is stale and the clean drops it).
+        string WithSuspend(string json) => WithSection("suspend", json).Replace("\"players\"", "\"dive\": { \"inDive\": true }, \"players\"");
+
+        // Catches: a build that can no longer read the v1 format because of the plan 3 fields, or the golden file gaining a suspend or dive section on load and save.
+        [Test]
+        public void GoldenV1Fixture_StillPassesUnchanged()
+        {
+            File.WriteAllText(_path, GoldenV1);
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.Empty);
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Current.Suspend, Is.Null);
+            Assert.That(store.Current.Dive, Is.Null);
+            store.MarkDirty(); store.FlushIfDirty();
+            Assert.That(File.ReadAllText(_path), Does.Not.Contain("\"suspend\""), "a world with no suspend writes no suspend key");
+            Assert.That(File.ReadAllText(_path), Does.Not.Contain("checkpointHeld").And.Not.Contain("pieceDepths"), "and no dive section appears for a world that has none");
+            Assert.That(GoldenV1, Does.Not.Contain("suspend"), "and the fixture itself was not edited");
+        }
+
+        // Catches: the suspend section altered through the real file path (a uint seed, a ulong chest mask with bit 63, floats, nested states, lists), or Clean changing a good one.
+        [Test]
+        public void Suspend_RoundTripsThroughTheStore()
+        {
+            WorldSaveStore store = Load();
+            WorldSave w = WorldSaveRules.New(7UL);
+            w.Players = WorldSaveStoreTestsPlayers();
+            w.Dive = new DiveSave { InDive = true };   // a suspend belongs to a dive in progress
+            w.Suspend = FullSuspend();
+            store.Replace(w);
+            Assert.That(store.FlushIfDirty(), Is.True);
+            Assert.That(File.ReadAllText(_path), Does.Contain("\"suspend\""));
+
+            WorldSaveStore again = Load();
+            Assert.That(again.Rejected, Is.Empty);
+            SuspendSave back = again.Current.Suspend;
+            Assert.That(back, Is.Not.Null);
+            Assert.That(JsonConvert.SerializeObject(back), Is.EqualTo(JsonConvert.SerializeObject(FullSuspend())), "every field survives the file");
+            Assert.That(back.Bags[0].OpenedChests, Is.EqualTo((1UL << 63) | 5UL));
+            Assert.That(back.Seed, Is.EqualTo(uint.MaxValue));
+            Assert.That(back.Stir.SecondsLeft, Is.EqualTo(41.5f));
+        }
+
+        // Catches: the dive section's new fields lost, rewritten or recomputed on the way through the file, and an old dive section (no new fields) being rejected.
+        [Test]
+        public void DiveV2Fields_RoundTrip_AndAnOldDiveSectionReadsAsNotHeld()
+        {
+            WorldSaveStore store = Load();
+            WorldSave w = WorldSaveRules.New(7UL);
+            w.Players = WorldSaveStoreTestsPlayers();
+            w.Dive = new DiveSave { ClearedMask = 0b10_0001_0011, CheckpointHeld = true, BossBeaten = true, ExtraSlotOwner = "Ugs:aaa", PieceDepths = new List<PieceDepthSave> { new PieceDepthSave { Id = 100, Floor = 4 }, new PieceDepthSave { Id = 400, Floor = 3 } } };
+            store.Replace(w);
+            store.FlushIfDirty();
+            WorldSaveStore again = Load();
+            Assert.That(again.Rejected, Is.Empty);
+            DiveSave d = again.Current.Dive;
+            Assert.That(d.ClearedMask, Is.EqualTo(0b10_0001_0011));
+            Assert.That(d.CheckpointHeld, Is.True); Assert.That(d.BossBeaten, Is.True); Assert.That(d.ExtraSlotOwner, Is.EqualTo("Ugs:aaa"));
+            Assert.That(d.PieceDepths.Select(x => x.Id + ":" + x.Floor), Is.EqualTo(new[] { "100:4", "400:3" }));
+
+            // OldSave_NoCheckpointField_ReadsAsNotHeld: a dive section written before these fields
+            File.WriteAllText(_path, WithSection("dive", "{ \"inDive\": false, \"clearedMask\": 3, \"checkpointReached\": true }"));
+            WorldSaveStore old = Load();
+            Assert.That(old.Rejected, Is.Empty, "an old save is not damaged");
+            Assert.That(old.Current.Dive.CheckpointHeld, Is.False);
+            Assert.That(old.Current.Dive.BossBeaten, Is.False);
+            Assert.That(old.Current.Dive.ExtraSlotOwner, Is.Null);
+            Assert.That(old.Current.Dive.PieceDepths, Is.Null, "missing, so the host assigns them once and saves them");
+            Assert.That(old.Current.Dive.CheckpointReached, Is.False, "the old 4-floor checkpoint reads as not held (task 12)");
+            Assert.That(old.Current.Dive.ClearedMask, Is.EqualTo(3));
+        }
+
+        // Catches (sc-netcode "World save"): a mistyped suspend section failing the whole WorldSave parse, so the world rolls back to .bak.
+        [Test]
+        public void Suspend_MistypedSection_KeepsTheRestOfTheFile()
+        {
+            File.WriteAllText(_path, WithSection("suspend", "\"oops\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }));
+            Assert.That(store.Current.Suspend, Is.Null);
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // Catches: one mistyped bag record (a string where the dive gold is) costing the other players' records, the section, or the file.
+        [Test]
+        public void Suspend_OneMistypedBag_KeepsTheOthers()
+        {
+            string section = "{ \"seed\": 5, \"floor\": 5, \"phase\": 2, \"presentIds\": [\"Ugs:aaa\", 7, \"Ugs:bbb\"], \"bags\": [ " + GoodBagJson + ", { \"identity\": 1, \"id\": \"bbb\", \"diveGold\": \"lots\" }, { \"identity\": 1, \"id\": \"ccc\", \"carried\": [110] } ] }";
+            File.WriteAllText(_path, WithSuspend(section));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }), "named so the original file is kept");
+            SuspendSave s = store.Current.Suspend;
+            Assert.That(s, Is.Not.Null);
+            Assert.That(s.Bags.Select(b => b.Id), Is.EqualTo(new[] { "aaa", "ccc" }));
+            Assert.That(s.Bags[0].Carried, Is.EqualTo(new[] { 104 }));
+            Assert.That(s.PresentIds, Is.EqualTo(new[] { "Ugs:aaa", "Ugs:bbb" }), "the mistyped present id went alone");
+            Assert.That(s.Floor, Is.EqualTo(5));
+        }
+
+        // Catches: a bad floor (a string, or out of range) in the suspend section taking the dive and bags sections with it.
+        [Test]
+        public void Suspend_BadFloor_DropsOnlyTheSuspend()
+        {
+            foreach (string floor in new[] { "\"five\"", "99" })
+            {
+                string suspend = "{ \"seed\": 5, \"floor\": " + floor + ", \"phase\": 2, \"bags\": [ " + GoodBagJson + " ] }";
+                string text = GoldenV1.Replace("\"players\"", "\"suspend\": " + suspend + ", \"dive\": { \"clearedMask\": 3, \"inDive\": true }, \"bags\": { \"players\": [ { \"identity\": 1, \"id\": \"aaa\", \"gold\": 6 } ] }, \"players\"");
+                File.WriteAllText(_path, text);
+                WorldSaveStore store = Load();
+                Assert.That(store.Rejected, Does.Contain(TownSaveRules.SectionSuspend), floor);
+                Assert.That(store.Current.Suspend, Is.Null, floor);
+                Assert.That(store.Current.Dive.ClearedMask, Is.EqualTo(3), floor);
+                // the dropped suspend's dive record is settled as a failed dive: half of its 3 dive gold (1) kept, the carried 104 waits in the satchel
+                PlayerBagSave bag = store.Current.Bags.Players.Single();
+                Assert.That(bag.Gold, Is.EqualTo(7), floor);
+                Assert.That(bag.Satchel.Items, Is.EqualTo(new[] { 104 }), floor);
+                Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2), floor);
+            }
+        }
+
+        // Catches: one mistyped new member of the dive section (checkpointHeld) or one mistyped piece depth costing the dive section, whose loss would put every piece back in stock.
+        [Test]
+        public void Dive_MistypedNewMember_AndOneBadDepth_KeepTheRest()
+        {
+            string dive = "{ \"clearedMask\": 3, \"checkpointHeld\": \"yes\", \"bossBeaten\": true, \"pieceDepths\": [ { \"id\": 100, \"floor\": 4 }, { \"id\": 101, \"floor\": \"deep\" }, { \"id\": 400, \"floor\": 3 } ] }";
+            File.WriteAllText(_path, WithSection("dive", dive));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionDive }));
+            DiveSave d = store.Current.Dive;
+            Assert.That(d.ClearedMask, Is.EqualTo(3));
+            Assert.That(d.CheckpointHeld, Is.False, "the mistyped member alone is gone");
+            Assert.That(d.BossBeaten, Is.True);
+            Assert.That(d.PieceDepths.Select(x => x.Id), Is.EqualTo(new[] { 100, 400 }));
+        }
+
+        // Catches: a scalar where a new list belongs ("pieceDepths": "oops") deleting the whole dive section (its banked pieces and cleared floors with it), or the suspend section.
+        [Test]
+        public void NewListFields_HoldingAScalar_CostOnlyThatField()
+        {
+            File.WriteAllText(_path, WithSection("dive", "{ \"clearedMask\": 3, \"bankedPieces\": [100], \"pieceDepths\": \"oops\" }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionDive }));
+            Assert.That(store.Current.Dive, Is.Not.Null, "the dive section stays");
+            Assert.That(store.Current.Dive.ClearedMask, Is.EqualTo(3));
+            Assert.That(store.Current.Dive.BankedPieces, Is.EqualTo(new[] { 100 }));
+            Assert.That(store.Current.Dive.PieceDepths, Is.Null);
+
+            File.WriteAllText(_path, WithSuspend("{ \"seed\": 5, \"floor\": 5, \"phase\": 2, \"presentIds\": \"oops\", \"bags\": 7 }"));
+            store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { TownSaveRules.SectionSuspend }));
+            Assert.That(store.Current.Suspend, Is.Not.Null, "the suspend section stays");
+            Assert.That(store.Current.Suspend.Floor, Is.EqualTo(5));
+            Assert.That(store.Current.Suspend.Bags, Is.Empty);
+            Assert.That(store.Current.Suspend.PresentIds, Is.Empty);
+        }
+
+        static WorldPlayersSave WorldSaveStoreTestsPlayers()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { new PlayerKey(IdentityKind.Ugs, "aaa"), new PlayerKey(IdentityKind.Ugs, "bbb") }, out WorldPlayers players);
+            return players.ToSave();
+        }
+
+        static HostWorld HostFor(WorldKind kind, params string[] ids)
+        {
+            var host = new HostWorld();
+            var keys = new PlayerKey[ids.Length];
+            for (int i = 0; i < ids.Length; i++) keys[i] = new PlayerKey(IdentityKind.Ugs, ids[i]);
+            WorldPlayers.TryCreate(kind, keys, out WorldPlayers players);
+            host.Load(players);
+            return host;
+        }
+
+        sealed class SnapshotSource : HostWorld.ITownSource
+        {
+            public TownSnapshot Live;
+            public TownSnapshot CaptureTown() => Live;
+            public void RestoreTown(TownSnapshot loaded) { Restored = loaded; }
+            public TownSnapshot Restored;
+        }
+
+        static WorldSave OldDiveWorld(ulong seed) => new WorldSave
+        {
+            WorldSeed = WorldSaveRules.SeedToHex(seed),
+            Dive = new DiveSave { ClearedMask = 1, BankedPieces = { 100 } },   // a dive section from before the plan 3 fields
+        };
+
+        // Catches: depths recomputed instead of saved (an old save assigned twice, a saved map replaced by the seed's), or a dive section invented for a world that has none
+        // (Reconcile would then read every piece as lost and hand them out for free).
+        [Test]
+        public void HostWorld_PieceDepths_AssignedOnceThenSaved_NeverRecomputed()
+        {
+            ulong seed = 1UL;
+            HostWorld host = HostFor(WorldKind.Multiplayer, "aaa", "bbb");
+            WorldSave file = OldDiveWorld(seed);
+            host.LoadTown(file);
+            IReadOnlyDictionary<int, int> assigned = PieceDepths.Assign(seed, PieceCatalog.Specs);
+            Assert.That(host.PieceFloors.OrderBy(kv => kv.Key).Select(kv => kv.Key + ":" + kv.Value), Is.EqualTo(assigned.OrderBy(kv => kv.Key).Select(kv => kv.Key + ":" + kv.Value)), "an old save with no depths: assigned from the seed");
+            Assert.That(file.Dive.PieceDepths, Is.Null, "loading does not write the file");
+
+            Assert.That(host.CaptureTownInto(file), Is.True);
+            Assert.That(file.Dive.PieceDepths.Count, Is.EqualTo(PieceCatalog.Specs.Count), "the first save writes them");
+            Assert.That(file.Dive.BankedPieces, Is.EqualTo(new[] { 100 }), "and nothing else of the dive section moved");
+
+            // a later load under a seed that would assign differently keeps the saved map
+            ulong other = 2UL;
+            while (other < 200 && PieceDepths.Assign(other, PieceCatalog.Specs).All(kv => assigned[kv.Key] == kv.Value)) other++;
+            Assert.That(PieceDepths.Assign(other, PieceCatalog.Specs).Any(kv => assigned[kv.Key] != kv.Value), Is.True, "premise: another seed assigns differently");
+            file.WorldSeed = WorldSaveRules.SeedToHex(other);
+            var again = HostFor(WorldKind.Multiplayer, "aaa", "bbb");
+            again.LoadTown(file);
+            foreach (KeyValuePair<int, int> kv in assigned) Assert.That(again.PieceFloors[kv.Key], Is.EqualTo(kv.Value), "piece " + kv.Key);
+
+            // a world with no dive section at all: depths are known, but no section is made up
+            var fresh = HostFor(WorldKind.Multiplayer, "aaa", "bbb");
+            var blank = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(seed) };
+            fresh.LoadTown(blank);
+            Assert.That(fresh.PieceFloors.Count, Is.EqualTo(PieceCatalog.Specs.Count));
+            Assert.That(fresh.Town.Dive, Is.Null);
+            fresh.CaptureTownInto(blank);
+            Assert.That(blank.Dive, Is.Null, "no dive section invented");
+            Assert.That(blank.Stock, Is.Null);
+        }
+
+        // Catches: a live capture (which knows none of the saved-only fields) wiping the saved depths, held checkpoint or extra-slot owner, or the saved suspend section.
+        [Test]
+        public void HostWorld_LegacySource_KeepsTheSavedV2FieldsAndSuspend()
+        {
+            HostWorld host = HostFor(WorldKind.Multiplayer, "aaa", "bbb");
+            WorldSave file = OldDiveWorld(1UL);
+            file.Dive.CheckpointHeld = true; file.Dive.BossBeaten = true; file.Dive.ExtraSlotOwner = "Ugs:bbb";
+            file.Suspend = FullSuspend();
+            file.Dive.InDive = true;   // a suspend belongs to a dive in progress
+            host.LoadTown(file);
+            Assert.That(host.Town.Suspend, Is.Not.Null);
+            var source = new SnapshotSource { Live = new TownSnapshot { Dive = new DiveSave { ClearedMask = 7, InDive = true } } };   // the hub's capture: no suspend, no v2 fields, the party still below
+            host.RegisterTownSource(source);
+            Assert.That(source.Restored.Suspend, Is.Not.Null, "the restoring source sees the loaded suspend");
+            Assert.That(source.Restored.Dive.PieceDepths, Is.Not.Null.And.Count.EqualTo(PieceCatalog.Specs.Count), "and the depths");
+
+            var target = new WorldSave { WorldSeed = file.WorldSeed };
+            host.CaptureTownInto(target);
+            Assert.That(target.Dive.ClearedMask, Is.EqualTo(7), "the live progress wins");
+            Assert.That(target.Dive.CheckpointHeld, Is.True);
+            Assert.That(target.Dive.BossBeaten, Is.True);
+            Assert.That(target.Dive.ExtraSlotOwner, Is.EqualTo("Ugs:bbb"));
+            Assert.That(target.Dive.PieceDepths.Count, Is.EqualTo(PieceCatalog.Specs.Count));
+            Assert.That(target.Suspend, Is.Not.Null, "a source that says nothing about the suspend keeps the saved one while its dive is in progress");
+            Assert.That(target.Suspend.Bags.Count, Is.EqualTo(2));
+
+            // the same source once the dive is over (plan 3 task 8a): a source that never says "known, none" can no longer keep a stale suspend alive
+            source.Live = new TownSnapshot { Dive = new DiveSave { ClearedMask = 0, InDive = false } };
+            host.CaptureTownInto(target);
+            Assert.That(target.Suspend, Is.Null, "no dive in progress: the saved suspend is stale and goes");
+        }
+
+        // Catches: the suspend section not reaching the file from a live source, an unrecorded player's record reaching it, a used suspend never being cleared, or being cleared by a source
+        // that merely said nothing.
+        [Test]
+        public void HostWorld_Suspend_WritesRecordedPlayersOnly_AndKnownNoneClearsIt()
+        {
+            HostWorld host = HostFor(WorldKind.Multiplayer, "aaa", "bbb");
+            host.LoadTown(new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL) });
+            SuspendSave live = FullSuspend();
+            live.Bags.Add(new SuspendedBag { Identity = 1, Id = "stranger", Carried = { 104 } });
+            live.PresentIds.Add("Ugs:stranger");
+            var source = new SnapshotSource { Live = new TownSnapshot { Suspend = live, SuspendKnown = true, Dive = new DiveSave { InDive = true } } };
+            host.RegisterTownSource(source);
+
+            var target = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL) };
+            Assert.That(host.CaptureTownInto(target), Is.True);
+            Assert.That(target.Suspend, Is.Not.Null);
+            Assert.That(target.Suspend.Bags.Select(b => b.Id), Is.EqualTo(new[] { "aaa", "bbb" }), "the stranger's record does not reach the file");
+            Assert.That(target.Suspend.PresentIds, Is.EqualTo(new[] { "Ugs:aaa", "Ugs:bbb" }));
+            Assert.That(live.Bags.Count, Is.EqualTo(3), "the source's own section is not changed");
+
+            source.Live = new TownSnapshot();   // says nothing: keeps it
+            host.CaptureTownInto(target);
+            Assert.That(target.Suspend, Is.Not.Null);
+
+            source.Live = new TownSnapshot { SuspendKnown = true };   // known: none (the suspend was used)
+            Assert.That(host.CaptureTownInto(target), Is.True);
+            Assert.That(target.Suspend, Is.Null, "a used suspend is gone from the file");
+            Assert.That(host.CaptureTownInto(target), Is.False, "and nothing more to write");
+        }
+
+        // Catches: a Solo world's owner losing the suspend record, present id, extra-slot ownership or dive-section owner when the world rebinds to the owner's new key.
+        [Test]
+        public void HostWorld_SoloRebind_MovesTheSuspendOwner()
+        {
+            var host = new HostWorld();
+            WorldPlayers.TryCreate(WorldKind.Solo, new[] { new PlayerKey(IdentityKind.Local, "old") }, out WorldPlayers players);
+            host.Load(players);
+            var file = new WorldSave { WorldSeed = WorldSaveRules.SeedToHex(1UL), Dive = new DiveSave { ExtraSlotOwner = "Local:old", InDive = true } };
+            file.Suspend = new SuspendSave
+            {
+                Seed = 1u, Floor = 5, Phase = (int)DivePhase.BankRoom, PresentIds = { "Local:old" }, ExtraSlotOwner = "Local:old",
+                Bags = { new SuspendedBag { Identity = 0, Id = "old", Carried = { 104 } } },
+            };
+            host.LoadTown(file);
+            Assert.That(host.Admit(new PlayerKey(IdentityKind.Local, "new"), 0UL, true), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(host.Town.Suspend.Bags.Single().Id, Is.EqualTo("new"));
+            Assert.That(host.Town.Suspend.PresentIds, Is.EqualTo(new[] { "Local:new" }));
+            Assert.That(host.Town.Suspend.ExtraSlotOwner, Is.EqualTo("Local:new"));
+            Assert.That(host.Town.Dive.ExtraSlotOwner, Is.EqualTo("Local:new"));
         }
     }
 }

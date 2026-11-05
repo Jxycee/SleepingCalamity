@@ -1,7 +1,7 @@
 // Authority: test-only (reads state, never writes). M7 S1: one peer's view of the replicated dive / town / hero state as canonical text and a hash of it.
 // Every peer (host or client) must produce the same text once replication has caught up; AssertAllEqual polls until they agree, else fails with the differing lines.
 // Covers (by reflection over each component's public NetworkVariable fields, so a new field is covered without editing this file):
-//   DiveDirector (NetActive, NetHeartBanked, NetCheckpoint, NetStartFloor, NetStairOpen, NetHome/HubStair/Origin), DiveHaulSync (Net = the Summary, NetHealSecondsLeft),
+//   DiveDirector (NetActive, NetHeartBanked, NetCheckpointHeld, NetPickableMaxFloor, NetStairOpen, NetHome/HubStair/Origin), DiveHaulSync (Net = the Summary, NetHealSecondsLeft),
 //   CellarFloorSync (Net seed/floor + the peer's BUILT seed, floor and layout hash), CellarContentsSync (Net = ContentsState), TownSync (NetTown signature, NetBuilder, NetGhost, NetBakerMet),
 //   HeroVitals (Hp, state, downed/revive, loaves) and HeroCombat.NetWeapon per player object, the player-object roster, and the set of spawned NetworkObject ids.
 // NOT covered: enemy state (moves every frame), transforms, owner-written vars (stance, swing), non-replicated host-only state, visuals.

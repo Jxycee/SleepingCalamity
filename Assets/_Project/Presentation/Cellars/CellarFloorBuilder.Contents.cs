@@ -66,6 +66,15 @@ namespace SleepingCalamity.Presentation
             return result;
         }
 
+        // The lost satchel's prop (a brown sack on a floor cell): local to one peer, drawn only for the player whose satchel it is (CellarContentsSync). Parent is the sync object.
+        public const string SatchelName = "SatchelPickup";
+        public static GameObject BuildSatchel(Transform parent, Vector3 worldPos)
+        {
+            GameObject g = Prim(parent, SatchelName, PrimitiveType.Cube, worldPos + new Vector3(0, 0.3f, 0), new Vector3(0.6f, 0.5f, 0.45f), ContentsMat(new Color(0.45f, 0.3f, 0.17f)));
+            g.transform.rotation = Quaternion.Euler(0f, 20f, 0f);
+            return g;
+        }
+
         // The gold cube the carrier leaves; `worldPos` is where it died (lifted a little). Parent is the sync object so it is not part of the floor build.
         public static GameObject BuildGateKey(Transform parent, Vector3 worldPos)
         {
