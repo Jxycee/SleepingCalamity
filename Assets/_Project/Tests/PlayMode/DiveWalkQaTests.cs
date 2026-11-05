@@ -1,4 +1,5 @@
-// Authority: test-only. M5 QA walk: a host + one client walk the dive floors 1-4 through the real DiveDirector, CellarFloorSync, DiveHaulSync, CellarContentsSync and player prefab.
+// Authority: test-only. M5 QA walk (ported to the 7-floor dive, plan 3 task 12): a host + one client walk the dive floors (the authored floor 1, then the generated floor that holds a piece), the stir
+// wiring and the bank room through the real DiveDirector, CellarFloorSync, DiveHaulSync, CellarContentsSync and player prefab.
 // The CLIENT hero drives (owner-side moves + client RPCs); the host side only kills enemies through the same ServerApplyHit path a swing uses.
 // Every assertion message starts with the walk step ("[F1 chest]") so a failure names the broken step. A failure that is a GAME bug is left failing; do not weaken it here.
 // NOT covered by a one-process test: the interact KEY and prompts, the greybox look, real relay latency, real melee combat.
@@ -161,17 +162,36 @@ namespace SleepingCalamity.Tests.PlayMode
             return n;
         }
 
-        // First seed whose floors 1-3 all have a gate-key carrier and whose floor 1 has the locked room + key chest.
-        private static uint FindSeed(bool need2and3)
+        // The first-half generated floor (2 or 4) that holds a bakery piece in the fallback world (the director's depths when no world is loaded); pieces never lie on floors 1, 3 or 5.
+        private static int PieceFloor()
+        {
+            IReadOnlyDictionary<int, int> depths = PieceDepths.Assign(DiveDirector.FallbackWorldSeed, PieceCatalog.Specs);
+            foreach (int f in new[] { 2, 4 }) foreach (KeyValuePair<int, int> kv in depths) if (kv.Value == f && !PieceCatalog.IsPerson(kv.Key)) return f;
+            Assert.Fail("[setup] no first-half piece on floor 2 or 4");
+            return 0;
+        }
+
+        // First seed whose generated floor `floor` has a gate-key carrier, the locked room and its key chest.
+        private static uint FindSeed(int floor)
         {
             for (uint sd = 1; sd < 2500; sd++)
             {
-                CellarFloorLayout l1 = CellarFloorGenerator.Layout(sd, 1);
-                if (!(l1.HasLockedRoom && l1.Carrier != null && l1.KeyChestIndex >= 0)) continue;
-                if (need2and3 && (CellarFloorGenerator.Layout(sd, 2).Carrier == null || CellarFloorGenerator.Layout(sd, 3).Carrier == null)) continue;
-                return sd;
+                CellarFloorLayout l = CellarFloorGenerator.Layout(sd, floor);
+                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return sd;
             }
             return 0;
+        }
+
+        // Starts the dive on `floor` through the checkpoint pick (a held checkpoint allows floors 1-5) and waits until every peer built it.
+        private IEnumerator StartOn(Rig rig, int floor, string step)
+        {
+            if (floor > UndercroftPlan.FirstFloor) rig.Host.TestHoldCheckpoint(true);
+            Assert.That(rig.Peer.ServerStartDive(), Is.False, step + " a client cannot start a dive");
+            Assert.That(rig.Host.ServerStartDive(floor), Is.True, step + " the host starts the dive on floor " + floor);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, floor, step);
+            yield return BothAtEntry(rig, step);
+            Assert.That(rig.Peer.NetActive.Value, Is.True, step + " the client sees the dive active");
         }
 
         // Kill the carrier the way the game does (enter its room, hit it), take the dropped key; the client drives. Skips when the floor never needed a key.
@@ -209,121 +229,99 @@ namespace SleepingCalamity.Tests.PlayMode
         // ---------------------------------------------------------------------------------------------------------------------------------
 
         [UnityTest]
-        public IEnumerator Walk_Floors1To3_GateKey_Chest_Piece_LockedDoor_Checkpoint_Descend([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
+        public IEnumerator Walk_Floor1ToTheGeneratedPieceFloor_GateKey_Chest_Piece_LockedDoor_Descend([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
-            uint seed = FindSeed(true);
-            if (seed == 0) seed = FindSeed(false);
-            Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed with a carrier and a locked room");
+            int target = PieceFloor();
+            uint seed = FindSeed(target);
+            Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed with a carrier and a locked room on floor " + target);
             Rig rig = null;
             yield return Start(net, r => rig = r);
             rig.Host.SeedOverride = seed;
-            Assert.That(rig.Peer.ServerStartDive(), Is.False, "[F1 start] a client cannot start a dive");
-            Assert.That(rig.Host.ServerStartDive(), Is.True, "[F1 start] the host starts the dive");
-            yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 1, "[F1 start]");
-            yield return BothAtEntry(rig, "[F1 start]");
-            Assert.That(rig.Peer.NetActive.Value, Is.True, "[F1 start] the client sees the dive active");
+            yield return StartOn(rig, 1, "[F1 start]");
             Assert.That(rig.Host.RequireGateKey, Is.True, "[F1 start] contents gate the stair");
-            Assert.That(rig.Contents.State.ExitUnlocked, Is.False, "[F1 start] the exit starts shut when the floor has a carrier");
-            int piecesAssigned = rig.HostHaul.Current.PiecesLeft;
-            Assert.That(piecesAssigned, Is.GreaterThan(0), "[F1 start] floor 1 has pieces left to find");
+            Assert.That(rig.HostHaul.Current.PiecesLeft, Is.EqualTo(0), "[F1 start] the authored floor holds no piece");
 
-            // F1: stair refused while the carrier holds the key.
-            Assert.That(CellarFloorBuilder.TryStairWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair1), Is.True);
-            yield return ClientTo(rig, stair1 + new Vector3(1f, 0.1f, 0f), "[F1 stair shut]");
+            // Down to the target floor: the authored floors open at once, a generated floor's stair stays shut until the carrier's key is taken.
+            for (int f = 1; f < target; f++)
+            {
+                yield return TakeGateKey(rig, f);
+                KillAll(rig.HostNm);
+                yield return Descend(rig, f);
+            }
+            Assert.That(rig.HostFloor.Layout.Floor, Is.EqualTo(target));
+            Assert.That(CellarFloorBuilder.TryStairWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 shutStair), Is.True);
+            yield return ClientTo(rig, shutStair + new Vector3(1f, 0.1f, 0f), "[F" + target + " stair shut]");
             int handled = rig.Host.RequestsHandled;
-            rig.Peer.RequestStair(1);
-            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "[F1 stair shut] the press never reached the host");
-            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(1), "[F1 stair shut] the stair stays shut while the carrier holds the key");
+            rig.Peer.RequestStair(target);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "[F" + target + " stair shut] the press never reached the host");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(target), "[F" + target + " stair shut] the stair stays shut while the carrier holds the key");
+            yield return TakeGateKey(rig, target);
+            int piecesAssigned = rig.HostHaul.Current.PiecesLeft;
+            Assert.That(piecesAssigned, Is.GreaterThan(0), "[F" + target + " start] the floor has pieces left to find");
 
-            // F1: carrier kill -> key -> stair opens (peer sees it too).
-            yield return TakeGateKey(rig, 1);
-
-            // F1: open a (non-key) chest from the client: loot enters the shared haul on both peers.
+            // Open a (non-key) chest from the client: loot enters the opener's bag on both peers.
             int chest = -1;
             for (int i = 0; i < rig.HostFloor.Layout.Chests.Count && chest < 0; i++) if (!rig.HostFloor.Layout.Chests[i].HoldsKey && i < 64) chest = i;
-            Assert.That(chest, Is.GreaterThanOrEqualTo(0), "[F1 chest] the floor has an ordinary chest");
-            Assert.That(rig.Contents.TryChestPosition(chest, out Vector3 chestPos), Is.True, "[F1 chest] the chest object exists");
-            yield return ClientTo(rig, chestPos + new Vector3(0.5f, 0.1f, 0f), "[F1 chest walk]");
+            Assert.That(chest, Is.GreaterThanOrEqualTo(0), "[chest] the floor has an ordinary chest");
+            Assert.That(rig.Contents.TryChestPosition(chest, out Vector3 chestPos), Is.True, "[chest] the chest object exists");
+            yield return ClientTo(rig, chestPos + new Vector3(0.5f, 0.1f, 0f), "[chest walk]");
             KillAll(rig.HostNm);
             ulong clientId = rig.Client.NetworkManager.LocalClientId;
             int loot0 = rig.HostHaul.ServerBagOf(clientId).Carried.Count;   // chest loot goes into the opener's bag (plan 2 task 6: loot chests are per player, no shared opened bit)
             rig.PeerContents.RequestOpenChest(chest);
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.ServerBagOf(clientId).Carried.Count > loot0, Timeout, "[F1 chest] the client's open-chest request never put loot in the opener's bag on the host (requests handled " + rig.Contents.ChestRequestsHandled + ")");
-            Assert.That(rig.Contents.State.Chests & (1UL << chest), Is.EqualTo(0UL), "[F1 chest] a loot chest never sets the shared opened bit");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.ServerBagOf(clientId).Carried.Count > loot0, Timeout, "[chest] the client's open-chest request never put loot in the opener's bag on the host (requests handled " + rig.Contents.ChestRequestsHandled + ")");
+            Assert.That(rig.Contents.State.Chests & (1UL << chest), Is.EqualTo(0UL), "[chest] a loot chest never sets the shared opened bit");
             // the opener's own client sees its item through its owner-only bag view, and its own copy of the chest lowered (the per-NetworkManager lookup: the host's hero is the 'last spawned' Local)
             NetworkManager clientNm = rig.Client.NetworkManager;
-            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync v = PlayerBagSync.ForLocalPlayer(clientNm); return v != null && v.View.Carried.Length == loot0 + 1; }, Timeout, "[F1 chest] the opener's client never saw the item in its own bag view");
-            yield return PlayModeHarness.WaitUntil(() => rig.PeerContents.ChestShownOpen(chest), Timeout, "[F1 chest] the client never showed the chest open");
+            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync v = PlayerBagSync.ForLocalPlayer(clientNm); return v != null && v.View.Carried.Length == loot0 + 1; }, Timeout, "[chest] the opener's client never saw the item in its own bag view");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerContents.ChestShownOpen(chest), Timeout, "[chest] the client never showed the chest open");
 
-            // F1: bakery piece -> pieces-left drops on both peers.
-            Assert.That(rig.Contents.PieceCount, Is.GreaterThan(0), "[F1 piece] the contents placed piece spots");
-            Assert.That(rig.Contents.TryPiecePosition(0, out Vector3 piecePos), Is.True, "[F1 piece] piece 0 exists");
-            yield return ClientTo(rig, piecePos, "[F1 piece walk]");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.PiecesLeft == piecesAssigned - 1, Timeout, "[F1 piece] walking onto the piece never took it (host left " + rig.HostHaul.Current.PiecesLeft + ", was " + piecesAssigned + ")");
-            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.PiecesLeft == piecesAssigned - 1, Timeout, "[F1 piece] pieces-left never dropped on the client");
-            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces == 1 && rig.PeerHaul.Current.FoundPieces == 1, Timeout, "[F1 piece] the piece is found and safe on both peers (client found " + rig.PeerHaul.Current.FoundPieces + ", safe " + rig.PeerHaul.Current.FoundPieces + ")");
-            Assert.That(System.Linq.Enumerable.Any(rig.Host.Town.State.StockPieces), Is.True, "[F1 piece] the piece reached the town stock at pickup, not at the dive's end");
-            yield return PlayModeHarness.WaitUntil(() => !rig.PeerContents.PieceVisible(0), Timeout, "[F1 piece] the client still draws the collected piece");
+            // A bakery piece -> pieces-left drops on both peers, the piece is safe and in the town stock at pickup.
+            Assert.That(rig.Contents.PieceCount, Is.EqualTo(piecesAssigned), "[piece] the contents placed one spot per piece the floor holds");
+            Assert.That(rig.Contents.TryPiecePosition(0, out Vector3 piecePos), Is.True, "[piece] piece 0 exists");
+            yield return ClientTo(rig, piecePos, "[piece walk]");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.PiecesLeft == piecesAssigned - 1, Timeout, "[piece] walking onto the piece never took it (host left " + rig.HostHaul.Current.PiecesLeft + ", was " + piecesAssigned + ")");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.PiecesLeft == piecesAssigned - 1, Timeout, "[piece] pieces-left never dropped on the client");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces == 1, Timeout, "[piece] the piece is found and safe on both peers (client found " + rig.PeerHaul.Current.FoundPieces + ")");
+            Assert.That(System.Linq.Enumerable.Any(rig.Host.Town.State.StockPieces), Is.True, "[piece] the piece reached the town stock at pickup, not at the dive's end");
+            yield return PlayModeHarness.WaitUntil(() => !rig.PeerContents.PieceVisible(0), Timeout, "[piece] the client still draws the collected piece");
 
-            // F1: locked room key chest + door.
-            CellarFloorLayout l1 = rig.HostFloor.Layout;
-            if (l1.HasLockedRoom && l1.KeyChestIndex >= 0 && l1.KeyChestIndex < 64)
-            {
-                int kc = l1.KeyChestIndex;
-                Assert.That(rig.Contents.TryChestPosition(kc, out Vector3 kcPos), Is.True, "[F1 key chest] exists");
-                Assert.That(rig.Contents.TryGatePosition(out Vector3 gatePos), Is.True, "[F1 locked door] the locked room has a gate");
-                Assert.That(rig.Contents.GateBlocking, Is.True, "[F1 locked door] shut at first");
-                yield return ClientTo(rig, kcPos + new Vector3(0.5f, 0.1f, 0f), "[F1 key chest walk]");
-                KillAll(rig.HostNm);
-                rig.PeerContents.RequestOpenChest(kc);
-                yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.RoomKeyHeld, Timeout, "[F1 key chest] the key chest never gave the room key");
-                yield return PlayModeHarness.WaitUntil(() => rig.PeerContents.State.RoomKeyHeld, Timeout, "[F1 key chest] the client never saw the room key");
-                yield return ClientTo(rig, gatePos + new Vector3(1f, 0.1f, 0f), "[F1 locked door walk]");
-                rig.PeerContents.RequestOpenDoor();
-                yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.DoorOpen, Timeout, "[F1 locked door] holding the key at the gate never opened it");
-                yield return PlayModeHarness.WaitUntil(() => rig.PeerContents.State.DoorOpen && !rig.PeerContents.GateBlocking, Timeout, "[F1 locked door] the client still sees the gate shut");
-            }
-            else Debug.Log("[DiveWalkQa] seed " + seed + " has no locked room on floor 1; door step skipped");
-
-            // F1 -> F2.
+            // Locked room key chest + door.
+            CellarFloorLayout lay = rig.HostFloor.Layout;
+            Assert.That(lay.HasLockedRoom && lay.KeyChestIndex >= 0 && lay.KeyChestIndex < 64, Is.True, "[locked room] the seed was picked for it");
+            int kc = lay.KeyChestIndex;
+            Assert.That(rig.Contents.TryChestPosition(kc, out Vector3 kcPos), Is.True, "[key chest] exists");
+            Assert.That(rig.Contents.TryGatePosition(out Vector3 gatePos), Is.True, "[locked door] the locked room has a gate");
+            Assert.That(rig.Contents.GateBlocking, Is.True, "[locked door] shut at first");
+            yield return ClientTo(rig, kcPos + new Vector3(0.5f, 0.1f, 0f), "[key chest walk]");
             KillAll(rig.HostNm);
-            yield return Descend(rig, 1);
-            Assert.That(rig.HostFloor.Layout.Floor, Is.EqualTo(2));
+            rig.PeerContents.RequestOpenChest(kc);
+            yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.RoomKeyHeld, Timeout, "[key chest] the key chest never gave the room key");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerContents.State.RoomKeyHeld, Timeout, "[key chest] the client never saw the room key");
+            yield return ClientTo(rig, gatePos + new Vector3(1f, 0.1f, 0f), "[locked door walk]");
+            rig.PeerContents.RequestOpenDoor();
+            yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.DoorOpen, Timeout, "[locked door] holding the key at the gate never opened it");
+            yield return PlayModeHarness.WaitUntil(() => rig.PeerContents.State.DoorOpen && !rig.PeerContents.GateBlocking, Timeout, "[locked door] the client still sees the gate shut");
 
-            // F2: checkpoint bank with the floor-1 piece, hurt heroes get healed.
-            var hostVitals = rig.HostHero.GetComponent<HeroVitals>(); var clientVitals = rig.ClientHeroOnHost.GetComponent<HeroVitals>();
-            hostVitals.ServerDamage(20); clientVitals.ServerDamage(20);
-            Assert.That(hostVitals.Hp, Is.LessThan(hostVitals.MaxHp), "[F2 bank] test premise: the host hero is hurt");
-            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank2), Is.True, "[F2 bank] floor 2 has the checkpoint bank point");
-            yield return ClientTo(rig, bank2 + new Vector3(0.5f, 0.1f, 0f), "[F2 bank walk]");
-            rig.PeerHaul.RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Session.BankChosenThisDive && rig.HostHaul.Current.FoundPieces == 1, Timeout, "[F2 bank] the client's bank press never used the checkpoint (used " + rig.HostHaul.Session.BankChosenThisDive + ", safe pieces " + rig.HostHaul.Current.FoundPieces + ")");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CheckpointHeld && rig.Host.NetCheckpointHeld.Value && rig.Peer.NetCheckpointHeld.Value, Timeout, "[F2 bank] checkpoint never reached / synced to the client");
-            yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces == 1, Timeout, "[F2 bank] the client never saw the banked count");
-            yield return PlayModeHarness.WaitUntil(() => hostVitals.Hp == hostVitals.MaxHp && clientVitals.Hp == clientVitals.MaxHp, Timeout, "[F2 bank] banking never healed the party (host " + hostVitals.Hp + "/" + hostVitals.MaxHp + ", client " + clientVitals.Hp + "/" + clientVitals.MaxHp + ")");
-
-            // F2 -> F3.
-            yield return TakeGateKey(rig, 2);
-            yield return Descend(rig, 2);
-            Assert.That(rig.HostFloor.Layout.Floor, Is.EqualTo(3));
-            Assert.That((rig.HostHaul.Current.ClearedMask & 0b11) == 0b11, Is.True, "[F3 arrive] floors 1 and 2 are marked cleared");
+            // On down: the cleared floors are marked, and the stir counts them.
+            KillAll(rig.HostNm);
+            yield return Descend(rig, target);
+            Assert.That(rig.HostFloor.Layout.Floor, Is.EqualTo(target + 1));
+            Assert.That((rig.HostHaul.Current.ClearedMask & (1 << (target - 1))) != 0, Is.True, "[arrive] the floor above is marked cleared");
+            Assert.That(rig.HostHaul.Current.StirValue, Is.GreaterThan(0), "[arrive] a cleared floor raises the stir meter (pieces never do)");
         }
 
         [UnityTest]
         public IEnumerator Stir_PastFortyAndSeventy_AddsExtraEnemiesAndTheHunter([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
-            uint seed = FindSeed(false);
+            uint seed = FindSeed(2);
             Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed");
             Rig rig = null;
             yield return Start(net, r => rig = r);
             // The stir is the valuables the party carries (plan 3 task 10; pieces and floors alone cannot reach the hunter): two players, so each valuable is worth 5 x sqrt 2 = 7.07.
             ulong stirHost = rig.HostNm.LocalClientId;
             rig.Host.SeedOverride = seed;
-            Assert.That(rig.Host.ServerStartDive(), Is.True, "[stir start]");
-            yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 1, "[stir start]");
-            yield return BothAtEntry(rig, "[stir start]");
+            yield return StartOn(rig, 2, "[stir start]");   // a generated floor: the authored one has no rooms to spawn extras in
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.EncounterPlan != null, Timeout, "[stir] the host never built an encounter plan");
             Assert.That(rig.HostHaul.EncounterPlan.ExtraPerRoom, Is.EqualTo(0), "[stir] no extras at the start");
             Assert.That(rig.HostHaul.EncounterPlan.Hunter, Is.Null, "[stir] no hunter at the start");
@@ -367,42 +365,41 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Floor4_ClientBanksAtTheHeart_GoHome_BankedSurvives_ThenSecondDiveFails_PiecesStaySafe([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
+        public IEnumerator BankRoom_ClientBanks_GoHome_FindsSurvive_ThenSecondDiveFails_PiecesStaySafe([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
-            uint seed = FindSeed(false);
+            int pieceFloor = PieceFloor();
+            uint seed = FindSeed(pieceFloor);
             Assert.That(seed, Is.Not.EqualTo(0u), "[setup] a seed");
             Rig rig = null;
             yield return Start(net, r => rig = r);
             rig.Host.SeedOverride = seed;
-            Assert.That(rig.Host.ServerStartDive(4), Is.True, "[F4 start]");
-            yield return ResolvePeers(rig);
-            yield return AllBuilt(rig, 4, "[F4 start]");
-            yield return BothAtEntry(rig, "[F4 start]");
-            int left1 = rig.HostHaul.Current.PiecesLeft;
-            Assert.That(rig.HostHaul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True, "[F4 bank] a carried piece");
-            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True, "[F4 bank] the heart has the baker");
-            yield return ClientTo(rig, bank + new Vector3(0.5f, 0.1f, 0f), "[F4 bank walk]");
+            ulong hostId = rig.HostNm.LocalClientId;
+            yield return StartOn(rig, UndercroftPlan.BankFloor, "[F5 start]");
+            Assert.That(rig.HostHaul.Session.StartedAtBank, Is.True, "[F5 start] the dive starts in the bank room's floor (decision 2)");
+            Assert.That(rig.HostHaul.ServerAddPiece(PieceCatalog.SpareFrameId), Is.True, "[F5 find] a spare piece (a second-half piece never lies on the floors the second dive walks)");
+            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True, "[F5 bank] the bank floor has the bank room cell");
+            Move(rig.HostHero, bank + new Vector3(0.5f, 0.1f, 0f));
+            yield return ClientTo(rig, bank + new Vector3(-0.5f, 0.1f, 0f), "[F5 bank walk]");
+            rig.PeerHaul.RequestBank();
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.DivePhase == DivePhase.BankRoom && rig.PeerHaul.Current.DivePhase == DivePhase.BankRoom, Timeout, "[F5 bank] the bank press never opened the room on both peers");
             rig.Peer.RequestGoHome();
             int handled = rig.Host.RequestsHandled;
-            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "[F4 early go-home] never reached the host");
-            Assert.That(rig.Host.NetActive.Value, Is.True, "[F4 early go-home] no way home before the bank");
-            rig.PeerHaul.RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.FoundPieces == 1 && rig.Host.BankChosenNow() && rig.Peer.BankChosenNow(), Timeout, "[F4 bank] the heart bank never landed on both peers");
-            rig.Peer.RequestGoHome();
-            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value && !rig.Peer.NetActive.Value, Timeout, "[F4 go home] the dive never ended on both peers");
-            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[F4 go home] banked survives");
-            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, Home) < 6f && Flat(rig.ClientHeroOnHost.transform.position, Home) < 8f, Timeout, "[F4 go home] the party is not back in the hub");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor && rig.PeerFloor.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "[F4 go home] the floor was never cleared on both peers");
-            yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.Floor == 0, Timeout, "[F4 go home] the contents were never cleared");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "[F5 go home] the press never reached the host");
+            Assert.That(rig.Host.NetActive.Value, Is.True, "[F5 go home] two players: one press only opens the confirm window");
+            Assert.That(rig.Host.ServerTryGoHome(hostId), Is.True, "[F5 go home] the second player's press confirms");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value && !rig.Peer.NetActive.Value, Timeout, "[F5 go home] the dive never ended on both peers");
+            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[F5 go home] the find survives");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.NetCheckpointHeld.Value && rig.Peer.NetCheckpointHeld.Value, Timeout, "[F5 go home] the checkpoint never reached both peers");
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, Home) < 6f && Flat(rig.ClientHeroOnHost.transform.position, Home) < 8f, Timeout, "[F5 go home] the party is not back in the hub");
+            yield return PlayModeHarness.WaitUntil(() => rig.HostFloor.BuiltFloor == CellarFloorSync.NoFloor && rig.PeerFloor.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "[F5 go home] the floor was never cleared on both peers");
+            yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.Floor == 0, Timeout, "[F5 go home] the contents were never cleared");
 
-            // Second dive: take a real piece on floor 1, then the whole party falls.
-            Assert.That(rig.Host.ServerStartDive(), Is.True, "[dive 2 start]");
-            yield return AllBuilt(rig, 1, "[dive 2 start]");
-            yield return BothAtEntry(rig, "[dive 2 start]");
-            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[dive 2 start] banked from dive 1 is still there");
+            // Second dive (the checkpoint pick): take a real piece on the piece floor, then the whole party falls.
+            yield return StartOn(rig, pieceFloor, "[dive 2 start]");
+            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[dive 2 start] the find of dive 1 is still there");
             int before = rig.HostHaul.Current.PiecesLeft;
-            Assert.That(rig.Contents.PieceCount, Is.GreaterThan(1), "[dive 2 piece] floor 1 has a second piece spot");
-            Assert.That(rig.Contents.TryPiecePosition(1, out Vector3 pp), Is.True, "[dive 2 piece]");
+            Assert.That(before, Is.GreaterThan(0), "[dive 2 piece] the floor has a piece left");
+            Assert.That(rig.Contents.TryPiecePosition(0, out Vector3 pp), Is.True, "[dive 2 piece]");
             yield return ClientTo(rig, pp, "[dive 2 piece walk]");
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.PiecesLeft == before - 1 && rig.PeerHaul.Current.PiecesLeft == before - 1, Timeout, "[dive 2 piece] pieces-left never dropped on both peers");
             KillAll(rig.HostNm);
@@ -411,18 +408,17 @@ namespace SleepingCalamity.Tests.PlayMode
             hv.ServerDamage(100000); cv.ServerDamage(100000);
             yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value && !rig.Peer.NetActive.Value, Timeout, "[dive 2 fail] the wipe never ended the dive on both peers");
             Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(0), "[dive 2 fail] floor reset");
-            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(1), "[dive 2 fail] the piece found in dive 2 is still counted for that dive");
             Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(2), "[dive 2 fail] pieces are safe on pickup: the failed dive keeps the one it found");
-            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.PiecesLeft == before - 1 && rig.PeerHaul.Current.PiecesLeft == before - 1, Timeout, "[dive 2 fail] pieces-left on floor 1 went back up although the piece is safe (host " + rig.HostHaul.Current.PiecesLeft + ", client " + rig.PeerHaul.Current.PiecesLeft + ", wanted " + (before - 1) + ")");
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, Home) < 6f && Flat(rig.ClientHeroOnHost.transform.position, Home) < 8f, Timeout, "[dive 2 fail] the party is not back in the hub");
             yield return PlayModeHarness.WaitUntil(() => hv.IsUp && cv.IsUp, Timeout, "[dive 2 fail] the heroes stayed down");
             yield return PlayModeHarness.WaitUntil(() => rig.Contents.State.Floor == 0, Timeout, "[dive 2 fail] the contents were never cleared");
+            Assert.That(rig.Host.Pieces.PiecesLeft(pieceFloor), Is.EqualTo(before - 1), "[dive 2 fail] the collected piece is not back on its floor");
 
-            // A third dive starts clean: the piece found in dive 2 stays collected (never offered again) and the found counter restarts.
+            // A third dive starts clean on floor 1 (the pick was spent): the finds stay found.
             Assert.That(rig.Host.ServerStartDive(), Is.True, "[dive 3 start]");
             yield return AllBuilt(rig, 1, "[dive 3 start]");
-            Assert.That(rig.HostHaul.Current.PiecesLeft, Is.EqualTo(before - 1), "[dive 3 start] the collected piece is not offered again");
-            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(0), "[dive 3 start] found counts this dive only");
+            Assert.That(rig.HostHaul.Current.FoundPieces, Is.EqualTo(2), "[dive 3 start] found pieces stay found");
+            Assert.That(rig.Host.Pieces.PiecesLeft(pieceFloor), Is.EqualTo(before - 1), "[dive 3 start] the collected piece is not offered again");
         }
     }
 }

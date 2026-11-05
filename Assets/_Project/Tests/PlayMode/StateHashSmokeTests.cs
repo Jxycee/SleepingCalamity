@@ -87,7 +87,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
         // Catches: any replicated dive / haul / floor / contents / town / hero field that differs between two peers, or a peer that misses a spawned object, with 4 players connected.
         [UnityTest]
-        public IEnumerator FourPeers_HashesAgree_ThroughDiveStart_PieceBank_AndAStairDescent()
+        public IEnumerator FourPeers_HashesAgree_ThroughDiveStart_PieceFind_StairDescent_AndTheBankRoom()
         {
             Rig rig = null;
             yield return Start(r => rig = r);
@@ -101,9 +101,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(startText, Does.Contain("DiveDirector#").And.Contain("DiveHaulSync#").And.Contain("CellarFloorSync#").And.Contain("CellarContentsSync#").And.Contain("HeroVitals#"), "the hash covers the dive and hero state it claims to");
             Assert.That(startText, Does.Contain("NetActive = True"), "the hash sees the dive active");
 
-            // A piece and the loot, then the bank: the haul summary changes and replicates to everyone.
+            // A piece and an item: the haul summary changes and replicates to everyone.
             DiveHaulSync haul = rig.Host.HaulSync;
-            Assert.That(haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True, "[F1 piece]");
+            Assert.That(haul.ServerAddPiece(PieceCatalog.FrameId), Is.True, "[F1 piece]");
             Assert.That(haul.ServerAddItem(rig.HostNm.LocalClientId, 101), Is.True, "[F1 loot]");   // a bag is host-only state: nothing of it replicates (the owner view is PlayerBagSync, plan 2 task 5)
             yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F1 piece found and an item in the host bag");
 
@@ -121,10 +121,19 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F2 arrived");
             Assert.That(ReplicatedStateHash.Describe(rig.HostNm), Does.Contain("CurrentFloor=2"), "the haul summary says floor 2");
 
-            // F2 has the checkpoint bank: bank the carried piece (host-side, no position check) and everyone agrees.
-            Assert.That(haul.ServerBank(), Is.True, "[F2 bank] the host-side bank");
-            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F2 banked");
-            Assert.That(ReplicatedStateHash.Describe(rig.HostNm), Does.Contain("BankedPieces=1"), "the bank shows in the hashed haul");
+            Assert.That(ReplicatedStateHash.Describe(rig.HostNm), Does.Contain("FoundPieces=1"), "the found piece shows in the hashed haul");
+
+            // The bank room (floor 5): the dive fails, the next one starts at the bank (the checkpoint pick, decision 2) and the host-side bank press opens the room; everyone agrees at every step.
+            Assert.That(rig.Host.ServerAbandonDive(), Is.True, "[F2 fail] the dive fails and the party goes home");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.NetActive.Value && rig.Host.FloorSync.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "[F2 fail] the floor never cleared");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "failed dive, back home");
+            rig.Host.TestHoldCheckpoint(true);
+            Assert.That(rig.Host.ServerStartDive(UndercroftPlan.BankFloor), Is.True, "[F5 start] the checkpoint starts the dive at the bank");
+            yield return FloorBuiltEverywhere(rig, UndercroftPlan.BankFloor, "[F5 start]");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F5 arrived at the bank");
+            Assert.That(haul.ServerEnterBankRoom(), Is.True, "[F5 bank] the host-side bank press (no position check) opens the room");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F5 bank room open");
+            Assert.That(ReplicatedStateHash.Describe(rig.HostNm), Does.Contain("CurrentFloor=5"), "the bank room shows in the hashed haul");
         }
 
         // Catches: the hash comparing nothing (an always-equal assertion). A client's local copy of a replicated field is changed behind NGO's back, and the same assertion must fail and name the line.

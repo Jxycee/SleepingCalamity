@@ -1,29 +1,32 @@
-// M6 S1: ties the Core PieceCatalog to what M5 really spawns (DiveHaulSync.DefaultPiecesPerFloor in Presentation), so changing the per-floor counts without
-// extending the catalog fails here.
+// M6 S1 / plan 3 task 12: ties the Core PieceCatalog to what the dive really places (PieceCatalog.Specs through PieceDepths.Assign), so adding a spec without a catalog entry, or a depth the
+// floors cannot hold, fails here. Pure Core + NUnit.
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using SleepingCalamity.Core;
-using SleepingCalamity.Presentation;
 
 namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class TownPieceCatalogSpawnTests
     {
         [Test]
-        public void EveryPieceTheDefaultDiveCanSpawnMapsToAPart()
+        public void EveryPieceTheDiveCanPlaceMapsToAPart_OnAFloorThatCanHoldIt()
         {
-            int[] perFloor = DiveHaulSync.DefaultPiecesPerFloor;
-            var haul = new DiveHaul(perFloor);
-            int spawnable = 0;
-            for (int floor = 1; floor <= DiveHaul.PieceFloors; floor++)
-                for (int i = 0; i < perFloor[floor - 1]; i++)
+            for (ulong world = 1; world <= 60; world++)
+            {
+                IReadOnlyDictionary<int, int> depths = PieceDepths.Assign(world, PieceCatalog.Specs);
+                Assert.That(depths.Count, Is.EqualTo(PieceCatalog.Specs.Count), "a depth for every spec, world " + world);
+                foreach (PieceSpec spec in PieceCatalog.Specs)
                 {
-                    int id = DiveHaul.PieceId(floor, i);
-                    Assert.That(haul.OriginFloor(id), Is.EqualTo(floor), "M5 can spawn piece " + id);
-                    Assert.That(PieceCatalog.TryGet(id, out PieceInfo info), Is.True, "piece " + id + " has no building part");
+                    Assert.That(UndercroftPlan.IsFloor(depths[spec.Id]), Is.True, "piece " + spec.Id + " world " + world);
+                    if (PieceCatalog.IsPerson(spec.Id)) continue;
+                    Assert.That(PieceCatalog.TryGet(spec.Id, out PieceInfo info), Is.True, "piece " + spec.Id + " has no building part");
                     Assert.That(TownBuildings.Get(info.Building).PartIndex(info.Part), Is.GreaterThanOrEqualTo(0));
-                    spawnable++;
                 }
-            Assert.That(spawnable, Is.EqualTo(haul.TotalPieces));
+                foreach (IGrouping<int, KeyValuePair<int, int>> floor in depths.Where(kv => !PieceCatalog.IsPerson(kv.Key)).GroupBy(kv => kv.Value))
+                    Assert.That(floor.Count(), Is.LessThanOrEqualTo(4), "floor " + floor.Key + " world " + world + " (CellarPieceSpots gives four spots)");
+            }
+            Assert.That(PieceCatalog.All.Count, Is.EqualTo(PieceCatalog.Specs.Count - 1), "the catalog holds every spec but the baker");
         }
     }
 }

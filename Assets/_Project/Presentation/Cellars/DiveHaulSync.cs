@@ -41,7 +41,6 @@ namespace SleepingCalamity.Presentation
     public sealed class DiveHaulSync : NetworkBehaviour
     {
         public const float BankRadius = 5f;
-        public static readonly int[] DefaultPiecesPerFloor = { 2, 2, 2 };   // legacy (the old 3-floor haul): read only by EditMode tests that plan 3 task 12 ports
 
         // Everything a peer needs to draw the haul and the pieces-left counters, in one value so a client never sees a half-updated haul.
         public struct Summary : INetworkSerializable, System.IEquatable<Summary>

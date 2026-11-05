@@ -1,11 +1,12 @@
 // Authority: test-only. M7 S3 (docs/design/m7-proposal.md section 4): scripted disconnect and rejoin proofs on a host + real TestClients (no scenes: the director, the cellar syncs and the heroes are spawned
 // by the test, like StateHashSmokeTests). After every case the world must be consistent: ReplicatedStateHash equal among the peers that remain, no stuck lock, no error log (the test runner fails a test on any
 // unexpected error log).
-//   1 a client drops mid-dive on floor 2 carrying a bag item and found pieces      2 a client drops right after sending a bank / stair / go-home request      3 the builder-lock holder drops (ghost, placed town)
-//   4 host-driven go-home with a client already gone                   5 rejoin keeps weapon growth (same PlayerId), a fresh player does not inherit it
+//   1 a client drops at the bank floor carrying a bag item and found pieces      2 a client drops right after sending a bank / stair / go-home request      3 the builder-lock holder drops (ghost, placed town)
+//   4 a go-home from the bank room with a client already gone                   5 rejoin keeps weapon growth (same PlayerId), a fresh player does not inherit it
 //   6 a world that records four players, only two of them connected: the absent two stay untouched in the save, difficulty scales to the present two
-// Rules the code applies and these tests pin: the found pieces are the PARTY's (DiveHaul, host-only, safe on pickup); a dropped hero's bag (DiveState.Bags, keyed by PlayerKey) stays and banks / waits in a satchel with the party, it is not forfeited
-// to the leaver and not dropped on the floor. NGO destroys the leaver's player object. The stir meter's player factor and the difficulty scale follow who is connected.
+// Rules the code applies and these tests pin: the found pieces are the PARTY's (DivePieces, host-only, safe on pickup); a dropped hero's bag (PartyBags, keyed by PlayerKey) stays and comes home / waits in a satchel with the party, it is not
+// forfeited to the leaver and not dropped on the floor. NGO destroys the leaver's player object. The stir meter's player factor and the difficulty scale follow who is connected.
+// The bank cases run at the bank floor (5): the dive starts there through the held checkpoint (plan 3 decision 2), the bank press opens the bank room, and going home is the shared choice.
 // NOT covered: a crash-style drop (transport timeout rather than a graceful leave), relay latency, scene-managed clients, a host that drops (no host migration in Phase 1), visuals.
 using System.Collections;
 using System.Collections.Generic;
@@ -136,6 +137,15 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return FloorBuilt(rig, 1, "[dive F1]");
         }
 
+        // The dive starts at the bank floor through the checkpoint pick (decision 2): the guardian is already beaten, the party arrives at the bank room's entrance.
+        private IEnumerator StartAtBank(Rig rig)
+        {
+            rig.Host.SeedOverride = 12345u;
+            rig.Host.TestHoldCheckpoint(true);
+            Assert.That(rig.Host.ServerStartDive(UndercroftPlan.BankFloor), Is.True, "[dive F5] the host starts the dive at the bank");
+            yield return FloorBuilt(rig, UndercroftPlan.BankFloor, "[dive F5]");
+        }
+
         // Host-side stair descent (the DiveDirector rules run in full: open stair, the asker near it); the host hero walks to the stair each retry because the arrival teleport may land late.
         private IEnumerator Descend(Rig rig, int from)
         {
@@ -155,17 +165,20 @@ namespace SleepingCalamity.Tests.PlayMode
             return bank + new Vector3(0.5f, 0.1f, 0f);
         }
 
-        // To floor 4 (the heart), the unbanked pieces still carried; the heart banked when `bankHeart`.
-        private IEnumerator ToHeart(Rig rig, bool bankHeart)
+        // Both go-home presses of a two-player party at the bank: the host's hero stands at the bank (the range check), the host presses, then client `i` walks there and presses.
+        private IEnumerator GoHomeTogether(Rig rig, int i, string step)
         {
-            yield return Descend(rig, 2);
-            yield return Descend(rig, 3);
-            Assert.That(rig.Host.FloorSync.Layout.Floor, Is.EqualTo(4), "the heart floor");
-            if (bankHeart)
+            Move(rig.HostHero, BankPos(rig));
+            Assert.That(rig.Host.ServerTryGoHome(rig.HostNm.LocalClientId), Is.True, step + ": the host's go-home press is accepted");
+            if (!rig.Host.NetActive.Value) yield break;
+            yield return ClientTo(rig, i, BankPos(rig), step + " walk to the bank");
+            float asked = -10f;
+            yield return PlayModeHarness.WaitUntil(() =>
             {
-                Assert.That(rig.Haul.ServerBank(), Is.True, "[heart] the host-side bank");
-                Assert.That(rig.Host.BankChosenNow(), Is.True, "[heart] the heart bank is the way home");
-            }
+                if (!rig.Host.NetActive.Value) return true;
+                if (Time.realtimeSinceStartup - asked >= 1f) { asked = Time.realtimeSinceStartup; rig.PeerDirector(i).RequestGoHome(); }
+                return false;
+            }, Timeout, step + ": the second player's go-home press never ended the dive");
         }
 
         // The client's hero (owner copy) walks to pos and the host's copy has arrived (a client RPC is range-checked against the host copy).
@@ -220,17 +233,16 @@ namespace SleepingCalamity.Tests.PlayMode
 
         // ================================================================ case 1
 
-        // Catches: a dropped client's hero left behind, the shared haul losing or duplicating the leaver's carried pieces, the stir player factor and party count not following the drop, a dive that cannot bank or go home
-        // after a drop. Rule pinned: the pieces found stay safe in the party haul; the leaver's own bag (keyed by their PlayerKey) keeps its items.
+        // Catches: a dropped client's hero left behind, the shared finds losing or duplicating the leaver's carried pieces, the stir player factor and party count not following the drop, a dive that cannot open the bank room or go home
+        // after a drop. Rule pinned: the pieces found stay safe in the party; the leaver's own bag (keyed by their PlayerKey) keeps its items and they come home with the party.
         [UnityTest]
-        public IEnumerator Case1_ClientDropsMidDive_OnFloor2_CarryingPieces_DiveBanksAndGoesHome()
+        public IEnumerator Case1_ClientDropsAtTheBankFloor_CarryingPieces_DiveOpensTheBankRoomAndGoesHome()
         {
             Rig rig = null;
             yield return Start(r => rig = r, 2);
-            yield return StartDive(rig);
-            yield return Descend(rig, 1);
-            Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
-            Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(2, 0)), Is.True);
+            yield return StartAtBank(rig);
+            Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.FrameId), Is.True);
+            Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.DoorId), Is.True);
             ulong leaverId = rig.ClientId(0);
             Assert.That(rig.Haul.ServerAddItem(leaverId, 101), Is.True, "the leaver carries one item");
             PlayerBag leaverBag = rig.Haul.ServerBagOf(leaverId);   // the bag object itself: after the drop the roster no longer maps the client id to its key
@@ -244,25 +256,27 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.HostNm.ConnectedClientsIds.Count, Is.EqualTo(2), "party count: host + 1 client");
             yield return PlayModeHarness.WaitUntil(() => rig.Haul.Session.Stir.PlayersPresent == 2, Timeout, "case1: the stir meter's player factor never followed the drop");
             Assert.That(rig.Host.NetActive.Value && rig.PeerDirector(1).NetActive.Value, Is.True, "the dive carries on for host and the other client");
-            Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(before.FoundPieces), "the pieces found stay in the party haul (not lost, not duplicated)");
+            Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(before.FoundPieces), "the pieces found stay in the party (not lost, not duplicated)");
             Assert.That(leaverBag.Carried, Is.EqualTo(new[] { 101 }), "the leaver's own bag keeps its item (not lost, not duplicated)");
             Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(2), "pieces are safe on pickup");
-            Assert.That(rig.Haul.Current.CurrentFloor, Is.EqualTo(2));
+            Assert.That(rig.Haul.Current.CurrentFloor, Is.EqualTo(UndercroftPlan.BankFloor));
 
-            // The dive can still bank (the remaining client asks, in range) ...
+            // The dive can still open the bank room (the remaining client asks, in range) ...
             yield return ClientTo(rig, 1, BankPos(rig), "case1 walk to the bank");
             float askedAt1 = -10f;
-            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 1, ref askedAt1, () => rig.Haul.Session.BankChosenThisDive), Timeout, "case1: the remaining client could not bank");
-            Assert.That(leaverBag.BankedThisDive.ContainsKey(101) && leaverBag.Carried.Count == 0, Is.True, "case1: the bank pushed the leaver's open visit on: its item is safe");
-            yield return Consistent(rig, "case1 banked");
-            Assert.That(rig.Haul.ServerBank(), Is.False, "banking again with nothing new is refused (no duplicate bank)");
+            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 1, ref askedAt1, () => rig.Haul.Session.Phase == DivePhase.BankRoom), Timeout, "case1: the remaining client could not open the bank room");
+            Assert.That(leaverBag.BankOpen, Is.False, "case1: the leaver has no bank visit (capacity follows who is present)");
+            Assert.That(leaverBag.Carried, Is.EqualTo(new[] { 101 }), "case1: the leaver's item is still carried in the open room");
+            yield return Consistent(rig, "case1 bank room");
+            Assert.That(rig.Haul.ServerEnterBankRoom(), Is.False, "the room is open already (no duplicate bank)");
 
-            // ... and go home from the heart.
-            yield return ToHeart(rig, true);
-            yield return PlayModeHarness.WaitUntil(() => { Move(rig.HostHero, BankPos(rig)); return rig.Host.ServerTryGoHome(rig.HostNm.LocalClientId); }, 5f, "case1: the host could not take the party home");
+            // ... and go home from it: the shared choice needs both remaining players.
+            yield return GoHomeTogether(rig, 1, "case1 go home");
             yield return PlayModeHarness.WaitUntil(() => !rig.PeerDirector(1).NetActive.Value, Timeout, "case1: the remaining client never went home");
             Assert.That(rig.Ends, Is.EqualTo(1), "the dive ended exactly once");
-            Assert.That(StockCount(rig), Is.EqualTo(2), "both banked pieces arrived in the town stock");
+            Assert.That(StockCount(rig), Is.EqualTo(2), "both found pieces are in the town stock");
+            Assert.That(leaverBag.Carried, Is.Empty, "case1: the leaver's bag came home with the party");
+            Assert.That(leaverBag.Stash.ContainsKey(101), Is.True, "case1: and its item is in the leaver's stash");
             yield return Consistent(rig, "case1 home");
         }
 
@@ -303,7 +317,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             Rig rig = null;
             yield return Start(r => rig = r, 2);
-            yield return StartDive(rig);
+            if (kind == Request.Stair) yield return StartDive(rig); else yield return StartAtBank(rig);
             Vector3 at;
             if (kind == Request.Stair)
             {
@@ -313,10 +327,8 @@ namespace SleepingCalamity.Tests.PlayMode
             }
             else
             {
-                yield return Descend(rig, 1);
-                Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
-                Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(2, 0)), Is.True);
-                if (kind == Request.GoHome) yield return ToHeart(rig, true);
+                Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.FrameId), Is.True);
+                Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.DoorId), Is.True);
                 at = BankPos(rig);
             }
             yield return Consistent(rig, "case2 before");
@@ -338,10 +350,10 @@ namespace SleepingCalamity.Tests.PlayMode
                 case Request.Bank:
                     {
                         var s = rig.Haul.Current;
-                        bool handled = rig.Haul.Session.BankChosenThisDive;   // pieces are safe on pickup, so the bank point itself is what a handled request leaves behind
+                        bool handled = rig.Haul.Session.Phase == DivePhase.BankRoom;   // pieces are safe on pickup, so the open bank room is what a handled request leaves behind
                         Assert.That(s.FoundPieces, Is.EqualTo(2), "case2 bank: the pieces are safe either way");
-                        if (!handled) Assert.That(rig.Haul.ServerBank(), Is.True, "case2 bank: the refused request left the bank usable");
-                        Assert.That(rig.Haul.ServerBank(), Is.False, "case2 bank: no duplicate bank");
+                        if (!handled) Assert.That(rig.Haul.ServerEnterBankRoom(), Is.True, "case2 bank: the refused request left the bank usable");
+                        Assert.That(rig.Haul.ServerEnterBankRoom(), Is.False, "case2 bank: no duplicate bank");
                         break;
                     }
                 case Request.Stair:
@@ -355,7 +367,7 @@ namespace SleepingCalamity.Tests.PlayMode
                     }
                 default:
                     {
-                        if (rig.Host.NetActive.Value) { Assert.That(rig.Ends, Is.EqualTo(0)); Assert.That(rig.Host.ServerTryGoHome(rig.HostNm.LocalClientId), Is.True, "case2 go-home: the refused request left the way home usable"); }
+                        if (rig.Host.NetActive.Value) { Assert.That(rig.Ends, Is.EqualTo(0)); yield return GoHomeTogether(rig, 1, "case2 go-home"); }   // the leaver's press (if it got through) does not count for the party that is left
                         Assert.That(rig.Ends, Is.EqualTo(1), "case2 go-home: the dive ended exactly once");
                         yield return PlayModeHarness.WaitUntil(() => !rig.PeerDirector(1).NetActive.Value, Timeout, "case2 go-home: the other client never went home");
                         Assert.That(StockCount(rig), Is.EqualTo(2), "case2 go-home: the banked pieces are in the stock once");
@@ -421,26 +433,27 @@ namespace SleepingCalamity.Tests.PlayMode
 
         // ================================================================ case 4
 
-        // Catches: a go-home that needs every client (a gone client's hero leaving the party stuck), the stock not receiving the banked haul, the dive not ending on the remaining peer.
+        // Catches: a go-home that needs every client (a gone client's hero leaving the party stuck), the stock not receiving the found pieces, the dive not ending on the remaining peer.
         [UnityTest]
-        public IEnumerator Case4_HostGoesHome_WithAClientAlreadyGone()
+        public IEnumerator Case4_GoHomeFromTheBankRoom_WithAClientAlreadyGone()
         {
             Rig rig = null;
             yield return Start(r => rig = r, 2);
-            yield return StartDive(rig);
-            yield return Descend(rig, 1);
-            Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
-            Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(2, 0)), Is.True);
-            yield return ToHeart(rig, true);   // the heart bank banks the two pieces
+            yield return StartAtBank(rig);
+            Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.FrameId), Is.True);
+            Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.DoorId), Is.True);
+            Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.BakerId), Is.True);
+            Assert.That(rig.Haul.ServerEnterBankRoom(), Is.True, "[bank] the host-side bank press opens the room");
             Assert.That(rig.Haul.Current.FoundPieces, Is.EqualTo(2));
             yield return Drop(rig, 1, "case4");
             yield return Consistent(rig, "case4 after the drop");
-            yield return PlayModeHarness.WaitUntil(() => { Move(rig.HostHero, BankPos(rig)); return rig.Host.ServerTryGoHome(rig.HostNm.LocalClientId); }, 5f, "case4: the host-driven go-home was refused");
+            yield return GoHomeTogether(rig, 0, "case4 go home");
             yield return PlayModeHarness.WaitUntil(() => !rig.PeerDirector(0).NetActive.Value, Timeout, "case4: the remaining client never went home");
             Assert.That(rig.Ends, Is.EqualTo(1), "one end");
-            Assert.That(StockCount(rig), Is.EqualTo(2), "the banked pieces are in the stock");
-            Assert.That(rig.Host.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "the heart's rescue came home");
+            Assert.That(StockCount(rig), Is.EqualTo(2), "the found pieces are in the stock");
+            Assert.That(rig.Host.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "the baker came home");
             yield return Consistent(rig, "case4 home");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.FloorSync.BuiltFloor == CellarFloorSync.NoFloor, Timeout, "case4: the floor was never cleared");
             Assert.That(rig.Host.ServerStartDive(), Is.True, "a new dive can start afterwards");
         }
 
@@ -558,10 +571,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(combat.Growth(rig.ClientId(0)).Weapon(Axe).Abs, Is.EqualTo(seedPresent), "the present client's saved growth was restored");
             combat.Growth(rig.ClientId(0)).Weapon(Axe).AddAbs(5f);
             float earned = combat.Growth(rig.ClientId(0)).Weapon(Axe).Abs;
-            Assert.That(rig.Haul.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
-            yield return ClientTo(rig, 0, BankPos(rig), "case6 walk to the bank");
-            float askedAt6 = -10f;
-            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 0, ref askedAt6, () => rig.Haul.Session.BankChosenThisDive), Timeout, "case6: the present client could not bank");
+            Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.FrameId), Is.True);
 
             // Leave: the session saves; the absent two must be exactly as seeded.
             yield return PlayModeHarness.Await(rig.App.Services.Get<INetworkSession>().LeaveAsync(), Timeout);

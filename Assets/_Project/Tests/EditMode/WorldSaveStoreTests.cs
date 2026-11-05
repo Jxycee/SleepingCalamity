@@ -658,7 +658,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(old.Current.Dive.BossBeaten, Is.False);
             Assert.That(old.Current.Dive.ExtraSlotOwner, Is.Null);
             Assert.That(old.Current.Dive.PieceDepths, Is.Null, "missing, so the host assigns them once and saves them");
-            Assert.That(old.Current.Dive.CheckpointReached, Is.True);
+            Assert.That(old.Current.Dive.CheckpointReached, Is.False, "the old 4-floor checkpoint reads as not held (task 12)");
             Assert.That(old.Current.Dive.ClearedMask, Is.EqualTo(3));
         }
 
@@ -811,7 +811,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(blank.Stock, Is.Null);
         }
 
-        // Catches: a live capture built from DiveState (which knows none of the new fields) wiping the saved depths, held checkpoint or extra-slot owner, or the saved suspend section.
+        // Catches: a live capture (which knows none of the saved-only fields) wiping the saved depths, held checkpoint or extra-slot owner, or the saved suspend section.
         [Test]
         public void HostWorld_LegacySource_KeepsTheSavedV2FieldsAndSuspend()
         {

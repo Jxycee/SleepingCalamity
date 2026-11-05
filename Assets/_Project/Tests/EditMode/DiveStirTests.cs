@@ -135,6 +135,71 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(s.Value, Is.EqualTo(25f).Within(0.001f), "baseline is gone");
         }
 
+        // The model cases of the retired StirMeterTests that the tests above do not cover (plan 3 task 12).
+        [Test]
+        public void Value_ClampsTo100_AndNeverGoesBelowOnePlayer()
+        {
+            var s = new DiveStir();
+            s.PlayersPresent = 0;
+            Assert.That(s.PlayersPresent, Is.EqualTo(1), "never below one player");
+            s.PlayersPresent = 4;
+            for (int f = 1; f <= 5; f++) s.OnFloorCleared(f);
+            s.UnbankedValuables = 30;
+            Assert.That(s.Value, Is.EqualTo(DiveStir.Max), "(50 + 150) x 2 clamps to 100");
+            s.UnbankedValuables = -3;
+            Assert.That(s.UnbankedValuables, Is.EqualTo(0), "never below zero valuables");
+        }
+
+        [Test]
+        public void Latches_StayOnWhenThePartyShrinks_AndClearAtPushOn()
+        {
+            var s = new DiveStir();
+            s.PlayersPresent = 4;
+            s.OnFloorCleared(1); s.OnFloorCleared(2); s.OnFloorCleared(3); s.OnFloorCleared(4);   // 40 x 2 = 80
+            Assert.That(s.HunterLatched, Is.True);
+            s.PlayersPresent = 1;                                                                  // 40
+            Assert.That(s.Value, Is.LessThan(DiveStir.HunterThreshold));
+            Assert.That(s.ExtraEnemyLatched && s.HunterLatched, Is.True, "latched for the half");
+            s.OnPushOn();
+            Assert.That(s.ExtraEnemyLatched || s.HunterLatched, Is.False, "the second half starts clean");
+            s.ResetForNewDive();
+            Assert.That(s.ExtraEnemyLatched || s.HunterLatched || s.CollapseRunning || s.CollapsePending, Is.False);
+            Assert.That(s.Value, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void Collapse_StoppedByTheStair_NeverFailsTheDive_AndAnExpiredOneTicksFalseAfterwards()
+        {
+            var s = new DiveStir();
+            s.UnbankedValuables = 20;
+            s.BeginCollapse(80f);
+            Assert.That(s.Tick(30f), Is.False);
+            Assert.That(s.CollapseSecondsLeft, Is.EqualTo(90f).Within(0.001f));
+            s.OnStairTaken();
+            Assert.That(s.Tick(500f), Is.False, "a stopped countdown never fails the dive");
+            Assert.That(s.ExtraEnemyLatched && s.HunterLatched, Is.True, "the latches stay");
+            var e = new DiveStir { UnbankedValuables = 20 };
+            e.BeginCollapse(10f);
+            Assert.That(e.Tick(60f), Is.True);
+            Assert.That(e.Tick(10f), Is.False, "the failure is reported once");
+            Assert.That(e.CollapseSecondsLeft, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void Numbers_ArePinned()
+        {
+            Assert.That(new[] { DiveStir.PerFloorCleared, DiveStir.PerUnbankedValuable, DiveStir.Max, DiveStir.ExtraEnemyThreshold, DiveStir.HunterThreshold, DiveStir.DeepClosesThreshold },
+                Is.EqualTo(new[] { 10f, 5f, 100f, 40f, 70f, 100f }));
+            Assert.That(new[] { DiveStir.CollapseMultiplier, DiveStir.CollapseMinSeconds, DiveStir.RewardRankStep }, Is.EqualTo(new[] { 1.5f, 60f, 35f }));
+        }
+
+        [Test]
+        public void Deterministic_TwoIdenticalRunsAgree()
+        {
+            float Run() { var s = new DiveStir { PlayersPresent = 3 }; s.OnFloorCleared(2); s.UnbankedValuables = 4; s.BeginCollapse(5f); s.Tick(5f); return s.Value + s.RewardValue + s.CollapseSecondsLeft; }
+            Assert.That(Run(), Is.EqualTo(Run()));
+        }
+
         [Test]
         public void CaptureRestore_RoundTrips()
         {

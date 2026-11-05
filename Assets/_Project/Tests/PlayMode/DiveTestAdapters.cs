@@ -1,5 +1,5 @@
-// Authority: test-only. Plan 3 task 7: PlayMode tests that predate the new dive position the host's session by hand. This keeps their call sites compiling while plan 3 task 12 ports them to the
-// real flow (start, stair, bank room); it is a hook for tests, never a game path. Delete it with the last caller.
+// Authority: test-only. Hooks for the PlayMode tests that run a DiveHaulSync ALONE (no director, so no real start, stair or bank walk): they position the host's session by hand. The tests with a
+// director (the walks, the disconnect cases, the hub, the bots) use the real flow since plan 3 task 12; this file keeps only what the haul-only rigs still call. Never a game path.
 using SleepingCalamity.Core;
 using SleepingCalamity.Presentation;
 
@@ -7,9 +7,6 @@ namespace SleepingCalamity.Tests.PlayMode
 {
     internal static class DiveTestAdapters
     {
-        // The old "heart banked" flag, now: this dive pushed on at the bank room.
-        public static bool BankChosenNow(this DiveDirector d) => d.HaulSync != null && d.HaulSync.Current.BankChosen;
-
         // The bank room, the way the party gets there: floor 5 cleared (its guardian), then the bank press. False when the session refuses.
         public static bool BankRoomNow(this DiveHaulSync haul)
         {
@@ -24,13 +21,6 @@ namespace SleepingCalamity.Tests.PlayMode
             if (!haul.IsServer || haul.Session == null) return false;
             foreach (ulong id in new System.Collections.Generic.List<ulong>(haul.NetworkManager.ConnectedClientsIds)) haul.ServerChoosePushOn(id);
             return haul.Session.BankChosenThisDive;
-        }
-
-        // The old stand-in press of tests that predate plan 3 task 8: the first one entered the bank room, the next pushed on. Delete with the last caller (task 12).
-        public static bool ServerBank(this DiveHaulSync haul)
-        {
-            if (!haul.IsServer || !haul.IsSpawned || haul.Session == null) return false;
-            return haul.Session.Phase == DivePhase.BankRoom ? haul.PushOnNow() : haul.ServerEnterBankRoom();
         }
 
         // Puts the host's session on `floor` (0 = home, a fresh Town-phase session over the same bags, checkpoint and pieces) without walking there. Cleared floors, stir and the bank state are

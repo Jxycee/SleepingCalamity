@@ -147,12 +147,6 @@ namespace SleepingCalamity.Tests.PlayMode
             return list;
         }
 
-        [Test]
-        public void DefaultPieceCounts_MatchTheCoreTestConstant()
-        {
-            Assert.That(DiveHaulSync.DefaultPiecesPerFloor, Is.EqualTo(new[] { 2, 2, 2 }));   // legacy until plan 3 task 12 (EditMode tests still read it)
-        }
-
         // A haul sync spawned alone deals its pieces from DefaultWorldSeed with the Core table: none on the authored floor 1, the baker on floor 3, the rest on the generated floors.
         [Test]
         public void DefaultPieces_AreDealtFromTheFallbackWorldSeed_NoneOnFloor1()

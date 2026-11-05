@@ -165,13 +165,13 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void StirMeter_DrivesThePlanInputs()
+        public void DiveStir_DrivesThePlanInputs()
         {
-            var haul = new DiveHaul(new[] { 3, 3, 3 });
-            var stir = new StirMeter(haul, StirTuning.Default);
-            Assert.AreEqual(0, stir.ExtraEnemiesPerRoom); Assert.IsFalse(stir.HunterLatched);
-            for (int f = 1; f <= 4; f++) stir.OnFloorCleared(f);   // 40
-            Assert.AreEqual(1, stir.ExtraEnemiesPerRoom);
+            var stir = new DiveStir();
+            Assert.IsFalse(stir.ExtraEnemyLatched); Assert.IsFalse(stir.HunterLatched);
+            for (int f = 1; f <= 4; f++) stir.OnFloorCleared(f);   // 40: the extra-enemy mark
+            Assert.IsTrue(stir.ExtraEnemyLatched); Assert.IsFalse(stir.HunterLatched);
+            Assert.IsNotNull(CellarEncounterPlan.Build(CellarFloorGenerator.Layout(3, 2), CellarFloorDressing.Resolve(CellarFloorGenerator.Layout(3, 2)), stir.ExtraEnemyLatched ? 1 : 0, stir.HunterLatched));
         }
 
         // procgen 3b: no plan spawn (authored, extra, hunter; with or without a twist) stands on a chunk solid cell.

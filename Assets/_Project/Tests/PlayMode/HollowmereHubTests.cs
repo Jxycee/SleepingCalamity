@@ -90,7 +90,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator GoHome_AfterTheHeartBank_LandsAtTheStairTop_TownStockHoldsTheBankedPieces_BakerReceived()
+        public IEnumerator GoHome_FromTheBankRoom_LandsAtTheStairTop_TownStockHoldsTheFoundPieces_BakerReceived()
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             yield return PlayModeHarness.StartSoloAndWaitForPlayer(SceneNames.Hollowmere);
@@ -101,27 +101,30 @@ namespace SleepingCalamity.Tests.PlayMode
             DiveDirector director = DiveDirector.Instance;
 
             director.SeedOverride = 777u;
-            Assert.That(director.ServerStartDive(4), Is.True);
-            yield return PlayModeHarness.WaitUntil(() => director.FloorSync != null && director.FloorSync.Built != null && director.FloorSync.BuiltFloor == 4, Timeout, "floor 4 never built");
+            director.TestHoldCheckpoint(true);   // the pick: start at the bank (decision 2), the guardian already beaten
+            Assert.That(director.ServerStartDive(UndercroftPlan.BankFloor), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => director.FloorSync != null && director.FloorSync.Built != null && director.FloorSync.BuiltFloor == UndercroftPlan.BankFloor, Timeout, "floor 5 never built");
             yield return PlayModeHarness.WaitUntil(() => hero.transform.position.y < AreaLook.Current.CellarBelowY, Timeout, "the hero never arrived under the town");
             yield return Seconds(1f);   // the arrival teleports have landed before the test moves the hero
 
-            // Bank at the heart: the hero stands at the bank point (the go-home range check), a piece is in the haul.
+            // The bank room: the hero stands at the bank point (the go-home range check), a piece and the baker were found.
             Assert.That(CellarFloorBuilder.TryBankWorld(director.FloorSync.Layout, director.FloorSync.Built, out Vector3 bank), Is.True);
             var cc = hero.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
             hero.transform.position = bank + new Vector3(0.5f, 0.1f, 0f);
             if (cc != null) cc.enabled = true;
-            Assert.That(director.HaulSync.ServerAddPiece(DiveHaul.PieceId(3, 0)), Is.True);
-            Assert.That(director.HaulSync.ServerBank(), Is.True, "floor 4 is a bank point");
-            yield return PlayModeHarness.WaitUntil(() => director.BankChosenNow(), Timeout, "the heart bank never registered");
+            Assert.That(director.HaulSync.ServerAddPiece(PieceCatalog.SpareFrameId), Is.True);
+            Assert.That(director.HaulSync.ServerAddPiece(PieceCatalog.BakerId), Is.True);
+            Assert.That(director.ServerTryBank(app.NetworkManager.LocalClientId), Is.True, "the cleared bank floor's press opens the bank room");
+            yield return PlayModeHarness.WaitUntil(() => director.HaulSync.Current.DivePhase == DivePhase.BankRoom, Timeout, "the bank room never opened");
 
-            Assert.That(director.ServerTryGoHome(app.NetworkManager.LocalClientId), Is.True, "the party can go home after the heart bank");
+            Assert.That(director.ServerTryGoHome(app.NetworkManager.LocalClientId), Is.True, "the party can go home from the bank room");
             yield return PlayModeHarness.WaitUntil(() => !director.NetActive.Value, Timeout, "go home never ended the dive");
             yield return PlayModeHarness.WaitUntil(() => Flat(hero.transform.position, top.position) < 3f, Timeout, "the party never landed at the stair top");
             Assert.That(hero.transform.position.y, Is.GreaterThan(AreaLook.Current.CellarBelowY));
-            Assert.That(director.Town.State.InStock(DiveHaul.PieceId(3, 0)), Is.True, "the banked piece is in the town stock");
-            Assert.That(director.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "the heart bank brought the baker home");
+            Assert.That(director.Town.State.InStock(PieceCatalog.SpareFrameId), Is.True, "the found piece is in the town stock");
+            Assert.That(director.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "the found baker is in the town stock");
+            Assert.That(director.Checkpoint.Held, Is.True, "going home from the bank holds the checkpoint");
         }
 
         [UnityTest]
@@ -157,8 +160,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Light sun = RenderSettings.sun;
             Assert.That(sun, Is.Not.Null);
 
-            // Dive to floor 2, bank a piece there, then abandon (the dive fails): the party must land at the stair top and the banked piece must be in the town stock.
+            // Dive to floor 2 (the checkpoint pick), find a piece there, then abandon (the dive fails): the party must land at the stair top and the found piece must be in the town stock.
             director.SeedOverride = 4242u;
+            director.TestHoldCheckpoint(true);
             Assert.That(director.ServerStartDive(2), Is.True);
             yield return PlayModeHarness.WaitUntil(() => director.FloorSync != null && director.FloorSync.Built != null && director.FloorSync.BuiltFloor == 2, Timeout, "floor 2 never built");
             // The look is right on every rendered frame of the teleport (checked at the end of each frame, once the camera is down there too).
@@ -176,8 +180,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(RenderSettings.fogDensity, Is.Not.EqualTo(townFog).Within(0.0001f), "the cellar has its own fog");
             Assert.That(RenderSettings.defaultReflectionMode, Is.EqualTo(DefaultReflectionMode.Custom));
 
-            Assert.That(director.HaulSync.ServerAddPiece(DiveHaul.PieceId(1, 0)), Is.True);
-            Assert.That(director.HaulSync.ServerBank(), Is.True, "floor 2 is a bank point");
+            Assert.That(director.HaulSync.ServerAddPiece(PieceCatalog.FrameId), Is.True);
             Assert.That(director.ServerAbandonDive(), Is.True);
             yield return WatchLook(probe, () => Flat(hero.transform.position, top.position) < 3f && Camera.main.transform.position.y > AreaLook.Current.CellarBelowY, "the party never landed at the stair top");
             Assert.That(AreaLook.Current.CurrentArea, Is.EqualTo(AreaLook.Area.Town), "the look is already the town's on the first frame the camera is back up");
@@ -193,9 +196,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(AreaLook.Current.TownWeight, Is.EqualTo(1f).Within(0.01f));
             Assert.That(AreaLook.Current.CellarWeight, Is.EqualTo(0f).Within(0.01f));
 
-            // The banked piece came home; nothing was stocked twice.
-            Assert.That(director.Town.State.InStock(DiveHaul.PieceId(1, 0)), Is.True, "the banked piece is in the town stock");
-            Assert.That(director.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.False, "the heart was not banked, so no baker");
+            // The found piece is home; nothing was stocked twice.
+            Assert.That(director.Town.State.InStock(PieceCatalog.FrameId), Is.True, "the found piece is in the town stock");
+            Assert.That(director.Town.State.ResidentInStock(TownBuildings.BakerResident), Is.False, "the baker was not found, so he is not home");
             int count = 0; foreach (int _ in director.Town.State.StockPieces) count++;
             Assert.That(count, Is.EqualTo(1));
         }

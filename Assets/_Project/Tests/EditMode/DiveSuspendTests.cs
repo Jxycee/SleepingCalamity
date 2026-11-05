@@ -359,7 +359,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(c.BossBeaten, Is.False);
             Assert.That(c.ExtraSlotOwner, Is.Null);
             Assert.That(c.PieceDepths, Is.Null, "missing stays missing (a repair at load, not a rejection)");
-            Assert.That(c.CheckpointReached, Is.True, "the old field is untouched until task 12");
+            Assert.That(c.CheckpointReached, Is.False, "the old 4-floor checkpoint reads as not held (task 12)");
             Assert.That(dropped, Is.Empty, "no rejection, so no .corrupt copy for every old save");
             Assert.That(TownSaveRules.CleanDive(new DiveSave { CheckpointHeld = true, BossBeaten = true }, null).CheckpointHeld, Is.True);
             Assert.That(TownSaveRules.IsPristine(new DiveSave { CheckpointHeld = true }), Is.False, "a held checkpoint is progress");
@@ -439,7 +439,7 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void MergeLive_LiveDiveWithoutV2Fields_KeepsSavedDepthsAndOwner()
         {
-            // the live capture builds a fresh DiveSave from DiveState (it knows none of the new fields): the saved ones must not be wiped by it
+            // the live capture builds a fresh DiveSave (it knows none of the new fields): the saved ones must not be wiped by it
             var previous = new TownSnapshot { Dive = V2Dive() };
             var live = new TownSnapshot { Dive = new DiveSave { ClearedMask = 3 } };
             TownSnapshot merged = TownSaveRules.MergeLive(live, previous);
@@ -501,11 +501,11 @@ namespace SleepingCalamity.Tests.EditMode
         public void TownSavesCapture_PassesTheSuspendSectionThrough_Cleaned()
         {
             SuspendSave sus = Section(GoodBag(KeyA.Id)); sus.ClearedMask = 0xFFFF;
-            TownSnapshot snap = TownSaves.Capture(null, null, null, null, null, sus, true);
+            TownSnapshot snap = TownSaves.Capture(null, null, null, sus, true);
             Assert.That(snap.SuspendKnown, Is.True);
             Assert.That(snap.Suspend.ClearedMask, Is.EqualTo(0x3FF));
-            Assert.That(TownSaves.Capture(null, null, null, null, null).SuspendKnown, Is.False, "the existing callers say nothing about it");
-            Assert.That(TownSaves.Capture(null, null, null, null, null).Suspend, Is.Null);
+            Assert.That(TownSaves.Capture(null, null, null).SuspendKnown, Is.False, "the existing callers say nothing about it");
+            Assert.That(TownSaves.Capture(null, null, null).Suspend, Is.Null);
         }
 
         [Test]

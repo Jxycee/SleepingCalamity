@@ -1,6 +1,6 @@
 // Core/Cellars/DivePieces.cs: which bakery pieces and people the party has found, and the floor each one lives on (spec 4.4, decision 10). Pure C#.
 // Authority: host only (owned by DiveDirector; a DiveSession reads it). Depths come from PieceDepths.Assign(worldSeed, PieceCatalog.Specs), saved once per world; a person is a
-// PieceCatalog.IsPerson id (the baker). A found piece is safe at once: it is never banked and never lost on failure (it sits beside DiveHaul until plan 3 task 12 retires that).
+// PieceCatalog.IsPerson id (the baker). A found piece is safe at once: it is never banked and never lost on failure.
 using System.Collections.Generic;
 
 namespace SleepingCalamity.Core

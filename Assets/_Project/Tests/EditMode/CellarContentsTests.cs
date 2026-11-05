@@ -1,6 +1,6 @@
 // Authority: none (pure EditMode tests). M5 contents in Core: CellarLoot (rank roll + key chest), CellarPieceSpots, CellarRoomClear, CellarEnemyMix.
 // Catches: a roll that differs between peers, a rank band that does not rise with the floor, a key chest that yields loot, a piece on a chest / spawn / bank / healing /
-// locked-room / entry cell, a piece count that differs from DefaultPiecesPerFloor, a room that clears early or never.
+// locked-room / entry cell, a piece count that differs from the one asked for, a room that clears early or never.
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -10,8 +10,6 @@ namespace SleepingCalamity.Tests.EditMode
 {
     public sealed class CellarContentsTests
     {
-        static readonly int[] Defaults = { 2, 2, 2 };   // = DiveHaulSync.DefaultPiecesPerFloor (the PlayMode contents test asserts the equality)
-
         [Test]
         public void Loot_IsDeterministic_AndItemsMatchTheirRank()
         {
@@ -83,7 +81,7 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void PieceSpots_CountMatchesDefaults_AndCellsAreLegalAndDistinct()
+        public void PieceSpots_CountMatchesTheRequest_AndCellsAreLegalAndDistinct()
         {
             for (uint seed = 0; seed < 120; seed++)
                 foreach (int floor in new[] { 2, 4, 6, 7 })   // the generated floors (plan 3 task 5: pieces never lie on floor 1, 3 or 5)
@@ -127,11 +125,12 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void PieceId_MatchesDiveHaul()
+        public void PieceIds_AreTheCatalogsSevenIds_AndTheirDepthsAreAssignedOnce()
         {
-            var h = new DiveHaul(Defaults);
-            for (int f = 1; f <= 3; f++) for (int i = 0; i < 2; i++) Assert.IsTrue(h.AddPiece(DiveHaul.PieceId(f, i)));
-            Assert.AreEqual(0, h.PiecesLeft(1) + h.PiecesLeft(2) + h.PiecesLeft(3));
+            Assert.AreEqual(new[] { 100, 101, 200, 201, 300, 301, PieceCatalog.BakerId }, PieceCatalog.Specs.Select(p => p.Id).ToArray(), "the ids old saves hold");
+            var pieces = new DivePieces(PieceDepths.Assign(12345UL, PieceCatalog.Specs));
+            foreach (PieceSpec p in PieceCatalog.Specs) { Assert.Greater(pieces.DepthOf(p.Id), 0, "depth of " + p.Id); Assert.IsTrue(pieces.Pick(p.Id)); }
+            Assert.AreEqual(0, Enumerable.Range(1, UndercroftPlan.BossFloor).Sum(f => pieces.PiecesLeft(f) + pieces.PeopleLeft(f)));
         }
 
         [Test]

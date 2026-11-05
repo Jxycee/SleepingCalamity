@@ -88,7 +88,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var records = new List<SuspendedBag>();
             BagsSave home = BagsSaveRules.Capture(bags, keys, true, session.Floor, suspended: true, suspendedBags: records);
             SuspendSave section = SuspendSaveRules.Build(session.Snapshot(), 4242u, new[] { ownerId }, new[] { ownerId }, records);
-            TownSnapshot snap = TownSaves.Capture(null, null, null, null, null, section, true);
+            TownSnapshot snap = TownSaves.Capture(null, null, null, section, true);
             snap.Dive.InDive = true;
             snap.Bags = home;
             var source = new SuspendSource { Live = snap };

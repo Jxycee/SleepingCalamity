@@ -110,9 +110,9 @@ namespace SleepingCalamity.Tests.EditMode
             var residents = new ResidentsSave();
             residents.Residents.Add(new ResidentSave { Id = TownBuildings.BakerResident, FirstMeetBeat = true });
             var stock = new TownStock(Hollow);
-            TownSnapshot snap = stock.Capture(null, null, residents);
+            TownSnapshot snap = TownSaves.Capture(stock.State, null, residents);
             Assert.That(TownSaves.FirstMeetBeat(snap.Residents, TownBuildings.BakerResident), Is.True);
-            Assert.That(TownSaves.FirstMeetBeat(stock.Capture(null, null).Residents, TownBuildings.BakerResident), Is.False, "null residents: the host keeps its saved beats");
+            Assert.That(TownSaves.FirstMeetBeat(TownSaves.Capture(stock.State, null, null).Residents, TownBuildings.BakerResident), Is.False, "null residents: the host keeps its saved beats");
             // a later capture that has not latched yet cannot roll the saved latch back
             ResidentsSave merged = TownSaveRules.MergeLatches(new ResidentsSave(), snap.Residents);
             Assert.That(TownSaves.FirstMeetBeat(merged, TownBuildings.BakerResident), Is.True);

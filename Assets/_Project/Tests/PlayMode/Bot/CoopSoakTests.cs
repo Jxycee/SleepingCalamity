@@ -155,9 +155,9 @@ namespace SleepingCalamity.Tests.PlayMode
             sb.AppendLine();
             sb.AppendLine("## Dives");
             sb.AppendLine();
-            sb.AppendLine($"- Dives started (host bot left the hub into floor 1): {divesStarted}; taken home: {run.DivesHome + (run.Bot.WentHome ? 1 : 0)}; failed: {run.Bot.DiveFails} (low HP {run.Bot.Deaths}, near a floor/traversal fault {run.Bot.FaultDeaths}); floors left: {run.Bot.FloorsCleared}; deepest floor {run.MaxFloor}");
+            sb.AppendLine($"- Dives started (host bot left the hub into floor 1): {divesStarted}; finished: {run.DivesHome + (run.Bot.Finished ? 1 : 0)}; failed: {run.Bot.DiveFails} (low HP {run.Bot.Deaths}, near a floor/traversal fault {run.Bot.FaultDeaths}); floors left: {run.Bot.FloorsCleared}; deepest floor {run.MaxFloor}");
             sb.AppendLine($"- Hero downs {run.Downs.Values.Sum()} ({string.Join(", ", run.Downs.OrderBy(k => k.Key).Select(k => "client " + k.Key + ": " + k.Value))}); out {run.Outs.Values.Sum()}; revives {run.Revives.Values.Sum()}; time downed {run.DownedSeconds.Values.Sum():0} s");
-            sb.AppendLine($"- Host bot: enemies killed {run.Bot.EnemiesKilled}, chests {run.Bot.ChestsOpened}, pieces {run.Bot.PiecesTaken}, stuck events {run.Bot.StuckEvents}, hearts banked: {run.Bot.HeartBanked}");
+            sb.AppendLine($"- Host bot: enemies killed {run.Bot.EnemiesKilled}, chests {run.Bot.ChestsOpened}, pieces {run.Bot.PiecesTaken}, stuck events {run.Bot.StuckEvents}, bank picks: {run.Bot.BankPicks}, pushed on: {run.Bot.PushedOn}");
             sb.AppendLine();
             sb.AppendLine("## Frame time per phase (real wall ms per frame, Stopwatch)");
             sb.AppendLine();

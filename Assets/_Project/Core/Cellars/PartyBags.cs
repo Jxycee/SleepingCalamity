@@ -1,5 +1,5 @@
 // Core/Cellars/PartyBags.cs: the host's PlayerBag per recorded player, keyed by player id (spec decision 39; per-player loot plan task 1). Pure C#.
-// Authority: host only (owned by DiveState). The id is the PlayerKey string, or the client id when there is no roster, so a rejoin gets the same bag back.
+// Authority: host only (owned by the DiveDirector, handed to each DiveSession). The id is the PlayerKey string, or the client id when there is no roster, so a rejoin gets the same bag back.
 using System;
 using System.Collections.Generic;
 

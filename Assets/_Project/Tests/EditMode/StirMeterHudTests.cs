@@ -55,7 +55,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(DiveStir.DeepClosesThreshold / DiveStir.Max, m[2], 1e-4f);
         }
 
-        // Catches: the HUD bar still drawn from the retired StirTuning (its Max, its marks) instead of the DiveStir the host runs: the fill is Value / DiveStir.Max and a full bar is the collapse threshold.
+        // Catches: the HUD bar still drawn from the retired stir tuning (its Max, its marks) instead of the DiveStir the host runs: the fill is Value / DiveStir.Max and a full bar is the collapse threshold.
         [Test]
         public void Fill_IsDiveStirValueOverItsMax()
         {

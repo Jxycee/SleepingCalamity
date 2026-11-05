@@ -1,6 +1,6 @@
 // Core/Cellars/DiveSession.cs: the host's rules for one dive (plan 3 task 2; spec decisions 13, 19, 25, 31, 32, 36-38). Pure C#, no clocks (the host ticks Stir).
 // Authority: host only (owned by DiveDirector). The director keeps PartyBags, DiveCheckpoint and DivePieces across dives and builds a fresh session per dive.
-// Floor 5 is the bank room; push-on and go-home are the one choice there. Replaces DiveState/DiveRoute/StirMeter.
+// Floor 5 is the bank room; push-on and go-home are the one choice there. Owns the host's dive rules (it replaced the 4-floor dive state).
 using System;
 using System.Collections.Generic;
 

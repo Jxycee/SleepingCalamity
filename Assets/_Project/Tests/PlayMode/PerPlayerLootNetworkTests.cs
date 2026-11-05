@@ -1,4 +1,4 @@
-// Authority: test-only. Per-player loot (plan 2): the host keeps one PlayerBag per player inside DiveHaulSync (DiveState.Bags); pieces stay shared and go into the town stock the moment
+// Authority: test-only. Per-player loot (plan 2): the host keeps one PlayerBag per player inside DiveHaulSync (the session's PartyBags); pieces stay shared and go into the town stock the moment
 // they are picked up (DiveDirector listens to DiveHaulSync.PieceAdded).
 // Host + clients in one process (scene management off; the syncs and the director are dynamically spawned network prefabs from the owned list).
 // Catches (HostKeepsOneBagPerPlayer_ItemsGoToTheRightBag): items landing in the wrong player's bag, the host's own bag collecting a client's loot, a bag key that is not the roster's PlayerKey
@@ -140,7 +140,7 @@ namespace SleepingCalamity.Tests.PlayMode
             DiveHaulSync haul = dir.HaulSync;
             Assert.That(haul, Is.Not.Null);
 
-            int piece = DiveHaul.PieceId(1, 0);
+            int piece = PieceCatalog.FrameId;
             Assert.That(dir.Town.State.InStock(piece), Is.False, "test premise: not home yet");
             Assert.That(haul.ServerAddPiece(piece), Is.True);
             Assert.That(dir.Town.State.InStock(piece), Is.True, "the piece is in the town stock right after the pickup, not at the dive's end");

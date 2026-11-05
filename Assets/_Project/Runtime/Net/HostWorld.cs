@@ -98,12 +98,12 @@ namespace SleepingCalamity.Runtime
         }
 
         // ---- the town sections (stock, town, residents, dive; M6 S2) and the bank-room suspend (plan 3 task 6) ----
-        // The host's live town and haul (M6 S3/S4: the hub's TownState, DiveState and the resident state) implement ITownSource. CaptureTown returns the sections as they
-        // stand now (TownSaves.Capture does the work from a TownState and DiveState); it must not hand out the live objects. A section the source returns as null (or
-        // loot counts / residents it passes as null to Capture) means "I do not know": the host keeps its previous copy of it, and a first-meet beat never goes back to false.
+        // The host's live town and dive (M6 S3/S4: the hub's TownState, DiveSession and the resident state) implement ITownSource. CaptureTown returns the sections as they
+        // stand now (TownStock.CaptureWorld does the work from the live DiveSession); it must not hand out the live objects. A section the source returns as null (or
+        // residents it passes as null to Capture) means "I do not know": the host keeps its previous copy of it, and a first-meet beat never goes back to false.
         // RestoreTown is called by RegisterTownSource, before the source is live (so a save flush can never capture its still-empty state over the loaded town): it gets its
-        // own cleaned, conserved copy of the loaded sections and builds TownState / DiveHaul / DiveState / resident state from it, once, with TownSaves.ToState /
-        // RestoreHaul / DiveState.RestoreProgress. Sections an older save lacks are null in that copy (the Town property itself is a snapshot whose sections may be null).
+        // own cleaned, conserved copy of the loaded sections and builds TownState / bags / checkpoint / DivePieces / resident state from it, once, with TownSaves.ToState /
+        // TownStock.RestoreWorld. Sections an older save lacks are null in that copy (the Town property itself is a snapshot whose sections may be null).
         // A mid-dive quit has already been turned into a failed dive (InDive false), unless the snapshot carries a valid suspend section (a bank-room save: Town.Suspend). A source that knows
         // whether a suspend exists sets TownSnapshot.SuspendKnown (Suspend null then means none: the saved one was used and is cleared); one that says nothing keeps the saved section.
         public interface ITownSource { TownSnapshot CaptureTown(); void RestoreTown(TownSnapshot loaded); }
@@ -125,6 +125,7 @@ namespace SleepingCalamity.Runtime
             _townSource = null;
             _town = saved == null ? new TownSnapshot()
                 : TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = saved.Stock, Town = saved.Town, Residents = saved.Residents, Dive = saved.Dive, Bags = saved.Bags, Suspend = saved.Suspend }, null);
+            TownSaves.MigrateLegacyLoot(_town, saved?.Players?.Recorded);   // an old save's town and banked loot become the first recorded player's stash (the next capture no longer writes them)
             PieceFloors = saved != null && WorldSaveRules.TryParseSeed(saved.WorldSeed, out ulong seed) ? TownSaveRules.ResolvePieceDepths(_town.Dive, seed) : new Dictionary<int, int>();
             StampPieceDepths();
         }

@@ -36,7 +36,7 @@ namespace SleepingCalamity.Tests.PlayMode
         public readonly List<string> Findings = new List<string>();
         public readonly List<string> Log = new List<string>();
         public float Seconds, MovedMeters, DownedSeconds, FightSeconds;
-        public int BankRequests, StairRequests, GoHomeRequests, ReviveHoldSeconds10, LoavesEaten, StuckEvents, Rescues, Downs;
+        public int BankRequests, StairRequests, PushOnRequests, ReviveHoldSeconds10, LoavesEaten, StuckEvents, Rescues, Downs;
         public float ReviveHoldSeconds => ReviveHoldSeconds10 * 0.1f;
         public bool Moving { get; private set; }
 
@@ -114,17 +114,24 @@ namespace SleepingCalamity.Tests.PlayMode
             if (fs == null || fs.Built == null || fs.Layout == null) return;
             int floor = fs.BuiltFloor;
             Vector3 me = _hero.position;
-            if (DiveRoute.HasStair(floor) && CellarFloorBuilder.TryStairWorld(fs.Layout, fs.Built, out Vector3 stair) && Flat(me - stair).magnitude <= DiveDirector.PromptRadius)
+            DiveHaulSync haul = _dir.HaulSync;
+            bool chosen = haul != null && haul.Current.BankChosen;
+            if (DiveFloorTable.HasStair(floor, chosen) && CellarFloorBuilder.TryDescentWorld(fs.Layout, fs.Built, out Vector3 stair) && Flat(me - stair).magnitude <= DiveDirector.PromptRadius)
             {
                 if (_dir.NetStairOpen.Value && Flat(lead - stair).magnitude <= DiveDirector.PromptRadius + 2.5f)
                 { _dir.RequestStair(floor); StairRequests++; _nextRequest = Seconds + 2.5f; Say($"asked for the stair on floor {floor}"); }
                 return;
             }
-            if (DiveState.FloorHasBank(floor) && CellarFloorBuilder.TryBankWorld(fs.Layout, fs.Built, out Vector3 bank) && Flat(me - bank).magnitude <= DiveDirector.BankPromptRadius
+            if (DiveFloorTable.HasBank(floor) && haul != null && CellarFloorBuilder.TryBankWorld(fs.Layout, fs.Built, out Vector3 bank) && Flat(me - bank).magnitude <= DiveDirector.BankPromptRadius
                 && Flat(lead - bank).magnitude <= DiveDirector.BankPromptRadius + 2.5f)
             {
-                if (DiveRoute.CanGoHome(floor, _dir.BankChosenNow())) { _dir.RequestGoHome(); GoHomeRequests++; _nextRequest = Seconds + 2.5f; Say("asked to take the party home"); }
-                else if (!(_dir.HaulSync != null && _dir.HaulSync.Current.BankChosen)) { _dir.RequestBank(); BankRequests++; _nextRequest = Seconds + 2.5f; Say($"asked to bank on floor {floor}"); }
+                DiveHaulSync.Summary sum = haul.Current;
+                if (sum.DivePhase == DivePhase.BankRoom)
+                {
+                    // inside the room the leader's push-on opens the shared choice: the follower joins it (a repeated press by the same player changes nothing)
+                    if (sum.ChoiceKind == BankChoiceKind.PushOn) { haul.RequestPushOn(); PushOnRequests++; _nextRequest = Seconds + 2.5f; Say("joined the push-on"); }
+                }
+                else if (!chosen && (sum.ClearedMask & (1 << (UndercroftPlan.BankFloor - 1))) != 0) { _dir.RequestBank(); BankRequests++; _nextRequest = Seconds + 2.5f; Say($"asked for the bank room on floor {floor}"); }
             }
         }
 
@@ -246,7 +253,7 @@ namespace SleepingCalamity.Tests.PlayMode
         static Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
 
         public string Summary() =>
-            $"follower {Index}: {Seconds:0} s, walked {MovedMeters:0} m, downs {Downs} ({DownedSeconds:0} s down), revive holds {ReviveHoldSeconds:0.0} s, requests bank {BankRequests} / stair {StairRequests} / home {GoHomeRequests}, loaves {LoavesEaten}, fight {FightSeconds:0} s, stuck spells {StuckEvents}, rescues {Rescues}, findings {Findings.Count}";
+            $"follower {Index}: {Seconds:0} s, walked {MovedMeters:0} m, downs {Downs} ({DownedSeconds:0} s down), revive holds {ReviveHoldSeconds:0.0} s, requests bank {BankRequests} / stair {StairRequests} / push-on {PushOnRequests}, loaves {LoavesEaten}, fight {FightSeconds:0} s, stuck spells {StuckEvents}, rescues {Rescues}, findings {Findings.Count}";
 
         public BotReport Fight => _fighter.Report;
     }

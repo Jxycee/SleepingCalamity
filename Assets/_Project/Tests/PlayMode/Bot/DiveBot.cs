@@ -1,8 +1,9 @@
 // Authority: test-only (local owner, solo host). A scripted alpha tester for the Cellars dive: it plays a whole solo dive through the same FakeInputService a
 // pad would feed (camera-relative stick, the interact edge, attack/dodge through ArenaBot when an enemy is in sight), so it exercises the real input, prompts,
 // locomotion, CharacterController, contents, haul and director paths that DiveWalkQaTests skips by teleporting and calling RPCs.
-// Route per floor: kill what's in sight, take the gate key when it drops, open every chest it can reach (key chest first, then the locked door, then the room
-// behind it), walk over every bakery piece, bank at the checkpoint (floor 2), take the stair once the exit unlocks; floor 4: bank at the heart, go home.
+// Route per floor (the 7-floor dive): kill what's in sight, take the gate key when it drops, open every chest it can reach (key chest first, then the locked door, then the room
+// behind it), walk over every piece and the baker, take the stair once the exit unlocks. Floor 5: beat the guardian, rest in the bank room, pick the bankable items it carries (the
+// bank screen's pick requests) and push on (the bank screen's Y key through the dev input). Floor 6 like the others; floor 7: walk to the EndCell and finish the dive.
 // It walks with its own runtime NavMesh (hero-sized agent) and flags what a human tester would write up: stuck spots (with what blocked the capsule), a press that
 // did nothing, a pickup that didn't happen while standing on it, a fall out of the floor, the hero embedded in geometry, a downed soft-lock, errors in the log.
 using System.Collections.Generic;
@@ -10,6 +11,7 @@ using System.Linq;
 using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Presentation;
+using SleepingCalamity.Runtime;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -19,7 +21,7 @@ namespace SleepingCalamity.Tests.PlayMode
     {
         public sealed class Finding { public string Kind, Where, Text; public int Floor; public Vector3 Pos; public override string ToString() => $"**{Kind}** F{Floor} at ({Pos.x:0.0}, {Pos.y:0.0}, {Pos.z:0.0}){(string.IsNullOrEmpty(Where) ? "" : " " + Where)}: {Text}"; }
 
-        enum Goal { None, Heal, Kill, GateKey, Chest, Door, Piece, Bank, Stair, GoHome, HubStair }
+        enum Goal { None, Heal, Kill, Guardian, GateKey, Chest, Door, Piece, Bank, Stair, Finish, HubStair }
         sealed class Target { public Goal Goal; public int Index; public Vector3 Pos; public float Range; public string Name; public int Attempts; public float GaveUpAt = -1f, Started; }
 
         readonly FakeInputService _input;
@@ -36,7 +38,11 @@ namespace SleepingCalamity.Tests.PlayMode
 
         public int Floor { get; private set; }            // the floor the bot is playing (0 = hub)
         public int FloorsCleared, ChestsOpened, PiecesTaken, Presses, StuckEvents, EnemiesKilled;
-        public bool HeartBanked, WentHome, Downed;
+        public bool PushedOn, Finished, Downed;           // PushedOn: the bank room's push-on went through; Finished: the dive ended at floor 7's EndCell
+        public int BankPicks;                              // items put into bank slots in the bank room
+        public readonly HashSet<int> ClearedFloors = new HashSet<int>();   // floors the bot left by their stair (1-4, 6) and the guardian floor once its guardian fell (5)
+        public readonly HashSet<int> EnteredFloors = new HashSet<int>();
+        float _bankRoomClock, _pushKeyAt = -1f;
         public bool Tough;                                 // test-only: the host tops the hero up below 50% HP, so the run explores floors 3-4 instead of measuring difficulty
         public int DiveFails, Deaths;
         float _teleportCheckAt = -1f; Bounds _teleportBounds;
@@ -102,6 +108,7 @@ namespace SleepingCalamity.Tests.PlayMode
             if (!_vitals.IsUp || d.HasPendingTeleport) { _input.Frame = f; return; }
 
             SyncFloor(d);
+            if (BankRoom(d, dt)) { _input.Frame = f; return; }
             if (_bakeAt > 0f && Seconds >= _bakeAt) { _bakeAt = -1f; Bake(_bakeArea); _corners.Clear(); EntryProbe(); }
             if (_bakeAt > 0f) { _input.Frame = f; return; }
             if (_teleportCheckAt > 0f && Seconds >= _teleportCheckAt)
@@ -151,6 +158,44 @@ namespace SleepingCalamity.Tests.PlayMode
             _input.Frame = f;
         }
 
+        // ------------------------------------------------------------------------------------------------ the bank room
+        // While the party is in the bank room the bot stands still: it picks every bankable item it carries into its slots (the bank screen's pick request, through its own bag view), then
+        // pushes on with the bank screen's Y key (the dev input). True while the room is open.
+        bool BankRoom(DiveDirector d, float dt)
+        {
+            if (_pushKeyAt >= 0f && Seconds >= _pushKeyAt) { _pushKeyAt = -1f; _input.DevPressed.Remove(DevKey.BankPushOn); }
+            DiveHaulSync h = d.HaulSync;
+            if (h == null || !d.NetActive.Value || h.Current.DivePhase != DivePhase.BankRoom) { _bankRoomClock = 0f; return false; }
+            _bankRoomClock += dt;
+            if (_bankRoomClock < 1.5f || !d.BankScreenOpen) return true;
+            PlayerBagSync bag = PlayerBagSync.ForLocalPlayer(AppBootstrapManager());
+            if (bag == null) return true;
+            BagView v = bag.View;
+            if (_bankRoomClock < 3.0f)
+            {
+                if (!_pickedThisVisit)
+                {
+                    _pickedThisVisit = true;
+                    int free = v.SlotCapacity - v.Picks.Length;
+                    for (int i = 0; i < v.Carried.Length && free > 0; i++)
+                    {
+                        if (!BankSlots.IsBankable(CellarLoot.KindOf(v.Carried[i]))) continue;
+                        bag.RequestPick(i); free--; BankPicks++;
+                    }
+                    Say($"bank room: picked {BankPicks} of {v.Carried.Length} carried items into {v.SlotCapacity} slots");
+                }
+                return true;
+            }
+            if (_bankRoomClock >= 3.0f && _pushKeyAt < 0f)
+            {
+                _input.DevPressed.Add(DevKey.BankPushOn); _pushKeyAt = Seconds + 0.1f;   // one frame: the bank screen reads it and asks the host
+                if (_bankRoomClock > 12f) Note("Interact", "pressed the push-on key in the bank room for 12 s and the room did not close");
+            }
+            return true;
+        }
+        bool _pickedThisVisit;
+        static Unity.Netcode.NetworkManager AppBootstrapManager() => SleepingCalamity.App.AppBootstrap.Current != null ? SleepingCalamity.App.AppBootstrap.Current.NetworkManager : null;
+
         // ------------------------------------------------------------------------------------------------ floors
         void SyncFloor(DiveDirector d)
         {
@@ -160,7 +205,8 @@ namespace SleepingCalamity.Tests.PlayMode
             if (built == _builtFloorSeen) { RebakeIfDoorOpened(d, fs); return; }
             if (built > 0 && Floor > 0 && built != Floor + 1 && built != Floor)
                 Note("Flow", $"floor jumped from {Floor} to {built}");
-            if (Floor > 0 && built != Floor) { FloorsCleared++; Say($"left floor {Floor} after {_floorClock:0} s"); }
+            if (Floor > 0 && built != Floor) { FloorsCleared++; if (built == Floor + 1) ClearedFloors.Add(Floor); Say($"left floor {Floor} after {_floorClock:0} s"); }
+            if (built > 0) EnteredFloors.Add(built);
             if (built > 0) VisitsByFloor[built] = (VisitsByFloor.TryGetValue(built, out int vis) ? vis : 0) + 1;
             _builtFloorSeen = built; Floor = built; _floorClock = 0f; _given.Clear(); _target = null; _corners.Clear();
             if (built > 0)
@@ -176,7 +222,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 Vector3 hub = (d.NetHome.Value + d.NetHubStair.Value) * 0.5f;
                 Bake(new Bounds(hub, new Vector3(70f, 20f, 70f)));
-                if (WentHome) Say("back in the hub");
+                if (Finished) Say("back in the hub");
             }
         }
 
@@ -235,7 +281,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var list = new List<Target>();
             if (Floor == 0)
             {
-                if (WentHome) return null;
+                if (Finished) return null;
                 list.Add(new Target { Goal = Goal.HubStair, Pos = d.NetHubStair.Value, Range = DiveDirector.PromptRadius - 0.5f, Name = "hub stair" });
                 return list[0];
             }
@@ -264,16 +310,16 @@ namespace SleepingCalamity.Tests.PlayMode
             if (stateOk && s.RoomKeyHeld && !s.DoorOpen && c.TryGatePosition(out Vector3 gp)) list.Add(new Target { Goal = Goal.Door, Pos = gp, Range = CellarContentsSync.GateRange, Name = "locked door" });
             for (int i = 0; i < c.PieceCount; i++)
                 if (c.PieceVisible(i) && c.TryPiecePosition(i, out Vector3 pp)) list.Add(new Target { Goal = Goal.Piece, Index = i, Pos = pp, Range = CellarContentsSync.PieceRange, Name = "piece " + i });
-            HaulBankTargets(d, fs, list);
-            if (list.Count(t => t.Goal != Goal.Stair && t.Goal != Goal.GoHome) == 0 || _floorClock > 240f)
+            GuardianAndBankTargets(d, fs, list);
+            if (list.Count(t => t.Goal != Goal.Stair && t.Goal != Goal.Finish) == 0 || _floorClock > 240f)
             {
-                if (DiveRoute.HasStair(Floor) && CellarFloorBuilder.TryStairWorld(l, fs.Built, out Vector3 st))
+                if (DiveFloorTable.HasStair(Floor, PushedOn) && CellarFloorBuilder.TryDescentWorld(l, fs.Built, out Vector3 st))
                 {
                     if (stateOk && s.ExitUnlocked) list.Add(new Target { Goal = Goal.Stair, Pos = st, Range = DiveDirector.PromptRadius - 0.5f, Name = "stair" });
                     else if (_floorClock > 150f) Note("Flow", $"floor {Floor}: everything taken or tried but the exit is still locked after {_floorClock:0} s (gate key {(stateOk ? s.GateKey.ToString() : "?")})");
                 }
-                if (Floor == DiveState.HeartFloor && HeartBanked && CellarFloorBuilder.TryBankWorld(l, fs.Built, out Vector3 home))
-                    list.Add(new Target { Goal = Goal.GoHome, Pos = home, Range = DiveDirector.BankPromptRadius - 0.5f, Name = "go home" });
+                if (Floor == DiveFloorTable.LastBuiltFloor && CellarFloorBuilder.TryEndWorld(l, fs.Built, out Vector3 end))
+                    list.Add(new Target { Goal = Goal.Finish, Pos = end, Range = DiveDirector.PromptRadius - 0.5f, Name = "the ending door" });
             }
             // skip targets given up on in the last 30 s
             list.RemoveAll(t => _given.Any(g => g.Goal == t.Goal && g.Index == t.Index && Seconds - g.GaveUpAt < 30f));
@@ -281,16 +327,24 @@ namespace SleepingCalamity.Tests.PlayMode
             return list.OrderBy(t => Order(t.Goal)).ThenBy(t => Flat(t.Pos - _hero.position).magnitude).First();
         }
 
-        void HaulBankTargets(DiveDirector d, CellarFloorSync fs, List<Target> list)
+        // Floor 5: the guardian first (its room spawns it when the bot walks in), then the bank room once the floor is cleared and the choice is still open.
+        void GuardianAndBankTargets(DiveDirector d, CellarFloorSync fs, List<Target> list)
         {
-            if (!DiveState.FloorHasBank(Floor) || !CellarFloorBuilder.TryBankWorld(fs.Layout, fs.Built, out Vector3 bank)) return;
-            if (Floor == DiveState.HeartFloor && HeartBanked) return;
-            if (Floor == DiveState.CheckpointFloor && _bankedOn.Contains(Floor)) return;
-            list.Add(new Target { Goal = Goal.Bank, Pos = bank, Range = DiveDirector.BankPromptRadius - 0.5f, Name = Floor == DiveState.HeartFloor ? "heart bank" : "checkpoint bank" });
+            if (Floor != UndercroftPlan.BankFloor || d.HaulSync == null) return;
+            DiveHaulSync.Summary sum = d.HaulSync.Current;
+            bool cleared = (sum.ClearedMask & (1 << (UndercroftPlan.BankFloor - 1))) != 0;
+            if (!cleared && fs.Layout.WardenCell.HasValue && fs.Built != null && fs.Built.Root != null)
+            {
+                list.Add(new Target { Goal = Goal.Guardian, Pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(fs.Layout.WardenCell.Value.X, fs.Layout.WardenCell.Value.Y)), Range = 1.5f, Name = "the guardian" });
+                return;
+            }
+            if (cleared) ClearedFloors.Add(Floor);
+            if (!cleared || sum.BankChosen || PushedOn || sum.DivePhase == DivePhase.BankRoom || !CellarFloorBuilder.TryBankWorld(fs.Layout, fs.Built, out Vector3 bank)) return;
+            // stand west of the lamp: the green go-home column is east of it, and a press near the column would take the party home
+            list.Add(new Target { Goal = Goal.Bank, Pos = bank + new Vector3(-1.2f, 0f, 0f), Range = 1.2f, Name = "bank room" });
         }
-        readonly HashSet<int> _bankedOn = new HashSet<int>();
 
-        static int Order(Goal g) => g switch { Goal.GateKey => 0, Goal.Chest => 1, Goal.Kill => 2, Goal.Door => 2, Goal.Piece => 3, Goal.Bank => 4, Goal.Stair => 5, Goal.GoHome => 6, _ => 9 };
+        static int Order(Goal g) => g switch { Goal.GateKey => 0, Goal.Chest => 1, Goal.Kill => 2, Goal.Door => 2, Goal.Guardian => 2, Goal.Piece => 3, Goal.Bank => 4, Goal.Stair => 5, Goal.Finish => 6, _ => 9 };
 
         bool Done(Target t)
         {
@@ -304,8 +358,9 @@ namespace SleepingCalamity.Tests.PlayMode
                 case Goal.GateKey: return s.GateKey != 1;
                 case Goal.Door: return s.DoorOpen;
                 case Goal.Piece: return c == null || !c.PieceVisible(t.Index);
-                case Goal.Bank: return Floor == DiveState.HeartFloor ? HeartBanked : _bankedOn.Contains(Floor);
-                case Goal.GoHome: return WentHome;
+                case Goal.Guardian: return d != null && d.HaulSync != null && (d.HaulSync.Current.ClearedMask & (1 << (UndercroftPlan.BankFloor - 1))) != 0;
+                case Goal.Bank: return d != null && d.HaulSync != null && (d.HaulSync.Current.DivePhase == DivePhase.BankRoom || d.HaulSync.Current.BankChosen);
+                case Goal.Finish: return Finished;
                 case Goal.HubStair: return d != null && d.NetActive.Value;
                 default: return false;
             }
@@ -337,29 +392,29 @@ namespace SleepingCalamity.Tests.PlayMode
                 case Goal.Door:
                     Press(t, () => { if (!Done(t)) { Note("Interact", $"held the room key, pressed interact at the locked door ({Flat(t.Pos - _hero.position).magnitude:0.0} m) and it stayed shut"); GiveUp(t); } });
                     return;
+                case Goal.Guardian:
+                    // walking into the guardian's room spawns it and the fight logic takes over; once in range with nothing in sight, wait for it
+                    if (_target != null && _target.Started > 0f && Seconds - _target.Started > 120f) { Note("Flow", "stood at the guardian's cell for 120 s and the floor was not cleared"); GiveUp(t); }
+                    return;
                 case Goal.Bank:
-                    bool wasSpent = d.HaulSync != null && d.HaulSync.Current.BankChosen;   // pieces are safe on pickup (plan 2): a bank press shows up as the bank point being used up
                     if (d.Prompt != DiveDirector.PromptKind.Bank) { Note("Prompt", $"standing {Flat(t.Pos - _hero.position).magnitude:0.0} m from the {t.Name} but the prompt is '{d.Prompt}' ('{d.PromptText}')"); }
                     Press(t, () =>
                     {
-                        bool spent = d.HaulSync != null && d.HaulSync.Current.BankChosen;
-                        bool ok = spent || wasSpent || d.Prompt != DiveDirector.PromptKind.Bank;
-                        if (Floor == DiveState.HeartFloor) { HeartBanked = d.BankChosenNow(); if (!HeartBanked) Note("Interact", "pressed interact at the heart bank and the heart isn't banked"); }
-                        else if (!ok) Note("Interact", "pressed interact at the checkpoint and the bank point was not used");
-                        _bankedOn.Add(Floor);
-                    });
+                        if (!Done(t)) { Note("Interact", "pressed interact at the bank room's lamp on the cleared bank floor and the room did not open"); GiveUp(t); }
+                    }, 3f);
                     return;
                 case Goal.Stair:
                     int from = Floor;
                     if (d.Prompt != DiveDirector.PromptKind.Stair) Note("Prompt", $"at the stair ({Flat(t.Pos - _hero.position).magnitude:0.0} m) with the exit unlocked but the prompt is '{d.Prompt}' ('{d.PromptText}')");
                     Press(t, () => { if (Floor == from && Dir.FloorSync.BuiltFloor == from) { Note("Interact", "pressed interact at the stair with the exit unlocked and stayed on the floor (6 s)"); GiveUp(t); } }, 6f);
                     return;
-                case Goal.GoHome:
+                case Goal.Finish:
+                    if (d.Prompt != DiveDirector.PromptKind.Finish) Note("Prompt", $"at the ending door ({Flat(t.Pos - _hero.position).magnitude:0.0} m) but the prompt is '{d.Prompt}' ('{d.PromptText}')");
                     Press(t, () =>
                     {
-                        WentHome = !Dir.NetActive.Value;
-                        if (!WentHome) { Note("Interact", "pressed interact for 'take the party home' after banking the heart and the dive is still active"); GiveUp(t); }
-                        else Say("went home");
+                        Finished = !Dir.NetActive.Value;
+                        if (!Finished) { Note("Interact", "pressed interact at the ending door on floor 7 and the dive is still active"); GiveUp(t); }
+                        else Say("finished the dive");
                     }, 6f);
                     return;
                 case Goal.HubStair:
@@ -486,7 +541,8 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             DiveDirector dd = Dir;
             bool active = dd != null && dd.NetActive.Value;
-            if (_wasActive && !active && !WentHome) { DiveFails++; if (Seconds - _lastFaultAt < 20f) FaultDeaths++; Say($"the dive ended without going home (fail #{DiveFails}{(Seconds - _lastFaultAt < 20f ? ", floor/traversal fault in the last 20 s: not a balance death" : "")}); HP {_vitals.Hp}, last HP {_lastHp}"); if (_lastHp >= 0 && _lastHp < _vitals.MaxHp * 0.35f) Deaths++; }
+            if (!PushedOn && active && dd.HaulSync != null && dd.HaulSync.Current.BankChosen) { PushedOn = true; Say("pushed on"); }
+            if (_wasActive && !active && !Finished) { DiveFails++; if (Seconds - _lastFaultAt < 20f) FaultDeaths++; Say($"the dive ended without going home (fail #{DiveFails}{(Seconds - _lastFaultAt < 20f ? ", floor/traversal fault in the last 20 s: not a balance death" : "")}); HP {_vitals.Hp}, last HP {_lastHp}"); if (_lastHp >= 0 && _lastHp < _vitals.MaxHp * 0.35f) Deaths++; }
             _wasActive = active;
             if (Tough && _vitals.IsUp && _vitals.Hp < _vitals.MaxHp / 2 && _vitals.IsServer) _vitals.ServerHeal(_vitals.MaxHp);
             if (_lastHp >= 0 && _vitals.Hp < _lastHp && !EnemyNear(4f)) Note("Combat", $"took {_lastHp - _vitals.Hp} damage with no enemy within 4 m");
@@ -545,7 +601,7 @@ namespace SleepingCalamity.Tests.PlayMode
         static string V(Vector3 p) => $"({p.x:0.0}, {p.y:0.0}, {p.z:0.0})";
 
         public string Summary() =>
-            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared}, chests {ChestsOpened}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips} (reached {HealsReached}), loaves eaten {LoavesEaten}, fails near a floor fault {FaultDeaths}, hits per floor {string.Join(", ", HitsByFloor.OrderBy(k => k.Key).Select(k => "F" + k.Key + " " + k.Value + " in " + (VisitsByFloor.TryGetValue(k.Key, out int vv) ? vv : 0) + " visits"))}, stuck spells {StuckEvents}, downed {Downed}, heart banked {HeartBanked}, went home {WentHome}, findings {Findings.Count}";
+            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared} ({string.Join(",", ClearedFloors.OrderBy(x => x))}), chests {ChestsOpened}, bank picks {BankPicks}, pushed on {PushedOn}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips} (reached {HealsReached}), loaves eaten {LoavesEaten}, fails near a floor fault {FaultDeaths}, hits per floor {string.Join(", ", HitsByFloor.OrderBy(k => k.Key).Select(k => "F" + k.Key + " " + k.Value + " in " + (VisitsByFloor.TryGetValue(k.Key, out int vv) ? vv : 0) + " visits"))}, stuck spells {StuckEvents}, downed {Downed}, finished {Finished}, findings {Findings.Count}";
 
         public BotReport Fight => _fighter.Report;
     }

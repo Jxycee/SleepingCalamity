@@ -4,7 +4,7 @@
 //  1. A hurt hero standing on the point is healed to full by the host, a hurt hero elsewhere is not; the point goes on a short recharge that the client sees
 //     (NetHealSecondsLeft > 0, the built orb hidden) and then ready again (orb back).
 //  2. While recharging nobody is healed; when it ends, a hero who walked onto the point meanwhile (the client's) is healed, and so is the one still standing there.
-//  3. A bank (the client asks by RPC at the floor-2 checkpoint) fully heals every living hero on the host and both peers see the new HP; a downed hero is not touched.
+//  3. The bank press (the client asks by RPC on the cleared bank floor, 5) opens the bank room and fully heals every living hero on the host and both peers see the new HP; a downed hero is not touched.
 // Catches: a heal that never reaches the host's vitals or the other peer, a point that heals during its recharge or never recharges, a recharge a client cannot see, a bank
 // that banks without healing, a heal for heroes of the wrong network manager.
 // NOT covered by a one-process test: real relay latency, the owner's own movement onto the point (the client hero is placed by teleport), late join (the variable is a plain
@@ -76,7 +76,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator HealingPoint_HealsWhoStandsOnIt_Recharges_AndBankHealsEveryone()
+        public IEnumerator HealingPoint_HealsWhoStandsOnIt_Recharges_AndTheBankRoomHealsEveryone()
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
@@ -146,29 +146,32 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => peerHaul.NetHealSecondsLeft.Value > 0, Timeout, "the second use never started a recharge");
             yield return PlayModeHarness.WaitUntil(() => peerHaul.NetHealSecondsLeft.Value == 0 && peerFloor.Built.HealingOrb.activeSelf, Recharge + 8f, "the point never became ready again on the client");
 
-            // 3. A bank heals everyone. Move the dive to the checkpoint floor (the built floor lags, so no range check) and let the client ask.
+            // 3. The bank room heals everyone. Move the dive to the cleared bank floor (the built floor lags, so no range check) and let the client ask.
             Teleport(hostHero, far); Teleport(clientHero, far + new Vector3(8f, 0f, 0f));
             yield return Seconds(0.3f);
             hostV.ServerDamage(50); clientV.ServerDamage(60);
-            Assert.That(haul.ServerSetFloor(2), Is.True);
+            Assert.That(haul.ServerSetFloor(UndercroftPlan.BankFloor), Is.True);
+            Assert.That(haul.ServerMarkCleared(UndercroftPlan.BankFloor), Is.True, "its guardian is down");
             int banked = 0; haul.Banked += () => banked++;
             peerHaul.RequestBank();
-            yield return PlayModeHarness.WaitUntil(() => haul.Current.CheckpointHeld, Timeout, "the bank request never banked");
+            yield return PlayModeHarness.WaitUntil(() => haul.Current.DivePhase == DivePhase.BankRoom, Timeout, "the bank request never opened the bank room");
             Assert.That(banked, Is.EqualTo(1), "Banked was raised once");
             Assert.That(hostV.Hp, Is.EqualTo(100), "the bank healed the host hero");
             Assert.That(clientV.Hp, Is.EqualTo(100), "the bank healed the client hero on the host");
             yield return PlayModeHarness.WaitUntil(() => clientVOnClient.Hp == 100, Timeout, "the client never saw the bank heal");
-            Assert.That(peerHaul.ServerBank(), Is.False, "a client cannot bank or heal directly");
+            Assert.That(peerHaul.ServerEnterBankRoom(), Is.False, "a client cannot open the room or heal directly");
 
-            // A downed hero is not healed by a bank (the revive rule stands).
+            // A downed hero is not healed by the bank room (the revive rule stands).
             clientV.ServerDamage(500);
             Assert.That(clientV.IsDowned, Is.True);
-            Assert.That(haul.ServerBank(), Is.False, "bank spam at a spent point is refused");
-            Assert.That(haul.ServerAddPiece(200), Is.True);   // a piece is safe at once: it does not reopen a spent bank point
-            Assert.That(haul.ServerBank(), Is.False, "a piece no longer waits to bank");
-            Assert.That(haul.ServerSetFloor(4), Is.True);   // the next bank point
-            Assert.That(haul.ServerBank(), Is.True);
-            Assert.That(clientV.IsDowned, Is.True, "a bank does not revive");
+            Assert.That(haul.ServerEnterBankRoom(), Is.False, "bank spam inside the open room is refused");
+            Assert.That(haul.ServerAddPiece(200), Is.True);   // a piece is safe at once: it does not reopen anything
+            Assert.That(haul.ServerEnterBankRoom(), Is.False, "a piece no longer waits to bank");
+            Assert.That(haul.ServerGoHome(), Is.True, "the party leaves the room");
+            hostV.ServerDamage(50);
+            Assert.That(haul.BankRoomNow(), Is.True, "the next dive's bank room");
+            Assert.That(hostV.Hp, Is.EqualTo(100), "the living are healed again");
+            Assert.That(clientV.IsDowned, Is.True, "the bank room does not revive");
         }
     }
 }

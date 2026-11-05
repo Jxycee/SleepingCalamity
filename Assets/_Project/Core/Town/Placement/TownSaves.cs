@@ -2,13 +2,15 @@
 //   stock     what the town holds unplaced: dive pieces, rescued residents, loot counts
 //   town      the placed buildings: foundation, turn, the piece each part consumed, the resident
 //   residents per-resident state that never rolls back (the baker's first-meet beat, Q4 C)
-//   dive      the cleared-floor mask, the checkpoint, the BANKED haul (pieces, residents, loot) and the pieces still left on their floors
+//   dive      the cleared-floor mask, the plan 3 fields (held checkpoint, piece depths, extra-slot owner), the banked pieces and residents an OLD save may still hold, and the pieces still left on their floors
 // Clean costs only the bad entry (an unknown piece, a building that does not fit its parts, a duplicate), never the section, and a section that does not fit its type is
 // dropped alone by WorldSaveStore. Then the CONSERVATION pass (Reconcile) makes every known piece and resident (PieceCatalog, TownBuildings) sit in exactly ONE place:
 // placed, else stock, else banked in the haul, else left on its floor. A duplicate keeps its highest place; a thing in no place goes to stock (only when the dive section is
-// present: it is the authority on what is still on the floors, so a save without one never hands out free pieces). Quitting mid-dive is a failed dive (DiveState.FailDive):
-// pieces are safe on pickup (DiveHaul.AddPiece banks at once), so a piece found mid-dive is saved as banked and never goes back to its floor; the banked haul, the cleared floors
-// and the checkpoint stay, InDive is cleared on load. Player loot is not here: the optional "bags" section holds it (BagsSave), a mid-dive bag written as the failed copy.
+// present: it is the authority on what is still on the floors, so a save without one never hands out free pieces). Quitting mid-dive is a failed dive (DiveSession.Fail):
+// a piece is safe the moment it is picked up (it goes straight into the town stock), so a piece found mid-dive is saved in stock and never goes back to its floor; InDive is cleared on load.
+// Player loot is not here: the optional "bags" section holds it (BagsSave), a mid-dive bag written as the failed copy. The old dive's town loot (stock.loot) and banked loot (dive.bankedLoot) are
+// still READ so an old save loads: MigrateLegacyLoot moves them into the first recorded player's stash. A capture never writes them (nor dive.bankedPieces); the old 4-floor checkpoint
+// (dive.checkpointReached) reads as not held.
 // Plan 3 task 6 adds: the dive section's v2 fields (CheckpointHeld, BossBeaten, PieceDepths saved and never recomputed, ExtraSlotOwner, a ten-floor cleared mask) and the optional
 // "suspend" section (SuspendSave.cs). A snapshot with a valid suspend section is a bank-room quit, never a failed dive.
 // Authority: host only (the host's world save). The live town and haul reach it through HostWorld.ITownSource.
@@ -31,8 +33,7 @@ namespace SleepingCalamity.Core
     {
         public List<int> Pieces = new List<int>();
         public List<string> Residents = new List<string>();
-        public List<LootCountSave> Loot = new List<LootCountSave>();
-        [JsonIgnore] public bool LootUnknown;               // capture only: the source did not know the loot counts (null), so the host keeps its saved Loot instead of wiping it
+        public List<LootCountSave> Loot = new List<LootCountSave>();   // legacy (the 4-floor dive's town loot): read only, MigrateLegacyLoot moves it into a player's stash; a capture writes none
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }
 
@@ -73,11 +74,11 @@ namespace SleepingCalamity.Core
     public sealed class DiveSave
     {
         public bool InDive;                                 // the party was below when this was written: load counts it as a failed dive
-        public int ClearedMask;                             // floors cleared (bit floor-1): DiveState.ClearedMask today, ten floors (DiveSession) from task 7; masked to ten bits here
-        public bool CheckpointReached;                      // the old 4-floor checkpoint (DiveState); task 12 migrates it into CheckpointHeld
-        public List<int> BankedPieces = new List<int>();    // banked in the haul, not yet home
-        public List<string> BankedResidents = new List<string>();   // the baker, banked at the floor-4 heart, not yet home
-        public List<LootCountSave> BankedLoot = new List<LootCountSave>();
+        public int ClearedMask;                             // floors cleared this dive (bit floor-1, ten bits; an old save's bits 1-4 are masked, never rejected)
+        public bool CheckpointReached;                      // legacy (the old 4-floor checkpoint): read, then cleaned to false (it is not a plan 3 checkpoint); a capture writes false
+        public List<int> BankedPieces = new List<int>();    // legacy: banked in the old haul, not yet home; RestoreWorld brings them home, a capture writes none
+        public List<string> BankedResidents = new List<string>();   // legacy: the baker, banked at the old floor-4 heart, not yet home
+        public List<LootCountSave> BankedLoot = new List<LootCountSave>();   // legacy: banked chest loot not yet moved; MigrateLegacyLoot moves it into a player's stash, a capture writes none
         public List<int> OnFloorPieces = new List<int>();   // known pieces not yet found (or lost to a failed dive): back on their floors
         public List<string> OnFloorResidents = new List<string>();   // the baker before the rescue
         public bool CheckpointHeld;                         // plan 3: DiveCheckpoint.Held (an old save has no field: not held)
@@ -169,7 +170,6 @@ namespace SleepingCalamity.Core
             clean.Pieces = CleanPieces(s.Pieces, dropped, "piece");
             clean.Residents = CleanResidentIds(s.Residents, dropped, "resident");
             clean.Loot = CleanLoot(s.Loot, dropped, "loot");
-            clean.LootUnknown = s.LootUnknown;
             clean.Extra = CopyExtra(s.Extra);
             return clean;
         }
@@ -270,7 +270,7 @@ namespace SleepingCalamity.Core
             if (s == null) return clean;
             clean.InDive = s.InDive;
             clean.ClearedMask = s.ClearedMask & ((1 << UndercroftPlan.BossFloor) - 1);   // mask to the ten Undercroft floors rather than reject
-            clean.CheckpointReached = s.CheckpointReached;
+            clean.CheckpointReached = false;   // the old 4-floor checkpoint (floor 2) maps to "not held": the plan 3 checkpoint is earned by going home from the bank room
             clean.CheckpointHeld = s.CheckpointHeld;
             clean.BossBeaten = s.BossBeaten;
             clean.V2Known = s.V2Known;
@@ -342,20 +342,14 @@ namespace SleepingCalamity.Core
             return live;
         }
 
-        // What a source captured, filled in from the host's previous sections where the source said nothing: a null section, null loot counts (StockSave.LootUnknown),
-        // null residents keep the previous copy, and a first-meet beat never goes back to false. Returns a new snapshot (clean it before use); inputs are not changed.
+        // What a source captured, filled in from the host's previous sections where the source said nothing: a null section or null residents keep the previous copy, and a
+        // first-meet beat never goes back to false. Returns a new snapshot (clean it before use); inputs are not changed.
         public static TownSnapshot MergeLive(TownSnapshot live, TownSnapshot previous)
         {
             if (live == null) return previous;
             previous = previous ?? new TownSnapshot();
             var d = new List<string>();
             StockSave stock = live.Stock;
-            if (stock != null && stock.LootUnknown)
-            {
-                stock = CleanStock(stock, d);
-                stock.Loot = CleanStock(previous.Stock, d).Loot;
-                stock.LootUnknown = false;
-            }
             ResidentsSave res = live.Residents == null ? null : CleanResidents(live.Residents, d);
             return new TownSnapshot
             {
@@ -365,7 +359,7 @@ namespace SleepingCalamity.Core
             };
         }
 
-        // The live dive section over the saved one. A live capture built from DiveState knows none of the plan 3 fields, so the saved piece depths always carry over, and the saved
+        // The live dive section over the saved one. A live capture knows the piece depths only through the host (it stamps them), so the saved piece depths always carry over, and the saved
         // CheckpointHeld, BossBeaten and ExtraSlotOwner carry over unless the source marked them known (V2Known). The live section is copied, never changed.
         static DiveSave MergeDive(DiveSave live, DiveSave previous)
         {
@@ -470,15 +464,14 @@ namespace SleepingCalamity.Core
     // Live state <-> save sections.
     public static class TownSaves
     {
-        // The sections for the host's live town and dive. dive may be null (no dive state yet); bankedResidents is the baker (or any resident) banked in the haul and not yet
-        // home; stockLoot is the town's loot counts (TownState keeps none); residents is the host's resident state. Everything not in stock, placed or banked is written as left on its
-        // floor. The bags section is not captured here (TownStock.Capture adds it: it needs the bag ids). The result is cleaned and conserved. A null stockLoot or residents means "the source
-        // does not know": the snapshot says so (Stock.LootUnknown, Residents null) and HostWorld keeps its saved copy instead of writing an empty one.
+        // The sections for the host's live town. bankedResidents is any resident already found but not in stock or placed (null: none; the new dive stocks a person the moment they are found);
+        // residents is the host's resident state (null: "the source does not know", HostWorld keeps its saved copy). Everything not in stock, placed or found is written as left on its floor. The
+        // dive section carries no loot, no banked pieces and a false legacy checkpoint: a capture clears what an old save held. The bags section is not captured here (TownStock.CaptureWorld adds
+        // it: it needs the bag ids). The result is cleaned and conserved.
         // suspend / suspendKnown (plan 3): the bank-room suspend section to carry, and whether the caller knows it (known + null clears the saved one). The existing callers say nothing.
-        public static TownSnapshot Capture(TownState town, DiveState dive, IReadOnlyDictionary<int, int> stockLoot, IEnumerable<string> bankedResidents, ResidentsSave residents,
-            SuspendSave suspend = null, bool suspendKnown = false)
+        public static TownSnapshot Capture(TownState town, IEnumerable<string> bankedResidents, ResidentsSave residents, SuspendSave suspend = null, bool suspendKnown = false)
         {
-            var raw = new TownSnapshot { Stock = new StockSave { LootUnknown = stockLoot == null }, Town = new TownSave(), Residents = residents, Dive = new DiveSave(), Suspend = suspend, SuspendKnown = suspendKnown };
+            var raw = new TownSnapshot { Stock = new StockSave(), Town = new TownSave(), Residents = residents, Dive = new DiveSave(), Suspend = suspend, SuspendKnown = suspendKnown };
             raw.Dive.KnownPieces = new List<int>(TownSaveRules.KnownPieceIds());
             raw.Dive.KnownResidents = new List<string>(TownSaveRules.KnownResidentIds());
             if (suspend != null) raw.Dive.InDive = true;   // a suspend is a dive still in progress (CleanSnapshot drops one without)
@@ -494,16 +487,6 @@ namespace SleepingCalamity.Core
                     foreach (int p in b.PiecesByPart) if (p >= 0) pieces.Add(p);
                     if (b.Resident != null) people.Add(b.Resident);
                 }
-            }
-            if (stockLoot != null)
-                foreach (KeyValuePair<int, int> kv in stockLoot) raw.Stock.Loot.Add(new LootCountSave { ItemId = kv.Key, Count = kv.Value });
-            if (dive != null)
-            {
-                raw.Dive.InDive = dive.CurrentFloor != DiveState.Town || suspend != null;
-                raw.Dive.ClearedMask = dive.ClearedMask;
-                raw.Dive.CheckpointReached = dive.CheckpointReached;
-                foreach (int p in dive.Haul.BankedPieces) { raw.Dive.BankedPieces.Add(p); pieces.Add(p); }
-                foreach (KeyValuePair<int, int> kv in dive.Haul.BankedLoot) raw.Dive.BankedLoot.Add(new LootCountSave { ItemId = kv.Key, Count = kv.Value });
             }
             if (bankedResidents != null)
                 foreach (string r in bankedResidents) { raw.Dive.BankedResidents.Add(r); people.Add(r); }
@@ -549,26 +532,46 @@ namespace SleepingCalamity.Core
             return state;
         }
 
-        // The loot the town holds, by item id.
-        public static Dictionary<int, int> StockLoot(TownSnapshot snap)
+        // The legacy loot of an old save (stock.loot and dive.bankedLoot, the 4-floor dive's town and banked chest loot) moved into the first recorded player's home stash (plan 3 task 12). Both
+        // lists are emptied, so a save written after the load no longer carries them; the stash entry is created when the player has no bag record yet. Idempotent. `first` is the world's first
+        // recorded player; with none (default PlayerKey) nothing is moved and the lists stay. Returns the item count moved.
+        public static int MigrateLegacyLoot(TownSnapshot snap, IReadOnlyList<WorldPlayerSave> recorded)
         {
-            var d = new Dictionary<int, int>();
-            if (snap?.Stock != null) foreach (LootCountSave l in snap.Stock.Loot) d[l.ItemId] = l.Count;
-            return d;
+            if (recorded != null)
+                foreach (WorldPlayerSave r in recorded)
+                {
+                    if (r == null || !BagsSaveRules.TryKind(r.Identity, out IdentityKind kind)) continue;
+                    var key = new PlayerKey(kind, r.Id);
+                    if (key.IsValid) return MigrateLegacyLoot(snap, key);
+                }
+            return 0;
         }
 
-        // The banked haul as a DiveHaul (pieces whose origin floor the per-floor counts do not hold are left out), already banked.
-        public static DiveHaul RestoreHaul(DiveSave dive, IReadOnlyList<int> piecesPerFloor)
+        public static int MigrateLegacyLoot(TownSnapshot snap, PlayerKey first)
         {
-            var haul = new DiveHaul(piecesPerFloor);
-            if (dive == null) return haul;
-            foreach (int p in dive.BankedPieces) haul.RestoreBankedPiece(p);   // restored, not "found this dive"
-            foreach (LootCountSave l in dive.BankedLoot) haul.AddLoot(l.ItemId, l.Count);
-            haul.Bank();
-            // Every other known piece that is not left on its floor is already in the town (stock or placed): collected, so the cellar does not spawn it again.
-            var onFloor = new HashSet<int>(dive.OnFloorPieces);
-            foreach (int id in TownSaveRules.KnownPieceIds()) if (!onFloor.Contains(id)) haul.MarkHome(id);
-            return haul;
+            if (snap == null || !first.IsValid) return 0;
+            bool stockHas = snap.Stock != null && snap.Stock.Loot.Count > 0, bankedHas = snap.Dive != null && snap.Dive.BankedLoot.Count > 0;
+            if (!stockHas && !bankedHas) return 0;
+            if (snap.Bags == null) snap.Bags = new BagsSave();
+            PlayerBagSave entry = null;
+            foreach (PlayerBagSave p in snap.Bags.Players)
+                if (p != null && p.Identity == (int)first.Kind && p.Id == first.Id) { entry = p; break; }
+            if (entry == null) { entry = new PlayerBagSave { Identity = (int)first.Kind, Id = first.Id }; snap.Bags.Players.Add(entry); }
+            int moved = 0;
+            var add = new List<LootCountSave>();
+            if (stockHas) add.AddRange(snap.Stock.Loot);
+            if (bankedHas) add.AddRange(snap.Dive.BankedLoot);
+            foreach (LootCountSave l in add)
+            {
+                if (l == null || l.ItemId <= 0 || l.Count <= 0) continue;   // a bag stash holds real items only (ids above 0)
+                LootCountSave have = entry.Stash.Find(x => x != null && x.ItemId == l.ItemId);
+                if (have == null) entry.Stash.Add(new LootCountSave { ItemId = l.ItemId, Count = Math.Min(TownSaveRules.MaxLootCount, l.Count) });
+                else have.Count = Math.Min(TownSaveRules.MaxLootCount, have.Count + l.Count);
+                moved += l.Count;
+            }
+            if (snap.Stock != null) snap.Stock.Loot.Clear();
+            if (snap.Dive != null) snap.Dive.BankedLoot.Clear();
+            return moved;
         }
 
         public static bool FirstMeetBeat(ResidentsSave r, string residentId)

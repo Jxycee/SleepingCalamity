@@ -1,5 +1,5 @@
 // Core/Cellars/PlayerBag.cs: one player's dive loot - carried items, gold, bank-visit picks, home stash, lost satchel, opened-chest mask (spec 4.3, decisions 33-35, 39). Pure C#.
-// Authority: the host owns one bag per recorded player (PartyBags in DiveState); nothing here is networked. Carried items are bankable at a bank room (picks, then PushOn);
+// Authority: the host owns one bag per recorded player (PartyBags in the DiveDirector); nothing here is networked. Carried items are bankable at a bank room (picks, then PushOn);
 // GoHome brings everything to the stash, Fail keeps banked items and half the dive gold and packs the rest into the player's one lost satchel.
 using System.Collections.Generic;
 
