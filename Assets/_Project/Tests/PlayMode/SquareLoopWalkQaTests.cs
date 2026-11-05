@@ -153,6 +153,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private static IEnumerator BothAtEntry(Rig rig, string step)
         {
             Vector3 entry = CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0);
+            if (rig.HostFloor.BuiltFloor == UndercroftPlan.BankFloor && CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 arrival)) entry = arrival;   // a dive started at the bank arrives at the bank room's entrance
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, entry) < 6f && rig.HostHero.transform.position.y < AreaLook.Current.CellarBelowY, Timeout, step + ": the host hero is at " + rig.HostHero.transform.position + ", wanted near the entry " + entry);
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.ClientHeroOnHost.transform.position, entry) < 6f, Timeout, step + ": the client hero is at " + rig.ClientHeroOnHost.transform.position + " on the host, wanted near the entry " + entry);
             yield return Seconds(1f);   // late arrival teleports must have landed before the test moves a hero
@@ -179,7 +180,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private static string Pieces(TownState s) { var l = new List<int>(s.StockPieces); return string.Join(",", l); }
 
         // The seed world: weapon growth for both players (the host's local id and the guest's), written to the library before the session opens it.
-        private static void SeedWorld(AppBootstrap app, out string worldId)
+        private static (int level, float abs, float guestAbs) SeedWorld(AppBootstrap app, out string worldId)
         {
             worldId = app.WorldSaveFlow.CreateWorld(WorldKind.Multiplayer, IdentityKind.Local);
             Assert.That(worldId, Is.Not.Null, "[S1 start] a multiplayer world was made");
@@ -193,6 +194,29 @@ namespace SleepingCalamity.Tests.PlayMode
             store.Current.Weapons = weapons;
             store.MarkDirty();
             Assert.That(store.Save(), Is.True, "[S1 start] the seed world was written");
+            return (host.Weapon(Axe).Level, host.Weapon(Axe).Abs, guest.Weapon(Axe).Abs);
+        }
+
+        // The client walks into a room whose plan has enemies, so the dive's contents begin the CombatHost (weapon growth is restored from the save there); everything in the room is then killed.
+        private static IEnumerator EnterFightRoom(Rig rig, string step)
+        {
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.EncounterPlan != null, Timeout, step + ": the host never built an encounter plan");
+            CellarEncounterPlan plan = rig.HostHaul.EncounterPlan;
+            CellarFloorLayout lay = rig.HostFloor.Layout;
+            int room = -1;
+            for (int r = 0; r < lay.Rooms.Count && room < 0; r++) if (plan.CountIn(r) > 0) room = r;
+            Assert.That(room, Is.GreaterThanOrEqualTo(0), step + ": the floor has a room with enemies");
+            CellPos enter = default; float bestGap = -1f;
+            foreach (CellPos c in CellarEncounterPlan.FreeCellsOf(lay, CellarFloorDressing.Resolve(lay), room))
+            {
+                float gap = float.MaxValue;
+                foreach (EncounterSpawn sp in plan.Spawns) if (sp.RoomIndex == room) gap = Mathf.Min(gap, Mathf.Abs(sp.X - c.X) + Mathf.Abs(sp.Y - c.Y));
+                if (gap > bestGap) { bestGap = gap; enter = c; }
+            }
+            Assert.That(bestGap, Is.GreaterThan(0f), step + ": the room has a free cell that is not a spawn cell");
+            yield return ClientTo(rig, rig.HostFloor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(enter.X, enter.Y)), step + " enter the room");
+            yield return PlayModeHarness.WaitUntil(() => CombatHost.Current != null && CombatHost.Current.Begun, Timeout, step + ": entering the room never started a CombatHost");
+            KillAll(rig.HostNm);
         }
 
         // ---------------------------------------------------------------------------------------------------------------------------------
@@ -205,7 +229,7 @@ namespace SleepingCalamity.Tests.PlayMode
             PlayModeHarness.AddNetworkSimulator(net);   // before the host starts
             _dir = PlayModeHarness.BeginSaveTest();
             AppBootstrap app = AppBootstrap.Current;
-            SeedWorld(app, out string worldId);
+            (int seedLevel, float seedAbs, float seedGuestAbs) = SeedWorld(app, out string worldId);
 
             // ======== S1 start in Hollowmere from a save
             Rig rig = null;
@@ -229,6 +253,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.HostNm.ConnectedClientsIds.Count, Is.EqualTo(2), "[S2 F5 arrive] both players are in the dive");
             ulong hostId = rig.HostNm.LocalClientId, guestId = rig.ClientNm.LocalClientId;
             Assert.That(rig.HostHaul.Session.StartedAtBank, Is.True, "[S2 F5 arrive] the party starts at the bank room's floor");
+            Assert.That(rig.HostHaul.ServerAddItem(guestId, 101), Is.True, "[S2 find] the client carries one item (a chest's loot goes to the opener's bag)");
             foreach (int id in new[] { 100, 101, 200, 201, 300, 301 }) Assert.That(rig.HostHaul.ServerAddPiece(id), Is.True, "[S2 find] piece " + id);
             Assert.That(rig.HostHaul.ServerAddPiece(PieceCatalog.BakerId), Is.True, "[S2 find] the baker");
             yield return PlayModeHarness.WaitUntil(() => rig.PeerHaul.Current.FoundPieces >= 6, Timeout, "[S2 find] the client never saw the six pieces found");
@@ -255,10 +280,12 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Pieces(stock.State), Is.EqualTo("100,101,200,201,300,301"), "[S3 stock] the six found pieces are in the town stock");
             Assert.That(stock.State.ResidentInStock(TownBuildings.BakerResident), Is.True, "[S3 stock] the baker is in the town stock");
             Assert.That(rig.Host.Checkpoint.Held, Is.True, "[S3 home] going home from the bank holds the checkpoint");
+            PlayerBag guestBag = rig.HostHaul.ServerBagOf(guestId);
+            Assert.That(guestBag.Carried, Is.Empty, "[S3 stock] the client's carried item came home");
+            Assert.That(guestBag.Stash.TryGetValue(101, out int stashed) ? stashed : 0, Is.EqualTo(1), "[S3 stock] the client's item is in its own stash, exactly once");
             yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.StirValue == 0 && rig.PeerHaul.Current.StirValue == 0, Timeout, "[S3 stir] the stir meter never reset (host " + rig.HostHaul.Current.StirValue + ")");
             yield return PlayModeHarness.WaitUntil(() => rig.PeerTown.View.InStock(100) && rig.PeerTown.View.ResidentInStock(TownBuildings.BakerResident), Timeout, "[S3 stock] the client never saw the new stock");
             Assert.That(Sig(rig.PeerTown.View), Is.EqualTo(Sig(stock.State)), "[S3 stock] the client's town view equals the host's");
-            // Weapon growth earned on a dive is the CombatHost's save path (CombatNetworkTests / SaveFlowTests); this walk keeps the seeded section in the file (S7).
 
             // ======== S4 place the bakery frame from stock (client request); a path-blocking turn is refused; the parts follow
             SortedSet<string> conserved = stock.State.Conservation();
@@ -325,6 +352,15 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.Checkpoint.Held, Is.False, "[S6 dive] starting a dive spends the checkpoint");
             yield return AllBuilt(rig, floor2, "[S6 arrive]");
             yield return BothAtEntry(rig, "[S6 arrive]");
+            // Weapon growth: the saved growth is restored when the contents begin the CombatHost; what the dive earns goes into the save (S7).
+            yield return EnterFightRoom(rig, "[S6 weapons]");
+            WeaponState hostAxe = CombatHost.Current.Growth(hostId).Weapon(Axe);
+            Assert.That((hostAxe.Level, hostAxe.Abs), Is.EqualTo((seedLevel, seedAbs)), "[S6 weapons] the host's saved weapon growth was restored");
+            Assert.That(CombatHost.Current.Growth(guestId).Weapon(Axe).Abs, Is.EqualTo(seedGuestAbs), "[S6 weapons] the guest's saved weapon growth was restored under its new client id");
+            hostAxe.AddAbs(25f);
+            (int earnedLevel, float earnedAbs) = (hostAxe.Level, hostAxe.Abs);
+            CombatHost.Current.Growth(guestId).Weapon(Axe).AddAbs(7f);
+            float guestEarned = CombatHost.Current.Growth(guestId).Weapon(Axe).Abs;
 
             // ======== S7 save mid-dive (a quit counts as a failed dive), leave, reload the same world
             string preSig = Sig(stock.State);
@@ -378,6 +414,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(again.Host.Pieces.PiecesLeft(UndercroftPlan.FirstFloor) + again.Host.Pieces.PiecesLeft(2) + again.Host.Pieces.PiecesLeft(4), Is.EqualTo(0), "[S7 reload dive] the found pieces are home: none respawns on a floor");
             yield return AllBuilt(again, UndercroftPlan.FirstFloor, "[S7 reload arrive]");
             yield return BothAtEntry(again, "[S7 reload arrive]");
+            yield return EnterFightRoom(again, "[S7 reload weapons]");
+            WeaponState hostBack = CombatHost.Current.Growth(again.HostNm.LocalClientId).Weapon(Axe);
+            Assert.That((hostBack.Level, hostBack.Abs), Is.EqualTo((earnedLevel, earnedAbs)), "[S7 reload weapons] the host's weapon growth, including what the dive earned, survived");
+            Assert.That(CombatHost.Current.Growth(again.ClientNm.LocalClientId).Weapon(Axe).Abs, Is.EqualTo(guestEarned), "[S7 reload weapons] the guest's growth came back to the guest under its new client id");
         }
 
         // Regression for a walk finding: NGO despawns the session's objects in no fixed order, so the DiveHaulSync can be gone (its session null) when the director's despawn hands the town to the

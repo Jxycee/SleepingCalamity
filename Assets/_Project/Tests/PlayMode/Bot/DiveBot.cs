@@ -39,7 +39,9 @@ namespace SleepingCalamity.Tests.PlayMode
         public int Floor { get; private set; }            // the floor the bot is playing (0 = hub)
         public int FloorsCleared, ChestsOpened, PiecesTaken, Presses, StuckEvents, EnemiesKilled;
         public bool PushedOn, Finished, Downed;           // PushedOn: the bank room's push-on went through; Finished: the dive ended at floor 7's EndCell
-        public int BankPicks;                              // items put into bank slots in the bank room
+        public int BankPicks, BankedItems;                 // pick requests sent in the bank room; items the host's bag holds as banked when the push-on went through
+        public DiveEndReason? LastEnd;                     // the reason of the last DiveEnded the bot saw
+        bool _endHooked;
         public readonly HashSet<int> ClearedFloors = new HashSet<int>();   // floors the bot left by their stair (1-4, 6) and the guardian floor once its guardian fell (5)
         public readonly HashSet<int> EnteredFloors = new HashSet<int>();
         float _bankRoomClock, _pushKeyAt = -1f;
@@ -541,7 +543,15 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             DiveDirector dd = Dir;
             bool active = dd != null && dd.NetActive.Value;
-            if (!PushedOn && active && dd.HaulSync != null && dd.HaulSync.Current.BankChosen) { PushedOn = true; Say("pushed on"); }
+            if (dd != null && !_endHooked) { _endHooked = true; dd.DiveEnded += r => LastEnd = r; }
+            if (!PushedOn && active && dd.HaulSync != null && dd.HaulSync.Current.BankChosen)
+            {
+                PushedOn = true;
+                PlayerBag mine = dd.HaulSync.ServerBagOf(dd.NetworkManager.LocalClientId);   // the host's own bag (a solo run): what the host accepted
+                if (mine != null) { BankedItems = 0; foreach (var kv in mine.BankedThisDive) BankedItems += kv.Value; }
+                Say($"pushed on ({BankPicks} picks asked, {BankedItems} items safe in the bag)");
+            }
+            if (_wasActive && !active && LastEnd == DiveEndReason.Finished && !Finished) { Finished = true; Say("finished the dive (the host ended it Finished)"); }
             if (_wasActive && !active && !Finished) { DiveFails++; if (Seconds - _lastFaultAt < 20f) FaultDeaths++; Say($"the dive ended without going home (fail #{DiveFails}{(Seconds - _lastFaultAt < 20f ? ", floor/traversal fault in the last 20 s: not a balance death" : "")}); HP {_vitals.Hp}, last HP {_lastHp}"); if (_lastHp >= 0 && _lastHp < _vitals.MaxHp * 0.35f) Deaths++; }
             _wasActive = active;
             if (Tough && _vitals.IsUp && _vitals.Hp < _vitals.MaxHp / 2 && _vitals.IsServer) _vitals.ServerHeal(_vitals.MaxHp);
@@ -601,7 +611,7 @@ namespace SleepingCalamity.Tests.PlayMode
         static string V(Vector3 p) => $"({p.x:0.0}, {p.y:0.0}, {p.z:0.0})";
 
         public string Summary() =>
-            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared} ({string.Join(",", ClearedFloors.OrderBy(x => x))}), chests {ChestsOpened}, bank picks {BankPicks}, pushed on {PushedOn}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips} (reached {HealsReached}), loaves eaten {LoavesEaten}, fails near a floor fault {FaultDeaths}, hits per floor {string.Join(", ", HitsByFloor.OrderBy(k => k.Key).Select(k => "F" + k.Key + " " + k.Value + " in " + (VisitsByFloor.TryGetValue(k.Key, out int vv) ? vv : 0) + " visits"))}, stuck spells {StuckEvents}, downed {Downed}, finished {Finished}, findings {Findings.Count}";
+            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared} ({string.Join(",", ClearedFloors.OrderBy(x => x))}), chests {ChestsOpened}, bank picks {BankPicks} ({BankedItems} accepted), pushed on {PushedOn}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips} (reached {HealsReached}), loaves eaten {LoavesEaten}, fails near a floor fault {FaultDeaths}, hits per floor {string.Join(", ", HitsByFloor.OrderBy(k => k.Key).Select(k => "F" + k.Key + " " + k.Value + " in " + (VisitsByFloor.TryGetValue(k.Key, out int vv) ? vv : 0) + " visits"))}, stuck spells {StuckEvents}, downed {Downed}, finished {Finished}, findings {Findings.Count}";
 
         public BotReport Fight => _fighter.Report;
     }

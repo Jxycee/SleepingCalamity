@@ -561,10 +561,9 @@ namespace SleepingCalamity.Tests.PlayMode
             int scale = rig.App.World.ScalePlayers(rig.App.Roster);
             Assert.That(scale, Is.EqualTo(2), "difficulty scales to the two present players, not the four recorded");
             Assert.That(CoopScaling.ExtraEnemiesPerRoom(scale), Is.EqualTo(1));
-            yield return StartDive(rig);
-            yield return Descend(rig, 1);
+            yield return StartAtBank(rig);
             Assert.That(rig.Haul.Session.Stir.PlayersPresent, Is.EqualTo(2), "the stir meter counts the present players");
-            yield return Consistent(rig, "case6 two present, floor 2");
+            yield return Consistent(rig, "case6 two present, bank floor");
 
             // The present players' growth is restored from the save; they earn some; the absent two are never loaded.
             CombatHost combat = MakeCombat(rig);
@@ -572,6 +571,10 @@ namespace SleepingCalamity.Tests.PlayMode
             combat.Growth(rig.ClientId(0)).Weapon(Axe).AddAbs(5f);
             float earned = combat.Growth(rig.ClientId(0)).Weapon(Axe).Abs;
             Assert.That(rig.Haul.ServerAddPiece(PieceCatalog.FrameId), Is.True);
+            yield return ClientTo(rig, 0, BankPos(rig), "case6 walk to the bank");
+            float askedAt6 = -10f;
+            yield return PlayModeHarness.WaitUntil(() => AskBankUntil(rig, 0, ref askedAt6, () => rig.Haul.Session.Phase == DivePhase.BankRoom), Timeout, "case6: the present client could not open the bank room");
+            Assert.That(rig.Haul.ServerBagOf(rig.ClientId(0)).BankOpen, Is.True, "case6: the present client has a bank visit (capacity follows who is present: the two absent players have none)");
 
             // Leave: the session saves; the absent two must be exactly as seeded.
             yield return PlayModeHarness.Await(rig.App.Services.Get<INetworkSession>().LeaveAsync(), Timeout);
