@@ -145,7 +145,7 @@ namespace SleepingCalamity.Tests.PlayMode
             _fightClock = 0f;
 
             if (_target != null && Done(_target) && _target.Goal == Goal.Piece) PiecesTaken++;
-            if (_target != null && _target.Goal == Goal.Kill && Seconds - _target.Started > 90f) { Note("Flow", "stood at the gate-key carrier's cell for 90 s and the key did not drop"); GiveUp(_target); }
+            if (_target != null && _target.Goal == Goal.Kill && Seconds - _target.Started > 90f) { Note("Flow", "stood at the gate-key carrier's cell for 90 s and the key did not drop" + CarrierDiag(d)); GiveUp(_target); }
             if (_target == null || Done(_target)) { _target = NextTarget(d); _corners.Clear(); _stuckOnTarget = 0; if (_target != null) _target.Started = Seconds; if (_target != null) Say($"goal: {_target.Name} at {V(_target.Pos)}"); }
             if (_target == null) { _input.Frame = f; return; }
 
@@ -599,6 +599,15 @@ namespace SleepingCalamity.Tests.PlayMode
                 Note("Embedded", $"the hero's capsule sits inside {Path(col.transform)} for over a second", PlanWhere());
                 _embeddedClock = -5f;
             }
+        }
+
+        // What the host knows about the gate-key carrier when the bot has waited for it in vain: the carrier enemy (null = never spawned or lost), its room's entered/cleared flags, and every live enemy's position.
+        string CarrierDiag(DiveDirector d)
+        {
+            CellarContentsSync c = Contents(d); if (c == null) return "";
+            Enemy ce = c.GateKeyCarrierEnemy;
+            string all = string.Join(" ", Enemy.All.Where(e => e != null).Select(e => $"{e.NetKind.Value}@{V(e.transform.position)}{(e.IsSpawned ? "" : "!unspawned")}{(e.Alive ? "" : "!dead")}"));
+            return $" [carrier enemy {(ce == null ? "none" : V(ce.transform.position) + (ce.Alive ? " alive" : " dead"))}; state {c.State}; enemies {all}]";
         }
 
         bool EnemyNear(float range)

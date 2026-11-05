@@ -63,6 +63,7 @@ namespace SleepingCalamity.Presentation
     public static partial class CellarFloorBuilder
     {
         public const float CellSize = CellarFloorLayout.CellMeters, WallHeight = 3.6f, WallThickness = 0.4f, DoorWidth = 2.4f, DoorHeight = 2.8f, PillarSize = 1.0f;
+        public const float VoidWallDepth = 2f;   // collider depth of a wall that faces no walkable cell (see Build)
         public const string FloorGroup = "Floor", WallGroup = "Walls", DoorGroup = "Doors", PillarGroup = "Pillars", MarkerGroup = "Markers", LampGroup = "Lamps";
         public const string VignetteGroup = "Vignettes", AtmosphereGroup = "Atmosphere";
         const float Tile = 2f;
@@ -170,8 +171,12 @@ namespace SleepingCalamity.Presentation
                         if (nOcc && (s == CellSide.North || s == CellSide.West)) continue;   // a wall between two occupied cells is drawn once, from the north/west cell
                         Vector3 mid = c + SideDir(s) * (CellSize * 0.5f);
                         bool ns = s == CellSide.North || s == CellSide.South;
+                        // A wall with nothing walkable behind it is VoidWallDepth deep, its inner face unchanged: a hero pinned to it (an enemy stepping into the capsule, the controller backing
+                        // out of the overlap) is pushed out the nearer side, and a 0.4 m slab let it come out the far side over the void and fall.
+                        float depth = nOcc ? WallThickness : VoidWallDepth;
+                        mid += SideDir(s) * ((depth - WallThickness) * 0.5f);
                         Box(walls, "Wall_" + x + "_" + y + "_" + s, mid + new Vector3(0, WallHeight * 0.5f, 0),
-                            ns ? new Vector3(CellSize + WallThickness, WallHeight, WallThickness) : new Vector3(WallThickness, WallHeight, CellSize + WallThickness), mats.Wall, 2f, true)
+                            ns ? new Vector3(CellSize + WallThickness, WallHeight, depth) : new Vector3(depth, WallHeight, CellSize + WallThickness), mats.Wall, 2f, true)
                             .GetComponent<MeshRenderer>().enabled = false;   // collider only: each side's face comes from the art layer
                         result.Walls++;
                     }
