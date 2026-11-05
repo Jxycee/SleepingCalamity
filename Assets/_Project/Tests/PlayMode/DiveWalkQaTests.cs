@@ -128,6 +128,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private static IEnumerator BothAtEntry(Rig rig, string step)
         {
             Vector3 entry = CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0);
+            if (rig.HostFloor.BuiltFloor == UndercroftPlan.BankFloor && CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 arrival)) entry = arrival;   // a dive started at the bank arrives at the bank room's entrance
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, entry) < 6f, Timeout, step + ": the host hero is at " + rig.HostHero.transform.position + ", wanted near the entry " + entry);
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.ClientHeroOnHost.transform.position, entry) < 6f, Timeout, step + ": the client hero is at " + rig.ClientHeroOnHost.transform.position + " on the host, wanted near the entry " + entry);
             Assert.That(Flat(rig.ClientHero.transform.position, entry), Is.LessThan(6f), step + ": the client's own copy was moved to the entry");
