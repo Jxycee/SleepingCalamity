@@ -145,6 +145,26 @@ namespace SleepingCalamity.Core
             return c;
         }
 
+        // A suspend that cannot be resumed (bad floor or phase, or no dive in progress) must not take its dive records with it: `bags` holds only the home halves, so the carried items, the
+        // banked-this-dive items and the dive gold live nowhere else. This settles raw's bag records as a failed dive at the saved floor (floor 1 when that is unusable), the same
+        // PlayerBag.CopyAsFailed a mid-dive quit uses: banked items to the stash, half the dive gold kept, the carried items into the waiting satchel. Returns the new home section
+        // (home itself when there is nothing to settle). Records that do not clean are dropped as Clean does.
+        public static BagsSave SettleAsFailed(BagsSave home, SuspendSave raw)
+        {
+            if (raw == null || raw.Bags == null || raw.Bags.Count == 0) return home;
+            int floor = UndercroftPlan.IsFloor(raw.Floor) ? raw.Floor : UndercroftPlan.FirstFloor;
+            SuspendSave shell = Clean(new SuspendSave { Floor = floor, Phase = (int)DivePhase.BankRoom, Bags = raw.Bags }, null);
+            if (shell.Bags.Count == 0) return home;
+            var party = new PartyBags();
+            BagsSaveRules.RestoreSuspended(home, shell, party);
+            var keyOf = new Dictionary<string, PlayerKey>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, PlayerBag> kv in party.All)
+                if (BagsSaveRules.TryParseBagId(kv.Key, out PlayerKey key)) keyOf[kv.Key] = key;
+            BagsSave settled = BagsSaveRules.Clean(BagsSaveRules.Capture(party, keyOf, true, floor), null);
+            if (home != null && home.Extra != null) settled.Extra = CopyExtra(home.Extra);
+            return settled;
+        }
+
         static SuspendStirSave CleanStir(SuspendStirSave s)
         {
             if (s == null) return new SuspendStirSave();

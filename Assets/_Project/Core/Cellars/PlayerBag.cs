@@ -44,13 +44,24 @@ namespace SleepingCalamity.Core
         // The player's boots (+5% run speed, plan 3 decision 12): carried, banked this dive or in the home stash. A pair in the lost satchel does not count until recovered.
         public bool HasBoots => _carried.Contains(CellarLoot.BootsId) || _banked.ContainsKey(CellarLoot.BootsId) || _stash.ContainsKey(CellarLoot.BootsId);
 
+        // The one-pair gate (Add, the chest roll's ownsBoots): HasBoots plus a pair waiting in, or carried inside, the lost satchel. The speed bonus pauses while the pair is in the satchel
+        // (HasBoots), but no second pair may be picked or rolled meanwhile.
+        public bool OwnsBoots => HasBoots || SatchelHolds(Satchel.Waiting, CellarLoot.BootsId) || SatchelHolds(Satchel.Carried, CellarLoot.BootsId);
+
+        static bool SatchelHolds(LostSatchel s, int itemId)
+        {
+            if (s == null) return false;
+            for (int i = 0; i < s.Items.Count; i++) if (s.Items[i] == itemId) return true;
+            return false;
+        }
+
         // No room for another carried item: the carried list plus the carried satchel (one slot) fill MaxCarried.
         public bool IsFull => _carried.Count + (Satchel.Carried != null ? 1 : 0) >= MaxCarried;
 
         public bool Add(int itemId)
         {
             if (itemId <= 0 || IsFull || !BankSlots.IsBankable(CellarLoot.KindOf(itemId))) return false;
-            if (itemId == CellarLoot.BootsId && HasBoots) return false;   // one pair per player
+            if (itemId == CellarLoot.BootsId && OwnsBoots) return false;   // one pair per player
             _carried.Add(itemId);
             Version++;
             return true;

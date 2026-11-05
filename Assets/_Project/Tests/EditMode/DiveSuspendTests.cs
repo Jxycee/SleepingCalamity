@@ -273,6 +273,57 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(SuspendSaveRules.Clean(Section(), null), Is.Not.Null, "a section with no bag records is valid (everyone's bag was empty)");
         }
 
+        static void AssertSettledAsFailed(TownSnapshot snap, int satchelFloor)
+        {
+            Assert.That(snap.Suspend, Is.Null);
+            PlayerBagSave a = snap.Bags.Players.Find(p => p.Id == KeyA.Id);
+            Assert.That(a, Is.Not.Null);
+            Assert.That(a.Stash.Find(r => r.ItemId == 101)?.Count, Is.EqualTo(1), "banked-this-dive item reaches the stash");
+            Assert.That(a.Stash.Find(r => r.ItemId == 109)?.Count, Is.EqualTo(1), "the home stash stays");
+            Assert.That(a.Gold, Is.EqualTo(5 + DiveGold.KeptOnFail(7)));
+            Assert.That(a.Satchel, Is.Not.Null);
+            Assert.That(a.Satchel.Floor, Is.EqualTo(satchelFloor));
+            Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 104, 105 }), "carried items wait in the satchel");
+        }
+
+        static TownSnapshot SnapshotOf(SuspendSave raw, BagsSave home, bool inDive)
+            => new TownSnapshot { Stock = new StockSave(), Town = new TownSave(), Dive = new DiveSave { InDive = inDive }, Bags = home, Suspend = raw };
+
+        [Test]
+        public void DiscardedSuspend_BadFloor_SettlesItsBagsAsAFailedDive()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            DiveSession s = AtBank(bags);
+            SuspendSave raw = CaptureSection(s, out BagsSave home);
+            raw.Floor = 99;
+            TownSnapshot snap = TownSaveRules.CleanSnapshot(SnapshotOf(raw, home, true), null);
+            AssertSettledAsFailed(snap, UndercroftPlan.FirstFloor);
+        }
+
+        [Test]
+        public void DiscardedSuspend_NoDiveInProgress_SettlesItsBagsAtTheSavedFloor()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            DiveSession s = AtBank(bags);
+            SuspendSave raw = CaptureSection(s, out BagsSave home);
+            TownSnapshot snap = TownSaveRules.CleanSnapshot(SnapshotOf(raw, home, false), null);
+            AssertSettledAsFailed(snap, UndercroftPlan.BankFloor);
+        }
+
+        [Test]
+        public void Suspend_ValidWithDive_IsKeptAndNotSettled()
+        {
+            var bags = new PartyBags();
+            bags.Adopt(IdA, MidDiveBagA());
+            DiveSession s = AtBank(bags);
+            SuspendSave raw = CaptureSection(s, out BagsSave home);
+            TownSnapshot snap = TownSaveRules.CleanSnapshot(SnapshotOf(raw, home, true), null);
+            Assert.That(snap.Suspend, Is.Not.Null);
+            Assert.That(snap.Bags.Players.Find(p => p.Id == KeyA.Id).Satchel, Is.Null);
+        }
+
         [Test]
         public void Suspend_Clean_RepairsNumbers_AndKeepsUnknownMembers()
         {

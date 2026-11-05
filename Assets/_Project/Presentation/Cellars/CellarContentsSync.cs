@@ -543,8 +543,9 @@ namespace SleepingCalamity.Presentation
             return _pieceIds.Count;
         }
 
-        // Only the floors whose way down needs the gate key (1-4 and 6: DiveFloorTable.HasStair) have a carrier; the bank floor and the ending floor have none.
-        public static bool HasGateKeyStair(int floor) => UndercroftPlan.IsFloor(floor) && DiveFloorTable.HasStair(floor, true);
+        // Only the floors whose way down needs the gate key (1-4 and 6: a stair that exists, and not the bank floor, whose stair opens on the push-on choice instead) have a carrier; the bank
+        // floor and the ending floor have none.
+        public static bool HasGateKeyStair(int floor) => UndercroftPlan.IsFloor(floor) && !DiveFloorTable.HasBank(floor) && DiveFloorTable.HasStair(floor, true);
 
         // The carrier is usable when its room exists, it stands in that room and an authored spawn of a Combat room sits on its cell.
         private static bool CarrierIsValid(CellarFloorLayout l, CellarFloorDressing dressing)
@@ -812,7 +813,7 @@ namespace SleepingCalamity.Presentation
             else
             {
                 int bonus = HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(_layout.Floor) : 0;   // momentum: a second-half chest rolls one rank higher
-                item = CellarLoot.RollChest(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId), bonus, bag.HasBoots);   // may be GoldId
+                item = CellarLoot.RollChest(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId), bonus, bag.OwnsBoots);   // may be GoldId
                 if (item != CellarLoot.GoldId && bag.IsFull)   // a full bag refuses the chest (decision 6): it stays closed for this player, who alone is told
                 {
                     NoticeOwner(clientId, BagFullText);

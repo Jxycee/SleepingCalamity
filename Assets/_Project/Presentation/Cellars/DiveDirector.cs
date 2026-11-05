@@ -752,7 +752,7 @@ namespace SleepingCalamity.Presentation
 
         public static string HubPromptText(bool checkpointHeld, IReadOnlyList<int> floors, int pick, bool suspended = false)
         {
-            if (suspended) return "Return to your dive at the bank room";
+            if (suspended) return "Return to your dive (a save after pushing on resumes at the start of floor 6; otherwise at the bank room)";
             if (!checkpointHeld && floors.Count <= 1) return "Go down the Undercroft";
             return "Go down the Undercroft: start on floor " + pick + "  (pickable: " + string.Join(", ", floors) + "; G changes the floor)";
         }

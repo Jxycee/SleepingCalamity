@@ -316,10 +316,17 @@ namespace SleepingCalamity.Core
             clean.SuspendKnown = s.SuspendKnown;
             // A suspend stands for a dive that is still in progress (the party is below, or waiting at the trapdoor to resume it: Dive.InDive). Without one it is stale (a source that never says
             // "known, none" would otherwise keep a used suspend forever, and a later failed-dive quit would resume from it): dropped here, whoever wrote it.
+            // A suspend dropped here (bad floor or phase, or stale) keeps its dive records: they are settled as a failed dive into the bags (SuspendSaveRules.SettleAsFailed), never lost.
             if (clean.Suspend != null && (clean.Dive == null || !clean.Dive.InDive))
             {
+                clean.Bags = SuspendSaveRules.SettleAsFailed(clean.Bags, s.Suspend);
                 clean.Suspend = null;
                 repaired?.Add("suspend dropped: no dive is in progress");
+            }
+            else if (s.Suspend != null && clean.Suspend == null)
+            {
+                clean.Bags = SuspendSaveRules.SettleAsFailed(clean.Bags, s.Suspend);
+                repaired?.Add("suspend dropped: bad floor or phase; its dive records were settled as a failed dive");
             }
             Reconcile(clean, repaired, failMidDive);
             return clean;

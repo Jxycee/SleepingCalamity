@@ -106,6 +106,20 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Boots_InTheSatchel_PauseSpeedButStillBlockASecondPair()
+        {
+            var waiting = PlayerBag.Restore(0, null, new LostSatchel(3, new[] { CellarLoot.BootsId }));
+            Assert.That(waiting.HasBoots, Is.False, "the speed bonus pauses while the pair waits in the satchel");
+            Assert.That(waiting.OwnsBoots, Is.True);
+            Assert.That(waiting.Add(CellarLoot.BootsId), Is.False, "no second pair while one waits in the satchel");
+            Assert.That(waiting.PickUpSatchel(), Is.True);
+            Assert.That(waiting.HasBoots, Is.False);
+            Assert.That(waiting.OwnsBoots, Is.True, "a carried satchel still owns the pair");
+            Assert.That(waiting.Add(CellarLoot.BootsId), Is.False);
+            Assert.That(new PlayerBag().OwnsBoots, Is.False);
+        }
+
+        [Test]
         public void Boots_OnlyOnePairPerPlayer()
         {
             var bag = new PlayerBag();
