@@ -68,3 +68,13 @@ Measured on the RTX 5070 12 GB (tools in C:\AI, commands in C:\AI\scripts\NOTES.
 - **Texture alternative under test:** StableGen (SDXL + IPAdapter + Marigold PBR) on the Hunyuan shape, once Blender online access is enabled.
 - **Known fault on every route:** dark fur comes out too dark and shiny; the pipeline needs a colour-correction step.
 - Next: StableGen test, then pipeline scripts (cutout, shape, texture, decimate/rebake 2048, colour-correct, import), then improve.
+
+## Working pipeline v1 (2026-11-06, proven on the goblin; GOBLIN_SHEET in C:\AI\test_out\goblin\)
+
+1. **Concept** (cloud, ~20 s): Nano Banana in Gemini (user's subscription, built-in browser). Prompt: Dark Cloud whimsical shapes + 2026 OoT-remake gritty stylised realism (props may lean Hobbit/LotR); one object or a 4-view turnaround (front, 3/4, side, back), plain light-grey background, even studio light, no text. Download full size (2752x1536).
+2. **Cut out** each view to RGBA (colour key on the grey background; C:\AI\scripts\cutout.py).
+3. **Shape**: Hunyuan3D 2.1 from the front view (StableGen ComfyUI :8190, run_hy_shape.py): ~70 s, ~9.4 GB, 40k tris.
+4. **Texture**: TRELLIS.2 `Trellis2MeshTexturingMultiView` with front/side/back views (ComfyUI :8188, run_tex_mv.py): ~200 s, ~5.7 GB, 2048 PBR UV. Single-view `Trellis2MeshTexturing` (~120 s) when only one view exists; it invents the back.
+5. **Still to build**: decimate/retopo to tier budget, proper UV unwrap, rebake 2048 base/normal/ORM, colour correction (base colour comes out washed with blue/purple tints), source record (`licence: personal-use`), Unity import and review.
+
+Total ~5 min GPU per model, peak under 10 GB, max 67 C. Rejected: SAM 3D (muddy own texture, distorted face/lantern on the goblin), StableGen (seams, colour drift; keep only if 2K PBR maps from it are needed), RealVisXL concepts (photoreal, view drift; OK for Hobbit-leaning prop ideas).
