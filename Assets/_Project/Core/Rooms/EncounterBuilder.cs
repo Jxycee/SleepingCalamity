@@ -67,7 +67,9 @@ namespace SleepingCalamity.Core
         {
             if (!t.LegalOnFloor(floor)) return false;
             if (t.IsAmbush && (!isAmbushRoom || room.Regions.Count > 0)) return false;
-            if (t.SoloPeak > room.Base.Spawns.Count + 1) return false;                       // plan guardrail: solo live <= today's plan count + 1
+            // plan guardrail: solo live <= today's AUTHORED plan count + 1. This uses Base.Spawns.Count, not a live plan count: the live count varies by twist (Thin -1, Crowded +1) and
+            // stir/co-op extras, which this pure pick cannot see. CellarTemplateSpawns trims/pads the built group to the live CellarEncounterPlan.CountIn(room), so the wiring never exceeds it.
+            if (t.SoloPeak > room.Base.Spawns.Count + 1) return false;
             if ((room.Affordances & t.Wants) != t.Wants) return false;
             if (t.Kinds.Any(k => k == EnemyKind.DoughWarden || !EnemyHabitat.Fits(k, room))) return false;
             return true;
