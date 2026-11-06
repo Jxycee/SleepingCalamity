@@ -1,6 +1,7 @@
 Title: Design note: gold sink + kill purse/stash
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-06 16:49 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: design notes", two related S items)
 Status file: Reference/sessions/gold-design/STATUS.md
