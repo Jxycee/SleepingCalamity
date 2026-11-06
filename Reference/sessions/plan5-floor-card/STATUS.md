@@ -1,8 +1,8 @@
 # plan5-floor-card (cloud session)
-State: run A (Core 1-3) merged on branch + reviewed; run B (Tasks 4-5, live dive) in progress
+State: run B (Tasks 4-5) done, main merged 0650487; risk review of 4-5 and run C (HUD, bots) in progress
 Branch: claude/upbeat-maxwell-pnadr4 (from main a85d686)
 Tip: -
-Check: gate on run A tip: compile PASS, EditMode 1573/1575 (2 expected roster re-pins, fixed in run B step 0)
+Check: run B 5ebbb03: gate PASS (EditMode 1577/1577), PlayMode 6 classes 73/73
 Soak: -
 Archive: no
 
@@ -18,3 +18,6 @@ Archive: no
 
 9. Valve fallback: layouts have 4-6 rooms, so valves may sit in adjacent rooms when no farther pair exists; 4.5% of valve rolls fall back to the gate key (fewer than 2 eligible combat rooms).
 10. Stirred's +10 can latch the extra enemy / hunter for the rest of the half (kept: it is the hazard; card says so).
+
+## Follow-ups (outside this plan)
+- Tools/cloud/sc_core_tests.py: its using-filter rejects `SleepingCalamity.Core.Combat`, so ~21 EditMode files (incl. CellarRosterTests) never run under it and it reports green; widening shows only RingPlannerTests.Plan_DoesNotAllocate_PerTick failing under .NET 8 (24 B). Needs its own small task.
