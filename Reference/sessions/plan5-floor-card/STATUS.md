@@ -1,5 +1,5 @@
 # plan5-floor-card (cloud session)
-State: plan written, in review (docs/superpowers/plans/2026-11-05-objectives-floor-card.md)
+State: implementing run A (Core tasks 1-3); plan reviewed 3f58ebe
 Branch: claude/upbeat-maxwell-pnadr4 (from main a85d686)
 Tip: -
 Check: -
