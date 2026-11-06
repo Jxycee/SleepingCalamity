@@ -1,4 +1,4 @@
-# Work queue (any hour)
+﻿# Work queue (any hour)
 
 One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). Built from a full open-work scan on 2026-11-06 (spec section 12, PARKING_LOT, BUGS, triage notes, session STATUS files, decisions-for-review).
 
@@ -12,7 +12,8 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 
 ## Ready: dive build (critical path after the playtest)
 - [x] **M** Dungeon spec step 5a: encounter templates for the 12 v2 rooms (spec `2026-11-03-hearthdeep-dungeon-design.md` section 12 step 5; `docs/ROOM_METRICS.md`, `CellarRoomsV2`) - write plan first, then code [U] (`4dee555f`)
-- [ ] **M** Wire the host spawner to encounter templates (after spec 5a merges; `EncounterBuilder`, Ambush hook = `CellarEncounterPlan.AmbushRoom == roomIndex`; first add a golden template-pick test for a fixed (seed, floor, room) and a comment that the solo cap uses `Base.Spawns.Count` while live plan counts vary by twist: 5a reviewer nits 1, 4) [U][net]
+- [x] **M** Wire the host spawner to encounter templates (after spec 5a merges; `EncounterBuilder`, Ambush hook = `CellarEncounterPlan.AmbushRoom == roomIndex`; first add a golden template-pick test for a fixed (seed, floor, room) and a comment that the solo cap uses `Base.Spawns.Count` while live plan counts vary by twist: 5a reviewer nits 1, 4) [U][net] (`edf1d82d`)
+- [ ] **S** Spawner follow-ups (risk review `Reference/sessions/spawner-wiring/STATUS.md`): wave 1 has no player-distance safety (`CellarContentsSync` TickWaveTwo); wave 1 dropped when wave 0 placed nothing + missing carrier-lost reset; PlayMode test of the two-wave handoff; exclude the hunter cell from template cells [U][net]
 - [ ] **L** Spec step 5b: water gimmick states on the 12 rooms (flood/drain), validator coverage via `RoomValidatorV2` [U]
 - [ ] **M** Spec step 5c: deferred floor modifiers Brimming, Fat Larder, Still Air (`Reference/sessions/plan5-floor-card/STATUS.md:12`) [U]; dungeon-1 guardrail: keep them light and readable (user 2026-11-06)
 - [ ] **S** Dungeon-1 modifier difficulty check: DiveBot solo runs with plan 5 modifiers on vs off; if they add much difficulty, soften (e.g. floor 7 one hazard at most, Stirred's latch ends at the next stair). Guardrail: user 2026-11-06, dungeon one must not be extremely complex or overly difficult [U]

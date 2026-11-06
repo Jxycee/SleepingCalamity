@@ -19,3 +19,5 @@ Rules:
 - User guardrail (2026-11-06): dungeon one must not get extremely complex or overly difficult.
 
 Done when: results table in STATUS, any softening merged with green check (+ soak), STATUS DONE, Archive: ready.
+
+Added by coordinator after spawner wiring merged (edf1d82d): risk review follow-up 1 says party size does not change enemy count (CellarTemplateSpawns trims to the plan count, which ignores party size) and wave 1 survives only when plan count >= 4. Settled rule: difficulty scales to the players present. Measure it in the bot runs and propose the fix (or make it, if small and Core-only).
