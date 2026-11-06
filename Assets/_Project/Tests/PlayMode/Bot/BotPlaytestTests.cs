@@ -70,6 +70,45 @@ namespace SleepingCalamity.Tests.PlayMode
                 startWave: 4);
         }
 
+        // One Broom, no waves, the dive bot's fighter settings: how long does the bot take to kill it (cap 120 s)? Answers "is the Broom slow by design or by bot".
+        [UnityTest, Timeout(200000)]
+        public IEnumerator Bot_KillsOneBroom_Quickly()
+        {
+            if (System.Environment.GetEnvironmentVariable("SC_BOT") != "1") Assert.Ignore("bot playtest: set SC_BOT=1 to run");
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            SceneFlow.DevCombatArena = true;
+            yield return PlayModeHarness.StartSoloAndWaitForPlayer(SceneNames.ArenaCombat);
+            var hero = AppBootstrap.Current.NetworkManager.LocalClient.PlayerObject;
+            var input = new FakeInputService();
+            hero.GetComponent<HeroLocomotion>().Input = input;
+            hero.GetComponent<TargetLockController>().Input = input;
+            hero.GetComponent<HeroCombat>().Input = input;
+            yield return null;
+            CombatHost combat = CombatHost.Current;
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            yield return PlayModeHarness.WaitUntil(() => Enemy.All.Count == 0, 5f, "strays did not despawn");
+            Enemy broom = combat.SpawnEnemy(EnemyKind.Broom, 1, hero.transform.position + hero.transform.forward * 6f);
+            var bot = new ArenaBot(input, hero.transform) { Dodges = true, FlankFrontalBlockers = true, DodgeMargin = 0.3f, Preferred = broom };
+            bot.Report.Goal = "kill one broom within 120 s";
+            float start = Time.time;
+            while (Time.time - start < 120f && broom != null && broom.IsSpawned && broom.Alive && bot.Report.HitsTaken < 40)
+            {
+                bot.Tick(Time.deltaTime, Time.time - start);
+                yield return null;
+            }
+            input.Frame = default;
+            float took = Time.time - start;
+            bool dead = broom == null || !broom.IsSpawned || !broom.Alive;
+            string md = bot.Report.ToMarkdown();
+            foreach (string line in md.Split('\n')) Debug.Log("[BOT] " + line.TrimEnd());
+            Debug.Log($"[BOT] BROOM killed={dead} after {took:F1} s");
+            string dir = System.Environment.GetEnvironmentVariable("SC_BOT_OUT");
+            if (!string.IsNullOrEmpty(dir)) { Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "broom.md"), md + $"\nkilled={dead} after {took:F1} s\n"); }
+            Assert.That(dead, Is.True, $"the bot did not kill one broom in {took:F0} s");
+            Assert.That(took, Is.LessThan(60f), "one broom took the bot over a minute");
+        }
+
         private static IEnumerator Play(string goal, float limit, bool dodges, System.Func<BotReport, bool> done, System.Func<BotReport, bool> met, int startWave = 1)
         {
             if (System.Environment.GetEnvironmentVariable("SC_BOT") != "1") Assert.Ignore("bot playtest: set SC_BOT=1 to run");
