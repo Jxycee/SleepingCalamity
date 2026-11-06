@@ -70,7 +70,11 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Tough_Seed31() { yield return Play(31u, tough: true); }
 
-        private IEnumerator Play(uint seed, bool tough = false)
+        // short proof: stops as soon as the bot enters floor 6 (or after 1500 s of play); no route asserts
+        [UnityTest, Timeout(7200000)]
+        public IEnumerator DiveBot_Tough_Seed7_ToFloor6() { yield return Play(7u, tough: true, stopFloor: 6, stopSeconds: 1500f); }
+
+        private IEnumerator Play(uint seed, bool tough = false, int stopFloor = 0, float stopSeconds = 0f)
         {
             if (System.Environment.GetEnvironmentVariable("SC_BOT") != "1") Assert.Ignore("dive bot: set SC_BOT=1 to run");
             LogAssert.ignoreFailingMessages = true;   // errors are findings, the run goes on
@@ -104,19 +108,21 @@ namespace SleepingCalamity.Tests.PlayMode
 
             // dive 1: hub -> floors 1-7 -> the EndCell
             float limit = 900f * DiveFloorTable.LastBuiltFloor;   // 900 s per floor (7 floors: 6300 s); the [Timeout]s (7200000 ms) stay above it
+            if (stopFloor > 0 && stopSeconds > 0f) limit = stopSeconds;
             int maxFloor = 0;
             while (bot.Seconds < limit && !(bot.Finished && bot.Floor == 0))
             {
                 bot.Tick(1f / 60f);
                 maxFloor = Mathf.Max(maxFloor, bot.Floor);
+                if (stopFloor > 0 && bot.Floor >= stopFloor) { Debug.Log($"[DIVEBOT] STOP: entered floor {bot.Floor} after {bot.Seconds:0} s"); break; }
                 yield return null;
             }
             input.Frame = default;
-            if (!bot.Finished) bot.Note("Run", $"the dive didn't finish within {limit:0} s of play (deepest floor {maxFloor}; cleared {string.Join(",", bot.ClearedFloors.OrderBy(x => x))}; pushed on {bot.PushedOn})");
+            if (!bot.Finished && stopFloor == 0) bot.Note("Run", $"the dive didn't finish within {limit:0} s of play (deepest floor {maxFloor}; cleared {string.Join(",", bot.ClearedFloors.OrderBy(x => x))}; pushed on {bot.PushedOn})");
 
             // dive 2: the hub stair again, then look at the first floor's fresh state (no checkpoint: finishing the dive earns none)
             string second = "not reached";
-            if (bot.Finished)
+            if (bot.Finished && stopFloor == 0)
             {
                 DiveHaulSync.Summary done = DiveDirector.Instance.HaulSync != null ? DiveDirector.Instance.HaulSync.Current : default;
                 bot.Finished = false;   // let the bot take the hub stair again
@@ -173,7 +179,8 @@ namespace SleepingCalamity.Tests.PlayMode
             Debug.Log("[DIVEBOT] report: " + file);
             Assert.That(maxFloor, Is.GreaterThanOrEqualTo(1), "the bot never got into the dive. Report: " + file);
             // The route criterion holds for the tough runs (the host tops the hero up, so the run measures the route). The plain runs measure the difficulty: the bot dies on the way and that is a finding.
-            if (tough)
+            if (stopFloor > 0) Assert.That(maxFloor, Is.GreaterThanOrEqualTo(stopFloor), $"the bot did not enter floor {stopFloor} within {stopSeconds:0} s (deepest {maxFloor}). Report: " + file);
+            else if (tough)
             {
                 Assert.That(bot.EnteredFloors.Count >= 7 && Enumerable.Range(1, 7).All(bot.EnteredFloors.Contains), Is.True, "the bot did not reach every floor 1-7 (entered " + string.Join(",", bot.EnteredFloors.OrderBy(x => x)) + "). Report: " + file);
                 Assert.That(Enumerable.Range(1, 6).All(bot.ClearedFloors.Contains), Is.True, "the bot did not clear floors 1-6 (cleared " + string.Join(",", bot.ClearedFloors.OrderBy(x => x)) + "). Report: " + file);

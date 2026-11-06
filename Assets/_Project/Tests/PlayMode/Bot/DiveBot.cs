@@ -111,7 +111,7 @@ namespace SleepingCalamity.Tests.PlayMode
             if (!_vitals.IsUp || d.HasPendingTeleport) { _input.Frame = f; return; }
 
             SyncFloor(d);
-            if (BankRoom(d, dt)) { _input.Frame = f; return; }
+            if (BankRoom(d, dt)) { if (_pushFrame) { _pushFrame = false; f.PrimaryPressed = true; } _input.Frame = f; return; }
             if (_bakeAt > 0f && Seconds >= _bakeAt) { _bakeAt = -1f; Bake(_bakeArea); _corners.Clear(); EntryProbe(); }
             if (_bakeAt > 0f) { _input.Frame = f; return; }
             if (_teleportCheckAt > 0f && Seconds >= _teleportCheckAt)
@@ -170,7 +170,7 @@ namespace SleepingCalamity.Tests.PlayMode
         // pushes on with the bank screen's Y key (the dev input). True while the room is open.
         bool BankRoom(DiveDirector d, float dt)
         {
-            if (_pushKeyAt >= 0f && Seconds >= _pushKeyAt) { _pushKeyAt = -1f; _input.DevPressed.Remove(DevKey.BankPushOn); }
+            if (_pushKeyAt >= 0f && Seconds >= _pushKeyAt) _pushKeyAt = -1f;   // push-on retry timer (real Primary edge, one frame)
             DiveHaulSync h = d.HaulSync;
             if (h == null || !d.NetActive.Value || h.Current.DivePhase != DivePhase.BankRoom) { _bankRoomClock = 0f; return false; }
             _bankRoomClock += dt;
@@ -195,12 +195,12 @@ namespace SleepingCalamity.Tests.PlayMode
             }
             if (_bankRoomClock >= 3.0f && _pushKeyAt < 0f)
             {
-                _input.DevPressed.Add(DevKey.BankPushOn); _pushKeyAt = Seconds + 0.1f;   // one frame: the bank screen reads it and asks the host
+                _pushFrame = true; _pushKeyAt = Seconds + 1.0f;   // the real Primary button, one-frame edge (the screen is held only in bank range, so retry each second)
                 if (_bankRoomClock > 12f) Note("Interact", "pressed the push-on key in the bank room for 12 s and the room did not close");
             }
             return true;
         }
-        bool _pickedThisVisit;
+        bool _pickedThisVisit, _pushFrame;
         static Unity.Netcode.NetworkManager AppBootstrapManager() => SleepingCalamity.App.AppBootstrap.Current != null ? SleepingCalamity.App.AppBootstrap.Current.NetworkManager : null;
 
         // ------------------------------------------------------------------------------------------------ floors
@@ -322,7 +322,9 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 if (DiveFloorTable.HasStair(Floor, PushedOn) && CellarFloorBuilder.TryDescentWorld(l, fs.Built, out Vector3 st))
                 {
-                    if (stateOk && s.ExitUnlocked) list.Add(new Target { Goal = Goal.Stair, Pos = st, Range = DiveDirector.PromptRadius - 0.5f, Name = "stair" });
+                    // the bank floor's stair is not a gate-key stair: it opens with the push-on (NetStairOpen), the contents' ExitUnlocked stays false
+                    bool bankStairOpen = Floor == UndercroftPlan.BankFloor && PushedOn && d.NetStairOpen.Value;
+                    if ((stateOk && s.ExitUnlocked) || bankStairOpen) list.Add(new Target { Goal = Goal.Stair, Pos = st, Range = DiveDirector.PromptRadius - 0.5f, Name = "stair" });
                     else if (_floorClock > 150f) Note("Flow", $"floor {Floor}: everything taken or tried but the exit is still locked after {_floorClock:0} s (gate key {(stateOk ? s.GateKey.ToString() : "?")})");
                 }
                 if (Floor == DiveFloorTable.LastBuiltFloor && CellarFloorBuilder.TryEndWorld(l, fs.Built, out Vector3 end))
