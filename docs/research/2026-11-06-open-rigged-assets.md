@@ -55,6 +55,14 @@ Still avoid on quality or safety grounds: Kenney blocky characters (tests only);
 - **UniRig: yes.** README: "at least 8GB VRAM" for generation; released checkpoint does skeleton + skinning (Articulation-XL2.0); Rig-XL/VRoid checkpoints still planned.
 - SkinTokens (14 GB+): no. Mesh2Motion: browser, no GPU.
 
+## Image-to-3D on the 12 GB RTX 5070 (checked 2026-11-06)
+- **Hunyuan3D-2.1** (Jun 2025, PBR): shape ~10 GB fits; PBR texture ~21 GB does not (README; `--low_vram_mode` exists, saving unpublished). Run shape only, texture with our own pipeline (`sc-ai-model-pipeline` retex / Blender bake), which we'd do anyway since AI paint blurs.
+- **Hunyuan3D-2 / 2mini-Turbo** (0.6B): README "6 GB VRAM for shape generation and 16 GB for shape and texture". Shape fits easily; texture borderline, community reports 2.0 paint running on a 12 GB RTX 3060.
+- **TripoSG** (VAST, MIT): >8 GB, shape only, CLI image to GLB. Fits; strong geometry, no texture.
+- **TRELLIS.2** (Microsoft, Dec 2025): numbers conflict (6-8 GB claimed with offload, 16 GB at 512^3, 24 GB+ comfortable); treat as borderline at low resolution.
+- **Step1X-3D**: no VRAM figure found.
+- Recommendation: Hunyuan3D-2.1 or TripoSG for shape locally, our texture pipeline for paint, UniRig (8 GB) to rig. Licence: Hunyuan community licence is fine under the personal-use bar.
+
 ## Still to verify before adopting
 1. Quaternius **QAL** licence text (Bestiary kit) and the UAL2 page's CC0-vs-"free commercial" wording.
 2. Ultimate Animated Animals roster (is there a rat, cat, crow?).
