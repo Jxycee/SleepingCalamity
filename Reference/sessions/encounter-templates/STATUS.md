@@ -1,2 +1,2 @@
 Status: IN PROGRESS
-Plan decisions committed; starting run A.
+Runs A-C implemented, gate PASS (1619 tests). Merged origin/main; running soak then check.
