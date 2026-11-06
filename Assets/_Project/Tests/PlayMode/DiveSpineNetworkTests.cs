@@ -688,10 +688,29 @@ namespace SleepingCalamity.Tests.PlayMode
 
         // atRealBank: the dive starts on the built floor 5 beside its real bank cell (checkpoint start, the real range rules apply to every request, including Go home); otherwise the haul session
         // is jumped to the bank floor on floor 1's build (host rules for picks and push-on only).
-        private IEnumerator OpenBankScreenOnRealInput(System.Action<Rig, FakeInputService, DiveHaulSync> done, float heldMoveY = 0f, bool atRealBank = false)
+        // The built floor's walkable room cell farthest from the bank (a spot a hero can stand on, well outside the bank screen's range).
+        private static Vector3 FarthestFloorSpot(Rig rig, Vector3 bank)
+        {
+            CellarFloorLayout l = rig.HostFloor.Layout; Vector3 best = bank; float bestD = -1f;
+            foreach (PlacedRoom p in l.Rooms)
+                for (int lx = 0; lx < p.Width; lx++)
+                    for (int ly = 0; ly < p.Height; ly++)
+                    {
+                        if (p.Room.CellAt(lx, ly) != CellKind.Floor) continue;
+                        Vector3 w = rig.HostFloor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(p.X + lx, p.Y + ly)) + new Vector3(0f, 0.1f, 0f);
+                        float d = Flat(w, bank);
+                        if (d > bestD) { bestD = d; best = w; }
+                    }
+            Assert.That(bestD, Is.GreaterThan(DiveDirector.BankPromptRadius + 3f), "premise: the floor has a room cell well away from the bank");
+            return best;
+        }
+
+        // clientCount > 0 (atRealBank only): that many client heroes join the party at the bank; clientsAway moves every client hero to the farthest room cell before the room opens.
+        // ONE input is shared by every peer's director in this process, so a single Tap is read by the host's and by each client's director alike (each asks for its own hero).
+        private IEnumerator OpenBankScreenOnRealInput(System.Action<Rig, FakeInputService, DiveHaulSync> done, float heldMoveY = 0f, bool atRealBank = false, int clientCount = 0, bool clientsAway = false)
         {
             Rig rig = null;
-            yield return Start(0, r => rig = r, withHeroes: true);
+            yield return Start(clientCount, r => rig = r, withHeroes: true);
             rig.Host.SeedOverride = 7171u;
             ulong hostId = rig.HostNm.LocalClientId;
             var input = new FakeInputService();
@@ -706,6 +725,20 @@ namespace SleepingCalamity.Tests.PlayMode
                 Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
                 yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) < 4f, Timeout, "the party did not arrive at the bank room");
                 haul.ServerMarkCleared(UndercroftPlan.BankFloor);
+                if (clientCount > 0)
+                {
+                    // a party of two starts spread around the entry, which is not all inside the bank's range: stand everyone at the bank (after the arrival teleports have landed)
+                    yield return Seconds(0.5f);
+                    Move(rig.HostHero, bank + new Vector3(0.5f, 0.1f, 0f));
+                    foreach (NetworkObject own in rig.OwnHeroes) Move(own, bank + new Vector3(0.5f, 0.1f, 0.8f));
+                    yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) < 3f && Flat(rig.HeroesOnHost[0].transform.position, bank) < 3f, Timeout, "the party never stood at the bank");
+                }
+                if (clientsAway)
+                {
+                    Vector3 far = FarthestFloorSpot(rig, bank);
+                    foreach (NetworkObject own in rig.OwnHeroes) Move(own, far);
+                    yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, bank) > DiveDirector.BankPromptRadius + 3f, Timeout, "the client hero never showed far from the bank on the host");
+                }
             }
             Assert.That(haul.ServerAddItem(hostId, 104) && haul.ServerAddItem(hostId, 110) && haul.ServerAddItem(hostId, 110), Is.True);
             input.Frame = new PlayerInputFrame { MoveY = heldMoveY };   // a stick already held as the room opens
@@ -776,6 +809,156 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => !rig.Host.BankScreenOpen && input.GameplayContext == InputContext.Free, Timeout, "the BankScreen context was not handed back after the dive ended");
             Assert.That(input.DevPressed, Is.Empty);
         }
+
+        // ---------------------------------------------------------------------------------------------------------------------------------
+        // Risk-review fixes of the bank screen's real input (co-op freeze, revive, re-arm) and the floor 5 -> 6 way down after a real-input push-on.
+        // Catches: a peer far from the bank holding InputContext.BankScreen (its Move zeroed while the host refuses every pick: frozen), a hero standing at the bank not holding it, the context staying held
+        // after the hero walks away, a pause menu closing (or a hero standing up) with a press that pushes the party on at once, a downed teammate that nobody can walk to, and the real push-on (Primary)
+        // not leaving a stair that opens on floor 5 (so the party sat on floor 5 for good). NOT covered (one process, ONE shared input for every peer's director): per-peer Move zeroing on a client machine
+        // (the director flags stand in: BankScreenOpen / BankRoomHint per peer), the owner-side NetworkTransform of a walking client, the IMGUI hint (the manual 2-PC walk).
+        // ---------------------------------------------------------------------------------------------------------------------------------
+
+        [UnityTest]
+        public IEnumerator BankScreen_PeerFarFromTheBank_DoesNotHoldTheScreen_AndHoldsItAgainWhenItWalksIn()
+        {
+            Rig rig = null; FakeInputService input = null; DiveHaulSync haul = null;
+            yield return OpenBankScreenOnRealInput((r, i, h) => { rig = r; input = i; haul = h; }, atRealBank: true, clientCount: 1, clientsAway: true);
+            DiveDirector peer = rig.Peers[0];
+            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
+            Assert.That(rig.Host.BankScreenOpen, Is.True, "the host hero stands at the bank: its screen is open (hint " + rig.Host.BankRoomHint + ", host hero " + Flat(rig.HostHero.transform.position, bank).ToString("0.0") + " m from the bank, client hero "
+                + Flat(rig.HeroesOnHost[0].transform.position, bank).ToString("0.0") + " m, client downed " + rig.HeroesOnHost[0].GetComponent<HeroVitals>().IsDowned + ", host down " + !rig.HostHero.GetComponent<HeroVitals>().IsUp + ")");
+            Assert.That(input.GameplayContext, Is.EqualTo(InputContext.BankScreen), "and holds the context");
+            yield return PlayModeHarness.WaitUntil(() => peer.BankRoomHint, Timeout, "the far client's director never showed the walk-to-the-bank hint");
+            Assert.That(peer.BankScreenOpen, Is.False, "a client far from the bank has no screen to arm (the host refuses its picks)");
+
+            // it walks in: now it holds the screen too, and the hint goes
+            Move(rig.OwnHeroes[0], bank + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => peer.BankScreenOpen && !peer.BankRoomHint, Timeout, "the client never got its screen on walking into the bank's range");
+
+            // and out again: released (the shared fake input stays BankScreen because the host's director still holds it; the peer's own flag is the proof)
+            Move(rig.OwnHeroes[0], FarthestFloorSpot(rig, bank));
+            yield return PlayModeHarness.WaitUntil(() => !peer.BankScreenOpen && peer.BankRoomHint, Timeout, "the client kept its screen after walking away from the bank");
+            Assert.That(haul.Session.Phase, Is.EqualTo(DivePhase.BankRoom));
+        }
+
+        [UnityTest]
+        public IEnumerator BankScreen_HeroFarFromTheBank_StaysFree_MoveNotZeroed_PressesSendNothing()
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r, withHeroes: true);
+            rig.Host.SeedOverride = 7171u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            var input = new FakeInputService();
+            ServiceRoots.App.Replace<IInputService>(input);
+            rig.Host.Checkpoint.Restore(true);
+            Assert.That(rig.Host.ServerStartDive(UndercroftPlan.BankFloor), Is.True);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, UndercroftPlan.BankFloor);
+            DiveHaulSync haul = rig.HostHaul;
+            Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) < 4f, Timeout, "the party did not arrive at the bank room");
+            haul.ServerMarkCleared(UndercroftPlan.BankFloor);
+            Vector3 far = FarthestFloorSpot(rig, bank);
+            Move(rig.HostHero, far);
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) > DiveDirector.BankPromptRadius + 3f, Timeout, "the host hero never moved away");
+            Assert.That(haul.ServerAddItem(hostId, 104), Is.True);
+            Assert.That(haul.ServerEnterBankRoom(), Is.True, "the party enters the room (no teleport: the hero stays where it stands)");
+
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.BankRoomHint, Timeout, "the far hero never got the hint");
+            Assert.That(rig.Host.BankScreenOpen, Is.False);
+            Assert.That(input.GameplayContext, Is.EqualTo(InputContext.Free), "out of range the context stays Free");
+            input.Frame = new PlayerInputFrame { MoveY = 1f, MoveX = 0.5f };
+            Assert.That(input.Intent.MoveY, Is.EqualTo(1f), "Move is not zeroed: the hero can walk to the bank");
+            Assert.That(input.Intent.MoveX, Is.EqualTo(0.5f));
+            yield return Seconds(0.7f);
+            Assert.That(input.GameplayContext, Is.EqualTo(InputContext.Free), "still free after the arm delay would have passed");
+            input.Frame = default; yield return null;
+
+            // a Primary press out there is an ordinary attack press: it asks for nothing
+            int handled = haul.ChoiceRequestsHandled;
+            yield return Tap(input, new PlayerInputFrame { PrimaryPressed = true });
+            yield return Seconds(0.3f);
+            Assert.That(haul.ChoiceRequestsHandled, Is.EqualTo(handled), "no push-on request left the far hero");
+            Assert.That(haul.Session.BankChosenThisDive, Is.False);
+
+            // it walks to the bank: the screen holds, its fields arm after the delay
+            Move(rig.HostHero, bank + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.BankScreenOpen && input.GameplayContext == InputContext.BankScreen, Timeout, "the hero never got the screen at the bank");
+            Assert.That(rig.Host.BankRoomHint, Is.False);
+
+            // and away again: released, not frozen
+            Move(rig.HostHero, far);
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.BankScreenOpen && input.GameplayContext == InputContext.Free, Timeout, "walking away did not hand the context back");
+        }
+
+        // A downed teammate: nobody holds the screen (the Move input must be able to walk to them for the revive hold); the room stays open.
+        [UnityTest]
+        public IEnumerator BankScreen_ADownedTeammate_ReleasesTheScreenSoTheHeroCanWalkToThemToRevive()
+        {
+            Rig rig = null; FakeInputService input = null;
+            yield return OpenBankScreenOnRealInput((r, i, h) => { rig = r; input = i; }, atRealBank: true, clientCount: 1, clientsAway: true);
+            Assert.That(rig.Host.BankScreenOpen && input.GameplayContext == InputContext.BankScreen, Is.True, "premise: the host hero holds the screen");
+            rig.HeroesOnHost[0].GetComponent<HeroVitals>().ServerDamage(100000);
+            Assert.That(rig.HeroesOnHost[0].GetComponent<HeroVitals>().IsDowned, Is.True, "premise: the client hero is down (not yet out)");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.BankRoomHint && input.GameplayContext == InputContext.Free, Timeout, "a downed teammate did not release the host hero's screen");
+            input.Frame = new PlayerInputFrame { MoveY = 1f, InteractHeld = true };
+            Assert.That(input.Intent.MoveY, Is.EqualTo(1f));
+            Assert.That(input.Intent.InteractHeld, Is.True, "the revive hold passes");
+            Assert.That(rig.HostHaul.Session.Phase, Is.EqualTo(DivePhase.BankRoom), "the room is still open");
+        }
+
+        // A pause menu over the screen zeroes the Bank* fields; the press that closes it (and the one just after) must not push on. The arm delay restarts when the fields come back.
+        [UnityTest]
+        public IEnumerator BankScreen_AfterThePauseMenuCloses_ReArmsBeforeButtonsCount()
+        {
+            Rig rig = null; FakeInputService input = null; DiveHaulSync haul = null;
+            yield return OpenBankScreenOnRealInput((r, i, h) => { rig = r; input = i; haul = h; }, atRealBank: true);   // armed: 0.7 s have passed
+            input.MenuOpen = true;
+            yield return Seconds(0.3f);
+            Assert.That(haul.Session.BankChosenThisDive, Is.False);
+            input.MenuOpen = false;                                   // the menu closes ...
+            yield return Tap(input, new PlayerInputFrame { PrimaryPressed = true });   // ... with a Primary press in the next frames
+            yield return Seconds(0.2f);
+            Assert.That(haul.Session.BankChosenThisDive, Is.False, "a press right after the menu closed must not push the party on");
+            yield return Seconds(0.5f);
+            yield return Tap(input, new PlayerInputFrame { PrimaryPressed = true });
+            yield return PlayModeHarness.WaitUntil(() => haul.Session.BankChosenThisDive, Timeout, "after the delay the button works again");
+        }
+
+        // Floor 5 -> 6 after a push-on through the real button (no dev key), solo and with two heroes: the bank floor's way down must open (the gate key never applies to it) and the interact
+        // press on the stair prompt must take the party to floor 6, once.
+        private IEnumerator PushOnThenTakeTheStair(int clientCount)
+        {
+            Rig rig = null; FakeInputService input = null; DiveHaulSync haul = null;
+            yield return OpenBankScreenOnRealInput((r, i, h) => { rig = r; input = i; haul = h; }, atRealBank: true, clientCount: clientCount);
+            Assert.That(rig.Host.RequireGateKey, Is.True, "premise: a real dive gates the gate-key stairs (the director arms the contents)");
+            Assert.That(haul.Session.BankChosenThisDive, Is.False);
+            yield return Tap(input, new PlayerInputFrame { PrimaryPressed = true });   // with two heroes the shared input presses for the host's and the client's director alike
+            yield return PlayModeHarness.WaitUntil(() => haul.Session.BankChosenThisDive, Timeout, "Primary never pushed the party on");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.BankScreenOpen && input.GameplayContext == InputContext.Free, Timeout, "the screen did not hand the context back");
+            Assert.That(haul.Session.Floor, Is.EqualTo(UndercroftPlan.BankFloor));
+            Assert.That(input.DevPressed, Is.Empty, "no dev key anywhere on this path");
+
+            Assert.That(CellarFloorBuilder.TryDescentWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True, "floor 5 has a way down once the choice is made");
+            Move(rig.HostHero, stair + new Vector3(1f, 0.1f, 0f));
+            foreach (NetworkObject own in rig.OwnHeroes) Move(own, stair + new Vector3(1f, 0.1f, 0.8f));
+            yield return NearOnHost(rig, stair, "the party at the floor-5 stair");
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.Prompt == DiveDirector.PromptKind.Stair, Timeout, "the stair prompt never showed on floor 5 after the push-on");
+            Assert.That(rig.Host.NetStairOpen.Value, Is.True, "the bank floor's stair is not a gate-key stair: it is open after the push-on");
+            Assert.That(rig.Host.PromptText, Does.Contain("Take the stair down"));
+
+            yield return Tap(input, new PlayerInputFrame { InteractPressed = true });
+            yield return PlayModeHarness.WaitUntil(() => haul.Current.CurrentFloor == 6, Timeout, "the stair press on floor 5 never took the party to floor 6");
+            yield return AllBuilt(rig, 6);
+            yield return Seconds(1f);
+            Assert.That(haul.Current.CurrentFloor, Is.EqualTo(6), "one stair press, one floor");
+        }
+
+        [UnityTest]
+        public IEnumerator Floor5_RealButtonPushOn_ThenTheStairOpensAndTakesTheSoloPartyToFloor6() { yield return PushOnThenTakeTheStair(0); }
+
+        [UnityTest]
+        public IEnumerator Floor5_RealButtonPushOn_ThenTheStairOpensAndTakesTwoHeroesToFloor6() { yield return PushOnThenTakeTheStair(1); }
 
         [UnityTest]
         public IEnumerator BankRoom_ThreePlayers_ExtraSlotNeverRepeats_AcrossRestart()

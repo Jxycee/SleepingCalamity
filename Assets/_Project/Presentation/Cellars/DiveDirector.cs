@@ -867,8 +867,9 @@ namespace SleepingCalamity.Presentation
         // The bank screen (plan 3 task 8): the minimum UI that drives the picks and the shared choice while the party is in the bank room. Every peer runs it for its own hero; it only asks (PlayerBagSync
         // RequestPick / RequestUnpick, DiveHaulSync.RequestPushOn, RequestGoHome): the host re-checks everything (range, hero up, open room). Buttons (any build, keyboard or gamepad, no input-asset change): the move
         // input up/down steps the cursor (one step per press across BankScreenInput.StepThreshold), Jump picks / unpicks the row, Primary pushes on, Secondary goes home. While the screen is open this peer
-        // holds InputContext.BankScreen: the router zeroes the hero's own move / jump / swing / interact (a cursor step must not walk the hero out of the bank's range, a stray Interact must not push a
-        // party on) and passes those buttons on the Bank* intent fields. The old dev keys ([ ] P Y N via IDevInput) stay as a second path. The draw is IMGUI. Rows: the carried satchel first (when carried), then the carried items.
+        // holds InputContext.BankScreen, but ONLY while its own hero stands within BankPromptRadius of the bank and no teammate lies downed: the router zeroes the hero's own move / jump / swing / interact
+        // (a cursor step must not walk the hero out of the bank's range, a stray Interact must not push a party on) and passes those buttons on the Bank* intent fields. A peer out of range (or with a
+        // teammate to revive) stays on Free, so the host's range refusal can never leave it frozen, and sees a hint line instead of the screen. The old dev keys ([ ] P Y N via IDevInput) stay as a second path. The draw is IMGUI. Rows: the carried satchel first (when carried), then the carried items.
         // =================================================================================================================================
         public bool BankScreenOpen { get; private set; }
         public int BankCursor { get; private set; }
@@ -889,30 +890,64 @@ namespace SleepingCalamity.Presentation
         private float _bankOpenAt = -1f, _bankPrevMoveY;
         private bool _heldBankContext;   // this director put the local input into InputContext.BankScreen (so only it hands it back: several peers' directors can share one input in a test process)
 
+        // True while the party is in the bank room but THIS peer is not holding the screen (its hero is out of the bank's range, or a teammate lies downed): the hint line is drawn instead and the hero walks freely.
+        public bool BankRoomHint { get; private set; }
+
+        // A downed teammate (another hero on this peer's network) is waiting to be revived: nobody holds the screen then, so the Move input walks the hero to them (ReviveHold reads InteractHeld, which the
+        // Free context passes). The room is still open: pick and push on work the moment the teammate is up again (or from the dev keys).
+        private bool TeammateDownedNearby(NetworkObject player)
+        {
+            HeroVitals own = player != null ? player.GetComponent<HeroVitals>() : null;
+            IReadOnlyList<HeroVitals> all = HeroVitals.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                HeroVitals v = all[i];
+                if (v != null && v != own && v.IsSpawned && v.NetworkManager == NetworkManager && v.IsDowned) return true;
+            }
+            return false;
+        }
+
         private void LocalBankScreen()
         {
-            BankScreenOpen = false;
+            BankScreenOpen = false; BankRoomHint = false;
             IInputService input = HeroInput.ResolveDefault();
             PlayerBagSync bag = null;
+            NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
+            bool hold = false;
             if (NetActive.Value)
             {
                 ResolveSyncs();
                 if (HaulSync != null && HaulSync.Current.DivePhase == DivePhase.BankRoom) bag = PlayerBagSync.ForLocalPlayer(NetworkManager);
+                if (bag != null)
+                {
+                    // Only a hero that stands at the bank holds the screen: the host refuses every pick and push-on from one that does not, so holding it there would only freeze the hero.
+                    Vector3 bankAt = default;
+                    bool known = player != null && FloorSync != null && FloorSync.Built != null && FloorSync.Layout != null && FloorSync.BuiltFloor == HaulSync.Current.CurrentFloor
+                        && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out bankAt);   // like the host: a built floor that is not the dive floor has no cell to trust
+                    Vector3 me = player != null ? player.transform.position : default;
+                    bool inRange = BankScreenInput.InRange(known, me.x, me.z, bankAt.x, bankAt.z, BankPromptRadius);
+                    hold = inRange && !TeammateDownedNearby(player);
+                }
             }
-            HoldBankContext(input, bag != null);
+            HoldBankContext(input, hold);
             if (bag == null) { _bankOpenAt = -1f; return; }
+            if (!hold) { BankRoomHint = true; _bankOpenAt = -1f; return; }   // out of range (or a teammate to revive): Free, nothing armed; re-arms 0.4 s after the screen comes back
             BankScreenOpen = true;
-            if (_bankOpenAt < 0f) _bankOpenAt = Time.unscaledTime;
             BagView v = bag.View;
             int rows = BankRows(v);
             BankCursor = rows > 0 ? Mathf.Clamp(BankCursor, 0, rows - 1) : 0;
-            NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             bool alive = player != null && !LocalHeroIsDown(player);   // a downed hero presses nothing (the host refuses it too)
+            // The real buttons are live only while the BankScreen context is actually the routed one: a pause menu over the screen (Context = Menu) or a downed hero zeroes the Bank* fields, and the
+            // arm delay then restarts, so the press that closes the menu or the stick still held when the hero is revived cannot step the cursor or push a party on.
+            bool live = alive && input != null && input.Context == InputContext.BankScreen;
+            if (!live) _bankOpenAt = -1f;
+            else if (_bankOpenAt < 0f) _bankOpenAt = Time.unscaledTime;
             var devPresses = new BankScreenDevPresses();
             if (alive && input is IDevInput dev)
                 devPresses = new BankScreenDevPresses { Prev = dev.WasPressed(DevKey.BankPrev), Next = dev.WasPressed(DevKey.BankNext), Pick = dev.WasPressed(DevKey.BankPick), PushOn = dev.WasPressed(DevKey.BankPushOn), GoHome = dev.WasPressed(DevKey.BankGoHome) };
             PlayerIntent intent = input != null ? input.Intent : PlayerIntent.None;
-            BankScreenAction act = BankScreenInput.Read(_bankPrevMoveY, in intent, in devPresses, alive && Time.unscaledTime - _bankOpenAt >= BankArmSeconds);
+            // Read runs every frame, armed or not: the stick value it returns is the next frame's prev, and is 0 while the fields are zeroed, so a stick held on re-entry is not a fresh press.
+            BankScreenAction act = BankScreenInput.Read(_bankPrevMoveY, in intent, in devPresses, live && Time.unscaledTime - _bankOpenAt >= BankArmSeconds);
             _bankPrevMoveY = act.MoveY;
             if (!alive) return;
             if (rows > 0 && act.CursorDelta != 0) BankCursor = BankScreenInput.Step(BankCursor, act.CursorDelta, rows);
@@ -1078,6 +1113,7 @@ namespace SleepingCalamity.Presentation
             if (_notice != null && Time.unscaledTime < _noticeUntil)
                 GUI.Box(new Rect(Screen.width * 0.5f - 190f, Screen.height - 190f, 380f, 30f), _notice);
             if (BankScreenOpen) DrawBankScreen();
+            else if (BankRoomHint) GUI.Box(new Rect(20f, 80f, 400f, 30f), TeammateDownedNearby(NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null) ? "Revive your downed teammate (hold Interact), then choose" : "Walk to the bank room to choose");
         }
     }
 }

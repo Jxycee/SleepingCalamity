@@ -42,6 +42,16 @@ namespace SleepingCalamity.Core
             return a;
         }
 
+        // Whether this peer's hero is close enough to the bank to hold the bank screen (the same flat test as the host's range rule, with the director's prompt margin as `radius`). A bank cell the
+        // peer cannot trust yet (no built floor, or the built floor is not the dive floor) passes, exactly like the host, which then skips its range check too. Out of range the hero keeps walking
+        // (nothing is frozen) and the screen is not armed, so a player away from the bank can never freeze, nor be asked to press, anything.
+        public static bool InRange(bool bankKnown, float meX, float meZ, float bankX, float bankZ, float radius)
+        {
+            if (!bankKnown) return true;
+            float dx = meX - bankX, dz = meZ - bankZ;
+            return dx * dx + dz * dz <= radius * radius;
+        }
+
         // The cursor after a step, wrapping both ways (rows <= 0 keeps it at 0).
         public static int Step(int cursor, int delta, int rows)
         {

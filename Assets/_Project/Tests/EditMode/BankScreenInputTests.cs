@@ -114,6 +114,20 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsTrue(a.PushOn, "either path pushes on (once: it is one flag)");
         }
 
+        // Catches: a range gate that is not the host's flat (XZ) test (height must not count), a boundary off by one side, or an unknown bank cell holding the screen's context hostage the other way
+        // (the host skips its range check then, so the screen must stay usable).
+        [Test]
+        public void InRange_IsTheFlatCircle_AndAnUnknownBankPasses()
+        {
+            const float r = 4.5f;
+            Assert.IsTrue(BankScreenInput.InRange(true, 10f, 10f, 10f, 10f, r), "standing on the bank");
+            Assert.IsTrue(BankScreenInput.InRange(true, 14.5f, 10f, 10f, 10f, r), "exactly on the edge counts");
+            Assert.IsFalse(BankScreenInput.InRange(true, 14.6f, 10f, 10f, 10f, r), "just outside");
+            Assert.IsTrue(BankScreenInput.InRange(true, 13f, 13f, 10f, 10f, r), "a diagonal of 4.24 m is in");
+            Assert.IsFalse(BankScreenInput.InRange(true, 13.5f, 13.5f, 10f, 10f, r), "a diagonal of 4.95 m is out");
+            Assert.IsTrue(BankScreenInput.InRange(false, 999f, 999f, 0f, 0f, r), "no trusted bank cell: pass, like the host");
+        }
+
         [Test]
         public void Step_WrapsBothWays_AndSurvivesNoRows()
         {
