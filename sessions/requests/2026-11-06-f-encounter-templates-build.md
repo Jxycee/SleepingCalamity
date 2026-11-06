@@ -1,6 +1,7 @@
 Title: Encounter templates phase 2: build (plan approved)
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-06T16:54Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10; continues request 2026-11-06-a (its session wrote the plan and stopped for the go; launcher sessions can't take messages)
 Status file: Reference/sessions/encounter-templates/STATUS.md
