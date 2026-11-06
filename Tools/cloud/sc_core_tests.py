@@ -2,7 +2,7 @@
 """Run SleepingCalamity's pure Core EditMode tests in the cloud, under .NET 8 + NUnitLite (no Unity).
 
 SleepingCalamity.Core has noEngineReferences, so Core and the EditMode test files that only use Core, System and NUnit compile and run as a plain console
-app. The script picks those files itself: a test file qualifies when its `using` lines name only System*, NUnit* and SleepingCalamity.Core. It never
+app. The script picks those files itself: a test file qualifies when its `using` lines name only System*, NUnit* and SleepingCalamity.Core (or a Core sub-namespace, e.g. Core.Combat). It never
 launches Unity, and it doesn't cover tests that need UnityEngine, the editor, scenes or the other assemblies (those stay with the PC's check).
 
 Run:  python3 Tools/cloud/sc_core_tests.py [--project <worktree>] [--where "test =~ WeirBoards"] [--list]
@@ -13,7 +13,11 @@ which the script sets unless you set it yourself; with an 8.x runtime installed 
 """
 import argparse, os, re, subprocess, sys
 
-ALLOWED = re.compile(r'^using\s+(static\s+)?(System(\.[\w.]+)?|NUnit(\.[\w.]+)?|SleepingCalamity\.Core)\s*;|^using\s+static\s+SleepingCalamity\.Tests\.EditMode\.\w+\s*;')
+ALLOWED = re.compile(r'^using\s+(static\s+)?(System(\.[\w.]+)?|NUnit(\.[\w.]+)?|SleepingCalamity\.Core(\.\w+)*)\s*;|^using\s+static\s+SleepingCalamity\.Tests\.EditMode\.\w+\s*;')
+# Tests that fail only because .NET 8 differs from Unity's Mono (not game bugs). Keyed by "Class.Method" (NUnit full-name suffix); value = reason.
+SKIP = {
+    'RingPlannerTests.Plan_DoesNotAllocate_PerTick': '.NET 8 allocates 24 B where Mono allocates 0 (runtime difference); Unity PC check still runs it',
+}
 USING = re.compile(r'^using\s+(static\s+)?[\w.]+\s*;')
 
 
@@ -71,14 +75,22 @@ def main():
         print('skipped (they need non-Core test helpers): ' + ', '.join(os.path.basename(f) for f in dropped))
     dll = os.path.join(work, 'bin', 'Release', 'net8.0', 'FgCoreTests.dll')
     args = ['dotnet', dll, '--noresult', '--noheader']
-    if a.where:
-        args += ['--where', a.where]
+    skip_expr = ' and '.join('test !~ %s' % k for k in SKIP)   # ~ = substring match on the full test name
+    where = ('(%s) and (%s)' % (a.where, skip_expr)) if a.where else skip_expr
+    args += ['--where', where]
     r = subprocess.run(args, cwd=root, capture_output=True, text=True)   # cwd = the project: tests read Assets/... relative paths
     out = r.stdout
     fails = out[out.find('Errors, Failures and Warnings'):out.find('Run Settings')] if 'Errors, Failures' in out else ''
     summary = out[out.find('Test Run Summary'):] if 'Test Run Summary' in out else out[-2000:]
     print(fails.strip())
     print(summary.strip().split('\n  Start time')[0])
+    m = re.search(r'Test Count: (\d+), Passed: (\d+), Failed: (\d+)', summary)
+    ran = m.group(1) if m else '?'
+    total = sum(f.endswith('.cs') for _, _, fs in os.walk(os.path.join(root, 'Assets', '_Project', 'Tests', 'EditMode')) for f in fs)
+    print('EditMode .cs files: %d total, %d run here, %d left to the Unity check (need engine/other assemblies)' % (total, len(files), total - len(files)))
+    print('ran %s tests in %d files (dropped %d files: build helpers); skipped by SKIP list: %d' % (ran, len(files), len(dropped), len(SKIP)))
+    for k, why in SKIP.items():
+        print('  skip %s: %s' % (k, why))
     print('%d test files; %s' % (len(files), 'PASS' if r.returncode == 0 else 'FAIL'))
     return 0 if r.returncode == 0 else 1
 
