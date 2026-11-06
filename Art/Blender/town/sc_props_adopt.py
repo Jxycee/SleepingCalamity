@@ -112,7 +112,7 @@ ASSETS = {   # folder names follow the BeautyCornerBuilder's name matching (barr
                       lean=1.5, bulge=0.025, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.70, 1.6), **WEAR_WOOD),
     'Bucket_B':  dict(src='wooden_bucket_02', parts=None, rings=True, res=1024, tris=4500, wood='#664a34',
                       lean=-1.0, bulge=0.02, hoop=0.004, wob=0.003, dirt=0.08, polish=(0.75, 1.0), **WEAR_WOOD),
-    'Basket_Produce': dict(src='wicker_basket_01', parts=None, res=1024, tris=5800, wood='#a07a48', basket=True,
+    'Basket_Produce': dict(src='wicker_basket_01', parts=None, res=1024, tris=5800, wood='#a07a48', basket=True, iso_uv=True,
                       lean=0.0, bulge=0.02, hoop=0.0, wob=0.003, dirt=0.05, polish=(0.85, 1.0), **WEAR_WICKER,
                       produce=dict(kind='basket', n_apple=10, n_turnip=3, n_loaf=0, n_squash=2, max_h=0.15)),
     'Basket_Lidded': dict(src='wicker_basket_02', parts=None, res=1024, tris=5800, wood='#9c7646', basket=True,
@@ -867,6 +867,56 @@ def build_high(name, p):
     return hi, H
 
 # ---------------------------------------------------------------- low, bake, export
+def isometrize_uv(lo):
+    """Make every UV island locally isometric (U and V the same metres per unit), then equalise island scale and pack.
+    The adopted source UVs (wicker) and the smart-projected produce islands carried 3-4x anisotropy once the prop was reshaped, which
+    HollowmereFaultScan.Uv() reads as stretch. Per island: G = area-weighted mean of J^T J (J = d world / d uv per triangle), then
+    uv' = sqrt(G) uv with det 1 (island area unchanged). Run before the bake so the bake lands on the corrected layout."""
+    me = lo.data; uvl = me.uv_layers['UVMap']
+    bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table(); uv = bm.loops.layers.uv['UVMap']
+    par = list(range(len(bm.faces)))
+    def find(a):
+        while par[a] != a: par[a] = par[par[a]]; a = par[a]
+        return a
+    for f in bm.faces:
+        for l in f.loops:
+            o = l.link_loop_radial_next
+            if o is l or o.face is f: continue
+            if (l[uv].uv - o.link_loop_next[uv].uv).length < 1e-6 and (l.link_loop_next[uv].uv - o[uv].uv).length < 1e-6:
+                par[find(f.index)] = find(o.face.index)
+    acc = {}
+    for f in bm.faces:
+        ls = list(f.loops)
+        a, b, c = [l.vert.co for l in ls[:3]]; ua, ub, uc = [l[uv].uv for l in ls[:3]]
+        e1, e2 = b - a, c - a; d1, d2 = ub - ua, uc - ua
+        det = d1.x * d2.y - d1.y * d2.x; wa = e1.cross(e2).length * 0.5
+        if wa < 1e-9 or abs(det) < 1e-14: continue
+        inv = 1.0 / det; pu = (e1 * d2.y - e2 * d1.y) * inv; pv = (e2 * d1.x - e1 * d2.x) * inv
+        g = acc.setdefault(find(f.index), [0.0, 0.0, 0.0, 0.0])
+        g[0] += wa * pu.dot(pu); g[1] += wa * pu.dot(pv); g[2] += wa * pv.dot(pv); g[3] += wa
+    mats = {}
+    for k, (A, B, C, W) in acc.items():
+        G = np.array([[A, B], [B, C]]) / W
+        w, V = np.linalg.eigh(G); w = np.maximum(w, 1e-12)
+        M = V @ np.diag(np.sqrt(w)) @ V.T; M = M / math.sqrt(abs(np.linalg.det(M)))
+        mats[k] = M
+    cen = {}
+    for f in bm.faces:
+        k = find(f.index); n = cen.setdefault(k, [Vector((0, 0)), 0])
+        for l in f.loops: n[0] += l[uv].uv; n[1] += 1
+    for f in bm.faces:
+        k = find(f.index); M = mats.get(k)
+        if M is None: continue
+        c = cen[k][0] / cen[k][1]
+        for l in f.loops:
+            q = M @ np.array(l[uv].uv - c); l[uv].uv = (c.x + q[0], c.y + q[1])
+    bm.to_mesh(me); bm.free()
+    bpy.ops.object.select_all(action='DESELECT'); lo.select_set(True); bpy.context.view_layer.objects.active = lo
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.select_all(action='SELECT')
+    bpy.ops.uv.average_islands_scale()
+    bpy.ops.uv.pack_islands(margin_method='FRACTION', margin=0.003, rotate=True, scale=True, shape_method='CONCAVE')
+    bpy.ops.object.mode_set(mode='OBJECT')
+
 def make_low(hi, name, p):
     dg = bpy.context.evaluated_depsgraph_get()
     me = bpy.data.meshes.new_from_object(hi.evaluated_get(dg)); me.name = name
@@ -926,6 +976,7 @@ def make_low(hi, name, p):
         else:
             bpy.ops.uv.pack_islands(margin=0.006, rotate=True)
     if bpy.context.object and bpy.context.object.mode == 'EDIT': bpy.ops.object.mode_set(mode='OBJECT')
+    if p.get('iso_uv'): isometrize_uv(lo)
     me = lo.data
     for f in me.polygons: f.use_smooth = True
     if hasattr(me, 'set_sharp_from_angle'): me.set_sharp_from_angle(angle=math.radians(50))

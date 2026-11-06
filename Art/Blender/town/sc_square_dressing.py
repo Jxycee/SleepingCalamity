@@ -332,7 +332,7 @@ SQ = {
                       wood='#5c4330', tone=0.12, grime=1.0, bleach=0.8, dirt=0.16, polish=(0.8, 1.0), moss=(0.15, 0.7), soil=0.62),
     'Pot_Clay':  dict(kind='pot', src='planter_pot_clay', res=1024, tris=4500, scale=1.10, squash=1.0, infl=0.0, lean=1.0, wob=0.002, clay='#b0653f',
                       grime=0.5, dirt=0.06, polish=(0.8, 1.0), moss=(0.28, 0.8), soil=0.85, bulge=0.03),
-    'Pot_Broken': dict(kind='pot', broken=True, src='planter_pot_clay', res=1024, tris=5500, scale=1.10, squash=1.0, infl=0.0, lean=0.0, wob=0.002, clay='#a85f3b',
+    'Pot_Broken': dict(kind='pot', broken=True, iso_uv=True, src='planter_pot_clay', res=1024, tris=5500, scale=1.10, squash=1.0, infl=0.0, lean=0.0, wob=0.002, clay='#a85f3b',
                       grime=0.7, dirt=0.08, polish=(0.8, 1.0), moss=(0.22, 0.9), soil=0.80, bulge=0.03),
     'LanternPost_A': dict(kind='post', res=2048, tris=6000),
     'LanternPost_Broken': dict(kind='post', broken=True, res=2048, tris=6000),
