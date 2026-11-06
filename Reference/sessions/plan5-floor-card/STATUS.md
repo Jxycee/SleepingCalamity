@@ -1,8 +1,8 @@
 # plan5-floor-card (cloud session)
-State: run B (Tasks 4-5) done, main merged 0650487; risk review of 4-5 and run C (HUD, bots) in progress
+State: all tasks done (runs A-D), main merged 1c030ee; full check + soak running, branch review running
 Branch: claude/upbeat-maxwell-pnadr4 (from main a85d686)
-Tip: -
-Check: run B 5ebbb03: gate PASS (EditMode 1577/1577), PlayMode 6 classes 73/73
+Tip: 1c030ee
+Check: run D 2cea726: gate PASS 1591/1591, PlayMode 5 classes 80/80; full check on 1c030ee pending
 Soak: -
 Archive: no
 
@@ -21,3 +21,4 @@ Archive: no
 
 ## Follow-ups (outside this plan)
 - Tools/cloud/sc_core_tests.py: its using-filter rejects `SleepingCalamity.Core.Combat`, so ~21 EditMode files (incl. CellarRosterTests) never run under it and it reports green; widening shows only RingPlannerTests.Plan_DoesNotAllocate_PerTick failing under .NET 8 (24 B). Needs its own small task.
+- Unexplained host-hero drift (~2 m/s, ~0.4 s after a Move) in DiveSpineNetworkTests floor-7 helper; test pins the hero per frame. Under branch review.
