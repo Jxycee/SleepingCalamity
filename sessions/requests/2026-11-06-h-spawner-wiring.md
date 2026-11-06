@@ -1,6 +1,6 @@
 Title: Wire the host spawner to encounter templates
 Target: cloud
-Status: started
+Status: done (merged edf1d82d; risk review no blockers, follow-ups in STATUS)
 Started: 2026-11-06 18:47 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md dive build; follows spec 5a merge 4dee555f)
