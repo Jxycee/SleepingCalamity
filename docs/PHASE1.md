@@ -268,11 +268,11 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
   - Floors stay cleared once cleared.
 - **Checkpoint and banking:**
   - The checkpoint room is after floor 2. Floor 4's rescue is a second bank point and leads home.
-  - **The haul is shared by the party and held by the host** (not per-player bags).
+  - **[Superseded by plan 2, `ee9435ef`: loot is per-player bags held by the host; pieces, keys and people stay one shared copy. Original M5 text:]** the haul is shared by the party and held by the host.
   - Banking at a checkpoint or in town makes it safe. A failed dive loses only the unbanked haul, and lost pieces return to their floors, so nothing is missable.
   - Return dives may start from the checkpoint.
 - **The stir meter** [P49] runs from 0 to 100 and resets when the haul is banked in town:
-  - +10 per floor cleared and +5 per unbanked piece carried, x(1 + 0.25 x (players - 1));
+  - [Current rule, `Core/Cellars/DiveStir.cs`: +10 per floor cleared this half and +5 per unbanked valuable carried (pieces no longer count), x sqrt(players), plus the Stirred modifier bonus.] M5 text: +10 per floor cleared and +5 per unbanked piece carried, x(1 + 0.25 x (players - 1));
   - at 40, one enemy more per room;
   - at 70, a roaming tier-2 rat-king hunts the party;
   - at 100, the deep closes: 90 s to reach the next bank point, or the dive fails.

@@ -41,7 +41,7 @@ The decorations still kit-ready in design section 6: vegetable beds, a trellis, 
 
 ## Q7. Cellars room pool, first rooms (M5 authoring)
 Folder: `Reference/hollowmere/room_pool/`
-Claimed: cloud session claude/practical-tesla-lqajeo (square, Q5 done), 2026-10-31
+Claimed: DONE, merged 513ac084 (2026-11-06 stale-cleanup; see the folder STATUS.md)
 `docs/PHASE1.md` M5 and 7.2: the room pool as data for floors 1-4, in greybox. Start from whatever M5 code is on main (look first; don't duplicate it). Author 8-12 rooms with sub-themes and dressing variants as data, with EditMode tests that every room is valid (exits connect, the key is reachable). Code and data only, no art. If M5's Core floor generator isn't on main yet, write only the room data format plus its tests, and say so in STATUS.md.
 
 ## Q8. Town wall, Lower Gate and East Gate
@@ -51,12 +51,12 @@ Replace the greybox town wall on its raised bank with real art: a weathered sand
 
 ## Q9. Keep terrace: the keep hall and the terrace dressing
 Folder: `Reference/hollowmere/keep/`
-Claimed: cloud session claude/sharp-goldberg-vpyt8c (bakery, Q2, Q4 done), 2026-10-31
+Claimed: DONE, merged 7bac761e (2026-11-06 stale-cleanup; see the folder STATUS.md)
 The bell tower is on main (`ee4fe79`), but its hall stays greybox. Build the keep hall (an old stone hall with tall windows and a slate roof, beside the tower on the +4 terrace), plus the terrace dressing: the buttressed retaining wall with ivy planters (the layout already has them as greybox), both stairs with balustrades, and benches. Captures: keep stairs and keep wall views, in both presets.
 
 ## Q10. Lake shore, stream and ravine
 Folder: `Reference/hollowmere/lake/`
-Claimed: -
+Claimed: DONE, merged 8031234e (2026-11-06 stale-cleanup; see the folder STATUS.md)
 The lake basin (water at -12 m) and the stream ravine, using `sc-water-look`: a stylised-real water surface with a shoreline foam and depth tint, reeds, shore stones, a small jetty, and stream rocks with small falls down the ravine toward the mill. Keep within the terrain from `HollowmereTerrain`. Captures: lake shore, the ravine and Mill Lane, at midday and low sun.
 
 ## Q11. Lane kit: lane walls, steps and lane dressing
@@ -66,20 +66,20 @@ The design keeps the lane kits at final quality but unplaced. Build the ring 2 l
 
 ## Q12. Whole-town look pass
 Folder: `Reference/hollowmere/look/`
-Claimed: -
+Claimed: DONE, merged 0331588e (2026-11-06 stale-cleanup; see the folder STATUS.md)
 Take this one only after Q3 or Q8 has merged, so there is a real town to light. Use `sc-scene-look` on the whole of Hollowmere: light, atmosphere (haze, volumetrics, pollen), the colour grade at midday and low sun, matched to the approved corner's bands (`sc_ref_palette.py`) and the style bible 3.1/3.5. Fixed capture set (overview, square, lanes, keep, lake) as a contact sheet beside the approved corner. Change only lighting, volume and grade settings and the builder's look hooks.
 
 ## Q13. The Undercroft stair: from the heroes' home down to the Cellars
 Folder: `Reference/hollowmere/undercroft_stair/`
-Claimed: -
+Claimed: DONE, merged 4b898941 (2026-11-06 stale-cleanup; see the folder STATUS.md)
 The transition between town and dungeon: the cistern-house cellar door (heroes' home, on main) opens onto a winding stone stair down to the first Cellars vault, built from the B5 cellar kit (on main, Q4), with warm light growing as you descend. An editor builder scene (`UndercroftStair`) with fixed capture cameras: the top, the turn and the bottom. It's lit like the dungeon corner.
 
 ## Q14. Decorations batch 2: market and lane clutter
 Folder: `Reference/hollowmere/clutter/`
-Claimed: -
+Claimed: DONE, merged 690694ac (2026-11-06 stale-cleanup; see the folder STATUS.md)
 More free-grid decorations (design 5.3) in the style of the B7 props: a handcart, sacks and crates stacks, rain barrels, hanging shop signs per trade, flower boxes, washing lines between houses, a well. Each has a ruined and a rebuilt look, with a contact sheet. Scatter them through ring 1 and ring 2 in Rebuilt, sparse and broken in Ruined, with none blocking the path graph.
 
 ## Q15. Beyond the Lower Gate: the Saltwake road
 Folder: `Reference/hollowmere/road/`
-Claimed: -
+Claimed: DONE, merged db9003ab (2026-11-06 stale-cleanup; see the folder STATUS.md)
 Outside the Lower Gate: the Saltwake road winding down the hillside (terrain heights from `HollowmereTerrain`), with milestones, a wayside shrine, a broken cart, hedgerows and fences, and distant fields as a backdrop ring so the low cameras don't see a bare horizon (the foliage session's open note). Captures from the gate looking out, and from the road looking back at the town.
