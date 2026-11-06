@@ -96,8 +96,8 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **M** MPFB2 hero/townsfolk base test: one CC0 body on `game_engine` rig through `HeroAnimator.controller` [A][U]
 
 ## Ready: design notes (docs only, placeholders marked)
-- [ ] **S** Gold sink proposal: what gold buys (triage :52; tuning blocked without it)
-- [ ] **S** Enemy-kill purse, stash view, town emptying (PARKING_LOT :77, triage C1)
+- [x] **S** Gold sink proposal: what gold buys (triage :52; tuning blocked without it) (`5854759a`, `docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`)
+- [x] **S** Enemy-kill purse, stash view, town emptying (PARKING_LOT :77, triage C1) (`5854759a`, `docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`)
 - [ ] **S** Co-op hearth marks design note (PARKING_LOT :15)
 - [ ] **S** Movement tools (glide, high jump) gating optional branches (PARKING_LOT :26)
 - [ ] **S** Rule-twist challenge gauntlets from existing rooms (PARKING_LOT :32)
@@ -110,7 +110,8 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - Story book read + bible sign-off; bible Qs 6, 7, 8, 13, 15, 16 touch dive text (triage :24); 5 and 20 touch rules
 - Rename placeholder floor and NPC names (spec Q7; decisions-for-review S1-S8)
 - Bag-rule decisions: chest with a full bag (PARKING_LOT :69); save-and-quit at a stair (:74); absent player's bag through push-on/fail (:82); bank-room picks UI vs auto-fill (:67)
-- Failed dive keeps half of gold? (triage :50); weapon wear (triage Q5, default no); network conditions numbers (Q6)
+- Gold economy decisions 1-5 (`docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`, recommended defaults given)
+- Failed dive keeps half of gold? (triage :50; proposal Q4 says keep settled decision 7); weapon wear (triage Q5, default no); network conditions numbers (Q6)
 - Co-op F10 proposal (spec section 4.7, decision 40); bank slots in a 4-player party (spec Q6)
 - decisions-for-review: A6 PHASE1 lock (51 decisions), A24 cellar mood, A34 WeaponsSave wiring (must-fix before M7), A2 OoT 2026 screens check now due
 - USER_TODO: Mixamo clips (blocks M2 animation), 2-player Relay walk (M1, M2, M5, M6, M7), Tobin concept (M10), corner approvals (M9)
