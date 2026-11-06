@@ -94,6 +94,16 @@ namespace SleepingCalamity.Core
         // The stir the Stirred hazard adds while the party is on its floor: StirredBonus when the floor the party is on has it, else 0 (it leaves with the floor).
         public static float StirredBonusFor(uint seed, int currentFloor) => For(seed, currentFloor).Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredBonus : 0f;
 
+        // ---- the effects the host applies on a floor with this set (plan 5 task 5); pure helpers so the numbers live here and the host code only calls them ----
+        public int GoldPerRoomClear => Has(FloorModifier.Crowded) ? FloorModifierTuning.CrowdedGoldPerClear : 0;       // each present player, each time a room becomes cleared
+        public int AmbushRoomGold => Has(FloorModifier.Ambush) ? FloorModifierTuning.AmbushGold : 0;                    // each present player, when the ambush room is cleared
+        public int LeaveGold => Has(FloorModifier.Hurried) ? FloorModifierTuning.HurriedGold : 0;                       // each present player, when the party leaves by the stair or exit
+        public int ExtraChestRolls => Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredExtraRolls : 0;           // extra rolls per loot chest per player
+        public int ChestRankBonus(int baseBonus) => baseBonus + (Has(FloorModifier.Dim) ? FloorModifierTuning.DimRankBonus : 0);
+        public float HealRechargeSeconds(float baseSeconds) => Has(FloorModifier.WarmHands) ? System.Math.Min(baseSeconds, FloorModifierTuning.WarmHandsRechargeSeconds) : baseSeconds;
+        // The path time the collapse is started with: DiveStir.CollapseSeconds multiplies it by DiveStir.CollapseMultiplier (1.5), so a Hurried floor passes it scaled to yield HurriedCollapseMultiplier (1.25) instead.
+        public float CollapsePathSeconds(float pathSeconds) => Has(FloorModifier.Hurried) ? pathSeconds * FloorModifierTuning.HurriedCollapseMultiplier / DiveStir.CollapseMultiplier : pathSeconds;
+
         public ulong Hash()
         {
             var h = Fnv1a64.Create();
