@@ -21,7 +21,7 @@ Then the same session with 3 and 4 players as a smoke run: no desync or error in
 ## 2. What exists vs what's missing
 | Area | Exists (main at `f0b9c338`) | Missing for M7 |
 |---|---|---|
-| Walks, automated | `DiveWalkQaTests` (M5 floors 1-4, host + client), `SquareLoopWalkQaTests` (M6 loop incl. save/reload), `DiveSpineNetworkTests`, `CellarContentsNetworkTests`, `TownSyncNetworkTests`, `BakerLoavesNetworkTests`, `SaveFlowTests`; `DiveBot` solo bot (SC_BOT-gated) | A 2-player walk that chains the full loop twice (second loop from the reloaded world); a 3-4 client variant; walks only use teleports, never real input or real latency |
+| Walks, automated | `DiveWalkQaTests` (M5 walk, floors 1-4 only, host + client; extend to floors 1-7), `SquareLoopWalkQaTests` (M6 loop incl. save/reload), `DiveSpineNetworkTests`, `CellarContentsNetworkTests`, `TownSyncNetworkTests`, `BakerLoavesNetworkTests`, `SaveFlowTests`; `DiveBot` solo bot (SC_BOT-gated) | A 2-player walk that chains the full loop twice (second loop from the reloaded world); a 3-4 client variant; walks only use teleports, never real input or real latency |
 | Network simulator | `CombatNetworkTests` already drives the Multiplayer Tools `NetworkSimulator` (150 ms RTT, loss percent configurable) for hit registration | The same preset under the dive and placement paths (stair, bank, go home, chest, piece, placement request, revive hold); the real M3 manual walk at 150 ms and 2% loss with the user |
 | Multiplayer Play Mode | Package `com.unity.multiplayer.playmode` 3.0.0 and `multiplayer.tools` 2.2.12 are in the manifest; `Tools/unity.ps1` runs batch tests only | A documented, working MPPM recipe for 2-4 virtual players on the PC (which scene, the dev panel flags, Relay vs direct), and what a batch run can and cannot replace |
 | Co-op scaling | Core `CoopScaling` (P23 life multipliers, extra enemy per room, strike caps 2p 3 / 3p 4 / 4p 5), revenge cap by players, enemy AI stages 1-4 (threat table, aggro/leash, ring slots) | Numbers measured at 3 and 4 players on real floors (is 4p winnable and not trivial); the host's CPU and bandwidth with 4 heroes plus a full room of enemies |
@@ -52,7 +52,7 @@ Then the same session with 3 and 4 players as a smoke run: no desync or error in
 - **Recommend A,** plus a read-only debug overlay (dive time, damage taken, heals used, loaves eaten) so notes come with numbers. Trade-off: B is faster per tweak but needs a panel and risks untracked changes.
 
 **Q4. What defines a winnable 2-player dive?**
-- A. **A bar on the bot and on the user:** the 2-player bot clears floors 1-4 in at least 1 of 4 runs and fails floor 1 in fewer than 1 of 4; the user clears it within three tries.
+- A. **A bar on the bot and on the user:** on Tough, the 2-player bot clears floors 1-7 (dive ends Finished) within 6300 s on at least 2 of 3 seeds (Seed7, Seed31, Seed12345), dive fails logged, and fails floor 1 in fewer than 1 of 4 runs; the user clears it within three tries.
 - B. Whatever the user thinks.
 - C. Match solo.
 - **Recommend A,** with 2-player as the tuned case (P44). Trade-off: bot skill is not user skill, so the bar is a guard rail and the user's verdict wins.
@@ -61,7 +61,7 @@ Then the same session with 3 and 4 players as a smoke run: no desync or error in
 - A. **Yes: the playtest ends with one question (did the loop want a field-repair beat?); default is no.** Anything yes goes to `PARKING_LOT.md`, not into M7.
 - B. Build the gentle DC1 repair curve now.
 - C. Drop it.
-- **Recommend A.** Phase 1 stops at floor 4 and one resident; M7 is not the place to start a new system.
+- **Recommend A.** Phase 1 stops at floor 7 (stand-in ending) and one resident; M7 is not the place to start a new system.
 
 **Q6. Which network conditions are the contract?**
 - A. **150 ms RTT, 2% loss (the plan's number) must feel right; 300 ms / 5% must not break state, only feel worse.**
@@ -78,7 +78,7 @@ Then the same session with 3 and 4 players as a smoke run: no desync or error in
 | **S3 Disconnect and rejoin proofs** | Scripted client drops during dive, at the floor-5 bank (slot assignment, push-on lock), placement (lock must release), go home, and a host quit after push-on (suspend resume at floor 6); a client's per-player bag survives the drop; rejoin keeps weapon growth; a 5th player is refused; a subset of the recorded four plays | Each case ends with a consistent world and no stuck lock | PlayMode host + clients per case | risk-reviewer (netcode and save) | 1 |
 | **S4 Soak and perf** | 30-60 minute 4-bot loop on the PC (one 7-floor dive is about 20 minutes of bot play, so 2-3 dives back to back); log scan for warnings, errors, mismatch; frame time and GC per phase; budget notes | No warnings, no hash mismatch, no unbounded growth, the 4-player frame time inside the budget (a number agreed in S4 from the 1p/2p baseline) | `SC_SOAK` PlayMode, report in `Reference/qa/m7/` | reviewer | 1 |
 | **S5 Debug overlay and tuning notes template** | Read-only overlay (dive time, damage taken, heals, loaves, stir, per-room clear time), `docs/design/m7-tuning-notes.md` template mapping each note to a JSON key | Overlay shows in dev builds only; every existing tuning key is listed | EditMode: overlay model; no PlayMode | reviewer | 1 |
-| **S6 The user's 2-player playtest** | The user plays the whole 7-floor loop (see section 1 step 8 for the run split) (two PCs or MPPM), the netsim walk at 150 ms / 2%, then one 4-player MPPM session | Notes file filled; the "samey?" verdict recorded; weapon-wear question answered | Manual, `sc-walk`; script in `USER_TODO.md` | user | 1 (script) + user time |
+| **S6 The user's 2-player playtest** | The user plays the whole 7-floor loop (two PCs or MPPM; run split in section 1 step 8), the netsim walk at 150 ms / 2%, then one 4-player MPPM session | Notes file filled; the "samey?" verdict recorded; weapon-wear question answered | Manual, `sc-walk`; script in `USER_TODO.md` | user | 1 (script) + user time |
 | **S7 Apply tuning** | Notes to JSON keys (data first), re-run S2 bots to prove the bars, re-triage `BUGS.md`, rescan traversal; fix what the playtest found | Notes closed or parked; bars still met; `check` green | EditMode for new keys; the S2 bot bars | reviewer; risk-reviewer for any netcode fix | 1-2 |
 | **S8 Close the phase** | `docs/PHASE1.md` status, `CURRENT.md`, parking lot for deferred items, M10 in-game step handed over | Every row of the M7 "done when" cell is ticked with evidence | `check` and `soak` on the merge tip | branch-reviewer | 1 |
 

@@ -1,4 +1,4 @@
-# Music stems plan (spec step 5d)
+# Music stems plan (spec section 12 step 5, music stems)
 
 Date: 2026-11-06. Docs only: **no audio is composed, recorded or generated here, and no code is written.** This plan says which stems the Undercroft needs and which game state switches each one, so a later audio pass and a later wiring pass have a contract. Everything marked **[PLACEHOLDER]** is a number or name to tune or rename; everything marked **[OPEN]** needs the user.
 
