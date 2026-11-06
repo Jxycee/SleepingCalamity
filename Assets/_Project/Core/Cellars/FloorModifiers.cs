@@ -49,7 +49,7 @@ namespace SleepingCalamity.Core
             }
         }
 
-        // The modifiers of one floor: a pure function of (seed, floor).
+        // The modifiers of one floor: a pure function of (seed, floor). Compute on floor entry and cache; never per frame (it replays the earlier floors, and the atmosphere roll, each call).
         public static FloorModifierSet For(uint seed, int floor)
         {
             if (!CellarFloorGenerator.IsGeneratedFloor(floor)) return default;

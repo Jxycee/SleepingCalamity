@@ -91,11 +91,21 @@ namespace SleepingCalamity.Tests.EditMode
                     if (t != FloorTwist.None) Assert.IsTrue(used.Add(t), "twist " + t + " twice in dive " + seed);
                 }
             }
-            // The first generated floor sits at the placeholders; later ones lose the repeats, so the overall share is a little under.
-            Assert.That(count[(int)FloorTwist.Ambush] / (double)floors, Is.InRange(0.08, 0.14), "ambush (procgen 3b ambush, deliberate)");
-            Assert.That(count[(int)FloorTwist.None] / (double)floors, Is.InRange(0.58, 0.72), "none");
-            Assert.That(count[(int)FloorTwist.Thin] / (double)floors, Is.InRange(0.08, 0.14), "thin");
-            Assert.That(count[(int)FloorTwist.Crowded] / (double)floors, Is.InRange(0.08, 0.14), "crowded");
+            // The twists are the modifiers now (plan 5 decision 3), so the nominal shares (Crowded and Ambush split the enemies-family hazards evenly) come from FloorModifierTuning: floors 2 and 4 fill one slot (hazard early% of which half are
+            // Crowded/Ambush, boon early% of which a third is Sparse); floor 6 is calm; floor 7 rolls both slots (a Sparse boon is lost to an enemies-family hazard, and Crowded/Ambush win TwistOf).
+            double hazardEnemies = 2.0 / 4.0, sparseOfBoons = 1.0 / 3.0;
+            double earlyEnemyHazard = FloorModifierTuning.EarlyAPercent / 100.0 * hazardEnemies;
+            double earlySparse = FloorModifierTuning.EarlyBPercent / 100.0 * sparseOfBoons;
+            double lateEnemyHazard = FloorModifierTuning.LateAPercent / 100.0 * hazardEnemies;
+            double lateSparse = FloorModifierTuning.LateBPercent / 100.0 * sparseOfBoons * (1.0 - lateEnemyHazard);
+            double nominalAmbush = (earlyEnemyHazard * 2 / 2 + 0 + lateEnemyHazard / 2) / 4, nominalCrowded = nominalAmbush;   // floors 2, 4, 6 (calm), 7; half of the enemies hazards each
+            double nominalThin = (earlySparse * 2 + 0 + lateSparse) / 4;
+            double nominalNone = 1.0 - nominalAmbush - nominalCrowded - nominalThin;
+            // The first generated floor sits at the nominal share; later floors lose the repeats and dark floors take slot A (Dim), so the measured share is a little under (twists) / over (none).
+            Assert.That(count[(int)FloorTwist.Ambush] / (double)floors, Is.InRange(nominalAmbush - 0.03, nominalAmbush + 0.01), "ambush (procgen 3b ambush, deliberate)");
+            Assert.That(count[(int)FloorTwist.None] / (double)floors, Is.InRange(nominalNone - 0.07, nominalNone + 0.07), "none");
+            Assert.That(count[(int)FloorTwist.Thin] / (double)floors, Is.InRange(nominalThin - 0.03, nominalThin + 0.01), "thin");
+            Assert.That(count[(int)FloorTwist.Crowded] / (double)floors, Is.InRange(nominalCrowded - 0.03, nominalCrowded + 0.01), "crowded");
             TestContext.WriteLine("twist shares of the generated floors: none " + count[0] / (double)floors + " ambush " + count[1] / (double)floors + " thin " + count[2] / (double)floors + " crowded " + count[3] / (double)floors);
         }
 
@@ -117,7 +127,7 @@ namespace SleepingCalamity.Tests.EditMode
             foreach (int f in new[] { 1, 2, 4, 6, 7 }) got[f] = CellarFloorRoster.LayerHash(12345, f);
             string all = got[1] + "UL, " + got[2] + "UL, " + got[4] + "UL, " + got[6] + "UL, " + got[7] + "UL";
             Assert.AreEqual(9929646806074584996UL, got[1], "floor 1; actual " + all); Assert.AreEqual(1000385178204227360UL, got[2], "floor 2; actual " + all); Assert.AreEqual(5465015992139406178UL, got[4], "floor 4; actual " + all);
-            Assert.AreEqual(12528100526218511281UL, got[6], "floor 6; actual " + all); Assert.AreEqual(856329369820389952UL, got[7], "floor 7; actual " + all);
+            Assert.AreEqual(1000385178204227360UL, got[6], "floor 6; actual " + all); Assert.AreEqual(16992731340153690099UL, got[7], "floor 7; actual " + all);
         }
 
         static List<(uint seed, int floor)> TwistedFloors(FloorTwist want)

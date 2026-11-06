@@ -1,6 +1,7 @@
 // Core/Cellars/DiveStir.cs: the stir meter for the 10-floor dive (spec decision 19, section 4.5, red-team F2). Pure C#; time comes in as Tick(dt).
 // Value = clamp((PerFloorCleared x floors cleared this half + PerUnbankedValuable x valuables carried) x sqrt(players) + ModifierBonus, 0, Max).
 // ModifierBonus (plan 5): the Stirred floor modifier's flat stir, added after the sqrt-of-players scaling, set by the host from (seed, current floor); not part of State, never saved.
+//   The bonus feeds Refresh like any stir, so Stirred can latch the extra enemy or the hunter early, and a latch holds for the rest of the half even after the party leaves the floor: that is the hazard (the card says so).
 // Latches hold for the half. At DeepClosesThreshold the host calls BeginCollapse with the path time to this floor's stair; once per half.
 // Pushing on resets the danger side and carries the reward side (RewardValue).
 using System;

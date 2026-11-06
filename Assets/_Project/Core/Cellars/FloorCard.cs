@@ -17,11 +17,16 @@ namespace SleepingCalamity.Core
 
         FloorCard(string name, int floor, FloorObjective objective, FloorModifierSet modifiers) { Name = name; Floor = floor; Objective = objective; Modifiers = modifiers; }
 
+        // Compute on floor entry and cache; never per frame (this replays earlier floors from the seed and may regenerate a layout).
         public static FloorCard For(uint seed, int floor, FloorObjective objective)
         {
             SubTheme theme = CellarFloorGenerator.IsGeneratedFloor(floor) ? CellarFloorGenerator.Layout(seed, floor).Theme : SubTheme.Any;
-            return new FloorCard(FloorCardNames.NameFor(seed, floor, theme), floor, objective, FloorModifierSet.For(seed, floor));
+            return For(seed, floor, objective, theme);
         }
+
+        // For callers that already hold the floor's layout: pass layout.Theme so the layout is not generated again. Same caching rule: floor entry only.
+        public static FloorCard For(uint seed, int floor, FloorObjective objective, SubTheme theme) =>
+            new FloorCard(FloorCardNames.NameFor(seed, floor, theme), floor, objective, FloorModifierSet.For(seed, floor));
     }
 
     public static class FloorCardNames
@@ -36,6 +41,7 @@ namespace SleepingCalamity.Core
 
         static string[] TableOf(SubTheme t) => t == SubTheme.Larder ? Larder : t == SubTheme.WineVault ? WineVault : t == SubTheme.CoalCellar ? CoalCellar : Bakery;   // Bakery and Any
 
+        // Compute on floor entry and cache; never per frame (replays the earlier floors' layouts to avoid repeats).
         public static string NameFor(uint seed, int floor, SubTheme theme)
         {
             if (floor == 1) return Floor1;
@@ -101,7 +107,7 @@ namespace SleepingCalamity.Core
             {
                 case FloorModifier.Crowded: return "More enemies in about half the rooms";
                 case FloorModifier.Ambush: return "Enemies spring from one room";
-                case FloorModifier.Stirred: return "The floor is stirred: +" + (int)FloorModifierTuning.StirredBonus + " stir while you are here";
+                case FloorModifier.Stirred: return "+" + (int)FloorModifierTuning.StirredBonus + " stir while here (it can bring the extra enemy or hunter early)";
                 case FloorModifier.Hurried: return "The collapse comes faster here";
                 case FloorModifier.Dim: return "The floor is dark";
                 case FloorModifier.Sparse: return "Fewer enemies in about half the rooms";

@@ -143,6 +143,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void DiveStir_ModifierBonus_AddedAfterSqrt_ClampedAndClearedOnPushOn()
         {
             var st = new DiveStir { PlayersPresent = 4 };
+            DiveStir.State before = st.Capture();   // a fresh meter, before any bonus is set
             st.OnFloorCleared(1); st.OnFloorCleared(2);   // base 20
             Assert.AreEqual(40f, st.Value, 0.001f);        // 20 * sqrt(4)
             st.ModifierBonus = FloorModifierTuning.StirredBonus;
@@ -152,15 +153,46 @@ namespace SleepingCalamity.Tests.EditMode
             st.ModifierBonus = -5f;
             Assert.AreEqual(0f, st.ModifierBonus);
             Assert.AreEqual(40f, st.Value, 0.001f);
-            DiveStir.State before = st.Capture();
+            DiveStir.State withoutBonus = st.Capture();
             st.ModifierBonus = 10f;
-            Assert.AreEqual(before, st.Capture(), "the bonus is not part of State");
-            var other = new DiveStir(); other.Restore(before);
+            Assert.AreEqual(withoutBonus, st.Capture(), "the bonus is not part of State (only the floors cleared differ from the fresh meter)");
+            Assert.AreNotEqual(before, withoutBonus, "the captured state does move with the floors cleared");
+            var other = new DiveStir(); other.Restore(withoutBonus);
             Assert.AreEqual(0f, other.ModifierBonus);
+            var fresh = new DiveStir { PlayersPresent = 4 };
+            fresh.ModifierBonus = 10f;
+            Assert.AreEqual(before, fresh.Capture(), "a bonus on a fresh meter leaves State at its fresh value (nothing latched below the thresholds)");
             st.OnPushOn();
             Assert.AreEqual(0f, st.ModifierBonus);
             st.ModifierBonus = 10f; st.ResetForNewDive();
             Assert.AreEqual(0f, st.ModifierBonus);
+        }
+
+        // Documented hazard (DiveStir.cs header, Stirred effect line): the flat +10 counts like any stir, so it can latch the extra enemy or the hunter for the rest of the half.
+        [Test]
+        public void DiveStir_ModifierBonus_CanLatchExtraEnemyAndHunter_ForTheHalf()
+        {
+            var calm = new DiveStir { PlayersPresent = 1 };
+            calm.OnFloorCleared(1); calm.OnFloorCleared(2); calm.OnFloorCleared(3);   // 30: below the extra-enemy threshold (40)
+            Assert.IsFalse(calm.ExtraEnemyLatched);
+            var stirred = new DiveStir { PlayersPresent = 1 };
+            stirred.OnFloorCleared(1); stirred.OnFloorCleared(2); stirred.OnFloorCleared(3);
+            stirred.ModifierBonus = FloorModifierTuning.StirredBonus;   // 30 + 10 = 40
+            Assert.IsTrue(stirred.ExtraEnemyLatched, "the bonus brought the extra enemy");
+            stirred.ModifierBonus = 0f;   // the party leaves the Stirred floor
+            Assert.AreEqual(30f, stirred.Value, 0.001f);
+            Assert.IsTrue(stirred.ExtraEnemyLatched, "the latch holds for the half after the bonus is gone");
+            Assert.IsTrue(stirred.Capture().Extra, "and it is part of the saved State");
+
+            var hunted = new DiveStir { PlayersPresent = 4 };
+            hunted.OnFloorCleared(1); hunted.OnFloorCleared(2); hunted.OnFloorCleared(3);   // 30 * 2 = 60: extra latched, hunter (70) not
+            Assert.IsTrue(hunted.ExtraEnemyLatched); Assert.IsFalse(hunted.HunterLatched);
+            hunted.ModifierBonus = FloorModifierTuning.StirredBonus;   // 70
+            Assert.IsTrue(hunted.HunterLatched, "the bonus brought the hunter");
+            hunted.ModifierBonus = 0f;
+            Assert.IsTrue(hunted.HunterLatched, "the hunter latch holds");
+            hunted.OnPushOn();
+            Assert.IsFalse(hunted.HunterLatched, "the second half starts without the latches");
         }
     }
 }
