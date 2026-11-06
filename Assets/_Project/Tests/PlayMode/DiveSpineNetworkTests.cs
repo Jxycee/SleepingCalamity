@@ -30,6 +30,7 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTearDown]
         public IEnumerator TearDown()
         {
+            CellarContentsSync.PumpSecondsOverrideForTests = 0f;
             foreach (PlayModeHarness.TestClient client in _clients) yield return client.LeaveAndDestroy();
             _clients.Clear();
             yield return PlayModeHarness.TearDownApp();
@@ -147,6 +148,157 @@ namespace SleepingCalamity.Tests.PlayMode
             }
         }
 
+        // Plan 5: finishes the armed floor's valve or pump objective with the host hero, through the same host methods the RPCs call (no-op when the floor has no unfinished valve/pump objective).
+        // Valves: stand at each valve and report every frame until its bit is set. Pump: stand at it, start it (the test hook makes it fill in under a second) and stay in the ring.
+        private static IEnumerator CompleteObjective(Rig rig, ulong hostId)
+        {
+            CellarContentsSync cs = rig.Host.ContentsSync;
+            int floor = rig.HostFloor.BuiltFloor;
+            yield return PlayModeHarness.WaitUntil(() => cs != null && cs.State.Floor == floor && cs.State.Seed == rig.HostFloor.BuiltSeed && cs.Plan != null, Timeout, "the contents were never armed for floor " + floor);
+            if (!cs.IsObjectiveGated(floor) && !(cs.CurrentObjective == FloorObjective.TwoValves || cs.CurrentObjective == FloorObjective.HoldPump)) yield break;
+            if (cs.State.ExitUnlocked) yield break;
+            if (cs.CurrentObjective == FloorObjective.TwoValves)
+            {
+                for (int v = 0; v < ValveHold.Count; v++)
+                {
+                    Assert.That(cs.TryValvePosition(v, out Vector3 at), Is.True, "valve " + v + " marker");
+                    Move(rig.HostHero, at + new Vector3(0.6f, 0.1f, 0f));
+                    double until = Time.realtimeSinceStartupAsDouble + Timeout;
+                    while ((cs.State.ValveMask & (1 << v)) == 0)
+                    {
+                        if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail("valve " + v + " never turned (mask " + cs.State.ValveMask + "); hero at " + rig.HostHero.transform.position + ", valve at " + at + ", up " + rig.HostHero.GetComponent<HeroVitals>().IsUp);
+                        Move(rig.HostHero, at + new Vector3(0.6f, 0.1f, 0f));   // the hero stands still for the hold: pinned every frame (a live hero drifted off the valve in an earlier run: the pin makes the test about the host rules, not about physics)
+                        cs.ServerReportValve(hostId, v);
+                        yield return null;
+                    }
+                }
+            }
+            else
+            {
+                CellarContentsSync.PumpSecondsOverrideForTests = 0.8f;
+                Assert.That(cs.TryPumpPosition(out Vector3 pump), Is.True, "pump marker");
+                Move(rig.HostHero, pump + new Vector3(1.2f, 0.1f, 0f));
+                double until = Time.realtimeSinceStartupAsDouble + Timeout;
+                while (!cs.State.PumpStarted)
+                {
+                    if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail("the pump never started");
+                    Move(rig.HostHero, pump + new Vector3(1.2f, 0.1f, 0f));   // pinned in the ring (see the valve hold)
+                    cs.ServerTryStartPump(hostId);
+                    yield return null;
+                }
+            }
+            double done = Time.realtimeSinceStartupAsDouble + Timeout;
+            while (!cs.State.ExitUnlocked)
+            {
+                if (Time.realtimeSinceStartupAsDouble > done) Assert.Fail("the objective never unlocked the exit (objective " + cs.CurrentObjective + ", valves " + cs.ValvesTurned + ", pump " + cs.State.PumpPercent + "%)");
+                if (cs.CurrentObjective == FloorObjective.HoldPump && cs.TryPumpPosition(out Vector3 ring)) Move(rig.HostHero, ring + new Vector3(1.2f, 0.1f, 0f));   // stays in the ring until it is done
+                yield return null;
+            }
+        }
+
+        private static void KillEveryEnemy(NetworkManager nm)
+        {
+            var hit = new EnemyHitInput { Attack = AttackCatalog.Axe.Attacks[0], Atk = 100000f, PartIndex = -1, CritChance = 0f };
+            foreach (NetworkObject o in new List<NetworkObject>(nm.SpawnManager.SpawnedObjects.Values))
+            {
+                Enemy e = o != null ? o.GetComponent<Enemy>() : null;
+                for (int i = 0; e != null && i < 6 && e.Alive; i++) e.ServerApplyHit(hit, e.transform.position + Vector3.back, Time.timeAsDouble);
+            }
+        }
+
+        // Plan 5 review focus 2: on a valve floor the carrier is an ordinary enemy. Killing it drops no key and the director's stair stays shut; the two valves then open it (the stair itself is the existing path).
+        // Catches: the carrier path still dropping a key / opening the stair on a valve floor, ExitUnlocked not reaching the director's NetStairOpen. NOT covered: the walk (prompt text, held input).
+        [UnityTest]
+        public IEnumerator ValveFloor_CarrierDropsNoKey_StairStaysShut_UntilBothValvesTurn()
+        {
+            uint seed = 0;
+            for (uint sd = 1; sd < 2000 && seed == 0; sd++)
+            {
+                CellarFloorLayout l = CellarFloorGenerator.Layout(sd, 2);
+                if (l.Carrier != null && l.HasLockedRoom && FloorObjectivePlan.For(l).Objective == FloorObjective.TwoValves) seed = sd;
+            }
+            Assert.That(seed, Is.Not.EqualTo(0u), "a seed with a carrier on a valve floor 2");
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = seed;
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return ToFloor(rig, 2);
+            rig.Host.RequireGateKey = true;
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.ContentsSync != null && rig.Host.ContentsSync.State.Seed == seed && rig.Host.ContentsSync.State.Floor == 2, Timeout, "the director never armed the contents for floor 2");
+            CellarContentsSync contents = rig.Host.ContentsSync;
+            Assert.That(contents.State.Objective, Is.EqualTo((byte)FloorObjective.TwoValves));
+            Assert.That(contents.State.ExitUnlocked, Is.False, "a valve floor does not open at arm time");
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-2 entry");
+            Assert.That(CellarFloorBuilder.TryStairWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True);
+
+            GateKeyCarrier car = rig.HostFloor.Layout.Carrier;
+            Move(rig.OwnHeroes[0], rig.HostFloor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(car.X, car.Y)));
+            yield return PlayModeHarness.WaitUntil(() => contents.EnterEnemyCount(car.RoomIndex) > 0, Timeout, "entering the carrier's room never spawned its enemies");
+            Assert.That(contents.GateKeyCarrierEnemy, Is.Null, "on a valve floor the carrier spawn is an ordinary enemy");
+            Move(rig.OwnHeroes[0], stair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair) < 3f, Timeout, "the client hero never reached the stair");
+            KillEveryEnemy(rig.HostNm);
+            yield return PlayModeHarness.WaitUntil(() => contents.AliveInRoom(car.RoomIndex) == 0, Timeout, "the carrier room never emptied");
+            yield return Seconds(0.5f);
+            Assert.That(contents.State.GateKey, Is.EqualTo((byte)0), "no key dropped");
+            Assert.That(contents.State.ExitUnlocked, Is.False);
+            Assert.That(rig.Host.ContentsSync.IsExitUnlocked(2), Is.False, "the exit stays shut");
+            int handled = rig.Host.RequestsHandled;
+            rig.Peers[0].RequestStair(2);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.RequestsHandled > handled, Timeout, "the shut stair press never reached the host");
+            Assert.That(rig.HostHaul.Current.CurrentFloor, Is.EqualTo(2), "still on floor 2");
+
+            yield return CompleteObjective(rig, hostId);
+            Assert.That(rig.Host.ContentsSync.IsExitUnlocked(2), Is.True, "both valves turned: the exit is open (the director's ServerOpenStair follows ExitUnlocked; the press below proves the stair takes the party)");
+            Move(rig.OwnHeroes[0], stair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HeroesOnHost[0].transform.position, stair) < 3f, Timeout, "the client hero never got back to the stair");
+            rig.Peers[0].RequestStair(2);
+            yield return PlayModeHarness.WaitUntil(() => rig.HostHaul.Current.CurrentFloor == 3, Timeout, "the opened stair never took the party down");
+        }
+
+        // Plan 5 task 4 item 5: floor 7 has no stair; its valve or pump gates the stand-in ending door. The finish is refused (with the objective line as the notice) until the objective is done.
+        // Catches: IsExitUnlocked / ServerTryFinish ignoring the objective on floor 7. NOT covered: the "Leave the Undercroft" prompt text on screen (IMGUI).
+        [UnityTest]
+        public IEnumerator Floor7_ValveOrPump_GatesFinish([Values(FloorObjective.TwoValves, FloorObjective.HoldPump)] FloorObjective objective)
+        {
+            uint seed = 0;
+            for (uint sd = 1; sd < 3000 && seed == 0; sd++) if (FloorObjectivePlan.For(CellarFloorGenerator.Layout(sd, 7)).Objective == objective) seed = sd;
+            Assert.That(seed, Is.Not.EqualTo(0u), "a seed whose floor 7 holds " + objective);
+            Rig rig = null;
+            yield return Start(0, r => rig = r);
+            rig.Host.SeedOverride = seed;
+            ulong hostId = rig.HostNm.LocalClientId;
+            DiveEndReason? ended = null; rig.Host.DiveEnded += r => ended = r;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            Assert.That(rig.HostHaul.ServerSetFloor(7), Is.True, "the session jumps to floor 7");
+            Assert.That(rig.HostFloor.ServerSetFloor(seed, 7), Is.True);
+            yield return AllBuilt(rig, 7);
+            CellarContentsSync contents = rig.Host.ContentsSync;
+            yield return PlayModeHarness.WaitUntil(() => contents != null && contents.State.Floor == 7 && contents.State.Seed == seed && contents.Plan != null, Timeout, "the director never armed the contents for floor 7");
+            Assert.That(contents.CurrentObjective, Is.EqualTo(objective));
+            Assert.That(contents.IsObjectiveGated(7), Is.True);
+            Assert.That(contents.IsExitUnlocked(7), Is.False, "floor 7's way out is not unconditionally open any more");
+
+            Assert.That(CellarFloorBuilder.TryEndWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 end), Is.True);
+            Move(rig.HostHero, end + new Vector3(0.5f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, end) < 3f, Timeout, "the host hero never reached the end door");
+            Assert.That(rig.Host.ServerTryFinish(hostId), Is.False, "the objective is open: the door is shut");
+            Assert.That(rig.Host.NetActive.Value, Is.True);
+            Assert.That(ended, Is.Null);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.Notice != null && rig.Host.Notice.Contains("to open the way out"), Timeout, "the refusal gave no objective notice");
+
+            yield return CompleteObjective(rig, hostId);
+            Assert.That(contents.IsObjectiveGated(7), Is.False);
+            Assert.That(contents.IsExitUnlocked(7), Is.True);
+            Move(rig.HostHero, end + new Vector3(0.5f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, end) < 3f, Timeout, "the host hero never got back to the end door");
+            Assert.That(rig.Host.ServerTryFinish(hostId), Is.True, "the objective is done: the finish");
+            Assert.That(ended, Is.EqualTo(DiveEndReason.Finished));
+        }
+
         // ---------------------------------------------------------------------------------------------------------------------------------
 
         [UnityTest]
@@ -230,6 +382,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.HostFloor.Built.Root.Find(CellarFloorBuilder.DiveMarkerGroup + "/EndColumn"), Is.Not.Null, "the end door is marked");
             Assert.That(rig.Host.ServerTryFinish(hostId), Is.False, "the hero stands at the entry, far from the end door");
             Assert.That(CellarFloorBuilder.TryEndWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 end), Is.True);
+            yield return CompleteObjective(rig, hostId);   // plan 5: floor 7's valve or pump gates the end door
             Move(rig.HostHero, end + new Vector3(0.5f, 0.1f, 0f));
             yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, end) < 3f, Timeout, "the host hero never reached the end door");
             Assert.That(rig.Host.ServerTryFinish(hostId), Is.True, "the finish");
@@ -512,7 +665,7 @@ namespace SleepingCalamity.Tests.PlayMode
             for (uint sd = 1; sd < 400 && seed == 0; sd++)
             {
                 CellarFloorLayout l = CellarFloorGenerator.Layout(sd, 2);   // floor 1 is the authored teaching floor: no locked room, no carrier
-                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) seed = sd;
+                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0 && FloorObjectivePlan.For(l).Objective == FloorObjective.GateKey) seed = sd;
             }
             Assert.That(seed, Is.Not.EqualTo(0u), "a seed with a carrier");
             Rig rig = null;

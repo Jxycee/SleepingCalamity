@@ -536,10 +536,10 @@ namespace SleepingCalamity.Tests.PlayMode
         // A seed whose floor 2 has a locked room with a gate, a key chest and a carrier (the same premise as CellarContentsNetworkTests).
         private static uint FindSeed()
         {
-            for (uint s = 1; s < 400; s++)
+            for (uint s = 1; s < 1500; s++)
             {
                 CellarFloorLayout l = CellarFloorGenerator.Layout(s, ChestFloor);
-                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return s;
+                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0 && FloorObjectivePlan.For(l).Objective == FloorObjective.GateKey && FloorModifierSet.For(s, ChestFloor).A == FloorModifier.None) return s;   // no Stirred extra roll / Dim rank bonus / room gold (plan 5)
             }
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
         }
