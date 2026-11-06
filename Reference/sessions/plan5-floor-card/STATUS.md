@@ -6,7 +6,9 @@ Check: unity.sh check PASS on f774e1f (build PASS, EditMode 1594/1594, PlayMode 
 Soak: unity.sh soak PASS 45/45 on 1c030ee (Core/Cellars unchanged since)
 Archive: ready
 
-## Open questions (placeholder taken, work continues; plan "Decisions" 1-11)
+## Decisions (user approved all placeholders as taken, 2026-11-06)
+Guardrail (user, 2026-11-06): full systems are fine, but this is dungeon one: modifiers must not make it extremely complex or overly difficult. Tune modifiers toward light and readable here; harder combos belong to later dungeons.
+
 1. Modifiers: one or two per floor? Taken: two slots (hazard+reward, boon), floors 2/4 at most one, floor 7 both possible, calm floors 1/3/5/6 none.
 2. Existing hidden twists (Ambush/Thin/Crowded) are folded into modifiers and printed on the card (Ambush named, room not). OK?
 3. Substitutions: Warm Hands = healing points recharge 15 s (they already heal fully); Hurried reward = +30 gold each on leaving (push-on stir reward is in DiveSession, another session's file); Dim = forced dark floor + better chest rolls. Brimming/Fat Larder/Still Air deferred to step 5.

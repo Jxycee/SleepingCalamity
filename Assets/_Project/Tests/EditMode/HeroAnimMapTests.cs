@@ -75,13 +75,5 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(p.Attack, Is.EqualTo(0));
             Assert.That(p.AttackTime, Is.EqualTo(0f));
         }
-
-        [Test]
-        public void IsHeavyHurt_QuarterOfMaxHpOrMore()
-        {
-            Assert.That(HeroAnimMap.IsHeavyHurt(24, 100), Is.False);
-            Assert.That(HeroAnimMap.IsHeavyHurt(25, 100), Is.True);
-            Assert.That(HeroAnimMap.IsHeavyHurt(10, 0), Is.False);
-        }
     }
 }

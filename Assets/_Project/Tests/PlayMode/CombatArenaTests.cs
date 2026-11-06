@@ -434,6 +434,62 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(combat.Growth(app.NetworkManager.LocalClientId).Weapon(WeaponCatalog.DaggerShield).Abs, Is.EqualTo(4.5f).Within(1e-4f), "the dagger's parry (3) with the tech bonus x1.5");
         }
 
+        // Catches: the post-hit grace check sitting above the guard branch in HeroCombat.ResolveEnemyHit, so a parry made inside the 0.8 s window was swallowed
+        // (no stun, host never told). Does not catch: the same ordering with real network latency (CombatNetworkTests covers the dodge case on two peers).
+        [UnityTest]
+        public IEnumerator Solo_DaggerParry_InsideTheGraceWindow_StillStunsTheAttacker()
+        {
+            yield return StartCombatSolo();
+            AppBootstrap app = AppBootstrap.Current;
+            var heroObject = app.NetworkManager.LocalClient.PlayerObject;
+            CombatHost combat = Object.FindAnyObjectByType<CombatHost>();
+            combat.WavesEnabled = false;
+            foreach (Enemy stray in new System.Collections.Generic.List<Enemy>(Enemy.All)) if (stray.IsSpawned) stray.NetworkObject.Despawn(true);
+            var input = new FakeInputService();
+            heroObject.GetComponent<HeroLocomotion>().Input = input;
+            heroObject.GetComponent<TargetLockController>().Input = input;
+            HeroCombat hero = heroObject.GetComponent<HeroCombat>();
+            hero.Input = input;
+            HeroVitals vitals = heroObject.GetComponent<HeroVitals>();
+            hero.OwnerSetWeapon(2);   // the dagger and shield
+            Assert.That(hero.WeaponKey, Is.EqualTo(WeaponCatalog.DaggerShield));
+            yield return Seconds(0.6f);
+
+            Vector3 at = heroObject.transform.position;
+            Enemy first = combat.SpawnEnemy(EnemyKind.Slime, 1, at + heroObject.transform.forward * 2.0f, ai: false);
+            Enemy second = combat.SpawnEnemy(EnemyKind.Slime, 1, at + heroObject.transform.forward * 2.5f, ai: false);
+            Time.captureDeltaTime = 1f / AttackData.FrameRate;   // exact 1/60 s steps, so the grace window (48 frames) is not eaten by a hitch
+            try
+            {
+                // 1. The first slime's nova lands: damage, and the 0.8 s grace window starts.
+                first.ServerForceAttack(AttackCatalog.TestNova, at);
+                for (int f = 0; vitals.Model.Hp >= 100 && f < 300; f++) yield return null;
+                int hpAfterFirst = vitals.Model.Hp;
+                Assert.That(hpAfterFirst, Is.LessThan(100), "the first hit landed");
+                Assert.That(hero.HurtGraceActive, Is.True, "the grace window is running");
+
+                // 2. Past the 0.25 s hurt stagger (so the shield can come up) but inside the window, the second slime strikes and the shield goes up 3 frames before it.
+                for (int f = 0; f < 18; f++) yield return null;
+                int serial = second.Serial;
+                second.ServerForceAttack(AttackCatalog.TestNova, at);
+                for (int f = 0; !(second.Serial != serial && second.Attacking) && f < 300; f++) yield return null;
+                float raiseAt = AttackCatalog.TestNova.HitOn.Start - 3;
+                for (int f = 0; second.AttackFrame < raiseAt && f < 600; f++) yield return null;
+                Assert.That(second.AttackFrame, Is.LessThan(AttackCatalog.TestNova.HitOn.Start), "still winding up when the shield goes up");
+                Assert.That(hero.HurtGraceActive, Is.True, "the second strike is judged inside the first hit's window");
+                input.Frame.SecondaryHeld = true;
+                input.Frame.SecondaryPressed = true;
+                yield return null;
+                input.Frame.SecondaryPressed = false;
+                bool stunned = false;
+                for (int f = 0; f < 72; f++) { stunned |= second.Phase == EnemyPhase.Stagger; yield return null; }
+                input.Frame.SecondaryHeld = false;
+                Assert.That(stunned, Is.True, "a parry made during grace reached the host and stunned the attacker");
+                Assert.That(vitals.Model.Hp, Is.EqualTo(hpAfterFirst), "no further damage");
+            }
+            finally { Time.captureDeltaTime = 0f; input.Frame = default; }
+        }
+
         [UnityTest]
         public IEnumerator Solo_WardenArm_BreaksOnce_DropsHealing_AndAHurtHeroPicksItUp()
         {

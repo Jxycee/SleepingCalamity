@@ -80,6 +80,24 @@ namespace SleepingCalamity.Core.Tuning
         };
     }
 
+    // Post-hit grace (HurtGrace, GuardMath.cs): the window lengths per hit kind, the knockdown, the flicker and the knockback that makes a hit heavy.
+    // Heavy must last at least as long as the knockdown it contains (the owner's grace pauses with it).
+    public static class HurtGraceTuning
+    {
+        public static float HeavyKnockback = 3f, LightSeconds = 0.8f, HeavySeconds = 1.2f, MultiHitSeconds = 0.15f, KnockdownSeconds = 0.9f, FlickerSeconds = 0.4f;
+        public static string Validate() => HeavySeconds < KnockdownSeconds
+            ? "heavySeconds (" + HeavySeconds + ") must not be less than knockdownSeconds (" + KnockdownSeconds + ")" : null;
+        public static Knob[] Knobs() => new[]
+        {
+            new Knob("heavyKnockback", () => HeavyKnockback, v => HeavyKnockback = (float)v, 0.1, 100),
+            new Knob("lightSeconds", () => LightSeconds, v => LightSeconds = (float)v, 0.05, 10),
+            new Knob("heavySeconds", () => HeavySeconds, v => HeavySeconds = (float)v, 0.05, 10),
+            new Knob("multiHitSeconds", () => MultiHitSeconds, v => MultiHitSeconds = (float)v, 0.05, 5),
+            new Knob("knockdownSeconds", () => KnockdownSeconds, v => KnockdownSeconds = (float)v, 0, 10),
+            new Knob("flickerSeconds", () => FlickerSeconds, v => FlickerSeconds = (float)v, 0, 10),
+        };
+    }
+
     // The enemy tier multipliers (EnemyCatalog): tier 1 is floors 1-2, tier 2 floors 3-4. Applied on top of each enemy's base table; the party-size life
     // scaling (CoopScaling) multiplies after them, so a change here moves solo and co-op together.
     public static class EnemyTuning
@@ -98,7 +116,9 @@ namespace SleepingCalamity.Core.Tuning
     }
 
     // "attacks": { "axe_1": { "range": 2.5, "hitOn": [10, 15] } }. Ids are the hero ground attacks (hit 1, hit 2, finisher, charge, special) of the four
-    // heirloom sets; the air versions follow from the ground ones. Enemy attack ids are not tunable yet (see the TODO in TuningStore.cs).
+    // heirloom sets; the air versions follow from the ground ones. Enemy attack ids (AttackCatalog.AllEnemyAttacks) are not tunable yet:
+    // EnemyDefinition, the AI, EnemyAttackRules and tests hold those AttackData by reference, so tuning them needs a replace-in-place or registry-lookup
+    // change across Core/Combat and Gameplay, more than a small edit (note in Reference/sessions/combat-tuning-followups/STATUS.md).
     public static class AttackTuning
     {
         static readonly string[] Ints = { "totalFrames", "cancelFrom", "hitstopFrames" };
