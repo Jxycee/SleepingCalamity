@@ -17,7 +17,8 @@ namespace SleepingCalamity.Tests.PlayMode
         public float SwingEvery = 0.3f;       // seconds between attack presses (the combo buffer takes the rest)
         public float DodgeMargin = 0.6f;      // roll when inside an attack's range plus this
         public bool Dodges = true;
-        public bool FlankFrontalBlockers;     // walk to a broom's side instead of straight at its blocking front (a player does); off for the arena bot's old baseline
+        public Enemy Preferred;               // when set and alive, attack this one instead of the nearest
+        public bool FlankFrontalBlockers;    // walk to a broom's side instead of straight at its blocking front (a player does); off for the arena bot's old baseline
 
         private readonly FakeInputService _input;
         private readonly HeroLocomotion _loco;
@@ -32,7 +33,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private ulong _lastStriker;
         private readonly HashSet<ulong> _stuckOn = new HashSet<ulong>();   // one stuck finding per target
         private readonly List<string> _stuckWhy = new List<string>();
-        private float _swingClock, _stuckClock;
+        private float _swingClock, _stuckClock, _flankClock;
         private Vector3 _lastPos;
         private int _lastHp = -1;
         private bool _pressedLast;
@@ -63,7 +64,7 @@ namespace SleepingCalamity.Tests.PlayMode
                     Vector3 away = Flat(_hero.position - attacker.AttackCentre);
                     Vector3 side = Vector3.Cross(Vector3.up, away).normalized;
                     Steer(ref f, (away.normalized + side * 0.5f).normalized);
-                    if (_combat.AllowsDodge) { f.DodgePressed = true; _pressedLast = true; _dodged.Add((attacker.NetworkObjectId, attacker.Serial)); Report.Dodges++; }
+                    if (_combat.AllowsDodge) { f.DodgePressed = true; _pressedLast = true; _dodged.Add((attacker.NetworkObjectId, attacker.Serial)); Report.Dodges++; Report.Kind(attacker.Def.Kind).Dodges++; }
                 }
                 else if (target != null)
                 {
@@ -78,14 +79,21 @@ namespace SleepingCalamity.Tests.PlayMode
                         goal = target.transform.position + Flat(right).normalized * (reach * 0.9f);
                     }
                     float goalDist = flank ? Flat(goal - _hero.position).magnitude : dist;
-                    if (flank && goalDist > 0.6f && dist > 0.7f) Steer(ref f, AroundObstacles(Flat(goal - _hero.position).normalized, goal));
+                    // Swing as soon as the target is in reach and the hero stands outside its blocking cone (the broom keeps turning to face the hero, so the
+                    // exact flank point keeps moving: waiting to arrive on it meant never swinging, measured 0 swings in 67 s inside reach). After 2 s of
+                    // chasing a flank, swing from the front anyway: a blocked hit still passes 20% and keeps the combo going.
+                    bool outsideCone = flank && Vector3.Angle(Flat(target.transform.forward), Flat(_hero.position - target.transform.position)) > FrontalBlock.HalfAngleDeg - 5f;
+                    if (flank && dist > reach) _flankClock += dt; else if (!flank || outsideCone) _flankClock = 0f;
+                    bool swingNow = dist <= reach && (!flank || outsideCone || _flankClock > 2f);
+                    if (flank && !swingNow && goalDist > 0.6f && dist > 0.7f) { Steer(ref f, AroundObstacles(Flat(goal - _hero.position).normalized, goal)); if (dist <= reach) _flankClock += dt; }
                     else if (dist > reach) Steer(ref f, AroundObstacles(to.normalized, target.transform.position));
                     else
                     {
                         Steer(ref f, to.normalized * 0.25f);   // a nudge keeps the hero facing its target
                         _swingClock -= dt;
-                        if (_swingClock <= 0f) { f.PrimaryPressed = f.PrimaryHeld = true; _pressedLast = true; _swingClock = SwingEvery; Report.Swings++; }
+                        if (_swingClock <= 0f) { f.PrimaryPressed = f.PrimaryHeld = true; _pressedLast = true; _swingClock = SwingEvery; Report.Swings++; Report.Kind(target.Def.Kind).Swings++; }
                     }
+                    if (dist <= reach) Report.Kind(target.Def.Kind).SecInReach += dt;
                     StuckCheck(dt, time, dist, reach, target);
                 }
             }
@@ -127,7 +135,12 @@ namespace SleepingCalamity.Tests.PlayMode
                     Report.Strikes++;
                 }
                 int ehp = e.NetHp.Value;
-                if (_enemyHp.TryGetValue(e.NetworkObjectId, out int before) && ehp < before) { Report.HitsDealt++; Report.DamageDealt += before - ehp; }
+                if (_enemyHp.TryGetValue(e.NetworkObjectId, out int before) && ehp < before)
+                {
+                    Report.HitsDealt++; Report.DamageDealt += before - ehp;
+                    KindStats ks = Report.Kind(e.Def.Kind); ks.Hits++; ks.Damage += before - ehp;
+                    if (e.Def.FrontalBlock && before - ehp <= Mathf.Max(1, e.Def.Hp / 40)) ks.LowHits++;   // a blocked hit passes 20%: well under a flank hit
+                }
                 if (!_enemyHp.ContainsKey(e.NetworkObjectId)) Report.EnemiesSeen++;
                 _enemyHp[e.NetworkObjectId] = ehp;
                 if (e.Attacking && (!_enemySerial.TryGetValue(e.NetworkObjectId, out int seen) || seen != e.Serial)) { _enemySerial[e.NetworkObjectId] = e.Serial; Report.EnemyAttacksStarted++; if (e.CurrentAttack == AttackCatalog.WardenQuake) { Report.SignatureAttacks++; Report.Events.Add($"{time:F2}s Warden dough quake"); } }
@@ -210,6 +223,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
         private Enemy Nearest(out float best)
         {
+            if (Preferred != null && Preferred.IsSpawned && Preferred.Alive) { best = Flat(Preferred.transform.position - _hero.position).magnitude; return Preferred; }   // the caller's chosen target (the dive bot)
             best = float.MaxValue; Enemy pick = null;
             foreach (Enemy e in Enemy.All)
             {
@@ -247,6 +261,8 @@ namespace SleepingCalamity.Tests.PlayMode
         private static Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
     }
 
+    public sealed class KindStats { public int Swings, Hits, Damage, LowHits, Dodges; public float SecInReach; }
+
     public sealed class BotReport
     {
         public string Goal = "";
@@ -255,6 +271,8 @@ namespace SleepingCalamity.Tests.PlayMode
         public int HitsTaken, DamageTaken, HitsDealt, DamageDealt, Swings, Dodges, EnemiesSeen, EnemyAttacksStarted, HighestWave, ClearedWaves;
         public int Strikes, HitsStacked, MaxWindUpsAtOnce, MaxWaitingAtOnce, SignatureAttacks;   // pacing: strikes opened, hits taken < 0.5 s after another, peaks
         public bool WentDown;
+        public readonly Dictionary<EnemyKind, KindStats> ByKind = new Dictionary<EnemyKind, KindStats>();
+        public KindStats Kind(EnemyKind k) { if (!ByKind.TryGetValue(k, out KindStats s)) ByKind[k] = s = new KindStats(); return s; }
         public readonly List<string> Events = new List<string>();
         public readonly List<string> Findings = new List<string>();
 
@@ -270,6 +288,8 @@ namespace SleepingCalamity.Tests.PlayMode
             sb.AppendLine($"- Hero: {Swings} attack presses, {HitsDealt} hits / {DamageDealt} damage dealt, {Dodges} rolls");
             sb.AppendLine($"- Pacing: {Strikes} enemy strikes, closest two from different enemies {(Strikes > 1 && MinGapBetweenStrikes < float.MaxValue ? MinGapBetweenStrikes.ToString("F2") + " s" : "n/a")} apart; " +
                           $"most winding up at once {MaxWindUpsAtOnce}, most waiting for a token {MaxWaitingAtOnce}; hits taken < 0.5 s after another {HitsStacked}; Warden signatures {SignatureAttacks}");
+            foreach (var kv in ByKind)
+                sb.AppendLine($"- {kv.Key}: swings {kv.Value.Swings}, hits {kv.Value.Hits} ({kv.Value.Damage} dmg, {kv.Value.LowHits} low/blocked), rolls {kv.Value.Dodges}, {kv.Value.SecInReach:F1} s inside strike reach");
             sb.AppendLine();
             sb.AppendLine("## Findings");
             if (Findings.Count == 0) sb.AppendLine("- none");
