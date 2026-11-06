@@ -1,6 +1,7 @@
 Title: Floor 3 deaths + coop F3 SoftLock
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-06T22:51Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md: Floor 3 deaths S + Coop SoftLock finding on F3 S)
 Status file: Reference/sessions/floor3-deaths/STATUS.md
