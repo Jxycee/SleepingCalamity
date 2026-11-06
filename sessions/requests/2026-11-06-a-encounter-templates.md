@@ -1,6 +1,7 @@
 Title: Spec step 5a: encounter templates for the 12 v2 rooms
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-06 16:35 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: dive build" top item)
 Status file: Reference/sessions/encounter-templates/STATUS.md
