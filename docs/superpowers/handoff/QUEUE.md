@@ -51,7 +51,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** Network conditions test set at 150 ms / 2% and 300 ms / 5% (triage Q6 default; user may change) [U][net]
 
 ## Ready: tools and process
-- [x] **S** `sc_core_tests.py` false green on `Core.Combat` (session started 2026-11-06)
+- [x] **S** `sc_core_tests.py` false green on `Core.Combat` (`8d823e23`: 105 of 157 EditMode files, 1205 tests pass)
 - [x] **S** `unity.ps1 exec` false FAIL on player builds (`cd4eec4e`)
 - [ ] **S** Verify the exec fix on the next player build (it was not re-run after `cd4eec4e`)
 - [ ] **S** `Reference/hollowmere/QUEUE.md` stale: Q7, Q9, Q10, Q12-Q15 say unclaimed but are DONE (docs)
