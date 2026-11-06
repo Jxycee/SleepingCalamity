@@ -1,6 +1,6 @@
 Title: Dungeon-1 difficulty check: modifiers on/off + DiveBot Tough 12345
 Target: cloud
-Status: started
+Status: done (merged; party-size fix e9e7d6db, modifiers within noise, Tough 3/3 seeds clear; see STATUS)
 Started: 2026-11-06T20:15Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md: modifier difficulty check S + DiveBot Tough Seed12345 S)
