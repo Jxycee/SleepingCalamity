@@ -1,6 +1,7 @@
 Title: Dungeon-1 difficulty check: modifiers on/off + DiveBot Tough 12345
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-06T20:15Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md: modifier difficulty check S + DiveBot Tough Seed12345 S)
 Status file: Reference/sessions/dungeon1-difficulty/STATUS.md
