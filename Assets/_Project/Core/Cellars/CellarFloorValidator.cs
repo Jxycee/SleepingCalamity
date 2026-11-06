@@ -210,6 +210,17 @@ namespace SleepingCalamity.Core
                     Err("the stair exit is only " + l.EntryToExitDistance() + " steps from the entry, needs at least " + CellarFloorGenerator.MinExitDistance);
                 if (l.KeyChest != null && !open[l.KeyChest.X, l.KeyChest.Y]) Err("the key chest is not reachable without passing the locked door");
                 if (l.Carrier != null && !open[l.Carrier.X, l.Carrier.Y]) Err("the gate-key carrier is not reachable without passing the locked door");
+                if (!l.IsStub && CellarFloorGenerator.IsGeneratedFloor(l.Floor))
+                {
+                    // plan 5: the valve / pump cells of the floor's objective must be reachable without the lock (a GateKey floor adds no cell)
+                    FloorObjectivePlan op = FloorObjectivePlan.For(l);
+                    if (op.Objective == FloorObjective.TwoValves)
+                    {
+                        if (!open[op.ValveCellA.X, op.ValveCellA.Y]) Err("valve A is not reachable without passing the locked door");
+                        if (!open[op.ValveCellB.X, op.ValveCellB.Y]) Err("valve B is not reachable without passing the locked door");
+                    }
+                    else if (op.Objective == FloorObjective.HoldPump && !open[op.PumpCell.X, op.PumpCell.Y]) Err("the pump is not reachable without passing the locked door");
+                }
             }
 
             // ---- locked room, key, carrier ----
