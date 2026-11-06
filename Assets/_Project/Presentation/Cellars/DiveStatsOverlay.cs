@@ -100,6 +100,7 @@ namespace SleepingCalamity.Presentation
             bool active = dd != null && dd.NetActive.Value && _haveSum;
             if (_hero != null) { _lastHp = _hero.Hp; _lastLoaves = _hero.Loaves; }   // hero briefly missing (respawn, reconnect): keep the last numbers, don't reset the dive
             double now = Time.unscaledTimeAsDouble;
+            if (active && !_wasActive) PruneGone(all);   // a new dive: drop heroes who left earlier (no ghost rows from an old party)
             int floor = _haveSum ? _sum.CurrentFloor : 0;
             ulong? mask = RoomMask(contents, floor);
             _model.Observe(now, active, floor, _lastHp, _lastLoaves, mask);
@@ -121,6 +122,19 @@ namespace SleepingCalamity.Presentation
             if (_wasActive && !_model.Active) SaveSummary(now);
             _wasActive = _model.Active;
             HandleToggle();
+        }
+
+        private void PruneGone(IReadOnlyList<HeroVitals> all)
+        {
+            for (int k = _otherKeys.Count - 1; k >= 0; k--)
+            {
+                ulong id = _otherKeys[k];
+                bool present = false;
+                for (int i = 0; i < all.Count && !present; i++) present = all[i] != null && all[i].OwnerClientId == id;
+                if (present) continue;
+                _others.Remove(id); _otherKeys.RemoveAt(k);
+            }
+            for (int k = 0; k < _otherKeys.Count; k++) _others[_otherKeys[k]].Order = k;
         }
 
         // F4 on a keyboard, or Back/Select + a right-stick click on a gamepad. Read straight from the devices (not the rebindable asset) so it works in every build.
