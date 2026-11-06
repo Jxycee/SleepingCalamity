@@ -1,4 +1,4 @@
-Status: BLOCKED
+Status: DONE (merged b76f862b, PC check PASS e10ef14a: EditMode 1595, PlayMode 198; soak PASS 45/45)
 Branch: plan5-nits tip 4067be5f (unmerged)
 Check: not run - Unity editor missing in cloud session; sc_core_tests.py 1206/1206 PASS.
 Done: key-floor card no longer prints "Find the gate key" when the exit is already open (FloorCard.ObjectiveLine exitOpen); card's pieces line dropped (StirMeterHud keeps it); valve ReportTimeout 0.6 -> 1.0 s so a short push out of the 1.8 m reach keeps the hold (reach and 0.5 m slack unchanged; longer absence still resets; test Valve_HoldSurvivesShortBlipOutOfReach).
