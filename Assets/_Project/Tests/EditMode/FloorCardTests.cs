@@ -56,6 +56,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual("Find the gate key", FloorCardText.ObjectiveLine(FloorObjective.GateKey, 0, 0f, false, 0));
             Assert.AreEqual("Find the gate key", FloorCardText.ObjectiveLine(FloorObjective.GateKey, 0, 0f, false, 1));
             Assert.AreEqual("Gate key found: the way down is open", FloorCardText.ObjectiveLine(FloorObjective.GateKey, 0, 0f, false, 2));
+            Assert.AreEqual("", FloorCardText.ObjectiveLine(FloorObjective.GateKey, 0, 0f, false, 0, true), "a key floor open at arm time (no carrier) has no key to find");
+            Assert.AreEqual("Find the gate key", FloorCardText.ObjectiveLine(FloorObjective.GateKey, 0, 0f, false, 1, false));
             Assert.AreEqual("Open both valves (0/2)", FloorCardText.ObjectiveLine(FloorObjective.TwoValves, 0, 0f, false, 0));
             Assert.AreEqual("Open both valves (1/2)", FloorCardText.ObjectiveLine(FloorObjective.TwoValves, 1, 0f, false, 0));
             Assert.AreEqual("Start the pump", FloorCardText.ObjectiveLine(FloorObjective.HoldPump, 0, 0f, false, 0));

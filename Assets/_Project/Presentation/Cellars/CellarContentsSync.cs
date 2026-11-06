@@ -742,7 +742,7 @@ namespace SleepingCalamity.Presentation
         }
 
         /// <summary>The objective line of the current floor for a prompt or the card: "Open both valves (1/2)", "Start the pump and hold it (40%)", "Find the gate key".</summary>
-        public string ObjectiveLine => FloorCardText.ObjectiveLine(CurrentObjective, ValvesTurned, PumpProgress, PumpStarted, Cur.GateKey);
+        public string ObjectiveLine => FloorCardText.ObjectiveLine(CurrentObjective, ValvesTurned, PumpProgress, PumpStarted, Cur.GateKey, Cur.ExitUnlocked);
 
         public bool AutoArm = true;
         private CellarFloorLayout _layout; private Transform _root; private CellarFloorDressing _dressing;

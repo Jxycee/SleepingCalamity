@@ -68,12 +68,12 @@ namespace SleepingCalamity.Core
     {
         public const string WayOutSuffix = " to open the way out";   // floor 7 prints any objective with this added (WithWayOut)
 
-        // gateKey: the host's ContentsState.GateKey (0 none yet, 1 lying, 2 taken). pumpProgress is 0..1.
-        public static string ObjectiveLine(FloorObjective o, int valvesTurned, float pumpProgress, bool pumpStarted, byte gateKey)
+        // gateKey: the host's ContentsState.GateKey (0 none yet, 1 lying, 2 taken). pumpProgress is 0..1. exitOpen: the host's ExitUnlocked; a key floor that is open with no key (no carrier at arm time) prints nothing.
+        public static string ObjectiveLine(FloorObjective o, int valvesTurned, float pumpProgress, bool pumpStarted, byte gateKey, bool exitOpen = false)
         {
             switch (o)
             {
-                case FloorObjective.GateKey: return gateKey == 2 ? "Gate key found: the way down is open" : "Find the gate key";
+                case FloorObjective.GateKey: return gateKey == 2 ? "Gate key found: the way down is open" : exitOpen && gateKey == 0 ? "" : "Find the gate key";
                 case FloorObjective.TwoValves: return "Open both valves (" + valvesTurned + "/" + ValveHold.Count + ")";
                 case FloorObjective.HoldPump: return pumpStarted ? "Start the pump and hold it (" + (int)(System.Math.Max(0f, System.Math.Min(1f, pumpProgress)) * 100f) + "%)" : "Start the pump";
                 case FloorObjective.Rescue: return "Wake the baker";

@@ -1,6 +1,6 @@
-// Authority: none (local, read-only). Plan 5 task 6: the floor card HUD (IMGUI, like StirMeterHud). Self-creates at runtime; reads the replicated CellarContentsSync state and DiveHaulSync's summary and never writes
+// Authority: none (local, read-only). Plan 5 task 6: the floor card HUD (IMGUI, like StirMeterHud). Self-creates at runtime; reads the replicated CellarContentsSync state and never writes
 // network state. The card (FloorCard.For) is computed once per floor change and cached, never per frame; the text comes from Core's FloorCardText so a number changes in one place. On a floor change the full
-// card is centred for FullCardSeconds (placeholder), then a compact panel stays in the top-right corner (objective with live progress, one line per modifier with its reward, pieces left here).
+// card is centred for FullCardSeconds (placeholder), then a compact panel stays in the top-right corner (objective with live progress, one line per modifier with its reward). Pieces left stay on StirMeterHud only.
 using System.Collections.Generic;
 using SleepingCalamity.Core;
 using SleepingCalamity.Presentation;
@@ -21,12 +21,11 @@ namespace SleepingCalamity.UI
         public int ComputeCount { get; private set; }
         public FloorCard Card => _card;
         public int Floor => _floor;
-        public int PiecesLeft { get; private set; }
         public string ObjectiveLine { get; private set; } = "";
         public FloorCardMode Mode { get; private set; } = FloorCardMode.Hidden;
 
         /// <summary>Call every frame (cheap): recomputes the card only when (seed, floor) or the objective changed; refreshes the live objective line and the mode.</summary>
-        public void Tick(CellarContentsSync contents, int piecesLeft, float now)
+        public void Tick(CellarContentsSync contents, float now)
         {
             if (contents == null || !contents.IsSpawned) { Mode = FloorCardMode.Hidden; _card = null; _floor = 0; return; }
             CellarContentsSync.ContentsState s = contents.State;
@@ -39,7 +38,6 @@ namespace SleepingCalamity.UI
                 _seed = s.Seed; _floor = s.Floor; ComputeCount++;
                 if (newFloor) _fullUntil = now + FullCardSeconds;
             }
-            PiecesLeft = piecesLeft;
             string line = contents.ObjectiveLine;
             ObjectiveLine = _floor == DiveFloorTable.LastBuiltFloor && (obj == FloorObjective.TwoValves || obj == FloorObjective.HoldPump) ? FloorCardText.WithWayOut(line) : line;
             Mode = now < _fullUntil ? FloorCardMode.Full : FloorCardMode.Compact;
@@ -54,7 +52,6 @@ namespace SleepingCalamity.UI
             if (ObjectiveLine.Length > 0) l.Add(ObjectiveLine);
             AddModifier(l, _card.Modifiers.A, full);
             AddModifier(l, _card.Modifiers.B, full);
-            if (PiecesLeft > 0) l.Add("Pieces left here: " + PiecesLeft);
             return l;
         }
 
@@ -74,7 +71,6 @@ namespace SleepingCalamity.UI
     public sealed class FloorCardHud : MonoBehaviour
     {
         public CellarContentsSync Contents;   // found in the scene when null (tests set it)
-        public DiveHaulSync Haul;
         public readonly FloorCardHudModel Model = new FloorCardHudModel();
         float _nextFind;
         GUIStyle _label, _title;
@@ -90,13 +86,12 @@ namespace SleepingCalamity.UI
 
         void Update()
         {
-            if ((Contents == null || !Contents.IsSpawned || Haul == null || !Haul.IsSpawned) && Time.unscaledTime >= _nextFind)
+            if ((Contents == null || !Contents.IsSpawned) && Time.unscaledTime >= _nextFind)
             {
                 _nextFind = Time.unscaledTime + 0.5f;
-                if (Contents == null || !Contents.IsSpawned) Contents = FindFirstObjectByType<CellarContentsSync>();
-                if (Haul == null || !Haul.IsSpawned) Haul = FindFirstObjectByType<DiveHaulSync>();
+                Contents = FindFirstObjectByType<CellarContentsSync>();
             }
-            Model.Tick(Contents, Haul != null && Haul.IsSpawned ? Haul.Current.PiecesLeft : 0, Time.unscaledTime);
+            Model.Tick(Contents, Time.unscaledTime);
         }
 
         void OnGUI()
