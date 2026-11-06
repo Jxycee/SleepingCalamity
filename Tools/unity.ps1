@@ -240,7 +240,10 @@ function Invoke-Exec {
         'LOCKED'  { Say 'SC RESULT exec LOCKED (close the Unity editor, then rerun)'; return 2 }
         'TIMEOUT' { Say ('SC RESULT exec TIMEOUT pid=' + $run.ProcId + ' log=' + $run.Log); return 3 }
     }
-    if (($run.ExitCode -eq 0) -and (Test-CompileClean $run.Log)) {
+    # Player builds can end in the leak-check output without writing 'Exiting batchmode successfully';
+    # exit 0 and no compile error is enough for exec (Unity exits non-zero when the method throws).
+    $execText = Get-LogText $run.Log
+    if (($run.ExitCode -eq 0) -and ($execText -notmatch 'error CS') -and (($execText -match 'Exiting batchmode successfully') -or ($execText -notmatch 'Executing method .* failed'))) {
         Say ('SC RESULT exec PASS method=' + $Method + ' log=' + $run.Log)
         return 0
     }
