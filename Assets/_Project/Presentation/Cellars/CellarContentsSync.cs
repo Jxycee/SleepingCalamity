@@ -16,6 +16,8 @@
 // Host logic (Update, host only): (1) floor change or DiveFailed resets per-floor state and despawns the floor's enemies; (2) a player stepping into a Combat room for the
 // first time spawns that room's CellarEncounterPlan spawns (DiveHaulSync.EncounterPlan, extras at that moment included) through CombatHost.SpawnEnemy: Tier1 = floor-banded
 // Slime/Broom/RatKing (CellarEnemyMix), Tier2 = RatKing tier 2, the bakery's WardenCell = DoughWarden; (2b) the Ambush floor's ambush room (host-only twist) springs its enemies after FloorTwistTuning.AmbushDelaySeconds at CellarAmbush ring cells, cancelled (room re-armed) if no living player is left when the delay ends; (3) when the plan's Hunter appears one tier-2 RatKing spawns at its cell;
+// (2c) ENCOUNTER TEMPLATES (spawner wiring, host only; clients never spawn): for the 12 pool combat rooms CellarTemplateSpawns.Resolve picks the kinds, cells and waves (EncounterBuilder, party size = connected players, isAmbushRoom = plan.AmbushRoom == room)
+// and holds the count to the plan's live count; wave 1 spawns on the host tick after the last wave-0 enemy dies (the room is not cleared in between). Rooms it returns null for (bakery set pieces, Tier 2 / warden rooms) keep the plan-driven spawns above;
 // (4) the enemy spawned for layout.Carrier drops the GATE key where it falls (only on death: a wipe/clear despawn drops nothing, resets the room and it respawns on re-entry): a player within GateKeyRange picks it up and ExitUnlocked is raised; keys live only in this state (GateKey, RoomKeyHeld), never in the haul's loot;
 // (5) pieces: a player within PieceRange of an uncollected piece spot adds it to the haul (ServerAddPiece), the collected mask follows the haul every frame so a failed
 // dive shows the pieces again; (6) the room key (key chest) lets the host open the locked gate, by Interact or by walking up to it.
@@ -644,6 +646,7 @@ namespace SleepingCalamity.Presentation
             CollectPlayers();
             EnterRooms(fs);
             TickAmbush(fs);
+            TickWaveTwo(fs);
             SpawnHunter(fs);
             TickGateKey();
             TickObjective(fs);
@@ -752,7 +755,7 @@ namespace SleepingCalamity.Presentation
         private void UntrackAll()
         {
             foreach (Enemy e in new List<Enemy>(_tracked.Keys)) Unhook(e);
-            _tracked.Clear();
+            _tracked.Clear(); _waveTwo.Clear(); _waveTwoDue.Clear();
             if (_hunter != null) Unhook(_hunter);
             ResetPump();
         }
@@ -828,6 +831,15 @@ namespace SleepingCalamity.Presentation
                 if (!ambushNow) { _ambushRoom = room; _ambushDue = Time.time + FloorTwistTuning.AmbushDelaySeconds; return; }
                 ambush = CellarAmbush.Cells(l, _dressing, plan, room, PlanePoints());
             }
+            CellarTemplateRoom tr = CellarTemplateSpawns.Resolve(l, _dressing, plan, room, PresentPlayers, ambush);   // host: encounter template for the 12 pool combat rooms; null keeps the plan-driven spawns below (bakery set pieces, Tier 2 / warden rooms)
+            if (tr != null)
+            {
+                foreach (TemplateSpawn ts in tr.InWave(0)) SpawnTemplateEnemy(fs, room, ts);
+                List<TemplateSpawn> second = new List<TemplateSpawn>(tr.InWave(1));
+                if (second.Count > 0 && RoomHasTracked(room)) _waveTwo[room] = second;   // wave 1 appears when wave 0 is cleared (TickWaveTwo)
+                _st.Cleared = _clear.ClearedMask;
+                return;
+            }
             foreach (EncounterSpawn sp in plan.Spawns)
             {
                 if (sp.RoomIndex != room || sp.Kind == EncounterKind.Hunter) continue;
@@ -852,6 +864,43 @@ namespace SleepingCalamity.Presentation
                 e.ServerDied += OnEnemyDied; e.ServerDespawned += OnEnemyDespawned;
             }
             _st.Cleared = _clear.ClearedMask;
+        }
+
+        // Host: one template enemy (Tier1, floor-banded tier). The carrier cell keeps the gate-key carrier; a re-entered room whose key already dropped does not bring it back.
+        private void SpawnTemplateEnemy(CellarFloorSync fs, int room, TemplateSpawn ts)
+        {
+            bool carrier = CarrierGatesExit && ts.Carrier;
+            if (carrier && _st.GateKey != 0) return;
+            Enemy e = EnsureCombat().SpawnEnemy(ts.Kind, EnemyCatalog.AuthoredTier(false, false, _layout.Floor), World(fs, ts.Cell), room: room);
+            if (e == null)
+            {
+                if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
+                return;
+            }
+            _tracked[e] = new Tracked { Room = room, Carrier = carrier };
+            if (carrier) _carrierEnemy = e;
+            _clear.Spawn(room);
+            e.ServerDied += OnEnemyDied; e.ServerDespawned += OnEnemyDespawned;
+        }
+
+        // Host: wave 1 of a template room. Its last wave-0 death leaves the room's alive count at one (Gone skips CellarRoomClear.Died), so the room cannot clear in between; this spawns
+        // wave 1 on the next host tick and then settles that one count, which clears the room only if nothing could be spawned.
+        private readonly Dictionary<int, List<TemplateSpawn>> _waveTwo = new Dictionary<int, List<TemplateSpawn>>();
+        private readonly List<int> _waveTwoDue = new List<int>();
+
+        private void TickWaveTwo(CellarFloorSync fs)
+        {
+            if (_waveTwoDue.Count == 0) return;
+            foreach (int room in _waveTwoDue.ToArray())
+            {
+                _waveTwoDue.Remove(room);
+                if (!_waveTwo.TryGetValue(room, out List<TemplateSpawn> second)) continue;
+                _waveTwo.Remove(room);
+                foreach (TemplateSpawn ts in second) SpawnTemplateEnemy(fs, room, ts);
+                if (_clear.Died(room)) { _st.Cleared = _clear.ClearedMask; PayRoomClear(room); RoomCleared?.Invoke(room); }
+                else _st.Cleared = _clear.ClearedMask;
+                Publish();
+            }
         }
 
         private void SpawnHunter(CellarFloorSync fs)
@@ -882,12 +931,13 @@ namespace SleepingCalamity.Presentation
                 if (e == _carrierEnemy) _carrierEnemy = null;
                 bool roomLeft = RoomHasTracked(t.Room);
                 if (roomLeft) { _clear.Despawned(t.Room); if (t.Carrier && _st.GateKey == 0) _carrierLostRoom = t.Room; }
-                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); if (_carrierLostRoom == t.Room) _carrierLostRoom = -1; }
+                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _waveTwo.Remove(t.Room); _waveTwoDue.Remove(t.Room); if (_carrierLostRoom == t.Room) _carrierLostRoom = -1; }
                 _st.Cleared = _clear.ClearedMask; Publish();
                 return;
             }
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = SettledKeyPos(e.transform.position); }
             if (t.Guardian) GuardianDefeated?.Invoke(_st.Floor);
+            if (_waveTwo.ContainsKey(t.Room) && !RoomHasTracked(t.Room)) { if (!_waveTwoDue.Contains(t.Room)) _waveTwoDue.Add(t.Room); Publish(); return; }   // wave 0 is down: wave 1 follows (TickWaveTwo) before the room can clear
             if (_clear.Died(t.Room)) { _st.Cleared = _clear.ClearedMask; PayRoomClear(t.Room); RoomCleared?.Invoke(t.Room); }
             if (_carrierLostRoom == t.Room && _st.GateKey == 0 && !RoomHasTracked(t.Room))   // its carrier was lost without a drop: reset the room so the carrier comes back on entry
             { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _carrierLostRoom = -1; _st.Cleared = _clear.ClearedMask; }

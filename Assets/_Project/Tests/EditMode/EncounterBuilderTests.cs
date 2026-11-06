@@ -21,6 +21,17 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(EncounterBuilder.SeedKey(200, int.MaxValue), Is.EqualTo((200UL << 32) | (uint)int.MaxValue));
         }
 
+        // Golden: the template pick for fixed (seed, floor, roomIndex) on stream "cellars.template" with key SeedKey. A change here re-rolls every dive's room templates: re-pin deliberately.
+        [Test]
+        public void Choose_Golden_FixedSeedFloorRoom()
+        {
+            string Pick(string room, uint seed, int floor, int idx) => EncounterBuilder.Choose(CellarRoomsV2.Find(room), seed, floor, idx, false).Id;
+            Assert.That(string.Join(",", new[]
+            {
+                Pick("coal_boiler_hall", 1234, 3, 2), Pick("coal_boiler_hall", 1234, 3, 3), Pick("wine_aisles", 99, 2, 1), Pick("larder_hanging_hall", 4242, 5, 4), Pick("wine_press_hall", 7, 6, 0),
+            }), Is.EqualTo("reinforced,mixed_tier,shield_wall,rush_bombard,guarded_caster"));
+        }
+
         [Test]
         public void Build_IsDeterministic_PerSeed()
         {
