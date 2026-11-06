@@ -1,6 +1,6 @@
 Title: Floor 3 deaths + coop F3 SoftLock
 Target: cloud
-Status: started
+Status: done (merged; F3 = intended rat_king content, out heroes now stand up at the stair; see STATUS)
 Started: 2026-11-06T22:51Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md: Floor 3 deaths S + Coop SoftLock finding on F3 S)
