@@ -1,5 +1,6 @@
 // Core/Cellars/DiveStir.cs: the stir meter for the 10-floor dive (spec decision 19, section 4.5, red-team F2). Pure C#; time comes in as Tick(dt).
-// Value = clamp((PerFloorCleared x floors cleared this half + PerUnbankedValuable x valuables carried) x sqrt(players), 0, Max).
+// Value = clamp((PerFloorCleared x floors cleared this half + PerUnbankedValuable x valuables carried) x sqrt(players) + ModifierBonus, 0, Max).
+// ModifierBonus (plan 5): the Stirred floor modifier's flat stir, added after the sqrt-of-players scaling, set by the host from (seed, current floor); not part of State, never saved.
 // Latches hold for the half. At DeepClosesThreshold the host calls BeginCollapse with the path time to this floor's stair; once per half.
 // Pushing on resets the danger side and carries the reward side (RewardValue).
 using System;
@@ -20,13 +21,16 @@ namespace SleepingCalamity.Core
         public int PlayersPresent { get => _players; set { _players = Math.Max(1, value); Refresh(); } }
         public int UnbankedValuables { get => _valuables; set { _valuables = Math.Max(0, value); Refresh(); } }
 
+        private float _modifierBonus;
+        public float ModifierBonus { get => _modifierBonus; set { _modifierBonus = Math.Max(0f, value); Refresh(); } }
+
         public float Value
         {
             get
             {
                 int floors = 0;
                 for (int m = _floorMask; m != 0; m >>= 1) floors += m & 1;
-                float raw = (PerFloorCleared * floors + PerUnbankedValuable * Math.Max(0, _valuables - _baseline)) * (float)Math.Sqrt(_players);
+                float raw = (PerFloorCleared * floors + PerUnbankedValuable * Math.Max(0, _valuables - _baseline)) * (float)Math.Sqrt(_players) + _modifierBonus;
                 return Math.Max(0f, Math.Min(Max, raw));
             }
         }
@@ -71,6 +75,7 @@ namespace SleepingCalamity.Core
             _floorMask = 0;
             _extra = _hunter = _collapseUsed = _running = false;
             _secondsLeft = 0f;
+            _modifierBonus = 0f;   // after the carry above: the floor's flat stir does not follow the party
         }
 
         public void ResetForNewDive()

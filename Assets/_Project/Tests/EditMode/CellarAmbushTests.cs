@@ -18,9 +18,12 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void Tuning_IsTheTwelvePercentPlaceholder_WithDelay()
+        public void Tuning_AmbushIsAFloorModifierHazard_WithDelay()
         {
-            Assert.AreEqual(12, FloorTwistTuning.AmbushPercent);
+            // plan 5: the ambush rate moved into FloorModifierTuning (floors 2 and 4: 40% hazard slot, a quarter of those the ambush); the card prints it
+            int ambush = 0, floors = 0;
+            for (uint seed = 1; seed <= 4000; seed++) { floors++; if (FloorModifierSet.For(seed, 2).Has(FloorModifier.Ambush)) ambush++; }
+            Assert.AreEqual(FloorModifierTuning.EarlyAPercent / 4f, ambush * 100f / floors, 3f);
             Assert.AreEqual(0.75f, FloorTwistTuning.AmbushDelaySeconds);
         }
 
