@@ -1,4 +1,5 @@
-Status: working
+Status: DONE (merged eb2ee73d; check PASS on tip 67dac163: EditMode 1594, PlayMode 219 = 198 pass + 21 skipped; marker == tip)
+Archive: ready
 
 # FBX UV regen (Inn, StoneCottage A/B/C, Townhouse A/B/C, RetainWallLow)
 
@@ -44,3 +45,10 @@ All below 2.5. Bloom/Leaf atlas cards (10.0) are not tiling materials and the sc
 
 Gate: PASS (compile, test-edit 1594/1594).
 Not done: captures (ordered separately); merge.
+
+## Frames
+inn_before_after.png, cottage_before_after.png, townhouse_before_after.png (Blender EEVEE, UV grid, left before, right after).
+
+## Open
+- Reviewer should-fix, unverified: RetainMinStub 0.85 (LaneKitPlan.cs) drops 3 retaining-wall stub rows beside stairs/cross walls with no pier; up to 0.85 m gap possible. Check in a Hollowmere capture/walk.
+- Inn roof stretch 2.30 (under 2.5).
