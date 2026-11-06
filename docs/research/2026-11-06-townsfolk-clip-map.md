@@ -1,6 +1,6 @@
 # Townsfolk idle-work clip map (2026-11-06)
 
-Goal: loops that make the rebuilt towns feel lived in. Residents: baker (Hollis Rye, placeholder name), innkeeper (Marta), smith (Dun), Saltwake fisherman (Teague); names are the research note's placeholders, not locked. Rig: the UAL humanoid (Unity Humanoid retarget), so every pack below plays on every townsperson.
+Goal: loops that make the rebuilt towns feel lived in. Residents: baker (Hollis Rye, placeholder name), innkeeper (Marta), smith (Dun), Saltwake fisherman (Teague); names are the research note's placeholders, not locked. Rig: the UAL humanoid (Unity Humanoid retarget), so clips from every pack below should retarget onto every townsperson (KayKit and generated clips still need a check and cleanup).
 
 Clip names below were read from the repo's own `UAL1_Standard.fbx.meta` and `UAL2_Standard.fbx.meta` (Standard tier), not guessed. KayKit lists come from the pack page (categories only, no file names); verify names after download. Licences: `docs/research/2026-11-06-open-rigged-assets.md` (UAL, KayKit `cc0`; HY-Motion and MoMask `personal-use`).
 
@@ -9,7 +9,7 @@ Clip names below were read from the repo's own `UAL1_Standard.fbx.meta` and `UAL
 |---|---|
 | `Idle_Loop`, `Idle_Talking_Loop`, `Idle_FoldArms_Loop`, `Idle_Lantern_Loop`, `Idle_TalkingPhone_Loop` (skip the phone), `Idle_Rail_Loop`, `Idle_Rail_Call` | standing base idles; Rail = leaning on a counter or rail, Call = hailing a customer |
 | `Sitting_Enter`, `Sitting_Idle_Loop`, `Sitting_Talking_Loop`, `Sitting_Exit` | inn patrons, resting fisherman |
-| `Walk_Loop`, `Walk_Formal_Loop`, `Walk_Carry_Loop`, `Idle_Talking_Loop` | errands, delivery |
+| `Walk_Loop`, `Walk_Formal_Loop`, `Walk_Carry_Loop` | errands, delivery |
 | `Farm_Harvest`, `Farm_PlantSeed`, `Farm_Watering` | allotments, orchard; stand-in for kneading or stirring only if held still |
 | `TreeChopping_Loop` | woodpile; closest swing motion we have for the smith's hammering until a real hammer clip lands |
 | `Fixing_Kneeling`, `PickUp_Table`, `Interact`, `Push_Loop`, `Chest_Open`, `Consume`, `OverhandThrow`, `Dance_Loop`, `Yes` | one-shots: repair, take an item off the counter, open a door/chest, serve a drink or loaf (Consume is eating), celebrate when a building is rebuilt |
