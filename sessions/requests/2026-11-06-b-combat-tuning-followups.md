@@ -1,6 +1,7 @@
 Title: Combat-polish follow-ups + TuningSections TODO
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-06T16:41Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: bugs and test health", two S items)
 Status file: Reference/sessions/combat-tuning-followups/STATUS.md
