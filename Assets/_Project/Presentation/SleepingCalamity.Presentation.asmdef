@@ -8,6 +8,7 @@
         "SleepingCalamity.Gameplay",
         "Unity.Cinemachine",
         "Unity.Netcode.Runtime",
+        "Unity.InputSystem",
         "Unity.Collections",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime"

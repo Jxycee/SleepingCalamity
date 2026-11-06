@@ -265,3 +265,48 @@ namespace SleepingCalamity.Tests.EditMode
         }
     }
 }
+
+namespace SleepingCalamity.Tests.EditMode
+{
+    public class DiveSummaryReportTests
+    {
+        private static SleepingCalamity.Core.DiveSummaryReport Sample()
+        {
+            var r = new SleepingCalamity.Core.DiveSummaryReport { DiveSeconds = 125.4, FinalFloor = 3, FailFloor = 0, PartySize = 2 };
+            r.FloorSeconds.Add(new System.Collections.Generic.KeyValuePair<int, double>(1, 60.5));
+            r.FloorSeconds.Add(new System.Collections.Generic.KeyValuePair<int, double>(2, 64.9));
+            r.Players.Add(new SleepingCalamity.Core.DiveSummaryReport.PlayerRow { Name = "P1 \"you\"", DamageTaken = 40, HealsUsed = 2, LoavesEaten = 1, LoavesLeft = 3 });
+            r.Players.Add(new SleepingCalamity.Core.DiveSummaryReport.PlayerRow { Name = "P2", DamageTaken = 25, HealsUsed = 1, LoavesEaten = 0, LoavesLeft = 4 });
+            return r;
+        }
+
+        [NUnit.Framework.Test]
+        public void PartyTotalsAddPlayers()
+        {
+            var r = Sample();
+            NUnit.Framework.Assert.That(r.TotalDamage, NUnit.Framework.Is.EqualTo(65));
+            NUnit.Framework.Assert.That(r.TotalHeals, NUnit.Framework.Is.EqualTo(3));
+            NUnit.Framework.Assert.That(r.TotalLoaves, NUnit.Framework.Is.EqualTo(1));
+        }
+
+        [NUnit.Framework.Test]
+        public void JsonIsExactAndEscaped()
+        {
+            string expected = "{\"diveSeconds\":125.4,\"finalFloor\":3,\"failFloor\":0,\"partySize\":2,\"floorSeconds\":{\"1\":60.5,\"2\":64.9},\"players\":["
+                + "{\"name\":\"P1 \\\"you\\\"\",\"damageTaken\":40,\"healsUsed\":2,\"loavesEaten\":1,\"loavesLeft\":3},"
+                + "{\"name\":\"P2\",\"damageTaken\":25,\"healsUsed\":1,\"loavesEaten\":0,\"loavesLeft\":4}],"
+                + "\"party\":{\"damageTaken\":65,\"healsUsed\":3,\"loavesEaten\":1}}";
+            NUnit.Framework.Assert.That(Sample().ToJson(), NUnit.Framework.Is.EqualTo(expected));
+        }
+
+        [NUnit.Framework.Test]
+        public void TextHasPartyLineOnlyInCoop()
+        {
+            var r = Sample();
+            NUnit.Framework.Assert.That(r.ToText(), NUnit.Framework.Does.Contain("Party: damage 65, heals 3, loaves eaten 1"));
+            NUnit.Framework.Assert.That(r.ToText(), NUnit.Framework.Does.Contain("Dive time 2:05, final floor 3, not failed, players 2"));
+            r.Players.RemoveAt(1);
+            NUnit.Framework.Assert.That(r.ToText(), NUnit.Framework.Does.Not.Contain("Party:"));
+        }
+    }
+}
