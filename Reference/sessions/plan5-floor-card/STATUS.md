@@ -1,8 +1,8 @@
 # plan5-floor-card (cloud session)
-State: implementing run A (Core tasks 1-3); plan reviewed 3f58ebe
+State: run A (Core 1-3) merged on branch + reviewed; run B (Tasks 4-5, live dive) in progress
 Branch: claude/upbeat-maxwell-pnadr4 (from main a85d686)
 Tip: -
-Check: -
+Check: gate on run A tip: compile PASS, EditMode 1573/1575 (2 expected roster re-pins, fixed in run B step 0)
 Soak: -
 Archive: no
 
@@ -15,3 +15,6 @@ Archive: no
 6. Modifier rewards are ordinary loot/gold (no stir or bank input).
 7. Names: hand-written table, 5 per sub-theme, no repeat within a dive.
 8. Card re-open: no map screen exists, so a compact always-on corner panel replaces "re-open from the map".
+
+9. Valve fallback: layouts have 4-6 rooms, so valves may sit in adjacent rooms when no farther pair exists; 4.5% of valve rolls fall back to the gate key (fewer than 2 eligible combat rooms).
+10. Stirred's +10 can latch the extra enemy / hunter for the rest of the half (kept: it is the hazard; card says so).
