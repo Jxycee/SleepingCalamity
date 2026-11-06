@@ -57,3 +57,14 @@ Do not generate whole humans. 1. MPFB2 base body (already approved in sc-asset-a
 1. **SAM 3D mesh to TRELLIS.2 texturing.** Use `sam3d_run_3/mesh.glb` (cat) with `Trellis2MeshTexturing`, texture-stage resolution 512 then 1024. Record time, peak VRAM, and compare against the 541 s cat and `mesh_textured.glb`. Pass if peak under 10 GB and texture beats SAM 3D's own bake.
 2. **Tile tuning on the cat at cascade 1024.** Look at the tiled-decoder code path for tile size/margin, shrink tiles (espalier uses 128 voxels, 8-16 margin) and rerun with `SC_CHUNK` ignored. Pass if `decode_shape_slat` completes under 11.5 GB; else port the neighbour-chunking idea from espalier's repo.
 3. **Split test on the dog.** Crop head and body images, run each through TRELLIS.2 at 768 and 1024, record tokens and VRAM per part, join in Blender with remesh and rebake. This confirms or refutes the "splitting does not cut tokens" estimate and shows whether the seam is acceptable.
+
+## Decided pipeline (user, 2026-11-06, after CREATURE_SHEET2 test)
+
+Measured on the RTX 5070 12 GB (tools in C:\AI, commands in C:\AI\scripts\NOTES.md):
+
+- **Non-human creatures and organic props:** Hunyuan3D 2.1 shape (~70 s, 10.5 GB peak, 40k tris) -> TRELLIS.2 `Trellis2MeshTexturing` on that external mesh (~75 s, ~5 GB, 2048 PBR UV). About 150 s per creature, best result of six routes (cat and dog). Fallback shape when Hunyuan misreads the image: SAM 3D Objects (~72 s, 6.7 GB) -> same TRELLIS.2 texturing.
+- **Hard props:** full TRELLIS.2 at 1024 (150-610 s, 4.5-10 GB), retry at cascade 768 on OOM.
+- **Humans/humanoids:** not decided (MPFB2 body + generated parts is the lead).
+- **Texture alternative under test:** StableGen (SDXL + IPAdapter + Marigold PBR) on the Hunyuan shape, once Blender online access is enabled.
+- **Known fault on every route:** dark fur comes out too dark and shiny; the pipeline needs a colour-correction step.
+- Next: StableGen test, then pipeline scripts (cutout, shape, texture, decimate/rebake 2048, colour-correct, import), then improve.
