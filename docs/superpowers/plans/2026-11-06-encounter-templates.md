@@ -19,10 +19,17 @@ New pure-C# files in `Core/Rooms/` (no engine refs):
 
 Integration note: this task ships the data + builder + validator and a thin adapter `EncounterBuilder.ToExtraCells(...)` for the existing spawner; wiring the host spawner to use templates is a follow-up request (it touches NetworkBehaviours and would need risk-reviewer) and is out of scope here.
 
+
 ## Tasks (implementer runs; 2-3 tasks each)
 Run A: **Task 1** types + the 8 templates (`EncounterTemplate.cs`, `EncounterTemplates.cs`) with `EncounterTemplatesTests` (ids unique, roles within tier 1, waves <= 2, solo base counts match research table, per-player adds respect the 8 cap). **Task 2** `RoomEncounterTable` for the 12 rooms + tests (every combat room has 2-3 templates; every template reaches >= 1 room; Ambush only where the room is empty-looking, i.e. >= 3 free cells).
 Run B: **Task 3** `EncounterBuilder` + tests (deterministic per seed, same output twice, players 1-4 monotone non-decreasing live count, <= 8, SmallParty respected, roster remap, carrier/warden cells untouched). **Task 4** `EncounterValidator` + tests incl. one negative case per rule.
 Run C: **Task 5** sweep test over all 12 rooms x players 1-4 x floors 1-7 x 200 seeds (fast tier 50 seeds, `[Category("Soak")]` 1000+) asserting validator-clean; doc `docs/ROOM_METRICS.md` addendum listing the table. Then: merge origin/main, `unity.sh gate` while working, `unity.sh soak` (Core/Cellars adjacency) and full `check` on final tip, Sonnet `reviewer`, merge.
+
+## Coordinator decisions (2026-11-06, supersede the text above)
+- Scope: Q1 yes, the 12 pool combat rooms (bakery set pieces keep their authored guard). Q2: NO host spawner wiring. Q3: Elite arena and Hunter stay out.
+- **Guardrail (a):** floors 1-2 use one-wave templates only (no Reinforced) and at most 2 enemy kinds. The solo live count per room must not exceed today's `CellarEncounterPlan` count for that room (its authored spawn count) by more than 1. Per-player adds must not exceed `CoopScaling.ExtraEnemiesPerRoom` (+1 per extra player). EditMode tests pin both limits (Tasks 1, 3 and 5).
+- **Ambush (b):** a template-level Ambush is not rolled once per floor on its own. `EncounterBuilder` uses the Ambush template only for the room the Ambush floor modifier already picks (`CellarEncounterPlan.AmbushRoom`, passed in as `isAmbushRoom`); every other room never gets it. No Ambush template on a floor with a hazard (so the validator rejects it when the floor has any hazard modifier other than the Ambush one that selected the room is moot: the Ambush modifier is itself slot A, so a second hazard cannot exist). Later wiring request: connect `AmbushRoom` to the builder's `isAmbushRoom` flag.
+- **Seed key (c):** `((ulong)floor << 32) | (uint)roomIndex` (cast before shifting).
 
 ## Open questions for the coordinator
 1. Scope: "12 v2 rooms" read as the 12 pool combat rooms (rooms-v2 plan). Bakery set-piece rooms keep their authored guard. OK?
