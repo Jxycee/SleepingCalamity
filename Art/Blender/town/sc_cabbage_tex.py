@@ -1,7 +1,7 @@
 """Procedural cabbage-leaf texture set for the garden beds (sc_garden.py): numpy + Pillow, deterministic, no Blender needed.
 
-One 1024 x 512 atlas per map: the LEFT half is the outer leaf (blue-green, #5b7a5a at the rim, paler #9fb486 toward the base), the RIGHT half is the pale
-heart variant. Inside a half, u runs across the leaf and v along it (0 at the stalk, 1 at the tip), so the midrib is the centre line u = 0.5.
+One 1024 x 1024 atlas per map: the BOTTOM half (v 0..0.5) is the outer leaf (blue-green, #5b7a5a at the rim, paler #9fb486 toward the base), the TOP half (v 0.5..1)
+is the pale heart variant (2026-11-05: stacked so a UV unit is the same on U and V). Inside a half, u runs across the leaf and v along it (0 at the stalk, 1 at the tip), so the midrib is the centre line u = 0.5.
   Cabbage_BaseColor.png  sRGB albedo: pale cream-green midrib, 6 pairs of paler side veins curving out to the rim, faint large-scale mottle, no baked light
   Cabbage_Normal.png     OpenGL (Y+) tangent normal from a height map (raised midrib and veins, subtle savoy pucker between them) via sc_texgrade.normal_from_height
   Cabbage_ORM.png        R occlusion 1, G roughness 0.55, B metal 0
@@ -68,14 +68,24 @@ def _half(heart, seed):
     return col.astype(np.float32), hgt.astype(np.float32)
 
 
+def _wide(a):
+    """512 x 512 half -> 1024 wide x 512 tall (Lanczos, per channel)."""
+    chans = [a] if a.ndim == 2 else [a[..., k] for k in range(a.shape[2])]
+    out = [np.asarray(Image.fromarray(c.astype(np.float32), 'F').resize((2 * H, H), Image.LANCZOS)) for c in chans]
+    return out[0] if a.ndim == 2 else np.stack(out, -1)
+
+
 def make(out):
+    """Atlas 1024 x 1024: outer leaf = bottom half of the image (v 0..0.5), heart = top half (v 0.5..1), each 1024 x 512. A UV unit is the same on U and V,
+    so a leaf mapped at one metres-to-UV scale (sc_garden.cabbage_uv_scale) is not stretched."""
     os.makedirs(out, exist_ok=True)
     cols, hs = [], []
     for heart, seed in ((False, 11), (True, 29)):
-        c, h = _half(heart, seed); cols.append(c); hs.append(h)
-    alb = np.concatenate(cols, 1)
-    nrm = np.concatenate([tg.normal_from_height(h, 8.0) for h in hs], 1)
-    orm = np.zeros((H, 2 * H, 3), np.float32); orm[..., 0] = 1.0; orm[..., 1] = 0.55
+        c, h = _half(heart, seed); cols.append(_wide(c)); hs.append(_wide(h))
+    # image rows run top-down: v 0.5..1 (heart) on top, v 0..0.5 (outer) below
+    alb = np.concatenate([cols[1], cols[0]], 0)
+    nrm = np.concatenate([tg.normal_from_height(h, 8.0) for h in (hs[1], hs[0])], 0)
+    orm = np.zeros((2 * H, 2 * H, 3), np.float32); orm[..., 0] = 1.0; orm[..., 1] = 0.55
     for n, arr in (('BaseColor', alb), ('Normal', nrm), ('ORM', orm)):
         Image.fromarray((np.clip(arr, 0, 1) * 255 + 0.5).astype(np.uint8), 'RGB').save(os.path.join(out, 'Cabbage_%s.png' % n), optimize=True)
     return [os.path.join(out, 'Cabbage_%s.png' % n) for n in ('BaseColor', 'Normal', 'ORM')]

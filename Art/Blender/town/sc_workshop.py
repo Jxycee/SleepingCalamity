@@ -154,11 +154,9 @@ def cyl(pc, mat, c0, c1, r0, r1, segs=8, cap=True, uvs=1.0):
     bmesh.ops.create_cone(bm, cap_ends=cap, cap_tris=False, segments=segs, radius1=r0, radius2=r1, depth=L)
     q = Vector((0, 0, 1)).rotation_difference(ax).to_matrix().to_4x4()
     bm.transform(Matrix.Translation((a + b) / 2) @ q)
-    for f in bm.faces:
-        for l in f.loops:
-            co = l.vert.co
-            t = (co - a).dot(ax)
-            l[uvl].uv = (t * uvs / fk.TILE * 3, (co.x + co.y) * uvs / fk.TILE * 3)
+    bm.normal_update()
+    for f in bm.faces:      # per-face isometric metre UVs, v along the axis (the old t*3 / (x+y)*3 mapping stretched 5-9x)
+        fk.planar_face_uv(f, uvl, ax, fk.TILE / uvs)
     bm.normal_update(); fk._merge(pc, bm, mat)
 
 def mk(name):
@@ -521,6 +519,7 @@ def build_roof(c, R_, P, tile_mat_key):
                     a0 = math.pi * 0.15 + math.pi * 1.25 * k / segs
                     row.append(bm.verts.new(p0 + Vector((sg * math.cos(a0) * rr_, 0, math.sin(a0) * rr_))))
                 rows.append(row)
+            kv = {v: kk for row in rows for kk, v in enumerate(row)}
             for i in range(ny):
                 for k in range(segs):
                     q = [rows[i][k], rows[i + 1][k], rows[i + 1][k + 1], rows[i][k + 1]]
@@ -530,8 +529,8 @@ def build_roof(c, R_, P, tile_mat_key):
                     if n.dot(ctr - p0) < 0:
                         q = q[::-1]
                     f = bm.faces.new(q)
-                    for l in f.loops:
-                        l[uvl].uv = (l.vert.co.y / fk.TILE, k * rr_ / fk.TILE)
+                    for l in f.loops:     # v = arc length per vertex ring (k was shared by all four corners: collapsed)
+                        l[uvl].uv = (l.vert.co.y / fk.TILE, kv[l.vert] * rr_ * 1.25 * math.pi / segs / fk.TILE)
             bm.normal_update(); fk.two_sided(bm); fk._merge(pc, bm, mat)
     # rafter tails under the eaves, barge boards on both verges
     for sg in (-1, 1):
@@ -748,10 +747,9 @@ def stone_stack(P, c, R_, x, yb):
         for j in range(len(rings) - 1):
             for s_ in range(segs):
                 f = bm.faces.new((rings[j][s_], rings[j][(s_ + 1) % segs], rings[j + 1][(s_ + 1) % segs], rings[j + 1][s_]))
-                for l in f.loops:
-                    co = l.vert.co
-                    l[uvl].uv = (math.atan2(co.y, co.x) * 0.15 / fk.TILE, co.z / fk.TILE)
         bm.normal_update()
+        for f in bm.faces:      # per-face isometric UVs (the old atan2*0.15 / z mapping stretched 3-10x; flat rim faces collapsed)
+            fk.planar_face_uv(f, uvl, (0, 0, 1))
         bm.transform(Matrix.Translation((x + px, yc, h + 0.16)) @ Matrix.Rotation(math.radians(tip), 4, 'X'))
         fk._merge(pc, bm, 'roof')
 

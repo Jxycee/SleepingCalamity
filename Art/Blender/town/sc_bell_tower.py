@@ -65,6 +65,12 @@ EXTRA = {
 _orig_M = FK.M
 FK.M = lambda k: EXTRA[k]() if k in EXTRA else _orig_M(k)
 
+def prim_uv(bm):
+    """World box-projected metre UVs for a primitive bmesh already placed in world space (cone, icosphere): the primitive ops leave UVs
+    at zero, which the fault scan counts as collapsed (stretch 10)."""
+    bm.normal_update()
+    FK._uv_project(bm.faces, bm.loops.layers.uv.get('UVMap') or bm.loops.layers.uv.new('UVMap'), Matrix.Identity(4), None, (0.0, 0.0))
+
 def frame(n):
     """Face frame for an outward normal n (one of the four sides): tangent t = Z x n (left to right seen from outside)."""
     n = Vector(n); t = Vector((0, 0, 1)).cross(n)
@@ -269,18 +275,23 @@ def kit_belfry():
     bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
     rings = [[bm.verts.new(Vector((r * math.cos(2 * math.pi * s / seg), r * math.sin(2 * math.pi * s / seg), top - zz)))
               for s in range(seg)] for (r, zz) in prof]
+    # cylindrical metres: U = arc length at the mean bell radius (s runs to seg at the wrap, so no seam jump), V = profile arc length
+    rbar = sum(r for r, _ in prof) / len(prof)
+    vacc = [0.0]
+    for j in range(1, len(prof)):
+        vacc.append(vacc[-1] + math.hypot(prof[j][0] - prof[j - 1][0], prof[j][1] - prof[j - 1][1]))
     for j in range(len(rings) - 1):
         for s in range(seg):
             f = bm.faces.new((rings[j][s], rings[j + 1][s], rings[j + 1][(s + 1) % seg], rings[j][(s + 1) % seg]))
-            for l in f.loops:
-                l[uvl].uv = (math.atan2(l.vert.co.y, l.vert.co.x) * 0.5 / FK.TILE, l.vert.co.z / FK.TILE)
+            for l, (ds, dj) in zip(f.loops, ((0, 0), (0, 1), (1, 1), (1, 0))):
+                l[uvl].uv = ((s + ds) * 2 * math.pi * rbar / seg / FK.TILE, vacc[j + dj] / FK.TILE)
     cap = bm.faces.new(rings[0])
     for l in cap.loops:
-        l[uvl].uv = (l.vert.co.x, l.vert.co.y)
+        l[uvl].uv = (l.vert.co.x / FK.TILE, l.vert.co.y / FK.TILE)
     bm.normal_update(); FK._merge(pc, bm, 'bronze')
     FK.add_box(pc, 'bronze', (0.12, 0.06, 0.14), Matrix.Translation((0, 0, top + 0.05)), cham=0.02, seed=7)
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.09)
-    bm.transform(Matrix.Translation((0.03, 0, top - 0.92))); bm.loops.layers.uv.new('UVMap'); FK._merge(pc, bm, 'iron')
+    bm.transform(Matrix.Translation((0.03, 0, top - 0.92))); prim_uv(bm); FK._merge(pc, bm, 'iron')
     FK.add_box(pc, 'iron', (0.03, 0.03, 0.62), Matrix.Translation((0.015, 0, top - 0.42)), cham=0.0, seed=8)
     return pc
 
@@ -359,10 +370,10 @@ def kit_spire():
     # lead cap and weathervane
     apex = Vector((0, 0, SP0 + SP_H))
     bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=0.24, radius2=0.03, depth=0.55)
-    bm.transform(Matrix.Translation(apex + Vector((0, 0, 0.12)))); bm.loops.layers.uv.new('UVMap'); FK._merge(pc, bm, 'iron')
+    bm.transform(Matrix.Translation(apex + Vector((0, 0, 0.12)))); prim_uv(bm); FK._merge(pc, bm, 'iron')
     FK.add_box(pc, 'iron', (0.035, 0.035, 0.95), Matrix.Translation(apex + Vector((0, 0, 0.75))), cham=0.0, seed=1)
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=2, radius=0.11)
-    bm.transform(Matrix.Translation(apex + Vector((0, 0, 0.5)))); bm.loops.layers.uv.new('UVMap'); FK._merge(pc, bm, 'bronze')
+    bm.transform(Matrix.Translation(apex + Vector((0, 0, 0.5)))); prim_uv(bm); FK._merge(pc, bm, 'bronze')
     for ang in (0, math.pi / 2):
         FK.add_box(pc, 'iron', (0.6, 0.02, 0.02), Matrix.Translation(apex + Vector((0, 0, 0.72))) @
                    Matrix.Rotation(ang, 4, 'Z'), cham=0.0, long_axis=0, seed=ang)
