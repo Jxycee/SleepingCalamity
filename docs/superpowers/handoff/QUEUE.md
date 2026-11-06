@@ -1,4 +1,4 @@
-﻿# Work queue (any hour)
+# Work queue (any hour)
 
 One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). Built from a full open-work scan on 2026-11-06 (spec section 12, PARKING_LOT, BUGS, triage notes, session STATUS files, decisions-for-review).
 
