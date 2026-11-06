@@ -20,7 +20,7 @@
 // Contents API (host, stable): Instance (set on spawn, cleared on despawn), RequireGateKey (default false: every stair is open; true: a gate-key stair needs ServerOpenStair(floor) first, the gate key opens floors 1-4 and 6),
 // ServerOpenStair(floor) (idempotent; the opened set lives for the current dive and is cleared on dive start, end and fail), events DiveStarted, FloorChanged(floor), DiveFailedOn(floor), DiveEnded(reason); DiveHaulSync.Banked/DiveFailed stay.
 // Debug (dev build, host): F7 starts a dive from anywhere (always floor 1), F8 abandons it (fails the dive like the stir countdown does); G cycles the hub prompt's floor pick.
-// Bank room (plan 3 task 8, 8a): the bank press enters the room (DiveHaulSync.ServerEnterBankRoom); inside it a minimal IMGUI bank screen (dev keys [ ] P Y N) asks for picks, push-on and go-home; the
+// Bank room (plan 3 task 8, 8a): the bank press enters the room (DiveHaulSync.ServerEnterBankRoom); inside it a minimal IMGUI bank screen asks for picks, push-on and go-home with the real buttons (move up/down, Jump, Primary, Secondary; the dev keys [ ] P Y N still work as a second path); the
 // shared choice confirms in DiveHaulSync, which raises PushedOn (saved at once) / WentHome (EndDive). Every capture says what it knows about the bank suspend (TownStock.CaptureWorld): a quit in the bank
 // room, or on floor 5 after the push-on, saves a suspend; a loaded one waits as pending and is re-emitted until the trapdoor resumes it (ServerResumeSuspended).
 // Host disconnect: NGO shuts the session down and everything despawns (no host migration in Phase 1).
@@ -832,7 +832,7 @@ namespace SleepingCalamity.Presentation
                 else if (DiveFloorTable.HasBank(floor) && !chosen && bankCleared && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && Flat(me, bank, BankPromptRadius))
                 {
                     bool inRoom = HaulSync != null && HaulSync.Current.DivePhase == DivePhase.BankRoom;
-                    if (inRoom) { }   // inside the bank room Interact does nothing (a stray press must never push a solo party on): only the bank screen keys (Y push on, N go home) decide
+                    if (inRoom) { }   // inside the bank room Interact does nothing (a stray press must never push a solo party on): only the bank screen buttons (Primary push on, Secondary go home; Y / N dev keys) decide
                     else if (Flat(me, bank + new Vector3(CellarFloorBuilder.HomeMarkerOffset, 0f, 0f), 1.0f)) { Prompt = PromptKind.GoHome; PromptText = "Take the party home"; }   // the green column beside the lamp
                     else { Prompt = PromptKind.Bank; PromptText = "Rest in the bank room"; }
                 }
@@ -865,8 +865,10 @@ namespace SleepingCalamity.Presentation
 
         // =================================================================================================================================
         // The bank screen (plan 3 task 8): the minimum UI that drives the picks and the shared choice while the party is in the bank room. Every peer runs it for its own hero; it only asks (PlayerBagSync
-        // RequestPick / RequestUnpick, DiveHaulSync.RequestPushOn, RequestGoHome): the host re-checks everything. Keys are the dev keys of PlayerInputAdapter ([ ] move, P pick, Y push on, N go home) until the
-        // input asset gets bank actions, so like the hub's floor cycle they work in development builds only; the draw is IMGUI. Rows: the carried satchel first (when carried), then the carried items.
+        // RequestPick / RequestUnpick, DiveHaulSync.RequestPushOn, RequestGoHome): the host re-checks everything (range, hero up, open room). Buttons (any build, keyboard or gamepad, no input-asset change): the move
+        // input up/down steps the cursor (one step per press across BankScreenInput.StepThreshold), Jump picks / unpicks the row, Primary pushes on, Secondary goes home. While the screen is open this peer
+        // holds InputContext.BankScreen: the router zeroes the hero's own move / jump / swing / interact (a cursor step must not walk the hero out of the bank's range, a stray Interact must not push a
+        // party on) and passes those buttons on the Bank* intent fields. The old dev keys ([ ] P Y N via IDevInput) stay as a second path. The draw is IMGUI. Rows: the carried satchel first (when carried), then the carried items.
         // =================================================================================================================================
         public bool BankScreenOpen { get; private set; }
         public int BankCursor { get; private set; }
@@ -882,30 +884,62 @@ namespace SleepingCalamity.Presentation
             return false;
         }
 
+        // The real buttons only count this long after the screen opens: a stick held on the way in, or the attack button a player was mashing, must not step the cursor or push a party on.
+        private const float BankArmSeconds = 0.4f;
+        private float _bankOpenAt = -1f, _bankPrevMoveY;
+        private bool _heldBankContext;   // this director put the local input into InputContext.BankScreen (so only it hands it back: several peers' directors can share one input in a test process)
+
         private void LocalBankScreen()
         {
             BankScreenOpen = false;
-            if (!NetActive.Value) return;
-            ResolveSyncs();
-            if (HaulSync == null || HaulSync.Current.DivePhase != DivePhase.BankRoom) return;
-            PlayerBagSync bag = PlayerBagSync.ForLocalPlayer(NetworkManager);
-            if (bag == null) return;
+            IInputService input = HeroInput.ResolveDefault();
+            PlayerBagSync bag = null;
+            if (NetActive.Value)
+            {
+                ResolveSyncs();
+                if (HaulSync != null && HaulSync.Current.DivePhase == DivePhase.BankRoom) bag = PlayerBagSync.ForLocalPlayer(NetworkManager);
+            }
+            HoldBankContext(input, bag != null);
+            if (bag == null) { _bankOpenAt = -1f; return; }
             BankScreenOpen = true;
+            if (_bankOpenAt < 0f) _bankOpenAt = Time.unscaledTime;
             BagView v = bag.View;
             int rows = BankRows(v);
             BankCursor = rows > 0 ? Mathf.Clamp(BankCursor, 0, rows - 1) : 0;
-            IDevInput dev = HeroInput.ResolveDefault() as IDevInput;
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
-            if (dev == null || player == null || LocalHeroIsDown(player)) return;   // a downed hero presses nothing (the host refuses it too)
-            if (rows > 0 && dev.WasPressed(DevKey.BankPrev)) BankCursor = (BankCursor + rows - 1) % rows;
-            if (rows > 0 && dev.WasPressed(DevKey.BankNext)) BankCursor = (BankCursor + 1) % rows;
-            if (rows > 0 && dev.WasPressed(DevKey.BankPick))
+            bool alive = player != null && !LocalHeroIsDown(player);   // a downed hero presses nothing (the host refuses it too)
+            var devPresses = new BankScreenDevPresses();
+            if (alive && input is IDevInput dev)
+                devPresses = new BankScreenDevPresses { Prev = dev.WasPressed(DevKey.BankPrev), Next = dev.WasPressed(DevKey.BankNext), Pick = dev.WasPressed(DevKey.BankPick), PushOn = dev.WasPressed(DevKey.BankPushOn), GoHome = dev.WasPressed(DevKey.BankGoHome) };
+            PlayerIntent intent = input != null ? input.Intent : PlayerIntent.None;
+            BankScreenAction act = BankScreenInput.Read(_bankPrevMoveY, in intent, in devPresses, alive && Time.unscaledTime - _bankOpenAt >= BankArmSeconds);
+            _bankPrevMoveY = act.MoveY;
+            if (!alive) return;
+            if (rows > 0 && act.CursorDelta != 0) BankCursor = BankScreenInput.Step(BankCursor, act.CursorDelta, rows);
+            if (rows > 0 && act.Pick)
             {
                 int pick = BankRowIsSatchel(v, BankCursor) ? PlayerBag.SatchelPick : BankRowCarriedIndex(v, BankCursor);
                 if (BankRowPicked(v, BankCursor)) bag.RequestUnpick(pick); else bag.RequestPick(pick);
             }
-            if (dev.WasPressed(DevKey.BankPushOn)) HaulSync.RequestPushOn();
-            if (dev.WasPressed(DevKey.BankGoHome)) RequestGoHome();
+            if (act.PushOn) HaulSync.RequestPushOn();
+            if (act.GoHome) RequestGoHome();
+        }
+
+        // Holds InputContext.BankScreen on the local input while the screen is open and hands it back to Free when it closes (never over a context another system owns: Placement).
+        private void HoldBankContext(IInputService input, bool open)
+        {
+            if (input == null) { _heldBankContext = false; return; }
+            if (open)
+            {
+                InputContext c = input.GameplayContext;
+                if (c == InputContext.Free || c == InputContext.LockOn) input.GameplayContext = InputContext.BankScreen;
+                if (input.GameplayContext == InputContext.BankScreen) _heldBankContext = true;
+            }
+            else if (_heldBankContext)
+            {
+                _heldBankContext = false;
+                if (input.GameplayContext == InputContext.BankScreen) input.GameplayContext = InputContext.Free;
+            }
         }
 
         private void DrawBankScreen()
@@ -915,8 +949,8 @@ namespace SleepingCalamity.Presentation
             BagView v = bag.View;
             DiveHaulSync.Summary sum = HaulSync.Current;
             int rows = BankRows(v);
-            float h = 120f + 20f * Mathf.Min(rows, 14);
-            var area = new Rect(20f, 80f, 360f, h);
+            float h = 150f + 20f * Mathf.Min(rows, 14);
+            var area = new Rect(20f, 80f, 400f, h);
             GUI.Box(area, "Bank room: " + v.Picks.Length + " of " + v.SlotCapacity + " slots picked");
             for (int row = 0; row < Mathf.Min(rows, 14); row++)
             {
@@ -930,8 +964,20 @@ namespace SleepingCalamity.Presentation
                 int pressed = 0; for (int b = sum.ChoiceMask; b != 0; b >>= 1) pressed += b & 1;
                 choice = (sum.ChoiceKind == BankChoiceKind.PushOn ? "Push on" : "Go home") + ": " + pressed + " pressed, " + sum.ChoiceSecondsLeft + " s";
             }
-            GUI.Label(new Rect(area.x + 12f, area.y + h - 66f, 336f, 20f), choice);
-            GUI.Label(new Rect(area.x + 12f, area.y + h - 46f, 336f, 40f), "[ ] move   P pick   Y push on   N go home\nEmpty slots stay empty; a second player's press, or the timer, confirms.");
+            IInputService input = HeroInput.ResolveDefault();
+            string move = BankKey(input, InputActionNames.Move, "Move"), jump = BankKey(input, InputActionNames.Jump, "Jump"),
+                   primary = BankKey(input, InputActionNames.Primary, "Primary"), secondary = BankKey(input, InputActionNames.Secondary, "Secondary");
+            GUI.Label(new Rect(area.x + 12f, area.y + h - 96f, 376f, 20f), choice);
+            GUI.Label(new Rect(area.x + 12f, area.y + h - 76f, 376f, 20f), "Push on / Go home:  [" + primary + "] push on   [" + secondary + "] go home");
+            GUI.Label(new Rect(area.x + 12f, area.y + h - 56f, 376f, 20f), "[" + move + "] up / down   [" + jump + "] pick / unpick");
+            GUI.Label(new Rect(area.x + 12f, area.y + h - 36f, 376f, 34f), "Empty slots stay empty; a second player's press, or the timer, confirms.");
+        }
+
+        // The bound button's name for the help line; a generic word when the binding has no display string (a composite, or no input service).
+        private static string BankKey(IInputService input, string action, string generic)
+        {
+            string s = input != null ? input.GetBindingDisplayString(action) : null;
+            return string.IsNullOrEmpty(s) ? generic : s;
         }
 
         // Owner (any peer): H eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf).
@@ -952,6 +998,8 @@ namespace SleepingCalamity.Presentation
         public override void OnNetworkDespawn()
         {
             ReleaseHold();
+            HoldBankContext(HeroInput.ResolveDefault(), false);   // never leave the hero frozen in the bank screen's context
+            BankScreenOpen = false; _bankOpenAt = -1f;
             if (_dcMgr != null) { _dcMgr.OnClientDisconnectCallback -= OnClientGone; _dcMgr = null; }
             HeroVitals.ServerHeroSpawned -= OnHeroSpawned;
             _loafLedger.End();

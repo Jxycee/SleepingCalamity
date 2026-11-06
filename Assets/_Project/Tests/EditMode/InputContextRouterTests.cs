@@ -101,6 +101,34 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsFalse(InputContextRouter.InteractLive(InputContext.Placement), "world interactables are off while placing");
         }
 
+        // Catches: a BankScreen row that lets the hero walk, jump, swing or interact while the bank screen is open (the cursor step would walk the hero out of the bank's range; a Primary push-on would
+        // also swing; a stray Interact could push a party on), or one that drops a bank button (move, pick, push on, go home), Look or Pause.
+        [Test]
+        public void InputContextRouter_BankScreen_ZeroesEveryGameplayField_PassesTheBankButtonsOnTheirOwnFields()
+        {
+            PlayerIntent i = InputContextRouter.Route(InputContext.BankScreen, AllActive());
+            Assert.AreEqual(0f, i.MoveX); Assert.AreEqual(0f, i.MoveY);
+            Assert.AreEqual(0f, i.SwitchX); Assert.AreEqual(0f, i.SwitchY);
+            Assert.IsFalse(i.JumpPressed || i.SprintHeld || i.DodgePressed || i.LockPressed || i.InteractPressed || i.InteractHeld);
+            Assert.IsFalse(i.PrimaryHeld || i.PrimaryPressed || i.PrimaryReleased || i.SecondaryHeld || i.SecondaryPressed || i.SecondaryReleased);
+            Assert.AreEqual(-1f, i.BankMoveY, 1e-6f, "move");
+            Assert.IsTrue(i.BankPickPressed, "Jump picks");
+            Assert.IsTrue(i.BankPushOnPressed, "Primary pushes on");
+            Assert.IsTrue(i.BankGoHomePressed, "Secondary goes home");
+            Assert.AreEqual(5f, i.LookYawDeg, 1e-6f); Assert.AreEqual(2f, i.LookPitchDeg, 1e-6f);
+            Assert.IsTrue(i.PausePressed, "the menu still opens");
+            Assert.IsFalse(i.PlacePressed || i.PickUpPressed || i.NextLotPressed || i.TurnPressed, "no placement leak");
+            // And no other context leaks the bank fields.
+            foreach (InputContext c in new[] { InputContext.Free, InputContext.LockOn, InputContext.Placement, InputContext.Menu })
+            {
+                PlayerIntent other = InputContextRouter.Route(c, AllActive());
+                Assert.IsFalse(other.BankPickPressed || other.BankPushOnPressed || other.BankGoHomePressed, c + " leaks a bank button");
+                Assert.AreEqual(0f, other.BankMoveY, c + " leaks the bank move");
+            }
+            Assert.AreEqual(InputMaps.Player, InputContextRouter.EnabledMaps(InputContext.BankScreen));
+            Assert.IsFalse(InputContextRouter.InteractLive(InputContext.BankScreen), "world interactables are off in the bank screen");
+        }
+
         // Catches: a Menu row that lets look or move through (the camera would turn behind a menu); Pause zeroed (the menu could not close).
         [Test]
         public void InputContextRouter_Menu_PassesPauseOnly()

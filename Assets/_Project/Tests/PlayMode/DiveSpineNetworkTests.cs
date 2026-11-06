@@ -15,6 +15,7 @@ using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Presentation;
+using SleepingCalamity.Runtime;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -668,6 +669,112 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.ServerStartDive(3), Is.True, "the next dive may start on the picked floor");
             Assert.That(rig.Host.Session.Floor, Is.EqualTo(3));
             Assert.That(rig.Host.Checkpoint.Held, Is.False, "and spends the checkpoint");
+        }
+
+        // ---------------------------------------------------------------------------------------------------------------------------------
+        // The bank screen driven by REAL input (a non-development build has no dev keys): a FakeInputService replaces the app's input, Frame is routed through the real router and the director's own
+        // LocalBankScreen reads Intent. Host only (one process shares one ServiceRoots.App input, so a client rig would make every peer read the same press). The dev keys are never touched.
+        // Catches: the bank screen reading only dev keys, a button wired to the wrong request (pick / push on / go home), the cursor repeating while the stick is held or stepping on a stick held on entry,
+        // Interact pushing a party on, the hero still walking / swinging while the screen is open (the BankScreen context), the context not handed back when the room closes, a host that stops accepting
+        // the owner's requests. NOT covered (one process, host owner): the client-owner RPC path of a remote peer, real WasPressedThisFrame edges and the gamepad bindings, binding display strings and the
+        // IMGUI draw (the manual 2-PC walk).
+        // ---------------------------------------------------------------------------------------------------------------------------------
+
+        private static IEnumerator Tap(FakeInputService input, PlayerInputFrame down)
+        {
+            input.Frame = down; yield return null;      // the director's next Update sees the press once
+            input.Frame = default; yield return null;
+        }
+
+        // atRealBank: the dive starts on the built floor 5 beside its real bank cell (checkpoint start, the real range rules apply to every request, including Go home); otherwise the haul session
+        // is jumped to the bank floor on floor 1's build (host rules for picks and push-on only).
+        private IEnumerator OpenBankScreenOnRealInput(System.Action<Rig, FakeInputService, DiveHaulSync> done, float heldMoveY = 0f, bool atRealBank = false)
+        {
+            Rig rig = null;
+            yield return Start(0, r => rig = r, withHeroes: true);
+            rig.Host.SeedOverride = 7171u;
+            ulong hostId = rig.HostNm.LocalClientId;
+            var input = new FakeInputService();
+            ServiceRoots.App.Replace<IInputService>(input);
+            if (atRealBank) rig.Host.Checkpoint.Restore(true);
+            Assert.That(rig.Host.ServerStartDive(atRealBank ? UndercroftPlan.BankFloor : UndercroftPlan.FirstFloor), Is.True);
+            yield return ResolvePeers(rig);
+            DiveHaulSync haul = rig.HostHaul;
+            if (atRealBank)
+            {
+                yield return AllBuilt(rig, UndercroftPlan.BankFloor);
+                Assert.That(CellarFloorBuilder.TryBankWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 bank), Is.True);
+                yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, bank) < 4f, Timeout, "the party did not arrive at the bank room");
+                haul.ServerMarkCleared(UndercroftPlan.BankFloor);
+            }
+            Assert.That(haul.ServerAddItem(hostId, 104) && haul.ServerAddItem(hostId, 110) && haul.ServerAddItem(hostId, 110), Is.True);
+            input.Frame = new PlayerInputFrame { MoveY = heldMoveY };   // a stick already held as the room opens
+            Assert.That(atRealBank ? haul.ServerEnterBankRoom() : haul.BankRoomNow(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.BankScreenOpen, Timeout, "the bank screen never opened for the host hero");
+            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync b = PlayerBagSync.ForLocalPlayer(rig.HostNm); return b != null && b.View.Carried.Length == 3 && b.View.BankOpen; }, Timeout, "the hero's bag view never showed the three carried items and the open visit");
+            Assert.That(input.GameplayContext, Is.EqualTo(InputContext.BankScreen), "the open screen holds the BankScreen context");
+            yield return Seconds(0.7f);   // the real buttons arm 0.4 s after the screen opens
+            done(rig, input, haul);
+        }
+
+        [UnityTest]
+        public IEnumerator BankScreen_RealButtons_StepPickUnpickAndPushOn_NoDevKeys_InteractDoesNothing()
+        {
+            Rig rig = null; FakeInputService input = null; DiveHaulSync haul = null;
+            yield return OpenBankScreenOnRealInput((r, i, h) => { rig = r; input = i; haul = h; }, heldMoveY: -1f);
+            ulong hostId = rig.HostNm.LocalClientId;
+            Assert.That(rig.Host.BankCursor, Is.EqualTo(0), "a stick held down as the screen opened is not a step");
+            input.Frame = default; yield return null; yield return null;
+
+            yield return Tap(input, new PlayerInputFrame { InteractPressed = true });
+            yield return Seconds(0.3f);
+            Assert.That(haul.Session.Phase, Is.EqualTo(DivePhase.BankRoom), "Interact does nothing in the room");
+            Assert.That(haul.Session.BankChosenThisDive, Is.False, "a stray Interact never pushes a solo party on");
+
+            // down: one step per press, and no repeat while the stick stays down
+            input.Frame = new PlayerInputFrame { MoveY = -1f };
+            for (int i = 0; i < 12; i++) yield return null;
+            Assert.That(rig.Host.BankCursor, Is.EqualTo(1), "twelve frames of the stick held down step once");
+            input.Frame = default; yield return null;
+            yield return Tap(input, new PlayerInputFrame { MoveY = 1f });
+            Assert.That(rig.Host.BankCursor, Is.EqualTo(0), "up steps back");
+            yield return Tap(input, new PlayerInputFrame { MoveY = -1f });
+            Assert.That(rig.Host.BankCursor, Is.EqualTo(1));
+
+            // Jump picks the row under the cursor, again unpicks, again picks
+            PlayerBag bag = haul.ServerBagOf(hostId);
+            yield return Tap(input, new PlayerInputFrame { JumpPressed = true });
+            yield return PlayModeHarness.WaitUntil(() => bag.Picks.Count == 1 && bag.Picks[0] == 1, Timeout, "Jump never picked row 1 on the host");
+            yield return Tap(input, new PlayerInputFrame { JumpPressed = true });
+            yield return PlayModeHarness.WaitUntil(() => bag.Picks.Count == 0, Timeout, "a second Jump never unpicked it");
+            yield return Tap(input, new PlayerInputFrame { JumpPressed = true });
+            yield return PlayModeHarness.WaitUntil(() => bag.Picks.Count == 1 && bag.Picks[0] == 1, Timeout, "a third Jump never picked it again");
+
+            // Primary pushes on: solo, so the first press confirms; only the pick is banked
+            int pushed = 0; haul.PushedOn += () => pushed++;
+            yield return Tap(input, new PlayerInputFrame { PrimaryPressed = true });
+            yield return PlayModeHarness.WaitUntil(() => haul.Session.BankChosenThisDive, Timeout, "Primary never pushed the party on");
+            Assert.That(pushed, Is.EqualTo(1));
+            Assert.That(bag.BankedThisDive.Keys, Is.EquivalentTo(new[] { 110 }), "the picked row (the middle 110) is banked; the empty slots stayed empty");
+            Assert.That(bag.Carried.Count, Is.EqualTo(2));
+            Assert.That(haul.Session.Phase, Is.EqualTo(DivePhase.Floor), "the room closed");
+
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.BankScreenOpen && input.GameplayContext == InputContext.Free, Timeout, "the screen closed but the BankScreen context was not handed back");
+            Assert.That(input.DevPressed, Is.Empty, "this path never used a dev key");
+        }
+
+        [UnityTest]
+        public IEnumerator BankScreen_RealSecondaryButton_GoesHome_NoDevKeys()
+        {
+            Rig rig = null; FakeInputService input = null; DiveHaulSync haul = null;
+            yield return OpenBankScreenOnRealInput((r, i, h) => { rig = r; input = i; haul = h; }, atRealBank: true);
+            DiveEndReason? ended = null; rig.Host.DiveEnded += r => ended = r;
+            yield return Tap(input, new PlayerInputFrame { SecondaryPressed = true });
+            yield return PlayModeHarness.WaitUntil(() => ended.HasValue, Timeout, "Secondary never took the party home");
+            Assert.That(ended, Is.EqualTo(DiveEndReason.WentHome));
+            Assert.That(rig.Host.Checkpoint.Held, Is.True, "going home from the bank holds the checkpoint");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Host.BankScreenOpen && input.GameplayContext == InputContext.Free, Timeout, "the BankScreen context was not handed back after the dive ended");
+            Assert.That(input.DevPressed, Is.Empty);
         }
 
         [UnityTest]
