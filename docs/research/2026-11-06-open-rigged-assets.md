@@ -48,11 +48,12 @@ The user plans to play the game privately with friends and probably never sell i
 - **Blender Studio CC-BY film characters**: always fine with credit; the blocker is their film rigs, not the licence.
 Still avoid on quality or safety grounds: Kenney blocky characters (tests only); repos with no licence or no code at all (MagicArticulate, RigAnything, Anymate, AnimaX) only because there is nothing reliable to run; PhilS94 spider (paid Asset Store product; don't copy). Never: Dark Cloud names, characters, story, text, music or assets.
 
-## Hardware fit (user PC: RTX 5070, 12 GB VRAM)
-- HY-Motion 1.0 full (24-26 GB): no. HY-Motion Lite (0.46B): may fit, VRAM figure not published; test first.
-- MoMask: small, commonly run on 8 GB cards; good local fallback for text-to-motion.
-- Kimodo: VRAM unknown; test. UniRig: should fit. SkinTokens (14 GB+): no. Mesh2Motion: browser, no GPU needed.
-- Bigger models: hosted demo (e.g. a Hugging Face Space) if one exists, or a paid hourly cloud GPU (ask the user first). Cloud Claude sessions have no GPU.
+## Hardware fit (user PC: RTX 5070, 12 GB VRAM; checked 2026-11-06)
+- **HY-Motion 1.0: no local run.** README minimum VRAM: 1.0B "26GB", Lite 0.46B "24GB" (low-VRAM tips: `--num_seeds=1`, prompt under 30 words, under 5 s). **Use Tencent's official Hugging Face Space** (`tencent/HY-Motion-1.0`, running on ZeroGPU, free with a daily quota) to generate clips, then retarget.
+- **Kimodo: no local run as shipped.** ~16-17 GB, mostly its Llama-3-8B-Instruct text encoder (~16 GB); the encoder can run on a separate machine (Toolchefs notes), not worth the setup.
+- **MoMask: yes.** ~150M-parameter class models peak well under 1 GB; a fork even runs it on CPU. Local text-to-motion option.
+- **UniRig: yes.** README: "at least 8GB VRAM" for generation; released checkpoint does skeleton + skinning (Articulation-XL2.0); Rig-XL/VRoid checkpoints still planned.
+- SkinTokens (14 GB+): no. Mesh2Motion: browser, no GPU.
 
 ## Still to verify before adopting
 1. Quaternius **QAL** licence text (Bestiary kit) and the UAL2 page's CC0-vs-"free commercial" wording.

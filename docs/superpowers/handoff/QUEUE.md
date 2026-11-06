@@ -91,7 +91,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **M** Gleaner prototype: Bestiary kit humanoid on the UAL rig + UAL2 clips, sheaf mask as prop (after QAL check) [A][U]
 - [ ] **M** Rig the Cellars tier-1 enemies (jam-jar slime, broom, rat-king) with small bone rigs (UniRig or hand) so they animate instead of sliding primitives [A][U]
 - [ ] **M** Wren's cat Tuppence: own mesh on a borrowed quadruped rig (Mesh2Motion fox / Quaternius cat), follow-Wren via Animation Rigging look-at [A][U][net]
-- [ ] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps for generated clips; test which text-to-motion model fits the 12 GB RTX 5070 (HY-Motion Lite, MoMask, Kimodo) (personal-use licence bar, user 2026-11-06)
+- [ ] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06)
 - [ ] **M** MPFB2 hero/townsfolk base test: one CC0 body on `game_engine` rig through `HeroAnimator.controller` [A][U]
 
 ## Ready: design notes (docs only, placeholders marked)
