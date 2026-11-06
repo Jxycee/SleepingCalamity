@@ -34,7 +34,7 @@ namespace SleepingCalamity.Tests.EditMode
                         if (t == null) continue;
                         templated++;
                         string who = "seed " + p.Seed + " floor " + p.Floor + " room " + r + " players " + players + " " + t.TemplateId;
-                        Assert.That(t.Spawns.Count, Is.LessThanOrEqualTo(p.CountIn(r)), who + ": harder than the plan");
+                        Assert.That(t.Spawns.Count, Is.LessThanOrEqualTo(p.CountIn(r) + CoopScaling.ExtraEnemiesPerRoom(players)), who + ": harder than the plan plus the party extras");
                         Assert.That(t.WaveCount, Is.LessThanOrEqualTo(2), who);
                         var legal = new HashSet<(int, int)>(CellarEncounterPlan.FreeCellsOf(l, d, r).Select(c => (c.X, c.Y)));
                         foreach (EncounterSpawn s in p.Spawns.Where(s => s.RoomIndex == r && s.Kind != EncounterKind.Hunter)) legal.Add((s.X, s.Y));
@@ -49,6 +49,29 @@ namespace SleepingCalamity.Tests.EditMode
                             Assert.That(t.Spawns.Count(s => s.Carrier && s.Cell.X == l.Carrier.X && s.Cell.Y == l.Carrier.Y), Is.EqualTo(1), who + ": carrier lost its cell");
                     }
             Assert.That(templated, Is.GreaterThan(100), "the sweep must actually exercise templated rooms");
+        }
+
+        [Test]
+        public void Resolve_ScalesWithPartySize_OneExtraEnemyPerExtraPlayer_WhereTheRoomHasSpace()
+        {
+            int grew = 0, rooms = 0;
+            foreach (var (l, d, p) in Floors(25))
+                for (int r = 0; r < l.Rooms.Count; r++)
+                {
+                    CellarTemplateRoom solo = CellarTemplateSpawns.Resolve(l, d, p, r, 1);
+                    if (solo == null) continue;
+                    rooms++;
+                    int prev = solo.Spawns.Count;
+                    for (int players = 2; players <= 4; players++)
+                    {
+                        int n = CellarTemplateSpawns.Resolve(l, d, p, r, players).Spawns.Count;
+                        Assert.That(n, Is.GreaterThanOrEqualTo(prev), "seed " + p.Seed + " floor " + p.Floor + " room " + r + " players " + players + ": fewer enemies than with one player fewer");
+                        if (n > prev) grew++;
+                        prev = n;
+                    }
+                }
+            Assert.That(rooms, Is.GreaterThan(100));
+            Assert.That(grew, Is.GreaterThan(rooms), "a bigger party must add enemies in most templated rooms");
         }
 
         [Test]

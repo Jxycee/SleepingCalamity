@@ -1,7 +1,7 @@
 // Core/Cellars/CellarTemplateSpawns.cs: turns one live Cellars combat room into the spawn list the host places, from EncounterBuilder templates (spawner wiring, plan 2026-11-06). Pure C#, no engine references.
 // A pure function of (layout, dressing, plan, roomIndex, players, ring cells): the host calls it when a player first enters the room (or the ambush springs); nothing here is networked.
 // Authority: none (static data); CellarContentsSync, which runs on the host only, consumes it.
-//   - The plan stays the budget. CellarEncounterPlan.CountIn(room) already folds in the authored spawns, the stir/co-op extras and the floor twist (Thin -1, Crowded +1), so the result
+//   - The plan stays the budget, plus CoopScaling.ExtraEnemiesPerRoom(players) (the plan itself ignores party size). CellarEncounterPlan.CountIn(room) already folds in the authored spawns, the stir/co-op extras and the floor twist (Thin -1, Crowded +1), so the result
 //     holds EXACTLY that many enemies: surplus template spawns are dropped (last wave first), a shortfall is padded with roster-banded wave-0 enemies. The template picks kinds, cells and
 //     waves, never the difficulty. (The template's own solo cap, EncounterBuilder.IsLegal, compares Base.Spawns.Count, the authored count, while the live plan count varies by twist
 //     and extras; trimming to the live count keeps the room no harder than today's plan.) Validator caps hold: at most GameMetrics.MaxLiveEnemies per wave, FightSpace.Fits at the party size.
@@ -55,7 +55,7 @@ namespace SleepingCalamity.Core
             foreach (EncounterSpawn s in mine) if (seen.Add((s.X, s.Y))) legal.Add(s.Cell);
             foreach (CellPos c in CellarEncounterPlan.FreeCellsOf(layout, dressing, roomIndex)) if (seen.Add((c.X, c.Y))) legal.Add(c);
 
-            int target = mine.Count, held = enc.HeldHeroes;
+            int target = mine.Count + CoopScaling.ExtraEnemiesPerRoom(players), held = enc.HeldHeroes;   // the plan ignores party size: one extra per extra player (settled rule), still bounded by the caps below
             var list = enc.Spawns.Select(s => new TemplateSpawn(p.Cell(s.Cell.X, s.Cell.Y), s.Kind, s.Wave, false)).ToList();
 
             // trim to the live plan count: last wave first, last spawn first (the carrier is the first wave-0 spawn, so it goes last)
