@@ -27,6 +27,7 @@ Then do runs A, B and C as planned:
 - `unity.sh gate` while working.
 - `unity.sh soak` and full `unity.sh check` on the final tip, after merging origin/main.
 - Sonnet reviewer, then merge the passing tip into fresh main (merge commit, no PR, never force-push).
+If this cloud session has no Unity licence (unity.sh can't run): use `python3 Tools/cloud/sc_cloud_compile.py` and `sc_core_tests.py` instead, push the branch, set STATUS `needs coordinator: PC check` and stop; the coordinator runs check + soak on the PC and merges.
 Never edit CURRENT.md or tick QUEUE.md. When done, set both request a and this request to done.
 
 Done when: merged with green check + soak, STATUS DONE with merge commit and test counts, Archive: ready.
