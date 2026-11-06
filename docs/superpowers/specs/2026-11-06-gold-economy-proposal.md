@@ -25,8 +25,8 @@ Gold with no sink is a number going up. The first dungeon should stay simple, so
 | Option | What it is | Cost to build | Fit |
 |---|---|---|---|
 | A. Retry only | The 500 fallback is the only sink | none | Gold would be nearly meaningless unless the party misses the idol |
-| **B. Retry + provisions counter (recommended)** | The baker (service opens when his wishes are met) sells a short fixed list before a dive: bread top-up to the stack of 10, a basic potion, a bomb. Bought items go in the bag and count toward bank slots only when bankable, like any find | One small town UI list; prices in data | Gives each dive a "spend what I earned" beat with no new systems; bread stays never-best (potions are about equal to the best bread) |
-| C. B + weapon and gear shop | Buy boots, a starter weapon or a build-up material | New shop stock, drop-table overlap | Competes with finding gear in chests (decision 39 need-weighted rolls); defer |
+| **B. Retry + provisions counter (recommended)** | The baker (service opens when his wishes are met) sells a short fixed list before a dive: bread top-up to the stack of 10, a basic potion, a bomb. Bought items go in the bag and count toward bank slots only when bankable, like any find | One small town UI list; prices in data | Gives each dive a "spend what I earned" beat with no new systems; bread stays never-best (spec 4.8: a basic potion is about equal to the best bread) |
+| C. B + weapon and gear shop | Buy boots, a starter weapon or a build-up material | New shop stock, drop-table overlap | Competes with finding gear in chests (the need-weighted boots roll, `CellarLoot.cs`); defer |
 | D. B + gold-priced town upgrades | Pay gold to upgrade buildings or helpers | Needs building upgrade design | Town growth is already paid by pieces and people; defer |
 
 Placeholder prices (option B): bread top-up 5 per loaf, basic potion 40, bomb 25, retry 500 (unchanged). A clean 7-floor solo dive earns about 300-400 (triage C1), so a full restock is cheap and a gold retry costs about 1.5 dives of income: noticeable, not a wall. Gold stays the fallback because the idol is the primary price.
@@ -49,7 +49,7 @@ If the walk shows a dive earns under about 250 gold, add Option 2; do not decide
 
 ## Q4. Failed-dive gold
 
-Keep decision 7 exactly: `DiveGold` is halved (round down), `Gold` held is untouched, and the lost satchel holds items only. The triage note's "keep half of that player's gold" line would also tax held gold and contradicts decision 7; recommend dropping it.
+Keep decision 7 exactly: `DiveGold` is halved (round down is a placeholder from the triage note, user to confirm; decision 7 gives no rounding), `Gold` held is untouched, and the lost satchel holds items only. The triage note's "keep half of that player's gold" line would also tax held gold and contradicts decision 7; recommend dropping it.
 
 ## Q5. Sharing and co-op
 
