@@ -375,7 +375,20 @@ namespace SleepingCalamity.Presentation
             FloorSync.ServerSetFloor(_seed, next);
             MarkPlacementNow();
             FloorChanged?.Invoke(next);
+            ServerStandUpOutHeroes();
             return true;
+        }
+
+        // Host: a hero who bled out (Out) while the party was still up stands up with the revive HP when the party takes the stair, so a pair is not left one hero short for the rest of the dive
+        // (a lone Out hero already fails the dive through WipeTick; floor 3 soak finding, 2026-11-06).
+        private void ServerStandUpOutHeroes()
+        {
+            IReadOnlyList<HeroVitals> heroes = HeroVitals.All;
+            for (int i = 0; i < heroes.Count; i++)
+            {
+                HeroVitals v = heroes[i];
+                if (v != null && v.IsSpawned && v.NetworkManager == NetworkManager && v.IsOut) v.ServerReviveFromOut();
+            }
         }
 
         // The "go home" press at the bank (plan 3 task 8, decision 11): the floor's guardian is down, the choice is not made yet. The press opens, joins or swaps the confirm window (DiveHaulSync); the

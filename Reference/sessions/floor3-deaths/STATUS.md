@@ -1,0 +1,2 @@
+Status: IN PROGRESS
+Unity ready, compile PASS. Added LastHitSource (HeroVitals/CombatHost) + bot hit log src. Running DiveBot seed 12345 for F3 damage evidence. Coop: spec says all-down ends dive (WipeTick); a solo Out hero already fails the dive, so the SoftLock note is likely a pair where the partner is up and the Out hero stays out for the rest of the dive (no revive path). Plan: stand Out heroes up at the next floor + PlayMode test.

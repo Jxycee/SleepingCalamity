@@ -633,7 +633,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 foreach (Enemy e in Object.FindObjectsByType<Enemy>(FindObjectsSortMode.None))
                 { float d = Flat(e.transform.position - _hero.position).magnitude; if (d < best) { best = d; near = e; } }
                 HitsByFloor[Floor] = (HitsByFloor.TryGetValue(Floor, out int hf) ? hf : 0) + 1;
-                HitLog.Add($"F{Floor} -{_lastHp - _vitals.Hp} ({_vitals.Hp}/{_vitals.MaxHp}) by {(near != null ? near.Def.Id + " tier " + near.Model?.Tier + " at " + best.ToString("0.0") + " m" : "nothing within 8 m")}");
+                HitLog.Add($"F{Floor} -{_lastHp - _vitals.Hp} ({_vitals.Hp}/{_vitals.MaxHp}) by {(near != null ? near.Def.Id + " tier " + near.Model?.Tier + " at " + best.ToString("0.0") + " m" : "nothing within 8 m")} [src {(_vitals.LastHitSource.Length > 0 ? _vitals.LastHitSource : "?")}]");
             }
             _lastHp = _vitals.Hp;
             if (!_vitals.IsUp)

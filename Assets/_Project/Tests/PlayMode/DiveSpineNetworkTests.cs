@@ -479,6 +479,32 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.ServerTryStair(clientId, 1), Is.True, "up again, the same press takes the party down");
         }
 
+        // Floor 3 soak finding (2026-11-06): a hero who bled out while the host stayed up used to stay out for the rest of the dive. The party's stair now stands them up with the revive HP.
+        [UnityTest]
+        public IEnumerator OutHero_StandsUp_WhenThePartyTakesTheStair_AndTheDiveGoesOn()
+        {
+            Rig rig = null;
+            yield return Start(1, r => rig = r);
+            rig.Host.SeedOverride = 5150u;
+            Assert.That(rig.Host.ServerStartDive(), Is.True);
+            yield return ResolvePeers(rig);
+            yield return AllBuilt(rig, 1);
+            yield return NearOnHost(rig, CellarFloorBuilder.EntryWorld(rig.HostFloor.Layout, rig.HostFloor.Built, 0), "floor-1 entry");
+            rig.Host.RequireGateKey = false;
+            HeroVitals outHero = rig.HeroesOnHost[0].GetComponent<HeroVitals>();
+            outHero.ServerDamage(100000);
+            yield return PlayModeHarness.WaitUntil(() => outHero.IsOut, 40f, "the downed client hero never bled out");
+            yield return Seconds(1f);
+            Assert.That(rig.Host.NetActive.Value, Is.True, "the host hero is up: the dive goes on");
+            Assert.That(CellarFloorBuilder.TryDescentWorld(rig.HostFloor.Layout, rig.HostFloor.Built, out Vector3 stair), Is.True);
+            Move(rig.HostHero, stair + new Vector3(1f, 0.1f, 0f));
+            yield return PlayModeHarness.WaitUntil(() => Flat(rig.HostHero.transform.position, stair) < 3f, Timeout, "the host hero never reached the stair");
+            Assert.That(rig.Host.ServerTryStair(rig.HostNm.LocalClientId, 1), Is.True);
+            Assert.That(outHero.IsUp, Is.True, "the out hero stood up on the stair");
+            Assert.That(outHero.Hp, Is.GreaterThan(0));
+            Assert.That(rig.Host.NetActive.Value, Is.True);
+        }
+
         [UnityTest]
         public IEnumerator Fail_AtFloor4_LeavesSatchelAtDepth4_NextDiveStartsFloor1_PiecesStayFound()
         {

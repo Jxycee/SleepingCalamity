@@ -61,6 +61,9 @@ namespace SleepingCalamity.Gameplay
             NetReviveProgress.Value = Model.ReviveProgress;
         }
 
+        // Host-only diagnostic (bot hit logs): the enemy kind, attack id and distance of the last enemy hit that landed. Not synced, not saved.
+        public string LastHitSource { get; set; } = "";
+
         // Host: returns the HP lost.
         public int ServerDamage(int amount)
         {
@@ -111,7 +114,7 @@ namespace SleepingCalamity.Gameplay
             ServerEatLoaf();
         }
 
-        // Host: an out hero stands up with the revive HP (the arena only; a dive keeps its out rule).
+        // Host: an out hero stands up with the revive HP (the arena wave clear and the dive stair).
         public bool ServerReviveFromOut()
         {
             if (!IsServer || Model.State != VitalState.Out) return false;
