@@ -38,8 +38,8 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **M** Builder bug: MotionVectors pass flips between graphics and `-nographics` builds (CURRENT Inbox) [U]
 
 ## Ready: per-player loot and save follow-ups (PARKING_LOT 2026-11-03)
-- [ ] **S** Close stale entries after checking code: satchel placement (:65, `LostSatchel.ShouldPlaceOn` exists), legacy DiveHaul retire (:68, class gone), per-player gold source (:78), stir thresholds (:75, :79, `DiveStir`), generator v1 vs v2 (`rooms-v2/STATUS.md:4`) (docs)
-- [ ] **S** Stale "shared haul" comments (2 left) + PHASE1 7.2 "+5 per unbanked piece" (PARKING_LOT :80)
+- [x] **S** Close stale entries after checking code: satchel placement (:65, `LostSatchel.ShouldPlaceOn` exists), legacy DiveHaul retire (:68, class gone), per-player gold source (:78), stir thresholds (:75, :79, `DiveStir`), generator v1 vs v2 (`rooms-v2/STATUS.md:4`) (docs) (`605d2ba0`; enemy-kill gold, stash view, generator v2 switch stay open in PARKING_LOT)
+- [ ] **S** Stale "shared haul" comments (2 left: `AssetPaths.cs:18`, `PrefabBuilder.cs:38`; PHASE1 7.2 done `605d2ba0`) - bundle with the next Assets change, it needs a check (PARKING_LOT :80)
 - [ ] **S** HUD "N home" undercounts pieces after reload; `Summary.BankedPieces` comment wrong (:81) [U]
 - [ ] **M** Bag robustness bundle: sticky `PlayerBagSync._bagId` re-resolve (:71); one bad value drops a whole bag entry (:72); satchel vs `PlayerBag.MaxCarried` (:73) [U][net]
 - [ ] **M** Bank slot edge cases: party shrinks mid-floor (:70); late joiner lifts slots above `BankSlots.TotalSlots` (:76); 3-player extra-slot owner not saved (:66) [U][net]
@@ -55,7 +55,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **S** `sc_core_tests.py` false green on `Core.Combat` (`8d823e23`: 105 of 157 EditMode files, 1205 tests pass)
 - [x] **S** `unity.ps1 exec` false FAIL on player builds (`cd4eec4e`)
 - [ ] **S** Verify the exec fix on the next player build (it was not re-run after `cd4eec4e`)
-- [ ] **S** `Reference/hollowmere/QUEUE.md` stale: Q7, Q9, Q10, Q12-Q15 say unclaimed but are DONE (docs)
+- [x] **S** `Reference/hollowmere/QUEUE.md` stale: Q7, Q9, Q10, Q12-Q15 say unclaimed but are DONE (docs) (`605d2ba0`)
 - [ ] **S** `sc-walk` documents WalkDriver helpers that don't exist: port them or fix the skill (CURRENT blockers)
 - [ ] **M** Legacy FishGame asset tools rework (`sc-asset-craft` section 0b)
 - [ ] **S** churn follow-ups: `M_CrackWeeds.mat` commit, PC run of `sc_churn_check.sh` (`hollowmere/churn/STATUS.md:18-19`) [U]
