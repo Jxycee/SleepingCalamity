@@ -12,14 +12,16 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 
 ## Ready: dive build (critical path after the playtest)
 - [ ] **M** Dungeon spec step 5a: encounter templates for the 12 v2 rooms (spec `2026-11-03-hearthdeep-dungeon-design.md` section 12 step 5; `docs/ROOM_METRICS.md`, `CellarRoomsV2`) - write plan first, then code [U]
+- [ ] **M** Wire the host spawner to encounter templates (after spec 5a merges; `EncounterBuilder`, Ambush hook from floor modifiers) [U][net]
 - [ ] **L** Spec step 5b: water gimmick states on the 12 rooms (flood/drain), validator coverage via `RoomValidatorV2` [U]
-- [ ] **M** Spec step 5c: deferred floor modifiers Brimming, Fat Larder, Still Air (`Reference/sessions/plan5-floor-card/STATUS.md:12`) [U]
-- [ ] **S** Spec step 5d: music stems plan (docs: which stems, where they switch; no audio yet)
+- [ ] **M** Spec step 5c: deferred floor modifiers Brimming, Fat Larder, Still Air (`Reference/sessions/plan5-floor-card/STATUS.md:12`) [U]; dungeon-1 guardrail: keep them light and readable (user 2026-11-06)
+- [ ] **S** Dungeon-1 modifier difficulty check: DiveBot solo runs with plan 5 modifiers on vs off; if they add much difficulty, soften (e.g. floor 7 one hazard at most, Stirred's latch ends at the next stair). Guardrail: user 2026-11-06, dungeon one must not be extremely complex or overly difficult [U]
+- [x] **S** Spec step 5d: music stems plan (docs: which stems, where they switch; no audio yet) (`141a79a4`)
 - [ ] **M** Spec step 6: jobs for dead ends, collapse fairness, crash saver if simple (section 12 step 6) - plan first [U]
-- [ ] **S** Floors 8-10 of the Undercroft have no plan row (spec :233 says 10 floors; plan 3 built 7): write the roadmap row (docs)
+- [x] **S** Floors 8-10 of the Undercroft have no plan row (spec :233 says 10 floors; plan 3 built 7): write the roadmap row (docs) (`141a79a4`)
 - [ ] **M** Secret-idol paid boss retry (spec Q3 / decision 25): no build row found; confirm in code, plan + build if missing [U][net]
 - [ ] **S** Confirm `RoomValidatorV2` checks every gimmick state (spec Q5 F7); close or file the gap [U]
-- [ ] **S** Rewrite `m7-proposal` sections 1 and 4 for the 7-floor dive (triage notes :7) (docs)
+- [x] **S** Rewrite `m7-proposal` sections 1 and 4 for the 7-floor dive (triage notes :7) (docs) (`141a79a4`)
 - [ ] **S** DiveBot Tough Seed12345 run: bar needs 2 of 3 seeds finished (triage :67) [U]
 
 ## Ready: bugs and test health
@@ -28,17 +30,19 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** BUGS item 18b: piece spheres uncollectable when haul piece count differs from floor arm count (`BUGS.md:94`); may be stale after plan 3 (`dive-flow/STATUS.md:12`) [U]
 - [ ] **S** `DiveSpineNetworkTests` floor-7 host-hero drift (~2 m/s after Move, unexplained) + `Floor5_RealButtonPushOn` flaked once (`plan5-floor-card/STATUS.md:24-26`) [U]
 - [ ] **S** plan5 nits: "Find the gate key" on an opened key floor; pieces line duplicates `StirMeterHud`; follower bots don't split valves (`plan5-floor-card/STATUS.md:27`) [U]
+- [ ] **M** Co-op follower bots split valves: FollowerBot has no goal pathing; needs nav + a hold loop (plan5-nits STATUS) [U]
 - [ ] **S** Floor-7 valve reach 1.8 m / 0.6 s hold lost to knockback: tuning note or fix (`plan5-floor-card/STATUS.md:25`) [U]
 - [ ] **S** `StairHandoverTests` should destroy `TestHubGround` in teardown (PARKING_LOT :56) [U]
 - [ ] **S** Test gap: host's own bag saved and reloaded (PARKING_LOT :83) [U][net]
 - [ ] **S** combat-polish follow-ups: parry-during-grace test; HurtGrace values into `TuningSections`; dead `HeroAnimMap.IsHeavyHurt` / `HurtGrace.Knockdown` (`combat-polish/STATUS.md:13-16`) [U]
 - [ ] **S** traversal-2 reviewer follow-ups: VoidEdge ray reaches 42 m; lane tolerance 0.7 vs 0.2 m; EditMode guard for `HollowmereRuinSeal` (`traversal-2/STATUS.md:36-38`) [U]
 - [ ] **S** `TuningSections.cs:101` points at a TODO that no longer exists; enemy attack-id tuning not tunable (code)
+- [ ] **M** Enemy attack ids tunable: AttackCatalog enemy attacks are static readonly AttackData held by reference (EnemyDefinition.Attacks, AllEnemyAttacks, EnemyAttackById, AI/tell rules); needs a registry or replace-in-place + EnemyAttackRules validation (combat-tuning-followups STATUS, Skipped) [U]
 - [ ] **M** Builder bug: MotionVectors pass flips between graphics and `-nographics` builds (CURRENT Inbox) [U]
 
 ## Ready: per-player loot and save follow-ups (PARKING_LOT 2026-11-03)
-- [ ] **S** Close stale entries after checking code: satchel placement (:65, `LostSatchel.ShouldPlaceOn` exists), legacy DiveHaul retire (:68, class gone), per-player gold source (:78), stir thresholds (:75, :79, `DiveStir`), generator v1 vs v2 (`rooms-v2/STATUS.md:4`) (docs)
-- [ ] **S** Stale "shared haul" comments (2 left) + PHASE1 7.2 "+5 per unbanked piece" (PARKING_LOT :80)
+- [x] **S** Close stale entries after checking code: satchel placement (:65, `LostSatchel.ShouldPlaceOn` exists), legacy DiveHaul retire (:68, class gone), per-player gold source (:78), stir thresholds (:75, :79, `DiveStir`), generator v1 vs v2 (`rooms-v2/STATUS.md:4`) (docs) (`605d2ba0`; enemy-kill gold, stash view, generator v2 switch stay open in PARKING_LOT)
+- [ ] **S** Stale "shared haul" comments (2 left: `AssetPaths.cs:18`, `PrefabBuilder.cs:38`; PHASE1 7.2 done `605d2ba0`) - bundle with the next Assets change, it needs a check (PARKING_LOT :80)
 - [ ] **S** HUD "N home" undercounts pieces after reload; `Summary.BankedPieces` comment wrong (:81) [U]
 - [ ] **M** Bag robustness bundle: sticky `PlayerBagSync._bagId` re-resolve (:71); one bad value drops a whole bag entry (:72); satchel vs `PlayerBag.MaxCarried` (:73) [U][net]
 - [ ] **M** Bank slot edge cases: party shrinks mid-floor (:70); late joiner lifts slots above `BankSlots.TotalSlots` (:76); 3-player extra-slot owner not saved (:66) [U][net]
@@ -54,7 +58,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **S** `sc_core_tests.py` false green on `Core.Combat` (`8d823e23`: 105 of 157 EditMode files, 1205 tests pass)
 - [x] **S** `unity.ps1 exec` false FAIL on player builds (`cd4eec4e`)
 - [ ] **S** Verify the exec fix on the next player build (it was not re-run after `cd4eec4e`)
-- [ ] **S** `Reference/hollowmere/QUEUE.md` stale: Q7, Q9, Q10, Q12-Q15 say unclaimed but are DONE (docs)
+- [x] **S** `Reference/hollowmere/QUEUE.md` stale: Q7, Q9, Q10, Q12-Q15 say unclaimed but are DONE (docs) (`605d2ba0`)
 - [ ] **S** `sc-walk` documents WalkDriver helpers that don't exist: port them or fix the skill (CURRENT blockers)
 - [ ] **M** Legacy FishGame asset tools rework (`sc-asset-craft` section 0b)
 - [ ] **S** churn follow-ups: `M_CrackWeeds.mat` commit, PC run of `sc_churn_check.sh` (`hollowmere/churn/STATUS.md:18-19`) [U]
@@ -83,9 +87,18 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** B11 cellar lantern wear and rust (PARKING_LOT :49) [A]
 - [ ] **S** B6 plaza ground jitter / wet band / moss rocks; B7 props polish (PARKING_LOT :50-51) [A]
 
+## Ready: rigged characters and animals (from `docs/research/2026-11-06-open-rigged-assets.md`)
+- [ ] **S** Verify licences before adopting: Quaternius QAL (Bestiary kit), UAL2 wording, Ultimate Animated Animals roster, MPFB2 rig options, Mixamo FAQ, UniRig skinning release (research note "Still to verify")
+- [ ] **M** Ambient life phase 2 without waiting on user models: Quaternius Farm/Animated Animals (CC0) restyled, plus rooks on a Mesh2Motion bird rig (`Reference/sessions/ambient-life/STATUS.md`) [A][U]
+- [ ] **M** Gleaner prototype: Bestiary kit humanoid on the UAL rig + UAL2 clips, sheaf mask as prop (after QAL check) [A][U]
+- [ ] **M** Rig the Cellars tier-1 enemies (jam-jar slime, broom, rat-king) with small bone rigs (UniRig or hand) so they animate instead of sliding primitives [A][U]
+- [ ] **M** Wren's cat Tuppence: own mesh on a borrowed quadruped rig (Mesh2Motion fox / Quaternius cat), follow-Wren via Animation Rigging look-at [A][U][net]
+- [ ] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06)
+- [ ] **M** MPFB2 hero/townsfolk base test: one CC0 body on `game_engine` rig through `HeroAnimator.controller` [A][U]
+
 ## Ready: design notes (docs only, placeholders marked)
-- [ ] **S** Gold sink proposal: what gold buys (triage :52; tuning blocked without it)
-- [ ] **S** Enemy-kill purse, stash view, town emptying (PARKING_LOT :77, triage C1)
+- [x] **S** Gold sink proposal: what gold buys (triage :52; tuning blocked without it) (`5854759a`, `docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`)
+- [x] **S** Enemy-kill purse, stash view, town emptying (PARKING_LOT :77, triage C1) (`5854759a`, `docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`)
 - [ ] **S** Co-op hearth marks design note (PARKING_LOT :15)
 - [ ] **S** Movement tools (glide, high jump) gating optional branches (PARKING_LOT :26)
 - [ ] **S** Rule-twist challenge gauntlets from existing rooms (PARKING_LOT :32)
@@ -95,11 +108,11 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 
 ## Waiting on the user (don't start; ask when they're around; plain bullets so the board doesn't count them)
 - Playtest `C:\Dev\SleepingCalamity-builds\playtest-2026-11-06\SleepingCalamity.exe` (includes plan 5); notes in `docs/playtest/NOTES.md`
-- plan 5 placeholder decisions 1-10 (`Reference/sessions/plan5-floor-card/STATUS.md`)
 - Story book read + bible sign-off; bible Qs 6, 7, 8, 13, 15, 16 touch dive text (triage :24); 5 and 20 touch rules
 - Rename placeholder floor and NPC names (spec Q7; decisions-for-review S1-S8)
 - Bag-rule decisions: chest with a full bag (PARKING_LOT :69); save-and-quit at a stair (:74); absent player's bag through push-on/fail (:82); bank-room picks UI vs auto-fill (:67)
-- Failed dive keeps half of gold? (triage :50); weapon wear (triage Q5, default no); network conditions numbers (Q6)
+- Gold economy decisions 1-5 (`docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`, recommended defaults given)
+- Failed dive keeps half of gold? (triage :50; proposal Q4 says keep settled decision 7); weapon wear (triage Q5, default no); network conditions numbers (Q6)
 - Co-op F10 proposal (spec section 4.7, decision 40); bank slots in a 4-player party (spec Q6)
 - decisions-for-review: A6 PHASE1 lock (51 decisions), A24 cellar mood, A34 WeaponsSave wiring (must-fix before M7), A2 OoT 2026 screens check now due
 - USER_TODO: Mixamo clips (blocks M2 animation), 2-player Relay walk (M1, M2, M5, M6, M7), Tobin concept (M10), corner approvals (M9)
