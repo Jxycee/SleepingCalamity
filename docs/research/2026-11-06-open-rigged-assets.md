@@ -48,6 +48,12 @@ The user plans to play the game privately with friends and probably never sell i
 - **Blender Studio CC-BY film characters**: always fine with credit; the blocker is their film rigs, not the licence.
 Still avoid on quality or safety grounds: Kenney blocky characters (tests only); repos with no licence or no code at all (MagicArticulate, RigAnything, Anymate, AnimaX) only because there is nothing reliable to run; PhilS94 spider (paid Asset Store product; don't copy). Never: Dark Cloud names, characters, story, text, music or assets.
 
+## Hardware fit (user PC: RTX 5070, 12 GB VRAM)
+- HY-Motion 1.0 full (24-26 GB): no. HY-Motion Lite (0.46B): may fit, VRAM figure not published; test first.
+- MoMask: small, commonly run on 8 GB cards; good local fallback for text-to-motion.
+- Kimodo: VRAM unknown; test. UniRig: should fit. SkinTokens (14 GB+): no. Mesh2Motion: browser, no GPU needed.
+- Bigger models: hosted demo (e.g. a Hugging Face Space) if one exists, or a paid hourly cloud GPU (ask the user first). Cloud Claude sessions have no GPU.
+
 ## Still to verify before adopting
 1. Quaternius **QAL** licence text (Bestiary kit) and the UAL2 page's CC0-vs-"free commercial" wording.
 2. Ultimate Animated Animals roster (is there a rat, cat, crow?).
