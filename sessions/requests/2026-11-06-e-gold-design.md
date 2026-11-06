@@ -1,6 +1,6 @@
 Title: Design note: gold sink + kill purse/stash
 Target: cloud
-Status: started
+Status: done - proposal merged (5854759a), STATUS DONE
 Started: 2026-11-06 16:49 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: design notes", two related S items)
