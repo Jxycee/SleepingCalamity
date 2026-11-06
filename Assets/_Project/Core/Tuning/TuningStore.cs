@@ -50,6 +50,7 @@ namespace SleepingCalamity.Core.Tuning
             RegisterKnobSection("weaponGrowth", WeaponGrowthTuning.Knobs());
             RegisterKnobSection("targeting", TargetingTuning.Knobs(), TargetingTuning.Validate);
             RegisterKnobSection("heroCombat", HeroCombatTuning.Knobs());
+            RegisterKnobSection("hurtGrace", HurtGraceTuning.Knobs(), HurtGraceTuning.Validate);
             RegisterKnobSection("enemies", EnemyTuning.Knobs());
             RegisterSection("attacks", AttackTuning.Apply, AttackTuning.Reset);
         }

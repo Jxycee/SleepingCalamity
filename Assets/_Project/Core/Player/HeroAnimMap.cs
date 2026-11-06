@@ -25,7 +25,6 @@ namespace SleepingCalamity.Core
     {
         public const byte NoAttack = 0;
         public const int WeaponCount = 4, SlotsPerWeapon = 5, AttackIdCount = WeaponCount * SlotsPerWeapon + 1;   // id 0 = none
-        public const float HeavyHurtFraction = 0.25f;   // a hit this share of max HP or more staggers hard
 
         // Weapon index (AttackCatalog: 0 axe, 1 staff, 2 dagger, 3 bow) and attack index (AttackSet: 0..4 ground, 5..7 air) -> a stable id 1..20, or 0.
         // The air chain reuses the ground clips until a real air attack arrives.
@@ -41,8 +40,6 @@ namespace SleepingCalamity.Core
 
         // Progress through an attack, 0..1 (the attack states play their clip by this, not by wall time, so the clip tracks the combat clock).
         public static float AttackProgress(float frame, int totalFrames) => totalFrames <= 0 ? 0f : Math.Clamp(frame / totalFrames, 0f, 1f);
-
-        public static bool IsHeavyHurt(int damage, int maxHp) => maxHp > 0 && damage >= maxHp * HeavyHurtFraction;
 
         public static HeroAnimParams Evaluate(in HeroAnimState s)
         {
