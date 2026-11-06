@@ -63,6 +63,14 @@ Still avoid on quality or safety grounds: Kenney blocky characters (tests only);
 - **Step1X-3D**: no VRAM figure found.
 - Recommendation: Hunyuan3D-2.1 or TripoSG for shape locally, our texture pipeline for paint, UniRig (8 GB) to rig. Licence: Hunyuan community licence is fine under the personal-use bar.
 
+## Local model + texture + rig at ~8 GB (second pass, 2026-11-06)
+No single local tool does all three at 8 GB. Best chain found (VRAM from READMEs and blogs; no independent RTX 5070 measurement exists):
+1. **TRELLIS.2** (Microsoft, Dec 2025, MIT) via `visualbruno/ComfyUI-Trellis2`: shape + PBR (base, roughness, metal) in one run, 1-3 min per try; Low-VRAM mode ~6.8-7.8 GB at 1024^3 on 8 GB cards (blog figures, UNVERIFIED); tested on Windows 11 torch 2.7 cu128 with a Blackwell fix; needs gated DINOv3 access. Known faults: black texture speckle (issue #162), colour drift on flat illustration input, soft textures at 512-1024.
+2. Blender cleanup: decimate/retopo, re-unwrap, check albedo for baked light; then our texture repaint where soft.
+3. **UniRig** (~8 GB, ComfyUI-UniRig with Make-It-Animatable, FBX out) or **SkinTokens** (README 14 GB, but one pipeline ran it on a 12 GB 4070 Ti in 23 s; drops UVs, reattach in Blender). Humanoids only in practice.
+Alternatives: **Pixal3D** (Tencent ARC, MIT, May 2026, on TRELLIS.2): pixel-aligned, closest to the reference, ~6.8 GB at draft, 6-8 min per try, more artifacts, 43 GB download (Pinokio one-click). **Hunyuan3D 2.1** paint needs ~12 GB even tuned (`Satyr-Astry/image-to-3d-rigged-pipeline`, 11.99 GB peak). Hunyuan 2.5/3.x are hosted only.
+Verdict: good enough for props and background creatures, behind Tripo for hero characters; every result still needs a Blender pass. Blackwell risk: CUDA extensions without sm_120 wheels need MSVC builds (`TORCH_CUDA_ARCH_LIST=12.0`).
+
 ## Still to verify before adopting
 1. Quaternius **QAL** licence text (Bestiary kit) and the UAL2 page's CC0-vs-"free commercial" wording.
 2. Ultimate Animated Animals roster (is there a rat, cat, crow?).
