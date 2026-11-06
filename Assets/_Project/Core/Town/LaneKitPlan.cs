@@ -479,7 +479,7 @@ namespace SleepingCalamity.Core
         }
 
         // ---- junction repairs (Hollowmere junction survey, 2026-11-03)
-        public const float FlightJoinGap = 2.5f, FlightMaxKink = 2f, FlightMargin = 0.3f, WallEmbed = 0.1f, WallMinStub = 0.5f, WallCrossMinAngle = 15f;
+        public const float FlightJoinGap = 2.5f, FlightMaxKink = 2f, FlightMargin = 0.3f, WallEmbed = 0.1f, WallMinStub = 0.5f, RetainMinStub = 0.85f, WallCrossMinAngle = 15f;
 
         // Consecutive flights of one lane whose axes differ by more than FlightMaxKink degrees are turned toward each other about their own middles until they differ
         // by at most that: a straight street reads as one stair, not two rectangles meeting at a corner. Treads keep their heights and stay about 0.25 m from the lane line.
@@ -581,7 +581,7 @@ namespace SleepingCalamity.Core
 
         // Walls meet walls and flights. The higher wall (coping), or on a tie the earlier one, runs on; any other wall that would cross its thick box is cut to end WallEmbed
         // inside the face (no coping past it), and a wall that runs over a flight (flight footprint + FlightMargin) is cut at the flight edge, a garden wall closed with a pier.
-        // Stubs shorter than WallMinStub go. Ruined and rebuilt rows of one place share the cut; a retaining buttress follows the longest stub.
+        // Stubs shorter than WallMinStub go (RetainMinStub for retaining walls). Ruined and rebuilt rows of one place share the cut; a retaining buttress follows the longest stub.
         static void ResolveWallJunctions(Ctx c)
         {
             for (int pass = 0; pass < 8 && ResolveWallJunctionsOnce(c); pass++) { }   // a cut changes the box a neighbour was judged against: repeat until nothing moves
@@ -654,7 +654,8 @@ namespace SleepingCalamity.Core
                     if (cut.B > cursor) { cursor = cut.B; pending = cut.Pier; }
                 }
                 if (cursor < w.Half - 1e-3f) keeps.Add(new Keep { A = cursor, B = w.Half, PierA = pending });
-                keeps.RemoveAll(k => k.B - k.A < WallMinStub);
+                float minStub = probe.IsRetaining ? RetainMinStub : WallMinStub;   // a retaining module is scaled along X: under 0.85 m (ScaleX < 0.425) its UVs stretch past 2.5x
+                keeps.RemoveAll(k => k.B - k.A < minStub);
                 double ya = w.Yaw * Math.PI / 180.0; float lx = (float)Math.Cos(ya), lz = (float)-Math.Sin(ya);
                 bool garden = IsGardenWall(probe.Piece);
                 bool first = true; WallGroup longest = null;
