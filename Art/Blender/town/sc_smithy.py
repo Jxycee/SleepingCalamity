@@ -253,11 +253,15 @@ def tile_face(pc, P3, n, u, e, tag, ds=0.42):
                 pt_ = a1.lerp(b1, uu)
                 pts.append((bm.verts.new(pb - n * 0.05), bm.verts.new(pb), bm.verts.new(pt_)))
             A, B = pts
-            for q in ((A[1], B[1], B[2], A[2]), (A[0], B[0], B[1], A[1])):
+            for qi, q in enumerate(((A[1], B[1], B[2], A[2]), (A[0], B[0], B[1], A[1]))):
                 f = bm.faces.new(q)
-                for l in f.loops:
-                    co = l.vert.co
-                    l[uvl].uv = (co.dot(e) / TILE, co.dot(u) / TILE)
+                if qi == 0:     # tile face: slope-plane projection (across the roof, up the slope)
+                    for l in f.loops:
+                        co = l.vert.co
+                        l[uvl].uv = (co.dot(e) / TILE, co.dot(u) / TILE)
+                else:           # butt (steep, 5 cm): its own plane, v up the butt. The slope-plane UVs collapsed it.
+                    bm.normal_update()
+                    FK.planar_face_uv(f, uvl, n)
         bm.normal_update()
         FK._merge(pc, bm, 'roof')
 
@@ -280,10 +284,11 @@ def ridge_cap(pc, a, b, tag, big=False):
             rr = r * (1.0 if e_ < 0 else 1.06)
             rows.append([bm.verts.new(c + ax * (e_ * Lt / 2) + side * (-rr * math.cos(math.pi * k / segs)) +
                                       up * (rr * math.sin(math.pi * k / segs) * 0.85 - 0.04)) for k in range(segs + 1)])
+        kv = {v: kk for row in rows for kk, v in enumerate(row)}
         for k in range(segs):
             f = bm.faces.new((rows[0][k], rows[1][k], rows[1][k + 1], rows[0][k + 1]))
-            for l in f.loops:
-                l[uvl].uv = ((l.vert.co - a).dot(ax) / TILE, k * r * 0.4 / TILE)
+            for l in f.loops:     # v = arc length per vertex (k was shared by all four corners: collapsed)
+                l[uvl].uv = ((l.vert.co - a).dot(ax) / TILE, kv[l.vert] * r * 0.4 / TILE)
         bmesh.ops.rotate(bm, verts=bm.verts[:], cent=c, matrix=Matrix.Rotation(math.radians(R.uniform(-2.5, 2.5)), 3, ax))
         bm.normal_update(); bm.faces.ensure_lookup_table()
         if bm.faces[0].normal.dot(up) < 0:

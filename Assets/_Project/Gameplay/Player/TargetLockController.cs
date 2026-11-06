@@ -133,7 +133,7 @@ namespace SleepingCalamity.Gameplay
 
         private void WriteContext(IInputService input, InputContext context)
         {
-            if (input.GameplayContext == InputContext.Placement) return;   // M6 S4: placement mode owns the context until it hands it back to Free (the lock must not overwrite it)
+            if (OwnsContext(input.GameplayContext)) return;   // M6 S4: placement mode owns the context until it hands it back to Free (the lock must not overwrite it); the bank screen likewise
             if (input.GameplayContext != context) input.GameplayContext = context;
             _wroteContext = true;
         }
@@ -144,8 +144,10 @@ namespace SleepingCalamity.Gameplay
             _wroteContext = false;
             IInputService input = Input;
             if (input == null || (input is UnityEngine.Object o && o == null)) return;
-            if (input.GameplayContext == InputContext.Placement) return;   // placement mode owns the context (same guard as WriteContext)
+            if (OwnsContext(input.GameplayContext)) return;   // placement mode / the bank screen own the context (same guard as WriteContext)
             if (input.GameplayContext != InputContext.Free) input.GameplayContext = InputContext.Free;
         }
+
+        private static bool OwnsContext(InputContext c) => c == InputContext.Placement || c == InputContext.BankScreen;
     }
 }

@@ -339,6 +339,7 @@ def roof_range(side, t, ruin):
     return xa, xb
 
 def tile_courses(pc, edge, n, nc, tag, flip, drop=None):
+    sl_up = Vector((0, -1 if n.y > 0 else 1, TANP)).normalized()   # up-slope direction of this pitch (unit)
     for c in range(nc):
         R = FK.rng('mlcourse%s%d' % (tag, c))
         t0, t1 = c / nc, min(1.0, (c + 1) / nc + 0.03)
@@ -359,9 +360,14 @@ def tile_courses(pc, edge, n, nc, tag, flip, drop=None):
                 f.normal_update()
                 want = n if qi == 0 else (a[1].co - a[2].co)       # top faces up out of the roof, risers down-slope toward the eave
                 if f.normal.dot(want) < 0: f.normal_flip()
+                if qi == 1:     # 5 cm butt riser: own-plane isometric UVs (the slope-plane projection collapsed it)
+                    FK.planar_face_uv(f, uvl, n)
+                    continue
+                # slope-plane projection on the true orthonormal basis (ridge axis x, up-slope d): the ragged ruin edges made
+                # (b0-a0) and (a1-a0) non-orthogonal, which sheared the UVs
                 for l in f.loops:
                     co = l.vert.co
-                    l[uvl].uv = ((co - a0).dot((b0 - a0).normalized()) / TILE, (c * 0.37 + (co - a0).dot((a1 - a0).normalized())) / TILE)
+                    l[uvl].uv = (co.x / TILE, (c * 0.37 + co.dot(sl_up)) / TILE)
         bm.normal_update(); FK._merge(pc, bm, 'roof')
 
 def roof(ruin):
@@ -416,7 +422,7 @@ def ridge_tiles(pc, xa, xb):
             rows.append([bm.verts.new((x + e * Lt / 2 + R.uniform(-0.01, 0.01), -rr * math.cos(math.pi * k / segs), zc + rr * math.sin(math.pi * k / segs) * 0.85 - 0.05)) for k in range(segs + 1)])
         for k in range(segs):
             f = bm.faces.new((rows[0][k], rows[1][k], rows[1][k + 1], rows[0][k + 1]))
-            for l in f.loops: l[uvl].uv = (l.vert.co.x / TILE, k * 0.07 / TILE)
+            for l, dk in zip(f.loops, (0, 0, 1, 1)): l[uvl].uv = (l.vert.co.x / TILE, (k + dk) * 0.07 / TILE)   # v per vertex ring (was k for all four: collapsed)
         orient_bm(bm, lambda c, zc=zc: Vector((0, c.y, c.z - (zc - 0.05))))
         FK.two_sided(bm); FK._merge(pc, bm, 'roof')
 
@@ -431,7 +437,7 @@ def rolled_eave(pc, side, xa, xb):
     for i in range(ny):
         for k in range(segs):
             f = bm.faces.new((rows[i][k], rows[i + 1][k], rows[i + 1][k + 1], rows[i][k + 1]))
-            for l in f.loops: l[uvl].uv = (l.vert.co.x / TILE, k * rr / TILE)
+            for l, dk in zip(f.loops, (0, 0, 1, 1)): l[uvl].uv = (l.vert.co.x / TILE, (k + dk) * rr * 1.25 * math.pi / segs / TILE)   # arc length per ring
     cz = slope_pt(side, (xa + xb) / 2, 0).z - 0.03; cy = slope_pt(side, (xa + xb) / 2, 0).y - side * 0.02
     orient_bm(bm, lambda c: Vector((0, c.y - cy, c.z - cz)))
     FK.two_sided(bm); FK._merge(pc, bm, 'roof')

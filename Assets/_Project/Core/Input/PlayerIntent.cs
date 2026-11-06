@@ -15,6 +15,11 @@ namespace SleepingCalamity.Core
         public float PlaceMoveX, PlaceMoveY;                  // move the ghost to the neighbouring lot (the switch stick)
         public bool PlacePressed, PickUpPressed, TurnPressed, NextLotPressed;
 
+        // Bank screen only (InputContext.BankScreen): filled by the BankScreen router row (the gameplay fields above stay zero except Look and Pause), so a cursor step never walks the hero,
+        // a pick never jumps and a push-on never swings.
+        public float BankMoveY;                               // the move stick / W S: up is positive
+        public bool BankPickPressed, BankPushOnPressed, BankGoHomePressed;   // Jump, Primary, Secondary
+
         public static readonly PlayerIntent None = default;
     }
 }
