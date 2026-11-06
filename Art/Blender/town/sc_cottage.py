@@ -323,10 +323,10 @@ def pots(pc, base):
             rings.append([bm.verts.new(Vector((r * math.cos(2 * math.pi * s / segs), r * math.sin(2 * math.pi * s / segs), z))) for s in range(segs)])
         for j in range(len(rings) - 1):
             for s in range(segs):
-                f = bm.faces.new((rings[j][s], rings[j][(s + 1) % segs], rings[j + 1][(s + 1) % segs], rings[j + 1][s]))
-                for l in f.loops:
-                    co = l.vert.co
-                    l[uvl].uv = (math.atan2(co.y, co.x) * 0.15 / TILE, co.z / TILE)
+                bm.faces.new((rings[j][s], rings[j][(s + 1) % segs], rings[j + 1][(s + 1) % segs], rings[j + 1][s]))
+        bm.normal_update()
+        for f in bm.faces:
+            FK.planar_face_uv(f, uvl, (0, 0, 1))      # isometric metre UVs per face (no stretch on the flat lip rings)
         bm.normal_update()
         bm.transform(base @ Matrix.Translation((px, 0, 0)) @ Matrix.Rotation(math.radians(tip), 4, 'X'))
         FK._merge(pc, bm, 'roof')
@@ -571,9 +571,14 @@ def slab(pc, mat, p00, p10, p11, p01, thick, nu=3, nv=3, amp=0.0, edge_mat=None,
         if f.normal.dot(nrm) < 0:
             bmesh.ops.reverse_faces(bm, faces=[f])
     bm.normal_update()
+    # metre UVs in the slab plane (equal texel density on U and V; v = up the slope)
+    ev = Vector((0, 0, 1)) - nrm * nrm.z
+    if ev.length < 1e-5:
+        ev = Vector((1, 0, 0)) - nrm * nrm.x
+    ev.normalize(); eu = nrm.cross(ev)
     for f in bm.faces:
         for l in f.loops:
-            l[uvl].uv = (l.vert.co.x / TILE + l.vert.co.y / TILE * 0.7, l.vert.co.z / TILE * 1.3)
+            l[uvl].uv = (l.vert.co.dot(eu) / TILE, l.vert.co.dot(ev) / TILE)
     FK._merge(pc, bm, mat)
     corners = [p00, p10, p11, p01]
     ctr = sum(corners, Vector()) / 4 - nrm * thick / 2
@@ -824,10 +829,10 @@ def lean_to(F, c, sgn, zt):
             bmesh.ops.create_cone(bm, cap_ends=True, segments=7, radius1=r, radius2=r * 0.97, depth=0.9)
             bm.transform(Matrix.Translation((x, ya + 0.46, 0.30 + row * 0.205)) @ Matrix.Rotation(math.pi / 2, 4, 'X') @
                          Matrix.Rotation(Rr.random() * 6.3, 4, 'Z'))
+            bm.normal_update()
             for f in bm.faces:
-                for l in f.loops:
-                    l[uvl].uv = (l.vert.co.x / TILE * 3, l.vert.co.y / TILE)
-            bm.normal_update(); FK._merge(F, bm, 'oak_lt')
+                FK.planar_face_uv(f, uvl, (0, 1, 0))   # metre UVs, v along the log
+            FK._merge(F, bm, 'oak_lt')
     # plinth round the lean-to
     plinth_seg(F, (xw, yf, 0), (xo + sgn * 0.10, yf, 0), (0, -1, 0), 11.0)
     plinth_seg(F, (xo + sgn * 0.10, yb, 0), (xw, yb, 0), (0, 1, 0), 12.0)
