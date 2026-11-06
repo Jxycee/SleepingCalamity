@@ -1,6 +1,6 @@
 Title: Regenerate Inn/Cottage/Townhouse FBX with fixed kit UVs
-Target: cloud
-Status: pending
+Target: local
+Status: started (local session, coordinator 10)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: Hollowmere art" top item)
 Status file: Reference/sessions/fbx-uv-regen/STATUS.md
