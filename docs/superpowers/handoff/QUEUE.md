@@ -15,12 +15,12 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **L** Spec step 5b: water gimmick states on the 12 rooms (flood/drain), validator coverage via `RoomValidatorV2` [U]
 - [ ] **M** Spec step 5c: deferred floor modifiers Brimming, Fat Larder, Still Air (`Reference/sessions/plan5-floor-card/STATUS.md:12`) [U]; dungeon-1 guardrail: keep them light and readable (user 2026-11-06)
 - [ ] **S** Dungeon-1 modifier difficulty check: DiveBot solo runs with plan 5 modifiers on vs off; if they add much difficulty, soften (e.g. floor 7 one hazard at most, Stirred's latch ends at the next stair). Guardrail: user 2026-11-06, dungeon one must not be extremely complex or overly difficult [U]
-- [ ] **S** Spec step 5d: music stems plan (docs: which stems, where they switch; no audio yet)
+- [x] **S** Spec step 5d: music stems plan (docs: which stems, where they switch; no audio yet) (`141a79a4`)
 - [ ] **M** Spec step 6: jobs for dead ends, collapse fairness, crash saver if simple (section 12 step 6) - plan first [U]
-- [ ] **S** Floors 8-10 of the Undercroft have no plan row (spec :233 says 10 floors; plan 3 built 7): write the roadmap row (docs)
+- [x] **S** Floors 8-10 of the Undercroft have no plan row (spec :233 says 10 floors; plan 3 built 7): write the roadmap row (docs) (`141a79a4`)
 - [ ] **M** Secret-idol paid boss retry (spec Q3 / decision 25): no build row found; confirm in code, plan + build if missing [U][net]
 - [ ] **S** Confirm `RoomValidatorV2` checks every gimmick state (spec Q5 F7); close or file the gap [U]
-- [ ] **S** Rewrite `m7-proposal` sections 1 and 4 for the 7-floor dive (triage notes :7) (docs)
+- [x] **S** Rewrite `m7-proposal` sections 1 and 4 for the 7-floor dive (triage notes :7) (docs) (`141a79a4`)
 - [ ] **S** DiveBot Tough Seed12345 run: bar needs 2 of 3 seeds finished (triage :67) [U]
 
 ## Ready: bugs and test health
