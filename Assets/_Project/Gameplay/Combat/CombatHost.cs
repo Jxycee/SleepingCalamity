@@ -587,7 +587,7 @@ namespace SleepingCalamity.Gameplay
             }
         }
 
-        // The arena's wave-clear rule: every hero that is up heals a little, and a hero that is out stands up (so nobody spectates forever; a dive keeps its own rule).
+        // The arena's wave-clear rule: every hero that is up heals a little, and a hero that is out stands up (so nobody spectates forever; a dive stands them up at the stair, DiveDirector).
         public void ServerOnWaveCleared()
         {
             if (_nm == null || !_nm.IsServer) return;

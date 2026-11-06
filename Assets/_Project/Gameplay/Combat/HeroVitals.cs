@@ -114,7 +114,7 @@ namespace SleepingCalamity.Gameplay
             ServerEatLoaf();
         }
 
-        // Host: an out hero stands up with the revive HP (the arena only; a dive keeps its out rule).
+        // Host: an out hero stands up with the revive HP (the arena wave clear and the dive stair).
         public bool ServerReviveFromOut()
         {
             if (!IsServer || Model.State != VitalState.Out) return false;
