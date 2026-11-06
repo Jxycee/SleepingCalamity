@@ -1,5 +1,7 @@
 // Core/Cellars/DiveStir.cs: the stir meter for the 10-floor dive (spec decision 19, section 4.5, red-team F2). Pure C#; time comes in as Tick(dt).
-// Value = clamp((PerFloorCleared x floors cleared this half + PerUnbankedValuable x valuables carried) x sqrt(players), 0, Max).
+// Value = clamp((PerFloorCleared x floors cleared this half + PerUnbankedValuable x valuables carried) x sqrt(players) + ModifierBonus, 0, Max).
+// ModifierBonus (plan 5): the Stirred floor modifier's flat stir, added after the sqrt-of-players scaling, set by the host from (seed, current floor); not part of State, never saved.
+//   The bonus feeds Refresh like any stir, so Stirred can latch the extra enemy or the hunter early, and a latch holds for the rest of the half even after the party leaves the floor: that is the hazard (the card says so).
 // Latches hold for the half. At DeepClosesThreshold the host calls BeginCollapse with the path time to this floor's stair; once per half.
 // Pushing on resets the danger side and carries the reward side (RewardValue).
 using System;
@@ -20,13 +22,16 @@ namespace SleepingCalamity.Core
         public int PlayersPresent { get => _players; set { _players = Math.Max(1, value); Refresh(); } }
         public int UnbankedValuables { get => _valuables; set { _valuables = Math.Max(0, value); Refresh(); } }
 
+        private float _modifierBonus;
+        public float ModifierBonus { get => _modifierBonus; set { _modifierBonus = Math.Max(0f, value); Refresh(); } }
+
         public float Value
         {
             get
             {
                 int floors = 0;
                 for (int m = _floorMask; m != 0; m >>= 1) floors += m & 1;
-                float raw = (PerFloorCleared * floors + PerUnbankedValuable * Math.Max(0, _valuables - _baseline)) * (float)Math.Sqrt(_players);
+                float raw = (PerFloorCleared * floors + PerUnbankedValuable * Math.Max(0, _valuables - _baseline)) * (float)Math.Sqrt(_players) + _modifierBonus;
                 return Math.Max(0f, Math.Min(Max, raw));
             }
         }
@@ -39,7 +44,8 @@ namespace SleepingCalamity.Core
         public bool CollapseRunning => _running;
         public float CollapseSecondsLeft => _running ? _secondsLeft : 0f;
 
-        public static float CollapseSeconds(float pathSecondsToStair) => Math.Max(CollapseMinSeconds, CollapseMultiplier * pathSecondsToStair);
+        // factor scales the final seconds, the 60 s minimum included (a Hurried floor passes ~0.833); 1 = the ordinary collapse.
+        public static float CollapseSeconds(float pathSecondsToStair, float factor = 1f) => Math.Max(CollapseMinSeconds, CollapseMultiplier * pathSecondsToStair) * factor;
 
         public bool OnFloorCleared(int floor)
         {
@@ -52,12 +58,12 @@ namespace SleepingCalamity.Core
             return true;
         }
 
-        public void BeginCollapse(float pathSecondsToStair)
+        public void BeginCollapse(float pathSecondsToStair, float factor = 1f)
         {
             if (!CollapsePending) return;
             _running = true;
             _collapseUsed = true;
-            _secondsLeft = CollapseSeconds(pathSecondsToStair);
+            _secondsLeft = CollapseSeconds(pathSecondsToStair, factor);
         }
 
         public void OnStairTaken() { _running = false; _secondsLeft = 0f; }
@@ -71,6 +77,7 @@ namespace SleepingCalamity.Core
             _floorMask = 0;
             _extra = _hunter = _collapseUsed = _running = false;
             _secondsLeft = 0f;
+            _modifierBonus = 0f;   // after the carry above: the floor's flat stir does not follow the party
         }
 
         public void ResetForNewDive()

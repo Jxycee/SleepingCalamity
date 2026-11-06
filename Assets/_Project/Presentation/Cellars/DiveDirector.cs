@@ -398,6 +398,7 @@ namespace SleepingCalamity.Presentation
             int floor = _session.Floor;
             if (_session.Phase != DivePhase.Floor || floor != DiveFloorTable.LastBuiltFloor || FloorSync.BuiltFloor != floor) return false;
             if (CellarFloorBuilder.TryEndWorld(FloorSync.Layout, FloorSync.Built, out Vector3 end) && !NearPlayer(clientId, end)) { NoticeTo(clientId, TooFar); return false; }
+            if (ContentsSync != null && ContentsSync.IsObjectiveGated(floor)) { NoticeTo(clientId, FloorCardText.WithWayOut(ContentsSync.ObjectiveLine)); return false; }   // plan 5: floor 7's valve or pump gates the way out
             if (!HaulSync.ServerFinish()) return false;
             return EndDive(DiveEndReason.Finished);
         }
@@ -826,9 +827,9 @@ namespace SleepingCalamity.Presentation
                 bool chosen = HaulSync != null && HaulSync.Current.BankChosen;
                 bool bankCleared = HaulSync != null && (HaulSync.Current.ClearedMask & (1 << (UndercroftPlan.BankFloor - 1))) != 0;
                 if (DiveFloorTable.HasStair(floor, chosen) && CellarFloorBuilder.TryDescentWorld(FloorSync.Layout, FloorSync.Built, out Vector3 stair) && Flat(me, stair, PromptRadius))
-                { Prompt = PromptKind.Stair; PromptText = NetStairOpen.Value ? "Take the stair down" : "The way down is shut (find the gate key)"; }
+                { Prompt = PromptKind.Stair; PromptText = NetStairOpen.Value ? "Take the stair down" : "The way down is shut: " + (ContentsSync != null && ContentsSync.ObjectiveLine.Length > 0 ? ContentsSync.ObjectiveLine : "Find the gate key"); }
                 else if (floor == DiveFloorTable.LastBuiltFloor && CellarFloorBuilder.TryEndWorld(FloorSync.Layout, FloorSync.Built, out Vector3 end) && Flat(me, end, PromptRadius))
-                { Prompt = PromptKind.Finish; PromptText = "Leave the Undercroft"; }
+                { Prompt = PromptKind.Finish; PromptText = ContentsSync != null && ContentsSync.IsObjectiveGated(floor) ? FloorCardText.WithWayOut(ContentsSync.ObjectiveLine) : "Leave the Undercroft"; }
                 else if (DiveFloorTable.HasBank(floor) && !chosen && bankCleared && CellarFloorBuilder.TryBankWorld(FloorSync.Layout, FloorSync.Built, out Vector3 bank) && Flat(me, bank, BankPromptRadius))
                 {
                     bool inRoom = HaulSync != null && HaulSync.Current.DivePhase == DivePhase.BankRoom;
@@ -842,6 +843,7 @@ namespace SleepingCalamity.Presentation
             IInputService input = HeroInput.ResolveDefault();
             if (input == null || !input.Intent.InteractPressed) return;
             if (Prompt == PromptKind.Stair && !NetStairOpen.Value) return;   // the locked stair only explains itself
+            if (Prompt == PromptKind.Finish && ContentsSync != null && ContentsSync.IsObjectiveGated(floor)) return;   // so does floor 7's door while its valve or pump objective is open
             if (LocalHeroIsDown(player)) return;   // a downed hero presses nothing (the host refuses it too)
             switch (Prompt)
             {

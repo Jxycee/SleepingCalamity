@@ -178,7 +178,10 @@ namespace SleepingCalamity.Tests.PlayMode
             for (uint sd = 1; sd < 2500; sd++)
             {
                 CellarFloorLayout l = CellarFloorGenerator.Layout(sd, floor);
-                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return sd;
+                if (!(l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0)) continue;
+                bool keysAllTheWay = true;   // plan 5: a valve or pump floor has no key to take and the walk does not play those yet: every generated floor on the way needs the gate key
+                for (int f = 2; f <= floor && keysAllTheWay; f += 2) keysAllTheWay = FloorObjectivePlan.For(CellarFloorGenerator.Layout(sd, f)).Objective == FloorObjective.GateKey;
+                if (keysAllTheWay) return sd;
             }
             return 0;
         }

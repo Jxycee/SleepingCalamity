@@ -67,13 +67,14 @@ namespace SleepingCalamity.Tests.PlayMode
             return p.PiecesLeft(2) >= p.PiecesLeft(4) ? 2 : 4;
         }
 
-        // A seed whose floor has a locked room with a gate, a key chest and a carrier.
+        // A seed whose floor has a locked room with a gate, a key chest and a carrier, a gate-key objective (plan 5: a valve or pump floor keeps its carrier as an ordinary enemy) and no hazard
+        // modifier (Crowded / Stirred / Dim / Ambush / Hurried change gold, rolls and rooms: FloorModifierNetworkTests covers them).
         private static uint FindSeed(int floor)
         {
-            for (uint s = 1; s < 400; s++)
+            for (uint s = 1; s < 1500; s++)
             {
                 CellarFloorLayout l = CellarFloorGenerator.Layout(s, floor);
-                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0) return s;
+                if (l.HasLockedRoom && l.Carrier != null && l.KeyChestIndex >= 0 && FloorObjectivePlan.For(l).Objective == FloorObjective.GateKey && FloorModifierSet.For(s, floor).A == FloorModifier.None) return s;
             }
             Assert.Fail("no seed with a locked room, a carrier and a key chest"); return 0;
         }
@@ -456,7 +457,14 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(expected, Is.GreaterThan(0));
             PlacedRoom pr = c.Layout.Rooms[room];
 
-            c.Players[c.HostId] = Cell(c, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].X : pr.X, plan.Spawns[0].RoomIndex == room ? plan.Spawns[0].Y : pr.Y) + Vector3.forward * 0.1f;
+            // the player stands on a movable spawn of the room: the gate-key carrier and the warden keep their authored cells (CellarAmbush), so standing on one would put an enemy at the player by design
+            int sx = pr.X, sy = pr.Y;
+            foreach (EncounterSpawn sp in plan.Spawns)
+            {
+                bool fixedCell = (c.Layout.Carrier != null && c.Layout.Carrier.X == sp.X && c.Layout.Carrier.Y == sp.Y) || (c.Layout.WardenCell.HasValue && c.Layout.WardenCell.Value.X == sp.X && c.Layout.WardenCell.Value.Y == sp.Y);
+                if (sp.RoomIndex == room && sp.Kind != EncounterKind.Hunter && !fixedCell) { sx = sp.X; sy = sp.Y; break; }
+            }
+            c.Players[c.HostId] = Cell(c, sx, sy) + Vector3.forward * 0.1f;
             Vector3 pl = c.Floor.Built.Root.InverseTransformPoint(c.Players[c.HostId]);
             CellPos[] ring = CellarAmbush.Cells(c.Layout, dressing, plan, room, new[] { new PlanePoint(pl.x, -pl.z) });   // the host keeps the ring 4 m clear of the entering player
             float t0 = Time.time;

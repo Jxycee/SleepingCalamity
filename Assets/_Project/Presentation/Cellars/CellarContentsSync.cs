@@ -24,6 +24,12 @@
 // Players are ignored for room entry and piece pickup until they are inside the armed floor's bounds and have moved over StaleMoveDistance from where they stood at arm time
 // (the owner teleport after a floor change may not have landed yet).
 // Range checks also need line of sight (WallBetween: a horizontal ray at eye height against the floor's Walls/Pillars/Doors colliders; the floor's colliders are on the default layer, not Structure). Ambush springs keep 4 m from every player and wait for someone in the room; the hunter (re)spawns only with no player within 8 m; the dropped gate key settles on a walkable cell.
+// FLOOR OBJECTIVES (plan 5 task 4; authority: host writes, owners ask). The floor's objective (FloorObjectivePlan.For, a pure function of the layout, so every peer computes the same objective and cells) is written to
+// State.Objective at arm time. TwoValves: an owner holding Interact within ValveReachMeters of an unturned valve sends ValveHoldRpc(valve) every ReportInterval; the host re-checks the sender (up, live, on this floor, within reach + 0.5 m),
+// feeds Core ValveHold, and sets State.ValveMask bits (a turned valve stays turned, any order); both turned sets ExitUnlocked. HoldPump: one press within PumpStartReach sends StartPumpRpc; the host re-checks and starts Core PumpHold,
+// ticks it with the living heroes inside PumpRingMeters and the pump-wave enemies at the pump, spawns the waves (Tier-1 roster enemies at CellarAmbush ring cells of the pump room, one at a time, never above GameMetrics.MaxLiveEnemies on the floor),
+// writes State.PumpStarted / PumpPercent (whole percents only), and at 100% sets ExitUnlocked. A valve or pump floor keeps the gate-key carrier as an ordinary enemy (it never drops a key; GateKey stays 0). Peers build the valve and pump
+// markers locally (CellarObjectiveMarkers, no NetworkObject) and restyle them from the replicated state, so a late joiner sees valves turned and the pump's progress with the spawn.
 // Known limits: players come from NetworkManager.ConnectedClients player objects (PlayersOverride replaces that in tests); enemies of a room whose stir extras latch after
 // entry are not topped up; the greybox CombatHost this creates (when the scene has none) runs with waves off.
 using System.Collections.Generic;
@@ -32,6 +38,7 @@ using UnityEngine;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Gameplay;
+using SleepingCalamity.Runtime;
 
 namespace SleepingCalamity.Presentation
 {
@@ -51,13 +58,19 @@ namespace SleepingCalamity.Presentation
             public bool RoomKeyHeld, DoorOpen, ExitUnlocked;
             public byte GateKey;        // 0 none yet, 1 lying at GateKeyPos, 2 taken
             public Vector3 GateKeyPos;
+            public byte Objective;      // FloorObjective of this floor (host-set at arm time)
+            public byte ValveMask;      // bit i = valve i turned (TwoValves)
+            public bool PumpStarted;    // HoldPump: the pump was started
+            public byte PumpPercent;    // HoldPump: whole percent 0-100
             public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
             {
                 s.SerializeValue(ref Seed); s.SerializeValue(ref Floor); s.SerializeValue(ref Chests); s.SerializeValue(ref Pieces); s.SerializeValue(ref Cleared); s.SerializeValue(ref PieceCount);
                 s.SerializeValue(ref RoomKeyHeld); s.SerializeValue(ref DoorOpen); s.SerializeValue(ref ExitUnlocked); s.SerializeValue(ref GateKey); s.SerializeValue(ref GateKeyPos);
+                s.SerializeValue(ref Objective); s.SerializeValue(ref ValveMask); s.SerializeValue(ref PumpStarted); s.SerializeValue(ref PumpPercent);
             }
             public bool Equals(ContentsState o) => Seed == o.Seed && Floor == o.Floor && Chests == o.Chests && Pieces == o.Pieces && Cleared == o.Cleared && PieceCount == o.PieceCount
-                && RoomKeyHeld == o.RoomKeyHeld && DoorOpen == o.DoorOpen && ExitUnlocked == o.ExitUnlocked && GateKey == o.GateKey && GateKeyPos == o.GateKeyPos;
+                && RoomKeyHeld == o.RoomKeyHeld && DoorOpen == o.DoorOpen && ExitUnlocked == o.ExitUnlocked && GateKey == o.GateKey && GateKeyPos == o.GateKeyPos
+                && Objective == o.Objective && ValveMask == o.ValveMask && PumpStarted == o.PumpStarted && PumpPercent == o.PumpPercent;
             public override bool Equals(object obj) => obj is ContentsState o && Equals(o);
             public override int GetHashCode() => unchecked((int)Chests * 31 + (int)Pieces * 7 + Floor);
         }
@@ -87,11 +100,23 @@ namespace SleepingCalamity.Presentation
 
         public ContentsState State => Net.Value;
         public int ChestRequestsHandled { get; private set; }   // host only: RPCs received, accepted or refused
+        public int ValveHoldRequests { get; private set; }       // host only: valve hold reports received, accepted or refused
         public int LastLootItem { get; private set; }            // host only
         public int NoticeCount { get; private set; }             // any peer: owner-only notices this peer received (a joiner or a restore never gets one)
         public string LastNotice { get; private set; }           // any peer: the text of the last one
         public Enemy GateKeyCarrierEnemy => _carrierEnemy;       // host only (tests)
         public Enemy HunterEnemy => _hunter;                     // host only (tests)
+
+        // ---- floor objective read API (any peer; from the replicated state, so a late joiner agrees) ----
+        public const float ValveReportReachSlack = 0.5f;          // the host accepts a valve report from this much beyond ValveReachMeters (movement between the owner's check and the RPC)
+        public static float PumpSecondsOverrideForTests;          // test hook: > 0 replaces FloorObjectiveTuning.PumpSeconds (progress runs faster; thresholds and waves are fractions of it)
+        private ContentsState Cur => IsServer ? _st : Net.Value;
+        public FloorObjective CurrentObjective => (FloorObjective)Cur.Objective;
+        public int ValvesTurned { get { int m = Cur.ValveMask, n = 0; for (int i = 0; i < ValveHold.Count; i++) if ((m & (1 << i)) != 0) n++; return n; } }
+        public float PumpProgress => Cur.PumpPercent / 100f;
+        public bool PumpStarted => Cur.PumpStarted;
+        public FloorObjectivePlan Plan => _plan;                 // computed locally per built floor (host and clients equal); null before a floor is built
+        public FloorModifierSet Modifiers => _mods;              // the floor's modifiers, computed once per built floor (never per frame)
 
         // ---- per-peer built-floor handles ----
         private int _handledBuild = -1;
@@ -127,6 +152,21 @@ namespace SleepingCalamity.Presentation
         private Bounds _armBounds; private bool _hasBounds;
         private int _handledPieces = -2;
 
+        // objective: per built floor, computed once on the build (never per frame) on every peer
+        private CellarFloorLayout _infoLayout; private FloorObjectivePlan _plan; private FloorModifierSet _mods;
+        private ulong _roomPaid;   // host: rooms already paid their Crowded/Ambush gold this floor visit (a room that resets and re-clears pays once); reset in ServerClearFloor
+        private GameObject[] _valveMarkers = new GameObject[ValveHold.Count]; private GameObject _pumpMarker;
+        private int _shownValveMask = -1, _shownPump = -1;
+        private string _objectivePrompt = "";          // owner side: the hold/press prompt of a valve or the pump in reach ("" = none)
+        private float _nextValveReport;
+        // host
+        private readonly ValveHold _valves = new ValveHold();
+        private PumpHold _pump = new PumpHold();
+        private readonly List<Enemy>[] _waveEnemies = { new List<Enemy>(), new List<Enemy>(), new List<Enemy>() };   // living members per pump wave
+        private readonly int[] _waveToSpawn = new int[3]; private readonly float[] _waveNextAt = new float[3];      // members of a started wave still to appear, and when the next one does
+        private int _pumpSpawnIndex;                                                                                   // running index for the roster remap and the ring cell pick
+        private bool _unlockRaised;                                                                                    // ExitUnlocked was raised for this floor
+
         public override void OnNetworkSpawn() { _handledBuild = -1; _hostBuild = -1; }
 
         public override void OnNetworkDespawn()
@@ -146,6 +186,7 @@ namespace SleepingCalamity.Presentation
         {
             if (_gateKeyMarker != null) Destroy(_gateKeyMarker);
             if (_satchel != null) Destroy(_satchel);
+            DestroyObjectiveMarkers();
             _gateKeyMarker = null; _satchel = null; _satchelBuild = -1; _chests = new Transform[0]; _gate = null; _pieces = new GameObject[0]; _pieceSpots = new CellPos[0]; _handledBuild = -1; _handledPieces = -2;
         }
 
@@ -180,13 +221,15 @@ namespace SleepingCalamity.Presentation
             int key = fs.Built == null ? 0 : fs.BuildCount;
             if (key != _handledBuild)
             {
-                DestroyPieceMarkers();
+                DestroyPieceMarkers(); DestroyObjectiveMarkers();
                 _handledBuild = key; _handledPieces = -2;
                 if (fs.Built == null || fs.Layout == null) { _chests = new Transform[0]; _chestHoldsKey = new bool[0]; _gate = null; return; }
                 CellarFloorLayout l = fs.Layout;
+                EnsureFloorInfo(l, fs.Built.Dressing);
                 _chests = new Transform[l.Chests.Count]; _chestHoldsKey = new bool[l.Chests.Count];
                 for (int i = 0; i < l.Chests.Count; i++) { _chests[i] = CellarFloorBuilder.FindChest(fs.Built.Root, l.Chests[i]); _chestHoldsKey[i] = l.Chests[i].HoldsKey; }
                 _gate = CellarFloorBuilder.FindGate(fs.Built.Root);
+                BuildObjectiveMarkers(fs);
             }
             if (fs.Built == null || fs.Layout == null) return;
             // the piece count comes from the haul via the host state; wait until the state of THIS floor has arrived
@@ -207,6 +250,36 @@ namespace SleepingCalamity.Presentation
             CellPos? baker = CellarPieceSpots.BakerSpot(layout);
             if (baker.HasValue) return count > 0 ? new[] { baker.Value } : new CellPos[0];
             return CellarPieceSpots.Choose(layout, dressing, count);
+        }
+
+        // The floor's objective plan and modifiers: pure functions of the layout (seed, floor), computed once per built layout on every peer (the host's arm reuses them).
+        private void EnsureFloorInfo(CellarFloorLayout layout, CellarFloorDressing dressing)
+        {
+            if (layout == null || ReferenceEquals(_infoLayout, layout)) return;
+            _infoLayout = layout;
+            _plan = FloorObjectivePlan.For(layout, dressing);
+            _mods = FloorModifierSet.For(layout.Seed, layout.Floor);
+        }
+
+        private void BuildObjectiveMarkers(CellarFloorSync fs)
+        {
+            if (_plan == null || fs.Built == null || fs.Built.Root == null) return;
+            Transform root = fs.Built.Root;
+            Vector3 At(CellPos c) => root.TransformPoint(CellarFloorBuilder.CellCenter(c.X, c.Y));
+            if (_plan.Objective == FloorObjective.TwoValves)
+            {
+                _valveMarkers[0] = CellarObjectiveMarkers.BuildValve(root, At(_plan.ValveCellA));
+                _valveMarkers[1] = CellarObjectiveMarkers.BuildValve(root, At(_plan.ValveCellB));
+            }
+            else if (_plan.Objective == FloorObjective.HoldPump) _pumpMarker = CellarObjectiveMarkers.BuildPump(root, At(_plan.PumpCell), FloorObjectiveTuning.PumpRingMeters);
+            _shownValveMask = -1; _shownPump = -1;
+        }
+
+        private void DestroyObjectiveMarkers()
+        {
+            for (int i = 0; i < _valveMarkers.Length; i++) { if (_valveMarkers[i] != null) Destroy(_valveMarkers[i]); _valveMarkers[i] = null; }
+            if (_pumpMarker != null) Destroy(_pumpMarker);
+            _pumpMarker = null; _shownValveMask = -1; _shownPump = -1; _objectivePrompt = "";
         }
 
         private void DestroyPieceMarkers()
@@ -231,6 +304,24 @@ namespace SleepingCalamity.Presentation
             if (keyLies && _gateKeyMarker == null) _gateKeyMarker = CellarFloorBuilder.BuildGateKey(transform, s.GateKeyPos);
             else if (!keyLies && _gateKeyMarker != null) { Destroy(_gateKeyMarker); _gateKeyMarker = null; }
             ShowSatchel(fs, s, ok);
+            ShowObjective(s, ok);
+        }
+
+        // Valves turn and the pump changes colour with the replicated state (restyled only when it changes).
+        private void ShowObjective(in ContentsState s, bool ok)
+        {
+            int mask = ok ? s.ValveMask : 0;
+            if (mask != _shownValveMask)
+            {
+                _shownValveMask = mask;
+                for (int i = 0; i < _valveMarkers.Length; i++) if (_valveMarkers[i] != null) CellarObjectiveMarkers.SetValve(_valveMarkers[i], (mask & (1 << i)) != 0);
+            }
+            int pump = !ok ? 0 : (s.PumpPercent >= 100 || (s.ExitUnlocked && s.Objective == (byte)FloorObjective.HoldPump)) ? 2 : s.PumpStarted ? 1 : 0;
+            if (pump != _shownPump)
+            {
+                _shownPump = pump;
+                if (_pumpMarker != null) CellarObjectiveMarkers.SetPump(_pumpMarker, pump >= 1, pump == 2);
+            }
         }
 
         // The local player's own bag view (see LocalOpenedMask for the per-NetworkManager lookup); false before the hero exists.
@@ -301,8 +392,11 @@ namespace SleepingCalamity.Presentation
         // owner side: the Interact prompt
         // =================================================================================================================================
 
+        // Restructured for the valves (plan 5 task 4): the held-valve report runs on EVERY frame the button is down, so it comes before the rising-edge return; a press that starts a valve hold or the pump is
+        // not also a chest, gate or key press.
         private void LocalInteract(CellarFloorSync fs)
         {
+            _objectivePrompt = "";
             NetworkClient me = NetworkManager.LocalClient;
             NetworkObject po = me?.PlayerObject;
             if (po == null) return;
@@ -311,10 +405,57 @@ namespace SleepingCalamity.Presentation
             var intent = hc.Input.Intent;
             bool now = intent.InteractPressed || intent.InteractHeld;
             bool edge = now && !_prevInteract; _prevInteract = now;
-            if (!edge || fs.Built == null) return;
-            int best = FindLocalTarget(fs, po.transform.position, out bool gate);
+            if (fs.Built == null) return;
+            HeroVitals vitals = po.GetComponent<HeroVitals>();
+            bool up = vitals == null || vitals.IsUp;
+            Vector3 at = po.transform.position;
+            int valve = up ? NearestUnturnedValve(fs, at) : -1;
+            if (valve >= 0)
+            {
+                _objectivePrompt = ValvePromptText;
+                if (now && Time.time >= _nextValveReport) { _nextValveReport = Time.time + FloorObjectiveTuning.ReportInterval; RequestValveHold(valve); }   // game time, like the host's report clock (a fixed-step bot run is faster than real time)
+                return;   // the whole press belongs to the valve
+            }
+            bool pump = up && PumpStartableAt(fs, at);
+            if (pump) _objectivePrompt = PumpPromptText;
+            if (!edge) return;
+            if (pump) { RequestStartPump(); return; }
+            int best = FindLocalTarget(fs, at, out bool gate);
             if (best >= 0) RequestOpenChest(best);
             else if (gate) RequestOpenDoor();
+        }
+
+        public const string ValvePromptText = "Hold [{0}] to open the valve", PumpPromptText = "[{0}] start the pump when you're ready";
+
+        // Owner side: the unturned valve within ValveReachMeters of `p` (flat), -1 when none. Reads the replicated state of the built floor.
+        private int NearestUnturnedValve(CellarFloorSync fs, Vector3 p)
+        {
+            ContentsState s = Net.Value;
+            if (_plan == null || _plan.Objective != FloorObjective.TwoValves || !StateMatches(fs, s) || s.Objective != (byte)FloorObjective.TwoValves) return -1;
+            int best = -1; float bestD = FloorObjectiveTuning.ValveReachMeters * FloorObjectiveTuning.ValveReachMeters;
+            for (int i = 0; i < ValveHold.Count; i++)
+            {
+                if ((s.ValveMask & (1 << i)) != 0 || _valveMarkers[i] == null) continue;
+                float d = FlatSqr(p, _valveMarkers[i].transform.position);
+                if (d <= bestD) { bestD = d; best = i; }
+            }
+            return best;
+        }
+
+        // Owner side: the pump is not started yet and `p` is within PumpStartReach of it.
+        private bool PumpStartableAt(CellarFloorSync fs, Vector3 p)
+        {
+            ContentsState s = Net.Value;
+            if (_plan == null || _plan.Objective != FloorObjective.HoldPump || _pumpMarker == null || !StateMatches(fs, s) || s.Objective != (byte)FloorObjective.HoldPump || s.PumpStarted) return false;
+            return FlatSqr(p, _pumpMarker.transform.position) <= FloorObjectiveTuning.PumpStartReach * FloorObjectiveTuning.PumpStartReach;
+        }
+
+        private void OnGUI()
+        {
+            if (!IsSpawned || _objectivePrompt.Length == 0) return;
+            IInputService input = HeroInput.ResolveDefault();
+            string key = input != null ? input.GetBindingDisplayString(InputActionNames.Interact) : "";
+            GUI.Box(new Rect(Screen.width * 0.5f - 190f, Screen.height - 150f, 380f, 30f), string.Format(_objectivePrompt, string.IsNullOrEmpty(key) ? "E" : key));
         }
 
         // The chest (index) or the gate that an Interact press at `p` would use; -1 and gate=false when none is in range.
@@ -341,16 +482,28 @@ namespace SleepingCalamity.Presentation
         public bool TrySatchelPosition(out Vector3 pos) { pos = default; if (_satchel == null) return false; pos = _satchel.transform.position; return true; }
 
         /// <summary>Owner side: true when an Interact press at `p` would open a chest or the gate. The dive director then leaves that press to the contents (one press, one action).</summary>
-        public bool WouldUseInteract(Vector3 p) { int c = FindLocalTarget(FloorSync, p, out bool gate); return c >= 0 || (gate && Net.Value.RoomKeyHeld); }   // the locked gate takes no press without the key
+        public bool WouldUseInteract(Vector3 p)
+        {
+            int c = FindLocalTarget(FloorSync, p, out bool gate);   // the locked gate takes no press without the key
+            return c >= 0 || (gate && Net.Value.RoomKeyHeld) || (FloorSync != null && (NearestUnturnedValve(FloorSync, p) >= 0 || PumpStartableAt(FloorSync, p)));
+        }
 
         public void RequestOpenChest(int chestIndex) { RequestOpenChestRpc(chestIndex); }
         public void RequestOpenDoor() { RequestOpenDoorRpc(); }
+        public void RequestValveHold(int valve) { ValveHoldRpc((byte)valve); }
+        public void RequestStartPump() { StartPumpRpc(); }
 
         [Rpc(SendTo.Server)]
         private void RequestOpenChestRpc(int chestIndex, RpcParams rpcParams = default) { ChestRequestsHandled++; ServerTryOpenChest(rpcParams.Receive.SenderClientId, chestIndex); }
 
         [Rpc(SendTo.Server)]
         private void RequestOpenDoorRpc(RpcParams rpcParams = default) { ServerTryOpenDoor(rpcParams.Receive.SenderClientId); }
+
+        [Rpc(SendTo.Server)]
+        private void ValveHoldRpc(byte valve, RpcParams rpcParams = default) { ValveHoldRequests++; ServerReportValve(rpcParams.Receive.SenderClientId, valve); }
+
+        [Rpc(SendTo.Server)]
+        private void StartPumpRpc(RpcParams rpcParams = default) { ServerTryStartPump(rpcParams.Receive.SenderClientId); }
 
         // Host to ONE client: a short refusal (the bag is full). A one-shot: it is never resent to a late joiner and a save restore sends none.
         private void NoticeOwner(ulong clientId, string text) { NoticeOwnerRpc(text, RpcTarget.Single(clientId, RpcTargetUse.Temp)); }
@@ -493,6 +646,7 @@ namespace SleepingCalamity.Presentation
             TickAmbush(fs);
             SpawnHunter(fs);
             TickGateKey();
+            TickObjective(fs);
             TickPieces(fs);
             TickSatchels(fs);
             TickAutoDoor(fs);
@@ -508,16 +662,17 @@ namespace SleepingCalamity.Presentation
             if (!IsServer || !IsSpawned || layout == null || floorRoot == null) return false;
             ServerClearFloor();
             _layout = layout; _root = floorRoot; _dressing = CellarFloorDressing.Resolve(layout);
-            _st = new ContentsState { Seed = layout.Seed, Floor = layout.Floor, PieceCount = ArmPieces(layout.Floor) };
+            EnsureFloorInfo(layout, _dressing);
+            _st = new ContentsState { Seed = layout.Seed, Floor = layout.Floor, PieceCount = ArmPieces(layout.Floor), Objective = (byte)_plan.Objective };
             _armPos.Clear(); _live.Clear(); _hasBounds = false;
             CellarFloorSync afs = FloorSync;
             if (afs != null && afs.Built != null && afs.Built.Root == floorRoot) { _armBounds = afs.Built.Bounds; _armBounds.Expand(new Vector3(2f, 0f, 2f)); _hasBounds = true; }
             _players.Clear();
             if (PlayersOverride != null) PlayersOverride(_players); else CollectFromNetwork();
             foreach (PlayerPos p in _players) _armPos[p.ClientId] = p.Position;
-            if (HasGateKeyStair(layout.Floor) && !CarrierIsValid(layout, _dressing)) _st.ExitUnlocked = true;
+            if (HasGateKeyStair(layout.Floor) && CarrierGatesExit && !CarrierIsValid(layout, _dressing)) _st.ExitUnlocked = true;   // a valve or pump floor waits for its objective instead
             Publish();
-            if (_st.ExitUnlocked) ExitUnlocked?.Invoke(layout.Floor);
+            if (_st.ExitUnlocked) { _unlockRaised = true; ExitUnlocked?.Invoke(layout.Floor); }
             return true;
         }
 
@@ -528,6 +683,7 @@ namespace SleepingCalamity.Presentation
             UntrackAll();
             if (_combat != null) _combat.ServerClearEnemies();
             _clear.Reset(); _entered.Clear(); _ambushRoom = -1; _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
+            _valves.Reset(); _unlockRaised = false; _roomPaid = 0UL;
             _layout = null; _root = null; _dressing = null; _armPos.Clear(); _live.Clear(); _hasBounds = false;
             _st = new ContentsState();
             if (IsSpawned) Publish();
@@ -561,9 +717,32 @@ namespace SleepingCalamity.Presentation
         // False for a gate-key floor that is not the armed one. The spine's wiring: ExitUnlocked += f => DiveDirector.Instance.ServerOpenStair(f).
         public bool IsExitUnlocked(int floor)
         {
+            if (_layout != null && _layout.Floor == floor && !CarrierGatesExit && floor == DiveFloorTable.LastBuiltFloor) return _st.ExitUnlocked;   // floor 7's valve or pump gates the stand-in ending door
             if (!HasGateKeyStair(floor)) return true;
             return _layout != null && _layout.Floor == floor && _st.ExitUnlocked;
         }
+
+        // False on a valve or pump floor: its gate-key carrier is an ordinary enemy (no key, no early unlock); Rescue, Guardian, the ending and the authored floors keep the carrier rules.
+        private bool CarrierGatesExit => _plan == null || (_plan.Objective != FloorObjective.TwoValves && _plan.Objective != FloorObjective.HoldPump);
+
+        /// <summary>Any peer: floor `floor`'s way out is gated by a valve or pump objective that is not finished (floor 7's ending door; the stair floors are gated by the stair itself). Before the floor's state arrives it answers from the locally computed plan (closed for a valve or pump floor).</summary>
+        public bool IsObjectiveGated(int floor)
+        {
+            ContentsState s = Cur;
+            if (s.Floor == floor)
+            {
+                if (s.ExitUnlocked) return false;
+                return s.Objective == (byte)FloorObjective.TwoValves || s.Objective == (byte)FloorObjective.HoldPump;
+            }
+            // The state is not (yet) on this floor (just built, between floors, a late joiner): fail closed from the plan every peer computes for the built floor, never open.
+            CellarFloorSync fs = FloorSync;
+            if (fs != null && fs.Layout != null && fs.Built != null && fs.BuiltFloor == floor) EnsureFloorInfo(fs.Layout, fs.Built.Dressing);
+            if (_plan == null || _infoLayout == null || _infoLayout.Floor != floor) return false;
+            return _plan.Objective == FloorObjective.TwoValves || _plan.Objective == FloorObjective.HoldPump;
+        }
+
+        /// <summary>The objective line of the current floor for a prompt or the card: "Open both valves (1/2)", "Start the pump and hold it (40%)", "Find the gate key".</summary>
+        public string ObjectiveLine => FloorCardText.ObjectiveLine(CurrentObjective, ValvesTurned, PumpProgress, PumpStarted, Cur.GateKey);
 
         public bool AutoArm = true;
         private CellarFloorLayout _layout; private Transform _root; private CellarFloorDressing _dressing;
@@ -575,9 +754,10 @@ namespace SleepingCalamity.Presentation
             foreach (Enemy e in new List<Enemy>(_tracked.Keys)) Unhook(e);
             _tracked.Clear();
             if (_hunter != null) Unhook(_hunter);
+            ResetPump();
         }
 
-        private void Unhook(Enemy e) { if (e == null) return; e.ServerDied -= OnEnemyDied; e.ServerDespawned -= OnEnemyDespawned; e.ServerDied -= OnHunterDied; e.ServerDespawned -= OnHunterDespawned; }
+        private void Unhook(Enemy e) { if (e == null) return; e.ServerDied -= OnEnemyDied; e.ServerDespawned -= OnEnemyDespawned; e.ServerDied -= OnHunterDied; e.ServerDespawned -= OnHunterDespawned; e.ServerDied -= OnWaveEnemyGone; e.ServerDespawned -= OnWaveEnemyGone; }
 
         private CombatHost EnsureCombat()
         {
@@ -652,7 +832,7 @@ namespace SleepingCalamity.Presentation
             {
                 if (sp.RoomIndex != room || sp.Kind == EncounterKind.Hunter) continue;
                 slot++;
-                bool carrierSpawn = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
+                bool carrierSpawn = CarrierGatesExit && l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
                 if (carrierSpawn && _st.GateKey != 0) { index++; continue; }   // its key already dropped (or was taken): a re-entered room does not bring the carrier back
                 bool warden = l.WardenCell.HasValue && l.WardenCell.Value.X == sp.X && l.WardenCell.Value.Y == sp.Y;
                 if (warden && HaulSync != null && HaulSync.Session != null && (HaulSync.Session.StartedAtBank || HaulSync.Session.IsCleared(l.Floor))) { index++; continue; }   // a party that started at the bank (decision 2), or returns to a cleared bank floor (a resumed suspend), never meets the guardian
@@ -660,7 +840,7 @@ namespace SleepingCalamity.Presentation
                 EnemyKind kind = warden ? EnemyKind.DoughWarden : sp.Tier == SpawnTier.Tier2 ? EnemyKind.RatKing : CellarEnemyMix.Tier1Kind(l.Seed, l.Floor, room, index, plan.RosterMask);
                 index++;
                 Enemy e = combat.SpawnEnemy(kind, tier, World(fs, ambush != null ? ambush[slot] : sp.Cell), room: room);
-                bool carrier = l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;
+                bool carrier = CarrierGatesExit && l.Carrier != null && l.Carrier.X == sp.X && l.Carrier.Y == sp.Y && sp.Kind == EncounterKind.Authored;   // false on a valve or pump floor: an ordinary enemy
                 if (e == null)
                 {
                     if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
@@ -676,7 +856,7 @@ namespace SleepingCalamity.Presentation
 
         private void SpawnHunter(CellarFloorSync fs)
         {
-            if (_hunterSpawned) return;
+            if (_hunterSpawned || _mods.Has(FloorModifier.Hushed)) return;   // Hushed: no hunter on this floor even when it is latched (the latch stays for the next floor)
             CellarEncounterPlan plan = HaulSync != null ? HaulSync.EncounterPlan : null;
             if (plan == null || plan.Hunter == null || plan.Floor != _layout.Floor || plan.Seed != _layout.Seed) return;
             if (!CellarSpawnSafety.FarFromAll(plan.Hunter.Cell, PlanePoints(), CellarSpawnSafety.HunterMinPlayerMeters)) return;   // never (re)appear on top of a player: wait until the cell is clear
@@ -708,7 +888,7 @@ namespace SleepingCalamity.Presentation
             }
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = SettledKeyPos(e.transform.position); }
             if (t.Guardian) GuardianDefeated?.Invoke(_st.Floor);
-            if (_clear.Died(t.Room)) { _st.Cleared = _clear.ClearedMask; RoomCleared?.Invoke(t.Room); }
+            if (_clear.Died(t.Room)) { _st.Cleared = _clear.ClearedMask; PayRoomClear(t.Room); RoomCleared?.Invoke(t.Room); }
             if (_carrierLostRoom == t.Room && _st.GateKey == 0 && !RoomHasTracked(t.Room))   // its carrier was lost without a drop: reset the room so the carrier comes back on entry
             { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _carrierLostRoom = -1; _st.Cleared = _clear.ClearedMask; }
             Publish();
@@ -813,6 +993,7 @@ namespace SleepingCalamity.Presentation
             else
             {
                 int bonus = HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(_layout.Floor) : 0;   // momentum: a second-half chest rolls one rank higher
+                bonus = _mods.ChestRankBonus(bonus);   // Dim: one more rank on every chest roll of the floor
                 item = CellarLoot.RollChest(_layout.Seed, _layout.Floor, chestIndex, HaulSync.PlayerSlotOf(clientId), bonus, bag.OwnsBoots);   // may be GoldId
                 if (item != CellarLoot.GoldId && bag.IsFull)   // a full bag refuses the chest (decision 6): it stays closed for this player, who alone is told
                 {
@@ -823,11 +1004,47 @@ namespace SleepingCalamity.Presentation
                 bag.MarkChestOpened(_layout.Seed, _layout.Floor, chestIndex);
                 if (item == CellarLoot.GoldId) HaulSync.ServerAddGold(clientId, CellarLoot.GoldPurse);   // a purse never reaches PlayerBag.Add (it rejects ids <= 0)
                 else HaulSync.ServerAddItem(clientId, item);
+                for (int k = 1; k <= _mods.ExtraChestRolls; k++) GiveExtraRoll(clientId, bag, chestIndex, k, bonus);   // Stirred: the printed reward
             }
             LastLootItem = item;
             Publish();
             ChestOpened?.Invoke(chestIndex, item);
             return true;
+        }
+
+        // Stirred's extra roll (plan 5 task 5): an extra CellarLoot.RollChest on a derived chest index, added under the normal bag-full rule. A refused roll is simply lost (the opener is told).
+        public int LastExtraLootItem { get; private set; }   // host only (tests)
+        private void GiveExtraRoll(ulong clientId, PlayerBag bag, int chestIndex, int k, int rankBonus)
+        {
+            int extra = CellarLoot.RollChest(_layout.Seed, _layout.Floor, chestIndex + 1000 * k, HaulSync.PlayerSlotOf(clientId), rankBonus, bag.OwnsBoots);
+            LastExtraLootItem = extra;
+            if (extra == CellarLoot.GoldId) HaulSync.ServerAddGold(clientId, CellarLoot.GoldPurse);
+            else if (bag.IsFull) NoticeOwner(clientId, BagFullText);
+            else HaulSync.ServerAddItem(clientId, extra);
+        }
+
+        // Crowded: gold for every present player each time a room becomes cleared; Ambush: more when the ambush room does. Per player through the ordinary ServerAddGold path.
+        public int GoldPaidForClears { get; private set; }   // host only (tests): the total gold handed out by the Crowded / Ambush rewards
+        private void PayRoomClear(int room)
+        {
+            if (room < 0 || room >= 64) return;
+            ulong bit = 1UL << room;
+            if ((_roomPaid & bit) != 0) return;   // paid already: a room that reset and cleared again does not pay twice
+            _roomPaid |= bit;
+            int each = _mods.GoldPerRoomClear;
+            if (_mods.AmbushRoomGold > 0)
+            {
+                CellarEncounterPlan plan = CurrentPlan(FloorSync);
+                if (plan.Twist == FloorTwist.Ambush && room == plan.AmbushRoom) each += _mods.AmbushRoomGold;
+            }
+            PayEveryone(each);
+        }
+
+        // "Present" = every connected client with a hero in the dive, downed ones included (they are in the party); HaulSync.ServerAddGold skips anyone without a dive hero.
+        private void PayEveryone(int each)
+        {
+            if (each <= 0 || HaulSync == null) return;
+            foreach (ulong id in NetworkManager.ConnectedClientsIds) if (HaulSync.ServerAddGold(id, each)) GoldPaidForClears += each;
         }
 
         public bool ServerTryOpenDoor(ulong clientId)
@@ -836,6 +1053,143 @@ namespace SleepingCalamity.Presentation
             if (!HostReady(fs) || _gate == null || !_st.RoomKeyHeld || _st.DoorOpen) return false;
             if (!TryPlayerPos(clientId, out Vector3 pos) || FlatSqr(pos, _gate.position) > GateRange * GateRange || WallBetween(_root, pos, _gate.position)) return false;
             _st.DoorOpen = true; Publish(); return true;
+        }
+
+        // ---- floor objectives (host) ----
+        private void RaiseExitUnlocked()
+        {
+            _st.ExitUnlocked = true;
+            Publish();
+            if (_unlockRaised) return;
+            _unlockRaised = true;
+            ExitUnlocked?.Invoke(_st.Floor);
+        }
+
+        private bool ValveAt(int valve, out Vector3 at)
+        {
+            at = default;
+            if (_plan == null || _plan.Objective != FloorObjective.TwoValves || valve < 0 || valve >= ValveHold.Count) return false;
+            at = World(null, valve == 0 ? _plan.ValveCellA : _plan.ValveCellB);
+            return true;
+        }
+
+        // Host: the owner of a hero reports "holding at valve `valve`" (every ReportInterval while the button is held). Refused off the host, on a floor that is not a valve floor, for a turned or bad valve, for a
+        // hero that is down, not yet on the floor or farther than ValveReachMeters + ValveReportReachSlack. A fresh report keeps the valve's hold running (ValveHold ends it when reports stop).
+        public bool ServerReportValve(ulong clientId, int valve)
+        {
+            CellarFloorSync fs = FloorSync;
+            if (!HostReady(fs) || _st.Objective != (byte)FloorObjective.TwoValves || (_st.ValveMask & (1 << valve)) != 0 || !ValveAt(valve, out Vector3 at)) return false;
+            if (!TryPlayerPos(clientId, out Vector3 pos)) return false;
+            float reach = FloorObjectiveTuning.ValveReachMeters + ValveReportReachSlack;
+            if (FlatSqr(pos, at) > reach * reach) return false;
+            _valves.Report(valve, Time.time);
+            return true;
+        }
+
+        // Host: one press within PumpStartReach of the pump starts it (a hero that is up; the pump then runs by itself while someone stands in the ring). False if already started.
+        public bool ServerTryStartPump(ulong clientId)
+        {
+            CellarFloorSync fs = FloorSync;
+            if (!HostReady(fs) || _st.Objective != (byte)FloorObjective.HoldPump || _plan == null || _pump.Started) return false;
+            if (!TryPlayerPos(clientId, out Vector3 pos)) return false;
+            if (FlatSqr(pos, World(fs, _plan.PumpCell)) > FloorObjectiveTuning.PumpStartReach * FloorObjectiveTuning.PumpStartReach) return false;
+            _pump.Start();
+            _st.PumpStarted = true; Publish();
+            return true;
+        }
+
+        private void TickObjective(CellarFloorSync fs)
+        {
+            float dt = Mathf.Min(Time.deltaTime, 0.25f);
+            if (_st.Objective == (byte)FloorObjective.TwoValves && !_st.ExitUnlocked)
+            {
+                if (_valves.Tick(Time.time, dt)) { _st.ValveMask = (byte)_valves.TurnedMask; if (_valves.AllTurned) RaiseExitUnlocked(); else Publish(); }
+            }
+            else if (_st.Objective == (byte)FloorObjective.HoldPump && _pump.Started) TickPump(dt);
+        }
+
+        private int PresentPlayers => Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
+        private int WaveLiving(int w) => _waveEnemies[w].Count + _waveToSpawn[w];
+
+        private void TickPump(float dt)
+        {
+            if (_pump.Done) return;
+            Vector3 pumpAt = World(null, _plan.PumpCell);
+            bool hero = false;
+            float ring2 = FloorObjectiveTuning.PumpRingMeters * FloorObjectiveTuning.PumpRingMeters;
+            foreach (PlayerPos p in _players) if (FlatSqr(p.Position, pumpAt) <= ring2) { hero = true; break; }
+            bool enemyAtPump = false;
+            float slow2 = FloorObjectiveTuning.PumpSlowRadius * FloorObjectiveTuning.PumpSlowRadius;
+            for (int w = 0; w < _waveEnemies.Length && !enemyAtPump; w++)
+                foreach (Enemy e in _waveEnemies[w]) if (e != null && e.Alive && FlatSqr(e.transform.position, pumpAt) <= slow2) { enemyAtPump = true; break; }
+            float scaled = PumpSecondsOverrideForTests > 0f ? dt * (FloorObjectiveTuning.PumpSeconds / PumpSecondsOverrideForTests) : dt;
+            PumpTick t = _pump.Tick(scaled, hero, enemyAtPump, WaveLiving(0), WaveLiving(1), WaveLiving(2));
+            if (t.StartWave >= 0) BeginWave(t.StartWave);
+            if (t.JustDone) { for (int w = 0; w < _waveToSpawn.Length; w++) _waveToSpawn[w] = 0; }   // the pump is done: no more enemies appear (the living ones stay)
+            else SpawnWaveMembers();
+            byte pct = t.JustDone || _pump.Done ? (byte)100 : (byte)Mathf.Min(99, Mathf.FloorToInt(_pump.Progress * 100f + 0.0001f));
+            if (pct != _st.PumpPercent) { _st.PumpPercent = pct; Publish(); }
+            if (t.JustDone) RaiseExitUnlocked();
+        }
+
+        // A wave starts: its size is trimmed so the floor stays within GameMetrics.MaxLiveEnemies (counting what other waves still have to spawn); members then appear one at a time.
+        private void BeginWave(int w)
+        {
+            int live = _combat != null ? _combat.AliveEnemies.Count : 0;
+            for (int o = 0; o < _waveToSpawn.Length; o++) if (o != w) live += _waveToSpawn[o];
+            _waveToSpawn[w] = PumpHold.WaveSize(PresentPlayers, live);
+            _waveNextAt[w] = Time.time;
+            WavesStarted++;
+        }
+
+        public CombatHost CombatForTests => IsServer ? EnsureCombat() : null;   // host only (tests): the floor's combat host, created on demand (a test spawns inert fodder with it to fill the live cap)
+        public int WavesStarted { get; private set; }      // host only (tests): pump waves begun on this floor
+        public int PumpEnemiesSpawned { get; private set; } // host only (tests)
+        public int PumpWaveLiving(int wave) => wave >= 0 && wave < _waveEnemies.Length ? _waveEnemies[wave].Count : 0;   // host only (tests)
+
+        private void SpawnWaveMembers()
+        {
+            for (int w = 0; w < _waveToSpawn.Length; w++)
+            {
+                if (_waveToSpawn[w] <= 0 || Time.time < _waveNextAt[w]) continue;
+                CombatHost combat = EnsureCombat();
+                if (combat.AliveEnemies.Count >= GameMetrics.MaxLiveEnemies) continue;   // the cap holds the spawn back: it comes when the floor has room again
+                Enemy e = SpawnPumpEnemy(combat);
+                _waveToSpawn[w]--;
+                _waveNextAt[w] = Time.time + PumpHold.Stagger(PresentPlayers);
+                if (e == null) continue;
+                _waveEnemies[w].Add(e); PumpEnemiesSpawned++;
+                e.ServerDied += OnWaveEnemyGone; e.ServerDespawned += OnWaveEnemyGone;
+            }
+        }
+
+        // One Tier-1 roster enemy at a CellarAmbush ring cell of the pump room (a room with no plan spawns uses its free cells), skipping the gate-key carrier's cell.
+        private Enemy SpawnPumpEnemy(CombatHost combat)
+        {
+            CellarFloorSync fs = FloorSync;
+            CellarEncounterPlan plan = CurrentPlan(fs);
+            int room = _plan.PumpRoom;
+            IReadOnlyList<CellPos> cells = CellarAmbush.Cells(_layout, _dressing, plan, room, PlanePoints());
+            if (cells.Count == 0) cells = CellarEncounterPlan.FreeCellsOf(_layout, _dressing, room);
+            if (cells.Count == 0) return null;
+            CellPos cell = cells[_pumpSpawnIndex % cells.Count];
+            for (int tries = 0; tries < cells.Count && _layout.Carrier != null && cell.X == _layout.Carrier.X && cell.Y == _layout.Carrier.Y; tries++) cell = cells[(_pumpSpawnIndex + tries + 1) % cells.Count];
+            EnemyKind kind = CellarEnemyMix.Tier1Kind(_layout.Seed, _layout.Floor, room, 100 + _pumpSpawnIndex, plan.RosterMask);
+            _pumpSpawnIndex++;
+            return combat.SpawnEnemy(kind, EnemyCatalog.AuthoredTier(false, false, _layout.Floor), World(fs, cell), room: room);
+        }
+
+        private void OnWaveEnemyGone(Enemy e)
+        {
+            Unhook(e);
+            foreach (List<Enemy> l in _waveEnemies) l.Remove(e);
+        }
+
+        private void ResetPump()
+        {
+            foreach (List<Enemy> l in _waveEnemies) { foreach (Enemy e in l) Unhook(e); l.Clear(); }
+            for (int w = 0; w < _waveToSpawn.Length; w++) { _waveToSpawn[w] = 0; _waveNextAt[w] = 0f; }
+            _pump = new PumpHold(); _pumpSpawnIndex = 0; WavesStarted = 0; PumpEnemiesSpawned = 0;
         }
 
         // Test/world hooks: world position of a chest / the gate / a piece / the gate key on this peer's built floor.
@@ -852,6 +1206,11 @@ namespace SleepingCalamity.Presentation
             pos = _pieces[i].transform.position; return true;
         }
         public bool GateKeyMarkerShown => _gateKeyMarker != null;
+        public bool TryValvePosition(int i, out Vector3 pos) { pos = default; if (i < 0 || i >= _valveMarkers.Length || _valveMarkers[i] == null) return false; pos = _valveMarkers[i].transform.position; return true; }
+        public bool TryPumpPosition(out Vector3 pos) { pos = default; if (_pumpMarker == null) return false; pos = _pumpMarker.transform.position; return true; }
+        public bool ValveShownTurned(int i) => i >= 0 && i < _valveMarkers.Length && CellarObjectiveMarkers.ValveShownTurned(_valveMarkers[i]);
+        public Color PumpMarkerColor => CellarObjectiveMarkers.PumpColorOf(_pumpMarker);
+        public bool PumpMarkerShown => _pumpMarker != null;
         public int EnterEnemyCount(int room) => _clear.Spawned(room);   // host only
         public int AliveInRoom(int room) => _clear.Alive(room);         // host only
     }

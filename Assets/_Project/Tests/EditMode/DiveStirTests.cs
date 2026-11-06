@@ -49,6 +49,21 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void CollapseFactor_ScalesTheMinimumToo_AndOneIsUnchanged()
+        {
+            float hurried = FloorModifierTuning.HurriedCollapseMultiplier / DiveStir.CollapseMultiplier;
+            Assert.That(DiveStir.CollapseSeconds(20f, 1f), Is.EqualTo(DiveStir.CollapseSeconds(20f)));
+            Assert.That(DiveStir.CollapseSeconds(80f, 1f), Is.EqualTo(120f));
+            Assert.That(DiveStir.CollapseSeconds(20f, hurried), Is.LessThanOrEqualTo(50f), "a short path: the 60 s minimum is scaled too");
+            Assert.That(DiveStir.CollapseSeconds(80f, hurried), Is.EqualTo(100f).Within(0.01f), "1.25x of 80");
+
+            var plain = new DiveStir { UnbankedValuables = 20 }; plain.BeginCollapse(20f);
+            var quick = new DiveStir { UnbankedValuables = 20 }; quick.BeginCollapse(20f, hurried);
+            Assert.That(plain.CollapseSecondsLeft, Is.EqualTo(60f));
+            Assert.That(quick.CollapseSecondsLeft, Is.LessThanOrEqualTo(50f));
+        }
+
+        [Test]
         public void Tick_FailsWhenTheCountdownRunsOut()
         {
             var s = new DiveStir();

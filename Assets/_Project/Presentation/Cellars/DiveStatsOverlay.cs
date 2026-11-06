@@ -19,6 +19,7 @@ namespace SleepingCalamity.Presentation
     {
         private readonly DiveStatsModel _model = new DiveStatsModel();
         private bool _visible;
+        public static bool Shown { get; private set; }   // read by FloorCardHud to sit below this panel (both use the top-right corner)
         private CellarContentsSync _hooked;
         private HeroVitals _hero;
         private DiveHaulSync.Summary _sum;
@@ -40,7 +41,7 @@ namespace SleepingCalamity.Presentation
             go.AddComponent<DiveStatsOverlay>();
         }
 
-        private void OnDestroy() { Unhook(); }
+        private void OnDestroy() { Unhook(); Shown = false; }
 
         private DiveDirector _hookedDir;
         private DiveHaulSync _hookedHaul;
@@ -143,6 +144,7 @@ namespace SleepingCalamity.Presentation
             Keyboard kb = Keyboard.current;
             Gamepad pad = Gamepad.current;
             if ((kb != null && kb.f4Key.wasPressedThisFrame) || (pad != null && pad.selectButton.isPressed && pad.rightStickButton.wasPressedThisFrame)) _visible = !_visible;
+            Shown = _visible;
         }
 
         private DiveSummaryReport BuildReport(double now)

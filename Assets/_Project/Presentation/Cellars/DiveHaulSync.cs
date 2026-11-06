@@ -181,12 +181,32 @@ namespace SleepingCalamity.Presentation
             if (failed) DiveFailed?.Invoke();
         }
 
+        // ---- floor modifiers on the host (plan 5 task 5) ----
+        // The modifiers of `floor` (seed = the built floor's seed when that floor is built, else the dive seed), cached per (seed, floor): FloorModifierSet.For replays earlier floors, so it is never asked every frame.
+        private bool _modValid; private uint _modSeed; private int _modFloor; private FloorModifierSet _modSet;
+        private FloorModifierSet ModifiersOf(int floor)
+        {
+            ResolveFloorSync();
+            CellarFloorSync fs = FloorSync;
+            uint seed = fs != null && fs.Built != null && fs.BuiltFloor == floor ? fs.BuiltSeed : DiveSeed;
+            if (!_modValid || _modSeed != seed || _modFloor != floor) { _modSet = FloorModifierSet.For(seed, floor); _modSeed = seed; _modFloor = floor; _modValid = true; }
+            return _modSet;
+        }
+
+        // Hurried and others pay every present player through the ordinary per-player gold path. "Present" = every connected client with a hero in the dive (a bag), downed ones included: they are in the party.
+        private void PayEveryoneGold(int each)
+        {
+            if (each <= 0) return;
+            foreach (ulong id in NetworkManager.ConnectedClientsIds) ServerAddGold(id, each);
+        }
+
         // The stir's two inputs, set every host frame and again the moment an item is added: who is connected, and the valuables still carried in every bag (the push-on takes the count after the picks as
         // its baseline, so the same feed after it measures only what was found since).
         private void FeedStir()
         {
             DiveStir stir = _session.Stir;
             stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
+            stir.ModifierBonus = _session.Phase == DivePhase.Floor && ModifiersOf(DiveFloor).Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredBonus : 0f;   // Stirred: flat stir while the party is on that floor only (= FloorModifierSet.StirredBonusFor, from the cached set)
             if (_session.Phase == DivePhase.Floor || _session.Phase == DivePhase.BankRoom) stir.UnbankedValuables = _session.Bags.CarriedValuables();
         }
 
@@ -210,7 +230,7 @@ namespace SleepingCalamity.Presentation
                 if (Time.unscaledTime - _collapseWaitSince < CollapseFloorWaitSeconds) return;
             }
             _collapseWaitSince = -1f;
-            stir.BeginCollapse(built ? DiveFloorTable.PathSecondsToTarget(fs.Layout) : 0f);
+            stir.BeginCollapse(built ? DiveFloorTable.PathSecondsToTarget(fs.Layout) : 0f, ModifiersOf(DiveFloor).CollapseFactor);   // Hurried: the factor scales the final seconds (minimum included) to the 1.25x instead of 1.5x
         }
 
         // A running collapse closes when every living hero (at least one) is at the target: the party is leaving, so the host treats it like the stair (DiveStir.OnStairTaken).
@@ -330,7 +350,10 @@ namespace SleepingCalamity.Presentation
         // Host only: the stair to the next floor (DiveSession.EnterFloor: only the next floor, and floor 5's only after the bank choice).
         public bool ServerEnterFloor(int floor)
         {
-            if (!Host || !_session.EnterFloor(floor)) return false;
+            if (!Host) return false;
+            FloorModifierSet leaving = ModifiersOf(DiveFloor);   // the floor the party leaves by this stair
+            if (!_session.EnterFloor(floor)) return false;
+            PayEveryoneGold(leaving.LeaveGold);   // Hurried's printed reward
             _visitExtraOwner = -1; _choice.Cancel();
             Publish();
             return true;
@@ -349,7 +372,11 @@ namespace SleepingCalamity.Presentation
         // Host only: finishes the Phase 1 stand-in ending after floor 7.
         public bool ServerFinish()
         {
-            if (!Host || !_session.Finish()) return false;
+            if (!Host) return false;
+            bool onFloor = _session.Phase == DivePhase.Floor && DiveFloor == DiveFloorTable.LastBuiltFloor;
+            int leaveGold = onFloor ? ModifiersOf(DiveFloor).LeaveGold : 0;   // read before Finish moves the dive on
+            if (!_session.Finish()) return false;
+            PayEveryoneGold(leaveGold);   // leaving by the exit: Hurried's reward is paid once Finish succeeded (a refused Finish pays nothing, so a retry cannot pay twice)
             _choice.Cancel(); Publish(); return true;
         }
 
@@ -665,6 +692,7 @@ namespace SleepingCalamity.Presentation
         }
 
         // ---- healing (host) ----
+        public float HealRechargeSecondsNow { get; private set; }   // host only: the recharge the current floor's healing point was created with (tests; Warm Hands shortens it)
         private static void HealOne(HeroVitals v)
         {
             int healed = v.ServerHeal(v.MaxHp);
@@ -702,7 +730,10 @@ namespace SleepingCalamity.Presentation
             if (TryHealWorldPosition(out Vector3 pos))
             {
                 if (_heal == null || _healSeed != FloorSync.BuiltSeed || _healFloor != FloorSync.BuiltFloor)
-                { _heal = new HealingPointState(_healTuning.RechargeSeconds); _healSeed = FloorSync.BuiltSeed; _healFloor = FloorSync.BuiltFloor; }
+                {
+                    HealRechargeSecondsNow = ModifiersOf(FloorSync.BuiltFloor).HealRechargeSeconds(_healTuning.RechargeSeconds);   // Warm Hands: 15 s instead of 30
+                    _heal = new HealingPointState(HealRechargeSecondsNow); _healSeed = FloorSync.BuiltSeed; _healFloor = FloorSync.BuiltFloor;
+                }
                 _heal.Tick(dt);
                 if (_heal.Ready)
                 {
