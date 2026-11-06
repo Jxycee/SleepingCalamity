@@ -90,3 +90,23 @@ The gym scene is `Assets/_Project/Scenes/MetricsGym.unity` (built by `MetricsGym
 | max_validated_level | 1 | level | design (plan 4) |
 | wide_arch_width | 3.6 | m | design (plan 4) |
 <!-- metrics:end -->
+
+## Addendum: encounter templates per combat room (2026-11-06)
+`RoomEncounterTable` (Core/Rooms) lists the templates each pool combat room may draw; `EncounterBuilder` picks one from the dive seed (stream `cellars.template`, key `((ulong)floor << 32) | (uint)roomIndex`), `EncounterValidator` checks it. Solo group <= the room's authored spawn count + 1; one extra enemy per extra player at most; floors 1-2 one wave and two kinds only; Ambush only in the room the Ambush modifier picks. Ids: pack P, gel_swarm G, shield_wall W, rush_bombard Rb, guarded_caster Gc, mixed_tier M, ambush A, reinforced Re.
+
+| Room | Authored spawns | Templates |
+|---|---|---|
+| larder_pantry | 2 | P, Gc, A |
+| larder_cold_store | 2 | P, Gc, M |
+| larder_hanging_hall | 3 | G, Rb, W |
+| larder_smoke_gallery | 3 | P, W, Re |
+| wine_cask_row | 3 | P, Rb, A |
+| wine_vault_l | 3 | W, Gc, G |
+| wine_press_hall | 2 | P, Gc, Re |
+| wine_aisles | 3 | Rb, W, Gc |
+| coal_bunker | 2 | P, M, A |
+| coal_furnace_ring | 3 | G, Rb, W |
+| coal_stoke_chicane (2 heroes) | 3 | Gc, W |
+| coal_boiler_hall | 2 | P, Re, M |
+
+Spawner wiring is a later request (host NetworkBehaviours); the Ambush hook: pass `CellarEncounterPlan.AmbushRoom == roomIndex` as `isAmbushRoom`.
