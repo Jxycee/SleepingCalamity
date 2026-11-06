@@ -14,7 +14,7 @@ namespace SleepingCalamity.Core
     // PLACEHOLDER tuning in ONE spot (decisions 7 and 8 of plan 5).
     public static class FloorObjectiveTuning
     {
-        public const float ValveHoldSeconds = 2f, ValveReachMeters = 1.8f, ReportInterval = 0.2f, ReportTimeout = 0.6f;   // placeholder
+        public const float ValveHoldSeconds = 2f, ValveReachMeters = 1.8f, ReportInterval = 0.2f, ReportTimeout = 1f;   // placeholder; a knockback or push that takes the hero out of reach for under a second keeps the hold
         public const float PumpSeconds = 75f, PumpRingMeters = 4f, PumpStartReach = 2.5f, PumpSlowRadius = 2.5f, PumpSlowFactor = 0.5f;   // placeholder
         public const float WaveStagger = 1.5f, SoloStaggerFactor = 1.25f;   // placeholder
         public const int WaveBase = 2, WaveCount = 3, MaxWavesAlive = 2;   // placeholder

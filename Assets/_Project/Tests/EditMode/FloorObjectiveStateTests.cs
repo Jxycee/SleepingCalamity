@@ -47,6 +47,18 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Valve_HoldSurvivesShortBlipOutOfReach()
+        {
+            var h = new ValveHold();
+            float now = Hold(h, 0, 0f, 1f, out _);
+            float before = h.Progress(0);
+            for (float t = 0f; t < 0.8f; t += 0.05f) { h.Tick(now, 0.05f); now += 0.05f; }   // pushed out of reach: no reports for 0.8 s
+            Assert.Greater(h.Progress(0), before * 0.9f, "a blip under a second does not reset the hold");
+            Hold(h, 0, now, 1.2f, out bool turned);
+            Assert.IsTrue(turned);
+        }
+
+        [Test]
         public void Valve_StaysTurned()
         {
             var h = new ValveHold();
