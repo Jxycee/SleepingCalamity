@@ -32,6 +32,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **S** plan5 nits: "Find the gate key" on an opened key floor; pieces line duplicates `StirMeterHud`; follower bots don't split valves (`plan5-floor-card/STATUS.md:27`) [U] (`b76f862b`; follower-bot valve split moved to its own M item)
 - [ ] **M** Co-op follower bots split valves: FollowerBot has no goal pathing; needs nav + a hold loop (plan5-nits STATUS) [U]
 - [x] **S** Floor-7 valve reach 1.8 m / 0.6 s hold lost to knockback: tuning note or fix (`plan5-floor-card/STATUS.md:25`) [U] (`b76f862b`: hold survives a <1 s blip, ReportTimeout 0.6 -> 1.0)
+- [ ] **S** Flaky `DiveWalkQaTests.Walk_Floor1ToTheGeneratedPieceFloor_..._Descend(Rtt300Loss5)`: 40 s timeout waiting for the client hero, passed on re-run (plan5-nits PC check, 2026-11-06) [U][net]
 - [ ] **S** `StairHandoverTests` should destroy `TestHubGround` in teardown (PARKING_LOT :56) [U]
 - [ ] **S** Test gap: host's own bag saved and reloaded (PARKING_LOT :83) [U][net]
 - [x] **S** combat-polish follow-ups: parry-during-grace test; HurtGrace values into `TuningSections`; dead `HeroAnimMap.IsHeavyHurt` / `HurtGrace.Knockdown` (`combat-polish/STATUS.md:13-16`) [U] (`0e8ace4a`; attack-id tuning split out as its own M item)
