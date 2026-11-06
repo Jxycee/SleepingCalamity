@@ -30,12 +30,14 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** BUGS item 18b: piece spheres uncollectable when haul piece count differs from floor arm count (`BUGS.md:94`); may be stale after plan 3 (`dive-flow/STATUS.md:12`) [U]
 - [ ] **S** `DiveSpineNetworkTests` floor-7 host-hero drift (~2 m/s after Move, unexplained) + `Floor5_RealButtonPushOn` flaked once (`plan5-floor-card/STATUS.md:24-26`) [U]
 - [ ] **S** plan5 nits: "Find the gate key" on an opened key floor; pieces line duplicates `StirMeterHud`; follower bots don't split valves (`plan5-floor-card/STATUS.md:27`) [U]
+- [ ] **M** Co-op follower bots split valves: FollowerBot has no goal pathing; needs nav + a hold loop (plan5-nits STATUS) [U]
 - [ ] **S** Floor-7 valve reach 1.8 m / 0.6 s hold lost to knockback: tuning note or fix (`plan5-floor-card/STATUS.md:25`) [U]
 - [ ] **S** `StairHandoverTests` should destroy `TestHubGround` in teardown (PARKING_LOT :56) [U]
 - [ ] **S** Test gap: host's own bag saved and reloaded (PARKING_LOT :83) [U][net]
 - [ ] **S** combat-polish follow-ups: parry-during-grace test; HurtGrace values into `TuningSections`; dead `HeroAnimMap.IsHeavyHurt` / `HurtGrace.Knockdown` (`combat-polish/STATUS.md:13-16`) [U]
 - [ ] **S** traversal-2 reviewer follow-ups: VoidEdge ray reaches 42 m; lane tolerance 0.7 vs 0.2 m; EditMode guard for `HollowmereRuinSeal` (`traversal-2/STATUS.md:36-38`) [U]
 - [ ] **S** `TuningSections.cs:101` points at a TODO that no longer exists; enemy attack-id tuning not tunable (code)
+- [ ] **M** Enemy attack ids tunable: AttackCatalog enemy attacks are static readonly AttackData held by reference (EnemyDefinition.Attacks, AllEnemyAttacks, EnemyAttackById, AI/tell rules); needs a registry or replace-in-place + EnemyAttackRules validation (combat-tuning-followups STATUS, Skipped) [U]
 - [ ] **M** Builder bug: MotionVectors pass flips between graphics and `-nographics` builds (CURRENT Inbox) [U]
 
 ## Ready: per-player loot and save follow-ups (PARKING_LOT 2026-11-03)
@@ -91,12 +93,12 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **M** Gleaner prototype: Bestiary kit humanoid on the UAL rig + UAL2 clips, sheaf mask as prop (after QAL check) [A][U]
 - [ ] **M** Rig the Cellars tier-1 enemies (jam-jar slime, broom, rat-king) with small bone rigs (UniRig or hand) so they animate instead of sliding primitives [A][U]
 - [ ] **M** Wren's cat Tuppence: own mesh on a borrowed quadruped rig (Mesh2Motion fox / Quaternius cat), follow-Wren via Animation Rigging look-at [A][U][net]
-- [ ] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps for HY-Motion / Kimodo generated clips (docs; personal-use licence bar, user 2026-11-06)
+- [ ] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06)
 - [ ] **M** MPFB2 hero/townsfolk base test: one CC0 body on `game_engine` rig through `HeroAnimator.controller` [A][U]
 
 ## Ready: design notes (docs only, placeholders marked)
-- [ ] **S** Gold sink proposal: what gold buys (triage :52; tuning blocked without it)
-- [ ] **S** Enemy-kill purse, stash view, town emptying (PARKING_LOT :77, triage C1)
+- [x] **S** Gold sink proposal: what gold buys (triage :52; tuning blocked without it) (`5854759a`, `docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`)
+- [x] **S** Enemy-kill purse, stash view, town emptying (PARKING_LOT :77, triage C1) (`5854759a`, `docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`)
 - [ ] **S** Co-op hearth marks design note (PARKING_LOT :15)
 - [ ] **S** Movement tools (glide, high jump) gating optional branches (PARKING_LOT :26)
 - [ ] **S** Rule-twist challenge gauntlets from existing rooms (PARKING_LOT :32)
@@ -109,7 +111,8 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - Story book read + bible sign-off; bible Qs 6, 7, 8, 13, 15, 16 touch dive text (triage :24); 5 and 20 touch rules
 - Rename placeholder floor and NPC names (spec Q7; decisions-for-review S1-S8)
 - Bag-rule decisions: chest with a full bag (PARKING_LOT :69); save-and-quit at a stair (:74); absent player's bag through push-on/fail (:82); bank-room picks UI vs auto-fill (:67)
-- Failed dive keeps half of gold? (triage :50); weapon wear (triage Q5, default no); network conditions numbers (Q6)
+- Gold economy decisions 1-5 (`docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`, recommended defaults given)
+- Failed dive keeps half of gold? (triage :50; proposal Q4 says keep settled decision 7); weapon wear (triage Q5, default no); network conditions numbers (Q6)
 - Co-op F10 proposal (spec section 4.7, decision 40); bank slots in a 4-player party (spec Q6)
 - decisions-for-review: A6 PHASE1 lock (51 decisions), A24 cellar mood, A34 WeaponsSave wiring (must-fix before M7), A2 OoT 2026 screens check now due
 - USER_TODO: Mixamo clips (blocks M2 animation), 2-player Relay walk (M1, M2, M5, M6, M7), Tobin concept (M10), corner approvals (M9)

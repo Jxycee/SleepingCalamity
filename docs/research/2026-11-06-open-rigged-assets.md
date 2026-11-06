@@ -48,6 +48,21 @@ The user plans to play the game privately with friends and probably never sell i
 - **Blender Studio CC-BY film characters**: always fine with credit; the blocker is their film rigs, not the licence.
 Still avoid on quality or safety grounds: Kenney blocky characters (tests only); repos with no licence or no code at all (MagicArticulate, RigAnything, Anymate, AnimaX) only because there is nothing reliable to run; PhilS94 spider (paid Asset Store product; don't copy). Never: Dark Cloud names, characters, story, text, music or assets.
 
+## Hardware fit (user PC: RTX 5070, 12 GB VRAM; checked 2026-11-06)
+- **HY-Motion 1.0: no local run.** README minimum VRAM: 1.0B "26GB", Lite 0.46B "24GB" (low-VRAM tips: `--num_seeds=1`, prompt under 30 words, under 5 s). **Use Tencent's official Hugging Face Space** (`tencent/HY-Motion-1.0`, running on ZeroGPU, free with a daily quota) to generate clips, then retarget.
+- **Kimodo: no local run as shipped.** ~16-17 GB, mostly its Llama-3-8B-Instruct text encoder (~16 GB); the encoder can run on a separate machine (Toolchefs notes), not worth the setup.
+- **MoMask: yes.** ~150M-parameter class models peak well under 1 GB; a fork even runs it on CPU. Local text-to-motion option.
+- **UniRig: yes.** README: "at least 8GB VRAM" for generation; released checkpoint does skeleton + skinning (Articulation-XL2.0); Rig-XL/VRoid checkpoints still planned.
+- SkinTokens (14 GB+): no. Mesh2Motion: browser, no GPU.
+
+## Image-to-3D on the 12 GB RTX 5070 (checked 2026-11-06)
+- **Hunyuan3D-2.1** (Jun 2025, PBR): shape ~10 GB fits; PBR texture ~21 GB does not (README; `--low_vram_mode` exists, saving unpublished). Run shape only, texture with our own pipeline (`sc-ai-model-pipeline` retex / Blender bake), which we'd do anyway since AI paint blurs.
+- **Hunyuan3D-2 / 2mini-Turbo** (0.6B): README "6 GB VRAM for shape generation and 16 GB for shape and texture". Shape fits easily; texture borderline, community reports 2.0 paint running on a 12 GB RTX 3060.
+- **TripoSG** (VAST, MIT): >8 GB, shape only, CLI image to GLB. Fits; strong geometry, no texture.
+- **TRELLIS.2** (Microsoft, Dec 2025): numbers conflict (6-8 GB claimed with offload, 16 GB at 512^3, 24 GB+ comfortable); treat as borderline at low resolution.
+- **Step1X-3D**: no VRAM figure found.
+- Recommendation: Hunyuan3D-2.1 or TripoSG for shape locally, our texture pipeline for paint, UniRig (8 GB) to rig. Licence: Hunyuan community licence is fine under the personal-use bar.
+
 ## Still to verify before adopting
 1. Quaternius **QAL** licence text (Bestiary kit) and the UAL2 page's CC0-vs-"free commercial" wording.
 2. Ultimate Animated Animals roster (is there a rat, cat, crow?).
