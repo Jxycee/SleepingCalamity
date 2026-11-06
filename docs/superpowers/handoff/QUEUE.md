@@ -93,15 +93,15 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** Residents travelling between towns (PARKING_LOT :59)
 - [ ] **S** Food/water craftables + cooking (PARKING_LOT :60) - proposal for the user
 
-## Waiting on the user (don't start; ask when they're around)
-- [ ] Playtest `C:\Dev\SleepingCalamity-builds\playtest-2026-11-06\SleepingCalamity.exe` (includes plan 5); notes in `docs/playtest/NOTES.md`
-- [ ] plan 5 placeholder decisions 1-10 (`Reference/sessions/plan5-floor-card/STATUS.md`)
-- [ ] Story book read + bible sign-off; bible Qs 6, 7, 8, 13, 15, 16 touch dive text (triage :24); 5 and 20 touch rules
-- [ ] Rename placeholder floor and NPC names (spec Q7; decisions-for-review S1-S8)
-- [ ] Bag-rule decisions: chest with a full bag (PARKING_LOT :69); save-and-quit at a stair (:74); absent player's bag through push-on/fail (:82); bank-room picks UI vs auto-fill (:67)
-- [ ] Failed dive keeps half of gold? (triage :50); weapon wear (triage Q5, default no); network conditions numbers (Q6)
-- [ ] Co-op F10 proposal (spec section 4.7, decision 40); bank slots in a 4-player party (spec Q6)
-- [ ] decisions-for-review: A6 PHASE1 lock (51 decisions), A24 cellar mood, A34 WeaponsSave wiring (must-fix before M7), A2 OoT 2026 screens check now due
-- [ ] USER_TODO: Mixamo clips (blocks M2 animation), 2-player Relay walk (M1, M2, M5, M6, M7), Tobin concept (M10), corner approvals (M9)
-- [ ] Standing on the other hero's head: block or allow (USER_TODO :13)
-- [ ] Trial ramenvr/autopilot smoke tester (CURRENT Inbox)
+## Waiting on the user (don't start; ask when they're around; plain bullets so the board doesn't count them)
+- Playtest `C:\Dev\SleepingCalamity-builds\playtest-2026-11-06\SleepingCalamity.exe` (includes plan 5); notes in `docs/playtest/NOTES.md`
+- plan 5 placeholder decisions 1-10 (`Reference/sessions/plan5-floor-card/STATUS.md`)
+- Story book read + bible sign-off; bible Qs 6, 7, 8, 13, 15, 16 touch dive text (triage :24); 5 and 20 touch rules
+- Rename placeholder floor and NPC names (spec Q7; decisions-for-review S1-S8)
+- Bag-rule decisions: chest with a full bag (PARKING_LOT :69); save-and-quit at a stair (:74); absent player's bag through push-on/fail (:82); bank-room picks UI vs auto-fill (:67)
+- Failed dive keeps half of gold? (triage :50); weapon wear (triage Q5, default no); network conditions numbers (Q6)
+- Co-op F10 proposal (spec section 4.7, decision 40); bank slots in a 4-player party (spec Q6)
+- decisions-for-review: A6 PHASE1 lock (51 decisions), A24 cellar mood, A34 WeaponsSave wiring (must-fix before M7), A2 OoT 2026 screens check now due
+- USER_TODO: Mixamo clips (blocks M2 animation), 2-player Relay walk (M1, M2, M5, M6, M7), Tobin concept (M10), corner approvals (M9)
+- Standing on the other hero's head: block or allow (USER_TODO :13)
+- Trial ramenvr/autopilot smoke tester (CURRENT Inbox)
