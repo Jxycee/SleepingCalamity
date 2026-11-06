@@ -101,8 +101,8 @@ namespace SleepingCalamity.Core
         public int ExtraChestRolls => Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredExtraRolls : 0;           // extra rolls per loot chest per player
         public int ChestRankBonus(int baseBonus) => baseBonus + (Has(FloorModifier.Dim) ? FloorModifierTuning.DimRankBonus : 0);
         public float HealRechargeSeconds(float baseSeconds) => Has(FloorModifier.WarmHands) ? System.Math.Min(baseSeconds, FloorModifierTuning.WarmHandsRechargeSeconds) : baseSeconds;
-        // The path time the collapse is started with: DiveStir.CollapseSeconds multiplies it by DiveStir.CollapseMultiplier (1.5), so a Hurried floor passes it scaled to yield HurriedCollapseMultiplier (1.25) instead.
-        public float CollapsePathSeconds(float pathSeconds) => Has(FloorModifier.Hurried) ? pathSeconds * FloorModifierTuning.HurriedCollapseMultiplier / DiveStir.CollapseMultiplier : pathSeconds;
+        // The factor the collapse is started with (DiveStir.BeginCollapse): it scales the final seconds, minimum included, so a Hurried floor's 1.25 vs 1.5 shows even on a short walk.
+        public float CollapseFactor => Has(FloorModifier.Hurried) ? FloorModifierTuning.HurriedCollapseMultiplier / DiveStir.CollapseMultiplier : 1f;
 
         public ulong Hash()
         {

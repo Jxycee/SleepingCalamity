@@ -154,6 +154,7 @@ namespace SleepingCalamity.Presentation
 
         // objective: per built floor, computed once on the build (never per frame) on every peer
         private CellarFloorLayout _infoLayout; private FloorObjectivePlan _plan; private FloorModifierSet _mods;
+        private ulong _roomPaid;   // host: rooms already paid their Crowded/Ambush gold this floor visit (a room that resets and re-clears pays once); reset in ServerClearFloor
         private GameObject[] _valveMarkers = new GameObject[ValveHold.Count]; private GameObject _pumpMarker;
         private int _shownValveMask = -1, _shownPump = -1;
         private string _objectivePrompt = "";          // owner side: the hold/press prompt of a valve or the pump in reach ("" = none)
@@ -682,7 +683,7 @@ namespace SleepingCalamity.Presentation
             UntrackAll();
             if (_combat != null) _combat.ServerClearEnemies();
             _clear.Reset(); _entered.Clear(); _ambushRoom = -1; _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
-            _valves.Reset(); _unlockRaised = false;
+            _valves.Reset(); _unlockRaised = false; _roomPaid = 0UL;
             _layout = null; _root = null; _dressing = null; _armPos.Clear(); _live.Clear(); _hasBounds = false;
             _st = new ContentsState();
             if (IsSpawned) Publish();
@@ -724,12 +725,20 @@ namespace SleepingCalamity.Presentation
         // False on a valve or pump floor: its gate-key carrier is an ordinary enemy (no key, no early unlock); Rescue, Guardian, the ending and the authored floors keep the carrier rules.
         private bool CarrierGatesExit => _plan == null || (_plan.Objective != FloorObjective.TwoValves && _plan.Objective != FloorObjective.HoldPump);
 
-        /// <summary>Any peer: floor `floor`'s way out is gated by a valve or pump objective that is not finished (floor 7's ending door; the stair floors are gated by the stair itself). False before the floor's state arrived.</summary>
+        /// <summary>Any peer: floor `floor`'s way out is gated by a valve or pump objective that is not finished (floor 7's ending door; the stair floors are gated by the stair itself). Before the floor's state arrives it answers from the locally computed plan (closed for a valve or pump floor).</summary>
         public bool IsObjectiveGated(int floor)
         {
             ContentsState s = Cur;
-            if (s.Floor != floor || s.ExitUnlocked) return false;
-            return s.Objective == (byte)FloorObjective.TwoValves || s.Objective == (byte)FloorObjective.HoldPump;
+            if (s.Floor == floor)
+            {
+                if (s.ExitUnlocked) return false;
+                return s.Objective == (byte)FloorObjective.TwoValves || s.Objective == (byte)FloorObjective.HoldPump;
+            }
+            // The state is not (yet) on this floor (just built, between floors, a late joiner): fail closed from the plan every peer computes for the built floor, never open.
+            CellarFloorSync fs = FloorSync;
+            if (fs != null && fs.Layout != null && fs.Built != null && fs.BuiltFloor == floor) EnsureFloorInfo(fs.Layout, fs.Built.Dressing);
+            if (_plan == null || _infoLayout == null || _infoLayout.Floor != floor) return false;
+            return _plan.Objective == FloorObjective.TwoValves || _plan.Objective == FloorObjective.HoldPump;
         }
 
         /// <summary>The objective line of the current floor for a prompt or the card: "Open both valves (1/2)", "Start the pump and hold it (40%)", "Find the gate key".</summary>
@@ -1018,6 +1027,10 @@ namespace SleepingCalamity.Presentation
         public int GoldPaidForClears { get; private set; }   // host only (tests): the total gold handed out by the Crowded / Ambush rewards
         private void PayRoomClear(int room)
         {
+            if (room < 0 || room >= 64) return;
+            ulong bit = 1UL << room;
+            if ((_roomPaid & bit) != 0) return;   // paid already: a room that reset and cleared again does not pay twice
+            _roomPaid |= bit;
             int each = _mods.GoldPerRoomClear;
             if (_mods.AmbushRoomGold > 0)
             {
@@ -1027,6 +1040,7 @@ namespace SleepingCalamity.Presentation
             PayEveryone(each);
         }
 
+        // "Present" = every connected client with a hero in the dive, downed ones included (they are in the party); HaulSync.ServerAddGold skips anyone without a dive hero.
         private void PayEveryone(int each)
         {
             if (each <= 0 || HaulSync == null) return;

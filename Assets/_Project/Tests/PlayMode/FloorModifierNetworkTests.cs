@@ -205,23 +205,16 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator Hurried_CollapseShorter_AndGoldOnLeave()
         {
-            // prefer a floor whose walk is long enough that 1.25x and 1.5x differ above the 60 s minimum
-            uint seed = 0;
-            for (uint s = 1; s < 8000 && seed == 0; s++)
-            {
-                CellarFloorLayout l = CellarFloorGenerator.Layout(s, 2);
-                if (FloorModifierSet.For(s, 2).A == FloorModifier.Hurried && DiveFloorTable.PathSecondsToTarget(l) * FloorModifierTuning.HurriedCollapseMultiplier >= DiveStir.CollapseMinSeconds + 6f) seed = s;
-            }
-            if (seed == 0) seed = FindSeed((s, l, m) => m.A == FloorModifier.Hurried);
+            uint seed = FindSeed((s, l, m) => m.A == FloorModifier.Hurried);
             Ctx c = null; yield return Setup(x => c = x, seed);
             float path = DiveFloorTable.PathSecondsToTarget(c.Layout);
-            int expected = Mathf.CeilToInt(DiveStir.CollapseSeconds(path * FloorModifierTuning.HurriedCollapseMultiplier / DiveStir.CollapseMultiplier));
+            int expected = Mathf.CeilToInt(DiveStir.CollapseSeconds(path, FloorModifierTuning.HurriedCollapseMultiplier / DiveStir.CollapseMultiplier));
             int unhurried = Mathf.CeilToInt(DiveStir.CollapseSeconds(path));
             TestContext.WriteLine("path " + path + " s: hurried " + expected + " s, unhurried " + unhurried + " s");
             for (int i = 0; i < 20; i++) Assert.That(c.Haul.ServerAddItem(c.HostId, Valuable), Is.True);   // 20 x 5 x sqrt 2: past 100
             yield return PlayModeHarness.WaitUntil(() => c.Haul.Current.DeepClosesLatched, Timeout, "the collapse never began (stir " + c.Haul.Current.StirValue + ")");
-            Assert.That(c.Haul.Current.DeepSecondsLeft, Is.InRange(expected - 3, expected), "the Hurried floor's collapse is 1.25x the walk (or the minimum), not 1.5x");
-            if (unhurried > expected + 4) Assert.That(c.Haul.Current.DeepSecondsLeft, Is.LessThan(unhurried - 2), "shorter than the ordinary collapse of this floor");
+            Assert.That(c.Haul.Current.DeepSecondsLeft, Is.InRange(expected - 3, expected), "the Hurried floor's collapse is 1.25x the walk, minimum scaled too");
+            Assert.That(c.Haul.Current.DeepSecondsLeft, Is.LessThan(unhurried - 2), "shorter than the ordinary collapse of this floor");
 
             int host0 = DiveGold(c, c.HostId), client0 = DiveGold(c, c.ClientId);
             Assert.That(c.Haul.ServerEnterFloor(3), Is.True, "the party takes the stair");

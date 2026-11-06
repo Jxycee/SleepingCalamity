@@ -168,7 +168,7 @@ namespace SleepingCalamity.Tests.PlayMode
                     while ((cs.State.ValveMask & (1 << v)) == 0)
                     {
                         if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail("valve " + v + " never turned (mask " + cs.State.ValveMask + "); hero at " + rig.HostHero.transform.position + ", valve at " + at + ", up " + rig.HostHero.GetComponent<HeroVitals>().IsUp);
-                        Move(rig.HostHero, at + new Vector3(0.6f, 0.1f, 0f));   // the hero stands still for the hold: pinned every frame (a live hero drifted off the valve in an earlier run: the pin makes the test about the host rules, not about physics)
+                        Move(rig.HostHero, at + new Vector3(0.6f, 0.1f, 0f));   // the hero stands still for the hold: pinned every frame (a live hero drifts off the valve at ~2 m/s about 0.4 s after a Move, with the CharacterController on, grounded, zero velocity and no pending teleport: seen 2026-11-06, cause not found; the pin makes the test about the host rules, not about physics)
                         cs.ServerReportValve(hostId, v);
                         yield return null;
                     }

@@ -193,7 +193,7 @@ namespace SleepingCalamity.Presentation
             return _modSet;
         }
 
-        // Hurried and others pay every present player (connected, with a bag) through the ordinary per-player gold path.
+        // Hurried and others pay every present player through the ordinary per-player gold path. "Present" = every connected client with a hero in the dive (a bag), downed ones included: they are in the party.
         private void PayEveryoneGold(int each)
         {
             if (each <= 0) return;
@@ -230,7 +230,7 @@ namespace SleepingCalamity.Presentation
                 if (Time.unscaledTime - _collapseWaitSince < CollapseFloorWaitSeconds) return;
             }
             _collapseWaitSince = -1f;
-            stir.BeginCollapse(built ? ModifiersOf(DiveFloor).CollapsePathSeconds(DiveFloorTable.PathSecondsToTarget(fs.Layout)) : 0f);   // Hurried: the path is scaled so CollapseSeconds yields 1.25x instead of 1.5x
+            stir.BeginCollapse(built ? DiveFloorTable.PathSecondsToTarget(fs.Layout) : 0f, ModifiersOf(DiveFloor).CollapseFactor);   // Hurried: the factor scales the final seconds (minimum included) to the 1.25x instead of 1.5x
         }
 
         // A running collapse closes when every living hero (at least one) is at the target: the party is leaving, so the host treats it like the stair (DiveStir.OnStairTaken).
@@ -373,8 +373,10 @@ namespace SleepingCalamity.Presentation
         public bool ServerFinish()
         {
             if (!Host) return false;
-            if (_session.Phase == DivePhase.Floor) PayEveryoneGold(ModifiersOf(DiveFloor).LeaveGold);   // leaving by the exit: Hurried's reward is paid before the haul comes home
+            bool onFloor = _session.Phase == DivePhase.Floor && DiveFloor == DiveFloorTable.LastBuiltFloor;
+            int leaveGold = onFloor ? ModifiersOf(DiveFloor).LeaveGold : 0;   // read before Finish moves the dive on
             if (!_session.Finish()) return false;
+            PayEveryoneGold(leaveGold);   // leaving by the exit: Hurried's reward is paid once Finish succeeded (a refused Finish pays nothing, so a retry cannot pay twice)
             _choice.Cancel(); Publish(); return true;
         }
 

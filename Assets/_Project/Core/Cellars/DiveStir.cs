@@ -44,7 +44,8 @@ namespace SleepingCalamity.Core
         public bool CollapseRunning => _running;
         public float CollapseSecondsLeft => _running ? _secondsLeft : 0f;
 
-        public static float CollapseSeconds(float pathSecondsToStair) => Math.Max(CollapseMinSeconds, CollapseMultiplier * pathSecondsToStair);
+        // factor scales the final seconds, the 60 s minimum included (a Hurried floor passes ~0.833); 1 = the ordinary collapse.
+        public static float CollapseSeconds(float pathSecondsToStair, float factor = 1f) => Math.Max(CollapseMinSeconds, CollapseMultiplier * pathSecondsToStair) * factor;
 
         public bool OnFloorCleared(int floor)
         {
@@ -57,12 +58,12 @@ namespace SleepingCalamity.Core
             return true;
         }
 
-        public void BeginCollapse(float pathSecondsToStair)
+        public void BeginCollapse(float pathSecondsToStair, float factor = 1f)
         {
             if (!CollapsePending) return;
             _running = true;
             _collapseUsed = true;
-            _secondsLeft = CollapseSeconds(pathSecondsToStair);
+            _secondsLeft = CollapseSeconds(pathSecondsToStair, factor);
         }
 
         public void OnStairTaken() { _running = false; _secondsLeft = 0f; }

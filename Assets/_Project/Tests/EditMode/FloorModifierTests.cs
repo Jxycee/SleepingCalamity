@@ -200,7 +200,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var none = default(FloorModifierSet);
             Assert.AreEqual(0, none.GoldPerRoomClear); Assert.AreEqual(0, none.AmbushRoomGold); Assert.AreEqual(0, none.LeaveGold); Assert.AreEqual(0, none.ExtraChestRolls);
-            Assert.AreEqual(2, none.ChestRankBonus(2)); Assert.AreEqual(30f, none.HealRechargeSeconds(30f)); Assert.AreEqual(100f, none.CollapsePathSeconds(100f));
+            Assert.AreEqual(2, none.ChestRankBonus(2)); Assert.AreEqual(30f, none.HealRechargeSeconds(30f)); Assert.AreEqual(1f, none.CollapseFactor);
             Assert.AreEqual(FloorModifierTuning.CrowdedGoldPerClear, new FloorModifierSet(FloorModifier.Crowded, FloorModifier.None).GoldPerRoomClear);
             Assert.AreEqual(FloorModifierTuning.AmbushGold, new FloorModifierSet(FloorModifier.Ambush, FloorModifier.None).AmbushRoomGold);
             Assert.AreEqual(FloorModifierTuning.HurriedGold, new FloorModifierSet(FloorModifier.Hurried, FloorModifier.None).LeaveGold);
@@ -210,8 +210,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(FloorModifierTuning.WarmHandsRechargeSeconds, warm.HealRechargeSeconds(30f));
             Assert.AreEqual(0.2f, warm.HealRechargeSeconds(0.2f), "a shorter test recharge is kept");
             var hurried = new FloorModifierSet(FloorModifier.Hurried, FloorModifier.None);
-            Assert.AreEqual(FloorModifierTuning.HurriedCollapseMultiplier * 200f, DiveStir.CollapseSeconds(hurried.CollapsePathSeconds(200f)), 0.01f, "1.25x the path, not 1.5x");
-            Assert.AreEqual(DiveStir.CollapseMultiplier * 200f, DiveStir.CollapseSeconds(none.CollapsePathSeconds(200f)), 0.01f);
+            Assert.AreEqual(FloorModifierTuning.HurriedCollapseMultiplier * 200f, DiveStir.CollapseSeconds(200f, hurried.CollapseFactor), 0.01f, "1.25x the path, not 1.5x");
+            Assert.AreEqual(DiveStir.CollapseMultiplier * 200f, DiveStir.CollapseSeconds(200f, none.CollapseFactor), 0.01f);
         }
     }
 }
