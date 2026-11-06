@@ -1,6 +1,6 @@
 Title: Rigged assets: licence checks + townsfolk clip map
 Target: cloud
-Status: started
+Status: done - licences verified, clip map written, merged to main (see STATUS.md)
 Started: 2026-11-06T17:32:12Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: rigged characters and animals", two S items, no Unity)
