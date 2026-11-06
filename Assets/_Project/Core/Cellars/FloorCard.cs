@@ -68,7 +68,7 @@ namespace SleepingCalamity.Core
             switch (o)
             {
                 case FloorObjective.GateKey: return gateKey == 2 ? "Gate key found: the way down is open" : "Find the gate key";
-                case FloorObjective.TwoValves: return "Open both valves (" + valvesTurned + "/2)";
+                case FloorObjective.TwoValves: return "Open both valves (" + valvesTurned + "/" + ValveHold.Count + ")";
                 case FloorObjective.HoldPump: return pumpStarted ? "Start the pump and hold it (" + (int)(System.Math.Max(0f, System.Math.Min(1f, pumpProgress)) * 100f) + "%)" : "Start the pump";
                 case FloorObjective.Rescue: return "Wake the baker";
                 case FloorObjective.Guardian: return "Beat the guardian, then reach the bank";
