@@ -1,6 +1,6 @@
 Title: Spec step 5a: encounter templates for the 12 v2 rooms
 Target: cloud
-Status: started
+Status: done (merged 4dee555f)
 Started: 2026-11-06 16:35 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: dive build" top item)

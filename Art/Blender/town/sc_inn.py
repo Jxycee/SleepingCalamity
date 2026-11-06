@@ -728,8 +728,18 @@ def roof():
     for side, ns, nt in (('f', 20, 10), ('b', 20, 10), ('l', 10, 10), ('r', 10, 10)):
         def deck(p, u, v, side=side):
             return slope_pt(side, u, v * 0.999, 0.05)[0]
+        # v = true arc length up the slope (the bellcast kick and steep hip ends change the pitch), u = metres along the eave
+        arc = [(0.0, 0.0)]; prev = slope_pt(side, 0.5, 0.0, 0.05)[0]
+        for k in range(1, 41):
+            cur = slope_pt(side, 0.5, k / 40 * 0.999, 0.05)[0]
+            arc.append((cur.z, arc[-1][1] + (cur - prev).length)); prev = cur
+        arc[0] = (slope_pt(side, 0.5, 0.0, 0.05)[0].z, 0.0)
+        def arc_v(z, arc=arc):
+            for (z0, s0), (z1, s1) in zip(arc, arc[1:]):
+                if z <= z1 or (z1, s1) == arc[-1]:
+                    return s0 + (s1 - s0) * (z - z0) / (z1 - z0) if abs(z1 - z0) > 1e-9 else s0
         FK.quad_grid(pc, 'roof', [(0, 0, 0)] * 4, ns, nt, push=deck,
-                     uv_fn=lambda c, side=side: ((c.x if side in 'fb' else c.y) / TILE, c.z * 1.41 / TILE))
+                     uv_fn=lambda c, side=side, arc_v=arc_v: ((c.x if side in 'fb' else c.y) / TILE, arc_v(c.z) / TILE))
         def under(p, u, v, side=side):
             return slope_pt(side, 1 - u, v * 0.999, TH)[0]
         FK.quad_grid(pc, 'oak', [(0, 0, 0)] * 4, ns // 2, 4, push=under,
@@ -779,7 +789,7 @@ def tile_courses(pc, edge, n, nc, tag, flip=False, lift=0.0):
                 f = bm.faces.new(qd[::-1] if flip else qd)
                 for l in f.loops:
                     co = l.vert.co
-                    l[uvl].uv = ((co - a0).dot((b0 - a0).normalized()) / TILE, (c * 0.37 + (co - a0).dot((a1 - a0).normalized())) / TILE)
+                    l[uvl].uv = ((co - a0).dot((b0 - a0).normalized()) / TILE, (c * 0.37 + (co - a0).dot((a1 - a0).normalized()) + (co - a0).dot(n)) / TILE)   # + n term: the butt riser has no extent along the slope, so it gets its height on V (no collapsed UVs)
         bm.normal_update()
         for f in bm.faces:
             if f.normal.dot(n) < -0.2:

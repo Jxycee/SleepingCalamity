@@ -11,8 +11,8 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - Sources are cited so a session can read the original note first.
 
 ## Ready: dive build (critical path after the playtest)
-- [ ] **M** Dungeon spec step 5a: encounter templates for the 12 v2 rooms (spec `2026-11-03-hearthdeep-dungeon-design.md` section 12 step 5; `docs/ROOM_METRICS.md`, `CellarRoomsV2`) - write plan first, then code [U]
-- [ ] **M** Wire the host spawner to encounter templates (after spec 5a merges; `EncounterBuilder`, Ambush hook from floor modifiers) [U][net]
+- [x] **M** Dungeon spec step 5a: encounter templates for the 12 v2 rooms (spec `2026-11-03-hearthdeep-dungeon-design.md` section 12 step 5; `docs/ROOM_METRICS.md`, `CellarRoomsV2`) - write plan first, then code [U] (`4dee555f`)
+- [ ] **M** Wire the host spawner to encounter templates (after spec 5a merges; `EncounterBuilder`, Ambush hook = `CellarEncounterPlan.AmbushRoom == roomIndex`; first add a golden template-pick test for a fixed (seed, floor, room) and a comment that the solo cap uses `Base.Spawns.Count` while live plan counts vary by twist: 5a reviewer nits 1, 4) [U][net]
 - [ ] **L** Spec step 5b: water gimmick states on the 12 rooms (flood/drain), validator coverage via `RoomValidatorV2` [U]
 - [ ] **M** Spec step 5c: deferred floor modifiers Brimming, Fat Larder, Still Air (`Reference/sessions/plan5-floor-card/STATUS.md:12`) [U]; dungeon-1 guardrail: keep them light and readable (user 2026-11-06)
 - [ ] **S** Dungeon-1 modifier difficulty check: DiveBot solo runs with plan 5 modifiers on vs off; if they add much difficulty, soften (e.g. floor 7 one hazard at most, Stirred's latch ends at the next stair). Guardrail: user 2026-11-06, dungeon one must not be extremely complex or overly difficult [U]
@@ -29,9 +29,10 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** BUGS item 18a: gate key dropped inside a wall has no fallback (`BUGS.md:93`) [U][net]
 - [ ] **S** BUGS item 18b: piece spheres uncollectable when haul piece count differs from floor arm count (`BUGS.md:94`); may be stale after plan 3 (`dive-flow/STATUS.md:12`) [U]
 - [ ] **S** `DiveSpineNetworkTests` floor-7 host-hero drift (~2 m/s after Move, unexplained) + `Floor5_RealButtonPushOn` flaked once (`plan5-floor-card/STATUS.md:24-26`) [U]
-- [ ] **S** plan5 nits: "Find the gate key" on an opened key floor; pieces line duplicates `StirMeterHud`; follower bots don't split valves (`plan5-floor-card/STATUS.md:27`) [U]
+- [x] **S** plan5 nits: "Find the gate key" on an opened key floor; pieces line duplicates `StirMeterHud`; follower bots don't split valves (`plan5-floor-card/STATUS.md:27`) [U] (`b76f862b`; follower-bot valve split moved to its own M item)
 - [ ] **M** Co-op follower bots split valves: FollowerBot has no goal pathing; needs nav + a hold loop (plan5-nits STATUS) [U]
-- [ ] **S** Floor-7 valve reach 1.8 m / 0.6 s hold lost to knockback: tuning note or fix (`plan5-floor-card/STATUS.md:25`) [U]
+- [x] **S** Floor-7 valve reach 1.8 m / 0.6 s hold lost to knockback: tuning note or fix (`plan5-floor-card/STATUS.md:25`) [U] (`b76f862b`: hold survives a <1 s blip, ReportTimeout 0.6 -> 1.0)
+- [ ] **S** Flaky `DiveWalkQaTests.Walk_Floor1ToTheGeneratedPieceFloor_..._Descend(Rtt300Loss5)`: 40 s timeout waiting for the client hero, passed on re-run (plan5-nits PC check, 2026-11-06) [U][net]
 - [ ] **S** `StairHandoverTests` should destroy `TestHubGround` in teardown (PARKING_LOT :56) [U]
 - [ ] **S** Test gap: host's own bag saved and reloaded (PARKING_LOT :83) [U][net]
 - [x] **S** combat-polish follow-ups: parry-during-grace test; HurtGrace values into `TuningSections`; dead `HeroAnimMap.IsHeavyHurt` / `HurtGrace.Knockdown` (`combat-polish/STATUS.md:13-16`) [U] (`0e8ace4a`; attack-id tuning split out as its own M item)
@@ -66,7 +67,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** `StallLodCapture` restore in `finally`; delete stale `M_LK_StepNosing.mat` (town-art-leftovers STATUS :15) [U]
 
 ## Ready: Hollowmere art
-- [ ] **M** Regenerate Inn / Cottage / Townhouse FBX with the fixed kit UVs; RetainWallLow `LK0727`/`LK0669` sandstone 2.53 (CURRENT, kit UV regen `bc520027`) [A][U]
+- [x] **M** Regenerate Inn / Cottage / Townhouse FBX with the fixed kit UVs; RetainWallLow `LK0727`/`LK0669` sandstone 2.53 (CURRENT, kit UV regen `bc520027`) [A][U] (`eb2ee73d`, uv_stretch 4 -> 0)
 - [ ] **L** Wide junction survey: every unnatural join, ~60-camera outside sweep (CURRENT Next 3; town-art-leftovers :31) [A][U]
 - [ ] **M** Traversal islands (17.7 m2, 32.5 m2), stuck pockets, corners R2_03_C3 / R2_08_C3 collider probe, Blocked +3 near lower gate (traversal-2 :41, stairs-traversal-3 :18) [U]
 - [ ] **M** Ivy / moss embedding, wall-breach weeds, stall-prop overlaps, uv_density x4 (town-art-leftovers :18) [A][U]
@@ -88,12 +89,12 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** B6 plaza ground jitter / wet band / moss rocks; B7 props polish (PARKING_LOT :50-51) [A]
 
 ## Ready: rigged characters and animals (from `docs/research/2026-11-06-open-rigged-assets.md`)
-- [ ] **S** Verify licences before adopting: Quaternius QAL (Bestiary kit), UAL2 wording, Ultimate Animated Animals roster, MPFB2 rig options, Mixamo FAQ, UniRig skinning release (research note "Still to verify")
+- [x] **S** Verify licences before adopting: Quaternius QAL (Bestiary kit), UAL2 wording, Ultimate Animated Animals roster, MPFB2 rig options, Mixamo FAQ, UniRig skinning release (research note "Still to verify") (`b3b146e9`)
 - [ ] **M** Ambient life phase 2 without waiting on user models: Quaternius Farm/Animated Animals (CC0) restyled, plus rooks on a Mesh2Motion bird rig (`Reference/sessions/ambient-life/STATUS.md`) [A][U]
 - [ ] **M** Gleaner prototype: Bestiary kit humanoid on the UAL rig + UAL2 clips, sheaf mask as prop (after QAL check) [A][U]
 - [ ] **M** Rig the Cellars tier-1 enemies (jam-jar slime, broom, rat-king) with small bone rigs (UniRig or hand) so they animate instead of sliding primitives [A][U]
 - [ ] **M** Wren's cat Tuppence: own mesh on a borrowed quadruped rig (Mesh2Motion fox / Quaternius cat), follow-Wren via Animation Rigging look-at [A][U][net]
-- [ ] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06)
+- [x] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06) (`b3b146e9`, `docs/research/2026-11-06-townsfolk-clip-map.md`)
 - [ ] **M** MPFB2 hero/townsfolk base test: one CC0 body on `game_engine` rig through `HeroAnimator.controller` [A][U]
 
 ## Ready: design notes (docs only, placeholders marked)

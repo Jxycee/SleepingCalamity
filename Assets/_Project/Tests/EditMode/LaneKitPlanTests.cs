@@ -38,8 +38,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(GoldenCount, Rows.Count, "row count (hash " + LaneKitPlan.Hash(sig) + ")");
             Assert.AreEqual(GoldenHash, LaneKitPlan.Hash(sig), "signature hash");
         }
-        const int GoldenCount = 1087;   // junction fixes 2026-11-03: walls cut at crossing walls and flights, flights aligned (was 1090); traversal-5: R2_23 moved up the Lower Lane (s 10 -> 5), so the lane plan beside it changes (was 1098, A10: no gutter bars beside a stair flight; was 1201)
-        const uint GoldenHash = 2080523462u;
+        const int GoldenCount = 1084;   // retaining-wall stubs under 0.85 m dropped, UV stretch (was 1087); junction fixes 2026-11-03: walls cut at crossing walls and flights, flights aligned (was 1090); traversal-5: R2_23 moved up the Lower Lane (s 10 -> 5), so the lane plan beside it changes (was 1098, A10: no gutter bars beside a stair flight; was 1201)
+        const uint GoldenHash = 3091156659u;
 
         [Test]
         public void BothPresetsArePopulated_WithEveryFamily()
