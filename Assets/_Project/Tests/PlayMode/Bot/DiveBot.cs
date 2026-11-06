@@ -22,8 +22,8 @@ namespace SleepingCalamity.Tests.PlayMode
     {
         public sealed class Finding { public string Kind, Where, Text; public int Floor; public Vector3 Pos; public override string ToString() => $"**{Kind}** F{Floor} at ({Pos.x:0.0}, {Pos.y:0.0}, {Pos.z:0.0}){(string.IsNullOrEmpty(Where) ? "" : " " + Where)}: {Text}"; }
 
-        enum Goal { None, Heal, Kill, Guardian, GateKey, Chest, Door, Piece, Bank, Stair, Finish, HubStair }
-        sealed class Target { public Goal Goal; public int Index; public Vector3 Pos; public float Range; public string Name; public int Attempts; public float GaveUpAt = -1f, Started; }
+        enum Goal { None, Heal, Kill, Guardian, GateKey, Valve, Pump, PumpHold, Chest, Door, Piece, Bank, Stair, Finish, HubStair }
+        sealed class Target { public Goal Goal; public int Index; public Vector3 Pos; public float Range; public string Name; public int Attempts; public float GaveUpAt = -1f, Started, ArrivedAt = -1f; }
 
         readonly FakeInputService _input;
         readonly Transform _hero;
@@ -311,7 +311,15 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (c.TryChestPosition(i, out Vector3 p)) list.Add(new Target { Goal = Goal.Chest, Index = i, Pos = p, Range = CellarContentsSync.ChestRange, Name = (l.Chests[i].HoldsKey ? "key chest " : "chest ") + i + (locked ? " (locked room)" : "") });
             }
             // the exit stays locked until the gate-key carrier dies: a player heads for its room (the room spawns when you walk in)
-            if (stateOk && s.GateKey == 0 && !s.ExitUnlocked && l.Carrier != null && fs.Built != null && fs.Built.Root != null
+            // plan 5: TwoValves / HoldPump floors. Objective first: walk to the nearest unturned valve and hold interact until its bit sets; walk to the pump, press once, then stay in its ring (the fight logic
+            // handles the waves) until the exit unlocks. The carrier opens nothing on these floors, so the bot does not hunt it.
+            bool valveFloor = stateOk && s.Objective == (byte)FloorObjective.TwoValves, pumpFloor = stateOk && s.Objective == (byte)FloorObjective.HoldPump;
+            if (valveFloor && !s.ExitUnlocked)
+                for (int i = 0; i < ValveHold.Count; i++)
+                    if ((s.ValveMask & (1 << i)) == 0 && c.TryValvePosition(i, out Vector3 vp)) list.Add(new Target { Goal = Goal.Valve, Index = i, Pos = vp, Range = FloorObjectiveTuning.ValveReachMeters, Name = "valve " + i });
+            if (pumpFloor && !s.ExitUnlocked && c.TryPumpPosition(out Vector3 pumpPos))
+                list.Add(s.PumpStarted ? new Target { Goal = Goal.PumpHold, Pos = pumpPos, Range = 2f, Name = "the pump (holding)" } : new Target { Goal = Goal.Pump, Pos = pumpPos, Range = FloorObjectiveTuning.PumpStartReach, Name = "the pump" });
+            if (stateOk && !valveFloor && !pumpFloor && s.GateKey == 0 && !s.ExitUnlocked && l.Carrier != null && fs.Built != null && fs.Built.Root != null
                 && !(l.HasLockedRoom && l.Carrier.RoomIndex == l.LockedRoomIndex && !s.DoorOpen))
                 list.Add(new Target { Goal = Goal.Kill, Pos = fs.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(l.Carrier.X, l.Carrier.Y)), Range = 1.5f, Name = "gate-key carrier" });
             if (stateOk && s.RoomKeyHeld && !s.DoorOpen && c.TryGatePosition(out Vector3 gp)) list.Add(new Target { Goal = Goal.Door, Pos = gp, Range = CellarContentsSync.GateRange, Name = "locked door" });
@@ -353,7 +361,7 @@ namespace SleepingCalamity.Tests.PlayMode
             list.Add(new Target { Goal = Goal.Bank, Pos = bank + new Vector3(-1.2f, 0f, 0f), Range = 1.2f, Name = "bank room" });
         }
 
-        static int Order(Goal g) => g switch { Goal.GateKey => 0, Goal.Chest => 1, Goal.Kill => 2, Goal.Door => 2, Goal.Guardian => 2, Goal.Piece => 3, Goal.Bank => 4, Goal.Stair => 5, Goal.Finish => 6, _ => 9 };
+        static int Order(Goal g) => g switch { Goal.GateKey => 0, Goal.Valve => 0, Goal.Pump => 0, Goal.PumpHold => 0, Goal.Chest => 1, Goal.Kill => 2, Goal.Door => 2, Goal.Guardian => 2, Goal.Piece => 3, Goal.Bank => 4, Goal.Stair => 5, Goal.Finish => 6, _ => 9 };
 
         bool Done(Target t)
         {
@@ -366,6 +374,9 @@ namespace SleepingCalamity.Tests.PlayMode
                 case Goal.Chest: return c != null && c.ChestOpenForLocal(t.Index);
                 case Goal.GateKey: return s.GateKey != 1;
                 case Goal.Door: return s.DoorOpen;
+                case Goal.Valve: return (s.ValveMask & (1 << t.Index)) != 0 || s.ExitUnlocked;
+                case Goal.Pump: return s.PumpStarted || s.ExitUnlocked;
+                case Goal.PumpHold: return s.ExitUnlocked;
                 case Goal.Piece: return c == null || !c.PieceVisible(t.Index);
                 case Goal.Guardian: return d != null && d.HaulSync != null && (d.HaulSync.Current.ClearedMask & (1 << (UndercroftPlan.BankFloor - 1))) != 0;
                 case Goal.Bank: return d != null && d.HaulSync != null && (d.HaulSync.Current.DivePhase == DivePhase.BankRoom || d.HaulSync.Current.BankChosen);
@@ -397,6 +408,20 @@ namespace SleepingCalamity.Tests.PlayMode
                         if (!Done(t)) { Note("Interact", $"pressed interact at {t.Name} ({Flat(t.Pos - _hero.position).magnitude:0.0} m, range {t.Range:0.0}) and it didn't open; prompt was '{d.PromptText}'"); GiveUp(t); }
                         else { ChestsOpened++; if (c != null && !c.ChestShownOpen(t.Index)) Note("Visual", $"{t.Name} opened in the state but its model doesn't show open"); }
                     });
+                    return;
+                case Goal.Valve:
+                    // hold interact (the real held input; the owner reports every 0.2 s, the host turns it after 2 s); the fight logic interrupts it when an enemy engages, the hold then restarts
+                    f.InteractHeld = true;
+                    if (t.ArrivedAt < 0f) t.ArrivedAt = Seconds;
+                    if (Seconds - t.ArrivedAt > 40f) { Note("Interact", $"held interact at {t.Name} ({Flat(t.Pos - _hero.position).magnitude:0.0} m, reach {FloorObjectiveTuning.ValveReachMeters:0.0}) for 40 s and it did not turn; prompt was '{d.PromptText}'"); GiveUp(t); }
+                    return;
+                case Goal.Pump:
+                    Press(t, () => { if (!Done(t)) { Note("Interact", $"pressed interact at the pump ({Flat(t.Pos - _hero.position).magnitude:0.0} m, reach {FloorObjectiveTuning.PumpStartReach:0.0}) and it did not start"); GiveUp(t); } });
+                    return;
+                case Goal.PumpHold:
+                    // stand in the ring; the fight logic takes over whenever a wave enemy engages. The pump needs about 75 s (more when enemies stand at it).
+                    if (t.ArrivedAt < 0f) t.ArrivedAt = Seconds;
+                    if (Seconds - t.ArrivedAt > 240f) { Note("Flow", $"stood at the pump for 240 s and the exit never unlocked (progress {(c != null ? c.PumpProgress : 0f):0.00})"); GiveUp(t); }
                     return;
                 case Goal.Door:
                     Press(t, () => { if (!Done(t)) { Note("Interact", $"held the room key, pressed interact at the locked door ({Flat(t.Pos - _hero.position).magnitude:0.0} m) and it stayed shut"); GiveUp(t); } });

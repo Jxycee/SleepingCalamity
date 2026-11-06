@@ -412,7 +412,7 @@ namespace SleepingCalamity.Presentation
             if (valve >= 0)
             {
                 _objectivePrompt = ValvePromptText;
-                if (now && Time.unscaledTime >= _nextValveReport) { _nextValveReport = Time.unscaledTime + FloorObjectiveTuning.ReportInterval; RequestValveHold(valve); }
+                if (now && Time.time >= _nextValveReport) { _nextValveReport = Time.time + FloorObjectiveTuning.ReportInterval; RequestValveHold(valve); }   // game time, like the host's report clock (a fixed-step bot run is faster than real time)
                 return;   // the whole press belongs to the valve
             }
             bool pump = up && PumpStartableAt(fs, at);
