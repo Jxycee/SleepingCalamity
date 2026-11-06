@@ -35,7 +35,7 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.WritePrefab(AssetPaths.DiveHaulSyncPrefab, root =>
             {
                 BuilderUtil.GetOrAdd<NetworkObject>(root);
-                BuilderUtil.GetOrAdd<DiveHaulSync>(root);   // host owns the per-player bags and dive progress; peers read the summaries
+                BuilderUtil.GetOrAdd<DiveHaulSync>(root);   // host owns the shared haul; peers read the summary
             });
             BuilderUtil.WritePrefab(AssetPaths.DiveDirectorPrefab, root =>
             {
