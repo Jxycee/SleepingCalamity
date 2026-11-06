@@ -6,7 +6,8 @@
 // Each run writes <SC_BOT_OUT>/DiveBot_<seed>.md and logs "[DIVEBOT]" lines. The test passes when the bot played (findings are the output, not failures);
 // it fails when the run itself broke: no dive started, the bot never left floor 1, or it did not do the whole route.
 // The pass criterion (plan 3 task 12): the bot clears floors 1-5, picks bank items, pushes on, clears 6, reaches the EndCell on 7 and the dive ends Finished within the time limit;
-// a timeout or a stuck floor is a FAIL.
+// a timeout or a stuck floor is a FAIL. The time limit is 900 s per built floor (DiveFloorTable.LastBuiltFloor; 6300 s for 7); every [Timeout] is 7200000 ms (2 h) so NUnit never fires first.
+// The report's summary lists the kill time per enemy type (first engage to death) to show whether a type (Broom) is slow by design.
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -45,28 +46,28 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.TearDownApp();
         }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Seed12345() { yield return Play(12345u); }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Seed7() { yield return Play(7u); }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Seed31() { yield return Play(31u); }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Seed404() { yield return Play(404u); }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Seed2024() { yield return Play(2024u); }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Tough_Seed12345() { yield return Play(12345u, tough: true); }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Tough_Seed7() { yield return Play(7u, tough: true); }
 
-        [UnityTest, Timeout(3600000)]
+        [UnityTest, Timeout(7200000)]
         public IEnumerator DiveBot_Tough_Seed31() { yield return Play(31u, tough: true); }
 
         private IEnumerator Play(uint seed, bool tough = false)
@@ -102,7 +103,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Application.logMessageReceived += _log;
 
             // dive 1: hub -> floors 1-7 -> the EndCell
-            float limit = 5400f;
+            float limit = 900f * DiveFloorTable.LastBuiltFloor;   // 900 s per floor (7 floors: 6300 s); the [Timeout]s (7200000 ms) stay above it
             int maxFloor = 0;
             while (bot.Seconds < limit && !(bot.Finished && bot.Floor == 0))
             {

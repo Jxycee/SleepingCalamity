@@ -1,7 +1,7 @@
 // Authority: test-only (local owner, solo host). A scripted alpha tester for the Cellars dive: it plays a whole solo dive through the same FakeInputService a
 // pad would feed (camera-relative stick, the interact edge, attack/dodge through ArenaBot when an enemy is in sight), so it exercises the real input, prompts,
 // locomotion, CharacterController, contents, haul and director paths that DiveWalkQaTests skips by teleporting and calling RPCs.
-// Route per floor (the 7-floor dive): kill what's in sight, take the gate key when it drops, open every chest it can reach (key chest first, then the locked door, then the room
+// Route per floor (the 7-floor dive): objective first (fight only what blocks or threatens: within 3.5 m, chasing/attacking within 5 m, the gate-key carrier, a guardian), take the gate key when it drops, open every chest it can reach (key chest first, then the locked door, then the room
 // behind it), walk over every piece and the baker, take the stair once the exit unlocks. Floor 5: beat the guardian, rest in the bank room, pick the bankable items it carries (the
 // bank screen's pick requests) and push on (the bank screen's Y key through the dev input). Floor 6 like the others; floor 7: walk to the EndCell and finish the dive.
 // It walks with its own runtime NavMesh (hero-sized agent) and flags what a human tester would write up: stuck spots (with what blocked the capsule), a press that
@@ -9,6 +9,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Presentation;
 using SleepingCalamity.Runtime;
@@ -78,7 +79,7 @@ namespace SleepingCalamity.Tests.PlayMode
             _input = input; _hero = hero;
             _loco = hero.GetComponent<HeroLocomotion>(); _combat = hero.GetComponent<HeroCombat>(); _vitals = hero.GetComponent<HeroVitals>();
             _cc = hero.GetComponent<CharacterController>();
-            _fighter = new ArenaBot(input, hero) { Dodges = true, FlankFrontalBlockers = true };
+            _fighter = new ArenaBot(input, hero) { Dodges = true, FlankFrontalBlockers = true, DodgeMargin = 0.3f };   // Broom (FrontalBlock): flank to its side, close to strike range, repeat the combo; roll only when the swing really reaches
             _progressPos = hero.position;
         }
 
@@ -133,9 +134,13 @@ namespace SleepingCalamity.Tests.PlayMode
             }
             bool healing = _target != null && _target.Goal == Goal.Heal;
 
-            // fight anything in sight first (ArenaBot writes the frame itself)
-            if (!healing && EnemyInSight(9f))
+            // objective first: fight only what blocks or threatens (close, chasing/attacking within 5 m, the gate-key carrier, a guardian); otherwise keep walking (ArenaBot writes the frame itself)
+            TrackKills();
+            Enemy engaged = healing ? null : PickEngaged(d);
+            if (engaged != null)
             {
+                _fighter.Preferred = engaged;
+                if (!_engagedAt.ContainsKey(engaged.NetworkObjectId)) _engagedAt[engaged.NetworkObjectId] = (engaged, engaged.Def.Id, Seconds);
                 _fightClock += dt;
                 _fighter.Tick(dt, Seconds);
                 if (_fightClock > 60f) { Note("Combat", "fought for 60 s without the room going quiet (an enemy that can't be killed or reached?)"); _fightClock = 0f; }
@@ -521,21 +526,60 @@ namespace SleepingCalamity.Tests.PlayMode
             return s;
         }
 
-        bool EnemyInSight(float range)
+        bool InSight(Enemy e, float range)
         {
             Vector3 eye = _hero.position + Vector3.up * 1.2f;
+            Vector3 to = e.transform.position + Vector3.up * 0.8f - eye;
+            if (Flat(to).magnitude > range || Mathf.Abs(to.y) > 3f) return false;
+            foreach (RaycastHit h in Physics.RaycastAll(eye, to.normalized, to.magnitude, ~0, QueryTriggerInteraction.Ignore))
+                if (h.collider.transform.root != _hero.root && h.collider.GetComponentInParent<Enemy>() == null) return false;
+            return true;
+        }
+
+        const float SightRange = 9f, CloseRange = 3.5f, ChaseRange = 5f;
+        Enemy _engagedEnemy;
+        readonly Dictionary<ulong, (Enemy E, string Id, float Start)> _engagedAt = new Dictionary<ulong, (Enemy, string, float)>();
+        readonly Dictionary<string, List<float>> _killTimes = new Dictionary<string, List<float>>();
+
+        // The enemy worth stopping for, or null. Sticky: once engaged, the bot fights it until it dies or leaves sight (no flapping at the range edges).
+        Enemy PickEngaged(DiveDirector d)
+        {
+            if (_engagedEnemy != null && _engagedEnemy.IsSpawned && _engagedEnemy.Alive && InSight(_engagedEnemy, SightRange)) return _engagedEnemy;
+            _engagedEnemy = null;
+            CellarContentsSync c = Contents(d);
+            Enemy carrier = c != null ? c.GateKeyCarrierEnemy : null;
+            Enemy best = null; float bestScore = float.MaxValue;
             foreach (Enemy e in Enemy.All)
             {
                 if (e == null || !e.IsSpawned || !e.Alive) continue;
-                Vector3 to = e.transform.position + Vector3.up * 0.8f - eye;
-                if (Flat(to).magnitude > range || Mathf.Abs(to.y) > 3f) continue;
-                bool blocked = false;
-                foreach (RaycastHit h in Physics.RaycastAll(eye, to.normalized, to.magnitude, ~0, QueryTriggerInteraction.Ignore))
-                    if (h.collider.transform.root != _hero.root && h.collider.GetComponentInParent<Enemy>() == null) { blocked = true; break; }
-                if (!blocked) return true;
+                float dist = Flat(e.transform.position - _hero.position).magnitude;
+                if (dist > SightRange) continue;
+                bool key = e == carrier || e.Def.Kind == EnemyKind.DoughWarden || e.Def.IsElite;   // the gate-key carrier and guardians stand between the bot and the exit
+                bool threat = dist <= CloseRange || (dist <= ChaseRange && (e.Phase == EnemyPhase.Chase || e.Attacking));
+                if (!key && !threat) continue;
+                if (!InSight(e, SightRange)) continue;
+                float score = (key ? 0f : 100f) + dist;
+                if (score < bestScore) { bestScore = score; best = e; }
             }
-            return false;
+            return _engagedEnemy = best;
         }
+
+        // Kill time per enemy type: seconds from the first engage to death (removed once it is dead or gone).
+        void TrackKills()
+        {
+            if (_engagedAt.Count == 0) return;
+            List<ulong> done = null;
+            foreach (var kv in _engagedAt)
+                if (kv.Value.E == null || !kv.Value.E.IsSpawned || !kv.Value.E.Alive)
+                {
+                    if (!_killTimes.TryGetValue(kv.Value.Id, out List<float> l)) _killTimes[kv.Value.Id] = l = new List<float>();
+                    l.Add(Seconds - kv.Value.Start); EnemiesKilled++;
+                    (done ??= new List<ulong>()).Add(kv.Key);
+                }
+            if (done != null) foreach (ulong k in done) _engagedAt.Remove(k);
+        }
+
+        public string KillTimes() => _killTimes.Count == 0 ? "none" : string.Join(", ", _killTimes.OrderBy(k => k.Key).Select(k => $"{k.Key} n={k.Value.Count} avg {k.Value.Average():0.0} s max {k.Value.Max():0.0} s"));
 
         // ------------------------------------------------------------------------------------------------ watchers
         bool _wasActive;
@@ -620,7 +664,7 @@ namespace SleepingCalamity.Tests.PlayMode
         static string V(Vector3 p) => $"({p.x:0.0}, {p.y:0.0}, {p.z:0.0})";
 
         public string Summary() =>
-            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared} ({string.Join(",", ClearedFloors.OrderBy(x => x))}), chests {ChestsOpened}, bank picks {BankPicks} ({BankedItems} accepted), pushed on {PushedOn}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips} (reached {HealsReached}), loaves eaten {LoavesEaten}, fails near a floor fault {FaultDeaths}, hits per floor {string.Join(", ", HitsByFloor.OrderBy(k => k.Key).Select(k => "F" + k.Key + " " + k.Value + " in " + (VisitsByFloor.TryGetValue(k.Key, out int vv) ? vv : 0) + " visits"))}, stuck spells {StuckEvents}, downed {Downed}, finished {Finished}, findings {Findings.Count}";
+            $"{(Tough ? "TOUGH (host top-ups) " : "")}{Seconds:0} s, dive fails {DiveFails} (after low HP {Deaths}), floors cleared {FloorsCleared} ({string.Join(",", ClearedFloors.OrderBy(x => x))}), chests {ChestsOpened}, bank picks {BankPicks} ({BankedItems} accepted), pushed on {PushedOn}, pieces {PiecesTaken}, presses {Presses}, heal trips {HealTrips} (reached {HealsReached}), loaves eaten {LoavesEaten}, fails near a floor fault {FaultDeaths}, hits per floor {string.Join(", ", HitsByFloor.OrderBy(k => k.Key).Select(k => "F" + k.Key + " " + k.Value + " in " + (VisitsByFloor.TryGetValue(k.Key, out int vv) ? vv : 0) + " visits"))}, stuck spells {StuckEvents}, downed {Downed}, finished {Finished}, findings {Findings.Count}, kill times (first engage to death): {KillTimes()}";
 
         public BotReport Fight => _fighter.Report;
     }

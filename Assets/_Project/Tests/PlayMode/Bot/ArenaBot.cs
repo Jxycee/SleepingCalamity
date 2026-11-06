@@ -17,7 +17,8 @@ namespace SleepingCalamity.Tests.PlayMode
         public float SwingEvery = 0.3f;       // seconds between attack presses (the combo buffer takes the rest)
         public float DodgeMargin = 0.6f;      // roll when inside an attack's range plus this
         public bool Dodges = true;
-        public bool FlankFrontalBlockers;     // walk to a broom's side instead of straight at its blocking front (a player does); off for the arena bot's old baseline
+        public Enemy Preferred;               // when set and alive, attack this one instead of the nearest
+        public bool FlankFrontalBlockers;    // walk to a broom's side instead of straight at its blocking front (a player does); off for the arena bot's old baseline
 
         private readonly FakeInputService _input;
         private readonly HeroLocomotion _loco;
@@ -210,6 +211,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
         private Enemy Nearest(out float best)
         {
+            if (Preferred != null && Preferred.IsSpawned && Preferred.Alive) { best = Flat(Preferred.transform.position - _hero.position).magnitude; return Preferred; }   // the caller's chosen target (the dive bot)
             best = float.MaxValue; Enemy pick = null;
             foreach (Enemy e in Enemy.All)
             {
