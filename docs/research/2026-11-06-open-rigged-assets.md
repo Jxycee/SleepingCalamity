@@ -1,6 +1,6 @@
 # Open rigged and animated assets: what fits Sleeping Calamity (2026-11-06)
 
-Asked by the user 2026-11-06: survey the open-source, already-rigged/animated models, auto-rig AI and drag-and-drop animation tools, and map them to the story. Method: two web research passes plus a scan of the story docs and the project (`docs/STORY.md`, story bible draft, book, dungeon spec, PHASE1 3.6, `Assets/_Project`). Licences were read on the source's own page unless marked UNVERIFIED; full legal text was read only where noted. Not legal advice.
+Asked by the user 2026-11-06: survey the open-source, already-rigged/animated models, auto-rig AI and drag-and-drop animation tools, and map them to the story. Method: two web research passes plus a scan of the story docs and the project (`docs/STORY.md`, story bible draft, book, dungeon spec, PHASE1 3.6, `Assets/_Project`). Licences were read on the source's own page unless marked UNVERIFIED; full legal text was read only where noted. Not legal advice. Licence bar: personal-use (see "Restricted licences").
 
 ## Summary
 - **Biggest win, already half in the repo:** Quaternius Universal Animation Library 1 + 2 (CC0 / free-commercial, one humanoid rig, 250+ clips incl. melee combos, farming, fishing). UAL1/UAL2 Standard FBX already sit in `Content/Animation/Quaternius/`; UAL2 adds working-life clips the townsfolk need.
@@ -40,14 +40,13 @@ Asked by the user 2026-11-06: survey the open-source, already-rigged/animated mo
 - **Unity Animation Rigging** (Unity package): IK, look-at, aim; already the right tool for procedural legs, heads tracking the hero, the cat following Wren.
 - **UnityRig** (MIT Blender add-on): builds Unity-Humanoid metarigs, handy when re-rigging MPFB2 or custom heroes.
 
-## Avoid
-- **Tencent HY-Motion 1.0 and other Hunyuan community licences:** License.txt read: Territory excludes the EU, UK and South Korea; above 1 million MAU needs Tencent's permission; outputs can't train other models. A worldwide PC release can't rely on it.
-- **AMASS and anything trained on it** (non-commercial; covers most text-to-motion weights incl. MoMask/HumanML3D and MotionStreamer).
-- **Bandai Namco motion datasets** (CC BY-NC-ND).
-- **Kimodo SMPL-X checkpoint** (research-only).
-- **PhilS94 wall-walking spider** (no open licence; Asset Store only). **MagicArticulate, RigAnything, Anymate, AnimaX, Active-Ragdoll repos:** licence not found, so treat as off-limits.
-- **Kenney animated characters:** CC0 but blocky; tests only.
-- **Blender Studio film rigs as-is:** CC-BY and lovely, but bendy-bone/driver rigs don't export to FBX; only worth it as sculpt/shape references or with a full game-rig rebuild.
+## Restricted licences: usable here (user, 2026-11-06)
+The user plans to play the game privately with friends and probably never sell it, so non-commercial, territory and MAU clauses don't block anything. Record provenance and tag these `licence: personal-use` in the asset source record so they can be swapped if the game is ever sold.
+- **Tencent HY-Motion 1.0** (1B / 0.46B Lite, 24-26 GB VRAM; text-to-motion, humanoid): now a real option for custom clips (baker kneading, sexton on the bell rope, Gleaner shuffles). Licence read: excludes EU/UK/South Korea, 1M MAU permission clause, outputs can't train other models. Retarget to Unity Humanoid.
+- **AMASS-trained text-to-motion** (MoMask, MotionStreamer, HumanML3D weights) and **Bandai Namco motion datasets**: usable for clip generation and reference.
+- **Kimodo SMPL-X checkpoint**: usable alongside the SOMA one.
+- **Blender Studio CC-BY film characters**: always fine with credit; the blocker is their film rigs, not the licence.
+Still avoid on quality or safety grounds: Kenney blocky characters (tests only); repos with no licence or no code at all (MagicArticulate, RigAnything, Anymate, AnimaX) only because there is nothing reliable to run; PhilS94 spider (paid Asset Store product; don't copy). Never: Dark Cloud names, characters, story, text, music or assets.
 
 ## Still to verify before adopting
 1. Quaternius **QAL** licence text (Bestiary kit) and the UAL2 page's CC0-vs-"free commercial" wording.
