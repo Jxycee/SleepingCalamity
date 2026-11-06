@@ -184,9 +184,9 @@ namespace SleepingCalamity.Tests.PlayMode
             c.Players[c.ClientId] = ValveAt(c, 0) + new Vector3(0.6f, 0f, 0f);
             int handled = c.Contents.ValveHoldRequests;
 
-            yield return HoldValve(c.Peer, 0, FloorObjectiveTuning.ValveHoldSeconds * 0.55f);
-            yield return Seconds(FloorObjectiveTuning.ReportTimeout + 0.4f);   // reports stop: the progress resets
-            yield return HoldValve(c.Peer, 0, FloorObjectiveTuning.ValveHoldSeconds * 0.55f);
+            yield return HoldValve(c.Peer, 0, FloorObjectiveTuning.ValveHoldSeconds * 0.45f);
+            yield return Seconds(FloorObjectiveTuning.ReportTimeout + 0.4f);   // reports stop: the progress resets (it still accrues for up to ReportTimeout after the last report, so each hold stays under hold time minus that)
+            yield return HoldValve(c.Peer, 0, FloorObjectiveTuning.ValveHoldSeconds * 0.45f);
             yield return Seconds(0.4f);
             Assert.That(c.Contents.ValveHoldRequests, Is.GreaterThan(handled), "the reports reached the host");
             Assert.That(c.Contents.State.ValveMask, Is.EqualTo((byte)0), "two interrupted holds (each under the hold time) never turn the valve, even though they add up to more");
