@@ -66,7 +66,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** `StallLodCapture` restore in `finally`; delete stale `M_LK_StepNosing.mat` (town-art-leftovers STATUS :15) [U]
 
 ## Ready: Hollowmere art
-- [ ] **M** Regenerate Inn / Cottage / Townhouse FBX with the fixed kit UVs; RetainWallLow `LK0727`/`LK0669` sandstone 2.53 (CURRENT, kit UV regen `bc520027`) [A][U]
+- [x] **M** Regenerate Inn / Cottage / Townhouse FBX with the fixed kit UVs; RetainWallLow `LK0727`/`LK0669` sandstone 2.53 (CURRENT, kit UV regen `bc520027`) [A][U] (`eb2ee73d`, uv_stretch 4 -> 0)
 - [ ] **L** Wide junction survey: every unnatural join, ~60-camera outside sweep (CURRENT Next 3; town-art-leftovers :31) [A][U]
 - [ ] **M** Traversal islands (17.7 m2, 32.5 m2), stuck pockets, corners R2_03_C3 / R2_08_C3 collider probe, Blocked +3 near lower gate (traversal-2 :41, stairs-traversal-3 :18) [U]
 - [ ] **M** Ivy / moss embedding, wall-breach weeds, stall-prop overlaps, uv_density x4 (town-art-leftovers :18) [A][U]
@@ -88,12 +88,12 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** B6 plaza ground jitter / wet band / moss rocks; B7 props polish (PARKING_LOT :50-51) [A]
 
 ## Ready: rigged characters and animals (from `docs/research/2026-11-06-open-rigged-assets.md`)
-- [ ] **S** Verify licences before adopting: Quaternius QAL (Bestiary kit), UAL2 wording, Ultimate Animated Animals roster, MPFB2 rig options, Mixamo FAQ, UniRig skinning release (research note "Still to verify")
+- [x] **S** Verify licences before adopting: Quaternius QAL (Bestiary kit), UAL2 wording, Ultimate Animated Animals roster, MPFB2 rig options, Mixamo FAQ, UniRig skinning release (research note "Still to verify") (`b3b146e9`)
 - [ ] **M** Ambient life phase 2 without waiting on user models: Quaternius Farm/Animated Animals (CC0) restyled, plus rooks on a Mesh2Motion bird rig (`Reference/sessions/ambient-life/STATUS.md`) [A][U]
 - [ ] **M** Gleaner prototype: Bestiary kit humanoid on the UAL rig + UAL2 clips, sheaf mask as prop (after QAL check) [A][U]
 - [ ] **M** Rig the Cellars tier-1 enemies (jam-jar slime, broom, rat-king) with small bone rigs (UniRig or hand) so they animate instead of sliding primitives [A][U]
 - [ ] **M** Wren's cat Tuppence: own mesh on a borrowed quadruped rig (Mesh2Motion fox / Quaternius cat), follow-Wren via Animation Rigging look-at [A][U][net]
-- [ ] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06)
+- [x] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06) (`b3b146e9`, `docs/research/2026-11-06-townsfolk-clip-map.md`)
 - [ ] **M** MPFB2 hero/townsfolk base test: one CC0 body on `game_engine` rig through `HeroAnimator.controller` [A][U]
 
 ## Ready: design notes (docs only, placeholders marked)
