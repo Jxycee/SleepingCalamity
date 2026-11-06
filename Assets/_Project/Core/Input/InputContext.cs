@@ -7,6 +7,7 @@ namespace SleepingCalamity.Core
         Free = 0,
         Menu = 1,
         LockOn = 2,  // M2: hard lock active. Look is zeroed (the camera follows the target) and the right stick / switch keys feed SwitchX/Y instead.
-    Placement = 3 // M6 S4: town placement mode. every gameplay intent field is zeroed (the hero stands still, nothing swings or jumps); the buttons arrive on the placement-only PlayerIntent fields (PlacePressed, PickUpPressed, NextLotPressed, TurnPressed, PlaceMoveX/Y); pause still passes.
+    Placement = 3, // M6 S4: town placement mode. every gameplay intent field is zeroed (the hero stands still, nothing swings or jumps); the buttons arrive on the placement-only PlayerIntent fields (PlacePressed, PickUpPressed, NextLotPressed, TurnPressed, PlaceMoveX/Y); pause still passes.
+        BankScreen = 4 // plan 3 bank room: the dive director holds it while the bank screen is open. The hero stands still and does not swing or interact; Look and Pause pass; Move/Jump/Primary/Secondary arrive on the BankMoveY / BankPickPressed / BankPushOnPressed / BankGoHomePressed fields.
     }
 }
