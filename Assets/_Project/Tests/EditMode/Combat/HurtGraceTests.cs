@@ -114,13 +114,5 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.That(HurtGrace.Pulse(false, k, d * 0.5f), Is.EqualTo(0f), "no hit");
             }
         }
-
-        [Test]
-        public void Knockdown_NeedsHeavyKnockback_AndASurvivor()
-        {
-            Assert.That(HurtGrace.Knockdown(3f, false), Is.True);
-            Assert.That(HurtGrace.Knockdown(2.9f, false), Is.False);
-            Assert.That(HurtGrace.Knockdown(4f, true), Is.False, "a killing blow is a death, not a knock-down");
-        }
     }
 }

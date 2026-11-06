@@ -67,12 +67,14 @@ namespace SleepingCalamity.Core.Combat
 
     public static class HurtGrace
     {
-        public const float HeavyKnockback = 3f;                 // attack knockback at or above this is a heavy hit
-        public const float LightSeconds = 0.8f;
-        public const float HeavySeconds = 1.2f;                 // 0.9 s knockdown + 0.3 s
-        public const float MultiHitSeconds = 0.15f;
-        public const float KnockdownSeconds = 0.9f;             // research recommendation 3 (DC1's 2.2 s is too long for us)
-        public const float FlickerSeconds = 0.4f;               // recommendation 2: the red pulse plus a flicker for this long
+        // Tunable (Core/Tuning, "hurtGrace"); the defaults (3, 0.8, 1.2, 0.15, 0.9, 0.4) are in HurtGraceTuning. Heavy 1.2 s = the 0.9 s knockdown + 0.3 s;
+        // the knockdown is research recommendation 3 (DC1's 2.2 s is too long for us); the flicker is recommendation 2 (the red pulse plus a flicker).
+        public static float HeavyKnockback => Tuning.HurtGraceTuning.HeavyKnockback;   // attack knockback at or above this is a heavy hit
+        public static float LightSeconds => Tuning.HurtGraceTuning.LightSeconds;
+        public static float HeavySeconds => Tuning.HurtGraceTuning.HeavySeconds;
+        public static float MultiHitSeconds => Tuning.HurtGraceTuning.MultiHitSeconds;
+        public static float KnockdownSeconds => Tuning.HurtGraceTuning.KnockdownSeconds;
+        public static float FlickerSeconds => Tuning.HurtGraceTuning.FlickerSeconds;
 
         // No data flag marks a multi-hit attack today (AttackData has none), so callers pass multiHit=false and get light / heavy only.
         // A guard break (on a raised guard) counts as heavy.
@@ -93,9 +95,6 @@ namespace SleepingCalamity.Core.Combat
 
         // A heavy hit: knockback >= 3 or a guard-breaker. The host sends this to every peer so all of them play the same reaction.
         public static bool IsHeavyHit(float knockback, bool guardBreak) => knockback >= HeavyKnockback || guardBreak;
-
-        // A heavy hit that does not kill knocks the hero down.
-        public static bool Knockdown(float knockback, bool killed) => knockback >= HeavyKnockback && !killed;
     }
 
     // The grace window as a countdown (not a sum of floats), so expiry is frame-accurate: 0.8 s at 60 Hz ends on exactly tick 48.
