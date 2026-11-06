@@ -93,7 +93,29 @@ EXTRA = {
 _prev_M = FK.M
 FK.M = lambda k: EXTRA[k]() if k in EXTRA else _prev_M(k)
 
-piece, merge, face_xf, tube = BK.piece, BK.merge, BK.face_xf, BK.tube
+piece, merge, face_xf = BK.piece, BK.merge, BK.face_xf
+
+def tube(pc, mat, pts, r, sides=6, closed=False):
+    """A round bar swept along pts, UV in metres: U = arc length round the bar, V = length along the path (BK.tube gave every face one flat
+    UV value and a fixed 0.05 V step per ring, which the fault scan reads as collapsed or stretched)."""
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
+    rings = []; vacc = [0.0]
+    for i, p in enumerate(pts):
+        d = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+        sd = d.cross(Vector((0, 0, 1)) if abs(d.z) < 0.9 else Vector((1, 0, 0))).normalized(); up = sd.cross(d)
+        rings.append([bm.verts.new(p + (sd * math.cos(2 * math.pi * k / sides) + up * math.sin(2 * math.pi * k / sides)) * r) for k in range(sides)])
+        if i: vacc.append(vacc[-1] + (p - pts[i - 1]).length)
+    du = 2 * math.pi * r / sides / FK.TILE
+    for i in range(len(rings) - 1):
+        for k in range(sides):
+            f = bm.faces.new((rings[i][k], rings[i][(k + 1) % sides], rings[i + 1][(k + 1) % sides], rings[i + 1][k]))
+            for l, (dk, di) in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+                l[uvl].uv = ((k + dk) * du, vacc[i + di] / FK.TILE)
+    for ring in (rings[0], rings[-1][::-1]):
+        bm.faces.new(ring[::-1])
+    bm.normal_update()
+    FK._uv_project([f for f in bm.faces if len(f.verts) == sides], uvl, Matrix.Identity(4), None, (0.0, 0.0))
+    FK._merge(pc, bm, mat)
 mem = BK.mem
 
 X0, X1 = -HX, HX

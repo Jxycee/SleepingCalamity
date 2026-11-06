@@ -11,6 +11,7 @@ namespace SleepingCalamity.Core
                 case InputContext.Menu: return RouteMenu(in frame);
                 case InputContext.LockOn: return RouteLockOn(in frame);
                 case InputContext.Placement: return RoutePlacement(in frame);
+                case InputContext.BankScreen: return RouteBankScreen(in frame);
                 default: return RouteFree(in frame);
             }
         }
@@ -52,6 +53,23 @@ namespace SleepingCalamity.Core
                 NextLotPressed = f.InteractPressed,
                 TurnPressed = f.JumpPressed,
                 PausePressed = f.PausePressed,
+            };
+        }
+
+        // BankScreen (the bank room's screen): the hero stands still and swings, jumps and interacts with nothing (so a stray press cannot push a party on, and a cursor step does not walk the
+        // hero out of the bank's range). Move -> BankMoveY, Jump -> BankPickPressed, Primary -> BankPushOnPressed, Secondary -> BankGoHomePressed. Look and Pause pass (the camera still turns,
+        // the menu still opens).
+        private static PlayerIntent RouteBankScreen(in PlayerInputFrame f)
+        {
+            return new PlayerIntent
+            {
+                LookYawDeg = f.LookYawDeg,
+                LookPitchDeg = f.LookPitchDeg,
+                PausePressed = f.PausePressed,
+                BankMoveY = f.MoveY,
+                BankPickPressed = f.JumpPressed,
+                BankPushOnPressed = f.PrimaryPressed,
+                BankGoHomePressed = f.SecondaryPressed,
             };
         }
 

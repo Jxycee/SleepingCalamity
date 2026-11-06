@@ -268,6 +268,21 @@ def _uv_project(faces, uvl, to_local, long_axis=None, off=(0.0, 0.0), grain_u=Fa
             uu, vv = (p[vax], p[uax]) if grain_u and long_axis is not None else (p[uax], p[vax])
             l[uvl].uv = (uu / TILE + off[0], vv / TILE + off[1])
 
+def planar_face_uv(f, uvl, hint, tile=None):
+    """Isometric metre UVs for one face: project onto its own plane, v along `hint` (a world direction, e.g. a
+    cylinder or beam axis, or the slope direction of a roof), u across. Equal texel density on U and V (no stretch)."""
+    tile = tile or TILE
+    n = f.normal.copy()
+    h = Vector(hint) - n * Vector(hint).dot(n)
+    if h.length < 1e-5:                     # face is perpendicular to the hint (cap): any in-plane direction
+        h = Vector((0, 0, 1)) - n * n.z
+        if h.length < 1e-5:
+            h = Vector((1, 0, 0)) - n * n.x
+    ev = h.normalized(); eu = n.cross(ev)
+    for l in f.loops:
+        p = l.vert.co
+        l[uvl].uv = (p.dot(eu) / tile, p.dot(ev) / tile)
+
 def add_box(pc, mat, size, xf, cham=0.02, cuts=(0, 0, 0), long_axis=None, uv_world=False, bend=None, wob=0.0, segs=1,
             seed=0.0, off=None):
     """Chamfered box of `size` centred at the local origin, then placed by matrix `xf`.
@@ -900,11 +915,12 @@ def kit_roof():
             a0 = math.pi * 0.15 + math.pi * 1.25 * k / segs
             row.append(bm.verts.new(c + Vector((0, -math.cos(a0) * rr, math.sin(a0) * rr))))
         ring_rows.append(row)
+    kv = {v: kk for row in ring_rows for kk, v in enumerate(row)}
     for i in range(len(ring_rows) - 1):
         for k in range(segs):
             f = bm.faces.new((ring_rows[i][k], ring_rows[i + 1][k], ring_rows[i + 1][k + 1], ring_rows[i][k + 1]))
-            for l in f.loops:
-                l[uvl].uv = (l.vert.co.x / TILE, k * rr / TILE)
+            for l in f.loops:     # v = arc length per vertex ring (k was shared by all four corners: collapsed)
+                l[uvl].uv = (l.vert.co.x / TILE, kv[l.vert] * rr * 1.25 * math.pi / segs / TILE)
     two_sided(bm)
     _merge(pc, bm, 'roof')
     return pc
@@ -945,8 +961,7 @@ def kit_leanto():
                 l[uvl].uv = (l.vert.co.y / TILE, (l.vert.co.x - x0) / TILE)
             u = [bm.verts.new(p - nrm * 0.05) for p in q[:2]]
             f = bm.faces.new((v[1], v[0], u[0], u[1]))
-            for l in f.loops:
-                l[uvl].uv = (l.vert.co.y / TILE, l.vert.co.z / TILE)
+            f.normal_update(); planar_face_uv(f, uvl, nrm)      # 5 cm butt: own plane
         bm.normal_update(); _merge(pc, bm, 'roof')
     quad_grid(pc, 'oak', [rs(y0 - 0.25, 0), rs(y1 + 0.25, 0), rs(y1 + 0.25, 1), rs(y0 - 0.25, 1)], ny, 3,
               uv_fn=lambda c: (c.y / TILE, c.x / TILE))
@@ -963,9 +978,9 @@ def kit_leanto():
             bmesh.ops.create_cone(bm, cap_ends=True, segments=7, radius1=r, radius2=r * 0.95, depth=2.2)
             bm.transform(Matrix.Translation((x, (y0 + y1) / 2 + R.uniform(-0.06, 0.06), z)) @
                          Matrix.Rotation(math.pi / 2, 4, 'X') @ Matrix.Rotation(R.random() * 6.3, 4, 'Z'))
-            for f in bm.faces:
-                for l in f.loops:
-                    l[uvl].uv = (l.vert.co.x / TILE * 3, l.vert.co.y / TILE)
+            bm.normal_update()
+            for f in bm.faces:      # per-face isometric metre UVs, v along the log (the old x*3 / y mapping stretched 3x)
+                planar_face_uv(f, uvl, (0, 1, 0))
             bm.normal_update(); _merge(pc, bm, 'oak_lt')
     # built on +X, mirrored onto the -X end: there it shows at the wide camera beside the house (Unity review)
     bmesh.ops.scale(pc.bm, vec=(-1, 1, 1), verts=pc.bm.verts[:])
@@ -1000,9 +1015,9 @@ def kit_chimney():
         for j in range(len(rings) - 1):
             for s in range(segs):
                 f = bm.faces.new((rings[j][s], rings[j][(s + 1) % segs], rings[j + 1][(s + 1) % segs], rings[j + 1][s]))
-                for l in f.loops:
-                    co = l.vert.co
-                    l[uvl].uv = (math.atan2(co.y, co.x) * 0.15 / TILE, co.z / TILE)
+        bm.normal_update()
+        for f in bm.faces:      # per-face isometric UVs (atan2*0.15 / z stretched 3-10x; the flat rim collapsed)
+            planar_face_uv(f, uvl, (0, 0, 1))
         bm.normal_update()
         bm.transform(base @ lean @ Matrix.Translation((px, 0, h + 0.16)) @ Matrix.Rotation(math.radians(tip), 4, 'X'))
         _merge(pc, bm, 'roof')

@@ -10,7 +10,7 @@ root empty <Asset> with child meshes `Body` and `Part_*` (origin at their SOCKET
 Materials are SLOT NAMES, Unity maps them to the shared tileables (no maps are exported): oak_timber, canvas, iron, sandstone, packed_soil (B1 tileables,
 UVs in metres by box projection, 1 UV unit = 2 m) and the flat slots Leaf (#6f8a34 family), Produce (#86a67c, onions; Blender renders warm them through a per-corner `tint` colour attribute, Unity gets the flat slot colour), Straw (#c9a85a), Glass,
 and the one TEXTURED slot Cabbage: the beds' cabbages are UV'd, subdivided single-sided leaf sheets (see vegbed/cabbage) painted by sc_cabbage_tex.py (Cabbage_BaseColor / _Normal / _ORM, a
-1024 x 512 atlas: outer leaf left, pale heart right), written next to each bed's FBX on --export. The corner
+1024 x 1024 atlas: outer leaf bottom half, pale heart top half), written next to each bed's FBX on --export. The corner
 attribute `wear` (R grime, G moss, B polish, linear) is written as the B4 kit does; the flat slots ignore it in Unity.
 
   blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_garden.py -- --out <scratch> [--only VegBed_A,Trellis] [--export]
@@ -39,6 +39,11 @@ DEST = os.path.join(ROOT, 'Assets', '_Project', 'Content', 'Art', 'Town', 'Garde
 SEED = 3106
 CABTEX = os.path.join(OUT, 'cabtex')   # the procedural cabbage maps (sc_cabbage_tex.py), written here, copied next to each bed's FBX on --export
 BEV = 0.016          # timber chamfer (style bible 3: 1.5 cm and up where the section allows)
+
+def cabbage_uv_scale(width_m, length_m):
+    """UV units per metre for a cabbage sheet: ONE scale for U and V (HollowmereFaultScan.Uv() flags stretch above 2.5). The atlas is 1024 x 1024:
+    half 0 (outer leaf) is v 0..0.5, half 1 (heart) v 0.5..1, each half spans the full u width, so a UV unit is the same length on both axes."""
+    return min(0.976 / max(width_m, 1e-4), 0.48 / max(length_m, 1e-4))
 
 def rng(stream):
     return random.Random(SEED ^ zlib.crc32(stream.encode()))
@@ -172,12 +177,19 @@ class Piece:
         faces = [(i * nv + j, i * nv + j + 1, (i + 1) * nv + j + 1, (i + 1) * nv + j) for i in range(nu - 1) for j in range(nv - 1)]
         self.thin(slot, pts, faces, ref, half, tint, smooth)
 
-    def sheet(self, slot, fn, nu, nv, ref, uvfn):
-        """A single-sided UV'd grid (nu x nv vertices): fn(s, u) -> point with s along the leaf and u across (both 0..1), uvfn(s, u) -> UV; see surf()."""
+    def sheet(self, slot, fn, nu, nv, ref, uvfn, half=None):
+        """A single-sided UV'd grid (nu x nv vertices): fn(s, u) -> point with s along the leaf and u across (both 0..1), uvfn(s, u) -> UV; see surf().
+        With uvfn None and `half` (0 outer, 1 heart), the UVs are metric: one scale for U and V, from the sheet's own mean width and length (cabbage_uv)."""
         pts, uvs = [], []
         for j in range(nv):
             for i in range(nu):
-                s, u = j / (nv - 1), i / (nu - 1); pts.append(fn(s, u)); uvs.append(uvfn(s, u))
+                s, u = j / (nv - 1), i / (nu - 1); pts.append(fn(s, u)); uvs.append(uvfn(s, u) if uvfn else (u, s))
+        if uvfn is None:
+            at = lambda i, j: pts[j * nu + i]
+            Wm = sum(sum((at(i + 1, j) - at(i, j)).length for i in range(nu - 1)) for j in range(nv)) / nv
+            Lm = sum(sum((at(i, j + 1) - at(i, j)).length for j in range(nv - 1)) for i in range(nu)) / nu
+            sc = cabbage_uv_scale(Wm, Lm)
+            uvs = [(0.5 + (u - 0.5) * Wm * sc, 0.5 * half + 0.01 + s * Lm * sc) for (u, s) in uvs]
         faces = [(i + j * nu, i + 1 + j * nu, i + 1 + (j + 1) * nu, i + (j + 1) * nu) for j in range(nv - 1) for i in range(nu - 1)]
         self.surf(slot, pts, faces, uvs, ref)
 
@@ -249,7 +261,7 @@ def vegbed(a, L, W, variant):
         b.prism('packed_soil', [(-0.12, 0), (0.12, 0), (0.075, 0.055), (-0.075, 0.055)], L - 0.2, c=(0, y, 0.299), plane='yz', bev=0.01)
 
     def cabbage(x, y, rad, burn):
-        """Savoy-style head from smooth UV'd sheets (slot Cabbage, textured: atlas left half = outer leaf, right half = pale heart): 4 wrapped heart leaves,
+        """Savoy-style head from smooth UV'd sheets (slot Cabbage, textured: atlas v 0..0.5 = outer leaf, v 0.5..1 = pale heart): 4 wrapped heart leaves,
         2 mid leaves standing round the head, 5 broad cupped outer leaves flaring out and down, tips curled back, the lowest lying on the soil.
         Each sheet is a coarse grid cut to a round wavy outline, cupped and bent by smooth functions, one subdivision level, single sided."""
         for _ in range(2 + 3 * burn): r.random()   # keep the bed's shared random stream where the first cabbage left it (leeks and onions stay put)
@@ -257,7 +269,6 @@ def vegbed(a, L, W, variant):
         yaw0 = c.uniform(0, 360); k = c.uniform(0.92, 1.08); R = rad * 0.62 * k
         hc = Vector((x, y, z0 + R * 0.92)); ry = min(rows, key=lambda q: abs(q - y))
         def ground(px, py): return 0.299 + 0.055 * min(1.0, max(0.0, (0.12 - abs(py - ry)) / 0.045)) + 0.004   # soil top incl. the raised row
-        uvo = lambda half: (lambda s, u: (0.5 * half + 0.5 * (0.012 + 0.976 * u), s))      # atlas half 0 outer, 1 heart; v along the leaf
         # head: four gores of a sphere, each from below the equator past the pole, overlapping, radii stepped so they never z-fight
         for i in range(4):
             lam = math.radians(yaw0 + i * 90 + c.uniform(-10, 10)); Ri = R * (1.0 + 0.045 * i); span = math.radians(c.uniform(190, 215)); top = math.radians(c.uniform(94, 102))
@@ -268,7 +279,7 @@ def vegbed(a, L, W, variant):
                 rr = Ri * (1 + 0.03 * math.sin(el * 5 + lam) * abs(u2) ** 2)
                 q = hc + Vector((math.cos(el) * math.cos(lon), math.cos(el) * math.sin(lon), math.sin(el))) * rr
                 q.z = max(q.z, ground(q.x, q.y)); return q
-            b.sheet('Cabbage', fn, 4, 5, lambda p: p - hc, uvo(1))
+            b.sheet('Cabbage', fn, 4, 5, lambda p: p - hc, None, half=1)
         # a leaf: a polar mesh (centre fan + rings) whose rim is a smooth obovate outline with a gentle wave, laid in a flat leaf plane (x across, y along from the
         # stalk), then bent: the centreline falls with an elevation angle (tip curling back up), the blade is cupped across and ruffled softly at the rim.
         # The UV is the flat leaf plane (u across, v along), so the midrib texture runs down the length of every leaf.
@@ -286,7 +297,8 @@ def vegbed(a, L, W, variant):
                 q = base + rot @ Vector((x, yy - math.sin(al) * dz, zz + math.cos(al) * dz))
                 q.z = max(q.z, ground(q.x, q.y)); return q
             pts = [bend(0.0, cyc, 0.0, 0.0)]; uvs = []
-            def uvp(x, yv): return (0.5 * half + 0.5 * (0.012 + 0.976 * (0.5 + 0.5 * x / (1.06 * Wr))), min(1.0, max(0.0, yv / Lr)))
+            usc = cabbage_uv_scale(2.12 * Wr, Lr)   # metric UVs from the flat leaf plane (x across, yv along, both metres): one scale for U and V
+            def uvp(x, yv): return (0.5 + x * usc, 0.5 * half + 0.01 + min(Lr, max(0.0, yv)) * usc)
             uvs.append(uvp(0.0, cyc))
             for k in range(1, nr + 1):
                 f = k / nr
@@ -736,7 +748,10 @@ def world_bounds(root):
 def main():
     bpy.ops.wm.read_homefile(use_empty=True)
     if ONLY is None or any(n.startswith("VegBed") for n in ONLY):   # needs Pillow (not in Blender python): only the bed runs
-        import sc_cabbage_tex; sc_cabbage_tex.make(CABTEX)
+        try:
+            import sc_cabbage_tex; sc_cabbage_tex.make(CABTEX)
+        except ImportError:   # Blender's Python has no Pillow: run `python sc_cabbage_tex.py <out>/cabtex` first, the maps are then reused
+            assert os.path.exists(os.path.join(CABTEX, 'Cabbage_BaseColor.png')), 'no Pillow and no pre-made cabtex maps'
     names = [n for n in ASSETS if ONLY is None or n in ONLY]
     built = {}; rows = []
     for n in names:

@@ -173,15 +173,20 @@ def tube(pc, mat, pts, r, sides=6, closed=False):
         d = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
         s = d.cross(Vector((0, 0, 1)) if abs(d.z) < 0.9 else Vector((1, 0, 0))).normalized(); u = s.cross(d)
         rings.append([bm.verts.new(p + (s * math.cos(2 * math.pi * k / sides) + u * math.sin(2 * math.pi * k / sides)) * r) for k in range(sides)])
-    acc = 0.0
+    # metre UVs: u = arc length round the bar, v = distance along the swept path (isometric, so no stretch)
+    acc = [0.0]
+    for i in range(1, len(pts)):
+        acc.append(acc[-1] + (pts[i] - pts[i - 1]).length)
     for i in range(len(rings) - 1):
         for k in range(sides):
             f = bm.faces.new((rings[i][k], rings[i][(k + 1) % sides], rings[i + 1][(k + 1) % sides], rings[i + 1][k]))
-            for l in f.loops:
-                l[uvl].uv = (k / sides * 2 * math.pi * r / TILE, i * 0.05 / TILE)
-    for ring in (rings[0], rings[-1][::-1]):
-        bm.faces.new(ring[::-1])
-    bm.normal_update(); FK._merge(pc, bm, mat)
+            for l, kk, ii in zip(f.loops, (k, k + 1, k + 1, k), (i, i, i + 1, i + 1)):
+                l[uvl].uv = (kk / sides * 2 * math.pi * r / TILE, acc[ii] / TILE)
+    caps = [bm.faces.new(ring[::-1]) for ring in (rings[0], rings[-1][::-1])]
+    bm.normal_update()
+    for f, dd in zip(caps, (pts[1] - pts[0], pts[-1] - pts[-2])):
+        FK.planar_face_uv(f, uvl, dd)
+    FK._merge(pc, bm, mat)
 
 def ember_mat():
     if 'BK_Ember' in FK.MATS:
@@ -868,10 +873,11 @@ def ridge_tiles(pc, a, b, n, tag, sag=False):
             rr = r * (1.0 if e < 0 else 1.06)
             rows.append([bm.verts.new(c + ax * (e * Lt / 2) + side * (-rr * math.cos(math.pi * k / segs)) +
                                       up * (rr * math.sin(math.pi * k / segs) * 0.85 - 0.04)) for k in range(segs + 1)])
+        kv = {v: kk for row in rows for kk, v in enumerate(row)}
         for k in range(segs):
             f = bm.faces.new((rows[0][k], rows[1][k], rows[1][k + 1], rows[0][k + 1]))
-            for l in f.loops:
-                l[uvl].uv = ((l.vert.co - a).dot(ax) / TILE, k * r * 0.4 / TILE)
+            for l in f.loops:     # v = arc length per vertex (k was shared by all four corners: collapsed)
+                l[uvl].uv = ((l.vert.co - a).dot(ax) / TILE, kv[l.vert] * r * 0.4 / TILE)
         bmesh.ops.rotate(bm, verts=bm.verts[:], cent=c, matrix=Matrix.Rotation(math.radians(R.uniform(-2.5, 2.5)), 3, ax))
         bm.normal_update()
         bm.faces.ensure_lookup_table()
@@ -890,12 +896,13 @@ def rolled_eave(pc, side, n):
         c = slope_pt(side, y, 0) + Vector((-side * 0.02, 0, -0.02))
         rows.append([bm.verts.new(c + Vector((side * math.cos(math.pi * 0.15 + math.pi * 1.25 * k / segs) * rr, 0,
                                                  math.sin(math.pi * 0.15 + math.pi * 1.25 * k / segs) * rr))) for k in range(segs + 1)])
+    kv = {v: kk for row in rows for kk, v in enumerate(row)}
     for i in range(ny):
         for k in range(segs):
             q = (rows[i][k], rows[i + 1][k], rows[i + 1][k + 1], rows[i][k + 1])
             f = bm.faces.new(q if side < 0 else q[::-1])
-            for l in f.loops:
-                l[uvl].uv = (l.vert.co.y / TILE, k * rr / TILE)
+            for l in f.loops:     # v = arc length per vertex ring (k was shared by all four corners: collapsed)
+                l[uvl].uv = (l.vert.co.y / TILE, kv[l.vert] * rr * 1.25 * math.pi / segs / TILE)
     bm.normal_update(); FK.two_sided(bm); FK._merge(pc, bm, 'roof')
 
 # ----------------------------------------------------------------------------- oven annex and chimney
@@ -1105,14 +1112,13 @@ def part_oven():
         a, b = inner[s], outer[s]
         c, d = bm.verts.new((xm + 0.12, a.co.y, zh + 0.0)), bm.verts.new((xm + 0.12, b.co.y, zh + 0.0))
         f = bm.faces.new((a, b, d, c) if s == 0 else (b, a, c, d))
-    for f in bm.faces:
-        for l in f.loops:
-            l[uvl].uv = (l.vert.co.y / TILE, l.vert.co.z / TILE)
     bm.normal_update()
     # thickness: extrude the collar back toward the dome
     ext = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
     bmesh.ops.translate(bm, verts=[e for e in ext['geom'] if isinstance(e, bmesh.types.BMVert)], vec=(-0.30, 0, 0))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    # world-scale box projection after the extrude (the old (y, z) mapping collapsed the extruded side faces)
+    FK._uv_project(bm.faces, uvl, Matrix.Identity(4), None, (0.0, 0.0))
     FK._merge(pc, bm, 'brick')
     # throat: soot lining behind the mouth, ember bed on its floor
     FK.quad_grid(pc, 'soot', [(xm - 0.25, yc + mw / 2, zh + 0.05), (xm - 0.25, yc - mw / 2, zh + 0.05),

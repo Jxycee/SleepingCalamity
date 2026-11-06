@@ -339,7 +339,7 @@ def uv_fit(ob, cell):
     a = (a - lo) * sc + np.array([cell[0], cell[1]]) + 0.004
     uvl.data.foreach_set('uv', a.ravel().astype(np.float32))
 
-def smart_uv(ob, margin=0.012, layer='UVMap', faces=None):
+def smart_uv(ob, margin=0.012, layer='UVMap', faces=None, angle=80):
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
     if layer not in ob.data.uv_layers: ob.data.uv_layers.new(name=layer)
     ob.data.uv_layers.active = ob.data.uv_layers[layer]
@@ -347,7 +347,58 @@ def smart_uv(ob, margin=0.012, layer='UVMap', faces=None):
     bm = bmesh.from_edit_mesh(ob.data)
     for f in bm.faces: f.select = (faces is None) or (f.index in faces)
     bmesh.update_edit_mesh(ob.data)
-    bpy.ops.uv.smart_project(angle_limit=math.radians(80), island_margin=margin, area_weight=0.6, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(angle), island_margin=margin, area_weight=0.6, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+def isometrize_uv(ob, layer, faces, margin=0.006):
+    """Make each UV island of `faces` on `layer` locally isometric (same metres per unit on U and V), then equalise island scale and repack.
+    smart_project with area_weight leaves 2.5x+ anisotropy on bevels and curved parts, which HollowmereFaultScan.Uv() flags as stretch. Per island:
+    G = area-weighted mean of J^T J (J = d world / d uv per triangle), uv' = sqrt(G) uv with det 1 (island area unchanged). Run before the bake."""
+    me = ob.data; bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table(); uv = bm.loops.layers.uv[layer]
+    fs = [f for f in bm.faces if f.index in faces]
+    par = {f.index: f.index for f in fs}
+    def find(a):
+        while par[a] != a: par[a] = par[par[a]]; a = par[a]
+        return a
+    for f in fs:
+        for l in f.loops:
+            o = l.link_loop_radial_next
+            if o is l or o.face is f or o.face.index not in par: continue
+            if (l[uv].uv - o.link_loop_next[uv].uv).length < 1e-6 and (l.link_loop_next[uv].uv - o[uv].uv).length < 1e-6:
+                par[find(f.index)] = find(o.face.index)
+    acc = {}; cen = {}
+    for f in fs:
+        k = find(f.index); n = cen.setdefault(k, [Vector((0, 0)), 0])
+        for l in f.loops: n[0] += l[uv].uv; n[1] += 1
+        ls = list(f.loops)
+        for t in range(1, len(ls) - 1):
+            a, b, c = ls[0].vert.co, ls[t].vert.co, ls[t + 1].vert.co; ua, ub, uc = ls[0][uv].uv, ls[t][uv].uv, ls[t + 1][uv].uv
+            e1, e2 = b - a, c - a; d1, d2 = ub - ua, uc - ua
+            det = d1.x * d2.y - d1.y * d2.x; wa = e1.cross(e2).length * 0.5
+            if wa < 1e-9 or abs(det) < 1e-14: continue
+            inv = 1.0 / det; pu = (e1 * d2.y - e2 * d1.y) * inv; pv = (e2 * d1.x - e1 * d2.x) * inv
+            g = acc.setdefault(k, [0.0, 0.0, 0.0, 0.0])
+            g[0] += wa * pu.dot(pu); g[1] += wa * pu.dot(pv); g[2] += wa * pv.dot(pv); g[3] += wa
+    mats = {}
+    for k, (A, B, C, W) in acc.items():
+        w, V = np.linalg.eigh(np.array([[A, B], [B, C]]) / W); w = np.maximum(w, 1e-12)
+        M = V @ np.diag(np.sqrt(w)) @ V.T; mats[k] = M / math.sqrt(abs(np.linalg.det(M)))
+    for f in fs:
+        k = find(f.index); M = mats.get(k)
+        if M is None: continue
+        c = cen[k][0] / cen[k][1]
+        for l in f.loops:
+            q = M @ np.array(l[uv].uv - c); l[uv].uv = (c.x + q[0], c.y + q[1])
+    bm.to_mesh(me); bm.free(); me.update()
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
+    me.uv_layers.active = me.uv_layers[layer]
+    bpy.ops.object.mode_set(mode='EDIT')
+    bm = bmesh.from_edit_mesh(me)
+    for f in bm.faces: f.select = f.index in faces
+    bmesh.update_edit_mesh(me)
+    bpy.ops.uv.select_all(action='SELECT')
+    bpy.ops.uv.average_islands_scale()
+    bpy.ops.uv.pack_islands(margin_method='FRACTION', margin=margin, rotate=True, scale=True, shape_method='CONCAVE')
     bpy.ops.object.mode_set(mode='OBJECT')
 
 # ----------------------------------------------------------------------------- rocks
@@ -621,7 +672,7 @@ def jetty_pieces():
             pts = [Vector((x, yy, z)) + lean * (z - PILE_ZLO) * 0.6 for z in zs]
             rad = [r0 * (0.9 + 0.1 * sstep(PILE_ZLO, 0, z)) * (1.0 if z <= (top - 0.07) or not moor else 0.88) for z in zs]
             if moor: rad[-1] = r0 * 0.7; rad[-2] = r0 * 0.96
-            tube(pc, 'pile', pts, rad, 10, lambda i, jf, kk, zs=zs: (jf if kk == 0 else 0.5, vmap(zs[i])), cap0=False, cap1=True, wob=0.05, seed=k * 3 + sgn)
+            tube(pc, 'pile', pts, rad, 10, lambda i, jf, kk, zs=zs, col=(k * 2 + (sgn > 0)) % 4: ((col + (jf if kk == 0 else 0.5)) * 0.25, vmap(zs[i])), cap0=False, cap1=True, wob=0.05, seed=k * 3 + sgn)
             # iron band(s)
             for bz in ([-PLK_T - 0.20 - 0.085, 0.9] if moor else [-PLK_T - 0.20 - 0.085]):
                 ctr = Vector((x, yy, bz)) + lean * (bz - PILE_ZLO) * 0.6
@@ -666,8 +717,8 @@ def jetty_pieces():
 
 def pile_textures():
     """Piles: oak_timber stacked along height, weathered silver-grey above the splash zone, damp dark brown below -0.35, an algae band
-    round the waterline (-0.6), darker and glossier underwater. 512 wide (one tile = circumference), 2048 high = z -3.0..1.2."""
-    W, H = 512, 2048
+    round the waterline (-0.6), darker and glossier underwater. four strips of 512 wide (one strip = circumference, UV 0.25 wide), 2048 high = z -3.0..1.2, in a 2048 x 2048 atlas."""
+    W, H = 512, 2048   # per strip
     def load(stem, nc):
         im = FK._img(os.path.join(TEX, 'B1_town', 'oak_timber', 'oak_timber_' + stem + '.png'), nc)
         w, h = im.size; a = np.empty(w * h * 4, np.float32); im.pixels.foreach_get(a); return a.reshape(h, w, 4)[..., :3]
@@ -679,23 +730,28 @@ def pile_textures():
         big = np.concatenate(tiles, 0)                        # 4096 x 1024
         # grain along v: the tileable's grain runs along image x or y? use as is; downsample by 2 (box)
         return big.reshape(2048, 2, 512, 2, 3).mean((1, 3))
-    alb = stack(np.clip(alb0, 0, 0.34)); nrm = stack(nrm0); orm = stack(orm0)
-    nrm = nrm / np.maximum(np.linalg.norm(nrm * 2 - 1, axis=2, keepdims=True) * 0 + 1, 1)
-    z = PILE_ZLO + (np.arange(H) + 0.5) / H * (PILE_ZHI - PILE_ZLO); Z = z[:, None]
-    wob = (R.rand(1, W) * 0.5 + 0.5)
-    from math import pi
-    xs = np.arange(W)[None, :] / W
-    wz = Z + 0.06 * np.sin(xs * 2 * pi * 3 + 1.3) + 0.04 * np.sin(xs * 2 * pi * 7 + 0.4) + 0.025 * (np.roll(np.roll(R.rand(H, W), 1, 0), 1, 1) - 0.5)
-    wet = np.clip((-0.25 - wz) / 0.35, 0, 1)[..., None]       # 0 above -0.25, 1 below -0.6
-    splash = np.clip((0.1 - wz) / 0.35, 0, 1)[..., None] * (1 - wet)
-    alg = np.exp(-(((wz + 0.62) / 0.16) ** 2))[..., None] * (0.55 + 0.45 * R.rand(H, W)[..., None]) ** 2
-    tint = np.array([1.57, 2.0, 2.6])                         # weathered silver-brown oak (the tileable is very dark)
-    c = alb * tint * (1 - 0.35 * splash) * (1 - wet * 0.58) * np.array([1, 1.0, 0.95]) ** wet
-    c = c * (1 - alg * 0.8) + alg * 0.8 * np.array([0.12, 0.17, 0.05])
-    below = np.clip((-0.9 - wz) / 0.8, 0, 1)[..., None]; c *= (1 - 0.35 * below)
-    top = np.clip((wz - 0.7) / 0.5, 0, 1)[..., None]; c = c * (1 + 0.1 * top)     # mooring posts a touch sun-bleached above the deck
-    rough = orm[..., 1:2] * (1 - 0.45 * wet) + 0.0
-    ao = orm[..., 0:1]
+    def column():
+        alb = stack(np.clip(alb0, 0, 0.34)); nrm = stack(nrm0); orm = stack(orm0)
+        nrm = nrm / np.maximum(np.linalg.norm(nrm * 2 - 1, axis=2, keepdims=True) * 0 + 1, 1)
+        z = PILE_ZLO + (np.arange(H) + 0.5) / H * (PILE_ZHI - PILE_ZLO); Z = z[:, None]
+        wob = (R.rand(1, W) * 0.5 + 0.5)
+        from math import pi
+        xs = np.arange(W)[None, :] / W
+        wz = Z + 0.06 * np.sin(xs * 2 * pi * 3 + 1.3) + 0.04 * np.sin(xs * 2 * pi * 7 + 0.4) + 0.025 * (np.roll(np.roll(R.rand(H, W), 1, 0), 1, 1) - 0.5)
+        wet = np.clip((-0.25 - wz) / 0.35, 0, 1)[..., None]       # 0 above -0.25, 1 below -0.6
+        splash = np.clip((0.1 - wz) / 0.35, 0, 1)[..., None] * (1 - wet)
+        alg = np.exp(-(((wz + 0.62) / 0.16) ** 2))[..., None] * (0.55 + 0.45 * R.rand(H, W)[..., None]) ** 2
+        tint = np.array([1.57, 2.0, 2.6])                         # weathered silver-brown oak (the tileable is very dark)
+        c = alb * tint * (1 - 0.35 * splash) * (1 - wet * 0.58) * np.array([1, 1.0, 0.95]) ** wet
+        c = c * (1 - alg * 0.8) + alg * 0.8 * np.array([0.12, 0.17, 0.05])
+        below = np.clip((-0.9 - wz) / 0.8, 0, 1)[..., None]; c *= (1 - 0.35 * below)
+        top = np.clip((wz - 0.7) / 0.5, 0, 1)[..., None]; c = c * (1 + 0.1 * top)     # mooring posts a touch sun-bleached above the deck
+        rough = orm[..., 1:2] * (1 - 0.45 * wet) + 0.0
+        ao = orm[..., 0:1]
+        return c, nrm, rough, ao
+    cols = [column() for _ in range(4)]   # four 512 px strips side by side: the atlas is square, so a UV unit is the same on U and V (the piles pick a strip)
+    c = np.concatenate([x[0] for x in cols], 1); nrm = np.concatenate([x[1] for x in cols], 1)
+    rough = np.concatenate([x[2] for x in cols], 1); ao = np.concatenate([x[3] for x in cols], 1)
     p = lambda s: os.path.join(TEXOUT, 'LakeShore_Pile_' + s + '.png')
     save_img(np.clip(c, 0, 1), 'LakeShore_Pile_BaseColor', False, p('BaseColor'))
     save_img(nrm, 'LakeShore_Pile_Normal', True, p('Normal'))
@@ -727,7 +783,8 @@ def build_jetty():
     pile_idx = [i for i, m in enumerate(me.materials) if m == pile_mat]
     # unique bake UVs for the deck faces
     deck_faces = {p.index for p in me.polygons if p.material_index not in pile_idx}
-    smart_uv(ob, 0.006, 'UVBake', deck_faces)
+    smart_uv(ob, 0.006, 'UVBake', deck_faces, angle=45)   # 80 deg islands put the round piles' grazing faces at 5x stretch; 45 deg keeps them under ~1.5
+    isometrize_uv(ob, 'UVBake', deck_faces)   # metric islands before the bake (stretch 2.6 -> ~1.2)
     bl = me.uv_layers['UVBake']
     # move pile faces out of the bake range
     for p in me.polygons:
@@ -773,8 +830,9 @@ def build_jetty():
     me.uv_layers.remove(bl)
     me.color_attributes.remove(me.color_attributes['var'])
     new_idx = []
+    pile_faces = {pl.index for pl in me.polygons if pl.material_index in pile_idx}   # read before clear(): clearing the slots resets every index to 0 (the piles then shipped in LS_Jetty with pile UVs)
     me.materials.clear(); me.materials.append(fm); me.materials.append(pile_final)
-    for pl in me.polygons: pl.material_index = 1 if pl.material_index in pile_idx or False else 0
+    for pl in me.polygons: pl.material_index = 1 if pl.index in pile_faces else 0
     return ob, pile_idx
 
 # ----------------------------------------------------------------------------- assembly
