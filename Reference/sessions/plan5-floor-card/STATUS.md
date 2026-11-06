@@ -1,10 +1,10 @@
 # plan5-floor-card (cloud session)
-State: all tasks done (runs A-D), main merged 1c030ee; full check + soak running, branch review running
+State: MERGED into main (see merge commit "Merge claude/upbeat-maxwell-pnadr4: plan 5"); branch review: merge, no blockers; risk review: no blockers (fixes in 2cea726)
 Branch: claude/upbeat-maxwell-pnadr4 (from main a85d686)
-Tip: 1c030ee
-Check: run D 2cea726: gate PASS 1591/1591, PlayMode 5 classes 80/80; full check on 1c030ee pending
-Soak: -
-Archive: no
+Tip: f774e1f (branch, before this status commit)
+Check: unity.sh check PASS on f774e1f (build PASS, EditMode 1594/1594, PlayMode 198 passed 0 failed 21 skipped), SC MARKER == f774e1f
+Soak: unity.sh soak PASS 45/45 on 1c030ee (Core/Cellars unchanged since)
+Archive: ready
 
 ## Open questions (placeholder taken, work continues; plan "Decisions" 1-11)
 1. Modifiers: one or two per floor? Taken: two slots (hazard+reward, boon), floors 2/4 at most one, floor 7 both possible, calm floors 1/3/5/6 none.
@@ -22,3 +22,6 @@ Archive: no
 ## Follow-ups (outside this plan)
 - Tools/cloud/sc_core_tests.py: its using-filter rejects `SleepingCalamity.Core.Combat`, so ~21 EditMode files (incl. CellarRosterTests) never run under it and it reports green; widening shows only RingPlannerTests.Plan_DoesNotAllocate_PerTick failing under .NET 8 (24 B). Needs its own small task.
 - Unexplained host-hero drift (~2 m/s, ~0.4 s after a Move) in DiveSpineNetworkTests floor-7 helper; test pins the hero per frame. Under branch review.
+- Floor-7 drift: branch review judges it live enemies pushing the hero's capsule (Enemy.MoveHorizontal ignores heroes) or knockback, both on main; players can be pushed out of valve reach (1.8 m) and lose the hold after 0.6 s. Tuning note; test keeps its pin.
+- Floor5_RealButtonPushOn (bank-input test) flaked once in a full run, passed alone twice and in both full checks; not from this branch per review.
+- Nits left: card prints "Find the gate key" on a key floor that opened at arm time (no carrier); card's pieces line repeats StirMeterHud's; co-op follower bots don't split valves.
