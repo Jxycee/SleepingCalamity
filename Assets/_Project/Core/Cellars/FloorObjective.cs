@@ -97,12 +97,14 @@ namespace SleepingCalamity.Core
             if (rolled == FloorObjective.TwoValves)
             {
                 // B: farthest from the entry, a dead end (one link) winning a distance tie; A: nearest the entry, not B and sharing no link with B.
-                // (only a room that has a partner sharing no link with it can be B)
+                // A non-adjacent pair is preferred (only a room with a non-adjacent partner can be B); when no such pair exists, two distinct adjacent eligible rooms do (B still the farthest, A the nearest other).
+                if (eligible.Count < 2) return fallback;
+                bool anyPair = false; foreach (int r in eligible) if (HasPartner(r)) anyPair = true;
                 bool HasPartner(int r) { foreach (int o in eligible) if (o != r && !adj[r].Contains(o)) return true; return false; }
                 int bestKey = -1; var bestB = new List<int>();
                 foreach (int r in eligible)
                 {
-                    if (!HasPartner(r)) continue;
+                    if (anyPair && !HasPartner(r)) continue;
                     int key = dist[r] * 2 + (adj[r].Count == 1 ? 1 : 0);
                     if (key > bestKey) { bestKey = key; bestB.Clear(); }
                     if (key == bestKey) bestB.Add(r);
@@ -112,7 +114,7 @@ namespace SleepingCalamity.Core
                 int bestDist = int.MaxValue; var nearest = new List<int>();
                 foreach (int r in eligible)
                 {
-                    if (r == b || adj[b].Contains(r)) continue;
+                    if (r == b || (anyPair && adj[b].Contains(r))) continue;
                     if (dist[r] < bestDist) { bestDist = dist[r]; nearest.Clear(); }
                     if (dist[r] == bestDist) nearest.Add(r);
                 }

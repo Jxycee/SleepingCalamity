@@ -78,10 +78,20 @@ namespace SleepingCalamity.Tests.EditMode
             return true;
         }
 
+        // Eligible rooms as the plan sees them (Combat, free cell, not the locked room); true when two of them share no link.
+        static bool HasNonAdjacentPair(CellarFloorLayout l, FloorObjectivePlan _)
+        {
+            CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+            var el = new List<int>();
+            for (int r = 0; r < l.Rooms.Count; r++) if (r != l.LockedRoomIndex && CellarEncounterPlan.FreeCellsOf(l, d, r).Count > 0) el.Add(r);
+            foreach (int x in el) foreach (int y in el) if (x < y && !l.Links.Any(k => k.Touches(x) && k.Touches(y))) return true;
+            return false;
+        }
+
         [Test]
         public void Plan_ValveRooms_DistinctNonAdjacentReachable()
         {
-            int seen = 0;
+            int seen = 0, adjacentSeen = 0;
             for (uint s = 1; s <= 300; s++)
                 foreach (int f in GeneratedFloors)
                 {
@@ -92,8 +102,8 @@ namespace SleepingCalamity.Tests.EditMode
                     string at = "seed " + s + " floor " + f;
                     int[] dist = Distances(l, out int entry);
                     Assert.AreNotEqual(p.ValveRoomA, p.ValveRoomB, at);
-                    for (int i = 0; i < l.Links.Count; i++)
-                        Assert.IsFalse(l.Links[i].Touches(p.ValveRoomA) && l.Links[i].Touches(p.ValveRoomB), at + " valves adjacent");
+                    bool adjacent = l.Links.Any(k => k.Touches(p.ValveRoomA) && k.Touches(p.ValveRoomB));
+                    if (adjacent) { adjacentSeen++; Assert.IsFalse(HasNonAdjacentPair(l, FloorObjectivePlan.For(l)), at + " valves adjacent although a non-adjacent pair exists"); }
                     foreach (int r in new[] { p.ValveRoomA, p.ValveRoomB })
                     {
                         Assert.AreNotEqual(entry, r, at); Assert.AreNotEqual(l.ExitRoomIndex(), r, at); Assert.AreNotEqual(l.LockedRoomIndex, r, at);
@@ -106,6 +116,7 @@ namespace SleepingCalamity.Tests.EditMode
                     Assert.IsEmpty(CellarFloorValidator.Validate(l), at);
                 }
             Assert.Greater(seen, 100, "the sweep must reach valve floors");
+            Assert.Greater(adjacentSeen, 0, "the sweep must reach the adjacent-pair relaxation");
         }
 
         [Test]
@@ -164,12 +175,11 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.AreEqual(before, CellarFloorGenerator.Layout(12345, 2).LayoutHash());
         }
 
-        // Measured 2026-11-06: the generator makes 4-6 rooms, entry / exit / locked room hold no valve, so a layout often has 1-2 eligible rooms and cannot host two non-adjacent valves.
-        // The plan allows a fallback only for a layout with no two eligible rooms sharing no link (at most 2 eligible rooms in nearly all cases; never a pump: every layout has a middle-third room), so that is what this asserts; the rate is printed.
+        // Decision 5 (relaxed 2026-11-06): valves prefer a non-adjacent pair, else two adjacent eligible rooms; a fallback is allowed only with fewer than 2 eligible rooms (never a pump).
         [Test, Category("Soak")]
         public void Plan_FallbackRate_2000Seeds()
         {
-            var fallbacks = new List<string>(); var bad = new List<string>();
+            int fallbacks = 0, adjacentPairs = 0; var bad = new List<string>();
             for (uint s = 1; s <= 2000; s++)
                 foreach (int f in GeneratedFloors)
                 {
@@ -177,18 +187,20 @@ namespace SleepingCalamity.Tests.EditMode
                     FloorObjectivePlan p = FloorObjectivePlan.For(l);
                     Assert.IsEmpty(CellarFloorValidator.Validate(l), "seed " + s + " floor " + f);
                     FloorObjective rolled = FloorObjectivePick.Rolled(s, f);
-                    if (p.Objective == rolled) continue;
+                    if (p.Objective == rolled)
+                    {
+                        if (rolled == FloorObjective.TwoValves && l.Links.Any(k => k.Touches(p.ValveRoomA) && k.Touches(p.ValveRoomB))) adjacentPairs++;
+                        continue;
+                    }
+                    fallbacks++;
                     CellarFloorDressing d = CellarFloorDressing.Resolve(l);
-                    var el = new List<int>();
-                    for (int r = 0; r < l.Rooms.Count; r++) if (r != l.LockedRoomIndex && CellarEncounterPlan.FreeCellsOf(l, d, r).Count > 0) el.Add(r);
-                    int eligible = el.Count; bool pair = false;   // a pair of eligible rooms sharing no link could have hosted the valves
-                    foreach (int x in el) foreach (int y in el) if (x < y && !l.Links.Any(k => k.Touches(x) && k.Touches(y))) pair = true;
-                    fallbacks.Add(s + "/" + f);
-                    if (rolled != FloorObjective.TwoValves || pair) bad.Add(s + "/" + f + " rolled " + rolled + " eligible " + eligible);
+                    int eligible = 0;
+                    for (int r = 0; r < l.Rooms.Count; r++) if (r != l.LockedRoomIndex && CellarEncounterPlan.FreeCellsOf(l, d, r).Count > 0) eligible++;
+                    if (rolled != FloorObjective.TwoValves || eligible >= 2) bad.Add(s + "/" + f + " rolled " + rolled + " eligible " + eligible);
                     Assert.AreEqual(f == DiveFloorTable.LastBuiltFloor ? FloorObjective.Ending : FloorObjective.GateKey, p.Objective, "seed " + s + " floor " + f);
                 }
-            TestContext.WriteLine("objective fallbacks: " + fallbacks.Count + " of " + 2000 * GeneratedFloors.Length);
-            Assert.IsEmpty(bad, "fallbacks a layout could have hosted (" + fallbacks.Count + " fallbacks in all): " + string.Join(", ", bad.Take(30)));
+            TestContext.WriteLine("objective fallbacks: " + fallbacks + " adjacent valve pairs: " + adjacentPairs + " of " + 2000 * GeneratedFloors.Length + " floors");
+            Assert.IsEmpty(bad, "fallbacks a layout could have hosted (" + fallbacks + " in all, " + adjacentPairs + " adjacent pairs): " + string.Join(", ", bad.Take(30)));
         }
     }
 }
