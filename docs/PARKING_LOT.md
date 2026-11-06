@@ -88,3 +88,4 @@ From `docs/superpowers/plans/2026-11-03-per-player-loot.md` (decisions and revie
 - 2026-11-02 F7 (`StairHandoverTests` leaves `TestHubGround`, line 230): still open, a one-line teardown fix for the next test cleanup.
 - Re-filed nowhere else: Art, Tooling and Town life items are unaffected by the Nov 1-4 merges (Hollowmere polish, junctions, rooms v2, story bible).
 
+- 2026-11-06 art direction (user): props may lean toward a Hobbit / Lord of the Rings / classic-fantasy film look where it fits (hand-made timber, round doors, carved wood, lived-in clutter). Props only, not people. Fold into the style bible (docs/PHASE1.md 3) at the next art pass.
