@@ -307,5 +307,39 @@ namespace SleepingCalamity.Core.Tuning.Tests
             Assert.IsTrue(TuningStore.ApplyJson(@"{ ""enemies"": { ""tier2MinFloor"": 1 } }", "t2.json"));
             Assert.AreEqual(2, Combat.EnemyCatalog.AuthoredTier(true, false, 1));
         }
+
+        [Test]
+        public void HurtGrace_DefaultsMatchTheResearchValues_OverrideMovesTheWindow_ResetRestores()
+        {
+            Assert.AreEqual(0.8f, Combat.HurtGrace.LightSeconds);
+            Assert.AreEqual(1.2f, Combat.HurtGrace.HeavySeconds);
+            Assert.AreEqual(0.15f, Combat.HurtGrace.MultiHitSeconds);
+            Assert.AreEqual(0.9f, Combat.HurtGrace.KnockdownSeconds);
+            Assert.AreEqual(0.4f, Combat.HurtGrace.FlickerSeconds);
+            Assert.AreEqual(3f, Combat.HurtGrace.HeavyKnockback);
+            Assert.IsTrue(TuningStore.ApplyJson(@"{ ""hurtGrace"": { ""lightSeconds"": 0.5, ""heavyKnockback"": 4, ""flickerSeconds"": ""x"", ""bogus"": 1 } }", "g.json"));
+            Assert.AreEqual(0.5f, Combat.HurtGrace.Seconds(Combat.HurtKind.Light));
+            Assert.AreEqual(Combat.HurtKind.Light, Combat.HurtGrace.Classify(3.5f), "the heavy threshold moved to 4");
+            Assert.AreEqual(Combat.HurtKind.Heavy, Combat.HurtGrace.Classify(4f));
+            Assert.IsFalse(Combat.HurtGrace.IsActive(true, Combat.HurtKind.Light, 0.6f));
+            Assert.AreEqual(0.4f, Combat.HurtGrace.FlickerSeconds, "a bad value keeps the default");
+            Assert.AreEqual(2, _log.Count);
+            TuningStore.Reset();
+            Assert.AreEqual(0.8f, Combat.HurtGrace.LightSeconds);
+            Assert.AreEqual(3f, Combat.HurtGrace.HeavyKnockback);
+        }
+
+        [Test]
+        public void HurtGrace_OutOfRangeValuesKeepTheDefault_HeavyShorterThanKnockdownRejectsTheSection()
+        {
+            TuningStore.ApplyJson(@"{ ""hurtGrace"": { ""lightSeconds"": 0, ""multiHitSeconds"": 99 } }", "r.json");
+            Assert.AreEqual(0.8f, Combat.HurtGrace.LightSeconds);
+            Assert.AreEqual(0.15f, Combat.HurtGrace.MultiHitSeconds);
+            Assert.AreEqual(2, _log.Count);
+            TuningStore.ApplyJson(@"{ ""hurtGrace"": { ""lightSeconds"": 0.6, ""heavySeconds"": 0.5 } }", "h.json");
+            Assert.AreEqual(1.2f, Combat.HurtGrace.HeavySeconds);
+            Assert.AreEqual(0.8f, Combat.HurtGrace.LightSeconds, "the valid key in the rejected section is rolled back too");
+            StringAssert.Contains("heavySeconds", _log[2]);
+        }
     }
 }
