@@ -9,6 +9,9 @@ The coordinator hands these out when the user is away (user, 2026-11-03: "keep l
 - Town art junctions pass: MERGED `a421ceb3`; wide join survey deferred.
 
 ## Next (take from the top)
+(empty 2026-11-06: refill with light items; critical path is the user playtest)
+
+## Done
 A. DONE 2026-11-05 (`docs/superpowers/specs/2026-11-05-queue-triage-notes.md` section A) ****M7 open questions triage** (docs only): sort the M7 open questions by whether plan 3 needs them; list what blocks, what can wait.
 B. DONE 2026-11-05 (`docs/superpowers/specs/2026-11-05-queue-triage-notes.md` section B) ****Story bible open questions sorted by plan 3 need** (docs only): from `docs/superpowers/specs/2026-11-04-story-bible-draft.md` (20 open questions); flag the ones touching floor names, NPCs or text the dive build will show.
 C. DONE 2026-11-05 (`docs/superpowers/specs/2026-11-05-queue-triage-notes.md` section C) ****PARKING_LOT plan 2 follow-ups + DiveBot pace notes** (docs only): per-player gold source design note (placeholder numbers), and DiveBot pace notes for the 7-floor dive.
