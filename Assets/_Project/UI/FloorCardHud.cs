@@ -109,15 +109,18 @@ namespace SleepingCalamity.UI
             if (_label == null) { _label = new GUIStyle(GUI.skin.label) { normal = { textColor = Color.white }, wordWrap = true }; _title = new GUIStyle(_label) { fontStyle = FontStyle.Bold }; }
             _label.fontSize = Mathf.Max(13, Mathf.RoundToInt((full ? 26 : 18) * scale));
             _title.fontSize = Mathf.Max(15, Mathf.RoundToInt((full ? 36 : 20) * scale));
-            float w = (full ? 760f : 400f) * scale, pad = 12f * scale, lh = _label.fontSize * 1.35f;
-            float h = pad * 2f + _title.fontSize * 1.4f + (lines.Count - 1) * lh;
-            float x = full ? (Screen.width - w) * 0.5f : Screen.width - w - 16f * scale, y = full ? Screen.height * 0.28f : 12f * scale;
+            float w = (full ? 760f : 400f) * scale, pad = 12f * scale, tw = w - pad * 2f, th = _title.CalcHeight(new GUIContent(lines[0]), tw);
+            var heights = new float[lines.Count];   // wrapped lines get their real height, so long objective lines never overlap the next one
+            float h = pad * 2f + th;
+            for (int i = 1; i < lines.Count; i++) { heights[i] = _label.CalcHeight(new GUIContent(lines[i]), tw); h += heights[i]; }
+            float topRight = DiveStatsOverlay.Shown ? 12f + 640f + 8f : 12f * scale;   // below the F4 playtest overlay when it is up (same corner)
+            float x = full ? (Screen.width - w) * 0.5f : Screen.width - w - 16f * scale, y = full ? Screen.height * 0.28f : topRight;
             GUI.color = new Color(0, 0, 0, full ? 0.72f : 0.5f); GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
             GUI.color = Color.white;
             float ly = y + pad;
-            GUI.Label(new Rect(x + pad, ly, w - pad * 2f, _title.fontSize * 1.4f), lines[0], _title);
-            ly += _title.fontSize * 1.4f;
-            for (int i = 1; i < lines.Count; i++) { GUI.Label(new Rect(x + pad, ly, w - pad * 2f, lh), lines[i], _label); ly += lh; }
+            GUI.Label(new Rect(x + pad, ly, tw, th), lines[0], _title);
+            ly += th;
+            for (int i = 1; i < lines.Count; i++) { GUI.Label(new Rect(x + pad, ly, tw, heights[i]), lines[i], _label); ly += heights[i]; }
         }
     }
 }
