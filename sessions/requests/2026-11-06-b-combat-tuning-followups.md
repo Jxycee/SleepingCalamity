@@ -1,6 +1,6 @@
 Title: Combat-polish follow-ups + TuningSections TODO
 Target: cloud
-Status: started
+Status: blocked: no Unity editor in cloud, so no check; work on branch claude/combat-tuning-followups (tip 1b07fee4) awaits a licensed check then merge; enemy attack-id tuning skipped (bigger than S)
 Started: 2026-11-06T16:41Z (cloud launcher)
 Model: sonnet
 From: coordinator session 10 (QUEUE.md "Ready: bugs and test health", two S items)
