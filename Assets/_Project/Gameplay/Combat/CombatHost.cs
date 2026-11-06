@@ -391,6 +391,7 @@ namespace SleepingCalamity.Gameplay
             if (guarded) dmg = Mathf.Max(1, Mathf.CeilToInt(dmg * GuardMath.GuardedDamage - 1e-4f));
             float ward = AbilityEffects.IncomingMult(Growth(victim.OwnerClientId).Abilities, WeaponStyle.FamilyOf(victim.WeaponKey));
             if (ward < 1f) dmg = Mathf.Max(1, Mathf.CeilToInt(dmg * ward - 1e-4f));
+            vitals.LastHitSource = e.Def.Id + " " + a.Id + " " + Vector3.Distance(e.transform.position, victim.transform.position).ToString("0.0") + " m" + (guarded ? " guarded" : "");
             int lost = vitals.ServerDamage(dmg);
             victim.ServerBroadcastHurt(lost, guarded, !guarded && HurtGrace.IsHeavyHit(a.Knockback, a.GuardBreak));
         }

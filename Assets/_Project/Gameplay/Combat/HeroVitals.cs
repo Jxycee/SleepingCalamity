@@ -61,6 +61,9 @@ namespace SleepingCalamity.Gameplay
             NetReviveProgress.Value = Model.ReviveProgress;
         }
 
+        // Host-only diagnostic (bot hit logs): the enemy kind, attack id and distance of the last enemy hit that landed. Not synced, not saved.
+        public string LastHitSource { get; set; } = "";
+
         // Host: returns the HP lost.
         public int ServerDamage(int amount)
         {
