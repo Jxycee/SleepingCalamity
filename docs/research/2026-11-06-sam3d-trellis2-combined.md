@@ -78,3 +78,11 @@ Measured on the RTX 5070 12 GB (tools in C:\AI, commands in C:\AI\scripts\NOTES.
 5. **Still to build**: decimate/retopo to tier budget, proper UV unwrap, rebake 2048 base/normal/ORM, colour correction (base colour comes out washed with blue/purple tints), source record (`licence: personal-use`), Unity import and review.
 
 Total ~5 min GPU per model, peak under 10 GB, max 67 C. Rejected: SAM 3D (muddy own texture, distorted face/lantern on the goblin), StableGen (seams, colour drift; keep only if 2K PBR maps from it are needed), RealVisXL concepts (photoreal, view drift; OK for Hobbit-leaning prop ideas).
+
+## Prop pipeline v2 (2026-11-06, five props: well, lantern post, ale barrel, cart, shrine)
+
+Scripts in C:\AI\scripts (usage in NOTES.md): `ai_prop_batch.py` (concept folder -> cutout -> Hunyuan 40k + 200k high -> TRELLIS texture -> v1 cleanup), `ai_prop_v2.py` (cleanup v2). Outputs C:\AI\test_out\props\final_v2\<name>\ (GLB, FBX path_mode STRIP, 2048 BaseColor/Normal/ORM). Sheet PROP_SHEET3.png.
+
+Cleanup v2 steps: junk/ground-plane removal and merge by distance; re-unwrap (variational charting + minimum-stretch unwrap, concave pack): UV islands 511-2,920 -> 63-175; rebake colour/rough/metal old->new UV at 2048, normal + AO from the 200k mesh, ORM packed; Real-ESRGAN x4plus upscale of base colour before rebake (~15 s); subtle triplanar detail overlay from our Art/Textures/B1_town oak_timber, sandstone, iron (hue/value masks, UDN normal add). ~70-95 s per asset on top of ~3-5 min generation.
+
+Verdict: props are close to the concepts at 40k tris and v2 textures are crisp at 1600 px renders. Open: UV packing only 49-60% (target 85%), ~5% squeezed triangles, streaks near some island edges, iron mask catching dark crevices, faint rim on the well, Unity import (FBX/GLB + ORM) unchecked, and no review against the style bible yet. Characters stay on Tripo (user, 2026-11-06).
