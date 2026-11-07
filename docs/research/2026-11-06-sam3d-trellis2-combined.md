@@ -86,3 +86,11 @@ Scripts in C:\AI\scripts (usage in NOTES.md): `ai_prop_batch.py` (concept folder
 Cleanup v2 steps: junk/ground-plane removal and merge by distance; re-unwrap (variational charting + minimum-stretch unwrap, concave pack): UV islands 511-2,920 -> 63-175; rebake colour/rough/metal old->new UV at 2048, normal + AO from the 200k mesh, ORM packed; Real-ESRGAN x4plus upscale of base colour before rebake (~15 s); subtle triplanar detail overlay from our Art/Textures/B1_town oak_timber, sandstone, iron (hue/value masks, UDN normal add). ~70-95 s per asset on top of ~3-5 min generation.
 
 Verdict: props are close to the concepts at 40k tris and v2 textures are crisp at 1600 px renders. Open: UV packing only 49-60% (target 85%), ~5% squeezed triangles, streaks near some island edges, iron mask catching dark crevices, faint rim on the well, Unity import (FBX/GLB + ORM) unchecked, and no review against the style bible yet. Characters stay on Tripo (user, 2026-11-06).
+
+## Prop pipeline v3 (hill-climb, 2026-11-06 night)
+
+One command: `python C:\AI\scripts\ai_prop.py <concept.png|folder> [--name] [--tris 40000]` (manages the ComfyUI servers, resumes, writes GLB/FBX/2048 maps + 1600 px preview + score JSON to C:\AI\test_out\props\final_v3\<name>\). Scorer: `C:\AI\scripts\prop_score.py`; scoreboard C:\AI\test_out\props\HILLCLIMB.md; sheet PROP_SHEET4.png.
+
+v2 -> v3 (5-prop mean): combined score 61.5 -> 72.9; squeezed triangles 5.7% -> 2.4%; overlap 0.29% -> 0.10%; texel-density spread 3.2 -> 1.8; manual steps 3 -> 1; look unchanged (render dE 0.4-1.0 vs v2). Kept: split non-disc charts, repair collapsed charts, dilate atlases before the UV transfer bake, remove the slab-band rim, fit packing to the unit square, low-frequency iron mask, drop the v1 Blender stage. Rejected: xatlas re-pack (little gain, mirrored charts), skipping the upscale (sharpness -17-22%).
+
+Still open: UV coverage ~49% (ragged islands; 85% target unmet), crude dot detector (no dot fix kept), time ~5-6 min per prop dominated by the GPU stages (Hunyuan shape, TRELLIS texture).
