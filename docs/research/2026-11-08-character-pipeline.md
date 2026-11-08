@@ -44,6 +44,24 @@ Goal: a bare Tobin base, one skinned mesh plus eyes, teeth, tongue, hair on the 
 - Eye/blink realism: https://la.disneyresearch.com/wp-content/uploads/Modeling-and-Animating-Eye-Blinks-Paper.pdf ; https://www.gamesradar.com/sony-explains-how-the-last-of-us-2-has-such-realistic-facial-animations
 - Earlier sources for HeadWrap, FaceKeys, AccuRIG, CC4 remain below for reference; they need purchases or were not needed.
 
+## 0b. How real teams do it, and the spike brief (user asked 2026-11-08)
+**The common flow** (every source agrees): concept -> high-poly sculpt -> **retopology to a clean low mesh with loops at eyes, mouth, shoulders, knees** -> UVs -> **bake** the sculpt's detail and colour onto the low mesh -> rig and skin -> facial shapes -> engine. AAA adds scans and FACS capture and hand-weights the hero; indies use Blender instead of ZBrush/Maya and often start from a **shared-topology base mesh** (Polycount threads: every head on the same topology as a variant of one base; The Order: 1886 reportedly shared head topology and UVs; Disney's Cinderella mouse and horse shared topology) so **one rig, one weight set and one expression library serve every character**. Shared topology only works if eyes and mouth sit on matching loops. Sources are forum and vendor material; I found no single studio case study end to end.
+**Can we copy it? Yes, the indie half.** Our Tripo mesh plays the role of the sculpt. The retopo step is "use the MPFB2 template as the low mesh", and the base-mesh/shared-rig idea is exactly what makes Wren, Pip, Ash and townsfolk cheap afterwards (same skeleton, same keys). What we cannot copy is scan/FACS capture and hand-painted weights; MPFB2's native weights stand in for those.
+
+**Texture stays as clean as the original (user's one hard requirement)**
+1. **One bake, from the original, never a chain.** Bake colour straight from the untouched Tripo head (original UVs and original texture file) onto the template's head UVs. Do not bake from a derived copy, and never re-bake a bake.
+2. **Supersample.** Bake at 4096 (or 2x the final), then downscale once to the final size with a high-quality filter. No AI upscale and no repaint on the face.
+3. **Cage, not guesswork.** Selected-to-Active with a cage object or tight extrusion (just enough to enclose the Tripo head); too small smears, too large ghosts. Margin 16 px or more; template UVs with no overlaps; one island for the face so there is no seam across skin.
+4. **Optional zero-loss variant for the face.** Instead of baking, copy the Tripo head's UVs onto the conformed template with Blender's Data Transfer (face corner data, UVs, nearest face interpolated) and keep the original texture file as-is. This works only where the Tripo face is one contiguous UV island; across island borders it stretches, so use it on the face, bake elsewhere. Try it first, because it has no resampling loss at all.
+5. **Measure, don't eyeball.** Render 1:1 crops (eye, lip edge, brow, cheek) of original vs result in the same light and compute the same sharpness number on both (the repo already has `sc_tripo_texel_analyze.py` for texel density; any Laplacian-variance script is fine). **Accept if the face crops score at least 95% of the original and a person can't pick the original in a blind A/B.** Reject on halos, seam lines, or colour shift (compare mean Lab colour per crop).
+
+**Spike brief for the local session (one new folder, one version, report once)**
+- Folder `base_v1`. Inputs: bare A-pose Tobin (neck_v3 body + face_v7 head, original textures), concept refs, MPFB2.
+- Build: one MPFB2 figure, `mixamo_unity` rig, targets set against the concept sheet; body nudged toward the Tripo body with Shrinkwrap (masked, smoothed); face by targets plus a small sculpt, no whole-face warp; then Export Copy with ARKit + visemes; eyes, teeth, tongue from MPFB2.
+- Texture: sections above.
+- Gates, in order, stop at the first failure and report: (1) Unity Humanoid maps with no manual fix and the ARKit keys move on the SkinnedMeshRenderer; (2) the Y Bot same-frame test on the 9 real clips plus arms-overhead, no pose rated unnatural; (3) face playback test with eyes, lids and micro-saccades on, neutral, blink, jaw open, AA, OO, smile at cutscene distance; (4) texture acceptance test above.
+- Rules: no new transfer/conform scripts between meshes; one change per version; every version scored on the section 6 scorecard.
+
 ## 1. What actually needs to be true (the contract)
 STORY.md (customisation, user): **outfits** are found, crafted and dyed and show on the hero in cutscenes; **faces, bodies and hair stay fixed**; heroes can be renamed. That is much smaller than a character creator. It means:
 - 4 heroes + a dozen townsfolk are **authored once**, not generated at runtime. No UMA-style DNA system is needed.
