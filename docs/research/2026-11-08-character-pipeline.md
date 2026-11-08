@@ -109,6 +109,17 @@ User fed the isolated Tobin face image to MetaPerson as the selfie and got "the 
 - Build script kept at `base_v1/build.py` in the scratchpad (`RINGS=2` env, 5 mm inset); not in the repo yet.
 - **Next:** hair onto the head, then the Unity gates (Humanoid map, face playback with jaw capped, Y Bot same-frame clips).
 
+## 0i. Tobin base v2: anatomical underlay instead of the flat skin suit (user request 2026-11-08; cloud Blender; not in Unity yet)
+`Tobin_Base_v2.glb` (35 MB, scratchpad, not committed). Replaces the recoloured clothing shells with a built body for the missing chest, back, upper arms, hips and thighs, in the order a sculptor works:
+1. **Measure** where the real skin ends: along each arm and leg the real skin starts at about 26% (arms) and 28% (legs) of the way from the joint; ring centre and radius measured there so the new pieces meet the real forearms and lower legs.
+2. **Blockout (mannequin):** clean lofted rings along the skeleton: superelliptic torso cross-sections from an anthropometric table (hip, waist, chest, trapezius slope, neck), tapered arm and thigh tubes, started inside the body so no open ends show. First attempt reshaping the T-shirt and shorts shells failed (inside-out lining, a chest pocket, white holes, a thigh ledge), so the mesh is built from scratch.
+3. **Primary forms:** pecs with lower border, sternum groove, rectus segments, obliques, lats, traps, scapulae, spine groove, glutes, quads, hamstrings, deltoids, as Gaussian displacements along the normals.
+4. **Bind:** vertex-group weights copied from the clothing shells by nearest surface (Data Transfer), Armature modifier, tag `sc_role = underlay_hide_when_clothed`.
+5. **Fit under the clothes:** each vertex is ray-cast from its bone axis against the tee and shorts and clamped at least 8 mm inside. Leak test (clothed, with vs without the underlay, A-pose): **258 / 1,058 / 1,056 differing pixels of 770,000** (front/side/back) versus about 13,000 / 9,600 / 9,300 before the clamp; what is left sits at the sleeve openings (skin tone filling the sleeve hollow) plus hairlines at the collar and the shorts' centre seam.
+- **Honest limits:** the clamp flattens most of the chest and abs because the tee is cut close to the body, so the muscle relief is faint; the back of each shoulder still has a few ragged overlapping edges where arm tube meets torso; the underlay has **no body-slider shape keys** (the old shell version had them); skin is still a flat tone; the underlay stays hidden whenever clothes are worn.
+- **References:** I could not download the Wikimedia anatomy plates (Hagström, public domain/CC0: "Muscles anterior labeled", "Muscle posterior labeled") because the proxy blocks the image host; the proportions come from anthropometric tables plus the measured pieces. Send 3-4 reference photos (front, back, side, thigh) via Drive to refine the forms, but they only matter if a bare torso is ever shown.
+- Scripts (scratchpad only): `sculpt/mannequin6.py` is the final version of the build.
+
 ## 1. What actually needs to be true (the contract)
 STORY.md (customisation, user): **outfits** are found, crafted and dyed and show on the hero in cutscenes; **faces, bodies and hair stay fixed**; heroes can be renamed. That is much smaller than a character creator. It means:
 - 4 heroes + a dozen townsfolk are **authored once**, not generated at runtime. No UMA-style DNA system is needed.
