@@ -101,6 +101,14 @@ User fed the isolated Tobin face image to MetaPerson as the selfie and got "the 
 - Free export is labelled non-commercial (panel: "LOD1 · JPG · 1K · non-commercial", 1 remaining); paid shapes cost +5 coins each; the panel has no option for hidden body skin; AI shirt texture cannot restore skin (exports trim skin under clothes).
 - Next: skin-suit torso/thighs from `outfit_top` and `outfit_bottom` (flat skin tone, then texture match), cut the sandals to bare feet, scale to 1.90 m, then the Unity gates in 0e.
 
+## 0h. Tobin base v1 built from MetaPerson file 3 (cloud Blender 4.5, 2026-11-08; not yet opened in Unity)
+`Tobin_Base_v1.glb` (37 MB, scratchpad only, not committed): file 3 minus sandals, tee and shorts, plus two **underlay** meshes (`BaseUnderlay_Torso` from the tee, `BaseUnderlay_Legs` from the shorts) carrying the missing torso/upper-arm/thigh surface. Same 73-joint skeleton, all 149 head shapes, body sliders on the underlays (12 and 8 keys), eyes, teeth, lashes, `Male_Pose_A`.
+- **Never seen under clothes, by construction and by test:** each underlay carries the custom property `sc_role = underlay_hide_when_clothed` (exported as glTF extras): the clothing system must disable those renderers whenever any top or bottom is worn. As a second guard each underlay is pulled **5 mm toward the nearest bone axis** (always inward; the first attempt used vertex normals, which are inconsistent on the cloth and pushed the suit through the sleeves, chest pocket and shorts hem: 13,493 leaking pixels) and **trimmed two edge rings** so it stops short of every open edge. Test: front render of the clothed avatar with and without the underlays, neutral and with the body sliders at full: **352 and 358 differing pixels of 770,000 (0.05%)**, all on existing mesh edges (a hairline crack in the shorts' centre seam and the one-pixel tee hem), none in the interior; the first attempt (normal inset, no trim) leaked 13,493 and 15,498.
+- **Bare look is not a goal:** the underlay is a flat tan, a little darker and more orange than the real skin, with open gaps at the sleeve ends and shorts hem. Fix later only if a bare-torso cutscene is ever needed (sculpt + baked skin texture).
+- **Scale:** exported at 1.80 m; Tobin's 1.90 m = Unity import scale 1.0556 (not baked, to keep bone scales at 1).
+- Build script kept at `base_v1/build.py` in the scratchpad (`RINGS=2` env, 5 mm inset); not in the repo yet.
+- **Next:** hair onto the head, then the Unity gates (Humanoid map, face playback with jaw capped, Y Bot same-frame clips).
+
 ## 1. What actually needs to be true (the contract)
 STORY.md (customisation, user): **outfits** are found, crafted and dyed and show on the hero in cutscenes; **faces, bodies and hair stay fixed**; heroes can be renamed. That is much smaller than a character creator. It means:
 - 4 heroes + a dozen townsfolk are **authored once**, not generated at runtime. No UMA-style DNA system is needed.
