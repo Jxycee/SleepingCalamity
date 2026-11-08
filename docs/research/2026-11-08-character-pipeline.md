@@ -2,6 +2,38 @@
 
 Asked by the user 2026-11-08: find the best verified pipeline for properly rigged characters (face and body) that we can still customise, using existing paths instead of inventing our own. Method: read the repo (PHASE1 3.6/P29, STORY customisation rule, the Nov 6 research notes, `sc-ai-model-pipeline`, `sc-asset-adopt`), then web research. **Not seen:** the user's local sessions and PC memory (this was a cloud session). Where the repo says something that may be out of date locally it is flagged. Tags: VERIFIED = read on the source's own page; VENDOR = only the vendor says so; UNVERIFIED = not found.
 
+## 0. Revision, same day: the user's real case is "the Tripo Tobin, rigged properly"
+User, 2026-11-08: they already have the Tripo Tobin and want it with good face and body rigging. Pain so far (almost 10 versions): rigging goes badly, textures stretch/merge on the model, proportions of body/clothes/hair are hard to get right. Sections 1-7 below describe building a character from an MPFB2 body; keep that for NPCs and for outfit layers later. **For Tobin, this section wins.**
+
+### Why it keeps failing (cause, not symptom)
+- **Rigging:** auto-riggers need a clean, A/T-posed, hole-free mesh with limbs clear of the torso. Reallusion's own tracker notes AccuRIG struggles with openings in meshes and with arms/thick limbs near the torso; fingers weight poorly on fused hands. A Tripo export is a triangle soup with fused hair, clothes, props and hands, so every rigger fails the same way.
+- **Texture stretch/merge:** the AI mesh's own UVs are a liability for any re-use (retopo guides agree). Stretching comes from re-using or auto-decimating those UVs. The fix is not repainting: it is **new clean UVs + bake the Tripo albedo/normal onto them from the high mesh** (the same rebake step already proven on props in pipeline v2/v3). Where two layers were generated fused (apron on shirt on skin) the merge is baked into the source and only a repaint or a re-generate removes it.
+- **Proportions:** a rig is fitted to whatever mesh you give it, so proportions must be decided **before** rigging. Fixing them afterwards means re-skinning.
+- **Process:** no gates and no pass criteria, so each version changed several things at once.
+
+### The pipeline: one-way gates, one change per version
+Verified building blocks (see sources): HeadWrap, FaceKeys, AccuRIG 2, Blender bake. No tool found does the whole job; the CC4 route for AI meshes (ArtStation tutorial) uses ZBrush + ZWrap, which is the paid professional version of the same idea.
+- **G0 Source gate (Tripo, before anything else).** Tobin must be A- or T-pose, arms at least about 10 cm off the torso, hands open, no held or back-mounted props (axe is a separate prop, bone-parented later), mouth closed or slightly open, eyes open, no cape. Tripo and Meshy both offer a pose option (vendor claims, UNVERIFIED for Tripo); if this model fails, **re-generate, don't repair**. Decide proportions here: PHASE1 3.6 (1.90 m, about 6.5 heads, hands/feet 1.15x). Put a flat render of the MPFB2 template at those proportions into the concept prompt as the guide image, and measure the result against it. **Proportion lock: no proportion edits after G3.**
+- **G1 Split.** In Blender separate: head (cut at the neck), body + outfit, hair, rigid accessories. Fused hair stays a solid mesh (stylised braids/ties read fine) or becomes cards later.
+- **G2 Head -> face rig.** **HeadWrap** ($19.99, Blender 4.2-5.2; template is CC0 MakeHuman, eyes + teeth + tongue included, 4,262 verts with loops at eyes and mouth) fits the clean head to the Tripo head in Guided mode (10 clicks; use Guided for stylised faces) and **bakes the Tripo texture onto clean UVs** (Full detail mode, up to 4096, normal map optional). **FaceKeys Full** ($21.75) then makes the **52 ARKit keys + 15 visemes**, exported via FBX/glTF. Known limits from the docs: folds near the ears when the head differs a lot from the template; joined lips block mouth-open shapes (use Cut Lips); eyeLook keys can conflict with bone eyes; painted-on mouths and flat eyes can't animate. Neck ends below the jaw: joining to the body needs the Open Neck option and a manual bridge (the weak spot, hide with collar/hair).
+- **G3 Body -> body rig.** Retopo the body + outfit to a clean quad mesh (Tripo's own retopo, QuadRemesher or Instant Meshes, then Shrinkwrap/snapping; guides agree hero characters still need a manual pass at shoulders, elbows, hips, knees). New UVs. **Bake** albedo/normal/AO from the Tripo high mesh with Blender's Selected-to-Active (Cycles). Rig with **AccuRIG 2 (free, Reallusion staff: usable for commercial projects; for your own meshes with no Reallusion content, rigging for a game is fine; read the current EULA)**: 19-joint body + separate fingers, Unity export preset, Humanoid friendly. Then check six poses (arms up, arms forward, sit, crouch, sword swing, run) and fix shoulders/hands by weight transfer or painting. UniRig remains the free backup but its skeleton needs mapping to Humanoid.
+- **G4 Assemble.** HeadWrap head parented to the head bone of the AccuRIG skeleton (blendshapes live on the head mesh only), hair and accessories to bones, one material per part. Eyes can be bone-driven; drop FaceKeys' eyeLook keys if so.
+- **G5 Unity + scorecard.** Humanoid avatar, UAL/Mixamo clips through `HeroAnimator.controller`, uLipSync on a voice line, then the section 6 scorecard. Freeze the version; the next version changes exactly one gate.
+
+### Cost and unknowns
+- Add-ons about $41 total, AccuRIG and Blender free. Time per hero is not measured: the Tobin spike will give the first number.
+- UNVERIFIED and to test on Tobin: HeadWrap on a heavily stylised Tripo head (ears, brows); Tripo face texture sharpness after the bake; AccuRIG on storybook proportions with big hands and boots; the neck bridge; whether the HeadWrap template (MakeHuman-derived) can share vertex groups with an MPFB2 body if we later want to unify the NPC path.
+- If the head fit fails after one retry: sculpt the face on the MPFB2 head (sections 3-4) and paint Tobin's face onto it. If AccuRIG fails G3 twice: take the CC4 trial and the ZWrap route from the ArtStation tutorial.
+
+### Added sources
+- HeadWrap: https://superhivemarket.com/products/headwrap/docs
+- FaceKeys: https://superhivemarket.com/products/facekeys/docs
+- AccuRIG 2 licence answers: https://discussions.reallusion.com/t/question-about-accurig-2s-eula/15034 ; release: https://www.cgchannel.com/2025/07/rig-and-animate-3d-characters-for-free-with-accurig-2-0/
+- AccuRIG known issues: https://cdn-www.reallusion.com/FeedBackTracker/Issue/CC452-AccuRig-wrongly-positioned-bones ; https://forum.reallusion.com/PrintTopic522904.aspx
+- AI mesh into CC4 with ZWrap: https://www.artstation.com/blogs/mythcons/mpyr7/convert-an-ai-generated-3d-mesh-into-character-creator-4-cc4
+- Retopo + bake for AI meshes: https://www.tripo3d.ai/media-production/retopologize-ai-3d-model-in-blender ; https://www.tripo3d.ai/blog/explore/ai-3d-model-generator-and-shrinkwrap-cleanup-workflow
+- A-pose vs T-pose for rigging: https://blog.neural4d.com/comparisons/a-pose-vs-t-pose/
+
 ## 1. What actually needs to be true (the contract)
 STORY.md (customisation, user): **outfits** are found, crafted and dyed and show on the hero in cutscenes; **faces, bodies and hair stay fixed**; heroes can be renamed. That is much smaller than a character creator. It means:
 - 4 heroes + a dozen townsfolk are **authored once**, not generated at runtime. No UMA-style DNA system is needed.
