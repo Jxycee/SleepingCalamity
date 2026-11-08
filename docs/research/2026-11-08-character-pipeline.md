@@ -94,6 +94,13 @@ User fed the isolated Tobin face image to MetaPerson as the selfie and got "the 
 - **Expression test (12 shapes at weight 1):** smile, brows, surprise, funnel, pucker and the vowels (aa, oh, ou, FF) read natural. Issues to check in engine with real lighting: (1) `jawOpen` at 1.0 shows a flat tongue filling the mouth with little visible upper teeth (looks like tongue out; fine at 0.5 and in the `aa` viseme), (2) closed eyelids render as a muddy brown patch (lid skin texture/shadow), (3) no dark mouth cavity in Workbench. These are the first things to fix or avoid by capping weights.
 - **Verdict so far:** far closer to usable than the Tripo-head-plus-transferred-shapes route: native rig, native face shapes, clean texture. Not yet verified: Unity Humanoid mapping, FBX route, licence, and how it fits Tobin's physique.
 
+## 0g. Three MetaPerson exports compared (read 2026-11-08)
+- **File 1** (jeans/tee/sneakers, one combined outfit mesh, all paid shapes): full shape set, skin only on head, neck, forearms, hands, toes.
+- **File 2** (tee/shorts/sandals, split outfit pieces, free export): different avatar (narrower, younger face; head 7,223 verts), 51 ARKit shapes only, real lower legs and bare feet, no visemes or sliders. Skeleton identical to file 1 (73 joints, 9 mm lower), so heads are not interchangeable.
+- **File 3** (tee/shorts/sandals, split outfit pieces, all paid shapes; 152 MB): file 1's avatar (head 7,321 verts, 149 shapes, head texture byte-identical to file 1) with real lower legs and bare feet. Head: 51 ARKit + 15 visemes + 83 sliders; body and outfit pieces carry the 14 body sliders; 73 joints; 48k tris; head/body textures 2048, outfit normals 4096; `Male_Pose_A`. Torso and thighs are still absent (covered by tee and shorts). **Best base so far.**
+- Free export is labelled non-commercial (panel: "LOD1 · JPG · 1K · non-commercial", 1 remaining); paid shapes cost +5 coins each; the panel has no option for hidden body skin; AI shirt texture cannot restore skin (exports trim skin under clothes).
+- Next: skin-suit torso/thighs from `outfit_top` and `outfit_bottom` (flat skin tone, then texture match), cut the sandals to bare feet, scale to 1.90 m, then the Unity gates in 0e.
+
 ## 1. What actually needs to be true (the contract)
 STORY.md (customisation, user): **outfits** are found, crafted and dyed and show on the hero in cutscenes; **faces, bodies and hair stay fixed**; heroes can be renamed. That is much smaller than a character creator. It means:
 - 4 heroes + a dozen townsfolk are **authored once**, not generated at runtime. No UMA-style DNA system is needed.
