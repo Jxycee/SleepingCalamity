@@ -114,7 +114,7 @@ mxs = (2 * xm - xx_).astype(np.float32)
 def mirror(a): return cv2.remap(a.astype(np.float32), mxs, yy_.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 symm = fitm & ndi.binary_erosion(fitm, iterations=2)
 symf = symm.astype(np.float32); symf_m = mirror(symf)
-SIGS = 18.0
+SIGS = 26.0
 Ld = delit_lab[..., 0].astype(np.float32)
 low_n = cv2.GaussianBlur(Ld * symf, (0, 0), SIGS); den_n = cv2.GaussianBlur(symf, (0, 0), SIGS)
 low = low_n / np.maximum(den_n, 1e-4); lowm = mirror(low); denm = mirror(den_n)
@@ -151,7 +151,7 @@ valid &= ~ear | (wface > 0.6)
 valid = ndi.binary_opening(valid, iterations=2)
 inval = ~valid & cov                                   # texels outside the coverage are neither valid nor invalid (UV island borders are not penalised)
 dist = ndi.distance_transform_edt(~inval)             # distance (texels) from the nearest invalid covered texel
-w_low = smoothstep(2, 34, dist) * valid               # wide transition for the colour
+w_low = smoothstep(6, 80, dist) * valid      # round 4: wider low-frequency blend (round 3: 2..34)               # wide transition for the colour
 w_hi = smoothstep(1, 12, dist) * valid * wface        # narrower for the detail
 print('valid texels', int(valid.sum()), 'of', int(cov.sum()))
 
@@ -168,7 +168,7 @@ def mblur(x, ww, s):
     den = cv2.GaussianBlur(ww.astype(np.float32), (0, 0), s)
     return np.stack([cv2.GaussianBlur(x[..., k].astype(np.float32) * ww, (0, 0), s) for k in range(3)], -1) / np.maximum(den, 1e-6)[..., None], den
 vf = valid.astype(np.float32)
-low6, d6 = mblur(proj_lab, vf, 5)              # projected colour within valid texels only
+low6, d6 = mblur(proj_lab, vf, 8)              # projected colour within valid texels only
 low60, d60 = mblur(proj_lab, ndi.binary_erosion(valid, iterations=2).astype(np.float32), 60); low250, _ = mblur(proj_lab, ndi.binary_erosion(valid, iterations=2).astype(np.float32), 250)
 fill_low = np.where((d60 > 0.02)[..., None], low60, low250)
 detail = tob_dark - np.stack([cv2.GaussianBlur(tob_dark[..., k], (0, 0), 25) for k in range(3)], -1)
