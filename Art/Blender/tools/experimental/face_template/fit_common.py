@@ -1,4 +1,5 @@
 """Shared helpers for the face-template fit spike (numpy/scipy only)."""
+import os
 import numpy as np, scipy.sparse as sp
 from scipy.spatial import cKDTree
 D = 'C:/AI/test_out/heroes/face_spike/'
@@ -6,7 +7,7 @@ FIT = D + 'fit/'
 
 class Tpl:
     def __init__(s):
-        z = np.load(D + 'template/tobin_head_template.npz', allow_pickle=True)
+        z = np.load(os.environ.get('SC_TPL', D + 'template/tobin_head_template.npz'), allow_pickle=True)
         s.z = z
         s.basis = z['head/basis'].astype(np.float64)
         s.keys = z['head/keys'].astype(np.float64)
