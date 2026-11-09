@@ -31,11 +31,15 @@ def wn(P, Q):
         out[i0:i0 + 500] = (2 * np.arctan2(num, den)).sum(1) / (4 * np.pi)
     return out
 kn = [str(x) for x in z['head/key_names']]; ji = kn.index('jawOpen')
-def head_state(basis, keys, st): return basis if st == 'neutral' else basis + 0.5 * (keys[ji] - basis)
-def teeth_state(b, k, names, st): return b if st == 'neutral' else b + 0.5 * (k[names.index('jawOpen')] - b) if 'jawOpen' in names else b
+STATES = {'neutral': (None, 0), 'jaw0.5': ('jawOpen', 0.5), 'aa': ('aa', 1.0), 'oh': ('oh', 1.0)}   # round 6: aa / oh are judged too
+def head_state(basis, keys, st):
+    k, w = STATES[st]; return basis if k is None else basis + w * (keys[kn.index(k)] - basis)
+def teeth_state(b, k, names, st):
+    kk, w = STATES[st]
+    return b if (kk is None or kk not in names) else b + w * (k[names.index(kk)] - b)
 def counts(head_b, head_k, tb, tk, names, idx=None):
     out = {}
-    for st in ('neutral', 'jaw0.5'):
+    for st in STATES:
         P = head_state(head_b, head_k, st); Q = teeth_state(tb, tk, names, st)
         if idx is not None: Q = Q[idx]
         out[st] = int((np.abs(wn(P, Q)) < 0.5).sum())
@@ -61,24 +65,28 @@ if '--apply' in sys.argv:
         return Rz @ Ry @ Rx
     def mk(p):
         Rm = rotm(p[4:7]); d = np.array(p[1:4]) * 1e-3; return lambda X: c0 + p[0] * ((X - c0) @ Rm.T) + d
-    def tot(p):
-        h = mk(p); n = 0
-        for k in TK:
-            c = counts(hb, hk, h(tb[k]), h(tkeys[k]), names[k]); n += c['neutral'] + c['jaw0.5']
-        return n
-    def score(p): return tot(p) + 0.3 * np.abs(p[1:4]).sum() + 20 * abs(p[0] - 1) + 2 * np.abs(p[4:7]).sum() + (1e4 if p[0] < 0.97 else 0)
-    p = np.array([1.0, 0, 0, 0, 0, 0, 0]); best = score(p)
-    for sweep in range(3):
-        for i, st in enumerate((0.01, 0.5, 0.5, 0.5, 0.7, 0.7, 0.7)):
-            for sgn in (-1, 1):
-                for mult in (1, 2, 3, 4):
-                    q = p.copy(); q[i] += sgn * st * mult
-                    if q[0] < 0.97 or q[0] > 1.05 or np.abs(q[1:4]).max() > 3.0 or np.abs(q[4:7]).max() > 4.0: continue
-                    sc = score(q)
-                    if sc < best: best, p = sc, q
-        print('sweep', sweep, 'p', p.round(3), 'score', round(best, 1))
-    h = mk(p); fin = {'similarity': dict(scale=float(p[0]), offset_mm=[float(v) for v in p[1:4]], rot_deg=[float(v) for v in p[4:7]])}
+    # round 6: SEPARATE similarity per jaw (scale >= 0.97, offsets <= 3 mm), search on a 1/3 subsample of the tooth vertices, all four states (neutral, jawOpen .5, aa, oh)
+    SUB = {k: np.arange(0, len(tb[k]), 3) for k in TK}
+    def tot(p, k, sub=True):
+        h = mk(p); idx = SUB[k] if sub else None
+        c = counts(hb, hk, h(tb[k]), h(tkeys[k]), names[k], idx); return sum(c.values()) * (3 if sub else 1)
+    def score(p, k): return tot(p, k) + 0.3 * np.abs(p[1:4]).sum() + 20 * abs(p[0] - 1) + 2 * np.abs(p[4:7]).sum() + (1e4 if p[0] < 0.97 else 0)
+    P6 = {}; fin = {}
     for k in TK:
+        p = np.array([1.0, 0, 0, 0, 0, 0, 0]); best = score(p, k)
+        for sweep in range(2):
+            for i, st in enumerate((0.01, 0.5, 0.5, 0.5, 0.7, 0.7, 0.7)):
+                for sgn in (-1, 1):
+                    for mult in (1, 2, 3, 4):
+                        q = p.copy(); q[i] += sgn * st * mult
+                        if q[0] < 0.97 or q[0] > 1.05 or np.abs(q[1:4]).max() > 3.0 or np.abs(q[4:7]).max() > 4.0: continue
+                        sc = score(q, k)
+                        if sc < best: best, p = sc, q
+            print(k, 'sweep', sweep, 'p', p.round(3), 'score', round(best, 1), flush=True)
+        P6[k] = p
+    fin['similarity'] = {k: dict(scale=float(P6[k][0]), offset_mm=[float(v) for v in P6[k][1:4]], rot_deg=[float(v) for v in P6[k][4:7]]) for k in TK}
+    for k in TK:
+        h = mk(P6[k])
         pp[f'full/{k}/basis'] = h(tb[k]).astype(np.float32); pp[f'full/{k}/keys'] = h(tkeys[k]).astype(np.float32)
         fin[k] = counts(hb, hk, h(tb[k]), h(tkeys[k]), names[k])
     np.savez_compressed(B2 + 'parts.npz', **pp); res['final'] = fin; print('final', fin)

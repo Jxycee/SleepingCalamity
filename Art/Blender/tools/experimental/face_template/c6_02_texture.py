@@ -190,17 +190,23 @@ comb = lowband + highband
 import os as _os
 BROW_K = float(_os.environ.get('BROW_K', '0.55')); BROW_ERODE = float(_os.environ.get('BROW_ERODE', '0.30'))
 s_brow = samp(cv2.GaussianBlur(brow_ph.astype(np.float32), (0, 0), 1.5)); brow_uv = (s_brow > 0.3) & valid
-ref_lab, _d = mblur(proj_lab, (valid & ~ndi.binary_dilation(brow_uv, iterations=2)).astype(np.float32), 10)
+ref_lab, _d = mblur(comb, (valid & ~ndi.binary_dilation(brow_uv, iterations=5)).astype(np.float32), 14)    # skin reference from the composed texture around the brows (no visible patch edge)
 dark = ref_lab[..., 0] - comb[..., 0]; dm_ = brow_uv & (dark > 4.0)
 if dm_.sum() > 50:
     dt = ndi.distance_transform_edt(dm_); hth = np.percentile(dt[dm_], 90); rr_ = max(1, int(round(BROW_ERODE * hth)))
     soft = cv2.GaussianBlur(ndi.binary_erosion(dm_, iterations=rr_).astype(np.float32), (0, 0), 1.3)
-    bw = np.clip(cv2.GaussianBlur(brow_uv.astype(np.float32), (0, 0), 2.0) * 1.5, 0, 1)
+    bw = np.clip(cv2.GaussianBlur(brow_uv.astype(np.float32), (0, 0), 4.0) * 1.3, 0, 1)
     thin = ref_lab[..., 0] - dark * soft * BROW_K
     comb[..., 0] = comb[..., 0] * (1 - bw) + np.where(brow_uv, thin, comb[..., 0]) * bw
     for k_ in (1, 2):
         dk_ = comb[..., k_] - ref_lab[..., k_]; comb[..., k_] = comb[..., k_] * (1 - bw) + (ref_lab[..., k_] + dk_ * (0.5 + 0.5 * BROW_K) * np.maximum(soft, 0.3)) * bw
     print('brows: half-thickness p90 %.1f texels, eroded %d, dark px %d' % (hth, rr_, int(dm_.sum())))
+# ---------------- round 6: flatten the remaining low-frequency luminance (side light) toward the photo skin tone over the valid skin texels (albedo has no large-scale shading)
+FLAT = float(_os.environ.get('FLAT', '0.85'))
+_okf = (valid & ~ndi.binary_dilation(brow_uv, iterations=4) & ~ndi.binary_dilation(lip_any, iterations=6) & ~ndi.binary_dilation(eye_uv, iterations=6)).astype(np.float32)
+_lp, _dn = mblur(comb, _okf, 40.0)
+_wf = np.clip(_dn / 0.15, 0, 1) * w_low
+comb[..., 0] = comb[..., 0] - FLAT * (_lp[..., 0] - Lc[0]) * _wf
 # ---------------- lips: tinted Tobin lip texture matched to the photo lip colour (never the photo projection)
 tob_lip_mean = tl[lip].mean(0) if lip.any() else Lt
 shift = lip_lab_ph - tob_lip_mean
