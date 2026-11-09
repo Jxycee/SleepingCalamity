@@ -27,6 +27,26 @@ def zscores(m, prior):
     return {k: (m[k] - f['median']) / f['sigma'] for k, f in prior['features'].items() if k in m}
 
 
+def skull_summary(zm, zp, limit=3.0, waive=0.5):
+    """Scored skull plausibility (round 15). Features = the silhouette ones (PR.SIL_KEYS). Per feature: raw |z| of the mesh; the feature is WAIVED when |z_mesh| <= |z_photo| + waive (the mesh is built like its photo:
+    the photo itself is the outlier, not the fit). value = max over features of (min(|z|, limit) if waived else |z|), so value <= limit passes; raw_max_abs_z is the unwaived maximum. Missing silhouette -> value None."""
+    ks = [k for k in PR.SIL_KEYS if k in zm]
+    if not ks: return dict(value=None, raw_max_abs_z=None, features={})
+    f = {}
+    for k in ks:
+        a = abs(zm[k]); b = abs(zp[k]) if k in zp else None; w = a > limit and b is not None and a <= b + waive
+        f[k] = dict(z_mesh=zm[k], z_photo=zp.get(k), waived=bool(w), effective=min(a, limit) if w else a)
+    return dict(value=max(v['effective'] for v in f.values()), raw_max_abs_z=max(abs(zm[k]) for k in ks), worst=max(ks, key=lambda k: f[k]['effective']), limit=limit, waive=waive, features=f)
+
+
+def skull_check(run_dir, tag=None, prior=None):
+    """cheap (no clay render): mesh render + photo mask -> skull_summary. Used by stages/score_final.py"""
+    run = VC.Run(run_dir, tag); prior = prior or json.load(open(PRIOR))
+    mm = PR.measure(cv2.imread(run.rn), run.lm_render); mm.pop('geom'); mm.pop('ok_sil')
+    mp_ = PR.measure(run.photo, run.lm_photo, mask=VC.photo_head_mask(run)); mp_.pop('geom'); mp_.pop('ok_sil')
+    return skull_summary(zscores(mm, prior), zscores(mp_, prior))
+
+
 def mahal(m, prior):
     mh = prior['mahalanobis']; ks = mh['keys']
     if not all(k in m for k in ks):
@@ -45,7 +65,8 @@ def analyse(run, prior=None, force_clay=False):
         if k == 'note' or k not in sd:
             continue
         side[k] = dict(value=sd[k], z=(sd[k] - ref['median']) / ref['sigma'], label=ref['label'], low=ref['low'], high=ref['high'], calibrated=False)
-    res = dict(run=run.name, tag=run.tag, silhouette_ok=dict(mesh=okm, photo=okp), mesh=mm, photo=mp_, z_mesh=zm, z_photo=zp, gap_sigma={k: zm[k] - zp[k] for k in zm if k in zp},
+    skull = skull_summary(zm, zp)
+    res = dict(run=run.name, tag=run.tag, skull=skull, silhouette_ok=dict(mesh=okm, photo=okp), mesh=mm, photo=mp_, z_mesh=zm, z_photo=zp, gap_sigma={k: zm[k] - zp[k] for k in zm if k in zp},
                mahalanobis=dict(mesh=mahal(mm, prior) if okm else None, photo=mahal(mp_, prior) if okp else None, keys=len(prior['mahalanobis']['keys'])), side=side, side_raw=sd)
     json.dump(res, open(run.look + 'plausibility.json', 'w'), indent=1)
     return res
@@ -66,6 +87,9 @@ def report(res, prior, thr=2.0):
         L.append('  %s %s: %+.1f sigma (photo %+.1f, gap %+.1f)  [%s %.3f vs prior %.3f]' % (lvl, name, z, zp, gap, k, res['mesh'][k], prior['features'][k]['median']))
         if abs(z) >= thr:
             flags.append('%s %+.1f' % (name, z))
+    sk = res.get('skull') or {}
+    if sk.get('value') is not None:
+        L.append('  skull plausibility (scored, <= %.0f): value %.2f (raw max |z| %.2f, worst %s; waived = mesh no worse than its photo + %.1f sigma: %s)' % (sk['limit'], sk['value'], sk['raw_max_abs_z'], sk['worst'], sk['waive'], ', '.join(k for k, v in sk['features'].items() if v['waived']) or 'none'))
     m = res['mahalanobis']
     L.append('  joint (Mahalanobis over %d features): mesh %s, photo %s (a typical face is about %.1f)' % (m['keys'], '%.1f' % m['mesh'] if m['mesh'] else 'n/a', '%.1f' % m['photo'] if m['photo'] else 'n/a', np.sqrt(m['keys'])))
     if not res['silhouette_ok']['mesh'] or not res['silhouette_ok']['photo']:

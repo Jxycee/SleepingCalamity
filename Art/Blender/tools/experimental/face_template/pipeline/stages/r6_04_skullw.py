@@ -27,6 +27,15 @@ rim = np.array(Image.open(FIT + f'rn_{tag}.png').convert('RGB')).astype(int); rm
 zb = t.basis[t.lm_idx[t.lm_names.index('brow_center')], 2]; ztop = P0[:, 2].max()
 ZB0 = zb - float(_os.environ.get('SCP_PROF_LOW', '0.008'))     # the profile starts 8 mm below the brow line (round 10): the temple band just above the eyes was 3-8 % narrow in the final render
 prof = lambda z: (lambda x: x * x * (3 - 2 * x))(np.clip((z - ZB0) / (ztop - ZB0), 0, 1))
+# round 15 (experimental, default OFF): SCP_CROWN_PRIOR=lam pulls the photo mask's crown taper (row width at 10 % of crown-to-chin over the width at 30 %) a fraction lam of the way towards the SDXL-face
+# median (0.703) when the mask is more pointed than that; the rows above 30 % are widened by a cosine ramp (full at <= 10 %). A likeness-for-plausibility trade: the mesh then leaves the mask by a few % at the crown.
+try: _cfgp = float(json.load(open(_P_RUN + 'config.resolved.json')).get('snap', {}).get('crown_prior', 0) or 0)     # config key snap.crown_prior (per character); env SCP_CROWN_PRIOR overrides
+except Exception: _cfgp = 0.0
+CROWN_PRIOR = float(_os.environ.get('SCP_CROWN_PRIOR', _cfgp));_Hpx = ph[152, 1] - ytop; _wr = lambda f: np.ptp(np.where(head[int(round(ytop + f * _Hpx))])[0]) + 1.0
+_tp = _wr(0.10) / _wr(0.30); CROWN_RAT = (_tp + CROWN_PRIOR * max(0.0, 0.703 - _tp)) / _tp if CROWN_PRIOR > 0 else 1.0
+def _cm(yp):
+    f = (yp - ytop) / _Hpx; ramp = 1.0 if f <= 0.10 else (0.0 if f >= 0.30 else 0.5 * (1 + np.cos(np.pi * (f - 0.10) / 0.20))); return 1 + (CROWN_RAT - 1) * ramp
+print('crown prior: photo taper %.3f, lambda %.2f -> width x%.3f at <= 10 %%' % (_tp, CROWN_PRIOR, CROWN_RAT))
 Z, DEF, HPW = [], [], []
 for yp in range(ytop + 6, ybrow + int(0.08 * np.linalg.norm(ph[33] - ph[263])), 4):
     rb = np.where(head[yp])[0]
@@ -35,7 +44,7 @@ for yp in range(ytop + 6, ybrow + int(0.08 * np.linalg.norm(ph[33] - ph[263])), 
     if vr < 0 or vr >= rm.shape[0]: continue
     rr = np.where(rm[vr])[0]
     if len(rr) < 5: continue
-    hp = (rb.max() - rb.min()) / 2 / s2 * mmpp; hr = (rr.max() - rr.min()) / 2 * mmpp
+    hp = (rb.max() - rb.min()) / 2 / s2 * mmpp * _cm(yp); hr = (rr.max() - rr.min()) / 2 * mmpp
     Z.append(cz + (0.5 - vr / R_) * S_); DEF.append(hp - hr); HPW.append(hp)
 Z = np.array(Z); DEF = np.array(DEF); HPW = np.array(HPW)
 def width_of(P, z, dz=0.004):

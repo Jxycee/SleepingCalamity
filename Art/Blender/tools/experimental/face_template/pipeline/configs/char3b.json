@@ -2,7 +2,18 @@
   "image": "C:/AI/test_out/heroes/pipeline_runs/char3/source.png",
   "name": "char3b",
   "out_dir": "C:/AI/test_out/heroes/pipeline_runs/char3b",
-  "hunyuan": {"seeds": [1, 2, 3]},
-  "align": {"soft_gate": true},
-  "iris_colour": "auto"
+  "hunyuan": {
+    "seeds": [
+      1,
+      2,
+      3
+    ]
+  },
+  "align": {
+    "soft_gate": true
+  },
+  "iris_colour": "auto",
+  "snap": {
+    "crown_prior": 0.3
+  }
 }
