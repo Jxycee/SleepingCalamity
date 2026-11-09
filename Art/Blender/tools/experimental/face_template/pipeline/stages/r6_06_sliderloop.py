@@ -56,11 +56,8 @@ def measure(ths, work):
     fs = []
     for i, th in enumerate(ths):
         P = W.ysnap(W.warp(th)); f = work + f'_m{i}.npz'; np.savez(f, v=P, f=t.faces, ev=eyes_for(P), ef=EF); fs.append(f)
-    r = subprocess.run([BLENDER, '-b', '--factory-startup', '-P', SC + 'r6_01b_batch_blender.py', '--', '1.46', '1.92', work + '_i'] + fs, capture_output=True, text=True)
-    assert 'OK' in r.stdout, r.stdout[-500:] + r.stderr[-500:]
-    pngs = [work + f'_i{i}.png' for i in range(len(ths))]
-    subprocess.run([MP, SC + 'r6_01c_batch_lm.py', work + '_lm.json'] + pngs, check=True, capture_output=True)
-    lm = json.load(open(work + '_lm.json')); return [W.ratios(np.array(lm[p])) for p in pngs]
+    import render_worker as RWK      # persistent Blender/MediaPipe workers (SCP_RENDER_CPU=1: legacy launch per call); identical numbers
+    return [W.ratios(L) for L in RWK.measure_landmarks(fs, work)]
 keys = list(W.photo_r)
 PENTOL = float(os.environ.get('PENTOL', '0.45'))   # round 6: lid-penetration gate template+0.45 mm (r5: +0.25; the base already sits at +0.22, any eye slider needs room)
 DEPTH_ONLY = {'snl', 'sly'}

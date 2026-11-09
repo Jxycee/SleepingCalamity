@@ -40,9 +40,8 @@ def eyes_for(P):   # eyeballs follow the lower lid ring (as r6_prep_render / r6_
 work = F_ + f'_pol_{pa.cand}'
 def measure(P):   # detector landmarks (468, 2) in mm with y = -z (the convention of W.ratios) on the render of P
     f = work + '_m.npz'; np.savez(f, v=P, f=t.faces, ev=eyes_for(P), ef=EF)
-    r = subprocess.run([BLENDER, '-b', '--factory-startup', '-P', SC + 'r6_01b_batch_blender.py', '--', '1.46', '1.92', work + '_i', f], capture_output=True, text=True); assert 'OK' in r.stdout, r.stdout[-400:] + r.stderr[-400:]
-    subprocess.run([MP, SC + 'r6_01c_batch_lm.py', work + '_lm.json', work + '_i0.png'], check=True, capture_output=True, env=dict(_os.environ, SCP_LM_JIT='5'))
-    rp = np.array(json.load(open(work + '_lm.json'))[work + '_i0.png']); xz = W.px2mm(rp); return np.c_[xz[:, 0], -xz[:, 1]]
+    import render_worker as RWK      # persistent workers (SCP_RENDER_CPU=1: legacy launches); identical numbers
+    rp = RWK.measure_landmarks([f], work, jit=5)[0]; xz = W.px2mm(rp); return np.c_[xz[:, 0], -xz[:, 1]]
 def cost_of(L):
     r = W.ratios(L); e = {k: 100 * (r[k] / W.photo_r[k] - 1) for k in keys}; return sum(W.EXTRA_W.get(k, 1.0) ** 2 * v * v for k, v in e.items()), e
 # ---- feasibility (same rules as r6_06 feasible(), relative to the start mesh)

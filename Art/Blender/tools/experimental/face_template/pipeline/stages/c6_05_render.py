@@ -127,6 +127,7 @@ if only_checks: sys.exit(0)
 # ---------------- rendering
 scn = sc; scn.render.engine = 'CYCLES'; scn.cycles.samples = 48; scn.cycles.use_denoising = True
 try:
+    if _os.environ.get('SCP_RENDER_CPU') == '1': raise RuntimeError('SCP_RENDER_CPU=1: Cycles on the CPU')
     pref = bpy.context.preferences.addons['cycles'].preferences; pref.compute_device_type = 'OPTIX'; pref.get_devices()
     for dv in pref.devices: dv.use = dv.type != 'CPU'
     scn.cycles.device = 'GPU'
