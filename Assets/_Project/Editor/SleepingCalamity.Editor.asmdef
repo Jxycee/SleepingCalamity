@@ -17,7 +17,8 @@
         "Unity.InputSystem",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "uLipSync.Runtime"
     ],
     "includePlatforms": [
         "Editor"

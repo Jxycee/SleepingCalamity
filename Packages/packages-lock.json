@@ -7,6 +7,16 @@
       "dependencies": {},
       "hash": "354ebc5b6ed3c2c40dc9797c813b56d5da213c4e"
     },
+    "com.hecomi.ulipsync": {
+      "version": "https://github.com/hecomi/uLipSync.git#upm@3.1.5",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.burst": "1.4.11",
+        "com.unity.mathematics": "1.2.5"
+      },
+      "hash": "ece3272762f2148dd8d3e658ec04fcbd79d4d97e"
+    },
     "com.kyrylokuzyk.primetween": {
       "version": "1.5.2",
       "depth": 0,
