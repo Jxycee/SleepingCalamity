@@ -1,0 +1,8 @@
+{
+  "image": "C:/AI/test_out/heroes/face_spike2/target/cloud_src.webp",
+  "name": "cloud_auto",
+  "out_dir": "C:/AI/test_out/heroes/pipeline_runs/cloud_auto",
+  "hunyuan": {"seeds": [1, 2], "pinned_glb": "C:/AI/test_out/heroes/pipeline_data/cloud_shape_s2.glb"},
+  "fit": {"seed_theta": "C:/AI/test_out/heroes/pipeline_data/warp_seed_default.json"},
+  "compare_to": "C:/AI/test_out/heroes/pipeline_data/r6_reference_score.json"
+}

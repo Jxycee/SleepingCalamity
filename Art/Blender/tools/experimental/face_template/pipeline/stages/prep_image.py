@@ -12,7 +12,7 @@ if box is None or (P.get('ellipses') is None and AUTO == 'landmarks'):   # fallb
     from mediapipe.tasks import python as mpp
     from mediapipe.tasks.python import vision
     lm = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(base_options=mpp.BaseOptions(model_asset_path=os.environ['SCP_FACE_MODEL']), num_faces=1))
-    r = lm.detect(mp.Image.create_from_file(cfg['image']))
+    r = lm.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(im[:, :, ::-1])))   # from the decoded array: mediapipe cannot open webp
     if not r.face_landmarks: raise SystemExit('no face found in the photo: give prep.box explicitly')
     L = np.array([[p.x * im.shape[1], p.y * im.shape[0]] for p in r.face_landmarks[0]])
     cx, top, bot = L[:, 0].mean(), L[:, 1].min(), L[:, 1].max(); fh = bot - top

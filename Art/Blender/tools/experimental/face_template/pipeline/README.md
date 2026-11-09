@@ -144,3 +144,32 @@ char2_zero, char3b and char4 pass every criterion. Cloud still fails the same th
 **char4 (fourth character, `configs/char4.json`, 4 lines: image, name, out_dir, `align.soft_gate`):** older man, shaved head, grey beard, navy top, neutral grey backdrop, RealVisXL V5 photo (`char4/source.png`, prompt in the same form as `sdxl_char2.py`). No hand edits, auto prep, Hunyuan seeds 1-3 auto pick. Needed generic fixes: the plain-backdrop prep, the dE flatten weight, the overlay framing (all above). Beard stubble is not modelled: it only appears as the baked texture.
 **Cloud:** not touched beyond the shared stages (MAE 3.40-3.95, worst 7.2-7.7, IoU 0.924); its cheek landmarks 234/454 on the hair-covered ear root were not tried.
 Experiments left out of the repo: seed pins (char3b_s2/s3), w3 run, snapsmooth 10/5 runs (all under `pipeline_runs/char3b_*`, `char2_ss10`).
+
+## Round 11 (2026-11-09): why Cloud fails, neck-clipped IoU, overlay fix
+Hypotheses checked on cloud_v1 (photo bald, ears bare):
+- **(a) cheek landmarks 234/454 under hair: refuted.** The head is shaved; they sit on bare skin at the ear root. No landmark down-weighting was added (nothing to remove).
+- **(b) mask vs render at jaw rows: true for the IoU, not for the ratios.** The hand cutout keeps the turtleneck collar and part of the sword guard (photo mask 321-325 px wide at rows 600-620, jaw 241 px), and Tobin's ears sit lower and bigger than this character's (render ears span eye line to nose base, photo ears brow to just under the eyes), so bands 400-580 lose IoU on unmodelled regions. The full auto prep (`configs/cloud_auto.json`, no box, no ellipses; mask is clean: no collar, no guard, small background wedges at the temples) gives the same ratios (MAE 3.89, worst 7.51) and a lower IoU (the render keeps its neck, the auto mask stops at the chin).
+- **(c) pose: refuted for pitch.** MediaPipe reads pitch 16.7 on the photo and 16.2 on the frontal render of the fitted mesh (the other characters' renders read 6-12 against photos at 1-9, and pass). Yaw differs by 4.8 degrees (photo -2.7, render +2.1): that is the 18 px sideways skull offset in every band (left_dx/right_dx), already removed by the row-centred IoU. Pitching the final mesh after the fact (no refit, +-6, +-12 degrees) made the ratios worse (MAE 4.9-7.9); eye_to_nose_base moves about 2 % per degree, so a pose-matched refit is not what is missing.
+- **Ratio errors are a reach limit of the fit, not a 3D trade-off.** A fit run with `fit.w3 = 0` (pure ratio cost, `pipeline_runs/cloud_w0`) ends at the same errors (MAE 2.85 in the loop; eye_to_nose_base -7.1, face_width -4.5, nose_width -4.3, mouth_to_chin +5.1, mouth_width +4.2). Together with round 8 (jitter, skincap/w3) four different weightings stop at the same ratios, so the template's warp/slider range plus the eye/lid gates cannot make this face (large eyes high under the brow, short eye-to-nose) from Tobin's base. Not fixed.
+**Changes (generic, scoring/display only):**
+- `r6_10_score.py`: new `iou_head_jaw_rowcentred_oval` / `iou_head_jaw_oval`. Below the jaw-angle row (mean y of landmarks 172 and 397) the photo head mask and the render silhouette are each cut to their own face-oval polygon (photo landmarks / render landmarks through the eye similarity), dilated by 5 % of the cheek width; above it (skull, ears) nothing is clipped. `score_final.py` uses it for `iou_head_jaw_rc`; the unclipped numbers stay in `fit/score.json` for comparison. Threshold unchanged (0.93).
+- `c6_05_render.py`: the overlay frame centre used `solve(A.T, ...)` instead of `solve(A, ...)` (A maps render to photo), so any photo with an eye-line roll got a frame misplaced by twice the roll times the distance to the photo centre: Cloud's overlay was 35 px left and 25 px low (two sets of eyes in the 50 % blend), char4 (roll -0.4) looked fine. Fixed; cloud_v1 and char3b overlays re-rendered (eyes coincide, skull and jaw line up).
+- `prep_image.py`: the landmark detector now gets the decoded array, so a `.webp` photo (Cloud's source) works with `box: null`.
+- `configs/cloud_auto.json`: Cloud through the auto prep (pinned shape and Cloud theta seed kept so only the mask differs).
+IoU head+jaw row-centred, old -> new (all final tags h6):
+| | char2_zero | char3b | char4 | cloud_v1 | cloud_auto |
+|---|---|---|---|---|---|
+| unclipped | 0.968 | 0.942 | 0.972 | 0.924 | 0.895 |
+| neck-clipped (criterion now) | 0.971 | 0.945 | 0.966 | 0.931 | 0.908 |
+Cloud crosses 0.93 by 0.001 with the metric change; it is not evidence of a better fit (nothing about the mesh changed). Ears remain the dominant IoU loss.
+Five-way scorecard (final): see table. cloud_v1 still fails ratio MAE 3.95 and worst 7.73; cloud_auto fails MAE 3.89, worst 7.51 and IoU 0.908. char2_zero, char3b, char4 unchanged and passing everything (only the scorer and sheet changed for them; scores re-run, sheet re-run for char3b only).
+| criterion | char2_zero | char3b | char4 | cloud_v1 | cloud_auto |
+|---|---|---|---|---|---|
+| ratio MAE (<= 2.5) | 1.04 | 2.01 | 1.45 | 3.95 FAIL | 3.89 FAIL |
+| worst ratio (<= 5) | 2.19 | 4.87 | 3.38 | 7.73 FAIL | 7.51 FAIL |
+| IoU head+jaw (>= 0.93) | 0.971 | 0.945 | 0.966 | 0.931 | 0.908 FAIL |
+| IoU skull (>= 0.95) | 0.987 | 0.985 | 0.969 | 0.980 | 0.974 |
+| 3D skin RMS (<= 0.95) | 0.867 | 0.916 | 0.774 | 0.739 | 0.934 |
+| skin dE76 (<= 2.0) | 1.52 | 1.34 | 1.35 | 1.73 | 1.74 |
+**How to add a character, what changed:** any image format PIL reads now works (webp too); read `target/mask_vis.png` AND `out/<name>_overlay.png` (the overlay is now registered to the photo, so eyes in the 50 % blend should coincide; if they do not, the fit is off, not the display); a collar, neck or prop in the mask no longer decides the head+jaw IoU. A photo whose ears sit unusually high or low relative to Tobin's will lose IoU in the ear bands whatever the fit does.
+Left over: ratio reach for faces far from the template (Cloud); ear shape/position (Tobin's ears fixed).

@@ -169,7 +169,7 @@ import struct as _st
 with open(D2 + 'target/crop_src.png', 'rb') as _f: _hd = _f.read(24)
 _PW, _PH = _st.unpack('>II', _hd[16:24])     # PNG IHDR width, height (Blender's python has no PIL)
 #       # the overlay is rendered at the photo's own frame (it was the Cloud crop's 670 x 710 for every photo)
-rp = np.linalg.solve(A.T, np.array([_PW / 2, _PH / 2]) - M[2])        # render px that lands on the photo centre
+rp = np.linalg.solve(A, np.array([_PW / 2, _PH / 2]) - M[2])       # render px that lands on the photo centre (A maps render -> photo; round 11: was solve(A.T), which misplaced the frame by 2 x the eye-line roll)
 wx = cj['cx'] + (rp[0] / cj['R'] - 0.5) * cj['S']; wz = cj['cz'] + (0.5 - rp[1] / cj['R']) * cj['S']
 cam.data.type = 'ORTHO'; cam.data.ortho_scale = max(_PW, _PH) / px_per_m; cam.location = (wx, -2.0, wz); cam.rotation_euler = (math.pi / 2, 0, 0)
 scn.render.resolution_x, scn.render.resolution_y = _PW, _PH; scn.render.film_transparent = True; scn.render.image_settings.color_mode = 'RGBA'
