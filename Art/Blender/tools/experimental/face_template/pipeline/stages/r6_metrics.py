@@ -17,9 +17,14 @@ def _masks():
     return dict(face=face, skin=face & ~exc, nose=near('nose_tip', 0.022) & face, brow=(near('brow_center', 0.02) | near('glabella', 0.02)) & face,
                 lips=(cKDTree(t.basis[t.S('lip_line')]).query_ball_point(t.basis, 0.012, return_length=True) > 0) & face)
 M = _masks()
+_U = np.zeros(len(_t.basis), bool)
+for _m in M.values(): _U |= _m
+_KDW = int(_os.environ.get('SCP_KD_WORKERS', '-1'))   # Jacobian pool workers set 1
 def tgt_stats(P):
     P = np.asarray(P, float); o = {}
-    for k, m in M.items(): a, b = p2s_stats(P, _surf, m); o[k + '_rms'] = round(a, 3); o[k + '_p95'] = round(b, 3)
+    d, _ = _surf.tree.query(P[_U], workers=_KDW)   # one KD query on the union of the masks (skin/nose/brow/lips are subsets of face), then index: same per-point distances as one query per mask
+    for k, m in M.items():
+        dk = d[m[_U]]; o[k + '_rms'] = round(float(np.sqrt((dk ** 2).mean()) * 1e3), 3); o[k + '_p95'] = round(float(np.percentile(dk, 95) * 1e3), 3)
     return o
 if __name__ == '__main__':
     for p in sys.argv[1:]: print(p.split('/')[-1], tgt_stats(np.load(p)))

@@ -13,11 +13,12 @@ import argparse
 pre = argparse.ArgumentParser(); pre.add_argument('--iters', type=int, default=5); pre.add_argument('--tr', type=float, default=0.35); pre.add_argument('--dscale', type=float, default=0.5)
 pre.add_argument('--sdelta', type=float, default=0.5); pre.add_argument('--cols', default='all'); pre.add_argument('--warpreg', type=float, default=1.0); pre.add_argument('--sreg', type=float, default=0.12)
 pre.add_argument('--maxnfev', type=int, default=40); pre.add_argument('--remeasure', type=int, default=99)
-pa, rest = pre.parse_known_args(); sys.argv = [sys.argv[0]] + rest
+pa, rest = pre.parse_known_args(); _ARGV = list(sys.argv); sys.argv = [sys.argv[0]] + rest
 import r6_02_warp as W
 from r6_common import *
 import fit_checks6 as FC
 from scipy.optimize import least_squares
+sys.argv = _ARGV   # r6_02 has parsed its options; restore the full argv so the Jacobian pool workers (spawn re-imports this script) see the same arguments
 tag = W.A.tag; SC = _P_STAGES; t = W.t
 # ---------------- slider columns
 PAIRS = [('Head_Width_Up', 'Head_Width_Dn'), ('Head_Cheek_Out', 'Head_Cheek_In'), ('Head_Height_Up', 'Head_Height_Dn'), ('Head_Thick', 'Head_Thin'), ('Head_Vol_Up', 'Head_Vol_Dn'),
@@ -55,7 +56,7 @@ def measure(ths, work):
     fs = []
     for i, th in enumerate(ths):
         P = W.ysnap(W.warp(th)); f = work + f'_m{i}.npz'; np.savez(f, v=P, f=t.faces, ev=eyes_for(P), ef=EF); fs.append(f)
-    r = subprocess.run([BLENDER, '-b', '-P', SC + 'r6_01b_batch_blender.py', '--', '1.46', '1.92', work + '_i'] + fs, capture_output=True, text=True)
+    r = subprocess.run([BLENDER, '-b', '--factory-startup', '-P', SC + 'r6_01b_batch_blender.py', '--', '1.46', '1.92', work + '_i'] + fs, capture_output=True, text=True)
     assert 'OK' in r.stdout, r.stdout[-500:] + r.stderr[-500:]
     pngs = [work + f'_i{i}.png' for i in range(len(ths))]
     subprocess.run([MP, SC + 'r6_01c_batch_lm.py', work + '_lm.json'] + pngs, check=True, capture_output=True)
@@ -86,53 +87,70 @@ def make_feasible(th_ok, th_new):
 def cost_from(r0v, th, J, th0):
     r0 = r0v; W.RAT = lambda P, t_: dict(zip(keys, r0 + J @ (np.asarray(t_) - th0)))
     return W.residual(th)
-th = np.zeros(n)
-if W.A.seed: sd = json.load(open(W.A.seed)); sd = sd.get('theta', sd); th = np.array([sd.get(k, 0.0) for k in NAMES])
-fixed = {kv.split('=')[0]: float(kv.split('=')[1]) for kv in W.A.fix.split(',') if kv}
-for k, v in fixed.items(): th[NAMES.index(k)] = v
-def is_free(i):
-    k = NAMES[i]
-    if k in fixed: return False
-    if pa.cols == 'sliders' and i < nw: return False
-    if pa.cols == 'warp' and i >= nw: return False
-    return not W.A.free or k in W.A.free.split(',')
-free = [i for i in range(n) if is_free(i)]
-print('n params', n, 'free', len(free), 'base feasible:', feasible(np.zeros(n)), 'seed feasible:', feasible(th))
-if not feasible(th): th = make_feasible(np.zeros(n), th)
-work = FIT + f'_cl_{tag}'; best = (1e18, th.copy(), None); tr = pa.tr; hist = []; J = None; th_prev = None; r_prev = None
-for it in range(pa.iters):
-    t0 = time.time(); fm = [i for i in free if NAMES[i] not in DEPTH_ONLY]
-    dl = {i: (pa.dscale * W.SIG[i] if i < nw else pa.sdelta) for i in fm}
-    if J is None or it % pa.remeasure == 0:
-        ths = [th.copy()] + [th + np.eye(n)[i] * dl[i] for i in fm]; rs = measure(ths, work); r0 = rs[0]; r0v = np.array([r0[k] for k in keys])
-        J = np.zeros((len(keys), n))
-        for j, i in enumerate(fm): J[:, i] = (np.array([rs[j + 1][k] for k in keys]) - r0v) / dl[i]
-    else:
-        r0 = measure([th], work)[0]; r0v = np.array([r0[k] for k in keys]); d = th - th_prev
-        if d @ d > 1e-12: J += np.outer(r0v - r_prev - J @ d, d) / (d @ d)
-    th_prev = th.copy(); r_prev = r0v.copy()
-    c0 = cost_from(r0v, th, J, th); cost = float((c0 ** 2).sum()); hist.append(cost)
-    err = {k: 100 * (r0[k] / W.photo_r[k] - 1) for k in keys}
-    print('iter %d true cost %.1f ratio MAE(11) %.2f%%  (%.0fs)' % (it, cost, np.mean([abs(err[k]) for k in keys[:11]]), time.time() - t0), {k: round(v, 1) for k, v in err.items() if abs(v) > 3}, flush=True)
+class _Resid:
+    """Picklable residual of the trust-region sub-problem, so scipy's own `workers=` option can evaluate the numerical-Jacobian columns in a process pool (scipy keeps its step rule, so the Jacobian equals the serial one up to float noise)."""
+    def __init__(self, r_anchor, th0, J, th_prev, free): self.r_anchor, self.th0, self.J, self.th_prev, self.free = r_anchor, th0, J, th_prev, np.isin(np.arange(n), free)
+    def __call__(self, v): return cost_from(self.r_anchor, np.where(self.free, v, self.th0), self.J, self.th_prev)
+def jac_pool():
+    """process pool for the Jacobian columns; None = serial (SCP_JAC_WORKERS=0 or 1, or the pool could not start). Workers re-import this script (definitions only, `main()` is guarded), which rebuilds the same warp/gate state."""
+    nwk = int(os.environ.get('SCP_JAC_WORKERS', max(1, min(10, (os.cpu_count() or 4) - 2))))
+    if nwk <= 1: return None
+    try:
+        import multiprocessing as mp
+        for k in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS'): os.environ[k] = '1'   # inherited by the workers only; this process has numpy loaded already
+        os.environ['SCP_KD_WORKERS'] = '1'
+        return mp.get_context('spawn').Pool(nwk)
+    except Exception as e: print('Jacobian pool unavailable (%s); serial' % str(e)[:100], flush=True); return None
+def main():
+    POOL = jac_pool(); th = np.zeros(n)
+    if W.A.seed: sd = json.load(open(W.A.seed)); sd = sd.get('theta', sd); th = np.array([sd.get(k, 0.0) for k in NAMES])
+    fixed = {kv.split('=')[0]: float(kv.split('=')[1]) for kv in W.A.fix.split(',') if kv}
+    for k, v in fixed.items(): th[NAMES.index(k)] = v
+    def is_free(i):
+        k = NAMES[i]
+        if k in fixed: return False
+        if pa.cols == 'sliders' and i < nw: return False
+        if pa.cols == 'warp' and i >= nw: return False
+        return not W.A.free or k in W.A.free.split(',')
+    free = [i for i in range(n) if is_free(i)]
+    print('n params', n, 'free', len(free), 'base feasible:', feasible(np.zeros(n)), 'seed feasible:', feasible(th))
+    if not feasible(th): th = make_feasible(np.zeros(n), th)
+    work = FIT + f'_cl_{tag}'; best = (1e18, th.copy(), None); tr = pa.tr; hist = []; J = None; th_prev = None; r_prev = None
+    for it in range(pa.iters):
+        t0 = time.time(); fm = [i for i in free if NAMES[i] not in DEPTH_ONLY]
+        dl = {i: (pa.dscale * W.SIG[i] if i < nw else pa.sdelta) for i in fm}
+        if J is None or it % pa.remeasure == 0:
+            ths = [th.copy()] + [th + np.eye(n)[i] * dl[i] for i in fm]; rs = measure(ths, work); r0 = rs[0]; r0v = np.array([r0[k] for k in keys])
+            J = np.zeros((len(keys), n))
+            for j, i in enumerate(fm): J[:, i] = (np.array([rs[j + 1][k] for k in keys]) - r0v) / dl[i]
+        else:
+            r0 = measure([th], work)[0]; r0v = np.array([r0[k] for k in keys]); d = th - th_prev
+            if d @ d > 1e-12: J += np.outer(r0v - r_prev - J @ d, d) / (d @ d)
+        th_prev = th.copy(); r_prev = r0v.copy()
+        c0 = cost_from(r0v, th, J, th); cost = float((c0 ** 2).sum()); hist.append(cost)
+        err = {k: 100 * (r0[k] / W.photo_r[k] - 1) for k in keys}
+        print('iter %d true cost %.1f ratio MAE(11) %.2f%%  (%.0fs)' % (it, cost, np.mean([abs(err[k]) for k in keys[:11]]), time.time() - t0), {k: round(v, 1) for k, v in err.items() if abs(v) > 3}, flush=True)
+        if cost < best[0] and feasible(th): best = (cost, th.copy(), err)
+        else:
+            tr *= 0.5; th = best[1].copy(); print('  no gain, shrink trust region ->', tr)
+            if tr < 0.03: break
+        lo = np.maximum(W.LO, th - tr * (W.HI - W.LO)); hi = np.minimum(W.HI, th + tr * (W.HI - W.LO))
+        for i in range(n):
+            if i not in free: lo[i] = hi[i] = th[i]; hi[i] += 1e-9
+        th0 = th.copy(); r_anchor = r_prev     # linear model anchored at the measured point th_prev
+        sol = least_squares(_Resid(r_anchor, th0, J, th_prev, free), th0, bounds=(lo, hi), x_scale=W.SIG, diff_step=1e-3, max_nfev=pa.maxnfev, **({'workers': POOL.map} if POOL is not None else {}))
+        th = make_feasible(th0, sol.x)
+        print('  theta warp', {k: round(float(v), 3) for k, v in zip(WNAMES, th[:nw])}); print('  sliders', {k: round(float(v), 2) for k, v in zip(SNAMES, th[nw:]) if abs(v) > 0.02}, flush=True)
+    rs = measure([th], work); c = cost_from(np.array([rs[0][k] for k in keys]), th, J, th); cost = float((c ** 2).sum()); err = {k: 100 * (rs[0][k] / W.photo_r[k] - 1) for k in keys}
+    print('final true cost %.1f' % cost)
     if cost < best[0] and feasible(th): best = (cost, th.copy(), err)
-    else:
-        tr *= 0.5; th = best[1].copy(); print('  no gain, shrink trust region ->', tr)
-        if tr < 0.03: break
-    lo = np.maximum(W.LO, th - tr * (W.HI - W.LO)); hi = np.minimum(W.HI, th + tr * (W.HI - W.LO))
-    for i in range(n):
-        if i not in free: lo[i] = hi[i] = th[i]; hi[i] += 1e-9
-    th0 = th.copy(); r_anchor = r_prev     # linear model anchored at the measured point th_prev
-    sol = least_squares(lambda v: cost_from(r_anchor, np.where(np.isin(np.arange(n), free), v, th0), J, th_prev), th0, bounds=(lo, hi), x_scale=W.SIG, diff_step=1e-3, max_nfev=pa.maxnfev)
-    th = make_feasible(th0, sol.x)
-    print('  theta warp', {k: round(float(v), 3) for k, v in zip(WNAMES, th[:nw])}); print('  sliders', {k: round(float(v), 2) for k, v in zip(SNAMES, th[nw:]) if abs(v) > 0.02}, flush=True)
-rs = measure([th], work); c = cost_from(np.array([rs[0][k] for k in keys]), th, J, th); cost = float((c ** 2).sum()); err = {k: 100 * (rs[0][k] / W.photo_r[k] - 1) for k in keys}
-print('final true cost %.1f' % cost)
-if cost < best[0] and feasible(th): best = (cost, th.copy(), err)
-cost, th, err = best; W.RAT = lambda P, t_: W.ratios(W.lm_model(P))
-P = W.ysnap(W.warp(th)); print('BEST cost %.1f' % cost); print('ratio err %:', {k: round(float(v), 1) for k, v in err.items()}); print('MAE(11) %.2f' % np.mean([abs(err[k]) for k in keys[:11]]))
-print('theta', {k: round(float(v), 3) for k, v in zip(NAMES, th) if abs(v) > 1e-3})
-st = W.MT.tgt_stats(P); print('3D (saved, y-snapped mesh)', st); chk = W.gates(P); print('GATES PASS=%s flips %d' % (chk['PASS'], W.flips_of(P)))
-dB = P - t.basis; nk = (t.keys + dB[None]).astype(np.float32); nk[0] = P
-np.save(FIT + f'wrap_r{tag}_basis.npy', P.astype(np.float32)); np.save(FIT + f'wrap_r{tag}_keys.npy', nk); np.savez(FIT + f'wrap_r{tag}_mesh.npz', v=P, f=t.faces)
-json.dump(dict(theta=dict(zip(NAMES, map(float, th))), ratio_err_pct=err, history=hist, checks=chk, target=st, args=vars(W.A)), open(FIT + f'warp_{tag}.json', 'w'), indent=1, default=float)
-json.dump(dict(theta=dict(zip(NAMES, map(float, th)))), open(FIT + f'wrap_r{tag}_report.json', 'w'))
+    cost, th, err = best; W.RAT = lambda P, t_: W.ratios(W.lm_model(P))
+    P = W.ysnap(W.warp(th)); print('BEST cost %.1f' % cost); print('ratio err %:', {k: round(float(v), 1) for k, v in err.items()}); print('MAE(11) %.2f' % np.mean([abs(err[k]) for k in keys[:11]]))
+    print('theta', {k: round(float(v), 3) for k, v in zip(NAMES, th) if abs(v) > 1e-3})
+    st = W.MT.tgt_stats(P); print('3D (saved, y-snapped mesh)', st); chk = W.gates(P); print('GATES PASS=%s flips %d' % (chk['PASS'], W.flips_of(P)))
+    dB = P - t.basis; nk = (t.keys + dB[None]).astype(np.float32); nk[0] = P
+    np.save(FIT + f'wrap_r{tag}_basis.npy', P.astype(np.float32)); np.save(FIT + f'wrap_r{tag}_keys.npy', nk); np.savez(FIT + f'wrap_r{tag}_mesh.npz', v=P, f=t.faces)
+    json.dump(dict(theta=dict(zip(NAMES, map(float, th))), ratio_err_pct=err, history=hist, checks=chk, target=st, args=vars(W.A)), open(FIT + f'warp_{tag}.json', 'w'), indent=1, default=float)
+    json.dump(dict(theta=dict(zip(NAMES, map(float, th)))), open(FIT + f'wrap_r{tag}_report.json', 'w'))
+    if POOL is not None: POOL.terminate()
+if __name__ == '__main__': main()

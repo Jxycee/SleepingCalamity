@@ -24,7 +24,7 @@ BND = [(u, v) for (u, v) in _dir if (v, u) not in _dir]; LOOPV = sorted({x for e
 W2V = {}
 for i in range(len(_rep)): W2V.setdefault(_rep[i], i)
 bu = np.array([W2V[u] for u, v in BND]); bv = np.array([W2V[v] for u, v in BND]); lv = np.array([W2V[v] for v in LOOPV])
-def wn(P, Q):
+def _wn_np(P, Q):
     cen = P[lv].mean(0)
     A = np.concatenate([P[SHELL[:, 0]], P[bv]]); B = np.concatenate([P[SHELL[:, 1]], P[bu]]); C = np.concatenate([P[SHELL[:, 2]], np.repeat(cen[None], len(bu), 0)])
     out = np.zeros(len(Q))
@@ -34,6 +34,38 @@ def wn(P, Q):
         num = (a * np.cross(b, c)).sum(2); den = la * lb * lc + (a * b).sum(2) * lc + (b * c).sum(2) * la + (c * a).sum(2) * lb
         out[i0:i0 + 500] = (2 * np.arctan2(num, den)).sum(1) / (4 * np.pi)
     return out
+_GPU = {'ok': None}
+def _gpu_ready():
+    """torch float64 winding number on CUDA (round 15: ~100x faster, agrees with numpy to ~1e-14, identical inside/outside counts). SCP_WN_CPU=1 forces numpy; any import/CUDA/VRAM problem falls back to numpy."""
+    if _GPU['ok'] is None:
+        ok = _os.environ.get('SCP_WN_CPU', '') in ('', '0')
+        if ok:
+            try:
+                import torch
+                ok = bool(torch.cuda.is_available()) and torch.cuda.mem_get_info()[0] > 1.5e9   # chunk of 1000 queries x ~1500 tris needs ~0.5 GB
+            except Exception: ok = False
+        _GPU['ok'] = ok
+        print('winding number on', 'GPU (torch float64)' if ok else 'CPU (numpy)', flush=True)
+    return _GPU['ok']
+def _wn_gpu(P, Q):
+    import torch
+    dev, dt = 'cuda', torch.float64
+    cen = P[lv].mean(0)
+    A = np.concatenate([P[SHELL[:, 0]], P[bv]]); B = np.concatenate([P[SHELL[:, 1]], P[bu]]); C = np.concatenate([P[SHELL[:, 2]], np.repeat(cen[None], len(bu), 0)])
+    A, B, C = [torch.as_tensor(x, dtype=dt, device=dev) for x in (A, B, C)]
+    out = np.zeros(len(Q))
+    for i0 in range(0, len(Q), 1000):
+        q = torch.as_tensor(Q[i0:i0 + 1000], dtype=dt, device=dev)[:, None, :]; a = A[None] - q; b = B[None] - q; c = C[None] - q
+        la, lb, lc = a.norm(dim=2), b.norm(dim=2), c.norm(dim=2)
+        num = (a * torch.cross(b, c, dim=2)).sum(2); den = la * lb * lc + (a * b).sum(2) * lc + (b * c).sum(2) * la + (c * a).sum(2) * lb
+        out[i0:i0 + 1000] = ((2 * torch.atan2(num, den)).sum(1) / (4 * np.pi)).cpu().numpy()
+    return out
+def wn(P, Q):
+    if _gpu_ready():
+        try: return _wn_gpu(P, Q)
+        except Exception as e:   # e.g. CUDA out of memory because ComfyUI grew: fall back, stay correct
+            print('GPU winding number failed (%s); using numpy' % str(e)[:120], flush=True); _GPU['ok'] = False
+    return _wn_np(P, Q)
 kn = [str(x) for x in z['head/key_names']]; ji = kn.index('jawOpen')
 STATES = {'neutral': (None, 0), 'jaw0.5': ('jawOpen', 0.5), 'aa': ('aa', 1.0), 'oh': ('oh', 1.0)}   # round 6: aa / oh are judged too
 def head_state(basis, keys, st):

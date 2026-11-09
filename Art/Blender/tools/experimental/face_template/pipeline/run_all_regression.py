@@ -54,10 +54,11 @@ def main():
     names = a.only or DEFAULT
     if not a.score_only:
         procs = []; t0 = time.time()
+        env = dict(os.environ); env.setdefault('SCP_JAC_WORKERS', str(max(2, ((os.cpu_count() or 8) - 2) // (1 if a.serial else len(names)))))   # Jacobian pool size per pipeline: share the cores between the parallel runs
         for n in names:
             cmd = [sys.executable, os.path.join(HERE, 'face_pipeline.py'), 'run', '--config', cfg_path(n)] + (['--force', a.force_from] if a.force_from else []) + (['--to', a.to] if a.to else [])
             od = load(n)['out_dir']; os.makedirs(os.path.dirname(od.rstrip('/')), exist_ok=True); log = open(od.rstrip('/') + '_regress.log', 'w')
-            p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT); procs.append((n, p, log))
+            p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env); procs.append((n, p, log))
             if a.serial: p.wait()
         for n, p, log in procs:
             p.wait(); log.close(); print('%-12s exit %d (%.0f s elapsed)' % (n, p.returncode, time.time() - t0))

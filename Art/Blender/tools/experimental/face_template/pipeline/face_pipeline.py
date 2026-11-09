@@ -49,7 +49,7 @@ class Ctx:
         return out
     def py(s, script, *a, **k): return s.run([s.T['py'], script] + list(a), **k)
     def mp(s, script, *a, **k): return s.run([s.T['mp'], script] + list(a), **k)
-    def bl(s, script, *a, **k): return s.run([s.T['blender'], '-b', '-P', os.path.join(STAGE_DIR, script), '--'] + list(a), **k)
+    def bl(s, script, *a, **k): return s.run([s.T['blender'], '-b', '--factory-startup', '-P', os.path.join(STAGE_DIR, script), '--'] + list(a), **k)
     def render_lm(s, tag, z=None):
         """front-ortho Workbench render of fit/wrap_r<tag>_mesh.npz + mediapipe landmarks -> fit/{_rr_,rn_,_cam_,lm_}<tag>"""
         F = s.P.fit; z = z or s.cfg['render']['z']

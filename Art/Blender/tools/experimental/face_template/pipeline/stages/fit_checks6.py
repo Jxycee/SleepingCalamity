@@ -58,6 +58,20 @@ def vnorm(P, faces):
     tri = P[faces]; n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); return n / (np.linalg.norm(n, axis=1)[:, None] + 1e-30)
 
 
+_RS = {}
+_EC = {}
+def _edges_cached(t):
+    if id(t) not in _EC: _EC[id(t)] = edges_of(t.rep[t.faces])
+    return _EC[id(t)]
+
+def _ring_static(t, rv, E):
+    key = (id(t), rv.tobytes())
+    if key not in _RS:
+        isr = np.zeros(len(t.rep), bool); isr[t.rep[rv]] = True   # t.rep values are weld reps
+        m = isr[E[:, 0]] & isr[E[:, 1]]; fm = isr[t.rep[t.faces]].any(1); _RS[key] = (E[m], fm)
+    return _RS[key]
+
+
 def run_checks(t, new_keys, label, old_basis=None, verbose=True):
     """new_keys: (150,N,3) absolute coords with index 0 = Basis. Template baseline = t.keys."""
     global keys_names
@@ -113,14 +127,12 @@ def run_checks(t, new_keys, label, old_basis=None, verbose=True):
         out[f'lip_{n}'] = dict(min_gap_mm=r['new'][0], mean_gap_mm=r['new'][1], tpl_min_gap_mm=r['tpl'][0], tpl_mean_gap_mm=r['tpl'][1])
         c_ = bool(r['new'][0] >= -0.3); ok &= c_; (c_ or fails.append('lip gap ' + n))
     # --- (c)
-    wf = t.rep[t.faces]; E = edges_of(wf)
+    E = _edges_cached(t)
     rings = {'lidL': S('eyelid_ring_L'), 'lidR': S('eyelid_ring_R'), 'lip': S('lip_line')}
     st_list = [('rest', None, 1.0), ('blinkL', 'eyeBlinkLeft', 1.0), ('blinkR', 'eyeBlinkRight', 1.0), ('jaw.5', 'jawOpen', 0.5), ('aa', 'aa', 1.0), ('oh', 'oh', 1.0)]
     worst = {k: [9, 0, 0] for k in rings}  # min ratio, max ratio, flips
     for rn, rv in rings.items():
-        rs = set(t.rep[rv].tolist())
-        m = np.array([(a in rs) and (b in rs) for a, b in E]); Er = E[m]
-        fm = np.array([any(t.rep[v] in rs for v in f) for f in t.faces])
+        Er, fm = _ring_static(t, rv, E)
         for sn, kn, w in st_list:
             Pn = nb if kn is None else state(new_keys, nb, kn, w); Pt = t.basis if kn is None else state(t.keys, t.basis, kn, w)
             ln = np.linalg.norm(Pn[Er[:, 0]] - Pn[Er[:, 1]], axis=1); lt = np.linalg.norm(Pt[Er[:, 0]] - Pt[Er[:, 1]], axis=1)
