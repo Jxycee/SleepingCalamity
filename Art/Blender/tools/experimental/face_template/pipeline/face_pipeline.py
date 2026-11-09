@@ -168,7 +168,7 @@ def s_snap(c):
     Pl = N.get('polish') or {}
     if Pl.get('iters', 0) > 0:   # local landmark polish (r6_13): closes the ratio residuals the global fit cannot reach, under the same 3D skin cap / gates; judged like the re-fit with a stricter IoU tolerance
         tg, pt = N['tag'], Pl.get('tag', 'p6'); c.env['SCP_LM_JIT'] = '5'
-        c.py('r6_13_polish.py', tg, pt, '--iters', Pl['iters'], '--sigma', Pl['sigma'], '--maxmm', Pl['maxmm'], '--mu', Pl['mu'], '--skincap', Pl['skincap'], expect='POLISH DONE')
+        c.py('r6_13_polish.py', tg, pt, '--iters', Pl['iters'], '--sigma', Pl['sigma'], '--maxmm', Pl['maxmm'], '--mu', Pl['mu'], '--skincap', Pl['skincap'], *(['--jac', Pl['jac'], '--jacshrink', Pl.get('jacshrink', 0.5)] + (['--lipmm', Pl['lipmm']] if Pl.get('lipmm') else []) if Pl.get('jac', 0) else []), expect='POLISH DONE')
         c.env['SCP_LM_JIT'] = '0'; c.render_lm(pt)
         c.mp('r6_10_score.py', 'base=%s/rn_%s.png' % (F, tg), 'cand=%s/rn_%s.png' % (F, pt))
         c.py('r6_12_refit_accept.py', tg, pt, '--label', 'polish', '--decision', 'polish_decision.json', '--iou_tol', Pl['iou_tol'], expect='REFIT DONE')

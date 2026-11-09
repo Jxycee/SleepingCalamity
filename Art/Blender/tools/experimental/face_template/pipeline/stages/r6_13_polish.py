@@ -17,7 +17,7 @@ _P_STAGES = _os.path.dirname(_os.path.abspath(__file__)).replace(chr(92), '/') +
 import sys, subprocess, json, time, shutil, argparse
 import numpy as np
 pre = argparse.ArgumentParser(); pre.add_argument('base'); pre.add_argument('cand'); pre.add_argument('--iters', type=int, default=10); pre.add_argument('--sigma', type=float, default=0.005)
-pre.add_argument('--mu', type=float, default=0.5); pre.add_argument('--maxmm', type=float, default=1.5); pre.add_argument('--skincap', type=float, default=0.94); pre.add_argument('--lam', type=float, default=1e-3); pre.add_argument('--minimax', type=float, default=0.0)
+pre.add_argument('--mu', type=float, default=0.5); pre.add_argument('--maxmm', type=float, default=1.5); pre.add_argument('--skincap', type=float, default=0.94); pre.add_argument('--lam', type=float, default=1e-3); pre.add_argument('--minimax', type=float, default=0.0); pre.add_argument('--jac', type=float, default=0.0, help='detector-gain model: probe size in mm for a finite-difference Jacobian of the detector landmarks w.r.t. the mesh landmark displacement (0 = off, detector assumed to follow 1:1)'); pre.add_argument('--lipmm', type=float, default=0.0, help='bound (mm) for the lip landmarks (61, 291, 13, 0, 17) when > 0: the lip ring edge-ratio gate binds as soon as they move, so the larger bound is spent on nose / cheek / jaw / chin'); pre.add_argument('--jacshrink', type=float, default=0.5, help='weight of the off-diagonal Jacobian terms (probes are noisy)')
 pa = pre.parse_args(); F_ = _P_FIT
 sys.argv = [sys.argv[0], F_ + f'wrap_r{pa.base}_basis.npy', F_ + f'lm_{pa.base}.json', F_ + f'_cam_{pa.base}.json', F_ + f'rn_{pa.base}.png', pa.cand]
 import r6_02_warp as W          # photo ratios, template landmark hits (geo), gates, flips, 3D metrics; its P0 is the base mesh
@@ -83,15 +83,35 @@ def sens3d(P):   # per (landmark, axis) first / second derivative of the skin me
 def plan(L, P):   # smallest landmark displacement (mm) that brings the 13 ratios to the photo values while the predicted 3D skin error stays under the cap
     n = len(MOVE); S0, g, h = sens3d(P); cap2 = SKINCAP ** 2; cur_r = W.ratios(L)      # minimax > 0: ratios that are far off carry more weight (iteratively re-weighted); off by default (no gain on Cloud)
     def Lof(x):
-        M = L.copy(); M[MOVE, 0] += x[:n]; M[MOVE, 1] -= x[n:]; return M
+        M = L.copy(); d = (JAC @ x) if JAC is not None else x; M[MOVE, 0] += d[:n]; M[MOVE, 1] -= d[n:]; return M
     def res(x):
         r = W.ratios(Lof(x)); Sp = S0 + g @ x + 0.5 * (h * x * x).sum()
         return np.r_[[W.EXTRA_W.get(k, 1.0) * 100 * (r[k] / W.photo_r[k] - 1) * (1 + pa.minimax * abs(100 * (cur_r[k] / W.photo_r[k] - 1)) / 5) ** 0.5 for k in keys], pa.mu * x, 80 * max(0.0, Sp - 0.97 * cap2) / cap2]
-    s = least_squares(res, np.zeros(2 * n), bounds=(-pa.maxmm * np.ones(2 * n), pa.maxmm * np.ones(2 * n)), diff_step=1e-3)
+    bd = pa.maxmm * np.ones(2 * n)
+    if pa.lipmm > 0:
+        for j, i in enumerate(MOVE):
+            if i in (61, 291, 13, 0, 17): bd[j] = bd[n + j] = pa.lipmm
+    s = least_squares(res, np.zeros(2 * n), bounds=(-bd, bd), diff_step=1e-3)
     return {i: (float(s.x[j]), float(s.x[n + j])) for j, i in enumerate(MOVE)}
 def apply(P, delta, s):
     d = {i: (s * v[0], s * v[1]) for i, v in delta.items()}; return deflip(t, P, P + field(P, d))
-P = P0.copy(); L = measure(P); c0, e0 = cost_of(L); best = (c0, P.copy(), e0); cur_c = c0
+JAC = None
+def mesh_lm(P):   # mesh landmark positions (x, z) in mm for the MOVE set, order [x(16), z(16)]
+    G = W.geo(P)[[W.lpos[i] for i in MOVE]] * 1e3; return np.r_[G[:, 0], G[:, 2]]
+def det_lm(L): return np.r_[L[MOVE, 0], -L[MOVE, 1]]
+def estimate_jac(P, L):   # central finite differences of the detector response (5-framing median) to a +-eps displacement of each landmark (RBF field), regressed on the achieved mesh motion
+    n = len(MOVE); eps = pa.jac; D = np.zeros((2 * n, 2 * n)); M = np.zeros((2 * n, 2 * n))
+    for a in range(2):
+        for j, i in enumerate(MOVE):
+            res = []
+            for sg in (1, -1):
+                Pq = deflip(t, P, P + field(P, {i: (sg * eps * (a == 0), sg * eps * (a == 1))})); res.append((mesh_lm(Pq), det_lm(measure(Pq))))
+            c = a * n + j; M[:, c] = res[0][0] - res[1][0]; D[:, c] = res[0][1] - res[1][1]
+    J = D @ np.linalg.inv(M + 1e-6 * np.eye(2 * n)); Jd = np.diag(np.diag(J)); J = Jd + pa.jacshrink * (J - Jd)
+    print('detector gain model: diag gain per landmark (x | z):', {i: (round(J[j, j], 2), round(J[n + j, n + j], 2)) for j, i in enumerate(MOVE)}, flush=True); return J
+P = P0.copy(); L = measure(P);
+if pa.jac > 0: JAC = estimate_jac(P, L)
+c0, e0 = cost_of(L); best = (c0, P.copy(), e0); cur_c = c0
 print('polish start: cost %.1f, MAE(11) %.2f, worst %.1f' % (c0, np.mean([abs(e0[k]) for k in keys[:11]]), max(abs(e0[k]) for k in keys[:11])), {k: round(v, 1) for k, v in e0.items() if abs(v) > 2}, flush=True)
 step = 1.0; acc = 0; tries = 0
 while acc < pa.iters and tries < pa.iters * 2 + 2 and step > 0.1:
@@ -111,6 +131,10 @@ while acc < pa.iters and tries < pa.iters * 2 + 2 and step > 0.1:
         for i in MOVE: print('   lm %3d req (%+.2f, %+.2f) got (%+.2f, %+.2f)' % (i, step * dl[i][0], step * dl[i][1], Lt[i, 0] - L[i, 0], -(Lt[i, 1] - L[i, 1])))
     print('try %d step %.2f: cost %.1f -> %.1f  MAE(11) %.2f worst %.1f  (%.0fs)' % (tries, step, cur_c, ct, np.mean([abs(et[k]) for k in keys[:11]]), max(abs(et[k]) for k in keys[:11]), time.time() - t0),
           {k: round(v, 1) for k, v in et.items() if abs(v) > 2}, flush=True)
+    if JAC is not None:      # Broyden rank-1 update of the gain model from the achieved step (mesh landmark motion -> detector landmark motion)
+        dm = mesh_lm(Pt) - mesh_lm(P); dd = det_lm(Lt) - det_lm(L)
+        if dm @ dm > 1e-6: JAC = JAC + np.outer(dd - JAC @ dm, dm) / (dm @ dm) * 0.5
+        # plan on the new J after a rejected or accepted step
     if ct < cur_c * 0.98:
         P, L, cur_c = Pt, Lt, ct; acc += 1
         if ct < best[0]: best = (ct, P.copy(), et)
