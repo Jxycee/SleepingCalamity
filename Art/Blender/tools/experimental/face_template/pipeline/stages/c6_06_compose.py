@@ -13,7 +13,9 @@ BG = (28, 28, 30)
 photo = Image.open(D2 + 'target/crop_src.png').convert('RGB')
 def cell(name, w, h):
     if name == 'PHOTO':
-        sq = photo.crop((0, 0, 670, 670)).resize((w, h), Image.LANCZOS); return sq
+        _pw, _ph = photo.size
+        _box = (0, 0, 670, 670) if (_pw, _ph) == (670, 710) else ((_pw - min(_pw, _ph)) // 2, 0, (_pw - min(_pw, _ph)) // 2 + min(_pw, _ph), min(_pw, _ph))     # Cloud crop: the fixed 670 square; others: the centred square
+        return photo.crop(_box).resize((w, h), Image.LANCZOS)
     try: im = Image.open(C + name + '.png').convert('RGB')
     except FileNotFoundError: return None
     return im.resize((w, h), Image.LANCZOS)
@@ -39,11 +41,13 @@ rows2 = [('eyes', 'neutral', 'eyes open'), ('eyes', 'blink', 'eyes blink'), ('mo
          ('mouth', 'aa', 'aa'), ('mouth', 'oh', 'oh'), ('mouth', 'smile', 'smile')]
 sheet(O + 'char_closeups.png', rows2, cols2, 2048, 620, 344, foot, 188)
 # overlay: photo | render | 50% blend
-r = Image.open(C + 'overlay_full.png').convert('RGBA'); bg = photo.convert('RGBA')
+_OH = 710; _OW = int(round(photo.size[0] * _OH / photo.size[1]))      # overlay panels at 710 px height, photo aspect
+photo = photo.resize((_OW, _OH), Image.LANCZOS)
+r = Image.open(C + 'overlay_full.png').convert('RGBA').resize((_OW, _OH), Image.LANCZOS); bg = photo.convert('RGBA')
 solid = Image.new('RGBA', r.size, (70, 70, 74, 255)); solid.alpha_composite(r)
 half = bg.copy(); rr = r.copy(); a = rr.getchannel('A').point(lambda v: v // 2); rr.putalpha(a); half.alpha_composite(rr)
 full_ov = bg.copy(); full_ov.alpha_composite(r)
-S = Image.new('RGB', (670 * 4, 710 + 50), BG); d = ImageDraw.Draw(S)
+S = Image.new('RGB', (_OW * 4, _OH + 50), BG); d = ImageDraw.Draw(S)
 for i, (im, t) in enumerate(((photo, 'photo'), (solid, 'full result, photo framing'), (full_ov, 'result over photo (100%)'), (half, '50% blend'))):
-    S.paste(im.convert('RGB'), (i * 670, 50)); d.text((i * 670 + 10, 12), t, fill=(240, 240, 240), font=F)
+    S.paste(im.convert('RGB'), (i * _OW, 50)); d.text((i * _OW + 10, 12), t, fill=(240, 240, 240), font=F)
 S.save(O + 'char_overlay.png'); print('overlay', S.size)

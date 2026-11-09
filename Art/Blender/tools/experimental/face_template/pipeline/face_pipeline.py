@@ -154,6 +154,8 @@ def s_snap(c):
     c.render_lm(N['tag'])
     if N.get('skull_width', True):   # generic skull-width match above the brows (the ratio fit does not see the dome); re-render afterwards
         c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag'])
+        if N.get('skull_pass2', True):   # second pass on the re-rendered mesh: the first pass leaves a residual (its width / height measure moves with the change); runs before the refit so the ratio fit sees the final dome
+            c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag'])
     R = N.get('refit') or {}
     if R.get('iters', 0) > 0:   # slider-only ratio re-fit on top of the snapped mesh; kept only if the score does not regress (r6_12_refit_accept)
         tg, ct = N['tag'], R.get('tag', 'g6'); c.env['SCP_LM_JIT'] = str(R.get('lm_jitter', 5))

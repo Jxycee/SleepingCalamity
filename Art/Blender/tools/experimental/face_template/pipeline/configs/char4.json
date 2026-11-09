@@ -1,0 +1,6 @@
+{
+  "image": "C:/AI/test_out/heroes/pipeline_runs/char4/source.png",
+  "name": "char4",
+  "out_dir": "C:/AI/test_out/heroes/pipeline_runs/char4",
+  "align": {"soft_gate": true}
+}

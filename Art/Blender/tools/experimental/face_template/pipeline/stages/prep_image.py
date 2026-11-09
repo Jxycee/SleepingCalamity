@@ -29,6 +29,7 @@ if E is None and AUTO == 'landmarks' and L is not None:
     # cranium: bald-ish skull dome up to ~0.40 fh above the forehead point (bald/shaved; hair is not modelled); probable foreground, centred between the dome top and the ear line
     ytop = L[10, 1] - 0.40 * fh; year = (L[234, 1] + L[454, 1]) / 2
     E = {'head': [cx, (ytop + yc) / 2 + 0.05 * fh, 0.60 * fw, (yc - ytop) / 2 * 1.05], 'face': [cx, L[10, 1] + 0.5 * fh, 0.34 * fw, 0.36 * fh], 'dome': [cx, year, 0.50 * fw, (year - ytop) * 0.95], 'neck': [cx, yc + 0.42 * fh, 0.26 * fw, 0.16 * fh]}
+    E['eye_y'] = float(L[[33, 263, 159, 386], 1].mean())      # the ears reach up to about the eye line: hull / dome fit only look above it (an ear top in the contour widens both: char4)
     print('landmark priors fw %.0f fh %.0f' % (fw, fh))
 elif E is None:      # relative to the crop: head, face, neck (fractions of w, h)
     E = {'head': [0.5 * w, 0.5 * h, 0.32 * w, 0.42 * h], 'face': [0.5 * w, 0.46 * h, 0.22 * w, 0.32 * h], 'neck': [0.55 * w, 0.88 * h, 0.19 * w, 0.085 * h]}
@@ -38,10 +39,12 @@ def e(c, v): cv2.ellipse(mask, (int(c[0] - X0), int(c[1] - Y0)), (int(c[2]), int
 e(E['head'], cv2.GC_PR_FGD); e(E['face'], cv2.GC_FGD); e(E['neck'], cv2.GC_FGD)
 if 'dome' in E and AUTO == 'landmarks':   # super-ellipse (n=2.6, boxier than an ellipse like a real skull), upper half from the ear line: [cx, ear y, half width, height]
     cxd, cyd, ad, bd = E['dome']; tt = np.linspace(0, np.pi, 90); xs = cxd + ad * np.sign(np.cos(tt)) * np.abs(np.cos(tt)) ** (2 / 2.6); ys = cyd - bd * np.abs(np.sin(tt)) ** (2 / 2.6)
+    _dm = np.zeros(mask.shape, np.uint8); cv2.fillPoly(_dm, [np.round(np.c_[xs - X0, ys - Y0]).astype(np.int32)], 1); dome_px = _dm > 0
     cv2.fillPoly(mask, [np.round(np.c_[xs - X0, ys - Y0]).astype(np.int32)], cv2.GC_FGD)
 elif 'dome' in E: e(E['dome'], cv2.GC_FGD)    # landmark mode: inner skull ellipse is sure foreground (the crown is the part GrabCut loses against similar-coloured backgrounds)
 if P.get('oval_seed', True) and L is not None and AUTO == 'landmarks' and P.get('ellipses') is None:   # face-oval polygon, shrunk 12 % toward its centre: sure foreground that follows the jaw line
     po = L[OVAL]; po = po.mean(0) + 0.88 * (po - po.mean(0)); cv2.fillPoly(mask, [np.round(po - [X0, Y0]).astype(np.int32)], cv2.GC_FGD)
+core_fg = (mask == cv2.GC_FGD) & ~dome_px if 'dome_px' in dir() else None      # face ellipse / neck / face oval only (what a plain background must not override)
 mask[:int(P.get('border_top', 40)), :] = cv2.GC_BGD
 sc0 = P.get('side_cuts')      # photo-px columns outside which is sure background; null = none (the Cloud values only make sense for the Cloud photo)
 if sc0:
@@ -50,7 +53,16 @@ if P.get('bg_seed', True):    # plain backgrounds: pixels close to the border co
     lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB).astype(np.float32)
     strips = np.concatenate([lab[:int(0.04 * h)].reshape(-1, 3), lab[:, :int(0.04 * w)].reshape(-1, 3), lab[:, w - int(0.04 * w):].reshape(-1, 3)])
     bgc = np.median(strips, 0); dist = np.linalg.norm(lab - bgc, axis=2)
-    sure_fg = (mask == cv2.GC_FGD) if (AUTO == 'landmarks' and 'dome' in E) else np.zeros(mask.shape, bool)    # landmark mode: the sure-foreground shapes are narrower than the old ellipses, so they win over the colour seed (busy backgrounds share colours with the scalp)
+    sure_fg = (mask == cv2.GC_FGD) if (AUTO == 'landmarks' and 'dome' in E) else np.zeros(mask.shape, bool)
+    _up = np.concatenate([lab[:int(0.04 * h)].reshape(-1, 3), lab[:int(0.6 * h), :int(0.04 * w)].reshape(-1, 3), lab[:int(0.6 * h), w - int(0.04 * w):].reshape(-1, 3)]); bg_sd = float(_up.std(0).max())   # upper part only (the lower side strips hold the shirt)
+    if core_fg is not None and bg_sd < float(P.get('plain_bg_std', 6.0)):     # plain / gradient backdrop: the border colour is reliable, the dome prior (0.4 face heights above the forehead point) is not (char4: it put a grey cap of background on a head with a lower crown)
+        sure_fg = core_fg
+        # vignetted backdrop: the colour beside the head is darker than the global border median. Per-row border colour (left strip for the left half, right strip for the right half, smoothed over rows).
+        k_ = max(int(0.04 * w), 2); rows_ = int(0.6 * h)
+        for side_, sl_ in (('L', slice(0, w // 2)), ('R', slice(w // 2, w))):
+            col_ = np.median(lab[:, :k_] if side_ == 'L' else lab[:, w - k_:], 1); col_ = cv2.GaussianBlur(col_.reshape(-1, 1, 3), (1, 0), 12).reshape(-1, 3)
+            dr_ = np.linalg.norm(lab[:rows_, sl_] - col_[:rows_, None, :], axis=2); mask[:rows_, sl_][(dr_ < float(P.get('bg_seed_dist', 10))) & ~sure_fg[:rows_, sl_]] = cv2.GC_BGD
+        print('plain background (strip std %.1f): the dome prior no longer overrides the border-colour seed' % bg_sd)    # landmark mode: the sure-foreground shapes are narrower than the old ellipses, so they win over the colour seed (busy backgrounds share colours with the scalp)
     mask[(dist < float(P.get('bg_seed_dist', 10))) & ~sure_fg] = cv2.GC_BGD
     print('bg seed colour (Lab)', bgc.round(1), 'pixels', int((dist < float(P.get('bg_seed_dist', 10))).sum()))
 bg = np.zeros((1, 65)); fg = np.zeros((1, 65)); cv2.grabCut(crop, mask, None, bg, fg, 10, cv2.GC_INIT_WITH_MASK)
@@ -59,7 +71,7 @@ n, l, s, _ = cv2.connectedComponentsWithStats(m); k = 1 + np.argmax(s[1:, 4]); m
 m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
 if AUTO == 'landmarks' and 'dome' in E and P.get('skull_hull', True):
     # a skull is convex: above the ear line replace the mask by its convex hull (GrabCut loses the crown where the scalp colour matches the background), clipped to the probable-head ellipse
-    ye = int(round(E['dome'][1] - Y0 - 0.15 * E['dome'][3])); up = m.copy(); up[ye:] = 0
+    ye = int(round(E['dome'][1] - Y0 - 0.15 * E['dome'][3])); ye = min(ye, int(round(E['eye_y'] - Y0))) if 'eye_y' in E else ye; up = m.copy(); up[ye:] = 0
     cn, _ = cv2.findContours(up, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if cn:
         hull = np.zeros_like(m); cv2.fillPoly(hull, [cv2.convexHull(np.vstack(cn))], 255); lim = np.zeros_like(m)
@@ -68,7 +80,7 @@ if AUTO == 'landmarks' and 'dome' in E and P.get('dome_fit', True):
     # round, symmetric crown: the GrabCut / hull mask of a shaved head is skewed and pointed where scalp and background share a colour (char3: +15 px of shelf on one side, 15 px of scalp cut on the other).
     # Robustly fit a symmetric super-ellipse |x-cx|^n/a^n + (yc-y)^n/b^n = 1 (centre column cx = cheek midpoint, free a, b, n in 2..3.6; soft-L1) to the mask contour above the ear line and use it as the mask there.
     from scipy.optimize import least_squares
-    cxd, cyd, ad, bd = E['dome']; cxd -= X0; cyd -= Y0; ye2 = int(round(cyd - 0.15 * bd)); up = m.copy(); up[ye2:] = 0
+    cxd, cyd, ad, bd = E['dome']; cxd -= X0; cyd -= Y0; ye2 = int(round(cyd - 0.15 * bd)); ye2 = min(ye2, int(round(E['eye_y'] - Y0))) if 'eye_y' in E else ye2; up = m.copy(); up[ye2:] = 0
     cn2, _ = cv2.findContours(up, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     if cn2:
         pts = np.vstack(cn2)[:, 0, :].astype(float); pts = pts[(pts[:, 1] < ye2 - 3) & (pts[:, 1] > 2)]

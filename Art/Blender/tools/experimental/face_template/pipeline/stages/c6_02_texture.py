@@ -111,6 +111,17 @@ delit_lab[..., 2] = lab_ph[..., 2] - fit_b + tone[2]
 teal_s = cv2.GaussianBlur(ndi.binary_dilation(teal & head_m, iterations=2).astype(np.float32), (0, 0), 3)
 delit_lab[..., 1] = delit_lab[..., 1] * (1 - teal_s) + (tone[1] + (lab_ph[..., 1] - fit_a).clip(-4, 4) * 0.3) * teal_s
 delit_lab[..., 2] = delit_lab[..., 2] * (1 - teal_s) + (tone[2] + (lab_ph[..., 2] - fit_b).clip(-4, 4) * 0.3) * teal_s
+# specular highlights (shiny scalp / forehead / nose tip): the photo is brighter AND washed out (chroma lost) there, which an albedo must not contain. Found as a positive luminance residual over the robust
+# polynomial (the polynomial rejects them as outliers); in those pixels the delit colour goes back to the fitted skin tone (L toward the local baseline, a/b to the photo tone). SPEC = strength (0 = off).
+SPEC = float(__import__('os').environ.get('SPEC', '1.0'))
+if SPEC > 0:
+    _res = cv2.GaussianBlur((lab_ph[..., 0] - fit_L).astype(np.float32), (0, 0), 3.0)
+    _cd = cv2.GaussianBlur((fit_b - lab_ph[..., 2]).astype(np.float32), (0, 0), 3.0)      # washed-out chroma: b below the fitted skin b (specular adds white)
+    _h = np.clip((_res - 3.0) / 5.0, 0, 1) * np.clip((_cd - 2.0) / 4.0, 0, 1) * (head_m & skin_hue & ~ndi.binary_dilation(feat, iterations=2))
+    _h = np.clip(np.maximum(_h, cv2.GaussianBlur(cv2.dilate(_h.astype(np.float32), np.ones((9, 9), np.uint8)), (0, 0), 5.0)) * 1.0, 0, 1) * (head_m & skin_hue) * SPEC
+    delit_lab[..., 0] = delit_lab[..., 0] - _h * (delit_lab[..., 0] - tone[0]).clip(0, None) * 0.9
+    delit_lab[..., 1] = delit_lab[..., 1] * (1 - _h) + tone[1] * _h; delit_lab[..., 2] = delit_lab[..., 2] * (1 - _h) + tone[2] * _h
+    print('specular highlight pixels (h>0.5): %d of %d head px' % (int((_h > 0.5).sum()), int(head_m.sum())))
 # side-light residual: symmetrise the low band of L about the face midline (mirror in photo space) so the one-sided light is not baked into the albedo
 mid_ids = [10, 168, 6, 1, 2, 0, 17, 152]; cm = np.polyfit(lm[mid_ids, 1], lm[mid_ids, 0], 1)
 xm = np.polyval(cm, yy_)
@@ -206,13 +217,13 @@ if dm_.sum() > 50:
         dk_ = comb[..., k_] - ref_lab[..., k_]; comb[..., k_] = comb[..., k_] * (1 - bw) + (ref_lab[..., k_] + dk_ * (0.5 + 0.5 * BROW_K) * np.maximum(soft, 0.3)) * bw
     print('brows: half-thickness p90 %.1f texels, eroded %d, dark px %d' % (hth, rr_, int(dm_.sum())))
 # ---------------- round 6: flatten the remaining low-frequency luminance (side light) toward the photo skin tone over the valid skin texels (albedo has no large-scale shading)
-FLAT = float(_os.environ.get('FLAT', '0.85'))
+FLAT = float(_os.environ.get('FLAT', '1.0'))
 _okf = (valid & ~ndi.binary_dilation(brow_uv, iterations=4) & ~ndi.binary_dilation(lip_any, iterations=6) & ~ndi.binary_dilation(eye_uv, iterations=6)).astype(np.float32)
 _lp, _dn = mblur(comb, _okf, 40.0)
-_wf = np.clip(_dn / 0.15, 0, 1) * w_low
+_wf = np.clip(_dn / 0.15, 0, 1) * np.maximum(w_low, smoothstep(1, 12, dist) * valid)     # round 10: full weight beyond 12 texels from an invalid area (w_low only reaches 1 at 80: cheeks beside the beard / eyes kept 35 % of the one-sided light)
 comb[..., 0] = comb[..., 0] - FLAT * (_lp[..., 0] - Lc[0]) * _wf
 # chroma too (generic): the large-scale a/b cast that survives the de-light polynomial (blush, shadow-side orange, one cheek redder than the other) is pulled toward the photo skin tone; fine detail stays
-FLATC = float(_os.environ.get('FLATC', '0.9'))
+FLATC = float(_os.environ.get('FLATC', '1.0'))
 for _k in (1, 2): comb[..., _k] = comb[..., _k] - FLATC * (_lp[..., _k] - Lc[_k]) * _wf
 # ---------------- lips: tinted Tobin lip texture matched to the photo lip colour (never the photo projection)
 tob_lip_mean = tl[lip].mean(0) if lip.any() else Lt
@@ -262,6 +273,9 @@ for name, k, off in (('cheek_R(img-left)', 50, (0, 0)), ('cheek_L(img-right)', 2
     else:
         tl_, uv = tex_patch_lab(basis[nn]); pl = photo_patch_lab(lm[k])
     rep[name] = dict(photo_Lab=pl.round(1).tolist(), texture_Lab=tl_.round(1).tolist())
+    _px, _py = uv; _sl = (slice(_py - 14, _py + 15), slice(_px - 14, _px + 15))
+    print('PATCH %s uv=%s valid=%.2f w_low=%.2f w_hi=%.2f far_w=%.2f d60=%.3f | proj %s lowband %s comb %s' % (name, uv, valid[_sl].mean(), w_low[_sl].mean(), w_hi[_sl].mean(), far_w[_sl].mean(), d60[_sl].mean(),
+          np.median(proj_lab[_sl].reshape(-1, 3), 0).round(1), np.median(lowband[_sl].reshape(-1, 3), 0).round(1), np.median(comb[_sl].reshape(-1, 3), 0).round(1)))
 print('SKIN LAB photo vs texture', json.dumps(rep))
 json.dump(dict(photo_fit_mean_Lab=tone.tolist(), photo_lip_Lab=lip_lab_ph.tolist(), tobin_Lab=Lt.tolist(), neck_shift=shift_n.tolist(), valid_texels=int(valid.sum()), cov_texels=int(cov.sum()),
                tps_pairs_kept=int(keep.sum()), tps_pairs=len(keep), chin_z=float(chin), skin_Lab_report=rep), open(B2 + 'texture.json', 'w'), indent=1)

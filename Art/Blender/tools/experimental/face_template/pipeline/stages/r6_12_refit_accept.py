@@ -16,6 +16,12 @@ s = json.load(open(FIT + 'score.json')); b, c = s['base'], s['cand']
 key = lambda v: v['mae_pct'] + v['max_abs_pct'] / 4 - 15 * (v['iou_head_jaw'] + v['iou_skull']) / 2   # 1 % of IoU is worth 0.15 ratio-%
 w = json.load(open(FIT + f'warp_{cand}.json')); gates_ok = bool(w.get('checks', {}).get('PASS'))
 t = Tpl(); P = np.load(FIT + f'wrap_r{cand}_basis.npy').astype(np.float64); fl = int(count_flips(t, P).sum())
+if fl:      # the slider-only candidate can leave a stray flipped face (char2: 1): repair it locally (displacement smoothing around the face, as the wrap stages do) instead of rejecting a much better candidate
+    from fit_common import repair_flips
+    P2, _f0, _f1 = repair_flips(t, P)
+    if _f1 == 0:
+        K = np.load(FIT + f'wrap_r{cand}_keys.npy'); K = K + (P2 - P)[None].astype(K.dtype); K[0] = P2
+        np.save(FIT + f'wrap_r{cand}_basis.npy', P2.astype(np.float32)); np.save(FIT + f'wrap_r{cand}_keys.npy', K); np.savez(FIT + f'wrap_r{cand}_mesh.npz', v=P2, f=t.faces); P = P2; fl = 0
 rb = json.load(open(FIT + f'wrap_r{base}_report.json')); sk_b = (rb.get('target') or {}).get('skin_rms'); sk_c = (w.get('target') or {}).get('skin_rms')
 sk_ok = sk_b is None or sk_c is None or sk_c <= max(sk_b * 1.03, 0.94)      # the 3D skin RMS must not worsen (a re-fit trades surface error for ratios otherwise)
 ok = sk_ok and (key(c) <= key(b) - 0.1) and (c['iou_head_jaw'] >= b['iou_head_jaw'] - 0.04) and (c['iou_skull'] >= b['iou_skull'] - 0.04) and gates_ok and fl == 0

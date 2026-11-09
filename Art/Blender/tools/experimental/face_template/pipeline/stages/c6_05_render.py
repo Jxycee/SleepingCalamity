@@ -165,10 +165,14 @@ _s = (_S * np.array([1, _d])).sum() / ((_a - _ma) ** 2).sum(); _t = _mb - _s * _
 M = np.vstack([(_s * _Rm).T, _t[None]])
 A = M[:2].T; sc_ = float(np.sqrt(abs(np.linalg.det(A))))          # photo px per render px
 px_per_m = sc_ * cj['R'] / cj['S']
-rp = np.linalg.solve(A.T, np.array([335.0, 355.0]) - M[2])        # render px that lands on the photo centre
+import struct as _st
+with open(D2 + 'target/crop_src.png', 'rb') as _f: _hd = _f.read(24)
+_PW, _PH = _st.unpack('>II', _hd[16:24])     # PNG IHDR width, height (Blender's python has no PIL)
+#       # the overlay is rendered at the photo's own frame (it was the Cloud crop's 670 x 710 for every photo)
+rp = np.linalg.solve(A.T, np.array([_PW / 2, _PH / 2]) - M[2])        # render px that lands on the photo centre
 wx = cj['cx'] + (rp[0] / cj['R'] - 0.5) * cj['S']; wz = cj['cz'] + (0.5 - rp[1] / cj['R']) * cj['S']
-cam.data.type = 'ORTHO'; cam.data.ortho_scale = 710 / px_per_m; cam.location = (wx, -2.0, wz); cam.rotation_euler = (math.pi / 2, 0, 0)
-scn.render.resolution_x, scn.render.resolution_y = 670, 710; scn.render.film_transparent = True; scn.render.image_settings.color_mode = 'RGBA'
+cam.data.type = 'ORTHO'; cam.data.ortho_scale = max(_PW, _PH) / px_per_m; cam.location = (wx, -2.0, wz); cam.rotation_euler = (math.pi / 2, 0, 0)
+scn.render.resolution_x, scn.render.resolution_y = _PW, _PH; scn.render.film_transparent = True; scn.render.image_settings.color_mode = 'RGBA'
 show('full'); setkeys('full', {}); bpy.context.view_layer.update(); shoot(f'{CELLS}overlay_full.png')
 json.dump(dict(ortho_scale=cam.data.ortho_scale, centre=[wx, wz], photo_px_per_render_px=sc_), open(O2 + 'overlay_cam.json', 'w'))
 print('RENDER DONE')

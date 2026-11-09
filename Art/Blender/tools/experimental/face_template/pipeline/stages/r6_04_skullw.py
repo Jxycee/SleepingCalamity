@@ -25,9 +25,10 @@ head = ndi.binary_opening(head, iterations=2); lab, n = ndi.label(head); head = 
 ytop = np.where(head.any(1))[0].min(); ybrow = int(ph[[105, 334], 1].mean())
 rim = np.array(Image.open(FIT + f'rn_{tag}.png').convert('RGB')).astype(int); rm = ndi.binary_opening(np.abs(rim - rim[2, 2]).sum(2) > 25, iterations=2)
 zb = t.basis[t.lm_idx[t.lm_names.index('brow_center')], 2]; ztop = P0[:, 2].max()
-prof = lambda z: (lambda x: x * x * (3 - 2 * x))(np.clip((z - zb) / (ztop - zb), 0, 1))
+ZB0 = zb - float(_os.environ.get('SCP_PROF_LOW', '0.008'))     # the profile starts 8 mm below the brow line (round 10): the temple band just above the eyes was 3-8 % narrow in the final render
+prof = lambda z: (lambda x: x * x * (3 - 2 * x))(np.clip((z - ZB0) / (ztop - ZB0), 0, 1))
 Z, DEF, HPW = [], [], []
-for yp in range(ytop + 6, ybrow - 10, 4):
+for yp in range(ytop + 6, ybrow + int(0.08 * np.linalg.norm(ph[33] - ph[263])), 4):
     rb = np.where(head[yp])[0]
     if len(rb) < 5: continue
     xp = (rb.min() + rb.max()) / 2; uu = inv(np.array([[xp, yp]]))[0]; vr = int(round(uu[1]))
@@ -38,10 +39,15 @@ for yp in range(ytop + 6, ybrow - 10, 4):
     Z.append(cz + (0.5 - vr / R_) * S_); DEF.append(hp - hr); HPW.append(hp)
 Z = np.array(Z); DEF = np.array(DEF); HPW = np.array(HPW)
 def width_of(P, z, dz=0.004):
-    m = np.abs(P[:, 2] - z) < dz; return np.abs(P[m, 0]).max() if m.any() else np.nan
+    m = np.abs(P[:, 2] - z) < dz; return (P[m, 0].max() - P[m, 0].min()) / 2 if m.any() else np.nan     # half-width of the row (the photo side is row-centred too; max|x| mixed in any lateral offset of the mesh)
 W0 = np.array([width_of(P0, z) for z in Z]); ok = np.isfinite(W0) & (prof(Z) > 0.02)
+# vertical crown alignment (round 10): the render's crown top is compared with the photo mask's top in the eye-aligned similarity; the dome above the brow is lowered / raised by the difference
+# (smoothstep profile, 0 at the brow line, full at the top: every landmark ratio stays put). A crown 1-2 mm too high made the head football-shaped (width at a fixed fraction of the height drops 5-10 %).
+_xp = np.where(head[ytop + 3])[0].mean(); _vt = inv(np.array([[_xp, ytop]]))[0][1]; _rt = np.where(rm.any(1))[0].min()
+CROWN_DZ = float(np.clip((_rt - _vt) * mmpp, -0.004, 0.004)) if _os.environ.get('SCP_CROWN_DZ', '1') != '0' and '--novertical' not in sys.argv else 0.0
+print('crown height: render top row %d, photo top lands on row %.1f -> dz %.2f mm' % (_rt, _vt, CROWN_DZ * 1e3))
 def apply(a, P):
-    Q = P.copy(); p = prof(P[:, 2]); Q[:, 0] *= 1 + a[0] * p + a[1] * p ** 3; return Q
+    Q = P.copy(); p = prof(P[:, 2]); Q[:, 0] *= 1 + a[0] * p + a[1] * p ** 3; Q[:, 2] += CROWN_DZ * p; return Q
 def res(a): return np.array([(width_of(apply(a, P0), z) - w0) for z, w0 in zip(Z[ok], W0[ok])]) - DEF[ok]
 a = np.zeros(2)
 if ok.sum() >= 4:
@@ -92,5 +98,9 @@ if '--nocrown' not in sys.argv:
     else: print('crown: not enough rows, skipped')
 dB = newP - t.basis; nk = (t.keys + dB[None]).astype(np.float32); nk[0] = newP
 np.save(FIT + f'wrap_r{tag}_basis.npy', newP.astype(np.float32)); np.save(FIT + f'wrap_r{tag}_keys.npy', nk); np.savez(FIT + f'wrap_r{tag}_mesh.npz', v=newP, f=t.faces)
-json.dump(dict(a=a.tolist(), crown=crown_info), open(FIT + 'skullw.json', 'w'))
+json.dump(dict(a=a.tolist(), crown=crown_info, crown_dz_mm=CROWN_DZ * 1e3), open(FIT + 'skullw.json', 'w'))
+try:     # keep the report's 3D skin statistics in step with the reshaped dome (the scorecard reads them)
+    import r6_metrics as MT
+    rp_ = json.load(open(FIT + f'wrap_r{tag}_report.json')); rp_['target'] = MT.tgt_stats(newP); json.dump(rp_, open(FIT + f'wrap_r{tag}_report.json', 'w'), indent=1, default=float); print('3D target after skull step', rp_['target'])
+except Exception as ex_: print('report 3D stats not updated:', ex_)
 print('SKULLW DONE')
