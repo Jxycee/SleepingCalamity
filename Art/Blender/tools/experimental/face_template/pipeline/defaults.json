@@ -19,6 +19,7 @@
            "polish": {"iters": 10, "tag": "p6", "sigma": 0.005, "maxmm": 3.0, "mu": 0.5, "skincap": 0.948, "iou_tol": 0.01, "jac": 2.0, "jacshrink": 0.5, "lipmm": 0.7}},
   "gates": {"note": "documentation only; the values live in stages/fit_checks6.py: lid penetration <= template+0.45 mm, blink mean gap <= template+0.5 mm, max gap <= template+0.5 mm, lip rings 0.7-1.4, 0 flips"},
   "thresholds": {"ratio_mae_max": 2.5, "ratio_worst_max": 5, "iou_head_jaw_min": 0.93, "iou_skull_min": 0.95, "head_aspect_err_max": 3.0, "skin_rms_3d_max": 0.95, "skin_dE76_max": 2.0, "head_keys_min": 184},
+  "skin_detail": {"enabled": true, "strength": 1.5, "pore_mm": 0.8, "line_mm": 1.6, "mottle": 0.25, "seed": 1},
   "switches": {"teeth_opt": true, "render_sheet": true, "skip": {}},
   "compare_to": null
 }

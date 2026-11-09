@@ -201,8 +201,24 @@ def s_texture(c):
     c.env['SC_FINAL_TAG'] = c.cfg['snap']['tag']
     c.py('c6_01_mapfit.py'); c.py('c6_02_texture.py', expect='TEXTURE DONE'); c.py('c6_03_eyes.py')
 
+def s_skin_detail(c):
+    """optional procedural pores/furrows layer (skin_detail/, round 16: user-approved look, default ON at strength 1.5). Writes out/skin_detail/{albedo,normal,roughness}_detail.png + report.json; the build swaps them in.
+    Fails if the detailed albedo moves the mean skin dE76 by more than 0.05 (the layer is dE-preserving by construction)."""
+    S = c.cfg.get('skin_detail', {}); od = c.P.out + '/skin_detail'; os.makedirs(od, exist_ok=True)
+    if not S.get('enabled', True):
+        for f in ('albedo_detail.png', 'normal_detail.png', 'roughness_detail.png'):
+            if os.path.exists(od + '/' + f): os.remove(od + '/' + f)
+        json.dump({'enabled': False}, open(od + '/report.json', 'w')); return
+    c.run([c.T['py'], os.path.join(STAGE_DIR, '..', 'skin_detail', 'apply_skin_detail.py'), c.P.run, '--strength', str(S.get('strength', 1.5)), '--pore-mm', str(S.get('pore_mm', 0.8)),
+           '--line-mm', str(S.get('line_mm', 1.6)), '--mottle', str(S.get('mottle', 0.25)), '--seed', str(S.get('seed', 1))], expect='done ')
+    r = json.load(open(od + '/report.json')); r['enabled'] = True; json.dump(r, open(od + '/report.json', 'w'), indent=1)
+    if abs(r['delta_mean_dE76']) > 0.05: raise RuntimeError('skin_detail moved skin dE76 by %.3f (> 0.05)' % r['delta_mean_dE76'])
+
 def s_build(c):
     c.env['SC_FINAL_TAG'] = c.cfg['snap']['tag']
+    sd = c.P.out + '/skin_detail'
+    if c.cfg.get('skin_detail', {}).get('enabled', True) and os.path.exists(sd + '/albedo_detail.png'): c.env['SCP_SKIN_DETAIL_DIR'] = sd
+    else: c.env.pop('SCP_SKIN_DETAIL_DIR', None)
     out = c.run([c.T['blender'], '-b', '--factory-startup', '--python', os.path.join(STAGE_DIR, 'c6_04_build.py')], expect='BUILD DONE')
     open(c.P.fit + '/build.log', 'w', encoding='utf-8').write(out)
 
@@ -234,9 +250,10 @@ STAGE_TABLE = [
  ('key_transfer',    s_key_transfer,    [], ['snap'], ['fit/wrap_rh6_keys.npy', 'fit/wrap_rh6_basis.npy'], ['fit/key_transfer.json'], 0.1, False),
  ('reseat',          s_reseat,          ['c6_00_reseat.py', 'c6_00b_teeth_opt.py', 'c6_common.py'], ['switches', 'snap'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png'], ['bake/parts.npz', 'bake/reseat.json'], 14, False),
  ('texture',         s_texture,         ['c6_01_mapfit.py', 'c6_02_texture.py', 'c6_03_eyes.py'], ['iris_colour', 'snap'], ['bake/parts.npz', 'target/crop_src.png', 'target/landmarks.json'], ['bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], 1, False),
- ('build',           s_build,           ['c6_04_build.py'], ['snap'], ['bake/parts.npz', 'bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], ['out/char.blend', 'fit/build.log'], 1, False),
+ ('skin_detail',     s_skin_detail,     ['../skin_detail/apply_skin_detail.py', '../skin_detail/synth.py', '../skin_detail/uvgeom.py'], ['skin_detail'], ['bake/Head_BaseColor_char.png', 'bake/texture.json'], ['out/skin_detail/report.json'], 0.5, True),
+ ('build',           s_build,           ['c6_04_build.py'], ['snap', 'skin_detail'], ['bake/parts.npz', 'bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png', 'out/skin_detail/report.json'], ['out/char.blend', 'fit/build.log'], 1, False),
  ('score',           s_score,           ['r6_10_score.py', 'score_final.py'], ['thresholds', 'compare_to', 'snap', 'fit'], ['fit/rn_h6.png', 'fit/rn_a6.png', 'bake/texture.json', 'fit/build.log', 'fit/wrap_rh6_report.json'], ['out/score.json'], 0.5, False),
- ('sheet',           s_sheet,           ['c6_05_render.py', 'c6_06_compose.py'], ['switches', 'name'], ['out/char.blend', 'out/score.json'], ['out/proof_sheet.png'] , 5, False),
+ ('sheet',           s_sheet,           ['c6_05_render.py', 'c6_06_compose.py', 'light_rig.py'], ['switches', 'name'], ['out/char.blend', 'out/score.json'], ['out/proof_sheet.png'] , 5, False),
 ]
 NAMES = [s[0] for s in STAGE_TABLE]
 

@@ -112,16 +112,22 @@ for v in ('slider', 'full'):
         print('INVARIANT', json.dumps(c, default=bool))
 report['invariants_all_ok'] = bool(ok)
 # ---- materials: simple principled (albedo + Tobin normal)
-def skin_mat(name, albedo):
+def skin_mat(name, albedo, detail=None):
+    # detail = out/skin_detail dir (round 16): detailed albedo + normal (Tobin normal + pores/furrows) + roughness map; None = plain albedo, Tobin normal, roughness 0.5
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; b = nt.nodes['Principled BSDF']
     t1 = nt.nodes.new('ShaderNodeTexImage'); t1.image = bpy.data.images.load(albedo); nt.links.new(t1.outputs['Color'], b.inputs['Base Color'])
-    t2 = nt.nodes.new('ShaderNodeTexImage'); t2.image = bpy.data.images.load(TEX + 'Head_Normal.png'); t2.image.colorspace_settings.name = 'Non-Color'
+    t2 = nt.nodes.new('ShaderNodeTexImage'); t2.image = bpy.data.images.load((detail + '/normal_detail.png') if detail else (TEX + 'Head_Normal.png')); t2.image.colorspace_settings.name = 'Non-Color'
     nm = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(t2.outputs['Color'], nm.inputs['Color']); nt.links.new(nm.outputs['Normal'], b.inputs['Normal'])
     b.inputs['Roughness'].default_value = 0.5
+    if detail:
+        r = nt.nodes.new('ShaderNodeTexImage'); r.image = bpy.data.images.load(detail + '/roughness_detail.png'); r.image.colorspace_settings.name = 'Non-Color'
+        for l in list(t2.inputs['Vector'].links): nt.links.new(l.from_socket, r.inputs['Vector'])
+        nt.links.new(r.outputs['Color'], b.inputs['Roughness'])
     for nme in ('Subsurface Weight',):
         if nme in b.inputs: b.inputs[nme].default_value = 0.04
     return m
-mf = skin_mat('Head_cloud', B2 + 'Head_BaseColor_char.png')
+_SD = _os.environ.get('SCP_SKIN_DETAIL_DIR') or None
+mf = skin_mat('Head_cloud', (_SD + '/albedo_detail.png') if _SD else (B2 + 'Head_BaseColor_char.png'), _SD)
 mt = skin_mat('Head_tobin', TEX + 'Head_BaseColor.png')
 for v, m in (('slider', mf), ('full', mf), ('tpl', mt)):
     h = var[v]['head']; h.data.materials.clear(); h.data.materials.append(m)

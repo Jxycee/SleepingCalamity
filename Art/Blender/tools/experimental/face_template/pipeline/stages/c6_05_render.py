@@ -131,14 +131,11 @@ try:
     for dv in pref.devices: dv.use = dv.type != 'CPU'
     scn.cycles.device = 'GPU'
 except Exception as e: print('gpu fail', e)
-scn.view_settings.view_transform = 'Standard'
 scn.render.image_settings.file_format = 'PNG'
-w = bpy.data.worlds.new('w'); w.use_nodes = True; w.node_tree.nodes['Background'].inputs[0].default_value = (0.55, 0.55, 0.57, 1); w.node_tree.nodes['Background'].inputs[1].default_value = 0.35; scn.world = w
-def light(name, loc, energy, size):
-    L = bpy.data.lights.new(name, 'AREA'); L.energy = energy; L.size = size
-    o = bpy.data.objects.new(name, L); scn.collection.objects.link(o); o.location = loc
-    d = Vector((0, -0.06, 1.69)) - Vector(loc); o.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler(); return o
-light('key', (-0.55, -0.8, 2.05), 22, 0.7); light('fill', (0.7, -0.7, 1.7), 7, 0.8); light('rim', (0.0, 0.5, 2.0), 9, 0.5)
+# round 16: neutral soft-box rig shared with skin_detail/blender_render.py (stages/light_rig.py; replaces the harsh 22 W side key, measured +15-20 L* over the albedo)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import light_rig
+import mathutils
+light_rig.build(bpy, mathutils, scn, (0, -0.06, 1.69), (0, -1, 0))
 cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); scn.collection.objects.link(cam); scn.camera = cam; cam.data.lens = 85
 def aim(centre, dist, az_deg, res):
     scn.render.resolution_x, scn.render.resolution_y = res
