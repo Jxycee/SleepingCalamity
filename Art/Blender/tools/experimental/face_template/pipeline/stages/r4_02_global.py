@@ -10,7 +10,7 @@ from PIL import Image
 from scipy import ndimage as ndi
 from scipy.optimize import least_squares
 from r4_common import *
-from fit_checks import run_checks
+from fit_checks6 import run_checks   # the documented gate set (was the stricter round-3 fit_checks: gap mean +0.3, penetration +0.25)
 import r4_metrics as MT
 ap = argparse.ArgumentParser(); [ap.add_argument(a) for a in ('inb', 'png', 'camj', 'lmj', 'tag')]
 ap.add_argument('--noheight', action='store_true'); ap.add_argument('--nowidth', action='store_true'); ap.add_argument('--hmax', type=float, default=20.0); ap.add_argument('--amax', type=float, default=2.0)
@@ -67,5 +67,5 @@ def fn(P): tri = P[t.faces]; n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri
 flips = int(((fn(newP) * fn(t.basis)).sum(1) < 0).sum()); print('flips', flips)
 dB = newP - t.basis; nk = (t.keys + dB[None]).astype(np.float32); nk[0] = newP
 np.save(FIT + f'wrap_r{A.tag}_basis.npy', newP.astype(np.float32)); np.save(FIT + f'wrap_r{A.tag}_keys.npy', nk); np.savez(FIT + f'wrap_r{A.tag}_mesh.npz', v=newP, f=t.faces)
-print('3D target', MT.tgt_stats(newP)); chk = run_checks(t, nk.astype(np.float64), f'global {A.tag}', verbose=False); print('GATES PASS=%s' % chk['PASS'])
+print('3D target', MT.tgt_stats(newP)); chk = run_checks(t, nk.astype(np.float64), f'global {A.tag}', verbose=False); print('GATES PASS=%s' % chk['PASS'], chk.get('fails'))
 json.dump(dict(args=vars(A), height_mm=h * 1e3, width_up=a[0], cheek_out=a[1], flips=flips, checks=chk), open(FIT + f'wrap_r{A.tag}_report.json', 'w'), indent=1, default=float)

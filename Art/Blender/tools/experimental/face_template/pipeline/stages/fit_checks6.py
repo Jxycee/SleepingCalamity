@@ -69,7 +69,7 @@ def run_checks(t, new_keys, label, old_basis=None, verbose=True):
     for n in ('Eye_Blink_L', 'Eye_Blink_R', 'eyeBlinkLeft', 'eyeBlinkRight'):
         states[n] = 1.0
     states['jawOpen'] = 0.5; states['aa'] = 1.0; states['oh'] = 1.0
-    ok = True
+    ok = True; fails = []
     # --- (a)
     sph = {'L': sphere_fit(t.eyeL), 'R': sphere_fit(t.eyeR)}
     for n in ('Eye_Blink_L', 'Eye_Blink_R', 'eyeBlinkLeft', 'eyeBlinkRight'):
@@ -99,9 +99,9 @@ def run_checks(t, new_keys, label, old_basis=None, verbose=True):
         gap, gap_t = np.abs(np.nan_to_num(gap, nan=1.0)), np.abs(np.nan_to_num(gap_t, nan=1.0))
         out[f'blink_{n}'] = dict(gap_max_mm=gap.max() * 1e3, gap_mean_mm=gap.mean() * 1e3, tpl_gap_max_mm=gap_t.max() * 1e3, tpl_gap_mean_mm=gap_t.mean() * 1e3,
                                  pen_moved_mm=pen_m, pen_fixed_mm=pen_f, pen_template_mm=pen_t)
-        ok &= bool(gap.max() * 1e3 <= gap_t.max() * 1e3 + 0.5)  # literal 0.5 mm fails on the untouched template (max ~2 mm), so gate = template + 0.5 mm
-        ok &= bool(gap.mean() * 1e3 <= gap_t.mean() * 1e3 + 0.5)
-        ok &= True and bool(pen_m <= pen_t + 0.45)
+        c_ = bool(gap.max() * 1e3 <= gap_t.max() * 1e3 + 0.5); ok &= c_; (c_ or fails.append('blink gap max ' + n))  # literal 0.5 mm fails on the untouched template (max ~2 mm), so gate = template + 0.5 mm
+        c_ = bool(gap.mean() * 1e3 <= gap_t.mean() * 1e3 + 0.5); ok &= c_; (c_ or fails.append('blink gap mean ' + n))
+        c_ = bool(pen_m <= pen_t + 0.45); ok &= c_; (c_ or fails.append('lid penetration ' + n))
     # --- (b)
     up, lo = S('lip_line_upper'), S('lip_line_lower')
     for n, w in (('jawOpen', 0.5), ('aa', 1.0), ('oh', 1.0)):
@@ -111,7 +111,7 @@ def run_checks(t, new_keys, label, old_basis=None, verbose=True):
             g = P[up][:, 2] - np.interp(P[up][:, 0], P[lo_s][:, 0], P[lo_s][:, 2])
             r[tag] = (g.min() * 1e3, g.mean() * 1e3)
         out[f'lip_{n}'] = dict(min_gap_mm=r['new'][0], mean_gap_mm=r['new'][1], tpl_min_gap_mm=r['tpl'][0], tpl_mean_gap_mm=r['tpl'][1])
-        ok &= bool(r['new'][0] >= -0.3)
+        c_ = bool(r['new'][0] >= -0.3); ok &= c_; (c_ or fails.append('lip gap ' + n))
     # --- (c)
     wf = t.rep[t.faces]; E = edges_of(wf)
     rings = {'lidL': S('eyelid_ring_L'), 'lidR': S('eyelid_ring_R'), 'lip': S('lip_line')}
@@ -127,11 +127,11 @@ def run_checks(t, new_keys, label, old_basis=None, verbose=True):
             sel = lt > 1e-5; ratio = ln[sel] / lt[sel]
             nn, nt = vnorm(Pn, t.faces[fm]), vnorm(Pt, t.faces[fm]); flips = int(((nn * nt).sum(1) < 0).sum())
             worst[rn][0] = min(worst[rn][0], ratio.min()); worst[rn][1] = max(worst[rn][1], ratio.max()); worst[rn][2] += flips
-        ok &= bool(worst[rn][0] >= 0.7 and worst[rn][1] <= 1.4 and worst[rn][2] == 0)
+        c_ = bool(worst[rn][0] >= 0.7 and worst[rn][1] <= 1.4 and worst[rn][2] == 0); ok &= c_; (c_ or fails.append('ring %s ratio/flips' % rn))
     out['rings'] = {k: dict(min_ratio=v[0], max_ratio=v[1], flips=v[2]) for k, v in worst.items()}
-    out['PASS'] = bool(ok)
+    out['PASS'] = bool(ok); out['fails'] = fails
     if verbose:
-        print(f'--- hard-stop checks [{label}] PASS={ok}')
+        print(f'--- hard-stop checks [{label}] PASS={ok} fails={fails}')
         for k, v in out.items():
             if isinstance(v, dict): print(' ', k, {a: round(b, 3) if isinstance(b, float) else b for a, b in v.items()} if k != 'rings' else {a: {x: round(y, 3) for x, y in b.items()} for a, b in v.items()})
     return out

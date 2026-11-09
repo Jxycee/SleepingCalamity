@@ -4,8 +4,9 @@
   "out_dir": "C:/AI/test_out/heroes/pipeline_runs/cloud_v1",
   "prep": {"box": [60, 60, 730, 770],
            "ellipses": {"head": [395, 400, 215, 300], "face": [395, 380, 150, 230], "neck": [430, 640, 130, 60]},
-           "border_top": 40, "side_cuts": [150, 650], "cut_rows": [640, 560, 560], "shoulder_cols": [195, 545]},
+           "border_top": 40, "bg_seed": false, "side_cuts": [150, 650], "cut_rows": [640, 560, 560], "shoulder_cols": [195, 545]},
   "hunyuan": {"seeds": [1, 2], "pinned_glb": "C:/AI/test_out/heroes/pipeline_data/cloud_shape_s2.glb"},
   "iris_colour": "auto",
+  "fit": {"seed_theta": "C:/AI/test_out/heroes/pipeline_data/warp_seed_default.json"},
   "compare_to": "C:/AI/test_out/heroes/pipeline_data/r6_reference_score.json"
 }

@@ -6,7 +6,7 @@
   python face_pipeline.py clean  --config cfg.json [--stage STAGE | --all]
 Stages are resumable: <out_dir>/manifest.json stores, per stage, a hash of (stage scripts + parameters + input file contents), the output hashes, seconds and status.
 A stage is skipped when its recorded hash equals the current one and its outputs exist; changing a parameter or an upstream output re-runs it and everything after."""
-import os, sys, json, glob, time, shutil, hashlib, argparse, subprocess, urllib.request
+import hashlib, os, sys, json, glob, time, shutil, hashlib, argparse, subprocess, urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 from paths import Paths, STAGES as STAGE_DIR
 
@@ -88,12 +88,15 @@ def s_target_3d(c):
         if not port_up(8190): raise RuntimeError('ComfyUI port 8190 did not come up (start C:/AI/stablegen/start_comfy_8190.bat)')
     for seed in H['seeds']:
         out = T + '/glb/shape_s%s.glb' % seed
+        key = hashlib.sha1(open(T + '/cutout_rgba.png', 'rb').read() + repr((H.get('steps', 30), seed, H.get('faces', 40000))).encode()).hexdigest()
+        if os.path.exists(out) and (not os.path.exists(out + '.key') or open(out + '.key').read() != key):
+            os.remove(out)      # a shape generated from an older cutout or other settings must not be reused
         if not os.path.exists(out):
             gpu_cool(); pref = '3D/pipe_%s_s%s' % (c.cfg['name'], seed)
             c.run([c.T['comfy_py'], c.T['hy_script'], T + '/cutout_rgba.png', pref, H.get('steps', 30), seed, H.get('faces', 40000)])
             cand = sorted(glob.glob('C:/AI/stablegen/ComfyUI/output/3D/pipe_%s_s%s_*.glb' % (c.cfg['name'], seed)), key=os.path.getmtime)
             if not cand: raise RuntimeError('no Hunyuan output for seed %s' % seed)
-            shutil.copy(cand[-1], out)
+            shutil.copy(cand[-1], out); open(out + '.key', 'w').write(key)
         c.bl('cloud_render_clay.py', out, T + '/glb/clay_s%s' % seed, 'clay', 'front')
     c.mp('target_pick.py', c.cfg['_cfg_path'])
     if H.get('trellis_tex_fallback'):   # optional, untested here: texture for a visual check only; downstream stages use the shape
@@ -122,13 +125,13 @@ def s_align(c):
     c.py('r3_02_wrap.py', '1', '--pass2', W['pass2'], '--prewarp', W['prewarp'], '--eyelm', W['eyelm'], '--sliders', 'slider_verts_noeye.npy', expect='PASS')
     c.render_lm('1')
     S = c.cfg['skull']
-    c.py('r4_02_global.py', F + '/wrap_r1_basis.npy', F + '/rn_1.png', F + '/_cam_1.json', F + '/lm_1.json', '51', '--hmax', S['hmax'], *(['--nowidth'] if S['nowidth'] else []), expect='GATES PASS=True')
+    c.py('r4_02_global.py', F + '/wrap_r1_basis.npy', F + '/rn_1.png', F + '/_cam_1.json', F + '/lm_1.json', '51', '--hmax', S['hmax'], *(['--nowidth'] if S['nowidth'] else []), expect=(None if c.cfg['align'].get('soft_gate') else 'GATES PASS=True'))   # soft_gate: the fit stage enforces the gates again, so a start state that misses one is a warning
     c.render_lm('51')
 
 def s_fit(c):
     F, Q = c.P.fit, c.cfg['fit']
     cols = 'all' if c.cfg['template']['sliders_enabled'] else 'warp'
-    c.py('r6_06_sliderloop.py', F + '/wrap_r51_basis.npy', F + '/lm_51.json', F + '/_cam_51.json', F + '/rn_51.png', Q['tag'], '--cols', cols, '--seed', Q['seed_theta'],
+    c.py('r6_06_sliderloop.py', F + '/wrap_r51_basis.npy', F + '/lm_51.json', F + '/_cam_51.json', F + '/rn_51.png', Q['tag'], '--cols', cols, *(['--seed', Q['seed_theta']] if Q.get('seed_theta') else []),
          '--iters', Q['iters'], '--tr', Q['tr'], '--w3', Q['w3'], '--skincap', Q['skincap'], '--wnose', Q['wnose'], '--wlips', Q['wlips'], '--wskin', Q['wskin'],
          '--sreg', Q['sreg'], '--remeasure', Q['remeasure'])
     shutil.copy(c.log, F + '/fit_%s.log' % Q['tag'])
@@ -203,7 +206,8 @@ def stage_inputs(c, spec):
     out = []
     for i in spec:
         if i == '@image': out.append(c.cfg['image'])
-        elif i == '@seed': out.append(c.cfg['fit']['seed_theta'])
+        elif i == '@seed':
+            if c.cfg['fit'].get('seed_theta'): out.append(c.cfg['fit']['seed_theta'])     # null = zero theta
         else: out.append(c.P.run + '/' + i)
     return out
 

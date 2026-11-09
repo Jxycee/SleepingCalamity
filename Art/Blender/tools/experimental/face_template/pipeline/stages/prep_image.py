@@ -1,6 +1,6 @@
 """Stage 1 prep_image (venv python: cv2 numpy PIL). Config-driven version of the hand-run target/prep.py + prep2.py.
 usage: prep_image.py <cfg.json>   -> target/{crop_src.png, mask_raw.png, mask_vis.png, cutout_rgba.png, input_1536.png}
-cfg.prep: box [x0,y0,x1,y1] (crop in photo px) or null = auto from the mediapipe face box; ellipses (probable head / sure face / neck), cut_rows, side_cuts, border."""
+cfg.prep: bg_seed (default true; false = the Cloud hand-tuned behaviour), bg_seed_dist, box [x0,y0,x1,y1] (crop in photo px) or null = auto from the mediapipe face box; ellipses (probable head / sure face / neck), cut_rows, side_cuts, border."""
 import os, sys, json
 import numpy as np, cv2
 from PIL import Image
@@ -29,7 +29,15 @@ mask = np.full((h, w), cv2.GC_PR_BGD, np.uint8)
 def e(c, v): cv2.ellipse(mask, (int(c[0] - X0), int(c[1] - Y0)), (int(c[2]), int(c[3])), 0, 0, 360, v, -1)
 e(E['head'], cv2.GC_PR_FGD); e(E['face'], cv2.GC_FGD); e(E['neck'], cv2.GC_FGD)
 mask[:int(P.get('border_top', 40)), :] = cv2.GC_BGD
-sl, sr = P.get('side_cuts', [150, 650]); mask[:, :max(int(sl - X0), 0)] = cv2.GC_BGD; mask[:, int(sr - X0):] = cv2.GC_BGD
+sc0 = P.get('side_cuts')      # photo-px columns outside which is sure background; null = none (the Cloud values only make sense for the Cloud photo)
+if sc0:
+    sl, sr = sc0; mask[:, :max(int(sl - X0), 0)] = cv2.GC_BGD; mask[:, max(int(sr - X0), 0):] = cv2.GC_BGD
+if P.get('bg_seed', True):    # plain backgrounds: pixels close to the border colour (Lab, median of the top/side strips) are sure background (overrides the ellipses: they are wide at the jaw)
+    lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB).astype(np.float32)
+    strips = np.concatenate([lab[:int(0.04 * h)].reshape(-1, 3), lab[:, :int(0.04 * w)].reshape(-1, 3), lab[:, w - int(0.04 * w):].reshape(-1, 3)])
+    bgc = np.median(strips, 0); dist = np.linalg.norm(lab - bgc, axis=2)
+    mask[dist < float(P.get('bg_seed_dist', 10))] = cv2.GC_BGD
+    print('bg seed colour (Lab)', bgc.round(1), 'pixels', int((dist < float(P.get('bg_seed_dist', 10))).sum()))
 bg = np.zeros((1, 65)); fg = np.zeros((1, 65)); cv2.grabCut(crop, mask, None, bg, fg, 10, cv2.GC_INIT_WITH_MASK)
 m = np.where((mask == 1) | (mask == 3), 255, 0).astype(np.uint8)
 n, l, s, _ = cv2.connectedComponentsWithStats(m); k = 1 + np.argmax(s[1:, 4]); m = np.where(l == k, 255, 0).astype(np.uint8)
