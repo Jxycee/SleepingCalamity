@@ -62,6 +62,9 @@ if A.snapfree: sm_ &= ~(MT.M['nose'] | MT.M['lips'] | MT.M['brow'])
 wm = np.zeros(nW); wm[wof[sm_]] = 1.0
 for _ in range(10): wm = 0.5 * wm + 0.5 * (adj @ wm) / np.maximum(deg, 1)
 ws = wm[wof] * A.snap
+# round 5: no snap inside the eye zone (lids move rigidly; the snap added 0.15-0.2 mm to the blink gap mean): fade in over 6..14 mm from the lid rings
+_dre = np.minimum(cKDTree(P0[t.S('eyelid_ring_L')]).query(P0)[0], cKDTree(P0[t.S('eyelid_ring_R')]).query(P0)[0]) * 1e3
+ws = ws * (lambda q: q * q * (3 - 2 * q))(np.clip((_dre - 6.0) / 8.0, 0, 1))
 dq, q, nq = MT._surf.query(newP); sd = ((newP - q) * nq).sum(1)
 if A.snapmode == 'y':
     ny = nq[:, 1]; dy = np.where((np.abs(ny) > 0.45) & (np.abs(sd) < 0.008), -sd / np.where(np.abs(ny) > 0.45, ny, 1.0), 0.0); dy = np.clip(dy, -0.004, 0.004) * ws
@@ -77,6 +80,7 @@ else:
     newP = base + wd[wof]; mv = np.linalg.norm(newP - base, axis=1)
 print('field |d| mm: mean %.2f max %.2f ; snap |d| mean %.3f max %.3f mm (on %d verts)' % (np.linalg.norm(dw, axis=1).mean() * 1e3, np.linalg.norm(dw, axis=1).max() * 1e3, np.abs(mv).mean() * 1e3, np.abs(mv).max() * 1e3, (ws > .5).sum()))
 def fn(P): tri = P[t.faces]; n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); return n / (np.linalg.norm(n, axis=1)[:, None] + 1e-30)
+newP = deflip(t, P0, newP)   # round 5: damp the displacement locally where it flips faces
 flips = int(((fn(newP) * fn(t.basis)).sum(1) < 0).sum()); print('whole-head rest flips vs template', flips)
 assert np.abs(newP[t.rep] - newP).max() < 1e-4, 'weld seams split'
 dB = newP - t.basis; nk = (t.keys + dB[None]).astype(np.float32); nk[0] = newP

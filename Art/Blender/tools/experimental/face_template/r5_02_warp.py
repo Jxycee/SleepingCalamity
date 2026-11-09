@@ -109,9 +109,16 @@ def warp(th):
         c = P0[RINGS[s]].mean(0) + m; w2 = (1 - ss(0.006, 0.020, dd)) * side; d += w2[:, None] * th['se'] * (P0 + m - c); d[:, 2] += w2 * th['sez'] * (P0 + m - c)[:, 2]
     return P0 + d
 _sk = np.where(MT.M['skin'] & ~(MT.M['nose'] | MT.M['lips'] | MT.M['brow']))[0]
+_reps = np.unique(t.rep); _nid = -np.ones(len(t.rep), int); _nid[_reps] = np.arange(len(_reps)); _wof = _nid[t.rep]
+_wf = _wof[t.faces]; _wf = _wf[(_wf[:, 0] != _wf[:, 1]) & (_wf[:, 1] != _wf[:, 2]) & (_wf[:, 0] != _wf[:, 2])]
+_E = edges_of(_wf); _nW = len(_reps); _adj = sp.coo_matrix((np.ones(len(_E)), (_E[:, 0], _E[:, 1])), shape=(_nW, _nW)); _adj = (_adj + _adj.T).tocsr(); _deg = np.maximum(np.asarray(_adj.sum(1)).ravel(), 1)
 def ysnap(P):   # model of the correction stage's snap: skin (not nose/lips/brow) is pulled back onto the 3D target along y (limited, as r5_03_corr snapmode y)
     Q = P.copy(); dq, q, nq = MT._surf.query(P[_sk]); sd = ((P[_sk] - q) * nq).sum(1); ny = nq[:, 1]
-    dy = np.where((np.abs(ny) > 0.45) & (np.abs(sd) < 0.008), -sd / np.where(np.abs(ny) > 0.45, ny, 1.0), 0.0); Q[_sk, 1] += np.clip(dy, -0.004, 0.004) * A.snapw; return Q
+    dy = np.where((np.abs(ny) > 0.45) & (np.abs(sd) < 0.008), -sd / np.where(np.abs(ny) > 0.45, ny, 1.0), 0.0); dyv = np.zeros(len(P)); dyv[_sk] = np.clip(dy, -0.004, 0.004) * A.snapw
+    wd = np.zeros(_nW); wd[_wof] = dyv       # smooth the snap field on the welded graph (the target's fine bumps must not become skin bumps)
+    for _ in range(25): wd = 0.4 * wd + 0.6 * (_adj @ wd) / _deg
+    Q[:, 1] += wd[_wof] * (np.abs(wd[_wof]) > 0) * 1.0; Q[~np.isin(np.arange(len(P)), _sk) & (np.abs(wd[_wof]) < 1e-9), 1] += 0
+    return deflip(t, P, Q)
 def flips_of(P):
     f = lambda Q: (lambda tri: (lambda n: n / (np.linalg.norm(n, axis=1)[:, None] + 1e-30))(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])))(Q[t.faces])
     return int(((f(P) * f(t.basis)).sum(1) < 0).sum())

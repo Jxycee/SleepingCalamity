@@ -3,12 +3,22 @@ Eyeball: translation by the eyelid-ring centroid change + uniform scale by ring 
 Teeth: similarity fitted on mouth corners + lip-line verts. Eye-bone head offsets are reported only (no re-rig).
 Writes bake/head_variants.npz, bake/parts.npz, bake/reseat.json."""
 from c5_common import *
-import json
+import json, os
 t = Tpl(); old = t.basis
 full_b = np.load(FIT + 'wrap_r' + FINAL_TAG + '_basis.npy').astype(np.float64); full_k = np.load(FIT + 'wrap_r' + FINAL_TAG + '_keys.npy').astype(np.float64)
 sl_b = np.load(FIT + 'slider_verts.npy').astype(np.float64)
 assert full_k.shape == (150, 7321, 3) and sl_b.shape == (7321, 3) and full_b.shape == (7321, 3)
 assert np.abs(full_k[0] - full_b).max() < 1e-4, np.abs(full_k[0] - full_b).max()
+# round 5: jaw keys are transferred as plain deltas, so on a shorter lower face the same chin travel opens the mouth too far (teeth then read as a comb). The jaw hinge arm
+# (upper lip to chin) is shorter by s = new/old, so the deltas of the jaw-driven ARKit/viseme keys (chin travel >= 3 mm, not cheek/slider keys) are scaled by s (rotation about the hinge).
+JAW_SCALE = os.environ.get('JAW_SCALE', '1') == '1'
+z = t.z; _kn = [str(x) for x in z['head/key_names']]; _chin = t.lm_idx[t.lm_names.index('chin_tip')]; _lu = t.lm_idx[t.lm_names.index('upper_lip_center')]
+JAW_S = float(np.clip((full_b[_lu][2] - full_b[_chin][2]) / (old[_lu][2] - old[_chin][2]), 0.75, 1.0)) if JAW_SCALE else 1.0
+_cand = [_kn[i] for i in list(t.z['tpl/key_arkit_idx']) + list(t.z['tpl/key_viseme_idx'])]
+JAW_KEYS = [n_ for n_ in _cand if not n_.startswith('cheek') and np.linalg.norm((t.keys[t.kidx(n_)] - old)[_chin]) * 1e3 >= 3.0]
+print('jaw key scale %.3f on' % JAW_S, JAW_KEYS)
+for n_ in JAW_KEYS:
+    i_ = t.kidx(n_); full_k[i_] = full_b + JAW_S * (full_k[i_] - full_b)
 sl_k = t.keys + (sl_b - old)[None]; sl_k[0] = sl_b
 z = t.z
 np.savez_compressed(B2 + 'head_variants.npz', full_basis=full_b.astype(np.float32), full_keys=full_k.astype(np.float32), slider_basis=sl_b.astype(np.float32), slider_keys=sl_k.astype(np.float32))
@@ -45,9 +55,13 @@ for var, newb in (('full', full_b), ('slider', sl_b)):
             s_ = float((ww * (a_ * b_).sum(1)).sum() / (ww * (a_ ** 2).sum(1)).sum()); t_ = (newb[pts] * ww[:, None]).sum(0) - s_ * (old[pts] * ww[:, None]).sum(0)
         s_u = float(np.clip(s_, 0.8, 1.25))
         if s_u != s_: t_ = newb[pts].mean(0) - s_u * R_ @ old[pts].mean(0)
-        P = z[tk + '/basis'].astype(np.float64); K = z[tk + '/keys'].astype(np.float64)
+        P = z[tk + '/basis'].astype(np.float64); K = z[tk + '/keys'].astype(np.float64); tnames = [str(x) for x in z[tk + '/key_names']]
         g = lambda X: (X @ R_.T) * s_u + t_
-        out[f'{var}/{tk}/basis'] = g(P).astype(np.float32); out[f'{var}/{tk}/keys'] = g(K).astype(np.float32)
+        Kg = g(K)
+        if var == 'full' and tk == 'teethLower':
+            for n_ in JAW_KEYS:
+                if n_ in tnames: j_ = tnames.index(n_); Kg[j_] = g(P) + JAW_S * (Kg[j_] - g(P))
+        out[f'{var}/{tk}/basis'] = g(P).astype(np.float32); out[f'{var}/{tk}/keys'] = Kg.astype(np.float32)
         res = np.linalg.norm(g(old[pts]) - newb[pts], axis=1) * 1e3
         ang = float(np.degrees(np.arccos(np.clip((np.trace(R_) - 1) / 2, -1, 1))))
         r[tk] = dict(scale_raw=float(s_), scale_used=s_u, rot_deg=ang, centroid_shift_mm=((newb[pts].mean(0) - old[pts].mean(0)) * 1e3).tolist(), fit_resid_rms_mm=float(np.sqrt((res ** 2).mean())))
