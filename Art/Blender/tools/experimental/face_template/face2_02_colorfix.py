@@ -55,7 +55,7 @@ Rgb = lambda l: (np.clip(lab2rgb(l), 0, 1) * 255 + 0.5).astype(np.uint8)
 c = np.array(Image.open(D + 'target/c2_3.png').convert('RGB'))
 rects = [(400, 190, 620, 290), (290, 470, 380, 560), (640, 470, 740, 560), (300, 560, 400, 660), (620, 560, 720, 660), (290, 330, 340, 420), (680, 330, 730, 420)]
 cl = np.concatenate([Lab(c[y0:y1, x0:x1]).reshape(-1, 3) for x0, y0, x1, y1 in rects])
-lo, hi = np.percentile(cl[:, 0], [15, 45]); Lc = np.median(cl[(cl[:, 0] >= lo) & (cl[:, 0] <= hi)], 0)  # skip specular highlights; print('concept skin Lab median', Lc, 'rgb', Rgb(Lc[None, None])[0, 0])
+lo, hi = np.percentile(cl[:, 0], [8, 32]); Lc = np.median(cl[(cl[:, 0] >= lo) & (cl[:, 0] <= hi)], 0)  # skip specular highlights; print('concept skin Lab median', Lc, 'rgb', Rgb(Lc[None, None])[0, 0])
 
 # ---- Tobin skin tone -> dark (same transform used for body so the neck matches)
 tl = Lab(tob); face_area = cov & (zmap > 1.58) & ~eye & ~mouth & ~lip & ~ear & ~nostril
@@ -92,25 +92,33 @@ low = mblur(fl, valid, 45); hf = fl - low
 mu = np.median(low[valid], 0)
 out = np.zeros_like(fl)
 dl = np.clip((low[..., 0] - mu[0]) * 0.12, -5, 5)           # keep a little large-scale shading
-out[..., 0] = Lc[0] + dl + np.clip(hf[..., 0], -28, 8)
+out[..., 0] = Lc[0] + dl + np.clip(hf[..., 0], -22, 8)
 dab = np.clip((low[..., 1:] - mu[1:]) * 0.2, -4, 4)
-out[..., 1:] = Lc[1:] + dab + hf[..., 1:] * 0.5
+out[..., 1:] = Lc[1:] + dab + hf[..., 1:] * 0.3
 bake_rgb = Rgb(out)
 
-# ---- blend with Tobin-dark
-w = np.zeros((R, R), np.float32)
-w = np.maximum(w, feather(eye, 10, 8))
-w = np.maximum(w, feather(mouth, 6, 6))
-w = np.maximum(w, 0.7 * feather(lip, 2, 5))
-w = np.maximum(w, 0.45 * feather(ear, 0, 6))
-w = np.maximum(w, feather(nostril, 4, 4))
+# ---- blend with Tobin-dark.  Eye/nostril/ear/no-hit/neck patches = diffused bake tone + Tobin's local detail (no tone jump);
+# mouth interior and lips use Tobin-dark directly.
+bake_lab = Lab(bake_rgb)
+core_bad = eye | mouth | nostril | lip | ear | ~valid
+wv = ndi.binary_erosion(valid & ~ndi.binary_dilation(core_bad, iterations=6), iterations=2)
+fill_low = mblur(bake_lab, wv, 60); den = cv2.GaussianBlur(wv.astype(np.float32), (0, 0), 60)
+far = mblur(bake_lab, wv, 250); fill_low = np.where((den > 0.02)[..., None], fill_low, far)
+tob_detail = tob_dark - np.stack([cv2.GaussianBlur(tob_dark[..., k], (0, 0), 25) for k in range(3)], -1)
+patch = fill_low + tob_detail
+w_patch = np.zeros((R, R), np.float32); w_direct = np.zeros((R, R), np.float32)
+w_patch = np.maximum(w_patch, feather(eye, 10, 8)); w_patch = np.maximum(w_patch, feather(nostril, 4, 4))
+w_patch = np.maximum(w_patch, 0.5 * feather(ear, 0, 6))
 nohit = ~valid
-w = np.maximum(w, feather(nohit & cov_d, 0, 6))
-w[nohit] = 1.0
-zl = z_hit_min + 0.004   # bake fades to Tobin over 14 mm above the first hit height
-w = np.maximum(w, np.clip(1 - (zmap - zl) / 0.014, 0, 1) * cov)
-w = np.clip(w, 0, 1)
-comb = Lab(bake_rgb) * (1 - w[..., None]) + tob_dark * w[..., None]
+w_patch = np.maximum(w_patch, feather(nohit & cov_d, 0, 6)); w_patch[nohit] = 1.0
+zl = z_hit_min + 0.004   # bake fades out over 14 mm above the first hit height
+w_patch = np.maximum(w_patch, np.clip(1 - (zmap - zl) / 0.014, 0, 1) * cov)
+w_direct = np.maximum(feather(mouth, 6, 6), 0.7 * feather(lip, 2, 5))
+w_direct = np.minimum(w_direct, 1 - 0 * w_patch)
+w = np.clip(np.maximum(w_patch, w_direct), 0, 1)
+inner = w_direct / np.maximum(w, 1e-6)           # share of the direct (Tobin-dark) term inside the blend
+tgt = patch * (1 - inner[..., None]) + tob_dark * inner[..., None]
+comb = bake_lab * (1 - w[..., None]) + tgt * w[..., None]
 
 # ---- neck match: Lab shift of head near neck ring toward the (tinted) body neck colour
 bz = z['body/basis'][:, 2]; bf = z['body/faces']; bnk = np.where(bz > 1.485)[0]
