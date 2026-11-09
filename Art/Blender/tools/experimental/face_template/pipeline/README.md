@@ -65,3 +65,21 @@ Config `configs/char2.json` (Cloud theta seed, run dir `pipeline_runs/char2`) an
 3. `python face_pipeline.py run --config configs/mychar.json --to target_3d`; read `target/mask_vis.png` (head inside, no background wedges) and `pick.json`; if wrong set `prep.box/ellipses/cut_rows`, `--force prep_image`.
 4. Run the rest (about 25-30 min), then `score`; if a gate fails in fit/snap read `logs/fit.log` (`fails=[...]`).
 5. Look at `out/<name>_proof_sheet.png` and `_overlay.png` (head height and width over the photo) before using the head.
+
+## Round 7 fixes (2026-11-09): flips, eye-following render, skull width, chroma flatten
+Final scorecards (final tag h6):
+| criterion | threshold | char2_zero | cloud_v1 (r6 ref) |
+|---|---|---|---|
+| ratio MAE % | <= 2.5 | 2.04 PASS | 3.36 FAIL (3.70) |
+| worst ratio % | <= 5 | 5.39 FAIL (3.4-6.6 with +-1 % render framing) | 7.20 FAIL (8.77) |
+| IoU head+jaw (row-centred) | >= 0.93 | 0.963 PASS | 0.925 FAIL (0.889) |
+| IoU skull | >= 0.95 | 0.976 PASS | 0.985 PASS (0.899) |
+| 3D skin RMS mm | <= 0.95 | 0.702 PASS | 0.892 PASS (0.845) |
+| skin dE76 | <= 2.0 | 1.974 PASS | 1.748 PASS (1.758) |
+| flips | 0 | 0 PASS | 0 PASS |
+| invariants / keys | ok / 184 | PASS / 184 | PASS / 184 |
+- **Flips:** the 2 flips came from the nricp wrap itself (r1): a degenerate 0.05 mm2 template sliver at the left inner eye corner, and a thin ear/neck-side face that nricp threw out. `fit_common.repair_flips` smooths the displacement field locally (patch grows ring by ring, boundary fixed) and runs at the end of `r3_02_wrap` and `r4_02_global`.
+- **Eye-following render (biggest ratio fix):** scoring and the snap rendered the head with the template eyeballs in place, while the fit loop moves them with the lids; the detector (eye corners = inter-ocular normaliser) read differently (char2: 0.84 % in the loop vs 2.14 % on the score render). `r6_prep_render.py` now makes the eyes follow the lid rings.
+- **Skull width:** new `r6_04_skullw.py` (snap stage, `snap.skull_width`, default true): smooth x-scale above the brow line solved from photo-vs-render row half-widths (char2 crown was 14 % too wide; skull IoU 0.93 -> 0.976).
+- **Chroma flatten:** `c6_02_texture.py` also pulls the large-scale a/b cast toward the photo skin tone (`FLATC`, default 0.9); char2 dE 2.51 -> 1.97.
+- **Not fixed:** worst ratio on char2 (5.39 vs 5.0) is inside detector noise: re-rendering the same mesh with +-1 % camera framing gives MAE 1.3-1.8 and worst 3.4-6.6. A landmark-pair snap (`snap.damp` 1) was tried and made it worse (MAE 2.46, worst 6.1), so damp stays 0. Cloud still misses MAE/worst/head-jaw IoU (the Hunyuan target and Cloud theta seed bound it).

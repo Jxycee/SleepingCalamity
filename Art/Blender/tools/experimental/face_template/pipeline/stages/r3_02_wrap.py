@@ -108,6 +108,8 @@ if A.intfollow:
     final[inner] = Wv[inner] + di[inner]
     print('inner follow: %d verts, mean |disp| mm %.2f (was %.2f)' % (inner.sum(), np.linalg.norm(final[inner] - Wv[inner], axis=1).mean() * 1e3, before))
 newP = final[w_of]; assert np.abs(newP[t.rep] - newP).max() < 1e-12
+from fit_common import repair_flips
+newP, _f0, _f1 = repair_flips(t, newP); print('wrap flips before/after repair', _f0, _f1)   # generic: local displacement smoothing around any flipped face
 # ---- metrics
 face = (t.rw == 1.0) & (t.basis[:, 2] > zc + 0.01)
 exc = coreraw.copy()

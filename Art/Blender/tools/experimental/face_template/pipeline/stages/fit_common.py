@@ -37,6 +37,37 @@ def edges_of(faces):
     e = np.sort(e, 1); e = e[e[:, 0] != e[:, 1]]
     return np.unique(e, axis=0)
 
+def count_flips(t, P):
+    """faces whose normal is reversed vs the template basis (boolean per face)"""
+    def fn(Q):
+        tri = Q[t.faces]; n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); return n / (np.linalg.norm(n, axis=1)[:, None] + 1e-30)
+    return (fn(P) * fn(t.basis)).sum(1) < 0
+
+def repair_flips(t, P, max_rings=8, smooth_iters=40, verbose=True):
+    """Generic flip repair for a wrap result P (same topology as the template): the displacement field d = P - basis is Jacobi-smoothed on the WELDED vertex graph
+    inside a patch around every flipped face (the patch grows ring by ring until no face is flipped; patch boundary stays fixed, so the repair is local and the fit
+    elsewhere is unchanged). Welded copies move together. Returns (P_new, flips_before, flips_after)."""
+    import scipy.sparse as sp
+    fl0 = count_flips(t, P); n0 = int(fl0.sum())
+    if n0 == 0: return P, 0, 0
+    nW = int(t.rep.max()) + 1; wf = weld_faces(t); e = edges_of(wf)
+    A = sp.coo_matrix((np.ones(len(e) * 2), (np.r_[e[:, 0], e[:, 1]], np.r_[e[:, 1], e[:, 0]])), shape=(nW, nW)).tocsr(); deg = np.maximum(np.asarray(A.sum(1)).ravel(), 1)
+    dW = np.zeros((nW, 3)); dW[t.rep] = (P - t.basis)
+    seed = np.zeros(nW, bool); seed[np.unique(wf[fl0])] = True
+    cur = P
+    for rings in range(1, max_rings + 1):
+        S = seed.copy()
+        for _ in range(rings): S |= (A @ S.astype(float)) > 0
+        d = dW.copy(); idx = np.where(S)[0]
+        for _ in range(smooth_iters): d[idx] = (A @ d)[idx] / deg[idx, None]
+        cur = t.basis + d[t.rep]
+        if not count_flips(t, cur).any():
+            if verbose: print('repair_flips: %d flipped faces fixed with %d-ring patch (%d verts), max move %.2f mm' % (n0, rings, len(idx), np.abs(cur - P).max() * 1e3))
+            return cur, n0, 0
+    n1 = int(count_flips(t, cur).sum())
+    if verbose: print('repair_flips: %d -> %d flipped faces after %d rings' % (n0, n1, max_rings))
+    return cur, n0, n1
+
 def umeyama(src, dst, scale=True, w=None):
     w = np.ones(len(src)) if w is None else w
     w = w / w.sum()

@@ -63,6 +63,8 @@ for side in ('L', 'R'):   # eyes rigid
     ring = t.S('eyelid_ring_' + side).astype(int); m = d[ring].mean(0); dd = cKDTree(P1[ring]).query(P1)[0]; x = np.clip((dd - 0.006) / 0.010, 0, 1); w = (1 - x * x * (3 - 2 * x)) * ((P1[:, 0] > 0) == (side == 'L'))
     d = w[:, None] * m + (1 - w[:, None]) * d
 newP = P1 + d
+from fit_common import repair_flips
+newP, _f0, _f1 = repair_flips(t, newP); print('global flips before/after repair', _f0, _f1)
 def fn(P): tri = P[t.faces]; n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); return n / (np.linalg.norm(n, axis=1)[:, None] + 1e-30)
 flips = int(((fn(newP) * fn(t.basis)).sum(1) < 0).sum()); print('flips', flips)
 dB = newP - t.basis; nk = (t.keys + dB[None]).astype(np.float32); nk[0] = newP

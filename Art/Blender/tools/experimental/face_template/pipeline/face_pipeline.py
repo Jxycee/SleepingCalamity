@@ -142,6 +142,8 @@ def s_snap(c):
     c.py('r6_03_corr.py', F + '/wrap_r%s_basis.npy' % Q['tag'], F + '/lm_%s.json' % Q['tag'], F + '/_cam_%s.json' % Q['tag'], F + '/rn_%s.png' % Q['tag'], N['tag'],
          '--damp', N['damp'], '--snapmode', N['snapmode'], '--snapsmooth', N['snapsmooth'], expect='GATES PASS=True')
     c.render_lm(N['tag'])
+    if N.get('skull_width', True):   # generic skull-width match above the brows (the ratio fit does not see the dome); re-render afterwards
+        c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag'])
 
 def s_key_transfer(c):
     """Keys are delta-transferred inside r6_06/r6_03 (wrap_r<tag>_keys.npy); this stage proves them and records the jaw-key hinge rescale input (the rescale itself is applied in reseat)."""
@@ -192,7 +194,7 @@ STAGE_TABLE = [
  ('align',           s_align,           ['r6_01_blender.py', 'r2_02_landmarks.py', 'r2_03_align.py', 'r2_03b_crop.py', 'r2_03c_lmpairs.py', 'r2_04_sliders.py', 'r3_02_wrap.py', 'r4_02_global.py', 'r6_prep_render.py', 'r2_common.py', 'r3_common.py', 'r4_common.py', 'fit_checks.py'],
                      ['align', 'skull', 'render'], ['target/shape.glb', 'fit/tobin_head_template6.npz'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', 'fit/_cam_51.json', 'fit/rn_51.png'], 1, False),
  ('fit',             s_fit,             ['r6_06_sliderloop.py', 'r6_02_warp.py', 'fit_checks6.py', 'r6_metrics.py', 'r6_common.py'], ['fit', 'template'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', '@seed'], ['fit/wrap_ra6_basis.npy', 'fit/wrap_ra6_mesh.npz'], 35, False),
- ('snap',            s_snap,            ['r6_03_corr.py', 'r6_metrics.py'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
+ ('snap',            s_snap,            ['r6_03_corr.py', 'r6_04_skullw.py', 'r6_metrics.py'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
  ('key_transfer',    s_key_transfer,    [], ['snap'], ['fit/wrap_rh6_keys.npy', 'fit/wrap_rh6_basis.npy'], ['fit/key_transfer.json'], 0.1, False),
  ('reseat',          s_reseat,          ['c6_00_reseat.py', 'c6_00b_teeth_opt.py', 'c6_common.py'], ['switches', 'snap'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png'], ['bake/parts.npz', 'bake/reseat.json'], 14, False),
  ('texture',         s_texture,         ['c6_01_mapfit.py', 'c6_02_texture.py', 'c6_03_eyes.py'], ['iris_colour', 'snap'], ['bake/parts.npz', 'target/crop_src.png', 'target/landmarks.json'], ['bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], 1, False),

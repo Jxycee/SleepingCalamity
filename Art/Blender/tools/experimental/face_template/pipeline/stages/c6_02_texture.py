@@ -211,6 +211,9 @@ _okf = (valid & ~ndi.binary_dilation(brow_uv, iterations=4) & ~ndi.binary_dilati
 _lp, _dn = mblur(comb, _okf, 40.0)
 _wf = np.clip(_dn / 0.15, 0, 1) * w_low
 comb[..., 0] = comb[..., 0] - FLAT * (_lp[..., 0] - Lc[0]) * _wf
+# chroma too (generic): the large-scale a/b cast that survives the de-light polynomial (blush, shadow-side orange, one cheek redder than the other) is pulled toward the photo skin tone; fine detail stays
+FLATC = float(_os.environ.get('FLATC', '0.9'))
+for _k in (1, 2): comb[..., _k] = comb[..., _k] - FLATC * (_lp[..., _k] - Lc[_k]) * _wf
 # ---------------- lips: tinted Tobin lip texture matched to the photo lip colour (never the photo projection)
 tob_lip_mean = tl[lip].mean(0) if lip.any() else Lt
 shift = lip_lab_ph - tob_lip_mean
