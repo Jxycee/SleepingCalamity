@@ -17,4 +17,4 @@ TEX = REPO + 'Assets/_Project/Content/Characters/TobinBase/Textures/'
 GLB = REPO + 'Art/Source/MetaPerson/Tobin_Base_v2_sliders.glb'
 for p in (FIT, B4, O4): os.makedirs(p, exist_ok=True)
 from fit_common import Tpl, weld_faces, edges_of, umeyama, Surf, vertex_normals, p2s_stats
-FINAL_TAG = 'x'   # round-3 final wrap (fit4/wrap_r23_*)
+FINAL_TAG = 'a2'   # round-4 final wrap (fit4/wrap_ra2_*)

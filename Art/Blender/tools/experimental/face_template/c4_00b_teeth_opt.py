@@ -51,29 +51,35 @@ for tk in ('teethUpper', 'teethLower'):
 print('template', tpl); print('result (nominal reseat)', nom)
 res['template'] = tpl; res['nominal'] = nom
 if '--apply' in sys.argv:
+    # round 4: ONE similarity (uniform scale s >= 0.97, translation, small rotation) for both jaws together, so the teeth keep the template-relative size
     if not os.path.exists(NOMF): shutil.copy(B2 + 'parts.npz', NOMF)
-    hb, hk = hv['full_basis'].astype(float), hv['full_keys'].astype(float); fin = {}
-    rng = np.random.default_rng(0)
-    for tk in ('teethUpper', 'teethLower'):
-        tb = pp[f'full/{tk}/basis'].astype(float); tkeys = pp[f'full/{tk}/keys'].astype(float); c0 = tb.mean(0)
-        sub = np.arange(len(tb))
-        def mk(p):
-            sc3 = np.array(p[:3]); d = np.array(p[3:]) * 1e-3; return lambda X: c0 + sc3 * (X - c0) + d
-        def score(p):
-            h = mk(p); c = counts(hb, hk, h(tb), h(tkeys), names[tk], idx=sub)
-            return c['neutral'] + c['jaw0.5'] + 0.3 * np.abs(p[3:]).sum() + 20 * np.abs(np.array(p[:3]) - 1).sum()
-        p = np.array([1.0, 1.0, 1.0, 0, 0, 0]); best = score(p)
-        for sweep in range(3):
-            for i, st in enumerate((0.015, 0.015, 0.015, 0.6, 0.6, 0.6)):
-                for sgn in (-1, 1):
-                    for mult in (1, 2, 3, 4):
-                        q = p.copy(); q[i] += sgn * st * mult
-                        if np.abs(q[:3] - 1).max() > 0.12 or np.abs(q[3:]).max() > 4.0: continue
-                        sc = score(q)
-                        if sc < best: best, p = sc, q
-            print(tk, 'sweep', sweep, 'p', p.round(3), 'score', round(best, 1))
-        h = mk(p)
-        pp[f'full/{tk}/basis'] = h(tb).astype(np.float32); pp[f'full/{tk}/keys'] = h(tkeys).astype(np.float32)
-        fin[tk] = dict(scale_xyz=[float(v) for v in p[:3]], offset_mm=[float(v) for v in p[3:]], counts=counts(hb, hk, h(tb), h(tkeys), names[tk]))
+    hb, hk = hv['full_basis'].astype(float), hv['full_keys'].astype(float)
+    TK = ('teethUpper', 'teethLower'); tb = {k: pp[f'full/{k}/basis'].astype(float) for k in TK}; tkeys = {k: pp[f'full/{k}/keys'].astype(float) for k in TK}
+    c0 = np.concatenate([tb[k] for k in TK]).mean(0)
+    def rotm(r):
+        a, b, c = np.radians(r); Rx = np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]]); Ry = np.array([[np.cos(b), 0, np.sin(b)], [0, 1, 0], [-np.sin(b), 0, np.cos(b)]]); Rz = np.array([[np.cos(c), -np.sin(c), 0], [np.sin(c), np.cos(c), 0], [0, 0, 1]])
+        return Rz @ Ry @ Rx
+    def mk(p):
+        Rm = rotm(p[4:7]); d = np.array(p[1:4]) * 1e-3; return lambda X: c0 + p[0] * ((X - c0) @ Rm.T) + d
+    def tot(p):
+        h = mk(p); n = 0
+        for k in TK:
+            c = counts(hb, hk, h(tb[k]), h(tkeys[k]), names[k]); n += c['neutral'] + c['jaw0.5']
+        return n
+    def score(p): return tot(p) + 0.3 * np.abs(p[1:4]).sum() + 20 * abs(p[0] - 1) + 2 * np.abs(p[4:7]).sum() + (1e4 if p[0] < 0.97 else 0)
+    p = np.array([1.0, 0, 0, 0, 0, 0, 0]); best = score(p)
+    for sweep in range(3):
+        for i, st in enumerate((0.01, 0.5, 0.5, 0.5, 0.7, 0.7, 0.7)):
+            for sgn in (-1, 1):
+                for mult in (1, 2, 3, 4):
+                    q = p.copy(); q[i] += sgn * st * mult
+                    if q[0] < 0.97 or q[0] > 1.05 or np.abs(q[1:4]).max() > 3.0 or np.abs(q[4:7]).max() > 4.0: continue
+                    sc = score(q)
+                    if sc < best: best, p = sc, q
+        print('sweep', sweep, 'p', p.round(3), 'score', round(best, 1))
+    h = mk(p); fin = {'similarity': dict(scale=float(p[0]), offset_mm=[float(v) for v in p[1:4]], rot_deg=[float(v) for v in p[4:7]])}
+    for k in TK:
+        pp[f'full/{k}/basis'] = h(tb[k]).astype(np.float32); pp[f'full/{k}/keys'] = h(tkeys[k]).astype(np.float32)
+        fin[k] = counts(hb, hk, h(tb[k]), h(tkeys[k]), names[k])
     np.savez_compressed(B2 + 'parts.npz', **pp); res['final'] = fin; print('final', fin)
 json.dump(res, open(B2 + 'teeth_counts.json', 'w'), indent=1)
