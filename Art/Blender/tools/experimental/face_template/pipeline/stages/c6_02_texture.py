@@ -247,9 +247,9 @@ def tex_patch_lab(vert_xyz, r=14):
     # a face of that vertex -> its loop UV
     f = np.where((faces == v).any(1))[0][0]; k = int(np.where(faces[f] == v)[0][0]); u = uvl[f, k]
     px, py = int(u[0] * R), int((1 - u[1]) * R)
-    return Lab(res[py - r:py + r + 1, px - r:px + r + 1].astype(np.float32) / 255).reshape(-1, 3).mean(0), (px, py)
+    return np.median(Lab(res[py - r:py + r + 1, px - r:px + r + 1].astype(np.float32) / 255).reshape(-1, 3), 0), (px, py)   # median: stubble, a speck of highlight or a neighbouring UV island must not move the report
 def photo_patch_lab(p, r=12):
-    x, y = int(p[0]), int(p[1]); return lab_ph[y - r:y + r + 1, x - r:x + r + 1].reshape(-1, 3).mean(0)
+    x, y = int(p[0]), int(p[1]); return np.median(lab_ph[y - r:y + r + 1, x - r:x + r + 1].reshape(-1, 3), 0)
 al = json.load(open(FIT + 'align.json'))
 rep = {}
 tpl_b = t.basis

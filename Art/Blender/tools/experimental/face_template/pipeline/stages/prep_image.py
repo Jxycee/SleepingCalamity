@@ -64,6 +64,19 @@ if AUTO == 'landmarks' and 'dome' in E and P.get('skull_hull', True):
     if cn:
         hull = np.zeros_like(m); cv2.fillPoly(hull, [cv2.convexHull(np.vstack(cn))], 255); lim = np.zeros_like(m)
         cv2.ellipse(lim, (int(E['head'][0] - X0), int(E['head'][1] - Y0)), (int(E['head'][2] * 1.02), int(E['head'][3] * 1.02)), 0, 0, 360, 255, -1); hull[ye:] = 0; m = np.where((hull > 0) & (lim > 0), 255, m).astype(np.uint8)
+if AUTO == 'landmarks' and 'dome' in E and P.get('dome_fit', True):
+    # round, symmetric crown: the GrabCut / hull mask of a shaved head is skewed and pointed where scalp and background share a colour (char3: +15 px of shelf on one side, 15 px of scalp cut on the other).
+    # Robustly fit a symmetric super-ellipse |x-cx|^n/a^n + (yc-y)^n/b^n = 1 (centre column cx = cheek midpoint, free a, b, n in 2..3.6; soft-L1) to the mask contour above the ear line and use it as the mask there.
+    from scipy.optimize import least_squares
+    cxd, cyd, ad, bd = E['dome']; cxd -= X0; cyd -= Y0; ye2 = int(round(cyd - 0.15 * bd)); up = m.copy(); up[ye2:] = 0
+    cn2, _ = cv2.findContours(up, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if cn2:
+        pts = np.vstack(cn2)[:, 0, :].astype(float); pts = pts[(pts[:, 1] < ye2 - 3) & (pts[:, 1] > 2)]
+        def sef(q): a_, b_, n_ = q; u = np.abs(pts[:, 0] - cxd) / a_; v = np.clip(cyd - pts[:, 1], 0, None) / b_; return ((u ** n_ + v ** n_) ** (1 / n_) - 1) * 0.5 * (a_ + b_)
+        sol = least_squares(sef, [ad, bd, 2.6], bounds=([0.6 * ad, 0.6 * bd, 2.0], [1.4 * ad, 1.4 * bd, 3.6]), loss='soft_l1', f_scale=4.0)
+        a_, b_, n_ = sol.x; tt2 = np.linspace(0, np.pi, 180); xs2 = cxd + a_ * np.sign(np.cos(tt2)) * np.abs(np.cos(tt2)) ** (2 / n_); ys2 = cyd - b_ * np.abs(np.sin(tt2)) ** (2 / n_)
+        dm = np.zeros_like(m); cv2.fillPoly(dm, [np.round(np.c_[xs2, ys2]).astype(np.int32)], 255); dm[ye2:] = 0; m[:ye2] = dm[:ye2]
+        print('dome fit: a %.0f (prior %.0f) b %.0f (prior %.0f) n %.2f, top y %.0f' % (a_, ad, b_, bd, n_, cyd - b_ + Y0))
 cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE); m = np.zeros_like(m); cv2.drawContours(m, cnts, -1, 255, -1)
 m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
 cv2.imwrite(D + 'mask_raw.png', m)
