@@ -9,6 +9,8 @@
         "SleepingCalamity.Gameplay",
         "SleepingCalamity.Presentation",
         "SleepingCalamity.UI",
+        "Unity.DemoTeam.Hair.Runtime",
+        "Unity.DemoTeam.Hair.Editor",
         "SleepingCalamity.App",
         "Unity.Cinemachine",
         "Unity.Netcode.Runtime",
