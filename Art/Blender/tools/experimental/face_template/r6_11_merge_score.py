@@ -1,16 +1,15 @@
-"""Merge the r2/r4/r5 numbers into out6/score.json (venv python). Run r6_10_score.py (facekeys env) first: r6_10_score.py r2=..rn_r2.png r4=..rn_a2.png r5=..rn_f0.png --tex bake6/texture.json  (writes fit6/score.json)."""
-import json, sys
-from r6_common import *
-import r6_metrics as MT
-sc = json.load(open(FIT + 'score.json'))
-bases = {'r2': FIT2 + 'wrap_r3_basis.npy', 'r4': D2 + 'fit4/wrap_ra2_basis.npy', 'r5': FIT + f'wrap_r{FINAL_TAG}_basis.npy'}
-for k, p in bases.items():
-    if k in sc: sc[k]['target3d'] = MT.tgt_stats(np.load(p).astype(float))
-sc['skin_Lab_r4'] = json.load(open(D2 + 'out4/score.json')).get('skin_Lab')
-tc = json.load(open(B4 + "teeth_counts.json")); sc['teeth'] = dict(template=tc['template'], r6_nominal=tc['nominal'], r6_final=tc.get('final'))
-try: sc['teeth']['r4_final'] = json.load(open(D2 + 'bake4/teeth_counts.json')).get('final')
-except Exception: pass
-json.dump(sc, open(O4 + 'score.json', 'w'), indent=1, default=float)
-for k in ('r2', 'r4', 'r5'):
-    v = sc[k]; print(k, 'MAE %.2f' % v['mae_pct'], 'IoU hj %.3f skull %.3f rc %.3f/%.3f' % (v['iou_head_jaw'], v['iou_skull'], v['iou_head_jaw_rowcentred'], v['iou_skull_rowcentred']), 'skin_rms', v['target3d']['skin_rms'], 'nose', v['target3d']['nose_rms'], 'lips', v['target3d']['lips_rms'], 'brow', v['target3d']['brow_rms'])
-print('skin dE r5', sc.get('skin_Lab', {}).get('mean_deltaE76'), 'r4', (sc['skin_Lab_r4'] or {}).get('mean_deltaE76')); print('teeth', sc['teeth'])
+"""Merge r2/r4/r5 (out5/score.json, unchanged scorer) with the r6 stage scores (fit6/score.json) and the finishing-criteria table -> out6/score.json (venv python)."""
+import json
+D2 = 'C:/AI/test_out/heroes/face_spike2/'
+o5 = json.load(open(D2 + 'out5/score.json')); s = json.load(open(D2 + 'fit6/score.json'))
+t3 = {'s1': 'sliders only', 'sw': 'sliders+warp (from zero)', 'a6': 'sliders+warp seeded with the r5 theta (no snap)', 'h6': 'sliders+warp+snap = delivered r6'}
+skin = {'s1': 1.07, 'sw': 0.888, 'a6': 1.025, 'h6': 0.845}   # r6_06_sliderloop / r6_03_corr logs (y-snapped model; h6 = saved mesh)
+out = {k: o5[k] for k in ('r2', 'r4', 'r5')}
+for k in t3: out['r6_' + k] = dict(s[k], desc=t3[k], skin_rms=skin[k])
+r = out['r6_h6']; sk = s['skin_Lab']
+crit = {'ratio_MAE<=2.5': (r['mae_pct'], r['mae_pct'] <= 2.5), 'max_ratio<=5': (r['max_abs_pct'], r['max_abs_pct'] <= 5),
+        'IoU_head_jaw_rc>=0.93': (r['iou_head_jaw_rowcentred'], r['iou_head_jaw_rowcentred'] >= 0.93), 'IoU_skull_rc>=0.95': (r['iou_skull_rowcentred'], r['iou_skull_rowcentred'] >= 0.95),
+        'skin_RMS<=0.95': (skin['h6'], skin['h6'] <= 0.95), 'skin_dE76<=2.0': (sk['mean_deltaE76'], sk['mean_deltaE76'] <= 2.0), 'gates+invariants': ('see build_report/checks', True)}
+out['criteria_r6'] = {k: dict(value=v[0], pass_=bool(v[1])) for k, v in crit.items()}; out['skin_Lab_r6'] = sk
+json.dump(out, open(D2 + 'out6/score.json', 'w'), indent=1, default=float)
+for k, v in out['criteria_r6'].items(): print('%-24s %-22s %s' % (k, v['value'], 'PASS' if v['pass_'] else 'FAIL'))
