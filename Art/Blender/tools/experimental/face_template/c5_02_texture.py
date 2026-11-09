@@ -127,7 +127,8 @@ delit_lab[..., 0] = np.clip(delit_lab[..., 0], 8, 92)
 _hi = tone[0] + 7.0; _L = delit_lab[..., 0]; delit_lab[..., 0] = np.where(_L > _hi, _hi + 0.3 * (_L - _hi), _L)    # soft-compress specular highlights (chin, nose tip) out of the albedo
 # (d) brow unsharp on luminance in the brow mask (feathered)
 Lsrc = delit_lab[..., 0]; bm = cv2.GaussianBlur(ndi.binary_dilation(brow_ph, iterations=2).astype(np.float32), (0, 0), 2.0)
-Lsharp = Lsrc + 1.4 * (Lsrc - cv2.GaussianBlur(Lsrc.astype(np.float32), (0, 0), 2.2))
+BROW_SHARP = float(__import__('os').environ.get('BROW_SHARP', '0.5'))   # round 5: 1.4 -> 0.5 (brows read thicker and darker than the photo's thin straight brows)
+Lsharp = Lsrc + BROW_SHARP * (Lsrc - cv2.GaussianBlur(Lsrc.astype(np.float32), (0, 0), 2.2))
 delit_lab[..., 0] = Lsrc * (1 - bm) + np.clip(Lsharp, 6, 92) * bm
 Lc = tone.copy()
 # photo lip colour (mean Lab inside the lip polygon, eroded; undelit: the lips keep their own colour)
