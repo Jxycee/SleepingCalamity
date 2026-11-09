@@ -1,0 +1,23 @@
+{
+  "image": null, "name": null, "out_dir": null,
+  "prep": {"box": null, "ellipses": null, "border_top": 40, "side_cuts": [150, 650], "cut_rows": null, "shoulder_cols": null},
+  "hunyuan": {"seeds": [1, 2, 3], "steps": 30, "faces": 40000, "pinned_glb": null, "trellis_tex_fallback": false},
+  "iris_colour": "auto",
+  "template": {
+    "root": "C:/AI/test_out/heroes/face_spike",
+    "npz": "C:/AI/test_out/heroes/face_spike/template/tobin_head_template.npz",
+    "sliders_dir": "C:/AI/test_out/heroes/pipeline_data/sliders",
+    "data_dir": "C:/AI/test_out/heroes/pipeline_data",
+    "sliders_enabled": true
+  },
+  "align": {"lm_weight": 0.3, "zcut_offset": 0.045, "slider_lam": 0.001, "slider_zr": 4, "target_render_z": [-1.0, 0.98],
+            "wrap": {"pass2": "0.01,0.006", "prewarp": 80, "eyelm": 0}},
+  "skull": {"hmax": 20, "nowidth": true},
+  "render": {"z": [1.46, 1.92]},
+  "fit": {"tag": "a6", "seed_theta": "C:/AI/test_out/heroes/pipeline_data/warp_seed_default.json", "iters": 7, "tr": 0.2, "w3": 0.5, "skincap": 0.85, "wnose": 0.3, "wlips": 0.3, "wskin": 3, "sreg": 0.3, "remeasure": 1},
+  "snap": {"tag": "h6", "damp": 0, "snapmode": "n", "snapsmooth": 30},
+  "gates": {"note": "documentation only; the values live in stages/fit_checks6.py: lid penetration <= template+0.45 mm, blink mean gap <= template+0.5 mm, max gap <= template+0.5 mm, lip rings 0.7-1.4, 0 flips"},
+  "thresholds": {"ratio_mae_max": 2.5, "ratio_worst_max": 5, "iou_head_jaw_min": 0.93, "iou_skull_min": 0.95, "skin_rms_3d_max": 0.95, "skin_dE76_max": 2.0, "head_keys_min": 184},
+  "switches": {"teeth_opt": true, "render_sheet": true, "skip": {}},
+  "compare_to": null
+}
