@@ -68,3 +68,9 @@ The char3b after-render shows a rounded occiput and a clean outline from the ear
 - The radial sigma is wide at the back and floors at 0.015 H elsewhere; a "-1.2 sigma" there is still a 7-13 mm shortfall.
 - Silhouette anchors depend on a clean chin (menton); a beard or high collar in a photo can move H by a few percent (the 136 kept portraits were checked on contact sheets; beards were in about a third of the men).
 - One mesh render each; no soak over many heads. Tags are the runs' own final tags (h6).
+
+## Implemented (round 16): snap stage `stages/r6_16_skulldepth.py` (config `snap.skulldepth`)
+- Runs after the polish, before the symmetrize (`when: late`, default). `when: early` (before the refit/polish) was measured: the refit then lands in a different optimum (char4 ratio worst 3.4 -> 5.5, refit rejected twice), so late it is.
+- Back of skull: a **y-only** field (depth only, z and x untouched) toward the prior back-contour median (one-sided: fuller than median + 1 sigma is only pulled back to that), alpha 0.8, ears and face kept by `smoothstep(t, .55, .95)`, crown row and neck faded. The first version (sagittal radial field, `mode: radial`) also moved z and cost 2-3 % skull IoU on char2_zero/char4/char3b, so it is not the default.
+- Crown cap: y widening (up to 8 %, to dome_round >= -1.5 sigma) and x widening only when the front crown_taper is below -1.5 sigma (char3b only, 2 %); unconditional x widening pushed char2_zero / char4 crown_taper to +2.9 / +2.7.
+- The side joint distance is **report-only** (`out/score.json: side_profile`): the pinned front of the skull (theta 120-165) sits 1.5-2 sigma inside the SDXL median on all four heads, so joint 3.6-4.6 stays above the prior p95 (3.7) from back-of-skull work alone.

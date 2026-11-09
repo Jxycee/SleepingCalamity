@@ -156,6 +156,11 @@ def s_snap(c):
         c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag'])
         if N.get('skull_pass2', True):   # second pass on the re-rendered mesh: the first pass leaves a residual (its width / height measure moves with the change); runs before the refit so the ratio fit sees the final dome
             c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag'])
+    SD = N.get('skulldepth') or {}
+    def skulldepth(when):
+        if SD.get('enabled') and SD.get('when', 'late') == when:   # round 16: y-only back-of-skull field + crown-cap widening against the SDXL side-profile prior (r6_16)
+            c.py('r6_16_skulldepth.py', N['tag'], expect='SKULLDEPTH DONE'); c.render_lm(N['tag'])
+    skulldepth('early')   # 'early' = before the ratio re-fit / polish (they then re-fit from the warped skull; measured chaotic: a 5 mm change moved char4's re-fit to a worse optimum)
     R = N.get('refit') or {}
     if R.get('iters', 0) > 0:   # slider-only ratio re-fit on top of the snapped mesh; kept only if the score does not regress (r6_12_refit_accept)
         tg, ct = N['tag'], R.get('tag', 'g6'); c.env['SCP_LM_JIT'] = str(R.get('lm_jitter', 5))
@@ -173,6 +178,7 @@ def s_snap(c):
         c.mp('r6_10_score.py', 'base=%s/rn_%s.png' % (F, tg), 'cand=%s/rn_%s.png' % (F, pt))
         c.py('r6_12_refit_accept.py', tg, pt, '--label', 'polish', '--decision', 'polish_decision.json', '--iou_tol', Pl['iou_tol'], expect='REFIT DONE')
         if json.load(open(F + '/polish_decision.json'))['accepted']: c.render_lm(tg)
+    skulldepth('late')    # default: after the polish, before the symmetrize; y-only, so the front view (ratios, IoU) is untouched apart from the optional taper-gated x widening
     Sy = N.get('symmetrize') or {}
     if Sy.get('enabled'):   # round 14: mirror-symmetric displacement field (mean of the two halves, or the better half); judged like the polish (IoU / 3D skin / gates), ear L/R metric in fit/ear_metric.json
         tg, st_ = N['tag'], Sy.get('tag', 's6'); c.env['SCP_LM_JIT'] = '0'
@@ -246,13 +252,13 @@ STAGE_TABLE = [
  ('align',           s_align,           ['r6_01_blender.py', 'r2_02_landmarks.py', 'r2_03_align.py', 'r2_03b_crop.py', 'r2_03c_lmpairs.py', 'r2_04_sliders.py', 'r3_02_wrap.py', 'r4_02_global.py', 'r6_prep_render.py', 'r2_common.py', 'r3_common.py', 'r4_common.py', 'fit_checks.py'],
                      ['align', 'skull', 'render'], ['target/shape.glb', 'fit/tobin_head_template6.npz'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', 'fit/_cam_51.json', 'fit/rn_51.png'], 1, False),
  ('fit',             s_fit,             ['r6_06_sliderloop.py', 'r6_02_warp.py', 'fit_checks6.py', 'r6_metrics.py', 'r6_common.py', 'r6_01c_batch_lm.py', 'r6_01b_batch_blender.py'], ['fit', 'template'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', '@seed'], ['fit/wrap_ra6_basis.npy', 'fit/wrap_ra6_mesh.npz'], 35, False),
- ('snap',            s_snap,            ['r6_03_corr.py', 'r6_04_skullw.py', 'r6_metrics.py', 'r6_12_refit_accept.py', 'r6_06_sliderloop.py', 'r6_02_warp.py', 'r6_13_polish.py', 'r6_14_symmetrize.py'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
+ ('snap',            s_snap,            ['r6_03_corr.py', 'r6_04_skullw.py', 'r6_metrics.py', 'r6_12_refit_accept.py', 'r6_06_sliderloop.py', 'r6_02_warp.py', 'r6_13_polish.py', 'r6_14_symmetrize.py', 'r6_16_skulldepth.py', '../vision/side_prior.py', '../vision/side_prior.json'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
  ('key_transfer',    s_key_transfer,    [], ['snap'], ['fit/wrap_rh6_keys.npy', 'fit/wrap_rh6_basis.npy'], ['fit/key_transfer.json'], 0.1, False),
  ('reseat',          s_reseat,          ['c6_00_reseat.py', 'c6_00b_teeth_opt.py', 'c6_common.py'], ['switches', 'snap'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png'], ['bake/parts.npz', 'bake/reseat.json'], 14, False),
  ('texture',         s_texture,         ['c6_01_mapfit.py', 'c6_02_texture.py', 'c6_03_eyes.py'], ['iris_colour', 'snap'], ['bake/parts.npz', 'target/crop_src.png', 'target/landmarks.json'], ['bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], 1, False),
  ('skin_detail',     s_skin_detail,     ['../skin_detail/apply_skin_detail.py', '../skin_detail/synth.py', '../skin_detail/uvgeom.py'], ['skin_detail'], ['bake/Head_BaseColor_char.png', 'bake/texture.json'], ['out/skin_detail/report.json'], 0.5, True),
  ('build',           s_build,           ['c6_04_build.py'], ['snap', 'skin_detail'], ['bake/parts.npz', 'bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png', 'out/skin_detail/report.json'], ['out/char.blend', 'fit/build.log'], 1, False),
- ('score',           s_score,           ['r6_10_score.py', 'score_final.py'], ['thresholds', 'compare_to', 'snap', 'fit'], ['fit/rn_h6.png', 'fit/rn_a6.png', 'bake/texture.json', 'fit/build.log', 'fit/wrap_rh6_report.json'], ['out/score.json'], 0.5, False),
+ ('score',           s_score,           ['r6_10_score.py', 'score_final.py', 'r6_16_skulldepth.py'], ['thresholds', 'compare_to', 'snap', 'fit'], ['fit/rn_h6.png', 'fit/rn_a6.png', 'bake/texture.json', 'fit/build.log', 'fit/wrap_rh6_report.json'], ['out/score.json'], 0.5, False),
  ('sheet',           s_sheet,           ['c6_05_render.py', 'c6_06_compose.py', 'light_rig.py'], ['switches', 'name'], ['out/char.blend', 'out/score.json'], ['out/proof_sheet.png'] , 5, False),
 ]
 NAMES = [s[0] for s in STAGE_TABLE]

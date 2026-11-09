@@ -16,6 +16,7 @@
   "render": {"z": [1.46, 1.92]},
   "fit": {"tag": "a6", "seed_theta": null, "iters": 7, "tr": 0.2, "w3": 0.5, "skincap": 0.85, "wnose": 0.3, "wlips": 0.3, "wskin": 3, "sreg": 0.3, "remeasure": 1, "lm_jitter": 0},
   "snap": {"tag": "h6", "damp": 0, "snapmode": "n", "snapsmooth": 5, "skull_width": true, "refit": {"iters": 4, "tag": "g6", "lm_jitter": 5},
+           "skulldepth": {"enabled": true, "alpha": 0.8, "over_k": 1.0, "iters": 1, "cap_y": true, "cap_x": true, "cap_target_z": -1.5, "cap_max": 0.08, "cap_x_z": -1.5, "cap_max_x": 0.04, "max_mm": 22, "when": "late"},
            "polish": {"iters": 10, "tag": "p6", "sigma": 0.005, "maxmm": 3.0, "mu": 0.5, "skincap": 0.948, "iou_tol": 0.01, "jac": 2.0, "jacshrink": 0.5, "lipmm": 0.7}},
   "gates": {"note": "documentation only; the values live in stages/fit_checks6.py: lid penetration <= template+0.45 mm, blink mean gap <= template+0.5 mm, max gap <= template+0.5 mm, lip rings 0.7-1.4, 0 flips"},
   "thresholds": {"ratio_mae_max": 2.5, "ratio_worst_max": 5, "iou_head_jaw_min": 0.93, "iou_skull_min": 0.95, "head_aspect_err_max": 3.0, "skin_rms_3d_max": 0.95, "skin_dE76_max": 2.0, "head_keys_min": 184},
