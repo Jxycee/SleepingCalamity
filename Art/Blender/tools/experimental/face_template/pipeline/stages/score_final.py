@@ -19,6 +19,7 @@ sk = s.get('skin_Lab') or {}
 crit = {
  'ratio_mae_pct': (f['mae_pct'], th['ratio_mae_max'], '<='), 'ratio_worst_pct': (f['max_abs_pct'], th['ratio_worst_max'], '<='),
  'iou_head_jaw_rc': (f.get('iou_head_jaw_rowcentred_oval', f['iou_head_jaw_rowcentred']), th['iou_head_jaw_min'], '>='), 'iou_skull_rc': (f['iou_skull_rowcentred'], th['iou_skull_min'], '>='),
+ 'head_aspect_err_pct': (max(abs(f['head_aspect']['err_pct']), abs(f['head_aspect']['err_cheek_pct'])) if f.get('head_aspect') else None, th.get('head_aspect_err_max', 3.0), '<='),
  'skin_rms_3d_mm': (skin_rms, th['skin_rms_3d_max'], '<='), 'skin_dE76': (sk.get('mean_deltaE76'), th['skin_dE76_max'], '<='),
  'flips': (rep.get('flips'), 0, '<='), 'invariants_build_ok': (1 if inv_ok else 0, 1, '>='), 'head_keys': (keys, th.get('head_keys_min', 184), '>=')}
 out = dict(name=cfg['name'], final_tag=tag, final=f, ratio_jitter={k: f.get(k) for k in ('mae_nominal', 'mae_min', 'mae_max', 'max_abs_nominal', 'max_abs_min', 'max_abs_max', 'jitter_n', 'err_pct_median')}, fit_stage=s.get('fit'), skin_Lab=sk, skin_rms_3d_mm=skin_rms, teeth=teeth, head_keys=keys, invariants_ok=inv_ok, gates=chk,

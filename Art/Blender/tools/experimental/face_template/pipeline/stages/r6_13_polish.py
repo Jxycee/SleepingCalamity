@@ -17,7 +17,7 @@ _P_STAGES = _os.path.dirname(_os.path.abspath(__file__)).replace(chr(92), '/') +
 import sys, subprocess, json, time, shutil, argparse
 import numpy as np
 pre = argparse.ArgumentParser(); pre.add_argument('base'); pre.add_argument('cand'); pre.add_argument('--iters', type=int, default=10); pre.add_argument('--sigma', type=float, default=0.005)
-pre.add_argument('--mu', type=float, default=0.5); pre.add_argument('--maxmm', type=float, default=1.5); pre.add_argument('--skincap', type=float, default=0.94); pre.add_argument('--lam', type=float, default=1e-3); pre.add_argument('--minimax', type=float, default=0.0); pre.add_argument('--jac', type=float, default=0.0, help='detector-gain model: probe size in mm for a finite-difference Jacobian of the detector landmarks w.r.t. the mesh landmark displacement (0 = off, detector assumed to follow 1:1)'); pre.add_argument('--lipmm', type=float, default=0.0, help='bound (mm) for the lip landmarks (61, 291, 13, 0, 17) when > 0: the lip ring edge-ratio gate binds as soon as they move, so the larger bound is spent on nose / cheek / jaw / chin'); pre.add_argument('--jacshrink', type=float, default=0.5, help='weight of the off-diagonal Jacobian terms (probes are noisy)')
+pre.add_argument('--mu', type=float, default=0.5); pre.add_argument('--maxmm', type=float, default=1.5); pre.add_argument('--skincap', type=float, default=0.94); pre.add_argument('--lam', type=float, default=1e-3); pre.add_argument('--minimax', type=float, default=0.0); pre.add_argument('--jac', type=float, default=0.0, help='detector-gain model: probe size in mm for a finite-difference Jacobian of the detector landmarks w.r.t. the mesh landmark displacement (0 = off, detector assumed to follow 1:1)'); pre.add_argument('--lipmm', type=float, default=0.0, help='bound (mm) for the lip landmarks (61, 291, 13, 0, 17) when > 0: the lip ring edge-ratio gate binds as soon as they move, so the larger bound is spent on nose / cheek / jaw / chin'); pre.add_argument('--liptie', type=float, default=0.0, help='when > 0 the z displacement of the 5 lip landmarks is ONE shared variable (the mouth block moves rigidly in z, so the lip ring edge ratios stay put) bounded by this many mm; the x displacements keep the --lipmm bound'); pre.add_argument('--jacshrink', type=float, default=0.5, help='weight of the off-diagonal Jacobian terms (probes are noisy)')
 pa = pre.parse_args(); F_ = _P_FIT
 sys.argv = [sys.argv[0], F_ + f'wrap_r{pa.base}_basis.npy', F_ + f'lm_{pa.base}.json', F_ + f'_cam_{pa.base}.json', F_ + f'rn_{pa.base}.png', pa.cand]
 import r6_02_warp as W          # photo ratios, template landmark hits (geo), gates, flips, 3D metrics; its P0 is the base mesh
@@ -91,6 +91,13 @@ def plan(L, P):   # smallest landmark displacement (mm) that brings the 13 ratio
     if pa.lipmm > 0:
         for j, i in enumerate(MOVE):
             if i in (61, 291, 13, 0, 17): bd[j] = bd[n + j] = pa.lipmm
+    if pa.liptie > 0:      # reduced variables y: x_full = T @ y with the lip z entries sharing one variable
+        lz = [n + j for j, i in enumerate(MOVE) if i in (61, 291, 13, 0, 17)]; keep = [c for c in range(2 * n) if c not in lz[1:]]; T = np.zeros((2 * n, len(keep)))
+        for c, k in enumerate(keep): T[k, c] = 1.0
+        for k in lz[1:]: T[k, keep.index(lz[0])] = 1.0
+        bdy = np.array([pa.liptie if k == lz[0] else bd[k] for k in keep]); res_full = res
+        s = least_squares(lambda y: res_full(T @ y), np.zeros(len(keep)), bounds=(-bdy, bdy), diff_step=1e-3); xs = T @ s.x
+        return {i: (float(xs[j]), float(xs[n + j])) for j, i in enumerate(MOVE)}
     s = least_squares(res, np.zeros(2 * n), bounds=(-bd, bd), diff_step=1e-3)
     return {i: (float(s.x[j]), float(s.x[n + j])) for j, i in enumerate(MOVE)}
 def apply(P, delta, s):

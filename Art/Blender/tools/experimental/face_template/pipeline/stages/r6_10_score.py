@@ -78,9 +78,17 @@ for arg in [x for x in sys.argv[1:] if '=' in x and not x.startswith('--')]:
     for y0 in range(40, ychin, 60):
         A_ = w[y0:y0 + 60]; B_ = head[y0:y0 + 60]; xa = np.where(A_.any(0))[0]; xb = np.where(B_.any(0))[0]
         bands[y0] = dict(iou=round(float((A_ & B_).sum() / max((A_ | B_).sum(), 1)), 3), width_render=int(A_.sum(1).mean()), width_photo=int(B_.sum(1).mean()), left_dx=int(xa.min() - xb.min()) if len(xa) and len(xb) else None, right_dx=int(xa.max() - xb.max()) if len(xa) and len(xb) else None)
+    # head aspect (round 14): crown-to-chin height over dome width, both in the photo frame (render warped through M). Parts: crown->brow-line (skull), brow-line->chin (face). Dome width = mask extent 15 px above the brow line.
+    def _asp(mk, ych, Pm=None):
+        rows = np.where(mk.sum(1) >= 3)[0]; top = int(rows.min()); h = ych - top; yd = int(round(top + 0.55 * (ybrow - top))); xs = np.where(mk[yd])[0]; wd = float(xs.max() - xs.min()) if len(xs) else float('nan')   # dome width: mid-skull row (above the ears, whose height differs between photo and template)
+        cw = float(abs(Pm[454][0] - Pm[234][0])) if Pm is not None else float('nan')      # bizygomatic width from the landmarks (cheek width)
+        return dict(top=top, height=float(h), dome_width=wd, cheek_width=cw, aspect=float(h / wd), aspect_cheek=float(h / cw), skull_h=float(ybrow - top), face_h=float(ych - ybrow))
+    ya = _asp(head, int(round(ph[152][1])), ph); yr = _asp(w, int(round(PM[152][1])), PM)
+    asp = dict(photo=ya, render=yr, err_pct=100 * (yr['aspect'] / ya['aspect'] - 1), err_cheek_pct=100 * (yr['aspect_cheek'] / ya['aspect_cheek'] - 1), height_err_pct=100 * (yr['height'] / ya['height'] - 1), width_err_pct=100 * (yr['dome_width'] / ya['dome_width'] - 1), skull_h_err_pct=100 * (yr['skull_h'] / ya['skull_h'] - 1), face_h_err_pct=100 * (yr['face_h'] / ya['face_h'] - 1))
+    print('   head aspect (height / mid-skull width; cheek-width variant %+.1f%%): photo %.3f render %.3f err %+.1f%% (height %+.1f%%, dome width %+.1f%%, skull h %+.1f%%, face h %+.1f%%)' % (asp['err_cheek_pct'], ya['aspect'], yr['aspect'], asp['err_pct'], asp['height_err_pct'], asp['width_err_pct'], asp['skull_h_err_pct'], asp['face_h_err_pct']))
     mae_nom = float(np.mean(np.abs(list(err.values())))); worst_nom = float(np.max(np.abs(list(err.values()))))
     err_med = {k: float(np.median([e[k] for e in jerr])) for k in a}
-    out[lab_] = dict(bands=bands, ratios=b, err_pct=err, err_pct_median=err_med, mae_pct=float(np.median(jm)), max_abs_pct=float(np.median(jw)),
+    out[lab_] = dict(head_aspect=asp, bands=bands, ratios=b, err_pct=err, err_pct_median=err_med, mae_pct=float(np.median(jm)), max_abs_pct=float(np.median(jw)),
                      mae_nominal=mae_nom, max_abs_nominal=worst_nom, mae_min=float(min(jm)), mae_max=float(max(jm)), max_abs_min=float(min(jw)), max_abs_max=float(max(jw)), jitter_mae=jm, jitter_worst=jw, jitter_n=len(jm),
                      iou_head_jaw=iou(ychin), iou_skull=iou(ybrow - 20), iou_head_jaw_rowcentred=centred(ychin), iou_skull_rowcentred=centred(ybrow - 20),
                      iou_head_jaw_oval=iou(ychin, w_c, head_c), iou_head_jaw_rowcentred_oval=centred(ychin, w_c, head_c))

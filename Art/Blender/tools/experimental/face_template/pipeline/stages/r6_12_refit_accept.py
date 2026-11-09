@@ -13,7 +13,7 @@ from r6_common import *
 from fit_common import count_flips
 base, cand = sys.argv[1], sys.argv[2]
 _opt = lambda k, d: (sys.argv[sys.argv.index(k) + 1] if k in sys.argv else d)
-LABEL = _opt('--label', 'refit'); DECISION = _opt('--decision', 'refit_decision.json'); IOU_TOL = float(_opt('--iou_tol', '0.04'))      # the local landmark polish (r6_13) is judged with --label polish --decision polish_decision.json --iou_tol 0.01
+LABEL = _opt('--label', 'refit'); DECISION = _opt('--decision', 'refit_decision.json'); IOU_TOL = float(_opt('--iou_tol', '0.04')); KEY_MARGIN = float(_opt('--key_margin', '0.1'))   # symmetrize passes a negative margin: it may cost a little score (--key_margin -0.3) because it trades photo asymmetry for a symmetric head      # the local landmark polish (r6_13) is judged with --label polish --decision polish_decision.json --iou_tol 0.01
 s = json.load(open(FIT + 'score.json')); b, c = s['base'], s['cand']
 key = lambda v: v['mae_pct'] + v['max_abs_pct'] / 4 - 15 * (v['iou_head_jaw'] + v['iou_skull']) / 2   # 1 % of IoU is worth 0.15 ratio-%
 w = json.load(open(FIT + f'warp_{cand}.json')); gates_ok = bool(w.get('checks', {}).get('PASS'))
@@ -26,7 +26,7 @@ if fl:      # the slider-only candidate can leave a stray flipped face (char2: 1
         np.save(FIT + f'wrap_r{cand}_basis.npy', P2.astype(np.float32)); np.save(FIT + f'wrap_r{cand}_keys.npy', K); np.savez(FIT + f'wrap_r{cand}_mesh.npz', v=P2, f=t.faces); P = P2; fl = 0
 rb = json.load(open(FIT + f'wrap_r{base}_report.json')); sk_b = (rb.get('target') or {}).get('skin_rms'); sk_c = (w.get('target') or {}).get('skin_rms')
 sk_ok = sk_b is None or sk_c is None or sk_c <= max(sk_b * 1.03, 0.94)      # the 3D skin RMS must not worsen (a re-fit trades surface error for ratios otherwise)
-ok = sk_ok and (key(c) <= key(b) - 0.1) and (c['iou_head_jaw'] >= b['iou_head_jaw'] - IOU_TOL) and (c['iou_skull'] >= b['iou_skull'] - IOU_TOL) and gates_ok and fl == 0
+ok = sk_ok and (key(c) <= key(b) - KEY_MARGIN) and (c['iou_head_jaw'] >= b['iou_head_jaw'] - IOU_TOL) and (c['iou_skull'] >= b['iou_skull'] - IOU_TOL) and gates_ok and fl == 0
 dec = dict(accepted=bool(ok), base=dict(mae=b['mae_pct'], worst=b['max_abs_pct'], iou_hj=b['iou_head_jaw'], iou_sk=b['iou_skull'], key=key(b)), cand=dict(mae=c['mae_pct'], worst=c['max_abs_pct'], iou_hj=c['iou_head_jaw'], iou_sk=c['iou_skull'], key=key(c)), gates_ok=gates_ok, flips=fl, skin_rms=dict(base=sk_b, cand=sk_c, ok=bool(sk_ok)))
 json.dump(dec, open(FIT + DECISION, 'w'), indent=1)
 print('REFIT %s: base MAE %.2f worst %.2f IoU %.3f/%.3f | cand MAE %.2f worst %.2f IoU %.3f/%.3f | gates %s flips %d' % ('ACCEPTED' if ok else 'REJECTED (snapped mesh kept)', b['mae_pct'], b['max_abs_pct'], b['iou_head_jaw'], b['iou_skull'],

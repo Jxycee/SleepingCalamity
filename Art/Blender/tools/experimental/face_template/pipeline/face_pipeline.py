@@ -168,11 +168,18 @@ def s_snap(c):
     Pl = N.get('polish') or {}
     if Pl.get('iters', 0) > 0:   # local landmark polish (r6_13): closes the ratio residuals the global fit cannot reach, under the same 3D skin cap / gates; judged like the re-fit with a stricter IoU tolerance
         tg, pt = N['tag'], Pl.get('tag', 'p6'); c.env['SCP_LM_JIT'] = '5'
-        c.py('r6_13_polish.py', tg, pt, '--iters', Pl['iters'], '--sigma', Pl['sigma'], '--maxmm', Pl['maxmm'], '--mu', Pl['mu'], '--skincap', Pl['skincap'], *(['--jac', Pl['jac'], '--jacshrink', Pl.get('jacshrink', 0.5)] + (['--lipmm', Pl['lipmm']] if Pl.get('lipmm') else []) if Pl.get('jac', 0) else []), expect='POLISH DONE')
+        c.py('r6_13_polish.py', tg, pt, '--iters', Pl['iters'], '--sigma', Pl['sigma'], '--maxmm', Pl['maxmm'], '--mu', Pl['mu'], '--skincap', Pl['skincap'], *(['--jac', Pl['jac'], '--jacshrink', Pl.get('jacshrink', 0.5)] + (['--lipmm', Pl['lipmm']] if Pl.get('lipmm') else []) + (['--liptie', Pl['liptie']] if Pl.get('liptie') else []) if Pl.get('jac', 0) else []), expect='POLISH DONE')
         c.env['SCP_LM_JIT'] = '0'; c.render_lm(pt)
         c.mp('r6_10_score.py', 'base=%s/rn_%s.png' % (F, tg), 'cand=%s/rn_%s.png' % (F, pt))
         c.py('r6_12_refit_accept.py', tg, pt, '--label', 'polish', '--decision', 'polish_decision.json', '--iou_tol', Pl['iou_tol'], expect='REFIT DONE')
         if json.load(open(F + '/polish_decision.json'))['accepted']: c.render_lm(tg)
+    Sy = N.get('symmetrize') or {}
+    if Sy.get('enabled'):   # round 14: mirror-symmetric displacement field (mean of the two halves, or the better half); judged like the polish (IoU / 3D skin / gates), ear L/R metric in fit/ear_metric.json
+        tg, st_ = N['tag'], Sy.get('tag', 's6'); c.env['SCP_LM_JIT'] = '0'
+        c.py('r6_14_symmetrize.py', tg, st_, '--mode', Sy.get('mode', 'avg'), expect='SYMMETRIZE DONE'); c.render_lm(st_)
+        c.mp('r6_10_score.py', 'base=%s/rn_%s.png' % (F, tg), 'cand=%s/rn_%s.png' % (F, st_))
+        c.py('r6_12_refit_accept.py', tg, st_, '--label', 'symmetrize', '--decision', 'symmetrize_decision.json', '--iou_tol', Sy.get('iou_tol', 0.02), '--key_margin', Sy.get('key_margin', -0.3), expect='REFIT DONE')
+        if json.load(open(F + '/symmetrize_decision.json'))['accepted']: c.render_lm(tg)
 
 def s_key_transfer(c):
     """Keys are delta-transferred inside r6_06/r6_03 (wrap_r<tag>_keys.npy); this stage proves them and records the jaw-key hinge rescale input (the rescale itself is applied in reseat)."""
@@ -223,7 +230,7 @@ STAGE_TABLE = [
  ('align',           s_align,           ['r6_01_blender.py', 'r2_02_landmarks.py', 'r2_03_align.py', 'r2_03b_crop.py', 'r2_03c_lmpairs.py', 'r2_04_sliders.py', 'r3_02_wrap.py', 'r4_02_global.py', 'r6_prep_render.py', 'r2_common.py', 'r3_common.py', 'r4_common.py', 'fit_checks.py'],
                      ['align', 'skull', 'render'], ['target/shape.glb', 'fit/tobin_head_template6.npz'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', 'fit/_cam_51.json', 'fit/rn_51.png'], 1, False),
  ('fit',             s_fit,             ['r6_06_sliderloop.py', 'r6_02_warp.py', 'fit_checks6.py', 'r6_metrics.py', 'r6_common.py', 'r6_01c_batch_lm.py', 'r6_01b_batch_blender.py'], ['fit', 'template'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', '@seed'], ['fit/wrap_ra6_basis.npy', 'fit/wrap_ra6_mesh.npz'], 35, False),
- ('snap',            s_snap,            ['r6_03_corr.py', 'r6_04_skullw.py', 'r6_metrics.py', 'r6_12_refit_accept.py', 'r6_06_sliderloop.py', 'r6_02_warp.py', 'r6_13_polish.py'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
+ ('snap',            s_snap,            ['r6_03_corr.py', 'r6_04_skullw.py', 'r6_metrics.py', 'r6_12_refit_accept.py', 'r6_06_sliderloop.py', 'r6_02_warp.py', 'r6_13_polish.py', 'r6_14_symmetrize.py'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
  ('key_transfer',    s_key_transfer,    [], ['snap'], ['fit/wrap_rh6_keys.npy', 'fit/wrap_rh6_basis.npy'], ['fit/key_transfer.json'], 0.1, False),
  ('reseat',          s_reseat,          ['c6_00_reseat.py', 'c6_00b_teeth_opt.py', 'c6_common.py'], ['switches', 'snap'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png'], ['bake/parts.npz', 'bake/reseat.json'], 14, False),
  ('texture',         s_texture,         ['c6_01_mapfit.py', 'c6_02_texture.py', 'c6_03_eyes.py'], ['iris_colour', 'snap'], ['bake/parts.npz', 'target/crop_src.png', 'target/landmarks.json'], ['bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], 1, False),
