@@ -1,0 +1,56 @@
+{
+  "image": "C:/AI/test_out/heroes/face_spike2/target/cloud_src.webp",
+  "name": "cloud_hy",
+  "out_dir": "C:/AI/test_out/heroes/pipeline_runs/cloud_hy",
+  "prep": {
+    "box": [
+      60,
+      60,
+      730,
+      770
+    ],
+    "ellipses": {
+      "head": [
+        395,
+        400,
+        215,
+        300
+      ],
+      "face": [
+        395,
+        380,
+        150,
+        230
+      ],
+      "neck": [
+        430,
+        640,
+        130,
+        60
+      ]
+    },
+    "border_top": 40,
+    "side_cuts": [
+      150,
+      650
+    ],
+    "cut_rows": [
+      640,
+      560,
+      560
+    ],
+    "shoulder_cols": [
+      195,
+      545
+    ]
+  },
+  "hunyuan": {
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "pinned_glb": null
+  },
+  "iris_colour": "auto"
+}

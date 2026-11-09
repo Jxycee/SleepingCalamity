@@ -11,7 +11,7 @@ from mathutils.bvhtree import BVHTree
 D = _P_TPLROOT; D2 = _P_RUN; B2 = _P_BAKE; O2 = _P_OUT
 GLB = _P_REPO + 'Art/Source/MetaPerson/Tobin_Base_v2_sliders.glb'
 TEX = _P_REPO + 'Assets/_Project/Content/Characters/TobinBase/Textures/'
-TPL6 = D2 + 'fit6/tobin_head_template6.npz'
+TPL6 = _P_FIT + 'tobin_head_template6.npz'
 z = np.load(TPL6, allow_pickle=True)
 hv = np.load(B2 + 'head_variants.npz'); pp = np.load(B2 + 'parts.npz')
 bpy.ops.wm.read_factory_settings(use_empty=True)

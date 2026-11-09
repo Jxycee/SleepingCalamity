@@ -5,7 +5,7 @@ _P_TPLROOT = _os.environ['SCP_TPL_ROOT'].rstrip('/') + '/'; _P_TPL0 = _os.enviro
 _P_STAGES = _os.path.dirname(_os.path.abspath(__file__)).replace(chr(92), '/') + '/'; _P_REPO = _os.environ['SCP_REPO'].rstrip('/') + '/'; _P_GLB = _os.environ.get('SCP_TARGET_GLB', _P_TGT + 'shape.glb')
 import json
 from PIL import Image, ImageDraw, ImageFont
-D2 = _P_RUN; C = D2 + 'out6/cells/'; O = _P_OUT
+D2 = _P_RUN; C = _P_OUT + 'cells/'; O = _P_OUT
 rep = json.load(open(O + 'build_report.json'))
 try: F = ImageFont.truetype('arial.ttf', 26); Fs = ImageFont.truetype('arial.ttf', 20)
 except Exception: F = Fs = ImageFont.load_default()

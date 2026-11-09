@@ -14,7 +14,7 @@ teeth = rd(R + 'bake/teeth_counts.json'); build = ''
 try: build = open(R + 'fit/build.log', errors='ignore').read()
 except Exception: pass
 inv_ok = ('BUILD DONE' in build) and ('Traceback' not in build) and ('AssertionError' not in build)
-keys = int(re.findall(r'head keys (\d+)', build)[-1]) if re.findall(r'head keys (\d+)', build) else None
+_k = re.findall(r'INVARIANT \{"variant": "full", "part": "head".*?"nkeys": (\d+)', build); keys = int(_k[-1]) if _k else None
 sk = s.get('skin_Lab') or {}
 crit = {
  'ratio_mae_pct': (f['mae_pct'], th['ratio_mae_max'], '<='), 'ratio_worst_pct': (f['max_abs_pct'], th['ratio_worst_max'], '<='),

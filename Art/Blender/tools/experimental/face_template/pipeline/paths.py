@@ -16,7 +16,7 @@ import os, sys, json
 
 HERE = os.path.dirname(os.path.abspath(__file__)).replace('\\', '/')
 STAGES = HERE + '/stages'
-REPO = os.path.abspath(os.path.join(HERE, *(['..'] * 5))).replace('\\', '/')   # .../Art/Blender/tools/experimental/face_template/pipeline -> repo root
+REPO = os.path.abspath(os.path.join(HERE, *(['..'] * 6))).replace('\\', '/')   # .../Art/Blender/tools/experimental/face_template/pipeline -> repo root
 
 TOOLS = dict(
     blender='C:/Program Files/Blender Foundation/Blender 5.2/blender.exe',

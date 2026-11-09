@@ -42,7 +42,8 @@ class Ctx:
         r = subprocess.run(cmd, cwd=cwd, env=s.env, capture_output=True, text=True, encoding='utf-8', errors='replace')
         out = (r.stdout or '') + (r.stderr or '')
         with open(s.log, 'a', encoding='utf-8', errors='replace') as lf: lf.write(out + '\n[%.1fs exit %d]\n' % (time.time() - t0, r.returncode))
-        if r.returncode != 0 or 'Traceback (most recent call last)' in out and not name == 'tolerate':
+        own_tb = 'Traceback (most recent call last)' in out and any(('File' in l and 'pipeline' in l and 'stages' in l) for l in out.splitlines())   # Blender prints add-on import tracebacks at start-up (stablegen): ignore those
+        if r.returncode != 0 or own_tb or ('Traceback (most recent call last)' in out and not cmd[0].lower().endswith('blender.exe')):
             raise RuntimeError('command failed (%d): %s\n%s' % (r.returncode, ' '.join(cmd)[:200], out[-1500:]))
         if expect and expect not in out: raise RuntimeError('expected %r in output of %s\n%s' % (expect, ' '.join(cmd)[:200], out[-1500:]))
         return out
@@ -209,14 +210,14 @@ def stage_inputs(c, spec):
 def stage_outputs(c, spec):
     r = []
     for o in spec:
-        if o.endswith('proof_sheet.png'): o = 'out/proof_sheet.png' if c.cfg['switches']['render_sheet'] else 'out/score.json'
+        if o.endswith('proof_sheet.png'): o = ('out/%s_proof_sheet.png' % c.cfg['name']) if c.cfg['switches']['render_sheet'] else 'out/score.json'
         r.append(c.P.run + '/' + o)
     return r
 
 def stage_hash(c, row):
     name, fn, scripts, keys, ins, outs = row[:6]
     h = hashlib.sha1(name.encode())
-    for sname in scripts + ['paths.py']: h.update(fhash(os.path.join(STAGE_DIR, sname) if sname != 'paths.py' else os.path.join(HERE, 'paths.py')).encode())
+    for sname in scripts: h.update(fhash(os.path.join(STAGE_DIR, sname)).encode())
     h.update(json.dumps({k: c.cfg.get(k) for k in keys}, sort_keys=True, default=str).encode())
     for p in stage_inputs(c, ins): h.update(fhash(p).encode())
     return h.hexdigest()

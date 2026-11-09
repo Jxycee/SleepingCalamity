@@ -10,7 +10,7 @@ from mathutils.bvhtree import BVHTree
 D = _P_TPLROOT; D2 = _P_RUN; B2 = _P_BAKE; O2 = _P_OUT
 CELLS = O2 + 'cells/'; os.makedirs(CELLS, exist_ok=True)
 only_checks = 'only_checks' in sys.argv
-TPL6 = D2 + 'fit6/tobin_head_template6.npz'
+TPL6 = _P_FIT + 'tobin_head_template6.npz'
 z = np.load(TPL6, allow_pickle=True)
 bpy.ops.wm.open_mainfile(filepath=O2 + 'char.blend')
 sc = bpy.context.scene
