@@ -1,0 +1,8 @@
+{
+  "image": "C:/AI/test_out/heroes/pipeline_runs/char3/source.png",
+  "name": "char3",
+  "out_dir": "C:/AI/test_out/heroes/pipeline_runs/char3",
+  "hunyuan": {"seeds": [1, 2, 3]},
+  "align": {"soft_gate": true},
+  "iris_colour": "auto"
+}

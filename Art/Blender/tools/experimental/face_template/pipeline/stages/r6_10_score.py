@@ -36,6 +36,16 @@ for arg in [x for x in sys.argv[1:] if '=' in x and not x.startswith('--')]:
     lab_, p = arg.split('=', 1); P = get(p)
     if P is None: print(lab_, 'NO FACE'); continue
     b = Rt(P); err = {k: 100 * (b[k] / a[k] - 1) for k in a}
+    # detector-noise robustness: the same render re-framed by +-1 % scale / shift (5 framings incl. nominal); the ratios are scale/shift invariant, so the spread is pure detector noise.
+    # The reported (thresholded) ratio MAE / worst are the MEDIANS over the framings; nominal, min and max are kept alongside.
+    jit = [(1.0, 0, 0), (1.01, 0, 0), (0.99, 0, 0), (1.0, 0.01, -0.01), (1.0, -0.01, 0.01)]; jm = []; jw = []; jerr = []; src_ = cv2.imread(p); h0, w0 = src_.shape[:2]; bgc = tuple(int(x) for x in src_[2, 2])
+    for js, jx, jy in jit:
+        if (js, jx, jy) == (1.0, 0, 0): Pj = P
+        else:
+            Mj = np.float32([[js, 0, (1 - js) * w0 / 2 + jx * w0], [0, js, (1 - js) * h0 / 2 + jy * h0]]); tmp = p[:-4] + '_jit.png'
+            cv2.imwrite(tmp, cv2.warpAffine(src_, Mj, (w0, h0), flags=cv2.INTER_LANCZOS4, borderValue=bgc)); Pj = get(tmp)
+            if Pj is None: continue
+        bj = Rt(Pj); ej = {k: 100 * (bj[k] / a[k] - 1) for k in a}; jerr.append(ej); jm.append(float(np.mean(np.abs(list(ej.values()))))); jw.append(float(np.max(np.abs(list(ej.values())))))
     EC = [33, 263, 133, 362]
     M, _ = cv2.estimateAffinePartial2D(P[EC].astype(np.float32), ph[EC].astype(np.float32))
     img = cv2.imread(p); bg = img[2, 2].astype(int); m = (np.abs(img.astype(int) - bg).sum(2) > 25).astype(np.uint8)
@@ -56,11 +66,15 @@ for arg in [x for x in sys.argv[1:] if '=' in x and not x.startswith('--')]:
     for y0 in range(40, ychin, 60):
         A_ = w[y0:y0 + 60]; B_ = head[y0:y0 + 60]; xa = np.where(A_.any(0))[0]; xb = np.where(B_.any(0))[0]
         bands[y0] = dict(iou=round(float((A_ & B_).sum() / max((A_ | B_).sum(), 1)), 3), width_render=int(A_.sum(1).mean()), width_photo=int(B_.sum(1).mean()), left_dx=int(xa.min() - xb.min()) if len(xa) and len(xb) else None, right_dx=int(xa.max() - xb.max()) if len(xa) and len(xb) else None)
-    out[lab_] = dict(bands=bands, ratios=b, err_pct=err, mae_pct=float(np.mean(np.abs(list(err.values())))), max_abs_pct=float(np.max(np.abs(list(err.values())))),
+    mae_nom = float(np.mean(np.abs(list(err.values())))); worst_nom = float(np.max(np.abs(list(err.values()))))
+    err_med = {k: float(np.median([e[k] for e in jerr])) for k in a}
+    out[lab_] = dict(bands=bands, ratios=b, err_pct=err, err_pct_median=err_med, mae_pct=float(np.median(jm)), max_abs_pct=float(np.median(jw)),
+                     mae_nominal=mae_nom, max_abs_nominal=worst_nom, mae_min=float(min(jm)), mae_max=float(max(jm)), max_abs_min=float(min(jw)), max_abs_max=float(max(jw)), jitter_mae=jm, jitter_worst=jw, jitter_n=len(jm),
                      iou_head_jaw=iou(ychin), iou_skull=iou(ybrow - 20), iou_head_jaw_rowcentred=centred(ychin), iou_skull_rowcentred=centred(ybrow - 20))
-    print('%-8s ratio MAE %.2f%% max %.1f%% (%s) | silhouette IoU head+jaw %.3f skull %.3f (row-centred %.3f / %.3f)' % (lab_, out[lab_]['mae_pct'], out[lab_]['max_abs_pct'], max(err, key=lambda k: abs(err[k])), out[lab_]['iou_head_jaw'], out[lab_]['iou_skull'], out[lab_]['iou_head_jaw_rowcentred'], out[lab_]['iou_skull_rowcentred']))
+    print('   jitter x%d: MAE median %.2f (min %.2f max %.2f; nominal %.2f) | worst median %.2f (min %.2f max %.2f; nominal %.2f) | median err %s' % (len(jm), np.median(jm), min(jm), max(jm), mae_nom, np.median(jw), min(jw), max(jw), worst_nom, {k: round(v, 1) for k, v in err_med.items()}))
+    print('%-8s ratio MAE %.2f%% max %.1f%% (%s) | silhouette IoU head+jaw %.3f skull %.3f (row-centred %.3f / %.3f)' % (lab_, out[lab_]['mae_pct'], out[lab_]['max_abs_pct'], max(err_med, key=lambda k: abs(err_med[k])), out[lab_]['iou_head_jaw'], out[lab_]['iou_skull'], out[lab_]['iou_head_jaw_rowcentred'], out[lab_]['iou_skull_rowcentred']))
     print('   bands(y: iou, left_dx,right_dx px):', {k: (v['iou'], v['left_dx'], v['right_dx']) for k, v in bands.items()})
-    print('   worst:', ', '.join('%s %+.1f%%' % (k, err[k]) for k in sorted(err, key=lambda k: -abs(err[k]))[:4]))
+    print('   worst (median over framings):', ', '.join('%s %+.1f%%' % (k, err_med[k]) for k in sorted(err_med, key=lambda k: -abs(err_med[k]))[:4]))
 if '--tex' in sys.argv:
     tj = json.load(open(sys.argv[sys.argv.index('--tex') + 1])); tone = np.array(tj['photo_fit_mean_Lab']); rep = tj['skin_Lab_report']
     de = {k: float(np.linalg.norm(np.array(v['texture_Lab']) - tone)) for k, v in rep.items()}

@@ -14,7 +14,7 @@
             "wrap": {"pass2": "0.01,0.006", "prewarp": 80, "eyelm": 0}},
   "skull": {"hmax": 20, "nowidth": true},
   "render": {"z": [1.46, 1.92]},
-  "fit": {"tag": "a6", "seed_theta": null, "iters": 7, "tr": 0.2, "w3": 0.5, "skincap": 0.85, "wnose": 0.3, "wlips": 0.3, "wskin": 3, "sreg": 0.3, "remeasure": 1},
+  "fit": {"tag": "a6", "seed_theta": null, "iters": 7, "tr": 0.2, "w3": 0.5, "skincap": 0.85, "wnose": 0.3, "wlips": 0.3, "wskin": 3, "sreg": 0.3, "remeasure": 1, "lm_jitter": 0},
   "snap": {"tag": "h6", "damp": 0, "snapmode": "n", "snapsmooth": 30, "skull_width": true},
   "gates": {"note": "documentation only; the values live in stages/fit_checks6.py: lid penetration <= template+0.45 mm, blink mean gap <= template+0.5 mm, max gap <= template+0.5 mm, lip rings 0.7-1.4, 0 flips"},
   "thresholds": {"ratio_mae_max": 2.5, "ratio_worst_max": 5, "iou_head_jaw_min": 0.93, "iou_skull_min": 0.95, "skin_rms_3d_max": 0.95, "skin_dE76_max": 2.0, "head_keys_min": 184},

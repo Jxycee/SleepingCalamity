@@ -34,7 +34,7 @@ else:
         cols = []
         for c, ring in ((468, (469, 470, 471, 472)), (473, (474, 475, 476, 477))):
             r = np.mean([np.linalg.norm(lm[k] - lm[c]) for k in ring]); y_, x_ = np.mgrid[:ph.shape[0], :ph.shape[1]]
-            mm = (np.hypot(x_ - lm[c, 0], y_ - lm[c, 1]) < 0.85 * r) & (ph_hsv[..., 1] > 60) & (ph_hsv[..., 2] > 50); cols.append(ph_hsv[mm])
+            dd = np.hypot(x_ - lm[c, 0], y_ - lm[c, 1]); mm = (dd < 0.85 * r) & (dd > 0.30 * r) & (ph_hsv[..., 2] > 15) & (ph_hsv[..., 2] < 190); cols.append(ph_hsv[mm])   # annulus around the pupil, no specular highlights; dark brown irises have few saturated pixels (a saturated-only cut picked up blue book reflections on char3)
         print('auto iris: no cyan found, using saturated iris pixels', sum(len(x) for x in cols))
     cols = np.concatenate(cols); H_, S_, V_ = np.median(cols, 0); Vhi = np.percentile(cols[:, 2], 85)
 print('photo iris median HSV(cv)', H_, S_, V_, 'rgb', cv2.cvtColor(np.uint8([[[H_, S_, V_]]]), cv2.COLOR_HSV2RGB)[0, 0])

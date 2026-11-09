@@ -99,8 +99,17 @@ def s_target_3d(c):
             shutil.copy(cand[-1], out); open(out + '.key', 'w').write(key)
         c.bl('cloud_render_clay.py', out, T + '/glb/clay_s%s' % seed, 'clay', 'front')
     c.mp('target_pick.py', c.cfg['_cfg_path'])
-    if H.get('trellis_tex_fallback'):   # optional, untested here: texture for a visual check only; downstream stages use the shape
-        c.run([c.T['py'], 'C:/AI/scripts/run_tex_ext.py', T + '/shape.glb', T + '/cutout_rgba.png', 'pipe_%s_tex' % c.cfg['name']])
+    if H.get('trellis_tex_fallback'):   # optional: TRELLIS.2 texture on the chosen Hunyuan shape (port 8188, visual check only; downstream stages use the shape and project the photo themselves)
+        s_trellis_tex(c, T)
+
+def s_trellis_tex(c, T):
+    TI = 'C:/AI/trellis2/ComfyUI'; name = 'pipe_%s_tex' % c.cfg['name']; img = 'pipe_%s_cutout.png' % c.cfg['name']
+    if not port_up(8188): raise RuntimeError('trellis_tex_fallback needs the TRELLIS ComfyUI on port 8188 (start it first; the Hunyuan stage frees its models, not its process)')
+    shutil.copy(T + '/cutout_rgba.png', TI + '/input/' + img)       # run_tex_ext.py takes the image NAME inside the TRELLIS ComfyUI input dir
+    c.run([c.T['py'], 'C:/AI/scripts/run_tex_ext.py', T + '/shape.glb', img, name], expect='success')
+    cand = sorted(glob.glob(TI + '/output/%s*.glb' % name), key=os.path.getmtime)
+    if not cand: raise RuntimeError('no TRELLIS texture output %s*.glb' % name)
+    shutil.copy(cand[-1], T + '/shape_textured.glb')
 
 def s_photo_landmarks(c): c.mp('photo_landmarks.py')
 
@@ -131,6 +140,7 @@ def s_align(c):
 def s_fit(c):
     F, Q = c.P.fit, c.cfg['fit']
     cols = 'all' if c.cfg['template']['sliders_enabled'] else 'warp'
+    c.env['SCP_LM_JIT'] = str(Q.get('lm_jitter', 0))   # inherited by the batch landmark detector the loop calls
     c.py('r6_06_sliderloop.py', F + '/wrap_r51_basis.npy', F + '/lm_51.json', F + '/_cam_51.json', F + '/rn_51.png', Q['tag'], '--cols', cols, *(['--seed', Q['seed_theta']] if Q.get('seed_theta') else []),
          '--iters', Q['iters'], '--tr', Q['tr'], '--w3', Q['w3'], '--skincap', Q['skincap'], '--wnose', Q['wnose'], '--wlips', Q['wlips'], '--wskin', Q['wskin'],
          '--sreg', Q['sreg'], '--remeasure', Q['remeasure'])
@@ -193,12 +203,12 @@ STAGE_TABLE = [
  ('template_prep',   s_template_prep,   ['r6_00_make_template.py'], ['template'], [], ['fit/tobin_head_template6.npz'], 0.3, False),
  ('align',           s_align,           ['r6_01_blender.py', 'r2_02_landmarks.py', 'r2_03_align.py', 'r2_03b_crop.py', 'r2_03c_lmpairs.py', 'r2_04_sliders.py', 'r3_02_wrap.py', 'r4_02_global.py', 'r6_prep_render.py', 'r2_common.py', 'r3_common.py', 'r4_common.py', 'fit_checks.py'],
                      ['align', 'skull', 'render'], ['target/shape.glb', 'fit/tobin_head_template6.npz'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', 'fit/_cam_51.json', 'fit/rn_51.png'], 1, False),
- ('fit',             s_fit,             ['r6_06_sliderloop.py', 'r6_02_warp.py', 'fit_checks6.py', 'r6_metrics.py', 'r6_common.py'], ['fit', 'template'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', '@seed'], ['fit/wrap_ra6_basis.npy', 'fit/wrap_ra6_mesh.npz'], 35, False),
+ ('fit',             s_fit,             ['r6_06_sliderloop.py', 'r6_02_warp.py', 'fit_checks6.py', 'r6_metrics.py', 'r6_common.py', 'r6_01c_batch_lm.py', 'r6_01b_batch_blender.py'], ['fit', 'template'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', '@seed'], ['fit/wrap_ra6_basis.npy', 'fit/wrap_ra6_mesh.npz'], 35, False),
  ('snap',            s_snap,            ['r6_03_corr.py', 'r6_04_skullw.py', 'r6_metrics.py'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
  ('key_transfer',    s_key_transfer,    [], ['snap'], ['fit/wrap_rh6_keys.npy', 'fit/wrap_rh6_basis.npy'], ['fit/key_transfer.json'], 0.1, False),
  ('reseat',          s_reseat,          ['c6_00_reseat.py', 'c6_00b_teeth_opt.py', 'c6_common.py'], ['switches', 'snap'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png'], ['bake/parts.npz', 'bake/reseat.json'], 14, False),
  ('texture',         s_texture,         ['c6_01_mapfit.py', 'c6_02_texture.py', 'c6_03_eyes.py'], ['iris_colour', 'snap'], ['bake/parts.npz', 'target/crop_src.png', 'target/landmarks.json'], ['bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], 1, False),
- ('build',           s_build,           ['c6_04_build.py'], ['snap'], ['bake/parts.npz', 'bake/texture.json', 'bake/Head_BaseColor_char.png'], ['out/char.blend', 'fit/build.log'], 1, False),
+ ('build',           s_build,           ['c6_04_build.py'], ['snap'], ['bake/parts.npz', 'bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], ['out/char.blend', 'fit/build.log'], 1, False),
  ('score',           s_score,           ['r6_10_score.py', 'score_final.py'], ['thresholds', 'compare_to', 'snap', 'fit'], ['fit/rn_h6.png', 'fit/rn_a6.png', 'bake/texture.json', 'fit/build.log', 'fit/wrap_rh6_report.json'], ['out/score.json'], 0.5, False),
  ('sheet',           s_sheet,           ['c6_05_render.py', 'c6_06_compose.py'], ['switches', 'name'], ['out/char.blend', 'out/score.json'], ['out/proof_sheet.png'] , 5, False),
 ]

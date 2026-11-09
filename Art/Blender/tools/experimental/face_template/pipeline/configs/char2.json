@@ -2,8 +2,21 @@
   "image": "C:/AI/test_out/heroes/pipeline_runs/char2/source.png",
   "name": "char2",
   "out_dir": "C:/AI/test_out/heroes/pipeline_runs/char2",
-  "hunyuan": {"seeds": [1, 2, 3]},
-  "align": {"soft_gate": true},
-  "fit": {"seed_theta": "C:/AI/test_out/heroes/pipeline_data/warp_seed_default.json"},
-  "iris_colour": "auto"
+  "hunyuan": {
+    "seeds": [
+      1,
+      2,
+      3
+    ]
+  },
+  "align": {
+    "soft_gate": true
+  },
+  "fit": {
+    "seed_theta": "C:/AI/test_out/heroes/pipeline_data/warp_seed_default.json"
+  },
+  "iris_colour": "auto",
+  "prep": {
+    "auto_mode": "fractions"
+  }
 }

@@ -2,8 +2,17 @@
   "image": "C:/AI/test_out/heroes/pipeline_runs/char2/source.png",
   "name": "char2_zero",
   "out_dir": "C:/AI/test_out/heroes/pipeline_runs/char2_zero",
-  "hunyuan": {"pinned_glb": "C:/AI/test_out/heroes/pipeline_runs/char2/target/shape.glb"},
-  "align": {"soft_gate": true},
-  "fit": {"seed_theta": null},
-  "iris_colour": "auto"
+  "hunyuan": {
+    "pinned_glb": "C:/AI/test_out/heroes/pipeline_runs/char2/target/shape.glb"
+  },
+  "align": {
+    "soft_gate": true
+  },
+  "fit": {
+    "seed_theta": null
+  },
+  "iris_colour": "auto",
+  "prep": {
+    "auto_mode": "fractions"
+  }
 }
