@@ -1,7 +1,7 @@
 # STATUS: face-template-spike (branch claude/face-template-spike, from claude/pensive-clarke-e25tku)
 Updated 2026-11-08. Not merged; CURRENT.md untouched.
 
-State: DONE (spike). Sheet C:/AI/test_out/heroes/face_spike/out/face2_proof_sheet.png; doc section 8 written. Verdict: route sound, not yet tool-worthy (target quality, wrap weighting, texture). Unity gate not run.
+State: DONE round 2 (Cloud photo). Sheet face_spike2/out/cloud_proof_sheet.png; doc sections 8-9 written. Next if wanted: round 3 (cranium height, lip UV, skin tone, teeth test). Unity gate not run.
 Data (outside repo): C:/AI/test_out/heroes/face_spike/{template,target,fit,bake,out}
 Target: SDXL (Gemini not signed in) bald dark-skinned adult male, front only, Hunyuan 40k + TRELLIS tex (blotchy colours, no eye cavities).
 Fit (face-skin RMS/P95 mm): basis 2.05/4.47, sliders 1.90/4.18, wrap r3 0.91/1.60. Sliders add little; ICP+landmarks did most.
