@@ -309,3 +309,75 @@ Scripts `Art/Blender/tools/experimental/face_template/sl_*.py` (analyse `sl_01`,
 Eye_Size note: its vertical scale is kept at 4 % (x 22 %) because a vertical lid scale opens the blink gap (30 % scale = +2 mm, fails the 0.5 mm gate); lid opening stays with Eye_Up/Eye_Dn/EyeT_Up.
 
 **Integration design** (not applied): append the 28 keys after the 149 existing non-basis keys (head keys 178, indices 150-177) so sliders (1-83), ARKit (84-134), visemes (135-149) keep their indices; store as absolute coordinates `Basis + delta` like the others. Lashes, eyeballs and teeth need no keys (re-seated per character). Fit stage: bounded ridge (bvls) over the 83+28 slider columns (new columns are `new_sliders.npz['delta']`, metres), weights in [0,1] per key and one of each +/- pair; refit order: proportions first (Midface, LowerFace, Forehead, Eye_Spacing, Cheekbone), then wrap. Unity: `TobinBaseModelImporter` sets `importBlendShapes = true` with no key list; `TobinBaseImportTests` asserts `AvatarHead` shape count 149 (line 93) and must become 177 (the importer drops Basis). Other hardcoding is in the spike scripts only (`export_template.py`, `build_template.py`, `c*_04_build.py` carry the 150-key list). Unity has no fixed blend shape limit but each shape costs GPU/CPU memory (7321 x 3 floats x 28 = about 2.4 MB); I did not test the import.
+
+## 11. Round 3: closed-loop front-plane correction (2026-11-08)
+Data/sheets (not committed): `face_spike2\out3\` (`cloud3_proof_sheet.png`, `cloud3_closeups.png`, `cloud3_overlay.png`, `r2_vs_r3.png`, `score.json`, `cloud3.blend`), fit `fit3/`, texture `bake3/`. Scripts `r3_*.py`, `c3_*.py`.
+**What changed**: round-2 wrap plus neck pins (45 mm under the chin, harmonic band) and inner nostril/mouth/lip-patch vertices that follow the outer skin. Then a closed loop on the front plane (`r3_03_corr`): mediapipe on the front-ortho render against the photo (eye-aligned), per-landmark and photo-silhouette pairs, thin-plate field in (x, z), eyes rigid, faded under the chin. 5 passes (tags 32, 33, 34, 44, 45), gates passed every pass, 0 flips. New texture (Lab de-light, lip tint) and a winding-number teeth test.
+**Numbers** (`out3/score.json`, r2 -> r3): ratio MAE 6.82% -> 1.76% (worst brow_eye_gap +10.2%, lip thickness +3.6%); silhouette IoU head+jaw 0.800 -> 0.907, skull 0.711 -> 0.919 raw; row-centred, yaw-compensated 0.873/0.845 -> 0.940/0.994; skin dE76 2.8. Teeth outside count, upper neutral/jaw 0.5: 27/32 vs template 46/62.
+**What went wrong**: the metrics are the best of any round, but the head looked worse than round 2. The correction fits one front view only, so it pulls the geometry toward whatever the detector sees from that angle (overfit to the front view); depth, brow ridge and the 3D plausibility of the face are free to wander. Other open items: brow-eye gap stalled (the eye zone is rigid), ears Tobin-like, UV blotchiness at the valid/fill boundary.
+**Lesson**: a score computed on the same view the fit optimises says nothing about the face. Judge on the clay 3/4 and side views too, and keep a depth prior in the objective.
+
+## 12. Round 4: constrained correction (2026-11-08)
+Data: `out4\` (`cloud4_proof_sheet.png`, `cloud4_closeups.png`, `cloud4_overlay.png`, `r2_r3_r4.png`, `score.json`, `cloud4.blend`); scripts `r4_*.py`, `c4_*.py`, `env4.sh`.
+**What changed**: chain W1 (round-2 wrap with neck pins) -> `r4_02_global` (one smoothstep stretch of the skull, 20 mm above the brow line, 0 below it; tag 51) -> `r4_03_corr` tag a2: landmark pairs only (mouth, nose, chin, brow, eye-ring anchors), thin-plate smoothing 100, damping 0.6, cap 3 mm (5 mm for lips/nose/brow), field faded beyond 30 mm of the face, then the skin snapped back onto the Hunyuan target along its normal (not on nose/lips/brow), snap field smoothed. Also a slider-first fit and a single-similarity teeth fit (scale >= 0.97).
+**Numbers**: ratio MAE 4.91% (worst nose_to_mouth +16.4%, eye_to_nose_base -11.4%); IoU raw 0.873/0.875, row-centred 0.918/0.949; 3D skin RMS 0.943 mm (nose 2.52, lips 1.16, brow 0.78); skin dE76 1.66. Comparison fits in `score.json`: sliders only MAE 9.53% (worst 24.2%), sliders then wrap 5.89%, round-2 plus height stretch only 6.92%. Teeth outside (upper neutral/jaw 0.5, lower neutral/jaw 0.5): 60/66, 45/57 vs template 46/62, 11/32.
+**What worked**: the face reads natural again; the height stretch and the capped correction recover most of the skull gap; the snap keeps the surface on the target.
+**What broke or looked wrong**: the ratios are far worse than round 3 by construction (the price of not overfitting); nose_to_mouth +16%; teeth read small and comb-like at jawOpen/aa because the scale was pinned at 0.97; the forehead midline crease and ears are Tobin geometry.
+**Lesson**: constraints (caps, fading, a 3D snap) give a believable face but leave the proportions to a hand-set correction. Proportions need a fit with a few global parameters, not a free field.
+
+## 13. Round 5: 16-parameter global warp, detector in the loop (2026-11-08/09)
+Data: `out5\` (`cloud5_proof_sheet.png`, `cloud5_closeups.png`, `cloud5_overlay.png`, `r4_r5.png`, `score.json`, `cloud5.blend`); scripts `r5_*.py`, `c5_*.py`. `CHECKPOINT_r5.md` holds the stage-by-stage pipeline notes.
+**What changed**: base = tag 51. A 16-parameter warp (skull height; three vertical zone scales eye-nose, nose-mouth, mouth-chin; face and jaw width pushes; nose width and protrusion; lip vertical scale and outward push; brow lift; eye-zone uniform and vertical scale and zone shift; nose zone shift; mouth width), all windows and anchors taken from the template's own landmarks, so a character is 16 numbers. Fitting puts the detector in the loop (`r5_04_closedloop`): render theta and theta + delta_k (one Blender and one mediapipe session, about 8 s per iteration for 16 meshes), measured Jacobian, bounded linearised solve with exact 3D, gate and regulariser terms, hard gates by bisecting to the last feasible theta. Final chain (tag g0): closed-loop theta -> y-snap with a graph-smoothed field + deflip -> snap-only correction (no landmark field) -> reseat with the jaw keys rescaled by the hinge-arm ratio (upper lip to chin 0.756) so the mouth opens proportionally -> texture with an ear rule (ears always skin tone + Tobin detail, photo only inside the fitted skin support) and brow sharpen 1.4 -> 0.5.
+**Numbers** (r4 -> r5): ratio MAE 4.91% -> 3.65% (worst eye_to_nose_base -7.6, nose_width -7.0, face_width -5.6, lips -5.6); IoU raw 0.873/0.875 -> 0.870/0.895, row-centred 0.918/0.949 -> 0.896/0.914; 3D skin RMS 0.943 -> 0.933 mm (nose 2.48, lips 0.81, brow 0.50); skin dE76 1.66 -> 2.09; teeth outside 62/70 and 45/51. Gates pass, 0 flips. Fitted theta: skull_dz 2.83 mm, eye zone shift 2.76 mm, nose zone shift -1.53 mm, s_en +0.083, s_nm -0.13, s_mc -0.082, face-width push -0.17 mm, jaw push 0.57 mm.
+**What worked**: a purely geometric landmark model does not predict the detector (it predicted nose_to_mouth +0.5% and lips -1.5%; the render gave +9.0% and +8.3%), so measuring in the loop was the fix. Width pushes must be lateral (a proportional x-scale moves the eyes and cancels in the inter-ocular-normalised ratios). The mouth now opens proportionally and the ears are no longer grey.
+**What broke or limits it**: detector noise of 0.2-0.6 mm makes finite-difference Jacobians jumpy near the optimum (cost swung 250-340 between iterations), so about 3% ratio MAE is the floor of this method. Photo ratios and 3D skin RMS conflict: any mid-face z move costs target distance (s_en +0.1 took skin RMS 0.56 -> 1.20); the wrap puts the eyes about 5 mm lower than the Hunyuan target. Depth-only parameters (nose protrusion, lip push) cannot be fitted from a front view. Review found three bugs: the measured mesh must be the saved (y-snapped) mesh, gates must be hard, and the unsmoothed snap puts the target's fine bumps on forehead and cheek. Still weak visually: brows thick and dark, eyes small and round, a lower teeth row still visible, row-centred IoU below round 4.
+**Lesson**: few global parameters plus a measured loop converge; the remaining error is the detector and the 3D prior, not the optimiser.
+
+## 14. Round 6: 34 SC_ sliders as real keys, slider+warp loop (2026-11-09)
+Data: `out6\` (`cloud6_proof_sheet.png`, `cloud6_closeups.png`, `cloud6_overlay.png`, `r5_r6.png`, `score.json`, `cloud6.blend`); scripts `r6_*.py`, `c6_*.py`, `sl6_*.py`. Final tag h6.
+**What changed**: the 28 section-10 keys plus 6 new eye keys (SC_Eye_Almond, SC_Eye_Width, SC_UpperLid_Heavy, each with +/- twins) were appended after the 150 template keys, giving 184 head keys with existing indices unchanged; build invariants pass (7321 verts, 14212 faces, UVs equal, no NaN). Eye sliders verified: 0 flips, ring ratios <= 1.13, blink gap delta <= 0.5 mm (UpperLid_Heavy amplitude cut 1.4 -> 0.7 mm so both signs pass the blink gate). `r6_06_sliderloop` runs the same detector-in-the-loop solve over 16 warp parameters + 38 slider columns (Jacobian by rendering each column perturbed, 55 renders in about 14 s, Broyden updates, ridge per column). Gates relaxed: lid penetration template + 0.25 -> +0.45 mm and blink mean gap +0.3 -> +0.5 (the r5 base already sat at +0.2, so every eye slider was infeasible). Teeth fitted per jaw over four states (neutral, jawOpen 0.5, aa, oh): both scales 0.97, offsets <= 3 mm. Texture: brows thinned (dark mask eroded 30%, contrast x0.55 toward local skin), side-light flatten (FLAT 0.85, sigma 40 texels).
+**Numbers** (scored on the saved mesh):
+
+| stage | tag | ratio MAE % | worst ratio % | IoU hj/skull (row-centred) | 3D skin RMS mm (model) |
+|---|---|---|---|---|---|
+| r5 final | g0 | 3.65 | 7.6 | 0.896/0.914 | 0.933 |
+| sliders only | s1 | 4.75 | 15.0 | 0.923/0.965 | 1.07 |
+| sliders + warp from zero | sw | 4.41 | 13.8 | 0.903/0.924 | 0.888 |
+| sliders + warp seeded with the r5 theta, no snap | a6 | 3.51 | 6.8 | 0.916/0.961 | 1.025 |
+| + snap-only correction (delivered) | h6 | 3.70 | 8.8 | 0.889/0.899 | 0.845 |
+
+Delivered h6: skin dE76 1.76 (forehead 0.54, photo-left cheek 1.02, photo-right cheek 3.71, the photo's shadow side).
+**Finding: the sliders carry little.** In the seeded fit every slider value is small (max 0.06; for example SC_Midface_Height +0.06, SC_Nose_Width +0.02, SC_Eye_Almond +0.016, SC_UpperLid_Heavy +0.016). They added about 0.15% MAE on top of the r5 warp (loop-measured 3.22 -> 3.05). Sliders only (s1) use larger values (Nose_Up/Dn -0.33, SC_Nose_Width +0.33, SC_Midface +0.24) but cannot move the eye zone and stop at 4.5-4.75%. Every slider direction that helps a photo ratio costs distance to the Hunyuan target, and the snap stage then trades ratio for skin RMS again (a6 3.51% vs h6 3.70%). A zero seed lands at a diffuse 30-slider mix (4.3%); seeding from the previous best gave 3.05%. Solve time grows with the parameter count (gate checks run about 1600 times per solve, 3-5 min per iteration).
+**Lesson**: more degrees of freedom do not beat the information limit. The photo detector and the 3D prior disagree, and extra sliders only trade between them.
+
+## 15. State and next steps (2026-11-09)
+Rounds on the Cloud photo, scored against the same photo (`out*/score.json`):
+
+| metric | r2 | r4 | r5 | r6 (h6) |
+|---|---|---|---|---|
+| ratio MAE (11 ratios), % | 6.82 | 4.91 | 3.65 | 3.70 |
+| worst ratio, % | 17.1 | 16.4 | 7.6 | 8.8 |
+| IoU head+jaw / skull, raw | 0.800/0.711 | 0.873/0.875 | 0.870/0.895 | 0.861/0.876 |
+| IoU head+jaw / skull, row-centred | 0.873/0.845 | 0.918/0.949 | 0.896/0.914 | 0.889/0.899 |
+| 3D skin RMS, mm | 0.587 | 0.943 | 0.933 | 0.845 |
+| skin dE76 | not scored | 1.66 | 2.09 | 1.76 |
+
+Round 3 (MAE 1.76%, row-centred IoU 0.940/0.994) is left out of the table because it is the overfit round (section 11).
+
+**Finishing criteria against round 6** (`out6/score.json`, `criteria_r6`):
+
+| criterion | r6 | result |
+|---|---|---|
+| ratio MAE <= 2.5% | 3.70 | FAIL |
+| worst ratio <= 5% | 8.8 (eye_to_nose_base) | FAIL |
+| IoU head+jaw >= 0.93 (row-centred) | 0.889 | FAIL |
+| IoU skull >= 0.95 (row-centred) | 0.899 | FAIL |
+| 3D skin RMS <= 0.95 mm | 0.845 | PASS |
+| skin dE76 <= 2.0 | 1.76 | PASS |
+| gates (blink gap, lid penetration under the relaxed tolerance, lips, ring ratios 0.7-1.4, 0 flips) and invariants | pass | PASS |
+| visual review | eyes small and round, nose about 6% too narrow, teeth read as a comb, brow patch artefact, ears and forehead crease are Tobin's | not met |
+
+No single variant meets everything: a6 (no snap) gives MAE 3.51 and skull 0.961 but 3D RMS 1.025; h6 passes 3D RMS but loses the skull gain.
+**Noise floor**: detector noise of 0.2-0.6 mm limits the closed loop to roughly 3% ratio MAE, so the 2.5% target is below what this method resolves by itself.
+**Likely next levers**: (1) pixel- or edge-based refinement of the warp parameters (silhouette and edge maps instead of landmark ratios) to get under the detector noise; (2) eye geometry: the almond and heavy-lid keys exist but the fit uses 0.016 of them because the gates and the 3D target hold the eye zone, so the eye zone needs its own fit or a relaxed target there; (3) a better single-image 3D prior than one Hunyuan seed (the eyes sit about 5 mm lower than the target, and target and photo ratios disagree); (4) vectorise the gate checks before adding parameters; the teeth fit (about 12 min) is the slowest stage and wants a smaller grid.
+**Unity note**: `TobinBaseImportTests.cs` line 93 asserts 149 non-basis head keys. Appending the SC_ keys (34 in r6; 184 head keys including Basis) changes that count, so the test must be updated together with importing any head built from the 184-key template. Not run in Unity so far.
