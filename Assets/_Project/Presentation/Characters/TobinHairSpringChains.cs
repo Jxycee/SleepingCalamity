@@ -17,7 +17,7 @@ namespace SleepingCalamity.Presentation
         public Transform head;
         public int ChainCount => chains.Count;
         [Tooltip("Pull back toward the rigid pose, 1/s^2. Higher = stiffer hair.")]
-        public float stiffness = 1500f;
+        public float stiffness = 2400f;
         [Range(0.5f, 1f)] public float damping = 0.93f;
         public float gravity = 9.8f;
         [Range(1, 8)] public int substeps = 4;

@@ -32,7 +32,7 @@ kd.balance()
 d=np.array([kd.find(Vector(p))[2] for p in W])
 print('hair verts',len(W),'dist to head: pct',np.percentile(d,[5,25,50,75,95]).round(4),'max',d.max().round(3))
 # free amount: near the scalp rigid, far hangs free (smoothstep 0.6 cm -> 3.5 cm)
-t=np.clip((d-0.006)/0.029,0,1); f=t*t*(3-2*t)
+t=np.clip((d-float(kw.get("r0",0.014)))/float(kw.get("rw",0.040)),0,1); f=t*t*(3-2*t)
 rng=np.random.default_rng(3); cen=W[rng.choice(len(W),K,replace=False)].copy()
 for _ in range(25):
     lab=np.argmin(((W[:,None,:]-cen[None])**2).sum(2),1)
@@ -80,6 +80,29 @@ for vi in range(N):
         w=row[ti]*sc
         if w>0.004: ci,bi=divmod(ti,NB); vg[chains[ci]['k']][bi].add([vi],float(w),'REPLACE')
     headg.add([vi],float(headw),'REPLACE')
+
+# scalp cap: faces of the head under dense hair coverage, pushed out 2.5 mm, flat dark hair colour - hides the gaps behind sparse strips
+import bmesh
+from mathutils.kdtree import KDTree as _KD
+hkd=_KD(len(W))
+for i,p in enumerate(W): hkd.insert(Vector(p),i)
+hkd.balance()
+bmc=bmesh.new(); bmc.from_mesh(head.data); bmc.faces.ensure_lookup_table(); bmc.verts.ensure_lookup_table()
+def _ok(f):
+    c=f.calc_center_median(); front=(c.y<-0.03 and abs(c.x)<0.08)      # face area: only above the brow line; sides and back: above the ears
+    zmin=float(kw.get("capzf",1.795)) if front else float(kw.get("capzs",1.75))
+    return c.z>zmin and len(hkd.find_range(c,float(kw.get("capr",0.022))))>=int(kw.get("capn",16))
+keepf=[f for f in bmc.faces if _ok(f)]
+print("CAP faces",len(keepf),"of",len(bmc.faces))
+drop=[f for f in bmc.faces if f not in set(keepf)]
+bmesh.ops.delete(bmc,geom=drop,context="FACES")
+bmesh.ops.delete(bmc,geom=[v for v in bmc.verts if not v.link_faces],context="VERTS")
+bmc.normal_update()
+for v in bmc.verts: v.co=v.co+v.normal*float(kw.get("capmm",0.0025))
+cm=bpy.data.meshes.new("HairCap"); bmc.to_mesh(cm); bmc.free()
+capo=bpy.data.objects.new("Tobin_HairCap",cm); bpy.context.scene.collection.objects.link(capo)
+g=capo.vertex_groups.new(name="Head"); g.add(list(range(len(cm.vertices))),1.0,"REPLACE")
+mod2=capo.modifiers.new("Armature","ARMATURE"); mod2.object=arm; capo.parent=arm
 mod=hair.modifiers.new('Armature','ARMATURE'); mod.object=arm; hair.parent=arm
 # preview helpers: face rigidly on the Head bone (no neck deformation), body hidden
 for o in bpy.data.objects:
@@ -87,7 +110,7 @@ for o in bpy.data.objects:
         for m in list(o.modifiers): o.modifiers.remove(m)
         o.parent=arm; o.parent_type='BONE'; o.parent_bone='Head'
         o.matrix_parent_inverse=(arm.matrix_world@arm.data.bones['Head'].matrix_local@__import__('mathutils').Matrix.Translation((0,arm.data.bones['Head'].length,0))).inverted()   # bone parenting is relative to the bone TAIL
-    elif o.type=='MESH' and o.name!='Tobin_Hair': o.hide_render=True; o.hide_viewport=True
+    elif o.type=='MESH' and o.name not in ('Tobin_Hair','Tobin_HairCap'): o.hide_render=True; o.hide_viewport=True
 mp_arm.hide_render=True
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out,'Tobin_mp_hair.blend'))
 json.dump([dict(k=c['k'],bones=[f'hair_{c["k"]}_{i}' for i in range(NB)],pts_char=tochar(c['pts']).tolist()) for c in chains],open(os.path.join(out,'chains.json'),'w'))

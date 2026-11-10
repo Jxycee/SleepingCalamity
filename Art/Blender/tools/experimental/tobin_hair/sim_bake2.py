@@ -18,7 +18,7 @@ bpy.context.view_layer.update()
 hr=np.array(arm.pose.bones['Head'].matrix)           # head pose matrix at rest (armature space)
 hrest_inv=np.linalg.inv(hr)
 for c in C: c['loc']=(hrest_inv[:3,:3]@c['rest'].T).T+hrest_inv[:3,3]; c['p']=c['rest'].copy(); c['pp']=c['rest'].copy(); c['seglen']=np.linalg.norm(c['rest'][1:]-c['rest'][:-1],axis=1)
-GRAV=np.array([0,0,-9.8]); DAMP=0.93; STIFF=1500.0; DT=1/30; SUB=4
+GRAV=np.array([0,0,-9.8]); DAMP=0.93; STIFF=2400.0; DT=1/30; SUB=4
 def head_mat(fr):
     t=fr/NF; yaw=math.radians(32)*math.sin(2*math.pi*t*1.5); nod=math.radians(10)*math.sin(2*math.pi*t*3)
     head.rotation_euler=Euler((nod,yaw,0),'XYZ'); bpy.context.view_layer.update(); return np.array(head.matrix)
