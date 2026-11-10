@@ -74,7 +74,7 @@ namespace SleepingCalamity.EditorTools
                 log.AppendLine("chains " + chains.ChainCount + " skinned renderers " + hair.GetComponentsInChildren<SkinnedMeshRenderer>().Length + " hair bones " + hair.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("hair_")));
 
                 if (System.Environment.GetEnvironmentVariable("SC_NOSHAD") == "1") { foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None)) l.shadows = LightShadows.None; log.AppendLine("shadows off"); }
-                var cam = new GameObject("Cam").AddComponent<Camera>(); cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.72f, 0.76f, 0.80f); cam.fieldOfView = hq ? 9f : 14f; cam.nearClipPlane = 0.05f; cam.farClipPlane = 20f;
+                var cam = new GameObject("Cam").AddComponent<Camera>(); cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.72f, 0.76f, 0.80f); cam.fieldOfView = hq ? 9f : 14f; { var fv = System.Environment.GetEnvironmentVariable("SC_FOV"); if (!string.IsNullOrEmpty(fv)) cam.fieldOfView = float.Parse(fv, System.Globalization.CultureInfo.InvariantCulture); }   // SC_FOV widens the frame (taller hair) cam.nearClipPlane = 0.05f; cam.farClipPlane = 20f;
                 var rt = new RenderTexture(Size, Size, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = hq ? 8 : 1 }; cam.targetTexture = rt;
                 if (hq)
                 {

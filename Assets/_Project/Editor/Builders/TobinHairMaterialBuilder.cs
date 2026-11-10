@@ -1,5 +1,8 @@
-// URP Lit material for Tobin's mesh hair from the Tripo hair textures (HairMesh/Textures, 2K): base colour (sRGB), normal map, metallic (R) + smoothness (A) packed from glTF metal/rough.
-// Two-sided (hair strips are single sheets). Menu-free entry: unity.ps1 exec -Method SleepingCalamity.EditorTools.TobinHairMaterialBuilder.Build
+// URP Lit materials for Tobin's hair (HairMesh/Textures, 2K, written by Art/Blender/tools/experimental/tobin_hair/shell/hair_atlas2.py):
+//   Tobin_Hair       lock cards (Tobin_Hair renderer): alpha-cut strand atlas, single-sided (every card has a reversed twin, see build_shell_hair.py).
+//   Tobin_HairShell  the modelled hair shell lying on the skull (Tobin_HairShell renderer): opaque clump texture, single-sided closed slab.
+//   Tobin_HairCap    flat scalp colour, only for the older hair meshes that still carry a Tobin_HairCap object.
+// Menu-free entry: unity.ps1 exec -Method SleepingCalamity.EditorTools.TobinHairMaterialBuilder.Build
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -36,6 +39,21 @@ namespace SleepingCalamity.EditorTools
             EditorUtility.SetDirty(mat); return mat;
         }
 
+        public const string ShellPath = Folder + "/Materials/Tobin_HairShell.mat";
+        /// <summary>Opaque material for the modelled hair shell (clump strands along the hair flow, normal map, low smoothness).</summary>
+        public static Material BuildShell()
+        {
+            Import("Hair_Shell_BaseColor", srgb: true, normal: false); Import("Hair_Shell_Normal", srgb: false, normal: true); Import("Hair_Shell_MetallicSmooth", srgb: false, normal: false);
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(ShellPath);
+            if (mat == null) { mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "Tobin_HairShell" }; AssetDatabase.CreateAsset(mat, ShellPath); }
+            mat.shader = Shader.Find("Universal Render Pipeline/Lit");
+            mat.SetTexture("_BaseMap", Tex("Hair_Shell_BaseColor")); mat.SetColor("_BaseColor", Color.white);
+            mat.SetTexture("_BumpMap", Tex("Hair_Shell_Normal")); mat.EnableKeyword("_NORMALMAP"); mat.SetFloat("_BumpScale", 1f);
+            mat.SetTexture("_MetallicGlossMap", Tex("Hair_Shell_MetallicSmooth")); mat.EnableKeyword("_METALLICSPECGLOSSMAP"); mat.SetFloat("_Smoothness", 1f); mat.SetFloat("_Metallic", 1f);
+            mat.SetFloat("_Cull", 2f);
+            EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
+        }
+
         static Texture2D Tex(string n) => AssetDatabase.LoadAssetAtPath<Texture2D>(Folder + "/Textures/" + n + ".png");
 
         static void Import(string n, bool srgb, bool normal)
@@ -50,9 +68,9 @@ namespace SleepingCalamity.EditorTools
         /// <summary>Applies the hair material to every renderer under the instance; returns its name.</summary>
         public static string Apply(GameObject hair)
         {
-            var m = Build(); var cap = BuildCap();
-            foreach (var r in hair.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = r.name.Contains("HairCap") ? cap : m;
-            return m.name + "+" + cap.name;
+            var m = Build(); var cap = BuildCap(); var shell = BuildShell();
+            foreach (var r in hair.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = r.name.Contains("HairCap") ? cap : r.name.Contains("HairShell") ? shell : m;
+            return m.name + "+" + shell.name;
         }
     }
 }
