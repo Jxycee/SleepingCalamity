@@ -1,11 +1,12 @@
 # Mix two HairDeck hairstyles (cards_seed*.json, both in HairDeck's canonical head frame, so their cards combine directly).
-#   python hd_mix.py <A.json> <B.json> <out.json> --mode union|region [--root 0.012] [--tip 0.02] [--crown 0.455] [--drop i,j]
+#   python hd_mix.py <A.json> <B.json> <out.json> --mode union|region [--root 0.012] [--tip 0.02] [--crown 0.455] [--drop i,j] [--trim i:frac,...]
 # union : all of A, plus every B card with no A card whose root lies within --root and tip within --tip (HairDeck units; head ~0.10 wide).
 # region: top / crown / back cards from A, fringe and side cards from B (classified by where each card ends).
 import sys, json, argparse, numpy as np
 ap = argparse.ArgumentParser(); ap.add_argument('a'); ap.add_argument('b'); ap.add_argument('out'); ap.add_argument('--mode', default='union')
 ap.add_argument('--root', type=float, default=0.012); ap.add_argument('--tip', type=float, default=0.02); ap.add_argument('--crown', type=float, default=0.455)
 ap.add_argument('--drop', default='', help='comma-separated indices of the mixed list to remove (stray cards)')
+ap.add_argument('--trim', default='', help='i:frac,... shorten card i (index after --drop, = hd_strands cid) to frac of its arc length')
 a = ap.parse_args()
 A, B = json.load(open(a.a)), json.load(open(a.b))
 ends = lambda C: (np.array([np.array(c['seq'])[0, :3] for c in C]), np.array([np.array(c['seq'])[-1, :3] for c in C]))
@@ -21,4 +22,11 @@ else:   # by where each card ENDS (roots all sit near the crown): fringe = tip i
     print('MIX region: A top/crown/back %d + B fringe/sides %d -> %d cards' % ((~fa).sum(), fb.sum(), len(out)))
 if a.drop:
     dr = {int(i) for i in a.drop.split(',')}; out = [c for i, c in enumerate(out) if i not in dr]; print('DROP', sorted(dr), '->', len(out))
+if a.trim:
+    for it in a.trim.split(','):
+        i, fr = it.split(':'); i, fr = int(i), float(fr); S = np.array(out[i]['seq'], float)
+        d = np.r_[0, np.cumsum(np.linalg.norm(np.diff(S[:, :3], axis=0), axis=1))]; d /= d[-1]
+        n = max(4, int(round(len(S) * fr))); q = np.linspace(0, fr, n)
+        out[i] = dict(out[i], seq=np.stack([np.interp(q, d, S[:, k]) for k in range(S.shape[1])], 1).tolist())
+    print('TRIM', a.trim)
 json.dump(out, open(a.out, 'w'))

@@ -73,7 +73,9 @@ one image in, stylised hair cards out. Installed outside the repo at `C:/AI/hair
 5. Unity: `SC_HairCards.shader` (two-sided, gradient colour, Kajiya-Kay), material from `TobinHairMaterialBuilder.BuildCards`.
 
 Current build (user: "seed 1 and seed 0 would be a good mix"): `hairdeck/hd_mix.py run1/tobin_bust/cards_seed1.json run1/tobin_close/cards_seed0.json
-final.json --mode region --drop 85` = top / crown / back cards of bust seed 1 + fringe and side cards of close seed 0 (classified by where each
-card ends), minus one stray card that stuck out at the chin; fit `sx=0.85 sy=0.88 sz=1.08 dy=-0.004 dz=-0.015 lt=0.030 fs=0.024` (hd_opt with
+final.json --mode region --drop 85 --trim 85:0.6,103:0.6,105:0.6,115:0.65,91:0.7,107:0.7` = top / crown / back cards of bust seed 1 + fringe and side cards of close seed 0 (classified by where each
+card ends), minus one stray card that stuck out at the chin, with the six fringe cards over the right eye shortened (eyes show through the fringe like the reference); fit `sx=0.85 sy=0.88 sz=1.08 dy=-0.004 dz=-0.015 lt=0.030 fs=0.024` (hd_opt with
 the face-framing band, --w 0.45,0.3,0.15,0.1). 442 strands, 20.3k tris, 37 chains. hd_strands.py seeds its randomness per card, so mixing or
 dropping cards leaves every other card's strands unchanged.
+Strand texture: `hairdeck/hd_strand_tex.py <Hair_Strands.png>` (trellis venv) -> Content/Characters/TobinBase/HairMesh/Textures; SC_HairCards
+alpha-cuts the strand ribbons with it (cores stay solid), bends the normal around each hair and jitters the highlight per hair.
