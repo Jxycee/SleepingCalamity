@@ -1,0 +1,18 @@
+{
+  "image": "C:/AI/test_out/heroes/pipeline_runs/mv1/source.png",
+  "name": "mv1",
+  "out_dir": "C:/AI/test_out/heroes/pipeline_runs/mv1/run",
+  "hunyuan": {
+    "pinned_glb": "C:/AI/test_out/heroes/pipeline_runs/mv1/recon/shape_pin.glb"
+  },
+  "align": {
+    "soft_gate": true
+  },
+  "fit": {
+    "seed_theta": null
+  },
+  "iris_colour": "auto",
+  "prep": {
+    "auto_mode": "fractions"
+  }
+}
