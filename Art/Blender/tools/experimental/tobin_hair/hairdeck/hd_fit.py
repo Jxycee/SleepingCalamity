@@ -69,7 +69,7 @@ if kw.get('fit', 'ell') == 'ell':
         for lp in hair.data.loops: tv[lp.vertex_index] = uvd[lp.index].uv[1]
         for v in hair.data.vertices:
             dv = (v.co - Vector(cen)).normalized(); s_ = min(1.0, max(0.0, tv[v.index] / 0.45)); s_ = s_ * s_ * (3 - 2 * s_); up = max(0.0, dv.z)
-            v.co += dv * (LT * (0.35 + 0.65 * s_) * up ** 1.5 + FS * min(1.0, tv[v.index]) ** 1.5 * abs(dv.x) * (1 - up))
+            v.co += dv * (LT * (0.08 + 0.92 * s_) * up ** 1.5 + FS * min(1.0, tv[v.index]) ** 1.5 * abs(dv.x) * (1 - up))
         print('VOLUME lt %.4f fs %.4f' % (LT, FS))
 else:
     S = Vector((s * F('sx', 1), s * F('sy', 1), s * F('sz', 1))); D = Vector((0, F('dy', 0), F('dz', 0)))

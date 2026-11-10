@@ -12,7 +12,7 @@ sys.path.insert(0, 'C:/AI/hairdeck')
 from hairdeck.cards.frames import bishop, tangents   # noqa: E402
 ap = argparse.ArgumentParser(); ap.add_argument('cards'); ap.add_argument('out')
 ap.add_argument('--per', type=float, default=0.0062); ap.add_argument('--kmin', type=int, default=2); ap.add_argument('--kmax', type=int, default=5)
-ap.add_argument('--core', type=float, default=0.8); ap.add_argument('--seed', type=int, default=3)
+ap.add_argument('--core', type=float, default=0.8); ap.add_argument('--core_len', type=float, default=1.0); ap.add_argument('--seed', type=int, default=3)
 ap.add_argument('--side_ext', type=float, default=0.0, help='0..1: side cards in front of the ears hanging short of --ext_target grow toward it (face-framing locks)')
 ap.add_argument('--ext_target', type=float, default=0.345, help='HairDeck-frame height the face-framing locks grow toward (~jaw)')
 a = ap.parse_args()
@@ -59,9 +59,13 @@ for ci, c in enumerate(cards):
     Bn = np.cross(Nw, Tg); Bn /= np.linalg.norm(Bn, axis=1, keepdims=True) + 1e-12
     out = np.sign(((P - HEAD_C) * Bn).sum(1).mean()) or 1.0; Bn *= out                  # b points away from the head
     colq = lambda qq: np.stack([np.interp(qq, (np.arange(len(cols)) + 0.5) / len(cols), cols[:, k]) for k in range(3)], 1)
-    # core: narrower, darker, a little toward the head
-    taper = 1 - 0.85 * q ** 2.2
-    ribbon(P, Nw, Bn, W * a.core * taper, np.zeros(n), -0.45 * Tk, 2.0, 3.0, q, colq(q) * 0.85, nstr); nstr += 1   # core: u + 2 (SC_HairCards keeps it solid)
+    # core: narrower, darker, a little toward the head, core_len of the card (SC_HairCards alpha-cuts its outer part, so its tip breaks into
+    # hairs instead of ending as a solid dark shard; cutting the core short instead thinned the whole hairstyle)
+    nc = max(6, int(round(n * a.core_len))); Pc, Wc, Tc, qc = resample(P0, W0, T0, None, a.core_len, nc)
+    Tgc = tangents(Pc); Nc = bishop(S[0, 5:8], Tgc); Bc = np.cross(Nc, Tgc); Bc /= np.linalg.norm(Bc, axis=1, keepdims=True) + 1e-12
+    Bc *= np.sign(((Pc - HEAD_C) * Bc).sum(1).mean()) or 1.0
+    taper = 1 - 0.9 * (qc / a.core_len) ** 2.2
+    ribbon(Pc, Nc, Bc, Wc * a.core * taper, np.zeros(nc), -0.45 * Tc, 2.0, 3.0, qc, colq(qc) * 0.85, nstr); nstr += 1   # core: u + 2 (SC_HairCards keeps it solid)
     K = int(np.clip(round(W.mean() / a.per), a.kmin, a.kmax))
     jlong = int(np.argmin([abs(-0.5 + (j + 0.5) / K) for j in range(K)]))   # the centre strand keeps the card's full length (spiky outline)
     for j in range(K):

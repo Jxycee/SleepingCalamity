@@ -20,7 +20,7 @@ for k in range(a.variants):
     for j in order:
         x0 = (j + rng.uniform(0.1, 0.9)) / n * TW
         L = rng.uniform(0.62, 1.0) if rng.random() > 0.12 else rng.uniform(0.35, 0.62)        # where this hair ends (fraction of the card)
-        drift = rng.uniform(-0.06, 0.06) * TW; wav = rng.uniform(0.004, 0.012) * TW; ph = rng.uniform(0, 6.28); fq = rng.uniform(1.5, 4.0)
+        drift = rng.uniform(-0.03, 0.03) * TW; wav = rng.uniform(0.002, 0.006) * TW; ph = rng.uniform(0, 6.28); fq = rng.uniform(1.5, 4.0)   # small: cut ends read as straight hair
         xc = x0 + drift * t ** 1.6 + wav * np.sin(t * fq * 6.28 + ph)                         # centre line along the card
         w0 = rng.uniform(2.0, 3.4) * TW / a.strands / 4.2                                     # hair half-width at the root (px at 2x)
         b = rng.uniform(0.84, 1.12); idv = rng.random(); z = rng.random()

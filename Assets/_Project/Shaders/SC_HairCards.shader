@@ -70,7 +70,9 @@ Shader "SleepingCalamity/HairCards"
             float var = floor(Hash11(rnd * 97.0 + 3.0) * _StrandVariants * 0.9999);
             return SAMPLE_TEXTURE2D(_StrandTex, sampler_StrandTex, float2((var + uu) / _StrandVariants, saturate(ts) * 0.99 + 0.005));
         }
-        void StrandClip(float4 uv) { half core; half4 s = SampleStrand(uv.x, uv.w, uv.z, core); clip(core > 0.5h ? 1.0h : s.a - _AlphaCut); }
+        // core ribbons stay solid near the root and break into hairs toward their tip (a solid tip read as a dark shard)
+        half StrandAlpha(half4 s, half core, float ts) { return core > 0.5h ? lerp(1.0h, s.a, smoothstep(0.75, 1.0, ts)) : s.a; }
+        void StrandClip(float4 uv) { half core; half4 s = SampleStrand(uv.x, uv.w, uv.z, core); clip(StrandAlpha(s, core, uv.w) - _AlphaCut); }
         ENDHLSL
 
         Pass
@@ -120,7 +122,7 @@ Shader "SleepingCalamity/HairCards"
                 float3 T = normalize(i.hairWS);
                 float u = frac(i.uv.x), v = saturate(i.uv.y), cardRnd = i.uv.z;
                 half core; half4 st = SampleStrand(i.uv.x, i.uv.w, cardRnd, core);
-                clip(core > 0.5h ? 1.0h : st.a - _AlphaCut);
+                clip(StrandAlpha(st, core, i.uv.w) - _AlphaCut);
                 float3 X = normalize(cross(T, N));
                 N = normalize(N + X * (st.b - 0.5h) * 2.0h * _StrandBump);                                  // rounded hairs
                 half jit = (st.g - 0.5h) * _ShiftJitter;

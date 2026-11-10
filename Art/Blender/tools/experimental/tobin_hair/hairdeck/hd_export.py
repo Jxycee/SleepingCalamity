@@ -65,6 +65,7 @@ def scalp(f):   # under hair within 2.5 cm, and not the face below the hairline 
     c = f.calc_center_median()
     if c.y < -0.06 and c.z < 1.79: return False
     if c.z < 1.67: return False            # nape: strand ends would show the scalp layer as dark stripes
+    if c.z < 1.71 and (abs(c.x) > 0.04 or c.y > 0.02): return False   # back / sides: its edge showed as dark shards through gaps when the head turns
     return th.ray_cast(c + f.normal * 0.0005, f.normal, 0.025)[0] is not None
 keep = {f.index for f in bs.faces if scalp(f)}
 bmesh.ops.delete(bs, geom=[f for f in bs.faces if f.index not in keep], context='FACES')

@@ -2,7 +2,7 @@
 #   python hd_opt.py <head.npz> <strands.npz | dir of strands*.npz> <hull_dir> <out_dir> [--rounds 8] [--w 0.5,0.3,0.2[,frame]]
 # Same mapping as hd_fit.py (fit=ell): HairDeck frame -> Blender (x, -z, y) -> head-proxy ellipsoid onto the TobinBase cranium ellipsoid,
 # times per-axis multipliers sx sy sz and offsets dy dz; then the volume deformation (vol_deform, also in hd_fit.py):
-#   crown lift: radial push lt * (0.35 + 0.65 smoothstep(0, 0.45, t)) * max(0, d_z)^1.5      (t = card fraction root..tip, d = unit dir from skull centre)
+#   crown lift: radial push lt * (0.08 + 0.92 smoothstep(0, 0.45, t)) * max(0, d_z)^1.5      (t = card fraction root..tip, d = unit dir from skull centre)
 #   side flare: radial push fs * t^1.5 * |d_x| * (1 - max(0, d_z))
 # then a clearance push (2 mm above AvatarHead, nearest head vertex + its normal). Score = weighted IoU (front, side, back) from hd_sil.py.
 # A 4th weight scores the front face-framing band (hd_sil.py 'frame': cheek-length side locks). Coordinate descent over (sx, sy, sz, dy, dz, lt, fs); writes best.json, overlay_best.png and prints the trail.
@@ -23,7 +23,7 @@ def vol_deform(P, t, lt, fs, cen):
     d = P - cen; d /= np.linalg.norm(d, axis=1, keepdims=True) + 1e-9
     s = np.clip(t / 0.45, 0, 1); s = s * s * (3 - 2 * s)
     up = np.clip(d[:, 2], 0, 1)
-    amt = lt * (0.35 + 0.65 * s) * up ** 1.5 + fs * np.clip(t, 0, 1) ** 1.5 * np.abs(d[:, 0]) * (1 - up)
+    amt = lt * (0.08 + 0.92 * s) * up ** 1.5 + fs * np.clip(t, 0, 1) ** 1.5 * np.abs(d[:, 0]) * (1 - up)
     return P + d * amt[:, None]
 def build(V0, t, p):
     V = np.c_[V0[:, 0], -V0[:, 2], V0[:, 1]]
