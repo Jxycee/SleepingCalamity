@@ -22,6 +22,7 @@ TEX = kw.get('tex', 'C:/AI/test_out/heroes/tobin/hair_v8/tex2'); PREVIEW = kw.ge
 rng = np.random.default_rng(int(kw.get('seed', 7)))
 F = lambda k, d: float(kw.get(k, d))
 os.makedirs(OUT, exist_ok=True)
+GROOM = kw.get('groom', '0') == '1'   # groom -> baked cards (groom_cards.py): thin scalp layer, volume from layered cards
 CLMP = kw.get('clumps', '1') == '1'   # FF / KH style solid clump locks (default) vs alpha strand cards
 NDEF = lambda k, clump, card: int(kw.get(k, clump if CLMP else card))
 
@@ -86,11 +87,11 @@ for _ in range(int(kw.get('dil', 2))):
 renv = np.maximum(blur(r1, 10), rhit + 0.002)
 # thickness profile: elevation of the direction (thin low, thick on the crown)
 elev = np.arcsin(np.clip(D[..., 2], -1, 1))
-thk = F('t0', 0.006) + F('t1', 0.027 if CLMP else 0.032) * sstep(-0.35, 1.0, elev) + F('tback', 0.008) * np.exp(-((elev - 0.45) / 0.35) ** 2) * sstep(0.1, 0.6, D[..., 1])   # rounder crown / occiput bulge behind
+thk = F('t0', 0.003 if GROOM else 0.006) + F('t1', 0.006 if GROOM else (0.027 if CLMP else 0.032)) * sstep(-0.35, 1.0, elev) + F('tback', 0.0 if GROOM else 0.008) * np.exp(-((elev - 0.45) / 0.35) ** 2) * sstep(0.1, 0.6, D[..., 1])   # rounder crown / occiput bulge behind
 _phd = np.degrees(np.arctan2(D[..., 0], -D[..., 1])); _zap = C.z + D[..., 2] * 0.10
 _wfl = np.exp(-(_phd / 50.0) ** 2) * sstep(1.80, 1.765, _zap)   # front, below the hairline: the fringe lies close on the forehead
 thk = thk * (1.0 - 0.75 * _wfl) * (1.0 - 0.30 * np.exp(-(_phd / 40.0) ** 2) * sstep(0.85, 0.35, elev))   # less forward bulge over the brow (side-view visor)
-thk = thk + F('tcrown', 0.0) * sstep(0.75, 1.0, elev) + F('tpuff', 0.013) * np.exp(-((elev - 0.35) / 0.25) ** 2) * sstep(45, 75, np.abs(_phd)) * sstep(150, 120, np.abs(_phd))   # puff above the ears: widest at temple height
+thk = thk + F('tcrown', 0.0) * sstep(0.75, 1.0, elev) + F('tpuff', 0.0 if GROOM else 0.013) * np.exp(-((elev - 0.35) / 0.25) ** 2) * sstep(45, 75, np.abs(_phd)) * sstep(150, 120, np.abs(_phd))   # puff above the ears: widest at temple height
 renv = renv * (1 - _wfl) + (rhit + 0.0025) * _wfl   # thin where the shell runs down the forehead (fringe)
 P_f = C[:] + D * (renv + thk)[..., None]
 P_f = np.asarray(P_f)
@@ -463,8 +464,12 @@ def build_clumps():
     g = ob.vertex_groups.new(name='free')
     for i, w in enumerate(FREE): g.add([i], w, 'REPLACE')
     return ob
-CLUMPS = kw.get('clumps', '1') == '1'
-cards_ob = build_clumps() if CLUMPS else build_cards()
+CLUMPS = kw.get('clumps', '1') == '1' and not GROOM
+if GROOM:
+    exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'groom_cards.py')).read())   # defines build_groom()
+    cards_ob = build_groom()
+else:
+    cards_ob = build_clumps() if CLUMPS else build_cards()
 # hybrid (FF7R-like): thin alpha flyaway wisps over the solid clumps give the soft, wispy outline of the reference
 wisp_ob = None
 if CLUMPS and int(kw.get('n_wisp', 1)) > 0:
@@ -513,10 +518,10 @@ print('EARS side rays', _n, 'hit shell', _hs, 'hit shell or cards', _ha, 'miss z
 print('TRIS shell', sum(len(p.vertices) - 2 for p in shell.data.polygons), 'cards', sum(len(p.vertices) - 2 for p in cards_ob.data.polygons))
 
 # ---------------- 5. materials ----------------
-def mat(name, prefix, clip):
+def mat(name, prefix, clip, texdir=None):
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; b = nt.nodes['Principled BSDF']
     def img(n, cs):
-        t = nt.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(f'{TEX}/{prefix}_{n}.png'); t.image.colorspace_settings.name = cs; return t
+        t = nt.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(f'{texdir or TEX}/{prefix}_{n}.png'); t.image.colorspace_settings.name = cs; return t
     c = img('BaseColor', 'sRGB'); nt.links.new(c.outputs['Color'], b.inputs['Base Color'])
     nm = img('Normal', 'Non-Color'); nn = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(nm.outputs['Color'], nn.inputs['Color']); nt.links.new(nn.outputs['Normal'], b.inputs['Normal'])
     b.inputs['Roughness'].default_value = 0.55; b.inputs['Specular IOR Level'].default_value = 0.35
@@ -525,7 +530,7 @@ def mat(name, prefix, clip):
         nt.links.new(c.outputs['Alpha'], g.inputs[0]); nt.links.new(g.outputs[0], b.inputs['Alpha'])
     m.use_backface_culling = True
     return m
-shell.data.materials.append(mat('Tobin_HairShell', 'Hair_Shell', False)); cards_ob.data.materials.append(shell.data.materials[0] if CLUMPS else mat('Tobin_Hair', 'Hair_Cards', True))
+shell.data.materials.append(mat('Tobin_HairShell', 'Hair_Shell', False)); cards_ob.data.materials.append(shell.data.materials[0] if CLUMPS else mat('Tobin_Hair', 'Hair_Cards', True, texdir=GROOM_TEX if GROOM else None))
 if wisp_ob is not None:   # one hair object, two materials: solid clumps (shell material) + alpha wisps (card material)
     wisp_ob.data.materials.append(mat('Tobin_Hair', 'Hair_Cards', True))
     bpy.ops.object.select_all(action='DESELECT'); wisp_ob.select_set(True); cards_ob.select_set(True); bpy.context.view_layer.objects.active = cards_ob

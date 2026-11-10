@@ -68,7 +68,7 @@ namespace SleepingCalamity.EditorTools
                 var hairHead = hair.GetComponentsInChildren<Transform>(true).First(t => t.name == "Head");
                 log.AppendLine("realHead " + realHead.position.ToString("F3") + " hairHead " + hairHead.position.ToString("F3") + " delta mm " + ((realHead.position - hairHead.position).magnitude * 1000f).ToString("F2"));
                 hairHead.SetParent(realHead, true);
-                var chains = hair.AddComponent<TobinHairSpringChains>(); chains.head = realHead; chains.Rebuild();
+                var chains = hair.AddComponent<TobinHairSpringChains>(); chains.head = realHead; if (System.Environment.GetEnvironmentVariable("SC_HAIRSHADOW") == "1") chains.hairReceivesShadows = true; chains.Rebuild();   // SC_HAIRSHADOW=1: hair receives (self) shadows
                 string sw = System.Environment.GetEnvironmentVariable("SC_W"); if (!string.IsNullOrEmpty(sw)) chains.weight = float.Parse(sw, System.Globalization.CultureInfo.InvariantCulture);   // 0 = rigid hair test
                 string ss = System.Environment.GetEnvironmentVariable("SC_STIFF"); if (!string.IsNullOrEmpty(ss)) chains.stiffness = float.Parse(ss, System.Globalization.CultureInfo.InvariantCulture);
                 log.AppendLine("chains " + chains.ChainCount + " skinned renderers " + hair.GetComponentsInChildren<SkinnedMeshRenderer>().Length + " hair bones " + hair.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("hair_")));
