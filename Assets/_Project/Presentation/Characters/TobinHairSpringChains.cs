@@ -15,6 +15,7 @@ namespace SleepingCalamity.Presentation
     {
         [Tooltip("Head bone the chains hang from. Auto-found by name (\"Head\") if empty.")]
         public Transform head;
+        public int ChainCount => chains.Count;
         [Tooltip("Pull back toward the rigid pose, 1/s^2. Higher = stiffer hair.")]
         public float stiffness = 1500f;
         [Range(0.5f, 1f)] public float damping = 0.93f;
@@ -38,6 +39,9 @@ namespace SleepingCalamity.Presentation
 
         void Awake() { Build(); }
         void OnEnable() { if (chains.Count == 0) Build(); }
+
+        /// <summary>Re-reads the chain bones (call after re-parenting the hair rig).</summary>
+        public void Rebuild() { Build(); }
 
         void Build()
         {
@@ -79,10 +83,13 @@ namespace SleepingCalamity.Presentation
             return null;
         }
 
-        void LateUpdate()
+        void LateUpdate() { Simulate(Time.deltaTime); }
+
+        /// <summary>One simulation step (every LateUpdate; editor captures and tests call it with a fixed step).</summary>
+        public void Simulate(float deltaTime)
         {
             if (chains.Count == 0 || !head) return;
-            float dt = Mathf.Min(Time.deltaTime, 1f / 20f) / substeps; if (dt <= 0f) return;
+            float dt = Mathf.Min(deltaTime, 1f / 20f) / substeps; if (dt <= 0f) return;
             Vector3 g = Vector3.down * gravity;
             foreach (var c in chains)
             {
