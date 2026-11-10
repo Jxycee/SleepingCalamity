@@ -90,7 +90,7 @@ thk = F('t0', 0.006) + F('t1', 0.027 if CLMP else 0.032) * sstep(-0.35, 1.0, ele
 _phd = np.degrees(np.arctan2(D[..., 0], -D[..., 1])); _zap = C.z + D[..., 2] * 0.10
 _wfl = np.exp(-(_phd / 50.0) ** 2) * sstep(1.80, 1.765, _zap)   # front, below the hairline: the fringe lies close on the forehead
 thk = thk * (1.0 - 0.75 * _wfl) * (1.0 - 0.30 * np.exp(-(_phd / 40.0) ** 2) * sstep(0.85, 0.35, elev))   # less forward bulge over the brow (side-view visor)
-thk = thk + F('tcrown', 0.0) * sstep(0.75, 1.0, elev) + F('tpuff', 0.009) * np.exp(-((elev - 0.35) / 0.25) ** 2) * sstep(45, 75, np.abs(_phd)) * sstep(150, 120, np.abs(_phd))   # puff above the ears: widest at temple height
+thk = thk + F('tcrown', 0.0) * sstep(0.75, 1.0, elev) + F('tpuff', 0.013) * np.exp(-((elev - 0.35) / 0.25) ** 2) * sstep(45, 75, np.abs(_phd)) * sstep(150, 120, np.abs(_phd))   # puff above the ears: widest at temple height
 renv = renv * (1 - _wfl) + (rhit + 0.0025) * _wfl   # thin where the shell runs down the forehead (fringe)
 P_f = C[:] + D * (renv + thk)[..., None]
 P_f = np.asarray(P_f)
@@ -311,7 +311,7 @@ for k in range(NDEF('n_cover', 72, 200)):
     a_root = solve_a(ap, t0); ph = abs(float(phi_of(shell_at(a_root, 1.0)[0][None])[0]))
     ext = rng.uniform(0.004, 0.016) if (t1 >= 1.0 and ph > 45) else 0.0
     def st(s, p, d): return G * 6.0 + outward_xy(p) * 2.0
-    add(grow(ap, t0, t1, ext, rng.uniform(0.002, 0.005), st, tiplift=rng.uniform(0.003, F('tiplift', 0.006 if CLMP else 0.012)), arch=(rng.uniform(0.004, F('arch', 0.010)) if (CLMP and t0 < 0.45 and abs(float(wrap(ap - A_PART))) > 0.35) else 0.0)), rng.uniform(0.014, 0.024))   # top locks swoop up off the part
+    add(grow(ap, t0, t1, ext, rng.uniform(0.002, 0.005), st, tiplift=rng.uniform(0.003, F('tiplift', 0.006 if CLMP else 0.012)) * (2.2 if (CLMP and ph > 120) else 1.0), arch=(rng.uniform(0.004, F('arch', 0.010)) if (CLMP and t0 < 0.45 and abs(float(wrap(ap - A_PART))) > 0.35) else 0.0)), rng.uniform(0.014, 0.024))   # top locks swoop up off the part
 # B) side locks over the ears: hang to cheekbone / jaw, flared, tips a little inward at the very end
 for side in (-1, 1):
     for k in range(NDEF('n_side', 13, 32)):
@@ -324,7 +324,7 @@ for side in (-1, 1):
         add(grow(ap, t0, 1.0, ext, rng.uniform(0.003, 0.008), st, minc=0.006, tiplift=rng.uniform(0.0, 0.008)), rng.uniform(0.013, 0.024))
 # B2) flared side locks: stick out sideways at temple / cheek level, then droop (the spiky outline of the reference front view)
 for side in (-1, 1):
-    for k in range(NDEF('n_flare', 5, 10)):
+    for k in range(NDEF('n_flare', 8, 10)):
         ap = math.radians(side * rng.uniform(55, 115)); t0 = rng.uniform(0.55, 0.85); ext = rng.uniform(0.018, 0.04)
         def st(s, p, d): return outward_xy(p) * (12.0 if s < 0.5 else 2.0) + G * (4.0 if s < 0.5 else 12.0)
         add(grow(ap, t0, 1.0, ext, rng.uniform(0.004, 0.008), st, minc=0.007, tiplift=0.006), rng.uniform(0.010, 0.018))
@@ -337,7 +337,7 @@ for k in range(int(kw.get('n_cowlick', 3))):
 for k in range(NDEF('n_nape', 14, 30)):
     phn = rng.uniform(125, 235); ap = math.radians(phn); t0 = rng.uniform(0.5, 0.85)
     ext = (0.002 + 0.024 * math.cos(math.radians(phn - 180)) ** 4) * rng.uniform(0.5, 1.3) * (0.7 if CLMP else 1.0)   # V at the nape   # longest at the nape centre
-    fk = rng.uniform(2.0, 9.0)
+    fk = rng.uniform(5.0, 14.0) if CLMP else rng.uniform(2.0, 9.0)
     def st(s, p, d, fk=fk): return G * 5.0 + outward_xy(p) * (1.0 + fk * s)
     add(grow(ap, t0, 1.0, ext, rng.uniform(0.003, 0.007), st, minc=0.006), rng.uniform(0.013, 0.02))
 # D) fringe: roots right of the part, swept across the forehead to the character's right, tips about eye level
@@ -465,6 +465,30 @@ def build_clumps():
     return ob
 CLUMPS = kw.get('clumps', '1') == '1'
 cards_ob = build_clumps() if CLUMPS else build_cards()
+# hybrid (FF7R-like): thin alpha flyaway wisps over the solid clumps give the soft, wispy outline of the reference
+wisp_ob = None
+if CLUMPS and int(kw.get('n_wisp', 1)) > 0:
+    cards.clear()
+    def wadd(g, w): cards.append((np.asarray(g, float), w * F('wwide', 1.9), int(rng.integers(0, 8)), 1.0))
+    for k in range(int(kw.get('n_wtop', 20))):            # rising arcs off the top / part
+        ap = rng.uniform(-0.9, 1.3); t0 = rng.uniform(0.15, 0.5); up = rng.uniform(2.0, 5.0)
+        def st(s, p, d, up=up): return outward_xy(p) * 4.0 + np.array([0, 0, 1.0]) * up * (1 - s) + G * 6.0 * s
+        wadd(grow(ap, t0, t0 + 0.12, rng.uniform(0.05, 0.09), 0.006, st, minc=0.008, cs=0.006), rng.uniform(0.005, 0.010))
+    for side in (-1, 1):                                  # side flyaways sticking out of the silhouette
+        for k in range(int(kw.get('n_wside', 12))):
+            ap = math.radians(side * rng.uniform(55, 125)); t0 = rng.uniform(0.45, 0.8)
+            def st(s, p, d): return outward_xy(p) * 9.0 + G * (3.0 + 8.0 * s)
+            wadd(grow(ap, t0, 1.0, rng.uniform(0.03, 0.065), 0.006, st, minc=0.008, cs=0.006), rng.uniform(0.004, 0.009))
+    for k in range(int(kw.get('n_wfr', 9))):              # fringe strays
+        ap = rng.uniform(-0.2, A_PART + 0.3); t0 = rng.uniform(0.5, 0.72); tgt = np.array([-rng.uniform(0.2, 0.9), -0.3, -1.0]); tgt /= np.linalg.norm(tgt)
+        def st(s, p, d, tgt=tgt): return (tgt - d) * 40.0
+        wadd(grow(ap, t0, t0 + 0.05, rng.uniform(0.06, 0.1), 0.009, st, minc=0.008, cs=0.009, raw=True, zstop=rng.uniform(1.71, 1.75)), rng.uniform(0.004, 0.008))
+    for k in range(int(kw.get('n_wnape', 7))):            # nape flicks
+        ap = math.radians(rng.uniform(140, 220)); t0 = rng.uniform(0.6, 0.85)
+        def st(s, p, d): return G * 4.0 + outward_xy(p) * (2.0 + 9.0 * s)
+        wadd(grow(ap, t0, 1.0, rng.uniform(0.015, 0.03), 0.006, st, minc=0.008, cs=0.006), rng.uniform(0.004, 0.008))
+    wisp_ob = build_cards()
+    print('WISPS', len(cards))
 def audit(ob):
     sd = []
     for v in ob.data.vertices:
@@ -502,6 +526,10 @@ def mat(name, prefix, clip):
     m.use_backface_culling = True
     return m
 shell.data.materials.append(mat('Tobin_HairShell', 'Hair_Shell', False)); cards_ob.data.materials.append(shell.data.materials[0] if CLUMPS else mat('Tobin_Hair', 'Hair_Cards', True))
+if wisp_ob is not None:   # one hair object, two materials: solid clumps (shell material) + alpha wisps (card material)
+    wisp_ob.data.materials.append(mat('Tobin_Hair', 'Hair_Cards', True))
+    bpy.ops.object.select_all(action='DESELECT'); wisp_ob.select_set(True); cards_ob.select_set(True); bpy.context.view_layer.objects.active = cards_ob
+    bpy.ops.object.join()
 for o in bpy.data.objects:
     if o.type == 'MESH' and o.name not in ('Tobin_Hair', 'Tobin_HairClumps', 'Tobin_HairShell', 'AvatarHead', 'AvatarEyelashes', 'AvatarLeftEyeball', 'AvatarRightEyeball', 'AvatarTeethLower', 'AvatarTeethUpper', 'AvatarBody'):
         o.hide_render = True

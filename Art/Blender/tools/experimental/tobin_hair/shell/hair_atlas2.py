@@ -9,8 +9,8 @@ S = 2                      # supersample
 N = 2048 * S
 rng = np.random.default_rng(11)
 ROOT = np.array([44, 31, 23], np.float32)      # sRGB, dark root / gap
-MID = np.array([114, 84, 61], np.float32)      # chestnut
-HI = np.array([166, 132, 100], np.float32)      # warm highlight
+MID = np.array([124, 92, 67], np.float32)      # chestnut
+HI = np.array([178, 142, 108], np.float32)      # warm highlight
 LOCKS_PER_TILE = 4
 
 ROOTK = 0.62
