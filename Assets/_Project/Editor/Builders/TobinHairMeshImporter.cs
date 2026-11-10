@@ -7,7 +7,7 @@ namespace SleepingCalamity.EditorTools
     public sealed class TobinHairMeshImporter : AssetPostprocessor
     {
         public const string ModelPath = "Assets/_Project/Content/Characters/TobinBase/HairMesh/TobinHairMesh.fbx";
-        public override uint GetVersion() => 1;
+        public override uint GetVersion() => 2;
         void OnPreprocessModel()
         {
             if (assetPath != ModelPath) return;
@@ -16,6 +16,7 @@ namespace SleepingCalamity.EditorTools
             mi.useFileScale = false;
             mi.importBlendShapes = false; mi.importCameras = false; mi.importLights = false; mi.importAnimation = false;
             mi.isReadable = true;
+            mi.importNormals = ModelImporterNormals.Import; mi.importTangents = ModelImporterTangents.CalculateMikk;   // HairCards shader: card direction = bitangent of uv0 (v runs root to tip)
             mi.animationType = ModelImporterAnimationType.Generic;
         }
     }

@@ -1,7 +1,8 @@
 // URP Lit materials for Tobin's hair (HairMesh/Textures, 2K, written by Art/Blender/tools/experimental/tobin_hair/shell/hair_atlas2.py):
 //   Tobin_Hair       lock cards (Tobin_Hair renderer): alpha-cut strand atlas, single-sided (every card has a reversed twin, see build_shell_hair.py).
 //   Tobin_HairShell  the modelled hair shell lying on the skull (Tobin_HairShell renderer) and the solid clump locks (Tobin_HairClumps): opaque clump texture.
-//   Tobin_HairCap    flat scalp colour, only for the older hair meshes that still carry a Tobin_HairCap object.
+//   Tobin_HairCap    flat scalp colour (older meshes' Tobin_HairCap object; HairDeck hair's scalp layer, FBX material named *HairCap*).
+//   Tobin_HairCards  HairDeck hair cards (FBX material named *HairCards*): SleepingCalamity/HairCards, vertex colour + Kajiya-Kay, two-sided.
 // Menu-free entry: unity.ps1 exec -Method SleepingCalamity.EditorTools.TobinHairMaterialBuilder.Build
 using System.IO;
 using UnityEditor;
@@ -54,6 +55,18 @@ namespace SleepingCalamity.EditorTools
             EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
         }
 
+        public const string CardsPath = Folder + "/Materials/Tobin_HairCards.mat";
+        /// <summary>HairDeck cards: SC_HairCards.shader (colour from the mesh's vertex colours, strands and highlights procedural).</summary>
+        public static Material BuildCards()
+        {
+            var sh = Shader.Find("SleepingCalamity/HairCards");
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(CardsPath);
+            if (mat == null) { mat = new Material(sh) { name = "Tobin_HairCards" }; AssetDatabase.CreateAsset(mat, CardsPath); }
+            mat.shader = sh; mat.SetFloat("_Cull", 0f);
+            mat.SetColor("_BaseColor", new Color(1.75f, 1.65f, 1.45f, 1f));   // HairDeck samples a dark ash brown (sRGB ~0.34,0.28,0.24); the reference reads mid warm brown mat.SetFloat("_Ambient", 1.4f); mat.SetFloat("_ShadowStrength", 0.55f); mat.SetFloat("_ShadowNormalOffset", 0.008f);
+            EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
+        }
+
         static Texture2D Tex(string n) => AssetDatabase.LoadAssetAtPath<Texture2D>(Folder + "/Textures/" + n + ".png");
 
         static void Import(string n, bool srgb, bool normal)
@@ -68,7 +81,7 @@ namespace SleepingCalamity.EditorTools
         /// <summary>Applies the hair material to every renderer under the instance; returns its name.</summary>
         public static string Apply(GameObject hair)
         {
-            var m = Build(); var cap = BuildCap(); var shell = BuildShell(); string slots = "";
+            var m = Build(); var cap = BuildCap(); var shell = BuildShell(); var cards = BuildCards(); string slots = "";
             foreach (var r in hair.GetComponentsInChildren<Renderer>(true))
             {
                 var mats = r.sharedMaterials;
@@ -77,6 +90,9 @@ namespace SleepingCalamity.EditorTools
                     for (int i = 0; i < mats.Length; i++) { slots += r.name + "[" + i + "]=" + (mats[i] ? mats[i].name : "null") + " "; mats[i] = mats[i] != null && mats[i].name.Contains("HairShell") ? shell : m; }
                     r.sharedMaterials = mats; continue;
                 }
+                string mn = r.sharedMaterial != null ? r.sharedMaterial.name : "";
+                if (mn.Contains("HairCards")) { r.sharedMaterial = cards; slots += r.name + "=cards "; continue; }   // HairDeck hair (hd_export.py names the materials)
+                if (mn.Contains("HairCap")) { r.sharedMaterial = cap; slots += r.name + "=cap "; continue; }
                 r.sharedMaterial = r.name.Contains("HairCap") ? cap : (r.name.Contains("HairShell") || r.name.Contains("HairClumps")) ? shell : m;   // solid clump locks share the opaque shell material
             }
             return m.name + "+" + shell.name + " " + slots;
