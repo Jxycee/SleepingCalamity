@@ -12,7 +12,10 @@ sys.path.insert(0, 'C:/AI/hairdeck')
 from hairdeck.cards.frames import bishop, tangents   # noqa: E402
 ap = argparse.ArgumentParser(); ap.add_argument('cards'); ap.add_argument('out')
 ap.add_argument('--per', type=float, default=0.0062); ap.add_argument('--kmin', type=int, default=2); ap.add_argument('--kmax', type=int, default=5)
-ap.add_argument('--core', type=float, default=0.8); ap.add_argument('--seed', type=int, default=3); a = ap.parse_args()
+ap.add_argument('--core', type=float, default=0.8); ap.add_argument('--seed', type=int, default=3)
+ap.add_argument('--side_ext', type=float, default=0.0, help='0..1: side cards in front of the ears hanging short of --ext_target grow toward it (face-framing locks)')
+ap.add_argument('--ext_target', type=float, default=0.345, help='HairDeck-frame height the face-framing locks grow toward (~jaw)')
+a = ap.parse_args()
 rng = np.random.default_rng(a.seed); HEAD_C = np.array([0.0, 0.422, 0.0])        # HairDeck head-proxy centre
 cards = json.load(open(a.cards)); V, F, UV, COL, SID = [], [], [], [], []
 def resample(P, W, Tk, C, s, n):
@@ -30,10 +33,23 @@ def ribbon(P, N, B, w, off_n, off_b, u0, u1, vv, col, sid):
     for i in range(len(P) - 1):
         k = base + 2 * i; f += [[k, k + 1, k + 3], [k, k + 3, k + 2]]
     V.append(vs); UV.append(uv); COL.append(cs); F.append(np.array(f)); SID.append(np.full(len(vs), sid))
-nstr = 0
+nstr = 0; nlong = 0
 for ci, c in enumerate(cards):
     S = np.array(c['seq'], float); P0, W0, T0 = S[:, :3], S[:, 3], S[:, 4]
     if len(P0) < 3: continue
+    if a.side_ext > 0:   # face-framing locks: tip at the side (|x| > 0.04 HairDeck units) in front of the ear centre (z > 0), hanging down
+        r0, tp = P0[0], P0[-1]; hang = (tp[1] - r0[1]) < -0.01
+        short = tp[1] - a.ext_target                                                    # how far above jaw height the tip ends
+        if abs(tp[0]) > 0.04 and tp[2] > 0.0 and hang and short > 0.004:
+            Lx = short * a.side_ext * 1.3; m = max(2, int(round(Lx / 0.006)))
+            step = Lx / m; T = P0[-1] - P0[-2]; T /= np.linalg.norm(T) + 1e-9; nlong += 1
+            out = np.array([np.sign(r0[0]), 0.0, 0.0]); ext = [P0[-1]]
+            for k in range(m):
+                T = 0.7 * T + 0.3 * np.array([0.0, -1.0, 0.0]) + 0.03 * out; T /= np.linalg.norm(T)      # bend toward hanging straight down
+                ext.append(ext[-1] + T * step)
+            ext = np.array(ext[1:]); wk = np.linspace(1.0, 0.8, m + 1)[1:]
+            P0 = np.vstack([P0, ext]); W0 = np.r_[W0, W0[-1] * wk]; T0 = np.r_[T0, T0[-1] * wk]
+            S = np.vstack([S, np.c_[ext, W0[-m:], T0[-m:], np.repeat(S[-1:, 5:8], m, 0)]])
     cols = np.array(c.get('colors', [[0.3, 0.22, 0.18]] * 16), float)
     n = max(8, min(28, len(P0) * 2))
     P, W, Tk, q = resample(P0, W0, T0, None, 1.0, n)
@@ -63,4 +79,4 @@ for ci, c in enumerate(cards):
         ribbon(Ps, Ns, Bs, ws, off_n, layer, 0.0, 1.0, qs, np.clip(colq(qs) * br, 0, 1), nstr); nstr += 1
 V = np.concatenate(V); F = np.concatenate(F); UV = np.concatenate(UV); COL = np.concatenate(COL); SID = np.concatenate(SID)
 np.savez(a.out, v=V.astype(np.float32), f=F.astype(np.int32), uv=UV.astype(np.float32), col=COL.astype(np.float32), sid=SID.astype(np.int32))
-print('STRANDS cards %d ribbons %d verts %d tris %d' % (len(cards), nstr, len(V), len(F)))
+print('STRANDS cards %d ribbons %d verts %d tris %d lengthened %d' % (len(cards), nstr, len(V), len(F), nlong))

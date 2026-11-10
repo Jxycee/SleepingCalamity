@@ -54,3 +54,23 @@ Research: no public breakdown of Noctis's (FFXV) or Sora's (KH3) hair mesh exist
 - Shell is thinner under the clumps (`t1` 0.027, `tpuff` 0.013 at temple height).
 Clumps: 12-ring lens x 11 segments (~43k tris with the wisps; shell 22.5k). Clump texture is heavily blurred (soft strand bands, normal relief 0.45): the strand-detail version read as wood grain on the big clumps.
 Tiles: C:/AI/test_out/heroes/tobin/hair_v8/u18/ (Unity), c14/ (Blender).
+
+## HairDeck hair cards (current, 2026-11-10)
+
+The procedural shell / groom routes above are superseded. Tobin's hair comes from **HairDeck** (github.com/hyz317/HairDeck, Apache-2.0):
+one image in, stylised hair cards out. Installed outside the repo at `C:/AI/hairdeck` (its own Python 3.12 venv, workspace `C:/AI/hairdeck/workspace`).
+
+1. `C:/AI/hairdeck/.venv/Scripts/python.exe C:/AI/hairdeck/scripts/image_to_hair.py <crop.png> --out <dir> --n 4 [--seed 4]` -> `cards_seed*.json`
+   (24 variants from refs/crop_front, crop_front2 and ref_front2; guidance 3-4 did not beat the default 2).
+2. `hairdeck/hd_strands.py <cards.json> <out.npz>` (HairDeck venv): every card -> a core ribbon + 2-5 strand ribbons (ragged tips, layering,
+   fan-out; the centre strand keeps full length). `--side_ext` lengthens face-framing locks (off: it read as wiry threads).
+3. `hairdeck/hd_opt.py <head.npz> <npz or dir> <hull_dir> <out>` (trellis venv): fits each variant to TobinBase (head-proxy ellipsoid onto the
+   cranium ellipsoid, per-axis scale, offsets, crown lift `lt`, side flare `fs`) by coordinate descent on the silhouette IoU against the
+   reference masks (`hd_sil.py`, masks from `shell/hull_prep.py`; head.npz from `hd_dump.py tobin=1`). Vertical scale is capped at 1.08:
+   stretching pulled the fringe over the eyes; crown height comes from the lift instead.
+4. `hairdeck/hd_fit.py <npz> <out> sx= sy= sz= dy= dz= lt= fs=` -> `hd_export.py` (cards, root-tip UVs, scalp layer, free weights)
+   -> `shell/rig_export.py` -> copy `TobinHairMesh.fbx` to Content/Characters/TobinBase/HairMesh.
+5. Unity: `SC_HairCards.shader` (two-sided, gradient colour, Kajiya-Kay), material from `TobinHairMaterialBuilder.BuildCards`.
+
+Current build: run1/tobin_bust seed 1, `sx=0.92 sy=0.94 sz=1.08 dy=-0.012 dz=-0.002 lt=0.021 fs=0.015` (silhouette front 0.887,
+side 0.908, back 0.811; the side/back calibration is less certain than the front's eye/chin landmarks).

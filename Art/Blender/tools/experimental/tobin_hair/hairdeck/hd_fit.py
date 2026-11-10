@@ -1,5 +1,5 @@
 # HairDeck hair cards -> TobinBase head (Blender 5.x headless).
-#   blender -b --factory-startup -P hd_fit.py -- <hair_seedN_nohead.glb | hd_strands.py .npz> <out_dir> [clear=0.002] [sx=1] [sy=1] [sz=1] [dz=0] [dy=0] [res=700]
+#   blender -b --factory-startup -P hd_fit.py -- <hair_seedN_nohead.glb | hd_strands.py .npz> <out_dir> [clear=0.002] [sx=1] [sy=1] [sz=1] [dz=0] [dy=0] [lt=0] [fs=0] [res=700]
 # HairDeck writes hair in its canonical head frame (hairdeck/data/head_frame.py): unit = face-mesh width W, origin O = face bbox centre
 # in x / depth and face bbox top in height (W, O from workspace/data/head_frame_train.npz: W 0.1276, O (0, 0.4791, 0.0258), glTF y up,
 # face +z). The glTF importer turns that into Blender z up, face -y: O_B = (0, -0.0258, 0.4791). TobinBase's matching box is AvatarHead
@@ -37,6 +37,9 @@ if GLB.lower().endswith('.npz'):   # hd_strands.py output (HairDeck frame, y up,
     ca = me.color_attributes.new('Color', 'BYTE_COLOR', 'CORNER'); cs = np.c_[d['col'][li], np.ones(len(li))]
     for k, c_ in enumerate(ca.data): c_.color_srgb = cs[k]
     hair = bpy.data.objects.new('Tobin_Hair', me); bpy.context.scene.collection.objects.link(hair)
+    pm = bpy.data.materials.new('preview_hair'); pm.use_nodes = True; pb = pm.node_tree.nodes['Principled BSDF']
+    pb.inputs['Base Color'].default_value = (0.20, 0.13, 0.085, 1); pb.inputs['Roughness'].default_value = 0.5; me.materials.append(pm)
+    for p_ in me.polygons: p_.use_smooth = True
 else:
     before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=GLB)
     new = [o for o in bpy.data.objects if o not in before]; hair = [o for o in new if o.type == 'MESH'][0]
@@ -59,6 +62,15 @@ if kw.get('fit', 'ell') == 'ell':
     for v in hair.data.vertices:
         p = v.co - PC; v.co = D + Vector((p.x * S.x, p.y * S.y, p.z * S.z))
     print('SCALE per axis', [round(c, 3) for c in S])
+    # volume deformation, identical to hd_opt.py vol_deform (crown lift lt, side flare fs; t = card fraction root..tip from uv v)
+    LT, FS = F('lt', 0), F('fs', 0)
+    if LT or FS:
+        tv = np.zeros(len(hair.data.vertices)); uvd = hair.data.uv_layers['UVMap'].data
+        for lp in hair.data.loops: tv[lp.vertex_index] = uvd[lp.index].uv[1]
+        for v in hair.data.vertices:
+            dv = (v.co - Vector(cen)).normalized(); s_ = min(1.0, max(0.0, tv[v.index] / 0.45)); s_ = s_ * s_ * (3 - 2 * s_); up = max(0.0, dv.z)
+            v.co += dv * (LT * (0.35 + 0.65 * s_) * up ** 1.5 + FS * min(1.0, tv[v.index]) ** 1.5 * abs(dv.x) * (1 - up))
+        print('VOLUME lt %.4f fs %.4f' % (LT, FS))
 else:
     S = Vector((s * F('sx', 1), s * F('sy', 1), s * F('sz', 1))); D = Vector((0, F('dy', 0), F('dz', 0)))
     for v in hair.data.vertices:
@@ -83,7 +95,7 @@ sc = bpy.context.scene; sc.render.engine = 'BLENDER_EEVEE'; sc.render.resolution
 sc.world = bpy.data.worlds.new('w'); sc.world.use_nodes = True; sc.world.node_tree.nodes['Background'].inputs[0].default_value = (0.35, 0.35, 0.37, 1)
 for nm, rot, en in (('key', (50, 0, -35), 3.0), ('fill', (60, 0, 140), 1.2)):
     l = bpy.data.objects.new(nm, bpy.data.lights.new(nm, 'SUN')); l.data.energy = en; l.rotation_euler = [math.radians(a) for a in rot]; sc.collection.objects.link(l)
-cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); sc.collection.objects.link(cam); sc.camera = cam; cam.data.type = 'ORTHO'; cam.data.ortho_scale = 0.42
+cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); sc.collection.objects.link(cam); sc.camera = cam; cam.data.type = 'ORTHO'; cam.data.ortho_scale = float(kw.get('ortho', 0.42))
 for v, az in dict(front=0, q34=-40, side=90, back=180).items():
     a = math.radians(az); tgt = Vector((0, -0.03, 1.735)); d = Vector((math.sin(a), -math.cos(a), 0.05)).normalized()
     cam.location = tgt + d * 1.0; cam.rotation_euler = (-d).to_track_quat('-Z', 'Y').to_euler()
