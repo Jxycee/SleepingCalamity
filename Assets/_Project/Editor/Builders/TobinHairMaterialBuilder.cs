@@ -1,6 +1,6 @@
 // URP Lit materials for Tobin's hair (HairMesh/Textures, 2K, written by Art/Blender/tools/experimental/tobin_hair/shell/hair_atlas2.py):
 //   Tobin_Hair       lock cards (Tobin_Hair renderer): alpha-cut strand atlas, single-sided (every card has a reversed twin, see build_shell_hair.py).
-//   Tobin_HairShell  the modelled hair shell lying on the skull (Tobin_HairShell renderer): opaque clump texture, single-sided closed slab.
+//   Tobin_HairShell  the modelled hair shell lying on the skull (Tobin_HairShell renderer) and the solid clump locks (Tobin_HairClumps): opaque clump texture.
 //   Tobin_HairCap    flat scalp colour, only for the older hair meshes that still carry a Tobin_HairCap object.
 // Menu-free entry: unity.ps1 exec -Method SleepingCalamity.EditorTools.TobinHairMaterialBuilder.Build
 using System.IO;
@@ -69,7 +69,7 @@ namespace SleepingCalamity.EditorTools
         public static string Apply(GameObject hair)
         {
             var m = Build(); var cap = BuildCap(); var shell = BuildShell();
-            foreach (var r in hair.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = r.name.Contains("HairCap") ? cap : r.name.Contains("HairShell") ? shell : m;
+            foreach (var r in hair.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = r.name.Contains("HairCap") ? cap : (r.name.Contains("HairShell") || r.name.Contains("HairClumps")) ? shell : m;   // solid clump locks share the opaque shell material
             return m.name + "+" + shell.name;
         }
     }

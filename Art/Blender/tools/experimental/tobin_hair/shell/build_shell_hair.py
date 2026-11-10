@@ -22,6 +22,8 @@ TEX = kw.get('tex', 'C:/AI/test_out/heroes/tobin/hair_v8/tex2'); PREVIEW = kw.ge
 rng = np.random.default_rng(int(kw.get('seed', 7)))
 F = lambda k, d: float(kw.get(k, d))
 os.makedirs(OUT, exist_ok=True)
+CLMP = kw.get('clumps', '1') == '1'   # FF / KH style solid clump locks (default) vs alpha strand cards
+NDEF = lambda k, clump, card: int(kw.get(k, clump if CLMP else card))
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 # the project's final head: TobinBase.fbx (the older Tobin_Base_v2_sliders.glb has a 2.4 cm smaller back of the skull / nape -> the shell sat inside the real head)
@@ -84,7 +86,7 @@ for _ in range(int(kw.get('dil', 2))):
 renv = np.maximum(blur(r1, 10), rhit + 0.002)
 # thickness profile: elevation of the direction (thin low, thick on the crown)
 elev = np.arcsin(np.clip(D[..., 2], -1, 1))
-thk = F('t0', 0.006) + F('t1', 0.032) * sstep(-0.35, 1.0, elev) + F('tback', 0.008) * np.exp(-((elev - 0.45) / 0.35) ** 2) * sstep(0.1, 0.6, D[..., 1])   # rounder crown / occiput bulge behind
+thk = F('t0', 0.006) + F('t1', 0.027 if CLMP else 0.032) * sstep(-0.35, 1.0, elev) + F('tback', 0.008) * np.exp(-((elev - 0.45) / 0.35) ** 2) * sstep(0.1, 0.6, D[..., 1])   # rounder crown / occiput bulge behind
 _phd = np.degrees(np.arctan2(D[..., 0], -D[..., 1])); _zap = C.z + D[..., 2] * 0.10
 _wfl = np.exp(-(_phd / 50.0) ** 2) * sstep(1.80, 1.765, _zap)   # front, below the hairline: the fringe lies close on the forehead
 thk = thk * (1.0 - 0.75 * _wfl) * (1.0 - 0.30 * np.exp(-(_phd / 40.0) ** 2) * sstep(0.85, 0.35, elev))   # less forward bulge over the brow (side-view visor)
@@ -275,13 +277,13 @@ def clearance_push(p, c, cs=0.0):
             off = v - loc; s = off.dot(nr)
             if s < cs and (d < 1e-6 or abs(s) > 0.7 * off.length): v = loc + nr * cs
     return np.array(v)
-def grow(ap, t0, t1, ext, lift, steer, ds=0.004, rooted=0.003, minc=0.005, tiplift=0.0, cs=0.0, raw=False, zstop=-1.0):
+def grow(ap, t0, t1, ext, lift, steer, ds=0.004, rooted=0.003, minc=0.005, tiplift=0.0, cs=0.0, raw=False, zstop=-1.0, arch=0.0):
     """on-shell part: constant swirled azimuth ap from t0 to t1 at `lift` above the shell (root starts `rooted` inside),
     then `ext` metres more in 3D, steered by steer(s, pos, dir) -> acceleration; clearance >= minc."""
     pts = []
     ts = np.linspace(t0, t1, max(3, int((t1 - t0) * 14) + 2))
     for k, t in enumerate(ts):
-        a = ap if raw else solve_a(ap, t); q, n = shell_at(a, t); h = -rooted + (lift + rooted) * float(sstep(0, 0.35, k / max(len(ts) - 1, 1))) + tiplift * (k / max(len(ts) - 1, 1)) ** 2
+        a = ap if raw else solve_a(ap, t); q, n = shell_at(a, t); h = -rooted + (lift + rooted) * float(sstep(0, 0.35, k / max(len(ts) - 1, 1))) + tiplift * (k / max(len(ts) - 1, 1)) ** 2 + arch * math.sin(math.pi * min(1.0, 1.3 * k / max(len(ts) - 1, 1)))
         pts.append(q + n * h)
     pts = [np.append(np.array(x), 0.0) for x in pts]   # 4th column: 'free' (0 = rides the rigid shell, 1 = swings on its chain)
     d = pts[-1][:3] - pts[-2][:3]; d /= np.linalg.norm(d) + 1e-12; p = pts[-1][:3].copy(); s = 0.0
@@ -297,64 +299,64 @@ def add(pts, w, var=None, tw=1.0):
     if len(pts) < 3: return
     pts = np.asarray(pts, float)
     if pts.shape[1] == 3: pts = np.hstack([pts, np.linspace(0, 0.6, len(pts))[:, None]])
-    cards.append((pts, w * F('wscale', 1.15), int(rng.integers(0, 8)) if var is None else var, tw))
+    cards.append((pts, w * F('wscale', 2.2 if CLMP else 1.15) * (rng.uniform(0.65, 1.35) if CLMP else 1.0), int(rng.integers(0, 8)) if var is None else var, tw))
 G = np.array([0, 0, -1.0])
 def outward_xy(p):
     h = np.array([p[0] - C.x, p[1] - C.y, 0.0]); return h / (np.linalg.norm(h) + 1e-9)
 
 # A) cover layer over the whole shell (strand look, layered edge)
 # shingles: shorter locks at all depths whose tips lift off the shell -> layered, jagged surface and silhouette
-for k in range(int(kw.get('n_cover', 200))):
-    ap = rng.uniform(-np.pi, np.pi); t0 = rng.uniform(0.02, 0.75); t1 = min(1.0, t0 + rng.uniform(0.25, 0.5))
+for k in range(NDEF('n_cover', 72, 200)):
+    ap = rng.uniform(-np.pi, np.pi); t0 = rng.uniform(0.02, 0.5 if CLMP else 0.75); t1 = (1.0 if rng.random() < 0.75 else min(1.0, t0 + rng.uniform(0.45, 0.75))) if CLMP else min(1.0, t0 + rng.uniform(0.25, 0.5))   # clumps: long continuous locks to the edge (tips mid-surface read as a pinecone)
     a_root = solve_a(ap, t0); ph = abs(float(phi_of(shell_at(a_root, 1.0)[0][None])[0]))
     ext = rng.uniform(0.004, 0.016) if (t1 >= 1.0 and ph > 45) else 0.0
     def st(s, p, d): return G * 6.0 + outward_xy(p) * 2.0
-    add(grow(ap, t0, t1, ext, rng.uniform(0.002, 0.005), st, tiplift=rng.uniform(0.003, F('tiplift', 0.012))), rng.uniform(0.014, 0.024))
+    add(grow(ap, t0, t1, ext, rng.uniform(0.002, 0.005), st, tiplift=rng.uniform(0.003, F('tiplift', 0.006 if CLMP else 0.012)), arch=(rng.uniform(0.004, F('arch', 0.010)) if (CLMP and t0 < 0.45 and abs(float(wrap(ap - A_PART))) > 0.35) else 0.0)), rng.uniform(0.014, 0.024))   # top locks swoop up off the part
 # B) side locks over the ears: hang to cheekbone / jaw, flared, tips a little inward at the very end
 for side in (-1, 1):
-    for k in range(int(kw.get('n_side', 32))):
+    for k in range(NDEF('n_side', 13, 32)):
         ph_t = side * rng.uniform(58, 128)
         # find the swirled azimuth whose edge lies at that world azimuth
         ap = math.radians(ph_t) * 0.98 + rng.normal(0, 0.03)
         t0 = rng.uniform(0.45, 0.8); ext = (0.004 + 0.036 * rng.beta(1.3, 2.2)) * (1.25 if abs(ph_t) < 100 else 1.0)   # mostly short, a few long: layered, no straight cut
         spl = rng.uniform(4.0, 11.0)
-        def st(s, p, d, spl=spl): return G * 6.0 + outward_xy(p) * (spl - 22.0 * max(0, s - 0.6))   # tips turn down and in toward the jaw   # splayed outline, tips turn down/in at the very end
+        def st(s, p, d, spl=spl): return G * 6.0 + outward_xy(p) * (spl - (8.0 if CLMP else 22.0) * max(0, s - 0.6))   # tips turn down and in toward the jaw   # splayed outline, tips turn down/in at the very end
         add(grow(ap, t0, 1.0, ext, rng.uniform(0.003, 0.008), st, minc=0.006, tiplift=rng.uniform(0.0, 0.008)), rng.uniform(0.013, 0.024))
 # B2) flared side locks: stick out sideways at temple / cheek level, then droop (the spiky outline of the reference front view)
 for side in (-1, 1):
-    for k in range(int(kw.get('n_flare', 10))):
+    for k in range(NDEF('n_flare', 5, 10)):
         ap = math.radians(side * rng.uniform(55, 115)); t0 = rng.uniform(0.55, 0.85); ext = rng.uniform(0.018, 0.04)
         def st(s, p, d): return outward_xy(p) * (12.0 if s < 0.5 else 2.0) + G * (4.0 if s < 0.5 else 12.0)
         add(grow(ap, t0, 1.0, ext, rng.uniform(0.004, 0.008), st, minc=0.007, tiplift=0.006), rng.uniform(0.010, 0.018))
 # H) crown cowlick: two broader wisps rising up and back from the top of the crown (side view of the reference)
-for k in range(int(kw.get('n_cowlick', 2))):
+for k in range(int(kw.get('n_cowlick', 3))):
     ap = rng.uniform(-0.5, 0.5) + np.pi; t0 = rng.uniform(0.03, 0.12)
     def st(s, p, d): return np.array([0, 1.0, -0.4]) * 8.0
     add(grow(ap, t0, t0 + 0.1, rng.uniform(0.02, 0.035), 0.004, st, minc=0.01, tiplift=0.01, cs=0.006), rng.uniform(0.012, 0.018))
 # C) nape: short flicked layers
-for k in range(int(kw.get('n_nape', 30))):
+for k in range(NDEF('n_nape', 14, 30)):
     phn = rng.uniform(125, 235); ap = math.radians(phn); t0 = rng.uniform(0.5, 0.85)
-    ext = (0.002 + 0.024 * math.cos(math.radians(phn - 180)) ** 4) * rng.uniform(0.5, 1.3)   # V at the nape   # longest at the nape centre
+    ext = (0.002 + 0.024 * math.cos(math.radians(phn - 180)) ** 4) * rng.uniform(0.5, 1.3) * (0.7 if CLMP else 1.0)   # V at the nape   # longest at the nape centre
     fk = rng.uniform(2.0, 9.0)
     def st(s, p, d, fk=fk): return G * 5.0 + outward_xy(p) * (1.0 + fk * s)
     add(grow(ap, t0, 1.0, ext, rng.uniform(0.003, 0.007), st, minc=0.006), rng.uniform(0.013, 0.02))
 # D) fringe: roots right of the part, swept across the forehead to the character's right, tips about eye level
-for k in range(int(kw.get('n_fringe', 44))):
+for k in range(NDEF('n_fringe', 13, 44)):
     # rooted near the part on the front top, leave the shell flow early and walk over it (shell clearance) diagonally across the forehead
     ap = rng.uniform(-0.15, A_PART - 0.03); t0 = rng.uniform(0.55, 0.75); t1 = t0 + 0.05
-    ext = rng.uniform(0.07, 0.11); zs = rng.uniform(1.712, 1.745) + 0.012 * max(0.0, ap); lf = rng.uniform(0.003, 0.007)
+    ext = rng.uniform(0.07, 0.11); zs = rng.uniform(1.712, 1.745) + 0.03 * max(0.0, ap); lf = rng.uniform(0.003, 0.007)
     tgt = np.array([-rng.uniform(0.35, 0.8), -0.2, -1.0]); tgt /= np.linalg.norm(tgt)   # ~30-45 deg from vertical toward the character's right
     def st(s, p, d, tgt=tgt): return (tgt - d) * F('fr_rate', 45.0)
     _g = grow(ap, t0, t1, ext, lf, st, minc=F('fringe_c', 0.007), cs=lf, raw=True, zstop=zs)
     if kw.get('dbg'): print('FRINGE', round(ap, 2), len(_g), _g[0].round(3), _g[len(_g)//2].round(3), _g[-1].round(3))
-    add(_g, rng.uniform(0.02, 0.032), tw=0.9)
+    add(_g, rng.uniform(0.02, 0.032), tw=0.62 if CLMP else 0.9)
 # E) short locks left of the part framing the other brow
-for k in range(int(kw.get('n_left', 10))):
-    ap = rng.uniform(A_PART + 0.05, 0.95); t0 = rng.uniform(0.45, 0.75); ext = rng.uniform(0.018, 0.035)
+for k in range(NDEF('n_left', 5, 10)):
+    ap = rng.uniform(A_PART + 0.05, 0.95); t0 = rng.uniform(0.45, 0.75); ext = rng.uniform(0.010, 0.022)   # short: the character's left eye stays visible
     def st(s, p, d): return G * 9.0 + np.array([0.6, -0.3, 0]) * 4.0
     add(grow(ap, t0, 1.0, ext, rng.uniform(0.003, 0.007), st, minc=0.007), rng.uniform(0.014, 0.022))
 # F) crown flicks: thin spikes up and back + a few flyaways
-for k in range(int(kw.get('n_spike', 4))):
+for k in range(int(kw.get('n_spike', 7 if CLMP else 4))):
     ap = rng.uniform(-0.9, 0.9); t0 = rng.uniform(0.12, 0.32)
     base, n = shell_at(solve_a(ap, t0), t0)
     up = np.array(n) * 0.85 + np.array([rng.uniform(-0.3, 0.3), 0.2, 0.35]); up /= np.linalg.norm(up)
@@ -412,7 +414,57 @@ def build_cards():
     g = ob.vertex_groups.new(name='free')
     for i, w in enumerate(FREE): g.add([i], w, 'REPLACE')
     return ob
-cards_ob = build_cards()
+def build_clumps():
+    """FF / KH style: every lock is a SOLID tapered clump (lens cross-section: domed outside, flatter underside), sharp point, root sunk in the shell.
+    UV: around the lens = one lock of the shell texture (u 0..0.25, mirrored so there is no seam; dark gap texels on the lens edges), v along the lock."""
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); fl = bm.verts.layers.float.new('free'); nseg = int(kw.get('cseg', 10)); NRG = 8
+    for pts, w0, var, tw in cards:
+        Pp4, L = resample(pts, nseg + 1); Pp = Pp4[:, :3]; FRv = Pp4[:, 3]
+        if L < 0.008: continue
+        u_off = 0.25 * (var % 4)
+        rings = []
+        for i in range(nseg + 1):
+            s = i / nseg; p = Pp[i]
+            tng = Pp[min(i + 1, nseg)] - Pp[max(i - 1, 0)]; tng /= np.linalg.norm(tng) + 1e-12
+            loc, nr, _, d = TREE.find_nearest(Vector(p), 0.3); out = np.array(nr) if loc is not None else (p - np.array(C))
+            out = out - tng * out.dot(tng); out /= np.linalg.norm(out) + 1e-12
+            b = np.cross(tng, out); b /= np.linalg.norm(b) + 1e-12
+            w = w0 * tw * (1.0 - s ** F('ctaper', 1.6)) * (0.75 + 0.25 * min(1.0, s * 6))   # swell just after the root, taper to a point
+            h_out, h_in = w * F('cdome', 0.34), w * 0.08
+            ring = []
+            for k in range(NRG):
+                th = 2 * np.pi * k / NRG; cx, sy = np.cos(th), np.sin(th)
+                q = p + b * cx * w / 2 + out * (sy * (h_out if sy > 0 else h_in))
+                ring.append((clearance_push(q, 0.003), (u_off + 0.25 * (0.5 + 0.5 * cx) * 0.98 + 0.0025, 1.0 - s * 0.97)))
+            rings.append(ring)
+        vs = []
+        for r in rings:
+            row = [bm.verts.new(q) for q, _ in r]
+            for v in row: v[fl] = float(FRv[len(vs)])
+            vs.append(row)
+        for i in range(nseg):
+            for k in range(NRG):
+                k1 = (k + 1) % NRG
+                quad = [vs[i][k], vs[i][k1], vs[i + 1][k1], vs[i + 1][k]]
+                uvs = [rings[i][k][1], rings[i][k1][1], rings[i + 1][k1][1], rings[i + 1][k][1]]
+                try: f = bm.faces.new(quad)
+                except ValueError: continue
+                for l, uv in zip(f.loops, uvs): l[uvl].uv = uv
+        try: bm.faces.new(vs[0][::-1])   # root cap (inside the shell)
+        except ValueError: pass
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)   # tip rings collapse to a point
+    bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=1e-7)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)          # closed tubes: consistent outward winding
+    bm.normal_update()
+    FREE = [v[fl] for v in bm.verts]
+    me = bpy.data.meshes.new('HairClumps'); bm.to_mesh(me); bm.free()
+    for p in me.polygons: p.use_smooth = True
+    ob = bpy.data.objects.new('Tobin_HairClumps', me); bpy.context.scene.collection.objects.link(ob)
+    g = ob.vertex_groups.new(name='free')
+    for i, w in enumerate(FREE): g.add([i], w, 'REPLACE')
+    return ob
+CLUMPS = kw.get('clumps', '1') == '1'
+cards_ob = build_clumps() if CLUMPS else build_cards()
 def audit(ob):
     sd = []
     for v in ob.data.vertices:
@@ -449,9 +501,9 @@ def mat(name, prefix, clip):
         nt.links.new(c.outputs['Alpha'], g.inputs[0]); nt.links.new(g.outputs[0], b.inputs['Alpha'])
     m.use_backface_culling = True
     return m
-shell.data.materials.append(mat('Tobin_HairShell', 'Hair_Shell', False)); cards_ob.data.materials.append(mat('Tobin_Hair', 'Hair_Cards', True))
+shell.data.materials.append(mat('Tobin_HairShell', 'Hair_Shell', False)); cards_ob.data.materials.append(shell.data.materials[0] if CLUMPS else mat('Tobin_Hair', 'Hair_Cards', True))
 for o in bpy.data.objects:
-    if o.type == 'MESH' and o.name not in ('Tobin_Hair', 'Tobin_HairShell', 'AvatarHead', 'AvatarEyelashes', 'AvatarLeftEyeball', 'AvatarRightEyeball', 'AvatarTeethLower', 'AvatarTeethUpper', 'AvatarBody'):
+    if o.type == 'MESH' and o.name not in ('Tobin_Hair', 'Tobin_HairClumps', 'Tobin_HairShell', 'AvatarHead', 'AvatarEyelashes', 'AvatarLeftEyeball', 'AvatarRightEyeball', 'AvatarTeethLower', 'AvatarTeethUpper', 'AvatarBody'):
         o.hide_render = True
     if o.name == 'Icosphere': o.hide_render = True; o.hide_viewport = True
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'Tobin_shell_hair.blend'))

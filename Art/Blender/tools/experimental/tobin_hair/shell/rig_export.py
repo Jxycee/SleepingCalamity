@@ -7,7 +7,7 @@ from mathutils import Vector
 a = sys.argv[sys.argv.index('--') + 1:]; OUT = a[0]; kw = dict(x.split('=') for x in a[1:]); K = int(kw.get('K', 40)); NB = int(kw.get('bones', 4))
 mp = bpy.data.objects['AvatarRoot']; hb = mp.data.bones['Head']
 HH = mp.matrix_world @ hb.head_local; HT = mp.matrix_world @ hb.tail_local
-cards = bpy.data.objects['Tobin_Hair']; shell = bpy.data.objects['Tobin_HairShell']
+cards = bpy.data.objects.get('Tobin_HairClumps') or bpy.data.objects['Tobin_Hair']; shell = bpy.data.objects['Tobin_HairShell']
 bpy.ops.object.select_all(action='DESELECT')
 bpy.ops.object.armature_add(enter_editmode=True, location=(0, 0, 0)); arm = bpy.context.active_object; arm.name = 'HairArmature'; arm.data.name = 'HairArmature'
 for e in list(arm.data.edit_bones): arm.data.edit_bones.remove(e)

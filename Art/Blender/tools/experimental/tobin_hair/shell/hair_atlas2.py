@@ -9,8 +9,8 @@ S = 2                      # supersample
 N = 2048 * S
 rng = np.random.default_rng(11)
 ROOT = np.array([44, 31, 23], np.float32)      # sRGB, dark root / gap
-MID = np.array([104, 76, 56], np.float32)      # chestnut
-HI = np.array([152, 120, 92], np.float32)      # warm highlight
+MID = np.array([114, 84, 61], np.float32)      # chestnut
+HI = np.array([166, 132, 100], np.float32)      # warm highlight
 LOCKS_PER_TILE = 4
 
 ROOTK = 0.62
@@ -96,7 +96,7 @@ finish(col, alpha, height, 'Hair_Cards', opaque=False)
 
 ROOTK = 0.70
 # ---------------- shell: tileable in u, LOCKS_PER_TILE clumps with dark gaps ----------------
-col = np.zeros((N, N, 3), np.float32); col[:] = ROOT * 1.85; alpha = np.zeros((N, N), np.float32); height = np.zeros((N, N), np.float32)
+col = np.zeros((N, N, 3), np.float32); col[:] = ROOT * 2.3; alpha = np.zeros((N, N), np.float32); height = np.zeros((N, N), np.float32)
 LW = N / LOCKS_PER_TILE
 for L in range(LOCKS_PER_TILE):
     cx = (L + 0.5) * LW
@@ -109,6 +109,6 @@ for L in range(LOCKS_PER_TILE):
         pts = np.stack([xs, ys], 1)
         bright = rng.choice([rng.uniform(0.8, 1.0), rng.uniform(1.0, 1.22)], p=[0.62, 0.38]) * (1.0 - 0.18 * abs(f))
         draw_strand(col, alpha, height, pts, bright, rng.uniform(8, 15) * S / 2, wrapW=N)
-xx = (np.arange(N) % LW - LW / 2) / (LW / 2); prof = 0.78 + 0.34 * np.cos(xx * np.pi / 2) ** 2
+xx = (np.arange(N) % LW - LW / 2) / (LW / 2); prof = 0.86 + 0.24 * np.cos(xx * np.pi / 2) ** 2
 col *= prof[None, :, None]
 finish(col, alpha, height, 'Hair_Shell', opaque=True)
