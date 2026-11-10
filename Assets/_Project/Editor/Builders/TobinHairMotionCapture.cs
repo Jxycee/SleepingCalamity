@@ -49,7 +49,22 @@ namespace SleepingCalamity.EditorTools
                 foreach (var smr in tobin.GetComponentsInChildren<SkinnedMeshRenderer>(true)) { smr.updateWhenOffscreen = true; smr.forceMatrixRecalculationPerRender = true; log.AppendLine("SMR " + smr.name + " bones " + smr.bones.Length + " hasHead " + smr.bones.Contains(realHead) + " root " + (smr.rootBone ? smr.rootBone.name : "null")); }
                 log.AppendLine("realHead name " + realHead.name + " path " + string.Join("/", realHead.GetComponentsInParent<Transform>().Select(t => t.name).Reverse()));
                 var hair = Object.Instantiate(hairSrc);
-                if (real) log.AppendLine("hair mat " + TobinHairMaterialBuilder.Apply(hair)); else foreach (var r in hair.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = hairM;
+                if (real)
+                {
+                    log.AppendLine("hair mat " + TobinHairMaterialBuilder.Apply(hair));
+                    string mv = System.Environment.GetEnvironmentVariable("SC_MATVAR");   // material experiments on a copy (asset untouched): nonorm | nomr | nonorm,nomr
+                    if (!string.IsNullOrEmpty(mv))
+                        foreach (var r in hair.GetComponentsInChildren<Renderer>(true))
+                        {
+                            if (r.name.Contains("HairCap")) continue;
+                            var mi = new Material(r.sharedMaterial);
+                            if (mv.Contains("cullback")) mi.SetFloat("_Cull", 2f);
+                            if (mv.Contains("cullfront")) mi.SetFloat("_Cull", 1f);
+                            if (mv.Contains("nonorm")) { mi.SetTexture("_BumpMap", null); mi.DisableKeyword("_NORMALMAP"); }
+                            if (mv.Contains("nomr")) { mi.SetTexture("_MetallicGlossMap", null); mi.DisableKeyword("_METALLICSPECGLOSSMAP"); mi.SetFloat("_Metallic", 0f); mi.SetFloat("_Smoothness", 0.35f); }
+                            r.sharedMaterial = mi; log.AppendLine("matvar " + mv);
+                        }
+                } else foreach (var r in hair.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = hairM;
                 var hairHead = hair.GetComponentsInChildren<Transform>(true).First(t => t.name == "Head");
                 log.AppendLine("realHead " + realHead.position.ToString("F3") + " hairHead " + hairHead.position.ToString("F3") + " delta mm " + ((realHead.position - hairHead.position).magnitude * 1000f).ToString("F2"));
                 hairHead.SetParent(realHead, true);
@@ -58,6 +73,7 @@ namespace SleepingCalamity.EditorTools
                 string ss = System.Environment.GetEnvironmentVariable("SC_STIFF"); if (!string.IsNullOrEmpty(ss)) chains.stiffness = float.Parse(ss, System.Globalization.CultureInfo.InvariantCulture);
                 log.AppendLine("chains " + chains.ChainCount + " skinned renderers " + hair.GetComponentsInChildren<SkinnedMeshRenderer>().Length + " hair bones " + hair.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("hair_")));
 
+                if (System.Environment.GetEnvironmentVariable("SC_NOSHAD") == "1") { foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None)) l.shadows = LightShadows.None; log.AppendLine("shadows off"); }
                 var cam = new GameObject("Cam").AddComponent<Camera>(); cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.72f, 0.76f, 0.80f); cam.fieldOfView = hq ? 9f : 14f; cam.nearClipPlane = 0.05f; cam.farClipPlane = 20f;
                 var rt = new RenderTexture(Size, Size, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = hq ? 8 : 1 }; cam.targetTexture = rt;
                 if (hq)

@@ -17,8 +17,79 @@ hv=np.array([(hair.matrix_world@v.co)[:] for v in hair.data.vertices]); hair.mat
 # fit Tripo-head frame -> MetaPerson head frame (skull slab box): scale x/y, shift z by the crown height difference
 SX,SY,CXT,CYT,CXM,CYM,DZ=0.1788/0.1807,0.2115/0.197,-0.0007,-0.0181,0.0001,-0.0205,1.8347-1.7562
 hv[:,0]=(hv[:,0]-CXT)*SX+CXM; hv[:,1]=(hv[:,1]-CYT)*SY+CYM; hv[:,2]+=DZ
+# push hair out of the head: vertices inside the head surface or closer than --clear (m) are moved to that clearance along the surface normal
+import bmesh as _bm
+from mathutils.bvhtree import BVHTree
+_bh=_bm.new(); _bh.from_mesh(head.data); _bh.transform(head.matrix_world); _bh.faces.ensure_lookup_table(); _tree=BVHTree.FromBMesh(_bh)
+CLEAR=float(kw.get("clear",0.006)); _moved=0; _deep=0
+for i in range(len(hv)):
+    co=Vector(hv[i]); loc,nrm,_idx,dist=_tree.find_nearest(co,0.05)
+    if loc is None: continue
+    side=(co-loc).dot(nrm)
+    if side<CLEAR:
+        hv[i]=np.array(loc+nrm*CLEAR); _moved+=1; _deep+= side<0
+print("PUSH moved",_moved,"of",len(hv),"inside",_deep)
 for i,v in enumerate(hair.data.vertices): v.co=hv[i]
 hair.data.update()
+# orient every strip face outward (away from the head centre): hair material is single-sided now, back faces were the black/navy chunks
+_bo=_bm.new(); _bo.from_mesh(hair.data); _bo.faces.ensure_lookup_table(); _hc=Vector((0.0,-0.005,1.70)); _flip=[f for f in _bo.faces if f.normal.dot(f.calc_center_median()-_hc)<0]
+print("FLIPPED",len(_flip),"of",len(_bo.faces)); bmesh.ops.reverse_faces(_bo,faces=_flip); _bo.to_mesh(hair.data); _bo.free(); hair.data.update()
+# debris removal: tiny faces, sliver triangles and faces whose texture sample is near-black (atlas holes) - all read as dirt on the finished hair
+if float(kw.get("debris",1)):
+    _img=bpy.data.images.load("C:/AI/test_out/heroes/tobin/hair_v6/tex/Hair_BaseColor.png"); _W,_H=_img.size; _px=np.array(_img.pixels[:],dtype=np.float32).reshape(_H,_W,4)
+    _bd=_bm.new(); _bd.from_mesh(hair.data); _bd.faces.ensure_lookup_table(); _uv=_bd.loops.layers.uv.active; _del=[]; _nt=_ns=_nd=0
+    for f in _bd.faces:
+        e=[(f.verts[1].co-f.verts[0].co).length,(f.verts[2].co-f.verts[1].co).length,(f.verts[0].co-f.verts[2].co).length]
+        a=f.calc_area(); q=4*3**0.5*a/max(sum(x*x for x in e),1e-18)
+        u=sum((l[_uv].uv.x for l in f.loops))/3; v=sum((l[_uv].uv.y for l in f.loops))/3
+        lum=float(_px[min(_H-1,max(0,int(v*_H))),min(_W-1,max(0,int(u*_W))),:3].mean())
+        tiny=a<float(kw.get("tiny_a",1.0e-6)); sl=q<float(kw.get("shard_q",0.05)); dk=lum<float(kw.get("dark_l",0.085))
+        c=f.calc_center_median(); face_zone=(c.z<float(kw.get("fz",1.745)) and c.y<-0.03 and abs(c.x)<float(kw.get("fx",0.058)))
+        if face_zone:   # strips lying on the eye / cheek area (they used to poke through the face; the clearance push flattened them into decals)
+            loc,nr,_i,dd=_tree.find_nearest(c,0.05)
+            if loc is not None and dd<float(kw.get("fd",0.014)): _del.append(f); _nd+=1; continue
+        if c.z<1.745 and c.y<-0.02 and abs(c.x)<0.095:   # outer eye corner / temple: anything hugging the skin within 7 mm
+            loc,nr,_i,dd=_tree.find_nearest(c,0.05)
+            if loc is not None and dd<0.007: _del.append(f); _nd+=1; continue
+        if tiny or sl or dk: _del.append(f); _nt+=tiny; _ns+=sl; _nd+=dk
+    print("DEBRIS removed",len(_del),"tiny",_nt,"sliver",_ns,"dark",_nd,"of",len(_bd.faces))
+    bmesh.ops.delete(_bd,geom=_del,context="FACES"); bmesh.ops.delete(_bd,geom=[v for v in _bd.verts if not v.link_faces],context="VERTS"); _bd.to_mesh(hair.data); _bd.free(); hair.data.update()
+    hv=np.array([v.co[:] for v in hair.data.vertices])
+    # drop small isolated pieces left behind by the removal (welded components of <= --iso faces in the lower half of the hair)
+    _bi=_bm.new(); _bi.from_mesh(hair.data); _bi.faces.ensure_lookup_table(); _kf=lambda v:(round(v.co.x/2e-6),round(v.co.y/2e-6),round(v.co.z/2e-6)); _par={}
+    def _fd(a):
+        while _par.setdefault(a,a)!=a: _par[a]=_par[_par[a]]; a=_par[a]
+        return a
+    for f in _bi.faces:
+        ks=[_kf(v) for v in f.verts]; r0=_fd(ks[0])
+        for k in ks[1:]: _par[_fd(k)]=r0
+    _grp={}
+    for f in _bi.faces: _grp.setdefault(_fd(_kf(f.verts[0])),[]).append(f)
+    _isol=[f for g in _grp.values() if len(g)<=int(kw.get("iso",10)) and (sum(x.calc_center_median().z for x in g)/len(g))<float(kw.get("iso_z",1.78)) for f in g]
+    print("ISOLATED removed",len(_isol),"in",sum(1 for g in _grp.values() if len(g)<=int(kw.get("iso",10))),"small pieces")
+    bmesh.ops.delete(_bi,geom=_isol,context="FACES"); bmesh.ops.delete(_bi,geom=[v for v in _bi.verts if not v.link_faces],context="VERTS"); _bi.to_mesh(hair.data); _bi.free(); hair.data.update()
+    hv=np.array([v.co[:] for v in hair.data.vertices])
+# shard removal: faces that face INTO the head, sit within --shard_d of it and meet a neighbour at a sharp angle (torn strip tips, flipped fragments), plus sliver triangles
+if float(kw.get("shards",0)):
+    _bs=_bm.new(); _bs.from_mesh(hair.data); _bs.faces.ensure_lookup_table()
+    _key=lambda v:(round(v.co.x/2e-6),round(v.co.y/2e-6),round(v.co.z/2e-6)); _vf={}
+    for f in _bs.faces:
+        for v in f.verts: _vf.setdefault(_key(v),[]).append(f.index)
+    _nr=np.array([f.normal[:] for f in _bs.faces]); _bad=[]
+    for f in _bs.faces:
+        c=f.calc_center_median(); loc,nr,_i,d=_tree.find_nearest(c,0.05)
+        e=[(f.verts[1].co-f.verts[0].co).length,(f.verts[2].co-f.verts[1].co).length,(f.verts[0].co-f.verts[2].co).length]; q=4*3**0.5*f.calc_area()/max(sum(x*x for x in e),1e-18)
+        sliver=q<float(kw.get("shard_q",0.03)); inward=False; sharp=False
+        if loc is not None and d<float(kw.get("shard_d",0.012)):
+            inward=float(np.dot(_nr[f.index],np.array(nr)))<-0.2 and (c-loc).dot(nr)>0
+            nb=set()
+            for v in f.verts: nb.update(_vf[_key(v)])
+            nb.discard(f.index); sharp=any(float(np.dot(_nr[f.index],_nr[j]))<float(np.cos(np.radians(float(kw.get("shard_a",60))))) for j in nb)
+        if sliver or (inward and sharp): _bad.append(f)
+    print("SHARDS removed",len(_bad),"of",len(_bs.faces))
+    bmesh.ops.delete(_bs,geom=_bad,context="FACES"); bmesh.ops.delete(_bs,geom=[v for v in _bs.verts if not v.link_faces],context="VERTS")
+    _bs.to_mesh(hair.data); _bs.free(); hair.data.update()
+    hv=np.array([v.co[:] for v in hair.data.vertices])
 hb=mp_arm.data.bones['Head']; HEAD_HEAD=np.array(mp_arm.matrix_world@hb.head_local); HEAD_TAIL=np.array(mp_arm.matrix_world@hb.tail_local)
 # minimal armature: Head + chains, in world frame
 bpy.ops.object.armature_add(enter_editmode=True,location=(0,0,0)); arm=bpy.context.active_object; arm.name='HairArmature'
@@ -89,7 +160,7 @@ for i,p in enumerate(W): hkd.insert(Vector(p),i)
 hkd.balance()
 bmc=bmesh.new(); bmc.from_mesh(head.data); bmc.faces.ensure_lookup_table(); bmc.verts.ensure_lookup_table()
 def _ok(f):
-    c=f.calc_center_median(); front=(c.y<-0.03 and abs(c.x)<0.08)      # face area: only above the brow line; sides and back: above the ears
+    c=f.calc_center_median(); front=(c.y<-0.03 and abs(c.x)<float(kw.get("fx",0.058)))      # face area: only above the brow line; sides and back: above the ears
     zmin=float(kw.get("capzf",1.795)) if front else float(kw.get("capzs",1.75))
     return c.z>zmin and len(hkd.find_range(c,float(kw.get("capr",0.022))))>=int(kw.get("capn",16))
 keepf=[f for f in bmc.faces if _ok(f)]

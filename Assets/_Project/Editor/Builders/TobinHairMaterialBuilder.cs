@@ -21,7 +21,7 @@ namespace SleepingCalamity.EditorTools
             mat.SetTexture("_BaseMap", Tex("Hair_BaseColor")); mat.SetColor("_BaseColor", new Color(0.80f, 0.70f, 0.64f, 1f));   // darker chestnut than the raw Tripo atlas
             mat.SetTexture("_BumpMap", Tex("Hair_Normal")); mat.EnableKeyword("_NORMALMAP"); mat.SetFloat("_BumpScale", 1f);
             mat.SetTexture("_MetallicGlossMap", Tex("Hair_MetallicSmooth")); mat.EnableKeyword("_METALLICSPECGLOSSMAP"); mat.SetFloat("_Smoothness", 1f); mat.SetFloat("_Metallic", 1f);
-            mat.SetFloat("_Cull", 0f);   // two-sided
+            mat.SetFloat("_Cull", 2f);   // single-sided (back faces were the black/navy chunks); the Blender step orients every strip face outward
             EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
         }
 
@@ -31,7 +31,7 @@ namespace SleepingCalamity.EditorTools
         {
             var mat = AssetDatabase.LoadAssetAtPath<Material>(CapPath);
             if (mat == null) { mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "Tobin_HairCap" }; AssetDatabase.CreateAsset(mat, CapPath); }
-            mat.SetColor("_BaseColor", new Color(0.24f, 0.145f, 0.085f, 1f)); mat.SetFloat("_Smoothness", 0.25f); mat.SetFloat("_Metallic", 0f);
+            mat.SetColor("_BaseColor", new Color(0.30f, 0.18f, 0.105f, 1f)); mat.SetFloat("_Smoothness", 0.25f); mat.SetFloat("_Metallic", 0f);
             EditorUtility.SetDirty(mat); return mat;
         }
 

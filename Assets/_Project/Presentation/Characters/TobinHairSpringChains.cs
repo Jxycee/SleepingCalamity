@@ -22,6 +22,8 @@ namespace SleepingCalamity.Presentation
         public float gravity = 9.8f;
         [Range(1, 8)] public int substeps = 4;
         [Range(1, 8)] public int lengthIterations = 4;
+        [Tooltip("Hair strips are single sheets: hard self-shadows turn the faces under other strips black/blue. Off = hair does not receive shadows (it still casts them).")]
+        public bool hairReceivesShadows = false;
         [Tooltip("Master blend: 0 = rigid hair (no motion), 1 = full simulation.")]
         [Range(0f, 1f)] public float weight = 1f;
 
@@ -46,6 +48,7 @@ namespace SleepingCalamity.Presentation
         void Build()
         {
             chains.Clear();
+            foreach (var r in GetComponentsInChildren<Renderer>(true)) if (r.name.StartsWith("Tobin_Hair")) r.receiveShadows = hairReceivesShadows;
             if (!head) head = FindByName(transform, "Head");
             if (!head) { Debug.LogWarning("TobinHairSpringChains: no Head bone found", this); return; }
             var roots = new Dictionary<string, SortedDictionary<int, Transform>>();
