@@ -72,5 +72,8 @@ one image in, stylised hair cards out. Installed outside the repo at `C:/AI/hair
    -> `shell/rig_export.py` -> copy `TobinHairMesh.fbx` to Content/Characters/TobinBase/HairMesh.
 5. Unity: `SC_HairCards.shader` (two-sided, gradient colour, Kajiya-Kay), material from `TobinHairMaterialBuilder.BuildCards`.
 
-Current build: run1/tobin_bust seed 1, `sx=0.92 sy=0.94 sz=1.08 dy=-0.012 dz=-0.002 lt=0.021 fs=0.015` (silhouette front 0.887,
-side 0.908, back 0.811; the side/back calibration is less certain than the front's eye/chin landmarks).
+Current build (user: "seed 1 and seed 0 would be a good mix"): `hairdeck/hd_mix.py run1/tobin_bust/cards_seed1.json run1/tobin_close/cards_seed0.json
+final.json --mode region --drop 85` = top / crown / back cards of bust seed 1 + fringe and side cards of close seed 0 (classified by where each
+card ends), minus one stray card that stuck out at the chin; fit `sx=0.85 sy=0.88 sz=1.08 dy=-0.004 dz=-0.015 lt=0.030 fs=0.024` (hd_opt with
+the face-framing band, --w 0.45,0.3,0.15,0.1). 442 strands, 20.3k tris, 37 chains. hd_strands.py seeds its randomness per card, so mixing or
+dropping cards leaves every other card's strands unchanged.

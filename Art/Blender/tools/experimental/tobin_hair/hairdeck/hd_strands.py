@@ -17,7 +17,7 @@ ap.add_argument('--side_ext', type=float, default=0.0, help='0..1: side cards in
 ap.add_argument('--ext_target', type=float, default=0.345, help='HairDeck-frame height the face-framing locks grow toward (~jaw)')
 a = ap.parse_args()
 rng = np.random.default_rng(a.seed); HEAD_C = np.array([0.0, 0.422, 0.0])        # HairDeck head-proxy centre
-cards = json.load(open(a.cards)); V, F, UV, COL, SID = [], [], [], [], []
+cards = json.load(open(a.cards)); V, F, UV, COL, SID, CID = [], [], [], [], [], []
 def resample(P, W, Tk, C, s, n):
     """curve sampled at n arc fractions in [0, s] (linear in the control points)."""
     d = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(P, axis=0), axis=1))]); d /= max(d[-1], 1e-9)
@@ -32,11 +32,13 @@ def ribbon(P, N, B, w, off_n, off_b, u0, u1, vv, col, sid):
     f = []
     for i in range(len(P) - 1):
         k = base + 2 * i; f += [[k, k + 1, k + 3], [k, k + 3, k + 2]]
-    V.append(vs); UV.append(uv); COL.append(cs); F.append(np.array(f)); SID.append(np.full(len(vs), sid))
+    V.append(vs); UV.append(uv); COL.append(cs); F.append(np.array(f)); SID.append(np.full(len(vs), sid)); CID.append(np.full(len(vs), cur_card))
 nstr = 0; nlong = 0
 for ci, c in enumerate(cards):
     S = np.array(c['seq'], float); P0, W0, T0 = S[:, :3], S[:, 3], S[:, 4]
     if len(P0) < 3: continue
+    cur_card = ci
+    rng = np.random.default_rng([a.seed, int(abs(S[0, 0]) * 1e5), int(abs(S[0, 1]) * 1e5), int(abs(S[0, 2]) * 1e5)])   # per card: mixing / dropping cards does not reshuffle the others
     if a.side_ext > 0:   # face-framing locks: tip at the side (|x| > 0.04 HairDeck units) in front of the ear centre (z > 0), hanging down
         r0, tp = P0[0], P0[-1]; hang = (tp[1] - r0[1]) < -0.01
         short = tp[1] - a.ext_target                                                    # how far above jaw height the tip ends
@@ -77,6 +79,6 @@ for ci, c in enumerate(cards):
         ws = Ws / K * rng.uniform(1.45, 1.95) * (1 - 0.88 * t ** 2.2)                    # overlap, pointed tip
         br = rng.uniform(0.86, 1.14)
         ribbon(Ps, Ns, Bs, ws, off_n, layer, 0.0, 1.0, qs, np.clip(colq(qs) * br, 0, 1), nstr); nstr += 1
-V = np.concatenate(V); F = np.concatenate(F); UV = np.concatenate(UV); COL = np.concatenate(COL); SID = np.concatenate(SID)
-np.savez(a.out, v=V.astype(np.float32), f=F.astype(np.int32), uv=UV.astype(np.float32), col=COL.astype(np.float32), sid=SID.astype(np.int32))
+V = np.concatenate(V); F = np.concatenate(F); UV = np.concatenate(UV); COL = np.concatenate(COL); SID = np.concatenate(SID); CID = np.concatenate(CID)
+np.savez(a.out, v=V.astype(np.float32), f=F.astype(np.int32), uv=UV.astype(np.float32), col=COL.astype(np.float32), sid=SID.astype(np.int32), cid=CID.astype(np.int32))
 print('STRANDS cards %d ribbons %d verts %d tris %d lengthened %d' % (len(cards), nstr, len(V), len(F), nlong))
