@@ -63,7 +63,10 @@ namespace SleepingCalamity.EditorTools
             var mat = AssetDatabase.LoadAssetAtPath<Material>(CardsPath);
             if (mat == null) { mat = new Material(sh) { name = "Tobin_HairCards" }; AssetDatabase.CreateAsset(mat, CardsPath); }
             mat.shader = sh; mat.SetFloat("_Cull", 0f);
-            mat.SetColor("_BaseColor", new Color(1.75f, 1.65f, 1.45f, 1f));   // HairDeck samples a dark ash brown (sRGB ~0.34,0.28,0.24); the reference reads mid warm brown mat.SetFloat("_Ambient", 1.4f); mat.SetFloat("_ShadowStrength", 0.55f); mat.SetFloat("_ShadowNormalOffset", 0.008f);
+            // colour gradient from the reference hair (sRGB): deep brown roots, warm brown middle, light brown tips, ~1 in 7 strands lighter (reference: a little blonde, leans brown)
+            mat.SetColor("_BaseColor", Color.white); mat.SetFloat("_GradientMix", 1f); mat.SetFloat("_GradMid", 0.4f);
+            mat.SetColor("_RootColor", new Color(0.25f, 0.17f, 0.13f)); mat.SetColor("_MidColor", new Color(0.46f, 0.35f, 0.26f)); mat.SetColor("_TipColor", new Color(0.56f, 0.44f, 0.33f));
+            mat.SetColor("_BlondeColor", new Color(0.68f, 0.55f, 0.40f)); mat.SetFloat("_BlondeChance", 0.15f); mat.SetFloat("_StrandVar", 0.22f); mat.SetFloat("_RootDark", 0.25f); mat.SetFloat("_Ambient", 1.4f); mat.SetFloat("_ShadowStrength", 0.55f); mat.SetFloat("_ShadowNormalOffset", 0.008f);
             EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
         }
 

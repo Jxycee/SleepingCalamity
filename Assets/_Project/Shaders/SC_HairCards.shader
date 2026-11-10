@@ -1,15 +1,24 @@
 // Stylised hair cards (Tobin's HairDeck hair, Art/Blender/tools/experimental/tobin_hair/hairdeck): two-sided lit cards, no alpha.
 // Mesh contract (hd_export.py): uv0 = (u across the card 0..1, v along it, 0 root .. 1 tip), uv1.x = per-card random 0..1,
 // vertex colour = HairDeck's colour along the card (sRGB). Hair direction = the uv0 bitangent (imported MikkTSpace tangents).
-// Shading: wrapped diffuse, root darkening / tip lift along v, procedural strands across u, two Kajiya-Kay highlight lobes
+// Colour: root -> middle -> tip gradient (sampled from the reference) with light strands and per-strand variation, or HairDeck's vertex
+// colours (_GradientMix 0). Shading: wrapped diffuse, root darkening / tip lift along v, procedural strands across u, two Kajiya-Kay highlight lobes
 // (a sharp one shifted toward the tip, a broad tinted one toward the root), main + additional lights, receives and casts shadows.
 Shader "SleepingCalamity/HairCards"
 {
     Properties
     {
-        _BaseColor ("Tint (multiplies the vertex colour)", Color) = (1.75, 1.65, 1.45, 1)
+        _BaseColor ("Tint", Color) = (1, 1, 1, 1)
         _UseVertexColor ("Use vertex colour (0 = tint only)", Range(0, 1)) = 1
-        _RootDark ("Root darkening", Range(0, 1)) = 0.45
+        _GradientMix ("Gradient colour (1) vs HairDeck vertex colour (0)", Range(0, 1)) = 1
+        _RootColor ("Gradient root", Color) = (0.25, 0.17, 0.13, 1)
+        _MidColor ("Gradient middle", Color) = (0.46, 0.35, 0.26, 1)
+        _TipColor ("Gradient tip", Color) = (0.56, 0.44, 0.33, 1)
+        _GradMid ("Gradient middle position along the card", Range(0.05, 0.95)) = 0.4
+        _BlondeColor ("Light strand colour", Color) = (0.68, 0.55, 0.40, 1)
+        _BlondeChance ("Share of light strands", Range(0, 1)) = 0.15
+        _StrandVar ("Per-strand brightness variation", Range(0, 0.6)) = 0.22
+        _RootDark ("Root darkening", Range(0, 1)) = 0.25
         _RootLen ("Root darkening length (fraction of the card)", Range(0.01, 1)) = 0.35
         _TipLift ("Tip lightening", Range(0, 1)) = 0.12
         _CardVar ("Per-card brightness variation", Range(0, 0.5)) = 0.12
@@ -35,7 +44,8 @@ Shader "SleepingCalamity/HairCards"
         HLSLINCLUDE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         CBUFFER_START(UnityPerMaterial)
-            half4 _BaseColor; half _UseVertexColor; half _RootDark; half _RootLen; half _TipLift; half _CardVar;
+            half4 _BaseColor; half _UseVertexColor; half _GradientMix; half4 _RootColor; half4 _MidColor; half4 _TipColor; half _GradMid;
+            half4 _BlondeColor; half _BlondeChance; half _StrandVar; half _RootDark; half _RootLen; half _TipLift; half _CardVar;
             float _Strands; half _StrandDepth; half _Wrap;
             half4 _Spec1Color; half _Spec1Exp; half _Spec1Shift; half4 _Spec2Color; half _Spec2Exp; half _Spec2Shift; half _SpecNoise;
             half _Ambient; half _ShadowStrength; float _ShadowNormalOffset; float _Cull;
@@ -90,7 +100,12 @@ Shader "SleepingCalamity/HairCards"
                 float3 T = normalize(i.hairWS);
                 float u = i.uv.x, v = saturate(i.uv.y), cardRnd = i.uv.z;
                 half3 vc = lerp(half3(1, 1, 1), SRGBToLinear(i.color.rgb), _UseVertexColor);
-                half3 base = _BaseColor.rgb * vc;
+                half3 grad = v < _GradMid ? lerp(_RootColor.rgb, _MidColor.rgb, smoothstep(0.0, _GradMid, v))
+                                          : lerp(_MidColor.rgb, _TipColor.rgb, smoothstep(_GradMid, 1.0, v));
+                float r2 = Hash11(cardRnd * 911.0 + 7.0);
+                grad = lerp(grad, _BlondeColor.rgb, (r2 > 1.0 - _BlondeChance ? 0.75 : 0.0) * smoothstep(0.1, 0.6, v));   // light strands, toward the tip
+                grad *= 1.0 + _StrandVar * (Hash11(cardRnd * 313.0 + 1.0) * 2.0 - 1.0);
+                half3 base = _BaseColor.rgb * lerp(vc, grad, _GradientMix);
                 half strand = Noise1(u * _Strands + cardRnd * 37.0) * 0.6 + Noise1(u * _Strands * 2.7 + cardRnd * 11.0 + v * 1.5) * 0.4;
                 base *= (1.0 - _StrandDepth * 0.5) + _StrandDepth * strand;
                 base *= 1.0 + _CardVar * (cardRnd * 2.0 - 1.0);

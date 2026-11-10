@@ -63,6 +63,7 @@ bs = bmh.copy(); bs.faces.ensure_lookup_table(); bs.normal_update()
 def scalp(f):   # under hair within 2.5 cm, and not the face below the hairline (the fringe hangs 3-5 cm in front of the forehead)
     c = f.calc_center_median()
     if c.y < -0.06 and c.z < 1.79: return False
+    if c.z < 1.67: return False            # nape: strand ends would show the scalp layer as dark stripes
     return th.ray_cast(c + f.normal * 0.0005, f.normal, 0.025)[0] is not None
 keep = {f.index for f in bs.faces if scalp(f)}
 bmesh.ops.delete(bs, geom=[f for f in bs.faces if f.index not in keep], context='FACES')

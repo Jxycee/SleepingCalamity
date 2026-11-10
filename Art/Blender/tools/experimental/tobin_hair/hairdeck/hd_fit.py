@@ -1,5 +1,5 @@
 # HairDeck hair cards -> TobinBase head (Blender 5.x headless).
-#   blender -b --factory-startup -P hd_fit.py -- <hair_seedN_nohead.glb> <out_dir> [clear=0.002] [sx=1] [sy=1] [sz=1] [dz=0] [dy=0] [res=700]
+#   blender -b --factory-startup -P hd_fit.py -- <hair_seedN_nohead.glb | hd_strands.py .npz> <out_dir> [clear=0.002] [sx=1] [sy=1] [sz=1] [dz=0] [dy=0] [res=700]
 # HairDeck writes hair in its canonical head frame (hairdeck/data/head_frame.py): unit = face-mesh width W, origin O = face bbox centre
 # in x / depth and face bbox top in height (W, O from workspace/data/head_frame_train.npz: W 0.1276, O (0, 0.4791, 0.0258), glTF y up,
 # face +z). The glTF importer turns that into Blender z up, face -y: O_B = (0, -0.0258, 0.4791). TobinBase's matching box is AvatarHead
@@ -29,12 +29,21 @@ HV = np.array([v.co[:] for v in bmh.verts]); HV = HV[HV[:, 2] > 1.60]
 A = Vector((0.5 * (HV[:, 0].min() + HV[:, 0].max()), 0.5 * (HV[:, 1].min() + HV[:, 1].max()), HV[:, 2].max()))
 s = np.ptp(HV[:, 0]) / W_C
 print('TOBIN head width %.4f depth %.4f top %.4f -> scale %.3f' % (np.ptp(HV[:, 0]), np.ptp(HV[:, 1]), HV[:, 2].max(), s))
-before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=GLB)
-new = [o for o in bpy.data.objects if o not in before]; hair = [o for o in new if o.type == 'MESH'][0]
-bpy.context.view_layer.update(); hair.data.transform(hair.matrix_world); hair.parent = None; hair.matrix_world = Matrix.Identity(4)
-for o in new:
-    if o != hair: bpy.data.objects.remove(o)
-hair.name = 'Tobin_Hair'
+if GLB.lower().endswith('.npz'):   # hd_strands.py output (HairDeck frame, y up, face +z) -> Blender (x, -z, y)
+    d = np.load(GLB); vv = d['v'].astype(float); vv = np.c_[vv[:, 0], -vv[:, 2], vv[:, 1]]
+    me = bpy.data.meshes.new('Tobin_Hair'); me.from_pydata(vv.tolist(), [], d['f'].tolist())
+    uvl = me.uv_layers.new(name='UVMap'); li = np.zeros(len(me.loops), int); me.loops.foreach_get('vertex_index', li)
+    uvl.data.foreach_set('uv', d['uv'][li].ravel())
+    ca = me.color_attributes.new('Color', 'BYTE_COLOR', 'CORNER'); cs = np.c_[d['col'][li], np.ones(len(li))]
+    for k, c_ in enumerate(ca.data): c_.color_srgb = cs[k]
+    hair = bpy.data.objects.new('Tobin_Hair', me); bpy.context.scene.collection.objects.link(hair)
+else:
+    before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=GLB)
+    new = [o for o in bpy.data.objects if o not in before]; hair = [o for o in new if o.type == 'MESH'][0]
+    bpy.context.view_layer.update(); hair.data.transform(hair.matrix_world); hair.parent = None; hair.matrix_world = Matrix.Identity(4)
+    for o in new:
+        if o != hair: bpy.data.objects.remove(o)
+    hair.name = 'Tobin_Hair'
 if kw.get('fit', 'ell') == 'ell':
     # HairDeck's head proxy is a fixed ellipsoid (glTF centre (0, 0.422, 0.0003), radii x 0.0517, y 0.0638, z 0.0638 = Blender centre
     # (0, -0.0003, 0.422), radii (0.0517, 0.0638, 0.0638)); map it onto a least-squares axis-aligned ellipsoid of TobinBase's cranium
