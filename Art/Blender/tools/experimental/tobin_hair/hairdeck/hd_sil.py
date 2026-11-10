@@ -27,6 +27,15 @@ def score(meshes, hull, zmin=1.68, overlay=None):
         if overlay:
             im = np.full(ref.shape + (3,), 255, np.uint8); im[r & o] = (150, 150, 150); im[o & ~r] = (40, 40, 230); im[r & ~o] = (230, 120, 30)
             cv2.line(im, (0, row), (im.shape[1], row), (0, 160, 0), 1); tiles.append(cv2.resize(im, (int(im.shape[1] * 400 / im.shape[0]), 400)))
+    # face-framing band: front view between chin and zmin, outside the face width (|x| > 0.06 m), so locks hanging to the cheeks count
+    # without the stylised-reference vs TobinBase face mismatch
+    c = cal['front']; sz = c.get('sz', c['s']); ref = M['front']; ours = np.zeros_like(ref)
+    for V, F in meshes: ours |= raster(V, F, 'front', cal, ref.shape)
+    r0, r1 = int(c['eye_py'] - sz * (zmin - cal['eye_z'])), int(c['eye_py'] - sz * (1.60 - cal['eye_z']))
+    cols = np.abs(np.arange(ref.shape[1]) - c['cx']) > c['s'] * 0.06
+    band = np.zeros_like(ref); band[max(r0, 0):max(r1, 0)] = True; band &= cols[None, :]
+    rb, ob = ref & band, ours & band
+    out['frame'] = dict(iou=(rb & ob).sum() / max((rb | ob).sum(), 1), over=(ob & ~rb).sum() / max(ob.sum(), 1), miss=(rb & ~ob).sum() / max(rb.sum(), 1))
     out['mean_iou'] = float(np.mean([out[v]['iou'] for v in AX]))
     if overlay: cv2.imwrite(overlay, np.hstack(tiles))
     return out
@@ -37,4 +46,4 @@ if __name__ == '__main__':
     head = load_mesh(a[0], 'AvatarHead'); d = np.load(a[1]); key = [k[:-2] for k in d.files if k.endswith('_v')][0]
     hair = (d[key + '_v'].astype(float), d[key + '_f'])
     r = score([head, hair], a[2], zmin, a[3] if len(a) > 3 and not a[3].startswith('--') else None)
-    print('SIL', ' '.join(f"{v}: iou {r[v]['iou']:.3f} over {r[v]['over']:.3f} miss {r[v]['miss']:.3f}" for v in AX), f"| mean {r['mean_iou']:.3f}")
+    print('SIL', ' '.join(f"{v}: iou {r[v]['iou']:.3f} over {r[v]['over']:.3f} miss {r[v]['miss']:.3f}" for v in list(AX) + ['frame']), f"| mean {r['mean_iou']:.3f}")
