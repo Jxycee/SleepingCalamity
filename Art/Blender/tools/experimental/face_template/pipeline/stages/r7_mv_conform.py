@@ -26,7 +26,7 @@ wf = wof[t.faces]; wf = wf[(wf[:, 0] != wf[:, 1]) & (wf[:, 1] != wf[:, 2]) & (wf
 E = edges_of(wf); nW = len(reps); adj = sp.coo_matrix((np.ones(len(E)), (E[:, 0], E[:, 1])), shape=(nW, nW)); adj = (adj + adj.T).tocsr(); deg = np.maximum(np.asarray(adj.sum(1)).ravel(), 1)
 # weights: 1 on skull/ears/neck sides, 0 on the face region (+ fade), 0 on the pinned lower neck
 face = MT.M['face'].copy()
-for k in ('eye_socket', 'mouth_interior', 'nostril', 'lip_line', 'lip_seam_all', 'eyelid_ring_L', 'eyelid_ring_R'): face[t.S(k)] = True
+for k in ('eye_socket', 'mouth_interior', 'nostril', 'lip_line', 'lip_seam_all', 'eyelid_ring_L', 'eyelid_ring_R', 'lip_patch_upper_verts', 'lip_patch_lower_verts'): face[t.S(k)] = True   # lip patch: the overlay layer must not move away from the skin under it (v2 eval: it caused the pink blotches)
 dface = cKDTree(t.basis[face]).query(t.basis)[0] * 1e3; w = np.clip((dface - 1.0) / max(A.fade, 1e-6), 0, 1); w = w * w * (3 - 2 * w)
 zf = np.clip((P0[:, 2] - (chin_z - 0.05)) / 0.04, 0, 1); w = w * zf * zf * (3 - 2 * zf)
 ear = np.zeros(len(w), bool); ear[t.S('ear_L')] = True; ear[t.S('ear_R')] = True; ear = np.isin(t.rep, t.rep[ear]); w = np.where(ear, np.minimum(1.0, A.earw) * np.maximum(w, 0.0), w)
