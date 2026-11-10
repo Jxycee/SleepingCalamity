@@ -5,7 +5,7 @@ Full write-up with the decision table: `C:/AI/test_out/heroes/model_research/INT
 ## What changed in the picture
 1. **Views: FLUX.2 klein 9B (fp8) multi-reference edit beats SDXL+ControlNet-depth** for photoreal identity: 12-15 s per view, same freckles/eyes/ears from one front photo, natural neck and skull. It ignores a depth reference (no geometric control), so the skull is "plausible", not calibrated to the template. SDXL+depth stays the calibrated option (circular, see README).
 2. **Shape: Hunyuan3D-2mv (kijai wrapper) replaces TRELLIS multi-view**: 53 s and 5.9 GB peak (TRELLIS 318 s, 6.8 GB), no scratches and 22 floater faces instead of 2305 pieces, rounded back of skull, clean nose/lips/ear. On the mv1 SDXL views: silhouette IoU front .892 / left .946 / right .932 / back .879 / held-out 3/4 .933 / .941; side joint 3.4 (TRELLIS 2.1, prior p95 3.7).
-3. **Pink lip blotches = the lip-patch overlay layer** (`lip_patch_*_verts`, 1434 faces) poking through the skin after the wrap; deleting those faces in `mv1mv.blend` removes every blotch (lips stay, they exist in the main surface). The patch is a second layer a fraction of a mm above the lips; the wrap moves it 8-9 mm on average (max 26 mm) differently from the skin, so it intersects (jagged cheek/chin polygons, broken lip geometry in clay). Slider-only head and old single-photo fit move the patch with the keys, hence clean.
+3. **Pink lip blotches come from `stages/r7_mv_conform.py`** (multiview mode). Same texture and camera, per-stage meshes (`v2_eval/H_stage_sheet.png`): old run r1/r51/a6/h6 clean; multiview r1 (wrap) clean; multiview r51 (= r7 output) and h6 blotchy. r7 zero-weights `M['face']`, eye/lip-line/seam sets and `mouth_interior` but not `lip_patch_upper_verts/lower_verts`; it moves 238 of the 800 patch vertices by >0.5 mm (max 13.3 mm) while the skin around the mouth moves 0.05 mm, so the lip-texture layer (1434 faces over the main lips) detaches and pierces the skin. Deleting the patch faces removes all blotches; undoing only that displacement removes them too (`H_fix_sheet.png`). The albedo texture is clean.
 4. **Hybrid works**: skull/back from the multiview fit, face + ears from the single-photo slider fit (`hybrid_face.py`): no blotches, clean lips/nose/ears, rounded back (sheet `v2_eval/E_hybrid_sheet.png`).
 
 ## Proposed v2 steps
@@ -18,11 +18,11 @@ Full write-up with the decision table: `C:/AI/test_out/heroes/model_research/INT
 | 5 | score | `mv_silhouette_iou.py` + side prior | 1 min | gate: mean IoU >= .90, side joint <= 3.7 |
 | 6 | wrap + conform | existing r1 + r7 on the Hunyuan shape | existing | |
 | 7 | face region | single-photo slider fit (existing fit/snap) of the same front photo | existing | |
-| 8 | merge | `hybrid_face.py --ears` | s | then lip patch must stay slaved (fix below) |
-| 9 | texture | front projection + multi-view c6_02b; klein delight for the side/back sources | | |
+| 8 | merge | `hybrid_face.py --ears` (optional once the r7 fix is in) | s | face smoothness + clean ears |
+| 9 | texture | front projection + multi-view c6_02b (klein delight tested: does not de-light, skip) | | |
 
-## Fix for the lip patch (not implemented, needs a stage change)
-After any wrap: re-derive `lip_patch_*_verts` from the wrapped main surface instead of letting nricp move them (barycentric on the main lip faces + the template's normal offset), or exclude them from the wrap targets and give them the displacement of their nearest main vertices. Add a gate: no patch face may intersect the main surface (ray test along the template normal).
+## Fix for the lip patch (one line, not applied: stages are frozen this round)
+In `stages/r7_mv_conform.py` add `'lip_patch_upper_verts', 'lip_patch_lower_verts'` to the tuple of sets that are forced into the zero-weight `face` mask. Add a gate: no lip-patch vertex may move more than 1 mm relative to its paired skin vertices in any conform/snap step.
 
 ## Scrap
 SDXL+ControlNet-depth grid as the shape source (circular), TRELLIS multi-view shape, FLUX.1 Depth (traces the guide, ages the face), MV-Adapter i2mv on 12 GB (79 s/step), nvfp4 klein on this machine (slower than fp8, no triton), single-photo ratio fit for the skull.
