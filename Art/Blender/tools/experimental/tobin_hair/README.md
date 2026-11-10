@@ -22,3 +22,14 @@ Debris removal (all parameters overridable as key=value after `--`): tiny faces 
 Diagnostics kept: `flag.py` (candidate shard sets in red), capture env `SC_MATVAR=cullback|cullfront|nonorm|nomr`, `SC_NOSHAD=1`.
 Reproduce: `blender -b --factory-startup -P hair_rig2.py -- <out>`, `blender -b <out>/Tobin_mp_hair.blend -P export_fbx2.py -- <out>/TobinHairMesh.fbx`, copy the FBX to Content/Characters/TobinBase/HairMesh, capture with `SC_REAL=1 SC_HQ=1 SC_SIZE=1400`.
 Tiles: C:/AI/test_out/heroes/tobin/hair_v6/clean7/.
+
+## Hair rebuilt as cards (2026-11-10, replaces the Tripo sheet mesh)
+Why: the Tripo mesh could only be trimmed (a haircut, not the intended style). New route, all local:
+1. Photoreal reference: FLUX.2 klein 9B edits the stylized concept head crop into a photoreal portrait with the same hairstyle (`v2/klein_views.py`, 10 s).
+2. DiffLocks (WSL, `C:/AI/difflocks/run1.sh`, run with `MSYS_NO_PATHCONV=1 wsl bash ...`) turns that portrait into ~100k strands: this time a side part, swept fringe, layered volume, sides over the ears (the stylized image gave a centre-parted bob).
+3. `hair_trim.py` (difflocks_trim_experiment.py) fits the strands to the MetaPerson head and applies a mild length trim (fringe 1.735, sides 1.60, back 1.605, squeeze 0.95).
+4. `cards/cards_from_strands.py`: clusters strands (K=260 by root + tip), one mean curve per cluster, 2 cards each (full + shorter, shifted), 9 rings, 3 verts across (bulged), tapered to a point, outward-facing, UV into an 8-variant strand atlas -> 520 cards, 14.6k tris (the old mesh: 16.8k ragged tris).
+5. `cards/hair_atlas.py`: procedural strand atlas (RGBA colour with alpha-cut tips, normal, metal/smooth; env HA_N / HA_T0 / HA_T1 set strand count and thickness; used 70 strands, 7-13 px).
+6. `hair_rig3.py`: same chain rig as hair_rig2 (`src=<cards.blend> fit=0 debris=0 shards=0 clear=0.005 K=48`; outward orientation, head clearance push, scalp cap over the whole crown `capall=1.77`), `export_fbx2.py`.
+7. Unity: `TobinHairMaterialBuilder` now builds the card material (alpha clip 0.38, single-sided, mip coverage preserved); the capture (`SC_REAL=1 SC_HQ=1 SC_SIZE=1400`) renders it on TobinBase.
+Known rough spots: the scalp cap shows as a flat brown patch at the parting and a faint band at the hairline; strand texture is procedural (stair-stepped chevrons where cards overlap on the crown); thin dark-blue wisps at the lowest side tips; fringe length over the eyes was set by eye. Tiles: C:/AI/test_out/heroes/tobin/hair_v7/cards6/.

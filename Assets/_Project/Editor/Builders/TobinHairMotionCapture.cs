@@ -33,7 +33,7 @@ namespace SleepingCalamity.EditorTools
                     MakeLight("Key", 2.1f, new Color(1f, 0.93f, 0.84f), new Vector3(32, 28, 0), true);
                     MakeLight("Fill", 0.55f, new Color(0.78f, 0.86f, 1f), new Vector3(12, -62, 0), false);
                     MakeLight("Rim", 1.3f, new Color(1f, 0.97f, 0.92f), new Vector3(38, 200, 0), true);
-                    RenderSettings.ambientLight = new Color(0.34f, 0.36f, 0.4f);
+                    RenderSettings.ambientLight = new Color(0.40f, 0.37f, 0.34f);
                 }
                 else MakeLight("Sun", 1.3f, Color.white, new Vector3(42, 28, 0), false);
                 var skin = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "Skin" }; skin.SetColor("_BaseColor", new Color(0.72f, 0.58f, 0.5f)); skin.SetFloat("_Smoothness", 0.2f);
@@ -85,7 +85,7 @@ namespace SleepingCalamity.EditorTools
                     var ca = prof.Add<UnityEngine.Rendering.Universal.ColorAdjustments>(true); ca.postExposure.Override(0.15f); ca.contrast.Override(8f); ca.saturation.Override(6f);
                     QualitySettings.shadowDistance = 6f;
                 }
-                cam.Render();   // warm-up: the first render of a fresh scene came out dark
+                cam.Render(); cam.Render(); cam.Render();   // warm-up: the first renders of a fresh scene came out dark / glossy (textures and shaders still loading)
                 Vector3 centre = realHead.position + new Vector3(0, hq ? 0.075f : 0.07f, 0);
                 var rot0 = realHead.localRotation; const float dt = 1f / 30f; int[] shoot = hq ? new[] { 0, 14, 28, 42, 56, 83 } : new[] { 0, 14, 28, 42, 56, 83 }; string[] names = { "rest", "yawL", "mid", "yawR", "nod", "settle" };
                 for (int f = 0; f < 84; f++)
@@ -97,7 +97,7 @@ namespace SleepingCalamity.EditorTools
                     foreach (var (nm, az) in new[] { ("f", 0f), ("q", 40f), ("s", 90f), ("b", 180f) })
                     {
                         cam.transform.position = centre + Quaternion.Euler(0, az, 0) * new Vector3(0, 0, 2.2f); cam.transform.LookAt(centre);
-                        cam.Render(); var prev = RenderTexture.active; RenderTexture.active = rt;
+                        cam.Render(); cam.Render(); var prev = RenderTexture.active; RenderTexture.active = rt;
                         var tex = new Texture2D(Size, Size, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, Size, Size), 0, 0); tex.Apply(); RenderTexture.active = prev;
                         File.WriteAllBytes(Path.Combine(dir, names[si] + "_" + nm + ".png"), tex.EncodeToPNG()); Object.DestroyImmediate(tex);
                     }

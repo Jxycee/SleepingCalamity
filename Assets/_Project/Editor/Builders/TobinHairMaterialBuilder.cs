@@ -14,13 +14,14 @@ namespace SleepingCalamity.EditorTools
         public static Material Build()
         {
             Directory.CreateDirectory(Folder + "/Materials");
-            Import("Hair_BaseColor", srgb: true, normal: false); Import("Hair_Normal", srgb: false, normal: true); Import("Hair_MetallicSmooth", srgb: false, normal: false);
+            Import("Hair_Cards_BaseColor", srgb: true, normal: false); Import("Hair_Cards_Normal", srgb: false, normal: true); Import("Hair_Cards_MetallicSmooth", srgb: false, normal: false);
             var mat = AssetDatabase.LoadAssetAtPath<Material>(MatPath);
             if (mat == null) { mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "Tobin_Hair" }; AssetDatabase.CreateAsset(mat, MatPath); }
             mat.shader = Shader.Find("Universal Render Pipeline/Lit");
-            mat.SetTexture("_BaseMap", Tex("Hair_BaseColor")); mat.SetColor("_BaseColor", new Color(0.80f, 0.70f, 0.64f, 1f));   // darker chestnut than the raw Tripo atlas
-            mat.SetTexture("_BumpMap", Tex("Hair_Normal")); mat.EnableKeyword("_NORMALMAP"); mat.SetFloat("_BumpScale", 1f);
-            mat.SetTexture("_MetallicGlossMap", Tex("Hair_MetallicSmooth")); mat.EnableKeyword("_METALLICSPECGLOSSMAP"); mat.SetFloat("_Smoothness", 1f); mat.SetFloat("_Metallic", 1f);
+            mat.SetTexture("_BaseMap", Tex("Hair_Cards_BaseColor")); mat.SetColor("_BaseColor", Color.white);
+            mat.SetTexture("_BumpMap", Tex("Hair_Cards_Normal")); mat.EnableKeyword("_NORMALMAP"); mat.SetFloat("_BumpScale", 1f);
+            mat.SetTexture("_MetallicGlossMap", Tex("Hair_Cards_MetallicSmooth")); mat.EnableKeyword("_METALLICSPECGLOSSMAP"); mat.SetFloat("_Smoothness", 1f); mat.SetFloat("_Metallic", 1f);
+            mat.SetFloat("_AlphaClip", 1f); mat.SetFloat("_Cutoff", 0.38f); mat.EnableKeyword("_ALPHATEST_ON"); mat.renderQueue = 2450; mat.SetOverrideTag("RenderType", "TransparentCutout");   // hair cards: alpha-cut strand atlas
             mat.SetFloat("_Cull", 2f);   // single-sided (back faces were the black/navy chunks); the Blender step orients every strip face outward
             EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
         }
@@ -42,7 +43,7 @@ namespace SleepingCalamity.EditorTools
             string p = Folder + "/Textures/" + n + ".png"; AssetDatabase.ImportAsset(p);
             var ti = (TextureImporter)AssetImporter.GetAtPath(p);
             if (ti == null) return;
-            ti.sRGBTexture = srgb; ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default; ti.maxTextureSize = 2048; ti.mipmapEnabled = true;
+            ti.sRGBTexture = srgb; ti.alphaSource = TextureImporterAlphaSource.FromInput; ti.alphaIsTransparency = srgb; if (srgb) { ti.mipMapsPreserveCoverage = true; ti.alphaTestReferenceValue = 0.38f; } ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default; ti.maxTextureSize = 2048; ti.mipmapEnabled = true;
             ti.SaveAndReimport();
         }
 
