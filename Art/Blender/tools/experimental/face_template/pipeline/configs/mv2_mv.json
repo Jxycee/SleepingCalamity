@@ -1,0 +1,15 @@
+{
+  "mode": "multiview",
+  "image": "C:/AI/test_out/heroes/pipeline_runs/mv2/source.png",
+  "name": "mv2mv",
+  "out_dir": "C:/AI/test_out/heroes/pipeline_runs/mv2/run",
+  "multiview": {
+    "headframe_npz": "C:/AI/test_out/heroes/pipeline_runs/mv2/recon/fblr_headframe.npz",
+    "cutout_dir": "C:/AI/trellis2/ComfyUI/input",
+    "cutout_tag": "p2"
+  },
+  "align": {"soft_gate": true},
+  "fit": {"seed_theta": null},
+  "iris_colour": "auto",
+  "prep": {"auto_mode": "fractions"}
+}

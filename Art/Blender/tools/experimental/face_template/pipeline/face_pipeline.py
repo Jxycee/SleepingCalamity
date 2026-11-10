@@ -17,8 +17,16 @@ def deep_merge(a, b):
     for k, v in b.items(): o[k] = deep_merge(a[k], v) if isinstance(v, dict) and isinstance(a.get(k), dict) else v
     return o
 
+# multi-view mode (config "mode": "multiview", multiview/README.md): the 3D shape is trusted; the single-photo ratio stages are switched off (a config file can still override any of these)
+MV_PRESET = {"multiview": {"clean": {"enabled": True, "voxel": 0.0025, "taubin": 20, "faces": 40000},
+                           "conform": {"enabled": True, "iters": 40, "alpha": 0.8, "maxmm": 40, "fade": 12, "smooth": 5, "earw": 1.0},
+                           "skip_fit": True, "textures": {"enabled": True}},
+             "snap": {"soft_gate": True, "snap_gain": 0.0, "skull_width": False, "skull_pass2": False, "refit": {"iters": 0}, "polish": {"iters": 0}, "skulldepth": {"enabled": False}, "symmetrize": {"enabled": False}}}
+
 def load_cfg(path):
-    cfg = deep_merge(json.load(open(DEFAULTS)), json.load(open(path)))
+    user = json.load(open(path)); base = json.load(open(DEFAULTS))
+    if user.get('mode') == 'multiview': base = deep_merge(base, MV_PRESET)
+    cfg = deep_merge(base, user)
     for k in ('image', 'name', 'out_dir'):
         if not cfg.get(k): raise SystemExit('config needs "%s"' % k)
     return cfg
@@ -76,6 +84,10 @@ def s_prep_image(c):
 
 def s_target_3d(c):
     H = c.cfg['hunyuan']; T = c.P.target; os.makedirs(T + '/glb', exist_ok=True)
+    MVc = c.cfg.get('multiview') or {}
+    if c.cfg.get('mode') == 'multiview' and MVc.get('headframe_npz') and MVc.get('clean', {}).get('enabled'):   # clean the TRELLIS multi-view mesh: largest piece, solid re-extraction (cracks, scratch sheets, terraces), cap, decimate
+        Cl = MVc['clean']; c.py(os.path.join(STAGE_DIR, '..', 'multiview', 'mv_clean_shape.py'), MVc['headframe_npz'], T + '/shape.glb', '--voxel', Cl['voxel'], '--taubin', Cl['taubin'], '--faces', Cl['faces'], '--report', T + '/clean_report.json', expect='faces_out')
+        json.dump(dict(chosen='multiview_clean', glb=T + '/shape.glb'), open(T + '/pick.json', 'w')); return
     if H.get('pinned_glb'):
         shutil.copy(H['pinned_glb'], T + '/shape.glb'); json.dump(dict(chosen='pinned', glb=H['pinned_glb']), open(T + '/pick.json', 'w')); return
     if port_up(8188):   # free the TRELLIS server's models before Hunyuan loads
@@ -131,14 +143,24 @@ def s_align(c):
     c.py('r2_03_align.py', A['lm_weight'], A['zcut_offset']); c.py('r2_03b_crop.py')
     c.py('r2_04_sliders.py', A['slider_lam'], A['slider_zr']); c.py('r2_04_sliders.py', A['slider_lam'], A['slider_zr'], 'noeye', '_noeye'); c.py('r2_03c_lmpairs.py')
     W = A['wrap']
-    c.py('r3_02_wrap.py', '1', '--pass2', W['pass2'], '--prewarp', W['prewarp'], '--eyelm', W['eyelm'], '--sliders', 'slider_verts_noeye.npy', expect='PASS')
+    c.py('r3_02_wrap.py', '1', '--pass2', W['pass2'], '--prewarp', W['prewarp'], '--eyelm', W['eyelm'], '--sliders', 'slider_verts_noeye.npy', *(['--steps', W['steps']] if W.get('steps') else []), expect='PASS')
     c.render_lm('1')
+    MVc = c.cfg.get('multiview') or {}
+    if c.cfg.get('mode') == 'multiview':   # no single-photo skull stretch: conform the non-face parts to the 3D shape, keep the face as the wrap made it
+        Cf = MVc['conform']
+        if Cf.get('enabled'): c.py('r7_mv_conform.py', '1', '51', '--iters', Cf['iters'], '--alpha', Cf['alpha'], '--maxmm', Cf['maxmm'], '--fade', Cf['fade'], '--smooth', Cf['smooth'], '--earw', Cf['earw'], expect='CONFORM DONE')
+        else:
+            for sfx in ('basis.npy', 'keys.npy', 'mesh.npz', 'report.json'): shutil.copy(F + '/wrap_r1_' + sfx, F + '/wrap_r51_' + sfx)
+        c.render_lm('51'); return
     S = c.cfg['skull']
     c.py('r4_02_global.py', F + '/wrap_r1_basis.npy', F + '/rn_1.png', F + '/_cam_1.json', F + '/lm_1.json', '51', '--hmax', S['hmax'], *(['--nowidth'] if S['nowidth'] else []), expect=(None if c.cfg['align'].get('soft_gate') else 'GATES PASS=True'))   # soft_gate: the fit stage enforces the gates again, so a start state that misses one is a warning
     c.render_lm('51')
 
 def s_fit(c):
     F, Q = c.P.fit, c.cfg['fit']
+    if c.cfg.get('mode') == 'multiview' and (c.cfg.get('multiview') or {}).get('skip_fit'):   # the ratio/slider fit chases ONE photo's landmark ratios: keep the 3D-conformed wrap (r51) as the fit result
+        for sfx in ('basis.npy', 'keys.npy', 'mesh.npz', 'report.json'): shutil.copy(F + '/wrap_r51_' + sfx, F + '/wrap_r%s_%s' % (Q['tag'], sfx))
+        c.render_lm(Q['tag']); open(F + '/fit_%s.log' % Q['tag'], 'w').write('multiview mode: fit skipped (copy of r51)'); return
     cols = 'all' if c.cfg['template']['sliders_enabled'] else 'warp'
     c.env['SCP_LM_JIT'] = str(Q.get('lm_jitter', 0))   # inherited by the batch landmark detector the loop calls
     c.py('r6_06_sliderloop.py', F + '/wrap_r51_basis.npy', F + '/lm_51.json', F + '/_cam_51.json', F + '/rn_51.png', Q['tag'], '--cols', cols, *(['--seed', Q['seed_theta']] if Q.get('seed_theta') else []),
@@ -148,18 +170,21 @@ def s_fit(c):
 
 def s_snap(c):
     F, Q, N = c.P.fit, c.cfg['fit'], c.cfg['snap']
+    def shot(label):   # diagnosis only (snap.snapshots, default off): keep the mesh after each snap sub-step for per-stage drift tables
+        if N.get('snapshots'):
+            os.makedirs(F + '/snapshots', exist_ok=True); shutil.copy(F + '/wrap_r%s_mesh.npz' % N['tag'], F + '/snapshots/%s.npz' % label)
     c.render_lm(Q['tag'])
     c.py('r6_03_corr.py', F + '/wrap_r%s_basis.npy' % Q['tag'], F + '/lm_%s.json' % Q['tag'], F + '/_cam_%s.json' % Q['tag'], F + '/rn_%s.png' % Q['tag'], N['tag'],
-         '--damp', N['damp'], '--snapmode', N['snapmode'], '--snapsmooth', N['snapsmooth'], expect='GATES PASS=True')
-    c.render_lm(N['tag'])
+         '--damp', N['damp'], '--snapmode', N['snapmode'], '--snapsmooth', N['snapsmooth'], *(['--snap', N['snap_gain']] if 'snap_gain' in N else []), expect=(None if N.get('soft_gate') else 'GATES PASS=True'))   # soft_gate (multiview): the gates are reported in wrap_r<tag>_report.json, not blocking
+    c.render_lm(N['tag']); shot('1_corr')
     if N.get('skull_width', True):   # generic skull-width match above the brows (the ratio fit does not see the dome); re-render afterwards
-        c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag'])
+        c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag']); shot('2_skullw1')
         if N.get('skull_pass2', True):   # second pass on the re-rendered mesh: the first pass leaves a residual (its width / height measure moves with the change); runs before the refit so the ratio fit sees the final dome
-            c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag'])
+            c.py('r6_04_skullw.py', N['tag'], expect='SKULLW DONE'); c.render_lm(N['tag']); shot('3_skullw2')
     SD = N.get('skulldepth') or {}
     def skulldepth(when):
         if SD.get('enabled') and SD.get('when', 'late') == when:   # round 16: y-only back-of-skull field + crown-cap widening against the SDXL side-profile prior (r6_16)
-            c.py('r6_16_skulldepth.py', N['tag'], expect='SKULLDEPTH DONE'); c.render_lm(N['tag'])
+            c.py('r6_16_skulldepth.py', N['tag'], expect='SKULLDEPTH DONE'); c.render_lm(N['tag']); shot('4_skulldepth_' + when)
     skulldepth('early')   # 'early' = before the ratio re-fit / polish (they then re-fit from the warped skull; measured chaotic: a 5 mm change moved char4's re-fit to a worse optimum)
     R = N.get('refit') or {}
     if R.get('iters', 0) > 0:   # slider-only ratio re-fit on top of the snapped mesh; kept only if the score does not regress (r6_12_refit_accept)
@@ -170,6 +195,7 @@ def s_snap(c):
         c.mp('r6_10_score.py', 'base=%s/rn_%s.png' % (F, tg), 'cand=%s/rn_%s.png' % (F, ct))
         c.py('r6_12_refit_accept.py', tg, ct, expect='REFIT DONE')
         if json.load(open(F + '/refit_decision.json'))['accepted']: c.render_lm(tg)
+        shot('5_refit_' + ('accepted' if json.load(open(F + '/refit_decision.json'))['accepted'] else 'rejected'))
     Pl = N.get('polish') or {}
     if Pl.get('iters', 0) > 0:   # local landmark polish (r6_13): closes the ratio residuals the global fit cannot reach, under the same 3D skin cap / gates; judged like the re-fit with a stricter IoU tolerance
         tg, pt = N['tag'], Pl.get('tag', 'p6'); c.env['SCP_LM_JIT'] = '5'
@@ -178,6 +204,7 @@ def s_snap(c):
         c.mp('r6_10_score.py', 'base=%s/rn_%s.png' % (F, tg), 'cand=%s/rn_%s.png' % (F, pt))
         c.py('r6_12_refit_accept.py', tg, pt, '--label', 'polish', '--decision', 'polish_decision.json', '--iou_tol', Pl['iou_tol'], expect='REFIT DONE')
         if json.load(open(F + '/polish_decision.json'))['accepted']: c.render_lm(tg)
+        shot('6_polish_' + ('accepted' if json.load(open(F + '/polish_decision.json'))['accepted'] else 'rejected'))
     skulldepth('late')    # default: after the polish, before the symmetrize; y-only, so the front view (ratios, IoU) is untouched apart from the optional taper-gated x widening
     Sy = N.get('symmetrize') or {}
     if Sy.get('enabled'):   # round 14: mirror-symmetric displacement field (mean of the two halves, or the better half); judged like the polish (IoU / 3D skin / gates), ear L/R metric in fit/ear_metric.json
@@ -186,6 +213,7 @@ def s_snap(c):
         c.mp('r6_10_score.py', 'base=%s/rn_%s.png' % (F, tg), 'cand=%s/rn_%s.png' % (F, st_))
         c.py('r6_12_refit_accept.py', tg, st_, '--label', 'symmetrize', '--decision', 'symmetrize_decision.json', '--iou_tol', Sy.get('iou_tol', 0.02), '--key_margin', Sy.get('key_margin', -0.3), expect='REFIT DONE')
         if json.load(open(F + '/symmetrize_decision.json'))['accepted']: c.render_lm(tg)
+        shot('7_symmetrize_' + ('accepted' if json.load(open(F + '/symmetrize_decision.json'))['accepted'] else 'rejected'))
 
 def s_key_transfer(c):
     """Keys are delta-transferred inside r6_06/r6_03 (wrap_r<tag>_keys.npy); this stage proves them and records the jaw-key hinge rescale input (the rescale itself is applied in reseat)."""
@@ -206,6 +234,9 @@ def s_reseat(c):
 def s_texture(c):
     c.env['SC_FINAL_TAG'] = c.cfg['snap']['tag']
     c.py('c6_01_mapfit.py'); c.py('c6_02_texture.py', expect='TEXTURE DONE'); c.py('c6_03_eyes.py')
+    MVc = c.cfg.get('multiview') or {}
+    if c.cfg.get('mode') == 'multiview' and MVc.get('textures', {}).get('enabled') and MVc.get('cutout_dir'):   # side / back / 3/4 colour from the other generated views (the front photo only sees the face)
+        c.py('c6_02b_mv_texture.py', MVc['headframe_npz'], MVc['cutout_dir'], MVc['cutout_tag'], expect='MVTEX DONE')
 
 def s_skin_detail(c):
     """optional procedural pores/furrows layer (skin_detail/, round 16: user-approved look, default ON at strength 1.5). Writes out/skin_detail/{albedo,normal,roughness}_detail.png + report.json; the build swaps them in.
@@ -246,22 +277,23 @@ def s_sheet(c):
 # name, fn, scripts, cfg param keys, inputs (relative to run dir; '@image' = config image), outputs, est. minutes, gpu
 STAGE_TABLE = [
  ('prep_image',      s_prep_image,      ['prep_image.py'], ['prep'], ['@image'], ['target/crop_src.png', 'target/mask_vis.png', 'target/cutout_rgba.png'], 0.1, False),
- ('target_3d',       s_target_3d,       ['target_pick.py', 'cloud_render_clay.py'], ['hunyuan'], ['target/cutout_rgba.png'], ['target/shape.glb', 'target/pick.json'], 8, True),
+ ('target_3d',       s_target_3d,       ['target_pick.py', 'cloud_render_clay.py', '../multiview/mv_clean_shape.py'], ['hunyuan', 'mode', 'multiview'], ['target/cutout_rgba.png'], ['target/shape.glb', 'target/pick.json'], 8, True),
  ('photo_landmarks', s_photo_landmarks, ['photo_landmarks.py'], [], ['target/crop_src.png'], ['target/landmarks.json'], 0.1, False),
  ('template_prep',   s_template_prep,   ['r6_00_make_template.py'], ['template'], [], ['fit/tobin_head_template6.npz'], 0.3, False),
- ('align',           s_align,           ['r6_01_blender.py', 'r2_02_landmarks.py', 'r2_03_align.py', 'r2_03b_crop.py', 'r2_03c_lmpairs.py', 'r2_04_sliders.py', 'r3_02_wrap.py', 'r4_02_global.py', 'r6_prep_render.py', 'r2_common.py', 'r3_common.py', 'r4_common.py', 'fit_checks.py'],
-                     ['align', 'skull', 'render'], ['target/shape.glb', 'fit/tobin_head_template6.npz'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', 'fit/_cam_51.json', 'fit/rn_51.png'], 1, False),
- ('fit',             s_fit,             ['r6_06_sliderloop.py', 'r6_02_warp.py', 'fit_checks6.py', 'r6_metrics.py', 'r6_common.py', 'r6_01c_batch_lm.py', 'r6_01b_batch_blender.py'], ['fit', 'template'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', '@seed'], ['fit/wrap_ra6_basis.npy', 'fit/wrap_ra6_mesh.npz'], 35, False),
+ ('align',           s_align,           ['r6_01_blender.py', 'r2_02_landmarks.py', 'r2_03_align.py', 'r2_03b_crop.py', 'r2_03c_lmpairs.py', 'r2_04_sliders.py', 'r3_02_wrap.py', 'r4_02_global.py', 'r6_prep_render.py', 'r2_common.py', 'r3_common.py', 'r4_common.py', 'fit_checks.py', 'r7_mv_conform.py'],
+                     ['align', 'skull', 'render', 'mode', 'multiview'], ['target/shape.glb', 'fit/tobin_head_template6.npz'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', 'fit/_cam_51.json', 'fit/rn_51.png'], 1, False),
+ ('fit',             s_fit,             ['r6_06_sliderloop.py', 'r6_02_warp.py', 'fit_checks6.py', 'r6_metrics.py', 'r6_common.py', 'r6_01c_batch_lm.py', 'r6_01b_batch_blender.py'], ['fit', 'template', 'mode', 'multiview'], ['fit/wrap_r51_basis.npy', 'fit/lm_51.json', '@seed'], ['fit/wrap_ra6_basis.npy', 'fit/wrap_ra6_mesh.npz'], 35, False),
  ('snap',            s_snap,            ['r6_03_corr.py', 'r6_04_skullw.py', 'r6_metrics.py', 'r6_12_refit_accept.py', 'r6_06_sliderloop.py', 'r6_02_warp.py', 'r6_13_polish.py', 'r6_14_symmetrize.py', 'r6_16_skulldepth.py', '../vision/side_prior.py', '../vision/side_prior.json'], ['snap', 'fit', 'render'], ['fit/wrap_ra6_basis.npy'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png', 'fit/lm_h6.json'], 3, False),
  ('key_transfer',    s_key_transfer,    [], ['snap'], ['fit/wrap_rh6_keys.npy', 'fit/wrap_rh6_basis.npy'], ['fit/key_transfer.json'], 0.1, False),
  ('reseat',          s_reseat,          ['c6_00_reseat.py', 'c6_00b_teeth_opt.py', 'c6_common.py'], ['switches', 'snap'], ['fit/wrap_rh6_basis.npy', 'fit/wrap_rh6_keys.npy', 'fit/rn_h6.png'], ['bake/parts.npz', 'bake/reseat.json'], 14, False),
- ('texture',         s_texture,         ['c6_01_mapfit.py', 'c6_02_texture.py', 'c6_03_eyes.py'], ['iris_colour', 'snap'], ['bake/parts.npz', 'target/crop_src.png', 'target/landmarks.json'], ['bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], 1, False),
+ ('texture',         s_texture,         ['c6_01_mapfit.py', 'c6_02_texture.py', 'c6_03_eyes.py', 'c6_02b_mv_texture.py'], ['iris_colour', 'snap', 'mode', 'multiview'], ['bake/parts.npz', 'target/crop_src.png', 'target/landmarks.json'], ['bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png'], 1, False),
  ('skin_detail',     s_skin_detail,     ['../skin_detail/apply_skin_detail.py', '../skin_detail/synth.py', '../skin_detail/uvgeom.py'], ['skin_detail'], ['bake/Head_BaseColor_char.png', 'bake/texture.json'], ['out/skin_detail/report.json'], 0.5, True),
  ('build',           s_build,           ['c6_04_build.py'], ['snap', 'skin_detail'], ['bake/parts.npz', 'bake/texture.json', 'bake/Head_BaseColor_char.png', 'bake/Eye_BaseColor_char.png', 'out/skin_detail/report.json'], ['out/char.blend', 'fit/build.log'], 1, False),
  ('score',           s_score,           ['r6_10_score.py', 'score_final.py', 'r6_16_skulldepth.py'], ['thresholds', 'compare_to', 'snap', 'fit'], ['fit/rn_h6.png', 'fit/rn_a6.png', 'bake/texture.json', 'fit/build.log', 'fit/wrap_rh6_report.json'], ['out/score.json'], 0.5, False),
  ('sheet',           s_sheet,           ['c6_05_render.py', 'c6_06_compose.py', 'light_rig.py'], ['switches', 'name'], ['out/char.blend', 'out/score.json'], ['out/proof_sheet.png'] , 5, False),
 ]
 NAMES = [s[0] for s in STAGE_TABLE]
+MV_ONLY_SCRIPTS = ('r7_mv_conform.py', 'c6_02b_mv_texture.py', '../multiview/mv_clean_shape.py')
 
 def stage_inputs(c, spec):
     out = []
@@ -282,8 +314,11 @@ def stage_outputs(c, spec):
 def stage_hash(c, row):
     name, fn, scripts, keys, ins, outs = row[:6]
     h = hashlib.sha1(name.encode())
-    for sname in scripts: h.update(fhash(os.path.join(STAGE_DIR, sname)).encode())
-    h.update(json.dumps({k: c.cfg.get(k) for k in keys}, sort_keys=True, default=str).encode())
+    mv = c.cfg.get('mode') == 'multiview'   # multi-view-only scripts / keys stay out of the hash of single-photo runs, so their manifests stay valid
+    for sname in scripts:
+        if not mv and sname in MV_ONLY_SCRIPTS: continue
+        h.update(fhash(os.path.join(STAGE_DIR, sname)).encode())
+    h.update(json.dumps({k: c.cfg.get(k) for k in keys if mv or k not in ('mode', 'multiview')}, sort_keys=True, default=str).encode())
     for p in stage_inputs(c, ins): h.update(fhash(p).encode())
     return h.hexdigest()
 

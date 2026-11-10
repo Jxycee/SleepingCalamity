@@ -1,5 +1,5 @@
 {
-  "image": null, "name": null, "out_dir": null,
+  "mode": "single", "image": null, "name": null, "out_dir": null,
   "prep": {"box": null, "ellipses": null, "border_top": 40, "side_cuts": null, "cut_rows": null, "shoulder_cols": null},
   "hunyuan": {"seeds": [1, 2, 3], "steps": 30, "faces": 40000, "pinned_glb": null, "trellis_tex_fallback": false},
   "iris_colour": "auto",
