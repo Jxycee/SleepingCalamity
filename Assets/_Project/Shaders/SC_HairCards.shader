@@ -1,5 +1,7 @@
-// Stylised hair cards (Tobin's HairDeck hair, Art/Blender/tools/experimental/tobin_hair/hairdeck): two-sided lit cards, no alpha.
-// Mesh contract (hd_export.py): uv0 = (u across the card 0..1, v along it, 0 root .. 1 tip), uv1.x = per-card random 0..1,
+// Stylised hair cards (Tobin's HairDeck hair, Art/Blender/tools/experimental/tobin_hair/hairdeck): two-sided lit cards, alpha-cut strands.
+// Mesh contract (hd_export.py): uv0 = (u across the card 0..1, +2 on core ribbons; v = card fraction, 0 root .. 1 tip), uv1 = (per-strand
+// random 0..1, this strand's own root..tip fraction). _StrandTex (hd_strand_tex.py, linear RGBA, _StrandVariants tiles): R brightness,
+// G hair id (highlight shift jitter), B across-hair slope (normal bend), A coverage (alpha cut; core ribbons stay solid).
 // vertex colour = HairDeck's colour along the card (sRGB). Hair direction = the uv0 bitangent (imported MikkTSpace tangents).
 // Colour: root -> middle -> tip gradient (sampled from the reference) with light strands and per-strand variation, or HairDeck's vertex
 // colours (_GradientMix 0). Shading: wrapped diffuse, root darkening / tip lift along v, procedural strands across u, two Kajiya-Kay highlight lobes
@@ -22,8 +24,14 @@ Shader "SleepingCalamity/HairCards"
         _RootLen ("Root darkening length (fraction of the card)", Range(0.01, 1)) = 0.35
         _TipLift ("Tip lightening", Range(0, 1)) = 0.12
         _CardVar ("Per-card brightness variation", Range(0, 0.5)) = 0.12
-        _Strands ("Strands across a card", Float) = 9
-        _StrandDepth ("Strand contrast", Range(0, 1)) = 0.35
+        [NoScaleOffset] _StrandTex ("Strand texture (linear RGBA)", 2D) = "white" {}
+        _StrandVariants ("Strand texture tiles", Float) = 8
+        _AlphaCut ("Strand alpha cut", Range(0, 1)) = 0.42
+        _StrandTexBright ("Strand texture brightness strength", Range(0, 1)) = 0.85
+        _StrandBump ("Hair roundness (normal bend across each hair)", Range(0, 1.5)) = 0.7
+        _ShiftJitter ("Highlight shift jitter per hair", Range(0, 1)) = 0.3
+        _Strands ("Procedural strands across a card", Float) = 9
+        _StrandDepth ("Procedural strand contrast", Range(0, 1)) = 0.1
         _Wrap ("Diffuse wrap", Range(0, 1)) = 0.4
         _Spec1Color ("Highlight 1 colour", Color) = (0.55, 0.47, 0.40, 1)
         _Spec1Exp ("Highlight 1 sharpness", Range(1, 512)) = 120
@@ -49,9 +57,20 @@ Shader "SleepingCalamity/HairCards"
             float _Strands; half _StrandDepth; half _Wrap;
             half4 _Spec1Color; half _Spec1Exp; half _Spec1Shift; half4 _Spec2Color; half _Spec2Exp; half _Spec2Shift; half _SpecNoise;
             half _Ambient; half _ShadowStrength; float _ShadowNormalOffset; float _Cull;
+            float _StrandVariants; half _AlphaCut; half _StrandTexBright; half _StrandBump; half _ShiftJitter;
         CBUFFER_END
         float Hash11(float p) { p = frac(p * 0.1031); p *= p + 33.33; p *= p + p; return frac(p); }
         float Noise1(float x) { float i = floor(x), f = frac(x); f = f * f * (3 - 2 * f); return lerp(Hash11(i), Hash11(i + 1), f); }
+        TEXTURE2D(_StrandTex); SAMPLER(sampler_StrandTex);
+        // u: across the card (core ribbons carry u + 2), ts: this strand's root..tip fraction, rnd: per-strand random
+        half4 SampleStrand(float u, float ts, float rnd, out half core)
+        {
+            core = u > 1.5 ? 1.0h : 0.0h;
+            float uu = saturate(u > 1.5 ? u - 2.0 : u) * 0.98 + 0.01;
+            float var = floor(Hash11(rnd * 97.0 + 3.0) * _StrandVariants * 0.9999);
+            return SAMPLE_TEXTURE2D(_StrandTex, sampler_StrandTex, float2((var + uu) / _StrandVariants, saturate(ts) * 0.99 + 0.005));
+        }
+        void StrandClip(float4 uv) { half core; half4 s = SampleStrand(uv.x, uv.w, uv.z, core); clip(core > 0.5h ? 1.0h : s.a - _AlphaCut); }
         ENDHLSL
 
         Pass
@@ -59,6 +78,7 @@ Shader "SleepingCalamity/HairCards"
             Name "Forward"
             Tags { "LightMode"="UniversalForward" }
             Cull [_Cull]
+            AlphaToMask On   // softer strand edges with MSAA (falls back to the clip without)
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
@@ -98,7 +118,12 @@ Shader "SleepingCalamity/HairCards"
                 float3 V = GetWorldSpaceNormalizeViewDir(i.positionWS);
                 float3 N = normalize(i.normalWS); N = dot(N, V) < 0.0 ? -N : N;   // thin cards: the seen side faces the viewer (SV_IsFrontFace flips wrong under the hair rig's mirrored transform)
                 float3 T = normalize(i.hairWS);
-                float u = i.uv.x, v = saturate(i.uv.y), cardRnd = i.uv.z;
+                float u = frac(i.uv.x), v = saturate(i.uv.y), cardRnd = i.uv.z;
+                half core; half4 st = SampleStrand(i.uv.x, i.uv.w, cardRnd, core);
+                clip(core > 0.5h ? 1.0h : st.a - _AlphaCut);
+                float3 X = normalize(cross(T, N));
+                N = normalize(N + X * (st.b - 0.5h) * 2.0h * _StrandBump);                                  // rounded hairs
+                half jit = (st.g - 0.5h) * _ShiftJitter;
                 half3 vc = lerp(half3(1, 1, 1), SRGBToLinear(i.color.rgb), _UseVertexColor);
                 half3 grad = v < _GradMid ? lerp(_RootColor.rgb, _MidColor.rgb, smoothstep(0.0, _GradMid, v))
                                           : lerp(_MidColor.rgb, _TipColor.rgb, smoothstep(_GradMid, 1.0, v));
@@ -111,6 +136,7 @@ Shader "SleepingCalamity/HairCards"
                 base *= 1.0 + _CardVar * (cardRnd * 2.0 - 1.0);
                 half root = 1.0 - _RootDark * (1.0 - smoothstep(0.0, _RootLen, v));
                 base *= root; base += base * _TipLift * smoothstep(0.55, 1.0, v);
+                base *= lerp(1.0h, st.r * 1.2h, _StrandTexBright);                                          // per-hair brightness, darker gaps
                 half specMask = lerp(1.0, Noise1(u * _Strands * 1.7 + cardRnd * 53.0 + v * 4.0), _SpecNoise);
 
                 float4 sc = TransformWorldToShadowCoord(i.positionWS + N * _ShadowNormalOffset);
@@ -119,7 +145,7 @@ Shader "SleepingCalamity/HairCards"
                 half atten = lerp(1.0h, ml.shadowAttenuation, _ShadowStrength) * ml.distanceAttenuation;
                 half ndl = dot(N, L);
                 half diff = saturate((ndl + _Wrap) / (1.0 + _Wrap));
-                half3 spec = (_Spec1Color.rgb * KK(T, N, H, _Spec1Shift, _Spec1Exp) + _Spec2Color.rgb * base * 2.0 * KK(T, N, H, _Spec2Shift, _Spec2Exp)) * specMask * saturate(ndl * 2.0 + 0.3);
+                half3 spec = (_Spec1Color.rgb * KK(T, N, H, _Spec1Shift + jit, _Spec1Exp) + _Spec2Color.rgb * base * 2.0 * KK(T, N, H, _Spec2Shift + jit, _Spec2Exp)) * specMask * saturate(ndl * 2.0 + 0.3);
                 half3 c = (base * diff + spec) * ml.color * atten;
                 c += base * SampleSH(N) * _Ambient * (0.55 + 0.45 * root);
 
@@ -152,8 +178,9 @@ Shader "SleepingCalamity/HairCards"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
             float3 _LightDirection; float3 _LightPosition;
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
-            float4 vert(Attributes i) : SV_POSITION
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; float2 uv1 : TEXCOORD1; };
+            struct Varyings { float4 positionCS : SV_POSITION; float4 uv : TEXCOORD0; };
+            Varyings vert(Attributes i)
             {
                 float3 pw = TransformObjectToWorld(i.positionOS.xyz); float3 nw = TransformObjectToWorldNormal(i.normalOS);
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
@@ -161,15 +188,15 @@ Shader "SleepingCalamity/HairCards"
                 #else
                 float3 ld = _LightDirection;
                 #endif
-                float4 cs = TransformWorldToHClip(ApplyShadowBias(pw, nw, ld));
+                float4 cs = TransformWorldToHClip(ApplyShadowBias(pw, nw, ld)); Varyings o; o.uv = float4(i.uv, i.uv1);
                 #if UNITY_REVERSED_Z
                 cs.z = min(cs.z, UNITY_NEAR_CLIP_VALUE);
                 #else
                 cs.z = max(cs.z, UNITY_NEAR_CLIP_VALUE);
                 #endif
-                return cs;
+                o.positionCS = cs; return o;
             }
-            half4 frag() : SV_Target { return 0; }
+            half4 frag(Varyings i) : SV_Target { StrandClip(i.uv); return 0; }
             ENDHLSL
         }
 
@@ -181,9 +208,10 @@ Shader "SleepingCalamity/HairCards"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            struct Attributes { float4 positionOS : POSITION; };
-            float4 vert(Attributes i) : SV_POSITION { return TransformObjectToHClip(i.positionOS.xyz); }
-            half frag() : SV_Target { return 0; }
+            struct Attributes { float4 positionOS : POSITION; float2 uv : TEXCOORD0; float2 uv1 : TEXCOORD1; };
+            struct Varyings { float4 positionCS : SV_POSITION; float4 uv : TEXCOORD0; };
+            Varyings vert(Attributes i) { Varyings o; o.positionCS = TransformObjectToHClip(i.positionOS.xyz); o.uv = float4(i.uv, i.uv1); return o; }
+            half frag(Varyings i) : SV_Target { StrandClip(i.uv); return 0; }
             ENDHLSL
         }
 
@@ -196,11 +224,12 @@ Shader "SleepingCalamity/HairCards"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
-            struct Varyings { float4 positionCS : SV_POSITION; float3 normalWS : TEXCOORD0; };
-            Varyings vert(Attributes i) { Varyings o; o.positionCS = TransformObjectToHClip(i.positionOS.xyz); o.normalWS = TransformObjectToWorldNormal(i.normalOS); return o; }
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; float2 uv1 : TEXCOORD1; };
+            struct Varyings { float4 positionCS : SV_POSITION; float3 normalWS : TEXCOORD0; float4 uv : TEXCOORD1; };
+            Varyings vert(Attributes i) { Varyings o; o.positionCS = TransformObjectToHClip(i.positionOS.xyz); o.normalWS = TransformObjectToWorldNormal(i.normalOS); o.uv = float4(i.uv, i.uv1); return o; }
             half4 frag(Varyings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_Target
             {
+                StrandClip(i.uv);
                 float3 n = normalize(i.normalWS) * IS_FRONT_VFACE(face, 1.0, -1.0);
                 #if defined(_GBUFFER_NORMALS_OCT)
                 float2 oct = PackNormalOctQuadEncode(n) * 0.5 + 0.5; return half4(PackFloat2To888(oct), 0);

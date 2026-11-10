@@ -2,7 +2,7 @@
 #   blender -b <fit_dir>/hd_fit.blend -P hd_export.py -- <out_dir> [res=700]
 # 1. HairDeck writes every card as unconnected flat-shaded segments: merge by distance -> one island per card.
 # 2. UVs for SC_HairCards.shader: uv0 = (u across 0..1, v root 0 .. tip 1; the root end is checked per card, the v end nearer the skin),
-#    uv1 = (per-card random 0..1, card length m). HairDeck's colours along each card stay in the colour attribute (FBX vertex colours).
+#    uv1 = (per-strand random 0..1, the strand's own root..tip fraction for the strand texture). HairDeck's colours along each card stay in the colour attribute (FBX vertex colours).
 # 3. Cards stay single sheets: the shader is two-sided.
 # 4. Tobin_HairShell = AvatarHead faces under the hair, offset 1.2 mm (no skin between cards). 'free' = how far along its card a vertex
 #    lies (rig_export.py hangs that part on spring chains). Root end checked per card (the v end nearer the skin).
@@ -39,9 +39,10 @@ for comp in cards:
     flip = d1 < d0; flipped += flip
     L = max(0.02, float(np.linalg.norm(r1 - r0)) * 1.15)
     ou, ov = rnd.random(), rnd.random()
+    tmax = max(1e-6, float((1 - vs.min()) if flip else vs.max()))          # this strand's own length as a card fraction
     for l in loops:
         u, v = l[uvl].uv; t = (1 - v) if flip else v
-        l[uvl].uv = (u, t); l[uv1].uv = (ou, L)
+        l[uvl].uv = (u, t); l[uv1].uv = (ou, min(1.0, t / tmax))            # uv1.y: root..tip of this strand (strand texture)
         vfree[l.vert.index] = t
 print('ROOT flipped', flipped)
 bm.verts.ensure_lookup_table(); bm.normal_update()

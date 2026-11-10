@@ -63,6 +63,16 @@ namespace SleepingCalamity.EditorTools
             var mat = AssetDatabase.LoadAssetAtPath<Material>(CardsPath);
             if (mat == null) { mat = new Material(sh) { name = "Tobin_HairCards" }; AssetDatabase.CreateAsset(mat, CardsPath); }
             mat.shader = sh; mat.SetFloat("_Cull", 0f);
+            // strand texture (hd_strand_tex.py): linear RGBA tiles, alpha = hair coverage; mips keep the coverage so distant hair does not thin out
+            string sp = Folder + "/Textures/Hair_Strands.png"; AssetDatabase.ImportAsset(sp);
+            if (AssetImporter.GetAtPath(sp) is TextureImporter sti)
+            {
+                sti.sRGBTexture = false; sti.alphaSource = TextureImporterAlphaSource.FromInput; sti.alphaIsTransparency = false; sti.mipmapEnabled = true;
+                sti.mipMapsPreserveCoverage = true; sti.alphaTestReferenceValue = 0.42f; sti.wrapMode = TextureWrapMode.Clamp; sti.maxTextureSize = 2048;
+                sti.textureCompression = TextureImporterCompression.CompressedHQ; sti.SaveAndReimport();
+            }
+            mat.SetTexture("_StrandTex", AssetDatabase.LoadAssetAtPath<Texture2D>(sp)); mat.SetFloat("_StrandVariants", 8f); mat.SetFloat("_AlphaCut", 0.42f);
+            mat.SetFloat("_StrandTexBright", 0.85f); mat.SetFloat("_StrandBump", 0.7f); mat.SetFloat("_ShiftJitter", 0.3f); mat.SetFloat("_StrandDepth", 0.1f);
             // colour gradient from the reference hair (sRGB): deep brown roots, warm brown middle, light brown tips, ~1 in 7 strands lighter (reference: a little blonde, leans brown)
             mat.SetColor("_BaseColor", Color.white); mat.SetFloat("_GradientMix", 1f); mat.SetFloat("_GradMid", 0.4f);
             mat.SetColor("_RootColor", new Color(0.25f, 0.17f, 0.13f)); mat.SetColor("_MidColor", new Color(0.46f, 0.35f, 0.26f)); mat.SetColor("_TipColor", new Color(0.56f, 0.44f, 0.33f));

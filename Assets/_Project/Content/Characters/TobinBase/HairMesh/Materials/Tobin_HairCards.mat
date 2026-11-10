@@ -22,9 +22,14 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _StrandTex:
+        m_Texture: {fileID: 2800000, guid: c0feaff7e4bb76941b282390f2ecbbbb, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AlphaCut: 0.42
     - _Ambient: 1.4
     - _BlondeChance: 0.15
     - _CardVar: 0.12
@@ -35,13 +40,17 @@ Material:
     - _RootLen: 0.35
     - _ShadowNormalOffset: 0.008
     - _ShadowStrength: 0.55
+    - _ShiftJitter: 0.3
     - _Spec1Exp: 120
     - _Spec1Shift: 0.08
     - _Spec2Exp: 24
     - _Spec2Shift: -0.12
     - _SpecNoise: 0.5
-    - _StrandDepth: 0.35
+    - _StrandBump: 0.7
+    - _StrandDepth: 0.1
+    - _StrandTexBright: 0.85
     - _StrandVar: 0.22
+    - _StrandVariants: 8
     - _Strands: 9
     - _TipLift: 0.12
     - _UseVertexColor: 1

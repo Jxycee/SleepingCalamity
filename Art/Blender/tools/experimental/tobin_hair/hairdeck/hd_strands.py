@@ -61,7 +61,7 @@ for ci, c in enumerate(cards):
     colq = lambda qq: np.stack([np.interp(qq, (np.arange(len(cols)) + 0.5) / len(cols), cols[:, k]) for k in range(3)], 1)
     # core: narrower, darker, a little toward the head
     taper = 1 - 0.85 * q ** 2.2
-    ribbon(P, Nw, Bn, W * a.core * taper, np.zeros(n), -0.45 * Tk, 0.0, 1.0, q, colq(q) * 0.85, nstr); nstr += 1
+    ribbon(P, Nw, Bn, W * a.core * taper, np.zeros(n), -0.45 * Tk, 2.0, 3.0, q, colq(q) * 0.85, nstr); nstr += 1   # core: u + 2 (SC_HairCards keeps it solid)
     K = int(np.clip(round(W.mean() / a.per), a.kmin, a.kmax))
     jlong = int(np.argmin([abs(-0.5 + (j + 0.5) / K) for j in range(K)]))   # the centre strand keeps the card's full length (spiky outline)
     for j in range(K):
