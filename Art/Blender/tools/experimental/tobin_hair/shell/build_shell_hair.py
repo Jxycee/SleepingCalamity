@@ -417,7 +417,7 @@ def build_cards():
 def build_clumps():
     """FF / KH style: every lock is a SOLID tapered clump (lens cross-section: domed outside, flatter underside), sharp point, root sunk in the shell.
     UV: around the lens = one lock of the shell texture (u 0..0.25, mirrored so there is no seam; dark gap texels on the lens edges), v along the lock."""
-    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); fl = bm.verts.layers.float.new('free'); nseg = int(kw.get('cseg', 10)); NRG = 8
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); fl = bm.verts.layers.float.new('free'); nseg = int(kw.get('cseg', 11)); NRG = int(kw.get('cring', 12))
     for pts, w0, var, tw in cards:
         Pp4, L = resample(pts, nseg + 1); Pp = Pp4[:, :3]; FRv = Pp4[:, 3]
         if L < 0.008: continue

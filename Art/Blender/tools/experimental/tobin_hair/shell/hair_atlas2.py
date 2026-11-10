@@ -35,13 +35,12 @@ def draw_strand(col, alpha, height, pts, bright, thick, wrapW=None):
             cv2.polylines(alpha, [q], False, 255, t, cv2.LINE_AA)
             cv2.polylines(height, [q], False, float(bright), t + 2, cv2.LINE_AA)
 
-def finish(col, alpha, height, name, opaque):
+def finish(col, alpha, height, name, opaque, k=2.2):
     col = cv2.resize(col, (2048, 2048), interpolation=cv2.INTER_AREA)
     alpha = cv2.resize(alpha, (2048, 2048), interpolation=cv2.INTER_AREA)
     h = cv2.resize(height, (2048, 2048), interpolation=cv2.INTER_AREA)
     h = cv2.GaussianBlur(h, (0, 0), 1.2)
     gx = cv2.Sobel(h, cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(h, cv2.CV_32F, 0, 1, ksize=3)
-    k = 2.2
     nrm = np.dstack([-gx * k, gy * k, np.ones_like(h)]); nrm /= np.linalg.norm(nrm, axis=2, keepdims=True)
     nrm_img = ((nrm * 0.5 + 0.5) * 255).astype(np.uint8)
     # bleed colour into transparent texels so mips / alpha edges do not pick up black
@@ -100,7 +99,7 @@ col = np.zeros((N, N, 3), np.float32); col[:] = ROOT * 2.3; alpha = np.zeros((N,
 LW = N / LOCKS_PER_TILE
 for L in range(LOCKS_PER_TILE):
     cx = (L + 0.5) * LW
-    for s in range(420):
+    for s in range(900):
         f = np.clip(rng.normal(0, 0.55), -1.1, 1.1)       # dense at the lock centre, sparse at its edges -> dark gaps
         n = 48; ys = np.linspace(0, N, n); t = ys / N
         conv = 1.0 - 0.45 * t ** 2                     # lock narrows toward its end (shell tips are pointed in geometry)
@@ -108,7 +107,12 @@ for L in range(LOCKS_PER_TILE):
         xs = cx + f * LW * 0.46 * conv + wob
         pts = np.stack([xs, ys], 1)
         bright = rng.choice([rng.uniform(0.8, 1.0), rng.uniform(1.0, 1.22)], p=[0.62, 0.38]) * (1.0 - 0.18 * abs(f))
-        draw_strand(col, alpha, height, pts, bright, rng.uniform(8, 15) * S / 2, wrapW=N)
+        draw_strand(col, alpha, height, pts, bright, rng.uniform(11, 20) * S / 2, wrapW=N)
+def wblur(img, sx, sy):   # Gaussian blur that wraps in u (tileable)
+    pad = int(sx * 4) + 1; t = np.concatenate([img[:, -pad:], img, img[:, :pad]], axis=1)
+    return cv2.GaussianBlur(t, (0, 0), sigmaX=sx, sigmaY=sy, borderType=cv2.BORDER_REFLECT)[:, pad:-pad]
+col = wblur(col, 9.0 * S, 22.0 * S)   # soft strand bands (stylised clumps), no wood grain
+height = wblur(height, 2.0 * S, 6.0 * S)
 xx = (np.arange(N) % LW - LW / 2) / (LW / 2); prof = 0.86 + 0.24 * np.cos(xx * np.pi / 2) ** 2
 col *= prof[None, :, None]
-finish(col, alpha, height, 'Hair_Shell', opaque=True)
+finish(col, alpha, height, 'Hair_Shell', opaque=True, k=0.45)   # softer relief on the solid clumps (strong relief read as wood grain)

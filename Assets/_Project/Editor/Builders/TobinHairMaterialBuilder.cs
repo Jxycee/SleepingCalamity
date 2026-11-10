@@ -68,18 +68,18 @@ namespace SleepingCalamity.EditorTools
         /// <summary>Applies the hair material to every renderer under the instance; returns its name.</summary>
         public static string Apply(GameObject hair)
         {
-            var m = Build(); var cap = BuildCap(); var shell = BuildShell();
+            var m = Build(); var cap = BuildCap(); var shell = BuildShell(); string slots = "";
             foreach (var r in hair.GetComponentsInChildren<Renderer>(true))
             {
                 var mats = r.sharedMaterials;
                 if (mats.Length > 1)
                 {   // the clump object carries two slots (from Blender): solid clumps (Tobin_HairShell) + alpha wisps (Tobin_Hair)
-                    for (int i = 0; i < mats.Length; i++) mats[i] = mats[i] != null && mats[i].name.Contains("HairShell") ? shell : m;
+                    for (int i = 0; i < mats.Length; i++) { slots += r.name + "[" + i + "]=" + (mats[i] ? mats[i].name : "null") + " "; mats[i] = mats[i] != null && mats[i].name.Contains("HairShell") ? shell : m; }
                     r.sharedMaterials = mats; continue;
                 }
                 r.sharedMaterial = r.name.Contains("HairCap") ? cap : (r.name.Contains("HairShell") || r.name.Contains("HairClumps")) ? shell : m;   // solid clump locks share the opaque shell material
             }
-            return m.name + "+" + shell.name;
+            return m.name + "+" + shell.name + " " + slots;
         }
     }
 }
