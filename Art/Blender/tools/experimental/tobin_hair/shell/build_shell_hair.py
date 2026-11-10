@@ -88,7 +88,7 @@ thk = F('t0', 0.006) + F('t1', 0.032) * sstep(-0.35, 1.0, elev) + F('tback', 0.0
 _phd = np.degrees(np.arctan2(D[..., 0], -D[..., 1])); _zap = C.z + D[..., 2] * 0.10
 _wfl = np.exp(-(_phd / 50.0) ** 2) * sstep(1.80, 1.765, _zap)   # front, below the hairline: the fringe lies close on the forehead
 thk = thk * (1.0 - 0.75 * _wfl) * (1.0 - 0.30 * np.exp(-(_phd / 40.0) ** 2) * sstep(0.85, 0.35, elev))   # less forward bulge over the brow (side-view visor)
-thk = thk + F('tcrown', 0.006) * sstep(0.75, 1.0, elev) + F('tpuff', 0.009) * np.exp(-((elev - 0.35) / 0.25) ** 2) * sstep(45, 75, np.abs(_phd)) * sstep(150, 120, np.abs(_phd))   # puff above the ears: widest at temple height
+thk = thk + F('tcrown', 0.0) * sstep(0.75, 1.0, elev) + F('tpuff', 0.009) * np.exp(-((elev - 0.35) / 0.25) ** 2) * sstep(45, 75, np.abs(_phd)) * sstep(150, 120, np.abs(_phd))   # puff above the ears: widest at temple height
 renv = renv * (1 - _wfl) + (rhit + 0.0025) * _wfl   # thin where the shell runs down the forehead (fringe)
 P_f = C[:] + D * (renv + thk)[..., None]
 P_f = np.asarray(P_f)
@@ -110,8 +110,8 @@ for j in range(NA):
 
 # ---------------- 2. lower edge per column + teeth ----------------
 # signed world azimuth (deg, + = character's left): fringe low on the character's right (-), shorter left of the part, temples, in front of / over the ears, nape
-EDGE = [(-180, 1.666), (-155, 1.688), (-125, 1.704), (-95, 1.694), (-75, 1.686), (-60, 1.700), (-48, 1.716), (-34, 1.728), (-18, 1.740), (-4, 1.752), (8, 1.768), (20, 1.776), (32, 1.765),
-        (45, 1.735), (60, 1.702), (75, 1.686), (95, 1.694), (125, 1.704), (155, 1.688), (180, 1.666)]
+EDGE = [(-180, 1.666), (-155, 1.688), (-135, 1.664), (-112, 1.644), (-92, 1.640), (-78, 1.652), (-60, 1.700), (-48, 1.716), (-34, 1.728), (-18, 1.740), (-4, 1.752), (8, 1.768), (20, 1.776), (32, 1.765),
+        (45, 1.735), (60, 1.702), (78, 1.652), (92, 1.640), (112, 1.644), (135, 1.664), (155, 1.688), (180, 1.666)]
 def zedge(ph):
     xs, ys = zip(*EDGE); return float(np.interp(float(ph), xs, ys))
 pedge = np.zeros(NA)
@@ -154,6 +154,14 @@ def push(P, clear):
             if loc is None: continue
             s = (v - loc).dot(nr)
             if s < clear: P[i, j] = np.array(loc + nr * clear); n += 1
+            # sides: horizontal ray from outside toward the head axis; if the outermost head hit (ear rim) lies outside the vertex, move the vertex out past it
+            p = P[i, j]; h = np.array([p[0] - C.x, p[1] - C.y]); rho = np.linalg.norm(h)
+            if 1.60 < p[2] < 1.76 and abs(phi_of(p)) > 45 and rho > 1e-4:
+                u = h / rho; o = Vector((C.x + u[0] * 0.4, C.y + u[1] * 0.4, p[2])); hit = TREE.ray_cast(o, Vector((-u[0], -u[1], 0.0)), 0.4)[0]
+                if hit is not None:
+                    rh = math.hypot(hit.x - C.x, hit.y - C.y)
+                    cr = clear + 0.004   # extra margin: the shell is a coarse grid, the ear rim must not poke through between vertices
+                    if rho < rh + cr: P[i, j, 0] = C.x + u[0] * (rh + cr); P[i, j, 1] = C.y + u[1] * (rh + cr); n += 1
     return n
 for it in range(6):
     Q = P.copy()
@@ -190,7 +198,11 @@ PI = np.zeros_like(P)
 for i in range(NR):
     for j in range(NA):
         v = Vector(PB[i, j]); loc, nr, _, d = TREE.find_nearest(v, 0.2); s = (v - loc).dot(nr) if loc is not None else 0.01
-        PI[i, j] = PB[i, j] - N0[i, j] * float(np.clip(s - 0.0015, 0.0015, 0.009))
+        PI[i, j] = PB[i, j] - N0[i, j] * float(np.clip(s - 0.0015, 0.0015, F('slab', 0.005)))
+for i in range(NR):   # inner surface never inside the head (nearest-point push only)
+    for j in range(NA):
+        v = Vector(PI[i, j]); loc, nr, _, d = TREE.find_nearest(v, 0.2)
+        if loc is not None and (v - loc).dot(nr) < 0.0012: PI[i, j] = np.array(loc + nr * 0.0012)
 pole_in = C + WD * (float(np.interp(0.0, PF, renv[:, 0])) + 0.0015)
 
 def build_shell():
@@ -198,6 +210,7 @@ def build_shell():
     NT = NL // 4
     def uv_of(i, j):
         jj = j % NA; a = AS[jj] + (2 * np.pi if j == NA else 0); ap = AS[jj] + swirl(AS[jj], TT[i]); x = float(lock_x(ap, TT[i])) + (NL if j == NA else 0); return (x / 4.0, 1.0 - TT[i] * 0.98)
+    GAP = lambda i: (0.003, 1.0 - TT[i] * 0.98)   # inner surface + rim sample the dark gap between texture locks (shadowed hair interior, no stripes)
     VO = [[bm.verts.new(P[i, j]) for j in range(NA)] for i in range(NR)]; VI = [[bm.verts.new(PI[i, j]) for j in range(NA)] for i in range(NR)]
     po = bm.verts.new(pole); pi_ = bm.verts.new(pole_in)
     def face(vs, uvs):
@@ -209,12 +222,12 @@ def build_shell():
     for j in range(NA):
         j1 = (j + 1) % NA
         outer.append(face([po, VO[0][j1], VO[0][j]], [(uv_of(0, j)[0], 1.0), uv_of(0, j + 1), uv_of(0, j)]))
-        inner.append(face([pi_, VI[0][j], VI[0][j1]], [(uv_of(0, j)[0], 1.0), uv_of(0, j), uv_of(0, j + 1)]))
+        inner.append(face([pi_, VI[0][j], VI[0][j1]], [GAP(0), GAP(0), GAP(0)]))
         for i in range(NR - 1):
             outer.append(face([VO[i][j], VO[i][j1], VO[i + 1][j1], VO[i + 1][j]], [uv_of(i, j), uv_of(i, j + 1), uv_of(i + 1, j + 1), uv_of(i + 1, j)]))
-            inner.append(face([VI[i][j], VI[i + 1][j], VI[i + 1][j1], VI[i][j1]], [uv_of(i, j), uv_of(i + 1, j), uv_of(i + 1, j + 1), uv_of(i, j + 1)]))
+            inner.append(face([VI[i][j], VI[i + 1][j], VI[i + 1][j1], VI[i][j1]], [GAP(i), GAP(i + 1), GAP(i + 1), GAP(i)]))
         # rim (lower edge): strip of dark gap texture
-        face([VO[NR - 1][j], VO[NR - 1][j1], VI[NR - 1][j1], VI[NR - 1][j]], [(uv_of(NR - 1, j)[0], 0.02), (uv_of(NR - 1, j + 1)[0], 0.02), (uv_of(NR - 1, j + 1)[0], 0.0), (uv_of(NR - 1, j)[0], 0.0)])
+        face([VO[NR - 1][j], VO[NR - 1][j1], VI[NR - 1][j1], VI[NR - 1][j]], [GAP(NR - 1)] * 4)
     bm.normal_update()
     # orient: outer faces away from the head (nearest head normal), inner faces toward it
     fl = 0
@@ -348,12 +361,12 @@ for k in range(int(kw.get('n_spike', 4))):
     bend = np.array([rng.uniform(-0.02, 0.02), rng.uniform(0.01, 0.025), -0.012])   # wisp arcs back / to the side
     L = rng.uniform(0.03, 0.045); m = 14; pts = [base - n * 0.004 + up * L * (i / m) + bend * (i / m) ** 2 for i in range(m + 1)]
     add(np.array(pts), rng.uniform(0.010, 0.016))
-# G) thin long strands in front of the ears
+# G) face-framing locks in front of the ears, down to about jaw / mouth level (they break the bowl line at brow and ear height)
 for side in (-1, 1):
-    for k in range(int(kw.get('n_thin', 0))):
-        ap = math.radians(side * rng.uniform(55, 70)); t0 = rng.uniform(0.6, 0.85); ext = rng.uniform(0.04, 0.06)
-        def st(s, p, d): return G * 12.0 + outward_xy(p) * 1.0
-        add(grow(ap, t0, 1.0, ext, 0.004, st, minc=0.006), rng.uniform(0.005, 0.008))
+    for k in range(int(kw.get('n_frame', 4))):
+        ap = math.radians(side * rng.uniform(55, 80)); t0 = rng.uniform(0.55, 0.8); zs = rng.uniform(1.618, 1.642)
+        def st(s, p, d): return G * 14.0 + outward_xy(p) * 1.5
+        add(grow(ap, t0, 1.0, 0.12, 0.005, st, minc=0.007, raw=True, zstop=zs), rng.uniform(0.008, 0.012))
 print('CARDS', len(cards))
 
 def build_cards():
@@ -372,7 +385,7 @@ def build_cards():
             b = np.cross(tng, out); b /= np.linalg.norm(b) + 1e-12
             w = w0 * (1.0 - 0.25 * s) * tw
             v = 1.0 - s * 0.97
-            rows.append([(p - b * w / 2, (u0, v)), (p + out * w * 0.14, ((u0 + u1) / 2, v)), (p + b * w / 2, (u1, v))]); OUTS.append(out)
+            rows.append([(clearance_push(p - b * w / 2, 0.003), (u0, v)), (clearance_push(p + out * w * 0.14, 0.003), ((u0 + u1) / 2, v)), (clearance_push(p + b * w / 2, 0.003), (u1, v))]); OUTS.append(out)   # card edges too, not only the centre line
         for back in (0, 1):
             vs = []
             for r in rows:
@@ -400,6 +413,27 @@ def build_cards():
     for i, w in enumerate(FREE): g.add([i], w, 'REPLACE')
     return ob
 cards_ob = build_cards()
+def audit(ob):
+    sd = []
+    for v in ob.data.vertices:
+        loc, nr, _, d = TREE.find_nearest(v.co, 0.3)
+        if loc is not None: sd.append((v.co - loc).dot(nr))
+    sd = np.array(sd); return int((sd < 0).sum()), int((sd < 0.002).sum()), len(sd), float(sd.min())
+print('CLEARANCE shell (inside, <2mm, verts, min m)', audit(shell), 'cards', audit(cards_ob))
+_zs = max(v.co.z for v in shell.data.vertices); _zc = max(v.co.z for v in cards_ob.data.vertices); _zh = max(v.co.z for v in bpy.data.objects['AvatarHead'].data.vertices)
+print('CROWN skull top %.3f shell +%.1f cm cards +%.1f cm' % (_zh, (_zs - _zh) * 100, (_zc - _zh) * 100))
+# ear coverage: rays from the side camera direction onto every ear-region head vertex must hit hair (shell, or shell+cards) first
+def _tree_of(ob):
+    b = bmesh.new(); b.from_mesh(ob.data); t = BVHTree.FromBMesh(b); b.free(); return t
+_ts, _tc = _tree_of(shell), _tree_of(cards_ob); _n = _hs = _ha = 0; _miss = []
+for v in bpy.data.objects['AvatarHead'].data.vertices:
+    c = v.co
+    if abs(c.x) > 0.075 and 1.65 < c.z < 1.73 and -0.09 < c.y < 0.03:
+        o = Vector((math.copysign(0.4, c.x), c.y, c.z)); dvec = (c - o); L = dvec.length; dvec.normalize(); _n += 1
+        hs = _ts.ray_cast(o, dvec, L - 0.0005)[0] is not None; hc = _tc.ray_cast(o, dvec, L - 0.0005)[0] is not None
+        _hs += hs; _ha += hs or hc
+        if not (hs or hc): _miss.append((round(c.z, 3), round(c.y, 3)))
+print('EARS side rays', _n, 'hit shell', _hs, 'hit shell or cards', _ha, 'miss z', sorted(_miss)[:12])
 print('TRIS shell', sum(len(p.vertices) - 2 for p in shell.data.polygons), 'cards', sum(len(p.vertices) - 2 for p in cards_ob.data.polygons))
 
 # ---------------- 5. materials ----------------

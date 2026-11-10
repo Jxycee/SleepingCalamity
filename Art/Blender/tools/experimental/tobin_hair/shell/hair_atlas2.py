@@ -58,7 +58,7 @@ def finish(col, alpha, height, name, opaque):
         cv2.imwrite(os.path.join(out, name + '_BaseColor.png'), np.dstack([rgb[..., ::-1], np.clip(alpha, 0, 255).astype(np.uint8)]))
     cv2.imwrite(os.path.join(out, name + '_Normal.png'), nrm_img[..., ::-1])
     # metallic R = 0, smoothness A: strands a little glossier on their crests, gaps matte
-    sm = np.clip(0.30 + 0.18 * (h / max(h.max(), 1e-3)), 0, 1)
+    sm = np.clip(0.16 + 0.14 * (h / max(h.max(), 1e-3)), 0, 1)   # low: glossier maps picked up blue-grey sky Fresnel on side locks in Unity
     ms = np.dstack([np.zeros_like(sm), np.zeros_like(sm), np.zeros_like(sm), sm]) * 255
     cv2.imwrite(os.path.join(out, name + '_MetallicSmooth.png'), ms.astype(np.uint8)[..., [2, 1, 0, 3]])
     print('wrote', name)
