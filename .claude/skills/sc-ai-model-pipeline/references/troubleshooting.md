@@ -6,7 +6,7 @@
 | Grey smear on a wall behind or under something | Generator never saw it (P2) | Harness render; `tripo_repair` visibility map | Step 1; at the source, multi-view input |
 | Pale ghost or halo around frames, doors, porches | Projection halo painted into that part's own texels (P2/P3), **not** UV overlap | Distance-to-other-part map (`near.py`) | Step 1 (chart quilting with the chroma gate) |
 | Whole roof or wall soft or streaky | Few good texels on that surface | Soft fraction per class | Step 2 (`--only-soft`); alone if the surface has no good texels |
-| Crisp in Blender, soft or blobby in game | an import-time filter on the texture (FishGame's Kuwahara clean did this, P9), or a mip/aniso issue at grazing angles | Compare the imported texture with the source; check the import settings | No smoothing filter on import; 4K, aniso 4 |
+| Crisp in Blender, soft or blobby in game | an import-time filter on the texture (FishGame's Kuwahara clean did this, P9), or a mip/aniso issue at grazing angles | Compare the imported texture with the source; check the import settings | No smoothing filter on import; max size 2048, aniso 4 |
 | Contrasty but blurry (checker floors) | sd metric misses it | "Mush" metric (share of texels with no 1-px detail), P8 | Step 2 catches it |
 | Bricks on a fascia, window glass or door | Class picked by colour or area, not geometry | Which part and face got repainted (`pick.py` maps a render pixel to its chart) | Geometry rules: 25° charts, feature vetoes (mean face area < 0.004 m², warm or pale) |
 | Visible tiling or mirrored motifs | One exemplar | Swatch image | Several quilted exemplars, swatch ≥ 6 m, no mirroring |

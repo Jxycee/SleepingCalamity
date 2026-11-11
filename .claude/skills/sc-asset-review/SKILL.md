@@ -21,7 +21,7 @@ python -I Art/Blender/tools/sc_ref_palette.py <render.png> --k 7 --sheet <scratc
 - **Scale:** a 1.75 m figure and a 2.2 m door beside anything whose proportion is in doubt (PHASE1 3.4).
 - **Colour and value:** run `sc_ref_palette.py --k 7` on the mood render and compare with PHASE1 3.1 (key hues in sc-asset-craft's palette summary, value p10/p50/p90, warmth). For a single prop this is advisory (one prop isn't a scene); for corner captures it is the 3.1 check. Grade relations (timber darker than plaster, moss darker and greener than stone), not exact hexes.
 - **Test it in a group** (the Sea of Thieves rule): render it with 3-4 neighbours from its kit or corner. An asset that reads alone can merge with its neighbours or out-shout them; kit pieces must match each other.
-- **Material vs photo:** `ref_match.py` is not ported (sc-asset-craft 0b). Put a crop of the material beside 2-3 flat-on photo crops, run `sc_ref_palette.py --k 7` on each, and judge detail per scale, edge crispness and value variation by eye.
+- **Material vs photo:** `ref_match.py` is not ported (sc-asset-craft 0b; `Art/Blender/tools/sc_ref_palette.py` replaces it). Put a crop of the material beside 2-3 flat-on photo crops, run `sc_ref_palette.py --k 7` on each, and judge detail per scale, edge crispness and value variation by eye.
 
 ## 2. Checks (budget and hygiene)
 - Budget: within PHASE1 3.3 for its tier, or the header says why.
@@ -41,7 +41,7 @@ Eight lines: 1 silhouette and read; 2 storybook proportion; 3 form and edges; 4 
 
 **Side-by-side, always (user, 2026-10-30):** every review round builds one image with the reference pasted right next to the render (reference left, render right, same height, labelled) and scores from that sheet. For in-engine work, pair the Unity capture with the reference frame the same way.
 
-**User calibration (2026-10-30):** the user reads our totals about 8-10 points low ("your 20/40 is more like a 30/40"). Treat **25/40** as the floor: if the first review already reaches it, the target becomes first score + 5 (max about 4 rounds, each with a visible gain of 1.5+ points), score only what the capture or play cameras see (backs, undersides and hidden faces don't count), and phrase every fix as a change visible at mid distance. Details: `docs/art/beauty-corner-brief.md` section 3.
+**User calibration (2026-10-30):** the user reads our totals about 8-10 points low ("your 20/40 is more like a 30/40"). Treat **25/40** as the floor: if the first review already reaches it, the target becomes first score + 5 (at most 3 art rounds per session-usage.md, each with a visible gain of 1.5+ points), score only what the capture or play cameras see (backs, undersides and hidden faces don't count), and phrase every fix as a change visible at mid distance. Details: `docs/art/beauty-corner-brief.md` section 3.
 
 Rubric expectation (same as sc-aaa-prop): about 4 per line is shipped-quality art, and the /40 total is harsher than shipped games' own art scored blind, so use scores to rank and compare, not to pass or fail.
 
@@ -57,7 +57,7 @@ Top fixes: 1) ... 2) ... 3) ...   (each: what, where, which line it should move)
 - `references/common-defects.md` - read when a render shows sandpaper or foam noise, melted rims, chip islands, stripes, black metal, neon liquid, plastic glaze or contour bands.
 
 ## 6. The engine is the final judge
-Blender renders are proxies until a Unity capture agrees. Before calling a set of assets "matching the reference", ask the PC session for one round of captures (the fixed capture cameras of PHASE1 3.7 once their builder exists) and batch it. Report results to the controller with the numbers.
+Blender renders are proxies until a Unity capture agrees. Before calling a set of assets "matching the reference", ask the PC session for one round of captures (the fixed capture cameras of PHASE1 3.7 in the corner capture builders) and batch it. Report results to the controller with the numbers.
 
 
 ## Maintaining these skills

@@ -116,7 +116,6 @@ See `references/facial-topology.md` for face-specific loops.
 |-------|-----------|-----------|
 | Facial topology | `references/facial-topology.md` | Face modeling |
 | Body proportions | `references/body-proportions.md` | Blockout |
-| Pipeline | `../references/asset-pipeline.md` | Phase context |
 
 ## Style Integration
 

@@ -4,6 +4,8 @@ description: Walk SleepingCalamity in the Unity editor's play mode through the U
 ---
 # Walking SleepingCalamity in the editor
 
+> **Status (2026-11-11):** `WalkDriver` and its helpers (`HostLocal`, `JoinLocal`, `InstallFakeInput`, `StateJson`, `UseTarget`) are not in this repo yet; they arrive with the App/Dev port from FishGame. Until then, walk with the Unity MCP directly and the existing dev tools (`Assets/_Project/Editor/Dev/`, `FakeInputService`), and treat the recipes below as the target design.
+
 Long walks belong in a subagent or child session that returns a ~5-line summary (CLAUDE.md, Agents and review). The controller orchestrates.
 
 ## Before you start

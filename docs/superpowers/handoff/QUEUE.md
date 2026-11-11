@@ -3,7 +3,7 @@
 One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). Built from a full open-work scan on 2026-11-06 (spec section 12, PARKING_LOT, BUGS, triage notes, session STATUS files, decisions-for-review).
 
 ## Rules
-- Take the top open item in **Ready** that nothing else is touching. One item (or 2-3 related S items) per fresh session.
+- Take the top open item in **Ready** that nothing else is touching, plus the related items that land with it: one M item with its S follow-ups, or 3-5 related S items, per fresh session (`session-usage.md`, "The game comes first"). Tick items in the merge commit that lands them, not in a commit of their own.
 - Size: **S** = under ~1 h, docs/tools/small code, at most one check. **M** = a few hours, one implementer run + review + check. **L** = multi-task plan, risk review, or art rounds.
 - Overnight: anything may run, but start with S items, and check usage (`get_usage`: weekly vs the even line, 5 h window) before starting an M or L. Workday break still stops everything.
 - `[U]` = needs Unity (PC: one PlayMode run at a time). `[A]` = art/Blender. `[net]` = networking/save, needs `risk-reviewer`.

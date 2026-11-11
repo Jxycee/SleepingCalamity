@@ -39,12 +39,9 @@ Gather brief budgets → Screenshot key angles → Run checklists
 
 Use `get_viewport_screenshot` via MCP when connected.
 
-## Checklists (load as needed)
+## Checklists
 
-- `../references/validation-checklist.md`
-- `../references/visual-match-checklist.md` (reference tasks)
-- `../references/naming-conventions.md`
-- `../references/polycount-budgets.md`
+Budgets and naming: sc-asset-budget and PHASE1 3.3.
 
 ## Defect Severity
 

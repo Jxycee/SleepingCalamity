@@ -4,8 +4,7 @@ description: SleepingCalamity's checklist for networked and saved gameplay (NGO 
 ---
 # Networked and saved gameplay in SleepingCalamity
 
-Distilled from the 2026-10-25 risk reviews of tug driving, world save, weir boards and the digs. Each line below was a real finding. Read the
-class comments of `TugBody`, `TugHelm`, `WeirBoardsState`, `DigSite` and `WorldSaveFlow` for the working patterns.
+Distilled from FishGame's 2026-10-25 risk reviews of tug driving, world save, weir boards and the digs. Each line below was a real finding. Those classes were not ported, so names like `TugBody`, `WeirBoardsState`, `DigSite`, `WorldSession` and `PlayerSpawner` below are FishGame's; the patterns still apply. In this repo, read the class comments of `CombatHost` (Gameplay/Combat), `WorldSaveFlow` and `SceneFlow` (App) and `DiveSession` (Core/Cellars) for working examples.
 
 ## Authority (CLAUDE.md: host-authoritative; no anti-cheat)
 - One class-level comment per networked class naming who writes what (host vs owner). Only the host writes `NetworkVariable`s; clients ask with

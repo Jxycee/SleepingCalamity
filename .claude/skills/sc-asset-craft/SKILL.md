@@ -23,7 +23,7 @@ Models are Python generators under `Art/Blender/` that build meshes from code, b
 
 
 ## 0b. Tools: what runs here, what is legacy, what is still in FishGame
-Every other asset skill links to this table. Current: `sc_asset_audit.py` (PHASE1 3.3 budgets), `sc_ref_fetch.py`, `sc_ref_palette.py --k 7`, and the ported fg-aaa-prop tools (sc-aaa-prop). **Legacy, do not use:** `sc_asset_preview.py`, `sc_asset_score.py`, `sc_asset_census.py`, `sc_paint_pass.py`, `sc_tint.py`. Not ported: `ref_match.py`, `sc_adopt_find.py`, `fg_handmade.py`, `fg_kit_costs.py`, `fg_hull.py`.
+Every other asset skill links to this table. Current: `sc_asset_audit.py` (PHASE1 3.3 budgets), `sc_ref_fetch.py`, `sc_ref_palette.py --k 7`, and the ported fg-aaa-prop tools (sc-aaa-prop). **Legacy, do not use:** `sc_asset_preview.py`, `sc_asset_score.py`, `sc_asset_census.py`, `sc_paint_pass.py`, `sc_tint.py`. Not ported: `ref_match.py` (use `Art/Blender/tools/sc_ref_palette.py`), `fg_adopt_find.py`, `fg_handmade.py`, `fg_kit_costs.py`, `fg_hull.py`.
 - `references/tools.md` - read before running any Art/Blender tool you have not used this session (full status table and replacements).
 
 ## 0c. Characters

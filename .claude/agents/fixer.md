@@ -2,7 +2,7 @@
 name: fixer
 description: LAST-RESORT escalation fixer (Fable, very expensive: the user can afford about one Fable use a week). Use only after an Opus 5.5 high attempt also failed, with the failing evidence, and only with the user's OK. Never for a first or second failure.
 model: fable
-effort: medium
+effort: high
 ---
 You take over a SleepingCalamity problem that earlier attempts didn't solve. The brief gives the goal, what was tried, and the failing evidence (test output, logs, diffs). Find the root cause before changing code, and give the reason for your fix.
 

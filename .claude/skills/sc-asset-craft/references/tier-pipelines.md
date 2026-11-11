@@ -23,6 +23,6 @@ part primitives (lathe / box / tube, real metres)
 
 **T3 instanced pieces:** a few sculpted variants per family (the cottage used 16 slates), baked into one 2K atlas, instanced with jitter (bond, tilt, scale). Cull faces buried in the wall or ground at assembly. The cottage's slate roof is the model.
 
-**Buildings** split like the cottage: plaster walls unique-UV and baked from a smart plaster with storytelling masks, repeated members (tiles, stones) as T3 kits, timber frame baked unique, hero bakes only for the door and lantern. Budget: PHASE1 3.3 (a whole building at most 75k tris, 2x4K + 4x2K + 2x1K).
+**Buildings** split like the cottage: plaster walls unique-UV and baked from a smart plaster with storytelling masks, repeated members (tiles, stones) as T3 kits, timber frame baked unique, hero bakes only for the door and lantern. Budget: PHASE1 3.3 (a whole building at most 75k tris, 6x2K + 2x1K; nothing bakes above 2048 px).
 
 **Batch, don't build one by one** (PHASE1 9): one generator per family, all its items run headless in one Blender session, one joined Cycles bake per batch, one contact sheet per batch.
