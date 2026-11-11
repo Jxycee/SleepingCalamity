@@ -16,7 +16,7 @@ Process was crowding out the game (2026-11-11 audit): about 2,075 commits in 13 
 - In every new worktree run `git lfs checkout` first: a fresh worktree holds LFS pointer stubs and the first Unity run fails on texture import (cost the Q12 baseline run).
 - Run subagents in their own git worktree, so the controller checkout stays clean and the stop hook doesn't loop on uncommitted changes.
 - Read files by grep and line range, never whole. Read long Unity logs through a subagent summary.
-- STATUS files change only when the state changes (started, blocked, waiting on the user, done), and the change goes into the next real commit. Progress in between goes to the board profile.
+- STATUS files change only when the state changes (started, blocked, waiting on the user, done), and the change goes into the next real commit. A state that stops the session (blocked, waiting on the user, done, `Archive: ready`) is pushed right away as part of the session's last push, because no later commit will carry it. Progress in between goes to the board profile.
 - Report status through the session board, not by message: `board` action `profile` (state, tip, check, next, waitingOn, holdsPort, needs). A message to the coordinator starts a turn on its large context. Message only when a decision is needed.
 - Every subagent report starts a turn on the session's whole context (plan 3, 2026-11-04: ~2,650 messages, a big Sonnet turn per "task N done"). So give each implementer run 2-3 related plan tasks with one report, and don't take a turn just to say "still waiting".
 - Context handoff (user). At about 250k tokens of context (local: `get_usage` self; cloud: the compaction warning), hand off at the next milestone boundary, not mid-step:
