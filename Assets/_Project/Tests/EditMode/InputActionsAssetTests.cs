@@ -119,6 +119,8 @@ namespace SleepingCalamity.Tests.EditMode
                 new[] { InputActionNames.SwitchTarget, "<Gamepad>/rightStick", GP },
                 new[] { InputActionNames.Dodge, "<Keyboard>/leftCtrl", KM },
                 new[] { InputActionNames.Dodge, "<Gamepad>/buttonEast", GP },
+                new[] { InputActionNames.UseItem, "<Keyboard>/f", KM },
+                new[] { InputActionNames.UseItem, "<Gamepad>/dpad/up", GP },
                 new[] { InputActionNames.Pause, "<Keyboard>/escape", KM },
                 new[] { InputActionNames.Pause, "<Gamepad>/start", GP },
                 new[] { InputActionNames.Submit, "<Keyboard>/enter", KM },

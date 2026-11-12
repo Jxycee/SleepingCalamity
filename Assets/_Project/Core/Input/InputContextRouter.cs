@@ -94,6 +94,7 @@ namespace SleepingCalamity.Core
                 SecondaryReleased = f.SecondaryReleased,
                 InteractPressed = f.InteractPressed,
                 InteractHeld = f.InteractHeld,
+                UseItemPressed = f.UseItemPressed,
                 PausePressed = f.PausePressed,
             };
         }

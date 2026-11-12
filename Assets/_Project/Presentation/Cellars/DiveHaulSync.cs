@@ -269,8 +269,7 @@ namespace SleepingCalamity.Presentation
             DiveSession s = _session;
             DiveStir stir = s.Stir;
             int floor = DiveFloor;
-            int found = 0;
-            foreach (int id in s.Pieces.FoundIds) if (!PieceCatalog.IsPerson(id)) found++;
+            int found = s.Pieces.FoundPieceCount;
             int choice = 0, choiceMask = 0, choiceSeconds = 0;
             if (_choice.IsOpen)
             {

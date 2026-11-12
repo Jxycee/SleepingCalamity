@@ -11,6 +11,7 @@ namespace SleepingCalamity.Core
         public bool LockPressed, DodgePressed;     // M2: toggle the hard lock; dodge (Primary is the attack button)
         public float SwitchX, SwitchY;             // M2: lock-on target switch (gamepad right stick, keyboard keys), -1..1
         public bool InteractPressed, InteractHeld;                // M3: held = the revive hold
-        public bool PausePressed;                  // Player/Pause in gameplay contexts; UI/Cancel in Menu
+        public bool UseItemPressed;                // PL-2 2.5: eat a loaf (Free and LockOn only)
+        public bool PausePressed;                 // Player/Pause in gameplay contexts; UI/Cancel in Menu
     }
 }

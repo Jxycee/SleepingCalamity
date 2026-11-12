@@ -1030,10 +1030,13 @@ namespace SleepingCalamity.Presentation
             return string.IsNullOrEmpty(s) ? generic : s;
         }
 
-        // Owner (any peer): H eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf).
+        // Owner (any peer): the UseItem button (or the dev key H) eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf: up, hurt, has one).
+        // UseItem arrives through the routed intent, so it is dead in placement, the bank screen and menus (InputContextRouter).
         private void LocalEat()
         {
-            if (!(HeroInput.ResolveDefault() is IDevInput dev) || !dev.WasPressed(DevKey.EatLoaf)) return;
+            IInputService input = HeroInput.ResolveDefault();
+            bool pressed = input != null && input.Intent.UseItemPressed || input is IDevInput dev && dev.WasPressed(DevKey.EatLoaf);
+            if (!pressed) return;
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             HeroVitals v = player != null ? player.GetComponent<HeroVitals>() : null;
             if (v != null) v.RequestEatLoaf();
