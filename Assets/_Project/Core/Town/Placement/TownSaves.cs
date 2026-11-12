@@ -462,7 +462,7 @@ namespace SleepingCalamity.Core
             int known = 0;
             foreach (int _ in KnownPieceIds()) known++;
             foreach (string _ in KnownResidentIds()) known++;
-            // PieceDepths is deliberately not part of this: a fresh world's depths come from its seed again at the next load, so they alone are not worth a dive section in the file.
+            // PieceDepths is deliberately not part of this: an untouched, never-stamped world's depths are re-derived from its seed at the next load (and D1 reshuffled those worlds' non-frame pieces), so they alone are not worth a dive section in the file.
             return !s.InDive && s.ClearedMask == 0 && !s.CheckpointReached && !s.CheckpointHeld && !s.BossBeaten && s.ExtraSlotOwner == null && s.BankedPieces.Count == 0 && s.BankedResidents.Count == 0 && s.BankedLoot.Count == 0
                 && s.OnFloorPieces.Count + s.OnFloorResidents.Count == known && s.Extra == null;
         }

@@ -67,16 +67,6 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(seen, Is.EquivalentTo(new[] { 2, 4 }));
         }
 
-        [Test, Category("Soak")]
-        public void FrameFloor_Share_Over1000Seeds()
-        {
-            int onFloor2 = 0;
-            for (ulong seed = 1; seed <= 1000; seed++)
-                if (PieceDepths.Assign(seed, PieceCatalog.Specs)[PieceCatalog.FrameId] == 2) onFloor2++;
-            TestContext.WriteLine($"PL-1 frame (id 100) on floor 2: {onFloor2}/1000 seeds ({onFloor2 / 10.0:0.0}%), on floor 4: {1000 - onFloor2}/1000");
-            Assert.That(onFloor2, Is.GreaterThan(0));
-        }
-
         [Test]
         public void Frame_IsOnFloor2_ForEveryNewWorld()
         {
