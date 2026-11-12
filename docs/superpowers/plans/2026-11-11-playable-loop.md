@@ -1,6 +1,6 @@
 # Playable loop milestone (PL)
 
-Written 2026-11-11 by Fable Run 1 (`2026-11-11-fable-reset-plan.md` section 4). Status: **proposal, waiting for the user's read.** Sections 1-2 say where the loop stands, section 3 is the work in four Sonnet sessions plus a reserve, section 4 is the first session's brief and the queue changes, section 5 is the walk that closes the milestone, section 6 lists what the user decides.
+Written 2026-11-11 by Fable Run 1 (`2026-11-11-fable-reset-plan.md` section 4). Status: **approved by the user on 2026-11-11 with the defaults for D1-D5 (section 6). PL-1 is ready to launch.** Sections 1-2 say where the loop stands, section 3 is the work in four Sonnet sessions plus a reserve, section 4 is the first session's brief and the queue changes, section 5 is the walk that closes the milestone, section 6 lists what the user decides.
 
 Citations are `path:line` under `Assets/_Project/` unless they start with `docs/`. They come from Haiku scans of `main` at `bb41d8be`; the lines marked (checked) were re-read for this plan. An implementer confirms a line with the LSP tool before editing.
 
@@ -81,10 +81,11 @@ Goal: play the whole loop with buttons in a test, find every break, and measure 
 | 1.1 | **Input tests for the town side** (fast tier, PlayMode). Drive `PlacementMode` and the trapdoor through `FakeInputService` in the real Hollowmere scene, solo host | new `Tests/PlayMode/PlacementModeInputTests.cs`, new `Tests/PlayMode/DiveEntryInputTests.cs`; read `Tests/PlayMode/Fakes/FakeInputService.cs`, `Tests/PlayMode/PlayModeHarness.cs:130-166`, `Tests/PlayMode/HollowmereHubTests.cs` | `PlacementModeInputTests`: `InteractAtBuildPoint_TakesLock_EntersPlacement`, `Primary_PlacesFrame_WhenFrameInStock`, `Primary_WithoutFrame_SaysNoFrameInStock`, `Jump_TurnsGhost_BlockedTurnIsRefused`, `Primary_PlacesPartsInOrder_ThenResident`, `Secondary_PicksUpLastPlaced`, `Pause_LeavesPlacement_ReleasesLock_WorldSaved`, `WalkingAway_LeavesPlacement`. `DiveEntryInputTests`: `InteractAtTrapdoor_StartsDive_Solo`, `OutOfRange_NoPrompt_NoStart`, `ReturnDive_NoDevKey_StartsOnFloor1_DespiteCheckpoint` (pins today's behaviour; PL-4 task 4.2 replaces it), `WalkOverPiece_PieceReachesTownStock` (a real pickup on a generated floor, no `ServerAddPiece`) |
 | 1.2 | **Loop bot** (`Category("Bot")`, `SC_BOT=1`). From the Hollowmere spawn: press Interact at the trapdoor, let `DiveBot` play, come home by any ending, press Interact at the build point, place what is in stock, Pause out, leave the session, start the same world again, check the town. The bot may teleport between town points; every interaction is a button press | new `Tests/PlayMode/Bot/LoopBot.cs`, new `Tests/PlayMode/Bot/LoopBotTests.cs`; reuse `Tests/PlayMode/Bot/DiveBot.cs:77-100`, `DiveBotTests.cs:27-79` | `SoloLoop_Tough_InputOnly_FrameHome_Placed_SurvivesReload` (seeds 7, 12345, 2026; `Tough` on so it tests wiring, not difficulty; must pass). `SoloLoop_Measure` (same seeds, `Tough` off, up to 4 dives, never fails: writes dives needed, minutes, deaths per floor and the floor each piece was found on to `Reference/sessions/pl1-loop-proof/RESULTS.md`) |
 | 1.3 | **Two-player loop by input**, as far as one process allows: both heroes on their own fake input, wired per hero as the co-op bot does (`Tests/PlayMode/Bot/CoopDiveRun.cs:103-128`), starting on floor 1 with real pickups. The in-process client declines scene loads, so its `PlacementMode` may not exist: then the client places through `TownSync` requests as `SquareLoopWalkQaTests` does, and the report says so; the two-process run is the user's walk | extend `LoopBotTests.cs`; read `Tests/PlayMode/SquareLoopWalkQaTests.cs:57-170`, `Tests/PlayMode/Bot/CoopDiveRun.cs` | `PairLoop_Tough_BothByInput_FrameHome_ClientPlacesPart_SurvivesReload` (seed 7) |
-| 1.4 | **First building distance** (EditMode). Count where the frame lands over world seeds. If the user said yes to D1: put the frame (id 100) on floor 2 for every new world, leave saved worlds alone (the assignment is saved in the dive section, field `pieceDepths`, `Runtime/Save/WorldSaveStore.cs:70, 88`, stamped at `Runtime/Net/HostWorld.cs:135-140`) | `Core/Town/Placement/PieceCatalog.cs:31-41`, `Core/Cellars/PieceDepths.cs:33-51`, new cases in its EditMode test file | `PieceDepthsTests.FrameFloor_Share_Over1000Seeds` (prints the share; `[Category("Soak")]`). With D1: `Frame_IsOnFloor2_ForEveryNewWorld` (200 seeds), `SavedAssignment_IsKept_OnLoad`, `OtherPieces_StillSpreadOverFloors2And4` |
+| 1.4 | **First building distance** (EditMode). Count where the frame lands over world seeds, then (D1, approved) put the frame (id 100) on floor 2 for every new world and leave saved worlds alone (the assignment is saved in the dive section, field `pieceDepths`, `Runtime/Save/WorldSaveStore.cs:70, 88`, stamped at `Runtime/Net/HostWorld.cs:135-140`) | `Core/Town/Placement/PieceCatalog.cs:31-41`, `Core/Cellars/PieceDepths.cs:33-51`, new cases in its EditMode test file | `PieceDepthsTests.FrameFloor_Share_Over1000Seeds` (prints the share before the change; `[Category("Soak")]`). `Frame_IsOnFloor2_ForEveryNewWorld` (200 seeds), `SavedAssignment_IsKept_OnLoad`, `OtherPieces_StillSpreadOverFloors2And4` |
+| 1.6 | **Floor 3 enemy mix 20/50/30 to 30/50/20** (D4, approved; the proposal from `e59bbfde`, `QUEUE.md:20`). Tuning data only | the floor-3 mix constant (a `scanner` finds it from `e59bbfde`), its EditMode test | the existing mix test updated to the new shares; `SoloLoop_Measure` runs after this change |
 | 1.5 | **Queue truth.** Close `QUEUE.md:55` with the evidence in row 9 above if 1.1 and the existing `BankScreenInputTests` agree. Close or re-scope `QUEUE.md:32` from the 1.2 numbers. List every break found, with a size, in the session's STATUS for PL-2 to PL-4 | `docs/superpowers/handoff/QUEUE.md` (in the merge commit) | none |
 
-Reviews: `reviewer` once for the batch (tests and Core). `risk-reviewer` only if 1.4 changes `PieceDepths` (it decides what a new world saves), and only on that diff. No branch review (tests, Core, docs).
+Reviews: `reviewer` once for the batch (tests and Core). `risk-reviewer` on the 1.4 `PieceDepths` diff only (it decides what a new world saves). No branch review (tests, Core, docs).
 Checks: `gate` on push; `check` on the tip before merge; the bot runs with `SC_BOT=1` are extra and do not gate the merge; `soak` once if 1.4 touches generation input.
 
 ### PL-2 Guide and dive result
@@ -149,7 +150,8 @@ nothing else in it is yours). The loop is wired already; your job is to find whe
 
 Branch: claude/pl1-loop-proof, cut from origin/main, in its own worktree. Run `git lfs checkout` first.
 Delegate code to `implementer` (effort high: PlayMode), reads to `scanner`. Two implementer runs:
-run A = tasks 1.1 + 1.4, run B = tasks 1.2 + 1.3. One `reviewer` pass at the end.
+run A = tasks 1.1 + 1.4 + 1.6, run B = tasks 1.2 + 1.3. One `reviewer` pass at the end, plus
+`risk-reviewer` on the 1.4 diff.
 
 Files and symbols (confirm lines with the LSP tool before editing):
 - Tests/PlayMode/Fakes/FakeInputService.cs (how tests feed buttons)
@@ -178,10 +180,13 @@ Behaviour (tests are the deliverable; change game code only for a break of 30 li
 1.3 `PairLoop_Tough_BothByInput_FrameHome_ClientPlacesPart_SurvivesReload` (seed 7): each hero on its own
     fake input (CoopDiveRun.Wire), starting on floor 1 with real pickups. If the in-process client has no
     PlacementMode (it declines scene loads), it places through TownSync requests; say so in the report.
-1.4 EditMode `PieceDepthsTests.FrameFloor_Share_Over1000Seeds` (Category Soak, prints the share).
-    ONLY if the coordinator's brief says decision D1 = yes: put piece 100 on floor 2 for every new world,
-    with `Frame_IsOnFloor2_ForEveryNewWorld`, `SavedAssignment_IsKept_OnLoad`,
-    `OtherPieces_StillSpreadOverFloors2And4`; that diff also gets `risk-reviewer`.
+1.4 EditMode `PieceDepthsTests.FrameFloor_Share_Over1000Seeds` (Category Soak, prints the share; run it
+    once before the change and note the number). Then, decision D1 (user, 2026-11-11: yes): put piece
+    100 on floor 2 for every new world; a world that already has a saved assignment keeps it. Tests
+    `Frame_IsOnFloor2_ForEveryNewWorld`, `SavedAssignment_IsKept_OnLoad`,
+    `OtherPieces_StillSpreadOverFloors2And4` fail first. That diff also gets `risk-reviewer`.
+1.6 Decision D4 (user, 2026-11-11: yes): floor 3 enemy mix 20/50/30 -> 30/50/20, the proposal recorded
+    with commit e59bbfde (QUEUE.md:20). Tuning data and its test only. Do it before `SoloLoop_Measure`.
 1.5 In the merge commit: tick QUEUE.md:55 if 1.1 and BankScreenInputTests show real input; tick or
     re-scope QUEUE.md:32 from the measured numbers.
 A test that fails because of a GAME bug stays failing with [Ignore("PL break: <one line>")] only if the
@@ -189,7 +194,7 @@ fix is over 30 lines; list each one in STATUS with file:line, a size and whether
 
 Tests that must fail first: none are expected to; an unexpected failure is the finding.
 
-Out of scope: menus, HUD, guide, result screen, pause (PL-2 to PL-4). Difficulty tuning. Any change to
+Out of scope: menus, HUD, guide, result screen, pause (PL-2 to PL-4). Difficulty tuning beyond 1.6. Any change to
 RPCs, NetworkVariables or save sections. CURRENT.md. Art.
 
 Check: PC `powershell -NoProfile -ExecutionPolicy Bypass -File <worktree>\Tools\unity.ps1 gate -OutDir <scratchpad>`
@@ -221,7 +226,7 @@ Fold into those and retire as separate items:
 
 Change in "Waiting on the user":
 - Replace "Playtest `playtest-2026-11-06`" with "Playable-loop walk on the PL-4 build (plan section 5)". The 11-06 build still opens on the dev panel and predates all of this; it is not worth the user's time now.
-- Add decisions D1-D5 (section 6).
+- Decisions D1-D5 (section 6) are answered: no entry needed. Record them in `CURRENT.md` with the PL-1 launch.
 - `USER_TODO.md` items 3b and 3c are stale (old four-floor dive); PL-4 replaces them.
 
 Push down, not out: the dive-build items (`QUEUE.md:16-29`), M7 readiness (`:58-60`) and per-player loot follow-ups (`:52-54`) stay, below the new section.
@@ -257,7 +262,7 @@ On the PL-4 release build. No dev panel, no dev keys, no flags. If a step needs 
 
 ## 6. Decisions for the user
 
-Each has a default; the sessions proceed on the defaults unless told otherwise, except D1, which changes a settled rule and waits for a yes.
+**All five approved as recommended (user, 2026-11-11).** D1 replaces plan 3 decision 10 for the frame only and is built in PL-1 task 1.4; D4 is built in PL-1 task 1.6 and closes the proposal waiting at `QUEUE.md:20`.
 
 - **D1. The bakery frame is always on floor 2 in a new world.** Today the four first-half pieces each land on floor 2 or 4 (plan 3 decision 10). If the frame is on floor 4, the first building sits behind floor 3's set piece with no bread yet. With the frame on floor 2, every first dive that clears one floor brings home something to place, and the loop closes in about ten minutes. Saved worlds keep what they have. *Recommended: yes.*
 - **D2. Menus on UI Toolkit, in-game HUD stays IMGUI for now.** With an IMGUI fallback if the spike fails. *Recommended: yes.*
