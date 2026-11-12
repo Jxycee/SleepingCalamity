@@ -245,7 +245,7 @@ namespace SleepingCalamity.Core
             foreach (PieceSpec spec in PieceCatalog.Specs)
             {
                 if (spec.Id != id) continue;
-                if (spec.FixedFloor != 0) return floor == spec.FixedFloor;
+                if (spec.FixedFloor != 0 && id != PieceCatalog.FrameId) return floor == spec.FixedFloor;   // the frame is fixed on floor 2 for new worlds (D1) but a saved one on floor 4 stays valid: saved worlds keep their assignment
                 foreach (int f in PieceDepths.CandidateFloors(spec.SecondHalf)) if (f == floor) return true;
                 return false;
             }

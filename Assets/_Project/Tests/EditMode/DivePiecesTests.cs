@@ -19,7 +19,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(ids, Does.Contain(PieceCatalog.BakerId));
             Assert.That(ids.Distinct().Count(), Is.EqualTo(ids.Count));
             Assert.That(PieceCatalog.Specs.Single(s => s.Id == PieceCatalog.BakerId).FixedFloor, Is.EqualTo(3));
-            foreach (PieceSpec s in PieceCatalog.Specs.Where(s => s.Id != PieceCatalog.BakerId)) Assert.That(s.FixedFloor, Is.EqualTo(0), "piece " + s.Id + " is random");
+            Assert.That(PieceCatalog.Specs.Single(s => s.Id == PieceCatalog.FrameId).FixedFloor, Is.EqualTo(2), "D1: the frame is always on floor 2 in a new world");
+            foreach (PieceSpec s in PieceCatalog.Specs.Where(s => s.Id != PieceCatalog.BakerId && s.Id != PieceCatalog.FrameId)) Assert.That(s.FixedFloor, Is.EqualTo(0), "piece " + s.Id + " is random");
             Assert.That(PieceCatalog.Specs.Where(s => s.SecondHalf).Select(s => s.Id), Is.EquivalentTo(new[] { 300, 301 }));
         }
 

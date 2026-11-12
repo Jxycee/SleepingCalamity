@@ -67,6 +67,47 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(seen, Is.EquivalentTo(new[] { 2, 4 }));
         }
 
+        [Test, Category("Soak")]
+        public void FrameFloor_Share_Over1000Seeds()
+        {
+            int onFloor2 = 0;
+            for (ulong seed = 1; seed <= 1000; seed++)
+                if (PieceDepths.Assign(seed, PieceCatalog.Specs)[PieceCatalog.FrameId] == 2) onFloor2++;
+            TestContext.WriteLine($"PL-1 frame (id 100) on floor 2: {onFloor2}/1000 seeds ({onFloor2 / 10.0:0.0}%), on floor 4: {1000 - onFloor2}/1000");
+            Assert.That(onFloor2, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void Frame_IsOnFloor2_ForEveryNewWorld()
+        {
+            for (ulong seed = 1; seed <= 200; seed++)
+                Assert.That(PieceDepths.Assign(seed, PieceCatalog.Specs)[PieceCatalog.FrameId], Is.EqualTo(2), $"seed {seed}");
+        }
+
+        [Test]
+        public void SavedAssignment_IsKept_OnLoad()
+        {
+            var dive = new DiveSave { PieceDepths = new List<PieceDepthSave> { new PieceDepthSave { Id = PieceCatalog.FrameId, Floor = 4 } } };
+            for (ulong seed = 1; seed <= 50; seed++)
+                Assert.That(TownSaveRules.ResolvePieceDepths(dive, seed)[PieceCatalog.FrameId], Is.EqualTo(4), $"seed {seed}");
+        }
+
+        [Test]
+        public void OtherPieces_StillSpreadOverFloors2And4()
+        {
+            var seen = new HashSet<int>();
+            for (ulong seed = 1; seed <= 200; seed++)
+            {
+                IReadOnlyDictionary<int, int> d = PieceDepths.Assign(seed, PieceCatalog.Specs);
+                foreach (int id in new[] { PieceCatalog.OvenId, PieceCatalog.DoorId, PieceCatalog.SignId })
+                {
+                    Assert.That(d[id], Is.EqualTo(2).Or.EqualTo(4), $"seed {seed} piece {id}");
+                    seen.Add(d[id]);
+                }
+            }
+            Assert.That(seen, Is.EquivalentTo(new[] { 2, 4 }));
+        }
+
         [Test]
         public void Assign_RejectsBadSpecs()
         {
