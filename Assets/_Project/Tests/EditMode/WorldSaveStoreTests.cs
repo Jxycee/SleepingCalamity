@@ -814,6 +814,26 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(blank.Stock, Is.Null);
         }
 
+        // Catches: a saved frame depth of 4 (pre-D1 worlds put the frame on floor 4) being cleaned away or re-derived to the new floor 2 on the real load path, or lost at the next capture.
+        [Test]
+        public void HostWorld_SavedFrameOnFloor4_SurvivesLoadAndRecapture()
+        {
+            ulong seed = 1UL;
+            Assert.That(PieceDepths.Assign(seed, PieceCatalog.Specs)[PieceCatalog.FrameId], Is.EqualTo(2), "premise: the seed alone would put the frame on floor 2");
+            var depths = new List<PieceDepthSave>();
+            foreach (PieceSpec s in PieceCatalog.Specs)
+                depths.Add(new PieceDepthSave { Id = s.Id, Floor = s.Id == PieceCatalog.FrameId ? 4 : PieceDepths.Assign(seed, PieceCatalog.Specs)[s.Id] });
+            WorldSave file = OldDiveWorld(seed);
+            file.Dive.PieceDepths = depths;
+
+            HostWorld host = HostFor(WorldKind.Multiplayer, "aaa", "bbb");
+            host.LoadTown(file);   // CleanSnapshot, then ResolvePieceDepths
+            Assert.That(host.PieceFloors[PieceCatalog.FrameId], Is.EqualTo(4), "the saved depth wins over the seed");
+
+            Assert.That(host.CaptureTownInto(file), Is.True);
+            Assert.That(file.Dive.PieceDepths.Single(p => p.Id == PieceCatalog.FrameId).Floor, Is.EqualTo(4), "re-capture still holds 100:4");
+        }
+
         // Catches: a live capture (which knows none of the saved-only fields) wiping the saved depths, held checkpoint or extra-slot owner, or the saved suspend section.
         [Test]
         public void HostWorld_LegacySource_KeepsTheSavedV2FieldsAndSuspend()

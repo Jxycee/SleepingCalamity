@@ -51,11 +51,17 @@ namespace SleepingCalamity.Tests.EditMode
         // The pre-roster pick, copied from origin/main (CellarEnemyMix.Tier1Kind before procgen 3): weights and stream pinned here so a drift in the new code fails.
         static EnemyKind OldPick(uint seed, int floor, int room, int index)
         {
-            int[][] weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 20, 50, 30 }, new[] { 30, 40, 30 } };
+            int[][] weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 30, 50, 20 }, new[] { 30, 40, 30 } };   // floor 3 retuned 20/50/30 -> 30/50/20 (D4, 2026-11-11)
             int[] w = weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1];
             var rng = new Pcg32(Rng.Derive(seed, "cellars.mix", ((ulong)floor << 32) | ((uint)room << 8) | (uint)index));
             int roll = rng.Range(0, w[0] + w[1] + w[2]);
             return roll < w[0] ? EnemyKind.Slime : roll < w[0] + w[1] ? EnemyKind.Broom : EnemyKind.RatKing;
+        }
+
+        [Test]
+        public void Floor3_Mix_IsSlime30_Broom50_RatKing20()
+        {
+            Assert.That(CellarEnemyMix.WeightsFor(3), Is.EqualTo(new[] { 30, 50, 20 }));
         }
 
         [Test]

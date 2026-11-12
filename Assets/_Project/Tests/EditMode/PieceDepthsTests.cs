@@ -68,6 +68,37 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Frame_IsOnFloor2_ForEveryNewWorld()
+        {
+            for (ulong seed = 1; seed <= 200; seed++)
+                Assert.That(PieceDepths.Assign(seed, PieceCatalog.Specs)[PieceCatalog.FrameId], Is.EqualTo(2), $"seed {seed}");
+        }
+
+        [Test]
+        public void SavedAssignment_IsKept_OnLoad()
+        {
+            var dive = new DiveSave { PieceDepths = new List<PieceDepthSave> { new PieceDepthSave { Id = PieceCatalog.FrameId, Floor = 4 } } };
+            for (ulong seed = 1; seed <= 50; seed++)
+                Assert.That(TownSaveRules.ResolvePieceDepths(dive, seed)[PieceCatalog.FrameId], Is.EqualTo(4), $"seed {seed}");
+        }
+
+        [Test]
+        public void OtherPieces_StillSpreadOverFloors2And4()
+        {
+            var seen = new HashSet<int>();
+            for (ulong seed = 1; seed <= 200; seed++)
+            {
+                IReadOnlyDictionary<int, int> d = PieceDepths.Assign(seed, PieceCatalog.Specs);
+                foreach (int id in new[] { PieceCatalog.OvenId, PieceCatalog.DoorId, PieceCatalog.SignId })
+                {
+                    Assert.That(d[id], Is.EqualTo(2).Or.EqualTo(4), $"seed {seed} piece {id}");
+                    seen.Add(d[id]);
+                }
+            }
+            Assert.That(seen, Is.EquivalentTo(new[] { 2, 4 }));
+        }
+
+        [Test]
         public void Assign_RejectsBadSpecs()
         {
             Assert.Throws<ArgumentException>(() => PieceDepths.Assign(1, new List<PieceSpec> { new PieceSpec(1, 11, false) }));

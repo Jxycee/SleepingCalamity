@@ -131,7 +131,7 @@ namespace SleepingCalamity.Runtime
         }
 
         // Writes PieceFloors into the host's dive section so the next save keeps them. Only when a dive section exists: creating one here would make Reconcile read every piece as lost
-        // (the dive section is the authority on what is still on the floors), and a fresh world without one gets its depths from the seed again, identically.
+        // (the dive section is the authority on what is still on the floors), and a world with no dive section (never stamped, untouched) gets its depths re-derived from the seed at each load. That re-derivation is stable only while PieceDepths.Assign is unchanged: D1 reshuffled the non-frame pieces of such worlds (frame on floor 2).
         private void StampPieceDepths()
         {
             if (_town.Dive == null || PieceFloors.Count == 0) return;

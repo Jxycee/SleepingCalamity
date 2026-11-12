@@ -54,7 +54,7 @@ namespace SleepingCalamity.Core
     public static class CellarEnemyMix
     {
         // weights for Slime, Broom, RatKing per floor 1-4
-        static readonly int[][] Weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 20, 50, 30 }, new[] { 30, 40, 30 } };
+        static readonly int[][] Weights = { new[] { 100, 0, 0 }, new[] { 60, 40, 0 }, new[] { 30, 50, 20 }, new[] { 30, 40, 30 } };   // floor 3 retuned 20/50/30 -> 30/50/20 (D4, 2026-11-11: floor 3 rat_king set piece killed the unhealed bot on every seed)
 
         public static int[] WeightsFor(int floor) => (int[])Weights[System.Math.Max(1, System.Math.Min(4, floor)) - 1].Clone();
 
