@@ -88,3 +88,18 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
 
 ## 6. Lessons for the next Fable run
 (Each run appends: date, run, Fable % and all-models % at start and end, what worked, what to brief differently.)
+
+### 2026-11-11, Run 1: playable-loop plan (`2026-11-11-playable-loop.md`)
+- **Cost.** Weekly Fable 0% to 8%. Weekly all models 4% to 8%. 5-hour window 28% to 58%. These are upper bounds: the Fable coordinator session was working at the same time and the numbers are for the account. The run stayed far below its 40% stop, but one run took about 30 points of a 5-hour window, so a Fable run needs a fresh window and nothing else heavy beside it. Session context ended near 220k tokens.
+- **Where it went.** Five Haiku scanners did the reading (about 490k subagent tokens in total); Fable itself read about 450 lines (the queue, the delegate skill, the stale walk script, the dev panel, one catalogue file) and wrote one 200-line plan with about 20 small edits. Each scanner hand-back woke Fable on its whole context, so the five reports cost five turns before any writing.
+- **What worked.**
+  - Scanners with a word cap, "file:line for every claim" and a closing "what is missing" list. Their reports were enough to design from without opening the code.
+  - A second, narrow scan that asked what the player presses and sees found what the wide scans missed.
+  - A final fact-check scan of the thirteen claims the plan leaned on, run while the plan was being written. It found two real breaks (no release-build button for the return-dive floor pick or for eating a loaf) and corrected three design points (the dive's end reason is not replicated, the roster is not replicated, fake input can be wired per hero).
+- **What to brief differently.**
+  - The brief's premise was off: it counted Gameplay, UI and App and called the glue thin. The glue is in Presentation (`DiveDirector`, `DiveHaulSync`, `PlacementMode`, `TownSync`), and the loop was already wired and had a passing automated walk. Say what is known to work and name every assembly that holds the area, so the run does not spend a scan round finding out.
+  - Ask player-level questions in the first scan round ("what does a player press and see at each step, and which steps need a dev key"), not only "which systems exist". That would have saved the second round.
+  - Give the right paths: `USER_TODO.md` is under `docs/superpowers/handoff/`, and playtest notes are in `Reference/qa/playtest/BUGS.md` and `docs/playtest/NOTES.md`, not in `CURRENT.md`.
+  - Start the session on Fable. The first turn ran on Opus and was stopped; its scans were kept, so little was lost, but the baseline had to be measured again.
+  - Launch every scan in one message and tell the run to write nothing until all are back, so it takes one long turn instead of one per report.
+  - Say which earlier decisions the run may propose to reopen. This plan asks to change plan 3 decision 10 (decision D1) and marks it as waiting for a yes.
