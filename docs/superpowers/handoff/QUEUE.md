@@ -10,7 +10,15 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - Mark done as `- [x]` with the merge commit; never delete lines in the same pass. Refill when fewer than ~10 Ready items are open. The board counts open `- [ ]` lines for its idle alarm.
 - Sources are cited so a session can read the original note first.
 
-## Ready: dive build (critical path after the playtest)
+## Ready: playable loop (critical path; plan `docs/superpowers/plans/2026-11-11-playable-loop.md`, decisions D1-D5 approved 2026-11-11)
+- [ ] **M** PL-1 Loop proof: input-only loop tests and loop bot, first-building measurement, D1 frame on floor 2, D4 floor 3 mix (plan section 3) [U] (launched 2026-11-11)
+- [ ] **M** PL-2 Guide and dive result: `LoopGuide`, objective line and beacons, dive result card, a real button to eat a loaf (after PL-1) [U][net]
+- [ ] **L** PL-3 Front door: UI Toolkit spike, `UiText`, `FrontDoorModel`, five screens, dev panel off in release (after PL-1) [U][net]
+- [ ] **M** PL-4 Way out and seams: pause menu, return-dive floor pick with a real button, PL-1 breaks, release build and walk script (after PL-3) [U][net]
+- [ ] **M** PL-5 Walk fixes (reserve; only after the user's walks)
+- [ ] **S** Stale docs, ride along with any PL merge: `docs/PHASE1.md:255-278, 326-331, 347` (floor-4 Dough Warden, shared haul, 90 s timer); roadmap header says four plans for five rows (docs)
+
+## Ready: dive build (after the playable loop)
 - [x] **M** Dungeon spec step 5a: encounter templates for the 12 v2 rooms (spec `2026-11-03-hearthdeep-dungeon-design.md` section 12 step 5; `docs/ROOM_METRICS.md`, `CellarRoomsV2`) - write plan first, then code [U] (`4dee555f`)
 - [x] **M** Wire the host spawner to encounter templates (after spec 5a merges; `EncounterBuilder`, Ambush hook = `CellarEncounterPlan.AmbushRoom == roomIndex`; first add a golden template-pick test for a fixed (seed, floor, room) and a comment that the solo cap uses `Base.Spawns.Count` while live plan counts vary by twist: 5a reviewer nits 1, 4) [U][net] (`edf1d82d`)
 - [ ] **S** Spawner follow-ups (risk review `Reference/sessions/spawner-wiring/STATUS.md`): wave 1 has no player-distance safety (`CellarContentsSync` TickWaveTwo); wave 1 dropped when wave 0 placed nothing + missing carrier-lost reset; PlayMode test of the two-wave handoff; exclude the hunter cell from template cells [U][net]
@@ -29,7 +37,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** DiveBot Tough Seed12345 run: bar needs 2 of 3 seeds finished (triage :67) [U]
 
 ## Ready: bugs and test health
-- [ ] **M** BUGS item 1: solo dives unwinnable for the bot (fails in 40-70 s, never past floor 2); re-measure on main since DiveBot pace `235164ee`, then tune or close (`Reference/qa/playtest/BUGS.md:36`) [U]
+- [x] **M** BUGS item 1: solo dives unwinnable for the bot (`Reference/qa/playtest/BUGS.md:36`) (folded into PL-1 task 1.2 `SoloLoop_Measure`; closed or re-scoped from its numbers)
 - [ ] **S** BUGS item 18a: gate key dropped inside a wall has no fallback (`BUGS.md:93`) [U][net]
 - [ ] **S** BUGS item 18b: piece spheres uncollectable when haul piece count differs from floor arm count (`BUGS.md:94`); may be stale after plan 3 (`dive-flow/STATUS.md:12`) [U]
 - [ ] **S** `DiveSpineNetworkTests` floor-7 host-hero drift (~2 m/s after Move, unexplained) + `Floor5_RealButtonPushOn` flaked once (`plan5-floor-card/STATUS.md:24-26`) [U]
@@ -48,11 +56,11 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 ## Ready: per-player loot and save follow-ups (PARKING_LOT 2026-11-03)
 - [x] **S** Close stale entries after checking code: satchel placement (:65, `LostSatchel.ShouldPlaceOn` exists), legacy DiveHaul retire (:68, class gone), per-player gold source (:78), stir thresholds (:75, :79, `DiveStir`), generator v1 vs v2 (`rooms-v2/STATUS.md:4`) (docs) (`605d2ba0`; enemy-kill gold, stash view, generator v2 switch stay open in PARKING_LOT)
 - [ ] **S** Stale "shared haul" comments (2 left: `AssetPaths.cs:18`, `PrefabBuilder.cs:38`; PHASE1 7.2 done `605d2ba0`) - bundle with the next Assets change, it needs a check (PARKING_LOT :80)
-- [ ] **S** HUD "N home" undercounts pieces after reload; `Summary.BankedPieces` comment wrong (:81) [U]
+- [x] **S** HUD "N home" undercounts pieces after reload (:81) (folded into PL-2 task 2.4)
 - [ ] **M** Bag robustness bundle: sticky `PlayerBagSync._bagId` re-resolve (:71); one bad value drops a whole bag entry (:72); satchel vs `PlayerBag.MaxCarried` (:73) [U][net]
 - [ ] **M** Bank slot edge cases: party shrinks mid-floor (:70); late joiner lifts slots above `BankSlots.TotalSlots` (:76); 3-player extra-slot owner not saved (:66) [U][net]
 - [ ] **M** Per-player enemy drops via `DiveHaulSync.ServerAddItem` (:64) [U][net]
-- [ ] **M** Dev-only bank keys: confirm push-on / go-home have real input everywhere (CURRENT Inbox; bank-input `dc8a20f2` may have closed it) [U]
+- [x] **M** Dev-only bank keys: confirm push-on / go-home have real input everywhere (folded into PL-1 task 1.5)
 
 ## Ready: multiplayer readiness (M7)
 - [ ] **M** 3-4 player smoke with bots + MPPM (triage Q1) [U][net]
@@ -62,9 +70,9 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 ## Ready: tools and process
 - [x] **S** `sc_core_tests.py` false green on `Core.Combat` (`8d823e23`: 105 of 157 EditMode files, 1205 tests pass)
 - [x] **S** `unity.ps1 exec` false FAIL on player builds (`cd4eec4e`)
-- [ ] **S** Verify the exec fix on the next player build (it was not re-run after `cd4eec4e`)
+- [x] **S** Verify the exec fix on the next player build (folded into PL-4 task 4.4)
 - [x] **S** `Reference/hollowmere/QUEUE.md` stale: Q7, Q9, Q10, Q12-Q15 say unclaimed but are DONE (docs) (`605d2ba0`)
-- [ ] **S** `sc-walk` documents WalkDriver helpers that don't exist: port them or fix the skill (CURRENT blockers)
+- [ ] **S** Rewrite `sc-walk` around `LoopBot` and `FakeInputService` after PL-1 lands, instead of porting `WalkDriver` (playable-loop plan section 4) (tools)
 - [ ] **M** Legacy FishGame asset tools rework (`sc-asset-craft` section 0b)
 - [ ] **S** churn follow-ups: `M_CrackWeeds.mat` commit, PC run of `sc_churn_check.sh` (`hollowmere/churn/STATUS.md:18-19`) [U]
 - [ ] **S** Linux float churn in 3 scenes + `M_HM_Surf_WornRun.mat`: find the builder that writes non-deterministic floats (cloud-tasker STATUS) [U]
@@ -112,7 +120,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** Food/water craftables + cooking (PARKING_LOT :60) - proposal for the user
 
 ## Waiting on the user (don't start; ask when they're around; plain bullets so the board doesn't count them)
-- Playtest `C:\Dev\SleepingCalamity-builds\playtest-2026-11-06\SleepingCalamity.exe` (includes plan 5); notes in `docs/playtest/NOTES.md`
+- Playable-loop walk on the PL-4 build (`docs/superpowers/plans/2026-11-11-playable-loop.md` section 5); the 11-06 build still opens on the dev panel and is not worth a walk now. `USER_TODO.md` items 3b and 3c are stale (old four-floor dive); PL-4 replaces them
 - Story book read + bible sign-off; bible Qs 6, 7, 8, 13, 15, 16 touch dive text (triage :24); 5 and 20 touch rules
 - Rename placeholder floor and NPC names (spec Q7; decisions-for-review S1-S8)
 - Bag-rule decisions: chest with a full bag (PARKING_LOT :69); save-and-quit at a stair (:74); absent player's bag through push-on/fail (:82); bank-room picks UI vs auto-fill (:67)
