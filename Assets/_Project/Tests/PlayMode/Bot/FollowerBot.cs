@@ -130,6 +130,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 {
                     // inside the room the leader's push-on opens the shared choice: the follower joins it (a repeated press by the same player changes nothing)
                     if (sum.ChoiceKind == BankChoiceKind.PushOn) { haul.RequestPushOn(); PushOnRequests++; _nextRequest = Seconds + 2.5f; Say("joined the push-on"); }
+                    else if (sum.ChoiceKind == BankChoiceKind.GoHome) { _dir.RequestGoHome(); PushOnRequests++; _nextRequest = Seconds + 2.5f; Say("joined the go-home"); }   // PL-1: the leader chose to go home (LoopBot); the shared choice needs this second press
                 }
                 else if (!chosen && (sum.ClearedMask & (1 << (UndercroftPlan.BankFloor - 1))) != 0) { _dir.RequestBank(); BankRequests++; _nextRequest = Seconds + 2.5f; Say($"asked for the bank room on floor {floor}"); }
             }

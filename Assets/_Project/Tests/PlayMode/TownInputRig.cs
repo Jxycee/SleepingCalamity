@@ -37,23 +37,41 @@ namespace SleepingCalamity.Tests.PlayMode
             var rig = new TownInputRig { App = AppBootstrap.Current, SaveDir = saveDir };
             rig.Hero = rig.App.NetworkManager.LocalClient.PlayerObject;
             rig.Input = new FakeInputService();
-            rig.Hero.GetComponent<HeroLocomotion>().Input = rig.Input;
-            rig.Hero.GetComponent<TargetLockController>().Input = rig.Input;
-            rig.Hero.GetComponent<HeroCombat>().Input = rig.Input;
-            ServiceRoots.App.Replace<IInputService>(rig.Input);
+            yield return rig.Finish(stock, bakerInStock);
+            done(rig);
+        }
+
+        // PL-1 (LoopBot): the same world opened again after a leave; the save library stays as it is. Returns a fresh rig on the reloaded town.
+        public static IEnumerator Reopen(Action<TownInputRig> done, string saveDir)
+        {
+            SceneFlow.StartSceneOverride = null;
+            yield return PlayModeHarness.StartSoloAndWaitForPlayer(SceneNames.Hollowmere);
+            var rig = new TownInputRig { App = AppBootstrap.Current, SaveDir = saveDir };
+            rig.Hero = rig.App.NetworkManager.LocalClient.PlayerObject;
+            rig.Input = new FakeInputService();
+            yield return rig.Finish(null, false);
+            done(rig);
+        }
+
+        // Wires the hero (host hero) to Input, replaces the app's input service with it and waits for the hub; for a host-plus-client session the caller sets App, Hero and Input first (the host's fake).
+        public IEnumerator Finish(int[] stock, bool bakerInStock)
+        {
+            Hero.GetComponent<HeroLocomotion>().Input = Input;
+            Hero.GetComponent<TargetLockController>().Input = Input;
+            Hero.GetComponent<HeroCombat>().Input = Input;
+            ServiceRoots.App.Replace<IInputService>(Input);
 
             yield return PlayModeHarness.WaitUntil(() => DiveDirector.Instance != null && DiveDirector.Instance.NetHubStair.Value != Vector3.zero
                 && DiveDirector.Instance.TownSync != null && DiveDirector.Instance.TownSync.IsSpawned, Timeout, "the hub never spawned the director and its TownSync");
-            rig.Director = DiveDirector.Instance;
-            rig.Town = rig.Director.TownSync;
-            rig.Mode = UnityEngine.Object.FindFirstObjectByType<PlacementMode>(FindObjectsInactive.Include);
-            Assert.That(rig.Mode, Is.Not.Null, "Hollowmere has its PlacementMode");
-            Assert.That(rig.Mode.BuildPoint, Is.Not.Null, "and its build point");
-            if (stock != null) foreach (int p in stock) Assert.That(rig.Director.Town.State.AddPiece(p), Is.EqualTo(PlaceResult.Ok), "stock piece " + p);
-            if (bakerInStock) Assert.That(rig.Director.Town.State.AddResident(TownBuildings.BakerResident), Is.EqualTo(PlaceResult.Ok));
-            rig.Town.ServerRefresh();
+            Director = DiveDirector.Instance;
+            Town = Director.TownSync;
+            Mode = UnityEngine.Object.FindFirstObjectByType<PlacementMode>(FindObjectsInactive.Include);
+            Assert.That(Mode, Is.Not.Null, "Hollowmere has its PlacementMode");
+            Assert.That(Mode.BuildPoint, Is.Not.Null, "and its build point");
+            if (stock != null) foreach (int p in stock) Assert.That(Director.Town.State.AddPiece(p), Is.EqualTo(PlaceResult.Ok), "stock piece " + p);
+            if (bakerInStock) Assert.That(Director.Town.State.AddResident(TownBuildings.BakerResident), Is.EqualTo(PlaceResult.Ok));
+            Town.ServerRefresh();
             yield return Seconds(1f);   // the spawn teleports have landed before the test moves the hero
-            done(rig);
         }
 
         public static IEnumerator Seconds(float s)
