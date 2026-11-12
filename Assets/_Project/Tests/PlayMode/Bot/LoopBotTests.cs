@@ -34,6 +34,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private string _dir;
         private PlayModeHarness.TestClient _client;
         private readonly List<string> _errors = new List<string>();
+        private readonly List<string> _exceptions = new List<string>();   // LogType.Exception entries only (unlike plain errors, never acceptable)
         private Application.LogCallback _tap;
 
         [UnityTearDown]
@@ -56,6 +57,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 if (type != LogType.Error && type != LogType.Exception && type != LogType.Assert) return;
                 if (msg.StartsWith("[DIVEBOT]") || msg.StartsWith("[LOOPBOT]")) return;
                 string first = msg.Split('\n')[0];
+                if (type == LogType.Exception && _exceptions.Count < 30) _exceptions.Add(first.Length > 300 ? first.Substring(0, 300) : first);
                 if (_errors.Count < 30 && !_errors.Contains(first)) _errors.Add(first.Length > 300 ? first.Substring(0, 300) : first);
             };
             Application.logMessageReceived += _tap;
@@ -92,6 +94,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(reloaded.PlacedBuildingOf(TownBuildings.Bakery).FoundationId, Is.EqualTo(placedId));
             Assert.That(LoopBot.Sig(reloaded), Is.EqualTo(placedSig), "the town, stock and residents are exactly as they were");
             Assert.That(again.Director.NetActive.Value, Is.False, "nobody is below after the reload");
+            Assert.That(_exceptions, Is.Empty, "exceptions were logged during the run");
             Debug.Log("[LOOPBOT] seed " + seed + " dives " + loop.Dives.Count + " errors " + _errors.Count + (_errors.Count > 0 ? ": " + string.Join(" || ", _errors) : ""));
         }
 
@@ -293,6 +296,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(app.WorldSaveFlow.SelectedWorldId, Is.EqualTo(worldId), "[pair] the same world reopened");
             Assert.That(LoopBot.Sig(again.Rig.Director.Town.State), Is.EqualTo(placedSig), "[pair] the town, stock and residents are exactly as saved");
             yield return PlayModeHarness.WaitUntil(() => LoopBot.Sig(again.PeerTown.View) == placedSig, Timeout, "[pair] the client never saw the reloaded town");
+            Assert.That(_exceptions, Is.Empty, "[pair] exceptions were logged during the run");
             Debug.Log("[LOOPBOT] pair dives " + loop.Dives.Count + " errors " + _errors.Count + (_errors.Count > 0 ? ": " + string.Join(" || ", _errors) : "") + " " + pair.Follower.Summary());
         }
 

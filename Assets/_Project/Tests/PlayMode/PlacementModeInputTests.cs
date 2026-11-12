@@ -2,6 +2,7 @@
 // Catches: Interact at the build point not taking the builder lock / not entering InputContext.Placement, Primary not placing frame -> parts -> resident in order, a lane-blocking turn being accepted or
 // refused without words, Secondary not returning the last piece, Pause not leaving (and not asking the world to save), a hero that walks away keeping the lock.
 // NOT covered: the camera on screen, the wish panel, a second player (PL-1 task 1.3, SquareLoopWalkQaTests).
+using System;
 using System.Collections;
 using System.IO;
 using NUnit.Framework;
@@ -146,14 +147,17 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => rig.Town.View.PlacedBuildingOf(TownBuildings.Bakery) != null, Timeout, "no frame");
             Assert.That(ServiceRoots.App.TryGet(out HostWorld world), Is.True);
             int saves = 0;
-            world.SaveRequested += () => saves++;
+            Action onSave = () => saves++;
+            world.SaveRequested += onSave;
             yield return rig.PressPause();
+            world.SaveRequested -= onSave;
             yield return PlayModeHarness.WaitUntil(() => !rig.Mode.Active && rig.Town.BuilderIsFree, Timeout, "Pause never left placement and freed the lock");
             Assert.That(rig.Input.Context, Is.EqualTo(InputContext.Free), "the hero is back in the Free context");
             Assert.That(saves, Is.GreaterThan(0), "leaving placement asked the world to save");
-            rig.App.WorldSaveFlow.SaveNow();
             string id = rig.App.WorldSaveFlow.SelectedWorldId;
-            WorldSave file = JsonSaveFile<WorldSave>.DeserializeOrNull(File.ReadAllText(Path.Combine(_dir, id + ".json")), w => w.SchemaVersion);
+            string path = Path.Combine(_dir, id + ".json");
+            yield return PlayModeHarness.WaitUntil(() => File.Exists(path), Timeout, "the world file was never written by leaving placement");
+            WorldSave file = JsonSaveFile<WorldSave>.DeserializeOrNull(File.ReadAllText(path), w => w.SchemaVersion);
             Assert.That(file, Is.Not.Null);
             Assert.That(file.Town, Is.Not.Null);
             Assert.That(file.Town.Buildings.Count, Is.EqualTo(1), "the placed bakery is in the saved world");
