@@ -4,34 +4,34 @@ Bot: LoopBot (trapdoor press, DiveBot through FakeInputService, bank-room go-hom
 
 ## Seed 7
 
-- Frame home: **yes**, dives needed: **1**, game minutes played: **3.2** (first frame reached in the last dive)
+- Frame home: **yes**, dives needed: **1**, game minutes played: **3.3** (first frame reached in the last dive)
 - Deaths (failed dives) by the floor they ended on: none
 - Pieces found, by floor: 100 on F2, 201 on F2
 - Errors in the log: none
 
 | dive | game s | ended | floor | deepest | found |
 |---|---|---|---|---|---|
-| 1 | 195 | stopped (frame home) | F3 | F3 | piece 100 on F2 at 157 s; piece 201 on F2 at 176 s |
+| 1 | 200 | stopped (frame home) | F3 | F3 | piece 100 on F2 at 160 s; piece 201 on F2 at 180 s |
 
 ## Seed 2026
 
-- Frame home: **yes**, dives needed: **2**, game minutes played: **8.7** (first frame reached in the last dive)
-- Deaths (failed dives) by the floor they ended on: F2 x2
-- Pieces found, by floor: 100 on F2
+- Frame home: **yes**, dives needed: **2**, game minutes played: **12.3** (first frame reached in the last dive)
+- Deaths (failed dives) by the floor they ended on: F2 x1
+- Pieces found, by floor: 100 on F2, 201 on F2
 - Errors in the log: none
 
 | dive | game s | ended | floor | deepest | found |
 |---|---|---|---|---|---|
-| 1 | 91 | Failed | F2 | F2 | - |
-| 2 | 430 | Failed | F2 | F2 | piece 100 on F2 at 204 s |
+| 1 | 274 | Failed | F2 | F2 | - |
+| 2 | 462 | stopped (frame home) | F3 | F3 | piece 100 on F2 at 388 s; piece 201 on F2 at 447 s |
 
 ## Seed 12345
 
-- Frame home: **yes**, dives needed: **1**, game minutes played: **1.7** (first frame reached in the last dive)
+- Frame home: **yes**, dives needed: **1**, game minutes played: **1.6** (first frame reached in the last dive)
 - Deaths (failed dives) by the floor they ended on: none
 - Pieces found, by floor: 100 on F2, 201 on F2
 - Errors in the log: none
 
 | dive | game s | ended | floor | deepest | found |
 |---|---|---|---|---|---|
-| 1 | 99 | stopped (frame home) | F3 | F3 | piece 100 on F2 at 84 s; piece 201 on F2 at 86 s |
+| 1 | 99 | stopped (frame home) | F3 | F3 | piece 100 on F2 at 83 s; piece 201 on F2 at 85 s |
