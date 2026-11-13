@@ -1,6 +1,6 @@
 // Not networked; the front door is local on every peer and only ASKS (PL-3 task 3.2). Authority stays where it was: the host's start gate
 // (HostWorld.TryStartSession, reached through SceneFlow.TryStartSession) and the join approval (ConnectionApprover, HostWorld.Admit) decide; this
-// model never reads or writes world or session state itself. Plain C#, no engine types, so EditMode tests drive it with a fake session.
+// model never reads or writes world or session state itself. Plain C# (the only engine call is Debug.LogWarning), so EditMode tests drive it with a fake session.
 //
 // States: Title, Worlds (the solo list or the multiplayer list), HostLobby (join code, who is in, Start), JoinEntry (type a code), Connecting,
 // WaitingForHost (a guest that is in, before the host starts), Ended (the session ended or could not start: the reason in words, then Title on
@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SleepingCalamity.Core;
 using SleepingCalamity.Runtime;
+using UnityEngine;
 
 namespace SleepingCalamity.App
 {
@@ -81,6 +82,7 @@ namespace SleepingCalamity.App
         private Attempt attempt = Attempt.None;
         private int attemptId;
         private string joinInput = "";
+        private bool leaveRequested;   // the player pressed Leave / Cancel for the attempt in flight: its end is their choice, whatever the host's last verdict says
         private bool disposed;
 
         public FrontDoorModel(INetworkSession session, IFrontDoorWorlds worlds, IFrontDoorHost host)
@@ -300,40 +302,57 @@ namespace SleepingCalamity.App
             return Begin(Attempt.Join, () => session.JoinOnlineAsync(code, CancellationToken.None));
         }
 
-        // HostLobby, WaitingForHost or Connecting: leave (a cancel while connecting). The player chose it, so no reason screen.
+        // HostLobby, WaitingForHost or Connecting: leave (a cancel while connecting). The player chose it, so no reason screen. The door goes back only once the
+        // session is Offline; if the session could not stop, the screen stays (the session is still up) and the player can press again.
         public async Task Leave()
         {
             if (state != FrontDoorState.HostLobby && state != FrontDoorState.WaitingForHost && state != FrontDoorState.Connecting) return;
+            leaveRequested = true;
+            bool left;
             try
             {
                 await session.LeaveAsync();
+                left = session.State == ConnState.Offline;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // LeaveAsync is idempotent and does not fault in practice; whatever happened, the door goes back.
+                Debug.LogWarning("FrontDoorModel: leaving the session failed: " + e.GetBaseException().Message);
+                left = false;
+            }
+            if (!left)
+            {
+                leaveRequested = false;
+                return;
             }
             if (state == FrontDoorState.HostLobby || state == FrontDoorState.WaitingForHost || state == FrontDoorState.Connecting) ResetAfterLeave();
         }
 
-        // The Back / Escape button of every screen.
+        // The Back / Escape / gamepad B of every screen. It never ends a session that is up: a host lobby or a waiting guest is left only by the Leave button
+        // (a stray Escape must not drop everyone). It does cancel a connect in progress, answers a delete question with no, and otherwise goes up one screen.
         public Task Back()
         {
             switch (state)
             {
                 case FrontDoorState.Worlds:
+                    if (PendingDeleteId != null)
+                    {
+                        CancelDelete();
+                        return Done;
+                    }
+                    state = FrontDoorState.Title;
+                    Touch();
+                    return Done;
                 case FrontDoorState.JoinEntry:
                     state = FrontDoorState.Title;
                     PendingDeleteId = null;
                     Touch();
                     return Done;
-                case FrontDoorState.HostLobby:
-                case FrontDoorState.WaitingForHost:
                 case FrontDoorState.Connecting:
                     return Leave();
                 case FrontDoorState.Ended:
                     Acknowledge();
                     return Done;
-                default:
+                default:   // Title, HostLobby, WaitingForHost
                     return Done;
             }
         }
@@ -372,6 +391,7 @@ namespace SleepingCalamity.App
             if (Busy) return;
             int id = ++attemptId;
             attempt = kind;
+            leaveRequested = false;
             StartMessage = null;
             JoinError = null;
             Notice = null;
@@ -386,6 +406,8 @@ namespace SleepingCalamity.App
             {
                 if (id == attemptId && state == FrontDoorState.Connecting)
                     End(e.GetBaseException() is NetworkSessionException ex ? ex.Reason : EndReason.Unknown);
+                else
+                    Debug.LogWarning("FrontDoorModel: a start attempt that was already cancelled or ended failed late: " + e.GetBaseException().Message);
             }
         }
 
@@ -422,7 +444,7 @@ namespace SleepingCalamity.App
                 state = FrontDoorState.JoinEntry;
                 JoinError = UiText.JoinRefusal(reason);   // null for a cancel
             }
-            else if (startingSolo && reason == EndReason.UserLeft && host.LastStartVerdict != WorldPlayerVerdict.Ok)
+            else if (startingSolo && !leaveRequested && reason == EndReason.UserLeft && host.LastStartVerdict != WorldPlayerVerdict.Ok)
             {
                 // SceneFlow leaves a solo session whose start the gate refused; say why instead of going quietly back.
                 ShowEnded(reason, UiText.StartRefusal(host.LastStartVerdict));
@@ -462,6 +484,7 @@ namespace SleepingCalamity.App
         private void ToTitle()
         {
             attemptId++;
+            leaveRequested = false;
             attempt = Attempt.None;
             state = FrontDoorState.Title;
             EndedWords = null;

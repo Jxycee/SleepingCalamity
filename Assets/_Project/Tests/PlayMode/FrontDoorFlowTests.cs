@@ -458,6 +458,139 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return WaitState(app.FrontDoor, FrontDoorState.Title, "the host that left did not return to Title");
         }
 
+        // ---- the join code field and the keyboard / gamepad (review round 1) ----
+
+        private static string FocusedName(FrontDoorView view)
+        {
+            var focused = view.DoorRoot?.panel?.focusController?.focusedElement as VisualElement;
+            while (focused != null && string.IsNullOrEmpty(focused.name)) focused = focused.parent;
+            return focused?.name;
+        }
+
+        private static IEnumerator TapPad(GamepadButton button)
+        {
+            Gamepad pad = InputSystem.AddDevice<Gamepad>("FlowGamepad");
+            try
+            {
+                InputSystem.QueueStateEvent(pad, new GamepadState(button));
+                yield return null;
+                yield return null;
+                InputSystem.QueueStateEvent(pad, new GamepadState());
+                yield return null;
+            }
+            finally { InputSystem.RemoveDevice(pad); }
+        }
+
+        // The join screen with the code field focused; a wrong code is refused by the stand-in, so a submit shows words and starts nothing real.
+        private IEnumerator OpenJoinScreen()
+        {
+            yield return Boot(hollowmere: false);
+            LocalNetworkSession local = app.Services.Get<LocalNetworkSession>();
+            AppBootstrap.OnlineSessionFactoryOverride = () => new DirectAsOnlineSession(local, false);
+            yield return Press(door, FrontDoorView.Ids.Join);
+            yield return WaitState(app.FrontDoor, FrontDoorState.JoinEntry, "Join did not open the code screen");
+            yield return PlayModeHarness.WaitUntil(() => FocusedName(door) == FrontDoorView.Ids.CodeField, StepTimeout, "the code field never got focus; focused: " + FocusedName(door));
+        }
+
+        // Catches: a typed code not reaching the model, and Return in the field not submitting.
+        // The letters are put in the field with field.value: neither a virtual Input System keyboard's text events (QueueTextEvent) nor a synthetic KeyDownEvent with a character
+        // inserts text into a UI Toolkit field in this setup (the engine feeds text from its own event queue), so real typing is on the manual walk. Return is a real device key
+        // pressed while the field has focus.
+        [UnityTest]
+        public IEnumerator JoinField_Typing_ReachesTheModel_AndReturnSubmits()
+        {
+            yield return OpenJoinScreen();
+            Find<TextField>(door, FrontDoorView.Ids.CodeField).value = "wrong1";
+            yield return PlayModeHarness.WaitUntil(() => app.FrontDoor.JoinCodeInput == "wrong1", StepTimeout, "the field's value never reached the model; it has '" + app.FrontDoor.JoinCodeInput + "'");
+            Assert.That(FocusedName(door), Is.EqualTo(FrontDoorView.Ids.CodeField), "the field keeps focus while it changes");
+
+            Keyboard keyboard = InputSystem.AddDevice<Keyboard>("FlowTypist");
+            try
+            {
+                InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.Enter));
+                yield return null;
+                yield return null;
+                InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            }
+            finally { InputSystem.RemoveDevice(keyboard); }
+            yield return WaitLabel(door, FrontDoorView.Ids.JoinError, t => t == UiText.JoinRefusal(EndReason.InvalidCode), "Return in the field did not submit the code");
+        }
+
+        // Catches: the text field eating Escape, so a keyboard player is stuck on the join screen.
+        [UnityTest]
+        public IEnumerator JoinField_Escape_ReturnsToTitle()
+        {
+            yield return OpenJoinScreen();
+            yield return TapKey(Key.Escape);
+            yield return WaitState(app.FrontDoor, FrontDoorState.Title, "Escape in the code field did not go back");
+        }
+
+        // Catches: the text field eating gamepad B (the cancel action).
+        [UnityTest]
+        public IEnumerator JoinField_GamepadB_ReturnsToTitle()
+        {
+            yield return OpenJoinScreen();
+            yield return TapPad(GamepadButton.East);
+            yield return WaitState(app.FrontDoor, FrontDoorState.Title, "gamepad B in the code field did not go back");
+        }
+
+        // Catches: a gamepad focus trap in the text field (d-pad down must reach the buttons below it).
+        [UnityTest]
+        public IEnumerator JoinField_GamepadDown_LeavesTheField()
+        {
+            yield return OpenJoinScreen();
+            yield return TapPad(GamepadButton.DpadDown);
+            yield return PlayModeHarness.WaitUntil(() => FocusedName(door) != FrontDoorView.Ids.CodeField && Find<Button>(door, FrontDoorView.Ids.JoinBack) != null
+                && (FocusedName(door) == FrontDoorView.Ids.JoinBack || FocusedName(door) == FrontDoorView.Ids.JoinGo), StepTimeout,
+                "d-pad down did not leave the code field; focused: " + FocusedName(door));
+        }
+
+        // ---- other review fixes ----
+
+        // Catches: the door's buttons staying pressable while a session the door did not start runs (the dev panel's, or a test's), on any screen, not just Title.
+        [UnityTest]
+        public IEnumerator Door_HidesOnEveryScreen_WhileAForeignSessionRuns()
+        {
+            yield return Boot(hollowmere: false);
+            yield return Press(door, FrontDoorView.Ids.Multiplayer);
+            yield return WaitState(app.FrontDoor, FrontDoorState.Worlds, "Multiplayer did not open the worlds list");
+            Assert.That(door.IsShown, Is.True);
+
+            yield return PlayModeHarness.StartDirectHostWithoutScenes();   // a session the door did not start
+
+            yield return PlayModeHarness.WaitUntil(() => !door.IsShown, StepTimeout, "the Worlds screen stayed up over a running session");
+            Assert.That(Displayed(Find<Button>(door, FrontDoorView.Ids.Host)), Is.False);
+        }
+
+        // Catches: a delete question that leaves the rest of the screen live, or a Cancel that loses the player's place.
+        [UnityTest]
+        public IEnumerator Delete_Ask_DisablesTheRest_CancelReturnsFocusToTheRow_EscapeAnswersNo()
+        {
+            yield return Boot(hollowmere: false);
+            yield return Press(door, FrontDoorView.Ids.PlaySolo);
+            yield return WaitState(app.FrontDoor, FrontDoorState.Worlds, "Play solo did not open the worlds list");
+            yield return Press(door, FrontDoorView.Ids.NewWorld);
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.WorldRow(1), _ => { });
+
+            yield return Press(door, FrontDoorView.Ids.DeleteWorld(1));
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.DeleteCancelButton, _ => { });
+            yield return PlayModeHarness.WaitUntil(() => FocusedName(door) == FrontDoorView.Ids.DeleteCancelButton, StepTimeout, "focus did not go to the question; focused: " + FocusedName(door));
+            foreach (string id in new[] { FrontDoorView.Ids.WorldRow(1), FrontDoorView.Ids.DeleteWorld(1), FrontDoorView.Ids.NewWorld, FrontDoorView.Ids.Play, FrontDoorView.Ids.WorldsBack })
+                Assert.That(Find<Button>(door, id).enabledSelf, Is.False, id + " must be off while the question is open");
+            Assert.That(Find<Button>(door, FrontDoorView.Ids.DeleteConfirmButton).enabledSelf, Is.True);
+
+            yield return Press(door, FrontDoorView.Ids.DeleteCancelButton);
+            yield return PlayModeHarness.WaitUntil(() => FocusedName(door) == FrontDoorView.Ids.DeleteWorld(1), StepTimeout, "Cancel did not return focus to the row; focused: " + FocusedName(door));
+            Assert.That(Find<Button>(door, FrontDoorView.Ids.Play).enabledSelf, Is.True);
+
+            yield return Press(door, FrontDoorView.Ids.DeleteWorld(1));
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.DeleteCancelButton, _ => { });
+            yield return TapKey(Key.Escape);
+            yield return PlayModeHarness.WaitUntil(() => app.FrontDoor.PendingDeleteId == null, StepTimeout, "Escape did not answer the question with no");
+            Assert.That(app.FrontDoor.State, Is.EqualTo(FrontDoorState.Worlds), "Escape cancelled the question and did not also leave the screen");
+            Assert.That(app.FrontDoor.Rows.Count, Is.EqualTo(1));
+        }
+
         // ---- release path ----
 
         // Catches: the IMGUI dev panel drawing for players. In the editor Debug.isDebugBuild is always true, so the gate is checked with the build pretended to be a release one;

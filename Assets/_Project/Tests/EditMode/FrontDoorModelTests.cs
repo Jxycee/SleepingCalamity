@@ -4,6 +4,7 @@
 using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
+using SleepingCalamity.Runtime;
 
 namespace SleepingCalamity.Tests.EditMode
 {
@@ -351,6 +352,226 @@ namespace SleepingCalamity.Tests.EditMode
             model.PlaySelected();
             Assert.That(session.Calls, Is.Empty);
             Assert.That(model.HostAction.Enabled, Is.True);
+        }
+
+        // ---- review round 1 ----
+
+        [Test]
+        public void Worlds_Back_WithDeletePending_CancelsTheAskAndStaysOnWorlds()
+        {
+            WorldSummary w = worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            model.OpenWorlds(WorldKind.Solo);
+            model.RequestDelete(w.Id);
+            Assert.That(model.PendingDeleteId, Is.EqualTo(w.Id));
+
+            model.Back();
+
+            Assert.That(model.PendingDeleteId, Is.Null, "Back (Escape) answers the question with no");
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Worlds), "and does not also leave the screen");
+            Assert.That(worlds.Deleted, Is.Empty);
+            model.Back();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title), "a second Back leaves");
+        }
+
+        [Test]
+        public void HostLobby_Back_DoesNotEndTheSession()
+        {
+            ReachHostLobby();
+
+            model.Back();
+
+            Assert.That(session.Calls, Does.Not.Contain("Leave"), "Escape / gamepad B must not drop a lobby; only the Leave button does");
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.HostLobby));
+            model.Leave();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title), "the explicit Leave still leaves");
+        }
+
+        [Test]
+        public void WaitingForHost_Back_DoesNotEndTheSession()
+        {
+            ReachWaiting();
+
+            model.Back();
+
+            Assert.That(session.Calls, Does.Not.Contain("Leave"));
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.WaitingForHost));
+            model.Leave();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title));
+        }
+
+        [Test]
+        public void Connecting_Back_StillCancels()
+        {
+            session.HoldConnect = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            model.OpenWorlds(WorldKind.Multiplayer);
+            model.HostSelected();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Connecting));
+
+            model.Back();
+
+            Assert.That(session.Calls, Does.Contain("Leave"));
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title));
+        }
+
+        // The verdict of an earlier refused start is still on the host side; a Leave while a later solo start is Connecting is the player's own choice.
+        [Test]
+        public void Solo_LeaveWhileConnecting_AfterAnEarlierRefusal_EndsOnTitle()
+        {
+            host.LastStartVerdict = WorldPlayerVerdict.NotEnoughPlayers;   // stale: from a multiplayer lobby the player left
+            session.HoldConnect = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            model.PlaySolo();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Connecting));
+
+            model.Leave();
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title), "not an Ended screen that blames a start the player never made");
+            Assert.That(model.EndedWords, Is.Null);
+        }
+
+        [Test]
+        public void Leave_WhenTheSessionFaults_StaysOnTheScreen()
+        {
+            ReachHostLobby();
+            session.LeaveFaults = true;
+
+            model.Leave();
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.HostLobby), "the session is still up, so the lobby stays");
+            Assert.That(model.JoinCode, Is.Not.Null);
+        }
+
+        [Test]
+        public void Leave_WhenTheSessionStaysUp_StaysOnTheScreen()
+        {
+            ReachWaiting();
+            session.LeaveDoesNothing = true;
+
+            model.Leave();
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.WaitingForHost));
+        }
+
+        [Test]
+        public void SoloStart_RefusedByTheGate_InSceneFlowOrder_ShowsTheGatesWords()
+        {
+            // The fake session asks the host's gate on connecting and leaves on a refusal, the way SceneFlow does.
+            host.NextVerdict = WorldPlayerVerdict.WrongPlayerCount;
+            session.SoloHost = host;
+
+            model.PlaySolo();
+
+            Assert.That(host.StartCalls, Is.EqualTo(1));
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Ended));
+            Assert.That(model.EndedWords, Is.EqualTo(UiText.StartRefusal(WorldPlayerVerdict.WrongPlayerCount)));
+        }
+
+        [Test]
+        public void SoloStart_Accepted_InSceneFlowOrder_StaysConnecting()
+        {
+            session.SoloHost = host;
+
+            model.PlaySolo();
+
+            Assert.That(host.StartCalls, Is.EqualTo(1));
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Connecting));
+        }
+
+        // ---- races between a held start and the player backing out ----
+
+        [Test]
+        public void Race_SoloBack_ThenHeldStartReleased_StaysOnTitle()
+        {
+            var hold = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            session.HoldConnect = hold;
+            model.PlaySolo();
+            model.Back();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title));
+
+            hold.SetResult(true);
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title), "a start that finishes after the cancel does not bring the door back to life");
+            Assert.That(model.EndedWords, Is.Null);
+        }
+
+        [Test]
+        public void Race_HostCancel_ThenHeldStartFaults_StaysOnTitle()
+        {
+            var hold = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            session.HoldConnect = hold;
+            model.OpenWorlds(WorldKind.Multiplayer);
+            model.HostSelected();
+            model.Leave();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title));
+
+            hold.SetException(new NetworkSessionException(EndReason.Timeout));
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title), "no Ended screen for an attempt the player cancelled");
+            Assert.That(model.JoinCode, Is.Null);
+        }
+
+        [Test]
+        public void Race_HostCancel_ThenHeldStartReleased_DoesNotOpenTheLobby()
+        {
+            var hold = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            session.HoldConnect = hold;
+            model.OpenWorlds(WorldKind.Multiplayer);
+            model.HostSelected();
+            model.Back();
+
+            hold.SetResult(true);
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title));
+            Assert.That(model.JoinCode, Is.Null);
+        }
+
+        [Test]
+        public void Race_JoinCancel_ThenHeldStartFaults_StaysOnJoinEntryWithoutError()
+        {
+            var hold = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            session.HoldConnect = hold;
+            model.OpenJoin();
+            model.JoinCodeInput = "ABC123";
+            model.Join();
+            model.Back();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.JoinEntry));
+
+            hold.SetException(new NetworkSessionException(EndReason.Timeout));
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.JoinEntry));
+            Assert.That(model.JoinError, Is.Null, "the player cancelled; a late timeout is not news");
+        }
+
+        [Test]
+        public void DoublePress_Play_StartsOnce()
+        {
+            session.HoldConnect = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            model.PlaySolo();
+            model.PlaySolo();
+            model.OpenWorlds(WorldKind.Solo);
+            model.PlaySelected();
+
+            Assert.That(session.Calls, Is.EqualTo(new[] { "StartLocal(false)" }));
+            Assert.That(worlds.Created, Has.Count.EqualTo(1), "a second press makes no second world");
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Connecting));
+        }
+
+        [Test]
+        public void DoublePress_Host_StartsOnce()
+        {
+            session.HoldConnect = new System.Threading.Tasks.TaskCompletionSource<bool>();
+            model.OpenWorlds(WorldKind.Multiplayer);
+            model.HostSelected();
+            model.HostSelected();
+
+            Assert.That(session.Calls, Is.EqualTo(new[] { "HostOnline" }));
+        }
+
+        private void ReachWaiting()
+        {
+            model.OpenJoin();
+            model.JoinCodeInput = "ABC123";
+            model.Join();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.WaitingForHost), "setup: the guest waits");
         }
 
         private void ReachHostLobby()

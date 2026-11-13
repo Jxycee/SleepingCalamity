@@ -101,6 +101,8 @@ namespace SleepingCalamity.App
         private bool dirty = true;
         private FrontDoorState? renderedState;
         private bool renderedPending;
+        private int pendingNumber;
+        private int pendingRowCount;
         private string worldsSignature = "";
         private int renderedRowCount;
         private string playersSignature = "";
@@ -172,12 +174,14 @@ namespace SleepingCalamity.App
             TryFocus();
         }
 
-        // The Lobby is the door's room; the Title screen yields to a session some other part of the app started.
+        // The Lobby is the door's room. A session the door did not start (the dev panel's, a test's) leaves the model on Title, Worlds or JoinEntry while it runs;
+        // the whole door yields to it, so none of its buttons can be pressed mid-session.
         private bool ShouldShow()
         {
             if (SceneManager.GetActiveScene().name != SceneNames.Lobby) return false;
-            if (model.State == FrontDoorState.Title && session != null && session.State != ConnState.Offline) return false;
-            return true;
+            bool foreignSession = session != null && session.State != ConnState.Offline
+                && (model.State == FrontDoorState.Title || model.State == FrontDoorState.Worlds || model.State == FrontDoorState.JoinEntry);
+            return !foreignSession;
         }
 
         // ---- tree ----
@@ -221,6 +225,21 @@ namespace SleepingCalamity.App
             if (code != null)
             {
                 code.RegisterValueChangedCallback(e => { if (model != null) model.JoinCodeInput = e.newValue; });
+                // A focused text field handles keyboard keys itself and sends no navigation event for them: Escape is Back here, Return is Join.
+                code.RegisterCallback<KeyDownEvent>(e =>
+                {
+                    if (e.keyCode == KeyCode.Escape)
+                    {
+                        GoBack();
+                        e.StopPropagation();
+                    }
+                }, TrickleDown.TrickleDown);
+                // Enter on the Input System path arrives as a NavigationSubmit (the UI module's Submit action), which the field does not turn into Join by itself.
+                code.RegisterCallback<NavigationSubmitEvent>(e =>
+                {
+                    if (model != null && model.JoinAction.Enabled) Fire(model.Join());
+                    e.StopPropagation();
+                }, TrickleDown.TrickleDown);
                 code.RegisterCallback<KeyDownEvent>(e =>
                 {
                     if ((e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) && model != null && model.JoinAction.Enabled)
@@ -235,12 +254,9 @@ namespace SleepingCalamity.App
             Hook(Ids.WaitingLeave, Leave);
             Hook(Ids.EndedOk, () => model?.Acknowledge());
 
-            // Escape and gamepad B go back from any screen.
-            root.RegisterCallback<NavigationCancelEvent>(e =>
-            {
-                if (model != null) Fire(model.Back());
-                e.StopPropagation();
-            });
+            // Escape and gamepad B go back from any screen (trickle down, so a focused control cannot swallow them). They never end a session that is up: on the host lobby
+            // and the waiting screen they only move focus to the Leave button.
+            root.RegisterCallback<NavigationCancelEvent>(e => { GoBack(); e.StopPropagation(); }, TrickleDown.TrickleDown);
 
             root.style.display = DisplayStyle.None;   // Update shows it when it should be up
             foreach (VisualElement screen in screens.Values) if (screen != null) screen.style.display = DisplayStyle.None;
@@ -264,6 +280,14 @@ namespace SleepingCalamity.App
         {
             Button button = root.Q<Button>(name);
             if (button != null) button.clicked += action;
+        }
+
+        private void GoBack()
+        {
+            if (model == null) return;
+            if (model.State == FrontDoorState.HostLobby) wantedFocus = Ids.LobbyLeave;
+            else if (model.State == FrontDoorState.WaitingForHost) wantedFocus = Ids.WaitingLeave;
+            Fire(model.Back());
         }
 
         private void Leave()
@@ -343,24 +367,40 @@ namespace SleepingCalamity.App
             }
             SetDisplay(Ids.WorldsEmpty, model.Rows.Count == 0);
 
+            // The delete question is modal: while it is open only Delete it / Keep it are on, and Keep it hands focus back to the row it was asked about.
             bool pending = model.PendingDeleteId != null;
             SetDisplay(Ids.DeleteConfirm, pending);
             SetText(Ids.DeleteAsk, model.PendingDeleteWords);
             if (pending != renderedPending)
             {
                 renderedPending = pending;
-                wantedFocus = pending ? Ids.DeleteCancelButton : PreferredFocus();
+                if (pending)
+                {
+                    pendingNumber = 1;
+                    for (int i = 0; i < model.Rows.Count; i++) if (model.Rows[i].Id == model.PendingDeleteId) pendingNumber = i + 1;
+                    pendingRowCount = model.Rows.Count;
+                    wantedFocus = Ids.DeleteCancelButton;
+                }
+                else
+                {
+                    string row = Ids.DeleteWorld(pendingNumber);
+                    wantedFocus = model.Rows.Count == pendingRowCount && root.Q<VisualElement>(row) != null ? row : PreferredFocus();
+                }
             }
+            VisualElement list = root.Q<VisualElement>(Ids.WorldList);
+            if (list != null)
+                list.Query<Button>().ForEach(b => { if (b.enabledSelf == pending) b.SetEnabled(!pending); });
 
             SetText(Ids.WorldsNotice, model.Notice);
-            SetAction(Ids.NewWorld, model.NewWorldAction);
+            SetAction(Ids.NewWorld, model.NewWorldAction, pending);
             SetText(Ids.NewWorldWhy, model.NewWorldAction.Why);
 
             bool solo = model.WorldsKind == WorldKind.Solo;
             SetDisplay(Ids.Play, solo);
             SetDisplay(Ids.Host, !solo);
-            SetAction(Ids.Play, model.PlayAction);
-            SetAction(Ids.Host, model.HostAction);
+            SetAction(Ids.Play, model.PlayAction, pending);
+            SetAction(Ids.Host, model.HostAction, pending);
+            SetAction(Ids.WorldsBack, FrontDoorAction.On, pending);
         }
 
         private void RebuildWorldRows()
@@ -448,10 +488,11 @@ namespace SleepingCalamity.App
             if (element != null) element.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        private void SetAction(string name, FrontDoorAction action)
+        private void SetAction(string name, FrontDoorAction action, bool forcedOff = false)
         {
             VisualElement element = root.Q<VisualElement>(name);
-            if (element != null && element.enabledSelf != action.Enabled) element.SetEnabled(action.Enabled);
+            bool on = action.Enabled && !forcedOff;
+            if (element != null && element.enabledSelf != on) element.SetEnabled(on);
         }
 
         // ---- focus ----

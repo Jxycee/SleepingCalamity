@@ -28,6 +28,11 @@ namespace SleepingCalamity.Tests.EditMode
         public TaskCompletionSource<bool> HoldConnect;
         // The code HostOnlineAsync hands out.
         public string CodeToIssue = "ABC123";
+        // Set to make a Solo session do what SceneFlow does when it connects: ask the host's start gate at once, and leave (Ended UserLeft) when it refuses.
+        public IFrontDoorHost SoloHost;
+        // LeaveAsync faults without going offline / completes without going offline (a session that could not stop).
+        public bool LeaveFaults;
+        public bool LeaveDoesNothing;
 
         public Task<string> HostOnlineAsync(CancellationToken ct)
         {
@@ -58,6 +63,8 @@ namespace SleepingCalamity.Tests.EditMode
         public Task LeaveAsync()
         {
             Calls.Add("Leave");
+            if (LeaveFaults) return Task.FromException(new InvalidOperationException("leave failed"));
+            if (LeaveDoesNothing) return Task.CompletedTask;
             if (State != ConnState.Offline) GoOffline(EndReason.UserLeft);
             return Task.CompletedTask;
         }
@@ -89,17 +96,26 @@ namespace SleepingCalamity.Tests.EditMode
             {
                 TaskCompletionSource<bool> hold = HoldConnect;
                 HoldConnect = null;
-                return hold.Task.ContinueWith(_ =>
+                // Like the real sessions: a start that is released or faulted after the attempt was left ends in a fault (UserLeft), never in Connected.
+                return hold.Task.ContinueWith(t =>
                 {
-                    JoinCode = code;
-                    SetState(ConnState.Connected);
+                    if (t.IsFaulted) throw t.Exception.GetBaseException();
+                    if (State != ConnState.Connecting) throw new NetworkSessionException(EndReason.UserLeft);
+                    Connect(mode, code);
                     return result();
                 }, TaskContinuationOptions.ExecuteSynchronously);
             }
 
+            Connect(mode, code);
+            return Task.FromResult(result());
+        }
+
+        private void Connect(SessionMode mode, string code)
+        {
             JoinCode = code;
             SetState(ConnState.Connected);
-            return Task.FromResult(result());
+            // SceneFlow: a Solo session starts by itself when it connects; a refused start leaves the session.
+            if (mode == SessionMode.Solo && SoloHost != null && !SoloHost.TryStartSession()) GoOffline(EndReason.UserLeft);
         }
 
         private void GoOffline(EndReason reason)
