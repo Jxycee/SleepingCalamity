@@ -1,6 +1,7 @@
 Title: Audit fixes finish (send-away button, check, merge) on claude/audit-fixes
 Target: cloud
-Status: pending
+Status: started
+Started: 2026-11-13 18:07 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 11, 2026-11-13 ~12:30 PM CST, with the user's call on the full-lobby question
 Status file: Reference/sessions/audit-fixes/STATUS.md
