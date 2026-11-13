@@ -210,5 +210,22 @@ namespace SleepingCalamity.Tests.EditMode
             roster.Clear();
             Assert.That(roster.ConnectedCount, Is.EqualTo(0));
         }
+
+        // Catches: the lobby listing a left player, names out of slot order, or a blank name showing as nothing (PL-3 host lobby).
+        [Test]
+        public void HostRoster_GetConnectedNames_SlotOrder_ConnectedOnly_BlankBecomesPlayerN()
+        {
+            var roster = new HostRoster();
+            roster.Connect(new ApprovedJoin(5, K("c"), "Cy", 2, false));
+            roster.Connect(new ApprovedJoin(6, K("a"), "Ann", 0, false));
+            roster.Connect(new ApprovedJoin(7, K("b"), "  ", 1, false));
+            roster.Connect(new ApprovedJoin(8, K("d"), "Dee", 3, false));
+            roster.Disconnect(8);
+
+            var names = new List<string> { "stale" };
+            roster.GetConnectedNames(names);
+
+            CollectionAssert.AreEqual(new[] { "Ann", "Player 2", "Cy" }, names);
+        }
     }
 }
