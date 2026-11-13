@@ -631,6 +631,59 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(app.FrontDoor.Rows.Count, Is.EqualTo(1));
         }
 
+        // Catches (audit A2): the host having no door to let a player go from a multiplayer world - no button per recorded player, no question
+        // before it happens, the question not modal, or the removal not reaching the world file. Drives the real view, model and WorldSaveFlow.
+        [UnityTest]
+        public IEnumerator RemovePlayer_FromTheMultiplayerPicker_AsksFirst_ThenFreesThePlace()
+        {
+            yield return Boot(hollowmere: false);
+
+            // A multiplayer world with two recorded players, as a played world would be.
+            // Ugs identity: that is the list the door's Multiplayer screen shows (KindIdentity), and this test never hosts it.
+            string worldId = app.WorldSaveFlow.CreateWorld(WorldKind.Multiplayer, IdentityKind.Ugs);
+            Assert.That(worldId, Is.Not.Null);
+            WorldSaveStore store = app.WorldSaveFlow.Library.Open(worldId);
+            var players = new WorldPlayersSave { Kind = (int)WorldKind.Multiplayer, Identity = (int)IdentityKind.Ugs };
+            players.Recorded.Add(new WorldPlayerSave { Identity = (int)IdentityKind.Ugs, Id = PlayModeHarness.PlayerId(20), Name = "Ann" });
+            players.Recorded.Add(new WorldPlayerSave { Identity = (int)IdentityKind.Ugs, Id = PlayModeHarness.PlayerId(21), Name = "Bo" });
+            store.Current.Players = players;
+            store.MarkDirty();
+            Assert.That(store.Save(), Is.True);
+
+            yield return Press(door, FrontDoorView.Ids.Multiplayer);
+            yield return WaitState(app.FrontDoor, FrontDoorState.Worlds, "Multiplayer did not open the worlds list");
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.RemovePlayer(1, 2), _ => { });
+            Assert.That(Find<Button>(door, FrontDoorView.Ids.RemovePlayer(1, 2)).text, Does.Contain("Bo"), "the button names the player");
+
+            yield return Press(door, FrontDoorView.Ids.RemovePlayer(1, 2));
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.RemoveCancelButton, _ => { });
+            Assert.That(app.FrontDoor.PendingRemoveWorldId, Is.EqualTo(worldId), "it asks first");
+            yield return WaitLabel(door, FrontDoorView.Ids.RemoveAsk, t => t.Contains("Bo"), "the question naming the player");
+            foreach (string id in new[] { FrontDoorView.Ids.WorldRow(1), FrontDoorView.Ids.RemovePlayer(1, 1), FrontDoorView.Ids.NewWorld, FrontDoorView.Ids.Host })
+                Assert.That(Find<Button>(door, id).enabledSelf, Is.False, id + " must be off while the question is open");
+
+            // No keeps them.
+            yield return Press(door, FrontDoorView.Ids.RemoveCancelButton);
+            yield return PlayModeHarness.WaitUntil(() => app.FrontDoor.PendingRemoveWorldId == null, StepTimeout, "Keep them did not answer the question");
+            Assert.That(ReadPlayerIds(worldId), Has.Count.EqualTo(2), "nobody was removed by the question alone");
+
+            // Yes frees the place, in the file and in the list.
+            yield return Press(door, FrontDoorView.Ids.RemovePlayer(1, 2));
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.RemoveConfirmButton, _ => { });
+            yield return Press(door, FrontDoorView.Ids.RemoveConfirmButton);
+            yield return PlayModeHarness.WaitUntil(() => app.FrontDoor.Rows[0].Players.Count == 1, StepTimeout, "the row still lists the player who was let go");
+            Assert.That(ReadPlayerIds(worldId), Is.EqualTo(new[] { PlayModeHarness.PlayerId(20) }), "the world file keeps the other player only");
+            yield return WaitLabel(door, FrontDoorView.Ids.WorldsNotice, t => t.Contains("Bo"), "the notice saying who was let go");
+        }
+
+        private List<string> ReadPlayerIds(string worldId)
+        {
+            WorldSaveStore store = app.WorldSaveFlow.Library.Open(worldId);
+            var ids = new List<string>();
+            foreach (WorldPlayerSave p in store.Current.Players.Recorded) ids.Add(p.Id);
+            return ids;
+        }
+
         // ---- release path ----
 
         // Catches: the IMGUI dev panel drawing for players. In the editor Debug.isDebugBuild is always true, so the gate is checked with the build pretended to be a release one;

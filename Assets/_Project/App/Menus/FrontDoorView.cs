@@ -51,6 +51,10 @@ namespace SleepingCalamity.App
             public const string DeleteAsk = "lbl-delete-ask";
             public const string DeleteConfirmButton = "btn-delete-confirm";
             public const string DeleteCancelButton = "btn-delete-cancel";
+            public const string RemoveConfirm = "remove-confirm";
+            public const string RemoveAsk = "lbl-remove-ask";
+            public const string RemoveConfirmButton = "btn-remove-confirm";
+            public const string RemoveCancelButton = "btn-remove-cancel";
             public const string WorldsNotice = "lbl-worlds-notice";
             public const string NewWorld = "btn-new-world";
             public const string NewWorldWhy = "lbl-new-world-why";
@@ -85,6 +89,9 @@ namespace SleepingCalamity.App
             public static string WorldRow(int number) => "world-row-" + number;
             public static string DeleteWorld(int number) => "btn-delete-" + number;
             public static string Player(int number) => "player-" + number;
+
+            // The host's "remove player" button of world `row`'s recorded player `player`, both 1-based: "btn-remove-player-1-2".
+            public static string RemovePlayer(int row, int player) => "btn-remove-player-" + row + "-" + player;
         }
 
         private const string CopiedWords = "Code copied.";
@@ -108,6 +115,7 @@ namespace SleepingCalamity.App
         private bool renderedPending;
         private int pendingNumber;
         private int pendingRowCount;
+        private string pendingAskedFrom;        // the button the open question was asked from, so No hands focus back to it
         private string worldsSignature = "";
         private int renderedRowCount;
         private string playersSignature = "";
@@ -251,6 +259,8 @@ namespace SleepingCalamity.App
             Hook(Ids.WorldsBack, () => { if (model != null) Fire(model.Back()); });
             Hook(Ids.DeleteConfirmButton, () => model?.ConfirmDelete());
             Hook(Ids.DeleteCancelButton, () => model?.CancelDelete());
+            Hook(Ids.RemoveConfirmButton, () => model?.ConfirmRemovePlayer());
+            Hook(Ids.RemoveCancelButton, () => model?.CancelRemovePlayer());
 
             Hook(Ids.CopyCode, CopyCode);
             Hook(Ids.Start, () => model?.StartSession());
@@ -396,7 +406,11 @@ namespace SleepingCalamity.App
 
             var signature = new StringBuilder();
             foreach (FrontDoorWorldRow row in model.Rows)
-                signature.Append(row.Id).Append('|').Append(row.Selected).Append('|').Append(row.LastPlayed).Append('|').Append(string.Join(",", row.PlayerNames)).Append(';');
+            {
+                signature.Append(row.Id).Append('|').Append(row.Selected).Append('|').Append(row.LastPlayed).Append('|').Append(string.Join(",", row.PlayerNames));
+                if (row.Players != null) foreach (FrontDoorPlayerRow p in row.Players) signature.Append('|').Append(p.Key.Id);   // a player let go must rebuild the row
+                signature.Append(';');
+            }
             string text = signature.ToString();
             if (text != worldsSignature)
             {
@@ -410,24 +424,34 @@ namespace SleepingCalamity.App
             }
             SetDisplay(Ids.WorldsEmpty, model.Rows.Count == 0);
 
-            // The delete question is modal: while it is open only Delete it / Keep it are on, and Keep it hands focus back to the row it was asked about.
-            bool pending = model.PendingDeleteId != null;
-            SetDisplay(Ids.DeleteConfirm, pending);
+            // Each question (delete a world, let one of its players go) is modal: while one is open only its own two buttons are on, and the No
+            // button hands focus back to the row it was asked about.
+            bool deletePending = model.PendingDeleteId != null;
+            bool removePending = model.PendingRemoveWorldId != null;
+            bool pending = deletePending || removePending;
+            SetDisplay(Ids.DeleteConfirm, deletePending);
             SetText(Ids.DeleteAsk, model.PendingDeleteWords);
+            SetDisplay(Ids.RemoveConfirm, removePending);
+            SetText(Ids.RemoveAsk, model.PendingRemoveWords);
             if (pending != renderedPending)
             {
                 renderedPending = pending;
                 if (pending)
                 {
+                    string askedAbout = model.PendingDeleteId ?? model.PendingRemoveWorldId;
                     pendingNumber = 1;
-                    for (int i = 0; i < model.Rows.Count; i++) if (model.Rows[i].Id == model.PendingDeleteId) pendingNumber = i + 1;
+                    for (int i = 0; i < model.Rows.Count; i++) if (model.Rows[i].Id == askedAbout) pendingNumber = i + 1;
                     pendingRowCount = model.Rows.Count;
-                    wantedFocus = Ids.DeleteCancelButton;
+                    FrontDoorWorldRow asked = pendingNumber <= model.Rows.Count ? model.Rows[pendingNumber - 1] : null;
+                    pendingAskedFrom = deletePending || asked == null
+                        ? Ids.DeleteWorld(pendingNumber)
+                        : Ids.RemovePlayer(pendingNumber, PlayerNumberOf(asked, model.PendingRemoveKey));
+                    wantedFocus = deletePending ? Ids.DeleteCancelButton : Ids.RemoveCancelButton;
                 }
                 else
                 {
-                    string row = Ids.DeleteWorld(pendingNumber);
-                    wantedFocus = model.Rows.Count == pendingRowCount && root.Q<VisualElement>(row) != null ? row : PreferredFocus();
+                    string back = pendingAskedFrom ?? Ids.DeleteWorld(pendingNumber);
+                    wantedFocus = model.Rows.Count == pendingRowCount && root.Q<VisualElement>(back) != null ? back : PreferredFocus();
                 }
             }
             VisualElement list = root.Q<VisualElement>(Ids.WorldList);
@@ -444,6 +468,14 @@ namespace SleepingCalamity.App
             SetAction(Ids.Play, model.PlayAction, pending);
             SetAction(Ids.Host, model.HostAction, pending);
             SetAction(Ids.WorldsBack, FrontDoorAction.On, pending);
+        }
+
+        // The 1-based position of a key among a row's recorded players (1 when it is not there: the row's first remove button).
+        private static int PlayerNumberOf(FrontDoorWorldRow row, PlayerKey key)
+        {
+            if (row.Players == null) return 1;
+            for (int i = 0; i < row.Players.Count; i++) if (row.Players[i].Key == key) return i + 1;
+            return 1;
         }
 
         private void RebuildWorldRows()
@@ -473,6 +505,29 @@ namespace SleepingCalamity.App
                 line.Add(delete);
 
                 list.Add(line);
+
+                // The host's own action on a multiplayer world: let one of its recorded players go, so their place is free again (audit A2).
+                if (model.CanRemovePlayers && row.Players != null && row.Players.Count > 0)
+                {
+                    var players = new VisualElement();
+                    players.AddToClassList("fd-world-players");
+                    int playerNumber = 0;
+                    foreach (FrontDoorPlayerRow player in row.Players)
+                    {
+                        playerNumber++;
+                        PlayerKey key = player.Key;
+                        var remove = new Button(() => model?.RequestRemovePlayer(id, key))
+                        {
+                            name = Ids.RemovePlayer(number, playerNumber),
+                            text = "Remove " + player.Name,
+                            focusable = true,
+                        };
+                        remove.AddToClassList("fd-button");
+                        remove.AddToClassList("fd-remove-player");
+                        players.Add(remove);
+                    }
+                    list.Add(players);
+                }
             }
         }
 

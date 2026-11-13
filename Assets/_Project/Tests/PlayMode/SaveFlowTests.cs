@@ -125,5 +125,40 @@ namespace SleepingCalamity.Tests.PlayMode
                 30f, "the arena never loaded with the host's player");
             Assert.That(app.World.ScalePlayers(app.Roster), Is.EqualTo(2));
         }
+
+        // Catches (audit A2): the host's "remove player" (the world picker's action) not reaching the world file, taking the wrong record with
+        // it, or reporting success for a world or a player that is not there.
+        // NOT covered: the refusal while that very world is the one being hosted (needs a session on it), and the view's buttons (3.3).
+        [UnityTest]
+        public IEnumerator RemovePlayer_LetsOneOfTheFourGo_InTheFile()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            _dir = PlayModeHarness.BeginSaveTest();
+            AppBootstrap app = AppBootstrap.Current;
+
+            string worldId = app.WorldSaveFlow.CreateWorld(WorldKind.Multiplayer, IdentityKind.Local);
+            Assert.That(worldId, Is.Not.Null);
+            WorldSaveStore store = app.WorldSaveFlow.Library.Open(worldId);
+            var players = new WorldPlayersSave { Kind = (int)WorldKind.Multiplayer, Identity = (int)IdentityKind.Local };
+            for (int i = 20; i < 24; i++)
+                players.Recorded.Add(new WorldPlayerSave { Identity = (int)IdentityKind.Local, Id = PlayModeHarness.PlayerId(i), Name = "p" + i });
+            store.Current.Players = players;
+            store.MarkDirty();
+            Assert.That(store.Save(), Is.True, "the four-player world was written");
+
+            var gone = PlayerKey.Local(PlayModeHarness.PlayerId(22));
+            Assert.That(app.WorldSaveFlow.RemovePlayer(worldId, gone), Is.True);
+
+            WorldSave file = ReadWorldFile(_dir, worldId);
+            Assert.That(file.Players.Recorded.Count, Is.EqualTo(3), "one of the four places is free again");
+            var ids = new List<string>();
+            foreach (WorldPlayerSave p in file.Players.Recorded) ids.Add(p.Id);
+            Assert.That(ids, Is.EqualTo(new[] { PlayModeHarness.PlayerId(20), PlayModeHarness.PlayerId(21), PlayModeHarness.PlayerId(23) }), "the others keep their records and order");
+            Assert.That(file.Players.Recorded[2].Name, Is.EqualTo("p23"), "with their names");
+
+            Assert.That(app.WorldSaveFlow.RemovePlayer(worldId, gone), Is.False, "they are not recorded any more");
+            Assert.That(app.WorldSaveFlow.RemovePlayer("no-such-world", gone), Is.False);
+            Assert.That(app.WorldSaveFlow.ListWorlds(WorldKind.Multiplayer, IdentityKind.Local)[0].PlayerNames.Count, Is.EqualTo(3), "the picker lists the three");
+        }
     }
 }

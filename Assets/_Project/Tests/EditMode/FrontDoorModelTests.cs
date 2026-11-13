@@ -129,6 +129,102 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(worlds.Deleted, Is.Empty);
         }
 
+        // Catches (audit A2): the host having no way to let a player go from a multiplayer world, a removal that happens without asking, the
+        // question not naming the player, or the row still listing them afterwards.
+        [Test]
+        public void Worlds_RemovePlayer_AsksFirst_ThenFreesThePlace()
+        {
+            WorldSummary w = worlds.Add(WorldKind.Multiplayer, IdentityKind.Ugs, "Ann", "Bo", "Cleo", "Dag");
+            model.OpenWorlds(WorldKind.Multiplayer);
+            Assert.That(model.CanRemovePlayers, Is.True);
+            FrontDoorWorldRow row = model.Rows[0];
+            Assert.That(row.Players, Has.Count.EqualTo(4), "the row carries the recorded players with their keys");
+            PlayerKey cleo = row.Players[2].Key;
+
+            model.RequestRemovePlayer(w.Id, cleo);
+
+            Assert.That(model.PendingRemoveWorldId, Is.EqualTo(w.Id));
+            Assert.That(model.PendingRemoveKey, Is.EqualTo(cleo));
+            Assert.That(model.PendingRemoveWords, Does.Contain("Cleo"), "the question names the player");
+            Assert.That(worlds.RemovedPlayers, Is.Empty, "asking is not removing");
+
+            model.ConfirmRemovePlayer();
+
+            Assert.That(worlds.RemovedPlayers, Is.EqualTo(new[] { w.Id + ":" + cleo.Id }));
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+            Assert.That(model.Notice, Does.Contain("Cleo"));
+            Assert.That(model.Rows[0].Players, Has.Count.EqualTo(3), "the row no longer lists them");
+            Assert.That(model.Rows[0].PlayerNames, Does.Not.Contain("Cleo"));
+        }
+
+        // Catches: a removal that happens on a cancel or on a stray Confirm, a question that survives leaving the screen, a failure shown as a
+        // success, and a solo world (one owner, bound to this machine) offering the action at all.
+        [Test]
+        public void Worlds_RemovePlayer_Cancel_AndRefusals()
+        {
+            WorldSummary multi = worlds.Add(WorldKind.Multiplayer, IdentityKind.Ugs, "Ann", "Bo");
+            model.OpenWorlds(WorldKind.Multiplayer);
+            PlayerKey bo = model.Rows[0].Players[1].Key;
+
+            model.RequestRemovePlayer(multi.Id, bo);
+            model.CancelRemovePlayer();
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+            Assert.That(worlds.RemovedPlayers, Is.Empty);
+            model.ConfirmRemovePlayer();   // nothing pending
+            Assert.That(worlds.RemovedPlayers, Is.Empty);
+
+            // A player the row does not hold, and a world that is not listed: no question is opened.
+            model.RequestRemovePlayer(multi.Id, new PlayerKey(IdentityKind.Ugs, "stranger"));
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+            model.RequestRemovePlayer("no-such-world", bo);
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+
+            // Leaving the screen drops the question.
+            model.RequestRemovePlayer(multi.Id, bo);
+            model.OpenWorlds(WorldKind.Multiplayer);
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "the question does not survive the screen");
+
+            // A refusal says so instead of claiming the place is free.
+            worlds.RemoveFails = true;
+            model.RequestRemovePlayer(multi.Id, bo);
+            model.ConfirmRemovePlayer();
+            Assert.That(model.Notice, Is.EqualTo(UiText.PlayerNotRemoved));
+            Assert.That(model.Rows[0].Players, Has.Count.EqualTo(2));
+
+            // The solo list never offers it.
+            worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            model.OpenWorlds(WorldKind.Solo);
+            Assert.That(model.CanRemovePlayers, Is.False);
+            model.RequestRemovePlayer(model.Rows[0].Id, model.Rows[0].Players[0].Key);
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "a solo world's owner follows the machine; delete the world instead");
+        }
+
+        // Catches: two questions open at once (Delete it would answer the one the player is not looking at), and Back not answering the
+        // remove question with no.
+        [Test]
+        public void Worlds_OneQuestionAtATime_AndBackAnswersIt()
+        {
+            WorldSummary w = worlds.Add(WorldKind.Multiplayer, IdentityKind.Ugs, "Ann", "Bo");
+            model.OpenWorlds(WorldKind.Multiplayer);
+            PlayerKey bo = model.Rows[0].Players[1].Key;
+
+            model.RequestDelete(w.Id);
+            model.RequestRemovePlayer(w.Id, bo);
+            Assert.That(model.PendingDeleteId, Is.Null, "asking about a player closes the delete question");
+            Assert.That(model.PendingRemoveWorldId, Is.EqualTo(w.Id));
+
+            model.RequestDelete(w.Id);
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "and the other way round");
+            Assert.That(model.PendingDeleteId, Is.EqualTo(w.Id));
+            model.CancelDelete();
+
+            model.RequestRemovePlayer(w.Id, bo);
+            model.Back();
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "Back (Escape) answers it with no");
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Worlds), "and does not also leave the screen");
+            Assert.That(worlds.RemovedPlayers, Is.Empty);
+        }
+
         [Test]
         public void Host_ShowsJoinCode_WhenConnected()
         {

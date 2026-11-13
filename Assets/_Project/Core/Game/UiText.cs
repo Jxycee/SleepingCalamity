@@ -81,6 +81,14 @@ namespace SleepingCalamity.Core
         public const string WorldNotDeleted = "That world could not be deleted.";
         public const string NeedsAWorldToHost = "Pick a multiplayer world to host.";
 
+        // The host letting one of a multiplayer world's recorded players go, so their place is free for someone else (audit A2). It asks first,
+        // like Delete, and then says what happened.
+        public static string RemovePlayerAsk(string name) => "Remove " + PlayerWord(name) + " from this world? Their place becomes free for someone else. What they grew here waits in the file in case you bring them back.";
+        public static string PlayerRemoved(string name) => PlayerWord(name) + " is no longer one of this world's players.";
+        public const string PlayerNotRemoved = "That player could not be removed.";
+
+        private static string PlayerWord(string name) => string.IsNullOrWhiteSpace(name) || name == "?" ? "this player" : name;
+
         // Worlds list full (WorldSummary.MaxPerList per kind): New world is off and says why.
         public static string WorldLibraryFull(WorldKind kind) => Toast("world.library_full", kind.ToString());
 

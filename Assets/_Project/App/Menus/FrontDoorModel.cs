@@ -4,7 +4,9 @@
 //
 // States: Title, Worlds (the solo list or the multiplayer list), HostLobby (join code, who is in, Start), JoinEntry (type a code), Connecting,
 // WaitingForHost (a guest that is in, before the host starts), Ended (the session ended or could not start: the reason in words, then Title on
-// Acknowledge). It calls only what App/DevSessionPanel calls today: WorldSaveFlow Select / ListWorlds / CreateWorld / DeleteWorld (IFrontDoorWorlds),
+// Acknowledge). The multiplayer world list also carries the host's own "remove player" action, which lets one of a world's recorded players go so
+// their place is free again (audit A2, user decision 2026-11-13); like Delete it asks first, and only one question is open at a time.
+// It calls only what App/DevSessionPanel calls today plus that one: WorldSaveFlow Select / ListWorlds / CreateWorld / DeleteWorld / RemovePlayer (IFrontDoorWorlds),
 // INetworkSession StartLocalAsync / HostOnlineAsync / JoinOnlineAsync / LeaveAsync, SceneFlow.TryStartSession + LastStartVerdict and HostRoster
 // (IFrontDoorHost). Dev-direct host and join stay in the dev panel. The front door hosts and joins ONLINE worlds only (Relay codes).
 // The view reads the properties each frame (nothing is cached except the world rows) and calls the commands; Changed fires after any change.
@@ -37,11 +39,19 @@ namespace SleepingCalamity.App
         public static FrontDoorAction Off(string why = null) => new FrontDoorAction(false, why);
     }
 
+    // One recorded player of a world row: what to show, and the key the host's "remove player" acts on.
+    public sealed class FrontDoorPlayerRow
+    {
+        public string Name;
+        public PlayerKey Key;
+    }
+
     public sealed class FrontDoorWorldRow
     {
         public string Id;
         public string Title;                       // "World 3" (position in the list, newest first)
         public IReadOnlyList<string> PlayerNames;  // the recorded players
+        public IReadOnlyList<FrontDoorPlayerRow> Players;   // the same players with their keys (the host's remove action)
         public string LastPlayed;                  // "2026-11-12 10:30", or ""
         public bool Selected;
     }
@@ -54,6 +64,7 @@ namespace SleepingCalamity.App
         IReadOnlyList<WorldSummary> ListWorlds(WorldKind kind, IdentityKind identity);
         string CreateWorld(WorldKind kind, IdentityKind identity);   // null when that list is full
         bool DeleteWorld(string worldId);
+        bool RemovePlayer(string worldId, PlayerKey key);            // lets one of a multiplayer world's recorded players go (audit A2)
     }
 
     // What the front door needs of the host's side: the start gate and who is connected (FrontDoorHost adapts SceneFlow and HostRoster).
@@ -82,6 +93,7 @@ namespace SleepingCalamity.App
         private Attempt attempt = Attempt.None;
         private int attemptId;
         private string joinInput = "";
+        private string pendingRemoveName = "";
         private bool leaveRequested;   // the player pressed Leave / Cancel for the attempt in flight: its end is their choice, whatever the host's last verdict says
         private bool disposed;
 
@@ -117,6 +129,15 @@ namespace SleepingCalamity.App
         // Delete asks first: RequestDelete sets this id and the words; ConfirmDelete deletes, CancelDelete drops it.
         public string PendingDeleteId { get; private set; }
         public string PendingDeleteWords => PendingDeleteId == null ? null : UiText.DeleteAsk;
+
+        // Removing a recorded player from a multiplayer world asks first too (it is what the world keeps for good): RequestRemovePlayer sets
+        // these, ConfirmRemovePlayer does it, CancelRemovePlayer drops the question. Only one question is open at a time.
+        public string PendingRemoveWorldId { get; private set; }
+        public PlayerKey PendingRemoveKey { get; private set; }
+        public string PendingRemoveWords => PendingRemoveWorldId == null ? null : UiText.RemovePlayerAsk(pendingRemoveName);
+
+        // The host may let a player go from a multiplayer world in the picker (never from a solo world: its one owner follows the machine).
+        public bool CanRemovePlayers => state == FrontDoorState.Worlds && worldsKind == WorldKind.Multiplayer;
 
         // HostLobby: the code to read out, who is in, and the Start line. Names and count are read live from the host.
         public string JoinCode => state == FrontDoorState.HostLobby ? session.JoinCode : null;
@@ -209,6 +230,7 @@ namespace SleepingCalamity.App
             state = FrontDoorState.Worlds;
             Notice = null;
             PendingDeleteId = null;
+            ClearPendingRemove();
             RebuildRows();
             Touch();
         }
@@ -241,6 +263,7 @@ namespace SleepingCalamity.App
         public void RequestDelete(string worldId)
         {
             if (state != FrontDoorState.Worlds || FindRow(worldId) == null) return;
+            ClearPendingRemove();
             PendingDeleteId = worldId;
             Touch();
         }
@@ -260,6 +283,45 @@ namespace SleepingCalamity.App
             if (PendingDeleteId == null) return;
             PendingDeleteId = null;
             Touch();
+        }
+
+        // Worlds (multiplayer list): the host asks to let one of a world's recorded players go. Asking changes nothing.
+        public void RequestRemovePlayer(string worldId, PlayerKey key)
+        {
+            if (!CanRemovePlayers) return;
+            FrontDoorWorldRow row = FindRow(worldId);
+            if (row == null) return;
+            FrontDoorPlayerRow player = FindPlayer(row, key);
+            if (player == null) return;
+            PendingDeleteId = null;
+            PendingRemoveWorldId = worldId;
+            PendingRemoveKey = key;
+            pendingRemoveName = player.Name;
+            Touch();
+        }
+
+        public void ConfirmRemovePlayer()
+        {
+            if (!CanRemovePlayers || PendingRemoveWorldId == null) return;
+            bool removed = worlds.RemovePlayer(PendingRemoveWorldId, PendingRemoveKey);
+            Notice = removed ? UiText.PlayerRemoved(pendingRemoveName) : UiText.PlayerNotRemoved;
+            ClearPendingRemove();
+            RebuildRows();
+            Touch();
+        }
+
+        public void CancelRemovePlayer()
+        {
+            if (PendingRemoveWorldId == null) return;
+            ClearPendingRemove();
+            Touch();
+        }
+
+        private void ClearPendingRemove()
+        {
+            PendingRemoveWorldId = null;
+            PendingRemoveKey = default;
+            pendingRemoveName = "";
         }
 
         // Worlds (solo list): Play the selected world (else the newest).
@@ -339,12 +401,18 @@ namespace SleepingCalamity.App
                         CancelDelete();
                         return Done;
                     }
+                    if (PendingRemoveWorldId != null)
+                    {
+                        CancelRemovePlayer();
+                        return Done;
+                    }
                     state = FrontDoorState.Title;
                     Touch();
                     return Done;
                 case FrontDoorState.JoinEntry:
                     state = FrontDoorState.Title;
                     PendingDeleteId = null;
+                    ClearPendingRemove();
                     Touch();
                     return Done;
                 case FrontDoorState.Connecting:
@@ -492,6 +560,7 @@ namespace SleepingCalamity.App
             StartMessage = null;
             JoinError = null;
             PendingDeleteId = null;
+            ClearPendingRemove();
             Touch();
         }
 
@@ -510,10 +579,32 @@ namespace SleepingCalamity.App
                     Id = w.Id,
                     Title = "World " + (i + 1),
                     PlayerNames = w.PlayerNames,
+                    Players = PlayerRows(w),
                     LastPlayed = ShortTime(w.LastPlayedUtc),
                     Selected = w.Id == selected,
                 });
             }
+        }
+
+        // The world's recorded players with their keys, so the host's remove action names one of them. A summary from an older build (or a
+        // damaged section) may have fewer keys than names: those players are shown but cannot be removed.
+        private static List<FrontDoorPlayerRow> PlayerRows(WorldSummary w)
+        {
+            var players = new List<FrontDoorPlayerRow>();
+            if (w.PlayerKeys == null) return players;
+            for (int i = 0; i < w.PlayerKeys.Count; i++)
+            {
+                string name = w.PlayerNames != null && i < w.PlayerNames.Count ? w.PlayerNames[i] : "?";
+                players.Add(new FrontDoorPlayerRow { Name = name, Key = w.PlayerKeys[i] });
+            }
+            return players;
+        }
+
+        private static FrontDoorPlayerRow FindPlayer(FrontDoorWorldRow row, PlayerKey key)
+        {
+            if (row.Players == null) return null;
+            foreach (FrontDoorPlayerRow p in row.Players) if (p.Key == key) return p;
+            return null;
         }
 
         private FrontDoorWorldRow FindRow(string id)

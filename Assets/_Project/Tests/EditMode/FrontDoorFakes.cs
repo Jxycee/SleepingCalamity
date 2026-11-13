@@ -140,6 +140,8 @@ namespace SleepingCalamity.Tests.EditMode
         public readonly List<WorldSummary> All = new List<WorldSummary>();
         public readonly List<string> Created = new List<string>();
         public readonly List<string> Deleted = new List<string>();
+        public readonly List<string> RemovedPlayers = new List<string>();   // "<worldId>:<playerId>"
+        public bool RemoveFails;
         public readonly List<WorldKind> Listed = new List<WorldKind>();
         public readonly List<IdentityKind> ListedIdentities = new List<IdentityKind>();
         private int nextId = 1;
@@ -150,6 +152,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var w = new WorldSummary { Id = "w" + nextId++, Kind = kind, Identity = (int)identity, LastPlayedUtc = "2026-11-12T10:30:00Z" };
             w.PlayerNames.AddRange(players);
+            foreach (string name in players) w.PlayerKeys.Add(new PlayerKey(identity, "id-" + name));   // the same order as the names
             All.Insert(0, w);   // newest first, like WorldLibrary.List
             return w;
         }
@@ -174,6 +177,22 @@ namespace SleepingCalamity.Tests.EditMode
             Created.Add(created.Id);
             SelectedWorldId = created.Id;
             return created.Id;
+        }
+
+        public bool RemovePlayer(string worldId, PlayerKey key)
+        {
+            RemovedPlayers.Add(worldId + ":" + key.Id);
+            if (RemoveFails) return false;
+            foreach (WorldSummary w in All)
+            {
+                if (w.Id != worldId) continue;
+                int at = w.PlayerKeys.IndexOf(key);
+                if (at < 0) return false;
+                w.PlayerKeys.RemoveAt(at);
+                if (at < w.PlayerNames.Count) w.PlayerNames.RemoveAt(at);
+                return true;
+            }
+            return false;
         }
 
         public bool DeleteWorld(string worldId)

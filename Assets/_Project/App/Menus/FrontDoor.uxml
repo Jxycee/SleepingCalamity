@@ -19,6 +19,11 @@
                 <ui:Button name="btn-delete-confirm" text="Delete it" focusable="true" class="fd-button" />
                 <ui:Button name="btn-delete-cancel" text="Keep it" focusable="true" class="fd-button" />
             </ui:VisualElement>
+            <ui:VisualElement name="remove-confirm" class="fd-confirm">
+                <ui:Label name="lbl-remove-ask" text="" class="fd-text" />
+                <ui:Button name="btn-remove-confirm" text="Remove them" focusable="true" class="fd-button" />
+                <ui:Button name="btn-remove-cancel" text="Keep them" focusable="true" class="fd-button" />
+            </ui:VisualElement>
             <ui:Label name="lbl-worlds-notice" text="" class="fd-text" />
             <ui:Button name="btn-new-world" text="New world" focusable="true" class="fd-button" />
             <ui:Label name="lbl-new-world-why" text="" class="fd-why" />
