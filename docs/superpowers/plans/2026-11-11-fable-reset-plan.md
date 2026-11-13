@@ -135,7 +135,7 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
   - A stop three points away from the measured end (65% against 68%) was luck. Give an audit run a budget with room for its risk review and one `check`.
 
 ### 2026-11-13, Run 3: area 1 and dungeon 1 design (`docs/design/area1-hollowmere.md`, `dungeon1-cellars.md`, `area1-dungeon1-needs.md`, `2026-11-13-area1-dungeon1-build.md`)
-- **Cost (interim, when the docs were written; the end figures follow below if the session got that far).** 5-hour window 19% to 92% in about 2 h 15 min. Weekly all models 3% to 13%. Weekly Fable 2% to 19%. Session context 510k tokens.
+- **Cost at the end:** weekly Fable 2% to 37%, weekly all models 3% to 23%, session context 578k tokens. The 5-hour window ran out as the docs were pushed; the review and merge ran after the reset. Interim figures when the docs were written: 5-hour window 19% to 92% in about 2 h 15 min. Weekly all models 3% to 13%. Weekly Fable 2% to 19%. Session context 510k tokens.
 - **Where it went.** Images. About 60 were read at full size (18 concepts at 2400 px, references, 30 contact sheets), which put the context past 500k halfway through, and every later turn re-read it. Eighteen subagent hand-backs (7 scans, 11 searches) each woke Fable on that context.
 - **What worked.**
   - Seven scans with a word cap, file:line and a "what is missing" list, all launched in one message. The generator and built-town scans were enough to design from.

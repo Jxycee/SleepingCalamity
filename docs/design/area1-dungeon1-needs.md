@@ -86,7 +86,7 @@
 | | | MS Brick Wall (rough pale brick: walls, floors 1-4) | https://www.fab.com/listings/c2061c4a-c730-45b3-b0bb-6f05e05103f7 | sheet | same |
 | | | MS Black Brick Facade (soot brick: floors 6-7) | https://www.fab.com/listings/6a8dcd47-e97f-43fb-9de2-76906e860f7e | sheet | same |
 | | | MS Coal Mine Wall (bunker walls) | https://www.fab.com/listings/62ac840f-02f7-4f13-8c17-1162f4d81c98 | title | - |
-| | | ours: vault_stone, limewash, old_brick, sandstone | - | - | - |
+| | | ours (texture sets in `Art/Textures/`, materials under `Content/Materials/`): vault_stone, limewash, old_brick, sandstone | - | - | - |
 | C02 | Floors | MS Stone Floor (warm squared flags: main) | https://www.fab.com/listings/08fb79f8-c70f-4ecb-ba32-4bf808f3c188 | sheet | C02_floor_p2.jpg |
 | | | MS Stone Floor (smooth worn slabs: bank room) | https://www.fab.com/listings/f1c4b161-760c-4801-b2fd-b3088ac0e85d | sheet | same |
 | | | MS Mossy Stone Floor (damp patches, floor 1) | https://www.fab.com/listings/530b8be4-955d-48cf-ae5e-637ad37d11a4 | sheet | same |
@@ -94,7 +94,7 @@
 | | | MS Moss Patch | https://www.fab.com/listings/b5fad446-5ca0-44b1-96cf-74051936b0e6 | title | same |
 | | | MS Industrial Decal Leak 02 | https://www.fab.com/listings/ff00c083-8e31-435e-8dfc-6b2c4528eea3 | title | same |
 | | | MS Mud Stain (puddle base) | https://www.fab.com/listings/0c20290d-5a14-4003-aaec-eba1704a4f01 | title | same |
-| | | ours: ambientCG Leaking set, B3 trims (drip, grime, moss, crack) | - | - | - |
+| | | ours: B3 trims (drip, grime, moss, crack) in `Art/Textures/B3_trims/`; the ambientCG Leaking set is recorded in `Art/Source/ambientCG/SOURCES.md` (fetch if missing) | - | - | - |
 | C04 | Cobwebs | Free Pack - Cobwebs, PolyOne Studio (FBX, Unity) | https://www.fab.com/listings/c09fb18e-eb8f-4a65-b0b6-c8a664d6b08d | title | C04_cobweb_p2.jpg |
 | C05 | Hanging food | MS Smoked Sausage | https://www.fab.com/listings/505e62c8-0419-478c-be3f-cf524e47a262 | sheet | C05_hangfood_p2.jpg |
 | | | MS Half Ham | https://www.fab.com/listings/089a9e41-8b23-4dd5-a01f-e1551be88c67 | sheet | same |
@@ -144,13 +144,13 @@
 | C14 | Roots, fungus | MS Dead Tree Root | https://www.fab.com/listings/1907e06d-41b8-4722-be9a-e7392d3dd005 | sheet | C14_roots_p2.jpg |
 | | | MS Thai Beach Roots (long, for walls) | https://www.fab.com/listings/ab37701d-8d9f-42cf-ab99-7ce83fe64fb2 | sheet | same |
 | | | MS Bolete Mushrooms | https://www.fab.com/listings/83c5683b-19c3-483f-bf9e-1e2c35de1ba8 | sheet | same |
-| | | ours: Roots, Poly Haven root_cluster | - | - | - |
-| C15 | Lights | Wall_Sconce, Get Dead Entertainment (iron cage sconce, as C1) | https://www.fab.com/listings/152bf785-ddf6-4057-9a80-8114473132cf | sheet | C15_lantern_p2.jpg |
-| | | Medieval Lantern, Get Dead Entertainment (cage lantern, as C3) | https://www.fab.com/listings/b291be9b-b584-4c72-944f-e218835c38c7 | sheet | same |
+| | | ours: Roots (kit piece); Poly Haven root_cluster is recorded in `Art/Source/PolyHaven/SOURCES.md` (fetch if missing) | - | - | - |
+| C15 | Lights | Wall_Sconce, Get Dead Entertainment (iron cage sconce, as concept C1) | https://www.fab.com/listings/152bf785-ddf6-4057-9a80-8114473132cf | sheet | C15_lantern_p2.jpg |
+| | | Medieval Lantern, Get Dead Entertainment (cage lantern, as concept C3) | https://www.fab.com/listings/b291be9b-b584-4c72-944f-e218835c38c7 | sheet | same |
 | | | HMF Lamp Iron Hanging 03 (Megascans alternative) | https://www.fab.com/listings/fac84636-4669-48c0-80dd-d0412feed377 | title | - |
-| | | Old Lantern, Sousinho Games (oil lantern, as C4) | https://www.fab.com/listings/17f4af61-5f14-45cf-a33c-3dc810997a21 | sheet | same |
+| | | Old Lantern, Sousinho Games (oil lantern, as concept C4) | https://www.fab.com/listings/17f4af61-5f14-45cf-a33c-3dc810997a21 | sheet | same |
 | | | HMF Candle Beeswax Burnt 01 | https://www.fab.com/listings/81966cc5-11f7-44fa-8ce0-ff1213121b2f | sheet | same |
-| | | HM Library Chandelier Metal Rusty 01 (floor 5 dome) | https://www.fab.com/listings/51879e64-6d4d-453b-8369-bbb977f9f1b7 | title | - |
+| | | HM Library Chandelier Metal Rusty 01 (floor 5 dome, floor 4 press hall) | https://www.fab.com/listings/51879e64-6d4d-453b-8369-bbb977f9f1b7 | title | - |
 | | | ours: CellarLantern (B11) | - | - | - |
 | A04 | Rats | Rat Multi Animations (Textured), DaVe inc. (FBX) | https://www.fab.com/listings/ee58a3ee-bf89-494c-9f91-6b1c4ad12a27 | sheet | A04_rat_p2.jpg |
 | | | Black Rat, Nestaeric (FBX, GLB; rig not confirmed) | https://www.fab.com/listings/3d8f4ca8-b9cf-4d82-a2b7-69882a0c8815 | sheet | same |

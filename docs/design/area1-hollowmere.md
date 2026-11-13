@@ -4,6 +4,7 @@
 **Builds on:** `docs/PHASE1.md` section 3 (style bible), `docs/STORY.md`, `docs/superpowers/specs/2026-10-30-hollowmere-mass-production-design.md`, the town as built (`Core/Town/HollowmereLayout.cs`, `Editor/Builders/Hollowmere*.cs`).
 **References, in order:** the user's concepts H1-H8 (`Reference/private/concepts/`), then `Reference/private/genre2/`, `oot2026/`, `totk/`, and our approved corner (`Reference/hollowmere/approved_corner/`).
 **Assets:** every code in square brackets (for example [T01]) is a row in `docs/design/area1-dungeon1-needs.md`, which holds the listing, URL, licence note and contact sheet. "ours" means a piece already under `Assets/_Project/Content/Art/`.
+**Labels:** H1 to H8 always mean the concept images. Decisions are DH1 to DH8 (section 8). Asset codes are in square brackets.
 **IP:** nothing of Dark Cloud's names, characters, text or assets.
 
 ## 1. Where the town stands today
@@ -19,12 +20,12 @@ Seen in the latest captures (`Reference/sessions/ambient-life/after/HM_Overview_
 
 ## 2. Six ideas
 
-1. **The chimneys stayed.** Every ruined lot keeps its hearth and chimney stack above the footing. The square at the start is a ring of lonely chimneys and doorsteps. It gives the ruin height and a silhouette, says "homes stood here", and ties the town to the Hearthdeep. When a house is rebuilt, smoke rises from that same chimney. (Decision H1: STORY says "foundations and doorsteps".)
+1. **The chimneys stayed.** Every ruined lot keeps its hearth and chimney stack above the footing. The square at the start is a ring of lonely chimneys and doorsteps. It gives the ruin height and a silhouette, says "homes stood here", and ties the town to the Hearthdeep. When a house is rebuilt, smoke rises from that same chimney. (Decision DH1: STORY says "foundations and doorsteps".)
 2. **Wild to tended.** Ten years of growth fill the ruin: saplings inside the lots, ivy on the stacks, meadow in the joints, all in the concepts' yellow-green. Rebuilding tames it lot by lot. Wildness is the progress bar.
 3. **Three anchors, one short walk.** Home (rest), the bakery lot (build) and the bell yard (dive) sit within 40 m. Each has its own tall shape, its own sound and one thing that moves.
 4. **A sky worth looking at.** A painted, hazy sky, drifting cloud shadows on the cobbles, and lake haze beyond the wall. Cheap in URP and it changes every frame.
 5. **Life without a crowd.** The residents are gone until rescued, so life comes from wind, cloth, smoke, birds, a cat, hens, and the heroes themselves standing at their own spots. Each rescued resident switches on a "life kit" for their building.
-6. **Evening home.** Leave for a dive in morning light. Come back at golden hour with lit windows. Two light states tied to the loop, no clock. (Decision H2.)
+6. **Evening home.** Leave for a dive in morning light. Come back at golden hour with lit windows. Two light states tied to the loop, no clock. (Decision DH2.)
 
 ## 3. Layout
 
@@ -83,7 +84,7 @@ Schematic, north up, not to scale. Coordinates in the table are metres from the 
 | Spawn, facing south-west (set the spawn yaw toward (-4, -6)) | fountain at 13 m, cloth stall, the west row's chimneys, Market Street's gap with sky and haze | first frame: fountain centred-left, haze gap on the left third |
 | Spawn, a quarter turn right | bakery lot at 26 m (F01 is a low ruin at the start, so nothing hides it) | Tobin hammering there is the sound that pulls the player over |
 | Spawn, behind | bell tower 17 m tall above the home roof | pigeons and the wind tone say "up there" |
-| Build point, facing south | fountain 15 m, stock pile 4 m, cloth stall, home's smoke to the east, inn across the square | the placement camera already sits above F02 |
+| Build point, facing south | fountain 18 m, stock pile 4 m, cloth stall, home's smoke to the east, inn across the square | the placement camera already sits above F02 |
 | Terrace edge at (0, 20.6), eye y 5.65 | the whole square, the fountain on axis, Market Street straight ahead, sky over the wall | the "progress balcony": a bench here, passed on every walk to the dive |
 | Trapdoor | tower door, landing, annex, the hill bank. No view of the square | on purpose: a sheltered pocket before the descent |
 | Market Street mouth (0, -21), facing north | fountain, north row, terrace wall, church and tower above | the postcard view (H1). Seen on every return from the lake |
@@ -140,7 +141,7 @@ No day-night cycle in Phase 1 (unchanged). The two states are presets (`SC_CAPTU
 | Inn dog | inn door, arrives with the innkeeper | lies down, follows her | [A05] |
 
 **People.**
-- The heroes are the first residents. In solo the three not in use stand in town (the swap already happens here). In co-op, absent heroes fill the spots. Tobin works at the bakery lot's bench, Wren at her list wall, Pip sits on the fountain rim, Ash sorts the haul at the tools stall. Looped idle clips from the animation sets we own. (Decision H3.)
+- The heroes are the first residents. In solo the three not in use stand in town (the swap already happens here). In co-op, absent heroes fill the spots. Tobin works at the bakery lot's bench, Wren at her list wall, Pip sits on the fountain rim, Ash sorts the haul at the tools stall. Looped idle clips from the animation sets we own. (Decision DH3.)
 - Rescued residents get two or three anchor points and walk between them slowly: Hollis Rye (baker) at the oven, the counter and the fountain; Marta Fenn (innkeeper) at the inn door, a bench and the produce stall. No schedule system.
 
 **Sound.** Nothing for the town exists yet. Sources: [S01].
@@ -169,7 +170,7 @@ The square as a whole gains fountain water and full bunting when ring 1 is compl
 ## 7. Spots
 
 Budget classes used in the tables:
-- **H** hero prop: up to 30k triangles, up to two 2K sets.
+- **H** hero prop: up to 30k triangles, up to two 2K sets (PHASE1 3.3 allows 60k; go past 30k only for a landmark).
 - **M** medium: up to 6k triangles, one 2K set (shared where possible).
 - **S** small: up to 1.5k triangles (400 if scattered more than 20 times), 1K or a shared 2K atlas.
 - Megascans imports take the LOD that fits the class, with textures at 2K at most (1K for S).
@@ -195,7 +196,7 @@ Concept H6. Cameras `Cap_HM_HomeDoor`, `Cap_HM_HeroesHome`, `Cap_HM_PX_Annex`. R
 Concepts H1, H3. Cameras `Cap_HM_Fountain`, `Cap_HM_SquareSouth`, `Cap_HM_SquareWest`, `Cap_HM_KeepWall`.
 | Prop | Asset | Count | Where | Role | Budget |
 |---|---|---|---|---|---|
-| Cobbles | [T01] Cobblestone Floor | whole square | | the H1 ground (Decision H4) | 2K tile, 1024 px/m |
+| Cobbles | [T01] Cobblestone Floor | whole square | | the H1 ground (Decision DH4) | 2K tile, 1024 px/m |
 | Fan ring | ours FlagRing | 6 m ring | round the fountain | keeps the approved motif | - |
 | Gutters, edge band | [T01] River Cobblestone | gutter lines, 1.5 m band at the walls | | H3 channel | 2K tile |
 | Moss in joints | ours B3 moss, [C03] moss decals | heavier in the north shade and at the fountain foot | | age | decals |
@@ -266,7 +267,7 @@ Cameras `Cap_HM_LaneMouth`, `Cap_HM_MarketStreet`, `Cap_HM_J03`, `Cap_HM_LowerGa
 - Keep the lot at the foot of the street (R2_16) low in Phase 1 so the street ends in sky.
 
 ### S8. Orchard corner (new)
-Concept H8. New camera `Cap_HM_Orchard`. STORY places an orchard on the south slope; none is built. (Decision H5.)
+Concept H8. New camera `Cap_HM_Orchard`. STORY places an orchard on the south slope; none is built. (Decision DH5.)
 | Prop | Asset | Count | Where | Role | Budget |
 |---|---|---|---|---|---|
 | Apple trees | ours, new, via `sc-foliage` (gnarled trunk, card crown, yellow-green). No free apple tree exists on Fab (sheet T10) | 7, in 2 shapes, 4.5 to 6 m, one fallen | the strip | H8 | H each, one shared 2K atlas |
@@ -293,14 +294,14 @@ Cameras `Cap_HM_LakeShore`, `Cap_HM_LakeJetty`. Ours LakeShore as built. Add one
 
 ## 8. Decisions for the user
 
-- **H1. Chimneys stand on ruined lots.** STORY 151 says "foundations and doorsteps". Reason: the ruin needs height and a readable silhouette, and the hearth is the game's own image. Small story wording change.
-- **H2. Evening state on return from a dive.** Reason: a warm homecoming for no clock system. Needs one line in the return flow to pick the preset.
-- **H3. Heroes stand in town as the first residents.** Reason: life on day one, and the swap gets a place. Uses the mannequin until hero models exist.
-- **H4. Swap the square's fan setts for the concept cobbles** (keep the fan ring at the fountain). The fan setts were part of the corner approved 2026-10-30; the concepts of 2026-11-13 show rounded cobbles.
-- **H5. Orchard at the south-east bend, with a fixed gap in the town wall for the lake view.** Needs `TownWallPlan` to accept fixed variants (a small Core change with a test).
-- **H6. New sky, fog mode and exposure.** This replaces the look of the approved corner, so B0 ends with a new reference row for approval.
-- **H7. Animal models.** No free rigged hen, cat or pigeon on Fab fits (sheets A01 to A03). `Reference/sessions/ambient-life` notes say the user planned to supply animal models. Otherwise the local AI pipeline makes them. Until then: card birds, and a static cat on the sill.
-- **H8. Spawn yaw** toward the fountain and the haze gap (first-frame composition).
+- **DH1. Chimneys stand on ruined lots.** STORY 151 says "foundations and doorsteps". Reason: the ruin needs height and a readable silhouette, and the hearth is the game's own image. Small story wording change.
+- **DH2. Evening state on return from a dive.** Reason: a warm homecoming for no clock system. Needs one line in the return flow to pick the preset.
+- **DH3. Heroes stand in town as the first residents.** Reason: life on day one, and the swap gets a place. Uses the mannequin until hero models exist.
+- **DH4. Swap the square's fan setts for the concept cobbles** (keep the fan ring at the fountain). The fan setts were part of the corner approved 2026-10-30; the concepts of 2026-11-13 show rounded cobbles.
+- **DH5. Orchard at the south-east bend, with a fixed gap in the town wall for the lake view.** Needs `TownWallPlan` to accept fixed variants (a small Core change with a test).
+- **DH6. New sky, fog mode and exposure.** This replaces the look of the approved corner, so B0 ends with a new reference row for approval.
+- **DH7. Animal models.** No free rigged hen, cat or pigeon on Fab fits (sheets A01 to A03). `Reference/sessions/ambient-life` notes say the user planned to supply animal models. Otherwise the local AI pipeline makes them. Until then: card birds, and a static cat on the sill.
+- **DH8. Spawn yaw** toward the fountain and the haze gap (first-frame composition).
 
 ## 9. Not in this design
 Interiors, a day-night cycle, shops and their UI, residents beyond the baker and innkeeper, the mill and smithy services, ring 3 beyond the shore.

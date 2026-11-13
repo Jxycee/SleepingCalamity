@@ -16,6 +16,8 @@
   5. The sheet goes to the user for corners and new spots.
 - **Checks and merge:** `gate` on the branch, `check` on the tip before merging, then `sc-merge`. Anything under `Core/Cellars` also needs `soak`.
 - **Review:** `reviewer` (Sonnet) for art, presentation and docs. B6 and B7 touch Core or the return flow; B7 gets `branch-reviewer` if it wires Presentation to the dive flow.
+- **Find the file first.** Hollowmere layout and dressing tables live in `Core/Town/` (pure C#, so changes need EditMode tests); builders live in `Editor/Builders/`. Where this plan gives a bare file name, locate it before editing.
+- **Labels:** H1-H8 and C1-C8 are concept images; DH and DC numbers are decisions; bracketed codes are assets.
 - **Downloads** need the user signed in to Fab in the browser pane. Each adopted asset gets a `SOURCES.md` line with licence and URL (`sc-asset-adopt`). 2K at most.
 
 ## Sessions
@@ -47,7 +49,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 - **Files:** `Editor/Builders/BeautyCornerBuilder.cs` (sun, fill, post: lines 79-92, 166, 322-330), `HollowmereLook.cs` (fog 67-74, sky 90), `DungeonCornerBuilder.cs`, `Presentation/Town/AreaLook.cs`.
 - **Do, town** (Hollowmere doc section 4): HDRI sky, ambient from the sky with an APV bake, Exponential fog with colour from the horizon, the cloud-shadow cookie, the Morning and Evening presets, the sun-elevation test (54, 46, 38), the square cobbles [T01] on the corner's ground.
 - **Do, cellar** (Cellars doc sections 3, 5, 6): [C01] and [C02] on the vault and floor at 1024 px/m, the lamp recipe, the warm ambient gradient, one wet patch, one sconce [C15].
-- **Also:** measure concepts H1-H3 and C1-C8 with `sc_ref_palette.py` and record the numbers; they settle Decision C5.
+- **Also:** measure concepts H1-H3 and C1-C8 with `sc_ref_palette.py` and record the numbers; they settle Decision DC5.
 - **Assets:** K01 (two HDRIs), T01 (two materials), C01 (two), C02 (one), C15 (one sconce).
 - **Done-check:** `Cap_Corner_Wide`, `_Mid`, `_Close` in Morning and `Cap_Corner_Wide` in Evening, beside H1, H3, H2 and the current approved row. `Cap_Cellar_Wide`, `_Mid`, `_Close` beside C1, C8, C2.
 - **Ends with:** the user's approval. The approved captures become the new reference rows (`Reference/hollowmere/approved_corner/` and a first Cellars row).
@@ -62,15 +64,15 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 - As B1 for the Cellars picks, under `Content/Art/Cellar/Adopted/<code>/`. Sheet under the B0 cellar light beside C2.
 
 ### B3. Square ground, sky rollout, the ruin look
-- **Spec:** Hollowmere sections 4, 6, S2; Decisions H1, H4, H6.
-- **Files:** `HollowmereSquare.cs`, `HollowmereFoliage.cs`, `HollowmereLook.cs`, `HollowmereBuilder.cs` (ruin footings about 484-505), `Art/Blender/town/ruin_kit.py` (add the chimney stack), `HollowmereTerrain.cs` (meadow layers outside the wall).
+- **Spec:** Hollowmere sections 4, 6, S2; Decisions DH1, DH4, DH6.
+- **Files:** `HollowmereSquare.cs`, `HollowmereFoliage.cs`, `HollowmereLook.cs`, `HollowmereBuilder.cs` (ruin footings about 484-505), `Art/Blender/town/sc_ruin_kit.py` (add the chimney stack), `HollowmereTerrain.cs` (meadow layers outside the wall).
 - **Do:** roll the B0 light out to `Hollowmere.unity`; swap the square's ground; move grass to edges and footings; stage 0 on every ruined lot (chimney, saplings, debris, crow); leaf drifts, puddles, the cart rut.
 - **Done-check:** `Cap_HM_HomeDoor`, `Cap_HM_Fountain`, `Cap_HM_SquareSouth`, `Cap_HM_SquareWest`, `Cap_HM_Ruins`, `Cap_HM_Overview`, Ruined preset, Morning, beside H1, H3 and the same cameras re-shot before the session.
 
 ### B4. Home, bakery lot, market row
 - **Spec:** S1, S3, S4, section 6.
-- **Files:** `HollowmereDressing.cs`, `HollowmereClutter.cs`, `HollowmereHub.cs` (build point), new `Art/Blender/town/scaffold_kit.py`.
-- **Do:** the three dressing tables; the scaffold kit; stage 1 and stage 2 on the bakery; the stock pile and Tobin's bench.
+- **Files:** `Core/Town/HollowmereDressing.cs` and `Core/Town/HollowmereClutter.cs` (the dressing rows; extend their EditMode tests), `Editor/Builders/HollowmereHub.cs` (build point, spawn yaw), new `Art/Blender/town/sc_scaffold_kit.py`.
+- **Do:** the three dressing tables; the spawn yaw (Decision DH8); the scaffold kit; stage 1 and stage 2 on the bakery; the stock pile and Tobin's bench.
 - **Done-check:** `Cap_HM_HomeDoor`, `Cap_HM_HeroesHome`, `Cap_HM_Bakery`, `Cap_HM_SquareWest`, `Cap_HM_TownhouseSide`, Ruined and Rebuilt, beside H6, H4, H7.
 
 ### B5. Terrace, tithe gate, bell yard, Market Street
@@ -79,12 +81,12 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 - **Done-check:** `Cap_HM_TitheGate`, `Cap_HM_KeepWall`, `Cap_HM_J09`, `Cap_HM_BellYard`, `Cap_HM_TerraceView`, `Cap_HM_LaneMouth`, `Cap_HM_MarketStreet` beside H5 and H1.
 
 ### B6. Orchard, allotments, lake edge
-- **Spec:** S8, S9, S10; Decision H5.
+- **Spec:** S8, S9, S10; Decision DH5.
 - **Files:** `Core/Town/TownWallPlan.cs` (fixed variants for the orchard gap, with an EditMode test), `HollowmereFoliage.cs`, `HollowmereGarden.cs`, `HollowmereLakeArt.cs`, a new orchard builder, the apple tree via `sc-foliage`; add `Cap_HM_Orchard`.
 - **Done-check:** `Cap_HM_Orchard`, `Cap_HM_Allotment`, `Cap_HM_Yard`, `Cap_HM_LakeShore`, `Cap_HM_LakeJetty` beside H8.
 
 ### B7. Town life
-- **Spec:** section 5; Decisions H2, H3, H7.
+- **Spec:** section 5; Decisions DH2, DH3, DH7.
 - **Files:** `HollowmereAmbientBuilder.cs`, `HollowmereLook.cs`, `Presentation/Town/AreaLook.cs`, the return-from-dive flow in Presentation (pick the Evening preset), an audio setup for beds and emitters.
 - **Do:** the one wind and everything it drives; smoke; pigeons, crows, sparrows; anchors for cat, hens and dog (placeholders until models arrive); hero idle spots; the sound map.
 - **Done-check:** stills from `Cap_HM_HomeDoor`, `Cap_HM_Fountain`, `Cap_HM_BellYard` in Morning and Evening beside H1 and H2; one walk (`sc-walk`) from spawn to the trapdoor to judge motion and sound, with its notes. Review before merge.
@@ -103,6 +105,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 
 ### B10. Floor 3 bakery and floor 4 wine
 - **Spec:** section 4 (floors 3, 4).
+- **If Decision DC1 puts the Dough-warden on floor 3:** add the guardian cell to the bakery heart (proposal P6) in `Core/Cellars` with an EditMode test, then run `soak`. Dressing only otherwise.
 - **Do:** the beehive oven (dead and lit states), the Great Oven, tide line, kneading hall, the sign; cask rows, racks, the press, the Great Tun, salt bloom, wet floor.
 - **Done-check:** `Floor_Room` in the bakery heart and the press hall, `Floor_Corridor` on floor 4, beside C7 (oven shapes) and C3.
 
@@ -113,7 +116,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 
 ### B12. Cellar life and sound
 - **Spec:** section 10.
-- **Do:** rats, moths, cinder moths, drips, ash and steam; sound beds per floor and emitters; Tuppence in the bank room if Decision C4 is yes.
+- **Do:** rats, moths, cinder moths, drips, ash and steam; sound beds per floor and emitters; Tuppence in the bank room if Decision DC4 is yes.
 - **Done-check:** stills of a lit lamp with moths and a drip puddle beside C1; one walk through floor 1 with notes.
 
 ### B13. Final captures and review
@@ -121,8 +124,8 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 - **Ends with:** the user's look at both sheets.
 
 ## What the user is asked for along the way
-1. Approve the two design docs and answer their decisions (H1-H8, C1-C7).
+1. Approve the two design docs and answer their decisions (DH1-DH8, DC1-DC7).
 2. Sign in to Fab in the browser pane when B0, B1 and B2 download.
 3. Approve the B0 corner sheets.
-4. Animal models (Decision H7), or a yes to making them with the local pipeline.
+4. Animal models (Decision DH7), or a yes to making them with the local pipeline.
 5. Look at the B13 sheets.

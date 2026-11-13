@@ -4,11 +4,12 @@
 **Builds on:** `docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` (signed off), `docs/ROOM_METRICS.md`, `docs/STORY.md`, `docs/PHASE1.md` section 3, and the generator in `Assets/_Project/Core/Cellars/` (rooms v2, seven floors).
 **References, in order:** the user's concepts C1-C8, Dough-warden and Rat-king (`Reference/private/concepts/`), then `Reference/hollowmere/dungeon_corner/` and `Reference/private/`.
 **Assets:** codes in square brackets are rows in `docs/design/area1-dungeon1-needs.md`. "ours" means a piece under `Assets/_Project/Content/Art/Cellar/`.
+**Labels:** C1 to C8 always mean the concept images. Decisions are DC1 to DC7 (section 12), proposals P1 to P7 (section 11). Asset codes are in square brackets and have two digits ([C01]).
 **IP:** nothing of Dark Cloud's names, characters, text or assets.
 
 ## 1. Scope and names
 
-"The Cellars" here means floors 1 to 7 of the Undercroft, the part Phase 1 builds (`UndercroftPlan.cs:11`). STORY and the spec call the whole ten-floor dungeon the Undercroft. Code and the concept sheet say Cellars. (Decision C3.)
+"The Cellars" here means floors 1 to 7 of the Undercroft, the part Phase 1 builds (`UndercroftPlan.cs:11`). STORY and the spec call the whole ten-floor dungeon the Undercroft. Code and the concept sheet say Cellars. (Decision DC3.)
 
 What the code builds today:
 | Floor | Kind | Content | Source |
@@ -38,7 +39,7 @@ Where the look stands today (`Reference/cellars/variety/floor_room.jpg`, `Refere
 
 ## 3. The depth gradient
 
-A per-floor look table. Today there is none (one kit, values rolled per seed), so this is a proposed Presentation table, `CellarFloorLook` (Decision C6). Values are starting points for the lighting test corner. Every shadow stays warm: no teal, no green, nothing pure black (PHASE1 3.1).
+A per-floor look table. Today there is none (one kit, values rolled per seed), so this is a proposed Presentation table, `CellarFloorLook` (Decision DC6). Values are starting points for the lighting test corner. Every shadow stays warm: no teal, no green, nothing pure black (PHASE1 3.1).
 
 | F | Name | Walls | Lamp tint | Ambient, top to bottom | Fog tint, density | Breath | Wet | Moss | Roots | Dust | Sound bed |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -54,14 +55,14 @@ A per-floor look table. Today there is none (one kit, values rolled per seed), s
 - "Wet", "Moss" and "Dust" are 0 to 1 weights for the overlay rules in section 7.
 - The existing dark-floor roll (`CellarAtmosphere.cs`) stays and multiplies lamp level on top.
 
-Value bands: PHASE1 3.1 gives the Cellars 0.06-0.10 / 0.24-0.32 / 0.55-0.68; `sc-scene-look` gives 0.12-0.16 / 0.30-0.40 / 0.65-0.75. The concepts look closer to the brighter set. Proposal: the brighter band for lit rooms on floors 1 to 5, the darker band for floors 6 and 7 and for rolled dark floors. B0 measures C1 to C8 with `sc_ref_palette.py` and settles it. (Decision C5.)
+Value bands: PHASE1 3.1 gives the Cellars 0.06-0.10 / 0.24-0.32 / 0.55-0.68; `sc-scene-look` gives 0.12-0.16 / 0.30-0.40 / 0.65-0.75. The concepts look closer to the brighter set. Proposal: the brighter band for lit rooms on floors 1 to 5, the darker band for floors 6 and 7 and for rolled dark floors. B0 measures C1 to C8 with `sc_ref_palette.py` and settles it. (Decision DC5.)
 
 ## 4. Floor by floor
 
 ### Floor 1. The Church Cellar (authored)
 - **Reads as:** the church's own store. Homely, a little damp, still safe-feeling.
-- **Landmark:** the daylight shaft under the trapdoor (C6): cool light on wet steps, warm lamp beyond. The only daylight in the dungeon.
-- **Set piece:** the Rat-king's court in the hanging hall. A throne of crates under the hook rail, a hoard of spoons and tin lids that glints. The concept gives him keys on his belt, so he is the floor's key carrier. (Decision C2.)
+- **Landmark:** the daylight shaft under the trapdoor (C6): cool light on wet steps, warm lamp beyond. The only real daylight on the way down.
+- **Set piece:** the Rat-king's court in the hanging hall. A throne of crates under the hook rail, a hoard of spoons and tin lids that glints. The concept gives him keys on his belt, so he is the floor's key carrier. (Decision DC2.)
 - **Also here (spec):** the sealed alcove with one pale sigil, the single non-warm light below the entry. A drain grate with the first red glow.
 - **Palette, light:** pale stone, limewash, candle gold. Lamps on every route cell.
 - **Surfaces:** roots through the entry vault, cobwebs on the stair, moss in the floor joints near the shaft.
@@ -78,9 +79,9 @@ Value bands: PHASE1 3.1 gives the Cellars 0.06-0.10 / 0.24-0.32 / 0.55-0.68; `sc
 - **Reads as:** the town's bakery, dragged down and drowned. Cold, grey, dripping. The one sad floor of the first half.
 - **Landmark:** the Great Oven in the heart room, a beehive oven face 5 m across. The baker sleeps on its hearth.
 - **Set piece:** every other oven is dead and wet, mouths black (C7's shapes with no fire). A grey tide line of flour paste runs along every wall at 0.5 m. Peels and trays lie where the water left them. The bakery's sign (the same piece as the town's `ShopSign_Bakery`) lies in the kneading hall.
-- **Guardian (Decision C1):** the Dough-warden kneels before the Great Oven like a statue. It is the only thing in the bakery still burning; it took the fire into its chest. Beat it and the Great Oven relights, the room turns gold, and the baker wakes. The spec already asks for "a lighter guard than a boss" here.
+- **Guardian (Decision DC1):** the Dough-warden kneels before the Great Oven like a statue. It is the only thing in the bakery still burning; it took the fire into its chest. Beat it and the Great Oven relights, the room turns gold, and the baker wakes. The spec already asks for "a lighter guard than a boss" here.
 - **Palette, light:** wet black stone, flour grey, dull brick, plum shadows. Almost no lamps; candle stubs on the kneading tables; one hearth glow. After the win, full gold.
-- **Surfaces:** wet everywhere, drips in every room. No standing water in Phase 1 (`CellarPieceSpots.cs:56`); the wet look, tide line and sound carry "drowned". (Decision C7.)
+- **Surfaces:** wet everywhere, drips in every room. No standing water in Phase 1 (`CellarPieceSpots.cs:56`); the wet look, tide line and sound carry "drowned". (Decision DC7.)
 - **Hooks:** `bakery_oven_mouth`, `bakery_proofing`, `bakery_flour_store`, `bakery_kneading_hall`, `bakery_flue_antechamber_calm`, `bakery_heart`; the `Baker` feature.
 
 ### Floor 4. The Wine Vaults (generated, wine)
@@ -93,7 +94,7 @@ Value bands: PHASE1 3.1 gives the Cellars 0.06-0.10 / 0.24-0.32 / 0.55-0.68; `sc
 ### Floor 5. The Cistern Dome and the bank room (set piece)
 - **Reads as:** the hinge of the dungeon. Water above, fire below.
 - **Landmark:** the dome: a round hall ringed by sluice arches, with a central drain grate that glows red and steams.
-- **Guardian:** per the signed-off spec this is the Brazen Ox (decision 46). Code places a "Warden" stand-in here. See Decision C1.
+- **Guardian:** per the signed-off spec this is the Brazen Ox (decision 46). Code places a "Warden" stand-in here. See Decision DC1.
 - **Then the bank room** (section 8).
 - **Palette, light:** dressed grey-gold stone, black iron, the red glow from the grate, steam catching the lamplight. A rusted chandelier [C15] under the dome.
 - **Hooks:** the guardian and bank cells (`CellarFloorLayout.cs:89-90`), `cellar_checkpoint`.
@@ -151,7 +152,8 @@ Rebuild the surfaces of the existing kit (`Content/Art/Cellar/FloorKit/`, genera
 | `coal_furnace_ring` | furnace mouths around the central pier; cracked ember floor | bellows, coal | furnace light |
 | `coal_stoke_chicane` | rails bending between heaps, a tipped cart [C09] (C4) | coal | 1 oil lantern |
 | `coal_boiler_hall` | a riveted boiler drum, a fallen arch (Arch chunks), a steam leak | rubble | ember, steam glow |
-| `bakery_*` | section 4, floor 3 | flour sacks, tables, racks | candle stubs |
+| `bakery_*` on floor 3 | section 4, floor 3 | flour sacks, tables, racks | candle stubs |
+| the floor 5 arena (it reuses the room id `bakery_flue_antechamber`, `SetPieces.cs:79`) | the Cistern Dome: a ring of sluice arches on the walls, corner squinches so the room reads round, the central drain grate. No oven or bakery dressing here | iron sluice wheels and chains at the edges only | chandelier, breath glow |
 | `cellar_checkpoint` | section 8 | | candle |
 
 Combat rooms keep the room-card rule (spec section 7): a landmark, a loop around a central obstacle, a cover foothold inside the door. Dressing never enters the fight space; it sits on walls, in corners and above 2.2 m.
@@ -184,12 +186,12 @@ All overlays are Presentation-only and seeded per floor. (Proposal P5.)
 ## 8. The bank room (floor 5)
 
 Concept C5. Reached after the guardian.
-- **The nook:** under a stair, timber-braced. A bedroll and pack [C12], a rough table with a candle and a scrap of map [C12], Wren's chalk mark on the plastered brick.
+- **The nook:** under a stair, timber-braced. A bedroll and pack [C12], a rough table [T16] with a candle [C12] and a scrap of map (build), Wren's chalk mark on the plastered brick.
 - **The bank:** chests [C12] against the wall, one per slot (solo 3; two players 2 each; three players 1 each and one extra; four players 1 each, as `BankSlots.cs`). In co-op each chest carries its owner's colour tag.
 - **The door:** iron-bound, shut behind the party. Nothing follows them in.
-- **Two ways out, told apart by light:** the stair up is washed in cool daylight (go home). The stair down glows red (push on).
+- **Two ways out, told apart by light.** Floor 5 has no stair today; the room has two markers, go home and push on (`BankColumn`, `HomeColumn`, `CellarFloorBuilder.Dive.cs:66-70`). Dress each marker as a stair mouth set into the wall. This is dressing only, with no new cells or rules. The way home is washed in cool light from above. The way on glows red from below.
 - **Light and sound:** calm candle gold, no fog, no drone. The fight's music stops at the door.
-- **Tuppence:** the cat waits on the bedroll and purrs. His collar keeps him safe (STORY). The cat means "safe". (Decision C4.)
+- **Tuppence:** the cat waits on the bedroll and purrs. His collar keeps him safe (STORY). The cat means "safe". (Decision DC4.)
 
 ## 9. The floor 7 end
 
@@ -222,20 +224,20 @@ All small, none changes dive rules. Each is for the user to accept or refuse.
 - **P3. Rails on coal floors:** a trim kind that follows the route.
 - **P4. One landmark socket per generated floor**, in its largest combat room (smoke gallery, Great Tun, coal chute, furnace ring).
 - **P5. Overlays** (wet, moss, roots, cobwebs, salt, soot, vermin, drips): Presentation-only, seeded.
-- **P6. A guardian cell on floor 3** if Decision C1 puts the Dough-warden there.
+- **P6. A guardian cell on floor 3** if Decision DC1 puts the Dough-warden there.
 - **P7. Stone scale:** walls and floors at 1024 px/m with real courses.
 
 Anything touching `Core/Cellars` needs the soak run before merge (CLAUDE.md).
 
 ## 12. Decisions for the user
 
-- **C1. Where the Dough-warden stands.** The spec replaced it with the Brazen Ox on floor 5 (decision 46). The new concept (2026-11-13) brings it back as a grim oven guardian. Recommended: Dough-warden guards the Great Oven on floor 3 and the Ox keeps floor 5. Until an Ox exists, the floor 5 arena keeps using the Warden stand-in. Alternatives: Dough-warden on floor 5 in place of the Ox; or at the floor 7 door.
-- **C2. The Rat-king is floor 1's key carrier.** STORY 85 says elites are fully demonic; the concept is storybook. Recommended: keep the concept and add ember eyes, so the dungeon's first face is whimsical with one wrong note.
-- **C3. Name.** Use "the Cellars" for floors 1 to 7 in Phase 1 talk, and keep "Undercroft" for the whole dungeon.
-- **C4. Tuppence waits at checkpoints.**
-- **C5. Value bands** (section 3): which set is the target.
-- **C6. The per-floor look table** (P1 to P5 follow from it).
-- **C7. No standing water in Phase 1;** floor 3 reads "drowned" by wetness alone.
+- **DC1. Where the Dough-warden stands.** The spec replaced it with the Brazen Ox on floor 5 (decision 46). The new concept (2026-11-13) brings it back as a grim oven guardian. Recommended: Dough-warden guards the Great Oven on floor 3 and the Ox keeps floor 5. Until an Ox exists, the floor 5 arena keeps using the Warden stand-in. Alternatives: Dough-warden on floor 5 in place of the Ox; or at the floor 7 door.
+- **DC2. The Rat-king is floor 1's key carrier.** STORY 85 says elites are fully demonic; the concept is storybook. Recommended: keep the concept and add ember eyes, so the dungeon's first face is whimsical with one wrong note.
+- **DC3. Name.** Use "the Cellars" for floors 1 to 7 in Phase 1 talk, and keep "Undercroft" for the whole dungeon.
+- **DC4. Tuppence waits at checkpoints.**
+- **DC5. Value bands** (section 3): which set is the target.
+- **DC6. The per-floor look table** (P1 to P5 follow from it).
+- **DC7. No standing water in Phase 1;** floor 3 reads "drowned" by wetness alone.
 
 ## 13. Not in this design
 Floors 8 to 10, enemy rosters and tuning, the Brazen Ox's look, music, creature models (the two concepts go through the creature pipeline separately).
