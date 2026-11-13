@@ -9,6 +9,7 @@ using System.Linq;
 using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Presentation;
+using SleepingCalamity.UI;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEngine;
@@ -54,6 +55,7 @@ namespace SleepingCalamity.EditorTools
             Vector3 landXZ = new Vector3(HollowmereLayout.ChurchTrapdoorLanding.X, HollowmereLayout.KeepHeight, HollowmereLayout.ChurchTrapdoorLanding.Z);
             landing.transform.position = new Vector3(landXZ.x, LandingY(t, landXZ, HollowmereLayout.KeepHeight), landXZ.z);
             BuildTrapdoor(entrance.transform);
+            BuildGuideBeacon(entrance.transform, LoopGuideHud.StairBeaconName, new Color(0.62f, 0.38f, 0.90f));
             var origin = new GameObject("DiveOrigin"); origin.transform.SetParent(hub, false);
             origin.transform.position = HubOrigin;
             var diveHub = new GameObject("DiveHub"); diveHub.transform.SetParent(hub, false);
@@ -81,6 +83,18 @@ namespace SleepingCalamity.EditorTools
             GameObject slab = LookTestBuilder.Prim(entrance, "Trapdoor", PrimitiveType.Cube, new Vector3(0f, 0.04f, 0f), new Vector3(1.6f, 0.08f, 1.2f), M("label"));
             GameObject ring = LookTestBuilder.Prim(entrance, "TrapdoorRing", PrimitiveType.Cylinder, new Vector3(0f, 0.1f, 0.25f), new Vector3(0.28f, 0.02f, 0.28f), M("label"));
             foreach (Collider c in entrance.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+        }
+
+        // PL-2 task 2.2: a tall unlit light column that LoopGuideHud switches on while the guide points here (built dark; no collider). Same shape as the dive floors' stair column.
+        static void BuildGuideBeacon(Transform parent, string name, Color color)
+        {
+            const float height = 7f;
+            BuilderUtil.EnsureFolder(MaterialsFolder);
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_GuideBeacon.mat", Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Universal Render Pipeline/Lit"));
+            m.SetColor("_BaseColor", color);
+            EditorUtility.SetDirty(m);
+            GameObject g = LookTestBuilder.Prim(parent, name, PrimitiveType.Cylinder, new Vector3(0f, height * 0.5f, 0f), new Vector3(0.22f, height * 0.5f, 0.22f), m);
+            g.SetActive(false);
         }
 
         // The stair top stands on whatever is really there (floor, step or terrain): a ground raycast from above, falling back to the layout ground, then the house floor.
@@ -113,6 +127,8 @@ namespace SleepingCalamity.EditorTools
             var point = new GameObject("BuildPoint").transform; point.SetParent(station, false);
             TownPoint step = f.DoorstepPoint(f.Facing);
             point.position = new Vector3(step.X, Ground(t, step.X, step.Z) + 0.1f, step.Z);
+
+            BuildGuideBeacon(point, LoopGuideHud.BuildBeaconName, new Color(1.0f, 0.82f, 0.30f));
 
             var camGo = new GameObject("PlacementCam"); camGo.transform.SetParent(station, false);
             CinemachineCamera cam = camGo.AddComponent<CinemachineCamera>();

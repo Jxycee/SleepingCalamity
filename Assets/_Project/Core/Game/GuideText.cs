@@ -23,6 +23,28 @@ namespace SleepingCalamity.Core
 
         public static IEnumerable<GuideKind> Kinds => Table.Keys;
 
+        // The dive result card (task 2.3): a title, then one line each for what came home, what was lost, gold, pieces and people. Words only; the numbers come from DiveResult.
+        public static List<string> ResultLines(DiveResult r)
+        {
+            var l = new List<string>();
+            switch (r.Ending)
+            {
+                case DiveEnding.WentHome: l.Add("You went home."); break;
+                case DiveEnding.Finished: l.Add("You reached the end of the Undercroft."); break;
+                default: l.Add("The dive failed."); break;
+            }
+            if (r.FloorsCleared > 0) l.Add(r.FloorsCleared == 1 ? "1 floor cleared." : r.FloorsCleared + " floors cleared.");
+            l.Add(Count(r.ItemsHome, "item") + " came home" + (r.ItemsBanked > 0 && r.ItemsBanked < r.ItemsHome ? " (" + r.ItemsBanked + " banked)." : r.ItemsBanked > 0 ? " (banked)." : "."));
+            if (r.ItemsLost > 0) l.Add(Count(r.ItemsLost, "item") + " " + (r.ItemsLost == 1 ? "waits" : "wait") + " in a lost satchel on the floor where you fell.");
+            if (r.SatchelLost) l.Add("The satchel you were carrying is gone.");
+            l.Add(r.GoldLost > 0 ? "Gold kept: " + r.GoldKept + " (" + r.GoldLost + " lost)." : "Gold kept: " + r.GoldKept + ".");
+            if (r.PiecesFound > 0) l.Add(Count(r.PiecesFound, "piece") + " found, safe in town.");
+            foreach (string person in r.PeopleFound) l.Add((person == TownBuildings.BakerResident ? "The baker" : person) + " is safe in town.");
+            return l;
+        }
+
+        static string Count(int n, string noun) => n + " " + noun + (n == 1 ? "" : "s");
+
         public static string For(GuideStep step)
         {
             if (!Table.TryGetValue(step.Kind, out (string Many, string One) t)) return "";

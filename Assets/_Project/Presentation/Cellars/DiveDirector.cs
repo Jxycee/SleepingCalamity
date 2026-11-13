@@ -2,7 +2,7 @@
 // spawned by the host (DiveHub in the dive scene, or a test). It owns the dive FLOW and the party state that outlives a dive: PartyBags, DiveCheckpoint and DivePieces (Core/Cellars); every dive gets a fresh
 // DiveSession over them (Core/Cellars/DiveSession: the rules for floor, phase, stir, momentum). The data stays where it lives: the floor (seed, floor) in CellarFloorSync, the session and its summary in
 // DiveHaulSync (both spawned here once per session and kept: ending a dive sets the floor to NoFloor, it never despawns them, so found pieces, the checkpoint and the bags survive a return dive).
-// Host-written NetworkVariables (late joiners get them with the spawn): NetActive, NetCheckpointHeld (the next dive may pick a floor), NetPickableMaxFloor (the deepest floor it may pick), NetStairOpen, and
+// Host-written NetworkVariables (late joiners get them with the spawn): NetActive, NetEnd (the last dive's end reason plus a counter; the host writes only that, each peer's result card builds its own numbers from its own owner-read bag), NetCheckpointHeld (the next dive may pick a floor), NetPickableMaxFloor (the deepest floor it may pick), NetStairOpen, and
 // the three world points NetHome / NetHubStair / NetOrigin (where the party lands, the church trapdoor, where the floors are built).
 // Clients ask by RPC and the host re-checks everything: RequestStartDiveRpc(floor) (trapdoor range, DiveCheckpoint.CanStartOn), RequestDescendRpc (floor 1), RequestStairRpc(fromFloor) (current floor must equal
 // fromFloor, so two presses in one tick advance once; range; gate key; floor 5's stair only after the bank choice), RequestGoHomeRpc (the cleared bank floor, range), RequestFinishRpc (floor 7's EndCell, range),
@@ -37,6 +37,17 @@ namespace SleepingCalamity.Presentation
 {
     public enum DiveEndReason : byte { Failed = 0, WentHome = 1, Abandoned = 2, Finished = 3 }
 
+    // PL-2 task 2.3: how the last dive ended, for every peer. Count rises on every ending (so the same reason twice still changes the value); Count 0 = no dive has ended in this session.
+    public struct DiveEndNet : INetworkSerializable, System.IEquatable<DiveEndNet>
+    {
+        public byte Reason;
+        public uint Count;
+        public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter { s.SerializeValue(ref Reason); s.SerializeValue(ref Count); }
+        public bool Equals(DiveEndNet o) => Reason == o.Reason && Count == o.Count;
+        public override bool Equals(object obj) => obj is DiveEndNet o && Equals(o);
+        public override int GetHashCode() => unchecked((int)(Count * 31u) + Reason);
+    }
+
     // Runs before HeroLocomotion (order 0): the gravity hold must be decided in the same frame a replicated floor swap lands, or the owner hero takes one gravity step over cells the new floor lacks
     // (a long frame under load sank a client hero 1.3 m once). ApplyPending also lands the arrival teleport before the hero moves.
     [DefaultExecutionOrder(-30)]
@@ -56,7 +67,8 @@ namespace SleepingCalamity.Presentation
         public const float PendingTimeout = 10f;      // an owner applies a teleport after this long even when its floor never built
 
         public readonly NetworkVariable<bool> NetActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public readonly NetworkVariable<bool> NetCheckpointHeld = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // DiveCheckpoint.Held: the next dive may pick a floor
+        public readonly NetworkVariable<DiveEndNet> NetEnd = new NetworkVariable<DiveEndNet>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // how the last dive ended (host writes in EndDive); a late joiner reads it with the spawn and shows no card for it
+        public readonly NetworkVariable<bool> NetCheckpointHeld =new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // DiveCheckpoint.Held: the next dive may pick a floor
         public readonly NetworkVariable<bool> NetSuspendedDive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // a loaded bank suspend waits: the trapdoor resumes it instead of starting a dive
         public readonly NetworkVariable<int> NetPickableMaxFloor = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the deepest floor the next dive may start on (hub prompt)
         public readonly NetworkVariable<bool> NetStairOpen = new NetworkVariable<bool>(true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the current floor's stair can be used (gate key taken or not required)
@@ -457,6 +469,7 @@ namespace SleepingCalamity.Presentation
             ForgetLiveParty();
             int endFloor = _session != null ? _session.Floor : 0;   // the dive's last floor, before the Town-phase session below replaces it
             NetActive.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
+            NetEnd.Value = new DiveEndNet { Reason = (byte)reason, Count = NetEnd.Value.Count + 1u };   // the one new replicated value of the dive result (PL-2 2.3); each peer builds its own numbers
             _session = NewSession();
             if (HaulSync != null) HaulSync.ServerAdopt(_session);
             RefreshHub();
