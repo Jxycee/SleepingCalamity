@@ -10,11 +10,11 @@ Not reported, by rule: anything about cheating, trusted client input or modded c
 
 | Severity | Count |
 |---|---|
-| blocker | 3 (A1 confirmed by code read, needs a live Relay check; A2 and A3 are decisions for the user) |
-| should-fix | 7 (A4 to A10) |
+| blocker | 2 (A1: confirmed in code, needs one live Relay check; A2: a decision for the user) |
+| should-fix | 9 (A3 to A11; A3 and A5 are decisions for the user) |
 | note | 12 (N1 to N12) |
 
-The save format itself held up: every section has a `Clean`, a store row and round-trip tests, captures copy instead of aliasing, restore runs before a source goes live, and a newer file is never written. No path was found where a normal save, quit and reload loses or duplicates town pieces, bags or weapon growth. The real risks sit at the edges of the format: who a world belongs to (A2, A3), what happens when the file cannot be used (A5, A6, A7), and the one rejoin path that tests cannot reach (A1, A9).
+The save format itself held up: every section has a `Clean`, a store row and round-trip tests, captures copy instead of aliasing, restore runs before a source goes live, and a newer file is never written. No path was found where a normal save, quit and reload loses or duplicates town pieces, bags or weapon growth. The real risks sit at the edges of the format: who a world belongs to (A2, A3), what happens when the file cannot be used (A5, A6, A7, A11), and the one rejoin path that tests cannot reach (A1, A9).
 
 Risk review: section 6.
 
@@ -61,20 +61,25 @@ Risk review: section 6.
 
 ### A2. A lobby visit takes one of a multiplayer world's four places for good [save] (decision for the user)
 - **Where:** `Networking/ConnectionApprover.cs:75-84` (`ClientConnected` calls `RecordEntered`), `Runtime/Net/HostWorld.cs:289-299`, `Core/World/WorldPlayers.cs:109-117`, saved at once by `App/WorldSaveFlow.cs:178-184`. `WorldPlayers` has no way to remove a record.
-- **Failure path:** world W has two recorded players (host and A). The host opens W's lobby and shares the code. C joins, looks around and leaves before Start; D does the same. Both were written into W the moment their connection came up, and the file was saved. W now has four recorded players. B, the friend the fourth place was meant for, is refused as `WorldFull` in every later session. Nothing in the game can undo it. The first session of a new world is not affected (the world does not exist until Start, so only the players present at Start are recorded).
+- **Failure path:** world W has two recorded players (host and A). The host opens W's lobby and shares the code. C joins, looks around and leaves before Start; D does the same. Both were written into W the moment their connection came up, and the file was saved. W now has four recorded players. B, the friend the fourth place was meant for, is refused as `WorldFull` in every later session. Nothing in the game can undo it.
+- **The first lobby is affected too (risk review):** `WorldLibrary.Create:76` writes a players section with the kind and an empty list, so `WorldSaveFlow.Open:141` gives `HostWorld` a world with zero records before anyone connects. Every visitor to a brand-new world's first lobby is recorded on the spot, and the start gate takes the `CanStart` branch, not `TryCreate`.
+- **Tests that pin today's behaviour (change them with the fix):** `ConnectionApproverTests.ANewPlayer_IsRecordedOnlyWhenTheirClientConnects`, `HostWorldTests.Admit_WritesNothing_RecordEnteredPersistsOnce`, and the `Recorded.Count == 2` assertion near `FrontDoorFlowTests.cs:400`.
 - **Why it is a decision:** CLAUDE.md says a world "records up to 4 unique players"; it does not say whether joining the lobby counts as playing.
-- **Options:** (a) record a joiner when the session starts (the gate already lists who is connected) and, for a join into a running session, when their hero spawns; (b) keep it and add a host-side "remove player" action in the world picker; (c) both.
+- **Options:** (a) record a joiner when the session starts (the gate already lists who is connected) and, for a join into a running session, when their hero spawns; the gate must record the new players before `CanStart` checks them, because it refuses anyone present who is not recorded (`WorldPlayers.cs:178`); (b) keep it and add a host-side "remove player" action in the world picker; (c) both.
 - **Proposed test:** `HostWorldTests.JoinerWhoLeavesBeforeStart_IsNotRecorded`.
 
-### A3. A multiplayer player whose UGS id changes loses their character, and a host can lose the world [save] (decision for the user)
+### A3. A multiplayer player whose UGS id changes loses their character, and a host can lose the world [save] (should-fix after the risk review; decision for the user)
 - **Where:** `Networking/UgsNetworkSession.cs:271-281` (the key is `AuthenticationService.Instance.PlayerId` from an anonymous sign-in), `Runtime/Net/HostWorld.cs:255-270`, `Core/World/WorldPlayers.cs:164-183`.
 - **Failure path (friend):** A plays W for weeks, then moves to a new PC or reinstalls Windows. The anonymous sign-in gives a new player id. If W has four records, A is refused as `WorldFull` for good. If it has fewer, A is recorded as a new player with fresh heirlooms, no gold and no stash; the old record stays and still uses a place. A's weapon growth and bags are still in the file under the old key, unreachable.
-- **Failure path (host):** the host's id changes and W is full. The host is admitted (`HostWorld.Admit` never refuses the host), but `TryStartSession` calls `CanStart`, which returns `NotRecorded` (`WorldPlayers.cs:178`). The host can never start W again from that machine.
+- **Failure path (host):** the host's id changes and W is full. The host is admitted (`HostWorld.Admit` never refuses the host), but `TryStartSession` calls `CanStart`, which returns `NotRecorded` (`WorldPlayers.cs:178`). The host can never start W again from that machine. If W is not full, the host is silently recorded as a new player when their own client connects: one more place used, and the host's own growth and bags stay under the old key.
+- **Why should-fix and not blocker:** the id changes only when the sign-in token kept in PlayerPrefs is lost outside the game (a new PC, a Windows reinstall), not through play.
 - **What already exists:** a Solo world rebinds its owner to the new key and renames weapons, bags and suspend records (`HostWorld.cs:258-268`). Multiplayer has no equivalent.
 - **Options:** (a) a host-side "this player is now that player" action that renames one record (the Solo rename code already does the work); (b) sign in with a platform account instead of an anonymous one; (c) accept it and document it.
 - **Proposed test:** `HostWorldTests.Multiplayer_RebindRecordedPlayer_MovesGrowthBagsAndSuspend` (after a decision); until then the repro above is the record.
 
 ## 4. Should-fix
+
+A3 above belongs here (demoted by the risk review); it stays in section 3 so the identity findings read together.
 
 ### A4. A client can be left without a hero, and nothing retries [net]
 - **Where:** `App/ArenaPlayerSpawner.cs:47-56` (spawns only `clientsCompleted`; `clientsTimedOut` is ignored), `:68-71` (`OnSynchronizeComplete` spawns only when the host's active scene is already a gameplay scene).
@@ -117,6 +122,12 @@ Risk review: section 6.
 - **Failure path:** the host closes the window mid-session. The save is written (good), but the process can exit before NGO sends its disconnect. Clients freeze on the last state until the transport times out, then see "host left".
 - **Check:** 2-player walk step: host presses Alt+F4, time how long the client takes to return to the title.
 
+### A11. The world is attached before its weapons and town are loaded [save] (from the risk review, low confidence)
+- **Where:** `App/WorldSaveFlow.cs:132` sets `store`; `:142-143` call `LoadWeapons` and `LoadTown`.
+- **Failure path:** if either load throws (swallowed as in A7), `HostWorld` keeps the previous session's weapons or town while `store` already points at the newly selected world. The next `CaptureTownInto` writes the other world's sections into this file (`HostWorld.cs:217-223`). No concrete throw was found in `CleanSnapshot` or `MigrateLegacyLoot`, so this is a guard to add with A7, not a known loss.
+- **Fix direction:** set `store` only after the loads succeeded.
+- **Proposed test:** `SaveFlowTests.LoadFault_AfterAnotherWorld_NeverWritesTheOldWorldIntoTheNewFile`.
+
 ## 5. Notes
 
 - **N1. Migration contract.** `WorldSaveRules.Clean:38` keeps `SchemaVersion` as read and `WorldSaveStore.Upgrade:313-319` has only a commented loop. The first real step must set `schemaVersion` in the JSON it returns, or the file is saved as v1 again and migrated on every load. `Upgrade`'s `JObject.Parse` is safe only because `JsonSaveFile.DeserializeOrNull:229-233` wraps the hook.
@@ -138,7 +149,21 @@ Risk review: section 6.
 
 ## 6. Risk review
 
-(filled in after the Opus `risk-reviewer` pass)
+One Opus `risk-reviewer` pass traced A1 to A3 in the code and checked A4 to A8 for reachability.
+
+| Finding | Verdict | Severity after review |
+|---|---|---|
+| A1 | Confirmed. NGO queues a disconnect that carries a reason, so `ClientDisconnected(1)` fires a tick after client 2 is approved; `_ugsIdByClient[1]` still holds P and `RemovePlayerAsync(P)` runs (`UgsNetworkSession.NgoEvents.cs:50-61`). The cache is the cause, not a guard: without it the lookup would miss. Open on real Relay only: whether the Lobby lets P join again while the old membership is still there (if not, the rejoin fails one step earlier), and how fast the kick arrives. | blocker, medium-high confidence |
+| A2 | Confirmed and widened: the first lobby of a new world records visitors too. Three tests pin the current behaviour. | blocker (decision for the user), high confidence |
+| A3 | Confirmed, with one more case (a host on a world that is not full is recorded as a new player). Demoted: the key changes only outside play. | should-fix (decision for the user) |
+| A4 | Reachable. Path 1 needs a load longer than NGO's scene-load timeout (project setting not checked; default 120 s). | should-fix |
+| A5 | Reachable; a toast is the only signal. | should-fix (decision for the user) |
+| A6 | Reachable, milder than written: `FrontDoorModel.HostSelected:272-285` creates a world when the list is empty, else takes the first; the files are untouched. | should-fix |
+| A7 | Reachable but rare (needs `Directory.GetFiles` to fail). | should-fix |
+| A8 | Reachable. Going home from the bank is covered too, but there the file still holds the bank-room suspend, which resumes rather than loses. | should-fix |
+| A11 | Added by the reviewer. | should-fix, low confidence |
+
+Proof for the blockers: A2 has a failing test marked `[Ignore("AUDIT A2: ...")]`. A1 has an ignored test if the session can be driven with a fake host session; otherwise the written repro in `docs/superpowers/handoff/USER_TODO.md` (2-player walk) is its record.
 
 ## 7. Rules this audit adds
 
