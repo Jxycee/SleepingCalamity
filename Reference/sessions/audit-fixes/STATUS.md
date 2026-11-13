@@ -1,4 +1,4 @@
-Status: BLOCKED
+Status: DONE (merged to main 2026-11-13, check PASS at aa48247a: EditMode 1735, PlayMode 255 pass)
 Update: PlayMode save-test failures fixed at 70165efd (tests started hosts without the start gate; 24/24). Remaining: HostClientTests.FifthUniquePlayer_IsRefusedByApproval pins the old refusal, follows the user rule call; then one full check on the tip.
 Started: 2026-11-13T13:24:21Z (cloud launcher)
 Branch: claude/audit-fixes
@@ -12,3 +12,5 @@ Also open: stale comments (ConnectionApprover.cs:12, HostWorld.cs:13-14), toast 
 
 ## 2026-11-13 BLOCKED (no Unity editor in cloud)
 Tip 154bebf2 has send-away, waiting words, Start-refused words, nits. Needs: licensed gate/check (new tests FrontDoorModelTests x2, HostWorldTests x1, PlayMode NoHost fake), one risk-reviewer pass on `git diff 20ccd4de..154bebf2`, merge origin/main, merge. Open: FrontDoorHost.WaitsForPlace is false in real play (no host-to-guest channel), so the stranger's own door cannot show the waiting words yet.
+
+Archive: ready

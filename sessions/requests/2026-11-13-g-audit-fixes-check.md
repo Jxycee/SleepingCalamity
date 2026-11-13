@@ -1,6 +1,6 @@
 Title: Audit fixes: gate, risk review, check, merge on claude/audit-fixes (tip 154bebf2)
 Target: local
-Status: started (local session, coordinator 2026-11-13)
+Status: done (merged to main 2026-11-13, claude/audit-fixes aa48247a)
 Model: sonnet
 From: coordinator session 11, 2026-11-13 ~12:20 PM CST; request f stopped because the cloud Unity editor was still installing
 Status file: Reference/sessions/audit-fixes/STATUS.md

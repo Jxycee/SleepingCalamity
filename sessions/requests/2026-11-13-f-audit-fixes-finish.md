@@ -1,6 +1,6 @@
 Title: Audit fixes finish (send-away button, check, merge) on claude/audit-fixes
 Target: cloud
-Status: blocked: send-away, waiting words and nits coded on claude/audit-fixes (154bebf2), core tests 1271 pass, but cloud has no Unity editor so gate/check unrun; risk review and merge not done; stranger-side waiting words lack a host-to-guest channel (needs user call)
+Status: done (merged to main 2026-11-13, claude/audit-fixes aa48247a)
 Started: 2026-11-13 18:07 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 11, 2026-11-13 ~12:30 PM CST, with the user's call on the full-lobby question
