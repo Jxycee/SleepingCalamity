@@ -2,7 +2,9 @@
 
 Action RPG in the Dark Cloud tradition: dive into dungeons (the Hearthdeep), bring back pieces to rebuild ruined towns, grow weapons by using them, calm side activities between dives. Solo, or co-op for 2-4 players with difficulty scaling (rules below). Original IP: a spiritual successor, never a remake. Unity 6000.6.5f1 (URP 17.6), Netcode for GameObjects 2.13, Unity Multiplayer Services (Relay + Lobby join codes), Input System, Cinemachine, ProBuilder.
 
-Sources of truth: `docs/STORY.md` (locked 2026-10-29), `docs/PHASE1.md`, and the founding handoff `docs/superpowers/handoff/2026-10-29-new-project-handoff.md` (its "User decisions" list is settled; the rest is recommendation). Don't re-litigate agreed items. Ideas for later go in `docs/PARKING_LOT.md` with a date.
+Sources of truth: `docs/STORY.md` (locked 2026-10-29), `docs/PHASE1.md`, and the founding handoff `docs/superpowers/handoff/2026-10-29-new-project-handoff.md` (its "User decisions" list is settled; the rest is recommendation). Don't re-litigate agreed items without a reason. Ideas for later go in `docs/PARKING_LOT.md` with a date.
+
+**Decisions have leeway (user, 2026-11-13).** A decision is the current direction, not a lock. Record it as "decided (date)", never as final or irreversible, and say so plainly when building on it. When the game would be better served by changing one (playtest, a bug, a better idea), raise it with the reason and let the user choose; don't treat "decided" as a reason to stop thinking. The IP rule and the no-anti-cheat rule are the exceptions that stay firm.
 
 ## Settled design rules
 - **Players and saves (user, 2026-10-29):** a world is either solo or multiplayer, never both. A multiplayer world needs 2+ players to start and records up to 4 unique players; once 4 are recorded, nobody else can join it (a fifth friend starts a new world with three of them). Any subset of the recorded players can play it, and difficulty scales to the players present.
