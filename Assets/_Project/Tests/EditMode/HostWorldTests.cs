@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Runtime;
 
 namespace SleepingCalamity.Tests.EditMode
