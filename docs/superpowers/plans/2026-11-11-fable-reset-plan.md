@@ -51,6 +51,12 @@ Each Fable run's brief still says it: delegate only to pinned agent types; pass 
 - **Produces:** a findings file with severity and a concrete failure path for each; failing tests for blockers; new rules added to `sc-netcode` / `REVIEW.md`; queue items.
 - **Done when:** every section and system is covered, blockers have a failing test or a written repro.
 
+### Run 2b (pool A leftover, Sat Nov 14): Coordinator playbook
+- **Why (user, 2026-11-12):** every coordinator should start with Fable's knowledge and process, not rebuild it from scattered memories.
+- **Goal:** a new `.claude/skills/sc-coordinator/SKILL.md` (about 1,500 words) that every coordinator reads once on claiming the role; `sc-steward` and the board's `claim` point to it.
+- **Inputs:** the coordinator memories (handoff, focus and usage police, Nov 1 lessons, board watchdog, usage pace), `session-usage.md`, section 6 here, and how recent coordinator sessions actually ran (Haiku scans of their transcripts).
+- **Done when:** the skill is merged, the memories it replaces are trimmed to pointers, and the cost is appended to section 6.
+
 ### Run 3 (pool B): Asset factory design
 - **Why:** design once, then Sonnet and your GPU produce assets without Fable from then on.
 - **Goal:** finish the local prop pipeline (`C:\AI\scripts\ai_prop.py`: Hunyuan3D shape + TRELLIS.2 texture) with the missing cleanup stage (decimate, UV, rebake at 2K max, colour fix toward the style bible) and automatic quality checks per asset type (prop, creature, foliage, kit piece).
