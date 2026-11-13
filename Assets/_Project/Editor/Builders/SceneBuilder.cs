@@ -50,7 +50,7 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.GetOrAdd<PlayerInputAdapter>(app);
             BuilderUtil.GetOrAdd<AudioBus>(app);
             BuilderUtil.GetOrAdd<DevSessionPanel>(app);
-            AddMenuSpike(app);
+            AddFrontDoor(app);
             ConfigureNetworkManager(networkManager, transport, prefabList);
             bootstrap.Configure(playerPrefab, inputActions);
 
@@ -60,15 +60,15 @@ namespace SleepingCalamity.EditorTools
         private const string MenuFolder = "Assets/_Project/App/Menus";
         private const string MenuPanelSettingsPath = MenuFolder + "/MenuPanelSettings.asset";
 
-        // PL-3 task 3.0, the UI Toolkit spike: a UIDocument (PanelSettings + UXML with one button) and its view on the App object. Input comes from
-        // an EventSystem with the Input System's UI module on its own default actions (never the SleepingCalamityInput asset): Enter / gamepad south
-        // submit, arrows / d-pad / left stick navigate, the mouse clicks.
-        private static void AddMenuSpike(GameObject app)
+        // PL-3 tasks 3.3 and 3.4, the front door: a UIDocument (PanelSettings + FrontDoor.uxml) and its FrontDoorView on the App object (AppBootstrap hands the
+        // view its model). Input comes from an EventSystem with the Input System's UI module on its own default actions (never the SleepingCalamityInput
+        // asset): Enter / gamepad south submit, arrows / d-pad / left stick navigate, the mouse clicks.
+        private static void AddFrontDoor(GameObject app)
         {
-            foreach (string file in new[] { "MenuTheme.tss", "MenuSpike.uss", "MenuSpike.uxml" })
+            foreach (string file in new[] { "MenuTheme.tss", "FrontDoor.uss", "FrontDoor.uxml" })
                 AssetDatabase.ImportAsset(MenuFolder + "/" + file, ImportAssetOptions.ForceSynchronousImport);
             var theme = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>(MenuFolder + "/MenuTheme.tss");
-            var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(MenuFolder + "/MenuSpike.uxml");
+            var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(MenuFolder + "/FrontDoor.uxml");
             if (theme == null || tree == null) throw new System.IO.FileNotFoundException("Missing the menu UI assets under " + MenuFolder);
 
             var panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(MenuPanelSettingsPath);
@@ -89,7 +89,7 @@ namespace SleepingCalamity.EditorTools
             UIDocument document = BuilderUtil.GetOrAdd<UIDocument>(app);
             document.panelSettings = panelSettings;
             document.visualTreeAsset = tree;
-            BuilderUtil.GetOrAdd<MenuSpikeView>(app);
+            BuilderUtil.GetOrAdd<FrontDoorView>(app);
             BuilderUtil.GetOrAdd<EventSystem>(app);
             BuilderUtil.GetOrAdd<InputSystemUIInputModule>(app);
         }

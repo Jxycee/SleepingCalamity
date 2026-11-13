@@ -1,0 +1,68 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="FrontDoor.uss" />
+    <ui:VisualElement name="door-root" class="fd-root">
+
+        <ui:VisualElement name="screen-title" class="fd-screen">
+            <ui:Label name="lbl-game-name" text="Sleeping Calamity" class="fd-title" />
+            <ui:Button name="btn-play-solo" text="Play solo" focusable="true" class="fd-button" />
+            <ui:Button name="btn-multiplayer" text="Multiplayer" focusable="true" class="fd-button" />
+            <ui:Button name="btn-join" text="Join" focusable="true" class="fd-button" />
+            <ui:Button name="btn-quit" text="Quit" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="screen-worlds" class="fd-screen">
+            <ui:Label name="lbl-worlds-heading" text="Worlds" class="fd-heading" />
+            <ui:Label name="lbl-worlds-empty" text="No worlds yet. Make one to play." class="fd-text" />
+            <ui:VisualElement name="world-list" class="fd-list" />
+            <ui:VisualElement name="delete-confirm" class="fd-confirm">
+                <ui:Label name="lbl-delete-ask" text="" class="fd-text" />
+                <ui:Button name="btn-delete-confirm" text="Delete it" focusable="true" class="fd-button" />
+                <ui:Button name="btn-delete-cancel" text="Keep it" focusable="true" class="fd-button" />
+            </ui:VisualElement>
+            <ui:Label name="lbl-worlds-notice" text="" class="fd-text" />
+            <ui:Button name="btn-new-world" text="New world" focusable="true" class="fd-button" />
+            <ui:Label name="lbl-new-world-why" text="" class="fd-why" />
+            <ui:Button name="btn-play" text="Play" focusable="true" class="fd-button" />
+            <ui:Button name="btn-host" text="Host" focusable="true" class="fd-button" />
+            <ui:Button name="btn-worlds-back" text="Back" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="screen-hostlobby" class="fd-screen">
+            <ui:Label name="lbl-lobby-heading" text="Your friends join with this code" class="fd-heading" />
+            <ui:Label name="lbl-join-code" text="" class="fd-code" />
+            <ui:Button name="btn-copy-code" text="Copy code" focusable="true" class="fd-button" />
+            <ui:Label name="lbl-copy-note" text="" class="fd-why" />
+            <ui:Label name="lbl-player-count" text="" class="fd-text" />
+            <ui:VisualElement name="player-list" class="fd-list" />
+            <ui:Button name="btn-start" text="Start" focusable="true" class="fd-button" />
+            <ui:Label name="lbl-start-why" text="" class="fd-why" />
+            <ui:Label name="lbl-start-message" text="" class="fd-why" />
+            <ui:Button name="btn-lobby-leave" text="Leave" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="screen-joinentry" class="fd-screen">
+            <ui:Label name="lbl-join-heading" text="Join a game" class="fd-heading" />
+            <ui:TextField name="field-code" label="Code" max-length="16" class="fd-field" />
+            <ui:Button name="btn-join-go" text="Join" focusable="true" class="fd-button" />
+            <ui:Label name="lbl-join-why" text="" class="fd-why" />
+            <ui:Label name="lbl-join-error" text="" class="fd-why" />
+            <ui:Button name="btn-join-back" text="Back" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="screen-connecting" class="fd-screen">
+            <ui:Label name="lbl-connecting" text="" class="fd-heading" />
+            <ui:Button name="btn-connecting-cancel" text="Cancel" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="screen-waiting" class="fd-screen">
+            <ui:Label name="lbl-waiting" text="" class="fd-heading" />
+            <ui:Button name="btn-waiting-leave" text="Leave" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="screen-ended" class="fd-screen">
+            <ui:Label name="lbl-ended-words" text="" class="fd-heading" />
+            <ui:Button name="btn-ended-ok" text="OK" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>
