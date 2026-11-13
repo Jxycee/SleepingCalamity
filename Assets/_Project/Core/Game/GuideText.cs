@@ -36,7 +36,8 @@ namespace SleepingCalamity.Core
             if (r.FloorsCleared > 0) l.Add(r.FloorsCleared == 1 ? "1 floor cleared." : r.FloorsCleared + " floors cleared.");
             l.Add(Count(r.ItemsHome, "item") + " came home" + (r.ItemsBanked > 0 && r.ItemsBanked < r.ItemsHome ? " (" + r.ItemsBanked + " banked)." : r.ItemsBanked > 0 ? " (banked)." : "."));
             if (r.ItemsLost > 0) l.Add(Count(r.ItemsLost, "item") + " " + (r.ItemsLost == 1 ? "waits" : "wait") + " in a lost satchel on the floor where you fell.");
-            if (r.SatchelLost) l.Add("The satchel you were carrying is gone.");
+            if (r.SatchelLost) l.Add(r.SatchelItems > 0 ? "The satchel you were carrying, with " + Count(r.SatchelItems, "item") + ", is gone." : "The satchel you were carrying is gone.");
+            else if (r.SatchelItems > 0) l.Add(Count(r.SatchelItems, "item") + " from the satchel you recovered came home too.");
             l.Add(r.GoldLost > 0 ? "Gold kept: " + r.GoldKept + " (" + r.GoldLost + " lost)." : "Gold kept: " + r.GoldKept + ".");
             if (r.PiecesFound > 0) l.Add(Count(r.PiecesFound, "piece") + " found, safe in town.");
             foreach (string person in r.PeopleFound) l.Add((person == TownBuildings.BakerResident ? "The baker" : person) + " is safe in town.");

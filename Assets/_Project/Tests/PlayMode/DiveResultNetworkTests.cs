@@ -161,6 +161,90 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(h.PeopleFound, Is.EqualTo(new[] { TownBuildings.BakerResident }));
         }
 
+        // Fix round 1 (finding 1): the haul sync is spawned by the dive's start, so a card that took its "already found" baseline between dives would have none and report everything the party
+        // ever found as found this dive. A world with pieces and a person already home must report only what the dive adds.
+        [UnityTest]
+        public IEnumerator FirstDiveAfterLoad_CountsOnlyWhatThisDiveFound()
+        {
+            var rig = new Rig();
+            yield return Start(rig, 1);
+            Peer host = rig.Host, client = rig.Clients[0];
+            rig.Director.Pieces.Restore(new[] { PieceCatalog.OvenId, PieceCatalog.DoorId });   // a loaded world: two pieces found in earlier dives ...
+            Assert.That(rig.Director.Town.State.AddPiece(PieceCatalog.OvenId), Is.EqualTo(PlaceResult.Ok));
+            Assert.That(rig.Director.Town.State.AddPiece(PieceCatalog.DoorId), Is.EqualTo(PlaceResult.Ok));
+            Assert.That(rig.Director.Town.State.AddResident(TownBuildings.BakerResident), Is.EqualTo(PlaceResult.Ok));   // ... and the baker already home
+            rig.Director.TownSync.ServerRefresh();
+            yield return TownInputRig.Seconds(0.6f);
+            yield return StartDive(rig);
+            yield return PlayModeHarness.WaitUntil(() => host.Card.Model.HasBaseline && client.Card.Model.HasBaseline, Timeout, "a card never took its baseline of the dive");
+            Assert.That(client.Dir.HaulSync.Current.FoundPieces, Is.EqualTo(2), "premise: the party holds two pieces from before");
+            Assert.That(rig.Director.HaulSync.ServerAddPiece(PieceCatalog.SignId), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => client.Dir.HaulSync.Current.FoundPieces == 3, Timeout, "the client never saw the third piece");
+            yield return WaitRecording(host, client);
+            yield return TownInputRig.Seconds(0.3f);
+            Assert.That(rig.Director.ServerAbandonDive(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => host.Card.Model.Result != null && client.Card.Model.Result != null, Timeout, "a card never appeared");
+            Assert.That(host.Card.Model.Result.PiecesFound, Is.EqualTo(1), "host: one piece this dive");
+            Assert.That(client.Card.Model.Result.PiecesFound, Is.EqualTo(1), "client: one piece this dive");
+            Assert.That(host.Card.Model.Result.PeopleFound, Is.Empty, "the baker was home before the dive");
+            Assert.That(client.Card.Model.Result.PeopleFound, Is.Empty);
+        }
+
+        [UnityTest]
+        public IEnumerator MidDiveJoiner_CountsOnlyWhatIsFoundAfterJoining()
+        {
+            var rig = new Rig();
+            yield return Start(rig, 0);
+            yield return StartDive(rig);
+            DiveHaulSync haul = rig.Director.HaulSync;
+            Assert.That(haul.ServerAddPiece(PieceCatalog.FrameId), Is.True);
+            Assert.That(haul.ServerAddPiece(PieceCatalog.BakerId), Is.True);
+            rig.Director.TownSync.ServerRefresh();
+            Peer late = null;
+            yield return AddClient(rig, 30, p => late = p);
+            yield return PlayModeHarness.WaitUntil(() => late.Dir.NetActive.Value && late.Dir.HaulSync != null && late.Card.Model.HasBaseline, Timeout, "the mid-dive joiner never took its baseline");
+            Assert.That(haul.ServerAddPiece(PieceCatalog.OvenId), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => late.Dir.HaulSync.Current.FoundPieces == 2, Timeout, "the joiner never saw the second piece");
+            yield return WaitRecording(late);
+            yield return TownInputRig.Seconds(0.3f);
+            Assert.That(rig.Director.ServerAbandonDive(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => late.Card.Model.Result != null, Timeout, "the joiner's card never appeared");
+            Assert.That(late.Card.Model.Result.PiecesFound, Is.EqualTo(1), "only the piece found after joining; the earlier ones are not counted as this player's find");
+            Assert.That(late.Card.Model.Result.PeopleFound, Is.Empty, "and the baker found before joining is not listed");
+        }
+
+        // Fix round 1 (the requested extra test): a pick made over the owner's RPC, the party pushing on, then a fall. The banked item must reach the owner's own view (BankedThisDive), and the card must keep it
+        // home while the two unbanked items are lost.
+        [UnityTest]
+        public IEnumerator Fell_BankedItem_Replicates_AndStaysHome()
+        {
+            var rig = new Rig();
+            yield return Start(rig, 1);
+            Peer host = rig.Host, client = rig.Clients[0];
+            yield return StartDive(rig);
+            DiveHaulSync haul = rig.Director.HaulSync;
+            Assert.That(haul.ServerAddItem(client.Id, 104), Is.True);
+            Assert.That(haul.ServerAddItem(client.Id, 105), Is.True);
+            Assert.That(haul.ServerAddItem(client.Id, 110), Is.True);
+            yield return WaitBagShows(client, 3, 0);
+            Assert.That(haul.BankRoomNow(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => client.Bag.View.BankOpen, Timeout, "the client's bank visit never opened");
+            client.Bag.RequestPick(2);   // the owner's own RPC
+            yield return PlayModeHarness.WaitUntil(() => client.Bag.View.Picks.Length == 1, Timeout, "the pick never reached the owner's view");
+            Assert.That(haul.ServerChoosePushOn(client.Id), Is.True);
+            Assert.That(haul.ServerChoosePushOn(host.Id), Is.True, "both players confirm");
+            yield return PlayModeHarness.WaitUntil(() => client.Bag.View.BankedThisDive == 1 && client.Bag.View.Carried.Length == 2, Timeout,
+                "the banked item never reached the owner's view (banked " + client.Bag.View.BankedThisDive + ", carried " + client.Bag.View.Carried.Length + ")");
+            yield return WaitRecording(client);
+            yield return TownInputRig.Seconds(0.3f);
+            Assert.That(rig.Director.ServerAbandonDive(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => client.Card.Model.Result != null, Timeout, "the client's card never appeared");
+            DiveResult r = client.Card.Model.Result;
+            Assert.That(r.ItemsBanked, Is.EqualTo(1));
+            Assert.That(r.ItemsHome, Is.EqualTo(1), "the banked item is safe");
+            Assert.That(r.ItemsLost, Is.EqualTo(2), "the two carried items wait in the satchel");
+        }
+
         [UnityTest]
         public IEnumerator Fail_ShowsTheLostSatchel()
         {
@@ -219,6 +303,35 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => host.Card.Model.Result == null, DiveResultModel.ShowSeconds + 5f, "the card never timed out");
             double up = Time.realtimeSinceStartupAsDouble - shown;
             Assert.That(up, Is.InRange(DiveResultModel.ShowSeconds - 0.5, DiveResultModel.ShowSeconds + 2.0), "the card stays about " + DiveResultModel.ShowSeconds + " s");
+        }
+
+        // Fix round 1 (finding 2): after a dive the party stands a few steps from the trapdoor, so the Interact that dismisses the card must not also start the next dive for everyone. Real Hollowmere scene.
+        [UnityTest]
+        public IEnumerator DismissingTheCard_DoesNotStartADive()
+        {
+            TownInputRig rig = null;
+            yield return TownInputRig.Start(r => rig = r);
+            DiveResultCard card = Object.FindFirstObjectByType<DiveResultCard>();
+            Assert.That(card, Is.Not.Null, "the card spawns itself with the game");
+            rig.StandAtTrapdoor();
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.Prompt == DiveDirector.PromptKind.Descend, Timeout, "no trapdoor prompt");
+            yield return rig.PressInteract();
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.NetActive.Value && rig.Director.FloorSync != null && rig.Director.FloorSync.Built != null, Timeout, "the dive never started");
+            yield return PlayModeHarness.WaitUntil(() => rig.Hero.transform.position.y < AreaLook.Current.CellarBelowY, Timeout, "the hero never arrived under the town");
+            yield return PlayModeHarness.WaitUntil(() => card.Model.Recording, Timeout, "the card never recorded the dive");
+            Assert.That(rig.Director.ServerAbandonDive(), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => card.Model.Result != null, Timeout, "the card never appeared");
+            yield return PlayModeHarness.WaitUntil(() => rig.Hero.transform.position.y > AreaLook.Current.CellarBelowY, Timeout, "the party never came home");
+            yield return TownInputRig.Seconds(1.5f);   // the floor is cleared and the home placement has settled
+            rig.StandAtTrapdoor();
+            yield return TownInputRig.Seconds(0.5f);
+            Assert.That(card.Model.Result, Is.Not.Null, "the card is still up");
+            Assert.That(rig.Director.Prompt, Is.EqualTo(DiveDirector.PromptKind.None), "the trapdoor offers nothing while the card owns Interact");
+            yield return rig.PressInteract();
+            yield return PlayModeHarness.WaitUntil(() => card.Model.Result == null, Timeout, "Interact never dismissed the card");
+            yield return TownInputRig.Seconds(1.5f);
+            Assert.That(rig.Director.NetActive.Value, Is.False, "the press that dismissed the card did not start a dive");
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.Prompt == DiveDirector.PromptKind.Descend, Timeout, "and the trapdoor prompt is back once the card is gone");
         }
 
         [UnityTest]

@@ -22,9 +22,6 @@ namespace SleepingCalamity.UI
         }
 
         // Pieces are safe on pickup and go to the town stock at once: the line says how many the party has found so far (all dives).
-        // The count behind that line, from the host's pieces: banked, stocked and placed pieces all count, also after a reload (people do not).
-        public static int HomeCount(DivePieces pieces) => pieces == null ? 0 : pieces.FoundPieceCount;
-
         public static string Pieces(DiveHaulSync.Summary s) => "Pieces found: " + s.FoundPieces;
 
         // The local player's own bag (owner-only PlayerBagSync view): items carried, items safe in the bank this dive, and all their gold (home + this dive's).

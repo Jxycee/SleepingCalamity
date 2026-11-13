@@ -24,8 +24,7 @@ namespace SleepingCalamity.Tests.EditMode
             saved.Dive.BankedResidents.Add(TownBuildings.BakerResident);
             var fresh = new TownStock(HollowmereLayout.Create());
             TownStock.WorldRestore w = fresh.RestoreWorld(TownSaveRules.CleanSnapshot(saved, null, null, false), Depths);
-            Assert.That(StirMeterText.HomeCount(w.Pieces), Is.EqualTo(3), "placed frame + stocked oven + the banked door; the baker is a person");
-            Assert.That(StirMeterText.HomeCount(null), Is.EqualTo(0));
+            Assert.That(w.Pieces.FoundPieceCount, Is.EqualTo(3), "placed frame + stocked oven + the banked door; the baker is a person (the count behind \"Pieces found\")");
         }
     }
 }

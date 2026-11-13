@@ -67,6 +67,29 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void WentHome_RecoveredSatchelItemsComeHome()
+        {
+            DiveResult r = DiveResult.Build(new DiveResultInput { Ending = DiveEnding.WentHome, Carried = 1, Banked = 1, SatchelCarried = true, SatchelItems = 3 });
+            Assert.That(r.ItemsHome, Is.EqualTo(5), "carried, banked and the recovered satchel's three");
+            Assert.That(r.SatchelLost, Is.False);
+            Assert.That(r.SatchelItems, Is.EqualTo(3));
+            string text = string.Join("\n", GuideText.ResultLines(r));
+            StringAssert.Contains("satchel", text, "the card says the recovered satchel came home");
+            StringAssert.Contains("3", text);
+        }
+
+        [Test]
+        public void Fell_CarriedSatchelItems_AreGone_NotHome()
+        {
+            DiveResult r = DiveResult.Build(new DiveResultInput { Ending = DiveEnding.Failed, Banked = 1, Carried = 2, SatchelCarried = true, SatchelItems = 4 });
+            Assert.That(r.ItemsHome, Is.EqualTo(1), "only the banked item is safe");
+            Assert.That(r.SatchelLost, Is.True);
+            string text = string.Join("\n", GuideText.ResultLines(r));
+            StringAssert.Contains("gone", text);
+            StringAssert.Contains("4", text);
+        }
+
+        [Test]
         public void BadNumbers_AreClamped()
         {
             DiveResult r = DiveResult.Build(new DiveResultInput { Ending = DiveEnding.Failed, Carried = -3, Banked = -1, DiveGold = -50, PiecesFound = -2 });

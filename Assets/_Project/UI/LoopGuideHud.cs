@@ -54,6 +54,8 @@ namespace SleepingCalamity.UI
         private PlacementMode _placement;
         private TownSync _town;
         private float _nextFind;
+        private int _beaconTries; private UnityEngine.SceneManagement.Scene _beaconScene;   // the beacon search gives up after BeaconTries looks in a scene that has none (the dive floors, the lobby)
+        private const int BeaconTries = 10;
         private GUIStyle _label;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -74,7 +76,9 @@ namespace SleepingCalamity.UI
                 _nextFind = Time.unscaledTime + 0.5f;
                 if (_town == null || !_town.IsSpawned) _town = GuideSources.TownOf(dir);
                 if (_placement == null) _placement = FindFirstObjectByType<PlacementMode>(FindObjectsInactive.Include);
-                if (StairBeacon == null || BuildBeacon == null) FindBeacons();
+                UnityEngine.SceneManagement.Scene scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                if (scene != _beaconScene) { _beaconScene = scene; _beaconTries = 0; StairBeacon = null; BuildBeacon = null; _placement = null; }
+                if ((StairBeacon == null || BuildBeacon == null) && _beaconTries < BeaconTries) { _beaconTries++; FindBeacons(); }
             }
             DiveHaulSync haul = dir.HaulSync;
             bool suppressed = (_placement != null && _placement.Active) || DiveResultCard.ShowingCount > 0;

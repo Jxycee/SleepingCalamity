@@ -24,6 +24,7 @@ namespace SleepingCalamity.Presentation
         public bool BankOpen, SatchelWaiting, SatchelCarried;
         public bool HasBoots;                       // PlayerBag.HasBoots: the owner's run bonus (plan 3 decision 12), read owner-side
         public byte SatchelFloor;                   // the floor of the carried satchel, else of the waiting one, else 0
+        public byte SatchelItems;                   // items inside the CARRIED satchel (they come home with the party; the dive result card counts them), 0 when none is carried
         public uint ChestSeed;
         public int ChestFloor;
         public ulong OpenedChests;
@@ -50,6 +51,7 @@ namespace SleepingCalamity.Presentation
             v.SatchelCarried = carried != null; v.SatchelWaiting = waiting != null; v.HasBoots = bag.HasBoots;
             LostSatchel shown = carried ?? waiting;
             v.SatchelFloor = shown == null ? (byte)0 : (byte)Mathf.Clamp(shown.Floor, 0, 255);
+            v.SatchelItems = carried == null ? (byte)0 : (byte)Mathf.Clamp(carried.Items.Count, 0, 255);
             v.ChestSeed = bag.ChestSeed; v.ChestFloor = bag.ChestFloor; v.OpenedChests = bag.OpenedChests;
             return v;
         }
@@ -77,7 +79,7 @@ namespace SleepingCalamity.Presentation
             s.SerializeValue(ref Gold); s.SerializeValue(ref DiveGold); s.SerializeValue(ref StashTotal);
             s.SerializeValue(ref BankedThisDive); s.SerializeValue(ref SlotCapacity);
             s.SerializeValue(ref BankOpen); s.SerializeValue(ref SatchelWaiting); s.SerializeValue(ref SatchelCarried); s.SerializeValue(ref HasBoots);
-            s.SerializeValue(ref SatchelFloor);
+            s.SerializeValue(ref SatchelFloor); s.SerializeValue(ref SatchelItems);
             s.SerializeValue(ref ChestSeed); s.SerializeValue(ref ChestFloor); s.SerializeValue(ref OpenedChests);
         }
 
@@ -87,7 +89,7 @@ namespace SleepingCalamity.Presentation
             for (int i = 0; i < Carried.Length; i++) if (Carried[i] != o.Carried[i]) return false;
             for (int i = 0; i < Picks.Length; i++) if (Picks[i] != o.Picks[i]) return false;
             return Gold == o.Gold && DiveGold == o.DiveGold && StashTotal == o.StashTotal && BankedThisDive == o.BankedThisDive && SlotCapacity == o.SlotCapacity
-                && BankOpen == o.BankOpen && SatchelWaiting == o.SatchelWaiting && SatchelCarried == o.SatchelCarried && HasBoots == o.HasBoots && SatchelFloor == o.SatchelFloor
+                && BankOpen == o.BankOpen && SatchelWaiting == o.SatchelWaiting && SatchelCarried == o.SatchelCarried && HasBoots == o.HasBoots && SatchelFloor == o.SatchelFloor && SatchelItems == o.SatchelItems
                 && ChestSeed == o.ChestSeed && ChestFloor == o.ChestFloor && OpenedChests == o.OpenedChests;
         }
 

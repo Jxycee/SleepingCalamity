@@ -61,7 +61,12 @@ namespace SleepingCalamity.Presentation
         public static DiveDirector Instance { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { Instance = null; }
+        private static void ResetStatics() { Instance = null; InteractClaims = 0; }
+
+        // A screen that owns the Interact press (the dive result card, in UI, which Presentation cannot see) claims it while it is up: the press that dismisses it must not also start a dive at the trapdoor
+        // the party was just sent home beside. Claims count, so several peers' cards in one process (tests) balance. While any claim stands LocalInteract shows and sends nothing.
+        public static int InteractClaims { get; private set; }
+        public static void ClaimInteract(bool on) { InteractClaims = Mathf.Max(0, InteractClaims + (on ? 1 : -1)); }
         public const float PlacementInterval = 0.2f;
         public const float FloorClearDelay = 0.75f;   // after the party was sent home, the floor stays this long so nobody drops through it first
         public const float PendingTimeout = 10f;      // an owner applies a teleport after this long even when its floor never built
@@ -824,6 +829,7 @@ namespace SleepingCalamity.Presentation
         private void LocalInteract()
         {
             Prompt = PromptKind.None; PromptText = "";
+            if (InteractClaims > 0) return;   // a card owns Interact right now (ClaimInteract)
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             if (player == null || _hasPending) return;
             Vector3 me = player.transform.position;

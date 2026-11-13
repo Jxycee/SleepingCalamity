@@ -18,6 +18,7 @@ namespace SleepingCalamity.Core
         public IReadOnlyList<string> PeopleFound;   // residents found this dive (null = none)
         public int Carried;            // items carried when the dive ended (not banked)
         public bool SatchelCarried;    // a lost satchel was being carried
+        public int SatchelItems;       // items inside that carried satchel (they come home with it, or are gone with it)
         public int Banked;             // items banked at the bank this dive
         public int DiveGold;           // gold earned this dive and not yet kept
     }
@@ -33,6 +34,7 @@ namespace SleepingCalamity.Core
         public int ItemsBanked { get; private set; }     // of those, the ones banked at the bank
         public int ItemsLost { get; private set; }       // items left in the lost satchel
         public bool SatchelLost { get; private set; }    // a carried satchel was lost for good
+        public int SatchelItems { get; private set; }    // items that were in the carried satchel: counted in ItemsHome when it came home, gone with it when SatchelLost
         public int GoldKept { get; private set; }
         public int GoldLost { get; private set; }
 
@@ -43,14 +45,15 @@ namespace SleepingCalamity.Core
         public static DiveResult Build(in DiveResultInput i)
         {
             int carried = System.Math.Max(0, i.Carried), banked = System.Math.Max(0, i.Banked), gold = System.Math.Max(0, i.DiveGold);
+            int satchel = i.SatchelCarried ? System.Math.Max(0, i.SatchelItems) : 0;
             bool fell = i.Ending == DiveEnding.Failed || i.Ending == DiveEnding.Abandoned;
             int kept = fell ? DiveGold.KeptOnFail(gold) : gold;
             return new DiveResult
             {
                 Ending = i.Ending, FloorsCleared = CountFloors(i.ClearedMask), LastFloor = System.Math.Max(0, i.LastFloor), PiecesFound = System.Math.Max(0, i.PiecesFound),
                 PeopleFound = i.PeopleFound == null ? new List<string>() : new List<string>(i.PeopleFound),
-                ItemsBanked = banked, ItemsHome = fell ? banked : banked + carried, ItemsLost = fell ? carried : 0,
-                SatchelLost = fell && i.SatchelCarried, GoldKept = kept, GoldLost = gold - kept,
+                ItemsBanked = banked, ItemsHome = fell ? banked : banked + carried + satchel, ItemsLost = fell ? carried : 0,
+                SatchelLost = fell && i.SatchelCarried, SatchelItems = satchel, GoldKept = kept, GoldLost = gold - kept,
             };
         }
     }
