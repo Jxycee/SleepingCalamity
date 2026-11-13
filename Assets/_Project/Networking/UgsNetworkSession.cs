@@ -49,6 +49,7 @@ namespace SleepingCalamity.Networking
         private readonly ConnectionStateMachine _sm = new ConnectionStateMachine();
         private readonly Dictionary<ulong, string> _ugsIdByClient = new Dictionary<ulong, string>();
         private readonly List<ApprovedJoin> _pendingScratch = new List<ApprovedJoin>();
+        private readonly List<SeatClaim> _seatScratch = new List<SeatClaim>();
 
         private int _attemptId;
         private bool _isHost;
