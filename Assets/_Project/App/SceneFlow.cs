@@ -70,6 +70,7 @@ namespace SleepingCalamity.App
         {
             if (disposed || !networkManager.IsServer || world.Started) return false;
             if (!roster.TryFindConnected(key, out ulong clientId)) return false;
+            if (clientId == NetworkManager.ServerClientId) return false;   // NGO refuses to disconnect the local host
             networkManager.DisconnectClient(clientId, EndReason.SentAway.ToString());
             return true;
         }

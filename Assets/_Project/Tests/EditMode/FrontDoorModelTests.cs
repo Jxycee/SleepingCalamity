@@ -315,6 +315,25 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(UiText.EndedBecause(EndReason.SentAway), Does.Contain("host"));
         }
 
+        // Catches: the host saying "was sent away" when SendAway returned false (the stranger had already left, or the host refused).
+        [Test]
+        public void Host_SendAway_ReturnsFalse_NoSentAwayMessage()
+        {
+            ReachHostLobby();
+            PlayerKey stranger = new PlayerKey(IdentityKind.Ugs, "fifth");
+            host.Strangers.Add(new FrontDoorPerson { Key = stranger, Name = "Eve" });
+            Assert.That(model.Strangers, Has.Count.EqualTo(1));
+            model.RequestSendAway(stranger);
+            Assert.That(model.HasPendingSendAway, Is.True);
+
+            host.Strangers.Clear();   // they left before the host confirmed
+            model.ConfirmSendAway();
+
+            Assert.That(model.HasPendingSendAway, Is.False);
+            Assert.That(model.RenameMessage, Is.Not.EqualTo(UiText.PlayerSentAway("Eve")));
+            Assert.That(model.RenameMessage, Is.EqualTo(UiText.PlayerAlreadyLeft("Eve")));
+        }
+
         // Catches (user decision 2026-11-13): the unrecorded player in a full world seeing the plain "waiting for the start" line, and Start
         // staying on (or refusing without naming the two choices) while they are there.
         [Test]

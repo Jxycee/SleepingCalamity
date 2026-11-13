@@ -234,8 +234,7 @@ namespace SleepingCalamity.App
             if (!HasPendingSendAway) return;
             FrontDoorPerson asked = pendingSendAway;
             pendingSendAway = null;
-            host.SendAway(asked.Key);
-            RenameMessage = UiText.PlayerSentAway(asked.Name);
+            RenameMessage = host.SendAway(asked.Key) ? UiText.PlayerSentAway(asked.Name) : UiText.PlayerAlreadyLeft(asked.Name);
             Touch();
         }
 

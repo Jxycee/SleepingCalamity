@@ -115,6 +115,8 @@ namespace SleepingCalamity.Core
         public static string SendAwayAsk(string name) => "Send " + PlayerWord(name) + " away? They leave this lobby and the world keeps its four players.";
         public static string PlayerSentAway(string name) => PlayerWord(name) + " was sent away.";
 
+        public static string PlayerAlreadyLeft(string name) => PlayerWord(name) + " has already left.";
+
         private static string PlayerWord(string name) => string.IsNullOrWhiteSpace(name) || name == "?" ? "this player" : name;
 
         // Worlds list full (WorldSummary.MaxPerList per kind): New world is off and says why.

@@ -309,7 +309,7 @@ namespace SleepingCalamity.Runtime
 
             WorldPlayerVerdict verdict = world.CanJoin(key);
             // A stranger may sit in the lobby of a full world until the session starts (audit A3): the host can then say who they really are
-            // (RenameRecorded) or let someone go. The start gate still refuses with the world-full words, and JoinRules caps the connections.
+            // (RenameRecorded) or send them away. The start gate still refuses with the world-full words, and JoinRules caps the connections.
             if (verdict == WorldPlayerVerdict.WorldFull && !Started) return WorldPlayerVerdict.Ok;
             if (verdict != WorldPlayerVerdict.Ok) return verdict;
             if (!world.IsRecorded(key))

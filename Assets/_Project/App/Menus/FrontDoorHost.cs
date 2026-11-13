@@ -57,8 +57,10 @@ namespace SleepingCalamity.App
             WorldPlayers players = world?.Players;
             if (players == null || players.Kind != WorldKind.Multiplayer || world.Started) return;
             roster.GetConnectedPeople(people);
+            // The host is never a stranger (HostWorld.Admit admits it even when its sign-in id changed) and cannot be sent away.
+            bool hasHostKey = roster.TryGetKey(Unity.Netcode.NetworkManager.ServerClientId, out PlayerKey hostKey);
             foreach (KeyValuePair<PlayerKey, string> person in people)
-                if (!players.IsRecorded(person.Key) && players.CanJoin(person.Key) == WorldPlayerVerdict.WorldFull)
+                if ((!hasHostKey || person.Key != hostKey) && !players.IsRecorded(person.Key) && players.CanJoin(person.Key) == WorldPlayerVerdict.WorldFull)
                     Put(into, strangerPool, person.Key, person.Value);
         }
 
