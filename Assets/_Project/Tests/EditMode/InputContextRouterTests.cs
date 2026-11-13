@@ -51,6 +51,17 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.IsTrue(i.DodgePressed, "Dodge");
         }
 
+        // Catches: the eat-a-loaf button lost in Free or lock-on, or leaking into placement, the bank screen or a menu (a stray press there would eat a loaf).
+        [Test]
+        public void UseItem_PassesInFreeAndLockOn_NotInPlacementBankOrMenu()
+        {
+            var f = new PlayerInputFrame { UseItemPressed = true };
+            Assert.IsTrue(InputContextRouter.Route(InputContext.Free, f).UseItemPressed, "Free");
+            Assert.IsTrue(InputContextRouter.Route(InputContext.LockOn, f).UseItemPressed, "LockOn");
+            foreach (InputContext c in new[] { InputContext.Placement, InputContext.BankScreen, InputContext.Menu })
+                Assert.IsFalse(InputContextRouter.Route(c, f).UseItemPressed, c + " must not pass UseItem");
+        }
+
         // Catches: the camera stick doing double duty in Free (a look turn would also flick a target switch).
         [Test]
         public void InputContextRouter_Free_ZeroesTheSwitchInput()

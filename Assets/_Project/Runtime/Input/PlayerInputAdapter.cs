@@ -16,7 +16,7 @@ namespace SleepingCalamity.Runtime
         private ISettings _settings;
 
         private InputActionMap _playerMap, _uiMap;
-        private InputAction _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge;
+        private InputAction _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge, _useItem;
         private InputAction _uiCancel;
         private InputAction[] _deviceProbe = Array.Empty<InputAction>();
 
@@ -111,11 +111,12 @@ namespace SleepingCalamity.Runtime
             _lock = _actions.FindAction(InputActionNames.Lock, throwIfNotFound: true);
             _switchTarget = _actions.FindAction(InputActionNames.SwitchTarget, throwIfNotFound: true);
             _dodge = _actions.FindAction(InputActionNames.Dodge, throwIfNotFound: true);
+            _useItem = _actions.FindAction(InputActionNames.UseItem, throwIfNotFound: true);
             _uiCancel = _actions.FindAction(InputActionNames.Cancel, throwIfNotFound: true);
 
             _deviceProbe = new[]
             {
-                _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge,
+                _move, _look, _jump, _sprint, _primary, _secondary, _interact, _pause, _lock, _switchTarget, _dodge, _useItem,
                 _actions.FindAction(InputActionNames.Navigate, throwIfNotFound: true),
                 _actions.FindAction(InputActionNames.Submit, throwIfNotFound: true),
                 _uiCancel,
@@ -187,6 +188,7 @@ namespace SleepingCalamity.Runtime
             f.SwitchY = sw.y;
             f.InteractPressed = _interact.WasPressedThisFrame();
             f.InteractHeld = _interact.IsPressed();
+            f.UseItemPressed = _useItem.WasPressedThisFrame();
             f.PausePressed = Context == InputContext.Menu ?_uiCancel.WasPressedThisFrame() : _pause.WasPressedThisFrame();
             return f;
         }
