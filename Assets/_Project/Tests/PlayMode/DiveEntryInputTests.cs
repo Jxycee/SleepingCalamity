@@ -1,11 +1,12 @@
 // Authority: test-only (local owner, solo host). PL-1 task 1.1: the trapdoor driven by button presses only (FakeInputService, every dev key off), solo host in the real Hollowmere scene.
 // Catches: the hub prompt not appearing at the trapdoor or appearing out of range, Interact not starting a dive (or starting one from afar), a return dive in a release build starting anywhere but floor 1
-// (ReturnDive_NoDevKey_StartsOnFloor1_DespiteCheckpoint PINS today's behaviour, PL-4 task 4.2 replaces it), a walked-over piece not reaching the town stock.
-// Setup that is not the action under test: the held checkpoint (TestHoldCheckpoint) and, for the pickup, the floor-2 start that a held checkpoint allows (a button for that pick is PL-4).
+// (PL-4 4.2: the pick defaults to the bank floor and a real button cycles it), a walked-over piece not reaching the town stock.
+// Setup that is not the action under test: the held checkpoint (TestHoldCheckpoint) and, for the pickup, the floor-2 start that a held checkpoint allows.
 using System.Collections;
 using NUnit.Framework;
 using SleepingCalamity.Core;
 using SleepingCalamity.Presentation;
+using SleepingCalamity.Runtime;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -51,9 +52,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Director.NetActive.Value, Is.False);
         }
 
-        // Today's release behaviour: with a checkpoint held the prompt offers floors 1..bank but the cycle button is the dev key G, so a press without it starts on floor 1.
+        // PL-4 4.2 (replaces PL-1's pin ReturnDive_NoDevKey_StartsOnFloor1_DespiteCheckpoint): with a held checkpoint the pick defaults to the bank floor, so a plain Interact uses the pick the party earned.
         [UnityTest]
-        public IEnumerator ReturnDive_NoDevKey_StartsOnFloor1_DespiteCheckpoint()
+        public IEnumerator ReturnDive_DefaultsToTheBankFloor()
         {
             TownInputRig rig = null;
             yield return TownInputRig.Start(r => rig = r);
@@ -62,13 +63,79 @@ namespace SleepingCalamity.Tests.PlayMode
             rig.StandAtTrapdoor();
             yield return PlayModeHarness.WaitUntil(() => rig.Director.Prompt == DiveDirector.PromptKind.Descend, Timeout, "no trapdoor prompt");
             Assert.That(rig.Input.DevPressed, Is.Empty, "no dev key is pressed");
-            Assert.That(rig.Director.PickFloor, Is.EqualTo(UndercroftPlan.FirstFloor), "the pick defaults to floor 1");
-            Assert.That(rig.Director.PromptText, Does.Contain("G changes the floor"), "the prompt still names the dev key (PL-4 4.2 gives it a real button)");
+            Assert.That(rig.Director.PickFloor, Is.EqualTo(UndercroftPlan.BankFloor), "the pick defaults to the bank floor");
             yield return rig.PressInteract();
             yield return PlayModeHarness.WaitUntil(() => rig.Director.NetActive.Value && rig.Director.FloorSync != null && rig.Director.FloorSync.Built != null, Timeout, "the dive never started");
-            Assert.That(rig.Director.FloorSync.BuiltFloor, Is.EqualTo(UndercroftPlan.FirstFloor), "a release build starts a return dive on floor 1 whatever the checkpoint holds");
-            // The rules spend the checkpoint on any start ("whatever floor it picks", DiveCheckpoint), so the default press burns the bank pick the party earned: without the dev key the player never gets to use it.
-            Assert.That(rig.Director.NetCheckpointHeld.Value, Is.False, "PL break (fixed by PL-4 4.2): the floor-1 start spent the checkpoint");
+            Assert.That(rig.Director.FloorSync.BuiltFloor, Is.EqualTo(UndercroftPlan.BankFloor), "a plain Interact starts the return dive on the bank floor");
+            Assert.That(rig.Director.NetCheckpointHeld.Value, Is.False, "the start spent the checkpoint");
+        }
+
+        // The floor-pick button is the Lock button (Tab; right-stick click on a pad): lock-on has nothing to do at the trapdoor.
+        [UnityTest]
+        public IEnumerator FloorPick_Button_CyclesAllowedFloors()
+        {
+            TownInputRig rig = null;
+            yield return TownInputRig.Start(r => rig = r);
+            rig.Director.TestHoldCheckpoint(true);
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.NetCheckpointHeld.Value && rig.Director.PickableFloors().Count == UndercroftPlan.BankFloor, Timeout, "the held checkpoint never offered floors 1 to the bank");
+            rig.StandAtTrapdoor();
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.Prompt == DiveDirector.PromptKind.Descend, Timeout, "no trapdoor prompt");
+            Assert.That(rig.Director.PickFloor, Is.EqualTo(UndercroftPlan.BankFloor));
+            int[] expected = { 1, 2, 3 };
+            foreach (int want in expected)
+            {
+                yield return rig.Press(i => i.Frame.LockPressed = true);
+                yield return PlayModeHarness.WaitUntil(() => rig.Director.PickFloor == want, Timeout, "the pick button never reached floor " + want + " (at " + rig.Director.PickFloor + ")");
+            }
+            Assert.That(rig.Input.DevPressed, Is.Empty, "no dev key is pressed");
+            yield return rig.PressInteract();
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.NetActive.Value && rig.Director.FloorSync != null && rig.Director.FloorSync.Built != null, Timeout, "the dive never started");
+            Assert.That(rig.Director.FloorSync.BuiltFloor, Is.EqualTo(3), "Interact starts on the picked floor");
+        }
+
+        [UnityTest]
+        public IEnumerator Prompt_NamesTheRealButton()
+        {
+            TownInputRig rig = null;
+            yield return TownInputRig.Start(r => rig = r);
+            rig.Director.TestHoldCheckpoint(true);
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.NetCheckpointHeld.Value && rig.Director.PickableFloors().Count > 1, Timeout, "the held checkpoint never offered more floors");
+            rig.StandAtTrapdoor();
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.Prompt == DiveDirector.PromptKind.Descend, Timeout, "no trapdoor prompt");
+            Assert.That(rig.Director.PromptText, Does.Not.Contain("G changes"), "the prompt no longer names the dev key");
+            Assert.That(rig.Director.PromptText, Does.Contain(InputActionNames.Lock), "the prompt names the bound pick button (the fake input reports the action path as its display string)");
+        }
+
+        [UnityTest]
+        public IEnumerator FloorPick_NoCheckpoint_OnlyFloor1()
+        {
+            TownInputRig rig = null;
+            yield return TownInputRig.Start(r => rig = r);
+            rig.StandAtTrapdoor();
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.Prompt == DiveDirector.PromptKind.Descend, Timeout, "no trapdoor prompt");
+            Assert.That(rig.Director.PickableFloors(), Is.EqualTo(new[] { UndercroftPlan.FirstFloor }));
+            Assert.That(rig.Director.PickFloor, Is.EqualTo(UndercroftPlan.FirstFloor));
+            yield return rig.Press(i => i.Frame.LockPressed = true);
+            Assert.That(rig.Director.PickFloor, Is.EqualTo(UndercroftPlan.FirstFloor), "the pick button does nothing without a checkpoint");
+            Assert.That(rig.Director.PromptText, Does.Not.Contain(InputActionNames.Lock), "the prompt offers no pick button without a checkpoint");
+            ulong me = rig.App.NetworkManager.LocalClientId;
+            Assert.That(rig.Director.ServerTryStartDive(me, 3), Is.False, "the host refuses floor 3 without a checkpoint");
+            Assert.That(rig.Director.NetActive.Value, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator FloorPick_AboveBank_Refused()
+        {
+            TownInputRig rig = null;
+            yield return TownInputRig.Start(r => rig = r);
+            rig.Director.TestHoldCheckpoint(true);
+            yield return PlayModeHarness.WaitUntil(() => rig.Director.NetCheckpointHeld.Value, Timeout, "the checkpoint never showed");
+            rig.StandAtTrapdoor();
+            yield return TownInputRig.Seconds(0.3f);
+            ulong me = rig.App.NetworkManager.LocalClientId;
+            Assert.That(rig.Director.ServerTryStartDive(me, UndercroftPlan.BankFloor + 1), Is.False, "a floor below the bank is refused");
+            Assert.That(rig.Director.NetActive.Value, Is.False);
+            Assert.That(rig.Director.NetCheckpointHeld.Value, Is.True, "a refused pick leaves the checkpoint held");
         }
 
         // A real pickup on a generated floor: walk onto each waiting piece of floor 2 (the hero is moved there, the host's own range check picks the piece up) and it reaches the town stock.

@@ -19,7 +19,7 @@
 // player that fell out of the world, and the trip home.
 // Contents API (host, stable): Instance (set on spawn, cleared on despawn), RequireGateKey (default false: every stair is open; true: a gate-key stair needs ServerOpenStair(floor) first, the gate key opens floors 1-4 and 6),
 // ServerOpenStair(floor) (idempotent; the opened set lives for the current dive and is cleared on dive start, end and fail), events DiveStarted, FloorChanged(floor), DiveFailedOn(floor), DiveEnded(reason); DiveHaulSync.Banked/DiveFailed stay.
-// Debug (dev build, host): F7 starts a dive from anywhere (always floor 1), F8 abandons it (fails the dive like the stir countdown does); G cycles the hub prompt's floor pick.
+// Debug (dev build, host): F7 starts a dive from anywhere (always floor 1), F8 abandons it (fails the dive like the stir countdown does); G also cycles the hub prompt's floor pick (the real button is Lock).
 // Bank room (plan 3 task 8, 8a): the bank press enters the room (DiveHaulSync.ServerEnterBankRoom); inside it a minimal IMGUI bank screen asks for picks, push-on and go-home with the real buttons (move up/down, Jump, Primary, Secondary; the dev keys [ ] P Y N still work as a second path); the
 // shared choice confirms in DiveHaulSync, which raises PushedOn (saved at once) / WentHome (EndDive). Every capture says what it knows about the bank suspend (TownStock.CaptureWorld): a quit in the bank
 // room, or on floor 5 after the push-on, saves a suspend; a loaded one waits as pending and is re-emitted until the trapdoor resumes it (ServerResumeSuspended).
@@ -779,23 +779,35 @@ namespace SleepingCalamity.Presentation
         public PromptKind Prompt { get; private set; }
         public string PromptText { get; private set; } = "";
 
-        // The hub prompt: the floor the next press starts on. With no checkpoint it is always floor 1; with one, the G key (dev builds) cycles PickableFloors().
+        // The hub prompt: the floor the next press starts on. With no checkpoint it is always floor 1; with one it defaults to the deepest pickable floor (the bank floor: the party earned that pick),
+        // and the Lock button (PL-4 4.2; the G dev key too) cycles PickableFloors(). The host re-checks the pick against its checkpoint whatever a peer sends.
         public int PickFloor { get; private set; } = UndercroftPlan.FirstFloor;
+        private bool _pickTouched;   // local: the player cycled the pick since the last start, so the default stays out of the way
 
-        public static string HubPromptText(bool checkpointHeld, IReadOnlyList<int> floors, int pick, bool suspended = false)
+        public static string HubPromptText(bool checkpointHeld, IReadOnlyList<int> floors, int pick, bool suspended = false, string pickButton = "")
         {
             if (suspended) return "Return to your dive (a save after pushing on resumes at the start of floor 6; otherwise at the bank room)";
             if (!checkpointHeld && floors.Count <= 1) return "Go down the Undercroft";
-            return "Go down the Undercroft: start on floor " + pick + "  (pickable: " + string.Join(", ", floors) + "; G changes the floor)";
+            string change = string.IsNullOrEmpty(pickButton) ? "" : "; " + pickButton + " changes the floor";
+            return "Go down the Undercroft: start on floor " + pick + "  (pickable: " + string.Join(", ", floors) + change + ")";
         }
 
-        // Host and clients: the pick follows the replicated floors (a pick no longer offered falls back to the first).
+        // Host and clients: the pick follows the replicated floors (a pick no longer offered falls back to the default; an untouched pick follows the checkpoint: the bank floor while it is held, else floor 1).
         private void ClampPick(IReadOnlyList<int> floors)
         {
             if (floors.Count == 0) { PickFloor = UndercroftPlan.FirstFloor; return; }
+            if (!NetCheckpointHeld.Value) _pickTouched = false;
+            int def = NetCheckpointHeld.Value ? floors[floors.Count - 1] : floors[0];
+            if (!_pickTouched) { PickFloor = def; return; }
             bool ok = false;
             foreach (int f in floors) if (f == PickFloor) { ok = true; break; }
-            if (!ok) PickFloor = floors[0];
+            if (!ok) { PickFloor = def; _pickTouched = false; }
+        }
+
+        private static string PickButtonName(IInputService input)
+        {
+            string key = input != null ? input.GetBindingDisplayString(InputActionNames.Lock) : "";
+            return string.IsNullOrEmpty(key) ? "the lock-on button" : key;
         }
 
         public void RequestDescend() { RequestDescendRpc(); }
@@ -840,13 +852,16 @@ namespace SleepingCalamity.Presentation
                 ClampPick(floors);
                 if (Flat(me, NetHubStair.Value, PromptRadius))
                 {
-                    Prompt = PromptKind.Descend; PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, NetSuspendedDive.Value);
-                    if (floors.Count > 1 && !NetSuspendedDive.Value && HeroInput.ResolveDefault() is IDevInput cyc && cyc.WasPressed(DevKey.CycleFloor))
+                    IInputService pickInput = HeroInput.ResolveDefault();
+                    string pickButton = PickButtonName(pickInput);
+                    Prompt = PromptKind.Descend; PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, NetSuspendedDive.Value, pickButton);
+                    bool cycle = pickInput != null && (pickInput.Intent.LockPressed || pickInput is IDevInput cyc && cyc.WasPressed(DevKey.CycleFloor));
+                    if (cycle && floors.Count > 1 && !NetSuspendedDive.Value && NetCheckpointHeld.Value && !LocalHeroIsDown(player))
                     {
                         int at = 0;
                         for (int i = 0; i < floors.Count; i++) if (floors[i] == PickFloor) at = i;
-                        PickFloor = floors[(at + 1) % floors.Count];
-                        PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, false);
+                        PickFloor = floors[(at + 1) % floors.Count]; _pickTouched = true;
+                        PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, false, pickButton);
                     }
                 }
             }
@@ -879,7 +894,7 @@ namespace SleepingCalamity.Presentation
             if (LocalHeroIsDown(player)) return;   // a downed hero presses nothing (the host refuses it too)
             switch (Prompt)
             {
-                case PromptKind.Descend: RequestStartDive(NetCheckpointHeld.Value && !NetSuspendedDive.Value ? PickFloor : UndercroftPlan.FirstFloor); break;
+                case PromptKind.Descend: RequestStartDive(NetCheckpointHeld.Value && !NetSuspendedDive.Value ? PickFloor : UndercroftPlan.FirstFloor); _pickTouched = false; break;
                 case PromptKind.Stair: RequestStair(floor); break;
                 case PromptKind.Bank: RequestBank(); break;
                 case PromptKind.GoHome: RequestGoHome(); break;
