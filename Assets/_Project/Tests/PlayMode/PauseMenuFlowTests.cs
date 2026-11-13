@@ -136,7 +136,7 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator Leave_AsHost_WorldSaved_SessionEnds()
         {
             yield return BootSolo();
-            // The start already wrote the world once. Change the world in memory after that (a sentinel stamp, no dirty mark, so only a real save at leave can replace it).
+            // The start already wrote the world once. Change the world in memory after that (a sentinel stamp plus a dirty mark, the in-memory change a save must write; only a real save at leave replaces the sentinel).
             const string Sentinel = "1999-01-01T00:00:00.0000000Z";
             Assert.That(app.WorldSaveFlow.Store, Is.Not.Null, "no world store while hosting");
             string[] before = Directory.GetFiles(saveDir, "*.json", SearchOption.AllDirectories);
@@ -144,6 +144,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var textBefore = new System.Collections.Generic.Dictionary<string, string>();
             foreach (string f in before) textBefore[f] = File.ReadAllText(f);
             app.WorldSaveFlow.Store.Current.SavedAtUtc = Sentinel;
+            app.WorldSaveFlow.Store.MarkDirty();
             yield return OpenWithEscape();
 
             yield return Press(PauseMenuView.Ids.Leave);
