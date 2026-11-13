@@ -200,6 +200,8 @@ namespace SleepingCalamity.Networking
             _config.Bridge.RemovePending(stale);
             _config.World?.CancelPending(stale);
             NetworkManager nm = _config.NetworkManager;
+            // The reason string matters: with a reason NGO queues the disconnect, so ClientDisconnected(stale) fires a tick AFTER the new client is
+            // approved (audit A1 relies on that ordering to tell a takeover from a leave).
             if (nm.IsServer) nm.DisconnectClient(stale, EndReason.Kicked.ToString());
         }
 

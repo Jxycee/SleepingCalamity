@@ -83,12 +83,13 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(r.CreatePlayerObject, Is.False);
         }
 
-        // Catches: the 5th unique player getting in, or being refused with the wrong reason (the client shows it).
+        // Catches: the 5th unique player being recorded, or refused in the lobby before the host can rename them (audit A3).
         [Test]
-        public void FifthUniquePlayer_IsRefused_WithFullLobby()
+        public void FifthUniquePlayer_IsLetIntoTheLobby_ButNeverRecorded()
         {
+            // Audit A3 (risk review): a stranger on a full world may sit in the lobby so the host can rename them; the start gate refuses until then.
             _world.Load(Multi("a", "b", "c", "d"));
-            AssertRefused(Ask(K("e"), 5), EndReason.FullLobby);
+            Assert.That(Ask(K("e"), 5).Approved, Is.True);
             Assert.That(_world.Players.Recorded.Count, Is.EqualTo(4));
             Assert.That(_world.Players.IsRecorded(K("e")), Is.False);
         }

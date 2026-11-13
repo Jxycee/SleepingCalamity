@@ -181,6 +181,10 @@ namespace SleepingCalamity.Runtime
             if (live.Suspend == null) return;
             if (Players == null) { live.Suspend = null; live.SuspendKnown = false; return; }
             live.Suspend = SuspendSaveRules.OnlyRecorded(live.Suspend, key => Players.IsRecorded(key));
+            // The suspend records of players the host let go stay in the file too (same promise as their bags).
+            if (live.Suspend != null && _town.Suspend?.Bags != null)
+                foreach (SuspendedBag b in _town.Suspend.Bags)
+                    if (b != null && !Players.IsRecorded(new PlayerKey((IdentityKind)b.Identity, b.Id)) && !live.Suspend.Bags.Exists(k => k.Identity == b.Identity && k.Id == b.Id)) live.Suspend.Bags.Add(b);
         }
 
         // The bags of the recorded players only; null (the previous copy is kept) when the source said nothing or the world has no players yet.
@@ -190,6 +194,10 @@ namespace SleepingCalamity.Runtime
             var kept = new BagsSave { Extra = bags.Extra };
             foreach (PlayerBagSave p in bags.Players)
                 if (p != null && Players.IsRecorded(new PlayerKey((IdentityKind)p.Identity, p.Id))) kept.Players.Add(p);
+            // A player the host let go (audit A2) keeps what the file already holds of theirs: "what they grew here waits in the file".
+            if (_town.Bags?.Players != null)
+                foreach (PlayerBagSave p in _town.Bags.Players)
+                    if (p != null && !Players.IsRecorded(new PlayerKey((IdentityKind)p.Identity, p.Id)) && !kept.Players.Exists(k => k.Identity == p.Identity && k.Id == p.Id)) kept.Players.Add(p);
             return kept;
         }
 
@@ -263,10 +271,11 @@ namespace SleepingCalamity.Runtime
         public WorldPlayerVerdict RenameRecorded(PlayerKey from, PlayerKey to)
         {
             if (Players == null) return WorldPlayerVerdict.NotRecorded;
-            if (Started) return WorldPlayerVerdict.WorldInProgress;
+            if (Started || _townSource != null || _sources.Count > 0) return WorldPlayerVerdict.WorldInProgress;   // a live source would write the old key back at its next capture
             WorldPlayerVerdict verdict = Players.RenameRecorded(from, to);
             if (verdict != WorldPlayerVerdict.Ok) return verdict;
             MovePlayerData(from, to);
+            ForgetPendingOf(Players);   // the new key is recorded now: its approval must not count a second time
             RaiseChanged();
             return WorldPlayerVerdict.Ok;
         }
@@ -297,6 +306,9 @@ namespace SleepingCalamity.Runtime
             }
 
             WorldPlayerVerdict verdict = world.CanJoin(key);
+            // A stranger may sit in the lobby of a full world until the session starts (audit A3): the host can then say who they really are
+            // (RenameRecorded) or let someone go. The start gate still refuses with the world-full words, and JoinRules caps the connections.
+            if (verdict == WorldPlayerVerdict.WorldFull && !Started) return WorldPlayerVerdict.Ok;
             if (verdict != WorldPlayerVerdict.Ok) return verdict;
             if (!world.IsRecorded(key))
             {

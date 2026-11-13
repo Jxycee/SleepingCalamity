@@ -247,6 +247,93 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Players.IsRecorded(K("a")), Is.True);
         }
 
+        sealed class FakeTownSource : HostWorld.ITownSource
+        {
+            public TownSnapshot Live;
+            public TownSnapshot CaptureTown() => Live;
+            public void RestoreTown(TownSnapshot loaded) { }
+        }
+
+        // Catches (risk review of A3): a friend whose id changed on a FULL world being refused at the door, so the host could never rename them.
+        [Test]
+        public void FullWorld_StrangerConnectsToTheLobby_HostRenames_StartIsOk()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b"), K("c"), K("d") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+
+            Assert.That(world.Admit(K("e"), 5, false), Is.EqualTo(WorldPlayerVerdict.Ok), "the lobby lets the stranger in");
+            world.NoteConnected(K("e"), 5);
+            Assert.That(world.TryStartSession(Roster("a", "e")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "but the start refuses until the host decides");
+            Assert.That(world.RenameRecorded(K("d"), K("e")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(world.TryStartSession(Roster("a", "e")), Is.EqualTo(WorldPlayerVerdict.Ok));
+
+            // Once a session runs a full world refuses a stranger again.
+            Assert.That(world.Admit(K("f"), 6, false), Is.EqualTo(WorldPlayerVerdict.WorldFull));
+        }
+
+        // Catches (risk review of A3): a stale pending approval of the renamed key making Admit refuse the next stranger.
+        [Test]
+        public void RenameRecorded_ForgetsThePendingApprovalOfTheNewKey()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b"), K("c") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+            Assert.That(world.Admit(K("e"), 5, false), Is.EqualTo(WorldPlayerVerdict.Ok), "e holds the fourth place while connected");
+            Assert.That(world.RenameRecorded(K("c"), K("e")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            // Three recorded again (a, b, e) plus one stale pending of e would count 4 and refuse f.
+            Assert.That(world.Admit(K("f"), 6, false), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(world.Admit(K("g"), 7, false), Is.EqualTo(WorldPlayerVerdict.WorldFull), "a, b, e and f's pending place");
+        }
+
+        // Catches (risk review of A3): a rename while a live town or growth source is registered (its next capture would write the old key back).
+        [Test]
+        public void RenameRecorded_IsRefusedWhileALiveSourceIsRegistered()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+            world.RegisterTownSource(new FakeTownSource { Live = new TownSnapshot() });
+            Assert.That(world.RenameRecorded(K("a"), K("z")), Is.EqualTo(WorldPlayerVerdict.WorldInProgress));
+            Assert.That(world.Players.IsRecorded(K("a")), Is.True);
+        }
+
+        // Catches (risk review of A2): a removed player's bags and suspend record dropped at the next in-game save, though the question says
+        // what they grew "waits in the file".
+        [Test]
+        public void RemovedPlayer_BagsAndSuspendStayInTheFile_AtTheNextCapture()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b"), K("c"), K("d") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+            world.Town.Bags = new BagsSave { Players = new List<PlayerBagSave>
+            {
+                new PlayerBagSave { Identity = (int)IdentityKind.Local, Id = "a", Gold = 1 },
+                new PlayerBagSave { Identity = (int)IdentityKind.Local, Id = "d", Gold = 9 },
+            } };
+            world.Town.Dive = new DiveSave { InDive = true };
+            world.Town.Suspend = new SuspendSave
+            {
+                Floor = 1, Phase = (int)DivePhase.BankRoom,
+                Bags = new List<SuspendedBag> { new SuspendedBag { Identity = (int)IdentityKind.Local, Id = "d", DiveGold = 5 } },
+            };
+            Assert.That(world.Players.Remove(K("d")), Is.True);   // the host's picker action (WorldSaveFlow.RemovePlayer does it on the file)
+
+            world.RegisterTownSource(new FakeTownSource { Live = new TownSnapshot
+            {
+                Bags = new BagsSave { Players = new List<PlayerBagSave> { new PlayerBagSave { Identity = (int)IdentityKind.Local, Id = "a", Gold = 2 } } },
+                Suspend = new SuspendSave { Floor = 1, Phase = (int)DivePhase.BankRoom },
+                SuspendKnown = true,
+                Dive = new DiveSave { InDive = true },   // a suspend only stands while a dive is in progress
+            } });
+            var save = new WorldSave();
+            world.CaptureTownInto(save);
+
+            Assert.That(save.Bags.Players.Find(p => p.Id == "a").Gold, Is.EqualTo(2), "the live bag of a recorded player wins");
+            Assert.That(save.Bags.Players.Find(p => p.Id == "d")?.Gold ?? 0, Is.EqualTo(9), "the removed player's gold waits in the file");
+            Assert.That(save.Suspend.Bags.Find(b => b.Id == "d")?.DiveGold, Is.EqualTo(5), "and so does their suspend record");
+        }
+
         // Catches (audit A3): the rename on a world that does not exist yet, or a Solo world (its owner follows the machine instead).
         [Test]
         public void RenameRecordedPlayer_NeedsAMultiplayerWorld()

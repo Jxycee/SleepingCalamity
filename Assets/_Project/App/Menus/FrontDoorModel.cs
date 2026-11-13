@@ -630,6 +630,7 @@ namespace SleepingCalamity.App
                 case FrontDoorState.Worlds:
                 case FrontDoorState.JoinEntry:
                 case FrontDoorState.Ended:
+                case FrontDoorState.ConfirmUnsaved:
                     return;   // a session this door did not start (the dev panel's), or one already reported
             }
             End(reason);
