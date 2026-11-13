@@ -67,6 +67,16 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **M** State-hash "no desync" pass bar: add per-player bags and the 7-floor stir to the hash (triage Q2) [U][net]
 - [ ] **S** Network conditions test set at 150 ms / 2% and 300 ms / 5% (triage Q6 default; user may change) [U][net]
 
+## Ready: save and netcode audit (2026-11-12, `docs/superpowers/audits/2026-11-12-save-netcode-audit.md`; each item names its finding and proposed test there)
+- [ ] **S** A1 (blocker): a stale-connection takeover must not free the rejoining player's own Lobby seat (`UgsNetworkSession.NgoEvents.cs:48-62`, `ConnectionApprover.cs:182-202`); turn the `AUDIT A1` ignored test or repro into a passing test [U][net]
+- [ ] **S** A4: host tick that spawns a hero for any connected client without one in a gameplay scene (`ArenaPlayerSpawner.cs:47-71`); closes N7 [U][net]
+- [ ] **S** A8: `DiveDirector.EndDive` asks for a world save (`DiveDirector.cs:469-488`) [U][net]
+- [ ] **M** A6 + A7 + A11 world-open hardening: a damaged world lists as damaged; no fallback to another world when one was selected; a guarded `WorldSaveFlow.Open` that clears `HostWorld` and toasts on a fault; `store` set only after the loads [U][net]
+- [ ] **M** A9 + save test gaps: PlayMode takeover test (a third NetworkManager with the first client's key); a failed write stays dirty and succeeds on the next flush; a corrupt `.bak` beside a good main; a golden file holding every section as written today [U][net]
+- [ ] **S** N1 + N2: member rows for the list members of weapons, bags, stock, town and residents (`WorldSaveStore.cs:77-101`); a test that pins the migration contract (a step sets `schemaVersion`) [U][net]
+- [ ] **M** Network test gaps: client-driven `CastServerRpc`, `ParryServerRpc`, `ReviveHoldServerRpc`, `RequestFinishRpc`, `SetGhostRpc`; late join for enemies, opened chests, room state and the healing point; a drop while downed, mid-revive and during a floor change; host drop seen from a client mid-dive [U][net]
+- [ ] **S** Audit notes sweep: N3 (`suspend.presentIds` unused), N9 (per-client leftovers, a missing static reset, the valve shift), N10 (a client's own link drop reads "host left"), N12 (two stale comments) [U][net]
+
 ## Ready: tools and process
 - [x] **S** `sc_core_tests.py` false green on `Core.Combat` (`8d823e23`: 105 of 157 EditMode files, 1205 tests pass)
 - [x] **S** `unity.ps1 exec` false FAIL on player builds (`cd4eec4e`)
@@ -120,6 +130,10 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** Food/water craftables + cooking (PARKING_LOT :60) - proposal for the user
 
 ## Waiting on the user (don't start; ask when they're around; plain bullets so the board doesn't count them)
+- Audit A2 (blocker, **M** [U][net] once decided): a lobby visit takes one of a multiplayer world's four places for good, in the first lobby too. Choose: record players at Start and when a hero spawns, or keep it and add a host "remove player" action, or both (audit section 3). An ignored failing test marks it (`AUDIT A2`).
+- Audit A3 (**M** [U][net] once decided): a multiplayer player whose UGS id changes (new PC, Windows reinstall) loses their character, and a host on a full world can no longer start it. Choose: a host-side "this player is now that player" rebind, a platform sign-in, or accept it.
+- Audit A5 (**S** [U][net] once decided): a read-only world (a newer build's file, a load fault) still starts and plays unsaved. Choose: refuse the start, or ask for a confirmation.
+- Audit walk steps on real Relay (`USER_TODO.md` item 3a): crash and rejoin (A1), host Alt+F4 (A10), join during the host's load (A4).
 - Playable-loop walk on the PL-4 build (`docs/superpowers/plans/2026-11-11-playable-loop.md` section 5); the 11-06 build still opens on the dev panel and is not worth a walk now. `USER_TODO.md` items 3b and 3c are stale (old four-floor dive); PL-4 replaces them
 - Story book read + bible sign-off; bible Qs 6, 7, 8, 13, 15, 16 touch dive text (triage :24); 5 and 20 touch rules
 - Rename placeholder floor and NPC names (spec Q7; decisions-for-review S1-S8)

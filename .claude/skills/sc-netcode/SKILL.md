@@ -31,6 +31,7 @@ Each rule below names the class that does it right and, where there is one, the 
 - A local input-context hold must let go when the host would refuse the actions anyway, or it only freezes the hero: the bank screen holds `InputContext.BankScreen` only while the hero is in bank range and no teammate is downed nearby, so nobody is stuck while a friend needs reviving (8d8f7d97, `DiveDirector.LocalBankScreen`).
 - A context that needs a fresh press arms on a zero first. The bank screen restarts its arm delay after a pause menu or a revive, so the press that closed the menu cannot push the party on (8d8f7d97). Menus raise `IInputService.MenuOpen` and use edge-triggered keys (`WeaponTreeHud`, 107d4187).
 - Every new context needs its row in `InputContextRouter` and a router test (`InputContextRouterTests`), or its keys are zeroed or leak into gameplay.
+- A disconnect handler that frees something by player id (a Lobby seat, a lock, a bag) first checks that the same player has no newer connection. A stale-connection takeover (`ConnectionApprover.TakeOverStaleConnection`) disconnects the old client id of a player who is joining right now, and `UgsNetworkSession.OnConnectionEvent` then removes that player's Lobby seat by id (audit A1, 2026-11-12, open).
 - Holds report on a timer (revive every 0.2 s via `HeroCombat` to `HeroVitals`; valves every `FloorObjectiveTuning.ReportInterval`) and the host drops a hold whose reports stop (`ValveHold` resets after `ReportTimeout`). A downed hero's presses are refused on the host too.
 - Push a snapshot only when it changed: `CombatHost.ServerSyncGrowth` pushes the weapon tree when `WeaponTreeSnapshot.SyncKey` changes (107d4187).
 
@@ -41,10 +42,15 @@ Each rule below names the class that does it right and, where there is one, the 
 - A null capture means "unknown, keep the previous copy", and a latch never rolls back (`TownSaveRules.MergeLatches`, 39ef1ba4). A discarded suspend settles its dive as a failed one (`SuspendSaveRules.SettleAsFailed`, bcc15762).
 - State that changes all the time (weapon growth, the town) is compared at every save in `WorldSaveFlow.CaptureSections`, not marked dirty per change. The last capture runs when the state turns `ConnState.ShuttingDown` or `ConnState.Failed`, before NGO stops (by then a later save may find the server gone), then again on the session's `Ended` event and on quit.
 - Restore on the host without firing toasts. A client never opens a world file.
+- A section with lists needs member rows as well as array rows: without a `MemberSections` row, a scalar where the list belongs costs the whole section (`"heroes": 5` drops every player's weapon growth; audit N2).
+- A migration step sets `schemaVersion` in the JSON it returns: `WorldSaveRules.Clean` keeps the version as read, so a step that forgets it runs again on every load (audit N1).
+- What a world keeps for good (a recorded player) is written when the player plays, not when a connection comes up, and has an undo. Today `ConnectionApprover.ClientConnected` records a lobby visitor at once and nothing can remove them (audit A2, open, a decision for the user).
+- Ask for a save (`HostWorld.RequestSave`) at every moment a player would call done: a build finished, a push-on, a dive ended. The 10 s flush is the fallback, and a crash inside it loads the older state (`DiveDirector.EndDive` does not ask yet; audit A8).
+- A session whose world cannot be saved must not start silently. A read-only store (a newer build's file, a load fault) and a failed `WorldSaveFlow.Open` both leave the game playable with nothing written; a failed open must also clear `HostWorld`, which otherwise keeps the previous session's players, weapons and town (audit A5, A7, A11, open).
 - PlayMode save tests set `WorldSaveStore.PathOverrideForTests`; never touch the real world file.
 
 ## NGO, UGS and Unity details
-- Never start a scene event inside a scene-event callback. Spawn players on `OnLoadEventCompleted` and, for late joiners, `OnSynchronizeComplete` (`ArenaPlayerSpawner`).
+- Never start a scene event inside a scene-event callback. Spawn players on `OnLoadEventCompleted` and, for late joiners, `OnSynchronizeComplete` (`ArenaPlayerSpawner`). Both are one-shots: a client in `clientsTimedOut`, or one that synchronizes while the host is still loading, gets no hero and nothing retries (audit A4, open). Anything a peer must have gets a host tick that repairs a miss, as `DiveDirector.PlacementPass` does for placement.
 - UGS uses the Multiplayer Services Sessions SDK (`UgsNetworkSession`): the SDK starts and stops NGO and sets the Relay data itself; `NetworkManager.Singleton` must exist before `CreateSessionAsync`; tear down with `ISession.LeaveAsync`, never `NetworkManager.Shutdown`; full-lobby and bad-code errors arrive as message text (`UgsErrorMap`). Wrap UGS calls in `UgsAsync.WithTimeoutAsync`.
 - Unity's fake null: `?.` and `??` bypass Unity's `==` on destroyed objects; compare with `== null` or `if (obj)`.
 - Statics survive Enter Play Mode with domain reload off: reset them in `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]` (`WorldSaveStore.ResetStatics`). Pair every subscription with an unsubscribe, and clear host-side state in `OnNetworkDespawn` (434cfc03).
@@ -55,6 +61,7 @@ Each rule below names the class that does it right and, where there is one, the 
 - Calling `Server*` methods directly skips the player's path; for input, drive `FakeInputService.Frame` (it routes through the real router).
 - A test must exercise the path it names: if another call also writes the value, it proves nothing. Delete the code under test in your head: would the test fail? Wait on a counter (`HeroCombat.TreePushes`), not a fixed delay (107d4187).
 - A layout test that compares a value to the formula that made it can't fail; raycast the built object instead.
+- A host call guarded by `nm.IsServer` or `IsListening` is skipped in an EditMode test whose NetworkManager is not running (`ConnectionApproverTests` never reaches `DisconnectClient`). Such a path needs a PlayMode test with a live host, or a `NOT covered:` line (audit A9).
 
 ## Before pushing
 Run the `gate` (or `python3 Tools/cloud/sc_cloud_compile.py --project <worktree>` without a licence: every assembly PASS), list the EditMode/PlayMode tests and the manual walk steps. Networking or save changes get the `risk-reviewer` (`sc-delegate`).

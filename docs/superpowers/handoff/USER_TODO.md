@@ -24,6 +24,10 @@ Tell the coordinator every surprise, a lying prompt, a stuck spot or a crash (pa
    3. When both players show, press "Start session" on the host. Both players should land in Arena_Greybox.
 
    Tell Claude what happened.
+3a. **Audit checks for the same 2-player Relay walk (2026-11-12, `docs/superpowers/audits/2026-11-12-save-netcode-audit.md`).** These need real Relay and two machines; no test can run them. About 10 minutes.
+   1. **Crash and rejoin (A1).** Mid-dive, the second player ends the game from Task Manager, relaunches at once and joins by the same code within about 10 seconds. Expected today: the join fails or the player is dropped a few seconds after arriving, and a second try works. Say what the screen showed and how long each step took.
+   2. **Host quits (A10).** Mid-session the host presses Alt+F4. Time how long the second player's game takes to return to the title, and what it says.
+   3. **Join while the host is loading (A4).** The host presses "Start session"; the second player joins by code during the host's loading screen. Does the second player get a hero in the hub?
 3b. **The M5 Cellars walk, floors 1-4 (2 players; spine `e525a51` + contents `c75c33f8`; an automated host+client run of this script passes).** About 20-30 minutes. The town and the Undercroft stair come in M6, so the dive starts from the Arena_Dive hub. The bottom of the screen shows `[E] ...` whenever an action is in reach; the stir meter sits on screen during a dive.
    1. Both machines: turn on the dev panel toggle "Start in the Cellars dive hub" (or editor menu `SleepingCalamity/Dev/Dive Hub`, or a build with `-dev-dive`).
    2. Host: press "Host online (Relay)" and read out the join code. Second player: "Join by code", enter it. Host: "Start session". Both land on the hub pad.

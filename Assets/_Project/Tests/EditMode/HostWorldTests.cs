@@ -164,6 +164,50 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Admit(K("e"), 6, false), Is.EqualTo(WorldPlayerVerdict.Ok), "the same key again just moves its pending place to the new client");
         }
 
+        // Catches (audit A2): a joiner who connects to a multiplayer lobby and leaves before Start still being written into the world for good
+        // and taking one of its four places (ConnectionApprover.ClientConnected calls RecordEntered when the connection comes up).
+        // NOT covered: the real ConnectionApprover/NGO path (this drives Admit, RecordEntered and CancelPending in the order the approver does),
+        // and what the fix records instead (a start-time record is a user decision).
+        [Test]
+        [Ignore("AUDIT A2: a lobby visit records the player for good; fix is a user decision (docs/superpowers/audits/2026-11-12-save-netcode-audit.md)")]
+        public void JoinerWhoLeavesBeforeStart_IsNotRecorded()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("host"), K("a") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+            HostRoster roster = Roster("host", "a");   // host and A are connected, so the gate could start later
+
+            Assert.That(world.Admit(K("c"), 7, false), Is.EqualTo(WorldPlayerVerdict.Ok));
+            world.RecordEntered(K("c"), 7, "C");   // the lobby connection comes up
+            world.CancelPending(7);                // C leaves before TryStartSession (ClientDisconnected)
+
+            Assert.That(world.Players.IsRecorded(K("c")), Is.False, "a lobby visit must not take one of the world's places");
+            Assert.That(world.Players.Recorded.Count, Is.EqualTo(2));
+            Assert.That(world.TryStartSession(roster), Is.EqualTo(WorldPlayerVerdict.Ok));
+        }
+
+        // Catches (audit A2, risk review): the first lobby of a brand-new world recording every visitor, because WorldLibrary.Create writes
+        // an empty players list and the start gate then takes the CanStart branch, not TryCreate.
+        // NOT covered: the WorldSaveFlow.Open wiring (the save is built by hand in WorldLibrary.Create's shape).
+        [Test]
+        [Ignore("AUDIT A2: a lobby visit records the player for good; fix is a user decision (docs/superpowers/audits/2026-11-12-save-netcode-audit.md)")]
+        public void FirstLobbyVisitor_OfANewWorld_IsNotRecorded()
+        {
+            // What WorldLibrary.Create writes for a new multiplayer world.
+            var fresh = new WorldPlayersSave { Kind = (int)WorldKind.Multiplayer, Identity = (int)IdentityKind.Local, Recorded = new List<WorldPlayerSave>() };
+            Assert.That(WorldPlayers.TryRestore(fresh, out WorldPlayers players, out _), Is.True);
+            var world = new HostWorld();
+            world.Load(players);
+            Assert.That(world.Players.Recorded.Count, Is.EqualTo(0), "setup: a new world records nobody");
+
+            Assert.That(world.Admit(K("visitor"), 4, false), Is.EqualTo(WorldPlayerVerdict.Ok));
+            world.RecordEntered(K("visitor"), 4, "Visitor");
+            world.CancelPending(4);
+
+            Assert.That(world.Players.IsRecorded(K("visitor")), Is.False, "a lobby visit must not record anyone before a start");
+            Assert.That(world.Players.Recorded.Count, Is.EqualTo(0));
+        }
+
         // The 2-player rule is a START rule (user ruling 2026-10-30): a session that dropped to one player carries on and scales down.
         [Test]
         public void TheTwoPlayerRule_AppliesAtStartOnly()

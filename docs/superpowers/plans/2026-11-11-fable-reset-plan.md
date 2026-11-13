@@ -109,3 +109,19 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
   - Start the session on Fable. The first turn ran on Opus and was stopped; its scans were kept, so little was lost, but the baseline had to be measured again.
   - Launch every scan in one message and tell the run to write nothing until all are back, so it takes one long turn instead of one per report.
   - Say which earlier decisions the run may propose to reopen. This plan asks to change plan 3 decision 10 (decision D1) and marks it as waiting for a yes.
+
+### 2026-11-12, Run 2: save and netcode risk audit (`docs/superpowers/audits/2026-11-12-save-netcode-audit.md`)
+- **Cost.** Weekly Fable 27% to 43% (16 points). Weekly all models 56% to 65% (9 points; the stop was 68%). 5-hour window 4% to 77%. Account numbers, so upper bounds, though nothing else heavy ran. About 105 minutes of wall clock, 24 of them the implementer's `check`. Session context ended near 395k tokens.
+- **Where it went.** Eight Haiku scanners (about 945k subagent tokens), one Opus risk review (118k), one Sonnet implementer (130k, three tests and one `check`). Fable itself read about 3,500 lines of the save spine and the session seams, and wrote one 190-line findings file plus the rule, queue and walk edits.
+- **Result.** 2 blockers, 9 should-fix, 12 notes. Both blockers were found by Fable reading two files side by side, not by a scanner: each scan had listed its half correctly and none connected them.
+- **What worked.**
+  - Scanners as maps, Fable as the reader of the code that matters. The save spine is small enough to read whole, and reading it while the scans ran filled the wait.
+  - The Opus risk review earned its cost: it widened one blocker (the first lobby is affected too), demoted another with a reason, and settled an NGO ordering question from the package source.
+  - Docs, rules and queue committed before the implementer ran, so the one `check` covered the final tip and the merge needed no second run.
+  - `System.Reflection.DispatchProxy` fakes an SDK interface in an EditMode test in about a dozen lines; the "needs a seam" finding got a real failing test.
+- **What to brief differently.**
+  - One run took a whole 5-hour window and ended above the 250k-token handoff line. Split a future audit in two runs (save, then network), or cap Fable's own reading to named files.
+  - Name the files Fable reads itself in the brief, and give the scanners the rest. The scans of the save spine repeated what the direct read found.
+  - Ask every network scan one cross-file question: "which other handlers run on the same event, and what do they free or write". That is where both blockers were.
+  - Subagents run in the background here, so eight scans cost eight wake-ups whatever the brief says; fewer, wider scans (four) would have cost less and mapped the same ground.
+  - A stop three points away from the measured end (65% against 68%) was luck. Give an audit run a budget with room for its risk review and one `check`.
