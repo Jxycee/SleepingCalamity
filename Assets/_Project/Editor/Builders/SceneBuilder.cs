@@ -50,6 +50,7 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.GetOrAdd<PlayerInputAdapter>(app);
             BuilderUtil.GetOrAdd<AudioBus>(app);
             BuilderUtil.GetOrAdd<DevSessionPanel>(app);
+            BuilderUtil.GetOrAdd<ToastLine>(app);
             AddFrontDoor(app);
             ConfigureNetworkManager(networkManager, transport, prefabList);
             bootstrap.Configure(playerPrefab, inputActions);

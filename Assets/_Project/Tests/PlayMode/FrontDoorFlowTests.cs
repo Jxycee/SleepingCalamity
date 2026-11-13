@@ -220,6 +220,19 @@ namespace SleepingCalamity.Tests.PlayMode
             finally { InputSystem.RemoveDevice(keyboard); }
         }
 
+        // The Lobby is a menu: the input service must say Menu while it is up (that unlocks and shows the cursor), and Free once the town has loaded.
+        private static IEnumerator ExpectMenuContext(AppBootstrap host)
+        {
+            var input = host.Services.Get<IInputService>();
+            yield return PlayModeHarness.WaitUntil(() => input.Context == InputContext.Menu, StepTimeout, "the Lobby never opened the Menu input context; it is " + input.Context);
+        }
+
+        private static IEnumerator ExpectFreeContextInTheTown(AppBootstrap host)
+        {
+            var input = host.Services.Get<IInputService>();
+            yield return PlayModeHarness.WaitUntil(() => input.Context == InputContext.Free, StepTimeout, "the Menu context stayed on in the town; it is " + input.Context);
+        }
+
         private static IEnumerator WaitInHollowmere(AppBootstrap host)
         {
             yield return PlayModeHarness.WaitUntil(
@@ -291,6 +304,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             yield return Boot(hollowmere: true);
 
+            yield return ExpectMenuContext(app);
             Label name = Find<Label>(door, FrontDoorView.Ids.GameName);
             Assert.That(name.text, Is.EqualTo("Sleeping Calamity"));
             yield return Press(door, FrontDoorView.Ids.PlaySolo);
@@ -309,10 +323,34 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return TapKey(Key.Enter);
 
             yield return WaitInHollowmere(app);
+            yield return ExpectFreeContextInTheTown(app);
             Assert.That(app.World.Started, Is.True);
             Assert.That(app.World.Players.Kind, Is.EqualTo(WorldKind.Solo));
             Assert.That(app.WorldSaveFlow.SelectedWorldId, Is.EqualTo(app.FrontDoor.Rows[0].Id), "it opened the world the list showed");
             yield return PlayModeHarness.WaitUntil(() => !door.IsShown, StepTimeout, "the door stayed on screen over Hollowmere");
+        }
+
+        // Catches: a second press of Play landing on Cancel (the Connecting screen's focused button) and abandoning the start the player just made.
+        [UnityTest]
+        public IEnumerator Solo_DoublePressPlay_DoesNotCancelTheStart()
+        {
+            yield return Boot(hollowmere: true);
+            yield return Press(door, FrontDoorView.Ids.PlaySolo);
+            yield return WaitState(app.FrontDoor, FrontDoorState.Worlds, "Play solo did not open the worlds list");
+            yield return Press(door, FrontDoorView.Ids.NewWorld);
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.WorldRow(1), _ => { });
+            yield return Press(door, FrontDoorView.Ids.Play);
+
+            // The second press arrives as soon as the Connecting screen is up: on Cancel, which must ignore it for a moment.
+            Button cancel = null;
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.ConnectingCancel, b => cancel = b);
+            using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
+            {
+                submit.target = cancel;
+                cancel.SendEvent(submit);
+            }
+            yield return WaitInHollowmere(app);
+            Assert.That(app.World.Started, Is.True, "the second press abandoned the start");
         }
 
         // Catches: Play opening the newest world instead of the one picked in the list. The OLDER of two worlds is selected, so the default (newest) could not pass.
@@ -350,6 +388,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             yield return Boot(hollowmere: true);
             yield return HostThroughTheDoor();
+            yield return ExpectMenuContext(app);
 
             yield return WaitLabel(door, FrontDoorView.Ids.JoinCode, t => t == Code, "the join code");
             Assert.That(app.Services.Get<INetworkSession>().JoinCode, Is.EqualTo(Code));
@@ -369,6 +408,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
             yield return Press(door, FrontDoorView.Ids.Start);
             yield return WaitInHollowmere(app);
+            yield return ExpectFreeContextInTheTown(app);
             Assert.That(app.World.Started, Is.True);
             Assert.That(app.World.Players.Kind, Is.EqualTo(WorldKind.Multiplayer));
             Assert.That(app.World.Players.Recorded.Count, Is.EqualTo(2), "both players are recorded in the world");

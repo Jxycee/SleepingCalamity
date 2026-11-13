@@ -172,7 +172,7 @@ namespace SleepingCalamity.App
             // the session after theirs, so by the time it hears Ended the flow has already saved and gone back to the Lobby.
             FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster));
             FrontDoorView view = GetComponent<FrontDoorView>();
-            if (view != null) view.Bind(FrontDoor, session);
+            if (view != null) view.Bind(FrontDoor, session, input);
         }
 
         private void Update()

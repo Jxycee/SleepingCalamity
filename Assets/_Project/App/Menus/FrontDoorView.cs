@@ -88,6 +88,7 @@ namespace SleepingCalamity.App
         }
 
         private const string CopiedWords = "Code copied.";
+        private const float CancelIgnoreSeconds = 0.4f;
 
         private UIDocument document;
         private FrontDoorModel model;
@@ -96,6 +97,10 @@ namespace SleepingCalamity.App
         private VisualElement root;
         private readonly Dictionary<FrontDoorState, VisualElement> screens = new Dictionary<FrontDoorState, VisualElement>();
         private PanelEventHandler panelHandler;
+        private IInputService input;            // the App's input service (null for a door that is not the App's)
+        private bool lobbyActive;               // the Lobby scene is the active scene
+        private bool menuOpenByDoor;            // this view raised IInputService.MenuOpen and must lower it
+        private float connectingSince;          // unscaled time the Connecting screen came up
 
         private bool shown;
         private bool dirty = true;
@@ -117,11 +122,13 @@ namespace SleepingCalamity.App
         public VisualElement DoorRoot => root;
 
         // AppBootstrap hands the model over once it exists; the session decides, with the model, whether the Title screen is up.
-        public void Bind(FrontDoorModel frontDoor, INetworkSession networkSession)
+        public void Bind(FrontDoorModel frontDoor, INetworkSession networkSession, IInputService inputService = null)
         {
             if (model != null) model.Changed -= MarkDirty;
+            ReleaseMenuContext();
             model = frontDoor;
             session = networkSession;
+            input = inputService;
             if (model != null && isActiveAndEnabled) model.Changed += MarkDirty;
             dirty = true;
             renderedState = null;
@@ -140,6 +147,7 @@ namespace SleepingCalamity.App
 
         private void OnDisable()
         {
+            ReleaseMenuContext();
             if (model != null) model.Changed -= MarkDirty;
             Release();
             UnbindTree();
@@ -147,8 +155,37 @@ namespace SleepingCalamity.App
 
         private void MarkDirty() => dirty = true;
 
+        // The Lobby is a menu: while it is the active scene the input service is in the Menu context, which unlocks and shows the cursor (without it a real build's mouse is dead:
+        // PlayerInputAdapter locks the cursor in every other context). Written on the Lobby transitions only, and only taken back if this view raised it.
+        private void TrackLobby()
+        {
+            bool lobby = SceneManager.GetActiveScene().name == SceneNames.Lobby;
+            if (lobby == lobbyActive) return;
+            lobbyActive = lobby;
+            if (lobby)
+            {
+                if (input != null && !input.MenuOpen)
+                {
+                    input.MenuOpen = true;
+                    menuOpenByDoor = true;
+                }
+            }
+            else
+            {
+                ReleaseMenuContext();
+            }
+        }
+
+        private void ReleaseMenuContext()
+        {
+            if (menuOpenByDoor && input != null) input.MenuOpen = false;
+            menuOpenByDoor = false;
+            lobbyActive = false;
+        }
+
         private void Update()
         {
+            if (model != null) TrackLobby();
             if (document != null && document.rootVisualElement != boundRoot) BindTree();
             if (root == null || model == null) return;
 
@@ -250,7 +287,12 @@ namespace SleepingCalamity.App
                 });
             }
 
-            Hook(Ids.ConnectingCancel, Leave);
+            // The Connecting screen's focused button is Cancel, so a second press of the button that started the attempt would land on it: ignore presses for a moment.
+            Hook(Ids.ConnectingCancel, () =>
+            {
+                if (Time.unscaledTime - connectingSince < CancelIgnoreSeconds) return;
+                Leave();
+            });
             Hook(Ids.WaitingLeave, Leave);
             Hook(Ids.EndedOk, () => model?.Acknowledge());
 
@@ -329,6 +371,7 @@ namespace SleepingCalamity.App
             bool stateChanged = renderedState != model.State;
             renderedState = model.State;
             dirty = false;
+            if (stateChanged && model.State == FrontDoorState.Connecting) connectingSince = Time.unscaledTime;
 
             foreach (KeyValuePair<FrontDoorState, VisualElement> screen in screens)
                 if (screen.Value != null) screen.Value.style.display = screen.Key == model.State ? DisplayStyle.Flex : DisplayStyle.None;

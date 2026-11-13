@@ -138,6 +138,7 @@ GameObject:
   - component: {fileID: 1009}
   - component: {fileID: 1010}
   - component: {fileID: 1011}
+  - component: {fileID: 1012}
   m_Layer: 0
   m_Name: App
   m_TagString: Untagged
@@ -293,6 +294,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 1000}
   m_Enabled: 1
   m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6afd424680a7c1e4c8674c6654ff0125, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SleepingCalamity.App::SleepingCalamity.App.ToastLine
+--- !u!114 &1009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
@@ -307,7 +320,7 @@ MonoBehaviour:
   m_PivotReferenceSize: 0
   m_Pivot: 0
   m_WorldSpaceCollider: {fileID: 0}
---- !u!114 &1009
+--- !u!114 &1010
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -319,7 +332,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ddb1ab02b0f731b48b871b5e7554a7a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SleepingCalamity.App::SleepingCalamity.App.FrontDoorView
---- !u!114 &1010
+--- !u!114 &1011
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -334,7 +347,7 @@ MonoBehaviour:
   m_FirstSelected: {fileID: 0}
   m_sendNavigationEvents: 1
   m_DragThreshold: 10
---- !u!114 &1011
+--- !u!114 &1012
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
