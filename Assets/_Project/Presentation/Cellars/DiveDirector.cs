@@ -2,7 +2,7 @@
 // spawned by the host (DiveHub in the dive scene, or a test). It owns the dive FLOW and the party state that outlives a dive: PartyBags, DiveCheckpoint and DivePieces (Core/Cellars); every dive gets a fresh
 // DiveSession over them (Core/Cellars/DiveSession: the rules for floor, phase, stir, momentum). The data stays where it lives: the floor (seed, floor) in CellarFloorSync, the session and its summary in
 // DiveHaulSync (both spawned here once per session and kept: ending a dive sets the floor to NoFloor, it never despawns them, so found pieces, the checkpoint and the bags survive a return dive).
-// Host-written NetworkVariables (late joiners get them with the spawn): NetActive, NetCheckpointHeld (the next dive may pick a floor), NetPickableMaxFloor (the deepest floor it may pick), NetStairOpen, and
+// Host-written NetworkVariables (late joiners get them with the spawn): NetActive, NetEnd (the last dive's end reason plus a counter; the host writes only that, each peer's result card builds its own numbers from its own owner-read bag), NetCheckpointHeld (the next dive may pick a floor), NetPickableMaxFloor (the deepest floor it may pick), NetStairOpen, and
 // the three world points NetHome / NetHubStair / NetOrigin (where the party lands, the church trapdoor, where the floors are built).
 // Clients ask by RPC and the host re-checks everything: RequestStartDiveRpc(floor) (trapdoor range, DiveCheckpoint.CanStartOn), RequestDescendRpc (floor 1), RequestStairRpc(fromFloor) (current floor must equal
 // fromFloor, so two presses in one tick advance once; range; gate key; floor 5's stair only after the bank choice), RequestGoHomeRpc (the cleared bank floor, range), RequestFinishRpc (floor 7's EndCell, range),
@@ -37,6 +37,17 @@ namespace SleepingCalamity.Presentation
 {
     public enum DiveEndReason : byte { Failed = 0, WentHome = 1, Abandoned = 2, Finished = 3 }
 
+    // PL-2 task 2.3: how the last dive ended, for every peer. Count rises on every ending (so the same reason twice still changes the value); Count 0 = no dive has ended in this session.
+    public struct DiveEndNet : INetworkSerializable, System.IEquatable<DiveEndNet>
+    {
+        public byte Reason;
+        public uint Count;
+        public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter { s.SerializeValue(ref Reason); s.SerializeValue(ref Count); }
+        public bool Equals(DiveEndNet o) => Reason == o.Reason && Count == o.Count;
+        public override bool Equals(object obj) => obj is DiveEndNet o && Equals(o);
+        public override int GetHashCode() => unchecked((int)(Count * 31u) + Reason);
+    }
+
     // Runs before HeroLocomotion (order 0): the gravity hold must be decided in the same frame a replicated floor swap lands, or the owner hero takes one gravity step over cells the new floor lacks
     // (a long frame under load sank a client hero 1.3 m once). ApplyPending also lands the arrival teleport before the hero moves.
     [DefaultExecutionOrder(-30)]
@@ -50,13 +61,19 @@ namespace SleepingCalamity.Presentation
         public static DiveDirector Instance { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { Instance = null; }
+        private static void ResetStatics() { Instance = null; InteractClaims = 0; }
+
+        // A screen that owns the Interact press (the dive result card, in UI, which Presentation cannot see) claims it while it is up: the press that dismisses it must not also start a dive at the trapdoor
+        // the party was just sent home beside. Claims count, so several peers' cards in one process (tests) balance. While any claim stands LocalInteract shows and sends nothing.
+        public static int InteractClaims { get; private set; }
+        public static void ClaimInteract(bool on) { InteractClaims = Mathf.Max(0, InteractClaims + (on ? 1 : -1)); }
         public const float PlacementInterval = 0.2f;
         public const float FloorClearDelay = 0.75f;   // after the party was sent home, the floor stays this long so nobody drops through it first
         public const float PendingTimeout = 10f;      // an owner applies a teleport after this long even when its floor never built
 
         public readonly NetworkVariable<bool> NetActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public readonly NetworkVariable<bool> NetCheckpointHeld = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // DiveCheckpoint.Held: the next dive may pick a floor
+        public readonly NetworkVariable<DiveEndNet> NetEnd = new NetworkVariable<DiveEndNet>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // how the last dive ended (host writes in EndDive); a late joiner reads it with the spawn and shows no card for it
+        public readonly NetworkVariable<bool> NetCheckpointHeld =new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // DiveCheckpoint.Held: the next dive may pick a floor
         public readonly NetworkVariable<bool> NetSuspendedDive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // a loaded bank suspend waits: the trapdoor resumes it instead of starting a dive
         public readonly NetworkVariable<int> NetPickableMaxFloor = new NetworkVariable<int>(1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the deepest floor the next dive may start on (hub prompt)
         public readonly NetworkVariable<bool> NetStairOpen = new NetworkVariable<bool>(true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);   // the current floor's stair can be used (gate key taken or not required)
@@ -457,6 +474,7 @@ namespace SleepingCalamity.Presentation
             ForgetLiveParty();
             int endFloor = _session != null ? _session.Floor : 0;   // the dive's last floor, before the Town-phase session below replaces it
             NetActive.Value = false; _openedStairs.Clear(); NetStairOpen.Value = true;
+            NetEnd.Value = new DiveEndNet { Reason = (byte)reason, Count = NetEnd.Value.Count + 1u };   // the one new replicated value of the dive result (PL-2 2.3); each peer builds its own numbers
             _session = NewSession();
             if (HaulSync != null) HaulSync.ServerAdopt(_session);
             RefreshHub();
@@ -811,6 +829,7 @@ namespace SleepingCalamity.Presentation
         private void LocalInteract()
         {
             Prompt = PromptKind.None; PromptText = "";
+            if (InteractClaims > 0) return;   // a card owns Interact right now (ClaimInteract)
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             if (player == null || _hasPending) return;
             Vector3 me = player.transform.position;
@@ -1030,10 +1049,13 @@ namespace SleepingCalamity.Presentation
             return string.IsNullOrEmpty(s) ? generic : s;
         }
 
-        // Owner (any peer): H eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf).
+        // Owner (any peer): the UseItem button (or the dev key H) eats one of the baker's loaves; the host re-checks everything (HeroVitals.ServerEatLoaf: up, hurt, has one).
+        // UseItem arrives through the routed intent, so it is dead in placement, the bank screen and menus (InputContextRouter).
         private void LocalEat()
         {
-            if (!(HeroInput.ResolveDefault() is IDevInput dev) || !dev.WasPressed(DevKey.EatLoaf)) return;
+            IInputService input = HeroInput.ResolveDefault();
+            bool pressed = input != null && input.Intent.UseItemPressed || input is IDevInput dev && dev.WasPressed(DevKey.EatLoaf);
+            if (!pressed) return;
             NetworkObject player = NetworkManager.LocalClient != null ? NetworkManager.LocalClient.PlayerObject : null;
             HeroVitals v = player != null ? player.GetComponent<HeroVitals>() : null;
             if (v != null) v.RequestEatLoaf();

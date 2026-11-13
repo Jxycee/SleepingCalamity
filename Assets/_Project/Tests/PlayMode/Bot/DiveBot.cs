@@ -454,6 +454,8 @@ namespace SleepingCalamity.Tests.PlayMode
                     }, 6f);
                     return;
                 case Goal.HubStair:
+                    // The result card of the dive just ended owns Interact (and the trapdoor prompt) until it is dismissed: press once to dismiss it, look again half a second later.
+                    if (SleepingCalamity.UI.DiveResultCard.ShowingCount > 0) { if (_pressCheck == null) { _pressNext = true; Check(0.5f, () => { }); } return; }
                     if (d.Prompt != DiveDirector.PromptKind.Descend) Note("Prompt", $"at the hub stair ({Flat(t.Pos - _hero.position).magnitude:0.0} m) but the prompt is '{d.Prompt}'", "hub");
                     Press(t, () => { if (!Dir.NetActive.Value) { Note("Interact", "pressed interact at the hub stair and no dive started (6 s)", "hub"); GiveUp(t); } }, 6f);
                     return;

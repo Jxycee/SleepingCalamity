@@ -20,6 +20,8 @@ namespace SleepingCalamity.Core
 
         public bool IsFound(int id) => _found.Contains(id);
         public IEnumerable<int> FoundIds => _found;
+        // Pieces (not people) found so far: the "N home" number. After a reload RestoreWorld marks every piece the town holds (stock or placed) as found, so this counts them too.
+        public int FoundPieceCount { get { int n = 0; foreach (int id in _found) if (!PieceCatalog.IsPerson(id)) n++; return n; } }
         public int DepthOf(int id) => _depth.TryGetValue(id, out int f) ? f : 0;
 
         // False for an unknown id or one already found.

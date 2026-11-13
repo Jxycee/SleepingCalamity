@@ -12,7 +12,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 
 ## Ready: playable loop (critical path; plan `docs/superpowers/plans/2026-11-11-playable-loop.md`, decisions D1-D5 approved 2026-11-11)
 - [x] **M** PL-1 Loop proof: input-only loop tests and loop bot, first-building measurement, D1 frame on floor 2, D4 floor 3 mix (plan section 3) [U] (launched 2026-11-11; merged from `afa1720a`, check PASS; results `Reference/sessions/pl1-loop-proof/RESULTS.md`)
-- [ ] **M** PL-2 Guide and dive result: `LoopGuide`, objective line and beacons, dive result card, a real button to eat a loaf (after PL-1) [U][net]
+- [x] **M** PL-2 Guide and dive result: `LoopGuide`, objective line and beacons, dive result card, a real button to eat a loaf (after PL-1) [U][net]
 - [ ] **L** PL-3 Front door: UI Toolkit spike, `UiText`, `FrontDoorModel`, five screens, dev panel off in release (after PL-1) [U][net]
 - [ ] **M** PL-4 Way out and seams: pause menu, return-dive floor pick with a real button, PL-1 breaks, release build and walk script (after PL-3) [U][net]
 - [ ] **M** PL-5 Walk fixes (reserve; only after the user's walks)
