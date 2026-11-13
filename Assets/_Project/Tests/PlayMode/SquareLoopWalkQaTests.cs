@@ -61,6 +61,7 @@ namespace SleepingCalamity.Tests.PlayMode
             AppBootstrap app = AppBootstrap.Current;
             SceneFlow.StartSceneOverride = null;   // the real default: the town
             yield return PlayModeHarness.StartDirectHostWithScenes();
+            ServiceRoots.App.Replace<SleepingCalamity.Runtime.IInputService>(new SleepingCalamity.Tests.PlayMode.FakeInputService());   // the real adapter's binding display strings (the trapdoor's floor-pick prompt) crash a headless Linux editor
             _client = new PlayModeHarness.TestClient(app, PlayModeHarness.PlayerId(8), declineScenes: true);
             var cts = new CancellationTokenSource();
             yield return PlayModeHarness.Await(_client.JoinAsync(cts.Token), 20f, cts);
@@ -445,6 +446,7 @@ namespace SleepingCalamity.Tests.PlayMode
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             yield return PlayModeHarness.StartDirectHostWithoutScenes();
+            ServiceRoots.App.Replace<SleepingCalamity.Runtime.IInputService>(new SleepingCalamity.Tests.PlayMode.FakeInputService());   // the real adapter's binding display strings (the trapdoor's floor-pick prompt) crash a headless Linux editor
             NetworkManager nm = AppBootstrap.Current.NetworkManager;
             NetworkObject prefab = null;
             foreach (NetworkPrefabsList list in nm.NetworkConfig.Prefabs.NetworkPrefabsLists)
