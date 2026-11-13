@@ -1,4 +1,5 @@
 Status: BLOCKED
+Update: PlayMode save-test failures fixed at 70165efd (tests started hosts without the start gate; 24/24). Remaining: HostClientTests.FifthUniquePlayer_IsRefusedByApproval pins the old refusal, follows the user rule call; then one full check on the tip.
 Started: 2026-11-13T13:24:21Z (cloud launcher)
 Branch: claude/audit-fixes
 
