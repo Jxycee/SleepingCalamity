@@ -10,7 +10,9 @@ namespace SleepingCalamity.Networking
     // Authority: host. NGO calls Handle on the server only (each remote join, and the host's own client inside StartHost).
     // Every decision goes through Core JoinRules, then through the world-player rules (HostWorld.Admit -> Core WorldPlayers): a join to a
     // Solo world is refused (JoinsClosed), a key that is not recorded is refused once 4 players are recorded (FullLobby), and a new key is
-    // recorded once its client connects. Approved joins are parked in the JoinApprovalBridge until their client connects; the approver's own NGO
+    // written into the world only when its player plays it - the start gate, or their hero spawning in a running session (user decision
+    // 2026-11-13, audit A2): a connection coming up only tells the world the player's name (HostWorld.NoteConnected), and the place their
+    // approval holds is freed again when they leave (CancelPending). Approved joins are parked in the JoinApprovalBridge until their client connects; the approver's own NGO
     // connection events then move them into the HostRoster (Connect / Disconnect), which is also the bridge's IJoinContextProvider.
     // The "2 or more players to start" gate is not an approval rule: it is HostWorld.TryStartSession, called by SceneFlow.
     public sealed class ConnectionApprover
@@ -79,7 +81,7 @@ namespace SleepingCalamity.Networking
             if (_config.Bridge.TryTakeApproved(clientId, out ApprovedJoin join))
             {
                 roster.Connect(join);
-                _config.World?.RecordEntered(join.Key, clientId, join.Name);   // the client is in: now the world writes it down, with its name
+                _config.World?.NoteConnected(join.Key, clientId, join.Name);   // the client is in; the world writes nobody down until they play it (audit A2)
             }
         }
 

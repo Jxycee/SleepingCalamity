@@ -2,6 +2,8 @@
 // connected client once a gameplay scene is loaded (OnLoadEventCompleted for the clients that loaded with the host) and for a client that
 // joins later (OnSynchronizeComplete). Attach / Detach follow NetworkManager.OnServerStarted / OnServerStopped (AppBootstrap).
 // The player prefab is owned by its client (owner-authoritative NetworkTransform); movement itself arrives with M2.
+// It is also the moment a player who joined a running session counts as one of the world's players: the spawn calls HostWorld.RecordHeroSpawned
+// (user decision 2026-11-13, audit A2; before the start gate nobody is recorded).
 using System;
 using System.Collections.Generic;
 using SleepingCalamity.Core;
@@ -18,13 +20,15 @@ namespace SleepingCalamity.App
         private readonly NetworkManager _nm;
         private readonly NetworkObject _playerPrefab;
         private readonly HostRoster _roster;
+        private readonly HostWorld _world;
         private NetworkSceneManager _attachedTo;
 
-        public ArenaPlayerSpawner(NetworkManager nm, NetworkObject playerPrefab, HostRoster roster)
+        public ArenaPlayerSpawner(NetworkManager nm, NetworkObject playerPrefab, HostRoster roster, HostWorld world = null)
         {
             _nm = nm ?? throw new ArgumentNullException(nameof(nm));
             _playerPrefab = playerPrefab;
             _roster = roster;
+            _world = world;
         }
 
         public void Attach()
@@ -91,7 +95,15 @@ namespace SleepingCalamity.App
 
             NetworkObject player = _nm.SpawnManager.InstantiateAndSpawn(_playerPrefab, clientId, destroyWithScene: true, isPlayerObject: true,
                 position: position, rotation: Quaternion.identity);
-            if (player == null) Debug.LogError("ArenaPlayerSpawner: spawning the player for client " + clientId + " failed.");
+            if (player == null)
+            {
+                Debug.LogError("ArenaPlayerSpawner: spawning the player for client " + clientId + " failed.");
+                return;
+            }
+
+            // A hero in a session that is already running: this player is playing the world, so the world records them now (user decision
+            // 2026-11-13, audit A2). At a session start the gate has recorded the group already and this is a no-op.
+            if (_world != null && _roster != null && _roster.TryGetKey(clientId, out PlayerKey key)) _world.RecordHeroSpawned(key, clientId);
         }
 
         // The roster slot of the client (0..3, kept for a rejoin), so a player always spawns at the same place around the point. Without a

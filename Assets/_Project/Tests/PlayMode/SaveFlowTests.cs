@@ -79,8 +79,9 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(app.World.Players.IsRecorded(PlayerKey.Local(app.Services.Get<ISettings>().EnsureLocalPlayerId())), Is.True);
         }
 
-        // Catches: the multiplayer start gate not being the thing that loads the arena, a recorded second player not reaching the file the
-        // moment they connect, and the 2-player start not creating the Multiplayer arena session. The second peer connects, synchronizes and
+        // Catches: the multiplayer start gate not being the thing that loads the arena, a lobby visitor being written into the world file before
+        // the start or the players the start records not reaching the file at once (audit A2), and the 2-player start not creating the
+        // Multiplayer arena session. The second peer connects, synchronizes and
         // declines scenes (one process), so the host's load event ends by its timeout for that peer.
         [UnityTest]
         public IEnumerator Multiplayer_StartsThroughSceneFlow_OnceASecondPlayerIsConnected()
@@ -105,15 +106,20 @@ namespace SleepingCalamity.Tests.PlayMode
             cts.Dispose();
             yield return PlayModeHarness.WaitUntil(() => app.Roster.ConnectedCount == 2, 20f, "the second player never reached the roster");
 
-            // Recorded on connecting, on disk already: host and friend, with names.
+            // Nobody is written into the world by a lobby connection (user decision 2026-11-13, audit A2): the file still records no players.
             WorldSave beforeStart = ReadWorldFile(_dir, worldId);
             Assert.That(beforeStart.Players.Kind, Is.EqualTo((int)WorldKind.Multiplayer));
-            Assert.That(beforeStart.Players.Recorded.Count, Is.EqualTo(2));
-            Assert.That(beforeStart.Players.Recorded[1].Id, Is.EqualTo(PlayModeHarness.PlayerId(5)));
+            Assert.That(beforeStart.Players.Recorded.Count, Is.EqualTo(0), "a lobby visit must not be recorded");
 
             // Two connected: the gate opens through the real flow and the arena loads on the host.
             Assert.That(app.SceneFlow.TryStartSession(), Is.True);
             Assert.That(app.World.Started, Is.True);
+
+            // The start is what records them, and HostWorld.Changed put it on disk at once: host and friend, with names.
+            WorldSave afterStart = ReadWorldFile(_dir, worldId);
+            Assert.That(afterStart.Players.Recorded.Count, Is.EqualTo(2));
+            Assert.That(afterStart.Players.Recorded[1].Id, Is.EqualTo(PlayModeHarness.PlayerId(5)));
+            Assert.That(afterStart.Players.Recorded[1].Name, Is.Not.Empty, "with the name their connection brought");
             yield return PlayModeHarness.WaitUntil(
                 () => SceneManager.GetActiveScene().name == SceneNames.ArenaGreybox && app.NetworkManager.LocalClient.PlayerObject != null,
                 30f, "the arena never loaded with the host's player");

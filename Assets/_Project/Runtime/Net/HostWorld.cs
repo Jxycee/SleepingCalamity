@@ -12,9 +12,12 @@ namespace SleepingCalamity.Runtime
     // The host's world-player gate (user decision 2026-10-29, rules in Core/World/WorldPlayers):
     //  - Admit is called by ConnectionApprover for every join, the host's own included, after JoinRules approved it. It refuses a join to a
     //    Solo world (SoloWorldClosed), refuses a key of another identity kind and refuses a new key when 4 players are recorded (WorldFull).
-    //    It records nothing: RecordEntered writes a key down once its client has actually connected (the approver's connection event).
+    //    It records nothing, and neither does a connection coming up (NoteConnected only keeps the display name): a player is written into the
+    //    world when they PLAY it (user decision 2026-11-13, audit A2) - at the session start for everyone present, or, for a join into a session
+    //    that is already running, when their hero spawns (RecordHeroSpawned). A lobby visitor who leaves before Start is never recorded.
     //  - TryStartSession is THE start gate. SceneFlow calls it before loading the first gameplay scene. A Multiplayer world is created at the
-    //    first start and every start needs 2 or more of its recorded players connected; a Solo world starts with its owner alone.
+    //    first start and every start needs 2 or more players connected (recorded or recordable: the gate records them); a Solo world starts with
+    //    its owner alone.
     //    Until it returns Ok the host sits in the lobby: clients can connect but no gameplay scene loads. The 2-player rule is a START rule
     //    only (user ruling 2026-10-30): once a session runs, players dropping to 1 does not end it (no kick mid-dive); ScalePlayers falls to 1.
     // Before the world exists (Players == null) the session mode decides what it will be (PendingKind). The world save flow loads a saved
@@ -23,6 +26,8 @@ namespace SleepingCalamity.Runtime
     {
         private readonly List<PlayerKey> _scratch = new List<PlayerKey>(NetworkConstants.MaxPlayers);
         private readonly Dictionary<ulong, PlayerKey> _pendingNew = new Dictionary<ulong, PlayerKey>(NetworkConstants.MaxPlayers);   // approved new players not yet recorded, by client id
+        private readonly List<ulong> _pendingDone = new List<ulong>(NetworkConstants.MaxPlayers);                                   // scratch for ForgetPendingOf
+        private readonly Dictionary<PlayerKey, string> _namesWhileConnected = new Dictionary<PlayerKey, string>(NetworkConstants.MaxPlayers);   // display names of connected players, kept until they are recorded
 
         // The recorded players of this machine's world; null until the world exists (first start, or loaded from the save).
         public WorldPlayers Players { get; private set; }
@@ -229,6 +234,7 @@ namespace SleepingCalamity.Runtime
             Players = players;
             Started = false;
             _pendingNew.Clear();
+            _namesWhileConnected.Clear();
         }
 
         // A new session starts: the world stays, the started flag and a pending kind reset.
@@ -237,6 +243,7 @@ namespace SleepingCalamity.Runtime
             PendingKind = pendingKind;
             Started = false;
             _pendingNew.Clear();
+            _namesWhileConnected.Clear();
         }
 
         // Connection approval. JoinRules (and so the host's self-approval, IsServerSelf) ran before this. Nothing is recorded here.
@@ -283,8 +290,21 @@ namespace SleepingCalamity.Runtime
             return WorldPlayerVerdict.Ok;
         }
 
-        // The client has entered the session (its connection is up): the key is written into the world now, with its display name.
-        // No-op before the world exists. A host whose key cannot be recorded (a full or other-identity Multiplayer world) stays unrecorded;
+        // A client's connection is up (ConnectionApprover). NOTHING is written into the world here (user decision 2026-11-13, audit A2): a
+        // player is recorded when they PLAY the world - at the session start (TryStartSession) or, for a join into a running session, when
+        // their hero spawns (RecordHeroSpawned). So a friend who looks at the lobby and leaves takes none of the world's four places. Their
+        // display name is kept until the moment they are recorded; their approved place stays taken while they are connected (CancelPending
+        // frees it). A player who is already recorded has their name refreshed now, as before.
+        public void NoteConnected(PlayerKey key, ulong clientId, string name = null)
+        {
+            if (!WorldPlayers.IsValidKey(key)) return;
+            if (!string.IsNullOrWhiteSpace(name)) _namesWhileConnected[key] = name;
+            WorldPlayers world = Players;
+            if (world != null && name != null && world.IsRecorded(key) && world.SetName(key, name)) RaiseChanged();
+        }
+
+        // The player is playing the world: the key is written into it now, with the display name their connection brought (name null = the kept
+        // one). No-op before the world exists. A host whose key cannot be recorded (a full or other-identity Multiplayer world) stays unrecorded;
         // TryStartSession then refuses with NotRecorded / WrongIdentityKind.
         public void RecordEntered(PlayerKey key, ulong clientId, string name = null)
         {
@@ -294,15 +314,28 @@ namespace SleepingCalamity.Runtime
             bool changed;
             if (world.Kind == WorldKind.Solo) changed = world.ClaimSoloOwner(key);
             else changed = !world.IsRecorded(key) && world.Record(key) == WorldPlayerVerdict.Ok;
-            if (name != null && world.SetName(key, name)) changed = true;
+            string display = name ?? (_namesWhileConnected.TryGetValue(key, out string kept) ? kept : null);
+            if (display != null && world.SetName(key, display)) changed = true;
             if (changed) RaiseChanged();
+        }
+
+        // A hero spawned for a client in a session that is already running (ArenaPlayerSpawner): that is the moment a player who joined after
+        // the start counts as having played, so the world records them now (user decision 2026-11-13, audit A2). Before the start gate has run
+        // nothing is recorded: the gate records the whole group that is present.
+        public void RecordHeroSpawned(PlayerKey key, ulong clientId)
+        {
+            if (!Started) return;
+            RecordEntered(key, clientId);
         }
 
         // An approved client that never entered (it dropped first): its place is free again. Keyed by client id, so it works whoever
         // else has already forgotten the approval.
         public void CancelPending(ulong clientId) => _pendingNew.Remove(clientId);
 
-        // The start gate. connected: the players connected now (HostRoster.GetConnectedKeys). Creates the world on the first start.
+        // The start gate. connected: the players connected now (HostRoster.GetConnectedKeys). Creates the world on the first start, and - since
+        // 2026-11-13 (user decision, audit A2) - RECORDS the players present here, because starting a session is what makes someone one of the
+        // world's players. CanStartWithNewPlayers checks the group with the newcomers counted as recordable, so nothing is written for a start
+        // that is refused (a refused start must not spend one of the four places).
         public WorldPlayerVerdict TryStartSession(IReadOnlyList<PlayerKey> connected)
         {
             WorldPlayers world = Players;
@@ -311,15 +344,52 @@ namespace SleepingCalamity.Runtime
                 WorldPlayerVerdict created = WorldPlayers.TryCreate(PendingKind, connected, out world);
                 if (created != WorldPlayerVerdict.Ok) return created;
                 Players = world;
+                ApplyKeptNames(world, connected);
+                ForgetPendingOf(world);
                 RaiseChanged();
             }
             else
             {
-                WorldPlayerVerdict can = world.CanStart(connected);
+                WorldPlayerVerdict can = world.CanStartWithNewPlayers(connected);
                 if (can != WorldPlayerVerdict.Ok) return can;
+                RecordPresent(world, connected);
             }
             Started = true;
             return WorldPlayerVerdict.Ok;
+        }
+
+        // Writes every player present into the world (the gate said they all fit), with the name their connection brought.
+        private void RecordPresent(WorldPlayers world, IReadOnlyList<PlayerKey> present)
+        {
+            bool changed = false;
+            for (int i = 0; i < present.Count; i++)
+            {
+                PlayerKey key = present[i];
+                if (world.Kind == WorldKind.Solo) changed |= world.ClaimSoloOwner(key);
+                else if (!world.IsRecorded(key) && world.Record(key) == WorldPlayerVerdict.Ok) changed = true;
+            }
+            changed |= ApplyKeptNames(world, present);
+            ForgetPendingOf(world);
+            if (changed) RaiseChanged();
+        }
+
+        // The display names the connections brought, now that the keys are recorded (SetName ignores a key that is not).
+        private bool ApplyKeptNames(WorldPlayers world, IReadOnlyList<PlayerKey> present)
+        {
+            bool changed = false;
+            for (int i = 0; i < present.Count; i++)
+                if (_namesWhileConnected.TryGetValue(present[i], out string name) && world.SetName(present[i], name)) changed = true;
+            return changed;
+        }
+
+        // A recorded player holds a place by their record, not by their approval: a pending entry left for them would count twice in Admit.
+        private void ForgetPendingOf(WorldPlayers world)
+        {
+            if (_pendingNew.Count == 0) return;
+            _pendingDone.Clear();
+            foreach (KeyValuePair<ulong, PlayerKey> pending in _pendingNew)
+                if (world.IsRecorded(pending.Value)) _pendingDone.Add(pending.Key);
+            for (int i = 0; i < _pendingDone.Count; i++) _pendingNew.Remove(_pendingDone[i]);
         }
 
         // Convenience for the host flow: the gate against a roster.

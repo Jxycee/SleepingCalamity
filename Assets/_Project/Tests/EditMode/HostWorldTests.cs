@@ -67,9 +67,10 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(new HostWorld().ScalePlayers(new HostRoster()), Is.EqualTo(1));
         }
 
-        // Catches: Admit writing into the world (only RecordEntered does), and the Changed event firing for a player who was already recorded.
+        // Catches: Admit or a connection coming up writing into the world (only playing it does: the start gate, or a hero spawn in a running
+        // session; user decision 2026-11-13, audit A2), and the Changed event firing for a player who was already recorded.
         [Test]
-        public void Admit_WritesNothing_RecordEnteredPersistsOnce()
+        public void Admit_AndAConnection_WriteNothing_TheStartGateRecordsOnce()
         {
             WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b") }, out WorldPlayers players);
             var world = new HostWorld();
@@ -82,12 +83,70 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Players.Recorded.Count, Is.EqualTo(2));
             Assert.That(changed, Is.EqualTo(0));
 
-            world.RecordEntered(K("a"), 1);
-            Assert.That(changed, Is.EqualTo(0), "already recorded");
-            world.RecordEntered(K("c"), 3, "Cleo");
-            Assert.That(world.Players.NameOf(K("c")), Is.EqualTo("Cleo"), "the display name is kept with the record");
+            world.NoteConnected(K("a"), 1);
+            world.NoteConnected(K("c"), 3, "Cleo");   // the lobby connection: the name is kept, the record is not written
+            Assert.That(world.Players.IsRecorded(K("c")), Is.False, "a connection is not playing the world");
+            Assert.That(changed, Is.EqualTo(0));
+
+            Assert.That(world.TryStartSession(Roster("a", "c")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(world.Players.IsRecorded(K("c")), Is.True, "the start records who is present");
+            Assert.That(world.Players.NameOf(K("c")), Is.EqualTo("Cleo"), "the display name their connection brought goes with the record");
             Assert.That(world.Players.Recorded.Count, Is.EqualTo(3));
+            Assert.That(changed, Is.EqualTo(1), "one write, one save");
+
+            world.RecordHeroSpawned(K("c"), 3);
+            Assert.That(changed, Is.EqualTo(1), "already recorded");
+        }
+
+        // Catches (audit A2): a player who joins a session that is already running never being recorded, so the world forgets who played it.
+        [Test]
+        public void AJoinerIntoARunningSession_IsRecordedWhenTheirHeroSpawns()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+            Assert.That(world.TryStartSession(Roster("a", "b")), Is.EqualTo(WorldPlayerVerdict.Ok));
+
+            Assert.That(world.Admit(K("c"), 3, false), Is.EqualTo(WorldPlayerVerdict.Ok));
+            world.NoteConnected(K("c"), 3, "Cleo");
+            Assert.That(world.Players.IsRecorded(K("c")), Is.False, "connected is not playing");
+
+            int changed = 0;
+            world.Changed += () => changed++;
+            world.RecordHeroSpawned(K("c"), 3);
+            Assert.That(world.Players.IsRecorded(K("c")), Is.True, "their hero is in the world: they played it");
+            Assert.That(world.Players.NameOf(K("c")), Is.EqualTo("Cleo"));
             Assert.That(changed, Is.EqualTo(1));
+
+            // A hero that spawns before any start (no session yet) records nobody.
+            var fresh = new HostWorld();
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b") }, out WorldPlayers other);
+            fresh.Load(other);
+            fresh.RecordHeroSpawned(K("c"), 3);
+            Assert.That(fresh.Players.IsRecorded(K("c")), Is.False);
+        }
+
+        // Catches (audit A2): a start that is refused spending one of the world's four places anyway (the gate records the group, so it must
+        // write nothing until it knows the whole group fits).
+        [Test]
+        public void ARefusedStart_RecordsNobody()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b"), K("c") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+            int changed = 0;
+            world.Changed += () => changed++;
+
+            Assert.That(world.TryStartSession(Roster("a", "d", "e")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "three recorded plus two newcomers is five");
+            Assert.That(world.Players.Recorded.Count, Is.EqualTo(3), "neither newcomer was written down");
+            Assert.That(world.Started, Is.False);
+            Assert.That(changed, Is.EqualTo(0));
+
+            Assert.That(world.TryStartSession(Roster("d")), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers), "one player cannot start a multiplayer world");
+            Assert.That(world.Players.IsRecorded(K("d")), Is.False);
+
+            Assert.That(world.TryStartSession(Roster("a", "d")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(world.Players.Recorded.Count, Is.EqualTo(4));
         }
 
         [Test]
@@ -164,12 +223,10 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Admit(K("e"), 6, false), Is.EqualTo(WorldPlayerVerdict.Ok), "the same key again just moves its pending place to the new client");
         }
 
-        // Catches (audit A2): a joiner who connects to a multiplayer lobby and leaves before Start still being written into the world for good
-        // and taking one of its four places (ConnectionApprover.ClientConnected calls RecordEntered when the connection comes up).
-        // NOT covered: the real ConnectionApprover/NGO path (this drives Admit, RecordEntered and CancelPending in the order the approver does),
-        // and what the fix records instead (a start-time record is a user decision).
+        // Catches (audit A2): a joiner who connects to a multiplayer lobby and leaves before Start being written into the world for good and
+        // taking one of its four places.
+        // NOT covered: the real ConnectionApprover/NGO path (this drives Admit, NoteConnected and CancelPending in the order the approver does).
         [Test]
-        [Ignore("AUDIT A2: a lobby visit records the player for good; fix is a user decision (docs/superpowers/audits/2026-11-12-save-netcode-audit.md)")]
         public void JoinerWhoLeavesBeforeStart_IsNotRecorded()
         {
             WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("host"), K("a") }, out WorldPlayers players);
@@ -178,7 +235,7 @@ namespace SleepingCalamity.Tests.EditMode
             HostRoster roster = Roster("host", "a");   // host and A are connected, so the gate could start later
 
             Assert.That(world.Admit(K("c"), 7, false), Is.EqualTo(WorldPlayerVerdict.Ok));
-            world.RecordEntered(K("c"), 7, "C");   // the lobby connection comes up
+            world.NoteConnected(K("c"), 7, "C");   // the lobby connection comes up
             world.CancelPending(7);                // C leaves before TryStartSession (ClientDisconnected)
 
             Assert.That(world.Players.IsRecorded(K("c")), Is.False, "a lobby visit must not take one of the world's places");
@@ -190,7 +247,6 @@ namespace SleepingCalamity.Tests.EditMode
         // an empty players list and the start gate then takes the CanStart branch, not TryCreate.
         // NOT covered: the WorldSaveFlow.Open wiring (the save is built by hand in WorldLibrary.Create's shape).
         [Test]
-        [Ignore("AUDIT A2: a lobby visit records the player for good; fix is a user decision (docs/superpowers/audits/2026-11-12-save-netcode-audit.md)")]
         public void FirstLobbyVisitor_OfANewWorld_IsNotRecorded()
         {
             // What WorldLibrary.Create writes for a new multiplayer world.
@@ -201,11 +257,19 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Players.Recorded.Count, Is.EqualTo(0), "setup: a new world records nobody");
 
             Assert.That(world.Admit(K("visitor"), 4, false), Is.EqualTo(WorldPlayerVerdict.Ok));
-            world.RecordEntered(K("visitor"), 4, "Visitor");
+            world.NoteConnected(K("visitor"), 4, "Visitor");
             world.CancelPending(4);
 
             Assert.That(world.Players.IsRecorded(K("visitor")), Is.False, "a lobby visit must not record anyone before a start");
             Assert.That(world.Players.Recorded.Count, Is.EqualTo(0));
+
+            // The host and one friend then start it: the two who play are recorded, with their names.
+            world.NoteConnected(K("host"), 0, "Hollis");
+            world.NoteConnected(K("friend"), 1, "Fen");
+            Assert.That(world.TryStartSession(Roster("host", "friend")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(world.Players.Recorded.Count, Is.EqualTo(2));
+            Assert.That(world.Players.NameOf(K("friend")), Is.EqualTo("Fen"));
+            Assert.That(world.Players.IsRecorded(K("visitor")), Is.False, "the visitor who left is still nobody");
         }
 
         // The 2-player rule is a START rule (user ruling 2026-10-30): a session that dropped to one player carries on and scales down.

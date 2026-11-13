@@ -180,16 +180,50 @@ namespace SleepingCalamity.Tests.EditMode
             AssertRefused(Ask(new PlayerKey(IdentityKind.Ugs, "online"), 2), EndReason.WrongWorld);
         }
 
-        // Catches: a key written into the world when it is merely approved (an approved client that never arrives would hold a place).
+        // Catches (audit A2): a key written into the world when it is merely approved or merely connected. A player is recorded when they PLAY
+        // the world (user decision 2026-11-13): the start gate, or their hero spawning in a running session. Their place is held meanwhile, so
+        // a lobby of four strangers cannot promise a fifth place, and their name is kept for the record.
         [Test]
-        public void ANewPlayer_IsRecordedOnlyWhenTheirClientConnects()
+        public void ANewPlayer_IsRecordedOnlyWhenTheSessionStarts()
         {
             _world.Load(Multi("a", "b"));
             Assert.That(Ask(K("c"), 3).Approved, Is.True);
             Assert.That(_world.Players.IsRecorded(K("c")), Is.False, "approved is not recorded");
             Connect(3);
-            Assert.That(_world.Players.IsRecorded(K("c")), Is.True);
+            Assert.That(_world.Players.IsRecorded(K("c")), Is.False, "a lobby visit is not recorded");
+            Assert.That(_world.Players.Recorded.Count, Is.EqualTo(2));
+            Assert.That(_world.Admit(K("e"), 9, false), Is.EqualTo(WorldPlayerVerdict.Ok), "three recorded players and C: the fourth place is C's while they are here");
+            _world.CancelPending(9);
+
+            Assert.That(_world.TryStartSession(_roster), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers), "only C is connected in this test");
+            Assert.That(_world.Players.IsRecorded(K("c")), Is.False);
+            Assert.That(Ask(K("a"), 1).Approved, Is.True);
+            Connect(1);
+            Assert.That(_world.TryStartSession(_roster), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(_world.Players.IsRecorded(K("c")), Is.True, "C played the world");
+            Assert.That(_world.Players.NameOf(K("c")), Is.EqualTo("P"), "the name their connection brought");
             Assert.That(_world.Players.Recorded.Count, Is.EqualTo(3));
+        }
+
+        // Catches (audit A2): a lobby visitor who leaves before Start keeping one of the world's four places for good (nothing in the game
+        // could undo it), or their approved place staying taken after they left.
+        [Test]
+        public void AVisitorWhoLeavesBeforeTheStart_TakesNoPlace()
+        {
+            _world.Load(Multi("a", "b", "c"));
+            Assert.That(Ask(K("d"), 4).Approved, Is.True);
+            Connect(4);
+            _approver.ClientDisconnected(4);   // D looked around and left
+            Assert.That(_world.Players.IsRecorded(K("d")), Is.False, "a lobby visit must not take one of the four places");
+            Assert.That(_world.Players.Recorded.Count, Is.EqualTo(3));
+
+            Assert.That(Ask(K("e"), 5).Approved, Is.True, "the fourth place is still free for the friend it was meant for");
+            Connect(5);
+            Assert.That(Ask(K("a"), 1).Approved, Is.True);
+            Connect(1);
+            Assert.That(_world.TryStartSession(_roster), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(_world.Players.IsRecorded(K("e")), Is.True);
+            Assert.That(_world.Players.Recorded.Count, Is.EqualTo(4));
         }
 
         // Catches: two joiners approved together both taking the last place (the second would then be refused after it connected).
@@ -200,7 +234,11 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(Ask(K("d"), 4).Approved, Is.True);
             AssertRefused(Ask(K("e"), 5), EndReason.FullLobby);
             Connect(4);
+            Assert.That(Ask(K("a"), 1).Approved, Is.True);
+            Connect(1);
+            Assert.That(_world.TryStartSession(_roster), Is.EqualTo(WorldPlayerVerdict.Ok), "the start records the group that is here");
             Assert.That(_world.Players.Recorded.Count, Is.EqualTo(4));
+            Assert.That(_world.Players.IsRecorded(K("d")), Is.True);
         }
 
         // Catches: a joiner that was approved and dropped before connecting keeping its place for good.

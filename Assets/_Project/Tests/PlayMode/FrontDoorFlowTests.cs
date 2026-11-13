@@ -397,7 +397,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return WaitControl<Label>(door, FrontDoorView.Ids.Player(1), _ => { });
             Assert.That(Find<Button>(door, FrontDoorView.Ids.Start).enabledSelf, Is.False, "Start is off with one player");
 
-            // The second player is already recorded by the host's approver when they connect; the lobby lists them and Start comes on.
+            // The second player is in the host's roster when they connect (the world records them at the start, audit A2); the lobby lists them and Start comes on.
             client = new PlayModeHarness.TestClient(app, PlayModeHarness.PlayerId(5), declineScenes: true);
             var cts = new CancellationTokenSource();
             yield return PlayModeHarness.Await(client.JoinAsync(cts.Token), 20f, cts);
