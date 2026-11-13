@@ -22,3 +22,8 @@ Needs list -> one cheap search per need -> GPU style rank against our reference 
 - Thumbnails are 320-640 px marketing renders on dark backdrops; scans look alike at that size. `unreal_only` listings (formats only unreal-engine) are flagged; check Unity-usable formats (fbx/gltf) before picking.
 - Fab can change or block the unofficial endpoint. Fallback: read search results in the browser pane (`get_page_text`) and fetch thumbs from the same page.
 - Tested needs and sheets: `Reference/private/asset-search-test/` (gitignored).
+
+## Changes 2026-11-13 (Fable Run 3)
+- `--type` fixed: the list was url-encoded as text and Fab answered HTTP 400. Types are now joined with commas.
+- For objects, judge sheets in Fab relevance order with the type filter (Megascans first); keep style rank for materials. A scene-like thumbnail outranks the right object otherwise.
+- Search Megascans by set name ("Historic Medieval Farm", "Historic Bazaar", "Old Mine") to list a whole prop family.

@@ -133,3 +133,21 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
   - Ask every network scan one cross-file question: "which other handlers run on the same event, and what do they free or write". That is where both blockers were.
   - Subagents run in the background here, so eight scans cost eight wake-ups whatever the brief says; fewer, wider scans (four) would have cost less and mapped the same ground.
   - A stop three points away from the measured end (65% against 68%) was luck. Give an audit run a budget with room for its risk review and one `check`.
+
+### 2026-11-13, Run 3: area 1 and dungeon 1 design (`docs/design/area1-hollowmere.md`, `dungeon1-cellars.md`, `area1-dungeon1-needs.md`, `2026-11-13-area1-dungeon1-build.md`)
+- **Cost (interim, when the docs were written; the end figures follow below if the session got that far).** 5-hour window 19% to 92% in about 2 h 15 min. Weekly all models 3% to 13%. Weekly Fable 2% to 19%. Session context 510k tokens.
+- **Where it went.** Images. About 60 were read at full size (18 concepts at 2400 px, references, 30 contact sheets), which put the context past 500k halfway through, and every later turn re-read it. Eighteen subagent hand-backs (7 scans, 11 searches) each woke Fable on that context.
+- **What worked.**
+  - Seven scans with a word cap, file:line and a "what is missing" list, all launched in one message. The generator and built-town scans were enough to design from.
+  - Looking at the latest captures of the real scenes before designing. They showed gaps no document mentions (the sky, the empty ruin, stone scale).
+  - Searching Megascans by set name ("Historic Medieval Farm", "Historic Bazaar", "Old Mine"): one query lists a whole matching prop family.
+  - One background script for the second search pass (36 needs, no agents, no wake-ups).
+- **What to brief differently.**
+  - Start in a fresh 5-hour window. This run began at 19% and reached 92% before the writing started.
+  - Test the search pipeline on one need before fanning out. `fab_search.py --type` was broken (HTTP 400), so the first pass (11 Haiku agents, about 1M subagent tokens) ran unfiltered and its sheets were mostly noise.
+  - Use style rank for materials only. For objects it ranks scene-like thumbnails first; Fab's relevance order with the type filter, Megascans first, gave usable sheets.
+  - Run searches as one background script, not one agent per need. Agents add wake-ups and no judgement.
+  - Downscale images before Fable reads them (1100 px sheets were enough; concepts at 1280 px would be) and set an image budget in the brief.
+  - Say in the brief that the dungeon is floors 1 to 7 of the Undercroft in code, and that the spec, STORY and the concept sheet disagree on floor themes and on the Dough-warden. The run found this from scans.
+  - Say that downloads need the user's Fab sign-in, so picks can be confirmed but not fetched by the run.
+

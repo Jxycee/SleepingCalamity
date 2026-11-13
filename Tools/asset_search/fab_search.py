@@ -34,7 +34,7 @@ def search(q, free=False, megascans=False, types=None, limit=30):
     p = {'q': q}
     if free: p['is_free'] = 1
     if megascans: p['seller'] = 'Quixel Megascans'
-    if types: p['listing_types'] = types
+    if types: p['listing_types'] = ','.join(types)   # a list here was url-encoded as "['material']" and fab answered HTTP 400 (found in Fable Run 3)
     out, cursor = [], None
     if free: p['is_free'] = 1
     while len(out) < limit:
