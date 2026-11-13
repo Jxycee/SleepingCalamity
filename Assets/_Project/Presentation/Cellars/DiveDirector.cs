@@ -779,23 +779,28 @@ namespace SleepingCalamity.Presentation
         public PromptKind Prompt { get; private set; }
         public string PromptText { get; private set; } = "";
 
-        // The hub prompt: the floor the next press starts on. With no checkpoint it is always floor 1; with one, the G key (dev builds) cycles PickableFloors().
+        // The hub prompt: the floor the next press starts on. With no checkpoint it is always floor 1; with one it defaults to the bank floor (the pick the party earned, PL-4 4.2) and the Lock
+        // button (any build; the dev key G is a second path) cycles PickableFloors(). Every peer picks for itself; the host re-checks the asked floor against the checkpoint (ServerStartDive).
         public int PickFloor { get; private set; } = UndercroftPlan.FirstFloor;
+        private bool _pickSawHeld;   // the checkpoint state the pick was last defaulted for
 
-        public static string HubPromptText(bool checkpointHeld, IReadOnlyList<int> floors, int pick, bool suspended = false)
+        public static string HubPromptText(bool checkpointHeld, IReadOnlyList<int> floors, int pick, bool suspended = false, string cycleKey = null)
         {
             if (suspended) return "Return to your dive (a save after pushing on resumes at the start of floor 6; otherwise at the bank room)";
             if (!checkpointHeld && floors.Count <= 1) return "Go down the Undercroft";
-            return "Go down the Undercroft: start on floor " + pick + "  (pickable: " + string.Join(", ", floors) + "; G changes the floor)";
+            return "Go down the Undercroft: start on floor " + pick + "  (pickable: " + string.Join(", ", floors) + "; " + (string.IsNullOrEmpty(cycleKey) ? "the lock-on button" : cycleKey) + " changes the floor)";
         }
 
         // Host and clients: the pick follows the replicated floors (a pick no longer offered falls back to the first).
         private void ClampPick(IReadOnlyList<int> floors)
         {
             if (floors.Count == 0) { PickFloor = UndercroftPlan.FirstFloor; return; }
+            bool held = NetCheckpointHeld.Value;
+            int dflt = held ? floors[floors.Count - 1] : floors[0];
+            if (held != _pickSawHeld) { _pickSawHeld = held; PickFloor = dflt; return; }   // a checkpoint just earned (or spent): the pick defaults to the bank floor (or back to floor 1)
             bool ok = false;
             foreach (int f in floors) if (f == PickFloor) { ok = true; break; }
-            if (!ok) PickFloor = floors[0];
+            if (!ok) PickFloor = dflt;
         }
 
         public void RequestDescend() { RequestDescendRpc(); }
@@ -840,13 +845,15 @@ namespace SleepingCalamity.Presentation
                 ClampPick(floors);
                 if (Flat(me, NetHubStair.Value, PromptRadius))
                 {
-                    Prompt = PromptKind.Descend; PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, NetSuspendedDive.Value);
-                    if (floors.Count > 1 && !NetSuspendedDive.Value && HeroInput.ResolveDefault() is IDevInput cyc && cyc.WasPressed(DevKey.CycleFloor))
+                    IInputService pickInput = HeroInput.ResolveDefault();
+                    string cycleKey = BankKey(pickInput, InputActionNames.Lock, "");
+                    Prompt = PromptKind.Descend; PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, NetSuspendedDive.Value, cycleKey);
+                    if (floors.Count > 1 && !NetSuspendedDive.Value && pickInput != null && (pickInput.Intent.LockPressed || (pickInput is IDevInput cyc && cyc.WasPressed(DevKey.CycleFloor))))
                     {
                         int at = 0;
                         for (int i = 0; i < floors.Count; i++) if (floors[i] == PickFloor) at = i;
                         PickFloor = floors[(at + 1) % floors.Count];
-                        PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, false);
+                        PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, false, cycleKey);
                     }
                 }
             }
