@@ -140,6 +140,8 @@ namespace SleepingCalamity.Tests.EditMode
         public readonly List<WorldSummary> All = new List<WorldSummary>();
         public readonly List<string> Created = new List<string>();
         public readonly List<string> Deleted = new List<string>();
+        public readonly List<string> RemovedPlayers = new List<string>();   // "<worldId>:<playerId>"
+        public bool RemoveFails;
         public readonly List<WorldKind> Listed = new List<WorldKind>();
         public readonly List<IdentityKind> ListedIdentities = new List<IdentityKind>();
         private int nextId = 1;
@@ -150,6 +152,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             var w = new WorldSummary { Id = "w" + nextId++, Kind = kind, Identity = (int)identity, LastPlayedUtc = "2026-11-12T10:30:00Z" };
             w.PlayerNames.AddRange(players);
+            foreach (string name in players) w.PlayerKeys.Add(new PlayerKey(identity, "id-" + name));   // the same order as the names
             All.Insert(0, w);   // newest first, like WorldLibrary.List
             return w;
         }
@@ -176,6 +179,25 @@ namespace SleepingCalamity.Tests.EditMode
             return created.Id;
         }
 
+        public readonly HashSet<string> Unsavable = new HashSet<string>();   // ids of worlds that load read-only
+        public bool CanSaveWorld(string worldId) => !Unsavable.Contains(worldId);
+
+        public bool RemovePlayer(string worldId, PlayerKey key)
+        {
+            RemovedPlayers.Add(worldId + ":" + key.Id);
+            if (RemoveFails) return false;
+            foreach (WorldSummary w in All)
+            {
+                if (w.Id != worldId) continue;
+                int at = w.PlayerKeys.IndexOf(key);
+                if (at < 0) return false;
+                w.PlayerKeys.RemoveAt(at);
+                if (at < w.PlayerNames.Count) w.PlayerNames.RemoveAt(at);
+                return true;
+            }
+            return false;
+        }
+
         public bool DeleteWorld(string worldId)
         {
             Deleted.Add(worldId);
@@ -197,6 +219,40 @@ namespace SleepingCalamity.Tests.EditMode
         {
             into.Clear();
             into.AddRange(Names);
+        }
+
+        public readonly List<FrontDoorPerson> Newcomers = new List<FrontDoorPerson>();
+        public readonly List<FrontDoorPerson> RecordedAway = new List<FrontDoorPerson>();
+        public readonly List<string> Renames = new List<string>();   // "<from>-><to>"
+        public WorldPlayerVerdict RenameVerdict = WorldPlayerVerdict.Ok;
+        public readonly List<FrontDoorPerson> Strangers = new List<FrontDoorPerson>();   // connected, unrecorded, in a full world
+        public readonly List<string> SentAway = new List<string>();                       // key ids
+        public bool WaitsForPlace { get; set; }
+
+        public void GetStrangers(List<FrontDoorPerson> into)
+        {
+            into.Clear();
+            into.AddRange(Strangers);
+        }
+
+        public bool SendAway(PlayerKey key)
+        {
+            SentAway.Add(key.Id);
+            return Strangers.RemoveAll(p => p.Key == key) > 0;
+        }
+
+        public void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway)
+        {
+            newcomers.Clear();
+            newcomers.AddRange(Newcomers);
+            recordedAway.Clear();
+            recordedAway.AddRange(RecordedAway);
+        }
+
+        public WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to)
+        {
+            Renames.Add(from.Id + "->" + to.Id);
+            return RenameVerdict;
         }
 
         public bool TryStartSession()

@@ -14,6 +14,7 @@ namespace SleepingCalamity.Core
                 case WorldPlayerVerdict.WrongIdentityKind: return "world.wrong_kind";        // a local world cannot be played online, or the other way round
                 case WorldPlayerVerdict.WrongPlayerCount: return "world.solo_alone";         // a solo world is played alone
                 case WorldPlayerVerdict.TooManyPlayers: return "world.too_many_players";
+                case WorldPlayerVerdict.WorldFull: return "world.world_full";                // the start would record someone, and the world's 4 places are taken
                 default: return "world.start_refused";
             }
         }

@@ -306,5 +306,97 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(solo.NameOf(new PlayerKey(IdentityKind.Ugs, "new")), Is.EqualTo("Mira"));
             Assert.That(Multi("a", "b").RebindSoloOwner(K("c")), Is.False);
         }
+
+        // ---- the start gate records the group (user decision 2026-11-13, audit A2) ----
+
+        // Catches: the start gate refusing a group because the newcomers in it are not recorded YET (nobody is recorded before a start now), or
+        // letting a group start that the world cannot hold.
+        [Test]
+        public void CanStartWithNewPlayers_TreatsNotYetRecordedPlayersAsRecordable()
+        {
+            WorldPlayers w = Multi("a", "b");
+            Assert.That(w.CanStart(new[] { K("a"), K("c") }), Is.EqualTo(WorldPlayerVerdict.NotRecorded), "CanStart alone refuses a newcomer");
+            Assert.That(w.CanStartWithNewPlayers(new[] { K("a"), K("c") }), Is.EqualTo(WorldPlayerVerdict.Ok), "the gate records C at this start");
+            Assert.That(w.Recorded.Count, Is.EqualTo(2), "the check writes nothing");
+
+            Assert.That(w.CanStartWithNewPlayers(new[] { K("a"), K("c"), K("d") }), Is.EqualTo(WorldPlayerVerdict.Ok), "four fit");
+            Assert.That(w.CanStartWithNewPlayers(new[] { K("a"), K("c"), K("d"), K("e") }), Is.EqualTo(WorldPlayerVerdict.WorldFull), "five do not");
+            Assert.That(w.CanStartWithNewPlayers(new[] { K("a") }), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers));
+            Assert.That(w.CanStartWithNewPlayers(new[] { K("a"), K("a") }), Is.EqualTo(WorldPlayerVerdict.DuplicatePlayer));
+            Assert.That(w.CanStartWithNewPlayers(new[] { K("a"), new PlayerKey(IdentityKind.Ugs, "c") }), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind));
+            Assert.That(w.CanStartWithNewPlayers(null), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers));
+        }
+
+        // Catches: a Solo world whose owner record was lost refusing its own start (nothing records the owner before the gate now), or a Solo
+        // world starting with someone who is not its owner.
+        [Test]
+        public void CanStartWithNewPlayers_SoloWorld()
+        {
+            WorldPlayers solo = Solo("owner");
+            Assert.That(solo.CanStartWithNewPlayers(new[] { K("owner") }), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(solo.CanStartWithNewPlayers(new[] { K("other") }), Is.EqualTo(WorldPlayerVerdict.NotRecorded));
+            Assert.That(solo.CanStartWithNewPlayers(new[] { K("owner"), K("other") }), Is.EqualTo(WorldPlayerVerdict.WrongPlayerCount));
+
+            WorldPlayers lost = Restore(new WorldPlayersSave { Kind = (int)WorldKind.Solo, Identity = -1, Recorded = new List<WorldPlayerSave>() });
+            Assert.That(lost.CanStartWithNewPlayers(new[] { K("me") }), Is.EqualTo(WorldPlayerVerdict.Ok), "the first player to start claims it");
+            Assert.That(lost.CanStartWithNewPlayers(new[] { K("me"), K("you") }), Is.EqualTo(WorldPlayerVerdict.WrongPlayerCount));
+        }
+
+        // Catches (audit A2): a world with no way to let go of a player, so a mistaken record keeps one of its four places for good.
+        [Test]
+        public void Remove_FreesOneOfTheFourPlaces_AndKeepsTheRest()
+        {
+            WorldPlayers w = Multi("a", "b", "c", "d");
+            w.SetName(K("c"), "Cleo");
+            Assert.That(Join(w, K("e")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "setup: the world is full");
+
+            Assert.That(w.Remove(K("c")), Is.True);
+            Assert.That(w.IsRecorded(K("c")), Is.False);
+            Assert.That(w.NameOf(K("c")), Is.EqualTo(""), "their name goes with the record");
+            Assert.That(w.Recorded.Count, Is.EqualTo(3));
+            Assert.That(new List<PlayerKey>(w.Recorded), Is.EqualTo(new[] { K("a"), K("b"), K("d") }), "the others keep their order");
+            Assert.That(Join(w, K("e")), Is.EqualTo(WorldPlayerVerdict.Ok), "the free place can be filled");
+
+            Assert.That(w.Remove(K("c")), Is.False, "not recorded");
+            Assert.That(w.Remove(default), Is.False);
+            Assert.That(Solo("owner").Remove(K("owner")), Is.False, "a Solo world belongs to this machine: delete the world instead");
+        }
+
+        // Catches (audit A3): a recorded player whose UGS id changed having no way to move to the new key, so a full world locks them out for good.
+        [Test]
+        public void RenameRecorded_MovesOneRecord_KeepingPlaceNameAndOrder()
+        {
+            WorldPlayers w = Multi("a", "b", "c", "d");
+            w.SetName(K("b"), "Bo");
+
+            Assert.That(w.RenameRecorded(K("b"), K("b2")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(new List<PlayerKey>(w.Recorded), Is.EqualTo(new[] { K("a"), K("b2"), K("c"), K("d") }), "same place in the order");
+            Assert.That(w.IsRecorded(K("b")), Is.False);
+            Assert.That(w.NameOf(K("b2")), Is.EqualTo("Bo"));
+            Assert.That(w.NameOf(K("b")), Is.EqualTo(""));
+            Assert.That(w.CanStart(new[] { K("a"), K("b2") }), Is.EqualTo(WorldPlayerVerdict.Ok), "the new key can play");
+            Assert.That(w.CanJoin(K("b")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "the old key is just a stranger now");
+        }
+
+        // Catches (audit A3): a rename that overwrites another player's record, accepts a key of another identity kind, or invents a record.
+        [Test]
+        public void RenameRecorded_Refusals_ChangeNothing()
+        {
+            WorldPlayers w = Multi("a", "b");
+            Assert.That(w.RenameRecorded(K("a"), K("b")), Is.EqualTo(WorldPlayerVerdict.DuplicatePlayer), "the new key is already recorded");
+            Assert.That(w.RenameRecorded(K("a"), K("a")), Is.EqualTo(WorldPlayerVerdict.DuplicatePlayer), "renaming onto itself");
+            Assert.That(w.RenameRecorded(K("a"), default), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
+            Assert.That(w.RenameRecorded(default, K("x")), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
+            Assert.That(w.RenameRecorded(K("a"), new PlayerKey(IdentityKind.Ugs, "x")), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind));
+            Assert.That(w.RenameRecorded(K("nobody"), K("x")), Is.EqualTo(WorldPlayerVerdict.NotRecorded));
+            Assert.That(Solo("owner").RenameRecorded(K("owner"), K("x")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed), "a Solo owner follows the machine (RebindSoloOwner)");
+            Assert.That(new List<PlayerKey>(w.Recorded), Is.EqualTo(new[] { K("a"), K("b") }));
+        }
+
+        static WorldPlayers Restore(WorldPlayersSave save)
+        {
+            Assert.That(WorldPlayers.TryRestore(save, out WorldPlayers w, out _), Is.True);
+            return w;
+        }
     }
 }

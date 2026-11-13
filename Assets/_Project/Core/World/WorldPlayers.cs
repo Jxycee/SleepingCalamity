@@ -15,7 +15,10 @@
 //    solo worlds, Ugs for online worlds). A key of another kind is refused (WrongIdentityKind). Local worlds and Online worlds are separate.
 //  - A recorded player can always rejoin. A key that is not recorded joins only while there is room.
 //  - Joining is two steps: CanJoin(key) is the pure check (the connection approver calls only this); Record(key) writes the key down and is
-//    called once the client has actually entered the session. The host itself is approved before CanJoin is asked (JoinRules, IsServerSelf)
+//    called once the player PLAYS the world (user decision 2026-11-13, audit A2): at the session start, for everyone present
+//    (CanStartWithNewPlayers, then Record), or, for someone who joins a session that is already running, when their hero spawns. A lobby
+//    visitor who leaves before the start is never written down, and Remove(key) lets a recorded player go again (the host's picker action).
+//    The host itself is approved before CanJoin is asked (JoinRules, IsServerSelf)
 //    and enters the same way: the host-side gate (HostWorld) treats it as the owner/creator, never as a joiner. A Solo world refuses all joins.
 //  - Difficulty scales to the players present: ScalePlayers(present) is that count, clamped to 1..4 (the input the difficulty table reads).
 // Authority: host only. The host loads this from the world save and runs these checks at connection approval and at session start;
@@ -39,6 +42,7 @@ namespace SleepingCalamity.Core
         NotRecorded,         // a player present at a start is not one of the world's recorded players
         WrongPlayerCount,    // a Solo world starts with exactly its owner present
         WrongIdentityKind,   // the key's identity kind is not the one this world was made with
+        WorldInProgress,     // a session of the world is running: the host's rename of a recorded player waits for the lobby (audit A3)
     }
 
     public sealed class WorldPlayers
@@ -180,6 +184,68 @@ namespace SleepingCalamity.Core
 
             if (Kind == WorldKind.Solo) return present.Count == 1 ? WorldPlayerVerdict.Ok : WorldPlayerVerdict.WrongPlayerCount;
             return present.Count >= MinPlayersToStartMultiplayer ? WorldPlayerVerdict.Ok : WorldPlayerVerdict.NotEnoughPlayers;
+        }
+
+        // Session start with the group that is here, the way the host's gate uses it (user decision 2026-11-13, audit A2): a player is recorded
+        // when they START a session, not when their lobby connection came up, so the players present need not be recorded yet. Same rules as
+        // CanStart, with "not recorded" replaced by "there is room to record them" (WorldFull when there is not). Writes nothing: the caller
+        // records the group only once this says Ok, so a refused start never spends one of the world's four places.
+        public WorldPlayerVerdict CanStartWithNewPlayers(IReadOnlyList<PlayerKey> present)
+        {
+            WorldPlayerVerdict list = CheckList(present);
+            if (list != WorldPlayerVerdict.Ok) return list;
+
+            for (int i = 0; i < present.Count; i++)
+                if (!Matches(present[i])) return WorldPlayerVerdict.WrongIdentityKind;
+
+            if (Kind == WorldKind.Solo)
+            {
+                if (present.Count != 1) return WorldPlayerVerdict.WrongPlayerCount;
+                if (_recorded.Count == 0) return WorldPlayerVerdict.Ok;   // the owner record was lost: this start claims it (ClaimSoloOwner)
+                return IsRecorded(present[0]) ? WorldPlayerVerdict.Ok : WorldPlayerVerdict.NotRecorded;
+            }
+
+            int newcomers = 0;
+            for (int i = 0; i < present.Count; i++)
+                if (!IsRecorded(present[i])) newcomers++;
+            if (_recorded.Count + newcomers > MaxRecorded) return WorldPlayerVerdict.WorldFull;
+            return present.Count >= MinPlayersToStartMultiplayer ? WorldPlayerVerdict.Ok : WorldPlayerVerdict.NotEnoughPlayers;
+        }
+
+        // Lets a recorded player go, with their name and their extra members: one of the world's four places is free again (audit A2; the host's
+        // own action in the world picker, never the game's). False for a key that is not recorded and for a Solo world, whose one owner follows
+        // the machine (RebindSoloOwner) and whose world is let go by deleting it.
+        public bool Remove(PlayerKey key)
+        {
+            if (Kind == WorldKind.Solo) return false;
+            int at = IndexOf(_recorded, key);
+            if (at < 0) return false;
+            _recorded.RemoveAt(at);
+            _names.Remove(key);
+            _keyExtra.Remove(key);
+            return true;
+        }
+
+        // The host's "this player is now that player" (audit A3): a recorded player whose key changed (a new PC, a reinstall: the anonymous UGS id is
+        // new) takes the new key in the same place, keeping their name and extra members. Multiplayer worlds only (a Solo owner follows the machine,
+        // RebindSoloOwner). Refused, changing nothing: an invalid key, a Solo world, a key of another identity kind, an old key that is not
+        // recorded, a new key that is already recorded (or is the old key). The caller moves the player's weapons, bags and suspend record.
+        public WorldPlayerVerdict RenameRecorded(PlayerKey from, PlayerKey to)
+        {
+            if (!IsValidKey(from) || !IsValidKey(to)) return WorldPlayerVerdict.InvalidPlayer;
+            if (Kind == WorldKind.Solo) return WorldPlayerVerdict.SoloWorldClosed;
+            if (_identity.HasValue && to.Kind != _identity.Value) return WorldPlayerVerdict.WrongIdentityKind;
+            int at = IndexOf(_recorded, from);
+            if (at < 0) return WorldPlayerVerdict.NotRecorded;
+            if (IsRecorded(to)) return WorldPlayerVerdict.DuplicatePlayer;
+            _names.TryGetValue(from, out string name);
+            _keyExtra.TryGetValue(from, out Dictionary<string, object> extra);
+            _names.Remove(from);
+            _keyExtra.Remove(from);
+            _recorded[at] = to;
+            if (name != null) _names[to] = name;
+            if (extra != null) _keyExtra[to] = extra;
+            return WorldPlayerVerdict.Ok;
         }
 
         // The difficulty scale input: how many of the world's recorded players are present (distinct; keys that are not recorded do not

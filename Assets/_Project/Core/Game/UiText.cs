@@ -14,8 +14,8 @@ namespace SleepingCalamity.Core
         public static readonly string[] PublishedToastKeys =
         {
             "world.library_full", "save.world_read_only", "save.world_load_failed",
-            "world.need_two_players", "world.not_a_player", "world.wrong_kind", "world.solo_alone", "world.too_many_players", "world.start_refused",
-            "err.host_left", "err.rejected", "err.wrong_world", "err.timeout", "err.session_full", "err.joins_closed", "err.version",
+            "world.need_two_players", "world.not_a_player", "world.wrong_kind", "world.solo_alone", "world.too_many_players", "world.world_full", "world.start_refused",
+            "err.host_left", "err.rejected", "err.sent_away", "err.wrong_world", "err.timeout", "err.session_full", "err.joins_closed", "err.version",
             "err.code_not_found", "err.services", "err.network", "err.generic",
         };
 
@@ -36,10 +36,12 @@ namespace SleepingCalamity.Core
                 case "world.wrong_kind": return "This world was made for a different kind of game (local or online) and cannot be played this way.";
                 case "world.solo_alone": return "A solo world is played alone.";
                 case "world.too_many_players": return "A world can have up to 4 players.";
+                case "world.world_full": return "This world already has 4 players, and someone connected is not one of them. Rename them as one of your friends, or send them away, then press Start again.";
                 case "world.start_refused": return "The game could not start.";
 
                 case "err.host_left": return "The host left, so the game has ended.";
                 case "err.rejected": return "The host did not let you in.";
+                case "err.sent_away": return "The host sent you away, because this world is full.";
                 case "err.wrong_world": return "This world was made for a different kind of game (local or online) and cannot be opened this way.";
                 case "err.timeout": return "Could not reach the host in time. Check the code and your connection.";
                 case "err.session_full": return "That game is full.";
@@ -75,11 +77,47 @@ namespace SleepingCalamity.Core
         public const string JoinCodeEmpty = "Type the code your host shows you.";
         public const string JoinCodeInvalid = "A code has only letters and numbers.";
         public const string WaitingForHost = "You are in. Waiting for the host to start the game.";
+        public const string WaitingForPlace = "This world is full. Waiting for the host to add you.";
         public const string Connecting = "Connecting...";
         public const string DeleteAsk = "Delete this world? It is set aside and no longer listed.";
         public const string WorldDeleted = "World set aside.";
         public const string WorldNotDeleted = "That world could not be deleted.";
         public const string NeedsAWorldToHost = "Pick a multiplayer world to host.";
+
+        // The host letting one of a multiplayer world's recorded players go, so their place is free for someone else (audit A2). It asks first,
+        // like Delete, and then says what happened.
+        public static string RemovePlayerAsk(string name) => "Remove " + PlayerWord(name) + " from this world? Their place becomes free for someone else. What they grew here waits in the file in case you bring them back.";
+        public static string PlayerRemoved(string name) => PlayerWord(name) + " is no longer one of this world's players.";
+        public const string PlayerNotRemoved = "That player could not be removed.";
+
+        // Audit A5: a world that cannot be saved (written by a newer build, or its file could not be read) asks before it starts.
+        public const string CannotSaveAsk = "This world can't be saved. Play anyway?";
+        public const string PlayAnywayYes = "Play anyway";
+        public const string PlayAnywayNo = "Don't play";
+
+        // Audit A3: the host's "this player is now that player" in the lobby. It asks first, then says what happened.
+        public static string RenamePlayerAsk(string newName, string recordedName) =>
+            "Is " + PlayerWord(newName) + " really " + PlayerWord(recordedName) + "? Their place, weapons and bags in this world move to the player who is connected now.";
+        public static string PlayerRenamed(string recordedName) => PlayerWord(recordedName) + " now plays as the connected player.";
+        public static string PlayerNotRenamed(WorldPlayerVerdict why)
+        {
+            switch (why)
+            {
+                case WorldPlayerVerdict.DuplicatePlayer: return "That player is already one of this world's players.";
+                case WorldPlayerVerdict.NotRecorded: return "That player is no longer one of this world's players.";
+                case WorldPlayerVerdict.WrongIdentityKind: return "That player is not from the same kind of sign-in as this world.";
+                case WorldPlayerVerdict.WorldInProgress: return "The game has already started. Change players from the lobby before it starts.";
+                default: return "That could not be changed.";
+            }
+        }
+
+        // The host's "send away" for an unrecorded player waiting in a full world's lobby (user decision 2026-11-13). It asks first.
+        public static string SendAwayAsk(string name) => "Send " + PlayerWord(name) + " away? They leave this lobby and the world keeps its four players.";
+        public static string PlayerSentAway(string name) => PlayerWord(name) + " was sent away.";
+
+        public static string PlayerAlreadyLeft(string name) => PlayerWord(name) + " has already left.";
+
+        private static string PlayerWord(string name) => string.IsNullOrWhiteSpace(name) || name == "?" ? "this player" : name;
 
         // Worlds list full (WorldSummary.MaxPerList per kind): New world is off and says why.
         public static string WorldLibraryFull(WorldKind kind) => Toast("world.library_full", kind.ToString());

@@ -129,6 +129,280 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(worlds.Deleted, Is.Empty);
         }
 
+        // Catches (audit A2): the host having no way to let a player go from a multiplayer world, a removal that happens without asking, the
+        // question not naming the player, or the row still listing them afterwards.
+        [Test]
+        public void Worlds_RemovePlayer_AsksFirst_ThenFreesThePlace()
+        {
+            WorldSummary w = worlds.Add(WorldKind.Multiplayer, IdentityKind.Ugs, "Ann", "Bo", "Cleo", "Dag");
+            model.OpenWorlds(WorldKind.Multiplayer);
+            Assert.That(model.CanRemovePlayers, Is.True);
+            FrontDoorWorldRow row = model.Rows[0];
+            Assert.That(row.Players, Has.Count.EqualTo(4), "the row carries the recorded players with their keys");
+            PlayerKey cleo = row.Players[2].Key;
+
+            model.RequestRemovePlayer(w.Id, cleo);
+
+            Assert.That(model.PendingRemoveWorldId, Is.EqualTo(w.Id));
+            Assert.That(model.PendingRemoveKey, Is.EqualTo(cleo));
+            Assert.That(model.PendingRemoveWords, Does.Contain("Cleo"), "the question names the player");
+            Assert.That(worlds.RemovedPlayers, Is.Empty, "asking is not removing");
+
+            model.ConfirmRemovePlayer();
+
+            Assert.That(worlds.RemovedPlayers, Is.EqualTo(new[] { w.Id + ":" + cleo.Id }));
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+            Assert.That(model.Notice, Does.Contain("Cleo"));
+            Assert.That(model.Rows[0].Players, Has.Count.EqualTo(3), "the row no longer lists them");
+            Assert.That(model.Rows[0].PlayerNames, Does.Not.Contain("Cleo"));
+        }
+
+        // Catches: a removal that happens on a cancel or on a stray Confirm, a question that survives leaving the screen, a failure shown as a
+        // success, and a solo world (one owner, bound to this machine) offering the action at all.
+        [Test]
+        public void Worlds_RemovePlayer_Cancel_AndRefusals()
+        {
+            WorldSummary multi = worlds.Add(WorldKind.Multiplayer, IdentityKind.Ugs, "Ann", "Bo");
+            model.OpenWorlds(WorldKind.Multiplayer);
+            PlayerKey bo = model.Rows[0].Players[1].Key;
+
+            model.RequestRemovePlayer(multi.Id, bo);
+            model.CancelRemovePlayer();
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+            Assert.That(worlds.RemovedPlayers, Is.Empty);
+            model.ConfirmRemovePlayer();   // nothing pending
+            Assert.That(worlds.RemovedPlayers, Is.Empty);
+
+            // A player the row does not hold, and a world that is not listed: no question is opened.
+            model.RequestRemovePlayer(multi.Id, new PlayerKey(IdentityKind.Ugs, "stranger"));
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+            model.RequestRemovePlayer("no-such-world", bo);
+            Assert.That(model.PendingRemoveWorldId, Is.Null);
+
+            // Leaving the screen drops the question.
+            model.RequestRemovePlayer(multi.Id, bo);
+            model.OpenWorlds(WorldKind.Multiplayer);
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "the question does not survive the screen");
+
+            // A refusal says so instead of claiming the place is free.
+            worlds.RemoveFails = true;
+            model.RequestRemovePlayer(multi.Id, bo);
+            model.ConfirmRemovePlayer();
+            Assert.That(model.Notice, Is.EqualTo(UiText.PlayerNotRemoved));
+            Assert.That(model.Rows[0].Players, Has.Count.EqualTo(2));
+
+            // The solo list never offers it.
+            worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            model.OpenWorlds(WorldKind.Solo);
+            Assert.That(model.CanRemovePlayers, Is.False);
+            model.RequestRemovePlayer(model.Rows[0].Id, model.Rows[0].Players[0].Key);
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "a solo world's owner follows the machine; delete the world instead");
+        }
+
+        // Catches: two questions open at once (Delete it would answer the one the player is not looking at), and Back not answering the
+        // remove question with no.
+        [Test]
+        public void Worlds_OneQuestionAtATime_AndBackAnswersIt()
+        {
+            WorldSummary w = worlds.Add(WorldKind.Multiplayer, IdentityKind.Ugs, "Ann", "Bo");
+            model.OpenWorlds(WorldKind.Multiplayer);
+            PlayerKey bo = model.Rows[0].Players[1].Key;
+
+            model.RequestDelete(w.Id);
+            model.RequestRemovePlayer(w.Id, bo);
+            Assert.That(model.PendingDeleteId, Is.Null, "asking about a player closes the delete question");
+            Assert.That(model.PendingRemoveWorldId, Is.EqualTo(w.Id));
+
+            model.RequestDelete(w.Id);
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "and the other way round");
+            Assert.That(model.PendingDeleteId, Is.EqualTo(w.Id));
+            model.CancelDelete();
+
+            model.RequestRemovePlayer(w.Id, bo);
+            model.Back();
+            Assert.That(model.PendingRemoveWorldId, Is.Null, "Back (Escape) answers it with no");
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Worlds), "and does not also leave the screen");
+            Assert.That(worlds.RemovedPlayers, Is.Empty);
+        }
+
+        // Catches (audit A5): a world that cannot be saved starting without a word (hours of play lost), "no" still starting it, "yes" not starting it.
+        [Test]
+        public void Play_OnAWorldThatCannotBeSaved_AsksFirst_AndStartsOnlyOnYes()
+        {
+            WorldSummary w = worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            worlds.Unsavable.Add(w.Id);
+            model.OpenWorlds(WorldKind.Solo);
+
+            model.PlaySelected();
+
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.ConfirmUnsaved));
+            Assert.That(model.ConfirmUnsavedWords, Is.EqualTo(UiText.CannotSaveAsk));
+            Assert.That(UiText.CannotSaveAsk, Is.EqualTo("This world can't be saved. Play anyway?"));
+            Assert.That(session.Calls, Is.Empty, "asking starts nothing");
+
+            model.DeclinePlayAnyway();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Worlds), "no goes back to where the player was");
+            Assert.That(session.Calls, Is.Empty, "no starts nothing");
+
+            model.PlaySelected();
+            model.Back();   // Escape answers with no
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Worlds));
+            Assert.That(session.Calls, Is.Empty);
+
+            model.PlaySelected();
+            model.PlayAnyway();
+            Assert.That(session.Calls, Is.EqualTo(new[] { "StartLocal(false)" }));
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Connecting));
+        }
+
+        // Catches (audit A5): the question missing from Host, from the Title's Play solo, or asked for a world that saves fine.
+        [Test]
+        public void Host_AndTitlePlay_AskToo_ButASavableWorldStartsAtOnce()
+        {
+            WorldSummary multi = worlds.Add(WorldKind.Multiplayer, IdentityKind.Ugs, "Ann", "Bo");
+            worlds.Unsavable.Add(multi.Id);
+            model.OpenWorlds(WorldKind.Multiplayer);
+            model.HostSelected();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.ConfirmUnsaved));
+            Assert.That(session.Calls, Is.Empty);
+            model.PlayAnyway();
+            Assert.That(session.Calls, Is.EqualTo(new[] { "HostOnline" }));
+
+            model.Dispose();
+            session = new FakeNetworkSession();
+            worlds = new FakeWorlds();
+            model = new FrontDoorModel(session, worlds, host);
+            WorldSummary solo = worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            worlds.Unsavable.Add(solo.Id);
+            model.PlaySolo();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.ConfirmUnsaved), "Play solo on the title asks too");
+            model.DeclinePlayAnyway();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.Title));
+            worlds.Unsavable.Clear();
+            model.PlaySolo();
+            Assert.That(session.Calls, Is.EqualTo(new[] { "StartLocal(false)" }), "a world that saves starts without a question");
+        }
+
+        // Catches (user decision 2026-11-13): a stranger in a full world's lobby that the host cannot send away, or one sent without asking,
+        // or one whose disconnect carries no reason of its own.
+        [Test]
+        public void Host_FullWorld_Stranger_SendAway_Disconnects()
+        {
+            ReachHostLobby();
+            PlayerKey stranger = new PlayerKey(IdentityKind.Ugs, "fifth");
+            Assert.That(model.Strangers, Is.Empty);
+            host.Strangers.Add(new FrontDoorPerson { Key = stranger, Name = "Eve" });
+            Assert.That(model.Strangers, Has.Count.EqualTo(1));
+
+            model.RequestSendAway(new PlayerKey(IdentityKind.Ugs, "nobody"));
+            Assert.That(model.HasPendingSendAway, Is.False, "only a listed stranger can be asked about");
+            model.RequestSendAway(stranger);
+            Assert.That(model.HasPendingSendAway, Is.True);
+            Assert.That(model.PendingSendAwayWords, Does.Contain("Eve"));
+            Assert.That(host.SentAway, Is.Empty, "asking is not sending away");
+
+            model.CancelSendAway();
+            model.ConfirmSendAway();   // nothing pending
+            Assert.That(host.SentAway, Is.Empty);
+
+            model.RequestSendAway(stranger);
+            model.ConfirmSendAway();
+            Assert.That(host.SentAway, Is.EqualTo(new[] { "fifth" }));
+            Assert.That(model.HasPendingSendAway, Is.False);
+            Assert.That(model.RenameMessage, Is.EqualTo(UiText.PlayerSentAway("Eve")));
+
+            Assert.That(EndReasonText.ToastKey(EndReason.SentAway), Is.Not.EqualTo("err.generic"), "the sent-away player is told why");
+            Assert.That(UiText.EndedBecause(EndReason.SentAway), Does.Contain("host"));
+        }
+
+        // Catches: the host saying "was sent away" when SendAway returned false (the stranger had already left, or the host refused).
+        [Test]
+        public void Host_SendAway_ReturnsFalse_NoSentAwayMessage()
+        {
+            ReachHostLobby();
+            PlayerKey stranger = new PlayerKey(IdentityKind.Ugs, "fifth");
+            host.Strangers.Add(new FrontDoorPerson { Key = stranger, Name = "Eve" });
+            Assert.That(model.Strangers, Has.Count.EqualTo(1));
+            model.RequestSendAway(stranger);
+            Assert.That(model.HasPendingSendAway, Is.True);
+
+            host.Strangers.Clear();   // they left before the host confirmed
+            model.ConfirmSendAway();
+
+            Assert.That(model.HasPendingSendAway, Is.False);
+            Assert.That(model.RenameMessage, Is.Not.EqualTo(UiText.PlayerSentAway("Eve")));
+            Assert.That(model.RenameMessage, Is.EqualTo(UiText.PlayerAlreadyLeft("Eve")));
+        }
+
+        // Catches (user decision 2026-11-13): the unrecorded player in a full world seeing the plain "waiting for the start" line, and Start
+        // staying on (or refusing without naming the two choices) while they are there.
+        [Test]
+        public void Host_FullWorld_Stranger_SeesWaitingWords()
+        {
+            host.WaitsForPlace = true;
+            model.OpenJoin();
+            model.JoinCodeInput = "ABC123";
+            model.Join();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.WaitingForHost));
+            Assert.That(model.WaitingWords, Is.EqualTo(UiText.WaitingForPlace));
+            Assert.That(UiText.WaitingForPlace, Is.EqualTo("This world is full. Waiting for the host to add you."));
+
+            host.WaitsForPlace = false;
+            Assert.That(model.WaitingWords, Is.EqualTo(UiText.WaitingForHost));
+
+            // The host's side: Start is off while a stranger is present, and the words name both choices.
+            model.Dispose();
+            host = new FakeHost();
+            host.Strangers.Add(new FrontDoorPerson { Key = new PlayerKey(IdentityKind.Ugs, "fifth"), Name = "Eve" });
+            session = new FakeNetworkSession();
+            model = new FrontDoorModel(session, worlds, host);
+            ReachHostLobby();
+            host.ConnectedCount = 3;
+            Assert.That(model.StartAction.Enabled, Is.False);
+            Assert.That(model.StartAction.Why, Does.Contain("friend").And.Contain("send"));
+        }
+
+        // Catches (audit A3): the host having no way to say "this connected player is that recorded one", a rename without asking, one the
+        // lobby did not offer, a refusal shown as a success.
+        [Test]
+        public void Lobby_RenamePlayer_AsksFirst_ThenRenamesOne()
+        {
+            ReachHostLobby();
+            PlayerKey fresh = new PlayerKey(IdentityKind.Ugs, "new-id");
+            PlayerKey old = new PlayerKey(IdentityKind.Ugs, "old-id");
+            Assert.That(model.RenameOptions, Is.Empty, "nobody to choose between");
+            host.Newcomers.Add(new FrontDoorPerson { Key = fresh, Name = "Ann" });
+            host.RecordedAway.Add(new FrontDoorPerson { Key = old, Name = "Annie" });
+            Assert.That(model.RenameOptions, Has.Count.EqualTo(1));
+
+            model.RequestRename(new PlayerKey(IdentityKind.Ugs, "stranger"), old);
+            Assert.That(model.HasPendingRename, Is.False, "only offered pairs can be asked");
+
+            model.RequestRename(fresh, old);
+            Assert.That(model.HasPendingRename, Is.True);
+            Assert.That(model.PendingRenameWords, Does.Contain("Ann").And.Contain("Annie"));
+            Assert.That(host.Renames, Is.Empty, "asking is not renaming");
+
+            model.CancelRename();
+            model.ConfirmRename();   // nothing pending
+            Assert.That(host.Renames, Is.Empty);
+
+            model.RequestRename(fresh, old);
+            model.Back();
+            Assert.That(model.HasPendingRename, Is.False, "Back answers with no");
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.HostLobby), "and does not leave the lobby");
+
+            model.RequestRename(fresh, old);
+            model.ConfirmRename();
+            Assert.That(host.Renames, Is.EqualTo(new[] { "old-id->new-id" }));
+            Assert.That(model.RenameMessage, Is.EqualTo(UiText.PlayerRenamed("Annie")));
+
+            host.RenameVerdict = WorldPlayerVerdict.DuplicatePlayer;
+            model.RequestRename(fresh, old);
+            model.ConfirmRename();
+            Assert.That(model.RenameMessage, Is.EqualTo(UiText.PlayerNotRenamed(WorldPlayerVerdict.DuplicatePlayer)));
+        }
+
         [Test]
         public void Host_ShowsJoinCode_WhenConnected()
         {

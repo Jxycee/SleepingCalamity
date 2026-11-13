@@ -37,6 +37,25 @@ namespace SleepingCalamity.App
             public const string ScreenConnecting = "screen-connecting";
             public const string ScreenWaiting = "screen-waiting";
             public const string ScreenEnded = "screen-ended";
+            public const string ScreenUnsaved = "screen-unsaved";
+            public const string UnsavedAsk = "lbl-unsaved-ask";
+            public const string UnsavedYes = "btn-unsaved-yes";
+            public const string UnsavedNo = "btn-unsaved-no";
+            public const string RenameList = "rename-list";
+            public const string RenameConfirm = "rename-confirm";
+            public const string RenameAsk = "lbl-rename-ask";
+            public const string RenameYes = "btn-rename-yes";
+            public const string RenameNo = "btn-rename-no";
+            public const string RenameMessage = "lbl-rename-message";
+            public const string SendAwayList = "send-away-list";
+            public const string SendAwayConfirm = "send-away-confirm";
+            public const string SendAwayAsk = "lbl-send-away-ask";
+            public const string SendAwayYes = "btn-send-away-yes";
+            public const string SendAwayNo = "btn-send-away-no";
+            // The host's "send this waiting player away" button, 1-based: "btn-send-away-1".
+            public static string SendAway(int number) => "btn-send-away-" + number;
+            // The host's "this connected player is that recorded player" button, 1-based: "btn-rename-1".
+            public static string RenameOption(int number) => "btn-rename-" + number;
 
             public const string GameName = "lbl-game-name";
             public const string PlaySolo = "btn-play-solo";
@@ -51,6 +70,10 @@ namespace SleepingCalamity.App
             public const string DeleteAsk = "lbl-delete-ask";
             public const string DeleteConfirmButton = "btn-delete-confirm";
             public const string DeleteCancelButton = "btn-delete-cancel";
+            public const string RemoveConfirm = "remove-confirm";
+            public const string RemoveAsk = "lbl-remove-ask";
+            public const string RemoveConfirmButton = "btn-remove-confirm";
+            public const string RemoveCancelButton = "btn-remove-cancel";
             public const string WorldsNotice = "lbl-worlds-notice";
             public const string NewWorld = "btn-new-world";
             public const string NewWorldWhy = "lbl-new-world-why";
@@ -85,6 +108,9 @@ namespace SleepingCalamity.App
             public static string WorldRow(int number) => "world-row-" + number;
             public static string DeleteWorld(int number) => "btn-delete-" + number;
             public static string Player(int number) => "player-" + number;
+
+            // The host's "remove player" button of world `row`'s recorded player `player`, both 1-based: "btn-remove-player-1-2".
+            public static string RemovePlayer(int row, int player) => "btn-remove-player-" + row + "-" + player;
         }
 
         private const string CopiedWords = "Code copied.";
@@ -108,9 +134,19 @@ namespace SleepingCalamity.App
         private bool renderedPending;
         private int pendingNumber;
         private int pendingRowCount;
+        private string pendingAskedFrom;        // the button the open question was asked from, so No hands focus back to it
         private string worldsSignature = "";
         private int renderedRowCount;
         private string playersSignature = "";
+        private string renameSignature = "";
+        private string sendAwaySignature = "";
+        private bool renderedRenamePending;
+        private bool renderedSendAwayPending;
+        // Cached so the lobby's per-frame redraw check allocates nothing while nothing changed (audit nit): the signatures are built in these
+        // and compared in place; a string is made only when the lobby really changed.
+        private readonly StringBuilder signatureBuilder = new StringBuilder(128);
+        private int renderedPlayerCount = -1;
+        private string playerCountText = "";
         private string wantedFocus;
 
         public FrontDoorModel Model => model;
@@ -239,6 +275,7 @@ namespace SleepingCalamity.App
             screens[FrontDoorState.Connecting] = root.Q<VisualElement>(Ids.ScreenConnecting);
             screens[FrontDoorState.WaitingForHost] = root.Q<VisualElement>(Ids.ScreenWaiting);
             screens[FrontDoorState.Ended] = root.Q<VisualElement>(Ids.ScreenEnded);
+            screens[FrontDoorState.ConfirmUnsaved] = root.Q<VisualElement>(Ids.ScreenUnsaved);
 
             Hook(Ids.PlaySolo, () => model?.OpenWorlds(WorldKind.Solo));
             Hook(Ids.Multiplayer, () => model?.OpenWorlds(WorldKind.Multiplayer));
@@ -251,6 +288,15 @@ namespace SleepingCalamity.App
             Hook(Ids.WorldsBack, () => { if (model != null) Fire(model.Back()); });
             Hook(Ids.DeleteConfirmButton, () => model?.ConfirmDelete());
             Hook(Ids.DeleteCancelButton, () => model?.CancelDelete());
+            Hook(Ids.RemoveConfirmButton, () => model?.ConfirmRemovePlayer());
+            Hook(Ids.RemoveCancelButton, () => model?.CancelRemovePlayer());
+
+            Hook(Ids.UnsavedYes, () => { if (model != null) Fire(model.PlayAnyway()); });
+            Hook(Ids.UnsavedNo, () => model?.DeclinePlayAnyway());
+            Hook(Ids.RenameYes, () => model?.ConfirmRename());
+            Hook(Ids.RenameNo, () => model?.CancelRename());
+            Hook(Ids.SendAwayYes, () => model?.ConfirmSendAway());
+            Hook(Ids.SendAwayNo, () => model?.CancelSendAway());
 
             Hook(Ids.CopyCode, CopyCode);
             Hook(Ids.Start, () => model?.StartSession());
@@ -307,6 +353,8 @@ namespace SleepingCalamity.App
             renderedState = null;
             worldsSignature = "";
             playersSignature = "";
+            renameSignature = "";
+            sendAwaySignature = "";
         }
 
         private void UnbindTree()
@@ -384,6 +432,7 @@ namespace SleepingCalamity.App
                 case FrontDoorState.Connecting: SetText(Ids.Connecting, model.ConnectingWords); break;
                 case FrontDoorState.WaitingForHost: SetText(Ids.Waiting, model.WaitingWords); break;
                 case FrontDoorState.Ended: SetText(Ids.EndedWords, model.EndedWords); break;
+                case FrontDoorState.ConfirmUnsaved: SetText(Ids.UnsavedAsk, model.ConfirmUnsavedWords); break;
             }
 
             if (stateChanged) wantedFocus = PreferredFocus();
@@ -396,7 +445,11 @@ namespace SleepingCalamity.App
 
             var signature = new StringBuilder();
             foreach (FrontDoorWorldRow row in model.Rows)
-                signature.Append(row.Id).Append('|').Append(row.Selected).Append('|').Append(row.LastPlayed).Append('|').Append(string.Join(",", row.PlayerNames)).Append(';');
+            {
+                signature.Append(row.Id).Append('|').Append(row.Selected).Append('|').Append(row.LastPlayed).Append('|').Append(string.Join(",", row.PlayerNames));
+                if (row.Players != null) foreach (FrontDoorPlayerRow p in row.Players) signature.Append('|').Append(p.Key.Id);   // a player let go must rebuild the row
+                signature.Append(';');
+            }
             string text = signature.ToString();
             if (text != worldsSignature)
             {
@@ -410,24 +463,34 @@ namespace SleepingCalamity.App
             }
             SetDisplay(Ids.WorldsEmpty, model.Rows.Count == 0);
 
-            // The delete question is modal: while it is open only Delete it / Keep it are on, and Keep it hands focus back to the row it was asked about.
-            bool pending = model.PendingDeleteId != null;
-            SetDisplay(Ids.DeleteConfirm, pending);
+            // Each question (delete a world, let one of its players go) is modal: while one is open only its own two buttons are on, and the No
+            // button hands focus back to the row it was asked about.
+            bool deletePending = model.PendingDeleteId != null;
+            bool removePending = model.PendingRemoveWorldId != null;
+            bool pending = deletePending || removePending;
+            SetDisplay(Ids.DeleteConfirm, deletePending);
             SetText(Ids.DeleteAsk, model.PendingDeleteWords);
+            SetDisplay(Ids.RemoveConfirm, removePending);
+            SetText(Ids.RemoveAsk, model.PendingRemoveWords);
             if (pending != renderedPending)
             {
                 renderedPending = pending;
                 if (pending)
                 {
+                    string askedAbout = model.PendingDeleteId ?? model.PendingRemoveWorldId;
                     pendingNumber = 1;
-                    for (int i = 0; i < model.Rows.Count; i++) if (model.Rows[i].Id == model.PendingDeleteId) pendingNumber = i + 1;
+                    for (int i = 0; i < model.Rows.Count; i++) if (model.Rows[i].Id == askedAbout) pendingNumber = i + 1;
                     pendingRowCount = model.Rows.Count;
-                    wantedFocus = Ids.DeleteCancelButton;
+                    FrontDoorWorldRow asked = pendingNumber <= model.Rows.Count ? model.Rows[pendingNumber - 1] : null;
+                    pendingAskedFrom = deletePending || asked == null
+                        ? Ids.DeleteWorld(pendingNumber)
+                        : Ids.RemovePlayer(pendingNumber, PlayerNumberOf(asked, model.PendingRemoveKey));
+                    wantedFocus = deletePending ? Ids.DeleteCancelButton : Ids.RemoveCancelButton;
                 }
                 else
                 {
-                    string row = Ids.DeleteWorld(pendingNumber);
-                    wantedFocus = model.Rows.Count == pendingRowCount && root.Q<VisualElement>(row) != null ? row : PreferredFocus();
+                    string back = pendingAskedFrom ?? Ids.DeleteWorld(pendingNumber);
+                    wantedFocus = model.Rows.Count == pendingRowCount && root.Q<VisualElement>(back) != null ? back : PreferredFocus();
                 }
             }
             VisualElement list = root.Q<VisualElement>(Ids.WorldList);
@@ -444,6 +507,14 @@ namespace SleepingCalamity.App
             SetAction(Ids.Play, model.PlayAction, pending);
             SetAction(Ids.Host, model.HostAction, pending);
             SetAction(Ids.WorldsBack, FrontDoorAction.On, pending);
+        }
+
+        // The 1-based position of a key among a row's recorded players (1 when it is not there: the row's first remove button).
+        private static int PlayerNumberOf(FrontDoorWorldRow row, PlayerKey key)
+        {
+            if (row.Players == null) return 1;
+            for (int i = 0; i < row.Players.Count; i++) if (row.Players[i].Key == key) return i + 1;
+            return 1;
         }
 
         private void RebuildWorldRows()
@@ -473,6 +544,29 @@ namespace SleepingCalamity.App
                 line.Add(delete);
 
                 list.Add(line);
+
+                // The host's own action on a multiplayer world: let one of its recorded players go, so their place is free again (audit A2).
+                if (model.CanRemovePlayers && row.Players != null && row.Players.Count > 0)
+                {
+                    var players = new VisualElement();
+                    players.AddToClassList("fd-world-players");
+                    int playerNumber = 0;
+                    foreach (FrontDoorPlayerRow player in row.Players)
+                    {
+                        playerNumber++;
+                        PlayerKey key = player.Key;
+                        var remove = new Button(() => model?.RequestRemovePlayer(id, key))
+                        {
+                            name = Ids.RemovePlayer(number, playerNumber),
+                            text = "Remove " + player.Name,
+                            focusable = true,
+                        };
+                        remove.AddToClassList("fd-button");
+                        remove.AddToClassList("fd-remove-player");
+                        players.Add(remove);
+                    }
+                    list.Add(players);
+                }
             }
         }
 
@@ -480,13 +574,21 @@ namespace SleepingCalamity.App
         {
             if (stateChanged) SetText(Ids.CopyNote, "");
             SetText(Ids.JoinCode, model.JoinCode);
-            SetText(Ids.PlayerCount, "Players in the game: " + model.PlayerCount);
+            int count = model.PlayerCount;
+            if (count != renderedPlayerCount)
+            {
+                renderedPlayerCount = count;
+                playerCountText = "Players in the game: " + count;
+            }
+            SetText(Ids.PlayerCount, playerCountText);
 
             IReadOnlyList<string> names = model.PlayerNames;
-            string joined = string.Join("\n", names);
-            if (joined != playersSignature)
+            StringBuilder sig = signatureBuilder;
+            sig.Clear();
+            for (int i = 0; i < names.Count; i++) sig.Append(names[i]).Append('\n');
+            if (!SameText(sig, playersSignature))
             {
-                playersSignature = joined;
+                playersSignature = sig.ToString();
                 VisualElement list = root.Q<VisualElement>(Ids.PlayerList);
                 if (list != null)
                 {
@@ -500,10 +602,84 @@ namespace SleepingCalamity.App
                 }
             }
 
+            // The host's "this player is now that player" (audit A3): one button per connected stranger and recorded absent player, then a question.
+            IReadOnlyList<FrontDoorRenameOption> options = model.RenameOptions;
+            sig.Clear();
+            for (int i = 0; i < options.Count; i++)
+            {
+                FrontDoorRenameOption o = options[i];
+                sig.Append(o.NewPlayer.Key.Id).Append('>').Append(o.Recorded.Key.Id).Append(o.NewPlayer.Name).Append(o.Recorded.Name).Append(';');
+            }
+            VisualElement renameList = root.Q<VisualElement>(Ids.RenameList);
+            if (renameList != null && !SameText(sig, renameSignature))
+            {
+                renameSignature = sig.ToString();
+                renameList.Clear();
+                for (int i = 0; i < options.Count; i++)
+                {
+                    PlayerKey fresh = options[i].NewPlayer.Key, old = options[i].Recorded.Key;
+                    var button = new Button(() => model?.RequestRename(fresh, old))
+                    {
+                        name = Ids.RenameOption(i + 1),
+                        text = options[i].NewPlayer.Name + " is really " + options[i].Recorded.Name,
+                        focusable = true,
+                    };
+                    button.AddToClassList("fd-button");
+                    renameList.Add(button);
+                }
+            }
+
+            // A stranger waiting in a full world's lobby can also be sent away (user decision 2026-11-13); it asks first.
+            IReadOnlyList<FrontDoorPerson> strangers = model.Strangers;
+            sig.Clear();
+            for (int i = 0; i < strangers.Count; i++) sig.Append(strangers[i].Key.Id).Append(strangers[i].Name).Append(';');
+            VisualElement sendAwayList = root.Q<VisualElement>(Ids.SendAwayList);
+            if (sendAwayList != null && !SameText(sig, sendAwaySignature))
+            {
+                sendAwaySignature = sig.ToString();
+                sendAwayList.Clear();
+                for (int i = 0; i < strangers.Count; i++)
+                {
+                    PlayerKey who = strangers[i].Key;
+                    var button = new Button(() => model?.RequestSendAway(who))
+                    {
+                        name = Ids.SendAway(i + 1),
+                        text = "Send " + strangers[i].Name + " away",
+                        focusable = true,
+                    };
+                    button.AddToClassList("fd-button");
+                    sendAwayList.Add(button);
+                }
+            }
+
+            bool renamePending = model.HasPendingRename;
+            bool sendAwayPending = model.HasPendingSendAway;
+            bool anyPending = renamePending || sendAwayPending;
+            SetDisplay(Ids.RenameConfirm, renamePending);
+            SetText(Ids.RenameAsk, model.PendingRenameWords);
+            SetDisplay(Ids.SendAwayConfirm, sendAwayPending);
+            SetText(Ids.SendAwayAsk, model.PendingSendAwayWords);
+            SetText(Ids.RenameMessage, model.RenameMessage);
+            if (renameList != null) renameList.style.display = options.Count > 0 && !anyPending ? DisplayStyle.Flex : DisplayStyle.None;
+            if (sendAwayList != null) sendAwayList.style.display = strangers.Count > 0 && !anyPending ? DisplayStyle.Flex : DisplayStyle.None;
+            if (renamePending != renderedRenamePending || sendAwayPending != renderedSendAwayPending)
+            {
+                renderedRenamePending = renamePending;
+                renderedSendAwayPending = sendAwayPending;
+                wantedFocus = renamePending ? Ids.RenameNo : sendAwayPending ? Ids.SendAwayNo : PreferredFocus();
+            }
+
             FrontDoorAction start = model.StartAction;
-            SetAction(Ids.Start, start);
+            SetAction(Ids.Start, start, anyPending);
             SetText(Ids.StartWhy, start.Why);
             SetText(Ids.StartMessage, model.StartMessage);
+        }
+
+        private static bool SameText(StringBuilder builder, string text)
+        {
+            if (builder.Length != text.Length) return false;
+            for (int i = 0; i < text.Length; i++) if (builder[i] != text[i]) return false;
+            return true;
         }
 
         private void RenderJoinEntry()
@@ -554,6 +730,7 @@ namespace SleepingCalamity.App
                 case FrontDoorState.Connecting: return Ids.ConnectingCancel;
                 case FrontDoorState.WaitingForHost: return Ids.WaitingLeave;
                 case FrontDoorState.Ended: return Ids.EndedOk;
+                case FrontDoorState.ConfirmUnsaved: return Ids.UnsavedNo;   // the safe answer is the one Enter gives
                 default: return null;
             }
         }
