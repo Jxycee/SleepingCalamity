@@ -96,9 +96,10 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(changed, Is.EqualTo(1));
         }
 
-        // Catches: the 5th unique player getting into a full world, or being refused with a reason the client cannot show.
+        // Catches (audit A3, user decision 2026-11-13): the 5th unique player being refused in the lobby of a full world (they may wait so the
+        // host can rename or send them away), being recorded by waiting, or the start gate letting a session start with them unrecorded.
         [UnityTest]
-        public IEnumerator FifthUniquePlayer_IsRefusedByApproval()
+        public IEnumerator FifthUniquePlayer_MayWaitInTheLobby_ButIsNeverRecordedAndStartIsRefused()
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
@@ -106,10 +107,35 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.StartDirectHostWithoutScenes();
 
             PlayModeHarness.TestClient fifth = NewClient(app, 9);   // not recorded
+            yield return Connect(fifth);
+            yield return PlayModeHarness.WaitUntil(() => app.Roster.ConnectedCount == 2, Timeout, "the waiting stranger never reached the roster");
+            Assert.That(app.World.Players.Recorded.Count, Is.EqualTo(4));
+            Assert.That(app.World.Players.IsRecorded(fifth.Key), Is.False);
+            Assert.That(app.World.TryStartSession(app.Roster), Is.Not.EqualTo(WorldPlayerVerdict.Ok), "start is refused while an unrecorded player is here");
+            Assert.That(app.World.Started, Is.False);
+            Assert.That(app.World.Players.IsRecorded(fifth.Key), Is.False);
+        }
+
+        // Catches: the 5th unique player getting into a full world whose session is running, or being refused with a reason the client cannot show.
+        [UnityTest]
+        public IEnumerator FifthUniquePlayer_IsRefusedByApproval_OnceTheSessionHasStarted()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            AppBootstrap app = AppBootstrap.Current;
+            app.World.Load(World(WorldKind.Multiplayer, HostKey(app), Player(1), Player(2), Player(3)));
+            yield return PlayModeHarness.StartDirectHostWithoutScenes();
+
+            PlayModeHarness.TestClient friend = NewClient(app, 1);   // recorded
+            yield return Connect(friend);
+            yield return PlayModeHarness.WaitUntil(() => app.Roster.ConnectedCount == 2, Timeout, "the recorded player never reached the roster");
+            Assert.That(app.World.TryStartSession(app.Roster), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(app.World.Started, Is.True);
+
+            PlayModeHarness.TestClient fifth = NewClient(app, 9);   // not recorded
             yield return ExpectRefused(fifth, EndReason.FullLobby);
             Assert.That(app.World.Players.Recorded.Count, Is.EqualTo(4));
             Assert.That(app.World.Players.IsRecorded(fifth.Key), Is.False);
-            Assert.That(app.Roster.ConnectedCount, Is.EqualTo(1), "only the host");
+            Assert.That(app.Roster.ConnectedCount, Is.EqualTo(2), "the host and the friend");
         }
 
         // Catches: a recorded player counted as new (refused when the world is full) and not recorded twice.
