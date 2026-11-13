@@ -1,6 +1,0 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <ui:Style src="MenuSpike.uss" />
-    <ui:VisualElement name="spike-root" class="spike-root">
-        <ui:Button name="spike-button" text="Spike" focusable="true" class="spike-button" />
-    </ui:VisualElement>
-</ui:UXML>
