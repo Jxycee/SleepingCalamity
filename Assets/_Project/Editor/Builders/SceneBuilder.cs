@@ -11,8 +11,11 @@ using Unity.Netcode.Transports.UTP;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
 
 namespace SleepingCalamity.EditorTools
 {
@@ -47,10 +50,49 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.GetOrAdd<PlayerInputAdapter>(app);
             BuilderUtil.GetOrAdd<AudioBus>(app);
             BuilderUtil.GetOrAdd<DevSessionPanel>(app);
+            BuilderUtil.GetOrAdd<ToastLine>(app);
+            AddFrontDoor(app);
             ConfigureNetworkManager(networkManager, transport, prefabList);
             bootstrap.Configure(playerPrefab, inputActions);
 
             BuilderUtil.SaveScene(scene, AssetPaths.BootstrapScene);
+        }
+
+        private const string MenuFolder = "Assets/_Project/App/Menus";
+        private const string MenuPanelSettingsPath = MenuFolder + "/MenuPanelSettings.asset";
+
+        // PL-3 tasks 3.3 and 3.4, the front door: a UIDocument (PanelSettings + FrontDoor.uxml) and its FrontDoorView on the App object (AppBootstrap hands the
+        // view its model). Input comes from an EventSystem with the Input System's UI module on its own default actions (never the SleepingCalamityInput
+        // asset): Enter / gamepad south submit, arrows / d-pad / left stick navigate, the mouse clicks.
+        private static void AddFrontDoor(GameObject app)
+        {
+            foreach (string file in new[] { "MenuTheme.tss", "FrontDoor.uss", "FrontDoor.uxml" })
+                AssetDatabase.ImportAsset(MenuFolder + "/" + file, ImportAssetOptions.ForceSynchronousImport);
+            var theme = AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>(MenuFolder + "/MenuTheme.tss");
+            var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(MenuFolder + "/FrontDoor.uxml");
+            if (theme == null || tree == null) throw new System.IO.FileNotFoundException("Missing the menu UI assets under " + MenuFolder);
+
+            var panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(MenuPanelSettingsPath);
+            if (panelSettings == null)
+            {
+                if (BuilderUtil.AssetPathOccupied(MenuPanelSettingsPath)) throw new System.InvalidOperationException(MenuPanelSettingsPath + " exists but is not a PanelSettings");
+                panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+                AssetDatabase.CreateAsset(panelSettings, MenuPanelSettingsPath);
+            }
+            panelSettings.themeStyleSheet = theme;
+            panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+            panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+            panelSettings.match = 0.5f;
+            EditorUtility.SetDirty(panelSettings);
+            AssetDatabase.SaveAssetIfDirty(panelSettings);
+
+            UIDocument document = BuilderUtil.GetOrAdd<UIDocument>(app);
+            document.panelSettings = panelSettings;
+            document.visualTreeAsset = tree;
+            BuilderUtil.GetOrAdd<FrontDoorView>(app);
+            BuilderUtil.GetOrAdd<EventSystem>(app);
+            BuilderUtil.GetOrAdd<InputSystemUIInputModule>(app);
         }
 
         // The lobby: a plain camera and light behind the dev panel. Sessions start here and the flow comes back here when one ends.

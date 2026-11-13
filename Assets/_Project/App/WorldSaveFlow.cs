@@ -20,7 +20,7 @@ using UnityEngine;
 
 namespace SleepingCalamity.App
 {
-    public sealed class WorldSaveFlow : IDisposable
+    public sealed class WorldSaveFlow : IDisposable, IFrontDoorWorlds
     {
         public const float FlushSeconds = 10f;       // a dirty file is on disk within this
 

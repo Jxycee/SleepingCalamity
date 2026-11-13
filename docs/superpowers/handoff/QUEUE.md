@@ -13,7 +13,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 ## Ready: playable loop (critical path; plan `docs/superpowers/plans/2026-11-11-playable-loop.md`, decisions D1-D5 approved 2026-11-11)
 - [x] **M** PL-1 Loop proof: input-only loop tests and loop bot, first-building measurement, D1 frame on floor 2, D4 floor 3 mix (plan section 3) [U] (launched 2026-11-11; merged from `afa1720a`, check PASS; results `Reference/sessions/pl1-loop-proof/RESULTS.md`)
 - [x] **M** PL-2 Guide and dive result: `LoopGuide`, objective line and beacons, dive result card, a real button to eat a loaf (after PL-1) [U][net]
-- [ ] **L** PL-3 Front door: UI Toolkit spike, `UiText`, `FrontDoorModel`, five screens, dev panel off in release (after PL-1) [U][net]
+- [x] **L** PL-3 Front door: UI Toolkit spike, `UiText`, `FrontDoorModel`, five screens, dev panel off in release (after PL-1) [U][net]
 - [ ] **M** PL-4 Way out and seams: pause menu, return-dive floor pick with a real button, PL-1 breaks, release build and walk script (after PL-3) [U][net]
 - [ ] **M** PL-5 Walk fixes (reserve; only after the user's walks)
 - [ ] **S** Stale docs, ride along with any PL merge: `docs/PHASE1.md:255-278, 326-331, 347` (floor-4 Dough Warden, shared haul, 90 s timer); roadmap header says four plans for five rows (docs)
@@ -131,3 +131,4 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - USER_TODO: Mixamo clips (blocks M2 animation), 2-player Relay walk (M1, M2, M5, M6, M7), Tobin concept (M10), corner approvals (M9)
 - Standing on the other hero's head: block or allow (USER_TODO :13)
 - Trial ramenvr/autopilot smoke tester (CURRENT Inbox)
+- [ ] **S** PL-3 leftovers: ToastLine/ToastQueue per-frame allocation (early return, plain loop, useGUILayout=false); longer duration for save.* toasts; SceneFlow forced-leave (first gameplay scene fails to load) bounces to Title silently, give it a distinct reason; hosting a world overwrites the solo world selection; host lobby re-renders every frame (allocations); typing into the join code field only manual-walk tested

@@ -57,6 +57,17 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
+        // PL-3 task 3.4: -dev-panel shows the IMGUI dev session panel in a release build (a debug build shows it anyway).
+        [Test]
+        public void DevPanel_Flag_Parses()
+        {
+            Assert.IsFalse(DevFlags.None.DevPanel);
+            Assert.IsFalse(DevFlags.Parse(new[] { "-dev-solo" }).DevPanel, "other flags leave the panel off");
+            Assert.IsTrue(DevFlags.Parse(new[] { "Game.exe", "-dev-panel" }).DevPanel);
+            Assert.IsTrue(DevFlags.Parse(new[] { "-DEV-PANEL", "-dev-solo" }).DevPanel, "case-insensitive, and the next flag is still read");
+            Assert.IsTrue(DevFlags.Parse(new[] { "-DEV-PANEL", "-dev-solo" }).Solo);
+        }
+
         // Review Focus 3: MPPM tag tokens in the wrong shape.
         [Test]
         public void DevFlags_Parse_MalformedJoinDirect_IsIgnoredAndNextFlagKept()

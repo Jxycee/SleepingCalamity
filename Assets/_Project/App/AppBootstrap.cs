@@ -43,6 +43,7 @@ namespace SleepingCalamity.App
         public DevFlags DevFlags { get; private set; }
         public SceneFlow SceneFlow => sceneFlow;
         public WorldSaveFlow WorldSaveFlow => worldSaveFlow;
+        public FrontDoorModel FrontDoor { get; private set; }
         public HostRoster Roster { get; private set; }
         public HostWorld World { get; private set; }
         public NetworkObject PlayerPrefab => playerPrefab;
@@ -166,6 +167,12 @@ namespace SleepingCalamity.App
             sceneFlow = new SceneFlow(session, NetworkManager, bus, Roster, World);
             worldSaveFlow = new WorldSaveFlow(session, NetworkManager, bus, World);
             spawner = new ArenaPlayerSpawner(NetworkManager, playerPrefab, Roster);
+
+            // The front door (PL-3): local on every peer, it only asks. Built after SceneFlow, the roster and the world library exist, and subscribed to
+            // the session after theirs, so by the time it hears Ended the flow has already saved and gone back to the Lobby.
+            FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster));
+            FrontDoorView view = GetComponent<FrontDoorView>();
+            if (view != null) view.Bind(FrontDoor, session, input);
         }
 
         private void Update()
@@ -236,6 +243,10 @@ namespace SleepingCalamity.App
 
             spawner?.Detach();
             spawner = null;
+            FrontDoorView view = GetComponent<FrontDoorView>();
+            if (view != null) view.Bind(null, null);
+            FrontDoor?.Dispose();
+            FrontDoor = null;
             sceneFlow?.Dispose();
             sceneFlow = null;
             worldSaveFlow?.Dispose();

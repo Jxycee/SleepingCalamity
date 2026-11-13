@@ -5,7 +5,8 @@ using System.Globalization;
 namespace SleepingCalamity.Core
 {
     // Dev-only command-line flags. AppBootstrap parses
-    // DevStartup.CollectArgs() (command line plus MPPM tags split on whitespace) and applies them only in dev builds.
+    // DevStartup.CollectArgs() (command line plus MPPM tags split on whitespace) and applies them only in dev builds
+    // (the one exception is -dev-panel, which a release build also honours).
     // Flag names are case-insensitive. Unknown tokens are ignored. A flag whose value is missing or malformed is
     // ignored (left at its default) and its value token is not consumed, so a following flag is still read.
     public sealed class DevFlags
@@ -27,6 +28,7 @@ namespace SleepingCalamity.Core
         public bool LongTimeout { get; private set; }          // -dev-long-timeout
         public bool CombatArena { get; private set; }          // -dev-combat: the first gameplay scene is the M3 combat arena
         public bool DiveArena { get; private set; }            // -dev-dive: the first gameplay scene is the M5 dive hub (Arena_Dive)
+        public bool DevPanel { get; private set; }             // -dev-panel: draw the IMGUI dev session panel (it always draws in a debug build; a release build hides it otherwise)
 
         public static DevFlags Parse(IReadOnlyList<string> args)
         {
@@ -53,6 +55,10 @@ namespace SleepingCalamity.Core
                 else if (Is(arg, "-dev-dive"))
                 {
                     flags.DiveArena = true;
+                }
+                else if (Is(arg, "-dev-panel"))
+                {
+                    flags.DevPanel = true;
                 }
                 else if (Is(arg, "-dev-long-timeout"))
                 {
