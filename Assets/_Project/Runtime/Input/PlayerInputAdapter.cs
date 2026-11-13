@@ -59,6 +59,15 @@ namespace SleepingCalamity.Runtime
 
         public PlayerIntent Intent => _intent;
         public bool HasFocus => _hasFocus;
+
+        // Tests only (PL-4 4.1): a batch-mode editor reports no window focus, so the adapter would hand every gameplay system neutral input. A device-level PlayMode test forces
+        // focus on; OnApplicationFocus then no longer changes it.
+        private bool _focusForced;
+        public void ForceFocusForTests()
+        {
+            _focusForced = true;
+            _hasFocus = true;
+        }
         public InputDeviceKind LastDevice => _lastDevice;
         public InputActionAsset Actions => _actions;
 
@@ -237,6 +246,7 @@ namespace SleepingCalamity.Runtime
 
         private void OnApplicationFocus(bool hasFocus)
         {
+            if (_focusForced) return;
             _hasFocus = hasFocus;
             if (hasFocus)
             {
