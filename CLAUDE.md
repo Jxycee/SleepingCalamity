@@ -34,7 +34,8 @@ A cloud session works like a PC session (user, 2026-10-30): it can be the contro
 - LSP tool → `python3 Tools/cloud/sc_lsp.py def|refs|hover <file>:<line> <name>` or `symbols <query>`: cloud Claude Code never offers the LSP tool, so this drives the same csharp-ls server directly.
 - `C:\Dev\FishGame` → `add_repo` Jxycee/FishGame (read), `git clone --depth 1 https://github.com/Jxycee/fishgame /home/user/fishgame`; don't register it as a session root (its own CLAUDE.md and skills would load). Same rules: copy from it, never edit it.
 - Blender MCP → the "SleepingCalamity Art" cloud environment (setup script with `SC_PROFILE=art`) serves a live Blender as the `blender` MCP server (`Tools/cloud/sc_blender_mcp.py`, also a CLI). Headless `blender -b` works everywhere.
-- Not in the cloud: the Unity MCP and `sc-walk` (they drive an editor window), `Reference/private/`, a GPU.
+- Not in the cloud: the Unity MCP and `sc-walk` (they drive an editor window), `Reference/private/`, a GPU, a Windows player build.
+- **No hybrid sessions (user, 2026-11-13).** If any step of a job needs the PC (Windows build, GPU captures or bakes, the Unity MCP, a walk, `Reference/private/`), the whole job runs as one local PC session. Don't split it into a cloud part plus a PC part; decide where a job runs before writing its brief.
 
 ## Code conventions
 - Code under `Assets/_Project/`, one assembly per folder: Core (pure C#, no engine), Data, Runtime, Gameplay, Presentation, UI, App, Networking, Editor, Tests/EditMode, Tests/PlayMode. `ArchitectureTests` enforces the forbidden references (Gameplay, Presentation and UI never touch Unity Services or transports).
