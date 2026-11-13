@@ -853,7 +853,7 @@ namespace SleepingCalamity.Presentation
                 if (Flat(me, NetHubStair.Value, PromptRadius))
                 {
                     IInputService pickInput = HeroInput.ResolveDefault();
-                    string pickButton = PickButtonName(pickInput);
+                    string pickButton = NetCheckpointHeld.Value && floors.Count > 1 && !NetSuspendedDive.Value ? PickButtonName(pickInput) : "";   // resolved only where the text shows it
                     Prompt = PromptKind.Descend; PromptText = HubPromptText(NetCheckpointHeld.Value, floors, PickFloor, NetSuspendedDive.Value, pickButton);
                     bool cycle = pickInput != null && (pickInput.Intent.LockPressed || pickInput is IDevInput cyc && cyc.WasPressed(DevKey.CycleFloor));
                     if (cycle && floors.Count > 1 && !NetSuspendedDive.Value && NetCheckpointHeld.Value && !LocalHeroIsDown(player))

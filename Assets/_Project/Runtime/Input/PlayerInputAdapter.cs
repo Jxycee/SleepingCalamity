@@ -198,7 +198,8 @@ namespace SleepingCalamity.Runtime
             f.InteractPressed = _interact.WasPressedThisFrame();
             f.InteractHeld = _interact.IsPressed();
             f.UseItemPressed = _useItem.WasPressedThisFrame();
-            f.PausePressed = Context == InputContext.Menu ?_uiCancel.WasPressedThisFrame() : _pause.WasPressedThisFrame();
+            // Menu: UI/Cancel (B, Escape) or Player/Pause (gamepad Start, Escape) both close it, so the key that opened the pause menu also closes it. Other contexts (PlacementMode too) read Player/Pause only.
+            f.PausePressed = Context == InputContext.Menu ? (_uiCancel.WasPressedThisFrame() || _pause.WasPressedThisFrame()) : _pause.WasPressedThisFrame();
             return f;
         }
 

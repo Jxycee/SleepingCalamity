@@ -122,6 +122,23 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void HostLeave_WorldCannotSave_DoesNotPromiseASave()
+        {
+            model.Dispose();
+            bool canSave = false;
+            model = new PauseMenuModel(session, input, () => quits++, () => canSave);
+            Connect(true);
+            model.Pause(InputContext.Free);
+            model.Leave();
+            Assert.That(model.ConfirmWords, Does.Contain("cannot be saved"));
+            Assert.That(model.ConfirmWords, Does.Not.Contain("Your world is saved"));
+            model.Back();
+            canSave = true;
+            model.Leave();
+            Assert.That(model.ConfirmWords, Does.Contain("Your world is saved"));
+        }
+
+        [Test]
         public void ClientLeave_DoesNotAsk()
         {
             Connect(false);

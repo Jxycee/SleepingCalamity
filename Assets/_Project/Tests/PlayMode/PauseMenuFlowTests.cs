@@ -136,6 +136,14 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator Leave_AsHost_WorldSaved_SessionEnds()
         {
             yield return BootSolo();
+            // The start already wrote the world once. Change the world in memory after that (a sentinel stamp, no dirty mark, so only a real save at leave can replace it).
+            const string Sentinel = "1999-01-01T00:00:00.0000000Z";
+            Assert.That(app.WorldSaveFlow.Store, Is.Not.Null, "no world store while hosting");
+            string[] before = Directory.GetFiles(saveDir, "*.json", SearchOption.AllDirectories);
+            Assert.That(before.Length, Is.GreaterThan(0), "the start wrote no world file");
+            var textBefore = new System.Collections.Generic.Dictionary<string, string>();
+            foreach (string f in before) textBefore[f] = File.ReadAllText(f);
+            app.WorldSaveFlow.Store.Current.SavedAtUtc = Sentinel;
             yield return OpenWithEscape();
 
             yield return Press(PauseMenuView.Ids.Leave);
@@ -154,6 +162,13 @@ namespace SleepingCalamity.Tests.PlayMode
             string[] files = Directory.Exists(saveDir) ? Directory.GetFiles(saveDir, "*.json", SearchOption.AllDirectories) : new string[0];
             Assert.That(files.Length, Is.GreaterThan(0), "no world file on disk after the host left");
             Assert.That(app.WorldSaveFlow.ListWorlds(WorldKind.Solo, IdentityKind.Local).Count, Is.EqualTo(1), "the solo world is in the library");
+            bool rewritten = false;
+            foreach (string f in files)
+            {
+                string now = File.ReadAllText(f);
+                if (textBefore.TryGetValue(f, out string old) && now != old && !now.Contains(Sentinel)) rewritten = true;
+            }
+            Assert.That(rewritten, Is.True, "the leave did not write the world: no file changed from its start-of-session content");
         }
 
         [UnityTest]

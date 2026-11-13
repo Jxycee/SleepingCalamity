@@ -31,8 +31,12 @@ namespace SleepingCalamity.App
         private bool raisedMenu;   // this model raised IInputService.MenuOpen and must lower it
         private bool disposed;
 
-        public PauseMenuModel(INetworkSession session, IInputService input, Action quit)
+        // canSave: whether a host's leave or quit writes the world (WorldSaveFlow.CanSave); null means yes.
+        private readonly Func<bool> canSave;
+
+        public PauseMenuModel(INetworkSession session, IInputService input, Action quit, Func<bool> canSave = null)
         {
+            this.canSave = canSave;
             this.session = session ?? throw new ArgumentNullException(nameof(session));
             this.input = input ?? throw new ArgumentNullException(nameof(input));
             this.quit = quit ?? throw new ArgumentNullException(nameof(quit));
@@ -59,8 +63,9 @@ namespace SleepingCalamity.App
             {
                 if (state != PauseMenuState.Confirm) return null;
                 bool solo = session.Mode == SessionMode.Solo;
-                if (pending == Pending.Quit) return solo ? PauseMenuText.SoloQuitAsk : PauseMenuText.HostQuitAsk;
-                return solo ? PauseMenuText.SoloLeaveAsk : PauseMenuText.HostLeaveAsk;
+                bool saves = canSave == null || canSave();
+                if (pending == Pending.Quit) return solo ? (saves ? PauseMenuText.SoloQuitAsk : PauseMenuText.SoloQuitAskUnsaved) : (saves ? PauseMenuText.HostQuitAsk : PauseMenuText.HostQuitAskUnsaved);
+                return solo ? (saves ? PauseMenuText.SoloLeaveAsk : PauseMenuText.SoloLeaveAskUnsaved) : (saves ? PauseMenuText.HostLeaveAsk : PauseMenuText.HostLeaveAskUnsaved);
             }
         }
 

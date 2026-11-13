@@ -174,7 +174,7 @@ namespace SleepingCalamity.App
             FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster));
             FrontDoorView view = GetComponent<FrontDoorView>();
             if (view != null) view.Bind(FrontDoor, session, input);
-            PauseMenu = new PauseMenuModel(session, input, PauseMenuView.QuitGame);
+            PauseMenu = new PauseMenuModel(session, input, PauseMenuView.QuitGame, () => worldSaveFlow != null && worldSaveFlow.CanSave);
             PauseMenuView pauseView = GetComponentInChildren<PauseMenuView>(true);
             if (pauseView != null) pauseView.Bind(PauseMenu, input);
         }

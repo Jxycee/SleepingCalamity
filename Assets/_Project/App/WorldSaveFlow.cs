@@ -59,6 +59,9 @@ namespace SleepingCalamity.App
         // The attached store while hosting (tests read it), else null.
         public WorldSaveStore Store => store;
 
+        // True while hosting a world that a leave or quit will write (a store is attached and not read-only). False for a full library or a read-only world.
+        public bool CanSave => store != null && !store.IsReadOnly;
+
         // The world the next hosted session opens (set by Select / CreateWorld); null = the most recently played, or a new one.
         public string SelectedWorldId { get; private set; }
 

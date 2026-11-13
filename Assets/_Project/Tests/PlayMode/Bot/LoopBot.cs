@@ -1,5 +1,5 @@
 // Authority: test-only (local owner of the host hero; solo host, or the host peer of a host-plus-client session). PL-1 task 1.2: plays the playable loop by button presses only, from the Hollowmere spawn:
-// Interact at the trapdoor (a floor-1 start: the floor pick has no button before PL-4), DiveBot plays the dive through the same FakeInputService, home by any ending (a death, or the bank room's
+// Interact at the trapdoor (a floor-1 start: with a checkpoint held the pick defaults to the bank floor after PL-4 4.2, so the bot presses Lock until the pick is floor 1), DiveBot plays the dive through the same FakeInputService, home by any ending (a death, or the bank room's
 // go-home button on floor 5), Interact at the build point, place what is in stock (Primary: frame, parts, resident), Pause out (the world saves), leave, start the same world again, check the town.
 // It may TELEPORT the hero between town points (the town walk is not what is under test); it never calls a Server* method or an RPC for the action under test. The only test-side cheats are the
 // two the dive bots already have: DiveBot.Tough (the host tops the hero up below 50% HP, so a run tests wiring and not difficulty) and the optional ExtraTick of a caller (pair test).
@@ -68,6 +68,9 @@ namespace SleepingCalamity.Tests.PlayMode
             if (BeforeDive != null) yield return BeforeDive();
             Rig.StandAtTrapdoor();
             yield return PlayModeHarness.WaitUntil(() => d.Prompt == DiveDirector.PromptKind.Descend, TownInputRig.Timeout, "[loop] dive " + rec.Number + ": no trapdoor prompt at the trapdoor");
+            for (int i = 0; i < 12 && d.NetCheckpointHeld.Value && d.PickFloor != UndercroftPlan.FirstFloor; i++)
+                yield return Rig.Press(f => f.Frame.LockPressed = true);   // a held checkpoint defaults the pick to the bank floor; this bot always starts on floor 1
+            Assert.AreEqual(UndercroftPlan.FirstFloor, d.PickFloor, "[loop] dive " + rec.Number + ": Lock never brought the pick back to floor 1");
             yield return Rig.PressInteract();
             yield return PlayModeHarness.WaitUntil(() => d.NetActive.Value && d.FloorSync != null && d.FloorSync.Built != null && d.FloorSync.BuiltFloor == UndercroftPlan.FirstFloor, TownInputRig.Timeout,
                 "[loop] dive " + rec.Number + ": Interact at the trapdoor never built floor 1");

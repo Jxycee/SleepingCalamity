@@ -21,6 +21,12 @@ namespace SleepingCalamity.App
         public const string SoloLeaveAsk = "Leave to the title screen? Your world is saved.";
         public const string SoloQuitAsk = "Quit the game? Your world is saved.";
 
+        // The same questions when the world cannot be written (a read-only world, or the world library was full): no promise of a save.
+        public const string HostLeaveAskUnsaved = "You are hosting. If you leave, the game ends for everyone. This world cannot be saved, so this session's progress is lost.";
+        public const string HostQuitAskUnsaved = "You are hosting. If you quit, the game ends for everyone. This world cannot be saved, so this session's progress is lost.";
+        public const string SoloLeaveAskUnsaved = "Leave to the title screen? This world cannot be saved, so this session's progress is lost.";
+        public const string SoloQuitAskUnsaved = "Quit the game? This world cannot be saved, so this session's progress is lost.";
+
         // The rows of the Controls screen: the words for each action in the game's action asset (the key is read from the asset, never typed here).
         public static readonly string[][] ControlRows =
         {

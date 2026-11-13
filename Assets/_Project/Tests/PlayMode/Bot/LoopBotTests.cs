@@ -150,7 +150,7 @@ namespace SleepingCalamity.Tests.PlayMode
             var all = new StringBuilder();
             all.AppendLine("# PL-1 loop proof: first building by player input only (SoloLoop_Measure, Tough off)");
             all.AppendLine();
-            all.AppendLine("Bot: LoopBot (trapdoor press, DiveBot through FakeInputService, bank-room go-home press or a death, build-point press). Dives start on floor 1; the frame lives on floor 2 (D1); floor 3 mix 30/50/20 (D4).");
+            all.AppendLine("Bot: LoopBot (trapdoor press, DiveBot through FakeInputService, bank-room go-home press or a death, build-point press). Dives start on floor 1 (the bot presses Lock past the bank-floor default); the frame lives on floor 2 (D1); floor 3 mix 30/50/20 (D4).");
             foreach (var kv in sections) { all.AppendLine(); all.Append(kv.Value); }
             File.WriteAllText(path, all.ToString());
             Debug.Log("[LOOPBOT] results: " + path);
