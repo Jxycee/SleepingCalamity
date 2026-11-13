@@ -246,6 +246,31 @@ namespace SleepingCalamity.Runtime
             _namesWhileConnected.Clear();
         }
 
+        // A player's saved data follows their key: weapons and hero growth (A32), gold, stash and waiting satchel, and a bank-room suspend's record of
+        // them (its bag, present id and the dive's extra-slot owner). Shared by the Solo owner rebind and the Multiplayer rename (audit A3).
+        private void MovePlayerData(PlayerKey from, PlayerKey to)
+        {
+            GrowthSaves.Rename(_weapons, from.Id, to.Id);
+            BagsSaveRules.Rename(_town.Bags, from, to);
+            SuspendSaveRules.Rename(_town.Suspend, from, to);
+            if (_town.Dive != null) _town.Dive.ExtraSlotOwner = SuspendSaveRules.RenameId(_town.Dive.ExtraSlotOwner, from, to);
+        }
+
+        // The host's "this player is now that player" (audit A3; the front door's host lobby): one recorded player of a Multiplayer world takes a
+        // new key (a new PC or a reinstall gave them a new UGS id) and brings their growth, bags and suspend record along. Refused with the
+        // verdict, changing nothing, for what WorldPlayers.RenameRecorded refuses (invalid or other-kind key, an old key that is not recorded, a
+        // new key that already is, a Solo world) and with WorldInProgress once a session runs (the live heroes then hold that state). Raises Changed.
+        public WorldPlayerVerdict RenameRecorded(PlayerKey from, PlayerKey to)
+        {
+            if (Players == null) return WorldPlayerVerdict.NotRecorded;
+            if (Started) return WorldPlayerVerdict.WorldInProgress;
+            WorldPlayerVerdict verdict = Players.RenameRecorded(from, to);
+            if (verdict != WorldPlayerVerdict.Ok) return verdict;
+            MovePlayerData(from, to);
+            RaiseChanged();
+            return WorldPlayerVerdict.Ok;
+        }
+
         // Connection approval. JoinRules (and so the host's self-approval, IsServerSelf) ran before this. Nothing is recorded here.
         //  - The HOST is never refused (user ruling 2026-10-30). On a Solo world the owner follows the file: a host key that is not the
         //    recorded owner (a new profile, a copied save) is rebound as the owner and the change is logged. On a Multiplayer world the host is
@@ -264,13 +289,7 @@ namespace SleepingCalamity.Runtime
                 PlayerKey previousOwner = world.Recorded.Count > 0 ? world.Recorded[0] : default;
                 if (world.Kind == WorldKind.Solo && !world.IsRecorded(key) && world.RebindSoloOwner(key))
                 {
-                    if (previousOwner.Id != null)
-                    {
-                        GrowthSaves.Rename(_weapons, previousOwner.Id, key.Id);   // the Solo world's weapons follow its owner (A32)
-                        BagsSaveRules.Rename(_town.Bags, previousOwner, key);     // so do the owner's gold, stash and waiting satchel
-                        SuspendSaveRules.Rename(_town.Suspend, previousOwner, key);   // and a bank-room suspend's record of them
-                        if (_town.Dive != null) _town.Dive.ExtraSlotOwner = SuspendSaveRules.RenameId(_town.Dive.ExtraSlotOwner, previousOwner, key);
-                    }
+                    if (previousOwner.Id != null) MovePlayerData(previousOwner, key);
                     Debug.LogWarning("HostWorld: the Solo world's owner key did not match this machine's key; the owner is now " + key + ".");
                     RaiseChanged();
                 }

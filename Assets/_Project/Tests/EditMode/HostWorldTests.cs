@@ -198,6 +198,66 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.TryStartSession(Roster("new")), Is.EqualTo(WorldPlayerVerdict.Ok));
         }
 
+        // Catches (audit A3): a multiplayer player whose key changed losing their growth, gold and suspend record (the Solo rebind moved them, Multiplayer had no
+        // equivalent), a rename that touches anyone else, and one that is allowed once play has begun.
+        [Test]
+        public void Multiplayer_RenameRecordedPlayer_MovesGrowthBagsAndSuspend()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b"), K("c"), K("d") }, out WorldPlayers players);
+            players.SetName(K("b"), "Bo");
+            var world = new HostWorld();
+            world.Load(players);
+            world.Weapons.Heroes.Add(new HeroSave { OwnerId = "b" });
+            world.Weapons.Heroes.Add(new HeroSave { OwnerId = "a" });
+            world.Town.Bags = new BagsSave { Players = new List<PlayerBagSave>
+            {
+                new PlayerBagSave { Identity = (int)IdentityKind.Local, Id = "b", Gold = 7 },
+                new PlayerBagSave { Identity = (int)IdentityKind.Local, Id = "a", Gold = 3 },
+            } };
+            world.Town.Suspend = new SuspendSave { PresentIds = new List<string> { K("b").ToString(), K("a").ToString() }, ExtraSlotOwner = K("b").ToString() };
+            world.Town.Dive = new DiveSave { ExtraSlotOwner = K("b").ToString() };
+            int changed = 0;
+            world.Changed += () => changed++;
+
+            Assert.That(world.RenameRecorded(K("b"), K("b2")), Is.EqualTo(WorldPlayerVerdict.Ok));
+
+            Assert.That(world.Players.IsRecorded(K("b2")), Is.True);
+            Assert.That(world.Players.IsRecorded(K("b")), Is.False);
+            Assert.That(world.Players.NameOf(K("b2")), Is.EqualTo("Bo"));
+            Assert.That(world.Weapons.Heroes.Exists(h => h.OwnerId == "b2"), Is.True, "growth follows");
+            Assert.That(world.Weapons.Heroes.Exists(h => h.OwnerId == "b"), Is.False);
+            Assert.That(world.Weapons.Heroes.Exists(h => h.OwnerId == "a"), Is.True, "others untouched");
+            Assert.That(world.Town.Bags.Players.Find(p => p.Id == "b2").Gold, Is.EqualTo(7), "gold follows");
+            Assert.That(world.Town.Bags.Players.Find(p => p.Id == "a").Gold, Is.EqualTo(3));
+            Assert.That(world.Town.Suspend.PresentIds, Is.EqualTo(new[] { K("b2").ToString(), K("a").ToString() }));
+            Assert.That(world.Town.Suspend.ExtraSlotOwner, Is.EqualTo(K("b2").ToString()));
+            Assert.That(world.Town.Dive.ExtraSlotOwner, Is.EqualTo(K("b2").ToString()));
+            Assert.That(changed, Is.EqualTo(1), "persisted");
+
+            // Refusals change nothing and raise nothing.
+            Assert.That(world.RenameRecorded(K("a"), K("c")), Is.EqualTo(WorldPlayerVerdict.DuplicatePlayer));
+            Assert.That(world.RenameRecorded(K("zz"), K("y")), Is.EqualTo(WorldPlayerVerdict.NotRecorded));
+            Assert.That(world.Town.Bags.Players.Find(p => p.Id == "a").Gold, Is.EqualTo(3));
+            Assert.That(changed, Is.EqualTo(1));
+
+            // Once a session runs the live heroes hold the state: no rename then.
+            Assert.That(world.TryStartSession(Roster("a", "b2")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(world.RenameRecorded(K("a"), K("a2")), Is.EqualTo(WorldPlayerVerdict.WorldInProgress));
+            Assert.That(world.Players.IsRecorded(K("a")), Is.True);
+        }
+
+        // Catches (audit A3): the rename on a world that does not exist yet, or a Solo world (its owner follows the machine instead).
+        [Test]
+        public void RenameRecordedPlayer_NeedsAMultiplayerWorld()
+        {
+            var empty = new HostWorld();
+            Assert.That(empty.RenameRecorded(K("a"), K("b")), Is.Not.EqualTo(WorldPlayerVerdict.Ok));
+            WorldPlayers.TryCreate(WorldKind.Solo, new[] { K("a") }, out WorldPlayers solo);
+            var world = new HostWorld();
+            world.Load(solo);
+            Assert.That(world.RenameRecorded(K("a"), K("b")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed));
+        }
+
         // Catches: the host being refused at approval on a Multiplayer world it is not recorded in. It is admitted; the start gate then says why not.
         [Test]
         public void MultiplayerWorld_HostThatIsNotRecorded_IsAdmitted_AndTheGateSaysWhy()

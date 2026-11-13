@@ -362,6 +362,37 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(Solo("owner").Remove(K("owner")), Is.False, "a Solo world belongs to this machine: delete the world instead");
         }
 
+        // Catches (audit A3): a recorded player whose UGS id changed having no way to move to the new key, so a full world locks them out for good.
+        [Test]
+        public void RenameRecorded_MovesOneRecord_KeepingPlaceNameAndOrder()
+        {
+            WorldPlayers w = Multi("a", "b", "c", "d");
+            w.SetName(K("b"), "Bo");
+
+            Assert.That(w.RenameRecorded(K("b"), K("b2")), Is.EqualTo(WorldPlayerVerdict.Ok));
+            Assert.That(new List<PlayerKey>(w.Recorded), Is.EqualTo(new[] { K("a"), K("b2"), K("c"), K("d") }), "same place in the order");
+            Assert.That(w.IsRecorded(K("b")), Is.False);
+            Assert.That(w.NameOf(K("b2")), Is.EqualTo("Bo"));
+            Assert.That(w.NameOf(K("b")), Is.EqualTo(""));
+            Assert.That(w.CanStart(new[] { K("a"), K("b2") }), Is.EqualTo(WorldPlayerVerdict.Ok), "the new key can play");
+            Assert.That(w.CanJoin(K("b")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "the old key is just a stranger now");
+        }
+
+        // Catches (audit A3): a rename that overwrites another player's record, accepts a key of another identity kind, or invents a record.
+        [Test]
+        public void RenameRecorded_Refusals_ChangeNothing()
+        {
+            WorldPlayers w = Multi("a", "b");
+            Assert.That(w.RenameRecorded(K("a"), K("b")), Is.EqualTo(WorldPlayerVerdict.DuplicatePlayer), "the new key is already recorded");
+            Assert.That(w.RenameRecorded(K("a"), K("a")), Is.EqualTo(WorldPlayerVerdict.DuplicatePlayer), "renaming onto itself");
+            Assert.That(w.RenameRecorded(K("a"), default), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
+            Assert.That(w.RenameRecorded(default, K("x")), Is.EqualTo(WorldPlayerVerdict.InvalidPlayer));
+            Assert.That(w.RenameRecorded(K("a"), new PlayerKey(IdentityKind.Ugs, "x")), Is.EqualTo(WorldPlayerVerdict.WrongIdentityKind));
+            Assert.That(w.RenameRecorded(K("nobody"), K("x")), Is.EqualTo(WorldPlayerVerdict.NotRecorded));
+            Assert.That(Solo("owner").RenameRecorded(K("owner"), K("x")), Is.EqualTo(WorldPlayerVerdict.SoloWorldClosed), "a Solo owner follows the machine (RebindSoloOwner)");
+            Assert.That(new List<PlayerKey>(w.Recorded), Is.EqualTo(new[] { K("a"), K("b") }));
+        }
+
         static WorldPlayers Restore(WorldPlayersSave save)
         {
             Assert.That(WorldPlayers.TryRestore(save, out WorldPlayers w, out _), Is.True);

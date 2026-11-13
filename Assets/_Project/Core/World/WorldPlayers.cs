@@ -42,6 +42,7 @@ namespace SleepingCalamity.Core
         NotRecorded,         // a player present at a start is not one of the world's recorded players
         WrongPlayerCount,    // a Solo world starts with exactly its owner present
         WrongIdentityKind,   // the key's identity kind is not the one this world was made with
+        WorldInProgress,     // a session of the world is running: the host's rename of a recorded player waits for the lobby (audit A3)
     }
 
     public sealed class WorldPlayers
@@ -223,6 +224,28 @@ namespace SleepingCalamity.Core
             _names.Remove(key);
             _keyExtra.Remove(key);
             return true;
+        }
+
+        // The host's "this player is now that player" (audit A3): a recorded player whose key changed (a new PC, a reinstall: the anonymous UGS id is
+        // new) takes the new key in the same place, keeping their name and extra members. Multiplayer worlds only (a Solo owner follows the machine,
+        // RebindSoloOwner). Refused, changing nothing: an invalid key, a Solo world, a key of another identity kind, an old key that is not
+        // recorded, a new key that is already recorded (or is the old key). The caller moves the player's weapons, bags and suspend record.
+        public WorldPlayerVerdict RenameRecorded(PlayerKey from, PlayerKey to)
+        {
+            if (!IsValidKey(from) || !IsValidKey(to)) return WorldPlayerVerdict.InvalidPlayer;
+            if (Kind == WorldKind.Solo) return WorldPlayerVerdict.SoloWorldClosed;
+            if (_identity.HasValue && to.Kind != _identity.Value) return WorldPlayerVerdict.WrongIdentityKind;
+            int at = IndexOf(_recorded, from);
+            if (at < 0) return WorldPlayerVerdict.NotRecorded;
+            if (IsRecorded(to)) return WorldPlayerVerdict.DuplicatePlayer;
+            _names.TryGetValue(from, out string name);
+            _keyExtra.TryGetValue(from, out Dictionary<string, object> extra);
+            _names.Remove(from);
+            _keyExtra.Remove(from);
+            _recorded[at] = to;
+            if (name != null) _names[to] = name;
+            if (extra != null) _keyExtra[to] = extra;
+            return WorldPlayerVerdict.Ok;
         }
 
         // The difficulty scale input: how many of the world's recorded players are present (distinct; keys that are not recorded do not
