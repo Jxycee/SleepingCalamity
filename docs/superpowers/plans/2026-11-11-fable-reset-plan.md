@@ -51,13 +51,20 @@ Each Fable run's brief still says it: delegate only to pinned agent types; pass 
 - **Produces:** a findings file with severity and a concrete failure path for each; failing tests for blockers; new rules added to `sc-netcode` / `REVIEW.md`; queue items.
 - **Done when:** every section and system is covered, blockers have a failing test or a written repro.
 
-### Run 2b (pool A leftover, Sat Nov 14): Coordinator playbook
+### Run 2b (pool C, moved 2026-11-13: all-models weekly runs out Saturday): Coordinator playbook
 - **Why (user, 2026-11-12):** every coordinator should start with Fable's knowledge and process, not rebuild it from scattered memories.
 - **Goal:** a new `.claude/skills/sc-coordinator/SKILL.md` (about 1,500 words) that every coordinator reads once on claiming the role; `sc-steward` and the board's `claim` point to it.
 - **Inputs:** the coordinator memories (handoff, focus and usage police, Nov 1 lessons, board watchdog, usage pace), `session-usage.md`, section 6 here, and how recent coordinator sessions actually ran (Haiku scans of their transcripts).
 - **Done when:** the skill is merged, the memories it replaces are trimmed to pointers, and the cost is appended to section 6.
 
-### Run 3 (pool B): Asset factory design
+### Run 3 (pool B, Sun Nov 15): Area 1 and dungeon 1 design (replaces the asset factory here; user, 2026-11-13)
+- **Why (user):** Fable designs Hollowmere (area 1) and the Cellars (dungeon 1) in full, and Sonnet sessions build them to spec. Scans (Megascans) plus Fable's judgement make worlds that are beautiful, engaging and lively.
+- **Goal:** one design doc per place: layout map with play positions and sight lines, light and atmosphere per spot (target URP, not Lumen), prop-by-prop dressing plan naming exact Megascans, items from the user's Fab library (user, 2026-11-13: the spec names them, so only those get downloaded) and our own pieces, ambient life (animals, smoke, cloth, sound), how each dungeon floor reads (landmarks, set pieces), and a build plan split into Sonnet sessions, each with a capture-camera done-check beside the reference row. First build step: a URP lighting test corner.
+- **Builds on, not redoes:** `docs/PHASE1.md` section 3 (style bible), the signed-off dungeon design and `docs/ROOM_METRICS.md`, the floor generator (rooms v2, 7 floors), the Hollowmere already standing, the NieR Replicant cohesion target. A generator change only if the design needs one, with the reason.
+- **Where:** one local PC session (needs `Reference/private/`, the browser pane for Fab pages, GPU captures; no hybrid).
+- **Done when:** both docs and the build plan are merged and the user has approved them.
+
+### Run 3b (pool C): Asset factory design (moved from Run 3; Megascans and Fab cover much of the need now)
 - **Why:** design once, then Sonnet and your GPU produce assets without Fable from then on.
 - **Goal:** finish the local prop pipeline (`C:\AI\scripts\ai_prop.py`: Hunyuan3D shape + TRELLIS.2 texture) with the missing cleanup stage (decimate, UV, rebake at 2K max, colour fix toward the style bible) and automatic quality checks per asset type (prop, creature, foliage, kit piece).
 - **Delegation:** Sonnet implementers write the Blender cleanup and check scripts; local GPU runs the generation sweeps; Haiku reads the audit output; Fable sets the thresholds and judges the contact sheets.
@@ -87,9 +94,9 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
 | Wed Nov 11 evening | Your go on this plan. Start the hair tool prep (Sonnet). Run 1 |
 | Thu Nov 12 | Review Run 1's plan; Run 2. First Sonnet session from the Run 1 plan |
 | Fri-Sat Nov 13-14 | Run 2 finishes; pool A spent by Saturday night |
-| Sun-Mon Nov 15-16 | Runs 3 and 4 (pool B); PC free for GPU sweeps |
+| Sun-Mon Nov 15-16 | Run 3 (area 1 + dungeon 1 design, local) and Run 4 (pool B); PC free for GPU sweeps |
 | Mon Nov 16 late | Redeem the one-off reset once pool B is spent |
-| Tue-Sun Nov 17-22 | Runs 5 and 6 (pool C) |
+| Tue-Sun Nov 17-22 | Pool C: Run 2b playbook, Run 5 balance, Run 3b asset factory if room, Run 6 reserve |
 | After Nov 22 | About one Fable use a week: the weekly planning session or an escalation |
 
 ## 6. Lessons for the next Fable run
