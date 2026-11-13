@@ -11,7 +11,9 @@ namespace SleepingCalamity.Runtime
     // Authority: host only (a plain C# object, never replicated; a client never evaluates the world rules for itself).
     // The host's world-player gate (user decision 2026-10-29, rules in Core/World/WorldPlayers):
     //  - Admit is called by ConnectionApprover for every join, the host's own included, after JoinRules approved it. It refuses a join to a
-    //    Solo world (SoloWorldClosed), refuses a key of another identity kind and refuses a new key when 4 players are recorded (WorldFull).
+    //    Solo world (SoloWorldClosed), refuses a key of another identity kind and refuses a new key when 4 players are recorded (WorldFull) once the session has started.
+    //    Before the start an unrecorded player may wait in a full world's lobby (user decision 2026-11-13): the host renames them as a friend
+    //    (RenameRecorded) or sends them away, and TryStartSession refuses (WorldFull) while they are there.
     //    It records nothing, and neither does a connection coming up (NoteConnected only keeps the display name): a player is written into the
     //    world when they PLAY it (user decision 2026-11-13, audit A2) - at the session start for everyone present, or, for a join into a session
     //    that is already running, when their hero spawns (RecordHeroSpawned). A lobby visitor who leaves before Start is never recorded.

@@ -272,6 +272,26 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(world.Admit(K("f"), 6, false), Is.EqualTo(WorldPlayerVerdict.WorldFull));
         }
 
+        // Catches (user decision 2026-11-13): the rule "an unrecorded player may wait in a full world's lobby, Start refused" - the refusal must
+        // record nobody, must stay while they are there, and must say the two choices (rename them as a friend, or send them away).
+        [Test]
+        public void FullWorld_UnrecordedInLobby_StartRefused()
+        {
+            WorldPlayers.TryCreate(WorldKind.Multiplayer, new[] { K("a"), K("b"), K("c"), K("d") }, out WorldPlayers players);
+            var world = new HostWorld();
+            world.Load(players);
+            Assert.That(world.Admit(K("e"), 5, false), Is.EqualTo(WorldPlayerVerdict.Ok));
+            world.NoteConnected(K("e"), 5);
+
+            WorldPlayerVerdict first = world.TryStartSession(Roster("a", "b", "e"));
+            Assert.That(first, Is.EqualTo(WorldPlayerVerdict.WorldFull));
+            Assert.That(world.TryStartSession(Roster("a", "b", "e")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "asking again changes nothing");
+            Assert.That(world.Players.IsRecorded(K("e")), Is.False, "a refused start records nobody");
+            Assert.That(world.Started, Is.False);
+            string words = UiText.StartRefusal(first);
+            Assert.That(words, Does.Contain("friend").And.Contain("send them away"), "the words name the two choices");
+        }
+
         // Catches (risk review of A3): a stale pending approval of the renamed key making Admit refuse the next stranger.
         [Test]
         public void RenameRecorded_ForgetsThePendingApprovalOfTheNewKey()

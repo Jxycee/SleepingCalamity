@@ -45,6 +45,12 @@
                 <ui:Button name="btn-rename-yes" text="Yes, that is them" focusable="true" class="fd-button" />
                 <ui:Button name="btn-rename-no" text="No" focusable="true" class="fd-button" />
             </ui:VisualElement>
+            <ui:VisualElement name="send-away-list" class="fd-list" />
+            <ui:VisualElement name="send-away-confirm" class="fd-confirm">
+                <ui:Label name="lbl-send-away-ask" text="" class="fd-text" />
+                <ui:Button name="btn-send-away-yes" text="Yes, send them away" focusable="true" class="fd-button" />
+                <ui:Button name="btn-send-away-no" text="No" focusable="true" class="fd-button" />
+            </ui:VisualElement>
             <ui:Label name="lbl-rename-message" text="" class="fd-why" />
             <ui:Button name="btn-start" text="Start" focusable="true" class="fd-button" />
             <ui:Label name="lbl-start-why" text="" class="fd-why" />

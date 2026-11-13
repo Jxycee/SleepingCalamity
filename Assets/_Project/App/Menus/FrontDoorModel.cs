@@ -93,6 +93,12 @@ namespace SleepingCalamity.App
         // not connected (both empty unless the world is Multiplayer and its session has not started), and the rename itself (the host's gate decides).
         void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway);
         WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to);
+        // A full world's lobby (user decision 2026-11-13): who is connected without a place (not recorded, and the world has none to give), and
+        // the host sending one away (disconnects them with EndReason.SentAway; false when they are gone already).
+        void GetStrangers(List<FrontDoorPerson> into);
+        bool SendAway(PlayerKey key);
+        // On a guest: true when the host has told this machine it is connected without a place in a full world (it can only wait to be added).
+        bool WaitsForPlace { get; }
     }
 
     public sealed class FrontDoorModel : IDisposable
@@ -164,6 +170,7 @@ namespace SleepingCalamity.App
         private readonly List<FrontDoorPerson> renameNew = new List<FrontDoorPerson>();
         private readonly List<FrontDoorPerson> renameAway = new List<FrontDoorPerson>();
         private readonly List<FrontDoorRenameOption> renameOptions = new List<FrontDoorRenameOption>();
+        private readonly List<FrontDoorRenameOption> renameOptionPool = new List<FrontDoorRenameOption>();   // reused: the lobby reads RenameOptions every frame
         private FrontDoorRenameOption pendingRename;
 
         public IReadOnlyList<FrontDoorRenameOption> RenameOptions
@@ -175,7 +182,14 @@ namespace SleepingCalamity.App
                 host.GetRenameChoices(renameNew, renameAway);
                 foreach (FrontDoorPerson fresh in renameNew)
                     foreach (FrontDoorPerson old in renameAway)
-                        renameOptions.Add(new FrontDoorRenameOption { NewPlayer = fresh, Recorded = old });
+                    {
+                        int at = renameOptions.Count;
+                        if (renameOptionPool.Count <= at) renameOptionPool.Add(new FrontDoorRenameOption());
+                        FrontDoorRenameOption option = renameOptionPool[at];
+                        option.NewPlayer = fresh;
+                        option.Recorded = old;
+                        renameOptions.Add(option);
+                    }
                 return renameOptions;
             }
         }
@@ -183,7 +197,54 @@ namespace SleepingCalamity.App
         public PlayerKey PendingRenameNewKey => pendingRename == null ? default : pendingRename.NewPlayer.Key;
         public PlayerKey PendingRenameOldKey => pendingRename == null ? default : pendingRename.Recorded.Key;
         public string PendingRenameWords => HasPendingRename ? UiText.RenamePlayerAsk(pendingRename.NewPlayer.Name, pendingRename.Recorded.Name) : null;
-        public string RenameMessage { get; private set; }   // what the last rename did, in words
+        public string RenameMessage { get; private set; }   // what the last rename (or send-away) did, in words
+
+        // A full world's strangers (user decision 2026-11-13): the host can send one away instead of renaming them. Asks first, like Remove.
+        private readonly List<FrontDoorPerson> strangers = new List<FrontDoorPerson>();
+        private FrontDoorPerson pendingSendAway;
+        public IReadOnlyList<FrontDoorPerson> Strangers
+        {
+            get
+            {
+                strangers.Clear();
+                if (state == FrontDoorState.HostLobby) host.GetStrangers(strangers);
+                return strangers;
+            }
+        }
+        public bool HasPendingSendAway => pendingSendAway != null && state == FrontDoorState.HostLobby;
+        public PlayerKey PendingSendAwayKey => pendingSendAway == null ? default : pendingSendAway.Key;
+        public string PendingSendAwayWords => HasPendingSendAway ? UiText.SendAwayAsk(pendingSendAway.Name) : null;
+
+        public void RequestSendAway(PlayerKey key)
+        {
+            if (state != FrontDoorState.HostLobby) return;
+            foreach (FrontDoorPerson person in Strangers)
+            {
+                if (person.Key != key) continue;
+                pendingSendAway = new FrontDoorPerson { Key = person.Key, Name = person.Name };
+                pendingRename = null;
+                RenameMessage = null;
+                Touch();
+                return;
+            }
+        }
+
+        public void ConfirmSendAway()
+        {
+            if (!HasPendingSendAway) return;
+            FrontDoorPerson asked = pendingSendAway;
+            pendingSendAway = null;
+            host.SendAway(asked.Key);
+            RenameMessage = UiText.PlayerSentAway(asked.Name);
+            Touch();
+        }
+
+        public void CancelSendAway()
+        {
+            if (pendingSendAway == null) return;
+            pendingSendAway = null;
+            Touch();
+        }
 
         public void RequestRename(PlayerKey newKey, PlayerKey recordedKey)
         {
@@ -191,7 +252,12 @@ namespace SleepingCalamity.App
             foreach (FrontDoorRenameOption option in RenameOptions)
             {
                 if (option.NewPlayer.Key != newKey || option.Recorded.Key != recordedKey) continue;
-                pendingRename = new FrontDoorRenameOption { NewPlayer = option.NewPlayer, Recorded = option.Recorded };
+                pendingRename = new FrontDoorRenameOption   // copies: the host's person objects are reused every frame
+                {
+                    NewPlayer = new FrontDoorPerson { Key = option.NewPlayer.Key, Name = option.NewPlayer.Name },
+                    Recorded = new FrontDoorPerson { Key = option.Recorded.Key, Name = option.Recorded.Name },
+                };
+                pendingSendAway = null;
                 RenameMessage = null;
                 Touch();
                 return;
@@ -277,7 +343,7 @@ namespace SleepingCalamity.App
         public string JoinError { get; private set; }
 
         public string ConnectingWords => state == FrontDoorState.Connecting ? UiText.Connecting : null;
-        public string WaitingWords => state == FrontDoorState.WaitingForHost ? UiText.WaitingForHost : null;
+        public string WaitingWords => state == FrontDoorState.WaitingForHost ? (host.WaitsForPlace ? UiText.WaitingForPlace : UiText.WaitingForHost) : null;
 
         // Ended: why (words) and the reason; both null again after Acknowledge.
         public string EndedWords { get; private set; }
@@ -306,6 +372,7 @@ namespace SleepingCalamity.App
             {
                 if (state != FrontDoorState.HostLobby) return FrontDoorAction.Off();
                 if (host.ConnectedCount < WorldPlayers.MinPlayersToStartMultiplayer) return FrontDoorAction.Off(UiText.StartRefusal(WorldPlayerVerdict.NotEnoughPlayers));
+                if (Strangers.Count > 0) return FrontDoorAction.Off(UiText.StartRefusal(WorldPlayerVerdict.WorldFull));   // rename them as a friend or send them away first
                 return FrontDoorAction.On;
             }
         }
@@ -544,6 +611,7 @@ namespace SleepingCalamity.App
                     return Done;
                 case FrontDoorState.HostLobby:
                     CancelRename();
+                    CancelSendAway();
                     return Done;
                 default:   // Title, WaitingForHost
                     return Done;
@@ -697,6 +765,7 @@ namespace SleepingCalamity.App
             PendingDeleteId = null;
             ClearPendingRemove();
             pendingRename = null;
+            pendingSendAway = null;
             RenameMessage = null;
             Touch();
         }

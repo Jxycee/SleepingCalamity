@@ -47,6 +47,13 @@ namespace SleepingCalamity.App
             public const string RenameYes = "btn-rename-yes";
             public const string RenameNo = "btn-rename-no";
             public const string RenameMessage = "lbl-rename-message";
+            public const string SendAwayList = "send-away-list";
+            public const string SendAwayConfirm = "send-away-confirm";
+            public const string SendAwayAsk = "lbl-send-away-ask";
+            public const string SendAwayYes = "btn-send-away-yes";
+            public const string SendAwayNo = "btn-send-away-no";
+            // The host's "send this waiting player away" button, 1-based: "btn-send-away-1".
+            public static string SendAway(int number) => "btn-send-away-" + number;
             // The host's "this connected player is that recorded player" button, 1-based: "btn-rename-1".
             public static string RenameOption(int number) => "btn-rename-" + number;
 
@@ -132,7 +139,14 @@ namespace SleepingCalamity.App
         private int renderedRowCount;
         private string playersSignature = "";
         private string renameSignature = "";
+        private string sendAwaySignature = "";
         private bool renderedRenamePending;
+        private bool renderedSendAwayPending;
+        // Cached so the lobby's per-frame redraw check allocates nothing while nothing changed (audit nit): the signatures are built in these
+        // and compared in place; a string is made only when the lobby really changed.
+        private readonly StringBuilder signatureBuilder = new StringBuilder(128);
+        private int renderedPlayerCount = -1;
+        private string playerCountText = "";
         private string wantedFocus;
 
         public FrontDoorModel Model => model;
@@ -281,6 +295,8 @@ namespace SleepingCalamity.App
             Hook(Ids.UnsavedNo, () => model?.DeclinePlayAnyway());
             Hook(Ids.RenameYes, () => model?.ConfirmRename());
             Hook(Ids.RenameNo, () => model?.CancelRename());
+            Hook(Ids.SendAwayYes, () => model?.ConfirmSendAway());
+            Hook(Ids.SendAwayNo, () => model?.CancelSendAway());
 
             Hook(Ids.CopyCode, CopyCode);
             Hook(Ids.Start, () => model?.StartSession());
@@ -337,6 +353,8 @@ namespace SleepingCalamity.App
             renderedState = null;
             worldsSignature = "";
             playersSignature = "";
+            renameSignature = "";
+            sendAwaySignature = "";
         }
 
         private void UnbindTree()
@@ -556,13 +574,21 @@ namespace SleepingCalamity.App
         {
             if (stateChanged) SetText(Ids.CopyNote, "");
             SetText(Ids.JoinCode, model.JoinCode);
-            SetText(Ids.PlayerCount, "Players in the game: " + model.PlayerCount);
+            int count = model.PlayerCount;
+            if (count != renderedPlayerCount)
+            {
+                renderedPlayerCount = count;
+                playerCountText = "Players in the game: " + count;
+            }
+            SetText(Ids.PlayerCount, playerCountText);
 
             IReadOnlyList<string> names = model.PlayerNames;
-            string joined = string.Join("\n", names);
-            if (joined != playersSignature)
+            StringBuilder sig = signatureBuilder;
+            sig.Clear();
+            for (int i = 0; i < names.Count; i++) sig.Append(names[i]).Append('\n');
+            if (!SameText(sig, playersSignature))
             {
-                playersSignature = joined;
+                playersSignature = sig.ToString();
                 VisualElement list = root.Q<VisualElement>(Ids.PlayerList);
                 if (list != null)
                 {
@@ -578,13 +604,16 @@ namespace SleepingCalamity.App
 
             // The host's "this player is now that player" (audit A3): one button per connected stranger and recorded absent player, then a question.
             IReadOnlyList<FrontDoorRenameOption> options = model.RenameOptions;
-            var renameSig = new StringBuilder();
-            foreach (FrontDoorRenameOption o in options) renameSig.Append(o.NewPlayer.Key.Id).Append('>').Append(o.Recorded.Key.Id).Append(o.NewPlayer.Name).Append(o.Recorded.Name).Append(';');
-            string renameText = renameSig.ToString();
-            VisualElement renameList = root.Q<VisualElement>(Ids.RenameList);
-            if (renameList != null && renameText != renameSignature)
+            sig.Clear();
+            for (int i = 0; i < options.Count; i++)
             {
-                renameSignature = renameText;
+                FrontDoorRenameOption o = options[i];
+                sig.Append(o.NewPlayer.Key.Id).Append('>').Append(o.Recorded.Key.Id).Append(o.NewPlayer.Name).Append(o.Recorded.Name).Append(';');
+            }
+            VisualElement renameList = root.Q<VisualElement>(Ids.RenameList);
+            if (renameList != null && !SameText(sig, renameSignature))
+            {
+                renameSignature = sig.ToString();
                 renameList.Clear();
                 for (int i = 0; i < options.Count; i++)
                 {
@@ -599,21 +628,58 @@ namespace SleepingCalamity.App
                     renameList.Add(button);
                 }
             }
+
+            // A stranger waiting in a full world's lobby can also be sent away (user decision 2026-11-13); it asks first.
+            IReadOnlyList<FrontDoorPerson> strangers = model.Strangers;
+            sig.Clear();
+            for (int i = 0; i < strangers.Count; i++) sig.Append(strangers[i].Key.Id).Append(strangers[i].Name).Append(';');
+            VisualElement sendAwayList = root.Q<VisualElement>(Ids.SendAwayList);
+            if (sendAwayList != null && !SameText(sig, sendAwaySignature))
+            {
+                sendAwaySignature = sig.ToString();
+                sendAwayList.Clear();
+                for (int i = 0; i < strangers.Count; i++)
+                {
+                    PlayerKey who = strangers[i].Key;
+                    var button = new Button(() => model?.RequestSendAway(who))
+                    {
+                        name = Ids.SendAway(i + 1),
+                        text = "Send " + strangers[i].Name + " away",
+                        focusable = true,
+                    };
+                    button.AddToClassList("fd-button");
+                    sendAwayList.Add(button);
+                }
+            }
+
             bool renamePending = model.HasPendingRename;
+            bool sendAwayPending = model.HasPendingSendAway;
+            bool anyPending = renamePending || sendAwayPending;
             SetDisplay(Ids.RenameConfirm, renamePending);
             SetText(Ids.RenameAsk, model.PendingRenameWords);
+            SetDisplay(Ids.SendAwayConfirm, sendAwayPending);
+            SetText(Ids.SendAwayAsk, model.PendingSendAwayWords);
             SetText(Ids.RenameMessage, model.RenameMessage);
-            if (renameList != null) renameList.style.display = options.Count > 0 && !renamePending ? DisplayStyle.Flex : DisplayStyle.None;
-            if (renamePending != renderedRenamePending)
+            if (renameList != null) renameList.style.display = options.Count > 0 && !anyPending ? DisplayStyle.Flex : DisplayStyle.None;
+            if (sendAwayList != null) sendAwayList.style.display = strangers.Count > 0 && !anyPending ? DisplayStyle.Flex : DisplayStyle.None;
+            if (renamePending != renderedRenamePending || sendAwayPending != renderedSendAwayPending)
             {
                 renderedRenamePending = renamePending;
-                wantedFocus = renamePending ? Ids.RenameNo : PreferredFocus();
+                renderedSendAwayPending = sendAwayPending;
+                wantedFocus = renamePending ? Ids.RenameNo : sendAwayPending ? Ids.SendAwayNo : PreferredFocus();
             }
 
             FrontDoorAction start = model.StartAction;
-            SetAction(Ids.Start, start, renamePending);
+            SetAction(Ids.Start, start, anyPending);
             SetText(Ids.StartWhy, start.Why);
             SetText(Ids.StartMessage, model.StartMessage);
+        }
+
+        private static bool SameText(StringBuilder builder, string text)
+        {
+            if (builder.Length != text.Length) return false;
+            for (int i = 0; i < text.Length; i++) if (builder[i] != text[i]) return false;
+            return true;
         }
 
         private void RenderJoinEntry()

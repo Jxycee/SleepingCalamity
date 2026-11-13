@@ -15,7 +15,7 @@ namespace SleepingCalamity.Core
         {
             "world.library_full", "save.world_read_only", "save.world_load_failed",
             "world.need_two_players", "world.not_a_player", "world.wrong_kind", "world.solo_alone", "world.too_many_players", "world.world_full", "world.start_refused",
-            "err.host_left", "err.rejected", "err.wrong_world", "err.timeout", "err.session_full", "err.joins_closed", "err.version",
+            "err.host_left", "err.rejected", "err.sent_away", "err.wrong_world", "err.timeout", "err.session_full", "err.joins_closed", "err.version",
             "err.code_not_found", "err.services", "err.network", "err.generic",
         };
 
@@ -36,11 +36,12 @@ namespace SleepingCalamity.Core
                 case "world.wrong_kind": return "This world was made for a different kind of game (local or online) and cannot be played this way.";
                 case "world.solo_alone": return "A solo world is played alone.";
                 case "world.too_many_players": return "A world can have up to 4 players.";
-                case "world.world_full": return "This world already has 4 players, so someone here cannot become one of them. They can watch another world, or you can remove a player from this one in the world list.";
+                case "world.world_full": return "This world already has 4 players, and someone connected is not one of them. Rename them as one of your friends, or send them away, then press Start again.";
                 case "world.start_refused": return "The game could not start.";
 
                 case "err.host_left": return "The host left, so the game has ended.";
                 case "err.rejected": return "The host did not let you in.";
+                case "err.sent_away": return "The host sent you away, because this world is full.";
                 case "err.wrong_world": return "This world was made for a different kind of game (local or online) and cannot be opened this way.";
                 case "err.timeout": return "Could not reach the host in time. Check the code and your connection.";
                 case "err.session_full": return "That game is full.";
@@ -76,6 +77,7 @@ namespace SleepingCalamity.Core
         public const string JoinCodeEmpty = "Type the code your host shows you.";
         public const string JoinCodeInvalid = "A code has only letters and numbers.";
         public const string WaitingForHost = "You are in. Waiting for the host to start the game.";
+        public const string WaitingForPlace = "This world is full. Waiting for the host to add you.";
         public const string Connecting = "Connecting...";
         public const string DeleteAsk = "Delete this world? It is set aside and no longer listed.";
         public const string WorldDeleted = "World set aside.";
@@ -108,6 +110,10 @@ namespace SleepingCalamity.Core
                 default: return "That could not be changed.";
             }
         }
+
+        // The host's "send away" for an unrecorded player waiting in a full world's lobby (user decision 2026-11-13). It asks first.
+        public static string SendAwayAsk(string name) => "Send " + PlayerWord(name) + " away? They leave this lobby and the world keeps its four players.";
+        public static string PlayerSentAway(string name) => PlayerWord(name) + " was sent away.";
 
         private static string PlayerWord(string name) => string.IsNullOrWhiteSpace(name) || name == "?" ? "this player" : name;
 

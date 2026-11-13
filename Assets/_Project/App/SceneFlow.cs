@@ -64,6 +64,16 @@ namespace SleepingCalamity.App
             SceneManager.activeSceneChanged -= HandleActiveSceneChanged;
         }
 
+        // Host only. Sends a connected player away from the lobby: they are disconnected with EndReason.SentAway (their door says why), and the
+        // roster and world forget them through the approver's disconnect events. False when they are not connected or the session has started.
+        public bool SendAway(PlayerKey key)
+        {
+            if (disposed || !networkManager.IsServer || world.Started) return false;
+            if (!roster.TryFindConnected(key, out ulong clientId)) return false;
+            networkManager.DisconnectClient(clientId, EndReason.SentAway.ToString());
+            return true;
+        }
+
         // Host only. The start gate: false (and LastStartVerdict says why) until the world rules allow a start. A refused Solo start leaves the
         // session, because nothing else can make a Solo start possible (a Multiplayer host keeps waiting in the lobby for more players).
         public bool TryStartSession()

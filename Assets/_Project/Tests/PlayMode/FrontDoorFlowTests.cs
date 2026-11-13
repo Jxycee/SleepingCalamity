@@ -139,6 +139,9 @@ namespace SleepingCalamity.Tests.PlayMode
             public WorldPlayerVerdict LastStartVerdict => WorldPlayerVerdict.Ok;
             public void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway) { newcomers.Clear(); recordedAway.Clear(); }
             public WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to) => WorldPlayerVerdict.NotRecorded;
+            public void GetStrangers(List<FrontDoorPerson> into) => into.Clear();
+            public bool SendAway(PlayerKey key) => false;
+            public bool WaitsForPlace => false;
         }
 
         // ---- set-up and driving helpers ----

@@ -283,6 +283,66 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(session.Calls, Is.EqualTo(new[] { "StartLocal(false)" }), "a world that saves starts without a question");
         }
 
+        // Catches (user decision 2026-11-13): a stranger in a full world's lobby that the host cannot send away, or one sent without asking,
+        // or one whose disconnect carries no reason of its own.
+        [Test]
+        public void Host_FullWorld_Stranger_SendAway_Disconnects()
+        {
+            ReachHostLobby();
+            PlayerKey stranger = new PlayerKey(IdentityKind.Ugs, "fifth");
+            Assert.That(model.Strangers, Is.Empty);
+            host.Strangers.Add(new FrontDoorPerson { Key = stranger, Name = "Eve" });
+            Assert.That(model.Strangers, Has.Count.EqualTo(1));
+
+            model.RequestSendAway(new PlayerKey(IdentityKind.Ugs, "nobody"));
+            Assert.That(model.HasPendingSendAway, Is.False, "only a listed stranger can be asked about");
+            model.RequestSendAway(stranger);
+            Assert.That(model.HasPendingSendAway, Is.True);
+            Assert.That(model.PendingSendAwayWords, Does.Contain("Eve"));
+            Assert.That(host.SentAway, Is.Empty, "asking is not sending away");
+
+            model.CancelSendAway();
+            model.ConfirmSendAway();   // nothing pending
+            Assert.That(host.SentAway, Is.Empty);
+
+            model.RequestSendAway(stranger);
+            model.ConfirmSendAway();
+            Assert.That(host.SentAway, Is.EqualTo(new[] { "fifth" }));
+            Assert.That(model.HasPendingSendAway, Is.False);
+            Assert.That(model.RenameMessage, Is.EqualTo(UiText.PlayerSentAway("Eve")));
+
+            Assert.That(EndReasonText.ToastKey(EndReason.SentAway), Is.Not.EqualTo("err.generic"), "the sent-away player is told why");
+            Assert.That(UiText.EndedBecause(EndReason.SentAway), Does.Contain("host"));
+        }
+
+        // Catches (user decision 2026-11-13): the unrecorded player in a full world seeing the plain "waiting for the start" line, and Start
+        // staying on (or refusing without naming the two choices) while they are there.
+        [Test]
+        public void Host_FullWorld_Stranger_SeesWaitingWords()
+        {
+            host.WaitsForPlace = true;
+            model.OpenJoin();
+            model.JoinCodeInput = "ABC123";
+            model.Join();
+            Assert.That(model.State, Is.EqualTo(FrontDoorState.WaitingForHost));
+            Assert.That(model.WaitingWords, Is.EqualTo(UiText.WaitingForPlace));
+            Assert.That(UiText.WaitingForPlace, Is.EqualTo("This world is full. Waiting for the host to add you."));
+
+            host.WaitsForPlace = false;
+            Assert.That(model.WaitingWords, Is.EqualTo(UiText.WaitingForHost));
+
+            // The host's side: Start is off while a stranger is present, and the words name both choices.
+            model.Dispose();
+            host = new FakeHost();
+            host.Strangers.Add(new FrontDoorPerson { Key = new PlayerKey(IdentityKind.Ugs, "fifth"), Name = "Eve" });
+            session = new FakeNetworkSession();
+            model = new FrontDoorModel(session, worlds, host);
+            ReachHostLobby();
+            host.ConnectedCount = 3;
+            Assert.That(model.StartAction.Enabled, Is.False);
+            Assert.That(model.StartAction.Why, Does.Contain("friend").And.Contain("send"));
+        }
+
         // Catches (audit A3): the host having no way to say "this connected player is that recorded one", a rename without asking, one the
         // lobby did not offer, a refusal shown as a success.
         [Test]

@@ -225,6 +225,21 @@ namespace SleepingCalamity.Tests.EditMode
         public readonly List<FrontDoorPerson> RecordedAway = new List<FrontDoorPerson>();
         public readonly List<string> Renames = new List<string>();   // "<from>-><to>"
         public WorldPlayerVerdict RenameVerdict = WorldPlayerVerdict.Ok;
+        public readonly List<FrontDoorPerson> Strangers = new List<FrontDoorPerson>();   // connected, unrecorded, in a full world
+        public readonly List<string> SentAway = new List<string>();                       // key ids
+        public bool WaitsForPlace { get; set; }
+
+        public void GetStrangers(List<FrontDoorPerson> into)
+        {
+            into.Clear();
+            into.AddRange(Strangers);
+        }
+
+        public bool SendAway(PlayerKey key)
+        {
+            SentAway.Add(key.Id);
+            return Strangers.RemoveAll(p => p.Key == key) > 0;
+        }
 
         public void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway)
         {
