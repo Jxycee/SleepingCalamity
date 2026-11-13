@@ -90,7 +90,7 @@ namespace SleepingCalamity.EditorTools
         {
             const float height = 7f;
             BuilderUtil.EnsureFolder(MaterialsFolder);
-            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_GuideBeacon.mat", Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Universal Render Pipeline/Lit"));
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_" + name + ".mat", Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Universal Render Pipeline/Lit"));
             m.SetColor("_BaseColor", color);
             EditorUtility.SetDirty(m);
             GameObject g = LookTestBuilder.Prim(parent, name, PrimitiveType.Cylinder, new Vector3(0f, height * 0.5f, 0f), new Vector3(0.22f, height * 0.5f, 0.22f), m);
