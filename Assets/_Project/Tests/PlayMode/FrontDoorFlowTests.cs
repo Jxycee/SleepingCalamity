@@ -137,6 +137,8 @@ namespace SleepingCalamity.Tests.PlayMode
             public void GetConnectedNames(List<string> into) => into.Clear();
             public bool TryStartSession() => false;
             public WorldPlayerVerdict LastStartVerdict => WorldPlayerVerdict.Ok;
+            public void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway) { newcomers.Clear(); recordedAway.Clear(); }
+            public WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to) => WorldPlayerVerdict.NotRecorded;
         }
 
         // ---- set-up and driving helpers ----
