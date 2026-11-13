@@ -179,6 +179,9 @@ namespace SleepingCalamity.Tests.EditMode
             return created.Id;
         }
 
+        public readonly HashSet<string> Unsavable = new HashSet<string>();   // ids of worlds that load read-only
+        public bool CanSaveWorld(string worldId) => !Unsavable.Contains(worldId);
+
         public bool RemovePlayer(string worldId, PlayerKey key)
         {
             RemovedPlayers.Add(worldId + ":" + key.Id);
@@ -216,6 +219,25 @@ namespace SleepingCalamity.Tests.EditMode
         {
             into.Clear();
             into.AddRange(Names);
+        }
+
+        public readonly List<FrontDoorPerson> Newcomers = new List<FrontDoorPerson>();
+        public readonly List<FrontDoorPerson> RecordedAway = new List<FrontDoorPerson>();
+        public readonly List<string> Renames = new List<string>();   // "<from>-><to>"
+        public WorldPlayerVerdict RenameVerdict = WorldPlayerVerdict.Ok;
+
+        public void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway)
+        {
+            newcomers.Clear();
+            newcomers.AddRange(Newcomers);
+            recordedAway.Clear();
+            recordedAway.AddRange(RecordedAway);
+        }
+
+        public WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to)
+        {
+            Renames.Add(from.Id + "->" + to.Id);
+            return RenameVerdict;
         }
 
         public bool TryStartSession()

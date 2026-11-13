@@ -37,6 +37,18 @@ namespace SleepingCalamity.App
             public const string ScreenConnecting = "screen-connecting";
             public const string ScreenWaiting = "screen-waiting";
             public const string ScreenEnded = "screen-ended";
+            public const string ScreenUnsaved = "screen-unsaved";
+            public const string UnsavedAsk = "lbl-unsaved-ask";
+            public const string UnsavedYes = "btn-unsaved-yes";
+            public const string UnsavedNo = "btn-unsaved-no";
+            public const string RenameList = "rename-list";
+            public const string RenameConfirm = "rename-confirm";
+            public const string RenameAsk = "lbl-rename-ask";
+            public const string RenameYes = "btn-rename-yes";
+            public const string RenameNo = "btn-rename-no";
+            public const string RenameMessage = "lbl-rename-message";
+            // The host's "this connected player is that recorded player" button, 1-based: "btn-rename-1".
+            public static string RenameOption(int number) => "btn-rename-" + number;
 
             public const string GameName = "lbl-game-name";
             public const string PlaySolo = "btn-play-solo";
@@ -119,6 +131,8 @@ namespace SleepingCalamity.App
         private string worldsSignature = "";
         private int renderedRowCount;
         private string playersSignature = "";
+        private string renameSignature = "";
+        private bool renderedRenamePending;
         private string wantedFocus;
 
         public FrontDoorModel Model => model;
@@ -247,6 +261,7 @@ namespace SleepingCalamity.App
             screens[FrontDoorState.Connecting] = root.Q<VisualElement>(Ids.ScreenConnecting);
             screens[FrontDoorState.WaitingForHost] = root.Q<VisualElement>(Ids.ScreenWaiting);
             screens[FrontDoorState.Ended] = root.Q<VisualElement>(Ids.ScreenEnded);
+            screens[FrontDoorState.ConfirmUnsaved] = root.Q<VisualElement>(Ids.ScreenUnsaved);
 
             Hook(Ids.PlaySolo, () => model?.OpenWorlds(WorldKind.Solo));
             Hook(Ids.Multiplayer, () => model?.OpenWorlds(WorldKind.Multiplayer));
@@ -261,6 +276,11 @@ namespace SleepingCalamity.App
             Hook(Ids.DeleteCancelButton, () => model?.CancelDelete());
             Hook(Ids.RemoveConfirmButton, () => model?.ConfirmRemovePlayer());
             Hook(Ids.RemoveCancelButton, () => model?.CancelRemovePlayer());
+
+            Hook(Ids.UnsavedYes, () => { if (model != null) Fire(model.PlayAnyway()); });
+            Hook(Ids.UnsavedNo, () => model?.DeclinePlayAnyway());
+            Hook(Ids.RenameYes, () => model?.ConfirmRename());
+            Hook(Ids.RenameNo, () => model?.CancelRename());
 
             Hook(Ids.CopyCode, CopyCode);
             Hook(Ids.Start, () => model?.StartSession());
@@ -394,6 +414,7 @@ namespace SleepingCalamity.App
                 case FrontDoorState.Connecting: SetText(Ids.Connecting, model.ConnectingWords); break;
                 case FrontDoorState.WaitingForHost: SetText(Ids.Waiting, model.WaitingWords); break;
                 case FrontDoorState.Ended: SetText(Ids.EndedWords, model.EndedWords); break;
+                case FrontDoorState.ConfirmUnsaved: SetText(Ids.UnsavedAsk, model.ConfirmUnsavedWords); break;
             }
 
             if (stateChanged) wantedFocus = PreferredFocus();
@@ -555,8 +576,42 @@ namespace SleepingCalamity.App
                 }
             }
 
+            // The host's "this player is now that player" (audit A3): one button per connected stranger and recorded absent player, then a question.
+            IReadOnlyList<FrontDoorRenameOption> options = model.RenameOptions;
+            var renameSig = new StringBuilder();
+            foreach (FrontDoorRenameOption o in options) renameSig.Append(o.NewPlayer.Key.Id).Append('>').Append(o.Recorded.Key.Id).Append(o.NewPlayer.Name).Append(o.Recorded.Name).Append(';');
+            string renameText = renameSig.ToString();
+            VisualElement renameList = root.Q<VisualElement>(Ids.RenameList);
+            if (renameList != null && renameText != renameSignature)
+            {
+                renameSignature = renameText;
+                renameList.Clear();
+                for (int i = 0; i < options.Count; i++)
+                {
+                    PlayerKey fresh = options[i].NewPlayer.Key, old = options[i].Recorded.Key;
+                    var button = new Button(() => model?.RequestRename(fresh, old))
+                    {
+                        name = Ids.RenameOption(i + 1),
+                        text = options[i].NewPlayer.Name + " is really " + options[i].Recorded.Name,
+                        focusable = true,
+                    };
+                    button.AddToClassList("fd-button");
+                    renameList.Add(button);
+                }
+            }
+            bool renamePending = model.HasPendingRename;
+            SetDisplay(Ids.RenameConfirm, renamePending);
+            SetText(Ids.RenameAsk, model.PendingRenameWords);
+            SetText(Ids.RenameMessage, model.RenameMessage);
+            if (renameList != null) renameList.style.display = options.Count > 0 && !renamePending ? DisplayStyle.Flex : DisplayStyle.None;
+            if (renamePending != renderedRenamePending)
+            {
+                renderedRenamePending = renamePending;
+                wantedFocus = renamePending ? Ids.RenameNo : PreferredFocus();
+            }
+
             FrontDoorAction start = model.StartAction;
-            SetAction(Ids.Start, start);
+            SetAction(Ids.Start, start, renamePending);
             SetText(Ids.StartWhy, start.Why);
             SetText(Ids.StartMessage, model.StartMessage);
         }
@@ -609,6 +664,7 @@ namespace SleepingCalamity.App
                 case FrontDoorState.Connecting: return Ids.ConnectingCancel;
                 case FrontDoorState.WaitingForHost: return Ids.WaitingLeave;
                 case FrontDoorState.Ended: return Ids.EndedOk;
+                case FrontDoorState.ConfirmUnsaved: return Ids.UnsavedNo;   // the safe answer is the one Enter gives
                 default: return null;
             }
         }

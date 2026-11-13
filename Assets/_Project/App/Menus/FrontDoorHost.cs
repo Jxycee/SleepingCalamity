@@ -11,12 +11,40 @@ namespace SleepingCalamity.App
     {
         private readonly SceneFlow flow;
         private readonly HostRoster roster;
+        private readonly HostWorld world;
+        private readonly List<KeyValuePair<PlayerKey, string>> people = new List<KeyValuePair<PlayerKey, string>>();
 
-        public FrontDoorHost(SceneFlow flow, HostRoster roster)
+        public FrontDoorHost(SceneFlow flow, HostRoster roster, HostWorld world = null)
         {
             this.flow = flow;
             this.roster = roster;
+            this.world = world;
         }
+
+        // Audit A3. Offered only while the hosted world is Multiplayer and its session has not started (HostWorld.RenameRecorded says the same).
+        public void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway)
+        {
+            newcomers.Clear();
+            recordedAway.Clear();
+            WorldPlayers players = world?.Players;
+            if (players == null || players.Kind != WorldKind.Multiplayer || world.Started) return;
+            roster.GetConnectedPeople(people);
+            foreach (KeyValuePair<PlayerKey, string> person in people)
+                if (!players.IsRecorded(person.Key) && players.CanJoin(person.Key) != WorldPlayerVerdict.WrongIdentityKind)
+                    newcomers.Add(new FrontDoorPerson { Key = person.Key, Name = person.Value });
+            if (newcomers.Count == 0) return;
+            foreach (PlayerKey key in players.Recorded)
+            {
+                bool connected = false;
+                foreach (KeyValuePair<PlayerKey, string> person in people) if (person.Key == key) connected = true;
+                if (connected) continue;
+                string name = players.NameOf(key);
+                recordedAway.Add(new FrontDoorPerson { Key = key, Name = string.IsNullOrEmpty(name) ? "Player " + (recordedAway.Count + 1) : name });
+            }
+        }
+
+        public WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to) =>
+            world == null ? WorldPlayerVerdict.NotRecorded : world.RenameRecorded(from, to);
 
         public int ConnectedCount => roster.ConnectedCount;
 

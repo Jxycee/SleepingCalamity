@@ -88,6 +88,27 @@ namespace SleepingCalamity.Core
         public static string PlayerRemoved(string name) => PlayerWord(name) + " is no longer one of this world's players.";
         public const string PlayerNotRemoved = "That player could not be removed.";
 
+        // Audit A5: a world that cannot be saved (written by a newer build, or its file could not be read) asks before it starts.
+        public const string CannotSaveAsk = "This world can't be saved. Play anyway?";
+        public const string PlayAnywayYes = "Play anyway";
+        public const string PlayAnywayNo = "Don't play";
+
+        // Audit A3: the host's "this player is now that player" in the lobby. It asks first, then says what happened.
+        public static string RenamePlayerAsk(string newName, string recordedName) =>
+            "Is " + PlayerWord(newName) + " really " + PlayerWord(recordedName) + "? Their place, weapons and bags in this world move to the player who is connected now.";
+        public static string PlayerRenamed(string recordedName) => PlayerWord(recordedName) + " now plays as the connected player.";
+        public static string PlayerNotRenamed(WorldPlayerVerdict why)
+        {
+            switch (why)
+            {
+                case WorldPlayerVerdict.DuplicatePlayer: return "That player is already one of this world's players.";
+                case WorldPlayerVerdict.NotRecorded: return "That player is no longer one of this world's players.";
+                case WorldPlayerVerdict.WrongIdentityKind: return "That player is not from the same kind of sign-in as this world.";
+                case WorldPlayerVerdict.WorldInProgress: return "The game has already started. Change players from the lobby before it starts.";
+                default: return "That could not be changed.";
+            }
+        }
+
         private static string PlayerWord(string name) => string.IsNullOrWhiteSpace(name) || name == "?" ? "this player" : name;
 
         // Worlds list full (WorldSummary.MaxPerList per kind): New world is off and says why.

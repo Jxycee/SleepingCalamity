@@ -121,6 +121,22 @@ namespace SleepingCalamity.App
             return target.Save();
         }
 
+        // Audit A5: false when the world loads read-only (written by a newer build, or its file could not be read), so the front door asks before
+        // starting it. A world that is not there (it would be made new) can be saved.
+        public bool CanSaveWorld(string worldId)
+        {
+            try
+            {
+                WorldSaveStore target = Library.Open(worldId);
+                return target == null || !target.IsReadOnly;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("WorldSaveFlow: could not check whether world " + worldId + " can be saved: " + e.Message);
+                return false;
+            }
+        }
+
         // Sets a world aside (never erases it). Not while it is the world being hosted.
         public bool DeleteWorld(string worldId)
         {

@@ -170,7 +170,7 @@ namespace SleepingCalamity.App
 
             // The front door (PL-3): local on every peer, it only asks. Built after SceneFlow, the roster and the world library exist, and subscribed to
             // the session after theirs, so by the time it hears Ended the flow has already saved and gone back to the Lobby.
-            FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster));
+            FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster, World));
             FrontDoorView view = GetComponent<FrontDoorView>();
             if (view != null) view.Bind(FrontDoor, session, input);
         }

@@ -21,7 +21,7 @@ using UnityEngine;
 
 namespace SleepingCalamity.App
 {
-    public enum FrontDoorState { Title, Worlds, HostLobby, JoinEntry, Connecting, WaitingForHost, Ended }
+    public enum FrontDoorState { Title, Worlds, HostLobby, JoinEntry, Connecting, WaitingForHost, Ended, ConfirmUnsaved }
 
     // A button: on, or off with the words that say why (null Why when on, and for a button that is simply not part of this screen).
     public readonly struct FrontDoorAction
@@ -46,6 +46,20 @@ namespace SleepingCalamity.App
         public PlayerKey Key;
     }
 
+    // A player of the host lobby's "this player is now that player" action: a key and the name to show.
+    public sealed class FrontDoorPerson
+    {
+        public string Name;
+        public PlayerKey Key;
+    }
+
+    // One offer of that action: `NewPlayer` (connected, not recorded in the world) is really `Recorded` (in the world, not connected).
+    public sealed class FrontDoorRenameOption
+    {
+        public FrontDoorPerson NewPlayer;
+        public FrontDoorPerson Recorded;
+    }
+
     public sealed class FrontDoorWorldRow
     {
         public string Id;
@@ -65,6 +79,7 @@ namespace SleepingCalamity.App
         string CreateWorld(WorldKind kind, IdentityKind identity);   // null when that list is full
         bool DeleteWorld(string worldId);
         bool RemovePlayer(string worldId, PlayerKey key);            // lets one of a multiplayer world's recorded players go (audit A2)
+        bool CanSaveWorld(string worldId);                           // false when the world loads read-only (a newer file or a load fault): nothing played in it would be kept (audit A5)
     }
 
     // What the front door needs of the host's side: the start gate and who is connected (FrontDoorHost adapts SceneFlow and HostRoster).
@@ -74,6 +89,10 @@ namespace SleepingCalamity.App
         void GetConnectedNames(List<string> into);
         bool TryStartSession();
         WorldPlayerVerdict LastStartVerdict { get; }
+        // The host lobby's "this player is now that player" (audit A3): who is connected but not recorded in the hosted world, who is recorded but
+        // not connected (both empty unless the world is Multiplayer and its session has not started), and the rename itself (the host's gate decides).
+        void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway);
+        WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to);
     }
 
     public sealed class FrontDoorModel : IDisposable
@@ -138,6 +157,98 @@ namespace SleepingCalamity.App
 
         // The host may let a player go from a multiplayer world in the picker (never from a solo world: its one owner follows the machine).
         public bool CanRemovePlayers => state == FrontDoorState.Worlds && worldsKind == WorldKind.Multiplayer;
+
+        // Host lobby (audit A3): a player whose key changed (a new PC, a reinstall) joins as a stranger; the host says "this connected player is
+        // that recorded player", which moves the record, growth, bags and suspend to the new key. RenameOptions lists every connected stranger
+        // against every recorded player who is not connected (empty when there is no one to choose from); asking changes nothing, the host confirms.
+        private readonly List<FrontDoorPerson> renameNew = new List<FrontDoorPerson>();
+        private readonly List<FrontDoorPerson> renameAway = new List<FrontDoorPerson>();
+        private readonly List<FrontDoorRenameOption> renameOptions = new List<FrontDoorRenameOption>();
+        private FrontDoorRenameOption pendingRename;
+
+        public IReadOnlyList<FrontDoorRenameOption> RenameOptions
+        {
+            get
+            {
+                renameOptions.Clear();
+                if (state != FrontDoorState.HostLobby) return renameOptions;
+                host.GetRenameChoices(renameNew, renameAway);
+                foreach (FrontDoorPerson fresh in renameNew)
+                    foreach (FrontDoorPerson old in renameAway)
+                        renameOptions.Add(new FrontDoorRenameOption { NewPlayer = fresh, Recorded = old });
+                return renameOptions;
+            }
+        }
+        public bool HasPendingRename => pendingRename != null && state == FrontDoorState.HostLobby;
+        public PlayerKey PendingRenameNewKey => pendingRename == null ? default : pendingRename.NewPlayer.Key;
+        public PlayerKey PendingRenameOldKey => pendingRename == null ? default : pendingRename.Recorded.Key;
+        public string PendingRenameWords => HasPendingRename ? UiText.RenamePlayerAsk(pendingRename.NewPlayer.Name, pendingRename.Recorded.Name) : null;
+        public string RenameMessage { get; private set; }   // what the last rename did, in words
+
+        public void RequestRename(PlayerKey newKey, PlayerKey recordedKey)
+        {
+            if (state != FrontDoorState.HostLobby) return;
+            foreach (FrontDoorRenameOption option in RenameOptions)
+            {
+                if (option.NewPlayer.Key != newKey || option.Recorded.Key != recordedKey) continue;
+                pendingRename = new FrontDoorRenameOption { NewPlayer = option.NewPlayer, Recorded = option.Recorded };
+                RenameMessage = null;
+                Touch();
+                return;
+            }
+        }
+
+        public void ConfirmRename()
+        {
+            if (!HasPendingRename) return;
+            FrontDoorRenameOption asked = pendingRename;
+            pendingRename = null;
+            WorldPlayerVerdict verdict = host.RenamePlayer(asked.Recorded.Key, asked.NewPlayer.Key);
+            RenameMessage = verdict == WorldPlayerVerdict.Ok ? UiText.PlayerRenamed(asked.Recorded.Name) : UiText.PlayerNotRenamed(verdict);
+            Touch();
+        }
+
+        public void CancelRename()
+        {
+            if (pendingRename == null) return;
+            pendingRename = null;
+            Touch();
+        }
+
+        // Audit A5: a world that cannot be saved (a newer file, a load fault) asks "play anyway?" first. Play or Host on such a world opens the
+        // ConfirmUnsaved screen instead of starting; PlayAnyway starts it, DeclinePlayAnyway (or Back) starts nothing and goes back.
+        private Attempt unsavedAttempt = Attempt.None;
+        private FrontDoorState unsavedReturn = FrontDoorState.Title;
+        public string ConfirmUnsavedWords => state == FrontDoorState.ConfirmUnsaved ? UiText.CannotSaveAsk : null;
+
+        public Task PlayAnyway()
+        {
+            if (state != FrontDoorState.ConfirmUnsaved) return Done;
+            Attempt kind = unsavedAttempt;
+            unsavedAttempt = Attempt.None;
+            state = unsavedReturn;
+            return kind == Attempt.Host ? BeginHost() : BeginSolo();
+        }
+
+        public void DeclinePlayAnyway()
+        {
+            if (state != FrontDoorState.ConfirmUnsaved) return;
+            unsavedAttempt = Attempt.None;
+            state = unsavedReturn;
+            Touch();
+        }
+
+        // True (and the question is open) when the world the attempt would open cannot be saved.
+        private bool AskIfUnsaved(Attempt kind)
+        {
+            string id = worlds.SelectedWorldId;
+            if (string.IsNullOrEmpty(id) || worlds.CanSaveWorld(id)) return false;
+            unsavedAttempt = kind;
+            unsavedReturn = state;
+            state = FrontDoorState.ConfirmUnsaved;
+            Touch();
+            return true;
+        }
 
         // HostLobby: the code to read out, who is in, and the Start line. Names and count are read live from the host.
         public string JoinCode => state == FrontDoorState.HostLobby ? session.JoinCode : null;
@@ -331,6 +442,14 @@ namespace SleepingCalamity.App
         public Task HostSelected()
         {
             if (!HostAction.Enabled) return Done;
+            if (!PrepareHost()) return Done;
+            return AskIfUnsaved(Attempt.Host) ? Done : BeginHost();
+        }
+
+        private Task BeginHost() => Begin(Attempt.Host, () => session.HostOnlineAsync(CancellationToken.None));
+
+        private bool PrepareHost()
+        {
             IReadOnlyList<WorldSummary> list = worlds.ListWorlds(WorldKind.Multiplayer, IdentityKind.Ugs);
             if (list.Count == 0)
             {
@@ -338,14 +457,14 @@ namespace SleepingCalamity.App
                 {
                     Notice = UiText.WorldLibraryFull(WorldKind.Multiplayer);
                     Touch();
-                    return Done;
+                    return false;
                 }
             }
             else if (!Contains(list, worlds.SelectedWorldId))
             {
                 worlds.Select(list[0].Id);
             }
-            return Begin(Attempt.Host, () => session.HostOnlineAsync(CancellationToken.None));
+            return true;
         }
 
         // HostLobby: ask the host's start gate. A refusal shows its words and the host stays and waits.
@@ -420,7 +539,13 @@ namespace SleepingCalamity.App
                 case FrontDoorState.Ended:
                     Acknowledge();
                     return Done;
-                default:   // Title, HostLobby, WaitingForHost
+                case FrontDoorState.ConfirmUnsaved:
+                    DeclinePlayAnyway();
+                    return Done;
+                case FrontDoorState.HostLobby:
+                    CancelRename();
+                    return Done;
+                default:   // Title, WaitingForHost
                     return Done;
             }
         }
@@ -436,6 +561,15 @@ namespace SleepingCalamity.App
 
         private Task StartSolo()
         {
+            if (!PrepareSolo()) return Done;
+            return AskIfUnsaved(Attempt.Solo) ? Done : BeginSolo();
+        }
+
+        private Task BeginSolo() => Begin(Attempt.Solo, () => session.StartLocalAsync(false, CancellationToken.None));
+
+        // Picks the world a solo start opens (the selected one, else the newest, else a new one). False when there is no room for a new one.
+        private bool PrepareSolo()
+        {
             IReadOnlyList<WorldSummary> list = worlds.ListWorlds(WorldKind.Solo, IdentityKind.Local);
             if (list.Count == 0)
             {
@@ -443,14 +577,14 @@ namespace SleepingCalamity.App
                 {
                     Notice = UiText.WorldLibraryFull(WorldKind.Solo);
                     Touch();
-                    return Done;
+                    return false;
                 }
             }
             else if (!Contains(list, worlds.SelectedWorldId))
             {
                 worlds.Select(list[0].Id);
             }
-            return Begin(Attempt.Solo, () => session.StartLocalAsync(false, CancellationToken.None));
+            return true;
         }
 
         // One start attempt. The session raises Ended itself when it fails (the reason there wins); the exception is only a fallback.
@@ -561,6 +695,8 @@ namespace SleepingCalamity.App
             JoinError = null;
             PendingDeleteId = null;
             ClearPendingRemove();
+            pendingRename = null;
+            RenameMessage = null;
             Touch();
         }
 
