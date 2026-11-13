@@ -14,7 +14,7 @@ namespace SleepingCalamity.Core
         public static readonly string[] PublishedToastKeys =
         {
             "world.library_full", "save.world_read_only", "save.world_load_failed",
-            "world.need_two_players", "world.not_a_player", "world.wrong_kind", "world.solo_alone", "world.too_many_players", "world.start_refused",
+            "world.need_two_players", "world.not_a_player", "world.wrong_kind", "world.solo_alone", "world.too_many_players", "world.world_full", "world.start_refused",
             "err.host_left", "err.rejected", "err.wrong_world", "err.timeout", "err.session_full", "err.joins_closed", "err.version",
             "err.code_not_found", "err.services", "err.network", "err.generic",
         };
@@ -36,6 +36,7 @@ namespace SleepingCalamity.Core
                 case "world.wrong_kind": return "This world was made for a different kind of game (local or online) and cannot be played this way.";
                 case "world.solo_alone": return "A solo world is played alone.";
                 case "world.too_many_players": return "A world can have up to 4 players.";
+                case "world.world_full": return "This world already has 4 players, so someone here cannot become one of them. They can watch another world, or you can remove a player from this one in the world list.";
                 case "world.start_refused": return "The game could not start.";
 
                 case "err.host_left": return "The host left, so the game has ended.";

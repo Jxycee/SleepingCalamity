@@ -56,7 +56,11 @@ namespace SleepingCalamity.Tests.EditMode
             world.Load(players);
             Assert.That(world.TryStartSession(Roster("c")), Is.EqualTo(WorldPlayerVerdict.NotEnoughPlayers));
             Assert.That(world.TryStartSession(Roster("b", "d")), Is.EqualTo(WorldPlayerVerdict.Ok), "2 of 4");
-            Assert.That(world.TryStartSession(Roster("a", "z")), Is.EqualTo(WorldPlayerVerdict.NotRecorded));
+            // A stranger here with the four places taken: the gate would have to record them and cannot (audit A2; with a free place they would
+            // simply become one of the world's players).
+            Assert.That(world.TryStartSession(Roster("a", "z")), Is.EqualTo(WorldPlayerVerdict.WorldFull));
+            Assert.That(world.Players.IsRecorded(K("z")), Is.False);
+            Assert.That(world.Players.Recorded.Count, Is.EqualTo(4));
             Assert.That(world.ScalePlayers(Roster("b", "d")), Is.EqualTo(2));
             Assert.That(world.ScalePlayers(Roster("b", "d", "z")), Is.EqualTo(2), "a stranger does not scale the difficulty");
         }
@@ -138,6 +142,7 @@ namespace SleepingCalamity.Tests.EditMode
             world.Changed += () => changed++;
 
             Assert.That(world.TryStartSession(Roster("a", "d", "e")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "three recorded plus two newcomers is five");
+            Assert.That(WorldStartText.ToastKey(WorldPlayerVerdict.WorldFull), Is.EqualTo("world.world_full"), "and the host is told so");
             Assert.That(world.Players.Recorded.Count, Is.EqualTo(3), "neither newcomer was written down");
             Assert.That(world.Started, Is.False);
             Assert.That(changed, Is.EqualTo(0));
@@ -202,10 +207,13 @@ namespace SleepingCalamity.Tests.EditMode
             world.Load(players);
 
             Assert.That(world.Admit(K("stranger"), 0, true), Is.EqualTo(WorldPlayerVerdict.Ok), "never refused at approval");
+            world.NoteConnected(K("stranger"), 0);
+            Assert.That(world.Players.IsRecorded(K("stranger")), Is.False, "a connection records nobody");
             world.RecordEntered(K("stranger"), 0);
             Assert.That(world.Players.IsRecorded(K("stranger")), Is.False, "a full world cannot take it");
-            Assert.That(world.TryStartSession(Roster("stranger", "a")), Is.EqualTo(WorldPlayerVerdict.NotRecorded));
-            Assert.That(WorldStartText.ToastKey(WorldPlayerVerdict.NotRecorded), Is.EqualTo("world.not_a_player"));
+            Assert.That(world.TryStartSession(Roster("stranger", "a")), Is.EqualTo(WorldPlayerVerdict.WorldFull), "the gate would have to record the host, and the four places are taken");
+            Assert.That(WorldStartText.ToastKey(WorldPlayerVerdict.WorldFull), Is.EqualTo("world.world_full"));
+            Assert.That(world.Started, Is.False);
         }
 
         // Catches: an approved newcomer who drops before connecting keeping a place when another part of the stack already forgot the
