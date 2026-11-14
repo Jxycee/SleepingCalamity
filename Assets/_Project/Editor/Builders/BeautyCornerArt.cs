@@ -413,7 +413,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Returns true when the file was written (new or different bytes).
-        static bool WritePng(string abs, int w, int h, Color32[] px)
+        internal static bool WritePng(string abs, int w, int h, Color32[] px)
         {
             var t = new Texture2D(w, h, TextureFormat.RGBA32, false, true);
             t.SetPixels32(px);
