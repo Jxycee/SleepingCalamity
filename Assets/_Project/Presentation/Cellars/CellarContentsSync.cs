@@ -86,6 +86,7 @@ namespace SleepingCalamity.Presentation
         public CellarFloorSync FloorSync;   // optional; found in the scene when null
         public DiveHaulSync HaulSync;       // optional; found in the scene when null (host needs it for loot, pieces and the plan)
         public System.Action<List<PlayerPos>> PlayersOverride;   // test hook: replaces the player-object scan on the host
+        public System.Func<CellarEncounterPlan> PlanOverride;   // test hook: the host spawns from this plan (when it matches the armed floor) instead of the dive's; a live 1-2 player party never reaches a second wave (extras top out at 1)
 
         // Host only: raised once per floor when the gate key is picked up (the spine opens the stair).
         public event System.Action<int> ExitUnlocked;
@@ -755,7 +756,7 @@ namespace SleepingCalamity.Presentation
         private void UntrackAll()
         {
             foreach (Enemy e in new List<Enemy>(_tracked.Keys)) Unhook(e);
-            _tracked.Clear(); _waveTwo.Clear(); _waveTwoDue.Clear();
+            _tracked.Clear(); _waveTwo.Clear(); _waveTwoDue.Clear(); _waveTwoNoHold.Clear(); _waveTwoSince.Clear();
             if (_hunter != null) Unhook(_hunter);
             ResetPump();
         }
@@ -780,6 +781,8 @@ namespace SleepingCalamity.Presentation
 
         private CellarEncounterPlan CurrentPlan(CellarFloorSync fs)
         {
+            CellarEncounterPlan ov = PlanOverride != null ? PlanOverride() : null;
+            if (ov != null && ov.Floor == _layout.Floor && ov.Seed == _layout.Seed) return ov;
             CellarEncounterPlan p = HaulSync != null ? HaulSync.EncounterPlan : null;
             if (p != null && p.Floor == _layout.Floor && p.Seed == _layout.Seed) return p;
             DiveHaulSync.Summary s = HaulSync != null ? HaulSync.Current : default;
@@ -836,7 +839,11 @@ namespace SleepingCalamity.Presentation
             {
                 foreach (TemplateSpawn ts in tr.InWave(0)) SpawnTemplateEnemy(fs, room, ts);
                 List<TemplateSpawn> second = new List<TemplateSpawn>(tr.InWave(1));
-                if (second.Count > 0 && RoomHasTracked(room)) _waveTwo[room] = second;   // wave 1 appears when wave 0 is cleared (TickWaveTwo)
+                if (second.Count > 0)   // wave 1 appears when wave 0 is cleared (TickWaveTwo)
+                {
+                    _waveTwo[room] = second;
+                    if (!RoomHasTracked(room)) { _waveTwoNoHold.Add(room); _waveTwoDue.Add(room); _waveTwoSince[room] = Time.time; }   // wave 0 placed nothing: wave 1 follows on the next tick, with no held count to settle
+                }
                 _st.Cleared = _clear.ClearedMask;
                 return;
             }
@@ -887,18 +894,35 @@ namespace SleepingCalamity.Presentation
         // wave 1 on the next host tick and then settles that one count, which clears the room only if nothing could be spawned.
         private readonly Dictionary<int, List<TemplateSpawn>> _waveTwo = new Dictionary<int, List<TemplateSpawn>>();
         private readonly List<int> _waveTwoDue = new List<int>();
+        private readonly HashSet<int> _waveTwoNoHold = new HashSet<int>();   // rooms whose wave 0 placed nothing: no held alive count to settle after wave 1
+        private readonly Dictionary<int, float> _waveTwoSince = new Dictionary<int, float>();
+        private const float WaveTwoMaxWaitSeconds = 8f;   // wave 1 waits at most this long for the player-distance rule, so a player camping its cells cannot stall the room forever
+
+        // Wave 1 keeps the ambush rule: no cell of the wave within CellarSpawnSafety.AmbushMinPlayerMeters of any connected player (PlanePoints, the same points the ambush and the hunter use).
+        // The wave is placed all at once or not at all (a partial wave would let a wave-1 death be skipped by Gone's wave-0 hold); it waits up to WaveTwoMaxWaitSeconds, then spawns anyway.
+        private bool WaveTwoSafe(int room, List<TemplateSpawn> second)
+        {
+            if (_waveTwoSince.TryGetValue(room, out float since) && Time.time - since >= WaveTwoMaxWaitSeconds) return true;
+            List<PlanePoint> pts = PlanePoints();
+            foreach (TemplateSpawn ts in second) if (!CellarSpawnSafety.FarFromAll(ts.Cell, pts, CellarSpawnSafety.AmbushMinPlayerMeters)) return false;
+            return true;
+        }
 
         private void TickWaveTwo(CellarFloorSync fs)
         {
             if (_waveTwoDue.Count == 0) return;
             foreach (int room in _waveTwoDue.ToArray())
             {
-                _waveTwoDue.Remove(room);
-                if (!_waveTwo.TryGetValue(room, out List<TemplateSpawn> second)) continue;
-                _waveTwo.Remove(room);
+                if (!_waveTwo.TryGetValue(room, out List<TemplateSpawn> second)) { _waveTwoDue.Remove(room); continue; }
+                if (!_waveTwoSince.ContainsKey(room)) _waveTwoSince[room] = Time.time;
+                if (!WaveTwoSafe(room, second)) continue;   // stays due: retried every host tick
+                _waveTwoDue.Remove(room); _waveTwoSince.Remove(room); _waveTwo.Remove(room);
+                bool held = !_waveTwoNoHold.Remove(room);
                 foreach (TemplateSpawn ts in second) SpawnTemplateEnemy(fs, room, ts);
-                if (_clear.Died(room)) { _st.Cleared = _clear.ClearedMask; PayRoomClear(room); RoomCleared?.Invoke(room); }
+                if (held && _clear.Died(room)) { _st.Cleared = _clear.ClearedMask; PayRoomClear(room); RoomCleared?.Invoke(room); }
                 else _st.Cleared = _clear.ClearedMask;
+                if (_carrierLostRoom == room && _st.GateKey == 0 && !RoomHasTracked(room))   // the same reset Gone does: the carrier was lost without a drop and nothing is left, so the carrier comes back on entry
+                { _clear.ResetRoom(room); _entered.Remove(room); _carrierLostRoom = -1; _st.Cleared = _clear.ClearedMask; }
                 Publish();
             }
         }
@@ -931,7 +955,7 @@ namespace SleepingCalamity.Presentation
                 if (e == _carrierEnemy) _carrierEnemy = null;
                 bool roomLeft = RoomHasTracked(t.Room);
                 if (roomLeft) { _clear.Despawned(t.Room); if (t.Carrier && _st.GateKey == 0) _carrierLostRoom = t.Room; }
-                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _waveTwo.Remove(t.Room); _waveTwoDue.Remove(t.Room); if (_carrierLostRoom == t.Room) _carrierLostRoom = -1; }
+                else { _clear.ResetRoom(t.Room); _entered.Remove(t.Room); _waveTwo.Remove(t.Room); _waveTwoDue.Remove(t.Room); _waveTwoNoHold.Remove(t.Room); _waveTwoSince.Remove(t.Room); if (_carrierLostRoom == t.Room) _carrierLostRoom = -1; }
                 _st.Cleared = _clear.ClearedMask; Publish();
                 return;
             }
