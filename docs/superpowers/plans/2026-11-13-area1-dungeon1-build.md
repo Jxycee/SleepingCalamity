@@ -1,6 +1,6 @@
 # Build plan: area 1 (Hollowmere) and dungeon 1 (the Cellars)
 
-**Status:** proposal from Fable Run 3, 2026-11-13. No session starts until the user has approved `docs/design/area1-hollowmere.md` and `docs/design/dungeon1-cellars.md`, including the decisions listed in each.
+**Status:** the two design docs were approved by the user on 2026-11-13 with all decisions as recommended, so sessions may start. B0 goes first.
 **Specs:** those two docs. **Assets:** `docs/design/area1-dungeon1-needs.md` (only what it names is downloaded).
 
 ## Rules for every session
@@ -105,7 +105,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 
 ### B10. Floor 3 bakery and floor 4 wine
 - **Spec:** section 4 (floors 3, 4).
-- **If Decision DC1 puts the Dough-warden on floor 3:** add the guardian cell to the bakery heart (proposal P6) in `Core/Cellars` with an EditMode test, then run `soak`. Dressing only otherwise.
+- **Decision DC1 puts the Dough-warden on floor 3 (decided 2026-11-13):** add the guardian cell to the bakery heart (proposal P6) in `Core/Cellars` with an EditMode test, then run `soak`. Dressing only otherwise.
 - **Do:** the beehive oven (dead and lit states), the Great Oven, tide line, kneading hall, the sign; cask rows, racks, the press, the Great Tun, salt bloom, wet floor.
 - **Done-check:** `Floor_Room` in the bakery heart and the press hall, `Floor_Corridor` on floor 4, beside C7 (oven shapes) and C3.
 
@@ -124,7 +124,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 - **Ends with:** the user's look at both sheets.
 
 ## What the user is asked for along the way
-1. Approve the two design docs and answer their decisions (DH1-DH8, DC1-DC7).
+1. Done 2026-11-13: the two design docs are approved, all decisions as recommended.
 2. Sign in to Fab in the browser pane when B0, B1 and B2 download.
 3. Approve the B0 corner sheets.
 4. Animal models (Decision DH7), or a yes to making them with the local pipeline.

@@ -1,6 +1,6 @@
 # Dungeon 1: the Cellars (design)
 
-**Status:** proposal from Fable Run 3, 2026-11-13. Not approved. The user approves this before any build session starts. Decisions are current direction, not locks.
+**Status:** approved by the user 2026-11-13 as written ("approve as is"). Decisions DC1 to DC7 are decided as recommended and proposals P1 to P7 are accepted (decided 2026-11-13). They are the current direction, not locks.
 **Builds on:** `docs/superpowers/specs/2026-11-03-hearthdeep-dungeon-design.md` (signed off), `docs/ROOM_METRICS.md`, `docs/STORY.md`, `docs/PHASE1.md` section 3, and the generator in `Assets/_Project/Core/Cellars/` (rooms v2, seven floors).
 **References, in order:** the user's concepts C1-C8, Dough-warden and Rat-king (`Reference/private/concepts/`), then `Reference/hollowmere/dungeon_corner/` and `Reference/private/`.
 **Assets:** codes in square brackets are rows in `docs/design/area1-dungeon1-needs.md`. "ours" means a piece under `Assets/_Project/Content/Art/Cellar/`.
@@ -218,7 +218,7 @@ Sound: one bed per floor (the table in section 3), plus emitters at drips, casks
 
 ## 11. Changes proposed to code
 
-All small, none changes dive rules. Each is for the user to accept or refuse.
+All small, none changes dive rules. All seven were accepted by the user on 2026-11-13.
 - **P1. `CellarFloorLook`:** a per-floor look table in Presentation (wall set, lamp tint, ambient, fog, breath, overlay weights, sound bed). Today seven floors share one kit and one material set.
 - **P2. Route lamps:** warm lights prefer route cells.
 - **P3. Rails on coal floors:** a trim kind that follows the route.

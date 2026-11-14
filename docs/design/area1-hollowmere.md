@@ -1,6 +1,6 @@
 # Area 1: Hollowmere (design)
 
-**Status:** proposal from Fable Run 3, 2026-11-13. Not approved. The user approves this before any build session starts. Decisions here are current direction, not locks (CLAUDE.md, "Decisions have leeway").
+**Status:** approved by the user 2026-11-13 as written ("approve as is"). Decisions DH1 to DH8 are decided as recommended (decided 2026-11-13). They are the current direction, not locks (CLAUDE.md, "Decisions have leeway").
 **Builds on:** `docs/PHASE1.md` section 3 (style bible), `docs/STORY.md`, `docs/superpowers/specs/2026-10-30-hollowmere-mass-production-design.md`, the town as built (`Core/Town/HollowmereLayout.cs`, `Editor/Builders/Hollowmere*.cs`).
 **References, in order:** the user's concepts H1-H8 (`Reference/private/concepts/`), then `Reference/private/genre2/`, `oot2026/`, `totk/`, and our approved corner (`Reference/hollowmere/approved_corner/`).
 **Assets:** every code in square brackets (for example [T01]) is a row in `docs/design/area1-dungeon1-needs.md`, which holds the listing, URL, licence note and contact sheet. "ours" means a piece already under `Assets/_Project/Content/Art/`.
