@@ -88,8 +88,8 @@ namespace SleepingCalamity.Core
         }
 
         // The party changed while the bank room is open (a player joined, left or came back): capacity follows who is present (decision 7). playerIds[i] is the bag id of the player in
-        // presentSlots[i]. A bag of anyone not listed has its visit cancelled (its picks are dropped, its items stay carried); a listed bag keeps its picks, the excess dropped from the end
-        // (PlayerBag.ReopenBank); a listed bag with no visit gets a fresh one. An absent bag whose visit is already closed (a restored suspend) keeps its picks until it is back or the party pushes on. The 3-player extra slot keeps its owner while that owner is still present; otherwise it is picked again from the
+        // presentSlots[i]. A bag of anyone not listed has its visit cancelled (its picks are dropped, its items stay carried); a listed bag keeps every pick (BankSlots.Allocate sizes capacity from the present party, never below the picks, and a late joiner gets what remains of
+        // TotalSlots); a listed bag with no visit gets a fresh one. An absent bag whose visit is already closed (a restored suspend) keeps its picks until it is back or the party pushes on. The 3-player extra slot keeps its owner while that owner is still present; otherwise it is picked again from the
         // seed, never priorOwner (the owner of the previous visit), and a party of any other size has none.
         public bool ResizeBankRoom(IReadOnlyList<int> presentSlots, IReadOnlyList<string> playerIds, ulong diveSeed, int priorOwner)
         {
@@ -109,10 +109,13 @@ namespace SleepingCalamity.Core
                 foreach (string id in playerIds) if (id == kv.Key) { here = true; break; }
                 if (!here && kv.Value.BankOpen) kv.Value.CancelBank();   // a leaver's open visit ends; an absent bag whose visit is already closed keeps its saved picks (a restored suspend)
             }
+            var picks = new int[n];
+            for (int i = 0; i < n; i++) picks[i] = Bags.For(playerIds[i]).Picks.Count;
+            int[] capacities = BankSlots.Allocate(n, presentSlots, ExtraSlotOwner, picks);   // never below a player's picks; the party never above TotalSlots(n) unless the picks alone are
             for (int i = 0; i < n; i++)
             {
                 PlayerBag bag = Bags.For(playerIds[i]);
-                int capacity = BankSlots.SlotsFor(n, presentSlots[i], ExtraSlotOwner);
+                int capacity = capacities[i];
                 if (bag.BankOpen || bag.Picks.Count > 0) bag.ReopenBank(capacity);   // keeps the picks (a restored suspend holds picks with the visit closed)
                 else bag.OpenBank(capacity);
             }

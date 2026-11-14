@@ -593,7 +593,8 @@ namespace SleepingCalamity.Presentation
             return true;
         }
 
-        // The party is in the bank room and this client's bag has no visit (it joined after the room opened): resize now.
+        // The party is in the bank room and this client's bag has no visit (it joined after the room opened): resize now (host only; same authority as the class). The resize shares
+        // BankSlots.TotalSlots for the party as it is now and never takes a slot that holds a pick, so a late joiner is sized from what remains (BankSlots.Allocate).
         private void EnsureVisit(ulong clientId)
         {
             if (_session.Phase != DivePhase.BankRoom) return;

@@ -801,6 +801,60 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Stamp(realPath), Is.EqualTo(realBefore), "the real world.json was not touched");
         }
 
+        // Catches (PARKING_LOT 2026-11-03 test gap): the HOST's own bag (the host client id, keyed by the roster's PlayerKey for the host's local player id) not reaching the world file or not
+        // coming back after a reload; every other bag test uses a client. Fails if the host's bag is dropped by Capture (no roster key for the host), by the recorded-players filter, or on restore.
+        // NOT covered: the host in a real two-machine session (the second NetworkManager here is in the same process).
+        [UnityTest]
+        public IEnumerator Save_HostsOwnBagSurvivesAWorldReload()
+        {
+            yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
+            _dir = PlayModeHarness.BeginSaveTest();
+            string realPath = WorldSaveStore.PathForThisInstance();
+            string realBefore = Stamp(realPath);
+            WorldSaveStore.PathOverrideForTests = Path.Combine(_dir, "legacy-single-file", "world.json");
+
+            var clients = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app = null; DiveDirector dir = null;
+            yield return StartSavedHost(21, clients, (a, d) => { app = a; dir = d; });
+            string worldId = app.WorldSaveFlow.SelectedWorldId;
+            Assert.That(worldId, Is.Not.Null);
+            ulong host = app.NetworkManager.LocalClientId;
+            string hostKey = PlayerKey.Local(app.Services.Get<ISettings>().EnsureLocalPlayerId()).ToString();
+
+            dir.SeedOverride = 6201u;
+            Assert.That(dir.ServerStartDive(), Is.True);
+            DiveHaulSync haul = dir.HaulSync;
+            Assert.That(haul.PlayerIdOf(host), Is.EqualTo(hostKey), "premise: the host's bag is keyed by the roster's PlayerKey, not the client id");
+            Assert.That(haul.ServerAddGold(host, 9), Is.True);
+            Assert.That(haul.ServerAddItem(host, 105), Is.True);
+            haul.Bags.GoHomeAll();
+            Assert.That(dir.ServerAbandonDive(), Is.True);
+            Assert.That(haul.ServerBagOf(host).Gold, Is.EqualTo(9), "premise: the host's gold is home");
+            app.WorldSaveFlow.SaveNow();
+
+            WorldSave file = ReadWorld(_dir, worldId);
+            PlayerBagSave saved = file?.Bags?.Players.Find(p => p.Id == hostKey.Substring(hostKey.IndexOf(':') + 1));
+            Assert.That(saved, Is.Not.Null, "the host's bag is in the world file");
+            Assert.That(saved.Gold, Is.EqualTo(9));
+            Assert.That(saved.Stash.Count, Is.EqualTo(1));
+            Assert.That((saved.Stash[0].ItemId, saved.Stash[0].Count), Is.EqualTo((105, 1)));
+
+            yield return PlayModeHarness.LeaveAndWaitForLobby();
+            if (clients[0].Session.State != ConnState.Offline) yield return PlayModeHarness.Await(clients[0].Session.LeaveAsync(), Timeout);
+
+            var again = new List<PlayModeHarness.TestClient>();
+            AppBootstrap app2 = null; DiveDirector dir2 = null;
+            yield return StartSavedHost(21, again, (x, d) => { app2 = x; dir2 = d; });
+            Assert.That(app2.WorldSaveFlow.SelectedWorldId, Is.EqualTo(worldId), "the same world reopened");
+            dir2.SeedOverride = 6202u;
+            Assert.That(dir2.ServerStartDive(), Is.True);
+            PlayerBag back = dir2.HaulSync.ServerBagOf(app2.NetworkManager.LocalClientId);
+            Assert.That(back, Is.Not.Null);
+            Assert.That(back.Gold, Is.EqualTo(9), "the host's gold came back");
+            Assert.That(back.Stash, Is.EqualTo(new Dictionary<int, int> { { 105, 1 } }), "the host's stash came back");
+            Assert.That(Stamp(realPath), Is.EqualTo(realBefore), "the real world.json was not touched");
+        }
+
         private static void AssertFileHoldsOnlyA(WorldSave file, string when)
         {
             Assert.That(file, Is.Not.Null, when + ": the world file reads");
