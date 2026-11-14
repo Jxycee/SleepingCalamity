@@ -63,9 +63,9 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **M** Dev-only bank keys: confirm push-on / go-home have real input everywhere (folded into PL-1 task 1.5)
 
 ## Ready: multiplayer readiness (M7)
-- [ ] **M** 3-4 player smoke with bots + MPPM (triage Q1) [U][net]
+- [x] **M** 3-4 player smoke with bots + MPPM (triage Q1) [U][net]
 - [ ] **M** State-hash "no desync" pass bar: add per-player bags and the 7-floor stir to the hash (triage Q2) [U][net]
-- [ ] **S** Network conditions test set at 150 ms / 2% and 300 ms / 5% (triage Q6 default; user may change) [U][net]
+- [x] **S** Network conditions test set at 150 ms / 2% and 300 ms / 5% (triage Q6 default; user may change) [U][net]
 
 ## Ready: save and netcode audit (2026-11-12, `docs/superpowers/audits/2026-11-12-save-netcode-audit.md`; each item names its finding and proposed test there)
 - [x] **S** A1 (blocker, done 2026-11-13, merge of claude/audit-fixes): a stale-connection takeover must not free the rejoining player's own Lobby seat (`UgsNetworkSession.NgoEvents.cs:48-62`, `ConnectionApprover.cs:182-202`); turn the `AUDIT A1` ignored test or repro into a passing test [U][net]
@@ -106,6 +106,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** Butterflies and bees faint at eye height (ambient-life STATUS :3; 1 round left) [U]
 
 ## Ready: Cellars art
+- **APV determinism test (S, from B0, 2026-11-14).** B0 shipped sky ambient (`AmbientMode.Skybox`), no Adaptive Probe Volume bake. Later: prove an APV bake per Morning/Evening scenario is headless, byte-identical on two builds (`Tools/cloud/sc_churn_check.sh` logic) and fits `ProjectBuilder.RunAll` and LFS; if not, keep it out of RunAll and say so. Sky ambient stays until then (user, 2026-11-14).
 - [ ] **M** B5 cellar kit 29/40 to 32 (`hollowmere/dungeon_corner/STATUS.md:9`) [A][U]
 - [ ] **S** Dust-motes ParticleSystem prefab (`CellarFloorBuilder.cs:8`, :416) [U]
 - [ ] **S** B11 cellar lantern wear and rust (PARKING_LOT :49) [A]
