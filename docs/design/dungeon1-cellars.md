@@ -229,7 +229,9 @@ All small, none changes dive rules. All seven were accepted by the user on 2026-
 
 Anything touching `Core/Cellars` needs the soak run before merge (CLAUDE.md).
 
-## 12. Decisions for the user
+## 12. Decisions
+
+All seven are decided as recommended (user, 2026-11-13). So: the Dough-warden guards the Great Oven on floor 3 (P6 is on) and the Brazen Ox keeps floor 5; the Rat-king is the key carrier on floor 1, with ember eyes; "the Cellars" names floors 1 to 7; Tuppence waits at checkpoints; the brighter value band is the target for lit rooms, pending the measurement in B0; the per-floor look table goes in; no standing water in Phase 1.
 
 - **DC1. Where the Dough-warden stands.** The spec replaced it with the Brazen Ox on floor 5 (decision 46). The new concept (2026-11-13) brings it back as a grim oven guardian. Recommended: Dough-warden guards the Great Oven on floor 3 and the Ox keeps floor 5. Until an Ox exists, the floor 5 arena keeps using the Warden stand-in. Alternatives: Dough-warden on floor 5 in place of the Ox; or at the floor 7 door.
 - **DC2. The Rat-king is floor 1's key carrier.** STORY 85 says elites are fully demonic; the concept is storybook. Recommended: keep the concept and add ember eyes, so the dungeon's first face is whimsical with one wrong note.

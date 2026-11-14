@@ -292,7 +292,9 @@ Cameras `Cap_HM_LakeShore`, `Cap_HM_LakeJetty`. Ours LakeShore as built. Add one
 - Growth sits at wall feet and in lots, never in the walking line.
 - One landmark per lane so they can be told apart: the smithy's anvil outside [T14], the schoolhouse's low bell post (ours, new), a cart [T16] in Wall Ginnel.
 
-## 8. Decisions for the user
+## 8. Decisions
+
+All eight are decided as recommended (user, 2026-11-13). DH1 changes the wording of STORY 151 ("foundations and doorsteps" gains the chimneys); the controller updates STORY with that decision.
 
 - **DH1. Chimneys stand on ruined lots.** STORY 151 says "foundations and doorsteps". Reason: the ruin needs height and a readable silhouette, and the hearth is the game's own image. Small story wording change.
 - **DH2. Evening state on return from a dive.** Reason: a warm homecoming for no clock system. Needs one line in the return flow to pick the preset.

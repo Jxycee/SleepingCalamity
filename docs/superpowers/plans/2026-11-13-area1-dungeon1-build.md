@@ -105,7 +105,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 
 ### B10. Floor 3 bakery and floor 4 wine
 - **Spec:** section 4 (floors 3, 4).
-- **Decision DC1 puts the Dough-warden on floor 3 (decided 2026-11-13):** add the guardian cell to the bakery heart (proposal P6) in `Core/Cellars` with an EditMode test, then run `soak`. Dressing only otherwise.
+- **Decision DC1 puts the Dough-warden on floor 3 (decided 2026-11-13):** add the guardian cell to the bakery heart (proposal P6) in `Core/Cellars` with an EditMode test, then run `soak`.
 - **Do:** the beehive oven (dead and lit states), the Great Oven, tide line, kneading hall, the sign; cask rows, racks, the press, the Great Tun, salt bloom, wet floor.
 - **Done-check:** `Floor_Room` in the bakery heart and the press hall, `Floor_Corridor` on floor 4, beside C7 (oven shapes) and C3.
 
