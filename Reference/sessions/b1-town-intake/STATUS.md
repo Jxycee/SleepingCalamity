@@ -1,4 +1,4 @@
-State: IN PROGRESS (builder done and idempotent, 42 prefabs adopted, gate PASS; reviewer, check, merge left)
+State: DONE (merged to main, see CURRENT.md). Archive: ready
 Branch: claude/b1-town-intake
 Task: build-plan row B1, Asset intake: town (docs/superpowers/plans/2026-11-13-area1-dungeon1-build.md)
 Started: 2026-11-14

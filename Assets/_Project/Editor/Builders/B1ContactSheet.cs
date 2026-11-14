@@ -74,6 +74,7 @@ namespace SleepingCalamity.EditorTools
             {
                 QualitySettings.renderPipeline = saved;
                 LookTestCapture.CleanProbes();
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single); // never leave the modified corner scene open
             }
         }
 
