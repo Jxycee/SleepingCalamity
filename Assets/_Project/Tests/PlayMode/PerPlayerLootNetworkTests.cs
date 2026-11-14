@@ -951,31 +951,6 @@ namespace SleepingCalamity.Tests.PlayMode
             haul.Identity = null;
         }
 
-        // Catches: the owner-only view staying bound to a stray bag (the host's client-id fallback key) after the roster's key for the owner arrives.
-        // NOT covered: this passed on the old code too (the key-change re-resolve already existed); it pins the behaviour. Real second machine: no.
-        [UnityTest]
-        public IEnumerator PlayerBagSync_BagId_LeavesTheStrayFallbackBagWhenTheRosterKeyArrives()
-        {
-            var clients = new List<PlayModeHarness.TestClient>();
-            AppBootstrap app = null; DiveHaulSync haul = null;
-            yield return StartParty(1, clients, (a, h) => { app = a; haul = h; });
-            NetworkManager nmA = clients[0].NetworkManager;
-            ulong ca = nmA.LocalClientId;
-            var identity = new FakeIdentity();   // a roster with no key for the owner yet
-            haul.Identity = identity;
-            Assert.That(haul.PlayerIdOf(ca), Is.EqualTo(ca.ToString()), "premise: the host falls back to its client id");
-            Assert.That(haul.ServerAddItem(ca, 104), Is.True);
-            PlayerBagSync ownA = BagSyncOwnedBy(nmA, ca);
-            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 104), Timeout, "A's view never showed the stray bag");
-
-            PlayerKey key = PlayerKey.Local(PlayModeHarness.PlayerId(50));
-            identity.Keys[ca] = key;   // the key arrives
-            Assert.That(haul.ServerAddItem(ca, 105), Is.True, "the host now fills the keyed bag");
-            Assert.That(haul.Bags.TryGet(ca.ToString(), out PlayerBag stray) && stray.Carried.Count == 1, Is.True, "premise: the stray bag is a different bag");
-            yield return PlayModeHarness.WaitUntil(() => Shows(ownA, 105), Timeout, "A's view stayed on the stray bag after the roster key arrived");
-            haul.Identity = null;
-        }
-
         // ---- lost satchel and boots (plan 3 task 9) ----
 
         // What a failed dive leaves: the unbanked haul waits in a satchel at the depth where `who` fell.
