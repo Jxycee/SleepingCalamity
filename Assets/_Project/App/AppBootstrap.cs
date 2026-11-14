@@ -178,6 +178,7 @@ namespace SleepingCalamity.App
         private void Update()
         {
             worldSaveFlow?.Tick();
+            spawner?.Tick(Time.unscaledTime);   // host only (no-op elsewhere): spawns a hero a one-shot scene hook missed (audit A4)
         }
 
         // Hands over to the Lobby scene, then lets a dev auto-start (command line, MPPM tag or the editor's Auto Solo) begin a session.

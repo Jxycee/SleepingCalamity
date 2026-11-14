@@ -484,6 +484,7 @@ namespace SleepingCalamity.Presentation
             ResetParty();      // wipe: every hero arrives home up and moving, and the combat host forgets the wipe
             if (reason == DiveEndReason.Failed || reason == DiveEndReason.Abandoned) DiveFailedOn?.Invoke(endFloor);
             DiveEnded?.Invoke(reason);
+            if (_world != null) _world.RequestSave();   // audit A8: the end state (bags settled, party home) goes to disk now, not at the next 10 s flush
             return true;
         }
 
