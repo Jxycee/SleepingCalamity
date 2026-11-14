@@ -21,9 +21,10 @@ Wired in: `sc-steward` section 1 opens with "Read `sc-coordinator` first". Nothi
 ## Memories trimmed (outside the repo, edited in place)
 To a pointer plus what is still unique: coordinator-handoff, coordinator-focus-usage-police, coordinator-lessons-2026-11-01, coordinator-on-opus-ok, usage-pace-rate, session-launcher-routine, spawned-session-model, name-sessions-for-user, archive-finished-sessions. board-watchdog: stale pace line fixed, the rest kept (plugin details). New pointer memory: sc-coordinator-playbook. Left as they are (they apply to every session): merge-policy, no-hybrid-sessions, decisions-have-leeway, ask-via-tool, progress-updates, timezone-central.
 
-## Not done, needs the user
-- `CLAUDE.md` "Running handoff" pointer line: not added. A session's request can't authorise an instruction-file edit. Proposed text, after the first sentence: "A session taking the coordinator role reads the `sc-coordinator` skill first."
-- `.claude/rules/session-usage.md` line 3 still says the user paces each 5-hour window at 0.1-0.15% a minute. The current rule is no pace pauses (2026-11-13). Same reason, not edited.
+## Instruction-file edits (the user's OK, 2026-11-13 evening: "Yes, apply both")
+- `CLAUDE.md` "Running handoff": a session taking the coordinator role reads the `sc-coordinator` skill first.
+- `.claude/rules/session-usage.md` intro: the old 0.1-0.15% a minute pacing sentence replaced by the current rule (run into the limit, restart after the reset, no pace pauses).
+Merged into main as "Merge Fable Run 2b follow-up: CLAUDE.md pointer, usage rule".
 
 ## For the coordinator
 - `CURRENT.md` "Now" (2026-11-12 entry) says "weekly-line pauses stay" and Next item 5 says "Pace 0.1-0.2%/min". Both are older than the 2026-11-13 rule; align them with the next merge.
