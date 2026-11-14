@@ -1,5 +1,7 @@
 // Authority: test-only. M7 S1: a host + three clients (the most a world records: 4 players) connect, one dive starts and the party takes a stair; ReplicatedStateHash must agree on all four peers
 // after every step. A deliberate local corruption on one peer must make the same assertion FAIL (checked by catching the assertion, so the test itself passes).
+// Bags (owner-only) and the stir (host-only internals) are checked against the HOST by ReplicatedStateHash.AssertBagsAndStirMatchHost: a clean run with items in several bags, an enemy drop, a cleared floor and the
+// second half after a push-on; a deliberate corruption of one client's bag view and a deliberate stir drift on the host must each fail it.
 // NOT covered: transforms, enemies, real-relay latency (run under NetCondition by the QA walks), visuals.
 using System.Collections;
 using System.Collections.Generic;
@@ -168,6 +170,140 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(message, Is.Not.Null, "AssertAllEqual must fail when one peer's replicated state differs");
             Assert.That(message, Does.Contain("NetPickableMaxFloor"), "the failure names the differing field");
             Assert.That(message, Does.Contain("client " + rig.Peers[2].LocalClientId), "the failure names the corrupted peer");
+        }
+
+        // Runs an assertion coroutine to the end; returns its AssertionException message through `message` (null when it passed).
+        private static IEnumerator Catch(IEnumerator check, System.Action<string> message)
+        {
+            while (true)
+            {
+                bool more;
+                try { more = check.MoveNext(); }
+                catch (AssertionException e) { message(e.Message); yield break; }
+                if (!more) { message(null); yield break; }
+                yield return check.Current;
+            }
+        }
+
+        private static ulong[] ClientIds(Rig rig)
+        {
+            var ids = new ulong[rig.Peers.Count];
+            for (int i = 0; i < ids.Length; i++) ids[i] = rig.Peers[i].LocalClientId;
+            return ids;
+        }
+
+        // Catches: a bag (owner-only view) that differs from the host's authoritative bag, a stir that drifts from the bags / cleared floors / players, in a clean 4-peer run with items in several bags,
+        // an enemy drop (the real per-player roll, paid through the host's own path) and a cleared floor. Bags are owner-only, so the check compares each peer to the HOST (ReplicatedStateHash.BagMismatch / StirMismatch).
+        [UnityTest]
+        public IEnumerator FourPeers_BagsAndStir_AgreeWithHost_ThroughItems_AnEnemyDrop_AndAClearedFloor()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r);
+            Assert.That(rig.Host.ServerStartDive(), Is.True, "[start dive]");
+            yield return FloorBuiltEverywhere(rig, 1, "[F1]");
+            DiveHaulSync haul = rig.Host.HaulSync;
+            ulong[] ids = ClientIds(rig);
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F1 clean");
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "F1 empty bags");
+
+            Assert.That(haul.ServerAddItem(ids[0], 101), Is.True); Assert.That(haul.ServerAddItem(ids[1], 104), Is.True); Assert.That(haul.ServerAddItem(ids[1], 105), Is.True); Assert.That(haul.ServerAddItem(ids[3], 110), Is.True);
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F1 items in three bags");
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "F1 items in three bags");
+            Assert.That(haul.Current.StirValue, Is.GreaterThan(0), "four valuables are in the stir");
+            foreach (NetworkManager nm in rig.Peers) Assert.That(PlayerBagSync.ForLocalPlayer(nm), Is.Not.Null, "every peer has its own bag view to compare");
+            Assert.That(ReplicatedStateHash.DescribeLocal(rig.HostNm), Does.Contain("host bag of client " + ids[1]), "the host's description lists every bag");
+
+            // An enemy drop through the real roll: client 2's bag gets exactly what CellarLoot.RollEnemyDrop says for its slot and this kill key; client 0 (a hitter too) rolls its own.
+            CellarFloorLayout layout = rig.Host.FloorSync.Layout;
+            int slot2 = haul.PlayerSlotOf(ids[2]), key = -1;
+            for (int k = 0; k < 2000 && key < 0; k++) if (CellarLoot.RollEnemyDrop(layout.Seed, layout.Floor, k, slot2) != CellarLoot.EnemyDropNoItem) key = k;
+            Assert.That(key, Is.GreaterThanOrEqualTo(0), "premise: some kill key drops for client 2");
+            int want = CellarLoot.RollEnemyDrop(layout.Seed, layout.Floor, key, slot2);
+            Assert.That(rig.Host.ContentsSync.TestQueueEnemyDrop(new[] { haul.PlayerIdOf(ids[2]), haul.PlayerIdOf(ids[0]) }, key), Is.True);
+            yield return PlayModeHarness.WaitUntil(() => haul.ServerBagOf(ids[2]).Carried.Count == 1, Timeout, "[drop] client 2's drop was never paid");
+            Assert.That(haul.ServerBagOf(ids[2]).Carried[0], Is.EqualTo(want), "the drop is the real per-slot roll");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F1 after an enemy drop");
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "F1 after an enemy drop");
+            yield return PlayModeHarness.WaitUntil(() => PlayerBagSync.ForLocalPlayer(rig.Peers[2]).View.Carried.Length == 1, Timeout, "[drop] client 2 never saw its own drop");
+
+            // The cleared floor feeds the stir; the recomputed stir must follow.
+            int before = haul.Current.StirValue;
+            Assert.That(haul.ServerMarkCleared(1), Is.True, "[F1 clear]");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F1 cleared");
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "F1 cleared");
+            Assert.That(haul.Current.StirValue, Is.GreaterThan(before), "a cleared floor stirs the dive");
+        }
+
+        // Catches: the stir across the dive's second half (after a push-on: baseline valuables, reward carry, the first half's floors no longer counting) drifting from what the bags and floors say.
+        [UnityTest]
+        public IEnumerator FourPeers_BagsAndStir_AgreeWithHost_AcrossThePushOnIntoTheSecondHalf()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r);
+            rig.Host.TestHoldCheckpoint(true);
+            Assert.That(rig.Host.ServerStartDive(UndercroftPlan.BankFloor), Is.True, "[F5 start]");
+            yield return FloorBuiltEverywhere(rig, UndercroftPlan.BankFloor, "[F5 start]");
+            DiveHaulSync haul = rig.Host.HaulSync;
+            ulong[] ids = ClientIds(rig);
+            Assert.That(haul.ServerAddItem(ids[0], 101), Is.True); Assert.That(haul.ServerAddItem(ids[2], 112), Is.True);
+            Assert.That(haul.ServerEnterBankRoom(), Is.True, "[F5 bank]");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "F5 bank room");
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "F5 bank room");
+
+            Assert.That(haul.Session.PushOn(), Is.True, "[push on] the party pushes on (the press rules are PerPlayerLootNetworkTests')");
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "second half, nothing new found");
+            Assert.That(haul.ServerAddItem(ids[1], 107), Is.True, "[second half] a new valuable");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "second half, one new valuable");
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "second half, one new valuable");
+            Assert.That(haul.Session.Stir.Capture().SecondHalf, Is.True, "premise: the stir is in its second half");
+            Assert.That(haul.Current.StirValue, Is.GreaterThan(0));
+        }
+
+        // Catches: BagMismatch comparing nothing. One client's LOCAL copy of its own owner-only bag view is changed behind NGO's back; the hash across peers cannot see it (owner-only), the host comparison must.
+        [UnityTest]
+        public IEnumerator DeliberateCorruption_OfOneClientsBagView_IsCaughtAgainstTheHostsBag()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r);
+            Assert.That(rig.Host.ServerStartDive(), Is.True, "[start dive]");
+            yield return FloorBuiltEverywhere(rig, 1, "[start dive]");
+            DiveHaulSync haul = rig.Host.HaulSync;
+            ulong[] ids = ClientIds(rig);
+            Assert.That(haul.ServerAddItem(ids[2], 104), Is.True); Assert.That(haul.ServerAddItem(ids[1], 110), Is.True);
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "clean before corruption");
+            yield return PlayModeHarness.WaitUntil(() => PlayerBagSync.ForLocalPlayer(rig.Peers[2]).View.Carried.Length == 1, Timeout, "client 2 never saw its item");
+
+            PlayerBagSync mine = PlayerBagSync.ForLocalPlayer(rig.Peers[2]);
+            BagView bad = mine.View;
+            bad.Carried.Add(112);   // an item the host's bag does not hold
+            ReplicatedStateHash.CorruptLocalCopy(mine.Net, bad);
+            Assert.That(mine.View.Carried.Length, Is.EqualTo(2), "test premise: the local copy was changed");
+
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "cross-peer hash cannot see an owner-only bag", 3f);   // bags are not in the shared hash: this still passes
+            string message = null;
+            yield return Catch(ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "corrupted bag", 2f), m => message = m);
+            Assert.That(message, Is.Not.Null, "the bag check must fail when a client's bag view differs from the host's bag");
+            Assert.That(message, Does.Contain("bag of client " + ids[2]), "the failure names the client whose bag differs");
+        }
+
+        // Catches: StirMismatch comparing nothing. The host's stir counts a cleared floor the session never cleared (the stir and the dive's floors drift apart); the published stir then disagrees with the recompute.
+        [UnityTest]
+        public IEnumerator DeliberateStirDrift_OnTheHost_IsCaughtByTheRecompute()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r);
+            Assert.That(rig.Host.ServerStartDive(), Is.True, "[start dive]");
+            yield return FloorBuiltEverywhere(rig, 1, "[start dive]");
+            DiveHaulSync haul = rig.Host.HaulSync;
+            yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "clean before drift");
+            haul.Session.Stir.OnFloorCleared(2);   // the stir alone, not DiveSession.ClearFloor: floor 2 is not in the session's cleared mask
+            Assert.That(haul.Session.Stir.Capture().FloorMask, Is.Not.EqualTo(0), "test premise: the stir counted a floor");
+
+            string message = null;
+            yield return Catch(ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "stir drift", 2f), m => message = m);
+            Assert.That(message, Is.Not.Null, "the stir recompute must fail when the stir counts a floor the session did not clear");
+            Assert.That(message, Does.Contain("StirValue published"), "the failure names the stir field");
+            yield return ReplicatedStateHash.AssertAllEqual(rig.Peers, "every peer still agrees on the (drifted) published stir", 5f);   // the cross-peer hash alone cannot see a host-side drift
         }
 
         // Catches: a fifth player getting into a four-player world (host + 3 clients is the maximum the join rules allow).

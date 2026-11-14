@@ -2,7 +2,7 @@
 // A chest roll is a Dark Cloud 2 style triangular draw on the item RANK: a symmetric triangular distribution (sum of two uniforms) whose peak moves up with the floor,
 // rounded and clamped to 1-5, then one item of that rank is picked. Deterministic per (seed, floor, chestIndex) on its own stream "cellars.loot", so the host and any test
 // agree and no other stream moves. The key chest yields the room key instead of loot (RoomKeyId); the gate key (GateKeyId) is dropped by the carrier enemy and never rolled.
-// Authority: none (static data); the host rolls when a chest is opened.
+// Authority: none (static data); the host rolls when a chest is opened or an enemy dies (RollEnemyDrop, one independent roll per hitter).
 using System.Collections.Generic;
 
 namespace SleepingCalamity.Core
@@ -119,6 +119,26 @@ namespace SleepingCalamity.Core
             if (!ownsBoots && roll < (floor >= BootsDeepFloor ? DeepBootsFactor : 1)
                 && CellarLootMix.CategoryFor(seed, floor, chestIndex, CellarLootMix.KeyFlagsOfDive(seed, floor)) != LootCategory.Common) return BootsId;
             return RollFor(seed, floor, chestIndex, playerSlot, rankBonus);
+        }
+
+        // ---- enemy drops (per player, host rolls on a real death) ----
+        public const int EnemyDropOneIn = 5;      // placeholder: one roll in five gives that player an item
+        public const int EnemyDropNoItem = 0;     // RollEnemyDrop returns this for "no drop"
+
+        // One player's own roll when an enemy dies (a slot 0-3, only for a player who hit it). Returns EnemyDropNoItem (0) or an id of the Items table: never gold, boots or a key (the chests carry those).
+        // dropKey is a per-floor deterministic id of the kill (CellarContentsSync: room * 64 + the room's spawn count), so the same (seed, floor, kill, slot) always rolls the same; its stream
+        // ("cellars.loot.enemy") touches no other. tier is the enemy's tier: a tier 2 enemy pays one rank more, tier 1 one rank less than the floor's chest rank (placeholder, min 1).
+        public static int RollEnemyDrop(uint seed, int floor, int dropKey, int playerSlot, int tier = 1, int rankBonus = 0)
+        {
+            if (playerSlot < 0 || playerSlot > 3) throw new System.ArgumentOutOfRangeException(nameof(playerSlot), playerSlot, "player slot 0-3");
+            var rng = new Pcg32(Rng.Derive(seed, "cellars.loot.enemy", ((ulong)floor << 32) | ((ulong)(uint)dropKey << 2) | (uint)playerSlot));
+            if (rng.Range(0, EnemyDropOneIn) != 0) return EnemyDropNoItem;
+            int rank = DrawRank(ref rng, floor) + (tier >= 2 ? 1 : -1) + System.Math.Max(0, rankBonus);
+            rank = rank < MinRank ? MinRank : rank > MaxRank ? MaxRank : rank;
+            int n = 0; foreach (LootItem i in Items) if (i.Rank == rank) n++;
+            int pick = rng.Range(0, n);
+            foreach (LootItem i in Items) if (i.Rank == rank && pick-- == 0) return i.Id;
+            return Items[0].Id;
         }
 
         // 0 for an unknown id or a key.

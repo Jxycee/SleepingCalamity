@@ -19,6 +19,9 @@
 // (2c) ENCOUNTER TEMPLATES (spawner wiring, host only; clients never spawn): for the 12 pool combat rooms CellarTemplateSpawns.Resolve picks the kinds, cells and waves (EncounterBuilder, party size = connected players, isAmbushRoom = plan.AmbushRoom == room)
 // and holds the count to the plan's live count; wave 1 spawns on the host tick after the last wave-0 enemy dies (the room is not cleared in between). Rooms it returns null for (bakery set pieces, Tier 2 / warden rooms) keep the plan-driven spawns above;
 // (4) the enemy spawned for layout.Carrier drops the GATE key where it falls (only on death: a wipe/clear despawn drops nothing, resets the room and it respawns on re-entry): a player within GateKeyRange picks it up and ExitUnlocked is raised; keys live only in this state (GateKey, RoomKeyHeld), never in the haul's loot;
+// (4b) ENEMY DROPS (host only): a real death of a tracked enemy (not a despawn, not the hunter or a pump-wave enemy) gives every still-connected player in the enemy's HitLog their OWN roll
+// (CellarLoot.RollEnemyDrop, per roster slot) into their own bag via DiveHaulSync.ServerAddItem, paid on the next host tick (the killing blow joins HitLog after ServerDied fires). A full bag drops nothing
+// for that player and only that player is told (NoticeOwner). The carrier's gate key is unchanged and never loot. Bags already ride the world save, so a drop needs no save field;
 // (5) pieces: a player within PieceRange of an uncollected piece spot adds it to the haul (ServerAddPiece), the collected mask follows the haul every frame so a failed
 // dive shows the pieces again; (6) the room key (key chest) lets the host open the locked gate, by Interact or by walking up to it.
 // Spine hooks: subscribe to the host event ExitUnlocked(int floor) (fired once per floor when the gate key is picked up; State.ExitUnlocked stays true on every peer until the
@@ -39,6 +42,7 @@ using Unity.Netcode;
 using UnityEngine;
 using SleepingCalamity.Core;
 using SleepingCalamity.Core.Combat;
+using SleepingCalamity.Core.Weapons;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Runtime;
 
@@ -138,7 +142,31 @@ namespace SleepingCalamity.Presentation
         private ContentsState _st;
         private readonly CellarRoomClear _clear = new CellarRoomClear();
         private readonly HashSet<int> _entered = new HashSet<int>();
-        private sealed class Tracked { public int Room; public bool Carrier, Guardian; }
+        private sealed class Tracked { public int Room; public bool Carrier, Guardian; public int DropKey; }
+
+        // ---- per-player enemy drops (host) ----
+        // A real death (not a despawn) of a TRACKED enemy gives every player who hit it and is still connected their own roll (CellarLoot.RollEnemyDrop, keyed by the enemy's per-floor DropKey and the
+        // player's roster slot) into their own bag. The kill is seen inside Enemy.ServerApplyHit, before CombatHost appends the killing blow to HitLog, so the drop is queued here and paid on the
+        // next host tick. DropKey = room * 64 + the room's spawn count this floor (never reset within a floor, so a respawn after a wipe rolls fresh). The hunter and the pump-wave enemies drop nothing.
+        public const string DropFullText = "Your bag is full: an enemy drop was lost.";
+        public System.Func<int, int, int> EnemyDropRollOverride;   // test seam (host): (player slot, drop key) -> item id, 0 = no drop; null = CellarLoot.RollEnemyDrop
+        public int EnemyDropsGiven { get; private set; }            // host only (tests)
+        public event System.Action<ulong, int> EnemyDropGiven;      // host: (clientId, item id)
+        private struct PendingDrop { public List<HitRecord> Hits; public uint Seed; public int Floor, Key, Tier; }
+        private readonly List<PendingDrop> _drops = new List<PendingDrop>();
+        private readonly Dictionary<int, int> _roomSpawns = new Dictionary<int, int>();
+        /// <summary>Host test entry: queues the drop of an enemy that "died" with these hitters (bag ids, DiveHaulSync.PlayerIdOf), exactly as a tracked death would, so the real roll and payout run without
+        /// spawning a room. False off the host or with no floor armed.</summary>
+        public bool TestQueueEnemyDrop(IEnumerable<string> hitters, int dropKey, int tier = 1)
+        {
+            if (!IsServer || !IsSpawned || _layout == null) return false;
+            var hits = new List<HitRecord>();
+            foreach (string id in hitters) hits.Add(new HitRecord(id, "test", 0.0));
+            _drops.Add(new PendingDrop { Hits = hits, Seed = _layout.Seed, Floor = _layout.Floor, Key = dropKey, Tier = tier });
+            return true;
+        }
+
+        private int NextDropKey(int room) { _roomSpawns.TryGetValue(room, out int n); _roomSpawns[room] = n + 1; return room * 64 + (n & 63); }
         private readonly Dictionary<Enemy, Tracked> _tracked = new Dictionary<Enemy, Tracked>();
         private Enemy _carrierEnemy, _hunter; private bool _hunterSpawned;
         private int _carrierLostRoom = -1;   // the carrier despawned without dying while room-mates lived: its room resets once no tracked enemy is left, so the key stays obtainable
@@ -627,8 +655,32 @@ namespace SleepingCalamity.Presentation
             pos = default; return false;
         }
 
+        // Host: pays the queued enemy deaths (see the per-player enemy drops block). Runs first in HostTick, before a new floor's arm clears the pending list.
+        private void TickDrops()
+        {
+            if (_drops.Count == 0) return;
+            PendingDrop[] due = _drops.ToArray(); _drops.Clear();
+            foreach (PendingDrop d in due)
+            {
+                var seen = new HashSet<string>();
+                foreach (HitRecord h in d.Hits)
+                {
+                    if (!seen.Add(h.PlayerId) || HaulSync == null || !HaulSync.TryClientOfPlayerId(h.PlayerId, out ulong cid)) continue;
+                    int slot = HaulSync.PlayerSlotOf(cid);
+                    int item = EnemyDropRollOverride != null ? EnemyDropRollOverride(slot, d.Key) : CellarLoot.RollEnemyDrop(d.Seed, d.Floor, d.Key, slot, d.Tier);
+                    if (item <= 0) continue;
+                    PlayerBag bag = HaulSync.ServerBagOf(cid);
+                    if (bag == null) continue;
+                    if (bag.IsFull) { NoticeOwner(cid, DropFullText); continue; }   // only that player is told; nobody else's drop moves
+                    if (!HaulSync.ServerAddItem(cid, item)) continue;
+                    EnemyDropsGiven++; EnemyDropGiven?.Invoke(cid, item);
+                }
+            }
+        }
+
         private void HostTick(CellarFloorSync fs)
         {
+            TickDrops();
             if (HaulSync != null && _subscribedHaul != HaulSync)
             {
                 if (_subscribedHaul != null) _subscribedHaul.DiveFailed -= OnDiveFailed;
@@ -683,7 +735,7 @@ namespace SleepingCalamity.Presentation
         public void ServerClearFloor()
         {
             if (!IsServer) return;
-            UntrackAll();
+            UntrackAll(); _drops.Clear(); _roomSpawns.Clear();
             if (_combat != null) _combat.ServerClearEnemies();
             _clear.Reset(); _entered.Clear(); _ambushRoom = -1; _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
             _valves.Reset(); _unlockRaised = false; _roomPaid = 0UL;
@@ -858,7 +910,7 @@ namespace SleepingCalamity.Presentation
                     if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
                     continue;
                 }
-                _tracked[e] = new Tracked { Room = room, Carrier = carrier, Guardian = warden };
+                _tracked[e] = new Tracked { Room = room, Carrier = carrier, Guardian = warden, DropKey = NextDropKey(room) };
                 if (carrier) _carrierEnemy = e;
                 _clear.Spawn(room);
                 e.ServerDied += OnEnemyDied; e.ServerDespawned += OnEnemyDespawned;
@@ -877,7 +929,7 @@ namespace SleepingCalamity.Presentation
                 if (carrier && !_st.ExitUnlocked) { _st.ExitUnlocked = true; Publish(); ExitUnlocked?.Invoke(_st.Floor); }   // the carrier could not spawn: never soft-lock the stair
                 return;
             }
-            _tracked[e] = new Tracked { Room = room, Carrier = carrier };
+            _tracked[e] = new Tracked { Room = room, Carrier = carrier, DropKey = NextDropKey(room) };
             if (carrier) _carrierEnemy = e;
             _clear.Spawn(room);
             e.ServerDied += OnEnemyDied; e.ServerDespawned += OnEnemyDespawned;
@@ -935,6 +987,7 @@ namespace SleepingCalamity.Presentation
                 _st.Cleared = _clear.ClearedMask; Publish();
                 return;
             }
+            if (_layout != null) _drops.Add(new PendingDrop { Hits = e.HitLog, Seed = _layout.Seed, Floor = _layout.Floor, Key = t.DropKey, Tier = e.Tier });
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = SettledKeyPos(e.transform.position); }
             if (t.Guardian) GuardianDefeated?.Invoke(_st.Floor);
             if (_waveTwo.ContainsKey(t.Room) && !RoomHasTracked(t.Room)) { if (!_waveTwoDue.Contains(t.Room)) _waveTwoDue.Add(t.Room); Publish(); return; }   // wave 0 is down: wave 1 follows (TickWaveTwo) before the room can clear
