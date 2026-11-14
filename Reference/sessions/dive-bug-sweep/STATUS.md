@@ -1,4 +1,4 @@
-State: running (resumed 2026-11-14)
+State: tip ready, waiting on merge order (drops-and-hash, dive-followups first); then merge origin/main, check, merge
 Branch: claude/dive-bug-sweep (from origin/main)
 Done: 18b stale (63e237d9, test Pieces_PieceZeroAlreadyHome_...); RoomValidatorV2 rules 6/7/9 cover all gimmick states (no gap); party-size check = PartyScaleSmokeTests.Party_EntersDive_ScalesEnemies_ChangesFloor_ReturnsToHub [2,3,4] (13/13 with SC_MP=1).
 In flight: DiveBot_Tough_Seed12345 run via wrapper (log %TEMP%\dbs.log, out %TEMP%\dbs); result not yet recorded.

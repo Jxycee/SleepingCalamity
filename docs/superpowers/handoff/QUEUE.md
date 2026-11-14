@@ -27,19 +27,19 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **S** Dungeon-1 modifier difficulty check: DiveBot solo runs with plan 5 modifiers on vs off; if they add much difficulty, soften (e.g. floor 7 one hazard at most, Stirred's latch ends at the next stair). Guardrail: user 2026-11-06, dungeon one must not be extremely complex or overly difficult [U] (`5d2dcf8c`, results `Reference/sessions/dungeon1-difficulty/RESULTS.md`: modifiers on/off within noise, party-size fix `e9e7d6db`)
 - [x] **S** Floor 3 deaths: plain DiveBot (no healing) dies on F3 on every seed, modifiers on or off (49/30/33 fails); seed 7 logs 'took damage with no enemy within 4 m' on F3. Find the damage source (hazard, hitbox reach or bug) and judge it against the dungeon-one guardrail [U] (`e59bbfde`: not a bug, F3 rat_king set piece = 252 of 331 hits; proposal F3 mix 20/50/30 to 30/50/20 waits on the user)
 - [x] **S** Coop SoftLock finding on F3: 'solo hero downed 30 s and nothing happened' (CoopBot_Pair_Seed12345); the downed player should be revived or the dive should fail [U][net] (`e59bbfde`: out heroes stand up when the party takes the stair; risk review no blockers)
-- [ ] **S** Live 2-4 player bot run on the party-size fix (`e9e7d6db`): enemy count rises with players, no hash mismatches [U][net]
+- [x] **S** Live 2-4 player bot run on the party-size fix (`e9e7d6db`): enemy count rises with players, no hash mismatches [U][net] (`PartyScaleSmokeTests.Party_EntersDive_ScalesEnemies_ChangesFloor_ReturnsToHub` [2,3,4]: enemy count rises with players, hash agrees; 13/13 with SC_MP=1)
 - [x] **S** Spec step 5d: music stems plan (docs: which stems, where they switch; no audio yet) (`141a79a4`)
 - [ ] **M** Spec step 6: jobs for dead ends, collapse fairness, crash saver if simple (section 12 step 6) - plan first [U]
 - [x] **S** Floors 8-10 of the Undercroft have no plan row (spec :233 says 10 floors; plan 3 built 7): write the roadmap row (docs) (`141a79a4`)
 - [ ] **M** Secret-idol paid boss retry (spec Q3 / decision 25): no build row found; confirm in code, plan + build if missing [U][net]
-- [ ] **S** Confirm `RoomValidatorV2` checks every gimmick state (spec Q5 F7); close or file the gap [U]
+- [x] **S** Confirm `RoomValidatorV2` checks every gimmick state (spec Q5 F7); close or file the gap [U] (rules 6/7/9 loop every gimmick state vector; no gap; dive-bug-sweep)
 - [x] **S** Rewrite `m7-proposal` sections 1 and 4 for the 7-floor dive (triage notes :7) (docs) (`141a79a4`)
-- [ ] **S** DiveBot Tough Seed12345 run: bar needs 2 of 3 seeds finished (triage :67) [U]
+- [x] **S** DiveBot Tough Seed12345 run: bar needs 2 of 3 seeds finished (triage :67) [U] (2026-11-14: finished, 7 floors, 0 fails, 938 s, 7 findings; one seed only, bar is 2 of 3)
 
 ## Ready: bugs and test health
 - [x] **M** BUGS item 1: solo dives unwinnable for the bot (`Reference/qa/playtest/BUGS.md:36`) (folded into PL-1 task 1.2 `SoloLoop_Measure`; closed or re-scoped from its numbers)
-- [ ] **S** BUGS item 18a: gate key dropped inside a wall has no fallback (`BUGS.md:93`) [U][net]
-- [ ] **S** BUGS item 18b: piece spheres uncollectable when haul piece count differs from floor arm count (`BUGS.md:94`); may be stale after plan 3 (`dive-flow/STATUS.md:12`) [U]
+- [x] **S** BUGS item 18a: gate key dropped inside a wall has no fallback (`BUGS.md:93`) [U][net] (fallback already on main `b2438821`; host-path test `CarrierDiesOffTheWalkableCells_KeySettlesOnAWalkableCell_AndCanBePickedUp` added)
+- [x] **S** BUGS item 18b: piece spheres uncollectable when haul piece count differs from floor arm count (`BUGS.md:94`); may be stale after plan 3 (`dive-flow/STATUS.md:12`) [U] (stale: fixed `63e237d9`, test `Pieces_PieceZeroAlreadyHome_EveryRemainingPieceStillGetsASphere`)
 - [ ] **S** `DiveSpineNetworkTests` floor-7 host-hero drift (~2 m/s after Move, unexplained) + `Floor5_RealButtonPushOn` flaked once (`plan5-floor-card/STATUS.md:24-26`) [U]
 - [x] **S** plan5 nits: "Find the gate key" on an opened key floor; pieces line duplicates `StirMeterHud`; follower bots don't split valves (`plan5-floor-card/STATUS.md:27`) [U] (`b76f862b`; follower-bot valve split moved to its own M item)
 - [ ] **M** Co-op follower bots split valves: FollowerBot has no goal pathing; needs nav + a hold loop (plan5-nits STATUS) [U]
