@@ -1,4 +1,4 @@
-State: WAITING ON USER (sheet approval). All of B0's list is built and captured; `check` on afd052ad: build and EditMode PASS (1735), PlayMode stage queued behind another session; marker not yet recorded.
+State: DONE (user approved the B0 sheets 2026-11-14; merged into main, see main's log for the merge commit; check PASS: build, EditMode 1735/1735, PlayMode 255 passed 0 failed 28 skipped, tree d25b5044, marker commit 159a7564 = the STATUS commit above the checked code tip afd052ad)
 Branch: claude/b0-lighting-corner-4098b7
 Task: build-plan row B0 (docs/superpowers/plans/2026-11-13-area1-dungeon1-build.md)
 
@@ -32,5 +32,6 @@ Round 1 -> final. Town Morning Wide 0.32/0.59/0.80 +0.14 -> 0.20/0.50/0.76 +0.22
 Round 2: town 25/25/26/26 (Wide, Mid, Close, Evening), cellar 24/21/19. Final: town 26/26/26/25 (103/160), cellar 23/23/21 (67/120). Town meets the 25/40 target; cellar Close 21 and Wide 23 are under it. Biggest defects: town plaza cobbles flat orange-tan with no stone-to-stone variation or cast structure; cellar brick still pink-salmon with noisy micro-pattern, chunky niche bricks in Close.
 Sun elevation 54/46/38: nearly identical at sheet size; reviewer picks 38 (longest shadows) with 46 second, low confidence; design default 42.
 
-## Open for the user
-Approve or send notes on the sheets. DC5 reading above. APV bake skipped. UndercroftStair.unity changed through the shared cellar builder but was not captured. After approval: approved captures go to Reference/hollowmere/approved_corner/ (town) and a first Cellars row, then sc-merge.
+## Landed
+Approved captures: Reference/hollowmere/approved_corner/ (Corner_*_Morning, Corner_Wide_Evening) and Reference/cellars/approved_corner/ (first Cellars row). Still open from the sheets: DC5 split proposal, APV bake skipped, UndercroftStair.unity not captured, sun elevation left at the design 42 (reviewer favoured 38, then 46), Fab download method recorded in the build plan.
+Archive: ready
