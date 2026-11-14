@@ -126,7 +126,7 @@ namespace SleepingCalamity.Core
         public const int EnemyDropNoItem = 0;     // RollEnemyDrop returns this for "no drop"
 
         // One player's own roll when an enemy dies (a slot 0-3, only for a player who hit it). Returns EnemyDropNoItem (0) or an id of the Items table: never gold, boots or a key (the chests carry those).
-        // dropKey is a per-floor deterministic id of the kill (CellarContentsSync: room * 64 + the room's spawn count), so the same (seed, floor, kill, slot) always rolls the same; its stream
+        // dropKey is a per-floor deterministic id of the kill (CellarContentsSync: room * 1024 + the room's spawn count), so the same (seed, floor, kill, slot) always rolls the same; its stream
         // ("cellars.loot.enemy") touches no other. tier is the enemy's tier: a tier 2 enemy pays one rank more, tier 1 one rank less than the floor's chest rank (placeholder, min 1).
         public static int RollEnemyDrop(uint seed, int floor, int dropKey, int playerSlot, int tier = 1, int rankBonus = 0)
         {

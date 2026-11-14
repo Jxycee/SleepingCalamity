@@ -147,7 +147,7 @@ namespace SleepingCalamity.Presentation
         // ---- per-player enemy drops (host) ----
         // A real death (not a despawn) of a TRACKED enemy gives every player who hit it and is still connected their own roll (CellarLoot.RollEnemyDrop, keyed by the enemy's per-floor DropKey and the
         // player's roster slot) into their own bag. The kill is seen inside Enemy.ServerApplyHit, before CombatHost appends the killing blow to HitLog, so the drop is queued here and paid on the
-        // next host tick. DropKey = room * 64 + the room's spawn count this floor (never reset within a floor, so a respawn after a wipe rolls fresh). The hunter and the pump-wave enemies drop nothing.
+        // next host tick. DropKey = room * 1024 + the room's spawn count this floor (never reset within a floor, so a respawn after a wipe rolls fresh). The hunter and the pump-wave enemies drop nothing.
         public const string DropFullText = "Your bag is full: an enemy drop was lost.";
         public System.Func<int, int, int> EnemyDropRollOverride;   // test seam (host): (player slot, drop key) -> item id, 0 = no drop; null = CellarLoot.RollEnemyDrop
         public int EnemyDropsGiven { get; private set; }            // host only (tests)
@@ -166,7 +166,7 @@ namespace SleepingCalamity.Presentation
             return true;
         }
 
-        private int NextDropKey(int room) { _roomSpawns.TryGetValue(room, out int n); _roomSpawns[room] = n + 1; return room * 64 + (n & 63); }
+        private int NextDropKey(int room) { _roomSpawns.TryGetValue(room, out int n); _roomSpawns[room] = n + 1; return room * 1024 + n; }
         private readonly Dictionary<Enemy, Tracked> _tracked = new Dictionary<Enemy, Tracked>();
         private Enemy _carrierEnemy, _hunter; private bool _hunterSpawned;
         private int _carrierLostRoom = -1;   // the carrier despawned without dying while room-mates lived: its room resets once no tracked enemy is left, so the key stays obtainable
@@ -655,19 +655,22 @@ namespace SleepingCalamity.Presentation
             pos = default; return false;
         }
 
-        // Host: pays the queued enemy deaths (see the per-player enemy drops block). Runs first in HostTick, before a new floor's arm clears the pending list.
+        // Host: pays the queued enemy deaths (see the per-player enemy drops block) on the NEXT HostTick after the kill. It runs first in HostTick, before a new floor's arm clears the pending list,
+        // so a kill in the same frame a new floor arms may lose its drop (production arms from DiveDirector.ContentsTick with AutoArm = false, so that window is one frame wide).
         private void TickDrops()
         {
             if (_drops.Count == 0) return;
             PendingDrop[] due = _drops.ToArray(); _drops.Clear();
             foreach (PendingDrop d in due)
             {
+                int rankBonus = HaulSync != null && HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(d.Floor) : 0;   // same bonus a chest of this floor gets
+                rankBonus = _mods.ChestRankBonus(rankBonus);
                 var seen = new HashSet<string>();
                 foreach (HitRecord h in d.Hits)
                 {
                     if (!seen.Add(h.PlayerId) || HaulSync == null || !HaulSync.TryClientOfPlayerId(h.PlayerId, out ulong cid)) continue;
                     int slot = HaulSync.PlayerSlotOf(cid);
-                    int item = EnemyDropRollOverride != null ? EnemyDropRollOverride(slot, d.Key) : CellarLoot.RollEnemyDrop(d.Seed, d.Floor, d.Key, slot, d.Tier);
+                    int item = EnemyDropRollOverride != null ? EnemyDropRollOverride(slot, d.Key) : CellarLoot.RollEnemyDrop(d.Seed, d.Floor, d.Key, slot, d.Tier, rankBonus);
                     if (item <= 0) continue;
                     PlayerBag bag = HaulSync.ServerBagOf(cid);
                     if (bag == null) continue;
@@ -987,6 +990,7 @@ namespace SleepingCalamity.Presentation
                 _st.Cleared = _clear.ClearedMask; Publish();
                 return;
             }
+            // The live HitLog is kept on purpose, not a copy: CombatHost appends the killing blow AFTER this runs, and TickDrops reads it a tick later.
             if (_layout != null) _drops.Add(new PendingDrop { Hits = e.HitLog, Seed = _layout.Seed, Floor = _layout.Floor, Key = t.DropKey, Tier = e.Tier });
             if (t.Carrier && _st.GateKey == 0) { _st.GateKey = 1; _st.GateKeyPos = SettledKeyPos(e.transform.position); }
             if (t.Guardian) GuardianDefeated?.Invoke(_st.Floor);

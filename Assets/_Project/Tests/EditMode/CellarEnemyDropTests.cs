@@ -68,6 +68,22 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void RankBonus_NeverLowersTheRank_AndDoesNotChangeWhetherItDrops()
+        {
+            int raised = 0;
+            for (int key = 0; key < 400; key++)
+            {
+                int a = CellarLoot.RollEnemyDrop(31u, 3, key, 0, 1, 0), b = CellarLoot.RollEnemyDrop(31u, 3, key, 0, 1, 2);
+                Assert.That(a == CellarLoot.EnemyDropNoItem, Is.EqualTo(b == CellarLoot.EnemyDropNoItem), "the bonus moves the rank, not whether it drops");
+                if (a == 0) continue;
+                Assert.That(CellarLoot.RankOf(b), Is.GreaterThanOrEqualTo(CellarLoot.RankOf(a)));
+                if (CellarLoot.RankOf(b) > CellarLoot.RankOf(a)) raised++;
+                Assert.That(CellarLoot.RollEnemyDrop(31u, 3, key, 0, 1, -3), Is.EqualTo(a), "a negative bonus is ignored");
+            }
+            Assert.That(raised, Is.GreaterThan(0), "premise: the bonus raises some drop");
+        }
+
+        [Test]
         public void DroppedItem_SurvivesBagGoHome_AndTheWorldSaveRoundTrip()
         {
             int drop = 0;
