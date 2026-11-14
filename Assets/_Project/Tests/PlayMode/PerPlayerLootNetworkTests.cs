@@ -718,6 +718,8 @@ namespace SleepingCalamity.Tests.PlayMode
             AppBootstrap app = AppBootstrap.Current;
             yield return PlayModeHarness.StartDirectHostWithoutScenes();
             yield return PlayModeHarness.StartClients(app, 1, false, clients, clientIndex);
+            // The world records its players when they PLAY it (audit A2): with no scene flow here, the start gate does it.
+            Assert.That(app.World.TryStartSession(app.Roster), Is.EqualTo(WorldPlayerVerdict.Ok), "setup: the gate records the connected players");
             NetworkManager hostNm = app.NetworkManager;
             NetworkObject o = hostNm.SpawnManager.InstantiateAndSpawn(Prefab<DiveDirector>(hostNm), hostNm.LocalClientId, false, false, false, Vector3.zero, Quaternion.identity);
             DiveDirector dir = o.GetComponent<DiveDirector>();

@@ -137,6 +137,11 @@ namespace SleepingCalamity.Tests.PlayMode
             public void GetConnectedNames(List<string> into) => into.Clear();
             public bool TryStartSession() => false;
             public WorldPlayerVerdict LastStartVerdict => WorldPlayerVerdict.Ok;
+            public void GetRenameChoices(List<FrontDoorPerson> newcomers, List<FrontDoorPerson> recordedAway) { newcomers.Clear(); recordedAway.Clear(); }
+            public WorldPlayerVerdict RenamePlayer(PlayerKey from, PlayerKey to) => WorldPlayerVerdict.NotRecorded;
+            public void GetStrangers(List<FrontDoorPerson> into) => into.Clear();
+            public bool SendAway(PlayerKey key) => false;
+            public bool WaitsForPlace => false;
         }
 
         // ---- set-up and driving helpers ----
@@ -397,7 +402,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return WaitControl<Label>(door, FrontDoorView.Ids.Player(1), _ => { });
             Assert.That(Find<Button>(door, FrontDoorView.Ids.Start).enabledSelf, Is.False, "Start is off with one player");
 
-            // The second player is already recorded by the host's approver when they connect; the lobby lists them and Start comes on.
+            // The second player is in the host's roster when they connect (the world records them at the start, audit A2); the lobby lists them and Start comes on.
             client = new PlayModeHarness.TestClient(app, PlayModeHarness.PlayerId(5), declineScenes: true);
             var cts = new CancellationTokenSource();
             yield return PlayModeHarness.Await(client.JoinAsync(cts.Token), 20f, cts);
@@ -629,6 +634,59 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => app.FrontDoor.PendingDeleteId == null, StepTimeout, "Escape did not answer the question with no");
             Assert.That(app.FrontDoor.State, Is.EqualTo(FrontDoorState.Worlds), "Escape cancelled the question and did not also leave the screen");
             Assert.That(app.FrontDoor.Rows.Count, Is.EqualTo(1));
+        }
+
+        // Catches (audit A2): the host having no door to let a player go from a multiplayer world - no button per recorded player, no question
+        // before it happens, the question not modal, or the removal not reaching the world file. Drives the real view, model and WorldSaveFlow.
+        [UnityTest]
+        public IEnumerator RemovePlayer_FromTheMultiplayerPicker_AsksFirst_ThenFreesThePlace()
+        {
+            yield return Boot(hollowmere: false);
+
+            // A multiplayer world with two recorded players, as a played world would be.
+            // Ugs identity: that is the list the door's Multiplayer screen shows (KindIdentity), and this test never hosts it.
+            string worldId = app.WorldSaveFlow.CreateWorld(WorldKind.Multiplayer, IdentityKind.Ugs);
+            Assert.That(worldId, Is.Not.Null);
+            WorldSaveStore store = app.WorldSaveFlow.Library.Open(worldId);
+            var players = new WorldPlayersSave { Kind = (int)WorldKind.Multiplayer, Identity = (int)IdentityKind.Ugs };
+            players.Recorded.Add(new WorldPlayerSave { Identity = (int)IdentityKind.Ugs, Id = PlayModeHarness.PlayerId(20), Name = "Ann" });
+            players.Recorded.Add(new WorldPlayerSave { Identity = (int)IdentityKind.Ugs, Id = PlayModeHarness.PlayerId(21), Name = "Bo" });
+            store.Current.Players = players;
+            store.MarkDirty();
+            Assert.That(store.Save(), Is.True);
+
+            yield return Press(door, FrontDoorView.Ids.Multiplayer);
+            yield return WaitState(app.FrontDoor, FrontDoorState.Worlds, "Multiplayer did not open the worlds list");
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.RemovePlayer(1, 2), _ => { });
+            Assert.That(Find<Button>(door, FrontDoorView.Ids.RemovePlayer(1, 2)).text, Does.Contain("Bo"), "the button names the player");
+
+            yield return Press(door, FrontDoorView.Ids.RemovePlayer(1, 2));
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.RemoveCancelButton, _ => { });
+            Assert.That(app.FrontDoor.PendingRemoveWorldId, Is.EqualTo(worldId), "it asks first");
+            yield return WaitLabel(door, FrontDoorView.Ids.RemoveAsk, t => t.Contains("Bo"), "the question naming the player");
+            foreach (string id in new[] { FrontDoorView.Ids.WorldRow(1), FrontDoorView.Ids.RemovePlayer(1, 1), FrontDoorView.Ids.NewWorld, FrontDoorView.Ids.Host })
+                Assert.That(Find<Button>(door, id).enabledSelf, Is.False, id + " must be off while the question is open");
+
+            // No keeps them.
+            yield return Press(door, FrontDoorView.Ids.RemoveCancelButton);
+            yield return PlayModeHarness.WaitUntil(() => app.FrontDoor.PendingRemoveWorldId == null, StepTimeout, "Keep them did not answer the question");
+            Assert.That(ReadPlayerIds(worldId), Has.Count.EqualTo(2), "nobody was removed by the question alone");
+
+            // Yes frees the place, in the file and in the list.
+            yield return Press(door, FrontDoorView.Ids.RemovePlayer(1, 2));
+            yield return WaitControl<Button>(door, FrontDoorView.Ids.RemoveConfirmButton, _ => { });
+            yield return Press(door, FrontDoorView.Ids.RemoveConfirmButton);
+            yield return PlayModeHarness.WaitUntil(() => app.FrontDoor.Rows[0].Players.Count == 1, StepTimeout, "the row still lists the player who was let go");
+            Assert.That(ReadPlayerIds(worldId), Is.EqualTo(new[] { PlayModeHarness.PlayerId(20) }), "the world file keeps the other player only");
+            yield return WaitLabel(door, FrontDoorView.Ids.WorldsNotice, t => t.Contains("Bo"), "the notice saying who was let go");
+        }
+
+        private List<string> ReadPlayerIds(string worldId)
+        {
+            WorldSaveStore store = app.WorldSaveFlow.Library.Open(worldId);
+            var ids = new List<string>();
+            foreach (WorldPlayerSave p in store.Current.Players.Recorded) ids.Add(p.Id);
+            return ids;
         }
 
         // ---- release path ----

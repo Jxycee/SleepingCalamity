@@ -1,6 +1,6 @@
 # Session usage rules
 
-From the working sessions' own usage reviews (2026-10-31: bell tower, bakery and foliage sessions; side notes `usage-waste-answers.md`). Each one names where the spend went. The user paces every 5-hour window at about 0.1-0.15% a minute (weekly allowance must last to the Sunday reset), so waste here stops other work.
+From the working sessions' own usage reviews (2026-10-31: bell tower, bakery and foliage sessions; side notes `usage-waste-answers.md`). Each one names where the spend went. Sessions run until the usage limit and are restarted after the reset: no pace pauses, 5-hour or weekly (user, 2026-11-13; `sc-coordinator` section 4). Only hold back a step that must not be cut off (a merge into `main`, a save migration) when the limit is near. The allowance is still finite, so waste here stops other work.
 
 ## The game comes first
 Process was crowding out the game (2026-11-11 audit): about 2,075 commits in 13 days, the most common topic "handoff" (124), plus queue (36), session request (22) and STATUS (20), and about 40% of spend on session overhead. Bookkeeping exists to keep game work moving; keep it to the minimum that does that.

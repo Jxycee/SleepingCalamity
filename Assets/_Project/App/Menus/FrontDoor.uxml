@@ -19,6 +19,11 @@
                 <ui:Button name="btn-delete-confirm" text="Delete it" focusable="true" class="fd-button" />
                 <ui:Button name="btn-delete-cancel" text="Keep it" focusable="true" class="fd-button" />
             </ui:VisualElement>
+            <ui:VisualElement name="remove-confirm" class="fd-confirm">
+                <ui:Label name="lbl-remove-ask" text="" class="fd-text" />
+                <ui:Button name="btn-remove-confirm" text="Remove them" focusable="true" class="fd-button" />
+                <ui:Button name="btn-remove-cancel" text="Keep them" focusable="true" class="fd-button" />
+            </ui:VisualElement>
             <ui:Label name="lbl-worlds-notice" text="" class="fd-text" />
             <ui:Button name="btn-new-world" text="New world" focusable="true" class="fd-button" />
             <ui:Label name="lbl-new-world-why" text="" class="fd-why" />
@@ -34,6 +39,19 @@
             <ui:Label name="lbl-copy-note" text="" class="fd-why" />
             <ui:Label name="lbl-player-count" text="" class="fd-text" />
             <ui:VisualElement name="player-list" class="fd-list" />
+            <ui:VisualElement name="rename-list" class="fd-list" />
+            <ui:VisualElement name="rename-confirm" class="fd-confirm">
+                <ui:Label name="lbl-rename-ask" text="" class="fd-text" />
+                <ui:Button name="btn-rename-yes" text="Yes, that is them" focusable="true" class="fd-button" />
+                <ui:Button name="btn-rename-no" text="No" focusable="true" class="fd-button" />
+            </ui:VisualElement>
+            <ui:VisualElement name="send-away-list" class="fd-list" />
+            <ui:VisualElement name="send-away-confirm" class="fd-confirm">
+                <ui:Label name="lbl-send-away-ask" text="" class="fd-text" />
+                <ui:Button name="btn-send-away-yes" text="Yes, send them away" focusable="true" class="fd-button" />
+                <ui:Button name="btn-send-away-no" text="No" focusable="true" class="fd-button" />
+            </ui:VisualElement>
+            <ui:Label name="lbl-rename-message" text="" class="fd-why" />
             <ui:Button name="btn-start" text="Start" focusable="true" class="fd-button" />
             <ui:Label name="lbl-start-why" text="" class="fd-why" />
             <ui:Label name="lbl-start-message" text="" class="fd-why" />
@@ -57,6 +75,12 @@
         <ui:VisualElement name="screen-waiting" class="fd-screen">
             <ui:Label name="lbl-waiting" text="" class="fd-heading" />
             <ui:Button name="btn-waiting-leave" text="Leave" focusable="true" class="fd-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="screen-unsaved" class="fd-screen">
+            <ui:Label name="lbl-unsaved-ask" text="" class="fd-heading" />
+            <ui:Button name="btn-unsaved-no" text="Don't play" focusable="true" class="fd-button" />
+            <ui:Button name="btn-unsaved-yes" text="Play anyway" focusable="true" class="fd-button" />
         </ui:VisualElement>
 
         <ui:VisualElement name="screen-ended" class="fd-screen">

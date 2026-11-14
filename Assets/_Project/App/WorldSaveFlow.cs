@@ -108,6 +108,38 @@ namespace SleepingCalamity.App
             return SelectedWorldId;
         }
 
+        // Lets one of a multiplayer world's recorded players go, so one of its four places is free again (the host's own action in the world
+        // picker; audit A2, user decision 2026-11-13). Refused while that world is the one being hosted (its players are live in HostWorld), for
+        // a world that is not there or loads read-only, for a Solo world and for a key that is not recorded (WorldPlayers.Remove).
+        // The player's own weapons and bags stay in the file: nothing reads them while they are not recorded, and adding them back finds them.
+        public bool RemovePlayer(string worldId, PlayerKey key)
+        {
+            if (store != null && store.Current.WorldId == worldId) return false;
+            WorldSaveStore target = Library.Open(worldId);
+            if (target == null || target.IsReadOnly) return false;
+            if (!WorldPlayers.TryRestore(target.Current.Players, out WorldPlayers players, out _)) return false;
+            if (!players.Remove(key)) return false;
+            target.Current.Players = players.ToSave();
+            target.MarkDirty();
+            return target.Save();
+        }
+
+        // Audit A5: false when the world loads read-only (written by a newer build, or its file could not be read), so the front door asks before
+        // starting it. A world that is not there (it would be made new) can be saved.
+        public bool CanSaveWorld(string worldId)
+        {
+            try
+            {
+                WorldSaveStore target = Library.Open(worldId);
+                return target == null || !target.IsReadOnly;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("WorldSaveFlow: could not check whether world " + worldId + " can be saved: " + e.Message);
+                return false;
+            }
+        }
+
         // Sets a world aside (never erases it). Not while it is the world being hosted.
         public bool DeleteWorld(string worldId)
         {

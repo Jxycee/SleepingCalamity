@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using SleepingCalamity.Core;
@@ -54,9 +55,10 @@ namespace SleepingCalamity.Networking
 
                 _ugsIdByClient.Remove(data.ClientId);   // the bridge entry is the approver's to remove
 
-                // Free the Lobby seat, or a rejoin would fail as "full".
+                // Free the Lobby seat, or a rejoin would fail as "full" - but never when this disconnect is a takeover of the same player's
+                // stale connection (audit A1): the rule is Core SeatRules, over every other client this host knows of.
                 var host = _host;
-                if (host != null && !string.IsNullOrEmpty(playerId))
+                if (host != null && SeatRules.ShouldFreeSeat(playerId, data.ClientId, SeatClaims()))
                 {
                     _ = RemoveSeatAsync(host, playerId);
                 }
@@ -68,6 +70,21 @@ namespace SleepingCalamity.Networking
         private void OnJoinApproved(ApprovedJoin join)
         {
             if (_isHost && join.Key.Kind == IdentityKind.Ugs && join.ClientId != NetworkManager.ServerClientId) _ugsIdByClient[join.ClientId] = join.Key.Id;
+        }
+
+        // Every client that holds or is about to hold a seat: the cached service ids (one per approved or connected client) plus the approvals
+        // the bridge still has pending (a client approved in this same tick may not be cached yet). The list is the scratch one; read at once.
+        private List<SeatClaim> SeatClaims()
+        {
+            _seatScratch.Clear();
+            foreach (var cached in _ugsIdByClient) _seatScratch.Add(new SeatClaim(cached.Key, cached.Value));
+            _config.Bridge.GetPending(_pendingScratch);   // clears the list first
+            foreach (var pending in _pendingScratch)
+            {
+                if (pending.Key.Kind != IdentityKind.Ugs || _ugsIdByClient.ContainsKey(pending.ClientId)) continue;
+                _seatScratch.Add(new SeatClaim(pending.ClientId, pending.Key.Id));
+            }
+            return _seatScratch;
         }
 
         private bool TryResolveKey(ulong clientId, out PlayerKey key)

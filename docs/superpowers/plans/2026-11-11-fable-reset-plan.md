@@ -51,13 +51,21 @@ Each Fable run's brief still says it: delegate only to pinned agent types; pass 
 - **Produces:** a findings file with severity and a concrete failure path for each; failing tests for blockers; new rules added to `sc-netcode` / `REVIEW.md`; queue items.
 - **Done when:** every section and system is covered, blockers have a failing test or a written repro.
 
-### Run 2b (pool A leftover, Sat Nov 14): Coordinator playbook
+### Run 2b (pool C, moved 2026-11-13: all-models weekly runs out Saturday): Coordinator playbook
 - **Why (user, 2026-11-12):** every coordinator should start with Fable's knowledge and process, not rebuild it from scattered memories.
 - **Goal:** a new `.claude/skills/sc-coordinator/SKILL.md` (about 1,500 words) that every coordinator reads once on claiming the role; `sc-steward` and the board's `claim` point to it.
 - **Inputs:** the coordinator memories (handoff, focus and usage police, Nov 1 lessons, board watchdog, usage pace), `session-usage.md`, section 6 here, and how recent coordinator sessions actually ran (Haiku scans of their transcripts).
 - **Done when:** the skill is merged, the memories it replaces are trimmed to pointers, and the cost is appended to section 6.
 
-### Run 3 (pool B): Asset factory design
+### Run 3 (pool B, Sun Nov 15): Area 1 and dungeon 1 design (replaces the asset factory here; user, 2026-11-13)
+- **Why (user):** Fable designs Hollowmere (area 1) and the Cellars (dungeon 1) in full, and Sonnet sessions build them to spec. Scans (Megascans) plus Fable's judgement make worlds that are beautiful, engaging and lively.
+- **Goal:** one design doc per place: layout map with play positions and sight lines, light and atmosphere per spot (target URP, not Lumen), prop-by-prop dressing plan naming exact Megascans, items from the user's Fab library (user, 2026-11-13: the spec names them, so only those get downloaded) and our own pieces, ambient life (animals, smoke, cloth, sound), how each dungeon floor reads (landmarks, set pieces), and a build plan split into Sonnet sessions, each with a capture-camera done-check beside the reference row. First build step: a URP lighting test corner.
+- **Builds on, not redoes:** `docs/PHASE1.md` section 3 (style bible), the signed-off dungeon design and `docs/ROOM_METRICS.md`, the floor generator (rooms v2, 7 floors), the Hollowmere already standing, the NieR Replicant cohesion target. A generator change only if the design needs one, with the reason.
+- **Asset search is delegated (user, 2026-11-13):** Fable never browses catalogs itself. Cheap agents search: `general-purpose` with `model: "haiku"` (it has web tools; the pinned `scanner` has none) searches Megascans and Fab per need ("mossy cellar stone wall", "worn cobble", "bakery props"), and reads the user's library list `Reference/private/fab-library-2026-11-13.md`. Each returns a capped shortlist: name, link, format (FBX/glTF/Unity or Unreal-only), licence, texture sizes, preview image URL. One Sonnet implementer downloads the previews into `Reference/private/` and builds contact sheets with `Art/Blender/tools/sc_ab_sheet.py` beside the reference row. Fable judges the sheets, not pages. Launch all searches in one message and write nothing until they are back (Run 1 lesson).
+- **Where:** one local PC session (needs `Reference/private/`, the browser pane for Fab pages, GPU captures; no hybrid).
+- **Done when:** both docs and the build plan are merged and the user has approved them.
+
+### Run 3b (pool C): Asset factory design (moved from Run 3; Megascans and Fab cover much of the need now)
 - **Why:** design once, then Sonnet and your GPU produce assets without Fable from then on.
 - **Goal:** finish the local prop pipeline (`C:\AI\scripts\ai_prop.py`: Hunyuan3D shape + TRELLIS.2 texture) with the missing cleanup stage (decimate, UV, rebake at 2K max, colour fix toward the style bible) and automatic quality checks per asset type (prop, creature, foliage, kit piece).
 - **Delegation:** Sonnet implementers write the Blender cleanup and check scripts; local GPU runs the generation sweeps; Haiku reads the audit output; Fable sets the thresholds and judges the contact sheets.
@@ -87,9 +95,9 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
 | Wed Nov 11 evening | Your go on this plan. Start the hair tool prep (Sonnet). Run 1 |
 | Thu Nov 12 | Review Run 1's plan; Run 2. First Sonnet session from the Run 1 plan |
 | Fri-Sat Nov 13-14 | Run 2 finishes; pool A spent by Saturday night |
-| Sun-Mon Nov 15-16 | Runs 3 and 4 (pool B); PC free for GPU sweeps |
+| Sun-Mon Nov 15-16 | Run 3 (area 1 + dungeon 1 design, local) and Run 4 (pool B); PC free for GPU sweeps |
 | Mon Nov 16 late | Redeem the one-off reset once pool B is spent |
-| Tue-Sun Nov 17-22 | Runs 5 and 6 (pool C) |
+| Tue-Sun Nov 17-22 | Pool C: Run 2b playbook, Run 5 balance, Run 3b asset factory if room, Run 6 reserve |
 | After Nov 22 | About one Fable use a week: the weekly planning session or an escalation |
 
 ## 6. Lessons for the next Fable run
@@ -125,3 +133,35 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
   - Ask every network scan one cross-file question: "which other handlers run on the same event, and what do they free or write". That is where both blockers were.
   - Subagents run in the background here, so eight scans cost eight wake-ups whatever the brief says; fewer, wider scans (four) would have cost less and mapped the same ground.
   - A stop three points away from the measured end (65% against 68%) was luck. Give an audit run a budget with room for its risk review and one `check`.
+
+### 2026-11-13, Run 3: area 1 and dungeon 1 design (`docs/design/area1-hollowmere.md`, `dungeon1-cellars.md`, `area1-dungeon1-needs.md`, `2026-11-13-area1-dungeon1-build.md`)
+- **Cost at the end:** weekly Fable 2% to 37%, weekly all models 3% to 23%, session context 578k tokens. The 5-hour window ran out as the docs were pushed; the review and merge ran after the reset. Interim figures when the docs were written: 5-hour window 19% to 92% in about 2 h 15 min. Weekly all models 3% to 13%. Weekly Fable 2% to 19%. Session context 510k tokens.
+- **Where it went.** Images. About 60 were read at full size (18 concepts at 2400 px, references, 30 contact sheets), which put the context past 500k halfway through, and every later turn re-read it. Eighteen subagent hand-backs (7 scans, 11 searches) each woke Fable on that context.
+- **What worked.**
+  - Seven scans with a word cap, file:line and a "what is missing" list, all launched in one message. The generator and built-town scans were enough to design from.
+  - Looking at the latest captures of the real scenes before designing. They showed gaps no document mentions (the sky, the empty ruin, stone scale).
+  - Searching Megascans by set name ("Historic Medieval Farm", "Historic Bazaar", "Old Mine"): one query lists a whole matching prop family.
+  - One background script for the second search pass (36 needs, no agents, no wake-ups).
+- **What to brief differently.**
+  - Start in a fresh 5-hour window. This run began at 19% and reached 92% before the writing started.
+  - Test the search pipeline on one need before fanning out. `fab_search.py --type` was broken (HTTP 400), so the first pass (11 Haiku agents, about 1M subagent tokens) ran unfiltered and its sheets were mostly noise.
+  - Use style rank for materials only. For objects it ranks scene-like thumbnails first; Fab's relevance order with the type filter, Megascans first, gave usable sheets.
+  - Run searches as one background script, not one agent per need. Agents add wake-ups and no judgement.
+  - Downscale images before Fable reads them (1100 px sheets were enough; concepts at 1280 px would be) and set an image budget in the brief.
+  - Say in the brief that the dungeon is floors 1 to 7 of the Undercroft in code, and that the spec, STORY and the concept sheet disagree on floor themes and on the Dough-warden. The run found this from scans.
+  - Say that downloads need the user's Fab sign-in, so picks can be confirmed but not fetched by the run.
+
+### 2026-11-13, Run 2b: coordinator playbook (`.claude/skills/sc-coordinator/SKILL.md`)
+- **Cost.** Weekly Fable 42% to 47% (5 points). Weekly all models 26% to 29%. 5-hour window 74% to 94% in about 70 minutes, measured before the merge and the memory trim. Account numbers; the coordinator session was also active. Session context ended near 195k tokens.
+- **Where it went.** Three subagents (Haiku repo digest 76k tokens, Haiku transcript search 125k, Sonnet review 54k). Fable read the four short skills, the coordinator memories (about 4,600 words) and about 150 lines of handoff and plan text itself, and wrote one skill of about 2,200 words.
+- **What worked.**
+  - Two scans launched in the first message, with the short files read directly while they ran.
+  - Trims and review fixes applied by one small replace script per round instead of many edits.
+  - The Sonnet review found two real gaps: a handoff step that would stall on a turn that can't start sessions, and unclear wording on the `fixer` exception.
+- **What to brief differently.**
+  - Start in a fresh 5-hour window (the third run to say so). This one began at 74% and reached 94% before the merge.
+  - The transcript search returned snippets, not incidents. The lessons listed in the brief by the outgoing coordinator were worth more. A coordinator should note incidents in the shared notes folder as they happen.
+  - Seven required topics don't fit in 1,500 words. Give the word target or the coverage list priority.
+  - A session can't authorise edits to `CLAUDE.md` or `.claude/rules/`. If a run needs one, the user asks for it directly, or the run leaves the exact line for them.
+  - A playbook for cloud coordinators can't lean on PC-only things (memories, the board, `~/.claude/coordinator/`). Say so in the brief.
+

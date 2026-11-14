@@ -167,11 +167,11 @@ namespace SleepingCalamity.App
             // Order matters: SceneFlow resets the world for the new session before WorldSaveFlow loads the saved one over it.
             sceneFlow = new SceneFlow(session, NetworkManager, bus, Roster, World);
             worldSaveFlow = new WorldSaveFlow(session, NetworkManager, bus, World);
-            spawner = new ArenaPlayerSpawner(NetworkManager, playerPrefab, Roster);
+            spawner = new ArenaPlayerSpawner(NetworkManager, playerPrefab, Roster, World);
 
             // The front door (PL-3): local on every peer, it only asks. Built after SceneFlow, the roster and the world library exist, and subscribed to
             // the session after theirs, so by the time it hears Ended the flow has already saved and gone back to the Lobby.
-            FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster));
+            FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster, World));
             FrontDoorView view = GetComponent<FrontDoorView>();
             if (view != null) view.Bind(FrontDoor, session, input);
             PauseMenu = new PauseMenuModel(session, input, PauseMenuView.QuitGame, () => worldSaveFlow != null && worldSaveFlow.CanSave);

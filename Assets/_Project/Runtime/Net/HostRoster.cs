@@ -104,6 +104,16 @@ namespace SleepingCalamity.Runtime
                         into.Add(string.IsNullOrWhiteSpace(_entries[i].Name) ? "Player " + (slot + 1) : _entries[i].Name);
         }
 
+        // The key and display name of every player connected now, in slot order (the same order as GetConnectedKeys). A blank name reads as "Player N".
+        public void GetConnectedPeople(List<KeyValuePair<PlayerKey, string>> into)
+        {
+            into.Clear();
+            for (int slot = 0; slot < MaxSlots; slot++)
+                for (int i = 0; i < _entries.Count; i++)
+                    if (_entries[i].Slot == slot && _entries[i].Connected)
+                        into.Add(new KeyValuePair<PlayerKey, string>(_entries[i].Key, string.IsNullOrWhiteSpace(_entries[i].Name) ? "Player " + (slot + 1) : _entries[i].Name));
+        }
+
         // An approved join whose client has connected. The slot is the verdict's: a reclaimed or taken-over slot replaces its old entry.
         public void Connect(in ApprovedJoin join)
         {

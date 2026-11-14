@@ -1,6 +1,6 @@
 Title: Audit fixes (resume after usage limit)
 Target: cloud
-Status: started
+Status: done (merged to main 2026-11-13, claude/audit-fixes aa48247a)
 Started: 2026-11-13 16:55 UTC (cloud launcher)
 Model: sonnet
 From: coordinator session 11; the first cloud run stopped on the 5-hour limit at ~8:45 AM CST 2026-11-13

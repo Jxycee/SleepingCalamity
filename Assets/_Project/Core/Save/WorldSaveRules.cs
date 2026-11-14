@@ -96,6 +96,7 @@ namespace SleepingCalamity.Core
             {
                 string name = world.NameOf(key);
                 summary.PlayerNames.Add(string.IsNullOrEmpty(name) ? "?" : name);
+                summary.PlayerKeys.Add(key);
             }
             return summary;
         }

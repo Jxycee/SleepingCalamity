@@ -36,7 +36,6 @@ namespace SleepingCalamity.Tests.EditMode
         // seat by the cached player id.
         // NOT covered: the real NGO kick and timing, and whether the Lobby lets P join twice (needs real Relay: USER_TODO 2-player walk).
         [Test]
-        [Ignore("AUDIT A1: a stale-connection takeover frees the rejoining player's own Lobby seat (docs/superpowers/audits/2026-11-12-save-netcode-audit.md)")]
         public void Takeover_OldClientDisconnect_DoesNotFreeSeatOfSameKey()
         {
             var go = new GameObject("UgsSeatTest");
@@ -66,6 +65,48 @@ namespace SleepingCalamity.Tests.EditMode
                 t.GetMethod("OnConnectionEvent", Inst).Invoke(session, new object[] { nm, data });
 
                 CollectionAssert.DoesNotContain(recorder.Removed, "P", "the old client's disconnect freed the seat of the player who is rejoining");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
+        // Catches: the A1 fix going too far - a player whose only connection drops keeping their Lobby seat, so their own rejoin is refused as
+        // "full" (SeatRules must free the seat when no other connection of theirs is up or approved).
+        // NOT covered: the real NGO and Sessions SDK (the host session is a DispatchProxy stand-in).
+        [Test]
+        public void TheLastConnectionOfAPlayer_Disconnects_FreesTheSeat()
+        {
+            var go = new GameObject("UgsSeatTest");
+            try
+            {
+                NetworkManager nm = go.AddComponent<NetworkManager>();
+                if (nm.NetworkConfig == null) nm.NetworkConfig = new NetworkConfig();
+                var bridge = new JoinApprovalBridge();
+                var settings = new SettingsStore(Path.Combine(Path.GetTempPath(), "sc_ugsseat_test_settings.json")); // never loaded or saved
+                var config = new NetworkSessionConfig(nm, bridge, settings, 1, 77UL, false, new HostRoster(), new HostWorld());
+                var session = new UgsNetworkSession(config);
+                Type t = typeof(UgsNetworkSession);
+
+                FieldInfo hostField = t.GetField("_host", Inst);
+                var create = typeof(DispatchProxy).GetMethod("Create").MakeGenericMethod(hostField.FieldType, typeof(SeatRecorder));
+                object fake = create.Invoke(null, null);
+                var recorder = (SeatRecorder)fake;
+
+                t.GetField("_isHost", Inst).SetValue(session, true);
+                hostField.SetValue(session, fake);
+                var seats = (Dictionary<ulong, string>)t.GetField("_ugsIdByClient", Inst).GetValue(session);
+                seats[1] = "P";
+                seats[2] = "Q";                                                       // another player stays: their seat is not touched
+                bridge.AddApproved(new ApprovedJoin(3, new PlayerKey(IdentityKind.Ugs, "R"), "R", 2, false));
+
+                var data = new ConnectionEventData { EventType = ConnectionEvent.ClientDisconnected, ClientId = 1 };
+                t.GetMethod("OnConnectionEvent", Inst).Invoke(session, new object[] { nm, data });
+
+                CollectionAssert.Contains(recorder.Removed, "P", "the player who left keeps their seat, so their own rejoin would be refused as full");
+                CollectionAssert.DoesNotContain(recorder.Removed, "Q");
+                CollectionAssert.DoesNotContain(recorder.Removed, "R");
             }
             finally
             {

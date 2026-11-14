@@ -1,6 +1,6 @@
 Title: Audit fixes: world players, rejoin, unsaved worlds
 Target: cloud
-Status: started
+Status: done (merged to main 2026-11-13, claude/audit-fixes aa48247a)
 Started: 2026-11-13T13:23:56Z (cloud launcher)
 Model: sonnet
 From: coordinator session 11 on the user's go (2026-11-13, "Cloud")
