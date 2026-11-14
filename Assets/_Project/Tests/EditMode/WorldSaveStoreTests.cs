@@ -494,13 +494,102 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void Bags_OneBadEntry_IsDroppedAlone()
         {
-            string bags = "{ \"players\": [ { \"identity\": 1, \"id\": \"aaa\", \"gold\": 5 }, { \"identity\": 1, \"id\": \"bbb\", \"gold\": \"lots\" }, { \"identity\": 77, \"id\": \"ccc\", \"gold\": 1 } ] }";
+            string bags = "{ \"players\": [ { \"identity\": 1, \"id\": \"aaa\", \"gold\": 5 }, { \"identity\": \"x\", \"id\": \"bbb\", \"gold\": 2 }, { \"identity\": 77, \"id\": \"ccc\", \"gold\": 1 } ] }";
             File.WriteAllText(_path, GoldenV1.Replace("\"players\"", "\"bags\": " + bags + ", \"players\""));
             WorldSaveStore store = Load();
             Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }), "named so the original is kept");
             Assert.That(store.Current.Bags.Players.Select(e => e.Id), Is.EqualTo(new[] { "aaa" }));
             Assert.That(store.Current.Bags.Players[0].Gold, Is.EqualTo(5));
             Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        const string BagsHead = "\"bags\": ";
+
+        static string BagsFile(string playersJson) => GoldenV1.Replace("\"players\"", BagsHead + "{ \"players\": [ " + playersJson + " ] }, \"players\"");
+
+        // Catches: a file written by today's code (WorldSaveStore's own serializer, camelCase, indented) not loading exactly after the bag rows changed. The text is committed as a fixture.
+        const string TodaysBagsJson = @"{
+      ""players"": [
+        {
+          ""identity"": 1,
+          ""id"": ""aaa"",
+          ""gold"": 7,
+          ""stash"": [
+            { ""itemId"": 104, ""count"": 3 },
+            { ""itemId"": 110, ""count"": 1 }
+          ],
+          ""satchel"": {
+            ""floor"": 2,
+            ""items"": [ 110, 111 ]
+          }
+        },
+        { ""identity"": 1, ""id"": ""bbb"", ""gold"": 0, ""stash"": [], ""satchel"": null }
+      ]
+    }";
+
+        [Test]
+        public void Bags_FileWrittenByTodaysCode_StillLoadsExactly()
+        {
+            File.WriteAllText(_path, GoldenV1.Replace("\"players\"", BagsHead + TodaysBagsJson + ", \"players\""));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.Empty);
+            Assert.That(store.Current.Bags.Players.Select(e => e.Id), Is.EqualTo(new[] { "aaa", "bbb" }));
+            PlayerBagSave a = store.Current.Bags.Players[0];
+            Assert.That(a.Gold, Is.EqualTo(7));
+            Assert.That(a.Stash.Select(r => r.ItemId + ":" + r.Count), Is.EqualTo(new[] { "104:3", "110:1" }));
+            Assert.That(a.Satchel.Floor, Is.EqualTo(2)); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110, 111 }));
+        }
+
+        // Catches: one mistyped value inside a bag entry costing the player's whole bag (gold, stash and satchel).
+        [Test]
+        public void Bags_BadGold_KeepsStashAndSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": \"lots\", \"stash\": [ { \"itemId\": 104, \"count\": 2 } ], \"satchel\": { \"floor\": 2, \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }), "named so the original is kept");
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(0));
+            Assert.That(a.Stash.Single().ItemId, Is.EqualTo(104)); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_BadStashRow_KeepsTheOtherRowsGoldAndSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": [ { \"itemId\": 104, \"count\": 2 }, { \"itemId\": 105, \"count\": \"two\" }, { \"itemId\": 106, \"count\": 1 } ], \"satchel\": { \"floor\": 2, \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }));
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9));
+            Assert.That(a.Stash.Select(r => r.ItemId), Is.EqualTo(new[] { 104, 106 }));
+            Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_ScalarStash_KeepsGoldAndSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": 5, \"satchel\": { \"floor\": 2, \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9)); Assert.That(a.Stash, Is.Empty); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_BadSatchelItem_KeepsTheRestOfTheSatchelGoldAndStash()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": [ { \"itemId\": 104, \"count\": 2 } ], \"satchel\": { \"floor\": 2, \"items\": [ 110, \"x\" ] } }"));
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionBags }));
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9)); Assert.That(a.Stash.Single().ItemId, Is.EqualTo(104)); Assert.That(a.Satchel.Items, Is.EqualTo(new[] { 110 }));
+        }
+
+        [Test]
+        public void Bags_BadSatchelFloor_DropsOnlyTheSatchel()
+        {
+            File.WriteAllText(_path, BagsFile("{ \"identity\": 1, \"id\": \"aaa\", \"gold\": 9, \"stash\": [ { \"itemId\": 104, \"count\": 2 } ], \"satchel\": { \"floor\": \"two\", \"items\": [ 110 ] } }"));
+            WorldSaveStore store = Load();
+            PlayerBagSave a = store.Current.Bags.Players.Single();
+            Assert.That(a.Gold, Is.EqualTo(9)); Assert.That(a.Stash.Single().ItemId, Is.EqualTo(104)); Assert.That(a.Satchel, Is.Null);
         }
 
         // Catches: HostWorld dropping the bags section, writing a pristine one into a file that has none, or writing bags of players the world does not record.

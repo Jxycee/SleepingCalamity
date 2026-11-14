@@ -284,6 +284,24 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(PlayerBag.RestoreSuspended(null, new SuspendedBag { Carried = { CellarLoot.BootsId } }).HasBoots, Is.True, "boots carried count after a restore too");
         }
 
+        // Catches: a restored suspend (hand-edited file: the live pickup already refuses a full bag) holding MaxCarried items plus a carried satchel, one more than the cap.
+        // Rule: the carried items keep their slots; a carried satchel that has no slot left stays waiting on its floor (nothing is lost) unless a home satchel already waits there.
+        [Test]
+        public void RestoreSuspended_FullCarriedList_LeavesTheCarriedSatchelWaiting_NeverOverTheCap()
+        {
+            var dive = new SuspendedBag { Identity = 0, Id = "aaaa", CarriedSatchel = new SatchelSave { Floor = 4, Items = { 120, 121 } } };
+            for (int i = 0; i < PlayerBag.MaxCarried; i++) dive.Carried.Add(104);
+            PlayerBag b = PlayerBag.RestoreSuspended(null, dive);
+            Assert.That(b.Carried.Count, Is.EqualTo(PlayerBag.MaxCarried), "no carried item is lost");
+            Assert.That(b.Satchel.Carried, Is.Null, "no slot for it");
+            Assert.That(b.Satchel.Waiting.Floor, Is.EqualTo(4)); Assert.That(b.Satchel.Waiting.Items, Is.EqualTo(new[] { 120, 121 }));
+            Assert.That(b.Carried.Count + (b.Satchel.Carried != null ? 1 : 0), Is.LessThanOrEqualTo(PlayerBag.MaxCarried));
+
+            dive.Carried.RemoveAt(0);   // one slot free: the satchel is carried
+            PlayerBag c = PlayerBag.RestoreSuspended(null, dive);
+            Assert.That(c.Satchel.Carried, Is.Not.Null); Assert.That(c.IsFull, Is.True);
+        }
+
         [Test]
         public void KindOf_TableItemsAreLarge_KeysAreKeys()
         {

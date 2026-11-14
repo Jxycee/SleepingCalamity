@@ -100,6 +100,24 @@ namespace SleepingCalamity.Runtime
             ("suspend", "presentIds", typeof(List<string>)),
         };
 
+        // Parts inside a record-array element (section key, array key, member path, type): a part that does not fit is dropped alone, so one mistyped value costs that part, not
+        // the element. A dropped identity or id leaves an element WorldSaveRules cleans away (BagsSaveRules.Clean); a dropped gold, stash or satchel leaves its default.
+        static readonly (string section, string array, string member, Type type)[] ElementMemberSections =
+        {
+            ("bags", "players", "identity", typeof(int)),
+            ("bags", "players", "id", typeof(string)),
+            ("bags", "players", "gold", typeof(int)),
+            ("bags", "players", "stash", typeof(List<LootCountSave>)),
+            ("bags", "players", "satchel", typeof(SatchelSave)),
+        };
+
+        // Lists inside a record-array element, checked item by item (same keys, then the list's path inside the element): a bad row goes alone, the other rows stay.
+        static readonly (string section, string array, string path, Type element)[] ElementListSections =
+        {
+            ("bags", "players", "stash", typeof(LootCountSave)),
+            ("bags", "players", "satchel.items", typeof(int)),
+        };
+
         public WorldSaveStore(string filePath, ulong defaultSeed)
         {
             _defaultSeed = defaultSeed;
@@ -273,6 +291,37 @@ namespace SleepingCalamity.Runtime
             return any;
         }
 
+        // Inside one array element: bad rows of its registered lists go first, then its registered parts that still do not fit. True when anything went.
+        private static bool DropMisfitElementParts(JObject item, string sectionKey, string arrayKey, string label, List<string> droppedInto)
+        {
+            bool any = false;
+            foreach ((string sectionName, string array, string path, Type elementType) in ElementListSections)
+            {
+                if (!string.Equals(sectionName, sectionKey, StringComparison.OrdinalIgnoreCase) || !string.Equals(array, arrayKey, StringComparison.OrdinalIgnoreCase)) continue;
+                JObject owner = item;
+                string[] parts = path.Split('.');
+                for (int k = 0; k < parts.Length - 1 && owner != null; k++) owner = owner.Property(parts[k], StringComparison.OrdinalIgnoreCase)?.Value as JObject;
+                if (!(owner?.Property(parts[parts.Length - 1], StringComparison.OrdinalIgnoreCase)?.Value is JArray rows)) continue;
+                for (int r = rows.Count - 1; r >= 0; r--)
+                {
+                    if (Fits(rows[r], elementType)) continue;
+                    rows.RemoveAt(r);
+                    droppedInto.Add(label + "." + path + "[" + r + "]");
+                    any = true;
+                }
+            }
+            foreach ((string sectionName, string array, string member, Type type) in ElementMemberSections)
+            {
+                if (!string.Equals(sectionName, sectionKey, StringComparison.OrdinalIgnoreCase) || !string.Equals(array, arrayKey, StringComparison.OrdinalIgnoreCase)) continue;
+                JProperty property = item.Property(member, StringComparison.OrdinalIgnoreCase);
+                if (property == null || property.Value.Type == JTokenType.Null || Fits(property.Value, type)) continue;
+                property.Remove();
+                droppedInto.Add(label + "." + member);
+                any = true;
+            }
+            return any;
+        }
+
         // Removes the array elements of a registered record array whose JSON does not fit the element type. True when any went.
         private static bool DropMisfitRecords(JObject section, string sectionKey, List<string> droppedInto)
         {
@@ -283,6 +332,7 @@ namespace SleepingCalamity.Runtime
                 if (!(section.Property(arrayKey, StringComparison.OrdinalIgnoreCase)?.Value is JArray array)) continue;
                 for (int i = array.Count - 1; i >= 0; i--)
                 {
+                    if (array[i] is JObject item && DropMisfitElementParts(item, sectionKey, arrayKey, sectionKey + "." + arrayKey + "[" + i + "]", droppedInto)) any = true;
                     if (Fits(array[i], element)) continue;
                     array.RemoveAt(i);
                     droppedInto.Add(sectionKey + "." + arrayKey + "[" + i + "]");
