@@ -156,8 +156,10 @@ namespace SleepingCalamity.App
                 WorldSummary w = listed[i];
                 bool selected = w.Id == flow.SelectedWorldId;
                 GUILayout.BeginHorizontal();
-                string label = (selected ? "> " : "  ") + "World " + (i + 1) + "  [" + string.Join(", ", w.PlayerNames) + "]  " + ShortTime(w.LastPlayedUtc);
-                if (GUILayout.Button(label, GUILayout.Width(340))) flow.Select(w.Id);
+                string label = w.Damaged
+                    ? "  World " + (i + 1) + "  [damaged: cannot be opened]"   // audit A6: it can be set aside, never selected
+                    : (selected ? "> " : "  ") + "World " + (i + 1) + "  [" + string.Join(", ", w.PlayerNames) + "]  " + ShortTime(w.LastPlayedUtc);
+                if (GUILayout.Button(label, GUILayout.Width(340)) && !w.Damaged) flow.Select(w.Id);
                 if (GUILayout.Button("Delete", GUILayout.Width(70)))
                 {
                     status = flow.DeleteWorld(w.Id) ? "World set aside." : "Could not delete that world.";
@@ -166,9 +168,11 @@ namespace SleepingCalamity.App
                 GUILayout.EndHorizontal();
             }
 
-            bool room = listed.Count < WorldSummary.MaxPerList;
+            int readable = 0;
+            foreach (WorldSummary w in listed) if (!w.Damaged) readable++;   // a damaged world takes no place
+            bool room = readable < WorldSummary.MaxPerList;
             GUI.enabled = room;
-            if (GUILayout.Button("New world (" + listed.Count + "/" + WorldSummary.MaxPerList + ")"))
+            if (GUILayout.Button("New world (" + readable + "/" + WorldSummary.MaxPerList + ")"))
             {
                 status = flow.CreateWorld(tab, PickerIdentity) != null ? "World created and selected." : "That list is full.";
                 listDirty = true;

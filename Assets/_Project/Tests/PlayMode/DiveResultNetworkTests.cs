@@ -267,6 +267,29 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => client.Bag.View.SatchelWaiting, Timeout, "the owner's own view never showed the waiting satchel the card talks about");
         }
 
+        // Audit A8: the end of a dive asks for a world save at once. Without it the last file on disk is the mid-dive capture (up to 10 s old: bags still as carried, dive.inDive true) and a power
+        // cut right after the result card appears reloads the dive as failed. Catches: EndDive not calling HostWorld.RequestSave, or asking before the dive's end state is in place (the save would
+        // capture the dive still running). NOT covered: the bytes WorldSaveFlow then writes (SaveFlowTests and the TownStock capture tests own those); only the request and its timing are checked,
+        // on the abandon path (finish, fail and go-home end through the same EndDive).
+        [UnityTest]
+        public IEnumerator EndDive_RequestsWorldSave()
+        {
+            var rig = new Rig();
+            yield return Start(rig, 0);
+            yield return StartDive(rig);
+            Assert.That(rig.Director.NetActive.Value, Is.True, "premise: the dive is running");
+            int saves = 0; bool diveStillActiveAtSave = false;
+            System.Action onSave = () => { saves++; if (rig.Director.NetActive.Value) diveStillActiveAtSave = true; };
+            rig.App.World.SaveRequested += onSave;
+            try
+            {
+                Assert.That(rig.Director.ServerAbandonDive(), Is.True);
+                Assert.That(saves, Is.GreaterThanOrEqualTo(1), "ending the dive asked the world to save at once");
+                Assert.That(diveStillActiveAtSave, Is.False, "the save was asked after the dive's end state was in place");
+            }
+            finally { rig.App.World.SaveRequested -= onSave; }
+        }
+
         [UnityTest]
         public IEnumerator Card_Dismisses_OnInteract()
         {

@@ -1020,5 +1020,78 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(host.Town.Suspend.ExtraSlotOwner, Is.EqualTo("Local:new"));
             Assert.That(host.Town.Dive.ExtraSlotOwner, Is.EqualTo("Local:new"));
         }
+
+        // ---- audit A9: the save-file gaps ----
+
+        // Catches: a damaged .bak (a crash mid-rotation, a bad disk block) beside a good main file costing the world, reading as a reset, or the next
+        // save not replacing it with the last good main (the only copy the world would then have).
+        [Test]
+        public void CorruptBak_BesideAGoodMain_IsHarmless_AndTheNextSaveRefillsIt()
+        {
+            File.WriteAllText(_path, GoldenV1);
+            File.WriteAllText(_path + ".bak", "{ \"schemaVersion\": 1, \"players\": {{{ damaged");
+            WorldSaveStore store = Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main), "the main file is read, the .bak is not even looked at");
+            Assert.That(store.Rejected, Is.Empty);
+            Assert.That(store.IsReadOnly, Is.False);
+            Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2));
+
+            store.MarkDirty();
+            Assert.That(store.Save(), Is.True);
+            Assert.That(File.ReadAllText(_path + ".bak"), Does.Contain("\"aaa\""), "the save rotated the good main over the damaged .bak");
+            File.Delete(_path);
+            WorldSaveStore fromBak = Load();
+            Assert.That(fromBak.LoadedFrom, Is.EqualTo(MetaLoadSource.Backup), "so a lost main now loads the good copy");
+            Assert.That(fromBak.Current.Players.Recorded.Count, Is.EqualTo(2));
+        }
+
+        // The fixed id the golden file is written under (a world's id is its file name).
+        const string GoldenWorldId = "0123456789abcdef0123456789abcdef";
+
+        // The file as written today by a world that holds every section: players with names, weapons, stock, a placed frame, residents, a dive in progress
+        // with its depth table, per-player bags and the bank-room suspend. A fixture file, never regenerated to make a test pass: GoldenV1Full.json in
+        // Fixtures/ is a world written by this build's store (first save of a full world, then loaded and saved again, which changed nothing).
+        static string GoldenV1Full() => File.ReadAllText(Path.Combine(UnityEngine.Application.dataPath, "_Project/Tests/EditMode/Fixtures/GoldenV1Full.json")).Replace("\r\n", "\n").TrimEnd();
+
+        // Catches (audit A9): a build that can no longer read a world with all of today's sections (the existing golden has only players), drops or alters
+        // one on the way through the file, or starts writing the sections differently (then the pinned text must be re-pinned on purpose, with a migration
+        // if an old file stops loading). It also fails when a section is added to WorldSave without being added to the fixture.
+        [Test]
+        public void GoldenV1Full_LoadsEverySection_AndSavesBackTheSameText()
+        {
+            string path = Path.Combine(_dir, GoldenWorldId + ".json");   // a world's id is its file name
+            File.WriteAllText(path, GoldenV1Full());
+            var store = new WorldSaveStore(path, DefaultSeed);
+            store.Load();
+            Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main));
+            Assert.That(store.Rejected, Is.Empty, "no section was dropped");
+            Assert.That(store.IsReadOnly, Is.False);
+
+            WorldSave w = store.Current;
+            foreach (System.Reflection.FieldInfo f in typeof(WorldSave).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                if (f.Name == nameof(WorldSave.Extra) || f.FieldType == typeof(int)) continue;
+                object value = f.GetValue(w);
+                Assert.That(value, Is.Not.Null, "the golden file has no value for " + f.Name + " (a new section needs adding to GoldenV1Full.json)");
+                if (value is string s) Assert.That(s, Is.Not.Empty, f.Name);
+            }
+            Assert.That(w.WorldId, Is.EqualTo(GoldenWorldId));
+            Assert.That(w.Players.Recorded.Select(p => p.Name), Is.EqualTo(new[] { "Ann", "Bob" }));
+            Assert.That(w.Weapons.Weapons.Single().OwnerId, Is.EqualTo("aaa"));
+            Assert.That(w.Weapons.Heroes.Single().Abilities.Unlocked, Is.EqualTo(new[] { "axe_quake" }));
+            Assert.That(w.Stock.Pieces, Is.EqualTo(new[] { 101, 300, 301 }));
+            Assert.That(w.Town.Buildings.Single().BuildingId, Is.EqualTo("bakery"));
+            Assert.That(w.Residents.Residents.Single().FirstMeetBeat, Is.True);
+            Assert.That(w.Dive.InDive, Is.True);
+            Assert.That(w.Dive.CheckpointHeld, Is.True);
+            Assert.That(w.Bags.Players.Single().Gold, Is.EqualTo(7));
+            Assert.That(w.Suspend.Floor, Is.EqualTo(5));
+            Assert.That(w.Suspend.Seed, Is.EqualTo(uint.MaxValue));
+            Assert.That(w.Suspend.Bags[0].OpenedChests, Is.EqualTo((1UL << 63) | 5UL));
+
+            store.MarkDirty();
+            Assert.That(store.Save(), Is.True);
+            Assert.That(File.ReadAllText(path).Replace("\r\n", "\n").TrimEnd(), Is.EqualTo(GoldenV1Full()), "the file is written back exactly as pinned");
+        }
     }
 }

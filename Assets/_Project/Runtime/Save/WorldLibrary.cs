@@ -43,8 +43,9 @@ namespace SleepingCalamity.Runtime
 
         public string PathOf(string worldId) => Path.Combine(_directory, worldId + ".json");
 
-        // The worlds of one kind and identity kind, most recently played first. A file that cannot be read is skipped (its own load would
-        // handle it: .bak, .corrupt); so is one that is not a world (no players section).
+        // The worlds of one kind and identity kind, most recently played first. A world file that neither loads nor has a usable .bak, or whose players
+        // section is unusable, is listed as Damaged (audit A6; its kind is unknown, so every list shows it, after the readable ones): the picker can offer
+        // to set it aside, and no start ever opens another world in its place.
         public List<WorldSummary> List(WorldKind kind, IdentityKind identity)
         {
             var list = new List<WorldSummary>();
@@ -60,7 +61,16 @@ namespace SleepingCalamity.Runtime
             return list;
         }
 
-        public bool HasRoom(WorldKind kind, IdentityKind identity) => List(kind, identity).Count < WorldSummary.MaxPerList;
+        // A damaged world takes no place: it is in every list and could never be played.
+        public bool HasRoom(WorldKind kind, IdentityKind identity)
+        {
+            int readable = 0;
+            foreach (WorldSummary w in List(kind, identity)) if (!w.Damaged) readable++;
+            return readable < WorldSummary.MaxPerList;
+        }
+
+        // True when a world of this id has a file (or a .bak) on disk, readable or not.
+        public bool Exists(string worldId) => WorldIds.IsValid(worldId) && (File.Exists(PathOf(worldId)) || File.Exists(PathOf(worldId) + AtomicFile.BackupSuffix));
 
         // Makes a new empty world of the kind and identity kind and returns its (loaded, saved) store; null when that list is full (10).
         public WorldSaveStore Create(WorldKind kind, IdentityKind identity, ulong seed)
@@ -143,15 +153,20 @@ namespace SleepingCalamity.Runtime
             }
         }
 
-        // The header of one world file, read the way the world itself loads (so a repaired file lists too). Null when it is not a world.
+        // The header of one world file, read the way the world itself loads (so a repaired file lists too). A file that is not a usable world (neither it
+        // nor its .bak could be read, or its players section is unusable) comes back as a Damaged summary, never null.
         private static WorldSummary Read(string path, string id)
         {
             var store = new WorldSaveStore(path, 0UL);
             store.Load();
-            if (store.LoadedFrom == MetaLoadSource.Defaults) return null;   // neither the file nor its .bak could be read
-            WorldSave save = store.Current;
-            save.WorldId = id;
-            return WorldSaveRules.Summarize(save);
+            WorldSummary summary = null;
+            if (store.LoadedFrom != MetaLoadSource.Defaults)
+            {
+                WorldSave save = store.Current;
+                save.WorldId = id;
+                summary = WorldSaveRules.Summarize(save);
+            }
+            return summary ?? new WorldSummary { Id = id, Damaged = true };
         }
 
         private static string Now() => DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);

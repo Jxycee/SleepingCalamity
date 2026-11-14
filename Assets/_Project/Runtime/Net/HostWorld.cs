@@ -118,6 +118,9 @@ namespace SleepingCalamity.Runtime
         private TownSnapshot _town = new TownSnapshot();
         private ITownSource _townSource;
 
+        // Test seam: runs (once) at the start of the next LoadTown, so a test can make the town load throw. Null in the game.
+        internal static Action LoadTownFaultForTests;
+
         // The sections as last loaded or captured: separate copies, never the file's own objects. Sections an older save lacks are null.
         public TownSnapshot Town => _town;
 
@@ -129,6 +132,9 @@ namespace SleepingCalamity.Runtime
         // world means the old world's town must not write into it.
         public void LoadTown(WorldSave saved)
         {
+            Action fault = LoadTownFaultForTests;   // a test makes the next load throw once (audit A7/A11: the save flow must survive it)
+            LoadTownFaultForTests = null;
+            fault?.Invoke();
             _townSource = null;
             _town = saved == null ? new TownSnapshot()
                 : TownSaveRules.CleanSnapshot(new TownSnapshot { Stock = saved.Stock, Town = saved.Town, Residents = saved.Residents, Dive = saved.Dive, Bags = saved.Bags, Suspend = saved.Suspend }, null);

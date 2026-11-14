@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "savedAtUtc": "2026-11-14T10:00:00Z",
+  "worldSeed": "00000000F15F15F1",
+  "worldId": "0123456789abcdef0123456789abcdef",
+  "createdAtUtc": "2026-11-01T09:00:00Z",
+  "weapons": {
+    "weapons": [
+      {
+        "key": "aaa/axe",
+        "ownerId": "aaa",
+        "definitionId": "axe",
+        "level": 2,
+        "abs": 0.0,
+        "atk": 26.0,
+        "fire": 0.0,
+        "pest": 0.0,
+        "lifetimeLevels": 2,
+        "buildUpsEver": 0,
+        "fitted": [],
+        "history": []
+      }
+    ],
+    "heroes": [
+      {
+        "ownerId": "aaa",
+        "abilities": {
+          "unlocked": [
+            "axe_quake"
+          ]
+        },
+        "pips": {
+          "cap": 3,
+          "current": 3,
+          "hitProgress": 0
+        }
+      }
+    ]
+  },
+  "stock": {
+    "pieces": [
+      101,
+      300,
+      301
+    ],
+    "residents": [],
+    "loot": []
+  },
+  "town": {
+    "buildings": [
+      {
+        "buildingId": "bakery",
+        "foundationId": "F02",
+        "turn": 1,
+        "parts": [
+          100,
+          -1,
+          -1,
+          -1
+        ],
+        "resident": null
+      }
+    ]
+  },
+  "residents": {
+    "residents": [
+      {
+        "id": "baker",
+        "firstMeetBeat": true
+      }
+    ]
+  },
+  "dive": {
+    "inDive": true,
+    "clearedMask": 3,
+    "checkpointReached": false,
+    "bankedPieces": [],
+    "bankedResidents": [],
+    "bankedLoot": [],
+    "onFloorPieces": [
+      200,
+      201
+    ],
+    "onFloorResidents": [
+      "baker"
+    ],
+    "checkpointHeld": true,
+    "bossBeaten": false,
+    "pieceDepths": [
+      {
+        "id": 200,
+        "floor": 2
+      }
+    ],
+    "extraSlotOwner": "Ugs:aaa",
+    "knownPieces": [
+      100,
+      101,
+      200,
+      201,
+      300,
+      301
+    ],
+    "knownResidents": [
+      "baker"
+    ]
+  },
+  "players": {
+    "kind": 1,
+    "identity": 1,
+    "recorded": [
+      {
+        "identity": 1,
+        "id": "aaa",
+        "name": "Ann"
+      },
+      {
+        "identity": 1,
+        "id": "bbb",
+        "name": "Bob"
+      }
+    ]
+  },
+  "bags": {
+    "players": [
+      {
+        "identity": 1,
+        "id": "aaa",
+        "gold": 7,
+        "stash": [
+          {
+            "itemId": 104,
+            "count": 3
+          }
+        ],
+        "satchel": {
+          "floor": 2,
+          "items": [
+            110,
+            111
+          ]
+        }
+      }
+    ]
+  },
+  "suspend": {
+    "seed": 4294967295,
+    "floor": 5,
+    "phase": 2,
+    "bankChosen": false,
+    "startedAtBank": true,
+    "clearedMask": 31,
+    "extraSlotOwner": "Ugs:bbb",
+    "stir": {
+      "floorMask": 15,
+      "valuables": 6,
+      "valuablesBaseline": 2,
+      "secondHalf": true,
+      "extraEnemy": true,
+      "hunter": true,
+      "collapseUsed": true,
+      "running": true,
+      "secondsLeft": 41.5,
+      "rewardCarry": 12.25
+    },
+    "momentum": {
+      "unbroken": true,
+      "pushedOn": false,
+      "walkedToBank": true
+    },
+    "retry": {
+      "usedThisDive": true,
+      "idolActivated": true
+    },
+    "presentIds": [
+      "Ugs:aaa",
+      "Ugs:bbb"
+    ],
+    "bags": [
+      {
+        "identity": 1,
+        "id": "aaa",
+        "carried": [
+          104,
+          105
+        ],
+        "bankedThisDive": [
+          {
+            "itemId": 101,
+            "count": 2
+          }
+        ],
+        "diveGold": 17,
+        "openedChests": 9223372036854775813,
+        "chestSeed": 4294967295,
+        "chestFloor": 3,
+        "carriedSatchel": {
+          "floor": 3,
+          "items": [
+            106
+          ]
+        },
+        "picks": [
+          1,
+          -1
+        ]
+      },
+      {
+        "identity": 1,
+        "id": "bbb",
+        "carried": [
+          110
+        ],
+        "bankedThisDive": [],
+        "diveGold": 0,
+        "openedChests": 0,
+        "chestSeed": 0,
+        "chestFloor": 0,
+        "carriedSatchel": null,
+        "picks": []
+      }
+    ]
+  }
+}
