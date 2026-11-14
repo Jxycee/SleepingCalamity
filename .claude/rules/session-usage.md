@@ -10,7 +10,7 @@ Process was crowding out the game (2026-11-11 audit): about 2,075 commits in 13 
 - Tooling, skills and process work stays at about one session in five unless it unblocks game work (`sc-steward`).
 
 ## Sessions and agents (about 40% of the spend)
-- One job (one batch, above) per fresh session. A finished session sets `Archive: ready` and stops; it never takes an unrelated next job (the coordinator starts a new session).
+- One job (one batch, above) per fresh session. A finished session sets `Archive: ready` and stops; it never takes an unrelated next job (the coordinator starts a new session). Exception (user, 2026-11-14): the coordinator may `/clear` a finished session and give it the next job when staying on the same worktree makes more sense (`sc-coordinator` section 2, "Size").
 - The session's own turns plan, score and merge. Generators, render loops, Unity runs and fixes go to Sonnet subagents (`model: sonnet`) from the first step; scans, logs and mechanical edits go to Haiku (`model: haiku`). Don't do art loops in the controller (exception: hero-character art loops, which run in an Opus session).
 - One fresh subagent per distinct step (build, capture, check) with a short brief. Send review findings for that step back to the same implementer (`sc-delegate`), but don't resume a large finished agent for new work: every resume re-reads its whole transcript. Stop an agent as soon as it reports.
 - In every new worktree run `git lfs checkout` first: a fresh worktree holds LFS pointer stubs and the first Unity run fails on texture import (cost the Q12 baseline run).
