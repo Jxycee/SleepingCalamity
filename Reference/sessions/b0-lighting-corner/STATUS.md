@@ -1,4 +1,4 @@
-State: BLOCKED (Fab EULA: the pane is signed in to Fab but the Fab End User License Agreement must be accepted by the user once; T01, C01, C02, C15 wait on it. Poly Haven K01 fetched, builders in progress)
+State: WAITING ON USER (sheet approval). All of B0's list is built and captured; `check` on afd052ad: build and EditMode PASS (1735), PlayMode stage queued behind another session; marker not yet recorded.
 Branch: claude/b0-lighting-corner-4098b7
 Task: build-plan row B0 (docs/superpowers/plans/2026-11-13-area1-dungeon1-build.md)
 
@@ -18,4 +18,19 @@ Task: build-plan row B0 (docs/superpowers/plans/2026-11-13-area1-dungeon1-build.
 | C8 combat room | 0.11 | 0.36 | 0.65 | +0.42 |
 
 DC5 reading (proposal, decided only when the user chooses): no concept reaches p10 0.12, so neither band fits as written. Lit rooms (C3, C7, C8): p50 0.35-0.40, p90 0.65-0.78 (the brighter band) with p10 0.06-0.11. Corridors and dark rooms (C1, C2, C4, C5, C6): p50 0.14-0.24 (PHASE1's darker band). Proposed split: lit rooms floors 1-5 take brighter p50/p90 with p10 0.06-0.11; corridors, floors 6-7 and rolled dark floors take the darker band. Town: H1 warmth +0.07 sits below the +0.12 band; H2/H3 inside it.
-Archive: no
+
+
+## Built (branch claude/b0-lighting-corner-4098b7, tip afd052ad)
+Town: Morning and Evening presets (HDRI sky K01 turned to the sun, Exponential fog 0.0048/0.006 from the horizon, cloud-shadow cookie 220 m on the BeautyCorner sun, post per table), sun-elevation capture 54/46/38, T01 cobbles. Cellar: C01 brick on vault, C02 floor, lamp recipe and warm ambient/post, wet patch, C15 sconce. Sky ambient is AmbientMode.Skybox; the APV bake was NOT done (proof file dropped by the builder, no determinism evidence): raise with the user.
+Art rounds used: 3 (round-1 numbers below, then deeper town shadows and brighter cellar, then cookie fix, tan brick, dark-iron sconce, contrast cobbles).
+Fab download method (Epic Launcher, settings Texture Set + Mid, vault path) is in the build plan "Fab download method".
+
+## Palette (value p10/p50/p90, warmth)
+Round 1 -> final. Town Morning Wide 0.32/0.59/0.80 +0.14 -> 0.20/0.50/0.76 +0.22; Mid 0.24/0.53/0.81 -> 0.14/0.42/0.78; Close 0.25/0.67/0.83 -> 0.14/0.61/0.80; Evening Wide 0.33/0.53/0.81 +0.07 -> 0.27/0.43/0.86 +0.19. Cellar Wide 0.09/0.12/0.38 +0.21 -> 0.10/0.27/0.68 +0.29; Mid 0.09/0.11/0.40 -> 0.10/0.24/0.63 +0.28; Close 0.10/0.23/0.73 -> 0.13/0.34/0.87 +0.29. Town p90 stays 0.76-0.78 (cream walls cap it).
+
+## Scores (/40, reviewer, rubric; user reads about 8-10 higher)
+Round 2: town 25/25/26/26 (Wide, Mid, Close, Evening), cellar 24/21/19. Final: town 26/26/26/25 (103/160), cellar 23/23/21 (67/120). Town meets the 25/40 target; cellar Close 21 and Wide 23 are under it. Biggest defects: town plaza cobbles flat orange-tan with no stone-to-stone variation or cast structure; cellar brick still pink-salmon with noisy micro-pattern, chunky niche bricks in Close.
+Sun elevation 54/46/38: nearly identical at sheet size; reviewer picks 38 (longest shadows) with 46 second, low confidence; design default 42.
+
+## Open for the user
+Approve or send notes on the sheets. DC5 reading above. APV bake skipped. UndercroftStair.unity changed through the shared cellar builder but was not captured. After approval: approved captures go to Reference/hollowmere/approved_corner/ (town) and a first Cellars row, then sc-merge.
