@@ -69,10 +69,10 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 
 ## Ready: save and netcode audit (2026-11-12, `docs/superpowers/audits/2026-11-12-save-netcode-audit.md`; each item names its finding and proposed test there)
 - [x] **S** A1 (blocker, done 2026-11-13, merge of claude/audit-fixes): a stale-connection takeover must not free the rejoining player's own Lobby seat (`UgsNetworkSession.NgoEvents.cs:48-62`, `ConnectionApprover.cs:182-202`); turn the `AUDIT A1` ignored test or repro into a passing test [U][net]
-- [ ] **S** A4: host tick that spawns a hero for any connected client without one in a gameplay scene (`ArenaPlayerSpawner.cs:47-71`); closes N7 [U][net]
-- [ ] **S** A8: `DiveDirector.EndDive` asks for a world save (`DiveDirector.cs:469-488`) [U][net]
-- [ ] **M** A6 + A7 + A11 world-open hardening: a damaged world lists as damaged; no fallback to another world when one was selected; a guarded `WorldSaveFlow.Open` that clears `HostWorld` and toasts on a fault; `store` set only after the loads [U][net]
-- [ ] **M** A9 + save test gaps (takeover PlayMode test done 2026-11-13; the rest still open): PlayMode takeover test (a third NetworkManager with the first client's key); a failed write stays dirty and succeeds on the next flush; a corrupt `.bak` beside a good main; a golden file holding every section as written today [U][net]
+- [x] **S** A4: host tick that spawns a hero for any connected client without one in a gameplay scene (`ArenaPlayerSpawner.cs:47-71`); closes N7 [U][net]
+- [x] **S** A8: `DiveDirector.EndDive` asks for a world save (`DiveDirector.cs:469-488`) [U][net]
+- [x] **M** A6 + A7 + A11 world-open hardening: a damaged world lists as damaged; no fallback to another world when one was selected; a guarded `WorldSaveFlow.Open` that clears `HostWorld` and toasts on a fault; `store` set only after the loads [U][net]
+- [x] **M** A9 + save test gaps (takeover PlayMode test done 2026-11-13; the rest still open): PlayMode takeover test (a third NetworkManager with the first client's key); a failed write stays dirty and succeeds on the next flush; a corrupt `.bak` beside a good main; a golden file holding every section as written today [U][net]
 - [ ] **S** N1 + N2: member rows for the list members of weapons, bags, stock, town and residents (`WorldSaveStore.cs:77-101`); a test that pins the migration contract (a step sets `schemaVersion`) [U][net]
 - [ ] **M** Network test gaps: client-driven `CastServerRpc`, `ParryServerRpc`, `ReviveHoldServerRpc`, `RequestFinishRpc`, `SetGhostRpc`; late join for enemies, opened chests, room state and the healing point; a drop while downed, mid-revive and during a floor change; host drop seen from a client mid-dive [U][net]
 - [ ] **S** Audit follow-up: the stranger's own front door cannot show the waiting words for a full world's lobby; no host-to-guest channel, `FrontDoorHost.WaitsForPlace` is false in real play [net]

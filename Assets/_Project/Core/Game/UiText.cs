@@ -13,7 +13,7 @@ namespace SleepingCalamity.Core
         // plus WorldSaveFlow's "world.library_full" (arg: the WorldKind name) and "save.world_read_only" / "save.world_load_failed".
         public static readonly string[] PublishedToastKeys =
         {
-            "world.library_full", "save.world_read_only", "save.world_load_failed",
+            "world.library_full", "save.world_read_only", "save.world_load_failed", "save.world_damaged",
             "world.need_two_players", "world.not_a_player", "world.wrong_kind", "world.solo_alone", "world.too_many_players", "world.world_full", "world.start_refused",
             "err.host_left", "err.rejected", "err.sent_away", "err.wrong_world", "err.timeout", "err.session_full", "err.joins_closed", "err.version",
             "err.code_not_found", "err.services", "err.network", "err.generic",
@@ -30,6 +30,8 @@ namespace SleepingCalamity.Core
                     return "This world was saved by a newer version of the game. You can play it, but your progress will not be saved.";
                 case "save.world_load_failed":
                     return "This world's save file could not be read, so it is open read-only. Your progress will not be saved.";
+                case "save.world_damaged":
+                    return "The world you picked cannot be opened: its save file is damaged or missing. No other world was opened in its place. Pick another world, or set this one aside.";
 
                 case "world.need_two_players": return "A multiplayer world needs at least 2 of its players connected to start. Wait for a friend to join.";
                 case "world.not_a_player": return "Someone connected is not a player of this world. Only the players a world has recorded can play it.";

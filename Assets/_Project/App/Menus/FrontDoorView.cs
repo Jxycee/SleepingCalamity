@@ -446,7 +446,7 @@ namespace SleepingCalamity.App
             var signature = new StringBuilder();
             foreach (FrontDoorWorldRow row in model.Rows)
             {
-                signature.Append(row.Id).Append('|').Append(row.Selected).Append('|').Append(row.LastPlayed).Append('|').Append(string.Join(",", row.PlayerNames));
+                signature.Append(row.Id).Append('|').Append(row.Selected).Append('|').Append(row.Damaged).Append('|').Append(row.LastPlayed).Append('|').Append(string.Join(",", row.PlayerNames));
                 if (row.Players != null) foreach (FrontDoorPlayerRow p in row.Players) signature.Append('|').Append(p.Key.Id);   // a player let go must rebuild the row
                 signature.Append(';');
             }
@@ -531,6 +531,7 @@ namespace SleepingCalamity.App
                 line.AddToClassList("fd-world-row");
 
                 string who = row.PlayerNames == null || row.PlayerNames.Count == 0 ? "" : string.Join(", ", row.PlayerNames);
+                if (row.Damaged) who = "Damaged: its save file cannot be read. It cannot be opened; Delete sets it aside.";   // audit A6
                 string label = row.Title + (row.Selected ? "  (selected)" : "") + (who.Length > 0 || row.LastPlayed.Length > 0 ? "\n" + who + (who.Length > 0 && row.LastPlayed.Length > 0 ? "   " : "") + row.LastPlayed : "");
                 var select = new Button(() => model?.SelectWorld(id)) { name = Ids.WorldRow(number), text = label, focusable = true };
                 select.AddToClassList("fd-button");
