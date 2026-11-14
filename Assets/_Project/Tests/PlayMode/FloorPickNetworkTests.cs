@@ -122,7 +122,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => rig.Peer.PickFloor != UndercroftPlan.BankFloor, Timeout, "the Lock press never cycled the client's pick");
 
             // The host starts a dive (spends the checkpoint), then the dive ends with the checkpoint held again.
-            rig.Host.RequestStartDive(3);
+            Assert.That(rig.Host.ServerStartDive(3), Is.True, "the host starts on floor 3");
             yield return PlayModeHarness.WaitUntil(() => rig.Host.NetActive.Value && rig.Peer.NetActive.Value && rig.Host.FloorSync != null && rig.Host.FloorSync.BuiltFloor == 3, Timeout, "the dive never started on both peers");
             yield return TownInputRig.Seconds(0.3f);   // the peer's own Update sees the dive running
             rig.Host.TestHoldCheckpoint(true);

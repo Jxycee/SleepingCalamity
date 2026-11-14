@@ -645,7 +645,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.PromptText, Is.EqualTo("Go down the Undercroft"), "no checkpoint: one floor, no list");
             rig.Host.TestHoldCheckpoint(true);
             yield return PlayModeHarness.WaitUntil(() => rig.Host.NetCheckpointHeld.Value && rig.Host.PromptText.Contains("pickable: 1, 2, 3, 4, 5"), Timeout, "the prompt never listed the pickable floors: " + rig.Host.PromptText);
-            Assert.That(rig.Host.PromptText, Does.Contain("start on floor 1"));
+            Assert.That(rig.Host.PromptText, Does.Contain("start on floor 5"));
             Assert.That(DiveDirector.HubPromptText(true, rig.Host.PickableFloors(), 3), Does.Contain("start on floor 3"));
         }
 
