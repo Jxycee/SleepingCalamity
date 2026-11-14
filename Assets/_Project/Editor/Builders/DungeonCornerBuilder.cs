@@ -31,7 +31,7 @@ namespace SleepingCalamity.EditorTools
         // piece -> LookTest source material and linear tint (the generator's tile_mat tint). Add a row when the controller sees "no material for slot".
         static readonly (string Slot, string Source, Color Tint)[] Slots =
         {
-            ("CV_Brick", "old_brick", new Color(0.98f, 1.04f, 1.0f)), ("CV_VaultStone", "vault_stone", new Color(0.93f, 0.91f, 0.88f)),
+            ("CV_Brick", "old_brick", new Color(0.70f, 1.0f, 0.84f)), ("CV_VaultStone", "vault_stone", new Color(0.74f, 0.97f, 0.82f)),   // round 3: the C01 scan reads pink-red, pulled to warm tan/ochre
             ("CV_Limewash", "limewash", new Color(1.06f, 1.0f, 0.94f)), ("CV_Flagstone", "flagstone", new Color(1.0f, 0.95f, 0.9f)),
             ("CV_BarrelOak", "barrel_oak", new Color(1.1f, 1.0f, 0.9f)), ("CV_Soot", "soot_coal", new Color(1.1f, 1.05f, 1.0f)),
             ("CV_RootBark", "root_bark", new Color(2.0f, 1.65f, 1.25f)), ("CV_Oak", "oak_timber", new Color(0.85f, 0.74f, 0.62f)),
@@ -158,8 +158,8 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             // Floor 1 (Cellars design section 3): ambient top #3a2c26 to bottom #2a1c18, warm umber, no blue-green. Intensity 0.23 as tuned before (sRGB values, passed as they are).
-            RenderSettings.ambientSkyColor = new Color(0.227f, 0.173f, 0.149f); RenderSettings.ambientEquatorColor = new Color(0.196f, 0.141f, 0.122f);
-            RenderSettings.ambientGroundColor = new Color(0.165f, 0.110f, 0.094f); RenderSettings.ambientIntensity = 0.40f;   // round 2: wide/mid p50 was 0.12 against 0.22-0.30
+            RenderSettings.ambientSkyColor = new Color(0.25f, 0.20f, 0.16f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.17f, 0.13f);   // round 3: a little less red
+            RenderSettings.ambientGroundColor = new Color(0.18f, 0.13f, 0.10f); RenderSettings.ambientIntensity = 0.85f;   // round 2: 0.40 (wide/mid p50 was 0.12); round 3: mid and close still dark
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
@@ -213,6 +213,9 @@ namespace SleepingCalamity.EditorTools
                 foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
                 foreach (var fs in FabSlots)
                     if (fs.Slot == s.Slot) { B0Fab.TexSet set = B0Fab.Megascans(fs.Folder, fs.Prefix); if (set != null) B0Fab.Apply(m, set, fs.Tiles); }
+                // round 3: the scans' normals read as melted plaster / chunky bricks at full strength
+                float bumpMul = s.Slot == "CV_Brick" || s.Slot == "CV_VaultStone" ? 0.55f : s.Slot == "CV_Limewash" ? 0.5f : 1f;
+                if (bumpMul != 1f && m.HasProperty("_BumpScale")) m.SetFloat("_BumpScale", m.GetFloat("_BumpScale") * bumpMul);
                 float peak = Mathf.Max(1f, Mathf.Max(s.Tint.r, Mathf.Max(s.Tint.g, s.Tint.b)));
                 m.SetColor("_BaseColor", new Color(s.Tint.r / peak, s.Tint.g / peak, s.Tint.b / peak, 1f).gamma);
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);   // same bytes with and without graphics
@@ -254,7 +257,7 @@ namespace SleepingCalamity.EditorTools
         {
             LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
             Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(0.35f); c.contrast.Override(48f); c.saturation.Override(-22f);
+            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(0.70f); c.contrast.Override(40f);   // round 3: 0.35 / 48, Mid and Close read too dark c.saturation.Override(-22f);
             ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.86f, 0.82f, 0.80f, 0f));   // grey-brown shadow fill, pushed down
             WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(-3f); w.tint.Override(12f);
             LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(1.0f, 0.97f, 0.97f, 0.0f));
@@ -264,7 +267,7 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- lanterns, candles, lights
         // Lamp recipe (Cellars design section 6): gold #d6a24a at the flame (sRGB, as entered), the floor-1 candle tint #F2D58A for candles, pools 5 to 6 m across (range 5.5).
         static readonly Color Gold = new Color(0.839f, 0.635f, 0.290f), CandleTint = new Color(0.949f, 0.835f, 0.541f);
-        const float LanternIntensity = 12f, LanternRange = 8.5f;   // round 2: wider, brighter pools
+        const float LanternIntensity = 15f, LanternRange = 8.5f;   // round 2: wider, brighter pools
 
         // hook position + the direction the wall lies in (the hook plate sits 0.1 m that way)
         static readonly (Vector3 Hook, Vector3 Side)[] RoomHooks =
@@ -377,7 +380,7 @@ namespace SleepingCalamity.EditorTools
             obj.transform.position += new Vector3(wallTarget.x - b.min.x, wallTarget.y - b.center.y, wallTarget.z - b.center.z);
             b = Measure();
             Debug.Log("SC B0 sconce raw extents=" + raw.size.ToString("F3") + " scale=" + sc.ToString("F4") + " placed centre=" + b.center.ToString("F2") + " size=" + b.size.ToString("F2") + " depthIsX=" + depthIsX);
-            LookTestBuilder.AddLight(lighting, "SconceLight", LightType.Point, new Vector3(b.max.x + 0.1f, b.center.y + 0.05f, b.center.z), Quaternion.identity, Gold, 3.5f, 4.5f, LightShadows.Soft);
+            LookTestBuilder.AddLight(lighting, "SconceLight", LightType.Point, new Vector3(b.max.x + 0.28f, b.center.y + 0.08f, b.center.z), Quaternion.identity, Gold, 5f, 4.5f, LightShadows.Soft);
             return true;
         }
 

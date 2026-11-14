@@ -73,6 +73,9 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.EnsureFolder(MaterialsFolder);
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_T01_Cobble.mat", Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found"));
             Apply(m, s, 1f);
+            // round 3: the cobbles read flat grey-pink under the hazy sky ambient: stronger relief and AO, a warmer albedo
+            m.SetFloat("_BumpScale", 1.6f); m.SetFloat("_OcclusionStrength", 1f);
+            Color warm = new Color(1.0f, 0.90f, 0.76f, 1f); m.SetColor("_BaseColor", warm); m.SetColor("_Color", warm);
             AssetDatabase.SaveAssetIfDirty(m);
             return m;
         }
@@ -108,9 +111,9 @@ namespace SleepingCalamity.EditorTools
             BeautyCornerArt.ImportTexture(nr, srgb: false, normal: true, alphaTransparency: false);
             GameObject model = BeautyCornerArt.LoadModel(SconceFolder, "Wall_Sconce.fbx");
             Material m2 = LookTestBuilder.Ensure(MaterialsFolder + "/M_C15_Sconce.mat", Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found"));
-            m2.SetColor("_BaseColor", Color.white); m2.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(bc));
+            m2.SetColor("_BaseColor", new Color(0.50f, 0.46f, 0.42f)); m2.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(bc));
             m2.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>(nr)); m2.SetFloat("_BumpScale", 1f); m2.EnableKeyword("_NORMALMAP");
-            m2.SetTexture("_MetallicGlossMap", AssetDatabase.LoadAssetAtPath<Texture2D>(ms)); m2.SetFloat("_Metallic", 1f); m2.SetFloat("_Smoothness", 1f); m2.EnableKeyword("_METALLICSPECGLOSSMAP");
+            m2.SetTexture("_MetallicGlossMap", AssetDatabase.LoadAssetAtPath<Texture2D>(ms)); m2.SetFloat("_Metallic", 0.8f); m2.SetFloat("_Smoothness", 0.55f); m2.EnableKeyword("_METALLICSPECGLOSSMAP");   // round 3: dark iron, not a blown-out mirror plate
             EditorUtility.SetDirty(m2); AssetDatabase.SaveAssetIfDirty(m2);
             mat = m2;
             return model;

@@ -389,11 +389,11 @@ namespace SleepingCalamity.EditorTools
                 case Preset.Evening:
                     bool morning = preset == Preset.Morning;
                     rot = morning ? MorningSun : EveningSun;
-                    sun.color = morning ? new Color(1.00f, 0.91f, 0.83f) : new Color(1.00f, 0.72f, 0.48f); sun.intensity = morning ? 4.8f : 5.2f;   // round 2: Morning sun/ambient ratio up, Evening sun stronger for p90
+                    sun.color = morning ? new Color(1.00f, 0.91f, 0.83f) : new Color(1.00f, 0.72f, 0.48f); sun.intensity = morning ? 5.8f : 5.2f;   // round 2: Morning sun/ambient ratio up, Evening sun stronger for p90
                     RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = morning ? 0.0048f : 0.006f;   // plain exponential: the square stays crisp, the far end softens
                     B0Fab.SkyInfo info = B0Fab.ProbeSky(morning ? MorningSkyFile : EveningSkyFile);
                     RenderSettings.fogColor = B0Fab.HorizonFog(info, morning ? MorningFogStart : EveningFogStart);
-                    RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox; RenderSettings.ambientIntensity = morning ? 0.7f : 0.65f;   // the sky is the fill (no APV bake, see the B0 report)
+                    RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox; RenderSettings.ambientIntensity = morning ? 0.40f : 0.65f;   // the sky is the fill (no APV bake, see the B0 report)
                     SetCloudShadows(sun, AssetDatabase.LoadAssetAtPath<Texture2D>(B0Fab.TexRoot + "Sky/CloudCookie_" + (morning ? "Morning" : "Evening") + ".png"), 220f);
                     break;
                 default: throw new System.ArgumentOutOfRangeException(nameof(preset), preset, null);
@@ -421,8 +421,11 @@ namespace SleepingCalamity.EditorTools
         }
 
         // The cloud-shadow cookie on the sun: a tiling map, tileMetres across, at the capture's fixed offset (CloudShadowDrift moves it in play). Null clears it.
+        // Midday and LowSun pass null: they leave the sun's cookie alone (the town keeps its own T_HM_CloudGust_Cookie); a CloudCookie_* left by Morning/Evening is cleared.
         static void SetCloudShadows(Light sun, Texture2D cookie, float tileMetres)
         {
+            bool ours = sun.cookie != null && sun.cookie.name.StartsWith("CloudCookie_");
+            if (cookie == null && !ours) return;
             sun.cookie = cookie;
             UniversalAdditionalLightData data = sun.GetUniversalAdditionalLightData();
             data.lightCookieSize = cookie != null ? new Vector2(tileMetres, tileMetres) : Vector2.one;
