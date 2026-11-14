@@ -23,6 +23,9 @@ namespace SleepingCalamity.EditorTools
         const int Cap = 2048;
         static readonly HashSet<string> Skip = new HashSet<string> { "T01", "T01b", "T01c", "T03", "T15a", "T15b", "C01", "C02", "C15" };
         static readonly HashSet<string> Plants = new HashSet<string> { "T12a", "T12b", "T12c", "T12d", "T12e" };
+        // Props whose source is far off real size: the prefab is scaled so the LOD0 bounds are this tall (m).
+        static readonly Dictionary<string, float> TargetHeight = new Dictionary<string, float> { { "T11b", 1.5f } };
+        const string L04Pick = "Composition_7";
         static readonly float[] LodHeights = { 0.5f, 0.2f, 0.05f };
 
         [MenuItem("SleepingCalamity/Art/Adopt Town Intake (B1)")]
@@ -89,6 +92,22 @@ namespace SleepingCalamity.EditorTools
                     g.name = plant ? "LOD" + i : "Model";
                     g.transform.SetParent(rootGo.transform, false);
                     inst.Add(g);
+                }
+                if (code == "L04")
+                {
+                    // The FBX is a layout sheet of ~64 pots on a grid: keep one pot (plain instance, not a prefab link, so the others can go).
+                    var single = UnityEngine.Object.Instantiate(models[0]); single.name = "Model";
+                    single.transform.SetParent(rootGo.transform, false);
+                    UnityEngine.Object.DestroyImmediate(inst[0]);
+                    inst[0] = single;
+                    var all = single.GetComponentsInChildren<Renderer>(true).ToList();
+                    if (!all.Any(r => r.name == L04Pick)) throw new InvalidOperationException("L04 part not found: " + L04Pick);
+                    foreach (var r in all) if (r != null && r.name != L04Pick) UnityEngine.Object.DestroyImmediate(r.gameObject);
+                }
+                if (TargetHeight.TryGetValue(code, out float th))
+                {
+                    float k = th / BoundsOf(inst[0]).size.y;
+                    foreach (var g in inst) g.transform.localScale = Vector3.one * k;
                 }
                 Bounds b = BoundsOf(inst[0]);
                 Vector3 off = new Vector3(-b.center.x, -b.min.y, -b.center.z);
@@ -200,7 +219,7 @@ namespace SleepingCalamity.EditorTools
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found");
             Material m = LookTestBuilder.Ensure(MatFolder + "/M_" + code + ".mat", lit);
             m.SetColor("_BaseColor", Color.white); m.SetColor("_Color", Color.white);
-            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo));
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo)); m.SetTexture("_MainTex", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo));
             m.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>(normal)); m.SetFloat("_BumpScale", 1f); m.EnableKeyword("_NORMALMAP");
             m.SetTexture("_MetallicGlossMap", AssetDatabase.LoadAssetAtPath<Texture2D>(ms)); m.SetFloat("_Metallic", 1f); m.SetFloat("_Smoothness", 1f); m.EnableKeyword("_METALLICSPECGLOSSMAP");
             if (ao != null) { m.SetTexture("_OcclusionMap", AssetDatabase.LoadAssetAtPath<Texture2D>(occ)); m.SetFloat("_OcclusionStrength", 1f); m.EnableKeyword("_OCCLUSIONMAP"); }
@@ -208,6 +227,7 @@ namespace SleepingCalamity.EditorTools
             {
                 m.SetFloat("_AlphaClip", 1f); m.SetFloat("_Cutoff", 0.5f); m.EnableKeyword("_ALPHATEST_ON");
                 m.SetFloat("_Cull", 0f); m.SetOverrideTag("RenderType", "TransparentCutout"); m.renderQueue = 2450;
+                m.SetFloat("_AlphaToMask", 1f); m.doubleSidedGI = true;
             }
             EditorUtility.SetDirty(m); AssetDatabase.SaveAssetIfDirty(m);
             return m;
