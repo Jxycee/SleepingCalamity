@@ -159,7 +159,7 @@ namespace SleepingCalamity.EditorTools
             RenderSettings.ambientMode = AmbientMode.Trilight;
             // Floor 1 (Cellars design section 3): ambient top #3a2c26 to bottom #2a1c18, warm umber, no blue-green. Intensity 0.23 as tuned before (sRGB values, passed as they are).
             RenderSettings.ambientSkyColor = new Color(0.227f, 0.173f, 0.149f); RenderSettings.ambientEquatorColor = new Color(0.196f, 0.141f, 0.122f);
-            RenderSettings.ambientGroundColor = new Color(0.165f, 0.110f, 0.094f); RenderSettings.ambientIntensity = 0.23f;
+            RenderSettings.ambientGroundColor = new Color(0.165f, 0.110f, 0.094f); RenderSettings.ambientIntensity = 0.40f;   // round 2: wide/mid p50 was 0.12 against 0.22-0.30
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
@@ -264,7 +264,7 @@ namespace SleepingCalamity.EditorTools
         // --------------------------------------------------------------------------------------------- lanterns, candles, lights
         // Lamp recipe (Cellars design section 6): gold #d6a24a at the flame (sRGB, as entered), the floor-1 candle tint #F2D58A for candles, pools 5 to 6 m across (range 5.5).
         static readonly Color Gold = new Color(0.839f, 0.635f, 0.290f), CandleTint = new Color(0.949f, 0.835f, 0.541f);
-        const float LanternIntensity = 5.0f, LanternRange = 5.5f;
+        const float LanternIntensity = 12f, LanternRange = 8.5f;   // round 2: wider, brighter pools
 
         // hook position + the direction the wall lies in (the hook plate sits 0.1 m that way)
         static readonly (Vector3 Hook, Vector3 Side)[] RoomHooks =

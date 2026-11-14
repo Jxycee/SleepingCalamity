@@ -100,8 +100,8 @@ namespace SleepingCalamity.EditorTools
             });
             // B0 states. Post per the design table: Neutral, contrast 20, saturation 0, shadows tinted toward #2f3a44 (its hue at 30%: the colour itself would crush them),
             // bloom 0.25 / threshold 1.0, vignette 0.18; exposure -0.3 and white balance +6 (Morning), exposure -0.2, white balance +14 and bloom 0.35 (Evening).
-            Vector4 shadowTint = new Vector4(Mathf.Lerp(1f, 0.69f, 0.3f), Mathf.Lerp(1f, 0.85f, 0.3f), 1f, 0f);
-            foreach (var st in new[] { (MorningProfileName, -0.3f, 6f, 0.25f), (EveningProfileName, -0.2f, 14f, 0.35f) })
+            Vector4 shadowTint = new Vector4(Mathf.Lerp(1f, 0.69f, 0.5f), Mathf.Lerp(1f, 0.85f, 0.5f), 1f, -0.15f);   // round 2: deeper shadow side
+            foreach (var st in new[] { (MorningProfileName, -0.45f, 8f, 0.25f), (EveningProfileName, -0.05f, 34f, 0.35f) })
                 LookTestBuilder.EnsureProfile(st.Item1, p =>
                 {
                     LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
@@ -389,11 +389,11 @@ namespace SleepingCalamity.EditorTools
                 case Preset.Evening:
                     bool morning = preset == Preset.Morning;
                     rot = morning ? MorningSun : EveningSun;
-                    sun.color = morning ? new Color(1.00f, 0.91f, 0.83f) : new Color(1.00f, 0.72f, 0.48f); sun.intensity = morning ? 4.5f : 3.2f;
+                    sun.color = morning ? new Color(1.00f, 0.91f, 0.83f) : new Color(1.00f, 0.72f, 0.48f); sun.intensity = morning ? 4.8f : 5.2f;   // round 2: Morning sun/ambient ratio up, Evening sun stronger for p90
                     RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = morning ? 0.0048f : 0.006f;   // plain exponential: the square stays crisp, the far end softens
                     B0Fab.SkyInfo info = B0Fab.ProbeSky(morning ? MorningSkyFile : EveningSkyFile);
                     RenderSettings.fogColor = B0Fab.HorizonFog(info, morning ? MorningFogStart : EveningFogStart);
-                    RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox; RenderSettings.ambientIntensity = 1f;   // the sky is the fill (no APV bake, see the B0 report)
+                    RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox; RenderSettings.ambientIntensity = morning ? 0.7f : 0.65f;   // the sky is the fill (no APV bake, see the B0 report)
                     SetCloudShadows(sun, AssetDatabase.LoadAssetAtPath<Texture2D>(B0Fab.TexRoot + "Sky/CloudCookie_" + (morning ? "Morning" : "Evening") + ".png"), 220f);
                     break;
                 default: throw new System.ArgumentOutOfRangeException(nameof(preset), preset, null);
