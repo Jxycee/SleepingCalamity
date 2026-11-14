@@ -75,13 +75,23 @@ namespace SleepingCalamity.EditorTools
             SkyThickness = 1.0f, SkyExposure = 1.0f, SkyTint = new Color(0.5f, 0.45f, 0.5f),
         };
 
-        public static Look For(BeautyCornerBuilder.Preset preset) => preset == BeautyCornerBuilder.Preset.Midday ? Midday : LowSun;
+        // The town has two looks. Morning and Evening are the B0 corner states (BeautyCornerBuilder) and reach the town in B3: until then they throw, instead of silently taking LowSun's.
+        public static Look For(BeautyCornerBuilder.Preset preset)
+        {
+            switch (preset)
+            {
+                case BeautyCornerBuilder.Preset.Midday: return Midday;
+                case BeautyCornerBuilder.Preset.LowSun: return LowSun;
+                default: throw new System.ArgumentOutOfRangeException(nameof(preset), preset, "HollowmereLook has no town look for this preset yet (B3)");
+            }
+        }
 
         public static void Apply(BeautyCornerBuilder.Preset preset) => Apply(preset, For(preset));
 
         // The corner's preset first (sun, fill, ambient colours, lamps), then the town's profile, sky, haze and ambient scale on the open scene.
         public static void Apply(BeautyCornerBuilder.Preset preset, Look look)
         {
+            For(preset);   // throws for a preset the town has no look for
             BeautyCornerBuilder.ApplyPreset(preset);
             bool day = preset == BeautyCornerBuilder.Preset.Midday;
             VolumeProfile profile = EnsureProfile(day ? DayProfileName : LowSunProfileName, day ? BeautyCornerBuilder.ProfileName : BeautyCornerBuilder.LowSunProfileName, look);

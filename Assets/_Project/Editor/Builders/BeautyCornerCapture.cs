@@ -46,6 +46,8 @@ namespace SleepingCalamity.EditorTools
             {
                 Debug.Log("SC CAPTURE pipeline=" + GraphicsSettings.currentRenderPipeline.name);
                 EditorSceneManager.OpenScene(BeautyCornerBuilder.ScenePath, OpenSceneMode.Single);
+                string b0 = System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN");
+                if (b0 == "Morning" || b0 == "Evening" || b0 == "Elev" || b0 == "B0") { CaptureB0(dir, b0); return; }
                 BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
                 foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -64,6 +66,41 @@ namespace SleepingCalamity.EditorTools
                 QualitySettings.renderPipeline = savedQuality;
                 LookTestCapture.CleanProbes();
             }
+            Debug.Log("SC CAPTURE DONE " + dir);
+        }
+
+        // The B0 lighting-test captures (Hollowmere design section 4), chosen by SC_CAPTURE_SUN and narrowed by SC_CAPTURE_ONLY (camera names containing one of the comma-separated words):
+        //   Morning: every camera at Morning -> Corner_<Wide|Mid|Close>_Morning.png     Evening: Cap_Corner_Wide at Evening -> Corner_Wide_Evening.png
+        //   Elev: Cap_Corner_Wide at the Morning colour with the sun at 54, 46 and 38 degrees -> Corner_Wide_Elev54/46/38.png     B0: all three.
+        // The default (SC_CAPTURE_SUN unset, Midday or LowSun) is the unchanged approved-corner run above.
+        static void CaptureB0(string dir, string mode)
+        {
+            string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");
+            string[] words = string.IsNullOrEmpty(only) ? null : only.Split(',');
+            bool Pick(Camera c) { if (words == null) return true; foreach (string w in words) if (c.name.Contains(w.Trim())) return true; return false; }
+            Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            System.Array.Sort(cams, (a, b) => string.CompareOrdinal(a.name, b.name));
+            bool all = mode == "B0";
+            void Probes() { foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe); }
+            SimulatePollen();
+            LookTestCapture.WarmUp(cams);
+            if (all || mode == "Morning")
+            {
+                BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Morning); Probes(); BeautyCornerBuilder.LogSkySunCheck(BeautyCornerBuilder.Preset.Morning);
+                foreach (Camera cam in cams) if (cam.name.StartsWith("Cap_Corner_") && Pick(cam)) LookTestCapture.Save(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_Morning.png"));
+            }
+            if (all || mode == "Elev")
+                foreach (int el in new[] { 54, 46, 38 })
+                {
+                    BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Morning); BeautyCornerBuilder.SetSunElevation(el); Probes();
+                    foreach (Camera cam in cams) if (cam.name == "Cap_Corner_Wide" && Pick(cam)) LookTestCapture.Save(cam, Path.Combine(dir, "Corner_Wide_Elev" + el + ".png"));
+                }
+            if (all || mode == "Evening")
+            {
+                BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Evening); Probes(); BeautyCornerBuilder.LogSkySunCheck(BeautyCornerBuilder.Preset.Evening);
+                foreach (Camera cam in cams) if (cam.name == "Cap_Corner_Wide" && Pick(cam)) LookTestCapture.Save(cam, Path.Combine(dir, "Corner_Wide_Evening.png"));
+            }
+            BeautyCornerBuilder.ApplyPreset(BeautyCornerBuilder.Preset.Midday);
             Debug.Log("SC CAPTURE DONE " + dir);
         }
 

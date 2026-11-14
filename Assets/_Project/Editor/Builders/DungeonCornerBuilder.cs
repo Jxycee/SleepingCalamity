@@ -31,12 +31,20 @@ namespace SleepingCalamity.EditorTools
         // piece -> LookTest source material and linear tint (the generator's tile_mat tint). Add a row when the controller sees "no material for slot".
         static readonly (string Slot, string Source, Color Tint)[] Slots =
         {
-            ("CV_Brick", "old_brick", new Color(0.98f, 1.04f, 1.0f)), ("CV_VaultStone", "vault_stone", new Color(0.93f, 0.91f, 0.88f)),
+            ("CV_Brick", "old_brick", new Color(0.70f, 1.0f, 0.84f)), ("CV_VaultStone", "vault_stone", new Color(0.74f, 0.97f, 0.82f)),   // round 3: the C01 scan reads pink-red, pulled to warm tan/ochre
             ("CV_Limewash", "limewash", new Color(1.06f, 1.0f, 0.94f)), ("CV_Flagstone", "flagstone", new Color(1.0f, 0.95f, 0.9f)),
             ("CV_BarrelOak", "barrel_oak", new Color(1.1f, 1.0f, 0.9f)), ("CV_Soot", "soot_coal", new Color(1.1f, 1.05f, 1.0f)),
             ("CV_RootBark", "root_bark", new Color(2.0f, 1.65f, 1.25f)), ("CV_Oak", "oak_timber", new Color(0.85f, 0.74f, 0.62f)),
             ("CV_Iron", "iron", new Color(0.62f, 0.58f, 0.55f)), ("CV_Mortar", "vault_stone", new Color(0.22f, 0.19f, 0.16f)),
             ("CV_Clay", "limewash", new Color(1.05f, 0.58f, 0.34f)),
+        };
+
+        // B0: the Quixel sets that replace a LookTest tileable on a slot, with the repeats per UV unit. The kit's UVs are metres / 2 (one repeat = 2 m, checked by LogUvDensity),
+        // so a 2 m scan (C02 Stone Floor) takes 1 and a 1.8 m scan (C01 Old Brick Wall) takes 2 / 1.8 = 1.111, which keeps both at their scanned 1024 px/m.
+        static readonly (string Slot, string Folder, string Prefix, float Tiles)[] FabSlots =
+        {
+            ("CV_Brick", "C01_old_brick_wall", "C01_brick", 2f / 1.8f), ("CV_VaultStone", "C01_old_brick_wall", "C01_brick", 2f / 1.8f),
+            ("CV_Flagstone", "C02_stone_floor", "C02_floor", 1f),
         };
 
         // flat slots: linear colour, smoothness = 1 - roughness
@@ -82,7 +90,8 @@ namespace SleepingCalamity.EditorTools
         {
             Scene scene = NewRoomScene();
             var root = new GameObject("DungeonCorner_Cellars").transform;
-            BuildRoom(root);
+            RoomKit room = BuildRoom(root);
+            WetPatch(room.Set);
 
             Transform cams = new GameObject("CaptureCameras").transform; cams.SetParent(root, false);
             LookTestBuilder.AddCapture(cams, "Cap_Cellar_Wide", new Vector3(0.3f, 1.7f, 0.6f), new Vector3(0f, 1.6f, 8f), 62f);
@@ -124,6 +133,7 @@ namespace SleepingCalamity.EditorTools
             Debug.Log("SC DUNGEON kit " + (kit != null ? KitFolder + "/" + KitFbx : "FBX missing, greybox for every piece"));
             Dictionary<string, Material> slots = kit != null ? SlotMaterials(own) : null;
 
+            if (kit != null) LogUvDensity(kit);
             Transform set = new GameObject("Set").transform; set.SetParent(root, false);
             var report = new SortedDictionary<string, string>();
             int n = 0;
@@ -138,17 +148,18 @@ namespace SleepingCalamity.EditorTools
             foreach (var kv in report) Debug.Log("SC DUNGEON piece " + kv.Key + " " + kv.Value);
 
             Transform lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
-            Lanterns(set, lighting, own, RoomHooks);
+            Lanterns(set, lighting, own, RoomHooks, "", LanternIntensity, LanternRange);
             Candles(set, lighting, own);
-            Lights(lighting, own);
+            Lights(set, lighting, own);
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 2.0f, 4f), new Vector3(6f, 4.6f, 9f));
             // A cellar reflects little: the baked probe sees the HDR hatch and lanterns, and at full strength it washed bevel speculars white.
             lighting.Find("ReflectionProbe").GetComponent<ReflectionProbe>().intensity = 0.35f;
             LookTestBuilder.AddVolume(lighting, ProfileName);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);   // warm umber to plum, no blue-green
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = 0.23f;
+            // Floor 1 (Cellars design section 3): ambient top #3a2c26 to bottom #2a1c18, warm umber, no blue-green. Intensity 0.23 as tuned before (sRGB values, passed as they are).
+            RenderSettings.ambientSkyColor = new Color(0.25f, 0.20f, 0.16f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.17f, 0.13f);   // round 3: a little less red
+            RenderSettings.ambientGroundColor = new Color(0.18f, 0.13f, 0.10f); RenderSettings.ambientIntensity = 0.85f;   // round 2: 0.40 (wide/mid p50 was 0.12); round 3: mid and close still dark
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = 0.007f; RenderSettings.fogColor = new Color(0.16f, 0.13f, 0.11f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
@@ -200,6 +211,11 @@ namespace SleepingCalamity.EditorTools
                 Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_" + s.Slot + ".mat", wear);
                 m.CopyPropertiesFromMaterial(src);
                 foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
+                foreach (var fs in FabSlots)
+                    if (fs.Slot == s.Slot) { B0Fab.TexSet set = B0Fab.Megascans(fs.Folder, fs.Prefix); if (set != null) B0Fab.Apply(m, set, fs.Tiles); }
+                // round 3: the scans' normals read as melted plaster / chunky bricks at full strength
+                float bumpMul = s.Slot == "CV_Brick" || s.Slot == "CV_VaultStone" ? 0.55f : s.Slot == "CV_Limewash" ? 0.5f : 1f;
+                if (bumpMul != 1f && m.HasProperty("_BumpScale")) m.SetFloat("_BumpScale", m.GetFloat("_BumpScale") * bumpMul);
                 float peak = Mathf.Max(1f, Mathf.Max(s.Tint.r, Mathf.Max(s.Tint.g, s.Tint.b)));
                 m.SetColor("_BaseColor", new Color(s.Tint.r / peak, s.Tint.g / peak, s.Tint.b / peak, 1f).gamma);
                 m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);   // same bytes with and without graphics
@@ -241,7 +257,7 @@ namespace SleepingCalamity.EditorTools
         {
             LookTestBuilder.Comp<Tonemapping>(p).mode.Override(TonemappingMode.Neutral);
             Bloom b = LookTestBuilder.Comp<Bloom>(p); b.threshold.Override(1.0f); b.intensity.Override(0.35f); b.scatter.Override(0.85f); b.clamp.Override(65000f);
-            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(0.35f); c.contrast.Override(48f); c.saturation.Override(-22f);
+            ColorAdjustments c = LookTestBuilder.Comp<ColorAdjustments>(p); c.postExposure.Override(0.70f); c.contrast.Override(40f); c.saturation.Override(-22f);   // round 3: exposure 0.35 -> 0.70 and contrast 48 -> 40 because Mid and Close read too dark
             ShadowsMidtonesHighlights s = LookTestBuilder.Comp<ShadowsMidtonesHighlights>(p); s.shadows.Override(new Vector4(0.86f, 0.82f, 0.80f, 0f));   // grey-brown shadow fill, pushed down
             WhiteBalance w = LookTestBuilder.Comp<WhiteBalance>(p); w.temperature.Override(-3f); w.tint.Override(12f);
             LiftGammaGain lg = LookTestBuilder.Comp<LiftGammaGain>(p); lg.lift.Override(new Vector4(1.0f, 0.97f, 0.97f, 0.0f));
@@ -249,12 +265,14 @@ namespace SleepingCalamity.EditorTools
         });
 
         // --------------------------------------------------------------------------------------------- lanterns, candles, lights
-        static readonly Color Gold = new Color(1.0f, 0.80f, 0.54f);
+        // Lamp recipe (Cellars design section 6): gold #d6a24a at the flame (sRGB, as entered), the floor-1 candle tint #F2D58A for candles, pools 5 to 6 m across (range 5.5).
+        static readonly Color Gold = new Color(0.839f, 0.635f, 0.290f), CandleTint = new Color(0.949f, 0.835f, 0.541f);
+        const float LanternIntensity = 15f, LanternRange = 8.5f;   // round 2: wider, brighter pools
 
         // hook position + the direction the wall lies in (the hook plate sits 0.1 m that way)
         static readonly (Vector3 Hook, Vector3 Side)[] RoomHooks =
         {
-            (new Vector3(-2.3f, 2.3f, 2.0f), new Vector3(-1, 0, 0)), (new Vector3(2.3f, 2.3f, 4.0f), new Vector3(1, 0, 0)),
+            (new Vector3(-2.3f, 2.3f, 1.2f), new Vector3(-1, 0, 0)), (new Vector3(2.3f, 2.3f, 4.2f), new Vector3(1, 0, 0)),   // pools about 3 m apart down the 8 m room: z 1.2, 4.2, the sconce at 6.8, the candle at 8
         };
 
         internal static void Lanterns(Transform set, Transform lighting, Dictionary<string, Material> own, (Vector3 Hook, Vector3 Side)[] hooks, string tag = "", float intensity = 6.0f, float range = 10f)
@@ -307,14 +325,16 @@ namespace SleepingCalamity.EditorTools
                 LookTestBuilder.Prim(set, "Candle_" + tag + i, PrimitiveType.Cylinder, c + offs[i] + new Vector3(0, hs[i] * 0.5f, 0), new Vector3(0.035f, hs[i] * 0.5f, 0.035f), own["wax"]);
                 LookTestBuilder.Prim(set, "Flame_" + tag + i, PrimitiveType.Sphere, c + offs[i] + new Vector3(0, hs[i] + 0.02f, 0), new Vector3(0.015f, 0.03f, 0.015f), own["flame"]);
             }
-            LookTestBuilder.AddLight(lighting, "CandleLight" + tag, LightType.Point, c + lightOffset, Quaternion.identity, new Color(1.0f, 0.72f, 0.44f), 1.6f, 3.8f, LightShadows.None);
+            LookTestBuilder.AddLight(lighting, "CandleLight" + tag, LightType.Point, c + lightOffset, Quaternion.identity, CandleTint, 1.6f, 3.8f, LightShadows.None);
         }
 
-        static void Lights(Transform lighting, Dictionary<string, Material> own)
+        // Six lights in the room, the cap (Cellars design section 6): two lanterns, the candle cluster, the grate, the wall sconce and the daylight spot; shadows on the lanterns,
+        // the sconce and the daylight spot (4, the top of the 2 to 4 rule). The sconce takes the larder light's place.
+        static void Lights(Transform set, Transform lighting, Dictionary<string, Material> own)
         {
             LookTestBuilder.AddLight(lighting, "GrateLight", LightType.Point, new Vector3(0.6f, 0.45f, 6.2f), Quaternion.identity, new Color(0.95f, 0.30f, 0.12f), 0.8f, 3.2f, LightShadows.None);
-            // A warm pool on the larder shelves and the barrels (a candle on the shelf, in effect).
-            LookTestBuilder.AddLight(lighting, "LarderLight", LightType.Point, new Vector3(-1.75f, 1.45f, 5.0f), Quaternion.identity, new Color(1.0f, 0.76f, 0.52f), 2.6f, 5.5f, LightShadows.None);
+            if (!Sconce(set, lighting))   // no C15 source: the old larder candle stays
+                LookTestBuilder.AddLight(lighting, "LarderLight", LightType.Point, new Vector3(-1.75f, 1.45f, 5.0f), Quaternion.identity, new Color(1.0f, 0.76f, 0.52f), 2.6f, 5.5f, LightShadows.None);
             // Daylight shaft from the coal hatch: the CV_Daylight quad centre is (2.5 cos 21, 1.6 + 2.5 sin 21, 5.5) = (2.33, 2.50, 5.5); start just inside it.
             Vector3 hatch = new Vector3(2.27f, 2.52f, 5.5f), dir = new Vector3(-0.55f, -0.83f, 0.0f).normalized;
             Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
@@ -336,6 +356,70 @@ namespace SleepingCalamity.EditorTools
             var vel = ps.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World;
             vel.x = new ParticleSystem.MinMaxCurve(-0.03f, 0.03f); vel.y = new ParticleSystem.MinMaxCurve(-0.01f, 0.04f); vel.z = new ParticleSystem.MinMaxCurve(-0.03f, 0.03f);
             var r = go.GetComponent<ParticleSystemRenderer>(); r.sharedMaterial = own["mote"]; r.shadowCastingMode = ShadowCastingMode.Off;
+        }
+
+        // [C15] the wall sconce on the left wall above the barrels (x -2.5 inner face), one soft-shadow gold light at its flame. The model's size and axes are unknown, so it is scaled
+        // to SconceHeight on its tallest extent, turned so its thinnest horizontal extent faces the wall, and placed by its bounds (not its pivot). Logs the measured extents.
+        const float SconceHeight = 0.45f, SconceYaw = 0f;
+        static bool Sconce(Transform set, Transform lighting)
+        {
+            GameObject fbx = B0Fab.Sconce(out Material mat);
+            if (fbx == null || mat == null) { Debug.Log("SC B0 sconce C15 absent (Art/Source/Fab/C15_wall_sconce), keeping the larder light"); return false; }
+            var holder = new GameObject("Sconce_C15").transform; holder.SetParent(set, false);
+            var obj = (GameObject)PrefabUtility.InstantiatePrefab(fbx, holder);
+            foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true)) { var m = new Material[Mathf.Max(1, r.sharedMaterials.Length)]; for (int k = 0; k < m.Length; k++) m[k] = mat; r.sharedMaterials = m; }
+            Bounds Measure() { Bounds bb = new Bounds(); bool first = true; foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true)) { if (first) { bb = r.bounds; first = false; } else bb.Encapsulate(r.bounds); } return bb; }
+            Bounds raw = Measure();
+            float sc = SconceHeight / Mathf.Max(raw.size.x, Mathf.Max(raw.size.y, raw.size.z));
+            obj.transform.localScale = Vector3.one * sc;
+            Bounds b0 = Measure();
+            bool depthIsX = b0.size.x <= b0.size.z;   // the plate is thin in the wall-normal direction; the wall normal is world X
+            obj.transform.rotation = Quaternion.Euler(0f, depthIsX ? SconceYaw : SconceYaw + 90f, 0f);
+            Bounds b = Measure();
+            Vector3 wallTarget = new Vector3(-2.5f + 0.01f, 1.9f, 6.8f);   // back of the bounds on the wall, centred on y and z
+            obj.transform.position += new Vector3(wallTarget.x - b.min.x, wallTarget.y - b.center.y, wallTarget.z - b.center.z);
+            b = Measure();
+            Debug.Log("SC B0 sconce raw extents=" + raw.size.ToString("F3") + " scale=" + sc.ToString("F4") + " placed centre=" + b.center.ToString("F2") + " size=" + b.size.ToString("F2") + " depthIsX=" + depthIsX);
+            LookTestBuilder.AddLight(lighting, "SconceLight", LightType.Point, new Vector3(b.max.x + 0.28f, b.center.y + 0.08f, b.center.z), Quaternion.identity, Gold, 5f, 4.5f, LightShadows.Soft);
+            return true;
+        }
+
+        // One wet patch on the floor (wet weight 0.6): a thin flat disc, base colour the floor tone darkened by lerp(1, 0.5, 0.6) = 0.7 and smoothness lerp(0.30, 0.95, 0.6) = 0.69.
+        // A material variant instead of a decal: no decal renderer feature is confirmed in this URP stack.
+        static void WetPatch(Transform set)
+        {
+            const float wet = 0.6f;
+            Material m = Lit("DC_WetPatch");
+            float dark = Mathf.Lerp(1f, 0.5f, wet);
+            m.SetColor("_BaseColor", new Color(0.16f * dark, 0.13f * dark, 0.11f * dark)); m.SetFloat("_Smoothness", Mathf.Lerp(0.30f, 0.95f, wet)); m.SetFloat("_Metallic", 0f);
+            m.SetColor("_Color", m.GetColor("_BaseColor")); EditorUtility.SetDirty(m);
+            GameObject patch = LookTestBuilder.Prim(set, "WetPatch", PrimitiveType.Cylinder, new Vector3(-0.3f, 0.003f, 3.4f), new Vector3(1.5f, 0.002f, 1.0f), m);
+            patch.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            patch.transform.localRotation = Quaternion.Euler(0f, 25f, 0f);
+        }
+
+        // The kit's UV density: UV area / world area over the triangles of a piece (expected 0.25 UV^2 per m^2 when one UV unit is 2 m). Logged, so the tiling above can be checked.
+        static void LogUvDensity(GameObject kit)
+        {
+            foreach (string piece in new[] { "VaultSegment", "FloorTile", "ArchRib" })
+            {
+                Transform t = kit.transform.Find(piece);
+                if (t == null) continue;
+                double uvArea = 0, worldArea = 0;
+                foreach (MeshFilter mf in t.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    Mesh mesh = mf.sharedMesh; if (mesh == null) continue;
+                    Vector3[] v = mesh.vertices; Vector2[] uv = mesh.uv; int[] tri = mesh.triangles;
+                    if (uv == null || uv.Length != v.Length) continue;
+                    for (int i = 0; i + 2 < tri.Length; i += 3)
+                    {
+                        worldArea += 0.5 * Vector3.Cross(v[tri[i + 1]] - v[tri[i]], v[tri[i + 2]] - v[tri[i]]).magnitude;
+                        Vector2 a = uv[tri[i + 1]] - uv[tri[i]], b = uv[tri[i + 2]] - uv[tri[i]];
+                        uvArea += 0.5 * Mathf.Abs(a.x * b.y - a.y * b.x);
+                    }
+                }
+                Debug.Log("SC B0 uv density " + piece + ": uvArea/worldArea=" + (uvArea / System.Math.Max(1e-9, worldArea)).ToString("F4") + " (0.25 = 2 m per UV unit) -> metres per UV unit=" + (1.0 / System.Math.Sqrt(System.Math.Max(1e-9, uvArea / worldArea))).ToString("F2"));
+            }
         }
 
         // --------------------------------------------------------------------------------------------- greybox pieces
