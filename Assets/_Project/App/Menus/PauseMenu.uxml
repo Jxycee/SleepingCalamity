@@ -1,0 +1,23 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="PauseMenu.uss" />
+    <ui:VisualElement name="pause-root" class="pm-root">
+        <ui:VisualElement name="pause-main" class="pm-screen">
+            <ui:Label name="lbl-pause-heading" text="Paused" class="pm-heading" />
+            <ui:Button name="btn-pause-resume" text="Resume" focusable="true" class="pm-button" />
+            <ui:Button name="btn-pause-controls" text="Controls" focusable="true" class="pm-button" />
+            <ui:Button name="btn-pause-leave" text="Leave to title" focusable="true" class="pm-button" />
+            <ui:Button name="btn-pause-quit" text="Quit" focusable="true" class="pm-button" />
+            <ui:Label name="lbl-pause-note" text="The game keeps going while this is open." class="pm-why" />
+        </ui:VisualElement>
+        <ui:VisualElement name="pause-controls" class="pm-screen">
+            <ui:Label name="lbl-controls-heading" text="Controls" class="pm-heading" />
+            <ui:VisualElement name="controls-list" class="pm-list" />
+            <ui:Button name="btn-controls-back" text="Back" focusable="true" class="pm-button" />
+        </ui:VisualElement>
+        <ui:VisualElement name="pause-confirm" class="pm-screen">
+            <ui:Label name="lbl-confirm-ask" text="" class="pm-text" />
+            <ui:Button name="btn-confirm-yes" text="Leave" focusable="true" class="pm-button" />
+            <ui:Button name="btn-confirm-no" text="Stay" focusable="true" class="pm-button" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -44,6 +44,7 @@ namespace SleepingCalamity.App
         public SceneFlow SceneFlow => sceneFlow;
         public WorldSaveFlow WorldSaveFlow => worldSaveFlow;
         public FrontDoorModel FrontDoor { get; private set; }
+        public PauseMenuModel PauseMenu { get; private set; }   // PL-4 4.1: local on every peer; its view sits on the App's PauseMenu child object
         public HostRoster Roster { get; private set; }
         public HostWorld World { get; private set; }
         public NetworkObject PlayerPrefab => playerPrefab;
@@ -173,6 +174,9 @@ namespace SleepingCalamity.App
             FrontDoor = new FrontDoorModel(session, worldSaveFlow, new FrontDoorHost(sceneFlow, Roster, World));
             FrontDoorView view = GetComponent<FrontDoorView>();
             if (view != null) view.Bind(FrontDoor, session, input);
+            PauseMenu = new PauseMenuModel(session, input, PauseMenuView.QuitGame, () => worldSaveFlow != null && worldSaveFlow.CanSave);
+            PauseMenuView pauseView = GetComponentInChildren<PauseMenuView>(true);
+            if (pauseView != null) pauseView.Bind(PauseMenu, input);
         }
 
         private void Update()
@@ -248,6 +252,10 @@ namespace SleepingCalamity.App
             if (view != null) view.Bind(null, null);
             FrontDoor?.Dispose();
             FrontDoor = null;
+            PauseMenuView pauseViewOnExit = GetComponentInChildren<PauseMenuView>(true);
+            if (pauseViewOnExit != null) pauseViewOnExit.Bind(null, null);
+            PauseMenu?.Dispose();
+            PauseMenu = null;
             sceneFlow?.Dispose();
             sceneFlow = null;
             worldSaveFlow?.Dispose();

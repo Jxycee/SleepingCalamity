@@ -52,6 +52,7 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.GetOrAdd<DevSessionPanel>(app);
             BuilderUtil.GetOrAdd<ToastLine>(app);
             AddFrontDoor(app);
+            AddPauseMenu(app);
             ConfigureNetworkManager(networkManager, transport, prefabList);
             bootstrap.Configure(playerPrefab, inputActions);
 
@@ -93,6 +94,25 @@ namespace SleepingCalamity.EditorTools
             BuilderUtil.GetOrAdd<FrontDoorView>(app);
             BuilderUtil.GetOrAdd<EventSystem>(app);
             BuilderUtil.GetOrAdd<InputSystemUIInputModule>(app);
+        }
+
+        // PL-4 task 4.1, the pause menu: a child object of App with its own UIDocument (PauseMenu.uxml) on the front door's PanelSettings (one panel, one PanelEventHandler)
+        // and a PauseMenuView (AppBootstrap hands it its model). Runs after AddFrontDoor, which creates the PanelSettings and the EventSystem.
+        private static void AddPauseMenu(GameObject app)
+        {
+            foreach (string file in new[] { "PauseMenu.uss", "PauseMenu.uxml" })
+                AssetDatabase.ImportAsset(MenuFolder + "/" + file, ImportAssetOptions.ForceSynchronousImport);
+            var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(MenuFolder + "/PauseMenu.uxml");
+            var panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(MenuPanelSettingsPath);
+            if (tree == null || panelSettings == null) throw new System.IO.FileNotFoundException("Missing the pause menu UI assets under " + MenuFolder);
+
+            var child = new GameObject("PauseMenu");
+            child.transform.SetParent(app.transform, false);
+            UIDocument document = BuilderUtil.GetOrAdd<UIDocument>(child);
+            document.panelSettings = panelSettings;
+            document.visualTreeAsset = tree;
+            document.sortingOrder = 10;
+            BuilderUtil.GetOrAdd<PauseMenuView>(child);
         }
 
         // The lobby: a plain camera and light behind the dev panel. Sessions start here and the flow comes back here when one ends.

@@ -59,6 +59,15 @@ namespace SleepingCalamity.Runtime
 
         public PlayerIntent Intent => _intent;
         public bool HasFocus => _hasFocus;
+
+        // Tests only (PL-4 4.1): a batch-mode editor reports no window focus, so the adapter would hand every gameplay system neutral input. A device-level PlayMode test forces
+        // focus on; OnApplicationFocus then no longer changes it.
+        private bool _focusForced;
+        public void ForceFocusForTests()
+        {
+            _focusForced = true;
+            _hasFocus = true;
+        }
         public InputDeviceKind LastDevice => _lastDevice;
         public InputActionAsset Actions => _actions;
 
@@ -189,7 +198,8 @@ namespace SleepingCalamity.Runtime
             f.InteractPressed = _interact.WasPressedThisFrame();
             f.InteractHeld = _interact.IsPressed();
             f.UseItemPressed = _useItem.WasPressedThisFrame();
-            f.PausePressed = Context == InputContext.Menu ?_uiCancel.WasPressedThisFrame() : _pause.WasPressedThisFrame();
+            // Menu: UI/Cancel (B, Escape) or Player/Pause (gamepad Start, Escape) both close it, so the key that opened the pause menu also closes it. Other contexts (PlacementMode too) read Player/Pause only.
+            f.PausePressed = Context == InputContext.Menu ? (_uiCancel.WasPressedThisFrame() || _pause.WasPressedThisFrame()) : _pause.WasPressedThisFrame();
             return f;
         }
 
@@ -237,6 +247,7 @@ namespace SleepingCalamity.Runtime
 
         private void OnApplicationFocus(bool hasFocus)
         {
+            if (_focusForced) return;
             _hasFocus = hasFocus;
             if (hasFocus)
             {
@@ -294,6 +305,8 @@ namespace SleepingCalamity.Runtime
             InputMaps maps = InputContextRouter.EnabledMaps(ctx);
             SetMapEnabled(_playerMap, (maps & InputMaps.Player) != 0);
             SetMapEnabled(_uiMap, (maps & InputMaps.UI) != 0);
+            // Menu: the Player map is off, but Player/Pause stays on so gamepad Start (not bound to UI/Cancel) closes the menu it opened. Only PauseMenuView reads PausePressed in Menu.
+            if (_pause != null && InputContextRouter.PauseStaysEnabled(ctx)) _pause.Enable();
         }
 
         private static void SetMapEnabled(InputActionMap map, bool enabled)

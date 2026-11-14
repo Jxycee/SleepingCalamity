@@ -159,6 +159,14 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void InputContextRouter_PauseStaysEnabled_OnlyInMenu()
+        {
+            Assert.IsTrue(InputContextRouter.PauseStaysEnabled(InputContext.Menu), "Player/Pause must stay on in Menu so gamepad Start closes the pause menu");
+            Assert.IsFalse(InputContextRouter.PauseStaysEnabled(InputContext.Free));
+            Assert.IsFalse(InputContextRouter.PauseStaysEnabled(InputContext.LockOn));
+        }
+
+        [Test]
         public void InputContextRouter_EnabledMaps_MenuIsUiOnly()
         {
             Assert.AreEqual(InputMaps.Player, InputContextRouter.EnabledMaps(InputContext.Free));

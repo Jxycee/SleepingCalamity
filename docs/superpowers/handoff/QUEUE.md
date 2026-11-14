@@ -14,7 +14,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **M** PL-1 Loop proof: input-only loop tests and loop bot, first-building measurement, D1 frame on floor 2, D4 floor 3 mix (plan section 3) [U] (launched 2026-11-11; merged from `afa1720a`, check PASS; results `Reference/sessions/pl1-loop-proof/RESULTS.md`)
 - [x] **M** PL-2 Guide and dive result: `LoopGuide`, objective line and beacons, dive result card, a real button to eat a loaf (after PL-1) [U][net]
 - [x] **L** PL-3 Front door: UI Toolkit spike, `UiText`, `FrontDoorModel`, five screens, dev panel off in release (after PL-1) [U][net]
-- [ ] **M** PL-4 Way out and seams: pause menu, return-dive floor pick with a real button, PL-1 breaks, release build and walk script (after PL-3) [U][net]
+- [x] **M** PL-4 Way out and seams: pause menu, return-dive floor pick with a real button, PL-1 breaks, release build and walk script (after PL-3) [U][net]
 - [ ] **M** PL-5 Walk fixes (reserve; only after the user's walks)
 - [ ] **S** Stale docs, ride along with any PL merge: `docs/PHASE1.md:255-278, 326-331, 347` (floor-4 Dough Warden, shared haul, 90 s timer); roadmap header says four plans for five rows (docs)
 
