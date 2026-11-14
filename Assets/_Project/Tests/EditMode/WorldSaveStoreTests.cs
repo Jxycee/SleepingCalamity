@@ -751,6 +751,21 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(old.Current.Dive.ClearedMask, Is.EqualTo(3));
         }
 
+        // Catches (PARKING_LOT :66, the 3-player extra-slot owner lives in dive.extraSlotOwner): a bad owner value costing the rest of the dive section or the file. A malformed id drops only the owner.
+        [Test]
+        public void DiveExtraSlotOwner_BadValue_KeepsTheRestOfTheDiveSectionAndFile()
+        {
+            foreach (string bad in new[] { "\"not-a-bag-id\"", "\"Nope:abc\"", "5", "\"\"" })
+            {
+                File.WriteAllText(_path, WithSection("dive", "{ \"inDive\": false, \"checkpointHeld\": true, \"bossBeaten\": true, \"extraSlotOwner\": " + bad + " }"));
+                WorldSaveStore store = Load();
+                Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main), bad);
+                Assert.That(store.Current.Dive.ExtraSlotOwner, Is.Null, bad);
+                Assert.That(store.Current.Dive.CheckpointHeld, Is.True, bad + ": the rest of the dive section is kept");
+                Assert.That(store.Current.Dive.BossBeaten, Is.True, bad);
+            }
+        }
+
         // Catches (sc-netcode "World save"): a mistyped suspend section failing the whole WorldSave parse, so the world rolls back to .bak.
         [Test]
         public void Suspend_MistypedSection_KeepsTheRestOfTheFile()
