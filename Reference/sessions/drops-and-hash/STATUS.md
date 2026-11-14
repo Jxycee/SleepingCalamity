@@ -1,4 +1,4 @@
-State: paused: user gaming (2026-11-14). Branch claude/drops-and-hash, tip 93c904e4 (+ this file). Not merged.
+State: merge in progress (check on tip, then sc-merge)
 Done: per-player enemy drops (CellarLoot.RollEnemyDrop, CellarContentsSync TickDrops) and hash bar (ReplicatedStateHash.AssertBagsAndStirMatchHost). Full check PASS on d72d18e0 (SC MARKER = d72d18e0). Risk review (Opus): no blockers.
 93c904e4 = review fixes (despawn test via ServerClearEnemies, real CombatHost hit-path test, rank bonus passed, key stride, comments). Gate + PerPlayerLoot|StateHashSmoke 32/32 passed before a mutation proof; not re-run after revert; no check on 93c904e4.
 Next:

@@ -59,12 +59,12 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **S** HUD "N home" undercounts pieces after reload (:81) (folded into PL-2 task 2.4)
 - [x] **M** Bag robustness bundle: sticky `PlayerBagSync._bagId` re-resolve (:71); one bad value drops a whole bag entry (:72); satchel vs `PlayerBag.MaxCarried` (:73) [U][net]
 - [x] **M** Bank slot edge cases: party shrinks mid-floor (:70); late joiner lifts slots above `BankSlots.TotalSlots` (:76); 3-player extra-slot owner not saved (:66) [U][net]
-- [ ] **M** Per-player enemy drops via `DiveHaulSync.ServerAddItem` (:64) [U][net]
+- [x] **M** Per-player enemy drops via `DiveHaulSync.ServerAddItem` (:64) [U][net]
 - [x] **M** Dev-only bank keys: confirm push-on / go-home have real input everywhere (folded into PL-1 task 1.5)
 
 ## Ready: multiplayer readiness (M7)
 - [x] **M** 3-4 player smoke with bots + MPPM (triage Q1) [U][net]
-- [ ] **M** State-hash "no desync" pass bar: add per-player bags and the 7-floor stir to the hash (triage Q2) [U][net]
+- [x] **M** State-hash "no desync" pass bar: add per-player bags and the 7-floor stir to the hash (triage Q2) [U][net]
 - [x] **S** Network conditions test set at 150 ms / 2% and 300 ms / 5% (triage Q6 default; user may change) [U][net]
 
 ## Ready: save and netcode audit (2026-11-12, `docs/superpowers/audits/2026-11-12-save-netcode-audit.md`; each item names its finding and proposed test there)
