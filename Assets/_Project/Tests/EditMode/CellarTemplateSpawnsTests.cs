@@ -97,6 +97,28 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Resolve_NeverPlacesAnEnemyOnTheHuntersCell()
+        {
+            int hunterRooms = 0;
+            for (uint seed = 1; seed <= 60; seed++)
+                foreach (int floor in new[] { 2, 4, 6, 7 })
+                {
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(seed, floor); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarEncounterPlan p = CellarEncounterPlan.BuildForDive(l, d, 0, true);
+                    if (p.Hunter == null) continue;
+                    for (int players = 1; players <= 4; players++)
+                    {
+                        CellarTemplateRoom t = CellarTemplateSpawns.Resolve(l, d, p, p.Hunter.RoomIndex, players);
+                        if (t == null) continue;
+                        hunterRooms++;
+                        foreach (TemplateSpawn s in t.Spawns)
+                            Assert.That((s.Cell.X, s.Cell.Y), Is.Not.EqualTo((p.Hunter.X, p.Hunter.Y)), "seed " + seed + " floor " + floor + " players " + players + " wave " + s.Wave + ": template enemy on the hunter's cell");
+                    }
+                }
+            Assert.That(hunterRooms, Is.GreaterThan(20), "the sweep must reach templated hunter rooms");
+        }
+
+        [Test]
         public void Resolve_AmbushRoom_UsesTheAmbushTemplateOnlyThere_AndRingCells()
         {
             int seen = 0;

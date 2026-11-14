@@ -53,6 +53,7 @@ namespace SleepingCalamity.Core
             // legal world cells: the plan's own spawn cells of this room plus the room's free cells
             var legal = new List<CellPos>(); var seen = new HashSet<(int, int)>();
             foreach (EncounterSpawn s in mine) if (seen.Add((s.X, s.Y))) legal.Add(s.Cell);
+            if (plan.Hunter != null && plan.Hunter.RoomIndex == roomIndex) seen.Add((plan.Hunter.X, plan.Hunter.Y));   // the hunter's cell is never a template cell (the plan picked it from cells no authored spawn holds)
             foreach (CellPos c in CellarEncounterPlan.FreeCellsOf(layout, dressing, roomIndex)) if (seen.Add((c.X, c.Y))) legal.Add(c);
 
             int target = mine.Count + CoopScaling.ExtraEnemiesPerRoom(players), held = enc.HeldHeroes;   // the plan ignores party size: one extra per extra player (settled rule), still bounded by the caps below
