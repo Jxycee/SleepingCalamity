@@ -106,6 +106,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** Butterflies and bees faint at eye height (ambient-life STATUS :3; 1 round left) [U]
 
 ## Ready: Cellars art
+- **APV determinism test (S, from B0, 2026-11-14).** B0 shipped sky ambient (`AmbientMode.Skybox`), no Adaptive Probe Volume bake. Later: prove an APV bake per Morning/Evening scenario is headless, byte-identical on two builds (`Tools/cloud/sc_churn_check.sh` logic) and fits `ProjectBuilder.RunAll` and LFS; if not, keep it out of RunAll and say so. Sky ambient stays until then (user, 2026-11-14).
 - [ ] **M** B5 cellar kit 29/40 to 32 (`hollowmere/dungeon_corner/STATUS.md:9`) [A][U]
 - [ ] **S** Dust-motes ParticleSystem prefab (`CellarFloorBuilder.cs:8`, :416) [U]
 - [ ] **S** B11 cellar lantern wear and rust (PARKING_LOT :49) [A]

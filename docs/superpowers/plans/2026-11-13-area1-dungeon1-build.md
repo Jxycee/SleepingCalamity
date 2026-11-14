@@ -62,6 +62,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 - **Done-check:** the audit passes; one contact sheet of all adopted pieces under the B0 Morning light beside H7. No scene changes.
 
 ### B2. Asset intake: cellars
+- **B0 leftovers (2026-11-14, user approved the B0 sheets as is):** cellar brick (C01) still reads pink-salmon with a noisy micro-pattern, so retune the albedo toward honey-tan/ochre and soften the normal further; the Close niche brickwork reads as chunky chip-islands around the arch (fix the arch/niche mesh or UVs, not just the material); the C15 sconce orientation was not checked in Close; `UndercroftStair.unity` took the shared brick/limewash/sconce changes but was never captured. Reviewer score of the Cellars row: 23/23/21 of 40.
 - As B1 for the Cellars picks, under `Content/Art/Cellar/Adopted/<code>/`. Sheet under the B0 cellar light beside C2.
 
 ### B3. Square ground, sky rollout, the ruin look
@@ -93,6 +94,7 @@ Order: B0 first. After that the town line (B1, B3-B7) and the cellar line (B2, B
 - **Done-check:** stills from `Cap_HM_HomeDoor`, `Cap_HM_Fountain`, `Cap_HM_BellYard` in Morning and Evening beside H1 and H2; one walk (`sc-walk`) from spawn to the trapdoor to judge motion and sound, with its notes. Review before merge.
 
 ### B8. Cellar kit and the per-floor look
+- **B0 leftovers (2026-11-14, user approved the B0 sheets as is):** cellar brick (C01) still reads pink-salmon with a noisy micro-pattern, so retune the albedo toward honey-tan/ochre and soften the normal further; the Close niche brickwork reads as chunky chip-islands around the arch (fix the arch/niche mesh or UVs, not just the material); the C15 sconce orientation was not checked in Close; `UndercroftStair.unity` took the shared brick/limewash/sconce changes but was never captured. Reviewer score of the Cellars row: 23/23/21 of 40.
 - **Spec:** Cellars sections 3, 5, 6, 7; proposals P1-P5, P7.
 - **Files:** `Art/Blender/cellars/sc_cellar_vault.py` and a new kit generator; `Editor/Builders/CellarFloorTestBuilder.cs`; `Presentation/Cellars/CellarFloorBuilder*.cs`; new `CellarFloorLook`; `Core/Cellars/CellarFloorWarmLights.cs` if route lamps need Core (then `soak`).
 - **Do:** re-surface the kit; groin bay, round pillar, wall variants, light fixtures; the look table; route lamps; overlays.
