@@ -804,10 +804,22 @@ namespace SleepingCalamity.Presentation
             if (!ok) { PickFloor = def; _pickTouched = false; }
         }
 
-        private static string PickButtonName(IInputService input)
+        private string _pickButtonCache;
+        private InputDeviceKind _pickButtonDevice;
+        private IInputService _pickButtonInput;
+
+        // Cached; refreshed only when the input service or its last-used device changes. A display-string fault falls back to the plain words (it must not break the prompt or Interact).
+        private string PickButtonName(IInputService input)
         {
-            string key = input != null ? input.GetBindingDisplayString(InputActionNames.Lock) : "";
-            return string.IsNullOrEmpty(key) ? "the lock-on button" : key;
+            if (input == null) return "the lock-on button";
+            if (_pickButtonCache != null && ReferenceEquals(_pickButtonInput, input) && _pickButtonDevice == input.LastDevice) return _pickButtonCache;
+            string key;
+            try { key = input.GetBindingDisplayString(InputActionNames.Lock); }
+            catch (System.Exception) { key = ""; }
+            _pickButtonCache = string.IsNullOrEmpty(key) ? "the lock-on button" : key;
+            _pickButtonInput = input;
+            _pickButtonDevice = input.LastDevice;
+            return _pickButtonCache;
         }
 
         public void RequestDescend() { RequestDescendRpc(); }
@@ -867,6 +879,8 @@ namespace SleepingCalamity.Presentation
             }
             else
             {
+                // A dive (any peer started it) ends the old pick: the next hub visit defaults again (the bank floor while the checkpoint is held).
+                _pickTouched = false; PickFloor = UndercroftPlan.FirstFloor;
                 ResolveSyncs();
                 if (FloorSync == null || FloorSync.Built == null || FloorSync.Layout == null) return;
                 floor = FloorSync.BuiltFloor;

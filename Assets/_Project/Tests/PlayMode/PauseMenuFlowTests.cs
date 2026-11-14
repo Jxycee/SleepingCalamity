@@ -132,11 +132,37 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return PlayModeHarness.WaitUntil(() => input.Intent.MoveY > 0.5f, StepTimeout, "the hero did not get Move back after Resume");
         }
 
+        // Gamepad Start opens the menu and, with the Player map off in the Menu context, must still close it (Player/Pause stays enabled on its own).
+        [UnityTest]
+        public IEnumerator GamepadStart_OpensAndCloses()
+        {
+            yield return BootSolo();
+            Gamepad pad = InputSystem.AddDevice<Gamepad>("PausePad");
+            try
+            {
+                yield return TapStart(pad);
+                yield return PlayModeHarness.WaitUntil(() => view.IsShown, StepTimeout, "gamepad Start did not open the pause menu (context " + input.Context + ")");
+                yield return TapStart(pad);
+                yield return PlayModeHarness.WaitUntil(() => !view.IsShown && input.Context == InputContext.Free, StepTimeout, "gamepad Start did not close the pause menu (context " + input.Context + ")");
+            }
+            finally { InputSystem.RemoveDevice(pad); }
+        }
+
+        private static IEnumerator TapStart(Gamepad pad)
+        {
+            InputSystem.QueueStateEvent(pad, new GamepadState(GamepadButton.Start));
+            yield return null;
+            yield return null;
+            InputSystem.QueueStateEvent(pad, new GamepadState());
+            yield return null;
+        }
+
         [UnityTest]
         public IEnumerator Leave_AsHost_WorldSaved_SessionEnds()
         {
             yield return BootSolo();
-            // The start already wrote the world once. Change the world in memory after that (a sentinel stamp plus a dirty mark, the in-memory change a save must write; only a real save at leave replaces the sentinel).
+            // The start already wrote the world once. Change the world in memory after that (a sentinel stamp plus a dirty mark). Any Write stamps SavedAtUtc, so the 10 s Tick flush would replace the
+            // sentinel too: the files are asserted unchanged just before the leave is confirmed, so a rewrite after that point can only come from the leave itself.
             const string Sentinel = "1999-01-01T00:00:00.0000000Z";
             Assert.That(app.WorldSaveFlow.Store, Is.Not.Null, "no world store while hosting");
             string[] before = Directory.GetFiles(saveDir, "*.json", SearchOption.AllDirectories);
@@ -156,6 +182,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(session.State, Is.EqualTo(ConnState.Connected), "Stay keeps the game going");
 
             yield return Press(PauseMenuView.Ids.Leave);
+            foreach (string f in before) Assert.That(File.ReadAllText(f), Is.EqualTo(textBefore[f]), "a file was rewritten before the leave was confirmed (the tick flush), so the test cannot tell the leave saved: " + f);
             yield return Press(PauseMenuView.Ids.ConfirmYes);
             yield return PlayModeHarness.WaitUntil(
                 () => session.State == ConnState.Offline && SceneManager.GetActiveScene().name == SceneNames.Lobby, 30f, "the host's leave did not end the session and reach the Lobby");

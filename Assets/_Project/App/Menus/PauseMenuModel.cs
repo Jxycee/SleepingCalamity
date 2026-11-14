@@ -79,7 +79,9 @@ namespace SleepingCalamity.App
                 controls.Clear();
                 foreach (string[] row in PauseMenuText.ControlRows)
                 {
-                    string binding = input.GetBindingDisplayString(row[1]);
+                    string binding;
+                    try { binding = input.GetBindingDisplayString(row[1]); }
+                    catch (Exception) { binding = null; }   // a display-string fault must not break the Controls screen
                     controls.Add(new KeyValuePair<string, string>(row[0], string.IsNullOrEmpty(binding) ? "-" : binding));
                 }
                 return controls;
@@ -87,7 +89,8 @@ namespace SleepingCalamity.App
         }
 
         // What the Pause button does. gameplayContext is the gameplay context before this press.
-        public PauseOutcome Pause(InputContext gameplayContext)
+        // menuWasOpenLastFrame: input.MenuOpen at the end of the frame before. A menu that closed on this very press (Escape closes the weapon tree) must not also open this one.
+        public PauseOutcome Pause(InputContext gameplayContext, bool menuWasOpenLastFrame = false)
         {
             if (disposed) return PauseOutcome.Ignored;
             switch (state)
@@ -104,6 +107,7 @@ namespace SleepingCalamity.App
             if (gameplayContext == InputContext.Placement) return PauseOutcome.LeftToPlacement;   // PlacementMode leaves on this very press
             if (gameplayContext != InputContext.Free && gameplayContext != InputContext.LockOn) return PauseOutcome.Ignored;
             if (input.MenuOpen) return PauseOutcome.Ignored;   // another menu is up
+            if (menuWasOpenLastFrame) return PauseOutcome.Ignored;   // another menu closed on this press
             if (session.State != ConnState.Connected) return PauseOutcome.Ignored;
             input.MenuOpen = true;
             raisedMenu = true;

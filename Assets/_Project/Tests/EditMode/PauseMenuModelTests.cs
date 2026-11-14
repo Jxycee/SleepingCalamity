@@ -95,6 +95,16 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
+        public void Pause_WhenAnotherMenuClosedOnThisPress_DoesNotOpen()
+        {
+            Connect(true);
+            Assert.That(model.Pause(InputContext.Free, menuWasOpenLastFrame: true), Is.EqualTo(PauseOutcome.Ignored), "Escape that closed the weapon tree must not also open the pause menu");
+            Assert.That(model.IsOpen, Is.False);
+            Assert.That(input.MenuOpen, Is.False);
+            Assert.That(model.Pause(InputContext.Free, menuWasOpenLastFrame: false), Is.EqualTo(PauseOutcome.Opened), "the next press opens it");
+        }
+
+        [Test]
         public void Pause_Offline_DoesNotOpen()
         {
             Assert.That(model.Pause(InputContext.Free), Is.EqualTo(PauseOutcome.Ignored));

@@ -102,6 +102,35 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.NetCheckpointHeld.Value, Is.False, "the start spent the checkpoint");
         }
 
+        // A peer that cycled its pick, then a dive another peer started and that ended with the checkpoint held, must default to the bank floor again (the touched pick went stale during the dive).
+        [UnityTest]
+        public IEnumerator FloorPick_TouchedPick_ResetsAfterDive_ReturnDefaultsToBankFloor()
+        {
+            Rig rig = null;
+            yield return Start(r => rig = r);
+            rig.Host.TestHoldCheckpoint(true);
+            yield return PlayModeHarness.WaitUntil(() => rig.Peer.NetCheckpointHeld.Value && rig.Peer.NetPickableMaxFloor.Value == UndercroftPlan.BankFloor, Timeout, "the client never saw the held checkpoint");
+            yield return ClientToTrapdoor(rig);
+            yield return PlayModeHarness.WaitUntil(() => rig.Peer.Prompt == DiveDirector.PromptKind.Descend && rig.Peer.PickFloor == UndercroftPlan.BankFloor, Timeout, "the client's pick never defaulted to the bank floor");
+
+            // The client cycles the pick with one Lock press (the shared fake input drives every in-process peer).
+            var input = (FakeInputService)HeroInput.ResolveDefault();
+            input.Frame.LockPressed = true;
+            yield return null;
+            input.Frame.LockPressed = false;
+            yield return PlayModeHarness.WaitUntil(() => rig.Peer.PickFloor != UndercroftPlan.BankFloor, Timeout, "the Lock press never cycled the client's pick");
+
+            // The host starts a dive (spends the checkpoint), then the dive ends with the checkpoint held again.
+            rig.Host.RequestStartDive(3);
+            yield return PlayModeHarness.WaitUntil(() => rig.Host.NetActive.Value && rig.Peer.NetActive.Value && rig.Host.FloorSync != null && rig.Host.FloorSync.BuiltFloor == 3, Timeout, "the dive never started on both peers");
+            yield return TownInputRig.Seconds(0.3f);   // the peer's own Update sees the dive running
+            rig.Host.TestHoldCheckpoint(true);
+            Assert.That(rig.Host.ServerAbandonDive(), Is.True, "the host ended the dive");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Peer.NetActive.Value && rig.Peer.NetCheckpointHeld.Value, Timeout, "the client never saw the dive end with the checkpoint held");
+            yield return ClientToTrapdoor(rig);
+            yield return PlayModeHarness.WaitUntil(() => rig.Peer.Prompt == DiveDirector.PromptKind.Descend && rig.Peer.PickFloor == UndercroftPlan.BankFloor, Timeout, "the return dive's pick did not default to the bank floor (pick " + rig.Peer.PickFloor + ", prompt " + rig.Peer.Prompt + ")");
+        }
+
         [UnityTest]
         public IEnumerator FloorPick_ClientPick_NoCheckpoint_HostRefuses()
         {

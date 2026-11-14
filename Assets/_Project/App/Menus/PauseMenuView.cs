@@ -1,7 +1,7 @@
 // Not networked; local on every peer, and it only ASKS (PL-4 task 4.1). The view of PauseMenuModel on the App's own UIDocument (PauseMenu.uxml / .uss, the same
 // PanelSettings as the front door, so there is one panel and one PanelEventHandler). It reads the Pause button from the input service's intent (in the Menu context
-// that is the UI cancel, so Escape / gamepad B also closes it or steps back), and passes the model the gameplay context of the frame BEFORE, so a Pause that has
-// just left placement mode (PlacementMode reads the same press) does not also open the menu. Opens only while a gameplay scene is the active scene.
+// that is UI/Cancel or Player/Pause, so Escape, gamepad B and gamepad Start all close it or step back), and passes the model the gameplay context and MenuOpen of the frame
+// BEFORE, so a Pause that has just left placement mode (PlacementMode reads the same press) or closed another menu (the weapon tree on Escape) does not also open it. Opens only while a gameplay scene is the active scene.
 // Input: keyboard and gamepad events reach the panel only through the EventSystem's selected object, so the view selects the panel's PanelEventHandler object while
 // open (and the first control of each screen is focused); the InputSystemUIInputModule runs on its own default actions, never on SleepingCalamityInput.
 // Hidden means display:none and no selection, so no press reaches an invisible button. Every control has a stable name (Ids) so tests find it.
@@ -45,6 +45,7 @@ namespace SleepingCalamity.App
         private VisualElement screenMain, screenControls, screenConfirm;
         private PanelEventHandler panelHandler;
         private InputContext lastGameplayContext = InputContext.Free;
+        private bool lastMenuOpen;
         private PauseMenuState renderedState = PauseMenuState.Closed;
         private bool dirty = true;
         private string wantedFocus;
@@ -93,7 +94,7 @@ namespace SleepingCalamity.App
             if (document != null && document.rootVisualElement != boundRoot) BindTree();
 
             if (input.HasFocus && input.Intent.PausePressed && SceneNames.IsGameplay(SceneManager.GetActiveScene().name))
-                model.Pause(lastGameplayContext);
+                model.Pause(lastGameplayContext, lastMenuOpen);
 
             if (root == null) return;
             if (dirty || renderedState != model.State) Render();
@@ -107,7 +108,11 @@ namespace SleepingCalamity.App
         // Recorded after every other script's Update, so the next frame's Pause press sees what the context was BEFORE that frame's scripts ran.
         private void LateUpdate()
         {
-            if (input != null) lastGameplayContext = input.GameplayContext;
+            if (input != null)
+            {
+                lastGameplayContext = input.GameplayContext;
+                lastMenuOpen = input.MenuOpen;
+            }
         }
 
         private void BindTree()

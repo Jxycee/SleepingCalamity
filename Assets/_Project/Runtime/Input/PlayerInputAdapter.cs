@@ -305,6 +305,8 @@ namespace SleepingCalamity.Runtime
             InputMaps maps = InputContextRouter.EnabledMaps(ctx);
             SetMapEnabled(_playerMap, (maps & InputMaps.Player) != 0);
             SetMapEnabled(_uiMap, (maps & InputMaps.UI) != 0);
+            // Menu: the Player map is off, but Player/Pause stays on so gamepad Start (not bound to UI/Cancel) closes the menu it opened. Only PauseMenuView reads PausePressed in Menu.
+            if (_pause != null && InputContextRouter.PauseStaysEnabled(ctx)) _pause.Enable();
         }
 
         private static void SetMapEnabled(InputActionMap map, bool enabled)
