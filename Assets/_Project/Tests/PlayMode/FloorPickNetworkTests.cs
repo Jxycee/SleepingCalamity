@@ -124,10 +124,12 @@ namespace SleepingCalamity.Tests.PlayMode
             // The host starts a dive (spends the checkpoint), then the dive ends with the checkpoint held again.
             Assert.That(rig.Host.ServerStartDive(3), Is.True, "the host starts on floor 3");
             yield return PlayModeHarness.WaitUntil(() => rig.Host.NetActive.Value && rig.Peer.NetActive.Value && rig.Host.FloorSync != null && rig.Host.FloorSync.BuiltFloor == 3, Timeout, "the dive never started on both peers");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Peer.HasPendingTeleport, Timeout, "the client never arrived on the dive floor");
             yield return TownInputRig.Seconds(0.3f);   // the peer's own Update sees the dive running
             rig.Host.TestHoldCheckpoint(true);
             Assert.That(rig.Host.ServerAbandonDive(), Is.True, "the host ended the dive");
             yield return PlayModeHarness.WaitUntil(() => !rig.Peer.NetActive.Value && rig.Peer.NetCheckpointHeld.Value, Timeout, "the client never saw the dive end with the checkpoint held");
+            yield return PlayModeHarness.WaitUntil(() => !rig.Peer.HasPendingTeleport, Timeout, "the client never finished its teleport home");
             yield return TownInputRig.Seconds(1.5f);   // the host sends the party home: let that teleport land before walking to the trapdoor again
             yield return ClientToTrapdoor(rig);
             yield return PlayModeHarness.WaitUntil(() => rig.Peer.Prompt == DiveDirector.PromptKind.Descend && rig.Peer.PickFloor == UndercroftPlan.BankFloor, Timeout, "the return dive's pick did not default to the bank floor (pick " + rig.Peer.PickFloor + ", prompt " + rig.Peer.Prompt + ")");
