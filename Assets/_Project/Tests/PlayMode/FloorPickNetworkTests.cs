@@ -130,6 +130,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(rig.Host.ServerAbandonDive(), Is.True, "the host ended the dive");
             yield return PlayModeHarness.WaitUntil(() => !rig.Peer.NetActive.Value && rig.Peer.NetCheckpointHeld.Value, Timeout, "the client never saw the dive end with the checkpoint held");
             yield return PlayModeHarness.WaitUntil(() => !rig.Peer.HasPendingTeleport, Timeout, "the client never finished its teleport home");
+            yield return PlayModeHarness.WaitUntil(() => DiveDirector.InteractClaims == 0, Timeout, "the dive result card never let go of Interact (it hides the trapdoor prompt while it is up)");
             yield return TownInputRig.Seconds(1.5f);   // the host sends the party home: let that teleport land before walking to the trapdoor again
             yield return ClientToTrapdoor(rig);
             yield return PlayModeHarness.WaitUntil(() => rig.Peer.Prompt == DiveDirector.PromptKind.Descend && rig.Peer.PickFloor == UndercroftPlan.BankFloor, Timeout, "the return dive's pick did not default to the bank floor (pick " + rig.Peer.PickFloor + ", prompt " + rig.Peer.Prompt + ")");
