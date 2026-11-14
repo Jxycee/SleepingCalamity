@@ -16,3 +16,8 @@ Started: 2026-11-14
 3. Run sc_asset_audit.py (Blender 5.2 is installed; find its exe) on the FBXs, record result.
 4. Contact sheet of all adopted pieces under the B0 Morning light beside Reference/private/concepts H7 via sc_ab_sheet.py; SendUserFile it.
 5. reviewer (Sonnet), `gate` then `check` on the tip (SC MARKER = HEAD), sc-merge into fresh origin/main, tick B1 in CURRENT.md "Now". Leave worktree clean for B2.
+
+## Paused: user gaming (2026-11-14)
+- B1TownIntake.cs written and run once via exec: 44 prefabs, 0 failures, nothing dropped, bounds sane (barrel 0.54 x 0.59 m). Prefabs under Assets/_Project/Content/Art/Town/Adopted/<code>/, materials Content/Materials/B1.
+- L04: flat URP materials from the FBX slot colours (no texture); bounds 6.6 x 11.4 m, so the FBX is a layout sheet of pots, needs splitting or a pick of single pots. T11b beach rock is 7 m long (scale at placement).
+- Remaining: `gate` run (not started), second exec run to confirm idempotent (no diff), style review/contact sheet, sc_asset_audit, reviewer, check, merge.
