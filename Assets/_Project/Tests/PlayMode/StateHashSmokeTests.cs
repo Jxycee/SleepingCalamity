@@ -298,6 +298,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "clean before drift");
             haul.Session.Stir.OnFloorCleared(2);   // the stir alone, not DiveSession.ClearFloor: floor 2 is not in the session's cleared mask
             Assert.That(haul.Session.Stir.Capture().FloorMask, Is.Not.EqualTo(0), "test premise: the stir counted a floor");
+            yield return PlayModeHarness.WaitUntil(() => haul.Current.StirValue > 0, Timeout, "the drifted stir was never published");   // the check polls until clean, so it must start after the publish
 
             string message = null;
             yield return Catch(ReplicatedStateHash.AssertBagsAndStirMatchHost(rig.Peers, "stir drift", 2f), m => message = m);

@@ -86,20 +86,33 @@ namespace SleepingCalamity.Tests.PlayMode
             var lines = new List<string>();
             if (nm == null || !nm.IsListening) return "(not listening)";
             PlayerBagSync own = PlayerBagSync.ForLocalPlayer(nm);
-            lines.Add("own bag view (client " + nm.LocalClientId + ") = " + (own == null ? "none" : Canon(own.View)));
+            lines.Add("own bag view (client " + nm.LocalClientId + ") = " + (own == null ? "none" : BagText(own.View)));
             DiveHaulSync haul = HostHaul(nm);
             if (haul != null)
             {
                 foreach (ulong cid in nm.ConnectedClientsIds)
                 {
                     PlayerBag bag = haul.ServerBagOf(cid);
-                    lines.Add("host bag of client " + cid + " = " + (bag == null ? "none" : Canon(BagView.From(bag))));
+                    lines.Add("host bag of client " + cid + " = " + (bag == null ? "none" : BagText(BagView.From(bag))));
                 }
                 DiveStir.State st = haul.Session.Stir.Capture();
                 lines.Add("host stir state = floorMask " + st.FloorMask + " valuables " + st.Valuables + " baseline " + st.ValuablesBaseline + " secondHalf " + st.SecondHalf + " extra " + st.Extra + " hunter " + st.Hunter
                     + " collapseUsed " + st.CollapseUsed + " running " + st.Running + " secondsLeft " + st.SecondsLeft + " rewardCarry " + st.RewardCarry + "; carried valuables " + haul.Session.Bags.CarriedValuables() + " cleared mask " + haul.Session.Snapshot().ClearedMask + " published " + Canon(haul.Current));
             }
             return string.Join("\n", lines);
+        }
+
+        // BagView holds FixedLists (their IEnumerable throws), so Canon cannot walk it: list the lists by index and the scalars by name.
+        private static string BagText(BagView v)
+        {
+            var sb = new StringBuilder("{carried=[");
+            for (int i = 0; i < v.Carried.Length; i++) sb.Append(i > 0 ? "," : "").Append(v.Carried[i]);
+            sb.Append("] picks=[");
+            for (int i = 0; i < v.Picks.Length; i++) sb.Append(i > 0 ? "," : "").Append(v.Picks[i]);
+            sb.Append("] gold=").Append(v.Gold).Append(" diveGold=").Append(v.DiveGold).Append(" stash=").Append(v.StashTotal).Append(" banked=").Append(v.BankedThisDive).Append(" slots=").Append(v.SlotCapacity)
+              .Append(" bankOpen=").Append(v.BankOpen).Append(" satchelWaiting=").Append(v.SatchelWaiting).Append(" satchelCarried=").Append(v.SatchelCarried).Append(" boots=").Append(v.HasBoots)
+              .Append(" satchelFloor=").Append(v.SatchelFloor).Append(" satchelItems=").Append(v.SatchelItems).Append(" chestSeed=").Append(v.ChestSeed).Append(" chestFloor=").Append(v.ChestFloor).Append(" opened=").Append(v.OpenedChests).Append('}');
+            return sb.ToString();
         }
 
         private static DiveHaulSync HostHaul(NetworkManager nm)
@@ -128,7 +141,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 PlayerBag bag = haul.ServerBagOf(nm.LocalClientId);
                 BagView expected = BagView.From(bag);
                 if (!s.View.Equals(expected))
-                    sb.AppendLine("bag of client " + nm.LocalClientId + ": " + Label(nm) + " sees " + Canon(s.View) + " but the host's bag is " + Canon(expected));
+                    sb.AppendLine("bag of client " + nm.LocalClientId + ": " + Label(nm) + " sees " + BagText(s.View) + " but the host's bag is " + BagText(expected));
             }
             return sb.Length == 0 ? null : sb.ToString();
         }
@@ -145,7 +158,8 @@ namespace SleepingCalamity.Tests.PlayMode
             var fresh = new DiveStir();
             fresh.Restore(new DiveStir.State(0, 0, st.ValuablesBaseline, st.SecondHalf, st.Extra, st.Hunter, st.CollapseUsed, st.Running, st.SecondsLeft, st.RewardCarry));
             int mask = ses.Snapshot().ClearedMask;
-            for (int f = UndercroftPlan.FirstFloor; f <= UndercroftPlan.BossFloor; f++) if ((mask & (1 << (f - 1))) != 0) fresh.OnFloorCleared(f);
+            for (int f = UndercroftPlan.FirstFloor; f <= UndercroftPlan.BossFloor; f++)
+                if ((mask & (1 << (f - 1))) != 0 && !(ses.StartedAtBank && f == UndercroftPlan.BankFloor)) fresh.OnFloorCleared(f);   // a dive that starts at the bank has floor 5 cleared WITHOUT stirring (DiveSession.TryStart)
             bool inDive = ses.Phase == DivePhase.Floor || ses.Phase == DivePhase.BankRoom;
             fresh.PlayersPresent = Mathf.Max(1, hostNm.ConnectedClientsIds.Count);
             fresh.UnbankedValuables = inDive ? ses.Bags.CarriedValuables() : st.Valuables;
