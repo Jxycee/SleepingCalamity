@@ -168,7 +168,6 @@ namespace SleepingCalamity.Tests.PlayMode
                     while ((cs.State.ValveMask & (1 << v)) == 0)
                     {
                         if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail("valve " + v + " never turned (mask " + cs.State.ValveMask + "); hero at " + rig.HostHero.transform.position + ", valve at " + at + ", up " + rig.HostHero.GetComponent<HeroVitals>().IsUp);
-                        Move(rig.HostHero, at + new Vector3(0.6f, 0.1f, 0f));   // the hero stands still for the hold: pinned every frame (a live hero drifts off the valve at ~2 m/s about 0.4 s after a Move, with the CharacterController on, grounded, zero velocity and no pending teleport: seen 2026-11-06, cause not found; the pin makes the test about the host rules, not about physics)
                         cs.ServerReportValve(hostId, v);
                         yield return null;
                     }
@@ -183,7 +182,6 @@ namespace SleepingCalamity.Tests.PlayMode
                 while (!cs.State.PumpStarted)
                 {
                     if (Time.realtimeSinceStartupAsDouble > until) Assert.Fail("the pump never started");
-                    Move(rig.HostHero, pump + new Vector3(1.2f, 0.1f, 0f));   // pinned in the ring (see the valve hold)
                     cs.ServerTryStartPump(hostId);
                     yield return null;
                 }
@@ -192,7 +190,6 @@ namespace SleepingCalamity.Tests.PlayMode
             while (!cs.State.ExitUnlocked)
             {
                 if (Time.realtimeSinceStartupAsDouble > done) Assert.Fail("the objective never unlocked the exit (objective " + cs.CurrentObjective + ", valves " + cs.ValvesTurned + ", pump " + cs.State.PumpPercent + "%)");
-                if (cs.CurrentObjective == FloorObjective.HoldPump && cs.TryPumpPosition(out Vector3 ring)) Move(rig.HostHero, ring + new Vector3(1.2f, 0.1f, 0f));   // stays in the ring until it is done
                 yield return null;
             }
         }
