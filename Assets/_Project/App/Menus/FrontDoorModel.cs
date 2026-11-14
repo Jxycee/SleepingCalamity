@@ -68,6 +68,7 @@ namespace SleepingCalamity.App
         public IReadOnlyList<FrontDoorPlayerRow> Players;   // the same players with their keys (the host's remove action)
         public string LastPlayed;                  // "2026-11-12 10:30", or ""
         public bool Selected;
+        public bool Damaged;                       // the world's file cannot be read (audit A6): listed so it can be set aside, never selected or opened
     }
 
     // What the front door needs of the world library (WorldSaveFlow implements it).
@@ -360,7 +361,9 @@ namespace SleepingCalamity.App
             get
             {
                 if (state != FrontDoorState.Worlds) return FrontDoorAction.Off();
-                return rows.Count < WorldSummary.MaxPerList ? FrontDoorAction.On : FrontDoorAction.Off(UiText.WorldLibraryFull(worldsKind));
+                int readable = 0;
+                foreach (FrontDoorWorldRow r in rows) if (!r.Damaged) readable++;   // a damaged world takes no place (audit A6)
+                return readable < WorldSummary.MaxPerList ? FrontDoorAction.On : FrontDoorAction.Off(UiText.WorldLibraryFull(worldsKind));
             }
         }
 
@@ -422,7 +425,8 @@ namespace SleepingCalamity.App
 
         public void SelectWorld(string worldId)
         {
-            if (state != FrontDoorState.Worlds || FindRow(worldId) == null) return;
+            FrontDoorWorldRow picked = FindRow(worldId);
+            if (state != FrontDoorState.Worlds || picked == null || picked.Damaged) return;   // a damaged world can be set aside, never picked (audit A6)
             worlds.Select(worldId);
             RebuildRows();
             Touch();
@@ -514,21 +518,36 @@ namespace SleepingCalamity.App
 
         private Task BeginHost() => Begin(Attempt.Host, () => session.HostOnlineAsync(CancellationToken.None));
 
-        private bool PrepareHost()
+        private bool PrepareHost() => PrepareWorld(WorldKind.Multiplayer, IdentityKind.Ugs);
+
+        // Picks the world a start opens: the selected one, else the newest readable one, else a new one. Audit A6: a selected world that is damaged is never
+        // swapped for another one behind the player's back (nothing starts, the notice says why); a list of damaged worlds only counts as empty.
+        // False when nothing can start (damaged pick, or no room for a new world).
+        private bool PrepareWorld(WorldKind kind, IdentityKind identity)
         {
-            IReadOnlyList<WorldSummary> list = worlds.ListWorlds(WorldKind.Multiplayer, IdentityKind.Ugs);
-            if (list.Count == 0)
+            IReadOnlyList<WorldSummary> list = worlds.ListWorlds(kind, identity);
+            string selected = worlds.SelectedWorldId;
+            WorldSummary picked = Find(list, selected);
+            if (picked != null && picked.Damaged)
             {
-                if (worlds.CreateWorld(WorldKind.Multiplayer, IdentityKind.Ugs) == null)
+                Notice = UiText.Toast("save.world_damaged");
+                Touch();
+                return false;
+            }
+            WorldSummary newest = null;
+            foreach (WorldSummary w in list) if (!w.Damaged) { newest = w; break; }
+            if (newest == null)
+            {
+                if (worlds.CreateWorld(kind, identity) == null)
                 {
-                    Notice = UiText.WorldLibraryFull(WorldKind.Multiplayer);
+                    Notice = UiText.WorldLibraryFull(kind);
                     Touch();
                     return false;
                 }
             }
-            else if (!Contains(list, worlds.SelectedWorldId))
+            else if (picked == null)
             {
-                worlds.Select(list[0].Id);
+                worlds.Select(newest.Id);
             }
             return true;
         }
@@ -635,24 +654,7 @@ namespace SleepingCalamity.App
         private Task BeginSolo() => Begin(Attempt.Solo, () => session.StartLocalAsync(false, CancellationToken.None));
 
         // Picks the world a solo start opens (the selected one, else the newest, else a new one). False when there is no room for a new one.
-        private bool PrepareSolo()
-        {
-            IReadOnlyList<WorldSummary> list = worlds.ListWorlds(WorldKind.Solo, IdentityKind.Local);
-            if (list.Count == 0)
-            {
-                if (worlds.CreateWorld(WorldKind.Solo, IdentityKind.Local) == null)
-                {
-                    Notice = UiText.WorldLibraryFull(WorldKind.Solo);
-                    Touch();
-                    return false;
-                }
-            }
-            else if (!Contains(list, worlds.SelectedWorldId))
-            {
-                worlds.Select(list[0].Id);
-            }
-            return true;
-        }
+        private bool PrepareSolo() => PrepareWorld(WorldKind.Solo, IdentityKind.Local);
 
         // One start attempt. The session raises Ended itself when it fails (the reason there wins); the exception is only a fallback.
         private async Task Begin(Attempt kind, Func<Task> start)
@@ -786,7 +788,8 @@ namespace SleepingCalamity.App
                     PlayerNames = w.PlayerNames,
                     Players = PlayerRows(w),
                     LastPlayed = ShortTime(w.LastPlayedUtc),
-                    Selected = w.Id == selected,
+                    Selected = w.Id == selected && !w.Damaged,
+                    Damaged = w.Damaged,
                 });
             }
         }
@@ -818,11 +821,11 @@ namespace SleepingCalamity.App
             return null;
         }
 
-        private static bool Contains(IReadOnlyList<WorldSummary> list, string id)
+        private static WorldSummary Find(IReadOnlyList<WorldSummary> list, string id)
         {
-            if (string.IsNullOrEmpty(id)) return false;
-            foreach (WorldSummary w in list) if (w.Id == id) return true;
-            return false;
+            if (string.IsNullOrEmpty(id)) return null;
+            foreach (WorldSummary w in list) if (w.Id == id) return w;
+            return null;
         }
 
         private static string ShortTime(string iso) => string.IsNullOrEmpty(iso) ? "" : (iso.Length >= 16 ? iso.Substring(0, 16).Replace('T', ' ') : iso);

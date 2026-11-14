@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using SleepingCalamity.Core;
 using SleepingCalamity.Runtime;
@@ -120,6 +121,34 @@ namespace SleepingCalamity.Tests.EditMode
             string[] aside = Directory.GetFiles(_library.Directory, id + ".json.old-*");
             Assert.That(aside.Length, Is.GreaterThan(0), "but the files are still on disk");
             Assert.That(_library.HasRoom(WorldKind.Solo, IdentityKind.Local), Is.True);
+        }
+
+        // Catches (audit A6): a world whose file cannot be read (junk, or a players section with an unknown kind) vanishing from the picker, so the host
+        // flow opens another world and the files are never mentioned; a damaged world taking one of the ten places of every list; and setting it aside
+        // not working. NOT covered: what the picker shows (FrontDoorModelTests) and the host flow (WorldSaveFlowTests).
+        [Test]
+        public void UnreadableWorld_IsListedAsDamaged()
+        {
+            WorldSaveStore good = _library.Create(WorldKind.Solo, IdentityKind.Local, 1UL);
+            string junkId = WorldIds.NewId();
+            File.WriteAllText(_library.PathOf(junkId), "not json at all");
+            string badKindId = WorldIds.NewId();
+            File.WriteAllText(_library.PathOf(badKindId), WorldSaveStoreTests.GoldenV1.Replace("\"kind\": 1", "\"kind\": 9"));   // parses; its players section is unusable
+
+            List<WorldSummary> solo = _library.List(WorldKind.Solo, IdentityKind.Local);
+            Assert.That(solo.Select(w => w.Id), Is.EquivalentTo(new[] { good.Current.WorldId, junkId, badKindId }), "all three files are listed");
+            Assert.That(solo.Single(w => w.Id == good.Current.WorldId).Damaged, Is.False);
+            Assert.That(solo.Single(w => w.Id == junkId).Damaged, Is.True, "unreadable file");
+            Assert.That(solo.Single(w => w.Id == badKindId).Damaged, Is.True, "unusable players section");
+            Assert.That(_library.List(WorldKind.Multiplayer, IdentityKind.Ugs).Select(w => w.Id), Is.EquivalentTo(new[] { junkId, badKindId }),
+                "its kind is unknown, so every list shows it (and only it)");
+
+            for (int i = 1; i < WorldSummary.MaxPerList; i++) Assert.That(_library.Create(WorldKind.Solo, IdentityKind.Local, (ulong)i + 1), Is.Not.Null, "world " + (i + 1) + ": damaged files take no place");
+            Assert.That(_library.HasRoom(WorldKind.Solo, IdentityKind.Local), Is.False, "ten good worlds fill the list");
+
+            Assert.That(_library.Delete(junkId), Is.True, "a damaged world can be set aside");
+            Assert.That(_library.List(WorldKind.Solo, IdentityKind.Local).Select(w => w.Id), Does.Not.Contain(junkId));
+            Assert.That(Directory.GetFiles(_library.Directory, junkId + ".json.old-*").Length, Is.GreaterThan(0), "and its file is still on disk");
         }
 
         // Catches (security of the file name): an id with path characters reaching the file system.

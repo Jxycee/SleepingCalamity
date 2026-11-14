@@ -157,6 +157,14 @@ namespace SleepingCalamity.Tests.EditMode
             return w;
         }
 
+        // A world file the library cannot read (audit A6): listed, kind unknown, never selectable.
+        public WorldSummary AddDamaged()
+        {
+            var w = new WorldSummary { Id = "w" + nextId++, Damaged = true };
+            All.Add(w);   // no last-played time: it sorts after the readable worlds, like WorldLibrary.List
+            return w;
+        }
+
         public void Select(string worldId) => SelectedWorldId = worldId;
 
         public IReadOnlyList<WorldSummary> ListWorlds(WorldKind kind, IdentityKind identity)
@@ -171,7 +179,7 @@ namespace SleepingCalamity.Tests.EditMode
         public string CreateWorld(WorldKind kind, IdentityKind identity)
         {
             int count = 0;
-            foreach (WorldSummary w in All) if (w.Matches(kind, identity)) count++;
+            foreach (WorldSummary w in All) if (!w.Damaged && w.Matches(kind, identity)) count++;
             if (count >= WorldSummary.MaxPerList) return null;
             WorldSummary created = Add(kind, identity, "?");
             Created.Add(created.Id);

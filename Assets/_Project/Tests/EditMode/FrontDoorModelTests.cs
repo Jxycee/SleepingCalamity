@@ -92,6 +92,70 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(model.Rows[0].Selected, Is.True, "the new world is the selected one, listed first");
         }
 
+        // Catches (audit A6): a world whose file cannot be read missing from the list (the player never learns why it is gone), being selectable, or
+        // taking one of the ten places.
+        [Test]
+        public void Worlds_DamagedWorld_IsListedAsDamaged_CannotBeSelected_AndTakesNoPlace()
+        {
+            WorldSummary good = worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            for (int i = 1; i < WorldSummary.MaxPerList; i++) worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            WorldSummary damaged = worlds.AddDamaged();
+            worlds.Select(good.Id);
+            model.OpenWorlds(WorldKind.Solo);
+
+            Assert.That(model.Rows, Has.Count.EqualTo(WorldSummary.MaxPerList + 1));
+            FrontDoorWorldRow row = model.Rows[WorldSummary.MaxPerList];
+            Assert.That(row.Id, Is.EqualTo(damaged.Id));
+            Assert.That(row.Damaged, Is.True);
+            Assert.That(model.Rows[0].Damaged, Is.False);
+            Assert.That(model.NewWorldAction.Enabled, Is.False, "ten readable worlds fill the list; the damaged one is not counted as an eleventh");
+
+            model.SelectWorld(damaged.Id);
+            Assert.That(worlds.SelectedWorldId, Is.EqualTo(good.Id), "a damaged world cannot be picked");
+
+            model.RequestDelete(damaged.Id);
+            Assert.That(model.PendingDeleteId, Is.EqualTo(damaged.Id), "but it can be set aside");
+        }
+
+        // Catches (audit A6): a damaged world counted as a place (a list of readable worlds 9 + 1 damaged showing "full").
+        [Test]
+        public void Worlds_NineReadableAndADamaged_StillHasRoom()
+        {
+            for (int i = 0; i < WorldSummary.MaxPerList - 1; i++) worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            worlds.AddDamaged();
+            model.OpenWorlds(WorldKind.Solo);
+            Assert.That(model.NewWorldAction.Enabled, Is.True);
+        }
+
+        // Catches (audit A6): Play opening the newest readable world (or making one) when the world the player had picked has become damaged.
+        [Test]
+        public void Title_PlaySolo_PickedWorldDamaged_StartsNothingAndSaysWhy()
+        {
+            worlds.Add(WorldKind.Solo, IdentityKind.Local, "Ann");
+            WorldSummary damaged = worlds.AddDamaged();
+            worlds.Select(damaged.Id);
+
+            model.PlaySolo();
+
+            Assert.That(session.Calls, Is.Empty, "no session was started");
+            Assert.That(worlds.SelectedWorldId, Is.EqualTo(damaged.Id), "the pick was not swapped");
+            Assert.That(worlds.Created, Is.Empty);
+            Assert.That(model.Notice, Is.EqualTo(UiText.Toast("save.world_damaged")));
+        }
+
+        // Catches (audit A6): a list holding only damaged files counting as "has worlds", so Play never makes a first one, or opens a damaged file.
+        [Test]
+        public void Title_PlaySolo_OnlyDamagedWorlds_MakesANewOne()
+        {
+            worlds.AddDamaged();
+
+            model.PlaySolo();
+
+            Assert.That(worlds.Created, Has.Count.EqualTo(1));
+            Assert.That(worlds.SelectedWorldId, Is.EqualTo(worlds.Created[0]));
+            Assert.That(session.Calls, Is.EqualTo(new[] { "StartLocal(false)" }));
+        }
+
         [Test]
         public void Worlds_Delete_AsksFirst()
         {
