@@ -10,6 +10,7 @@ The user works fast and in many directions at once (their words, 2026-10-25: "I 
 Sources of truth, in this order: the user's words today → `docs/superpowers/handoff/CURRENT.md` (Now / Next / Inbox) → `docs/PHASE1.md` and the active plan under `docs/superpowers/plans/` → `docs/superpowers/handoff/QUEUE.md`.
 
 ## 1. Open the session (5 minutes, before any other work)
+Read `sc-coordinator` first (once per coordinator session): it is the playbook for running the other sessions; this skill steers your own.
 1. Read `CURRENT.md`'s Now, Next and Inbox sections (not the whole file) and `git branch -r` for open branches.
 2. Rank candidate work with this order, top first:
    1. anything **blocking the user** or a broken `main` / red check;
