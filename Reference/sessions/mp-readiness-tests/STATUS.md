@@ -1,4 +1,4 @@
-State: DONE (tests written and run, branch claude/mp-readiness-tests pushed, not merged)
+State: merged to main; Archive: ready
 Started: 2026-11-14
 Branch: claude/mp-readiness-tests
 Job: QUEUE.md "Ready: multiplayer readiness (M7)", the 3-4 player smoke (triage Q1) and the network-conditions set (triage Q6). Tests only; no game code, no ReplicatedStateHash, no DiveWalkQaTests changes.
