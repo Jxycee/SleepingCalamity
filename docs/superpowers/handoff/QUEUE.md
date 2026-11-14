@@ -63,9 +63,9 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [x] **M** Dev-only bank keys: confirm push-on / go-home have real input everywhere (folded into PL-1 task 1.5)
 
 ## Ready: multiplayer readiness (M7)
-- [ ] **M** 3-4 player smoke with bots + MPPM (triage Q1) [U][net]
+- [x] **M** 3-4 player smoke with bots + MPPM (triage Q1) [U][net]
 - [ ] **M** State-hash "no desync" pass bar: add per-player bags and the 7-floor stir to the hash (triage Q2) [U][net]
-- [ ] **S** Network conditions test set at 150 ms / 2% and 300 ms / 5% (triage Q6 default; user may change) [U][net]
+- [x] **S** Network conditions test set at 150 ms / 2% and 300 ms / 5% (triage Q6 default; user may change) [U][net]
 
 ## Ready: save and netcode audit (2026-11-12, `docs/superpowers/audits/2026-11-12-save-netcode-audit.md`; each item names its finding and proposed test there)
 - [x] **S** A1 (blocker, done 2026-11-13, merge of claude/audit-fixes): a stale-connection takeover must not free the rejoining player's own Lobby seat (`UgsNetworkSession.NgoEvents.cs:48-62`, `ConnectionApprover.cs:182-202`); turn the `AUDIT A1` ignored test or repro into a passing test [U][net]

@@ -175,7 +175,7 @@ namespace SleepingCalamity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Stairs_F1ToF3_ThenHome_NoHeroSinksAndTheHoldClears([Values(NetCondition.None, NetCondition.Rtt150Loss2)] NetCondition net)
+        public IEnumerator Stairs_F1ToF3_ThenHome_NoHeroSinksAndTheHoldClears([Values(NetCondition.None, NetCondition.Rtt150Loss2, NetCondition.Rtt300Loss5)] NetCondition net)
         {
             Failures.Clear();
             Rig r = null;
