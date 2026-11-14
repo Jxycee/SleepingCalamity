@@ -151,3 +151,17 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
   - Say in the brief that the dungeon is floors 1 to 7 of the Undercroft in code, and that the spec, STORY and the concept sheet disagree on floor themes and on the Dough-warden. The run found this from scans.
   - Say that downloads need the user's Fab sign-in, so picks can be confirmed but not fetched by the run.
 
+### 2026-11-13, Run 2b: coordinator playbook (`.claude/skills/sc-coordinator/SKILL.md`)
+- **Cost.** Weekly Fable 42% to 47% (5 points). Weekly all models 26% to 29%. 5-hour window 74% to 94% in about 70 minutes, measured before the merge and the memory trim. Account numbers; the coordinator session was also active. Session context ended near 195k tokens.
+- **Where it went.** Three subagents (Haiku repo digest 76k tokens, Haiku transcript search 125k, Sonnet review 54k). Fable read the four short skills, the coordinator memories (about 4,600 words) and about 150 lines of handoff and plan text itself, and wrote one skill of about 2,200 words.
+- **What worked.**
+  - Two scans launched in the first message, with the short files read directly while they ran.
+  - Trims and review fixes applied by one small replace script per round instead of many edits.
+  - The Sonnet review found two real gaps: a handoff step that would stall on a turn that can't start sessions, and unclear wording on the `fixer` exception.
+- **What to brief differently.**
+  - Start in a fresh 5-hour window (the third run to say so). This one began at 74% and reached 94% before the merge.
+  - The transcript search returned snippets, not incidents. The lessons listed in the brief by the outgoing coordinator were worth more. A coordinator should note incidents in the shared notes folder as they happen.
+  - Seven required topics don't fit in 1,500 words. Give the word target or the coverage list priority.
+  - A session can't authorise edits to `CLAUDE.md` or `.claude/rules/`. If a run needs one, the user asks for it directly, or the run leaves the exact line for them.
+  - A playbook for cloud coordinators can't lean on PC-only things (memories, the board, `~/.claude/coordinator/`). Say so in the brief.
+
