@@ -39,7 +39,7 @@ namespace SleepingCalamity.EditorTools
             foreach (string dir in dirs)
             {
                 string name = Path.GetFileName(dir); string code = name.Split('_')[0];
-                if (Skip.Contains(code)) continue;
+                if (Skip.Contains(code) || code.StartsWith("C") || code == "A04") continue;   // C and A04 folders belong to B2CellarIntake
                 if (Directory.GetFiles(dir, "*.fbx").Length == 0) continue;
                 try { Adopt(code, dir); made++; }
                 catch (Exception e) { failed.Add(code + ": " + e.Message); Debug.LogError("SC B1 FAIL " + code + ": " + e); }

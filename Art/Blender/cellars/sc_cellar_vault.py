@@ -424,13 +424,13 @@ def p_niche_wall():
         for ci, cx in enumerate(NICHE_X):
             box(pc, 'vault', (NICHE_W + 0.2, NICHE_D + 0.12, 0.07), (cx, -NICHE_D / 2 + 0.06, z0 - 0.025), Rx(R.uniform(-0.8, 0.8)), cham=0.025, wob=0.004, seed=R.random() * 90)
             zs = z0 + NICHE_H - NICHE_W / 2
-            n = 5
+            n = 9   # 2026-11-15: was 5 big blocks whose boxes left wedge gaps (chip islands); 9 voussoirs sized at the ring's mid radius read as one brick arch
             for i in range(n):
                 am = 180 / n * (i + 0.5)
-                tang = 2 * (NICHE_W / 2) * math.tan(math.radians(180 / n / 2)) * 1.02
+                tang = 2 * (NICHE_W / 2 + 0.05) * math.tan(math.radians(180 / n / 2)) * 1.03
                 # ring stops at r 0.46 + 0.12: 0.14 m of plain wall (a pier) stays between neighbouring rings
                 # seated: inner radius 0.02 inside the niche opening, 0.07 m embedded into the wall face (y -0.07..0.05), tangential 1.07 so joints close
-                arc_stone(pc, 'brick', cx, zs, am, NICHE_W / 2 - 0.02, NICHE_W / 2 + 0.12, tang * 1.05, -0.01, 0.12, cham=0.012, R=R, tilt=R.uniform(-0.3, 0.3), wob=0.0015)
+                arc_stone(pc, 'brick', cx, zs, am, NICHE_W / 2 - 0.02, NICHE_W / 2 + 0.12, tang * 1.05, -0.01, 0.12, cham=0.008, R=R, tilt=R.uniform(-0.1, 0.1), wob=0.0008)
     # (the render windows are part of the wall body cutters above)
     # bottles lying in the niches (neck out, y -0.36 .. -0.04)
     for ri, z0 in enumerate(NICHE_Z):

@@ -120,6 +120,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **M** Wren's cat Tuppence: own mesh on a borrowed quadruped rig (Mesh2Motion fox / Quaternius cat), follow-Wren via Animation Rigging look-at [A][U][net]
 - [x] **S** Townsfolk idle-work loops: map UAL2 farming/fishing/carry clips to baker, smith, innkeeper, Saltwake fisherman; list gaps to generate with HY-Motion via Tencent's HF Space (local 12 GB GPU can't run it) or MoMask locally (personal-use licence bar, user 2026-11-06) (`b3b146e9`, `docs/research/2026-11-06-townsfolk-clip-map.md`)
 - [ ] **M** MPFB2 hero/townsfolk base test: one CC0 body on `game_engine` rig through `HeroAnimator.controller` [A][U]
+- [ ] **M** B2 downloads + adoption (needs user's Fab sign-in): fetch list in `Reference/sessions/b2-cellar-intake/STATUS.md`; then run `B2CellarIntake.Run`, contact sheet beside C2, audit [A][U]
 
 ## Ready: design notes (docs only, placeholders marked)
 - [x] **S** Gold sink proposal: what gold buys (triage :52; tuning blocked without it) (`5854759a`, `docs/superpowers/specs/2026-11-06-gold-economy-proposal.md`)
