@@ -22,6 +22,8 @@ namespace SleepingCalamity.EditorTools
         const string MatFolder = "Assets/_Project/Content/Materials/B2";
         const int Cap = 2048;
         static readonly HashSet<string> Skip = new HashSet<string> { "C01", "C02", "C15" };   // adopted in B0 (DungeonCornerBuilder / B0Fab)
+        static readonly HashSet<string> Plants = new HashSet<string>();
+        static readonly HashSet<string> Decals = new HashSet<string> { "C03a", "C03b", "C03c", "C03d" };   // opacity goes into albedo alpha (alpha clip)
         // Props whose source is far off real size: the prefab is scaled so the LOD0 bounds are this tall (m).
         static readonly Dictionary<string, float> TargetHeight = new Dictionary<string, float>();
         const string L04Pick = "Composition_7";
@@ -42,7 +44,7 @@ namespace SleepingCalamity.EditorTools
             }
             AssetDatabase.SaveAssets(); AssetDatabase.Refresh();
             Debug.Log("SC B2 DONE prefabs=" + made + " materialSets=" + sets + " failed=" + failed.Count);
-            if (failed.Count > 0) throw new InvalidOperationException("B1 intake failures: " + string.Join("; ", failed));
+            if (failed.Count > 0) throw new InvalidOperationException("B2 intake failures: " + string.Join("; ", failed));
         }
 
         // Texture-set listings (no mesh): only the packed material under Content/Materials/B2.
@@ -182,7 +184,7 @@ namespace SleepingCalamity.EditorTools
         {
             string bc = Find(srcDir, "BaseColor"), nr = Find(srcDir, "Normal"), ro = Find(srcDir, "Roughness"), ao = Find(srcDir, "AO"), me = Find(srcDir, "Metalness"), op = Find(srcDir, "Opacity");
             if (bc == null || nr == null || ro == null) throw new InvalidOperationException("missing BaseColor/Normal/Roughness");
-            bool alpha = plant && op != null;
+            bool alpha = (plant || Decals.Contains(code)) && op != null;
             var written = new List<string>();
             string albedo = dst + "/" + code + "_albedo." + (alpha ? "png" : "jpg"), normal = dst + "/" + code + "_normal.jpg", ms = dst + "/" + code + "_ms.png", occ = dst + "/" + code + "_occ.png";
 
