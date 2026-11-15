@@ -42,33 +42,33 @@ namespace SleepingCalamity.Core.Combat
 
         public readonly string Id, Name;
         public readonly AttackKind Kind;
-        public readonly int TotalFrames;
-        public readonly FrameWindow HitOn;            // the hitbox is live
-        public readonly FrameWindow ComboOpen;        // a press here chains into the next normal hit
-        public readonly FrameWindow FinisherAllowed;  // a press here chains into the finisher
-        public readonly int CancelFrom;               // from this frame on the attack can be cancelled into the next attack or a dodge
-        public readonly FrameWindow IFrames;          // the attacker cannot be hit (rare: dodge-attacks, charge armour)
-        public readonly FrameWindow SuperArmor;       // the attacker is not staggered by hits
-        public readonly FrameWindow Turn;             // the attacker turns toward its target at TurnDegPerSec
-        public readonly float TurnDegPerSec;
-        public readonly FrameWindow Lunge;            // the attacker slides forward LungeMeters over this window
-        public readonly float LungeMeters;
-        public readonly float Multiplier;             // the move multiplier in the damage formula (6.5)
+        public int TotalFrames { get; private set; }
+        public FrameWindow HitOn { get; private set; }            // the hitbox is live
+        public FrameWindow ComboOpen { get; private set; }        // a press here chains into the next normal hit
+        public FrameWindow FinisherAllowed { get; private set; }  // a press here chains into the finisher
+        public int CancelFrom { get; private set; }               // from this frame on the attack can be cancelled into the next attack or a dodge
+        public FrameWindow IFrames { get; private set; }          // the attacker cannot be hit (rare: dodge-attacks, charge armour)
+        public FrameWindow SuperArmor { get; private set; }       // the attacker is not staggered by hits
+        public FrameWindow Turn { get; private set; }             // the attacker turns toward its target at TurnDegPerSec
+        public float TurnDegPerSec { get; private set; }
+        public FrameWindow Lunge { get; private set; }            // the attacker slides forward LungeMeters over this window
+        public float LungeMeters { get; private set; }
+        public float Multiplier { get; private set; }             // the move multiplier in the damage formula (6.5)
         public readonly HitShape Shape;
         public readonly HitOrigin Origin;
-        public readonly float Range;                  // cone / ray length, or the circle radius (m)
-        public readonly float HalfAngleDeg;           // cone half angle
-        public readonly float HeightBand;             // +- metres around the attacker's feet
-        public readonly float Knockback;              // metres the victim is pushed (halved on a heavy enemy by its own rules)
-        public readonly float Revenge;                // what a hit adds to the revenge gauge (opener 1, finisher 3, charge 4)
-        public readonly int HitstopFrames;            // cosmetic, attacker side
-        public readonly float CameraKick;             // cosmetic, attacker side (0..1)
-        public readonly bool GuardBreak;              // passes a guard and a broom's bristles
-        public readonly bool Guardable;               // enemy attacks only: a guard or parry can answer it
-        public readonly bool Fire;                    // spells: the hit carries the staff's element
+        public float Range { get; private set; }                  // cone / ray length, or the circle radius (m)
+        public float HalfAngleDeg { get; private set; }           // cone half angle
+        public float HeightBand { get; private set; }             // +- metres around the attacker's feet
+        public float Knockback { get; private set; }              // metres the victim is pushed (halved on a heavy enemy by its own rules)
+        public float Revenge { get; private set; }                // what a hit adds to the revenge gauge (opener 1, finisher 3, charge 4)
+        public int HitstopFrames { get; private set; }            // cosmetic, attacker side
+        public float CameraKick { get; private set; }             // cosmetic, attacker side (0..1)
+        public bool GuardBreak { get; private set; }              // passes a guard and a broom's bristles
+        public bool Guardable { get; private set; }               // enemy attacks only: a guard or parry can answer it
+        public bool Fire { get; private set; }                    // spells: the hit carries the staff's element
         public readonly int SpellPips;                // pips it costs
         public readonly EnemyTell Tell;               // enemy attacks: how the body stages the wind-up (EnemyTell); null for hero attacks
-        public readonly float Poise;                  // hero attacks: what a hit adds to the enemy's poise count (PoiseMeter); defaults to Revenge
+        public float Poise { get; private set; }                  // hero attacks: what a hit adds to the enemy's poise count (PoiseMeter); defaults to Revenge
         public readonly TokenCategory? TokenPool;     // enemy attacks: which attack-token pool this attack draws from; null = the enemy's own default (EnemyDefinition.CategoryOf)
 
         public AttackData(string id, string name, AttackKind kind, int totalFrames, FrameWindow hitOn, float multiplier, HitShape shape, float range,
@@ -113,6 +113,23 @@ namespace SleepingCalamity.Core.Combat
 
         public float TotalSeconds => TotalFrames / (float)FrameRate;
         public bool IsFinisher => Kind == AttackKind.Finisher;
+
+        // A full copy (same id, tell and token pool): the snapshot the enemy catalog keeps as its defaults and the rollback point of a rejected tuning.
+        public AttackData Copy() => new AttackData(Id, Name, Kind, TotalFrames, HitOn, Multiplier, Shape, Range, HalfAngleDeg, ComboOpen, FinisherAllowed, CancelFrom, IFrames,
+            SuperArmor, Turn, TurnDegPerSec, Lunge, LungeMeters, HeightBand, Knockback, Revenge, HitstopFrames, CameraKick, GuardBreak, Guardable, Fire, SpellPips, Origin,
+            Tell, Poise, TokenPool);
+
+        // The one way to change an attack's numbers after construction (Core/Tuning, AttackCatalog.TuneEnemyAttack): overwrite the tunable numbers, windows and
+        // flags with `v`'s, keeping THIS instance, so every holder of the reference sees the change. Id, Name, Kind, Shape, Origin, SpellPips, Tell and
+        // TokenPool are not touched. Startup only, before any attack runs; nothing here is replicated (every peer loads the same tuning files).
+        public void Retune(AttackData v)
+        {
+            if (v == null || ReferenceEquals(v, this)) return;
+            TotalFrames = v.TotalFrames; HitOn = v.HitOn; ComboOpen = v.ComboOpen; FinisherAllowed = v.FinisherAllowed; CancelFrom = v.CancelFrom;
+            IFrames = v.IFrames; SuperArmor = v.SuperArmor; Turn = v.Turn; TurnDegPerSec = v.TurnDegPerSec; Lunge = v.Lunge; LungeMeters = v.LungeMeters;
+            Multiplier = v.Multiplier; Range = v.Range; HalfAngleDeg = v.HalfAngleDeg; HeightBand = v.HeightBand; Knockback = v.Knockback; Revenge = v.Revenge;
+            HitstopFrames = v.HitstopFrames; CameraKick = v.CameraKick; GuardBreak = v.GuardBreak; Guardable = v.Guardable; Fire = v.Fire; Poise = v.Poise;
+        }
 
         // The same attack in the air: quicker (x0.85 frames), a touch weaker (x0.9), and the revenge values of KH's air hits (1.5, finisher 3.5). Poise is
         // the ground attack's.

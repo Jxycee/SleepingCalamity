@@ -369,6 +369,42 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Fail("Tools/balance_sim/data/game_numbers.json has drifted from the game numbers: run with SC_BALANCE_EXPORT=1 to regenerate it. " + string.Join("; ", diffs));
         }
 
+        // The simulator writes override files under the exporter's own key names; the tuning sections must accept every one of them, as written, with the
+        // exported value (so applying the exported numbers changes nothing and warns about nothing).
+        [Test]
+        public void ExportedEnemyAttackAndPacingKeys_ApplyVerbatimThroughTheTuningSections()
+        {
+            var log = new List<string>();
+            Core.Tuning.TuningStore.Reset();
+            Core.Tuning.TuningStore.Log = log.Add;
+            try
+            {
+                var before = new List<string>();
+                foreach (AttackData a in AttackCatalog.AllEnemyAttacks) before.Add(a.TotalFrames + "|" + a.HitOn + "|" + a.Multiplier + "|" + a.Range + "|" + a.GuardBreak + "|" + a.Guardable);
+                float cd = AttackPacing.CooldownSeconds(EnemyKind.RatKing, 2), rc = AttackPacing.RecoverSeconds(EnemyKind.RatKing, 1);
+                string json = ToJson(new Obj().Add("enemyAttacks", EnemyAttacks()).Add("enemyPacing", EnemyPacing()));
+                Assert.IsTrue(Core.Tuning.TuningStore.ApplyJson(json, "export.json"));
+                Assert.IsEmpty(log, string.Join("; ", log));
+                for (int i = 0; i < before.Count; i++)
+                {
+                    AttackData a = AttackCatalog.AllEnemyAttacks[i];
+                    Assert.AreEqual(before[i], a.TotalFrames + "|" + a.HitOn + "|" + a.Multiplier + "|" + a.Range + "|" + a.GuardBreak + "|" + a.Guardable, a.Id);
+                }
+                Assert.AreEqual(cd, AttackPacing.CooldownSeconds(EnemyKind.RatKing, 2));
+                Assert.AreEqual(rc, AttackPacing.RecoverSeconds(EnemyKind.RatKing, 1));
+
+                // and the values really land: every exported attack key set to a changed value moves the C# field it maps to
+                Assert.IsTrue(Core.Tuning.TuningStore.ApplyJson(@"{ ""enemyAttacks"": { ""rat_spin"": { ""mult"": 1.5, ""hitOnFrame"": 31, ""hitOffFrame"": 41, ""range"": 1.4, ""guardable"": false } } }", "alias.json"));
+                Assert.IsEmpty(log, string.Join("; ", log));
+                Assert.AreEqual(1.5f, AttackCatalog.RatSpin.Multiplier);
+                Assert.AreEqual(31, AttackCatalog.RatSpin.HitOn.Start);
+                Assert.AreEqual(41, AttackCatalog.RatSpin.HitOn.End);
+                Assert.AreEqual(1.4f, AttackCatalog.RatSpin.Range);
+                Assert.IsFalse(AttackCatalog.RatSpin.Guardable);
+            }
+            finally { Core.Tuning.TuningStore.Reset(); Core.Tuning.TuningStore.Log = null; }
+        }
+
         static string FirstDiff(JToken a, JToken b, string path)
         {
             if (a is JObject ao && b is JObject bo)

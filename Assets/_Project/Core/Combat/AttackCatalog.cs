@@ -156,5 +156,32 @@ namespace SleepingCalamity.Core.Combat
             foreach (AttackData a in AllEnemyAttacks) d[a.Id] = a;
             return d;
         }
+
+        // The code defaults of every enemy attack, cloned once at static init (after the catalogue above), so tuning can be undone. Tuning (Core/Tuning
+        // "enemyAttacks") changes the SAME instances in place (AttackData.Retune): EnemyDefinition.Attacks, AllEnemyAttacks, EnemyAttackById, the `==`
+        // identity checks and the network attack index (Array.IndexOf over AllEnemyAttacks) all stay valid. Startup only; every peer loads the same files.
+        static readonly AttackData[] s_enemyDefaults = SnapshotEnemyAttacks();
+
+        static AttackData[] SnapshotEnemyAttacks()
+        {
+            var d = new AttackData[AllEnemyAttacks.Length];
+            for (int i = 0; i < d.Length; i++) d[i] = AllEnemyAttacks[i].Copy();
+            return d;
+        }
+
+        // Back to the code defaults.
+        public static void ResetEnemyAttacks()
+        {
+            for (int i = 0; i < AllEnemyAttacks.Length; i++) AllEnemyAttacks[i].Retune(s_enemyDefaults[i]);
+        }
+
+        // Overwrite one enemy attack's tunable values in place from `tunedValues` (see AttackData.Retune). False for an unknown id. No rule check here:
+        // the tuning section runs EnemyAttackRules.Problem and rolls back.
+        public static bool TuneEnemyAttack(string id, AttackData tunedValues)
+        {
+            if (tunedValues == null || id == null || !EnemyAttackById.TryGetValue(id, out AttackData a)) return false;
+            a.Retune(tunedValues);
+            return true;
+        }
     }
 }
