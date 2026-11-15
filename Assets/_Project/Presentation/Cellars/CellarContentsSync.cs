@@ -1154,7 +1154,7 @@ namespace SleepingCalamity.Presentation
             else HaulSync.ServerAddItem(clientId, extra);
         }
 
-        // Crowded: gold for every present player each time a room becomes cleared; Ambush: more when the ambush room does. Per player through the ordinary ServerAddGold path.
+        // (Host only: PayRoomClear runs from the host's clear checks.) Crowded: gold for every present player each time a room becomes cleared; Ambush: more when the ambush room does. Per player through the ordinary ServerAddGold path.
         public int GoldPaidForClears { get; private set; }   // host only (tests): the total gold handed out by the Crowded / Ambush rewards
         private void PayRoomClear(int room)
         {
@@ -1169,7 +1169,24 @@ namespace SleepingCalamity.Presentation
                 if (plan.Twist == FloorTwist.Ambush && room == plan.AmbushRoom) each += _mods.AmbushRoomGold;
             }
             PayEveryone(each);
+            int rolls = _mods.ExtraRollsOnClear(room, _mods.Has(FloorModifier.FatLarder) ? CurrentPlan(FloorSync).FatRoom : -1);   // Brimming: every room; Fat Larder: the fat room. Same once-per-room guard as the gold above.
+            if (rolls > 0) PayExtraRolls(room, rolls);
         }
+
+        // Brimming / Fat Larder reward: `rolls` extra loot rolls for every connected hero with a bag, on the derived chest index 50000 + room (Stirred uses chestIndex + 1000 * k, chestIndex < 64: no collision). Host only.
+        private void PayExtraRolls(int room, int rolls)
+        {
+            if (HaulSync == null) return;
+            int bonus = HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(_layout.Floor) : 0;
+            bonus = _mods.ChestRankBonus(bonus);
+            foreach (ulong id in NetworkManager.ConnectedClientsIds)
+            {
+                PlayerBag bag = HaulSync.ServerBagOf(id);
+                if (bag == null) continue;
+                for (int k = 1; k <= rolls; k++) GiveExtraRoll(id, bag, ExtraRollChestBase + room, k, bonus);
+            }
+        }
+        private const int ExtraRollChestBase = 50000;
 
         // "Present" = every connected client with a hero in the dive, downed ones included (they are in the party); HaulSync.ServerAddGold skips anyone without a dive hero.
         private void PayEveryone(int each)

@@ -10,7 +10,7 @@
 //   - floor 4 (the bakery set-piece) is treated like any floor: its Combat rooms take extras and the hunter may roam it. Its fixed rooms keep every authored cell, so a legal cell
 //     is simply the room's remaining free floor.
 //   - procgen 3: the plan also carries the floor's roster (RosterMask, CellarFloorRoster) and, from BuildForDive only, its twist: Thin drops one spawn per room that has more than
-//     one (an authored spawn first, never the gate-key carrier or the warden; extras survive), Crowded adds one extra in about half the Combat rooms (at least one), Ambush names AmbushRoom (plan data; CellarAmbush picks the ring cells and CellarContentsSync springs them after a short delay).
+//     one (an authored spawn first, never the gate-key carrier or the warden; extras survive), Crowded adds one extra in about half the Combat rooms (at least one), Ambush names AmbushRoom (plan data; CellarAmbush picks the ring cells and CellarContentsSync springs them after a short delay), FatLarder adds exactly one Tier1 extra in FatRoom (the first Combat room with a free cell).
 //   - procgen 3b: no spawn stands on a chunk solid cell (CellarRoomChunks): extras and the hunter skip them, an authored spawn on one moves to the nearest free non-solid cell (never the gate-key carrier or the warden, whose logic is keyed to their cell). Build() (no twist) stays the plain plan the older tests and the carrier check use.
 // Own Rng stream, never touches the layout/dressing goldens. No float, no string hashing for decisions.
 // Authority: none (static data); the host consumes it.
@@ -32,10 +32,11 @@ namespace SleepingCalamity.Core
         public readonly uint Seed; public readonly int Floor, ExtraPerRoom; public readonly bool HunterLatched;
         public readonly int RosterMask;                           // Tier1 kinds allowed on this floor (CellarFloorRoster bits); spawners pick only these
         public readonly FloorTwist Twist; public readonly int AmbushRoom;   // AmbushRoom: room index when Twist is Ambush, else -1
+        public readonly int FatRoom;                              // room index of the Fat Larder's one extra Tier1 enemy when Twist is FatLarder, else -1
         public readonly IReadOnlyList<EncounterSpawn> Spawns;     // room by room (authored, then extras), then the hunter last
         public EncounterSpawn Hunter { get; }                     // null when not latched or no legal cell
-        CellarEncounterPlan(uint seed, int floor, int extra, bool hunterLatched, List<EncounterSpawn> spawns, EncounterSpawn hunter, int rosterMask, FloorTwist twist, int ambushRoom)
-        { Seed = seed; Floor = floor; ExtraPerRoom = extra; HunterLatched = hunterLatched; Spawns = spawns; Hunter = hunter; RosterMask = rosterMask; Twist = twist; AmbushRoom = ambushRoom; }
+        CellarEncounterPlan(uint seed, int floor, int extra, bool hunterLatched, List<EncounterSpawn> spawns, EncounterSpawn hunter, int rosterMask, FloorTwist twist, int ambushRoom, int fatRoom)
+        { Seed = seed; Floor = floor; ExtraPerRoom = extra; HunterLatched = hunterLatched; Spawns = spawns; Hunter = hunter; RosterMask = rosterMask; Twist = twist; AmbushRoom = ambushRoom; FatRoom = fatRoom; }
 
         // Spawns of one room (the hunter is never counted); kind filters when given.
         public int CountIn(int roomIndex, EncounterKind? kind = null)
@@ -74,6 +75,12 @@ namespace SleepingCalamity.Core
                 for (int r = 0; r < layout.Rooms.Count && firstCombat < 0; r++) if (layout.Rooms[r].Room.Kind == RoomKind.Combat && FreeCells(layout.Rooms[r], blocked).Count > 0) firstCombat = r;
                 if (firstCombat < 0) twist = FloorTwist.None;
             }
+            int fatRoom = -1;   // Fat Larder: exactly one extra Tier1 enemy in the first Combat room that has a free cell (same pick as Crowded's guaranteed room); no such room: no twist
+            if (twist == FloorTwist.FatLarder)
+            {
+                for (int r = 0; r < layout.Rooms.Count && fatRoom < 0; r++) if (layout.Rooms[r].Room.Kind == RoomKind.Combat && FreeCells(layout.Rooms[r], blocked).Count > 0) fatRoom = r;
+                if (fatRoom < 0) twist = FloorTwist.None;
+            }
 
             var spawns = new List<EncounterSpawn>();
             var taken = new bool[n, n];
@@ -103,6 +110,7 @@ namespace SleepingCalamity.Core
                 }
                 int roomExtra = extra;
                 if (twist == FloorTwist.Crowded && (r == firstCombat || new Pcg32(Rng.Derive(layout.Seed, "cellars.twist.rooms", ((ulong)layout.Floor << 32) | (uint)r)).Range(0, 2) == 0)) roomExtra++;
+                if (twist == FloorTwist.FatLarder && r == fatRoom) roomExtra++;
                 if (roomExtra > 0)
                 {
                     List<CellPos> free = FreeCells(p, blocked); free.RemoveAll(c => taken[c.X, c.Y]);
@@ -145,7 +153,7 @@ namespace SleepingCalamity.Core
                     }
                 }
             }
-            return new CellarEncounterPlan(layout.Seed, layout.Floor, extra, hunterLatched, spawns, hunter, CellarFloorRoster.RosterMask(layout.Seed, layout.Floor), twist, ambushRoom);
+            return new CellarEncounterPlan(layout.Seed, layout.Floor, extra, hunterLatched, spawns, hunter, CellarFloorRoster.RosterMask(layout.Seed, layout.Floor), twist, ambushRoom, twist == FloorTwist.FatLarder ? fatRoom : -1);
         }
 
         // Thin twist: -1 spawn in a room that has more than one: the last authored spawn that is not the gate-key carrier or the warden (so stir extras survive);

@@ -244,7 +244,7 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator WarmHands_FasterRecharge([Values(true, false)] bool warm)
         {
-            uint seed = FindSeed((s, l, m) => (warm ? m.B == FloorModifier.WarmHands : m.B != FloorModifier.WarmHands) && CellarHealing.PointFor(l, CellarFloorDressing.Resolve(l)).HasValue);
+            uint seed = FindSeed((s, l, m) => (warm ? m.B == FloorModifier.WarmHands : m.B != FloorModifier.WarmHands && !m.Has(FloorModifier.Brimming)) && CellarHealing.PointFor(l, CellarFloorDressing.Resolve(l)).HasValue);
             Ctx c = null; yield return Setup(x => c = x, seed);
             yield return PlayModeHarness.WaitUntil(() => c.Haul.HealRechargeSecondsNow > 0f, Timeout, "the floor's healing point never came up");
             Assert.That(c.Haul.HealRechargeSecondsNow, Is.EqualTo(warm ? FloorModifierTuning.WarmHandsRechargeSeconds : HealTuning.Default.RechargeSeconds), warm ? "Warm Hands: 15 s" : "no modifier: the ordinary 30 s");
