@@ -41,6 +41,10 @@ Shader "SleepingCalamity/HairCards"
         _Spec2Shift ("Highlight 2 shift", Range(-1, 1)) = -0.12
         _SpecNoise ("Highlight break-up", Range(0, 1)) = 0.5
         _Ambient ("Ambient strength", Range(0, 3)) = 1.4
+        _ShadowLift ("Shadow-side lift (adds base colour where the key light does not reach)", Range(0, 1)) = 0
+        _HueShift ("Hue shift (degrees)", Range(-180, 180)) = 0
+        _Saturation ("Saturation multiplier", Range(0, 2)) = 1
+        _Value ("Value multiplier", Range(0, 3)) = 1
         _ShadowStrength ("Received shadow strength (hair self-shadow is soft)", Range(0, 1)) = 0.55
         _ShadowNormalOffset ("Shadow lookup normal offset (m)", Range(0, 0.02)) = 0.008
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 0
@@ -56,7 +60,7 @@ Shader "SleepingCalamity/HairCards"
             half4 _BlondeColor; half _BlondeChance; half _StrandVar; half _RootDark; half _RootLen; half _TipLift; half _CardVar;
             float _Strands; half _StrandDepth; half _Wrap;
             half4 _Spec1Color; half _Spec1Exp; half _Spec1Shift; half4 _Spec2Color; half _Spec2Exp; half _Spec2Shift; half _SpecNoise;
-            half _Ambient; half _ShadowStrength; float _ShadowNormalOffset; float _Cull;
+            half _Ambient; half _ShadowLift; half _HueShift; half _Saturation; half _Value; half _ShadowStrength; float _ShadowNormalOffset; float _Cull;
             float _StrandVariants; half _AlphaCut; half _StrandTexBright; half _StrandBump; half _ShiftJitter;
         CBUFFER_END
         float Hash11(float p) { p = frac(p * 0.1031); p *= p + 33.33; p *= p + p; return frac(p); }
@@ -139,6 +143,11 @@ Shader "SleepingCalamity/HairCards"
                 half root = 1.0 - _RootDark * (1.0 - smoothstep(0.0, _RootLen, v));
                 base *= root; base += base * _TipLift * smoothstep(0.55, 1.0, v);
                 base *= lerp(1.0h, st.r * 1.2h, _StrandTexBright);                                          // per-hair brightness, darker gaps
+                if (_HueShift != 0.0h || _Saturation != 1.0h || _Value != 1.0h)                                // look controls (unity_look.json); defaults leave the colour untouched
+                {
+                    half3 hsv = RgbToHsv(saturate(base)); hsv.x = frac(hsv.x + _HueShift / 360.0h + 1.0h); hsv.y = saturate(hsv.y * _Saturation); hsv.z *= _Value;
+                    base = HsvToRgb(hsv);
+                }
                 half specMask = lerp(1.0, Noise1(u * _Strands * 1.7 + cardRnd * 53.0 + v * 4.0), _SpecNoise);
 
                 float4 sc = TransformWorldToShadowCoord(i.positionWS + N * _ShadowNormalOffset);
@@ -150,6 +159,7 @@ Shader "SleepingCalamity/HairCards"
                 half3 spec = (_Spec1Color.rgb * KK(T, N, H, _Spec1Shift + jit, _Spec1Exp) + _Spec2Color.rgb * base * 2.0 * KK(T, N, H, _Spec2Shift + jit, _Spec2Exp)) * specMask * saturate(ndl * 2.0 + 0.3);
                 half3 c = (base * diff + spec) * ml.color * atten;
                 c += base * SampleSH(N) * _Ambient * (0.55 + 0.45 * root);
+                c += base * _ShadowLift * (1.0h - diff * atten);   // lift the side the key light does not reach
 
                 #if defined(_ADDITIONAL_LIGHTS)
                 uint count = GetAdditionalLightsCount();

@@ -19,7 +19,7 @@ namespace SleepingCalamity.EditorTools
         {
             { var sz = System.Environment.GetEnvironmentVariable("SC_SIZE"); if (!string.IsNullOrEmpty(sz)) Size = int.Parse(sz); }
             string dir = System.Environment.GetEnvironmentVariable("SC_OUT_DIR"); if (string.IsNullOrEmpty(dir)) dir = Path.GetFullPath("hair_capture");
-            Directory.CreateDirectory(dir); var log = new StringBuilder(); var savedQuality = QualitySettings.renderPipeline;
+            Directory.CreateDirectory(dir); var log = new StringBuilder(); var savedQuality = QualitySettings.renderPipeline; float savedShadowDist = QualitySettings.shadowDistance;
             try
             {
                 var baseSrc = AssetDatabase.LoadAssetAtPath<GameObject>(TobinBaseModelImporter.ModelPath) ?? throw new FileNotFoundException(TobinBaseModelImporter.ModelPath);
@@ -88,7 +88,11 @@ namespace SleepingCalamity.EditorTools
                 cam.Render(); cam.Render(); cam.Render();   // warm-up: the first renders of a fresh scene came out dark / glossy (textures and shaders still loading)
                 Vector3 centre = realHead.position + new Vector3(0, hq ? 0.075f : 0.07f, 0);
                 var rot0 = realHead.localRotation; const float dt = 1f / 30f; int[] shoot = hq ? new[] { 0, 14, 28, 42, 56, 83 } : new[] { 0, 14, 28, 42, 56, 83 }; string[] names = { "rest", "yawL", "mid", "yawR", "nod", "settle" };
-                for (int f = 0; f < 84; f++)
+                // SC_CAPTURE_ONLY=rest_f,rest_s,rest_b (tile names) or a pose name (rest) shoots only those tiles; SC_HAIRMASK=1 also writes <tile>_nohair.png (hair hidden) for a hair-region mask
+                var only = (System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY") ?? "").Split(new[] { ',', ';', ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+                bool hairMask = System.Environment.GetEnvironmentVariable("SC_HAIRMASK") == "1";
+                int lastFrame = 83; if (only.Length > 0) { lastFrame = -1; for (int k = 0; k < shoot.Length; k++) if (only.Any(o => o == names[k] || o.StartsWith(names[k] + "_"))) lastFrame = System.Math.Max(lastFrame, shoot[k]); }
+                for (int f = 0; f <= lastFrame; f++)
                 {
                     float t = f / 84f; float yaw = 32f * Mathf.Sin(2 * Mathf.PI * t * 1.5f), nod = 10f * Mathf.Sin(2 * Mathf.PI * t * 3f);
                     realHead.localRotation = rot0 * Quaternion.Euler(nod, yaw, 0);
@@ -96,16 +100,23 @@ namespace SleepingCalamity.EditorTools
                     int si = System.Array.IndexOf(shoot, f); if (si < 0) continue;
                     foreach (var (nm, az) in new[] { ("f", 0f), ("q", 40f), ("s", 90f), ("b", 180f) })
                     {
+                        if (only.Length > 0 && !only.Any(o => o == names[si] || o == names[si] + "_" + nm)) continue;
                         cam.transform.position = centre + Quaternion.Euler(0, az, 0) * new Vector3(0, 0, 2.2f); cam.transform.LookAt(centre);
                         cam.Render(); cam.Render(); var prev = RenderTexture.active; RenderTexture.active = rt;
                         var tex = new Texture2D(Size, Size, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, Size, Size), 0, 0); tex.Apply(); RenderTexture.active = prev;
                         File.WriteAllBytes(Path.Combine(dir, names[si] + "_" + nm + ".png"), tex.EncodeToPNG()); Object.DestroyImmediate(tex);
+                        if (hairMask)
+                        {
+                            hair.SetActive(false); cam.Render(); cam.Render(); var pv2 = RenderTexture.active; RenderTexture.active = rt;
+                            var t2 = new Texture2D(Size, Size, TextureFormat.RGB24, false); t2.ReadPixels(new Rect(0, 0, Size, Size), 0, 0); t2.Apply(); RenderTexture.active = pv2;
+                            File.WriteAllBytes(Path.Combine(dir, names[si] + "_" + nm + "_nohair.png"), t2.EncodeToPNG()); Object.DestroyImmediate(t2); hair.SetActive(true);
+                        }
                     }
                     log.AppendLine("frame " + f + " " + names[si] + " headRot " + realHead.eulerAngles.ToString("F1"));
                 }
                 rt.Release();
             }
-            finally { QualitySettings.renderPipeline = savedQuality; File.WriteAllText(Path.Combine(dir, "log.txt"), log.ToString()); Debug.Log("SC HAIRCAP\n" + log); }
+            finally { QualitySettings.renderPipeline = savedQuality; QualitySettings.shadowDistance = savedShadowDist; File.WriteAllText(Path.Combine(dir, "log.txt"), log.ToString()); Debug.Log("SC HAIRCAP\n" + log); }
         }
     }
 }
