@@ -1,4 +1,4 @@
-State: planning (gate on fresh main running)
+State: merged to main (5b done); step 6 next
 Branch: claude/dive-5b-water (from origin/main 366d0126)
 Archive: not yet
 
