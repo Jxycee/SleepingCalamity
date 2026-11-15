@@ -212,11 +212,11 @@ namespace SleepingCalamity.Presentation
 
         // ---- the collapse (plan 3 task 10; host) ----
         public const float CollapseTargetRadius = 4f;     // placeholder: every living hero within this many metres (flat) of the target cell closes the timer early
-        public const float CollapseFloorWaitSeconds = 3f; // a built floor that lags the dive floor is waited for this long before the collapse begins with no path
+        public const float CollapseFloorWaitSeconds = CollapseStartPlan.WaitCapSeconds; // a floor build that lags the dive floor is waited for this long; then the path comes from the seed's layout (CollapseStartPlan)
         private float _collapseWaitSince = -1f;
 
         // The collapse is pending (stir 100, once per half) on a floor of the dive: it begins with the walk time to this floor's target. With a floor sync in the scene it waits for the layout of
-        // this floor (a few seconds at most); with none (haul-only tests) it begins at once with no path, so the minimum applies.
+        // this floor (up to CollapseFloorWaitSeconds, then it begins with the path of the layout regenerated from the dive seed, never 0; host only); with none (haul-only tests) it begins at once with no path, so the minimum applies.
         private void TickCollapseStart()
         {
             DiveStir stir = _session.Stir;
@@ -224,13 +224,14 @@ namespace SleepingCalamity.Presentation
             ResolveFloorSync();
             CellarFloorSync fs = FloorSync;
             bool built = fs != null && fs.Layout != null && fs.Built != null && fs.BuiltFloor == DiveFloor;
-            if (fs != null && !built)
-            {
-                if (_collapseWaitSince < 0f) _collapseWaitSince = Time.unscaledTime;
-                if (Time.unscaledTime - _collapseWaitSince < CollapseFloorWaitSeconds) return;
-            }
+            if (fs != null && !built && _collapseWaitSince < 0f) _collapseWaitSince = Time.unscaledTime;
+            float waited = _collapseWaitSince < 0f ? 0f : Time.unscaledTime - _collapseWaitSince;
+            CollapseStartAction act = CollapseStartPlan.Decide(fs != null, built, waited);
+            if (act == CollapseStartAction.Wait) return;
             _collapseWaitSince = -1f;
-            stir.BeginCollapse(built ? DiveFloorTable.PathSecondsToTarget(fs.Layout) : 0f, ModifiersOf(DiveFloor).CollapseFactor);   // Hurried: the factor scales the final seconds (minimum included) to the 1.25x instead of 1.5x
+            float path = act == CollapseStartAction.BeginBuilt ? DiveFloorTable.PathSecondsToTarget(fs.Layout)
+                : act == CollapseStartAction.BeginFromSeed ? CollapseStartPlan.FallbackPathSeconds(DiveSeed, DiveFloor) : 0f;   // past the cap: the path of the layout regenerated from (seed, floor), never 0
+            stir.BeginCollapse(path, ModifiersOf(DiveFloor).CollapseFactor);   // Hurried: the factor scales the final seconds (minimum included) to the 1.25x instead of 1.5x
         }
 
         // A running collapse closes when every living hero (at least one) is at the target: the party is leaving, so the host treats it like the stair (DiveStir.OnStairTaken).
