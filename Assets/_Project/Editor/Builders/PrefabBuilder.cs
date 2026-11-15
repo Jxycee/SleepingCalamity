@@ -211,6 +211,7 @@ namespace SleepingCalamity.EditorTools
             Material wood = MaterialLibrary.Get("M_WeaponWood");
             BuildEnemy(AssetPaths.SlimePrefab, EnemyKind.Slime, "M_EnemySlime", marker, visual =>
             {
+                if (PlaceRiggedModel(visual, EnemyKind.Slime)) return new Transform[0];
                 Material body = MaterialLibrary.Get("M_EnemySlime");
                 BuilderUtil.EnsurePrimitive(visual, "Jar", PrimitiveType.Cylinder, new Vector3(0f, 0.5f, 0f), Quaternion.identity, new Vector3(1.0f, 0.5f, 1.0f), body, false);
                 BuilderUtil.EnsurePrimitive(visual, "Lid", PrimitiveType.Cylinder, new Vector3(0f, 1.05f, 0f), Quaternion.identity, new Vector3(0.7f, 0.05f, 0.7f), steel, false);
@@ -220,6 +221,7 @@ namespace SleepingCalamity.EditorTools
             });
             BuildEnemy(AssetPaths.RatPrefab, EnemyKind.RatKing, "M_EnemyRat", marker, visual =>
             {
+                if (PlaceRiggedModel(visual, EnemyKind.RatKing)) return new Transform[0];
                 Material body = MaterialLibrary.Get("M_EnemyRat");
                 BuilderUtil.EnsurePrimitive(visual, "Body", PrimitiveType.Sphere, new Vector3(0f, 0.55f, 0f), Quaternion.identity, new Vector3(0.7f, 0.65f, 1.1f), body, false);
                 BuilderUtil.EnsurePrimitive(visual, "Head", PrimitiveType.Sphere, new Vector3(0f, 0.7f, 0.6f), Quaternion.identity, new Vector3(0.4f, 0.4f, 0.45f), body, false);
@@ -229,6 +231,7 @@ namespace SleepingCalamity.EditorTools
             });
             BuildEnemy(AssetPaths.BroomPrefab, EnemyKind.Broom, "M_EnemyBroom", marker, visual =>
             {
+                if (PlaceRiggedModel(visual, EnemyKind.Broom)) return new Transform[0];
                 BuilderUtil.EnsurePrimitive(visual, "Bristles", PrimitiveType.Cube, new Vector3(0f, 0.55f, 0.3f), Quaternion.identity, new Vector3(0.95f, 1.1f, 0.5f), MaterialLibrary.Get("M_EnemyBroom"), false);
                 BuilderUtil.EnsurePrimitive(visual, "Handle", PrimitiveType.Cylinder, new Vector3(0f, 1.45f, -0.05f), Quaternion.Euler(-8f, 0f, 0f), new Vector3(0.1f, 0.6f, 0.1f), wood, false);
                 BuilderUtil.EnsurePrimitive(visual, "Band", PrimitiveType.Cube, new Vector3(0f, 1.05f, 0.3f), Quaternion.identity, new Vector3(1.0f, 0.1f, 0.55f), wood, false);
@@ -245,6 +248,30 @@ namespace SleepingCalamity.EditorTools
                 GameObject crown = BuilderUtil.EnsurePrimitive(visual, "Part_DoughCrown", PrimitiveType.Sphere, new Vector3(0f, 2.9f, 0f), Quaternion.identity, new Vector3(0.9f, 0.55f, 0.9f), MaterialLibrary.Get("M_EnemyPart"), false);
                 return new[] { pin.transform, crown.transform };
             });
+        }
+
+        // The rigged FBX (EnemyArtBuilder) as the enemy's visual: a "Model" child of Visual at the feet (front +z, scale 1) with its Animator and controller.
+        // False when the FBX or its controller is missing, and the greybox primitives are built instead. Replaces the greybox children once.
+        static bool PlaceRiggedModel(Transform visual, EnemyKind kind)
+        {
+            GameObject fbx = EnemyArtBuilder.Model(kind);
+            RuntimeAnimatorController controller = EnemyArtBuilder.ControllerOf(kind);
+            if (fbx == null || controller == null) { Debug.LogWarning("SC ENEMYART " + kind + " keeps its greybox: no model or controller"); return false; }
+            Transform model = visual.Find("Model");
+            if (model == null || UnityEditor.PrefabUtility.GetCorrespondingObjectFromSource(model.gameObject) != fbx)
+            {
+                for (int i = visual.childCount - 1; i >= 0; i--) Object.DestroyImmediate(visual.GetChild(i).gameObject);
+                model = ((GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(fbx, visual)).transform;
+                model.name = "Model";
+            }
+            model.localPosition = Vector3.zero;
+            model.localRotation = Quaternion.identity;
+            model.localScale = Vector3.one;
+            var animator = BuilderUtil.GetOrAdd<Animator>(model.gameObject);
+            animator.runtimeAnimatorController = controller;
+            animator.applyRootMotion = false;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            return true;
         }
 
         static void BuildEnemy(string path, EnemyKind kind, string materialName, Material marker, System.Func<Transform, Transform[]> buildVisual)
