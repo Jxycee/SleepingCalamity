@@ -1,10 +1,10 @@
 // Core/Tuning/TuningStore.cs: optional JSON tuning files laid over the code defaults (docs/design/m3-combat-greybox.md, "Tuning files"). Pure C#, no engine.
 // Files: *.json in each folder given to LoadFolders, folders in order (StreamingAssets/Tuning first, the user's mod folder last), files in ordinal name order;
 // a later value wins over an earlier one. Each file is one JSON object whose top-level keys are sections: "attacks", "poise", "weaponGrowth", "targeting",
-// "heroCombat", "enemies" (tier multipliers). An unknown section or key, a value of the wrong type or out of range, or a file that is not valid JSON is skipped (the default stays) and
+// "heroCombat", "hurtGrace", "enemies" (tier multipliers), "enemyAttacks" (enemy attack values, changed in place) and "enemyPacing" (enemy cooldowns, recovery, tokens). An unknown section or key, a value of the wrong type or out of range, or a file that is not valid JSON is skipped (the default stays) and
 // logged once through TuningStore.Log. With no files nothing changes.
 // Authority: none. Tuning is read at startup, before any scene runs, on every peer alike (host and clients must load the same files).
-// Enemy base tables and enemy attack ids are not tunable yet (only the "enemies" tier multipliers); enemy attack ids in "attacks" are logged as unknown.
+// Enemy base tables (hp/atk/def/speed per kind) are not tunable yet (only the "enemies" tier multipliers); enemy attack ids in "attacks" are logged as unknown (use "enemyAttacks").
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -53,19 +53,22 @@ namespace SleepingCalamity.Core.Tuning
             RegisterKnobSection("hurtGrace", HurtGraceTuning.Knobs(), HurtGraceTuning.Validate);
             RegisterKnobSection("enemies", EnemyTuning.Knobs());
             RegisterSection("attacks", AttackTuning.Apply, AttackTuning.Reset);
+            RegisterSection("enemyAttacks", EnemyAttackTuning.Apply, EnemyAttackTuning.Reset);
+            RegisterKnobSection("enemyPacing", EnemyPacingTuning.Knobs(), EnemyPacingTuning.Validate, nested: true);
         }
 
         public static void RegisterSection(string name, SectionApply apply, Action reset) => s_sections[name] = new Section { Apply = apply, Reset = reset };
 
         // validate (optional) checks ordered pairs on the values after a section is applied; it returns a message when they are inconsistent, and then the
         // whole section from that file is rolled back (the earlier values stay).
-        static void RegisterKnobSection(string name, Knob[] knobs, Func<string> validate = null)
+        // nested: the body may hold one level of objects ("cooldown": { "default": 1.2 }), flattened to the dotted knob names ("cooldown.default").
+        static void RegisterKnobSection(string name, Knob[] knobs, Func<string> validate = null, bool nested = false)
         {
             RegisterSection(name, (body, source) =>
             {
                 double[] before = new double[knobs.Length];
                 for (int i = 0; i < knobs.Length; i++) before[i] = knobs[i].Value;
-                foreach (var kv in body)
+                foreach (var kv in nested ? Flatten(body) : Direct(body))
                 {
                     Knob k = Array.Find(knobs, x => string.Equals(x.Name, kv.Key, StringComparison.OrdinalIgnoreCase));
                     if (k == null) { Warn(source + ": unknown key '" + name + "." + kv.Key + "'"); continue; }
@@ -76,6 +79,21 @@ namespace SleepingCalamity.Core.Tuning
                 for (int i = 0; i < knobs.Length; i++) knobs[i].Set(before[i]);
                 Warn(source + ": section '" + name + "' ignored, " + problem);
             }, () => { foreach (var k in knobs) k.Restore(); });
+        }
+
+        static IEnumerable<KeyValuePair<string, JToken>> Direct(JObject body)
+        {
+            foreach (var p in body.Properties()) yield return new KeyValuePair<string, JToken>(p.Name, p.Value);
+        }
+
+        static IEnumerable<KeyValuePair<string, JToken>> Flatten(JObject body)
+        {
+            foreach (var p in body.Properties())
+            {
+                if (p.Value is JObject inner)
+                    foreach (var q in inner.Properties()) yield return new KeyValuePair<string, JToken>(p.Name + "." + q.Name, q.Value);
+                else yield return new KeyValuePair<string, JToken>(p.Name, p.Value);
+            }
         }
 
         // A JSON integer or decimal as a double. False for anything else (string, bool, null, object, array) and for NaN / Infinity.
