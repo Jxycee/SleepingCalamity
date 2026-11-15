@@ -139,10 +139,12 @@ def verdicts(M, cfg, nd):
     if t:
         cn = t["case"]
         for kind, band in t.items():
-            if kind == "case" or kind.startswith("_"):
+            if kind in ("case", "floors") or kind.startswith("_"):
                 continue
             got = False
             for f in range(1, NF + 1):
+                if "floors" in t and f not in t["floors"]:
+                    continue
                 v = gv(M, cn, "ttk_d1", kind, f, nmin=20)
                 if v == v:
                     got = True
@@ -620,6 +622,12 @@ def selftest(nums, cfg, dev):
           "hp %s def %s atk %s" % (float(w1.ehp[0, 0]), float(w1.edef[0, 0]), float(w1.eatk[0, 0])))
     check("wardenTier 2 (default) keeps the tier-2 Warden", bool(w2.et2[:, 0].all()) and float(w2.ehp[0, 0]) > float(w1.ehp[0, 0]) * 2.5
           and abs(float(w2.eatk[0, 0]) - wh["atk"] * ts_["tier2Atk"] * ts_.get("soloAtk", 1.0)) < 1e-4)
+    # 5. ttkKindSoloDive1 "floors" restricts the verdict to those floors
+    Mf = {"c": {("ttk_d1", "Slime", f): (50, 5.0) for f in (1, 2, 3, 4)}}
+    tf = lambda **k: {"targets": {"ttkKindSoloDive1": dict({"case": "c", "Slime": [1.0, 9.0]}, **k)}}
+    subs_all = [v["sub"] for v in verdicts(Mf, tf(), 1) if v["check"] == "ttkKind"]
+    subs_fl = [v["sub"] for v in verdicts(Mf, tf(floors=[1, 2, 3]), 1) if v["check"] == "ttkKind"]
+    check("ttkKind floors key limits verdicts to those floors", len(subs_all) == 4 and subs_fl == ["Slime f1", "Slime f2", "Slime f3"], str(subs_fl))
     print("SELFTEST", "PASS" if fails == 0 else "FAIL (%d)" % fails)
     return 1 if fails else 0
 
