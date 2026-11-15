@@ -1,0 +1,60 @@
+{
+ "round": 4,
+ "top": 6,
+ "jut_mm": 6.0,
+ "defaults": {
+  "opt": {
+   "w": "0.45,0.3,0.15,0.1",
+   "rounds": 8
+  },
+  "fit": {
+   "clear": 0.002
+  }
+ },
+ "weights": {
+  "iou_mean": 1.0,
+  "iou_frame": 0.5,
+  "iou_min": 0.5,
+  "jut": 0.5,
+  "color": 0.2,
+  "warm": 0.2,
+  "clear": 0.2,
+  "cover": 0.4,
+  "spike": 1.0
+ },
+ "variants": [
+  {
+   "id": "w_final_trim",
+   "label": "pick + tails below the jaw trimmed to eye_z-0.085 m, fringe test (10 mm) found none",
+   "mix": {
+    "a": "run1/tobin_bust/cards_seed2.json",
+    "b": "run1/tobin_bust/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region",
+     "--trim",
+     "2:0.6,4:0.809,5:0.846,6:0.874,8:0.887,12:0.889,14:0.872,21:0.958,23:0.958,24:0.9,26:0.86,29:0.6,30:0.957,31:0.6,32:0.841,43:0.848,46:0.851,47:0.947,48:0.881"
+    ]
+   },
+   "opt": {
+    "rounds": 0,
+    "fix": {
+     "sx": 0.92,
+     "sy": 0.8,
+     "sz": 1.08,
+     "dy": -0.016,
+     "dz": -0.012,
+     "lt": 0.024,
+     "fs": 0.006
+    }
+   },
+   "strands": {
+    "core_len": 0.7
+   },
+   "tint": {
+    "root": "#3a281c",
+    "tip": "#7a563c"
+   }
+  }
+ ]
+}
