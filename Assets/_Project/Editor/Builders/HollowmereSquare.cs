@@ -145,7 +145,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // B3 tint for the tufts: the shared M_CrackWeeds atlas reads lime on the square, so the square gets its own olive copy (the corner keeps the original).
-        static Material OliveTufts(Material src)
+        internal static Material OliveTufts(Material src)
         {
             Material m = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/Hollowmere/M_SquareTufts.mat", src.shader);
             m.CopyPropertiesFromMaterial(src);
@@ -196,7 +196,7 @@ namespace SleepingCalamity.EditorTools
             {
                 if (s.p == null || s.p.Length < 3) continue;
                 float blob = Mathf.PerlinNoise(s.p[0] * 0.33f + 17.3f, s.p[2] * 0.33f + 5.1f);
-                float cluster = 0.02f + 0.98f * Mathf.SmoothStep(0.48f, 0.66f, blob);   // blobs along the edges, hardly any stray between them (round 2: steeper)
+                float cluster = Mathf.SmoothStep(0.52f, 0.68f, blob);   // polish: no floor, a tuft is only ever part of a blob   // blobs along the edges, hardly any stray between them (round 2: steeper)
                 float baseKeep = s.kind == "joint" ? 0.08f : s.kind == "missing_sett" ? 0.9f : 1f;   // the open-centre joints thin hardest, cracks (missing setts) and wall edges keep theirs
                 float keepRoll = (float)(Hash((uint)Mathf.RoundToInt(s.p[0] * 50f + 50000f), (uint)Mathf.RoundToInt(s.p[2] * 50f + 50000f)) % 10007u) / 10007f;
                 // round 2: weeds belong at walls and kerbs. Distance from the slot to the square's border (the lots' fronts and kerbs): inside 1.2 m everything stays, beyond 3.5 m only strays.
@@ -207,7 +207,6 @@ namespace SleepingCalamity.EditorTools
                 foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(new TownPoint(wp.x, wp.z), 1.5f)) { atFooting = true; break; }
                 bool atFountain = wp.x * wp.x + wp.z * wp.z < 3.5f * 3.5f;
                 if (dEdge > 1.5f && !atFooting && !atFountain) continue;
-                float near = 1f;
                 float pKeep = baseKeep * cluster * 0.45f;   // about half the old density
                 if (keepRoll >= pKeep) continue;
                 bool tended = keepRoll < pKeep * 0.1f;   // survives into Rebuilt

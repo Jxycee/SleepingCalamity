@@ -40,7 +40,7 @@ namespace SleepingCalamity.EditorTools
                 m.SetTexture("_DetailAlbedoMap", macro); m.SetFloat("_DetailAlbedoMapScale", 1f); m.EnableKeyword("_DETAIL_MULX2");
                 m.SetTextureScale("_DetailAlbedoMap", Vector2.one * (2f / 37f));   // detail uv = base uv (1 per 2 m) x this: one repeat per 37 m, not lined up with the corner's 23 m
             }
-            Color neutral = new Color(0.86f, 0.90f, 0.90f, 1f); m.SetColor("_BaseColor", neutral); m.SetColor("_Color", neutral);   // round 2: B0's warm tint read orange on the whole square
+            Color neutral = new Color(0.97f, 0.93f, 0.86f, 1f);   // polish: round 1 read grey and dark (p90 0.66); a touch warmer and lighter, still not B0's orange m.SetColor("_BaseColor", neutral); m.SetColor("_Color", neutral);   // round 2: B0's warm tint read orange on the whole square
             m.enableInstancing = true;
             MaterialValidation.Validate(m);
             EditorUtility.SetDirty(m);
@@ -109,7 +109,7 @@ namespace SleepingCalamity.EditorTools
         {
             var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
             if (existing != null && existing.vertexCount == fresh.vertexCount && existing.vertices.SequenceEqual(fresh.vertices) && existing.uv.SequenceEqual(fresh.uv)
-                && existing.triangles.SequenceEqual(fresh.triangles)) { Object.DestroyImmediate(fresh); return existing; }
+                && existing.triangles.SequenceEqual(fresh.triangles) && existing.normals.SequenceEqual(fresh.normals)) { Object.DestroyImmediate(fresh); return existing; }
             if (existing != null) { EditorUtility.CopySerialized(fresh, existing); Object.DestroyImmediate(fresh); EditorUtility.SetDirty(existing); AssetDatabase.SaveAssets(); return existing; }
             AssetDatabase.CreateAsset(fresh, path); AssetDatabase.SaveAssets();
             return fresh;
@@ -191,7 +191,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ------------------------------------------------------------------------------------------------ decals
-        sealed class DecalTextures { public Texture2D Blob, Moss, RutAlbedo, RutNormal, LeafA, LeafANormal, LeafB, LeafBNormal; }
+        sealed class DecalTextures { public Texture2D Blob, Moss, MossJoint, RutAlbedo, RutNormal, LeafA, LeafANormal, LeafB, LeafBNormal; }
 
         public static void BuildDecals(Transform set, TownLayout t)
         {
@@ -204,9 +204,9 @@ namespace SleepingCalamity.EditorTools
             // 1. leaf drifts: along the square's kerbs (border), the lee side (the east face of each lot front is picked by the seeded side order)
             var leafA = new MeshBuf(); var leafB = new MeshBuf();
             int drifts = 0;
-            for (int i = 0; i < 12; i++)
+            for (int i = 0; i < 20; i++)   // polish: 12 -> 20 drifts along the kerbs
             {
-                float pr = (i + 0.15f + 0.7f * (float)rnd.NextDouble()) / 12f;
+                float pr = (i + 0.15f + 0.7f * (float)rnd.NextDouble()) / 20f;
                 Vector2 pos = default, n = default, d = default; bool ok = false;
                 for (int tries = 0; tries < 24 && !ok; tries++)
                 {
@@ -222,13 +222,19 @@ namespace SleepingCalamity.EditorTools
                 drifts++;
             }
 
-            // 2. five puddles: a small organic blob each, one by the gutter (S edge); the others in the open cobbles away from the stalls
-            var pud = new MeshBuf();
+            // 2. seven puddles (H3: wet sky mirrors in the joints): a small organic blob each, one by the gutter (S edge); the others in the open cobbles away from the stalls.
+            // Each gets a wider dark wet halo (the dirt blob) under it so the cobbles round the water read soaked.
+            var pud = new MeshBuf(); var halo = new MeshBuf();
             var puddles = new (float x, float z, float sx, float sz, float yaw)[]
             {
-                (-9.5f, -18.7f, 2.4f, 1.1f, 8f), (9.8f, -14.2f, 2.0f, 1.5f, 35f), (-14.5f, -6.5f, 2.6f, 1.6f, 100f), (13.5f, 1.5f, 1.7f, 1.3f, 62f), (-3.2f, -11.5f, 3.0f, 1.8f, 160f)
+                (-9.5f, -18.7f, 2.8f, 1.3f, 8f), (9.8f, -14.2f, 2.4f, 1.8f, 35f), (-14.5f, -6.5f, 3.0f, 1.9f, 100f), (13.5f, 1.5f, 2.0f, 1.5f, 62f), (-3.2f, -11.5f, 3.6f, 2.2f, 160f),
+                (4.5f, -9.0f, 2.6f, 1.4f, 120f), (-8.0f, -2.5f, 2.2f, 1.2f, 20f)
             };
-            foreach (var p in puddles) AddGrid(t, pud, new Vector2(p.x, p.z), p.yaw, p.sx, p.sz, 4, lift0 + 0.020f, 1f);
+            foreach (var p in puddles)
+            {
+                AddGrid(t, pud, new Vector2(p.x, p.z), p.yaw, p.sx, p.sz, 4, lift0 + 0.020f, 1f);
+                AddGrid(t, halo, new Vector2(p.x, p.z), p.yaw, p.sx * 1.9f, p.sz * 1.9f, 5, lift0 + 0.014f, 1f);
+            }
 
             // 3. the cart rut: the Market Street mouth (0, -21) to the bakery lot F02's doorstep, bending round the fountain and the cloth stall
             var rut = new MeshBuf();
@@ -242,22 +248,48 @@ namespace SleepingCalamity.EditorTools
                 (-14f, 5.2f, 5.5f, 20f), (-2f, 5.6f, 4.5f, 95f), (12.5f, 5.0f, 5f, 140f), (1.9f, -1.6f, 3.4f, 40f), (-1.7f, 1.9f, 3.0f, 130f), (-16.5f, -12f, 3.8f, 70f), (15f, -15f, 3.4f, 10f)
             };
             foreach (var m in mossAt) AddGrid(t, moss, new Vector2(m.x, m.z), m.yaw, m.s, m.s * 0.75f, 5, lift0 + 0.010f, 1f);
-            for (int i = 0; i < 14; i++)
+            for (int i = 0; i < 24; i++)   // polish: 14 -> 24 dark patches, and below 14 light dusty ones, so the ground varies in value, not just in colour
             {
                 float x = Mathf.Lerp(HollowmereLayout.SquareMinX + 4f, HollowmereLayout.SquareMaxX - 4f, (float)rnd.NextDouble());
                 float z = Mathf.Lerp(HollowmereLayout.SquareMinZ + 4f, HollowmereLayout.SquareMaxZ - 3f, (float)rnd.NextDouble());
-                float s = 5f + 5f * (float)rnd.NextDouble();
+                float s = 4f + 6f * (float)rnd.NextDouble();
                 AddGrid(t, dirt, new Vector2(x, z), (float)rnd.NextDouble() * 360f, s, s * (0.55f + 0.3f * (float)rnd.NextDouble()), 6, lift0 + 0.008f, 1f);
             }
+            var dust = new MeshBuf();
+            for (int i = 0; i < 14; i++)
+            {
+                float x = Mathf.Lerp(HollowmereLayout.SquareMinX + 3f, HollowmereLayout.SquareMaxX - 3f, (float)rnd.NextDouble());
+                float z = Mathf.Lerp(HollowmereLayout.SquareMinZ + 3f, HollowmereLayout.SquareMaxZ - 3f, (float)rnd.NextDouble());
+                float s = 3f + 5f * (float)rnd.NextDouble();
+                AddGrid(t, dust, new Vector2(x, z), (float)rnd.NextDouble() * 360f, s, s * (0.5f + 0.4f * (float)rnd.NextDouble()), 6, lift0 + 0.007f, 1f);
+            }
+            // moss in the joints: many small mottled patches (0.6-1.5 m), clustered at kerbs, the fountain foot and the damp (west/south) side, a few in the open
+            var jointMoss = new MeshBuf();
+            for (int i = 0; i < 60; i++)
+            {
+                float x, z;
+                if (i < 28) { Perimeter((float)rnd.NextDouble(), out Vector2 pp, out Vector2 dd, out Vector2 nn); Vector2 q = pp + nn * (0.6f + 2.2f * (float)rnd.NextDouble()); x = q.x; z = q.y; }
+                else if (i < 42) { float a = (float)rnd.NextDouble() * 6.283f, rr = 2.6f + 2.4f * (float)rnd.NextDouble(); x = Mathf.Cos(a) * rr; z = Mathf.Sin(a) * rr; }
+                else { x = Mathf.Lerp(HollowmereLayout.SquareMinX + 3f, HollowmereLayout.SquareMaxX - 3f, (float)rnd.NextDouble()); z = Mathf.Lerp(HollowmereLayout.SquareMinZ + 3f, HollowmereLayout.SquareMaxZ - 3f, (float)rnd.NextDouble()); }
+                if (NearLane(t, x, z, 1.0f)) continue;
+                float s = 0.6f + 0.9f * (float)rnd.NextDouble();
+                AddGrid(t, jointMoss, new Vector2(x, z), (float)rnd.NextDouble() * 360f, s * 1.5f, s, 3, lift0 + 0.011f, 1f);
+            }
 
-            Material mDirt = DecalMaterial("SquareDirt", tx.Blob, null, new Color(0.23f, 0.18f, 0.13f, 0.20f), 0f, false, 1);
-            Material mMoss = DecalMaterial("SquareMoss", tx.Moss, null, new Color(0.62f, 0.78f, 0.45f, 0.62f), 0f, false, 2);
+            Material mDirt = DecalMaterial("SquareDirt", tx.Blob, null, new Color(0.20f, 0.17f, 0.14f, 0.26f), 0f, false, 1);
+            Material mDust = DecalMaterial("SquareDust", tx.Blob, null, new Color(0.78f, 0.74f, 0.66f, 0.17f), 0f, false, 1);
+            Material mHalo = DecalMaterial("SquareWetHalo", tx.Blob, null, new Color(0.10f, 0.10f, 0.10f, 0.36f), 0.35f, false, 1);
+            Material mMoss = DecalMaterial("SquareMoss", tx.Moss, null, new Color(0.46f, 0.56f, 0.34f, 0.50f), 0f, false, 2);   // polish: round 1 moss read as flat neon green strips
+            Material mJoint = DecalMaterial("SquareJointMoss", tx.MossJoint, null, new Color(0.55f, 0.64f, 0.38f, 0.95f), 0f, false, 2);
             Material mRut = DecalMaterial("SquareRut", tx.RutAlbedo, tx.RutNormal, new Color(1f, 1f, 1f, 0.85f), 0.1f, false, 3);
             Material mLeafA = tx.LeafA != null ? DecalMaterial("SquareLeavesA", tx.LeafA, tx.LeafANormal, new Color(1f, 0.96f, 0.88f, 0.95f), 0.15f, false, 4) : null;
             Material mLeafB = tx.LeafB != null ? DecalMaterial("SquareLeavesB", tx.LeafB, tx.LeafBNormal, new Color(1f, 0.96f, 0.88f, 0.95f), 0.15f, false, 5) : null;
             Material mPud = DecalMaterial("SquarePuddle", tx.Blob, null, new Color(0.035f, 0.045f, 0.05f, 0.9f), 0.95f, true, 6);
             string folder = DecalFolder;
             Place(root, "Dirt", SaveMesh(folder + "/SquareDecal_Dirt.asset", dirt.ToMesh("SquareDecal_Dirt")), mDirt, false);
+            Place(root, "Dust", SaveMesh(folder + "/SquareDecal_Dust.asset", dust.ToMesh("SquareDecal_Dust")), mDust, false);
+            Place(root, "WetHalo", SaveMesh(folder + "/SquareDecal_WetHalo.asset", halo.ToMesh("SquareDecal_WetHalo")), mHalo, false);
+            Place(root, "JointMoss", SaveMesh(folder + "/SquareDecal_JointMoss.asset", jointMoss.ToMesh("SquareDecal_JointMoss")), mJoint, false);
             Place(root, "Moss", SaveMesh(folder + "/SquareDecal_Moss.asset", moss.ToMesh("SquareDecal_Moss")), mMoss, false);
             Place(root, "CartRut", SaveMesh(folder + "/SquareDecal_Rut.asset", rut.ToMesh("SquareDecal_Rut")), mRut, false);
             if (mLeafA != null && leafA.V.Count > 0) Place(root, "LeafDriftsA", SaveMesh(folder + "/SquareDecal_LeavesA.asset", leafA.ToMesh("SquareDecal_LeavesA")), mLeafA, false);
@@ -333,7 +365,7 @@ namespace SleepingCalamity.EditorTools
             string dir = DecalFolder;
 
             // organic blob: alpha only (white colour), a wobbling radius with a soft inner falloff
-            const int bn = 256; var blob = new Color32[bn * bn]; var moss = new Color32[bn * bn];
+            const int bn = 256; var blob = new Color32[bn * bn]; var moss = new Color32[bn * bn]; var mossJ = new Color32[bn * bn];
             for (int y = 0; y < bn; y++)
                 for (int x = 0; x < bn; x++)
                 {
@@ -347,9 +379,15 @@ namespace SleepingCalamity.EditorTools
                     float ma = a * Mathf.Clamp01(0.35f + 1.1f * mott);
                     Color g = Color.Lerp(new Color(0.30f, 0.44f, 0.16f), new Color(0.52f, 0.62f, 0.28f), mott);
                     moss[y * bn + x] = new Color32((byte)(g.r * 255f), (byte)(g.g * 255f), (byte)(g.b * 255f), (byte)Mathf.RoundToInt(ma * 255f));
+                    // joint moss: a broken network of fine specks (moss lives in the joints, not as a wash), darker and more varied than the soft patches
+                    float fine = 0.5f * VNoise(u * 14f + 4f, v * 14f + 8f, 21) + 0.32f * VNoise(u * 31f + 1f, v * 31f + 3f, 22) + 0.18f * VNoise(u * 63f, v * 63f, 23);
+                    float ja = a * Mathf.SmoothStep(0.50f, 0.64f, fine);
+                    Color gj = Color.Lerp(new Color(0.20f, 0.30f, 0.10f), new Color(0.46f, 0.55f, 0.22f), VNoise(u * 9f, v * 9f, 24));
+                    mossJ[y * bn + x] = new Color32((byte)(gj.r * 255f), (byte)(gj.g * 255f), (byte)(gj.b * 255f), (byte)Mathf.RoundToInt(ja * 255f));
                 }
             tx.Blob = WriteTex(dir + "/Blob_BaseColor.png", bn, bn, blob, true, false, true, true, 256);
             tx.Moss = WriteTex(dir + "/Moss_BaseColor.png", bn, bn, moss, true, false, true, true, 256);
+            tx.MossJoint = WriteTex(dir + "/MossJoint_BaseColor.png", bn, bn, mossJ, true, false, true, true, 256);
 
             // cart rut: 128 across x 256 along (tiles along v every 4 m): two worn tracks 1.1 m apart in a 1.7 m ribbon, a faint hump between, broken by periodic noise
             const int rw = 128, rh = 256; var ra = new Color32[rw * rh]; var height = new float[rw * rh];
