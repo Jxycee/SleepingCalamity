@@ -330,8 +330,11 @@ def selftest(nums, cfg, dev):
     check("combo 2 prior on finisher = ceil(33.52*1.2)=41", f(mult=1.6, prior=2, is_fin=1) == 41, str(f(mult=1.6, prior=2, is_fin=1)))
     check("min damage 1", f(atk=0.01) == 1)
     check("DEF 15 Broom: ceil(22*100/115)=20", f(deff=15) == 20, str(f(deff=15)))
+    g = lambda atk, mult, deff, oth: float(sc.damage_formula(torch.tensor(atk), torch.tensor(mult), torch.tensor(deff), torch.tensor(0.0), torch.tensor(0.0),
+                                                              torch.tensor(0.0), torch.tensor(0.0), torch.tensor(False), torch.tensor(0.0), torch.tensor(0.0), D, other=torch.tensor(oth)))
+    check("single ceil: atk 7.8 def 10 rage 1.3 = ceil(7.8*100/110*1.3=9.218) -> 10", g(7.8, 1.0, 10.0, 1.3) == 10, str(g(7.8, 1.0, 10.0, 1.3)))
     # determinism
-    small = [{"name": "t1", "players": 1, "profiles": ["average"], "loadouts": ["axe"]}]
+    small =[{"name": "t1", "players": 1, "profiles": ["average"], "loadouts": ["axe"]}]
     res = []
     for _ in range(2):
         sim, _t = run_cases(nums, cfg, dev, lanes=1000, n_dives=2, cases=small, seed=777)

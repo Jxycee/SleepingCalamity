@@ -69,7 +69,10 @@ def wmatch(heroWeapon, key):
 
 
 # ----------------------------------------------------------------------------- damage formula
-def damage_formula(atk, mult, deff, fire_pts, weak_fire, pest_pts, is_pest, crit_hit, prior, is_fin, D):
+EPS = 1e-4   # DamageFormula.cs subtracts 1e-4 before the single ceil
+
+
+def damage_formula(atk, mult, deff, fire_pts, weak_fire, pest_pts, is_pest, crit_hit, prior, is_fin, D, other=None):
     """DamageFormula.cs: max(min, ceil(ATK*move*100/(100+DEF) * (1+element) * tag * crit * combo)).
     All args broadcastable tensors; D = numbers['damage']."""
     base = atk * mult * 100.0 / (100.0 + deff)
@@ -78,7 +81,9 @@ def damage_formula(atk, mult, deff, fire_pts, weak_fire, pest_pts, is_pest, crit
     cr = torch.where(crit_hit, torch.full_like(base, D["critMultiplier"]), torch.ones_like(base))
     cb = 1.0 + D["comboBonusPerHit"] * prior * is_fin
     raw = base * el * tg * cr * cb
-    return torch.clamp(torch.ceil(raw - 1e-6), min=D["minDamage"])
+    if other is not None:
+        raw = raw * other   # DamageInput.Other (rage x guard x ward, Broom front block): folded in before the ONE ceil
+    return torch.clamp(torch.ceil(raw - EPS), min=D["minDamage"])
 
 
 # ----------------------------------------------------------------------------- simulator
@@ -477,9 +482,14 @@ class Sim:
         t2 = (self.R(L, E) < self.fT2[f][:, None]) & (self.ts.get("cellarsMaxTier", 1) >= 2) & ~isw[:, None]
         t2 = t2 | wslot
         ts = self.ts
-        hp = self.eHp[kind] * torch.where(t2, torch.full_like(r, ts["tier2Life"]), torch.ones_like(r)) * self.lifeMult[self.P - 1][:, None]
-        dfn = self.eDef[kind] * torch.where(t2, torch.full_like(r, ts["tier2Def"]), torch.ones_like(r))
-        atk = self.eAtk[kind] * torch.where(t2, torch.full_like(r, ts["tier2Atk"]), torch.full_like(r, ts["tier1Atk"]))
+        solo = (self.P == 1)[:, None]                            # EnemyModel.cs:178-179: SoloLife / SoloAtk apply with one hero present
+        one = torch.ones_like(r)
+        hp = self.eHp[kind] * torch.where(t2, torch.full_like(r, ts["tier2Life"]), one) * self.lifeMult[self.P - 1][:, None] \
+            * torch.where(solo, torch.full_like(r, ts.get("soloLife", 1.0)), one)
+        hp = torch.ceil(hp - EPS)                                # MaxHp = ceil(... - 1e-4)
+        dfn = self.eDef[kind] * torch.where(t2, torch.full_like(r, ts["tier2Def"]), one)
+        atk = self.eAtk[kind] * torch.where(t2, torch.full_like(r, ts["tier2Atk"]), torch.full_like(r, ts["tier1Atk"])) \
+            * torch.where(solo, torch.full_like(r, ts.get("soloAtk", 1.0)), one)
         cd0 = self.cdT[kind, t2.long()] * self.R(L, E) + self.A["engageDelaySeconds"]
         mE = mask[:, None]
         w = lambda new, old: torch.where(mE, new, old)
@@ -552,10 +562,10 @@ class Sim:
         isfin = self.tFin[w, self.hslot]
         crit = self.R(L, H) < D["critChance"]
         tdef = self.edef[ar, tgt][:, None]
-        dmg = damage_formula(self.curAtk, mult, tdef, self.curFire, self.eWeak[tk][:, None], self.curPest,
-                             self.ePest[tk][:, None], crit, self.hcombo, isfin, D)
         blocked = (self.eBlock[tk][:, None] > 0.5) & (self.R(L, H) < A["broomBlockFraction"])
-        dmg = torch.where(blocked, torch.clamp(torch.ceil(dmg * A["broomBlockedMult"] - 1e-6), min=D["minDamage"]), dmg)
+        oth = torch.where(blocked, torch.full_like(mult, A["broomBlockedMult"]), torch.ones_like(mult))
+        dmg = damage_formula(self.curAtk, mult, tdef, self.curFire, self.eWeak[tk][:, None], self.curPest,
+                             self.ePest[tk][:, None], crit, self.hcombo, isfin, D, other=oth)
         dmg = dmg * connect
         tot_dmg = dmg.sum(1)
         hit_any = connect.any(1)
@@ -582,7 +592,11 @@ class Sim:
         thp = self.ehp[ar, tgt]
         killed = hit_any & (thp <= 0) & self.ealive[ar, tgt]
         self.ealive[ar, tgt] = self.ealive[ar, tgt] & ~killed
-        finKill = (connect & (isfin > 0.5)).any(1)
+        # killing blow = first hero (by slot order within the tick) whose cumulative damage takes the target to 0; bonus only if that hit is a finisher
+        hp_before = (thp + tot_dmg)[:, None]
+        crossed = (hp_before - torch.cumsum(dmg, 1)) <= 0
+        first_cross = crossed & (torch.cumsum(crossed.long(), 1) == 1)
+        finKill = (first_cross & connect & (isfin > 0.5)).any(1)
         amt = self.absKill[tk] * torch.where(finKill, torch.full_like(thp, self.G["finisherKillMult"]), torch.ones_like(thp))
         cred = (self.elast[ar, tgt] >= (self.rc - self.G["creditWindowSeconds"])[:, None]) & self.present
         self.abs = self.abs + cred * (amt * killed)[:, None]
@@ -623,12 +637,12 @@ class Sim:
         self.epend = self.epend & ~land
         rr = torch.where(up[:, None, :], self.R(L, E, H), torch.full((L, E, H), -1.0, device=dev))
         th = rr.argmax(-1)                                      # [L,E] target hero
-        raw = torch.ceil(self.eatk * self.eamul * 100.0 / (100.0 + D["playerDef"]) - 1e-6)
+        raw = self.eatk * self.eamul * 100.0 / (100.0 + D["playerDef"])
         raw = raw * torch.where(self.erage > 0, torch.full_like(raw, D["rageMult"]), torch.ones_like(raw))
         dodged = self.R(L, E) < self.dodge.gather(1, th)
         guarded = (self.R(L, E) < self.guard.gather(1, th)) & (self.egb < 0.5)
         raw = torch.where(guarded, raw * D["guardMult"], raw)
-        raw = torch.clamp(torch.ceil(raw - 1e-6), min=D["minDamage"])
+        raw = torch.clamp(torch.ceil(raw - EPS), min=D["minDamage"])   # one ceil over every multiplier, as DamageFormula.Compute
         raw = raw * (land & ~dodged & up.any(1)[:, None])
         onehot = torch.nn.functional.one_hot(th, H).float()
         dmgH = (onehot * raw[:, :, None]).sum(1)                # [L,H]
