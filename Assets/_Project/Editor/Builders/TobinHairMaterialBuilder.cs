@@ -36,7 +36,7 @@ namespace SleepingCalamity.EditorTools
         {
             var mat = AssetDatabase.LoadAssetAtPath<Material>(CapPath);
             if (mat == null) { mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "Tobin_HairCap" }; AssetDatabase.CreateAsset(mat, CapPath); }
-            mat.SetColor("_BaseColor", new Color(0.30f, 0.18f, 0.105f, 1f)); mat.SetFloat("_Smoothness", 0.25f); mat.SetFloat("_Metallic", 0f);
+            mat.SetColor("_BaseColor", Hex(LoadLook().cap_color, new Color(0.30f, 0.18f, 0.105f, 1f))); mat.SetFloat("_Smoothness", 0.25f); mat.SetFloat("_Metallic", 0f);
             EditorUtility.SetDirty(mat); return mat;
         }
 
@@ -89,7 +89,7 @@ namespace SleepingCalamity.EditorTools
         [System.Serializable] public class HairLook
         {
             public float shadow_lift = 0f, hue_shift = 0f, saturation = 1f, value = 1f, alpha_cut = 0.42f;
-            public string root_tint = "#3a281c", mid_tint = "#5c402c", tip_tint = "#7a563c", blonde_color = "#ae8c66"; public float blonde_chance = 0.06f;
+            public string root_tint = "#3a281c", mid_tint = "#5c402c", tip_tint = "#7a563c", blonde_color = "#ae8c66", cap_color = "#4d2e1b"; public float blonde_chance = 0.06f;   // cap_color: scalp shell under the cards, the hair's own mid colour so gaps read as hair
         }
         public const string LookPath = "Art/Blender/tools/experimental/tobin_hair/sweep/unity_look.json";
         public static HairLook LoadLook()

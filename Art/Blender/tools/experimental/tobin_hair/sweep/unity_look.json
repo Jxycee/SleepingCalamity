@@ -8,5 +8,6 @@
  "tip_tint": "#7a563c",
  "alpha_cut": 0.42,
  "blonde_color": "#8f6d4c",
- "blonde_chance": 0.04
+ "blonde_chance": 0.04,
+ "cap_color": "#5c4332"
 }
