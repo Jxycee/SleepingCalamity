@@ -224,7 +224,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             Assert.That(WorldSaveStore.Upgrade(GoldenV1), Is.EqualTo(GoldenV1));
             Assert.That(WorldSaveStore.Upgrade("not json"), Is.EqualTo("not json"));
-            Assert.That(WorldSaveStore.Upgrade("{\"schemaVersion\": 0}"), Does.Contain("schemaVersion"));
+            Assert.That(WorldSaveStore.Upgrade("{\"schemaVersion\": 0}"), Is.EqualTo("{\"schemaVersion\": 0}"));
         }
 
         // Catches: a type error in one section ("kind": "x" into an int, a recorded list that is a number) making the whole file unreadable

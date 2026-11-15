@@ -379,7 +379,7 @@ namespace SleepingCalamity.Runtime
         // or above the current version, or one whose version can't be read, passes through untouched for JsonSaveFile to judge.
         internal static string Upgrade(string json)
         {
-            if (!JsonSaveFile<WorldSave>.TryReadSchemaVersion(json, out long version) || version >= TargetVersion) return json;
+            if (!JsonSaveFile<WorldSave>.TryReadSchemaVersion(json, out long version) || version < 1 || version >= TargetVersion) return json;
             JObject root = JObject.Parse(json);
             // Each step turns version v into v+1 and must leave "schemaVersion" at v+1 (Clean keeps the version as read, so a step that forgot would
             // save the file as the old version and migrate it again on every load); the loop sets it after each step as a guard (N1).
