@@ -54,7 +54,7 @@ namespace SleepingCalamity.EditorTools
                 string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");   // e.g. "SquareSouth,Fountain": only the cameras whose name contains one of them
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 // Default: Midday renders every camera; LowSun (design 7: "at midday and low sun") only the four play-position cameras, files <Camera>_<Preset>_LowSun.png.
-                BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") == "Midday" ? new[] { BeautyCornerBuilder.Preset.Midday } : new[] { BeautyCornerBuilder.Preset.Midday, BeautyCornerBuilder.Preset.LowSun };
+                BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") is string sunEnv && System.Enum.TryParse(sunEnv, out BeautyCornerBuilder.Preset one) ? new[] { one } : new[] { BeautyCornerBuilder.Preset.Morning, BeautyCornerBuilder.Preset.Evening };
                 string variantSpec = System.Environment.GetEnvironmentVariable("SC_LOOK_VARIANTS");
                 string[] variants = string.IsNullOrEmpty(variantSpec) ? new[] { "" } : variantSpec.Split(';');
                 foreach (string variant in variants)
@@ -65,7 +65,7 @@ namespace SleepingCalamity.EditorTools
                     HollowmereLook.Look look = HollowmereLook.For(light).Parse(colon < 0 ? null : variant.Substring(colon + 1));
                     HollowmereLook.Apply(light, look);
                     string prefix = vName.Length > 0 ? vName + "_" : "";
-                    string suffix = light == BeautyCornerBuilder.Preset.Midday ? "" : "_" + light;
+                    string suffix = light == BeautyCornerBuilder.Preset.Midday || light == BeautyCornerBuilder.Preset.Morning ? "" : "_" + light;
                     foreach (HollowmereBuilder.Preset preset in new[] { HollowmereBuilder.Preset.Ruined, HollowmereBuilder.Preset.Rebuilt })
                     {
                         string onlyPreset = System.Environment.GetEnvironmentVariable("SC_CAPTURE_PRESET");   // e.g. "Rebuilt": skip the other preset
@@ -79,7 +79,7 @@ namespace SleepingCalamity.EditorTools
                         {
                             if (!cam.name.StartsWith("Cap_HM_") && !cam.name.StartsWith("Cap_Corner_")) continue;
                             if (!string.IsNullOrEmpty(only) && !only.Split(',').Any(o => cam.name.Contains(o))) continue;
-                            if (!lowOnly && light != BeautyCornerBuilder.Preset.Midday && System.Array.IndexOf(PlayPositionCameras, cam.name) < 0) continue;
+                            if (!lowOnly && light != BeautyCornerBuilder.Preset.Midday && light != BeautyCornerBuilder.Preset.Morning && System.Array.IndexOf(PlayPositionCameras, cam.name) < 0) continue;
                             bool overview = cam.name.StartsWith("Cap_HM_Overview"), fog = RenderSettings.fog; float density = RenderSettings.fogDensity;
                             if (overview) { RenderSettings.fog = look.OverviewFog > 0f; RenderSettings.fogDensity = look.OverviewFog; }   // the play-distance haze would hide the town at 100 m+: the overview has its own thin one
                             try { LookTestCapture.Save(cam, Path.Combine(dir, prefix + cam.name.Replace("Cap_", "") + "_" + preset + suffix + ".png")); }
@@ -87,7 +87,7 @@ namespace SleepingCalamity.EditorTools
                         }
                     }
                 }
-                HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);
+                HollowmereLook.Apply(BeautyCornerBuilder.Preset.Morning);
                 HollowmereBuilder.ApplyPreset(HollowmereBuilder.Preset.Ruined);
             }
             finally

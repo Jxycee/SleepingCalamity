@@ -33,6 +33,7 @@ namespace SleepingCalamity.EditorTools
         public static void Build(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
         {
             BuildGround(set, ruined, t);
+            HollowmereB3Ground.BuildDecals(set, t);   // B3 (S2 table): leaf drifts, puddles, cart rut, moss and dirt patches, shared by both presets
             BuildDressing(set, ruined, rebuilt, t);
         }
 
@@ -105,27 +106,27 @@ namespace SleepingCalamity.EditorTools
             if (maxCornerCorr > 0.01f) Debug.LogWarning(corner + " (over 0.01 m: the draped square would move the approved corner's seam)"); else Debug.Log(corner);
             if (residual > DriftWarn) Debug.LogWarning("SC HOLLOWMERE square ground: residual " + residual.ToString("F3") + " m after the drape (over " + DriftWarn + " m)");
 
-            Dictionary<string, GameObject> prefabs = BeautyCornerGround.SettPrefabs(data.stones.Select(s => s.v).Where(v => !string.IsNullOrEmpty(v)).Distinct(), out Material bed);
-            if (prefabs == null) { Debug.LogWarning("SC HOLLOWMERE square ground: the B6 Cobbles art (CobbleFamily.fbx) is missing, no setts"); return; }
-
+            // B3 / DH4: the 35k setts are gone; the draped bed carries the T01 cobble scan (UV = metres / 2, macro tint in the detail slot). The old corner bed material is only the
+            // fallback when the scan is missing.
+            Material ground = HollowmereB3Ground.SquareGroundMaterial();
+            if (ground == null)
+            {
+                BeautyCornerGround.SettPrefabs(data.stones.Select(s => s.v).Where(v => !string.IsNullOrEmpty(v)).Distinct(), out Material bed);
+                if (bed != null) ground = SquareBedMaterial(bed);
+                Debug.LogWarning("SC HOLLOWMERE square ground: Art/Source/Fab/T01_cobblestone_floor is missing, the bed keeps " + (ground != null ? "the old grey-brown corner material" : "no material"));
+            }
             GameObject bedFbx = BeautyCornerArt.LoadModel(folder, "SquareBed.fbx");
             if (bedFbx != null)
             {
                 var bedGo = (GameObject)PrefabUtility.InstantiatePrefab(bedFbx, holder); bedGo.name = "Art_SquareBed";
-                BeautyCornerGround.Assign(bedGo, SquareBedMaterial(bed));   // A7: the bed shows where the setts stop; the olive tileable read as a hard green rectangle, so the square gets a warm grey-brown copy
+                if (ground != null) BeautyCornerGround.Assign(bedGo, ground);
                 DrapeBed(bedGo, holder, folder, drop, origin, step, nx, nz);
             }
             else Debug.LogWarning("SC HOLLOWMERE square ground: SquareBed.fbx is missing");
-
-            var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(json);
-            string[] names = prefabs.Keys.OrderBy(k => k, System.StringComparer.Ordinal).ToArray();
-            var spawner = new GameObject("Setts").AddComponent<SleepingCalamity.Presentation.CobbleSpawner>();
-            spawner.transform.SetParent(holder, false);
-            spawner.Configure(textAsset, names, names.Select(n => prefabs[n]).ToArray(), drop, origin, step, nx, nz);
-            Debug.Log("SC HOLLOWMERE square ground: spawner with " + data.stones.Length + " stones from " + prefabs.Count + " variant prefabs");
+            HollowmereB3Ground.BuildEdges(holder, t, folder);
 
             PlaceDrains(holder, data.drains, t, shelf);
-            ScatterEdges(holder, ruined, data.weed_slots, drop, origin, step, nx, nz);
+            ScatterEdges(holder, ruined, data.weed_slots, drop, origin, step, nx, nz, t);
         }
 
         // A copy of the shared CobbleBed material (the beauty corner keeps its own) tinted from olive to a dark warm brown like the mortar between the setts.
@@ -143,17 +144,24 @@ namespace SleepingCalamity.EditorTools
             return m;
         }
 
-        // Inside the square proper the bed sinks 2.5 cm so the square's paving slab (HollowmereBuilder's SquarePaving, top -0.02) shows in the joints like the approved
-        // corner's; it rises back to the shelf over the last 0.5 m before the square's edge, where the lane stubs have no slab and keep the bed at the setts.
-        static float BedSink(float x, float z)
+        // B3 tint for the tufts: the shared M_CrackWeeds atlas reads lime on the square, so the square gets its own olive copy (the corner keeps the original).
+        static Material OliveTufts(Material src)
         {
-            float inside = Mathf.Min(Mathf.Min(x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - x), Mathf.Min(z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - z));
-            return -0.025f * Mathf.Clamp01(inside / 0.5f);
+            Material m = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/Hollowmere/M_SquareTufts.mat", src.shader);
+            m.CopyPropertiesFromMaterial(src);
+            foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
+            m.renderQueue = src.renderQueue;
+            Color olive = new Color(0.70f, 0.74f, 0.52f, 1f);
+            m.SetColor("_BaseColor", olive); m.SetColor("_Color", olive);
+            m.enableInstancing = true;
+            MaterialValidation.Validate(m);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         // B9 tufts on the json's weed slots, like BeautyCornerGround.Weeds does for the corner: lot_edge / edge_grass (the worn grass-to-cobble edges) get a dense mix of
         // moss tufts and grass clumps, missing_sett gets weeds and moss, joint gets small tufts. One shared foliage material, seeded scale and yaw, heights capped.
-        static void ScatterEdges(Transform holder, Transform ruined, PSlot[] slots, float[] drop, Vector2 origin, float step, int nx, int nz)
+        static void ScatterEdges(Transform holder, Transform ruined, PSlot[] slots, float[] drop, Vector2 origin, float step, int nx, int nz, TownLayout t)
         {
             if (slots == null || slots.Length == 0) return;
             var moss = new List<GameObject>(); var grass = new List<GameObject>(); var weeds = new List<GameObject>();
@@ -172,6 +180,7 @@ namespace SleepingCalamity.EditorTools
             }
             Load("Moss_Tuft_", "ABC", moss); Load("Grass_", "ABC", grass); Load("Weed_", "ABCDE", weeds);
             if (mat == null) { Debug.LogWarning("SC HOLLOWMERE square edges: no B9 tuft art, edges stay bare"); return; }
+            mat = OliveTufts(mat);
             float Height(GameObject go) { Bounds b = default; bool any = false; foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true)) { if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds); } return any ? Mathf.Max(0.01f, b.size.y) : 1f; }
             var heights = new Dictionary<GameObject, float>();
             foreach (var l in new[] { moss, grass, weeds }) foreach (GameObject g in l) heights[g] = Height(g);
@@ -193,8 +202,13 @@ namespace SleepingCalamity.EditorTools
                 // round 2: weeds belong at walls and kerbs. Distance from the slot to the square's border (the lots' fronts and kerbs): inside 1.2 m everything stays, beyond 3.5 m only strays.
                 Vector3 wp = holder.TransformPoint(new Vector3(s.p[0], 0f, s.p[2]));
                 float dEdge = Mathf.Min(Mathf.Min(wp.x - HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX - wp.x), Mathf.Min(wp.z - HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ - wp.z));
-                float near = Mathf.SmoothStep(1f, 0f, Mathf.InverseLerp(1.2f, 3.5f, dEdge));
-                float pKeep = baseKeep * cluster * (0.03f + 0.97f * near);
+                // B3 (DH4): tufts only within ~1.5 m of the border, at the lots' footings (1.5 m margin) and at the fountain foot (3.5 m); the open middle stays clean cobble.
+                bool atFooting = false;
+                foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(new TownPoint(wp.x, wp.z), 1.5f)) { atFooting = true; break; }
+                bool atFountain = wp.x * wp.x + wp.z * wp.z < 3.5f * 3.5f;
+                if (dEdge > 1.5f && !atFooting && !atFountain) continue;
+                float near = 1f;
+                float pKeep = baseKeep * cluster * 0.45f;   // about half the old density
                 if (keepRoll >= pKeep) continue;
                 bool tended = keepRoll < pKeep * 0.1f;   // survives into Rebuilt
                 List<GameObject> pool; float lo, hi, cap;
@@ -220,7 +234,7 @@ namespace SleepingCalamity.EditorTools
                 }
                 float scale = lo + (float)rnd.NextDouble() * (hi - lo);
                 scale = Mathf.Min(scale, cap / heights[model]);
-                w.transform.localPosition = new Vector3(s.p[0], s.p[1] + CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, s.p[0], s.p[2]), s.p[2]);
+                w.transform.localPosition = new Vector3(s.p[0], HollowmereB3Ground.BedLift + CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, s.p[0], s.p[2]), s.p[2]);   // on the bed (the json's y was for sett tops)
                 w.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
                 w.transform.localScale = Vector3.one * scale;
                 n++;
@@ -239,21 +253,28 @@ namespace SleepingCalamity.EditorTools
                 if (src == null) continue;
                 Matrix4x4 m = holder.worldToLocalMatrix * mf.transform.localToWorldMatrix, inv = m.inverse;
                 Vector3[] v = src.vertices;
+                // B3: no setts sit on the bed any more and the paving slab (top -0.02) must not show through it: the bed's lowest vertex goes to BedLift above the draped ground.
+                float minY = float.MaxValue, maxY = float.MinValue;
+                for (int i = 0; i < v.Length; i++) { float y = m.MultiplyPoint3x4(v[i]).y; minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y); }
+                var uv = new Vector2[v.Length];
                 for (int i = 0; i < v.Length; i++)
                 {
                     Vector3 p = m.MultiplyPoint3x4(v[i]);
-                    p.y += SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x, p.z) + BedSink(p.x, p.z);
+                    p.y += SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x, p.z) + HollowmereB3Ground.BedLift - minY;
+                    uv[i] = new Vector2((p.x + holder.position.x) / 2f, (p.z + holder.position.z) / 2f);   // world metres / 2: the T01 tile is 2 m
                     v[i] = inv.MultiplyPoint3x4(p);
                 }
+                if (n == 0) Debug.Log("SC HOLLOWMERE square bed: source y " + minY.ToString("F3") + ".." + maxY.ToString("F3") + " (holder space), lifted to " + HollowmereB3Ground.BedLift + " above the draped ground (slab top -0.02)");
                 string path = folder + "/SquareBed_Draped" + (n == 0 ? "" : "_" + n) + ".asset"; n++;
                 var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
                 Mesh result;
-                if (existing != null && existing.vertexCount == v.Length && existing.vertices.SequenceEqual(v) && existing.subMeshCount == src.subMeshCount) result = existing;
+                if (existing != null && existing.vertexCount == v.Length && existing.vertices.SequenceEqual(v) && existing.uv.SequenceEqual(uv) && existing.subMeshCount == src.subMeshCount) result = existing;
                 else
                 {
-                    var copy = Object.Instantiate(src); copy.name = "SquareBed_Draped"; copy.vertices = v;
+                    var copy = Object.Instantiate(src); copy.name = "SquareBed_Draped"; copy.vertices = v; copy.uv = uv;
                     copy.RecalculateBounds();
                     if (src.normals != null && src.normals.Length > 0) copy.RecalculateNormals();   // the drape tilts the bed a little: keep the lighting honest
+                    copy.RecalculateTangents();   // the UVs were rewritten: the FBX's tangents no longer match
                     if (existing != null) { EditorUtility.CopySerialized(copy, existing); Object.DestroyImmediate(copy); result = existing; EditorUtility.SetDirty(result); }
                     else { AssetDatabase.CreateAsset(copy, path); result = copy; }
                     AssetDatabase.SaveAssets();
@@ -274,7 +295,7 @@ namespace SleepingCalamity.EditorTools
             {
                 PDrain d = drains[i];
                 if (d.p == null || d.p.Length < 3) continue;
-                var pos = new Vector3(d.p[0], d.p[1] + HollowmereLayout.Ground(t, d.p[0], d.p[2]) - shelf, d.p[2]);   // on the draped ground
+                var pos = new Vector3(d.p[0], HollowmereB3Ground.BedLift + HollowmereLayout.Ground(t, d.p[0], d.p[2]) - shelf, d.p[2]);   // on the draped bed (B3: flush with the cobble bed, no setts)
                 if (fbx != null)
                 {
                     var go = (GameObject)PrefabUtility.InstantiatePrefab(fbx, group); go.name = "Drain_" + i;

@@ -104,7 +104,7 @@ namespace SleepingCalamity.EditorTools
         {
             BuilderUtil.EnsureFolder(Folder);
             TerrainLayer[] layers = { Ground("Grass", "meadow_grass", 3f), Ground("Dirt", "packed_soil", 3f), Ground("Path", "worn_path", 2.5f), CobbleLayer() };
-            layers[0].diffuseRemapMax = new Vector4(0.97f, 0.93f, 0.88f, 1f);   // a little less saturated green (round 3)
+            layers[0].diffuseRemapMax = new Vector4(0.94f, 0.90f, 0.76f, 1f);   // a little less saturated green (round 3); B3: olive, less lime (blue pulled down)
             layers[1].normalScale = 1.8f;                                        // a coarser read on the earth banks (round 3)
             layers[1].tileSize = new Vector2(1.7f, 1.7f);                         // A8: more texels on the steep banks (was 3 m)
             EditorUtility.SetDirty(layers[0]); EditorUtility.SetDirty(layers[1]);
@@ -203,6 +203,18 @@ namespace SleepingCalamity.EditorTools
                         path = Mathf.Max(path, 0.3f * Smooth(0.45f, 0.85f, Mathf.PerlinNoise(x * 0.017f + 203f, z * 0.017f + 57f)));
                         soil = Mathf.Max(soil, 0.2f * Smooth(0.5f, 0.9f, Mathf.PerlinNoise(x * 0.022f + 311f, z * 0.022f + 149f)));
                         FieldPaint(t, x, z, ref soil, ref path);   // Q15: the patchwork outside the wall
+                        // B3 meadow: outside the wall the grass layer is broken up by seeded noise, no fifth layer (height blend allows four): darker olive patches (soil weight
+                        // mixed into the green), straw drift (path layer), a fine stipple, and bare earth along the lanes. Subtle: every weight stays under about 0.5.
+                        float outside = Smooth(33f, 46f, e);
+                        if (outside > 0f)
+                        {
+                            float olive = Mathf.PerlinNoise(x * 0.045f + 101f, z * 0.045f + 23f), straw = Mathf.PerlinNoise(x * 0.028f + 57f, z * 0.028f + 181f);
+                            float stipple = Mathf.PerlinNoise(x * 0.31f + 9f, z * 0.31f + 71f), bare = Mathf.PerlinNoise(x * 0.21f + 3f, z * 0.21f + 8f);
+                            soil = Mathf.Max(soil, outside * 0.34f * Smooth(0.52f, 0.78f, olive));
+                            path = Mathf.Max(path, outside * 0.48f * Smooth(0.50f, 0.76f, straw));
+                            soil = Mathf.Max(soil, outside * 0.14f * Smooth(0.62f, 0.86f, stipple));
+                            soil = Mathf.Max(soil, outside * 0.45f * (1f - Smooth(1.2f, 5.5f, lane)) * Smooth(0.35f, 0.7f, bare));   // bare earth along the lanes
+                        }
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
                         grass = Mathf.Max(0f, 1f - soil - path);

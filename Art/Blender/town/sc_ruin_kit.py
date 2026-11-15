@@ -33,6 +33,14 @@ language; docs/art/beauty-corner-brief.md for the scoring.
 
 Status (2026-10-31, cloud): exported. Self-review 31/40 (calibrated rubric; rounds 26, 28, 29.5, 30, then the controller's round 5
 for standing remains: 31). Tris printed per variant (all < 10k). Rounds, per-variant table and parked ideas: Ruins/SOURCES.md.
+Status (2026-11-15, B3): chimney stack added (DH1: every ruined lot keeps its hearth and chimney above the footing; smoke rises from
+it when the house is rebuilt). Separate child 'Chimney' (FK_ChimneyStone / FK_Sandstone / FK_PlinthJoint, same wear attribute) on the
+back (+Y) wall at the hearth, 1.1 x 0.8 m (S) to 1.5 x 1.0 m (L), nominal height S 3.0 / M 3.8 / L 4.6 m +-0.3 m per variant, leaning
+1-2 deg, tapering, stepped shoulder, open firebox arch on the -Y side, hollow flue, A/C corbelled cap, B/C broken top; SOCKET_Smoke
+empty at the flue mouth (Z up). The chimney is the one piece above MAX_Z (it is the silhouette); the hearth moved in front of it.
+To hold the budget the tuft/strip counts were trimmed (moss 4/3/2, M strips 4, L grass 0). Tris per variant (total; chimney part):
+S_A 7942 (718), S_B 8596 (748), S_C 8296 (838), M_A 9326 (1038), M_B 9532 (998), M_C 9770 (918), L_A 9620 (1288), L_B 9568 (1128),
+L_C 9074 (1038).
 """
 import sys, os, math, random, zlib, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -199,6 +207,16 @@ class Ruin:
         self.collapse = R.choice([1, 2, 3])
         self.decay = {'A': 0.25, 'B': -0.05, 'C': -0.3}[name[-1]] + R.uniform(-0.1, 0.1)   # A mostly whole, C mostly gone
         self.heaps = []; self.moss_spots = []
+        # DH1 chimney (own RNG: the footing layout above and below is unchanged by it). Stands on the back (+Y) wall at the hearth.
+        CR = random.Random(self.seed ^ 0xC1A5)
+        H = {'S': 3.0, 'M': 3.8, 'L': 4.6}[self.cls] + CR.uniform(-0.3, 0.3)
+        W0 = {'S': 1.1, 'M': 1.3, 'L': 1.5}[self.cls] * CR.uniform(0.96, 1.04)
+        D0 = {'S': 0.8, 'M': 0.9, 'L': 1.0}[self.cls] * CR.uniform(0.96, 1.04)
+        ymax = self.h - 0.07
+        self.chim = dict(H=H, W0=W0, D0=D0, cx=CR.uniform(-0.3, 0.3) * self.h, ymax=ymax, front=ymax - D0,
+                         zb=H * CR.uniform(0.42, 0.48), lean=math.radians(CR.uniform(1.0, 2.0)) * CR.choice([-1, 1]),
+                         lean_y=math.radians(CR.uniform(0.0, 0.8)))
+        self.cg = Geo(self.h - 0.03, 0.0)
         # round 5: standing remains. 1-2 corner stubs (0.8-1.4 m, stepped down along both sides), one broken wall run, 1-2 gaps
         alive = [c for c in range(4) if c not in self.lost]
         R.shuffle(alive)
@@ -409,6 +427,7 @@ class Ruin:
         """Round 5: an old hearth (sooted flags and a kerb of stones) against the back, a few fallen blocks, the fallen beam."""
         R = self.R; g = self.g; h = self.h
         hx = R.uniform(-0.35, 0.35) * h; hy = self.rc - FOOT_W / 2 - R.uniform(0.9, 1.2)
+        hx = self.chim['cx']; hy = self.chim['front'] - 0.42      # DH1: the hearth sits in front of its chimney (draws above kept)
         self.hearth = (hx, hy)
         for i in range(R.randint(3, 4)):
             q = (hx + R.uniform(-0.45, 0.45), hy + R.uniform(-0.3, 0.3))
@@ -433,6 +452,139 @@ class Ruin:
             g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
             if R.random() < 0.6 and sum(1 for pl in self.plants if pl[0] == 'weed') < 2:
                 self.plants.append(('weed', x + R.uniform(-0.3, 0.3), y + R.uniform(-0.3, 0.3), 0.0, R.uniform(0, 6.3), R.uniform(1.5, 1.9)))
+
+    def build_chimney(self):
+        """DH1: the hearth's chimney stack, standing on the back wall line (a hollow ring of chunky coursed rubble blocks): a breast
+        with an open firebox arch on the front (toward the room), a sloped-in shoulder slab, then a tapering, leaning stack that
+        steps in from the front only (the back stays flush with the wall), a corbelled cap lip (A, C) or a broken-off ragged top
+        (B, C). Hollow flue, dark smoke shelf at the shoulder. Variant A: capped, nearly whole; B: ragged; C: low on one side."""
+        c = self.chim; R = random.Random(self.seed ^ 0xC1A6); g = self.cg
+        H, W0, D0, cx, ymax = c['H'], c['W0'], c['D0'], c['cx'], c['ymax']
+        tl = math.tan(c['lean']); tly = math.tan(c['lean_y']); v = self.name[-1]
+        B = BLOCK[self.cls]; ofs = self.nofs
+        t0 = {'S': 0.26, 'M': 0.28, 'L': 0.30}[self.cls]; tu = {'S': 0.17, 'M': 0.19, 'L': 0.21}[self.cls]
+        r = {'S': 0.30, 'M': 0.34, 'L': 0.38}[self.cls]           # firebox half width
+        jam = 0.22
+
+        def mk(z0, z1):
+            lst = []; z = z0
+            while z < z1 - 0.12:
+                h = min(R.uniform(0.19, 0.25) * (0.9 + 0.1 * B), z1 - z); lst.append([z, h]); z += h
+            if lst:
+                lst[-1][1] = z1 - lst[-1][0]
+            return lst
+        zbt = c['zb']
+        breast = mk(-0.05, zbt); zb = breast[-1][0] + breast[-1][1]; c['zb'] = zb
+        slab_h = 0.14
+        upper = mk(zb + slab_h, H)
+        zspr = next(cz + ch for cz, ch in breast if cz + ch >= 0.33)
+        W1, W2 = W0 * 0.72, W0 * 0.54; D1, D2 = D0 * 0.82, D0 * 0.68
+        cap = v in 'AC'
+        def hfn(xl, y):
+            nz_ = noise.noise(Vector((xl * 2.4, y * 2.4, 1.7)) + ofs)
+            if v == 'A':
+                return H + 0.08 * nz_ - 0.45 * max(0.0, noise.noise(Vector((xl * 1.7 + 9, y * 1.7, 4.1)) + ofs) + 0.05)   # cap chipped away in places
+            if v == 'B':
+                return H - 0.28 + 0.32 * nz_ - 0.12 * xl / W2
+            s = max(0.0, min(1.0, (xl * (1 if c['lean'] > 0 else -1) / W2 + 0.35) / 0.7))      # low on the side it leans away from
+            return H + 0.05 - 0.75 * s * s * (3 - 2 * s) + 0.12 * nz_
+        tops = []
+
+        def seg(Lw, lo, hi, cuts=()):
+            pts = [0.0]; x = 0.0
+            while Lw - x > hi * 1.25:
+                x += R.uniform(lo, hi); pts.append(x)
+            if Lw - pts[-1] < lo * 0.6 and len(pts) > 1:
+                pts.pop()
+            pts.append(Lw)
+            for cc in cuts:
+                if 0.06 < cc < Lw - 0.06 and all(abs(cc - p) > 0.08 for p in pts):
+                    pts.append(cc)
+            pts.sort()
+            return list(zip(pts[:-1], pts[1:]))
+
+        cjit = {}
+
+        def block(xl, y, z0, h, sx, sy, mat, last, broken=0.0):
+            zc = z0 + h / 2
+            tilt = c['lean'] + math.radians(R.uniform(-1.5, 1.5))
+            jx = cjit.setdefault(round(z0, 3), R.uniform(-0.03, 0.03))        # each course sits a little off its neighbours
+            xf = place(cx + xl + tl * zc + jx, y, zc, math.radians(R.uniform(-2.5, 2.5)), math.radians(R.uniform(-1.5, 1.5)), tilt)
+            vs, fs = soft_box((sx - 0.035, sy - R.uniform(0.0, 0.03), h - 0.02), xf, R, soft=R.uniform(0.07, 0.15), wob=0.018,
+                              bulge=0.01, cuts=0, top_break=(0.05 + broken) if (last and R.random() < 0.6) else 0.0)
+            g.add(vs, fs, mat)
+
+        def course(j, z0, h, W, D, t, arch, hf=False, ncap=0):
+            zc = z0 + h / 2; odd = j % 2
+            yb = ymax - tly * zc; ymin = yb - D
+            def hh(xl, y):
+                return hfn(xl, y) if hf else 1e9
+            def lastp(xl, y):
+                return z0 + h * 1.6 > hh(xl, y)
+            def mat():
+                return 'stone' if (ncap or R.random() < 0.3) else 'stone_dk'
+            for fy, ysg in ((ymin + t / 2, 'f'), (yb - t / 2, 'b')):               # front and back walls
+                x0 = -W / 2 + (t if odd else 0.0); x1 = W / 2 - (t if odd else 0.0)
+                cuts = [-(r + jam) - x0, -r - x0, r - x0, r + jam - x0] if (arch and ysg == 'f') else []
+                for a, b in seg(x1 - x0, 0.38 * B, 0.68 * B, cuts):
+                    xm = x0 + (a + b) / 2; ao = abs(xm)
+                    if arch and ysg == 'f':
+                        crown = zspr + r + jam
+                        if ao < r and zc < crown:
+                            continue
+                        if ao < r + jam and z0 >= zspr - 0.02 and zc < crown:
+                            continue
+                    if z0 + h * 0.55 >= hh(xm, fy):
+                        continue
+                    block(xm, fy, z0, h, b - a, t, mat(), lastp(xm, fy)); tops.append(z0 + h) if hf else None
+            for sx_ in (-1, 1):                                                     # side walls
+                xs = sx_ * (W / 2 - t / 2)
+                y0 = ymin + (0.0 if odd == 0 else 0.0) + (0.0 if odd else t); y1 = yb - (0.0 if odd else t)
+                for a, b in seg(y1 - y0, 0.34 * B, 0.6 * B):
+                    ym = y0 + (a + b) / 2
+                    if z0 + h * 0.55 >= hh(xs, ym):
+                        continue
+                    block(xs, ym, z0, h, t, b - a, mat(), lastp(xs, ym)); tops.append(z0 + h) if hf else None
+
+        arch_on = True
+        for j, (z0, h) in enumerate(breast):
+            course(j, z0, h, W0, D0, t0, True)
+        # the sooted flags inside the firebox
+        ymin0 = ymax - D0
+        vs, fs = soft_box((W0 - 2 * t0, D0 - 2 * t0, 0.06), place(cx, ymin0 + D0 / 2, 0.0, math.radians(R.uniform(-3, 3))), R,
+                          soft=0.2, wob=0.01, bulge=0.0, cuts=0)
+        g.add(vs, fs, 'core')
+        # the firebox arch: voussoirs on a half circle over the opening, set into the front wall
+        nv = 5
+        for i in range(nv):
+            th = math.radians(180 - (i + 0.5) * 180 / nv)
+            rr = r + jam / 2
+            zc = zspr + rr * math.sin(th)
+            xl = rr * math.cos(th)
+            tang = rr * math.pi / nv + 0.03
+            xf = place(cx + xl + tl * zc, ymin0 + t0 / 2 - tly * zc, zc, math.radians(R.uniform(-1.5, 1.5)), 0.0,
+                       math.radians(90) - th + c['lean'])
+            vs, fs = soft_box((tang, t0 + 0.02, jam + R.uniform(0.0, 0.04)) if i != nv // 2 else (tang, t0 + 0.04, jam + 0.08), xf, R,
+                              soft=0.12, wob=0.012, bulge=0.006, cuts=0)
+            g.add(vs, fs, 'stone')
+        # the shoulder: a slab that closes the breast (a smoke shelf inside) and carries the narrower stack
+        sd = D0 + 0.04
+        xf = place(cx + tl * (zb + slab_h / 2), ymax - tly * zb - sd / 2 + 0.02, zb + slab_h / 2 - 0.02, math.radians(R.uniform(-1, 1)), 0.0, c['lean'])
+        vs, fs = soft_box((W0 + 0.08, sd, slab_h + 0.04), xf, R, soft=0.12, wob=0.012, bulge=0.012, cuts=2, bottom=True)
+        g.add(vs, fs, 'stone')
+        # the stack
+        n = len(upper)
+        for j, (z0, h) in enumerate(upper):
+            u = j / max(1, n - 1)
+            W = W1 + (W2 - W1) * u; D = D1 + (D2 - D1) * u; t = tu; nc = 0
+            if cap and j >= n - 2:
+                gr = 0.05 if j == n - 2 else 0.10
+                W += 2 * gr; D += 1.6 * gr; t += gr; nc = 1
+            course(j + 1, z0, h, W, D, t, False, hf=True, ncap=nc)
+        # the smoke socket: the highest rim of the flue
+        zt = float(np.mean(sorted(tops)[-4:])) if tops else H
+        c['zt'] = zt; c['W2'] = W2
+        self.smoke = Vector((cx + tl * zt, ymax - tly * zt - D2 / 2, zt))
 
     def build_doorstep(self):
         R = self.R; g = self.g
@@ -556,9 +708,9 @@ class Ruin:
         """Weeds in the joints at the footing's foot (both faces), grass at corners and against the stones, moss on the back course."""
         R = self.R
         nweed = {'S': 1, 'M': 1, 'L': 0}[self.cls]
-        ngrass = {'S': 1, 'M': 1, 'L': 1}[self.cls]
+        ngrass = {'S': 1, 'M': 1, 'L': 0}[self.cls]
         # B9 grass strips lapping off the footing's foot (breaks the stone-to-ground seam), alternating faces
-        nstrip = {'S': 4, 'M': 5, 'L': 4}[self.cls]
+        nstrip = {'S': 4, 'M': 4, 'L': 4}[self.cls]
         ks = [0, 1, 2, 3] + [R.choice([1, 2, 3]) for _ in range(nstrip - 4)]
         for j, k in enumerate(ks):
             a, b, d, out = self.side_frame(k)
@@ -570,7 +722,7 @@ class Ruin:
             dvec = out * side
             q = a + d * t + dvec * (FOOT_W / 2 - 0.03)
             self.plants.append(('strip', q.x, q.y, 0.0, math.atan2(dvec.x, -dvec.y), R.uniform(0.95, 1.25)))
-        nmoss = {'S': 5, 'M': 6, 'L': 7}[self.cls]
+        nmoss = {'S': 4, 'M': 3, 'L': 2}[self.cls]       # DH1: the chimney carries its own moss in the wear; keeps the tri budget
         for i in range(nweed):
             k = R.choice([1, 2, 3, 0, 2])
             a, b, d, out = self.side_frame(k)
@@ -602,7 +754,8 @@ class Ruin:
         for (x, y, _) in self.moss_spots:                 # a cushion on each stub top, grass at its foot
             q = Vector((x, y, 0.0))
             self.plants.append(('moss', x, y, self.top_at(q), R.uniform(0, 6.3), R.uniform(1.5, 1.9)))
-            self.plants.append(('grass', x * 0.9, y * 0.9, 0.0, R.uniform(0, 6.3), R.uniform(1.4, 1.7)))
+            if self.cls != 'L':
+                self.plants.append(('grass', x * 0.9, y * 0.9, 0.0, R.uniform(0, 6.3), R.uniform(1.4, 1.7)))
         hx, hy = self.hearth                               # weeds through the old hearth kerb
         self.plants.append(('weed', hx + 0.5, hy - 0.4, 0.0, R.uniform(0, 6.3), R.uniform(1.6, 2.0)))
 
@@ -615,9 +768,9 @@ class Ruin:
         return max(0.0, best - 0.03)
 
     # ----------------------------------------------------------------------------- mesh + wear
-    def to_object(self, coll):
-        g = self.g
-        me = bpy.data.meshes.new('Footing'); me.from_pydata([tuple(v) for v in g.v], [], g.f)
+    def to_object(self, coll, g=None, name='Footing'):
+        g = g or self.g
+        me = bpy.data.meshes.new(name); me.from_pydata([tuple(v) for v in g.v], [], g.f)
         me.polygons.foreach_set('material_index', g.m)
         me.polygons.foreach_set('use_smooth', [True] * len(me.polygons))
         for m in slot_mats():
@@ -626,10 +779,10 @@ class Ruin:
         nl = len(me.loops); UV = np.zeros((nl, 2), np.float32); WC = np.ones((nl, 4), np.float32)
         h = self.h
         sx, sy = self.step
-        pv = [random.Random(self.seed * 7919 + i).random() for i in range(self.g.np + 1)]
+        pv = [random.Random(self.seed * 7919 + i).random() for i in range(g.np + 1)]
         for poly in me.polygons:
             n = poly.normal
-            self.piece_v = pv[self.g.pid[poly.index]]
+            self.piece_v = pv[g.pid[poly.index]]
             ax = max(range(3), key=lambda i: abs(n[i]))
             slot = SLOTS[poly.material_index]
             for li in poly.loop_indices:
@@ -646,7 +799,7 @@ class Ruin:
         # bulk-set at the end: per-element UV writes create UV sub-layers that reallocate attribute storage under a held handle
         me.uv_layers.new(name='UVMap'); me.uv_layers['UVMap'].data.foreach_set('uv', UV.ravel())
         me.color_attributes.new('wear', 'FLOAT_COLOR', 'CORNER'); me.color_attributes['wear'].data.foreach_set('color', WC.ravel())
-        ob = bpy.data.objects.new('Footing', me); coll.objects.link(ob)
+        ob = bpy.data.objects.new(name, me); coll.objects.link(ob)
         return ob
 
     def wear_at(self, p, n, slot):
@@ -675,6 +828,22 @@ class Ruin:
             gm = max(gm, 0.6 * n.y + 0.25 * nz)
         if slot == 'oak':
             gm *= 0.4
+        ch = self.chim
+        cxz = ch['cx'] + math.tan(ch['lean']) * max(p.z, 0.0)
+        if abs(p.x - cxz) < ch['W0'] / 2 + 0.3 and p.y > ch['front'] - 0.45 and p.z > -0.1:
+            # DH1 soot: black round the firebox mouth and up the front above it, a band on the flue mouth, heavy inside the flue
+            d = math.sqrt((p.x - cxz) ** 2 + (0.8 * (p.y - ch['front'])) ** 2 + (p.z - 0.45) ** 2)
+            r = max(r, max(0.0, 1.0 - d / 1.1) * 0.97)
+            if n.y < -0.3 and abs(p.x - cxz) < 0.38 and 0.8 < p.z < ch['zb']:
+                r = max(r, 0.65 * (1.0 - (p.z - 0.8) / (ch['zb'] - 0.8 + 0.01)) * (0.8 + 0.3 * nz))
+            zt = ch.get('zt', ch['H'])
+            rim = max(0.0, min(1.0, (p.z - (zt - 0.65)) / 0.5))
+            inner = abs(p.x - cxz) < ch['W2'] / 2 - 0.12 and abs(n.z) < 0.5
+            r = max(r, rim * (0.95 if inner else 0.5) * (0.85 + 0.3 * nz))
+            if p.z > 0.6 and n.z > 0.5:                   # moss on the shaded tops, the shoulder and the north face
+                gm = max(gm, (0.7 + 0.3 * nz) * (1.0 - 0.9 * rim))
+            if n.y > 0.3 and p.z > 0.4:
+                gm = max(gm, 0.8 * min(1.0, (p.z - 0.4) / 1.0) * (0.85 + 0.3 * nz) * (1.0 - 0.8 * rim))
         # B: polish in the threshold and step dips (feet went in and out for years)
         b = 0.0
         if n.z > 0.6 and abs(p.x - self.door_x) < 0.6 and p.y < -self.rc + 0.3:
@@ -757,8 +926,9 @@ def footprint_box(S, coll):
 def build_variant(name, lib):
     coll = bpy.data.collections.new(name); bpy.context.scene.collection.children.link(coll)
     rn = Ruin(name)
-    rn.build_standing(); rn.build_footing(); rn.build_quoins(); rn.build_doorstep(); rn.build_interior(); rn.build_wood(); rn.build_rubble(); rn.plan_plants()
+    rn.build_standing(); rn.build_footing(); rn.build_quoins(); rn.build_chimney(); rn.build_doorstep(); rn.build_interior(); rn.build_wood(); rn.build_rubble(); rn.plan_plants()
     foot = rn.to_object(coll)
+    chim = rn.to_object(coll, rn.cg, 'Chimney')
     fol = build_foliage(rn, lib, coll)
     for c in fol.users_collection:
         if c != coll:
@@ -768,19 +938,21 @@ def build_variant(name, lib):
     fp = footprint_box(rn.S, coll)
     sock = bpy.data.objects.new('SOCKET_Doorstep', None); coll.objects.link(sock)
     sock.empty_display_type = 'ARROWS'; sock.empty_display_size = 0.3; sock.location = rn.socket
+    smoke = bpy.data.objects.new('SOCKET_Smoke', None); coll.objects.link(smoke)       # DH1: flue mouth, Z up (Blender)
+    smoke.empty_display_type = 'ARROWS'; smoke.empty_display_size = 0.25; smoke.location = rn.smoke
     root = bpy.data.objects.new(name, None); coll.objects.link(root); root.empty_display_type = 'PLAIN_AXES'
-    for o in (foot, fol, fp, sock):
+    for o in (foot, chim, fol, fp, sock, smoke):
         o.parent = root
         o['base'] = o.name.split('.')[0]
         o.name = name + '__' + o['base']
-    tris = L.tri_count(foot) + L.tri_count(fol)
-    zmax = max(v.co.z for o in (foot, fol) for v in o.data.vertices)
-    ext = max(max(abs(v.co.x), abs(v.co.y)) for o in (foot, fol) for v in o.data.vertices)
+    tris = L.tri_count(foot) + L.tri_count(chim) + L.tri_count(fol)
+    zmax = max(v.co.z for o in (foot, chim, fol) for v in o.data.vertices)
+    ext = max(max(abs(v.co.x), abs(v.co.y)) for o in (foot, chim, fol) for v in o.data.vertices)
     inner = rn.h - 1.0
     intr = sum(1 for v in foot.data.vertices if abs(v.co.x) < inner - 0.02 and abs(v.co.y) < inner - 0.02)
-    print('VARIANT %s: tris %d (footing %d, foliage %d), max z %.3f, max |xy| %.3f (half %.2f), verts in interior %d'
-          % (name, tris, L.tri_count(foot), L.tri_count(fol), zmax, ext, rn.h, intr))
-    return dict(name=name, root=root, objs=[root, foot, fol, fp, sock], coll=coll, tris=tris, ruin=rn,
+    print('VARIANT %s: tris %d (footing %d, chimney %d, foliage %d), max z %.3f, chimney z %.3f (nominal H %.2f), max |xy| %.3f (half %.2f), verts in interior %d'
+          % (name, tris, L.tri_count(foot), L.tri_count(chim), L.tri_count(fol), zmax, max(v.co.z for v in chim.data.vertices), rn.chim['H'], ext, rn.h, intr))
+    return dict(name=name, root=root, objs=[root, foot, chim, fol, fp, sock, smoke], coll=coll, tris=tris, ruin=rn,
                 foot_tris=L.tri_count(foot), fol_tris=L.tri_count(fol), zmax=zmax, ext=ext, intr=intr)
 
 def export(v):
