@@ -281,9 +281,7 @@ namespace SleepingCalamity.Tests.PlayMode
 
             yield return Drop(rig, 0, false, "D3");
             yield return Seconds(1f);   // the host keeps holding Interact against nothing: no error, no exception
-            int onHost = 0;
-            foreach (HeroVitals v in HeroVitals.All) if (v != null && v.NetworkManager == rig.HostNm) onHost++;
-            Assert.That(onHost, Is.EqualTo(1), "only the host's own vitals are left on the host (no stale entry for the dropped hero)");
+            Assert.That(HeroVitals.All.Count, Is.EqualTo(1), "only the host's own hero is registered in this process (a dropped hero's vitals left in the list would be stale)");
             Assert.That(rig.HostHero.GetComponent<HeroVitals>().IsUp, Is.True, "the host still stands");
             input.Frame = default;
         }

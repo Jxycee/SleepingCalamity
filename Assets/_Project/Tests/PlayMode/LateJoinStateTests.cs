@@ -1,7 +1,7 @@
 // Authority: test-only. Audit 2026-11-12 "test gaps": a client that connects AFTER state exists must see that state from the spawn alone (nothing is replayed). Host first, state built up with NO client connected, then
 // one TestClient joins late and the test reads what ITS copies of the objects show. Host (no scenes) + one late client in one process; the sync objects are the owned network prefabs. Players on the contents host are
 // simulated through CellarContentsSync.PlayersOverride, like CellarContentsNetworkTests.
-//   L1 contents: live enemies (one hurt, one dead), a cleared room and the opened key chest reach the late client: the same enemies with the same HP / kind / liveness, the room's cleared bit, the key chest shown open
+//   L1 contents: live enemies (one hurt), a cleared room (its enemies dead) and the opened key chest reach the late client: the same enemies with the same HP / kind / liveness, the room's cleared bit, the key chest shown open
 //      on the client's own built floor, the room key held, the door still shut.
 //   L2 healing: a point already used (recharging) shows as recharging on the late client: NetHealSecondsLeft > 0 and the client's own orb dark; a point still ready shows lit.
 // Catches: a contents / enemy / healing value that is only sent as an event (a late joiner would see a fresh, untouched floor), an enemy's NetworkVariables not seeded before Spawn, a client that builds the floor but never
