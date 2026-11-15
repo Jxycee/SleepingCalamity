@@ -155,7 +155,7 @@ namespace SleepingCalamity.Presentation
         }
 
         // HostWorld.ITownSource (M6 step 0), host only: the hub's town saves through the stock/town/residents/dive/bags sections. Registered in OnNetworkSpawn, unregistered on despawn.
-        // The sections come from TownStock.CaptureWorld over the live session; residents are passed as unknown (null), so the host keeps its saved first-meet beats.
+        // The sections come from TownStock.CaptureWorld over the live session; residents are passed as the director's live ResidentsSave (_residents; null until a first-meet beat latches), so the host keeps its saved first-meet beats.
         // Every capture says what it knows about the bank suspend (TownStock.CaptureWorld): the bank room or floor 5 after the push-on writes one with the bags as carried, a loaded one nobody has
         // resumed yet is re-emitted, anything else is "known, none" (a used or ended suspend leaves the file). The 3-player extra slot's previous owner is saved from DiveHaulSync as a bag id.
         public TownSnapshot CaptureTown()

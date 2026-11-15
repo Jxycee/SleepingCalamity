@@ -117,6 +117,8 @@ namespace SleepingCalamity.Presentation
         // ---- floor objective read API (any peer; from the replicated state, so a late joiner agrees) ----
         public const float ValveReportReachSlack = 0.5f;          // the host accepts a valve report from this much beyond ValveReachMeters (movement between the owner's check and the RPC)
         public static float PumpSecondsOverrideForTests;          // test hook: > 0 replaces FloorObjectiveTuning.PumpSeconds (progress runs faster; thresholds and waves are fractions of it)
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { PumpSecondsOverrideForTests = 0f; }
         private ContentsState Cur => IsServer ? _st : Net.Value;
         public FloorObjective CurrentObjective => (FloorObjective)Cur.Objective;
         public int ValvesTurned { get { int m = Cur.ValveMask, n = 0; for (int i = 0; i < ValveHold.Count; i++) if ((m & (1 << i)) != 0) n++; return n; } }
@@ -1209,7 +1211,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerReportValve(ulong clientId, int valve)
         {
             CellarFloorSync fs = FloorSync;
-            if (!HostReady(fs) || _st.Objective != (byte)FloorObjective.TwoValves || (_st.ValveMask & (1 << valve)) != 0 || !ValveAt(valve, out Vector3 at)) return false;
+            if (valve < 0 || valve >= ValveHold.Count || !HostReady(fs) || _st.Objective != (byte)FloorObjective.TwoValves || (_st.ValveMask & (1 << valve)) != 0 || !ValveAt(valve, out Vector3 at)) return false;
             if (!TryPlayerPos(clientId, out Vector3 pos)) return false;
             float reach = FloorObjectiveTuning.ValveReachMeters + ValveReportReachSlack;
             if (FlatSqr(pos, at) > reach * reach) return false;

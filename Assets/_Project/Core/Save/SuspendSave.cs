@@ -92,7 +92,7 @@ namespace SleepingCalamity.Core
         public SuspendStirSave Stir = new SuspendStirSave();
         public SuspendMomentumSave Momentum = new SuspendMomentumSave();
         public SuspendRetrySave Retry = new SuspendRetrySave();
-        public List<string> PresentIds = new List<string>();    // bag ids ("Kind:Id") of the players present when it was written
+        public List<string> PresentIds = new List<string>();    // bag ids ("Kind:Id") of the players present when it was written. Written and cleaned but never read (Resume takes the live lists); kept so old and new files stay compatible (N3)
         public List<SuspendedBag> Bags = new List<SuspendedBag>();
         [JsonExtensionData] public Dictionary<string, object> Extra;
     }

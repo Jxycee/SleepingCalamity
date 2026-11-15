@@ -9,14 +9,16 @@ namespace SleepingCalamity.Core
     {
         // 1 userInitiated -> UserLeft
         // 2 disconnectReason is exactly one defined EndReason name (case-sensitive, first char a letter, no comma) -> that value
-        // 3 wasConnected -> HostLeft
+        // 3 wasConnected -> HostLeft when the host gave some reason text, TransportFailure when there is none (our own link dropped)
         // 4 secondsSinceStart < NetworkConstants.VersionMismatchWindowSeconds -> VersionMismatch
         // 5 else Timeout
         public static EndReason Classify(bool userInitiated, bool wasConnected, string disconnectReason, double secondsSinceStart)
         {
             if (userInitiated) return EndReason.UserLeft;
             if (TryParseReason(disconnectReason, out EndReason parsed)) return parsed;
-            if (wasConnected) return EndReason.HostLeft;
+            // A host that leaves sends NGO's own reason text ("Disconnected due to host shutting down."); a connected client with no text at all
+            // lost its own link, which is not the host leaving (N10).
+            if (wasConnected) return string.IsNullOrEmpty(disconnectReason) ? EndReason.TransportFailure : EndReason.HostLeft;
             if (secondsSinceStart < NetworkConstants.VersionMismatchWindowSeconds) return EndReason.VersionMismatch;
             return EndReason.Timeout;
         }
