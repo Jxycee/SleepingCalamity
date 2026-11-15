@@ -1,0 +1,65 @@
+{
+  "_comment": "Balance simulator config. Game numbers are NEVER here: they come from data/game_numbers.json. Everything below is a run setting, a labelled assumption, a player-skill profile, a case definition, an override on top of game numbers, or a target band.",
+  "run": {
+    "_comment": "lanesPerCase = independent parties per case; nDives = consecutive dives per lane (weapon growth carries over, HP resets); seed = RNG seed; device = cuda|cpu|auto; dt = tick seconds; frameRate = frames/s the game's frame counts are expressed in (ASSUMED 60, number map says 60 fps); maxEnemies = enemy slots per room.",
+    "lanesPerCase": 2048,
+    "nDives": 10,
+    "seed": 12345,
+    "device": "auto",
+    "dt": 0.03333333,
+    "frameRate": 60,
+    "maxEnemies": 10
+  },
+  "assumptions": {
+    "_comment": "Model assumptions NOT taken from game_numbers.json. All ASSUMED.",
+    "roomTimeoutSeconds": 240,
+    "engageDelaySeconds": 1.0,
+    "broomBlockFraction": 0.3,
+    "broomBlockedMult": 0.2,
+    "ratKingHitRateMult": 0.8,
+    "ratKingReposExtraSeconds": 0.4,
+    "reviveTravelSeconds": 2.0,
+    "loafCooldownSeconds": 2.0,
+    "healPointThresholdFrac": 0.5,
+    "buildUpEnabled": true,
+    "maxWeaponLevel": 60,
+    "bakeryBuilt": false,
+    "axeGuardBreakProb": 0.15,
+    "daggerParryProbPerHit": 0.10,
+    "staffExtraSwingProbPerHit": 0.30,
+    "bowWeakShotProbPerHit": 0.25
+  },
+  "weaponCycles": {
+    "_comment": "Attack kinds per swing cycle per weapon (from heroAttacks). ASSUMED: normal1, normal2, finisher; add \"charge\" to a list to include charge swings.",
+    "default": ["normal1", "normal2", "finisher"]
+  },
+  "skillProfiles": {
+    "_comment": "ASSUMED player skill. hitRate = fraction of swings that connect; uptime = fraction of time spent attacking (rest = moving/repositioning, stretches each swing by 1/uptime); dodgeRate = P(an incoming attack is fully dodged); guardRate = P(guard x guardMult when not dodged; guard-break attacks ignore it); reviveWillingness = P a downed hero gets revived when a mate is up; loafThresholdHpFrac = eat a loaf below this HP fraction.",
+    "novice":  {"hitRate": 0.60, "uptime": 0.50, "dodgeRate": 0.25, "guardRate": 0.10, "reviveWillingness": 0.50, "loafThresholdHpFrac": 0.25},
+    "average": {"hitRate": 0.80, "uptime": 0.65, "dodgeRate": 0.50, "guardRate": 0.30, "reviveWillingness": 0.80, "loafThresholdHpFrac": 0.40},
+    "expert":  {"hitRate": 0.92, "uptime": 0.80, "dodgeRate": 0.75, "guardRate": 0.60, "reviveWillingness": 0.95, "loafThresholdHpFrac": 0.50}
+  },
+  "partySkillMix": {"_comment": "Weights used when a case lists the profile name \"mix\".", "novice": 0.3, "average": 0.5, "expert": 0.2},
+  "cases": [
+    {"_comment": "name, players (1..4), profiles = list per hero slot (repeated if shorter; \"mix\" samples partySkillMix per lane), loadouts = weapon per hero slot (axe|staff|dagger_shield|bow_sword).",
+     "name": "p1_average", "players": 1, "profiles": ["average"], "loadouts": ["axe"]},
+    {"name": "p2_average", "players": 2, "profiles": ["average"], "loadouts": ["axe"]},
+    {"name": "p4_average", "players": 4, "profiles": ["average"], "loadouts": ["axe"]},
+    {"name": "p1_novice", "players": 1, "profiles": ["novice"], "loadouts": ["axe"]},
+    {"name": "p1_expert", "players": 1, "profiles": ["expert"], "loadouts": ["axe"]},
+    {"name": "p4_mix", "players": 4, "profiles": ["mix"], "loadouts": ["axe", "staff", "dagger_shield", "bow_sword"]}
+  ],
+  "overrides": {
+    "_comment": "Applied on top of game_numbers.json before simulating. Key = dotted path into game_numbers.json (list elements by index: coop.lifeMult.2). Value = number/bool/string (absolute) or {\"mult\": x} or {\"add\": x}. Unknown paths raise an error. Examples (kept empty by default): \"enemies.Slime.hp\": {\"mult\": 1.2}, \"heroAttacks.axe_1.mult\": 1.1, \"weapons.axe.atk\": 24, \"growth.levelCostBase\": 30, \"coop.lifeMult.3\": 2.0, \"enemyAttacks.rat_lunge.mult\": 0.9, \"tierScale.tier1Atk\": 0.6, \"healing.healPointChancePercent\": 70."
+  },
+  "targets": {
+    "_comment": "ASSUMED target bands (tier-1 tutorial roughness like early Dark Cloud). deathsPerDiveMax is per hero (party deaths / players); scoredCases are judged against bands; partyTtkRatio judges p2/p4 pooled TTK divided by p1 pooled TTK per floor.",
+    "scoredCases": ["p1_average", "p2_average", "p4_average"],
+    "ttkSeconds": {"1": [2, 9], "2": [3, 12], "3": [3, 14], "4": [4, 16], "5": [20, 60], "6": [4, 16], "7": [4, 16]},
+    "roomClearSeconds": {"1": [8, 24], "2": [8, 30], "3": [10, 34], "4": [10, 36], "5": [20, 70], "6": [10, 36], "7": [10, 36]},
+    "damageTakenFractionOfMaxHp": {"1": [0.05, 0.40], "2": [0.05, 0.45], "3": [0.10, 0.55], "4": [0.10, 0.55], "5": [0.15, 0.80], "6": [0.10, 0.60], "7": [0.10, 0.60]},
+    "deathsPerDiveMax": 0.5,
+    "weaponLevelAfterDive": {"1": [1, 4], "3": [3, 9], "10": [8, 25]},
+    "partyTtkRatio": [0.5, 1.3]
+  }
+}
