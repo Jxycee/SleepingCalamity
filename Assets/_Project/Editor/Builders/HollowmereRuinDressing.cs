@@ -65,6 +65,15 @@ namespace SleepingCalamity.EditorTools
             for (int v = 0; v < 4; v++) sapMeshes[v] = BuildSapling(v);
         }
 
+        // The statics (loaded assets, counters) outlive a build in the same editor session: HollowmereBuilder.BuildScene calls this first so every build starts clean.
+        public static void Reset()
+        {
+            loaded = false; ivy = roof = scatter = plank = null;
+            weeds.Clear(); prefabBounds.Clear();
+            brambleMat = crowMat = treeMat = null; crowMesh = null; sapMeshes = null;
+            lots = withChimney = saplings = crows = debris = brambles = ivies = 0;
+        }
+
         public static void LogSummary() =>
             Debug.Log("SC HOLLOWMERE ruin dressing: " + lots + " lots, " + withChimney + " with a chimney found, " + ivies + " ivy, " + saplings + " saplings, " + brambles + " bramble clumps, " + debris + " debris pieces, " + crows + " crows"
                 + (ivy == null || roof == null || scatter == null || plank == null ? " (an adopted prefab is MISSING)" : ""));
@@ -85,6 +94,15 @@ namespace SleepingCalamity.EditorTools
             var door2 = new Vector2(doorL.x, doorL.z);
             Vector2 chim2 = Vector2.zero; float chimR = 0f; bool hasChim = false;
             Bounds chimWorld = default;
+            if (chim != null && TryBounds(chim, out Bounds chimPre))
+            {
+                // round 3: a hint of extra lean (seeded, 2.5-4 degrees about the stack's own base, away from the door) so the stack stops reading as a plumb slab
+                Vector3 basePt = new Vector3(chimPre.center.x, chimPre.min.y, chimPre.center.z);
+                Vector3 away = new Vector3(chimPre.center.x - ruin.position.x, 0f, chimPre.center.z - ruin.position.z);
+                if (away.sqrMagnitude < 0.01f) away = ruin.right;
+                Vector3 axis = Vector3.Cross(Vector3.up, away.normalized);
+                chim.RotateAround(basePt, axis, -(2.5f + 1.5f * (float)rnd.NextDouble()));
+            }
             if (chim != null && TryBounds(chim, out chimWorld))
             {
                 hasChim = true; withChimney++;
@@ -110,16 +128,17 @@ namespace SleepingCalamity.EditorTools
                 return new Vector2(float.NaN, float.NaN);
             }
 
+            if (hasChim) ChimneyDress(chim, chimWorld, dress, rnd);
             // ivy on the chimney's sunny face
             if (hasChim && ivy != null && TryIvy(ruin, chim, chimWorld, dress, rnd)) ivies++;
 
             // saplings
-            int nSap = f.Size == FoundationSize.S ? 0 : 1;   // round 2: the cards read as agave from above; one small one on M and L lots
+            int nSap = f.Size == FoundationSize.L ? 1 : 0;   // polish: the small cards read as agave from above; now one taller tree (trunk-led) on L lots only
             for (int i = 0; i < nSap && treeMat != null; i++)
             {
                 Vector2 p = Pick(2.4f);
                 if (float.IsNaN(p.x)) continue;
-                int variant = rnd.Next(4); float h = 0.8f + (float)rnd.NextDouble() * 0.5f;
+                int variant = rnd.Next(4); float h = 1.7f + (float)rnd.NextDouble() * 0.6f;
                 var go = new GameObject("Dress_Sapling_" + i); go.transform.SetParent(dress, false);
                 go.transform.localPosition = new Vector3(p.x, -0.06f * h, p.y);
                 go.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
@@ -151,7 +170,7 @@ namespace SleepingCalamity.EditorTools
                             for (int q = 0; q < mats.Length; q++) mats[q] = brambleMat;
                             rd.sharedMaterials = mats; rd.shadowCastingMode = ShadowCastingMode.Off;
                         }
-                        float hh = Mathf.Max(0.05f, PrefabBounds(model).size.y), target = 0.7f + (float)rnd.NextDouble() * 0.45f;
+                        float hh = Mathf.Max(0.05f, PrefabBounds(model).size.y), target = 0.45f + (float)rnd.NextDouble() * 0.3f;   // polish: 0.7-1.15 m rosettes read as agave from the overview
                         w.transform.localPosition = new Vector3(p.x, 0f, p.y);
                         w.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
                         w.transform.localScale = Vector3.one * (target / hh);
@@ -198,6 +217,43 @@ namespace SleepingCalamity.EditorTools
                 go.AddComponent<MeshFilter>().sharedMesh = crowMesh;
                 var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = crowMat; r.shadowCastingMode = ShadowCastingMode.On;
                 crows++;
+            }
+        }
+
+
+        // Round 3: break the slab look. Corbel stones overhang the top (one slipped, one missing), and a rubble apron of block-sized stones lies round the foot, heavier on the side
+        // the top fell toward. Stone material taken from the stack itself.
+        static void ChimneyDress(Transform chim, Bounds b, Transform dress, System.Random rnd)
+        {
+            Material stone = null;
+            foreach (Renderer r in chim.GetComponentsInChildren<Renderer>(true)) { if (r.sharedMaterial != null) { stone = r.sharedMaterial; break; } }
+            if (stone == null) return;
+            var root = new GameObject("Dress_ChimneyStones").transform; root.SetParent(dress, false);
+            float top = b.max.y, hx = b.extents.x, hz = b.extents.z;
+            // corbel / cap stones
+            int caps = 5;
+            int missing = rnd.Next(caps);
+            for (int i = 0; i < caps; i++)
+            {
+                if (i == missing) continue;
+                float a = (i / (float)caps) * 6.283f + 0.3f;
+                Vector3 pos = new Vector3(b.center.x + Mathf.Cos(a) * (hx + 0.02f), top - 0.04f, b.center.z + Mathf.Sin(a) * (hz + 0.02f));
+                Vector3 size = new Vector3(0.42f + 0.18f * (float)rnd.NextDouble(), 0.2f + 0.08f * (float)rnd.NextDouble(), 0.34f + 0.12f * (float)rnd.NextDouble());
+                var go = LookTestBuilder.Box(root, "Corbel_" + i, Vector3.zero, size, stone, default, 2f);
+                go.transform.position = pos;
+                go.transform.rotation = Quaternion.Euler(((float)rnd.NextDouble() - 0.5f) * 14f, -a * Mathf.Rad2Deg + 90f + ((float)rnd.NextDouble() - 0.5f) * 20f, ((float)rnd.NextDouble() - 0.5f) * 14f);
+            }
+            // rubble apron
+            float fallA = (float)rnd.NextDouble() * 6.283f;
+            int n = 9;
+            for (int i = 0; i < n; i++)
+            {
+                float a = fallA + ((float)rnd.NextDouble() - 0.5f) * (i < 6 ? 2.2f : 6.283f), d = Mathf.Max(hx, hz) + 0.25f + (i < 6 ? 0.9f : 0.5f) * (float)rnd.NextDouble();
+                Vector3 pos = new Vector3(b.center.x + Mathf.Cos(a) * d, b.min.y + 0.08f, b.center.z + Mathf.Sin(a) * d);
+                float s = 0.28f + 0.3f * (float)rnd.NextDouble();
+                var go = LookTestBuilder.Box(root, "Rubble_" + i, Vector3.zero, new Vector3(s * (1f + 0.5f * (float)rnd.NextDouble()), s * 0.7f, s), stone, default, 2f);
+                go.transform.position = pos;
+                go.transform.rotation = Quaternion.Euler(((float)rnd.NextDouble() - 0.5f) * 40f, (float)rnd.NextDouble() * 360f, ((float)rnd.NextDouble() - 0.5f) * 40f);
             }
         }
 
