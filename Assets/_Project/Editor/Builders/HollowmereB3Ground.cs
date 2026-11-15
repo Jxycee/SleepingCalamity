@@ -40,7 +40,7 @@ namespace SleepingCalamity.EditorTools
                 m.SetTexture("_DetailAlbedoMap", macro); m.SetFloat("_DetailAlbedoMapScale", 1f); m.EnableKeyword("_DETAIL_MULX2");
                 m.SetTextureScale("_DetailAlbedoMap", Vector2.one * (2f / 37f));   // detail uv = base uv (1 per 2 m) x this: one repeat per 37 m, not lined up with the corner's 23 m
             }
-            Color neutral = new Color(0.93f, 0.91f, 0.85f, 1f); m.SetColor("_BaseColor", neutral); m.SetColor("_Color", neutral);   // round 2: B0's warm tint read orange on the whole square
+            Color neutral = new Color(0.86f, 0.90f, 0.90f, 1f); m.SetColor("_BaseColor", neutral); m.SetColor("_Color", neutral);   // round 2: B0's warm tint read orange on the whole square
             m.enableInstancing = true;
             MaterialValidation.Validate(m);
             EditorUtility.SetDirty(m);

@@ -272,10 +272,10 @@ namespace SleepingCalamity.EditorTools
             Terrain terrain = HollowmereTerrain.Build(set, t);
             HollowmereFoliage.TerrainGrass(terrain, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
             // The square keeps the approved corner's surround paving (B6 FarCobble with its macro breakup) as a slab over the terrain, so the corner reads as approved.
-            Material far = BeautyCornerArt.SurroundGround();
+            Material far = HollowmereB3Ground.SquareGroundMaterial() ?? BeautyCornerArt.SurroundGround();   // B3: the slab shows wherever the irregular bed stops, so it takes the square's own ground
             var sq = LookTestBuilder.Box(set, "SquarePaving", new Vector3((HollowmereLayout.SquareMinX + HollowmereLayout.SquareMaxX) * 0.5f, -0.17f, (HollowmereLayout.SquareMinZ + HollowmereLayout.SquareMaxZ) * 0.5f),
                 new Vector3(HollowmereLayout.SquareMaxX - HollowmereLayout.SquareMinX, 0.3f, HollowmereLayout.SquareMaxZ - HollowmereLayout.SquareMinZ),
-                far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? BeautyCornerArt.FarTileMetres : 3f);
+                far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? 2f : 3f);
 
             HollowmereWater.Build(set, t, terrain);   // lake + stepped stream pools + weir falls (SC_Water; HollowmereWater.cs)
         }
