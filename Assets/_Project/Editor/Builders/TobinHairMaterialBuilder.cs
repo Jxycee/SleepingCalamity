@@ -75,8 +75,11 @@ namespace SleepingCalamity.EditorTools
             mat.SetFloat("_StrandTexBright", 0.85f); mat.SetFloat("_StrandBump", 0.7f); mat.SetFloat("_ShiftJitter", 0.3f); mat.SetFloat("_StrandDepth", 0.1f);
             // colour gradient from the reference hair (sRGB): deep brown roots, warm brown middle, light brown tips, ~1 in 7 strands lighter (reference: a little blonde, leans brown)
             mat.SetColor("_BaseColor", Color.white); mat.SetFloat("_GradientMix", 1f); mat.SetFloat("_GradMid", 0.4f);
-            mat.SetColor("_RootColor", new Color(0.25f, 0.17f, 0.13f)); mat.SetColor("_MidColor", new Color(0.46f, 0.35f, 0.26f)); mat.SetColor("_TipColor", new Color(0.56f, 0.44f, 0.33f));
-            mat.SetColor("_BlondeColor", new Color(0.68f, 0.55f, 0.40f)); mat.SetFloat("_BlondeChance", 0.15f); mat.SetFloat("_StrandVar", 0.22f); mat.SetFloat("_RootDark", 0.25f); mat.SetFloat("_Ambient", 1.4f); mat.SetFloat("_ShadowStrength", 0.55f); mat.SetFloat("_ShadowNormalOffset", 0.008f);
+            // sweep pick w_trim60_core70_tintB: root #3a281c, tip #7a563c, mid chestnut between them
+            mat.SetColor("_RootColor", new Color32(0x3a, 0x28, 0x1c, 255)); mat.SetColor("_MidColor", new Color32(0x5c, 0x40, 0x2c, 255)); mat.SetColor("_TipColor", new Color32(0x7a, 0x56, 0x3c, 255));
+            mat.SetColor("_BlondeColor", new Color(0.68f, 0.55f, 0.40f)); mat.SetFloat("_BlondeChance", 0.06f); mat.SetFloat("_StrandVar", 0.22f); mat.SetFloat("_RootDark", 0.25f); mat.SetFloat("_Ambient", 1.15f);
+            // back of the head read orange under the key light: cooler, weaker highlights, less tip lift
+            mat.SetColor("_Spec1Color", new Color(0.28f, 0.26f, 0.25f)); mat.SetColor("_Spec2Color", new Color(0.14f, 0.12f, 0.11f)); mat.SetFloat("_TipLift", 0.04f); mat.SetFloat("_ShadowStrength", 0.55f); mat.SetFloat("_ShadowNormalOffset", 0.008f);
             EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
         }
 
