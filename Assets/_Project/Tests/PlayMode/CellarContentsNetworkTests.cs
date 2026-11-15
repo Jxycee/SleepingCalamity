@@ -671,13 +671,32 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That((c.Contents.State.Cleared & (1UL << room)) != 0, Is.False, "the room cleared between the waves");
 
             c.Players[c.HostId] = Cell(c, wave1Cell.X, wave1Cell.Y) + Vector3.right * 80f;
-            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == n0 + n1, Timeout, "wave 1 never spawned once the player stepped away");
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == n0 + n1, 2.5f, "wave 1 did not spawn within ~2 s of the player stepping away (the distance release, not the 8 s cap)");
             Assert.That(c.Contents.AliveInRoom(room), Is.EqualTo(n1), "wave 1 is alive and the held count is settled");
             yield return PlayModeHarness.WaitUntil(() => { int alive = 0; foreach (Enemy e in EnemiesOn(c.Client.NetworkManager)) if (e.Alive) alive++; return alive == n1; }, Timeout, "the client does not see wave 1");
             Assert.That((c.Peer.State.Cleared & (1UL << room)) != 0, Is.False, "the room is not clear while wave 1 lives");
 
             foreach (Enemy e in EnemiesOn(c.HostNm)) if (e.Alive) Kill(e);
             yield return PlayModeHarness.WaitUntil(() => (c.Peer.State.Cleared & (1UL << room)) != 0, Timeout, "the client never saw the room cleared after wave 1");
+        }
+
+        // Catches: a player camping a wave-1 cell stalling the room forever (WaveTwoMaxWaitSeconds, 8 s, must release wave 1 anyway), and the cap firing early (nothing may spawn at 5 s).
+        [UnityTest]
+        public IEnumerator TwoWaveRoom_PlayerCampsAWaveOneCell_Wave1SpawnsAnywayAfterTheCap()
+        {
+            uint seed = FindTwoWaveSeed(out int floor, out CellarEncounterPlan plan, out int room, out CellarTemplateRoom tpl);
+            int n0 = 0, n1 = 0; foreach (TemplateSpawn ts in tpl.Spawns) { if (ts.Wave == 0) n0++; else n1++; }
+            CellPos wave1Cell = System.Linq.Enumerable.First(tpl.InWave(1)).Cell;
+            Ctx c = null; yield return Setup(x => c = x, default, seed, floor);
+            c.Contents.PlanOverride = () => plan;
+            c.Players[c.HostId] = Cell(c, wave1Cell.X, wave1Cell.Y);
+            yield return RoomSpawned(c, room, n0, false);
+            foreach (Enemy e in EnemiesOn(c.HostNm)) Kill(e);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.AliveInRoom(room) <= 1, Timeout, "wave 0 never went down");
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup < start + 5f) { PlayModeHarness.Pace(); yield return null; }
+            Assert.That(c.Contents.EnterEnemyCount(room), Is.EqualTo(n0), "the cap fired early: wave 1 spawned on the camping player before 8 s");
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(room) == n0 + n1, 8f, "wave 1 never spawned although the player camped its cell past the 8 s cap");
         }
 
         // Catches: BUGS 18, a save with piece 0 already home left piece id 101 without a collectible sphere (spot i was mapped to PieceId(floor, i), the spot count to the remaining count).
