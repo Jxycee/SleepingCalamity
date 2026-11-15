@@ -1,4 +1,4 @@
-State: paused: user gaming (2026-11-14)
+State: DONE (merged to main as ca39298b, check PASS e3d94fda)
 Branch: claude/dive-followups (from origin/main)
 
 Done (commits fa3d9813, dabc5e09, 90c56ad7; gate PASS EditMode 1781/1781, soak 46/46, touched PlayMode classes pass):
@@ -16,4 +16,4 @@ Next:
 0. On resume: repeat-run DiveSpineNetworkTests (Floor5_* repeated) 3-5x; fix teardown input restore if confirmed; stress DiveWalkQa Rtt300Loss5; gate.
 1. Items 2 and 3 (DiveSpineNetworkTests floor-7 drift + Floor5_RealButtonPushOn; DiveWalkQaTests Rtt300Loss5 40 s timeout): implementer ae5cf5f1a17d7b751 was investigating when paused; check its commits.
 2. Gate, soak (Core/Cellars touched), risk-reviewer (Opus) over branch, full check on tip (SC MARKER = HEAD), sc-merge into fresh origin/main (pre-approved 2026-11-14); merge commit ticks QUEUE lines 24, 43, 47, 48 and adds a CURRENT.md Now line.
-Archive: no
+Archive: ready
