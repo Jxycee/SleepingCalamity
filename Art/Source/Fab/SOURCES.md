@@ -121,6 +121,6 @@
 | C15f | chandelier_rusty | https://www.fab.com/listings/51879e64-6d4d-453b-8369-bbb977f9f1b7 | Fab Standard License (Quixel Megascans) | Fab | 2026-11-15 | Mid tier (2K), via Epic Launcher; 10 files copied as published |
 | A04a | rat_multi | https://www.fab.com/listings/ee58a3ee-bf89-494c-9f91-6b1c4ad12a27 | check listing (non-Megascans) | Fab | 2026-11-15 | Mid tier (2K), via Epic Launcher; 3 files copied as published |
 | A04b | black_rat | https://www.fab.com/listings/3d8f4ca8-b9cf-4d82-a2b7-69882a0c8815 | check listing (non-Megascans) | Fab | 2026-11-15 | Mid tier (2K), via Epic Launcher; 8 files copied as published |
-
-B2 notes: C04, C07d, C11c textures were 4096 px and were deleted for the 2K cap (re-export at 2K or re-texture with ours before adopting); C15b Medieval Lantern is CC-BY if like C15 (confirm on listing before credits); C15d Old Lantern was not fetched; A04a/A04b rats are rigged characters (own job). Non-Megascans licences marked 'check listing' still need confirming.
 | C15d | old_lantern | https://www.fab.com/listings/17f4af61-5f14-45cf-a33c-3dc810997a21 | check listing (non-Megascans) | Sousinho Games | 2026-11-15 | FBX only; its 4096+ px textures were not copied (2K cap), re-export or re-texture before adopting |
+
+B2 notes: C04, C07d, C11c textures were 4096 px and were deleted for the 2K cap (re-export at 2K or re-texture with ours before adopting); C15b Medieval Lantern is CC-BY if like C15 (confirm on listing before credits); C15d Old Lantern: FBX only, textures not copied; C04/C07d/C11c rows list fewer files than shipped because the 4096 px textures were deleted; A04a/A04b rats are rigged characters (own job). Non-Megascans licences marked 'check listing' still need confirming.
