@@ -85,8 +85,7 @@ namespace SleepingCalamity.Presentation
                 {
                     _animator.Play(hash, 0, EnemyAnimMap.AttackNormalizedTime(enemy.AttackFrame, attack.TotalFrames));
                     _current = state;
-                    _prevReact = enemy.HitReact;
-                    _started = true;
+                    _started = true;   // _prevReact stays as it was, so a flinch landed during the attack still plays Hit once it ends
                     return;
                 }
             }

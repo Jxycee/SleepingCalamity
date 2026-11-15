@@ -54,7 +54,7 @@ namespace SleepingCalamity.EditorTools
         static readonly Dictionary<string, Look> Looks = new Dictionary<string, Look>
         {
             { "M_Slime_Glass", L(0.93f, 0.95f, 0.88f, 0f, 0.96f, null, 0.28f) },
-            { "M_Slime_Jam", L(0.12f, 0.005f, 0.018f, 0f, 0.93f) },
+            { "M_Slime_Jam", L(0.22f, 0.012f, 0.03f, 0f, 0.55f) },
             { "M_Slime_Lid", L(0.42f, 0.31f, 0.16f, 0.9f, 0.60f) },
             { "M_Slime_Eye", L(0.96f, 0.92f, 0.80f, 0f, 0.90f) },
             { "M_Slime_Pupil", L(0.03f, 0.02f, 0.025f, 0f, 0.95f) },
@@ -316,7 +316,7 @@ namespace SleepingCalamity.EditorTools
         {
             AnimationClip[] clips = Clips(spec);
             if (clips.Length == 0) { Debug.LogWarning("SC ENEMYART no clips in " + spec.Fbx); return; }
-            string signature = "v" + Version + "|" + string.Join(",", clips.Select(c => c.name + ":" + c.length.ToString("F4") + ":" + c.isLooping));
+            string signature = "v" + Version + "|" + string.Join(",", clips.Select(c => c.name + ":" + c.length.ToString("F4", System.Globalization.CultureInfo.InvariantCulture) + ":" + c.isLooping));
             AnimatorController ctrl = AssetDatabase.LoadAssetAtPath<AnimatorController>(spec.Controller);
             if (ctrl != null && AssetImporter.GetAtPath(spec.Controller) is AssetImporter existing && existing.userData == signature) return;
             if (ctrl == null) ctrl = AnimatorController.CreateAnimatorControllerAtPath(spec.Controller);

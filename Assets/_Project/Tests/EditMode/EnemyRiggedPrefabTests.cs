@@ -60,6 +60,9 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.That(clip.length * AttackData.FrameRate, Is.EqualTo(attack.TotalFrames).Within(1.0), clip.name + " length in frames");
                 Assert.That(clip.isLooping, Is.False, clip.name);
             }
+            AnimationClip death = clips.FirstOrDefault(c => c.name == EnemyAnimMap.Death);
+            Assert.That(death, Is.Not.Null, "Death clip");
+            Assert.That(death.length, Is.EqualTo(EnemyVisual.DeathClipSeconds).Within(0.05f), "Death clip length matches EnemyVisual's shrink timing");
             foreach (string n in new[] { EnemyAnimMap.Idle, EnemyAnimMap.Move })
             {
                 AnimationClip clip = clips.FirstOrDefault(c => c.name == n);

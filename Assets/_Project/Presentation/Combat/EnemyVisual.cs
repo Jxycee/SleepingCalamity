@@ -26,7 +26,8 @@ namespace SleepingCalamity.Presentation
     {
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
-        private const float DeathClipSeconds = 1.2f, DeathShrinkSeconds = 0.2f;   // a rigged corpse plays its clip, then shrinks before the 1.4 s despawn
+        public const float DeathClipSeconds = 1.2f;
+        private const float DeathShrinkSeconds = 0.2f;   // a rigged corpse plays its clip, then shrinks before the 1.4 s despawn
         private const float FootprintY = 0.04f;
         private static readonly Color GlintColor = new Color(1f, 0.97f, 0.8f);
         private static readonly Color ChargeColor = new Color(1f, 0.55f, 0.12f);
@@ -106,6 +107,8 @@ namespace SleepingCalamity.Presentation
         {
             Transform t = visual.Find(name);
             if (t != null) return t;
+            // The recursive search is for rigged models only (their parts sit under Visual/Model); greybox rigs keep the direct-child lookup.
+            if (visual.GetComponentInChildren<Animator>(true) == null) return null;
             foreach (Transform c in visual.GetComponentsInChildren<Transform>(true))
                 if (c.name == name) return c;
             return null;
