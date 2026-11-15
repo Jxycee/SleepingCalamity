@@ -1,7 +1,7 @@
 {
- "shadow_lift": 0.0,
- "hue_shift": 0.0,
- "saturation": 1.0,
+ "shadow_lift": 1.2,
+ "hue_shift": 0.5,
+ "saturation": 0.62,
  "value": 1.0,
  "root_tint": "#3a281c",
  "mid_tint": "#5c402c",

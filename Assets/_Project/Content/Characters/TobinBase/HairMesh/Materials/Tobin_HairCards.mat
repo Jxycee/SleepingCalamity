@@ -36,11 +36,11 @@ Material:
     - _Cull: 0
     - _GradMid: 0.4
     - _GradientMix: 1
-    - _HueShift: 0
+    - _HueShift: 0.5
     - _RootDark: 0.25
     - _RootLen: 0.35
-    - _Saturation: 1
-    - _ShadowLift: 0
+    - _Saturation: 0.62
+    - _ShadowLift: 1.2
     - _ShadowNormalOffset: 0.008
     - _ShadowStrength: 0.55
     - _ShiftJitter: 0.3
