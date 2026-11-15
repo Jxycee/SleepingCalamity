@@ -1,4 +1,4 @@
-State: done, gate PASS (compile + EditMode 1804/1804), branch claude/tunable-enemy-attacks not merged, not pushed
+State: DONE, merged acbf91a3 (check PASS cbe350a8)
 
 QUEUE 53 "Enemy attack ids tunable", no balance change.
 
@@ -10,3 +10,4 @@ QUEUE 53 "Enemy attack ids tunable", no balance change.
 - README of Tools/balance_sim: mapping table and the apply recipe.
 
 Limits: EnemyTell frames (pose end, glint commit) are not tunable, so hitOn changes must keep the 12-24 frame glint lead; `enemies.<Kind>.hp/atk/def/speed` stays a separate item.
+Archive: ready
