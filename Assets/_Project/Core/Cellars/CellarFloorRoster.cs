@@ -10,7 +10,7 @@ using SleepingCalamity.Core.Combat;
 
 namespace SleepingCalamity.Core
 {
-    public enum FloorTwist : byte { None = 0, Ambush = 1, Thin = 2, Crowded = 3 }
+    public enum FloorTwist : byte { None = 0, Ambush = 1, Thin = 2, Crowded = 3, FatLarder = 4 }
 
     // PLACEHOLDER tuning in ONE spot. The twist rates moved into FloorModifierTuning (plan 5 decision 3).
     public static class FloorTwistTuning
@@ -49,7 +49,7 @@ namespace SleepingCalamity.Core
         public static FloorTwist TwistOf(uint seed, int floor)
         {
             FloorModifierSet m = FloorModifierSet.For(seed, floor);
-            return m.A == FloorModifier.Crowded ? FloorTwist.Crowded : m.A == FloorModifier.Ambush ? FloorTwist.Ambush : m.B == FloorModifier.Sparse ? FloorTwist.Thin : FloorTwist.None;
+            return m.A == FloorModifier.Crowded ? FloorTwist.Crowded : m.A == FloorModifier.Ambush ? FloorTwist.Ambush : m.A == FloorModifier.FatLarder ? FloorTwist.FatLarder : m.B == FloorModifier.Sparse ? FloorTwist.Thin : FloorTwist.None;
         }
 
         // Hash of the layer for (seed, floor): roster mask and twist kind (the room picks are part of the plan, not this layer).

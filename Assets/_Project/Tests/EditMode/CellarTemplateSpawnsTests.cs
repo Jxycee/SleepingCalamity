@@ -55,7 +55,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void Resolve_ScalesWithPartySize_OneExtraEnemyPerExtraPlayer_WhereTheRoomHasSpace()
         {
             int grew = 0, rooms = 0;
-            foreach (var (l, d, p) in Floors(25))
+            foreach (var (l, d, p) in Floors(35))   // 25 seeds gave 98 rooms once plan 5c shifted the twists; the sample size is incidental
                 for (int r = 0; r < l.Rooms.Count; r++)
                 {
                     CellarTemplateRoom solo = CellarTemplateSpawns.Resolve(l, d, p, r, 1);
