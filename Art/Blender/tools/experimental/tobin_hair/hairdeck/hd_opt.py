@@ -37,6 +37,8 @@ def evaluate(V, F, overlay=None):
     return sum(w * r[v]['iou'] for w, v in zip(WV, ('front', 'side', 'back', 'frame'))), r
 files = sorted(glob.glob(os.path.join(SRC, '*.npz'))) if os.path.isdir(SRC) else [SRC]
 P0 = dict(sx=1.0, sy=1.0, sz=1.0, dy=0.0, dz=0.0, lt=0.0, fs=0.0)
+FIX = dict((kv.split('=')[0], float(kv.split('=')[1])) for kv in opt('--fix', '').split(',') if '=' in kv)   # --fix sx=0.9,lt=0.03: start there and keep fixed
+P0.update(FIX)
 STEP = dict(sx=0.04, sy=0.04, sz=0.04, dy=0.004, dz=0.004, lt=0.006, fs=0.006)
 LIM = dict(sx=(0.85, 1.2), sy=(0.8, 1.15), sz=(0.95, 1.08), dy=(-0.02, 0.02), dz=(-0.015, 0.02), lt=(0.0, 0.04), fs=(0.0, 0.03))
 results = []
@@ -47,6 +49,7 @@ for fpath in files:
     for rd in range(ROUNDS):
         moved = False
         for k in P0:
+            if k in FIX: continue
             for sgn in (1, -1):
                 q = dict(p); q[k] = float(np.clip(p[k] + sgn * st[k], *LIM[k]))
                 if q[k] == p[k]: continue
@@ -60,4 +63,5 @@ for e in results: print('RESULT %.4f %s' % (e['score'], os.path.basename(e['file
 b = results[0]; dd = np.load(b['file'])
 evaluate(build(dd['v'].astype(float), dd['uv'][:, 1].astype(float), b['params']), dd['f'], overlay=os.path.join(OUT, 'overlay_best.png'))
 json.dump(dict(best=b, all=results, cranium=dict(cen=CEN.tolist(), rad=RAD.tolist())), open(os.path.join(OUT, 'best.json'), 'w'), indent=1)
+Vb = build(dd['v'].astype(float), dd['uv'][:, 1].astype(float), b['params']); np.savez(os.path.join(OUT, 'fit_best.npz'), v=Vb, f=dd['f'])   # fitted hair verts (Blender frame) for sweep scoring
 print('BEST', b['file'], b['params'])
