@@ -16,7 +16,7 @@ M_Slime_* names; glass is a transparent material there). Run:
       [--no-export]
 
 Hierarchy and names (presentation code finds these by name; mesh nodes are the renderers, bones are named *_Bone or rig names):
-  SlimeRig (armature): Root > Body > { Jam > JamTop > { EyeL_Bone, EyeR_Bone }, Lid_Bone }, Root > Splat_Bone. All deform bones.
+  SlimeRig (armature): Root > Body > Jam > JamTop > { EyeL_Bone, EyeR_Bone }; Root > Lid_Bone (follows Body by keys, no shear); Root > Splat_Bone. All deform bones.
   Skinned meshes (to Body / Jam+JamTop): Jar (glass + label), Jam.
   Rigid meshes parented to bones (own Renderer, move with the bone): Lid (Lid_Bone), EyeL, EyeR, Splat (death puddle; rest scale is
   1 cm wide and Splat_Bone scales it x50 in Death, so it is invisible in every other clip).
@@ -24,7 +24,7 @@ Clips (60 fps; frame 1 == one game AttackFrame; keys start at frame 0): Idle 120
   Attack_slime_hop 60 (AttackCatalog.SlimeHop total 60; tell poseEnd 10, commit/glint 16, lunge 16-34, HitOn 34-40),
   Attack_slime_glob 66 (SlimeGlob total 66; tell poseEnd 18, commit/glint 26, HitOn 46-52).
 Root never translates in any clip; the hop arc is Body only (the game moves the enemy).
-Dated pass lines: 2026-11-15 first pass.
+Dated pass lines: 2026-11-15 first pass; round 3: iris+catch-light eyes, fruit chunks and neck drips in the jam, bigger puddle, unsheared lid.
 """
 import sys, os, math, random
 import bpy, bmesh
@@ -54,13 +54,15 @@ def mat(name, base, rough=0.5, metal=0.0, **kw):
     return m, b
 
 M_GLASS, bg = mat('M_Slime_Glass', (0.93, 0.95, 0.88), 0.03, 0.0, **{'Transmission Weight': 1.0, 'IOR': 1.5})
-M_JAM, bj = mat('M_Slime_Jam', (0.20, 0.010, 0.030), 0.14, 0.0, **{'Subsurface Weight': 0.22, 'Subsurface Scale': 0.05, 'Coat Weight': 0.6, 'Coat Roughness': 0.05})
+M_JAM, bj = mat('M_Slime_Jam', (0.12, 0.005, 0.018), 0.07, 0.0, **{'Subsurface Weight': 0.10, 'Subsurface Scale': 0.04, 'Coat Weight': 0.6, 'Coat Roughness': 0.05})
 bj.inputs['Subsurface Radius'].default_value = (1.0, 0.18, 0.12)
 M_LID, bl = mat('M_Slime_Lid', (0.42, 0.31, 0.16), 0.40, 0.9)
 M_EYE, be = mat('M_Slime_Eye', (0.96, 0.92, 0.80), 0.10, 0.0, **{'Emission Strength': 0.0})
-M_PUPIL, bp = mat('M_Slime_Pupil', (0.04, 0.025, 0.03), 0.08, 0.0)
+M_PUPIL, bp = mat('M_Slime_Pupil', (0.03, 0.02, 0.025), 0.05, 0.0)
+M_IRIS, bi = mat('M_Slime_Iris', (0.62, 0.34, 0.07), 0.12, 0.0)
+M_FRUIT, bf = mat('M_Slime_Fruit', (0.46, 0.035, 0.05), 0.22, 0.0, **{'Coat Weight': 0.5, 'Coat Roughness': 0.08})
 M_LABEL, bb = mat('M_Slime_Label', (0.80, 0.70, 0.50), 0.85, 0.0)
-M_PUDDLE, bd = mat('M_Slime_Puddle', (0.30, 0.02, 0.04), 0.12, 0.0, **{'Coat Weight': 0.7, 'Coat Roughness': 0.04})
+M_PUDDLE, bd = mat('M_Slime_Puddle', (0.16, 0.008, 0.02), 0.06, 0.0, **{'Coat Weight': 0.8, 'Coat Roughness': 0.03})
 # Look-dev extras for the Blender previews only (the FBX carries the base colours): speckled jam, rusty tin.
 def noise_to(b, name, scale, c0, c1, detail=6.0):
     nt = b.id_data
@@ -68,7 +70,7 @@ def noise_to(b, name, scale, c0, c1, detail=6.0):
     tc = nt.nodes.new('ShaderNodeTexCoord'); nt.links.new(tc.outputs['Object'], n.inputs['Vector'])
     r = nt.nodes.new('ShaderNodeValToRGB'); r.color_ramp.elements[0].color = (*c0, 1); r.color_ramp.elements[1].color = (*c1, 1)
     nt.links.new(n.outputs['Fac'], r.inputs['Fac']); nt.links.new(r.outputs['Color'], b.inputs['Base Color'])
-noise_to(bj, 'jam', 38.0, (0.09, 0.004, 0.012), (0.36, 0.022, 0.04))
+noise_to(bj, 'jam', 30.0, (0.05, 0.002, 0.008), (0.22, 0.012, 0.03))
 noise_to(bl, 'tin', 14.0, (0.26, 0.18, 0.09), (0.58, 0.44, 0.24))
 
 # ------------------------------------------------------------------ mesh helpers
@@ -112,7 +114,7 @@ def tris(ob):
     me = ob.data; me.calc_loop_triangles(); return len(me.loop_triangles)
 
 # ------------------------------------------------------------------ geometry (Blender axes: z up, front -Y), metres
-SEG = 40
+SEG = 36
 # Jar: closed profile outside bottom -> lip -> inside -> axis, so one revolve gives a thick-walled glass shell (inner wall normals face the cavity).
 JAR_PROF = [(0, 0), (0.30, 0), (0.44, 0.006), (0.485, 0.025), (0.503, 0.06), (0.508, 0.14), (0.508, 0.60), (0.500, 0.68), (0.478, 0.75),
             (0.440, 0.81), (0.405, 0.855), (0.388, 0.885), (0.394, 0.90), (0.394, 0.925), (0.376, 0.932), (0.356, 0.926), (0.350, 0.89),
@@ -145,14 +147,38 @@ def jam_lump(r, z, th):
     return r + d * (1.0 if r > 0.05 else 0.0)
 JAM_PROF = [(0, 0.045), (0.25, 0.045), (0.375, 0.055), (0.440, 0.09), (0.453, 0.16), (0.455, 0.32), (0.453, 0.50), (0.449, 0.62), (0.438, 0.72),
             (0.410, 0.795), (0.355, 0.84), (0.27, 0.868), (0.15, 0.885), (0, 0.892)]
-jam = lathe('Jam', JAM_PROF, SEG, [M_JAM], lump=jam_lump)
+jam = lathe('Jam', JAM_PROF, SEG, [M_JAM, M_FRUIT], lump=jam_lump)
+def add_fruit_and_drips(ob):
+    bm = bmesh.new(); bm.from_mesh(ob.data); fr = random.Random(11)
+    def blob(c, sc, mi, subd=1):
+        r = bmesh.ops.create_icosphere(bm, subdivisions=subd, radius=1.0)
+        vs = r['verts']
+        for v in vs: v.co = Vector((v.co.x * sc[0], v.co.y * sc[1], v.co.z * sc[2])) + c
+        for f in {f for v in vs for f in v.link_faces}: f.material_index = mi; f.smooth = True
+    # strawberry chunks half-sunk in the jam surface (front-biased so the face reads over them), seeded
+    for k in range(13):
+        th = math.radians(fr.choice([-1, 1]) * fr.uniform(35, 150) - 90) if k < 9 else math.radians(fr.uniform(0, 360))
+        z = fr.uniform(0.14, 0.74); rr = 0.452 - 0.012
+        if abs(math.sin(th + math.pi / 2)) < 0.0: continue
+        # keep the eye area (front centre, z .4-.7, |x|<.26) clear
+        x, y = rr * math.cos(th), rr * math.sin(th)
+        if y < -0.25 and abs(x) < 0.27 and 0.38 < z < 0.70: z = fr.choice([0.18, 0.26, 0.78])
+        s0 = fr.uniform(0.032, 0.058)
+        blob(Vector((x, y, z)), (s0 * 1.1, s0 * 1.1, s0 * 0.8), 1)
+    # drips: jam runs down the inside of the glass neck above the jam line
+    for k in range(6):
+        th = math.radians(k * 60 + fr.uniform(-12, 12) - 90); z = fr.uniform(0.84, 0.88); h = fr.uniform(0.035, 0.06)
+        rr = 0.364 - 0.004
+        blob(Vector((rr * math.cos(th), rr * math.sin(th), z)), (0.016, 0.016, h), 0, 1)
+    bm.normal_update(); bm.to_mesh(ob.data); bm.free()
+add_fruit_and_drips(jam)
 
 # Lid: ridged tin cap, hinged at its back edge (bone Lid_Bone head at (0, 0.40, 0.91)); built around its world position, tilted 2.5 deg ajar.
 LID_PROF = [(0, 0.998), (0.12, 0.998), (0.26, 0.994), (0.335, 0.985), (0.362, 0.976), (0.398, 0.971), (0.424, 0.963), (0.433, 0.95), (0.433, 0.917),
             (0.427, 0.905), (0.402, 0.903), (0.392, 0.915), (0, 0.915)]
 KN = 36
 def knurl(r, z, th): return r + (0.0075 * (0.5 + 0.5 * math.cos(KN * th)) if (r > 0.42 and 0.918 < z < 0.96) else 0.0)
-lid = lathe('Lid', LID_PROF, 64, [M_LID], knurl=knurl)
+lid = lathe('Lid', LID_PROF, 48, [M_LID], knurl=knurl)
 HINGE = Vector((0.0, 0.40, 0.91))
 def tilt_about(ob, pivot, rx_deg=0.0, ry_deg=0.0):
     m = Matrix.Translation(pivot) @ Matrix.Rotation(math.radians(rx_deg), 4, 'X') @ Matrix.Rotation(math.radians(ry_deg), 4, 'Y') @ Matrix.Translation(-pivot)
@@ -160,27 +186,31 @@ def tilt_about(ob, pivot, rx_deg=0.0, ry_deg=0.0):
 tilt_about(lid, HINGE, -2.5, 2.0)
 
 # Eyes: cream ellipsoids with a dark pupil cap on the front (-Y), sitting on the jam just behind the glass.
-EYE_C = {'L': Vector((0.150, -0.366, 0.530)), 'R': Vector((-0.150, -0.366, 0.530))}   # slime's left = +x when seen from the front (-Y)... mirrored, symmetric
+EYE_C = {'L': Vector((0.128, -0.362, 0.540)), 'R': Vector((-0.128, -0.362, 0.540))}   # slime's left = +x when seen from the front (-Y)... mirrored, symmetric
 def eye(side):
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=10, radius=0.112)
-    for v in bm.verts: v.co.x *= 0.95; v.co.y *= 0.66; v.co.z *= 1.12
+    bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=14, radius=0.125)
+    for v in bm.verts: v.co.x *= 0.95; v.co.y *= 0.62; v.co.z *= 1.10
     bm.normal_update()
     for f in bm.faces:
         n = f.normal
-        f.material_index = 1 if (n.y < -0.62 and abs(n.x) < 0.55 and abs(n.z) < 0.6) else 0
+        front = n.y < -0.55 and abs(n.x) < 0.62 and abs(n.z) < 0.66
+        mi = 2 if front else 0                                            # amber iris
+        if n.y < -0.80 and abs(n.x) < 0.30 and abs(n.z) < 0.34: mi = 1  # pupil
+        if (n - Vector((0.34, -0.86, 0.38)).normalized()).length < 0.30: mi = 0  # catch-light (cream white) at the upper right of the pupil
+        f.material_index = mi
         f.smooth = True
     me = bpy.data.meshes.new('Eye' + side); bm.to_mesh(me); bm.free()
     me.transform(Matrix.Translation(EYE_C[side]))
-    return make_obj('Eye' + side, me, [M_EYE, M_PUPIL])
+    return make_obj('Eye' + side, me, [M_EYE, M_PUPIL, M_IRIS])
 eyeL, eyeR = eye('L'), eye('R')
 
 # Splat: the death puddle, authored 1 cm wide; Splat_Bone scales it x50 in Death (rest scale hides it in every other clip).
-PUD_C = Vector((1.12, -0.05, 0.0)); PUD_K = 1.0 / 50.0
+PUD_C = Vector((1.00, -0.05, 0.0)); PUD_K = 1.0 / 50.0
 prn = random.Random(3); PR = [prn.uniform(0.82, 1.18) for _ in range(9)]
 def pud_radial(th):
     t = th / (2 * math.pi) * 9; i = int(t) % 9; f = t - int(t); return PR[i] * (1 - f) + PR[(i + 1) % 9] * f
-splat = lathe('Splat', [(0, 0.062), (0.20, 0.060), (0.36, 0.048), (0.48, 0.026), (0.545, 0.004), (0.55, 0.0), (0, 0.0)], 36, [M_PUDDLE],
+splat = lathe('Splat', [(0, 0.085), (0.28, 0.082), (0.52, 0.066), (0.70, 0.036), (0.79, 0.006), (0.80, 0.0), (0, 0.0)], 36, [M_PUDDLE],
               radial=pud_radial, center=(PUD_C.x * PUD_K, PUD_C.y * PUD_K, 0.0), scale=PUD_K)
 # the puddle is built around the bone head at the world position PUD_C; the bone scales about that head.
 splat.data.transform(Matrix.Translation(PUD_C * (1 - PUD_K)))   # undo the K scale on the centre offset: centre at PUD_C, size 1 cm
@@ -192,7 +222,7 @@ bpy.ops.object.mode_set(mode='EDIT')
 BONES = {   # name: (head, parent)
     'Root': ((0, 0, 0), None), 'Body': ((0, 0, 0), 'Root'), 'Jam': ((0, 0, 0.05), 'Body'), 'JamTop': ((0, 0, 0.55), 'Jam'),
     'EyeL_Bone': (tuple(EYE_C['L']), 'JamTop'), 'EyeR_Bone': (tuple(EYE_C['R']), 'JamTop'),
-    'Lid_Bone': (tuple(HINGE), 'Body'), 'Splat_Bone': (tuple(PUD_C), 'Root'),
+    'Lid_Bone': (tuple(HINGE), 'Root'), 'Splat_Bone': (tuple(PUD_C), 'Root'),
 }
 for n, (h, p) in BONES.items():
     eb = arm_data.edit_bones.new(n); eb.head = h; eb.tail = (h[0], h[1] + 0.10, h[2]); eb.roll = 0.0; eb.use_deform = True
@@ -227,7 +257,7 @@ arm.animation_data_create()
 CUR = {'act': None}
 
 def new_action(name, length, loop=False):
-    BODYSC.clear()
+    BODYSC.clear(); BODYST.clear(); CUR['leul'] = None
     act = bpy.data.actions.new(name); act.use_fake_user = True
     arm.animation_data.action = act
     CUR.update(act=act, length=length, name=name)
@@ -240,13 +270,13 @@ def K(bone, f, loc=(0, 0, 0), rot=(0, 0, 0), sc=(1, 1, 1)):
     for path in ('location', 'rotation_euler', 'scale'):
         pb.keyframe_insert(path, frame=f)
 
-BODYSC = {}
+BODYSC = {}; BODYST = {}
 def vol(sz, k=0.35): return sz ** -k
 def body(f, lift=0, sz=1, sxy=None, rx=0, ry=0, rz=0, dx=0, dy=0, ground=True):
     sxy = vol(sz) if sxy is None else sxy
     if ground:   # a lean about the base centre would sink the low rim into the floor: lift by the rim's drop
         lift += 0.5 * sxy * max(math.sin(math.radians(abs(rx))), math.sin(math.radians(abs(ry))))
-    BODYSC[f] = (sxy, sz)
+    BODYSC[f] = (sxy, sz); BODYST[f] = ((dx, dy, lift), (rx, ry, rz), sxy, sz)
     K('Body', f, (dx, dy, lift), (rx, ry, rz), (sxy, sxy, sz))
 def jamb(f, sz=1, sxy=None, rx=0, ry=0, dx=0, dz=0):
     sxy = vol(sz, 0.25) if sxy is None else sxy
@@ -254,8 +284,15 @@ def jamb(f, sz=1, sxy=None, rx=0, ry=0, dx=0, dz=0):
 def top(f, sx=1, sy=None, sz=1, rx=0, ry=0, dz=0, dx=0):
     K('JamTop', f, (dx, 0, dz), (rx, ry, 0), (sx, sx if sy is None else sy, sz))
 def lidb(f, rx=0, ry=0, rz=0, dz=0, dx=0, dy=0):
-    sxy, sz = BODYSC.get(f, (1.0, 1.0))      # cancel the Body squash on the lid (a tin lid does not squash); keeps shear small
-    K('Lid_Bone', f, (dx, dy, dz), (rx, ry, rz), (1 / sxy, 1 / sxy, 1 / sz))
+    # Lid_Bone is a child of Root and follows Body's move + rotation by hand: a tin lid neither squashes nor shears when the jar does.
+    from mathutils import Euler
+    (bl, br, sxy, sz) = BODYST.get(f, ((0, 0, 0), (0, 0, 0), 1.0, 1.0))
+    Rb = Euler(tuple(math.radians(a) for a in br), 'XYZ').to_matrix(); Rl = Euler(tuple(math.radians(a) for a in (rx, ry, rz)), 'XYZ').to_matrix()
+    h = HINGE; hs = Vector((sxy * (h.x + dx), sxy * (h.y + dy), sz * (h.z + dz)))
+    P = Vector(bl) + Rb @ hs
+    eul = (Rb @ Rl).to_euler('XYZ', CUR.get('leul') or Euler((0, 0, 0)))
+    CUR['leul'] = eul
+    K('Lid_Bone', f, tuple(P - h), tuple(math.degrees(a) for a in eul), (1, 1, 1))
 def eyes(f, sz=1, sx=1, dx=0, dz=0, dy=0):
     K('EyeL_Bone', f, (dx, dy, dz), (0, 0, 0), (sx, sx, sz)); K('EyeR_Bone', f, (dx, dy, dz), (0, 0, 0), (sx, sx, sz))
 def splatb(f, s=1.0): K('Splat_Bone', f, (0, 0, 0), (0, 0, 0), (s, s, s))
