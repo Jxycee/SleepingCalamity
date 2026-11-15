@@ -6,7 +6,7 @@ mean hue (deg), saturation, value of the hair region in capture vs reference, pe
 reference hair region = hull mask above z 1.68 on refs/crop_<view>.png (same as sweep_score.py; includes some forehead skin)."""
 import argparse, json, os, subprocess, sys, time
 import numpy as np, cv2
-HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.abspath(os.path.join(HERE, *['..'] * 5))
+HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.abspath(os.path.join(HERE, *['..'] * 6))
 sys.path.insert(0, os.path.join(HERE, '..', 'hairdeck'))
 ap = argparse.ArgumentParser(); ap.add_argument('--tag', default=time.strftime('%H%M%S')); ap.add_argument('--look', default=os.path.join(HERE, 'unity_look.json'))
 ap.add_argument('--out', default='C:/AI/test_out/heroes/tobin/hair_sweep/look'); ap.add_argument('--skip-unity', action='store_true')
