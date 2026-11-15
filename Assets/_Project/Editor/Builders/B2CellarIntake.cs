@@ -22,7 +22,8 @@ namespace SleepingCalamity.EditorTools
         const string MatFolder = "Assets/_Project/Content/Materials/B2";
         const int Cap = 2048;
         static readonly HashSet<string> Skip = new HashSet<string> { "C01", "C02", "C15",   // adopted in B0 (DungeonCornerBuilder / B0Fab)
-            "C04", "C07d", "C11c", "C15b", "C15d", "A04a", "A04b" };   // non-Megascans (png textures, other layouts; C04/C07d/C11c 4096 px textures deleted for the 2K cap): adopt by hand later; A04 rats are rigged characters (own job)
+            "C04", "C07d", "C11c", "C15b", "C15d", "A04a", "A04b",
+            "C13a", "C13c", "C14b", "C10c", "C14c", "C12c" };   // dropped 2026-11-15 (style review of the contact sheet): C13a flat door slab, C13c floating arc ribbon, C14b formless smear, C10c floating slab, C14c glowing orange fungus, C12c plastic green bedroll; sources stay in Art/Source/Fab   // non-Megascans (png textures, other layouts; C04/C07d/C11c 4096 px textures deleted for the 2K cap): adopt by hand later; A04 rats are rigged characters (own job)
         static readonly HashSet<string> Plants = new HashSet<string>();
         static readonly HashSet<string> Decals = new HashSet<string> { "C03a", "C03b", "C03c", "C03d" };   // opacity goes into albedo alpha (alpha clip)
         // Props whose source is far off real size: the prefab is scaled so the LOD0 bounds are this tall (m).
