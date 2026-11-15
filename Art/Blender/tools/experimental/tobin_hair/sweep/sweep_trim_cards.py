@@ -9,9 +9,11 @@ from hd_sil import load_cal, load_mesh   # noqa: E402
 vd, ctxp = sys.argv[1:3]; kw = dict(a.split('=', 1) for a in sys.argv[3:])
 ex = kw.get('existing', '2:0.6,29:0.6,31:0.6'); below = float(kw.get('tail_below', 0.10)); to = float(kw.get('tail_to', 0.085))
 fmm = float(kw.get('fringe_mm', 10)); ffr = float(kw.get('fringe_frac', 0.75))
+back_to = float(kw.get('back_to', to)); back_jit = float(kw.get('back_jit', 0.01)); back_y = kw.get('back_y')   # cards whose lowest vertex is behind back_y (skull centre, |x| < 6.5 cm; default hd_fit's cranium centre + dy) are cut at eye_z - back_to, +-back_jit
 ctx = json.load(open(ctxp)); cal, M = load_cal(ctx['hull']); ez = cal['eye_z']
 S = np.load(os.path.join(vd, 'strands.npz')); cid, vv = S['cid'], S['uv'][:, 1]; HV = np.load(os.path.join(vd, 'opt', 'fit_best.npz'))['v'].astype(float)
 hv, _ = load_mesh(ctx['head'], 'AvatarHead'); yc = hv[hv[:, 2] > 1.6][:, 1].mean()
+yb = float(back_y) if back_y else -0.0177 + float(json.load(open(os.path.join(vd, 'opt', 'best.json')))['best']['params'].get('dy', 0))
 c = cal['side']; s = c['s']; sz = c.get('sz', s)
 px = c['cx'] + c['sign'] * s * HV[:, 1]; py = c['eye_py'] - sz * (HV[:, 2] - ez)
 dt = cv2.distanceTransform((~M['side']).astype(np.uint8), cv2.DIST_L2, 5); h, w = dt.shape
@@ -21,9 +23,11 @@ mm = d / min(s, sz) * 1000
 trim = {int(k.split(':')[0]): float(k.split(':')[1]) for k in ex.split(',') if k}; tails, fringe = {}, {}
 for k in np.unique(cid):
     m = cid == k
-    if HV[m, 2].min() < ez - below:
-        lo = m & (HV[:, 2] < ez - to); f = float(vv[lo].min()) if lo.any() else 1.0
-        f = float(np.clip(f + ((zlib.crc32(b'cid%d' % k) % 2001) - 1000) / 1000 * 0.01 / max(1e-3, np.ptp(HV[m, 2])), 0.2, 1.0)); tails[int(k)] = round(f, 3)
+    lv = HV[m][np.argmin(HV[m, 2])]; bk = lv[1] > yb and abs(lv[0]) < 0.065   # lowest vertex behind the skull centre and not beside an ear
+    to_k = back_to if bk else to; jit = back_jit if bk else 0.01
+    if HV[m, 2].min() < ez - (to_k + 0.015 if bk else below):
+        lo = m & (HV[:, 2] < ez - to_k); f = float(vv[lo].min()) if lo.any() else 1.0
+        f = float(np.clip(f + ((zlib.crc32(b'cid%d' % k) % 2001) - 1000) / 1000 * jit / max(1e-3, np.ptp(HV[m, 2])), 0.2, 1.0)); tails[int(k)] = round(f, 3)
     if (m & (HV[:, 2] > 1.60) & (HV[:, 1] < yc) & (mm > fmm)).any(): fringe[int(k)] = ffr
 for src in (tails, fringe):
     for k, f in src.items(): trim[k] = min(trim.get(k, 1.0), f)

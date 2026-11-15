@@ -1,0 +1,93 @@
+{
+ "round": 5,
+ "top": 6,
+ "jut_mm": 6.0,
+ "defaults": {
+  "opt": {
+   "w": "0.45,0.3,0.15,0.1",
+   "rounds": 8
+  },
+  "fit": {
+   "clear": 0.002
+  }
+ },
+ "weights": {
+  "iou_mean": 1.0,
+  "iou_frame": 0.5,
+  "iou_min": 0.5,
+  "jut": 0.5,
+  "color": 0.2,
+  "warm": 0.2,
+  "clear": 0.2,
+  "cover": 0.4,
+  "spike": 1.0
+ },
+ "variants": [
+  {
+   "id": "w_nape0",
+   "label": "round-4 pick untrimmed (region mix, manual trims only) + nape cards (seed0 tips behind skull centre, below ear top); measure run",
+   "mix": {
+    "a": "C:/AI/test_out/heroes/tobin/hair_sweep/round5/base_region.json",
+    "b": "C:/AI/test_out/heroes/tobin/hair_sweep/round5/nape_cards.json",
+    "args": [
+     "--mode",
+     "union"
+    ]
+   },
+   "opt": {
+    "rounds": 0,
+    "fix": {
+     "sx": 0.92,
+     "sy": 0.8,
+     "sz": 1.08,
+     "dy": -0.016,
+     "dz": -0.012,
+     "lt": 0.024,
+     "fs": 0.006
+    }
+   },
+   "strands": {
+    "core_len": 0.7
+   },
+   "tint": {
+    "root": "#3a281c",
+    "tip": "#7a563c"
+   }
+  },
+  {
+   "id": "w_nape",
+   "label": "w_nape0 + back cards cut at eye_z-0.12 m (+-15 mm), side tails at eye_z-0.085, crown stub card 22 removed (top 2.3 cm above the next card)",
+   "mix": {
+    "a": "C:/AI/test_out/heroes/tobin/hair_sweep/round5/base_region.json",
+    "b": "C:/AI/test_out/heroes/tobin/hair_sweep/round5/nape_cards.json",
+    "args": [
+     "--mode",
+     "union",
+     "--trim",
+     "2:0.6,23:0.958,29:0.6,30:0.957,31:0.6,110:0.847,119:0.867,121:0.924,143:0.864",
+     "--remove",
+     "22"
+    ]
+   },
+   "opt": {
+    "rounds": 0,
+    "fix": {
+     "sx": 0.92,
+     "sy": 0.8,
+     "sz": 1.08,
+     "dy": -0.016,
+     "dz": -0.012,
+     "lt": 0.024,
+     "fs": 0.006
+    }
+   },
+   "strands": {
+    "core_len": 0.7
+   },
+   "tint": {
+    "root": "#3a281c",
+    "tip": "#7a563c"
+   }
+  }
+ ]
+}

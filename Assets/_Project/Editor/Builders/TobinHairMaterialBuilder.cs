@@ -79,7 +79,7 @@ namespace SleepingCalamity.EditorTools
             // sweep pick w_trim60_core70_tintB: root #3a281c, tip #7a563c, mid chestnut between them
             mat.SetColor("_RootColor", Hex(look.root_tint, new Color32(0x3a, 0x28, 0x1c, 255))); mat.SetColor("_MidColor", Hex(look.mid_tint, new Color32(0x5c, 0x40, 0x2c, 255))); mat.SetColor("_TipColor", Hex(look.tip_tint, new Color32(0x7a, 0x56, 0x3c, 255)));
             mat.SetFloat("_ShadowLift", look.shadow_lift); mat.SetFloat("_HueShift", look.hue_shift); mat.SetFloat("_Saturation", look.saturation); mat.SetFloat("_Value", look.value);
-            mat.SetColor("_BlondeColor", new Color(0.68f, 0.55f, 0.40f)); mat.SetFloat("_BlondeChance", 0.06f); mat.SetFloat("_StrandVar", 0.22f); mat.SetFloat("_RootDark", 0.25f); mat.SetFloat("_Ambient", 1.15f);
+            mat.SetColor("_BlondeColor", Hex(look.blonde_color, new Color32(0xae, 0x8c, 0x66, 255))); mat.SetFloat("_BlondeChance", look.blonde_chance); mat.SetFloat("_StrandVar", 0.22f); mat.SetFloat("_RootDark", 0.25f); mat.SetFloat("_Ambient", 1.15f);
             // back of the head read orange under the key light: cooler, weaker highlights, less tip lift
             mat.SetColor("_Spec1Color", new Color(0.28f, 0.26f, 0.25f)); mat.SetColor("_Spec2Color", new Color(0.14f, 0.12f, 0.11f)); mat.SetFloat("_TipLift", 0.04f); mat.SetFloat("_ShadowStrength", 0.55f); mat.SetFloat("_ShadowNormalOffset", 0.008f);
             EditorUtility.SetDirty(mat); AssetDatabase.SaveAssets(); return mat;
@@ -89,7 +89,7 @@ namespace SleepingCalamity.EditorTools
         [System.Serializable] public class HairLook
         {
             public float shadow_lift = 0f, hue_shift = 0f, saturation = 1f, value = 1f, alpha_cut = 0.42f;
-            public string root_tint = "#3a281c", mid_tint = "#5c402c", tip_tint = "#7a563c";
+            public string root_tint = "#3a281c", mid_tint = "#5c402c", tip_tint = "#7a563c", blonde_color = "#ae8c66"; public float blonde_chance = 0.06f;
         }
         public const string LookPath = "Art/Blender/tools/experimental/tobin_hair/sweep/unity_look.json";
         public static HairLook LoadLook()

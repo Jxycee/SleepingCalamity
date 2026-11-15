@@ -61,13 +61,21 @@ for p in hair.data.polygons: p.use_smooth = True   # smooth along and across eac
 # scalp shell
 th = BVHTree.FromObject(hair, bpy.context.evaluated_depsgraph_get())
 bs = bmh.copy(); bs.faces.ensure_lookup_table(); bs.normal_update()
+NAPE_Z = float(kw.get('nape', 0))   # nape=1.62: extend the scalp layer down the back of the head (default 0 = old edge)
+NAPE_RING = int(kw.get('nape_ring', 1))   # drop this many face rings along the extended lower edge (cards cover it; no straight edge or triangles show)
 def scalp(f):   # under hair within 2.5 cm, and not the face below the hairline (the fringe hangs 3-5 cm in front of the forehead)
     c = f.calc_center_median()
     if c.y < -0.06 and c.z < 1.79: return False
-    if c.z < 1.67: return False            # nape: strand ends would show the scalp layer as dark stripes
-    if c.z < 1.71 and (abs(c.x) > 0.04 or c.y > 0.02): return False   # back / sides: its edge showed as dark shards through gaps when the head turns
+    if NAPE_Z and c.y > 0.02:               # back (nape=<z>): hairline at nape_z at the back centre, rising behind the ears (1.5 m per m of |x| past 3 cm), never above the old 1.71 limit
+        if c.z < min(1.71, NAPE_Z + 1.5 * max(0.0, abs(c.x) - 0.03)): return False
+    else:
+        if c.z < 1.67: return False            # nape: strand ends would show the scalp layer as dark stripes
+        if c.z < 1.71 and (abs(c.x) > 0.04 or c.y > 0.02): return False   # back / sides: its edge showed as dark shards through gaps when the head turns
     return th.ray_cast(c + f.normal * 0.0005, f.normal, 0.025)[0] is not None
 keep = {f.index for f in bs.faces if scalp(f)}
+for _ in range(NAPE_RING if NAPE_Z else 0):   # faces touching a vertex that has a non-kept neighbour face = the lower edge ring (back only)
+    edge = {f.index for f in bs.faces if f.index in keep and f.calc_center_median().y > 0.02 and any(g.index not in keep for v in f.verts for g in v.link_faces)}
+    keep -= {i for i in edge if bs.faces[i].calc_center_median().z < 1.70}
 bmesh.ops.delete(bs, geom=[f for f in bs.faces if f.index not in keep], context='FACES')
 bmesh.ops.delete(bs, geom=[v for v in bs.verts if not v.link_faces], context='VERTS'); bs.normal_update()
 for v in bs.verts: v.co += v.normal * 0.0012

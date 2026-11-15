@@ -2,9 +2,11 @@
  "shadow_lift": 1.2,
  "hue_shift": 0.5,
  "saturation": 0.62,
- "value": 1.0,
- "root_tint": "#3a281c",
+ "value": 1.045,
+ "root_tint": "#2c1e15",
  "mid_tint": "#5c402c",
  "tip_tint": "#7a563c",
- "alpha_cut": 0.42
+ "alpha_cut": 0.42,
+ "blonde_color": "#8f6d4c",
+ "blonde_chance": 0.04
 }
