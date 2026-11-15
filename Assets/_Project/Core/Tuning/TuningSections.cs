@@ -218,7 +218,7 @@ namespace SleepingCalamity.Core.Tuning
             }
             if (!changed) return a;
             // An attack with no early cancel (every enemy attack: CancelFrom == TotalFrames) keeps having none when its length changes, unless cancelFrom is set.
-            if (a.CancelFrom >= a.TotalFrames && cancel == a.CancelFrom && total != a.TotalFrames) cancel = Math.Max(hitOn.End, total);
+            if (section == "enemyAttacks" && a.CancelFrom >= a.TotalFrames && cancel == a.CancelFrom && total != a.TotalFrames) cancel = Math.Max(hitOn.End, total);
             string problem = Check(total, cancel, hitOn, combo, fin, ifr, armor, turn, lunge);
             if (problem != null) { TuningStore.Warn(source + ": attack '" + id + "' ignored, " + problem); return a; }
             return new AttackData(a.Id, a.Name, a.Kind, total, hitOn, mult, a.Shape, range, half, combo, fin, cancel, ifr, armor, turn, turnSpeed, lunge, lungeM, band,
