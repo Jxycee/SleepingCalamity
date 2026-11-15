@@ -1173,7 +1173,10 @@ namespace SleepingCalamity.Presentation
             if (rolls > 0) PayExtraRolls(room, rolls);
         }
 
-        // Brimming / Fat Larder reward: `rolls` extra loot rolls for every connected hero with a bag, on the derived chest index 50000 + room (Stirred uses chestIndex + 1000 * k, chestIndex < 64: no collision). Host only.
+        // Authority: host only (runs from the host's clear checks).
+        // Brimming / Fat Larder reward: `rolls` extra loot rolls for every connected hero that has a spawned player object and an existing bag. The roll index is
+        // ExtraRollChestBase + room, then GiveExtraRoll adds 1000 * k: 51000 + room + 1000 * (k - 1) for k = 1.. (Stirred uses chestIndex + 1000 * k with chestIndex < 64: no collision).
+        // Present = has a PlayerObject (downed heroes count; _players is not used). Absent clients are skipped and no bag is created for them.
         private void PayExtraRolls(int room, int rolls)
         {
             if (HaulSync == null) return;
@@ -1181,18 +1184,25 @@ namespace SleepingCalamity.Presentation
             bonus = _mods.ChestRankBonus(bonus);
             foreach (ulong id in NetworkManager.ConnectedClientsIds)
             {
-                PlayerBag bag = HaulSync.ServerBagOf(id);
+                if (!HasPlayerObject(id)) continue;
+                PlayerBag bag = HaulSync.ServerExistingBagOf(id);
                 if (bag == null) continue;
                 for (int k = 1; k <= rolls; k++) GiveExtraRoll(id, bag, ExtraRollChestBase + room, k, bonus);
             }
         }
         private const int ExtraRollChestBase = 50000;
 
-        // "Present" = every connected client with a hero in the dive, downed ones included (they are in the party); HaulSync.ServerAddGold skips anyone without a dive hero.
+        private bool HasPlayerObject(ulong id) => NetworkManager.ConnectedClients.TryGetValue(id, out NetworkClient c) && c.PlayerObject != null;
+
+        // Authority: host only. "Present" = every connected client with a spawned player object, downed ones included (they are in the party). Others are skipped, and no bag is created for them.
         private void PayEveryone(int each)
         {
             if (each <= 0 || HaulSync == null) return;
-            foreach (ulong id in NetworkManager.ConnectedClientsIds) if (HaulSync.ServerAddGold(id, each)) GoldPaidForClears += each;
+            foreach (ulong id in NetworkManager.ConnectedClientsIds)
+            {
+                if (!HasPlayerObject(id) || HaulSync.ServerExistingBagOf(id) == null) continue;
+                if (HaulSync.ServerAddGold(id, each)) GoldPaidForClears += each;
+            }
         }
 
         public bool ServerTryOpenDoor(ulong clientId)

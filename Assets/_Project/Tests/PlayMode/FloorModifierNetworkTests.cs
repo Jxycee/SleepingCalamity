@@ -83,6 +83,11 @@ namespace SleepingCalamity.Tests.PlayMode
             cts.Dispose();
             yield return PlayModeHarness.WaitUntil(() => client.NetworkManager.IsConnectedClient, Timeout, "client never connected");
 
+            // A present hero = a connected client with a player object (the payouts skip clients without one). Positions are judged through PlayersOverride, so these stay parked.
+            c.HostNm.SpawnManager.InstantiateAndSpawn(app.PlayerPrefab, c.HostNm.LocalClientId, false, true, false, new Vector3(0f, -50f, 0f), Quaternion.identity);
+            c.HostNm.SpawnManager.InstantiateAndSpawn(app.PlayerPrefab, client.NetworkManager.LocalClientId, false, true, false, new Vector3(2f, -50f, 0f), Quaternion.identity);
+            yield return PlayModeHarness.WaitUntil(() => client.NetworkManager.LocalClient != null && client.NetworkManager.LocalClient.PlayerObject != null, Timeout, "the client never received its hero");
+
             c.Floor = Spawn<CellarFloorSync>(c.HostNm); c.Haul = Spawn<DiveHaulSync>(c.HostNm); c.Contents = Spawn<CellarContentsSync>(c.HostNm);
             ulong id = c.Contents.NetworkObjectId;
             yield return PlayModeHarness.WaitUntil(() => client.NetworkManager.SpawnManager.SpawnedObjects.ContainsKey(id), Timeout, "client never received the contents object");
@@ -136,6 +141,116 @@ namespace SleepingCalamity.Tests.PlayMode
             KillEveryEnemy(c.HostNm);
             yield return PlayModeHarness.WaitUntil(() => c.Contents.AliveInRoom(r) == 0 && (c.Contents.State.Cleared & (1UL << r)) != 0, Timeout, "the room never cleared");
             room(r);
+        }
+
+        // The room ClearARoom picks: the first room with a non-hunter spawn (and, on an Ambush floor, not the ambush room).
+        private static int FirstClearRoom(CellarEncounterPlan plan)
+        {
+            foreach (EncounterSpawn sp in plan.Spawns) if (sp.Kind != EncounterKind.Hunter && (plan.Twist != FloorTwist.Ambush || sp.RoomIndex != plan.AmbushRoom)) return sp.RoomIndex;
+            return -1;
+        }
+
+        // The first room with a non-hunter spawn other than `not` (the fat room is the first Combat room, so the ordinary room is a later one).
+        private static int OtherRoom(CellarEncounterPlan plan, int not)
+        {
+            foreach (EncounterSpawn sp in plan.Spawns) if (sp.Kind != EncounterKind.Hunter && sp.RoomIndex != not) return sp.RoomIndex;
+            return -1;
+        }
+
+        private static EncounterSpawn SpawnIn(CellarEncounterPlan plan, int room)
+        {
+            foreach (EncounterSpawn sp in plan.Spawns) if (sp.RoomIndex == room && sp.Kind != EncounterKind.Hunter) return sp;
+            return null;
+        }
+
+        // Clears one named room: both heroes step in, everything dies, wait for the clear. Time-boxed waits only.
+        private static IEnumerator ClearRoom(Ctx c, CellarEncounterPlan plan, int r)
+        {
+            EncounterSpawn first = SpawnIn(plan, r);
+            Assert.That(first, Is.Not.Null, "premise: room " + r + " has enemies");
+            c.Players[c.HostId] = Cell(c, first.X, first.Y) + Vector3.forward * 0.1f;
+            c.Players[c.ClientId] = Cell(c, first.X, first.Y) + Vector3.back * 0.3f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.EnterEnemyCount(r) > 0, Timeout, "room " + r + " never spawned its enemies");
+            KillEveryEnemy(c.HostNm);
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.AliveInRoom(r) == 0 && (c.Contents.State.Cleared & (1UL << r)) != 0, Timeout, "room " + r + " never cleared");
+        }
+
+        // What one extra roll on `room` gives `id` (GiveExtraRoll: chest index 50000 + room, + 1000 * k for k = 1). A fresh bag, no rank bonus on these floors.
+        private static int ExtraRollItem(Ctx c, ulong id, int room) => CellarLoot.RollChest(c.Seed, c.FloorNo, 51000 + room, c.Haul.PlayerSlotOf(id), 0, false);
+
+        private static bool RollsAnItemForEverySlot(uint seed, int floor, int room)
+        {
+            for (int slot = 0; slot < 4; slot++) if (CellarLoot.RollChest(seed, floor, 51000 + room, slot, 0, false) == CellarLoot.GoldId) return false;
+            return true;
+        }
+
+        private static void AssertPaid(Ctx c, ulong id, int room, int items0, int gold0, string who)
+        {
+            bool gold = ExtraRollItem(c, id, room) == CellarLoot.GoldId;
+            Assert.That(c.Haul.ServerBagOf(id).Carried.Count, Is.EqualTo(items0 + (gold ? 0 : 1)), who + ": exactly BrimmingRollsPerRoom (" + FloorModifierTuning.BrimmingRollsPerRoom + ") item roll(s)");
+            Assert.That(DiveGold(c, id), Is.EqualTo(gold0 + (gold ? CellarLoot.GoldPurse : 0)), who + ": a purse only when the roll is gold");
+        }
+
+        // ---- Brimming / Fat Larder (extra rolls on a room clear; host-paid to every client with a hero object) ----
+
+        [UnityTest]
+        public IEnumerator Brimming_EveryPresentClientGetsTheRoll_AndAReClearPaysNothing()
+        {
+            Assert.That(FloorModifierTuning.BrimmingRollsPerRoom, Is.EqualTo(1), "the test's expectation is written for one roll per room");
+            uint seed = FindSeed((s, l, m) => m.Has(FloorModifier.Brimming) && FirstClearRoom(CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false)) >= 0);
+            Ctx c = null; yield return Setup(x => c = x, seed);
+            int h0 = c.Haul.ServerBagOf(c.HostId).Carried.Count, k0 = c.Haul.ServerBagOf(c.ClientId).Carried.Count, hg0 = DiveGold(c, c.HostId), kg0 = DiveGold(c, c.ClientId);
+            int room = -1;
+            yield return ClearARoom(c, r => room = r);
+            AssertPaid(c, c.HostId, room, h0, hg0, "host");
+            AssertPaid(c, c.ClientId, room, k0, kg0, "client");
+
+            // the room resets and clears again: the host's once-per-room guard pays nothing (PayRoomClear is the call the clear checks make)
+            int h1 = c.Haul.ServerBagOf(c.HostId).Carried.Count, k1 = c.Haul.ServerBagOf(c.ClientId).Carried.Count, hg1 = DiveGold(c, c.HostId), kg1 = DiveGold(c, c.ClientId);
+            typeof(CellarContentsSync).GetMethod("PayRoomClear", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(c.Contents, new object[] { room });
+            Assert.That(c.Haul.ServerBagOf(c.HostId).Carried.Count, Is.EqualTo(h1), "a second clear of the same room gives the host nothing");
+            Assert.That(c.Haul.ServerBagOf(c.ClientId).Carried.Count, Is.EqualTo(k1), "nor the client");
+            Assert.That(DiveGold(c, c.HostId), Is.EqualTo(hg1));
+            Assert.That(DiveGold(c, c.ClientId), Is.EqualTo(kg1));
+        }
+
+        [UnityTest]
+        public IEnumerator FatLarder_OnlyTheFatRoomPays()
+        {
+            uint seed = FindSeed((s, l, m) =>
+            {
+                if (!m.Has(FloorModifier.FatLarder)) return false;
+                CellarEncounterPlan p = CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false);
+                return p.FatRoom >= 0 && SpawnIn(p, p.FatRoom) != null && OtherRoom(p, p.FatRoom) >= 0;
+            });
+            Ctx c = null; yield return Setup(x => c = x, seed);
+            CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(c.Layout, c.Floor.Built.Dressing, 0, false);
+            int plain = OtherRoom(plan, plan.FatRoom);
+            int h0 = c.Haul.ServerBagOf(c.HostId).Carried.Count, k0 = c.Haul.ServerBagOf(c.ClientId).Carried.Count, hg0 = DiveGold(c, c.HostId), kg0 = DiveGold(c, c.ClientId);
+            yield return ClearRoom(c, plan, plain);
+            Assert.That(c.Haul.ServerBagOf(c.HostId).Carried.Count, Is.EqualTo(h0), "an ordinary room pays no extra roll on a Fat Larder floor (host)");
+            Assert.That(c.Haul.ServerBagOf(c.ClientId).Carried.Count, Is.EqualTo(k0), "(client)");
+            Assert.That(DiveGold(c, c.HostId), Is.EqualTo(hg0));
+            Assert.That(DiveGold(c, c.ClientId), Is.EqualTo(kg0));
+
+            yield return ClearRoom(c, plan, plan.FatRoom);
+            AssertPaid(c, c.HostId, plan.FatRoom, h0, hg0, "host (fat room)");
+            AssertPaid(c, c.ClientId, plan.FatRoom, k0, kg0, "client (fat room)");
+        }
+
+        [UnityTest]
+        public IEnumerator Brimming_AFullBagGetsTheNotice_AndNoItem()
+        {
+            uint seed = FindSeed((s, l, m) => m.Has(FloorModifier.Brimming) && FirstClearRoom(CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false)) is int r && r >= 0 && RollsAnItemForEverySlot(s, 2, r));
+            Ctx c = null; yield return Setup(x => c = x, seed);
+            PlayerBag bag = c.Haul.ServerBagOf(c.ClientId);
+            for (int n = 0; n < PlayerBag.MaxCarried; n++) Assert.That(c.Haul.ServerAddItem(c.ClientId, 101), Is.True);
+            Assert.That(bag.IsFull, Is.True, "premise: the client's bag is full");
+            int k0 = bag.Carried.Count, notices0 = c.Peer.NoticeCount;
+            yield return ClearARoom(c, r => { });
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.NoticeCount == notices0 + 1, Timeout, "the client was never told its bag is full");
+            Assert.That(c.Peer.LastNotice, Is.EqualTo(CellarContentsSync.BagFullText));
+            Assert.That(bag.Carried.Count, Is.EqualTo(k0), "the full bag took no item");
         }
 
         // ---- Stirred ----
