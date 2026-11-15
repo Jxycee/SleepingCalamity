@@ -1,0 +1,1070 @@
+{
+ "timing": "device=cuda lanes/case=2048 cases=6 dives=10 ticks=109504 sim=201.5s",
+ "pass": 54,
+ "fail": 19,
+ "verdicts": [
+  {
+   "case": "p1_average",
+   "check": "ttk",
+   "floor": 1,
+   "value": 2.934,
+   "band": [
+    2,
+    9
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "room_clear",
+   "floor": 1,
+   "value": 11.166,
+   "band": [
+    8,
+    24
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "damage_frac",
+   "floor": 1,
+   "value": 0.244,
+   "band": [
+    0.05,
+    0.4
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "ttk",
+   "floor": 2,
+   "value": 5.134,
+   "band": [
+    3,
+    12
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "room_clear",
+   "floor": 2,
+   "value": 15.353,
+   "band": [
+    8,
+    30
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "damage_frac",
+   "floor": 2,
+   "value": 0.508,
+   "band": [
+    0.05,
+    0.45
+   ],
+   "pass": false
+  },
+  {
+   "case": "p1_average",
+   "check": "ttk",
+   "floor": 3,
+   "value": 6.603,
+   "band": [
+    3,
+    14
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "room_clear",
+   "floor": 3,
+   "value": 16.792,
+   "band": [
+    10,
+    34
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "damage_frac",
+   "floor": 3,
+   "value": 0.621,
+   "band": [
+    0.1,
+    0.55
+   ],
+   "pass": false
+  },
+  {
+   "case": "p1_average",
+   "check": "ttk",
+   "floor": 4,
+   "value": 5.067,
+   "band": [
+    4,
+    16
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "room_clear",
+   "floor": 4,
+   "value": 16.133,
+   "band": [
+    10,
+    36
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "damage_frac",
+   "floor": 4,
+   "value": 0.301,
+   "band": [
+    0.1,
+    0.55
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "damage_frac",
+   "floor": 5,
+   "value": 0.618,
+   "band": [
+    0.15,
+    0.8
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "deaths_per_dive",
+   "floor": 0,
+   "value": 1.0,
+   "band": [
+    0,
+    0.5
+   ],
+   "pass": false
+  },
+  {
+   "case": "p1_average",
+   "check": "weapon_level_d1",
+   "floor": 0,
+   "value": 1.374,
+   "band": [
+    1,
+    4
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "weapon_level_d3",
+   "floor": 0,
+   "value": 3.649,
+   "band": [
+    3,
+    9
+   ],
+   "pass": true
+  },
+  {
+   "case": "p1_average",
+   "check": "weapon_level_d10",
+   "floor": 0,
+   "value": 8.696,
+   "band": [
+    8,
+    25
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "ttk",
+   "floor": 1,
+   "value": 2.806,
+   "band": [
+    2,
+    9
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "room_clear",
+   "floor": 1,
+   "value": 13.291,
+   "band": [
+    8,
+    24
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "damage_frac",
+   "floor": 1,
+   "value": 0.173,
+   "band": [
+    0.05,
+    0.4
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "ttk",
+   "floor": 2,
+   "value": 4.758,
+   "band": [
+    3,
+    12
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "room_clear",
+   "floor": 2,
+   "value": 19.209,
+   "band": [
+    8,
+    30
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "damage_frac",
+   "floor": 2,
+   "value": 0.376,
+   "band": [
+    0.05,
+    0.45
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "ttk",
+   "floor": 3,
+   "value": 5.983,
+   "band": [
+    3,
+    14
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "room_clear",
+   "floor": 3,
+   "value": 21.367,
+   "band": [
+    10,
+    34
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "damage_frac",
+   "floor": 3,
+   "value": 0.832,
+   "band": [
+    0.1,
+    0.55
+   ],
+   "pass": false
+  },
+  {
+   "case": "p2_average",
+   "check": "ttk",
+   "floor": 4,
+   "value": 4.447,
+   "band": [
+    4,
+    16
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "room_clear",
+   "floor": 4,
+   "value": 20.773,
+   "band": [
+    10,
+    36
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "damage_frac",
+   "floor": 4,
+   "value": 0.499,
+   "band": [
+    0.1,
+    0.55
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "ttk",
+   "floor": 5,
+   "value": 84.066,
+   "band": [
+    20,
+    60
+   ],
+   "pass": false
+  },
+  {
+   "case": "p2_average",
+   "check": "damage_frac",
+   "floor": 5,
+   "value": 0.906,
+   "band": [
+    0.15,
+    0.8
+   ],
+   "pass": false
+  },
+  {
+   "case": "p2_average",
+   "check": "ttk",
+   "floor": 6,
+   "value": 3.205,
+   "band": [
+    4,
+    16
+   ],
+   "pass": false
+  },
+  {
+   "case": "p2_average",
+   "check": "room_clear",
+   "floor": 6,
+   "value": 15.792,
+   "band": [
+    10,
+    36
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "damage_frac",
+   "floor": 6,
+   "value": 0.679,
+   "band": [
+    0.1,
+    0.6
+   ],
+   "pass": false
+  },
+  {
+   "case": "p2_average",
+   "check": "ttk",
+   "floor": 7,
+   "value": 4.235,
+   "band": [
+    4,
+    16
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "room_clear",
+   "floor": 7,
+   "value": 17.613,
+   "band": [
+    10,
+    36
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "damage_frac",
+   "floor": 7,
+   "value": 0.659,
+   "band": [
+    0.1,
+    0.6
+   ],
+   "pass": false
+  },
+  {
+   "case": "p2_average",
+   "check": "deaths_per_dive",
+   "floor": 0,
+   "value": 1.981,
+   "band": [
+    0,
+    0.5
+   ],
+   "pass": false
+  },
+  {
+   "case": "p2_average",
+   "check": "weapon_level_d1",
+   "floor": 0,
+   "value": 2.552,
+   "band": [
+    1,
+    4
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "weapon_level_d3",
+   "floor": 0,
+   "value": 6.121,
+   "band": [
+    3,
+    9
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "weapon_level_d10",
+   "floor": 0,
+   "value": 13.23,
+   "band": [
+    8,
+    25
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "ttk",
+   "floor": 1,
+   "value": 2.4,
+   "band": [
+    2,
+    9
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "room_clear",
+   "floor": 1,
+   "value": 16.279,
+   "band": [
+    8,
+    24
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "damage_frac",
+   "floor": 1,
+   "value": 0.14,
+   "band": [
+    0.05,
+    0.4
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "ttk",
+   "floor": 2,
+   "value": 3.847,
+   "band": [
+    3,
+    12
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "room_clear",
+   "floor": 2,
+   "value": 23.556,
+   "band": [
+    8,
+    30
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "damage_frac",
+   "floor": 2,
+   "value": 0.308,
+   "band": [
+    0.05,
+    0.45
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "ttk",
+   "floor": 3,
+   "value": 4.293,
+   "band": [
+    3,
+    14
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "room_clear",
+   "floor": 3,
+   "value": 24.639,
+   "band": [
+    10,
+    34
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "damage_frac",
+   "floor": 3,
+   "value": 0.87,
+   "band": [
+    0.1,
+    0.55
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "ttk",
+   "floor": 4,
+   "value": 4.186,
+   "band": [
+    4,
+    16
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "room_clear",
+   "floor": 4,
+   "value": 27.556,
+   "band": [
+    10,
+    36
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "damage_frac",
+   "floor": 4,
+   "value": 0.636,
+   "band": [
+    0.1,
+    0.55
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "ttk",
+   "floor": 5,
+   "value": 74.0,
+   "band": [
+    20,
+    60
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "damage_frac",
+   "floor": 5,
+   "value": 1.173,
+   "band": [
+    0.15,
+    0.8
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "ttk",
+   "floor": 6,
+   "value": 3.526,
+   "band": [
+    4,
+    16
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "room_clear",
+   "floor": 6,
+   "value": 22.367,
+   "band": [
+    10,
+    36
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "damage_frac",
+   "floor": 6,
+   "value": 0.546,
+   "band": [
+    0.1,
+    0.6
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "ttk",
+   "floor": 7,
+   "value": 3.661,
+   "band": [
+    4,
+    16
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "room_clear",
+   "floor": 7,
+   "value": 23.689,
+   "band": [
+    10,
+    36
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "damage_frac",
+   "floor": 7,
+   "value": 0.592,
+   "band": [
+    0.1,
+    0.6
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "deaths_per_dive",
+   "floor": 0,
+   "value": 3.532,
+   "band": [
+    0,
+    0.5
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "weapon_level_d1",
+   "floor": 0,
+   "value": 5.328,
+   "band": [
+    1,
+    4
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "weapon_level_d3",
+   "floor": 0,
+   "value": 10.805,
+   "band": [
+    3,
+    9
+   ],
+   "pass": false
+  },
+  {
+   "case": "p4_average",
+   "check": "weapon_level_d10",
+   "floor": 0,
+   "value": 21.965,
+   "band": [
+    8,
+    25
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "party_ttk_ratio",
+   "floor": 1,
+   "value": 0.956,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "party_ttk_ratio",
+   "floor": 2,
+   "value": 0.927,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "party_ttk_ratio",
+   "floor": 3,
+   "value": 0.906,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  },
+  {
+   "case": "p2_average",
+   "check": "party_ttk_ratio",
+   "floor": 4,
+   "value": 0.878,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "party_ttk_ratio",
+   "floor": 1,
+   "value": 0.818,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "party_ttk_ratio",
+   "floor": 2,
+   "value": 0.749,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "party_ttk_ratio",
+   "floor": 3,
+   "value": 0.65,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  },
+  {
+   "case": "p4_average",
+   "check": "party_ttk_ratio",
+   "floor": 4,
+   "value": 0.826,
+   "band": [
+    0.5,
+    1.3
+   ],
+   "pass": true
+  }
+ ],
+ "headline": {
+  "p1_average": {
+   "ttk_d1": {
+    "1": 2.9335274992475826,
+    "2": 5.133902219467889,
+    "3": 6.603124773666837,
+    "4": 5.066679000854492,
+    "5": NaN,
+    "6": NaN,
+    "7": NaN
+   },
+   "room_clear_d1": {
+    "1": 11.16571593284607,
+    "2": 15.352905978643527,
+    "3": 16.791743709704104,
+    "4": 16.133362293243408,
+    "5": NaN,
+    "6": NaN,
+    "7": NaN
+   },
+   "dmg_frac": {
+    "1": 0.24378808593750004,
+    "2": 0.50777880859375,
+    "3": 0.6205206498892235,
+    "4": 0.30084525702172765,
+    "5": 0.6182777777777778,
+    "6": NaN,
+    "7": NaN
+   },
+   "deaths_per_dive": 1.0,
+   "success_rate": 0.0,
+   "weapon_level": {
+    "1": 1.3740234375,
+    "2": 2.56298828125,
+    "3": 3.64892578125,
+    "4": 4.5849609375,
+    "5": 5.4150390625,
+    "6": 6.17626953125,
+    "7": 6.85693359375,
+    "8": 7.5078125,
+    "9": 8.1240234375,
+    "10": 8.6962890625
+   }
+  },
+  "p2_average": {
+   "ttk_d1": {
+    "1": 2.8056798924735014,
+    "2": 4.757647131949485,
+    "3": 5.982829869263874,
+    "4": 4.446937462014003,
+    "5": 4.33168888092041,
+    "6": 3.2051264322721043,
+    "7": 4.235308030072381
+   },
+   "room_clear_d1": {
+    "1": 13.291301638353616,
+    "2": 19.209244152278004,
+    "3": 21.366881112253,
+    "4": 20.772916390345646,
+    "5": NaN,
+    "6": 15.791662693023682,
+    "7": 17.61338653564453
+   },
+   "dmg_frac": {
+    "1": 0.17256591796875,
+    "2": 0.37557666015624996,
+    "3": 0.8319841584158415,
+    "4": 0.4991991186257757,
+    "5": 0.905999356637358,
+    "6": 0.6794565217391305,
+    "7": 0.6585632183908047
+   },
+   "deaths_per_dive": 3.961962890625,
+   "success_rate": 0.003173828125,
+   "weapon_level": {
+    "1": 2.55224609375,
+    "2": 4.5458984375,
+    "3": 6.120849609375,
+    "4": 7.45263671875,
+    "5": 8.614990234375,
+    "6": 9.680908203125,
+    "7": 10.65234375,
+    "8": 11.57958984375,
+    "9": 12.431396484375,
+    "10": 13.23046875
+   }
+  },
+  "p4_average": {
+   "ttk_d1": {
+    "1": 2.399936763670267,
+    "2": 3.8471043939343947,
+    "3": 4.293344774282269,
+    "4": 4.18622940285657,
+    "5": 4.3921981027413,
+    "6": 3.525928647267455,
+    "7": 3.661282321763938
+   },
+   "room_clear_d1": {
+    "1": 16.278567511355504,
+    "2": 23.55581422438011,
+    "3": 24.639091792914385,
+    "4": 27.555990967835314,
+    "5": NaN,
+    "6": 22.367219721243455,
+    "7": 23.68876010064275
+   },
+   "dmg_frac": {
+    "1": 0.1396103515625,
+    "2": 0.30793945312500004,
+    "3": 0.8699587099926706,
+    "4": 0.6356808116180863,
+    "5": 1.1733276470588234,
+    "6": 0.5456252085882746,
+    "7": 0.592099899766121
+   },
+   "deaths_per_dive": 14.129150390625,
+   "success_rate": 0.42841796875,
+   "weapon_level": {
+    "1": 5.3277587890625,
+    "2": 8.4600830078125,
+    "3": 10.80517578125,
+    "4": 12.878173828125,
+    "5": 14.683837890625,
+    "6": 16.362548828125,
+    "7": 17.8946533203125,
+    "8": 19.3404541015625,
+    "9": 20.680419921875,
+    "10": 21.96484375
+   }
+  },
+  "p1_novice": {
+   "ttk_d1": {
+    "1": 5.274317847582789,
+    "2": 5.828448001943339,
+    "3": 5.744455258051555,
+    "4": NaN,
+    "5": NaN,
+    "6": NaN,
+    "7": NaN
+   },
+   "room_clear_d1": {
+    "1": 17.828711817081675,
+    "2": 18.5494923923589,
+    "3": 18.866722106933594,
+    "4": NaN,
+    "5": NaN,
+    "6": NaN,
+    "7": NaN
+   },
+   "dmg_frac": {
+    "1": 0.84952099609375,
+    "2": 0.6968191803391227,
+    "3": 0.5123936430317848,
+    "4": NaN,
+    "5": NaN,
+    "6": NaN,
+    "7": NaN
+   },
+   "deaths_per_dive": 1.0,
+   "success_rate": 0.0,
+   "weapon_level": {
+    "1": 0.27587890625,
+    "2": 0.970703125,
+    "3": 1.46484375,
+    "4": 1.9443359375,
+    "5": 2.3466796875,
+    "6": 2.81689453125,
+    "7": 3.2763671875,
+    "8": 3.70751953125,
+    "9": 4.0966796875,
+    "10": 4.4970703125
+   }
+  },
+  "p1_expert": {
+   "ttk_d1": {
+    "1": 1.9620252047924711,
+    "2": 3.866074346110137,
+    "3": 5.158750966623243,
+    "4": 3.751259929187088,
+    "5": 3.699373193864543,
+    "6": 3.431502319460538,
+    "7": 3.448176269896293
+   },
+   "room_clear_d1": {
+    "1": 8.04705808905419,
+    "2": 12.10840392473173,
+    "3": 13.037733775512624,
+    "4": 13.757825268386336,
+    "5": NaN,
+    "6": 11.617209267762542,
+    "7": 12.096192114280932
+   },
+   "dmg_frac": {
+    "1": 0.0602294921875,
+    "2": 0.12854931640624997,
+    "3": 0.30320197284891104,
+    "4": 0.26855908430596603,
+    "5": 0.7887412646055795,
+    "6": 0.23913151364764268,
+    "7": 0.25518001241464927
+   },
+   "deaths_per_dive": 0.922119140625,
+   "success_rate": 0.077880859375,
+   "weapon_level": {
+    "1": 3.169921875,
+    "2": 5.1796875,
+    "3": 6.78271484375,
+    "4": 8.08544921875,
+    "5": 9.24072265625,
+    "6": 10.30224609375,
+    "7": 11.30859375,
+    "8": 12.23974609375,
+    "9": 13.11083984375,
+    "10": 13.919921875
+   }
+  },
+  "p4_mix": {
+   "ttk_d1": {
+    "1": 2.8133482744426495,
+    "2": 3.944582725564462,
+    "3": 4.502645499980758,
+    "4": 4.0487384722924284,
+    "5": 4.04313862651957,
+    "6": 3.199199731797177,
+    "7": 3.202048837629139
+   },
+   "room_clear_d1": {
+    "1": 17.966354776937454,
+    "2": 23.460761790903792,
+    "3": 24.958702850872598,
+    "4": 25.83172489722285,
+    "5": NaN,
+    "6": 19.87074699220716,
+    "7": 20.306742022269553
+   },
+   "dmg_frac": {
+    "1": 0.170072265625,
+    "2": 0.3722427601699468,
+    "3": 0.8928821253162675,
+    "4": 0.5820133694563874,
+    "5": 0.8815548963402439,
+    "6": 0.43823215917165775,
+    "7": 0.4648487002437043
+   },
+   "deaths_per_dive": 12.338232421875,
+   "success_rate": 0.477783203125,
+   "weapon_level": {
+    "1": 5.2874755859375,
+    "2": 8.31689453125,
+    "3": 10.693359375,
+    "4": 12.69873046875,
+    "5": 14.486328125,
+    "6": 16.0985107421875,
+    "7": 17.5765380859375,
+    "8": 18.965087890625,
+    "9": 20.2803955078125,
+    "10": 21.5155029296875
+   }
+  }
+ }
+}
