@@ -446,6 +446,14 @@ namespace SleepingCalamity.Presentation
             return id == null ? null : _session.Bags.For(id);
         }
 
+        // Host only: the client's existing bag, or null (no roster key, or no bag made yet). Never creates one (ServerBagOf does).
+        public PlayerBag ServerExistingBagOf(ulong clientId)
+        {
+            if (!Host) return null;
+            string id = PlayerIdOf(clientId);
+            return id != null && _session.Bags.TryGet(id, out PlayerBag bag) ? bag : null;
+        }
+
         public bool ServerAddItem(ulong clientId, int itemId)
         {
             PlayerBag bag = ServerBagOf(clientId);

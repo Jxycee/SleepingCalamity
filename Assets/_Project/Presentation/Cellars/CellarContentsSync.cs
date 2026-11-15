@@ -1156,7 +1156,7 @@ namespace SleepingCalamity.Presentation
             else HaulSync.ServerAddItem(clientId, extra);
         }
 
-        // Crowded: gold for every present player each time a room becomes cleared; Ambush: more when the ambush room does. Per player through the ordinary ServerAddGold path.
+        // (Host only: PayRoomClear runs from the host's clear checks.) Crowded: gold for every present player each time a room becomes cleared; Ambush: more when the ambush room does. Per player through the ordinary ServerAddGold path.
         public int GoldPaidForClears { get; private set; }   // host only (tests): the total gold handed out by the Crowded / Ambush rewards
         private void PayRoomClear(int room)
         {
@@ -1171,13 +1171,40 @@ namespace SleepingCalamity.Presentation
                 if (plan.Twist == FloorTwist.Ambush && room == plan.AmbushRoom) each += _mods.AmbushRoomGold;
             }
             PayEveryone(each);
+            int rolls = _mods.ExtraRollsOnClear(room, _mods.Has(FloorModifier.FatLarder) ? CurrentPlan(FloorSync).FatRoom : -1);   // Brimming: every room; Fat Larder: the fat room. Same once-per-room guard as the gold above.
+            if (rolls > 0) PayExtraRolls(room, rolls);
         }
 
-        // "Present" = every connected client with a hero in the dive, downed ones included (they are in the party); HaulSync.ServerAddGold skips anyone without a dive hero.
+        // Authority: host only (runs from the host's clear checks).
+        // Brimming / Fat Larder reward: `rolls` extra loot rolls for every connected hero that has a spawned player object and an existing bag. The roll index is
+        // ExtraRollChestBase + room, then GiveExtraRoll adds 1000 * k: 51000 + room + 1000 * (k - 1) for k = 1.. (Stirred uses chestIndex + 1000 * k with chestIndex < 64: no collision).
+        // Present = has a PlayerObject (downed heroes count; _players is not used). Absent clients are skipped and no bag is created for them.
+        private void PayExtraRolls(int room, int rolls)
+        {
+            if (HaulSync == null) return;
+            int bonus = HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(_layout.Floor) : 0;
+            bonus = _mods.ChestRankBonus(bonus);
+            foreach (ulong id in NetworkManager.ConnectedClientsIds)
+            {
+                if (!HasPlayerObject(id)) continue;
+                PlayerBag bag = HaulSync.ServerExistingBagOf(id);
+                if (bag == null) continue;
+                for (int k = 1; k <= rolls; k++) GiveExtraRoll(id, bag, ExtraRollChestBase + room, k, bonus);
+            }
+        }
+        private const int ExtraRollChestBase = 50000;
+
+        private bool HasPlayerObject(ulong id) => NetworkManager.ConnectedClients.TryGetValue(id, out NetworkClient c) && c.PlayerObject != null;
+
+        // Authority: host only. "Present" = every connected client with a spawned player object, downed ones included (they are in the party). Others are skipped, and no bag is created for them.
         private void PayEveryone(int each)
         {
             if (each <= 0 || HaulSync == null) return;
-            foreach (ulong id in NetworkManager.ConnectedClientsIds) if (HaulSync.ServerAddGold(id, each)) GoldPaidForClears += each;
+            foreach (ulong id in NetworkManager.ConnectedClientsIds)
+            {
+                if (!HasPlayerObject(id) || HaulSync.ServerExistingBagOf(id) == null) continue;
+                if (HaulSync.ServerAddGold(id, each)) GoldPaidForClears += each;
+            }
         }
 
         public bool ServerTryOpenDoor(ulong clientId)

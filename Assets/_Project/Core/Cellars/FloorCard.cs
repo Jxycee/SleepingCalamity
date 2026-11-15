@@ -97,6 +97,9 @@ namespace SleepingCalamity.Core
                 case FloorModifier.Sparse: return "Sparse";
                 case FloorModifier.WarmHands: return "Warm Hands";
                 case FloorModifier.Hushed: return "Hushed";
+                case FloorModifier.Brimming: return "Brimming";
+                case FloorModifier.FatLarder: return "Fat Larder";
+                case FloorModifier.StillAir: return "Still Air";
                 default: return "";
             }
         }
@@ -113,9 +116,14 @@ namespace SleepingCalamity.Core
                 case FloorModifier.Sparse: return "Fewer enemies in about half the rooms";
                 case FloorModifier.WarmHands: return "Healing points recharge in " + (int)FloorModifierTuning.WarmHandsRechargeSeconds + " s";
                 case FloorModifier.Hushed: return "The hunter stays away this floor";
+                case FloorModifier.Brimming: return "The cellar is damp: healing points recharge in " + (int)FloorModifierTuning.BrimmingRechargeSeconds + " s";
+                case FloorModifier.FatLarder: return "One room holds one extra enemy";
+                case FloorModifier.StillAir: return "The air is still: no drips or steam";
                 default: return "";
             }
         }
+
+        static string RollsText(int n) => n == 1 ? "one extra loot roll" : n + " extra loot rolls";
 
         // The reward line of a hazard; boons and None print none.
         public static string RewardLine(FloorModifier m)
@@ -127,6 +135,8 @@ namespace SleepingCalamity.Core
                 case FloorModifier.Stirred: return "Reward: every chest gives each hero " + (FloorModifierTuning.StirredExtraRolls == 1 ? "one extra roll" : FloorModifierTuning.StirredExtraRolls + " extra rolls");
                 case FloorModifier.Hurried: return "Reward: +" + FloorModifierTuning.HurriedGold + " gold each when you leave by the stair";
                 case FloorModifier.Dim: return "Reward: better chest finds";
+                case FloorModifier.Brimming: return "Reward: each room cleared gives each hero " + RollsText(FloorModifierTuning.BrimmingRollsPerRoom);
+                case FloorModifier.FatLarder: return "Reward: clearing the fat room gives each hero " + RollsText(FloorModifierTuning.FatLarderRolls);
                 default: return "";
             }
         }

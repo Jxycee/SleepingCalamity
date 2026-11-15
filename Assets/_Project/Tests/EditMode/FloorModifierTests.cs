@@ -98,10 +98,79 @@ namespace SleepingCalamity.Tests.EditMode
                 foreach (int f in new[] { 1, 2, 3, 4, 5, 6, 7 })
                 {
                     FloorModifierSet m = FloorModifierSet.For(s, f);
-                    FloorTwist want = m.A == FloorModifier.Crowded ? FloorTwist.Crowded : m.A == FloorModifier.Ambush ? FloorTwist.Ambush : m.B == FloorModifier.Sparse ? FloorTwist.Thin : FloorTwist.None;
+                    FloorTwist want = m.A == FloorModifier.Crowded ? FloorTwist.Crowded : m.A == FloorModifier.Ambush ? FloorTwist.Ambush : m.A == FloorModifier.FatLarder ? FloorTwist.FatLarder : m.B == FloorModifier.Sparse ? FloorTwist.Thin : FloorTwist.None;
                     Assert.AreEqual(want, CellarFloorRoster.TwistOf(s, f), "seed " + s + " floor " + f);
                     if (CellarFloorRoster.TwistOf(s, f) == FloorTwist.Thin) Assert.IsTrue(m.Has(FloorModifier.Sparse));
                 }
+        }
+
+        // ---- plan 5c: Brimming, Fat Larder, Still Air ----
+        [Test]
+        public void NewModifiers_AppearInASeedSweep_NeverOnCalmFloors_AreDeterministic()
+        {
+            var seen = new System.Collections.Generic.HashSet<FloorModifier>();
+            for (uint s = 1; s <= 2000; s++)
+                for (int f = 1; f <= 7; f++)
+                {
+                    FloorModifierSet m = FloorModifierSet.For(s, f);
+                    Assert.AreEqual(m.Hash(), FloorModifierSet.For(s, f).Hash(), "deterministic, seed " + s + " floor " + f);
+                    foreach (FloorModifier x in new[] { m.A, m.B })
+                    {
+                        if (x != FloorModifier.Brimming && x != FloorModifier.FatLarder && x != FloorModifier.StillAir) continue;
+                        seen.Add(x);
+                        Assert.IsFalse(DiveFloorTable.IsCalmFloor(f), x + " on calm floor " + f + " seed " + s);
+                    }
+                    Assert.IsFalse(m.Has(FloorModifier.Brimming) && m.Has(FloorModifier.WarmHands), "Brimming with Warm Hands, seed " + s + " floor " + f);
+                }
+            Assert.IsTrue(seen.Contains(FloorModifier.Brimming)); Assert.IsTrue(seen.Contains(FloorModifier.FatLarder)); Assert.IsTrue(seen.Contains(FloorModifier.StillAir));
+        }
+
+        [Test]
+        public void Brimming_LongerRecharge_WarmHandsUnchanged_RollsEveryRoom()
+        {
+            var brim = new FloorModifierSet(FloorModifier.Brimming, FloorModifier.None);
+            Assert.AreEqual(FloorModifierTuning.BrimmingRechargeSeconds, brim.HealRechargeSeconds(30f));
+            Assert.AreEqual(FloorModifierTuning.BrimmingRechargeSeconds, brim.HealRechargeSeconds(0.2f), "the longer value wins");
+            Assert.AreEqual(FloorModifierTuning.WarmHandsRechargeSeconds, new FloorModifierSet(FloorModifier.None, FloorModifier.WarmHands).HealRechargeSeconds(30f));
+            Assert.AreEqual(FloorModifierTuning.BrimmingRollsPerRoom, brim.ExtraRollsOnClear(3, -1));
+            Assert.AreEqual(0, default(FloorModifierSet).ExtraRollsOnClear(3, 3));
+            Assert.AreEqual(FloorModifierSet.FamilyOf(FloorModifier.WarmHands), FloorModifierSet.FamilyOf(FloorModifier.Brimming));
+        }
+
+        [Test]
+        public void StillAir_OnlyTurnsOffAmbientLife()
+        {
+            var still = new FloorModifierSet(FloorModifier.None, FloorModifier.StillAir);
+            Assert.IsFalse(still.AmbientLife); Assert.IsTrue(default(FloorModifierSet).AmbientLife);
+            Assert.AreEqual(ModifierFamily.Ambience, FloorModifierSet.FamilyOf(FloorModifier.StillAir));
+            Assert.AreEqual(0, still.ExtraRollsOnClear(0, 0)); Assert.AreEqual(0, still.GoldPerRoomClear); Assert.AreEqual(30f, still.HealRechargeSeconds(30f));
+        }
+
+        [Test]
+        public void FatLarder_ExactlyOneExtraTier1_InExactlyOneRoom_RewardOnlyThere()
+        {
+            int checkedFloors = 0;
+            for (uint s = 1; s <= 600 && checkedFloors < 40; s++)
+                foreach (int f in new[] { 2, 4, 7 })
+                {
+                    if (CellarFloorRoster.TwistOf(s, f) != FloorTwist.FatLarder) continue;
+                    CellarFloorLayout l = CellarFloorGenerator.Layout(s, f); CellarFloorDressing d = CellarFloorDressing.Resolve(l);
+                    CellarEncounterPlan fat = CellarEncounterPlan.BuildForDive(l, d, 0, false), plain = CellarEncounterPlan.Build(l, d, 0, false);
+                    Assert.AreEqual(FloorTwist.FatLarder, fat.Twist, "seed " + s + " floor " + f);
+                    Assert.GreaterOrEqual(fat.FatRoom, 0);
+                    Assert.AreEqual(plain.Spawns.Count + 1, fat.Spawns.Count, "exactly one more enemy, seed " + s + " floor " + f);
+                    for (int r = 0; r < l.Rooms.Count; r++)
+                    {
+                        Assert.AreEqual(plain.CountIn(r) + (r == fat.FatRoom ? 1 : 0), fat.CountIn(r), "room " + r);
+                        if (r == fat.FatRoom) Assert.AreEqual(1, fat.CountIn(r, EncounterKind.Extra));
+                    }
+                    foreach (EncounterSpawn sp in fat.Spawns) if (sp.Kind == EncounterKind.Extra) Assert.AreEqual(SpawnTier.Tier1, sp.Tier);
+                    var set = FloorModifierSet.For(s, f);
+                    for (int r = 0; r < l.Rooms.Count; r++) Assert.AreEqual(r == fat.FatRoom ? FloorModifierTuning.FatLarderRolls : 0, set.ExtraRollsOnClear(r, fat.FatRoom), "room " + r);
+                    Assert.AreEqual(-1, plain.FatRoom);
+                    checkedFloors++;
+                }
+            Assert.Greater(checkedFloors, 5, "the sweep must reach Fat Larder floors");
         }
 
         [Test]

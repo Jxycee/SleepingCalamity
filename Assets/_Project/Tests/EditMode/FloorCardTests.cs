@@ -73,12 +73,12 @@ namespace SleepingCalamity.Tests.EditMode
         [Test]
         public void EveryModifier_HasTitleEffect_AndHazardsHaveReward()
         {
-            foreach (FloorModifier m in new[] { FloorModifier.Crowded, FloorModifier.Ambush, FloorModifier.Stirred, FloorModifier.Hurried, FloorModifier.Dim })
+            foreach (FloorModifier m in new[] { FloorModifier.Crowded, FloorModifier.Ambush, FloorModifier.Stirred, FloorModifier.Hurried, FloorModifier.Dim, FloorModifier.Brimming, FloorModifier.FatLarder })
             {
                 Assert.IsNotEmpty(FloorCardText.Title(m), m.ToString()); Assert.IsNotEmpty(FloorCardText.EffectLine(m), m.ToString());
                 StringAssert.StartsWith("Reward:", FloorCardText.RewardLine(m), m.ToString());
             }
-            foreach (FloorModifier m in new[] { FloorModifier.Sparse, FloorModifier.WarmHands, FloorModifier.Hushed })
+            foreach (FloorModifier m in new[] { FloorModifier.Sparse, FloorModifier.WarmHands, FloorModifier.Hushed, FloorModifier.StillAir })
             {
                 Assert.IsNotEmpty(FloorCardText.Title(m), m.ToString()); Assert.IsNotEmpty(FloorCardText.EffectLine(m), m.ToString());
                 Assert.AreEqual("", FloorCardText.RewardLine(m), m.ToString());
