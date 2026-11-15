@@ -1,4 +1,4 @@
-State: IN PROGRESS, partial. Fab downloads blocked: needs user. Archive: not ready
+State: PAUSED, check PASS on 8850bea4 (build, EditMode, PlayMode 287 passed 0 failed 36 skipped), not merged; Fab downloads need user. Archive: not ready
 Branch: claude/b2-cellar-intake
 Task: build-plan row B2 (asset intake: cellars) + B0 leftovers
 Started: 2026-11-15
