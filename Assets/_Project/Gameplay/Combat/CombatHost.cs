@@ -53,6 +53,8 @@ namespace SleepingCalamity.Gameplay
         private bool _growthRegistered;
         private readonly Dictionary<ulong, HostPlayerState> _states = new Dictionary<ulong, HostPlayerState>();
         private readonly HashSet<long> _enemyHitDedupe = new HashSet<long>();   // (victim client << 32) | enemy attack serial; serials are unique per host (Enemy)
+        private readonly Queue<long> _enemyHitOrder = new Queue<long>();        // the same keys oldest first: the dedupe evicts one at a time past the cap, never all at once (N9)
+        private const int EnemyHitDedupeCap = 512;
         private readonly List<Enemy> _alive = new List<Enemy>();
         // Host: ONE set of attack tokens for the whole host (pools are keyed per hero, and targeting is world-wide, so a hero's caps and strike gap must hold
         // across every room's enemies) and one crowd (membership) per room that shares it (docs/research/enemy-ai.md 10.4).
@@ -107,6 +109,7 @@ namespace SleepingCalamity.Gameplay
         private void OnDisable()
         {
             if (Current == this) Current = null;
+            if (_nm != null) _nm.OnClientDisconnectCallback -= OnClientDisconnected;
             if (_growthRegistered && _world != null) _world.UnregisterGrowthSource(this);   // keeps these players' growth in the world for the next CombatHost and the save
             _growthRegistered = false;
         }
@@ -119,6 +122,8 @@ namespace SleepingCalamity.Gameplay
         {
             if (nm == null || !nm.IsServer || _begun) return false;
             _nm = nm;
+            _nm.OnClientDisconnectCallback -= OnClientDisconnected;
+            _nm.OnClientDisconnectCallback += OnClientDisconnected;
             _begun = true;
             // A CombatHost made without an Identity (CellarContentsSync.EnsureCombat) takes the session's roster, so its growth is keyed per recorded player.
             if (Identity == null && ServiceRoots.App != null && ServiceRoots.App.TryGet(out HostRoster roster)) Identity = roster;
@@ -173,6 +178,18 @@ namespace SleepingCalamity.Gameplay
         {
             foreach (KeyValuePair<string, string> kv in _ownerIds)
                 if (_growth.TryGetValue(kv.Key, out PlayerGrowth g)) GrowthSaves.Capture(g, kv.Value, into);
+        }
+
+        // A client that left takes its per-connection swing state with it (a rejoin gets a new client id; growth is keyed by player key, not this).
+        private void OnClientDisconnected(ulong clientId) { _states.Remove(clientId); }
+
+        // True the first time a key is seen; past the cap the oldest key goes, one at a time (a whole-set clear could let a recent hit apply twice).
+        private bool MarkEnemyHit(long key)
+        {
+            if (!_enemyHitDedupe.Add(key)) return false;
+            _enemyHitOrder.Enqueue(key);
+            while (_enemyHitOrder.Count > EnemyHitDedupeCap) _enemyHitDedupe.Remove(_enemyHitOrder.Dequeue());
+            return true;
         }
 
         private HostPlayerState StateOf(ulong clientId)
@@ -384,8 +401,7 @@ namespace SleepingCalamity.Gameplay
             HeroVitals vitals = victim.GetComponent<HeroVitals>();
             if (vitals == null || !vitals.IsUp) return;
             long key = DedupeKey(victim, serial);
-            if (_enemyHitDedupe.Count > 512) _enemyHitDedupe.Clear();
-            if (!_enemyHitDedupe.Add(key)) return;
+            if (!MarkEnemyHit(key)) return;
 
             int dmg = e.Model.AttackDamage(a, vitals.Model.Def);
             if (guarded) dmg = Mathf.Max(1, Mathf.CeilToInt(dmg * GuardMath.GuardedDamage - 1e-4f));
@@ -400,7 +416,7 @@ namespace SleepingCalamity.Gameplay
         {
             if (_nm == null || !_nm.IsServer || victim == null || e == null || !e.Alive) return;
             if (!e.ServerAcceptsSerial(serial)) return;
-            if (!_enemyHitDedupe.Add(DedupeKey(victim, serial))) return;
+            if (!MarkEnemyHit(DedupeKey(victim, serial))) return;
             e.ServerParried();
             victim.ServerBroadcastParry();
             StateOf(victim.OwnerClientId).LastParryAt = Time.timeAsDouble;
@@ -419,7 +435,7 @@ namespace SleepingCalamity.Gameplay
             HeroVitals vitals = victim.GetComponent<HeroVitals>();
             if (vitals == null || !vitals.IsUp) return;
             if (!e.ServerAcceptsSerial(serial)) return;
-            if (!_enemyHitDedupe.Add(DedupeKey(victim, serial))) return;
+            if (!MarkEnemyHit(DedupeKey(victim, serial))) return;
             e.ServerPerfectDodged();
             string weaponKey = victim.WeaponKey;
             AbsGain gain = CombatRewards.OnPerfectDodge(Growth(victim.OwnerClientId), weaponKey, e.NetworkObjectId.ToString());
