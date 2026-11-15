@@ -166,11 +166,13 @@ namespace SleepingCalamity.EditorTools
             foreach (BeautyCornerTable.Row row in BeautyCornerTable.Rows)
             {
                 if (row.Id.StartsWith("NEIGHBOUR_", StringComparison.Ordinal)) continue;
+                if (row.Id == "PlazaCobbles") continue;   // B3 (DH4): the town square has one ground (HollowmereSquare); the corner's fan setts left an island round the fountain
                 BeautyCornerTable.Row placed = StallFolder("Stall_1") != null ? WithoutStallDressing(row) : row;   // the produce stall art carries its own goods and lantern
                 if (placed != null) BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, placed);
             }
             ThinCornerWeeds(both, ruined, t);
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
+            HollowmereRuinDressing.LogSummary();
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
             HollowmereClutter.Build(ruined, rebuilt, t);   // Q14: market and lane clutter, shop signs and washing lines
@@ -205,7 +207,7 @@ namespace SleepingCalamity.EditorTools
                 LookTestBuilder.AddCapture(cams, c.Name, new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z), c.Target, c.Fov).farClipPlane = HollowmereRoad.FarClip;
             HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
             HollowmereAmbientBuilder.BakeAvoid(root);   // cards kept clear of every capture camera
-            HollowmereLook.Apply(BeautyCornerBuilder.Preset.Midday);   // the corner's light with the town-scale haze, sky and grade (Q12)
+            HollowmereLook.Apply(BeautyCornerBuilder.Preset.Morning);   // B3: the B0 Morning light; the corner's light with the town-scale haze, sky and grade (Q12)
             BuildHub(root, lighting, t);   // M6 S3: gameplay camera, spawn point, the cistern-stair DiveHub, the area look switcher (after Look.Apply: it finds the town's one Volume) and the TownView
             ApplyPreset(Preset.Ruined);
             BuilderUtil.SaveScene(scene, ScenePath);
@@ -270,10 +272,10 @@ namespace SleepingCalamity.EditorTools
             Terrain terrain = HollowmereTerrain.Build(set, t);
             HollowmereFoliage.TerrainGrass(terrain, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
             // The square keeps the approved corner's surround paving (B6 FarCobble with its macro breakup) as a slab over the terrain, so the corner reads as approved.
-            Material far = BeautyCornerArt.SurroundGround();
+            Material far = HollowmereB3Ground.SquareGroundMaterial() ?? BeautyCornerArt.SurroundGround();   // B3: the slab shows wherever the irregular bed stops, so it takes the square's own ground
             var sq = LookTestBuilder.Box(set, "SquarePaving", new Vector3((HollowmereLayout.SquareMinX + HollowmereLayout.SquareMaxX) * 0.5f, -0.17f, (HollowmereLayout.SquareMinZ + HollowmereLayout.SquareMaxZ) * 0.5f),
                 new Vector3(HollowmereLayout.SquareMaxX - HollowmereLayout.SquareMinX, 0.3f, HollowmereLayout.SquareMaxZ - HollowmereLayout.SquareMinZ),
-                far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? BeautyCornerArt.FarTileMetres : 3f);
+                far != null ? far : LookTestBuilder.Mat("cobble"), default, far != null ? 2f : 3f);
 
             HollowmereWater.Build(set, t, terrain);   // lake + stepped stream pools + weir falls (SC_Water; HollowmereWater.cs)
         }
@@ -496,6 +498,7 @@ namespace SleepingCalamity.EditorTools
             // An empty lot shows its ruin (the ruin kit, or the greybox stubs when the art is missing); a placed building or garden switches the ruin off
             // (design 5.3), so it stands on a plain footing slab instead.
             bool ruin = kind == HollowmereLayout.BuildingKind.Empty && PlaceRuin(go.transform, f);
+            if (ruin && preset == Preset.Ruined) HollowmereRuinDressing.Dress(go.transform, f);   // B3 stage 0: ivy, saplings, brambles, debris, a crow (DH1)
             if (kind != HollowmereLayout.BuildingKind.ApprovedFacade && !ruin)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
                 LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(side, 0.4f, side), stone, default, 2f);
             switch (kind)

@@ -9,9 +9,9 @@ using System.Collections.Generic;
 
 namespace SleepingCalamity.Core
 {
-    public enum FloorModifier : byte { None = 0, Crowded = 1, Ambush = 2, Stirred = 3, Hurried = 4, Dim = 5, Sparse = 20, WarmHands = 21, Hushed = 22 }
+    public enum FloorModifier : byte { None = 0, Crowded = 1, Ambush = 2, Stirred = 3, Hurried = 4, Dim = 5, Brimming = 6, FatLarder = 7, Sparse = 20, WarmHands = 21, Hushed = 22, StillAir = 23 }
 
-    public enum ModifierFamily : byte { None, Enemies, Stir, Clock, Light, Healing }
+    public enum ModifierFamily : byte { None, Enemies, Stir, Clock, Light, Healing, Ambience }
 
     // PLACEHOLDER tuning in ONE spot (decisions 1 and 2 of plan 5). Hazard weights are equal among Crowded, Ambush, Stirred, Hurried; boon weights equal among Sparse, WarmHands, Hushed.
     public static class FloorModifierTuning
@@ -24,6 +24,9 @@ namespace SleepingCalamity.Core
         public const int CrowdedGoldPerClear = 15, AmbushGold = 40, HurriedGold = 30;   // placeholder: gold per present player
         public const int DimRankBonus = 1;                         // placeholder: rank bonus on every chest roll on a Dim floor
         public const int StirredExtraRolls = 1;                    // placeholder: extra chest roll per player on a Stirred floor
+        public const float BrimmingRechargeSeconds = 45f;          // placeholder: healing point recharge on a Brimming (damp) floor
+        public const int BrimmingRollsPerRoom = 1;                 // placeholder: extra loot roll per present hero for each room cleared on a Brimming floor
+        public const int FatLarderRolls = 1;                       // placeholder: extra loot roll per present hero when the Fat Larder room is cleared
     }
 
     public readonly struct FloorModifierSet
@@ -31,8 +34,8 @@ namespace SleepingCalamity.Core
         public readonly FloorModifier A, B;
         public FloorModifierSet(FloorModifier a, FloorModifier b) { A = a; B = b; }
 
-        static readonly FloorModifier[] Hazards = { FloorModifier.Crowded, FloorModifier.Ambush, FloorModifier.Stirred, FloorModifier.Hurried };
-        static readonly FloorModifier[] Boons = { FloorModifier.Sparse, FloorModifier.WarmHands, FloorModifier.Hushed };
+        static readonly FloorModifier[] Hazards = { FloorModifier.Crowded, FloorModifier.Ambush, FloorModifier.Stirred, FloorModifier.Hurried, FloorModifier.Brimming, FloorModifier.FatLarder };   // append only: the draw is Range(0, Length), so growing the array shifts goldens (plan 5c, deliberate)
+        static readonly FloorModifier[] Boons = { FloorModifier.Sparse, FloorModifier.WarmHands, FloorModifier.Hushed, FloorModifier.StillAir };
 
         public bool Has(FloorModifier m) => m != FloorModifier.None && (A == m || B == m);
 
@@ -40,11 +43,12 @@ namespace SleepingCalamity.Core
         {
             switch (m)
             {
-                case FloorModifier.Crowded: case FloorModifier.Ambush: case FloorModifier.Sparse: return ModifierFamily.Enemies;
+                case FloorModifier.Crowded: case FloorModifier.Ambush: case FloorModifier.Sparse: case FloorModifier.FatLarder: return ModifierFamily.Enemies;
                 case FloorModifier.Stirred: case FloorModifier.Hushed: return ModifierFamily.Stir;
                 case FloorModifier.Hurried: return ModifierFamily.Clock;
                 case FloorModifier.Dim: return ModifierFamily.Light;
-                case FloorModifier.WarmHands: return ModifierFamily.Healing;
+                case FloorModifier.WarmHands: case FloorModifier.Brimming: return ModifierFamily.Healing;
+                case FloorModifier.StillAir: return ModifierFamily.Ambience;
                 default: return ModifierFamily.None;
             }
         }
@@ -100,7 +104,15 @@ namespace SleepingCalamity.Core
         public int LeaveGold => Has(FloorModifier.Hurried) ? FloorModifierTuning.HurriedGold : 0;                       // each present player, when the party leaves by the stair or exit
         public int ExtraChestRolls => Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredExtraRolls : 0;           // extra rolls per loot chest per player
         public int ChestRankBonus(int baseBonus) => baseBonus + (Has(FloorModifier.Dim) ? FloorModifierTuning.DimRankBonus : 0);
-        public float HealRechargeSeconds(float baseSeconds) => Has(FloorModifier.WarmHands) ? System.Math.Min(baseSeconds, FloorModifierTuning.WarmHandsRechargeSeconds) : baseSeconds;
+        // Warm Hands shortens the recharge, Brimming (damp) lengthens it; they share the Healing family, so never both.
+        public float HealRechargeSeconds(float baseSeconds) =>
+            Has(FloorModifier.WarmHands) ? System.Math.Min(baseSeconds, FloorModifierTuning.WarmHandsRechargeSeconds)
+            : Has(FloorModifier.Brimming) ? System.Math.Max(baseSeconds, FloorModifierTuning.BrimmingRechargeSeconds) : baseSeconds;
+        // Extra loot rolls each present hero gets when `room` becomes cleared (once per room: the host's _roomPaid guard). Brimming: every room; Fat Larder: only its fat room (fatRoom is CellarEncounterPlan.FatRoom, -1 when none).
+        public int ExtraRollsOnClear(int room, int fatRoom) =>
+            (Has(FloorModifier.Brimming) ? FloorModifierTuning.BrimmingRollsPerRoom : 0)
+            + (Has(FloorModifier.FatLarder) && fatRoom >= 0 && room == fatRoom ? FloorModifierTuning.FatLarderRolls : 0);
+        public bool AmbientLife => !Has(FloorModifier.StillAir);   // presentation: false means no drips or steam on this floor (the overlays themselves are later P5 work)
         // The factor the collapse is started with (DiveStir.BeginCollapse): it scales the final seconds, minimum included, so a Hurried floor's 1.25 vs 1.5 shows even on a short walk.
         public float CollapseFactor => Has(FloorModifier.Hurried) ? FloorModifierTuning.HurriedCollapseMultiplier / DiveStir.CollapseMultiplier : 1f;
 

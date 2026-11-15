@@ -288,7 +288,7 @@ namespace SleepingCalamity.Runtime
             return WorldPlayerVerdict.Ok;
         }
 
-        // Connection approval. JoinRules (and so the host's self-approval, IsServerSelf) ran before this. Nothing is recorded here.
+        // Connection approval. JoinRules (and so the host's self-approval, IsServerSelf) ran before this. No player is added to the world here (that is the start gate's job), except that a Solo world's owner key is rebound below.
         //  - The HOST is never refused (user ruling 2026-10-30). On a Solo world the owner follows the file: a host key that is not the
         //    recorded owner (a new profile, a copied save) is rebound as the owner and the change is logged. On a Multiplayer world the host is
         //    admitted whatever its key; if its key is not (and cannot be) recorded, the start gate says so with a clear message.
