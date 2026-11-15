@@ -1,4 +1,4 @@
-State: IN PROGRESS (Run 5, round 1)
+State: IN PROGRESS (Run 5, round 2)
 Branch: claude/run5-balance
 Usage at start (2026-11-15, 3:33 PM Central): 5-hour 28%, weekly all models 31%, weekly Fable 2%.
 
@@ -14,4 +14,10 @@ Basis: Dark Cloud tradition, the Cellars as a rough tutorial with tier-1 enemies
 - **Tier rule:** regular Cellars enemies stay tier 1; the Warden moves to tier 1 too (life raised to compensate), so the starting axe is not hitting a 3.3x defence wall.
 
 ## Rounds
-(filled in per round)
+### Round 1 (r0, r1a, r1b; sheet `Tools/balance_sim/out/r1b_sheet.png`)
+- **r0, the game as built with the real Rat-king share:** solo average never reaches the bank (0% at every dive, floor 2.1 on dive 1); two players 4% at dive 10; four players 32% to 72% with 4 downs per hero per dive. Rat-king takes 14 s solo on floor 1.
+- **r1a (bread ladder, Warden tier 1 with life 1200, co-op life 1.4 / 1.65 / 1.8):** co-op flips to easy (four players 86% on dive 1), solo still 0%.
+- **r1b (r1a + tier-1 attack 0.5, Broom life 130, Rat-king life 140):** solo average bank 0% / 5% / 23% at dives 1 / 3 / 10 (damage 0.30 / 0.53 / 0.75 / 0.60 on floors 1-4, still over budget); two players 44% / 90% / 99%; four players 99% from dive 1. Warden 38 / 27 / 16 s for 1 / 2 / 4 players (too short). Kill times per kind inside T1.
+- **Why:** my first model of co-op was wrong. The pressure on a hero follows enemies alive per hero, and co-op adds only one enemy per extra player, so flattening co-op life made parties far too safe; revives at room end add free health on top. Solo has no revive and takes every hit.
+- **Round 2 change:** co-op life back up to 1.6 / 2.3 / 3.0; solo assist through the existing knobs `soloAtk` 0.65 and `soloLife` 0.75; Warden life 2000.
+- **Targets revised, with reasons:** co-op damage ratio band 0.7-2.0 and time-per-enemy ratio 0.6-1.5 (a party has revives, a solo hero has the assist; the absolute T3 bands still hold for every party size). Four players: bank 40-85% / 60-98% / 75-100% (holding four players lower would need more than 1.5 downs each, and T6 wins). Expert: dive 1 70-100% (the skill gap is large by nature). Novice: dive 10 at least 3% (a fixed novice profile never improves; co-op and weapon growth are their way through). Co-op weapon level up to 2.2 times solo per dive: co-op rooms hold more enemies and last about twice as long, so growth per minute of combat is equal; no shared-credit penalty needed. T1 is judged on floors 1-3 (the starting axe).
