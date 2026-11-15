@@ -89,7 +89,7 @@ def tex_straw(S=1024):
     fib = np.ones((S, 1)) * cols[None, :]
     lum = fbm(S, S, 3, 90, 3, 11)                                            # long streaks
     t = np.clip(0.55 * fib + 0.45 * lum, 0, 1)
-    base = lerp3((0.30, 0.17, 0.06), (0.72, 0.50, 0.21), t)                  # warm honey straw
+    base = lerp3((0.22, 0.16, 0.09), (0.58, 0.48, 0.29), t)                  # dusty gold-brown straw (cooler, less peach)
     base *= (0.55 + 0.45 * np.clip(v * 2.2, 0, 1))[..., None]                # stained dark at the neck
     base = lerp3_apply(base, (0.30, 0.22, 0.13), np.clip((v - 0.8) * 3.0, 0, 1) * lum * 0.8)   # worn, sooty tips
     base[:, :12] = np.array((0.16, 0.11, 0.07))                              # core stripe (u 0..0.012)
@@ -136,7 +136,7 @@ def make_textures(d):
         save_png(os.path.join(d, name + '_ORM.png'), orm)   # R occlusion, G roughness, B metallic
 
 def make_material(name, d, ember=False):
-    m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
+    m = bpy.data.materials.new('M_' + name); m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
     out = nt.nodes.new('ShaderNodeOutputMaterial'); bsdf = nt.nodes.new('ShaderNodeBsdfPrincipled'); nt.links.new(bsdf.outputs[0], out.inputs[0])
     if ember:
         bsdf.inputs['Base Color'].default_value = (0.05, 0.02, 0.01, 1); bsdf.inputs['Roughness'].default_value = 0.35
@@ -188,49 +188,50 @@ def tri_count(ob): return sum(len(p.vertices) - 2 for p in ob.data.polygons)
 
 # ------------------------------------------------------------------ the model
 HEAD_TOP, NECK_Z = 0.66, 0.66
-def head_x(c, z): return c * (0.12 + (HEAD_TOP - z) / HEAD_TOP * 0.285)    # c in -1..1, clump centre line at height z
-def head_y(row, z): return row * (0.075 + (HEAD_TOP - z) / HEAD_TOP * 0.06)
+FLARE_X, FLARE_Y, CR = 0.17, 0.045, 0.05            # chunky tapered head: 0.58 m wide at the floor, bundles 0.1 m thick
+def head_x(c, z): return c * (0.12 + (HEAD_TOP - z) / HEAD_TOP * FLARE_X)    # c in -1..1, clump centre line at height z
+def head_y(row, z): return row * (0.075 + (HEAD_TOP - z) / HEAD_TOP * FLARE_Y)
 
 def build_bristles(mat):
     bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
-    layers = [(-1, 13), (0, 11), (1, 13)]       # front, middle, back rows of straw clumps
+    layers = [(-1, 7), (0, 6), (1, 7)]          # front, middle, back rows of thick bound straw bundles
     clumps = []
     for row, n in layers:
         for k in range(n):
-            c = (k / (n - 1)) * 2 - 1 + rng.uniform(-0.02, 0.02)
-            zb = rng.uniform(0.0, 0.05) + (0.0 if abs(c) < 0.9 else 0.015)
+            c = (k / (n - 1)) * 2 - 1 + rng.uniform(-0.015, 0.015)
+            zb = rng.uniform(0.0, 0.07) + (0.0 if abs(c) < 0.9 else 0.01)
             top = Vector((head_x(c, HEAD_TOP), head_y(row, HEAD_TOP) + rng.uniform(-0.01, 0.01), HEAD_TOP))
             bot = Vector((head_x(c, zb) + rng.uniform(-0.02, 0.02), head_y(row, zb) + rng.uniform(-0.015, 0.015), zb))
             pts = [top.lerp(bot, t) for t in (0, 0.35, 0.7)] + [bot]
-            for p in pts[1:3]: p.x += rng.uniform(-0.02, 0.02); p.y += rng.uniform(-0.012, 0.012)
-            clumps.append((pts, [0.040, 0.040, 0.034, 0.012], rng.uniform(0.04, 0.9)))
+            for p in pts[1:3]: p.x += rng.uniform(-0.008, 0.008); p.y += rng.uniform(-0.006, 0.006)
+            clumps.append((pts, [CR, CR, CR * 0.92, CR * 0.7], rng.uniform(0.04, 0.9)))
     for pts, rads, u0 in clumps:
         def e_fn(i, pts=pts):
             t = normalize(pts[min(i + 1, 3)] - pts[max(i - 1, 0)]); e1 = normalize(t.cross(Vector((0, 1, 0)))); return e1, t.cross(e1)
         zs = [p.z for p in pts]
-        sweep(bm, uvl, pts, rads, 6, e_fn, lambda i, j, u0=u0, zs=zs: (u0 + 0.08 * j / 6, 1 - (zs[min(i, 3)]) / HEAD_TOP * 0.95), cap_end=True)
-    for _ in range(80):                              # loose wisps
+        sweep(bm, uvl, pts, rads, 7, e_fn, lambda i, j, u0=u0, zs=zs: (u0 + 0.08 * j / 7, 1 - (zs[min(i, 3)]) / HEAD_TOP * 0.95), cap_end=True)
+    for _ in range(22):                            # loose wisps
         pts0, rads0, u0 = rng.choice(clumps); t0 = rng.uniform(0.5, 0.95)
         seg = min(2, int(t0 * 3)); a = pts0[seg].lerp(pts0[seg + 1], t0 * 3 - seg)
         out = Vector((a.x, a.y * 0.5, 0)); out = normalize(out) * 0.03 if out.length > 1e-4 else Vector((0, 0, 0))
         d = normalize((pts0[3] - pts0[0]) + Vector((rng.uniform(-0.45, 0.45) + a.x * 1.2, rng.uniform(-0.45, 0.45), 0)))
-        p0 = a + out; p1 = p0 + d * rng.uniform(0.08, 0.16); p1.z = max(p1.z, 0.003)
+        p0 = a + out; p1 = p0 + d * rng.uniform(0.04, 0.08); p1.z = max(p1.z, 0.003)
         def e_fn(i, d=d):
             e1 = normalize(d.cross(Vector((0, 1, 0)))); return e1, d.cross(e1)
         sweep(bm, uvl, [p0, p1], [0.009, 0.002], 3, e_fn, lambda i, j, u0=u0: (u0 + 0.05 * j / 3, 0.45 + 0.5 * i))
     # core: a dark squashed plug so there is no see-through between the clumps
     cpts = [Vector((0, 0, 0.64)), Vector((0, 0, 0.35)), Vector((0, 0, 0.10))]
-    sweep(bm, uvl, cpts, [(0.17, 0.09), (0.28, 0.12), (0.34, 0.14)], 12, lambda i: (Vector((1, 0, 0)), Vector((0, 1, 0))), lambda i, j: (0.005, 0.5), cap_end=True)
+    sweep(bm, uvl, cpts, [(0.15, 0.09), (0.22, 0.11), (0.26, 0.12)], 12, lambda i: (Vector((1, 0, 0)), Vector((0, 1, 0))), lambda i, j: (0.005, 0.5), cap_end=True)
     # twig feet: three splayed twigs each, out of the front of the head
     foot_verts = {'foot_L': [], 'foot_R': []}
     for side, nm in ((1, 'foot_L'), (-1, 'foot_R')):
         before = len(bm.verts)
         for k in range(3):
-            tip = Vector((side * (0.22 + 0.05 * (k - 1)), -0.29 - 0.03 * (k == 1), 0.005)); top = Vector((side * 0.19, -0.13, 0.24 + 0.02 * k))
+            tip = Vector((side * (0.20 + 0.07 * (k - 1)), -0.40 - 0.04 * (k == 1), 0.005)); top = Vector((side * 0.19, -0.13, 0.24 + 0.02 * k))
             mid = top.lerp(tip, 0.55) + Vector((0, -0.01, 0.015)); pts = [top, mid, tip]
             def e_fn(i, pts=pts):
                 t = normalize(pts[min(i + 1, 2)] - pts[max(i - 1, 0)]); e1 = normalize(t.cross(Vector((1, 0, 0)))); return e1, t.cross(e1)
-            sweep(bm, uvl, pts, [0.018, 0.016, 0.008], 5, e_fn, lambda i, j: (0.3 + 0.1 * j / 5, 0.3 + 0.2 * i), cap_end=True)
+            sweep(bm, uvl, pts, [0.034, 0.030, 0.016], 6, e_fn, lambda i, j: (0.3 + 0.1 * j / 5, 0.3 + 0.2 * i), cap_end=True)
         bm.verts.ensure_lookup_table(); foot_verts[nm] = list(range(before, len(bm.verts)))
     ob = mesh_obj('Bristles', bm, [mat]); ob['foot_L'] = foot_verts['foot_L']; ob['foot_R'] = foot_verts['foot_R']
     return ob
@@ -260,9 +261,13 @@ def build_band(m_twine, m_iron):
         def e_fn(i):
             a = 2 * math.pi * i / N; e1 = normalize(Vector((math.cos(a) * ry, math.sin(a) * rx, 0))); return e1, Vector((0, 0, 1))
         sweep(bm, uvl, pts, [rad] * N, seg, e_fn, lambda i, j: (i / N * 6, j / seg), closed=True, mat=0)
-    for z, tilt in ((0.575, 0.004), (0.545, -0.004), (0.515, 0.005), (0.485, -0.003)):          # twine binding below the cuff
+    for z, tilt in ((0.585, 0.004), (0.557, -0.004), (0.529, 0.005), (0.501, -0.003), (0.473, 0.004), (0.445, -0.004)):    # thick twine binding below the cuff
         s = (HEAD_TOP - z) / HEAD_TOP
-        wrap(z, 0.12 + s * 0.285 + 0.032, 0.075 + s * 0.06 + 0.036, 0.0145, tilt=tilt)
+        wrap(z, 0.12 + s * FLARE_X + CR + 0.012, 0.075 + s * FLARE_Y + CR + 0.012, 0.019, tilt=tilt, seg=6)
+    for a0 in range(0, 360, 60):      # stitches: short cross-ties between the wraps
+        a = math.radians(a0); s = (HEAD_TOP - 0.515) / HEAD_TOP; rx = 0.12 + s * FLARE_X + CR + 0.03; ry = 0.075 + s * FLARE_Y + CR + 0.03
+        p0 = Vector((rx * math.cos(a), ry * math.sin(a), 0.597)); p1 = Vector((rx * math.cos(a + 0.05), ry * math.sin(a + 0.05), 0.435))
+        sweep(bm, uvl, [p0, p1], [0.007, 0.007], 4, lambda i, p0=p0, p1=p1: (normalize((p1 - p0).cross(Vector((1, 0, 0)))), normalize((p1 - p0).cross(normalize((p1 - p0).cross(Vector((1, 0, 0))))))), lambda i, j: (j / 4, i), cap_end=True, mat=0)
     wrap(1.83, 0.047, 0.047, 0.012, N=20, seg=5)                  # twine at the top of the pole (hanging tie)
     wrap(1.17, 0.043, 0.043, 0.011, N=20, seg=5, tilt=0.004)      # an old repair
     return mesh_obj('Band', bm, [m_twine, m_iron])
@@ -285,10 +290,10 @@ BONES = [
     ('spine2', 'spine1', (0, 0, 0.72), (0, 0, 1.30)),
     ('spine3', 'spine2', (0, 0, 1.30), (0, 0, 1.90)),
     ('brist_mid', 'spine1', (0, 0, 0.58), (0, 0, 0.06)),
-    ('brist_L', 'spine1', (0.10, 0, 0.56), (0.40, 0, 0.04)),      # broom's left = +X in Blender (facing -Y)
-    ('brist_R', 'spine1', (-0.10, 0, 0.56), (-0.40, 0, 0.04)),
-    ('foot_L', 'spine1', (0.19, -0.13, 0.24), (0.22, -0.29, 0.0)),
-    ('foot_R', 'spine1', (-0.19, -0.13, 0.24), (-0.22, -0.29, 0.0)),
+    ('brist_L', 'spine1', (0.10, 0, 0.56), (0.30, 0, 0.04)),      # broom's left = +X in Blender (facing -Y)
+    ('brist_R', 'spine1', (-0.10, 0, 0.56), (-0.30, 0, 0.04)),
+    ('foot_L', 'spine1', (0.19, -0.13, 0.24), (0.22, -0.40, 0.0)),
+    ('foot_R', 'spine1', (-0.19, -0.13, 0.24), (-0.22, -0.40, 0.0)),
 ]
 BONE_NAMES = [b[0] for b in BONES]
 
@@ -330,7 +335,7 @@ def bristle_fn(foot_idx):
         if v.index in foot_idx['foot_R']: return {'foot_R': 1.0}
         x, z = v.co.x, v.co.z
         h = min(1.0, max(0.0, (0.60 - z) / 0.45))             # 0 at the neck, 1 low in the head
-        s = max(-1.0, min(1.0, x / 0.36)); side = h * abs(s) ** 0.8
+        s = max(-1.0, min(1.0, x / 0.28)); side = h * abs(s) ** 0.8
         mid = h * (1 - abs(s) ** 0.8) * 0.9
         w = {'spine1': max(0.0, 1 - side - mid)}
         w['brist_L' if s > 0 else 'brist_R'] = side; w['brist_mid'] = mid
@@ -411,7 +416,7 @@ def apply_pose(arm_ob, pose, lift_extra=0.0):
         d = pose.get(n, {}); b = pb[n]; sg = SIGN.get(n, {})
         rx = math.radians(d.get('p', 0.0)) * sg.get('pitch', 1.0)
         ry = math.radians(d.get('y', 0.0)) * sg.get('yaw', 1.0)
-        rz = math.radians(d.get('s', 0.0)) * sg.get('splay', 1.0) if n.startswith('brist_') and n != 'brist_mid' else math.radians(d.get('r', 0.0))
+        rz = math.radians(d.get('s', 0.0)) * 0.6 * sg.get('splay', 1.0) if n.startswith('brist_') and n != 'brist_mid' else math.radians(d.get('r', 0.0))
         b.rotation_euler = Euler((rx, ry, rz), 'XYZ')
         wd = Vector((d.get('dx', 0.0), d.get('dy', 0.0), d.get('dz', 0.0)))
         if n == 'spine1':     # the head is ~0.17 m deep: lean about the base lifts it so the front edge never sinks into the floor
@@ -482,7 +487,7 @@ def clip_brace():
 
 def clip_sweep():
     N = SWEEP_N
-    wind = lambda a, b, c: merge(spine(p1=-12, p2=-1.5, p3=-0.5, y1=35 * a, y2=15 * a, y3=10 * a, dz=-0.02 * b), head(sp=6 + 18 * c, sw=4, swL=-5 * a, swR=-5 * a), feet(pl=6, pr=6))
+    wind = lambda a, b, c: merge(spine(p1=-12, p2=-1.5, p3=-0.5, y1=48 * a, y2=14 * a, y3=8 * a, dz=-0.02 * b), head(sp=6 + 18 * c, sw=4, swL=-5 * a, swR=-5 * a), feet(pl=6, pr=6))
     K = [(0, {}, 'lin'),
          (SWEEP['pose_end'], wind(1.0, 1, 0), 'smooth'),                                 # tell pose: twisted back 60, leaned back 10
          (SWEEP['commit'], merge(wind(1.03, 1.6, 1), spine(p1=-9, p2=-2, p3=-1, y1=36, y2=16, y3=11)), 'snap'),   # glint: bristles flare, body coils
@@ -618,15 +623,24 @@ def setup_render(w, h):
     light('Rim', 'AREA', (1.5, 3.0, 2.8), 500, (1.0, 0.75, 0.5), 2.0)
     cd = bpy.data.cameras.new('Cam'); cd.lens = 70; co = bpy.data.objects.new('Cam', cd); co.location = (3.3, -4.4, 2.0); bpy.context.collection.objects.link(co)
     t = co.constraints.new('TRACK_TO'); t.target = tgt; t.track_axis = 'TRACK_NEGATIVE_Z'; t.up_axis = 'UP_Y'; sc.camera = co
+    cf = bpy.data.cameras.new('CamF'); cf.lens = 70; cfo = bpy.data.objects.new('CamF', cf); cfo.location = (0.0, -5.4, 1.7); bpy.context.collection.objects.link(cfo)
+    t = cfo.constraints.new('TRACK_TO'); t.target = tgt; t.track_axis = 'TRACK_NEGATIVE_Z'; t.up_axis = 'UP_Y'
+    CAMS['3Q'] = co; CAMS['F'] = cfo
 
-POSES = [('Rest (Idle 0)', 'Idle', 0), ('Sweep tell peak (f14)', 'Attack_broom_sweep', 14), ('Sweep glint (f22)', 'Attack_broom_sweep', 22), ('Sweep strike (f40)', 'Attack_broom_sweep', 40),
-         ('Poke tell (f10)', 'Attack_broom_poke', 10), ('Poke thrust (f30)', 'Attack_broom_poke', 30), ('Riposte glint (f15)', 'Attack_broom_riposte', 15), ('Riposte shove (f30)', 'Attack_broom_riposte', 30),
-         ('Brace (f8)', 'Brace', 8), ('Hit recoil (f5)', 'Hit', 5), ('Death topple (f34)', 'Death', 34), ('Death held (f72)', 'Death', 72)]
+CAMS = {}
+POSES = [('Rest, 3/4 (Idle 0)', 'Idle', 0, '3Q'), ('Rest, front', 'Idle', 0, 'F'),
+         ('Sweep tell peak, front (f14)', 'Attack_broom_sweep', 14, 'F'), ('Sweep glint, front (f22)', 'Attack_broom_sweep', 22, 'F'),
+         ('Sweep tell peak, 3/4 (f14)', 'Attack_broom_sweep', 14, '3Q'), ('Sweep strike, 3/4 (f40)', 'Attack_broom_sweep', 40, '3Q'),
+         ('Sweep strike, front (f40)', 'Attack_broom_sweep', 40, 'F'), ('Poke tell (f10)', 'Attack_broom_poke', 10, '3Q'),
+         ('Poke thrust (f30)', 'Attack_broom_poke', 30, '3Q'), ('Riposte glint, front (f15)', 'Attack_broom_riposte', 15, 'F'),
+         ('Riposte shove (f30)', 'Attack_broom_riposte', 30, '3Q'), ('Brace, front (f8)', 'Brace', 8, 'F'),
+         ('Hit recoil (f5)', 'Hit', 5, '3Q'), ('Move apex (f8)', 'Move', 8, '3Q'),
+         ('Death topple (f34)', 'Death', 34, '3Q'), ('Death held (f72)', 'Death', 72, '3Q')]
 
 def render_poses(arm_ob, acts, meshes):
     sc = bpy.context.scene; setup_render(420, 620); td = os.path.join(OUT, 'tiles'); os.makedirs(td, exist_ok=True); labels = []
-    for i, (label, clip, fr) in enumerate(POSES):
-        arm_ob.animation_data.action = acts[clip]
+    for i, (label, clip, fr, cam) in enumerate(POSES):
+        sc.camera = CAMS[cam]; arm_ob.animation_data.action = acts[clip]
         if hasattr(arm_ob.animation_data, 'action_slot') and acts[clip].slots: arm_ob.animation_data.action_slot = acts[clip].slots[0]
         sc.frame_set(fr); p = os.path.join(td, f'{i:02d}.png'); sc.render.filepath = p; bpy.ops.render.render(write_still=True); labels.append((p, label))
     json.dump(labels, open(os.path.join(td, 'labels.json'), 'w'))
