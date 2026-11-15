@@ -403,6 +403,16 @@ namespace SleepingCalamity.Presentation
             return NetworkManager != null && clientId == NetworkManager.LocalClientId ? clientId.ToString() : null;
         }
 
+        // Host only: the connected client whose bag key (PlayerIdOf) is `playerId` (CombatHost's HitRecord.PlayerId is the same string), false when that player is not connected.
+        public bool TryClientOfPlayerId(string playerId, out ulong clientId)
+        {
+            clientId = 0;
+            if (!Host || string.IsNullOrEmpty(playerId) || NetworkManager == null) return false;
+            foreach (ulong cid in NetworkManager.ConnectedClientsIds)
+                if (PlayerIdOf(cid) == playerId) { clientId = cid; return true; }
+            return false;
+        }
+
         private readonly System.Collections.Generic.Dictionary<ulong, int> _seenOrder = new System.Collections.Generic.Dictionary<ulong, int>();   // no roster: client id -> order first seen
 
         // 0-3, used for the chest roll stream and the 3-player extra slot. The roster slot (stable across a rejoin); with no roster, the order the host first saw each client id

@@ -207,6 +207,37 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(Loot(c), Is.EqualTo(1), "an open chest does not pay twice");
         }
 
+        // BUGS 18a: the carrier dies where no hero can stand (a wall / off the walkable cells): the host settles the key on the nearest walkable cell, so it can still be picked up.
+        [UnityTest]
+        public IEnumerator CarrierDiesOffTheWalkableCells_KeySettlesOnAWalkableCell_AndCanBePickedUp()
+        {
+            Ctx c = null; yield return Setup(x => c = x);
+            GateKeyCarrier car = c.Layout.Carrier;
+            bool[,] ok = CellarKeyDrop.Walkable(c.Layout, c.Floor.Built.Dressing);
+            int n = CellarFloorLayout.GridSize; CellPos bad = default; bool found = false; int best = int.MaxValue;
+            for (int x = 0; x < n; x++) for (int y = 0; y < n; y++)
+            {
+                if (ok[x, y]) continue;
+                int d = (x - car.X) * (x - car.X) + (y - car.Y) * (y - car.Y);
+                if (d < best) { best = d; bad = new CellPos(x, y); found = true; }
+            }
+            Assert.That(found, Is.True, "the grid has a cell nobody can stand on");
+
+            c.Players[c.HostId] = Cell(c, car.X, car.Y) + Vector3.forward * 0.1f;
+            yield return PlayModeHarness.WaitUntil(() => c.Contents.GateKeyCarrierEnemy != null, Timeout, "no carrier enemy");
+            c.Players[c.HostId] = Cell(c, car.X, car.Y) + new Vector3(8f, 0f, 0f);   // keeps the room entered, out of pickup range
+            Enemy carrier = c.Contents.GateKeyCarrierEnemy;
+            carrier.transform.position = Cell(c, bad.X, bad.Y);
+            Kill(carrier);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.GateKey == 1, Timeout, "the gate key never dropped");
+
+            Vector3 l = c.Floor.Built.Root.InverseTransformPoint(c.Peer.State.GateKeyPos);
+            int kx = Mathf.FloorToInt(l.x / CellarFloorBuilder.CellSize), ky = Mathf.FloorToInt(-l.z / CellarFloorBuilder.CellSize);
+            Assert.That(ok[kx, ky], Is.True, "the key lies on a walkable cell (" + kx + "," + ky + "), not at the dead carrier's cell (" + bad.X + "," + bad.Y + ")");
+            c.Players[c.HostId] = c.Peer.State.GateKeyPos + new Vector3(0.5f, 0f, 0f);
+            yield return PlayModeHarness.WaitUntil(() => c.Peer.State.ExitUnlocked, Timeout, "the settled key could not be picked up");
+        }
+
         [UnityTest]
         public IEnumerator CarrierDrop_PickupUnlocksExit_KeyChestOpensTheDoor_OnEveryPeer()
         {

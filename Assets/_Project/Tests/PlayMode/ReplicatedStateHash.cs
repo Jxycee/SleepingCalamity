@@ -4,7 +4,11 @@
 //   DiveDirector (NetActive, NetHeartBanked, NetCheckpointHeld, NetPickableMaxFloor, NetStairOpen, NetHome/HubStair/Origin), DiveHaulSync (Net = the Summary, NetHealSecondsLeft),
 //   CellarFloorSync (Net seed/floor + the peer's BUILT seed, floor and layout hash), CellarContentsSync (Net = ContentsState), TownSync (NetTown signature, NetBuilder, NetGhost, NetBakerMet),
 //   HeroVitals (Hp, state, downed/revive, loaves) and HeroCombat.NetWeapon per player object, the player-object roster, and the set of spawned NetworkObject ids.
-// NOT covered: enemy state (moves every frame), transforms, owner-written vars (stance, swing), non-replicated host-only state, visuals.
+// ALSO (separate calls, because peers legitimately differ; the public API above is unchanged and source-compatible): BagMismatch (each peer's own owner-only PlayerBagSync view must equal BagView.From the HOST's
+//   authoritative PlayerBag of that client), StirMismatch (the host's published Summary stir fields must equal a fresh DiveStir recomputed from the host's bags, the session's cleared floors across the dive's
+//   halves, the connected players and the floor's Stirred bonus), AssertBagsAndStirMatchHost (both, polled), DescribeLocal (own bag view + the host's authoritative bags and stir, for messages).
+// NOT covered: enemy state (moves every frame), transforms, owner-written vars (stance, swing), host-only state other than the bags and the stir (momentum, retry, objectives), visuals. A bag view only reaches a peer
+//   whose hero exists (PlayerBagSync lives on the player object), so a peer with no hero is skipped by BagMismatch.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,6 +17,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using NUnit.Framework;
+using SleepingCalamity.Core;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Presentation;
 using Unity.Netcode;
@@ -67,6 +72,132 @@ namespace SleepingCalamity.Tests.PlayMode
                 var sb = new StringBuilder();
                 for (int i = 0; i < 8; i++) sb.Append(h[i].ToString("x2"));
                 return sb.ToString();
+            }
+        }
+
+        // ---- per-peer views that legitimately differ (bags, the host's stir internals) ----
+        // Describe/Hash/AssertAllEqual compare what EVERY peer should see identically, so they cannot hold a player's bag: PlayerBagSync.Net is owner-only (a peer sees only its own bag, the host sees all).
+        // The bag and stir checks below compare each peer against the HOST instead: a peer's own BagView must equal BagView.From(the host's PlayerBag for that owner), and the published stir
+        // (DiveHaulSync.Summary) must equal a DiveStir recomputed from the host's bags, the dive's cleared floors and the connected players. Hash/Describe are unchanged (cross-peer equal).
+
+        // This peer's own bag view, and for the host also the authoritative bag of every connected player and the stir inputs, as canonical lines (for failure messages and hand inspection).
+        public static string DescribeLocal(NetworkManager nm)
+        {
+            var lines = new List<string>();
+            if (nm == null || !nm.IsListening) return "(not listening)";
+            PlayerBagSync own = PlayerBagSync.ForLocalPlayer(nm);
+            lines.Add("own bag view (client " + nm.LocalClientId + ") = " + (own == null ? "none" : BagText(own.View)));
+            DiveHaulSync haul = HostHaul(nm);
+            if (haul != null)
+            {
+                foreach (ulong cid in nm.ConnectedClientsIds)
+                {
+                    PlayerBag bag = haul.ServerBagOf(cid);
+                    lines.Add("host bag of client " + cid + " = " + (bag == null ? "none" : BagText(BagView.From(bag))));
+                }
+                DiveStir.State st = haul.Session.Stir.Capture();
+                lines.Add("host stir state = floorMask " + st.FloorMask + " valuables " + st.Valuables + " baseline " + st.ValuablesBaseline + " secondHalf " + st.SecondHalf + " extra " + st.Extra + " hunter " + st.Hunter
+                    + " collapseUsed " + st.CollapseUsed + " running " + st.Running + " secondsLeft " + st.SecondsLeft + " rewardCarry " + st.RewardCarry + "; carried valuables " + haul.Session.Bags.CarriedValuables() + " cleared mask " + haul.Session.Snapshot().ClearedMask + " published " + Canon(haul.Current));
+            }
+            return string.Join("\n", lines);
+        }
+
+        // BagView holds FixedLists (their IEnumerable throws), so Canon cannot walk it: list the lists by index and the scalars by name.
+        private static string BagText(BagView v)
+        {
+            var sb = new StringBuilder("{carried=[");
+            for (int i = 0; i < v.Carried.Length; i++) sb.Append(i > 0 ? "," : "").Append(v.Carried[i]);
+            sb.Append("] picks=[");
+            for (int i = 0; i < v.Picks.Length; i++) sb.Append(i > 0 ? "," : "").Append(v.Picks[i]);
+            sb.Append("] gold=").Append(v.Gold).Append(" diveGold=").Append(v.DiveGold).Append(" stash=").Append(v.StashTotal).Append(" banked=").Append(v.BankedThisDive).Append(" slots=").Append(v.SlotCapacity)
+              .Append(" bankOpen=").Append(v.BankOpen).Append(" satchelWaiting=").Append(v.SatchelWaiting).Append(" satchelCarried=").Append(v.SatchelCarried).Append(" boots=").Append(v.HasBoots)
+              .Append(" satchelFloor=").Append(v.SatchelFloor).Append(" satchelItems=").Append(v.SatchelItems).Append(" chestSeed=").Append(v.ChestSeed).Append(" chestFloor=").Append(v.ChestFloor).Append(" opened=").Append(v.OpenedChests).Append('}');
+            return sb.ToString();
+        }
+
+        private static DiveHaulSync HostHaul(NetworkManager nm)
+        {
+            if (nm == null || !nm.IsServer || !nm.IsListening) return null;
+            foreach (NetworkObject o in nm.SpawnManager.SpawnedObjects.Values)
+            {
+                DiveHaulSync h = o != null ? o.GetComponent<DiveHaulSync>() : null;
+                if (h != null && h.Session != null) return h;
+            }
+            return null;
+        }
+
+        // Null when every peer's own bag view equals the host's authoritative bag for that peer's client id; else the differing lines. The host peer must be in the list (without it: null, nothing to compare).
+        public static string BagMismatch(IEnumerable<NetworkManager> peers)
+        {
+            var list = new List<NetworkManager>(peers);
+            DiveHaulSync haul = null;
+            foreach (NetworkManager nm in list) { haul = HostHaul(nm); if (haul != null) break; }
+            if (haul == null) return null;
+            var sb = new StringBuilder();
+            foreach (NetworkManager nm in list)
+            {
+                PlayerBagSync s = PlayerBagSync.ForLocalPlayer(nm);
+                if (s == null) continue;
+                PlayerBag bag = haul.ServerBagOf(nm.LocalClientId);
+                BagView expected = BagView.From(bag);
+                if (!s.View.Equals(expected))
+                    sb.AppendLine("bag of client " + nm.LocalClientId + ": " + Label(nm) + " sees " + BagText(s.View) + " but the host's bag is " + BagText(expected));
+            }
+            return sb.Length == 0 ? null : sb.ToString();
+        }
+
+        // Null when the host's published stir (Summary) equals a fresh DiveStir recomputed from the host's bags (valuables), the session's cleared floors, the connected players and the floor's Stirred
+        // modifier (the same inputs DiveHaulSync.FeedStir uses); the baseline, half, reward carry, latches and collapse clock are taken from the live stir (nothing else holds them). Catches a bag
+        // and the stir drifting apart, or a floor the stir counted that the session did not (or the reverse).
+        public static string StirMismatch(NetworkManager hostNm)
+        {
+            DiveHaulSync haul = HostHaul(hostNm);
+            if (haul == null) return null;
+            DiveSession ses = haul.Session;
+            DiveStir.State st = ses.Stir.Capture();
+            var fresh = new DiveStir();
+            fresh.Restore(new DiveStir.State(0, 0, st.ValuablesBaseline, st.SecondHalf, st.Extra, st.Hunter, st.CollapseUsed, st.Running, st.SecondsLeft, st.RewardCarry));
+            int mask = ses.Snapshot().ClearedMask;
+            for (int f = UndercroftPlan.FirstFloor; f <= UndercroftPlan.BossFloor; f++)
+                if ((mask & (1 << (f - 1))) != 0 && !(ses.StartedAtBank && f == UndercroftPlan.BankFloor)) fresh.OnFloorCleared(f);   // a dive that starts at the bank has floor 5 cleared WITHOUT stirring (DiveSession.TryStart)
+            bool inDive = ses.Phase == DivePhase.Floor || ses.Phase == DivePhase.BankRoom;
+            fresh.PlayersPresent = Mathf.Max(1, hostNm.ConnectedClientsIds.Count);
+            fresh.UnbankedValuables = inDive ? ses.Bags.CarriedValuables() : st.Valuables;
+            float bonus = 0f;
+            if (ses.Phase == DivePhase.Floor)
+            {
+                int floor = haul.Current.CurrentFloor;
+                CellarFloorSync fs = null;
+                foreach (NetworkObject o in hostNm.SpawnManager.SpawnedObjects.Values) { fs = o != null ? o.GetComponent<CellarFloorSync>() : null; if (fs != null) break; }
+                uint seed = fs != null && fs.Built != null && fs.BuiltFloor == floor ? fs.BuiltSeed : haul.DiveSeed;
+                if (FloorModifierSet.For(seed, floor).Has(FloorModifier.Stirred)) bonus = FloorModifierTuning.StirredBonus;
+            }
+            fresh.ModifierBonus = bonus;
+
+            DiveHaulSync.Summary sm = haul.Current;
+            var sb = new StringBuilder();
+            if (sm.StirValue != Mathf.RoundToInt(fresh.Value)) sb.AppendLine("StirValue published " + sm.StirValue + " but recomputed " + Mathf.RoundToInt(fresh.Value) + " (floors cleared mask " + mask + ", valuables " + (inDive ? ses.Bags.CarriedValuables() : st.Valuables) + ", players " + fresh.PlayersPresent + ")");
+            if ((sm.ExtraEnemiesPerRoom > 0) != fresh.ExtraEnemyLatched) sb.AppendLine("ExtraEnemiesPerRoom published " + sm.ExtraEnemiesPerRoom + " but the recomputed latch is " + fresh.ExtraEnemyLatched);
+            if (sm.HunterLatched != fresh.HunterLatched) sb.AppendLine("HunterLatched published " + sm.HunterLatched + " but recomputed " + fresh.HunterLatched);
+            if (sm.RewardRankBonus != fresh.RewardRankBonus) sb.AppendLine("RewardRankBonus published " + sm.RewardRankBonus + " but recomputed " + fresh.RewardRankBonus);
+            if (sm.DeepClosesLatched != fresh.CollapseRunning) sb.AppendLine("DeepClosesLatched published " + sm.DeepClosesLatched + " but recomputed " + fresh.CollapseRunning);
+            if (inDive && st.Valuables != ses.Bags.CarriedValuables()) sb.AppendLine("the stir holds " + st.Valuables + " valuables but the bags carry " + ses.Bags.CarriedValuables());
+            return sb.Length == 0 ? null : sb.ToString();
+        }
+
+        // Polls (paced, bounded) until BagMismatch and StirMismatch are both clean (host publish lag), else fails with what differs. peers must include the host.
+        public static IEnumerator AssertBagsAndStirMatchHost(IEnumerable<NetworkManager> peers, string step, float timeoutSeconds = 20f)
+        {
+            var list = new List<NetworkManager>(peers);
+            NetworkManager host = list.Find(p => p.IsServer);
+            Assert.That(host, Is.Not.Null, step + ": the host must be one of the peers");
+            double deadline = Time.realtimeSinceStartupAsDouble + timeoutSeconds;
+            string failure;
+            while ((failure = BagMismatch(list) + StirMismatch(host)) != "")
+            {
+                if (Time.realtimeSinceStartupAsDouble > deadline) Assert.Fail("[" + step + "] bags / stir differ from the host after " + timeoutSeconds + " s:\n" + failure + "\n" + DescribeLocal(host));
+                PlayModeHarness.Pace();
+                yield return null;
             }
         }
 

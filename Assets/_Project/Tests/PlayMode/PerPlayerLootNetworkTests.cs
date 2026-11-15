@@ -41,6 +41,7 @@ using System.IO;
 using NUnit.Framework;
 using SleepingCalamity.App;
 using SleepingCalamity.Core;
+using SleepingCalamity.Core.Combat;
 using SleepingCalamity.Gameplay;
 using SleepingCalamity.Networking;
 using SleepingCalamity.Presentation;
@@ -1068,6 +1069,133 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(r.PeerA.SatchelShownForLocal, Is.True, "A's own prop is unchanged by the join");
             Assert.That(r.PeerB.SatchelShownForLocal, Is.False);
             Assert.That(peerC.TrySatchelPosition(out Vector3 cAt) && r.PeerA.TrySatchelPosition(out Vector3 aAt) && (cAt - aAt).sqrMagnitude < 0.01f, Is.True, "the same spot for everyone's own satchel");
+        }
+
+        // ---- per-player enemy drops ----
+
+        // Every player stands in the carrier's room; returns once its enemies exist. The first enemy on the host is the one the test kills.
+        private static IEnumerator EnterCarrierRoom(ChestRig r, System.Action<Enemy> enemy)
+        {
+            GateKeyCarrier car = r.Layout.Carrier;
+            Vector3 at = r.Floor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(car.X, car.Y)) + Vector3.forward * 0.1f;
+            r.Players[r.Host] = at; r.Players[r.A] = at; r.Players[r.B] = at;
+            yield return PlayModeHarness.WaitUntil(() => r.Contents.EnterEnemyCount(car.RoomIndex) > 0, Timeout, "the carrier room's enemies never spawned");
+            Enemy found = null;
+            foreach (NetworkObject o in r.HostNm.SpawnManager.SpawnedObjects.Values) { Enemy e = o.GetComponent<Enemy>(); if (e != null && found == null) found = e; }
+            Assert.That(found, Is.Not.Null, "an enemy exists on the host");
+            enemy(found);
+        }
+
+        // The kill is the same ServerApplyHit a swing reaches; like CombatHost, the hit records join the HitLog AFTER the enemy died (ServerDied has already fired).
+        private static void KillThenLogHits(Enemy e, params string[] playerIds)
+        {
+            var input = new EnemyHitInput { Attack = AttackCatalog.Axe.Attacks[0], Atk = 100000f, PartIndex = -1, CritChance = 0f };
+            for (int i = 0; i < 6 && e.Alive; i++) e.ServerApplyHit(input, e.transform.position + Vector3.back, Time.timeAsDouble);
+            Assert.That(e.Alive, Is.False, "the enemy died");
+            foreach (string id in playerIds) e.HitLog.Add(new SleepingCalamity.Core.Weapons.HitRecord(id, "Axe", Time.timeAsDouble));
+        }
+
+        // Catches: a drop going to the wrong bag or a shared one, a non-hitter getting loot, a drop visible to another peer, a drop not counting as a stir valuable, a kill whose killing blow is logged
+        // after ServerDied losing its drop. NOT covered: the real CellarLoot odds (EditMode CellarEnemyDropTests); here the roll is forced through the host seam.
+        [UnityTest]
+        public IEnumerator EnemyDrop_EachHitterGetsTheirOwn_NonHitterNone_OwnerOnlyView_CountsForStir()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            NetworkManager nmA = clients[0].NetworkManager, nmB = clients[1].NetworkManager;
+            int slotA = r.Haul.PlayerSlotOf(r.A), slotB = r.Haul.PlayerSlotOf(r.B);
+            Assert.That(slotA, Is.Not.EqualTo(slotB));
+            r.Contents.EnemyDropRollOverride = (slot, key) => 101 + slot;   // each slot its own item
+            Enemy e = null; yield return EnterCarrierRoom(r, x => e = x);
+            int valuablesBefore = r.Haul.Bags.CarriedValuables();
+
+            KillThenLogHits(e, r.Haul.PlayerIdOf(r.A), r.Haul.PlayerIdOf(r.B));   // the host's hero never touched it
+            yield return PlayModeHarness.WaitUntil(() => r.Contents.EnemyDropsGiven == 2, Timeout, "the two hitters' drops were never paid");
+            Assert.That(r.Haul.ServerBagOf(r.A).Carried, Is.EqualTo(new[] { 101 + slotA }), "A's own drop");
+            Assert.That(r.Haul.ServerBagOf(r.B).Carried, Is.EqualTo(new[] { 101 + slotB }), "B's own drop, not A's");
+            Assert.That(r.Haul.ServerBagOf(r.Host).Carried, Is.Empty, "the one who did not hit it gets nothing");
+            Assert.That(r.Haul.Bags.CarriedValuables(), Is.EqualTo(valuablesBefore + 2), "drops are valuables for the stir");
+            Assert.That(r.Haul.Session.Stir.UnbankedValuables, Is.EqualTo(valuablesBefore + 2), "the stir was fed at once");
+
+            // Owner-only: each peer's own view holds its own drop; another owner's view on that peer stays default.
+            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync v = PlayerBagSync.ForLocalPlayer(nmA); return v != null && v.View.Carried.Length == 1 && v.View.Carried[0] == 101 + slotA; }, Timeout, "A never saw its own drop");
+            yield return PlayModeHarness.WaitUntil(() => { PlayerBagSync v = PlayerBagSync.ForLocalPlayer(nmB); return v != null && v.View.Carried.Length == 1 && v.View.Carried[0] == 101 + slotB; }, Timeout, "B never saw its own drop");
+            yield return Settle(0.5f);
+            Assert.That(BagSyncOwnedBy(nmA, r.B).View.Carried.Length, Is.EqualTo(0), "A's peer never sees B's bag");
+            Assert.That(BagSyncOwnedBy(nmB, r.A).View.Carried.Length, Is.EqualTo(0), "B's peer never sees A's bag");
+            Assert.That(PlayerBagSync.ForLocalPlayer(r.HostNm).View.Carried.Length, Is.EqualTo(0), "the host's own view is its own empty bag");
+            Assert.That(r.PeerA.NoticeCount + r.PeerB.NoticeCount + r.Contents.NoticeCount, Is.EqualTo(0), "no notice for a clean drop");
+        }
+
+        // Catches: a full bag taking the drop anyway, losing it silently, telling the wrong players, or blocking another player's drop.
+        [UnityTest]
+        public IEnumerator EnemyDrop_FullBag_DropsNothing_NoticesOnlyThatPlayer_OthersUnaffected()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            r.Contents.EnemyDropRollOverride = (slot, key) => 104;
+            Enemy e = null; yield return EnterCarrierRoom(r, x => e = x);
+            for (int n = 0; n < PlayerBag.MaxCarried; n++) Assert.That(r.Haul.ServerAddItem(r.A, 101), Is.True);
+            Assert.That(r.Haul.ServerBagOf(r.A).IsFull, Is.True);
+
+            KillThenLogHits(e, r.Haul.PlayerIdOf(r.A), r.Haul.PlayerIdOf(r.B));
+            yield return PlayModeHarness.WaitUntil(() => r.Contents.EnemyDropsGiven == 1, Timeout, "B's drop was never paid");
+            Assert.That(r.Haul.ServerBagOf(r.B).Carried, Is.EqualTo(new[] { 104 }), "B (not full) still gets the drop");
+            Assert.That(r.Haul.ServerBagOf(r.A).Carried.Count, Is.EqualTo(PlayerBag.MaxCarried), "A's full bag took nothing");
+            yield return PlayModeHarness.WaitUntil(() => r.PeerA.NoticeCount == 1, Timeout, "A was never told");
+            Assert.That(r.PeerA.LastNotice, Is.EqualTo(CellarContentsSync.DropFullText));
+            yield return Settle(0.5f);
+            Assert.That(r.PeerB.NoticeCount + r.Contents.NoticeCount, Is.EqualTo(0), "nobody else is told");
+        }
+
+        // Catches: a despawn of a TRACKED enemy (party wipe: CombatHost.ServerClearEnemies) paying a drop as if it were a kill. The enemy is still tracked when it despawns, so Gone(e, false) really runs.
+        [UnityTest]
+        public IEnumerator EnemyDrop_DespawnIsNotAKill_NoDrop()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            r.Contents.EnemyDropRollOverride = (slot, key) => 104;
+            Enemy e = null; yield return EnterCarrierRoom(r, x => e = x);
+            e.HitLog.Add(new SleepingCalamity.Core.Weapons.HitRecord(r.Haul.PlayerIdOf(r.A), "Axe", Time.timeAsDouble));
+            Assert.That(e.Alive, Is.True, "premise: a living tracked enemy with a hitter on its log");
+            CombatHost.Current.ServerClearEnemies();   // what a party wipe does; the contents still track the enemy
+            yield return PlayModeHarness.WaitUntil(() => e == null, Timeout, "the enemy never despawned");
+            yield return Settle(0.5f);   // several host ticks: a queued drop would have been paid by now
+            Assert.That(r.Contents.EnemyDropsGiven, Is.EqualTo(0));
+            Assert.That(r.Haul.ServerBagOf(r.A).Carried, Is.Empty);
+        }
+
+        // Catches: the drop path working only for hand-built HitRecords. Both players land real hits through CombatHost.ServerPlayerHitsEnemy (the HeroCombat swing entry), the second one kills,
+        // and each hitter's own bag gets its drop; the host's hero, who never hit, gets none. The roll is forced through the host seam.
+        [UnityTest]
+        public IEnumerator EnemyDrop_RealHitPath_EachHitterGetsTheirDrop()
+        {
+            var clients = new List<PlayModeHarness.TestClient>();
+            ChestRig r = null; yield return StartChestRig(clients, x => r = x);
+            r.Contents.EnemyDropRollOverride = (slot, key) => 101 + slot;
+            Enemy e = null; yield return EnterCarrierRoom(r, x => e = x);
+            HeroCombat heroA = r.HostNm.ConnectedClients[r.A].PlayerObject.GetComponent<HeroCombat>();
+            HeroCombat heroB = r.HostNm.ConnectedClients[r.B].PlayerObject.GetComponent<HeroCombat>();
+            Assert.That(heroA, Is.Not.Null); Assert.That(heroB, Is.Not.Null);
+            CombatHost combat = CombatHost.Current;
+            Assert.That(combat, Is.Not.Null);
+            Vector3 from = e.transform.position - e.transform.forward * 0.6f;   // from behind, close: inside the melee sight and not into a guard
+            float yaw = e.transform.eulerAngles.y;
+
+            int swing = 0;
+            combat.ServerPlayerHitsEnemy(heroA, ++swing, AttackSet.Hit1, e, -1, from, yaw);
+            Assert.That(e.Alive, Is.True, "premise: A's first hit does not kill (so B can land the killing blow)");
+            for (int i = 0; i < 60 && e != null && e.Alive; i++)
+            {
+                combat.ServerPlayerHitsEnemy(heroB, ++swing, AttackSet.Finisher, e, -1, from, yaw);
+                if (e != null && e.Alive) { PlayModeHarness.Pace(); yield return null; }
+            }
+            Assert.That(e == null || !e.Alive, Is.True, "B killed the enemy through the real hit path");
+            yield return PlayModeHarness.WaitUntil(() => r.Contents.EnemyDropsGiven == 2, Timeout, "both hitters' drops were never paid");
+            int slotA = r.Haul.PlayerSlotOf(r.A), slotB = r.Haul.PlayerSlotOf(r.B);
+            Assert.That(r.Haul.ServerBagOf(r.A).Carried, Is.EqualTo(new[] { 101 + slotA }), "A's drop (hit first, did not kill)");
+            Assert.That(r.Haul.ServerBagOf(r.B).Carried, Is.EqualTo(new[] { 101 + slotB }), "B's drop (the killing blow)");
+            Assert.That(r.Haul.ServerBagOf(r.Host).Carried, Is.Empty, "the host's hero never hit it");
         }
 
         [UnityTest]
