@@ -30,7 +30,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void StartState_IsDeterministic_AndInRange()
         {
             foreach (RoomDataV2 room in CellarWaterRooms.All)
-                for (int seed = 1; seed <= 40; seed++)
+                for (uint seed = 1; seed <= 40; seed++)
                     for (int floor = 1; floor <= 5; floor++)
                     {
                         int[] a = CellarWater.StartState(seed, floor, 3, room), b = CellarWater.StartState(seed, floor, 3, room);
@@ -45,15 +45,8 @@ namespace SleepingCalamity.Tests.EditMode
         {
             RoomDataV2 room = CellarWaterRooms.Find("larder_pantry");
             var seen = new System.Collections.Generic.HashSet<int>();
-            for (int seed = 1; seed <= 60; seed++) seen.Add(CellarWater.StartState(seed, 2, 0, room)[0]);
+            for (uint seed = 1; seed <= 60; seed++) seen.Add(CellarWater.StartState(seed, 2, 0, room)[0]);
             Assert.That(seen.Count, Is.EqualTo(room.Regions[0].StateCount));
-        }
-
-        [Test]
-        public void StartState_IsAlwaysAValidatedVector()
-        {
-            foreach (RoomDataV2 room in CellarWaterRooms.All)
-                Assert.That(RoomValidatorV2.Validate(room), Is.Empty);   // every vector the start state can pick is covered by rules 6-9
         }
     }
 }

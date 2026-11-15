@@ -23,10 +23,10 @@ namespace SleepingCalamity.Core
         public static float BrimmingHold(int floor, bool brimming) => Enabled(floor) && brimming ? BrimmingHoldSeconds : 0f;
 
         // One state index per region of the room, on the stream "cellars.water" (no other stream moves). Every region draws once per call so a room change never shifts a later draw.
-        public static int[] StartState(int seed, int floor, int roomIndex, RoomDataV2 room)
+        public static int[] StartState(uint seed, int floor, int roomIndex, RoomDataV2 room)
         {
             if (room == null) throw new ArgumentNullException(nameof(room));
-            var rng = new Pcg32(Rng.Derive(unchecked((uint)seed), "cellars.water", (ulong)(floor * 1000 + roomIndex)));
+            var rng = new Pcg32(Rng.Derive(seed, "cellars.water", (ulong)(floor * 1000 + roomIndex)));
             var state = new int[room.Regions.Count];
             for (int i = 0; i < state.Length; i++) state[i] = rng.Range(0, Math.Max(1, room.Regions[i].StateCount));
             return state;
