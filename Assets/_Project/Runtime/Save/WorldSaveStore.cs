@@ -79,6 +79,13 @@ namespace SleepingCalamity.Runtime
             ("players", "kind", typeof(int)),
             ("players", "identity", typeof(int)),
             ("players", "recorded", typeof(List<WorldPlayerSave>)),
+            ("weapons", "weapons", typeof(List<WeaponSave>)),   // a scalar where a list belongs loses only that list, not the section (N2)
+            ("weapons", "heroes", typeof(List<HeroSave>)),
+            ("bags", "players", typeof(List<PlayerBagSave>)),
+            ("stock", "pieces", typeof(List<int>)),
+            ("stock", "residents", typeof(List<string>)),
+            ("town", "buildings", typeof(List<PlacedBuildingSave>)),
+            ("residents", "residents", typeof(List<ResidentSave>)),
             ("dive", "inDive", typeof(bool)),
             ("dive", "clearedMask", typeof(int)),
             ("dive", "checkpointReached", typeof(bool)),
@@ -122,7 +129,7 @@ namespace SleepingCalamity.Runtime
         {
             _defaultSeed = defaultSeed;
             _filePath = filePath;   // before the file object: its constructor already normalizes a default value through Clean
-            _file = new JsonSaveFile<WorldSave>(filePath, WorldSave.CurrentSchemaVersion, w => w.SchemaVersion, () => WorldSaveRules.New(_defaultSeed),
+            _file = new JsonSaveFile<WorldSave>(filePath, TargetVersion, w => w.SchemaVersion, () => WorldSaveRules.New(_defaultSeed),
                 Clean, "world file", "the world is read-only this session", Prepare);
         }
 
@@ -135,7 +142,17 @@ namespace SleepingCalamity.Runtime
         public static string PathOverrideForTests { get; set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => PathOverrideForTests = null;
+        private static void ResetStatics()
+        {
+            PathOverrideForTests = null;
+            TargetVersionOverrideForTests = 0;
+            MigrationStepsForTests = null;
+        }
+
+        // Test seam for the migration contract (N1): a pretend newer schema version and its steps (from-version -> step on the parsed JSON). Zero / null outside tests.
+        internal static int TargetVersionOverrideForTests;
+        internal static Dictionary<long, Action<JObject>> MigrationStepsForTests;
+        private static int TargetVersion => TargetVersionOverrideForTests > 0 ? TargetVersionOverrideForTests : WorldSave.CurrentSchemaVersion;
 
         public static WorldSaveStore CreateForThisInstance(ulong defaultSeed) => new WorldSaveStore(PathForThisInstance(), defaultSeed);
 
@@ -226,7 +243,7 @@ namespace SleepingCalamity.Runtime
             _parseRejected.Clear();
             _droppedEntries.Clear();
             string upgraded = Upgrade(json);
-            if (!JsonSaveFile<WorldSave>.TryReadSchemaVersion(upgraded, out long version) || version > WorldSave.CurrentSchemaVersion) return upgraded;
+            if (!JsonSaveFile<WorldSave>.TryReadSchemaVersion(upgraded, out long version) || version > TargetVersion) return upgraded;
             JObject root;
             try { root = JObject.Parse(upgraded); }
             catch (Exception) { return upgraded; }
@@ -362,9 +379,15 @@ namespace SleepingCalamity.Runtime
         // or above the current version, or one whose version can't be read, passes through untouched for JsonSaveFile to judge.
         internal static string Upgrade(string json)
         {
-            if (!JsonSaveFile<WorldSave>.TryReadSchemaVersion(json, out long version) || version >= WorldSave.CurrentSchemaVersion) return json;
+            if (!JsonSaveFile<WorldSave>.TryReadSchemaVersion(json, out long version) || version >= TargetVersion) return json;
             JObject root = JObject.Parse(json);
-            // for (long v = version; v < WorldSave.CurrentSchemaVersion; v++) Steps[v](root);   (no steps before v2)
+            // Each step turns version v into v+1 and must leave "schemaVersion" at v+1 (Clean keeps the version as read, so a step that forgot would
+            // save the file as the old version and migrate it again on every load); the loop sets it after each step as a guard (N1).
+            for (long v = version; v < TargetVersion; v++)
+            {
+                if (MigrationStepsForTests != null && MigrationStepsForTests.TryGetValue(v, out Action<JObject> step)) step(root);   // no real steps before v2
+                root["schemaVersion"] = v + 1;
+            }
             return root.ToString();
         }
     }

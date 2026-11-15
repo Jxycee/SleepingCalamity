@@ -18,10 +18,11 @@ namespace SleepingCalamity.Tests.EditMode
         }
 
         [Test]
-        public void DisconnectClassifier_EmptyWhileConnected_IsHostLeft()
+        public void DisconnectClassifier_EmptyWhileConnected_IsTransportFailure_NotHostLeft()
         {
-            Assert.AreEqual(EndReason.HostLeft, DisconnectClassifier.Classify(false, true, "", 100.0));
-            Assert.AreEqual(EndReason.HostLeft, DisconnectClassifier.Classify(false, true, null, 1.0));
+            // Catches (N10): a connected client whose own link dropped (no reason text from anyone) being told the host left.
+            Assert.AreEqual(EndReason.TransportFailure, DisconnectClassifier.Classify(false, true, "", 100.0));
+            Assert.AreEqual(EndReason.TransportFailure, DisconnectClassifier.Classify(false, true, null, 1.0));
         }
 
         [Test]

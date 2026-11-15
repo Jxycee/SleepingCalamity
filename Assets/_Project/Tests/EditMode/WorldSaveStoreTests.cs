@@ -857,6 +857,81 @@ namespace SleepingCalamity.Tests.EditMode
             return players.ToSave();
         }
 
+        // Catches (N2): a scalar where a list belongs ("heroes": 5) dropping the whole weapons section, with every player's weapon growth, instead of only that list.
+        [Test]
+        public void Weapons_ScalarWhereHeroesListBelongs_KeepsWeapons()
+        {
+            WorldSaveStore writer = Load();
+            WorldSave w = WorldSaveRules.New(7UL);
+            w.Weapons = OneWeapon("me", 1);
+            writer.Replace(w);
+            Assert.That(writer.FlushIfDirty(), Is.True);
+            Newtonsoft.Json.Linq.JObject root = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(_path));
+            root["weapons"]["heroes"] = 5;   // a scalar where the heroes list belongs
+            File.WriteAllText(_path, root.ToString());
+            WorldSaveStore store = Load();
+            Assert.That(store.Rejected, Is.EqualTo(new[] { WorldSaveRules.SectionWeapons }));
+            Assert.That(store.Current.Weapons, Is.Not.Null, "the weapons section stays");
+            Assert.That(store.Current.Weapons.Weapons, Has.Count.EqualTo(1));
+            Assert.That(store.Current.Weapons.Heroes, Is.Empty);
+        }
+
+        // Catches (N2): the same loss for each other section whose list holds a scalar; the file's other sections (players) always stay.
+        [Test]
+        public void ScalarWhereAListBelongs_CostsOnlyThatList_InEverySection()
+        {
+            (string section, string json, string name)[] cases =
+            {
+                ("weapons", "{ \"weapons\": 5, \"heroes\": [] }", WorldSaveRules.SectionWeapons),
+                ("bags", "{ \"players\": 5 }", WorldSaveRules.SectionBags),
+                ("stock", "{ \"pieces\": 5, \"residents\": [ \"baker\" ] }", TownSaveRules.SectionStock),
+                ("stock", "{ \"pieces\": [ 100 ], \"residents\": 5 }", TownSaveRules.SectionStock),
+                ("town", "{ \"buildings\": 5 }", TownSaveRules.SectionTown),
+                ("residents", "{ \"residents\": 5 }", TownSaveRules.SectionResidents),
+            };
+            foreach ((string section, string json, string name) in cases)
+            {
+                File.WriteAllText(_path, WithSection(section, json));
+                WorldSaveStore store = Load();
+                Assert.That(store.Rejected, Is.EqualTo(new[] { name }), section + " is named as partly dropped");
+                Assert.That(store.Current.Players, Is.Not.Null, section + ": the players section stays");
+                Assert.That(store.Current.Players.Recorded.Count, Is.EqualTo(2), section + ": the recorded players stay");
+                Assert.That(store.LoadedFrom, Is.EqualTo(MetaLoadSource.Main), section + ": the file itself loads");
+            }
+            File.WriteAllText(_path, WithSection("stock", "{ \"pieces\": 5, \"residents\": [ \"baker\" ] }"));
+            Assert.That(Load().Current.Stock.Residents, Is.EqualTo(new[] { "baker" }), "the sibling list stays");
+            File.WriteAllText(_path, WithSection("stock", "{ \"pieces\": [ 100 ], \"residents\": 5 }"));
+            Assert.That(Load().Current.Stock.Pieces, Is.EqualTo(new[] { 100 }), "the sibling list stays");
+        }
+
+        // Catches (N1): a migration step that leaves the file at its old version (migrated again on every load) or a step that re-runs after it was saved.
+        [Test]
+        public void MigrationStep_IsSavedWithTheNewVersion_AndNotRunAgain()
+        {
+            int runs = 0;
+            WorldSaveStore.TargetVersionOverrideForTests = 2;
+            WorldSaveStore.MigrationStepsForTests = new Dictionary<long, Action<Newtonsoft.Json.Linq.JObject>> { { 1, root => runs++ } };
+            try
+            {
+                File.WriteAllText(_path, GoldenV1);
+                WorldSaveStore store = Load();
+                Assert.That(runs, Is.EqualTo(1), "the v1 file runs the 1 to 2 step");
+                Assert.That(store.Current.SchemaVersion, Is.EqualTo(2));
+                Assert.That(store.Save(), Is.True);
+                StringAssert.Contains("\"schemaVersion\": 2", File.ReadAllText(_path));
+
+                store = Load();
+                Assert.That(runs, Is.EqualTo(1), "the saved file is at version 2: no second run");
+                Assert.That(store.Current.SchemaVersion, Is.EqualTo(2));
+                Assert.That(store.IsReadOnly, Is.False);
+            }
+            finally
+            {
+                WorldSaveStore.TargetVersionOverrideForTests = 0;
+                WorldSaveStore.MigrationStepsForTests = null;
+            }
+        }
+
         static HostWorld HostFor(WorldKind kind, params string[] ids)
         {
             var host = new HostWorld();
