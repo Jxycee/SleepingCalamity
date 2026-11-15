@@ -28,12 +28,24 @@ Edit `config.json` (every key has a `_comment`):
 |---|---|---|
 | `growth.*`, `weaponGrowth` knobs | `WeaponGrowth` / `WeaponGrowthTuning` (`Core/Tuning/TuningSections.cs`), JSON section `weaponGrowth` | yes (StreamingAssets/Tuning/*.json) |
 | `tierScale.*`, `enemies` knobs (soloAtk, soloLife, tier1Atk, tier2Life, tier2Def, cellarsMaxTier) | JSON section `enemies` | yes |
-| `enemies.<Kind>.hp/atk/def/speed` | `EnemyCatalog` (`Core/Combat/EnemyModel.cs`) static table | NO until QUEUE 53 |
-| `enemyAttacks.<id>.*` | `AttackCatalog` static readonly `AttackData` | NO until QUEUE 53 |
+| `enemies.<Kind>.hp/atk/def/speed` | `EnemyCatalog` (`Core/Combat/EnemyModel.cs`) static table | NO, a separate later item (not part of the attack work) |
+| `enemyAttacks.<id>.*` | JSON section `enemyAttacks` (`EnemyAttackTuning`, `Core/Tuning/TuningSections.cs`); values are written in place into the `AttackCatalog` enemy attacks | yes (StreamingAssets/Tuning/*.json) |
+| `enemyPacing.*` | JSON section `enemyPacing` (`EnemyPacingTuning`; `AttackPacing` bases and tier profiles) | yes (StreamingAssets/Tuning/*.json) |
 | `heroAttacks.*`, `weapons.*` | `AttackCatalog`, `WeaponDefinitions` | code edit |
 | `coop.*` | `CoopScaling` (`Core/Combat/EnemyRules.cs`) | code edit |
 | `healing.*` | `HealTuning` (`Core/Cellars/HealTuning.cs`), `HeroVitals.LoafHeal` | code edit |
 After editing C#, regenerate the JSON (above) and re-run: the sheet should reproduce the overridden run.
+
+### Applying an `enemyAttacks` / `enemyPacing` value set in the game
+Put the values in any `StreamingAssets/Tuning/*.json` (or the mod folder), with the simulator's own key names; they apply as written:
+```json
+{
+  "enemyAttacks": { "rat_lunge": { "mult": 0.9, "hitOnFrame": 30, "hitOffFrame": 38, "range": 1.4, "totalFrames": 64, "guardBreak": false } },
+  "enemyPacing": { "cooldown": { "default": 1.2, "RatKing": 0.8, "Warden": 1.4 }, "recover": { "default": 0.35, "RatKing": 0.9 }, "tier2CooldownScale": 0.7 }
+}
+```
+Name mapping (exporter name -> tuning key): `mult` = `multiplier`; `hitOnFrame` / `hitOffFrame` = the start / end of `hitOn: [start, end]`; `totalFrames`, `range`, `guardBreak`, `guardable` are the same. `enemyAttacks` also takes every `attacks` key (`halfAngleDeg`, `knockback`, `turn`, `lunge`, `superArmor`, ...). `enemyPacing` uses the exported names (`cooldown.default/RatKing/Warden`, `recover.default/RatKing`, `tier1Scale`, `tier1RecoverScale`, `tier2CooldownScale`, `tier2RecoverScale`, `tier1/2MaxAttackersPerHero`, `tier1/2MinStrikeGapSeconds`, `signatureEvery`, `signatureExtraRecoverSeconds`).
+An attack that would break an enemy rule after the override (wind-up floor, glint 12-24 frames before the hitbox, lunge ends before the strike, reach against the body, 30-frame punish window) is rejected whole with a warning and keeps its defaults; the tell's own frames are not tunable, so move `hitOn` only within the glint lead. `test_nova` is not tunable. `BalanceExportTests` asserts the exporter's keys apply verbatim.
 
 ## Model summary and known limits
 Time-stepped (dt 1/30 s), vectorised over dive lanes. Hero attack cycle normal1, normal2, finisher; damage by the exact `DamageFormula`. Skill profile = hit rate, uptime, dodge rate, guard rate, revive willingness. Enemy cooldown/recover from `enemyPacing`, strike cap by party size, rage after 7 hits. Weapon growth carried across floors and across N dives (ABS per kill, level cost, build-up). Heal points on eligible floors, loaves only with `bakeryBuilt`. Warden fight on floor 5 (tier 2).
