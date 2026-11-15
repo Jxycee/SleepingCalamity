@@ -30,28 +30,33 @@ namespace SleepingCalamity.Core.Combat
     {
         // Tier 1 (waves 1-4): one attacker per hero, a duel at a time while the other enemy circles (OoT: the others wait; combat depth 2026-10-30, was
         // 2). Tier 2: two attackers, and they come back faster and closer together.
-        public static readonly PacingProfile Tier1 = new PacingProfile(1, 0.5f, 1.0f, 1.0f, 0.3f);
-        public static readonly PacingProfile Tier2 = new PacingProfile(2, 0.35f, 0.7f, 0.8f, 0.2f);
+        // Settable statics (not readonly): the "enemyPacing" tuning section (Core/Tuning) changes them at startup and Reset puts the defaults back.
+        public static PacingProfile Tier1 = new PacingProfile(1, 0.5f, 1.0f, 1.0f, 0.3f);
+        public static PacingProfile Tier2 = new PacingProfile(2, 0.35f, 0.7f, 0.8f, 0.2f);
+
+        // Per-kind bases before the tier scale (the numbers the M3 greybox used). Kinds not named (slime, broom) use the default.
+        public static float CooldownDefault = 1.2f, CooldownRatKing = 0.8f, CooldownWarden = 1.4f;
+        public static float RecoverDefault = 0.35f, RecoverRatKing = 0.9f;
 
         public static PacingProfile ForTier(int tier) => tier >= 2 ? Tier2 : Tier1;
 
         // Seconds before the enemy may start another attack (it chases meanwhile). Values from the M3 greybox, now scaled per tier.
         public static float CooldownSeconds(EnemyKind kind, int tier)
         {
-            float b = kind == EnemyKind.DoughWarden ? 1.4f : kind == EnemyKind.RatKing ? 0.8f : 1.2f;
+            float b = kind == EnemyKind.DoughWarden ? CooldownWarden : kind == EnemyKind.RatKing ? CooldownRatKing : CooldownDefault;
             return b * ForTier(tier).CooldownScale;
         }
 
         // Seconds the enemy stands (or, the rat-king, scatters) after its attack ends: part of the punish window with the attack's own recovery frames.
         public static float RecoverSeconds(EnemyKind kind, int tier)
         {
-            float b = kind == EnemyKind.RatKing ? 0.9f : 0.35f;
+            float b = kind == EnemyKind.RatKing ? RecoverRatKing : RecoverDefault;
             return b * ForTier(tier).RecoverScale;
         }
 
         // The Warden's signature after this many other attacks (and first after this many, so the fight opens with the basics).
-        public const int SignatureEvery = 3;
-        public const float SignatureExtraRecoverSeconds = 1.0f;   // stuck in the floor after the quake
+        public static int SignatureEvery = 3;
+        public static float SignatureExtraRecoverSeconds = 1.0f;   // stuck in the floor after the quake
     }
 
     // Which attack an enemy starts at a distance (host AI, pure so EditMode tests cover the cadence). The elite's signature comes on a cadence (after

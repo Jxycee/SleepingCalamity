@@ -116,9 +116,8 @@ namespace SleepingCalamity.Core.Tuning
     }
 
     // "attacks": { "axe_1": { "range": 2.5, "hitOn": [10, 15] } }. Ids are the hero ground attacks (hit 1, hit 2, finisher, charge, special) of the four
-    // heirloom sets; the air versions follow from the ground ones. Enemy attack ids (AttackCatalog.AllEnemyAttacks) are not tunable yet:
-    // EnemyDefinition, the AI, EnemyAttackRules and tests hold those AttackData by reference, so tuning them needs a replace-in-place or registry-lookup
-    // change across Core/Combat and Gameplay, more than a small edit (note in Reference/sessions/combat-tuning-followups/STATUS.md).
+    // heirloom sets; the air versions follow from the ground ones. Enemy attack ids are the separate "enemyAttacks" section (EnemyAttackTuning below):
+    // they are changed in place, because EnemyDefinition, the AI and EnemyAttackRules hold those AttackData by reference.
     public static class AttackTuning
     {
         static readonly string[] Ints = { "totalFrames", "cancelFrom", "hitstopFrames" };
@@ -142,12 +141,15 @@ namespace SleepingCalamity.Core.Tuning
                 var fields = kv.Value as JObject;
                 if (fields == null) { TuningStore.Warn(source + ": attack '" + kv.Key + "' must be an object"); continue; }
                 AttackData cur = set.Attacks[slot];
-                AttackData next = Tuned(cur, kv.Key, fields, source);
+                AttackData next = Tuned(cur, kv.Key, fields, source, "attacks");
                 if (next != cur) set.Replace(slot, next);
             }
         }
 
-        static AttackData Tuned(AttackData a, string id, JObject f, string source)
+        // The override logic shared with EnemyAttackTuning: the attack's values with `f` laid over them, or `a` itself when nothing took effect. `section` is
+        // only the name in messages. The simulator's export names (mult, hitOnFrame, hitOffFrame; Tools/balance_sim/data/game_numbers.json) are accepted as
+        // aliases of multiplier and the two ends of hitOn, so a value set from the simulator applies as written.
+        internal static AttackData Tuned(AttackData a, string id, JObject f, string source, string section)
         {
             int total = a.TotalFrames, cancel = a.CancelFrom, stop = a.HitstopFrames;
             FrameWindow hitOn = a.HitOn, combo = a.ComboOpen, fin = a.FinisherAllowed, ifr = a.IFrames, armor = a.SuperArmor, turn = a.Turn, lunge = a.Lunge;
@@ -158,15 +160,22 @@ namespace SleepingCalamity.Core.Tuning
 
             foreach (var kv in f)
             {
-                string path = "attacks." + id + "." + kv.Key;
-                string key = Array.Find(Ints, x => string.Equals(x, kv.Key, StringComparison.OrdinalIgnoreCase));
+                string path = section + "." + id + "." + kv.Key;
+                if (string.Equals(kv.Key, "hitOnFrame", StringComparison.OrdinalIgnoreCase) || string.Equals(kv.Key, "hitOffFrame", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!Number(kv.Value, path, source, 0, 100000, true, out double edge)) continue;
+                    hitOn = string.Equals(kv.Key, "hitOnFrame", StringComparison.OrdinalIgnoreCase) ? new FrameWindow((int)edge, hitOn.End) : new FrameWindow(hitOn.Start, (int)edge);
+                    changed = true; continue;
+                }
+                string name = string.Equals(kv.Key, "mult", StringComparison.OrdinalIgnoreCase) ? "multiplier" : kv.Key;
+                string key = Array.Find(Ints, x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
                 if (key != null)
                 {
                     if (!Number(kv.Value, path, source, 0, 100000, true, out double v)) continue;
                     if (key == "totalFrames") total = (int)v; else if (key == "cancelFrom") cancel = (int)v; else stop = (int)v;
                     changed = true; continue;
                 }
-                key = Array.Find(Windows, x => string.Equals(x, kv.Key, StringComparison.OrdinalIgnoreCase));
+                key = Array.Find(Windows, x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
                 if (key != null)
                 {
                     var arr = kv.Value as JArray;
@@ -184,7 +193,7 @@ namespace SleepingCalamity.Core.Tuning
                     }
                     changed = true; continue;
                 }
-                key = Array.Find(Floats, x => string.Equals(x, kv.Key, StringComparison.OrdinalIgnoreCase));
+                key = Array.Find(Floats, x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
                 if (key != null)
                 {
                     if (!Number(kv.Value, path, source, 0, 100000, false, out double v)) continue;
@@ -197,7 +206,7 @@ namespace SleepingCalamity.Core.Tuning
                     }
                     changed = true; continue;
                 }
-                key = Array.Find(Bools, x => string.Equals(x, kv.Key, StringComparison.OrdinalIgnoreCase));
+                key = Array.Find(Bools, x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
                 if (key != null)
                 {
                     if (kv.Value == null || kv.Value.Type != JTokenType.Boolean) { TuningStore.Warn(source + ": '" + path + "' must be true or false, keeping the default"); continue; }
@@ -208,6 +217,8 @@ namespace SleepingCalamity.Core.Tuning
                 TuningStore.Warn(source + ": unknown key '" + path + "'");
             }
             if (!changed) return a;
+            // An attack with no early cancel (every enemy attack: CancelFrom == TotalFrames) keeps having none when its length changes, unless cancelFrom is set.
+            if (section == "enemyAttacks" && a.CancelFrom >= a.TotalFrames && cancel == a.CancelFrom && total != a.TotalFrames) cancel = Math.Max(hitOn.End, total);
             string problem = Check(total, cancel, hitOn, combo, fin, ifr, armor, turn, lunge);
             if (problem != null) { TuningStore.Warn(source + ": attack '" + id + "' ignored, " + problem); return a; }
             return new AttackData(a.Id, a.Name, a.Kind, total, hitOn, mult, a.Shape, range, half, combo, fin, cancel, ifr, armor, turn, turnSpeed, lunge, lungeM, band,
@@ -233,5 +244,83 @@ namespace SleepingCalamity.Core.Tuning
             v = d;
             return true;
         }
+    }
+
+    // "enemyAttacks": { "rat_lunge": { "multiplier": 1.2, "range": 1.5, "hitOn": [28, 36], "totalFrames": 62 } }. The same keys, ranges and checks as
+    // "attacks" (AttackTuning.Tuned), plus the simulator's export names as aliases: mult = multiplier, hitOnFrame / hitOffFrame = the two ends of hitOn.
+    // Ids are AttackCatalog.AllEnemyAttacks (test_nova is not tunable). The values are written INTO the existing AttackData (AttackData.Retune), so the
+    // enemy definitions, the id registry and the network attack index keep pointing at the same objects. After an override the enemy rules
+    // (EnemyAttackRules.Problem: wind-up floors, glint 12-24 frames before the hitbox, lunge before strike, reach against the body, punish window) must
+    // still hold; an attack that breaks one is rolled back to what it was and warned about. The tell's own frames (EnemyTell: pose end, glint) are not
+    // tunable, so a hitOn change must keep the glint lead in range.
+    public static class EnemyAttackTuning
+    {
+        public static void Reset() => AttackCatalog.ResetEnemyAttacks();
+
+        public static void Apply(JObject body, string source)
+        {
+            foreach (var kv in body)
+            {
+                if (!AttackCatalog.EnemyAttackById.TryGetValue(kv.Key, out AttackData cur) || cur == AttackCatalog.TestNova)
+                { TuningStore.Warn(source + ": unknown enemy attack '" + kv.Key + "'"); continue; }
+                var fields = kv.Value as JObject;
+                if (fields == null) { TuningStore.Warn(source + ": enemy attack '" + kv.Key + "' must be an object"); continue; }
+                AttackData next = AttackTuning.Tuned(cur, kv.Key, fields, source, "enemyAttacks");
+                if (next == cur) continue;
+                AttackData before = cur.Copy();
+                cur.Retune(next);
+                string problem = EnemyAttackRules.Problem(cur);
+                if (problem != null)
+                {
+                    cur.Retune(before);
+                    TuningStore.Warn(source + ": enemy attack '" + kv.Key + "' ignored, " + problem);
+                }
+            }
+        }
+    }
+
+    // "enemyPacing": { "cooldown": { "default": 1.2, "RatKing": 0.8, "Warden": 1.4 }, "recover": { "default": 0.35, "RatKing": 0.9 }, "tier1Scale": 1,
+    // "tier1RecoverScale": 1, "tier2CooldownScale": 0.7, "tier2RecoverScale": 0.8, "tier1MaxAttackersPerHero": 1, ... }. The names are the ones the balance
+    // export writes under "enemyPacing" (BalanceExportTests), so a simulator value set applies as written. cooldown is the seconds before the next attack,
+    // recover the standing time after one (AttackPacing); both are scaled per tier. The punish window of every enemy attack must still be at least
+    // EnemyAttackRules.MinPunishFrames at both tiers, else the whole section from that file is rolled back.
+    public static class EnemyPacingTuning
+    {
+        static Knob TierKnob(string name, int tier, Func<PacingProfile, double> get, Func<PacingProfile, double, PacingProfile> set, double min, double max, bool integer = false) =>
+            new Knob(name, () => get(tier == 1 ? AttackPacing.Tier1 : AttackPacing.Tier2),
+                v => { if (tier == 1) AttackPacing.Tier1 = set(AttackPacing.Tier1, v); else AttackPacing.Tier2 = set(AttackPacing.Tier2, v); }, min, max, integer);
+
+        public static string Validate()
+        {
+            foreach (EnemyDefinition def in EnemyCatalog.All)
+                foreach (AttackData a in def.Attacks)
+                    for (int tier = 1; tier <= 2; tier++)
+                    {
+                        int punish = EnemyAttackRules.PunishFrames(a, def.Kind, tier);
+                        if (punish < EnemyAttackRules.MinPunishFrames)
+                            return def.Name + " / " + a.Id + " would leave " + punish + " punish frames at tier " + tier + " (at least " + EnemyAttackRules.MinPunishFrames + ")";
+                    }
+            return null;
+        }
+
+        // Dotted names: the section's nested JSON ("cooldown": { "default": .. }) is flattened to "cooldown.default".
+        public static Knob[] Knobs() => new[]
+        {
+            new Knob("cooldown.default", () => AttackPacing.CooldownDefault, v => AttackPacing.CooldownDefault = (float)v, 0.05, 60),
+            new Knob("cooldown.RatKing", () => AttackPacing.CooldownRatKing, v => AttackPacing.CooldownRatKing = (float)v, 0.05, 60),
+            new Knob("cooldown.Warden", () => AttackPacing.CooldownWarden, v => AttackPacing.CooldownWarden = (float)v, 0.05, 60),
+            new Knob("recover.default", () => AttackPacing.RecoverDefault, v => AttackPacing.RecoverDefault = (float)v, 0, 60),
+            new Knob("recover.RatKing", () => AttackPacing.RecoverRatKing, v => AttackPacing.RecoverRatKing = (float)v, 0, 60),
+            TierKnob("tier1Scale", 1, p => p.CooldownScale, (p, v) => new PacingProfile(p.MaxAttackersPerHero, p.MinStrikeGapSeconds, (float)v, p.RecoverScale, p.RetrySeconds), 0.05, 10),
+            TierKnob("tier1RecoverScale", 1, p => p.RecoverScale, (p, v) => new PacingProfile(p.MaxAttackersPerHero, p.MinStrikeGapSeconds, p.CooldownScale, (float)v, p.RetrySeconds), 0, 10),
+            TierKnob("tier2CooldownScale", 2, p => p.CooldownScale, (p, v) => new PacingProfile(p.MaxAttackersPerHero, p.MinStrikeGapSeconds, (float)v, p.RecoverScale, p.RetrySeconds), 0.05, 10),
+            TierKnob("tier2RecoverScale", 2, p => p.RecoverScale, (p, v) => new PacingProfile(p.MaxAttackersPerHero, p.MinStrikeGapSeconds, p.CooldownScale, (float)v, p.RetrySeconds), 0, 10),
+            TierKnob("tier1MaxAttackersPerHero", 1, p => p.MaxAttackersPerHero, (p, v) => new PacingProfile((int)v, p.MinStrikeGapSeconds, p.CooldownScale, p.RecoverScale, p.RetrySeconds), 1, 8, true),
+            TierKnob("tier2MaxAttackersPerHero", 2, p => p.MaxAttackersPerHero, (p, v) => new PacingProfile((int)v, p.MinStrikeGapSeconds, p.CooldownScale, p.RecoverScale, p.RetrySeconds), 1, 8, true),
+            TierKnob("tier1MinStrikeGapSeconds", 1, p => p.MinStrikeGapSeconds, (p, v) => new PacingProfile(p.MaxAttackersPerHero, (float)v, p.CooldownScale, p.RecoverScale, p.RetrySeconds), 0, 10),
+            TierKnob("tier2MinStrikeGapSeconds", 2, p => p.MinStrikeGapSeconds, (p, v) => new PacingProfile(p.MaxAttackersPerHero, (float)v, p.CooldownScale, p.RecoverScale, p.RetrySeconds), 0, 10),
+            new Knob("signatureEvery", () => AttackPacing.SignatureEvery, v => AttackPacing.SignatureEvery = (int)v, 1, 50, true),
+            new Knob("signatureExtraRecoverSeconds", () => AttackPacing.SignatureExtraRecoverSeconds, v => AttackPacing.SignatureExtraRecoverSeconds = (float)v, 0, 30),
+        };
     }
 }
