@@ -165,3 +165,15 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
   - A session can't authorise edits to `CLAUDE.md` or `.claude/rules/`. If a run needs one, the user asks for it directly, or the run leaves the exact line for them.
   - A playbook for cloud coordinators can't lean on PC-only things (memories, the board, `~/.claude/coordinator/`). Say so in the brief.
 
+### 2026-11-14, Run 4: Tobin's hair (branch `claude/hair-sweep-tool-abafe3`, unmerged hero branch; prep tool `claude/hair-colour-prep-5b22b0`)
+- **Cost.** Sweep part: weekly Fable 64% to 68%, all models 75% to 81%. Colour round (user's go for the leftover, 7:10 PM): Fable 68% to 74%, all models 84% to 88%. About 10 Fable points in all, plus two Sonnet prep sessions (sweep tool about 2 h; colour tooling about 1 h). Fable context ended near 175k tokens after the sweeps.
+- **Result.** About 21/40 strict in Unity (target 25 not reached): colour fixed on every view (mid chestnut, hue 22-25), front shape good, nape covered. Still short: the back and side read as one straight curtain, not short layers; less crown volume. Final sheet `C:/AI/test_out/heroes/tobin/hair_sweep/look/f1/sheet.png`; tip b9697055 gate PASS. Sweep tool `Art/Blender/tools/experimental/tobin_hair/sweep/` (README, one JSON config per round, `unity_look.json` + `unity_look_iter.py`).
+- **What worked.** One sheet per round; region mixes of two seeds (single seeds all gave bowl backs); trimming jutting cards found from the score data (53 mm to 14 mm); judging in Unity every iteration (15 to 21 in one evening); numeric colour targets the implementer loops on alone; blocking commands under 10 minutes (no interim wake-ups); restoring a known-good FBX from git after a regression.
+- **What to brief differently.**
+  - The Blender preview did not predict Unity: three sweep rounds went to shape while the colour fault only showed in Unity. Capture the top 2 in Unity from round 1, or port the shader and capture light into the preview.
+  - The rank never separated candidates (silhouette IoU saturates when every variant is fitted to the same masks); let the judge name ids on the sheet instead of top-N by rank.
+  - Background waits sent 5 interim notices, each a Fable turn; brief blocking batches under 10 minutes from the start.
+  - Back layering needs different outer-layer cards (a source whose outer back cards end high, or authored layer cards); length caps hide under the outer curtain.
+  - Put the previous iteration beside the new one in each sheet, ask for a bare-nape number on every capture, and keep one iteration in reserve for a revert.
+  - Coordinator side: a session's 5-hour window shared with other sessions; the clear failed while the prep session still had a background task (ask it to stop its tasks first).
+
