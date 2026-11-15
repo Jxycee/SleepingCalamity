@@ -132,6 +132,7 @@ One queue for day and night (user, 2026-11-06; replaces `overnight-queue.md`). B
 - [ ] **S** Food/water craftables + cooking (PARKING_LOT :60) - proposal for the user
 
 ## Waiting on the user (don't start; ask when they're around; plain bullets so the board doesn't count them)
+- Two-wave cellar rooms: wave 1 never spawns in live play (400-seed probe, floors 2-7, 1-4 players, `Resolve_WaveOneSurvives_ReportsWhichPartiesReachIt` asserts 0; dive-followups `ca39298b`). Decide: make wave 1 reachable (design the trigger) or drop the second wave. Asked 2026-11-14.
 - [done 2026-11-13, merge of claude/audit-fixes] Audit A2 (blocker, **M** [U][net] once decided): a lobby visit takes one of a multiplayer world's four places for good, in the first lobby too. Choose: record players at Start and when a hero spawns, or keep it and add a host "remove player" action, or both (audit section 3). An ignored failing test marks it (`AUDIT A2`).
 - [done 2026-11-13, merge of claude/audit-fixes] Audit A3 (**M** [U][net] once decided): a multiplayer player whose UGS id changes (new PC, Windows reinstall) loses their character, and a host on a full world can no longer start it. Choose: a host-side "this player is now that player" rebind, a platform sign-in, or accept it.
 - [done 2026-11-13, merge of claude/audit-fixes] Audit A5 (**S** [U][net] once decided): a read-only world (a newer build's file, a load fault) still starts and plays unsaved. Choose: refuse the start, or ask for a confirmation.
