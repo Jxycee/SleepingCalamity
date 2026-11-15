@@ -36,3 +36,10 @@ Copy `config_round1.json`, change `tools` (`head` npz from `hd_dump.py`, `hull` 
 
 ## Approximations
 Reference masks are the existing hull masks (no SAM masks). Preview lighting is a fixed sun + fill, Standard view transform; colour distance is meaningful for ranking, not absolute. Previews are EEVEE, 700 px.
+
+## Unity colour round (one blocking command)
+`unity_look.json` holds the Unity hair look (shadow_lift, hue_shift, saturation, value, root/mid/tip tint, alpha_cut; defaults = the installed look). `TobinHairMaterialBuilder.BuildCards` reads it (override the path with env `SC_HAIR_LOOK`) and sets the `SC_HairCards` knobs.
+
+    C:/AI/trellis2/venv/Scripts/python.exe Art/Blender/tools/experimental/tobin_hair/sweep/unity_look_iter.py --tag r1   # edit unity_look.json between runs
+
+It shoots rest-pose front/side/back (`SC_CAPTURE_ONLY=rest_f,rest_s,rest_b`, hair-hidden twins via `SC_HAIRMASK=1`) through this worktree's `Tools/unity.ps1` (about 3-6 min, blocks), then writes `<out>/<tag>/sheet.png` (reference row over capture row, ~1100 px) and prints hue/sat/val of the hair region, capture vs reference, per view (`colour.txt`/`colour.json`). Default out: `C:/AI/test_out/heroes/tobin/hair_sweep/look`. Mesh shape is not touched; the reference region includes some forehead skin.
