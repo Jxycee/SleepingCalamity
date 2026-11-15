@@ -249,10 +249,10 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
 ### 7.2 Undercroft Cellars floors 1-4 (greybox in M5) [P16] [P17] [P18] [P19] [P20] [P21] [P22]
 *As built in M5. The dungeon design amendment (section 2, 2026-11-03) changes the floor plan, checkpoint, banking, haul and stir rules below; the build order is in the spec, section 12.*
 
-- **Two layers, after DC2.** A hand-authored floor graph decides what each floor is. Phase 1's graph is linear: floor 1, 2, 3, 4.
-  - A Core generator builds floors 1-3 from a seed: 32-bit seed plus floor id, sent by the host, so every client builds the same floor. The grid is 14 x 14 cells of 4 m.
+- **Two layers, after DC2.** A hand-authored floor graph decides what each floor is. Phase 1's graph is linear: floors 1 to 7 (the Cellars; 8-10 are Phase 2).
+  - A Core generator builds the generated floors (2, 4, 6, 7) from a seed: 32-bit seed plus floor id, sent by the host, so every client builds the same floor. The grid is 14 x 14 cells of 4 m.
   - Each floor has 4-6 rooms from the pool. Each room's rectangle plus a one-cell margin must be clear. Each new room links to a random earlier one, then 1-3 extra corridors make loops, and 1-3 side dead ends are added. Corridor tiles are matched by a 4-bit neighbour mask.
-  - Floor 4 is a fixed layout: the taken bakery's oven maze, with the baker asleep at its heart and the Dough Warden on guard.
+  - **[Updated 2026-11-15 to `docs/design/dungeon1-cellars.md`, DC1: floors 1, 3 and 5 are authored; 2, 4, 6 and 7 are generated.]** Floor 3 is the taken bakery's oven maze, with the baker asleep at its heart and the Dough-warden guarding the Great Oven; floor 5 is the Brazen Ox's arena and the bank room. (The spec put the Warden's replacement on floor 5 and STORY and the old concept differ; the dungeon design wins.)
 - **Rooms are authored as data grids** (cells, doors, dressing sockets, spawn points) and built into greybox prefabs by an Editor builder. The art pass later swaps kit pieces into the same sockets.
 - **The Phase 1 pool:**
   - 12 combat rooms (2x5 to 5x4 cells), 1 entry, 1 stair-exit and 1 checkpoint room;
@@ -275,7 +275,7 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
   - [Current rule, `Core/Cellars/DiveStir.cs`: +10 per floor cleared this half and +5 per unbanked valuable carried (pieces no longer count), x sqrt(players), plus the Stirred modifier bonus.] M5 text: +10 per floor cleared and +5 per unbanked piece carried, x(1 + 0.25 x (players - 1));
   - at 40, one enemy more per room;
   - at 70, a roaming tier-2 rat-king hunts the party;
-  - at 100, the deep closes: 90 s to reach the next bank point, or the dive fails.
+  - at 100, the deep closes: the party gets 1.5 x the walk time to the stair (at least 60 s; 1.25 x on a Hurried floor) to reach the next bank point, or the dive fails (`DiveStir.CollapseSeconds`).
 
 ## 8. FishGame port (copy, never move) [P43]
 | When | What | Note |
@@ -328,7 +328,7 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 3. **P3 Call:** all four heirlooms are playable; the axe and the dagger and shield are tuned deep, the staff and the bow and sword stay at base depth.
 4. **P4 Call:** only the four heirlooms exist in Phase 1; no other weapons.
 5. **P5 Call:** three story enemies in two tiers each, plus one floor-4 elite. *Amended 2026-11-03 (dungeon design amendment, section 2).*
-6. **P6 Placeholder:** the elite's name, "Dough Warden"; the attachment names Ember, Pest-bane and Heartwood.
+6. **P6 Placeholder:** the elite's name, "Dough Warden" (guards the floor-3 Great Oven, `dungeon1-cellars.md` DC1); the attachment names Ember, Pest-bane and Heartwood.
 7. **P7 Call:** no weapon wear in Phase 1; revisit after the M7 playtest, with the DC1 curve on output as the starting point.
 8. **P8 Call:** the ratio damage formula `ATK x move x 100/(100+DEF)` with named multipliers, minimum 1.
 9. **P9 Placeholder:** the combat, camera, lock-on, hitstop, dodge, guard, revenge and rage starting numbers (6.5) and enemy stats (6.6).
@@ -343,7 +343,7 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 18. **P18 Call:** rooms are authored as data grids and built by an Editor builder; art swaps into the same sockets.
 19. **P19 Call:** the floor loop: a gate-key carrier, a 50% locked room whose key any player can carry, rank-filtered chests, and floors stay cleared. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 20. **P20 Call:** a checkpoint after floor 2 and a bank point at floor 4; a failed dive loses only the unbanked haul, and lost pieces return to their floors. *Amended 2026-11-03 (dungeon design amendment, section 2).*
-21. **P21 Placeholder:** the stir meter values (+10 per floor, +5 per piece, the player factor) and thresholds (40, 70, 100, 90 s); the effects themselves are P49. *Amended 2026-11-03 (dungeon design amendment, section 2).*
+21. **P21 Placeholder:** the stir meter values (+10 per floor, +5 per piece, the player factor) and thresholds (40, 70, 100, 1.5 x walk time, 60 s minimum); the effects themselves are P49. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 22. **P22 Call:** the party shares one haul, held by the host. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 23. **P23 Call:** co-op scales enemy life (x1.7, 2.3, 2.8) and enemy count, not attack. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 24. **P24 Call:** co-op players are downed for 20 s and revived by an ally; all down ends the dive.
