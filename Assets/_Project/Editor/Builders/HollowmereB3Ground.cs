@@ -40,11 +40,110 @@ namespace SleepingCalamity.EditorTools
                 m.SetTexture("_DetailAlbedoMap", macro); m.SetFloat("_DetailAlbedoMapScale", 1f); m.EnableKeyword("_DETAIL_MULX2");
                 m.SetTextureScale("_DetailAlbedoMap", Vector2.one * (2f / 37f));   // detail uv = base uv (1 per 2 m) x this: one repeat per 37 m, not lined up with the corner's 23 m
             }
-            Color neutral = new Color(0.97f, 0.93f, 0.86f, 1f);   // polish: round 1 read grey and dark (p90 0.66); a touch warmer and lighter, still not B0's orange m.SetColor("_BaseColor", neutral); m.SetColor("_Color", neutral);   // round 2: B0's warm tint read orange on the whole square
+            Texture2D graded = GradedCobbleAlbedo();   // round 3: per-stone value and hue, dark joints with moss, edge rims (baked from the T01c albedo + displacement)
+            if (graded != null) m.SetTexture("_BaseMap", graded);
+            Color neutral = new Color(1.0f, 0.97f, 0.92f, 1f);
+            m.SetColor("_BaseColor", neutral); m.SetColor("_Color", neutral);
             m.enableInstancing = true;
             MaterialValidation.Validate(m);
             EditorUtility.SetDirty(m);
             return m;
+        }
+
+        // Round 3: the T01c scan reads as one grey-tan sheet. Bake a graded copy: stones are the connected high regions of the displacement map; each gets its own tone (warm tan,
+        // cool grey, a few rust) and value, the joints go darker with olive moss in them, and a thin dark rim sits on every stone edge. Tiles (wrap-around fill and noise).
+        static Texture2D GradedCobbleAlbedo()
+        {
+            string srcDir = BuilderUtil.Abs("Art/Source/Fab/T01c_cobblestone");
+            if (!Directory.Exists(srcDir)) return null;
+            string Find(string tail) => Directory.GetFiles(srcDir, "*_" + tail + ".jpg").OrderBy(f => f, System.StringComparer.Ordinal).FirstOrDefault();
+            string bcf = Find("BaseColor"), dpf = Find("Displacement");
+            if (bcf == null || dpf == null) return null;
+            Color32[] bc = DecodeJpg(bcf, out int N, out int h0), dp = DecodeJpg(dpf, out int N2, out int h2);
+            if (N != h0 || N != N2 || h2 != N) return null;
+            int total = N * N;
+            var hist = new int[256];
+            for (int i = 0; i < total; i++) hist[dp[i].r]++;
+            int acc = 0, thr = 0, target = Mathf.RoundToInt(total * 0.38f);
+            for (; thr < 256; thr++) { acc += hist[thr]; if (acc >= target) break; }
+            var mask = new bool[total];
+            for (int i = 0; i < total; i++) mask[i] = dp[i].r > thr;
+            var lab = new int[total]; for (int i = 0; i < total; i++) lab[i] = -1;
+            int nLab = 0; var stack = new Stack<int>();
+            for (int i = 0; i < total; i++)
+            {
+                if (!mask[i] || lab[i] >= 0) continue;
+                lab[i] = nLab; stack.Push(i);
+                while (stack.Count > 0)
+                {
+                    int c = stack.Pop(), cx = c % N, cy = c / N;
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nx = (cx + (d == 0 ? 1 : d == 1 ? N - 1 : 0)) % N, ny = (cy + (d == 2 ? 1 : d == 3 ? N - 1 : 0)) % N, ni = ny * N + nx;
+                        if (mask[ni] && lab[ni] < 0) { lab[ni] = nLab; stack.Push(ni); }
+                    }
+                }
+                nLab++;
+            }
+            // soft mask (1 inside a stone, 0 in a joint): separable wrap-around box blur, three passes
+            var soft = new float[total]; var tmp = new float[total];
+            for (int i = 0; i < total; i++) soft[i] = mask[i] ? 1f : 0f;
+            int rad = 4;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                for (int y = 0; y < N; y++)
+                {
+                    float sum = 0f; for (int k = -rad; k <= rad; k++) sum += soft[y * N + (k + N) % N];
+                    for (int x = 0; x < N; x++) { tmp[y * N + x] = sum / (2 * rad + 1); sum += soft[y * N + (x + rad + 1) % N] - soft[y * N + (x - rad + N) % N]; }
+                }
+                for (int x = 0; x < N; x++)
+                {
+                    float sum = 0f; for (int k = -rad; k <= rad; k++) sum += tmp[((k + N) % N) * N + x];
+                    for (int y = 0; y < N; y++) { soft[y * N + x] = sum / (2 * rad + 1); sum += tmp[((y + rad + 1) % N) * N + x] - tmp[((y - rad + N) % N) * N + x]; }
+                }
+            }
+            // per-stone tone and value
+            var tones = new[] { new Vector3(1.06f, 1.0f, 0.88f), new Vector3(1.0f, 0.96f, 0.84f), new Vector3(0.94f, 0.97f, 1.01f), new Vector3(0.90f, 0.93f, 0.98f), new Vector3(1.10f, 0.90f, 0.80f), Vector3.one };
+            float[] cum = { 0.22f, 0.44f, 0.64f, 0.82f, 0.90f, 1f };
+            var stoneTone = new Vector3[Mathf.Max(1, nLab)];
+            for (int l = 0; l < nLab; l++)
+            {
+                float r = H(l, 3, 0xB30), v = Mathf.Lerp(0.84f, 1.24f, H(l, 5, 0xB31)) * 1.10f;
+                int ti = 0; while (ti < cum.Length - 1 && r > cum[ti]) ti++;
+                stoneTone[l] = tones[ti] * v;
+            }
+            var px = new Color32[total];
+            int cells = 16;   // joint-moss noise lattice, wraps over the tile
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    int i = y * N + x;
+                    float u = x / (float)N, w = y / (float)N;
+                    Vector3 c = new Vector3(bc[i].r, bc[i].g, bc[i].b) / 255f;
+                    if (mask[i]) { Vector3 t = stoneTone[lab[i]]; c = new Vector3(Mathf.Clamp01(c.x * t.x), Mathf.Clamp01(c.y * t.y), Mathf.Clamp01(c.z * t.z)); }
+                    float jw = 1f - soft[i];
+                    float nz = 0.5f * TNoise(u, w, cells, 0xB41) + 0.3f * TNoise(u, w, cells * 2 + 8, 0xB42) + 0.2f * TNoise(u, w, cells * 6 + 4, 0xB43);
+                    float moss = Mathf.Clamp01((nz - 0.55f) * 5f) * Mathf.Clamp01(jw * 1.3f);
+                    c *= 1f - 0.55f * jw;
+                    Vector3 mc = new Vector3(0.24f, 0.30f, 0.10f) * (0.7f + 0.6f * TNoise(u, w, 60, 0xB44));
+                    c = c * (1f - moss) + mc * moss;
+                    if (mask[i]) c *= 1f - 0.25f * Mathf.Clamp01(1f - soft[i]);   // bevel rim darkening
+                    px[i] = new Color32((byte)Mathf.RoundToInt(Mathf.Clamp01(c.x) * 255f), (byte)Mathf.RoundToInt(Mathf.Clamp01(c.y) * 255f), (byte)Mathf.RoundToInt(Mathf.Clamp01(c.z) * 255f), 255);
+                }
+            Debug.Log("SC HOLLOWMERE square cobble albedo: " + nLab + " stones graded at " + N + " px");
+            return WritePng2("Assets/_Project/Content/Art/Town/Decals/SquareCobble_Albedo.png", N, px);
+        }
+
+        static Texture2D WritePng2(string path, int n, Color32[] px) { BuilderUtil.EnsureFolder(DecalFolder); return WriteTex(path, n, n, px, true, false, false, false, 2048); }
+
+        // Value noise on a lattice that wraps in both axes (cells per tile), u and w in 0..1.
+        static float TNoise(float u, float w, int cells, int seed)
+        {
+            float x = u * cells, y = w * cells;
+            int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y); float fx = x - x0, fy = y - y0;
+            float sx = fx * fx * (3f - 2f * fx), sy = fy * fy * (3f - 2f * fy);
+            int a = ((x0 % cells) + cells) % cells, b = ((x0 + 1) % cells + cells) % cells, c = ((y0 % cells) + cells) % cells, d = ((y0 + 1) % cells + cells) % cells;
+            return Mathf.Lerp(Mathf.Lerp(H(a, c, seed), H(b, c, seed), sx), Mathf.Lerp(H(a, d, seed), H(b, d, seed), sx), sy);
         }
 
         static Material RiverMaterial(bool gutter)
@@ -204,9 +303,9 @@ namespace SleepingCalamity.EditorTools
             // 1. leaf drifts: along the square's kerbs (border), the lee side (the east face of each lot front is picked by the seeded side order)
             var leafA = new MeshBuf(); var leafB = new MeshBuf();
             int drifts = 0;
-            for (int i = 0; i < 20; i++)   // polish: 12 -> 20 drifts along the kerbs
+            for (int i = 0; i < 34; i++)   // round 3: 20 -> 34 drifts along the kerbs and footings
             {
-                float pr = (i + 0.15f + 0.7f * (float)rnd.NextDouble()) / 20f;
+                float pr = (i + 0.15f + 0.7f * (float)rnd.NextDouble()) / 34f;
                 Vector2 pos = default, n = default, d = default; bool ok = false;
                 for (int tries = 0; tries < 24 && !ok; tries++)
                 {
@@ -222,13 +321,28 @@ namespace SleepingCalamity.EditorTools
                 drifts++;
             }
 
+            // 1b. round 3: drifts round the fountain foot and along the rut (leaf litter gathers where the stone is lower and wetter)
+            for (int i = 0; i < 9; i++)
+            {
+                float a = (i / 9f) * 6.283f + 0.4f * (float)rnd.NextDouble(), rr = 3.4f + 1.4f * (float)rnd.NextDouble();
+                AddGrid(t, i % 2 == 0 ? leafB : leafA, new Vector2(Mathf.Cos(a) * rr, Mathf.Sin(a) * rr), a * Mathf.Rad2Deg + 90f, 1.1f + 0.5f * (float)rnd.NextDouble(), 1.8f + 1.2f * (float)rnd.NextDouble(), 5, lift0 + 0.017f, 1f);
+                drifts++;
+            }
+            var rutDrift = new[] { new Vector2(0f, -16f), new Vector2(-1.6f, -11f), new Vector2(-3.6f, -5.5f), new Vector2(-5f, -0.5f), new Vector2(-8.6f, 3.4f), new Vector2(-10.5f, 5.8f) };
+            foreach (Vector2 rd in rutDrift)
+            {
+                AddGrid(t, leafA, rd + new Vector2(0.5f * (float)rnd.NextDouble(), 0.5f * (float)rnd.NextDouble()), (float)rnd.NextDouble() * 360f, 1.0f, 2.2f, 5, lift0 + 0.017f, 1f);
+                drifts++;
+            }
+
             // 2. seven puddles (H3: wet sky mirrors in the joints): a small organic blob each, one by the gutter (S edge); the others in the open cobbles away from the stalls.
             // Each gets a wider dark wet halo (the dirt blob) under it so the cobbles round the water read soaked.
             var pud = new MeshBuf(); var halo = new MeshBuf();
             var puddles = new (float x, float z, float sx, float sz, float yaw)[]
             {
                 (-9.5f, -18.7f, 2.8f, 1.3f, 8f), (9.8f, -14.2f, 2.4f, 1.8f, 35f), (-14.5f, -6.5f, 3.0f, 1.9f, 100f), (13.5f, 1.5f, 2.0f, 1.5f, 62f), (-3.2f, -11.5f, 3.6f, 2.2f, 160f),
-                (4.5f, -9.0f, 2.6f, 1.4f, 120f), (-8.0f, -2.5f, 2.2f, 1.2f, 20f)
+                (4.5f, -9.0f, 2.6f, 1.4f, 120f), (-8.0f, -2.5f, 2.2f, 1.2f, 20f),
+                (-1.1f, -12.4f, 2.4f, 0.8f, 100f), (-4.0f, -4.6f, 2.2f, 0.7f, 70f), (-9.0f, 4.0f, 2.6f, 0.9f, 35f), (7.5f, -4.0f, 3.2f, 1.6f, 20f), (0.8f, -16.5f, 2.0f, 0.8f, 95f)
             };
             foreach (var p in puddles)
             {
@@ -239,7 +353,7 @@ namespace SleepingCalamity.EditorTools
             // 3. the cart rut: the Market Street mouth (0, -21) to the bakery lot F02's doorstep, bending round the fountain and the cloth stall
             var rut = new MeshBuf();
             var way = new[] { new Vector2(0.4f, -21.2f), new Vector2(0f, -17f), new Vector2(-1.2f, -12f), new Vector2(-3f, -6f), new Vector2(-4.2f, -1f), new Vector2(-7.5f, 3f), new Vector2(-11f, 6f), new Vector2(-12.0f, 6.9f) };
-            float rutLen = Ribbon(t, rut, way, 1.7f, 4f, lift0 + 0.012f);
+            float rutLen = Ribbon(t, rut, way, 2.2f, 4f, lift0 + 0.012f);
 
             // 4. moss patches heavier at the north shade and the fountain foot, plus large faint dirt patches against the tile repeat
             var moss = new MeshBuf(); var dirt = new MeshBuf();
@@ -263,6 +377,16 @@ namespace SleepingCalamity.EditorTools
                 float s = 3f + 5f * (float)rnd.NextDouble();
                 AddGrid(t, dust, new Vector2(x, z), (float)rnd.NextDouble() * 360f, s, s * (0.5f + 0.4f * (float)rnd.NextDouble()), 6, lift0 + 0.007f, 1f);
             }
+            // round 3: large (9-17 m) tone patches, warm tan / cool slate / rust, so the Overview ground is not one grey and the open square varies at the 10 m scale
+            var warm = new MeshBuf(); var cool = new MeshBuf(); var rust = new MeshBuf();
+            var rnd2 = new System.Random(0xB3E1);
+            for (int i = 0; i < 24; i++)
+            {
+                float x = Mathf.Lerp(HollowmereLayout.SquareMinX, HollowmereLayout.SquareMaxX, (float)rnd2.NextDouble());
+                float z = Mathf.Lerp(HollowmereLayout.SquareMinZ, HollowmereLayout.SquareMaxZ, (float)rnd2.NextDouble());
+                float s = 9f + 8f * (float)rnd2.NextDouble();
+                AddGrid(t, i % 3 == 0 ? cool : i % 3 == 1 ? warm : (i % 6 == 2 ? rust : warm), new Vector2(x, z), (float)rnd2.NextDouble() * 360f, s, s * (0.5f + 0.35f * (float)rnd2.NextDouble()), 6, lift0 + 0.006f, 1f);
+            }
             // moss in the joints: many small mottled patches (0.6-1.5 m), clustered at kerbs, the fountain foot and the damp (west/south) side, a few in the open
             var jointMoss = new MeshBuf();
             for (int i = 0; i < 60; i++)
@@ -281,11 +405,17 @@ namespace SleepingCalamity.EditorTools
             Material mHalo = DecalMaterial("SquareWetHalo", tx.Blob, null, new Color(0.10f, 0.10f, 0.10f, 0.36f), 0.35f, false, 1);
             Material mMoss = DecalMaterial("SquareMoss", tx.Moss, null, new Color(0.46f, 0.56f, 0.34f, 0.50f), 0f, false, 2);   // polish: round 1 moss read as flat neon green strips
             Material mJoint = DecalMaterial("SquareJointMoss", tx.MossJoint, null, new Color(0.55f, 0.64f, 0.38f, 0.95f), 0f, false, 2);
-            Material mRut = DecalMaterial("SquareRut", tx.RutAlbedo, tx.RutNormal, new Color(1f, 1f, 1f, 0.85f), 0.1f, false, 3);
+            Material mRut = DecalMaterial("SquareRut", tx.RutAlbedo, tx.RutNormal, new Color(1f, 1f, 1f, 1f), 0.3f, false, 3);
             Material mLeafA = tx.LeafA != null ? DecalMaterial("SquareLeavesA", tx.LeafA, tx.LeafANormal, new Color(1f, 0.96f, 0.88f, 0.95f), 0.15f, false, 4) : null;
             Material mLeafB = tx.LeafB != null ? DecalMaterial("SquareLeavesB", tx.LeafB, tx.LeafBNormal, new Color(1f, 0.96f, 0.88f, 0.95f), 0.15f, false, 5) : null;
-            Material mPud = DecalMaterial("SquarePuddle", tx.Blob, null, new Color(0.035f, 0.045f, 0.05f, 0.9f), 0.95f, true, 6);
+            Material mPud = DecalMaterial("SquarePuddle", tx.Blob, null, new Color(0.07f, 0.09f, 0.11f, 0.94f), 0.97f, true, 6);
+            Material mWarm = DecalMaterial("SquareToneWarm", tx.Blob, null, new Color(0.66f, 0.50f, 0.30f, 0.34f), 0f, false, 1);
+            Material mCool = DecalMaterial("SquareToneCool", tx.Blob, null, new Color(0.36f, 0.42f, 0.50f, 0.30f), 0f, false, 1);
+            Material mRust = DecalMaterial("SquareToneRust", tx.Blob, null, new Color(0.55f, 0.28f, 0.16f, 0.26f), 0f, false, 1);
             string folder = DecalFolder;
+            Place(root, "ToneWarm", SaveMesh(folder + "/SquareDecal_ToneWarm.asset", warm.ToMesh("SquareDecal_ToneWarm")), mWarm, false);
+            Place(root, "ToneCool", SaveMesh(folder + "/SquareDecal_ToneCool.asset", cool.ToMesh("SquareDecal_ToneCool")), mCool, false);
+            Place(root, "ToneRust", SaveMesh(folder + "/SquareDecal_ToneRust.asset", rust.ToMesh("SquareDecal_ToneRust")), mRust, false);
             Place(root, "Dirt", SaveMesh(folder + "/SquareDecal_Dirt.asset", dirt.ToMesh("SquareDecal_Dirt")), mDirt, false);
             Place(root, "Dust", SaveMesh(folder + "/SquareDecal_Dust.asset", dust.ToMesh("SquareDecal_Dust")), mDust, false);
             Place(root, "WetHalo", SaveMesh(folder + "/SquareDecal_WetHalo.asset", halo.ToMesh("SquareDecal_WetHalo")), mHalo, false);
@@ -404,7 +534,7 @@ namespace SleepingCalamity.EditorTools
                     float a = tk * Mathf.Clamp01(0.55f + 0.7f * (wob - 0.5f) + 0.5f * (cut - 0.5f));
                     a *= Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.12f, Mathf.Min(u, 1f - u)));   // never a hard ribbon edge
                     height[y * rw + x] = -tk * (0.6f + 0.4f * wob);
-                    ra[y * rw + x] = new Color32(52, 40, 31, (byte)Mathf.RoundToInt(a * 0.9f * 255f));
+                    ra[y * rw + x] = new Color32(34, 26, 20, (byte)Mathf.RoundToInt(a * 1.0f * 255f));
                 }
             tx.RutAlbedo = WriteTex(dir + "/Rut_BaseColor.png", rw, rh, ra, true, false, true, false, 256);
             var rn = new Color32[rw * rh];

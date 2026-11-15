@@ -151,7 +151,7 @@ namespace SleepingCalamity.EditorTools
             m.CopyPropertiesFromMaterial(src);
             foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
             m.renderQueue = src.renderQueue;
-            Color olive = new Color(0.70f, 0.74f, 0.52f, 1f);
+            Color olive = new Color(0.62f, 0.64f, 0.44f, 1f);
             m.SetColor("_BaseColor", olive); m.SetColor("_Color", olive);
             m.enableInstancing = true;
             MaterialValidation.Validate(m);
@@ -196,7 +196,7 @@ namespace SleepingCalamity.EditorTools
             {
                 if (s.p == null || s.p.Length < 3) continue;
                 float blob = Mathf.PerlinNoise(s.p[0] * 0.33f + 17.3f, s.p[2] * 0.33f + 5.1f);
-                float cluster = Mathf.SmoothStep(0.52f, 0.68f, blob);   // polish: no floor, a tuft is only ever part of a blob   // blobs along the edges, hardly any stray between them (round 2: steeper)
+                float cluster = Mathf.SmoothStep(0.54f, 0.66f, blob);   // polish: no floor, a tuft is only ever part of a blob   // blobs along the edges, hardly any stray between them (round 2: steeper)
                 float baseKeep = s.kind == "joint" ? 0.08f : s.kind == "missing_sett" ? 0.9f : 1f;   // the open-centre joints thin hardest, cracks (missing setts) and wall edges keep theirs
                 float keepRoll = (float)(Hash((uint)Mathf.RoundToInt(s.p[0] * 50f + 50000f), (uint)Mathf.RoundToInt(s.p[2] * 50f + 50000f)) % 10007u) / 10007f;
                 // round 2: weeds belong at walls and kerbs. Distance from the slot to the square's border (the lots' fronts and kerbs): inside 1.2 m everything stays, beyond 3.5 m only strays.
@@ -207,6 +207,7 @@ namespace SleepingCalamity.EditorTools
                 foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(new TownPoint(wp.x, wp.z), 1.5f)) { atFooting = true; break; }
                 bool atFountain = wp.x * wp.x + wp.z * wp.z < 3.5f * 3.5f;
                 if (dEdge > 1.5f && !atFooting && !atFountain) continue;
+                if (s.kind == "joint" && !atFooting && !atFountain) continue;   // round 3: no lone sprouts out in the joints of the open cobbles
                 float pKeep = baseKeep * cluster * 0.45f;   // about half the old density
                 if (keepRoll >= pKeep) continue;
                 bool tended = keepRoll < pKeep * 0.1f;   // survives into Rebuilt
@@ -222,20 +223,25 @@ namespace SleepingCalamity.EditorTools
                     default: continue;
                 }
                 if (pool.Count == 0) continue;
-                GameObject model = pool[rnd.Next(pool.Count)];
-                var w = (GameObject)PrefabUtility.InstantiatePrefab(model, tended ? group : ruinedGroup);
-                w.name = s.kind + "_" + n;
-                foreach (Renderer rd in w.GetComponentsInChildren<Renderer>(true))
+                int clump = 2 + rnd.Next(3);   // round 3: a tuft is a clump of 2-4 hugging the footing, never one sprout
+                for (int cl = 0; cl < clump; cl++)
                 {
-                    var mats = new Material[Mathf.Max(1, rd.sharedMaterials.Length)];
-                    for (int k = 0; k < mats.Length; k++) mats[k] = mat;
-                    rd.sharedMaterials = mats; rd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    GameObject model = pool[rnd.Next(pool.Count)];
+                    var w = (GameObject)PrefabUtility.InstantiatePrefab(model, tended ? group : ruinedGroup);
+                    w.name = s.kind + "_" + n + "_" + cl;
+                    foreach (Renderer rd in w.GetComponentsInChildren<Renderer>(true))
+                    {
+                        var mats = new Material[Mathf.Max(1, rd.sharedMaterials.Length)];
+                        for (int k = 0; k < mats.Length; k++) mats[k] = mat;
+                        rd.sharedMaterials = mats; rd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    }
+                    float scale = lo + (float)rnd.NextDouble() * (hi - lo);
+                    scale = Mathf.Min(scale, cap / heights[model]);
+                    float ox = cl == 0 ? 0f : ((float)rnd.NextDouble() - 0.5f) * 0.7f, oz = cl == 0 ? 0f : ((float)rnd.NextDouble() - 0.5f) * 0.7f;
+                    w.transform.localPosition = new Vector3(s.p[0] + ox, HollowmereB3Ground.BedLift + CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, s.p[0] + ox, s.p[2] + oz), s.p[2] + oz);
+                    w.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
+                    w.transform.localScale = Vector3.one * scale;
                 }
-                float scale = lo + (float)rnd.NextDouble() * (hi - lo);
-                scale = Mathf.Min(scale, cap / heights[model]);
-                w.transform.localPosition = new Vector3(s.p[0], HollowmereB3Ground.BedLift + CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, s.p[0], s.p[2]), s.p[2]);   // on the bed (the json's y was for sett tops)
-                w.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
-                w.transform.localScale = Vector3.one * scale;
                 n++;
             }
             Debug.Log("SC HOLLOWMERE square edges: " + n + " tufts on " + slots.Length + " slots (" + nEdge + " edge, " + nMissing + " missing sett, " + nJoint + " joint)");

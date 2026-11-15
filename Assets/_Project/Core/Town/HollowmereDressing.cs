@@ -119,6 +119,20 @@ namespace SleepingCalamity.Core
             R("Prop_Ruin_Crate", "Crate_C", "B7", DecoKind.Prop, Ru, -14f, -10f, 35f, 0.6f, 0.6f, 0.6f, broken: true, tiltX: 8f, tiltZ: 12f),
             R("Prop_Ruin_Sack", "Sack_B", "B7", DecoKind.Prop, Ru, 13.2f, -15f, 70f, 0.5f, 0.45f, 0.3f, broken: true, tiltX: 80f),
             R("Prop_Ruin_Bucket", "Bucket_A", "B7", DecoKind.Prop, Ru, -1.5f, -17.5f, 0f, 0.4f, 0.4f, 0.35f, broken: true, tiltX: 90f),
+            // B3 round 3: the open middle ground, dropped goods in small groups (crates split, sacks slumped, a barrel on its side)
+            R("Drop_A_Crate", "Crate_B", "B7", DecoKind.Prop, Ru, -1.8f, -9.6f, 25f, 0.9f, 0.5f, 0.5f, broken: true, tiltX: 6f, tiltZ: 10f),
+            R("Drop_A_Sack", "Sack_Pair", "B7", DecoKind.Prop, Ru, -1.9f, -11.3f, 100f, 0.8f, 0.4f, 0.3f, broken: true, tiltX: 70f),
+            R("Drop_A_Basket", "Basket_Produce", "B7", DecoKind.Prop, Ru, -3.1f, -9.5f, 0f, 0.45f, 0.45f, 0.3f, broken: true, tiltX: 90f),
+            R("Drop_B_Crate", "Crate_A", "B7", DecoKind.Prop, Ru, 1.8f, -14.2f, -30f, 0.6f, 0.6f, 0.6f, broken: true, tiltX: 12f, tiltZ: -8f),
+            R("Drop_B_SackA", "Sack_A", "B7", DecoKind.Prop, Ru, 2.3f, -14.8f, 40f, 0.45f, 0.35f, 0.3f, broken: true, tiltX: 80f),
+            R("Drop_B_SackC", "Sack_C", "B7", DecoKind.Prop, Ru, 0.9f, -13.2f, 200f, 0.45f, 0.35f, 0.3f, broken: true, tiltX: 75f),
+            R("Drop_C_Barrel", "Barrel_C", "B7", DecoKind.Prop, Ru, 10.6f, -12.8f, 70f, 0.65f, 0.95f, 0.65f, broken: true, tiltX: 90f),
+            R("Drop_C_Crate", "Crate_C", "B7", DecoKind.Prop, Ru, 9.4f, -12.2f, 10f, 0.6f, 0.6f, 0.6f, broken: true, tiltX: 8f, tiltZ: 14f),
+            R("Drop_D_Crate", "Crate_B", "B7", DecoKind.Prop, Ru, 9.8f, 3.2f, -15f, 0.9f, 0.5f, 0.5f, broken: true, tiltX: 5f, tiltZ: -9f),
+            R("Drop_D_Sack", "Sack_B", "B7", DecoKind.Prop, Ru, 10.8f, 2.2f, 95f, 0.5f, 0.45f, 0.3f, broken: true, tiltX: 80f),
+            R("Drop_D_Bucket", "Bucket_B", "B7", DecoKind.Prop, Ru, 9.2f, 1.6f, 0f, 0.4f, 0.4f, 0.35f, broken: true, tiltX: 90f),
+            R("Drop_E_Crate", "Crate_A", "B7", DecoKind.Prop, Ru, -9.8f, -7.0f, 55f, 0.6f, 0.6f, 0.6f, broken: true, tiltX: 10f, tiltZ: 6f),
+            R("Drop_E_Sack", "Sack_Pair", "B7", DecoKind.Prop, Ru, -8.7f, -7.2f, 10f, 0.8f, 0.4f, 0.3f, broken: true, tiltX: 70f),
         };
 
         public static readonly BuntingSpan[] Bunting =
