@@ -1,4 +1,4 @@
-State: planning
+State: implemented, check PASS on d9b4c3c9; review fixes + soak + merge still open
 Branch: claude/floor-modifiers-5c-4b3b0f (from origin/main 14fa7b94)
 Archive: not yet
 
@@ -12,3 +12,8 @@ Design (all placeholder numbers in FloorModifierTuning, deterministic via the ex
 Core: FloorModifiers.cs, FloorCard.cs (title/effect/reward text), CellarEncounterPlan (FatLarder extra), CellarFloorRoster.TwistOf + FloorTwist.FatLarder; EditMode tests per modifier + determinism.
 Host wiring (small): DiveHaulSync heal recharge already reads HealRechargeSeconds (Brimming through the same helper); CellarContentsSync PayRoomClear grants extra rolls via GiveExtraRoll (same bag path as Stirred). Touches host loot grants: risk-reviewer, stop merge-ready (needs: coordinator).
 Gates: unity.ps1 check + soak (Core/Cellars touched). Docs: PHASE1.md stale lines + roadmap header, QUEUE lines 19 and 26 ticked in merge commit.
+
+## Progress (2026-11-15, usage limit hit)
+- Tip d9b4c3c9: unity.ps1 check PASS (build PASS, EditMode 1794/1794, PlayMode 287 passed 0 failed 36 skipped), SC MARKER == d9b4c3c9.
+- Risk review (no blockers). TODO should-fix: (1) PayExtraRolls / PayEveryone in CellarContentsSync skip clients whose NetworkManager.ConnectedClients[id].PlayerObject == null and use a non-creating bag lookup (PartyBags.For creates bags); (2) add a PlayMode payout test (copy room-clear setup of FloorModifierNetworkTests ~line 131: each client gains exactly `rolls`, re-clear pays nothing, only fat room pays on Fat Larder). Nit: comment says 50000+room, real index 51000+room+1000(k-1).
+- Then: rerun check, `unity.ps1 soak` (Core/Cellars touched), tick QUEUE lines 19 and 26 in merge commit, Archive: ready, board needs: coordinator (host loot grant = networked).
