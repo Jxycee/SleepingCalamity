@@ -36,8 +36,11 @@ Material:
     - _Cull: 0
     - _GradMid: 0.4
     - _GradientMix: 1
+    - _HueShift: 0
     - _RootDark: 0.25
     - _RootLen: 0.35
+    - _Saturation: 1
+    - _ShadowLift: 0
     - _ShadowNormalOffset: 0.008
     - _ShadowStrength: 0.55
     - _ShiftJitter: 0.3
@@ -54,6 +57,7 @@ Material:
     - _Strands: 9
     - _TipLift: 0.04
     - _UseVertexColor: 1
+    - _Value: 1
     - _Wrap: 0.4
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
