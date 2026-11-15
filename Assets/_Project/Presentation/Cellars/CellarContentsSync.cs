@@ -17,7 +17,7 @@
 // first time spawns that room's CellarEncounterPlan spawns (DiveHaulSync.EncounterPlan, extras at that moment included) through CombatHost.SpawnEnemy: Tier1 = floor-banded
 // Slime/Broom/RatKing (CellarEnemyMix), Tier2 = RatKing tier 2, the bakery's WardenCell = DoughWarden; (2b) the Ambush floor's ambush room (host-only twist) springs its enemies after FloorTwistTuning.AmbushDelaySeconds at CellarAmbush ring cells, cancelled (room re-armed) if no living player is left when the delay ends; (3) when the plan's Hunter appears one tier-2 RatKing spawns at its cell;
 // (2c) ENCOUNTER TEMPLATES (spawner wiring, host only; clients never spawn): for the 12 pool combat rooms CellarTemplateSpawns.Resolve picks the kinds, cells and waves (EncounterBuilder, party size = connected players, isAmbushRoom = plan.AmbushRoom == room)
-// and holds the count to the plan's live count; wave 1 spawns on the host tick after the last wave-0 enemy dies (the room is not cleared in between). Rooms it returns null for (bakery set pieces, Tier 2 / warden rooms) keep the plan-driven spawns above;
+// and holds the count to the plan's live count; wave 1 spawns once the last wave-0 enemy has died and no wave-1 cell is within the ambush distance of a player (or WaveTwoMaxWaitSeconds has passed); the room is not cleared in between. Rooms it returns null for (bakery set pieces, Tier 2 / warden rooms) keep the plan-driven spawns above;
 // (4) the enemy spawned for layout.Carrier drops the GATE key where it falls (only on death: a wipe/clear despawn drops nothing, resets the room and it respawns on re-entry): a player within GateKeyRange picks it up and ExitUnlocked is raised; keys live only in this state (GateKey, RoomKeyHeld), never in the haul's loot;
 // (5) pieces: a player within PieceRange of an uncollected piece spot adds it to the haul (ServerAddPiece), the collected mask follows the haul every frame so a failed
 // dive shows the pieces again; (6) the room key (key chest) lets the host open the locked gate, by Interact or by walking up to it.
@@ -86,7 +86,7 @@ namespace SleepingCalamity.Presentation
         public CellarFloorSync FloorSync;   // optional; found in the scene when null
         public DiveHaulSync HaulSync;       // optional; found in the scene when null (host needs it for loot, pieces and the plan)
         public System.Action<List<PlayerPos>> PlayersOverride;   // test hook: replaces the player-object scan on the host
-        public System.Func<CellarEncounterPlan> PlanOverride;   // test hook: the host spawns from this plan (when it matches the armed floor) instead of the dive's; a live 1-2 player party never reaches a second wave (extras top out at 1)
+        public System.Func<CellarEncounterPlan> PlanOverride;   // test hook: the host spawns from this plan (when it matches the armed floor) instead of the dive's; a live 1-4 player party never reaches a second wave (probe CellarTemplateSpawnsTests.Resolve_WaveOneSurvives_*: the plan's extras top out at 1 and Resolve trims wave 1 first), so tests need this
 
         // Host only: raised once per floor when the gate key is picked up (the spine opens the stair).
         public event System.Action<int> ExitUnlocked;
@@ -842,7 +842,7 @@ namespace SleepingCalamity.Presentation
                 if (second.Count > 0)   // wave 1 appears when wave 0 is cleared (TickWaveTwo)
                 {
                     _waveTwo[room] = second;
-                    if (!RoomHasTracked(room)) { _waveTwoNoHold.Add(room); _waveTwoDue.Add(room); _waveTwoSince[room] = Time.time; }   // wave 0 placed nothing: wave 1 follows on the next tick, with no held count to settle
+                    if (!RoomHasTracked(room)) { _waveTwoNoHold.Add(room); _waveTwoDue.Add(room); _waveTwoSince[room] = Time.time; }   // wave 0 placed nothing: wave 1 is due at once (TickWaveTwo, same distance rule and cap), with no held count to settle
                 }
                 _st.Cleared = _clear.ClearedMask;
                 return;
@@ -891,7 +891,7 @@ namespace SleepingCalamity.Presentation
         }
 
         // Host: wave 1 of a template room. Its last wave-0 death leaves the room's alive count at one (Gone skips CellarRoomClear.Died), so the room cannot clear in between; this spawns
-        // wave 1 on the next host tick and then settles that one count, which clears the room only if nothing could be spawned.
+        // wave 1 as soon as WaveTwoSafe allows (distance rule or the cap) and then settles that one count, which clears the room only if nothing could be spawned.
         private readonly Dictionary<int, List<TemplateSpawn>> _waveTwo = new Dictionary<int, List<TemplateSpawn>>();
         private readonly List<int> _waveTwoDue = new List<int>();
         private readonly HashSet<int> _waveTwoNoHold = new HashSet<int>();   // rooms whose wave 0 placed nothing: no held alive count to settle after wave 1
@@ -913,7 +913,7 @@ namespace SleepingCalamity.Presentation
             if (_waveTwoDue.Count == 0) return;
             foreach (int room in _waveTwoDue.ToArray())
             {
-                if (!_waveTwo.TryGetValue(room, out List<TemplateSpawn> second)) { _waveTwoDue.Remove(room); continue; }
+                if (!_waveTwo.TryGetValue(room, out List<TemplateSpawn> second)) { _waveTwoDue.Remove(room); _waveTwoSince.Remove(room); _waveTwoNoHold.Remove(room); continue; }
                 if (!_waveTwoSince.ContainsKey(room)) _waveTwoSince[room] = Time.time;
                 if (!WaveTwoSafe(room, second)) continue;   // stays due: retried every host tick
                 _waveTwoDue.Remove(room); _waveTwoSince.Remove(room); _waveTwo.Remove(room);
