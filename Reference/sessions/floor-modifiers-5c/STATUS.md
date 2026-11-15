@@ -1,4 +1,4 @@
-State: implemented, check PASS on d9b4c3c9; review fixes + soak + merge still open
+State: merge-ready (host loot grant = networked, needs: coordinator); check PASS + soak PASS on f51a70e5
 Branch: claude/floor-modifiers-5c-4b3b0f (from origin/main 14fa7b94)
 Archive: not yet
 
@@ -17,3 +17,11 @@ Gates: unity.ps1 check + soak (Core/Cellars touched). Docs: PHASE1.md stale line
 - Tip d9b4c3c9: unity.ps1 check PASS (build PASS, EditMode 1794/1794, PlayMode 287 passed 0 failed 36 skipped), SC MARKER == d9b4c3c9.
 - Risk review (no blockers). TODO should-fix: (1) PayExtraRolls / PayEveryone in CellarContentsSync skip clients whose NetworkManager.ConnectedClients[id].PlayerObject == null and use a non-creating bag lookup (PartyBags.For creates bags); (2) add a PlayMode payout test (copy room-clear setup of FloorModifierNetworkTests ~line 131: each client gains exactly `rolls`, re-clear pays nothing, only fat room pays on Fat Larder). Nit: comment says 50000+room, real index 51000+room+1000(k-1).
 - Then: rerun check, `unity.ps1 soak` (Core/Cellars touched), tick QUEUE lines 19 and 26 in merge commit, Archive: ready, board needs: coordinator (host loot grant = networked).
+
+## Final (2026-11-15)
+Tip f51a70e5 (review fixes applied: payouts skip clients without a hero object, non-creating bag lookup, 3 PlayMode payout tests).
+Check: unity.ps1 check PASS (build PASS, EditMode 1794/1794, PlayMode 290 passed 0 failed 36 skipped), SC MARKER == f51a70e5.
+Soak: unity.ps1 soak PASS 46/46 on f51a70e5.
+origin/main moved (18 commits since my base 14fa7b94, incl. QUEUE.md): merger merges origin/main, checks the new tip, and ticks QUEUE lines 19 (stale docs, done in d50b549a) and 26 (5c) in the merge commit. I did not tick them here to avoid a QUEUE conflict.
+Risk review: no blockers; both should-fix items done. Nits left: bonus rolls never in boots band; each Brimming roll feeds stir; full bag gets a notice each room clear.
+Archive: ready
