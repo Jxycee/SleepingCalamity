@@ -206,7 +206,9 @@ namespace SleepingCalamity.Presentation
         {
             DiveStir stir = _session.Stir;
             stir.PlayersPresent = Mathf.Max(1, NetworkManager.ConnectedClientsIds.Count);
-            stir.ModifierBonus = _session.Phase == DivePhase.Floor && ModifiersOf(DiveFloor).Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredBonus : 0f;   // Stirred: flat stir while the party is on that floor only (= FloorModifierSet.StirredBonusFor, from the cached set)
+            float bonus = _session.Phase == DivePhase.Floor && ModifiersOf(DiveFloor).Has(FloorModifier.Stirred) ? FloorModifierTuning.StirredBonus : 0f;   // Stirred: flat stir while the party is on that floor only (= FloorModifierSet.StirredBonusFor, from the cached set)
+            if (_session.Phase == DivePhase.Floor) bonus += SpecialJobs.StirBonusOnFloor(_shrineFloor, SpecialJobTuning.ShrineStir, DiveFloor);   // a cleared stir altar adds its delta on its own floor only
+            stir.ModifierBonus = bonus;
             if (_session.Phase == DivePhase.Floor || _session.Phase == DivePhase.BankRoom) stir.UnbankedValuables = _session.Bags.CarriedValuables();
         }
 
@@ -302,7 +304,7 @@ namespace SleepingCalamity.Presentation
         public bool ServerAdopt(DiveSession session)
         {
             if (!IsServer || !IsSpawned || session == null) return false;
-            _session = session; _heal = null; _visitExtraOwner = -1; _choice.Cancel(); if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
+            _session = session; _heal = null; _shrineFloor = 0; _visitExtraOwner = -1; _choice.Cancel(); if (EncounterPlan != null) { EncounterPlan = null; EncounterChanged?.Invoke(); } Publish(); return true;
         }
         // Host only: adopts the session a resumed suspend rebuilt (DiveDirector.ServerResumeSuspended): the saved dive seed, and the bank room's extra-slot owner kept as it was (when it had one it
         // was set before the quit, so PreviousExtraOwner is not written again this visit).
@@ -708,6 +710,33 @@ namespace SleepingCalamity.Presentation
         {
             if (!IsServer || !IsSpawned) return false;
             _healTuning = tuning; _heal = null; return true;
+        }
+
+        // ---- special-room jobs (host; called once per room per floor visit by CellarContentsSync, which holds the latch) ----
+        private int _shrineFloor;   // host only: the floor whose stir altar was cleared this dive (0 = none); cleared with the session in ServerAdopt
+
+        // Mending spring: every up hero in this world is healed MendPercent of max HP through the healing point's ServerHeal + broadcast path. Clients cannot call it.
+        public bool ServerMendParty(int percent)
+        {
+            if (!Host) return false;
+            var all = HeroVitals.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                HeroVitals v = all[i];
+                if (!IsMine(v)) continue;
+                int healed = v.ServerHeal(SpecialJobs.MendAmount(v.MaxHp, percent));
+                if (healed <= 0) continue;
+                HeroCombat c = v.GetComponent<HeroCombat>();
+                if (c != null) c.ServerBroadcastHeal(healed);
+            }
+            return true;
+        }
+
+        // Stir altar: marks `floor` so FeedStir adds the delta while the party is on it (the next host frame feeds it). One floor per dive is enough (the special room is once per dive kind).
+        public bool ServerShrineStir(int floor, float delta)
+        {
+            if (!Host || delta <= 0f || floor < 1) return false;
+            _shrineFloor = floor; FeedStir(); return true;
         }
 
         // ---- healing (host) ----
