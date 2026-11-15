@@ -74,7 +74,8 @@ def components(s):
     g = lambda k, d=0.0: s.get(k) if s.get(k) is not None else d
     return dict(iou_mean=g('iou_mean'), iou_frame=g('iou_frame'), iou_min=min(g('iou_front'), g('iou_side'), g('iou_back')),
         jut=max(0.0, 1 - g('jut_side_frac') / 0.10), color=max(0.0, 1 - g('dE_mean', 40) / 30.0), warm=1.0 - g('warm_back'),
-        clear=max(0.0, 1 - g('clear_pushed_frac') / 0.5), cover=g('cover'))
+        clear=max(0.0, 1 - g('clear_pushed_frac') / 0.5), cover=g('cover'),
+        spike=min(1.0, max(0.0, ((g('rough_side', 1.05) + g('rough_back', 1.05)) / 2 - 1.05) / 0.6)))
 def rank_of(s):
     c = components(s); w = {k: W.get(k, 0.0) for k in c}; t = sum(w.values()) or 1.0
     return sum(w[k] * c[k] for k in c) / t

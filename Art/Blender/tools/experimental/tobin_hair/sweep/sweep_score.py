@@ -56,6 +56,17 @@ for v in ('front', 'side', 'back'):
         R['hue_diff_back'] = hue(mh) - hue(mr); R['chroma_ratio_back'] = chroma(mh) / max(chroma(mr), 1e-3)
         R['warm_back'] = int(R['hue_diff_back'] > 8 or R['chroma_ratio_back'] > 1.4)
 R['dE_mean'] = float(np.mean([R[f'dE_{v}'] for v in ('front', 'side', 'back') if R.get(f'dE_{v}') is not None] or [99]))
+# outline roughness: perimeter / convex-hull perimeter of the largest blob after a 5 px open (smooth bowl ~1.0-1.1, spiky more)
+def rough(mask):
+    m = cv2.morphologyEx(mask.astype(np.uint8) * 255, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not cs: return None
+    c = max(cs, key=cv2.contourArea); hp = cv2.arcLength(cv2.convexHull(c), True)
+    return float(cv2.arcLength(c, True) / hp) if hp > 0 else None
+for v in ('front', 'side', 'back'):
+    im = cv2.imread(os.path.join(vd, f'hair_{v}.png'), cv2.IMREAD_UNCHANGED)
+    R[f'rough_{v}'] = rough(ren_region(im)) if im is not None else None
+    R[f'rough_ref_{v}'] = rough(ref_region(v))
 # hd_fit log: CLEAR pushed N of M verts, worst before W m ; COVER a/b
 log = open(os.path.join(vd, 'fit.log'), errors='ignore').read()
 m = re.search(r'CLEAR pushed (\d+) of (\d+) verts, worst before (-?[\d.]+)', log)

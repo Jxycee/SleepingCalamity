@@ -1,0 +1,238 @@
+{
+ "round": 2,
+ "top": 6,
+ "jut_mm": 6.0,
+ "defaults": {
+  "opt": {
+   "w": "0.45,0.3,0.15,0.1",
+   "rounds": 8
+  },
+  "fit": {
+   "clear": 0.002
+  }
+ },
+ "weights": {
+  "iou_mean": 1.0,
+  "iou_frame": 0.5,
+  "iou_min": 0.5,
+  "jut": 0.5,
+  "color": 0.2,
+  "warm": 0.2,
+  "clear": 0.2,
+  "cover": 0.4,
+  "spike": 1.0
+ },
+ "variants": [
+  {
+   "id": "a_bust_s0",
+   "label": "r1 pick: run1 bust s0",
+   "cards": "run1/tobin_bust/cards_seed0.json"
+  },
+  {
+   "id": "a_cfg3_close_s1",
+   "label": "r1 rank 1",
+   "cards": "run_cfg3/tobin_close/cards_seed1.json"
+  },
+  {
+   "id": "rg_close3_bust0",
+   "label": "top/back close s3 + fringe bust s0",
+   "mix": {
+    "a": "run1/tobin_close/cards_seed3.json",
+    "b": "run1/tobin_bust/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region"
+    ]
+   }
+  },
+  {
+   "id": "rg_cfg3c1_bust0",
+   "label": "top/back cfg3 close s1 + fringe bust s0",
+   "mix": {
+    "a": "run_cfg3/tobin_close/cards_seed1.json",
+    "b": "run1/tobin_bust/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region"
+    ]
+   }
+  },
+  {
+   "id": "rg_close3_close0",
+   "label": "top/back close s3 + fringe close s0",
+   "mix": {
+    "a": "run1/tobin_close/cards_seed3.json",
+    "b": "run1/tobin_close/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region"
+    ]
+   }
+  },
+  {
+   "id": "rg_cfg3c1_close0",
+   "label": "top/back cfg3 close s1 + fringe close s0",
+   "mix": {
+    "a": "run_cfg3/tobin_close/cards_seed1.json",
+    "b": "run1/tobin_close/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region"
+    ]
+   }
+  },
+  {
+   "id": "rg_bust3_bust0",
+   "label": "top/back bust s3 + fringe bust s0",
+   "mix": {
+    "a": "run1/tobin_bust/cards_seed3.json",
+    "b": "run1/tobin_bust/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region"
+    ]
+   }
+  },
+  {
+   "id": "rg_bust2_bust0",
+   "label": "top/back bust s2 + fringe bust s0",
+   "mix": {
+    "a": "run1/tobin_bust/cards_seed2.json",
+    "b": "run1/tobin_bust/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region"
+    ]
+   }
+  },
+  {
+   "id": "un_bust0_close3",
+   "label": "bust s0 + extra layers from close s3",
+   "mix": {
+    "a": "run1/tobin_bust/cards_seed0.json",
+    "b": "run1/tobin_close/cards_seed3.json",
+    "args": [
+     "--mode",
+     "union",
+     "--root",
+     "0.02",
+     "--tip",
+     "0.035"
+    ]
+   }
+  },
+  {
+   "id": "un_bust0_cfg3c1",
+   "label": "bust s0 + extra layers from cfg3 close s1",
+   "mix": {
+    "a": "run1/tobin_bust/cards_seed0.json",
+    "b": "run_cfg3/tobin_close/cards_seed1.json",
+    "args": [
+     "--mode",
+     "union",
+     "--root",
+     "0.02",
+     "--tip",
+     "0.035"
+    ]
+   }
+  },
+  {
+   "id": "un_close3_bust0",
+   "label": "close s3 + gaps filled from bust s0",
+   "mix": {
+    "a": "run1/tobin_close/cards_seed3.json",
+    "b": "run1/tobin_bust/cards_seed0.json",
+    "args": [
+     "--mode",
+     "union",
+     "--root",
+     "0.02",
+     "--tip",
+     "0.035"
+    ]
+   }
+  },
+  {
+   "id": "st_bust0_core70",
+   "label": "bust s0, core_len 0.7",
+   "cards": "run1/tobin_bust/cards_seed0.json",
+   "strands": {
+    "core_len": 0.7
+   }
+  },
+  {
+   "id": "st_bust0_core55_k6",
+   "label": "bust s0, core_len 0.55, core 0.6, kmax 6",
+   "cards": "run1/tobin_bust/cards_seed0.json",
+   "strands": {
+    "core_len": 0.55,
+    "core": 0.6,
+    "kmax": 6
+   }
+  },
+  {
+   "id": "vf_bust0_flare",
+   "label": "bust s0, flare fs 0.035 lt 0.03 fixed",
+   "cards": "run1/tobin_bust/cards_seed0.json",
+   "opt": {
+    "fix": {
+     "fs": 0.035,
+     "lt": 0.03
+    }
+   }
+  },
+  {
+   "id": "rg_close3_bust0_rag",
+   "label": "close s3 + bust s0, core_len 0.7, flare fs 0.03",
+   "mix": {
+    "a": "run1/tobin_close/cards_seed3.json",
+    "b": "run1/tobin_bust/cards_seed0.json",
+    "args": [
+     "--mode",
+     "region"
+    ]
+   },
+   "strands": {
+    "core_len": 0.7
+   },
+   "opt": {
+    "fix": {
+     "fs": 0.03
+    }
+   }
+  },
+  {
+   "id": "cfg3_close_s0",
+   "cards": "run_cfg3/tobin_close/cards_seed0.json"
+  },
+  {
+   "id": "cfg3_close_s2",
+   "cards": "run_cfg3/tobin_close/cards_seed2.json"
+  },
+  {
+   "id": "cfg3_close_s3",
+   "cards": "run_cfg3/tobin_close/cards_seed3.json"
+  },
+  {
+   "id": "cfg3_bust_s0",
+   "cards": "run_cfg3/tobin_bust/cards_seed0.json"
+  },
+  {
+   "id": "cfg3_bust_s2",
+   "cards": "run_cfg3/tobin_bust/cards_seed2.json"
+  },
+  {
+   "id": "cfg3_bust_s3",
+   "cards": "run_cfg3/tobin_bust/cards_seed3.json"
+  },
+  {
+   "id": "cfg4_close_s0",
+   "cards": "run_cfg4/tobin_close/cards_seed0.json"
+  },
+  {
+   "id": "cfg4_bust_s0",
+   "cards": "run_cfg4/tobin_bust/cards_seed0.json"
+  }
+ ]
+}
