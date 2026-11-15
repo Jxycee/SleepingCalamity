@@ -31,7 +31,7 @@ namespace SleepingCalamity.EditorTools
         // piece -> LookTest source material and linear tint (the generator's tile_mat tint). Add a row when the controller sees "no material for slot".
         static readonly (string Slot, string Source, Color Tint)[] Slots =
         {
-            ("CV_Brick", "old_brick", new Color(0.70f, 1.0f, 0.84f)), ("CV_VaultStone", "vault_stone", new Color(0.74f, 0.97f, 0.82f)),   // round 3: the C01 scan reads pink-red, pulled to warm tan/ochre
+            ("CV_Brick", "old_brick", new Color(0.64f, 0.84f, 0.55f)), ("CV_VaultStone", "vault_stone", new Color(0.66f, 0.83f, 0.57f)),   // round 4: (0.70,1,0.84) and (0.80,1,0.55) both stayed salmon: red cut to half so R~G>B reads honey-tan/ochre
             ("CV_Limewash", "limewash", new Color(1.06f, 1.0f, 0.94f)), ("CV_Flagstone", "flagstone", new Color(1.0f, 0.95f, 0.9f)),
             ("CV_BarrelOak", "barrel_oak", new Color(1.1f, 1.0f, 0.9f)), ("CV_Soot", "soot_coal", new Color(1.1f, 1.05f, 1.0f)),
             ("CV_RootBark", "root_bark", new Color(2.0f, 1.65f, 1.25f)), ("CV_Oak", "oak_timber", new Color(0.85f, 0.74f, 0.62f)),
@@ -214,7 +214,7 @@ namespace SleepingCalamity.EditorTools
                 foreach (var fs in FabSlots)
                     if (fs.Slot == s.Slot) { B0Fab.TexSet set = B0Fab.Megascans(fs.Folder, fs.Prefix); if (set != null) B0Fab.Apply(m, set, fs.Tiles); }
                 // round 3: the scans' normals read as melted plaster / chunky bricks at full strength
-                float bumpMul = s.Slot == "CV_Brick" || s.Slot == "CV_VaultStone" ? 0.55f : s.Slot == "CV_Limewash" ? 0.5f : 1f;
+                float bumpMul = s.Slot == "CV_Brick" || s.Slot == "CV_VaultStone" ? 0.30f : s.Slot == "CV_Limewash" ? 0.5f : 1f;
                 if (bumpMul != 1f && m.HasProperty("_BumpScale")) m.SetFloat("_BumpScale", m.GetFloat("_BumpScale") * bumpMul);
                 float peak = Mathf.Max(1f, Mathf.Max(s.Tint.r, Mathf.Max(s.Tint.g, s.Tint.b)));
                 m.SetColor("_BaseColor", new Color(s.Tint.r / peak, s.Tint.g / peak, s.Tint.b / peak, 1f).gamma);
