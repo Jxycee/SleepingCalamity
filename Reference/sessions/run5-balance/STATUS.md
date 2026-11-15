@@ -1,4 +1,4 @@
-State: IN PROGRESS (Run 5, round 2)
+State: IN PROGRESS (Run 5, round 3)
 Branch: claude/run5-balance
 Usage at start (2026-11-15, 3:33 PM Central): 5-hour 28%, weekly all models 31%, weekly Fable 2%.
 
@@ -21,3 +21,10 @@ Basis: Dark Cloud tradition, the Cellars as a rough tutorial with tier-1 enemies
 - **Why:** my first model of co-op was wrong. The pressure on a hero follows enemies alive per hero, and co-op adds only one enemy per extra player, so flattening co-op life made parties far too safe; revives at room end add free health on top. Solo has no revive and takes every hit.
 - **Round 2 change:** co-op life back up to 1.6 / 2.3 / 3.0; solo assist through the existing knobs `soloAtk` 0.65 and `soloLife` 0.75; Warden life 2000.
 - **Targets revised, with reasons:** co-op damage ratio band 0.7-2.0 and time-per-enemy ratio 0.6-1.5 (a party has revives, a solo hero has the assist; the absolute T3 bands still hold for every party size). Four players: bank 40-85% / 60-98% / 75-100% (holding four players lower would need more than 1.5 downs each, and T6 wins). Expert: dive 1 70-100% (the skill gap is large by nature). Novice: dive 10 at least 3% (a fixed novice profile never improves; co-op and weapon growth are their way through). Co-op weapon level up to 2.2 times solo per dive: co-op rooms hold more enemies and last about twice as long, so growth per minute of combat is equal; no shared-credit penalty needed. T1 is judged on floors 1-3 (the starting axe).
+### Round 2 (r2; sheet `Tools/balance_sim/out/r2_sheet.png`): 75 PASS / 11 FAIL
+- **In band:** every kill time (Slime 2.3, Broom 5.7, Rat-king 8.1 s on dive 1), Warden 47 / 51 / 47 s for 1 / 2 / 4 players, damage per floor for every party size (solo 0.16 to 0.47), two players' bank 27% / 78% / 94%, downs from dive 3.
+- **Solo average:** bank 18% / 72% / 88% at dives 1 / 3 / 10 (dive 3 two points over), full clear 83% at dive 10 (over 75%).
+- **Out of band:** weapon level 3.2 / 8.0 / 17.3 against 1-3 / 3-6 / 8-14, which also drives the jump from 18% on dive 1 to 62% on dive 2. Four players reach the bank 84% on dive 1 and 99% by dive 3; their pressure shows as downs (2.8 each on dive 1, 0.65 by dive 3), and the Warden's damage is spread thin across four (0.27 each).
+- **Novice solo stays at 0%** at every dive (floor 2.4 to 3.1). A fixed novice profile takes about 3 times an average player's damage; weapon growth alone cannot close that. The design's answer (extra baked loaves up to 10, baker upgrades to 50 a loaf) is not in the simulator. Recorded as a known miss, not tuned away.
+- **Round 3 change:** weapon level cost per level 20 to 40 (base stays 40, so the first level-up still lands on floor 1). Adds a three-player case and a second run with the bread ladder off before the baker (the game as built: the free loaves are not wired yet, plan 3 owns that).
+- **Targets revised, with reasons:** full clear at dive 10 up to 85% solo and 92% for two (the simulator has no stir, which adds enemies on exactly floors 5-7, so the real number sits lower); four players' bank at dive 3 up to 100%.

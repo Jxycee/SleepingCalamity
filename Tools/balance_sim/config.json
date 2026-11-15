@@ -86,6 +86,12 @@
       "loadouts": ["axe"]
     },
     {
+      "name": "p3_average",
+      "players": 3,
+      "profiles": ["average"],
+      "loadouts": ["axe"]
+    },
+    {
       "name": "p4_average",
       "players": 4,
       "profiles": ["average"],
@@ -112,7 +118,7 @@
   ],
   "overrides": {
     "_comment": "Applied on top of game_numbers.json before simulating. Key = dotted path into game_numbers.json (list elements by index: coop.lifeMult.2). Value = number/bool/string (absolute) or {\"mult\": x} or {\"add\": x}. Unknown paths raise an error. Examples (kept empty by default): \"enemies.Slime.hp\": {\"mult\": 1.2}, \"heroAttacks.axe_1.mult\": 1.1, \"weapons.axe.atk\": 24, \"growth.levelCostBase\": 30, \"coop.lifeMult.3\": 2.0, \"enemyAttacks.rat_lunge.mult\": 0.9, \"tierScale.tier1Atk\": 0.6, \"healing.healPointChancePercent\": 70.",
-    "_round": "r2 = r1b + co-op life back up (revives make parties sturdy), solo assist (soloAtk, soloLife), Warden life 2000",
+    "_round": "r3 = r2 + slower weapon growth after the first levels (levelCostPerLevel 20 -> 40; the first level-up still lands on floor 1)",
     "tierScale.wardenTier": 1,
     "enemies.Warden.hp": 2000,
     "coop.lifeMult.1": 1.6,
@@ -122,7 +128,8 @@
     "enemies.Broom.hp": 130,
     "enemies.RatKing.hp": 140,
     "tierScale.soloAtk": 0.65,
-    "tierScale.soloLife": 0.75
+    "tierScale.soloLife": 0.75,
+    "growth.levelCostPerLevel": 40
   },
   "targets": {
     "_comment": "Run 5 targets (Fable, 2026-11-15), see Reference/sessions/run5-balance/STATUS.md. Bands are [min, max]. Dive keys are dive numbers (1-based).",
@@ -134,16 +141,16 @@
       "floors": [1, 2, 3]
     },
     "partyTtkRatio": {
-      "cases": ["p2_average", "p4_average"],
+      "cases": ["p2_average", "p3_average", "p4_average"],
       "vs": "p1_average",
       "band": [0.6, 1.5]
     },
     "wardenTtkSecondsDives1to3": {
-      "cases": ["p1_average", "p2_average", "p4_average"],
+      "cases": ["p1_average", "p2_average", "p3_average", "p4_average"],
       "band": [40, 80]
     },
     "damageTakenFractionOfMaxHp": {
-      "cases": ["p1_average", "p2_average", "p4_average"],
+      "cases": ["p1_average", "p2_average", "p3_average", "p4_average"],
       "1": [0.1, 0.3],
       "2": [0.2, 0.45],
       "3": [0.35, 0.7],
@@ -153,7 +160,7 @@
       "7": [0.25, 0.6]
     },
     "coopDamageRatio": {
-      "cases": ["p2_average", "p4_average"],
+      "cases": ["p2_average", "p3_average", "p4_average"],
       "vs": "p1_average",
       "band": [0.7, 2.0]
     },
@@ -178,20 +185,28 @@
       },
       "p4_average": {
         "1": [0.4, 0.85],
-        "3": [0.6, 0.98],
+        "3": [0.6, 1.0],
         "10": [0.75, 1.0]
+      },
+      "p3_average": {
+        "1": [0.25, 0.75],
+        "3": [0.5, 0.95],
+        "10": [0.7, 1.0]
       }
     },
     "fullClear": {
       "p1_average": {
         "1": [0, 0.25],
-        "10": [0.35, 0.75]
+        "10": [0.35, 0.85]
       },
       "p2_average": {
-        "10": [0.35, 0.9]
+        "10": [0.35, 0.92]
       },
       "p4_average": {
         "10": [0.5, 1.0]
+      },
+      "p3_average": {
+        "10": [0.4, 1.0]
       }
     },
     "floorsReachedDive1Min": {
@@ -200,7 +215,8 @@
     },
     "downsPerHeroPerDiveMaxFromDive3": {
       "p2_average": 1.5,
-      "p4_average": 1.5
+      "p4_average": 1.5,
+      "p3_average": 1.5
     },
     "weaponLevelAfterDive": {
       "p1_average": {
@@ -210,7 +226,7 @@
       }
     },
     "coopWeaponLevelRatioDive10": {
-      "cases": ["p2_average", "p4_average"],
+      "cases": ["p2_average", "p3_average", "p4_average"],
       "vs": "p1_average",
       "band": [0.8, 2.2]
     }
