@@ -26,6 +26,7 @@ namespace SleepingCalamity.EditorTools
             public float OverviewFog;                                           // the overview camera's own density (corner: fog off there)
             public float SkyThickness, SkyExposure; public Color SkyTint;       // procedural sky
             public float Ambient = 1f;                                          // scales the corner's trilight colours
+            public float Sun = 1f;                                              // town Morning only: scales the corner's sun intensity
 
             public Look Clone() => (Look)MemberwiseClone();
 
@@ -51,6 +52,7 @@ namespace SleepingCalamity.EditorTools
                         case "skyexp": l.SkyExposure = F(v); break;
                         case "skytint": l.SkyTint = C(v); break;
                         case "ambient": l.Ambient = F(v); break;
+                        case "sun": l.Sun = F(v); break;
                         default: throw new System.ArgumentException("unknown look key '" + k + "'");
                     }
                 }
@@ -91,6 +93,7 @@ namespace SleepingCalamity.EditorTools
         {
             FogDensity = 0.0062f, OverviewFog = 0.0016f, FogColor = new Color(0.84f, 0.82f, 0.74f),
             Exposure = 0.25f, Ambient = 0.62f, SkyExposure = 1.18f, SkyTint = new Color(0.53f, 0.51f, 0.47f),
+            Sun = 1.22f, Contrast = 8f,   // round 2: the sunlit side was still dull (p90 .66-.71, target .80-.86): a stronger sun and a little grade contrast (ADDED to the corner's 8)
         };
         public static readonly Look Evening = new Look { FogDensity = 0.006f, OverviewFog = 0.002f };
 
@@ -143,6 +146,7 @@ namespace SleepingCalamity.EditorTools
             {
                 skyTurn = SunAzimuth(TownMorningSun) - SunAzimuth(sun.transform.rotation);
                 sun.transform.rotation = TownMorningSun;
+                sun.intensity *= look.Sun;   // ApplyPreset just set the corner's value, so this never compounds
             }
             Material cornerSky = RenderSettings.skybox;
             if (cornerSky != null && cornerSky.HasProperty("_Rotation"))
@@ -161,11 +165,13 @@ namespace SleepingCalamity.EditorTools
             Volume post = Object.FindFirstObjectByType<Volume>();
             if (corner != null && post != null)
             {
-                float cornerExposure = corner.TryGet(out ColorAdjustments cornerGrade) ? cornerGrade.postExposure.value : 0f;
+                bool graded = corner.TryGet(out ColorAdjustments cornerGrade);
+                float cornerExposure = graded ? cornerGrade.postExposure.value : 0f, cornerContrast = graded ? cornerGrade.contrast.value : 0f;
                 post.sharedProfile = LookTestBuilder.EnsureProfile(MorningProfileName, p =>
                 {
                     CopyProfile(corner, p);
-                    LookTestBuilder.Comp<ColorAdjustments>(p).postExposure.Override(cornerExposure + look.Exposure);
+                    ColorAdjustments grade = LookTestBuilder.Comp<ColorAdjustments>(p);
+                    grade.postExposure.Override(cornerExposure + look.Exposure); grade.contrast.Override(cornerContrast + look.Contrast);
                 });
             }
         }

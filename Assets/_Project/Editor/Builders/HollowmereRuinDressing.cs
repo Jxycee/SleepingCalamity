@@ -136,6 +136,7 @@ namespace SleepingCalamity.EditorTools
             // Area 1 rework (Run 6): a real young tree has grown up through each ruin since the town fell (S 1, M 1, L 2; 3.8-8 m; HollowmereWild.LotTree, no
             // collider), so the ruined rows carry height and cast shade. The crossed-card sapling stays as the fallback while the tree prefabs are missing.
             int nSap = f.Size == FoundationSize.L ? 2 : 1;
+            if (Mathf.Abs(f.Centre.X) < 10f && f.Centre.Z > 6f && f.Centre.Z < HollowmereLayout.KeepWallZ) nSap = 0;   // the lots under the terrace balcony: its view over the square stays open (round 2)
             for (int i = 0; i < nSap; i++)
             {
                 Vector2 p = Pick(2.4f);

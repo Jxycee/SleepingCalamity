@@ -146,18 +146,23 @@ namespace SleepingCalamity.EditorTools
         // ------------------------------------------------------------------------------------------------ 2. town trees
         static void TownTrees(Transform parent)
         {
-            const float cell = 6f;
-            for (int ix = -9; ix <= 9; ix++)
-                for (int iz = -11; iz <= 5; iz++)
+            // Round 2: the first rule (6 m grid, two chance gates) found 7 spots: free ground inside the wall is scarce. Now every 4 m cell is tried, with a
+            // light chance gate, and the back of the outer lots (PlateauDistance over 12, the ground 3-6 m under the square) takes the tall trees: seen from the
+            // square they stand over the ruined rows and hide the wall and the bare ground past it.
+            const float cell = 4f;
+            for (int ix = -14; ix <= 14; ix++)
+                for (int iz = -17; iz <= 7; iz++)
                 {
-                    if (Hash01(ix, iz, 101) > 0.42f) continue;
+                    if (Hash01(ix, iz, 101) > 0.8f) continue;
                     float x = (ix + 0.15f + 0.7f * Hash01(ix, iz, 103)) * cell, z = (iz + 0.15f + 0.7f * Hash01(ix, iz, 105)) * cell;
-                    if (HollowmereLayout.PlateauDistance(x, z) > 25f || z > HollowmereLayout.KeepWallZ - 1.5f) continue;   // inside the wall, below the keep terrace
-                    if (Mathf.PerlinNoise(x * 0.045f + 31.7f, z * 0.045f + 8.3f) < 0.40f) continue;                          // groves and gaps, not an even scatter
-                    if (!Clear(x, z, 2.5f, 3.5f)) continue;
+                    float e = HollowmereLayout.PlateauDistance(x, z);
+                    if (e > 25f || z > HollowmereLayout.KeepWallZ - 1.5f) continue;   // inside the wall, below the keep terrace
+                    if (Mathf.Abs(x) < 9f && z > 6f) continue;                       // the balcony's view over the square stays open
+                    if (!Clear(x, z, 1.8f, 4.2f, laneGap: 1.6f)) continue;
                     float roll = Hash01(ix, iz, 107);
-                    string[] slot = roll < 0.5f ? Small : roll < 0.9f ? Medium : Big;
-                    float h = roll < 0.5f ? Mathf.Lerp(4.5f, 6.5f, Hash01(ix, iz, 109)) : roll < 0.9f ? Mathf.Lerp(7f, 9.5f, Hash01(ix, iz, 109)) : Mathf.Lerp(10f, 12f, Hash01(ix, iz, 109));
+                    bool outer = e > 12f;
+                    string[] slot = outer ? (roll < 0.55f ? Medium : roll < 0.85f ? Big : Small) : (roll < 0.55f ? Small : roll < 0.92f ? Medium : Big);
+                    float h = slot == Small ? Mathf.Lerp(4.5f, 6.5f, Hash01(ix, iz, 109)) : slot == Medium ? Mathf.Lerp(outer ? 9f : 7f, outer ? 12.5f : 9.5f, Hash01(ix, iz, 109)) : Mathf.Lerp(outer ? 12f : 10f, outer ? 15.5f : 12f, Hash01(ix, iz, 109));
                     if (Plant(parent, slot, new Vector3(x, GroundY(x, z), z), h, Hash01(ix, iz, 111) * 360f, 0.92f + 0.16f * Hash01(ix, iz, 113), true, 3f) != null) { trunks.Add(new Vector2(x, z)); nTown++; }
                 }
         }
@@ -167,15 +172,16 @@ namespace SleepingCalamity.EditorTools
         // 8-11 m under the square, so the trees are tall (12-18 m) to stand 3-8 m over the wall top from inside the town. The lake foreshore stays open.
         static void WallBelt(Transform parent)
         {
-            const float cell = 5.5f;
-            for (int ix = -19; ix <= 19; ix++)
-                for (int iz = -22; iz <= 6; iz++)
+            // Round 2: 49 trees and shrubs did not read from the square. Tighter grid (4.6 m), smaller gaps, the band starts at the ditch's outer lip (33.5).
+            const float cell = 4.6f;
+            for (int ix = -24; ix <= 24; ix++)
+                for (int iz = -27; iz <= 8; iz++)
                 {
                     float x = (ix + 0.1f + 0.8f * Hash01(ix, iz, 201)) * cell, z = (iz + 0.1f + 0.8f * Hash01(ix, iz, 203)) * cell;
                     float e = HollowmereLayout.PlateauDistance(x, z);
-                    if (e < 34.5f || e > 60f) continue;
+                    if (e < 33.5f || e > 60f) continue;
                     if (HollowmereLayout.BackHill(x, z) > 0.05f) continue;                 // the hill forest takes over
-                    if (z < -62f && x > -45f && x < 60f) continue;                         // the lake foreshore: the south view stays open over the water
+                    if (z < -62f && x > -8f && x < 50f) continue;                          // the lake foreshore: the view south from the Lower Gate stays open over the water (trees frame it on both sides)
                     float clump = Mathf.PerlinNoise(x * 0.028f + 5.1f, z * 0.028f + 19.4f);
                     bool hedgeLine = false;
                     if (e > 45f)
@@ -188,10 +194,10 @@ namespace SleepingCalamity.EditorTools
                         }
                         if (Hash01(ix, iz, 205) > (hedgeLine ? 0.30f : 0.22f)) continue;   // thin past the belt
                     }
-                    else if (clump < 0.36f) continue;                                      // the gaps in the belt
+                    else if (clump < 0.27f) continue;                                      // the gaps in the belt
                     if (!Clear(x, z, 2.5f, hedgeLine ? 5f : 4f)) continue;
                     float roll = Hash01(ix, iz, 207), y = GroundY(x, z);
-                    if (clump < 0.43f && e <= 45f)
+                    if (clump < 0.33f && e <= 45f)
                     {
                         // the ragged edge of a clump: shrubs and saplings
                         if (Plant(parent, roll < 0.5f ? TallShrub : LowShrub, new Vector3(x, y, z), roll < 0.5f ? Mathf.Lerp(1.8f, 3.2f, Hash01(ix, iz, 209)) : Mathf.Lerp(0.8f, 1.4f, Hash01(ix, iz, 209)),
@@ -199,7 +205,7 @@ namespace SleepingCalamity.EditorTools
                         continue;
                     }
                     string[] slot = roll < 0.55f ? Medium : roll < 0.82f ? Big : roll < 0.92f ? Conifer : Small;
-                    float h = slot == Small ? Mathf.Lerp(7f, 9f, Hash01(ix, iz, 209)) : Mathf.Lerp(12f, 18f, Hash01(ix, iz, 209)) * (hedgeLine ? 0.8f : 1f);
+                    float h = slot == Small ? Mathf.Lerp(7f, 9f, Hash01(ix, iz, 209)) : Mathf.Lerp(14f, 20f, Hash01(ix, iz, 209)) * (hedgeLine ? 0.75f : 1f);
                     if (Plant(parent, slot, new Vector3(x, y, z), h, Hash01(ix, iz, 211) * 360f, 0.9f + 0.2f * Hash01(ix, iz, 213), true, 3.5f) != null) { trunks.Add(new Vector2(x, z)); nBelt++; }
                 }
         }
@@ -209,6 +215,24 @@ namespace SleepingCalamity.EditorTools
         static void CragFoot(Transform parent)
         {
             GameObject[] rocks = { Adopted("T11a"), Adopted("T11b") }; GameObject fern = Adopted("T12b");
+            // Round 2: rock outcrops ON the crag face. The bank is terrain at 50 degrees and more, where any terrain layer stretches into stripes; big boulders
+            // half sunk into it (2.2-5 m, in overlapping groups, thicker behind the keep where the walk passes) turn it into broken rock with earth between.
+            for (int i = -70; i <= 70; i++)
+            {
+                float x = (i + 0.8f * Hash01(i, 31, 303)) * 2.1f;
+                if (Hash01(i, 32, 303) > (Mathf.Abs(x) < 70f ? 0.78f : 0.5f)) continue;
+                float up = Hash01(i, 33, 303);                                             // 0 at the foot, 1 at the crag's top
+                float z = HollowmereLayout.HillFoot(x) + Mathf.Lerp(0.8f, HollowmereLayout.CragRun + 0.6f, up);
+                if (!Clear(x, z, 1.0f, 0f, steepLimit: 89f, colliders: false)) continue;
+                GameObject rock = rocks[Hash01(i, 34, 303) < 0.5f ? 0 : 1] ?? rocks[0] ?? rocks[1];
+                if (rock == null) break;
+                float h = Mathf.Lerp(2.2f, 5f, Hash01(i, 35, 303) * Hash01(i, 36, 303) + 0.1f);
+                var go = Instance(parent, rock, new Vector3(x, GroundY(x, z) - 0.42f * h, z), h / Mathf.Max(0.05f, Height(rock)), 0f);
+                go.transform.rotation = Quaternion.Euler((Hash01(i, 37, 303) - 0.5f) * 50f, Hash01(i, 38, 303) * 360f, (Hash01(i, 39, 303) - 0.5f) * 50f);
+                go.transform.localScale = Vector3.Scale(go.transform.localScale, new Vector3(1f + 0.5f * Hash01(i, 40, 303), 1f, 1f + 0.5f * Hash01(i, 41, 303)));
+                go.name = "Outcrop";
+                nRocks++;
+            }
             for (int i = -47; i <= 47; i++)
             {
                 float x = (i + 0.8f * Hash01(i, 1, 301)) * 3f;
@@ -433,11 +457,11 @@ namespace SleepingCalamity.EditorTools
         }
 
         // The placement rules of the file header. `margin` is the clearance from lots and landmarks, `trunkGap` the distance to other trunks (0: not a tree).
-        static bool Clear(float x, float z, float margin, float trunkGap, float steepLimit = 38f)
+        static bool Clear(float x, float z, float margin, float trunkGap, float steepLimit = 38f, float laneGap = 2.2f, bool colliders = true)
         {
             if (!SaltwakeRoadPlan.OnTerrain(x, z, 1.5f)) return false;
             var p = new TownPoint(x, z); var p2 = new Vector2(x, z);
-            if (HollowmereTerrain.IsPaved(layout, x, z) || LaneEdge(p) < 2.2f) return false;
+            if (HollowmereTerrain.IsPaved(layout, x, z) || LaneEdge(p) < laneGap) return false;
             if (PathDistance(p2) < 1.6f) return false;
             foreach (Foundation f in layout.Foundations) if (f.Footprint.Contains(p, margin)) return false;
             foreach (Landmark l in layout.Landmarks) if (l.Footprint.Contains(p, margin)) return false;
@@ -446,6 +470,7 @@ namespace SleepingCalamity.EditorTools
             if (y < HollowmereLayout.WaterY + 1.2f) return false;
             if (Steepness(x, z) > steepLimit) return false;
             if (trunkGap > 0f) foreach (Vector2 q in trunks) if ((q - p2).sqrMagnitude < trunkGap * trunkGap) return false;
+            if (!colliders) return true;
             int n = Physics.OverlapSphereNonAlloc(new Vector3(x, y + 1.3f, z), 1.0f, hits, ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < n; i++) if (!(hits[i] is TerrainCollider)) return false;
             return true;

@@ -40,7 +40,7 @@ Material:
     - _HazeFar: 0.42
     - _HazeNear: 0.32
     - _HazeTop: 0.3
-    - _HazeTopHeight: 870
+    - _HazeTopHeight: 670
     - _KeyBias: 0.1
     - _KeyBoost: 2
     - _KeyWrap: 1

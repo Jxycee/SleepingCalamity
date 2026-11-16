@@ -226,8 +226,11 @@ namespace SleepingCalamity.EditorTools
                         {
                             float wood = Smooth(0.2f, 3f, hill);
                             float litter = Mathf.PerlinNoise(x * 0.06f + 211f, z * 0.06f + 87f);
-                            soil = Mathf.Max(soil, wood * (0.32f + 0.38f * Smooth(0.35f, 0.75f, litter)));
-                            path = Mathf.Max(path, wood * 0.22f * Smooth(0.5f, 0.8f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
+                            // Round 2: the first build read as a bare tan slope (soil + the steep rule's cobble, stretched). Woodland floor is mostly grass and moss
+                            // in the shade, with litter patches; the crag keeps more earth.
+                            float cragFace = wood * (1f - Smooth(HollowmereLayout.CragHeight - 1f, HollowmereLayout.CragHeight + 4f, hill));
+                            soil = Mathf.Max(soil, wood * (0.10f + 0.30f * Smooth(0.45f, 0.8f, litter)) + 0.35f * cragFace);
+                            path = Mathf.Max(path, wood * 0.10f * Smooth(0.55f, 0.85f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
                         }
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
@@ -235,6 +238,7 @@ namespace SleepingCalamity.EditorTools
                         // A8 (town surfaces): a raw earth slope stretched one low-res soil tile over 3 m. Steep ground takes half its weight in the cobble layer (grey rubble
                         // flecks in the earth, its own mask map) and the earth tile is smaller (layers[1] below), so banks read as stony earth, not a stretched brown sheet.
                         float rock = 0.65f * Smooth(22f, 36f, steep) * (1f - Smooth(0.2f, 1.2f, -lane));
+                        rock *= 1f - 0.85f * Smooth(0.2f, 3f, hill);   // Bell Hill (28-34 degrees all over) is not a rubble bank: the cobble layer stretched there read as tiles
                         grass *= 1f - rock; soil *= 1f - rock; path *= 1f - rock; cobble = rock;
                     }
                     a[j, i, 0] = grass; a[j, i, 1] = soil; a[j, i, 2] = path; a[j, i, 3] = cobble;

@@ -19,7 +19,7 @@ namespace SleepingCalamity.EditorTools
     public static class HollowmereBackdropTuning
     {
         public static bool Ridges = true, Mountain = true, Wisp = true, Windmill = true, Lighthouse = true;
-        public static float MountainAzDeg = -118f, MountainDist = 2600f, MountainHeight = 900f;   // area 1 rework: 560 -> 900 with the taller ranges;   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180); the far ridges hide its lower 7 degrees
+        public static float MountainAzDeg = -118f, MountainDist = 2600f, MountainHeight = 700f;   // area 1 rework: 560 -> 700 with the taller ranges (900 read as a pale spike, not a slumped massif);   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180); the far ridges hide its lower 7 degrees
         public static float WindmillAzDeg = -62f, LighthouseAzDeg = 186f, WindmillScale = 2.0f, LighthouseScale = 1.8f;
         public static float WispAlpha = 0.07f;
     }

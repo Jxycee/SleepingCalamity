@@ -395,7 +395,7 @@ namespace SleepingCalamity.EditorTools
         // the far ridge a blue-violet (Cool is luminance-normalised in the shader, so cooling changes hue, not value).
         static readonly Haze NearHaze = new Haze(0.56f, 0.76f, 150f, 700f, new Color(0.97f, 1.0f, 0.93f), 0.10f, 0.05f, 0.03f, new Color(0.95f, 1.0f, 1.05f), 0.25f);     // the ring trees: the nearest silhouette layer
         static readonly Haze GroundHaze = new Haze(0.88f, 0.78f, 150f, 700f, Color.white, 0.03f, 0.08f, 0.05f, new Color(0.9f, 0.97f, 1.1f), 0.35f);   // the ring ground: matches the scene fog at the terrain edge (no seam); full fog at the terrain edge (no seam), easing to the hills-foot haze by 700 m so the far ground no longer sits pale against the dark hills (that was the flat cyan strip behind the tree line)
-        static readonly Haze MidHaze = new Haze(0.72f, 0.70f, 560f, 1500f, new Color(0.98f, 1.0f, 1.03f), 0.22f, 0.06f, 0.03f, new Color(0.70f, 0.88f, 1.30f), 0.8f);       // foot mist (up to +0.15) takes it to the ground's haze, thinning toward the crest
+        static readonly Haze MidHaze = new Haze(0.66f, 0.68f, 560f, 1500f, new Color(0.98f, 1.0f, 1.03f), 0.22f, 0.12f, 0.06f, new Color(0.70f, 0.88f, 1.30f), 0.5f);   // area 1 rework round 2: a little less haze and cooling, more noise (the doubled ridge read as one flat lavender band)       // foot mist (up to +0.15) takes it to the ground's haze, thinning toward the crest
         static readonly Haze FarHaze = new Haze(0.84f, 0.90f, 1400f, 2700f, new Color(0.97f, 1.0f, 1.05f), 0.06f, 0.02f, 0.01f, new Color(0.62f, 0.76f, 1.45f), 1.0f);
 
         static Material Backdrop(string name, Texture2D tex, Color tint, Haze h, bool cards)
