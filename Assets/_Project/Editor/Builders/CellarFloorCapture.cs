@@ -20,7 +20,7 @@ namespace SleepingCalamity.EditorTools
             CaptureTo(DefaultDir());
         }
 
-        const float OverviewAmbientBoost = 2.6f;
+        const float OverviewAmbientBoost = 5f;
         static string DefaultDir() => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Reference", "cellars", "floors"));
 
         public static void CaptureAll()

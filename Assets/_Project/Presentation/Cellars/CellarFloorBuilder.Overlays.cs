@@ -67,7 +67,7 @@ namespace SleepingCalamity.Presentation
                     Vector3 c = CellCenter(x, y);
                     string id = x + "_" + y;
 
-                    if (damp != null && Rand01(layout.Seed, layout.Floor, x, y, 1) < look.Wet * 0.22f)
+                    if (damp != null && look.Salt <= 0f && Rand01(layout.Seed, layout.Floor, x, y, 1) < look.Wet * 0.22f)
                     {
                         float size = 1.1f + 0.7f * Rand01(layout.Seed, layout.Floor, x, y, 2), yaw = 360f * Rand01(layout.Seed, layout.Floor, x, y, 3);
                         Vector3 at = c + new Vector3((Rand01(layout.Seed, layout.Floor, x, y, 4) - 0.5f) * 1.6f, 0.015f, (Rand01(layout.Seed, layout.Floor, x, y, 5) - 0.5f) * 1.6f);

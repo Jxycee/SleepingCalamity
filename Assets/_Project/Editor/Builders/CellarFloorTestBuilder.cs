@@ -69,8 +69,9 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.AddCapture(cams, "Floor_Room", camPos, camTarget, 78f);
             var (corPos, corTarget) = CorridorView(layout);
             LookTestBuilder.AddCapture(cams, "Floor_Corridor", corPos, corTarget, 70f);
+            AddFixtureViews(cams, root, built, layout);
             DungeonCornerBuilder.DarkBackground(cams);
-            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // the roofless cutaway: warm umber backdrop; the vaulted views keep the corner's near-black
+            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = OverviewBackdrop(Floor);   // per floor, so the 320 px thumbnails tell the floors apart (the roofless cutaway)
 
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " floor=" + Floor + " overlays=" + built.Overlays + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
@@ -145,6 +146,21 @@ namespace SleepingCalamity.EditorTools
             foreach (Transform t in markers)
                 foreach (string h in hide)
                     if (t.name.StartsWith(h)) { foreach (MeshRenderer r in t.GetComponentsInChildren<MeshRenderer>(true)) r.enabled = false; break; }
+        }
+
+        // B8 round 3: the overview backdrop per floor: cool grey limewash (1-2), honey gold (3-5), dark soot (6-7).
+        static Color OverviewBackdrop(int floor) => floor <= 2 ? new Color(0.46f, 0.45f, 0.43f) : floor <= 5 ? new Color(0.55f, 0.38f, 0.14f) : new Color(0.12f, 0.08f, 0.07f);
+
+        // Floor_Groin: play height under the first groin bay (an interior cell of a room 3+ cells each way); Floor_Fixture: close on the first wall sconce. Both fall back to the room view / skip when absent.
+        static void AddFixtureViews(Transform cams, Transform root, CellarFloorBuild built, CellarFloorLayout layout)
+        {
+            Transform ceiling = built.Root.Find(CellarFloorBuilder.CeilingGroup);
+            Transform groin = null;
+            if (ceiling != null) foreach (Transform t in ceiling) if (t.name.StartsWith("GroinBay_")) { groin = t; break; }
+            if (groin != null) LookTestBuilder.AddCapture(cams, "Floor_Groin", groin.position + new Vector3(-3.2f, 1.7f, -3.2f), groin.position + new Vector3(0.6f, 3.2f, 0.6f), 78f);
+            Transform lamps = built.Root.Find(CellarFloorBuilder.LampGroup), sconce = null;
+            if (lamps != null) foreach (Transform l in lamps) { sconce = l.Find("Sconce"); if (sconce != null) break; }
+            if (sconce != null) LookTestBuilder.AddCapture(cams, "Floor_Fixture", sconce.position + sconce.forward * 4.2f + new Vector3(0.8f, -0.5f, 0f), sconce.position, 38f);
         }
 
         // The largest combat room (first on a tie): the camera stands at play height in its south-west corner cell and looks at its far north-east cell.
