@@ -18,20 +18,24 @@ namespace SleepingCalamity.EditorTools
 {
     public static class CellarFloorTestBuilder
     {
-        public const string ScenePath = "Assets/_Project/Scenes/CellarFloorTest.unity";
+        const string ScenePathBase = "Assets/_Project/Scenes/CellarFloorTest";
         public const uint Seed = 12345;
-        public const int FloorNumber = 1;
+        public const int FloorNumber = 1;   // the default floor; SC_FLOOR=<1-7> builds another (look-table checks: floors 1, 4, 6), into CellarFloorTest_f<N>.unity, floor 1 keeps the plain name
+        // The floor this run builds: env SC_FLOOR (1-7), default FloorNumber.
+        public static int Floor => int.TryParse(System.Environment.GetEnvironmentVariable("SC_FLOOR"), out int f) ? Mathf.Clamp(f, CellarFloorLook.FirstFloor, CellarFloorLook.LastFloor) : FloorNumber;
+        public static string ScenePath => Floor == FloorNumber ? ScenePathBase + ".unity" : ScenePathBase + "_f" + Floor + ".unity";
         const float Ambient = CellarArtTuning.Ambient;   // the colour tuning block lives in CellarFloorBuilder.Art.cs (was 0.8)
         const string ClutterFolder = "Assets/_Project/Content/Art/Cellar/B5/CellarClutter";
         static readonly string[] ClutterPieces = { "Crate", "CrateStack", "JarCluster", "Rubble", "SackPile" };
         const string MaterialsFolder = "Assets/_Project/Content/Materials/CellarFloor";
         const string LanternFolder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
-        static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate" };
+        static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate", "GroinBay", "PillarRound", "WallAshlar", "WallBrickArch", "WallSoot", "WallLime", "SconceCage", "LanternChain", "LanternOil" };
 
         [MenuItem("SleepingCalamity/Art/Build Cellar Floor Test")]
         public static void Build()
         {
-            CellarFloorLayout layout = CellarFloorGenerator.Layout(Seed, FloorNumber);
+            CellarFloorLookRow look = CellarFloorLook.For(Floor);
+            CellarFloorLayout layout = CellarFloorGenerator.Layout(Seed, Floor);
             Scene scene = DungeonCornerBuilder.NewRoomScene();
             DungeonCornerBuilder.BuildProfile();
 
@@ -39,6 +43,7 @@ namespace SleepingCalamity.EditorTools
             var templates = new GameObject("KitTemplates").transform; templates.SetParent(root, false); templates.gameObject.SetActive(false);
             CellarFloorKit kit = BuildKit(templates);
             CellarFloorBuild built = CellarFloorBuilder.Build(layout, root, kit);
+            HideQaMarkers(built.Root);
             Object.DestroyImmediate(templates.gameObject);
 
             var lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
@@ -48,8 +53,8 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.AddVolume(lighting, DungeonCornerBuilder.ProfileName);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = Ambient;   // vaulted rooms: nearer the corner's 0.23 than the roofless greybox's 1.6
+            RenderSettings.ambientSkyColor = look.AmbientTop; RenderSettings.ambientEquatorColor = look.AmbientEquator;   // B8: the floor's trilight from the look table (design section 3)
+            RenderSettings.ambientGroundColor = look.AmbientBottom; RenderSettings.ambientIntensity = Ambient;   // vaulted rooms: nearer the corner's 0.23 than the roofless greybox's 1.6
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
 
@@ -64,11 +69,12 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.AddCapture(cams, "Floor_Room", camPos, camTarget, 78f);
             var (corPos, corTarget) = CorridorView(layout);
             LookTestBuilder.AddCapture(cams, "Floor_Corridor", corPos, corTarget, 70f);
+            AddFixtureViews(cams, root, built, layout);
             DungeonCornerBuilder.DarkBackground(cams);
-            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // the roofless cutaway: warm umber backdrop; the vaulted views keep the corner's near-black
+            cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = OverviewBackdrop(Floor);   // per floor, so the 320 px thumbnails tell the floors apart (the roofless cutaway)
 
             BuilderUtil.SaveScene(scene, ScenePath);
-            Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
+            Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " floor=" + Floor + " overlays=" + built.Overlays + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
         }
 
         // The art-layer kit of the real Cellars floor: floor tile, B5 vault pieces, the floor-art-2 clutter (Crate, CrateStack, JarCluster, Rubble, SackPile), lantern, materials
@@ -84,12 +90,14 @@ namespace SleepingCalamity.EditorTools
                 Floor = slots["CV_Flagstone"], Wall = slots["CV_Brick"], Pillar = slots["CV_VaultStone"], Trim = slots["CV_Oak"], Flame = own["flame"],
                 // B2: the locked gate and plain chests wear the cellar oak instead of glowing red / flat brown greybox blocks; the spawn, entry, special-room and door-hint markers are QA-only and draw nothing (CellarFloorBuilder.ShowDebugMarkers; the spawn discs read as white discs on the floor)
                 LockedGate = slots["CV_Oak"], Chest = slots["CV_BarrelOak"],
-                KeyChest = Marker("CF_KeyChest", new Color(0.95f, 0.72f, 0.12f), 0.8f), Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
+                KeyChest = slots["CV_Oak"], Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
                 EntryStart = Marker("CF_Entry", new Color(0.30f, 0.58f, 0.18f), 0.5f), StairExit = Marker("CF_Stair", new Color(0.55f, 0.30f, 0.70f), 0.6f),
                 SpawnT1 = Marker("CF_SpawnT1", new Color(0.62f, 0.60f, 0.55f), 0f), SpawnT2 = Marker("CF_SpawnT2", new Color(0.85f, 0.45f, 0.10f), 0f),
                 FogBaseDensity = 0.007f, FogBaseColor = new Color(0.16f, 0.13f, 0.11f),   // the corner's fog; the floor's atmosphere roll scales and warms this
                 Ceiling = slots["CV_VaultStone"], Limewash = slots["CV_Limewash"], Iron = slots["CV_Iron"], Crate = slots["CV_BarrelOak"],
                 Wax = own["wax"], Mote = own["mote"],
+                // B8 overlays: the adopted C03 alpha-clip sets (C03a moss patches, C03b moss clump, C03c water streak, C03d mud/damp); null when the asset is not there (cobwebs C04 has none)
+                DecalMoss = AdoptedMaterial("C03a"), DecalMossClump = AdoptedMaterial("C03b"), DecalLeak = AdoptedMaterial("C03c"), DecalDamp = AdoptedMaterial("C03d"),
                 Pieces = new Dictionary<string, GameObject>(),
             };
             GameObject vault = BeautyCornerArt.LoadModel(DungeonCornerBuilder.KitFolder, DungeonCornerBuilder.KitFbx, keepMaterialSlots: true);
@@ -126,6 +134,33 @@ namespace SleepingCalamity.EditorTools
             if (lantern != null && lanternMat != null) { kit.Lantern = lantern; kit.LanternMaterial = lanternMat; }
             Debug.Log("SC CELLARFLOOR kit floorTile=" + (kit.FloorTile != null ? "B5 art" : "greybox slab") + " lantern=" + (kit.Lantern != null ? "B11 art" : "flame sphere"));
             return kit;
+        }
+
+        // B8 round 2: the greybox QA markers (carrier capsule, stair disc, bank disc, healing disc and orb, baker, warden, entry and spawn discs) stand in the hierarchy for tests but draw
+        // nothing in this look-test scene, so captures show the floor, not placeholders. Chests keep their oak boxes.
+        static void HideQaMarkers(Transform floorRoot)
+        {
+            Transform markers = floorRoot.Find(CellarFloorBuilder.MarkerGroup);
+            if (markers == null) return;
+            string[] hide = { "Carrier", "StairExit", "Bank", "HealingPoint", "HealingOrb", "Baker", "Warden", "EntryStart", "Spawn" };
+            foreach (Transform t in markers)
+                foreach (string h in hide)
+                    if (t.name.StartsWith(h)) { foreach (MeshRenderer r in t.GetComponentsInChildren<MeshRenderer>(true)) r.enabled = false; break; }
+        }
+
+        // B8 round 3: the overview backdrop per floor: cool grey limewash (1-2), honey gold (3-5), dark soot (6-7).
+        static Color OverviewBackdrop(int floor) => floor <= 2 ? new Color(0.46f, 0.45f, 0.43f) : floor <= 5 ? new Color(0.55f, 0.38f, 0.14f) : new Color(0.12f, 0.08f, 0.07f);
+
+        // Floor_Groin: play height under the first groin bay (an interior cell of a room 3+ cells each way); Floor_Fixture: close on the first wall sconce. Both fall back to the room view / skip when absent.
+        static void AddFixtureViews(Transform cams, Transform root, CellarFloorBuild built, CellarFloorLayout layout)
+        {
+            Transform ceiling = built.Root.Find(CellarFloorBuilder.CeilingGroup);
+            Transform groin = null;
+            if (ceiling != null) foreach (Transform t in ceiling) if (t.name.StartsWith("GroinBay_")) { groin = t; break; }
+            if (groin != null) LookTestBuilder.AddCapture(cams, "Floor_Groin", groin.position + new Vector3(-3.2f, 1.7f, -3.2f), groin.position + new Vector3(0.6f, 3.2f, 0.6f), 78f);
+            Transform lamps = built.Root.Find(CellarFloorBuilder.LampGroup), sconce = null;
+            if (lamps != null) foreach (Transform l in lamps) { sconce = l.Find("Sconce"); if (sconce != null) break; }
+            if (sconce != null) LookTestBuilder.AddCapture(cams, "Floor_Fixture", sconce.position + sconce.forward * 4.2f + new Vector3(0.8f, -0.5f, 0f), sconce.position, 38f);
         }
 
         // The largest combat room (first on a tie): the camera stands at play height in its south-west corner cell and looks at its far north-east cell.
@@ -209,6 +244,8 @@ namespace SleepingCalamity.EditorTools
             }
             finally { Object.DestroyImmediate(holderRoot); }
         }
+
+        static Material AdoptedMaterial(string code) => AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/B2/M_" + code + ".mat");
 
         static Material Marker(string name, Color c, float glow)
         {

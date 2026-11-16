@@ -137,7 +137,7 @@ namespace SleepingCalamity.Tests.EditMode
 
         // Pinned from the first run: a change to the trim or light rules changes them on purpose.
         const ulong GoldenTrim12345Floor1 = 13227003863544816685UL, GoldenTrim12345Floor2 = 8280870466982864294UL, GoldenTrim12345Floor3 = 14394277620009763814UL;   // re-pinned by plan 3 task 3/4;   // re-pinned by rooms-v2 (pool resize)
-        const ulong GoldenLights12345Floor1 = 4423935260014456059UL, GoldenLights12345Floor2 = 16095538575615222836UL, GoldenLights12345Floor3 = 14394277620009763814UL;   // re-pinned by rooms-v2 (pool resize)
+        const ulong GoldenLights12345Floor1 = 4342787907815943265UL, GoldenLights12345Floor2 = 4426672782664196888UL, GoldenLights12345Floor3 = 14394277620009763814UL;   // re-pinned by B8 route lamps (floors 1 and 2; floor 3 is a set piece, unchanged); before: rooms-v2 (pool resize)
 
         [Test]
         public void Golden_Seed12345_TrimAndLightHashes()

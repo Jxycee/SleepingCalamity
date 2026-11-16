@@ -29,6 +29,7 @@ namespace SleepingCalamity.Presentation
         public float FogBaseDensity;            // > 0: Build sets RenderSettings exponential fog to this density times the floor's FogPercent, tinted from FogBaseColor
         public Color FogBaseColor;              // the scene's fog colour before the floor's warm offset
         public Material Ceiling, Limewash, Iron, Wax, Mote, Crate;   // vault stone, end-wall limewash, chains and hooks, candles, dust motes, crates
+        public Material DecalLeak, DecalDamp, DecalMoss, DecalMossClump;   // B8 overlays (adopted C03 sets: alpha-clip cards); null skips that overlay
         // B5 CellarVault pieces by name (VaultSegment, ArchRib, Pillar, EndWall, NicheWall, LarderShelf, CoalChute, Barrels, Roots, BreathGrate): each a holder
         // whose child is the piece at its authored pivot, so the builder only moves, turns and scales the holder. Missing pieces fall back to boxes or nothing.
         [System.Serializable] public struct NamedPiece { public string Name; public GameObject Prefab; }
@@ -67,7 +68,7 @@ namespace SleepingCalamity.Presentation
         public const string FloorGroup = "Floor", WallGroup = "Walls", DoorGroup = "Doors", PillarGroup = "Pillars", MarkerGroup = "Markers", LampGroup = "Lamps";
         public const string VignetteGroup = "Vignettes", AtmosphereGroup = "Atmosphere";
         const float Tile = 2f;
-        const int BigRoomCells = 12;
+        const int BigRoomCells = 8;   // B8 round 2: 12 -> 8, so a mid-size room is not left to one wall lantern
         static readonly Color GoldLamp = new Color(1.0f, 0.80f, 0.54f);   // the approved dungeon corner's paler lantern gold (not orange)
 
         public static Vector3 CellCenter(int x, int y) => new Vector3((x + 0.5f) * CellSize, 0f, -(y + 0.5f) * CellSize);
@@ -139,7 +140,8 @@ namespace SleepingCalamity.Presentation
             var root = new GameObject("CellarFloor_s" + layout.Seed + "_f" + layout.Floor).transform;
             var result = new CellarFloorBuild { Root = root };
             var grid = new Grid(layout);
-            var mats = new Mats(kit);
+            CellarFloorLookRow look = CellarFloorLook.For(layout.Floor);
+            var mats = new Mats(kit, look);
 
             Transform floor = Group(root, FloorGroup), walls = Group(root, WallGroup), doors = Group(root, DoorGroup), pillars = Group(root, PillarGroup);
             Transform markers = Group(root, MarkerGroup), lamps = Group(root, LampGroup);
@@ -220,8 +222,9 @@ namespace SleepingCalamity.Presentation
             Dress(layout, dressing, grid, root, kit, mats, result);
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
             Procgen(layout, dressing, Group(root, ProcgenGroup), mats, result);
-            Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
-            ArtFinish(root, kit, result);   // art layer: lamp gold and fog colour from CellarArtTuning
+            Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, look, result);
+            Overlays(layout, grid, root, kit, look, result);
+            ArtFinish(root, kit, mats, look, result);   // art layer: lamp colour, floor material variants and fog from the floor's look and CellarArtTuning
             ParentBuiltFloor(root, parent, result);
             return result;
         }
@@ -315,6 +318,7 @@ namespace SleepingCalamity.Presentation
         static void Lamps(CellarFloorLayout layout, CellarFloorDressing dressing, Grid grid, Transform group, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
         {
             CellarAtmosphere atm = dressing.Atmosphere; float k = Mathf.Clamp(atm.LampPercent, 20, 115) / 100f;
+            bool coal = layout.Floor >= CoalFloor;
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r]; int n = 0; bool hasSocket = false;
@@ -325,11 +329,12 @@ namespace SleepingCalamity.Presentation
                     if (!s.Filled) continue;
                     Vector3 c = CellCenter(s.Cell.X, s.Cell.Y);
                     Vector3 wall = SideDir(CellarRoom.Opposite(s.Facing));
-                    Transform wl = Lamp(group, "Lamp_r" + r + "_" + n++, c + wall * (CellSize * 0.5f - 0.3f) + new Vector3(0, 2.3f, 0), kit, mats, WallLampIntensity * k, 12f, true);
-                    Box(wl, "Hook", wl.position + wall * 0.12f + new Vector3(0, 0.02f, 0), wall.x != 0 ? new Vector3(0.26f, 0.04f, 0.04f) : new Vector3(0.04f, 0.04f, 0.26f), mats.Iron, 1f, false);
+                    Transform wl = Lamp(group, "Lamp_r" + r + "_" + n++, c + wall * (CellSize * 0.5f - 0.3f) + new Vector3(0, 2.3f, 0), kit, mats, WallLampIntensity * k, 12f, true, "sconce", wall);
+                    if (wl.Find("Sconce") == null) Box(wl, "Hook", wl.position + wall * 0.12f + new Vector3(0, 0.02f, 0), wall.x != 0 ? new Vector3(0.26f, 0.04f, 0.04f) : new Vector3(0.04f, 0.04f, 0.26f), mats.Iron, 1f, false);
                     result.Lamps++;
                 }
-                if (hasSocket && (n == 0 || p.Room.FloorCount < BigRoomCells)) continue;   // a big room gets a hanging centre lamp as well as its wall lanterns
+                bool emptyRoll = hasSocket && n == 0;   // B8 round 2: every lantern rolled empty: on a lit floor the room still gets a (dimmer) centre lamp, a dark floor keeps it black
+                if (hasSocket && ((n == 0 && atm.Dark) || (n > 0 && p.Room.FloorCount < BigRoomCells))) continue;   // a big room gets a hanging centre lamp as well as its wall lanterns
                 if (atm.Dark && p.Room.Kind == RoomKind.Combat) continue;
                 // nearest floor cell to the room's centre
                 float cx = p.X + p.Width * 0.5f - 0.5f, cy = p.Y + p.Height * 0.5f - 0.5f; int bx = -1, by = -1; float best = float.MaxValue;
@@ -340,28 +345,42 @@ namespace SleepingCalamity.Presentation
                     if (d < best) { best = d; bx = p.X + lx; by = p.Y + ly; }
                 }
                 if (bx < 0) continue;
-                Transform cl = Lamp(group, "Lamp_r" + r + "_c", CellCenter(bx, by) + new Vector3(0, 3.0f, 0), kit, mats, CentreLampIntensity * k, 13f, true);
-                Chain(cl, mats, RoomSpring + VaultRise);
+                Transform cl = Lamp(group, "Lamp_r" + r + "_c", CellCenter(bx, by) + new Vector3(0, 3.0f, 0), kit, mats, CentreLampIntensity * k * (emptyRoll ? 0.8f : 1f), 13f, true, coal ? "oil" : "chain");
+                Chain(cl, mats, RoomSpring + VaultRise, cl.Find("Fixture") != null ? FixtureRise(coal ? "oil" : "chain") : 0f);
                 result.Lamps++;
             }
             foreach (PlacedCorridor c in layout.Corridors)
             {
                 if ((c.X + c.Y) % 2 != 0) continue;
                 if ((c.X * 31 + c.Y * 17) % 100 >= atm.LampPercent) continue;   // thinned by position, no RNG: the same cells on every peer
-                Transform kl = Lamp(group, "Lamp_c" + c.X + "_" + c.Y, CellCenter(c.X, c.Y) + new Vector3(0, 3.0f, 0), kit, mats, CorridorLampIntensity * k, 9f, false);
-                Chain(kl, mats, CorridorSpring + VaultRise);
+                Transform kl = Lamp(group, "Lamp_c" + c.X + "_" + c.Y, CellCenter(c.X, c.Y) + new Vector3(0, 3.0f, 0), kit, mats, CorridorLampIntensity * k, 9f, false, coal ? "oil" : "lantern");
+                Chain(kl, mats, CorridorSpring + VaultRise, kl.Find("Fixture") != null ? FixtureRise("oil") : 0f);
                 result.Lamps++;
             }
         }
 
-        static Transform Lamp(Transform group, string name, Vector3 pos, CellarFloorKit kit, Mats mats, float intensity, float range, bool shadows)
+        // The kit fixture a lamp wears (B8): "sconce" = SconceCage on the wall behind it (wallDir points at the wall), "chain" = LanternChain hung from a hook FixtureRise above the lamp point,
+        // "oil" = LanternOil hanging on its bail, "lantern" = the B11 CellarLantern. A missing piece falls back to the B11 lantern. The fixture's object is named "Sconce" or "Fixture".
+        static float FixtureRise(string fixture) => fixture == "chain" ? 0.75f : 0.2f;
+
+        static Transform Lamp(Transform group, string name, Vector3 pos, CellarFloorKit kit, Mats mats, float intensity, float range, bool shadows, string fixture = "lantern", Vector3 wallDir = default)
         {
             var go = new GameObject(name).transform; go.SetParent(group, false); go.position = pos;
             var lg = new GameObject("Light"); lg.transform.SetParent(go, false);
             Light l = lg.AddComponent<Light>(); l.type = LightType.Point; l.color = GoldLamp; l.intensity = intensity; l.range = range;
             l.shadows = shadows ? LightShadows.Soft : LightShadows.None;
             if (shadows) { l.shadowStrength = 1f; l.shadowBias = 0.03f; l.shadowNormalBias = 0.4f; }
-            if (kit.Lantern != null)
+            string piece = fixture == "sconce" ? "SconceCage" : fixture == "chain" ? "LanternChain" : fixture == "oil" ? "LanternOil" : null;
+            if (piece != null && HasPiece(kit, piece))
+            {
+                Vector3 at; Quaternion rot = Quaternion.identity;
+                if (fixture == "sconce") { at = pos + wallDir * 0.1f - new Vector3(0, 0.1f, 0); rot = Quaternion.LookRotation(-wallDir, Vector3.up); }   // the mount sits on the wall face, the cage projects into the room
+                else if (fixture == "chain") at = pos + new Vector3(0, FixtureRise(fixture), 0);                                                       // origin at the top hook
+                else at = pos - new Vector3(0, 0.34f - FixtureRise(fixture), 0);                                                                       // origin at the base: the bail meets the chain
+                GameObject fx = PlacePiece(kit, piece, go, fixture == "sconce" ? "Sconce" : "Fixture", at, rot, Vector3.one);
+                foreach (Renderer rd in fx.GetComponentsInChildren<Renderer>(true)) rd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // the light sits inside it
+            }
+            else if (kit.Lantern != null)
             {
                 GameObject lan = Object.Instantiate(kit.Lantern, go, false); lan.name = "Lantern"; lan.SetActive(true);
                 if (kit.LanternMaterial != null)
@@ -377,9 +396,9 @@ namespace SleepingCalamity.Presentation
         }
 
         // An iron chain (a thin bar) from a hanging lamp's top up into the vault crown.
-        static void Chain(Transform lamp, Mats mats, float ceilingY)
+        static void Chain(Transform lamp, Mats mats, float ceilingY, float rise = 0f)
         {
-            Vector3 p = lamp.position; float len = ceilingY - p.y + 0.1f;
+            Vector3 p = lamp.position + new Vector3(0, rise, 0); float len = ceilingY - p.y + 0.1f;
             if (len > 0.05f) Box(lamp, "Chain", new Vector3(p.x, p.y + len * 0.5f, p.z), new Vector3(0.035f, len, 0.035f), mats.Iron, 1f, false);
         }
 
@@ -415,15 +434,15 @@ namespace SleepingCalamity.Presentation
         // ------------------------------------------------------------------------------------------------ atmosphere
         // Fog (when the kit gives a base), the odd-light patch of one combat room (a warm tinted point light) and the dust-motes marker. TODO: a ParticleSystem prefab for the
         // motes once the dungeon corner kit has one (none exists yet); the empty marker object marks where it goes and lets a test read the toggle.
-        static void Atmosphere(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, CellarFloorKit kit, CellarFloorBuild result)
+        static void Atmosphere(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, CellarFloorKit kit, CellarFloorLookRow look, CellarFloorBuild result)
         {
             CellarAtmosphere atm = dressing.Atmosphere;
             if (kit.FogBaseDensity > 0f)
             {
                 atm.FogTintOffset(out float fr, out float fg, out float fb);
-                result.FogDensity = kit.FogBaseDensity * atm.FogPercent / 100f;
+                result.FogDensity = look.FogDensity * atm.FogPercent / 100f;   // the floor's look density; the atmosphere roll (dark floors) still scales it
                 RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = result.FogDensity;
-                RenderSettings.fogColor = new Color(Mathf.Clamp01(kit.FogBaseColor.r + fr), Mathf.Clamp01(kit.FogBaseColor.g + fg), kit.FogBaseColor.b + fb);
+                RenderSettings.fogColor = new Color(Mathf.Clamp01(look.FogTint.r + fr), Mathf.Clamp01(look.FogTint.g + fg), look.FogTint.b + fb);
             }
             if (atm.OddLightRoom >= 0)
             {
@@ -472,12 +491,54 @@ namespace SleepingCalamity.Presentation
         {
             readonly Dictionary<Color, Material> flat = new Dictionary<Color, Material>();
             public readonly Material Floor, Wall, Pillar, Trim, Ceiling, Limewash, Iron, Wax, Flame, Crate;
-            public Mats(CellarFloorKit k)
+            // B8: the floor's look makes per-floor material instances of the wall, limewash, stone (piers, vault, ceiling) and floor materials (the kit's shared assets stay untouched);
+            // Swap maps each kit material to its instance, so ArtFinish can re-skin the kit-piece clones (they hold the kit's own materials).
+            public readonly Dictionary<Material, Material> Swap = new Dictionary<Material, Material>();
+            readonly CellarFloorLookRow look;
+            public Mats(CellarFloorKit k, CellarFloorLookRow look)
             {
-                Floor = k.Floor ?? Flat(new Color(0.42f, 0.38f, 0.33f)); Wall = k.Wall ?? Flat(new Color(0.55f, 0.47f, 0.38f));
-                Pillar = k.Pillar ?? Flat(new Color(0.50f, 0.46f, 0.42f)); Trim = k.Trim ?? Flat(new Color(0.34f, 0.25f, 0.17f));
-                Ceiling = k.Ceiling ?? Pillar; Limewash = k.Limewash ?? Flat(new Color(0.62f, 0.56f, 0.47f)); Iron = k.Iron ?? Flat(new Color(0.16f, 0.15f, 0.14f));
+                this.look = look;
+                Material wallSrc = k.Wall ?? Flat(new Color(0.55f, 0.47f, 0.38f)), limeSrc = k.Limewash ?? Flat(new Color(0.62f, 0.56f, 0.47f));
+                Material pillarSrc = k.Pillar ?? Flat(new Color(0.50f, 0.46f, 0.42f)), floorSrc = k.Floor ?? Flat(new Color(0.42f, 0.38f, 0.33f));
+                Color limeBase = BaseColorOf(limeSrc);
+                Wall = Variant(wallSrc, "Wall", c => Color.Lerp(Mul(c, look.WallTint), limeBase, look.Limewash * LimewashPull), 0f);
+                Limewash = Variant(limeSrc, "Limewash", c => Mul(c, Color.Lerp(Color.white, look.WallTint, 0.5f)), 0f);
+                if (look.Limewash >= LimewashWallFrom) Wall = Limewash;   // B8 round 2: limewash floors (1-2) face their walls in the limewash material itself: tinting a red brick texture toward white stayed brick-red
+                Pillar = Stone(pillarSrc); Ceiling = k.Ceiling != null ? Stone(k.Ceiling) : Pillar;
+                float wetDark = 1f - WetDarken * look.Wet;
+                Floor = Variant(floorSrc, "Floor", c => Mul(c, new Color(wetDark, wetDark, wetDark, 1f)), WetGloss * look.Wet);
+                Trim = k.Trim ?? Flat(new Color(0.34f, 0.25f, 0.17f)); Iron = k.Iron ?? Flat(new Color(0.16f, 0.15f, 0.14f));
                 Wax = k.Wax ?? Flat(new Color(0.62f, 0.55f, 0.42f)); Flame = k.Flame ?? Flat(new Color(1.0f, 0.7f, 0.3f)); Crate = k.Crate ?? Trim;
+            }
+
+            static readonly Dictionary<(Material, int, string), Material> Cache = new Dictionary<(Material, int, string), Material>();
+            [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] static void ResetCache() => Cache.Clear();
+            public const float LimewashWallFrom = 0.5f, LimewashPull = 0.6f, WetDarken = 0.15f, WetGloss = 0.15f, SootDarken = 0.45f;
+            static Color Mul(Color a, Color b) => new Color(a.r * b.r, a.g * b.g, a.b * b.b, a.a);
+            static Color BaseColorOf(Material m) => m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : m.HasProperty("_Color") ? m.GetColor("_Color") : Color.white;
+
+            // Stone: wall tint at 60% (vault stone is paler than brick) darkened by the floor's soot weight; one instance per source material.
+            Material Stone(Material src)
+            {
+                if (Swap.TryGetValue(src, out Material have) && have != src) return have;
+                float soot = Mathf.Lerp(1f, 1f - SootDarken, look.Soot);
+                return Variant(src, "Stone", c => Mul(Mul(c, Color.Lerp(Color.white, look.WallTint, 0.6f)), new Color(soot, soot, soot, 1f)), 0f);
+            }
+
+            // An instance of src with its colour passed through recolour (both _BaseColor and _Color) and its smoothness raised by gloss.
+            Material Variant(Material src, string tag, System.Func<Color, Color> recolour, float gloss)
+            {
+                // one instance per (source material, floor, slot) for the process: a rebuilt floor (every client, every dive) reuses it instead of leaking a new copy
+                var key = (src, look.Floor, tag);
+                if (Cache.TryGetValue(key, out Material cached) && cached != null) { Swap[src] = cached; return cached; }
+                var m = new Material(src) { name = "CellarLook_f" + look.Floor + "_" + tag };
+                Cache[key] = m;
+                Color c = recolour(BaseColorOf(src)); c.a = BaseColorOf(src).a;
+                if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+                if (m.HasProperty("_Color")) m.SetColor("_Color", c);
+                if (gloss > 0f && m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", Mathf.Clamp01(m.GetFloat("_Smoothness") + gloss));
+                Swap[src] = m;
+                return m;
             }
             public Material Marker(Material fromKit, Color fallback) => fromKit != null ? fromKit : Flat(fallback);
             public Material Flat(Color c)

@@ -243,7 +243,7 @@ def wall_profile(r=R_OUT, segs=24):
     pts.append((-r, SPRING))
     return pts
 
-def wall_body(pc, cutters, y0=-0.5, y1=0.0, back_key=None, uvfix=None):
+def wall_body(pc, cutters, y0=-0.5, y1=0.0, back_key=None, uvfix=None, front_key=None):
     """Brick wall body of the vault section with arched cutters (boolean), chamfered rim; returns after merging into pc.
     Recess faces facing +y inside a cutter get limewash, the rest brick."""
     bm = prism_bm(wall_profile(), y0, y1)
@@ -273,6 +273,10 @@ def wall_body(pc, cutters, y0=-0.5, y1=0.0, back_key=None, uvfix=None):
             uvfix(f, uvl)
     def key(f):
         c = f.calc_center_median()
+        if front_key is not None and f.normal.y > 0.9:
+            k = front_key(f, c)      # B8 wall variants pick the face material (stone, soot, brick infill); None falls through to the default
+            if k:
+                return k
         if f.normal.y > 0.9:
             if y1 - 0.07 < c.y < y1 - 0.02:
                 return 'brick'            # the floor of a window in the render
