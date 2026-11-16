@@ -54,7 +54,7 @@ namespace SleepingCalamity.EditorTools
                 string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");   // e.g. "SquareSouth,Fountain": only the cameras whose name contains one of them
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 // Default: Midday renders every camera; LowSun (design 7: "at midday and low sun") only the four play-position cameras, files <Camera>_<Preset>_LowSun.png.
-                BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") is string sunEnv && System.Enum.TryParse(sunEnv, out BeautyCornerBuilder.Preset one) ? new[] { one } : new[] { BeautyCornerBuilder.Preset.Morning, BeautyCornerBuilder.Preset.Evening };
+                BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") is string sunEnv && !int.TryParse(sunEnv, out _) && System.Enum.TryParse(sunEnv, out BeautyCornerBuilder.Preset one) && System.Enum.IsDefined(typeof(BeautyCornerBuilder.Preset), one) ? new[] { one } : new[] { BeautyCornerBuilder.Preset.Morning, BeautyCornerBuilder.Preset.Evening };
                 string variantSpec = System.Environment.GetEnvironmentVariable("SC_LOOK_VARIANTS");
                 string[] variants = string.IsNullOrEmpty(variantSpec) ? new[] { "" } : variantSpec.Split(';');
                 foreach (string variant in variants)

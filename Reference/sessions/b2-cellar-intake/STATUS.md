@@ -1,4 +1,4 @@
-State: DONE (partial): merged to main; downloads and adoption pending the user's Fab sign-in (QUEUE). Archive: ready
+State: DONE: B2 merged (partial: 36 prefabs + 11 material sets adopted; 5 non-Megascans + rats left). Archive: ready
 Branch: claude/b2-cellar-intake
 Task: build-plan row B2 (asset intake: cellars) + B0 leftovers
 Started: 2026-11-15
@@ -18,3 +18,9 @@ Listing URL = https://www.fab.com/listings/<id>. Full table with names: docs/des
 - B0 leftovers (commit 7494ce2f, 3 art rounds): brick tint retuned to ochre-tan (CV_Brick 0.64,0.84,0.55), bumpMul 0.55 to 0.30; niche arch rebuilt as 9 seated voussoirs in Art/Blender/cellars/sc_cellar_vault.py (CellarVault.fbx re-exported, kit 38k tris); sconce faces the room in Mid/Wide (not visible in Close, it is on the left wall); UndercroftStair captured (Top, Turn, Bottom).
 - Palette p10/p50/p90: Wide 0.10/0.26/0.66, Mid 0.10/0.24/0.60, Close 0.13/0.33/0.85. Self-score about 24/24/23 of 40 (below the 25 line; the art-round cap was reached).
 - Unfixed: Close wall and stair brick still lean salmon-red; spiky sliver corners on the niche outer ring; dark shards top right of Stair_Turn; normal not blurred. Candidates for a later cellar-kit round (B8).
+
+## Adoption (claude/b2-adopt, 2026-11-15)
+- Fab downloads done via the Launcher (UI-driven script, no credentials/API): 58 listings; C15d Old Lantern fetched last. Settings: Texture Set or FBX, Medium (2K). C04, C07d, C11c textures were 4096 px: deleted (2K cap).
+- B2CellarIntake: 42 prefabs + 11 material sets, 0 failures; 6 prefabs then dropped on the style review (C13a, C13c, C14b, C10c, C14c, C12c). Skipped for hand adoption: C04, C07d, C11c, C15b, C15d (non-Megascans), A04a/b rats (rigged, own job).
+- Sheet: scratchpad b2_cellar_sheet.png and b2_vs_c2.jpg (no palette run, no post/fog). Score 24/40 (props strong in warm light; kit pieces weak, material decals not meaningful on spheres; C03 alpha sets need card/decal use).
+- Next: hand-adopt C04, C07d, C11c, C15b, C15d at 2K; confirm non-Megascans licences (C15b probably CC-BY); B8 cellar kit rebuilds C13 doors/arches.

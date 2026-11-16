@@ -154,6 +154,7 @@ namespace SleepingCalamity.EditorTools
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var root = new GameObject("Hollowmere").transform;
+            HollowmereRuinDressing.Reset();
             Transform set = Child(root, "Set");
 
             BuildGround(set, t);
@@ -169,6 +170,7 @@ namespace SleepingCalamity.EditorTools
                 if (row.Id == "PlazaCobbles") continue;   // B3 (DH4): the town square has one ground (HollowmereSquare); the corner's fan setts left an island round the fountain
                 BeautyCornerTable.Row placed = StallFolder("Stall_1") != null ? WithoutStallDressing(row) : row;   // the produce stall art carries its own goods and lantern
                 if (placed != null) BeautyCornerBuilder.PlaceRow(RebuiltOnlyRows.Contains(row.Id) ? Child(rebuilt, "Corner") : both, placed);
+                if (row.Id == "FountainRing") DropRingBed(both);
             }
             ThinCornerWeeds(both, ruined, t);
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
@@ -228,6 +230,18 @@ namespace SleepingCalamity.EditorTools
             throw new InvalidOperationException("No Hollowmere root in the open scene");
         }
 
+        // B3 polish: the FountainRing row also lays Art_RingBed (the corner's PlazaBed tileable, a different grain and tone from the square's coursed T01c ground), which showed as an
+        // island round the fountain. The square bed under it is draped at the same height, so the ring bed goes; the flagstone ring itself stays.
+        static void DropRingBed(Transform both)
+        {
+            Transform g = both.Find("FountainRing");
+            if (g == null) return;
+            var doomed = new List<GameObject>();
+            foreach (Transform c in g.GetComponentsInChildren<Transform>(true)) if (c.name.StartsWith("Art_RingBed", StringComparison.Ordinal)) doomed.Add(c.gameObject);
+            foreach (GameObject d in doomed) if (d != null) UnityEngine.Object.DestroyImmediate(d);
+            Debug.Log("SC HOLLOWMERE B3 polish: " + doomed.Count + " Art_RingBed removed from the fountain ring");
+        }
+
         // A3 round 2: the corner's CrackWeeds row is laid for the corner's own plaza (its "edge" is x +-6, z -4.5..6.2), so in the town it sprinkled tufts evenly over the open
         // cobbles of both presets. Keep the ones at the square's border or against a building (85%), a rare stray (7%) elsewhere; about 40% of the keepers stay in Rebuilt (a tended
         // town), the rest move under the Ruined root. Position-hashed, so two builds match.
@@ -242,6 +256,8 @@ namespace SleepingCalamity.EditorTools
             var list = new List<Transform>();
             foreach (Transform c in holder) list.Add(c);
             int dropped = 0, moved = 0;
+            Material crack = BeautyCornerArt.CrackWeedsMaterial();
+            Material olive = crack != null ? HollowmereSquare.OliveTufts(crack) : null;   // the shared atlas reads lime on the town's stone: the square's olive copy
             foreach (Transform c in list)
             {
                 Vector3 p = c.position; var tp = new TownPoint(p.x, p.z);
@@ -252,8 +268,15 @@ namespace SleepingCalamity.EditorTools
                 uint h = unchecked((uint)Mathf.RoundToInt(p.x * 50f + 50000f) * 73856093u ^ (uint)Mathf.RoundToInt(p.z * 50f + 50000f) * 19349663u);
                 h ^= h >> 15; h *= 0x2c1b3c6du; h ^= h >> 12; h *= 0x297a2d39u; h ^= h >> 15;
                 float roll = (h % 1000u) / 1000f;
-                if (roll >= (atWall ? 0.85f : 0.07f)) { UnityEngine.Object.DestroyImmediate(c.gameObject); dropped++; }
+                if (roll >= (atWall ? 0.85f : 0f)) { UnityEngine.Object.DestroyImmediate(c.gameObject); dropped++; }   // B3 polish: no strays in the open middle (they read as lone lime tufts)
                 else if (roll > 0.4f) { c.SetParent(ruinedOnly, true); moved++; }
+                if (olive != null && c != null && roll < (atWall ? 0.85f : 0f))
+                    foreach (Renderer rd in c.GetComponentsInChildren<Renderer>(true))
+                    {
+                        var mats = new Material[Mathf.Max(1, rd.sharedMaterials.Length)];
+                        for (int k = 0; k < mats.Length; k++) mats[k] = olive;
+                        rd.sharedMaterials = mats;
+                    }
             }
             Debug.Log("SC HOLLOWMERE corner weeds thinned: " + dropped + " removed, " + moved + " ruined-only, " + (list.Count - dropped - moved) + " in both presets");
         }

@@ -469,7 +469,7 @@ class Ruin:
         def mk(z0, z1):
             lst = []; z = z0
             while z < z1 - 0.12:
-                h = min(R.uniform(0.19, 0.25) * (0.9 + 0.1 * B), z1 - z); lst.append([z, h]); z += h
+                h = min(R.uniform(0.27, 0.40) * (0.9 + 0.1 * B), z1 - z); lst.append([z, h]); z += h   # B3 polish: chunkier courses (0.19-0.25 read as stacked slabs)
             if lst:
                 lst[-1][1] = z1 - lst[-1][0]
             return lst
@@ -508,7 +508,7 @@ class Ruin:
         def block(xl, y, z0, h, sx, sy, mat, last, broken=0.0):
             zc = z0 + h / 2
             tilt = c['lean'] + math.radians(R.uniform(-1.5, 1.5))
-            jx = cjit.setdefault(round(z0, 3), R.uniform(-0.03, 0.03))        # each course sits a little off its neighbours
+            jx = cjit.setdefault(round(z0, 3), R.uniform(-0.05, 0.05)) + R.uniform(-0.02, 0.02)   # each course (and block) sits a little off its neighbours: no flat slab faces
             xf = place(cx + xl + tl * zc + jx, y, zc, math.radians(R.uniform(-2.5, 2.5)), math.radians(R.uniform(-1.5, 1.5)), tilt)
             vs, fs = soft_box((sx - 0.035, sy - R.uniform(0.0, 0.03), h - 0.02), xf, R, soft=R.uniform(0.07, 0.15), wob=0.018,
                               bulge=0.01, cuts=0, top_break=(0.05 + broken) if (last and R.random() < 0.6) else 0.0)
@@ -526,7 +526,7 @@ class Ruin:
             for fy, ysg in ((ymin + t / 2, 'f'), (yb - t / 2, 'b')):               # front and back walls
                 x0 = -W / 2 + (t if odd else 0.0); x1 = W / 2 - (t if odd else 0.0)
                 cuts = [-(r + jam) - x0, -r - x0, r - x0, r + jam - x0] if (arch and ysg == 'f') else []
-                for a, b in seg(x1 - x0, 0.38 * B, 0.68 * B, cuts):
+                for a, b in seg(x1 - x0, 0.38 * B, 0.68 * B, cuts) if arch else seg(x1 - x0, 0.22 * B, 0.36 * B, cuts):   # B3 polish: the stack's walls are 0.5-0.7 m wide, one block each read as slabs
                     xm = x0 + (a + b) / 2; ao = abs(xm)
                     if arch and ysg == 'f':
                         crown = zspr + r + jam
@@ -540,7 +540,7 @@ class Ruin:
             for sx_ in (-1, 1):                                                     # side walls
                 xs = sx_ * (W / 2 - t / 2)
                 y0 = ymin + (0.0 if odd == 0 else 0.0) + (0.0 if odd else t); y1 = yb - (0.0 if odd else t)
-                for a, b in seg(y1 - y0, 0.34 * B, 0.6 * B):
+                for a, b in seg(y1 - y0, 0.34 * B, 0.6 * B) if arch else seg(y1 - y0, 0.2 * B, 0.34 * B):
                     ym = y0 + (a + b) / 2
                     if z0 + h * 0.55 >= hh(xs, ym):
                         continue
