@@ -40,7 +40,7 @@ namespace SleepingCalamity.Tests.EditMode
 
         // Fast tier: 200 seeds. The 2000-seed sweep is Soak (1000+ seed sweeps run with `unity.ps1 soak`; it timed out the fast tier under machine load).
         [Test] public void GeneratedNames_NoRepeatInDive() => NoRepeatInDive(200);
-        [Test, Category("Soak")] public void GeneratedNames_NoRepeatInDive_Soak() => NoRepeatInDive(2000);
+        [Test, Category("Soak"), Timeout(600000)] public void GeneratedNames_NoRepeatInDive_Soak() => NoRepeatInDive(2000);
 
         [Test]
         public void ThemeTables_AreFiveNamesEach()
