@@ -45,8 +45,8 @@ namespace SleepingCalamity.Tests.EditMode
         {
             R("slime_hop", 60, "34-40", 1.0f, 1.1f, 180f, 1f, false, "16-34@2.2", "none", "0-14@360"),
             R("slime_glob", 66, "46-52", 0.8f, 1.3f, 180f, 1f, false, "none@0", "none", "none@0"),
-            R("rat_lunge", 62, "28-36", 1.1f, 1.45f, 42f, 1f, false, "16-28@3.4", "none", "0-14@720"),
-            R("rat_spin", 62, "30-40", 1.3f, 1.45f, 180f, 2f, false, "none@0", "none", "none@0"),
+            R("rat_lunge", 62, "28-36", 0.85f, 1.45f, 42f, 1f, false, "16-28@3.4", "none", "0-14@720"),
+            R("rat_spin", 62, "30-40", 1.0f, 1.45f, 180f, 2f, false, "none@0", "none", "none@0"),
             R("broom_sweep", 70, "36-44", 1.2f, 2.4f, 80f, 3f, false, "none@0", "none", "0-20@300"),
             R("broom_poke", 52, "28-34", 1.0f, 1.9f, 30f, 1f, false, "16-28@1.2", "none", "0-14@420"),
             R("warden_slam", 100, "56-64", 2.1f, 3.0f, 55f, 4f, true, "none@0", "0-100", "0-40@200"),
@@ -109,7 +109,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(AttackCatalog.EnemyAttackById["rat_lunge"], Is.SameAs(a));
             Assert.That(Array.IndexOf(AttackCatalog.AllEnemyAttacks, a), Is.EqualTo(index));
             Assert.That(a.Tell, Is.Not.Null, "the tell stays");
-            Assert.That(AttackCatalog.RatSpin.Multiplier, Is.EqualTo(1.3f), "other attacks are untouched");
+            Assert.That(AttackCatalog.RatSpin.Multiplier, Is.EqualTo(1.0f), "other attacks are untouched");
         }
 
         [Test]
@@ -177,7 +177,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             TuningStore.ApplyJson(@"{ ""enemyAttacks"": { ""rat_lunge"": { ""multiplier"": 5, ""range"": 2.0 } } }", "mixed.json");
             Assert.That(_log, Is.Not.Empty);
-            Assert.That(AttackCatalog.RatLunge.Multiplier, Is.EqualTo(1.1f), "the whole attack is rolled back, not half of it");
+            Assert.That(AttackCatalog.RatLunge.Multiplier, Is.EqualTo(0.85f), "the whole attack is rolled back, not half of it");
         }
 
         [Test]

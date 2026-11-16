@@ -99,10 +99,11 @@ namespace SleepingCalamity.Core.Combat
         // 6.6 tier 1 stats. Placeholder: which are weak to fire (the jam, the wooden broom) and which are pests (the rat-king).
         // Combat depth (2026-10-30, "fewer, tougher enemies"): small-enemy life roughly doubles so each takes a few openings (a rat-king about three with
         // the axe): slime 40 -> 80, rat-king 90 -> 180, broom 60 -> 160; the Warden stays 600. Poise thresholds: slime 2, rat-king 4, broom 5.
+        // Run 5 balance (2026-11-15): rat-king life stays 180 (three axe openings, CombatDepthTests); its relief is smaller bites (rat_lunge 0.85, rat_spin 1.0). Broom 160 -> 130, Warden 600 -> 2000.
         public static readonly EnemyDefinition Slime = new EnemyDefinition(EnemyKind.Slime, "slime", "Jam-jar slime", Species.Slime, 80, 12f, 5f, 2.6f, 0.55f, 1.0f,
             new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f, poiseThreshold: 2f, tokenCategory: TokenCategory.Ranged,
             role: EnemyRole.Ranged, preferredRing: 6.0f, strafeFlipMin: 2.0f, strafeFlipMax: 4.0f);   // far ring (5 to 8 m)
-        public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 140, 18f, 10f, 4.6f, 0.5f, 1.2f,
+        public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 180, 18f, 10f, 4.6f, 0.5f, 1.2f,
             new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f, poiseThreshold: 4f,
             role: EnemyRole.Rusher);
         public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 130, 15f, 15f, 2.3f, 0.55f, 1.9f,

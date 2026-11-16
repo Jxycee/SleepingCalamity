@@ -34,7 +34,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             Assert.AreEqual(80, EnemyCatalog.Slime.Hp, "slime life is unchanged" + Note);
             Assert.AreEqual(130, EnemyCatalog.Broom.Hp, "broom life" + Note);
-            Assert.AreEqual(140, EnemyCatalog.RatKing.Hp, "rat-king life" + Note);
+            Assert.AreEqual(180, EnemyCatalog.RatKing.Hp, "rat-king life" + Note);
             Assert.AreEqual(2000, EnemyCatalog.DoughWarden.Hp, "Warden life" + Note);
         }
 
@@ -43,7 +43,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             Assert.AreEqual(60, new EnemyModel(EnemyCatalog.Slime, 1, 1).MaxHp, "slime 80 x 0.75" + Note);
             Assert.AreEqual(98, new EnemyModel(EnemyCatalog.Broom, 1, 1).MaxHp, "broom 130 x 0.75, rounded up" + Note);
-            Assert.AreEqual(105, new EnemyModel(EnemyCatalog.RatKing, 1, 1).MaxHp, "rat-king 140 x 0.75" + Note);
+            Assert.AreEqual(135, new EnemyModel(EnemyCatalog.RatKing, 1, 1).MaxHp, "rat-king 180 x 0.75" + Note);
             Assert.AreEqual(1500, new EnemyModel(EnemyCatalog.DoughWarden, EnemyCatalog.AuthoredTier(false, true, 5), 1).MaxHp, "Warden 2000 x 0.75" + Note);
             Assert.AreEqual(12f * 0.5f * 0.6f, new EnemyModel(EnemyCatalog.Slime, 1, 1).Atk, 1e-4f, "slime attack 12 x 0.5 x 0.6" + Note);
             Assert.AreEqual(30f * 0.5f * 0.6f, new EnemyModel(EnemyCatalog.DoughWarden, 1, 1).Atk, 1e-4f, "Warden attack 30 x 0.5 x 0.6 at tier 1" + Note);

@@ -111,7 +111,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(CoopScaling.LifeMultiplier(9), Is.EqualTo(3.0f), "clamped to four");
             var solo = new EnemyModel(EnemyCatalog.RatKing, 1, 1);
             var four = new EnemyModel(EnemyCatalog.RatKing, 1, 4);
-            Assert.That(four.MaxHp, Is.EqualTo(420), "140 x 3.0 (Run 5 balance 2026-11-15)");
+            Assert.That(four.MaxHp, Is.EqualTo(540), "180 x 3.0 (Run 5 balance 2026-11-15)");
             var two = new EnemyModel(EnemyCatalog.RatKing, 1, 2);
             Assert.That(four.Atk, Is.EqualTo(two.Atk), "P23: co-op scales life, not attack");
             Assert.That(four.Atk, Is.EqualTo(solo.Atk / EnemyCatalog.SoloAtk).Within(1e-4f), "only a lone hero gets the solo attack assist (Run 5 balance 2026-11-15)");

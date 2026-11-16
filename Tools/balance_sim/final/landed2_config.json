@@ -1,0 +1,1188 @@
+{
+ "config": {
+  "_comment": "Balance simulator config. Game numbers are NEVER here: they come from data/game_numbers.json. Everything below is a run setting, a labelled assumption, a player-skill profile, a case definition, an override on top of game numbers, or a target band.",
+  "run": {
+   "_comment": "lanesPerCase = independent parties per case; nDives = consecutive dives per lane (weapon growth carries over, HP resets); seed = RNG seed; device = cuda|cpu|auto; dt = tick seconds; frameRate = frames/s the game's frame counts are expressed in (ASSUMED 60, number map says 60 fps); maxEnemies = enemy slots per room.",
+   "lanesPerCase": 2048,
+   "nDives": 10,
+   "seed": 12345,
+   "device": "auto",
+   "dt": 0.03333333,
+   "frameRate": 60,
+   "maxEnemies": 10
+  },
+  "assumptions": {
+   "_comment": "Model assumptions NOT taken from game_numbers.json. All ASSUMED. Run 5 additions: breadLadder* (PHASE1 bread ladder: free poor loaves before the baker, his bread after; 0 free loaves + bakeryBuilt false = the game as built on 2026-11-15); bakeryAfterFloor = a lane's bakery counts as built from the dive after it first clears this floor (0 = off, use bakeryBuilt); dodgeWindupRefSeconds = dodge chance rises with the wind-up: P = 1-(1-dodgeRate)^max(1, windupSeconds/ref) (0 = off); useFloorStatsKindShare = sample enemy kinds from floorStats.kindShare (the real generator) instead of floorMix.",
+   "roomTimeoutSeconds": 240,
+   "engageDelaySeconds": 1.0,
+   "broomBlockFraction": 0.3,
+   "broomBlockedMult": 0.2,
+   "ratKingHitRateMult": 0.8,
+   "ratKingReposExtraSeconds": 0.4,
+   "reviveTravelSeconds": 2.0,
+   "loafCooldownSeconds": 2.0,
+   "healPointThresholdFrac": 0.5,
+   "buildUpEnabled": true,
+   "maxWeaponLevel": 60,
+   "bakeryBuilt": false,
+   "axeGuardBreakProb": 0.15,
+   "daggerParryProbPerHit": 0.1,
+   "staffExtraSwingProbPerHit": 0.3,
+   "bowWeakShotProbPerHit": 0.25,
+   "breadLadderFreeLoaves": 3,
+   "breadLadderPoorLoafHeal": 15,
+   "bakeryAfterFloor": 3,
+   "dodgeWindupRefSeconds": 0.6,
+   "useFloorStatsKindShare": true
+  },
+  "weaponCycles": {
+   "_comment": "Attack kinds per swing cycle per weapon (from heroAttacks). ASSUMED: normal1, normal2, finisher; add \"charge\" to a list to include charge swings.",
+   "default": [
+    "normal1",
+    "normal2",
+    "finisher"
+   ]
+  },
+  "skillProfiles": {
+   "_comment": "ASSUMED player skill. hitRate = fraction of swings that connect; uptime = fraction of time spent attacking (rest = moving/repositioning, stretches each swing by 1/uptime); dodgeRate = P(an incoming attack is fully dodged); guardRate = P(guard x guardMult when not dodged; guard-break attacks ignore it); reviveWillingness = P a downed hero gets revived when a mate is up; loafThresholdHpFrac = eat a loaf below this HP fraction.",
+   "novice": {
+    "hitRate": 0.6,
+    "uptime": 0.5,
+    "dodgeRate": 0.25,
+    "guardRate": 0.1,
+    "reviveWillingness": 0.5,
+    "loafThresholdHpFrac": 0.25
+   },
+   "average": {
+    "hitRate": 0.8,
+    "uptime": 0.65,
+    "dodgeRate": 0.5,
+    "guardRate": 0.3,
+    "reviveWillingness": 0.8,
+    "loafThresholdHpFrac": 0.4
+   },
+   "expert": {
+    "hitRate": 0.92,
+    "uptime": 0.8,
+    "dodgeRate": 0.75,
+    "guardRate": 0.6,
+    "reviveWillingness": 0.95,
+    "loafThresholdHpFrac": 0.5
+   }
+  },
+  "partySkillMix": {
+   "_comment": "Weights used when a case lists the profile name \"mix\".",
+   "novice": 0.3,
+   "average": 0.5,
+   "expert": 0.2
+  },
+  "cases": [
+   {
+    "_comment": "name, players (1..4), profiles = list per hero slot (repeated if shorter; \"mix\" samples partySkillMix per lane), loadouts = weapon per hero slot (axe|staff|dagger_shield|bow_sword).",
+    "name": "p1_average",
+    "players": 1,
+    "profiles": [
+     "average"
+    ],
+    "loadouts": [
+     "axe"
+    ]
+   },
+   {
+    "name": "p2_average",
+    "players": 2,
+    "profiles": [
+     "average"
+    ],
+    "loadouts": [
+     "axe"
+    ]
+   },
+   {
+    "name": "p3_average",
+    "players": 3,
+    "profiles": [
+     "average"
+    ],
+    "loadouts": [
+     "axe"
+    ]
+   },
+   {
+    "name": "p4_average",
+    "players": 4,
+    "profiles": [
+     "average"
+    ],
+    "loadouts": [
+     "axe"
+    ]
+   },
+   {
+    "name": "p1_novice",
+    "players": 1,
+    "profiles": [
+     "novice"
+    ],
+    "loadouts": [
+     "axe"
+    ]
+   },
+   {
+    "name": "p1_expert",
+    "players": 1,
+    "profiles": [
+     "expert"
+    ],
+    "loadouts": [
+     "axe"
+    ]
+   },
+   {
+    "name": "p4_mix",
+    "players": 4,
+    "profiles": [
+     "mix"
+    ],
+    "loadouts": [
+     "axe",
+     "staff",
+     "dagger_shield",
+     "bow_sword"
+    ]
+   }
+  ],
+  "overrides": {
+   "_comment": "Applied on top of game_numbers.json before simulating. Key = dotted path into game_numbers.json (list elements by index: coop.lifeMult.2). Value = number/bool/string (absolute) or {\"mult\": x} or {\"add\": x}. Unknown paths raise an error. Examples (kept empty by default): \"enemies.Slime.hp\": {\"mult\": 1.2}, \"heroAttacks.axe_1.mult\": 1.1, \"weapons.axe.atk\": 24, \"growth.levelCostBase\": 30, \"coop.lifeMult.3\": 2.0, \"enemyAttacks.rat_lunge.mult\": 0.9, \"tierScale.tier1Atk\": 0.6, \"healing.healPointChancePercent\": 70."
+  },
+  "targets": {
+   "_comment": "Run 5 targets (Fable, 2026-11-15), see Reference/sessions/run5-balance/STATUS.md. Bands are [min, max]. Dive keys are dive numbers (1-based).",
+   "ttkKindSoloDive1": {
+    "case": "p1_average",
+    "Slime": [
+     2,
+     4
+    ],
+    "Broom": [
+     5,
+     8
+    ],
+    "RatKing": [
+     6,
+     11
+    ],
+    "floors": [
+     1,
+     2,
+     3
+    ]
+   },
+   "partyTtkRatio": {
+    "cases": [
+     "p2_average",
+     "p3_average",
+     "p4_average"
+    ],
+    "vs": "p1_average",
+    "band": [
+     0.6,
+     1.5
+    ]
+   },
+   "wardenTtkSecondsDives1to3": {
+    "cases": [
+     "p1_average",
+     "p2_average",
+     "p3_average",
+     "p4_average"
+    ],
+    "band": [
+     40,
+     80
+    ]
+   },
+   "damageTakenFractionOfMaxHp": {
+    "cases": [
+     "p1_average",
+     "p2_average",
+     "p3_average",
+     "p4_average"
+    ],
+    "1": [
+     0.1,
+     0.3
+    ],
+    "2": [
+     0.2,
+     0.45
+    ],
+    "3": [
+     0.35,
+     0.7
+    ],
+    "4": [
+     0.25,
+     0.55
+    ],
+    "5": [
+     0.4,
+     0.9
+    ],
+    "6": [
+     0.25,
+     0.6
+    ],
+    "7": [
+     0.25,
+     0.6
+    ]
+   },
+   "coopDamageRatio": {
+    "cases": [
+     "p2_average",
+     "p3_average",
+     "p4_average"
+    ],
+    "vs": "p1_average",
+    "band": [
+     0.7,
+     2.0
+    ]
+   },
+   "bankReach": {
+    "p1_average": {
+     "1": [
+      0.15,
+      0.45
+     ],
+     "3": [
+      0.4,
+      0.7
+     ],
+     "10": [
+      0.65,
+      0.9
+     ]
+    },
+    "p1_novice": {
+     "1": [
+      0,
+      0.15
+     ],
+     "10": [
+      0.03,
+      0.5
+     ]
+    },
+    "p1_expert": {
+     "1": [
+      0.7,
+      1.0
+     ],
+     "3": [
+      0.8,
+      1.0
+     ]
+    },
+    "p2_average": {
+     "1": [
+      0.15,
+      0.6
+     ],
+     "3": [
+      0.4,
+      0.85
+     ],
+     "10": [
+      0.65,
+      0.95
+     ]
+    },
+    "p4_average": {
+     "1": [
+      0.4,
+      0.85
+     ],
+     "3": [
+      0.6,
+      1.0
+     ],
+     "10": [
+      0.75,
+      1.0
+     ]
+    },
+    "p3_average": {
+     "1": [
+      0.25,
+      0.75
+     ],
+     "3": [
+      0.5,
+      0.95
+     ],
+     "10": [
+      0.7,
+      1.0
+     ]
+    }
+   },
+   "fullClear": {
+    "p1_average": {
+     "1": [
+      0,
+      0.25
+     ],
+     "10": [
+      0.35,
+      0.85
+     ]
+    },
+    "p2_average": {
+     "10": [
+      0.35,
+      0.92
+     ]
+    },
+    "p4_average": {
+     "10": [
+      0.5,
+      1.0
+     ]
+    },
+    "p3_average": {
+     "10": [
+      0.4,
+      1.0
+     ]
+    }
+   },
+   "floorsReachedDive1Min": {
+    "p1_novice": 2.0,
+    "p1_average": 3.0
+   },
+   "downsPerHeroPerDiveMaxFromDive3": {
+    "p2_average": 1.5,
+    "p4_average": 1.5,
+    "p3_average": 1.5
+   },
+   "weaponLevelAfterDive": {
+    "p1_average": {
+     "1": [
+      1,
+      3
+     ],
+     "3": [
+      3,
+      6
+     ],
+     "10": [
+      8,
+      14
+     ]
+    }
+   },
+   "coopWeaponLevelRatioDive10": {
+    "cases": [
+     "p2_average",
+     "p3_average",
+     "p4_average"
+    ],
+    "vs": "p1_average",
+    "band": [
+     0.8,
+     2.2
+    ]
+   }
+  }
+ },
+ "effective_game_numbers": {
+  "version": 1,
+  "damage": {
+   "critChance": 0.05,
+   "critMultiplier": 1.5,
+   "elementPerPoint": 0.02,
+   "tagPerPoint": 0.03,
+   "comboBonusPerHit": 0.1,
+   "minDamage": 1,
+   "guardMult": 0.2,
+   "playerDef": 10,
+   "playerMaxHp": 100,
+   "rageMult": 1.3,
+   "rageHits": 7,
+   "rageSeconds": 15,
+   "rageTelegraphSeconds": 0.8,
+   "openingDamage": 1.5,
+   "frontBlockPassedMult": 0.2,
+   "frontBlockHalfAngleDeg": 70,
+   "guardHalfAngleDeg": 60,
+   "parryFrames": 6,
+   "dodgeTotalFrames": 30,
+   "dodgeIFrameStart": 5,
+   "dodgeIFrameEnd": 18,
+   "spellFireValue": 10
+  },
+  "enemies": {
+   "Slime": {
+    "hp": 80,
+    "atk": 12,
+    "def": 5,
+    "speed": 2.6,
+    "weakFire": true,
+    "isPest": false,
+    "frontBlock": false,
+    "poiseThreshold": 2,
+    "staggerSeconds": 0.5,
+    "isElite": false,
+    "canRage": true,
+    "ripostes": false,
+    "attacks": [
+     "slime_hop",
+     "slime_glob"
+    ]
+   },
+   "RatKing": {
+    "hp": 180,
+    "atk": 18,
+    "def": 10,
+    "speed": 4.6,
+    "weakFire": false,
+    "isPest": true,
+    "frontBlock": false,
+    "poiseThreshold": 4,
+    "staggerSeconds": 0.35,
+    "isElite": false,
+    "canRage": true,
+    "ripostes": false,
+    "attacks": [
+     "rat_lunge",
+     "rat_spin"
+    ]
+   },
+   "Broom": {
+    "hp": 130,
+    "atk": 15,
+    "def": 15,
+    "speed": 2.3,
+    "weakFire": true,
+    "isPest": false,
+    "frontBlock": true,
+    "poiseThreshold": 5,
+    "staggerSeconds": 0.45,
+    "isElite": false,
+    "canRage": true,
+    "ripostes": true,
+    "attacks": [
+     "broom_sweep",
+     "broom_poke"
+    ]
+   },
+   "Warden": {
+    "hp": 2000,
+    "atk": 30,
+    "def": 20,
+    "speed": 2.4,
+    "weakFire": false,
+    "isPest": false,
+    "frontBlock": false,
+    "poiseThreshold": 0,
+    "staggerSeconds": 0.9,
+    "isElite": true,
+    "canRage": false,
+    "ripostes": false,
+    "attacks": [
+     "warden_slam",
+     "warden_sweep",
+     "warden_pound",
+     "warden_quake"
+    ]
+   }
+  },
+  "tierScale": {
+   "tier1Atk": 0.5,
+   "tier2Atk": 1,
+   "tier2Life": 3,
+   "tier2Def": 3.3,
+   "cellarsMaxTier": 1,
+   "wardenTier": 1,
+   "tier2MinFloor": 3,
+   "soloAtk": 0.6,
+   "soloLife": 0.75
+  },
+  "enemyAttacks": {
+   "slime_hop": {
+    "totalFrames": 60,
+    "hitOnFrame": 34,
+    "hitOffFrame": 40,
+    "mult": 1,
+    "range": 1.1,
+    "guardBreak": false,
+    "guardable": true
+   },
+   "slime_glob": {
+    "totalFrames": 66,
+    "hitOnFrame": 46,
+    "hitOffFrame": 52,
+    "mult": 0.8,
+    "range": 1.3,
+    "guardBreak": false,
+    "guardable": true
+   },
+   "rat_lunge": {
+    "totalFrames": 62,
+    "hitOnFrame": 28,
+    "hitOffFrame": 36,
+    "mult": 0.85,
+    "range": 1.45,
+    "guardBreak": false,
+    "guardable": true
+   },
+   "rat_spin": {
+    "totalFrames": 62,
+    "hitOnFrame": 30,
+    "hitOffFrame": 40,
+    "mult": 1,
+    "range": 1.45,
+    "guardBreak": false,
+    "guardable": true
+   },
+   "broom_sweep": {
+    "totalFrames": 70,
+    "hitOnFrame": 36,
+    "hitOffFrame": 44,
+    "mult": 1.2,
+    "range": 2.4,
+    "guardBreak": false,
+    "guardable": true
+   },
+   "broom_poke": {
+    "totalFrames": 52,
+    "hitOnFrame": 28,
+    "hitOffFrame": 34,
+    "mult": 1,
+    "range": 1.9,
+    "guardBreak": false,
+    "guardable": true
+   },
+   "warden_slam": {
+    "totalFrames": 100,
+    "hitOnFrame": 56,
+    "hitOffFrame": 64,
+    "mult": 2.1,
+    "range": 3,
+    "guardBreak": true,
+    "guardable": true
+   },
+   "warden_pound": {
+    "totalFrames": 116,
+    "hitOnFrame": 72,
+    "hitOffFrame": 80,
+    "mult": 2.5,
+    "range": 3,
+    "guardBreak": true,
+    "guardable": true
+   },
+   "warden_sweep": {
+    "totalFrames": 98,
+    "hitOnFrame": 54,
+    "hitOffFrame": 64,
+    "mult": 1.5,
+    "range": 3,
+    "guardBreak": false,
+    "guardable": true
+   },
+   "warden_breakfree": {
+    "totalFrames": 78,
+    "hitOnFrame": 36,
+    "hitOffFrame": 44,
+    "mult": 1,
+    "range": 3,
+    "guardBreak": true,
+    "guardable": true
+   },
+   "warden_quake": {
+    "totalFrames": 160,
+    "hitOnFrame": 90,
+    "hitOffFrame": 100,
+    "mult": 2.8,
+    "range": 3,
+    "guardBreak": true,
+    "guardable": true
+   },
+   "broom_riposte": {
+    "totalFrames": 58,
+    "hitOnFrame": 27,
+    "hitOffFrame": 33,
+    "mult": 1,
+    "range": 2,
+    "guardBreak": false,
+    "guardable": true
+   }
+  },
+  "enemyPacing": {
+   "cooldown": {
+    "default": 1.2,
+    "RatKing": 0.8,
+    "Warden": 2.4
+   },
+   "recover": {
+    "default": 0.35,
+    "RatKing": 0.9
+   },
+   "tier1Scale": 1,
+   "tier1RecoverScale": 1,
+   "tier2CooldownScale": 0.7,
+   "tier2RecoverScale": 0.8,
+   "tier1MaxAttackersPerHero": 1,
+   "tier2MaxAttackersPerHero": 2,
+   "tier1MinStrikeGapSeconds": 0.5,
+   "tier2MinStrikeGapSeconds": 0.35,
+   "signatureEvery": 3,
+   "signatureExtraRecoverSeconds": 1
+  },
+  "heroAttacks": {
+   "axe_1": {
+    "weapon": "axe",
+    "kind": "normal1",
+    "totalFrames": 34,
+    "hitOnFrame": 11,
+    "hitOffFrame": 16,
+    "mult": 1,
+    "range": 2.3,
+    "guardBreak": false,
+    "fire": false
+   },
+   "axe_2": {
+    "weapon": "axe",
+    "kind": "normal2",
+    "totalFrames": 36,
+    "hitOnFrame": 12,
+    "hitOffFrame": 17,
+    "mult": 1.1,
+    "range": 2.4,
+    "guardBreak": false,
+    "fire": false
+   },
+   "axe_f": {
+    "weapon": "axe",
+    "kind": "finisher",
+    "totalFrames": 58,
+    "hitOnFrame": 22,
+    "hitOffFrame": 28,
+    "mult": 1.6,
+    "range": 2.7,
+    "guardBreak": true,
+    "fire": false
+   },
+   "axe_c": {
+    "weapon": "axe",
+    "kind": "charge",
+    "totalFrames": 62,
+    "hitOnFrame": 24,
+    "hitOffFrame": 32,
+    "mult": 2,
+    "range": 3,
+    "guardBreak": true,
+    "fire": false
+   },
+   "staff_1": {
+    "weapon": "staff",
+    "kind": "normal1",
+    "totalFrames": 26,
+    "hitOnFrame": 8,
+    "hitOffFrame": 14,
+    "mult": 1,
+    "range": 3.3,
+    "guardBreak": false,
+    "fire": false
+   },
+   "staff_2": {
+    "weapon": "staff",
+    "kind": "normal2",
+    "totalFrames": 26,
+    "hitOnFrame": 8,
+    "hitOffFrame": 14,
+    "mult": 1.1,
+    "range": 3.3,
+    "guardBreak": false,
+    "fire": false
+   },
+   "staff_f": {
+    "weapon": "staff",
+    "kind": "finisher",
+    "totalFrames": 46,
+    "hitOnFrame": 14,
+    "hitOffFrame": 24,
+    "mult": 1.6,
+    "range": 3.5,
+    "guardBreak": false,
+    "fire": false
+   },
+   "staff_c": {
+    "weapon": "staff",
+    "kind": "charge",
+    "totalFrames": 50,
+    "hitOnFrame": 18,
+    "hitOffFrame": 26,
+    "mult": 2,
+    "range": 4.6,
+    "guardBreak": false,
+    "fire": false
+   },
+   "staff_s": {
+    "weapon": "staff",
+    "kind": "spell",
+    "totalFrames": 42,
+    "hitOnFrame": 14,
+    "hitOffFrame": 20,
+    "mult": 2.2,
+    "range": 4.5,
+    "guardBreak": false,
+    "fire": true
+   },
+   "dag_1": {
+    "weapon": "dagger",
+    "kind": "normal1",
+    "totalFrames": 16,
+    "hitOnFrame": 5,
+    "hitOffFrame": 9,
+    "mult": 1,
+    "range": 1.9,
+    "guardBreak": false,
+    "fire": false
+   },
+   "dag_2": {
+    "weapon": "dagger",
+    "kind": "normal2",
+    "totalFrames": 16,
+    "hitOnFrame": 5,
+    "hitOffFrame": 9,
+    "mult": 1.1,
+    "range": 1.9,
+    "guardBreak": false,
+    "fire": false
+   },
+   "dag_f": {
+    "weapon": "dagger",
+    "kind": "finisher",
+    "totalFrames": 30,
+    "hitOnFrame": 10,
+    "hitOffFrame": 17,
+    "mult": 1.6,
+    "range": 2.1,
+    "guardBreak": false,
+    "fire": false
+   },
+   "dag_c": {
+    "weapon": "dagger",
+    "kind": "charge",
+    "totalFrames": 40,
+    "hitOnFrame": 12,
+    "hitOffFrame": 18,
+    "mult": 2,
+    "range": 2.4,
+    "guardBreak": false,
+    "fire": false
+   },
+   "bow_1": {
+    "weapon": "bow",
+    "kind": "normal1",
+    "totalFrames": 22,
+    "hitOnFrame": 7,
+    "hitOffFrame": 12,
+    "mult": 1,
+    "range": 2.1,
+    "guardBreak": false,
+    "fire": false
+   },
+   "bow_2": {
+    "weapon": "bow",
+    "kind": "normal2",
+    "totalFrames": 22,
+    "hitOnFrame": 7,
+    "hitOffFrame": 12,
+    "mult": 1.1,
+    "range": 2.1,
+    "guardBreak": false,
+    "fire": false
+   },
+   "bow_f": {
+    "weapon": "bow",
+    "kind": "finisher",
+    "totalFrames": 40,
+    "hitOnFrame": 14,
+    "hitOffFrame": 21,
+    "mult": 1.6,
+    "range": 2.3,
+    "guardBreak": false,
+    "fire": false
+   },
+   "bow_c": {
+    "weapon": "bow",
+    "kind": "charge",
+    "totalFrames": 48,
+    "hitOnFrame": 16,
+    "hitOffFrame": 24,
+    "mult": 2,
+    "range": 2.7,
+    "guardBreak": false,
+    "fire": false
+   },
+   "bow_s": {
+    "weapon": "bow",
+    "kind": "shot",
+    "totalFrames": 30,
+    "hitOnFrame": 4,
+    "hitOffFrame": 5,
+    "mult": 1.8,
+    "range": 26,
+    "guardBreak": false,
+    "fire": false
+   }
+  },
+  "weapons": {
+   "axe": {
+    "atk": 22,
+    "fire": 0,
+    "pest": 0,
+    "slots": 3,
+    "buildUpTarget": "cinder_axe",
+    "family": "Axe"
+   },
+   "staff": {
+    "atk": 14,
+    "fire": 0,
+    "pest": 0,
+    "slots": 3,
+    "buildUpTarget": "warden_staff",
+    "family": "Staff"
+   },
+   "dagger_shield": {
+    "atk": 10,
+    "fire": 0,
+    "pest": 0,
+    "slots": 2,
+    "buildUpTarget": "bane_dagger",
+    "family": "Dagger"
+   },
+   "bow_sword": {
+    "atk": 12,
+    "fire": 0,
+    "pest": 0,
+    "slots": 2,
+    "buildUpTarget": "ember_bow",
+    "family": "Bow"
+   },
+   "cinder_axe": {
+    "atk": 30,
+    "fire": 10,
+    "pest": 0,
+    "slots": 3,
+    "buildUpTarget": null,
+    "family": "Axe"
+   },
+   "warden_staff": {
+    "atk": 20,
+    "fire": 0,
+    "pest": 10,
+    "slots": 3,
+    "buildUpTarget": null,
+    "family": "Staff"
+   },
+   "bane_dagger": {
+    "atk": 15,
+    "fire": 0,
+    "pest": 10,
+    "slots": 3,
+    "buildUpTarget": null,
+    "family": "Dagger"
+   },
+   "ember_bow": {
+    "atk": 18,
+    "fire": 10,
+    "pest": 0,
+    "slots": 3,
+    "buildUpTarget": null,
+    "family": "Bow"
+   },
+   "_attachments": {
+    "ember": {
+     "atk": 0,
+     "fire": 5,
+     "pest": 0
+    },
+    "pestBane": {
+     "atk": 0,
+     "fire": 0,
+     "pest": 5
+    },
+    "heartwood": {
+     "atk": 2,
+     "fire": 0,
+     "pest": 0
+    }
+   }
+  },
+  "growth": {
+   "absPerKill": {
+    "Slime": 4,
+    "RatKing": 8,
+    "Broom": 6,
+    "Elite": 40
+   },
+   "finisherKillMult": 1.25,
+   "creditWindowSeconds": 10,
+   "levelCostBase": 40,
+   "levelCostPerLevel": 40,
+   "atkPerLevelEarly": 2,
+   "earlyLevels": 5,
+   "atkPerLevelLate": 1,
+   "buildUpThreshold": 0.9,
+   "buildUpBonus": 0.1,
+   "styleAbs": {
+    "axeFinisherHit": 2,
+    "axeGuardBreak": 3,
+    "daggerHit": 1,
+    "daggerParry": 3,
+    "staffExtraSwing": 1,
+    "bowWeakShot": 2
+   },
+   "styleAbsCapPerEnemy": 6
+  },
+  "coop": {
+   "lifeMult": [
+    1,
+    1.5,
+    2.3,
+    3
+   ],
+   "extraEnemiesPerExtraPlayer": 1,
+   "strikeCap": [
+    0,
+    3,
+    4,
+    5
+   ],
+   "deathDownedSeconds": 20,
+   "reviveHoldSeconds": 3,
+   "reviveHpFraction": 0.4,
+   "poisePerExtraPlayer": 0.5,
+   "revengeCapPerExtraPlayer": 0.5
+  },
+  "healing": {
+   "healPointChancePercent": 51,
+   "healPointFloors": [
+    1,
+    2,
+    4,
+    6,
+    7
+   ],
+   "healPointRechargeSeconds": 30,
+   "loafHeal": 30,
+   "loavesPerDive": 3,
+   "loavesNeedBakery": true,
+   "bankFullHeal": true,
+   "breadLadderFreeLoavesUnused": 3
+  },
+  "stir": {
+   "perFloorCleared": 10,
+   "perUnbankedValuable": 5,
+   "max": 100,
+   "extraEnemyThreshold": 40,
+   "hunterThreshold": 70,
+   "deepClosesThreshold": 100,
+   "collapseMultiplier": 1.5,
+   "collapseMinSeconds": 60,
+   "rewardRankStep": 35
+  },
+  "floorMix": {
+   "1": {
+    "Slime": 100,
+    "Broom": 0,
+    "RatKing": 0
+   },
+   "2": {
+    "Slime": 60,
+    "Broom": 40,
+    "RatKing": 0
+   },
+   "3": {
+    "Slime": 30,
+    "Broom": 50,
+    "RatKing": 20
+   },
+   "4": {
+    "Slime": 30,
+    "Broom": 40,
+    "RatKing": 30
+   },
+   "5": {
+    "Slime": 30,
+    "Broom": 40,
+    "RatKing": 30
+   },
+   "6": {
+    "Slime": 30,
+    "Broom": 40,
+    "RatKing": 30
+   },
+   "7": {
+    "Slime": 30,
+    "Broom": 40,
+    "RatKing": 30
+   }
+  },
+  "floors": {
+   "1": {
+    "kind": "Authored",
+    "calm": true,
+    "guardian": false,
+    "hasHealPoint": true
+   },
+   "2": {
+    "kind": "Generated",
+    "calm": false,
+    "guardian": false,
+    "hasHealPoint": true
+   },
+   "3": {
+    "kind": "SetPiece",
+    "calm": true,
+    "guardian": false,
+    "hasHealPoint": false
+   },
+   "4": {
+    "kind": "Generated",
+    "calm": false,
+    "guardian": false,
+    "hasHealPoint": true
+   },
+   "5": {
+    "kind": "SetPiece",
+    "calm": true,
+    "guardian": true,
+    "hasHealPoint": false
+   },
+   "6": {
+    "kind": "Generated",
+    "calm": true,
+    "guardian": false,
+    "hasHealPoint": true
+   },
+   "7": {
+    "kind": "Generated",
+    "calm": false,
+    "guardian": false,
+    "hasHealPoint": true
+   }
+  },
+  "floorStats": {
+   "1": {
+    "seeds": 200,
+    "meanCombatRooms": 2,
+    "meanEnemiesPerRoom": 2.5,
+    "meanEnemiesTotal": 5,
+    "meanTier1Enemies": 5,
+    "meanTier2Enemies": 0,
+    "healPointShare": 0.535,
+    "kindShare": {
+     "Slime": 0.8,
+     "Broom": 0,
+     "RatKing": 0.2,
+     "Warden": 0
+    }
+   },
+   "2": {
+    "seeds": 200,
+    "meanCombatRooms": 2.655,
+    "meanEnemiesPerRoom": 2.4218455743879472,
+    "meanEnemiesTotal": 6.43,
+    "meanTier1Enemies": 6.43,
+    "meanTier2Enemies": 0,
+    "healPointShare": 0.53,
+    "kindShare": {
+     "Slime": 0.4370139968895801,
+     "Broom": 0.31493001555209954,
+     "RatKing": 0.24805598755832037,
+     "Warden": 0
+    }
+   },
+   "3": {
+    "seeds": 200,
+    "meanCombatRooms": 5,
+    "meanEnemiesPerRoom": 2,
+    "meanEnemiesTotal": 10,
+    "meanTier1Enemies": 10,
+    "meanTier2Enemies": 0,
+    "healPointShare": 0,
+    "kindShare": {
+     "Slime": 0.2805,
+     "Broom": 0.4275,
+     "RatKing": 0.292,
+     "Warden": 0
+    }
+   },
+   "4": {
+    "seeds": 200,
+    "meanCombatRooms": 2.73,
+    "meanEnemiesPerRoom": 2.750915750915751,
+    "meanEnemiesTotal": 7.51,
+    "meanTier1Enemies": 7.51,
+    "meanTier2Enemies": 0,
+    "healPointShare": 0.525,
+    "kindShare": {
+     "Slime": 0.21238348868175766,
+     "Broom": 0.2589880159786951,
+     "RatKing": 0.5286284953395473,
+     "Warden": 0
+    }
+   },
+   "5": {
+    "seeds": 200,
+    "meanCombatRooms": 1,
+    "meanEnemiesPerRoom": 2,
+    "meanEnemiesTotal": 2,
+    "meanTier1Enemies": 2,
+    "meanTier2Enemies": 0,
+    "healPointShare": 0,
+    "kindShare": {
+     "Slime": 0.155,
+     "Broom": 0.1975,
+     "RatKing": 0.1475,
+     "Warden": 0.5
+    }
+   },
+   "6": {
+    "seeds": 200,
+    "meanCombatRooms": 2.785,
+    "meanEnemiesPerRoom": 2.421903052064632,
+    "meanEnemiesTotal": 6.745,
+    "meanTier1Enemies": 6.745,
+    "meanTier2Enemies": 0,
+    "healPointShare": 0.555,
+    "kindShare": {
+     "Slime": 0.17346182357301704,
+     "Broom": 0.24240177909562638,
+     "RatKing": 0.5841363973313566,
+     "Warden": 0
+    }
+   },
+   "7": {
+    "seeds": 200,
+    "meanCombatRooms": 2.86,
+    "meanEnemiesPerRoom": 2.5786713286713288,
+    "meanEnemiesTotal": 7.375,
+    "meanTier1Enemies": 7.375,
+    "meanTier2Enemies": 0,
+    "healPointShare": 0.545,
+    "kindShare": {
+     "Slime": 0.21694915254237288,
+     "Broom": 0.2522033898305085,
+     "RatKing": 0.5308474576271186,
+     "Warden": 0
+    }
+   }
+  }
+ }
+}

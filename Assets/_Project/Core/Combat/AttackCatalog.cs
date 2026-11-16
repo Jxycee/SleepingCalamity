@@ -100,11 +100,12 @@ namespace SleepingCalamity.Core.Combat
         // Leans back with the glob swelling on its lid; the lid flashes as it throws (the glob flies from the glint to the strike frame).
         public static readonly AttackData SlimeGlob = E("slime_glob", "Glob lob", 66, 46, 52, 0.8f, HitShape.Circle, 1.3f, 180f, origin: HitOrigin.GroundAtTarget,
             tell: T(TellPart.Lid, 18, 26, lean: 16f, crouch: 0.2f, tremble: 0.4f, sfx: CombatSfx.WindUp, pitch: 1.1f));
+        // Run 5 balance (2026-11-15): Rat-king bite multipliers 1.1 -> 0.85 (lunge) and 1.3 -> 1.0 (spin); its life stays 180 (three axe openings, 2026-10-30).
         // Rat-king: rears back on its haunches, crown glints, lunges. Recovery 18 -> 26 frames after the bite (research recommendation 6: the punish window).
-        public static readonly AttackData RatLunge = E("rat_lunge", "Lunge", 62, 28, 36, 1.1f, HitShape.Cone, 1.45f, 42f, lunge: W(16, 28), lunges: 3.4f, turn: W(0, 14), turnSpeed: 720f,
+        public static readonly AttackData RatLunge = E("rat_lunge", "Lunge", 62, 28, 36, 0.85f, HitShape.Cone, 1.45f, 42f, lunge: W(16, 28), lunges: 3.4f, turn: W(0, 14), turnSpeed: 720f,
             tell: T(TellPart.Head, 8, 14, lean: 22f, crouch: 0.2f, tremble: 0.8f, sfx: CombatSfx.WindUpScratch, pitch: 1.2f));
         // Coils its body the other way, tail raised and glinting, then whips round. Recovery 16 -> 22 frames.
-        public static readonly AttackData RatSpin = E("rat_spin", "Tail spin", 62, 30, 40, 1.3f, HitShape.Circle, 1.45f, 180f, knockback: 2f,
+        public static readonly AttackData RatSpin = E("rat_spin", "Tail spin", 62, 30, 40, 1.0f, HitShape.Circle, 1.45f, 180f, knockback: 2f,
             tell: T(TellPart.Tail, 12, 16, crouch: 0.1f, twist: 75f, tremble: 0.4f, sfx: CombatSfx.WindUpScratch, pitch: 1.0f));
         // Broom: twists its bristles back with a wooden creak, bristles flash, sweeps.
         public static readonly AttackData BroomSweep = E("broom_sweep", "Sweep", 70, 36, 44, 1.2f, HitShape.Cone, 2.4f, 80f, knockback: 3f, turn: W(0, 20), turnSpeed: 300f,

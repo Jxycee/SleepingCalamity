@@ -46,7 +46,7 @@ namespace SleepingCalamity.Tests.EditMode
         public void StatsTable_MatchesSection66()
         {
             // Life roughly doubled for small enemies (combat depth, "fewer, tougher enemies"); the 6.6 table was 40 / 90 / 60 / 600.
-            Assert.That(new[] { EnemyCatalog.Slime.Hp, EnemyCatalog.RatKing.Hp, EnemyCatalog.Broom.Hp, EnemyCatalog.DoughWarden.Hp }, Is.EqualTo(new[] { 80, 140, 130, 2000 }));   // Run 5 balance 2026-11-15: rat-king 180 -> 140, broom 160 -> 130, Warden 600 -> 2000
+            Assert.That(new[] { EnemyCatalog.Slime.Hp, EnemyCatalog.RatKing.Hp, EnemyCatalog.Broom.Hp, EnemyCatalog.DoughWarden.Hp }, Is.EqualTo(new[] { 80, 180, 130, 2000 }));   // Run 5 balance 2026-11-15: rat-king stays 180, broom 160 -> 130, Warden 600 -> 2000
             Assert.That(new[] { EnemyCatalog.Slime.Atk, EnemyCatalog.RatKing.Atk, EnemyCatalog.Broom.Atk, EnemyCatalog.DoughWarden.Atk }, Is.EqualTo(new[] { 12f, 18f, 15f, 30f }));
             Assert.That(new[] { EnemyCatalog.Slime.Def, EnemyCatalog.RatKing.Def, EnemyCatalog.Broom.Def, EnemyCatalog.DoughWarden.Def }, Is.EqualTo(new[] { 5f, 10f, 15f, 20f }));
         }
@@ -179,8 +179,8 @@ namespace SleepingCalamity.Tests.EditMode
             for (int i = 0; i < 7; i++) e.Rage.OnHit();
             e.Rage.Tick(1f);
             int raging = e.AttackDamage(AttackCatalog.RatLunge, PlayerVitals.BaseDef);
-            Assert.That(calm, Is.EqualTo(6), "solo tier 1 attack is x0.5 x 0.6 (Run 5 balance 2026-11-15): 18 x 0.3 = 5.4; 5.4 x 1.1 x 100/110 = 5.4 -> 6 (was 12)");
-            Assert.That(raging, Is.EqualTo(8), "x1.3 = 7.02 -> 8 (was 16)");
+            Assert.That(calm, Is.EqualTo(5), "solo tier 1 attack is x0.5 x 0.6 (Run 5 balance 2026-11-15): 18 x 0.3 = 5.4; 5.4 x 0.85 x 100/110 = 4.17 -> 5 (was 12)");
+            Assert.That(raging, Is.EqualTo(6), "x1.3 = 5.43 -> 6 (was 16)");
         }
 
         // ---- rewards ----
