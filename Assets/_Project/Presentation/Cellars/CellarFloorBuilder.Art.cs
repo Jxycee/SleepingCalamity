@@ -369,13 +369,23 @@ namespace SleepingCalamity.Presentation
 
         // The one hook the main builder calls after its own pass (lamps, atmosphere): recolours every lamp light to CellarArtTuning.LampGold and sets the fog colour from the
         // tuning block (the base plus the floor's warm offset, halved and clamped), so the colour tuning lives in this file only.
-        static void ArtFinish(Transform root, CellarFloorKit kit, CellarFloorBuild result)
+        static void ArtFinish(Transform root, CellarFloorKit kit, Mats mats, CellarFloorLookRow look, CellarFloorBuild result)
         {
+            // B8: the kit-piece clones hold the kit's shared wall, limewash, stone and floor materials: give them this floor's instances (walls, vaults, piers, flags).
+            if (root != null)
+                foreach (Renderer rd in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    Material[] cur = rd.sharedMaterials; bool changed = false;
+                    for (int i = 0; i < cur.Length; i++)
+                        if (cur[i] != null && mats.Swap.TryGetValue(cur[i], out Material to)) { cur[i] = to; changed = true; }
+                    if (changed) rd.sharedMaterials = cur;
+                }
             Transform lamps = root != null ? root.Find(LampGroup) : null;
             if (lamps != null)
                 foreach (Light l in lamps.GetComponentsInChildren<Light>(true))
                 {
-                    l.color = CellarArtTuning.LampGold;
+                    l.color = Color.Lerp(CellarArtTuning.LampGold, look.LampTint, CellarFloorLook.LampTintWeight);
+                    l.intensity *= look.LampScale;   // the dark-floor roll already scaled the intensity; this multiplies on top
                     string owner = l.transform.parent != null ? l.transform.parent.name : "";
                     if (owner.StartsWith("Lamp_c")) l.range *= CellarArtTuning.CorridorLampRangeScale;                 // corridor pools fall off into darker walls between lamps
                     else if (owner.StartsWith("Lamp_r") && owner.EndsWith("_c")) l.intensity *= CellarArtTuning.CentreLampScale;   // the room's hanging centre lamp
@@ -383,7 +393,7 @@ namespace SleepingCalamity.Presentation
             if (kit != null && kit.FogBaseDensity > 0f && result.Dressing != null)
             {
                 result.Dressing.Atmosphere.FogTintOffset(out float fr, out float fg, out float fb);
-                RenderSettings.fogColor = CellarArtTuning.FogColor(kit.FogBaseColor, fr, fg, fb);
+                RenderSettings.fogColor = CellarArtTuning.FogColor(look.FogTint, fr, fg, fb);
                 HasLastFog = true; LastFogDensity = RenderSettings.fogDensity; LastFogColor = RenderSettings.fogColor;   // the town area look re-applies these when the viewer is in the cellar
             }
         }

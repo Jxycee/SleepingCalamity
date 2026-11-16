@@ -7,6 +7,8 @@
 //   - Rule: a floor cell with a closed wall face, off the trim legality bans (door, door lane, chest, healing point, vignette, chunk solid), not under a filled lantern, not on a wall face
 //     that already carries a trim piece or a wall-mounted socket; cells that hold wall clutter or sit beside a filled bulky socket come first; two lights of one room never share a cell
 //     or touch.
+//   - Route lamps (B8, proposal P2): the room's role in CellarFloorRoute decides the count (WantFor): Spine rooms keep the rolled count and try cells within RouteReach of an open door
+//     first, a side room (Arc, or Branch with 2+ open doors) gets one, dead ends (Branch with at most one open door) and the locked room none.
 //   - Stream: Rng.Derive(seed, "cellars.warmlight", floor << 32 | roomIndex). Corridors and the floor-4 stub get none.
 // Authority: none (every peer derives the same lights from (seed, floor)).
 using System;
@@ -60,12 +62,28 @@ namespace SleepingCalamity.Core
             return n;
         }
 
-        public static CellarFloorWarmLights Resolve(CellarFloorLayout layout, CellarFloorDressing dressing, CellarRoomChunks chunks, CellarFloorClutter clutter, CellarFloorTrim trim)
+        // Route lamps (design dungeon1-cellars section 6, proposal P2): warm lights go first to rooms on the entry-to-stair route (Spine), whose cells within RouteReach steps of an
+        // open door are tried first; a side room (an Arc room, or a Branch room with 2+ open doors) gets one; dead ends (a Branch room with at most one open door, the locked room) get none. Without a route (no entry or stair) every room
+        // counts as Spine, the old behaviour.
+        public const int RouteReach = 3;
+
+        // The rooms' warm-light count for a role: Spine keeps the rolled count; a side room (Arc, or a Branch room with 2+ open doors) gets exactly one if the budget allows; a dead end
+        // (a Branch room with at most one open door) and the locked room get none.
+        public static int WantFor(RoomRole role, int rolled, int allowed, int openDoors = 2)
+        {
+            if (role == RoomRole.Locked || (role == RoomRole.Branch && openDoors <= 1)) return 0;
+            if (role == RoomRole.Arc || role == RoomRole.Branch) return Math.Min(allowed, 1);
+            return Math.Min(allowed, rolled);
+        }
+
+        public static CellarFloorWarmLights Resolve(CellarFloorLayout layout, CellarFloorDressing dressing, CellarRoomChunks chunks, CellarFloorClutter clutter, CellarFloorTrim trim, CellarFloorRoute route = null)
         {
             if (layout == null) throw new ArgumentNullException(nameof(layout));
             if (dressing == null) throw new ArgumentNullException(nameof(dressing));
             var rows = new List<WarmLightRow>();
             bool[,] ban = CellarFloorTrim.BannedCells(layout, dressing, chunks);
+            route = route ?? CellarFloorRoute.Resolve(layout);
+            bool routed = route.Spine.Count > 0;
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r]; CellarRoom room = p.Room;
@@ -74,7 +92,10 @@ namespace SleepingCalamity.Core
                 int floorCount = room.FloorCount; if (floorCount == 0) continue;
                 int dropRoll = rng.Range(0, 100);
                 int allowed = Math.Max(0, Math.Min(MaxPerRoom, RoomLightCap - ExistingLights(layout, dressing, r)));
-                int want = Math.Min(allowed, 1 + (floorCount >= 10 ? 1 : 0) - (dropRoll < 20 ? 1 : 0));
+                int rolled = 1 + (floorCount >= 10 ? 1 : 0) - (dropRoll < 20 ? 1 : 0);
+                var doorCells = new List<(int x, int y)>();   // this room's open doors in room-local cells: the route enters and leaves there
+                for (int d = 0; d < room.Doors.Count; d++) if (layout.DoorIsOpen(r, d)) doorCells.Add((room.Doors[d].X, room.Doors[d].Y));
+                int want = WantFor(routed ? route.RoleOf(r) : RoomRole.Spine, rolled, allowed, doorCells.Count);
                 if (want <= 0) continue;
 
                 var clutterCell = new bool[p.Width, p.Height];
@@ -86,7 +107,7 @@ namespace SleepingCalamity.Core
                             var (dx, dy) = CellarRoom.Step(sd); int bx = s.Cell.X - p.X + dx, by = s.Cell.Y - p.Y + dy;
                             if (room.InBounds(bx, by)) clutterCell[bx, by] = true;
                         }
-                var tier0 = new List<(int x, int y, int side)>(); var tier1 = new List<(int x, int y, int side)>();
+                var tierR = new List<(int x, int y, int side)>(); var tier0 = new List<(int x, int y, int side)>(); var tier1 = new List<(int x, int y, int side)>();
                 for (int y = 0; y < p.Height; y++) for (int x = 0; x < p.Width; x++)
                 {
                     if (room.CellAt(x, y) != CellKind.Floor || ban[p.X + x, p.Y + y]) continue;
@@ -99,11 +120,13 @@ namespace SleepingCalamity.Core
                         bool trimmed = false;
                         if (trim != null) foreach (TrimRow t in trim.Rows) if (t.RoomIndex == r && t.Layer == TrimLayer.Wall && t.CellX == p.X + x && t.CellY == p.Y + y && t.Wall == sd) trimmed = true;
                         if (trimmed) continue;
-                        (clutterCell[x, y] ? tier0 : tier1).Add((x, y, (int)sd));
+                        bool onRoute = false;
+                        foreach (var dc in doorCells) if (Math.Abs(dc.x - x) + Math.Abs(dc.y - y) <= RouteReach) onRoute = true;
+                        (onRoute ? tierR : clutterCell[x, y] ? tier0 : tier1).Add((x, y, (int)sd));
                     }
                 }
-                Shuffle(tier0, ref rng); Shuffle(tier1, ref rng);
-                var cands = new List<(int x, int y, int side)>(tier0); cands.AddRange(tier1);
+                Shuffle(tierR, ref rng); Shuffle(tier0, ref rng); Shuffle(tier1, ref rng);
+                var cands = new List<(int x, int y, int side)>(tierR); cands.AddRange(tier0); cands.AddRange(tier1);
                 var pick = new List<(int x, int y, int side)>();
                 foreach (var c in cands)
                 {

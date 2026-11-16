@@ -18,9 +18,12 @@ namespace SleepingCalamity.EditorTools
 {
     public static class CellarFloorTestBuilder
     {
-        public const string ScenePath = "Assets/_Project/Scenes/CellarFloorTest.unity";
+        const string ScenePathBase = "Assets/_Project/Scenes/CellarFloorTest";
         public const uint Seed = 12345;
-        public const int FloorNumber = 1;
+        public const int FloorNumber = 1;   // the default floor; SC_FLOOR=<1-7> builds another (look-table checks: floors 1, 4, 6), into CellarFloorTest_f<N>.unity, floor 1 keeps the plain name
+        // The floor this run builds: env SC_FLOOR (1-7), default FloorNumber.
+        public static int Floor => int.TryParse(System.Environment.GetEnvironmentVariable("SC_FLOOR"), out int f) ? Mathf.Clamp(f, CellarFloorLook.FirstFloor, CellarFloorLook.LastFloor) : FloorNumber;
+        public static string ScenePath => Floor == FloorNumber ? ScenePathBase + ".unity" : ScenePathBase + "_f" + Floor + ".unity";
         const float Ambient = CellarArtTuning.Ambient;   // the colour tuning block lives in CellarFloorBuilder.Art.cs (was 0.8)
         const string ClutterFolder = "Assets/_Project/Content/Art/Cellar/B5/CellarClutter";
         static readonly string[] ClutterPieces = { "Crate", "CrateStack", "JarCluster", "Rubble", "SackPile" };
@@ -31,7 +34,8 @@ namespace SleepingCalamity.EditorTools
         [MenuItem("SleepingCalamity/Art/Build Cellar Floor Test")]
         public static void Build()
         {
-            CellarFloorLayout layout = CellarFloorGenerator.Layout(Seed, FloorNumber);
+            CellarFloorLookRow look = CellarFloorLook.For(Floor);
+            CellarFloorLayout layout = CellarFloorGenerator.Layout(Seed, Floor);
             Scene scene = DungeonCornerBuilder.NewRoomScene();
             DungeonCornerBuilder.BuildProfile();
 
@@ -48,8 +52,8 @@ namespace SleepingCalamity.EditorTools
             LookTestBuilder.AddVolume(lighting, DungeonCornerBuilder.ProfileName);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.23f, 0.19f, 0.18f); RenderSettings.ambientEquatorColor = new Color(0.22f, 0.18f, 0.15f);
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.11f, 0.09f); RenderSettings.ambientIntensity = Ambient;   // vaulted rooms: nearer the corner's 0.23 than the roofless greybox's 1.6
+            RenderSettings.ambientSkyColor = look.AmbientTop; RenderSettings.ambientEquatorColor = look.AmbientEquator;   // B8: the floor's trilight from the look table (design section 3)
+            RenderSettings.ambientGroundColor = look.AmbientBottom; RenderSettings.ambientIntensity = Ambient;   // vaulted rooms: nearer the corner's 0.23 than the roofless greybox's 1.6
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.sun = null;
 
@@ -68,7 +72,7 @@ namespace SleepingCalamity.EditorTools
             cams.Find("Floor_Overview").GetComponent<Camera>().backgroundColor = new Color(0.50f, 0.36f, 0.22f);   // the roofless cutaway: warm umber backdrop; the vaulted views keep the corner's near-black
 
             BuilderUtil.SaveScene(scene, ScenePath);
-            Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
+            Debug.Log("SC CELLARFLOOR scene built " + ScenePath + " floor=" + Floor + " overlays=" + built.Overlays + " hash=" + layout.LayoutHash() + " tiles=" + built.FloorTiles + " walls=" + built.Walls + " doors=" + built.DoorOpenings + " lamps=" + built.Lamps);
         }
 
         // The art-layer kit of the real Cellars floor: floor tile, B5 vault pieces, the floor-art-2 clutter (Crate, CrateStack, JarCluster, Rubble, SackPile), lantern, materials
@@ -90,6 +94,8 @@ namespace SleepingCalamity.EditorTools
                 FogBaseDensity = 0.007f, FogBaseColor = new Color(0.16f, 0.13f, 0.11f),   // the corner's fog; the floor's atmosphere roll scales and warms this
                 Ceiling = slots["CV_VaultStone"], Limewash = slots["CV_Limewash"], Iron = slots["CV_Iron"], Crate = slots["CV_BarrelOak"],
                 Wax = own["wax"], Mote = own["mote"],
+                // B8 overlays: the adopted C03 alpha-clip sets (C03a moss patches, C03b moss clump, C03c water streak, C03d mud/damp); null when the asset is not there (cobwebs C04 has none)
+                DecalMoss = AdoptedMaterial("C03a"), DecalMossClump = AdoptedMaterial("C03b"), DecalLeak = AdoptedMaterial("C03c"), DecalDamp = AdoptedMaterial("C03d"),
                 Pieces = new Dictionary<string, GameObject>(),
             };
             GameObject vault = BeautyCornerArt.LoadModel(DungeonCornerBuilder.KitFolder, DungeonCornerBuilder.KitFbx, keepMaterialSlots: true);
@@ -209,6 +215,8 @@ namespace SleepingCalamity.EditorTools
             }
             finally { Object.DestroyImmediate(holderRoot); }
         }
+
+        static Material AdoptedMaterial(string code) => AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/B2/M_" + code + ".mat");
 
         static Material Marker(string name, Color c, float glow)
         {

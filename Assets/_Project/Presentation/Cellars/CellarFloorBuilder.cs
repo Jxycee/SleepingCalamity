@@ -29,6 +29,7 @@ namespace SleepingCalamity.Presentation
         public float FogBaseDensity;            // > 0: Build sets RenderSettings exponential fog to this density times the floor's FogPercent, tinted from FogBaseColor
         public Color FogBaseColor;              // the scene's fog colour before the floor's warm offset
         public Material Ceiling, Limewash, Iron, Wax, Mote, Crate;   // vault stone, end-wall limewash, chains and hooks, candles, dust motes, crates
+        public Material DecalLeak, DecalDamp, DecalMoss, DecalMossClump;   // B8 overlays (adopted C03 sets: alpha-clip cards); null skips that overlay
         // B5 CellarVault pieces by name (VaultSegment, ArchRib, Pillar, EndWall, NicheWall, LarderShelf, CoalChute, Barrels, Roots, BreathGrate): each a holder
         // whose child is the piece at its authored pivot, so the builder only moves, turns and scales the holder. Missing pieces fall back to boxes or nothing.
         [System.Serializable] public struct NamedPiece { public string Name; public GameObject Prefab; }
@@ -139,7 +140,8 @@ namespace SleepingCalamity.Presentation
             var root = new GameObject("CellarFloor_s" + layout.Seed + "_f" + layout.Floor).transform;
             var result = new CellarFloorBuild { Root = root };
             var grid = new Grid(layout);
-            var mats = new Mats(kit);
+            CellarFloorLookRow look = CellarFloorLook.For(layout.Floor);
+            var mats = new Mats(kit, look);
 
             Transform floor = Group(root, FloorGroup), walls = Group(root, WallGroup), doors = Group(root, DoorGroup), pillars = Group(root, PillarGroup);
             Transform markers = Group(root, MarkerGroup), lamps = Group(root, LampGroup);
@@ -220,8 +222,9 @@ namespace SleepingCalamity.Presentation
             Dress(layout, dressing, grid, root, kit, mats, result);
             Vignettes(dressing, Group(root, VignetteGroup), mats, result);
             Procgen(layout, dressing, Group(root, ProcgenGroup), mats, result);
-            Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, result);
-            ArtFinish(root, kit, result);   // art layer: lamp gold and fog colour from CellarArtTuning
+            Atmosphere(layout, dressing, Group(root, AtmosphereGroup), kit, look, result);
+            Overlays(layout, grid, root, kit, look, result);
+            ArtFinish(root, kit, mats, look, result);   // art layer: lamp colour, floor material variants and fog from the floor's look and CellarArtTuning
             ParentBuiltFloor(root, parent, result);
             return result;
         }
@@ -415,15 +418,15 @@ namespace SleepingCalamity.Presentation
         // ------------------------------------------------------------------------------------------------ atmosphere
         // Fog (when the kit gives a base), the odd-light patch of one combat room (a warm tinted point light) and the dust-motes marker. TODO: a ParticleSystem prefab for the
         // motes once the dungeon corner kit has one (none exists yet); the empty marker object marks where it goes and lets a test read the toggle.
-        static void Atmosphere(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, CellarFloorKit kit, CellarFloorBuild result)
+        static void Atmosphere(CellarFloorLayout layout, CellarFloorDressing dressing, Transform group, CellarFloorKit kit, CellarFloorLookRow look, CellarFloorBuild result)
         {
             CellarAtmosphere atm = dressing.Atmosphere;
             if (kit.FogBaseDensity > 0f)
             {
                 atm.FogTintOffset(out float fr, out float fg, out float fb);
-                result.FogDensity = kit.FogBaseDensity * atm.FogPercent / 100f;
+                result.FogDensity = look.FogDensity * atm.FogPercent / 100f;   // the floor's look density; the atmosphere roll (dark floors) still scales it
                 RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Exponential; RenderSettings.fogDensity = result.FogDensity;
-                RenderSettings.fogColor = new Color(Mathf.Clamp01(kit.FogBaseColor.r + fr), Mathf.Clamp01(kit.FogBaseColor.g + fg), kit.FogBaseColor.b + fb);
+                RenderSettings.fogColor = new Color(Mathf.Clamp01(look.FogTint.r + fr), Mathf.Clamp01(look.FogTint.g + fg), look.FogTint.b + fb);
             }
             if (atm.OddLightRoom >= 0)
             {
@@ -472,12 +475,53 @@ namespace SleepingCalamity.Presentation
         {
             readonly Dictionary<Color, Material> flat = new Dictionary<Color, Material>();
             public readonly Material Floor, Wall, Pillar, Trim, Ceiling, Limewash, Iron, Wax, Flame, Crate;
-            public Mats(CellarFloorKit k)
+            // B8: the floor's look makes per-floor material instances of the wall, limewash, stone (piers, vault, ceiling) and floor materials (the kit's shared assets stay untouched);
+            // Swap maps each kit material to its instance, so ArtFinish can re-skin the kit-piece clones (they hold the kit's own materials).
+            public readonly Dictionary<Material, Material> Swap = new Dictionary<Material, Material>();
+            readonly CellarFloorLookRow look;
+            public Mats(CellarFloorKit k, CellarFloorLookRow look)
             {
-                Floor = k.Floor ?? Flat(new Color(0.42f, 0.38f, 0.33f)); Wall = k.Wall ?? Flat(new Color(0.55f, 0.47f, 0.38f));
-                Pillar = k.Pillar ?? Flat(new Color(0.50f, 0.46f, 0.42f)); Trim = k.Trim ?? Flat(new Color(0.34f, 0.25f, 0.17f));
-                Ceiling = k.Ceiling ?? Pillar; Limewash = k.Limewash ?? Flat(new Color(0.62f, 0.56f, 0.47f)); Iron = k.Iron ?? Flat(new Color(0.16f, 0.15f, 0.14f));
+                this.look = look;
+                Material wallSrc = k.Wall ?? Flat(new Color(0.55f, 0.47f, 0.38f)), limeSrc = k.Limewash ?? Flat(new Color(0.62f, 0.56f, 0.47f));
+                Material pillarSrc = k.Pillar ?? Flat(new Color(0.50f, 0.46f, 0.42f)), floorSrc = k.Floor ?? Flat(new Color(0.42f, 0.38f, 0.33f));
+                Color limeBase = BaseColorOf(limeSrc);
+                Wall = Variant(wallSrc, "Wall", c => Color.Lerp(Mul(c, look.WallTint), limeBase, look.Limewash * LimewashPull), 0f);
+                Limewash = Variant(limeSrc, "Limewash", c => Mul(c, Color.Lerp(Color.white, look.WallTint, 0.5f)), 0f);
+                Pillar = Stone(pillarSrc); Ceiling = k.Ceiling != null ? Stone(k.Ceiling) : Pillar;
+                float wetDark = 1f - WetDarken * look.Wet;
+                Floor = Variant(floorSrc, "Floor", c => Mul(c, new Color(wetDark, wetDark, wetDark, 1f)), WetGloss * look.Wet);
+                Trim = k.Trim ?? Flat(new Color(0.34f, 0.25f, 0.17f)); Iron = k.Iron ?? Flat(new Color(0.16f, 0.15f, 0.14f));
                 Wax = k.Wax ?? Flat(new Color(0.62f, 0.55f, 0.42f)); Flame = k.Flame ?? Flat(new Color(1.0f, 0.7f, 0.3f)); Crate = k.Crate ?? Trim;
+            }
+
+            static readonly Dictionary<(Material, int, string), Material> Cache = new Dictionary<(Material, int, string), Material>();
+            [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] static void ResetCache() => Cache.Clear();
+            public const float LimewashPull = 0.6f, WetDarken = 0.15f, WetGloss = 0.15f, SootDarken = 0.7f;
+            static Color Mul(Color a, Color b) => new Color(a.r * b.r, a.g * b.g, a.b * b.b, a.a);
+            static Color BaseColorOf(Material m) => m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : m.HasProperty("_Color") ? m.GetColor("_Color") : Color.white;
+
+            // Stone: wall tint at 60% (vault stone is paler than brick) darkened by the floor's soot weight; one instance per source material.
+            Material Stone(Material src)
+            {
+                if (Swap.TryGetValue(src, out Material have) && have != src) return have;
+                float soot = Mathf.Lerp(1f, 1f - SootDarken, look.Soot);
+                return Variant(src, "Stone", c => Mul(Mul(c, Color.Lerp(Color.white, look.WallTint, 0.6f)), new Color(soot, soot, soot, 1f)), 0f);
+            }
+
+            // An instance of src with its colour passed through recolour (both _BaseColor and _Color) and its smoothness raised by gloss.
+            Material Variant(Material src, string tag, System.Func<Color, Color> recolour, float gloss)
+            {
+                // one instance per (source material, floor, slot) for the process: a rebuilt floor (every client, every dive) reuses it instead of leaking a new copy
+                var key = (src, look.Floor, tag);
+                if (Cache.TryGetValue(key, out Material cached) && cached != null) { Swap[src] = cached; return cached; }
+                var m = new Material(src) { name = "CellarLook_f" + look.Floor + "_" + tag };
+                Cache[key] = m;
+                Color c = recolour(BaseColorOf(src)); c.a = BaseColorOf(src).a;
+                if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+                if (m.HasProperty("_Color")) m.SetColor("_Color", c);
+                if (gloss > 0f && m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", Mathf.Clamp01(m.GetFloat("_Smoothness") + gloss));
+                Swap[src] = m;
+                return m;
             }
             public Material Marker(Material fromKit, Color fallback) => fromKit != null ? fromKit : Flat(fallback);
             public Material Flat(Color c)
