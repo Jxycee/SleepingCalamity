@@ -26,7 +26,7 @@ namespace SleepingCalamity.Tests.PlayMode
         private const int Valuable = 101;   // a 5-stir item (DiveStir.PerUnbankedValuable)
         private readonly List<PlayModeHarness.TestClient> _clients = new List<PlayModeHarness.TestClient>();
 
-        private sealed class Ctx
+        internal sealed class Ctx
         {
             public NetworkManager HostNm; public PlayModeHarness.TestClient Client;
             public CellarFloorSync Floor; public DiveHaulSync Haul; public CellarContentsSync Contents, Peer;
@@ -58,7 +58,7 @@ namespace SleepingCalamity.Tests.PlayMode
             return o.GetComponent<T>();
         }
 
-        private static uint FindSeed(System.Func<uint, CellarFloorLayout, FloorModifierSet, bool> want, int floor = 2, uint limit = 8000)
+        internal static uint FindSeed(System.Func<uint, CellarFloorLayout, FloorModifierSet, bool> want, int floor = 2, uint limit = 8000)
         {
             for (uint s = 1; s < limit; s++)
             {
@@ -70,7 +70,17 @@ namespace SleepingCalamity.Tests.PlayMode
 
         private static int LootChest(CellarFloorLayout l) { for (int i = 0; i < l.Chests.Count; i++) if (!l.Chests[i].HoldsKey) return i; return -1; }
 
-        private IEnumerator Setup(System.Action<Ctx> done, uint seed, int floor = 2)
+        // True when none of `rooms` is the floor's special room: its job (SpecialJobs.OnClear) would add extra rolls / gold / a stir to the clear these tests count.
+        internal static bool NoSpecialIn(CellarFloorLayout l, params int[] rooms)
+        {
+            int special = SpecialRoomDive.Resolve(l, null, CellarFloorDressing.Resolve(l)).RoomIndex;
+            foreach (int r in rooms) if (r == special) return false;
+            return true;
+        }
+
+        private IEnumerator Setup(System.Action<Ctx> done, uint seed, int floor = 2) => SetupWith(_clients, done, seed, floor);
+
+        internal static IEnumerator SetupWith(List<PlayModeHarness.TestClient> _clients, System.Action<Ctx> done, uint seed, int floor = 2)
         {
             yield return PlayModeHarness.LoadBootstrapAndWaitForLobby();
             AppBootstrap app = AppBootstrap.Current;
@@ -109,8 +119,8 @@ namespace SleepingCalamity.Tests.PlayMode
             done(c);
         }
 
-        private static Vector3 Cell(Ctx c, int x, int y) => c.Floor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(x, y));
-        private static int DiveGold(Ctx c, ulong id) => c.Haul.ServerBagOf(id).DiveGold;
+        internal static Vector3 Cell(Ctx c, int x, int y) => c.Floor.Built.Root.TransformPoint(CellarFloorBuilder.CellCenter(x, y));
+        internal static int DiveGold(Ctx c, ulong id) => c.Haul.ServerBagOf(id).DiveGold;
 
         private static IEnumerator Seconds(float s)
         {
@@ -157,14 +167,14 @@ namespace SleepingCalamity.Tests.PlayMode
             return -1;
         }
 
-        private static EncounterSpawn SpawnIn(CellarEncounterPlan plan, int room)
+        internal static EncounterSpawn SpawnIn(CellarEncounterPlan plan, int room)
         {
             foreach (EncounterSpawn sp in plan.Spawns) if (sp.RoomIndex == room && sp.Kind != EncounterKind.Hunter) return sp;
             return null;
         }
 
         // Clears one named room: both heroes step in, everything dies, wait for the clear. Time-boxed waits only.
-        private static IEnumerator ClearRoom(Ctx c, CellarEncounterPlan plan, int r)
+        internal static IEnumerator ClearRoom(Ctx c, CellarEncounterPlan plan, int r)
         {
             EncounterSpawn first = SpawnIn(plan, r);
             Assert.That(first, Is.Not.Null, "premise: room " + r + " has enemies");
@@ -197,7 +207,7 @@ namespace SleepingCalamity.Tests.PlayMode
         public IEnumerator Brimming_EveryPresentClientGetsTheRoll_AndAReClearPaysNothing()
         {
             Assert.That(FloorModifierTuning.BrimmingRollsPerRoom, Is.EqualTo(1), "the test's expectation is written for one roll per room");
-            uint seed = FindSeed((s, l, m) => m.Has(FloorModifier.Brimming) && FirstClearRoom(CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false)) >= 0);
+            uint seed = FindSeed((s, l, m) => m.Has(FloorModifier.Brimming) && FirstClearRoom(CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false)) is int r && r >= 0 && NoSpecialIn(l, r));
             Ctx c = null; yield return Setup(x => c = x, seed);
             int h0 = c.Haul.ServerBagOf(c.HostId).Carried.Count, k0 = c.Haul.ServerBagOf(c.ClientId).Carried.Count, hg0 = DiveGold(c, c.HostId), kg0 = DiveGold(c, c.ClientId);
             int room = -1;
@@ -221,7 +231,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 if (!m.Has(FloorModifier.FatLarder)) return false;
                 CellarEncounterPlan p = CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false);
-                return p.FatRoom >= 0 && SpawnIn(p, p.FatRoom) != null && OtherRoom(p, p.FatRoom) >= 0;
+                return p.FatRoom >= 0 && SpawnIn(p, p.FatRoom) != null && OtherRoom(p, p.FatRoom) >= 0 && NoSpecialIn(l, p.FatRoom, OtherRoom(p, p.FatRoom));
             });
             Ctx c = null; yield return Setup(x => c = x, seed);
             CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(c.Layout, c.Floor.Built.Dressing, 0, false);
@@ -241,7 +251,7 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator Brimming_AFullBagGetsTheNotice_AndNoItem()
         {
-            uint seed = FindSeed((s, l, m) => m.Has(FloorModifier.Brimming) && FirstClearRoom(CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false)) is int r && r >= 0 && RollsAnItemForEverySlot(s, 2, r));
+            uint seed = FindSeed((s, l, m) => m.Has(FloorModifier.Brimming) && FirstClearRoom(CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false)) is int r && r >= 0 && RollsAnItemForEverySlot(s, 2, r) && NoSpecialIn(l, r));
             Ctx c = null; yield return Setup(x => c = x, seed);
             PlayerBag bag = c.Haul.ServerBagOf(c.ClientId);
             for (int n = 0; n < PlayerBag.MaxCarried; n++) Assert.That(c.Haul.ServerAddItem(c.ClientId, 101), Is.True);
@@ -286,7 +296,7 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator Crowded_GoldPerClear_PerPlayer()
         {
-            uint seed = FindSeed((s, l, m) => m.A == FloorModifier.Crowded);
+            uint seed = FindSeed((s, l, m) => m.A == FloorModifier.Crowded && FirstClearRoom(CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false)) is int r && r >= 0 && NoSpecialIn(l, r));
             Ctx c = null; yield return Setup(x => c = x, seed);
             int host0 = DiveGold(c, c.HostId), client0 = DiveGold(c, c.ClientId);
             int room = -1;
@@ -299,7 +309,7 @@ namespace SleepingCalamity.Tests.PlayMode
         [UnityTest]
         public IEnumerator Ambush_GoldWhenTheAmbushRoomClears_PerPlayer()
         {
-            uint seed = FindSeed((s, l, m) => m.A == FloorModifier.Ambush && CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false).AmbushRoom >= 0);
+            uint seed = FindSeed((s, l, m) => m.A == FloorModifier.Ambush && CellarEncounterPlan.BuildForDive(l, CellarFloorDressing.Resolve(l), 0, false).AmbushRoom is int ar && ar >= 0 && NoSpecialIn(l, ar));
             Ctx c = null; yield return Setup(x => c = x, seed);
             CellarEncounterPlan plan = CellarEncounterPlan.BuildForDive(c.Layout, c.Floor.Built.Dressing, 0, false);
             Assert.That(plan.Twist, Is.EqualTo(FloorTwist.Ambush));

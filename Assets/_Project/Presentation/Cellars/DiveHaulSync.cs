@@ -714,6 +714,7 @@ namespace SleepingCalamity.Presentation
 
         // ---- special-room jobs (host; called once per room per floor visit by CellarContentsSync, which holds the latch) ----
         private int _shrineFloor;   // host only: the floor whose stir altar was cleared this dive (0 = none); cleared with the session in ServerAdopt
+        public int ShrineFloor => _shrineFloor;   // host only (tests: the stir recompute)
 
         // Mending spring: every up hero in this world is healed MendPercent of max HP through the healing point's ServerHeal + broadcast path. Clients cannot call it.
         public bool ServerMendParty(int percent)
