@@ -171,6 +171,7 @@ namespace SleepingCalamity.Tests.PlayMode
                 foreach (NetworkObject o in hostNm.SpawnManager.SpawnedObjects.Values) { fs = o != null ? o.GetComponent<CellarFloorSync>() : null; if (fs != null) break; }
                 uint seed = fs != null && fs.Built != null && fs.BuiltFloor == floor ? fs.BuiltSeed : haul.DiveSeed;
                 if (FloorModifierSet.For(seed, floor).Has(FloorModifier.Stirred)) bonus = FloorModifierTuning.StirredBonus;
+                bonus += SpecialJobs.StirBonusOnFloor(haul.ShrineFloor, SpecialJobTuning.ShrineStir, floor);   // a cleared stir altar (host-only latch), as FeedStir adds it
             }
             fresh.ModifierBonus = bonus;
 

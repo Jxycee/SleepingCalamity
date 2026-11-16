@@ -744,7 +744,7 @@ namespace SleepingCalamity.Presentation
             UntrackAll(); _drops.Clear(); _roomSpawns.Clear();
             if (_combat != null) _combat.ServerClearEnemies();
             _clear.Reset(); _entered.Clear(); _ambushRoom = -1; _carrierEnemy = null; _carrierLostRoom = -1; _hunter = null; _hunterSpawned = false;
-            _valves.Reset(); _unlockRaised = false; _roomPaid = 0UL;
+            _valves.Reset(); _unlockRaised = false; _roomPaid = 0UL; _special = null; _specialFor = null;
             _layout = null; _root = null; _dressing = null; _armPos.Clear(); _live.Clear(); _hasBounds = false;
             _st = new ContentsState();
             if (IsSpawned) Publish();
@@ -1173,13 +1173,28 @@ namespace SleepingCalamity.Presentation
             PayEveryone(each);
             int rolls = _mods.ExtraRollsOnClear(room, _mods.Has(FloorModifier.FatLarder) ? CurrentPlan(FloorSync).FatRoom : -1);   // Brimming: every room; Fat Larder: the fat room. Same once-per-room guard as the gold above.
             if (rolls > 0) PayExtraRolls(room, rolls);
+            ApplySpecialJob(room);
+        }
+
+        // Authority: host only (PayRoomClear, once per room per floor visit via _roomPaid). The special room's job (SpecialJobs.OnClear; Core numbers): a mend of the party, extra loot rolls on their own roll index base,
+        // or a one-floor stir. The special room is a pure function of the layout, resolved once per layout and dropped in ServerClearFloor.
+        private SpecialRoom _special; private CellarFloorLayout _specialFor;
+        private void ApplySpecialJob(int room)
+        {
+            if (_layout == null || HaulSync == null) return;
+            if (!ReferenceEquals(_specialFor, _layout)) { _special = SpecialRoomDive.Resolve(_layout, null, _dressing); _specialFor = _layout; }
+            SpecialJobEffect job = SpecialJobs.OnClear(_special, room);
+            if (!job.Any) return;
+            if (job.ExtraRolls > 0) PayExtraRolls(room, job.ExtraRolls, SpecialJobTuning.ExtraRollChestBase);
+            if (job.MendPercent > 0) HaulSync.ServerMendParty(job.MendPercent);
+            if (job.StirDelta > 0f) HaulSync.ServerShrineStir(_layout.Floor, job.StirDelta);
         }
 
         // Authority: host only (runs from the host's clear checks).
         // Brimming / Fat Larder reward: `rolls` extra loot rolls for every connected hero that has a spawned player object and an existing bag. The roll index is
         // ExtraRollChestBase + room, then GiveExtraRoll adds 1000 * k: 51000 + room + 1000 * (k - 1) for k = 1.. (Stirred uses chestIndex + 1000 * k with chestIndex < 64: no collision).
         // Present = has a PlayerObject (downed heroes count; _players is not used). Absent clients are skipped and no bag is created for them.
-        private void PayExtraRolls(int room, int rolls)
+        private void PayExtraRolls(int room, int rolls, int chestBase = ExtraRollChestBase)
         {
             if (HaulSync == null) return;
             int bonus = HaulSync.Session != null ? HaulSync.Session.Momentum.ChestRankBonus(_layout.Floor) : 0;
@@ -1189,7 +1204,7 @@ namespace SleepingCalamity.Presentation
                 if (!HasPlayerObject(id)) continue;
                 PlayerBag bag = HaulSync.ServerExistingBagOf(id);
                 if (bag == null) continue;
-                for (int k = 1; k <= rolls; k++) GiveExtraRoll(id, bag, ExtraRollChestBase + room, k, bonus);
+                for (int k = 1; k <= rolls; k++) GiveExtraRoll(id, bag, chestBase + room, k, bonus);
             }
         }
         private const int ExtraRollChestBase = 50000;
