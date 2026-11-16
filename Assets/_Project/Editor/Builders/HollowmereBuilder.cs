@@ -195,6 +195,9 @@ namespace SleepingCalamity.EditorTools
             Transform lighting = Child(root, "Lighting");
             Light sun = LookTestBuilder.AddLight(lighting, "Sun", LightType.Directional, new Vector3(0, 10, 0), Quaternion.identity, Color.white, 3f, 10f, LightShadows.Soft);
             LookTestBuilder.AddLight(lighting, "ShadeFill", LightType.Directional, new Vector3(0, 10, 0), Quaternion.Euler(22f, 18f, 0f), new Color(0.78f, 0.84f, 1.0f), 0.5f, 10f, LightShadows.None);
+            // Area 1 rework round 4: the bell yard (the walk to the dive) lies between the church's north wall and the crag, in shade all morning, and the wall read
+            // black (p10 .05). A weak, shadowless, sky-coloured point light stands in for the light the sunlit crag and sky would bounce into the yard.
+            LookTestBuilder.AddLight(lighting, "BellYardFill", LightType.Point, new Vector3(9f, HollowmereLayout.KeepHeight + 2.6f, 30.2f), Quaternion.identity, new Color(0.80f, 0.87f, 1.0f), 5f, 11f, LightShadows.None);
             LookTestBuilder.AddProbe(lighting, new Vector3(0f, 3f, 3f), new Vector3(30f, 12f, 28f));
             LookTestBuilder.AddVolume(lighting, BeautyCornerBuilder.ProfileName);
             RenderSettings.ambientMode = AmbientMode.Trilight; RenderSettings.ambientIntensity = 1f;

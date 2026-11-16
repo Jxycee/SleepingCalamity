@@ -34,7 +34,7 @@ Material:
     - _Cutoff: 0.5
     - _DistFar: 3000
     - _DistNear: 2000
-    - _FillBoost: 2
+    - _FillBoost: 1.5
     - _GroundMist: 0.04
     - _HazeCoolAmt: 0.8
     - _HazeFar: 0.42
@@ -42,7 +42,7 @@ Material:
     - _HazeTop: 0.3
     - _HazeTopHeight: 670
     - _KeyBias: 0.1
-    - _KeyBoost: 2
+    - _KeyBoost: 1.4
     - _KeyWrap: 1
     - _MistScale: 40
     - _MistTop: -8
@@ -51,7 +51,7 @@ Material:
     - _SkyFillDir: 1
     m_Colors:
     - _BaseColor: {r: 0.35, g: 0.345, b: 0.36, a: 1}
-    - _HazeCool: {r: 0.806, g: 0.8, b: 1.5600001, a: 1}
+    - _HazeCool: {r: 0.62, g: 0.8, b: 1.2, a: 1}
     - _HazeTint: {r: 0.98, g: 1, b: 1.03, a: 1}
     - _ShadowTint: {r: 0.3, g: 0.38, b: 0.48, a: 1}
   m_BuildTextureStacks: []
