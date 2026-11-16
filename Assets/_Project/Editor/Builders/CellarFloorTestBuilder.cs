@@ -26,7 +26,7 @@ namespace SleepingCalamity.EditorTools
         static readonly string[] ClutterPieces = { "Crate", "CrateStack", "JarCluster", "Rubble", "SackPile" };
         const string MaterialsFolder = "Assets/_Project/Content/Materials/CellarFloor";
         const string LanternFolder = "Assets/_Project/Content/Art/Cellar/B11/CellarLantern";
-        static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate" };
+        static readonly string[] ArtPieces = { "VaultSegment", "ArchRib", "Pillar", "EndWall", "NicheWall", "LarderShelf", "CoalChute", "Barrels", "Roots", "BreathGrate", "GroinBay", "PillarRound", "WallAshlar", "WallBrickArch", "WallSoot", "WallLime", "SconceCage", "LanternChain", "LanternOil" };
 
         [MenuItem("SleepingCalamity/Art/Build Cellar Floor Test")]
         public static void Build()
