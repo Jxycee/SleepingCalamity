@@ -349,7 +349,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Seconds(0.6f);
 
             Enemy slime = combat.SpawnEnemy(EnemyKind.Slime, 1, heroObject.transform.position + heroObject.transform.forward * 1.6f, ai: false);
-            Assert.That(slime.Model.MaxHp, Is.EqualTo(80), "solo: life x1.0 (80 since combat depth)");
+            Assert.That(slime.Model.MaxHp, Is.EqualTo(60), "solo: life x0.75 of 80 (Run 5 balance 2026-11-15)");
             double until = Time.realtimeSinceStartupAsDouble + 6.0;
             while (slime.Alive && Time.realtimeSinceStartupAsDouble < until)
             {
@@ -403,7 +403,7 @@ namespace SleepingCalamity.Tests.PlayMode
             Assert.That(hero.Guarding, Is.True);
             slime.ServerForceAttack(AttackCatalog.TestNova, heroObject.transform.position);
             yield return Seconds(1.3f);
-            Assert.That(vitals.Model.Hp, Is.EqualTo(98), "a held guard takes a fifth of the damage, rounded up: the nova hits for 8 (12 x 0.65 x 100/110 = 7.09 -> 8), x0.2 = 1.6 -> 2 (was 11 -> 3, hp 97)");
+            Assert.That(vitals.Model.Hp, Is.EqualTo(99), "a held guard takes a fifth of the damage, rounded up: the solo nova hits for 4 (12 x 0.5 x 0.6 x 100/110 = 3.27 -> 4; Run 5 balance 2026-11-15), x0.2 = 0.8 -> 1");
 
             // Parry: the shield comes up just before the hit, inside the 6-frame window: no damage, the attacker is stunned, the dagger earns its parry ABS.
             input.Frame.SecondaryHeld = false;
@@ -505,7 +505,7 @@ namespace SleepingCalamity.Tests.PlayMode
             yield return Seconds(0.6f);
 
             Enemy warden = combat.SpawnEnemy(EnemyKind.DoughWarden, 1, new Vector3(0f, 0f, 6f), ai: false);
-            Assert.That(warden.Model.MaxHp, Is.EqualTo(600));
+            Assert.That(warden.Model.MaxHp, Is.EqualTo(1500), "2000 x 0.75 (Run 5 balance 2026-11-15)");
             int swing = 100;
             for (int i = 0; i < 8; i++)   // 4 break the arm (70 HP, 28 per hit / 1.5); the other 4 prove it breaks once. 8 opener hits stay under the revenge cap (12), or it breaks free
                 combat.ServerPlayerHitsEnemy(hero, ++swing, AttackSet.Hit1, warden, 0, new Vector3(1f, 0f, 5f), 90f);
@@ -793,7 +793,7 @@ namespace SleepingCalamity.Tests.PlayMode
             {
                 combat.ServerPlayerHitsEnemy(hero, ++swing, attacks[i], warden, -1, at, 90f, priors[i]);
                 Assert.That(combat.LastAppliedPrior, Is.EqualTo(priors[i]), "swing " + i + " used the owner's prior-hit count");
-                if (i == 2) Assert.That(warden.Model.Hp, Is.LessThan(600), "the first combo hit");
+                if (i == 2) Assert.That(warden.Model.Hp, Is.LessThan(1500), "the first combo hit");
             }
             Assert.That(combat.LastAppliedPrior, Is.EqualTo(2), "a second combo inside the grace counts only its own two hits (not the first combo's)");
         }
