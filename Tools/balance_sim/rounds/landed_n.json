@@ -1,0 +1,307 @@
+{
+  "_comment": "Balance simulator config. Game numbers are NEVER here: they come from data/game_numbers.json. Everything below is a run setting, a labelled assumption, a player-skill profile, a case definition, an override on top of game numbers, or a target band.",
+  "run": {
+    "_comment": "lanesPerCase = independent parties per case; nDives = consecutive dives per lane (weapon growth carries over, HP resets); seed = RNG seed; device = cuda|cpu|auto; dt = tick seconds; frameRate = frames/s the game's frame counts are expressed in (ASSUMED 60, number map says 60 fps); maxEnemies = enemy slots per room.",
+    "lanesPerCase": 2048,
+    "nDives": 10,
+    "seed": 12345,
+    "device": "auto",
+    "dt": 0.03333333,
+    "frameRate": 60,
+    "maxEnemies": 10
+  },
+  "assumptions": {
+    "_comment": "Model assumptions NOT taken from game_numbers.json. All ASSUMED. Run 5 additions: breadLadder* (PHASE1 bread ladder: free poor loaves before the baker, his bread after; 0 free loaves + bakeryBuilt false = the game as built on 2026-11-15); bakeryAfterFloor = a lane's bakery counts as built from the dive after it first clears this floor (0 = off, use bakeryBuilt); dodgeWindupRefSeconds = dodge chance rises with the wind-up: P = 1-(1-dodgeRate)^max(1, windupSeconds/ref) (0 = off); useFloorStatsKindShare = sample enemy kinds from floorStats.kindShare (the real generator) instead of floorMix.",
+    "roomTimeoutSeconds": 240,
+    "engageDelaySeconds": 1.0,
+    "broomBlockFraction": 0.3,
+    "broomBlockedMult": 0.2,
+    "ratKingHitRateMult": 0.8,
+    "ratKingReposExtraSeconds": 0.4,
+    "reviveTravelSeconds": 2.0,
+    "loafCooldownSeconds": 2.0,
+    "healPointThresholdFrac": 0.5,
+    "buildUpEnabled": true,
+    "maxWeaponLevel": 60,
+    "bakeryBuilt": false,
+    "axeGuardBreakProb": 0.15,
+    "daggerParryProbPerHit": 0.1,
+    "staffExtraSwingProbPerHit": 0.3,
+    "bowWeakShotProbPerHit": 0.25,
+    "breadLadderFreeLoaves": 0,
+    "breadLadderPoorLoafHeal": 15,
+    "bakeryAfterFloor": 3,
+    "dodgeWindupRefSeconds": 0.6,
+    "useFloorStatsKindShare": true
+  },
+  "weaponCycles": {
+    "_comment": "Attack kinds per swing cycle per weapon (from heroAttacks). ASSUMED: normal1, normal2, finisher; add \"charge\" to a list to include charge swings.",
+    "default": [
+      "normal1",
+      "normal2",
+      "finisher"
+    ]
+  },
+  "skillProfiles": {
+    "_comment": "ASSUMED player skill. hitRate = fraction of swings that connect; uptime = fraction of time spent attacking (rest = moving/repositioning, stretches each swing by 1/uptime); dodgeRate = P(an incoming attack is fully dodged); guardRate = P(guard x guardMult when not dodged; guard-break attacks ignore it); reviveWillingness = P a downed hero gets revived when a mate is up; loafThresholdHpFrac = eat a loaf below this HP fraction.",
+    "novice": {
+      "hitRate": 0.6,
+      "uptime": 0.5,
+      "dodgeRate": 0.25,
+      "guardRate": 0.1,
+      "reviveWillingness": 0.5,
+      "loafThresholdHpFrac": 0.25
+    },
+    "average": {
+      "hitRate": 0.8,
+      "uptime": 0.65,
+      "dodgeRate": 0.5,
+      "guardRate": 0.3,
+      "reviveWillingness": 0.8,
+      "loafThresholdHpFrac": 0.4
+    },
+    "expert": {
+      "hitRate": 0.92,
+      "uptime": 0.8,
+      "dodgeRate": 0.75,
+      "guardRate": 0.6,
+      "reviveWillingness": 0.95,
+      "loafThresholdHpFrac": 0.5
+    }
+  },
+  "partySkillMix": {
+    "_comment": "Weights used when a case lists the profile name \"mix\".",
+    "novice": 0.3,
+    "average": 0.5,
+    "expert": 0.2
+  },
+  "cases": [
+    {
+      "_comment": "name, players (1..4), profiles = list per hero slot (repeated if shorter; \"mix\" samples partySkillMix per lane), loadouts = weapon per hero slot (axe|staff|dagger_shield|bow_sword).",
+      "name": "p1_average",
+      "players": 1,
+      "profiles": [
+        "average"
+      ],
+      "loadouts": [
+        "axe"
+      ]
+    },
+    {
+      "name": "p2_average",
+      "players": 2,
+      "profiles": [
+        "average"
+      ],
+      "loadouts": [
+        "axe"
+      ]
+    },
+    {
+      "name": "p4_average",
+      "players": 4,
+      "profiles": [
+        "average"
+      ],
+      "loadouts": [
+        "axe"
+      ]
+    }
+  ],
+  "overrides": {
+    "_comment": "Applied on top of game_numbers.json before simulating. Key = dotted path into game_numbers.json (list elements by index: coop.lifeMult.2). Value = number/bool/string (absolute) or {\"mult\": x} or {\"add\": x}. Unknown paths raise an error. Examples (kept empty by default): \"enemies.Slime.hp\": {\"mult\": 1.2}, \"heroAttacks.axe_1.mult\": 1.1, \"weapons.axe.atk\": 24, \"growth.levelCostBase\": 30, \"coop.lifeMult.3\": 2.0, \"enemyAttacks.rat_lunge.mult\": 0.9, \"tierScale.tier1Atk\": 0.6, \"healing.healPointChancePercent\": 70."
+  },
+  "targets": {
+    "_comment": "Run 5 targets (Fable, 2026-11-15), see Reference/sessions/run5-balance/STATUS.md. Bands are [min, max]. Dive keys are dive numbers (1-based).",
+    "ttkKindSoloDive1": {
+      "case": "p1_average",
+      "Slime": [
+        2,
+        4
+      ],
+      "Broom": [
+        5,
+        8
+      ],
+      "RatKing": [
+        6,
+        11
+      ],
+      "floors": [
+        1,
+        2,
+        3
+      ]
+    },
+    "partyTtkRatio": {
+      "cases": [
+        "p2_average",
+        "p4_average"
+      ],
+      "vs": "p1_average",
+      "band": [
+        0.6,
+        1.5
+      ]
+    },
+    "wardenTtkSecondsDives1to3": {
+      "cases": [
+        "p1_average",
+        "p2_average",
+        "p4_average"
+      ],
+      "band": [
+        40,
+        80
+      ]
+    },
+    "damageTakenFractionOfMaxHp": {
+      "cases": [
+        "p1_average",
+        "p2_average",
+        "p4_average"
+      ],
+      "1": [
+        0.1,
+        0.3
+      ],
+      "2": [
+        0.2,
+        0.45
+      ],
+      "3": [
+        0.35,
+        0.7
+      ],
+      "4": [
+        0.25,
+        0.55
+      ],
+      "5": [
+        0.4,
+        0.9
+      ],
+      "6": [
+        0.25,
+        0.6
+      ],
+      "7": [
+        0.25,
+        0.6
+      ]
+    },
+    "coopDamageRatio": {
+      "cases": [
+        "p2_average",
+        "p4_average"
+      ],
+      "vs": "p1_average",
+      "band": [
+        0.7,
+        2.0
+      ]
+    },
+    "bankReach": {
+      "p1_average": {
+        "1": [
+          0.15,
+          0.45
+        ],
+        "3": [
+          0.4,
+          0.7
+        ],
+        "10": [
+          0.65,
+          0.9
+        ]
+      },
+      "p2_average": {
+        "1": [
+          0.15,
+          0.6
+        ],
+        "3": [
+          0.4,
+          0.85
+        ],
+        "10": [
+          0.65,
+          0.95
+        ]
+      },
+      "p4_average": {
+        "1": [
+          0.4,
+          0.85
+        ],
+        "3": [
+          0.6,
+          1.0
+        ],
+        "10": [
+          0.75,
+          1.0
+        ]
+      }
+    },
+    "fullClear": {
+      "p1_average": {
+        "1": [
+          0,
+          0.25
+        ],
+        "10": [
+          0.35,
+          0.85
+        ]
+      },
+      "p2_average": {
+        "10": [
+          0.35,
+          0.92
+        ]
+      },
+      "p4_average": {
+        "10": [
+          0.5,
+          1.0
+        ]
+      }
+    },
+    "floorsReachedDive1Min": {
+      "p1_average": 3.0
+    },
+    "downsPerHeroPerDiveMaxFromDive3": {
+      "p2_average": 1.5,
+      "p4_average": 1.5
+    },
+    "weaponLevelAfterDive": {
+      "p1_average": {
+        "1": [
+          1,
+          3
+        ],
+        "3": [
+          3,
+          6
+        ],
+        "10": [
+          8,
+          14
+        ]
+      }
+    },
+    "coopWeaponLevelRatioDive10": {
+      "cases": [
+        "p2_average",
+        "p4_average"
+      ],
+      "vs": "p1_average",
+      "band": [
+        0.8,
+        2.2
+      ]
+    }
+  }
+}

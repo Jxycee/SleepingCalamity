@@ -77,14 +77,14 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
             var w = WeaponState.NewHeirloom(WeaponCatalog.Axe);
             var book = new HeroAbilityBook();
             Assert.That(book.Update(w), Is.Empty);
-            w.AddAbs(40f + 60f);                                  // level 2
+            w.AddAbs(40f + 80f);                                  // level 2
             Assert.That(book.Update(w), Is.Empty);
-            w.AddAbs(80f);                                        // level 3
+            w.AddAbs(120f);                                       // level 3
             Assert.That(book.Update(w), Is.EqualTo(new[] { "axe_quake" }));
             Assert.That(book.Update(w), Is.Empty, "reported once");
 
             w.Fit(AttachmentKind.Ember); w.Fit(AttachmentKind.Ember);
-            w.AddAbs(100f);                                       // level 4, 10 fire
+            w.AddAbs(160f);                                       // level 4, 10 fire
             Assert.That(w.TryBuildUp(), Is.True);
             Assert.That(book.Update(w), Is.EqualTo(new[] { "axe_cinder_sweep" }));
 
@@ -98,7 +98,7 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
         {
             var staff = WeaponState.NewHeirloom(WeaponCatalog.Staff);
             var book = new HeroAbilityBook();
-            staff.AddAbs(180f);
+            staff.AddAbs(240f);   // level 3 (40 + 80 + 120)
             Assert.That(book.Update(staff), Is.EqualTo(new[] { "staff_spark_ward" }));
             Assert.That(book.Has("axe_quake"), Is.False);
         }
@@ -109,7 +109,7 @@ namespace SleepingCalamity.Tests.EditMode.Weapons
             var w = WeaponState.NewHeirloom(WeaponCatalog.Axe);
             var book = new HeroAbilityBook();
             Assert.That(book.TierWith("axe_quake", WeaponFamily.Axe), Is.EqualTo(0));
-            w.AddAbs(180f);
+            w.AddAbs(240f);   // level 3 (40 + 80 + 120)
             book.Update(w);
             Assert.That(book.TierWith("axe_quake", WeaponFamily.Axe), Is.EqualTo(2));
             Assert.That(book.TierWith("axe_quake", WeaponFamily.Bow), Is.EqualTo(1));

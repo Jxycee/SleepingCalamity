@@ -40,8 +40,10 @@ def collect(sim):
     g = lambda t: t.detach().cpu().numpy()
     ttk = g(sim.h_ttk).reshape(C, NF, 4, NB_T)
     ttk1 = g(sim.h_ttk1).reshape(C, NF, 4, NB_T)
+    ttk3 = g(sim.h_ttk3).reshape(C, NF, 4, NB_T)
     sttk = g(sim.s_ttk).reshape(C, NF, 4)
     sttk1 = g(sim.s_ttk1).reshape(C, NF, 4)
+    sttk3 = g(sim.s_ttk3).reshape(C, NF, 4)
     room = g(sim.h_room).reshape(C, NF, NB_T)
     room1 = g(sim.h_room1).reshape(C, NF, NB_T)
     sroom = g(sim.s_room).reshape(C, NF)
@@ -56,7 +58,7 @@ def collect(sim):
     for c, cd in enumerate(sim.case_defs):
         m = {"players": cd["players"], "profile": "+".join(sorted(set(cd.get("profiles", ["average"])))),
              "loadout": "+".join(cd.get("loadouts", ["axe"]))}
-        for sc_, (th, ts_, rh, rs) in {"all": (ttk, sttk, room, sroom), "d1": (ttk1, sttk1, room1, sroom1)}.items():
+        for sc_, (th, ts_) in {"all": (ttk, sttk), "d1": (ttk1, sttk1), "d1to3": (ttk3, sttk3)}.items():
             for k in range(4):
                 for f in range(NF):
                     m[("ttk_" + sc_, KINDS[k], f + 1)] = hstats(th[c, f, k], BIN_T, ts_[c, f, k])
@@ -64,69 +66,145 @@ def collect(sim):
                 reg = th[c, f, :3].sum(0)
                 tot = ts_[c, f, :3].sum()
                 m[("ttk_" + sc_, "regular", f + 1)] = hstats(reg, BIN_T, tot)
+        for sc_, (rh, rs) in {"all": (room, sroom), "d1": (room1, sroom1)}.items():
+            for f in range(NF):
                 m[("room_clear_" + sc_, "regular", f + 1)] = hstats(rh[c, f], BIN_T, rs[c, f])
         for f in range(NF):
             m[("dmg_taken_frac", "per_hero", f + 1)] = hstats(dmg[c, f], BIN_F)
+        P = float(cd["players"])
         for d in range(N):
-            for nm, arr in (("deaths_per_dive", death), ("weapon_level", lvl)):
-                hs = hstats(arr[c, d], 1.0)
-                m[(nm, "dive", d + 1)] = (hs[0],) + tuple(v - 0.5 for v in hs[1:])   # integer-valued: centre -> value
+            hs = hstats(death[c, d], 1.0)
+            dd = (hs[0],) + tuple(v - 0.5 for v in hs[1:])     # integer-valued: bin centre -> value
+            m[("deaths_per_dive", "dive", d + 1)] = dd           # party total
+            m[("downs_per_hero", "dive", d + 1)] = (dd[0],) + tuple(v / P for v in dd[1:])
+            hs = hstats(lvl[c, d], 1.0)
+            m[("weapon_level", "dive", d + 1)] = (hs[0],) + tuple(v - 0.5 for v in hs[1:])
             n = max(dives[c, d], 1)
             m[("dive_success", "dive", d + 1)] = (int(dives[c, d]), float(succ[c, d] / n), float("nan"), float("nan"))
             fc = flr[c, d]
             nn = max(fc.sum(), 1)
             fm = float((fc * np.arange(NF + 1)).sum() / nn)
             m[("floors_reached", "dive", d + 1)] = (int(nn), fm, float("nan"), float("nan"))
+            # bank reached = floor 5 cleared in that dive = the dive ended on floor 6 or later (or succeeded)
+            m[("bank_reach", "dive", d + 1)] = (int(dives[c, d]), float(fc[6:].sum() / nn), float("nan"), float("nan"))
         out[cd["name"]] = m
     return out
 
 
+def load_prev(path):
+    """Read a previous <tag>_metrics.csv back into the structure collect() returns."""
+    M = {}
+    with open(path, newline="") as f:
+        for r in csv.DictReader(f):
+            m = M.setdefault(r["case"], {"players": int(r["players"]), "profile": r["profile"]})
+            fl, kd = int(r["floor"]), r["kind"]
+            key = (r["metric"], "dive", int(kd[4:])) if (fl == 0 and kd.startswith("dive")) else (r["metric"], kd, fl)
+            m[key] = (int(float(r["n"])), float(r["mean"]), float(r["p10"]), float(r["p90"]))
+    tag = os.path.basename(path)
+    return M, (tag[:-len("_metrics.csv")] if tag.endswith("_metrics.csv") else tag)
+
+
 # ------------------------------------------------------------------------ verdicts
+def gv(M, case, metric, kind, x, nmin=1):
+    """Mean of one metric, or nan (no such case or key, or fewer than nmin samples)."""
+    v = M.get(case, {}).get((metric, kind, x))
+    return v[1] if (v and v[0] >= nmin and v[1] == v[1]) else float("nan")
+
+
 def pooled(m, metric, f):
     v = m.get((metric, "regular", f))
     return v[1] if v and v[0] > 0 else float("nan")
 
 
+BIG = 99.0
+
+
 def verdicts(M, cfg, nd):
+    """One verdict per target value of the Run 5 schema: check, case, sub, value (float or "no data"), band, pass."""
     T = cfg["targets"]
     V = []
 
-    def add(case, check, floor, val, band):
-        if val != val:
-            return
-        ok = band[0] <= val <= band[1]
-        V.append({"case": case, "check": check, "floor": floor, "value": round(float(val), 3), "band": band, "pass": bool(ok)})
+    def add(check, case, sub, val, band):
+        if val is None or val != val:
+            V.append({"check": check, "case": case, "sub": sub, "value": "no data", "band": list(band), "pass": False})
+        else:
+            V.append({"check": check, "case": case, "sub": sub, "value": round(float(val), 3), "band": list(band),
+                      "pass": bool(band[0] <= val <= band[1])})
 
-    for cn in T["scoredCases"]:
-        if cn not in M:
-            continue
-        m = M[cn]
-        for f in range(1, NF + 1):
-            fs = str(f)
-            tk = m.get(("ttk_d1", "Warden", f)) if f == 5 else None
-            v = tk[1] if (tk and tk[0] > 0) else pooled(m, "ttk_d1", f)
-            add(cn, "ttk", f, v, T["ttkSeconds"][fs])
-            rc = pooled(m, "room_clear_d1", f)
-            if f == 5:  # Warden room clear time = its fight + adds; use all-kind room via ttk of warden
-                rc = float("nan")
-            add(cn, "room_clear", f, rc, T["roomClearSeconds"][fs])
-            d = m[("dmg_taken_frac", "per_hero", f)]
-            if d[0] > 0:
-                add(cn, "damage_frac", f, d[1], T["damageTakenFractionOfMaxHp"][fs])
-        dm = np.mean([m[("deaths_per_dive", "dive", d)][1] for d in range(1, nd + 1)]) / m["players"]  # per hero
-        add(cn, "deaths_per_dive", 0, dm, [0, T["deathsPerDiveMax"]])
-        for ds, band in T["weaponLevelAfterDive"].items():
-            d = int(ds)
-            if d <= nd:
-                add(cn, "weapon_level_d" + ds, 0, m[("weapon_level", "dive", d)][1], band)
-    if "p1_average" in M:
-        for cn in T["scoredCases"]:
-            if cn == "p1_average" or cn not in M:
+    def ratio(a, b):
+        return a / b if (a == a and b == b and b > 0) else float("nan")
+
+    # ttkKindSoloDive1: regular rooms, dive 1, per kind per floor where the kind appears (n >= 20)
+    t = T.get("ttkKindSoloDive1")
+    if t:
+        cn = t["case"]
+        for kind, band in t.items():
+            if kind in ("case", "floors") or kind.startswith("_"):
                 continue
+            got = False
             for f in range(1, NF + 1):
-                a, b = pooled(M[cn], "ttk_d1", f), pooled(M["p1_average"], "ttk_d1", f)
-                if b == b and a == a and b > 0:
-                    add(cn, "party_ttk_ratio", f, a / b, T["partyTtkRatio"])
+                if "floors" in t and f not in t["floors"]:
+                    continue
+                v = gv(M, cn, "ttk_d1", kind, f, nmin=20)
+                if v == v:
+                    got = True
+                    add("ttkKind", cn, "%s f%d" % (kind, f), v, band)
+            if not got:
+                add("ttkKind", cn, kind, float("nan"), band)
+    t = T.get("partyTtkRatio")        # pooled regular TTK dive 1, case / vs, per floor where both have data
+    if t:
+        for cn in t["cases"]:
+            got = False
+            for f in range(1, NF + 1):
+                r = ratio(pooled(M.get(cn, {}), "ttk_d1", f), pooled(M.get(t["vs"], {}), "ttk_d1", f))
+                if r == r:
+                    got = True
+                    add("partyTtkRatio", cn, "f%d" % f, r, t["band"])
+            if not got:
+                add("partyTtkRatio", cn, "", float("nan"), t["band"])
+    t = T.get("wardenTtkSecondsDives1to3")
+    if t:
+        for cn in t["cases"]:
+            add("wardenTtk", cn, "f5", gv(M, cn, "ttk_d1to3", "Warden", 5), t["band"])
+    t = T.get("damageTakenFractionOfMaxHp")
+    if t:
+        for cn in t["cases"]:
+            for f in range(1, NF + 1):
+                if str(f) in t:
+                    add("damageFrac", cn, "f%d" % f, gv(M, cn, "dmg_taken_frac", "per_hero", f), t[str(f)])
+    t = T.get("coopDamageRatio")
+    if t:
+        for cn in t["cases"]:
+            got = False
+            for f in range(1, NF + 1):
+                r = ratio(gv(M, cn, "dmg_taken_frac", "per_hero", f), gv(M, t["vs"], "dmg_taken_frac", "per_hero", f))
+                if r == r:
+                    got = True
+                    add("coopDamageRatio", cn, "f%d" % f, r, t["band"])
+            if not got:
+                add("coopDamageRatio", cn, "", float("nan"), t["band"])
+    for key, check, metric in (("bankReach", "bankReach", "bank_reach"), ("fullClear", "fullClear", "dive_success"),
+                               ("weaponLevelAfterDive", "weaponLevel", "weapon_level")):
+        for cn, per in (T.get(key) or {}).items():
+            if cn.startswith("_"):
+                continue
+            for ds, band in per.items():
+                if int(ds) <= nd:
+                    add(check, cn, "d" + ds, gv(M, cn, metric, "dive", int(ds)), band)
+    for cn, lo in (T.get("floorsReachedDive1Min") or {}).items():
+        if not cn.startswith("_"):
+            add("floorsReached", cn, "d1", gv(M, cn, "floors_reached", "dive", 1), [lo, BIG])
+    for cn, mx in (T.get("downsPerHeroPerDiveMaxFromDive3") or {}).items():
+        if cn.startswith("_"):
+            continue
+        vals = [gv(M, cn, "downs_per_hero", "dive", d) for d in range(3, nd + 1)]
+        vals = [v for v in vals if v == v]
+        add("downsPerHero", cn, "d3+", float(np.mean(vals)) if vals else float("nan"), [0, mx])
+    t = T.get("coopWeaponLevelRatioDive10")
+    if t:
+        d = 10 if nd >= 10 else nd
+        for cn in t["cases"]:
+            add("coopWeaponRatio", cn, "d%d" % d, ratio(gv(M, cn, "weapon_level", "dive", d), gv(M, t["vs"], "weapon_level", "dive", d)), t["band"])
     return V
 
 
@@ -149,107 +227,227 @@ def write_csv(M, path):
         w.writerows(rows)
 
 
-def plot(M, V, cfg, path, nd, timing, title_extra=""):
+def bandstr(b):
+    return "%g-%g" % (b[0], b[1]) if b[1] < BIG else ">=%g" % b[0]
+
+
+def vstr(v):
+    return v["value"] if isinstance(v["value"], str) else "%g" % v["value"]
+
+
+def fail_text(v):
+    return "%s %s%s=%s [%s]" % (v["check"], v["case"], (" " + v["sub"]) if v["sub"] else "", vstr(v), bandstr(v["band"]))
+
+
+COL = {"p1_average": "#1f77b4", "p2_average": "#ff7f0e", "p3_average": "#e377c2", "p4_average": "#2ca02c",
+       "p1_novice": "#9467bd", "p1_expert": "#d62728", "p4_mix": "#8c564b"}
+KCOL = {"Slime": "#2ca02c", "Broom": "#ff7f0e", "RatKing": "#d62728", "Warden": "#1f77b4"}
+
+
+def plot(M, V, cfg, path, nd, timing, title_extra="", prev=None, prev_tag=None):
+    import textwrap
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     T = cfg["targets"]
     fl = np.arange(1, NF + 1)
-    col = {"p1_average": "#1f77b4", "p2_average": "#ff7f0e", "p4_average": "#2ca02c",
-           "p1_novice": "#9467bd", "p1_expert": "#d62728", "p4_mix": "#8c564b"}
-    fig = plt.figure(figsize=(12.6, 11.6), dpi=100)
-    gs = fig.add_gridspec(4, 3, height_ratios=[0.55, 1, 1, 1], hspace=0.5, wspace=0.28, left=0.055, right=0.985, top=0.975, bottom=0.05)
+    dv = np.arange(1, nd + 1)
     npass = sum(v["pass"] for v in V)
     nfail = len(V) - npass
-    ax = fig.add_subplot(gs[0, :])
-    ax.axis("off")
     byc = {}
     for v in V:
         byc.setdefault(v["case"], [0, 0])[0 if v["pass"] else 1] += 1
-    fails = [f"{v['case'][:6]} {v['check']}{'' if not v['floor'] else ' f%d' % v['floor']}={v['value']} {v['band']}" for v in V if not v["pass"]]
+    fails = [fail_text(v) for v in V if not v["pass"]]
+    wrapped = textwrap.wrap("FAIL: " + "; ".join(fails), width=205) if fails else ["FAIL: none"]
+    hdr_in = 0.75 + 0.118 * len(wrapped)
+    fig = plt.figure(figsize=(12.6, hdr_in + 3 * 3.2), dpi=100)          # 1260 px wide
+    gs = fig.add_gridspec(4, 3, height_ratios=[hdr_in, 3.2, 3.2, 3.2], hspace=0.45, wspace=0.26,
+                          left=0.05, right=0.985, top=0.985, bottom=0.04)
+    ax = fig.add_subplot(gs[0, :])
+    ax.axis("off")
     head = f"BALANCE SIM  PASS {npass} / FAIL {nfail}   |  " + "   ".join(f"{k}: {a}P/{b}F" for k, (a, b) in byc.items())
-    ax.text(0, 0.95, head, fontsize=10.5, fontweight="bold", va="top", family="monospace")
-    ax.text(0, 0.55, f"{timing}  {title_extra}", fontsize=8, va="top", family="monospace")
-    ax.text(0, 0.30, "FAIL: " + "; ".join(fails[:7]) + (" ..." if len(fails) > 7 else ""), fontsize=6.6, va="top", family="monospace", wrap=True)
+    ax.text(0, 1.0, head, fontsize=9.5, fontweight="bold", va="top", family="monospace", transform=ax.transAxes)
+    line2 = f"{timing}  {title_extra}" + (f"   |  dashed = previous run: {prev_tag}" if prev else "")
+    ax.text(0, 1.0 - 0.17 / hdr_in, line2, fontsize=6.8, va="top", family="monospace", transform=ax.transAxes)
+    ax.text(0, 1.0 - 0.36 / hdr_in, "\n".join(wrapped), fontsize=6.3, va="top", family="monospace", transform=ax.transAxes)
 
-    def band(ax, key, ylab=None):
-        for f in fl:
-            lo, hi = T[key][str(f)]
-            ax.fill_between([f - 0.4, f + 0.4], lo, hi, color="#2ca02c", alpha=0.15, lw=0)
+    def draw(a, fn, color, label=None, marker="o", ms=3.5, lw=1.2):
+        """fn(M) -> (x, y). The previous run is drawn in the same colour, dashed and fainter."""
+        x, y = fn(M)
+        a.plot(x, y, marker=marker, ms=ms, color=color, label=label, lw=lw)
+        if prev is not None:
+            x2, y2 = fn(prev)
+            a.plot(x2, y2, marker=marker, ms=ms * 0.7, color=color, ls="--", alpha=0.4, lw=lw)
 
-    # A: TTK per kind, solo average d1
-    a = fig.add_subplot(gs[1, 0])
-    band(a, "ttkSeconds")
-    mk = {"Slime": "o", "RatKing": "s", "Broom": "^", "Warden": "D"}
-    for k in KINDS:
-        xs, ys, lo, hi = [], [], [], []
-        for f in fl:
-            v = M["p1_average"][("ttk_d1", k, int(f))]
-            if v[0] > 0:
-                xs.append(f); ys.append(v[1]); lo.append(v[1] - v[2]); hi.append(v[3] - v[1])
-        a.errorbar(xs, ys, yerr=[np.clip(lo, 0, None), np.clip(hi, 0, None)], marker=mk[k], ms=4, lw=1.1, capsize=2, label=k)
-    a.set_yscale("log"); a.set_title("Time to kill per enemy kind, solo avg, dive 1\n(bar p10-p90, green = target band)", fontsize=8)
-    a.set_xlabel("floor", fontsize=7); a.set_ylabel("seconds", fontsize=7); a.legend(fontsize=6)
-    # B: pooled TTK, 1/2/4
-    b = fig.add_subplot(gs[1, 1])
-    band(b, "ttkSeconds")
-    for cn in ["p1_average", "p2_average", "p4_average"]:
-        ys = [M[cn][("ttk_d1", "Warden", int(f))][1] if f == 5 and M[cn][("ttk_d1", "Warden", 5)][0] > 0 else pooled(M[cn], "ttk_d1", int(f)) for f in fl]
-        b.plot(fl, ys, marker="o", ms=4, color=col[cn], label=cn[:2])
-    b.set_yscale("log"); b.set_title("Mean TTK pooled (floor 5 = Warden), dive 1\n1 vs 2 vs 4 players", fontsize=8)
-    b.set_xlabel("floor", fontsize=7); b.legend(fontsize=6)
-    # C: room clear
-    c = fig.add_subplot(gs[1, 2])
-    band(c, "roomClearSeconds")
-    for cn in ["p1_average", "p2_average", "p4_average"]:
-        c.plot(fl, [pooled(M[cn], "room_clear_d1", int(f)) for f in fl], marker="o", ms=4, color=col[cn], label=cn[:2])
-    c.set_title("Regular room clear time (s), dive 1", fontsize=8); c.set_xlabel("floor", fontsize=7); c.legend(fontsize=6)
-    # D: damage taken
-    d = fig.add_subplot(gs[2, 0])
-    band(d, "damageTakenFractionOfMaxHp")
-    for cn in ["p1_average", "p2_average", "p4_average"]:
-        ys = [M[cn][("dmg_taken_frac", "per_hero", int(f))] for f in fl]
-        d.errorbar(fl, [y[1] for y in ys], yerr=[[max(y[1] - y[2], 0) if y[1] == y[1] else 0 for y in ys], [max(y[3] - y[1], 0) if y[1] == y[1] else 0 for y in ys]],
-                   marker="o", ms=4, capsize=2, color=col[cn], label=cn[:2], lw=1)
-    d.set_title("Damage taken per hero per floor (fraction of max HP)\nbar p10-p90, all dives", fontsize=8); d.set_xlabel("floor", fontsize=7); d.legend(fontsize=6)
-    # E: deaths per dive
-    e = fig.add_subplot(gs[2, 1])
-    dv = np.arange(1, nd + 1)
+    def fl_curve(case, metric, kind):
+        return lambda MM: (fl, [gv(MM, case, metric, kind, int(f)) for f in fl])
+
+    def dv_curve(case, metric):
+        return lambda MM: (dv, [gv(MM, case, metric, "dive", int(d)) for d in dv])
+
+    def titled(a, t, xl):
+        a.set_title(t, fontsize=8)
+        a.set_xlabel(xl, fontsize=7)
+
+    def hband(a, lo, hi, x0, x1, color="#2ca02c", alpha=0.16):
+        a.fill_between([x0, x1], lo, hi, color=color, alpha=alpha, lw=0)
+
+    # 1 per-kind TTK, solo, dive 1, per-kind T1 bands
+    a1 = fig.add_subplot(gs[1, 0])
+    tk = T.get("ttkKindSoloDive1", {})
+    cn1 = tk.get("case", "p1_average")
+    for k in ("Slime", "Broom", "RatKing"):
+        if k in tk:
+            hband(a1, tk[k][0], tk[k][1], 0.6, NF + 0.4, KCOL[k], 0.13)
+        draw(a1, lambda MM, k=k: (fl, [gv(MM, cn1, "ttk_d1", k, int(f), nmin=5) for f in fl]), KCOL[k], k)
+    a1.set_yscale("log")
+    titled(a1, f"TTK per enemy kind, {cn1}, dive 1 (shade = per-kind band)", "floor")
+    a1.set_ylabel("seconds", fontsize=7)
+    a1.legend(fontsize=6)
+    # 2 pooled TTK 1-4 players (floor 5 = Warden, dives 1-3)
+    a2 = fig.add_subplot(gs[1, 1])
+    wt = T.get("wardenTtkSecondsDives1to3", {"band": [40, 80]})
+    hband(a2, wt["band"][0], wt["band"][1], 4.6, 5.4)
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average"):
+        def fn(MM, cn=cn):
+            return fl, [gv(MM, cn, "ttk_d1to3", "Warden", 5) if f == 5 else pooled(MM.get(cn, {}), "ttk_d1", int(f)) for f in fl]
+        draw(a2, fn, COL[cn], cn[:2])
+    a2.set_yscale("log")
+    titled(a2, "Mean TTK, 1-4 players (floor 5 = Warden dives 1-3, band 40-80 s)", "floor")
+    a2.legend(fontsize=6)
+    # 3 room clear time
+    a3 = fig.add_subplot(gs[1, 2])
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average"):
+        draw(a3, lambda MM, cn=cn: (fl, [pooled(MM.get(cn, {}), "room_clear_d1", int(f)) for f in fl]), COL[cn], cn[:2])
+    titled(a3, "Regular room clear time (s), dive 1", "floor")
+    a3.legend(fontsize=6)
+    # 4 damage per hero per floor with the new bands
+    a4 = fig.add_subplot(gs[2, 0])
+    dt_ = T.get("damageTakenFractionOfMaxHp", {})
+    for f in fl:
+        if str(f) in dt_:
+            hband(a4, dt_[str(f)][0], dt_[str(f)][1], f - 0.4, f + 0.4)
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average"):
+        draw(a4, fl_curve(cn, "dmg_taken_frac", "per_hero"), COL[cn], cn[:2])
+    titled(a4, "Damage taken per hero per floor (fraction of max HP, all dives)", "floor")
+    a4.legend(fontsize=6)
+    # 5 downs per hero per dive
+    a5 = fig.add_subplot(gs[2, 1])
     for cn in M:
-        e.plot(dv, [M[cn][("deaths_per_dive", "dive", int(x))][1] / M[cn]["players"] for x in dv], marker="o", ms=3, color=col.get(cn), label=cn, lw=1)
-    e.axhline(T["deathsPerDiveMax"], color="#2ca02c", ls="--", lw=1)
-    e.set_title("Deaths per hero per dive, by dive number\ngreen = target max", fontsize=8); e.set_xlabel("dive", fontsize=7); e.legend(fontsize=5.5, ncol=2)
-    # F: weapon level
-    g = fig.add_subplot(gs[2, 2])
-    for ds, bd in T["weaponLevelAfterDive"].items():
-        if int(ds) <= nd:
-            g.fill_between([int(ds) - 0.35, int(ds) + 0.35], bd[0], bd[1], color="#2ca02c", alpha=0.18, lw=0)
-    for cn in ["p1_average", "p2_average", "p4_average", "p1_novice", "p1_expert"]:
-        ys = [M[cn][("weapon_level", "dive", int(x))] for x in dv]
-        g.plot(dv, [y[1] for y in ys], marker="o", ms=3, color=col[cn], label=cn, lw=1)
-        if cn in ("p1_average", "p4_average"):
-            g.fill_between(dv, [y[2] for y in ys], [y[3] for y in ys], color=col[cn], alpha=0.12, lw=0)
-    g.set_title("Weapon level after dive N (mean; shade p10-p90)\ngreen = target at dives 1, 3, 10", fontsize=8); g.set_xlabel("dive", fontsize=7); g.legend(fontsize=5.5)
-    # G: success / floors reached
-    h = fig.add_subplot(gs[3, 0])
+        draw(a5, dv_curve(cn, "downs_per_hero"), COL.get(cn), cn)
+    dm = T.get("downsPerHeroPerDiveMaxFromDive3", {})
+    dm = [v for k, v in dm.items() if not k.startswith("_")]
+    if dm:
+        a5.hlines(max(dm), 3, nd, color="#2ca02c", ls="--", lw=1)
+    titled(a5, "Downs per hero per dive (green = co-op max from dive 3)", "dive")
+    a5.legend(fontsize=5.5, ncol=2)
+    # 6 weapon level after dive N
+    a6 = fig.add_subplot(gs[2, 2])
+    for cn, per in T.get("weaponLevelAfterDive", {}).items():
+        for ds, bd in per.items():
+            if int(ds) <= nd:
+                hband(a6, bd[0], bd[1], int(ds) - 0.35, int(ds) + 0.35, alpha=0.2)
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average", "p1_novice", "p1_expert"):
+        draw(a6, dv_curve(cn, "weapon_level"), COL[cn], cn)
+    titled(a6, "Weapon level after dive N (mean; green = p1_average band)", "dive")
+    a6.legend(fontsize=5.5)
+
+    def band_marks(a, key, case="p1_average"):
+        for ds, bd in T.get(key, {}).get(case, {}).items():
+            if int(ds) <= nd:
+                hband(a, bd[0], bd[1], int(ds) - 0.35, int(ds) + 0.35, alpha=0.22)
+
+    # 7 bank reach, 8 full clear, 9 mean floor reached
+    a7 = fig.add_subplot(gs[3, 0])
+    band_marks(a7, "bankReach")
     for cn in M:
-        h.plot(dv, [M[cn][("dive_success", "dive", int(x))][1] for x in dv], marker="o", ms=3, color=col.get(cn), label=cn, lw=1)
-    h.set_ylim(0, 1.02); h.set_title("Dive success rate (reach floor 7 cleared), by dive", fontsize=8); h.set_xlabel("dive", fontsize=7); h.legend(fontsize=5.5, ncol=2)
-    i = fig.add_subplot(gs[3, 1])
+        draw(a7, dv_curve(cn, "bank_reach"), COL.get(cn), cn)
+    a7.set_ylim(0, 1.02)
+    titled(a7, "Bank reach (floor 5 cleared) by dive (green = p1_average)", "dive")
+    a7.legend(fontsize=5.5, ncol=2)
+    a8 = fig.add_subplot(gs[3, 1])
+    band_marks(a8, "fullClear")
     for cn in M:
-        i.plot(dv, [M[cn][("floors_reached", "dive", int(x))][1] for x in dv], marker="o", ms=3, color=col.get(cn), label=cn, lw=1)
-    i.set_title("Mean floor reached (1-7), by dive", fontsize=8); i.set_xlabel("dive", fontsize=7)
-    # H: skill sensitivity room clear
-    j = fig.add_subplot(gs[3, 2])
-    for cn in ["p1_novice", "p1_average", "p1_expert", "p4_mix"]:
-        j.plot(fl, [pooled(M[cn], "room_clear_d1", int(f)) for f in fl], marker="o", ms=3, color=col[cn], label=cn, lw=1)
-    band(j, "roomClearSeconds")
-    j.set_title("Room clear time vs skill (solo) and 4p mixed loadout", fontsize=8); j.set_xlabel("floor", fontsize=7); j.legend(fontsize=5.5)
+        draw(a8, dv_curve(cn, "dive_success"), COL.get(cn), cn)
+    a8.set_ylim(0, 1.02)
+    titled(a8, "Full clear (floor 7 cleared) by dive (green = p1_average)", "dive")
+    a9 = fig.add_subplot(gs[3, 2])
+    for cn in M:
+        draw(a9, dv_curve(cn, "floors_reached"), COL.get(cn), cn)
+    titled(a9, "Mean floor reached (1-7), by dive", "dive")
     for axx in fig.axes:
         axx.tick_params(labelsize=6.5)
         axx.grid(alpha=0.25, lw=0.4)
     fig.savefig(path, dpi=100)
     plt.close(fig)
+
+
+# ------------------------------------------------------------------------ digest
+def digest(M, V, cfg, nd, timing, tag, prev=None, prev_tag=None, Vprev=None):
+    """Compact text for the controller: verdicts, then one-line-per-case tables. Previous value in [brackets]."""
+    L = []
+    T = cfg["targets"]
+    fr = range(1, NF + 1)
+
+    def f1(v, fmt):
+        return "-" if v != v else fmt % v
+
+    def both(fn, fmt):
+        s = f1(fn(M), fmt)
+        if prev is not None:
+            s += "[" + f1(fn(prev), fmt) + "]"
+        return s
+
+    def num(case, metric, kind, x, fmt="%.1f", nmin=1):
+        return both(lambda MM: gv(MM, case, metric, kind, x, nmin), fmt)
+
+    def rat(case, vs, metric, kind, f, fmt="%.2f"):
+        def r(MM):
+            a, b = gv(MM, case, metric, kind, f), gv(MM, vs, metric, kind, f)
+            return a / b if (a == a and b == b and b > 0) else float("nan")
+        return both(r, fmt)
+
+    npass = sum(v["pass"] for v in V)
+    L.append(f"DIGEST {tag}" + (f"   previous run in [brackets]: {prev_tag}" if prev else "") + f"   {timing}")
+    pv = f" (previous run: PASS {sum(v['pass'] for v in Vprev)} FAIL {sum(not v['pass'] for v in Vprev)})" if Vprev else ""
+    L.append(f"VERDICTS PASS {npass} FAIL {len(V) - npass}{pv}. Per check and case; FAIL items sub=value band [previous value]")
+    pmap = {(v["check"], v["case"], v["sub"]): vstr(v) for v in (Vprev or [])}
+    groups = {}
+    for v in V:
+        groups.setdefault((v["check"], v["case"]), []).append(v)
+    for (chk, cn), vs in groups.items():
+        bad = [v for v in vs if not v["pass"]]
+        items = ["%s=%s band %s%s" % (v["sub"] or "-", vstr(v), bandstr(v["band"]),
+                                      (" [%s]" % pmap[(chk, cn, v["sub"])]) if (chk, cn, v["sub"]) in pmap else "") for v in bad]
+        L.append("%-15s %-10s PASS %2d FAIL %2d%s" % (chk, cn, len(vs) - len(bad), len(bad), (" | " + "; ".join(items)) if bad else ""))
+    fh = " ".join("f%d" % f for f in fr)
+    L.append("")
+    L.append(f"TTK dive 1 (s), regular rooms, floors {fh}")
+    kcase = T.get("ttkKindSoloDive1", {}).get("case", "p1_average")
+    for k in ("Slime", "Broom", "RatKing"):
+        L.append("  %-10s %-8s %s" % (kcase, k, " ".join(num(kcase, "ttk_d1", k, f, nmin=5) for f in fr)))
+    for cn in M:
+        L.append("  %-10s %-8s %s" % (cn, "pooled", " ".join(both(lambda MM, cn=cn, f=f: pooled(MM.get(cn, {}), "ttk_d1", f), "%.1f") for f in fr)))
+    L.append("Warden TTK dives 1-3 (s): " + "  ".join("%s %s" % (cn, num(cn, "ttk_d1to3", "Warden", 5)) for cn in M))
+    L.append(f"Damage taken per hero (fraction of max HP), floors {fh}")
+    for cn in M:
+        L.append("  %-10s %s" % (cn, " ".join(num(cn, "dmg_taken_frac", "per_hero", f, "%.2f") for f in fr)))
+    vs = T.get("partyTtkRatio", {}).get("vs", "p1_average")
+    L.append(f"Co-op ratios vs {vs}: TTK d1 per floor | damage frac per floor | weapon level d{min(10, nd)}")
+    for cn in ("p2_average", "p3_average", "p4_average"):
+        if cn in M:
+            L.append("  %-10s %s | %s | %s" % (cn, " ".join(rat(cn, vs, "ttk_d1", "regular", f) for f in fr),
+                                              " ".join(rat(cn, vs, "dmg_taken_frac", "per_hero", f) for f in fr),
+                                              rat(cn, vs, "weapon_level", "dive", min(10, nd))))
+    ds = [d for d in (1, 2, 3, 5, 10) if d <= nd]
+    L.append("By dive " + " ".join("d%d" % d for d in ds))
+    for title, metric, fmt in (("bank reach", "bank_reach", "%.2f"), ("full clear", "dive_success", "%.2f"),
+                               ("floors reached", "floors_reached", "%.1f"), ("downs per hero", "downs_per_hero", "%.2f"),
+                               ("weapon level", "weapon_level", "%.1f")):
+        L.append(title + ":")
+        for cn in M:
+            L.append("  %-10s %s" % (cn, " ".join(num(cn, metric, "dive", d, fmt) for d in ds)))
+    return "\n".join(L) + "\n"
 
 
 # ------------------------------------------------------------------------ run
@@ -276,7 +474,11 @@ def main():
     ap.add_argument("--lanes", type=int)
     ap.add_argument("--dives", type=int)
     ap.add_argument("--device")
+    ap.add_argument("--prev", help="previous run's <tag>_metrics.csv: drawn dashed on every panel, shown in [brackets] in the digest")
     a = ap.parse_args()
+    for flag, p in (("--config", a.config), ("--numbers", a.numbers), ("--prev", a.prev)):
+        if p and not os.path.isfile(p):
+            sys.exit("ERROR: %s file not found: %s (relative paths resolve from the current working directory)" % (flag, os.path.abspath(p)))
     cfg = sc.load_json(a.config)
     nums = sc.load_json(a.numbers)
     if a.device:
@@ -291,18 +493,27 @@ def main():
     nd = sim.N_DIVES
     M = collect(sim)
     V = verdicts(M, cfg, nd)
+    prev, prev_tag, Vprev = None, None, None
+    if a.prev:
+        prev, prev_tag = load_prev(a.prev)
+        Vprev = verdicts(prev, cfg, nd)
     timing = f"device={dev} lanes/case={sim.lanes} cases={sim.C} dives={nd} ticks={ticks} sim={t1 - t0:.1f}s"
     print(timing)
     base = os.path.join(a.out, a.tag)
     write_csv(M, base + "_metrics.csv")
-    plot(M, V, cfg, base + "_sheet.png", nd, timing, f"numbers={os.path.basename(a.numbers)}")
+    plot(M, V, cfg, base + "_sheet.png", nd, timing, f"numbers={os.path.basename(a.numbers)}", prev=prev, prev_tag=prev_tag)
+    with open(base + "_digest.txt", "w", encoding="utf-8") as fd:
+        fd.write(digest(M, V, cfg, nd, timing, a.tag, prev, prev_tag, Vprev))
     eff = {"config": cfg, "effective_game_numbers": sim.nums}
     json.dump(eff, open(base + "_config.json", "w"), indent=1)
     summ = {"timing": timing, "pass": sum(v["pass"] for v in V), "fail": sum(not v["pass"] for v in V), "verdicts": V,
             "headline": {cn: {"ttk_d1": {str(f): pooled(m, "ttk_d1", f) for f in range(1, NF + 1)},
+                              "ttk_d1to3_warden": gv(M, cn, "ttk_d1to3", "Warden", 5),
                               "room_clear_d1": {str(f): pooled(m, "room_clear_d1", f) for f in range(1, NF + 1)},
                               "dmg_frac": {str(f): m[("dmg_taken_frac", "per_hero", f)][1] for f in range(1, NF + 1)},
                               "deaths_per_dive": float(np.mean([m[("deaths_per_dive", "dive", d)][1] for d in range(1, nd + 1)])),
+                              "downs_per_hero": {str(d): m[("downs_per_hero", "dive", d)][1] for d in range(1, nd + 1)},
+                              "bank_reach": {str(d): m[("bank_reach", "dive", d)][1] for d in range(1, nd + 1)},
                               "success_rate": float(np.mean([m[("dive_success", "dive", d)][1] for d in range(1, nd + 1)])),
                               "weapon_level": {str(d): m[("weapon_level", "dive", d)][1] for d in range(1, nd + 1)}}
                          for cn, m in M.items()}}
@@ -359,6 +570,67 @@ def selftest(nums, cfg, dev):
     c2["overrides"] = {"damage.playerMaxHp": 1e6}
     sim5, _t = run_cases(nums, c2, dev, lanes=300, n_dives=1, cases=small, seed=9)
     check("invulnerable party: no deaths and dive success", int(sim5.c_succ.sum()) == 300 and float((sim5.h_death.cpu().numpy()[..., 1:]).sum()) == 0)
+    # ---- Run 5 model features
+    def mk(assume=None, over=None, lanes=64):
+        c = copy.deepcopy(cfg)
+        c["overrides"] = dict(over or {})
+        c["assumptions"].update(assume or {})
+        return sc.Sim(nums, c, dev, lanes=lanes, n_dives=3, cases=small, seed=3)
+    # 1. kinds from floorStats.kindShare (floor 1: Slime 0.8, Rat-king 0.2, no Broom) vs floorMix (no Rat-king on floor 1)
+    ks = mk({"useFloorStatsKindShare": True}).fMixCum[1].cpu().tolist()
+    fm = mk({"useFloorStatsKindShare": False}).fMixCum[1].cpu().tolist()
+    exp = nums["floorStats"]["1"]["kindShare"]
+    tot_ = exp["Slime"] + exp["RatKing"] + exp["Broom"]
+    check("kind share from floorStats (floor 1)", abs(ks[0] - exp["Slime"] / tot_) < 1e-4 and abs(ks[1] - (exp["Slime"] + exp["RatKing"]) / tot_) < 1e-4, str(ks))
+    check("floorMix has no Rat-king on floor 1 (old behaviour kept when off)", abs(fm[1] - fm[0]) < 1e-6, str(fm))
+    # 2. bread ladder
+    hl = nums["healing"]
+    base_a = {"bakeryBuilt": False, "bakeryAfterFloor": 0, "breadLadderFreeLoaves": 3, "breadLadderPoorLoafHeal": 15}
+    sm = mk(base_a)
+    check("poor loaves without the bakery", float(sm.loaves.min()) == 3 and float(sm.loaves.max()) == 3 and float(sm.loafHealL.max()) == 15)
+    sm = mk(dict(base_a, bakeryBuilt=True))
+    check("bakery built: loavesPerDive x loafHeal", float(sm.loaves.min()) == hl["loavesPerDive"] and float(sm.loafHealL.min()) == hl["loafHeal"])
+    sm = mk(dict(base_a, breadLadderFreeLoaves=0))
+    check("0 free loaves, no bakery = no loaves (game as built)", float(sm.loaves.max()) == 0)
+    sm = mk(dict(base_a, bakeryAfterFloor=3))
+    allm = torch.ones(sm.L, dtype=torch.bool, device=sm.dev)
+    sm.floor[:] = 3                                   # failed on floor 3: floors 1-2 cleared
+    sm._end_dive(allm, torch.zeros_like(allm))
+    ok1 = float(sm.loaves.max()) == 3 and not bool(sm.bakery.any())
+    sm.floor[:] = 4                                   # next dive failed on floor 4: floor 3 cleared, bakery from the dive after
+    sm._end_dive(allm, torch.zeros_like(allm))
+    check("bakeryAfterFloor 3: poor loaves, then the bakery's bread after a dive that cleared floor 3",
+          ok1 and bool(sm.bakery.all()) and float(sm.loaves.min()) == hl["loavesPerDive"] and float(sm.loafHealL.min()) == hl["loafHeal"])
+    # 3. dodge by wind-up
+    check("dodge ref 0 = flat rate", sc.dodge_prob(0.5, 1.2, 0) == 0.5)
+    check("dodge wind-up at or under ref = flat rate", abs(sc.dodge_prob(0.5, 0.3, 0.6) - 0.5) < 1e-9 and abs(sc.dodge_prob(0.5, 0.6, 0.6) - 0.5) < 1e-9)
+    check("dodge wind-up 2x ref = 1-(1-r)^2", abs(sc.dodge_prob(0.5, 1.2, 0.6) - 0.75) < 1e-9)
+    check("dodge tensor form agrees", abs(float(sc.dodge_prob(torch.tensor(0.5), torch.tensor(1.2), 0.6)) - 0.75) < 1e-6)
+    # 4. Warden tier (was hardcoded tier 2: t2 | wslot)
+    def warden(tier):
+        sm = mk(over={"tierScale.wardenTier": tier}, lanes=16)
+        m_ = torch.ones(sm.L, dtype=torch.bool, device=sm.dev)
+        sm.floor[:] = 5
+        sm.ntot[:] = 1
+        sm.room[:] = 0
+        sm._spawn(m_)
+        return sm
+    w1, w2 = warden(1), warden(2)
+    ts_ = nums["tierScale"]
+    wh = nums["enemies"]["Warden"]
+    exp_hp1 = math.ceil(wh["hp"] * nums["coop"]["lifeMult"][1 if len(nums["coop"]["lifeMult"]) == 5 else 0] * ts_.get("soloLife", 1.0) - 1e-4)
+    check("wardenTier 1: tier-1 Warden (no tier-2 life/def, tier-1 atk, tier-1 pacing)",
+          bool(w1.iswarden.all()) and not bool(w1.et2[:, 0].any()) and abs(float(w1.ehp[0, 0]) - exp_hp1) < 1e-3
+          and abs(float(w1.edef[0, 0]) - wh["def"]) < 1e-4 and abs(float(w1.eatk[0, 0]) - wh["atk"] * ts_["tier1Atk"] * ts_.get("soloAtk", 1.0)) < 1e-4,
+          "hp %s def %s atk %s" % (float(w1.ehp[0, 0]), float(w1.edef[0, 0]), float(w1.eatk[0, 0])))
+    check("wardenTier 2 (default) keeps the tier-2 Warden", bool(w2.et2[:, 0].all()) and float(w2.ehp[0, 0]) > float(w1.ehp[0, 0]) * 2.5
+          and abs(float(w2.eatk[0, 0]) - wh["atk"] * ts_["tier2Atk"] * ts_.get("soloAtk", 1.0)) < 1e-4)
+    # 5. ttkKindSoloDive1 "floors" restricts the verdict to those floors
+    Mf = {"c": {("ttk_d1", "Slime", f): (50, 5.0) for f in (1, 2, 3, 4)}}
+    tf = lambda **k: {"targets": {"ttkKindSoloDive1": dict({"case": "c", "Slime": [1.0, 9.0]}, **k)}}
+    subs_all = [v["sub"] for v in verdicts(Mf, tf(), 1) if v["check"] == "ttkKind"]
+    subs_fl = [v["sub"] for v in verdicts(Mf, tf(floors=[1, 2, 3]), 1) if v["check"] == "ttkKind"]
+    check("ttkKind floors key limits verdicts to those floors", len(subs_all) == 4 and subs_fl == ["Slime f1", "Slime f2", "Slime f3"], str(subs_fl))
     print("SELFTEST", "PASS" if fails == 0 else "FAIL (%d)" % fails)
     return 1 if fails else 0
 

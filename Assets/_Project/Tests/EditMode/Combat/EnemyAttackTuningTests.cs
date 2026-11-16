@@ -45,16 +45,16 @@ namespace SleepingCalamity.Tests.EditMode
         {
             R("slime_hop", 60, "34-40", 1.0f, 1.1f, 180f, 1f, false, "16-34@2.2", "none", "0-14@360"),
             R("slime_glob", 66, "46-52", 0.8f, 1.3f, 180f, 1f, false, "none@0", "none", "none@0"),
-            R("rat_lunge", 62, "28-36", 1.1f, 1.45f, 42f, 1f, false, "16-28@3.4", "none", "0-14@720"),
-            R("rat_spin", 62, "30-40", 1.3f, 1.45f, 180f, 2f, false, "none@0", "none", "none@0"),
+            R("rat_lunge", 62, "28-36", 0.85f, 1.45f, 42f, 1f, false, "16-28@3.4", "none", "0-14@720"),
+            R("rat_spin", 62, "30-40", 1.0f, 1.45f, 180f, 2f, false, "none@0", "none", "none@0"),
             R("broom_sweep", 70, "36-44", 1.2f, 2.4f, 80f, 3f, false, "none@0", "none", "0-20@300"),
             R("broom_poke", 52, "28-34", 1.0f, 1.9f, 30f, 1f, false, "16-28@1.2", "none", "0-14@420"),
-            R("warden_slam", 100, "56-64", 1.5f, 3.0f, 55f, 4f, true, "none@0", "0-100", "0-40@200"),
-            R("warden_pound", 116, "72-80", 1.8f, 3.0f, 180f, 5f, true, "none@0", "0-116", "none@0"),
-            R("warden_sweep", 98, "54-64", 1.1f, 3.0f, 100f, 3f, false, "none@0", "0-98", "0-36@240"),
+            R("warden_slam", 100, "56-64", 2.1f, 3.0f, 55f, 4f, true, "none@0", "0-100", "0-40@200"),
+            R("warden_pound", 116, "72-80", 2.5f, 3.0f, 180f, 5f, true, "none@0", "0-116", "none@0"),
+            R("warden_sweep", 98, "54-64", 1.5f, 3.0f, 100f, 3f, false, "none@0", "0-98", "0-36@240"),
             R("warden_breakfree", 78, "36-44", 1.0f, 3.0f, 180f, 6f, true, "none@0", "0-78", "none@0"),
             R("test_nova", 60, "12-40", 1.0f, 30f, 180f, 0f, false, "none@0", "none", "none@0"),
-            R("warden_quake", 160, "90-100", 2.0f, 3.0f, 180f, 6f, true, "none@0", "0-160", "0-50@160"),
+            R("warden_quake", 160, "90-100", 2.8f, 3.0f, 180f, 6f, true, "none@0", "0-160", "0-50@160"),
             R("broom_riposte", 58, "27-33", 1.0f, 2.0f, 50f, 2f, false, "none@0", "none", "0-12@420"),
         };
 
@@ -109,7 +109,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(AttackCatalog.EnemyAttackById["rat_lunge"], Is.SameAs(a));
             Assert.That(Array.IndexOf(AttackCatalog.AllEnemyAttacks, a), Is.EqualTo(index));
             Assert.That(a.Tell, Is.Not.Null, "the tell stays");
-            Assert.That(AttackCatalog.RatSpin.Multiplier, Is.EqualTo(1.3f), "other attacks are untouched");
+            Assert.That(AttackCatalog.RatSpin.Multiplier, Is.EqualTo(1.0f), "other attacks are untouched");
         }
 
         [Test]
@@ -129,7 +129,7 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(AttackCatalog.WardenQuake.Multiplier, Is.EqualTo(3.5f));
             TuningStore.Reset();
             Assert.That(Snap(AttackCatalog.WardenQuake), Is.EqualTo(before));
-            Assert.That(AttackCatalog.WardenQuake.Multiplier, Is.EqualTo(2.0f));
+            Assert.That(AttackCatalog.WardenQuake.Multiplier, Is.EqualTo(2.8f));
         }
 
         [Test]
@@ -177,7 +177,7 @@ namespace SleepingCalamity.Tests.EditMode
         {
             TuningStore.ApplyJson(@"{ ""enemyAttacks"": { ""rat_lunge"": { ""multiplier"": 5, ""range"": 2.0 } } }", "mixed.json");
             Assert.That(_log, Is.Not.Empty);
-            Assert.That(AttackCatalog.RatLunge.Multiplier, Is.EqualTo(1.1f), "the whole attack is rolled back, not half of it");
+            Assert.That(AttackCatalog.RatLunge.Multiplier, Is.EqualTo(0.85f), "the whole attack is rolled back, not half of it");
         }
 
         [Test]

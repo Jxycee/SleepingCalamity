@@ -40,7 +40,7 @@ def apply_overrides(nums, overrides):
     ("coop.lifeMult.2"). Unknown paths raise (a typo must not silently do nothing)."""
     out = copy.deepcopy(nums)
     for path, spec in (overrides or {}).items():
-        if path.startswith("_comment"):
+        if path.startswith("_"):      # _comment, _round: notes
             continue
         parts = path.split(".")
         cur = out
@@ -66,6 +66,17 @@ def apply_overrides(nums, overrides):
 def wmatch(heroWeapon, key):
     a, b = heroWeapon.lower(), key.lower()
     return a == b or b.startswith(a) or a.startswith(b.split("_")[0])
+
+
+def dodge_prob(dodge_rate, windup_seconds, ref_seconds):
+    """Chance to dodge an enemy attack. ref <= 0: the flat dodge rate. Otherwise a longer wind-up gives
+    more chances: 1 - (1 - rate) ^ max(1, windup / ref). Works on floats or tensors."""
+    if ref_seconds <= 0:
+        return dodge_rate
+    if isinstance(windup_seconds, torch.Tensor):
+        expo = torch.clamp(windup_seconds / ref_seconds, min=1.0)
+        return 1.0 - torch.pow(1.0 - dodge_rate, expo)
+    return 1.0 - (1.0 - dodge_rate) ** max(1.0, windup_seconds / ref_seconds)
 
 
 # ----------------------------------------------------------------------------- damage formula
@@ -230,8 +241,14 @@ class Sim:
             heal = [0.0] + [float(bool(fl[str(f)]["hasHealPoint"])) for f in range(1, NF + 1)]
         self.fHeal = T(heal)
         mix = [[0.0] * 3 for _ in range(NF + 1)]
+        use_ks = bool(A.get("useFloorStatsKindShare", False))
         for f in range(1, NF + 1):
             w = [float(fm[str(f)].get(k, 0)) for k in KINDS[:3]]
+            if use_ks:
+                ks = fs[str(f)].get("kindShare", {})
+                wk_ = [float(ks.get(k, 0)) for k in KINDS[:3]]   # Warden share dropped, renormalised below
+                if sum(wk_) > 0:
+                    w = wk_
             s = sum(w) or 1.0
             c = 0.0
             for j in range(3):
@@ -248,8 +265,16 @@ class Sim:
         self.strikeCap = T([min(c if c > 0 else 99, pm * (i + 1)) for i, c in enumerate(sc)], torch.long)
         self.coop = co
         self.heal = N["healing"]
-        # loaves need the bakery (real source): 0 unless config assumptions.bakeryBuilt
-        self.loavesPer = float(self.heal["loavesPerDive"]) if A.get("bakeryBuilt", False) else 0.0
+        # bread ladder: a lane with the bakery gets healing.loavesPerDive loaves of healing.loafHeal; one without gets
+        # assumptions.breadLadderFreeLoaves loaves of breadLadderPoorLoafHeal. Flag: bakeryBuilt, or (bakeryAfterFloor > 0)
+        # from the dive after the lane first cleared that floor.
+        self.loavesBakery = float(self.heal["loavesPerDive"])
+        self.loafHealBakery = float(self.heal["loafHeal"])
+        self.loavesFree = float(A.get("breadLadderFreeLoaves", 0))
+        self.loafHealPoor = float(A.get("breadLadderPoorLoafHeal", 0))
+        self.bakeryAfter = int(A.get("bakeryAfterFloor", 0))
+        self.dodgeRef = float(A.get("dodgeWindupRefSeconds", 0))
+        self.wardenT2 = int(self.ts.get("wardenTier", 2)) >= 2
         self.maxHp = float(self.D["playerMaxHp"])
         self._build_lanes()
         self._alloc()
@@ -328,7 +353,10 @@ class Sim:
         self.hcyc = z(L, H, dtype=torch.long)
         self.hcombo = z(L, H)
         self.hdmgF = z(L, H)
-        self.loaves = torch.full((L, H), self.loavesPer, device=dev)
+        self.bakery = torch.full((L,), bool(self.A.get("bakeryBuilt", False)), device=dev, dtype=torch.bool)
+        self.maxClear = z(L, dtype=torch.long)       # most floors cleared in any earlier dive
+        self.loafHealL = z(L)
+        self.loaves = z(L, H)
         self.hloafCd = z(L, H)
         # weapon growth (persists across dives)
         self.abs = z(L, H)
@@ -370,6 +398,8 @@ class Sim:
         self.h_ttk1 = zl(C * NF * K * NB_T)
         self.s_ttk = zf(C * NF * K)
         self.s_ttk1 = zf(C * NF * K)
+        self.h_ttk3 = zl(C * NF * K * NB_T)       # dives 1-3 pooled
+        self.s_ttk3 = zf(C * NF * K)
         self.h_room = zl(C * NF * NB_T)
         self.h_room1 = zl(C * NF * NB_T)
         self.s_room = zf(C * NF)
@@ -429,7 +459,10 @@ class Sim:
         self.floor = torch.where(mask, torch.ones_like(self.floor), self.floor)
         self.hhp = torch.where(m2, torch.full_like(self.hhp, self.maxHp), self.hhp)
         self.hst = torch.where(m2, torch.zeros_like(self.hst), self.hst)
-        self.loaves = torch.where(m2, torch.full_like(self.loaves, self.loavesPer), self.loaves)
+        loafN = torch.where(self.bakery, torch.full_like(self.loafHealL, self.loavesBakery), torch.full_like(self.loafHealL, self.loavesFree))
+        self.loaves = torch.where(m2, loafN[:, None].expand_as(self.loaves), self.loaves)
+        lh = torch.where(self.bakery, torch.full_like(self.loafHealL, self.loafHealBakery), torch.full_like(self.loafHealL, self.loafHealPoor))
+        self.loafHealL = torch.where(mask, lh, self.loafHealL)
         self.hloafCd = torch.where(m2, torch.zeros_like(self.hloafCd), self.hloafCd)
         self.deaths = torch.where(mask, torch.zeros_like(self.deaths), self.deaths)
         self.ph = torch.where(mask, torch.zeros_like(self.ph), self.ph)
@@ -452,6 +485,11 @@ class Sim:
         idx = (base[:, None] * NB_LVL + lv)
         w = (mask[:, None] & self.present).long()
         self.h_lvl.index_add_(0, idx.reshape(-1), w.reshape(-1))
+        # bakery: built from the dive after the lane first cleared floor `bakeryAfter` (this dive counts for the next one)
+        cleared = torch.where(success, torch.full_like(self.floor, NF), self.floor - 1)
+        self.maxClear = torch.where(mask, torch.maximum(self.maxClear, cleared), self.maxClear)
+        if self.bakeryAfter > 0:
+            self.bakery = self.bakery | (mask & (self.maxClear >= self.bakeryAfter))
         self.dive = torch.where(mask, self.dive + 1, self.dive)
         fin = mask & (self.dive >= N)
         self.ph = torch.where(fin, torch.full_like(self.ph, 2), self.ph)
@@ -480,7 +518,8 @@ class Sim:
         kind = (r[:, :, None] > cum[:, None, :]).sum(-1).clamp(max=2)
         kind = torch.where(wslot, torch.full_like(kind, 3), kind)
         t2 = (self.R(L, E) < self.fT2[f][:, None]) & (self.ts.get("cellarsMaxTier", 1) >= 2) & ~isw[:, None]
-        t2 = t2 | wslot
+        if self.wardenT2:
+            t2 = t2 | wslot           # tierScale.wardenTier 1 makes the Warden tier 1 in every respect (atk, life, def, pacing)
         ts = self.ts
         solo = (self.P == 1)[:, None]                            # EnemyModel.cs:178-179: SoloLife / SoloAtk apply with one hero present
         one = torch.ones_like(r)
@@ -612,6 +651,9 @@ class Sim:
         k1 = (killed & (self.dive == 0)).long()
         self.h_ttk1.index_add_(0, kb * NB_T + tb, k1)
         self.s_ttk1.index_add_(0, kb, ttk.double() * k1)
+        k3 = (killed & (self.dive <= 2)).long()
+        self.h_ttk3.index_add_(0, kb * NB_T + tb, k3)
+        self.s_ttk3.index_add_(0, kb, ttk.double() * k3)
         # ---------------- enemy attacks
         alive = self.ealive
         self.ecd = self.ecd - dt * alive
@@ -639,7 +681,9 @@ class Sim:
         th = rr.argmax(-1)                                      # [L,E] target hero
         raw = self.eatk * self.eamul * 100.0 / (100.0 + D["playerDef"])
         raw = raw * torch.where(self.erage > 0, torch.full_like(raw, D["rageMult"]), torch.ones_like(raw))
-        dodged = self.R(L, E) < self.dodge.gather(1, th)
+        aland = torch.clamp(self.ecyc - 1, min=0) % self.nAtk[self.ekind]           # the attack that is landing
+        wsec = self.aHit[self.ekind, aland]
+        dodged = self.R(L, E) < dodge_prob(self.dodge.gather(1, th), wsec, self.dodgeRef)
         guarded = (self.R(L, E) < self.guard.gather(1, th)) & (self.egb < 0.5)
         raw = torch.where(guarded, raw * D["guardMult"], raw)
         raw = torch.clamp(torch.ceil(raw - EPS), min=D["minDamage"])   # one ceil over every multiplier, as DamageFormula.Compute
@@ -652,7 +696,7 @@ class Sim:
         # ---------------- loaves
         self.hloafCd = self.hloafCd - dt
         eat = actH & (self.hhp > 0) & (self.hhp / self.maxHp < self.loafThr) & (self.loaves > 0) & (self.hloafCd <= 0)
-        self.hhp = torch.where(eat, torch.clamp(self.hhp + self.heal["loafHeal"], max=self.maxHp), self.hhp)
+        self.hhp = torch.where(eat, torch.clamp(self.hhp + self.loafHealL[:, None], max=self.maxHp), self.hhp)
         self.loaves = self.loaves - eat.float()
         self.hloafCd = torch.where(eat, torch.full_like(self.hloafCd, A["loafCooldownSeconds"]), self.hloafCd)
         # ---------------- deaths, revive, timeout
@@ -732,7 +776,7 @@ class Sim:
 
     _STATE = ("ph dive floor room nreg ntot rc healAvail deaths hhp hst hdl hrev hwill hsw hhit hpend hslot hcyc hcombo "
               "hdmgF loaves hloafCd abs bup bupLvl lvl curAtk curFire curPest ealive ehp edef eatk ekind et2 ecd ewind "
-              "epend eamul egb ecyc erage ehitc efirst elast estyle iswarden").split()
+              "epend eamul egb ecyc erage ehitc efirst elast estyle iswarden bakery maxClear loafHealL").split()
 
     def _capture(self):
         """CUDA graph of one tick. State tensors are updated in place (copy_ back at the end of capture)."""
