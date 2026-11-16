@@ -44,7 +44,9 @@ namespace SleepingCalamity.EditorTools
             new Layer { Name = "HillRidge", R0 = 1400f, Rc = 1750f, R1 = 2100f, Foot = -20f, Base = 150f, Big = 110f, Rag = 18f, Clump = 14f, Segs = 1440, Seed = 11f,
                 Tint = new Color(0.17f, 0.24f, 0.19f), HazeNear = 0.72f, HazeFar = 0.82f, D0 = 1200f, D1 = 2200f, Mist = 0.10f, Cool = 1.1f, CoolAmt = 0.6f },
             new Layer { Name = "FarRange", R0 = 2150f, Rc = 2450f, R1 = 2750f, Foot = -20f, Base = 330f, Big = 210f, Rag = 30f, Clump = 14f, Segs = 1440, Seed = 23f,
-                Tint = new Color(0.22f, 0.28f, 0.31f), HazeNear = 0.84f, HazeFar = 0.90f, D0 = 1800f, D1 = 2900f, Mist = 0.05f, Cool = 1.4f, CoolAmt = 1.0f },
+                // Area 1 rework round 4: Cool 1.4 at full amount makes the haze (0.87, 0.8, 1.68): violet. Doubled in height it read as a flat lavender band over
+                // the tree line from the square. Cool 1.05 at 0.7 is a blue-grey (0.65, 0.8, 1.26), one step past HillRidge.
+                Tint = new Color(0.22f, 0.28f, 0.31f), HazeNear = 0.84f, HazeFar = 0.90f, D0 = 1800f, D1 = 2900f, Mist = 0.05f, Cool = 1.05f, CoolAmt = 0.7f },
         };
 
         // Midday sun (BeautyCornerBuilder Midday: Euler(54, -32, 0)), direction TOWARD the sun. The vertex colours below bake a gentle warm-lit / cool-shade split on top of the
@@ -196,7 +198,8 @@ namespace SleepingCalamity.EditorTools
                     idx.AddRange(new[] { a, e, d, a, b, e });   // the local (tangent, radial) frame is left-handed against world (x, z): this winding faces up (the old one gave downward normals, so the key light never reached the mountain)
                 }
             // A12 r2 (town-art-leftovers): ROOT CAUSE of the flat dark mountain was inverted winding (downward normals, no key light). With it fixed the mountain is backlit (sun south-east, camera looks south): wide wrap, key x2.6, fill x2, light haze 0.15-0.25 (30% less on the upper 60%) give spurs a p10-p90 spread of 0.3 at a mean 0.34 (mist band 0.57). A12 r2b (controller): the 0.15-0.25 haze and warm tint read as a near clay model at 2.6 km; neutral cool rock, haze 0.32-0.42 and key x2.0 put it back behind the aerial perspective (Friedrich blue-grey distance).
-            Material m = Mat("M_BD_Mawrrow", new Color(0.35f, 0.345f, 0.36f), 0.32f, 0.42f, 2000f, 3000f, 0.04f, 1.3f, 0.8f, 1.0f, 0.10f, 2.0f, 1f, 0.30f, H - 30f, 2f);
+            // Area 1 rework round 4: cool 1.3 -> 1.0 and key boost 2.0 -> 1.4, fill boost 2 -> 1.5: under the town's stronger Morning sun the massif read as a pale pink spike, not a dark slumped mountain.
+            Material m = Mat("M_BD_Mawrrow", new Color(0.35f, 0.345f, 0.36f), 0.32f, 0.42f, 2000f, 3000f, 0.04f, 1.0f, 0.8f, 1.0f, 0.10f, 1.4f, 1f, 0.30f, H - 30f, 1.5f);
             MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
             {
                 float y = p.y + 30f;
