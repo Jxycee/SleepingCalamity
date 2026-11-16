@@ -305,6 +305,9 @@ namespace SleepingCalamity.EditorTools
             return obj;
         }
 
+        /// <summary>B4: a Clutter piece (FlowerBox, RainBarrel ...) on its own, slots mapped, at the parent's origin. Null when the art is missing.</summary>
+        internal static GameObject PlaceArt(string asset, Transform parent) => Instantiate(asset, parent);
+
         static Material[] MapSlots(Material[] current, Dictionary<string, Material> slots, string where)
         {
             var mats = new Material[Mathf.Max(1, current.Length)];

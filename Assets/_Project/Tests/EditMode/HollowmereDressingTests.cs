@@ -72,5 +72,59 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.Less(In(DecoPreset.Ruined).Count(), In(DecoPreset.Rebuilt).Count(), "sparser than rebuilt");
             Assert.IsTrue(HollowmereDressing.Bunting.Any(b => HollowmereDressing.InPreset(b.Preset, DecoPreset.Ruined) && b.Torn), "torn bunting");
         }
+
+        // ---- B4 spots (home door S1, bakery lot S3, market row S4)
+        [Test]
+        public void Spots_AreValidOnTheTownLayout()
+        {
+            List<string> errors = HollowmereDressing.ValidateSpots(HollowmereLayout.Create());
+            Assert.IsEmpty(errors, string.Join("\n", errors));
+        }
+
+        [Test]
+        public void Spots_ValidateReportsASolidRowOnAPathNode()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            PathNode n = t.Node("SQ_0");
+            var bad = new SpotRow { Id = "X", Piece = "Crate_A", Stage = HollowmereDressing.Always, X = n.Pos.X, Z = n.Pos.Z, SizeX = 1f, SizeZ = 1f };
+            Assert.IsTrue(HollowmereDressing.ValidateSpots(t, new[] { bad }).Any(e => e.Contains("path node")));
+        }
+
+        [Test]
+        public void Spots_CoverEveryStageOfTheBakeryAndTheMarketRow()
+        {
+            var s = HollowmereDressing.Spots;
+            Assert.IsTrue(s.Any(r => r.Spot == "S3" && r.Stage == HollowmereDressing.StageRuined && r.Piece == "T05a"), "stage 0 roof tiles");
+            Assert.AreEqual(12, s.Count(r => r.Piece == "T05a"), "twelve roof tiles");
+            Assert.AreEqual(2, s.Count(r => r.Piece == "T05b"), "two rubble");
+            Assert.AreEqual(4, s.Count(r => r.Piece == "T05d" && r.Anchor == "F02"), "four planks in the footing");
+            Assert.AreEqual(2, s.Count(r => r.Piece == "Scaffold_Bay" && r.Stage == HollowmereDressing.StageFrame), "two scaffold bays (west and south)");
+            Assert.IsTrue(s.Any(r => r.Piece == "Sack_A" && r.Stage == HollowmereDressing.StageFrame) && s.Any(r => r.Piece == "Sack_A" && r.Stage == HollowmereDressing.StageRebuilt), "flour sacks from stage 1 on");
+            Assert.AreEqual(6, s.Count(r => r.Spot == "S3" && (r.Piece == "T08e" || r.Piece == "T08f")), "six loaves in stage 2");
+            Assert.IsFalse(s.Any(r => r.Spot == "S3" && r.Stage == HollowmereDressing.StageRuined && r.Piece.StartsWith("Basket")), "no bread while ruined");
+            for (int c = 0; c < 3; c++) { }
+            Assert.AreEqual(3, new[] { "Back_Tools", "Inn_Wall", "Back_Cloth" }.Count(id => s.Count(r => r.Id.StartsWith(id + "_")) == 5), "three clusters of five");
+        }
+
+        [Test]
+        public void Spots_HomeDoorSetIsThere()
+        {
+            var s = HollowmereDressing.Spots.Where(r => r.Spot == "S1").ToList();
+            foreach (string piece in new[] { "Woodshed", "T06a", "T06b", "T16g", "Crate_A", "T16e", "FlowerBox", "T12c" }) Assert.IsTrue(s.Any(r => r.Piece == piece), "home door has " + piece);
+            Assert.AreEqual(2, s.Count(r => r.Piece == "T06a"), "two log piles");
+            Assert.AreEqual(6, s.Count(r => r.Piece == "T06b"), "six loose logs");
+        }
+
+        [Test]
+        public void SpawnYaw_FacesTheFountainSideOfTheSquare()
+        {
+            TownLayout t = HollowmereLayout.Create();
+            float yaw = HollowmereDressing.SpawnYaw(t);
+            PathNode door = t.Nodes.First(n => n.Id == t.Landmarks.First(l => l.Id == "HeroesHome_Cistern").DoorNode);
+            double toFountain = System.Math.Atan2(-door.Pos.X, -(door.Pos.Z - 3f)) * 180.0 / System.Math.PI;
+            double diff = System.Math.Abs(((yaw - toFountain + 540.0) % 360.0) - 180.0);
+            Assert.Less(diff, 25.0, "within 25 degrees of straight at the fountain (yaw " + yaw + ")");
+            Assert.Less(yaw, -90f); Assert.Greater(yaw, -180f);   // west-south-west, never at the house
+        }
     }
 }

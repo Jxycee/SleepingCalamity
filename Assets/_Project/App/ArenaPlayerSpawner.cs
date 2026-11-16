@@ -143,12 +143,13 @@ namespace SleepingCalamity.App
             if (_nm.ConnectedClients.TryGetValue(clientId, out NetworkClient client) && client.PlayerObject != null) return;
 
             Vector3 position = Vector3.zero;
+            Quaternion facing = Quaternion.identity;
             SpawnPoint point = UnityEngine.Object.FindFirstObjectByType<SpawnPoint>();
-            if (point != null) position = point.PositionForSlot(SlotOf(clientId));
+            if (point != null) { position = point.PositionForSlot(SlotOf(clientId)); facing = Quaternion.Euler(0f, point.transform.eulerAngles.y, 0f); }   // DH8: the hub's spawn yaw
             else Debug.LogWarning("ArenaPlayerSpawner: no SpawnPoint in the scene; spawning at the origin.");
 
             NetworkObject player = _nm.SpawnManager.InstantiateAndSpawn(_playerPrefab, clientId, destroyWithScene: true, isPlayerObject: true,
-                position: position, rotation: Quaternion.identity);
+                position: position, rotation: facing);
             if (player == null)
             {
                 Debug.LogError("ArenaPlayerSpawner: spawning the player for client " + clientId + " failed.");

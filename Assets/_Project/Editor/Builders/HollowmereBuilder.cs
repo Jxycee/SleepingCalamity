@@ -178,6 +178,7 @@ namespace SleepingCalamity.EditorTools
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
             HollowmereClutter.Build(ruined, rebuilt, t);   // Q14: market and lane clutter, shop signs and washing lines
+            BuildB4Spots(root, set, ruined, rebuilt, t);   // B4: home door set, bakery lot stages 0-2, market row dressing (Core HollowmereDressing.Spots)
             HollowmereSurfaces.Build(set, ruined, rebuilt, t);   // town surfaces: square macro variation and contact AO under props (decals, no colliders)
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
             HollowmereRoad.Build(set, ruined, rebuilt, t);   // Q15: the Saltwake road's dressing, the field hedgerows and trees, the backdrop ring

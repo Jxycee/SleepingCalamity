@@ -45,6 +45,7 @@ namespace SleepingCalamity.EditorTools
             PathNode door = t.Nodes.First(n => n.Id == home.DoorNode);
             var spawn = new GameObject("SpawnPoint"); spawn.transform.SetParent(hub, false);
             spawn.transform.position = new Vector3(door.Pos.X, Ground(t, door.Pos.X, door.Pos.Z - 3.0f) + 0.1f, door.Pos.Z - 3.0f);
+            spawn.transform.rotation = Quaternion.Euler(0f, HollowmereDressing.SpawnYaw(t), 0f);   // DH8: first frame looks across the square at the fountain and the haze gap
             spawn.AddComponent<SpawnPoint>();
 
             // The way down: the church cellar trapdoor on the keep walk in front of the bell tower's door (plan 3 task 7; STORY: the church and the bell tower are one building). The cistern house keeps its
