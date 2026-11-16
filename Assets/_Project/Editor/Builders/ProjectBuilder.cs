@@ -42,6 +42,7 @@ namespace SleepingCalamity.EditorTools
             Step(errors, "Scenes", SceneBuilder.BuildAll);
             Step(errors, "LookTest", LookTestBuilder.Build);
             Step(errors, "BeautyCorner", BeautyCornerBuilder.Build);
+            Step(errors, "AreaTrees", AreaTreesIntake.Run);   // the Hollowmere tree prefabs (TR01-TR07) from the adopted FBX, before the town scene loads them
             Step(errors, "Hollowmere", HollowmereBuilder.Build);   // after BeautyCorner: reuses its look assets and rows; throws on an invalid town layout
             Step(errors, "DungeonCorner", DungeonCornerBuilder.Build);   // after LookTest: shares its B2 materials, rendering stack and volume helpers
             Step(errors, "UndercroftStair", UndercroftStairBuilder.Build);   // after DungeonCorner: builds the same room plus the stair down to it
