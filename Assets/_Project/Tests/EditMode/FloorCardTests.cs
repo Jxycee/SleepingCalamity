@@ -20,11 +20,10 @@ namespace SleepingCalamity.Tests.EditMode
             }
         }
 
-        [Test]
-        public void GeneratedNames_NoRepeatInDive()
+        private static void NoRepeatInDive(uint seeds)
         {
             var all = new HashSet<string>();
-            for (uint s = 1; s <= 2000; s++)
+            for (uint s = 1; s <= seeds; s++)
             {
                 var seen = new HashSet<string>();
                 foreach (int f in new[] { 2, 4, 6, 7 })
@@ -38,6 +37,10 @@ namespace SleepingCalamity.Tests.EditMode
             }
             Assert.GreaterOrEqual(all.Count, 15, "the names of every theme appear");
         }
+
+        // Fast tier: 200 seeds. The 2000-seed sweep is Soak (1000+ seed sweeps run with `unity.ps1 soak`; it timed out the fast tier under machine load).
+        [Test] public void GeneratedNames_NoRepeatInDive() => NoRepeatInDive(200);
+        [Test, Category("Soak")] public void GeneratedNames_NoRepeatInDive_Soak() => NoRepeatInDive(2000);
 
         [Test]
         public void ThemeTables_AreFiveNamesEach()

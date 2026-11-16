@@ -7,6 +7,9 @@
 // before the hitbox opens, a snap into the strike, an eased recovery. Each attack also plays its own wind-up sound when it starts (a squelch, a scratch,
 // a wooden creak, a low groan) and the elite's signature tolls a bell as its pose peaks while its crown glows hotter through the hold.
 //
+// A rigged enemy (an Animator under Visual: Slime, RatKing, Broom) is played by EnemyAnimatorDriver and skips the procedural squash, lean, twist and hop;
+// the hit tint is then added as emission so the model keeps its own materials. Greybox enemies are unchanged.
+//
 // The ground footprint (readability pass) is now an optional assist, off by default (CombatAssists.GroundTelegraph, F2 in the arena): built from the SAME
 // AttackData the hit test uses (Core Telegraph), it fills to the strike frame and turns solid red while the hitbox is live. A lobbed glob always shows
 // in flight and casts a growing shadow where it will land (a shadow, not a marker), so a hit from range is never invisible with the assist off.
@@ -22,6 +25,9 @@ namespace SleepingCalamity.Presentation
     public sealed class EnemyVisual : MonoBehaviour
     {
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+        private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
+        public const float DeathClipSeconds = 1.2f;
+        private const float DeathShrinkSeconds = 0.2f;   // a rigged corpse plays its clip, then shrinks before the 1.4 s despawn
         private const float FootprintY = 0.04f;
         private static readonly Color GlintColor = new Color(1f, 0.97f, 0.8f);
         private static readonly Color ChargeColor = new Color(1f, 0.55f, 0.12f);
@@ -52,6 +58,8 @@ namespace SleepingCalamity.Presentation
         private float _prevFrame = -1f;
         private float _prevFlash;
         private bool _flashAllowed = true;
+        private EnemyAnimatorDriver _anim;   // a rigged model (an Animator under Visual): the clips replace the procedural squash/lean/hop below
+        private Transform _lid;
 
         private sealed class Marker
         {
@@ -81,14 +89,39 @@ namespace SleepingCalamity.Presentation
                 _visualBase = visual.localScale;
                 _visualRotBase = visual.localRotation;
                 // The greybox rig's parts by name (PrefabBuilder.BuildEnemies), found at runtime so the prefabs need no rebuild.
-                _tellParts[(int)TellPart.Head] = visual.Find("Head");
-                _tellParts[(int)TellPart.Tail] = visual.Find("Tail");
-                _tellParts[(int)TellPart.Bristles] = visual.Find("Bristles");
-                _tellParts[(int)TellPart.Handle] = visual.Find("Handle");
-                _tellParts[(int)TellPart.RollingPin] = visual.Find("Part_RollingPin");
-                _tellParts[(int)TellPart.Crown] = visual.Find("Part_DoughCrown") ?? visual.Find("Crown");
-                _tellParts[(int)TellPart.Lid] = visual.Find("Lid");
+                // A rigged model nests its meshes under the FBX root, so the search is recursive (a direct child still wins).
+                _tellParts[(int)TellPart.Head] = FindPart("Head");
+                _tellParts[(int)TellPart.Tail] = FindPart("Tail");
+                _tellParts[(int)TellPart.Bristles] = FindPart("Bristles");
+                _tellParts[(int)TellPart.Handle] = FindPart("Handle");
+                _tellParts[(int)TellPart.RollingPin] = FindPart("Part_RollingPin");
+                _tellParts[(int)TellPart.Crown] = FindPart("Part_DoughCrown") ?? FindPart("Crown");
+                _tellParts[(int)TellPart.Lid] = FindPart("Lid");
+                _lid = _tellParts[(int)TellPart.Lid];
+                Animator animator = visual.GetComponentInChildren<Animator>(true);
+                if (animator != null && animator.runtimeAnimatorController != null) _anim = new EnemyAnimatorDriver(animator);
             }
+        }
+
+        private Transform FindPart(string name)
+        {
+            Transform t = visual.Find(name);
+            if (t != null) return t;
+            // The recursive search is for rigged models only (their parts sit under Visual/Model); greybox rigs keep the direct-child lookup.
+            if (visual.GetComponentInChildren<Animator>(true) == null) return null;
+            foreach (Transform c in visual.GetComponentsInChildren<Transform>(true))
+                if (c.name == name) return c;
+            return null;
+        }
+
+        // A rigged model keeps its own material colours, so the tint is added as emission instead of overwriting _BaseColor (the materials carry a
+        // faint _EmissionColor so the keyword stays on). No tint clears the block, so an ember eye keeps its own glow.
+        private void PaintBlock(MaterialPropertyBlock block, Color tint)
+        {
+            if (_anim == null) { block.SetColor(BaseColor, tint); return; }
+            Color add = new Color(Mathf.Max(0f, tint.r - baseColor.r), Mathf.Max(0f, tint.g - baseColor.g), Mathf.Max(0f, tint.b - baseColor.b), 1f);
+            block.Clear();
+            if (add.maxColorComponent > 0.002f) block.SetColor(EmissionColor, add);
         }
 
         private void OnDestroy()
@@ -142,13 +175,13 @@ namespace SleepingCalamity.Presentation
             if (flash > 0f && _prevFlash <= 0f) _flashAllowed = FeedbackDirector.Flash.Allow(Time.unscaledTime);
             _prevFlash = flash;
             if (flash > 0f && _flashAllowed) tint = Color.Lerp(tint, Color.white, FeedbackDirector.Flash.Brightness(flash));
-            _block.SetColor(BaseColor, tint);
+            PaintBlock(_block, tint);
 
             // The attacking part: glows hotter through a charge hold, then flashes white-hot at the commit (the glint).
             Color partTint = tint;
             if (pose.Charge > 0f) partTint = Color.Lerp(partTint, ChargeColor, 0.35f + 0.5f * pose.Charge + 0.15f * Mathf.Sin(t * (14f + 20f * pose.Charge)));
             if (pose.Glint > 0f) partTint = Color.Lerp(partTint, GlintColor * 2f, Mathf.Sqrt(pose.Glint));   // over 1: brighter than lit white, so it reads as a flash
-            _partBlock.SetColor(BaseColor, partTint);
+            PaintBlock(_partBlock, partTint);
             bool partLit = pose.Charge > 0f || pose.Glint > 0f;
 
             if (bodyRenderers != null)
@@ -157,13 +190,15 @@ namespace SleepingCalamity.Presentation
                     Renderer r = bodyRenderers[i];
                     if (r == null) continue;
                     bool isPart = partLit && (_activePart == null ? pose.Glint > 0f : r.transform == _activePart);
-                    r.SetPropertyBlock(isPart ? _partBlock : _block);
+                    MaterialPropertyBlock use = isPart ? _partBlock : _block;
+                    r.SetPropertyBlock(_anim != null && use.isEmpty ? null : use);
                 }
 
             if (partObjects != null)
                 for (int i = 0; i < partObjects.Length; i++)
                     if (partObjects[i] != null) partObjects[i].gameObject.SetActive(_enemy.PartIntact(i));
 
+            _anim?.Tick(_enemy, t);
             Animate(t, pose, a);
             UpdateFlare(pose);
         }
@@ -198,6 +233,7 @@ namespace SleepingCalamity.Presentation
         {
             if (visual == null) return;
             EnemyPhase phase = _enemy.Phase;
+            if (_anim != null) { AnimateRigged(phase); return; }
             float y = 0f, squash = 1f;
             Vector3 jitter = Vector3.zero;
             if (phase == EnemyPhase.Chase && _enemy.Def.Kind == EnemyKind.Slime) y = Mathf.Abs(Mathf.Sin(t * 5f + _enemy.NetworkObjectId)) * 0.25f;
@@ -242,6 +278,23 @@ namespace SleepingCalamity.Presentation
             // Lean back is a pitch about the feet (the visual root sits at the feet): negative X tips the top away from the facing.
             visual.localRotation = _visualRotBase * Quaternion.Euler(-lean, twist, 0f);
             visual.localScale = new Vector3(_visualBase.x / Mathf.Sqrt(squash), _visualBase.y * squash, _visualBase.z / Mathf.Sqrt(squash)) * scaleOut;
+        }
+
+        // A rigged enemy: the clips do the squash, lean, twist and hop, so only the shove from a landed hit and the death shrink stay procedural.
+        private void AnimateRigged(EnemyPhase phase)
+        {
+            Vector3 shove = Vector3.zero;
+            float react = _enemy.HitReact;
+            if (react > 0f) shove = transform.InverseTransformDirection(_enemy.HitDirection) * ((0.18f + 0.35f * _enemy.HitHeavy) * react * react);
+            float scaleOut = 1f;
+            if (phase == EnemyPhase.Dead)
+            {
+                _deadTime += Time.deltaTime;
+                scaleOut = Mathf.Clamp01(1f - (_deadTime - DeathClipSeconds) / DeathShrinkSeconds);
+            }
+            visual.localPosition = new Vector3(shove.x, 0f, shove.z);
+            visual.localRotation = _visualRotBase;
+            visual.localScale = _visualBase * scaleOut;
         }
 
         // ---- the glint flare: a four-point star that pops on the attacking part at the commit ----
@@ -384,6 +437,21 @@ namespace SleepingCalamity.Presentation
             }
         }
 
+        private Material JamMaterial()
+        {
+            Material first = null;
+            if (bodyRenderers != null)
+                foreach (Renderer r in bodyRenderers)
+                    if (r != null)
+                        foreach (Material m in r.sharedMaterials)
+                        {
+                            if (m == null) continue;
+                            if (m.name.Contains("Jam")) return m;
+                            if (first == null) first = m;
+                        }
+            return first;
+        }
+
         // A lobbed glob: it swells on the slime's lid through the wind-up, is thrown at the glint and flies to where it lands on the strike frame, casting a
         // shadow that grows as it falls (so a hit from range is never invisible, even with the footprint assist off).
         private void UpdateGlob(AttackData a, float frame)
@@ -400,12 +468,17 @@ namespace SleepingCalamity.Presentation
                 _glob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 DestroyImmediate(_glob.GetComponent<Collider>());   // not Destroy: a collider that lives to the end of the frame can shove a character controller
                 _glob.name = "Glob";
-                if (bodyRenderers != null && bodyRenderers.Length > 0 && bodyRenderers[0] != null) _glob.GetComponent<Renderer>().sharedMaterial = bodyRenderers[0].sharedMaterial;
-                _globBlock.SetColor(BaseColor, baseColor);
-                _glob.GetComponent<Renderer>().SetPropertyBlock(_globBlock);
+                if (_anim != null) _glob.GetComponent<Renderer>().sharedMaterial = JamMaterial();   // the model's own jam material, untinted
+                else
+                {
+                    if (bodyRenderers != null && bodyRenderers.Length > 0 && bodyRenderers[0] != null) _glob.GetComponent<Renderer>().sharedMaterial = bodyRenderers[0].sharedMaterial;
+                    _globBlock.SetColor(BaseColor, baseColor);
+                    _glob.GetComponent<Renderer>().SetPropertyBlock(_globBlock);
+                }
             }
             int launch = a.Tell != null ? a.Tell.Commit : 0;
-            Vector3 lid = transform.position + Vector3.up * (1.15f * (visual != null ? visual.localScale.y / Mathf.Max(0.01f, _visualBase.y) : 1f));
+            Vector3 lid = _lid != null && _anim != null ? _lid.position + Vector3.up * 0.05f
+                : transform.position + Vector3.up * (1.15f * (visual != null ? visual.localScale.y / Mathf.Max(0.01f, _visualBase.y) : 1f));
             Vector3 to = _enemy.AttackCentre + Vector3.up * 0.25f;
             float k = 0f;
             if (frame < launch)
