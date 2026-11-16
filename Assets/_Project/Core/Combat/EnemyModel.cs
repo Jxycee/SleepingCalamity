@@ -76,7 +76,8 @@ namespace SleepingCalamity.Core.Combat
 
         // First playtest (2026-10-30): tier 1 hit too hard to read the fight. Tier 1 attack is x0.65 of the 6.6 table (slime 12 -> 7.8, rat-king 18 -> 11.7,
         // broom 15 -> 9.75, Warden 30 -> 19.5). P9 Placeholder.
-        public static float Tier1Atk = 0.65f;
+        // Run 5 balance (2026-11-15, decided with leeway, docs/design/balance-dungeon1.md): x0.5 (tier-1 hits of 5-12 instead of 7-14 on 100 health).
+        public static float Tier1Atk = 0.5f;
 
         // The authored 'S' room spawns are rat-kings, tier 2 (life x3, defence x3.3) from this floor down. Above it they spawn as tier 1 rat-kings: the alpha
         // bot met a 540 HP, DEF 33 rat-king in nearly every floor 1 combat room and died there. The Warden and the stir-meter hunter stay tier 2 on every floor.
@@ -84,12 +85,16 @@ namespace SleepingCalamity.Core.Combat
 
         // Solo only (one hero present): multipliers on enemy attack and life, 1 = the table. The 1-player cut for the alpha bot's solo normal dives; 2-4 players
         // keep CoopScaling and the tier tables untouched, so co-op does not get easier.
-        public static float SoloAtk = 1f, SoloLife = 1f;
+        // Run 5 balance (2026-11-15): 0.6 and 0.75, because a solo hero has no revive and takes every hit (docs/design/balance-dungeon1.md).
+        public static float SoloAtk = 0.6f, SoloLife = 0.75f;
         // The Cellars (the first dungeon, floors 1-4) are a rougher tutorial (user, 2026-11-02): every regular enemy is tier 1 until the hero has the weapon upgrades and
-        // gear of later dungeons; tier 2 belongs to them. The Dough Warden, the floor-4 set-piece guard, keeps its tier-2 stats. Tunable: "cellarsMaxTier": 2 restores them.
+        // gear of later dungeons; tier 2 belongs to them. Tunable: "cellarsMaxTier": 2 restores them.
+        // The Dough Warden, the floor-5 set-piece guard, is tier 1 too since 2026-11-15 (Run 5 balance): tier 2 put a 3.3x defence wall in front of the
+        // starting axe, so its life went up instead (2000). Tunable: "wardenTier": 2 restores the old tier-2 fight.
         public static int CellarsMaxTier = 1;
+        public static int WardenTier = 1;
         public static int CappedTier(int tier) => Math.Min(tier, CellarsMaxTier);
-        public static int AuthoredTier(bool tier2Marker, bool warden, int floor) => warden ? 2 : CappedTier(tier2Marker && floor >= Tier2MinFloor ? 2 : 1);
+        public static int AuthoredTier(bool tier2Marker, bool warden, int floor) => warden ? WardenTier : CappedTier(tier2Marker && floor >= Tier2MinFloor ? 2 : 1);
 
         // 6.6 tier 1 stats. Placeholder: which are weak to fire (the jam, the wooden broom) and which are pests (the rat-king).
         // Combat depth (2026-10-30, "fewer, tougher enemies"): small-enemy life roughly doubles so each takes a few openings (a rat-king about three with
@@ -97,13 +102,13 @@ namespace SleepingCalamity.Core.Combat
         public static readonly EnemyDefinition Slime = new EnemyDefinition(EnemyKind.Slime, "slime", "Jam-jar slime", Species.Slime, 80, 12f, 5f, 2.6f, 0.55f, 1.0f,
             new[] { AttackCatalog.SlimeHop, AttackCatalog.SlimeGlob }, weakToFire: true, staggerSeconds: 0.5f, visualReach: 0.5f, poiseThreshold: 2f, tokenCategory: TokenCategory.Ranged,
             role: EnemyRole.Ranged, preferredRing: 6.0f, strafeFlipMin: 2.0f, strafeFlipMax: 4.0f);   // far ring (5 to 8 m)
-        public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 180, 18f, 10f, 4.6f, 0.5f, 1.2f,
+        public static readonly EnemyDefinition RatKing = new EnemyDefinition(EnemyKind.RatKing, "rat_king", "Rat-king", Species.RatKing, 140, 18f, 10f, 4.6f, 0.5f, 1.2f,
             new[] { AttackCatalog.RatLunge, AttackCatalog.RatSpin }, isPest: true, staggerSeconds: 0.35f, visualReach: 0.85f, poiseThreshold: 4f,
             role: EnemyRole.Rusher);
-        public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 160, 15f, 15f, 2.3f, 0.55f, 1.9f,
+        public static readonly EnemyDefinition Broom = new EnemyDefinition(EnemyKind.Broom, "broom", "Sweeping broom", Species.Broom, 130, 15f, 15f, 2.3f, 0.55f, 1.9f,
             new[] { AttackCatalog.BroomSweep, AttackCatalog.BroomPoke }, frontalBlock: true, weakToFire: true, staggerSeconds: 0.45f, visualReach: 1.9f, poiseThreshold: 5f, ripostes: true,
             role: EnemyRole.Skirmisher, preferredRing: 3.6f);
-        public static readonly EnemyDefinition DoughWarden = new EnemyDefinition(EnemyKind.DoughWarden, "dough_warden", "Dough Warden", Species.Elite, 600, 30f, 20f, 2.4f, 1.0f, 2.8f,
+        public static readonly EnemyDefinition DoughWarden = new EnemyDefinition(EnemyKind.DoughWarden, "dough_warden", "Dough Warden", Species.Elite, 2000, 30f, 20f, 2.4f, 1.0f, 2.8f,
             new[] { AttackCatalog.WardenSlam, AttackCatalog.WardenSweep, AttackCatalog.WardenPound, AttackCatalog.WardenQuake }, isElite: true, canRage: false, superArmorAlways: true, staggerSeconds: 0.9f, visualReach: 2.4f, tokenCategory: TokenCategory.Heavy,
             role: EnemyRole.Heavy, preferredRing: 4.0f, circleSpeedScale: 0.35f, strafeFlipMin: 2.5f, strafeFlipMax: 4.5f,
             parts: new[]

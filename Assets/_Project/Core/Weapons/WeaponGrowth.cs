@@ -47,8 +47,8 @@ namespace SleepingCalamity.Core.Weapons
         public static float KillValue(Species s, bool finisher) => KillValue(SpeciesValue(s), finisher);
         public static float KillValue(float baseValue, bool finisher) => finisher ? baseValue * FinisherMultiplier : baseValue;
 
-        // ABS needed to go from `level` to level + 1: 40 x (1 + 0.5 x L), as a float.
-        public static float LevelCost(int level) => 40f * (1f + 0.5f * level);
+        // ABS needed to go from `level` to level + 1: 40 + 40 x L (was 40 x (1 + 0.5 x L); per level 20 -> 40 in the Run 5 balance, 2026-11-15), as a float.
+        public static float LevelCost(int level) => Tuning.WeaponGrowthTuning.LevelCostBase + Tuning.WeaponGrowthTuning.LevelCostPerLevel * level;
 
         // ATK gained on reaching `newLevel` (1-based): +2 up to level 5, +1 after.
         public static float AtkGain(int newLevel) => newLevel <= FlatAtkFromLevel ? 2f : 1f;

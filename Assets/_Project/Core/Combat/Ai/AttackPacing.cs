@@ -35,7 +35,7 @@ namespace SleepingCalamity.Core.Combat
         public static PacingProfile Tier2 = new PacingProfile(2, 0.35f, 0.7f, 0.8f, 0.2f);
 
         // Per-kind bases before the tier scale (the numbers the M3 greybox used). Kinds not named (slime, broom) use the default.
-        public static float CooldownDefault = 1.2f, CooldownRatKing = 0.8f, CooldownWarden = 1.4f;
+        public static float CooldownDefault = 1.2f, CooldownRatKing = 0.8f, CooldownWarden = 2.4f;   // Warden 1.4 -> 2.4 in Run 5 (2026-11-15): bigger hits, fewer of them
         public static float RecoverDefault = 0.35f, RecoverRatKing = 0.9f;
 
         public static PacingProfile ForTier(int tier) => tier >= 2 ? Tier2 : Tier1;

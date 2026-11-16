@@ -117,24 +117,7 @@
     }
   ],
   "overrides": {
-    "_comment": "Applied on top of game_numbers.json before simulating. Key = dotted path into game_numbers.json (list elements by index: coop.lifeMult.2). Value = number/bool/string (absolute) or {\"mult\": x} or {\"add\": x}. Unknown paths raise an error. Examples (kept empty by default): \"enemies.Slime.hp\": {\"mult\": 1.2}, \"heroAttacks.axe_1.mult\": 1.1, \"weapons.axe.atk\": 24, \"growth.levelCostBase\": 30, \"coop.lifeMult.3\": 2.0, \"enemyAttacks.rat_lunge.mult\": 0.9, \"tierScale.tier1Atk\": 0.6, \"healing.healPointChancePercent\": 70.",
-    "_round": "r4 = r3 + small nudges (soloAtk 0.6, two-player life 1.5) and a Warden that hits harder but less often (attack multipliers x1.4, cooldown 1.4 -> 2.4)",
-    "tierScale.wardenTier": 1,
-    "enemies.Warden.hp": 2000,
-    "coop.lifeMult.1": 1.5,
-    "coop.lifeMult.2": 2.3,
-    "coop.lifeMult.3": 3.0,
-    "tierScale.tier1Atk": 0.5,
-    "enemies.Broom.hp": 130,
-    "enemies.RatKing.hp": 140,
-    "tierScale.soloAtk": 0.6,
-    "tierScale.soloLife": 0.75,
-    "growth.levelCostPerLevel": 40,
-    "enemyPacing.cooldown.Warden": 2.4,
-    "enemyAttacks.warden_slam.mult": 2.1,
-    "enemyAttacks.warden_pound.mult": 2.5,
-    "enemyAttacks.warden_quake.mult": 2.8,
-    "enemyAttacks.warden_sweep.mult": 1.5
+    "_comment": "Applied on top of game_numbers.json before simulating. Key = dotted path into game_numbers.json (list elements by index: coop.lifeMult.2). Value = number/bool/string (absolute) or {\"mult\": x} or {\"add\": x}. Unknown paths raise an error. Examples (kept empty by default): \"enemies.Slime.hp\": {\"mult\": 1.2}, \"heroAttacks.axe_1.mult\": 1.1, \"weapons.axe.atk\": 24, \"growth.levelCostBase\": 30, \"coop.lifeMult.3\": 2.0, \"enemyAttacks.rat_lunge.mult\": 0.9, \"tierScale.tier1Atk\": 0.6, \"healing.healPointChancePercent\": 70."
   },
   "targets": {
     "_comment": "Run 5 targets (Fable, 2026-11-15), see Reference/sessions/run5-balance/STATUS.md. Bands are [min, max]. Dive keys are dive numbers (1-based).",

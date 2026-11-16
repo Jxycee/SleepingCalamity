@@ -22,8 +22,12 @@ namespace SleepingCalamity.Core.Tuning
         public static float FinisherMultiplier = 1.25f, BuildUpThreshold = 0.9f, BuildUpBonus = 0.1f;
         public static double CreditWindowSeconds = 10.0;
         public static int FlatAtkFromLevel = 5;
+        // ABS to go from level L to L + 1 is LevelCostBase + LevelCostPerLevel x L. Run 5 balance (2026-11-15): per level 20 -> 40 (docs/design/balance-dungeon1.md).
+        public static float LevelCostBase = 40f, LevelCostPerLevel = 40f;
         public static Knob[] Knobs() => new[]
         {
+            new Knob("levelCostBase", () => LevelCostBase, v => LevelCostBase = (float)v, 1, 100000),
+            new Knob("levelCostPerLevel", () => LevelCostPerLevel, v => LevelCostPerLevel = (float)v, 0, 100000),
             new Knob("finisherMultiplier", () => FinisherMultiplier, v => FinisherMultiplier = (float)v, 0.01, 100),
             new Knob("creditWindowSeconds", () => CreditWindowSeconds, v => CreditWindowSeconds = v, 0, 3600),
             new Knob("flatAtkFromLevel", () => FlatAtkFromLevel, v => FlatAtkFromLevel = (int)v, 0, 1000, true),
@@ -111,6 +115,7 @@ namespace SleepingCalamity.Core.Tuning
             new Knob("soloAtk", () => EnemyCatalog.SoloAtk, v => EnemyCatalog.SoloAtk = (float)v, 0.01, 20),
             new Knob("soloLife", () => EnemyCatalog.SoloLife, v => EnemyCatalog.SoloLife = (float)v, 0.05, 20),
             new Knob("cellarsMaxTier", () => EnemyCatalog.CellarsMaxTier, v => EnemyCatalog.CellarsMaxTier = (int)v, 1, 2, true),
+            new Knob("wardenTier", () => EnemyCatalog.WardenTier, v => EnemyCatalog.WardenTier = (int)v, 1, 2, true),
             new Knob("tier2MinFloor", () => EnemyCatalog.Tier2MinFloor, v => EnemyCatalog.Tier2MinFloor = (int)v, 1, 5, true),
         };
     }

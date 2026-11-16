@@ -84,7 +84,7 @@ namespace SleepingCalamity.Core.Combat
 
     public static class CoopScaling
     {
-        static readonly float[] Life = { 1.0f, 1.0f, 1.7f, 2.3f, 2.8f };   // index = players (0 is unused), P23
+        static readonly float[] Life = { 1.0f, 1.0f, 1.5f, 2.3f, 3.0f };   // index = players (0 is unused), P23; 2 and 4 players 1.7 -> 1.5 and 2.8 -> 3.0 in Run 5 (2026-11-15, docs/design/balance-dungeon1.md)
 
         public static int ClampPlayers(int players) => Math.Max(1, Math.Min(4, players));
         public static float LifeMultiplier(int players) => Life[ClampPlayers(players)];

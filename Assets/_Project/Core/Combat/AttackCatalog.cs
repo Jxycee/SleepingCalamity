@@ -112,15 +112,15 @@ namespace SleepingCalamity.Core.Combat
         // Draws its handle back, the handle glints, jabs forward.
         public static readonly AttackData BroomPoke = E("broom_poke", "Handle poke", 52, 28, 34, 1.0f, HitShape.Cone, 1.9f, 30f, lunge: W(16, 28), lunges: 1.2f, turn: W(0, 14), turnSpeed: 420f,
             tell: T(TellPart.Handle, 8, 14, lean: 20f, tremble: 0.3f, sfx: CombatSfx.WindUpWood, pitch: 1.25f));
-        // Dough Warden: big and slow, every tell at least 0.9 s.
-        public static readonly AttackData WardenSlam = E("warden_slam", "Rolling-pin slam", 100, 56, 64, 1.5f, HitShape.Cone, 3.0f, 55f, knockback: 4f, guardBreak: true,
+        // Dough Warden: big and slow, every tell at least 0.9 s. Multipliers x1.4 in Run 5 (2026-11-15, with a 2.4 s cooldown): hits that matter, fewer of them.
+        public static readonly AttackData WardenSlam = E("warden_slam", "Rolling-pin slam", 100, 56, 64, 2.1f, HitShape.Cone, 3.0f, 55f, knockback: 4f, guardBreak: true,
             superArmor: W(0, 100), turn: W(0, 40), turnSpeed: 200f,
             tell: T(TellPart.RollingPin, 28, 40, lean: 22f, rise: 0.25f, tremble: 0.5f, sfx: CombatSfx.WindUpHeavy, pitch: 0.9f));
-        public static readonly AttackData WardenPound = E("warden_pound", "Oven-door pound", 116, 72, 80, 1.8f, HitShape.Circle, 3.0f, 180f, knockback: 5f, guardBreak: true,
+        public static readonly AttackData WardenPound = E("warden_pound", "Oven-door pound", 116, 72, 80, 2.5f, HitShape.Circle, 3.0f, 180f, knockback: 5f, guardBreak: true,
             superArmor: W(0, 116),
             tell: T(TellPart.Body, 40, 56, lean: 16f, crouch: 0.2f, rise: 0.35f, tremble: 0.6f, sfx: CombatSfx.WindUpHeavy, pitch: 0.8f));
         // Wind-up 40 -> 54 frames (the elite floor; research recommendation 4).
-        public static readonly AttackData WardenSweep = E("warden_sweep", "Flour sweep", 98, 54, 64, 1.1f, HitShape.Cone, 3.0f, 100f, knockback: 3f, superArmor: W(0, 98),
+        public static readonly AttackData WardenSweep = E("warden_sweep", "Flour sweep", 98, 54, 64, 1.5f, HitShape.Cone, 3.0f, 100f, knockback: 3f, superArmor: W(0, 98),
             turn: W(0, 36), turnSpeed: 240f,
             tell: T(TellPart.RollingPin, 26, 38, lean: 8f, twist: 80f, tremble: 0.4f, sfx: CombatSfx.WindUpHeavy, pitch: 1.0f));
         // The Warden's answer when its revenge gauge fills: a quick big circle that clears everyone off it. Wind-up 30 -> 36 (research recommendation 4);
@@ -131,7 +131,7 @@ namespace SleepingCalamity.Core.Combat
         // The Warden's signature (the elite's dramatic tell): it rises to full height leaning far back with the rolling pin overhead, a low bell tolls as
         // it peaks, the dough crown glows hotter through a long trembling hold, flashes, and it brings everything down in a ring. 1.5 s to the hitbox
         // (KH2's single big strikes are 1.2-1.3 s), then a second stuck in the floor: the reward for reading it. Chosen every few attacks, never at random.
-        public static readonly AttackData WardenQuake = E("warden_quake", "Dough quake", 160, 90, 100, 2.0f, HitShape.Circle, 3.0f, 180f, knockback: 6f, guardBreak: true,
+        public static readonly AttackData WardenQuake = E("warden_quake", "Dough quake", 160, 90, 100, 2.8f, HitShape.Circle, 3.0f, 180f, knockback: 6f, guardBreak: true,
             superArmor: W(0, 160), turn: W(0, 50), turnSpeed: 160f,
             tell: T(TellPart.Crown, 50, 72, lean: 26f, rise: 0.6f, tremble: 0.9f, sfx: CombatSfx.WindUpHeavy, pitch: 0.7f, hold: CombatSfx.EliteToll, charge: true));
         // The broom's answer to a hammered guard (combat depth, change 4): three blocked front hits inside 2 s and it braces, the bristles flash and it
