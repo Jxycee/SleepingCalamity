@@ -223,12 +223,36 @@ namespace SleepingCalamity.EditorTools
                 else Hedge(cm, new Vector3(i.X, y - 0.2f, i.Z), i.Yaw, i.Scale, i.Variant, atlas);
                 cards++;
             }
-            Transform root = Group(country, "Cards");
+            EmitTiles(Group(country, "Cards"), "RD_Cards_", tiles, mat, ringMat);
+        }
+
+        // Area 1 rework: card trees for another builder (HollowmereWild's far forest on Bell Hill), with the road's atlas, materials and 100 m tiles. Base is the foot of
+        // the tree on the ground; trees on the terrain take the lit material and cast shadows, trees on the backdrop ring take the ring's hazed material.
+        internal static int CardForest(Transform parent, string group, IEnumerable<(Vector3 Base, float Yaw, float Height, int Variant, bool OnRing)> trees)
+        {
+            Material mat = CardMaterial();
+            bool atlas = mat != null && mat.name == "M_RD_FarTrees";
+            Material ringMat = atlas ? Backdrop("M_RD_FarTreesBackdrop", mat.GetTexture("_BaseMap") as Texture2D, Color.white, NearHaze, true) : mat;
+            var tiles = new Dictionary<(int, int, bool), CardMesh>();
+            int n = 0;
+            foreach (var tr in trees)
+            {
+                var key = (Mathf.FloorToInt(tr.Base.x / TileSize), Mathf.FloorToInt(tr.Base.z / TileSize), tr.OnRing);
+                if (!tiles.TryGetValue(key, out CardMesh cm)) tiles[key] = cm = new CardMesh();
+                Tree(cm, tr.Base - Vector3.up * (0.09f * tr.Height), tr.Yaw, tr.Height, tr.Variant, atlas);
+                n++;
+            }
+            EmitTiles(Group(parent, group), "RD_" + group + "_", tiles, mat, ringMat);
+            return n;
+        }
+
+        static void EmitTiles(Transform root, string meshPrefix, Dictionary<(int, int, bool), CardMesh> tiles, Material mat, Material ringMat)
+        {
             foreach (var kv in tiles.OrderBy(k => k.Key.Item3).ThenBy(k => k.Key.Item1).ThenBy(k => k.Key.Item2))
             {
                 CardMesh cm = kv.Value;
                 string name = (kv.Key.Item3 ? "Ring_" : "Terrain_") + kv.Key.Item1 + "_" + kv.Key.Item2;
-                var mesh = new Mesh { name = "RD_Cards_" + name, indexFormat = cm.V.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
+                var mesh = new Mesh { name = meshPrefix + name, indexFormat = cm.V.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
                 mesh.SetVertices(cm.V); mesh.SetNormals(cm.N); mesh.SetTangents(cm.T); mesh.SetUVs(0, cm.UV); mesh.SetTriangles(cm.I, 0);
                 mesh.RecalculateBounds();
                 var go = new GameObject(name);
@@ -302,6 +326,7 @@ namespace SleepingCalamity.EditorTools
             float hills = -16f + 0.055f * Mathf.Max(0f, r - 200f)
                 + 18f * (Mathf.PerlinNoise(x * 0.0035f + 17.3f, z * 0.0035f + 4.1f) - 0.5f)
                 + 6f * (Mathf.PerlinNoise(x * 0.011f + 3.7f, z * 0.011f + 29.9f) - 0.5f);
+            hills += HollowmereLayout.BackHill(x, z);   // area 1 rework: Bell Hill carries on past the terrain's north edge to its crest
             float k = Smooth(10f, 260f, dOut);
             return Mathf.Lerp(near, hills, k);
         }
@@ -354,8 +379,9 @@ namespace SleepingCalamity.EditorTools
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
             RoadRibbon(ring, t);
             // the mid hill ridge and the far ridge: annuli rising out of the ring's edge (their feet tucked under the layer in front)
-            Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 256, 45f, 55f, 7f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
-            Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 256, 150f, 120f, 23f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
+            // Area 1 rework: both ridges roughly doubled (peak 45 -> 95, 150 -> 290) so the valley has walls: they stood 2-4 degrees over the horizon, a flat line from the square.
+            Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 256, 95f, 105f, 12f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
+            Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 256, 290f, 200f, 30f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
             HollowmereBackdrop.Build(ring);   // A12/C3: ragged ridge layers, the Mawrrow mountain, a ruined windmill, a far lighthouse (HollowmereBackdrop.cs)
         }
 

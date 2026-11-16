@@ -19,7 +19,7 @@ namespace SleepingCalamity.EditorTools
     public static class HollowmereBackdropTuning
     {
         public static bool Ridges = true, Mountain = true, Wisp = true, Windmill = true, Lighthouse = true;
-        public static float MountainAzDeg = -118f, MountainDist = 2600f, MountainHeight = 560f;   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180); the far ridges hide its lower 7 degrees
+        public static float MountainAzDeg = -118f, MountainDist = 2600f, MountainHeight = 900f;   // area 1 rework: 560 -> 900 with the taller ranges;   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180); the far ridges hide its lower 7 degrees
         public static float WindmillAzDeg = -62f, LighthouseAzDeg = 186f, WindmillScale = 2.0f, LighthouseScale = 1.8f;
         public static float WispAlpha = 0.07f;
     }
@@ -35,13 +35,15 @@ namespace SleepingCalamity.EditorTools
             public Color Tint; public float HazeNear, HazeFar, D0, D1, Mist, Cool, CoolAmt;
         }
 
+        // Area 1 rework (Run 6): HillRidge and FarRange raised (base 80 -> 150, 200 -> 330; relief about doubled) so the skyline is a mountain valley, 6-12 degrees
+        // over the horizon from the square, in place of a 3-5 degree band that read as a flat line.
         static readonly Layer[] Layers =
         {
             new Layer { Name = "TreeRidge", R0 = 700f, Rc = 760f, R1 = 840f, Foot = -8f, Base = 24f, Big = 14f, Rag = 6f, Clump = 11f, Segs = 1440, Seed = 3f,
                 Tint = new Color(0.12f, 0.18f, 0.09f), HazeNear = 0.62f, HazeFar = 0.74f, D0 = 500f, D1 = 1300f, Mist = 0.10f, Cool = 0.95f, CoolAmt = 0.3f },
-            new Layer { Name = "HillRidge", R0 = 1400f, Rc = 1750f, R1 = 2100f, Foot = -20f, Base = 80f, Big = 50f, Rag = 14f, Clump = 14f, Segs = 1440, Seed = 11f,
+            new Layer { Name = "HillRidge", R0 = 1400f, Rc = 1750f, R1 = 2100f, Foot = -20f, Base = 150f, Big = 110f, Rag = 18f, Clump = 14f, Segs = 1440, Seed = 11f,
                 Tint = new Color(0.17f, 0.24f, 0.19f), HazeNear = 0.72f, HazeFar = 0.82f, D0 = 1200f, D1 = 2200f, Mist = 0.10f, Cool = 1.1f, CoolAmt = 0.6f },
-            new Layer { Name = "FarRange", R0 = 2150f, Rc = 2450f, R1 = 2750f, Foot = -20f, Base = 200f, Big = 110f, Rag = 22f, Clump = 14f, Segs = 1440, Seed = 23f,
+            new Layer { Name = "FarRange", R0 = 2150f, Rc = 2450f, R1 = 2750f, Foot = -20f, Base = 330f, Big = 210f, Rag = 30f, Clump = 14f, Segs = 1440, Seed = 23f,
                 Tint = new Color(0.22f, 0.28f, 0.31f), HazeNear = 0.84f, HazeFar = 0.90f, D0 = 1800f, D1 = 2900f, Mist = 0.05f, Cool = 1.4f, CoolAmt = 1.0f },
         };
 

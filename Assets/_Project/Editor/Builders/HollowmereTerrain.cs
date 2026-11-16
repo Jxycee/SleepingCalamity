@@ -22,7 +22,8 @@ namespace SleepingCalamity.EditorTools
     {
         public const int Res = 513, SplatRes = 512;
         public static readonly Vector3 Origin = new Vector3(-150f, -24f, -170f);
-        public static readonly Vector3 Size = new Vector3(300f, 44f, 300f);
+        public static readonly Vector3 Size = new Vector3(300f, 96f, 300f);   // y -24..72: Bell Hill reaches about +45 at the north edge (area 1 rework; was 44)
+        const float RawOriginY = -24f, RawSizeY = 44f;   // the erosion RAW keeps its own height range (baked before the rework): metres = raw * RawSizeY + RawOriginY
         public const string Folder = "Assets/_Project/Content/Terrain/Hollowmere";
         public const string DataPath = Folder + "/Hollowmere_TerrainData.asset";
         public const string RawPath = Folder + "/Hollowmere_Eroded_513.r16";   // 16-bit little-endian, Res x Res, row 0 = south edge, column 0 = west edge
@@ -67,6 +68,8 @@ namespace SleepingCalamity.EditorTools
         static float Smooth(float a, float b, float x) { float u = Mathf.Clamp01((x - a) / (b - a)); return u * u * (3f - 2f * u); }
 
         // Designed heights with the baked erosion blended in where the mask allows (no RAW: the designed heights).
+        // The RAW holds eroded heights in metres WITHOUT the two landform terms added after its bake (Q15 OuterFall, the area 1 rework's BackHill): both are added
+        // back under the erosion, so the RAW keeps working as the open ground's erosion detail on any later landform.
         public static float[,] Final(TownLayout t, out bool eroded)
         {
             float[,] h = Designed(t);
@@ -76,9 +79,10 @@ namespace SleepingCalamity.EditorTools
             for (int j = 0; j < Res; j++)
                 for (int i = 0; i < Res; i++)
                 {
-                    float m = ProtectMask(t, WorldX(i), WorldZ(j));
-                    // the RAW stores heights without the western fall (Q15 OuterFall, added after the bake): add it back under the erosion
-                    h[j, i] = Mathf.Lerp(raw[j, i] + HollowmereLayout.OuterFall(WorldX(i), WorldZ(j)) / Size.y, h[j, i], m);
+                    float x = WorldX(i), z = WorldZ(j);
+                    float m = ProtectMask(t, x, z);
+                    float erodedY = raw[j, i] * RawSizeY + RawOriginY + HollowmereLayout.OuterFall(x, z) + HollowmereLayout.BackHill(x, z);
+                    h[j, i] = Mathf.Lerp(Mathf.Clamp01((erodedY - Origin.y) / Size.y), h[j, i], m);
                 }
             return h;
         }
@@ -214,6 +218,16 @@ namespace SleepingCalamity.EditorTools
                             path = Mathf.Max(path, outside * 0.48f * Smooth(0.50f, 0.76f, straw));
                             soil = Mathf.Max(soil, outside * 0.14f * Smooth(0.62f, 0.86f, stipple));
                             soil = Mathf.Max(soil, outside * 0.45f * (1f - Smooth(1.2f, 5.5f, lane)) * Smooth(0.35f, 0.7f, bare));   // bare earth along the lanes
+                        }
+                        // Area 1 rework: Bell Hill is woodland. Under the trees the ground is leaf litter and bare earth with thin grass, in big soft patches,
+                        // and the crag bank at its foot is earth and stone (the steep rule below adds the stone).
+                        float hill = HollowmereLayout.BackHill(x, z);
+                        if (hill > 0f)
+                        {
+                            float wood = Smooth(0.2f, 3f, hill);
+                            float litter = Mathf.PerlinNoise(x * 0.06f + 211f, z * 0.06f + 87f);
+                            soil = Mathf.Max(soil, wood * (0.32f + 0.38f * Smooth(0.35f, 0.75f, litter)));
+                            path = Mathf.Max(path, wood * 0.22f * Smooth(0.5f, 0.8f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
                         }
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
@@ -379,9 +393,12 @@ namespace SleepingCalamity.EditorTools
                 for (int j = 0; j < Res; j++)
                     for (int i = 0; i < Res; i++)
                     {
-                        float m = ProtectMask(t, WorldX(i), WorldZ(j));
-                        float v = Mathf.Clamp01(Mathf.Lerp(eroded[j, i], designed[j, i], m) - HollowmereLayout.OuterFall(WorldX(i), WorldZ(j)) / Size.y);   // stored without the fall (Final adds it)
-                        maxDelta = Mathf.Max(maxDelta, Mathf.Abs(v + HollowmereLayout.OuterFall(WorldX(i), WorldZ(j)) / Size.y - designed[j, i]) * Size.y);
+                        float x = WorldX(i), z = WorldZ(j);
+                        float m = ProtectMask(t, x, z);
+                        // stored in the RAW's own range, in metres without the fall and the back hill (Final adds both). NOT re-run since the area 1 rework changed Size.y.
+                        float metres = Mathf.Lerp(eroded[j, i], designed[j, i], m) * Size.y + Origin.y;
+                        float v = Mathf.Clamp01((metres - HollowmereLayout.OuterFall(x, z) - HollowmereLayout.BackHill(x, z) - RawOriginY) / RawSizeY);
+                        maxDelta = Mathf.Max(maxDelta, Mathf.Abs(metres - (designed[j, i] * Size.y + Origin.y)));
                         ushort q = (ushort)Mathf.RoundToInt(v * 65535f);
                         int k = (j * Res + i) * 2; bytes[k] = (byte)(q & 0xff); bytes[k + 1] = (byte)(q >> 8);
                     }

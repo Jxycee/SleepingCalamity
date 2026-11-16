@@ -47,7 +47,7 @@ namespace SleepingCalamity.Core
 
         // ------------------------------------------------------------------------------------------------ ground
         // Natural ground height (before lane corridors and lot pads), a castle hill in terraces:
-        //   the square's shelf at 0 (ring 1), the keep terrace 4 m higher on its north side and the hill rising behind it;
+        //   the square's shelf at 0 (ring 1), the keep terrace 4 m higher on its north side and Bell Hill rising behind it (BackHill);
         //   one TerraceStep down at the shelf edge (TerraceOffset) for the lanes on the west, east and north flanks;
         //   on the south side a second TerraceStep just below (LowerTerraceOffset), so the Ring Lane spirals down about 3 m from the flanks to the south;
         //   the town wall on a raised bank (offset 26-29.5), a dry ditch outside it (offset 31), then the land falls to the meadow and the lake basin
@@ -68,13 +68,35 @@ namespace SleepingCalamity.Core
                 y -= 3.0f * (1f - Smooth(1.0f, 3.0f, Math.Abs(e - 31f)));   // the dry ditch
             }
             float keep = KeepHeight * Smooth(KeepWallZ - 0.4f, KeepWallZ + 0.4f, z) * (1f - Smooth(KeepHalfWidth, KeepHalfWidth + 6f, ax));
-            float hill = 0.14f * Math.Max(0f, z - 32f) * (1f - Smooth(34f, 60f, ax));
+            float hill = BackHill(x, z);
             float lx = (x - LakeCentre.X) / LakeRadiusX, lz = (z - LakeCentre.Z) / LakeRadiusZ;
             double th = Math.Atan2(lz, lx);   // a ragged shore, not an oval
             float shore = 1f + 0.07f * (float)Math.Sin(3 * th + 1.0) + 0.05f * (float)Math.Sin(5 * th + 2.3) + 0.03f * (float)Math.Sin(9 * th);
             float lake = -6f * (1f - Smooth(0.7f, 1.0f, (float)Math.Sqrt(lx * lx + lz * lz) / shore));
             float ravine = e > 30f ? -3.5f * (1f - Smooth(1.5f, 7f, DistanceToPolyline(new TownPoint(x, z), Stream))) : 0f;
             return y + keep + hill + Math.Min(lake, 0f) + ravine + OuterFall(x, z);
+        }
+
+        // Area 1 rework (Run 6, decided 2026-11-16): the town no longer stands on a bare summit. Behind the keep the land climbs into Bell Hill, a wooded
+        // hillside running east-west across the whole north side, so every view north ends in rising ground and trees, and the keep sits on a spur of it.
+        //   - the foot line runs about z 33 behind the keep (the keep walk and the trapdoor at z 29 stay level) and eases south to about z 19 by the terrain's
+        //     east and west edges, wobbling a few metres;
+        //   - a crag bank first: CragHeight up in CragRun metres (over 45 degrees for most of it, so nobody walks up; MovementMath.SlopeLimit is 45);
+        //   - then a long hillside, about +35 m at the terrain's north edge (z 130) and about +110 m at its crest 450 m out (the backdrop ring carries it on:
+        //     HollowmereRoad.RingHeight adds this same term), with slow rolls along its length so the crest is not a ruler line.
+        // 0 everywhere south of the foot line, so the town, its lanes and lots, the lake and the stream are untouched.
+        public const float HillFootZ = 33f, CragHeight = 6.5f, CragRun = 5f;
+        public static float HillFoot(float x) => HillFootZ - 14f * Smooth(30f, 150f, Math.Abs(x)) + 3.5f * (float)Math.Sin(x * 0.045f + 0.8f);
+        public static float BackHill(float x, float z)
+        {
+            float d = z - HillFoot(x);
+            if (d <= 0f) return 0f;
+            float crag = CragHeight * Smooth(0f, CragRun, d);
+            float u = Math.Max(0f, d - CragRun);
+            float slope = 40f * (1f - (float)Math.Exp(-u / 75f)) + 70f * Smooth(110f, 460f, d);
+            float roll = 1f + 0.16f * (float)Math.Sin(x * 0.021f + 1.3f) + 0.09f * (float)Math.Sin(x * 0.052f + z * 0.017f + 0.4f);
+            float lateral = 1f - 0.55f * Smooth(260f, 620f, Math.Abs(x));
+            return crag + slope * roll * lateral;
         }
 
         // Q15: west of the lake the meadow falls away toward Saltwake, so the road winds down a real hillside into a shallow valley (0 east of x -72, so the

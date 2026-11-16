@@ -88,6 +88,7 @@ namespace SleepingCalamity.Core
         {
             float e = HollowmereLayout.PlateauDistance(x, z);
             float w = Smooth(FieldStartOffset - 4f, FieldStartOffset + 4f, e);
+            w *= 1f - Smooth(0.3f, 2.5f, HollowmereLayout.BackHill(x, z));   // no fields on Bell Hill: it is woodland (area 1 rework)
             if (w <= 0f) return 0f;
             float lx = (x - HollowmereLayout.LakeCentre.X) / HollowmereLayout.LakeRadiusX, lz = (z - HollowmereLayout.LakeCentre.Z) / HollowmereLayout.LakeRadiusZ;
             w *= Smooth(1.12f, 1.35f, (float)Math.Sqrt(lx * lx + lz * lz));
