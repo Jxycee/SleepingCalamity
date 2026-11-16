@@ -1,6 +1,6 @@
-State: merged to main (5b done); step 6 next
+State: merged to main (5b 871802e0, step 6 d07261d7)
 Branch: claude/dive-5b-water (from origin/main 366d0126)
-Archive: not yet
+Archive: ready
 
 ## Plan 5b (2026-11-15)
 Findings: the 12 pool combat rooms are `RoomDataV2.FromV1` wrappers (no regions); only the pilot hanging hall has a sump. The generator and spawner read v1 `CellarRoom`; v2 feeds tests, encounters and the greybox. `RoomValidatorV2` already loops every state vector (rules 6-9).
@@ -24,7 +24,7 @@ Crash saver: NOT simple, skipped. Pieces it needs: floor-start dive snapshot wri
 Churn bug to report: after `check`, the build rewrote 9+ Hollowmere materials (M_GD_Leaf, M_GD_Produce, M_GD_Straw, M_GD_patch_rust, M_GD_patch_seam, M_HM_Surf_Moss, M_HM_Surf_Stain, M_HM_Surf_Wear, M_StoneCottage_B_SC_Rubble .mat and maybe more under Content/Materials/Hollowmere); discarded, not committed (session-usage.md).
 
 ## Step 6 final (2026-11-16)
-State: merge-ready (host wiring = networked, needs: coordinator). Tip 97b9952a (includes merged origin/main), branch claude/dive-6-jobs pushed.
+State: merged to main (5b 871802e0, step 6 d07261d7)
 Check PASS on 97b9952a: EditMode 1843/1843, PlayMode 307 passed 0 failed 36 skipped; soak PASS 47/47. Risk review: no blockers; should-fixes applied in 9c457131 (shrine bonus in StirMismatch, 4 PlayMode job tests, seed isolation in modifier gold tests).
 Flakes seen once under load, passed on rerun: StairHandoverTests Rtt300Loss5 (timeout, 3 sessions on the PC); FloorCardTests soak sweep hit the 180 s default (now [Timeout(600000)]).
 Also on main from this session: 5b 871802e0, stale M_HM_Surf_* mats fix 88a8a6c5. Open churn bug: build rewrites M_GD_Leaf/Produce/Straw/patch_rust/patch_seam + M_StoneCottage_B_SC_Rubble .mat (not committed).
