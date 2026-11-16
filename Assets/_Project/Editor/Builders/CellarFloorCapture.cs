@@ -20,6 +20,7 @@ namespace SleepingCalamity.EditorTools
             CaptureTo(DefaultDir());
         }
 
+        const float OverviewAmbientBoost = 2.6f;
         static string DefaultDir() => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Reference", "cellars", "floors"));
 
         public static void CaptureAll()
@@ -48,6 +49,7 @@ namespace SleepingCalamity.EditorTools
                 foreach (ReflectionProbe probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)) LookTestCapture.RenderProbe(probe);
                 LookTestCapture.WarmUp(cams);
                 string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");
+                float ambient = RenderSettings.ambientIntensity;
                 var ceilings = new System.Collections.Generic.List<GameObject>();
                 foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                     if (t.name == CellarFloorBuilder.CeilingGroup) ceilings.Add(t.gameObject);
@@ -57,9 +59,11 @@ namespace SleepingCalamity.EditorTools
                     if (!string.IsNullOrEmpty(only) && System.Array.IndexOf(only.Split(','), cam.name) < 0) continue;
                     bool overview = cam.name == "Floor_Overview";   // the cutaway: vault ceilings off so the whole floor reads from above
                     foreach (GameObject g in ceilings) g.SetActive(!overview);
+                    RenderSettings.ambientIntensity = overview ? ambient * OverviewAmbientBoost : ambient;   // capture only: the roofless cutaway sees dark outer faces, so lift them to read each floor's wall tint
                     SaveJpg(cam, Path.Combine(dir, cam.name.Replace("Floor_", "floor_").ToLowerInvariant() + ".jpg"));
                 }
                 foreach (GameObject g in ceilings) g.SetActive(true);
+                RenderSettings.ambientIntensity = ambient;
             }
             finally
             {

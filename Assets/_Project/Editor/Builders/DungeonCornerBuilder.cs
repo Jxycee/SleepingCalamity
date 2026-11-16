@@ -229,6 +229,7 @@ namespace SleepingCalamity.EditorTools
                 EditorUtility.SetDirty(m); map[f.Slot] = m;
             }
             map["CV_Breath"] = own["CV_Breath"]; map["CV_Daylight"] = own["CV_Daylight"];
+            map["CV_Flame"] = own["flame"];   // B8: SconceCage / LanternOil flame slot (emissive, same as the candle flame)
             AssetDatabase.SaveAssets();
             return map;
         }

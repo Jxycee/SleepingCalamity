@@ -68,7 +68,7 @@ namespace SleepingCalamity.Presentation
         public const string FloorGroup = "Floor", WallGroup = "Walls", DoorGroup = "Doors", PillarGroup = "Pillars", MarkerGroup = "Markers", LampGroup = "Lamps";
         public const string VignetteGroup = "Vignettes", AtmosphereGroup = "Atmosphere";
         const float Tile = 2f;
-        const int BigRoomCells = 12;
+        const int BigRoomCells = 8;   // B8 round 2: 12 -> 8, so a mid-size room is not left to one wall lantern
         static readonly Color GoldLamp = new Color(1.0f, 0.80f, 0.54f);   // the approved dungeon corner's paler lantern gold (not orange)
 
         public static Vector3 CellCenter(int x, int y) => new Vector3((x + 0.5f) * CellSize, 0f, -(y + 0.5f) * CellSize);
@@ -318,6 +318,7 @@ namespace SleepingCalamity.Presentation
         static void Lamps(CellarFloorLayout layout, CellarFloorDressing dressing, Grid grid, Transform group, CellarFloorKit kit, Mats mats, CellarFloorBuild result)
         {
             CellarAtmosphere atm = dressing.Atmosphere; float k = Mathf.Clamp(atm.LampPercent, 20, 115) / 100f;
+            bool coal = layout.Floor >= CoalFloor;
             for (int r = 0; r < layout.Rooms.Count; r++)
             {
                 PlacedRoom p = layout.Rooms[r]; int n = 0; bool hasSocket = false;
@@ -328,11 +329,12 @@ namespace SleepingCalamity.Presentation
                     if (!s.Filled) continue;
                     Vector3 c = CellCenter(s.Cell.X, s.Cell.Y);
                     Vector3 wall = SideDir(CellarRoom.Opposite(s.Facing));
-                    Transform wl = Lamp(group, "Lamp_r" + r + "_" + n++, c + wall * (CellSize * 0.5f - 0.3f) + new Vector3(0, 2.3f, 0), kit, mats, WallLampIntensity * k, 12f, true);
-                    Box(wl, "Hook", wl.position + wall * 0.12f + new Vector3(0, 0.02f, 0), wall.x != 0 ? new Vector3(0.26f, 0.04f, 0.04f) : new Vector3(0.04f, 0.04f, 0.26f), mats.Iron, 1f, false);
+                    Transform wl = Lamp(group, "Lamp_r" + r + "_" + n++, c + wall * (CellSize * 0.5f - 0.3f) + new Vector3(0, 2.3f, 0), kit, mats, WallLampIntensity * k, 12f, true, "sconce", wall);
+                    if (wl.Find("Sconce") == null) Box(wl, "Hook", wl.position + wall * 0.12f + new Vector3(0, 0.02f, 0), wall.x != 0 ? new Vector3(0.26f, 0.04f, 0.04f) : new Vector3(0.04f, 0.04f, 0.26f), mats.Iron, 1f, false);
                     result.Lamps++;
                 }
-                if (hasSocket && (n == 0 || p.Room.FloorCount < BigRoomCells)) continue;   // a big room gets a hanging centre lamp as well as its wall lanterns
+                bool emptyRoll = hasSocket && n == 0;   // B8 round 2: every lantern rolled empty: on a lit floor the room still gets a (dimmer) centre lamp, a dark floor keeps it black
+                if (hasSocket && ((n == 0 && atm.Dark) || (n > 0 && p.Room.FloorCount < BigRoomCells))) continue;   // a big room gets a hanging centre lamp as well as its wall lanterns
                 if (atm.Dark && p.Room.Kind == RoomKind.Combat) continue;
                 // nearest floor cell to the room's centre
                 float cx = p.X + p.Width * 0.5f - 0.5f, cy = p.Y + p.Height * 0.5f - 0.5f; int bx = -1, by = -1; float best = float.MaxValue;
@@ -343,28 +345,42 @@ namespace SleepingCalamity.Presentation
                     if (d < best) { best = d; bx = p.X + lx; by = p.Y + ly; }
                 }
                 if (bx < 0) continue;
-                Transform cl = Lamp(group, "Lamp_r" + r + "_c", CellCenter(bx, by) + new Vector3(0, 3.0f, 0), kit, mats, CentreLampIntensity * k, 13f, true);
-                Chain(cl, mats, RoomSpring + VaultRise);
+                Transform cl = Lamp(group, "Lamp_r" + r + "_c", CellCenter(bx, by) + new Vector3(0, 3.0f, 0), kit, mats, CentreLampIntensity * k * (emptyRoll ? 0.8f : 1f), 13f, true, coal ? "oil" : "chain");
+                Chain(cl, mats, RoomSpring + VaultRise, cl.Find("Fixture") != null ? FixtureRise(coal ? "oil" : "chain") : 0f);
                 result.Lamps++;
             }
             foreach (PlacedCorridor c in layout.Corridors)
             {
                 if ((c.X + c.Y) % 2 != 0) continue;
                 if ((c.X * 31 + c.Y * 17) % 100 >= atm.LampPercent) continue;   // thinned by position, no RNG: the same cells on every peer
-                Transform kl = Lamp(group, "Lamp_c" + c.X + "_" + c.Y, CellCenter(c.X, c.Y) + new Vector3(0, 3.0f, 0), kit, mats, CorridorLampIntensity * k, 9f, false);
-                Chain(kl, mats, CorridorSpring + VaultRise);
+                Transform kl = Lamp(group, "Lamp_c" + c.X + "_" + c.Y, CellCenter(c.X, c.Y) + new Vector3(0, 3.0f, 0), kit, mats, CorridorLampIntensity * k, 9f, false, coal ? "oil" : "lantern");
+                Chain(kl, mats, CorridorSpring + VaultRise, kl.Find("Fixture") != null ? FixtureRise("oil") : 0f);
                 result.Lamps++;
             }
         }
 
-        static Transform Lamp(Transform group, string name, Vector3 pos, CellarFloorKit kit, Mats mats, float intensity, float range, bool shadows)
+        // The kit fixture a lamp wears (B8): "sconce" = SconceCage on the wall behind it (wallDir points at the wall), "chain" = LanternChain hung from a hook FixtureRise above the lamp point,
+        // "oil" = LanternOil hanging on its bail, "lantern" = the B11 CellarLantern. A missing piece falls back to the B11 lantern. The fixture's object is named "Sconce" or "Fixture".
+        static float FixtureRise(string fixture) => fixture == "chain" ? 0.75f : 0.2f;
+
+        static Transform Lamp(Transform group, string name, Vector3 pos, CellarFloorKit kit, Mats mats, float intensity, float range, bool shadows, string fixture = "lantern", Vector3 wallDir = default)
         {
             var go = new GameObject(name).transform; go.SetParent(group, false); go.position = pos;
             var lg = new GameObject("Light"); lg.transform.SetParent(go, false);
             Light l = lg.AddComponent<Light>(); l.type = LightType.Point; l.color = GoldLamp; l.intensity = intensity; l.range = range;
             l.shadows = shadows ? LightShadows.Soft : LightShadows.None;
             if (shadows) { l.shadowStrength = 1f; l.shadowBias = 0.03f; l.shadowNormalBias = 0.4f; }
-            if (kit.Lantern != null)
+            string piece = fixture == "sconce" ? "SconceCage" : fixture == "chain" ? "LanternChain" : fixture == "oil" ? "LanternOil" : null;
+            if (piece != null && HasPiece(kit, piece))
+            {
+                Vector3 at; Quaternion rot = Quaternion.identity;
+                if (fixture == "sconce") { at = pos + wallDir * 0.1f - new Vector3(0, 0.1f, 0); rot = Quaternion.LookRotation(-wallDir, Vector3.up); }   // the mount sits on the wall face, the cage projects into the room
+                else if (fixture == "chain") at = pos + new Vector3(0, FixtureRise(fixture), 0);                                                       // origin at the top hook
+                else at = pos - new Vector3(0, 0.34f - FixtureRise(fixture), 0);                                                                       // origin at the base: the bail meets the chain
+                GameObject fx = PlacePiece(kit, piece, go, fixture == "sconce" ? "Sconce" : "Fixture", at, rot, Vector3.one);
+                foreach (Renderer rd in fx.GetComponentsInChildren<Renderer>(true)) rd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // the light sits inside it
+            }
+            else if (kit.Lantern != null)
             {
                 GameObject lan = Object.Instantiate(kit.Lantern, go, false); lan.name = "Lantern"; lan.SetActive(true);
                 if (kit.LanternMaterial != null)
@@ -380,9 +396,9 @@ namespace SleepingCalamity.Presentation
         }
 
         // An iron chain (a thin bar) from a hanging lamp's top up into the vault crown.
-        static void Chain(Transform lamp, Mats mats, float ceilingY)
+        static void Chain(Transform lamp, Mats mats, float ceilingY, float rise = 0f)
         {
-            Vector3 p = lamp.position; float len = ceilingY - p.y + 0.1f;
+            Vector3 p = lamp.position + new Vector3(0, rise, 0); float len = ceilingY - p.y + 0.1f;
             if (len > 0.05f) Box(lamp, "Chain", new Vector3(p.x, p.y + len * 0.5f, p.z), new Vector3(0.035f, len, 0.035f), mats.Iron, 1f, false);
         }
 
@@ -487,6 +503,7 @@ namespace SleepingCalamity.Presentation
                 Color limeBase = BaseColorOf(limeSrc);
                 Wall = Variant(wallSrc, "Wall", c => Color.Lerp(Mul(c, look.WallTint), limeBase, look.Limewash * LimewashPull), 0f);
                 Limewash = Variant(limeSrc, "Limewash", c => Mul(c, Color.Lerp(Color.white, look.WallTint, 0.5f)), 0f);
+                if (look.Limewash >= LimewashWallFrom) Wall = Limewash;   // B8 round 2: limewash floors (1-2) face their walls in the limewash material itself: tinting a red brick texture toward white stayed brick-red
                 Pillar = Stone(pillarSrc); Ceiling = k.Ceiling != null ? Stone(k.Ceiling) : Pillar;
                 float wetDark = 1f - WetDarken * look.Wet;
                 Floor = Variant(floorSrc, "Floor", c => Mul(c, new Color(wetDark, wetDark, wetDark, 1f)), WetGloss * look.Wet);
@@ -496,7 +513,7 @@ namespace SleepingCalamity.Presentation
 
             static readonly Dictionary<(Material, int, string), Material> Cache = new Dictionary<(Material, int, string), Material>();
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] static void ResetCache() => Cache.Clear();
-            public const float LimewashPull = 0.6f, WetDarken = 0.15f, WetGloss = 0.15f, SootDarken = 0.7f;
+            public const float LimewashWallFrom = 0.5f, LimewashPull = 0.6f, WetDarken = 0.15f, WetGloss = 0.15f, SootDarken = 0.45f;
             static Color Mul(Color a, Color b) => new Color(a.r * b.r, a.g * b.g, a.b * b.b, a.a);
             static Color BaseColorOf(Material m) => m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : m.HasProperty("_Color") ? m.GetColor("_Color") : Color.white;
 

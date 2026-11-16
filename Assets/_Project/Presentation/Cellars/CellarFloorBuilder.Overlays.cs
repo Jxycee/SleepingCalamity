@@ -22,7 +22,7 @@ namespace SleepingCalamity.Presentation
     {
         public const string OverlayGroup = "Overlays";
         public const float MossLampReach = 5.5f;
-        static readonly Color MossOlive = new Color(0.62f, 0.66f, 0.26f), DampTint = new Color(0.50f, 0.44f, 0.40f), LeakTint = new Color(0.78f, 0.74f, 0.68f);
+        static readonly Color MossOlive = new Color(0.62f, 0.66f, 0.26f), DampTint = new Color(2.6f, 2.3f, 2.0f), LeakTint = new Color(0.78f, 0.74f, 0.68f);
 
         // A deterministic 0-1 value from (seed, floor, cell, salt): a 32-bit integer mix.
         public static float Rand01(uint seed, int floor, int x, int y, uint salt)
@@ -49,7 +49,7 @@ namespace SleepingCalamity.Presentation
         static void Overlays(CellarFloorLayout layout, Grid grid, Transform root, CellarFloorKit kit, CellarFloorLookRow look, CellarFloorBuild result)
         {
             if (kit == null || (kit.DecalDamp == null && kit.DecalLeak == null && kit.DecalMoss == null && kit.DecalMossClump == null)) return;
-            Material damp = kit.DecalDamp != null && look.Wet > 0f ? Decal(kit.DecalDamp, DampTint, 0.7f, "Damp", look.Floor) : null;
+            Material damp = kit.DecalDamp != null && look.Wet > 0f ? Decal(kit.DecalDamp, DampTint, 0.25f, "Damp", look.Floor) : null;
             Material leak = kit.DecalLeak != null && look.Wet > 0f ? Decal(kit.DecalLeak, LeakTint, -1f, "Leak", look.Floor) : null;
             Material moss = kit.DecalMoss != null && look.Moss > 0f ? Decal(kit.DecalMoss, MossOlive, -1f, "Moss", look.Floor) : null;
             Material clump = kit.DecalMossClump != null && look.Moss > 0f ? Decal(kit.DecalMossClump, MossOlive, -1f, "MossClump", look.Floor) : null;
@@ -67,9 +67,9 @@ namespace SleepingCalamity.Presentation
                     Vector3 c = CellCenter(x, y);
                     string id = x + "_" + y;
 
-                    if (damp != null && Rand01(layout.Seed, layout.Floor, x, y, 1) < look.Wet * 0.30f)
+                    if (damp != null && Rand01(layout.Seed, layout.Floor, x, y, 1) < look.Wet * 0.22f)
                     {
-                        float size = 2.0f + 1.2f * Rand01(layout.Seed, layout.Floor, x, y, 2), yaw = 360f * Rand01(layout.Seed, layout.Floor, x, y, 3);
+                        float size = 1.1f + 0.7f * Rand01(layout.Seed, layout.Floor, x, y, 2), yaw = 360f * Rand01(layout.Seed, layout.Floor, x, y, 3);
                         Vector3 at = c + new Vector3((Rand01(layout.Seed, layout.Floor, x, y, 4) - 0.5f) * 1.6f, 0.015f, (Rand01(layout.Seed, layout.Floor, x, y, 5) - 0.5f) * 1.6f);
                         Card(group, "Damp_" + id, at, Quaternion.Euler(90f, yaw, 0f), size, size, damp, result);
                     }

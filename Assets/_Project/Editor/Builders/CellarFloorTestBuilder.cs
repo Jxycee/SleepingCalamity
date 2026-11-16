@@ -43,6 +43,7 @@ namespace SleepingCalamity.EditorTools
             var templates = new GameObject("KitTemplates").transform; templates.SetParent(root, false); templates.gameObject.SetActive(false);
             CellarFloorKit kit = BuildKit(templates);
             CellarFloorBuild built = CellarFloorBuilder.Build(layout, root, kit);
+            HideQaMarkers(built.Root);
             Object.DestroyImmediate(templates.gameObject);
 
             var lighting = new GameObject("Lighting").transform; lighting.SetParent(root, false);
@@ -88,7 +89,7 @@ namespace SleepingCalamity.EditorTools
                 Floor = slots["CV_Flagstone"], Wall = slots["CV_Brick"], Pillar = slots["CV_VaultStone"], Trim = slots["CV_Oak"], Flame = own["flame"],
                 // B2: the locked gate and plain chests wear the cellar oak instead of glowing red / flat brown greybox blocks; the spawn, entry, special-room and door-hint markers are QA-only and draw nothing (CellarFloorBuilder.ShowDebugMarkers; the spawn discs read as white discs on the floor)
                 LockedGate = slots["CV_Oak"], Chest = slots["CV_BarrelOak"],
-                KeyChest = Marker("CF_KeyChest", new Color(0.95f, 0.72f, 0.12f), 0.8f), Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
+                KeyChest = slots["CV_Oak"], Carrier = Marker("CF_Carrier", new Color(0.62f, 0.09f, 0.09f), 0.4f),
                 EntryStart = Marker("CF_Entry", new Color(0.30f, 0.58f, 0.18f), 0.5f), StairExit = Marker("CF_Stair", new Color(0.55f, 0.30f, 0.70f), 0.6f),
                 SpawnT1 = Marker("CF_SpawnT1", new Color(0.62f, 0.60f, 0.55f), 0f), SpawnT2 = Marker("CF_SpawnT2", new Color(0.85f, 0.45f, 0.10f), 0f),
                 FogBaseDensity = 0.007f, FogBaseColor = new Color(0.16f, 0.13f, 0.11f),   // the corner's fog; the floor's atmosphere roll scales and warms this
@@ -132,6 +133,18 @@ namespace SleepingCalamity.EditorTools
             if (lantern != null && lanternMat != null) { kit.Lantern = lantern; kit.LanternMaterial = lanternMat; }
             Debug.Log("SC CELLARFLOOR kit floorTile=" + (kit.FloorTile != null ? "B5 art" : "greybox slab") + " lantern=" + (kit.Lantern != null ? "B11 art" : "flame sphere"));
             return kit;
+        }
+
+        // B8 round 2: the greybox QA markers (carrier capsule, stair disc, bank disc, healing disc and orb, baker, warden, entry and spawn discs) stand in the hierarchy for tests but draw
+        // nothing in this look-test scene, so captures show the floor, not placeholders. Chests keep their oak boxes.
+        static void HideQaMarkers(Transform floorRoot)
+        {
+            Transform markers = floorRoot.Find(CellarFloorBuilder.MarkerGroup);
+            if (markers == null) return;
+            string[] hide = { "Carrier", "StairExit", "Bank", "HealingPoint", "HealingOrb", "Baker", "Warden", "EntryStart", "Spawn" };
+            foreach (Transform t in markers)
+                foreach (string h in hide)
+                    if (t.name.StartsWith(h)) { foreach (MeshRenderer r in t.GetComponentsInChildren<MeshRenderer>(true)) r.enabled = false; break; }
         }
 
         // The largest combat room (first on a tie): the camera stands at play height in its south-west corner cell and looks at its far north-east cell.

@@ -30,7 +30,7 @@ namespace SleepingCalamity.Presentation
     public static class CellarFloorLook
     {
         public const int FirstFloor = 1, LastFloor = 7;
-        public const float LampTintWeight = 0.8f;   // how far a floor's lamp tint replaces the shared lamp gold
+        public const float LampTintWeight = 0.6f;   // how far a floor's lamp tint replaces the shared lamp gold
 
         // "#rrggbb" to a colour (sRGB bytes read as the 0-1 colour the table gives: the same convention as the town and corner values).
         public static Color Hex(string hex)
@@ -45,12 +45,12 @@ namespace SleepingCalamity.Presentation
         static readonly CellarFloorLookRow[] Table =
         {
             //                       floor name                    wallTint                limewash lampTint        lampScale ambientTop        ambientBottom     fogTint                fogDens breath wet   moss  roots dust  soot  salt
-            new CellarFloorLookRow(1, "Church Cellar",   C(0.92f, 0.88f, 0.80f), 0.40f, Hex("#F2D58A"), 1.00f, Hex("#3a2c26"), Hex("#2a1c18"), C(0.16f, 0.13f, 0.11f), 0.007f, 0.15f, 0.6f, 0.5f, 1.00f, 0.40f, 0.00f, 0f),
+            new CellarFloorLookRow(1, "Church Cellar",   C(0.90f, 0.88f, 0.82f), 0.65f, Hex("#F2D58A"), 1.20f, Hex("#3a2c26"), Hex("#2a1c18"), C(0.16f, 0.13f, 0.11f), 0.007f, 0.15f, 0.6f, 0.5f, 1.00f, 0.40f, 0.00f, 0f),
             new CellarFloorLookRow(2, "Cold Stores",     C(0.95f, 0.93f, 0.88f), 0.70f, Hex("#F2D58A"), 1.00f, Hex("#3a2e2a"), Hex("#2a1e1c"), C(0.15f, 0.14f, 0.13f), 0.009f, 0.20f, 0.5f, 0.3f, 0.35f, 0.30f, 0.20f, 0f),
             new CellarFloorLookRow(3, "Drowned Bakery",  C(0.52f, 0.43f, 0.41f), 0.00f, Hex("#E8A63C"), 0.80f, Hex("#34282a"), Hex("#241a1c"), C(0.14f, 0.12f, 0.12f), 0.011f, 0.25f, 1.0f, 0.2f, 0.00f, 0.20f, 0.00f, 0f),
-            new CellarFloorLookRow(4, "Wine Vaults",     C(1.00f, 0.80f, 0.50f), 0.10f, Hex("#E8A63C"), 1.20f, Hex("#40302a"), Hex("#2e1e1a"), C(0.17f, 0.13f, 0.10f), 0.006f, 0.35f, 0.7f, 0.1f, 0.00f, 0.35f, 0.00f, 1f),
+            new CellarFloorLookRow(4, "Wine Vaults",     C(0.86f, 0.96f, 0.70f), 0.00f, Hex("#E8A63C"), 1.20f, Hex("#40302a"), Hex("#2e1e1a"), C(0.17f, 0.13f, 0.10f), 0.006f, 0.35f, 0.7f, 0.1f, 0.00f, 0.35f, 0.00f, 1f),
             new CellarFloorLookRow(5, "Cistern Dome",    C(0.74f, 0.70f, 0.66f), 0.00f, Hex("#E8A63C"), 1.00f, Hex("#3c2a26"), Hex("#2c1a18"), C(0.18f, 0.12f, 0.09f), 0.010f, 0.60f, 0.4f, 0.0f, 0.00f, 0.20f, 0.00f, 0f),
-            new CellarFloorLookRow(6, "Coal Cellars",    C(0.34f, 0.27f, 0.24f), 0.00f, Hex("#D2562A"), 0.80f, Hex("#30221e"), Hex("#1e1412"), C(0.14f, 0.09f, 0.06f), 0.012f, 0.75f, 0.0f, 0.0f, 0.00f, 0.80f, 0.80f, 0f),
+            new CellarFloorLookRow(6, "Coal Cellars",    C(0.40f, 0.50f, 0.44f), 0.00f, Hex("#D2562A"), 1.20f, Hex("#30221e"), Hex("#1e1412"), C(0.14f, 0.09f, 0.06f), 0.012f, 0.75f, 0.0f, 0.0f, 0.00f, 0.80f, 0.80f, 0f),
             new CellarFloorLookRow(7, "Stokehold",       C(0.30f, 0.20f, 0.17f), 0.00f, Hex("#D2562A"), 0.75f, Hex("#38201a"), Hex("#22120e"), C(0.18f, 0.09f, 0.05f), 0.012f, 1.00f, 0.0f, 0.0f, 0.10f, 0.90f, 1.00f, 0f),
         };
 

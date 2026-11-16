@@ -96,7 +96,7 @@ namespace SleepingCalamity.Tests.EditMode
             // floor 1 is pale limewashed stone with candle gold; floor 4 the honey brick under the brightest lamps; floor 6 soot brick under ember
             CellarFloorLookRow f1 = CellarFloorLook.For(1), f4 = CellarFloorLook.For(4), f6 = CellarFloorLook.For(6);
             Assert.Greater(Luma(f1.WallTint), Luma(f6.WallTint) + 0.3f); Assert.GreaterOrEqual(f1.Limewash, 0.4f - 1e-4f);
-            Assert.Greater(f4.WallTint.r - f4.WallTint.b, 0.4f, "honey brick is amber");
+            Assert.Greater(f4.LampTint.r - f4.LampTint.b, 0.4f, "honey brick under amber lamps");   // B8 round 2: the wall tint is a multiplier over the green-biased CV_Brick base and cut in red to leave honey, no longer amber itself; the amber check moves to the lamp
             Assert.That(CellarFloorLook.For(4).LampScale, Is.EqualTo(Enumerable.Range(1, 7).Max(f => CellarFloorLook.For(f).LampScale)), "the Wine Vaults are the brightest floor");
             Assert.Greater(f6.LampTint.r - f6.LampTint.b, 0.5f, "ember"); Assert.Greater(f6.Soot, 0.5f);
         }
