@@ -177,3 +177,16 @@ A second hair or face round, a plan revision once Run 1's first sessions land, o
   - Put the previous iteration beside the new one in each sheet, ask for a bare-nape number on every capture, and keep one iteration in reserve for a revert.
   - Coordinator side: a session's 5-hour window shared with other sessions; the clear failed while the prep session still had a background task (ask it to stop its tasks first).
 
+### 2026-11-15/16, Run 5: combat and weapon-growth balance (merged `5275f9a5`; note `docs/design/balance-dungeon1.md` if written; sim `Tools/balance_sim/`)
+- **Cost.** Start (Nov 15, 3:33 PM): 5-hour 28%, weekly all models 31%, weekly Fable 2%. End (Nov 16, 4:30 AM): weekly all models 64%, weekly Fable 31%. About 29 Fable points, far over Run 4's 10. Three 5-hour windows; two limit hits (8 PM, 1 AM) each killed a running implementer. Fable context ended near 340k tokens. Six sheets read, as budgeted.
+- **Result.** Solo went from 0% to 17% / 76% / 85% bank reach at dives 1 / 3 / 10; co-op in band; 105 of 114 checks; merged on a green check.
+- **What worked.** A text digest per run instead of the CSV; the previous run dashed on the same sheet; two or three runs inside round 1 (as built, structural only, structural plus numbers), which showed at once that the first co-op guess was wrong; a second run per round for the game as built; the landing run from exported numbers as proof that the C# matches the tuned set; implementers that stopped on a behavioural test instead of editing it.
+- **What to brief differently.**
+  - Fable should stop when the values are chosen. Landing, check, review and merge took about half of the Fable turns and needed one judgement (the Rat-king test). Hand the landing to a Sonnet session with the values table, and let it message Fable only for a decision.
+  - Every background wait in a subagent sends the Fable session an interim notice (about a dozen here). Checks and long runs belong in a session that is not Fable.
+  - Put the decisions that tests and comments already pin into the reading list (here `CombatDepthTests` and the comment block in `EnemyModel.cs`). I cut Rat-king life against a pinned decision and found out at landing.
+  - The prep simulator took enemy kinds from `floorMix`, not from the generator's real shares, so its baseline was too kind (no Rat-kings on floors 1-2). Ask the prep session to check simulator inputs against the generator's output.
+  - Read the simulator's rule before reasoning about it. My round 1 co-op change came from a wrong mental model of how many enemies attack a hero; 40 lines of `sim_core.py` would have saved half a round.
+  - Set outcome targets (bank reach, downs, kill times) and treat ratios as diagnostics. I revised targets three times because the first set mixed the two.
+  - Quote the real run time and the foreground limit in the brief (prep said 3.5 minutes, the runs took 7 to 11), and have tools check their input paths before a long run.
+  - Flaky network tests turn a 25-minute check into a lottery; fix or quarantine them before the next run that needs a merge.
