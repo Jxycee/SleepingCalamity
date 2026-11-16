@@ -96,6 +96,14 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_J10", new Vector3(-38.50f, 3.20f, -24.50f), new Vector3(-43.80f, -4.00f, -28.10f), 55f),   // retaining wall LK0797 into the Ring Lane SW flight's first treads
             ("Cap_HM_OverviewW", new Vector3(-110f, 45f, -20f), new Vector3(-30f, -3f, -20f), 48f),   // high oblique over the west lane and wall ring
             ("Cap_HM_OverviewE", new Vector3(100f, 45f, 35f), new Vector3(20f, -3f, -15f), 48f),     // high oblique over the east lane and wall ring and the keep terrace
+            // Area 1 rework (Run 6): the eye-level set along the main walk, level gaze, 1.65 m. SC_CAPTURE_ONLY=Eye_ shoots just these; they are the cameras the rework is scored on.
+            ("Cap_HM_Eye_Spawn", new Vector3(12.5f, 1.65f, 3.75f), new Vector3(-4f, 1.9f, -6f), 60f),        // the first frame: from the home door toward the fountain and the Market Street gap (DH8 yaw)
+            ("Cap_HM_Eye_Postcard", new Vector3(0f, 1.65f, -19.5f), new Vector3(0f, 4.5f, 20f), 60f),       // Market Street mouth looking north: fountain, north row, terrace wall, church and tower (H1)
+            ("Cap_HM_Eye_West", new Vector3(5f, 1.65f, -1f), new Vector3(-30f, 2.2f, -7f), 60f),            // from the fountain west over the ruined row and the West Lane mouth
+            ("Cap_HM_Eye_Climb", new Vector3(22.5f, 1.65f, 8.5f), new Vector3(16.5f, 5.5f, 22f), 60f),      // Keep Lane toward the east stair, the terrace wall and the tower: the walk to the dive
+            ("Cap_HM_Eye_BellYard", new Vector3(17f, 1.65f, 28.7f), new Vector3(2f, 5.4f, 29.2f), 60f),     // the keep walk looking west at the tower door, the trapdoor and the hill bank
+            ("Cap_HM_Eye_Balcony", new Vector3(0f, 1.65f, 20.9f), new Vector3(0f, 0f, -30f), 60f),          // the terrace edge over the whole square and Market Street to the south sky
+            ("Cap_HM_Eye_Lake", new Vector3(-21.5f, 1.65f, -73f), new Vector3(6f, -9f, -100f), 60f),        // outside the Lower Gate, down the bank over the lake to the far shore
         };
 
         // Cameras whose Pos is an absolute world position (not ground + eye height).
