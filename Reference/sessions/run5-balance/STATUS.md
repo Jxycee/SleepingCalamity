@@ -1,4 +1,4 @@
-State: IN PROGRESS (Run 5, round 4, the last)
+State: IN PROGRESS (Run 5, rounds done, landing the values)
 Branch: claude/run5-balance
 Usage at start (2026-11-15, 3:33 PM Central): 5-hour 28%, weekly all models 31%, weekly Fable 2%.
 
@@ -34,3 +34,20 @@ Basis: Dark Cloud tradition, the Cellars as a rough tutorial with tier-1 enemies
 - **Still out:** co-op damage on floor 4 at 0.56-0.60 against 0.55 (noise level); the Warden's damage per hero with three or four players (0.36 / 0.30 against 0.40); novice solo (known miss).
 - **r3n, the game as built (no free loaves before the baker):** dive 1 is rougher (solo 3%, two players 10%, four players 70%), then it converges (solo 52% at dive 3, 85% at dive 10). So the values work before the bread ladder is wired, with a harsher first dive.
 - **Round 4 change (last):** `soloAtk` 0.65 to 0.6 and two-player life 1.6 to 1.5 (lift dive 1 a little, smooth the step from two to three players); the Warden hits harder but less often (attack multipliers x1.4, cooldown 1.4 to 2.4 s), because at tier 1 with the solo assist its hits had shrunk to 12-16 a hit, which is not a guardian.
+### Round 4, final (r4 and r4n; sheet `Tools/balance_sim/final/r4_sheet.png`): 105 PASS / 9 FAIL
+- **Bank reach at dives 1 / 3 / 10:** solo 14% / 68% / 84%, two players 25% / 78% / 87%, three 55% / 95% / 98%, four 79% / 98% / 100%. Full clear at dive 10: 80% / 82% / 97% / 100%.
+- **Fights:** Slime 2.3 s, Broom 5.8 s, Rat-king 8.0 s solo on dive 1; Warden 49-52 s at every party size. Damage per floor 0.17 to 0.49 solo, 0.18 to 0.66 in co-op. Downs per hero from dive 3: 0.9 or less. Weapon level 2.5 / 5.9 / 12.5 solo, 14.8 / 17.5 / 19.4 for two / three / four at dive 10.
+- **As built (r4n, no free loaves before the baker):** solo 3% / 56% / 82%, two players 13% / 66% / 89%, four 69% / 98% / 100%.
+- **Misses left, not tuned away:** solo dive 1 at 14.5% against 15%; co-op floor 4 damage 0.56-0.57 against 0.55; the Warden's damage per hero with three or four players (0.38 / 0.32 against 0.40); three players' bank at dive 3 at 95.3% against 95%; novice solo 0% (the bread upgrades that are the design's answer are not in the simulator).
+
+## Chosen values
+| Value | Was | Now | Why |
+|---|---|---|---|
+| `tier1Atk` | 0.65 | 0.5 | tier-1 hits of 5-12 instead of 7-14 on 100 health |
+| `soloAtk`, `soloLife` | 1, 1 | 0.6, 0.75 | a solo hero has no revive and takes every hit |
+| Broom life, Rat-king life | 160, 180 | 130, 140 | Rat-king took 14 s solo and is over half of floors 4-7 |
+| Warden tier, life | 2, 600 | 1, 2000 | tier 2 put a 3.3x defence wall in front of the starting axe; 49-52 s now |
+| Warden attack multipliers (slam, pound, quake, sweep) | 1.5, 1.8, 2.0, 1.1 | 2.1, 2.5, 2.8, 1.5 | hits that matter (20-38 in co-op), fewer of them |
+| Warden cooldown | 1.4 s | 2.4 s | pays for the bigger hits |
+| Co-op life (2 / 3 / 4 players) | 1.7, 2.3, 2.8 | 1.5, 2.3, 3.0 | smooths the step from two to three players |
+| Weapon level cost per level | 20 | 40 | level 12.5 after ten dives instead of 17; the first level-up still lands on floor 1 |
