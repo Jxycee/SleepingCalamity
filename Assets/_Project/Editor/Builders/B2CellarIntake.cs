@@ -21,7 +21,9 @@ namespace SleepingCalamity.EditorTools
         const string DstRoot = "Assets/_Project/Content/Art/Cellar/Adopted/";
         const string MatFolder = "Assets/_Project/Content/Materials/B2";
         const int Cap = 2048;
-        static readonly HashSet<string> Skip = new HashSet<string> { "C01", "C02", "C15" };   // adopted in B0 (DungeonCornerBuilder / B0Fab)
+        static readonly HashSet<string> Skip = new HashSet<string> { "C01", "C02", "C15",   // adopted in B0 (DungeonCornerBuilder / B0Fab)
+            "C04", "C07d", "C11c", "C15b", "C15d", "A04a", "A04b",
+            "C13a", "C13c", "C14b", "C10c", "C14c", "C12c" };   // dropped 2026-11-15 (style review of the contact sheet): C13a flat door slab, C13c floating arc ribbon, C14b formless smear, C10c floating slab, C14c glowing orange fungus, C12c plastic green bedroll; sources stay in Art/Source/Fab   // non-Megascans (png textures, other layouts; C04/C07d/C11c 4096 px textures deleted for the 2K cap): adopt by hand later; A04 rats are rigged characters (own job)
         static readonly HashSet<string> Plants = new HashSet<string>();
         static readonly HashSet<string> Decals = new HashSet<string> { "C03a", "C03b", "C03c", "C03d" };   // opacity goes into albedo alpha (alpha clip)
         // Props whose source is far off real size: the prefab is scaled so the LOD0 bounds are this tall (m).
@@ -177,12 +179,13 @@ namespace SleepingCalamity.EditorTools
 
         // ------------------------------------------------------------------------------------------------ textures and material
         static string Find(string dir, string tail) =>
-            Directory.GetFiles(dir, "*.jpg").Where(f => !Path.GetFileName(f).Contains("Billboard") && Path.GetFileName(f).EndsWith("_2K_" + tail + ".jpg", StringComparison.Ordinal))
+            Directory.GetFiles(dir, "*.jpg").Where(f => !Path.GetFileName(f).Contains("Billboard") && Path.GetFileName(f).EndsWith("_2K_" + tail + ".jpg", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(f => f, StringComparer.Ordinal).FirstOrDefault();
 
         static Material BuildMaterial(string code, string srcDir, string dst, bool plant)
         {
             string bc = Find(srcDir, "BaseColor"), nr = Find(srcDir, "Normal"), ro = Find(srcDir, "Roughness"), ao = Find(srcDir, "AO"), me = Find(srcDir, "Metalness"), op = Find(srcDir, "Opacity");
+            if (Decals.Contains(code) && bc != null && op != null && (nr == null || ro == null)) return BuildDecalMaterial(code, bc, op, dst);   // decal sets ship BaseColor + Opacity + Specular only
             if (bc == null || nr == null || ro == null) throw new InvalidOperationException("missing BaseColor/Normal/Roughness");
             bool alpha = (plant || Decals.Contains(code)) && op != null;
             var written = new List<string>();
@@ -237,6 +240,29 @@ namespace SleepingCalamity.EditorTools
                 m.SetFloat("_Cull", 0f); m.SetOverrideTag("RenderType", "TransparentCutout"); m.renderQueue = 2450;
                 m.SetFloat("_AlphaToMask", 1f); m.doubleSidedGI = true;
             }
+            EditorUtility.SetDirty(m); AssetDatabase.SaveAssetIfDirty(m);
+            return m;
+        }
+
+        // Decal without normal/roughness maps: albedo RGB + Opacity in alpha (alpha clip), flat smoothness.
+        static Material BuildDecalMaterial(string code, string bc, string op, string dst)
+        {
+            Color32[] c = Decode(bc, out int w, out int h);
+            Color32[] o = Decode(op, out int ow, out int oh);
+            if (ow != w || oh != h) throw new InvalidDataException("opacity size mismatch");
+            var px = new Color32[c.Length];
+            for (int i = 0; i < px.Length; i++) px[i] = new Color32(c[i].r, c[i].g, c[i].b, o[i].r);
+            string albedo = dst + "/" + code + "_albedo.png";
+            if (WritePacked(albedo, w, h, px)) AssetDatabase.ImportAsset(albedo, ImportAssetOptions.ForceUpdate);
+            BeautyCornerArt.ImportTexture(albedo, srgb: true, normal: false, alphaTransparency: true);
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found");
+            Material m = LookTestBuilder.Ensure(MatFolder + "/M_" + code + ".mat", lit);
+            m.SetColor("_BaseColor", Color.white); m.SetColor("_Color", Color.white);
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo)); m.SetTexture("_MainTex", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo));
+            m.SetFloat("_Metallic", 0f); m.SetFloat("_Smoothness", 0.25f);
+            m.SetFloat("_AlphaClip", 1f); m.SetFloat("_Cutoff", 0.5f); m.EnableKeyword("_ALPHATEST_ON");
+            m.SetFloat("_Cull", 0f); m.SetOverrideTag("RenderType", "TransparentCutout"); m.renderQueue = 2450;
+            m.SetFloat("_AlphaToMask", 1f); m.doubleSidedGI = true;
             EditorUtility.SetDirty(m); AssetDatabase.SaveAssetIfDirty(m);
             return m;
         }

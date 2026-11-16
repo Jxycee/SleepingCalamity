@@ -81,6 +81,7 @@ namespace SleepingCalamity.EditorTools
             m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF"); m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             LookTestBuilder.MakeTransparent(m);
             m.SetShaderPassEnabled("MotionVectors", true);
+            MaterialValidation.Validate(m);   // B3 polish: settle the state a graphics editor would (MaterialValidationTests flagged Surf_Moss and Surf_Stain)
             EditorUtility.SetDirty(m);
             return m;
         }
