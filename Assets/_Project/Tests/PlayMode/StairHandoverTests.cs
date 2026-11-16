@@ -135,7 +135,7 @@ namespace SleepingCalamity.Tests.PlayMode
             double deadline = Time.realtimeSinceStartupAsDouble + Timeout;
             while (!cond())
             {
-                if (Time.realtimeSinceStartupAsDouble > deadline) Assert.Fail("Timed out: " + what);
+                if (Time.realtimeSinceStartupAsDouble > deadline) Assert.Fail("Timed out: " + what + " [client on host " + r.ClientHeroOnHost.transform.position + ", client own " + r.ClientHeroOwn.transform.position + ", host hero " + r.HostHero.transform.position + ", host floor " + r.HostHaul.Current.CurrentFloor + " built " + r.HostFloor.BuiltFloor + ", entry0 " + CellarFloorBuilder.EntryWorld(r.HostFloor.Layout, r.HostFloor.Built, 0) + ", entry1 " + CellarFloorBuilder.EntryWorld(r.HostFloor.Layout, r.HostFloor.Built, 1) + "]");
                 Sample(r);
                 PlayModeHarness.Pace();
                 yield return null;
