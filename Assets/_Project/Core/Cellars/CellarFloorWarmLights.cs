@@ -26,7 +26,7 @@ namespace SleepingCalamity.Core
     public sealed class CellarFloorWarmLights
     {
         public const string StreamName = "cellars.warmlight";
-        public const int RoomLightCap = 6, MaxPerRoom = 2, BigRoomCells = 12, HeightCm = 140;
+        public const int RoomLightCap = 6, MaxPerRoom = 2, BigRoomCells = 8, HeightCm = 140;
         static readonly string[] Names = { "Candle", "Sconce" };
         static readonly CellSide[] AllSides = { CellSide.North, CellSide.East, CellSide.South, CellSide.West };
 
@@ -54,7 +54,7 @@ namespace SleepingCalamity.Core
                 hasSocket = true; if (s.Filled) n++;
             }
             int wall = n;
-            bool centre = !(hasSocket && (wall == 0 || p.Room.FloorCount < BigRoomCells)) && !(dressing.Atmosphere.Dark && p.Room.Kind == RoomKind.Combat);
+            bool centre = !(hasSocket && ((wall == 0 && dressing.Atmosphere.Dark) || (wall > 0 && p.Room.FloorCount < BigRoomCells))) && !(dressing.Atmosphere.Dark && p.Room.Kind == RoomKind.Combat);
             if (centre) n++;
             n++;   // the room's warm fill
             foreach (FloorChest c in layout.Chests) if (c.RoomIndex == roomIndex) n++;

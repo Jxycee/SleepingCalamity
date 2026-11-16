@@ -237,7 +237,7 @@ namespace SleepingCalamity.Presentation
                 bool hasLamp = false; string lampPrefix = "Lamp_r" + r + "_";
                 foreach (Transform lamp in root.Find(LampGroup)) if (lamp.name.StartsWith(lampPrefix)) { hasLamp = true; break; }
                 bool unlit = !hasLamp && !resolved.Atmosphere.Dark;
-                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, unlit ? 2.6f : 1.8f, 0), FillGold, CellarArtTuning.FillIntensity * (1f + look.Soot) * (unlit ? CellarArtTuning.UnlitFillScale : 1f), span * 0.75f + 2f);
+                FillLight(dressing, "Fill_r" + r, (a + b) * 0.5f + new Vector3(0, unlit ? 2.6f : 1.8f, 0), FillGold, CellarArtTuning.FillIntensity * (1f + 2.2f * look.Soot) * (unlit ? CellarArtTuning.UnlitFillScale : 1f), span * 0.75f + 2f);
             }
             if (kit.Mote != null)
                 foreach (Transform lamp in root.Find(LampGroup))

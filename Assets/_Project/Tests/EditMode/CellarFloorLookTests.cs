@@ -117,7 +117,7 @@ namespace SleepingCalamity.Tests.EditMode
                 {
                     CellarFloorLayout layout = CellarTestFloors.Layout(12345, floor);
                     CellarFloorBuild b = CellarFloorBuilder.Build(layout, null, FogKit()); built[floor] = b;
-                    Material wall = b.Root.GetComponentsInChildren<Renderer>(true).Select(r => r.sharedMaterial).First(m => m != null && m.name == "CellarLook_f" + floor + "_Wall");
+                    Material wall = b.Root.GetComponentsInChildren<Renderer>(true).Select(r => r.sharedMaterial).First(m => m != null && (m.name == "CellarLook_f" + floor + "_Wall" || (CellarFloorLook.For(floor).Limewash >= 0.5f && m.name == "CellarLook_f" + floor + "_Limewash")));   // limewash floors face their walls in the limewash instance
                     Light lamp = b.Root.Find(CellarFloorBuilder.LampGroup).GetComponentsInChildren<Light>(true).First();
                     colours[floor] = (wall.color, lamp.color, RenderSettings.fogColor, RenderSettings.fogDensity);
                     CellarFloorLookRow look = CellarFloorLook.For(floor);
