@@ -22,3 +22,11 @@ Work, in order:
 4. Reviews: Core part reviewer; host parts risk-reviewer. Stop merge-ready, board needs: coordinator (networking merge needs the user's go).
 Crash saver: NOT simple, skipped. Pieces it needs: floor-start dive snapshot writer in the host save, Application.quitting clean-exit marker, next-launch crash-evidence check (Player-prev.log / crash folder), resume-at-floor-N offer UI, and IsResumable change (today only bank room / floor 5 after push-on). All save data + App + UI; spec and QUEUE say skip if complicated. Filed for the coordinator.
 Churn bug to report: after `check`, the build rewrote 9+ Hollowmere materials (M_GD_Leaf, M_GD_Produce, M_GD_Straw, M_GD_patch_rust, M_GD_patch_seam, M_HM_Surf_Moss, M_HM_Surf_Stain, M_HM_Surf_Wear, M_StoneCottage_B_SC_Rubble .mat and maybe more under Content/Materials/Hollowmere); discarded, not committed (session-usage.md).
+
+## Step 6 final (2026-11-16)
+State: merge-ready (host wiring = networked, needs: coordinator). Tip 97b9952a (includes merged origin/main), branch claude/dive-6-jobs pushed.
+Check PASS on 97b9952a: EditMode 1843/1843, PlayMode 307 passed 0 failed 36 skipped; soak PASS 47/47. Risk review: no blockers; should-fixes applied in 9c457131 (shrine bonus in StirMismatch, 4 PlayMode job tests, seed isolation in modifier gold tests).
+Flakes seen once under load, passed on rerun: StairHandoverTests Rtt300Loss5 (timeout, 3 sessions on the PC); FloorCardTests soak sweep hit the 180 s default (now [Timeout(600000)]).
+Also on main from this session: 5b 871802e0, stale M_HM_Surf_* mats fix 88a8a6c5. Open churn bug: build rewrites M_GD_Leaf/Produce/Straw/patch_rust/patch_seam + M_StoneCottage_B_SC_Rubble .mat (not committed).
+Not built: crash saver (not simple: floor-start snapshot writer, quitting marker, crash-evidence check, resume UI, IsResumable change; all save data). Rewards of EliteDen/Treasury stack with Brimming/Fat Larder rolls in the same room (reviewer nit 4, read as intended). Hurt/healthy gating dropped for dungeon 1.
+Archive: ready
