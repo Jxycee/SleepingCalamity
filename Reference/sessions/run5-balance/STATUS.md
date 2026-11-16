@@ -1,4 +1,4 @@
-State: IN PROGRESS (Run 5, round 3)
+State: IN PROGRESS (Run 5, round 4, the last)
 Branch: claude/run5-balance
 Usage at start (2026-11-15, 3:33 PM Central): 5-hour 28%, weekly all models 31%, weekly Fable 2%.
 
@@ -28,3 +28,9 @@ Basis: Dark Cloud tradition, the Cellars as a rough tutorial with tier-1 enemies
 - **Novice solo stays at 0%** at every dive (floor 2.4 to 3.1). A fixed novice profile takes about 3 times an average player's damage; weapon growth alone cannot close that. The design's answer (extra baked loaves up to 10, baker upgrades to 50 a loaf) is not in the simulator. Recorded as a known miss, not tuned away.
 - **Round 3 change:** weapon level cost per level 20 to 40 (base stays 40, so the first level-up still lands on floor 1). Adds a three-player case and a second run with the bread ladder off before the baker (the game as built: the free loaves are not wired yet, plan 3 owns that).
 - **Targets revised, with reasons:** full clear at dive 10 up to 85% solo and 92% for two (the simulator has no stir, which adds enemies on exactly floors 5-7, so the real number sits lower); four players' bank at dive 3 up to 100%.
+### Round 3 (r3 and r3n; sheet `Tools/balance_sim/out/r3_sheet.png`): 106 PASS / 8 FAIL
+- **Weapon level now in band:** 2.4 / 5.9 / 12.5 solo at dives 1 / 3 / 10 (two players 14.8, four players 19.4 at dive 10).
+- **Bank reach at dives 1 / 3 / 10:** solo 13% / 65% / 83% (dive 1 two points under), two players 18% / 74% / 87%, three 56% / 94% / 99%, four 79% / 98% / 100%. Full clear at dive 10: 77% / 81% / 97% / 100%. Downs per hero from dive 3: 1.1 or less for every party size.
+- **Still out:** co-op damage on floor 4 at 0.56-0.60 against 0.55 (noise level); the Warden's damage per hero with three or four players (0.36 / 0.30 against 0.40); novice solo (known miss).
+- **r3n, the game as built (no free loaves before the baker):** dive 1 is rougher (solo 3%, two players 10%, four players 70%), then it converges (solo 52% at dive 3, 85% at dive 10). So the values work before the bread ladder is wired, with a harsher first dive.
+- **Round 4 change (last):** `soloAtk` 0.65 to 0.6 and two-player life 1.6 to 1.5 (lift dive 1 a little, smooth the step from two to three players); the Warden hits harder but less often (attack multipliers x1.4, cooldown 1.4 to 2.4 s), because at tier 1 with the solo assist its hits had shrunk to 12-16 a hit, which is not a guardian.
