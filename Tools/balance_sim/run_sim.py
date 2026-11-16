@@ -239,7 +239,7 @@ def fail_text(v):
     return "%s %s%s=%s [%s]" % (v["check"], v["case"], (" " + v["sub"]) if v["sub"] else "", vstr(v), bandstr(v["band"]))
 
 
-COL = {"p1_average": "#1f77b4", "p2_average": "#ff7f0e", "p4_average": "#2ca02c",
+COL = {"p1_average": "#1f77b4", "p2_average": "#ff7f0e", "p3_average": "#e377c2", "p4_average": "#2ca02c",
        "p1_novice": "#9467bd", "p1_expert": "#d62728", "p4_mix": "#8c564b"}
 KCOL = {"Slime": "#2ca02c", "Broom": "#ff7f0e", "RatKing": "#d62728", "Warden": "#1f77b4"}
 
@@ -304,20 +304,20 @@ def plot(M, V, cfg, path, nd, timing, title_extra="", prev=None, prev_tag=None):
     titled(a1, f"TTK per enemy kind, {cn1}, dive 1 (shade = per-kind band)", "floor")
     a1.set_ylabel("seconds", fontsize=7)
     a1.legend(fontsize=6)
-    # 2 pooled TTK 1/2/4 players (floor 5 = Warden, dives 1-3)
+    # 2 pooled TTK 1-4 players (floor 5 = Warden, dives 1-3)
     a2 = fig.add_subplot(gs[1, 1])
     wt = T.get("wardenTtkSecondsDives1to3", {"band": [40, 80]})
     hband(a2, wt["band"][0], wt["band"][1], 4.6, 5.4)
-    for cn in ("p1_average", "p2_average", "p4_average"):
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average"):
         def fn(MM, cn=cn):
             return fl, [gv(MM, cn, "ttk_d1to3", "Warden", 5) if f == 5 else pooled(MM.get(cn, {}), "ttk_d1", int(f)) for f in fl]
         draw(a2, fn, COL[cn], cn[:2])
     a2.set_yscale("log")
-    titled(a2, "Mean TTK, 1/2/4 players (floor 5 = Warden dives 1-3, band 40-80 s)", "floor")
+    titled(a2, "Mean TTK, 1-4 players (floor 5 = Warden dives 1-3, band 40-80 s)", "floor")
     a2.legend(fontsize=6)
     # 3 room clear time
     a3 = fig.add_subplot(gs[1, 2])
-    for cn in ("p1_average", "p2_average", "p4_average"):
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average"):
         draw(a3, lambda MM, cn=cn: (fl, [pooled(MM.get(cn, {}), "room_clear_d1", int(f)) for f in fl]), COL[cn], cn[:2])
     titled(a3, "Regular room clear time (s), dive 1", "floor")
     a3.legend(fontsize=6)
@@ -327,7 +327,7 @@ def plot(M, V, cfg, path, nd, timing, title_extra="", prev=None, prev_tag=None):
     for f in fl:
         if str(f) in dt_:
             hband(a4, dt_[str(f)][0], dt_[str(f)][1], f - 0.4, f + 0.4)
-    for cn in ("p1_average", "p2_average", "p4_average"):
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average"):
         draw(a4, fl_curve(cn, "dmg_taken_frac", "per_hero"), COL[cn], cn[:2])
     titled(a4, "Damage taken per hero per floor (fraction of max HP, all dives)", "floor")
     a4.legend(fontsize=6)
@@ -347,7 +347,7 @@ def plot(M, V, cfg, path, nd, timing, title_extra="", prev=None, prev_tag=None):
         for ds, bd in per.items():
             if int(ds) <= nd:
                 hband(a6, bd[0], bd[1], int(ds) - 0.35, int(ds) + 0.35, alpha=0.2)
-    for cn in ("p1_average", "p2_average", "p4_average", "p1_novice", "p1_expert"):
+    for cn in ("p1_average", "p2_average", "p3_average", "p4_average", "p1_novice", "p1_expert"):
         draw(a6, dv_curve(cn, "weapon_level"), COL[cn], cn)
     titled(a6, "Weapon level after dive N (mean; green = p1_average band)", "dive")
     a6.legend(fontsize=5.5)
@@ -434,7 +434,7 @@ def digest(M, V, cfg, nd, timing, tag, prev=None, prev_tag=None, Vprev=None):
         L.append("  %-10s %s" % (cn, " ".join(num(cn, "dmg_taken_frac", "per_hero", f, "%.2f") for f in fr)))
     vs = T.get("partyTtkRatio", {}).get("vs", "p1_average")
     L.append(f"Co-op ratios vs {vs}: TTK d1 per floor | damage frac per floor | weapon level d{min(10, nd)}")
-    for cn in ("p2_average", "p4_average"):
+    for cn in ("p2_average", "p3_average", "p4_average"):
         if cn in M:
             L.append("  %-10s %s | %s | %s" % (cn, " ".join(rat(cn, vs, "ttk_d1", "regular", f) for f in fr),
                                               " ".join(rat(cn, vs, "dmg_taken_frac", "per_hero", f) for f in fr),
@@ -476,6 +476,9 @@ def main():
     ap.add_argument("--device")
     ap.add_argument("--prev", help="previous run's <tag>_metrics.csv: drawn dashed on every panel, shown in [brackets] in the digest")
     a = ap.parse_args()
+    for flag, p in (("--config", a.config), ("--numbers", a.numbers), ("--prev", a.prev)):
+        if p and not os.path.isfile(p):
+            sys.exit("ERROR: %s file not found: %s (relative paths resolve from the current working directory)" % (flag, os.path.abspath(p)))
     cfg = sc.load_json(a.config)
     nums = sc.load_json(a.numbers)
     if a.device:

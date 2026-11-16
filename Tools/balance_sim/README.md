@@ -9,6 +9,8 @@ Tools\balance_sim\run.cmd [--config config.json] [--numbers data\game_numbers.js
 Tools\balance_sim\run.cmd --selftest
 ```
 
+Relative paths (`--config`, `--numbers`, `--prev`, `--out`) resolve from the current working directory (run from the repo root). `--config`, `--numbers` and `--prev` are checked at startup: a missing file exits with an error before the simulation starts.
+
 `run.cmd` uses `C:\AI\hairdeck\.venv\Scripts\python.exe` (torch 2.8 CUDA + matplotlib). CPU fallback works but is slow. Output (default `Tools/balance_sim/out/`, gitignored), per `--tag`:
 - `<tag>_sheet.png`: ONE sheet, 1260 px wide, 3x3 panels: per-kind TTK solo dive 1 (per-kind bands), pooled TTK 1/2/4 players (floor 5 = Warden dives 1-3, band 40-80), room clear time, damage per hero per floor (bands), downs per hero per dive, weapon level after dive N, bank reach by dive, full clear by dive, mean floor reached. The header lists every FAIL (value and band), wrapped. With `--prev <metrics.csv>` every panel also draws the previous run, same colour, dashed and fainter, and the header names its tag.
 - `<tag>_digest.txt`: text for reading instead of the CSV (about 90 lines): verdicts grouped per check and case (FAIL items with value and band), then one-line-per-case tables (TTK dive 1 per kind and floor, Warden `ttk_d1to3`, damage fraction, co-op ratios, bank reach / full clear / floors reached / downs per hero / weapon level at dives 1, 2, 3, 5, 10). With `--prev` the previous value follows each number in [brackets].
