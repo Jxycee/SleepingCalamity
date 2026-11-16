@@ -108,7 +108,7 @@ namespace SleepingCalamity.EditorTools
         {
             BuilderUtil.EnsureFolder(Folder);
             TerrainLayer[] layers = { Ground("Grass", "meadow_grass", 3f), Ground("Dirt", "packed_soil", 3f), Ground("Path", "worn_path", 2.5f), CobbleLayer() };
-            layers[0].diffuseRemapMax = new Vector4(0.94f, 0.90f, 0.76f, 1f);   // a little less saturated green (round 3); B3: olive, less lime (blue pulled down)
+            layers[0].diffuseRemapMax = new Vector4(0.85f, 0.84f, 0.68f, 1f);   // area 1 rework round 3: was (0.94, 0.90, 0.76); the meadow read pale lime under the stronger town sun (lake view p50 .66, target .44-.50)   // a little less saturated green (round 3); B3: olive, less lime (blue pulled down)
             layers[1].normalScale = 1.8f;                                        // a coarser read on the earth banks (round 3)
             layers[1].tileSize = new Vector2(1.7f, 1.7f);                         // A8: more texels on the steep banks (was 3 m)
             EditorUtility.SetDirty(layers[0]); EditorUtility.SetDirty(layers[1]);

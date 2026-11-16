@@ -92,8 +92,9 @@ namespace SleepingCalamity.EditorTools
         public static readonly Look Morning = new Look
         {
             FogDensity = 0.0062f, OverviewFog = 0.0016f, FogColor = new Color(0.84f, 0.82f, 0.74f),
-            Exposure = 0.25f, Ambient = 0.62f, SkyExposure = 1.18f, SkyTint = new Color(0.53f, 0.51f, 0.47f),
-            Sun = 1.22f, Contrast = 8f,   // round 2: the sunlit side was still dull (p90 .66-.71, target .80-.86): a stronger sun and a little grade contrast (ADDED to the corner's 8)
+            Exposure = 0.25f, Ambient = 0.56f, SkyExposure = 1.18f, SkyTint = new Color(0.53f, 0.51f, 0.47f),
+            Sun = 1.38f, Contrast = 8f,   // round 2: the sunlit side was still dull (p90 .66-.71, target .80-.86): a stronger sun and a little grade contrast (ADDED to the corner's 8).
+                                          // Round 3: p90 reached .70-.76 with p10 .26-.30 (over the .21-.25 target), so more sun (1.22 -> 1.38) and a little less sky fill (0.62 -> 0.56)
         };
         public static readonly Look Evening = new Look { FogDensity = 0.006f, OverviewFog = 0.002f };
 

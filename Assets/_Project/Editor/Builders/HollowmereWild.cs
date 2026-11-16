@@ -181,7 +181,7 @@ namespace SleepingCalamity.EditorTools
                     float e = HollowmereLayout.PlateauDistance(x, z);
                     if (e < 33.5f || e > 60f) continue;
                     if (HollowmereLayout.BackHill(x, z) > 0.05f) continue;                 // the hill forest takes over
-                    if (z < -62f && x > -8f && x < 50f) continue;                          // the lake foreshore: the view south from the Lower Gate stays open over the water (trees frame it on both sides)
+                    if (z < -62f && x > -45f && x < 60f) continue;                         // the lake foreshore: the view south from the Lower Gate stays open over the water (round 2 narrowed this to x -8..50 and a trunk stood in front of the gate's view: back to the full width)
                     float clump = Mathf.PerlinNoise(x * 0.028f + 5.1f, z * 0.028f + 19.4f);
                     bool hedgeLine = false;
                     if (e > 45f)
@@ -195,7 +195,7 @@ namespace SleepingCalamity.EditorTools
                         if (Hash01(ix, iz, 205) > (hedgeLine ? 0.30f : 0.22f)) continue;   // thin past the belt
                     }
                     else if (clump < 0.27f) continue;                                      // the gaps in the belt
-                    if (!Clear(x, z, 2.5f, hedgeLine ? 5f : 4f)) continue;
+                    if (!Clear(x, z, 2.5f, hedgeLine ? 5f : 4f, laneGap: 4.5f)) continue;   // tall trees stand back from the roads out of the gates (round 3)
                     float roll = Hash01(ix, iz, 207), y = GroundY(x, z);
                     if (clump < 0.33f && e <= 45f)
                     {
