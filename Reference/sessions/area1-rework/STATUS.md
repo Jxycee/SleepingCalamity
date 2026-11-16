@@ -1,7 +1,7 @@
 # Area 1 rework (Fable Run 6) STATUS
 
 State: building. Context handoff written 2026-11-16 about 11:05 Central (session cleared and restarted by the coordinator; brief unchanged: `side-session-notes/local_88bfb1c1-.../run6-fable-area1-brief.md`).
-Branch `claude/area1-rework`, worktree `.claude/worktrees/elated-dubinsky-d77725`. **Not pushed:** guard.sh wants a `gate` PASS for a push that touches Assets, and the tip is uncompiled WIP. First Unity run of the next session settles it.
+Branch `claude/area1-rework`, worktree `.claude/worktrees/elated-dubinsky-d77725`. Origin holds b3f286f7 (WIP, pushed on the coordinator's request; the first push of the new branch went through). **No `gate` has run on it:** the round 1 code is uncompiled. guard.sh blocks every further push until a `gate` PASS, so this file's later edits are local only (this worktree). The first Unity run of the next session shows any compile error.
 Usage: start 5-hour 48%, weekly 75%, Fable 44%. At handoff (after the 11:00 reset) 5-hour 0%, weekly 82%, Fable 57%. Context was 346k.
 Images used: 2 of 10 (refs + B3 sheet; baseline sheet). Scratch: `C:\Users\jayce\AppData\Local\Temp\claude\602ec13e15d252cb\9bc72263-ffd8-4546-b30f-19d24fe64b2b\scratchpad\run6` (a reboot clears it).
 
@@ -50,4 +50,4 @@ Brief: adopt CC0 Poly Haven trees TR01-TR07 in headless Blender, 3 LODs, texture
 
 ## Run 6 lessons so far
 - The scanner map and my own reads of terrain, layout, look and backdrop cost most of the 346k context before any round ran. Brief the next run with this file and skip the wide reads.
-- Check `guard.sh` push rules before promising a WIP push.
+- guard.sh's fast gate let the first push of a new branch (`git push -u origin <branch>`) through without a gate PASS, then blocked the next plain `git push`: a possible hole in the hook, for the coordinator to look at.
