@@ -77,7 +77,21 @@ namespace SleepingCalamity.EditorTools
 
         // B3: Morning and Evening are the B0 states (design section 4) and take the town. They keep the corner's own profile, HDRI sky, fog and ambient (BeautyCornerBuilder.ApplyPreset);
         // the Look only carries the town's overview haze (FogDensity is the play-distance density, from the design table). Midday and LowSun stay for the old captures.
-        public static readonly Look Morning = new Look { FogDensity = 0.0048f, OverviewFog = 0.0016f };
+        // Area 1 rework (Run 6, decided 2026-11-16): Morning in the town is no longer the corner's light unchanged. The baseline read flat: the sun (42, -32) lit
+        // the north view from the front, the shade sides went black (sky ambient 0.40), the highlights stayed dull (p90 .67) and the HDRI's hard blue sat
+        // over a pale band. The town's Morning keeps the corner's sun colour, cookie and profile and changes, on the town scene only:
+        //   - the sun lower and from the east (TownMorningSun), so the walk north is side-lit and trees and walls throw long shadows across the ground;
+        //   - its own sky copy M_HM_Sky_Morning (the corner's HDRI turned with the sun, SkyExposure, SkyTint as the panoramic tint);
+        //   - Ambient = the sky ambient intensity (corner 0.40); Exposure = stops ADDED to the corner's Morning profile (copy HM_Morning_Profile);
+        //   - FogDensity (corner 0.0048, plain exponential) and FogColor, mixed half and half with the corner's horizon fog (black = keep the corner's).
+        // The corner scene, BeautyCornerBuilder's presets and M_BC_* are never touched.
+        public static readonly Quaternion TownMorningSun = Quaternion.Euler(33f, -68f, 0f);
+        public const string MorningProfileName = "HM_Morning_Profile";
+        public static readonly Look Morning = new Look
+        {
+            FogDensity = 0.0062f, OverviewFog = 0.0016f, FogColor = new Color(0.84f, 0.82f, 0.74f),
+            Exposure = 0.25f, Ambient = 0.62f, SkyExposure = 1.18f, SkyTint = new Color(0.53f, 0.51f, 0.47f),
+        };
         public static readonly Look Evening = new Look { FogDensity = 0.006f, OverviewFog = 0.002f };
 
         public static Look For(BeautyCornerBuilder.Preset preset)
@@ -101,7 +115,8 @@ namespace SleepingCalamity.EditorTools
             BeautyCornerBuilder.ApplyPreset(preset);
             if (preset == BeautyCornerBuilder.Preset.Morning || preset == BeautyCornerBuilder.Preset.Evening)
             {
-                RenderSettings.fogDensity = look.FogDensity;   // the corner's HDRI sky, profile, fog colour and sky ambient stand as B0 tuned them
+                RenderSettings.fogDensity = look.FogDensity;   // Evening: the corner's HDRI sky, profile, fog colour and sky ambient stand as B0 tuned them
+                if (preset == BeautyCornerBuilder.Preset.Morning) TownMorning(look);
                 Transform sh = GameObject.Find(ShaftsRoot)?.transform;
                 if (sh != null && RenderSettings.sun != null) foreach (Transform spot in sh) spot.rotation = RenderSettings.sun.transform.rotation;
                 DynamicGI.UpdateEnvironment();
@@ -117,6 +132,63 @@ namespace SleepingCalamity.EditorTools
             if (shafts != null && RenderSettings.sun != null) foreach (Transform spot in shafts) spot.rotation = RenderSettings.sun.transform.rotation;
             RenderSettings.ambientSkyColor *= look.Ambient; RenderSettings.ambientEquatorColor *= look.Ambient; RenderSettings.ambientGroundColor *= look.Ambient;
             DynamicGI.UpdateEnvironment();
+        }
+
+        // The town's Morning on top of the corner's preset (see the Morning look above). Runs after BeautyCornerBuilder.ApplyPreset(Morning).
+        static void TownMorning(Look look)
+        {
+            Light sun = RenderSettings.sun;
+            float skyTurn = 0f;
+            if (sun != null)
+            {
+                skyTurn = SunAzimuth(TownMorningSun) - SunAzimuth(sun.transform.rotation);
+                sun.transform.rotation = TownMorningSun;
+            }
+            Material cornerSky = RenderSettings.skybox;
+            if (cornerSky != null && cornerSky.HasProperty("_Rotation"))
+            {
+                Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_Sky_Morning.mat", cornerSky.shader);
+                m.CopyPropertiesFromMaterial(cornerSky);
+                m.SetFloat("_Rotation", Mathf.Repeat(cornerSky.GetFloat("_Rotation") + skyTurn, 360f));   // B0Fab.SkyRotationDegrees: rotation = the sun's azimuth - the HDRI's own
+                if (look.SkyExposure > 0f) m.SetFloat("_Exposure", look.SkyExposure);
+                if (look.SkyTint.maxColorComponent > 0f) m.SetColor("_Tint", new Color(look.SkyTint.r, look.SkyTint.g, look.SkyTint.b, 0.5f));
+                EditorUtility.SetDirty(m);
+                RenderSettings.skybox = m;
+            }
+            if (look.FogColor.maxColorComponent > 0f) RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, look.FogColor, 0.5f);
+            RenderSettings.ambientIntensity = look.Ambient;
+            var corner = AssetDatabase.LoadAssetAtPath<VolumeProfile>(LookTestBuilder.RenderingFolder + "/" + BeautyCornerBuilder.MorningProfileName + ".asset");
+            Volume post = Object.FindFirstObjectByType<Volume>();
+            if (corner != null && post != null)
+            {
+                float cornerExposure = corner.TryGet(out ColorAdjustments cornerGrade) ? cornerGrade.postExposure.value : 0f;
+                post.sharedProfile = LookTestBuilder.EnsureProfile(MorningProfileName, p =>
+                {
+                    CopyProfile(corner, p);
+                    LookTestBuilder.Comp<ColorAdjustments>(p).postExposure.Override(cornerExposure + look.Exposure);
+                });
+            }
+        }
+
+        // The compass angle B0Fab.SkyRotationDegrees turns the sky to: atan2 of the direction toward the sun, in degrees.
+        static float SunAzimuth(Quaternion sunRotation)
+        {
+            Vector3 toSun = -(sunRotation * Vector3.forward);
+            return Mathf.Atan2(toSun.z, toSun.x) * Mathf.Rad2Deg;
+        }
+
+        static void CopyProfile(VolumeProfile corner, VolumeProfile p)
+        {
+            foreach (VolumeComponent src in corner.components)
+            {
+                if (!p.TryGet(src.GetType(), out VolumeComponent dst))
+                {
+                    dst = p.Add(src.GetType()); dst.name = src.GetType().Name;
+                    AssetDatabase.AddObjectToAsset(dst, p);
+                }
+                dst.active = src.active;
+                for (int i = 0; i < src.parameters.Count; i++) { dst.parameters[i].SetValue(src.parameters[i]); dst.parameters[i].overrideState = src.parameters[i].overrideState; }
+            }
         }
 
         // ------------------------------------------------------------------------------------------- atmosphere

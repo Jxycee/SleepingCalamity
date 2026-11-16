@@ -133,12 +133,18 @@ namespace SleepingCalamity.EditorTools
             if (hasChim && ivy != null && TryIvy(ruin, chim, chimWorld, dress, rnd)) ivies++;
 
             // saplings
-            int nSap = f.Size == FoundationSize.L ? 1 : 0;   // polish: the small cards read as agave from above; now one taller tree (trunk-led) on L lots only
-            for (int i = 0; i < nSap && treeMat != null; i++)
+            // Area 1 rework (Run 6): a real young tree has grown up through each ruin since the town fell (S 1, M 1, L 2; 3.8-8 m; HollowmereWild.LotTree, no
+            // collider), so the ruined rows carry height and cast shade. The crossed-card sapling stays as the fallback while the tree prefabs are missing.
+            int nSap = f.Size == FoundationSize.L ? 2 : 1;
+            for (int i = 0; i < nSap; i++)
             {
                 Vector2 p = Pick(2.4f);
                 if (float.IsNaN(p.x)) continue;
                 int variant = rnd.Next(4); float h = 1.7f + (float)rnd.NextDouble() * 0.6f;
+                float treeH = f.Size == FoundationSize.S ? 3.8f + (float)rnd.NextDouble() * 1.7f : 4.6f + (float)rnd.NextDouble() * 3.4f, treeYaw = (float)rnd.NextDouble() * 360f;
+                GameObject lotTree = HollowmereWild.LotTree(dress, dress.TransformPoint(new Vector3(p.x, 0f, p.y)), treeH, treeYaw);
+                if (lotTree != null) { lotTree.name = "Dress_Tree_" + i; saplings++; continue; }
+                if (treeMat == null || f.Size != FoundationSize.L || i > 0) continue;   // the card fallback keeps the old rule: one on L lots only
                 var go = new GameObject("Dress_Sapling_" + i); go.transform.SetParent(dress, false);
                 go.transform.localPosition = new Vector3(p.x, -0.06f * h, p.y);
                 go.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
