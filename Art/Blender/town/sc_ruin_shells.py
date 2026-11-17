@@ -1,0 +1,689 @@
+"""RuinShells: taller ruin shells (Mid, Tall) for Hollowmere's 36 house lots, plus three small props (Hollowmere world build, Area 1 Run 7).
+
+Why: the low ruin kit (sc_ruin_kit.py) leaves the square reading as empty plaza with trees. Design DH1: "the chimneys stayed: every ruined lot
+keeps its hearth and chimney stack; the square is a ring of lonely chimneys and doorsteps". These shells are whole replacement ruins in the same
+family, so they keep the low kit's contract (see its docstring): root empty Ruin_<C>_<V>_<Level>, children Footing, Chimney, FOOTPRINT (flat S x S
+x 0.1 m box, hidden by the builder), SOCKET_Doorstep, SOCKET_Smoke; slots FK_Sandstone / FK_ChimneyStone / FK_PlinthJoint / FK_Oak; UV0 metre box
+UVs at 2 m per tile; CORNER colour attribute 'wear' (R grime/char, G moss, B polish); Blender z up, front (doorstep) -Y, export -Z forward / Y up.
+It re-uses sc_ruin_kit.py by executing its source without the trailing main() call (the kit runs main() at import), so Ruin, Geo, soft_box, the
+doorstep, the chimney stack builder, the materials and the wear function are the kit's own. Door position and chimney parameters come from the same
+seeds as the base variant (Ruin_<C>_<V>).
+
+Base variant A / B / C changes which end holds the gable (and the chimney) and which wall stands:
+  A: gable on the back (+Y), tall long wall on the left (-X), door in the low front end wall (jambs and lintel stand)
+  B: gable on the left (-X), tall long wall on the back (+Y), door in the low front long wall
+  C: gable on the right (+X), tall long wall is the front (-Y) with the door opening in it, low back wall
+Tall: gable to its apex (S 5.5 / M 6.5 / L 7.5 m) with the stack built in and 1.2-1.8 m above it, hearth at its foot, L: second-storey window in
+the gable; long wall 3-3.6 m with 1-2 windows; opposite wall low; door frame with lintel; 2-3 charred beams leaning to the floor; rubble.
+Mid: stack and hearth alone (S 4.6 / M 5.2 / L 5.9 m) with a 2-3 m gable stub either side, other walls 0.8-2.2 m with one window sill, one corner
+pier at about 3 m, one fallen beam, rubble.
+Collision: the low kit has none (its FOOTPRINT box is the only collider shape), so the shells add simple box meshes FOOTPRINT_COL_<n> (every wall
+section, jamb, pier and the stack). The prefix FOOTPRINT is what HollowmereBuilder.PlaceRuin hides (renderer disabled), so they never draw.
+
+  blender -b --factory-startup --python-exit-code 1 --python Art/Blender/town/sc_ruin_shells.py -- --out <scratch> [--only Ruin_M_B_Tall,Headstone_A]
+      [--export] [--no-render] [--samples 20]
+  --export writes Art/Staging/area1-world/shells/<Name>.fbx (path_mode STRIP). Renders <out>/shells_sheet.png (all 18, three columns A B C, rows
+  S Tall, S Mid, M Tall, M Mid, L Tall, L Mid, 1000 px wide) and <out>/props_sheet.png.
+"""
+import sys, os, math, random, zlib
+HERE = os.path.dirname(os.path.abspath(__file__))
+KIT = os.path.join(HERE, 'sc_ruin_kit.py')
+_src = open(KIT, encoding='utf-8').read().rstrip()
+assert _src.endswith('main()'), 'sc_ruin_kit.py no longer ends with main()'
+K = {'__name__': 'sc_ruin_kit', '__file__': KIT}
+exec(compile(_src[:-len('main()')], KIT, 'exec'), K)          # the kit's functions without running its main()
+
+import bpy, bmesh
+import numpy as np
+from mathutils import Vector, Matrix, noise
+Ruin, Geo, soft_box, place, L = K['Ruin'], K['Geo'], K['soft_box'], K['place'], K['L']
+FOOT_W, BLOCK, CLASSES, SLOTS = K['FOOT_W'], K['BLOCK'], K['CLASSES'], K['SLOTS']
+OUT, SAMPLES, EXPORT, RENDER, REPO = K['OUT'], K['SAMPLES'], K['EXPORT'], K['RENDER'], K['REPO']
+STAGE_DIR = os.path.join(REPO, 'Art', 'Staging', 'area1-world', 'shells')
+only_arg = K['arg']('--only')
+DSCALE = float(K['arg']('--dscale', '1.0')); CAMZ = float(K['arg']('--camz', '1.75')); ANG = float(K['arg']('--ang', '35'))
+SHEETNAME = K['arg']('--sheet', 'shells_sheet.png')
+rad = math.radians
+SIZES = ['S', 'M', 'L']
+SHELL_NAMES = ['Ruin_%s_%s_%s' % (c, v, lv) for lv in ('Tall', 'Mid') for c in SIZES for v in 'ABC']
+PROP_NAMES = ['Headstone_A', 'Headstone_B', 'Headstone_C', 'Signpost_A', 'Hatch_Oak']
+WANT = only_arg.split(',') if only_arg else SHELL_NAMES + PROP_NAMES
+
+
+def sstep(x):
+    x = max(0.0, min(1.0, x)); return x * x * (3 - 2 * x)
+
+
+# ============================================================================================ the shell
+class Shell(Ruin):
+    def __init__(self, base, level):
+        super().__init__(base)
+        self.level = level; self.base = base
+        self.Q = random.Random(self.seed ^ (0x7A11 if level == 'Tall' else 0x31D))
+        self.wall_info = {}; self.cols = []; self.rot = 0.0
+        self.hearth = (1e3, 1e3); self.hearth_c = (1e3, 1e3)
+
+    # ---- wear: the kit's own, with the chimney's soot and the hearth mapped through the gable rotation, plus fire-black high on the walls
+    def wear_at(self, p, n, slot):
+        rot = self.rot; sup = super().wear_at
+        if rot:
+            Mi = Matrix.Rotation(-rot, 3, 'Z'); pu = Mi @ p; nu = Mi @ n
+            ch = self.chim; cxz = ch['cx'] + math.tan(ch['lean']) * max(pu.z, 0.0)
+            inreg = abs(pu.x - cxz) < ch['W0'] / 2 + 0.3 and pu.y > ch['front'] - 0.45 and pu.z > -0.1
+            if inreg:
+                saved = self.hearth; self.hearth = self.hearth_c
+                try: res = sup(pu, nu, slot)
+                finally: self.hearth = saved
+            else:
+                sv = ch['front']; ch['front'] = 1e9
+                try: res = sup(p, n, slot)
+                finally: ch['front'] = sv
+        else:
+            res = sup(p, n, slot)
+        r = res[0]
+        r = max(r, min(0.6, 0.17 * max(0.0, p.z - 0.9)) * (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs)))
+        return (min(1.0, r), res[1], res[2], res[3])
+
+    # ---- coursed walls with openings: every course snaps to a global edge list so windows and doors cut cleanly
+    def edges(self, hmax, ch):
+        e = [-0.04]
+        while e[-1] < hmax - 0.05:
+            e.append(e[-1] + self.R.uniform(*ch))
+        return e
+
+    def fill(self, a, b, j, blen, B):
+        R = self.R; out = []; t = a
+        first = R.uniform(0.4, 0.65) * (blen[0] + blen[1]) / 2 * B if j % 2 else None
+        while b - t > 0.02:
+            ln = R.uniform(*blen) * B
+            if first:
+                ln = first; first = None
+            if b - (t + ln) < 0.35 * B:
+                ln = b - t
+            ln = min(ln, b - t)
+            out.append((t, t + ln)); t += ln
+        return out
+
+    def wall_run(self, k, t0, t1, hfn, ch=(0.30, 0.44), openings=(), excl=None, blen=(0.65, 1.05)):
+        R = self.R; g = self.g; B = BLOCK[self.cls]
+        a, b, d, out = self.side_frame(k); yaw = math.atan2(d.y, d.x)
+        hmax = max(hfn(t0 + (t1 - t0) * i / 40) for i in range(41))
+        E = self.edges(hmax + 0.2, ch)
+        ops = []
+        for (oa, ob, oz0, oz1) in openings:
+            z0 = min(E, key=lambda e: abs(e - oz0))
+            z1 = 1e9 if oz1 > 1e8 else min(E, key=lambda e: abs(e - oz1))
+            if z1 <= z0 + 0.1 and z1 < 1e8:
+                z1 = E[E.index(z0) + 2] if E.index(z0) + 2 < len(E) else z0 + 0.7
+            ops.append((oa, ob, z0, z1))
+        self.wall_info[k] = dict(t0=t0, t1=t1, hfn=hfn, ops=ops)
+        for j in range(len(E) - 1):
+            z = E[j]; h = E[j + 1] - z
+            cuts = sorted((oa, ob) for (oa, ob, z0, z1) in ops if z >= z0 - 1e-3 and z + h <= z1 + 1e-3)
+            spans = []; cur = t0
+            for oa, ob in cuts:
+                if oa > cur: spans.append((cur, min(oa, t1)))
+                cur = max(cur, ob)
+            if cur < t1: spans.append((cur, t1))
+            for (sa, sb) in spans:
+                if sb - sa < 0.15:
+                    continue
+                for (ta, tb) in self.fill(sa, sb, j, blen, B):
+                    tc = (ta + tb) / 2; top = hfn(tc)
+                    if z + h * 0.55 >= top:
+                        continue
+                    if excl and excl(tc, z, h):
+                        continue
+                    last = z + h * 1.6 > top
+                    p = a + d * tc + out * R.uniform(-0.03, 0.03)
+                    xf = place(p.x, p.y, z + h / 2, yaw + rad(R.uniform(-3, 3)), rad(R.uniform(-1.8, 1.8)), rad(R.uniform(-1.8, 1.8)))
+                    vs, fs = soft_box((tb - ta - 0.035, FOOT_W - R.uniform(0.02, 0.1), h + 0.035), xf, R, soft=R.uniform(0.04, 0.10), wob=0.016,
+                                      bulge=0.01, cuts=0, top_break=0.08 if (last and R.random() < 0.7) else 0.0)
+                    g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
+        return E
+
+    def sill_and_lintel(self, k, ta, tb, z0, z1, lintel=True):
+        R = self.R; g = self.g
+        a, b, d, out = self.side_frame(k); yaw = math.atan2(d.y, d.x); tm = (ta + tb) / 2; p = a + d * tm
+        E = self.wall_info[k]['E']
+        z0 = min(E, key=lambda e: abs(e - z0))
+        vs, fs = soft_box((tb - ta + 0.3, FOOT_W + 0.06, 0.14), place(p.x, p.y, z0 + 0.03, yaw + rad(R.uniform(-1.5, 1.5)), 0, rad(R.uniform(-1.5, 1.5))), R,
+                          soft=0.12, wob=0.012, bulge=0.01, cuts=0)
+        g.add(vs, fs, 'stone')
+        if lintel and z1 < 1e8:
+            z1 = min(E, key=lambda e: abs(e - z1))
+            vs, fs = soft_box((tb - ta + 0.5, FOOT_W - 0.06, 0.2), place(p.x, p.y, z1 - 0.08, yaw + rad(R.uniform(-1.5, 1.5)), 0, rad(R.uniform(-1.5, 1.5))), R,
+                              soft=0.08, wob=0.01, bulge=0.0, cuts=0)
+            g.add(vs, fs, 'oak')
+
+    # ---- door frame: stone jambs on the kit's jamb bases, an oak lintel across (Tall: both; Mid: one tall jamb, one short)
+    def door_frame(self, Hj, lintel):
+        R = self.R; g = self.g; x = self.door_x; c = self.rc
+        for sgn in (-1, 1):
+            hj = Hj if (lintel or sgn < 0) else Hj * 0.6
+            z = 0.40
+            while z < hj - 0.1:
+                h = min(R.uniform(0.30, 0.40), hj - z)
+                vs, fs = soft_box((0.36 + R.uniform(-0.03, 0.04), FOOT_W + 0.04, h + 0.03), place(x + sgn * (self.door_w / 2 + 0.2) + R.uniform(-0.03, 0.03), -c, z + h / 2,
+                                  rad(R.uniform(-3, 3)), rad(R.uniform(-1.5, 1.5)), rad(R.uniform(-2, 2))), R, soft=0.12, wob=0.012, bulge=0.008, cuts=0,
+                                  top_break=0.06 if z + h >= hj - 0.05 and R.random() < 0.5 else 0.0)
+                g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone'); z += h
+            if lintel or sgn < 0:
+                self.cols.append((x + sgn * (self.door_w / 2 + 0.2), -c, 0.36, FOOT_W, hj - 0.1, 'x'))
+        if lintel:
+            ln = self.door_w + 0.4 + 0.72 + 0.1
+            vs, fs = soft_box((ln, 0.36, 0.26), place(x, -c, Hj + 0.12, rad(R.uniform(-1, 1)), rad(R.uniform(-1.2, 1.2)), rad(R.uniform(-1, 1))), R,
+                              soft=0.10, wob=0.012, bulge=0.0, cuts=1)
+            g.add(vs, fs, 'oak')
+
+    # ---- charred beam from a wall top down to the floor
+    def lean_beam(self, k, t, ang, skew, sec=(0.26, 0.22)):
+        R = self.R; g = self.g; info = self.wall_info[k]
+        a, b, d, out = self.side_frame(k); inward = -out
+        top = min(info['hfn'](t + s) for s in (-0.5, 0.0, 0.5))
+        zhi = top + 0.03
+        hi = a + d * t + inward * 0.02
+        lh = (zhi - 0.17) / math.tan(rad(ang))
+        dirh = (inward * math.cos(rad(skew)) + d * math.sin(rad(skew))).normalized()
+        lim = self.h - 0.55
+        lo = hi + dirh * lh
+        if abs(lo.x) > lim or abs(lo.y) > lim:
+            s = min(lim - 1e-3, abs(hi.x) + 1e-3) if False else 1.0
+            for ax in (0, 1):
+                if abs(lo[ax]) > lim and abs(dirh[ax]) > 1e-3:
+                    s = min(s, (math.copysign(lim, lo[ax]) - hi[ax]) / (dirh[ax] * lh))
+            lh *= max(0.2, s); lo = hi + dirh * lh
+        P_hi = Vector((hi.x, hi.y, zhi)); P_lo = Vector((lo.x, lo.y, 0.17))
+        v = P_hi - P_lo; ln = v.length + 0.25
+        mid = (P_hi + P_lo) / 2 + v.normalized() * 0.05
+        q = v.normalized().to_track_quat('X', 'Z')
+        xf = Matrix.Translation(mid) @ q.to_matrix().to_4x4()
+        vs, fs = soft_box((ln, sec[0], sec[1]), xf, R, soft=0.12, wob=0.02, bulge=0.0, cuts=1)
+        for vv in vs:                                   # burnt through at the foot: pull the low end in and down
+            if (vv - P_lo).length < 0.2:
+                vv.z -= 0.03 * R.random()
+        g.add(vs, fs, 'oak')
+        return P_lo
+
+    def heap(self, x, y, n, rad_, big=0.40):
+        R = self.R; g = self.g
+        for i in range(n):
+            ang = R.uniform(0, 6.283); r_ = rad_ * math.sqrt(R.random())
+            q = Vector((x + math.cos(ang) * r_, y + math.sin(ang) * r_, 0.0))
+            lim = self.h - 0.12
+            q.x = max(-lim, min(lim, q.x)); q.y = max(-lim, min(lim, q.y))
+            if abs(q.x - self.door_x) < self.door_w / 2 + 0.3 and q.y < -self.rc + 0.5:
+                continue
+            s = R.uniform(0.18, big)
+            size = (s * R.uniform(0.9, 1.5), s * R.uniform(0.8, 1.2), s * R.uniform(0.5, 0.8))
+            zc = size[2] * 0.35 + max(0.0, 1 - r_ / rad_) * R.uniform(0.0, 0.4)
+            xf = place(q.x, q.y, zc, R.uniform(0, math.pi), rad(R.uniform(-18, 18)), rad(R.uniform(-18, 18)))
+            vs, fs = soft_box(size, xf, R, soft=0.3, wob=0.03 * s / 0.3, bulge=0.01, cuts=0, top_break=0.03 if s > 0.3 else 0.0)
+            g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
+
+    def hearth_build(self):
+        """Open hearth at the gable's foot: sooted flags and a kerb of stones, in front of the stack (kit's interior, rotated with the gable)."""
+        R = self.R; g = self.g; ch = self.chim
+        hx, hy = ch['cx'], ch['front'] - 0.42
+        self.hearth_c = (hx, hy)
+        Rz = Matrix.Rotation(self.rot, 3, 'Z')
+        def rp(x, y):
+            v = Rz @ Vector((x, y, 0)); return v.x, v.y
+        for i in range(3):
+            qx, qy = rp(hx + R.uniform(-0.45, 0.45), hy + R.uniform(-0.3, 0.3))
+            vs, fs = soft_box((R.uniform(0.45, 0.65), R.uniform(0.4, 0.55), 0.07), place(qx, qy, 0.0, R.uniform(0, 3.1) + self.rot, rad(R.uniform(-2, 2)), rad(R.uniform(-2, 2))),
+                              R, soft=0.2, wob=0.012, bulge=0.004, cuts=0)
+            g.add(vs, fs, 'core')
+        for i in range(6):
+            ang = math.pi * (0.1 + 0.8 * i / 5)
+            qx, qy = rp(hx + math.cos(ang) * 0.9, hy - math.sin(ang) * 0.65 + 0.25)
+            sz = R.uniform(0.24, 0.34)
+            vs, fs = soft_box((sz * 1.3, sz, sz * 0.8), place(qx, qy, sz * 0.3, R.uniform(0, 3.1), rad(R.uniform(-10, 10)), 0), R, soft=0.3, wob=0.02, bulge=0.01, cuts=0)
+            g.add(vs, fs, 'stone_dk')
+        qx, qy = rp(hx, hy)
+        self.hearth = (qx, qy)
+
+    # ---- the whole shell
+    def build(self):
+        Q = self.Q; R = self.R; cls = self.cls; v = self.base[-1]; S = self.S; h = self.h
+        tall = self.level == 'Tall'
+        gs, kt, kl, ke = {'A': (2, 3, 1, 0), 'B': (3, 2, 0, 1), 'C': (1, 0, 2, 3)}[v]
+        self.rot = {2: 0.0, 3: math.pi / 2, 1: -math.pi / 2}[gs]
+        ch = self.chim
+        Ha = {'S': 5.5, 'M': 6.5, 'L': 7.5}[cls]
+        if tall:
+            ch['H'] = Ha + Q.uniform(1.2, 1.8)
+            ch['zb'] = {'S': 2.4, 'M': 2.7, 'L': 3.0}[cls]
+        else:
+            ch['H'] = {'S': 4.6, 'M': 5.2, 'L': 5.9}[cls] + Q.uniform(-0.25, 0.25)
+            ch['zb'] = {'S': 2.0, 'M': 2.2, 'L': 2.5}[cls]
+        self.build_chimney()
+        if self.rot:
+            Rz = Matrix.Rotation(self.rot, 3, 'Z')
+            self.cg.v = [Rz @ vv for vv in self.cg.v]; self.smoke = Rz @ self.smoke
+        self.build_doorstep()
+        self.hearth_build()
+        # chimney position along the gable side
+        Pc = Matrix.Rotation(self.rot, 3, 'Z') @ Vector((ch['cx'], ch['ymax'] - ch['D0'] / 2, 0))
+        a, b, d, out = self.side_frame(gs); tcg = (Pc - a).dot(d)
+        W0, W1, W2, zb = ch['W0'], ch['W0'] * 0.72, ch['W2'], ch['zb']
+        def excl_g(tc, z, hh):
+            return abs(tc - tcg) < ((W0 / 2 + 0.08) if z + hh <= zb + 0.2 else (W1 / 2 + 0.12))
+        Ls = {k: (self.side_frame(k)[1] - self.side_frame(k)[0]).length for k in range(4)}
+        span = {k: ((-FOOT_W / 2, Ls[k] + FOOT_W / 2) if k in (0, 2) else (FOOT_W / 2, Ls[k] - FOOT_W / 2)) for k in range(4)}
+        g_start = (kt == (gs + 1) % 4)
+        def u_of(t):                                                  # 0 at the tall wall's gable end, 1 at its far end
+            u = (t - span[kt][0]) / (span[kt][1] - span[kt][0]); return u if g_start else 1 - u
+        def t_of(u):
+            return span[kt][0] + (span[kt][1] - span[kt][0]) * (u if g_start else 1 - u)
+        nz = {k: Q.random() * 9 for k in range(4)}
+        sl, sr = Q.uniform(0.70, 0.86), Q.uniform(0.70, 0.86)
+        sag_f, sag_side = Q.uniform(0.7, 1.3), Q.choice([-1, 1])
+        # ---- wall height functions
+        stub = {'S': 2.0, 'M': 2.5, 'L': 3.0}[cls]
+        sL, sR = stub * Q.uniform(0.9, 1.15), stub * Q.uniform(0.9, 1.15)
+        def hg(t):
+            dt = t - tcg
+            if tall:
+                s_ = sl if dt < 0 else sr
+                hh = Ha - s_ * abs(dt) + 0.35 * noise.noise(Vector((t * 1.3 + nz[gs], 2.0, 0)))
+                if (dt * sag_side) > 0:
+                    hh -= sag_f * sstep((abs(dt) - 1.0) / 2.2)
+                return max(hh, 1.5)
+            sd = sL if dt < 0 else sR
+            if abs(dt) < sd:
+                return 0.7 + 2.8 * (1 - abs(dt) / sd) ** 0.9 + 0.2 * noise.noise(Vector((t * 1.6 + nz[gs], 2.0, 0)))
+            return 0.45 + 0.25 * noise.noise(Vector((t * 2.0 + nz[gs], 2.0, 0)))
+        Ht = {'A': 3.5, 'B': 3.1, 'C': 3.6}[v] * Q.uniform(0.97, 1.03) if tall else Q.uniform(1.7, 2.2)
+        sag_u = Q.uniform(0.72, 0.88)
+        def ht(t):
+            u = max(0.0, min(1.0, u_of(t)))
+            lo_ = 1.9 if tall else 0.9
+            hh = lo_ + (Ht - lo_) * (1 - u) ** 0.8 + 0.25 * noise.noise(Vector((t * 1.4 + nz[kt], 5.0, 0)))
+            if tall:
+                hh -= 0.9 * math.exp(-((u - sag_u) / 0.1) ** 2)
+            return max(hh, 0.7)
+        low_hi = Q.uniform(0.9, 1.4) if tall else Q.uniform(0.8, 1.25)
+        gapk, gapt = Q.random(), Q.uniform(0.3, 0.7)
+        def hl(t):
+            u = (t - span[kl][0]) / (span[kl][1] - span[kl][0])
+            hh = 0.6 + (low_hi - 0.6) * (0.5 + 0.5 * noise.noise(Vector((t * 1.1 + nz[kl], 7.0, 0)))) + 0.2 * noise.noise(Vector((t * 2.7 + nz[kl], 8.0, 0)))
+            return max(0.45, hh - 0.5 * math.exp(-((u - gapt) / 0.08) ** 2))
+        end_hi = Q.uniform(0.9, 1.5)
+        def he(t):
+            return max(0.5, 0.7 + (end_hi - 0.7) * (0.5 + 0.5 * noise.noise(Vector((t * 1.2 + nz[ke], 9.0, 0)))) + 0.2 * noise.noise(Vector((t * 2.9 + nz[ke], 4.0, 0))))
+        base_fn = {gs: hg, kt: ht, kl: hl, ke: he}
+        pier = None
+        if not tall:
+            pc = {'A': 1, 'B': 2, 'C': 3}[v]
+            pier = (pc, 0.95)
+        def wrap(k):
+            f0 = base_fn[k]
+            def f(t):
+                hh = f0(t)
+                if pier:
+                    pc, P = pier
+                    if (k == pc and t < P) or (k == (pc - 1) % 4 and t > Ls[k] - P):
+                        hh = max(hh, 3.0 + 0.25 * noise.noise(Vector((t * 2.0 + nz[k], 6.0, 0))))
+                return hh
+            return f
+        fn = {k: wrap(k) for k in range(4)}
+        # ---- openings
+        dxt = self.rc + self.door_x
+        door_cut = (dxt - 0.95, dxt + 0.95, -1.0, 2.1 + 0.4 if tall else 1.5)
+        wwid = {'S': 0.95, 'M': 1.0, 'L': 1.15}[cls]
+        ops = {k: [] for k in range(4)}
+        wins = []                                                    # (k, ta, tb, z0, z1)
+        if tall:
+            nwin = {'S': 1, 'M': 2, 'L': 2}[cls]
+            for i in range(nwin):
+                u = [0.38, 0.68][i] if nwin == 2 else 0.42
+                tm = t_of(u + Q.uniform(-0.04, 0.04))
+                if kt == 0 and abs(tm - dxt) < 1.9:
+                    tm = dxt + (2.2 if tm >= dxt else -2.2)
+                wins.append((kt, tm - wwid / 2, tm + wwid / 2, 1.05, 2.05))
+            if cls == 'L':
+                sgn = Q.choice([-1, 1]); tm = tcg + sgn * 2.3
+                wins.append((gs, tm - wwid / 2, tm + wwid / 2, 3.8, 4.8))
+        else:
+            tm = t_of(0.55)
+            if kt == 0 and abs(tm - dxt) < 1.5:
+                tm = t_of(0.3)
+            wins.append((kt, tm - wwid / 2, tm + wwid / 2, 0.95, 1e9))
+        for (k, ta, tb, z0, z1) in wins:
+            ops[k].append((ta, tb, z0, z1))
+        ops[0].append(door_cut)
+        # ---- walls
+        for k in range(4):
+            ex = excl_g if k == gs else None
+            E = self.wall_run(k, span[k][0], span[k][1], fn[k], openings=ops[k], excl=ex)
+            self.wall_info[k]['E'] = E
+        for (k, ta, tb, z0, z1) in wins:
+            self.sill_and_lintel(k, ta, tb, z0, z1, lintel=(z1 < 1e8))
+        self.door_frame(2.1 if tall else 1.85, lintel=tall)
+        # ---- beams
+        if tall:
+            plan = {'A': [('g', 1.4, 50, 15), ('g', -1.6, 34, -22), ('t', 0.45, 60, 5)],
+                    'B': [('t', 0.25, 40, 10), ('t', 0.6, 58, -12), ('g', -1.3, 46, 0)],
+                    'C': [('g', 1.2, 62, -8), ('t', 0.35, 44, 18), ('t', 0.7, 30, -15)]}[v]
+            if cls == 'S':
+                plan = plan[:3] if v != 'C' else plan[:3]
+        else:
+            plan = {'A': [('t', 0.5, 24, 25)], 'B': [('g', -2.2, 26, -20)], 'C': [('t', 0.35, 22, 15)]}[v]
+        for (w, off, ang, skew) in plan:
+            if w == 'g':
+                self.lean_beam(gs, tcg + off * (1.0 if cls != 'L' else 1.25), ang, skew)
+            else:
+                self.lean_beam(kt, t_of(off), ang, skew)
+        # ---- rubble heaps inside at the foot of the fallen walls
+        nh = {'S': 6, 'M': 8, 'L': 10}[cls]
+        def inside(k, t, depth=0.8):
+            a_, b_, d_, o_ = self.side_frame(k); p = a_ + d_ * t - o_ * depth; return p.x, p.y
+        sites = [(gs, tcg + 2.0), (gs, tcg - 2.0), (kt, t_of(0.3)), (kt, t_of(0.7)), (ke, (span[ke][0] + span[ke][1]) / 2), (kl, (span[kl][0] + span[kl][1]) * 0.4)]
+        if not tall:
+            sites = sites[:4] + [sites[5]]
+        for (k, t) in sites:
+            x, y = inside(k, t)
+            self.heap(x, y, nh, 0.75)
+        # ---- collision boxes (section per ~1.6 m of wall, jambs, the stack)
+        for k in range(4):
+            info = self.wall_info[k]; t0_, t1_ = info['t0'], info['t1']
+            cutsd = [(oa, ob) for (oa, ob, z0, z1) in info['ops'] if z0 < 0]
+            segs = []; cur = t0_
+            for oa, ob in sorted(cutsd):
+                if oa > cur: segs.append((cur, oa))
+                cur = max(cur, ob)
+            segs.append((cur, t1_))
+            a_, b_, d_, o_ = self.side_frame(k)
+            for (sa, sb) in segs:
+                n_ = max(1, int(round((sb - sa) / 1.6)))
+                for i in range(n_):
+                    ta = sa + (sb - sa) * i / n_; tb = sa + (sb - sa) * (i + 1) / n_
+                    hmin = min(info['hfn'](ta + (tb - ta) * s / 4) for s in range(5)) - 0.2
+                    if hmin < 0.4: continue
+                    c_ = a_ + d_ * (ta + tb) / 2
+                    ax = 'x' if abs(d_.x) > 0.5 else 'y'
+                    self.cols.append((c_.x, c_.y, (tb - ta), FOOT_W - 0.1, hmin, ax))
+        xs = [vv.x for vv in self.cg.v]; ys = [vv.y for vv in self.cg.v]; zs = [vv.z for vv in self.cg.v]
+        self.cols.append(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, max(xs) - min(xs) - 0.1, max(ys) - min(ys) - 0.1, max(zs) - 0.2, 'stack'))
+        self.tcg = tcg
+
+
+def box_mesh(name, cx, cy, sx, sy, hz, coll):
+    vs = [(cx - sx / 2, cy - sy / 2, 0), (cx + sx / 2, cy - sy / 2, 0), (cx + sx / 2, cy + sy / 2, 0), (cx - sx / 2, cy + sy / 2, 0),
+          (cx - sx / 2, cy - sy / 2, hz), (cx + sx / 2, cy - sy / 2, hz), (cx + sx / 2, cy + sy / 2, hz), (cx - sx / 2, cy + sy / 2, hz)]
+    fs = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    me = bpy.data.meshes.new(name); me.from_pydata(vs, [], fs)
+    ob = bpy.data.objects.new(name, me); coll.objects.link(ob); ob.hide_render = True
+    return ob
+
+
+def build_shell(name):
+    base, level = name.rsplit('_', 1)
+    coll = bpy.data.collections.new(name); bpy.context.scene.collection.children.link(coll)
+    sh = Shell(base, level)
+    sh.build()
+    foot = sh.to_object(coll)
+    chim = sh.to_object(coll, sh.cg, 'Chimney')
+    fp = K['footprint_box'](sh.S, coll)
+    sock = bpy.data.objects.new('SOCKET_Doorstep', None); coll.objects.link(sock)
+    sock.empty_display_type = 'ARROWS'; sock.empty_display_size = 0.3; sock.location = sh.socket
+    smoke = bpy.data.objects.new('SOCKET_Smoke', None); coll.objects.link(smoke)
+    smoke.empty_display_type = 'ARROWS'; smoke.empty_display_size = 0.25; smoke.location = sh.smoke
+    root = bpy.data.objects.new(name, None); coll.objects.link(root); root.empty_display_type = 'PLAIN_AXES'
+    cols = []
+    for i, (cx, cy, sx, sy, hz, ax) in enumerate(sh.cols):
+        if ax == 'y': sx, sy = sy, sx
+        elif ax == 'stack': pass
+        elif ax == 'x': pass
+        cols.append(box_mesh('FOOTPRINT_COL_%d' % i, cx, cy, sx, sy, hz, coll))
+    objs = [root, foot, chim, fp, sock, smoke] + cols
+    for o in objs[1:]:
+        o.parent = root; o['base'] = o.name.split('.')[0]; o.name = name + '__' + o['base']
+    tris = L.tri_count(foot) + L.tri_count(chim)
+    zmax = max(vv.co.z for o in (foot, chim) for vv in o.data.vertices)
+    ext = max(max(abs(vv.co.x), abs(vv.co.y)) for o in (foot, chim) for vv in o.data.vertices)
+    print('SHELL %s: tris %d (footing %d, chimney %d), max z %.2f, chimney top %.2f, max |xy| %.3f (half %.1f), cols %d, door_x %.2f'
+          % (name, tris, L.tri_count(foot), L.tri_count(chim), zmax, max(vv.co.z for vv in chim.data.vertices), ext, sh.h, len(cols), sh.door_x))
+    return dict(name=name, root=root, objs=objs, coll=coll, tris=tris, zmax=zmax, ext=ext, S=sh.S, kind='shell', sh=sh)
+
+
+# ============================================================================================ props
+class PropHost(Ruin):
+    """A host for the kit's to_object / wear_at that has no ruin around it (no chimney, hearth, door)."""
+    def __init__(self, name):
+        self.name = name; self.cls = 'S'; self.S = 6.0; self.h = 100.0
+        self.seed = zlib.crc32(name.encode()) & 0xFFFF; self.R = random.Random(self.seed); self.nofs = Vector((self.seed % 97, self.seed % 61, 0.0))
+        self.g = Geo(99.0, 0.0); self.rc = 1e3; self.door_x = 1e3; self.step = (0.0, 0.0); self.hearth = (1e3, 1e3)
+        self.chim = dict(cx=0, W0=0.0, front=1e9, H=0, lean=0.0, W2=0.0, zb=0)
+
+    def wear_at(self, p, n, slot):
+        res = super().wear_at(p, n, slot)
+        if slot == 'oak':                               # weathered oak, not burnt: the kit's char ramp is for the ruin's beams
+            r = 0.12 + 0.12 * (0.5 + 0.5 * noise.noise(p * 3.1 + self.nofs)) + 0.25 * max(0.0, 1 - p.z / 0.25)
+            return (min(1.0, r), res[1] * 0.5, res[2], res[3])
+        return res
+
+
+def orient(vs, fs):
+    c = sum((Vector(p) for p in vs), Vector()) / len(vs); out = []
+    for f in fs:
+        pts = [Vector(vs[i]) for i in f]; n = (pts[1] - pts[0]).cross(pts[2] - pts[0]); ctr = sum(pts, Vector()) / len(pts)
+        out.append(tuple(reversed(f)) if n.dot(ctr - c) < 0 else tuple(f))
+    return out
+
+
+def slab(prof, thick, R, wob=0.012, bulge=0.025, inset=0.07):
+    """A pillowed slab: a convex profile in (x, z), a chamfer ring and a bulged face front and back (centred at y = 0)."""
+    n = len(prof); cx = sum(p[0] for p in prof) / n; cz = sum(p[1] for p in prof) / n
+    V = []
+    for yy, k, sh in ((-thick / 2, 1.0, -1), (-thick / 2 - bulge, 1 - inset, -1), (thick / 2, 1.0, 1), (thick / 2 + bulge, 1 - inset, 1)):
+        for (x, z) in prof:
+            V.append((cx + (x - cx) * k + R.uniform(-wob, wob), yy + R.uniform(-wob, wob) * 0.5, cz + (z - cz) * k + R.uniform(-wob, wob)))
+    F = []
+    F.append(tuple(n + i for i in range(n)))
+    F.append(tuple(3 * n + i for i in range(n)))
+    for i in range(n):
+        j = (i + 1) % n
+        F.append((i, j, n + j, n + i)); F.append((2 * n + i, 2 * n + j, 3 * n + j, 3 * n + i)); F.append((i, j, 2 * n + j, 2 * n + i))
+    return V, orient(V, F)
+
+
+def xf_pts(vs, xf):
+    return [xf @ Vector(v) for v in vs]
+
+
+def build_prop(name):
+    coll = bpy.data.collections.new(name); bpy.context.scene.collection.children.link(coll)
+    host = PropHost(name); R = host.R; g = host.g
+    if name.startswith('Headstone'):
+        v = name[-1]
+        hgt = {'A': 0.95, 'B': 0.8, 'C': 1.05}[v]; w = {'A': 0.62, 'B': 0.56, 'C': 0.6}[v]
+        if v == 'A':                                    # round arch top
+            prof = [(-w / 2, 0), (w / 2, 0), (w / 2, hgt - w / 2)] + [(math.cos(math.pi * i / 6) * w / 2, hgt - w / 2 + math.sin(math.pi * i / 6) * w / 2) for i in range(1, 6)] + [(-w / 2, hgt - w / 2)]
+        elif v == 'B':                                  # pointed shoulders
+            prof = [(-w / 2, 0), (w / 2, 0), (w / 2, hgt - 0.2), (0.0, hgt), (-w / 2, hgt - 0.2)]
+        else:                                           # snapped off on a slant
+            prof = [(-w / 2, 0), (w / 2, 0), (w / 2, hgt * 0.62), (w * 0.12, hgt * 0.76), (-w * 0.2, hgt), (-w / 2, hgt * 0.94)]
+        vs, fs = slab(prof, 0.15, R)
+        xf = place(0, 0, -0.06, rad(R.uniform(-5, 5)), rad(R.uniform(-4, 4)), rad(R.uniform(-4, 4)))
+        g.add(xf_pts(vs, xf), fs, 'stone')
+        vs, fs = soft_box((w + 0.3, 0.42, 0.14), place(0, 0.02, 0.0, rad(R.uniform(-4, 4)), rad(R.uniform(-3, 3)), rad(R.uniform(-3, 3))), R, soft=0.25, wob=0.02, bulge=0.01, cuts=0)
+        g.add(vs, fs, 'stone_dk')
+    elif name == 'Signpost_A':
+        vs, fs = soft_box((0.17, 0.17, 2.4), place(0, 0, 1.18, rad(R.uniform(-4, 4)), rad(R.uniform(-1.5, 1.5)), rad(R.uniform(-1.5, 1.5))), R, soft=0.10, wob=0.012, bulge=0.0, cuts=2, top_break=0.05)
+        g.add(vs, fs, 'oak')
+        vs, fs = soft_box((0.27, 0.27, 0.06), place(0, 0, 2.42, rad(R.uniform(-8, 8)), rad(R.uniform(-3, 3)), rad(R.uniform(-3, 3))), R, soft=0.2, wob=0.01, bulge=0.0, cuts=0)
+        g.add(vs, fs, 'oak')
+        for (zc, sgn, yaw) in ((2.12, 1, -6), (1.78, -1, 9)):
+            prof = [(0.0, -0.1), (0.95, -0.1), (1.08, 0.0), (0.95, 0.1), (0.0, 0.1)]
+            vs, fs = slab(prof, 0.045, R, wob=0.006, bulge=0.008, inset=0.05)
+            xf = place(0, -0.12, zc, rad(yaw if sgn > 0 else 180 - yaw), rad(R.uniform(-1.5, 1.5)), rad(R.uniform(-2, 2)))
+            if sgn < 0:                                  # points left: mirror about the post
+                xf = place(0, -0.12, zc, rad(R.uniform(-1.5, 1.5))) @ Matrix.Scale(-1, 4, Vector((1, 0, 0)))
+                vs = [(-x, y, z) for (x, y, z) in vs]; fs = [tuple(reversed(f)) for f in fs]; xf = place(0, -0.12, zc, rad(yaw))
+            g.add(xf_pts(vs, xf), fs, 'oak')
+        for i in range(4):                                # a cairn round the foot
+            ang = i * 1.6 + R.uniform(-0.3, 0.3); s = R.uniform(0.2, 0.3)
+            vs, fs = soft_box((s * 1.4, s, s * 0.7), place(math.cos(ang) * 0.24, math.sin(ang) * 0.24, s * 0.25, R.uniform(0, 3), rad(R.uniform(-12, 12)), rad(R.uniform(-12, 12))), R, soft=0.3, wob=0.02, bulge=0.01, cuts=0)
+            g.add(vs, fs, 'stone_dk' if i % 2 else 'stone')
+    elif name == 'Hatch_Oak':
+        kh = 0.14
+        for sy in (-1, 1):                                # kerb stones along the long sides (two each) ...
+            for sx in (-1, 1):
+                vs, fs = soft_box((1.06, 0.24, kh + 0.05), place(sx * 0.53, sy * 0.745, kh / 2 - 0.04, rad(R.uniform(-1.5, 1.5)), 0, rad(R.uniform(-1.5, 1.5))), R, soft=0.18, wob=0.012, bulge=0.012, cuts=0, top_break=0.02)
+                g.add(vs, fs, 'stone_dk' if (sx + sy) % 4 == 0 else 'stone')
+        for sx in (-1, 1):                                # ... and across the ends
+            vs, fs = soft_box((0.24, 1.26, kh + 0.04), place(sx * 0.945, 0.0, kh / 2 - 0.04, rad(R.uniform(-1.5, 1.5)), 0, rad(R.uniform(-1.5, 1.5))), R, soft=0.18, wob=0.012, bulge=0.012, cuts=0)
+            g.add(vs, fs, 'stone')
+        vs, fs = soft_box((1.64, 1.24, 0.04), place(0, 0, -0.01), R, soft=0.0, wob=0.0, bulge=0.0, cuts=0)
+        g.add(vs, fs, 'core')                              # the dark pit under the boards
+        for i in range(5):                                # planks run across the 1.2 m, five of them over the 1.6 m
+            px = -0.64 + 0.32 * i
+            vs, fs = soft_box((0.305, 1.2, 0.07), place(px, 0, 0.055 + R.uniform(-0.004, 0.004), rad(R.uniform(-0.8, 0.8)), 0, rad(R.uniform(-0.8, 0.8))), R, soft=0.14, wob=0.004, bulge=0.004, cuts=0, top_break=0.0)
+            g.add(vs, fs, 'oak')
+        for sx in (-0.42, 0.42):                          # iron strap hinges along the -Y edge
+            vs, fs = soft_box((0.075, 0.62, 0.014), place(sx, -0.30, 0.097), R, soft=0.1, wob=0.002, bulge=0.0, cuts=0)
+            g.add(vs, fs, 'core')
+            vs, fs = soft_box((0.12, 0.12, 0.03), place(sx, -0.58, 0.103), R, soft=0.4, wob=0.002, bulge=0.0, cuts=0)
+            g.add(vs, fs, 'core')
+        vs, fs = soft_box((0.11, 0.11, 0.016), place(0.0, 0.5, 0.097), R, soft=0.2, wob=0.002, bulge=0.0, cuts=0)
+        g.add(vs, fs, 'core')                              # pull ring: plate and a small torus
+        verts = []; faces = []; M, m = 8, 4; R0, r0 = 0.07, 0.012
+        for i in range(M):
+            a = 2 * math.pi * i / M
+            for j in range(m):
+                b = 2 * math.pi * j / m
+                verts.append(((R0 + r0 * math.cos(b)) * math.cos(a), (R0 + r0 * math.cos(b)) * math.sin(a), r0 * math.sin(b)))
+        for i in range(M):
+            for j in range(m):
+                faces.append((i * m + j, ((i + 1) % M) * m + j, ((i + 1) % M) * m + (j + 1) % m, i * m + (j + 1) % m))
+        xf = Matrix.Translation((0.0, 0.5 - 0.04, 0.125)) @ Matrix.Rotation(rad(24), 4, 'X')
+        g.add(xf_pts(verts, xf), orient(verts, faces), 'core')
+    ob = host.to_object(coll, g, name)
+    root = bpy.data.objects.new(name + '_root', None); coll.objects.link(root)
+    ob.parent = root; ob['base'] = name; ob.name = name + '__mesh'
+    tris = L.tri_count(ob)
+    zmax = max(vv.co.z for vv in ob.data.vertices)
+    print('PROP %s: tris %d, max z %.2f' % (name, tris, zmax))
+    return dict(name=name, root=root, objs=[root, ob], coll=coll, tris=tris, zmax=zmax, ext=0.0, S=0, kind='prop', sh=None)
+
+
+# ============================================================================================ export, render
+def export(v):
+    os.makedirs(STAGE_DIR, exist_ok=True)
+    path = os.path.join(STAGE_DIR, v['name'] + '.fbx')
+    kids = [o for o in v['objs'] if 'base' in o]
+    for o in kids:
+        o.name = o['base']
+    old = v['root'].location.copy(); v['root'].location = (0, 0, 0)
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in v['objs']:
+        o.hide_render = False
+        o.select_set(True)
+    if v['kind'] == 'prop':
+        v['root'].name = v['name'] + '_root'
+    bpy.context.view_layer.objects.active = v['root']
+    bpy.ops.export_scene.fbx(filepath=path, use_selection=True, object_types={'MESH', 'EMPTY'}, use_mesh_modifiers=True,
+                             mesh_smooth_type='OFF', colors_type='LINEAR', apply_scale_options='FBX_SCALE_UNITS',
+                             axis_forward='-Z', axis_up='Y', bake_space_transform=True, add_leaf_bones=False, bake_anim=False,
+                             use_custom_props=False, use_tspace=True, path_mode='STRIP')
+    v['root'].location = old
+    for o in kids:
+        o.name = v['name'] + '__' + o['base']
+    for o in v['objs']:
+        if o.name.split('__')[-1].startswith('FOOTPRINT'):
+            o.hide_render = True
+    print('EXPORT', path)
+
+
+def show(vs, keep):
+    for v in vs:
+        for o in v['objs']:
+            hide = (v['name'] not in keep) or o.name.split('__')[-1].startswith('FOOTPRINT')
+            o.hide_render = hide
+
+
+def render_cell(path, cam, w, h):
+    sc = bpy.context.scene; sc.camera = cam
+    sc.render.resolution_x = w; sc.render.resolution_y = h; sc.render.resolution_percentage = 100
+    sc.cycles.samples = SAMPLES; sc.cycles.use_denoising = True
+    sc.render.image_settings.file_format = 'PNG'; sc.render.image_settings.color_mode = 'RGB'
+    sc.render.filepath = path; bpy.ops.render.render(write_still=True)
+
+
+def human(x, y, mat):
+    me = bpy.data.meshes.new('human')
+    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
+    for vv in bm.verts:
+        vv.co.x *= 0.38; vv.co.y *= 0.28; vv.co.z = (vv.co.z + 0.5) * 1.75
+    bm.to_mesh(me); bm.free(); me.materials.append(mat)
+    ob = bpy.data.objects.new('SB_Human', me); bpy.context.scene.collection.objects.link(ob); ob.location = (x, y, 0)
+    return ob
+
+
+def sheet(paths, cols, w, h, out):
+    rows = (len(paths) + cols - 1) // cols
+    A = np.ones((rows * h, cols * w, 4), np.float32)
+    for i, p in enumerate(paths):
+        im = bpy.data.images.load(p, check_existing=False)
+        px = np.empty(len(im.pixels), np.float32); im.pixels.foreach_get(px)
+        px = px.reshape(im.size[1], im.size[0], 4)
+        r, c = divmod(i, cols)
+        A[(rows - 1 - r) * h:(rows - r) * h, c * w:(c + 1) * w] = px[:h, :w]
+        bpy.data.images.remove(im)
+    img = bpy.data.images.new('sheet', cols * w, rows * h, alpha=False, float_buffer=False)
+    img.pixels.foreach_set(A.ravel()); img.filepath_raw = out; img.file_format = 'PNG'; img.save()
+
+
+def review(vs):
+    sun = K['stage']()
+    sc = bpy.context.scene
+    hm = bpy.data.materials.new('SB_Human'); hm.use_nodes = True
+    hm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.9, 0.35, 0.05, 1)
+    shells = [v for v in vs if v['kind'] == 'shell']
+    if len(shells) >= 1:
+        cw, chh = 333, 300; cells = []
+        order = [n for n in SHELL_NAMES if any(v['name'] == n for v in shells)]
+        order = sorted(order, key=lambda n: (SIZES.index(n.split('_')[1]), 0 if n.endswith('Tall') else 1, n.split('_')[2]))
+        hmn = human(0, 0, hm)
+        for n in order:
+            v = next(x for x in shells if x['name'] == n); S = v['S']
+            show(vs, [n]); hmn.location = (S / 2 + 1.0, -S / 2 - 1.5, 0)
+            dist = {6.0: 20.0, 8.0: 25.0, 11.0: 33.0}[S] * DSCALE; ang = rad(ANG)
+            eye = (-math.sin(ang) * dist, -math.cos(ang) * dist, CAMZ)
+            cam = K['cam_at']('cam', eye, (0, 0, min(v['zmax'] * 0.42, 3.2)), fov=36)
+            p = os.path.join(OUT, n + '_3q.png'); render_cell(p, cam, cw, chh); cells.append(p)
+        sheet(cells, 3, cw, chh, os.path.join(OUT, SHEETNAME))
+        hmn.location = (50, 50, 0)
+    props = [v for v in vs if v['kind'] == 'prop']
+    if props:
+        xs = {'Headstone_A': -2.4, 'Headstone_B': -1.2, 'Headstone_C': 0.0, 'Signpost_A': 1.6, 'Hatch_Oak': 3.8}
+        for v in props:
+            v['root'].location = (xs[v['name']], 0, 0)
+        show(vs, [v['name'] for v in props])
+        hmn = human(-3.7, 0.4, hm)
+        cam = K['cam_at']('camp', (1.0, -8.0, 1.5), (0.6, 0, 0.9), fov=38)
+        sc.render.resolution_x = 1000
+        render_cell(os.path.join(OUT, 'props_sheet.png'), cam, 1000, 420)
+        for v in props:
+            v['root'].location = (0, 0, 0)
+
+
+def main():
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    vs = []
+    for n in WANT:
+        if n in SHELL_NAMES: vs.append(build_shell(n))
+        elif n in PROP_NAMES: vs.append(build_prop(n))
+    with open(os.path.join(OUT, 'shell_stats.txt'), 'w') as f:
+        for v in vs:
+            f.write('%s tris %d zmax %.2f ext %.3f\n' % (v['name'], v['tris'], v['zmax'], v['ext']))
+    if EXPORT:
+        for v in vs:
+            export(v)
+    if RENDER:
+        review(vs)
+
+
+main()
