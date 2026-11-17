@@ -78,7 +78,7 @@ Frames: 12 anchors (OoT 2026 remake x4, a UE5 Megascans village x2, NieR Replica
 - Null pair Postcard R1 -> R2 (sc_imgdiff 0.24, only grass jitter changed): both runs picked a side and described a difference that isn't there (and contradicted each other). Fail; fixed by the diff gate and null pairs in 2.5.
 - Subtle Postcard R6 -> R7 (sc_imgdiff 0.65, a local change): one run picked R6, one called a tie. Inconclusive, as expected for a change this small.
 - Second batch (one reviewer, seven pairs normalised to 1280x720, told that several pairs may not differ): Epic's three toggles (shell vs dressed, bounce off vs on, grass vs mud) and Meadow R1 -> R4 all picked the right way (three at high confidence, the mud pair at low), naming the right region and line (density, shade fill, density, weathering); both null pairs (a pixel-identical Spawn pair and Postcard R1/R2) called ties. Pass: telling the reviewer that nulls exist removed the confabulation. Postcard R6 -> R7 again went to R6 ("B: broken, stacked rubble blocks with ragged edges" vs "smooth intact brick walls" in R7, medium confidence).
-- **Signal for Run 7:** across three looks, Postcard R6 -> R7 (shell round 3c, flat-faced stacks) was judged worse twice and a tie once: at that distance the flatter stacks read as cleaner, less ruined walls. Check it on a same-camera toggle before building more on round 3c.
+- **Signal for Run 7:** across four looks, Postcard R6 -> R7 (shell round 3c, flat-faced stacks) was judged worse three times and a tie once: at that distance the flatter stacks read as cleaner, less ruined walls. Check it on a same-camera toggle before building more on round 3c.
 
 ## 5. Calibration to the user
 2026-11-17, six frames, user out of 10 vs reviewer mean (/50 shown as /10):
@@ -95,6 +95,12 @@ Frames: 12 anchors (OoT 2026 remake x4, a UE5 Megascans village x2, NieR Replica
 - **Scale:** on the anchors the user and the reviewers agree within 0.4/10, and the mean offset over all six is -0.3/10 (-1.5/50). The v1 problem (our scores 8-10 points low on /40) is gone: report the reviewer mean as is.
 - **What the reviewers missed (user's words, summarised):** immersion you can see before you feel it, as in the Abbey, OoT and NieR; Postcard "looks empty, nothing to do but look around from one spot, nothing says explore me", with oddly placed toy-like props on a bare plaza. Orchard looks fuller and like a place where you could find something (herbs, a small treasure), with moody light, natural cohesion and depth; its placement is still a bit unnatural, but more correct than elsewhere in Hollowmere.
 - **Card change from this:** line 4 now asks for natural placement and believable size, and line 10 for an invitation to explore. Postcard was not re-scored under the new wording; the next reviewer pass will show whether the gap closes. If ours keep scoring above the user's eye, weight lines 4 and 10 double for our own frames' summary.
+
+**Run 3 (same day, after calibration):** new card wording (lines 4 and 10) and four Abbey anchors captured in Unreal Editor for Fortnite from the template itself (A13 abbey arcade, A14 abbey nave lane, A15 cemetery lion and lamp, A16 round wall with lit statue; 170 cm eye height, line-traced ground; 16 usable views in `Reference/private/abbey/eye/`, the user's own four picks in `Reference/private/abbey/user/`). One blind run, 22 frames:
+- Abbey anchors 38.5-44.5 (the cemetery view is the top frame of the set, above the OoT market at 42.5). Night and storm did not count against them.
+- Ours dropped 3-5 points under the new wording, mostly on lines 4 and 10: MarketStreet 32.5, Postcard 31.5 (6.3/10, toward the user's 5), Spawn 31, Bakery 31, Orchard 30, HillWest 29.5. Orchard still sits under the user's 7.
+- Separation is now clean: all twelve modern anchors (OoT, UE5 village, NieR plaza and ledge, Abbey) score above every frame of ours; ours sit level with the older or plainer anchors (Fable, TotK field, raised NieR) at 29.5-31.5.
+- Pairs: Meadow R1 -> R4 right, null Postcard R1/R2 a tie, Postcard R6 -> R7 again went to R6 ("greener growth at wall bases and fuller ruins" in R6). That is three of four looks against round 3c.
 
 Comparison sheet (all 18 frames ranked, ours marked): `Reference/private/judging-v2/sheets/comparison_18.jpg`; calibration sheet: `calibration_6.jpg` beside it.
 
