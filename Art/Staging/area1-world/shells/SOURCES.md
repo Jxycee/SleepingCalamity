@@ -7,7 +7,7 @@
 
 ## Ruin shells (18)
 `Ruin_<S|M|L>_<A|B|C>_<Mid|Tall>.fbx`: whole replacement for `Ruin_<C>_<V>` (same footprint S 6 / M 8 / L 11 m, doorstep and `SOCKET_Doorstep`, door x from the base variant's seed).
-Root empty plus children `Footing` (walls, door frame, doorstep, hearth, beams, rubble), `Chimney`, `FOOTPRINT` (flat box, hidden by the builder), `SOCKET_Doorstep`, `SOCKET_Smoke`, and box colliders `FOOTPRINT_COL_<n>` (the prefix is what `HollowmereBuilder.PlaceRuin` hides; the low kit has no collision). Slots `FK_Sandstone` / `FK_ChimneyStone` / `FK_PlinthJoint` / `FK_Oak`, UV0 metre box UVs (2 m per tile), CORNER colour attribute `wear` (R grime/char, G moss, B polish). No `Foliage` child (triangle budget).
+Root empty plus children `Footing` (walls, door frame, doorstep, hearth, beams, rubble), `Chimney`, `FOOTPRINT` (flat box, hidden by the builder), `SOCKET_Doorstep`, `SOCKET_Smoke`, and box colliders `FOOTPRINT_COL_<n>` (the prefix is what `HollowmereBuilder.PlaceRuin` hides; the low kit has no collision). Slots `FK_Sandstone` / `FK_ChimneyStone` / `FK_PlinthJoint` / `FK_Oak` and, new in round 2, `FK_Plaster` (the facade kit's own slot, B1 plaster tileable; `BuildFacadeMaterials` already maps it; used for the lime-wash infill of the Tall gable's half-timber frame), UV0 metre box UVs (2 m per tile), CORNER colour attribute `wear` (R grime/char, G moss, B polish). No `Foliage` child (triangle budget).
 Walls are 0.48-0.56 m thick blocks on a 0.58 m line (the base kit's footing width).
 
 | Variant | Gable and stack | Tall long wall | Door |

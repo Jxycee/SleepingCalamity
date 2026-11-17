@@ -30,6 +30,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 KIT = os.path.join(HERE, 'sc_ruin_kit.py')
 _src = open(KIT, encoding='utf-8').read().rstrip()
 assert _src.endswith('main()'), 'sc_ruin_kit.py no longer ends with main()'
+# Round 2 chimney: proud and chunky (W 1.05-1.2 m at the base tapering to 0.85-0.95, two blocks wide per course, corbelled cap on all). These are
+# text patches of the kit source held in memory only; the kit file on disk and its own variants are untouched.
+for _a, _b in (("W1, W2 = W0 * 0.72, W0 * 0.54; D1, D2 = D0 * 0.82, D0 * 0.68", "W1, W2 = W0 * 0.85, W0 * 0.68; D1, D2 = D0 * 0.90, D0 * 0.72"),
+               ("cap = v in 'AC'", "cap = True"),
+               ("tu = {'S': 0.17, 'M': 0.19, 'L': 0.21}[self.cls]", "tu = {'S': 0.27, 'M': 0.27, 'L': 0.28}[self.cls]"),
+               ("else seg(x1 - x0, 0.22 * B, 0.36 * B, cuts)", "else seg(x1 - x0, 0.42, 0.56, cuts)"),
+               ("else seg(y1 - y0, 0.2 * B, 0.34 * B)", "else seg(y1 - y0, 0.40, 0.52)")):
+    assert _a in _src, _a
+    _src = _src.replace(_a, _b)
 K = {'__name__': 'sc_ruin_kit', '__file__': KIT}
 exec(compile(_src[:-len('main()')], KIT, 'exec'), K)          # the kit's functions without running its main()
 
@@ -37,6 +46,10 @@ import bpy, bmesh
 import numpy as np
 from mathutils import Vector, Matrix, noise
 Ruin, Geo, soft_box, place, L = K['Ruin'], K['Geo'], K['soft_box'], K['place'], K['L']
+# plaster slot: FK_Plaster is the facade kit's own slot name (BeautyCornerArt.BuildFacadeMaterials already maps it), B1 plaster tileable, no new texture
+K['SLOTS'].append('plaster')
+_old_slot_mats = K['slot_mats']
+K['slot_mats'] = lambda: _old_slot_mats() + [K['tile_mat']('FK_Plaster', 'B1_town/plaster', tint=(1.0, 0.97, 0.90), normal=0.55)]
 FOOT_W, BLOCK, CLASSES, SLOTS = K['FOOT_W'], K['BLOCK'], K['CLASSES'], K['SLOTS']
 OUT, SAMPLES, EXPORT, RENDER, REPO = K['OUT'], K['SAMPLES'], K['EXPORT'], K['RENDER'], K['REPO']
 STAGE_DIR = os.path.join(REPO, 'Art', 'Staging', 'area1-world', 'shells')
@@ -81,6 +94,10 @@ class Shell(Ruin):
         else:
             res = sup(p, n, slot)
         r = res[0]
+        if slot == 'plaster':                             # soot-grey lime wash, darker toward the broken top
+            r = max(r, 0.30 + 0.12 * noise.noise(p * 2.1 + self.nofs) + 0.07 * max(0.0, p.z - 2.5))
+        if n.z > 0.6 and p.z > 1.5 and slot in ('oak', 'plaster', 'stone', 'stone_dk'):     # broken tops take the fire hardest
+            r = max(r, min(0.92, 0.38 + 0.12 * (p.z - 1.5)))
         r = max(r, min(0.6, 0.17 * max(0.0, p.z - 0.9)) * (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs)))
         return (min(1.0, r), res[1], res[2], res[3])
 
@@ -104,11 +121,11 @@ class Shell(Ruin):
             out.append((t, t + ln)); t += ln
         return out
 
-    def wall_run(self, k, t0, t1, hfn, ch=(0.30, 0.44), openings=(), excl=None, blen=(0.65, 1.05)):
+    def wall_run(self, k, t0, t1, hfn, ch=(0.30, 0.44), openings=(), excl=None, blen=(0.65, 1.05), E=None):
         R = self.R; g = self.g; B = BLOCK[self.cls]
         a, b, d, out = self.side_frame(k); yaw = math.atan2(d.y, d.x)
         hmax = max(hfn(t0 + (t1 - t0) * i / 40) for i in range(41))
-        E = self.edges(hmax + 0.2, ch)
+        E = E if E is not None else self.edges(hmax + 0.2, ch)
         ops = []
         for (oa, ob, oz0, oz1) in openings:
             z0 = min(E, key=lambda e: abs(e - oz0))
@@ -171,16 +188,133 @@ class Shell(Ruin):
             if lintel or sgn < 0:
                 self.cols.append((x + sgn * (self.door_w / 2 + 0.2), -c, 0.36, FOOT_W, hj - 0.1, 'x'))
         if lintel:
-            ln = self.door_w + 0.4 + 0.72 + 0.1
-            vs, fs = soft_box((ln, 0.36, 0.26), place(x, -c, Hj + 0.12, rad(R.uniform(-1, 1)), rad(R.uniform(-1.2, 1.2)), rad(R.uniform(-1, 1))), R,
+            ln = 2 * (self.door_w / 2 + 0.2 + 0.19) + 0.46          # overhangs each jamb by 0.23 m, the full wall thickness deep
+            vs, fs = soft_box((ln, FOOT_W, 0.30), place(x, -c, Hj + 0.15, rad(R.uniform(-1, 1)), rad(R.uniform(-1.2, 1.2)), rad(R.uniform(-1, 1))), R,
                               soft=0.10, wob=0.012, bulge=0.0, cuts=1)
             g.add(vs, fs, 'oak')
 
     # ---- charred beam from a wall top down to the floor
-    def lean_beam(self, k, t, ang, skew, sec=(0.26, 0.22)):
+    def beam_shape(self, ln, sec, xf):
+        """A charred beam: sec = (y, z) section, ends tapered and splintered (jagged, shortened at random)."""
+        R = self.R
+        vs, fs = soft_box((ln, sec[0], sec[1]), xf, R, soft=0.10, wob=0.015, bulge=0.0, cuts=2)
+        inv = xf.inverted()
+        for i, vv in enumerate(vs):
+            l = inv @ vv; e = ln / 2 - abs(l.x)
+            if e < 0.01:
+                f = R.uniform(0.38, 0.55)
+                l.y *= f; l.z = l.z * f + R.uniform(-0.05, 0.05); l.x -= math.copysign(R.uniform(0.0, 0.18), l.x)
+                vs[i] = xf @ l
+        return vs, fs
+
+    def oak_member(self, P0, P1, yaw, w=0.22, dep=0.24, break_top=0.10):
+        R = self.R; v = P1 - P0; ln = v.length
+        if ln < 0.25:
+            return
+        mid = (P0 + P1) / 2
+        if abs(v.x) + abs(v.y) < 0.04 * ln:                              # a post
+            xf = place(mid.x, mid.y, mid.z, yaw + rad(R.uniform(-1.5, 1.5)), rad(R.uniform(-2, 2)), rad(R.uniform(-2, 2)))
+            vs, fs = soft_box((w, dep, ln), xf, R, soft=0.08, wob=0.012, bulge=0.0, cuts=0, top_break=break_top)
+        else:
+            q = v.normalized().to_track_quat('X', 'Z'); xf = Matrix.Translation(mid) @ q.to_matrix().to_4x4()
+            vs, fs = self.beam_shape(ln, (dep, w), xf)
+        self.g.add(vs, fs, 'oak')
+
+    def gable_frame(self, gs, tcg, pf, ZS, W1, open_bay=None):
+        """Charred half-timber frame above the stone ground storey of the gable: sill, posts, tie beam, braces, rafters along the rake and plaster
+        infill left in about half of the bays, ragged at the top. The stack stands in the middle."""
+        Q = self.Q
+        a, b, d, out = self.side_frame(gs); yaw = math.atan2(d.y, d.x)
+        info = self.wall_info[gs]
+        P = lambda t, z: Vector((a.x + d.x * t, a.y + d.y * t, z))
+        for half in (-1, 1):
+            t_in = tcg + half * (W1 / 2 + 0.12)
+            t_end = (info['t1'] - 0.2) if half > 0 else (info['t0'] + 0.2)
+            if (t_end - t_in) * half < 0.8:
+                continue
+            tm = (t_end + t_in) / 2
+            z0 = ZS + 0.11
+            self.oak_member(P(t_end, z0), P(t_in, z0), yaw, w=0.22)                             # sill plate on the stone
+            base = ZS + 0.22
+            posts = {}
+            for tt in (t_end, tm, t_in):
+                top = pf(tt) - 0.12
+                if top - base > 0.45:
+                    self.oak_member(P(tt, base), P(tt, top), yaw, w=0.22); posts[tt] = top
+            z_tie = base + 0.5 * (pf(tm) - 0.2 - base)
+            if z_tie > base + 0.5:
+                ta_ = t_end if pf(t_end) - 0.15 > z_tie else tm
+                fr = Q.uniform(0.6, 1.0); tb_ = t_in + (ta_ - t_in) * fr
+                self.oak_member(P(tb_, z_tie), P(t_in, z_tie), yaw, w=0.2)                       # tie beam, broken at the outer end
+                if t_end in posts and Q.random() < 0.9:
+                    self.oak_member(P(t_end, base + 0.1), P(tm, z_tie - 0.1), yaw, w=0.18)       # diagonal brace
+                if t_in in posts and Q.random() < 0.7:
+                    self.oak_member(P(t_in, base + 0.1), P(tm, z_tie - 0.1), yaw, w=0.18)
+            if pf(t_end) > ZS + 0.3:
+                pa = P(t_in, pf(t_in) - 0.12); pb = P(t_end, pf(t_end) - 0.08); fr2 = Q.uniform(0.45, 1.0)
+                self.oak_member(pa, pa + (pb - pa) * fr2, yaw, w=0.2)                              # rafter along the rake, outer end gone
+            for bi, (ta_, tb_) in enumerate(((t_end, tm), (tm, t_in))):
+                topz = min(pf(ta_), pf(tb_)) - 0.28
+                if open_bay == (half, bi) or topz - base < 0.4 or Q.random() > 0.55:
+                    continue
+                lo, hi = min(ta_, tb_) + 0.13, max(ta_, tb_) - 0.13
+                ns = 3; sw = (hi - lo) / ns
+                for j in range(ns):
+                    tz = base + (topz - base) * Q.uniform(0.3, 1.0)
+                    if tz - base < 0.2:
+                        continue
+                    tc_ = lo + sw * (j + 0.5); pc = P(tc_, base + (tz - base) / 2)
+                    vs, fs = soft_box((sw - 0.02, 0.13, tz - base), place(pc.x, pc.y, pc.z, yaw + rad(Q.uniform(-1.5, 1.5)), rad(Q.uniform(-1, 1)), rad(Q.uniform(-1, 1))),
+                                      self.R, soft=0.08, wob=0.012, bulge=0.012, cuts=0, top_break=0.12)
+                    self.g.add(vs, fs, 'plaster')
+
+    def wall_posts(self, k, t, n, gap, hgt):
+        """Mid: one or two charred posts standing from a wall top, a broken top plate between them."""
+        R = self.R; info = self.wall_info[k]
+        a, b, d, out = self.side_frame(k); yaw = math.atan2(d.y, d.x)
+        tops = []
+        for i in range(n):
+            tt = t + i * gap
+            top = min(info['hfn'](tt + s) for s in (-0.25, 0.0, 0.25))
+            P0 = Vector((a.x + d.x * tt, a.y + d.y * tt, top - 0.12)); P1 = P0 + Vector((0, 0, 0.12 + hgt * R.uniform(0.8, 1.15)))
+            self.oak_member(P0, P1, yaw, w=0.22, break_top=0.16); tops.append(P1.z)
+        z = min(tops) - 0.06
+        tt1 = t + (gap * 0.65 if n > 1 else 0.9)
+        self.oak_member(Vector((a.x + d.x * t, a.y + d.y * t, z)), Vector((a.x + d.x * tt1, a.y + d.y * tt1, z - 0.12)), yaw, w=0.2)
+
+    def rafter_pair(self, gs, tm, apex_z):
+        """Two rafters still joined at the apex, standing inside the gable (a surviving truss pair)."""
+        a, b, d, out = self.side_frame(gs); inward = -out; yaw = math.atan2(d.y, d.x)
+        base = a + inward * 1.05
+        apex = Vector((base.x + d.x * tm, base.y + d.y * tm, apex_z))
+        for sgn in (-1, 1):
+            foot = Vector((base.x + d.x * (tm + sgn * 1.15), base.y + d.y * (tm + sgn * 1.15), 0.17))
+            v = apex - foot; q = v.normalized().to_track_quat('X', 'Z')
+            xf = Matrix.Translation((apex + foot) / 2) @ q.to_matrix().to_4x4()
+            vs, fs = self.beam_shape(v.length + 0.2, (0.20, 0.25), xf)
+            self.g.add(vs, fs, 'oak')
+        vs, fs = soft_box((0.36, 0.34, 0.3), place(apex.x, apex.y, apex.z - 0.05, yaw), self.R, soft=0.1, wob=0.01, bulge=0.0, cuts=0)
+        self.g.add(vs, fs, 'oak')
+
+    def chimney_pot(self):
+        R = self.R; sx, sy, sz = self.smoke.x, self.smoke.y, self.smoke.z
+        rings = [(0.0, 0.17), (0.14, 0.22), (0.38, 0.17), (0.5, 0.21), (0.5, 0.13), (0.4, 0.12)]
+        n = 10; vs = []; fs = []
+        for (z, r_) in rings:
+            for i in range(n):
+                a_ = 2 * math.pi * i / n
+                vs.append((sx + math.cos(a_) * r_ + R.uniform(-0.01, 0.01), sy + math.sin(a_) * r_ + R.uniform(-0.01, 0.01), sz + z - 0.02))
+        for j in range(len(rings) - 1):
+            for i in range(n):
+                i2 = (i + 1) % n
+                fs.append((j * n + i, j * n + i2, (j + 1) * n + i2, (j + 1) * n + i))
+        fs.append(tuple((len(rings) - 1) * n + i for i in range(n)))
+        self.cg.add(vs, orient(vs, fs), 'core')
+
+    def lean_beam(self, k, t, ang, skew, sec=(0.20, 0.25)):
         R = self.R; g = self.g; info = self.wall_info[k]
         a, b, d, out = self.side_frame(k); inward = -out
-        top = min(info['hfn'](t + s) for s in (-0.5, 0.0, 0.5))
+        top = min((info.get('btop') or info['hfn'])(t + s) for s in (-0.5, 0.0, 0.5))
         zhi = top + 0.03
         hi = a + d * t + inward * 0.02
         lh = (zhi - 0.17) / math.tan(rad(ang))
@@ -198,10 +332,7 @@ class Shell(Ruin):
         mid = (P_hi + P_lo) / 2 + v.normalized() * 0.05
         q = v.normalized().to_track_quat('X', 'Z')
         xf = Matrix.Translation(mid) @ q.to_matrix().to_4x4()
-        vs, fs = soft_box((ln, sec[0], sec[1]), xf, R, soft=0.12, wob=0.02, bulge=0.0, cuts=1)
-        for vv in vs:                                   # burnt through at the foot: pull the low end in and down
-            if (vv - P_lo).length < 0.2:
-                vv.z -= 0.03 * R.random()
+        vs, fs = self.beam_shape(ln, sec, xf)
         g.add(vs, fs, 'oak')
         return P_lo
 
@@ -257,16 +388,19 @@ class Shell(Ruin):
         else:
             ch['H'] = {'S': 4.6, 'M': 5.2, 'L': 5.9}[cls] + Q.uniform(-0.25, 0.25)
             ch['zb'] = {'S': 2.0, 'M': 2.2, 'L': 2.5}[cls]
+        ch['W0'] = {'S': 1.25, 'M': 1.30, 'L': 1.38}[cls]; ch['D0'] = {'S': 1.15, 'M': 1.20, 'L': 1.25}[cls]; ch['front'] = ch['ymax'] - ch['D0']
         self.build_chimney()
         if self.rot:
             Rz = Matrix.Rotation(self.rot, 3, 'Z')
             self.cg.v = [Rz @ vv for vv in self.cg.v]; self.smoke = Rz @ self.smoke
+        if v == 'A':
+            self.chimney_pot()
         self.build_doorstep()
         self.hearth_build()
         # chimney position along the gable side
         Pc = Matrix.Rotation(self.rot, 3, 'Z') @ Vector((ch['cx'], ch['ymax'] - ch['D0'] / 2, 0))
         a, b, d, out = self.side_frame(gs); tcg = (Pc - a).dot(d)
-        W0, W1, W2, zb = ch['W0'], ch['W0'] * 0.72, ch['W2'], ch['zb']
+        W0, W1, W2, zb = ch['W0'], ch['W0'] * 0.85, ch['W2'], ch['zb']
         def excl_g(tc, z, hh):
             return abs(tc - tcg) < ((W0 / 2 + 0.08) if z + hh <= zb + 0.2 else (W1 / 2 + 0.12))
         Ls = {k: (self.side_frame(k)[1] - self.side_frame(k)[0]).length for k in range(4)}
@@ -279,11 +413,14 @@ class Shell(Ruin):
         nz = {k: Q.random() * 9 for k in range(4)}
         sl, sr = Q.uniform(0.70, 0.86), Q.uniform(0.70, 0.86)
         sag_f, sag_side = Q.uniform(0.7, 1.3), Q.choice([-1, 1])
+        isC = (v == 'C')
         # ---- wall height functions
         stub = {'S': 2.0, 'M': 2.5, 'L': 3.0}[cls]
         sL, sR = stub * Q.uniform(0.9, 1.15), stub * Q.uniform(0.9, 1.15)
         def hg(t):
             dt = t - tcg
+            if tall and isC:                                   # C: the gable is broken off at half height, the stack rises clear
+                return max(0.5 * Ha - 0.45 * abs(dt) + 0.35 * noise.noise(Vector((t * 1.3 + nz[gs], 2.0, 0))), 1.2)
             if tall:
                 s_ = sl if dt < 0 else sr
                 hh = Ha - s_ * abs(dt) + 0.35 * noise.noise(Vector((t * 1.3 + nz[gs], 2.0, 0)))
@@ -297,6 +434,8 @@ class Shell(Ruin):
         Ht = {'A': 3.5, 'B': 3.1, 'C': 3.6}[v] * Q.uniform(0.97, 1.03) if tall else Q.uniform(1.7, 2.2)
         sag_u = Q.uniform(0.72, 0.88)
         def ht(t):
+            if tall and isC:                                   # C: a two-wall corner (front-left) standing to about 3.5 m
+                return 1.3 + 2.2 * max(0.0, 1 - (t - span[kt][0]) / 3.4) ** 0.9 + 0.25 * noise.noise(Vector((t * 1.4 + nz[kt], 5.0, 0)))
             u = max(0.0, min(1.0, u_of(t)))
             lo_ = 1.9 if tall else 0.9
             hh = lo_ + (Ht - lo_) * (1 - u) ** 0.8 + 0.25 * noise.noise(Vector((t * 1.4 + nz[kt], 5.0, 0)))
@@ -311,11 +450,16 @@ class Shell(Ruin):
             return max(0.45, hh - 0.5 * math.exp(-((u - gapt) / 0.08) ** 2))
         end_hi = Q.uniform(0.9, 1.5)
         def he(t):
+            if tall and isC:
+                return 1.2 + 2.3 * max(0.0, 1 - (span[ke][1] - t) / 2.8) ** 0.9 + 0.25 * noise.noise(Vector((t * 1.2 + nz[ke], 9.0, 0)))
             return max(0.5, 0.7 + (end_hi - 0.7) * (0.5 + 0.5 * noise.noise(Vector((t * 1.2 + nz[ke], 9.0, 0)))) + 0.2 * noise.noise(Vector((t * 2.9 + nz[ke], 4.0, 0))))
-        base_fn = {gs: hg, kt: ht, kl: hl, ke: he}
+        # stone ground storey only on the Tall gable; above it the charred half-timber frame (gable_frame)
+        E_g = self.edges(Ha + 0.5, (0.30, 0.44)); ZS = next(e for e in E_g if e >= 2.5)
+        base_fn = {gs: ((lambda t: min(hg(t), ZS + 0.1)) if tall else hg), kt: ht, kl: hl, ke: he}
+        guards = []                                            # (k, ta, tb, min height): wall above windows, stubs beside the jambs
         pier = None
         if not tall:
-            pc = {'A': 1, 'B': 2, 'C': 3}[v]
+            pc = {'A': 1, 'B': 2, 'C': 0}[v]
             pier = (pc, 0.95)
         def wrap(k):
             f0 = base_fn[k]
@@ -325,6 +469,9 @@ class Shell(Ruin):
                     pc, P = pier
                     if (k == pc and t < P) or (k == (pc - 1) % 4 and t > Ls[k] - P):
                         hh = max(hh, 3.0 + 0.25 * noise.noise(Vector((t * 2.0 + nz[k], 6.0, 0))))
+                for (gk, ga, gb, gh) in guards:
+                    if gk == k and ga < t < gb:
+                        hh = max(hh, gh + 0.1 * noise.noise(Vector((t * 2.0, 3.0 + k, 0))))
                 return hh
             return f
         fn = {k: wrap(k) for k in range(4)}
@@ -332,6 +479,8 @@ class Shell(Ruin):
         dxt = self.rc + self.door_x
         door_cut = (dxt - 0.95, dxt + 0.95, -1.0, 2.1 + 0.4 if tall else 1.5)
         wwid = {'S': 0.95, 'M': 1.0, 'L': 1.15}[cls]
+        for (ga, gb) in ((dxt - 1.9, dxt - 0.95), (dxt + 0.95, dxt + 1.9)):      # at least 0.5 m of wall stub either side of the jambs
+            guards.append((0, ga, gb, 1.15 if tall else 1.0))
         ops = {k: [] for k in range(4)}
         wins = []                                                    # (k, ta, tb, z0, z1)
         if tall:
@@ -339,28 +488,41 @@ class Shell(Ruin):
             for i in range(nwin):
                 u = [0.38, 0.68][i] if nwin == 2 else 0.42
                 tm = t_of(u + Q.uniform(-0.04, 0.04))
-                if kt == 0 and abs(tm - dxt) < 1.9:
-                    tm = dxt + (2.2 if tm >= dxt else -2.2)
-                wins.append((kt, tm - wwid / 2, tm + wwid / 2, 1.05, 2.05))
-            if cls == 'L':
-                sgn = Q.choice([-1, 1]); tm = tcg + sgn * 2.3
-                wins.append((gs, tm - wwid / 2, tm + wwid / 2, 3.8, 4.8))
+                if isC:
+                    if i > 0:
+                        break
+                    tm = span[0][0] + 1.5                       # in the standing front corner, clear of the door
+                wins.append((kt, tm - wwid / 2, tm + wwid / 2, 0.95, 2.15))
         else:
             tm = t_of(0.55)
-            if kt == 0 and abs(tm - dxt) < 1.5:
-                tm = t_of(0.3)
+            if kt == 0:
+                tm = span[0][0] + 1.5
             wins.append((kt, tm - wwid / 2, tm + wwid / 2, 0.95, 1e9))
         for (k, ta, tb, z0, z1) in wins:
             ops[k].append((ta, tb, z0, z1))
+            if z1 < 1e8:
+                guards.append((k, ta - 0.45, tb + 0.45, z1 + 0.55))
         ops[0].append(door_cut)
         # ---- walls
         for k in range(4):
             ex = excl_g if k == gs else None
-            E = self.wall_run(k, span[k][0], span[k][1], fn[k], openings=ops[k], excl=ex)
+            E = self.wall_run(k, span[k][0], span[k][1], fn[k], openings=ops[k], excl=ex, E=(E_g if (k == gs and tall) else None))
             self.wall_info[k]['E'] = E
+            if k == gs and tall:
+                self.wall_info[k]['btop'] = lambda t: hg(t) - 0.4
         for (k, ta, tb, z0, z1) in wins:
             self.sill_and_lintel(k, ta, tb, z0, z1, lintel=(z1 < 1e8))
         self.door_frame(2.1 if tall else 1.85, lintel=tall)
+        if tall:
+            self.gable_frame(gs, tcg, hg, ZS, W1, open_bay=((Q.choice([-1, 1]), 1) if cls == 'L' and not isC else None))
+            if v == 'B':                                            # one variant per size keeps a rafter pair joined at the apex
+                room = [(sg, (self.wall_info[gs]['t1'] - tcg - 1.3) if sg > 0 else (tcg - self.wall_info[gs]['t0'] - 1.3)) for sg in (-1, 1)]
+                sg = max(room, key=lambda r_: r_[1])[0]
+                self.rafter_pair(gs, tcg + sg * {'S': 2.2, 'M': 2.6, 'L': 3.0}[cls], {'S': 3.3, 'M': 4.0, 'L': 4.6}[cls])
+        else:
+            wp = {'A': (kl, 0.35, 2, 1.4, 1.4), 'B': (ke, 0.5, 2, 1.3, 1.6), 'C': (kl, 0.4, 1, 1.0, 1.5)}[v]
+            wk = wp[0]; tw = span[wk][0] + (span[wk][1] - span[wk][0]) * wp[1]
+            self.wall_posts(wk, tw, wp[2], wp[3], wp[4])
         # ---- beams
         if tall:
             plan = {'A': [('g', 1.4, 50, 15), ('g', -1.6, 34, -22), ('t', 0.45, 60, 5)],
