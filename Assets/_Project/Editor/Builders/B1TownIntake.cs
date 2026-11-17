@@ -21,7 +21,7 @@ namespace SleepingCalamity.EditorTools
         const string DstRoot = "Assets/_Project/Content/Art/Town/Adopted/";
         const string MatFolder = "Assets/_Project/Content/Materials/B1";
         const int Cap = 2048;
-        static readonly HashSet<string> Skip = new HashSet<string> { "T01", "T01b", "T01c", "T03", "T15a", "T15b", "C01", "C02", "C15",
+        static readonly HashSet<string> Skip = new HashSet<string> { "T01", "T01b", "T01c", "T03", "T15a", "T15b", "T17d", "C01", "C02", "C15",
             "L04",    // dropped 2026-11-14 (style review): FBX has no usable texture, flat white pot and paper-like leaves; the L04Pick path below is kept only in case a 2K re-export arrives
             "T12a" }; // dropped 2026-11-14 (style review): sparse grey card cluster, reads as dead scrub
         static readonly HashSet<string> Plants = new HashSet<string> { "T12a", "T12b", "T12c", "T12d", "T12e" };

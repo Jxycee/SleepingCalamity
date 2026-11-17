@@ -59,6 +59,8 @@
 | T16m | scythe | https://www.fab.com/listings/af97917b-cc5c-4978-a6c5-8f9b753f8953 | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-14 | Mid tier (2K), via Epic Launcher; mesh + 2K maps copied as published |
 | T17a | crate_old10 | Fab listing "Historic Bazaar Crate Wood Old 10" (Launcher library id e71db792) | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
 | T17b | crate_old11 | Fab listing "Historic Bazaar Crate Wood Old 11" (Launcher library id 302d48e2) | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
+| T17c | old_wooden_bucket | https://www.fab.com/listings/e533d240-129e-4fbf-9c64-68337093d714 | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
+| T17d | hay_pile | https://www.fab.com/listings/700cac67-b37c-4546-9b01-60873f5490ec | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | 2K decal texture set (with Opacity), via Epic Launcher; not adopted by B1TownIntake (decal, used by the Hollowmere decal builders) |
 | L04 | plants_in_pots | https://www.fab.com/listings/4c300dab-9fa5-4bdf-9509-6b0d934622a5 | unchecked: user library item, read the licence on the listing (likely not Standard) | see listing | 2026-11-14 | Mid tier (2K), via Epic Launcher; mesh + 2K maps copied as published Dropped 2026-11-14 in B1, not adopted, source kept. |
 
 # Adopted in B2 (cellar intake)
