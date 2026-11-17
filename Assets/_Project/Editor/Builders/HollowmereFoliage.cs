@@ -28,8 +28,8 @@ namespace SleepingCalamity.EditorTools
     {
         const string AtlasPrefix = "T_B9_Foliage", MaterialName = "B9_Foliage";
         static readonly string[] KitNames = { "Grass_A", "Grass_B", "Grass_C", "Grass_Strip", "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E", "Moss_Tuft_A", "Moss_Tuft_B", "Moss_Tuft_C",
-            "Ivy_Patch_A", "Ivy_Patch_B", "Lintel_Ivy", "Ivy_Facade" };
-        static readonly string[] Weeds = { "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E" }, Grasses = { "Grass_A", "Grass_B", "Grass_C" }, Mosses = { "Moss_Tuft_A", "Moss_Tuft_B", "Moss_Tuft_C" };
+            "Ivy_Patch_A", "Ivy_Patch_B", "Lintel_Ivy", "Ivy_Facade", "Grass_Fine_A", "Grass_Fine_B", "Grass_Fine_C" };
+        static readonly string[] Weeds = { "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E" }, Grasses = { "Grass_A", "Grass_B", "Grass_C" }, Mosses = { "Moss_Tuft_A", "Moss_Tuft_B", "Moss_Tuft_C" }, Fines = { "Grass_Fine_A", "Grass_Fine_B", "Grass_Fine_C" };
 
         const float DenseM2 = 3.8f, SparseM2 = 0.3f;   // clumps per m2 in the thick patches and between them; the view budget below fixes the mix
         const int DetailRes = 1024, DetailPatch = 32;
@@ -174,14 +174,77 @@ namespace SleepingCalamity.EditorTools
             HollowmereTerrain.IsPaved(t, x + r, z) || HollowmereTerrain.IsPaved(t, x - r, z) || HollowmereTerrain.IsPaved(t, x, z + r) || HollowmereTerrain.IsPaved(t, x, z - r);
 
         // ------------------------------------------------------------------------------------------------ 1. terrain grass
+        // Prototype layout: 0-4 the original grass and rosette (inside the town wall, unchanged); 5-7 the old tall clumps as small accents (outside); 8-16 the fine carpet
+        // (mesh A/B/C x tint dark/mid/dry); 17 dandelion (N06), 18 meadow spike (N07).
+        const int ProtoAccent = 5, ProtoFine = 8, ProtoDandelion = 17, ProtoSpike = 18, ProtoCount = 19;
+        const float FineM2 = 8.5f;   // fine clumps per m2 across the open ground outside the wall (about 0.6 m clumps overlap into a carpet)
+        const string NatureRoot = "Assets/_Project/Content/Art/Town/Adopted/", NatureMats = "Assets/_Project/Content/Materials/B1/";
+        static readonly string[] TintNames = { "Dark", "Mid", "Dry" };
+        // Multiplies the atlas blade (dark green base to yellow-green tip). Per clump: a dark green, a mid green and a yellow-green.
+        static readonly Color[] FineTints = { new Color(0.27f, 0.37f, 0.22f), new Color(0.41f, 0.48f, 0.29f), new Color(0.57f, 0.53f, 0.27f) };
+        static readonly string[] FlowerFolders = { "N06_dandelion", "N07_meadow_spike" };
+
+        // A copy of the shared foliage material, tinted and matte: the atlas ORM gave the blades smoothness 1, so grass seen toward the sun at grazing angles glared white.
+        static Material MatteCopy(string name, Color tint)
+        {
+            string path = HollowmereTerrain.Folder + "/M_HM_" + name + ".mat";
+            Material m = LookTestBuilder.Ensure(path, mat.shader);
+            m.CopyPropertiesFromMaterial(mat); m.shaderKeywords = mat.shaderKeywords; m.renderQueue = mat.renderQueue;
+            m.SetColor("_BaseColor", tint); m.SetColor("_Color", tint); m.enableInstancing = true;
+            m.SetTexture("_MetallicGlossMap", null); m.DisableKeyword("_METALLICSPECGLOSSMAP");
+            m.SetFloat("_Metallic", 0f); m.SetFloat("_Smoothness", 0.12f); m.SetFloat("_SpecularHighlights", 0f); m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            EditorUtility.SetDirty(m); AssetDatabase.SaveAssetIfDirty(m);
+            return m;
+        }
+
+        static Material FineMaterial(int tint) => MatteCopy("GrassFine_" + TintNames[tint], FineTints[tint]);
+
+        // Detail prefab with its own mesh and material on the root (terrain details read MeshFilter + MeshRenderer of the prefab root).
+        static GameObject DetailPrefabOf(Mesh mesh, Material material, string name)
+        {
+            var go = new GameObject("Detail_" + name);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = material; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = true;
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, HollowmereTerrain.Folder + "/Detail_" + name + ".prefab");
+            UnityEngine.Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        static DetailPrototype Proto(GameObject prefab, float w0, float w1, float h0, float h1, int seed) => new DetailPrototype
+        {
+            prototype = prefab, usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = true,
+            minWidth = w0, maxWidth = w1, minHeight = h0, maxHeight = h1, noiseSeed = seed, noiseSpread = 0.5f, holeEdgePadding = 0f,
+            healthyColor = Color.white, dryColor = Color.white, positionJitter = 1f, alignToGround = 0f, useDensityScaling = true,
+        };
+
+        // The shore end of the jetty (root bank to 9 m out), recomputed as HollowmereLakeArt.BuildJetty does: no grass on or under the planks.
+        static (Vector2 A, Vector2 B) JettyLine(Terrain terrain)
+        {
+            const float deckTop = HollowmereLayout.WaterY + 0.6f;
+            float baseY = terrain.transform.position.y, x = -22f, z = -72f;
+            while (z > -100f && terrain.SampleHeight(new Vector3(x, 0f, z)) + baseY > deckTop) z -= 0.1f;
+            Vector2 shore = new Vector2(x, z), toCentre = (new Vector2(HollowmereLayout.LakeCentre.X, HollowmereLayout.LakeCentre.Z) - shore).normalized;
+            Vector3 fwd = Quaternion.Euler(0f, Mathf.Atan2(toCentre.x, toCentre.y) * Mathf.Rad2Deg + 2f, 0f) * Vector3.forward;
+            Vector2 a = shore - new Vector2(fwd.x, fwd.z) * 0.6f;
+            return (a, a + new Vector2(fwd.x, fwd.z) * 9f);
+        }
+
+        static float SegDist(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a; float tt = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+            return (p - (a + ab * tt)).magnitude;
+        }
+
+        // ------------------------------------------------------------------------------------------------ 1. terrain grass
         public static void TerrainGrass(Terrain terrain, TownLayout t)
         {
-            grassClumps = 0;
+            grassClumps = 0; carpetClumps = 0;
             if (!Load()) return;
             TerrainData data = terrain.terrainData;
             BuilderUtil.EnsureFolder(HollowmereTerrain.Folder);
             terr = terrain;
-            var protos = new DetailPrototype[Grasses.Length + 2];
+            var protos = new DetailPrototype[ProtoCount];
+            var protoTris = new int[ProtoCount];
             Color[] healthy = { new Color(0.50f, 0.62f, 0.24f), new Color(0.46f, 0.58f, 0.22f), new Color(0.56f, 0.62f, 0.26f) };
             Color[] dry = { new Color(0.66f, 0.64f, 0.30f), new Color(0.62f, 0.60f, 0.27f), new Color(0.70f, 0.64f, 0.32f) };   // yellow-green family, never blue-green
             for (int i = 0; i < Grasses.Length; i++)
@@ -192,8 +255,9 @@ namespace SleepingCalamity.EditorTools
                     minWidth = 0.7f, maxWidth = 1.4f, minHeight = 0.7f, maxHeight = 1.4f, noiseSeed = 11 + i * 7, noiseSpread = 0.4f, holeEdgePadding = 0f,
                     healthyColor = healthy[i], dryColor = dry[i], positionJitter = 1f, alignToGround = 0f, useDensityScaling = true,
                 };
+                protoTris[i] = kits[Grasses[i]].Tris;
             }
-            // taller seed-head grass (Grass_C at 1.5-1.9), sparse and mostly in the clumps; a low clover rosette (Weed_D) scattered in low patches
+            // taller seed-head grass (Grass_C at 1.5-1.9) inside the wall, sparse and mostly in the clumps; a low clover rosette (Weed_D) scattered in low patches
             protos[3] = new DetailPrototype
             {
                 prototype = DetailPrefab(kits["Grass_C"], "Grass_C_Tall"), usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = true,
@@ -206,6 +270,31 @@ namespace SleepingCalamity.EditorTools
                 minWidth = 0.8f, maxWidth = 1.5f, minHeight = 0.8f, maxHeight = 1.3f, noiseSeed = 73, noiseSpread = 0.5f, holeEdgePadding = 0f,
                 healthyColor = new Color(0.42f, 0.56f, 0.22f), dryColor = new Color(0.58f, 0.60f, 0.28f), positionJitter = 1f, alignToGround = 0f, useDensityScaling = true,
             };
+            protoTris[3] = kits["Grass_C"].Tris; protoTris[4] = kits["Weed_D"].Tris;
+            // T08 outside the wall: the old tall clumps scaled to 0.5-0.8 of today (0.7-1.4 -> 0.4-1.0), accents only at wall feet, field edges and the water; the fine carpet
+            for (int i = 0; i < Grasses.Length; i++)
+            {
+                protos[ProtoAccent + i] = Proto(DetailPrefabOf(kits[Grasses[i]].Meshes[0], MatteCopy("GrassAccent", new Color(0.55f, 0.62f, 0.38f)), Grasses[i] + "_Acc"), 0.45f, 0.85f, 0.45f, 0.9f, 311 + i * 7);
+                protos[ProtoAccent + i].healthyColor = healthy[i]; protos[ProtoAccent + i].dryColor = dry[i];
+                protoTris[ProtoAccent + i] = kits[Grasses[i]].Tris;
+            }
+            for (int m = 0; m < Fines.Length; m++)
+                for (int k = 0; k < 3; k++)
+                {
+                    protos[ProtoFine + m * 3 + k] = Proto(DetailPrefabOf(kits[Fines[m]].Meshes[0], FineMaterial(k), Fines[m] + "_" + TintNames[k]), 0.85f, 1.3f, 0.8f, 1.25f, 401 + m * 13 + k * 5);
+                    protoTris[ProtoFine + m * 3 + k] = kits[Fines[m]].Tris;
+                }
+            float[][] flowerSize = { new[] { 0.8f, 1.2f }, new[] { 1.0f, 1.5f } };
+            for (int f = 0; f < 2; f++)
+            {
+                string code = FlowerFolders[f].Split('_')[0];
+                GameObject src = AssetDatabase.LoadAssetAtPath<GameObject>(NatureRoot + FlowerFolders[f] + "/" + code + ".prefab");
+                Material fm = AssetDatabase.LoadAssetAtPath<Material>(NatureMats + "M_" + code + ".mat");
+                MeshFilter mf = src != null ? src.GetComponentInChildren<MeshFilter>(true) : null;
+                if (mf == null || fm == null) throw new InvalidOperationException("nature intake first: " + code + " prefab or material missing (SleepingCalamity.EditorTools.NatureIntake.Run)");
+                protos[ProtoDandelion + f] = Proto(DetailPrefabOf(mf.sharedMesh, fm, code + "_Flower"), flowerSize[f][0], flowerSize[f][1], flowerSize[f][0], flowerSize[f][1], 601 + f * 17);
+                protoTris[ProtoDandelion + f] = Tris(mf.sharedMesh);
+            }
             data.SetDetailResolution(DetailRes, DetailPatch);
             data.detailPrototypes = protos;
             data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
@@ -221,15 +310,24 @@ namespace SleepingCalamity.EditorTools
                     if (splat[y, x, 3] > 0f)
                         for (int dy = -1; dy <= 1; dy++)
                             for (int dx = -1; dx <= 1; dx++) { int yy = y + dy, xx = x + dx; if (yy >= 0 && xx >= 0 && yy < sr && xx < sr) nearCobble[yy, xx] = true; }
-            var spots = new List<Vector2>();
+            var spots = new List<Vector3>();   // x, tris, z
+            var (jettyA, jettyB) = JettyLine(terrain);
+            long perProto = 0; var counts = new int[protos.Length];
             for (int cy = 0; cy < DetailRes; cy++)
                 for (int cx = 0; cx < DetailRes; cx++)
                 {
                     float u = (cx + 0.5f) / DetailRes, v = (cy + 0.5f) / DetailRes;
                     int sx = Mathf.Min(sr - 1, (int)(u * sr)), sy = Mathf.Min(sr - 1, (int)(v * sr));
+                    float x = HollowmereTerrain.Origin.x + u * HollowmereTerrain.Size.x, z = HollowmereTerrain.Origin.z + v * HollowmereTerrain.Size.z;
+                    float e = HollowmereLayout.PlateauDistance(x, z), hill = HollowmereLayout.BackHill(x, z);
+                    if (e >= 29.5f || hill > 1f)
+                    {
+                        int cp = CarpetCell(t, data, splat, nearCobble, sx, sy, u, v, x, z, e, cellArea, cx, cy, jettyA, jettyB);
+                        if (cp >= 0) { layers[cp][cy, cx] = 1; counts[cp]++; carpetClumps++; spots.Add(new Vector3(x, protoTris[cp], z)); }
+                        continue;
+                    }
                     float w = splat[sy, sx, 0] + 0.3f * splat[sy, sx, 2];
                     if (w <= 0.02f || nearCobble[sy, sx]) continue;
-                    float x = HollowmereTerrain.Origin.x + u * HollowmereTerrain.Size.x, z = HollowmereTerrain.Origin.z + v * HollowmereTerrain.Size.z;
                     // round 3: tight clumps. Dense along wall feet, lot and landmark footprint edges and the bank top; two noise octaves (about 7 m / 3.5 m) pick a
                     // few more clumps in the open; bare gaps elsewhere.
                     var pt = new TownPoint(x, z);
@@ -251,12 +349,12 @@ namespace SleepingCalamity.EditorTools
                         int pr = PickProto(h >> 24);
                         if (thick > 0.5f && ((h >> 20) & 15u) < 3u) pr = 3;   // seed-head grass mostly inside the clumps
                         else if (thick <= 0.5f && ((h >> 20) & 63u) == 0u) pr = 3;
-                        layers[pr][cy, cx] = 1; placed = true;
+                        layers[pr][cy, cx] = 1; counts[pr]++; placed = true;
                     }
                     else if (lowPatch && ((h >> 3) & 0xFFFFFFu) / (float)0x1000000 < 0.9f * cellArea * Mathf.Clamp01(w) && !InSquare(x, z, 0.6f) && !NearPaved(t, x, z)
                         && data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y >= HollowmereLayout.WaterY + 0.5f)
-                    { layers[4][cy, cx] = 1; placed = true; }
-                    if (placed) { spots.Add(new Vector2(x, z)); grassClumps++; }
+                    { layers[4][cy, cx] = 1; counts[4]++; placed = true; }
+                    if (placed) { spots.Add(new Vector3(x, AvgGrassTris, z)); grassClumps++; }
                 }
             for (int i = 0; i < layers.Length; i++) data.SetDetailLayer(0, 0, i, layers[i]);
             EditorUtility.SetDirty(data);
@@ -264,8 +362,60 @@ namespace SleepingCalamity.EditorTools
             terrain.detailObjectDistance = DetailDistance;
             terrain.detailObjectDensity = 1f;
             terrain.drawTreesAndFoliage = true;
-            Debug.Log("SC HOLLOWMERE foliage grass clumps=" + grassClumps + " prototypes=" + protos.Length);
+            for (int i = 0; i < protos.Length; i++) perProto += counts[i];
+            Debug.Log("SC HOLLOWMERE foliage grass clumps inside=" + grassClumps + " carpet+accents+flowers outside=" + carpetClumps + " instances=" + perProto + " prototypes=" + protos.Length
+                + " per proto " + string.Join(",", counts));
             ViewBudget(t, spots);
+        }
+
+        static int carpetClumps;
+
+        // The fine carpet, accents and flowers outside the town wall and on the hill floor. Returns the prototype index for this 0.29 m cell, or -1 for none.
+        // Density mask: no grass where the splat has cobble, lanes, doorsteps, the road's walking line, the jetty or under water; bare earth patches come from the splat
+        // (soil weight) so the carpet thins out exactly where the ground shows through.
+        static int CarpetCell(TownLayout t, TerrainData data, float[,,] splat, bool[,] nearCobble, int sx, int sy, float u, float v, float x, float z, float e, float cellArea, int cx, int cy, Vector2 jettyA, Vector2 jettyB)
+        {
+            float gw = splat[sy, sx, 0] + 0.35f * splat[sy, sx, 2];
+            if (gw <= 0.08f || nearCobble[sy, sx]) return -1;
+            var pt = new TownPoint(x, z);
+            bool foot = e < 34f;   // the wall's foot, the ditch and the first metres of the bank
+            foreach (Foundation f in t.Foundations) { if (f.Footprint.Contains(pt, 0.3f)) return -1; if (!foot && f.Footprint.Contains(pt, 2.2f)) foot = true; }
+            foreach (Landmark l in t.Landmarks) { if (l.Footprint.Contains(pt, 0.3f)) return -1; if (!foot && l.Footprint.Contains(pt, 2.2f)) foot = true; }
+            float gy = data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y;
+            if (gy < HollowmereLayout.WaterY + 0.5f) return -1;
+            if (gy < HollowmereLayout.WaterY + 1.7f) foot = true;   // the water's edge
+            else if (!foot && e > 40f)
+            {
+                SaltwakeRoadPlan.Field(x, z, out float edge, out _);
+                if (edge < 1.5f && SaltwakeRoadPlan.FieldWeight(t, x, z) > 0.3f) foot = true;   // the hedge and fence lines between fields
+            }
+            float cover = Smooth(0.12f, 0.70f, gw);
+            float lowF = 0.72f + 0.55f * Mathf.PerlinNoise(x * 0.05f + 9f, z * 0.05f + 3f);
+            float pFine = FineM2 * cellArea * lowF * cover;
+            float pAcc = (foot ? 0.55f : 0.02f) * cellArea * Smooth(0.2f, 0.6f, gw);
+            float d1 = Smooth(0.60f, 0.72f, Mathf.PerlinNoise(x * 0.04f + 300f, z * 0.04f + 17f)) * Smooth(0.42f, 0.66f, Mathf.PerlinNoise(x * 0.45f + 5f, z * 0.45f + 99f));
+            float d2 = Smooth(0.60f, 0.72f, Mathf.PerlinNoise(x * 0.035f + 517f, z * 0.035f + 71f)) * Smooth(0.42f, 0.66f, Mathf.PerlinNoise(x * 0.5f + 61f, z * 0.5f + 7f));
+            float fl = 2.2f * cellArea * Smooth(0.5f, 0.85f, gw);
+            float pDand = fl * d1, pSpike = fl * d2;
+            uint h = Hash((uint)cx, (uint)cy);
+            float r = (h & 0xFFFFFF) / (float)0x1000000;
+            if (r >= pFine + pAcc + pDand + pSpike) return -1;
+            // the expensive tests, only for cells that would get a plant
+            if (InSquare(x, z, 0.6f) || NearPaved(t, x, z)) return -1;
+            if (HollowmereTerrain.RoadDistance(t, x, z) < 0.5f) return -1;   // the Saltwake Road's walking line
+            if (SegDist(new Vector2(x, z), jettyA, jettyB) < 1.5f) return -1;
+            if (r < pFine)
+            {
+                int m = (int)((h >> 24) % 3u);   // the top byte: r uses the low 24 bits, but r < pFine pins those, so the top byte is still free
+                uint h2 = Hash((uint)cx * 7u + 1u, (uint)cy * 13u + 5u);   // independent of the cell's draw r
+                float tn = 0.30f * Mathf.PerlinNoise(x * 0.09f + 500f, z * 0.09f + 800f) + 0.70f * ((h2 & 0xFFFFu) / 65535f) + 0.35f * splat[sy, sx, 2];
+                int k = tn < 0.40f ? 0 : tn < 0.64f ? 1 : 2;
+                return ProtoFine + m * 3 + k;
+            }
+            r -= pFine;
+            if (r < pAcc) return ProtoAccent + (int)PickProto(h >> 24);
+            r -= pAcc;
+            return r < pDand ? ProtoDandelion : ProtoSpike;
         }
 
         static float Smooth(float a, float b, float x) { float u = Mathf.Clamp01((x - a) / (b - a)); return u * u * (3f - 2f * u); }
@@ -300,25 +450,25 @@ namespace SleepingCalamity.EditorTools
             return prefab;
         }
 
-        // Clumps inside a play camera's frustum wedge (detail distance, 16:9) x average clump tris: the cost of the grass in a capture or in play.
-        static void ViewBudget(TownLayout t, List<Vector2> spots)
+        // Clump instances inside a play camera's frustum wedge (detail distance, 16:9) and their triangles: the cost of the grass in a capture or in play.
+        static void ViewBudget(TownLayout t, List<Vector3> spots)
         {
-            int worst = 0; string worstCam = "";
+            int worst = 0; long worstTris = 0; string worstCam = "";
             foreach (var c in HollowmereBuilder.Cameras)
             {
-                if (c.Name == "Cap_HM_Overview") continue;   // above the detail distance: nothing drawn
+                if (c.Name == "Cap_HM_Overview" || c.Name.StartsWith("Cap_HM_High")) continue;   // above the detail distance: nothing drawn
                 float hfov = 2f * Mathf.Atan(Mathf.Tan(c.Fov * 0.5f * Mathf.Deg2Rad) * 16f / 9f);
                 Vector2 pos = new Vector2(c.Pos.x, c.Pos.z), fwd = (new Vector2(c.Target.x, c.Target.z) - pos).normalized;
-                float cosHalf = Mathf.Cos(hfov * 0.5f); int n = 0;
-                foreach (Vector2 s in spots)
+                float cosHalf = Mathf.Cos(hfov * 0.5f); int n = 0; long tris = 0;
+                foreach (Vector3 s in spots)
                 {
-                    Vector2 d = s - pos; float m = d.magnitude;
-                    if (m < DetailDistance && (m < 1f || Vector2.Dot(d / m, fwd) > cosHalf)) n++;
+                    Vector2 d = new Vector2(s.x, s.z) - pos; float m = d.magnitude;
+                    if (m < DetailDistance && (m < 1f || Vector2.Dot(d / m, fwd) > cosHalf)) { n++; tris += (long)s.y; }
                 }
-                if (n > worst) { worst = n; worstCam = c.Name; }
+                if (c.Name == "Cap_HM_Eye_Meadow" || c.Name == "Cap_HM_Eye_Lake" || c.Name == "Cap_HM_Eye_RoadOut") Debug.Log("SC HOLLOWMERE foliage grass view " + c.Name + " instances=" + n + " ~tris=" + tris);
+                if (tris > worstTris) { worst = n; worstTris = tris; worstCam = c.Name; }
             }
-            int tris = Mathf.RoundToInt(worst * AvgGrassTris);
-            Debug.Log("SC HOLLOWMERE foliage grass view worst=" + worstCam + " clumps=" + worst + " ~tris=" + tris + (tris > 400000 ? " OVER the 400k budget" : " (budget 400k)"));
+            Debug.Log("SC HOLLOWMERE foliage grass view worst=" + worstCam + " clumps=" + worst + " ~tris=" + worstTris + (worstTris > 6000000 ? " OVER the 6M eye-camera budget" : " (eye budget 6M)"));
         }
 
         // ------------------------------------------------------------------------------------------------ the scene pass

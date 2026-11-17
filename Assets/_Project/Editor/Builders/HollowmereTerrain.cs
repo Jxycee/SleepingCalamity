@@ -21,6 +21,7 @@ namespace SleepingCalamity.EditorTools
     public static class HollowmereTerrain
     {
         public const int Res = 513, SplatRes = 512;
+        const float BareLo = 0.60f;   // T08: threshold of the bare-earth patch noise (tuned for about 10-15% of the open ground outside the wall)
         public static readonly Vector3 Origin = new Vector3(-150f, -24f, -170f);
         public static readonly Vector3 Size = new Vector3(300f, 96f, 300f);   // y -24..72: Bell Hill reaches about +45 at the north edge (area 1 rework; was 44)
         const float RawOriginY = -24f, RawSizeY = 44f;   // the erosion RAW keeps its own height range (baked before the rework): metres = raw * RawSizeY + RawOriginY
@@ -108,7 +109,7 @@ namespace SleepingCalamity.EditorTools
         {
             BuilderUtil.EnsureFolder(Folder);
             TerrainLayer[] layers = { Ground("Grass", "meadow_grass", 3f), Ground("Dirt", "packed_soil", 3f), Ground("Path", "worn_path", 2.5f), CobbleLayer() };
-            layers[0].diffuseRemapMax = new Vector4(0.85f, 0.84f, 0.68f, 1f);   // area 1 rework round 3: was (0.94, 0.90, 0.76); the meadow read pale lime under the stronger town sun (lake view p50 .66, target .44-.50)   // a little less saturated green (round 3); B3: olive, less lime (blue pulled down)
+            layers[0].diffuseRemapMax = new Vector4(0.56f, 0.60f, 0.40f, 1f);   // area 1 rework round 3: was (0.94, 0.90, 0.76); the meadow read pale lime under the stronger town sun (lake view p50 .66, target .44-.50)   // a little less saturated green (round 3); B3: olive, less lime (blue pulled down)
             layers[2].diffuseRemapMax = new Vector4(0.82f, 0.78f, 0.70f, 1f);   // area 1 rework round 4: the worn-path layer (the road out of the Lower Gate, the lots) read pale cream under the town sun (lake view p50 .69, target .44-.50)
             EditorUtility.SetDirty(layers[2]);
             layers[1].normalScale = 1.8f;                                      // a coarser read on the earth banks (round 3)
@@ -158,8 +159,10 @@ namespace SleepingCalamity.EditorTools
         // Splat weights per texel (grass, soil, path, cobble): cobble on the square, the keep top and the lanes; worn path in a 1.6 m band along the lane edges and
         // on the lots (trodden ground round the old footings); soil on steep banks (24-38 deg), in the dry ditch, on the lake shore and in patches on the lots;
         // grass on the open ground, with large dry patches (path) and a few bare spots (soil) from low-frequency noise so the 300 m meadow does not read as one tile.
+        static int statOut, statBare, statPath, statCob;
         static float[,,] Splat(TownLayout t, TerrainData data)
         {
+            statOut = statBare = statPath = statCob = 0;
             var a = new float[SplatRes, SplatRes, 4];
             for (int j = 0; j < SplatRes; j++)
                 for (int i = 0; i < SplatRes; i++)
@@ -196,9 +199,11 @@ namespace SleepingCalamity.EditorTools
                         float e = HollowmereLayout.PlateauDistance(x, z);
                         float n1 = Mathf.PerlinNoise(x * 0.11f + 13f, z * 0.11f + 7f) - 0.5f;          // ~9 m breakup of every edge
                         float big = Mathf.PerlinNoise(x * 0.035f + 41f, z * 0.035f + 3f);                 // ~30 m dry patches
-                        soil = Mathf.Max(Smooth(24f, 38f, steep), 1f - Smooth(HollowmereLayout.WaterY + 0.3f, HollowmereLayout.WaterY + 1.8f, y));
-                        soil = Mathf.Max(soil, 0.85f * (1f - Smooth(1.2f, 3.0f, Mathf.Abs(e - 31f))));     // the dry ditch floor and its sides
-                        path = 1f - Smooth(0.3f, 1.6f, lane + 0.5f * n1);                                  // the lane edges
+                        // T08: ow is 1 outside the town wall's ditch, 0 inside and on the wall's bank (nothing changes there). Outside, slopes are earth and grass, never cobble.
+                        float ow = Smooth(28.7f, 29.2f, e);
+                        soil = Mathf.Max(Smooth(24f, 38f, steep) * (1f - 0.75f * ow), (1f - Smooth(HollowmereLayout.WaterY + 0.3f, HollowmereLayout.WaterY + 1.8f, y)) * (1f - 0.7f * ow * (1f - Smooth(33f, 38f, e))));   // T08: the ditch's wet earth under the wall is grassier; the lake shore keeps its earth
+                        soil = Mathf.Max(soil, (0.85f - 0.6f * Smooth(28.7f, 29.2f, e)) * (1f - Smooth(1.2f, 3.0f, Mathf.Abs(e - 31f))));     // the dry ditch floor and its sides (T08: grassier outside the wall's bank)
+                        path = 1f - Smooth(0.3f, 1.6f, lane + 0.5f * n1 + ow * 1.3f * (Mathf.PerlinNoise(x * 0.55f + 9f, z * 0.55f + 31f) - 0.5f));   // the lane edges (ragged outside the wall)
                         foreach (Foundation f in t.Foundations)
                             if (f.Footprint.Contains(p, 1.2f)) { path = Mathf.Max(path, 0.75f); soil = Mathf.Max(soil, Smooth(0.55f, 0.75f, big + n1)); break; }
                         foreach (Landmark l in t.Landmarks)
@@ -234,17 +239,33 @@ namespace SleepingCalamity.EditorTools
                             soil = Mathf.Max(soil, wood * (0.10f + 0.30f * Smooth(0.45f, 0.8f, litter)) + 0.35f * cragFace);
                             path = Mathf.Max(path, wood * 0.10f * Smooth(0.55f, 0.85f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
                         }
+                        if (ow > 0f)
+                        {
+                            // T08 ground breakup outside the wall: 2-6 m patches of bare earth (1-4 m across, ragged edges), dry yellow-green patches (path layer) and a darker
+                            // earthy wash, so the meadow, shore and verges are never one flat colour; more bare earth within a few metres of the road.
+                            float a1 = Mathf.PerlinNoise(x * 0.23f + 17f, z * 0.23f + 61f), a2 = Mathf.PerlinNoise(x * 0.47f + 83f, z * 0.47f + 5f), a3 = Mathf.PerlinNoise(x * 0.9f + 41f, z * 0.9f + 77f);
+                            float roadNear = road < 1000f ? 1f - Smooth(0.6f, 6f, road) : 0f;
+                            float bare = Smooth(BareLo - 0.07f * roadNear, BareLo + 0.05f - 0.07f * roadNear, 0.55f * a1 + 0.35f * a2 + 0.10f * a3);
+                            soil = Mathf.Max(soil, ow * 0.92f * bare);
+                            path = Mathf.Max(path, ow * 0.55f * Smooth(0.56f, 0.72f, Mathf.PerlinNoise(x * 0.16f + 133f, z * 0.16f + 211f)));
+                            soil = Mathf.Max(soil, ow * 0.38f * Smooth(0.48f, 0.74f, Mathf.PerlinNoise(x * 0.12f + 251f, z * 0.12f + 9f)));
+                            float bank = ow * Smooth(20f, 36f, steep) * (0.10f + 0.22f * Mathf.PerlinNoise(x * 0.33f + 5f, z * 0.33f + 17f)) * (1f - 0.85f * Smooth(0.2f, 3f, hill));
+                            soil = Mathf.Max(soil, bank);
+                        }
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
                         grass = Mathf.Max(0f, 1f - soil - path);
                         // A8 (town surfaces): a raw earth slope stretched one low-res soil tile over 3 m. Steep ground takes half its weight in the cobble layer (grey rubble
                         // flecks in the earth, its own mask map) and the earth tile is smaller (layers[1] below), so banks read as stony earth, not a stretched brown sheet.
                         float rock = 0.65f * Smooth(22f, 36f, steep) * (1f - Smooth(0.2f, 1.2f, -lane));
+                        rock *= 1f - ow;                                   // T08: no cobble outside the wall
                         rock *= 1f - 0.85f * Smooth(0.2f, 3f, hill);   // Bell Hill (28-34 degrees all over) is not a rubble bank: the cobble layer stretched there read as tiles
                         grass *= 1f - rock; soil *= 1f - rock; path *= 1f - rock; cobble = rock;
                     }
                     a[j, i, 0] = grass; a[j, i, 1] = soil; a[j, i, 2] = path; a[j, i, 3] = cobble;
+                    if (HollowmereLayout.PlateauDistance(x, z) >= 31.5f && HollowmereLayout.BackHill(x, z) <= 0f && z > -150f && !(lane < 0f) && data.GetInterpolatedHeight(u, v) + Origin.y > HollowmereLayout.WaterY + 0.5f && data.GetSteepness(u, v) < 18f) { statOut++; if (soil > 0.5f) statBare++; if (path > 0.4f) statPath++; if (cobble > 0.05f) statCob++; }
                 }
+            Debug.Log("SC HOLLOWMERE splat outside the wall: texels=" + statOut + " bare earth (soil>0.5)=" + (100f * statBare / Mathf.Max(1, statOut)).ToString("F1") + "% dry path (>0.4)=" + (100f * statPath / Mathf.Max(1, statOut)).ToString("F1") + "% cobble=" + statCob);
             return a;
         }
 
@@ -260,6 +281,9 @@ namespace SleepingCalamity.EditorTools
             }
             return d;
         }
+
+        // Signed distance (m) of a point from the edge of the Saltwake Road's dirt past the gate apron (negative on the road); a large number nearer the gate.
+        public static float RoadDistance(TownLayout t, float x, float z) { float d = CountryRoad(t, new TownPoint(x, z), out _, out _); return d > 1000f ? 1000f : d; }
 
         public const float GateApron = 9f;   // the Saltwake Road stays cobbled about this far from the Lower Gate, then turns to dirt (blended over GateApron -4..+10)
 

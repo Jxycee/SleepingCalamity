@@ -287,13 +287,36 @@ namespace SleepingCalamity.EditorTools
 
         static void Hedge(CardMesh cm, Vector3 basePos, float yaw, float s, int variant, bool atlas)
         {
-            Rect uv = Cell(variant, atlas, true);
+            // T08: the two 4.6 m x 1.7 m cards stretched one crown band of the atlas over the whole hedge, so each leaf was a cabbage. The hedge is now three
+            // layers of small cards (1.2 m x 0.55 m, each showing the whole band): leaves a third of the size, many more of them, and a deeper, ragged body.
             Quaternion q = Quaternion.Euler(0f, yaw, 0f);
             Vector3 right = q * Vector3.right, fwd = q * Vector3.forward;
             float len = 4.6f, h = 1.7f * s;
-            Quad(cm, basePos, right, Vector3.up, len, h, uv, basePos + Vector3.up * h * 0.4f, 0.5f);
-            Rect uv2 = Cell((variant + 1) % 4, atlas, true);
-            Quad(cm, basePos + fwd * 0.45f + right * 0.8f, right, Vector3.up, len * 0.8f, h * 0.85f, uv2, basePos + Vector3.up * h * 0.4f, 0.5f);
+            const int cols = 5, rows = 4, layers = 3;
+            float qw = 1.2f, qh = h / rows * 1.35f;   // 35% overlap between rows
+            Vector3 centre = basePos + Vector3.up * h * 0.45f;
+            for (int l = 0; l < layers; l++)
+                for (int r = 0; r < rows; r++)
+                    for (int c = 0; c < cols; c++)
+                    {
+                        uint hh = HedgeHash(variant, l, r, c);
+                        float jx = ((hh & 255u) / 255f - 0.5f) * 0.5f, jy = (((hh >> 8) & 255u) / 255f - 0.5f) * 0.12f * h, ja = (((hh >> 16) & 255u) / 255f - 0.5f) * 40f;
+                        float u = (c + 0.5f) / cols - 0.5f + (l == 1 ? 0.5f / cols : 0f);
+                        Quaternion ql = q * Quaternion.Euler(0f, ja, 0f);
+                        Vector3 p = basePos + right * (u * len + jx) + fwd * ((l - 1) * 0.38f + (((hh >> 24) & 255u) / 255f - 0.5f) * 0.15f) + Vector3.up * (r * (h / rows) * 0.92f + jy);
+                        Rect uv = Cell((variant + (int)((hh >> 3) % 4u)) % 4, atlas, true);
+                        Quad(cm, p, ql * Vector3.right, Vector3.up, qw, qh * (r == rows - 1 ? 0.85f : 1f), uv, centre, 0.5f);
+                    }
+        }
+
+        static uint HedgeHash(int a, int b, int c, int d)
+        {
+            unchecked
+            {
+                uint h = (uint)a * 73856093u ^ (uint)b * 19349663u ^ (uint)c * 83492791u ^ (uint)d * 2654435761u ^ 0x9E3779B9u;
+                h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;
+                return h;
+            }
         }
 
         // A vertical quad, bottom-centre at p, width w along `right`, height h; normals bend from the face normal toward (vertex - centre) by `bend`.
