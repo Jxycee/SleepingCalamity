@@ -9,8 +9,9 @@ Code Mode: not offered in a Desktop session.
 - Start (17:30): 5-hour 45%, weekly 64%, Fable 9%.
 - The 5-hour limit hit at about 19:10 and cut T03 and T04 mid-run. After the reset (21:02): 5-hour 14%, weekly 74%, Fable 20%.
 - So the first window cost 10 weekly points for: three Haiku scans (310k tokens), the plan, T01 (156k), T02 in two rounds (280k), T04 (finished and committed before the cut), a few minutes of T03.
-- Budget left to the 92% stop: about 18 points, roughly seven implementer runs with their judging. **Run one implementer at a time** (parallel runs filled the window in 100 minutes) and cut the list as below.
-- Images used by the controller: 3 of 16 (Run 6 R4 sheet, shell kit sheet, `R0_sheet_B.jpg`). `R0_sheet_A.jpg` (cameras 1-10) has not been looked at.
+- **User direction relayed by the coordinator (2026-11-16, about 21:00):** no image budget; no weekly-usage stop; the full task list stands (road boundary, LOD pass, APV trial included); implementers may remove, add, edit or replace anything in area 1 for the best result (the playable loop and its tests still hold); study the Abbey's images in the browser. Context handoff moves to about 450k: write STATUS and tell the coordinator.
+- **Run one implementer at a time** (parallel runs filled the 5-hour window in 100 minutes). The 5-hour stop at about 90% still holds.
+- Abbey images studied in the browser pane (nine shots); the lessons are in the plan, section 1b.
 
 ## Task progress
 | Task | State | Commit | Notes |
@@ -35,16 +36,17 @@ What the new cameras show:
 8. High_Lake and High_East render with fog on (only names starting `Cap_HM_Overview` get fog off in `HollowmereCapture`): add `Cap_HM_High` to that rule.
 9. RoadOut already has the shrine, fences and trees and is the best of the new views (17).
 
-## Revised order (2026-11-16, for about 18 weekly points)
+## Order (2026-11-16, full list restored)
 1. **T03** scene diet (resumed).
 2. **T05** shells into the town, plus moving the staged nature set into `Assets/` in the same run.
-3. **T08+** ground and shore: grass layer colour and density for the whole outside, bank splat fix, reed beds, shore rocks, boats, meadow flowers (N06, N07), the Mill and HillWest camera fixes, hedge scale, fog-off for the High cameras.
-4. **T06** streets (decals, wall-foot strips, clutter clusters, story props), slim.
+3. **T08** ground and shore, grown after the Abbey study (plan 1b, points 1, 2, 7): fine-blade grass carpet with per-clump colour for the whole outside, splat breakup, bank fix, reed beds, shore rocks, boats, meadow flowers (N06, N07), tree bases, the Mill and HillWest camera fixes, hedge scale, fog-off for the High cameras. Probably two runs (ground, then shore and mill).
+4. **T06** streets (decals, wall-foot strips, rubble spill, clutter clusters, story props).
 5. **T07** orchard and allotments.
 6. **T09** bell yard, churchyard, crag variety (N01-N03).
-7. **T11** atmosphere, slim: light zones Z2, Z4, Z5, Z7, shade fill, highlight shoulder.
-8. **T14** landing.
-Dropped to the landing session's list unless usage allows: T10 (road boundary and hill edge floor), T12 (LOD and cull pass, APV trial), the mountain reshape, a second round for every district. One judged sheet per task; a second round only where a district is under 20.
+7. **T10** road out, boundary, hill edge.
+8. **T11** atmosphere: light zones, fills, shafts, fog planes, highlight shoulder, ambient life, mountain reshape.
+9. **T12** LOD and cull pass, APV trial.
+10. **T13** round 2 where a district is under 25; **T14** landing.
 
 ## What T05 needs to know (from T02's report)
 - Staged pieces: `Ruin_<S|M|L>_<A|B|C>_<Mid|Tall>.fbx` (18), `Headstone_A/B/C`, `Signpost_A`, `Hatch_Oak`. Tall max heights S 6.7-7.7 m, M 7.8-8.4 m, L 8.9-9.3 m; Mid 4.8-6.6 m. Triangles 2.9k-5.7k. No LODs, no foliage child (the low kit has one).

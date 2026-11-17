@@ -12,6 +12,21 @@ Reference: Epic's Shadows of the Abbey template (layering, reuse and LOD rules o
 4. **The scene is too heavy to grow.** `Hollowmere.unity` is 59.5 MB: 9,441 GameObjects and 479 meshes embedded in the scene file. Nothing is GPU-instanced outside the terrain grass.
 5. **Judging looked at seven cameras**, five of them in or over the square.
 
+## 1b. What we take from the Abbey's images (studied in the browser, 2026-11-16)
+
+Nine of the template's environment shots were looked at (grass field, painted mud, optimised ruin wall and arch, shell against shell plus dressing, wall instances, wood kit, hero tree, windmill hill, shoreline, bounce lights off and on). Its palette is a cold night and is not ours; these are the build lessons, each with what it changes here.
+
+1. **Grass is a dense carpet of fine blades, not clumps on a lawn.** Blades are thin and 0.2-0.35 m tall, clumps overlap until the soil is hidden, every clump has its own colour between dark green and yellow-green, and the carpet breaks into bare mud with ragged edges. Ours is sparse single blades near a metre wide on pale ground. Change: new fine-blade detail meshes (0.25-0.4 m, many thin blades per clump), three to four times the density, per-clump colour through the detail prototype's healthy and dry colours, tall clumps only as accents at walls and water (T08).
+2. **The ground is never one material.** Grass, mud, moss and low red-brown plants mix in blotches of 1-5 m with ragged borders; mud holds puddles and prints; paths are mud that grass invades, not a clean strip. Change: the terrain splat gets a 2-6 m noise breakup between grass, soil and path everywhere outside the cobbles; path edges ragged; puddle and mud decals in the low spots; one low ochre plant as a colour accent (T08, T06).
+3. **A ruin wall is stained, ragged and spilling.** Small irregular masonry, broken edges that step down along the courses, large moss and damp stains across the whole face, a rubble spill at the foot that leaves the footprint, grass at the base. Change: shells get strong low-frequency stain in the `wear` channels (moss on the north and low parts, char at the tops), rubble and fallen blocks spill 1-2 m outside every broken wall, tufts at every wall foot (T05, T06).
+4. **Dressing carries the depth, the shell is plain.** The same vault with and without ribs, columns and arches is the difference between a box and a place. Change: the three-to-one dressing rule stays, and the triangle budget goes to what stands at eye height along the paths.
+5. **One wall, three states.** The same module as bare stone, half-fallen plaster and whole plaster reads as three buildings. Change: shells use plaster state as their variety (the `FK_Plaster` bays), and the rebuilt houses later use the same family.
+6. **A dozen raw beams make every wooden thing.** Fences, walkways, trestles and boxes are built from one small set of planks and beams. Change: story props (fallen roof frames, trestles, broken fences, the road block) are assembled from the plank and beam pieces we have (T05d, T04a, Fence_Rail), not modelled one by one.
+7. **Trees grip the ground.** The hero tree has a wide root flare and a low spreading crown. Change: every tree in walking range gets a base: a low earth mound, two or three stones, a grass ring; the great tree keeps its pit (T08, T10).
+8. **A landmark stands on a rise against the sky, framed and led to.** The windmill shot is a path, a fence line beside it, a dark foreground frame of branches, and the mill small against cloud. Change: each district's landmark is checked from its eye camera for those four things: path, line, frame, sky behind (the mill, the tower, the gate, the shrine).
+9. **Fog makes the planes.** Trees are swallowed at 40-80 m, so near, middle and far separate at once. Ours is a clear day, so lighter, but the belt trees, the far shore and the hill forest each sit one step paler than the plane before (T11).
+10. **Shade is lit by fill, not left black.** With the bounce lights off the vault is a silhouette; with them on it has form. Change: shadowless fills in the bell yard, under the orchard crowns and on the mill's shade wall (T09, T11).
+
 ## 2. Judged state and cameras
 
 **Decided: the Ruined preset in Morning light is the judged state**, because it is what the player walks first and longest. Rebuilt gets one sanity sheet at the end (six cameras) so that nothing placed for the ruin stands inside a rebuilt house.
@@ -190,10 +205,10 @@ One Unity task at a time (U). Blender and fetch tasks (B) run beside it and stag
 | T13 U | Round 2 fixes from the sheets (one or two runs) | as the notes say |
 | T14 U | Landing: traversal nodes for the orchard, shore, road and hill edge; Rebuilt sanity sheet; whole-area capture and sheet; `gate`; push | `Reference/qa/traversal/`, tests, `STATUS.md` |
 
-Order: T01 and T02 together; then T03 with T04; then T05 to T12 in order; T13; T14. If usage runs short, T12 and the mountain reshape drop first, then T10; the shells, streets, orchard and shore do not.
+Order (revised 2026-11-16 after the baseline): T01, T02, T04 done; T03; T05 (with the nature set moved into `Assets/`); T08 (the ground outside the wall is the weakest thing in the area, so it moves up and grows: grass carpet, splat breakup, bank fix, shore, meadow, tree bases); T06; T07; T09; T10; T11; T12; T13; T14. One implementer at a time. The user lifted the image limit and the weekly usage stop (2026-11-16), so the full list stands and implementers may remove, replace or rebuild anything in area 1 that serves the result; the playable loop and its tests still hold.
 
 ## 7. Stops and what stays untouched
 
-Stops: every district at 25/40 strict, or the list done with two rounds per district; weekly all-models above about 92%; the 5-hour window above about 90% (push, STATUS current).
+Stops: every district at 25/40 strict, or the list done with two rounds per district; the 5-hour window above about 90% (push, STATUS current; the coordinator restarts the run). The weekly stop was lifted by the user on 2026-11-16.
 
 Untouched: `Core/Cellars/`, the dive, combat, enemies, Networking. The playable loop (spawn, build point, placement, bell yard dive, return) and the fast `gate` stay green after every Unity task that changes colliders or ground.
