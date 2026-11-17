@@ -182,3 +182,6 @@ LightingData.asset     binary
 *.bin                   lfs
 *.usd                   lfs
 *.usdc                  lfs
+
+# Generated mesh assets (GeneratedMeshes.cs): text-serialised vertex data, large; the .meta stays plain text
+Assets/_Project/Content/Generated/**/*.asset  lfs

@@ -257,6 +257,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Morning);   // B3: the B0 Morning light; the corner's light with the town-scale haze, sky and grade (Q12)
             BuildHub(root, lighting, t);   // M6 S3: gameplay camera, spawn point, the cistern-stair DiveHub, the area look switcher (after Look.Apply: it finds the town's one Volume) and the TownView
             ApplyPreset(Preset.Ruined);
+            GeneratedMeshes.Externalize(scene, "Hollowmere");   // T03 scene diet: generated meshes become assets instead of hex text in the scene file
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC HOLLOWMERE scene built " + ScenePath);
         }

@@ -4,6 +4,11 @@ Produced by `Reference/sessions/area1-world/tools/scene_composition.py Assets/_P
 
 Total 59,582,323 bytes (56.8 MB), 43,992 YAML documents, 9,457 GameObjects (9,057 under the root "Hollowmere").
 
+## After T03 (scene diet)
+`GeneratedMeshes.Externalize` (called by `HollowmereBuilder.BuildScene` just before the save) moves every generated mesh of 6 KB raw payload or more (about 15 KB as scene text)
+into `Assets/_Project/Content/Generated/Hollowmere/<mesh name>.asset` (274 assets, 21.0 MB as text YAML, Git LFS). The scene is now 38,565,388 bytes (36.8 MB), 205 small
+meshes (3.7 MB) still embedded; MeshRenderer 27.5%, PrefabInstance 22.1%. The numbers below are the state before T03.
+
 ## What makes it 59 MB
 Embedded Mesh documents are 41.5% of the file (24.7 MB, only 479 meshes): Unity writes each mesh's vertices, normals, UVs and triangles as hex text.
 Two families are 19.4 MB of that (33% of the whole file): the card-forest tiles (14.4 MB, two groups) and the lane step treads (4.9 MB). MeshRenderer docs
