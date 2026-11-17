@@ -714,6 +714,9 @@ namespace SleepingCalamity.EditorTools
             if (cls != RuinClass.Low)
             {
                 PrefabUtility.UnpackPrefabInstance(obj, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);   // the collision stand-ins lose their mesh components
+                // 5% tighter in plan: a shell's perimeter wall stands on the footprint edge, which left 1.18 m between R2_01's east wall and the lane's retaining wall and cut the
+                // pocket's doorstep off at the hero's reach; 0.98 still failed, 0.96 passed (traversal probe), 0.95 keeps a margin. Heights are unchanged.
+                obj.transform.localScale = new Vector3(0.95f, 1f, 0.95f);
                 HollowmereRuinShells.MakeColliders(obj.transform);
             }
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
