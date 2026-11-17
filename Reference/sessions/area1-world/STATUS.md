@@ -59,6 +59,13 @@ Meadow 16 -> 20, JettyBack 17 -> 21; the rest unchanged. The bank now reads as a
 - For T13 round 2: the face is too clean and regular up close (Meadow): running bond reads tiled, the moss and damp masks barely show, the foot meets the ditch earth in a hard line at the bottom left. Wanted: visible moss and damp on the lower half, more size variation and a few missing or pushed-out stones, grass tufts in the joints.
 - New churn: `M_RD_RoadHedge.mat` flipped once; `T_Water_N.png.meta` once.
 
+## Shell round 3 (313a1fd3; gate PASS 1859/1859 marker = 313a1fd3; play loop PASS; build twice identical)
+Blender: courses 0.25-0.35 m with quoins, stacks 1.6-1.8 m breast tapering to a 0.9-1.1 m shaft with cap, pots, soot; thick charred gable frames, plaster grid with lath; moss/char wear; 3 cm stone overlap and a dark FK_PlinthJoint backer per course. Unity: Tall lots turn the door to the lane (`FacingYaw`) and take the B or C file whose gable faces the square (Core untouched). R5 verdict (9 square cameras against R4): walls read as real masonry now (Bakery 18 -> 19), but three defects:
+- The Bakery stack shows a checker of dark holes (missing stones over the dark backer).
+- No wear shows in Unity: no moss at wall feet, no char at tops, no soot band on stacks; all shells read one clean sandstone.
+- No gable timber is visible from any of the nine eye cameras.
+Round 3b (fresh implementer) fixes these with an in-engine close probe first.
+
 ## Resume order (2026-11-17, after the handoff)
 1. **T08b** done (c3ca712a). **T08c** done (19514f61, stone revetment).
 2. **Shell round 3** (brief below): the shells are the reason D1 sits at 22/25/22.

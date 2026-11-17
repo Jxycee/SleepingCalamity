@@ -16,6 +16,23 @@
 #define SC_POLISH_LIFT    1.18h                       // albedo gain at mask 1
 #define SC_POLISH_SMOOTH  0.18h                       // smoothness added at mask 1
 
+// _SC_WEARGB (the ruin shells' own materials, HollowmereBuilder.ShellMaterials): the same masks, strong enough to read at 10-20 m. Soot and char go nearly black
+// (the shells' oak carries R 0.38, about 70% char after the remap, so its grain still shows through as dark brown), moss goes a full green. Every other WearLit material keeps the constants above.
+#if defined(_SC_WEARGB)
+    #undef SC_GRIME_COLOR
+    #undef SC_GRIME_STRENGTH
+    #undef SC_GRIME_ROUGH
+    #undef SC_MOSS_COLOR
+    #undef SC_MOSS_STRENGTH
+    #undef SC_POLISH_LIFT
+    #define SC_GRIME_COLOR   half3(0.045, 0.032, 0.022)
+    #define SC_GRIME_STRENGTH 1.0h
+    #define SC_GRIME_ROUGH    0.15h
+    #define SC_MOSS_COLOR    half3(0.075, 0.150, 0.024)
+    #define SC_MOSS_STRENGTH  1.0h
+    #define SC_POLISH_LIFT    1.25h
+#endif
+
 #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
@@ -276,8 +293,17 @@ void LitPassFragment(
     half3 wm = input.wear.rgb;
     half hasWear = (wm.r + wm.g + wm.b) < 2.99h ? 1.0h : 0.0h;
     half grime = saturate(wm.r) * hasWear, moss = saturate(wm.g) * hasWear, polish = saturate(wm.b) * hasWear;
+#if defined(_SC_WEARGB)
+    // The masks are soft (a 0.4 char value darkened the sunlit stone by a third, which hides in the tonemapped frame): push them to clear patches.
+    grime = smoothstep(0.12h, 0.55h, grime); moss = smoothstep(0.05h, 0.75h, moss);
+    // keep the stone's own relief in the char and the moss (a flat colour read as paint): the target colour follows the texture's luminance
+    half wLum = saturate(0.55h + 1.3h * dot(surfaceData.albedo, half3(0.2126h, 0.7152h, 0.0722h)));
+    surfaceData.albedo = lerp(surfaceData.albedo, SC_GRIME_COLOR * wLum, grime * SC_GRIME_STRENGTH);
+    surfaceData.albedo = lerp(surfaceData.albedo, SC_MOSS_COLOR * wLum, moss * SC_MOSS_STRENGTH);
+#else
     surfaceData.albedo = lerp(surfaceData.albedo, SC_GRIME_COLOR, grime * SC_GRIME_STRENGTH);
     surfaceData.albedo = lerp(surfaceData.albedo, SC_MOSS_COLOR, moss * SC_MOSS_STRENGTH);
+#endif
     surfaceData.albedo *= lerp(1.0h, SC_POLISH_LIFT, polish);
     surfaceData.smoothness = saturate(surfaceData.smoothness - grime * SC_GRIME_ROUGH - moss * 0.3h + polish * SC_POLISH_SMOOTH);
 

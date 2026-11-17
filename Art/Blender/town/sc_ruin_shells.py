@@ -41,7 +41,15 @@ for _a, _b in (("W1, W2 = W0 * 0.72, W0 * 0.54; D1, D2 = D0 * 0.82, D0 * 0.68", 
                ("seg(y1 - y0, 0.34 * B, 0.6 * B) if arch else seg(y1 - y0, 0.2 * B, 0.34 * B)", "seg(y1 - y0, 0.30, 0.50) if arch else seg(y1 - y0, 0.30, 0.48)"),
                ("            g.add(vs, fs, mat)\n\n        def course(", "            if not last:\n                fs = fs[1:]            # soft_box(cuts=0) face 0 is the top, hidden by the next course\n            g.add(vs, fs, mat)\n\n        def course("),
                ("soft_box((sx - 0.035, sy - R.uniform(0.0, 0.03), h - 0.02)", "soft_box((sx + 0.03, sy - R.uniform(0.0, 0.03), h + 0.03)"),
-               ("gr = 0.05 if j == n - 2 else 0.10", "gr = 0.07 if j == n - 2 else 0.15")):
+               ("gr = 0.05 if j == n - 2 else 0.10", "gr = 0.07 if j == n - 2 else 0.15"),
+               # round 3b: the per-course jitter moved side-wall stones in their thickness direction (+-7 cm), so neighbouring stones stood at different depths and the low
+               # morning sun shadowed every other one (the checker of dark holes on the stacks). Jitter now runs along the wall, and the yaw is smaller.
+               ("xf = place(cx + xl + tl * zc + jx, y, zc, math.radians(R.uniform(-2.5, 2.5)), math.radians(R.uniform(-1.5, 1.5)), tilt)",
+                "xf = place(cx + xl + tl * zc + (jx if sx >= sy else 0.0), y + (jx if sx < sy else 0.0), zc, math.radians(R.uniform(-0.4, 0.4)), math.radians(R.uniform(-0.3, 0.3)), tilt)"),
+               # ... and the sun grazes the stack faces in the morning, so per-stone orientation noise (yaw, tilt, 1.8 cm vertex wobble = a 3 degree face normal spread)
+               # swung the shading stone by stone. The stack keeps its relief from the normal map; the stones are nearly flat-faced.
+               ("tilt = c['lean'] + math.radians(R.uniform(-1.5, 1.5))", "tilt = c['lean'] + math.radians(R.uniform(-0.4, 0.4))"),
+               ("soft=R.uniform(0.07, 0.15), wob=0.018,", "soft=R.uniform(0.07, 0.15), wob=0.005,")):
     assert _a in _src, _a
     _src = _src.replace(_a, _b)
 K = {'__name__': 'sc_ruin_kit', '__file__': KIT}
@@ -90,7 +98,14 @@ class Shell(Ruin):
 
     # ---- wear: the kit's own, with the chimney's soot and the hearth mapped through the gable rotation, plus fire-black high on the walls
     def wear_at(self, p, n, slot):
-        rot = self.rot; sup = super().wear_at
+        rot = self.rot; sup0 = super().wear_at
+        # round 3b: the shells' own WearLit materials draw the mask strongly (_SC_WEARGB), so the kit's block-to-block grime (piece_v) is cut to a third: at full strength it
+        # made a checker of dark and light stones.
+        pv = self.piece_v
+        def sup(*a_):
+            self.piece_v = pv * 0.33
+            try: return sup0(*a_)
+            finally: self.piece_v = pv
         if rot:
             Mi = Matrix.Rotation(-rot, 3, 'Z'); pu = Mi @ p; nu = Mi @ n
             ch = self.chim; cxz = ch['cx'] + math.tan(ch['lean']) * max(pu.z, 0.0)
@@ -105,7 +120,11 @@ class Shell(Ruin):
                 finally: ch['front'] = sv
         else:
             res = sup(p, n, slot)
-        r, gm = res[0], res[1]
+        r, gm = res[0], res[1] * 0.3
+        if slot == 'oak':
+            gm = 0.0
+        if slot != 'oak' and self.chim_soot(p)[0] is not None and p.z > 1.5:
+            gm *= 0.25                                    # the shaft of a stack is sooted, not mossed
         if slot == 'plaster':                             # warm off-white limewash: no moss; soot and char only at the panel edges (against the timbers)
             r = 0.05 + 0.05 * (0.5 + 0.5 * noise.noise(p * 2.1 + self.nofs)); gm = 0.0
             for (c_, d_, hw, hh) in self.panels:
@@ -117,12 +136,12 @@ class Shell(Ruin):
                 de = min(hw - dt, hh - abs(q.z))
                 r = max(r, 0.8 * max(0.0, 1.0 - max(de, 0.0) / 0.24) * (0.8 + 0.4 * noise.noise(p * 4.0 + self.nofs)))
                 break
-        if slot == 'oak':                                 # fully charred: the wear shader blackens it
-            r = 1.0
+        if slot == 'oak':                                 # charred: the strong wear shader (smoothstep 0.12-0.55) turns 0.38 into about 70% char, a dark warm brown with the grain showing through
+            r = 0.38
         if n.z > 0.5 and p.z > 1.0 and slot in ('oak', 'stone', 'stone_dk'):     # broken tops take the fire hardest
             r = max(r, min(0.92, 0.45 + 0.10 * (p.z - 1.0)))
         if slot != 'plaster':
-            r = max(r, min(0.6, 0.17 * max(0.0, p.z - 0.9)) * (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs)))
+            r = max(r, min(0.60, 0.14 * max(0.0, p.z - 0.9)) * (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs)))
         # char around window and door openings (the fire drew through them)
         if slot not in ('core', 'plaster'):
             for (a_, d_, o_, oa, ob, z0, z1) in self.open_rects:
@@ -145,11 +164,11 @@ class Shell(Ruin):
             r = min(r, 0.2); gm = min(gm, 0.1)
         elif self.chim_soot is not None:                 # soot-dark band over the top 1.5 m of the stack (wear R)
             pu, ztop = self.chim_soot(p)
-            if pu is not None and pu.z > ztop - 1.5:
-                ramp = min(1.0, (pu.z - (ztop - 1.5)) / 1.0)
-                r = max(r, (0.55 + 0.4 * ramp) * (0.85 + 0.2 * noise.noise(p * 2.5 + self.nofs)))
+            if pu is not None and pu.z > ztop - 2.4:
+                ramp = min(1.0, (pu.z - (ztop - 2.4)) / 1.4)
+                r = max(r, 0.75 * ramp * (0.97 + 0.06 * noise.noise(p * 0.7 + self.nofs)))    # smooth in z: no per-stone checker through the shader's remap
                 gm *= 1.0 - 0.8 * ramp
-        return (min(1.0, r), min(1.0, gm), res[2], res[3])
+        return (min(1.0, r), min(1.0, gm), 0.7 if slot == 'plaster' else res[2], res[3])     # plaster: polish 0.7 lifts the limewash to a warm off-white
 
     def chim_soot(self, p):
         """(point in the unrotated stack frame, rim height) if p is on the stack above the shoulder, else (None, 0)."""

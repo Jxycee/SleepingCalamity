@@ -679,12 +679,36 @@ namespace SleepingCalamity.EditorTools
             if (fbx != null)
             {
                 var slots = new Dictionary<string, Material>(BeautyCornerArt.BuildFacadeMaterials());
+                if (name.EndsWith("_Mid", StringComparison.Ordinal) || name.EndsWith("_Tall", StringComparison.Ordinal)) slots = ShellMaterials(slots);
                 slots["M_B9_Foliage"] = RuinFoliage();
                 art = new RuinArt { Fbx = fbx, Slots = slots };
             }
             Debug.Log("SC HOLLOWMERE ruin " + name + " art=" + (art != null ? folder + "/" + name + ".fbx" : "missing, greybox stubs"));
             RuinCache[name] = art;
             return art;
+        }
+
+        // The shells' own copies of the facade slots they use (M_RuinShell_<slot>.mat): the same WearLit material with _SC_WEARGB on, which makes the forward pass read the mesh
+        // colour "wear" (R char and soot, G moss, B polish) with stronger constants than the facade's (they did not read at 10-20 m). The shared facade materials keep their
+        // look, and so do the low kit and the other buildings. Plaster is lifted to a warm limewash through the polish channel (the generator writes 0.7 on the panels).
+        static Dictionary<string, Material> ShellMaterials(Dictionary<string, Material> facade)
+        {
+            var map = new Dictionary<string, Material>(facade);
+            foreach (string slot in new[] { "FK_Sandstone", "FK_ChimneyStone", "FK_PlinthJoint", "FK_Oak", "FK_Plaster" })
+            {
+                Material src = facade[slot];
+                Material m = LookTestBuilder.Ensure("Assets/_Project/Content/Materials/Hollowmere/M_RuinShell_" + slot.Substring(3) + ".mat", src.shader);
+                m.CopyPropertiesFromMaterial(src);
+                foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
+                m.EnableKeyword("_SC_WEARGB");
+                if (slot == "FK_ChimneyStone")   // 30% light and 70% dark stones on the stack read as a checker in the morning sun: halve the tint's difference from the sandstone
+                    m.SetColor("_BaseColor", Color.Lerp(src.GetColor("_BaseColor"), Color.white, 0.5f));
+                m.SetColor("_Color", m.GetColor("_BaseColor")); m.SetShaderPassEnabled("MotionVectors", true);
+                EditorUtility.SetDirty(m);
+                map[slot] = m;
+            }
+            AssetDatabase.SaveAssets();
+            return map;
         }
 
         // The ruin folders hold byte-identical copies of the B9 atlas (different GUIDs): build the one shared material from a fixed folder, so it does not
