@@ -21,8 +21,9 @@
 #             is skipped. Share of empty cells in mid and near, and the largest 4-connected empty patch as a share of the whole frame.
 #             High = bare ground / flat walls with nothing to read (undressed areas).
 #   spectrum  radial power spectrum of the Hann-windowed luminance: share of energy low (<1/32 cyc/px), mid (1/32-1/8), high (>1/8), and the
-#             high share per band (far / mid / near). Low high-share = soft, blurry or unspoilt-by-detail image; a far high share that exceeds
-#             near's usually means noise or aliasing, not detail.
+#             high share per band (far / mid / near). More is not better: on the 2026-11-17 proof the AAA anchors ran 0.01-0.10 and our
+#             frames 0.08-0.23, i.e. our surfaces carry busy fine noise everywhere instead of detail grouped into masses with rests
+#             (docs/art/scene-judging.md section 4). A far high share that exceeds near's usually means noise or aliasing, not detail.
 
 import json, sys
 import numpy as np
