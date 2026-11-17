@@ -21,7 +21,7 @@ Code Mode: not offered in a Desktop session.
 | T02 ruin shell kit | done (2 rounds), not yet in Unity | 34568e7b, 2ce1fa03 | `Art/Staging/area1-world/shells/` (23 FBX), generator `Art/Blender/town/sc_ruin_shells.py` |
 | T04 nature set | done by its commit; its final report was cut by the limit, so unreviewed | 75329ede | `Art/Staging/area1-world/nature/N01..N07` and `SOURCES.md`; contact sheet in scratch `nature\contact_sheet.png` (not looked at) |
 | T03 scene diet | done, pushed; gate PASS 1859/1859 but run before the commit (marker is not e1e9ca72: T05's gate covers it) | e1e9ca72 | scene 59.6 -> 38.6 MB; 274 LFS mesh assets in `Content/Generated/Hollowmere/` through one scene-level pass (`GeneratedMeshes.Externalize`); build twice identical; three-camera blurred difference under 0.6/255 |
-| T05 shells into the town | running (launched 21:50) | | brief: shells by the height table, shell colliders, rubble spill, ivy, camera fixes, R1 sheets, play loop tests, gate after commit |
+| T05 shells into the town | done, pushed; gate PASS 1859/1859, marker = fa5a9b77; play loop PASS (11 passed, 7 existing ignores) | 78a035d2, 90d3812a, fa5a9b77 | 29 shells (Mid 14, Tall 15), 503 shell BoxColliders, 160 rubble pieces, 104 wall-foot tufts; cameras HillWest moved, Churchyard added, Mill moved; High cameras fog off; `R1/` sheets |
 | T06 onward | not started | | order below |
 
 ## Verification rules in force (coordinator's note `verification-practice.md`)
@@ -34,6 +34,14 @@ A plain `build` rewrites, the same way every time: `M_GD_Leaf.mat`, `M_GD_Produc
 - Stair treads sharing one mesh by dimensions: each tread is seeded from its step id (joints, jitter, UV), so sharing would change the stairs' look. Left as 220 assets.
 - HillWest camera at (-36, 23) or (-38, 23) looking east: it faces the keep's 7 m west retaining wall in shade. Moved in T05 to look north-north-east at the crag foot; the churchyard gets its own camera on the terrace.
 - All-stone ruin shells with single-block stacks (shell kit round 1): read as generic stone ruins, not Hollowmere houses. Round 2 has stone below, charred half-timber and plaster above.
+
+## R1 verdict (after T05; strict /40, judged on `R1/R1_sheet_A.jpg` and `_B.jpg` against the concept row)
+Spawn 22, Postcard 25, West 22, Bakery 18, InnFront 18, Climb 20, Balcony 22, BellYard 17, Churchyard 17, HillWest 14, MarketStreet 17, LowerLane 16, RingWest 18, RingSouth 14, Orchard 10, Mill 15, Meadow 8, Lake 13, JettyBack 12, RoadOut 17, RoadBack 15. Weakest district: D9 meadow and shore (8).
+What T05 did and did not do:
+- Stacks now stand above the square's skyline (Spawn, West, Postcard, Balcony) and RingWest has a real tall ruin with ivy. The town reads as ruins from the high views.
+- **The shells read as stacked blocks, not burnt houses.** Masonry blocks are far too big (about 0.5 x 0.3 m faces read as slabs at 10 m; the Bakery view is a wall of chunky bricks), stacks read as thin pillars, and the charred half-timber and plaster gables are not visible from any eye camera. Round-2 item for the shells (T13 or a shell kit round): smaller courses (target 0.25-0.35 m long stones in the texture/UV scale or in the block size), a darker soot band at the top, and turn the gable frames to face the lanes.
+- Mill camera now shows the mill frame against the sky (+4), but the meadow under it is still the pale flat ground.
+- Collision deviation (accepted): shell Footing and Chimney carry no MeshCollider; the boxes are the collision (walls to about 2.7 m, stack full height), shells are scaled 0.95 in plan so R2_01_North stays reachable. Interior rubble is walkable.
 
 ## Baseline verdict (R0, Ruined, Morning; strict /40)
 Seen on sheet B: LowerLane 16, RingWest 15, RingSouth 14, Orchard 10, Mill 11, Meadow 8, Lake 13, JettyBack 12, RoadOut 17, RoadBack 15. From Run 6 (same views): Spawn 22, Postcard 25, West 22, Climb 20, BellYard 17, Balcony 22. Not seen: Bakery, InnFront, HillWest (HillWest is nearly black: p50 0.08; it looks straight at the morning-shaded crag from (-38, 23): retarget it to look east-south-east along the church wall, or move it to about (-34, 20)).
