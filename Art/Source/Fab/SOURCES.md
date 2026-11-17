@@ -62,6 +62,11 @@
 | T17c | old_wooden_bucket | https://www.fab.com/listings/e533d240-129e-4fbf-9c64-68337093d714 | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
 | T17d | hay_pile | https://www.fab.com/listings/700cac67-b37c-4546-9b01-60873f5490ec | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | 2K decal texture set (with Opacity), via Epic Launcher; not adopted by B1TownIntake (decal, used by the Hollowmere decal builders) |
 | L04 | plants_in_pots | https://www.fab.com/listings/4c300dab-9fa5-4bdf-9509-6b0d934622a5 | unchecked: user library item, read the licence on the listing (likely not Standard) | see listing | 2026-11-14 | Mid tier (2K), via Epic Launcher; mesh + 2K maps copied as published Dropped 2026-11-14 in B1, not adopted, source kept. |
+| T18a | gravestone_a | https://www.fab.com/listings/656f0685-5a1e-4605-bead-7da3e37c605c | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
+| T18b | gravestone_b | https://www.fab.com/listings/ebe20a24-560f-4151-99c2-800d54f8d32d | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
+| T18c | gravestone_c | https://www.fab.com/listings/87a59fed-e48b-471c-ba36-967205ab965b | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
+| T18d | large_fallen_tree | https://www.fab.com/listings/8d26548e-4102-4974-b04e-ddb0e9c7fb83 | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
+| T18e | mossy_log | https://www.fab.com/listings/427b13b8-d9ae-43c6-a963-91cd05e13b1b | Fab Standard License (Quixel Megascans) | Quixel Megascans | 2026-11-17 | Mid tier (2K) FBX, via Epic Launcher; mesh + 2K maps copied as published |
 
 # Adopted in B2 (cellar intake)
 | code | name | URL | licence | author | fetched | files used |
