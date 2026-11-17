@@ -32,11 +32,16 @@ _src = open(KIT, encoding='utf-8').read().rstrip()
 assert _src.endswith('main()'), 'sc_ruin_kit.py no longer ends with main()'
 # Round 2 chimney: proud and chunky (W 1.05-1.2 m at the base tapering to 0.85-0.95, two blocks wide per course, corbelled cap on all). These are
 # text patches of the kit source held in memory only; the kit file on disk and its own variants are untouched.
-for _a, _b in (("W1, W2 = W0 * 0.72, W0 * 0.54; D1, D2 = D0 * 0.82, D0 * 0.68", "W1, W2 = W0 * 0.85, W0 * 0.68; D1, D2 = D0 * 0.90, D0 * 0.72"),
+for _a, _b in (("W1, W2 = W0 * 0.72, W0 * 0.54; D1, D2 = D0 * 0.82, D0 * 0.68", "W1, W2 = W0 * 0.80, c['Wtop']; D1, D2 = D0 * 0.90, D0 * 0.74"),
                ("cap = v in 'AC'", "cap = True"),
                ("tu = {'S': 0.17, 'M': 0.19, 'L': 0.21}[self.cls]", "tu = {'S': 0.27, 'M': 0.27, 'L': 0.28}[self.cls]"),
-               ("else seg(x1 - x0, 0.22 * B, 0.36 * B, cuts)", "else seg(x1 - x0, 0.42, 0.56, cuts)"),
-               ("else seg(y1 - y0, 0.2 * B, 0.34 * B)", "else seg(y1 - y0, 0.40, 0.52)")):
+               # round 3: smaller courses on the stack (0.25-0.35 m tall, 0.3-0.55 m long), drip course proud of the shaft
+               ("h = min(R.uniform(0.27, 0.40) * (0.9 + 0.1 * B), z1 - z)", "h = min(R.uniform(0.25, 0.35), z1 - z)"),
+               ("seg(x1 - x0, 0.38 * B, 0.68 * B, cuts) if arch else seg(x1 - x0, 0.22 * B, 0.36 * B, cuts)", "seg(x1 - x0, 0.30, 0.52, cuts) if arch else seg(x1 - x0, 0.30, 0.50, cuts)"),
+               ("seg(y1 - y0, 0.34 * B, 0.6 * B) if arch else seg(y1 - y0, 0.2 * B, 0.34 * B)", "seg(y1 - y0, 0.30, 0.50) if arch else seg(y1 - y0, 0.30, 0.48)"),
+               ("            g.add(vs, fs, mat)\n\n        def course(", "            if not last:\n                fs = fs[1:]            # soft_box(cuts=0) face 0 is the top, hidden by the next course\n            g.add(vs, fs, mat)\n\n        def course("),
+               ("soft_box((sx - 0.035, sy - R.uniform(0.0, 0.03), h - 0.02)", "soft_box((sx + 0.03, sy - R.uniform(0.0, 0.03), h + 0.03)"),
+               ("gr = 0.05 if j == n - 2 else 0.10", "gr = 0.07 if j == n - 2 else 0.15")):
     assert _a in _src, _a
     _src = _src.replace(_a, _b)
 K = {'__name__': 'sc_ruin_kit', '__file__': KIT}
@@ -63,6 +68,12 @@ PROP_NAMES = ['Headstone_A', 'Headstone_B', 'Headstone_C', 'Signpost_A', 'Hatch_
 WANT = only_arg.split(',') if only_arg else SHELL_NAMES + PROP_NAMES
 
 
+def pick_faces(vs, fs, keep):
+    """Keep only faces by index (and drop the verts nothing uses)."""
+    fs = [fs[i] for i in keep]; used = sorted({i for f in fs for i in f}); m = {o: n for n, o in enumerate(used)}
+    return [vs[i] for i in used], [tuple(m[i] for i in f) for f in fs]
+
+
 def sstep(x):
     x = max(0.0, min(1.0, x)); return x * x * (3 - 2 * x)
 
@@ -75,6 +86,7 @@ class Shell(Ruin):
         self.Q = random.Random(self.seed ^ (0x7A11 if level == 'Tall' else 0x31D))
         self.wall_info = {}; self.cols = []; self.rot = 0.0
         self.hearth = (1e3, 1e3); self.hearth_c = (1e3, 1e3)
+        self.open_rects = []; self.pot_xy = None; self.panels = []
 
     # ---- wear: the kit's own, with the chimney's soot and the hearth mapped through the gable rotation, plus fire-black high on the walls
     def wear_at(self, p, n, slot):
@@ -93,13 +105,62 @@ class Shell(Ruin):
                 finally: ch['front'] = sv
         else:
             res = sup(p, n, slot)
-        r = res[0]
-        if slot == 'plaster':                             # soot-grey lime wash, darker toward the broken top
-            r = max(r, 0.30 + 0.12 * noise.noise(p * 2.1 + self.nofs) + 0.07 * max(0.0, p.z - 2.5))
-        if n.z > 0.6 and p.z > 1.5 and slot in ('oak', 'plaster', 'stone', 'stone_dk'):     # broken tops take the fire hardest
-            r = max(r, min(0.92, 0.38 + 0.12 * (p.z - 1.5)))
-        r = max(r, min(0.6, 0.17 * max(0.0, p.z - 0.9)) * (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs)))
-        return (min(1.0, r), res[1], res[2], res[3])
+        r, gm = res[0], res[1]
+        if slot == 'plaster':                             # warm off-white limewash: no moss; soot and char only at the panel edges (against the timbers)
+            r = 0.05 + 0.05 * (0.5 + 0.5 * noise.noise(p * 2.1 + self.nofs)); gm = 0.0
+            for (c_, d_, hw, hh) in self.panels:
+                q = p - c_
+                if abs(q.z) > hh + 0.06: continue
+                dt = abs(q.dot(d_))
+                if dt > hw + 0.06: continue
+                if abs(q.x * d_.y - q.y * d_.x) > 0.3: continue            # not in this panel's plane
+                de = min(hw - dt, hh - abs(q.z))
+                r = max(r, 0.8 * max(0.0, 1.0 - max(de, 0.0) / 0.24) * (0.8 + 0.4 * noise.noise(p * 4.0 + self.nofs)))
+                break
+        if slot == 'oak':                                 # fully charred: the wear shader blackens it
+            r = 1.0
+        if n.z > 0.5 and p.z > 1.0 and slot in ('oak', 'stone', 'stone_dk'):     # broken tops take the fire hardest
+            r = max(r, min(0.92, 0.45 + 0.10 * (p.z - 1.0)))
+        if slot != 'plaster':
+            r = max(r, min(0.6, 0.17 * max(0.0, p.z - 0.9)) * (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs)))
+        # char around window and door openings (the fire drew through them)
+        if slot not in ('core', 'plaster'):
+            for (a_, d_, o_, oa, ob, z0, z1) in self.open_rects:
+                q = p - a_
+                if abs(q.dot(o_)) > 0.55:
+                    continue
+                t_ = q.dot(d_)
+                dt = max(oa - t_, 0.0, t_ - ob); dz = max(z0 - p.z, 0.0, (p.z - z1) if z1 < 1e8 else 0.0)
+                dd = math.hypot(dt, dz)
+                if dd < 0.6:
+                    r = max(r, 0.85 * (1.0 - dd / 0.6) * (0.8 + 0.3 * noise.noise(p * 3.0 + self.nofs)))
+        # moss and damp stain on the lower walls: strong, low-frequency, highest at the foot, fading by 1.5-2 m, broken up by noise
+        if slot in ('stone', 'stone_dk') and n.z < 0.6:
+            fade = max(0.0, 1.0 - max(0.0, p.z - 0.1) / (1.5 + 0.5 * noise.noise(p * 0.5 + self.nofs)))
+            lf = 0.5 + 0.5 * noise.noise(p * Vector((0.45, 0.45, 0.9)) + self.nofs + Vector((11.0, 3.0, 0.0)))
+            hf = 0.5 + 0.5 * noise.noise(p * 2.6 + self.nofs)
+            gm = max(gm, min(1.0, fade * (0.25 + 1.0 * lf) * (0.65 + 0.5 * hf)))
+        # the clay pot on the stack: not sooted like the shaft under it
+        if self.pot_xy is not None and p.z > self.pot_xy[2] - 0.05 and (p.x - self.pot_xy[0]) ** 2 + (p.y - self.pot_xy[1]) ** 2 < 0.4 ** 2:
+            r = min(r, 0.2); gm = min(gm, 0.1)
+        elif self.chim_soot is not None:                 # soot-dark band over the top 1.5 m of the stack (wear R)
+            pu, ztop = self.chim_soot(p)
+            if pu is not None and pu.z > ztop - 1.5:
+                ramp = min(1.0, (pu.z - (ztop - 1.5)) / 1.0)
+                r = max(r, (0.55 + 0.4 * ramp) * (0.85 + 0.2 * noise.noise(p * 2.5 + self.nofs)))
+                gm *= 1.0 - 0.8 * ramp
+        return (min(1.0, r), min(1.0, gm), res[2], res[3])
+
+    def chim_soot(self, p):
+        """(point in the unrotated stack frame, rim height) if p is on the stack above the shoulder, else (None, 0)."""
+        ch = self.chim
+        pu = Matrix.Rotation(-self.rot, 3, 'Z') @ p if self.rot else p
+        if pu.z < ch['zb'] + 0.1:
+            return None, 0.0
+        cxz = ch['cx'] + math.tan(ch['lean']) * max(pu.z, 0.0)
+        if abs(pu.x - cxz) < ch['W0'] / 2 + 0.2 and pu.y > ch['front'] - 0.3:
+            return pu, ch.get('zt', ch['H'])
+        return None, 0.0
 
     # ---- coursed walls with openings: every course snaps to a global edge list so windows and doors cut cleanly
     def edges(self, hmax, ch):
@@ -108,21 +169,31 @@ class Shell(Ruin):
             e.append(e[-1] + self.R.uniform(*ch))
         return e
 
-    def fill(self, a, b, j, blen, B):
-        R = self.R; out = []; t = a
-        first = R.uniform(0.4, 0.65) * (blen[0] + blen[1]) / 2 * B if j % 2 else None
-        while b - t > 0.02:
-            ln = R.uniform(*blen) * B
-            if first:
-                ln = first; first = None
-            if b - (t + ln) < 0.35 * B:
-                ln = b - t
-            ln = min(ln, b - t)
+    def fill(self, a, b, j, blen, B, k=0):
+        """Stone lengths along a span: 0.3-0.6 m, with a long quoin (0.7-0.95 m) at the span ends on alternating courses."""
+        R = self.R; total = b - a
+        if total < 1.0:
+            n = max(1, int(round(total / 0.45))); cut = [a + total * i / n for i in range(n + 1)]
+            return list(zip(cut[:-1], cut[1:]))
+        quoin = lambda: R.uniform(0.70, 0.95)
+        small = lambda: R.uniform(0.30, 0.42)
+        fl = quoin() if (j + k) % 2 == 0 else small()
+        ll = quoin() if (j + k) % 2 == 1 else small()
+        rest = total - fl - ll
+        if rest < 0.2:
+            n = max(2, int(round(total / 0.5))); cut = [a + total * i / n for i in range(n + 1)]
+            return list(zip(cut[:-1], cut[1:]))
+        out = [(a, a + fl)]; t = a + fl; end = b - ll
+        while end - t > 0.02:
+            ln = R.uniform(*blen)
+            if end - (t + ln) < 0.2:
+                ln = end - t
             out.append((t, t + ln)); t += ln
+        out.append((end, b))
         return out
 
-    def wall_run(self, k, t0, t1, hfn, ch=(0.30, 0.44), openings=(), excl=None, blen=(0.65, 1.05), E=None):
-        R = self.R; g = self.g; B = BLOCK[self.cls]
+    def wall_run(self, k, t0, t1, hfn, ch=(0.25, 0.35), openings=(), excl=None, blen=(0.30, 0.60), E=None):
+        R = self.R; g = self.g; B = 1.0
         a, b, d, out = self.side_frame(k); yaw = math.atan2(d.y, d.x)
         hmax = max(hfn(t0 + (t1 - t0) * i / 40) for i in range(41))
         E = E if E is not None else self.edges(hmax + 0.2, ch)
@@ -145,7 +216,8 @@ class Shell(Ruin):
             for (sa, sb) in spans:
                 if sb - sa < 0.15:
                     continue
-                for (ta, tb) in self.fill(sa, sb, j, blen, B):
+                pieces = self.fill(sa, sb, j, blen, B, k); added = []
+                for pi_, (ta, tb) in enumerate(pieces):
                     tc = (ta + tb) / 2; top = hfn(tc)
                     if z + h * 0.55 >= top:
                         continue
@@ -154,9 +226,26 @@ class Shell(Ruin):
                     last = z + h * 1.6 > top
                     p = a + d * tc + out * R.uniform(-0.03, 0.03)
                     xf = place(p.x, p.y, z + h / 2, yaw + rad(R.uniform(-3, 3)), rad(R.uniform(-1.8, 1.8)), rad(R.uniform(-1.8, 1.8)))
-                    vs, fs = soft_box((tb - ta - 0.035, FOOT_W - R.uniform(0.02, 0.1), h + 0.035), xf, R, soft=R.uniform(0.04, 0.10), wob=0.016,
-                                      bulge=0.01, cuts=0, top_break=0.08 if (last and R.random() < 0.7) else 0.0)
+                    vs, fs = soft_box((tb - ta + 0.03, FOOT_W - R.uniform(0.02, 0.1), h + 0.04), xf, R, soft=R.uniform(0.04, 0.10), wob=0.012,
+                                      bulge=0.008, cuts=0, top_break=0.07 if (last and R.random() < 0.7) else 0.0)
+                    # soft_box(cuts=0) face order: top, -y, +y, -x, +x. Interior blocks keep the two wall faces only (top and ends are hidden by
+                    # the course above and the neighbours); span ends (jambs, openings) and the broken top course keep theirs.
+                    keep = [1, 2]
+                    if last or (z + h * 1.5 > top): keep.append(0)
+                    if pi_ == 0 or pi_ == len(pieces) - 1 or (last and pi_ % 2 == 0): keep += [3, 4]
+                    vs, fs = pick_faces(vs, fs, keep)
                     g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone')
+                    if not last: added.append((ta, tb))
+                # dark backer inside the wall behind the joints: a gap between stones shows dark core, never sky
+                run = None
+                for it in added + [None]:
+                    ta, tb = it if it else (None, None)
+                    if run is not None and (ta is None or ta - run[1] > 0.02):
+                        c0 = a + d * ((run[0] + run[1]) / 2)
+                        bv, bf = soft_box((run[1] - run[0] + 0.02, 0.26, h * 0.92), place(c0.x, c0.y, z + h / 2, yaw), random.Random(1), soft=0.0, wob=0.0, bulge=0.0, cuts=0)
+                        bv, bf = pick_faces(bv, bf, [1, 2]); g.add(bv, bf, 'core'); run = None
+                    if ta is not None:
+                        run = (ta, tb) if run is None else (run[0], tb)
         return E
 
     def sill_and_lintel(self, k, ta, tb, z0, z1, lintel=True):
@@ -178,13 +267,15 @@ class Shell(Ruin):
         R = self.R; g = self.g; x = self.door_x; c = self.rc
         for sgn in (-1, 1):
             hj = Hj if (lintel or sgn < 0) else Hj * 0.6
-            z = 0.40
+            z = 0.40; ji = 0
             while z < hj - 0.1:
-                h = min(R.uniform(0.30, 0.40), hj - z)
-                vs, fs = soft_box((0.36 + R.uniform(-0.03, 0.04), FOOT_W + 0.04, h + 0.03), place(x + sgn * (self.door_w / 2 + 0.2) + R.uniform(-0.03, 0.03), -c, z + h / 2,
+                h = min(R.uniform(0.25, 0.35), hj - z)
+                wq = 0.36 if ji % 2 else R.uniform(0.62, 0.78)                      # jamb quoins: long stones alternate with short, reaching outward
+                xo = x + sgn * (self.door_w / 2 + 0.2 + (wq - 0.36) / 2) + R.uniform(-0.03, 0.03)
+                vs, fs = soft_box((wq + R.uniform(-0.03, 0.04), FOOT_W + 0.04, h + 0.03), place(xo, -c, z + h / 2,
                                   rad(R.uniform(-3, 3)), rad(R.uniform(-1.5, 1.5)), rad(R.uniform(-2, 2))), R, soft=0.12, wob=0.012, bulge=0.008, cuts=0,
                                   top_break=0.06 if z + h >= hj - 0.05 and R.random() < 0.5 else 0.0)
-                g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone'); z += h
+                g.add(vs, fs, 'stone_dk' if R.random() < 0.5 else 'stone'); z += h; ji += 1
             if lintel or sgn < 0:
                 self.cols.append((x + sgn * (self.door_w / 2 + 0.2), -c, 0.36, FOOT_W, hj - 0.1, 'x'))
         if lintel:
@@ -197,7 +288,7 @@ class Shell(Ruin):
     def beam_shape(self, ln, sec, xf):
         """A charred beam: sec = (y, z) section, ends tapered and splintered (jagged, shortened at random)."""
         R = self.R
-        vs, fs = soft_box((ln, sec[0], sec[1]), xf, R, soft=0.10, wob=0.015, bulge=0.0, cuts=2)
+        vs, fs = soft_box((ln, sec[0], sec[1]), xf, R, soft=0.10, wob=0.015, bulge=0.0, cuts=1)
         inv = xf.inverted()
         for i, vv in enumerate(vs):
             l = inv @ vv; e = ln / 2 - abs(l.x)
@@ -207,7 +298,7 @@ class Shell(Ruin):
                 vs[i] = xf @ l
         return vs, fs
 
-    def oak_member(self, P0, P1, yaw, w=0.22, dep=0.24, break_top=0.10):
+    def oak_member(self, P0, P1, yaw, w=0.30, dep=0.28, break_top=0.10):
         R = self.R; v = P1 - P0; ln = v.length
         if ln < 0.25:
             return
@@ -234,39 +325,60 @@ class Shell(Ruin):
                 continue
             tm = (t_end + t_in) / 2
             z0 = ZS + 0.11
-            self.oak_member(P(t_end, z0), P(t_in, z0), yaw, w=0.22)                             # sill plate on the stone
+            self.oak_member(P(t_end, z0), P(t_in, z0), yaw, w=0.30)                             # sill plate on the stone
             base = ZS + 0.22
             posts = {}
             for tt in (t_end, tm, t_in):
                 top = pf(tt) - 0.12
                 if top - base > 0.45:
-                    self.oak_member(P(tt, base), P(tt, top), yaw, w=0.22); posts[tt] = top
+                    self.oak_member(P(tt, base), P(tt, top), yaw, w=0.32); posts[tt] = top
             z_tie = base + 0.5 * (pf(tm) - 0.2 - base)
             if z_tie > base + 0.5:
                 ta_ = t_end if pf(t_end) - 0.15 > z_tie else tm
                 fr = Q.uniform(0.6, 1.0); tb_ = t_in + (ta_ - t_in) * fr
-                self.oak_member(P(tb_, z_tie), P(t_in, z_tie), yaw, w=0.2)                       # tie beam, broken at the outer end
+                self.oak_member(P(tb_, z_tie), P(t_in, z_tie), yaw, w=0.30)                       # tie beam, broken at the outer end
                 if t_end in posts and Q.random() < 0.9:
-                    self.oak_member(P(t_end, base + 0.1), P(tm, z_tie - 0.1), yaw, w=0.18)       # diagonal brace
+                    self.oak_member(P(t_end, base + 0.1), P(tm, z_tie - 0.1), yaw, w=0.28)       # diagonal brace
                 if t_in in posts and Q.random() < 0.7:
-                    self.oak_member(P(t_in, base + 0.1), P(tm, z_tie - 0.1), yaw, w=0.18)
+                    self.oak_member(P(t_in, base + 0.1), P(tm, z_tie - 0.1), yaw, w=0.28)
             if pf(t_end) > ZS + 0.3:
                 pa = P(t_in, pf(t_in) - 0.12); pb = P(t_end, pf(t_end) - 0.08); fr2 = Q.uniform(0.45, 1.0)
-                self.oak_member(pa, pa + (pb - pa) * fr2, yaw, w=0.2)                              # rafter along the rake, outer end gone
+                self.oak_member(pa, pa + (pb - pa) * fr2, yaw, w=0.28)                              # rafter along the rake, outer end gone
             for bi, (ta_, tb_) in enumerate(((t_end, tm), (tm, t_in))):
                 topz = min(pf(ta_), pf(tb_)) - 0.28
-                if open_bay == (half, bi) or topz - base < 0.4 or Q.random() > 0.55:
+                if open_bay == (half, bi) or topz - base < 0.4:
                     continue
-                lo, hi = min(ta_, tb_) + 0.13, max(ta_, tb_) - 0.13
-                ns = 3; sw = (hi - lo) / ns
-                for j in range(ns):
-                    tz = base + (topz - base) * Q.uniform(0.3, 1.0)
-                    if tz - base < 0.2:
-                        continue
-                    tc_ = lo + sw * (j + 0.5); pc = P(tc_, base + (tz - base) / 2)
-                    vs, fs = soft_box((sw - 0.02, 0.13, tz - base), place(pc.x, pc.y, pc.z, yaw + rad(Q.uniform(-1.5, 1.5)), rad(Q.uniform(-1, 1)), rad(Q.uniform(-1, 1))),
-                                      self.R, soft=0.08, wob=0.012, bulge=0.012, cuts=0, top_break=0.12)
-                    self.g.add(vs, fs, 'plaster')
+                lo, hi = min(ta_, tb_) + 0.15, max(ta_, tb_) - 0.15
+                if hi - lo < 0.3:
+                    continue
+                self.plaster_bay(P, yaw, lo, hi, base, topz, Q)
+
+    def plaster_bay(self, P, yaw, lo, hi, base, topz, Q):
+        """A plaster-and-lath infill panel between the posts: a grid of lime-wash cells (about 0.8 x 0.7 m), the upper ones more likely gone; where a
+        cell has fallen out the oak laths show (thin horizontal strips) or the bay is just open. Plaster is 0.12 m thick, recessed in the frame."""
+        nc = max(1, int(round((hi - lo) / 0.85))); nr = max(1, int(round((topz - base) / 0.7)))
+        cw = (hi - lo) / nc; chh = (topz - base) / nr
+        gone = {(ci, ri): Q.random() < 0.12 + 0.45 * (ri + 0.5) / nr for ci in range(nc) for ri in range(nr)}
+        for ci in range(nc):
+            for ri in range(nr):
+                z0 = base + ri * chh; tc_ = lo + (ci + 0.5) * cw; pc = P(tc_, z0 + chh / 2)
+                if gone[(ci, ri)]:
+                    if Q.random() < 0.6:                                   # lath showing: 2 thin strips across the hole
+                        for li in range(2):
+                            zl = z0 + chh * (li + 0.5) / 2
+                            pl = P(tc_, zl)
+                            vs, fs = soft_box((cw - 0.02, 0.05, 0.05), place(pl.x, pl.y, pl.z, yaw + rad(Q.uniform(-1, 1)), rad(Q.uniform(-2, 2)), rad(Q.uniform(-3, 3))),
+                                              self.R, soft=0.2, wob=0.006, bulge=0.0, cuts=0, top_break=0.02)
+                            vs, fs = pick_faces(vs, fs, [1, 2]); self.g.add(vs, fs, 'oak')
+                    continue
+                vs, fs = soft_box((cw - 0.03, 0.12, chh - 0.03), place(pc.x, pc.y, pc.z, yaw + rad(Q.uniform(-1.5, 1.5)), rad(Q.uniform(-1, 1)), rad(Q.uniform(-1, 1))),
+                                  self.R, soft=0.10, wob=0.014, bulge=0.012, cuts=0, top_break=0.10 if ri == nr - 1 else 0.03)
+                keep = [1, 2]                                              # faces: top, -y, +y, -x, +x; edges show only next to a hole or the bay border
+                if ri == nr - 1 or gone[(ci, ri + 1)]: keep.append(0)
+                if ci == 0 or gone[(ci - 1, ri)]: keep.append(3)
+                if ci == nc - 1 or gone[(ci + 1, ri)]: keep.append(4)
+                vs, fs = pick_faces(vs, fs, keep); self.g.add(vs, fs, 'plaster')
+                self.panels.append((Vector(pc), (P(1.0, 0.0) - P(0.0, 0.0)).normalized(), cw / 2, chh / 2))
 
     def wall_posts(self, k, t, n, gap, hgt):
         """Mid: one or two charred posts standing from a wall top, a broken top plate between them."""
@@ -298,8 +410,8 @@ class Shell(Ruin):
 
     def chimney_pot(self):
         R = self.R; sx, sy, sz = self.smoke.x, self.smoke.y, self.smoke.z
-        rings = [(0.0, 0.17), (0.14, 0.22), (0.38, 0.17), (0.5, 0.21), (0.5, 0.13), (0.4, 0.12)]
-        n = 10; vs = []; fs = []
+        rings = [(0.0, 0.25), (0.20, 0.31), (0.55, 0.25), (0.72, 0.29), (0.72, 0.18), (0.60, 0.17)]
+        n = 8; vs = []; fs = []
         for (z, r_) in rings:
             for i in range(n):
                 a_ = 2 * math.pi * i / n
@@ -309,7 +421,7 @@ class Shell(Ruin):
                 i2 = (i + 1) % n
                 fs.append((j * n + i, j * n + i2, (j + 1) * n + i2, (j + 1) * n + i))
         fs.append(tuple((len(rings) - 1) * n + i for i in range(n)))
-        self.cg.add(vs, orient(vs, fs), 'core')
+        self.cg.add(vs, orient(vs, fs), 'stone_dk'); self.pot_xy = (sx, sy, sz)
 
     def lean_beam(self, k, t, ang, skew, sec=(0.20, 0.25)):
         R = self.R; g = self.g; info = self.wall_info[k]
@@ -388,19 +500,20 @@ class Shell(Ruin):
         else:
             ch['H'] = {'S': 4.6, 'M': 5.2, 'L': 5.9}[cls] + Q.uniform(-0.25, 0.25)
             ch['zb'] = {'S': 2.0, 'M': 2.2, 'L': 2.5}[cls]
-        ch['W0'] = {'S': 1.25, 'M': 1.30, 'L': 1.38}[cls]; ch['D0'] = {'S': 1.15, 'M': 1.20, 'L': 1.25}[cls]; ch['front'] = ch['ymax'] - ch['D0']
+        ch['W0'] = {'S': 1.60, 'M': 1.70, 'L': 1.80}[cls]; ch['D0'] = {'S': 1.25, 'M': 1.30, 'L': 1.35}[cls]; ch['front'] = ch['ymax'] - ch['D0']
+        ch['Wtop'] = {'S': 0.90, 'M': 1.00, 'L': 1.10}[cls]            # shaft width: a clear taper from the 1.6-1.8 m breast
         self.build_chimney()
         if self.rot:
             Rz = Matrix.Rotation(self.rot, 3, 'Z')
             self.cg.v = [Rz @ vv for vv in self.cg.v]; self.smoke = Rz @ self.smoke
-        if v == 'A':
+        if random.Random(self.seed ^ (0x907 if tall else 0x9A1)).random() < 0.5:       # clay pot on about half of the stacks (seeded)
             self.chimney_pot()
         self.build_doorstep()
         self.hearth_build()
         # chimney position along the gable side
         Pc = Matrix.Rotation(self.rot, 3, 'Z') @ Vector((ch['cx'], ch['ymax'] - ch['D0'] / 2, 0))
         a, b, d, out = self.side_frame(gs); tcg = (Pc - a).dot(d)
-        W0, W1, W2, zb = ch['W0'], ch['W0'] * 0.85, ch['W2'], ch['zb']
+        W0, W1, W2, zb = ch['W0'], ch['W0'] * 0.80, ch['W2'], ch['zb']
         def excl_g(tc, z, hh):
             return abs(tc - tcg) < ((W0 / 2 + 0.08) if z + hh <= zb + 0.2 else (W1 / 2 + 0.12))
         Ls = {k: (self.side_frame(k)[1] - self.side_frame(k)[0]).length for k in range(4)}
@@ -508,6 +621,8 @@ class Shell(Ruin):
             ex = excl_g if k == gs else None
             E = self.wall_run(k, span[k][0], span[k][1], fn[k], openings=ops[k], excl=ex, E=(E_g if (k == gs and tall) else None))
             self.wall_info[k]['E'] = E
+            fa_, fb_, fd_, fo_ = self.side_frame(k)
+            self.open_rects += [(fa_, fd_, fo_, oa, ob, z0, z1) for (oa, ob, z0, z1) in self.wall_info[k]['ops']]
             if k == gs and tall:
                 self.wall_info[k]['btop'] = lambda t: hg(t) - 0.4
         for (k, ta, tb, z0, z1) in wins:
@@ -805,7 +920,7 @@ def review(vs):
     hm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.9, 0.35, 0.05, 1)
     shells = [v for v in vs if v['kind'] == 'shell']
     if len(shells) >= 1:
-        cw, chh = 333, 300; cells = []
+        cw, chh = int(K['arg']('--cw', '333')), int(K['arg']('--chh', '300')); cells = []
         order = [n for n in SHELL_NAMES if any(v['name'] == n for v in shells)]
         order = sorted(order, key=lambda n: (SIZES.index(n.split('_')[1]), 0 if n.endswith('Tall') else 1, n.split('_')[2]))
         hmn = human(0, 0, hm)
@@ -816,7 +931,7 @@ def review(vs):
             eye = (-math.sin(ang) * dist, -math.cos(ang) * dist, CAMZ)
             cam = K['cam_at']('cam', eye, (0, 0, min(v['zmax'] * 0.42, 3.2)), fov=36)
             p = os.path.join(OUT, n + '_3q.png'); render_cell(p, cam, cw, chh); cells.append(p)
-        sheet(cells, 3, cw, chh, os.path.join(OUT, SHEETNAME))
+        sheet(cells, min(3, len(cells)), cw, chh, os.path.join(OUT, SHEETNAME))
         hmn.location = (50, 50, 0)
     props = [v for v in vs if v['kind'] == 'prop']
     if props:

@@ -4,6 +4,7 @@
 // a BoxCollider fitted to its bounds on a renderer-less child (the camera boom and the hero cannot pass through the walls and stacks).
 using System;
 using System.Collections.Generic;
+using SleepingCalamity.Core;
 using UnityEditor;
 using UnityEngine;
 
@@ -37,6 +38,31 @@ namespace SleepingCalamity.EditorTools
         public static RuinClass Built(string lotId) => built.TryGetValue(lotId, out RuinClass c) ? c : RuinClass.Low;
         public static void Record(string lotId, RuinClass c) { built[lotId] = c; if (c != RuinClass.Low) ShellCount++; }
         public static IEnumerable<KeyValuePair<string, RuinClass>> BuiltAll => built;
+
+        // Shell round 3: Tall lots turn their door to the lane (the doorstep wins) and pick the file variant whose gable end (the charred half-timber and plaster frame) shows from
+        // the lane or the square: B has its gable on the art's +X side, C on -X, A on the back (-Z, never seen from the lane, so Tall lots never take A). Core's RuinVariant / RuinTurn stay as they are
+        // (names, layout tests); this only changes the file and the placed yaw. Lot Yaw's +Z points away from the lane (Foundation.FacingYaw: the lane side is the door side).
+        public static int DoorTurn(Foundation f)
+        {
+            int t = (int)Math.Round((f.FacingYaw + 180f - f.Yaw) / 90f);
+            return ((t % 4) + 4) % 4;
+        }
+
+        public static float ShellYaw(Foundation f, RuinClass c) => f.Yaw + 90f * (c == RuinClass.Tall ? DoorTurn(f) : f.RuinTurn);
+
+        public static string VariantFor(Foundation f, RuinClass c)
+        {
+            if (c != RuinClass.Tall) return f.RuinVariant;
+            float th = ShellYaw(f, c) * Mathf.Deg2Rad;
+            Vector2 gB = new Vector2(Mathf.Cos(th), -Mathf.Sin(th));            // world direction of B's gable end (art +X)
+            Vector2 toSquare = new Vector2(-f.Centre.X, -f.Centre.Z);
+            float len = toSquare.magnitude;
+            float dB = len > 0.01f ? Vector2.Dot(gB, toSquare / len) : 0f;
+            // the door faces the square head-on (|dB| near 0): both gable ends flank the view and show obliquely, so A (gable hidden on the back) is never used; pick by lot id
+            if (Mathf.Abs(dB) < 0.2f) dB = (f.Id[f.Id.Length - 1] & 1) == 0 ? 1f : -1f;
+            char v = dB > 0f ? 'B' : 'C';
+            return f.RuinVariant.Substring(0, f.RuinVariant.Length - 1) + v;
+        }
 
         // "Ruin_M_A" + Mid -> "Ruin_M_A_Mid"; Low keeps the base name.
         public static string FileName(string variant, RuinClass c) => c == RuinClass.Low ? variant : variant + "_" + c;

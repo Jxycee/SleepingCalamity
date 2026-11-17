@@ -278,8 +278,8 @@ namespace SleepingCalamity.EditorTools
             var root = new GameObject("Dress_ChimneyStones").transform; root.SetParent(dress, false);
             float top = b.max.y, hx = b.extents.x, hz = b.extents.z;
             // corbel / cap stones
-            int caps = 5;
-            int missing = rnd.Next(caps);
+            int caps = shell ? 0 : 5;   // shells carry their own cap and drip course; a ring of loose corbels at the (wide) breast bounds floated off the shaft
+            int missing = caps > 0 ? rnd.Next(caps) : -1;
             for (int i = 0; i < caps; i++)
             {
                 if (i == missing) continue;
@@ -367,7 +367,11 @@ namespace SleepingCalamity.EditorTools
                 }
             }
             Vector3 toSun = -(MorningSun * Vector3.forward);
-            Vector3[] normals = { Vector3.right, Vector3.left, Vector3.back };   // never Vector3.forward: the firebox
+            // never the firebox face: the art's +Z for variant A (stack on the back wall); B and C put the stack on a side wall, its firebox faces the room (toward the ruin's centre)
+            Vector3 toRoom = -((lo + hi) * 0.5f); toRoom.y = 0f;
+            Vector3 fire = Mathf.Abs(toRoom.x) > Mathf.Abs(toRoom.z) ? (toRoom.x > 0f ? Vector3.right : Vector3.left) : (toRoom.z > 0f ? Vector3.forward : Vector3.back);
+            var nl = new List<Vector3>(); foreach (Vector3 c4 in new[] { Vector3.right, Vector3.left, Vector3.back, Vector3.forward }) if (c4 != fire) nl.Add(c4);
+            Vector3[] normals = nl.ToArray();
             Vector3 best = normals[0]; float bestDot = shell ? float.MaxValue : float.MinValue;
             foreach (Vector3 n in normals)
             {
@@ -378,7 +382,7 @@ namespace SleepingCalamity.EditorTools
             Vector3 faceL = centreL + Vector3.Scale(best, ext);
             Vector3 N = ruin.TransformDirection(best).normalized;
             float stackH = hi.y - lo.y;
-            float faceW = (best == Vector3.back ? ext.x : ext.z) * 2f;
+            float faceW = ((best == Vector3.back || best == Vector3.forward) ? ext.x : ext.z) * 2f;
             float targetH = shell ? Mathf.Min(0.6f * stackH, 4.5f) : Mathf.Min(0.55f * stackH, 2.6f);
             float lateral = ((float)rnd.NextDouble() - 0.5f) * faceW * 0.3f;
             Vector3 faceW3 = ruin.TransformPoint(faceL);

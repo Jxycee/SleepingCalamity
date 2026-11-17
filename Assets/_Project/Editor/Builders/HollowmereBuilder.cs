@@ -704,8 +704,10 @@ namespace SleepingCalamity.EditorTools
             RuinArt art = null;
             if (cls != RuinClass.Low)
             {
-                art = LoadRuin(HollowmereRuinShells.FileName(f.RuinVariant, cls));
-                if (art == null) { Debug.LogWarning("SC HOLLOWMERE ruin shell " + HollowmereRuinShells.FileName(f.RuinVariant, cls) + " missing for lot " + f.Id + ": low ruin instead"); cls = RuinClass.Low; }
+                string shellVariant = HollowmereRuinShells.VariantFor(f, cls);
+                art = LoadRuin(HollowmereRuinShells.FileName(shellVariant, cls));
+                if (art != null && cls == RuinClass.Tall) Debug.Log("SC HOLLOWMERE gable " + f.Id + " " + shellVariant + " (core " + f.RuinVariant + ", door turn " + HollowmereRuinShells.DoorTurn(f) + ")");
+                if (art == null) { Debug.LogWarning("SC HOLLOWMERE ruin shell " + HollowmereRuinShells.FileName(shellVariant, cls) + " missing for lot " + f.Id + ": low ruin instead"); cls = RuinClass.Low; }
             }
             if (art == null) art = LoadRuin(f.RuinVariant);
             if (art == null) return false;
@@ -713,7 +715,7 @@ namespace SleepingCalamity.EditorTools
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(art.Fbx, lot);
             obj.name = "Ruin_" + f.RuinVariant.Substring(5) + "_T" + f.RuinTurn;
             obj.transform.localPosition = Vector3.zero;
-            obj.transform.rotation = Quaternion.Euler(0f, f.Yaw + 90f * f.RuinTurn, 0f);
+            obj.transform.rotation = Quaternion.Euler(0f, HollowmereRuinShells.ShellYaw(f, cls), 0f);   // Tall shells: door on the lane (cls is Low here when no shell was found, then RuinTurn as before)
             if (cls != RuinClass.Low)
             {
                 PrefabUtility.UnpackPrefabInstance(obj, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);   // the collision stand-ins lose their mesh components
