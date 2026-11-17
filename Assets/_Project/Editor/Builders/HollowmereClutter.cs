@@ -287,7 +287,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // The prefab instance of an asset with its slots mapped, FOOTPRINT hidden. Null when the art is not there (the caller builds a greybox).
-        static GameObject Instantiate(string asset, Transform parent)
+        internal static GameObject Instantiate(string asset, Transform parent)   // T06: HollowmereStreetClutter places the same art as street props
         {
             GameObject fbx = Model(asset);
             if (fbx == null) return null;

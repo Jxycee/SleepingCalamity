@@ -227,6 +227,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereWild.Build(set, ruined, rebuilt, t);   // area 1 rework: the great tree, town trees, the wall belt, Bell Hill's forest, square drift (after everything with a collider)
             HollowmereRevetment.Build(ruined, rebuilt);   // T08c: the stone face down the steep bank under the town wall, both presets (after every collider; it has none)
             HollowmereShore.Build(set, ruined, rebuilt, t);   // T08b: the wall bank, the shore, the mill yard and the tree bases outside the wall (after the trees, the jetty and every collider)
+            HollowmereStreets.Build(set, ruined, rebuilt, t);   // T06: decal projectors, wall-foot strips, street clutter clusters, lane landmarks and story props inside the wall (after every collider)
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");

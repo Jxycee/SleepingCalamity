@@ -68,11 +68,12 @@ Round 3b (620aceab; gate PASS marker = 620aceab; play loop PASS; build twice ide
 - **The Bakery-view right stack still shows the dark-square checker**, unchanged from R4/R5: the 3b fix (stack jitter in the generator) did not touch it, so that stack is probably not a shell (low kit `sc_ruin_kit.py` stack, or another builder). Next round: identify the object by a probe (renderer under that pixel) before any fix.
 - **Gables are edge-on from every lane** (door to the lane, gable on a side wall); only RingWest shows one, small. Concept H4 is a gable-fronted house. Next round: Tall shells put the charred gable over the door end (front gable, door in the gable wall, stack to the back or side), so the gable faces the lane.
 - Moss at wall feet is a vivid green in sun: mute it toward olive-grey.
+Round 3c (00e73432; gate PASS marker = 00e73432; play loop PASS; build twice identical for the scene and FBX metas): the checker was F02's Mid shell (`Ruin_L_B_Mid`), cause smoothed normals (every 0.3 m stone shaded as a pillow under the grazing sun); shells now flat-shaded. Tall shells have a front gable over the door wall (A stack back-centre, B back-left, C left side wall), `VariantFor` returns Core's variant again; moss olive-grey. R7 verdict (`R7/R7_sheet_A.jpg`): Spawn 22 -> 23, West 22 -> 23, Bakery 20 -> 22, InnFront 18 -> 19, Balcony 22 -> 23, Postcard 25. Gable frames now show in Spawn, West, Balcony, RingWest, small; fuller frames (fewer open bays) are a T13 item. Shell round 3 closed.
 
 ## Resume order (2026-11-17, after the handoff)
 
 ## Resume order (2026-11-17, after the handoff)
-1. **T08b** done (c3ca712a). **T08c** done (19514f61, stone revetment).
+1. **T08b** done (c3ca712a). **T08c** done (19514f61, stone revetment). **Shell round 3** done (313a1fd3, 620aceab, 00e73432). **T06** streets running next.
 2. **Shell round 3** (brief below): the shells are the reason D1 sits at 22/25/22.
 3. **T06** streets; **T07** orchard and allotments; **T09** bell yard, churchyard, crag (N01-N03); **T10** road out, boundary, hill edge; **T11** atmosphere and backdrop (mountain spike, flat far ranges); **T12** LOD and APV trial; **T13** round 2; **T14** landing.
 One Sonnet implementer at a time; every brief carries the verification rules (section above) and the known churn list (add `M_HM_WallIvy.mat` and `M_HH_OldStone.mat`: they flip `_Color` between builds).
