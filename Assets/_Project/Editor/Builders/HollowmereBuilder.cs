@@ -225,6 +225,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
             HollowmereRoad.Build(set, ruined, rebuilt, t);   // Q15: the Saltwake road's dressing, the field hedgerows and trees, the backdrop ring
             HollowmereWild.Build(set, ruined, rebuilt, t);   // area 1 rework: the great tree, town trees, the wall belt, Bell Hill's forest, square drift (after everything with a collider)
+            HollowmereShore.Build(set, ruined, rebuilt, t);   // T08b: the wall bank, the shore, the mill yard and the tree bases outside the wall (after the trees, the jetty and every collider)
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");

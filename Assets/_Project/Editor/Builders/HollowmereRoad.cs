@@ -42,7 +42,7 @@ namespace SleepingCalamity.EditorTools
         // ------------------------------------------------------------------------------------------------ entry
         public static void Build(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
         {
-            Models.Clear(); slots = null; placed = greybox = cards = 0;
+            Models.Clear(); slots = null; hedgeSlots = null; placed = greybox = cards = 0;
             terrain = set.GetComponentInChildren<Terrain>();
             List<RoadItem> plan = SaltwakeRoadPlan.Create(t);
 
@@ -109,6 +109,37 @@ namespace SleepingCalamity.EditorTools
             return slots;
         }
 
+        // T08b: the roadside hedge's leaves were giant (cabbages at 2 m): the hedge FBX takes a copy of the B9 foliage material with its leaf texture tiled 3 x 3 (leaves a third the size).
+        static Dictionary<string, Material> hedgeSlots;
+        static Dictionary<string, Material> HedgeSlots()
+        {
+            if (hedgeSlots != null) return hedgeSlots;
+            hedgeSlots = new Dictionary<string, Material>(Slots());
+            Material leaf = HollowmereFoliage.FoliageMaterial();
+            if (leaf != null)
+            {
+                BuilderUtil.EnsureFolder(MaterialsFolder);
+                Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_RD_RoadHedge.mat", leaf.shader);
+                m.CopyPropertiesFromMaterial(leaf);
+                foreach (string tex in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" }) if (m.HasProperty(tex)) m.SetTextureScale(tex, new Vector2(3f, 3f));
+                EditorUtility.SetDirty(m);
+                hedgeSlots["B9_Foliage"] = m;
+            }
+            return hedgeSlots;
+        }
+
+        // T08b: a road kit piece (Fence_Rail ...) for HollowmereShore's mill yard: the prefab with the wall kit's materials mapped and FOOTPRINT removed; null when the art is missing.
+        internal static GameObject Prop(string piece, Transform parent)
+        {
+            GameObject prefab = Model(piece);
+            if (prefab == null) return null;
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            HollowmereTownWall.ApplyMaterials(go, Slots(), piece);
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true)) if (r.name == "FOOTPRINT") Object.DestroyImmediate(r);
+            go.name = piece;
+            return go;
+        }
+
         // ------------------------------------------------------------------------------------------------ 1. roadside pieces
         static void Piece(Transform parent, RoadItem i)
         {
@@ -120,7 +151,7 @@ namespace SleepingCalamity.EditorTools
             if (prefab != null)
             {
                 go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
-                HollowmereTownWall.ApplyMaterials(go, Slots(), i.Piece);
+                HollowmereTownWall.ApplyMaterials(go, i.Kind == RoadItemKind.Hedge ? HedgeSlots() : Slots(), i.Piece);
                 foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
                     if (r.name == "FOOTPRINT") { Object.DestroyImmediate(r); }
             }

@@ -239,6 +239,7 @@ namespace SleepingCalamity.EditorTools
                             soil = Mathf.Max(soil, wood * (0.10f + 0.30f * Smooth(0.45f, 0.8f, litter)) + 0.35f * cragFace);
                             path = Mathf.Max(path, wood * 0.10f * Smooth(0.55f, 0.85f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
                         }
+                        float shoreStone = 0f, bankStone = 0f;
                         if (ow > 0f)
                         {
                             // T08 ground breakup outside the wall: 2-6 m patches of bare earth (1-4 m across, ragged edges), dry yellow-green patches (path layer) and a darker
@@ -251,6 +252,17 @@ namespace SleepingCalamity.EditorTools
                             soil = Mathf.Max(soil, ow * 0.38f * Smooth(0.48f, 0.74f, Mathf.PerlinNoise(x * 0.12f + 251f, z * 0.12f + 9f)));
                             float bank = ow * Smooth(20f, 36f, steep) * (0.10f + 0.22f * Mathf.PerlinNoise(x * 0.33f + 5f, z * 0.33f + 17f)) * (1f - 0.85f * Smooth(0.2f, 3f, hill));
                             soil = Mathf.Max(soil, bank);
+                            // T08b: dark, rich earth under the grass on the slope below the wall (e 29-38, a ragged foot line at 33-43 that follows two noise scales; none on lanes
+                            // or Bell Hill), and a ragged earth-and-shingle band at the waterline (the old rule multiplied the shore soil by 0.3 outside the wall).
+                            float footN = Mathf.PerlinNoise(x * 0.17f + 61f, z * 0.17f + 29f), footN2 = Mathf.PerlinNoise(x * 0.45f + 7f, z * 0.45f + 93f);
+                            float bankZone = (1f - Smooth(33f + 5f * footN + 1.2f * footN2, 36.5f + 6f * footN + 1.2f * footN2, e)) * Smooth(28.9f, 29.6f, e);
+                            bankZone *= (1f - 0.85f * Smooth(0.2f, 3f, hill)) * Smooth(0.6f, 3.2f, lane) * Smooth(5f, 15f, steep);   // slopes only: the flat meadow between the wall and the lake keeps its grass
+                            soil = Mathf.Max(soil, bankZone * (0.30f + 0.50f * Smooth(0.25f, 0.75f, Mathf.PerlinNoise(x * 0.62f + 19f, z * 0.62f + 3f))));   // grass tufts and earth in 1-2 m patches, not one tan plane
+                            bankStone = bankZone * 0.0f * Smooth(0.45f, 0.70f, Mathf.PerlinNoise(x * 0.5f + 3f, z * 0.5f + 11f));   // the cobble layer's grey rubble flecks in the earth
+                            float shoreY = HollowmereLayout.WaterY + 0.45f + 0.8f * footN + 0.5f * footN2;
+                            float shoreBand = 1f - Smooth(shoreY, shoreY + 0.9f, y);
+                            soil = Mathf.Max(soil, ow * 0.92f * shoreBand);
+                            shoreStone = Mathf.Max(bankStone, ow * 0.55f * Smooth(0.42f, 0.68f, a3) * (1f - Smooth(HollowmereLayout.WaterY + 0.25f, HollowmereLayout.WaterY + 0.9f + 0.7f * footN2, y)));
                         }
                         soil = Mathf.Clamp01(soil + 0.18f * n1);
                         path = Mathf.Clamp01(path) * (1f - soil);
@@ -260,6 +272,7 @@ namespace SleepingCalamity.EditorTools
                         float rock = 0.65f * Smooth(22f, 36f, steep) * (1f - Smooth(0.2f, 1.2f, -lane));
                         rock *= 1f - ow;                                   // T08: no cobble outside the wall
                         rock *= 1f - 0.85f * Smooth(0.2f, 3f, hill);   // Bell Hill (28-34 degrees all over) is not a rubble bank: the cobble layer stretched there read as tiles
+                        rock = Mathf.Max(rock, shoreStone);              // T08b: shingle at the waterline (the cobble layer's grey rubble flecks)
                         grass *= 1f - rock; soil *= 1f - rock; path *= 1f - rock; cobble = rock;
                     }
                     a[j, i, 0] = grass; a[j, i, 1] = soil; a[j, i, 2] = path; a[j, i, 3] = cobble;

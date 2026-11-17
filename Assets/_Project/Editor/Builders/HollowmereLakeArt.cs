@@ -7,7 +7,7 @@
 // landmarks (HollowmereTerrain.IsPaved, footprints with a 2 m margin), on the jetty line, or within 2.5 m of a capture camera.
 //   Jetty        root on the north shore near x -22 where the terrain falls through the deck level going south, deck toward the lake centre (+2 deg off true),
 //                deck top at WaterY + 0.6. Cap_HM_LakeJetty looks at it from the land side (HollowmereBuilder.Cameras).
-//   Reeds        clusters of 3-5 clumps (yaw random, scale 0.85-1.2), 7 m apart, on lake ground -12.35..-11.75 (~60) and on ravine pool edges 0.1-0.4 m below the reach's level (~25).
+//   Reeds        T08b: three dense beds of 22 clumps on the north shore plus 10 loose clusters (was ~60 evenly spread), and on ravine pool edges 0.1-0.4 m below the reach's level (~25).
 //   Shore stones clusters of 3-5 on lake ground -12.3..-11.85 (base 3 cm under the ground, so the water stands ~17 cm up the stone; ~40) and on the pool banks (~15).
 //   Boulders     a row across the channel on each weir lip (W1, W2) with three gaps where the fall shows, tops 0.2-0.5 m above the upper pool; plus boulders in each
 //                pool, below the mill tail and above it (~35 in all).
@@ -41,6 +41,7 @@ namespace SleepingCalamity.EditorTools
         static Dictionary<string, Piece> pieces;
         static Transform root;
         static Vector2 jettyA, jettyB;
+        public static Vector2 JettyStart => jettyA;   // x, z of the jetty's root on the bank (T08b: HollowmereShore keeps its dressing off the planks)
         public static Vector2 JettyEnd => jettyB;   // x, z of the jetty's seaward end (set by BuildJetty)
         static readonly List<Vector2> cams = new();
         static readonly Dictionary<string, int> counts = new();
@@ -60,7 +61,7 @@ namespace SleepingCalamity.EditorTools
             root = new GameObject("LakeShore").transform; root.SetParent(set, false);
 
             BuildJetty();
-            ShoreReeds(60);
+            ReedBeds();
             PoolReeds(25);
             ShoreStones(40);
             PoolStones(15);
@@ -234,7 +235,40 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        static void ShoreReeds(int total) => LakeClusters("ShoreReeds", total, -12.35f, -11.75f, 7f, 1.6f, ReedKinds, 0.85f, 1.2f, 0f, true);
+        // T08b: three dense reed beds (about 22 clumps each, 3.4 m across, longer along the shore) at the waterline nearest to three anchors on the north shore, plus ten loose
+        // clumps; the old even scatter of 60 read as a sprinkle. A bed's centre is the first free spot of the reed band nearest its anchor, 10+ m from the jetty.
+        static readonly Vector2[] BedAnchors = { new Vector2(2f, -79f), new Vector2(30f, -78f), new Vector2(56f, -83f) };
+        static void ReedBeds()
+        {
+            Transform g = Group("ShoreReeds");
+            var centres = new List<Vector2>();
+            foreach (Vector2 anchor in BedAnchors)
+            {
+                Vector2 best = Vector2.zero; float bestD = float.MaxValue;
+                for (float x = anchor.x - 30f; x <= anchor.x + 30f; x += 1f)
+                    for (float z = anchor.y - 14f; z <= anchor.y + 14f; z += 1f)
+                    {
+                        float gy = ground(x, z);
+                        if (gy < -12.35f || gy > -11.75f || !Allowed(x, z) || DistToJetty(x, z) < 10f) continue;
+                        float d = (x - anchor.x) * (x - anchor.x) + (z - anchor.y) * (z - anchor.y);
+                        if (d < bestD && Spaced(centres, x, z, 14f)) { bestD = d; best = new Vector2(x, z); }
+                    }
+                if (bestD == float.MaxValue) continue;
+                centres.Add(best);
+                // along-shore direction: perpendicular to the direction toward the lake centre
+                Vector2 toLake = (new Vector2(HollowmereLayout.LakeCentre.X, HollowmereLayout.LakeCentre.Z) - best).normalized, along = new Vector2(-toLake.y, toLake.x);
+                int placed = 0;
+                for (int attempt = 0; attempt < 400 && placed < 22; attempt++)
+                {
+                    float u = R(-1f, 1f) * 3.4f, v = R(-1f, 1f) * 1.5f;
+                    float mx = best.x + along.x * u + toLake.x * v, mz = best.y + along.y * u + toLake.y * v, my = ground(mx, mz);
+                    if (my < -12.5f || my > -11.7f || !Allowed(mx, mz) || DistToJetty(mx, mz) < 4f) continue;
+                    Put(ReedKinds[rng.Next(ReedKinds.Length)], g, new Vector3(mx, my, mz), R(0f, 360f), R(0.95f, 1.35f));
+                    placed++;
+                }
+            }
+            LakeClusters("ShoreReedsLoose", 10, -12.35f, -11.75f, 9f, 1.2f, ReedKinds, 0.8f, 1.1f, 0f, true);
+        }
         static void ShoreStones(int total) => LakeClusters("ShoreStones", total, -12.3f, -11.85f, 5f, 1.4f, ShoreKinds, 0.8f, 1.3f, 0.03f, true);
 
         static float LevelOfReach(int i) => HollowmereWater.PoolLevels[i];
