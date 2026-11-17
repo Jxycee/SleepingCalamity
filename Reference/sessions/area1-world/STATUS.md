@@ -20,8 +20,20 @@ Code Mode: not offered in a Desktop session.
 | T01 cameras, sheet tool, baseline, scene composition | done, gate PASS 1859/1859, pushed | 4dbeb2f3 | `R0/` JPGs and sheets A/B; `tools/sheet_area.py`, `tools/scene_composition.py`; `scene-composition.md` |
 | T02 ruin shell kit | done (2 rounds), not yet in Unity | 34568e7b, 2ce1fa03 | `Art/Staging/area1-world/shells/` (23 FBX), generator `Art/Blender/town/sc_ruin_shells.py` |
 | T04 nature set | done by its commit; its final report was cut by the limit, so unreviewed | 75329ede | `Art/Staging/area1-world/nature/N01..N07` and `SOURCES.md`; contact sheet in scratch `nature\contact_sheet.png` (not looked at) |
-| T03 scene diet | cut by the limit after a few minutes, nothing changed on disk; being resumed | | brief below |
-| T05 onward | not started | | revised order below |
+| T03 scene diet | done, pushed; gate PASS 1859/1859 but run before the commit (marker is not e1e9ca72: T05's gate covers it) | e1e9ca72 | scene 59.6 -> 38.6 MB; 274 LFS mesh assets in `Content/Generated/Hollowmere/` through one scene-level pass (`GeneratedMeshes.Externalize`); build twice identical; three-camera blurred difference under 0.6/255 |
+| T05 shells into the town | running (launched 21:50) | | brief: shells by the height table, shell colliders, rubble spill, ivy, camera fixes, R1 sheets, play loop tests, gate after commit |
+| T06 onward | not started | | order below |
+
+## Verification rules in force (coordinator's note `verification-practice.md`)
+Each report is checked against `git show --stat` and the sheet; before and after from the same cameras; no stray `.unity`/`.prefab`/`.mat` in a commit; gate after the commit so `SC MARKER` equals HEAD; play loop tests for any collider or ground change; judged against the concept row; three failed rounds on one item means stop and ask.
+
+## Known churn (not ours; revert before every commit, never commit)
+A plain `build` rewrites, the same way every time: `M_GD_Leaf.mat`, `M_GD_Produce.mat`, `M_GD_Straw.mat`, `M_GD_patch_rust.mat`, `M_GD_patch_seam.mat`, `M_StoneCottage_B_SC_Rubble.mat` (float noise in `_Color`), `Assets/_Project/Prefabs/CellarFloorSync.prefab`, `Assets/_Project/Scenes/CellarFloorTest.unity`; once also `Content/Materials/Enemies/M_Slime_Glass.mat`. A churn bug for the coordinator.
+
+## Rejection list (tried, did not work; do not repeat)
+- Stair treads sharing one mesh by dimensions: each tread is seeded from its step id (joints, jitter, UV), so sharing would change the stairs' look. Left as 220 assets.
+- HillWest camera at (-36, 23) or (-38, 23) looking east: it faces the keep's 7 m west retaining wall in shade. Moved in T05 to look north-north-east at the crag foot; the churchyard gets its own camera on the terrace.
+- All-stone ruin shells with single-block stacks (shell kit round 1): read as generic stone ruins, not Hollowmere houses. Round 2 has stone below, charred half-timber and plaster above.
 
 ## Baseline verdict (R0, Ruined, Morning; strict /40)
 Seen on sheet B: LowerLane 16, RingWest 15, RingSouth 14, Orchard 10, Mill 11, Meadow 8, Lake 13, JettyBack 12, RoadOut 17, RoadBack 15. From Run 6 (same views): Spawn 22, Postcard 25, West 22, Climb 20, BellYard 17, Balcony 22. Not seen: Bakery, InnFront, HillWest (HillWest is nearly black: p50 0.08; it looks straight at the morning-shaded crag from (-38, 23): retarget it to look east-south-east along the church wall, or move it to about (-34, 20)).
