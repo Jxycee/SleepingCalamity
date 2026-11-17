@@ -1,6 +1,6 @@
 # Area 1 world (Fable Run 7) STATUS
 
-State: **building; handoff written at 252k context (2026-11-16 21:05 Central)**. A restarted session needs only this file and the plan `docs/design/area1-world-build.md`. Brief: `side-session-notes/local_88bfb1c1-.../run7-fable-whole-area1-brief.md`.
+State: **handoff for a /clear (2026-11-17, after T08a; context about 420k)**. The session now runs on Opus 5.5 high (Fable left the user's plan, 2026-11-17). Next: T08b, then the shell round (briefs below). Work silently (user rule): text only for work, a decision, a blocker, READY FOR CLEAR or run done. A restarted session needs only this file and the plan `docs/design/area1-world-build.md`. Brief: `side-session-notes/local_88bfb1c1-.../run7-fable-whole-area1-brief.md`.
 Branch `claude/area1-world` (from `origin/claude/area1-rework` 44a12aa2), worktree `.claude/worktrees/elated-dubinsky-d77725`, upstream set (`git push` works).
 Scratch (a reboot clears it): `C:\Users\jayce\AppData\Local\Temp\claude\602ec13e15d252cb\0975e27d-5568-4784-b3db-e3319868a89d\scratchpad\run7`.
 Code Mode: not offered in a Desktop session.
@@ -22,6 +22,8 @@ Code Mode: not offered in a Desktop session.
 | T04 nature set | done by its commit; its final report was cut by the limit, so unreviewed | 75329ede | `Art/Staging/area1-world/nature/N01..N07` and `SOURCES.md`; contact sheet in scratch `nature\contact_sheet.png` (not looked at) |
 | T03 scene diet | done, pushed; gate PASS 1859/1859 but run before the commit (marker is not e1e9ca72: T05's gate covers it) | e1e9ca72 | scene 59.6 -> 38.6 MB; 274 LFS mesh assets in `Content/Generated/Hollowmere/` through one scene-level pass (`GeneratedMeshes.Externalize`); build twice identical; three-camera blurred difference under 0.6/255 |
 | T05 shells into the town | done, pushed; gate PASS 1859/1859, marker = fa5a9b77; play loop PASS (11 passed, 7 existing ignores) | 78a035d2, 90d3812a, fa5a9b77 | 29 shells (Mid 14, Tall 15), 503 shell BoxColliders, 160 rubble pieces, 104 wall-foot tufts; cameras HillWest moved, Churchyard added, Mill moved; High cameras fog off; `R1/` sheets |
+| T08a ground outside the wall | done, pushed; gate PASS 1859/1859, marker = 6222f837; play loop not run (no collider change) | 6222f837 | probe: bank = steep-rule cobble, flat meadow = the grass layer itself bare under sun (no mesh over it); fine-blade carpet (3 meshes x 3 tints, 8.5/m2), tall clumps as accents only, N06/N07 flower drifts, bare-earth and dry patches, earth bank outside the wall; N01-N07 adopted into `Content/Art/Town/Adopted/N0x_*` with materials, prefabs, LODGroups (`NatureIntake.cs`); `R2/` sheets and `meadow_crop.jpg`; inside-wall views unchanged (blurred diff under 0.53/255); 334,602 detail instances, worst eye camera about 2.9M grass triangles |
+| T08b shore, bank, mill | next (brief below) | | |
 | T06 onward | not started | | order below |
 
 ## Verification rules in force (coordinator's note `verification-practice.md`)
@@ -34,6 +36,38 @@ A plain `build` rewrites, the same way every time: `M_GD_Leaf.mat`, `M_GD_Produc
 - Stair treads sharing one mesh by dimensions: each tread is seeded from its step id (joints, jitter, UV), so sharing would change the stairs' look. Left as 220 assets.
 - HillWest camera at (-36, 23) or (-38, 23) looking east: it faces the keep's 7 m west retaining wall in shade. Moved in T05 to look north-north-east at the crag foot; the churchyard gets its own camera on the terrace.
 - All-stone ruin shells with single-block stacks (shell kit round 1): read as generic stone ruins, not Hollowmere houses. Round 2 has stone below, charred half-timber and plaster above.
+
+## R2 verdict (after T08a; strict /40, judged on `R2/R2_sheet_B.jpg` against R1)
+Changed views: Meadow 8 -> 15, Lake 13 -> 18, JettyBack 12 -> 17, Mill 15 -> 20, RoadOut 17 -> 19, RoadBack 15 -> 16. The rest as R1 (inside the wall unchanged by design). Mean of the 21 eye cameras about 17.
+- The grass is now a real carpet with colour variety and flowers; the meadow and the lake shore read as meadow.
+- **The bank under the town wall is still the worst surface**: a smooth, pale grey-green slope (no cobble now, but no rock, shrub or texture break), wall foot to meadow in one plane (Meadow, JettyBack). Needs rocks, shrubs, darker earth, a ragged foot line.
+- **The road hedges in RoadBack still read as giant cabbages**: T08a shrank the field-hedge cards, but the hedges in that view are the `Hedge_A/B` FBX props (`RoadItemKind.Hedge`), which were not touched. Replace or rescale those.
+- The lake shore is one clean line of grass to water: no reeds, stones or earth band; the far shore is a thin strip.
+- Orchard (10) untouched: it is T07's.
+
+## Resume order (2026-11-17, after the handoff)
+1. **T08b** shore, bank, mill (brief below).
+2. **Shell round 3** (brief below): the shells are the reason D1 sits at 22/25/22.
+3. **T06** streets; **T07** orchard and allotments; **T09** bell yard, churchyard, crag (N01-N03); **T10** road out, boundary, hill edge; **T11** atmosphere and backdrop (mountain spike, flat far ranges); **T12** LOD and APV trial; **T13** round 2; **T14** landing.
+One Sonnet implementer at a time; every brief carries the verification rules (section above) and the known churn list (add `M_HM_WallIvy.mat` and `M_HH_OldStone.mat`: they flip `_Color` between builds).
+
+## T08b brief (shore, wall bank, mill; Unity)
+Goal: the lake edge and the slope under the town wall read as natural ground; the mill sits in a dressed yard. Owns `HollowmereLakeArt.cs`, `HollowmereTerrain.cs` (outside the wall only), `HollowmereRoad.cs` (hedges), a new `HollowmereShore.cs` if wanted. Use the adopted N01-N05 rocks, stump, log (`Content/Art/Town/Adopted/N0x_*`, prefabs with LODGroups), T11a/T11b, T13 boat, T12 ferns.
+- Wall bank (all around the outside of the town wall, e 28-34 from the plateau): darker, richer earth under the grass; 1-2 m rubble and fallen wall blocks at the wall foot (T05b/c, N03), N02 boulders and N01 outcrops half sunk every 8-15 m on the steeper parts, shrubs (TR05-TR07) and ferns in clumps, a ragged foot line between the bank and the meadow. Never in front of the Lake or JettyBack cameras within 5 m (`HollowmereBuilder.cs` camera table; the Lake camera stands on the road out of the Lower Gate at (-21.5, -73)).
+- Shore: an earth and stone band 0.5-2 m wide at the waterline (soil splat plus N03 and T11b stones), three dense reed beds (existing reeds in `HollowmereLakeArt.ShoreReeds`, about :236, grouped instead of evenly scattered), one boat drawn up on the shingle near the jetty and one moored (T13), a few logs (N05) and a stump (N04) near the water, short-range shoreline foam only if `SC_Water.shader` already supports it.
+- Mill (69.5, -58.5): sacks, a cart (T16b), a fence run (Fence_Rail), firewood (T06), a millstone leaning on the wall; the Mill camera's foreground is grass, keep it so.
+- Road hedges: replace the `Hedge_A/B` props on the Saltwake Road with smaller-leaved hedges (rebuild from cards like the field hedges T08a made, or scale the leaf texture down by 3) so a hedge reads as a hedge at 2 m.
+- Tree bases in walking range outside the wall (plan 1b point 7): an earth mound, 2-3 stones, a grass ring under each 3D tree within 20 m of a lane or the shore.
+- Verify: R3 capture of all cameras against R2 (`sheet_area.py R3 <S>\r3 .../R2 .../R3`), inside-wall blurred diff for Spawn, Postcard, West under 1/255, determinism (build twice), churn reverted, gate after the commit with marker = HEAD, play loop tests (rocks and boats add colliders), traversal regression without a baseline change (no rock on the road, the shore path or the jetty), push.
+
+## Shell round 3 brief (Blender then Unity)
+Why: in every square view the shells read as stacked blocks, not burnt houses (R1 verdict). Owns `Art/Blender/town/sc_ruin_shells.py`, the 18 shell FBX in `Content/Art/Town/Ruins/Ruin_*/`, `HollowmereRuinShells.cs`.
+- Masonry scale: courses of 0.25-0.35 m stones (today about 0.5 x 0.3 m faces that read as slabs at 10 m); change the block size in the generator (the base kit's `soft_box` courses), not only the UV.
+- Stacks: they read as thin pillars at 20 m. Wider breast at the bottom (1.6-1.8 m), clear taper, a soot-dark band on the top 1.5 m, pots on half of them.
+- Gables: the charred half-timber and plaster gable must face the lane or the square, not the back: in `HollowmereRuinShells.cs` pick the variant or a yaw per lot so the gable end faces the nearest lane (keep the doorstep on the lane side; if both cannot hold, the doorstep wins).
+- Wear: strong low-frequency moss and damp stain on the lower walls and north faces (`wear` G), char at the broken tops (`wear` R); rubble spill already exists.
+- Keep the contract (nodes, `FOOTPRINT_COL_<n>` boxes, slot names, budgets S 5k / M 8k / L 12k).
+- Verify: Blender contact sheet once, then R-capture of Spawn, Postcard, West, Bakery, InnFront, Balcony, RingWest, RingSouth, MarketStreet against the previous round, traversal regression unchanged, gate after the commit, play loop tests, push.
 
 ## R1 verdict (after T05; strict /40, judged on `R1/R1_sheet_A.jpg` and `_B.jpg` against the concept row)
 Spawn 22, Postcard 25, West 22, Bakery 18, InnFront 18, Climb 20, Balcony 22, BellYard 17, Churchyard 17, HillWest 14, MarketStreet 17, LowerLane 16, RingWest 18, RingSouth 14, Orchard 10, Mill 15, Meadow 8, Lake 13, JettyBack 12, RoadOut 17, RoadBack 15. Weakest district: D9 meadow and shore (8).
