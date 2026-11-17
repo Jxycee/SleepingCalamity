@@ -41,6 +41,7 @@ namespace SleepingCalamity.EditorTools
         static Dictionary<string, Piece> pieces;
         static Transform root;
         static Vector2 jettyA, jettyB;
+        public static Vector2 JettyEnd => jettyB;   // x, z of the jetty's seaward end (set by BuildJetty)
         static readonly List<Vector2> cams = new();
         static readonly Dictionary<string, int> counts = new();
 

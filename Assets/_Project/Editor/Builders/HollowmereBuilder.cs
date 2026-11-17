@@ -104,10 +104,31 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Eye_BellYard", new Vector3(17f, 1.65f, 28.7f), new Vector3(2f, 5.4f, 29.2f), 60f),     // the keep walk looking west at the tower door, the trapdoor and the hill bank
             ("Cap_HM_Eye_Balcony", new Vector3(-2.25f, 1.65f, 20.7f), new Vector3(-1f, 0f, -30f), 60f),     // (between two parapet planters: one stands at x 0) the terrace edge over the whole square and Market Street to the south sky
             ("Cap_HM_Eye_Lake", new Vector3(-21.5f, 1.65f, -73f), new Vector3(6f, -9f, -100f), 60f),        // outside the Lower Gate, down the bank over the lake to the far shore
+            // Area 1 world build (Run 7): the rest of the 20-camera eye set (docs/design/area1-world-build.md section 2) and two high views. For the cameras in EyeRelTarget the
+            // Target y is an offset from the camera's own eye height (0 = level gaze), so the gaze follows the terrain; JettyBack's position is computed from the jetty.
+            ("Cap_HM_Eye_Bakery", new Vector3(-6f, 1.65f, 3.5f), new Vector3(-14f, 1.5f, 12f), 60f),         // D1: the bakery front on F02 from the square
+            ("Cap_HM_Eye_InnFront", new Vector3(16f, 1.65f, -13f), new Vector3(40f, 1.0f, -16.5f), 60f),     // D6: east along the inn row
+            ("Cap_HM_Eye_HillWest", new Vector3(-38f, 1.65f, 23f), new Vector3(-8f, 1.0f, 27f), 60f),        // D3, D11: the west side of Bell Hill toward the church (moved 2 m west of the plan's (-36, 23): there the eye stood against the shaded crag face and the frame was black)
+            ("Cap_HM_Eye_MarketStreet", new Vector3(0f, 1.65f, -27f), new Vector3(0f, 0f, -50f), 60f),       // D5: down Market Street
+            ("Cap_HM_Eye_LowerLane", new Vector3(-14.5f, 1.65f, -53f), new Vector3(-23f, 0f, -68f), 60f),    // D5: the lane to the Lower Gate
+            ("Cap_HM_Eye_RingWest", new Vector3(-46f, 1.65f, 6f), new Vector3(-46f, 0f, -28f), 60f),         // D4: the west Ring Lane, south
+            ("Cap_HM_Eye_RingSouth", new Vector3(-8f, 1.65f, -48.8f), new Vector3(22f, 0f, -48.5f), 60f),    // D4, D8: the south Ring Lane, east
+            ("Cap_HM_Eye_Orchard", new Vector3(35f, 1.65f, -44.5f), new Vector3(43f, 0f, -58f), 60f),        // D7: the orchard
+            ("Cap_HM_Eye_Mill", new Vector3(60.5f, 1.65f, -50.5f), new Vector3(71f, 0f, -60f), 60f),         // D9: Mill Lane toward the mill
+            ("Cap_HM_Eye_Meadow", new Vector3(-8f, 1.65f, -72f), new Vector3(50f, 0f, -68f), 60f),           // D9: the lake meadow, east
+            ("Cap_HM_Eye_JettyBack", new Vector3(0f, 0f, 0f), new Vector3(-5f, 0f, -40f), 60f),              // D9: from the jetty's end back at the town (position computed, Target y absolute 0)
+            ("Cap_HM_Eye_RoadOut", new Vector3(-48f, 1.65f, -74f), new Vector3(-100f, 0.5f, -82f), 60f),     // D10: the Saltwake road, out
+            ("Cap_HM_Eye_RoadBack", new Vector3(-85f, 1.65f, -80f), new Vector3(-20f, 0f, -55f), 60f),       // D10: the road, back at the town
+            ("Cap_HM_High_Lake", new Vector3(10f, 38f, -128f), new Vector3(0f, 0f, -25f), 60f),              // absolute: high over the lake, the town behind
+            ("Cap_HM_High_East", new Vector3(118f, 30f, -30f), new Vector3(0f, 2f, -20f), 60f),              // absolute: high east of the town, over the mill and the east wall
         };
 
         // Cameras whose Pos is an absolute world position (not ground + eye height).
-        static readonly HashSet<string> AbsolutePosCameras = new HashSet<string> { "Cap_HM_Overview", "Cap_HM_OverviewW", "Cap_HM_OverviewE", "Cap_HM_TerraceDown", "Cap_HM_TerraceUp" };
+        static readonly HashSet<string> AbsolutePosCameras = new HashSet<string> { "Cap_HM_Overview", "Cap_HM_OverviewW", "Cap_HM_OverviewE", "Cap_HM_TerraceDown", "Cap_HM_TerraceUp", "Cap_HM_High_Lake", "Cap_HM_High_East" };
+
+        // Cameras whose Target y is an offset from the camera's own y.
+        static readonly HashSet<string> EyeRelTarget = new HashSet<string> { "Cap_HM_Eye_Bakery", "Cap_HM_Eye_InnFront", "Cap_HM_Eye_HillWest", "Cap_HM_Eye_MarketStreet", "Cap_HM_Eye_LowerLane", "Cap_HM_Eye_RingWest", "Cap_HM_Eye_RingSouth",
+            "Cap_HM_Eye_Orchard", "Cap_HM_Eye_Mill", "Cap_HM_Eye_Meadow", "Cap_HM_Eye_RoadOut", "Cap_HM_Eye_RoadBack" };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]
         public static void BuildMenu()
@@ -213,8 +234,20 @@ namespace SleepingCalamity.EditorTools
             foreach (var c in Cameras)
             {
                 Vector3 pos = AbsolutePosCameras.Contains(c.Name) ? c.Pos : new Vector3(c.Pos.x, Mathf.Max(HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z), HollowmereLayout.WaterY) + c.Pos.y, c.Pos.z);   // never under the lake
-                Camera cam = LookTestBuilder.AddCapture(cams, c.Name, pos, c.Target, c.Fov);
-                cam.farClipPlane = c.Name.StartsWith("Cap_HM_Overview") ? 400f : HollowmereRoad.FarClip;   // Q15: the low cameras see the backdrop ridges
+                Vector3 target = c.Target;
+                if (c.Name == "Cap_HM_Eye_JettyBack") pos = new Vector3(HollowmereLakeArt.JettyEnd.x, HollowmereLayout.WaterY + 0.6f + 1.65f, HollowmereLakeArt.JettyEnd.y);   // deck top + eye height at the jetty's end
+                else if (EyeRelTarget.Contains(c.Name)) target.y += pos.y;
+                Camera cam = LookTestBuilder.AddCapture(cams, c.Name, pos, target, c.Fov);
+                cam.farClipPlane = c.Name.StartsWith("Cap_HM_Overview") || c.Name.StartsWith("Cap_HM_High") ? 400f : HollowmereRoad.FarClip;   // Q15: the low cameras see the backdrop ridges
+                if (c.Name.StartsWith("Cap_HM_Eye_") || c.Name.StartsWith("Cap_HM_High"))
+                {
+                    Physics.SyncTransforms();
+                    var near = new List<string>();
+                    foreach (Collider col in Physics.OverlapSphere(pos, 1.5f))
+                        if (!(col is TerrainCollider) && col.bounds.max.y > pos.y - 0.9f) near.Add(col.name + "@" + (col.transform.parent != null ? col.transform.parent.name : "-"));
+                    string below = Physics.Raycast(pos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f) ? " topHit " + hit.collider.name + " y " + hit.point.y.ToString("F2") : " topHit none";   // what the highest surface under the camera is (a hit above the camera = the camera is buried)
+                    Debug.Log("SC HOLLOWMERE cam " + c.Name + " pos " + pos.ToString("F2") + " target " + target.ToString("F2") + below + (near.Count > 0 ? " NEAR " + string.Join(",", near.Take(6)) : ""));
+                }
             }
 
             foreach (var c in HollowmereRoad.Cameras)   // Q15: from the gate looking out, from the road looking back (Target absolute)
