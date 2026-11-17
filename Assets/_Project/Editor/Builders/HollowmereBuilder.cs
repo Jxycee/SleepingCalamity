@@ -115,6 +115,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Eye_RingWest", new Vector3(-46f, 1.65f, 6f), new Vector3(-46f, 0f, -28f), 60f),         // D4: the west Ring Lane, south
             ("Cap_HM_Eye_RingSouth", new Vector3(-8f, 1.65f, -48.8f), new Vector3(22f, 0f, -48.5f), 60f),    // D4, D8: the south Ring Lane, east
             ("Cap_HM_Eye_Orchard", new Vector3(35f, 1.65f, -44.5f), new Vector3(43f, 0f, -58f), 60f),        // D7: the orchard
+            ("Cap_HM_Eye_OrchardGap", new Vector3(40.2f, 1.65f, -53.2f), new Vector3(46.5f, -0.3f, -64f), 60f),   // D7 (T07): inside the orchard through the wall gap to the lake and the mill
             ("Cap_HM_Eye_Mill", new Vector3(58f, 1.65f, -67f), new Vector3(70.5f, 2.5f, -58f), 60f),         // D9: the sunlit side of the mill with the stream in front (T05: the old Mill Lane view faced the mill's shadow wall)
             ("Cap_HM_Eye_Meadow", new Vector3(-8f, 1.65f, -72f), new Vector3(50f, 0f, -68f), 60f),           // D9: the lake meadow, east
             ("Cap_HM_Eye_JettyBack", new Vector3(0f, 0f, 0f), new Vector3(-5f, 0f, -40f), 60f),              // D9: from the jetty's end back at the town (position computed, Target y absolute 0)
@@ -129,7 +130,7 @@ namespace SleepingCalamity.EditorTools
 
         // Cameras whose Target y is an offset from the camera's own y.
         static readonly HashSet<string> EyeRelTarget = new HashSet<string> { "Cap_HM_Eye_Bakery", "Cap_HM_Eye_InnFront", "Cap_HM_Eye_HillWest", "Cap_HM_Eye_Churchyard", "Cap_HM_Eye_MarketStreet", "Cap_HM_Eye_LowerLane", "Cap_HM_Eye_RingWest", "Cap_HM_Eye_RingSouth",
-            "Cap_HM_Eye_Orchard", "Cap_HM_Eye_Mill", "Cap_HM_Eye_Meadow", "Cap_HM_Eye_RoadOut", "Cap_HM_Eye_RoadBack" };
+            "Cap_HM_Eye_Orchard", "Cap_HM_Eye_OrchardGap", "Cap_HM_Eye_Mill", "Cap_HM_Eye_Meadow", "Cap_HM_Eye_RoadOut", "Cap_HM_Eye_RoadBack" };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]
         public static void BuildMenu()
@@ -228,6 +229,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereRevetment.Build(ruined, rebuilt);   // T08c: the stone face down the steep bank under the town wall, both presets (after every collider; it has none)
             HollowmereShore.Build(set, ruined, rebuilt, t);   // T08b: the wall bank, the shore, the mill yard and the tree bases outside the wall (after the trees, the jetty and every collider)
             HollowmereStreets.Build(set, ruined, rebuilt, t);   // T06: decal projectors, wall-foot strips, street clutter clusters, lane landmarks and story props inside the wall (after every collider)
+            HollowmereOrchard.Build(set, ruined, rebuilt, t);   // T07: the orchard (apple trees in both presets) and the Ruined allotments, after every collider and after the streets' decals
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");

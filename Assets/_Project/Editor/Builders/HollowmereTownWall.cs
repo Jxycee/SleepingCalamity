@@ -34,6 +34,8 @@ namespace SleepingCalamity.EditorTools
         public const bool ShowDoorLeaves = false;   // Part_Door stays off: the gates are open passages (the leaves would close the arch with no collider behind them)
         public const string GateShell = "Shell", GateFrame = "Frame", GateDoor = "Part_Door", GateSocketDoor = "SOCKET_Door", GateFootprint = "FOOTPRINT";
 
+        public const int OrchardGapSlot = 41;   // T07: Ruined only, the wall module between the planned Breach (40) and Crumbled (42) at the orchard
+
         public const string RuinedSuffix = "_Ruined";   // Wall_Straight_A_Ruined / _B_Ruined: the Ruined preset's straight modules
 
         public static string FileFor(WallPiece p)
@@ -178,7 +180,10 @@ namespace SleepingCalamity.EditorTools
                     // Wall_Stair is a fitting beside a straight module and leads nowhere (its steps stop 1.2 m under the wall-walk): left out.
                     if (s.Piece == WallPiece.Stair) continue;
                     WallPiece piece = s.Piece;
-                    GameObject prefab = PieceFor(piece, isRebuilt);
+                    // T07: the orchard's stretch (Ruined): slot 41, a straight module between the planned Breach (40) and Crumbled (42), shows the Crumbled visual; its collider stays the straight
+                    // module's box (AddColliders reads `piece`), so the play boundary does not move.
+                    WallPiece visual = !isRebuilt && (piece == WallPiece.StraightA || piece == WallPiece.StraightB) && s.Index == OrchardGapSlot ? WallPiece.Crumbled : piece;
+                    GameObject prefab = PieceFor(visual, isRebuilt);
                     if (prefab == null) continue;
                     var obj = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
                     obj.name = (piece == WallPiece.End ? "End" : "M" + s.Index.ToString("000")) + "_" + piece;

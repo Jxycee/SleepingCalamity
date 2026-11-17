@@ -339,7 +339,10 @@ namespace SleepingCalamity.EditorTools
                     if (blocked) continue;
                     if (Mathf.Abs(HollowmereLayout.PlateauDistance(x, z) - 27.5f) < 2.2f) foot = true;   // the bank top at the town wall's foot
                     float nz = 0.65f * Mathf.PerlinNoise(x * 0.14f + 5f, z * 0.14f + 91f) + 0.35f * Mathf.PerlinNoise(x * 0.29f + 47f, z * 0.29f + 13f);
+                    bool orch = HollowmereOrchard.InOrchard(x, z);   // T07: long grass and flowers in the orchard, a cleared strip on its worn path
+                    if (orch && HollowmereOrchard.OnPath(x, z)) continue;
                     float thick = Mathf.Max(Smooth(0.60f, 0.67f, nz), foot ? Smooth(0.30f, 0.42f, nz) : 0f);
+                    if (orch) thick = Mathf.Max(thick, 0.9f);
                     float p = Mathf.Lerp(0.18f, 5.5f, thick) * cellArea * Mathf.Clamp01(w);
                     uint h = Hash((uint)cx, (uint)cy);
                     bool lowPatch = Mathf.PerlinNoise(x * 0.21f + 131f, z * 0.21f + 29f) > 0.64f;
@@ -348,7 +351,8 @@ namespace SleepingCalamity.EditorTools
                         && data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y >= HollowmereLayout.WaterY + 0.5f)
                     {
                         int pr = PickProto(h >> 24);
-                        if (thick > 0.5f && ((h >> 20) & 15u) < 3u) pr = 3;   // seed-head grass mostly inside the clumps
+                        if (orch && ((h >> 17) & 31u) < 2u) pr = ((h >> 13) & 1u) == 0u ? ProtoDandelion : ProtoSpike;   // T07: flowers among the orchard grass
+                        else if (thick > 0.5f && ((h >> 20) & 15u) < 3u) pr = 3;   // seed-head grass mostly inside the clumps
                         else if (thick <= 0.5f && ((h >> 20) & 63u) == 0u) pr = 3;
                         layers[pr][cy, cx] = 1; counts[pr]++; placed = true;
                     }

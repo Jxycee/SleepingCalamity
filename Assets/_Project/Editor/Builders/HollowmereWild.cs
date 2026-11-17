@@ -158,6 +158,7 @@ namespace SleepingCalamity.EditorTools
                     float e = HollowmereLayout.PlateauDistance(x, z);
                     if (e > 25f || z > HollowmereLayout.KeepWallZ - 1.5f) continue;   // inside the wall, below the keep terrace
                     if (Mathf.Abs(x) < 9f && z > 6f) continue;                       // the balcony's view over the square stays open
+                    if (HollowmereOrchard.Reserved(x, z)) continue;                   // T07: the orchard's box is planted by HollowmereOrchard
                     if (!Clear(x, z, 1.8f, 4.2f, laneGap: 1.6f)) continue;
                     float roll = Hash01(ix, iz, 107);
                     bool outer = e > 12f;

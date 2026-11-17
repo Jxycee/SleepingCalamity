@@ -1,0 +1,879 @@
+// Hollowmere's orchard (D7) and the Ruined allotments (D8), area 1 world T07 (2026-11-17). Everything is table-driven and position-hashed (plan rule 3.3), editor-time only (authority none).
+//   Orchard (x 34..51, z -61..-42, south of the Ring Lane's garden wall, whose gate piers and broken courses are the lane kit's, LK0469-LK0481, and stay the orchard's north wall):
+//     - seven gnarled apple crowns (TR02/TR03 at 4.6-5.8 m, wide girth, a yellow-green leaf variant) in both presets, each with a low earth mound; the Wild builder skips the box
+//       (Reserved) so the old 9-15 m town trees no longer stand there; in the Ruined preset also a fallen apple tree with a torn-up root pit;
+//     - bases (stones, grass ring, leaf litter), windfalls clustered under three crowns and along the fallen trunk, the ladder, baskets, a half-loaded wheelbarrow, crates, tools at the
+//       gate pier, a bench under the best crown, two nooks (R2_18's corner and the pocket behind the fallen tree), moss/damp/grime at the wall feet, spill at the wall gap;
+//     - the worn path (mud decals + a cleared strip in the terrain grass mask, see GrassMask) from the gate to the wall gap; one shadowless fill light under the crowns.
+//   Allotments (Ruined): the four garden lots R2_07, R2_18, R2_22, R3_02 each get a plot on the free side of the lot (pen-wall fence runs, fallen or leaning, a gate off one hinge, bolted
+//   beds gone to seed, a toppled scarecrow, a water butt with a bucket, tools where work stopped; one bed on R2_18 weeded and replanted).
+//   Every prop is Megascans / Poly Haven from the adopted kit (T17a-d included); the procedural garden kit is used for the scarecrow only. Colliders: trunks, the fallen tree, large props.
+using System.Collections.Generic;
+using System.Linq;
+using SleepingCalamity.Core;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
+
+namespace SleepingCalamity.EditorTools
+{
+    internal static class HollowmereOrchard
+    {
+        const string Ad = HollowmereStreets.Adopted, Cel = HollowmereStreets.CellarAdopted;
+        const string MatFolder = "Assets/_Project/Content/Materials/Hollowmere";
+        const string TreesFolder = "Assets/_Project/Content/Art/Town/Trees/";
+        const string HayTex = "Assets/_Project/Content/Art/Town/Decals/T17d_BaseColor.png";
+
+        // ------------------------------------------------------------------------------------------------ masks (also read by HollowmereWild and HollowmereFoliage)
+        static readonly Vector2[] Poly =
+        {
+            new Vector2(34.3f, -48.0f), new Vector2(39.3f, -44.9f), new Vector2(44.3f, -40.0f), new Vector2(49.5f, -42.5f), new Vector2(51.5f, -48.5f), new Vector2(49.4f, -53.0f),
+            new Vector2(46.0f, -56.2f), new Vector2(43.0f, -58.0f), new Vector2(38.0f, -60.0f), new Vector2(34.0f, -59.8f), new Vector2(33.9f, -56.0f), new Vector2(34.0f, -50.5f),
+        };
+        // The worn path: the gate (between the piers at (39.2,-45.0) and (40.9,-43.9)) to the foot of the wall gap.
+        static readonly Vector2[] PathLine = { new Vector2(40.7f, -45.4f), new Vector2(41.8f, -48.5f), new Vector2(41.9f, -52.0f), new Vector2(41.5f, -55.0f), new Vector2(43.0f, -57.6f) };
+
+        static float DistToSeg(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a; float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+            return Vector2.Distance(p, a + ab * t);
+        }
+
+        internal static bool InOrchard(float x, float z, float margin = 0f)
+        {
+            var p = new Vector2(x, z); bool inside = false;
+            for (int i = 0, j = Poly.Length - 1; i < Poly.Length; j = i++)
+                if ((Poly[i].y > p.y) != (Poly[j].y > p.y) && p.x < (Poly[j].x - Poly[i].x) * (p.y - Poly[i].y) / (Poly[j].y - Poly[i].y) + Poly[i].x) inside = !inside;
+            if (inside) return true;
+            if (margin <= 0f) return false;
+            for (int i = 0, j = Poly.Length - 1; i < Poly.Length; j = i++) if (DistToSeg(p, Poly[j], Poly[i]) < margin) return true;
+            return false;
+        }
+
+        internal static float PathDist(float x, float z)
+        {
+            var p = new Vector2(x, z); float d = float.MaxValue;
+            for (int i = 1; i < PathLine.Length; i++) d = Mathf.Min(d, DistToSeg(p, PathLine[i - 1], PathLine[i]));
+            return d;
+        }
+
+        // True on the cleared strip of the path (ragged edge: 0.5-0.95 m half width from a noise of the position).
+        internal static bool OnPath(float x, float z) => PathDist(x, z) < Mathf.Lerp(0.5f, 0.95f, Mathf.PerlinNoise(x * 1.9f + 3f, z * 1.9f + 9f));
+
+        // The trees of the Wild builder stay out of the box (and 2.5 m round it).
+        internal static bool Reserved(float x, float z) => InOrchard(x, z, 2.5f);
+
+        // ------------------------------------------------------------------------------------------------ tables
+        struct TreeDef { public float X, Z, H; public string Code; public float Yaw, Girth; }
+        static readonly TreeDef[] Trees =
+        {
+            new TreeDef { X = 38.0f, Z = -53.8f, H = 5.6f, Code = "TR03", Yaw = 20f, Girth = 1.25f },   // 0 the best crown: bench
+            new TreeDef { X = 37.0f, Z = -57.0f, H = 5.0f, Code = "TR02", Yaw = 140f, Girth = 1.3f },
+            new TreeDef { X = 44.0f, Z = -45.4f, H = 5.2f, Code = "TR03", Yaw = 250f, Girth = 1.25f },
+            new TreeDef { X = 44.6f, Z = -51.6f, H = 5.7f, Code = "TR02", Yaw = 80f, Girth = 1.3f },
+            new TreeDef { X = 34.6f, Z = -58.4f, H = 4.8f, Code = "TR02", Yaw = 300f, Girth = 1.3f },
+            new TreeDef { X = 39.6f, Z = -49.8f, H = 5.0f, Code = "TR03", Yaw = 200f, Girth = 1.25f },   // 5 ladder and basket
+            new TreeDef { X = 36.0f, Z = -51.8f, H = 4.6f, Code = "TR03", Yaw = 60f, Girth = 1.3f },    // 6 R2_18's corner
+        };
+        static readonly Vector2 FallenRoot = new Vector2(47.0f, -53.2f), FallenCrown = new Vector2(47.4f, -47.6f);
+        static readonly Vector2 PierA = new Vector2(39.2f, -45.0f), PierB = new Vector2(40.9f, -43.9f);
+        static readonly Vector2 OrchardNormal = new Vector2(0.54f, -0.84f);   // out of the garden wall into the orchard at the gate
+        static readonly Vector2 Mill = new Vector2(69.5f, -58.5f);
+
+        // ------------------------------------------------------------------------------------------------ state
+        static TownLayout T;
+        static readonly Dictionary<string, GameObject> prefabs = new Dictionary<string, GameObject>();
+        static readonly Dictionary<GameObject, Bounds> unit = new Dictionary<GameObject, Bounds>();
+        static readonly Dictionary<string, int> counts = new Dictionary<string, int>();
+        static readonly List<Vector2> eyeCams = new List<Vector2>();
+        static readonly List<Vector2> trunkXZ = new List<Vector2>();
+        static int decals;
+        static void Count(string k, int n = 1) { counts[k] = counts.TryGetValue(k, out int c) ? c + n : n; }
+        static float H(int a, int b, int salt) => HollowmereStreets.H(a, b, salt);
+
+        public static void Build(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
+        {
+            T = t; counts.Clear(); trunkXZ.Clear(); eyeCams.Clear(); decals = 0; prefabs.Clear(); unit.Clear();
+            foreach (var c in HollowmereBuilder.Cameras) if (c.Name.StartsWith("Cap_HM_Eye_", System.StringComparison.Ordinal) && !c.Name.Contains("JettyBack")) eyeCams.Add(new Vector2(c.Pos.x, c.Pos.z));
+            Physics.SyncTransforms();
+            Transform wild = set.Find("Wild") ?? set;
+            Transform treeRoot = Sub(wild, "Orchard");
+            Transform g = Sub(ruined, "Orchard");
+            Trees_(treeRoot);
+            Physics.SyncTransforms();
+            Transform props = Sub(g, "Props"), flora = Sub(g, "Flora"), dec = Sub(g, "Decals");
+            FallenTree(props, flora, dec);
+            Physics.SyncTransforms();
+            TreeBases(props, flora, dec);
+            Windfalls(props);
+            Story(props, flora, dec);
+            Nooks(props, flora, dec);
+            Path(flora, dec);
+            WallFeet(props, flora, dec);
+            WallGap(props, flora, dec);
+            FillLight(g);
+            Allotments(Sub(ruined, "Allotments"));
+            var lights = Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None).Count(l => l.type != LightType.Directional);
+            Debug.Log("SC HOLLOWMERE orchard: " + string.Join(", ", counts.OrderBy(kv => kv.Key, System.StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)) + ", decals=" + decals + ", non-directional lights in the scene=" + lights);
+        }
+
+        static Transform Sub(Transform parent, string name)
+        {
+            Transform c = parent.Find(name);
+            if (c != null) return c;
+            c = new GameObject(name).transform; c.SetParent(parent, false);
+            return c;
+        }
+
+        // ------------------------------------------------------------------------------------------------ helpers
+        static GameObject Prefab(string code)
+        {
+            if (prefabs.TryGetValue(code, out GameObject p)) return p;
+            string path = code.StartsWith("TR", System.StringComparison.Ordinal) ? TreesFolder + code + "/" + code + ".prefab"
+                : code == "N04" ? Ad + "N04_stump/N04.prefab" : code == "N05" ? Ad + "N05_fallen_log/N05.prefab"
+                : code == "C11b" ? Cel + "C11b/C11b.prefab" : Ad + code + "/" + code + ".prefab";
+            return prefabs[code] = HollowmereStreets.LoadPrefab(path);
+        }
+
+        static Bounds Render(GameObject go)
+        {
+            Bounds b = default; bool any = false;
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
+            {
+                if (!r.enabled || r is ParticleSystemRenderer) continue;
+                if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+            }
+            return any ? b : new Bounds(go.transform.position, Vector3.one * 0.3f);
+        }
+
+        static Bounds Unit(GameObject pf)
+        {
+            if (unit.TryGetValue(pf, out Bounds b)) return b;
+            var tmp = (GameObject)PrefabUtility.InstantiatePrefab(pf);
+            tmp.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity); tmp.transform.localScale = Vector3.one;
+            LODGroup lod = tmp.GetComponent<LODGroup>(); bool any = false; b = default;
+            Renderer[] rs = lod != null && lod.lodCount > 0 ? lod.GetLODs()[0].renderers : tmp.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer r in rs) { if (r == null) continue; if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds); }
+            Object.DestroyImmediate(tmp);
+            return unit[pf] = any ? b : new Bounds(Vector3.up * 0.3f, Vector3.one * 0.6f);
+        }
+
+        static float Gy(Vector2 p) { HollowmereStreets.Surface(p.x, p.y, out float y, out _); return y; }
+
+        // A prefab scaled so its largest dimension is `maxDim`, turned (Euler: Z, then X, then yaw), centred on xz and standing on y (sunk by `sinkM`); colliders stripped, a box when solid.
+        static GameObject Put(Transform parent, string code, string name, Vector2 xz, float y, float maxDim, float yaw, float tx, float tz, float sinkM, bool solid = false)
+        {
+            GameObject pf = Prefab(code);
+            if (pf == null) { Count("missing_" + code); return null; }
+            Bounds ub = Unit(pf);
+            float s = maxDim / Mathf.Max(0.02f, Mathf.Max(ub.size.x, Mathf.Max(ub.size.y, ub.size.z)));
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
+            go.name = name;
+            go.transform.localScale = Vector3.one * s;
+            go.transform.SetPositionAndRotation(new Vector3(xz.x, y, xz.y), Quaternion.Euler(tx, yaw, tz));
+            foreach (Collider c in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            Bounds b = Render(go);
+            go.transform.position += new Vector3(xz.x - b.center.x, y - sinkM - b.min.y, xz.y - b.center.z);
+            if (solid) { var bc = go.AddComponent<BoxCollider>(); bc.center = ub.center; bc.size = ub.size * 0.9f; Physics.SyncTransforms(); Count("solidProps"); }
+            Count("props");
+            return go;
+        }
+
+        // A thin prop that lies along local +X when unturned (ladder, rake, shovel, scythe, plank) leaning against something: foot at `foot`, top toward `dir` (unit xz), phi degrees off vertical.
+        static GameObject Lean(Transform parent, string code, string name, Vector2 foot, Vector2 dir, float length, float phi, bool flip, float sinkM)
+        {
+            GameObject pf = Prefab(code);
+            if (pf == null) { Count("missing_" + code); return null; }
+            float reach = length * Mathf.Sin(phi * Mathf.Deg2Rad);
+            Vector2 d = flip ? -dir : dir;
+            float yaw = Mathf.Atan2(-d.y, d.x) * Mathf.Rad2Deg;
+            Vector2 centre = foot + dir * (reach * 0.5f);   // top end toward dir in both cases: the flip only turns the object's own head end
+            GameObject go = Put(parent, code, name, centre, Gy(foot), length, flip ? yaw : yaw, 0f, flip ? -(90f - phi) : (90f - phi), sinkM);
+            return go;
+        }
+
+        static void Weed(Transform flora, Vector2 p, int key, int salt, float s0 = 0.9f, float s1 = 1.5f)
+        {
+            string[] kits = { "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E", "Grass_A", "Grass_B", "Grass_C" };
+            string kit = kits[(int)(H(key, salt, 701) * kits.Length) % kits.Length];
+            float y = Gy(p);
+            GameObject go = HollowmereFoliage.Tuft(flora, kit, new Vector3(p.x, y - 0.02f, p.y), H(key, salt, 702) * 360f, Mathf.Lerp(s0, s1, H(key, salt, 703)));
+            if (go != null) Count("tufts");
+        }
+
+        static Material Variant(Material src, string name, Color tint)
+        {
+            if (src == null) return null;
+            string path = MatFolder + "/M_HM_" + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null) { m = new Material(src); AssetDatabase.CreateAsset(m, path); }
+            m.shader = src.shader; m.CopyPropertiesFromMaterial(src);
+            if (src.HasProperty("_BaseColor")) { Color c = src.GetColor("_BaseColor"); var nc = new Color(c.r * tint.r, c.g * tint.g, c.b * tint.b, c.a); m.SetColor("_BaseColor", nc); if (m.HasProperty("_Color")) m.SetColor("_Color", nc); }
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        static void Recolor(GameObject go, string suffix, Color tint, string only = null)
+        {
+            if (go == null) return;
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
+            {
+                var mats = r.sharedMaterials; bool ch = false;
+                for (int i = 0; i < mats.Length; i++)
+                    if (mats[i] != null && (only == null || mats[i].name.Contains(only))) { mats[i] = Variant(mats[i], mats[i].name.Replace(" (Instance)", "") + "_" + suffix, tint); ch = true; }
+                if (ch) r.sharedMaterials = mats;
+            }
+        }
+
+        // -------- decals (the materials T06 made, plus the T17d hay pile)
+        static readonly Dictionary<string, Material> decalMats = new Dictionary<string, Material>();
+        static Material DM(string n)
+        {
+            if (decalMats.TryGetValue(n, out Material m)) return m;
+            if (n == "Hay")
+            {
+                var imp = AssetImporter.GetAtPath(HayTex) as TextureImporter;
+                if (imp != null && (imp.wrapMode != TextureWrapMode.Clamp || !imp.alphaIsTransparency || !imp.sRGBTexture || imp.maxTextureSize != 1024))
+                { imp.wrapMode = TextureWrapMode.Clamp; imp.alphaIsTransparency = true; imp.sRGBTexture = true; imp.maxTextureSize = 1024; imp.SaveAndReimport(); }
+                Shader sh = Shader.Find("Shader Graphs/Decal");
+                m = LookTestBuilder.Ensure(MatFolder + "/M_ST_Decal_Hay.mat", sh);
+                m.SetTexture("Base_Map", AssetDatabase.LoadAssetAtPath<Texture2D>(HayTex)); m.SetFloat("Normal_Blend", 0f);
+                EditorUtility.SetDirty(m);
+            }
+            else m = AssetDatabase.LoadAssetAtPath<Material>(MatFolder + "/M_ST_Decal_" + n + ".mat");
+            if (m == null) Debug.LogWarning("SC HOLLOWMERE orchard: decal material missing: " + n);
+            return decalMats[n] = m;
+        }
+
+        static void Decal(Transform parent, string mat, Vector2 p, float w, float h, float yaw, string name)
+        {
+            Material m = DM(mat); if (m == null) return;
+            float y = Gy(p);
+            var go = new GameObject(name); go.transform.SetParent(parent, false);
+            go.transform.SetPositionAndRotation(new Vector3(p.x, y + 0.5f, p.y), Quaternion.Euler(90f, yaw, 0f));
+            var dp = go.AddComponent<DecalProjector>();
+            dp.material = m; dp.size = new Vector3(w, h, 1.5f); dp.pivot = new Vector3(0f, 0f, 0.75f);
+            dp.drawDistance = 70f; dp.fadeScale = 0.8f; dp.startAngleFade = 45f; dp.endAngleFade = 75f; dp.fadeFactor = 1f;
+            decals++; Count("decal" + mat);
+        }
+
+        static bool Ok(Vector2 p, float rad, bool flatOnly = true)
+        {
+            if (!HollowmereStreets.Surface(p.x, p.y, out float y, out float ny)) return false;
+            if (flatOnly && ny < 0.86f) return false;
+            if (Mathf.Abs(y - HollowmereLayout.Ground(T, p.x, p.y)) > 0.35f) return false;
+            var tp = new TownPoint(p.x, p.y);
+            foreach (Foundation f in T.Foundations) if (f.Footprint.Contains(tp, 0.1f)) return false;
+            foreach (Landmark l in T.Landmarks) if (l.Footprint.Contains(tp, 0.3f)) return false;
+            foreach (Vector2 c in eyeCams) if (Vector2.Distance(c, p) < 1.3f) return false;
+            return HollowmereStreets.FreeOf(p, y, rad);
+        }
+
+        static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
+        static Vector2 Perp(Vector2 d) => new Vector2(-d.y, d.x);
+        static float YawAlong(Vector2 d) => Mathf.Atan2(-d.y, d.x) * Mathf.Rad2Deg;   // local +X turned along d
+        static float YawFace(Vector2 d) => Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg;     // local +Z turned along d
+
+        // ------------------------------------------------------------------------------------------------ trees (both presets)
+        sealed class MB
+        {
+            public readonly List<Vector3> V = new List<Vector3>(); public readonly List<Vector2> UV = new List<Vector2>(); public readonly List<int> I = new List<int>();
+            public Mesh ToMesh(string name) { var m = new Mesh { name = name }; m.indexFormat = V.Count > 60000 ? IndexFormat.UInt32 : IndexFormat.UInt16; m.SetVertices(V); m.SetUVs(0, UV); m.SetTriangles(I, 0); m.RecalculateNormals(); m.RecalculateTangents(); m.RecalculateBounds(); return m; }
+            public int Add(Vector3 v) { V.Add(v); UV.Add(new Vector2(v.x, v.z) / 1.5f); return V.Count - 1; }
+        }
+
+        static void Mound(MB mb, Vector2 p, float rad, float peak, int seed)
+        {
+            const int segs = 12, rings = 2;
+            int b0 = mb.Add(new Vector3(p.x, Gy(p) + peak, p.y));
+            for (int r = 1; r <= rings; r++)
+                for (int s = 0; s < segs; s++)
+                {
+                    float u = r / (float)rings, a = s * Mathf.PI * 2f / segs;
+                    float rr = rad * u * (1f + 0.25f * (H(seed, s, 811) - 0.5f));
+                    var q = new Vector2(p.x + Mathf.Cos(a) * rr, p.y + Mathf.Sin(a) * rr);
+                    mb.Add(new Vector3(q.x, Gy(q) + (r == rings ? 0.015f : peak * 0.66f), q.y));
+                }
+            for (int s = 0; s < segs; s++) { mb.I.Add(b0); mb.I.Add(b0 + 1 + (s + 1) % segs); mb.I.Add(b0 + 1 + s); }
+            for (int r = 1; r < rings; r++)
+                for (int s = 0; s < segs; s++)
+                {
+                    int a = b0 + 1 + (r - 1) * segs + s, b = b0 + 1 + (r - 1) * segs + (s + 1) % segs, c = a + segs, d = b + segs;
+                    mb.I.Add(a); mb.I.Add(b); mb.I.Add(c); mb.I.Add(b); mb.I.Add(d); mb.I.Add(c);
+                }
+        }
+
+        // A torn-root pit seen from above: a raised berm of spoil round a hollow (the hollow is the ground itself, darkened by decals).
+        static void Berm(MB mb, Vector2 p, float rin, float rout, float h, int seed)
+        {
+            const int segs = 16;
+            int i0 = mb.V.Count;
+            for (int s = 0; s < segs; s++)
+            {
+                float a = s * Mathf.PI * 2f / segs, w = 1f + 0.3f * (H(seed, s, 821) - 0.5f), hh = h * (0.6f + 0.8f * H(seed, s, 822));
+                Vector2 d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                Vector2 q0 = p + d * rin * w, q1 = p + d * (rin + (rout - rin) * 0.35f) * w, q2 = p + d * rout * w;
+                mb.Add(new Vector3(q0.x, Gy(q0) + 0.01f, q0.y)); mb.Add(new Vector3(q1.x, Gy(q1) + hh, q1.y)); mb.Add(new Vector3(q2.x, Gy(q2) + 0.01f, q2.y));
+            }
+            for (int s = 0; s < segs; s++)
+            {
+                int n = (s + 1) % segs;
+                for (int k = 0; k < 2; k++)
+                {
+                    int a = i0 + s * 3 + k, b = i0 + n * 3 + k, c = a + 1, d = b + 1;
+                    mb.I.Add(a); mb.I.Add(c); mb.I.Add(b); mb.I.Add(b); mb.I.Add(c); mb.I.Add(d);
+                }
+            }
+        }
+
+        static Material Soil() => AssetDatabase.LoadAssetAtPath<Material>(MatFolder + "/M_KT_Soil.mat") ?? AssetDatabase.LoadAssetAtPath<Material>(MatFolder + "/M_GD_packed_soil.mat");
+
+        static void Trees_(Transform root)
+        {
+            var mb = new MB();
+            Material leafVar2 = null, leafVar3 = null;
+            Material L(string code) => AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/Trees/M_" + code + "_Leaves.mat");
+            leafVar2 = Variant(L("TR02"), "AppleLeaf_TR02", new Color(1.0f, 1.0f, 0.62f)); leafVar3 = Variant(L("TR03"), "AppleLeaf_TR03", new Color(1.0f, 1.0f, 0.62f));
+            for (int i = 0; i < Trees.Length; i++)
+            {
+                TreeDef d = Trees[i];
+                var p = new Vector2(d.X, d.Z);
+                GameObject pf = Prefab(d.Code); if (pf == null) { Count("treeMissing"); continue; }
+                if (!HollowmereStreets.Surface(p.x, p.y, out float y, out float ny) || !HollowmereStreets.FreeOf(p, y, 0.6f)) { Count("treeRejected"); var hs = Physics.OverlapSphere(new Vector3(p.x, y + 0.75f, p.y), 0.6f, ~0, QueryTriggerInteraction.Ignore).Where(c => !(c is TerrainCollider)).Select(c => c.transform.root.name + "/" + c.transform.parent?.name + "/" + c.name); Debug.LogWarning("SC HOLLOWMERE orchard: apple tree " + i + " rejected at " + p + " hit " + string.Join(";", hs)); continue; }
+                Bounds ub = Unit(pf); float s = d.H / Mathf.Max(0.1f, ub.max.y);
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, root);
+                go.name = "Apple_" + i + "_" + d.Code;
+                go.transform.position = new Vector3(p.x, y - 0.04f, p.y);
+                go.transform.rotation = Quaternion.Euler((H(i, 1, 831) - 0.5f) * 10f, d.Yaw, (H(i, 2, 831) - 0.5f) * 10f);
+                go.transform.localScale = new Vector3(s * d.Girth, s, s * d.Girth);
+                Material lv = d.Code == "TR02" ? leafVar2 : leafVar3;
+                foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
+                {
+                    var mats = r.sharedMaterials; bool ch = false;
+                    for (int k = 0; k < mats.Length; k++) if (mats[k] != null && mats[k].name.Contains("Leaves") && lv != null) { mats[k] = lv; ch = true; }
+                    if (ch) r.sharedMaterials = mats;
+                }
+                trunkXZ.Add(p); Count("appleTrees");
+                Mound(mb, p, Mathf.Lerp(1.2f, 1.7f, H(i, 3, 831)), 0.17f, i);
+            }
+            var mo = new GameObject("OrchardMounds"); mo.transform.SetParent(root, false);
+            mo.AddComponent<MeshFilter>().sharedMesh = mb.ToMesh("OR_Mounds");
+            var mr = mo.AddComponent<MeshRenderer>(); mr.sharedMaterial = Soil(); mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = true;
+        }
+
+        // ------------------------------------------------------------------------------------------------ the fallen tree (Ruined)
+        static void FallenTree(Transform props, Transform flora, Transform dec)
+        {
+            var mb = new MB();
+            Berm(mb, FallenRoot, 0.9f, 2.0f, 0.3f, 91);
+            var mo = new GameObject("FallenTreePit"); mo.transform.SetParent(props, false);
+            mo.AddComponent<MeshFilter>().sharedMesh = mb.ToMesh("OR_FallenPit");
+            var mr = mo.AddComponent<MeshRenderer>(); mr.sharedMaterial = Soil(); mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = true;
+            GameObject pf = Prefab("TR02"); if (pf == null) return;
+            Bounds ub = Unit(pf); float s = 5.6f / Mathf.Max(0.1f, ub.max.y);
+            Vector2 axis = (FallenCrown - FallenRoot).normalized;
+            float y = Gy(FallenRoot);
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, props);
+            go.name = "FallenApple";
+            Vector3 up = new Vector3(axis.x, 0.14f, axis.y).normalized;   // the trunk lies 8 degrees up from the ground toward the crown
+            go.transform.rotation = Quaternion.FromToRotation(Vector3.up, up) * Quaternion.Euler(0f, 30f, 0f);
+            go.transform.localScale = new Vector3(s * 1.2f, s, s * 1.2f);
+            go.transform.position = new Vector3(FallenRoot.x, y + 0.28f, FallenRoot.y);   // the root end stands on the pit's lip, the crown settles into the grass
+            foreach (Collider c in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            var cap = go.AddComponent<CapsuleCollider>(); cap.direction = 1; cap.radius = 0.5f; cap.height = 8.5f; cap.center = new Vector3(0f, 4.4f, 0f);   // the trunk to the first forks
+            Material lv = AssetDatabase.LoadAssetAtPath<Material>(MatFolder + "/M_HM_AppleLeaf_TR02.mat");
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true)) { var mats = r.sharedMaterials; for (int k = 0; k < mats.Length; k++) if (mats[k] != null && mats[k].name.Contains("Leaves") && lv != null) mats[k] = lv; r.sharedMaterials = mats; }
+            Physics.SyncTransforms(); Count("fallenTree");
+            // root wad and spoil: the N04 stump on its side in the pit, stones, the pit and litter decals
+            Put(props, "N04", "FallenRootWad", FallenRoot + new Vector2(-0.3f, 0.2f), y, 1.7f, 40f, 28f, 20f, 0.15f);
+            for (int i = 0; i < 3; i++)
+            {
+                float a = (0.7f + i * 2.1f) * 1f; Vector2 q = FallenRoot + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Mathf.Lerp(1.5f, 2.3f, H(i, 1, 841));
+                if (Ok(q, 0.3f)) Put(props, "T11a", "PitStone_" + i, q, Gy(q), Mathf.Lerp(0.45f, 0.8f, H(i, 2, 841)), H(i, 3, 841) * 360f, (H(i, 4, 841) - 0.5f) * 14f, (H(i, 5, 841) - 0.5f) * 14f, 0.12f);
+            }
+            Decal(dec, "Mud", FallenRoot, 3.4f, 3.4f, 20f, "Pit_Mud"); Decal(dec, "Damp", FallenRoot + new Vector2(0.2f, -0.2f), 2.2f, 2.2f, 110f, "Pit_Damp");
+            for (int i = 0; i < 6; i++) { float a = i * 1.05f; Weed(flora, FallenRoot + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Mathf.Lerp(1.9f, 2.7f, H(i, 6, 841)), 91, i, 1.0f, 1.7f); }
+            for (int i = 0; i < 3; i++)
+            {
+                Vector2 q = Vector2.Lerp(FallenRoot, FallenCrown, 0.35f + 0.25f * i) + Perp(axis) * (i % 2 == 0 ? 0.9f : -0.8f);
+                Decal(dec, i % 2 == 0 ? "LeavesA" : "LeavesB", q, 2.6f, 2.6f, H(i, 7, 841) * 360f, "Fallen_Litter" + i);
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------------ tree bases (Ruined): stones, grass ring, leaf litter, moss
+        static void TreeBases(Transform props, Transform flora, Transform dec)
+        {
+            for (int i = 0; i < trunkXZ.Count; i++)
+            {
+                Vector2 p = trunkXZ[i]; int n = 1 + (int)(H(i, 1, 851) * 2.99f);
+                for (int k = 0; k < n; k++)
+                {
+                    float a = (H(i, 2 + k, 851) + k / (float)n) * Mathf.PI * 2f; Vector2 q = p + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Mathf.Lerp(0.9f, 1.4f, H(i, 5 + k, 851));
+                    if (Ok(q, 0.3f)) Put(props, "T11a", "BaseStone_" + i + "_" + k, q, Gy(q), Mathf.Lerp(0.3f, 0.55f, H(i, 8 + k, 851)), H(i, 11 + k, 851) * 360f, (H(i, 14 + k, 851) - 0.5f) * 20f, (H(i, 17 + k, 851) - 0.5f) * 20f, 0.06f);
+                }
+                for (int k = 0; k < 7; k++)
+                {
+                    float a = (k + H(i, 20 + k, 851)) * Mathf.PI * 2f / 7f; Vector2 q = p + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Mathf.Lerp(0.8f, 1.9f, H(i, 30 + k, 851));
+                    if (!OnPath(q.x, q.y)) Weed(flora, q, i, 40 + k, 0.9f, 1.5f);
+                }
+                Decal(dec, i % 2 == 0 ? "LeavesA" : "LeavesB", p + new Vector2(0.3f, -0.2f), 3.6f, 3.6f, H(i, 50, 851) * 360f, "Litter_" + i + "a");
+                Decal(dec, i % 2 == 0 ? "LeavesB" : "LeavesA", p + new Vector2(-1.2f, 1.0f), 2.6f, 2.6f, H(i, 51, 851) * 360f, "Litter_" + i + "b");
+                Decal(dec, "MossSoft", p, 2.2f, 2.2f, H(i, 52, 851) * 360f, "TrunkMoss_" + i);
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------------ windfalls: 20, clustered
+        static GameObject Apple(Transform props, Vector2 p, int key, int salt, bool rotten, float y0 = float.NaN)
+        {
+            float y = float.IsNaN(y0) ? Gy(p) : y0;
+            GameObject a = Put(props, "T08d", (rotten ? "AppleRot_" : "Apple_") + key + "_" + salt, p, y, Mathf.Lerp(0.075f, 0.095f, H(key, salt, 861)), H(key, salt, 862) * 360f, (H(key, salt, 863) - 0.5f) * 40f, (H(key, salt, 864) - 0.5f) * 40f, float.IsNaN(y0) ? 0.018f : 0f);
+            if (a != null && rotten) Recolor(a, "Rotten", new Color(0.42f, 0.32f, 0.22f));
+            return a;
+        }
+
+        static void Cluster(Transform props, Vector2 centre, float spread, int count, int key, int rotten, ref int made)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float a = H(key, i, 871) * Mathf.PI * 2f, r = spread * Mathf.Sqrt(H(key, i, 872));
+                Vector2 q = centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
+                if (OnPath(q.x, q.y) || !Ok(q, 0.1f)) continue;
+                if (Apple(props, q, key, i, i < rotten) != null) made++;
+            }
+        }
+
+        static void Windfalls(Transform props)
+        {
+            Transform g = Sub(props, "Windfalls"); int made = 0;
+            Cluster(g, new Vector2(Trees[0].X + 1.1f, Trees[0].Z - 0.5f), 1.3f, 6, 1, 1, ref made);
+            Cluster(g, new Vector2(Trees[3].X - 0.9f, Trees[3].Z - 0.8f), 1.2f, 6, 2, 1, ref made);
+            Cluster(g, new Vector2(Trees[5].X + 1.0f, Trees[5].Z - 1.3f), 1.0f, 3, 3, 0, ref made);
+            Cluster(g, Vector2.Lerp(FallenRoot, FallenCrown, 0.5f) + new Vector2(-0.9f, 0f), 2.4f, 6, 4, 2, ref made);
+            Cluster(g, new Vector2(Trees[1].X + 0.8f, Trees[1].Z + 0.9f), 0.7f, 2, 5, 2, ref made);
+            Count("windfalls", made);
+        }
+
+        // ------------------------------------------------------------------------------------------------ story props
+        static void Story(Transform props, Transform flora, Transform dec)
+        {
+            Transform g = Sub(props, "Story"); int key = 7001;
+            // the ladder against a trunk of tree 5 and a full basket at its foot
+            {
+                Vector2 tp = trunkXZ.Count > 5 ? trunkXZ[5] : new Vector2(Trees[5].X, Trees[5].Z);
+                Vector2 toTree = new Vector2(0.1f, 0.99f).normalized;
+                float phi = 13f, L = 2.7f, reach = L * Mathf.Sin(phi * Mathf.Deg2Rad);
+                Vector2 foot = tp - toTree * (reach + 0.27f);
+                if (Ok(foot, 0.2f, false)) { Lean(g, "T04b", "Ladder", foot, toTree, L, phi, false, 0.02f); Decal(dec, "Hay", foot + toTree * 0.1f, 1.7f, 1.7f, 35f, "Hay_Ladder"); }
+                Vector2 bp = foot - toTree * 0.55f + Perp(toTree) * 0.55f;
+                if (Ok(bp, 0.2f))
+                {
+                    float by = Gy(bp);
+                    Put(g, "T08g", "BasketFull", bp, by, 0.5f, 20f, 0f, 0f, 0.03f);
+                    for (int i = 0; i < 8; i++) { float a = i * 2.4f; Vector2 q = bp + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (i < 5 ? 0.10f : 0.03f); Apple(g, q, 11, i, i == 6, by + (i < 5 ? 0.275f : 0.335f)); }
+                }
+            }
+            // a tipped basket with apples spilled downhill (toward the wall) under tree 4
+            {
+                Vector2 tp = new Vector2(Trees[3].X, Trees[3].Z), d = new Vector2(0.45f, -0.89f).normalized;
+                Vector2 bp = tp + new Vector2(-0.6f, -1.2f);
+                if (Ok(bp, 0.25f))
+                {
+                    float by = Gy(bp);
+                    Put(g, "T08g", "BasketTipped", bp, by, 0.5f, YawFace(d), 72f, 0f, 0.03f);
+                    Decal(dec, "Hay", bp + d * 0.5f, 1.4f, 1.4f, 200f, "Hay_Basket");
+                    for (int i = 0; i < 9; i++)
+                    {
+                        float t = 0.35f + 1.3f * Mathf.Pow(H(key, i, 881), 0.8f); float lat = (H(key, i, 882) - 0.5f) * (0.3f + 0.55f * t);
+                        Vector2 q = bp + d * t + Perp(d) * lat;
+                        if (Ok(q, 0.1f)) Apple(g, q, 12, i, i == 7);
+                    }
+                }
+            }
+            // the half-loaded wheelbarrow parked on the garden wall's orchard face, with a sack and a crate stack beside it
+            {
+                Vector2 wallPt = new Vector2(43.0f, -41.3f), n = new Vector2(0.81f, -0.58f), t = new Vector2(0.58f, 0.81f);
+                Vector2 wp = wallPt + n * 0.95f;
+                if (Ok(wp, 0.5f, false))
+                {
+                    float wy = Gy(wp);
+                    Put(g, "T16c", "Wheelbarrow", wp, wy, 1.55f, YawAlong(t) + 8f, 0f, 3f, 0.03f, true);
+                    Decal(dec, "Hay", wp - t * 0.5f, 1.6f, 1.6f, 80f, "Hay_Barrow");
+                    for (int i = 0; i < 7; i++) { Vector2 q = wp + t * ((H(key, i, 891) - 0.5f) * 0.55f) + n * ((H(key, i, 892) - 0.5f) * 0.25f) + t * 0.08f; Apple(g, q, 13, i, i == 5, wy + 0.32f + 0.04f * (i % 3)); }
+                }
+                Vector2 sp = wallPt + t * -1.2f + n * 0.5f;
+                if (Ok(sp, 0.3f)) Put(g, "C11b", "SackLeaning", sp, Gy(sp), 0.7f, YawFace(-n), 6f, 4f, 0.04f);
+            }
+            // crate stack, a tipped crate with spilled apples, a broken-open crate: along the wall east of the gate
+            {
+                Vector2 wallPt = new Vector2(42.0f, -42.95f), n = new Vector2(0.81f, -0.58f), t = new Vector2(0.58f, 0.81f);
+                Vector2 cp = wallPt + n * 0.45f;
+                if (Ok(cp, 0.4f, false))
+                {
+                    float cy = Gy(cp);
+                    Put(g, "T17a", "CrateBase", cp, cy, 0.58f, YawAlong(t) + 4f, 0f, 0f, 0.03f, true);
+                    Put(g, "T17b", "CrateTop", cp + t * 0.03f, cy + 0.22f, 0.6f, YawAlong(t) - 9f, 0f, 2f, 0f);
+                    Decal(dec, "Hay", cp + n * 0.2f, 1.8f, 1.8f, 120f, "Hay_Crates");
+                }
+                Vector2 tp = wallPt - t * 1.15f + n * 0.7f;
+                if (Ok(tp, 0.3f))
+                {
+                    float ty = Gy(tp);
+                    Put(g, "T17a", "CrateTipped", tp, ty, 0.55f, YawAlong(t) + 40f, 0f, 78f, 0.02f);
+                    for (int i = 0; i < 4; i++) { Vector2 q = tp + n * (0.3f + 0.25f * i) + Perp(n) * ((H(key, i, 895) - 0.5f) * 0.4f); if (Ok(q, 0.1f)) Apple(g, q, 14, i, i == 3); }
+                }
+            }
+            // tools leaning on the gate pier (orchard face)
+            {
+                Vector2 centre = PierB + OrchardNormal * 0.62f; Vector2 u = new Vector2(0.84f, 0.54f);
+                string[] tools = { "T16k", "T16l", "T16m" }; float[] len = { 1.5f, 1.25f, 1.45f };
+                for (int i = 0; i < 3; i++)
+                {
+                    Vector2 foot = centre + u * (-0.26f + 0.26f * i);
+                    if (Ok(foot, 0.1f, false)) Lean(g, tools[i], "GateTool_" + tools[i], foot, -OrchardNormal, len[i], 20f + 3f * i, i == 1, 0.02f);
+                }
+                Vector2 bkp = centre + u * 0.85f + OrchardNormal * 0.1f;
+                if (Ok(bkp, 0.2f)) Put(g, "T17c", "GateBucket", bkp, Gy(bkp), 0.34f, 40f, 0f, 6f, 0.025f);
+                Decal(dec, "Hay", centre + u * 0.2f, 1.2f, 1.2f, 300f, "Hay_Gate");
+            }
+            // the bench under the best crown
+            {
+                Vector2 tp = trunkXZ.Count > 0 ? trunkXZ[0] : new Vector2(Trees[0].X, Trees[0].Z), f = new Vector2(0.92f, -0.38f).normalized;
+                Vector2 bp = tp + f * 1.0f;
+                if (Ok(bp, 0.5f, false))
+                {
+                    Put(g, "T16e", "Bench", bp, Gy(bp), 1.4f, YawFace(f), 0f, 3f, 0.04f, true);
+                    Decal(dec, "LeavesB", bp + f * 0.3f, 2.6f, 2.6f, 15f, "Litter_Bench");
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------------ two nooks
+        static void Nooks(Transform props, Transform flora, Transform dec)
+        {
+            Transform g = Sub(props, "Nooks");
+            // A: the corner of R2_18's shell and the garden wall's end, under the seventh crown: ferns, a mossy stone, a basket half under ivy
+            Vector2 a = new Vector2(34.4f, -50.6f);
+            Vector2[] fern = { a + new Vector2(-0.2f, -0.9f), a + new Vector2(0.9f, 0.7f), a + new Vector2(0.7f, -1.1f), a + new Vector2(-0.1f, 1.0f) };
+            float[] fs = { 0.95f, 0.75f, 0.85f, 0.7f };
+            for (int i = 0; i < fern.Length; i++) if (Ok(fern[i], 0.3f, false)) Put(g, "T12b", "NookFern_A" + i, fern[i], Gy(fern[i]), fs[i], H(i, 1, 901) * 360f, 0f, 0f, 0.03f);
+            Vector2 sp = a + new Vector2(0.2f, 0.3f); if (Ok(sp, 0.3f, false)) Put(g, "T11a", "NookStone_A", sp, Gy(sp), 0.75f, 35f, 4f, -5f, 0.15f);
+            Vector2 bp = a + new Vector2(0.55f, -0.35f);
+            if (Ok(bp, 0.25f, false)) { Put(g, "T08g", "NookBasket_A", bp, Gy(bp), 0.46f, 150f, 25f, 6f, 0.03f); Put(g, "T12c", "NookIvy_A", bp + new Vector2(-0.25f, 0.25f), Gy(bp), 0.95f, 215f, 0f, 3f, 0.0f); }
+            Vector2 cp = a + new Vector2(-0.5f, 0.4f); if (Ok(cp, 0.3f, false)) Put(g, "T17a", "NookCrate_A", cp, Gy(cp), 0.5f, 70f, 0f, 76f, 0.02f);
+            Decal(dec, "Hay", a + new Vector2(0.2f, -0.4f), 1.6f, 1.6f, 200f, "Hay_NookA"); Decal(dec, "Moss", a + new Vector2(-0.4f, 0.2f), 1.8f, 1.8f, 40f, "Moss_NookA"); Decal(dec, "LeavesA", a, 2.8f, 2.8f, 260f, "Litter_NookA");
+            for (int i = 0; i < 4; i++) Weed(flora, a + new Vector2(Mathf.Cos(i * 1.6f), Mathf.Sin(i * 1.6f)) * 1.3f, 901, i, 1.0f, 1.6f);
+            // B: the pocket behind the fallen tree, between its trunk and the crumbled wall
+            Vector2 b = new Vector2(49.3f, -49.6f);
+            Vector2[] fern2 = { b + new Vector2(0.2f, -1.2f), b + new Vector2(1.1f, 0.9f), b + new Vector2(-0.9f, 1.4f) };
+            for (int i = 0; i < fern2.Length; i++) if (Ok(fern2[i], 0.3f, false)) Put(g, "T12b", "NookFern_B" + i, fern2[i], Gy(fern2[i]), 0.9f - 0.1f * i, H(i, 2, 901) * 360f, 0f, 0f, 0.03f);
+            Vector2 s1 = b + new Vector2(-0.6f, 0.1f); if (Ok(s1, 0.3f, false)) Put(g, "T11a", "NookStone_B1", s1, Gy(s1), 0.8f, 100f, 3f, 5f, 0.14f);
+            Vector2 s2 = b + new Vector2(0.9f, -0.2f); if (Ok(s2, 0.3f, false)) Put(g, "T11a", "NookStone_B2", s2, Gy(s2), 0.5f, 10f, -4f, 4f, 0.1f);
+            Vector2 cb = b + new Vector2(0.2f, 0.2f);
+            if (Ok(cb, 0.3f, false))
+            {
+                Put(g, "T17b", "NookCrateBroken", cb, Gy(cb), 0.58f, 25f, 0f, 62f, 0.02f);
+                for (int i = 0; i < 4; i++) { Vector2 q = cb + new Vector2(0.3f + 0.2f * i, -0.15f * i + 0.1f); if (Ok(q, 0.1f)) Apple(g, q, 15, i, i >= 2); }
+            }
+            Vector2 r1 = b + new Vector2(0.4f, 1.5f); if (Ok(r1, 0.4f, false)) Put(g, "T05b", "NookRubble_B", r1, Gy(r1), 0.9f, 130f, 4f, -6f, 0.1f);
+            Decal(dec, "Hay", b + new Vector2(0.5f, 0.0f), 1.7f, 1.7f, 330f, "Hay_NookB"); Decal(dec, "Damp", b, 2.4f, 2.4f, 90f, "Damp_NookB"); Decal(dec, "LeavesB", b + new Vector2(-0.3f, 0.6f), 2.6f, 2.6f, 10f, "Litter_NookB");
+            for (int i = 0; i < 4; i++) Weed(flora, b + new Vector2(Mathf.Cos(i * 1.7f + 0.5f), Mathf.Sin(i * 1.7f + 0.5f)) * 1.5f, 902, i, 1.0f, 1.6f);
+        }
+
+        // ------------------------------------------------------------------------------------------------ the path (Ruined decals; the grass strip is cleared in the terrain mask)
+        static void Path(Transform flora, Transform dec)
+        {
+            for (int i = 1; i < PathLine.Length; i++)
+            {
+                Vector2 a = PathLine[i - 1], b = PathLine[i]; float len = Vector2.Distance(a, b); Vector2 d = (b - a) / len;
+                int n = Mathf.Max(1, Mathf.RoundToInt(len / 1.8f));
+                for (int k = 0; k < n; k++)
+                {
+                    Vector2 q = a + d * ((k + 0.5f) * len / n) + Perp(d) * ((H(i, k, 911) - 0.5f) * 0.25f);
+                    Decal(dec, "Mud", q, 2.0f + 0.5f * H(i, k + 20, 911), 1.5f + 0.4f * H(i, k + 40, 911), YawAlong(d) + (H(i, k, 912) - 0.5f) * 40f, "PathMud_" + i + "_" + k);
+                }
+            }
+            Decal(dec, "Puddle", PathLine[2] + new Vector2(0.15f, 0.2f), 1.2f, 0.9f, 60f, "PathPuddle");
+            // grass and weeds invading the edge from both sides
+            for (int i = 1; i < PathLine.Length; i++)
+            {
+                Vector2 a = PathLine[i - 1], b = PathLine[i]; float len = Vector2.Distance(a, b); Vector2 d = (b - a) / len;
+                for (int k = 0; k < 4; k++)
+                {
+                    float s = (k + H(i, k, 921)) * len / 4f; float side = (k % 2 == 0 ? 1f : -1f);
+                    Vector2 q = a + d * s + Perp(d) * side * Mathf.Lerp(0.75f, 1.15f, H(i, k + 9, 921));
+                    if (Ok(q, 0.1f)) Weed(flora, q, 921, i * 10 + k, 0.8f, 1.3f);
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------------ wall feet: the garden wall, its gate piers and the town wall in the orchard stretch
+        static void WallFeet(Transform props, Transform flora, Transform dec)
+        {
+            // garden wall, orchard side: tufts in the joints and at the pier feet, moss, damp and grime
+            var runs = new (Vector2 A, Vector2 B, Vector2 N)[] { (new Vector2(35.9f, -47.2f), new Vector2(38.9f, -45.2f), new Vector2(0.55f, -0.83f)), (new Vector2(41.1f, -43.8f), new Vector2(44.1f, -39.6f), new Vector2(0.81f, -0.58f)) };
+            int ri = 0;
+            foreach (var r in runs)
+            {
+                float len = Vector2.Distance(r.A, r.B); Vector2 d = (r.B - r.A) / len;
+                int nt = Mathf.RoundToInt(len / 0.9f);
+                for (int k = 0; k < nt; k++) { Vector2 q = r.A + d * ((k + 0.5f) * len / nt) + r.N * Mathf.Lerp(0.3f, 0.6f, H(ri, k, 931)); if (H(ri, k, 932) < 0.85f && Ok(q, 0.05f, false)) Weed(flora, q, 931 + ri, k, 0.6f, 1.2f); }
+                for (int k = 0; k < 3; k++)
+                {
+                    float s = (k + 0.5f) * len / 3f; Vector2 q = r.A + d * s + r.N * 0.4f;
+                    string m = k == 0 ? "Grime" : k == 1 ? "Moss" : "Damp";
+                    Decal(dec, m, m == "Grime" ? q + r.N * 0.15f : q, 1.8f, m == "Grime" ? 1.0f : 1.5f, m == "Grime" ? YawFace(-r.N) + 180f : H(ri, k, 933) * 360f, "WallFoot_" + ri + "_" + k);
+                }
+                ri++;
+            }
+            foreach (Vector2 pier in new[] { PierA, PierB })
+            {
+                Vector2 f = pier + OrchardNormal * 0.55f;
+                for (int k = 0; k < 4; k++) { Vector2 q = f + Dir(k * 90f + 30f) * 0.5f; if (Ok(q, 0.05f, false)) Weed(flora, q, 941 + (pier == PierA ? 0 : 1), k, 0.7f, 1.2f); }
+                Decal(dec, "MossSoft", f, 1.6f, 1.6f, pier == PierA ? 30f : 200f, "PierMoss" + (pier == PierA ? "A" : "B")); Decal(dec, "Grime", f + OrchardNormal * 0.1f, 1.5f, 0.9f, YawFace(-OrchardNormal) + 180f, "PierGrime" + (pier == PierA ? "A" : "B"));
+            }
+            // town wall inner face (the arc of radius 38 about (24,-26), inner face 37.35) from x 34 to 51
+            Vector2 centre = new Vector2(24f, -26f);
+            for (int k = 0; k < 11; k++)
+            {
+                float th = Mathf.Lerp(-74.5f, -45f, (k + 0.5f) / 11f) * Mathf.Deg2Rad;
+                Vector2 dirOut = new Vector2(Mathf.Cos(th), Mathf.Sin(th));
+                Vector2 q = centre + dirOut * 36.95f;
+                string m = k % 3 == 0 ? "Grime" : k % 3 == 1 ? "Moss" : "Damp";
+                Decal(dec, m, q, 2.4f, m == "Grime" ? 1.1f : 1.8f, m == "Grime" ? YawFace(dirOut) : H(k, 1, 951) * 360f, "TownWallFoot_" + k);
+            }
+            for (int k = 0; k < 22; k++)
+            {
+                float th = Mathf.Lerp(-74.5f, -45f, (k + H(k, 2, 952)) / 22f) * Mathf.Deg2Rad;
+                Vector2 q = centre + new Vector2(Mathf.Cos(th), Mathf.Sin(th)) * Mathf.Lerp(36.6f, 37.0f, H(k, 3, 952));
+                if (Ok(q, 0.05f, false)) Weed(flora, q, 952, k, 0.7f, 1.4f);
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------------ the wall gap: rubble spill 1-2 m out on both sides, ferns and grass at its edges
+        static void WallGap(Transform props, Transform flora, Transform dec)
+        {
+            Transform g = Sub(props, "WallGap");
+            Vector2 c = new Vector2(44.2f, -57.4f), n = new Vector2(0.51f, -0.86f), t = new Vector2(0.86f, 0.51f);   // 40-42: breach at (43.4,-58.6), crumbled at (46.7,-56.4) and (49.7,-53.9)
+            string[] kinds = { "T05b", "T05c", "T05b", "T05c", "T05b" };
+            for (int side = 0; side < 2; side++)
+                for (int k = 0; k < 7; k++)
+                {
+                    float along = (H(k, side, 961) - 0.3f) * 8f - 1.0f;   // -1 .. 7 m along the gap
+                    float outD = side == 0 ? -(0.9f + 1.6f * H(k, 5, 962)) : (0.9f + 1.4f * H(k, 6, 962));
+                    Vector2 q = c + t * along + n * outD;
+                    bool inside = side == 0;
+                    if (inside ? !Ok(q, 0.25f, false) : false) continue;
+                    float y = Gy(q);
+                    string kind = kinds[(k + side) % kinds.Length];
+                    Put(g, kind, "GapRubble_" + side + "_" + k, q, y, Mathf.Lerp(0.6f, 1.3f, H(k, 7 + side, 963)), H(k, 8, 963) * 360f, (H(k, 9, 963) - 0.5f) * 24f, (H(k, 10, 963) - 0.5f) * 24f, 0.2f);
+                }
+            for (int k = 0; k < 5; k++) { Vector2 q = c + t * (k * 1.6f - 0.8f) - n * 1.5f; if (Ok(q, 0.3f, false)) Put(g, "T12b", "GapFern_" + k, q, Gy(q), 0.75f + 0.1f * (k % 3), H(k, 1, 965) * 360f, 0f, 0f, 0.03f); }
+            for (int k = 0; k < 8; k++) { Vector2 q = c + t * (k * 1.0f - 1f) - n * Mathf.Lerp(0.5f, 2.2f, H(k, 2, 966)); if (Ok(q, 0.05f, false)) Weed(flora, q, 966, k, 0.9f, 1.5f); }
+            Decal(dec, "Damp", c - n * 1.0f, 3.2f, 2.2f, YawAlong(t), "GapDamp"); Decal(dec, "Moss", c - n * 1.8f + t * 2f, 2.0f, 2.0f, 40f, "GapMoss");
+        }
+
+        // ------------------------------------------------------------------------------------------------ one shadowless fill under the crowns
+        static void FillLight(Transform g)
+        {
+            var go = new GameObject("OrchardFill"); go.transform.SetParent(g, false);
+            go.transform.position = new Vector3(41.0f, Gy(new Vector2(41.0f, -51.5f)) + 3.3f, -51.5f);
+            Light l = go.AddComponent<Light>();
+            l.type = LightType.Point; l.color = new Color(0.86f, 0.93f, 0.72f); l.intensity = 3.2f; l.range = 12f; l.shadows = LightShadows.None;
+            Count("lights");
+        }
+
+        // ------------------------------------------------------------------------------------------------ the allotments (D8)
+        sealed class Plot
+        {
+            public Foundation F; public Vector2 O, Fw, Rt; public float Depth = 4.2f, Half = 3.3f; public int Key; public int Score;
+            public Vector2 W(float a, float d) => O + Rt * a + Fw * d;
+        }
+
+        static bool PlotOk(Vector2 p, float rad)
+        {
+            if (!Ok(p, rad)) return false;
+            if (HollowmereStreets.PathDistance(p) < 1.0f) return false;
+            var tp = new TownPoint(p.x, p.y);
+            foreach (Lane l in T.Lanes) if (HollowmereLayout.DistanceToPolyline(tp, l.Points) - l.Width * 0.5f < 0.5f) return false;
+            return true;
+        }
+
+        static Plot ChoosePlot(Foundation f)
+        {
+            TownPoint ax = f.Footprint.AxisX, az = f.Footprint.AxisZ;
+            Vector2[] fws = { new Vector2(az.X, az.Z), new Vector2(ax.X, ax.Z), new Vector2(-az.X, -az.Z), new Vector2(-ax.X, -ax.Z) };
+            Plot best = null;
+            for (int k = 0; k < 4; k++)
+            {
+                var p = new Plot { F = f, Fw = fws[k], Rt = new Vector2(fws[k].y, -fws[k].x), Key = HollowmereStreets.StableHash(f.Id) };
+                p.O = new Vector2(f.Centre.X, f.Centre.Z) + p.Fw * (f.Side * 0.5f + 0.35f);
+                int score = 0;
+                for (float d = 0.5f; d <= 3.8f; d += 0.9f) for (float a = -3.0f; a <= 3.0f; a += 0.9f) if (PlotOk(p.W(a, d), 0.3f)) score++;
+                p.Score = score;
+                if (best == null || score > best.Score) best = p;
+            }
+            return best;
+        }
+
+        static void Allotments(Transform root)
+        {
+            foreach (string id in new[] { "R2_07", "R2_18", "R2_22", "R3_02" })
+            {
+                Foundation f = T.Foundations.Find(x => x.Id == id); if (f == null) continue;
+                Plot p = ChoosePlot(f);
+                Transform g = Sub(root, id);
+                Debug.Log("SC HOLLOWMERE allotment " + id + ": plot score " + p.Score + " facing (" + p.Fw.x.ToString("F2") + "," + p.Fw.y.ToString("F2") + ") origin " + p.O);
+                Count("plots");
+                if (p.Score < 4) { Count("plotsEmpty"); continue; }
+                Fence(g, p); Beds(g, p, id); Cluster(g, p, id);
+            }
+        }
+
+        static void Fence(Transform g, Plot p)
+        {
+            var spots = new List<(Vector2 pos, Vector2 along, int slot)>();
+            for (float a = -p.Half + 0.5f; a <= p.Half - 0.4f; a += 1.0f) spots.Add((p.W(a, p.Depth), p.Rt, spots.Count));
+            for (float d = p.Depth - 1.0f; d >= 0.5f; d -= 1.0f) { spots.Add((p.W(-p.Half, d), p.Fw, spots.Count)); spots.Add((p.W(p.Half, d), p.Fw, spots.Count)); }
+            int gateSlot = spots.Count - 2;   // a side piece near the lot: the gate that hangs off one hinge
+            foreach (var s in spots)
+            {
+                float r = H(p.Key, s.slot, 971);
+                if (r < 0.16f) { Count("fenceMissing"); continue; }
+                if (!PlotOk(s.pos, 0.25f)) { Count("fenceRejected"); continue; }
+                float y = Gy(s.pos);
+                float yaw = YawAlong(s.along) + (H(p.Key, s.slot, 972) - 0.5f) * 14f;
+                if (s.slot == gateSlot)
+                {
+                    Vector2 hinge = s.pos - s.along * 0.5f; Vector2 outN = Perp(s.along) * (Vector2.Dot(Perp(s.along), p.W(0, p.Depth * 0.5f) - s.pos) > 0f ? -1f : 1f);
+                    Vector2 centre = hinge + (s.along * Mathf.Cos(0.5f) + outN * Mathf.Sin(0.5f)) * 0.52f;
+                    Put(g, "T16f", "FenceGate", centre, y, 1.22f, YawAlong((s.along * Mathf.Cos(0.5f) + outN * Mathf.Sin(0.5f))), 0f, -24f, 0.03f);
+                    Count("fenceGate"); continue;
+                }
+                if (r < 0.36f) { Put(g, "T16f", "FenceFallen_" + s.slot, s.pos, y, 1.22f, yaw, (H(p.Key, s.slot, 973) < 0.5f ? 1f : -1f) * (80f + 8f * H(p.Key, s.slot, 974)), 0f, 0.02f); Count("fenceFallen"); }
+                else { Put(g, "T16f", "Fence_" + s.slot, s.pos, y, 1.22f, yaw, (H(p.Key, s.slot, 973) - 0.5f) * (4f + 14f * H(p.Key, s.slot, 975)), (H(p.Key, s.slot, 976) - 0.5f) * 5f, 0.03f); Count("fenceStanding"); }
+                if (H(p.Key, s.slot, 977) < 0.55f) Weed(g, s.pos + Perp(s.along) * 0.2f, p.Key, 100 + s.slot, 0.7f, 1.3f);
+            }
+        }
+
+        static void Beds(Transform g, Plot p, string id)
+        {
+            bool replanted = id == "R2_18";
+            (float a, float d, float len)[] beds = { (-1.45f, 1.25f, 2.3f), (1.45f, 1.25f, 2.3f), (0f, 2.95f, 3.1f) };
+            for (int i = 0; i < beds.Length; i++)
+            {
+                var b = beds[i]; Vector2 c = p.W(b.a, b.d);
+                if (!PlotOk(c, 0.55f)) { Count("bedRejected"); continue; }
+                Bed(g, p, c, p.Rt, b.len, replanted && i == 0, p.Key + i * 31);
+            }
+            // a bean trellis built of planks on the back edge (two plots), a scarecrow toppled on R2_07
+            if (id == "R2_18" || id == "R2_22" || id == "R3_02") Trellis(g, p.W(id == "R2_22" ? -1.7f : 1.9f, p.Depth - 0.55f), p.Rt, p.Key);
+            if (id == "R2_07")
+            {
+                Vector2 sp = p.W(2.0f, 3.2f);
+                if (PlotOk(sp, 0.6f))
+                {
+                    GameObject s = HollowmereGarden.Loose(g, "Scarecrow", new Vector3(sp.x, Gy(sp), sp.y), 40f);
+                    if (s != null)
+                    {
+                        foreach (Collider c in s.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+                        s.transform.rotation = Quaternion.Euler(78f, 55f, 12f) * Quaternion.identity; s.transform.position = new Vector3(sp.x, Gy(sp) + 0.24f, sp.y);
+                        Recolor(s, "Worn", new Color(0.62f, 0.58f, 0.52f));
+                        Decal(g, "Hay", sp, 2.4f, 2.4f, 25f, "Hay_Scarecrow"); Count("scarecrow");
+                    }
+                }
+            }
+        }
+
+        static void Bed(Transform g, Plot p, Vector2 c, Vector2 along, float len, bool replanted, int key)
+        {
+            Vector2 perp = Perp(along); float y = Gy(c), yaw = YawAlong(along);
+            Decal(g, replanted ? "Damp" : "Mud", c, len * 0.95f, 1.0f, yaw, "BedSoil_" + key);
+            // frame: two long planks and two short ones, tidy on the replanted bed, tilted and shifted on the others
+            for (int k = 0; k < 4; k++)
+            {
+                bool longSide = k < 2; float sgn = (k % 2 == 0) ? 1f : -1f;
+                Vector2 pos = longSide ? c + perp * sgn * 0.52f : c + along * sgn * (len * 0.5f);
+                float jitter = replanted ? 0f : 1f;
+                if (!replanted && k == 3 && H(key, 1, 981) < 0.7f) pos += along * 0.35f + perp * 0.3f;   // one plank has slipped
+                Put(g, "T05d", "BedPlank_" + key + "_" + k, pos, y, longSide ? len : 1.05f, longSide ? yaw : yaw + 90f, jitter * (H(key, k, 982) - 0.5f) * 8f, jitter * (H(key, k, 983) - 0.5f) * 6f, 0.03f);
+            }
+            if (replanted)
+            {
+                for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++)
+                    Put(g, "T08a", "Seedling_" + key + "_" + i + j, c + along * ((i - 1) * 0.62f) + perp * ((j - 1) * 0.28f), y, 0.17f, H(key, i * 3 + j, 984) * 360f, 0f, 0f, 0.015f);
+                Vector2 bk = c + along * (len * 0.5f + 0.5f) + perp * 0.1f; if (PlotOk(bk, 0.2f)) Put(g, "T17c", "ReplantBucket", bk, Gy(bk), 0.34f, 25f, 0f, 3f, 0.025f);
+                Vector2 sh = c + along * (len * 0.5f + 0.8f) - perp * 0.5f; if (PlotOk(sh, 0.15f)) Lean(g, "T16l", "ReplantShovel", sh, along * -1f, 1.25f, 62f, false, 0.02f);
+                Count("bedReplanted");
+                return;
+            }
+            // gone to seed: split cabbages, rotting pumpkins, a few potatoes, weeds over the frame
+            for (int i = 0; i < 3; i++)
+            {
+                Vector2 q = c + along * ((i - 1) * len * 0.3f + (H(key, i, 985) - 0.5f) * 0.25f) + perp * ((H(key, i + 5, 985) - 0.5f) * 0.35f);
+                bool split = i == 1;
+                Put(g, "T08a", "CabbageSeed_" + key + "_" + i, q, y, split ? 0.38f : 0.3f, H(key, i, 986) * 360f, split ? 18f : 0f, split ? 14f : 0f, 0.03f);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                Vector2 q = c + along * ((i == 0 ? -1f : 1f) * len * 0.42f) + perp * ((H(key, i, 987) - 0.5f) * 0.5f) + (i == 1 ? perp * 0.7f : Vector2.zero);
+                GameObject pm = Put(g, "T08b", "PumpkinRot_" + key + "_" + i, q, y, 0.34f, H(key, i, 988) * 360f, (H(key, i, 989) - 0.5f) * 16f, (H(key, i, 990) - 0.5f) * 16f, 0.04f);
+                Recolor(pm, "Rot", new Color(0.36f, 0.30f, 0.22f));
+            }
+            for (int i = 0; i < 4; i++) { Vector2 q = c + along * ((H(key, i, 991) - 0.5f) * len * 0.6f) + perp * ((H(key, i + 9, 991) - 0.5f) * 0.6f); Put(g, "T08c", "Potato_" + key + "_" + i, q, y, 0.1f, H(key, i, 992) * 360f, 0f, 0f, 0.015f); }
+            for (int i = 0; i < 8; i++) { Vector2 q = c + along * ((H(key, i, 993) - 0.5f) * len * 0.95f) + perp * (Mathf.Sign(H(key, i, 994) - 0.5f) * Mathf.Lerp(0.2f, 0.75f, H(key, i, 995))); Weed(g, q, key, i, 1.1f, 2.0f); }
+            Count("bedBolted");
+        }
+
+        static void Trellis(Transform g, Vector2 b, Vector2 along, int key)
+        {
+            if (!PlotOk(b, 0.4f)) { Count("trellisRejected"); return; }
+            float y = Gy(b), yaw = YawAlong(along); Vector2 face = Perp(along);
+            for (int i = 0; i < 2; i++)
+            {
+                Vector2 q = b + along * (i == 0 ? -0.75f : 0.75f);
+                Put(g, "T05d", "TrellisPost_" + i, q, y, 1.9f, yaw + 90f, (H(key, i, 996) - 0.5f) * 7f, 90f, 0.04f, false);
+            }
+            Put(g, "T04a", "TrellisBarTop", b, y + 1.62f, 1.7f, yaw, 0f, (H(key, 3, 996) - 0.5f) * 6f, 0f);
+            Put(g, "T04a", "TrellisBarMid", b + face * 0.02f, y + 0.95f, 1.6f, yaw + 3f, 0f, 2f, 0f);
+            Put(g, "T12c", "TrellisVines_0", b + face * 0.06f - along * 0.2f, y + 0.1f, 1.25f, yaw, 0f, 0f, 0f);
+            Put(g, "T12c", "TrellisVines_1", b - face * 0.06f + along * 0.3f, y + 0.4f, 1.0f, yaw + 180f, 0f, 0f, 0f);
+            Count("trellis");
+        }
+
+        // water butt with a bucket against the lot's wall, tools where work stopped, hay and crates; the wheelbarrow on R2_22
+        static void Cluster(Transform g, Plot p, string id)
+        {
+            Vector2 bp = p.W(-p.Half + 0.8f, 0.7f);
+            if (PlotOk(bp, 0.45f))
+            {
+                float y = Gy(bp);
+                Put(g, "T16d", "WaterButt", bp, y, 0.95f, H(p.Key, 1, 1001) * 360f, 0f, 2f, 0.04f, true);
+                Vector2 bk = bp + new Vector2(0.55f, -0.2f); if (PlotOk(bk, 0.2f)) Put(g, "T17c", "ButtBucket", bk, Gy(bk), 0.34f, 140f, 0f, 4f, 0.025f);
+                Decal(g, "Moss", bp, 1.6f, 1.6f, 70f, "ButtMoss"); Decal(g, "Damp", bp + new Vector2(0.1f, 0.1f), 2.0f, 2.0f, 10f, "ButtDamp");
+                for (int i = 0; i < 4; i++) Weed(g, bp + Dir(i * 90f + 20f) * 0.55f, p.Key, 200 + i, 0.8f, 1.3f);
+            }
+            Vector2 tp = p.W(0.8f, p.Depth - 0.5f);
+            if (PlotOk(tp, 0.15f))
+            {
+                Lean(g, "T16k", "PlotRake", tp, p.Fw, 1.5f, 19f, false, 0.02f);
+                Vector2 t2 = tp + p.Rt * 0.3f; if (PlotOk(t2, 0.1f)) Lean(g, "T16m", "PlotScythe", t2, p.Fw, 1.45f, 24f, true, 0.02f);
+            }
+            Vector2 hp = p.W(p.Half - 0.9f, 0.9f);
+            if (id != "R2_22" && PlotOk(hp, 0.4f))
+            {
+                float y = Gy(hp);
+                Put(g, "T17a", "PlotCrate_A", hp, y, 0.56f, H(p.Key, 2, 1001) * 90f, 0f, 0f, 0.03f, true);
+                Put(g, "T17b", "PlotCrate_B", hp + p.Rt * 0.05f, y + 0.22f, 0.58f, H(p.Key, 3, 1001) * 90f + 20f, 0f, 3f, 0f);
+                Decal(g, "Hay", hp, 1.8f, 1.8f, 50f, "Hay_Crates");
+            }
+            if (id == "R2_22")
+            {
+                Vector2 wp = p.W(2.0f, 3.5f);
+                if (PlotOk(wp, 0.5f)) { Put(g, "T16c", "PlotWheelbarrow", wp, Gy(wp), 1.55f, YawAlong(p.Rt) + 25f, 0f, 5f, 0.03f, true); Decal(g, "Hay", wp, 1.8f, 1.8f, 140f, "Hay_Barrow"); }
+            }
+            // hay strewn along the beds
+            for (int i = 0; i < 2; i++) Decal(g, "Hay", p.W(-1.2f + 2.4f * i, 2.1f), 2.0f, 2.0f, 70f + 110f * i, "Hay_Beds" + i);
+        }
+    }
+}

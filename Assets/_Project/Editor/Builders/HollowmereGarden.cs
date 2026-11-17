@@ -100,6 +100,17 @@ namespace SleepingCalamity.EditorTools
             if (firstYardLot == null) firstYardLot = f.Id;
         }
 
+        // T07: one garden asset placed loose in world space (the Ruined allotments use the scarecrow). Its collider and slot materials come from Place; the caller turns and weathers it.
+        internal static GameObject Loose(Transform parent, string asset, Vector3 worldPos, float yaw)
+        {
+            var root = new GameObject("Loose_" + asset).transform; root.SetParent(parent, false);
+            root.position = worldPos;
+            GameObject o = Place(root, asset, 0f, 0f, yaw);
+            if (o == null) return null;
+            o.transform.localPosition = Vector3.zero;   // Place stands it on the footing slab (FootingTop): the caller's ground is the real one
+            return o;
+        }
+
         // ------------------------------------------------------------------------------------------------ capture cameras and the summary line
         // Called once per Build after the cameras group exists: adds the two garden captures and logs the totals of this build.
         public static void AddCaptureCameras(Transform cams, TownLayout t)
