@@ -13,13 +13,13 @@ World views were scored with the per-asset rubric (silhouette, edges, micro-deta
 | 1 | **Depth and atmosphere layering** | 3+ depth planes (near, mid, far) each separated by a visible step in value, contrast or haze; far plane lighter, cooler and softer; silhouettes overlap and the eye travels into the distance | 2 planes read; the far plane is as crisp and dark as the near, or the haze is one uniform veil | everything at one value and sharpness; a flat wall or a void behind the subject |
 | 2 | **Light direction and light zones** | key direction obvious from cast shadows; shadows shape the forms; pools of light and shade alternate along the view, so the eye has lit places to go | direction readable but the frame is evenly lit, or the shadows are blobs that don't shape anything | flat ambient light with no direction, or one shadow covering everything |
 | 3 | **Shade fill and highlight handling** | shade has coloured fill (sky-blue, bounce-warm) with detail still readable; brightest areas roll off softly with texture left in them; small bright accents; nothing pure black or blown white in large areas | shade readable but grey or muddy, or a large area (sky, ground, wall) clipped flat white or crushed | shade is black holes or milky; highlights blown in big flat patches |
-| 4 | **Density and clutter where the eye lands** | the surfaces near the path and the focal area carry dressing at 2-3 scales (structures, props, small clutter, plants) in natural clusters with breathing room; no bare stretch over about a quarter of the frame | the hero spots are dressed, gaps between them are bare; scatter looks evenly sprinkled or repeated | big bare planes; props stand singly, as if placed in an editor |
+| 4 | **Density and natural placement where the eye lands** | the surfaces near the path and the focal area carry dressing at 2-3 scales (structures, props, small clutter, plants) in natural clusters with breathing room; every item sits where it would have fallen, been dropped or been put to use (against walls, in corners, by doors), at a believable size; no bare stretch over about a quarter of the frame | the hero spots are dressed, gaps between them are bare; scatter looks evenly sprinkled or repeated; one or two items look oddly placed or oddly sized | big bare planes; props stand singly in the open, as if placed in an editor |
 | 5 | **Weathering and ground contact** | things grow out of the ground: moss, damp and grime at wall feet, root flare at trees, rubble drifts and spill, grass in joints, soot or char where fire was; wear follows water and hands | wear is present but even, like a mask; some objects meet the ground on a hard clean line | showroom clean; hard intersection lines; objects float or slice into the ground |
 | 6 | **Material realism at mid distance (5-30 m)** | each material identifiable at mid distance; roughness varies (wet vs dry, worn vs rough); no visible repeat; large surfaces broken by macro variation | materials read, but one repeats visibly or looks waxy or plastic; large surfaces are uniform | obvious tiling grid, plastic sheen, or smeared low-resolution surfaces |
 | 7 | **Composition and focal point** | one clear focal point the eye hits first, framed by leading lines and edges; 3-4 big value masses still read when the frame is squinted at thumbnail size | something to look at, but it competes or sits dead centre without support; masses muddle at thumbnail | no subject: a wall in the face, sky and ground halves, or noise |
 | 8 | **Life and motion cues** | visible signs of ongoing life and time: smoke, birds, motes or pollen, wind-bent grass or trees, ripples, lit windows, cloth, animals or people (three or more independent cues) | one or two cues | frozen and sterile |
 | 9 | **Cohesion: one visual language** | every element shares one shape language, material fidelity and palette; nothing looks imported from another game | mostly coherent; one element clashes (a photoscan rock beside toy shapes, a neon or grey-photo material, a different texel density) | kit-bash: elements from several styles or fidelities |
-| 10 | **Play-path readability** | where you can walk reads at once (ground value or material contrast, edges, openings, a lit destination), and the way on is inviting | the path is findable but blends into its surroundings | can't tell walkable from blocked, or where to go |
+| 10 | **Play-path and invitation to explore** | where you can walk reads at once (ground value or material contrast, edges, openings, a lit destination), and the frame promises things to find: side openings, nooks, half-hidden corners, a path bending out of sight, spots where herbs or a small treasure could be | the path is findable, but the view is a display to look at from one spot; nothing pulls you off the main line | can't tell walkable from blocked, or a dead end with nothing to do |
 
 Line 9 judges internal cohesion so anchors from other styles can sit on the same card. Fit to our own target (PHASE1 section 3: Dark Cloud shapes in OoT-2026 stylised realism) stays the user's call on captures.
 
@@ -81,11 +81,25 @@ Frames: 12 anchors (OoT 2026 remake x4, a UE5 Megascans village x2, NieR Replica
 - **Signal for Run 7:** across three looks, Postcard R6 -> R7 (shell round 3c, flat-faced stacks) was judged worse twice and a tie once: at that distance the flatter stacks read as cleaner, less ruined walls. Check it on a same-camera toggle before building more on round 3c.
 
 ## 5. Calibration to the user
-USER_CALIBRATION
+2026-11-17, six frames, user out of 10 vs reviewer mean (/50 shown as /10):
+
+| Frame | User | Reviewers |
+|---|---|---|
+| A01 OoT market square | 9 | 9.0 |
+| A07 NieR arched plaza | 8 | 7.6 |
+| A12 TotK cottage field | 6 | 6.4 |
+| ours Orchard R4 | 7 | 6.4 |
+| ours MarketStreet R7 | 7 | 7.1 |
+| ours Postcard R7 | 5 | 7.3 |
+
+- **Scale:** on the anchors the user and the reviewers agree within 0.4/10, and the mean offset over all six is -0.3/10 (-1.5/50). The v1 problem (our scores 8-10 points low on /40) is gone: report the reviewer mean as is.
+- **What the reviewers missed (user's words, summarised):** immersion you can see before you feel it, as in the Abbey, OoT and NieR; Postcard "looks empty, nothing to do but look around from one spot, nothing says explore me", with oddly placed toy-like props on a bare plaza. Orchard looks fuller and like a place where you could find something (herbs, a small treasure), with moody light, natural cohesion and depth; its placement is still a bit unnatural, but more correct than elsewhere in Hollowmere.
+- **Card change from this:** line 4 now asks for natural placement and believable size, and line 10 for an invitation to explore. Postcard was not re-scored under the new wording; the next reviewer pass will show whether the gap closes. If ours keep scoring above the user's eye, weight lines 4 and 10 double for our own frames' summary.
 
 Comparison sheet (all 18 frames ranked, ours marked): `Reference/private/judging-v2/sheets/comparison_18.jpg`; calibration sheet: `calibration_6.jpg` beside it.
 
 ## 6. For Run 7 (next resume brief)
 - Score world views with this card, not the per-asset rubric; two blind `reviewer` runs with the anchors in the pass, mean per frame. Never self-score.
 - Prove each task with a same-camera toggle or round pair through the A/B method (diff gate, null pair, named region).
+- The user's eye weighs natural placement and "something to explore" most (section 5): dress for discovery (nooks, side openings, herbs, small finds against walls and in corners), never props stood alone in the open.
 - Biggest visible gains, in order: ground contact and weathering (vertex AO and contact decals at every wall and prop base, grass in joints, rubble spill); clustering the dressing (clumps at corners and doorways with bare rests between) instead of even scatter; a shared detail fade at about 40 m plus quieter ground detail to bring the high-frequency energy down; one shared material language between props and trees (prop scale and chroma toward the trees' realism).
