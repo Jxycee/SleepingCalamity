@@ -7,7 +7,7 @@
 import sys, os, glob
 from PIL import Image, ImageDraw
 
-A = ['Eye_Spawn', 'Eye_Postcard', 'Eye_West', 'Eye_Bakery', 'Eye_InnFront', 'Eye_Climb', 'Eye_Balcony', 'Eye_BellYard', 'Eye_HillWest', 'Eye_MarketStreet']
+A = ['Eye_Spawn', 'Eye_Postcard', 'Eye_West', 'Eye_Bakery', 'Eye_InnFront', 'Eye_Climb', 'Eye_Balcony', 'Eye_BellYard', 'Eye_Churchyard', 'Eye_HillWest', 'Eye_MarketStreet']
 B = ['Eye_LowerLane', 'Eye_RingWest', 'Eye_RingSouth', 'Eye_Orchard', 'Eye_Mill', 'Eye_Meadow', 'Eye_Lake', 'Eye_JettyBack', 'Eye_RoadOut', 'Eye_RoadBack']
 HIGH = ['Overview', 'High_Lake', 'High_East']
 CONCEPTS = r'C:\Dev\SleepingCalamity\Reference\private\concepts'
@@ -76,7 +76,7 @@ def main():
     if not have_refs:
         print('note: concept folder missing, reference row skipped')
     RW = SW // 4; RH = round(RW * 9 / 16); top = RH if have_refs else 0
-    sa = Image.new('RGB', (SW, top + 5 * TH), (20, 20, 20)); da = ImageDraw.Draw(sa)
+    sa = Image.new('RGB', (SW, top + ((len(A) + 1) // 2) * TH), (20, 20, 20)); da = ImageDraw.Draw(sa)
     if have_refs:
         for i, (l, p) in enumerate(refs):
             if os.path.exists(p):

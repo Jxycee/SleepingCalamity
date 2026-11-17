@@ -23,19 +23,21 @@ namespace SleepingCalamity.EditorTools
         static readonly Quaternion MorningSun = Quaternion.Euler(42f, -32f, 0f);   // BeautyCornerBuilder.MorningSun
 
         static bool loaded;
-        static GameObject ivy, roof, scatter, plank;
+        static GameObject ivy, roof, scatter, plank, rubB;
+        static TownLayout layout;
+        public static void SetLayout(TownLayout t) => layout = t;
         static readonly List<GameObject> weeds = new List<GameObject>();
         static readonly Dictionary<GameObject, Bounds> prefabBounds = new Dictionary<GameObject, Bounds>();
         static Material brambleMat, crowMat, treeMat;
         static Mesh crowMesh; static Mesh[] sapMeshes;
-        static int lots, withChimney, saplings, crows, debris, brambles, ivies;
+        static int lots, withChimney, saplings, crows, debris, brambles, ivies, spills, tufts, wallIvies, treesDropped;
 
         static GameObject LoadPrefab(string code) => AssetDatabase.LoadAssetAtPath<GameObject>(Adopted + code + "/" + code + ".prefab");
 
         static void Load()
         {
             loaded = true;
-            ivy = LoadPrefab("T12c"); roof = LoadPrefab("T05a"); scatter = LoadPrefab("T05c"); plank = LoadPrefab("T05d");
+            ivy = LoadPrefab("T12c"); rubB = LoadPrefab("T05b"); roof = LoadPrefab("T05a"); scatter = LoadPrefab("T05c"); plank = LoadPrefab("T05d");
             foreach (string name in new[] { "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E" })
             {
                 string folder = BeautyCornerArt.FindFolder("B9", name);
@@ -68,14 +70,14 @@ namespace SleepingCalamity.EditorTools
         // The statics (loaded assets, counters) outlive a build in the same editor session: HollowmereBuilder.BuildScene calls this first so every build starts clean.
         public static void Reset()
         {
-            loaded = false; ivy = roof = scatter = plank = null;
+            loaded = false; ivy = roof = scatter = plank = rubB = null; layout = null;
             weeds.Clear(); prefabBounds.Clear();
             brambleMat = crowMat = treeMat = null; crowMesh = null; sapMeshes = null;
-            lots = withChimney = saplings = crows = debris = brambles = ivies = 0;
+            lots = withChimney = saplings = crows = debris = brambles = ivies = spills = tufts = wallIvies = treesDropped = 0;
         }
 
         public static void LogSummary() =>
-            Debug.Log("SC HOLLOWMERE ruin dressing: " + lots + " lots, " + withChimney + " with a chimney found, " + ivies + " ivy, " + saplings + " saplings, " + brambles + " bramble clumps, " + debris + " debris pieces, " + crows + " crows"
+            Debug.Log("SC HOLLOWMERE ruin dressing: " + lots + " lots, " + withChimney + " with a chimney found, " + ivies + " ivy, " + saplings + " saplings, " + brambles + " bramble clumps, " + debris + " debris pieces, " + crows + " crows, " + spills + " rubble spill pieces, " + tufts + " wall-foot tufts, " + wallIvies + " wall ivy, " + treesDropped + " lot trees dropped by shell walls"
                 + (ivy == null || roof == null || scatter == null || plank == null ? " (an adopted prefab is MISSING)" : ""));
 
         // ------------------------------------------------------------------------------------------------ one lot
@@ -90,6 +92,10 @@ namespace SleepingCalamity.EditorTools
             Transform dress = new GameObject("Dress").transform; dress.SetParent(lot, false);
             float half = f.Side * 0.5f;
             Transform chim = FindDeep(ruin, "Chimney"), door = FindDeep(ruin, "SOCKET_Doorstep");
+            RuinClass cls = HollowmereRuinShells.Built(f.Id);
+            bool shell = cls != RuinClass.Low;
+            List<BoxCollider> boxes = shell ? HollowmereRuinShells.Boxes(ruin) : new List<BoxCollider>();
+            if (shell) Physics.SyncTransforms();
             Vector3 doorL = lot.InverseTransformPoint(door != null ? door.position : ruin.position + ruin.forward * half);
             var door2 = new Vector2(doorL.x, doorL.z);
             Vector2 chim2 = Vector2.zero; float chimR = 0f; bool hasChim = false;
@@ -101,7 +107,8 @@ namespace SleepingCalamity.EditorTools
                 Vector3 away = new Vector3(chimPre.center.x - ruin.position.x, 0f, chimPre.center.z - ruin.position.z);
                 if (away.sqrMagnitude < 0.01f) away = ruin.right;
                 Vector3 axis = Vector3.Cross(Vector3.up, away.normalized);
-                chim.RotateAround(basePt, axis, -(2.5f + 1.5f * (float)rnd.NextDouble()));
+                float lean = 2.5f + 1.5f * (float)rnd.NextDouble();
+                chim.RotateAround(basePt, axis, -(shell ? Mathf.Min(1f, lean * 0.3f) : lean));   // shells: the frame members do not follow the node, so at most 1 degree
             }
             if (chim != null && TryBounds(chim, out chimWorld))
             {
@@ -109,8 +116,20 @@ namespace SleepingCalamity.EditorTools
                 Vector3 cl = lot.InverseTransformPoint(chimWorld.center); chim2 = new Vector2(cl.x, cl.z); chimR = Mathf.Max(chimWorld.extents.x, chimWorld.extents.z) + 0.9f;
             }
 
-            bool Free(Vector2 p, float doorClear)
+            bool NearBox(Vector2 p, float margin)
             {
+                if (boxes.Count == 0) return false;
+                Vector3 w = dress.TransformPoint(new Vector3(p.x, 0f, p.y));
+                foreach (BoxCollider bc in boxes)
+                {
+                    Vector3 l = bc.transform.InverseTransformPoint(w), c = bc.center, e = bc.size * 0.5f;
+                    if (Mathf.Abs(l.x - c.x) < e.x + margin && Mathf.Abs(l.z - c.z) < e.z + margin) return true;
+                }
+                return false;
+            }
+            bool Free(Vector2 p, float doorClear, float boxMargin = 0.6f)
+            {
+                if (NearBox(p, boxMargin)) return false;
                 if (Mathf.Abs(p.x) > half - 0.9f || Mathf.Abs(p.y) > half - 0.9f) return false;
                 if (Vector2.Distance(p, door2) < doorClear) return false;
                 Vector2 ab = Vector2.zero - door2; float tt = Mathf.Clamp01(Vector2.Dot(p - door2, ab) / Mathf.Max(0.01f, ab.sqrMagnitude));
@@ -118,19 +137,21 @@ namespace SleepingCalamity.EditorTools
                 if (hasChim && Vector2.Distance(p, chim2) < chimR) return false;
                 return true;
             }
-            Vector2 Pick(float doorClear)
+            Vector2 Pick(float doorClear, float boxMargin = 0.6f)
             {
                 for (int k = 0; k < 24; k++)
                 {
                     var p = new Vector2(((float)rnd.NextDouble() * 2f - 1f) * (half - 0.9f), ((float)rnd.NextDouble() * 2f - 1f) * (half - 0.9f));
-                    if (Free(p, doorClear)) return p;
+                    if (Free(p, doorClear, boxMargin)) return p;
                 }
                 return new Vector2(float.NaN, float.NaN);
             }
 
             if (hasChim) ChimneyDress(chim, chimWorld, dress, rnd);
+            var xr = new System.Random(f.Id.Aggregate(17, (a, c) => a * 31 + c) * 7919 + 13);   // own stream for the shell dressing: the low-kit lots keep their old random sequence
             // ivy on the chimney's sunny face
-            if (hasChim && ivy != null && TryIvy(ruin, chim, chimWorld, dress, rnd)) ivies++;
+            if (hasChim && ivy != null && TryIvy(ruin, chim, chimWorld, dress, rnd, shell)) ivies++;
+            if (shell && ivy != null && TryWallIvy(ruin, dress, xr)) wallIvies++;
 
             // saplings
             // Area 1 rework (Run 6): a real young tree has grown up through each ruin since the town fell (S 1, M 1, L 2; 3.8-8 m; HollowmereWild.LotTree, no
@@ -139,11 +160,19 @@ namespace SleepingCalamity.EditorTools
             if (Mathf.Abs(f.Centre.X) < 10f && f.Centre.Z > 6f && f.Centre.Z < HollowmereLayout.KeepWallZ) nSap = 0;   // the lots under the terrace balcony: its view over the square stays open (round 2)
             for (int i = 0; i < nSap; i++)
             {
-                Vector2 p = Pick(2.4f);
-                if (float.IsNaN(p.x)) continue;
+                Vector2 p = Pick(2.4f, shell ? 1.3f : 0.6f);
+                if (float.IsNaN(p.x)) { if (shell) treesDropped++; continue; }
                 int variant = rnd.Next(4); float h = 1.7f + (float)rnd.NextDouble() * 0.6f;
                 float treeH = f.Size == FoundationSize.S ? 3.8f + (float)rnd.NextDouble() * 1.7f : 4.6f + (float)rnd.NextDouble() * 3.4f, treeYaw = (float)rnd.NextDouble() * 360f;
                 GameObject lotTree = HollowmereWild.LotTree(dress, dress.TransformPoint(new Vector3(p.x, 0f, p.y)), treeH, treeYaw);
+                for (int attempt = 0; shell && lotTree != null && attempt < 8 && CrownHitsBox(lotTree, boxes); attempt++)
+                {
+                    Object.DestroyImmediate(lotTree); lotTree = null;   // the crown would pass through a standing wall or the stack: try another spot
+                    p = Pick(2.4f, 1.3f);
+                    if (float.IsNaN(p.x)) break;
+                    lotTree = HollowmereWild.LotTree(dress, dress.TransformPoint(new Vector3(p.x, 0f, p.y)), treeH, treeYaw + 37f * (attempt + 1));
+                }
+                if (shell && (lotTree == null || CrownHitsBox(lotTree, boxes))) { if (lotTree != null) Object.DestroyImmediate(lotTree); treesDropped++; continue; }
                 if (lotTree != null) { lotTree.name = "Dress_Tree_" + i; saplings++; continue; }
                 if (treeMat == null || f.Size != FoundationSize.L || i > 0) continue;   // the card fallback keeps the old rule: one on L lots only
                 var go = new GameObject("Dress_Sapling_" + i); go.transform.SetParent(dress, false);
@@ -207,9 +236,18 @@ namespace SleepingCalamity.EditorTools
                 debris++;
             }
 
+            // rubble spill and wall-foot tufts (own random stream)
+            Spill(dress, f, boxes, door2, half, xr);
+
             // one perched crow
             Vector3 perch; bool ok = false; float yaw = (float)rnd.NextDouble() * 360f;
-            if (hasChim)
+            Transform smoke = shell ? FindDeep(ruin, "SOCKET_Smoke") : null;
+            if (smoke != null)
+            {
+                Vector3 side = ruin.right * (Mathf.Min(chimWorld.extents.x, chimWorld.extents.z) * 0.5f * ((rnd.Next(2) == 0) ? 1f : -1f));
+                perch = smoke.position + new Vector3(side.x, -0.03f, side.z); ok = true;   // the real stack top (the flue mouth)
+            }
+            else if (hasChim)
             {
                 perch = new Vector3(chimWorld.center.x, chimWorld.max.y, chimWorld.center.z);   // the cap (SOCKET_Smoke, when present, is the flue mouth just inside it)
                 Vector3 side = ruin.right * (Mathf.Min(chimWorld.extents.x, chimWorld.extents.z) * 0.5f * ((rnd.Next(2) == 0) ? 1f : -1f));
@@ -311,9 +349,9 @@ namespace SleepingCalamity.EditorTools
             return b;
         }
 
-        // Ivy stands on the chimney face (in the ruin's frame: +-X and -Z faces; the +Z face is the firebox) turned most toward the Morning sun, thin axis of the card on the
-        // wall normal, its long axis up, from about a third of the way up the stack.
-        static bool TryIvy(Transform ruin, Transform chim, Bounds chimWorld, Transform dress, System.Random rnd)
+        // Ivy stands on the chimney face (in the ruin's frame: +-X and -Z faces; the +Z face is the firebox) turned most toward the Morning sun (shells: the shaded face),
+        // thin axis of the card on the wall normal, its long axis up, from about a third of the way up the stack.
+        static bool TryIvy(Transform ruin, Transform chim, Bounds chimWorld, Transform dress, System.Random rnd, bool shell)
         {
             // chimney extents in the ruin's own frame
             Vector3 lo = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue), hi = -lo;
@@ -328,34 +366,230 @@ namespace SleepingCalamity.EditorTools
             }
             Vector3 toSun = -(MorningSun * Vector3.forward);
             Vector3[] normals = { Vector3.right, Vector3.left, Vector3.back };   // never Vector3.forward: the firebox
-            Vector3 best = normals[0]; float bestDot = float.MinValue;
-            foreach (Vector3 n in normals) { float d = Vector3.Dot(ruin.TransformDirection(n), toSun); if (d > bestDot) { bestDot = d; best = n; } }
+            Vector3 best = normals[0]; float bestDot = shell ? float.MaxValue : float.MinValue;
+            foreach (Vector3 n in normals)
+            {
+                float d = Vector3.Dot(ruin.TransformDirection(n), toSun);
+                if (shell ? d < bestDot : d > bestDot) { bestDot = d; best = n; }
+            }
             Vector3 centreL = (lo + hi) * 0.5f, ext = (hi - lo) * 0.5f;
             Vector3 faceL = centreL + Vector3.Scale(best, ext);
             Vector3 N = ruin.TransformDirection(best).normalized;
             float stackH = hi.y - lo.y;
+            float faceW = (best == Vector3.back ? ext.x : ext.z) * 2f;
+            float targetH = shell ? Mathf.Min(0.6f * stackH, 4.5f) : Mathf.Min(0.55f * stackH, 2.6f);
+            float lateral = ((float)rnd.NextDouble() - 0.5f) * faceW * 0.3f;
+            Vector3 faceW3 = ruin.TransformPoint(faceL);
+            float baseY = ruin.TransformPoint(new Vector3(0f, lo.y + 0.33f * stackH, 0f)).y;
+            PlaceIvyCard(dress, "Dress_ChimneyIvy", N, faceW3, baseY, targetH, faceW, lateral);
+            return true;
+        }
 
+        // One ivy card standing on a wall face: its thin axis on the normal N, its long axis up, `targetH` tall (squeezed to at most 1.4 x the face width), its foot at baseY,
+        // centred on faceW3 (a point on the face) shifted `lateral` metres along the face.
+        static void PlaceIvyCard(Transform dress, string name, Vector3 N, Vector3 faceW3, float baseY, float targetH, float faceW, float lateral)
+        {
             Bounds b0 = PrefabBounds(ivy);
             Vector3 sz = b0.size;
             int thin = sz.x <= sz.y && sz.x <= sz.z ? 0 : sz.y <= sz.z ? 1 : 2;
             int tall = -1; float tallV = -1f;
             for (int a = 0; a < 3; a++) if (a != thin && sz[a] > tallV) { tallV = sz[a]; tall = a; }
             Vector3 thinAxis = Axis(thin), tallAxis = Axis(tall);
-            float targetH = Mathf.Min(0.55f * stackH, 2.6f);
             float s = Mathf.Max(0.05f, targetH / Mathf.Max(0.05f, tallV));
-            float wide = sz[3 - thin - tall] * s, faceW = (best == Vector3.back ? ext.x : ext.z) * 2f;
+            float wide = sz[3 - thin - tall] * s;
             if (wide > faceW * 1.4f) s *= faceW * 1.4f / wide;
             Quaternion src = Quaternion.LookRotation(thinAxis, tallAxis), dst = Quaternion.LookRotation(N, Vector3.up);
             Quaternion rot = dst * Quaternion.Inverse(src);
             var go = (GameObject)PrefabUtility.InstantiatePrefab(ivy, dress);
-            go.name = "Dress_ChimneyIvy";
+            go.name = name;
             go.transform.rotation = rot; go.transform.localScale = Vector3.one * s;
-            float lateral = ((float)rnd.NextDouble() - 0.5f) * faceW * 0.3f;
-            Vector3 faceW3 = ruin.TransformPoint(faceL);
-            float baseY = ruin.TransformPoint(new Vector3(0f, lo.y + 0.33f * stackH, 0f)).y;
             Vector3 want = new Vector3(faceW3.x, baseY + tallV * s * 0.5f, faceW3.z) + Vector3.Cross(Vector3.up, N) * lateral + N * (sz[thin] * s * 0.5f + 0.03f);
             go.transform.position = want - rot * Vector3.Scale(b0.center, Vector3.one * s);
+        }
+
+        // Thin-axis normal, thickness, length, centre, top and bottom of a collision box in world terms (the boxes are axis-aligned in their own frame, which only yaws).
+        static void BoxFace(BoxCollider bc, out Vector3 axisN, out float thick, out float len, out Vector3 centre, out float top, out float bottom)
+        {
+            Transform t = bc.transform; Vector3 sc = t.lossyScale, size = Vector3.Scale(bc.size, new Vector3(Mathf.Abs(sc.x), Mathf.Abs(sc.y), Mathf.Abs(sc.z)));
+            centre = t.TransformPoint(bc.center);
+            bool xThin = size.x <= size.z;
+            axisN = t.TransformDirection(xThin ? Vector3.right : Vector3.forward).normalized;
+            thick = xThin ? size.x : size.z; len = xThin ? size.z : size.x;
+            top = centre.y + size.y * 0.5f; bottom = centre.y - size.y * 0.5f;
+        }
+
+        // About 60% of the shell's standing wall gets one ivy card on its shaded face. The wall is found in the Footing mesh: the vertices above 2.8 m cluster on the plane of the
+        // tall wall or gable (a 0.3 m histogram on x and on z in the ruin's frame; the fuller axis wins), the card hangs from just above the ground up to 60% of that wall's height.
+        static bool TryWallIvy(Transform ruin, Transform dress, System.Random xr)
+        {
+            MeshFilter footing = null;
+            foreach (MeshFilter mf in ruin.GetComponentsInChildren<MeshFilter>(true)) if (mf.name == "Footing") { footing = mf; break; }
+            if (footing == null || footing.sharedMesh == null) return false;
+            var pts = new List<Vector3>();
+            foreach (Vector3 v in footing.sharedMesh.vertices)
+            {
+                Vector3 p = ruin.InverseTransformPoint(footing.transform.TransformPoint(v));
+                if (p.y > 2.8f) pts.Add(p);
+            }
+            if (pts.Count < 20) return false;
+            int bestAxis = 0, bestBin = 0, bestCount = -1;
+            for (int axis = 0; axis < 2; axis++)
+            {
+                var hist = new Dictionary<int, int>();
+                foreach (Vector3 p in pts) { int k = Mathf.RoundToInt((axis == 0 ? p.x : p.z) / 0.3f); hist.TryGetValue(k, out int c0); hist[k] = c0 + 1; }
+                foreach (var kv in hist)
+                {
+                    hist.TryGetValue(kv.Key - 1, out int cl); hist.TryGetValue(kv.Key + 1, out int cr);
+                    int sum = kv.Value + cl + cr;
+                    if (sum > bestCount || (sum == bestCount && axis == bestAxis && kv.Key < bestBin)) { bestCount = sum; bestAxis = axis; bestBin = kv.Key; }
+                }
+            }
+            float plane = bestBin * 0.3f;
+            float sumC = 0f, amin = float.MaxValue, amax = float.MinValue; int n = 0; var ys = new List<float>();
+            foreach (Vector3 p in pts)
+            {
+                float cc = bestAxis == 0 ? p.x : p.z, aa = bestAxis == 0 ? p.z : p.x;
+                if (Mathf.Abs(cc - plane) > 0.5f) continue;
+                sumC += cc; n++; amin = Mathf.Min(amin, aa); amax = Mathf.Max(amax, aa); ys.Add(p.y);
+            }
+            if (n < 10 || amax - amin < 1.8f) return false;
+            ys.Sort();
+            float top = ys[Mathf.Min(ys.Count - 1, (int)(ys.Count * 0.9f))], wallC = sumC / n, len = amax - amin;
+            Vector3 axisL = bestAxis == 0 ? Vector3.right : Vector3.forward;
+            Vector3 toSun = -(MorningSun * Vector3.forward);
+            Vector3 nW = ruin.TransformDirection(axisL).normalized;
+            float sign = Vector3.Dot(nW, toSun) <= Vector3.Dot(-nW, toSun) ? 1f : -1f;   // the shaded face
+            float alongC = (amin + amax) * 0.5f + ((float)xr.NextDouble() - 0.5f) * Mathf.Max(0f, len - 3f) * 0.4f;
+            Vector3 faceL = bestAxis == 0 ? new Vector3(wallC + sign * 0.25f, 0.1f, alongC) : new Vector3(alongC, 0.1f, wallC + sign * 0.25f);
+            Vector3 faceW = ruin.TransformPoint(faceL);
+            PlaceIvyCard(dress, "Dress_WallIvy", nW * sign, faceW, faceW.y, 0.6f * (top - 0.1f), len, 0f);
             return true;
+        }
+
+        // True when the tree's crown (its bounds, 30% narrower) would pass through a collision box that reaches above the crown's base height.
+        static bool CrownHitsBox(GameObject tree, List<BoxCollider> boxes)
+        {
+            if (boxes.Count == 0) return false;
+            bool any = false; Bounds tb = default;
+            foreach (Renderer r in tree.GetComponentsInChildren<Renderer>(true)) { if (!any) { tb = r.bounds; any = true; } else tb.Encapsulate(r.bounds); }
+            if (!any) return false;
+            float crownBase = tb.min.y + 0.35f * tb.size.y;
+            tb.size = new Vector3(tb.size.x * 0.7f, tb.size.y, tb.size.z * 0.7f);
+            foreach (BoxCollider bc in boxes)
+            {
+                Bounds bb = bc.bounds;
+                if (bb.max.y < crownBase) continue;
+                if (bb.Intersects(tb)) return true;
+            }
+            return false;
+        }
+
+        // ------------------------------------------------------------------------------------------------ rubble spill and wall-foot tufts
+        // 3-6 pieces of the adopted rubble and debris (T05b, T05c, T05d) lie at the foot of the broken walls and reach up to 2 m outside the footprint, half sunk and tilted;
+        // 2-4 weed tufts stand at wall feet. Never on a lane's walking corridor, a doorstep or another lot, never where the ground is not the pad's.
+        static bool SpillOk(Foundation f, Vector2 doorW, Vector3 world, float margin)
+        {
+            var p = new TownPoint(world.x, world.z);
+            foreach (Lane lane in layout.Lanes) if (HollowmereLayout.DistanceToPolyline(p, lane.Points) - lane.Width * 0.5f < margin) return false;
+            foreach (Foundation o in layout.Foundations) if (o != f && o.Footprint.Contains(p, 0.6f)) return false;
+            foreach (LotSide sd in TownLayout.AllSides) { TownPoint d = f.DoorstepPoint(sd); if (Vector2.Distance(new Vector2(d.X, d.Z), new Vector2(world.x, world.z)) < 1.8f) return false; }
+            if (Vector2.Distance(doorW, new Vector2(world.x, world.z)) < 2.2f) return false;
+            if (Mathf.Abs(HollowmereLayout.Ground(layout, world.x, world.z) - f.Y) > 0.5f) return false;
+            return true;
+        }
+
+        static bool InAnyBox(List<BoxCollider> boxes, Vector3 w, float margin)
+        {
+            foreach (BoxCollider bc in boxes)
+            {
+                Vector3 l = bc.transform.InverseTransformPoint(w), c = bc.center, ex = bc.size * 0.5f;
+                if (Mathf.Abs(l.x - c.x) < ex.x + margin && Mathf.Abs(l.z - c.z) < ex.z + margin) return true;
+            }
+            return false;
+        }
+
+        static void Spill(Transform dress, Foundation f, List<BoxCollider> boxes, Vector2 door2, float half, System.Random xr)
+        {
+            if (layout == null) return;
+            Vector3 doorWorld3 = dress.TransformPoint(new Vector3(door2.x, 0f, door2.y));
+            var doorW = new Vector2(doorWorld3.x, doorWorld3.z);
+            GameObject[] kinds = { rubB, scatter, plank };
+            int n = 3 + xr.Next(4);
+            for (int i = 0; i < n; i++)
+            {
+                int kind = xr.Next(3);
+                GameObject prefab = kinds[kind];
+                // the same numbers are drawn per piece whether or not it is placed, so one rejected spot does not shift the others
+                float sideR = (float)xr.NextDouble(), alongR = (float)xr.NextDouble(), outR = (float)xr.NextDouble(), yawR = (float)xr.NextDouble(), pitchR = (float)xr.NextDouble(), rollR = (float)xr.NextDouble(), sizeR = (float)xr.NextDouble();
+                if (prefab == null) continue;
+                Vector3 world = default; bool found = false;
+                for (int attempt = 0; attempt < 16 && !found; attempt++)
+                {
+                    int side = (int)(sideR * 4f + attempt) % 4;
+                    float along = Mathf.Lerp(-half + 0.5f, half - 0.5f, Mathf.Repeat(alongR + 0.37f * attempt, 1f));
+                    float outD = Mathf.Lerp(-0.2f, 2.0f, Mathf.Repeat(outR + 0.21f * attempt, 1f));
+                    float e = half + outD;
+                    Vector3 local = side == 0 ? new Vector3(along, 0f, e) : side == 1 ? new Vector3(e, 0f, along) : side == 2 ? new Vector3(along, 0f, -e) : new Vector3(-e, 0f, along);
+                    Vector3 w = dress.TransformPoint(local);
+                    if (!SpillOk(f, doorW, w, 0.5f) || InAnyBox(boxes, w, 0.2f)) continue;
+                    world = w; found = true;
+                }
+                if (!found) continue;
+                Bounds b0 = PrefabBounds(prefab);
+                float ext = Mathf.Max(0.05f, Mathf.Max(b0.size.x, b0.size.z));
+                float target = (kind == 2 ? 1.5f : 0.8f) * (0.75f + 0.6f * sizeR);
+                float sc = Mathf.Clamp(target / ext, 0.05f, 8f);
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, dress);
+                go.name = "Dress_Spill_" + i;
+                go.transform.rotation = Quaternion.Euler((pitchR - 0.5f) * 50f, yawR * 360f, (rollR - 0.5f) * 50f);
+                go.transform.localScale = Vector3.one * sc;
+                float gy = HollowmereLayout.Ground(layout, world.x, world.z);
+                go.transform.position = new Vector3(world.x, gy - b0.min.y * sc - 0.45f * b0.size.y * sc, world.z);   // half sunk
+                spills++;
+            }
+
+            // weed or grass tufts at wall feet: beside the collision boxes when the lot has them, else along the footprint line
+            if (brambleMat == null || weeds.Count == 0) return;
+            int nT = 2 + xr.Next(3);
+            for (int i = 0; i < nT; i++)
+            {
+                float a = (float)xr.NextDouble(), b = (float)xr.NextDouble(), c2 = (float)xr.NextDouble(), d = (float)xr.NextDouble(), e = (float)xr.NextDouble();
+                int wi = xr.Next(weeds.Count);
+                for (int attempt = 0; attempt < 12; attempt++)
+                {
+                    Vector3 w;
+                    if (boxes.Count > 0)
+                    {
+                        BoxCollider bc = boxes[(int)(Mathf.Repeat(a + 0.173f * attempt, 1f) * boxes.Count) % boxes.Count];
+                        BoxFace(bc, out Vector3 wn, out float thick, out float len, out Vector3 ctr, out _, out _);
+                        Vector3 along = Vector3.Cross(Vector3.up, wn);
+                        float sgn = Mathf.Repeat(b + 0.31f * attempt, 1f) < 0.5f ? -1f : 1f;
+                        w = ctr + wn * sgn * (thick * 0.5f + 0.3f) + along * ((Mathf.Repeat(c2 + 0.13f * attempt, 1f) - 0.5f) * len * 0.9f);
+                    }
+                    else
+                    {
+                        float t0 = Mathf.Lerp(-half, half, Mathf.Repeat(c2 + 0.13f * attempt, 1f)); int side = (int)(Mathf.Repeat(b + 0.31f * attempt, 1f) * 4f);
+                        float eo = half + 0.35f;
+                        w = dress.TransformPoint(side == 0 ? new Vector3(t0, 0f, eo) : side == 1 ? new Vector3(eo, 0f, t0) : side == 2 ? new Vector3(t0, 0f, -eo) : new Vector3(-eo, 0f, t0));
+                    }
+                    if (!SpillOk(f, doorW, w, 0.4f) || InAnyBox(boxes, w, 0.05f)) continue;
+                    GameObject model = weeds[wi];
+                    var go = (GameObject)PrefabUtility.InstantiatePrefab(model, dress);
+                    go.name = "Dress_WallTuft_" + i;
+                    foreach (Renderer rd in go.GetComponentsInChildren<Renderer>(true))
+                    {
+                        var mats = new Material[Mathf.Max(1, rd.sharedMaterials.Length)];
+                        for (int q = 0; q < mats.Length; q++) mats[q] = brambleMat;
+                        rd.sharedMaterials = mats; rd.shadowCastingMode = ShadowCastingMode.Off;
+                    }
+                    float hh = Mathf.Max(0.05f, PrefabBounds(model).size.y), tgt = 0.3f + 0.25f * d;
+                    go.transform.rotation = Quaternion.Euler(0f, e * 360f, 0f);
+                    go.transform.localScale = Vector3.one * (tgt / hh);
+                    go.transform.position = new Vector3(w.x, HollowmereLayout.Ground(layout, w.x, w.z), w.z);
+                    tufts++;
+                    break;
+                }
+            }
         }
 
         static Vector3 Axis(int i) => i == 0 ? Vector3.right : i == 1 ? Vector3.up : Vector3.forward;

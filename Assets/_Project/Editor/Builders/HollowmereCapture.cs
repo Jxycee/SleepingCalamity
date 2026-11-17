@@ -80,7 +80,7 @@ namespace SleepingCalamity.EditorTools
                             if (!cam.name.StartsWith("Cap_HM_") && !cam.name.StartsWith("Cap_Corner_")) continue;
                             if (!string.IsNullOrEmpty(only) && !only.Split(',').Any(o => cam.name.Contains(o))) continue;
                             if (!lowOnly && light != BeautyCornerBuilder.Preset.Midday && light != BeautyCornerBuilder.Preset.Morning && System.Array.IndexOf(PlayPositionCameras, cam.name) < 0) continue;
-                            bool overview = cam.name.StartsWith("Cap_HM_Overview"), fog = RenderSettings.fog; float density = RenderSettings.fogDensity;
+                            bool overview = cam.name.StartsWith("Cap_HM_Overview") || cam.name.StartsWith("Cap_HM_High"), fog = RenderSettings.fog; float density = RenderSettings.fogDensity;
                             if (overview) { RenderSettings.fog = look.OverviewFog > 0f; RenderSettings.fogDensity = look.OverviewFog; }   // the play-distance haze would hide the town at 100 m+: the overview has its own thin one
                             try { LookTestCapture.Save(cam, Path.Combine(dir, prefix + cam.name.Replace("Cap_", "") + "_" + preset + suffix + ".png")); }
                             finally { RenderSettings.fog = fog; RenderSettings.fogDensity = density; }

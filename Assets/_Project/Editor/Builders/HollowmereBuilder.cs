@@ -108,13 +108,14 @@ namespace SleepingCalamity.EditorTools
             // Target y is an offset from the camera's own eye height (0 = level gaze), so the gaze follows the terrain; JettyBack's position is computed from the jetty.
             ("Cap_HM_Eye_Bakery", new Vector3(-6f, 1.65f, 3.5f), new Vector3(-14f, 1.5f, 12f), 60f),         // D1: the bakery front on F02 from the square
             ("Cap_HM_Eye_InnFront", new Vector3(16f, 1.65f, -13f), new Vector3(40f, 1.0f, -16.5f), 60f),     // D6: east along the inn row
-            ("Cap_HM_Eye_HillWest", new Vector3(-38f, 1.65f, 23f), new Vector3(-8f, 1.0f, 27f), 60f),        // D3, D11: the west side of Bell Hill toward the church (moved 2 m west of the plan's (-36, 23): there the eye stood against the shaded crag face and the frame was black)
+            ("Cap_HM_Eye_HillWest", new Vector3(-42f, 1.65f, 17f), new Vector3(-28f, 3.0f, 36f), 60f),        // D3, D11: the west side of Bell Hill, looking north-north-east at the crag foot (T05: the old (-38, 23) view faced the keep's shaded retaining wall)
+            ("Cap_HM_Eye_Churchyard", new Vector3(-9f, 1.65f, 21.5f), new Vector3(-21f, 0.5f, 28.5f), 60f),   // D3: on the keep terrace (y 4) looking west-north-west across the churchyard
             ("Cap_HM_Eye_MarketStreet", new Vector3(0f, 1.65f, -27f), new Vector3(0f, 0f, -50f), 60f),       // D5: down Market Street
             ("Cap_HM_Eye_LowerLane", new Vector3(-14.5f, 1.65f, -53f), new Vector3(-23f, 0f, -68f), 60f),    // D5: the lane to the Lower Gate
             ("Cap_HM_Eye_RingWest", new Vector3(-46f, 1.65f, 6f), new Vector3(-46f, 0f, -28f), 60f),         // D4: the west Ring Lane, south
             ("Cap_HM_Eye_RingSouth", new Vector3(-8f, 1.65f, -48.8f), new Vector3(22f, 0f, -48.5f), 60f),    // D4, D8: the south Ring Lane, east
             ("Cap_HM_Eye_Orchard", new Vector3(35f, 1.65f, -44.5f), new Vector3(43f, 0f, -58f), 60f),        // D7: the orchard
-            ("Cap_HM_Eye_Mill", new Vector3(60.5f, 1.65f, -50.5f), new Vector3(71f, 0f, -60f), 60f),         // D9: Mill Lane toward the mill
+            ("Cap_HM_Eye_Mill", new Vector3(58f, 1.65f, -67f), new Vector3(70.5f, 2.5f, -58f), 60f),         // D9: the sunlit side of the mill with the stream in front (T05: the old Mill Lane view faced the mill's shadow wall)
             ("Cap_HM_Eye_Meadow", new Vector3(-8f, 1.65f, -72f), new Vector3(50f, 0f, -68f), 60f),           // D9: the lake meadow, east
             ("Cap_HM_Eye_JettyBack", new Vector3(0f, 0f, 0f), new Vector3(-5f, 0f, -40f), 60f),              // D9: from the jetty's end back at the town (position computed, Target y absolute 0)
             ("Cap_HM_Eye_RoadOut", new Vector3(-48f, 1.65f, -74f), new Vector3(-100f, 0.5f, -82f), 60f),     // D10: the Saltwake road, out
@@ -127,7 +128,7 @@ namespace SleepingCalamity.EditorTools
         static readonly HashSet<string> AbsolutePosCameras = new HashSet<string> { "Cap_HM_Overview", "Cap_HM_OverviewW", "Cap_HM_OverviewE", "Cap_HM_TerraceDown", "Cap_HM_TerraceUp", "Cap_HM_High_Lake", "Cap_HM_High_East" };
 
         // Cameras whose Target y is an offset from the camera's own y.
-        static readonly HashSet<string> EyeRelTarget = new HashSet<string> { "Cap_HM_Eye_Bakery", "Cap_HM_Eye_InnFront", "Cap_HM_Eye_HillWest", "Cap_HM_Eye_MarketStreet", "Cap_HM_Eye_LowerLane", "Cap_HM_Eye_RingWest", "Cap_HM_Eye_RingSouth",
+        static readonly HashSet<string> EyeRelTarget = new HashSet<string> { "Cap_HM_Eye_Bakery", "Cap_HM_Eye_InnFront", "Cap_HM_Eye_HillWest", "Cap_HM_Eye_Churchyard", "Cap_HM_Eye_MarketStreet", "Cap_HM_Eye_LowerLane", "Cap_HM_Eye_RingWest", "Cap_HM_Eye_RingSouth",
             "Cap_HM_Eye_Orchard", "Cap_HM_Eye_Mill", "Cap_HM_Eye_Meadow", "Cap_HM_Eye_RoadOut", "Cap_HM_Eye_RoadBack" };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]
@@ -183,7 +184,7 @@ namespace SleepingCalamity.EditorTools
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var root = new GameObject("Hollowmere").transform;
-            HollowmereRuinDressing.Reset(); HollowmereWild.Reset();
+            HollowmereRuinDressing.Reset(); HollowmereRuinShells.Reset(); HollowmereRuinDressing.SetLayout(t); HollowmereWild.Reset();
             Transform set = Child(root, "Set");
 
             BuildGround(set, t);
@@ -204,6 +205,19 @@ namespace SleepingCalamity.EditorTools
             ThinCornerWeeds(both, ruined, t);
             foreach (Foundation f in t.Foundations) { BuildFoundation(Child(ruined, "Foundations"), f, Preset.Ruined); BuildFoundation(Child(rebuilt, "Foundations"), f, Preset.Rebuilt); }
             HollowmereRuinDressing.LogSummary();
+            {
+                int nm = 0, nt = 0, nl = 0; foreach (var kv in HollowmereRuinShells.BuiltAll) { if (kv.Value == RuinClass.Mid) nm++; else if (kv.Value == RuinClass.Tall) nt++; else nl++; }
+                int rRuin = 0, rCol = 0, rDress = 0, rRuined = 0, rShellCol = 0;
+                foreach (Transform tr in rebuilt.GetComponentsInChildren<Transform>(true))
+                {
+                    if (tr.name.StartsWith("Ruin_", StringComparison.Ordinal)) rRuin++;
+                    if (tr.name.StartsWith("FOOTPRINT_COL_", StringComparison.Ordinal)) rCol++;
+                    if (tr.name.StartsWith("Dress", StringComparison.Ordinal)) rDress++;
+                }
+                foreach (Transform tr in ruined.GetComponentsInChildren<Transform>(true)) { if (tr.name.StartsWith("Ruin_", StringComparison.Ordinal)) rRuined++; if (tr.name.StartsWith("FOOTPRINT_COL_", StringComparison.Ordinal)) rShellCol++; }
+                Debug.Log("SC HOLLOWMERE rebuilt check: under Preset_Rebuilt Ruin_* objects " + rRuin + " (low kit on empty lots), FOOTPRINT_COL_* " + rCol + ", Dress* " + rDress + "; under Preset_Ruined Ruin_* " + rRuined + ", FOOTPRINT_COL_* " + rShellCol);
+                Debug.Log("SC HOLLOWMERE shells: Mid " + nm + " Tall " + nt + " Low " + nl + " (Ruined preset), shell colliders " + HollowmereRuinShells.Colliders + ", tallest point world y " + HollowmereRuinShells.Tallest.ToString("F2") + " at " + HollowmereRuinShells.TallestLot);
+            }
             foreach (Landmark l in t.Landmarks) { BuildLandmark(Child(ruined, "Landmarks"), l, Preset.Ruined, t); BuildLandmark(Child(rebuilt, "Landmarks"), l, Preset.Rebuilt, t); }
             HollowmereSquare.Build(set, ruined, rebuilt, t);
             HollowmereClutter.Build(ruined, rebuilt, t);   // Q14: market and lane clutter, shop signs and washing lines
@@ -246,7 +260,8 @@ namespace SleepingCalamity.EditorTools
                     foreach (Collider col in Physics.OverlapSphere(pos, 1.5f))
                         if (!(col is TerrainCollider) && col.bounds.max.y > pos.y - 0.9f) near.Add(col.name + "@" + (col.transform.parent != null ? col.transform.parent.name : "-"));
                     string below = Physics.Raycast(pos + Vector3.up * 80f, Vector3.down, out RaycastHit hit, 200f) ? " topHit " + hit.collider.name + " y " + hit.point.y.ToString("F2") : " topHit none";   // what the highest surface under the camera is (a hit above the camera = the camera is buried)
-                    Debug.Log("SC HOLLOWMERE cam " + c.Name + " pos " + pos.ToString("F2") + " target " + target.ToString("F2") + below + (near.Count > 0 ? " NEAR " + string.Join(",", near.Take(6)) : ""));
+                    string gaze = Physics.Raycast(pos, (target - pos).normalized, out RaycastHit gh, 60f) ? " gaze " + gh.collider.name + "@" + (gh.collider.transform.parent != null ? gh.collider.transform.parent.name : "-") + " " + gh.distance.ToString("F1") + "m" : " gaze open";   // a hit under 3 m = the frame looks straight into a wall
+                    Debug.Log("SC HOLLOWMERE cam " + c.Name + " pos " + pos.ToString("F2") + " target " + target.ToString("F2") + below + gaze + (near.Count > 0 ? " NEAR " + string.Join(",", near.Take(6)) : ""));
                 }
             }
 
@@ -566,7 +581,7 @@ namespace SleepingCalamity.EditorTools
 
             // An empty lot shows its ruin (the ruin kit, or the greybox stubs when the art is missing); a placed building or garden switches the ruin off
             // (design 5.3), so it stands on a plain footing slab instead.
-            bool ruin = kind == HollowmereLayout.BuildingKind.Empty && PlaceRuin(go.transform, f);
+            bool ruin = kind == HollowmereLayout.BuildingKind.Empty && PlaceRuin(go.transform, f, preset);
             if (ruin && preset == Preset.Ruined) HollowmereRuinDressing.Dress(go.transform, f);   // B3 stage 0: ivy, saplings, brambles, debris, a crow (DH1)
             if (kind != HollowmereLayout.BuildingKind.ApprovedFacade && !ruin)   // the facade brings its own plinth; a slab would add a ledge in front of the approved look
                 LookTestBuilder.Box(g, "Footing", new Vector3(0f, 0.05f, 0f), new Vector3(side, 0.4f, side), stone, default, 2f);
@@ -643,20 +658,22 @@ namespace SleepingCalamity.EditorTools
         sealed class RuinArt { public GameObject Fbx; public Dictionary<string, Material> Slots; }
         static readonly Dictionary<string, RuinArt> RuinCache = new Dictionary<string, RuinArt>();
 
-        static RuinArt LoadRuin(string variant)
+        // name: "Ruin_S_A" (the low kit) or "Ruin_S_A_Mid" / "Ruin_S_A_Tall" (the T05 shells); the FBX sits in the base variant's folder.
+        static RuinArt LoadRuin(string name)
         {
-            if (RuinCache.TryGetValue(variant, out RuinArt cached)) return cached;
+            if (RuinCache.TryGetValue(name, out RuinArt cached)) return cached;
             RuinArt art = null;
-            string folder = RuinsFolder + "/" + variant;
-            GameObject fbx = AssetDatabase.IsValidFolder(folder) ? BeautyCornerArt.LoadModel(folder, variant + ".fbx", keepMaterialSlots: true) : null;
+            string baseVariant = name.Length > 8 ? name.Substring(0, 8) : name;
+            string folder = RuinsFolder + "/" + baseVariant;
+            GameObject fbx = AssetDatabase.IsValidFolder(folder) ? BeautyCornerArt.LoadModel(folder, name + ".fbx", keepMaterialSlots: true) : null;
             if (fbx != null)
             {
                 var slots = new Dictionary<string, Material>(BeautyCornerArt.BuildFacadeMaterials());
                 slots["M_B9_Foliage"] = RuinFoliage();
                 art = new RuinArt { Fbx = fbx, Slots = slots };
             }
-            Debug.Log("SC HOLLOWMERE ruin " + variant + " art=" + (art != null ? folder + "/" + variant + ".fbx" : "missing, greybox stubs"));
-            RuinCache[variant] = art;
+            Debug.Log("SC HOLLOWMERE ruin " + name + " art=" + (art != null ? folder + "/" + name + ".fbx" : "missing, greybox stubs"));
+            RuinCache[name] = art;
             return art;
         }
 
@@ -669,14 +686,29 @@ namespace SleepingCalamity.EditorTools
             return ruinFoliage;
         }
 
-        static bool PlaceRuin(Transform lot, Foundation f)
+        static bool PlaceRuin(Transform lot, Foundation f, Preset preset)
         {
-            RuinArt art = LoadRuin(f.RuinVariant);
+            // T05: the Ruined preset puts a Mid or Tall shell on the lots the height table names; Rebuilt keeps the low kit on its few empty lots. A missing shell file
+            // falls back to the low ruin with a warning.
+            RuinClass cls = preset == Preset.Ruined ? HollowmereRuinShells.Planned(f.Id) : RuinClass.Low;
+            RuinArt art = null;
+            if (cls != RuinClass.Low)
+            {
+                art = LoadRuin(HollowmereRuinShells.FileName(f.RuinVariant, cls));
+                if (art == null) { Debug.LogWarning("SC HOLLOWMERE ruin shell " + HollowmereRuinShells.FileName(f.RuinVariant, cls) + " missing for lot " + f.Id + ": low ruin instead"); cls = RuinClass.Low; }
+            }
+            if (art == null) art = LoadRuin(f.RuinVariant);
             if (art == null) return false;
+            if (preset == Preset.Ruined) HollowmereRuinShells.Record(f.Id, cls);
             var obj = (GameObject)PrefabUtility.InstantiatePrefab(art.Fbx, lot);
             obj.name = "Ruin_" + f.RuinVariant.Substring(5) + "_T" + f.RuinTurn;
             obj.transform.localPosition = Vector3.zero;
             obj.transform.rotation = Quaternion.Euler(0f, f.Yaw + 90f * f.RuinTurn, 0f);
+            if (cls != RuinClass.Low)
+            {
+                PrefabUtility.UnpackPrefabInstance(obj, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);   // the collision stand-ins lose their mesh components
+                HollowmereRuinShells.MakeColliders(obj.transform);
+            }
             foreach (Renderer r in obj.GetComponentsInChildren<Renderer>(true))
             {
                 if (r.name.StartsWith("FOOTPRINT", StringComparison.Ordinal)) { r.enabled = false; continue; }   // the collider / NPC-block shape, never drawn
@@ -689,6 +721,7 @@ namespace SleepingCalamity.EditorTools
                 }
                 r.sharedMaterials = mats;
             }
+            if (cls != RuinClass.Low) HollowmereRuinShells.Measure(f.Id, cls, obj.transform, lot.position.y);
             return true;
         }
 
