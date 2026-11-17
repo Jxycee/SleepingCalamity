@@ -55,3 +55,10 @@ Raw downloads for adoption (sc-asset-adopt). Written by `Art/Blender/tools/sc_fe
 | planter_box_01 | https://polyhaven.com/a/planter_box_01 | CC0 1.0 (polyhaven.com/license) | James Ray Cock | 2026-10-31 | 8094 | sq | planter | none (glTF 2k as published) |
 | planter_box_02 | https://polyhaven.com/a/planter_box_02 | CC0 1.0 (polyhaven.com/license) | James Ray Cock | 2026-10-31 | 10944 | sq | planter | none (glTF 2k as published) |
 | planter_box_03 | https://polyhaven.com/a/planter_box_03 | CC0 1.0 (polyhaven.com/license) | James Ray Cock | 2026-10-31 | 13112 | sq | planter | none (glTF 2k as published) |
+| rock_face_02 | https://polyhaven.com/a/rock_face_02 | CC0 1.0 (polyhaven.com/license) | Dario Barresi, Rico Cilliers | 2026-11-16 | 29566 | N01 | cliff | none (glTF 2k as published) |
+| boulder_01 | https://polyhaven.com/a/boulder_01 | CC0 1.0 (polyhaven.com/license) | Rico Cilliers | 2026-11-16 | 123976 | N02 | angular | none (glTF 2k as published) |
+| namaqualand_stones_01 | https://polyhaven.com/a/namaqualand_stones_01 | CC0 1.0 (polyhaven.com/license) | Greg Zaal, Jenelle van Heerden | 2026-11-16 | 106602 | N03 | test | none (glTF 2k as published) |
+| tree_stump_01 | https://polyhaven.com/a/tree_stump_01 | CC0 1.0 (polyhaven.com/license) | Rob Tuytel | 2026-11-16 | 41046 | N04 | stump | none (glTF 2k as published) |
+| dead_tree_trunk_02 | https://polyhaven.com/a/dead_tree_trunk_02 | CC0 1.0 (polyhaven.com/license) | Jenelle van Heerden, Rico Cilliers | 2026-11-16 | 155864 | N05 | log | none (glTF 2k as published) |
+| dandelion_01 | https://polyhaven.com/a/dandelion_01 | CC0 1.0 (polyhaven.com/license) | Rob Tuytel, Rico Cilliers | 2026-11-16 | 64099 | N06 | flower | none (glTF 2k as published) |
+| shrub_01 | https://polyhaven.com/a/shrub_01 | CC0 1.0 (polyhaven.com/license) | Rico Cilliers | 2026-11-16 | 282224 | N07 | flower | none (glTF 2k as published) |
