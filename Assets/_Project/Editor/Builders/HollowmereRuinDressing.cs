@@ -147,7 +147,7 @@ namespace SleepingCalamity.EditorTools
                 return new Vector2(float.NaN, float.NaN);
             }
 
-            if (hasChim) ChimneyDress(chim, chimWorld, dress, rnd);
+            if (hasChim) ChimneyDress(chim, chimWorld, dress, rnd, shell);
             var xr = new System.Random(f.Id.Aggregate(17, (a, c) => a * 31 + c) * 7919 + 13);   // own stream for the shell dressing: the low-kit lots keep their old random sequence
             // ivy on the chimney's sunny face
             if (hasChim && ivy != null && TryIvy(ruin, chim, chimWorld, dress, rnd, shell)) ivies++;
@@ -268,7 +268,9 @@ namespace SleepingCalamity.EditorTools
 
         // Round 3: break the slab look. Corbel stones overhang the top (one slipped, one missing), and a rubble apron of block-sized stones lies round the foot, heavier on the side
         // the top fell toward. Stone material taken from the stack itself.
-        static void ChimneyDress(Transform chim, Bounds b, Transform dress, System.Random rnd)
+        // T05: on a shell lot the stack stands on the wall line, so its rubble apron reaches over the footprint edge; those pieces are named Apron_ (SolidLotMasses gives only
+        // Rubble_* a collider), so the apron cannot wall off a doorstep or a lane edge.
+        static void ChimneyDress(Transform chim, Bounds b, Transform dress, System.Random rnd, bool shell)
         {
             Material stone = null;
             foreach (Renderer r in chim.GetComponentsInChildren<Renderer>(true)) { if (r.sharedMaterial != null) { stone = r.sharedMaterial; break; } }
@@ -296,7 +298,7 @@ namespace SleepingCalamity.EditorTools
                 float a = fallA + ((float)rnd.NextDouble() - 0.5f) * (i < 6 ? 2.2f : 6.283f), d = Mathf.Max(hx, hz) + 0.25f + (i < 6 ? 0.9f : 0.5f) * (float)rnd.NextDouble();
                 Vector3 pos = new Vector3(b.center.x + Mathf.Cos(a) * d, b.min.y + 0.08f, b.center.z + Mathf.Sin(a) * d);
                 float s = 0.28f + 0.3f * (float)rnd.NextDouble();
-                var go = LookTestBuilder.Box(root, "Rubble_" + i, Vector3.zero, new Vector3(s * (1f + 0.5f * (float)rnd.NextDouble()), s * 0.7f, s), stone, default, 2f);
+                var go = LookTestBuilder.Box(root, (shell ? "Apron_" : "Rubble_") + i, Vector3.zero, new Vector3(s * (1f + 0.5f * (float)rnd.NextDouble()), s * 0.7f, s), stone, default, 2f);
                 go.transform.position = pos;
                 go.transform.rotation = Quaternion.Euler(((float)rnd.NextDouble() - 0.5f) * 40f, (float)rnd.NextDouble() * 360f, ((float)rnd.NextDouble() - 0.5f) * 40f);
             }

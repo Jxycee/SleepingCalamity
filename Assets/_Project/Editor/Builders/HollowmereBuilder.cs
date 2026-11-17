@@ -639,6 +639,13 @@ namespace SleepingCalamity.EditorTools
                 {
                     var box = mf.gameObject.AddComponent<BoxCollider>(); box.center = mf.sharedMesh.bounds.center; box.size = mf.sharedMesh.bounds.size;
                 }
+                else if (mf.transform.parent != null && mf.transform.parent.Find("FOOTPRINT_COL_0") != null)
+                {
+                    // A T05 shell: its FOOTPRINT_COL_<n> boxes are the collision. The Footing mesh (rubble spilled up to 1.3 m past the footprint) as a MeshCollider closed the
+                    // 0.8 m corridor between the lot and the lane's retaining wall (R2_01_North and R2_03_North became unreachable); the boxes stay inside the footprint.
+                    if (n == "Footing" && mf.transform.parent.name.StartsWith("Ruin_", StringComparison.Ordinal))
+                        HollowmereRuinSeal.Seal(g, mf);
+                }
                 else
                 {
                     mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
