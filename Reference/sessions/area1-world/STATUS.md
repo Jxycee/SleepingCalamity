@@ -23,7 +23,8 @@ Code Mode: not offered in a Desktop session.
 | T03 scene diet | done, pushed; gate PASS 1859/1859 but run before the commit (marker is not e1e9ca72: T05's gate covers it) | e1e9ca72 | scene 59.6 -> 38.6 MB; 274 LFS mesh assets in `Content/Generated/Hollowmere/` through one scene-level pass (`GeneratedMeshes.Externalize`); build twice identical; three-camera blurred difference under 0.6/255 |
 | T05 shells into the town | done, pushed; gate PASS 1859/1859, marker = fa5a9b77; play loop PASS (11 passed, 7 existing ignores) | 78a035d2, 90d3812a, fa5a9b77 | 29 shells (Mid 14, Tall 15), 503 shell BoxColliders, 160 rubble pieces, 104 wall-foot tufts; cameras HillWest moved, Churchyard added, Mill moved; High cameras fog off; `R1/` sheets |
 | T08a ground outside the wall | done, pushed; gate PASS 1859/1859, marker = 6222f837; play loop not run (no collider change) | 6222f837 | probe: bank = steep-rule cobble, flat meadow = the grass layer itself bare under sun (no mesh over it); fine-blade carpet (3 meshes x 3 tints, 8.5/m2), tall clumps as accents only, N06/N07 flower drifts, bare-earth and dry patches, earth bank outside the wall; N01-N07 adopted into `Content/Art/Town/Adopted/N0x_*` with materials, prefabs, LODGroups (`NatureIntake.cs`); `R2/` sheets and `meadow_crop.jpg`; inside-wall views unchanged (blurred diff under 0.53/255); 334,602 detail instances, worst eye camera about 2.9M grass triangles |
-| T08b shore, bank, mill | next (brief below) | | |
+| T08b shore, bank, mill | done, pushed; gate PASS 1859/1859, marker = c3ca712a; play loop PASS (11, 7 ignores) | c3ca712a | new `HollowmereShore.cs`; reed beds (3 x 22), shore band, 123 stones, 2 boats (T13, boxes), logs, stumps; bank 18 N02 + 3 N01 (boxes), rubble, 108 shrubs, 144 ferns; 28 tree bases; mill yard; road hedges = Hedge_A/B with leaf tiled 3x3 (`M_RD_RoadHedge`; card hedges read as saplings); inside diff 0.44/255; build twice identical; `R3/` sheets |
+| T08c bank | round 1 (5th terrain layer `BankEarth`) failed after 3 captures, uncommitted; user chose a stone revetment (2026-11-17); T08c round 2 running | | the slope is 45-72 deg: terrain layers stretch and the sun lights it flat; the 5th layer ignores `diffuseRemapMax` and turns height blend off for the whole terrain (dropped); kept: shore band no longer paints the bank as Dirt, `BuilderUtil.NormalizeSceneFile` IOException retry |
 | T06 onward | not started | | order below |
 
 ## Verification rules in force (coordinator's note `verification-practice.md`)
@@ -45,8 +46,16 @@ Changed views: Meadow 8 -> 15, Lake 13 -> 18, JettyBack 12 -> 17, Mill 15 -> 20,
 - The lake shore is one clean line of grass to water: no reeds, stones or earth band; the far shore is a thin strip.
 - Orchard (10) untouched: it is T07's.
 
+## R3 verdict (after T08b; strict /40, judged on `R3/R3_sheet_B.jpg` against R2)
+Meadow 15 -> 16, Lake 18 -> 20, JettyBack 17 -> 17, Mill 20 -> 20, RoadOut 19 -> 19, RoadBack 16 -> 20. Inside the wall unchanged (diff 0.44/255).
+- Road hedges now read as hedges (leaf tiled 3x3 on the FBX). Shore has an earth/shingle band, a beached boat and reeds (Lake).
+- **The bank under the wall is still a smooth pale tan plane** (Meadow, JettyBack): the stones and tufts on it are too few and too small to break it. Cause (read in `HollowmereTerrain.cs` :202-261): the slope e 29.5-36 is outside (`ow` = 1) and paints the `Dirt` layer (`packed_soil`, pale) at 0.3-0.8 weight; the agent could not darken it because that layer also covers the lots inside the wall. T08b spent about four blind rounds on it.
+- T08c fix (cause-based, one round; if it fails, ask the user): a fifth terrain layer `BankEarth` (a darker, rootier forest soil, existing texture or Poly Haven CC0 via `sc_fetch_*`, tinted with `diffuseRemapMax` if needed) painted only where `ow` = 1 in place of `Dirt`; on the bank the grass layer stays dominant with the dark earth in ragged 1-3 m patches; the fine-blade carpet continues up the bank at reduced density; more and bigger half-sunk N02/N01 on the bank (every 6-10 m) and a ragged foot line.
+- **Decided (user, 2026-11-17): stone revetment.** The town wall continues down the steep outer bank as a battered masonry base with moss, ivy, rubble and grass at its foot (generator-built, no Core change). Rejected: terrain-layer paint on the 45-72 deg face (7 rounds), a 5th terrain layer, mesh earth skins, cobble flecks.
+- New churn: `M_HM_GrassAccent`, `M_HM_GrassFine_Dark`, `M_HM_GrassFine_Dry`, `M_HM_GrassFine_Mid` flip `_Color` between builds (revert, never commit). IOException 1224 on `Hollowmere.unity` save about every second run; a retry passes.
+
 ## Resume order (2026-11-17, after the handoff)
-1. **T08b** shore, bank, mill (brief below).
+1. **T08b** done (c3ca712a). **T08c** bank earth (R3 verdict above).
 2. **Shell round 3** (brief below): the shells are the reason D1 sits at 22/25/22.
 3. **T06** streets; **T07** orchard and allotments; **T09** bell yard, churchyard, crag (N01-N03); **T10** road out, boundary, hill edge; **T11** atmosphere and backdrop (mountain spike, flat far ranges); **T12** LOD and APV trial; **T13** round 2; **T14** landing.
 One Sonnet implementer at a time; every brief carries the verification rules (section above) and the known churn list (add `M_HM_WallIvy.mat` and `M_HH_OldStone.mat`: they flip `_Color` between builds).

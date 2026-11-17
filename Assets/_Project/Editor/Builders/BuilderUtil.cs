@@ -189,7 +189,12 @@ namespace SleepingCalamity.EditorTools
             string text = System.IO.File.ReadAllText(full);
             string normal = SceneFileNormalizer.Normalize(text);
             if (normal == text) return;
-            System.IO.File.WriteAllText(full, normal, new System.Text.UTF8Encoding(false));
+            // Win32 error 1224 (the file is memory-mapped by the import that just followed the save) comes and goes: wait and retry instead of failing the build.
+            for (int attempt = 0; ; attempt++)
+            {
+                try { System.IO.File.WriteAllText(full, normal, new System.Text.UTF8Encoding(false)); break; }
+                catch (System.IO.IOException) when (attempt < 20) { System.Threading.Thread.Sleep(500); }
+            }
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
             if (normal.Contains("GlobalObjectIdHash:")) RefreshSceneNetworkObjectHashes(assetPath);
         }

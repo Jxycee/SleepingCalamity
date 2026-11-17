@@ -225,6 +225,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereFoliage.Place(ruined, rebuilt, t);   // B9 grass, weeds, moss and ivy on both presets (never inside the square)
             HollowmereRoad.Build(set, ruined, rebuilt, t);   // Q15: the Saltwake road's dressing, the field hedgerows and trees, the backdrop ring
             HollowmereWild.Build(set, ruined, rebuilt, t);   // area 1 rework: the great tree, town trees, the wall belt, Bell Hill's forest, square drift (after everything with a collider)
+            HollowmereRevetment.Build(ruined, rebuilt);   // T08c: the stone face down the steep bank under the town wall, both presets (after every collider; it has none)
             HollowmereShore.Build(set, ruined, rebuilt, t);   // T08b: the wall bank, the shore, the mill yard and the tree bases outside the wall (after the trees, the jetty and every collider)
             BuildPathDebug(root, t);
 
@@ -355,6 +356,7 @@ namespace SleepingCalamity.EditorTools
         static void BuildGround(Transform set, TownLayout t)
         {
             Terrain terrain = HollowmereTerrain.Build(set, t);
+            HollowmereRevetment.Prepare(terrain, t);   // T08c: where the steep bank under the town wall gets its stone face (the grass and the shore dressing keep off it)
             HollowmereFoliage.TerrainGrass(terrain, t);   // a Unity Terrain from the layout heights (+ baked Terrain Tools erosion on the open ground)
             // The square keeps the approved corner's surround paving (B6 FarCobble with its macro breakup) as a slab over the terrain, so the corner reads as approved.
             Material far = HollowmereB3Ground.SquareGroundMaterial() ?? BeautyCornerArt.SurroundGround();   // B3: the slab shows wherever the irregular bed stops, so it takes the square's own ground

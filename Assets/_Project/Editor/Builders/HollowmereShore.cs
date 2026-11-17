@@ -458,6 +458,7 @@ namespace SleepingCalamity.EditorTools
         static bool Ok(float x, float z, float laneGap, float pathGap, float minE, float maxE, bool bigRock, bool lowOk = false, bool anyE = false)
         {
             if (!SaltwakeRoadPlan.OnTerrain(x, z, 1.5f)) return false;
+            if (HollowmereRevetment.Covers(x, z, 0.6f)) return false;   // T08c: the wall's stone face covers the bank
             var p = new TownPoint(x, z); var p2 = new Vector2(x, z);
             if (!anyE && !lowOk) { float e = HollowmereLayout.PlateauDistance(x, z); if (e < minE || e > maxE) return false; }
             if (HollowmereLayout.BackHill(x, z) > 0.05f && !anyE) return false;

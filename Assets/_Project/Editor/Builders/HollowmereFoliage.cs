@@ -320,6 +320,7 @@ namespace SleepingCalamity.EditorTools
                     int sx = Mathf.Min(sr - 1, (int)(u * sr)), sy = Mathf.Min(sr - 1, (int)(v * sr));
                     float x = HollowmereTerrain.Origin.x + u * HollowmereTerrain.Size.x, z = HollowmereTerrain.Origin.z + v * HollowmereTerrain.Size.z;
                     float e = HollowmereLayout.PlateauDistance(x, z), hill = HollowmereLayout.BackHill(x, z);
+                    if (e < 40f && HollowmereRevetment.Covers(x, z, 0.1f)) continue;   // T08c: no blade grows through the revetment's stone
                     if (e >= 29.5f || hill > 1f)
                     {
                         int cp = CarpetCell(t, data, splat, nearCobble, sx, sy, u, v, x, z, e, cellArea, cx, cy, jettyA, jettyB);

@@ -239,7 +239,7 @@ namespace SleepingCalamity.EditorTools
                             soil = Mathf.Max(soil, wood * (0.10f + 0.30f * Smooth(0.45f, 0.8f, litter)) + 0.35f * cragFace);
                             path = Mathf.Max(path, wood * 0.10f * Smooth(0.55f, 0.85f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
                         }
-                        float shoreStone = 0f, bankStone = 0f;
+                        float shoreStone = 0f, bankStone = 0f, bankW = 0f, shoreSoil = 0f;
                         if (ow > 0f)
                         {
                             // T08 ground breakup outside the wall: 2-6 m patches of bare earth (1-4 m across, ragged edges), dry yellow-green patches (path layer) and a darker
@@ -258,13 +258,15 @@ namespace SleepingCalamity.EditorTools
                             float bankZone = (1f - Smooth(33f + 5f * footN + 1.2f * footN2, 36.5f + 6f * footN + 1.2f * footN2, e)) * Smooth(28.9f, 29.6f, e);
                             bankZone *= (1f - 0.85f * Smooth(0.2f, 3f, hill)) * Smooth(0.6f, 3.2f, lane) * Smooth(5f, 15f, steep);   // slopes only: the flat meadow between the wall and the lake keeps its grass
                             soil = Mathf.Max(soil, bankZone * (0.30f + 0.50f * Smooth(0.25f, 0.75f, Mathf.PerlinNoise(x * 0.62f + 19f, z * 0.62f + 3f))));   // grass tufts and earth in 1-2 m patches, not one tan plane
+                            bankW = bankZone * Smooth(29.2f, 29.7f, e);   // T08c: the steep bank under the wall (the revetment stands on it)
                             bankStone = bankZone * 0.0f * Smooth(0.45f, 0.70f, Mathf.PerlinNoise(x * 0.5f + 3f, z * 0.5f + 11f));   // the cobble layer's grey rubble flecks in the earth
                             float shoreY = HollowmereLayout.WaterY + 0.45f + 0.8f * footN + 0.5f * footN2;
                             float shoreBand = 1f - Smooth(shoreY, shoreY + 0.9f, y);
-                            soil = Mathf.Max(soil, ow * 0.92f * shoreBand);
+                            shoreSoil = ow * 0.92f * shoreBand; soil = Mathf.Max(soil, shoreSoil);
                             shoreStone = Mathf.Max(bankStone, ow * 0.55f * Smooth(0.42f, 0.68f, a3) * (1f - Smooth(HollowmereLayout.WaterY + 0.25f, HollowmereLayout.WaterY + 0.9f + 0.7f * footN2, y)));
                         }
-                        soil = Mathf.Clamp01(soil + 0.18f * n1);
+                        soil *= 1f - bankW;   // T08c: the low bank sits inside the height-based shore band, which painted all of it Dirt: on the slope the band gives way to the bank mix
+                        soil = Mathf.Clamp01(soil + 0.18f * n1 * (1f - bankW));
                         path = Mathf.Clamp01(path) * (1f - soil);
                         grass = Mathf.Max(0f, 1f - soil - path);
                         // A8 (town surfaces): a raw earth slope stretched one low-res soil tile over 3 m. Steep ground takes half its weight in the cobble layer (grey rubble
@@ -284,6 +286,8 @@ namespace SleepingCalamity.EditorTools
 
         // Signed distance (m) from the nearest lane's edge: negative inside a lane. Without countryRoad the Saltwake Road past the gate apron is left out
         // (it is painted as a dirt road, CountryRoad); IsPaved keeps it, so grass and foliage still stay off it.
+        public static float LaneEdgeAll(TownLayout t, float x, float z) => LaneEdge(t, new TownPoint(x, z));   // T08c: the revetment stops at every lane, the Saltwake Road included
+
         static float LaneEdge(TownLayout t, TownPoint p, bool countryRoad = true)
         {
             float d = float.MaxValue;
