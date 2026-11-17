@@ -43,6 +43,8 @@ Eight lines: 1 silhouette and read; 2 storybook proportion; 3 form and edges; 4 
 
 **User calibration (2026-10-30):** the user reads our totals about 8-10 points low ("your 20/40 is more like a 30/40"). Treat **25/40** as the floor: if the first review already reaches it, the target becomes first score + 5 (at most 3 art rounds per session-usage.md, each with a visible gain of 1.5+ points), score only what the capture or play cameras see (backs, undersides and hidden faces don't count), and phrase every fix as a change visible at mid distance. Details: `docs/art/beauty-corner-brief.md` section 3.
 
+**Whole-area views are not scored here.** Eye-level views of a whole place (Run 7 `HM_Eye_*` cameras, corner and room captures) use the world scorecard and blind anchored method in `docs/art/scene-judging.md` (sc-scene-look). This rubric is for single assets, kits and batches.
+
 Rubric expectation (same as sc-aaa-prop): about 4 per line is shipped-quality art, and the /40 total is harsher than shipped games' own art scored blind, so use scores to rank and compare, not to pass or fail.
 
 Write the review as:
