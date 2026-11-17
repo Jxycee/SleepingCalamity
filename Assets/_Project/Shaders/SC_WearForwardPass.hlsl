@@ -17,7 +17,7 @@
 #define SC_POLISH_SMOOTH  0.18h                       // smoothness added at mask 1
 
 // _SC_WEARGB (the ruin shells' own materials, HollowmereBuilder.ShellMaterials): the same masks, strong enough to read at 10-20 m. Soot and char go nearly black
-// (the shells' oak carries R 0.38, about 70% char after the remap, so its grain still shows through as dark brown), moss goes a full green. Every other WearLit material keeps the constants above.
+// (the shells' oak carries R 0.38, about 70% char after the remap, so its grain still shows through as dark brown), moss goes a dark olive-grey. Every other WearLit material keeps the constants above.
 #if defined(_SC_WEARGB)
     #undef SC_GRIME_COLOR
     #undef SC_GRIME_STRENGTH
@@ -28,8 +28,8 @@
     #define SC_GRIME_COLOR   half3(0.045, 0.032, 0.022)
     #define SC_GRIME_STRENGTH 1.0h
     #define SC_GRIME_ROUGH    0.15h
-    #define SC_MOSS_COLOR    half3(0.075, 0.150, 0.024)
-    #define SC_MOSS_STRENGTH  1.0h
+    #define SC_MOSS_COLOR    half3(0.066, 0.080, 0.036)      // round 7: olive-grey, dark green-brown (the 3b green read vivid in sun)
+    #define SC_MOSS_STRENGTH  0.9h
     #define SC_POLISH_LIFT    1.25h
 #endif
 

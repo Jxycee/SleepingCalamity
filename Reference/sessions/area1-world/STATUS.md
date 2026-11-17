@@ -64,7 +64,12 @@ Blender: courses 0.25-0.35 m with quoins, stacks 1.6-1.8 m breast tapering to a 
 - The Bakery stack shows a checker of dark holes (missing stones over the dark backer).
 - No wear shows in Unity: no moss at wall feet, no char at tops, no soot band on stacks; all shells read one clean sandstone.
 - No gable timber is visible from any of the nine eye cameras.
-Round 3b (fresh implementer) fixes these with an in-engine close probe first.
+Round 3b (620aceab; gate PASS marker = 620aceab; play loop PASS; build twice identical): wear now shows (own `M_RuinShell_*` materials, `_SC_WEARGB` keyword in `SC_WearLit` with strong constants: moss feet, char tops, soot band, charred brown oak, limewash plaster); stack jitter flattened. R6 verdict: Bakery 19 -> 20 (moss at wall feet reads); the rest as R5.
+- **The Bakery-view right stack still shows the dark-square checker**, unchanged from R4/R5: the 3b fix (stack jitter in the generator) did not touch it, so that stack is probably not a shell (low kit `sc_ruin_kit.py` stack, or another builder). Next round: identify the object by a probe (renderer under that pixel) before any fix.
+- **Gables are edge-on from every lane** (door to the lane, gable on a side wall); only RingWest shows one, small. Concept H4 is a gable-fronted house. Next round: Tall shells put the charred gable over the door end (front gable, door in the gable wall, stack to the back or side), so the gable faces the lane.
+- Moss at wall feet is a vivid green in sun: mute it toward olive-grey.
+
+## Resume order (2026-11-17, after the handoff)
 
 ## Resume order (2026-11-17, after the handoff)
 1. **T08b** done (c3ca712a). **T08c** done (19514f61, stone revetment).

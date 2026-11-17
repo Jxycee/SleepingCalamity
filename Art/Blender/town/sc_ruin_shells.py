@@ -9,12 +9,12 @@ It re-uses sc_ruin_kit.py by executing its source without the trailing main() ca
 doorstep, the chimney stack builder, the materials and the wear function are the kit's own. Door position and chimney parameters come from the same
 seeds as the base variant (Ruin_<C>_<V>).
 
-Base variant A / B / C changes which end holds the gable (and the chimney) and which wall stands:
-  A: gable on the back (+Y), tall long wall on the left (-X), door in the low front end wall (jambs and lintel stand)
-  B: gable on the left (-X), tall long wall on the back (+Y), door in the low front long wall
-  C: gable on the right (+X), tall long wall is the front (-Y) with the door opening in it, low back wall
-Tall: gable to its apex (S 5.5 / M 6.5 / L 7.5 m) with the stack built in and 1.2-1.8 m above it, hearth at its foot, L: second-storey window in
-the gable; long wall 3-3.6 m with 1-2 windows; opposite wall low; door frame with lintel; 2-3 charred beams leaning to the floor; rubble.
+Base variant A / B / C. Mid (unchanged since round 2): A gable on the back (+Y), tall long wall on the left (-X), door in the low front end wall; B gable on the left (-X),
+tall long wall on the back, door in the low front long wall; C gable on the right (+X), tall long wall is the front with the door opening in it.
+Tall (round 7, FRONT GABLE): the charred half-timber and plaster gable rises over the door end wall (the door opening is in the gable wall: stone ground storey to about 2.7 m,
+then sill plate, posts, tie beam, braces, rake rafters and plaster bays to an apex of S 5.5 / M 6.5 / L 7.5 m, one side sagging). The stack stands on the back wall (A: about
+centre, B: left of centre) or on the left side wall (C) and rises 1.2-1.8 m above the apex, hearth at its foot. A / B / C are three layouts of that front gable: a tall long
+side wall of 3-3.6 m with 1-2 windows (left for A, right for B and C), the other side low; L: an open bay in the gable; 2-3 charred beams leaning to the floor; rubble.
 Mid: stack and hearth alone (S 4.6 / M 5.2 / L 5.9 m) with a 2-3 m gable stub either side, other walls 0.8-2.2 m with one window sill, one corner
 pier at about 3 m, one fallen beam, rubble.
 Collision: the low kit has none (its FOOTPRINT box is the only collider shape), so the shells add simple box meshes FOOTPRINT_COL_<n> (every wall
@@ -45,9 +45,15 @@ for _a, _b in (("W1, W2 = W0 * 0.72, W0 * 0.54; D1, D2 = D0 * 0.82, D0 * 0.68", 
                # round 3b: the per-course jitter moved side-wall stones in their thickness direction (+-7 cm), so neighbouring stones stood at different depths and the low
                # morning sun shadowed every other one (the checker of dark holes on the stacks). Jitter now runs along the wall, and the yaw is smaller.
                ("xf = place(cx + xl + tl * zc + jx, y, zc, math.radians(R.uniform(-2.5, 2.5)), math.radians(R.uniform(-1.5, 1.5)), tilt)",
-                "xf = place(cx + xl + tl * zc + (jx if sx >= sy else 0.0), y + (jx if sx < sy else 0.0), zc, math.radians(R.uniform(-0.4, 0.4)), math.radians(R.uniform(-0.3, 0.3)), tilt)"),
+                "xf = place(cx + xl + tl * zc + (jx if along == 'x' else 0.0), y + (jx if along == 'y' else 0.0), zc, math.radians(R.uniform(-0.4, 0.4)), math.radians(R.uniform(-0.3, 0.3)), tilt)"),
                # ... and the sun grazes the stack faces in the morning, so per-stone orientation noise (yaw, tilt, 1.8 cm vertex wobble = a 3 degree face normal spread)
                # swung the shading stone by stone. The stack keeps its relief from the normal map; the stones are nearly flat-faced.
+               # round 7: the jitter axis was chosen by comparing the block's length with its thickness, so every short block (length under the 0.27 m wall thickness) slid in its
+               # THICKNESS direction by up to 7 cm: stones standing proud and set back at random, the checker of dark squares on the stack. The wall now says which way it runs.
+               ("def block(xl, y, z0, h, sx, sy, mat, last, broken=0.0):", "def block(xl, y, z0, h, sx, sy, mat, last, broken=0.0, along='x'):"),
+               ("block(xm, fy, z0, h, b - a, t, mat(), lastp(xm, fy))", "block(xm, fy, z0, h, b - a, t, mat(), lastp(xm, fy), along='x')"),
+               ("block(xs, ym, z0, h, t, b - a, mat(), lastp(xs, ym))", "block(xs, ym, z0, h, t, b - a, mat(), lastp(xs, ym), along='y')"),
+               ("R.uniform(-0.05, 0.05)) + R.uniform(-0.02, 0.02)", "R.uniform(-0.03, 0.03)) + R.uniform(-0.01, 0.01)"),
                ("tilt = c['lean'] + math.radians(R.uniform(-1.5, 1.5))", "tilt = c['lean'] + math.radians(R.uniform(-0.4, 0.4))"),
                ("soft=R.uniform(0.07, 0.15), wob=0.018,", "soft=R.uniform(0.07, 0.15), wob=0.005,")):
     assert _a in _src, _a
@@ -94,7 +100,19 @@ class Shell(Ruin):
         self.Q = random.Random(self.seed ^ (0x7A11 if level == 'Tall' else 0x31D))
         self.wall_info = {}; self.cols = []; self.rot = 0.0
         self.hearth = (1e3, 1e3); self.hearth_c = (1e3, 1e3)
-        self.open_rects = []; self.pot_xy = None; self.panels = []
+        self.open_rects = []; self.pot_xy = None; self.panels = []; self._stack = False
+
+    def to_object(self, coll, g=None, name='Footing'):
+        self._stack = (name == 'Chimney')                  # wear_at treats the stack's stones apart (smooth wear, no block-scale noise)
+        try: ob = super().to_object(coll, g, name)
+        finally: self._stack = False
+        # round 7: flat shading. The kit smooths every polygon, so the exported normals are averaged over the corners of each little block: every stone shades as a pillow, lit on one
+        # half and dark on the other, and a stack of 0.3 m stones under the grazing morning sun reads as a checker of dark squares (found with a plain-lit, shadow-free, textureless render
+        # of the stack: the pattern stayed; unlit it vanished). Face normals keep the stones' faces flat; the normal map carries the relief.
+        me = ob.data
+        me.polygons.foreach_set('use_smooth', [False] * len(me.polygons))
+        me.update()
+        return ob
 
     # ---- wear: the kit's own, with the chimney's soot and the hearth mapped through the gable rotation, plus fire-black high on the walls
     def wear_at(self, p, n, slot):
@@ -121,6 +139,11 @@ class Shell(Ruin):
         else:
             res = sup(p, n, slot)
         r, gm = res[0], res[1] * 0.3
+        if self._stack and slot in ('stone', 'stone_dk') and p.z > 0.6:
+            # round 7: the stack's checker of dark stones was the wear mask, not geometry: the kit's block-scale noise (0.6 and 2.3 cycles per m, piece_v) sits at 0.1-0.3, right where
+            # the shell shader's smoothstep(0.12, 0.55) is steepest, so stones one course apart came out 20% and 80% charred. Drop everything under 0.25 (continuous remap; the firebox soot
+            # and the rim stay) and run the height ramp below without block-scale noise.
+            r = max(0.0, r - 0.25) * 1.33
         if slot == 'oak':
             gm = 0.0
         if slot != 'oak' and self.chim_soot(p)[0] is not None and p.z > 1.5:
@@ -141,7 +164,8 @@ class Shell(Ruin):
         if n.z > 0.5 and p.z > 1.0 and slot in ('oak', 'stone', 'stone_dk'):     # broken tops take the fire hardest
             r = max(r, min(0.92, 0.45 + 0.10 * (p.z - 1.0)))
         if slot != 'plaster':
-            r = max(r, min(0.60, 0.14 * max(0.0, p.z - 0.9)) * (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs)))
+            bn = (1.0 + 0.12 * noise.noise(p * 0.3 + self.nofs)) if self._stack else (0.8 + 0.4 * noise.noise(p * 1.7 + self.nofs))
+            r = max(r, min(0.60, 0.14 * max(0.0, p.z - 0.9)) * bn)
         # char around window and door openings (the fire drew through them)
         if slot not in ('core', 'plaster'):
             for (a_, d_, o_, oa, ob, z0, z1) in self.open_rects:
@@ -157,7 +181,7 @@ class Shell(Ruin):
         if slot in ('stone', 'stone_dk') and n.z < 0.6:
             fade = max(0.0, 1.0 - max(0.0, p.z - 0.1) / (1.5 + 0.5 * noise.noise(p * 0.5 + self.nofs)))
             lf = 0.5 + 0.5 * noise.noise(p * Vector((0.45, 0.45, 0.9)) + self.nofs + Vector((11.0, 3.0, 0.0)))
-            hf = 0.5 + 0.5 * noise.noise(p * 2.6 + self.nofs)
+            hf = 0.5 if self._stack else 0.5 + 0.5 * noise.noise(p * 2.6 + self.nofs)
             gm = max(gm, min(1.0, fade * (0.25 + 1.0 * lf) * (0.65 + 0.5 * hf)))
         # the clay pot on the stack: not sooted like the shaft under it
         if self.pot_xy is not None and p.z > self.pot_xy[2] - 0.05 and (p.x - self.pot_xy[0]) ** 2 + (p.y - self.pot_xy[1]) ** 2 < 0.4 ** 2:
@@ -361,7 +385,7 @@ class Shell(Ruin):
                 if t_in in posts and Q.random() < 0.7:
                     self.oak_member(P(t_in, base + 0.1), P(tm, z_tie - 0.1), yaw, w=0.28)
             if pf(t_end) > ZS + 0.3:
-                pa = P(t_in, pf(t_in) - 0.12); pb = P(t_end, pf(t_end) - 0.08); fr2 = Q.uniform(0.45, 1.0)
+                pa = P(t_in, pf(t_in) - 0.12); pb = P(t_end, pf(t_end) - 0.08); fr2 = Q.uniform(0.7, 1.0)
                 self.oak_member(pa, pa + (pb - pa) * fr2, yaw, w=0.28)                              # rafter along the rake, outer end gone
             for bi, (ta_, tb_) in enumerate(((t_end, tm), (tm, t_in))):
                 topz = min(pf(ta_), pf(tb_)) - 0.28
@@ -510,8 +534,18 @@ class Shell(Ruin):
         Q = self.Q; R = self.R; cls = self.cls; v = self.base[-1]; S = self.S; h = self.h
         tall = self.level == 'Tall'
         gs, kt, kl, ke = {'A': (2, 3, 1, 0), 'B': (3, 2, 0, 1), 'C': (1, 0, 2, 3)}[v]
+        gf = gs                                                   # the wall that carries the half-timber gable
+        if tall:
+            # round 7 (shell round 3c): Tall shells have a FRONT gable. The charred half-timber and plaster gable rises over the door wall (k 0, the door opening in it),
+            # and the stack stands on the back wall (A centre, B left of centre) or on the left side wall (C), so gs now names the stack wall, not the gable wall.
+            gf = 0
+            gs, kt, kl, ke = {'A': (2, 3, 1, 0), 'B': (2, 1, 3, 0), 'C': (3, 1, 2, 0)}[v]
         self.rot = {2: 0.0, 3: math.pi / 2, 1: -math.pi / 2}[gs]
         ch = self.chim
+        if tall and v == 'B':
+            ch['cx'] = -0.50 * h                                   # back wall, left of centre
+        elif tall and v == 'A':
+            ch['cx'] = max(-0.12 * h, min(0.12 * h, ch['cx']))     # back wall, about centre
         Ha = {'S': 5.5, 'M': 6.5, 'L': 7.5}[cls]
         if tall:
             ch['H'] = Ha + Q.uniform(1.2, 1.8)
@@ -537,7 +571,7 @@ class Shell(Ruin):
             return abs(tc - tcg) < ((W0 / 2 + 0.08) if z + hh <= zb + 0.2 else (W1 / 2 + 0.12))
         Ls = {k: (self.side_frame(k)[1] - self.side_frame(k)[0]).length for k in range(4)}
         span = {k: ((-FOOT_W / 2, Ls[k] + FOOT_W / 2) if k in (0, 2) else (FOOT_W / 2, Ls[k] - FOOT_W / 2)) for k in range(4)}
-        g_start = (kt == (gs + 1) % 4)
+        g_start = (kt == (gf + 1) % 4)
         def u_of(t):                                                  # 0 at the tall wall's gable end, 1 at its far end
             u = (t - span[kt][0]) / (span[kt][1] - span[kt][0]); return u if g_start else 1 - u
         def t_of(u):
@@ -545,23 +579,24 @@ class Shell(Ruin):
         nz = {k: Q.random() * 9 for k in range(4)}
         sl, sr = Q.uniform(0.70, 0.86), Q.uniform(0.70, 0.86)
         sag_f, sag_side = Q.uniform(0.7, 1.3), Q.choice([-1, 1])
-        isC = (v == 'C')
+        isC = False                                            # (round 3's broken-off gable on Tall C is gone: every Tall gable is the front gable)
         # ---- wall height functions
         stub = {'S': 2.0, 'M': 2.5, 'L': 3.0}[cls]
         sL, sR = stub * Q.uniform(0.9, 1.15), stub * Q.uniform(0.9, 1.15)
-        def hg(t):
+        gc = Ls[gf] / 2                                        # Tall: the front gable's apex stands over the middle of the door wall
+        def hg(t):                                             # Tall: the gable's rake over the door wall (gf)
+            dt = t - gc
+            s_ = sl if dt < 0 else sr
+            hh = Ha - s_ * abs(dt) + 0.35 * noise.noise(Vector((t * 1.3 + nz[gf], 2.0, 0)))
+            if (dt * sag_side) > 0:
+                hh -= sag_f * sstep((abs(dt) - 1.0) / 2.2)
+            return max(hh, 1.5)
+        def hs(t):                                             # the stack wall: a stub peaking at the stack (Mid: the gable stub)
             dt = t - tcg
-            if tall and isC:                                   # C: the gable is broken off at half height, the stack rises clear
-                return max(0.5 * Ha - 0.45 * abs(dt) + 0.35 * noise.noise(Vector((t * 1.3 + nz[gs], 2.0, 0))), 1.2)
-            if tall:
-                s_ = sl if dt < 0 else sr
-                hh = Ha - s_ * abs(dt) + 0.35 * noise.noise(Vector((t * 1.3 + nz[gs], 2.0, 0)))
-                if (dt * sag_side) > 0:
-                    hh -= sag_f * sstep((abs(dt) - 1.0) / 2.2)
-                return max(hh, 1.5)
-            sd = sL if dt < 0 else sR
+            sd = (sL if dt < 0 else sR) * (1.5 if tall else 1.0)
+            top = 0.7 + (3.3 if tall else 2.8)
             if abs(dt) < sd:
-                return 0.7 + 2.8 * (1 - abs(dt) / sd) ** 0.9 + 0.2 * noise.noise(Vector((t * 1.6 + nz[gs], 2.0, 0)))
+                return 0.7 + (top - 0.7) * (1 - abs(dt) / sd) ** 0.9 + 0.2 * noise.noise(Vector((t * 1.6 + nz[gs], 2.0, 0)))
             return 0.45 + 0.25 * noise.noise(Vector((t * 2.0 + nz[gs], 2.0, 0)))
         Ht = {'A': 3.5, 'B': 3.1, 'C': 3.6}[v] * Q.uniform(0.97, 1.03) if tall else Q.uniform(1.7, 2.2)
         sag_u = Q.uniform(0.72, 0.88)
@@ -587,7 +622,9 @@ class Shell(Ruin):
             return max(0.5, 0.7 + (end_hi - 0.7) * (0.5 + 0.5 * noise.noise(Vector((t * 1.2 + nz[ke], 9.0, 0)))) + 0.2 * noise.noise(Vector((t * 2.9 + nz[ke], 4.0, 0))))
         # stone ground storey only on the Tall gable; above it the charred half-timber frame (gable_frame)
         E_g = self.edges(Ha + 0.5, (0.30, 0.44)); ZS = next(e for e in E_g if e >= 2.5)
-        base_fn = {gs: ((lambda t: min(hg(t), ZS + 0.1)) if tall else hg), kt: ht, kl: hl, ke: he}
+        base_fn = {gs: hs, kt: ht, kl: hl, ke: he}
+        if tall:
+            base_fn = {gf: (lambda t: min(hg(t), ZS + 0.1)), gs: hs, kt: ht, kl: hl}
         guards = []                                            # (k, ta, tb, min height): wall above windows, stubs beside the jambs
         pier = None
         if not tall:
@@ -638,21 +675,19 @@ class Shell(Ruin):
         # ---- walls
         for k in range(4):
             ex = excl_g if k == gs else None
-            E = self.wall_run(k, span[k][0], span[k][1], fn[k], openings=ops[k], excl=ex, E=(E_g if (k == gs and tall) else None))
+            E = self.wall_run(k, span[k][0], span[k][1], fn[k], openings=ops[k], excl=ex, E=(E_g if (k == gf and tall) else None))
             self.wall_info[k]['E'] = E
             fa_, fb_, fd_, fo_ = self.side_frame(k)
             self.open_rects += [(fa_, fd_, fo_, oa, ob, z0, z1) for (oa, ob, z0, z1) in self.wall_info[k]['ops']]
-            if k == gs and tall:
-                self.wall_info[k]['btop'] = lambda t: hg(t) - 0.4
         for (k, ta, tb, z0, z1) in wins:
             self.sill_and_lintel(k, ta, tb, z0, z1, lintel=(z1 < 1e8))
         self.door_frame(2.1 if tall else 1.85, lintel=tall)
         if tall:
-            self.gable_frame(gs, tcg, hg, ZS, W1, open_bay=((Q.choice([-1, 1]), 1) if cls == 'L' and not isC else None))
+            self.gable_frame(gf, gc, hg, ZS, 0.0, open_bay=((Q.choice([-1, 1]), 1) if cls == 'L' else None))     # no stack in the gable: the two halves meet at a king post
             if v == 'B':                                            # one variant per size keeps a rafter pair joined at the apex
-                room = [(sg, (self.wall_info[gs]['t1'] - tcg - 1.3) if sg > 0 else (tcg - self.wall_info[gs]['t0'] - 1.3)) for sg in (-1, 1)]
+                room = [(sg, (self.wall_info[gf]['t1'] - gc - 1.3) if sg > 0 else (gc - self.wall_info[gf]['t0'] - 1.3)) for sg in (-1, 1)]
                 sg = max(room, key=lambda r_: r_[1])[0]
-                self.rafter_pair(gs, tcg + sg * {'S': 2.2, 'M': 2.6, 'L': 3.0}[cls], {'S': 3.3, 'M': 4.0, 'L': 4.6}[cls])
+                self.rafter_pair(gf, gc + sg * {'S': 2.2, 'M': 2.6, 'L': 3.0}[cls], {'S': 3.3, 'M': 4.0, 'L': 4.6}[cls])
         else:
             wp = {'A': (kl, 0.35, 2, 1.4, 1.4), 'B': (ke, 0.5, 2, 1.3, 1.6), 'C': (kl, 0.4, 1, 1.0, 1.5)}[v]
             wk = wp[0]; tw = span[wk][0] + (span[wk][1] - span[wk][0]) * wp[1]
@@ -672,7 +707,7 @@ class Shell(Ruin):
             else:
                 self.lean_beam(kt, t_of(off), ang, skew)
         # ---- rubble heaps inside at the foot of the fallen walls
-        nh = {'S': 6, 'M': 8, 'L': 10}[cls]
+        nh = {'S': 3 if tall else 6, 'M': 8, 'L': 10}[cls]       # S Tall: the front gable's frame costs tris; stay under the 5k budget
         def inside(k, t, depth=0.8):
             a_, b_, d_, o_ = self.side_frame(k); p = a_ + d_ * t - o_ * depth; return p.x, p.y
         sites = [(gs, tcg + 2.0), (gs, tcg - 2.0), (kt, t_of(0.3)), (kt, t_of(0.7)), (ke, (span[ke][0] + span[ke][1]) / 2), (kl, (span[kl][0] + span[kl][1]) * 0.4)]
