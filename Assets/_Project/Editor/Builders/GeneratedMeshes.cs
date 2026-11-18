@@ -14,14 +14,16 @@ namespace SleepingCalamity.EditorTools
     internal static class GeneratedMeshes
     {
         public const string Root = "Assets/_Project/Content/Generated";
-        // Raw payload estimate (vertices x 32 B + indices x 4 B). About 20 KB as scene text; the lane treads and card tiles are moved, small props stay embedded.
-        const int MinBytes = 6000;
+        // T09b scene diet: every generated mesh leaves the scene (rule 3.7; the 157 lane treads of 20 KB each stayed under the old 6000 B floor and were 3.2 MB of the scene file).
+        // Meshes with the same content (the lane treads of one size) share one asset.
+        const int MinBytes = 0;
 
         public static void Externalize(Scene scene, string area)
         {
             string folder = Root + "/" + area;
             BuilderUtil.EnsureFolder(folder);
             var byInstance = new Dictionary<Mesh, Mesh>();
+            var byContent = new Dictionary<string, Mesh>();
             var usedPaths = new HashSet<string>();
             var nameCount = new Dictionary<string, int>();
             long bytes = 0; int moved = 0, kept = 0;
@@ -44,9 +46,12 @@ namespace SleepingCalamity.EditorTools
             Mesh Map(Mesh m)
             {
                 if (m == null || AssetDatabase.Contains(m)) return m;
+                if ((m.hideFlags & HideFlags.DontSaveInEditor) != 0) return m;   // LookTestGeometry rebuilds its box/cone meshes (HideAndDontSave) on load: the scene stores no mesh for them, an asset would be dead weight
                 if (byInstance.TryGetValue(m, out Mesh done)) return done;
                 long size = (long)m.vertexCount * 32 + IndexCount(m) * 4L;
                 if (size < MinBytes && !AlwaysAsset(m.name)) { kept++; byInstance[m] = m; return m; }
+                string ck = ContentKey(m);
+                if (byContent.TryGetValue(ck, out Mesh same)) { byInstance[m] = same; return same; }
                 string stem = Sanitize(string.IsNullOrEmpty(m.name) ? "Mesh" : m.name);
                 nameCount.TryGetValue(stem, out int n); nameCount[stem] = ++n;
                 string path = folder + "/" + (n == 1 ? stem : stem + "_" + n) + ".asset";
@@ -55,13 +60,26 @@ namespace SleepingCalamity.EditorTools
                 Mesh result;
                 if (existing == null) { AssetDatabase.CreateAsset(m, path); result = m; }
                 else { EditorUtility.CopySerialized(m, existing); EditorUtility.SetDirty(existing); result = existing; }   // the fresh mesh is left unreferenced (never saved)
-                byInstance[m] = result; bytes += size; moved++;
+                byInstance[m] = result; byContent[ck] = result; bytes += size; moved++;
                 return result;
             }
         }
 
         // Meshes that stay assets whatever their size (the orchard's tree mounds are only ~4 KB since T07b cut the trees to four, but rule 3.7 keeps them out of the scene file).
         static bool AlwaysAsset(string name) => name == "OR_Mounds";
+
+        // A content key: counts plus an FNV-1a hash over positions, normals, uvs, colors and triangle indices (same bytes in, same key out).
+        static string ContentKey(Mesh m)
+        {
+            ulong h = 1469598103934665603UL;
+            void Mix(float f) { h = (h ^ (uint)System.BitConverter.SingleToInt32Bits(f)) * 1099511628211UL; }
+            foreach (Vector3 v in m.vertices) { Mix(v.x); Mix(v.y); Mix(v.z); }
+            foreach (Vector3 v in m.normals) { Mix(v.x); Mix(v.y); Mix(v.z); }
+            foreach (Vector2 v in m.uv) { Mix(v.x); Mix(v.y); }
+            foreach (Color c in m.colors) { Mix(c.r); Mix(c.g); Mix(c.b); Mix(c.a); }
+            for (int i = 0; i < m.subMeshCount; i++) foreach (int t in m.GetIndices(i)) h = (h ^ (uint)t) * 1099511628211UL;
+            return m.vertexCount + "_" + IndexCount(m) + "_" + m.subMeshCount + "_" + h.ToString("x");
+        }
 
         static long IndexCount(Mesh m)
         {

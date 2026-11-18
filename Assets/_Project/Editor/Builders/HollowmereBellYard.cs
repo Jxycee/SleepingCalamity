@@ -22,6 +22,7 @@ namespace SleepingCalamity.EditorTools
         internal static readonly Vector2 GraveTended = new Vector2(-14.7f, 26.4f);
         const float TendedRadius = 1.7f;
         static readonly Vector2 HatchXZ = new Vector2(5.6f, 29.2f);
+        static Transform setRoot;
         static readonly Vector2 ChurchTree = new Vector2(-18.5f, 28.5f);
 
         // The churchyard lawn mask, 0..1 (1 = grass): the keep top's paving stops 9.8 m west of the hall's gable door and 23.3 m south... see KeepLawnBounds.
@@ -37,6 +38,13 @@ namespace SleepingCalamity.EditorTools
         {
             float ax = Mathf.Abs(x);
             return (ax > 22.5f && ax < 38f && z > 18f && z < 37f) ? 1f : 0f;
+        }
+
+        // The crag face behind the bell yard and the churchyard (x -40..40, z 32..60), 0..1: terrain painted as earth, no cobble layer.
+        internal static float BellCrag(float x, float z)
+        {
+            float k = Mathf.Clamp01((z - 32f) / 2f) * (1f - Mathf.Clamp01((z - 52f) / 8f)) * (1f - Mathf.Clamp01((Mathf.Abs(x) - 38f) / 6f));
+            return k * k * (3f - 2f * k);
         }
 
         // Where the bell zone's fine carpet and flowers run (the keep terrace's grass, the banks beside it and the foot of the crag), 0.29 m cells.
@@ -77,6 +85,40 @@ namespace SleepingCalamity.EditorTools
             return go;
         }
 
+        // T09b: a boulder on a slope, sunk a third to half its height along the slope normal and turned onto it (a rock laid level on a 50 degree face reads as a pasted card with a hard
+        // cast shadow). scaleMul = uniform scale of the prefab; tiltX/tiltZ = lean in degrees in the aligned frame.
+        static Vector3 TN(Vector2 p)
+        {
+            Terrain t = Terrain.activeTerrain; Vector3 o = t.transform.position, sz = t.terrainData.size;
+            return t.terrainData.GetInterpolatedNormal((p.x - o.x) / sz.x, (p.y - o.z) / sz.z);
+        }
+
+        static GameObject PutSlopeDim(Transform parent, string code, string name, Vector2 xz, float maxDim, float yaw, float tiltX, float tiltZ, float sinkFrac)
+        {
+            GameObject pf = Prefab(code);
+            if (pf == null) { Count("missing_" + code); return null; }
+            Bounds ub = Unit(pf);
+            return PutSlope(parent, code, name, xz, maxDim / Mathf.Max(0.02f, Mathf.Max(ub.size.x, Mathf.Max(ub.size.y, ub.size.z))), yaw, tiltX, tiltZ, sinkFrac);
+        }
+
+        static GameObject PutSlope(Transform parent, string code, string name, Vector2 xz, float scaleMul, float yaw, float tiltX, float tiltZ, float sinkFrac)
+        {
+            GameObject pf = Prefab(code);
+            if (pf == null) { Count("missing_" + code); return null; }
+            Bounds ub = Unit(pf);
+            float s = scaleMul;
+            Vector3 n = Vector3.Slerp(Vector3.up, TN(xz), 0.85f);
+            Quaternion rot = Quaternion.FromToRotation(Vector3.up, n) * Quaternion.Euler(tiltX, yaw, tiltZ);
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
+            go.name = name; go.transform.localScale = Vector3.one * s; go.transform.rotation = rot;
+            foreach (Collider c in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            Vector3 bottom = new Vector3(ub.center.x, ub.min.y, ub.center.z);
+            Vector3 target = new Vector3(xz.x, TY(xz), xz.y) - n * (sinkFrac * s * ub.size.y);
+            go.transform.position = target - rot * (bottom * s);
+            Count("props"); Count("slopeRocks");
+            return go;
+        }
+
         // On the banks the layout ground is not the terrain (HollowmereStreets.Surface falls back to it when its short ray misses a 45 degree slope): sample the terrain itself.
         static float TY(Vector2 p) { Terrain t = Terrain.activeTerrain; return t.SampleHeight(new Vector3(p.x, 0f, p.y)) + t.transform.position.y; }
 
@@ -107,20 +149,38 @@ namespace SleepingCalamity.EditorTools
             if (HollowmereFoliage.Tuft(flora, kit, new Vector3(p.x, TY(p) - 0.02f, p.y), H(key, salt, 702) * 360f, Mathf.Lerp(s0, s1, H(key, salt, 703))) != null) Count("tufts");
         }
 
-        // The scanned rocks T20a-h and T11a have albedo means of 33-54 (sRGB), a third of T11b's: in shade they read black, in sun a wet brown. A base-colour multiplier brings them to
-        // a mean near 75, a mossy stone; idempotent (same values every build). The colour property is gamma space: 1.5 here is about 1.8x in linear light.
-        static void BrightenRocks()
+        // T09b material probe (no wrong map: the _ms maps of every rock, wall piece and plant here have metallic 0 and smoothness 0.1-0.3): the rocks' albedo means are 33-54 (sRGB),
+        // a third of T11b's, so they read black in shade; the 1.5-1.75 base-colour lift of T09 pushed the mossy tops to lime (182/199/87 in R12) because green got the same boost as
+        // red. The bright glassy rim on the T11b boulder and the wet black sheen on the churchyard wall coping are environment reflection and specular at grazing angles on a rough map:
+        // rocks, wall pieces and plants now take smoothness 0 with specular highlights and environment reflections off. Dark plants (T21e/f/h/j/n, T19u) get a lift of their own.
+        // Idempotent: same values every build. The colour property is gamma space.
+        static Color Gr(float k) => new Color(k, k * 0.97f, k, 1f);   // a stone lift that keeps the hue (T09: blue at 0.92 and red above green read lime and pink)
+
+        static void FixScannedMaterials()
         {
-            var f = new Dictionary<string, float> { ["T20a"] = 1.5f, ["T20b"] = 1.75f, ["T20c"] = 1.5f, ["T20d"] = 1.55f, ["T20e"] = 1.65f, ["T20f"] = 1.7f, ["T20g"] = 1.7f, ["T20h"] = 1.75f, ["T11a"] = 1.75f };
-            foreach (var kv in f)
+            var rocks = new Dictionary<string, Color>
             {
-                Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/B1/M_" + kv.Key + ".mat");
-                if (m == null) { Count("missing_mat_" + kv.Key); continue; }
-                var c = new Color(kv.Value, kv.Value, kv.Value * 0.92f, 1f);
-                m.SetColor("_BaseColor", c); if (m.HasProperty("_Color")) m.SetColor("_Color", c);
-                EditorUtility.SetDirty(m);
-            }
+                ["T20a"] = Gr(1.5f), ["T20b"] = Gr(1.7f), ["T20c"] = Gr(1.5f), ["T20d"] = Gr(1.6f), ["T20e"] = Gr(1.6f), ["T20f"] = Gr(1.6f), ["T20g"] = Gr(1.6f), ["T20h"] = Gr(1.7f),
+                ["T11a"] = Gr(1.7f), ["T11b"] = Color.white,
+                ["T19e"] = Gr(1.45f), ["T19f"] = Gr(1.45f), ["T19g"] = Gr(1.45f), ["T19h"] = Gr(1.45f), ["T19i"] = Gr(1.45f), ["T19j"] = Gr(1.45f), ["T19k"] = Gr(1.45f), ["T19l"] = Gr(1.45f),
+                ["T21a"] = Color.white, ["T21b"] = Color.white,
+            };
+            foreach (var kv in rocks) MatFix(kv.Key, kv.Value, 0f);
+            MatFix("T20w", Gr(1.8f), 0.1f); MatFix("T20t", Gr(1.5f), 0.1f); MatFix("T20u", Gr(1.4f), 0.1f); MatFix("T20y", Gr(1.4f), 0.1f);   // the dive kit: the sack read as a black bin bag
+            var plants = new Dictionary<string, float> { ["T21e"] = 1.8f, ["T21f"] = 1.7f, ["T21h"] = 2.1f, ["T21j"] = 1.7f, ["T21n"] = 1.5f, ["T19u"] = 1.7f, ["T21i"] = 1.2f, ["T21l"] = 1.2f, ["T19x"] = 1.2f, ["T21g"] = 1f, ["T21d"] = 1f, ["T21m"] = 1f, ["T21o"] = 1f };
+            foreach (var kv in plants) MatFix(kv.Key, new Color(kv.Value, kv.Value, kv.Value, 1f), 0.25f);
             AssetDatabase.SaveAssets();
+        }
+
+        static void MatFix(string code, Color tint, float smooth)
+        {
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/B1/M_" + code + ".mat");
+            if (m == null) { Count("missing_mat_" + code); return; }
+            m.SetColor("_BaseColor", tint); if (m.HasProperty("_Color")) m.SetColor("_Color", tint);
+            m.SetFloat("_Smoothness", smooth);
+            m.SetFloat("_SpecularHighlights", 0f); m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            m.SetFloat("_EnvironmentReflections", 0f); m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+            EditorUtility.SetDirty(m);
         }
 
         static Light AddLight(Transform parent, string name, Vector3 pos, Color color, float intensity, float range)
@@ -136,7 +196,7 @@ namespace SleepingCalamity.EditorTools
         public static void BuildBell(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
         {
             T = t; counts.Clear(); decals = 0; graveXZ.Clear();
-            BrightenRocks();
+            FixScannedMaterials(); setRoot = set;
             Physics.SyncTransforms();
             Transform g = Sub(ruined, "BellYard");
             Transform props = Sub(g, "Props"), flora = Sub(g, "Flora"), dec = Sub(g, "Decals"), lights = Sub(g, "Lights");
@@ -145,6 +205,8 @@ namespace SleepingCalamity.EditorTools
             WallFeet2(props, flora, dec);
             Banks(props, flora, dec, lights);
             CragDressing(props, flora, dec);
+            foreach (UnityEngine.Rendering.Universal.DecalProjector dp in dec.GetComponentsInChildren<UnityEngine.Rendering.Universal.DecalProjector>(true))
+                if (dp.material != null && dp.material.name.Contains("Moss")) dp.fadeFactor = 0.45f;   // T09b: the moss decal is lime in sun (R12: a flat bright rectangle on the slope, a blob at the tree foot)
             int fills = Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None).Count(l => l.type != LightType.Directional && l.name.Contains("Fill"));
             Debug.Log("SC HOLLOWMERE bell: " + string.Join(", ", counts.OrderBy(kv => kv.Key, System.StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)) + ", decals=" + decals + ", fill lights in the scene=" + fills);
         }
@@ -155,26 +217,26 @@ namespace SleepingCalamity.EditorTools
             Transform g = Sub(props, "DiveKit");
             float gy = HollowmereLayout.KeepHeight;
             // the kit, laid out round the hatch the way a party leaves it after a dive: coil of rope at the hatch edge, a chest with a lantern on it, a sack, a rusty sword, a barrel
-            Vector2 rope = HatchXZ + new Vector2(-1.1f, -0.75f);
-            if (Ok(rope, 0.2f, true, false)) PutNat(g, "T21c", "RopeCoil", rope, Gy(rope), 1f, 35f, 0f, 0f, 0.02f);
-            Vector2 chest = HatchXZ + new Vector2(1.9f, -1.9f);
+            Vector2 rope = HatchXZ + new Vector2(-1.9f, -1.35f);   // T09b: the kit stands outside the (now larger) hatch frame, a third bigger so it reads from the camera
+            if (Ok(rope, 0.2f, true, false)) PutNat(g, "T21c", "RopeCoil", rope, Gy(rope), 1.6f, 35f, 0f, 0f, 0.02f);
+            Vector2 chest = HatchXZ + new Vector2(2.1f, -1.9f);
             if (Ok(chest, 0.4f, true, false))
             {
-                GameObject c = Put(g, "C12a", "DiveChest", chest, Gy(chest), 0.85f, 80f, 0f, 0f, 0.02f, true);
-                if (c != null) { Bounds b = Render(c); Vector2 lp = new Vector2(b.center.x, b.center.z); Put(g, "C15c", "ChestLantern", lp, b.max.y - 0.02f, 0.38f, 120f, 0f, 0f, 0f); }
+                GameObject c = Put(g, "C12a", "DiveChest", chest, Gy(chest), 1.15f, 80f, 0f, 0f, 0.02f, true);
+                if (c != null) { Bounds b = Render(c); Vector2 lp = new Vector2(b.center.x, b.center.z); Put(g, "C15c", "ChestLantern", lp, b.max.y - 0.02f, 0.5f, 120f, 0f, 0f, 0f); }
                 Decal(dec, "Grime", chest + new Vector2(0.1f, 0.2f), 1.6f, 1.2f, 80f, "Grime_Chest");
             }
-            Vector2 sack = HatchXZ + new Vector2(2.9f, -1.6f);
-            if (Ok(sack, 0.3f, true, false)) PutNat(g, "T20w", "DiveSack", sack, Gy(sack), 1f, 200f, 4f, 3f, 0.03f);
-            Vector2 sword = HatchXZ + new Vector2(0.6f, -1.55f);
-            if (Ok(sword, 0.3f, true, false)) PutNat(g, "T20z", "RustySword", sword, Gy(sword), 1f, 25f, 0f, 0f, 0.0f);
+            Vector2 sack = HatchXZ + new Vector2(3.3f, -1.5f);
+            if (Ok(sack, 0.3f, true, false)) PutNat(g, "T20w", "DiveSack", sack, Gy(sack), 1.1f, 200f, 4f, 3f, 0.03f);
+            Vector2 sword = HatchXZ + new Vector2(0.9f, -1.65f);
+            if (Ok(sword, 0.3f, true, false)) PutNat(g, "T20z", "RustySword", sword, Gy(sword), 1.5f, 25f, 0f, 0f, 0.0f);
             Vector2 barrel = new Vector2(3.6f, 27.9f);
-            if (Ok(barrel, 0.5f, true, false)) PutNat(g, "T20t", "DiveBarrel", barrel, Gy(barrel), 1f, 40f, 0f, 0f, 0.02f, true);
+            if (Ok(barrel, 0.5f, true, false)) PutNat(g, "T20t", "DiveBarrel", barrel, Gy(barrel), 1.3f, 40f, 0f, 0f, 0.02f, true);
             Vector2 bucket = new Vector2(3.9f, 28.1f);
             if (Ok(bucket, 0.25f, true, false)) Put(g, "T17c", "DiveBucket", bucket, Gy(bucket), 0.4f, 0f, 0f, 0f, 0.02f);
             // the brazier on the lawn's edge, a warm point light (the zone's one warm light)
             Vector2 brazier = HatchXZ + new Vector2(1.5f, 2.3f);
-            GameObject bz = Ok(brazier, 0.5f, false, false) ? Put(g, "T16h", "Brazier", brazier, Gy(brazier), 1.4f, 0f, 0f, 0f, 0.02f, true) : null;
+            GameObject bz = Ok(brazier, 0.5f, false, false) ? Put(g, "T16h", "Brazier", brazier, Gy(brazier), 1.9f, 0f, 0f, 0f, 0.02f, true) : null;
             if (bz != null)
             {
                 Bounds fb = Render(bz);
@@ -182,12 +244,12 @@ namespace SleepingCalamity.EditorTools
                 if (unlit != null)
                 {
                     Material fm = LookTestBuilder.Ensure(MatFolder + "/M_HM_BrazierFlame.mat", unlit); fm.SetColor("_BaseColor", new Color(1.0f, 0.52f, 0.14f)); EditorUtility.SetDirty(fm);
-                    GameObject flame = LookTestBuilder.Prim(g, "BrazierFlame", PrimitiveType.Sphere, new Vector3(fb.center.x, fb.max.y - 0.04f, fb.center.z), new Vector3(0.34f, 0.5f, 0.34f), fm);
+                    GameObject flame = LookTestBuilder.Prim(g, "BrazierFlame", PrimitiveType.Sphere, new Vector3(fb.center.x, fb.max.y - 0.04f, fb.center.z), new Vector3(0.46f, 0.68f, 0.46f), fm);
                     foreach (Collider fc in flame.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(fc);
                     flame.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 }
             }
-            if (bz != null) { Bounds b = Render(bz); AddLight(lights, "BrazierWarm", new Vector3(b.center.x, b.max.y + 0.15f, b.center.z), new Color(1.0f, 0.62f, 0.30f), 7f, 9f); }
+            if (bz != null) { Bounds b = Render(bz); AddLight(lights, "BrazierWarm", new Vector3(b.center.x, b.max.y + 0.15f, b.center.z), new Color(1.0f, 0.62f, 0.30f), 16f, 13f); }
             Decal(dec, "Soot", brazier + new Vector2(0f, -0.2f), 1.8f, 1.8f, 30f, "Soot_Brazier");
             // the wall of the church behind the hatch: ferns, a mossy stone
             // cobbles: moss, grime and leaves at the joints and along the lawn edge (few, large decals)
@@ -371,7 +433,7 @@ namespace SleepingCalamity.EditorTools
                     float dx = Mathf.Lerp(23.2f, 30.4f, Mathf.Pow(H(i, 1, key), 0.9f));
                     Vector2 p = new Vector2(side * dx, Mathf.Lerp(19.6f, 31.8f, H(i, 2, key)));
                     if (!OkBank(p, 0.35f)) continue;
-                    PutNat(g, rocks[(int)(H(i, 3, key) * rocks.Length) % rocks.Length], "BankRock_" + side + "_" + i, p, TY(p), Mathf.Lerp(0.55f, 1.15f, H(i, 4, key)), H(i, 5, key) * 360f, (H(i, 6, key) - 0.5f) * 20f, (H(i, 7, key) - 0.5f) * 20f, Mathf.Lerp(0.1f, 0.3f, H(i, 8, key)));
+                    PutSlope(g, rocks[(int)(H(i, 3, key) * rocks.Length) % rocks.Length], "BankRock_" + side + "_" + i, p, Mathf.Lerp(0.5f, 1.1f, H(i, 4, key)), H(i, 5, key) * 360f, (H(i, 6, key) - 0.5f) * 12f, (H(i, 7, key) - 0.5f) * 12f, Mathf.Lerp(0.33f, 0.5f, H(i, 8, key)));
                 }
                 for (int i = 0; i < 16; i++)
                 {
@@ -406,29 +468,37 @@ namespace SleepingCalamity.EditorTools
             {
                 Vector2 p = new Vector2(Mathf.Lerp(24.6f, 34f, (i + 0.5f * H(i, 1, 1460)) / 16f), 18.1f + H(i, 2, 1460) * 1.3f);
                 if (!OkBank(p, 0.3f)) continue;
-                if (i % 4 == 0) PutNat(sb, rocks[(i * 5) % rocks.Length], "SBankRock_" + i, p, TY(p), Mathf.Lerp(0.6f, 1.1f, H(i, 3, 1460)), H(i, 4, 1460) * 360f, (H(i, 5, 1460) - 0.5f) * 14f, (H(i, 6, 1460) - 0.5f) * 14f, 0.2f);
+                if (i % 4 == 0) PutSlope(sb, rocks[(i * 5) % rocks.Length], "SBankRock_" + i, p, Mathf.Lerp(0.55f, 1.0f, H(i, 3, 1460)), H(i, 4, 1460) * 360f, (H(i, 5, 1460) - 0.5f) * 12f, (H(i, 6, 1460) - 0.5f) * 12f, Mathf.Lerp(0.33f, 0.5f, H(i, 7, 1460)));
                 else if (i % 4 == 1) PutNat(sb, i % 8 == 1 ? "T21l" : "T12b", "SBankFern_" + i, p, TY(p), Mathf.Lerp(0.8f, 1.3f, H(i, 7, 1460)), H(i, 8, 1460) * 360f, 0f, 0f, 0.03f);
                 else if (i % 4 == 2) Put(sb, "T12c", "SBankIvy_" + i, p + new Vector2(0f, 0.6f), TY(p) + 0.1f, Mathf.Lerp(1.6f, 2.3f, H(i, 9, 1460)), 180f, 0f, 0f, 0.05f);
                 else WeedT(flora, p, 1461, i, 0.9f, 1.6f);
             }
             for (int i = 0; i < 4; i++) DecalT(dec, i % 2 == 0 ? "Moss" : "Damp", new Vector2(26.5f + i * 2.4f, 18.8f), 3.2f, 2.6f, 0f, "SBankDecal_" + i);
-            // the shelf's west scarp (x -35, 3 m of near-vertical earth, the HillWest camera looks straight at it from the ditch): faced with a dry-stone retaining wall of two
-            // courses (T19e/f upright, 1.5 m each), ivy on a third of it, moss and damp at its foot, grass overhanging its top, ferns and rocks along the foot
+            // the shelf's west scarp (x -35, 3 m of near-vertical earth, the HillWest camera looks straight at it from the ditch): T09b, a rough dry-stone revetment of scanned forest
+            // rocks (T20d-h) in three staggered tiers pressed into the earth face (the single course of T19e/f blocks read as black beams and the face behind them as a brown plane),
+            // ivy on a third of it, moss and damp at its foot, grass overhanging its top, ferns and rocks along the foot
             Transform sw = Sub(g, "ScarpWall");
             float baseY = TY(new Vector2(-35.9f, 25f)) - 0.05f;
+            string[] fr = { "T20d", "T20e", "T20f", "T20g", "T20h", "T20d", "T20g" };
             int ci = 0;
             for (float z = 19.3f; z < 31.6f; z += 2.15f, ci++)
             {
-                if (H(ci, 1, 1450) < 0.07f) continue;   // one length has fallen
-                {
-                    // one course (two read as T-beams in the first frame: the 2 m deep blocks overhang when stacked)
-                    Vector2 p = new Vector2(-35.55f + (H(ci, 2, 1450) - 0.5f) * 0.15f, z + (H(ci, 5, 1450) - 0.5f) * 0.2f);
-                    PutWall(sw, (ci % 2 == 0) ? "T19e" : "T19f", "ScarpWall_" + ci, p, 90f + (H(ci, 8, 1450) - 0.5f) * 3f, 0.5f, 0.75f, 1f, (H(ci, 9, 1450) - 0.5f) * 2f, 0.08f, baseY);
-                }
-                Vector2 q = new Vector2(-36.5f, z + 1f);
-                if (ci % 3 == 1) Put(sw, "T12c", "ScarpIvy_" + ci, new Vector2(-36.1f, z + 1f), baseY + 0.1f, 2.6f, 270f, 0f, 0f, 0.05f);
+                for (int tier = 0; tier < 4; tier++)
+                    for (int k = 0; k < 2; k++)
+                    {
+                        float zz = z + k * 1.07f + (H(ci * 2 + k, tier, 1450) - 0.5f) * 0.5f + (tier % 2) * 0.5f;
+                        float level = baseY + 0.45f + tier * 0.95f + (H(ci * 2 + k, tier + 5, 1450) - 0.5f) * 0.25f;
+                        float fx = float.NaN;
+                        for (float x = -41f; x < -30f; x += 0.1f) if (TY(new Vector2(x, zz)) >= level) { fx = x; break; }
+                        if (float.IsNaN(fx)) continue;
+                        if (H(ci * 2 + k, tier + 9, 1450) < 0.06f) continue;   // a gap where a stone has fallen
+                        Vector2 p = new Vector2(fx - 0.25f, zz);
+                        GameObject r = PutNat(sw, fr[(ci * 3 + k * 2 + tier) % fr.Length], "ScarpRock_" + ci + "_" + k + "_" + tier, p, level - 0.7f, Mathf.Lerp(0.7f, 1.0f, H(ci * 2 + k, tier + 13, 1450)), H(ci * 2 + k, tier + 17, 1450) * 360f, (H(ci, k, 1453) - 0.5f) * 8f, (H(ci, tier, 1454) - 0.5f) * 8f, 0.1f);
+                        if (r != null) Count("scarpRocks");
+                    }
+                if (ci % 2 == 1) Put(sw, "T12c", "ScarpIvy_" + ci, new Vector2(-36.1f, z + 1f), baseY + 1.1f, 2.8f, 270f, 0f, 0f, 0.05f);
                 if (ci % 2 == 0) PutNat(sw, ci % 4 == 0 ? "T21l" : "T12b", "ScarpFern_" + ci, new Vector2(-36.9f + H(ci, 11, 1450) * 0.6f, z + 0.3f + H(ci, 12, 1450)), baseY + 0.05f, 1.1f, H(ci, 13, 1450) * 360f, 0f, 0f, 0.03f);
-                if (ci % 2 == 1) PutNat(sw, rocks[(ci * 3) % rocks.Length], "ScarpFootRock_" + ci, new Vector2(-37.1f, z + 0.6f), TY(new Vector2(-37.1f, z + 0.6f)), 0.55f, H(ci, 14, 1450) * 360f, 0f, 0f, 0.12f);
+                if (ci % 2 == 1) PutSlope(sw, rocks[(ci * 3) % rocks.Length], "ScarpFootRock_" + ci, new Vector2(-37.1f, z + 0.6f), 0.4f, H(ci, 14, 1450) * 360f, 0f, 0f, 0.4f);
                 DecalT(dec, ci % 2 == 0 ? "Moss" : "Damp", new Vector2(-36.6f, z + 1f), 2.6f, 3.4f, 90f, "ScarpDecal_" + ci);
                 WeedT(flora, new Vector2(-35.2f, z + 0.5f), 1451, ci, 0.9f, 1.5f);
                 WeedT(flora, new Vector2(-37.0f, z + 1.5f), 1452, ci, 0.8f, 1.3f);
@@ -460,7 +530,48 @@ namespace SleepingCalamity.EditorTools
                 if (OkBank(p, 0.4f)) PutNat(g, i % 2 == 0 ? "T20o" : "T20q", "CragBranch_" + i, p, TY(p), 1f, H(i, 11, 1500) * 360f, 0f, 0f, 0.08f);
             }
             for (int i = 0; i < 4; i++)
-                DecalT(dec, i % 2 == 0 ? "MossSoft" : "Damp", new Vector2(Mathf.Lerp(-18f, 18f, (i + 0.4f) / 4f), 34.0f), 4.0f, 3.2f, H(i, 12, 1500) * 360f, "CragDecal_" + i);
+                DecalT(dec, "Damp", new Vector2(Mathf.Lerp(-18f, 18f, (i + 0.4f) / 4f), 34.0f), 4.0f, 3.2f, H(i, 12, 1500) * 360f, "CragDecal_" + i);
+
+            // T09b: the slope reads as hillside, not a dirt ramp. (1) A ring of ferns and grass at the foot of every outcrop the Wild builder set on the face (the downslope side first),
+            // (2) a fern-and-grass band over the bare earth between them, (3) roots and fallen branches lying on the slope, (4) a scree skirt at the foot, (5) a few big moss/damp decals.
+            Transform slope = Sub(g, "Slope");
+            int ring = 0;
+            foreach (Transform o in setRoot.GetComponentsInChildren<Transform>(false))
+            {
+                if (o.name != "Outcrop") continue;
+                Vector2 c = new Vector2(o.position.x, o.position.z);
+                if (Mathf.Abs(c.x) > 31f || c.y < 31f || c.y > 46f) continue;
+                Bounds rb = Render(o.gameObject); float rad = Mathf.Min(3.4f, Mathf.Max(rb.extents.x, rb.extents.z) * 0.75f);
+                for (int k = 0; k < 5; k++)
+                {
+                    float a = (-100f + 22f * k + (H(ring, k, 1510) - 0.5f) * 40f) * Mathf.Deg2Rad;   // mostly the south (downslope) half of the rock
+                    Vector2 q = c + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (rad + 0.15f + 0.5f * H(ring, k, 1511));
+                    if (!OkBank(q, 0.1f)) continue;
+                    if (k % 2 == 0) PutNat(slope, k % 4 == 0 ? "T21l" : "T12b", "RockFern_" + ring + "_" + k, q, TY(q), Mathf.Lerp(0.7f, 1.2f, H(ring, k, 1512)), H(ring, k, 1513) * 360f, 0f, 0f, 0.04f);
+                    else WeedT(flora, q, 1514, ring * 5 + k, 1.0f, 1.8f);
+                }
+                ring++;
+            }
+            for (int i = 0; i < 210; i++)
+            {
+                Vector2 p = new Vector2(Mathf.Lerp(-28f, 28f, H(i, 20, 1520)), Mathf.Lerp(33.3f, 46f, Mathf.Pow(H(i, 21, 1520), 0.8f)));
+                if (!OkBank(p, 0.1f)) continue;
+                if (i % 5 == 0) PutNat(slope, i % 10 == 0 ? "T21l" : "T12b", "SlopeFern_" + i, p, TY(p), Mathf.Lerp(1.0f, 1.6f, H(i, 22, 1520)), H(i, 23, 1520) * 360f, 0f, 0f, 0.04f);
+                else WeedT(flora, p, 1521, i, 1.6f, 2.8f);
+            }
+            for (int i = 0; i < 14; i++)
+            {
+                Vector2 p = new Vector2(Mathf.Lerp(-22f, 22f, (i + H(i, 24, 1520)) / 14f), Mathf.Lerp(34f, 41f, H(i, 25, 1520)));
+                if (OkBank(p, 0.4f)) PutNat(slope, i % 3 == 0 ? "T20p" : i % 3 == 1 ? "T20o" : "T20q", "SlopeRoot_" + i, p, TY(p), 1f, H(i, 26, 1520) * 360f, 0f, 0f, 0.12f);
+            }
+            string[] sc = { "T20i", "T20g", "T20h" };
+            for (int i = 0; i < 26; i++)
+            {
+                Vector2 p = new Vector2(Mathf.Lerp(-23f, 23f, H(i, 27, 1520)), 33.3f + 2.0f * H(i, 28, 1520));
+                if (OkBank(p, 0.3f)) PutSlopeDim(slope, sc[i % sc.Length], "ScreeStone_" + i, p, Mathf.Lerp(0.3f, 0.75f, H(i, 29, 1520)), H(i, 30, 1520) * 360f, (H(i, 31, 1520) - 0.5f) * 20f, (H(i, 32, 1520) - 0.5f) * 20f, 0.35f);
+            }
+            for (int i = 0; i < 8; i++)
+                DecalT(dec, i % 4 == 0 ? "Damp" : i % 4 == 1 ? "LeavesA" : i % 4 == 2 ? "Damp" : "LeavesB", new Vector2(Mathf.Lerp(-22f, 22f, (i + 0.5f) / 8f), 36f + 5f * H(i, 34, 1520)), 5.0f, 4.6f, H(i, 33, 1520) * 360f, "SlopeDecal_" + i);
         }
     }
 }

@@ -237,6 +237,7 @@ namespace SleepingCalamity.EditorTools
                             // in the shade, with litter patches; the crag keeps more earth.
                             float cragFace = wood * (1f - Smooth(HollowmereLayout.CragHeight - 1f, HollowmereLayout.CragHeight + 4f, hill));
                             soil = Mathf.Max(soil, wood * (0.10f + 0.30f * Smooth(0.45f, 0.8f, litter)) + 0.35f * cragFace);
+                            soil = Mathf.Max(soil, 0.5f * wood * HollowmereOrchard.BellCrag(x, z));   // T09b: the crag face behind the bell yard and churchyard is earth and grass in even parts (R12: stretched cobble chevrons); the carpet and objects dress it
                             path = Mathf.Max(path, wood * 0.10f * Smooth(0.55f, 0.85f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
                         }
                         float shoreStone = 0f, bankStone = 0f, bankW = 0f, shoreSoil = 0f;
@@ -275,6 +276,7 @@ namespace SleepingCalamity.EditorTools
                         rock *= 1f - ow;                                   // T08: no cobble outside the wall
                         rock *= 1f - 0.85f * Smooth(0.2f, 3f, hill);   // Bell Hill (28-34 degrees all over) is not a rubble bank: the cobble layer stretched there read as tiles
                         rock = Mathf.Max(rock, shoreStone);              // T08b: shingle at the waterline (the cobble layer's grey rubble flecks)
+                        rock *= 1f - HollowmereOrchard.BellCrag(x, z);   // T09b: no stretched cobble on the bell crag
                         // T09: the keep terrace's flanking banks (45-60 degrees) are earth and grass with moss, not the stretched cobble layer (it read as a dark streaked plane)
                         float kb = HollowmereOrchard.KeepBank(x, z);
                         if (kb > 0f)

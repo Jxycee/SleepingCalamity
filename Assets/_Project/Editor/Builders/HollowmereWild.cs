@@ -237,9 +237,14 @@ namespace SleepingCalamity.EditorTools
                 if (!Clear(x, z, 1.0f, 0f, steepLimit: 89f, colliders: false)) continue;
                 GameObject rock = rocks[(int)(Hash01(i, 34, 303) * rocks.Length) % rocks.Length];
                 if (rock == null) break;
-                float h = Mathf.Lerp(2.2f, 5f, Hash01(i, 35, 303) * Hash01(i, 36, 303) + 0.1f);
-                var go = Instance(parent, rock, new Vector3(x, GroundY(x, z) - 0.42f * h, z), RockScale(rock, h), 0f);
-                go.transform.rotation = Quaternion.Euler((Hash01(i, 37, 303) - 0.5f) * 24f, Hash01(i, 38, 303) * 360f, (Hash01(i, 39, 303) - 0.5f) * 24f);   // T09: uniform scale and gentler tilt (the shear turned scanned boulders into wings)
+                float h = Mathf.Lerp(1.3f, 4.6f, Hash01(i, 35, 303) * Hash01(i, 36, 303) + 0.1f);   // T09b: smaller ones mixed in (was 2.2-5 m)
+                // T09b: a rock lying level on a 50 degree face reads as a card with a hard cast shadow. Sink it a third to a half of its height along the slope normal (mostly the
+                // slope's own normal, a little of up), align it to that, add a small random tilt.
+                Vector3 n = Vector3.Slerp(Vector3.up, GroundN(x, z), 0.85f);
+                float sink = Mathf.Lerp(0.33f, 0.5f, Hash01(i, 40, 303));
+                float sc = Mathf.Min(RockScale(rock, h), 5.2f / Mathf.Max(0.5f, Mathf.Max(PrefabBounds(rock).size.x, PrefabBounds(rock).size.z)));   // no 8 m slab (the lime-topped one in R12)
+                var go = Instance(parent, rock, new Vector3(x, GroundY(x, z), z) - n * (sink * h), sc, 0f);
+                go.transform.rotation = Quaternion.FromToRotation(Vector3.up, n) * Quaternion.Euler((Hash01(i, 37, 303) - 0.5f) * 14f, Hash01(i, 38, 303) * 360f, (Hash01(i, 39, 303) - 0.5f) * 14f);   // T09: uniform scale (the shear turned scanned boulders into wings)
                 go.name = "Outcrop";
                 nRocks++;
             }
@@ -433,6 +438,11 @@ namespace SleepingCalamity.EditorTools
             return go;
         }
 
+        static Vector3 GroundN(float x, float z)
+        {
+            Vector3 o = terrain.transform.position, sz = terrain.terrainData.size;
+            return terrain.terrainData.GetInterpolatedNormal((x - o.x) / sz.x, (z - o.z) / sz.z);
+        }
         static float GroundY(float x, float z) => terrain.SampleHeight(new Vector3(x, 0f, z)) + terrain.transform.position.y;
 
         // The top of whatever is built at (x, z) near the expected height (paving slab, terrace floor), else the terrain.

@@ -85,15 +85,18 @@ namespace SleepingCalamity.EditorTools
             Material oak = wear != null ? HollowmereArt.Tinted("HM_HatchOak", "oak_timber", new Color(0.62f, 0.46f, 0.30f), wear) : M("label");
             Material iron = wear != null ? HollowmereArt.Flat("HM_HatchIron", new Color(0.03f, 0.03f, 0.035f), 0.35f, wear) : M("label");
             Material stone = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_KT_Rubble.mat") ?? oak;
-            LookTestBuilder.Prim(entrance, "Trapdoor", PrimitiveType.Cube, new Vector3(0f, 0.05f, 0f), new Vector3(1.5f, 0.1f, 1.1f), oak);
-            for (int i = -1; i <= 1; i += 2) LookTestBuilder.Prim(entrance, "TrapdoorPlankGap" + (i < 0 ? "A" : "B"), PrimitiveType.Cube, new Vector3(i * 0.25f, 0.104f, 0f), new Vector3(0.025f, 0.012f, 1.1f), iron);
-            for (int i = -1; i <= 1; i += 2) LookTestBuilder.Prim(entrance, "TrapdoorStrap" + (i < 0 ? "A" : "B"), PrimitiveType.Cube, new Vector3(0f, 0.108f, i * 0.34f), new Vector3(1.5f, 0.012f, 0.07f), iron);
-            LookTestBuilder.Prim(entrance, "TrapdoorFrameN", PrimitiveType.Cube, new Vector3(0f, 0.06f, 0.7f), new Vector3(1.95f, 0.12f, 0.2f), stone);
-            LookTestBuilder.Prim(entrance, "TrapdoorFrameS", PrimitiveType.Cube, new Vector3(0f, 0.06f, -0.7f), new Vector3(1.95f, 0.12f, 0.2f), stone);
-            LookTestBuilder.Prim(entrance, "TrapdoorFrameE", PrimitiveType.Cube, new Vector3(0.87f, 0.06f, 0f), new Vector3(0.2f, 0.12f, 1.2f), stone);
-            LookTestBuilder.Prim(entrance, "TrapdoorFrameW", PrimitiveType.Cube, new Vector3(-0.87f, 0.06f, 0f), new Vector3(0.2f, 0.12f, 1.2f), stone);
-            LookTestBuilder.Prim(entrance, "TrapdoorRing", PrimitiveType.Cylinder, new Vector3(0f, 0.115f, 0.25f), new Vector3(0.24f, 0.012f, 0.24f), iron);
-            LookTestBuilder.Prim(entrance, "TrapdoorRingBoss", PrimitiveType.Cylinder, new Vector3(0f, 0.125f, 0.25f), new Vector3(0.09f, 0.012f, 0.09f), iron);
+            // T09b: 1.45 x wider and 1.8 x higher (from the bell yard camera 9 m away the 1.5 x 1.1 m flat hatch did not read); still visual only.
+            const float K = 1.45f, Y = 1.8f;
+            Vector3 P(float x, float y, float z) => new Vector3(x * K, y * Y, z * K);
+            LookTestBuilder.Prim(entrance, "Trapdoor", PrimitiveType.Cube, P(0f, 0.05f, 0f), new Vector3(1.5f * K, 0.1f * Y, 1.1f * K), oak);
+            for (int i = -1; i <= 1; i += 2) LookTestBuilder.Prim(entrance, "TrapdoorPlankGap" + (i < 0 ? "A" : "B"), PrimitiveType.Cube, P(i * 0.25f, 0.104f, 0f), new Vector3(0.03f, 0.016f, 1.1f * K), iron);
+            for (int i = -1; i <= 1; i += 2) LookTestBuilder.Prim(entrance, "TrapdoorStrap" + (i < 0 ? "A" : "B"), PrimitiveType.Cube, P(0f, 0.108f, i * 0.34f), new Vector3(1.5f * K, 0.016f, 0.09f), iron);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameN", PrimitiveType.Cube, P(0f, 0.06f, 0.7f), new Vector3(1.95f * K, 0.12f * Y, 0.28f), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameS", PrimitiveType.Cube, P(0f, 0.06f, -0.7f), new Vector3(1.95f * K, 0.12f * Y, 0.28f), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameE", PrimitiveType.Cube, P(0.87f, 0.06f, 0f), new Vector3(0.28f, 0.12f * Y, 1.2f * K), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameW", PrimitiveType.Cube, P(-0.87f, 0.06f, 0f), new Vector3(0.28f, 0.12f * Y, 1.2f * K), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorRing", PrimitiveType.Cylinder, P(0f, 0.115f, 0.25f), new Vector3(0.34f, 0.016f, 0.34f), iron);
+            LookTestBuilder.Prim(entrance, "TrapdoorRingBoss", PrimitiveType.Cylinder, P(0f, 0.125f, 0.25f), new Vector3(0.13f, 0.016f, 0.13f), iron);
             foreach (Collider c in entrance.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
         }
 

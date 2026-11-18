@@ -101,7 +101,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Eye_Postcard", new Vector3(0f, 1.65f, -19.5f), new Vector3(0f, 4.5f, 20f), 60f),       // Market Street mouth looking north: fountain, north row, terrace wall, church and tower (H1)
             ("Cap_HM_Eye_West", new Vector3(5f, 1.65f, -1f), new Vector3(-30f, 2.2f, -7f), 60f),            // from the fountain west over the ruined row and the West Lane mouth
             ("Cap_HM_Eye_Climb", new Vector3(22.5f, 1.65f, 8.5f), new Vector3(16.5f, 5.5f, 22f), 60f),      // Keep Lane toward the east stair, the terrace wall and the tower: the walk to the dive
-            ("Cap_HM_Eye_BellYard", new Vector3(17f, 1.65f, 28.7f), new Vector3(2f, 5.4f, 29.2f), 60f),     // the keep walk looking west at the tower door, the trapdoor and the hill bank
+            ("Cap_HM_Eye_BellYard", new Vector3(14.2f, 1.65f, 28.4f), new Vector3(2.5f, 2.6f, 29.7f), 60f),     // the keep walk looking west at the hatch and its dive kit, the tower door and the hill bank (T09b: 2.8 m closer, aimed lower, was (17, 1.65, 28.7) -> (2, 5.4, 29.2))
             ("Cap_HM_Eye_Balcony", new Vector3(-2.25f, 1.65f, 20.7f), new Vector3(-1f, 0f, -30f), 60f),     // (between two parapet planters: one stands at x 0) the terrace edge over the whole square and Market Street to the south sky
             ("Cap_HM_Eye_Lake", new Vector3(-21.5f, 1.65f, -73f), new Vector3(6f, -9f, -100f), 60f),        // outside the Lower Gate, down the bank over the lake to the far shore
             // Area 1 world build (Run 7): the rest of the 20-camera eye set (docs/design/area1-world-build.md section 2) and two high views. For the cameras in EyeRelTarget the

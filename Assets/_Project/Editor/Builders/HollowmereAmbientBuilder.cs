@@ -246,28 +246,39 @@ namespace SleepingCalamity.EditorTools
             {
                 float x = HollowmereLayout.LakeCentre.X + o.x, z = HollowmereLayout.LakeCentre.Z + o.y;
                 if (HollowmereLayout.Ground(t, x, z) > HollowmereLayout.WaterY - 0.8f) continue;   // only over real depth
-                var go = new GameObject("Rings_" + (int)o.x); go.transform.SetParent(grp, false);
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(ParticlePrefab("Assets/_Project/Content/Prefabs/Hollowmere/HM_FishRing.prefab", () => MakeRing(mat, 301)), grp);
+                go.name = "Rings_" + (int)o.x;
                 go.transform.position = new Vector3(x, HollowmereLayout.WaterY + 0.04f, z);
-                var ps = go.AddComponent<ParticleSystem>();
-                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                var main = ps.main;
-                main.duration = 10f; main.loop = true; main.prewarm = true; main.startLifetime = 3.4f; main.startSpeed = 0f;
-                main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 0.9f); main.startRotation = 0f;
-                main.startColor = new Color(1f, 1f, 1f, 1f); main.simulationSpace = ParticleSystemSimulationSpace.World;
-                main.maxParticles = 8; main.gravityModifier = 0f;
-                var em = ps.emission; em.rateOverTime = HollowmereAmbientLife.FishRingRate;
-                var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(14f, 0f, 6f);
-                var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.25f), new Keyframe(1f, 2.2f)));
-                var col = ps.colorOverLifetime; col.enabled = true;
-                var g = new Gradient();
-                g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) }, new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(0f, 1f) });
-                col.color = g;
-                ps.useAutoRandomSeed = false; ps.randomSeed = (uint)seed++;
-                var r = go.GetComponent<ParticleSystemRenderer>();
-                r.sharedMaterial = mat; r.renderMode = ParticleSystemRenderMode.HorizontalBillboard;
-                r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+                var rps = go.GetComponent<ParticleSystem>();
+                rps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                rps.randomSeed = (uint)seed++;
             }
         }
+
+        static GameObject MakeRing(Material mat, int seed)
+        {
+            var go = new GameObject("HM_FishRing");
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.duration = 10f; main.loop = true; main.prewarm = true; main.startLifetime = 3.4f; main.startSpeed = 0f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 0.9f); main.startRotation = 0f;
+            main.startColor = new Color(1f, 1f, 1f, 1f); main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 8; main.gravityModifier = 0f;
+            var em = ps.emission; em.rateOverTime = HollowmereAmbientLife.FishRingRate;
+            var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(14f, 0f, 6f);
+            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.25f), new Keyframe(1f, 2.2f)));
+            var col = ps.colorOverLifetime; col.enabled = true;
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) }, new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(0f, 1f) });
+            col.color = g;
+            ps.useAutoRandomSeed = false; ps.randomSeed = (uint)seed;
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = mat; r.renderMode = ParticleSystemRenderMode.HorizontalBillboard;
+            r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+            return go;
+        }
+
 
         // ---------------------------------------------------------------------------------------------------------------- reed sway
         static void BuildReedSway(Transform life, Transform root)
@@ -387,10 +398,47 @@ namespace SleepingCalamity.EditorTools
 
         static Bounds Grow(Bounds a, Bounds b) { a.Encapsulate(b); return a; }
 
+        // T09b scene diet: the 40 chimney plumes were 52 KB of particle YAML each (2.1 MB of the scene file). One prefab holds the plume; each scene object is an instance with its own
+        // position and random seed. The prefab is created once (delete it to regenerate after changing the plume settings) and committed, so builds stay byte-identical.
+        // One saved particle prefab per kind (created once from `make`, then reused and committed): the fish rings and pollen volumes were 50 KB of YAML each too.
+        internal static GameObject ParticlePrefab(string path, System.Func<GameObject> make)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null) return existing;
+            BuilderUtil.EnsureFolder("Assets/_Project/Content/Prefabs/Hollowmere");
+            GameObject tmp = make();
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(tmp, path);
+            Object.DestroyImmediate(tmp);
+            return saved;
+        }
+
+        const string SmokePrefabPath = "Assets/_Project/Content/Prefabs/Hollowmere/HM_SmokePlume.prefab";
+
+        static GameObject SmokePrefab(Material mat)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(SmokePrefabPath);
+            if (existing != null) return existing;
+            BuilderUtil.EnsureFolder("Assets/_Project/Content/Prefabs/Hollowmere");
+            GameObject tmp = MakePlume("HM_SmokePlume", mat, 401);
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(tmp, SmokePrefabPath);
+            Object.DestroyImmediate(tmp);
+            return saved;
+        }
+
         static void Plume(Transform parent, string name, Vector3 top, Material mat, int seed)
         {
-            var go = new GameObject(name); go.transform.SetParent(parent, false);
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(SmokePrefab(mat), parent);
+            go.name = name;
             go.transform.position = top + Vector3.up * 0.15f; go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);   // cone axis (+Z) points up
+            var inst = go.GetComponent<ParticleSystem>();
+            inst.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            inst.randomSeed = (uint)seed;
+        }
+
+        static GameObject MakePlume(string name, Material mat, int seed)
+        {
+            var go = new GameObject(name);
+            go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
@@ -418,6 +466,7 @@ namespace SleepingCalamity.EditorTools
             var r = go.GetComponent<ParticleSystemRenderer>();
             r.sharedMaterial = mat; r.renderMode = ParticleSystemRenderMode.Billboard;
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+            return go;
         }
 
         // ---------------------------------------------------------------------------------------------------------------- particle assets

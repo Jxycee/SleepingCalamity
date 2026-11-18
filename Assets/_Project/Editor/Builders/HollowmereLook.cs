@@ -231,23 +231,37 @@ namespace SleepingCalamity.EditorTools
             }
         }
 
-        // The corner's pollen (BeautyCornerBuilder.BuildPollen): soft additive dots below eye height, fixed seed; the box and rate fit the spot.
+        // T09b scene diet: one pollen prefab, each spot an instance with its own box, rate, particle cap and seed (six 50 KB particle systems became six small overrides).
         static void Pollen(Transform parent, string name, Vector3 pos, Vector3 box, float rate, Material mat, int seed)
         {
-            var go = new GameObject("Pollen_" + name); go.transform.SetParent(parent, false); go.transform.position = pos;
+            GameObject pf = HollowmereAmbientBuilder.ParticlePrefab("Assets/_Project/Content/Prefabs/Hollowmere/HM_Pollen.prefab", () => MakePollen(mat));
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent); go.name = "Pollen_" + name; go.transform.position = pos;
+            var ps = go.GetComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            ParticleSystem.MainModule main = ps.main; main.maxParticles = Mathf.CeilToInt(rate * 14f);
+            ParticleSystem.EmissionModule em = ps.emission; em.rateOverTime = rate;
+            ParticleSystem.ShapeModule shape = ps.shape; shape.scale = box;
+            ps.randomSeed = (uint)seed;
+        }
+
+        // The corner's pollen (BeautyCornerBuilder.BuildPollen): soft additive dots below eye height, fixed seed; the box and rate fit the spot (set per instance).
+        static GameObject MakePollen(Material mat)
+        {
+            var go = new GameObject("HM_Pollen");
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             ParticleSystem.MainModule main = ps.main;
             main.duration = 12f; main.loop = true; main.prewarm = true; main.startLifetime = 14f; main.startSpeed = 0.05f;
             main.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.055f); main.startColor = new Color(1f, 0.93f, 0.72f, 0.75f);
-            main.simulationSpace = ParticleSystemSimulationSpace.World; main.maxParticles = Mathf.CeilToInt(rate * 14f); main.gravityModifier = 0f;
-            ParticleSystem.EmissionModule em = ps.emission; em.rateOverTime = rate;
-            ParticleSystem.ShapeModule shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = box;
+            main.simulationSpace = ParticleSystemSimulationSpace.World; main.maxParticles = 200; main.gravityModifier = 0f;
+            ParticleSystem.EmissionModule em = ps.emission; em.rateOverTime = 14f;
+            ParticleSystem.ShapeModule shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(10f, 1.5f, 10f);
             ParticleSystem.NoiseModule noise = ps.noise; noise.enabled = true; noise.strength = 0.12f; noise.frequency = 0.25f; noise.scrollSpeed = 0.1f;
-            ps.useAutoRandomSeed = false; ps.randomSeed = (uint)seed;
+            ps.useAutoRandomSeed = false; ps.randomSeed = 11;
             var r = go.GetComponent<ParticleSystemRenderer>();
             r.sharedMaterial = mat; r.renderMode = ParticleSystemRenderMode.Billboard;
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+            return go;
         }
 
         // The town profile: a copy of the corner's (so later corner grade fixes carry over) with the town's exposure, contrast, saturation and white balance.
