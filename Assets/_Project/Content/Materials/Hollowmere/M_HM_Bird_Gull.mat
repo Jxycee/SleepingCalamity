@@ -26,11 +26,14 @@ Material:
     m_Ints: []
     m_Floats:
     - _Belly: 0.8
+    - _Dihedral: 0.22
+    - _FadeFar: 30
+    - _FadeNear: 10
     - _FlapAmp: 0.3
     - _FlapSpeed: 7
     - _Fold: 0
     m_Colors:
-    - _Color: {r: 0.8, g: 0.81, b: 0.8, a: 1}
+    - _Color: {r: 0.62, g: 0.63, b: 0.64, a: 1}
     - _TipColor: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -62,7 +62,7 @@ namespace SleepingCalamity.EditorTools
             diveHub.AddComponent<DiveHub>().Configure(entrance.transform, origin.transform, landing.transform);
 
             // Look separation: the cellar's own global volume (weight 0 until AreaLook is under the town) beside the town's.
-            Volume town = Object.FindFirstObjectByType<Volume>();
+            Volume town = LookTestBuilder.GlobalVolume();
             DungeonCornerBuilder.BuildProfile();
             var cellarGo = new GameObject("PostFX_Cellar"); cellarGo.transform.SetParent(lighting, false);
             Volume cellar = cellarGo.AddComponent<Volume>(); cellar.isGlobal = true; cellar.priority = 1f; cellar.weight = 0f;

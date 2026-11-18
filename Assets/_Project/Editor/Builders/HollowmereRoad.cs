@@ -434,23 +434,23 @@ namespace SleepingCalamity.EditorTools
             RoadRibbon(ring, t);
             // the mid hill ridge and the far ridge: annuli rising out of the ring's edge (their feet tucked under the layer in front)
             // Area 1 rework: both ridges roughly doubled (peak 45 -> 95, 150 -> 290) so the valley has walls: they stood 2-4 degrees over the horizon, a flat line from the square.
-            Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 256, 95f, 105f, 12f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
-            Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 256, 290f, 200f, 30f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
+            Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 768, 95f, 105f, 12f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
+            Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 768, 290f, 200f, 30f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
             HollowmereBackdrop.Build(ring);   // A12/C3: ragged ridge layers, the Mawrrow mountain, a ruined windmill, a far lighthouse (HollowmereBackdrop.cs)
         }
 
         // The three haze layers (SleepingCalamity/Backdrop): haze at DistNear, haze at DistFar, the distances, the tint on the fog colour.
         struct Haze
         {
-            public float Near, Far, D0, D1, Mist, Noise, NoiseLit, CoolAmt; public Color Tint, Cool;
-            public Haze(float n, float f, float d0, float d1, Color tint, float mist, float noise, float noiseLit, Color cool, float coolAmt) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; Mist = mist; Noise = noise; NoiseLit = noiseLit; Cool = cool; CoolAmt = coolAmt; }
+            public float Near, Far, D0, D1, Mist, Noise, NoiseLit, CoolAmt, Patch; public Color Tint, Cool;   // Patch (T11): the shader's world-XZ patchwork strength
+            public Haze(float n, float f, float d0, float d1, Color tint, float mist, float noise, float noiseLit, Color cool, float coolAmt) { Near = n; Far = f; D0 = d0; D1 = d1; Tint = tint; Mist = mist; Noise = noise; NoiseLit = noiseLit; Cool = cool; CoolAmt = coolAmt; Patch = 0f; }
         }
         // Value steps near < mid < far at midday and at low sun (haze 0.6 / 0.75 / 0.87 at the crests); at low sun the layers also step in hue: trees warm-green, mid hills a cool grey-blue,
         // the far ridge a blue-violet (Cool is luminance-normalised in the shader, so cooling changes hue, not value).
         static readonly Haze NearHaze = new Haze(0.56f, 0.76f, 150f, 700f, new Color(0.97f, 1.0f, 0.93f), 0.10f, 0.05f, 0.03f, new Color(0.95f, 1.0f, 1.05f), 0.25f);     // the ring trees: the nearest silhouette layer
         static readonly Haze GroundHaze = new Haze(0.88f, 0.78f, 150f, 700f, Color.white, 0.03f, 0.08f, 0.05f, new Color(0.9f, 0.97f, 1.1f), 0.35f);   // the ring ground: matches the scene fog at the terrain edge (no seam); full fog at the terrain edge (no seam), easing to the hills-foot haze by 700 m so the far ground no longer sits pale against the dark hills (that was the flat cyan strip behind the tree line)
-        static readonly Haze MidHaze = new Haze(0.66f, 0.68f, 560f, 1500f, new Color(0.98f, 1.0f, 1.03f), 0.22f, 0.12f, 0.06f, new Color(0.70f, 0.88f, 1.30f), 0.5f);   // area 1 rework round 2: a little less haze and cooling, more noise (the doubled ridge read as one flat lavender band)       // foot mist (up to +0.15) takes it to the ground's haze, thinning toward the crest
-        static readonly Haze FarHaze = new Haze(0.80f, 0.88f, 1400f, 2700f, new Color(0.97f, 1.0f, 1.05f), 0.06f, 0.05f, 0.03f, new Color(0.70f, 0.86f, 1.28f), 0.7f);   // area 1 rework round 3: the doubled far ridge read as a flat lavender band from the square: less violet (cool 1.0 -> 0.7, bluer-grey), a touch less haze, more noise
+        static readonly Haze MidHaze = new Haze(0.46f, 0.70f, 560f, 1500f, new Color(0.96f, 0.99f, 1.04f), 0.22f, 0.12f, 0.06f, new Color(0.70f, 0.88f, 1.30f), 0.5f) { Patch = 0.6f };   // T11: haze now steps 0.56 -> 0.74 and the tint turns bluer with distance (it was one flat 0.66-0.68 band, "painted hills"); the patchwork breaks the one green   // area 1 rework round 2: a little less haze and cooling, more noise (the doubled ridge read as one flat lavender band)       // foot mist (up to +0.15) takes it to the ground's haze, thinning toward the crest
+        static readonly Haze FarHaze = new Haze(0.80f, 0.88f, 1400f, 2700f, new Color(0.92f, 0.98f, 1.07f), 0.06f, 0.05f, 0.03f, new Color(0.70f, 0.86f, 1.28f), 0.7f) { Patch = 0.3f };   // T11: bluer tint, a lighter patchwork   // area 1 rework round 3: the doubled far ridge read as a flat lavender band from the square: less violet (cool 1.0 -> 0.7, bluer-grey), a touch less haze, more noise
 
         static Material Backdrop(string name, Texture2D tex, Color tint, Haze h, bool cards)
         {
@@ -464,7 +464,7 @@ namespace SleepingCalamity.EditorTools
             m.SetFloat("_GroundMist", h.Mist); m.SetFloat("_MistTop", -8f); m.SetFloat("_MistScale", 30f);   // smooth exp foot mist; subtle on the hills (an earlier hard ramp read as a pale water band)
             m.SetFloat("_NoiseAmp", h.Noise); m.SetFloat("_NoiseLit", h.NoiseLit);
             m.SetColor("_ShadowTint", new Color(0.30f, 0.38f, 0.48f)); m.SetColor("_HazeCool", h.Cool); m.SetFloat("_HazeCoolAmt", h.CoolAmt);
-            m.SetFloat("_AlphaClip", cards ? 1f : 0f); m.SetFloat("_Cutoff", 0.5f);
+            m.SetFloat("_Patch", h.Patch); m.SetFloat("_AlphaClip", cards ? 1f : 0f); m.SetFloat("_Cutoff", 0.5f);
             if (cards) m.EnableKeyword("_ALPHATEST_ON"); else m.DisableKeyword("_ALPHATEST_ON");
             m.SetFloat("_Cull", (float)(cards ? CullMode.Off : CullMode.Back));
             m.enableInstancing = true;
@@ -486,6 +486,8 @@ namespace SleepingCalamity.EditorTools
                     float a = i * 2f * Mathf.PI / segs, ca = Mathf.Cos(a), sa = Mathf.Sin(a);
                     float x = c.X + r * ca, z = c.Z + r * sa;
                     float top = peak + spread * Mathf.PerlinNoise(ca * 2.2f + 11f + r0 * 0.001f, sa * 2.2f + 7f) + 0.35f * spread * Mathf.PerlinNoise(ca * 7f + 3f, sa * 7f + r0 * 0.002f);
+                    // T11: a tree line along the crest: scalloped lumps (tree groups, about 6 m) and a finer fringe, so the ridge is not a smooth drawn curve
+                    top += (6f * (Mathf.PerlinNoise(ca * 90f + r0 * 0.003f, sa * 90f + 5f) - 0.5f) + 2.5f * (Mathf.PerlinNoise(ca * 200f + 2f, sa * 200f + r0 * 0.002f) - 0.5f)) * (r0 > 1000f ? 2.2f : 1f);
                     float foot = RingHeight(c.X + r0 * ca, c.Z + r0 * sa) - 3f;
                     float y = r <= rPeak ? Mathf.Lerp(foot, top, Smooth(r0, rPeak, r)) : Mathf.Lerp(top, top * 0.65f, Smooth(rPeak, r1, r));
                     y += lump * (Mathf.PerlinNoise(x * 0.0045f + 5f, z * 0.0045f + 9f) - 0.5f) * Smooth(r0, r0 + 120f, r);

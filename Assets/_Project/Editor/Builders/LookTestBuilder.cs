@@ -316,6 +316,14 @@ namespace SleepingCalamity.EditorTools
             return cam;
         }
 
+        /// <summary>The scene's global post volume (T11: Hollowmere also has local zone Volumes, so "the first Volume" is no longer the grade).</summary>
+        internal static Volume GlobalVolume()
+        {
+            Volume[] all = Object.FindObjectsByType<Volume>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (Volume v in all) if (v.isGlobal) return v;
+            return all.Length > 0 ? all[0] : null;
+        }
+
         internal static void AddVolume(Transform parent, string profileName)
         {
             var go = new GameObject("PostFX"); go.transform.SetParent(parent, false);

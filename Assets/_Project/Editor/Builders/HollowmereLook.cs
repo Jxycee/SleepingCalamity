@@ -128,7 +128,7 @@ namespace SleepingCalamity.EditorTools
             }
             bool day = preset == BeautyCornerBuilder.Preset.Midday;
             VolumeProfile profile = EnsureProfile(day ? DayProfileName : LowSunProfileName, day ? BeautyCornerBuilder.ProfileName : BeautyCornerBuilder.LowSunProfileName, look);
-            Volume post = Object.FindFirstObjectByType<Volume>();
+            Volume post = LookTestBuilder.GlobalVolume();
             if (post != null) post.sharedProfile = profile;
             RenderSettings.skybox = EnsureSky(day ? "M_HM_Sky_Midday" : "M_HM_Sky_LowSun", day ? "M_BC_Sky_Midday" : "M_BC_Sky_LowSun", look);
             RenderSettings.fogColor = look.FogColor; RenderSettings.fogDensity = look.FogDensity;
@@ -163,7 +163,7 @@ namespace SleepingCalamity.EditorTools
             if (look.FogColor.maxColorComponent > 0f) RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, look.FogColor, 0.5f);
             RenderSettings.ambientIntensity = look.Ambient;
             var corner = AssetDatabase.LoadAssetAtPath<VolumeProfile>(LookTestBuilder.RenderingFolder + "/" + BeautyCornerBuilder.MorningProfileName + ".asset");
-            Volume post = Object.FindFirstObjectByType<Volume>();
+            Volume post = LookTestBuilder.GlobalVolume();
             if (corner != null && post != null)
             {
                 bool graded = corner.TryGet(out ColorAdjustments cornerGrade);
@@ -232,7 +232,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // T09b scene diet: one pollen prefab, each spot an instance with its own box, rate, particle cap and seed (six 50 KB particle systems became six small overrides).
-        static void Pollen(Transform parent, string name, Vector3 pos, Vector3 box, float rate, Material mat, int seed)
+        internal static void Pollen(Transform parent, string name, Vector3 pos, Vector3 box, float rate, Material mat, int seed)
         {
             GameObject pf = HollowmereAmbientBuilder.ParticlePrefab("Assets/_Project/Content/Prefabs/Hollowmere/HM_Pollen.prefab", () => MakePollen(mat));
             var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent); go.name = "Pollen_" + name; go.transform.position = pos;

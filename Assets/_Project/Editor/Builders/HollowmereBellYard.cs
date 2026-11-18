@@ -240,16 +240,10 @@ namespace SleepingCalamity.EditorTools
             if (bz != null)
             {
                 Bounds fb = Render(bz);
-                Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
-                if (unlit != null)
-                {
-                    Material fm = LookTestBuilder.Ensure(MatFolder + "/M_HM_BrazierFlame.mat", unlit); fm.SetColor("_BaseColor", new Color(1.0f, 0.52f, 0.14f)); EditorUtility.SetDirty(fm);
-                    GameObject flame = LookTestBuilder.Prim(g, "BrazierFlame", PrimitiveType.Sphere, new Vector3(fb.center.x, fb.max.y - 0.04f, fb.center.z), new Vector3(0.46f, 0.68f, 0.46f), fm);
-                    foreach (Collider fc in flame.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(fc);
-                    flame.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                }
+                // T11: R12 "orange blob on brazier": the flame was an unlit orange sphere. Now a prefab instance of layered additive flame cards, ember sparks and a smoke thread (HollowmereAmbientBuilder.BuildFlame).
+                HollowmereAmbientBuilder.BuildFlame(g, new Vector3(fb.center.x, fb.max.y - 0.12f, fb.center.z));
             }
-            if (bz != null) { Bounds b = Render(bz); AddLight(lights, "BrazierWarm", new Vector3(b.center.x, b.max.y + 0.15f, b.center.z), new Color(1.0f, 0.62f, 0.30f), 16f, 13f); }
+            if (bz != null) { Bounds b = Render(bz); Light bl = AddLight(lights, "BrazierWarm", new Vector3(b.center.x, b.max.y + 0.15f, b.center.z), new Color(1.0f, 0.62f, 0.30f), 16f, 13f); var fl = bl.gameObject.AddComponent<SleepingCalamity.Presentation.AmbientFlicker>(); fl.Base = 16f; fl.Amount = 0.2f; }   // T11: flicker on the point light
             Decal(dec, "Soot", brazier + new Vector2(0f, -0.2f), 1.8f, 1.8f, 30f, "Soot_Brazier");
             // the wall of the church behind the hatch: ferns, a mossy stone
             // cobbles: moss, grime and leaves at the joints and along the lawn edge (few, large decals)

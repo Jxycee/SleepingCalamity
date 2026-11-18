@@ -26,6 +26,9 @@ Material:
     m_Ints: []
     m_Floats:
     - _Belly: 1.3
+    - _Dihedral: 0.22
+    - _FadeFar: 26
+    - _FadeNear: 8
     - _FlapAmp: 0.4
     - _FlapSpeed: 26
     - _Fold: 0

@@ -19,7 +19,7 @@ namespace SleepingCalamity.EditorTools
     public static class HollowmereBackdropTuning
     {
         public static bool Ridges = true, Mountain = true, Wisp = true, Windmill = true, Lighthouse = true;
-        public static float MountainAzDeg = -118f, MountainDist = 2600f, MountainHeight = 700f;   // area 1 rework: 560 -> 700 with the taller ranges (900 read as a pale spike, not a slumped massif);   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180); the far ridges hide its lower 7 degrees
+        public static float MountainAzDeg = -118f, MountainDist = 2500f, MountainHeight = 700f;   // area 1 rework: 560 -> 700 with the taller ranges (900 read as a pale spike, not a slumped massif);   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180); the far ridges hide its lower 7 degrees
         public static float WindmillAzDeg = -62f, LighthouseAzDeg = 186f, WindmillScale = 2.0f, LighthouseScale = 1.8f;
         public static float WispAlpha = 0.07f;
     }
@@ -101,6 +101,8 @@ namespace SleepingCalamity.EditorTools
             float k = 0f;
             if (layer == 0 && HollowmereBackdropTuning.Windmill) k += Gauss(a, Rad(HollowmereBackdropTuning.WindmillAzDeg), 0.03f) * 18f;
             if (layer == 1 && HollowmereBackdropTuning.Lighthouse) k += Gauss(a, Rad(HollowmereBackdropTuning.LighthouseAzDeg), 0.022f) * 20f;
+            // T11: the far range swells toward the Mawrrow massif (about 90 m over 8 degrees each side), so the mountain rises out of a continuous ridge instead of standing on a thin pale band
+            if (layer == 2 && HollowmereBackdropTuning.Mountain) k += Gauss(a, Rad(HollowmereBackdropTuning.MountainAzDeg), 0.15f) * 90f;
             return k;
         }
         static float Gauss(float a, float c, float s) { float d = Mathf.Atan2(Mathf.Sin(a - c), Mathf.Cos(a - c)) / s; return Mathf.Exp(-d * d); }
@@ -138,7 +140,10 @@ namespace SleepingCalamity.EditorTools
                     int a = j * w + i, b = a + 1, d = a + w, e = d + 1;
                     idx.AddRange(new[] { a, e, d, a, b, e });
                 }
-            Material m = Mat("M_BD_" + L.Name, L.Tint, L.HazeNear, L.HazeFar, L.D0, L.D1, L.Mist, L.Cool, L.CoolAmt);
+            // T11 aerial perspective: each layer one step bluer and paler than the one in front (haze tint turns from green-white to blue), and a world-XZ patchwork breaks the one flat green
+            Color[] tints = { new Color(0.98f, 1.0f, 1.02f), new Color(0.94f, 0.99f, 1.05f), new Color(0.91f, 0.98f, 1.08f) };
+            float[] patches = { 0.8f, 0.6f, 0.3f };
+            Material m = Mat("M_BD_" + L.Name, L.Tint, L.HazeNear, L.HazeFar, L.D0, L.D1, L.Mist, L.Cool, L.CoolAmt, patch: patches[li], hazeTint: tints[li]);
             float hi = L.Base + L.Big;
             MakeObject(parent, L.Name, v, idx, m, null, (p, n) =>
             {
@@ -160,30 +165,31 @@ namespace SleepingCalamity.EditorTools
             float cx = c.X + HollowmereBackdropTuning.MountainDist * Mathf.Cos(az), cz = c.Z + HollowmereBackdropTuning.MountainDist * Mathf.Sin(az);
             // local axes: radial (away from the town) and tangential (along the horizon)
             Vector2 rad = new Vector2(Mathf.Cos(az), Mathf.Sin(az)), tan = new Vector2(-rad.y, rad.x);
-            const int N = 128; const float Half = 700f;
+            const int N = 144; const float Half = 700f, Widen = 1.3f;   // T11: Widen stretches the massif along the horizon (the old one stood as a lone crag)
             float[] hs = new float[(N + 1) * (N + 1)];
             var v = new List<Vector3>();
             float best = 0f;
             for (int j = 0; j <= N; j++)
                 for (int i = 0; i <= N; i++)
                 {
-                    float lt = (i / (float)N * 2f - 1f) * Half, lr = (j / (float)N * 2f - 1f) * Half;   // tangential, radial offsets from the centre
+                    float lt = (i / (float)N * 2f - 1f) * Half * Widen, lr = (j / (float)N * 2f - 1f) * Half;   // tangential, radial offsets from the centre (lt is the widened frame: Bump/Spur are evaluated in lt / Widen)
+                    float ltS = lt / Widen;
                     // two summits along the horizon (the long slumped body): a tall one and a lower shoulder, an elliptical footprint (wide along the horizon)
-                    float h = H * Bump(lt, lr, 150f, 0f, 430f, 260f) + 0.58f * H * Bump(lt, lr, -300f, 40f, 360f, 240f);
+                    float h = H * Bump(ltS, lr, 150f, 0f, 430f, 260f) + 0.58f * H * Bump(ltS, lr, -300f, 40f, 360f, 240f);
                     float x = cx + tan.x * lt + rad.x * lr, z = cz + tan.y * lt + rad.y * lr;
                     float ridged = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.004f + 2f, z * 0.004f + 8f) * 2f - 1f);
                     h *= 0.72f + 0.45f * ridged + 0.06f * (Mathf.PerlinNoise(x * 0.02f, z * 0.02f) - 0.5f);
                     // A12 r1 (town-art-leftovers): the 0.045 term made a row of summit "teeth" (a crown); gone. One dominant crag on the tall summit instead.
                     h *= 1f + 0.16f * (Mathf.PerlinNoise(x * 0.012f + 31f, z * 0.012f + 7f) - 0.5f);
-                    h += H * 0.07f * Mathf.Exp(-(((lt - 150f) * (lt - 150f)) + lr * lr) / (2f * 55f * 55f)) * (h > 0f ? 1f : 0f);
+                    h += H * 0.07f * Mathf.Exp(-(((ltS - 150f) * (ltS - 150f)) + lr * lr) / (2f * 55f * 55f)) * (h > 0f ? 1f : 0f);
                     // radial erosion: spurs and gullies fan out from the summit, strongest at mid-slope; +/-7.5% of local height
-                    if (h > 0f) h *= 1f + 0.15f * (Spur(lt, lr) - 0.5f) * SpurFade(lt, lr);
+                    if (h > 0f) h *= 1f + 0.15f * (Spur(ltS, lr) - 0.5f) * SpurFade(ltS, lr);
                     // A12 r3 (town-art-leftovers): the eroded spurs read as smooth draped cloth. One fine ridged-noise crag octave (feature ~60 m, amplitude 2.5% of local height,
                     // x(0.8..1.4) from gully to spur crest, faded out at the foot under the mist) breaks the faces into rock planes. Grid, winding, silhouette scale and materials unchanged.
                     if (h > 0f)
                     {
                         float crag = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.0165f + 57f, z * 0.0165f + 13f) * 2f - 1f);
-                        h *= 1f + 0.05f * (crag - 0.5f) * (0.8f + 0.6f * Spur(lt, lr)) * Smooth(0.04f, 0.28f, h / H);
+                        h *= 1f + 0.05f * (crag - 0.5f) * (0.8f + 0.6f * Spur(ltS, lr)) * Smooth(0.04f, 0.28f, h / H);
                     }
                     hs[j * (N + 1) + i] = h;
                     if (h > best) { best = h; mountainPeak = new Vector3(x, h - 30f, z); }
@@ -199,7 +205,9 @@ namespace SleepingCalamity.EditorTools
                 }
             // A12 r2 (town-art-leftovers): ROOT CAUSE of the flat dark mountain was inverted winding (downward normals, no key light). With it fixed the mountain is backlit (sun south-east, camera looks south): wide wrap, key x2.6, fill x2, light haze 0.15-0.25 (30% less on the upper 60%) give spurs a p10-p90 spread of 0.3 at a mean 0.34 (mist band 0.57). A12 r2b (controller): the 0.15-0.25 haze and warm tint read as a near clay model at 2.6 km; neutral cool rock, haze 0.32-0.42 and key x2.0 put it back behind the aerial perspective (Friedrich blue-grey distance).
             // Area 1 rework round 4: cool 1.3 -> 1.0 and key boost 2.0 -> 1.4, fill boost 2 -> 1.5: under the town's stronger Morning sun the massif read as a pale pink spike, not a dark slumped mountain.
-            Material m = Mat("M_BD_Mawrrow", new Color(0.35f, 0.345f, 0.36f), 0.32f, 0.42f, 2000f, 3000f, 0.04f, 1.0f, 0.8f, 1.0f, 0.10f, 1.4f, 1f, 0.30f, H - 30f, 1.5f);
+            // T11 (Balcony "grey jagged shape floating top right"): the massif was LESS hazed (0.32-0.42) than the far range in front of it (0.84-0.90) and warm-lit, so it read as a pale pink crag pasted on the sky.
+            // Now it sits one step beyond the range: the range's haze and blue tint (a little less haze up the face keeps the form), cooler rock, softer key, and the far range swells toward it (Knoll layer 2).
+            Material m = Mat("M_BD_Mawrrow", new Color(0.20f, 0.22f, 0.26f), 0.52f, 0.70f, 2000f, 3000f, 0.04f, 1.0f, 0.8f, 1.0f, 0.10f, 1.1f, 1f, 0.22f, H - 30f, 1.5f, patch: 0f, hazeTint: new Color(0.91f, 0.98f, 1.07f));
             MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
             {
                 float y = p.y + 30f;
@@ -208,7 +216,7 @@ namespace SleepingCalamity.EditorTools
                 float fleck = Mathf.PerlinNoise(p.x * 0.05f, p.z * 0.05f) - 0.5f;
                 // light-independent form term (no sun bake: the shader lights it): spur crests x1.13, gully floors x0.75, from the same spur function as the geometry
                 Vector2 d = new Vector2(p.x - cx, p.z - cz);
-                float lt = Vector2.Dot(d, tan), lr = Vector2.Dot(d, rad);
+                float lt = Vector2.Dot(d, tan) / Widen, lr = Vector2.Dot(d, rad);
                 float form = Mathf.Lerp(1f, Mathf.Lerp(0.75f, 1.13f, Spur(lt, lr)), Mathf.Lerp(0.5f, 1f, SpurFade(lt, lr)));
                 float k = Mathf.Lerp(0.80f, 1.05f, up) * (0.90f + 0.10f * strata) * (1f + 0.18f * fleck) * form;
                 // volcanic ash on the summit (pale, cool), warmer brown-grey on the lower slopes
@@ -422,7 +430,7 @@ namespace SleepingCalamity.EditorTools
         // A SleepingCalamity/Backdrop material (same property set as HollowmereRoad.Backdrop; no texture, a flat tint).
         // A12 r1 (town-art-leftovers): the trailing key/fill args default to the shader's old behaviour, so ridges, cards and road are unchanged; always written so a regenerated .mat is never stale.
         static Material Mat(string name, Color tint, float hazeNear, float hazeFar, float d0, float d1, float mist, float cool, float coolAmt,
-            float keyWrap = 0.7f, float keyBias = 0.15f, float keyBoost = 1f, float skyFillDir = 0f, float hazeTop = 0f, float hazeTopHeight = 0f, float fillBoost = 1f)
+            float keyWrap = 0.7f, float keyBias = 0.15f, float keyBoost = 1f, float skyFillDir = 0f, float hazeTop = 0f, float hazeTopHeight = 0f, float fillBoost = 1f, float patch = 0f, Color? hazeTint = null)
         {
             Shader sh = Shader.Find("SleepingCalamity/Backdrop") ?? Shader.Find("Universal Render Pipeline/Lit");
             BuilderUtil.EnsureFolder(MaterialsFolder);
@@ -430,7 +438,7 @@ namespace SleepingCalamity.EditorTools
             m.SetTexture("_BaseMap", Texture2D.whiteTexture);
             m.SetColor("_BaseColor", tint);
             m.SetFloat("_HazeNear", hazeNear); m.SetFloat("_HazeFar", hazeFar); m.SetFloat("_DistNear", d0); m.SetFloat("_DistFar", d1);
-            m.SetColor("_HazeTint", new Color(0.98f, 1.0f, 1.03f));
+            m.SetColor("_HazeTint", hazeTint ?? new Color(0.98f, 1.0f, 1.03f)); m.SetFloat("_Patch", patch);
             m.SetFloat("_GroundMist", mist); m.SetFloat("_MistTop", -8f); m.SetFloat("_MistScale", 40f);
             m.SetFloat("_NoiseAmp", 0.04f); m.SetFloat("_NoiseLit", 0.03f);
             m.SetColor("_ShadowTint", new Color(0.30f, 0.38f, 0.48f));

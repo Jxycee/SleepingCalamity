@@ -31,6 +31,8 @@ Shader "SleepingCalamity/Backdrop"
         _FillBoost ("Sky fill multiplier (shade side of a tall mass)", Range(0, 8)) = 1
         _HazeTop ("Haze reduction at the top of a tall mass (0 = off)", Range(0, 1)) = 0
         _HazeTopHeight ("Height (world y) where that reduction is full (0 = off)", Float) = 0
+        // T11: world-XZ colour patchwork (dark wood patches, sunlit field patches, fine tree grain) so a hill band is not one flat painted green. 0 = off (the old look).
+        _Patch ("Patchwork strength (0 = off)", Range(0, 1)) = 0
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha clip", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
@@ -55,6 +57,7 @@ Shader "SleepingCalamity/Backdrop"
             half _HazeCoolAmt;
             half _KeyWrap, _KeyBias, _KeyBoost, _SkyFillDir, _FillBoost, _HazeTop;
             float _HazeTopHeight;
+            half _Patch;
             half _AlphaClip, _Cull;
         CBUFFER_END
         ENDHLSL
@@ -103,6 +106,20 @@ Shader "SleepingCalamity/Backdrop"
                 clip(c.a - _Cutoff);
                 #endif
                 c.rgb *= i.color.rgb;
+                half3 patchFinal = half3(1, 1, 1);
+                if (_Patch > 0.0)   // T11: wood and field patches (about 260 m, 120 m) and a fine grain (about 18 m) from the world position, so a ridge reads as land, not paint
+                {
+                    float2 q = i.positionWS.xz;
+                    float f1 = VNoise(q / 260.0 + 3.0) * 0.6 + VNoise(q / 70.0 + 9.0) * 0.4;
+                    float f3 = VNoise(q / 18.0 + 21.0);
+                    float wood = smoothstep(0.46, 0.58, f1);
+                    float field = smoothstep(0.55, 0.68, VNoise(q / 120.0 + 40.0)) * (1.0 - wood);
+                    half3 pc = lerp(half3(1, 1, 1), half3(0.72, 0.82, 0.68), wood);
+                    pc = lerp(pc, half3(1.18, 1.14, 0.84), field);
+                    pc *= 1.0 + (f3 - 0.5) * 0.55;
+                    c.rgb *= lerp(half3(1, 1, 1), pc, _Patch);
+                    patchFinal = lerp(half3(1, 1, 1), pc, _Patch * 0.35);   // and again on the hazed result, or the haze (0.6-0.9) washes the patches out
+                }
                 float3 n = normalize(i.normalWS);
                 n = IS_FRONT_VFACE(face, n, -n);
                 Light l = GetMainLight();
@@ -136,7 +153,7 @@ Shader "SleepingCalamity/Backdrop"
                     half3 dbg = _SC_BackdropDebug < 1.5 ? c.rgb : _SC_BackdropDebug < 2.5 ? l.color * sun : _SC_BackdropDebug < 3.5 ? fill : _SC_BackdropDebug < 4.5 ? n * 0.5 + 0.5 : _SC_BackdropDebug < 5.5 ? h.xxx : lit;
                     return half4(dbg, 1.0);
                 }
-                return half4(lerp(lit, haze, h), 1.0);
+                return half4(lerp(lit, haze, h) * patchFinal, 1.0);
             }
             ENDHLSL
         }

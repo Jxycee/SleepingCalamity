@@ -278,8 +278,8 @@ namespace SleepingCalamity.EditorTools
                 LookTestBuilder.AddCapture(cams, c.Name, new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z), c.Target, c.Fov).farClipPlane = HollowmereRoad.FarClip;
             if (HollowmereOrchard.AllotmentCam is var ac && ac.HasValue) LookTestBuilder.AddCapture(cams, "Cap_HM_Eye_Allotment", ac.Value.Pos, ac.Value.Target, 60f).farClipPlane = 400f;   // T07b: D8 from the lane side of R2_18's plot
             HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
-            HollowmereAmbientBuilder.BakeAvoid(root);   // cards kept clear of every capture camera
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Morning);   // B3: the B0 Morning light; the corner's light with the town-scale haze, sky and grade (Q12)
+            HollowmereZones.Build(root, t);   // T11: local light-zone Volumes, fills, mist, shafts and motes (after Look.Apply: it reads the Morning grade; before the hub, whose Volume lookup skips local volumes)
             BuildHub(root, lighting, t);   // M6 S3: gameplay camera, spawn point, the cistern-stair DiveHub, the area look switcher (after Look.Apply: it finds the town's one Volume) and the TownView
             ApplyPreset(Preset.Ruined);
             GeneratedMeshes.Externalize(scene, "Hollowmere");   // T03 scene diet: generated meshes become assets instead of hex text in the scene file

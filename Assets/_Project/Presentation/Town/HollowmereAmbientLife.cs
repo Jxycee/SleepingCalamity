@@ -29,7 +29,7 @@ namespace SleepingCalamity.Presentation
         public const float AloftSeconds = 28f;             // how long a lifted flock wheels before it settles again
         public const float FlockCullDistance = 260f;       // a flock further than this from the camera is not animated
 
-        public const float BirdScale = 2.3f;               // wingspan multiplier for every bird card (cards, no models: they must read at distance)
+        public const float BirdScale = 1.8f;               // wingspan multiplier for every bird card (T11: 2.3 -> 1.8, a gull card was a 2.8 m grey sheet; cards, no models: they must read at distance)
         public const float ButterflySpan = 0.25f;          // metres wing to wing (0.15 was a speck at 10 m eye height; the cards are bright two-tone with a big flap so 0.25 reads at 5-15 m)
         public const float BeeSpan = 0.12f;
         public const float ButterflyHover = 0.35f;         // m of slow vertical loop on top of the wander (bobbing flutter)

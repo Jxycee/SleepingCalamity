@@ -29,7 +29,7 @@ namespace SleepingCalamity.EditorTools
         const string MeshPath = TexFolder + "/AmbientCard.asset";
         static readonly string[] GardenLots = { "R2_07", "R2_18", "R2_22", "R3_02" };
 
-        static Mesh _card; static Material _crow, _swallow, _gull, _butterfly, _butterflyYellow, _butterflyOrange, _bee;
+        static Mesh _card; static Material _lark, _pigeon, _crow, _swallow, _gull, _butterfly, _butterflyYellow, _butterflyOrange, _bee;
         static Texture2D _smokeTex, _ringTex;
 
         public static void Build(Transform root, TownLayout t)
@@ -64,6 +64,10 @@ namespace SleepingCalamity.EditorTools
             common.Add(Circle("HomeCrows", life, _crow, new Vector3(2f, home, 14f), 3, 14f, 18f, 6f, 0.9f, 6.28f, 109));
             common.Add(Circle("ShoreGulls", life, _gull, new Vector3(-14f, HollowmereLayout.WaterY, -66f), 5, 16f, 9f, 6f, 1.2f, 6.28f, 110));
             common.Add(Circle("OverviewGulls", life, _gull, new Vector3(HollowmereLayout.LakeCentre.X + 6f, HollowmereLayout.WaterY, HollowmereLayout.LakeCentre.Z + 4f), 5, 22f, 20f, 6f, 1.2f, 6.28f, 111));
+            // T11 life per district: larks over the meadow and the road, pigeons on the square's wall tops
+            common.Add(Circle("MeadowLarks", life, _lark, new Vector3(-8f, HollowmereLayout.Ground(t, -8f, -76f), -76f), 3, 26f, 16f, 5f, 0.34f, 6.28f, 112));
+            common.Add(Circle("RoadLarks", life, _lark, new Vector3(-84f, HollowmereLayout.Ground(t, -84f, -87f), -87f), 2, 22f, 17f, 5f, 0.34f, 6.28f, 113));
+            AddRoofPigeons(common, life, ruined, t);
             Vector3 valley =new Vector3(-95f, HollowmereLayout.Ground(t, -95f, 20f), 20f);
             common.Add(Circle("ValleyCrows", life, _crow, valley, 8, 50f, 46f, 8f, 0.9f, 2.4f, 104));
 
@@ -79,6 +83,52 @@ namespace SleepingCalamity.EditorTools
                 var list = new List<AmbientCreatures.Flock> { Circle("RuinCrows", holder.transform, _crow, new Vector3(f03.Centre.X, f03.Y, f03.Centre.Z), 4, 8f, 12f, 5.5f, 0.9f, 6.28f, 107) };
                 Finish(holder, list);
             }
+        }
+
+        // T11: pigeons sitting on the tops of the square's tall shells (F03, F05, F06): wall tops found by rays from above onto the lot's own colliders, three birds per lot
+        // on three tops at least 3 m apart (one card each: every card is a GameObject, Transform and renderer in the 47 MB scene); they lift and wheel low over the square when the hero comes near, then settle again.
+        static void AddRoofPigeons(List<AmbientCreatures.Flock> list, Transform parent, Transform ruined, TownLayout t)
+        {
+            Transform lots = ruined != null ? ruined.Find("Foundations") : null;
+            if (lots == null) return;
+            Physics.SyncTransforms();
+            int seed = 114;
+            foreach (string id in new[] { "F03", "F05", "F06" })
+            {
+                Transform lot = null;
+                foreach (Transform c in lots) if (c.name.StartsWith(id + "_", System.StringComparison.Ordinal)) { lot = c; break; }
+                if (lot == null) continue;
+                Bounds? bb = null;
+                foreach (Renderer r in lot.GetComponentsInChildren<Renderer>(true)) { if (r is MeshRenderer) bb = bb.HasValue ? Grow(bb.Value, r.bounds) : r.bounds; }
+                if (!bb.HasValue) continue;
+                Bounds b = bb.Value;
+                var tops = new List<Vector3>();
+                for (float x = b.min.x + 0.5f; x < b.max.x; x += 1.1f)
+                    for (float z = b.min.z + 0.5f; z < b.max.z; z += 1.1f)
+                        foreach (RaycastHit h in Physics.RaycastAll(new Vector3(x, b.max.y + 3f, z), Vector3.down, b.size.y + 6f, ~0, QueryTriggerInteraction.Ignore))
+                        {
+                            if (!h.collider.transform.IsChildOf(lot) || h.normal.y < 0.7f || h.point.y < b.max.y - 1.8f) continue;
+                            tops.Add(h.point); break;
+                        }
+                var picked = new List<Vector3>();
+                foreach (Vector3 p in tops.OrderByDescending(p => p.y + 0.4f * SaltwakeRoadPlan.Hash01((int)(p.x * 9f + p.z * 31f), seed)))
+                {
+                    if (picked.Any(q => (new Vector2(p.x, p.z) - new Vector2(q.x, q.z)).magnitude < 3f)) continue;
+                    picked.Add(p);
+                    if (picked.Count >= 3) break;
+                }
+                foreach (Vector3 p in picked)
+                {
+                    var f = new AmbientCreatures.Flock
+                    {
+                        Name = "Pigeons_" + id + "_" + list.Count, Move = AmbientCreatures.Motion.Perch, Centre = new Vector3(p.x, p.y, p.z), Spread = 1.2f, Wingspan = 0.55f * HollowmereAmbientLife.BirdScale,
+                        AloftRadius = 14f, AloftHeight = 9f, Speed = 8f, Clump = 1.6f, Seed = seed++,
+                    };
+                    f.Cards = Cards(parent, f.Name, _pigeon, 1);
+                    list.Add(f);
+                }
+            }
+            Debug.Log("SC HOLLOWMERE ambient: " + list.Count(f => f.Name.StartsWith("Pigeons_")) + " pigeon roosts on the square's shells");
         }
 
         static AmbientCreatures.Flock Circle(string name, Transform parent, Material mat, Vector3 centre, int count, float radius, float height, float speed, float span, float clump, int seed)
@@ -190,17 +240,6 @@ namespace SleepingCalamity.EditorTools
             c.Pose(37f, 0f, false);   // a settled frame for edit-mode captures
         }
 
-        /// <summary>Called once every capture camera exists (round 3: the avoid list used the cameras' relative heights and missed the road and garden cameras): re-poses the baked cards clear of all of them.</summary>
-        public static void BakeAvoid(Transform root)
-        {
-            Transform cams = root.Find("CaptureCameras");
-            if (cams == null) return;
-            var pos = new List<Vector3>(); var dir = new List<Vector3>();
-            foreach (Camera cam in cams.GetComponentsInChildren<Camera>(true)) { pos.Add(cam.transform.position); dir.Add(cam.transform.forward); }
-            AmbientCreatures.BakedAvoid = pos.ToArray(); AmbientCreatures.BakedAvoidDir = dir.ToArray();
-            foreach (AmbientCreatures c in root.GetComponentsInChildren<AmbientCreatures>(true)) { c.Pose(37f, 0f, false); EditorUtility.SetDirty(c); }
-        }
-
         static Mesh EnsureCardMesh()
         {
             var m = AssetDatabase.LoadAssetAtPath<Mesh>(MeshPath);
@@ -215,19 +254,23 @@ namespace SleepingCalamity.EditorTools
         static void EnsureCardMaterials()
         {
             Shader sh = Shader.Find("SleepingCalamity/BirdCard") ?? throw new System.InvalidOperationException("Shader not found: SleepingCalamity/BirdCard");
-            _crow = CardMat("M_HM_Bird_Crow", sh, new Color(0.15f, 0.15f, 0.17f), 1.15f, 13f, 0.5f);
-            _swallow = CardMat("M_HM_Bird_Swallow", sh, new Color(0.17f, 0.18f, 0.23f), 1.3f, 26f, 0.4f);
-            _gull = CardMat("M_HM_Bird_Gull", sh, new Color(0.80f, 0.81f, 0.80f), 0.8f, 7f, 0.3f);
-            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(1.6f, 1.55f, 1.35f), 0.8f, 22f, 0.95f, new Color(0.35f, 0.5f, 1.1f, 1f));
-            _butterflyYellow = CardMat("M_HM_Butterfly_Yellow", sh, new Color(1.8f, 1.5f, 0.3f), 0.8f, 22f, 0.95f, new Color(0.9f, 0.35f, 0.08f, 1f));
-            _butterflyOrange = CardMat("M_HM_Butterfly_Orange", sh, new Color(1.8f, 0.8f, 0.12f), 0.8f, 22f, 0.95f, new Color(0.25f, 0.1f, 0.05f, 1f));
-            _bee = CardMat("M_HM_Bee", sh, new Color(0.55f, 0.36f, 0.05f), 1.0f, 140f, 0.3f, new Color(0.14f, 0.1f, 0.04f, 1f));
+            // T11: birds (cards of 1-3 m) fade out inside 8-26 m of any camera and carry a resting V; butterflies and bees (0.12-0.25 m) only inside 0.8-2.5 m
+            _lark = CardMat("M_HM_Bird_Lark", sh, new Color(0.34f, 0.29f, 0.22f), 1.1f, 20f, 0.45f, null, 0.2f, 8f, 26f);   // T11: small brown larks over the meadow and the road
+            _pigeon = CardMat("M_HM_Bird_Pigeon", sh, new Color(0.40f, 0.42f, 0.47f), 1.15f, 18f, 0.45f, new Color(0.22f, 0.23f, 0.27f, 1f), 0.18f, 5f, 16f);   // T11: roof pigeons, seen close, so they fade later than the high birds
+            _crow = CardMat("M_HM_Bird_Crow", sh, new Color(0.15f, 0.15f, 0.17f), 1.15f, 13f, 0.5f, null, 0.22f, 8f, 26f);
+            _swallow = CardMat("M_HM_Bird_Swallow", sh, new Color(0.17f, 0.18f, 0.23f), 1.3f, 26f, 0.4f, null, 0.22f, 8f, 26f);
+            _gull = CardMat("M_HM_Bird_Gull", sh, new Color(0.62f, 0.63f, 0.64f), 0.8f, 7f, 0.3f, null, 0.22f, 10f, 30f);   // greyer than before (0.80): a pale flat card read as a grey gull sticker
+            _butterfly = CardMat("M_HM_Butterfly", sh, new Color(1.6f, 1.55f, 1.35f), 0.8f, 22f, 0.95f, new Color(0.35f, 0.5f, 1.1f, 1f), 0.1f, 0.8f, 2.5f);
+            _butterflyYellow = CardMat("M_HM_Butterfly_Yellow", sh, new Color(1.8f, 1.5f, 0.3f), 0.8f, 22f, 0.95f, new Color(0.9f, 0.35f, 0.08f, 1f), 0.1f, 0.8f, 2.5f);
+            _butterflyOrange = CardMat("M_HM_Butterfly_Orange", sh, new Color(1.8f, 0.8f, 0.12f), 0.8f, 22f, 0.95f, new Color(0.25f, 0.1f, 0.05f, 1f), 0.1f, 0.8f, 2.5f);
+            _bee = CardMat("M_HM_Bee", sh, new Color(0.55f, 0.36f, 0.05f), 1.0f, 140f, 0.3f, new Color(0.14f, 0.1f, 0.04f, 1f), 0f, 0.5f, 1.5f);
         }
 
-        static Material CardMat(string name, Shader sh, Color c, float belly, float flapSpeed, float flapAmp, Color? tip = null)
+        static Material CardMat(string name, Shader sh, Color c, float belly, float flapSpeed, float flapAmp, Color? tip = null, float dihedral = 0.22f, float fadeNear = 8f, float fadeFar = 26f)
         {
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/" + name + ".mat", sh);
             m.SetColor("_Color", c); m.SetFloat("_Belly", belly); m.SetFloat("_FlapSpeed", flapSpeed); m.SetFloat("_FlapAmp", flapAmp); m.SetFloat("_Fold", 0f); m.SetColor("_TipColor", tip ?? new Color(0f, 0f, 0f, 0f));
+            m.SetFloat("_Dihedral", dihedral); m.SetFloat("_FadeNear", fadeNear); m.SetFloat("_FadeFar", fadeFar);
             m.enableInstancing = false;
             EditorUtility.SetDirty(m);
             return m;
@@ -469,6 +512,119 @@ namespace SleepingCalamity.EditorTools
             return go;
         }
 
+        // ---------------------------------------------------------------------------------------------------------------- flame (T11: the brazier)
+        const string FlamePrefabPath = "Assets/_Project/Content/Prefabs/Hollowmere/HM_BrazierFlame.prefab";
+
+        /// <summary>T11: a real flame in place of the orange sphere: a few dozen additive teardrop cards that rise, narrow and cool from yellow to red (noise-licked), ember sparks and a thin smoke thread, as one prefab instance. Cost: 3 particle systems, at most 28 + 16 + 12 particles.</summary>
+        public static GameObject BuildFlame(Transform parent, Vector3 pos)
+        {
+            EnsureParticleTextures();
+            Texture2D flameTex = FlameTexture();
+            Material flameMat = AdditiveMat("M_HM_Flame", flameTex, new Color(0.95f, 0.78f, 0.55f, 1f));
+            Material sparkMat = AdditiveMat("M_HM_Ember", _smokeTex, new Color(1.4f, 0.8f, 0.35f, 1f));
+            Material smokeMat = ParticleMat("M_HM_FlameSmoke", _smokeTex, new Color(0.35f, 0.33f, 0.32f, 0.16f));
+            GameObject pf = ParticlePrefab(FlamePrefabPath, () => MakeFlame(flameMat, sparkMat, smokeMat));
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
+            go.name = "BrazierFlame"; go.transform.position = pos;
+            foreach (ParticleSystem ps in go.GetComponentsInChildren<ParticleSystem>()) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            return go;
+        }
+
+        static GameObject MakeFlame(Material flameMat, Material sparkMat, Material smokeMat)
+        {
+            var root = new GameObject("HM_BrazierFlame");
+            root.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);   // cone axes (+Z) point up
+            // flame body: teardrop cards, screen-up, rising 0.55 m and narrowing to nothing
+            ParticleSystem flame = root.AddComponent<ParticleSystem>(); flame.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = flame.main;
+            main.duration = 4f; main.loop = true; main.prewarm = true; main.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 0.85f); main.startSpeed = new ParticleSystem.MinMaxCurve(0.45f, 0.8f);
+            main.startSize3D = true; main.startSizeX = new ParticleSystem.MinMaxCurve(0.26f, 0.4f); main.startSizeY = new ParticleSystem.MinMaxCurve(0.55f, 0.9f); main.startSizeZ = 1f;
+            main.startRotation = 0f; main.startColor = Color.white; main.simulationSpace = ParticleSystemSimulationSpace.World; main.maxParticles = 28; main.gravityModifier = 0f;
+            var em = flame.emission; em.rateOverTime = 16f;
+            var shape = flame.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 4f; shape.radius = 0.09f;
+            var sz = flame.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.75f), new Keyframe(0.25f, 1f), new Keyframe(1f, 0.12f)));
+            var col = flame.colorOverLifetime; col.enabled = true;
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.95f, 0.65f), 0f), new GradientColorKey(new Color(1f, 0.62f, 0.18f), 0.3f), new GradientColorKey(new Color(0.85f, 0.22f, 0.05f), 0.75f), new GradientColorKey(new Color(0.3f, 0.05f, 0.02f), 1f) },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.95f, 0.12f), new GradientAlphaKey(0.6f, 0.65f), new GradientAlphaKey(0f, 1f) });
+            col.color = g;
+            var noise = flame.noise; noise.enabled = true; noise.strength = 0.22f; noise.frequency = 1.6f; noise.scrollSpeed = 1.8f; noise.damping = true;
+            flame.useAutoRandomSeed = false; flame.randomSeed = 77u;
+            var fr = root.GetComponent<ParticleSystemRenderer>();
+            fr.sharedMaterial = flameMat; fr.renderMode = ParticleSystemRenderMode.Billboard; fr.shadowCastingMode = ShadowCastingMode.Off; fr.receiveShadows = false;
+
+            // sparks: tiny embers lifting off, drifting with the wind
+            var sparks = new GameObject("Embers"); sparks.transform.SetParent(root.transform, false);
+            ParticleSystem sp = sparks.AddComponent<ParticleSystem>(); sp.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var sm = sp.main;
+            sm.duration = 6f; sm.loop = true; sm.prewarm = true; sm.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.4f); sm.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 1.3f);
+            sm.startSize = new ParticleSystem.MinMaxCurve(0.018f, 0.04f); sm.startColor = Color.white; sm.simulationSpace = ParticleSystemSimulationSpace.World; sm.maxParticles = 16; sm.gravityModifier = -0.04f;
+            var se = sp.emission; se.rateOverTime = 5f;
+            var ss = sp.shape; ss.shapeType = ParticleSystemShapeType.Cone; ss.angle = 22f; ss.radius = 0.16f;
+            var sc = sp.colorOverLifetime; sc.enabled = true;
+            var sg = new Gradient();
+            sg.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.8f, 0.4f), 0f), new GradientColorKey(new Color(1f, 0.35f, 0.08f), 1f) }, new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.1f), new GradientAlphaKey(0f, 1f) });
+            sc.color = sg;
+            var sn = sp.noise; sn.enabled = true; sn.strength = 0.6f; sn.frequency = 0.8f; sn.scrollSpeed = 0.6f;
+            sp.useAutoRandomSeed = false; sp.randomSeed = 78u;
+            var sr = sparks.GetComponent<ParticleSystemRenderer>();
+            sr.sharedMaterial = sparkMat; sr.renderMode = ParticleSystemRenderMode.Billboard; sr.shadowCastingMode = ShadowCastingMode.Off; sr.receiveShadows = false;
+
+            // a thin smoke thread above the flame
+            var smoke = new GameObject("Smoke"); smoke.transform.SetParent(root.transform, false); smoke.transform.localPosition = new Vector3(0f, 0f, 0.5f);
+            ParticleSystem sk = smoke.AddComponent<ParticleSystem>(); sk.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var km = sk.main;
+            km.duration = 8f; km.loop = true; km.prewarm = true; km.startLifetime = new ParticleSystem.MinMaxCurve(3f, 4.5f); km.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 0.8f);
+            km.startSize = new ParticleSystem.MinMaxCurve(0.25f, 0.4f); km.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.28f); km.startColor = Color.white;
+            km.simulationSpace = ParticleSystemSimulationSpace.World; km.maxParticles = 12; km.gravityModifier = 0f;
+            var ke = sk.emission; ke.rateOverTime = 2.4f;
+            var ks = sk.shape; ks.shapeType = ParticleSystemShapeType.Cone; ks.angle = 6f; ks.radius = 0.1f;
+            var kz = sk.sizeOverLifetime; kz.enabled = true; kz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 4.5f)));
+            var kc = sk.colorOverLifetime; kc.enabled = true;
+            var kg = new Gradient();
+            kg.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) }, new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(0f, 1f) });
+            kc.color = kg;
+            var kn = sk.noise; kn.enabled = true; kn.strength = 0.3f; kn.frequency = 0.35f; kn.scrollSpeed = 0.2f;
+            sk.useAutoRandomSeed = false; sk.randomSeed = 79u;
+            var kr = smoke.GetComponent<ParticleSystemRenderer>();
+            kr.sharedMaterial = smokeMat; kr.renderMode = ParticleSystemRenderMode.Billboard; kr.shadowCastingMode = ShadowCastingMode.Off; kr.receiveShadows = false;
+            return root;
+        }
+
+        internal static Material AdditiveMat(string name, Texture2D tex, Color tint)
+        {
+            Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new System.InvalidOperationException("URP Particles/Unlit not found");
+            Material m = LookTestBuilder.Ensure(MaterialsFolder + "/" + name + ".mat", sh);
+            m.SetTexture("_BaseMap", tex); m.SetColor("_BaseColor", tint);
+            m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 2f); m.SetFloat("_SrcBlend", 5f); m.SetFloat("_DstBlend", 1f);   // Additive: SrcAlpha / One
+            m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 1f); m.SetFloat("_ZWrite", 0f);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.SetOverrideTag("RenderType", "Transparent"); m.renderQueue = 3000;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        // A teardrop flame card: wide at the foot, a pointed licking tip, soft edges; a value noise bends the outline so no two layers match.
+        static Texture2D FlameTexture()
+        {
+            const int R = 128;
+            var px = new Color32[R * R];
+            for (int j = 0; j < R; j++)
+                for (int i = 0; i < R; i++)
+                {
+                    float u = (i + 0.5f) / R, v = (j + 0.5f) / R;   // v = 0 at the foot
+                    float bend = (VN(u, v, 4, 21) - 0.5f) * 0.22f * v + (VN(u, v, 8, 22) - 0.5f) * 0.08f;
+                    float x = (u - 0.5f - bend) * 2f;
+                    float width = Mathf.Pow(Mathf.Clamp01(1f - v), 0.8f) * (0.35f + 0.65f * Mathf.Sin(Mathf.Clamp01(v * 3.2f) * 1.5708f)) * 0.9f;
+                    float d = Mathf.Abs(x) / Mathf.Max(0.02f, width);
+                    float a = Mathf.Clamp01(1f - d); a = a * a * (3f - 2f * a);
+                    a *= Mathf.Clamp01(v * 10f);   // soft base
+                    a *= Mathf.Lerp(0.8f, 1.15f, VN(u, v, 6, 23));
+                    byte b = (byte)Mathf.Clamp(Mathf.RoundToInt(a * 255f), 0, 255);
+                    px[j * R + i] = new Color32(255, 255, 255, b);
+                }
+            return ParticlePng(TexFolder + "/T_HM_Flame.png", R, px);
+        }
+
         // ---------------------------------------------------------------------------------------------------------------- particle assets
         static Material ParticleMat(string name, Texture2D tex, Color tint)
         {
@@ -503,7 +659,7 @@ namespace SleepingCalamity.EditorTools
             _ringTex = ParticlePng(TexFolder + "/T_HM_FishRing.png", R, ring);
         }
 
-        static Texture2D ParticlePng(string path, int res, Color32[] px)
+        internal static Texture2D ParticlePng(string path, int res, Color32[] px)
         {
             WritePng(path, res, px);
             var imp = (TextureImporter)AssetImporter.GetAtPath(path);

@@ -48,6 +48,7 @@ Material:
     - _MistTop: -8
     - _NoiseAmp: 0.04
     - _NoiseLit: 0.03
+    - _Patch: 0
     - _SkyFillDir: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}

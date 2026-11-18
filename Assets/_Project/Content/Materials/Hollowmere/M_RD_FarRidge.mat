@@ -48,11 +48,12 @@ Material:
     - _MistTop: -8
     - _NoiseAmp: 0.05
     - _NoiseLit: 0.03
+    - _Patch: 0.3
     - _SkyFillDir: 0
     m_Colors:
     - _BaseColor: {r: 0.22, g: 0.28, b: 0.27, a: 1}
     - _HazeCool: {r: 0.7, g: 0.86, b: 1.28, a: 1}
-    - _HazeTint: {r: 0.97, g: 1, b: 1.05, a: 1}
+    - _HazeTint: {r: 0.92, g: 0.98, b: 1.07, a: 1}
     - _ShadowTint: {r: 0.3, g: 0.38, b: 0.48, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

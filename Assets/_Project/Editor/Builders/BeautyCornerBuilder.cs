@@ -398,7 +398,7 @@ namespace SleepingCalamity.EditorTools
                     break;
                 default: throw new System.ArgumentOutOfRangeException(nameof(preset), preset, null);
             }
-            Volume post = Object.FindFirstObjectByType<Volume>();
+            Volume post = LookTestBuilder.GlobalVolume();
             string profile = preset == Preset.Midday ? ProfileName : preset == Preset.LowSun ? LowSunProfileName : preset == Preset.Morning ? MorningProfileName : EveningProfileName;
             if (post != null) post.sharedProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/_Project/Content/Rendering/" + profile + ".asset");
             GameObject fillGo = GameObject.Find("ShadeFill");
