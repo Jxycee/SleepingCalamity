@@ -133,6 +133,7 @@ namespace SleepingCalamity.EditorTools
 
         static void DecalT(Transform parent, string mat, Vector2 p, float w, float h, float yaw, string name)
         {
+            if (HollowmereDecalThin.Drop(name)) return;
             Material m = DM(mat); if (m == null) return;
             var go = new GameObject(name); go.transform.SetParent(parent, false);
             go.transform.SetPositionAndRotation(new Vector3(p.x, TY(p) + 1.2f, p.y), Quaternion.Euler(90f, yaw, 0f));

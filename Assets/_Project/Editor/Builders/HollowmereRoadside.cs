@@ -552,7 +552,7 @@ namespace SleepingCalamity.EditorTools
             for (int i = 0; i + 1 < wp.Length; i++)
             {
                 Vector2 a = wp[i], b = wp[i + 1]; Vector2 d = (b - a).normalized; float len = Vector2.Distance(a, b);
-                for (float s = 1.4f; s < len; s += 2.9f, pi++) DecalT(dec, "Mud", a + d * s, 3.6f, 1.5f, YawAlong(d), "WornPath_" + pi);
+                for (float s = 1.4f; s < len; s += 2.9f, pi++) DecalT(dec, "Mud", a + d * s, 5.4f, 1.5f, YawAlong(d), "WornPath_" + pi);
                 if (i == 1 || i == 2) { Vector2 q = (a + b) * 0.5f + Perp(d) * 1.4f; if (RsHillOk(q, 0.3f)) PutSlopeDim(g, "T20e", "PathStone_" + i, q, 0.9f, H(i, 1, 1740) * 360f, 0f, 0f, 0.4f); }
             }
             Vector2 end = wp[wp.Length - 1] + new Vector2(-0.5f, 1.2f);

@@ -282,7 +282,9 @@ namespace SleepingCalamity.EditorTools
             HollowmereZones.Build(root, t);   // T11: local light-zone Volumes, fills, mist, shafts and motes (after Look.Apply: it reads the Morning grade; before the hub, whose Volume lookup skips local volumes)
             BuildHub(root, lighting, t);   // M6 S3: gameplay camera, spawn point, the cistern-stair DiveHub, the area look switcher (after Look.Apply: it finds the town's one Volume) and the TownView
             ApplyPreset(Preset.Ruined);
+            HollowmereCombine.Apply(scene);   // T12 scene diet: small plain objects merged per parent and 12 m cell (before the meshes become assets)
             GeneratedMeshes.Externalize(scene, "Hollowmere");   // T03 scene diet: generated meshes become assets instead of hex text in the scene file
+            HollowmereLods.Apply(scene);   // T12: Mesh LOD levels inside the mesh assets (zero scene bytes), shadows off under 0.5 m
             BuilderUtil.SaveScene(scene, ScenePath);
             Debug.Log("SC HOLLOWMERE scene built " + ScenePath);
         }

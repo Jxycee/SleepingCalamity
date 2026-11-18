@@ -105,7 +105,7 @@ namespace SleepingCalamity.EditorTools
         static readonly Dictionary<string, int> counts = new Dictionary<string, int>();
         static readonly List<Vector2> eyeCams = new List<Vector2>();
         static readonly List<Vector2> trunkXZ = new List<Vector2>();
-        static int decals;
+        static int decals, thinned;
         static void Count(string k, int n = 1) { counts[k] = counts.TryGetValue(k, out int c) ? c + n : n; }
         static float H(int a, int b, int salt) => HollowmereStreets.H(a, b, salt);
 
@@ -267,6 +267,7 @@ namespace SleepingCalamity.EditorTools
 
         static void Decal(Transform parent, string mat, Vector2 p, float w, float h, float yaw, string name)
         {
+            if (HollowmereDecalThin.Drop(name)) { thinned++; return; }
             Material m = DM(mat); if (m == null) return;
             float y = Gy(p);
             var go = new GameObject(name); go.transform.SetParent(parent, false);
