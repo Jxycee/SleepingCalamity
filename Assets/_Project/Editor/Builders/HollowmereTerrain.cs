@@ -289,6 +289,8 @@ namespace SleepingCalamity.EditorTools
                         // T10: the hill flanks (x +-30..60, z 27..62) are woodland floor: the 50-70 degree faces read as one stretched brown plane, so soil and cobble thin out and grass carries them
                         float he = HollowmereOrchard.HillEdge(x, z);
                         if (he > 0f) { rock *= 1f - he; soil *= 1f - 0.6f * he; path = Mathf.Clamp01(path) * (1f - soil); grass = Mathf.Max(0f, 1f - soil - path); }
+                        float reg = HollowmereOrchard.RoadEndGrass(x, z);   // T10b: the ploughed field at the road end greens over (bare dirt around the blockage)
+                        if (reg > 0f) { soil *= 1f - 0.85f * reg; path = Mathf.Clamp01(path) * (1f - soil) * (1f - 0.5f * reg); grass = Mathf.Max(0f, 1f - soil - path); }
                         grass *= 1f - rock; soil *= 1f - rock; path *= 1f - rock; cobble = rock;
                     }
                     a[j, i, 0] = grass; a[j, i, 1] = soil; a[j, i, 2] = path; a[j, i, 3] = cobble;

@@ -68,7 +68,11 @@ namespace SleepingCalamity.EditorTools
             return hi >= lo ? 1f : -1f;
         }
 
-        static bool RsFree(Vector2 p, float rad) => HollowmereStreets.FreeOf(p, TY(p), rad) && !eyeCams.Any(c => Vector2.Distance(c, p) < 1.3f);
+        internal const float RsEyeClear = 4f;   // T10b: nothing the roadside places stands within 4 m of an eye camera (the RoadOut foreground slab, plank and stalks were 1.8-4.5 m away)
+        static bool RsFree(Vector2 p, float rad) => HollowmereStreets.FreeOf(p, TY(p), rad) && !eyeCams.Any(c => Vector2.Distance(c, p) < RsEyeClear);
+
+        // T10b: the soil around the road end greens over (the ploughed field's bare dirt): read by HollowmereTerrain
+        internal static float RoadEndGrass(float x, float z) { float d = Mathf.Sqrt((x + 122f) * (x + 122f) + (z + 97f) * (z + 97f)); return 1f - RsSm(12f, 34f, d); }
 
         // ------------------------------------------------------------------------------------------------ entry
         public static void BuildRoadside(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
@@ -85,6 +89,9 @@ namespace SleepingCalamity.EditorTools
             Block(Sub(props, "Block"), flora, dec, sBlock);
             Verge(Sub(props, "Verge"), flora, dec, sBlock);
             RoadProps(Sub(props, "RoadProps"), flora, dec, sBlock);
+            RoadEndCover(Sub(props, "EndCover"), flora, sBlock);
+            TreeBelt(Sub(props, "Belt"));
+            RuinFoot(ruined, flora);
             MoveMilestone(ruined);
             ShrineFlowers(ruined, Sub(props, "ShrineGifts"), flora);
             RebuiltBarrier(rebuilt, sBlock);
@@ -107,7 +114,7 @@ namespace SleepingCalamity.EditorTools
                     {
                         int key = Mathf.RoundToInt(i.X * 3f) * 131 + Mathf.RoundToInt(i.Z * 7f) + (row * 3 + k) * 17;
                         Vector2 p = c + axis * ((k - 1) * 1.45f + (row == 1 ? 0.7f : 0f) + (H(key, 1, 1600) - 0.5f) * 0.4f) + perp * ((row == 0 ? -0.45f : 0.45f) + (H(key, 2, 1600) - 0.5f) * 0.3f);
-                        if (eyeCams.Any(e => Vector2.Distance(e, p) < 1.3f)) continue;
+                        if (eyeCams.Any(e => Vector2.Distance(e, p) < RsEyeClear)) continue;
                         string code = codes[(int)(H(key, 3, 1600) * codes.Length) % codes.Length];
                         if (row == 1 && k == 1) code = "TR06";
                         GameObject pf = Prefab(code);
@@ -136,9 +143,12 @@ namespace SleepingCalamity.EditorTools
             GameObject tpf = Prefab("T18d");
             float rs = tpf != null ? RsRootSign(tpf) : 1f;
             Vector2 tc = B + north * 0.35f;
-            Put(g, "T18d", "BlockTrunk", tc, by, 5.86f, YawFace(north * rs) + 9f, 0f, 0f, 0.22f, true);
-            // the wagon on the east side, tipped on its broken axle across the south half of the road
-            Vector2 W = RoadAt(sBlock - 9.6f, out Vector2 wd) - RightOf(wd) * 2.6f;   // on the south edge: the lane line (node 6 at 5.5 m east of the trunk) stays clear
+            Put(g, "T18d", "BlockTrunk", tc, by, 7.7f, YawFace(north * rs) + 9f, 0f, 0f, 0.3f, true);   // T10b: 7.7 m (was 5.86), sunk 0.3 m: the thin log read as passable
+            // T10b: the mossy tree behind it, across the road the other way (crown on the south verge)
+            Vector2 mp = B + dir * 2.3f + north * 0.2f;
+            Put(g, "T20n", "BlockMossyTree", mp, TY(mp), 8.4f, YawAlong(north) - 14f, 0f, 0f, 0.22f, true);
+            // the wagon on the east side, tipped on its broken axle across the south half of the road (T10b: 7 m east of the trunk, 2.6 m closer, so the diagnostic and eye cameras see it with the trunk)
+            Vector2 W = RoadAt(sBlock - 7.0f, out Vector2 wd) - RightOf(wd) * 2.6f;   // on the south edge: the lane line (node 6 at 5.5 m east of the trunk) stays clear
             float wyaw = YawFace(wd) + 12f;
             Vector2 u = new Vector2(Mathf.Sin(wyaw * Mathf.Deg2Rad), Mathf.Cos(wyaw * Mathf.Deg2Rad)), v = RightOf(u);
             Put(g, "T16a", "BlockWagon", W, TY(W), 3.1f, wyaw, 5f, -15f, 0.3f, true);
@@ -155,17 +165,18 @@ namespace SleepingCalamity.EditorTools
             Decal(dec, "Mud", At(2.0f, 0.6f), 2.6f, 1.3f, wyaw, "Mud_Wagon");
             Decal(dec, "Grime", tc, 3.0f, 2.2f, YawAlong(dir), "Grime_Trunk");
             // logs and branches piled behind the trunk, a mossy windthrow beyond the north hedge, mushrooms at the trunk's foot
-            Vector2 lp = B + dir * 2.3f + north * 1.0f;
-            Put(g, "T20r", "BlockLog", lp, TY(lp), 3.4f, YawAlong(RightOf(dir)) + 8f, 0f, 0f, 0.1f, true);
-            Vector2 lp2 = B + dir * 1.9f - north * 1.7f;
-            Put(g, "T18e", "BlockLog2", lp2, TY(lp2), 1.46f, 20f, 0f, 0f, 0.04f);
-            Vector2 mp = B + dir * 2.4f + north * 6.2f;
-            Put(g, "T20n", "BlockMossyTree", mp, TY(mp), 7.6f, YawAlong(dir) + 6f, 0f, 0f, 0.14f, true);
-            string[] br = { "T20o", "T20p", "T20q", "T20q", "T20o", "T20p", "T20q" };
+            // T10b: a log across each verge end, a third on the south side, and a band of branches over the trunks, so the blockage runs verge to verge
+            Vector2 lp = B + dir * 1.0f + north * (rHalf + 1.0f);
+            Put(g, "T20r", "BlockLog", lp, TY(lp), 3.6f, YawAlong(north) + 25f, 0f, 0f, 0.1f, true);
+            Vector2 lp2 = B + dir * 1.0f - north * (rHalf + 1.1f);
+            Put(g, "T18e", "BlockLog2", lp2, TY(lp2), 2.6f, YawAlong(north) - 18f, 0f, 0f, 0.05f, true);
+            Vector2 lp3 = B + dir * 3.4f - north * (rHalf - 0.2f);
+            Put(g, "T20r", "BlockLog3", lp3, TY(lp3), 3.2f, YawAlong(north) + 80f, 0f, 0f, 0.1f, true);
+            string[] br = { "T20o", "T20p", "T20q", "T20q", "T20o", "T20p", "T20q", "T20o", "T20q", "T20p", "T20q", "T20o", "T20p", "T20q" };
             for (int i = 0; i < br.Length; i++)
             {
-                Vector2 p = tc + dir * (-0.9f + 3.2f * H(i, 1, 1610)) + north * (-3.1f + 6.2f * H(i, 2, 1610));
-                Put(g, br[i], "BlockBranch_" + i, p, TY(p), 1f, H(i, 3, 1610) * 360f, 0f, 0f, 0.05f);
+                Vector2 p = tc + dir * (-1.4f + 4.8f * H(i, 1, 1610)) + north * (-4.4f + 8.8f * H(i, 2, 1610));
+                Put(g, br[i], "BlockBranch_" + i, p, TY(p), 1.2f, H(i, 3, 1610) * 360f, 0f, 0f, 0.05f);
             }
             for (int i = 0; i < 4; i++)
             {
@@ -177,6 +188,7 @@ namespace SleepingCalamity.EditorTools
                 Vector2 p = tc + dir * (1.2f + 1.5f * H(i, 6, 1610)) + north * (-2.4f + 5.6f * H(i, 7, 1610));
                 WeedT(flora, p, 1611, i, 1.0f, 1.8f);
             }
+            HedgeSpan(Sub(g, "EndHedge"), sBlock - 13f, sBlock + 5f);   // T10b: the hedges run on up to the blockage on both sides
             // the wall behind: invisible, across the whole terrain, a child of EdgeBounds so the traversal scan reads it as a world bound
             Transform eb = null;
             foreach (Transform tr in setRoot.GetComponentsInChildren<Transform>(true)) if (tr.name == "EdgeBounds") { eb = tr; break; }
@@ -185,6 +197,133 @@ namespace SleepingCalamity.EditorTools
             var bc = wall.AddComponent<BoxCollider>(); bc.size = new Vector3(1f, 80f, SaltwakeRoadPlan.TerrainMaxZ - SaltwakeRoadPlan.TerrainMinZ + 8f);
             Physics.SyncTransforms();
             Debug.Log("SC HOLLOWMERE roadside block: centre " + B + " ground y " + by.ToString("0.00") + " trunk root sign " + rs + " wagon " + W + " wall x " + RoadBlockWallX);
+        }
+
+        // Hedge bushes (the RoadHedges recipe) along both verges from s0 to s1: the hedges end at the blockage, not 10 m short of it.
+        static void HedgeSpan(Transform parent, float s0, float s1)
+        {
+            string[] codes = { "T21j", "T21m", "T19x", "T21j", "T21m", "TR06" };
+            int n = 0;
+            for (float s = s0; s < s1; s += 1.9f, n++)
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    int key = 3000 + n * 7 + (side > 0 ? 1 : 0);
+                    Vector2 c = RoadAt(s, out Vector2 d); Vector2 right = RightOf(d);
+                    Vector2 p = c + right * (side * (rHalf + 1.15f + (H(key, 2, 1900) - 0.5f) * 0.5f)) + d * ((H(key, 1, 1900) - 0.5f) * 0.6f);
+                    if (!RsFree(p, 0.2f)) continue;
+                    string code = codes[(int)(H(key, 3, 1900) * codes.Length) % codes.Length];
+                    GameObject pf = Prefab(code); if (pf == null) { Count("missing_" + code); continue; }
+                    Bounds ub = Unit(pf);
+                    float h = code == "TR06" ? Mathf.Lerp(2.0f, 2.5f, H(key, 4, 1900)) : Mathf.Lerp(1.5f, 1.95f, H(key, 4, 1900)), sc = h / Mathf.Max(0.1f, ub.size.y);
+                    var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
+                    go.name = "EndHedgeBush_" + Count2();
+                    go.transform.localScale = new Vector3(sc * 1.1f, sc, sc * 1.1f);
+                    go.transform.rotation = Quaternion.Euler((H(key, 6, 1900) - 0.5f) * 4f, H(key, 7, 1900) * 360f, (H(key, 8, 1900) - 0.5f) * 4f);
+                    go.transform.position = new Vector3(p.x, TY(p) - 0.03f * h, p.y);
+                    foreach (Collider col in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
+                    Count("endHedgeBushes");
+                }
+        }
+
+        // T10b: past the blockage the world must read as country, not the backdrop ring's hazed ground (the "grey plane": SC Backdrop GroundHaze is 0.88 at the terrain's edge and the
+        // ring lies below the eye there): a belt of real trees over a hedge of shrubs behind the wall, north to south field, crossing the dead road beyond the blockage.
+        static void TreeBelt(Transform g)
+        {
+            string[] shrub = { "TR05", "TR06", "TR07", "T21m", "T21j", "TR06", "T19x" };
+            string[] trees = { "TR02", "TR03", "TR01", "TR02", "TR04", "TR03", "TR04", "TR01" };
+            const float zLo = -142f, zHi = -58f;
+            int n = 0;
+            for (float z = zLo; z <= zHi; z += 2.6f, n++)
+            {
+                Vector2 p = new Vector2(-127.9f + (H(n, 1, 2000) - 0.5f) * 1.1f, z + (H(n, 2, 2000) - 0.5f) * 1.0f);
+                BeltPut(g, shrub[(int)(H(n, 3, 2000) * shrub.Length) % shrub.Length], "BeltShrub_" + n, p, Mathf.Lerp(1.8f, 2.8f, H(n, 4, 2000)), H(n, 5, 2000) * 360f);
+            }
+            for (int row = 0; row < 4; row++)
+            {
+                n = 0;
+                for (float z = zLo + (row % 2) * 2.1f; z <= zHi; z += 4.2f, n++)
+                {
+                    int key = row * 1000 + n;
+                    Vector2 p = new Vector2(-130.4f - row * 3.9f + (H(key, 1, 2100) - 0.5f) * 2.4f, z + (H(key, 2, 2100) - 0.5f) * 2.4f);
+                    if (p.x < SaltwakeRoadPlan.TerrainMinX + 3f) continue;
+                    string code = trees[(int)(H(key, 3, 2100) * trees.Length) % trees.Length];
+                    float h = Mathf.Lerp(9f, 15f, H(key, 4, 2100)) * (row == 0 ? 0.85f : 1f);
+                    BeltPut(g, code, "BeltTree_" + row + "_" + n, p, h, H(key, 5, 2100) * 360f);
+                }
+            }
+            Count("beltObjects", g.childCount);
+        }
+
+        static void BeltPut(Transform parent, string code, string name, Vector2 p, float h, float yaw)
+        {
+            GameObject pf = Prefab(code); if (pf == null) { Count("missing_" + code); return; }
+            Bounds ub = Unit(pf);
+            float sc = h / Mathf.Max(0.1f, ub.size.y);
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
+            go.name = name;
+            go.transform.localScale = new Vector3(sc * 1.05f, sc, sc * 1.05f);
+            go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            go.transform.position = new Vector3(p.x, TY(p) - 0.04f * h, p.y);
+            foreach (Collider col in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
+        }
+
+        // T10b: ground cover around the road end: scanned plants, fine tufts and a few stones over the field's bare dirt (the terrain's soil also greens over: RoadEndGrass), off the road.
+        static void RoadEndCover(Transform g, Transform flora, float sBlock)
+        {
+            string[] low = { "T21d", "T21e", "T21f", "T21j", "T21n", "T21o", "T21i", "T21g", "T21d", "T21m" };
+            string[] stones = { "T20c", "T20d", "T20e", "T20g", "T20f" };
+            Vector2 centre = new Vector2(-119f, -97f);
+            int placed = 0, st = 0;
+            for (int ix = -10; ix <= 10; ix++)
+                for (int iz = -10; iz <= 10; iz++)
+                {
+                    int key = 4000 + (ix + 10) * 21 + (iz + 10);
+                    Vector2 p = centre + new Vector2((ix + 0.15f + 0.7f * H(key, 1, 2200)) * 2.0f, (iz + 0.15f + 0.7f * H(key, 2, 2200)) * 2.0f);
+                    if ((p - centre).magnitude > 16f || p.x < RoadBlockWallX + 1f) continue;
+                    if (HollowmereLayout.DistanceToPolyline(new TownPoint(p.x, p.y), rp) < rHalf - 0.1f) continue;
+                    if (!RsFree(p, 0.15f)) continue;
+                    float r = H(key, 3, 2200);
+                    if (r < 0.52f) PutNat(flora, low[(int)(H(key, 4, 2200) * low.Length) % low.Length], "EndPlant_" + placed++, p, TY(p), Mathf.Lerp(0.8f, 1.35f, H(key, 5, 2200)), H(key, 6, 2200) * 360f, 0f, 0f, 0.02f);
+                    else if (r < 0.80f) WeedT(flora, p, 2201, key, 0.9f, 1.4f);
+                    else if (r < 0.88f) Put(g, stones[(int)(H(key, 7, 2200) * stones.Length) % stones.Length], "EndStone_" + st++, p, TY(p), Mathf.Lerp(0.3f, 0.65f, H(key, 8, 2200)), H(key, 9, 2200) * 360f, 3f, -4f, 0.08f);
+                }
+            Count("endCover", placed + st);
+        }
+
+        // T10b RoadOut foreground: the lot's grass-strip row at the R3_02 ruin's wall foot (the bright spiky tufts) becomes irregular clumps of tufts and scanned plants; spill pieces
+        // (the pale plank) the ruin dressing dropped within 5.5 m of an eye camera go.
+        static void RuinFoot(Transform ruined, Transform flora)
+        {
+            int dropped = 0;
+            foreach (Transform tr in ruined.GetComponentsInChildren<Transform>(true).ToArray())
+            {
+                if (tr == null || !tr.name.StartsWith("Dress_Spill_", System.StringComparison.Ordinal)) continue;
+                Vector2 q = new Vector2(tr.position.x, tr.position.z);
+                if (eyeCams.Any(c => Vector2.Distance(c, q) < 5.5f)) { Object.DestroyImmediate(tr.gameObject); dropped++; }
+            }
+            Count("spillsDropped", dropped);
+            Transform lot = ruined.Find("Foliage/Edges/R3_02");
+            if (lot == null) { Count("missing_R3_02_edges"); return; }
+            string[] pl = { "T21d", "T21e", "T21j", "T21f", "T21n", "T21m", "T21d" };
+            var strips = new List<Transform>();
+            foreach (Transform c in lot) if (c.name.StartsWith("Grass_Strip", System.StringComparison.Ordinal)) strips.Add(c);
+            int i = 0, clumps = 0;
+            foreach (Transform sTr in strips)
+            {
+                Vector2 p = new Vector2(sTr.position.x, sTr.position.z); int k0 = i++;
+                Object.DestroyImmediate(sTr.gameObject);
+                if (k0 % 2 != 1) continue;
+                for (int k = 0; k < 4; k++)
+                {
+                    float a = H(k0, k, 2300) * 6.283f, rr = 0.15f + 0.8f * H(k0, k + 5, 2300);
+                    Vector2 q = p + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * rr;
+                    if (eyeCams.Any(c => Vector2.Distance(c, q) < RsEyeClear) || !HollowmereStreets.FreeOf(q, TY(q), 0.05f)) continue;
+                    if (k < 2) PutNat(flora, pl[(int)(H(k0, 20, 2300) * pl.Length) % pl.Length], "RuinFootPlant_" + clumps + "_" + k, q, TY(q), Mathf.Lerp(0.7f, 1.1f, H(k0, 21, 2300)), H(k0, 22, 2300) * 360f, 0f, 0f, 0.02f);
+                    else WeedT(flora, q, 2301, k0 * 5 + k, 0.9f, 1.5f);
+                }
+                clumps++;
+            }
+            Count("ruinFootClumps", clumps);
         }
 
         // The Rebuilt preset has no fallen tree: three rails across the road in front of the same wall.
@@ -208,7 +347,7 @@ namespace SleepingCalamity.EditorTools
         static void Verge(Transform g, Transform flora, Transform dec, float sBlock)
         {
             string[] bloom = { "T21d", "T21d", "T21j", "T21e", "T21f", "T21g", "T21i", "T21n", "T21o", "T19x", "T21m", "T21d" };
-            string[] tall = { "T21h", "T19u", "T19y" };
+            string[] tall = { "T21h" };   // T10b: the dark tall stalks (T19u, T19y) read as black weeds in the RoadOut foreground
             int placed = 0;
             for (float s = 12f; s < sBlock - 2.5f; s += 0.9f)
             {

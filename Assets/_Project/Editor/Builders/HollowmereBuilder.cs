@@ -121,7 +121,8 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Eye_JettyBack", new Vector3(0f, 0f, 0f), new Vector3(-5f, 0f, -40f), 60f),              // D9: from the jetty's end back at the town (position computed, Target y absolute 0)
             ("Cap_HM_Eye_RoadOut", new Vector3(-48f, 1.65f, -74f), new Vector3(-100f, 0.5f, -82f), 60f),     // D10: the Saltwake road, out
             ("Cap_HM_Eye_RoadBack", new Vector3(-85f, 1.65f, -80f), new Vector3(-20f, 0f, -55f), 60f),       // D10: the road, back at the town
-            ("Cap_HM_Diag_RoadEnd", new Vector3(-110.2f, 1.65f, -100.2f), new Vector3(-122.3f, -14.4f, -97.2f), 60f),   // T10 diagnostic only (not in the judged set): 12.5 m east of the road blockage, looking west at the fallen tree, the wagon and the spill
+            ("Cap_HM_Diag_RoadEnd", new Vector3(-110.2f, 1.65f, -100.2f), new Vector3(-122.3f, -14.4f, -97.2f), 60f),   // T10 diagnostic only (not in the judged set): 12.5 m east of the road blockage, looking west at the fallen trees, the wagon and the spill
+            ("Cap_HM_Diag_RoadEndEye", new Vector3(-102.5f, 1.65f, -92.3f), new Vector3(-150f, 0.3f, -100f), 60f),   // T10b diagnostic only: eye height on the road 20 m east of the blockage, level gaze west (what a player walking to the road end sees)
             ("Cap_HM_High_Lake", new Vector3(10f, 38f, -128f), new Vector3(0f, 0f, -25f), 60f),              // absolute: high over the lake, the town behind
             ("Cap_HM_High_East", new Vector3(118f, 30f, -30f), new Vector3(0f, 2f, -20f), 60f),              // absolute: high east of the town, over the mill and the east wall
         };
@@ -131,7 +132,7 @@ namespace SleepingCalamity.EditorTools
 
         // Cameras whose Target y is an offset from the camera's own y.
         static readonly HashSet<string> EyeRelTarget = new HashSet<string> { "Cap_HM_Eye_Bakery", "Cap_HM_Eye_InnFront", "Cap_HM_Eye_HillWest", "Cap_HM_Eye_Churchyard", "Cap_HM_Eye_MarketStreet", "Cap_HM_Eye_LowerLane", "Cap_HM_Eye_RingWest", "Cap_HM_Eye_RingSouth",
-            "Cap_HM_Eye_Orchard", "Cap_HM_Eye_OrchardGap", "Cap_HM_Eye_Mill", "Cap_HM_Eye_Meadow", "Cap_HM_Eye_RoadOut", "Cap_HM_Eye_RoadBack" };
+            "Cap_HM_Eye_Orchard", "Cap_HM_Eye_OrchardGap", "Cap_HM_Eye_Mill", "Cap_HM_Eye_Meadow", "Cap_HM_Eye_RoadOut", "Cap_HM_Eye_RoadBack", "Cap_HM_Diag_RoadEndEye" };
 
         [MenuItem("SleepingCalamity/Art/Build Hollowmere")]
         public static void BuildMenu()
