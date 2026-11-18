@@ -29,7 +29,7 @@ Process was crowding out the game (2026-11-11 audit): about 2,075 commits in 13 
 - Iterate with `SC_CAPTURE_ONLY=<cameras>` (only the cameras that show the change). Shoot the full capture set once, for the final sheet, when the code is final for that round.
 - Before any 40-minute run, prove the risky piece with one reduced capture of the camera that shows it.
 - Cloud captures are software-rendered (about 40 minutes a set); heavy capture rounds go to a local PC session (GPU) when one is free.
-- Blender previews: 960-1000 px, about 20 samples, until the final round. At most 3 art rounds.
+- Blender previews: 960-1000 px, about 20 samples, until the final round. Art rounds end on results, not a count (user, 2026-11-18): stop after two rounds in a row that don't win the blind A/B (`docs/art/scene-judging.md`).
 - Reuse the shared helpers instead of writing new ones: `Art/Blender/tools/sc_ab_sheet.py` (reference-beside-render sheet), `Art/Blender/tools/sc_asset_audit.py` (FBX audit), `sc_imgdiff.py`.
 - Export FBX with `path_mode='STRIP'`: absolute texture paths resolve only on the export machine and cost four capture runs once.
 - Wait on Unity with one blocking command (`--timeout 90` or `120` for capture runs), never by polling in turns.

@@ -15,7 +15,7 @@ The facts behind them:
 - **Co-op:** up to four players' cameras, volumetrics, SSAO and lights share the frame (urp-stylised-realism section 10). Alpha-tested foliage shadows are a common hidden cost.
 
 ## Applying the budgets
-**Texture cap (user, 2026-10-30): the game targets 1440p, so nothing bakes above 2048 px.**
+**Texture size (user, 2026-10-30, widened 2026-11-18): 2048 px is the default for a 1440p target. A few large surfaces seen up close (terrain blend, church facade, fountain, hero props) may use 4K, case by case, when a capture shows 2K blurring.**
 
 | Tier | Budget (PHASE1 3.3) | Judge it as |
 |---|---|---|
@@ -27,7 +27,7 @@ The facts behind them:
 | Hero character / enemy | 60k, 2K body + 2K head / 25k, one 2K set | per character |
 
 - `Art/Blender/tools/sc_asset_audit.py` (rewritten M8) reports tris, surface area, density, UV texel density against these budgets, colour attributes and bounds per object, and FAILs only on triangles and material slots. Report its numbers; the table above is the judge.
-- **Over budget usually means cut,** unless the extra tris are on the silhouette or a story beat the brief names: then say so in the header and the report. The budgets themselves are placeholders ([P35]) and the controller can change them.
+- **The per-asset numbers are guides, not caps (user, 2026-11-18).** The game is PC-only and quality-first, and Mesh LOD is in. The binding budget is per camera: visible triangles and GPU cost at the eye cameras (T12 measured about 6M at the worst view). Scanned or adopted props keep their detail; cut only what is wasted (hidden faces, dense flat areas) or when a camera goes over budget.
 - A building's 75k includes its instanced roof tiles and stones: count the instances, not the variants.
 
 ## Where triangles pay (in this order)
