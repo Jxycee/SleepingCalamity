@@ -1,4 +1,5 @@
 # Whole-area sheets for the Area 1 world build (from Run 6's sheet_round.py).
+# T11b: only cameras present in <this round's dir> get a tile (no MISSING panels); the reference row and the before inset stay when their files exist.
 # usage: python sheet_area.py <round name> <dir of this round's PNG or JPG> <dir of previous round or "none"> <out dir>
 # Writes every camera as a 1280 px wide JPG (quality 88) into <out dir>, plus <round>_sheet_A.jpg (concept row, cameras 1-10) and
 # <round>_sheet_B.jpg (cameras 11-20, then the three high views). Each tile is labelled with the camera name and p10/p50/p90 of the max
@@ -67,32 +68,36 @@ def main():
         p10, p50, p90, dark = st[cam]
         flag = '  FLAG probably blocked or inside geometry' if p50 < 0.12 or dark > 0.35 else ''
         print('%s %-16s p10/p50/p90 %.3f/%.3f/%.3f dark<0.03 %.1f%%%s' % (rnd, cam, p10, p50, p90, dark * 100, flag))
-    for cam in A + B + HIGH:
-        st.setdefault(cam, (0, 0, 0, 0))
-    # sheet A: concept row + 10 tiles; sheet B: 10 tiles + high row
+    # T11b: lay out only the cameras this round captured (no blank MISSING panels); a sheet with no camera is skipped
+    pa = [c for c in A if c in st]; pb = [c for c in B if c in st]; ph = [c for c in HIGH if c in st]
     TW = SW // 2; TH = round(TW * 9 / 16)
     refs = [(l, os.path.join(CONCEPTS, f)) for l, f in REFS]
     have_refs = os.path.isdir(CONCEPTS) and any(os.path.exists(p) for _, p in refs)
     if not have_refs:
         print('note: concept folder missing, reference row skipped')
     RW = SW // 4; RH = round(RW * 9 / 16); top = RH if have_refs else 0
-    sa = Image.new('RGB', (SW, top + ((len(A) + 1) // 2) * TH), (20, 20, 20)); da = ImageDraw.Draw(sa)
-    if have_refs:
-        for i, (l, p) in enumerate(refs):
-            if os.path.exists(p):
-                sa.paste(fit(Image.open(p).convert('RGB'), RW, RH), (i * RW, 0))
-            da.rectangle((i * RW, 0, i * RW + 40, 14), fill=(0, 0, 0)); da.text((i * RW + 4, 2), 'ref ' + l, fill=(255, 255, 0))
-    for i, cam in enumerate(A):
-        tile(sa, da, (i % 2) * TW, top + (i // 2) * TH, TW, TH, cam, cur, prev, rnd, out, st)
-    sa.save(os.path.join(out, rnd + '_sheet_A.jpg'), quality=88)
+    made = []
+    if pa:
+        sa = Image.new('RGB', (SW, top + ((len(pa) + 1) // 2) * TH), (20, 20, 20)); da = ImageDraw.Draw(sa)
+        if have_refs:
+            for i, (l, p) in enumerate(refs):
+                if os.path.exists(p):
+                    sa.paste(fit(Image.open(p).convert('RGB'), RW, RH), (i * RW, 0))
+                da.rectangle((i * RW, 0, i * RW + 40, 14), fill=(0, 0, 0)); da.text((i * RW + 4, 2), 'ref ' + l, fill=(255, 255, 0))
+        for i, cam in enumerate(pa):
+            tile(sa, da, (i % 2) * TW, top + (i // 2) * TH, TW, TH, cam, cur, prev, rnd, out, st)
+        f = os.path.join(out, rnd + '_sheet_A.jpg'); sa.save(f, quality=88); made.append((f, sa.size))
     HW = SW // 3; HH = round(HW * 9 / 16)
-    sb = Image.new('RGB', (SW, 5 * TH + HH), (20, 20, 20)); db = ImageDraw.Draw(sb)
-    for i, cam in enumerate(B):
-        tile(sb, db, (i % 2) * TW, (i // 2) * TH, TW, TH, cam, cur, prev, rnd, out, st)
-    for i, cam in enumerate(HIGH):
-        tile(sb, db, i * HW, 5 * TH, HW, HH, cam, cur, prev, rnd, out, st)
-    sb.save(os.path.join(out, rnd + '_sheet_B.jpg'), quality=88)
-    print('sheets', os.path.join(out, rnd + '_sheet_A.jpg'), sa.size, os.path.join(out, rnd + '_sheet_B.jpg'), sb.size)
+    if pb or ph:
+        rows = (len(pb) + 1) // 2
+        sb = Image.new('RGB', (SW, rows * TH + (HH if ph else 0)), (20, 20, 20)); db = ImageDraw.Draw(sb)
+        for i, cam in enumerate(pb):
+            tile(sb, db, (i % 2) * TW, (i // 2) * TH, TW, TH, cam, cur, prev, rnd, out, st)
+        for i, cam in enumerate(ph):
+            tile(sb, db, i * HW, rows * TH, HW, HH, cam, cur, prev, rnd, out, st)
+        f = os.path.join(out, rnd + '_sheet_B.jpg'); sb.save(f, quality=88); made.append((f, sb.size))
+    for f, sz in made:
+        print('sheet', f, sz)
 
 
 main()

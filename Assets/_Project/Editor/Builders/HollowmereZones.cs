@@ -44,7 +44,7 @@ namespace SleepingCalamity.EditorTools
             new Zone { Name = "Z4_GoldenGreen_Orchard", X = 39f, Z = -49f, W = 24f, D = 20f, Temperature = 10f, Saturation = 8f },                      // warmer white balance, foliage saturation +8, pollen
             new Zone { Name = "Z5_BrightHaze_Shore", X = 19f, Z = -93f, W = 122f, D = 58f, Exposure = -0.15f, Temperature = -8f, Contrast = -4f },       // exposure -0.15, cooler (fog x1.5 near the water: mist cards)
             new Zone { Name = "Z6_Distance_Road", X = -91f, Z = -90f, W = 98f, D = 56f, Contrast = -8f, Saturation = -8f, Temperature = -5f },           // aerial haze: less contrast and colour, cooler, mist rising westward
-            new Zone { Name = "Z7_DeepGreen_West", X = -60.5f, Z = 30f, W = 43f, D = 52f, Exposure = -0.12f, Temperature = -4f, Tint = -8f, Saturation = 6f },   // exposure -0.2, deep green (fog x1.6, two shafts)
+            new Zone { Name = "Z7_DeepGreen_West", X = -60.5f, Z = 30f, W = 43f, D = 52f, Exposure = 0.0f, Temperature = -4f, Tint = -8f, Saturation = 6f },   // exposure -0.2, deep green (fog x1.6, two shafts)
             new Zone { Name = "Z7_DeepGreen_North", X = -5.5f, Z = 63f, W = 65f, D = 33f, Exposure = -0.20f, Temperature = -4f, Tint = -8f, Saturation = 6f },
             new Zone { Name = "Z7_DeepGreen_East", X = 49f, Z = 30f, W = 42f, D = 52f, Exposure = -0.20f, Temperature = -4f, Tint = -8f, Saturation = 6f },
         };
@@ -52,7 +52,8 @@ namespace SleepingCalamity.EditorTools
         // fills: name, x, z, height above ground, colour, intensity, range
         static readonly (string Name, float X, float Z, float Up, Color C, float I, float R)[] Fills =
         {
-            ("HillWestFill", -38f, 29f, 5.5f, new Color(0.78f, 0.88f, 0.98f), 13.0f, 20f),      // the HillWest scarp and the crag foot, in shade all morning
+            ("HillWestFill", -38f, 29f, 5.5f, new Color(0.78f, 0.88f, 0.98f), 17.0f, 20f),      // the HillWest scarp and the crag foot, in shade all morning
+            ("HillWestFill2", -40f, 21f, 3.0f, new Color(0.88f, 0.93f, 1.0f), 16.0f, 18f),       // T11b: from the HillWest camera side, lifts the revetment face and the hill face behind it that look at the camera in shade
             ("TerraceNorthFill", -8f, 27f, 2.6f, new Color(0.80f, 0.87f, 1.0f), 4.5f, 12f),     // the north side of the keep terrace under the church wall
             ("MillShadeFill", 64f, -53f, 2.8f, new Color(0.80f, 0.88f, 1.0f), 5.0f, 11f),       // the mill's shade wall (north-west face)
         };

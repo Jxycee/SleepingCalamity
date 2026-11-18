@@ -102,7 +102,14 @@ namespace SleepingCalamity.EditorTools
             if (layer == 0 && HollowmereBackdropTuning.Windmill) k += Gauss(a, Rad(HollowmereBackdropTuning.WindmillAzDeg), 0.03f) * 18f;
             if (layer == 1 && HollowmereBackdropTuning.Lighthouse) k += Gauss(a, Rad(HollowmereBackdropTuning.LighthouseAzDeg), 0.022f) * 20f;
             // T11: the far range swells toward the Mawrrow massif (about 90 m over 8 degrees each side), so the mountain rises out of a continuous ridge instead of standing on a thin pale band
-            if (layer == 2 && HollowmereBackdropTuning.Mountain) k += Gauss(a, Rad(HollowmereBackdropTuning.MountainAzDeg), 0.15f) * 90f;
+            if (layer == 2 && HollowmereBackdropTuning.Mountain)
+            {
+                // T11b: the separate Mawrrow mesh floated (its hazed foot dissolved to sky above the range, the shape read as a crumpled sheet). Now the massif IS the far range: a broad swell,
+                // a tall summit and a lower shoulder grown out of the same crest mesh, so its foot is the range itself and no sky can show under it. Two summits and a saddle, as before.
+                float az0 = Rad(HollowmereBackdropTuning.MountainAzDeg), ca = Mathf.Cos(a), sa = Mathf.Sin(a);
+                float jag = 0.82f + 0.36f * Mathf.PerlinNoise(ca * 70f + 7f, sa * 70f + 3f);
+                k += Gauss(a, az0, 0.17f) * 100f + Gauss(a, az0 + 0.06f, 0.065f) * 250f * jag + Gauss(a, az0 - 0.12f, 0.065f) * 150f * jag;
+            }
             return k;
         }
         static float Gauss(float a, float c, float s) { float d = Mathf.Atan2(Mathf.Sin(a - c), Mathf.Cos(a - c)) / s; return Mathf.Exp(-d * d); }
@@ -149,7 +156,7 @@ namespace SleepingCalamity.EditorTools
             {
                 float g = Mathf.Clamp01((p.y - L.Foot) / Mathf.Max(1f, hi - L.Foot));
                 float band = Mathf.PerlinNoise(p.x * 0.013f + L.Seed, p.z * 0.013f) - 0.5f;   // patches of lighter meadow and darker wood along the ridge
-                float k = Mathf.Lerp(0.74f, 1.10f, g) * (1f + 0.22f * band);
+                float k = Mathf.Lerp(0.74f, 1.10f, g) * (1f + 0.22f * band) * (li == 2 ? 1f + 0.22f * Smooth(hi + 20f, hi + 260f, p.y) : 1f);   // T11b: pale ash on the Mawrrow summit
                 Color sh = LitShade(n, 0.45f);
                 return new Color(k * sh.r, k * sh.g, k * sh.b, 1f);
             });
@@ -161,74 +168,11 @@ namespace SleepingCalamity.EditorTools
 
         static int BuildMountain(Transform parent, TownPoint c)
         {
-            float az = Rad(HollowmereBackdropTuning.MountainAzDeg), H = HollowmereBackdropTuning.MountainHeight;
-            float cx = c.X + HollowmereBackdropTuning.MountainDist * Mathf.Cos(az), cz = c.Z + HollowmereBackdropTuning.MountainDist * Mathf.Sin(az);
-            // local axes: radial (away from the town) and tangential (along the horizon)
-            Vector2 rad = new Vector2(Mathf.Cos(az), Mathf.Sin(az)), tan = new Vector2(-rad.y, rad.x);
-            const int N = 144; const float Half = 700f, Widen = 1.3f;   // T11: Widen stretches the massif along the horizon (the old one stood as a lone crag)
-            float[] hs = new float[(N + 1) * (N + 1)];
-            var v = new List<Vector3>();
-            float best = 0f;
-            for (int j = 0; j <= N; j++)
-                for (int i = 0; i <= N; i++)
-                {
-                    float lt = (i / (float)N * 2f - 1f) * Half * Widen, lr = (j / (float)N * 2f - 1f) * Half;   // tangential, radial offsets from the centre (lt is the widened frame: Bump/Spur are evaluated in lt / Widen)
-                    float ltS = lt / Widen;
-                    // two summits along the horizon (the long slumped body): a tall one and a lower shoulder, an elliptical footprint (wide along the horizon)
-                    float h = H * Bump(ltS, lr, 150f, 0f, 430f, 260f) + 0.58f * H * Bump(ltS, lr, -300f, 40f, 360f, 240f);
-                    float x = cx + tan.x * lt + rad.x * lr, z = cz + tan.y * lt + rad.y * lr;
-                    float ridged = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.004f + 2f, z * 0.004f + 8f) * 2f - 1f);
-                    h *= 0.72f + 0.45f * ridged + 0.06f * (Mathf.PerlinNoise(x * 0.02f, z * 0.02f) - 0.5f);
-                    // A12 r1 (town-art-leftovers): the 0.045 term made a row of summit "teeth" (a crown); gone. One dominant crag on the tall summit instead.
-                    h *= 1f + 0.16f * (Mathf.PerlinNoise(x * 0.012f + 31f, z * 0.012f + 7f) - 0.5f);
-                    h += H * 0.07f * Mathf.Exp(-(((ltS - 150f) * (ltS - 150f)) + lr * lr) / (2f * 55f * 55f)) * (h > 0f ? 1f : 0f);
-                    // radial erosion: spurs and gullies fan out from the summit, strongest at mid-slope; +/-7.5% of local height
-                    if (h > 0f) h *= 1f + 0.15f * (Spur(ltS, lr) - 0.5f) * SpurFade(ltS, lr);
-                    // A12 r3 (town-art-leftovers): the eroded spurs read as smooth draped cloth. One fine ridged-noise crag octave (feature ~60 m, amplitude 2.5% of local height,
-                    // x(0.8..1.4) from gully to spur crest, faded out at the foot under the mist) breaks the faces into rock planes. Grid, winding, silhouette scale and materials unchanged.
-                    if (h > 0f)
-                    {
-                        float crag = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.0165f + 57f, z * 0.0165f + 13f) * 2f - 1f);
-                        h *= 1f + 0.05f * (crag - 0.5f) * (0.8f + 0.6f * Spur(ltS, lr)) * Smooth(0.04f, 0.28f, h / H);
-                    }
-                    hs[j * (N + 1) + i] = h;
-                    if (h > best) { best = h; mountainPeak = new Vector3(x, h - 30f, z); }
-                    v.Add(new Vector3(x, h - 30f, z));
-                }
-            var idx = new List<int>();
-            for (int j = 0; j < N; j++)
-                for (int i = 0; i < N; i++)
-                {
-                    int a = j * (N + 1) + i, b = a + 1, d = a + N + 1, e = d + 1;
-                    if (hs[a] <= 0f && hs[b] <= 0f && hs[d] <= 0f && hs[e] <= 0f) continue;
-                    idx.AddRange(new[] { a, e, d, a, b, e });   // the local (tangent, radial) frame is left-handed against world (x, z): this winding faces up (the old one gave downward normals, so the key light never reached the mountain)
-                }
-            // A12 r2 (town-art-leftovers): ROOT CAUSE of the flat dark mountain was inverted winding (downward normals, no key light). With it fixed the mountain is backlit (sun south-east, camera looks south): wide wrap, key x2.6, fill x2, light haze 0.15-0.25 (30% less on the upper 60%) give spurs a p10-p90 spread of 0.3 at a mean 0.34 (mist band 0.57). A12 r2b (controller): the 0.15-0.25 haze and warm tint read as a near clay model at 2.6 km; neutral cool rock, haze 0.32-0.42 and key x2.0 put it back behind the aerial perspective (Friedrich blue-grey distance).
-            // Area 1 rework round 4: cool 1.3 -> 1.0 and key boost 2.0 -> 1.4, fill boost 2 -> 1.5: under the town's stronger Morning sun the massif read as a pale pink spike, not a dark slumped mountain.
-            // T11 (Balcony "grey jagged shape floating top right"): the massif was LESS hazed (0.32-0.42) than the far range in front of it (0.84-0.90) and warm-lit, so it read as a pale pink crag pasted on the sky.
-            // Now it sits one step beyond the range: the range's haze and blue tint (a little less haze up the face keeps the form), cooler rock, softer key, and the far range swells toward it (Knoll layer 2).
-            Material m = Mat("M_BD_Mawrrow", new Color(0.16f, 0.18f, 0.22f), 0.60f, 0.76f, 2000f, 3000f, 0.04f, 1.0f, 0.8f, 1.0f, 0.10f, 0.9f, 1f, 0.30f, H - 30f, 1.5f, patch: 0f, hazeTint: new Color(0.91f, 0.98f, 1.07f));
-            MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
-            {
-                float y = p.y + 30f;
-                float up = Mathf.Clamp01(y / H);
-                float strata = 0.5f + 0.5f * Mathf.Sin(y * 0.07f + Mathf.PerlinNoise(p.x * 0.009f + 4f, p.z * 0.009f + 2f) * 7f);   // rock bands
-                float fleck = Mathf.PerlinNoise(p.x * 0.05f, p.z * 0.05f) - 0.5f;
-                // light-independent form term (no sun bake: the shader lights it): spur crests x1.13, gully floors x0.75, from the same spur function as the geometry
-                Vector2 d = new Vector2(p.x - cx, p.z - cz);
-                float lt = Vector2.Dot(d, tan) / Widen, lr = Vector2.Dot(d, rad);
-                float form = Mathf.Lerp(1f, Mathf.Lerp(0.75f, 1.13f, Spur(lt, lr)), Mathf.Lerp(0.5f, 1f, SpurFade(lt, lr)));
-                float k = Mathf.Lerp(0.80f, 1.05f, up) * (0.90f + 0.10f * strata) * (1f + 0.18f * fleck) * form;
-                // volcanic ash on the summit (pale, cool), warmer brown-grey on the lower slopes
-                Color warm = new Color(1.06f, 0.96f, 0.88f), ash = new Color(1.06f, 1.07f, 1.10f);
-                Color tone = Color.Lerp(warm, ash, Smooth(0.55f, 0.92f, up));
-                // the foot dissolves into haze (alpha < 1 adds haze in the shader): fully misted at the base, clear by about a third of the way up
-                float a = Mathf.Lerp(0.05f, 1f, Smooth(8f, 0.34f * H, y));
-                return new Color(k * tone.r, k * tone.g, k * tone.b, a);
-            });
-            int tris = idx.Count / 3;
+            // T11b: the massif is a knoll of the far range (Knoll layer 2); only the steam wisp is placed here, on its summit
+            float a = Rad(HollowmereBackdropTuning.MountainAzDeg) + 0.06f;
+            mountainPeak = new Vector3(c.X + Layers[2].Rc * Mathf.Cos(a), Top(2, a), c.Z + Layers[2].Rc * Mathf.Sin(a));
             if (HollowmereBackdropTuning.Wisp) BuildWisp(parent);
-            return tris;
+            return 0;
         }
 
         // Spur ridges radiating from a summit: 1 on a spur crest, 0 in a gully. Polar (theta, r) around the summit; a low-frequency warp bends and forks them.
