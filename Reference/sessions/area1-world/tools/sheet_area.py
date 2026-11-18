@@ -8,7 +8,7 @@ import sys, os, glob
 from PIL import Image, ImageDraw
 
 A = ['Eye_Spawn', 'Eye_Postcard', 'Eye_West', 'Eye_Bakery', 'Eye_InnFront', 'Eye_Climb', 'Eye_Balcony', 'Eye_BellYard', 'Eye_Churchyard', 'Eye_HillWest', 'Eye_MarketStreet']
-B = ['Eye_LowerLane', 'Eye_RingWest', 'Eye_RingSouth', 'Eye_Orchard', 'Eye_OrchardGap', 'Eye_Mill', 'Eye_Meadow', 'Eye_Lake', 'Eye_JettyBack', 'Eye_RoadOut', 'Eye_RoadBack']
+B = ['Eye_LowerLane', 'Eye_RingWest', 'Eye_RingSouth', 'Eye_Orchard', 'Eye_OrchardGap', 'Eye_Allotment', 'Eye_Mill', 'Eye_Meadow', 'Eye_Lake', 'Eye_JettyBack', 'Eye_RoadOut', 'Eye_RoadBack']
 HIGH = ['Overview', 'High_Lake', 'High_East']
 CONCEPTS = r'C:\Dev\SleepingCalamity\Reference\private\concepts'
 REFS = [('H1', 'H1 wide square, midday.jpg'), ('H4', 'H4 bakery (ruined, to be rebuilt).jpg'), ('H5', 'H5 church and bell tower.jpg'), ('H8', 'H8 orchard edge.jpg')]

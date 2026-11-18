@@ -115,7 +115,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Eye_RingWest", new Vector3(-46f, 1.65f, 6f), new Vector3(-46f, 0f, -28f), 60f),         // D4: the west Ring Lane, south
             ("Cap_HM_Eye_RingSouth", new Vector3(-8f, 1.65f, -48.8f), new Vector3(22f, 0f, -48.5f), 60f),    // D4, D8: the south Ring Lane, east
             ("Cap_HM_Eye_Orchard", new Vector3(35f, 1.65f, -44.5f), new Vector3(43f, 0f, -58f), 60f),        // D7: the orchard
-            ("Cap_HM_Eye_OrchardGap", new Vector3(40.2f, 1.65f, -53.2f), new Vector3(46.5f, -0.3f, -64f), 60f),   // D7 (T07): inside the orchard through the wall gap to the lake and the mill
+            ("Cap_HM_Eye_OrchardGap", new Vector3(41.9f, 1.65f, -52.0f), new Vector3(46.5f, -0.3f, -64f), 60f),   // D7 (T07): inside the orchard through the wall gap to the lake and the mill
             ("Cap_HM_Eye_Mill", new Vector3(58f, 1.65f, -67f), new Vector3(70.5f, 2.5f, -58f), 60f),         // D9: the sunlit side of the mill with the stream in front (T05: the old Mill Lane view faced the mill's shadow wall)
             ("Cap_HM_Eye_Meadow", new Vector3(-8f, 1.65f, -72f), new Vector3(50f, 0f, -68f), 60f),           // D9: the lake meadow, east
             ("Cap_HM_Eye_JettyBack", new Vector3(0f, 0f, 0f), new Vector3(-5f, 0f, -40f), 60f),              // D9: from the jetty's end back at the town (position computed, Target y absolute 0)
@@ -272,6 +272,7 @@ namespace SleepingCalamity.EditorTools
 
             foreach (var c in HollowmereRoad.Cameras)   // Q15: from the gate looking out, from the road looking back (Target absolute)
                 LookTestBuilder.AddCapture(cams, c.Name, new Vector3(c.Pos.x, HollowmereLayout.Ground(t, c.Pos.x, c.Pos.z) + c.Pos.y, c.Pos.z), c.Target, c.Fov).farClipPlane = HollowmereRoad.FarClip;
+            if (HollowmereOrchard.AllotmentCam is var ac && ac.HasValue) LookTestBuilder.AddCapture(cams, "Cap_HM_Eye_Allotment", ac.Value.Pos, ac.Value.Target, 60f).farClipPlane = 400f;   // T07b: D8 from the lane side of R2_18's plot
             HollowmereGarden.AddCaptureCameras(cams, t);   // Q6: Cap_HM_Allotment, Cap_HM_Yard and the garden log line
             HollowmereAmbientBuilder.BakeAvoid(root);   // cards kept clear of every capture camera
             HollowmereLook.Apply(BeautyCornerBuilder.Preset.Morning);   // B3: the B0 Morning light; the corner's light with the town-scale haze, sky and grade (Q12)

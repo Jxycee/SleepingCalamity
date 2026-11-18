@@ -59,22 +59,37 @@ namespace SleepingCalamity.EditorTools
         }
 
         // True on the cleared strip of the path (ragged edge: 0.5-0.95 m half width from a noise of the position).
-        internal static bool OnPath(float x, float z) => PathDist(x, z) < Mathf.Lerp(0.5f, 0.95f, Mathf.PerlinNoise(x * 1.9f + 3f, z * 1.9f + 9f));
+        // T07b: worn ground under the harvest tree and round the bench, so the story props stand on bare earth and hay, not in long grass.
+        static readonly Vector3[] WornDiscs = { new Vector3(39.5f, -53.0f, 2.7f), new Vector3(43.6f, -51.0f, 1.5f), new Vector3(39.4f, -50.9f, 0f) };
+        internal static bool OnPath(float x, float z)
+        {
+            foreach (Vector3 d in WornDiscs) if (Vector2.Distance(new Vector2(x, z), new Vector2(d.x, d.y)) < d.z * Mathf.Lerp(0.7f, 1.05f, Mathf.PerlinNoise(x * 2.3f + 5f, z * 2.3f + 1f))) return true;
+            return OnPathLine(x, z);
+        }
+
+        static bool OnPathLine(float x, float z) => PathDist(x, z) < Mathf.Lerp(0.5f, 0.95f, Mathf.PerlinNoise(x * 1.9f + 3f, z * 1.9f + 9f));
+
+        // True at wall feet and trunk bases: the only places the orchard carpet takes the tall spiky accent clumps (T07b).
+        internal static bool AccentSpot(float x, float z)
+        {
+            var p = new Vector2(x, z);
+            for (int i = 0, j = Poly.Length - 1; i < Poly.Length; j = i++) if (DistToSeg(p, Poly[j], Poly[i]) < 1.3f) return true;
+            for (int i = 0; i < Trees.Length; i++) if (Vector2.Distance(p, new Vector2(Trees[i].X, Trees[i].Z)) < 1.6f) return true;
+            return false;
+        }
 
         // The trees of the Wild builder stay out of the box (and 2.5 m round it).
         internal static bool Reserved(float x, float z) => InOrchard(x, z, 2.5f);
 
         // ------------------------------------------------------------------------------------------------ tables
         struct TreeDef { public float X, Z, H; public string Code; public float Yaw, Girth; }
+        // T07b: four crowns (was seven) at 6-10 m spacing so sun and sky come through; crowns no wider than tall (Girth 0.9-1.0). Index 0 carries the harvest story.
         static readonly TreeDef[] Trees =
         {
-            new TreeDef { X = 38.0f, Z = -53.8f, H = 5.6f, Code = "TR03", Yaw = 20f, Girth = 1.25f },   // 0 the best crown: bench
-            new TreeDef { X = 37.0f, Z = -57.0f, H = 5.0f, Code = "TR02", Yaw = 140f, Girth = 1.3f },
-            new TreeDef { X = 44.0f, Z = -45.4f, H = 5.2f, Code = "TR03", Yaw = 250f, Girth = 1.25f },
-            new TreeDef { X = 44.6f, Z = -51.6f, H = 5.7f, Code = "TR02", Yaw = 80f, Girth = 1.3f },
-            new TreeDef { X = 34.6f, Z = -58.4f, H = 4.8f, Code = "TR02", Yaw = 300f, Girth = 1.3f },
-            new TreeDef { X = 39.6f, Z = -49.8f, H = 5.0f, Code = "TR03", Yaw = 200f, Girth = 1.25f },   // 5 ladder and basket
-            new TreeDef { X = 36.0f, Z = -51.8f, H = 4.6f, Code = "TR03", Yaw = 60f, Girth = 1.3f },    // 6 R2_18's corner
+            new TreeDef { X = 39.6f, Z = -54.6f, H = 6.0f, Code = "TR03", Yaw = 20f, Girth = 0.85f },    // 0 the harvest tree: ladder, baskets, crates
+            new TreeDef { X = 44.0f, Z = -45.4f, H = 5.6f, Code = "TR03", Yaw = 250f, Girth = 0.85f },
+            new TreeDef { X = 44.6f, Z = -51.6f, H = 6.0f, Code = "TR02", Yaw = 80f, Girth = 0.85f },   // 2 the bench
+            new TreeDef { X = 34.9f, Z = -54.8f, H = 5.2f, Code = "TR03", Yaw = 60f, Girth = 0.85f },    // 3 R2_18's corner (left frame)
         };
         static readonly Vector2 FallenRoot = new Vector2(47.0f, -53.2f), FallenCrown = new Vector2(47.4f, -47.6f);
         static readonly Vector2 PierA = new Vector2(39.2f, -45.0f), PierB = new Vector2(40.9f, -43.9f);
@@ -94,7 +109,7 @@ namespace SleepingCalamity.EditorTools
 
         public static void Build(Transform set, Transform ruined, Transform rebuilt, TownLayout t)
         {
-            T = t; counts.Clear(); trunkXZ.Clear(); eyeCams.Clear(); decals = 0; prefabs.Clear(); unit.Clear();
+            T = t; scarecrowDone = false; AllotmentCam = null; counts.Clear(); trunkXZ.Clear(); eyeCams.Clear(); decals = 0; prefabs.Clear(); unit.Clear();
             foreach (var c in HollowmereBuilder.Cameras) if (c.Name.StartsWith("Cap_HM_Eye_", System.StringComparison.Ordinal) && !c.Name.Contains("JettyBack")) eyeCams.Add(new Vector2(c.Pos.x, c.Pos.z));
             Physics.SyncTransforms();
             Transform wild = set.Find("Wild") ?? set;
@@ -131,7 +146,7 @@ namespace SleepingCalamity.EditorTools
         {
             if (prefabs.TryGetValue(code, out GameObject p)) return p;
             string path = code.StartsWith("TR", System.StringComparison.Ordinal) ? TreesFolder + code + "/" + code + ".prefab"
-                : code == "N04" ? Ad + "N04_stump/N04.prefab" : code == "N05" ? Ad + "N05_fallen_log/N05.prefab"
+                : code == "N04" ? Ad + "N04_stump/N04.prefab" : code == "N05" ? Ad + "N05_fallen_log/N05.prefab" : code == "N03" ? Ad + "N03_scree_cluster/N03.prefab" : code == "N02" ? Ad + "N02_angular_rock/N02.prefab"
                 : code == "C11b" ? Cel + "C11b/C11b.prefab" : Ad + code + "/" + code + ".prefab";
             return prefabs[code] = HollowmereStreets.LoadPrefab(path);
         }
@@ -258,7 +273,7 @@ namespace SleepingCalamity.EditorTools
             decals++; Count("decal" + mat);
         }
 
-        static bool Ok(Vector2 p, float rad, bool flatOnly = true)
+        static bool Ok(Vector2 p, float rad, bool flatOnly = true, bool free = true)
         {
             if (!HollowmereStreets.Surface(p.x, p.y, out float y, out float ny)) return false;
             if (flatOnly && ny < 0.86f) return false;
@@ -267,7 +282,7 @@ namespace SleepingCalamity.EditorTools
             foreach (Foundation f in T.Foundations) if (f.Footprint.Contains(tp, 0.1f)) return false;
             foreach (Landmark l in T.Landmarks) if (l.Footprint.Contains(tp, 0.3f)) return false;
             foreach (Vector2 c in eyeCams) if (Vector2.Distance(c, p) < 1.3f) return false;
-            return HollowmereStreets.FreeOf(p, y, rad);
+            return !free || HollowmereStreets.FreeOf(p, y, rad);
         }
 
         static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
@@ -334,7 +349,7 @@ namespace SleepingCalamity.EditorTools
             var mb = new MB();
             Material leafVar2 = null, leafVar3 = null;
             Material L(string code) => AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Content/Materials/Trees/M_" + code + "_Leaves.mat");
-            leafVar2 = Variant(L("TR02"), "AppleLeaf_TR02", new Color(1.0f, 1.0f, 0.62f)); leafVar3 = Variant(L("TR03"), "AppleLeaf_TR03", new Color(1.0f, 1.0f, 0.62f));
+            leafVar2 = Variant(L("TR02"), "AppleLeaf_TR02", new Color(1.3f, 1.27f, 0.72f)); leafVar3 = Variant(L("TR03"), "AppleLeaf_TR03", new Color(1.3f, 1.27f, 0.72f));
             for (int i = 0; i < Trees.Length; i++)
             {
                 TreeDef d = Trees[i];
@@ -384,7 +399,7 @@ namespace SleepingCalamity.EditorTools
             var cap = go.AddComponent<CapsuleCollider>(); cap.direction = 1; cap.radius = 0.5f; cap.height = 8.5f; cap.center = new Vector3(0f, 4.4f, 0f);   // the trunk to the first forks
             Material lv = AssetDatabase.LoadAssetAtPath<Material>(MatFolder + "/M_HM_AppleLeaf_TR02.mat");
             foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true)) { var mats = r.sharedMaterials; for (int k = 0; k < mats.Length; k++) if (mats[k] != null && mats[k].name.Contains("Leaves") && lv != null) mats[k] = lv; r.sharedMaterials = mats; }
-            Physics.SyncTransforms(); Count("fallenTree");
+            Physics.SyncTransforms(); Count("fallenTree"); Count("solidProps");
             // root wad and spoil: the N04 stump on its side in the pit, stones, the pit and litter decals
             Put(props, "N04", "FallenRootWad", FallenRoot + new Vector2(-0.3f, 0.2f), y, 1.7f, 40f, 28f, 20f, 0.15f);
             for (int i = 0; i < 3; i++)
@@ -438,7 +453,7 @@ namespace SleepingCalamity.EditorTools
             {
                 float a = H(key, i, 871) * Mathf.PI * 2f, r = spread * Mathf.Sqrt(H(key, i, 872));
                 Vector2 q = centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
-                if (OnPath(q.x, q.y) || !Ok(q, 0.1f)) continue;
+                if (OnPathLine(q.x, q.y) || !Ok(q, 0.1f)) continue;
                 if (Apple(props, q, key, i, i < rotten) != null) made++;
             }
         }
@@ -447,10 +462,10 @@ namespace SleepingCalamity.EditorTools
         {
             Transform g = Sub(props, "Windfalls"); int made = 0;
             Cluster(g, new Vector2(Trees[0].X + 1.1f, Trees[0].Z - 0.5f), 1.3f, 6, 1, 1, ref made);
-            Cluster(g, new Vector2(Trees[3].X - 0.9f, Trees[3].Z - 0.8f), 1.2f, 6, 2, 1, ref made);
-            Cluster(g, new Vector2(Trees[5].X + 1.0f, Trees[5].Z - 1.3f), 1.0f, 3, 3, 0, ref made);
+            Cluster(g, new Vector2(Trees[2].X - 0.9f, Trees[2].Z - 0.8f), 1.2f, 6, 2, 1, ref made);
+            Cluster(g, new Vector2(Trees[0].X + 0.3f, Trees[0].Z + 1.9f), 1.0f, 4, 3, 0, ref made);
             Cluster(g, Vector2.Lerp(FallenRoot, FallenCrown, 0.5f) + new Vector2(-0.9f, 0f), 2.4f, 6, 4, 2, ref made);
-            Cluster(g, new Vector2(Trees[1].X + 0.8f, Trees[1].Z + 0.9f), 0.7f, 2, 5, 2, ref made);
+            Cluster(g, new Vector2(Trees[3].X + 0.8f, Trees[3].Z + 0.9f), 0.7f, 2, 5, 2, ref made);
             Count("windfalls", made);
         }
 
@@ -460,13 +475,13 @@ namespace SleepingCalamity.EditorTools
             Transform g = Sub(props, "Story"); int key = 7001;
             // the ladder against a trunk of tree 5 and a full basket at its foot
             {
-                Vector2 tp = trunkXZ.Count > 5 ? trunkXZ[5] : new Vector2(Trees[5].X, Trees[5].Z);
-                Vector2 toTree = new Vector2(0.1f, 0.99f).normalized;
+                Vector2 tp = trunkXZ.Count > 0 ? trunkXZ[0] : new Vector2(Trees[0].X, Trees[0].Z);
+                Vector2 toTree = new Vector2(-0.35f, -0.94f).normalized;   // T07b: the ladder stands on the camera side of the harvest tree, leaning south onto the trunk
                 float phi = 13f, L = 2.7f, reach = L * Mathf.Sin(phi * Mathf.Deg2Rad);
                 Vector2 foot = tp - toTree * (reach + 0.27f);
-                if (Ok(foot, 0.2f, false)) { Lean(g, "T04b", "Ladder", foot, toTree, L, phi, false, 0.02f); Decal(dec, "Hay", foot + toTree * 0.1f, 1.7f, 1.7f, 35f, "Hay_Ladder"); }
-                Vector2 bp = foot - toTree * 0.55f + Perp(toTree) * 0.55f;
-                if (Ok(bp, 0.2f))
+                if (Ok(foot, 0.2f, false, false)) { Lean(g, "T04b", "Ladder", foot, toTree, L, phi, false, 0.02f); Decal(dec, "Hay", foot + toTree * 0.1f, 1.7f, 1.7f, 35f, "Hay_Ladder"); }
+                Vector2 bp = foot - toTree * 0.5f + Perp(toTree) * 0.6f;
+                if (Ok(bp, 0.2f, true, false))
                 {
                     float by = Gy(bp);
                     Put(g, "T08g", "BasketFull", bp, by, 0.5f, 20f, 0f, 0f, 0.03f);
@@ -475,8 +490,8 @@ namespace SleepingCalamity.EditorTools
             }
             // a tipped basket with apples spilled downhill (toward the wall) under tree 4
             {
-                Vector2 tp = new Vector2(Trees[3].X, Trees[3].Z), d = new Vector2(0.45f, -0.89f).normalized;
-                Vector2 bp = tp + new Vector2(-0.6f, -1.2f);
+                Vector2 tp = new Vector2(Trees[0].X, Trees[0].Z), d = new Vector2(-0.3f, 0.95f).normalized;   // T07b: east of the harvest trunk, apples spilling toward the lane
+                Vector2 bp = tp + new Vector2(1.55f, -0.1f);
                 if (Ok(bp, 0.25f))
                 {
                     float by = Gy(bp);
@@ -494,7 +509,7 @@ namespace SleepingCalamity.EditorTools
             {
                 Vector2 wallPt = new Vector2(43.0f, -41.3f), n = new Vector2(0.81f, -0.58f), t = new Vector2(0.58f, 0.81f);
                 Vector2 wp = wallPt + n * 0.95f;
-                if (Ok(wp, 0.5f, false))
+                if (Ok(wp, 0.5f, false, false))
                 {
                     float wy = Gy(wp);
                     Put(g, "T16c", "Wheelbarrow", wp, wy, 1.55f, YawAlong(t) + 8f, 0f, 3f, 0.03f, true);
@@ -508,7 +523,7 @@ namespace SleepingCalamity.EditorTools
             {
                 Vector2 wallPt = new Vector2(42.0f, -42.95f), n = new Vector2(0.81f, -0.58f), t = new Vector2(0.58f, 0.81f);
                 Vector2 cp = wallPt + n * 0.45f;
-                if (Ok(cp, 0.4f, false))
+                if (Ok(cp, 0.4f, false, false))
                 {
                     float cy = Gy(cp);
                     Put(g, "T17a", "CrateBase", cp, cy, 0.58f, YawAlong(t) + 4f, 0f, 0f, 0.03f, true);
@@ -522,6 +537,21 @@ namespace SleepingCalamity.EditorTools
                     Put(g, "T17a", "CrateTipped", tp, ty, 0.55f, YawAlong(t) + 40f, 0f, 78f, 0.02f);
                     for (int i = 0; i < 4; i++) { Vector2 q = tp + n * (0.3f + 0.25f * i) + Perp(n) * ((H(key, i, 895) - 0.5f) * 0.4f); if (Ok(q, 0.1f)) Apple(g, q, 14, i, i == 3); }
                 }
+            }
+            // T07b: a crate stack and a sack at the harvest tree's west side, in the frame's mid-ground
+            {
+                Vector2 tp = new Vector2(Trees[0].X, Trees[0].Z), t = new Vector2(0.9f, -0.44f);
+                Vector2 cp = tp + new Vector2(-1.6f, 0.5f);
+                if (Ok(cp, 0.35f, false, false))
+                {
+                    float cy = Gy(cp);
+                    Put(g, "T17a", "HarvestCrateBase", cp, cy, 0.58f, YawAlong(t) + 12f, 0f, 0f, 0.03f, true);
+                    Put(g, "T17b", "HarvestCrateTop", cp + t * 0.04f, cy + 0.22f, 0.6f, YawAlong(t) - 14f, 0f, 2f, 0f);
+                    Put(g, "T17a", "HarvestCrateSide", cp + new Vector2(-0.45f, 0.15f), Gy(cp), 0.55f, 40f, 0f, 78f, 0.02f);
+                    Decal(dec, "Hay", cp + new Vector2(0.1f, 0.2f), 1.8f, 1.8f, 160f, "Hay_Harvest");
+                    for (int i = 0; i < 4; i++) { Vector2 q = cp + new Vector2(-0.7f - 0.2f * i, 0.5f - 0.15f * i); if (Ok(q, 0.1f)) Apple(g, q, 16, i, i == 3); }
+                }
+                Vector2 sp = tp + new Vector2(-0.95f, 1.5f); if (Ok(sp, 0.3f, false, false)) Put(g, "C11b", "HarvestSack", sp, Gy(sp), 0.7f, 120f, 6f, 4f, 0.04f);
             }
             // tools leaning on the gate pier (orchard face)
             {
@@ -538,9 +568,9 @@ namespace SleepingCalamity.EditorTools
             }
             // the bench under the best crown
             {
-                Vector2 tp = trunkXZ.Count > 0 ? trunkXZ[0] : new Vector2(Trees[0].X, Trees[0].Z), f = new Vector2(0.92f, -0.38f).normalized;
+                Vector2 tp = trunkXZ.Count > 2 ? trunkXZ[2] : new Vector2(Trees[2].X, Trees[2].Z), f = new Vector2(-0.95f, 0.3f).normalized;
                 Vector2 bp = tp + f * 1.0f;
-                if (Ok(bp, 0.5f, false))
+                if (Ok(bp, 0.4f, false, false))
                 {
                     Put(g, "T16e", "Bench", bp, Gy(bp), 1.4f, YawFace(f), 0f, 3f, 0.04f, true);
                     Decal(dec, "LeavesB", bp + f * 0.3f, 2.6f, 2.6f, 15f, "Litter_Bench");
@@ -575,6 +605,7 @@ namespace SleepingCalamity.EditorTools
                 Put(g, "T17b", "NookCrateBroken", cb, Gy(cb), 0.58f, 25f, 0f, 62f, 0.02f);
                 for (int i = 0; i < 4; i++) { Vector2 q = cb + new Vector2(0.3f + 0.2f * i, -0.15f * i + 0.1f); if (Ok(q, 0.1f)) Apple(g, q, 15, i, i >= 2); }
             }
+            Vector2 lg = b + new Vector2(-1.3f, -1.0f); if (Ok(lg, 0.5f, false)) Put(g, "T18e", "NookLog_B", lg, Gy(lg), 1.9f, 60f, 2f, 3f, 0.08f);
             Vector2 r1 = b + new Vector2(0.4f, 1.5f); if (Ok(r1, 0.4f, false)) Put(g, "T05b", "NookRubble_B", r1, Gy(r1), 0.9f, 130f, 4f, -6f, 0.1f);
             Decal(dec, "Hay", b + new Vector2(0.5f, 0.0f), 1.7f, 1.7f, 330f, "Hay_NookB"); Decal(dec, "Damp", b, 2.4f, 2.4f, 90f, "Damp_NookB"); Decal(dec, "LeavesB", b + new Vector2(-0.3f, 0.6f), 2.6f, 2.6f, 10f, "Litter_NookB");
             for (int i = 0; i < 4; i++) Weed(flora, b + new Vector2(Mathf.Cos(i * 1.7f + 0.5f), Mathf.Sin(i * 1.7f + 0.5f)) * 1.5f, 902, i, 1.0f, 1.6f);
@@ -630,6 +661,13 @@ namespace SleepingCalamity.EditorTools
             {
                 Vector2 f = pier + OrchardNormal * 0.55f;
                 for (int k = 0; k < 4; k++) { Vector2 q = f + Dir(k * 90f + 30f) * 0.5f; if (Ok(q, 0.05f, false)) Weed(flora, q, 941 + (pier == PierA ? 0 : 1), k, 0.7f, 1.2f); }
+                if (pier == PierA)
+                {   // T07b: the pier in the foreground of Eye_Orchard stands on the lane side: ivy up its face, a fern and tufts at its foot
+                    Vector2 lf = pier - OrchardNormal * 0.65f;
+                    if (Ok(lf, 0.2f, false, false)) { Put(props, "T12c", "PierIvy", lf, Gy(lf), 1.7f, YawFace(OrchardNormal) + 180f, 0f, 3f, 0f); Put(props, "T12b", "PierFern", lf + new Vector2(-0.5f, 0.1f), Gy(lf), 0.8f, 40f, 0f, 0f, 0.03f); }
+                    for (int k = 0; k < 4; k++) { Vector2 q = lf + Dir(k * 90f + 50f) * 0.55f; if (Ok(q, 0.05f, false, false)) Weed(flora, q, 947, k, 0.8f, 1.3f); }
+                    Decal(dec, "MossSoft", lf, 1.8f, 1.8f, 90f, "PierMossLane");
+                }
                 Decal(dec, "MossSoft", f, 1.6f, 1.6f, pier == PierA ? 30f : 200f, "PierMoss" + (pier == PierA ? "A" : "B")); Decal(dec, "Grime", f + OrchardNormal * 0.1f, 1.5f, 0.9f, YawFace(-OrchardNormal) + 180f, "PierGrime" + (pier == PierA ? "A" : "B"));
             }
             // town wall inner face (the arc of radius 38 about (24,-26), inner face 37.35) from x 34 to 51
@@ -655,29 +693,61 @@ namespace SleepingCalamity.EditorTools
         {
             Transform g = Sub(props, "WallGap");
             Vector2 c = new Vector2(44.2f, -57.4f), n = new Vector2(0.51f, -0.86f), t = new Vector2(0.86f, 0.51f);   // 40-42: breach at (43.4,-58.6), crumbled at (46.7,-56.4) and (49.7,-53.9)
-            string[] kinds = { "T05b", "T05c", "T05b", "T05c", "T05b" };
-            for (int side = 0; side < 2; side++)
-                for (int k = 0; k < 7; k++)
-                {
-                    float along = (H(k, side, 961) - 0.3f) * 8f - 1.0f;   // -1 .. 7 m along the gap
-                    float outD = side == 0 ? -(0.9f + 1.6f * H(k, 5, 962)) : (0.9f + 1.4f * H(k, 6, 962));
-                    Vector2 q = c + t * along + n * outD;
-                    bool inside = side == 0;
-                    if (inside ? !Ok(q, 0.25f, false) : false) continue;
-                    float y = Gy(q);
-                    string kind = kinds[(k + side) % kinds.Length];
-                    Put(g, kind, "GapRubble_" + side + "_" + k, q, y, Mathf.Lerp(0.6f, 1.3f, H(k, 7 + side, 963)), H(k, 8, 963) * 360f, (H(k, 9, 963) - 0.5f) * 24f, (H(k, 10, 963) - 0.5f) * 24f, 0.2f);
-                }
-            for (int k = 0; k < 5; k++) { Vector2 q = c + t * (k * 1.6f - 0.8f) - n * 1.5f; if (Ok(q, 0.3f, false)) Put(g, "T12b", "GapFern_" + k, q, Gy(q), 0.75f + 0.1f * (k % 3), H(k, 1, 965) * 360f, 0f, 0f, 0.03f); }
-            for (int k = 0; k < 8; k++) { Vector2 q = c + t * (k * 1.0f - 1f) - n * Mathf.Lerp(0.5f, 2.2f, H(k, 2, 966)); if (Ok(q, 0.05f, false)) Weed(flora, q, 966, k, 0.9f, 1.5f); }
-            Decal(dec, "Damp", c - n * 1.0f, 3.2f, 2.2f, YawAlong(t), "GapDamp"); Decal(dec, "Moss", c - n * 1.8f + t * 2f, 2.0f, 2.0f, 40f, "GapMoss");
+            // T07b: the wall fell years ago. The breach's own modules give the courses; the spill is real scanned rubble (T05b/T05c/N03/T11a) stepping down from the wall foot in a
+            // heap that buries the module's base, with grass, ferns and moss through it. Larger pieces near the wall, smaller and sparser out into the grass.
+            string[] kinds = { "T05b", "N03", "T05c", "T11a", "T05b", "N03", "T05c" };
+            int made = 0;
+            for (int k = 0; k < 26; k++)
+            {
+                float along = (H(k, 1, 961) - 0.25f) * 9f - 2.8f;                 // about -3.5 .. 5.5 m along the gap
+                float depth = Mathf.Pow(H(k, 2, 962), 1.3f) * 3.6f + 0.1f;       // 0.1 .. 3.7 m out from the wall foot (into the orchard), crowded near the wall
+                Vector2 q = c + t * along - n * depth;
+                float size = Mathf.Lerp(1.9f, 0.55f, depth / 3.8f) * Mathf.Lerp(0.8f, 1.15f, H(k, 3, 963));
+                string kind = kinds[k % kinds.Length];
+                if (!Ok(q, 0.2f, false, false)) continue;
+                float y = Gy(q);
+                Put(g, kind, "GapRubble_" + k, q, y, size, H(k, 8, 963) * 360f, (H(k, 9, 963) - 0.5f) * 30f, (H(k, 10, 963) - 0.5f) * 30f, size * 0.3f);
+                made++;
+            }
+            // the heap that buries the floating module's base: big pieces on the wall line, sunk half in
+            for (int k = 0; k < 9; k++)
+            {
+                Vector2 q = c + t * (k * 0.5f - 0.6f) - n * (0.2f + 1.1f * H(k, 11, 968));
+                if (!Ok(q, 0.2f, false, false)) continue;
+                float size = Mathf.Lerp(1.5f, 2.5f, H(k, 12, 968));
+                Put(g, k % 3 == 0 ? "T11a" : k % 3 == 1 ? "N03" : "T05b", "GapHeap_" + k, q, Gy(q), size, H(k, 13, 968) * 360f, (H(k, 14, 968) - 0.5f) * 24f, (H(k, 15, 968) - 0.5f) * 24f, size * 0.38f);
+                made++;
+            }
+            // the ground east of the breach (the bare cracked plane): rubble, ferns, tufts, litter
+            for (int k = 0; k < 7; k++) { Vector2 q = c + t * (3.2f + 0.7f * k) - n * (0.6f + 2.2f * H(k, 16, 969)); if (Ok(q, 0.2f, false, false)) { Put(g, k % 2 == 0 ? "T05c" : "T11a", "GapEast_" + k, q, Gy(q), Mathf.Lerp(0.5f, 1.2f, H(k, 17, 969)), H(k, 18, 969) * 360f, (H(k, 19, 969) - 0.5f) * 20f, (H(k, 20, 969) - 0.5f) * 20f, 0.15f); made++; } }
+            for (int k = 0; k < 12; k++) { Vector2 q = c + t * (2.6f + 0.45f * k) - n * (0.5f + 2.6f * H(k, 21, 969)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 969, k, 0.9f, 1.6f); }
+            for (int k = 0; k < 4; k++) { Vector2 q = c + t * (3.5f + 1.1f * k) - n * (1.0f + 1.5f * H(k, 22, 969)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFernE_" + k, q, Gy(q), 0.75f, H(k, 23, 969) * 360f, 0f, 0f, 0.03f); }
+            Decal(dec, "LeavesB", c + t * 4.2f - n * 1.6f, 3.2f, 3.2f, 30f, "GapLitterE"); Decal(dec, "MossSoft", c + t * 3.4f - n * 0.9f, 2.6f, 2.6f, 80f, "GapMossE"); Decal(dec, "Damp", c + t * 5.0f - n * 1.3f, 3.0f, 2.0f, 20f, "GapDampE");
+            // in front of the floating box of the breach module (seen from Eye_OrchardGap at (41.9,-52.0) bearing 38 deg): two rows of big pieces 3.3-4.9 m out from the camera
+            for (int k = 0; k < 8; k++)
+            {
+                float d = 3.3f + 0.35f * (k % 4) + 0.4f * (k / 4), lat = (k % 4) * 0.75f - 0.9f;
+                Vector2 q = new Vector2(41.9f + 0.616f * d, -52.0f - 0.788f * d) + t * lat;
+                if (!Ok(q, 0.2f, false, false)) continue;
+                float size = Mathf.Lerp(1.6f, 2.4f, H(k, 31, 968));
+                Put(g, k % 3 == 0 ? "N03" : k % 3 == 1 ? "T11a" : "T05b", "GapFore_" + k, q, Gy(q), size, H(k, 32, 968) * 360f, (H(k, 33, 968) - 0.5f) * 20f, (H(k, 34, 968) - 0.5f) * 20f, size * 0.25f);
+                if (Ok(q + t * 0.9f, 0.2f, false, false)) Put(g, "T12b", "GapForeFern_" + k, q + t * 0.9f, Gy(q), 0.8f, H(k, 35, 968) * 360f, 0f, 0f, 0.03f);
+                made++;
+            }
+            Count("gapRubble", made);
+            for (int k = 0; k < 10; k++) { Vector2 q = c + t * (k * 0.95f - 3.3f) - n * (1.0f + 2.0f * H(k, 4, 965)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFern_" + k, q, Gy(q), 0.65f + 0.35f * H(k, 1, 965), H(k, 2, 965) * 360f, 0f, 0f, 0.03f); }
+            for (int k = 0; k < 26; k++) { Vector2 q = c + t * (k * 0.42f - 3.5f) - n * Mathf.Lerp(0.2f, 3.6f, H(k, 2, 966)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 966, k, 0.9f, 1.6f); }
+            for (int k = 0; k < 4; k++) { Vector2 q = c + t * (k * 2.1f - 2.8f) - n * (1.0f + 1.4f * H(k, 5, 967)); if (Ok(q, 0.2f, false, false)) Put(g, "T12c", "GapIvy_" + k, q, Gy(q), 1.1f, H(k, 6, 967) * 360f, 0f, 3f, 0f); }
+            Decal(dec, "Damp", c - n * 1.0f, 4.0f, 3.0f, YawAlong(t), "GapDamp"); Decal(dec, "Moss", c - n * 1.8f + t * 2f, 2.6f, 2.6f, 40f, "GapMoss"); Decal(dec, "Moss", c - n * 1.2f - t * 2.2f, 2.4f, 2.4f, 130f, "GapMoss2");
+            Decal(dec, "LeavesA", c - n * 3.0f, 3.0f, 3.0f, 70f, "GapLitterA"); Decal(dec, "LeavesB", c - n * 2.6f + t * 3f, 3.0f, 3.0f, 10f, "GapLitterB"); Decal(dec, "LeavesA", c - n * 3.4f - t * 2f, 2.6f, 2.6f, 200f, "GapLitterC");
+            for (int k = 0; k < 4; k++) { Vector2 q = c - n * (2.2f + 0.6f * k) + t * (k * 1.5f - 2f); if (Ok(q, 0.1f, false, false)) Apple(g, q, 17, k, k == 2); }
         }
 
         // ------------------------------------------------------------------------------------------------ one shadowless fill under the crowns
         static void FillLight(Transform g)
         {
             var go = new GameObject("OrchardFill"); go.transform.SetParent(g, false);
-            go.transform.position = new Vector3(41.0f, Gy(new Vector2(41.0f, -51.5f)) + 3.3f, -51.5f);
+            go.transform.position = new Vector3(39.4f, Gy(new Vector2(39.4f, -53.3f)) + 2.7f, -53.3f);   // T07b: over the harvest cluster
             Light l = go.AddComponent<Light>();
             l.type = LightType.Point; l.color = new Color(0.86f, 0.93f, 0.72f); l.intensity = 3.2f; l.range = 12f; l.shadows = LightShadows.None;
             Count("lights");
@@ -718,6 +788,7 @@ namespace SleepingCalamity.EditorTools
 
         static void Allotments(Transform root)
         {
+            var built = new List<Plot>();
             foreach (string id in new[] { "R2_07", "R2_18", "R2_22", "R3_02" })
             {
                 Foundation f = T.Foundations.Find(x => x.Id == id); if (f == null) continue;
@@ -727,7 +798,39 @@ namespace SleepingCalamity.EditorTools
                 Count("plots");
                 if (p.Score < 4) { Count("plotsEmpty"); continue; }
                 Fence(g, p); Beds(g, p, id); Cluster(g, p, id);
+                built.Add(p);
             }
+            AllotmentCamera(built);
+        }
+
+        // T07b: Cap_HM_Eye_Allotment, 1.65 m: the plot (of those built) with the clearest line to its beds from a spot 3.6-6 m out on free ground.
+        static void AllotmentCamera(List<Plot> built)
+        {
+            var big = new List<Bounds>();
+            foreach (Renderer rr in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None)) { Bounds bb = rr.bounds; if (bb.size.y > 1.8f) big.Add(bb); }
+            float bestScore = -1f;
+            foreach (Plot p in built)
+            {
+                Vector2 tg = p.W(0f, 1.8f); float gyT = Gy(tg) + 0.8f; Vector3 tgv = new Vector3(tg.x, gyT, tg.y);
+                for (int a = 0; a < 16; a++)
+                    foreach (float dist in new[] { 6.0f, 5.2f, 4.4f, 3.6f })
+                    {
+                        Vector2 cand = tg + Dir(a * 22.5f) * dist; var eye = new Vector3(cand.x, Gy(cand) + 1.65f, cand.y);
+                        if (Physics.CheckSphere(eye, 0.45f, ~0, QueryTriggerInteraction.Ignore)) { Count("camSphere"); continue; }
+                        Ray er = new Ray(eye, (tgv - eye).normalized); float el = Vector3.Distance(eye, tgv), clear = el; bool inside = false;
+                        foreach (Bounds bb in big)
+                        {
+                            if (Mathf.Abs(bb.center.x - tg.x) > 20f || Mathf.Abs(bb.center.z - tg.y) > 20f) continue;
+                            var ex = bb; ex.Expand(0.4f); if (ex.Contains(eye)) { inside = true; break; }
+                            if (bb.IntersectRay(er, out float hd) && hd < clear) clear = hd;
+                        }
+                        if (inside) { Count("camInside"); continue; }
+                        if (Physics.Linecast(eye, tgv, out RaycastHit hit, ~0, QueryTriggerInteraction.Ignore) && !(hit.collider is TerrainCollider)) clear = Mathf.Min(clear, hit.distance);
+                        float score = clear / el * 10f + dist * 0.1f;
+                        if (score > bestScore) { bestScore = score; AllotmentCam = (eye, tgv); }
+                    }
+            }
+            if (bestScore < 0f) Count("allotCamFailed");
         }
 
         static void Fence(Transform g, Plot p)
@@ -768,21 +871,29 @@ namespace SleepingCalamity.EditorTools
             }
             // a bean trellis built of planks on the back edge (two plots), a scarecrow toppled on R2_07
             if (id == "R2_18" || id == "R2_22" || id == "R3_02") Trellis(g, p.W(id == "R2_22" ? -1.7f : 1.9f, p.Depth - 0.55f), p.Rt, p.Key);
-            if (id == "R2_07")
-            {
-                Vector2 sp = p.W(2.0f, 3.2f);
-                if (PlotOk(sp, 0.6f))
+            if ((id == "R2_07" || id == "R3_02") && !scarecrowDone) Scarecrow(g, p);
+        }
+
+        static bool scarecrowDone;
+        internal static (Vector3 Pos, Vector3 Target)? AllotmentCam;
+        // T07b: the first free spot inside the plot (T07's single spot failed placement): toppled and weathered, hay round it.
+        static void Scarecrow(Transform g, Plot p)
+        {
+            float[] aa = { 2.0f, -2.2f, 0f, 2.5f, -2.6f, 1.0f, -1.0f }, dd = { 3.2f, 2.2f, 0.8f, 3.6f, 1.2f, 3.0f };
+            foreach (float d in dd)
+                foreach (float a in aa)
                 {
+                    Vector2 sp = p.W(a, d);
+                    if (!Ok(sp, 0.35f, false)) continue;
                     GameObject s = HollowmereGarden.Loose(g, "Scarecrow", new Vector3(sp.x, Gy(sp), sp.y), 40f);
-                    if (s != null)
-                    {
-                        foreach (Collider c in s.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
-                        s.transform.rotation = Quaternion.Euler(78f, 55f, 12f) * Quaternion.identity; s.transform.position = new Vector3(sp.x, Gy(sp) + 0.24f, sp.y);
-                        Recolor(s, "Worn", new Color(0.62f, 0.58f, 0.52f));
-                        Decal(g, "Hay", sp, 2.4f, 2.4f, 25f, "Hay_Scarecrow"); Count("scarecrow");
-                    }
+                    if (s == null) continue;
+                    foreach (Collider c in s.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+                    s.transform.rotation = Quaternion.Euler(78f, 55f, 12f); s.transform.position = new Vector3(sp.x, Gy(sp) + 0.24f, sp.y);
+                    Recolor(s, "Worn", new Color(0.62f, 0.58f, 0.52f));
+                    Decal(g, "Hay", sp, 2.4f, 2.4f, 25f, "Hay_Scarecrow"); Count("scarecrow"); scarecrowDone = true;
+                    return;
                 }
-            }
+            Count("scarecrowFailed");
         }
 
         static void Bed(Transform g, Plot p, Vector2 c, Vector2 along, float len, bool replanted, int key)
