@@ -117,10 +117,12 @@ namespace SleepingCalamity.EditorTools
                         if (eyeCams.Any(e => Vector2.Distance(e, p) < RsEyeClear)) continue;
                         string code = codes[(int)(H(key, 3, 1600) * codes.Length) % codes.Length];
                         if (row == 1 && k == 1) code = "TR06";
+                        if (H(key, 9, 1600) < 0.2f) continue;   // T13c: gaps in the hedge, so it is no longer one lumpy body
+                        if (H(key, 10, 1600) > 0.9f) code = "TR05";   // T13c: a sapling now and then
                         GameObject pf = Prefab(code);
                         if (pf == null) { Count("missing_" + code); continue; }
                         Bounds ub = Unit(pf);
-                        float h = (code == "TR06" ? Mathf.Lerp(2.0f, 2.5f, H(key, 4, 1600)) : Mathf.Lerp(1.5f, 1.9f, H(key, 4, 1600))) * (i.Scale / 1.2f), s = h / Mathf.Max(0.1f, ub.size.y);
+                        float h = (code == "TR06" ? Mathf.Lerp(2.0f, 2.7f, H(key, 4, 1600)) : code == "TR05" ? Mathf.Lerp(2.2f, 3.0f, H(key, 4, 1600)) : Mathf.Lerp(1.0f, 2.3f, Mathf.Pow(H(key, 4, 1600), 1.4f))) * (i.Scale / 1.2f), s = h / Mathf.Max(0.1f, ub.size.y);
                         var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
                         go.name = "HedgeBush_" + Count2();
                         go.transform.localScale = new Vector3(s * 1.1f, s, s * 1.1f);
@@ -129,7 +131,27 @@ namespace SleepingCalamity.EditorTools
                         foreach (Collider col in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
                         Count("hedgeBushes");
                     }
+                // T13c: a post-and-rail fence (T27p) runs along the road side of the hedge, in sections with gaps
+                Vector2 rn = RoadNearest(c);
+                Vector2 toRoad = (rn - c).normalized;
+                if (HollowmereTerrain.IsPaved(T, c.x, c.y)) continue;
+                for (int fs = 0; fs < 3; fs++)
+                {
+                    int fk = Mathf.RoundToInt(i.X * 3f) * 131 + Mathf.RoundToInt(i.Z * 7f) + fs * 29;
+                    if (H(fk, 1, 1610) < 0.3f) continue;
+                    Vector2 fp = c + axis * ((fs - 1) * 1.72f) + toRoad * (1.15f + (H(fk, 2, 1610) - 0.5f) * 0.3f);
+                    if (eyeCams.Any(e => Vector2.Distance(e, fp) < RsEyeClear) || !RsFree(fp, 0.3f)) continue;
+                    Put(parent, "T27p", "HedgeFence_" + Count2(), fp, TY(fp), 1.72f, YawAlong(axis) + (H(fk, 3, 1610) - 0.5f) * 6f, 0f, (H(fk, 4, 1610) - 0.5f) * 4f, 0.05f);
+                    Count("hedgeFence");
+                }
             }
+        }
+        static Vector2 RoadNearest(Vector2 p)
+        {
+            Vector2 best = p; float bd = float.MaxValue;
+            float len = ArcTo(rp.Length - 1);
+            for (float s = 0f; s <= len; s += 1.5f) { Vector2 q = RoadAt(s, out _); float d = (q - p).sqrMagnitude; if (d < bd) { bd = d; best = q; } }
+            return best;
         }
         static int rsSeq; static int Count2() => rsSeq++;
 

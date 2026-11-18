@@ -12,11 +12,11 @@ namespace SleepingCalamity.EditorTools
         public static bool Drop(string name)
         {
             bool odd = (Sum(name) & 1) == 1;
-            if (name.StartsWith("Rut_") || name.StartsWith("WornPath_") || name.StartsWith("HillDecal_") || name.StartsWith("PathMud_") || name.StartsWith("TownWallFoot_") || name.StartsWith("TrunkMoss_")) return odd;
+            if (name.StartsWith("Rut_") || name.StartsWith("WornPath_") || name.StartsWith("PathMud_")) return odd;   // T13c: HillDecal_, TownWallFoot_ and TrunkMoss_ are no longer thinned (they grounded the orchard, shore and road)
             if (name.StartsWith("BankDecal_") || name.StartsWith("SBankDecal_") || name.StartsWith("ScarpDecal_") || name.StartsWith("SlopeDecal_") || name.StartsWith("CragDecal_")) return odd;
             if (name.StartsWith("CobbleLeaves_") || name.StartsWith("CobbleMoss_") || name.StartsWith("FootDecal_") || name.StartsWith("GraveMoss_")) return odd;
             if (name.StartsWith("Litter_") && name.EndsWith("b")) return true;
-            if (name.StartsWith("Gap") && (char.IsDigit(name[name.Length - 1]) || name.EndsWith("C") || name.EndsWith("B"))) return true;
+            // T13c: the Gap* litter decals are kept again (OrchardGap foreground)
             return false;
         }
     }

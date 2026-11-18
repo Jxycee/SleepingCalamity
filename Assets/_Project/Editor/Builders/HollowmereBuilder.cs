@@ -235,6 +235,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereOrchard.BuildBell(set, ruined, rebuilt, t);   // T09: bell yard, churchyard, keep banks, crag foot (after the orchard: shares its helpers and caches)
             HollowmereOrchard.BuildRoadside(set, ruined, rebuilt, t);   // T10: road blockage, road dressing, shrub hedges, hill edge (after the bell yard: shares its helpers)
             HollowmereOrchard.BuildBanksT13(set, ruined, rebuilt, t);   // T13a: outcrops, fern bands and roots on the keep banks and the crag face (after the roadside: shares its helpers; before Combine and Mesh LODs)
+            HollowmereOrchard.BuildT13c(set, ruined, rebuilt, t);   // T13c: orchard lane-kit pier and broken courses to church-ruin stone, OrchardGap foreground, shore wall foot, R3_02 foot
             HollowmereGround.Build(set, ruined, rebuilt, t);   // T13a: lone street props grouped by use or removed, stall goods, contact rings, plants and chips (after every collider)
             BuildPathDebug(root, t);
 

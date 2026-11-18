@@ -247,6 +247,7 @@ namespace SleepingCalamity.EditorTools
             foreach (RoadItem i in plan)
             {
                 if (i.Kind != RoadItemKind.Tree && i.Kind != RoadItemKind.FieldHedge) continue;
+                if (!i.OnRing && HollowmereOrchard.NearRoadEye(i.X, i.Z)) continue;   // T13c: real scanned trees stand here (HollowmereOrchard.RoadTrees)
                 var key = (Mathf.FloorToInt(i.X / TileSize), Mathf.FloorToInt(i.Z / TileSize), i.OnRing);
                 if (!tiles.TryGetValue(key, out CardMesh cm)) tiles[key] = cm = new CardMesh();
                 float y = GroundY(t, i.X, i.Z);
