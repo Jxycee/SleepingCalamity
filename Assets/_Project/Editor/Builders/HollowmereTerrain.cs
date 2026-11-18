@@ -173,7 +173,11 @@ namespace SleepingCalamity.EditorTools
                     float grass, soil = 0f, path = 0f, cobble = 0f;
                     float lane = LaneEdge(t, p, false);
                     float road = CountryRoad(t, p, out float roadOff, out float roadS);
-                    if (lane < 0f || IsPavedArea(x, z)) { cobble = 1f; grass = 0f; }
+                    if (lane < 0f || IsPavedArea(x, z))
+                    {
+                        cobble = 1f; grass = 0f;
+                        if (lane < 0f && !IsPavedArea(x, z) && HollowmereLayout.PlateauDistance(x, z) < 29f) LaneWear(x, z, -lane, ref grass, ref soil, ref path, ref cobble);   // T13a
+                    }
                     else if (road < 0.6f)
                     {
                         // Q15: the Saltwake Road past the gate apron is a rutted dirt road: worn path, two soil ruts about 0.8 m either side of the
@@ -236,8 +240,10 @@ namespace SleepingCalamity.EditorTools
                             // Round 2: the first build read as a bare tan slope (soil + the steep rule's cobble, stretched). Woodland floor is mostly grass and moss
                             // in the shade, with litter patches; the crag keeps more earth.
                             float cragFace = wood * (1f - Smooth(HollowmereLayout.CragHeight - 1f, HollowmereLayout.CragHeight + 4f, hill));
-                            soil = Mathf.Max(soil, wood * (0.10f + 0.30f * Smooth(0.45f, 0.8f, litter)) + 0.35f * cragFace);
-                            soil = Mathf.Max(soil, 0.5f * wood * HollowmereOrchard.BellCrag(x, z));   // T09b: the crag face behind the bell yard and churchyard is earth and grass in even parts (R12: stretched cobble chevrons); the carpet and objects dress it
+                            path *= 1f - 0.85f * HollowmereOrchard.BellCrag(x, z);   // T13a
+                            float cragStripe = 0.12f + 0.95f * Smooth(0.56f, 0.72f, Mathf.PerlinNoise(x * 0.85f + 9f, z * 0.13f + 5f));   // T13a: gullies down the fall line (z) 1-2 m wide, grass carries the bands between
+                            soil = Mathf.Max(soil, wood * (0.10f + 0.30f * Smooth(0.45f, 0.8f, litter)) + 0.55f * cragFace * cragStripe);
+                            soil = Mathf.Max(soil, 0.8f * wood * HollowmereOrchard.BellCrag(x, z) * cragStripe);   // T09b: the crag face behind the bell yard and churchyard is earth and grass in even parts (R12: stretched cobble chevrons); the carpet and objects dress it
                             path = Mathf.Max(path, wood * 0.10f * Smooth(0.55f, 0.85f, Mathf.PerlinNoise(x * 0.09f + 5f, z * 0.09f + 311f)));
                         }
                         float shoreStone = 0f, bankStone = 0f, bankW = 0f, shoreSoil = 0f;
@@ -282,7 +288,10 @@ namespace SleepingCalamity.EditorTools
                         if (kb > 0f)
                         {
                             rock *= 1f - kb;
-                            soil = Mathf.Max(soil, kb * (0.24f + 0.42f * Smooth(0.35f, 0.70f, Mathf.PerlinNoise(x * 0.7f + 5f, z * 0.7f + 9f))));
+                            // T13a: erosion lines down the fall line (noise stretched along x, the banks fall in x): bare gullies 0.5-1 m wide between grass bands, not one tan ramp
+                            float gully = Smooth(0.60f, 0.76f, Mathf.PerlinNoise(x * 0.10f + 3f, z * 1.15f + 7f)), bandN = Smooth(0.35f, 0.70f, Mathf.PerlinNoise(x * 0.7f + 5f, z * 0.7f + 9f));
+                            soil = Mathf.Max(soil, kb * Mathf.Clamp01(0.06f + 0.85f * gully + 0.15f * bandN));
+                            path *= 1f - kb;   // T13a: no pale worn-path grit on the bank, so grass and the gullies carry it
                             path = Mathf.Clamp01(path) * (1f - soil);
                             grass = Mathf.Max(0f, 1f - soil - path);
                         }
@@ -298,6 +307,23 @@ namespace SleepingCalamity.EditorTools
                 }
             Debug.Log("SC HOLLOWMERE splat outside the wall: texels=" + statOut + " bare earth (soil>0.5)=" + (100f * statBare / Mathf.Max(1, statOut)).ToString("F1") + "% dry path (>0.4)=" + (100f * statPath / Mathf.Max(1, statOut)).ToString("F1") + "% cobble=" + statCob);
             return a;
+        }
+
+        // T13a cobble wear on the lanes inside the wall, from the terrain paint (no decals): inside = metres from the lane edge. The cobble layer keeps the centre; dirt (the Dirt layer
+        // height-blended under the setts) fills the gaps in ragged 1-2 m patches and thickens toward the edges, and grass and the worn-path grit creep in from the edges and along the
+        // walls in a ragged band 0.3-1.4 m deep. Hash/noise only, so builds are identical.
+        static void LaneWear(float x, float z, float inside, ref float grass, ref float soil, ref float path, ref float cobble)
+        {
+            float n1 = Mathf.PerlinNoise(x * 0.9f + 17f, z * 0.9f + 5f), n2 = Mathf.PerlinNoise(x * 2.3f + 71f, z * 2.3f + 29f), n3 = Mathf.PerlinNoise(x * 0.35f + 3f, z * 0.35f + 41f);
+            float edge = 1f - Smooth(0.1f, 1.6f, inside + 0.7f * (n1 - 0.5f));                                  // 1 at the kerb, ragged
+            float creep = (1f - Smooth(0.0f, 0.5f + 1.0f * n3, inside + 0.5f * (n2 - 0.5f))) * Smooth(0.3f, 0.6f, n1);   // grass pushes in from the edge in tongues
+            float gaps = 0.22f * Smooth(0.42f, 0.78f, n2) + 0.30f * edge;                                       // dirt in the joints, heavier at the edges
+            float grit = 0.3f * edge * Smooth(0.35f, 0.7f, n3);                                                 // worn-path grit mixed into the gaps
+            float lowSpot = Smooth(0.62f, 0.82f, n3) * 0.12f;                                                   // darker damp earth where the lane dips
+            grass = Mathf.Clamp01(0.7f * creep);
+            soil = Mathf.Clamp01((gaps + lowSpot) * (1f - grass));
+            path = Mathf.Clamp01(grit * (1f - grass - soil));
+            cobble = Mathf.Max(0f, 1f - grass - soil - path);
         }
 
         // Signed distance (m) from the nearest lane's edge: negative inside a lane. Without countryRoad the Saltwake Road past the gate apron is left out

@@ -121,7 +121,7 @@ namespace SleepingCalamity.EditorTools
                 BuilderUtil.EnsureFolder(MaterialsFolder);
                 Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_RD_RoadHedge.mat", leaf.shader);
                 m.CopyPropertiesFromMaterial(leaf);
-                foreach (string tex in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" }) if (m.HasProperty(tex)) m.SetTextureScale(tex, new Vector2(3f, 3f));
+                foreach (string tex in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" }) if (m.HasProperty(tex)) m.SetTextureScale(tex, Vector2.one);   // T13a: 1x1. The B9 atlas cell the Hedge_A/B cards use spans UV 0..0.6 x 0..0.5; the 3x3 tiling sampled across atlas cells (and wrapped past 1)
                 EditorUtility.SetDirty(m);
                 hedgeSlots["B9_Foliage"] = m;
             }

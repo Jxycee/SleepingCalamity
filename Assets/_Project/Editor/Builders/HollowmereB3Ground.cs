@@ -30,8 +30,9 @@ namespace SleepingCalamity.EditorTools
             B0Fab.TexSet row = B0Fab.Megascans("T01c_cobblestone", "T01c_cobble");   // round 2: T01 is fan-laid and its arcs repeat every 2 m; T01c is coursed like H1 (spec leeway: DH4 says concept cobbles)
 
             BuilderUtil.EnsureFolder(MatFolder);
-            Material m = LookTestBuilder.Ensure(MatFolder + "/M_SquareGround.mat", src.shader);
+            Material m = LookTestBuilder.Ensure(MatFolder + "/M_SquareGround.mat", Shader.Find("SleepingCalamity/WearLit") ?? src.shader);   // T13a: WearLit reads the bed's vertex colours as the cobble wear (HollowmereGround.SquareWear)
             m.CopyPropertiesFromMaterial(src);
+            Shader wearShader = Shader.Find("SleepingCalamity/WearLit"); if (wearShader != null && m.shader != wearShader) m.shader = wearShader;
             foreach (var k in src.enabledKeywords) m.EnableKeyword(k.name);
             if (row != null) { B0Fab.Apply(m, row, 1f); m.SetFloat("_BumpScale", 1.6f); }   // on the square's own copy: the B0 material stays T01
             var macro = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Content/Textures/BeautyCorner/Surround/SurroundMacro.png");

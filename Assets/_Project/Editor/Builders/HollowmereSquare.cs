@@ -120,7 +120,7 @@ namespace SleepingCalamity.EditorTools
             {
                 var bedGo = (GameObject)PrefabUtility.InstantiatePrefab(bedFbx, holder); bedGo.name = "Art_SquareBed";
                 if (ground != null) BeautyCornerGround.Assign(bedGo, ground);
-                DrapeBed(bedGo, holder, folder, drop, origin, step, nx, nz);
+                DrapeBed(bedGo, holder, folder, drop, origin, step, nx, nz, t);
             }
             else Debug.LogWarning("SC HOLLOWMERE square ground: SquareBed.fbx is missing");
             HollowmereB3Ground.BuildEdges(holder, t, folder);
@@ -249,7 +249,7 @@ namespace SleepingCalamity.EditorTools
 
         // Copies each bed mesh with its vertices moved up by the drape (vertex -> holder space -> + correction -> back), saved as <folder>/SquareBed_Draped[_n].asset
         // (rewritten only when the vertices changed), and puts the copy on the instance's MeshFilter.
-        static void DrapeBed(GameObject bedGo, Transform holder, string folder, float[] drop, Vector2 origin, float step, int nx, int nz)
+        static void DrapeBed(GameObject bedGo, Transform holder, string folder, float[] drop, Vector2 origin, float step, int nx, int nz, TownLayout t)
         {
             int n = 0;
             foreach (MeshFilter mf in bedGo.GetComponentsInChildren<MeshFilter>(true))
@@ -262,10 +262,15 @@ namespace SleepingCalamity.EditorTools
                 float minY = float.MaxValue, maxY = float.MinValue;
                 for (int i = 0; i < v.Length; i++) { float y = m.MultiplyPoint3x4(v[i]).y; minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y); }
                 var uv = new Vector2[v.Length];
+                var wear = new Color32[v.Length];   // T13a: the WearLit mask (R grime, G moss, B polish), HollowmereGround.SquareWear
                 for (int i = 0; i < v.Length; i++)
                 {
                     Vector3 p = m.MultiplyPoint3x4(v[i]);
-                    p.y += SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x, p.z) + HollowmereB3Ground.BedLift - minY;
+                    float d0 = SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x, p.z);
+                    float ring = 0f;
+                    for (int k = 0; k < 4; k++) ring += SleepingCalamity.Presentation.CobbleSpawner.SampleDrop(drop, origin, step, nx, nz, p.x + (k == 0 ? 1.5f : k == 1 ? -1.5f : 0f), p.z + (k == 2 ? 1.5f : k == 3 ? -1.5f : 0f)) * 0.25f;
+                    wear[i] = (Color32)HollowmereGround.SquareWear(t, p.x + holder.position.x, p.z + holder.position.z, Mathf.Clamp01((ring - d0) / 0.025f));
+                    p.y += d0 + HollowmereB3Ground.BedLift - minY;
                     uv[i] = new Vector2((p.x + holder.position.x) / 2f, (p.z + holder.position.z) / 2f);   // world metres / 2: the T01 tile is 2 m
                     v[i] = inv.MultiplyPoint3x4(p);
                 }
@@ -273,10 +278,10 @@ namespace SleepingCalamity.EditorTools
                 string path = folder + "/SquareBed_Draped" + (n == 0 ? "" : "_" + n) + ".asset"; n++;
                 var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
                 Mesh result;
-                if (existing != null && existing.vertexCount == v.Length && existing.vertices.SequenceEqual(v) && existing.uv.SequenceEqual(uv) && existing.subMeshCount == src.subMeshCount) result = existing;
+                if (existing != null && existing.vertexCount == v.Length && existing.vertices.SequenceEqual(v) && existing.uv.SequenceEqual(uv) && existing.colors32.SequenceEqual(wear) && existing.subMeshCount == src.subMeshCount) result = existing;
                 else
                 {
-                    var copy = Object.Instantiate(src); copy.name = "SquareBed_Draped"; copy.vertices = v; copy.uv = uv;
+                    var copy = Object.Instantiate(src); copy.name = "SquareBed_Draped"; copy.vertices = v; copy.uv = uv; copy.colors32 = wear;
                     copy.RecalculateBounds();
                     if (src.normals != null && src.normals.Length > 0) copy.RecalculateNormals();   // the drape tilts the bed a little: keep the lighting honest
                     copy.RecalculateTangents();   // the UVs were rewritten: the FBX's tangents no longer match

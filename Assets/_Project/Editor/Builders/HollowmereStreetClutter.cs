@@ -19,13 +19,13 @@ namespace SleepingCalamity.EditorTools
     {
         const string MatFolder = "Assets/_Project/Content/Materials/Hollowmere";
 
-        sealed class Kind
+        internal sealed class Kind
         {
             public string[] Src; public float Min, Max; public bool Solid, Along, Lay; public float Tilt = 5f, Sink = 0.03f;
             public Kind(float min, float max, params string[] src) { Min = min; Max = max; Src = src; }
         }
 
-        static readonly Dictionary<string, Kind> Kinds = new Dictionary<string, Kind>
+        internal static readonly Dictionary<string, Kind> Kinds = new Dictionary<string, Kind>
         {
             ["Barrel"] = new Kind(0.75f, 0.95f, "C:C07b/C07b.prefab") { Solid = true, Tilt = 3f },
             ["Sack"] = new Kind(0.55f, 0.8f, "C:C11b/C11b.prefab") { Sink = 0.06f },
@@ -113,7 +113,7 @@ namespace SleepingCalamity.EditorTools
         }
 
         // ------------------------------------------------------------------------------------------------ helpers
-        static GameObject Make(string src, Transform parent)
+        internal static GameObject Make(string src, Transform parent)
         {
             if (src.StartsWith("Q:", System.StringComparison.Ordinal)) return HollowmereClutter.Instantiate(src.Substring(2), parent);
             if (src.StartsWith("R:", System.StringComparison.Ordinal)) return HollowmereRoad.Prop(src.Substring(2), parent);
@@ -121,9 +121,9 @@ namespace SleepingCalamity.EditorTools
             return pf == null ? null : (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
         }
 
-        static void Strip(GameObject go) { foreach (Collider c in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c); }
+        internal static void Strip(GameObject go) { foreach (Collider c in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c); }
 
-        static Bounds RenderBounds(GameObject go)
+        internal static Bounds RenderBounds(GameObject go)
         {
             Bounds b = default; bool any = false;
             foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
@@ -168,6 +168,47 @@ namespace SleepingCalamity.EditorTools
             GameObject g = LookTestBuilder.Prim(frame, name, PrimitiveType.Cube, c, size, m);
             g.transform.localRotation = Quaternion.Euler(euler);
             return g;
+        }
+
+        // T13a: a beam, post or plank of the adopted timber props (T05d plank, T06 log) instead of a scaled cube: the prop is turned so its long axis is the holder's +X, stretched to `len` and
+        // thinned to `thick` (cross-section keeps its own proportions), centred on `c` in `frame`'s space and turned by `euler` (the holder's +X is the beam axis: euler z = 90 stands it up).
+        internal static GameObject Timber(Transform frame, string name, Vector3 c, Vector3 euler, float len, float thick, string src = "A:T05d/T05d.prefab")
+        {
+            var holder = new GameObject(name).transform; holder.SetParent(frame, false);
+            GameObject go = Make(src, holder);
+            if (go == null) { Object.DestroyImmediate(holder.gameObject); return null; }
+            Strip(go);
+            holder.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.transform.localPosition = Vector3.zero; go.transform.localRotation = Quaternion.identity; go.transform.localScale = Vector3.one;
+            Bounds b0 = RenderBounds(go);
+            int a = b0.size.x >= b0.size.y && b0.size.x >= b0.size.z ? 0 : b0.size.y >= b0.size.z ? 1 : 2;
+            float[] sz = { b0.size.x, b0.size.y, b0.size.z };
+            float cross = Mathf.Max(0.01f, a == 0 ? Mathf.Max(sz[1], sz[2]) : a == 1 ? Mathf.Max(sz[0], sz[2]) : Mathf.Max(sz[0], sz[1]));
+            float k = thick / cross, sl = len / Mathf.Max(0.01f, sz[a]);
+            go.transform.localScale = new Vector3(a == 0 ? sl : k, a == 1 ? sl : k, a == 2 ? sl : k);
+            go.transform.localRotation = a == 0 ? Quaternion.identity : a == 1 ? Quaternion.Euler(0f, 0f, -90f) : Quaternion.Euler(0f, 90f, 0f);
+            Bounds b2 = RenderBounds(go);
+            go.transform.position += -b2.center;
+            holder.localPosition = c; holder.localRotation = Quaternion.Euler(euler);
+            return holder.gameObject;
+        }
+
+        // T13a: one prop of a Kinds row at a chosen spot, with the cluster rules' own hashed size, yaw and tilt; null when the spot fails HollowmereStreets.Valid. Solid kinds get a box collider.
+        internal static GameObject PlaceKind(Transform parent, string kn, string name, Vector2 p, int hA, int hB)
+        {
+            Kind kind = Kinds[kn];
+            float ext = Mathf.Lerp(kind.Min, kind.Max, HollowmereStreets.H(hA, hB, 37));
+            if (!HollowmereStreets.Valid(p, kind.Solid, ext * 0.5f, out float y)) return null;
+            string src = kind.Src[(int)(HollowmereStreets.H(hA, hB, 41) * kind.Src.Length) % kind.Src.Length];
+            GameObject go = Make(src, parent);
+            if (go == null) return null;
+            Strip(go);
+            float yaw = HollowmereStreets.H(hA, hB, 38) * 360f;
+            float tilt = kind.Lay ? 82f + HollowmereStreets.H(hA, hB, 39) * 8f : 2f + (kind.Tilt - 2f) * HollowmereStreets.H(hA, hB, 39);
+            float roll = (HollowmereStreets.H(hA, hB, 40) - 0.5f) * 2f * (kind.Lay ? 20f : kind.Tilt);
+            Fit(go, name, p, y, ext, yaw, kind.Lay ? tilt : (HollowmereStreets.H(hA, hB, 42) - 0.5f) * 2f * tilt, roll, kind.Sink, out _);
+            if (kind.Solid && HollowmereClutter.VisibleBounds(go.transform, out Bounds vb)) { var box = go.AddComponent<BoxCollider>(); box.center = vb.center; box.size = vb.size * 0.9f; Physics.SyncTransforms(); }
+            return go;
         }
 
         // The wall face of a lot that looks at the lane (or the square): the face whose street side point is nearest a lane edge.
@@ -260,11 +301,12 @@ namespace SleepingCalamity.EditorTools
                 var frame = new GameObject("BellPost").transform; frame.SetParent(HollowmereStreets.Group(landmarks, "School"), false);
                 Vector2 p = At(sc, sc.Len * 0.5f, 0.75f);
                 frame.SetPositionAndRotation(new Vector3(p.x, GroundAt(p), p.y), Quaternion.Euler(0f, YawAlong(sc), 0f));
-                Beam(frame, "PostL", new Vector3(-0.65f, 1.2f, 0f), new Vector3(0.16f, 2.4f, 0.16f), new Vector3(0f, 0f, 1.5f), oak);
-                Beam(frame, "PostR", new Vector3(0.65f, 1.2f, 0f), new Vector3(0.16f, 2.4f, 0.16f), new Vector3(0f, 0f, -1.5f), oak);
-                Beam(frame, "Cross", new Vector3(0f, 2.34f, 0f), new Vector3(1.55f, 0.13f, 0.13f), Vector3.zero, oak);
-                Beam(frame, "BraceL", new Vector3(-0.45f, 2.05f, 0f), new Vector3(0.07f, 0.55f, 0.07f), new Vector3(0f, 0f, 40f), oak);
-                Beam(frame, "BraceR", new Vector3(0.45f, 2.05f, 0f), new Vector3(0.07f, 0.55f, 0.07f), new Vector3(0f, 0f, -40f), oak);
+                const string log = "A:T06b/T06b.prefab";   // T13a: posts and beams are the adopted log and plank props, not scaled cubes
+                Timber(frame, "PostL", new Vector3(-0.65f, 1.2f, 0f), new Vector3(0f, 0f, 91.5f), 2.4f, 0.2f, log);
+                Timber(frame, "PostR", new Vector3(0.65f, 1.2f, 0f), new Vector3(0f, 0f, 88.5f), 2.4f, 0.2f, log);
+                Timber(frame, "Cross", new Vector3(0f, 2.34f, 0f), new Vector3(0f, 0f, 0f), 1.7f, 0.17f, log);
+                Timber(frame, "BraceL", new Vector3(-0.45f, 2.05f, 0f), new Vector3(0f, 0f, 130f), 0.6f, 0.09f);
+                Timber(frame, "BraceR", new Vector3(0.45f, 2.05f, 0f), new Vector3(0f, 0f, 50f), 0.6f, 0.09f);
                 GameObject bell = LookTestBuilder.Prim(frame, "Bell", PrimitiveType.Sphere, new Vector3(0.05f, 1.95f, 0f), new Vector3(0.42f, 0.46f, 0.42f), bronze);
                 bell.transform.localRotation = Quaternion.Euler(0f, 0f, 9f);
                 LookTestBuilder.Prim(frame, "BellMouth", PrimitiveType.Cylinder, new Vector3(0.04f, 1.74f, 0f), new Vector3(0.44f, 0.03f, 0.44f), bronze);
@@ -279,12 +321,12 @@ namespace SleepingCalamity.EditorTools
                 frame.SetPositionAndRotation(new Vector3(p.x, GroundAt(p), p.y), Quaternion.Euler(0f, YawAlong(ws), 0f));
                 foreach (float x in new[] { -0.8f, 0.8f })
                 {
-                    Beam(frame, "LegA", new Vector3(x, 0.45f, 0.16f), new Vector3(0.09f, 1.0f, 0.09f), new Vector3(-20f, 0f, 0f), oak);
-                    Beam(frame, "LegB", new Vector3(x, 0.45f, -0.16f), new Vector3(0.09f, 1.0f, 0.09f), new Vector3(20f, 0f, 0f), oak);
-                    Beam(frame, "Rung", new Vector3(x, 0.3f, 0f), new Vector3(0.07f, 0.07f, 0.5f), Vector3.zero, oak);
-                    Beam(frame, "Top", new Vector3(x, 0.92f, 0f), new Vector3(0.12f, 0.1f, 0.4f), Vector3.zero, oak);
+                    Timber(frame, "LegA", new Vector3(x, 0.45f, 0.16f), new Vector3(-20f, 0f, 90f), 1.05f, 0.12f);
+                    Timber(frame, "LegB", new Vector3(x, 0.45f, -0.16f), new Vector3(20f, 0f, 90f), 1.05f, 0.12f);
+                    Timber(frame, "Rung", new Vector3(x, 0.3f, 0f), new Vector3(0f, -90f, 0f), 0.5f, 0.09f);
+                    Timber(frame, "Top", new Vector3(x, 0.92f, 0f), new Vector3(0f, -90f, 0f), 0.42f, 0.13f, "A:T06b/T06b.prefab");
                 }
-                Beam(frame, "Rail", new Vector3(0f, 1.0f, 0.05f), new Vector3(2.0f, 0.08f, 0.1f), new Vector3(0f, 0f, 1.5f), oak);
+                Timber(frame, "Rail", new Vector3(0f, 1.0f, 0.05f), new Vector3(0f, 0f, 1.5f), 2.1f, 0.12f, "A:T06b/T06b.prefab");
                 Put(HollowmereStreets.Group(landmarks, "Workshop"), "SawLog", "A:T06a/T06a.prefab", p, 1.6f, YawAlong(ws), 0f, 0f, false, 0f, GroundAt(p) + 1.04f);
                 Put(HollowmereStreets.Group(landmarks, "Workshop"), "Plane", "A:T14d/T14d.prefab", At(ws, ws.Len * 0.5f + 1.7f, 0.55f), 0.38f, 20f, 0f, 0f, false);
                 Put(HollowmereStreets.Group(landmarks, "Workshop"), "LeaningPlank", "A:T05d/T05d.prefab", At(ws, ws.Len * 0.5f - 1.7f, 0.25f), 1.8f, YawAlong(ws) + 90f, 0f, 24f, false, 0f);
@@ -316,16 +358,17 @@ namespace SleepingCalamity.EditorTools
                 Vector2 b = new Vector2(15.6f, 7.5f - 0.32f);
                 var frame = new GameObject("WrenList").transform; frame.SetParent(d1, false);
                 frame.SetPositionAndRotation(new Vector3(b.x, GroundAt(b), b.y), Quaternion.Euler(0f, 180f, 0f));   // the board faces the square (south)
-                Beam(frame, "PostL", new Vector3(-0.8f, 0.95f, 0f), new Vector3(0.1f, 1.9f, 0.1f), Vector3.zero, oak);
-                Beam(frame, "PostR", new Vector3(0.8f, 0.95f, 0f), new Vector3(0.1f, 1.9f, 0.1f), Vector3.zero, oak);
-                Beam(frame, "Board", new Vector3(0f, 1.35f, -0.04f), new Vector3(1.75f, 1.2f, 0.07f), Vector3.zero, oak);
-                Beam(frame, "Cap", new Vector3(0f, 1.99f, -0.02f), new Vector3(1.95f, 0.07f, 0.16f), Vector3.zero, oak);
+                Timber(frame, "PostL", new Vector3(-0.8f, 0.95f, 0f), new Vector3(0f, 0f, 90f), 1.95f, 0.14f, "A:T06b/T06b.prefab");   // T13a: posts and a board of three planks, not scaled cubes
+                Timber(frame, "PostR", new Vector3(0.8f, 0.95f, 0f), new Vector3(0f, 0f, 89f), 1.95f, 0.14f, "A:T06b/T06b.prefab");
+                for (int pl = 0; pl < 3; pl++) Timber(frame, "BoardPlank_" + pl, new Vector3(0f, 0.95f + 0.4f * pl + 0.2f, -0.04f - 0.005f * pl), new Vector3(0f, 0f, (HollowmereStreets.H(pl, 5, 201) - 0.5f) * 1.6f), 1.8f, 0.4f);
+                Timber(frame, "Cap", new Vector3(0f, 2.0f, -0.02f), new Vector3(0f, 0f, 0f), 2.0f, 0.13f);
                 Material paper = Mat("ST_Paper", new Color(0.80f, 0.74f, 0.58f), 0.1f), paperB = Mat("ST_PaperOld", new Color(0.62f, 0.52f, 0.34f), 0.1f);
                 for (int i = 0; i < 9; i++)
                 {
                     int cx = i % 3, cy = i / 3;
                     float px = (cx - 1) * 0.52f + (HollowmereStreets.H(i, 1, 201) - 0.5f) * 0.1f, py = 1.1f + cy * 0.38f + (HollowmereStreets.H(i, 2, 201) - 0.5f) * 0.08f;
-                    Beam(frame, "Paper_" + i, new Vector3(px, py, -0.1f), new Vector3(0.34f, 0.44f, 0.012f), new Vector3(0f, 0f, (HollowmereStreets.H(i, 3, 201) - 0.5f) * 14f), i % 3 == 1 ? paperB : paper);
+                    GameObject sheet = LookTestBuilder.Prim(frame, "Paper_" + i, PrimitiveType.Quad, new Vector3(px, py, -0.1f), new Vector3(0.34f, 0.44f, 1f), i % 3 == 1 ? paperB : paper);
+                    sheet.transform.localRotation = Quaternion.Euler(0f, 0f, (HollowmereStreets.H(i, 3, 201) - 0.5f) * 14f);
                 }
                 HollowmereStreets.Count("storyWrenList"); HollowmereStreets.Count("storyPieces", 13);
             }
@@ -365,14 +408,15 @@ namespace SleepingCalamity.EditorTools
                 Vector2 p = At(wl, wl.Len * 0.5f, 0.55f);
                 frame.SetPositionAndRotation(new Vector3(p.x, GroundAt(p), p.y), Quaternion.Euler(0f, YawAlong(wl), 0f));
                 Material rope = Mat("ST_Rope", new Color(0.35f, 0.28f, 0.18f), 0.1f);
-                Beam(frame, "PostL", new Vector3(-1.7f, 1.05f, 0f), new Vector3(0.09f, 2.1f, 0.09f), new Vector3(0f, 0f, 2f), oak);
-                Beam(frame, "PostR", new Vector3(1.7f, 1.05f, 0f), new Vector3(0.09f, 2.1f, 0.09f), new Vector3(0f, 0f, -4f), oak);
+                Timber(frame, "PostL", new Vector3(-1.7f, 1.05f, 0f), new Vector3(0f, 0f, 92f), 2.1f, 0.13f, "A:T06b/T06b.prefab");   // T13a: log posts, a cord of thin cylinders, quad rags
+                Timber(frame, "PostR", new Vector3(1.7f, 1.05f, 0f), new Vector3(0f, 0f, 86f), 2.1f, 0.13f, "A:T06b/T06b.prefab");
                 const int seg = 8;
                 for (int i = 0; i < seg; i++)
                 {
                     float x0 = Mathf.Lerp(-1.7f, 1.7f, i / (float)seg), x1 = Mathf.Lerp(-1.7f, 1.7f, (i + 1) / (float)seg);
                     float y0 = 1.98f - 0.28f * Mathf.Sin(Mathf.PI * i / seg), y1 = 1.98f - 0.28f * Mathf.Sin(Mathf.PI * (i + 1) / seg);
-                    Beam(frame, "Rope_" + i, new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, 0f), new Vector3(Vector3.Distance(new Vector3(x0, y0, 0), new Vector3(x1, y1, 0)), 0.02f, 0.02f), new Vector3(0f, 0f, Mathf.Atan2(y1 - y0, x1 - x0) * Mathf.Rad2Deg), rope);
+                    GameObject cord = LookTestBuilder.Prim(frame, "Rope_" + i, PrimitiveType.Cylinder, new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, 0f), new Vector3(0.022f, Vector3.Distance(new Vector3(x0, y0, 0), new Vector3(x1, y1, 0)) * 0.5f, 0.022f), rope);
+                    cord.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(y1 - y0, x1 - x0) * Mathf.Rad2Deg - 90f);
                 }
                 string[] cloth = { "ST_RagGrey", "ST_RagBlue", "ST_RagRed" };
                 Color[] cc = { new Color(0.50f, 0.47f, 0.42f), new Color(0.30f, 0.38f, 0.52f), new Color(0.55f, 0.30f, 0.24f) };
@@ -380,7 +424,9 @@ namespace SleepingCalamity.EditorTools
                 {
                     float x = -1.0f + i * 0.62f, y = 1.98f - 0.28f * Mathf.Sin(Mathf.PI * (x + 1.7f) / 3.4f);
                     float h = 0.5f + 0.25f * HollowmereStreets.H(i, 1, 221);
-                    Beam(frame, "Rag_" + i, new Vector3(x, y - h * 0.5f, 0f), new Vector3(0.4f, h, 0.012f), new Vector3(0f, (HollowmereStreets.H(i, 2, 221) - 0.5f) * 30f, (HollowmereStreets.H(i, 3, 221) - 0.5f) * 12f), Mat(cloth[i % 3], cc[i % 3], 0.05f));
+                    GameObject rag = LookTestBuilder.Prim(frame, "Rag_" + i, PrimitiveType.Quad, new Vector3(x, y - h * 0.5f, 0f), new Vector3(0.4f, h, 1f), Mat(cloth[i % 3], cc[i % 3], 0.05f));
+                    rag.transform.localRotation = Quaternion.Euler(0f, (HollowmereStreets.H(i, 2, 221) - 0.5f) * 30f, (HollowmereStreets.H(i, 3, 221) - 0.5f) * 12f);
+                    rag.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
                 }
                 HollowmereStreets.Count("storyWashingLine"); HollowmereStreets.Count("storyPieces", 16);
             }
