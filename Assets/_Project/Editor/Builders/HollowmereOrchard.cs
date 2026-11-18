@@ -89,7 +89,7 @@ namespace SleepingCalamity.EditorTools
             new TreeDef { X = 39.6f, Z = -54.6f, H = 6.0f, Code = "TR03", Yaw = 20f, Girth = 0.85f },    // 0 the harvest tree: ladder, baskets, crates
             new TreeDef { X = 44.0f, Z = -45.4f, H = 5.6f, Code = "TR03", Yaw = 250f, Girth = 0.85f },
             new TreeDef { X = 44.6f, Z = -51.6f, H = 6.0f, Code = "TR02", Yaw = 80f, Girth = 0.85f },   // 2 the bench
-            new TreeDef { X = 34.9f, Z = -54.8f, H = 5.2f, Code = "TR03", Yaw = 60f, Girth = 0.85f },    // 3 R2_18's corner (left frame)
+            new TreeDef { X = 36.6f, Z = -57.6f, H = 5.2f, Code = "TR03", Yaw = 60f, Girth = 0.85f },    // 3 R2_18's corner (left frame)
         };
         static readonly Vector2 FallenRoot = new Vector2(47.0f, -53.2f), FallenCrown = new Vector2(47.4f, -47.6f);
         static readonly Vector2 PierA = new Vector2(39.2f, -45.0f), PierB = new Vector2(40.9f, -43.9f);
