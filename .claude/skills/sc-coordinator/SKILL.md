@@ -35,12 +35,7 @@ You are the head role: the user trusts you with anything whose safety you can ve
 
 **Models** (routing table in `sc-delegate`). Sessions Sonnet medium; scans Haiku (`scanner`); reviews Sonnet (`reviewer`) or Opus high (`risk-reviewer`, `branch-reviewer`). Only pinned agent types: never `fork`, `Plan`, `claude`, or `general-purpose` without an explicit cheaper `model`.
 
-**Fable** is for the judgement runs in `docs/superpowers/plans/2026-11-11-fable-reset-plan.md` and nothing else: about one use a week, the user's OK each time. The one delegated use is `fixer`, after Opus high failed with evidence and with the user's OK. Inside a Fable session `model-guard.sh` blocks `fixer`, Workflow runs and any Fable override. To start a Fable session:
-1. Start it with a placeholder turn ("reply ready, read nothing").
-2. `set_session_model` to `claude-fable-5-2` and `set_session_effort` to `high`.
-3. Send the brief.
-
-Give it a fresh 5-hour window with nothing heavy beside it. Its brief names the files Fable reads itself, has every scan launched in one message with nothing written until all are back, sets an image budget and stops as weekly percentages (from `get_usage` and the run's pool in the plan), and asks for `get_usage` at start and end (plan section 6).
+**Fable.** On hold: Fable is not in the user's plan since 2026-11-17 (needs usage credits); ask the user before any Fable use.
 
 ## 3. Running work
 - **Don't poll.** Sessions report through STATUS files and the board profile, and you are woken when one ends a turn. Long commands run in the background with a completion notice.
@@ -88,6 +83,7 @@ Give it a fresh 5-hour window with nothing heavy beside it. Its brief names the 
 | Board paused workers for pace against the user's wish (Nov 2-13) | Section 4: resume them; config stays at never-pause |
 | Launcher runs share one title; the user continued a stale run and two runs wrote PL-4 (Nov 13) | Name every run; one writer per branch; resume briefs name the winning branch |
 | Cloud runs quit because the editor was still installing (Nov 13) | `setup.sh --wait` in the brief |
+| Coordinator pushed four CURRENT-only commits in one evening (Nov 18) | Bookkeeping rides in the next real commit; at most one end-of-session bookkeeping commit |
 | PL-4 split into a cloud part and a PC Windows build (Nov 13) | No hybrid jobs: any PC step makes the job local |
 | `start_session` refused over Remote Control or on a session-started turn | Launcher for cloud; the user says "start" at the desktop for local |
 | A session stopped at a usage limit sat idle | Restart it yourself after the reset |

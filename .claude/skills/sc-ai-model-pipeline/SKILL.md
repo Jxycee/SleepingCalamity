@@ -15,7 +15,7 @@ Evidence for every rule here: FishGame's `docs/superpowers/research/2026-10-28-a
 - **The look:** stylised realism. Real PBR material at high detail (skin, stitched leather, woven cloth, fur, metal), slightly stylised form; storybook, not chibi, not toy (sc-asset-craft section 3).
 - **Hero proportions:** about 6.5 heads tall; hands and feet about 1.15x real with chunky boots, gauntlets and belts; eyes about 1.1x; faces realistic in material. Heights: Tobin 1.90 m, Ash 1.75 m, Wren 1.68 m, Pip 1.58 m. Each hero reads at 30 m from silhouette alone.
 - **Heroes are a hybrid** (PHASE1 5, [P29]): an MPFB2 body for topology, rig and weights (licence: sc-asset-adopt), with the **head, hair and outfit generated as separate parts** from multi-view concept images, retopologised and cleaned here and with `texture-bleed-cleanup`, then skinned by weight transfer. Outfits stay separate meshes on one skeleton. If a part fails cleanup twice, model it in Blender over the body instead.
-- **Budgets:** PHASE1 3.3 (hero 60k tris, 1 x 2K body and outfit, 1 x 2K head and hair; enemy 25k, one 2K set; a whole building at most 75k). Nothing bakes above 2048 px.
+- **Budgets:** PHASE1 3.3 (hero 60k tris, 1 x 2K body and outfit, 1 x 2K head and hair; enemy 25k, one 2K set; a whole building at most 75k). 2K is the default bake; 4K is allowed for a few close-up hero surfaces when a capture shows 2K blurring (user, 2026-11-18; `sc-asset-budget`).
 - **Inputs** should show the target directly: chunky storybook proportion, clean colour in the PHASE1 3.1 palette, evenly lit with no baked shadows.
 
 House rules for this pipeline:
@@ -45,7 +45,7 @@ Run in order, each with a before/after in the log: (1) local repair `tripo_repai
 - `references/repair-steps.md` - read before running any repair step: the full table with commands, flags, proven results and known breaks.
 
 ## 3. Import into Unity (URP Lit)
-URP Lit with the repaired base colour, plus normal, metallic-smoothness and occlusion when they help (`sc_pack_unity.py`). **Don't port FishGame's import cleaning** (Kuwahara, dark lift, desaturation); grade toward PHASE1 3.1 by hand per asset. Import: max size 2048 (the project texture cap; 4K source maps are imported at 2048), high-quality compression, aniso 4; don't change these to fix blur. Final export: GLB plus repaired maps, real size, base on z 0, moving parts separated, no armature.
+URP Lit with the repaired base colour, plus normal, metallic-smoothness and occlusion when they help (`sc_pack_unity.py`). **Don't port FishGame's import cleaning** (Kuwahara, dark lift, desaturation); grade toward PHASE1 3.1 by hand per asset. Import: max size 2048 by default (4K only for a few close-up hero surfaces when a capture shows 2K blurring, `sc-asset-budget`; other 4K source maps are imported at 2048), high-quality compression, aniso 4; don't change these to fix blur. Final export: GLB plus repaired maps, real size, base on z 0, moving parts separated, no armature.
 - `references/import-and-export.md` - read for the final-export command and config.
 
 ## 2b. Bringing a building to the cottage bar (M2, M3: the mill)

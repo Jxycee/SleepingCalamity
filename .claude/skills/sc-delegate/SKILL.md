@@ -14,7 +14,7 @@ description: Brief template and routing for delegating SleepingCalamity work to 
 | Milestone branch before merging into `main` | `branch-reviewer` (Opus, high) | never raise it to xhigh or max (user, 2026-11-03: usage) |
 | Locate symbols, inventories, counts | `scanner` (Haiku) | keep the brief and the files it reads short: Haiku 5.5 costs 5x more per token above 100K prompt tokens, so split a big sweep into several scans |
 | Fails twice, or nobody can find the root cause | `implementer` with model `opus`, effort `high` | Opus 5.5 high comes first, always |
-| Opus 5.5 high also failed (very rare) | `fixer` (Fable, high) | **Fable is a last resort (user, 2026-11-09: the plan only affords about one Fable use a week).** Use it only after an Opus 5.5 high run failed with evidence, ask the user first, and never more than about once a week. It starts at `high` (Anthropic's Fable 5.2 guide: most of the gain arrives by `high`, gains above it are uneven); `xhigh` and `max` need the user's go-ahead |
+| Opus 5.5 high also failed (very rare) | `fixer` (Fable, high) | On hold: Fable is not in the user's plan since 2026-11-17 (needs usage credits); ask the user before any Fable use. |
 | Vision-heavy loop (capture, judge against reference, fix) that Sonnet scores wrongly or stalls on | `implementer` | model `opus`, effort `medium` (guide: computer use and vision-heavy long loops start on Opus 5.5); the first rounds stay Sonnet |
 | Docs, design notes, triage, plan drafts | `implementer` (Sonnet, medium) | model `opus`, effort `medium` for a plan section on networking, save schema or a state machine (`high` only if the first draft failed review) |
 | Story and book prose | `implementer` | model `opus`, effort `high` (prose only; the bible assembly and fixes stay Sonnet) |
@@ -39,6 +39,7 @@ Files and symbols: <path:line for each thing to change or read first>
 Behaviour: <what must be true afterwards; network authority (host vs owner) if networked>
 Tests: <test names and cases; which must fail first>
 Out of scope: <what not to touch>
+Fix round: <the previous round's faults list; the first step is a cheap probe (unlit/albedo-only, normals view, terrain-angle dump, or a reduced capture of the suspect camera) and a one-line cause before any rebuild (user, 2026-11-18)>
 Check: <the Tools/unity.ps1 (PC) or Tools/cloud/unity.sh (cloud) command that proves it; cloud without a Unity licence: sc_cloud_compile.py / sc_core_tests.py plus the tests a licensed run must pass>
 Report: what changed, the check result line, anything unverified.
 ```

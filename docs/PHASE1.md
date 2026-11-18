@@ -99,6 +99,8 @@ The target: Dark Cloud's whimsical shapes and town and dungeon themes, rendered 
 | Hero character | n/a | 60k | 1 x 2K body and outfit, 1 x 2K head and hair |
 | Enemy (later) | n/a | 25k | 1 x 2K |
 
+These numbers are guides, not caps (user, 2026-11-18). The binding budget is per camera: visible triangles and GPU cost at the eye cameras, with Mesh LOD (see the 2026-11-18 log entry).
+
 ### 3.4 Shape language [P36]
 - Take dimensions from photos, then exaggerate. Timber sections are about 1.4x real (25 cm and up), arches and voussoirs about 1.3x, and roof overhangs and chimney stacks are bigger and chunkier.
 - No dead-straight long lines on old work: beams and walls are 1-3 degrees off true, roof ridges sag 2-5 cm per metre, and nothing aged runs perfectly straight for more than 2 m.
@@ -120,7 +122,8 @@ Use the URP stack proposed in decisions A1: Forward+, GPU Resident Drawer, HDR, 
 
 ### 3.7 The approval gate (beauty corner and dungeon corner)
 - **Captures:** three fixed capture cameras per corner (wide, mid, close) at 1920x1080 [P39], built by an Editor builder so every round is identical. The town is captured at midday plus one low-sun shot.
-- **Before showing the user:** the captures fall inside the 3.1 bands, and a reviewer has scored them with the rewritten `sc-asset-review` rubric against the reference row (the photos and paintings in `Reference/`, plus the private style frames for study).
+- **Before showing the user:** a reviewer has scored the captures with the rewritten `sc-asset-review` rubric against the reference row (the photos and paintings in `Reference/`, plus the private style frames for study).
+- **The 3.1 bands are advisory diagnostics, not a gate** (user, 2026-11-18): the scene-judging scores and the user decide.
 - **The user approves on captures.** That is the only sign-off in the art track. If the user rejects, their notes become the next round.
 - Once approved, the captures become the reference row that every later batch is reviewed against.
 
@@ -294,7 +297,7 @@ Placeholder combat sounds use CC0 packs (Kenney and similar, licence recorded), 
 - **Brief:** a Sonnet agent gets a brief (`sc-delegate`) naming the family, the 3.x rules, the budget and the reference row.
 - **Build:** it writes or extends one generator per family and runs all the items headless in one Blender session.
 - **Bake:** joined highs go into one Cycles bake per batch (the cottage lesson: 1 h down to 4.5 min).
-- **Review:** the agent renders one small JPEG contact sheet with the reference row. The controller (Opus) scores the sheet itself and names the worst three, because the pinned `reviewer` agent is Sonnet. A Sonnet agent fixes those three, and the sheet is re-scored once. [P50]
+- **Review:** the agent renders one small JPEG contact sheet with the reference row. Sonnet `reviewer` agents do all the scoring (blind, `docs/art/scene-judging.md`); the controller reads the verdict JSON and only the frames a verdict names, and Opus decides placement. The worst three go to a Sonnet fixer, and the sheet is re-scored once (revised 2026-11-18). [P50]
 - **Heroes and new families** (B10, B11, the first B4 facade) also get the two-reviewer blind A/B, with `imgdiff.py` run first.
 - Separate families run in separate agents with their own scratch folders, at most 3 at once, once the user gives the go-ahead (CLAUDE.md: multi-agent work needs it). [P51] A fix to a tileable flows to every piece that uses it.
 
@@ -372,7 +375,7 @@ Phase 1 art (B1-B11) comes to roughly 4M Sonnet and 1M Opus tokens. Tobin (M10) 
 47. **P47 Call:** the dive heals at the checkpoint room, the floor-4 bank point, and healing points on about half of floors 1-3 (30 s recharge is a placeholder). *Amended 2026-11-03 (dungeon design amendment, section 2).*
 48. **P48 Call:** meeting the baker's wishes opens a service: healing loaves for the next dive. *Amended 2026-11-03 (dungeon design amendment, section 2).*
 49. **P49 Call:** the stir effects: one more enemy per room, then a roaming tier-2 rat-king hunter, then "the deep closes" (reach a bank point in time or the dive fails). *Amended 2026-11-03 (dungeon design amendment, section 2).*
-50. **P50 Call:** the controller (Opus) scores the art contact sheets itself; the pinned Sonnet `reviewer` does not.
+50. **P50 Call:** Sonnet reviewers do all art scoring; the controller reads the verdict JSON and only the frames a verdict names, and Opus decides placement (revised 2026-11-18).
 51. **P51 Call:** at most 3 art-batch agents run at once, after the user's go-ahead.
 
 ## Change log
