@@ -94,7 +94,7 @@ namespace SleepingCalamity.EditorTools
             AssetDatabase.Refresh();
         }
 
-        internal static void Save(Camera cam, string path)
+        internal static void Save(Camera cam, string path, System.Action<Texture2D> withPixels = null, bool writeFile = true)   // withPixels sees the frame before it is destroyed (T26 crops and motion strips)
         {
             var rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 1 };
             RenderTexture prevActive = RenderTexture.active;
@@ -104,10 +104,11 @@ namespace SleepingCalamity.EditorTools
             RenderTexture.active = rt;
             var tex = new Texture2D(Width, Height, TextureFormat.RGB24, false, false);
             tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0); tex.Apply();
-            File.WriteAllBytes(path, tex.EncodeToPNG());
+            if (writeFile) File.WriteAllBytes(path, tex.EncodeToPNG());
             RenderTexture.active = prevActive;
+            withPixels?.Invoke(tex);
             Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt);
-            Debug.Log("SC CAPTURE wrote " + path);
+            if (writeFile) Debug.Log("SC CAPTURE wrote " + path);
         }
     }
 }

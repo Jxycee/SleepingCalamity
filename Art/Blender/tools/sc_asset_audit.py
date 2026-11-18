@@ -1,7 +1,7 @@
 # sc_asset_audit.py (rewritten 2026-10-30, M8): measures a SleepingCalamity model against the style bible budgets (docs/PHASE1.md 3.3), as JSON.
 # Used by the sc-asset-* skills to measure a model against the PHASE1 3.3 budgets before it is committed; read-only (it never writes into the repo).
 #
-# Run:  blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- <out.json> [--class kit|scatter|hero|building|character|enemy|prop] [--tex-res 2048] <model.fbx|.glb> [...]
+# Run:  blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- <out.json> [--class kit|scatter|hero|building|character|enemy|prop] [--tex-res 2048] [--per-camera N] <model.fbx|.glb> [...]
 #       blender -b --factory-startup --python Art/Blender/tools/sc_asset_audit.py -- --selftest      (builds a T2 test mesh: 2 UV maps + a corner colour attribute)
 # Per mesh object it reports:
 #   size: tris, verts, surface area (m2), tri density (tris/m2), bounding box in metres (Blender axes after import: z up), origin offset
@@ -9,7 +9,7 @@
 #   colour attributes: every attribute's name, domain and luminance min/mean/max (a T2 piece's mask-blend colour is allowed, never required)
 #   shading: smooth share, smear share (corner normals > 45 deg off their face)
 #   hygiene: degenerate faces, loose verts, non-manifold edges, material slots
-# FAIL = over a PHASE1 3.3 hard budget (triangles, material slots); WARN = advice (texel density, density, hygiene). Exit code is 0 either way: read the JSON.
+# FAIL = over the PHASE1 3.3 material-slot budget; WARN = advice (triangle overage with its per-camera cost when --per-camera N is passed, texel density, density, hygiene). Exit code is 0 either way: read the JSON.
 # It makes no palette, colour-encoding or second-UV checks: a T2 piece may carry a second UV map and a mask-blend colour attribute. Colour is judged
 # from renders and captures with sc_ref_palette.py (sc-asset-review).
 import bpy, bmesh, json, math, os, sys
@@ -27,7 +27,8 @@ BUDGET = {
     'prop':      dict(tris=6000,  tex_ppm=1024, mats=2),    # generic fallback for a T2/T3 prop family member
 }
 SMALL_DIAG = 0.8   # objects under this bounding diagonal (m) skip the texel-density judgement
-TEXEL_TOL = 2.0    # WARN when density is outside target / TEXEL_TOL .. target * TEXEL_TOL
+PER_CAMERA = 0     # --per-camera N
+TEXEL_TOL = 2.0   # WARN when density is outside target / TEXEL_TOL .. target * TEXEL_TOL
 
 
 def lum(c):
@@ -102,8 +103,12 @@ def audit_object(o, cls, tex_res=2048):
     F, W = [], []
     diag = (hi - lo).length; r['diag'] = round(diag, 3)
     r['tris_budget'] = b['tris']
-    if tris > b['tris']:
-        F.append('tris %d > %d (PHASE1 3.3 %s)' % (tris, b['tris'], cls))
+    if tris > b['tris']:   # T26: triangle overage is advice, not a stop (the per-camera cost is what matters); material slots stay FAIL
+        w = 'tris %d > %d (PHASE1 3.3 %s, over by %d)' % (tris, b['tris'], cls, tris - b['tris'])
+        if PER_CAMERA > 0:
+            r['tris_per_camera'] = tris * PER_CAMERA
+            w += '; per-camera cost %d tris at %d visible instance(s)' % (tris * PER_CAMERA, PER_CAMERA)
+        W.append(w)
     if r['mats'] > b['mats']:
         F.append('%d material slots > %d' % (r['mats'], b['mats']))
     if not r['uv_layers']:
@@ -161,6 +166,9 @@ def main(argv):
     cls = 'prop'; tex_res = 2048
     if '--class' in rest:
         i = rest.index('--class'); cls = rest[i + 1]; del rest[i:i + 2]
+    global PER_CAMERA
+    if '--per-camera' in rest:   # instances of this asset visible in one camera: reported with a triangle-overage WARN
+        i = rest.index('--per-camera'); PER_CAMERA = int(rest[i + 1]); del rest[i:i + 2]
     if '--tex-res' in rest:
         i = rest.index('--tex-res'); tex_res = int(rest[i + 1]); del rest[i:i + 2]
     if cls not in BUDGET:

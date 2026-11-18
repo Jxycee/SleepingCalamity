@@ -21,6 +21,21 @@ namespace SleepingCalamity.EditorTools
         const string DstRoot = "Assets/_Project/Content/Art/Town/Adopted/";
         const string MatFolder = "Assets/_Project/Content/Materials/B1";
         const int Cap = 2048;
+        // Per-asset 4K opt-in (T26): asset codes that take the _4K_ source maps and import at 4096. Default empty = every asset stays at 2K (user rule 2026-10-30).
+        // Add a code here, or set SC_INTAKE_4K=T05,T19a for one run. Each use logs "SC INTAKE 4K <code>".
+        public static readonly HashSet<string> FourK = new HashSet<string>();
+        public static bool IsFourK(string code)
+        {
+            if (FourK.Contains(code)) return true;
+            string env = Environment.GetEnvironmentVariable("SC_INTAKE_4K");
+            return !string.IsNullOrEmpty(env) && env.Split(',').Select(s => s.Trim()).Contains(code);
+        }
+        public static bool IsFourKPath(string assetPath)
+        {
+            if (!assetPath.StartsWith(DstRoot, StringComparison.Ordinal)) return false;
+            string rest = assetPath.Substring(DstRoot.Length); int slash = rest.IndexOf('/');
+            return slash > 0 && IsFourK(rest.Substring(0, slash));
+        }
         static readonly HashSet<string> Skip = new HashSet<string> { "T01", "T01b", "T01c", "T03", "T15a", "T15b", "T17d", "C01", "C02", "C15",
             "L04",    // dropped 2026-11-14 (style review): FBX has no usable texture, flat white pot and paper-like leaves; the L04Pick path below is kept only in case a 2K re-export arrives
             "T12a" }; // dropped 2026-11-14 (style review): sparse grey card cluster, reads as dead scrub
@@ -170,24 +185,29 @@ namespace SleepingCalamity.EditorTools
         static string Sanitize(string s) => Regex.Replace(s, "[^A-Za-z0-9_]", "_");
 
         // ------------------------------------------------------------------------------------------------ textures and material
-        static string Find(string dir, string tail) =>
-            Directory.GetFiles(dir, "*.jpg").Where(f => !Path.GetFileName(f).Contains("Billboard") && Path.GetFileName(f).EndsWith("_2K_" + tail + ".jpg", StringComparison.Ordinal))
+        static string Find(string dir, string tail, string res = "2K") =>
+            Directory.GetFiles(dir, "*.jpg").Where(f => !Path.GetFileName(f).Contains("Billboard") && Path.GetFileName(f).EndsWith("_" + res + "_" + tail + ".jpg", StringComparison.Ordinal))
                 .OrderBy(f => f, StringComparer.Ordinal).FirstOrDefault();
 
         static Material BuildMaterial(string code, string srcDir, string dst, bool plant)
         {
-            string bc = Find(srcDir, "BaseColor"), nr = Find(srcDir, "Normal"), ro = Find(srcDir, "Roughness"), ao = Find(srcDir, "AO"), me = Find(srcDir, "Metalness"), op = Find(srcDir, "Opacity");
+            // 4K opt-in: use the _4K_ maps when the folder has them (all or nothing per map set), else stay at 2K.
+            bool k4 = IsFourK(code) && Find(srcDir, "BaseColor", "4K") != null;
+            string res = k4 ? "4K" : "2K"; int cap = k4 ? 4096 : Cap;
+            if (k4) Debug.Log("SC INTAKE 4K " + code);
+            else if (IsFourK(code)) Debug.Log("SC INTAKE 4K " + code + " requested but no _4K_ maps in " + srcDir + ", staying 2K");
+            string bc = Find(srcDir, "BaseColor", res), nr = Find(srcDir, "Normal", res), ro = Find(srcDir, "Roughness", res), ao = Find(srcDir, "AO", res), me = Find(srcDir, "Metalness", res), op = Find(srcDir, "Opacity", res);
             if (bc == null || nr == null || ro == null) throw new InvalidOperationException("missing BaseColor/Normal/Roughness");
             bool alpha = plant && op != null;
             var written = new List<string>();
             string albedo = dst + "/" + code + "_albedo." + (alpha ? "png" : "jpg"), normal = dst + "/" + code + "_normal.jpg", ms = dst + "/" + code + "_ms.png", occ = dst + "/" + code + "_occ.png";
 
-            Color32[] c = Decode(bc, out int w, out int h);
-            Color32[] rough = Decode(ro, out int rw, out int rh);
+            Color32[] c = Decode(bc, out int w, out int h, cap);
+            Color32[] rough = Decode(ro, out int rw, out int rh, cap);
             if (rw != w || rh != h) throw new InvalidDataException("map size mismatch");
             if (alpha)
             {
-                Color32[] o = Decode(op, out int ow, out int oh);
+                Color32[] o = Decode(op, out int ow, out int oh, cap);
                 if (ow != w || oh != h) throw new InvalidDataException("opacity size mismatch");
                 var px = new Color32[c.Length];
                 for (int i = 0; i < px.Length; i++) px[i] = new Color32(c[i].r, c[i].g, c[i].b, o[i].r);
@@ -196,14 +216,14 @@ namespace SleepingCalamity.EditorTools
             else if (B0Fab.CopyIfDifferent(bc, BuilderUtil.Abs(albedo)) || AssetImporter.GetAtPath(albedo) == null) written.Add(albedo);
             if (B0Fab.CopyIfDifferent(nr, BuilderUtil.Abs(normal)) || AssetImporter.GetAtPath(normal) == null) written.Add(normal);
 
-            Color32[] met = me != null && !plant ? Decode(me, out int mw, out int mh) : null;
+            Color32[] met = me != null && !plant ? Decode(me, out int mw, out int mh, cap) : null;
             if (met != null && met.Length != rough.Length) met = null;
             var msPx = new Color32[rough.Length];
             for (int i = 0; i < msPx.Length; i++) msPx[i] = new Color32(met != null ? met[i].r : (byte)0, 0, 0, (byte)(255 - rough[i].r));
             if (WritePacked(ms, w, h, msPx)) written.Add(ms);
             if (ao != null)
             {
-                Color32[] a = Decode(ao, out int aw, out int ah);
+                Color32[] a = Decode(ao, out int aw, out int ah, cap);
                 if (a.Length == rough.Length)
                 {
                     var op2 = new Color32[a.Length];
@@ -213,10 +233,10 @@ namespace SleepingCalamity.EditorTools
                 else ao = null;
             }
             foreach (string p in written) AssetDatabase.ImportAsset(p, ImportAssetOptions.ForceUpdate);
-            BeautyCornerArt.ImportTexture(albedo, srgb: true, normal: false, alphaTransparency: alpha);
-            BeautyCornerArt.ImportTexture(normal, srgb: false, normal: true, alphaTransparency: false);
-            BeautyCornerArt.ImportTexture(ms, srgb: false, normal: false, alphaTransparency: false);
-            if (ao != null) BeautyCornerArt.ImportTexture(occ, srgb: false, normal: false, alphaTransparency: false);
+            BeautyCornerArt.ImportTexture(albedo, srgb: true, normal: false, alphaTransparency: alpha, maxSize: cap);
+            BeautyCornerArt.ImportTexture(normal, srgb: false, normal: true, alphaTransparency: false, maxSize: cap);
+            BeautyCornerArt.ImportTexture(ms, srgb: false, normal: false, alphaTransparency: false, maxSize: cap);
+            if (ao != null) BeautyCornerArt.ImportTexture(occ, srgb: false, normal: false, alphaTransparency: false, maxSize: cap);
 
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? throw new InvalidOperationException("URP Lit not found");
             Material m = LookTestBuilder.Ensure(MatFolder + "/M_" + code + ".mat", lit);
@@ -244,12 +264,12 @@ namespace SleepingCalamity.EditorTools
         }
 
         // Decodes a jpg to RGBA32; halves it (2 x 2 box) until it fits the 2048 cap, so nothing above 2048 reaches the project.
-        static Color32[] Decode(string file, out int w, out int h)
+        static Color32[] Decode(string file, out int w, out int h, int cap = Cap)
         {
             var t = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
             if (!ImageConversion.LoadImage(t, File.ReadAllBytes(file), false)) throw new InvalidDataException("Cannot read " + file);
             w = t.width; h = t.height; Color32[] px = t.GetPixels32(); UnityEngine.Object.DestroyImmediate(t);
-            while (w > Cap || h > Cap)
+            while (w > cap || h > cap)
             {
                 int nw = w / 2, nh = h / 2; var o = new Color32[nw * nh];
                 for (int y = 0; y < nh; y++)

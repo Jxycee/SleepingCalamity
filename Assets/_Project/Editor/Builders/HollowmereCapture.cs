@@ -29,20 +29,25 @@ namespace SleepingCalamity.EditorTools
             CaptureTo(dir);
         }
 
-        public static void CaptureAll()
+        public static void CaptureAll() => CaptureTo(ResolveDir());
+
+        internal static string ResolveDir()
         {
             string dir = null;
             string[] args = System.Environment.GetCommandLineArgs();
             for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-scCaptureDir") dir = args[i + 1];
             if (string.IsNullOrEmpty(dir)) dir = System.Environment.GetEnvironmentVariable("SC_CAPTURE_DIR");
             if (string.IsNullOrEmpty(dir)) throw new System.InvalidOperationException("Set SC_CAPTURE_DIR (or pass -scCaptureDir) to the folder for the PNGs");
-            CaptureTo(dir);
+            return dir;
         }
 
-        public static void CaptureTo(string dir)
+        public static void CaptureTo(string dir) => CaptureTo(dir, string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("SC_CAPTURE_NOBUILD")));
+
+        // build = run the full HollowmereBuilder.Build first; false when the scene on disk is already current (HollowmereScoped.BuildAndCapture builds it in the same editor process).
+        public static void CaptureTo(string dir, bool build)
         {
             Directory.CreateDirectory(dir);
-            if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("SC_CAPTURE_NOBUILD"))) HollowmereBuilder.Build();
+            if (build) HollowmereBuilder.Build();
             var rp = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(BeautyCornerBuilder.RpAssetPath) ?? throw new FileNotFoundException(BeautyCornerBuilder.RpAssetPath);
             RenderPipelineAsset savedQuality = QualitySettings.renderPipeline;
             QualitySettings.renderPipeline = rp;
@@ -53,6 +58,7 @@ namespace SleepingCalamity.EditorTools
                 bool lowOnly = System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") == "LowSun";
                 string only = System.Environment.GetEnvironmentVariable("SC_CAPTURE_ONLY");   // e.g. "SquareSouth,Fountain": only the cameras whose name contains one of them
                 Camera[] cams = Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                if (HollowmereCaptureExtras.MilestoneOn) cams = cams.Concat(HollowmereCaptureExtras.MakeRandomEyes()).ToArray();   // T26: seeded random eye cameras (never saved)
                 // Default: Midday renders every camera; LowSun (design 7: "at midday and low sun") only the four play-position cameras, files <Camera>_<Preset>_LowSun.png.
                 BeautyCornerBuilder.Preset[] lights = lowOnly ? new[] { BeautyCornerBuilder.Preset.LowSun } : System.Environment.GetEnvironmentVariable("SC_CAPTURE_SUN") is string sunEnv && !int.TryParse(sunEnv, out _) && System.Enum.TryParse(sunEnv, out BeautyCornerBuilder.Preset one) && System.Enum.IsDefined(typeof(BeautyCornerBuilder.Preset), one) ? new[] { one } : new[] { BeautyCornerBuilder.Preset.Morning, BeautyCornerBuilder.Preset.Evening };
                 string variantSpec = System.Environment.GetEnvironmentVariable("SC_LOOK_VARIANTS");
@@ -78,17 +84,34 @@ namespace SleepingCalamity.EditorTools
                         foreach (Camera cam in cams)
                         {
                             if (!cam.name.StartsWith("Cap_HM_") && !cam.name.StartsWith("Cap_Corner_")) continue;
-                            if (!string.IsNullOrEmpty(only) && !only.Split(',').Any(o => cam.name.Contains(o))) continue;
-                            if (!lowOnly && light != BeautyCornerBuilder.Preset.Midday && light != BeautyCornerBuilder.Preset.Morning && System.Array.IndexOf(PlayPositionCameras, cam.name) < 0) continue;
+                            bool random = cam.name.StartsWith("Cap_HM_Rand_");
+                            bool named = !string.IsNullOrEmpty(only) && only.Split(',').Any(o => cam.name.Contains(o));
+                            if (!string.IsNullOrEmpty(only) && !named && !random) continue;
+                            bool dusk = HollowmereCaptureExtras.MilestoneOn && (named || random);   // milestone: the named cameras and the random eyes also at Evening, not only the play positions
+                            if (!lowOnly && light != BeautyCornerBuilder.Preset.Midday && light != BeautyCornerBuilder.Preset.Morning && !dusk && System.Array.IndexOf(PlayPositionCameras, cam.name) < 0) continue;
                             bool overview = cam.name.StartsWith("Cap_HM_Overview") || cam.name.StartsWith("Cap_HM_High"), fog = RenderSettings.fog; float density = RenderSettings.fogDensity;
                             if (overview) { RenderSettings.fog = look.OverviewFog > 0f; RenderSettings.fogDensity = look.OverviewFog; }   // the play-distance haze would hide the town at 100 m+: the overview has its own thin one
-                            try { LookTestCapture.Save(cam, Path.Combine(dir, prefix + cam.name.Replace("Cap_", "") + "_" + preset + suffix + ".png")); }
+                            try { HollowmereCaptureExtras.SaveWithCrops(cam, Path.Combine(dir, prefix + cam.name.Replace("Cap_", "") + "_" + preset + suffix + ".png")); }
                             finally { RenderSettings.fog = fog; RenderSettings.fogDensity = density; }
                         }
                     }
                 }
                 HollowmereLook.Apply(BeautyCornerBuilder.Preset.Morning);
                 HollowmereBuilder.ApplyPreset(HollowmereBuilder.Preset.Ruined);
+                if (HollowmereCaptureExtras.MotionOn)   // T26: 2x2 motion strip per named camera, Morning, Ruined unless SC_CAPTURE_PRESET says otherwise (last, so the poses it moves touch no other frame)
+                {
+                    if (string.IsNullOrEmpty(only)) Debug.Log("SC CAPTURE motion skipped: set SC_CAPTURE_ONLY to the cameras to strip");
+                    else
+                    {
+                        string mp = System.Environment.GetEnvironmentVariable("SC_CAPTURE_PRESET");
+                        HollowmereBuilder.Preset mPreset = mp == "Rebuilt" ? HollowmereBuilder.Preset.Rebuilt : HollowmereBuilder.Preset.Ruined;
+                        HollowmereBuilder.ApplyPreset(mPreset);
+                        foreach (Camera cam in cams)
+                            if (cam.name.StartsWith("Cap_HM_") && only.Split(',').Any(o => cam.name.Contains(o)))
+                                HollowmereCaptureExtras.SaveMotion(cam, Path.Combine(dir, cam.name.Replace("Cap_", "") + "_" + mPreset + "_motion.jpg"));
+                        HollowmereBuilder.ApplyPreset(HollowmereBuilder.Preset.Ruined);
+                    }
+                }
             }
             finally
             {

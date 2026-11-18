@@ -114,7 +114,7 @@ namespace SleepingCalamity.EditorTools
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 var ti = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (ti == null || ti.maxTextureSize <= TextureCap) continue;
+                if (ti == null || ti.maxTextureSize <= TextureCap || B1TownIntake.IsFourKPath(path)) continue;
                 ti.maxTextureSize = TextureCap; ti.SaveAndReimport(); changed++;
             }
             Debug.Log("SC BEAUTY texture cap " + TextureCap + ": lowered " + changed + " importers");
@@ -345,15 +345,15 @@ namespace SleepingCalamity.EditorTools
             if (dirty) mi.SaveAndReimport();
         }
 
-        internal static void ImportTexture(string path, bool srgb, bool normal, bool alphaTransparency)
+        internal static void ImportTexture(string path, bool srgb, bool normal, bool alphaTransparency, int maxSize = TextureCap)   // maxSize above TextureCap only for a per-asset 4K opt-in (B1TownIntake.FourK)
         {
             var ti = (TextureImporter)AssetImporter.GetAtPath(path);
             if (ti == null) return;
             TextureImporterType type = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
-            bool dirty = ti.textureType != type || ti.sRGBTexture != srgb || ti.maxTextureSize != TextureCap || ti.alphaIsTransparency != alphaTransparency
+            bool dirty = ti.textureType != type || ti.sRGBTexture != srgb || ti.maxTextureSize != maxSize || ti.alphaIsTransparency != alphaTransparency
                 || ti.mipmapEnabled != true || ti.anisoLevel < 8;
             if (!dirty) return;
-            ti.textureType = type; ti.sRGBTexture = srgb; ti.maxTextureSize = TextureCap; ti.mipmapEnabled = true;
+            ti.textureType = type; ti.sRGBTexture = srgb; ti.maxTextureSize = maxSize; ti.mipmapEnabled = true;
             ti.anisoLevel = 8; ti.filterMode = FilterMode.Trilinear;
             ti.alphaSource = alphaTransparency ? TextureImporterAlphaSource.FromInput : TextureImporterAlphaSource.None;
             ti.alphaIsTransparency = alphaTransparency;

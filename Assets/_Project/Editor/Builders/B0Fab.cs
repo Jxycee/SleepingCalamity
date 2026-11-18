@@ -144,12 +144,15 @@ namespace SleepingCalamity.EditorTools
             string path = SkyFolder + "/" + fileName;
             var ti = AssetImporter.GetAtPath(path) as TextureImporter;
             if (ti == null) return null;
-            bool dirty = ti.textureShape != TextureImporterShape.Texture2D || ti.sRGBTexture || ti.mipmapEnabled || ti.maxTextureSize != 2048
+            // T26: a sky opts into 4K by its file name without extension in B1TownIntake.FourK / SC_INTAKE_4K (default 2K; the source must really be 4K).
+            bool k4 = B1TownIntake.IsFourK(Path.GetFileNameWithoutExtension(fileName)); int max = k4 ? 4096 : 2048;
+            if (k4) Debug.Log("SC INTAKE 4K " + Path.GetFileNameWithoutExtension(fileName));
+            bool dirty = ti.textureShape != TextureImporterShape.Texture2D || ti.sRGBTexture || ti.mipmapEnabled || ti.maxTextureSize != max
                 || ti.wrapModeU != TextureWrapMode.Repeat || ti.wrapModeV != TextureWrapMode.Clamp || ti.textureCompression != TextureImporterCompression.CompressedHQ || ti.filterMode != FilterMode.Bilinear;
             if (dirty)
             {
                 ti.textureType = TextureImporterType.Default; ti.textureShape = TextureImporterShape.Texture2D; ti.sRGBTexture = false; ti.mipmapEnabled = false;   // T09: no mips: the panorama's u wrap picks the smallest mip on one column and drew a dashed grey vertical line in the sky
-                ti.maxTextureSize = 2048; ti.wrapModeU = TextureWrapMode.Repeat; ti.wrapModeV = TextureWrapMode.Clamp; ti.filterMode = FilterMode.Bilinear;
+                ti.maxTextureSize = max; ti.wrapModeU = TextureWrapMode.Repeat; ti.wrapModeV = TextureWrapMode.Clamp; ti.filterMode = FilterMode.Bilinear;
                 ti.textureCompression = TextureImporterCompression.CompressedHQ; ti.isReadable = false;
                 ti.SaveAndReimport();
             }
