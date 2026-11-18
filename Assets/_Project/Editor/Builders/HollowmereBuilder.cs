@@ -121,6 +121,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Eye_JettyBack", new Vector3(0f, 0f, 0f), new Vector3(-5f, 0f, -40f), 60f),              // D9: from the jetty's end back at the town (position computed, Target y absolute 0)
             ("Cap_HM_Eye_RoadOut", new Vector3(-48f, 1.65f, -74f), new Vector3(-100f, 0.5f, -82f), 60f),     // D10: the Saltwake road, out
             ("Cap_HM_Eye_RoadBack", new Vector3(-85f, 1.65f, -80f), new Vector3(-20f, 0f, -55f), 60f),       // D10: the road, back at the town
+            ("Cap_HM_Diag_RoadEnd", new Vector3(-110.2f, 1.65f, -100.2f), new Vector3(-122.3f, -14.4f, -97.2f), 60f),   // T10 diagnostic only (not in the judged set): 12.5 m east of the road blockage, looking west at the fallen tree, the wagon and the spill
             ("Cap_HM_High_Lake", new Vector3(10f, 38f, -128f), new Vector3(0f, 0f, -25f), 60f),              // absolute: high over the lake, the town behind
             ("Cap_HM_High_East", new Vector3(118f, 30f, -30f), new Vector3(0f, 2f, -20f), 60f),              // absolute: high east of the town, over the mill and the east wall
         };
@@ -231,6 +232,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereStreets.Build(set, ruined, rebuilt, t);   // T06: decal projectors, wall-foot strips, street clutter clusters, lane landmarks and story props inside the wall (after every collider)
             HollowmereOrchard.Build(set, ruined, rebuilt, t);   // T07: the orchard (apple trees in both presets) and the Ruined allotments, after every collider and after the streets' decals
             HollowmereOrchard.BuildBell(set, ruined, rebuilt, t);   // T09: bell yard, churchyard, keep banks, crag foot (after the orchard: shares its helpers and caches)
+            HollowmereOrchard.BuildRoadside(set, ruined, rebuilt, t);   // T10: road blockage, road dressing, shrub hedges, hill edge (after the bell yard: shares its helpers)
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");

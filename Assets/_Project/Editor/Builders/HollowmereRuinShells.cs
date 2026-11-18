@@ -25,7 +25,7 @@ namespace SleepingCalamity.EditorTools
             { "R2_10", RuinClass.Low }, { "R2_11", RuinClass.Tall }, { "R2_12", RuinClass.Mid }, { "R2_13", RuinClass.Tall }, { "R2_14", RuinClass.Mid },
             { "R2_15", RuinClass.Tall }, { "R2_16", RuinClass.Low }, { "R2_17", RuinClass.Tall }, { "R2_18", RuinClass.Low }, { "R2_19", RuinClass.Tall },
             { "R2_20", RuinClass.Mid }, { "R2_21", RuinClass.Tall }, { "R2_22", RuinClass.Low }, { "R2_23", RuinClass.Mid },
-            { "R3_01", RuinClass.Mid }, { "R3_02", RuinClass.Low }, { "R3_03", RuinClass.Mid },
+            { "R3_01", RuinClass.Mid }, { "R3_02", RuinClass.Mid }, { "R3_03", RuinClass.Mid },
         };
 
         // What was actually built per lot id (a missing file falls back to Low).

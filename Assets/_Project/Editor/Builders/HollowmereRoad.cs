@@ -50,7 +50,7 @@ namespace SleepingCalamity.EditorTools
             foreach (RoadItem i in plan)
             {
                 if (i.Kind == RoadItemKind.Tree || i.Kind == RoadItemKind.FieldHedge) continue;
-                if ((i.Presets & RoadPresets.Ruined) != 0) Piece(roadR, i);
+                if ((i.Presets & RoadPresets.Ruined) != 0 && i.Kind != RoadItemKind.Hedge) Piece(roadR, i);   // T10: the Ruined hedge is a row of scanned shrubs (HollowmereRoadside.RoadHedges), not Hedge_A/B cards
                 if ((i.Presets & RoadPresets.Rebuilt) != 0) Piece(roadB, i);
             }
 

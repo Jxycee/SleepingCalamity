@@ -57,6 +57,8 @@ namespace SleepingCalamity.EditorTools
                 Vector3 p = P(n);
                 if (Physics.CheckCapsule(p + Vector3.up * 0.75f, p + Vector3.up * 1.45f, 0.3f, ~0, QueryTriggerInteraction.Ignore) || WedgedCorners.Contains(n.Id)) dropped.Add(n.Id);
             }
+            // T10: the Saltwake road is closed by a fallen tree and a wall (HollowmereOrchard.RoadBlockWallX); the lane nodes behind it are not places a player can stand
+            foreach (PathNode n in t.Nodes) if (n.Id.StartsWith("SaltwakeRoad_", System.StringComparison.Ordinal) && n.Pos.X < HollowmereOrchard.RoadBlockWallX) dropped.Add(n.Id);
             Debug.Log($"SC TRAVERSAL {preset}: {dropped.Count} lot corner nodes dropped as non-places: {string.Join(", ", dropped.OrderBy(x => x, System.StringComparer.Ordinal))}");
 
             var doorNodes = new HashSet<string>(t.Nodes.Where(n => n.Kind == PathNodeKind.Door).Select(n => n.Id));
