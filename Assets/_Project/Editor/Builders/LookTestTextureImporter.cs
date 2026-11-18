@@ -25,15 +25,18 @@ namespace SleepingCalamity.EditorTools
             string name = Path.GetFileNameWithoutExtension(assetPath);
             bool albedo = name.EndsWith("_albedo"), normal = name.EndsWith("_normal"), ms = name.EndsWith("_ms") || name.EndsWith("_mask");
             bool decal = IsDecal(assetPath);
+            // T11: the ambient particle sprites (smoke puff, fish ring, flame, shaft beam: white RGB, the shape is the alpha) were forced to AlphaSource None here, so every one drew as a solid square
+            // (the squares in the RoadOut sky, the chimney smoke and the rings). They keep their alpha and clamp. The sun cookie in the same folder keeps the old path (EnsureCookie sets its type).
+            bool particle = assetPath.Contains("/Textures/Hollowmere/Ambient/") && !name.Contains("Cookie");
 
             ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
             ti.sRGBTexture = albedo;
-            ti.alphaSource = (albedo && decal) || ms ? TextureImporterAlphaSource.FromInput : TextureImporterAlphaSource.None;
-            ti.alphaIsTransparency = albedo && decal;
+            ti.alphaSource = (albedo && decal) || ms || particle ? TextureImporterAlphaSource.FromInput : TextureImporterAlphaSource.None;
+            ti.alphaIsTransparency = (albedo && decal) || particle;
             ti.mipmapEnabled = true;
             ti.filterMode = FilterMode.Trilinear;
             ti.anisoLevel = 8;
-            ti.wrapMode = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
+            ti.wrapMode = decal || particle ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
             ti.maxTextureSize = 2048;   // user rule 2026-10-30: the game targets 1440p, nothing above 2048 px
             ti.textureCompression = TextureImporterCompression.CompressedHQ;
             ti.isReadable = false;

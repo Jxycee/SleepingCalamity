@@ -207,7 +207,7 @@ namespace SleepingCalamity.EditorTools
             // Area 1 rework round 4: cool 1.3 -> 1.0 and key boost 2.0 -> 1.4, fill boost 2 -> 1.5: under the town's stronger Morning sun the massif read as a pale pink spike, not a dark slumped mountain.
             // T11 (Balcony "grey jagged shape floating top right"): the massif was LESS hazed (0.32-0.42) than the far range in front of it (0.84-0.90) and warm-lit, so it read as a pale pink crag pasted on the sky.
             // Now it sits one step beyond the range: the range's haze and blue tint (a little less haze up the face keeps the form), cooler rock, softer key, and the far range swells toward it (Knoll layer 2).
-            Material m = Mat("M_BD_Mawrrow", new Color(0.20f, 0.22f, 0.26f), 0.52f, 0.70f, 2000f, 3000f, 0.04f, 1.0f, 0.8f, 1.0f, 0.10f, 1.1f, 1f, 0.22f, H - 30f, 1.5f, patch: 0f, hazeTint: new Color(0.91f, 0.98f, 1.07f));
+            Material m = Mat("M_BD_Mawrrow", new Color(0.16f, 0.18f, 0.22f), 0.60f, 0.76f, 2000f, 3000f, 0.04f, 1.0f, 0.8f, 1.0f, 0.10f, 0.9f, 1f, 0.30f, H - 30f, 1.5f, patch: 0f, hazeTint: new Color(0.91f, 0.98f, 1.07f));
             MakeObject(parent, "MawrrowMountain", v, idx, m, null, (p, n) =>
             {
                 float y = p.y + 30f;

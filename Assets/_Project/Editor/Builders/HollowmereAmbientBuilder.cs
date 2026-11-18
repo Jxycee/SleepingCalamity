@@ -520,9 +520,9 @@ namespace SleepingCalamity.EditorTools
         {
             EnsureParticleTextures();
             Texture2D flameTex = FlameTexture();
-            Material flameMat = AdditiveMat("M_HM_Flame", flameTex, new Color(0.95f, 0.78f, 0.55f, 1f));
-            Material sparkMat = AdditiveMat("M_HM_Ember", _smokeTex, new Color(1.4f, 0.8f, 0.35f, 1f));
-            Material smokeMat = ParticleMat("M_HM_FlameSmoke", _smokeTex, new Color(0.35f, 0.33f, 0.32f, 0.16f));
+            Material flameMat = AdditiveMat("M_HM_Flame", flameTex, new Color(1.5f, 1.2f, 0.85f, 1f));
+            Material sparkMat = AdditiveMat("M_HM_Ember", _smokeTex, new Color(2.2f, 1.2f, 0.5f, 1f));
+            Material smokeMat = ParticleMat("M_HM_FlameSmoke", _smokeTex, new Color(0.35f, 0.33f, 0.32f, 0.32f));
             GameObject pf = ParticlePrefab(FlamePrefabPath, () => MakeFlame(flameMat, sparkMat, smokeMat));
             var go = (GameObject)PrefabUtility.InstantiatePrefab(pf, parent);
             go.name = "BrazierFlame"; go.transform.position = pos;
@@ -538,9 +538,9 @@ namespace SleepingCalamity.EditorTools
             ParticleSystem flame = root.AddComponent<ParticleSystem>(); flame.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = flame.main;
             main.duration = 4f; main.loop = true; main.prewarm = true; main.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 0.85f); main.startSpeed = new ParticleSystem.MinMaxCurve(0.45f, 0.8f);
-            main.startSize3D = true; main.startSizeX = new ParticleSystem.MinMaxCurve(0.26f, 0.4f); main.startSizeY = new ParticleSystem.MinMaxCurve(0.55f, 0.9f); main.startSizeZ = 1f;
-            main.startRotation = 0f; main.startColor = Color.white; main.simulationSpace = ParticleSystemSimulationSpace.World; main.maxParticles = 28; main.gravityModifier = 0f;
-            var em = flame.emission; em.rateOverTime = 16f;
+            main.startSize3D = true; main.startSizeX = new ParticleSystem.MinMaxCurve(0.3f, 0.46f); main.startSizeY = new ParticleSystem.MinMaxCurve(0.6f, 1.0f); main.startSizeZ = 1f;
+            main.startRotation = 0f; main.startColor = Color.white; main.simulationSpace = ParticleSystemSimulationSpace.World; main.maxParticles = 36; main.gravityModifier = 0f;
+            var em = flame.emission; em.rateOverTime = 26f;
             var shape = flame.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 4f; shape.radius = 0.09f;
             var sz = flame.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.75f), new Keyframe(0.25f, 1f), new Keyframe(1f, 0.12f)));
             var col = flame.colorOverLifetime; col.enabled = true;
@@ -663,9 +663,9 @@ namespace SleepingCalamity.EditorTools
         {
             WritePng(path, res, px);
             var imp = (TextureImporter)AssetImporter.GetAtPath(path);
-            if (!imp.alphaIsTransparency || imp.wrapMode != TextureWrapMode.Clamp)
+            if (!imp.alphaIsTransparency || imp.wrapMode != TextureWrapMode.Clamp || imp.alphaSource != TextureImporterAlphaSource.FromInput)   // T11: LookTestTextureImporter used to force alphaSource None
             {
-                imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp;
+                imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.alphaSource = TextureImporterAlphaSource.FromInput;
                 imp.SaveAndReimport();
             }
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);

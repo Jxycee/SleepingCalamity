@@ -52,7 +52,7 @@ namespace SleepingCalamity.EditorTools
         // fills: name, x, z, height above ground, colour, intensity, range
         static readonly (string Name, float X, float Z, float Up, Color C, float I, float R)[] Fills =
         {
-            ("HillWestFill", -35f, 28f, 2.8f, new Color(0.78f, 0.88f, 0.98f), 26.0f, 20f),      // the HillWest scarp and the crag foot, in shade all morning
+            ("HillWestFill", -38f, 29f, 5.5f, new Color(0.78f, 0.88f, 0.98f), 13.0f, 20f),      // the HillWest scarp and the crag foot, in shade all morning
             ("TerraceNorthFill", -8f, 27f, 2.6f, new Color(0.80f, 0.87f, 1.0f), 4.5f, 12f),     // the north side of the keep terrace under the church wall
             ("MillShadeFill", 64f, -53f, 2.8f, new Color(0.80f, 0.88f, 1.0f), 5.0f, 11f),       // the mill's shade wall (north-west face)
         };
@@ -199,7 +199,7 @@ namespace SleepingCalamity.EditorTools
             Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? throw new System.InvalidOperationException("URP Particles/Unlit not found");
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Content/Textures/Hollowmere/Ambient/T_HM_SmokePuff.png") ?? throw new System.IO.FileNotFoundException("T_HM_SmokePuff.png (built by HollowmereAmbientBuilder)");
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/M_HM_Mist.mat", sh);
-            m.SetTexture("_BaseMap", tex); m.SetColor("_BaseColor", new Color(0.86f, 0.90f, 0.95f, 0.06f));
+            m.SetTexture("_BaseMap", tex); m.SetColor("_BaseColor", new Color(0.86f, 0.90f, 0.95f, 0.15f));   // with the sprite's alpha working a puff peaks at about 0.76 of this and falls off to its edge
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f); m.SetFloat("_SrcBlend", 5f); m.SetFloat("_DstBlend", 10f);
             m.SetFloat("_SrcBlendAlpha", 1f); m.SetFloat("_DstBlendAlpha", 10f); m.SetFloat("_ZWrite", 0f);
             m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.SetOverrideTag("RenderType", "Transparent"); m.renderQueue = 3000;
@@ -257,8 +257,8 @@ namespace SleepingCalamity.EditorTools
             if (!System.IO.File.Exists(abs) || !System.IO.File.ReadAllBytes(abs).SequenceEqual(png)) { System.IO.File.WriteAllBytes(abs, png); AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate); }
             else if (AssetImporter.GetAtPath(path) == null) AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             var imp = (TextureImporter)AssetImporter.GetAtPath(path);
-            if (!imp.alphaIsTransparency || imp.wrapMode != TextureWrapMode.Clamp) { imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.SaveAndReimport(); }
-            return HollowmereAmbientBuilder.AdditiveMat("M_HM_ZoneBeam", AssetDatabase.LoadAssetAtPath<Texture2D>(path), new Color(0.30f, 0.24f, 0.14f, 1f));
+            if (!imp.alphaIsTransparency || imp.wrapMode != TextureWrapMode.Clamp || imp.alphaSource != TextureImporterAlphaSource.FromInput) { imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.alphaSource = TextureImporterAlphaSource.FromInput; imp.SaveAndReimport(); }
+            return HollowmereAmbientBuilder.AdditiveMat("M_HM_ZoneBeam", AssetDatabase.LoadAssetAtPath<Texture2D>(path), new Color(0.9f, 0.72f, 0.42f, 1f));
         }
 
         static void BuildPollen(Transform motes, TownLayout t)
