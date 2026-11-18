@@ -1,0 +1,1027 @@
+{
+    "assetCategories": {
+        "3D asset": {
+            "props": {
+                "wood": {}
+            }
+        }
+    },
+    "averageColor": "#724F33",
+    "brushes": [],
+    "categories": [
+        "3d",
+        "Interior",
+        "Furniture"
+    ],
+    "comp_version": 1,
+    "displacement_bias_tier1": 0.697527,
+    "displacement_scale_tier1": 2.454623,
+    "environment": {
+        "biome": "rural",
+        "region": "Europe"
+    },
+    "highest_available_res": 8192,
+    "id": "ukimedmaw",
+    "is_uefn_compatible": true,
+    "json": {
+        "contentLength": 23674,
+        "uri": "ukimedmaw.json"
+    },
+    "maps": [
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 49184468,
+            "mimeType": "image/x-exr",
+            "name": "Ao",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "ao",
+            "uri": "tier_0/ukimedmaw_8K_AO.exr"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 25235674,
+            "mimeType": "image/jpeg",
+            "name": "Ao",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "ao",
+            "uri": "tier_0/ukimedmaw_8K_AO.jpg"
+        },
+        {
+            "averageColor": "#724F33",
+            "bitDepth": 16,
+            "colorSpace": "sRGB",
+            "contentLength": 218075107,
+            "maxIntensity": 122,
+            "mimeType": "image/x-exr",
+            "minIntensity": 47,
+            "name": "Basecolor",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "basecolor",
+            "uri": "tier_0/ukimedmaw_8K_Basecolor.exr"
+        },
+        {
+            "averageColor": "#724F33",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 36745153,
+            "maxIntensity": 122,
+            "mimeType": "image/jpeg",
+            "minIntensity": 47,
+            "name": "Basecolor",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "basecolor",
+            "uri": "tier_0/ukimedmaw_8K_Basecolor.jpg"
+        },
+        {
+            "averageColor": "#8282FE",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 189323615,
+            "maxIntensity": 157,
+            "mimeType": "image/x-exr",
+            "minIntensity": 129,
+            "name": "Bump",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "bump",
+            "uri": "tier_0/ukimedmaw_8K_Bump.exr"
+        },
+        {
+            "averageColor": "#8282FE",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 12203122,
+            "maxIntensity": 157,
+            "mimeType": "image/jpeg",
+            "minIntensity": 129,
+            "name": "Bump",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "bump",
+            "uri": "tier_0/ukimedmaw_8K_Bump.jpg"
+        },
+        {
+            "averageColor": "#F2F2F2",
+            "bitDepth": 32,
+            "colorSpace": "sRGB",
+            "contentLength": 188140331,
+            "maxIntensity": 255,
+            "mimeType": "image/x-exr",
+            "minIntensity": 213,
+            "name": "Cavity",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "cavity",
+            "uri": "tier_0/ukimedmaw_8K_Cavity.exr"
+        },
+        {
+            "averageColor": "#F2F2F2",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 38069537,
+            "maxIntensity": 255,
+            "mimeType": "image/jpeg",
+            "minIntensity": 213,
+            "name": "Cavity",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "cavity",
+            "uri": "tier_0/ukimedmaw_8K_Cavity.jpg"
+        },
+        {
+            "averageColor": "#161616",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 160421382,
+            "maxIntensity": 43,
+            "mimeType": "image/x-exr",
+            "minIntensity": 8,
+            "name": "Gloss",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "gloss",
+            "uri": "tier_0/ukimedmaw_8K_Gloss.exr"
+        },
+        {
+            "averageColor": "#161616",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 18976301,
+            "maxIntensity": 43,
+            "mimeType": "image/jpeg",
+            "minIntensity": 8,
+            "name": "Gloss",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "gloss",
+            "uri": "tier_0/ukimedmaw_8K_Gloss.jpg"
+        },
+        {
+            "bitDepth": 16,
+            "colorspace": "linear",
+            "contentLength": 160981858,
+            "mimeType": "image/x-exr",
+            "name": "Normal",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "normal",
+            "uri": "tier_0/ukimedmaw_8K_Normal.exr"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 56034686,
+            "mimeType": "image/jpeg",
+            "name": "Normal",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "normal",
+            "uri": "tier_0/ukimedmaw_8K_Normal.jpg"
+        },
+        {
+            "averageColor": "#E9E9E9",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 182946773,
+            "maxIntensity": 246,
+            "mimeType": "image/x-exr",
+            "minIntensity": 211,
+            "name": "Roughness",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "roughness",
+            "uri": "tier_0/ukimedmaw_8K_Roughness.exr"
+        },
+        {
+            "averageColor": "#E9E9E9",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 17737782,
+            "maxIntensity": 246,
+            "mimeType": "image/jpeg",
+            "minIntensity": 211,
+            "name": "Roughness",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "roughness",
+            "uri": "tier_0/ukimedmaw_8K_Roughness.jpg"
+        },
+        {
+            "averageColor": "#323232",
+            "bitDepth": 16,
+            "colorSpace": "sRGB",
+            "contentLength": 200379758,
+            "maxIntensity": 54,
+            "mimeType": "image/x-exr",
+            "minIntensity": 42,
+            "name": "Specular",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "specular",
+            "uri": "tier_0/ukimedmaw_8K_Specular.exr"
+        },
+        {
+            "averageColor": "#323232",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 22308983,
+            "maxIntensity": 54,
+            "mimeType": "image/jpeg",
+            "minIntensity": 42,
+            "name": "Specular",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 0,
+            "type": "specular",
+            "uri": "tier_0/ukimedmaw_8K_Specular.jpg"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 49184468,
+            "mimeType": "image/x-exr",
+            "name": "Ao",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "ao",
+            "uri": "tier_1/ukimedmaw_8K_AO.exr"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 25235674,
+            "mimeType": "image/jpeg",
+            "name": "Ao",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "ao",
+            "uri": "tier_1/ukimedmaw_8K_AO.jpg"
+        },
+        {
+            "averageColor": "#724F33",
+            "bitDepth": 16,
+            "colorSpace": "sRGB",
+            "contentLength": 218075107,
+            "maxIntensity": 122,
+            "mimeType": "image/x-exr",
+            "minIntensity": 47,
+            "name": "Basecolor",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "basecolor",
+            "uri": "tier_1/ukimedmaw_8K_Basecolor.exr"
+        },
+        {
+            "averageColor": "#724F33",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 36745153,
+            "maxIntensity": 122,
+            "mimeType": "image/jpeg",
+            "minIntensity": 47,
+            "name": "Basecolor",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "basecolor",
+            "uri": "tier_1/ukimedmaw_8K_Basecolor.jpg"
+        },
+        {
+            "averageColor": "#8282FE",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 189323615,
+            "maxIntensity": 157,
+            "mimeType": "image/x-exr",
+            "minIntensity": 129,
+            "name": "Bump",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "bump",
+            "uri": "tier_1/ukimedmaw_8K_Bump.exr"
+        },
+        {
+            "averageColor": "#8282FE",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 12203122,
+            "maxIntensity": 157,
+            "mimeType": "image/jpeg",
+            "minIntensity": 129,
+            "name": "Bump",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "bump",
+            "uri": "tier_1/ukimedmaw_8K_Bump.jpg"
+        },
+        {
+            "averageColor": "#F2F2F2",
+            "bitDepth": 32,
+            "colorSpace": "sRGB",
+            "contentLength": 188140331,
+            "maxIntensity": 255,
+            "mimeType": "image/x-exr",
+            "minIntensity": 213,
+            "name": "Cavity",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "cavity",
+            "uri": "tier_1/ukimedmaw_8K_Cavity.exr"
+        },
+        {
+            "averageColor": "#F2F2F2",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 38069537,
+            "maxIntensity": 255,
+            "mimeType": "image/jpeg",
+            "minIntensity": 213,
+            "name": "Cavity",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "cavity",
+            "uri": "tier_1/ukimedmaw_8K_Cavity.jpg"
+        },
+        {
+            "averageColor": "#B4B4B4",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 268635546,
+            "maxIntensity": 186,
+            "mimeType": "image/x-exr",
+            "minIntensity": 163,
+            "name": "Displacement",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "displacement",
+            "uri": "tier_1/ukimedmaw_8K_Displacement.exr"
+        },
+        {
+            "averageColor": "#B4B4B4",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 2784800,
+            "maxIntensity": 186,
+            "mimeType": "image/jpeg",
+            "minIntensity": 163,
+            "name": "Displacement",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "displacement",
+            "uri": "tier_1/ukimedmaw_8K_Displacement.jpg"
+        },
+        {
+            "averageColor": "#161616",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 160421382,
+            "maxIntensity": 43,
+            "mimeType": "image/x-exr",
+            "minIntensity": 8,
+            "name": "Gloss",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "gloss",
+            "uri": "tier_1/ukimedmaw_8K_Gloss.exr"
+        },
+        {
+            "averageColor": "#161616",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 18976301,
+            "maxIntensity": 43,
+            "mimeType": "image/jpeg",
+            "minIntensity": 8,
+            "name": "Gloss",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "gloss",
+            "uri": "tier_1/ukimedmaw_8K_Gloss.jpg"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 89044260,
+            "mimeType": "image/x-exr",
+            "name": "Normal",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "normal",
+            "uri": "tier_1/ukimedmaw_8K_Normal.exr"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 59966028,
+            "mimeType": "image/jpeg",
+            "name": "Normal",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "normal",
+            "uri": "tier_1/ukimedmaw_8K_Normal.jpg"
+        },
+        {
+            "averageColor": "#E9E9E9",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 182946773,
+            "maxIntensity": 246,
+            "mimeType": "image/x-exr",
+            "minIntensity": 211,
+            "name": "Roughness",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "roughness",
+            "uri": "tier_1/ukimedmaw_8K_Roughness.exr"
+        },
+        {
+            "averageColor": "#E9E9E9",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 17737782,
+            "maxIntensity": 246,
+            "mimeType": "image/jpeg",
+            "minIntensity": 211,
+            "name": "Roughness",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "roughness",
+            "uri": "tier_1/ukimedmaw_8K_Roughness.jpg"
+        },
+        {
+            "averageColor": "#323232",
+            "bitDepth": 16,
+            "colorSpace": "sRGB",
+            "contentLength": 200379758,
+            "maxIntensity": 54,
+            "mimeType": "image/x-exr",
+            "minIntensity": 42,
+            "name": "Specular",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "specular",
+            "uri": "tier_1/ukimedmaw_8K_Specular.exr"
+        },
+        {
+            "averageColor": "#323232",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 22308983,
+            "maxIntensity": 54,
+            "mimeType": "image/jpeg",
+            "minIntensity": 42,
+            "name": "Specular",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 1,
+            "type": "specular",
+            "uri": "tier_1/ukimedmaw_8K_Specular.jpg"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 49184468,
+            "mimeType": "image/x-exr",
+            "name": "Ao",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "ao",
+            "uri": "tier_2/ukimedmaw_8K_AO.exr"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 25235674,
+            "mimeType": "image/jpeg",
+            "name": "Ao",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "ao",
+            "uri": "tier_2/ukimedmaw_8K_AO.jpg"
+        },
+        {
+            "averageColor": "#724F33",
+            "bitDepth": 16,
+            "colorSpace": "sRGB",
+            "contentLength": 218075107,
+            "maxIntensity": 122,
+            "mimeType": "image/x-exr",
+            "minIntensity": 47,
+            "name": "Basecolor",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "basecolor",
+            "uri": "tier_2/ukimedmaw_8K_Basecolor.exr"
+        },
+        {
+            "averageColor": "#724F33",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 36745153,
+            "maxIntensity": 122,
+            "mimeType": "image/jpeg",
+            "minIntensity": 47,
+            "name": "Basecolor",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "basecolor",
+            "uri": "tier_2/ukimedmaw_8K_Basecolor.jpg"
+        },
+        {
+            "averageColor": "#8282FE",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 189323615,
+            "maxIntensity": 157,
+            "mimeType": "image/x-exr",
+            "minIntensity": 129,
+            "name": "Bump",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "bump",
+            "uri": "tier_2/ukimedmaw_8K_Bump.exr"
+        },
+        {
+            "averageColor": "#8282FE",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 12203122,
+            "maxIntensity": 157,
+            "mimeType": "image/jpeg",
+            "minIntensity": 129,
+            "name": "Bump",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "bump",
+            "uri": "tier_2/ukimedmaw_8K_Bump.jpg"
+        },
+        {
+            "averageColor": "#F2F2F2",
+            "bitDepth": 32,
+            "colorSpace": "sRGB",
+            "contentLength": 188140331,
+            "maxIntensity": 255,
+            "mimeType": "image/x-exr",
+            "minIntensity": 213,
+            "name": "Cavity",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "cavity",
+            "uri": "tier_2/ukimedmaw_8K_Cavity.exr"
+        },
+        {
+            "averageColor": "#F2F2F2",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 38069537,
+            "maxIntensity": 255,
+            "mimeType": "image/jpeg",
+            "minIntensity": 213,
+            "name": "Cavity",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "cavity",
+            "uri": "tier_2/ukimedmaw_8K_Cavity.jpg"
+        },
+        {
+            "averageColor": "#161616",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 160421382,
+            "maxIntensity": 43,
+            "mimeType": "image/x-exr",
+            "minIntensity": 8,
+            "name": "Gloss",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "gloss",
+            "uri": "tier_2/ukimedmaw_8K_Gloss.exr"
+        },
+        {
+            "averageColor": "#161616",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 18976301,
+            "maxIntensity": 43,
+            "mimeType": "image/jpeg",
+            "minIntensity": 8,
+            "name": "Gloss",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "gloss",
+            "uri": "tier_2/ukimedmaw_8K_Gloss.jpg"
+        },
+        {
+            "bitDepth": 16,
+            "colorspace": "linear",
+            "contentLength": 165277337,
+            "mimeType": "image/x-exr",
+            "name": "Normal",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "normal",
+            "uri": "tier_2/ukimedmaw_8K_Normal.exr"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 56353905,
+            "mimeType": "image/jpeg",
+            "name": "Normal",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "normal",
+            "uri": "tier_2/ukimedmaw_8K_Normal.jpg"
+        },
+        {
+            "averageColor": "#E9E9E9",
+            "bitDepth": 32,
+            "colorSpace": "Linear",
+            "contentLength": 182946773,
+            "maxIntensity": 246,
+            "mimeType": "image/x-exr",
+            "minIntensity": 211,
+            "name": "Roughness",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "roughness",
+            "uri": "tier_2/ukimedmaw_8K_Roughness.exr"
+        },
+        {
+            "averageColor": "#E9E9E9",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 17737782,
+            "maxIntensity": 246,
+            "mimeType": "image/jpeg",
+            "minIntensity": 211,
+            "name": "Roughness",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "roughness",
+            "uri": "tier_2/ukimedmaw_8K_Roughness.jpg"
+        },
+        {
+            "averageColor": "#323232",
+            "bitDepth": 16,
+            "colorSpace": "sRGB",
+            "contentLength": 200379758,
+            "maxIntensity": 54,
+            "mimeType": "image/x-exr",
+            "minIntensity": 42,
+            "name": "Specular",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "specular",
+            "uri": "tier_2/ukimedmaw_8K_Specular.exr"
+        },
+        {
+            "averageColor": "#323232",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 22308983,
+            "maxIntensity": 54,
+            "mimeType": "image/jpeg",
+            "minIntensity": 42,
+            "name": "Specular",
+            "physicalSize": "1x1",
+            "resolution": "8192x8192",
+            "tier": 2,
+            "type": "specular",
+            "uri": "tier_2/ukimedmaw_8K_Specular.jpg"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 2496905,
+            "mimeType": "image/jpeg",
+            "name": "Ao",
+            "resolution": "4096x4096",
+            "tier": 3,
+            "type": "ao",
+            "uri": "tier_3/ukimedmaw_4K_AO.jpg"
+        },
+        {
+            "averageColor": "#724F33",
+            "bitDepth": 8,
+            "colorSpace": "sRGB",
+            "contentLength": 4712329,
+            "maxIntensity": 122,
+            "mimeType": "image/jpeg",
+            "minIntensity": 47,
+            "name": "Basecolor",
+            "physicalSize": "1x1",
+            "resolution": "4096x4096",
+            "tier": 3,
+            "type": "basecolor",
+            "uri": "tier_3/ukimedmaw_4K_Basecolor.jpg"
+        },
+        {
+            "bitDepth": 8,
+            "colorspace": "linear",
+            "contentLength": 5689838,
+            "mimeType": "image/jpeg",
+            "name": "Normal",
+            "resolution": "4096x4096",
+            "tier": 3,
+            "type": "normal",
+            "uri": "tier_3/ukimedmaw_4K_Normal.jpg"
+        },
+        {
+            "averageColor": "#E9E9E9",
+            "bitDepth": 8,
+            "colorSpace": "Linear",
+            "contentLength": 2594922,
+            "maxIntensity": 246,
+            "mimeType": "image/jpeg",
+            "minIntensity": 211,
+            "name": "Roughness",
+            "physicalSize": "1x1",
+            "resolution": "4096x4096",
+            "tier": 3,
+            "type": "roughness",
+            "uri": "tier_3/ukimedmaw_4K_Roughness.jpg"
+        }
+    ],
+    "meta": [
+        {
+            "key": "assembly",
+            "name": "Assembly",
+            "value": "false"
+        },
+        {
+            "key": "small3dasset",
+            "name": "Small3dAsset",
+            "value": "false"
+        },
+        {
+            "key": "color",
+            "name": "Color",
+            "value": "Brown"
+        },
+        {
+            "key": "points",
+            "name": "Points",
+            "value": 4
+        },
+        {
+            "key": "texelDensity",
+            "name": "Texel Density",
+            "value": "32 px/m"
+        },
+        {
+            "key": "splitSubmeshes",
+            "name": "Split Submeshes",
+            "value": true
+        },
+        {
+            "key": "isScaleFixed",
+            "name": "Is scale fixed",
+            "value": "true"
+        },
+        {
+            "key": "length",
+            "name": "Length",
+            "value": "0.55m"
+        },
+        {
+            "key": "width",
+            "name": "Width",
+            "value": "0.07m"
+        },
+        {
+            "key": "height",
+            "name": "Height",
+            "value": "1.54m"
+        }
+    ],
+    "models": [
+        {
+            "contentLength": 63421872,
+            "mimeType": "application/x-fbx",
+            "tier": 0,
+            "tris": 999999,
+            "uri": "tier_0/ukimedmaw.fbx"
+        },
+        {
+            "contentLength": 522304,
+            "mimeType": "application/x-fbx",
+            "tier": 1,
+            "tris": 19071,
+            "uri": "tier_1/ukimedmaw.fbx"
+        },
+        {
+            "contentLength": 153520,
+            "mimeType": "application/x-fbx",
+            "tier": 2,
+            "tris": 4767,
+            "uri": "tier_2/ukimedmaw.fbx"
+        },
+        {
+            "contentLength": 60128,
+            "mimeType": "application/x-fbx",
+            "tier": 3,
+            "tris": 361,
+            "uri": "tier_3/ukimedmaw.fbx"
+        },
+        {
+            "contentLength": 703993362,
+            "mimeType": "application/x-ztl",
+            "uri": "tier_0/ukimedmaw_ZTool.ztl"
+        }
+    ],
+    "name": "Wooden Ladder",
+    "pack": null,
+    "physicalSize": "1x1",
+    "points": 4,
+    "previews": {
+        "images": [
+            {
+                "contentLength": 566823,
+                "content_length": 50984,
+                "resolution": "1920x1080",
+                "uri": "ukimedmaw_preview.png"
+            }
+        ],
+        "relativeSize": "1x1"
+    },
+    "process_date": "2023-11-25 13:27:45",
+    "properties": [
+        {
+            "key": "size",
+            "value": "medium"
+        },
+        {
+            "key": "mesh type",
+            "value": "Closed"
+        }
+    ],
+    "referencePreviews": {
+        "maps": [],
+        "models": [
+            {
+                "contentLength": 532048,
+                "mimeType": "application/x-fbx",
+                "tris": 19071,
+                "uri": "ukimedmaw_layout.fbx"
+            }
+        ]
+    },
+    "references": [],
+    "revised": false,
+    "revision": 0,
+    "semanticTags": {
+        "3d_mesh": "Closed",
+        "architectural_style": {},
+        "asset_type": "3D asset",
+        "city": "Tabernas",
+        "color": [
+            "Brown"
+        ],
+        "contains": [
+            "wood",
+            "ladder",
+            "steps",
+            "rungs"
+        ],
+        "country": "Poland",
+        "descriptive": [
+            "dirty",
+            "worn",
+            "old",
+            "wooden",
+            "stained"
+        ],
+        "environment": [
+            "rural"
+        ],
+        "industry": [
+            "archviz",
+            "games",
+            "VFX"
+        ],
+        "latin_name": [],
+        "locations": {
+            "Europe": {
+                "Poland": {
+                    "Tabernas": {}
+                }
+            }
+        },
+        "maxSize": 1.54,
+        "minSize": 0.07,
+        "name": "Wooden Ladder",
+        "orientation": [
+            "floor"
+        ],
+        "region": "Europe",
+        "resolution": 8192,
+        "season": [],
+        "state": [
+            "old"
+        ],
+        "subject_matter": "manmade",
+        "theme": [
+            "workspaces",
+            "garages",
+            "library",
+            "restaurants",
+            "houses",
+            "furniture"
+        ]
+    },
+    "tags": [
+        "brown",
+        "workspaces",
+        "garages",
+        "library",
+        "restaurants",
+        "houses",
+        "canteens",
+        "wood",
+        "ladder",
+        "step",
+        "dirty",
+        "worn",
+        "old",
+        "wooden",
+        "stained"
+    ],
+    "texelDensity": 6411,
+    "texture_type": "basic",
+    "ue_plugin_archives": [
+        {
+            "contentLength": 255494068,
+            "gltfVersion": "2.0",
+            "tier": 0,
+            "type": "gltf",
+            "uri": "ue_plugin_archives/tier_0/ukimedmaw_tier_0.zip",
+            "version": 1
+        },
+        {
+            "contentLength": 70290424,
+            "gltfVersion": "2.0",
+            "tier": 1,
+            "type": "gltf",
+            "uri": "ue_plugin_archives/tier_1/ukimedmaw_tier_1.zip",
+            "version": 1
+        },
+        {
+            "contentLength": 18508187,
+            "gltfVersion": "2.0",
+            "tier": 2,
+            "type": "gltf",
+            "uri": "ue_plugin_archives/tier_2/ukimedmaw_tier_2.zip",
+            "version": 1
+        },
+        {
+            "contentLength": 665179,
+            "gltfVersion": "2.0",
+            "tier": 3,
+            "type": "gltf",
+            "uri": "ue_plugin_archives/tier_3/ukimedmaw_tier_3.zip",
+            "version": 1
+        }
+    ],
+    "version": 2
+}
