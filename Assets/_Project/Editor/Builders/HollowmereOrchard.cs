@@ -60,7 +60,9 @@ namespace SleepingCalamity.EditorTools
 
         // True on the cleared strip of the path (ragged edge: 0.5-0.95 m half width from a noise of the position).
         // T07b: worn ground under the harvest tree and round the bench, so the story props stand on bare earth and hay, not in long grass.
-        static readonly Vector3[] WornDiscs = { new Vector3(39.5f, -53.0f, 2.7f), new Vector3(43.6f, -51.0f, 1.5f), new Vector3(39.4f, -50.9f, 0f) };
+        static readonly Vector3[] WornDiscs = { new Vector3(39.5f, -53.0f, 2.7f), new Vector3(43.6f, -51.0f, 1.5f), new Vector3(39.4f, -50.9f, 0f), new Vector3(36.3f, -51.0f, 2.1f) };
+        // T07c: the crates, sack and tipped basket stand here, 6.8 m out from Eye_Orchard (33.2,-44.7) and 8 degrees right of its axis, on a worn patch in the lit lawn; the ladder and full basket stay at the trunk behind.
+        static readonly Vector2 HarvestSpot = new Vector2(36.1f, -50.9f);
         internal static bool OnPath(float x, float z)
         {
             foreach (Vector3 d in WornDiscs) if (Vector2.Distance(new Vector2(x, z), new Vector2(d.x, d.y)) < d.z * Mathf.Lerp(0.7f, 1.05f, Mathf.PerlinNoise(x * 2.3f + 5f, z * 2.3f + 1f))) return true;
@@ -128,7 +130,9 @@ namespace SleepingCalamity.EditorTools
             WallFeet(props, flora, dec);
             WallGap(props, flora, dec);
             FillLight(g);
+            EyeClear(ruined);
             Allotments(Sub(ruined, "Allotments"));
+            SolidPier(ruined, "R2_22");
             var lights = Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None).Count(l => l.type != LightType.Directional);
             Debug.Log("SC HOLLOWMERE orchard: " + string.Join(", ", counts.OrderBy(kv => kv.Key, System.StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)) + ", decals=" + decals + ", non-directional lights in the scene=" + lights);
         }
@@ -491,7 +495,7 @@ namespace SleepingCalamity.EditorTools
             // a tipped basket with apples spilled downhill (toward the wall) under tree 4
             {
                 Vector2 tp = new Vector2(Trees[0].X, Trees[0].Z), d = new Vector2(-0.3f, 0.95f).normalized;   // T07b: east of the harvest trunk, apples spilling toward the lane
-                Vector2 bp = tp + new Vector2(1.55f, -0.1f);
+                Vector2 bp = HarvestSpot + new Vector2(1.55f, -0.2f);
                 if (Ok(bp, 0.25f))
                 {
                     float by = Gy(bp);
@@ -541,7 +545,7 @@ namespace SleepingCalamity.EditorTools
             // T07b: a crate stack and a sack at the harvest tree's west side, in the frame's mid-ground
             {
                 Vector2 tp = new Vector2(Trees[0].X, Trees[0].Z), t = new Vector2(0.9f, -0.44f);
-                Vector2 cp = tp + new Vector2(-1.6f, 0.5f);
+                Vector2 cp = HarvestSpot;
                 if (Ok(cp, 0.35f, false, false))
                 {
                     float cy = Gy(cp);
@@ -551,7 +555,7 @@ namespace SleepingCalamity.EditorTools
                     Decal(dec, "Hay", cp + new Vector2(0.1f, 0.2f), 1.8f, 1.8f, 160f, "Hay_Harvest");
                     for (int i = 0; i < 4; i++) { Vector2 q = cp + new Vector2(-0.7f - 0.2f * i, 0.5f - 0.15f * i); if (Ok(q, 0.1f)) Apple(g, q, 16, i, i == 3); }
                 }
-                Vector2 sp = tp + new Vector2(-0.95f, 1.5f); if (Ok(sp, 0.3f, false, false)) Put(g, "C11b", "HarvestSack", sp, Gy(sp), 0.7f, 120f, 6f, 4f, 0.04f);
+                Vector2 sp = HarvestSpot + new Vector2(0.95f, 0.75f); if (Ok(sp, 0.3f, false, false)) Put(g, "C11b", "HarvestSack", sp, Gy(sp), 0.7f, 120f, 6f, 4f, 0.04f);
             }
             // tools leaning on the gate pier (orchard face)
             {
@@ -695,7 +699,7 @@ namespace SleepingCalamity.EditorTools
             Vector2 c = new Vector2(44.2f, -57.4f), n = new Vector2(0.51f, -0.86f), t = new Vector2(0.86f, 0.51f);   // 40-42: breach at (43.4,-58.6), crumbled at (46.7,-56.4) and (49.7,-53.9)
             // T07b: the wall fell years ago. The breach's own modules give the courses; the spill is real scanned rubble (T05b/T05c/N03/T11a) stepping down from the wall foot in a
             // heap that buries the module's base, with grass, ferns and moss through it. Larger pieces near the wall, smaller and sparser out into the grass.
-            string[] kinds = { "T05b", "N03", "T05c", "T11a", "T05b", "N03", "T05c" };
+            string[] kinds = { "T05b", "N03", "T05c", "T19k", "T05b", "N03", "T19g" };   // T07c: no T11a here (its albedo averages 53/44/26: black under the crowns), the church-ruin wall kit stones instead
             int made = 0;
             for (int k = 0; k < 26; k++)
             {
@@ -715,11 +719,11 @@ namespace SleepingCalamity.EditorTools
                 Vector2 q = c + t * (k * 0.5f - 0.6f) - n * (0.2f + 1.1f * H(k, 11, 968));
                 if (!Ok(q, 0.2f, false, false)) continue;
                 float size = Mathf.Lerp(1.5f, 2.5f, H(k, 12, 968));
-                Put(g, k % 3 == 0 ? "T11a" : k % 3 == 1 ? "N03" : "T05b", "GapHeap_" + k, q, Gy(q), size, H(k, 13, 968) * 360f, (H(k, 14, 968) - 0.5f) * 24f, (H(k, 15, 968) - 0.5f) * 24f, size * 0.38f);
+                Put(g, k % 3 == 0 ? "T19l" : k % 3 == 1 ? "N03" : "T05b", "GapHeap_" + k, q, Gy(q), size, H(k, 13, 968) * 360f, (H(k, 14, 968) - 0.5f) * 24f, (H(k, 15, 968) - 0.5f) * 24f, size * 0.38f);
                 made++;
             }
             // the ground east of the breach (the bare cracked plane): rubble, ferns, tufts, litter
-            for (int k = 0; k < 7; k++) { Vector2 q = c + t * (3.2f + 0.7f * k) - n * (0.6f + 2.2f * H(k, 16, 969)); if (Ok(q, 0.2f, false, false)) { Put(g, k % 2 == 0 ? "T05c" : "T11a", "GapEast_" + k, q, Gy(q), Mathf.Lerp(0.5f, 1.2f, H(k, 17, 969)), H(k, 18, 969) * 360f, (H(k, 19, 969) - 0.5f) * 20f, (H(k, 20, 969) - 0.5f) * 20f, 0.15f); made++; } }
+            for (int k = 0; k < 7; k++) { Vector2 q = c + t * (3.2f + 0.7f * k) - n * (0.6f + 2.2f * H(k, 16, 969)); if (Ok(q, 0.2f, false, false)) { Put(g, k % 2 == 0 ? "T05c" : "T19k", "GapEast_" + k, q, Gy(q), Mathf.Lerp(0.5f, 1.2f, H(k, 17, 969)), H(k, 18, 969) * 360f, (H(k, 19, 969) - 0.5f) * 20f, (H(k, 20, 969) - 0.5f) * 20f, 0.15f); made++; } }
             for (int k = 0; k < 12; k++) { Vector2 q = c + t * (2.6f + 0.45f * k) - n * (0.5f + 2.6f * H(k, 21, 969)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 969, k, 0.9f, 1.6f); }
             for (int k = 0; k < 4; k++) { Vector2 q = c + t * (3.5f + 1.1f * k) - n * (1.0f + 1.5f * H(k, 22, 969)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFernE_" + k, q, Gy(q), 0.75f, H(k, 23, 969) * 360f, 0f, 0f, 0.03f); }
             Decal(dec, "LeavesB", c + t * 4.2f - n * 1.6f, 3.2f, 3.2f, 30f, "GapLitterE"); Decal(dec, "MossSoft", c + t * 3.4f - n * 0.9f, 2.6f, 2.6f, 80f, "GapMossE"); Decal(dec, "Damp", c + t * 5.0f - n * 1.3f, 3.0f, 2.0f, 20f, "GapDampE");
@@ -729,11 +733,30 @@ namespace SleepingCalamity.EditorTools
                 float d = 3.3f + 0.35f * (k % 4) + 0.4f * (k / 4), lat = (k % 4) * 0.75f - 0.9f;
                 Vector2 q = new Vector2(41.9f + 0.616f * d, -52.0f - 0.788f * d) + t * lat;
                 if (!Ok(q, 0.2f, false, false)) continue;
-                float size = Mathf.Lerp(1.6f, 2.4f, H(k, 31, 968));
-                Put(g, k % 3 == 0 ? "N03" : k % 3 == 1 ? "T11a" : "T05b", "GapFore_" + k, q, Gy(q), size, H(k, 32, 968) * 360f, (H(k, 33, 968) - 0.5f) * 20f, (H(k, 34, 968) - 0.5f) * 20f, size * 0.25f);
+                float size = Mathf.Lerp(0.9f, 1.7f, H(k, 31, 968));   // T07c: smaller and lighter (was 1.6-2.4 m of T11a)
+                Put(g, k % 3 == 0 ? "N03" : k % 3 == 1 ? "T19k" : "T05b", "GapFore_" + k, q, Gy(q), size, H(k, 32, 968) * 360f, (H(k, 33, 968) - 0.5f) * 20f, (H(k, 34, 968) - 0.5f) * 20f, size * 0.25f);
                 if (Ok(q + t * 0.9f, 0.2f, false, false)) Put(g, "T12b", "GapForeFern_" + k, q + t * 0.9f, Gy(q), 0.8f, H(k, 35, 968) * 360f, 0f, 0f, 0.03f);
                 made++;
             }
+            // T07c: a dry-stone spill stepping down from the broken courses toward the camera: church-wall skirt, top and block stones in tiers that fall with distance, lying a little off level
+            string[] steps = { "T19g", "T19k", "T19h", "T19k", "T19i", "T19g", "T19j" };
+            for (int tier = 0; tier < 4; tier++)
+                for (int k = 0; k < 5; k++)
+                {
+                    int key = tier * 7 + k;
+                    Vector2 q = c + t * ((k - 1.6f) * 1.35f + (H(key, 41, 970) - 0.5f) * 0.7f) - n * (0.55f + 0.95f * tier + (H(key, 42, 970) - 0.5f) * 0.4f);
+                    if (!Ok(q, 0.2f, false, false)) continue;
+                    string sk = steps[key % steps.Length];
+                    float size = Mathf.Lerp(1.7f, 0.9f, tier / 3f) * Mathf.Lerp(0.8f, 1.15f, H(key, 43, 970)) * (sk == "T19i" || sk == "T19j" ? 0.42f : 1f);
+                    Put(g, sk, "GapStep_" + tier + "_" + k, q, Gy(q), size, YawAlong(t) + (H(key, 44, 970) - 0.5f) * 50f, (H(key, 45, 970) - 0.5f) * 14f, (H(key, 46, 970) - 0.5f) * 14f, 0.06f + 0.05f * tier);
+                    made++;
+                }
+            // T07c: the flagged ledge of the breach module west of the gap (the right of the frame) stood bare: moss, litter and damp over it, small stones, ferns and tufts through it
+            Decal(dec, "MossSoft", new Vector2(40.2f, -58.7f), 3.4f, 3.0f, 20f, "GapMossW"); Decal(dec, "LeavesB", new Vector2(39.0f, -58.6f), 3.4f, 3.0f, 110f, "GapLitterW");
+            Decal(dec, "Damp", new Vector2(41.2f, -58.6f), 3.0f, 2.0f, 60f, "GapDampW"); Decal(dec, "LeavesA", new Vector2(38.2f, -59.2f), 3.0f, 3.0f, 200f, "GapLitterW2"); Decal(dec, "Moss", new Vector2(37.6f, -58.0f), 2.6f, 2.6f, 75f, "GapMossW2");
+            for (int k = 0; k < 16; k++) { Vector2 q = new Vector2(36.8f + k * 0.34f + (H(k, 51, 970) - 0.5f) * 0.3f, -58.9f + (H(k, 52, 970) - 0.5f) * 1.2f); Weed(flora, q, 970, k, 0.9f, 1.5f); }
+            for (int k = 0; k < 5; k++) { Vector2 q = new Vector2(37.6f + k * 0.95f, -58.6f + (H(k, 53, 970) - 0.5f) * 0.8f); Put(g, "T12b", "GapFernW_" + k, q, Gy(q), 0.85f, H(k, 54, 970) * 360f, 0f, 0f, 0.03f); }
+            for (int k = 0; k < 6; k++) { Vector2 q = new Vector2(37.4f + k * 0.8f, -58.4f + (H(k, 55, 970) - 0.5f) * 0.9f); Put(g, k % 2 == 0 ? "T05c" : "T19k", "GapStoneW_" + k, q, Gy(q), 0.45f + 0.35f * H(k, 56, 970), H(k, 57, 970) * 360f, (H(k, 58, 970) - 0.5f) * 12f, (H(k, 59, 970) - 0.5f) * 12f, 0.06f); made++; }
             Count("gapRubble", made);
             for (int k = 0; k < 10; k++) { Vector2 q = c + t * (k * 0.95f - 3.3f) - n * (1.0f + 2.0f * H(k, 4, 965)); if (Ok(q, 0.3f, false, false)) Put(g, "T12b", "GapFern_" + k, q, Gy(q), 0.65f + 0.35f * H(k, 1, 965), H(k, 2, 965) * 360f, 0f, 0f, 0.03f); }
             for (int k = 0; k < 26; k++) { Vector2 q = c + t * (k * 0.42f - 3.5f) - n * Mathf.Lerp(0.2f, 3.6f, H(k, 2, 966)); if (Ok(q, 0.05f, false, false)) Weed(flora, q, 966, k, 0.9f, 1.6f); }
@@ -741,6 +764,70 @@ namespace SleepingCalamity.EditorTools
             Decal(dec, "Damp", c - n * 1.0f, 4.0f, 3.0f, YawAlong(t), "GapDamp"); Decal(dec, "Moss", c - n * 1.8f + t * 2f, 2.6f, 2.6f, 40f, "GapMoss"); Decal(dec, "Moss", c - n * 1.2f - t * 2.2f, 2.4f, 2.4f, 130f, "GapMoss2");
             Decal(dec, "LeavesA", c - n * 3.0f, 3.0f, 3.0f, 70f, "GapLitterA"); Decal(dec, "LeavesB", c - n * 2.6f + t * 3f, 3.0f, 3.0f, 10f, "GapLitterB"); Decal(dec, "LeavesA", c - n * 3.4f - t * 2f, 2.6f, 2.6f, 200f, "GapLitterC");
             for (int k = 0; k < 4; k++) { Vector2 q = c - n * (2.2f + 0.6f * k) + t * (k * 1.5f - 2f); if (Ok(q, 0.1f, false, false)) Apple(g, q, 17, k, k == 2); }
+        }
+
+        // ------------------------------------------------------------------------------------------------ T07c: clear the Orchard eye line, a solid pier for the allotment view
+        static Transform FindByName(Transform root, string name)
+        {
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
+            return null;
+        }
+
+        // The lane clutter's broken handcart stood 4.9 m in front of Eye_Orchard on the harvest cluster's bearing (a 1.1 m prop hides ground 5-16 m behind it from a 1.65 m eye).
+        // It moves to the nook at the frame's right edge, still lying in the grass, half cut by the frame.
+        static void EyeClear(Transform ruined)
+        {
+            Transform cart = FindByName(ruined, "Clutter_Clutter_Ru_Wreck1_Handcart");
+            if (cart == null) { Count("cartMissing"); return; }
+            foreach (Vector2 to in new[] { new Vector2(33.3f, -48.7f), new Vector2(33.0f, -49.3f), new Vector2(33.8f, -48.2f), new Vector2(33.4f, -49.8f) })
+            {
+                if (!Ok(to, 0.2f, false, false)) continue;
+                Bounds b = Render(cart.gameObject);
+                cart.position += new Vector3(to.x - b.center.x, 0f, to.y - b.center.z);
+                Physics.SyncTransforms();
+                b = Render(cart.gameObject);
+                cart.position += new Vector3(0f, Gy(to) - 0.05f - b.min.y, 0f);
+                Physics.SyncTransforms();
+                Count("cartMoved");
+                return;
+            }
+            Count("cartNotMoved");
+        }
+
+        // R2_22's chimney stack (the pillar of Eye_Allotment): the shell kit's mesh has gaps between its courses and the dressing's loose corbels float over the top, so sky shows
+        // between the blocks. Its renderers go; a solid stack of touching courses in the same stone stands in its place (the kit's own collider stays).
+        static void SolidPier(Transform ruined, string lotId)
+        {
+            Transform lot = null;
+            foreach (Transform t in ruined.GetComponentsInChildren<Transform>(true)) if (t.name.StartsWith(lotId + "_", System.StringComparison.Ordinal) && t.parent != null && t.parent.name == "Foundations") { lot = t; break; }
+            if (lot == null) { Count("pierLotMissing"); return; }
+            Transform chim = FindByName(lot, "Chimney");
+            if (chim == null) { Count("pierMissing"); return; }
+            Material stone = null; Bounds b = default; bool any = false;
+            foreach (Renderer r in chim.GetComponentsInChildren<Renderer>(true)) { if (stone == null) stone = r.sharedMaterial; if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds); r.enabled = false; }
+            Transform dress = lot.Find("Dress");
+            if (dress != null) foreach (Transform c in dress.GetComponentsInChildren<Transform>(true).Where(x => x.name.StartsWith("Corbel_", System.StringComparison.Ordinal)).ToArray()) Object.DestroyImmediate(c.gameObject);
+            if (stone == null || !any) { Count("pierNoStone"); return; }
+            var root = new GameObject("SolidPier").transform; root.SetParent(chim.parent, true);
+            float[] hs = { 0.46f, 0.42f, 0.40f, 0.38f, 0.36f }, ws = { 1.04f, 1.0f, 0.96f, 0.9f, 0.82f };
+            float y = Gy(new Vector2(b.center.x, b.center.z)) - 0.06f;
+            for (int i = 0; i < hs.Length; i++)
+            {
+                float jx = (H(i, 1, 1101) - 0.5f) * 0.06f, jz = (H(i, 2, 1101) - 0.5f) * 0.06f;
+                Vector3 size = new Vector3(ws[i] * Mathf.Lerp(0.96f, 1.04f, H(i, 3, 1101)), hs[i], ws[i] * 0.94f * Mathf.Lerp(0.96f, 1.04f, H(i, 4, 1101)));
+                var go = LookTestBuilder.Box(root, "Course_" + i, Vector3.zero, size, stone, default, 2f);
+                go.transform.position = new Vector3(b.center.x + jx, y + hs.Take(i).Sum() * 0.99f + hs[i] * 0.5f, b.center.z + jz);
+                go.transform.rotation = Quaternion.Euler((H(i, 5, 1101) - 0.5f) * 2f, (H(i, 6, 1101) - 0.5f) * 10f, (H(i, 7, 1101) - 0.5f) * 2f);
+                foreach (Collider c in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            }
+            // the broken top: one slanted slab on half the last course, one fallen block at the foot
+            float topY = y + hs.Sum() * 0.99f;
+            var cap = LookTestBuilder.Box(root, "BrokenCap", Vector3.zero, new Vector3(0.5f, 0.24f, 0.56f), stone, default, 2f);
+            cap.transform.position = new Vector3(b.center.x + 0.18f, topY + 0.1f, b.center.z - 0.1f); cap.transform.rotation = Quaternion.Euler(8f, 25f, -12f);
+            var fall = LookTestBuilder.Box(root, "FallenBlock", Vector3.zero, new Vector3(0.55f, 0.34f, 0.5f), stone, default, 2f);
+            fall.transform.position = new Vector3(b.center.x + 0.95f, y + 0.15f, b.center.z + 0.35f); fall.transform.rotation = Quaternion.Euler(4f, 60f, 9f);
+            foreach (Collider c in root.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            Count("solidPier");
         }
 
         // ------------------------------------------------------------------------------------------------ one shadowless fill under the crowns
@@ -838,6 +925,7 @@ namespace SleepingCalamity.EditorTools
             var spots = new List<(Vector2 pos, Vector2 along, int slot)>();
             for (float a = -p.Half + 0.5f; a <= p.Half - 0.4f; a += 1.0f) spots.Add((p.W(a, p.Depth), p.Rt, spots.Count));
             for (float d = p.Depth - 1.0f; d >= 0.5f; d -= 1.0f) { spots.Add((p.W(-p.Half, d), p.Fw, spots.Count)); spots.Add((p.W(p.Half, d), p.Fw, spots.Count)); }
+            for (int i = 0; i < spots.Count; i++) spots[i] = (spots[i].pos + Perp(spots[i].along) * ((H(p.Key, spots[i].slot, 978) - 0.5f) * 0.40f), spots[i].along, spots[i].slot);   // T07c: posts wander off the line
             int gateSlot = spots.Count - 2;   // a side piece near the lot: the gate that hangs off one hinge
             foreach (var s in spots)
             {
@@ -845,7 +933,7 @@ namespace SleepingCalamity.EditorTools
                 if (r < 0.16f) { Count("fenceMissing"); continue; }
                 if (!PlotOk(s.pos, 0.25f)) { Count("fenceRejected"); continue; }
                 float y = Gy(s.pos);
-                float yaw = YawAlong(s.along) + (H(p.Key, s.slot, 972) - 0.5f) * 14f;
+                float yaw = YawAlong(s.along) + (H(p.Key, s.slot, 972) - 0.5f) * 28f;
                 if (s.slot == gateSlot)
                 {
                     Vector2 hinge = s.pos - s.along * 0.5f; Vector2 outN = Perp(s.along) * (Vector2.Dot(Perp(s.along), p.W(0, p.Depth * 0.5f) - s.pos) > 0f ? -1f : 1f);
@@ -854,8 +942,8 @@ namespace SleepingCalamity.EditorTools
                     Count("fenceGate"); continue;
                 }
                 if (r < 0.36f) { Put(g, "T16f", "FenceFallen_" + s.slot, s.pos, y, 1.22f, yaw, (H(p.Key, s.slot, 973) < 0.5f ? 1f : -1f) * (80f + 8f * H(p.Key, s.slot, 974)), 0f, 0.02f); Count("fenceFallen"); }
-                else { Put(g, "T16f", "Fence_" + s.slot, s.pos, y, 1.22f, yaw, (H(p.Key, s.slot, 973) - 0.5f) * (4f + 14f * H(p.Key, s.slot, 975)), (H(p.Key, s.slot, 976) - 0.5f) * 5f, 0.03f); Count("fenceStanding"); }
-                if (H(p.Key, s.slot, 977) < 0.55f) Weed(g, s.pos + Perp(s.along) * 0.2f, p.Key, 100 + s.slot, 0.7f, 1.3f);
+                else { Put(g, "T16f", "Fence_" + s.slot, s.pos, y, 1.22f, yaw, (H(p.Key, s.slot, 973) - 0.5f) * (6f + 24f * H(p.Key, s.slot, 975)), (H(p.Key, s.slot, 976) - 0.5f) * 5f, 0.03f); Count("fenceStanding"); }
+                if (H(p.Key, s.slot, 977) < 0.55f) Wild(g, s.pos + Perp(s.along) * 0.2f, p.Key, 100 + s.slot, 0.8f);
             }
         }
 
@@ -872,6 +960,7 @@ namespace SleepingCalamity.EditorTools
             // a bean trellis built of planks on the back edge (two plots), a scarecrow toppled on R2_07
             if (id == "R2_18" || id == "R2_22" || id == "R3_02") Trellis(g, p.W(id == "R2_22" ? -1.7f : 1.9f, p.Depth - 0.55f), p.Rt, p.Key);
             if ((id == "R2_07" || id == "R3_02") && !scarecrowDone) Scarecrow(g, p);
+            Sunflowers(g, p);
         }
 
         static bool scarecrowDone;
@@ -932,8 +1021,30 @@ namespace SleepingCalamity.EditorTools
                 Recolor(pm, "Rot", new Color(0.36f, 0.30f, 0.22f));
             }
             for (int i = 0; i < 4; i++) { Vector2 q = c + along * ((H(key, i, 991) - 0.5f) * len * 0.6f) + perp * ((H(key, i + 9, 991) - 0.5f) * 0.6f); Put(g, "T08c", "Potato_" + key + "_" + i, q, y, 0.1f, H(key, i, 992) * 360f, 0f, 0f, 0.015f); }
-            for (int i = 0; i < 8; i++) { Vector2 q = c + along * ((H(key, i, 993) - 0.5f) * len * 0.95f) + perp * (Mathf.Sign(H(key, i, 994) - 0.5f) * Mathf.Lerp(0.2f, 0.75f, H(key, i, 995))); Weed(g, q, key, i, 1.1f, 2.0f); }
+            for (int i = 0; i < 7; i++) { Vector2 q = c + along * ((H(key, i, 993) - 0.5f) * len * 0.95f) + perp * (Mathf.Sign(H(key, i, 994) - 0.5f) * Mathf.Lerp(0.2f, 0.75f, H(key, i, 995))); Wild(g, q, key, i, 1f); }   // T07c: bolted vegetables and allotment weeds, not spiky clumps
             Count("bedBolted");
+        }
+
+        // T07c: allotment growth in the plots (T19u sowthistle, T19v hemp nettle, T19w yellow flower, T19x white windflower) instead of the spiky grass clumps.
+        static readonly string[] AllotKinds = { "T19u", "T19v", "T19w", "T19x", "T19v", "T19w", "T19u" };
+        static readonly float[] AllotSize = { 1.35f, 0.42f, 0.32f, 0.95f, 0.45f, 0.34f, 1.1f };
+        static void Wild(Transform g, Vector2 p, int key, int salt, float scale)
+        {
+            int k = (int)(H(key, salt, 1201) * AllotKinds.Length) % AllotKinds.Length;
+            Put(g, AllotKinds[k], "Allot_" + AllotKinds[k] + "_" + salt, p, Gy(p), AllotSize[k] * Mathf.Lerp(0.8f, 1.2f, H(key, salt, 1202)) * scale, H(key, salt, 1203) * 360f, 0f, 0f, 0.02f);
+            Count("allotPlants");
+        }
+
+        // A leaning row of old sunflowers (T19y) along the back edge of the plot, all gone over the same way.
+        static void Sunflowers(Transform g, Plot p)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                Vector2 q = p.W(-2.6f + i * 1.3f + (H(p.Key, i, 1211) - 0.5f) * 0.5f, p.Depth - 0.25f - H(p.Key, i, 1212) * 0.3f);
+                if (!PlotOk(q, 0.2f)) continue;
+                Put(g, "T19y", "Sunflower_" + i, q, Gy(q), 1.3f * Mathf.Lerp(0.85f, 1.15f, H(p.Key, i, 1213)), YawAlong(p.Rt) + (H(p.Key, i, 1214) - 0.5f) * 24f, 0f, 12f + 12f * H(p.Key, i, 1215), 0.03f);
+                Count("sunflowers");
+            }
         }
 
         static void Trellis(Transform g, Vector2 b, Vector2 along, int key)
@@ -962,7 +1073,7 @@ namespace SleepingCalamity.EditorTools
                 Put(g, "T16d", "WaterButt", bp, y, 0.95f, H(p.Key, 1, 1001) * 360f, 0f, 2f, 0.04f, true);
                 Vector2 bk = bp + new Vector2(0.55f, -0.2f); if (PlotOk(bk, 0.2f)) Put(g, "T17c", "ButtBucket", bk, Gy(bk), 0.34f, 140f, 0f, 4f, 0.025f);
                 Decal(g, "Moss", bp, 1.6f, 1.6f, 70f, "ButtMoss"); Decal(g, "Damp", bp + new Vector2(0.1f, 0.1f), 2.0f, 2.0f, 10f, "ButtDamp");
-                for (int i = 0; i < 4; i++) Weed(g, bp + Dir(i * 90f + 20f) * 0.55f, p.Key, 200 + i, 0.8f, 1.3f);
+                for (int i = 0; i < 4; i++) Wild(g, bp + Dir(i * 90f + 20f) * 0.55f, p.Key, 200 + i, 0.8f);
             }
             Vector2 tp = p.W(0.8f, p.Depth - 0.5f);
             if (PlotOk(tp, 0.15f))

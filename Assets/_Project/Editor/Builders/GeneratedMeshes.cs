@@ -46,7 +46,7 @@ namespace SleepingCalamity.EditorTools
                 if (m == null || AssetDatabase.Contains(m)) return m;
                 if (byInstance.TryGetValue(m, out Mesh done)) return done;
                 long size = (long)m.vertexCount * 32 + IndexCount(m) * 4L;
-                if (size < MinBytes) { kept++; byInstance[m] = m; return m; }
+                if (size < MinBytes && !AlwaysAsset(m.name)) { kept++; byInstance[m] = m; return m; }
                 string stem = Sanitize(string.IsNullOrEmpty(m.name) ? "Mesh" : m.name);
                 nameCount.TryGetValue(stem, out int n); nameCount[stem] = ++n;
                 string path = folder + "/" + (n == 1 ? stem : stem + "_" + n) + ".asset";
@@ -59,6 +59,9 @@ namespace SleepingCalamity.EditorTools
                 return result;
             }
         }
+
+        // Meshes that stay assets whatever their size (the orchard's tree mounds are only ~4 KB since T07b cut the trees to four, but rule 3.7 keeps them out of the scene file).
+        static bool AlwaysAsset(string name) => name == "OR_Mounds";
 
         static long IndexCount(Mesh m)
         {

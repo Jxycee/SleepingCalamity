@@ -238,7 +238,7 @@ namespace SleepingCalamity.EditorTools
         // ------------------------------------------------------------------------------------------------ 1. terrain grass
         public static void TerrainGrass(Terrain terrain, TownLayout t)
         {
-            grassClumps = 0; carpetClumps = 0;
+            grassClumps = 0; carpetClumps = 0; allotLots = null; allotT = t;
             if (!Load()) return;
             TerrainData data = terrain.terrainData;
             BuilderUtil.EnsureFolder(HollowmereTerrain.Folder);
@@ -323,9 +323,10 @@ namespace SleepingCalamity.EditorTools
                     if (e < 40f && HollowmereRevetment.Covers(x, z, 0.1f)) continue;   // T08c: no blade grows through the revetment's stone
                     // T07b: the orchard takes the fine-blade carpet with flowers (spiky accents only at wall feet and trunk bases); its worn path stays cleared
                     bool orchCarpet = e < 29.5f && hill <= 1f && HollowmereOrchard.InOrchard(x, z, 1.0f) && !HollowmereOrchard.OnPath(x, z);
-                    if (e >= 29.5f || hill > 1f || orchCarpet)
+                    bool allotZone = !orchCarpet && e < 29.5f && hill <= 1f && InAllotZone(x, z);   // T07c: the four garden plots take the fine carpet, spiky accents only at the lot walls' feet
+                    if (e >= 29.5f || hill > 1f || orchCarpet || allotZone)
                     {
-                        int cp = CarpetCell(t, data, splat, nearCobble, sx, sy, u, v, x, z, e, cellArea, cx, cy, jettyA, jettyB, orchCarpet);
+                        int cp = CarpetCell(t, data, splat, nearCobble, sx, sy, u, v, x, z, e, cellArea, cx, cy, jettyA, jettyB, orchCarpet, allotZone);
                         if (cp >= 0) { layers[cp][cy, cx] = 1; counts[cp]++; carpetClumps++; spots.Add(new Vector3(x, protoTris[cp], z)); }
                         continue;
                     }
@@ -380,14 +381,15 @@ namespace SleepingCalamity.EditorTools
         // The fine carpet, accents and flowers outside the town wall and on the hill floor. Returns the prototype index for this 0.29 m cell, or -1 for none.
         // Density mask: no grass where the splat has cobble, lanes, doorsteps, the road's walking line, the jetty or under water; bare earth patches come from the splat
         // (soil weight) so the carpet thins out exactly where the ground shows through.
-        static int CarpetCell(TownLayout t, TerrainData data, float[,,] splat, bool[,] nearCobble, int sx, int sy, float u, float v, float x, float z, float e, float cellArea, int cx, int cy, Vector2 jettyA, Vector2 jettyB, bool orchard = false)
+        static int CarpetCell(TownLayout t, TerrainData data, float[,,] splat, bool[,] nearCobble, int sx, int sy, float u, float v, float x, float z, float e, float cellArea, int cx, int cy, Vector2 jettyA, Vector2 jettyB, bool orchard = false, bool allot = false)
         {
             float gw = splat[sy, sx, 0] + 0.35f * splat[sy, sx, 2];
             if (gw <= 0.08f || nearCobble[sy, sx]) return -1;
             var pt = new TownPoint(x, z);
-            bool foot = orchard ? HollowmereOrchard.AccentSpot(x, z) : e < 34f;   // the wall's foot, the ditch and the first metres of the bank
-            foreach (Foundation f in t.Foundations) { if (f.Footprint.Contains(pt, 0.3f)) return -1; if (!foot && f.Footprint.Contains(pt, 2.2f)) foot = true; }
-            foreach (Landmark l in t.Landmarks) { if (l.Footprint.Contains(pt, 0.3f)) return -1; if (!foot && l.Footprint.Contains(pt, 2.2f)) foot = true; }
+            bool foot = allot ? false : orchard ? HollowmereOrchard.AccentSpot(x, z) : e < 34f;   // the wall's foot, the ditch and the first metres of the bank
+            float footReach = allot ? 0.9f : 2.2f;
+            foreach (Foundation f in t.Foundations) { if (f.Footprint.Contains(pt, 0.3f)) return -1; if (!foot && f.Footprint.Contains(pt, footReach)) foot = true; }
+            foreach (Landmark l in t.Landmarks) { if (l.Footprint.Contains(pt, 0.3f)) return -1; if (!foot && l.Footprint.Contains(pt, footReach)) foot = true; }
             float gy = data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y;
             if (gy < HollowmereLayout.WaterY + 0.5f) return -1;
             if (gy < HollowmereLayout.WaterY + 1.7f) foot = true;   // the water's edge
@@ -423,6 +425,21 @@ namespace SleepingCalamity.EditorTools
             if (r < pAcc) return ProtoAccent + (int)PickProto(h >> 24);
             r -= pAcc;
             return r < pDand ? ProtoDandelion : ProtoSpike;
+        }
+
+        // T07c: within 6.5 m of the lots that carry an allotment plot (HollowmereOrchard.Allotments).
+        static List<(Vector2 c, float r, Foundation f)> allotLots; static TownLayout allotT;
+        static bool InAllotZone(float x, float z)
+        {
+            if (allotLots == null)
+            {
+                allotLots = new List<(Vector2, float, Foundation)>();
+                foreach (Foundation f in allotT.Foundations)
+                    if (f.Id == "R2_07" || f.Id == "R2_18" || f.Id == "R2_22" || f.Id == "R3_02") allotLots.Add((new Vector2(f.Centre.X, f.Centre.Z), f.Side * 0.75f + 8f, f));
+            }
+            foreach (var l in allotLots)
+                if (Vector2.Distance(new Vector2(x, z), l.c) < l.r && l.f.Footprint.Contains(new TownPoint(x, z), 6.5f)) return true;
+            return false;
         }
 
         static float Smooth(float a, float b, float x) { float u = Mathf.Clamp01((x - a) / (b - a)); return u * u * (3f - 2f * u); }

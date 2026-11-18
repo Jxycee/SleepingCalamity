@@ -195,9 +195,9 @@ namespace SleepingCalamity.EditorTools
         {
             Transform cams = root.Find("CaptureCameras");
             if (cams == null) return;
-            var pos = new List<Vector3>();
-            foreach (Camera cam in cams.GetComponentsInChildren<Camera>(true)) pos.Add(cam.transform.position);
-            AmbientCreatures.BakedAvoid = pos.ToArray();
+            var pos = new List<Vector3>(); var dir = new List<Vector3>();
+            foreach (Camera cam in cams.GetComponentsInChildren<Camera>(true)) { pos.Add(cam.transform.position); dir.Add(cam.transform.forward); }
+            AmbientCreatures.BakedAvoid = pos.ToArray(); AmbientCreatures.BakedAvoidDir = dir.ToArray();
             foreach (AmbientCreatures c in root.GetComponentsInChildren<AmbientCreatures>(true)) { c.Pose(37f, 0f, false); EditorUtility.SetDirty(c); }
         }
 

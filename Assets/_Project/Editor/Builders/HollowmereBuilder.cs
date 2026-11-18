@@ -114,7 +114,7 @@ namespace SleepingCalamity.EditorTools
             ("Cap_HM_Eye_LowerLane", new Vector3(-14.5f, 1.65f, -53f), new Vector3(-23f, 0f, -68f), 60f),    // D5: the lane to the Lower Gate
             ("Cap_HM_Eye_RingWest", new Vector3(-46f, 1.65f, 6f), new Vector3(-46f, 0f, -28f), 60f),         // D4: the west Ring Lane, south
             ("Cap_HM_Eye_RingSouth", new Vector3(-8f, 1.65f, -48.8f), new Vector3(22f, 0f, -48.5f), 60f),    // D4, D8: the south Ring Lane, east
-            ("Cap_HM_Eye_Orchard", new Vector3(35f, 1.65f, -44.5f), new Vector3(43f, 0f, -58f), 60f),        // D7: the orchard
+            ("Cap_HM_Eye_Orchard", new Vector3(33.2f, 1.65f, -44.7f), new Vector3(42.5f, 0f, -59.0f), 60f),        // D7: the orchard. T07c: 1.8 m west of the T07 spot (turned 2 degrees) so the garden wall's end pier and broken piece stand left and the harvest cluster is off the pier's line
             ("Cap_HM_Eye_OrchardGap", new Vector3(41.9f, 1.65f, -52.0f), new Vector3(46.5f, -0.3f, -64f), 60f),   // D7 (T07): inside the orchard through the wall gap to the lake and the mill
             ("Cap_HM_Eye_Mill", new Vector3(58f, 1.65f, -67f), new Vector3(70.5f, 2.5f, -58f), 60f),         // D9: the sunlit side of the mill with the stream in front (T05: the old Mill Lane view faced the mill's shadow wall)
             ("Cap_HM_Eye_Meadow", new Vector3(-8f, 1.65f, -72f), new Vector3(50f, 0f, -68f), 60f),           // D9: the lake meadow, east

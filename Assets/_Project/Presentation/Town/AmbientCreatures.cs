@@ -115,7 +115,7 @@ namespace SleepingCalamity.Presentation
         }
 
         /// <summary>Edit-time only: camera positions (the capture cameras) that the baked pose keeps clear, 3 m radius.</summary>
-        public static Vector3[] BakedAvoid;
+        public static Vector3[] BakedAvoid, BakedAvoidDir;
 
         void Update()
         {
@@ -178,6 +178,13 @@ namespace SleepingCalamity.Presentation
                     // a card within 3 m of the camera would read as a huge wing: hide it there
                     bool near = cam != null && (cam.transform.position - p).sqrMagnitude < 9f;
                     if (!live && BakedAvoid != null) foreach (Vector3 a in BakedAvoid) if ((a - p).sqrMagnitude < 16f) { near = true; break; }
+                    // T07c: a baked bird (a card over 0.5 m: crow, gull, swallow) within 18 m inside a capture camera's view cone reads as a flat grey shape in the sky: hide it there
+                    if (!live && !near && scale > 0.5f && BakedAvoid != null && BakedAvoidDir != null)
+                        for (int a = 0; a < BakedAvoid.Length && a < BakedAvoidDir.Length; a++)
+                        {
+                            Vector3 d = p - BakedAvoid[a]; float m = d.magnitude;
+                            if (m < 18f && m > 0.1f && Vector3.Dot(d / m, BakedAvoidDir[a]) > 0.5f) { near = true; break; }
+                        }
                     float s = near ? 0f : scale;
                     c.localScale = new Vector3(s, s, s);
                 }
