@@ -91,3 +91,7 @@ From `docs/superpowers/plans/2026-11-03-per-player-loot.md` (decisions and revie
 - Re-filed nowhere else: Art, Tooling and Town life items are unaffected by the Nov 1-4 merges (Hollowmere polish, junctions, rooms v2, story bible).
 
 - 2026-11-06 art direction (user): props may lean toward a Hobbit / Lord of the Rings / classic-fantasy film look where it fits (hand-made timber, round doors, carved wood, lived-in clutter). Props only, not people. Fold into the style bible (docs/PHASE1.md 3) at the next art pass.
+
+## Character and asset tools to trial later (2026-11-17, user)
+- **MetahumanMaker** (github.com/TREE-Ind/MetahumanMaker, MIT Blender add-on): more character heads than the single Tobin preset. Revisit when we come back to character models. Assessment: `docs/research/metahumanmaker-unity-assessment.md` (fit/sculpt/skin bakes work in Blender; any rigged Unity asset needs UE 5.8 + MetaHuman Creator, then a GLB with sampled facial morphs, no RigLogic; licence for Unity use looks OK under the UE EULA since 5.6 but is unverified against Epic's own pages; photoreal, so heads need correcting toward our style). Pilot when revisited: one Opus local session, one Hunyuan head end to end to a GLB beside Tobin, stop at the first failed gate.
+- **Patch** (patch.gg/blender, cloud Blender, 500 free credits): test run on a few assets after the Run 7 T list finishes; complements the Megascans additions. No rush. A Haiku batch trial was suggested earlier (CURRENT, 2026-11-17).
