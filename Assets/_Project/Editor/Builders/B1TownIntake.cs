@@ -24,7 +24,7 @@ namespace SleepingCalamity.EditorTools
         static readonly HashSet<string> Skip = new HashSet<string> { "T01", "T01b", "T01c", "T03", "T15a", "T15b", "T17d", "C01", "C02", "C15",
             "L04",    // dropped 2026-11-14 (style review): FBX has no usable texture, flat white pot and paper-like leaves; the L04Pick path below is kept only in case a 2K re-export arrives
             "T12a" }; // dropped 2026-11-14 (style review): sparse grey card cluster, reads as dead scrub
-        static readonly HashSet<string> Plants = new HashSet<string> { "T12a", "T12b", "T12c", "T12d", "T12e", "T19u", "T19v", "T19w", "T19x", "T19y" };
+        static readonly HashSet<string> Plants = new HashSet<string> { "T12a", "T12b", "T12c", "T12d", "T12e", "T19u", "T19v", "T19w", "T19x", "T19y", "T21d", "T21e", "T21f", "T21g", "T21h", "T21i", "T21j", "T21k", "T21l", "T21m", "T21n", "T21o", "T21p" };
         // Props whose source is far off real size: the prefab is scaled so the LOD0 bounds are this tall (m).
         static readonly Dictionary<string, float> TargetHeight = new Dictionary<string, float> { { "T11b", 1.5f } };
         const string L04Pick = "Composition_7";
