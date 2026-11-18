@@ -29,7 +29,7 @@ namespace SleepingCalamity.EditorTools
         internal const string Adopted = "Assets/_Project/Content/Art/Town/Adopted/", CellarAdopted = "Assets/_Project/Content/Art/Cellar/Adopted/";
         const string ArtDecals = "Assets/_Project/Content/Art/Town/Decals", MatFolder = "Assets/_Project/Content/Materials/Hollowmere";
         const string PcRenderer = "Assets/Settings/PC_Renderer.asset";
-        const int DecalBudget = 150;   // T12: was 300 (the area budget is about 300 over all builders: streets 150, orchard 50, bell yard 48, roadside 40, allotments 19)
+        const int DecalBudget = 170;   // T12: was 300 (the area budget is about 300 over all builders: streets 170, orchard 55, bell yard 40, roadside 40, allotments 19); kept by distance to the eye cameras' sightlines
 
         internal static TownLayout T;
         internal static readonly List<WallSeg> Walls = new List<WallSeg>();
@@ -283,9 +283,9 @@ namespace SleepingCalamity.EditorTools
             // gutter leaf drift: every third bay on Market Street, every seventh elsewhere on the lanes
             var gutters = LaneKitPlan.Plan(t).Where(r => r.In(false) && (r.Piece == LanePiece.Gutter || r.Piece == LanePiece.GutterChoked || r.Piece == LanePiece.GutterGrate)).ToList();
             var market = gutters.Where(r => r.Lane == "MarketStreet").OrderByDescending(r => r.Z).ThenBy(r => r.X).ToList();
-            for (int i = 0; i < market.Count; i += 8) AddLeaf(list, market[i], i, mLeafA, mLeafB, 1.9f);
+            for (int i = 0; i < market.Count; i += 3) AddLeaf(list, market[i], i, mLeafA, mLeafB, 1.9f);
             var others = gutters.Where(r => r.Lane != "MarketStreet").OrderBy(r => r.Id, System.StringComparer.Ordinal).ToList();
-            for (int i = 3; i < others.Count; i += 14) AddLeaf(list, others[i], i, mLeafA, mLeafB, 1.5f);
+            for (int i = 3; i < others.Count; i += 7) AddLeaf(list, others[i], i, mLeafA, mLeafB, 1.5f);
             // soot under every chimney stack of the ruined shells
             foreach (Transform tr in ruined.GetComponentsInChildren<Transform>(true))
             {
@@ -294,7 +294,7 @@ namespace SleepingCalamity.EditorTools
                 var p = new Vector2(rd.bounds.center.x, rd.bounds.center.z);
                 float y = HollowmereLayout.Ground(t, p.x, p.y);
                 int k = StableHash(tr.parent != null ? tr.parent.name + tr.position.x.ToString("F1") : "c");
-                if (H(k, 9, 70) > 0.22f) continue;
+                if (H(k, 9, 70) > 0.4f) continue;
                 list.Add(new DecalSpec { M = mSoot, P = p, Y = y, W = Mathf.Lerp(2.2f, 3.2f, H(k, 1, 71)), Hh = Mathf.Lerp(2.2f, 3.2f, H(k, 2, 71)), Yaw = H(k, 3, 71) * 360f, Fade = 1f, Group = 1, Name = "Soot", Order = k });
             }
             // mud and puddles on the flat stretches of every lane (water stands where the grade is under 5%)
@@ -305,7 +305,7 @@ namespace SleepingCalamity.EditorTools
                 for (float s = 3f; s < len - 3f; s += 3.5f)
                 {
                     int si = (int)(s * 10f);
-                    if (H(lk, si, 81) > 0.13f) continue;
+                    if (H(lk, si, 81) > 0.3f) continue;
                     HollowmereLayout.PointAlong(lane.Points, s, out TownPoint p, out TownPoint dir);
                     HollowmereLayout.PointAlong(lane.Points, Mathf.Min(len - 0.1f, s + 1.5f), out TownPoint p2, out _);
                     HollowmereLayout.PointAlong(lane.Points, Mathf.Max(0f, s - 1.5f), out TownPoint p0, out _);
@@ -316,7 +316,7 @@ namespace SleepingCalamity.EditorTools
                     if (!DecalSpot(q, out float y)) continue;
                     float yaw = H(lk, si, 83) * 360f;
                     list.Add(new DecalSpec { M = mMud, P = q, Y = y, W = Mathf.Lerp(2.0f, 3.2f, H(lk, si, 84)), Hh = Mathf.Lerp(1.6f, 2.6f, H(lk, si, 85)), Yaw = yaw, Fade = 1f, Group = 2, Name = "Mud", Order = lk + si });
-                    if (H(lk, si, 86) < 0.5f)
+                    if (H(lk, si, 86) < 0.65f)
                         list.Add(new DecalSpec { M = mPud, P = q, Y = y, W = Mathf.Lerp(0.9f, 1.6f, H(lk, si, 87)), Hh = Mathf.Lerp(0.8f, 1.3f, H(lk, si, 88)), Yaw = yaw + 40f, Fade = 1f, Group = 2, Name = "Puddle", Order = lk + si + 0.5f });
                 }
             }
@@ -329,7 +329,7 @@ namespace SleepingCalamity.EditorTools
                     for (float s = 2f + 2f * H(lk, side, 141); s < len - 2f; s += 4.2f)
                     {
                         int si = (int)(s * 10f) + side * 100000;
-                        if (H(lk, si, 142) > 0.4f) continue;
+                        if (H(lk, si, 142) > 0.8f) continue;
                         HollowmereLayout.PointAlong(lane.Points, s, out TownPoint p, out TownPoint dir);
                         float sg = side == 0 ? 1f : -1f, off = lane.Width * 0.5f - 0.25f;
                         var q = new Vector2(p.X + dir.Z * sg * off, p.Z - dir.X * sg * off);
@@ -345,7 +345,7 @@ namespace SleepingCalamity.EditorTools
                 if (w.Len < 1.5f) continue;
                 Vector2 mid = w.A + w.Dir * (w.Len * 0.5f) + w.N * 0.9f;
                 StreetZone z = ZoneOf(mid, out _, out _); if (z == StreetZone.None) continue;
-                float spacing = z == StreetZone.Square ? 4.2f : 9.5f;
+                float spacing = z == StreetZone.Square ? 2.5f : 6.6f;
                 int count = Mathf.FloorToInt(w.Len / spacing + H(w.Key, 0, 91));
                 for (int c = 0; c < count; c++)
                 {
@@ -370,12 +370,31 @@ namespace SleepingCalamity.EditorTools
                     list.Add(new DecalSpec { M = m, P = centre, Y = y, W = dw, Hh = dh, Yaw = yaw, Fade = 1f, Group = 3, Name = m == mGrime ? "Grime" : m == mDamp ? "Damp" : m == mMud ? "Mud" : "Moss", Order = H(w.Key, c, 99) });
                 }
             }
-            int fixedCount = list.Count(d => d.Group < 3);
-            var feet = list.Where(d => d.Group == 3).OrderBy(d => d.Order).Take(Mathf.Max(0, DecalBudget - fixedCount)).ToList();
+            // T12: the budget keeps the decals nearest to the eye cameras' sightlines (camera to target, first 45 m; the ones the frames judge), wall feet (the kit-into-ground blend) first
+            var sights = new List<(Vector2 a, Vector2 b)>();
+            foreach (var c in HollowmereBuilder.Cameras)
+                if (c.Name.StartsWith("Cap_HM_Eye_", System.StringComparison.Ordinal))
+                {
+                    var a = new Vector2(c.Pos.x, c.Pos.z); var dir = new Vector2(c.Target.x - c.Pos.x, c.Target.z - c.Pos.z);
+                    sights.Add((a, a + dir.normalized * Mathf.Min(45f, dir.magnitude)));
+                }
+            float Sight(Vector2 p)
+            {
+                float best = 1e9f;
+                foreach (var (a, b) in sights)
+                {
+                    Vector2 ab = b - a; float u = ab.sqrMagnitude < 1e-4f ? 0f : Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+                    best = Mathf.Min(best, Vector2.Distance(p, a + ab * u));
+                }
+                return best;
+            }
+            var keep = new HashSet<int>();
+            var ranked = Enumerable.Range(0, list.Count).OrderBy(i => Sight(list[i].P) - (list[i].Group == 3 ? 12f : 0f)).ThenBy(i => i).Take(DecalBudget);
+            foreach (int i in ranked) keep.Add(i);
             int idx = 0;
-            foreach (DecalSpec d in list.Where(d => d.Group < 3).Concat(feet)) { AddDecal(parent, d, idx++); Count("decal" + d.Name); }
+            foreach (DecalSpec d in list.Where((d, i) => keep.Contains(i)).OrderBy(d => d.Group).ThenBy(d => d.Order)) { AddDecal(parent, d, idx++); Count("decal" + d.Name); }
             Count("decals", idx);
-            if (list.Count(d => d.Group == 3) > feet.Count) Count("decalsTrimmed", list.Count(d => d.Group == 3) - feet.Count);
+            Count("decalsTrimmed", list.Count - idx);
         }
 
         static bool DecalSpot(Vector2 p, out float y)
