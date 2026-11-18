@@ -258,7 +258,7 @@ namespace SleepingCalamity.EditorTools
             else if (AssetImporter.GetAtPath(path) == null) AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             var imp = (TextureImporter)AssetImporter.GetAtPath(path);
             if (!imp.alphaIsTransparency || imp.wrapMode != TextureWrapMode.Clamp || imp.alphaSource != TextureImporterAlphaSource.FromInput) { imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.alphaSource = TextureImporterAlphaSource.FromInput; imp.SaveAndReimport(); }
-            return HollowmereAmbientBuilder.AdditiveMat("M_HM_ZoneBeam", AssetDatabase.LoadAssetAtPath<Texture2D>(path), new Color(0.9f, 0.72f, 0.42f, 1f));
+            return HollowmereAmbientBuilder.AdditiveMat("M_HM_ZoneBeam", AssetDatabase.LoadAssetAtPath<Texture2D>(path), new Color(0.45f, 0.36f, 0.21f, 1f));   // 0.9 drew a hard golden streak through the Churchyard tree
         }
 
         static void BuildPollen(Transform motes, TownLayout t)
