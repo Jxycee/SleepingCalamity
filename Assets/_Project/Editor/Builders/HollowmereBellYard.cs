@@ -240,7 +240,7 @@ namespace SleepingCalamity.EditorTools
             int wi = 0;
             for (float x = -22.6f; x < -10.4f; x += 2.2f, wi++)
             {
-                if (x > -17.9f && x < -15.6f) continue;   // the stile where the path comes in
+                if (x + 1.1f > -18.4f && x - 1.1f < -15.4f) continue;   // the stile: the path graph's Keep_WStairHead -> Keep_Walk_W edge crosses this wall at x -16.9 (a piece there blocked the traversal scan)
                 float h = H(wi, 1, 1201);
                 if (h < 0.1f) continue;                   // a fallen length
                 Vector2 p = new Vector2(x + (H(wi, 2, 1201) - 0.5f) * 0.25f, 23.15f);
@@ -275,6 +275,7 @@ namespace SleepingCalamity.EditorTools
                     Vector2 p = new Vector2(x, rows[r] + (H(r, c, 1211) - 0.5f) * 0.7f + 0.12f * Mathf.Sin(x * 0.9f + r));
                     x += 1.55f + H(r, c, 1212) * 0.85f;
                     if (H(r, c, 1213) < 0.20f) continue;
+                    if (DistToSeg(p, new Vector2(-20.8f, 20.6f), new Vector2(-8f, 29.0f)) < 1.3f) continue;   // keep the path graph's diagonal through the churchyard clear
                     if (Vector2.Distance(p, ChurchTree) < 2.0f || Tended(p.x, p.y) || Vector2.Distance(p, GraveTended + new Vector2(0f, 0.9f)) < 1.2f) continue;
                     if (!Ok(p, 0.35f, false, true)) continue;
                     bool cross = H(r, c, 1214) < 0.14f;
