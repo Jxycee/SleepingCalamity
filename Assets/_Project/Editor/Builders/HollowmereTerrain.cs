@@ -275,6 +275,15 @@ namespace SleepingCalamity.EditorTools
                         rock *= 1f - ow;                                   // T08: no cobble outside the wall
                         rock *= 1f - 0.85f * Smooth(0.2f, 3f, hill);   // Bell Hill (28-34 degrees all over) is not a rubble bank: the cobble layer stretched there read as tiles
                         rock = Mathf.Max(rock, shoreStone);              // T08b: shingle at the waterline (the cobble layer's grey rubble flecks)
+                        // T09: the keep terrace's flanking banks (45-60 degrees) are earth and grass with moss, not the stretched cobble layer (it read as a dark streaked plane)
+                        float kb = HollowmereOrchard.KeepBank(x, z);
+                        if (kb > 0f)
+                        {
+                            rock *= 1f - kb;
+                            soil = Mathf.Max(soil, kb * (0.24f + 0.42f * Smooth(0.35f, 0.70f, Mathf.PerlinNoise(x * 0.7f + 5f, z * 0.7f + 9f))));
+                            path = Mathf.Clamp01(path) * (1f - soil);
+                            grass = Mathf.Max(0f, 1f - soil - path);
+                        }
                         grass *= 1f - rock; soil *= 1f - rock; path *= 1f - rock; cobble = rock;
                     }
                     a[j, i, 0] = grass; a[j, i, 1] = soil; a[j, i, 2] = path; a[j, i, 3] = cobble;
@@ -351,7 +360,7 @@ namespace SleepingCalamity.EditorTools
         // The paved areas that are not lanes: the square (the corner's surround paving slab) and the keep terrace's top beside the stairs and gate.
         static bool IsPavedArea(float x, float z) =>
             (x >= HollowmereLayout.SquareMinX && x <= HollowmereLayout.SquareMaxX && z >= HollowmereLayout.SquareMinZ && z <= HollowmereLayout.SquareMaxZ)
-            || (Mathf.Abs(x) < HollowmereLayout.KeepHalfWidth && z > HollowmereLayout.KeepWallZ - 0.2f && z < HollowmereLayout.KeepWallZ + 11f);
+            || (Mathf.Abs(x) < HollowmereLayout.KeepHalfWidth && z > HollowmereLayout.KeepWallZ - 0.2f && z < HollowmereLayout.KeepWallZ + 11f && HollowmereOrchard.KeepLawn(x, z) < 0.5f);   // T09: the churchyard is a lawn
 
         public static bool IsPaved(TownLayout t, float x, float z) => IsPavedArea(x, z) || LaneEdge(t, new TownPoint(x, z)) < 0f;
 

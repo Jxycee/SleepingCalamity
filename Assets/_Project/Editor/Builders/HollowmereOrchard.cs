@@ -18,7 +18,7 @@ using UnityEngine.Rendering.Universal;
 
 namespace SleepingCalamity.EditorTools
 {
-    internal static class HollowmereOrchard
+    internal static partial class HollowmereOrchard
     {
         const string Ad = HollowmereStreets.Adopted, Cel = HollowmereStreets.CellarAdopted;
         const string MatFolder = "Assets/_Project/Content/Materials/Hollowmere";
@@ -151,7 +151,7 @@ namespace SleepingCalamity.EditorTools
             if (prefabs.TryGetValue(code, out GameObject p)) return p;
             string path = code.StartsWith("TR", System.StringComparison.Ordinal) ? TreesFolder + code + "/" + code + ".prefab"
                 : code == "N04" ? Ad + "N04_stump/N04.prefab" : code == "N05" ? Ad + "N05_fallen_log/N05.prefab" : code == "N03" ? Ad + "N03_scree_cluster/N03.prefab" : code == "N02" ? Ad + "N02_angular_rock/N02.prefab"
-                : code == "C11b" ? Cel + "C11b/C11b.prefab" : Ad + code + "/" + code + ".prefab";
+                : (code.Length > 2 && code[0] == 'C' && char.IsDigit(code[1])) ? Cel + code + "/" + code + ".prefab" : Ad + code + "/" + code + ".prefab";
             return prefabs[code] = HollowmereStreets.LoadPrefab(path);
         }
 

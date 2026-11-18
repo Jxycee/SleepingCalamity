@@ -144,11 +144,11 @@ namespace SleepingCalamity.EditorTools
             string path = SkyFolder + "/" + fileName;
             var ti = AssetImporter.GetAtPath(path) as TextureImporter;
             if (ti == null) return null;
-            bool dirty = ti.textureShape != TextureImporterShape.Texture2D || ti.sRGBTexture || !ti.mipmapEnabled || ti.maxTextureSize != 2048
+            bool dirty = ti.textureShape != TextureImporterShape.Texture2D || ti.sRGBTexture || ti.mipmapEnabled || ti.maxTextureSize != 2048
                 || ti.wrapModeU != TextureWrapMode.Repeat || ti.wrapModeV != TextureWrapMode.Clamp || ti.textureCompression != TextureImporterCompression.CompressedHQ || ti.filterMode != FilterMode.Bilinear;
             if (dirty)
             {
-                ti.textureType = TextureImporterType.Default; ti.textureShape = TextureImporterShape.Texture2D; ti.sRGBTexture = false; ti.mipmapEnabled = true;
+                ti.textureType = TextureImporterType.Default; ti.textureShape = TextureImporterShape.Texture2D; ti.sRGBTexture = false; ti.mipmapEnabled = false;   // T09: no mips: the panorama's u wrap picks the smallest mip on one column and drew a dashed grey vertical line in the sky
                 ti.maxTextureSize = 2048; ti.wrapModeU = TextureWrapMode.Repeat; ti.wrapModeV = TextureWrapMode.Clamp; ti.filterMode = FilterMode.Bilinear;
                 ti.textureCompression = TextureImporterCompression.CompressedHQ; ti.isReadable = false;
                 ti.SaveAndReimport();

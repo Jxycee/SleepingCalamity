@@ -80,8 +80,20 @@ namespace SleepingCalamity.EditorTools
         // The hatch: a dark slab with an iron ring in the keep walk's paving, flush with the ground, no collider (nothing to trip on; the prompt is the DiveHub's).
         static void BuildTrapdoor(Transform entrance)
         {
-            GameObject slab = LookTestBuilder.Prim(entrance, "Trapdoor", PrimitiveType.Cube, new Vector3(0f, 0.04f, 0f), new Vector3(1.6f, 0.08f, 1.2f), M("label"));
-            GameObject ring = LookTestBuilder.Prim(entrance, "TrapdoorRing", PrimitiveType.Cylinder, new Vector3(0f, 0.1f, 0.25f), new Vector3(0.28f, 0.02f, 0.28f), M("label"));
+            // T09: the hatch is oak planks in a stone frame with iron straps and a ring (it was one flat red slab, the greybox door marker). Visual only: no collider, no script.
+            Shader wear = Shader.Find("SleepingCalamity/WearLit");
+            Material oak = wear != null ? HollowmereArt.Tinted("HM_HatchOak", "oak_timber", new Color(0.62f, 0.46f, 0.30f), wear) : M("label");
+            Material iron = wear != null ? HollowmereArt.Flat("HM_HatchIron", new Color(0.03f, 0.03f, 0.035f), 0.35f, wear) : M("label");
+            Material stone = AssetDatabase.LoadAssetAtPath<Material>(MaterialsFolder + "/M_KT_Rubble.mat") ?? oak;
+            LookTestBuilder.Prim(entrance, "Trapdoor", PrimitiveType.Cube, new Vector3(0f, 0.05f, 0f), new Vector3(1.5f, 0.1f, 1.1f), oak);
+            for (int i = -1; i <= 1; i += 2) LookTestBuilder.Prim(entrance, "TrapdoorPlankGap" + (i < 0 ? "A" : "B"), PrimitiveType.Cube, new Vector3(i * 0.25f, 0.104f, 0f), new Vector3(0.025f, 0.012f, 1.1f), iron);
+            for (int i = -1; i <= 1; i += 2) LookTestBuilder.Prim(entrance, "TrapdoorStrap" + (i < 0 ? "A" : "B"), PrimitiveType.Cube, new Vector3(0f, 0.108f, i * 0.34f), new Vector3(1.5f, 0.012f, 0.07f), iron);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameN", PrimitiveType.Cube, new Vector3(0f, 0.06f, 0.7f), new Vector3(1.95f, 0.12f, 0.2f), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameS", PrimitiveType.Cube, new Vector3(0f, 0.06f, -0.7f), new Vector3(1.95f, 0.12f, 0.2f), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameE", PrimitiveType.Cube, new Vector3(0.87f, 0.06f, 0f), new Vector3(0.2f, 0.12f, 1.2f), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorFrameW", PrimitiveType.Cube, new Vector3(-0.87f, 0.06f, 0f), new Vector3(0.2f, 0.12f, 1.2f), stone);
+            LookTestBuilder.Prim(entrance, "TrapdoorRing", PrimitiveType.Cylinder, new Vector3(0f, 0.115f, 0.25f), new Vector3(0.24f, 0.012f, 0.24f), iron);
+            LookTestBuilder.Prim(entrance, "TrapdoorRingBoss", PrimitiveType.Cylinder, new Vector3(0f, 0.125f, 0.25f), new Vector3(0.09f, 0.012f, 0.09f), iron);
             foreach (Collider c in entrance.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
         }
 

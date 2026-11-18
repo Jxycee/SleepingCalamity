@@ -324,9 +324,11 @@ namespace SleepingCalamity.EditorTools
                     // T07b: the orchard takes the fine-blade carpet with flowers (spiky accents only at wall feet and trunk bases); its worn path stays cleared
                     bool orchCarpet = e < 29.5f && hill <= 1f && HollowmereOrchard.InOrchard(x, z, 1.0f) && !HollowmereOrchard.OnPath(x, z);
                     bool allotZone = !orchCarpet && e < 29.5f && hill <= 1f && InAllotZone(x, z);   // T07c: the four garden plots take the fine carpet, spiky accents only at the lot walls' feet
-                    if (e >= 29.5f || hill > 1f || orchCarpet || allotZone)
+                    bool bellZone = !orchCarpet && !allotZone && HollowmereOrchard.InBellZone(x, z) && !HollowmereOrchard.Tended(x, z);   // T09: the keep terrace's lawns and banks, the bell yard, the churchyard
+                    if (HollowmereOrchard.Tended(x, z)) continue;   // T09: the tended grave's cut grass
+                    if (e >= 29.5f || hill > 1f || orchCarpet || allotZone || bellZone)
                     {
-                        int cp = CarpetCell(t, data, splat, nearCobble, sx, sy, u, v, x, z, e, cellArea, cx, cy, jettyA, jettyB, orchCarpet, allotZone);
+                        int cp = CarpetCell(t, data, splat, nearCobble, sx, sy, u, v, x, z, e, cellArea, cx, cy, jettyA, jettyB, orchCarpet, allotZone || bellZone);
                         if (cp >= 0) { layers[cp][cy, cx] = 1; counts[cp]++; carpetClumps++; spots.Add(new Vector3(x, protoTris[cp], z)); }
                         continue;
                     }

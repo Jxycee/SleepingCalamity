@@ -213,9 +213,19 @@ namespace SleepingCalamity.EditorTools
 
         // ------------------------------------------------------------------------------------------------ 4. Bell Hill
         // Boulders and ferns along the foot of the crag bank, so the cliff meets the level ground in a broken line and not in a crease.
+        // T09: a scanned rock may be a flat slab (T20a 3.2 x 1.0 x 2.1, T20f 4.2 x 1.3 x 2.0): scale flat ones by their width (1.5 x the wanted height) so they stay slabs, tall ones by height.
+        static float RockScale(GameObject rock, float h)
+        {
+            Vector3 s = PrefabBounds(rock).size; float w = Mathf.Max(s.x, s.z);
+            return w > 1.9f * s.y ? 1.5f * h / Mathf.Max(0.05f, w) : h / Mathf.Max(0.05f, s.y);
+        }
+
         static void CragFoot(Transform parent)
         {
-            GameObject[] rocks = { Adopted("T11a"), Adopted("T11b") }; GameObject fern = Adopted("T12b");
+            // T09: no T11a here (its albedo averages 53/44/26: near-black and glossy in shade): the scanned mossy Icelandic (T20a-c) and forest rocks (T20d-h) with T11b's layered stone, T11a only if none loads
+            GameObject[] rocks = new[] { "T20a", "T20b", "T20c", "T20d", "T20e", "T20f", "T20g", "T11b", "T11b", "T11b" }.Select(c => Adopted(c)).Where(r => r != null).ToArray();
+            if (rocks.Length == 0) rocks = new[] { Adopted("T11a"), Adopted("T11b") };
+            GameObject fern = Adopted("T12b");
             // Round 2: rock outcrops ON the crag face. The bank is terrain at 50 degrees and more, where any terrain layer stretches into stripes; big boulders
             // half sunk into it (2.2-5 m, in overlapping groups, thicker behind the keep where the walk passes) turn it into broken rock with earth between.
             for (int i = -70; i <= 70; i++)
@@ -225,12 +235,11 @@ namespace SleepingCalamity.EditorTools
                 float up = Hash01(i, 33, 303);                                             // 0 at the foot, 1 at the crag's top
                 float z = HollowmereLayout.HillFoot(x) + Mathf.Lerp(0.8f, HollowmereLayout.CragRun + 0.6f, up);
                 if (!Clear(x, z, 1.0f, 0f, steepLimit: 89f, colliders: false)) continue;
-                GameObject rock = rocks[Hash01(i, 34, 303) < 0.5f ? 0 : 1] ?? rocks[0] ?? rocks[1];
+                GameObject rock = rocks[(int)(Hash01(i, 34, 303) * rocks.Length) % rocks.Length];
                 if (rock == null) break;
                 float h = Mathf.Lerp(2.2f, 5f, Hash01(i, 35, 303) * Hash01(i, 36, 303) + 0.1f);
-                var go = Instance(parent, rock, new Vector3(x, GroundY(x, z) - 0.42f * h, z), h / Mathf.Max(0.05f, Height(rock)), 0f);
-                go.transform.rotation = Quaternion.Euler((Hash01(i, 37, 303) - 0.5f) * 50f, Hash01(i, 38, 303) * 360f, (Hash01(i, 39, 303) - 0.5f) * 50f);
-                go.transform.localScale = Vector3.Scale(go.transform.localScale, new Vector3(1f + 0.5f * Hash01(i, 40, 303), 1f, 1f + 0.5f * Hash01(i, 41, 303)));
+                var go = Instance(parent, rock, new Vector3(x, GroundY(x, z) - 0.42f * h, z), RockScale(rock, h), 0f);
+                go.transform.rotation = Quaternion.Euler((Hash01(i, 37, 303) - 0.5f) * 24f, Hash01(i, 38, 303) * 360f, (Hash01(i, 39, 303) - 0.5f) * 24f);   // T09: uniform scale and gentler tilt (the shear turned scanned boulders into wings)
                 go.name = "Outcrop";
                 nRocks++;
             }
@@ -245,10 +254,10 @@ namespace SleepingCalamity.EditorTools
                 float y = GroundY(x, z);
                 if (roll < 0.62f)
                 {
-                    GameObject rock = rocks[Hash01(i, 4, 301) < 0.5f ? 0 : 1] ?? rocks[0] ?? rocks[1];
+                    GameObject rock = rocks[(int)(Hash01(i, 4, 301) * rocks.Length) % rocks.Length];
                     if (rock == null) continue;
                     float h = Mathf.Lerp(0.6f, 2.0f, Hash01(i, 5, 301) * Hash01(i, 6, 301) + 0.15f);
-                    var go = Instance(parent, rock, new Vector3(x, y - 0.22f * h, z), h / Mathf.Max(0.05f, Height(rock)), Hash01(i, 7, 301) * 360f);
+                    var go = Instance(parent, rock, new Vector3(x, y - 0.22f * h, z), RockScale(rock, h), Hash01(i, 7, 301) * 360f);
                     go.transform.rotation = Quaternion.Euler((Hash01(i, 8, 301) - 0.5f) * 30f, Hash01(i, 7, 301) * 360f, (Hash01(i, 9, 301) - 0.5f) * 30f);
                     nRocks++;
                 }
@@ -463,6 +472,7 @@ namespace SleepingCalamity.EditorTools
             if (!SaltwakeRoadPlan.OnTerrain(x, z, 1.5f)) return false;
             var p = new TownPoint(x, z); var p2 = new Vector2(x, z);
             if (HollowmereTerrain.IsPaved(layout, x, z) || LaneEdge(p) < laneGap) return false;
+            if (HollowmereOrchard.KeepLawn(x, z) > 0f && Mathf.Abs(x) < 25f && z < 31f) return false;   // T09: the churchyard lawn is dressed by HollowmereBellYard
             if (PathDistance(p2) < 1.6f) return false;
             foreach (Foundation f in layout.Foundations) if (f.Footprint.Contains(p, margin)) return false;
             foreach (Landmark l in layout.Landmarks) if (l.Footprint.Contains(p, margin)) return false;

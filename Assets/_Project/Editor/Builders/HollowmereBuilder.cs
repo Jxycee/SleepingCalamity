@@ -230,6 +230,7 @@ namespace SleepingCalamity.EditorTools
             HollowmereShore.Build(set, ruined, rebuilt, t);   // T08b: the wall bank, the shore, the mill yard and the tree bases outside the wall (after the trees, the jetty and every collider)
             HollowmereStreets.Build(set, ruined, rebuilt, t);   // T06: decal projectors, wall-foot strips, street clutter clusters, lane landmarks and story props inside the wall (after every collider)
             HollowmereOrchard.Build(set, ruined, rebuilt, t);   // T07: the orchard (apple trees in both presets) and the Ruined allotments, after every collider and after the streets' decals
+            HollowmereOrchard.BuildBell(set, ruined, rebuilt, t);   // T09: bell yard, churchyard, keep banks, crag foot (after the orchard: shares its helpers and caches)
             BuildPathDebug(root, t);
 
             Transform lighting = Child(root, "Lighting");
