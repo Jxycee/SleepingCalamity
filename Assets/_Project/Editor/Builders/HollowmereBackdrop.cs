@@ -1,11 +1,15 @@
-// Hollowmere's horizon (QUEUE A12 / TOWN_VISUAL_REVIEW C3): real silhouette meshes beyond the backdrop ring, built on top of HollowmereRoad's ring, mid hills and far ridge.
-//  1. Three ragged ridge layers (r 760 / 1750 / 2450 m from RingCentre): polar strips whose crest is low-frequency hills + ragged noise + tree-clump bumps, each layer
-//     lighter and bluer (SleepingCalamity/Backdrop shader: its own haze by distance, no scene fog), so the valley wall reads as depth, not one card band.
-//  2. ONE dark mountain massif on the horizon (the place Mawrrow sleeps: a long slumped shape, two summits and a saddle) with a faint warm steam wisp (particles, low alpha).
-//  3. A ruined windmill on the nearest ridge (dark, in haze), 4. a far lighthouse with a faint glint on the middle ridge to the west (toward Saltwake).
-// Everything is a builder-made mesh, no colliders, nothing reachable (all of it stands 700+ m from the playable terrain). One tuning spot with an on/off per piece:
-// HollowmereBackdropTuning. Deterministic (Mathf.PerlinNoise, fixed seeds). Hooked by one line at the end of HollowmereRoad.Ring.
-// Authority: none (editor-time scene building).
+// Hollowmere's horizon (T22 rebuild of QUEUE A12 / TOWN_VISUAL_REVIEW C3): real layered 3D distant terrain beyond the backdrop ring.
+// Common practice for distant terrain at this scale (open-world games: low-poly heightfield shells with baked/macro-tiled albedo, ridged domain-warped noise, impostor canopy and crest
+// fringes, aerial perspective by distance): picked as built-in heightfield meshes from ridged fbm, vertex-baked land cover, one tiling crown texture on the forest, instanced crest tree
+// blobs and per-layer haze (SC Backdrop shader). Why: it is the proven recipe, costs one draw per 15-degree sector and needs no baked bitmap bigger than 2K.
+//  1. Three heightfield layers around RingCentre: Near (500-1300 m, forested hills, crest trees), Mid (1150-2300 m, field and forest patchwork, valleys between spurs),
+//     Far (2050-2990 m, the Mawrrow massif of rock, scree and pale ash). Each is a polar grid cut into 24 sectors (frustum culling), heights from domain-warped ridged noise under a
+//     meandering crest band, lighter and bluer by distance (the shader grades by distance), valley floors darker (baked AO from height above the local floor).
+//  2. Saltwake: a notch in all three layers at SaltwakeAzDeg (the road's direction from Eye_RoadOut) opens onto a flat marsh plain, an estuary with a pale water glint and a headland
+//     with a lighthouse, all hazed. HollowmereRoad.RingHeight uses ApplyGap so the road and the ring ground fall away into the same plain (the bowl would hide the water otherwise).
+//  3. Crest trees (12-tri blobs, deterministic) on the near and middle hills, the Mawrrow steam wisp, the ruined windmill on the near crest.
+// Everything is a builder-made mesh, no colliders, nothing reachable. One tuning spot: HollowmereBackdropTuning. Deterministic (Mathf.PerlinNoise, System.Random with fixed seeds).
+// Hooked by one line at the end of HollowmereRoad.Ring. Authority: none (editor-time scene building).
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -18,9 +22,10 @@ namespace SleepingCalamity.EditorTools
 {
     public static class HollowmereBackdropTuning
     {
-        public static bool Ridges = true, Mountain = true, Wisp = true, Windmill = true, Lighthouse = true;
-        public static float MountainAzDeg = -118f, MountainDist = 2500f, MountainHeight = 700f;   // area 1 rework: 560 -> 700 with the taller ranges (900 read as a pale spike, not a slumped massif);   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180); the far ridges hide its lower 7 degrees
-        public static float WindmillAzDeg = -62f, LighthouseAzDeg = 186f, WindmillScale = 2.0f, LighthouseScale = 1.8f;
+        public static bool Terrain = true, Trees = true, Mountain = true, Wisp = true, Windmill = true, Saltwake = true;
+        public static float MountainAzDeg = -118f, MountainDist = 2520f;   // azimuth = atan2(dz, dx) from RingCentre (north = 90, west = 180)
+        public static float WindmillAzDeg = -62f, WindmillScale = 2.0f;
+        public static float SaltwakeAzDeg = 186f, HeadlandOffsetDeg = 3f, HeadlandDist = 2640f, LighthouseScale = 2.4f;
         public static float WispAlpha = 0.07f;
     }
 
@@ -28,37 +33,155 @@ namespace SleepingCalamity.EditorTools
     {
         const string MaterialsFolder = "Assets/_Project/Content/Materials/Hollowmere";
         const string SpritePath = HollowmereRoad.Folder + "/Backdrop/T_Backdrop_Soft.png";
+        const string CanopyPath = HollowmereRoad.Folder + "/Backdrop/T_Backdrop_Canopy.png";
+        const float SeaY = -3f;
+        const int Sectors = 24;
 
         struct Layer
         {
-            public string Name; public float R0, Rc, R1, Foot, Base, Big, Rag, Clump; public int Segs; public float Seed;
-            public Color Tint; public float HazeNear, HazeFar, D0, D1, Mist, Cool, CoolAmt;
+            public string Name; public float R0, Rc, R1, W, Amp, Lam, Meander, Tile, TreeH, TreeCell; public int Segs, Rings; public float Seed;
+            public float HazeNear, HazeFar, D0, D1, Mist, Cool, CoolAmt, Patch; public Color HazeTint; public Vector3 Lift;
         }
 
-        // Area 1 rework (Run 6): HillRidge and FarRange raised (base 80 -> 150, 200 -> 330; relief about doubled) so the skyline is a mountain valley, 6-12 degrees
-        // over the horizon from the square, in place of a 3-5 degree band that read as a flat line.
         static readonly Layer[] Layers =
         {
-            new Layer { Name = "TreeRidge", R0 = 700f, Rc = 760f, R1 = 840f, Foot = -8f, Base = 24f, Big = 14f, Rag = 6f, Clump = 11f, Segs = 1440, Seed = 3f,
-                Tint = new Color(0.12f, 0.18f, 0.09f), HazeNear = 0.62f, HazeFar = 0.74f, D0 = 500f, D1 = 1300f, Mist = 0.10f, Cool = 0.95f, CoolAmt = 0.3f },
-            new Layer { Name = "HillRidge", R0 = 1400f, Rc = 1750f, R1 = 2100f, Foot = -20f, Base = 150f, Big = 110f, Rag = 18f, Clump = 14f, Segs = 1440, Seed = 11f,
-                Tint = new Color(0.17f, 0.24f, 0.19f), HazeNear = 0.72f, HazeFar = 0.82f, D0 = 1200f, D1 = 2200f, Mist = 0.10f, Cool = 1.1f, CoolAmt = 0.6f },
-            new Layer { Name = "FarRange", R0 = 2150f, Rc = 2450f, R1 = 2750f, Foot = -20f, Base = 330f, Big = 210f, Rag = 30f, Clump = 14f, Segs = 1440, Seed = 23f,
-                // Area 1 rework round 4: Cool 1.4 at full amount makes the haze (0.87, 0.8, 1.68): violet. Doubled in height it read as a flat lavender band over
-                // the tree line from the square. Cool 1.05 at 0.7 is a blue-grey (0.65, 0.8, 1.26), one step past HillRidge.
-                Tint = new Color(0.22f, 0.28f, 0.31f), HazeNear = 0.84f, HazeFar = 0.90f, D0 = 1800f, D1 = 2900f, Mist = 0.05f, Cool = 1.05f, CoolAmt = 0.7f },
+            new Layer { Name = "NearHills", R0 = 520f, Rc = 900f, R1 = 1300f, W = 190f, Amp = 70f, Lam = 420f, Meander = 140f, Tile = 220f, TreeH = 8f, TreeCell = 8f, Segs = 1440, Rings = 90, Seed = 3f,
+                HazeNear = 0.24f, HazeFar = 0.44f, D0 = 500f, D1 = 1300f, Mist = 0.10f, Cool = 0.95f, CoolAmt = 0.3f, Patch = 0f, HazeTint = new Color(0.98f, 1.0f, 1.02f), Lift = new Vector3(1f, 1f, 1f) },
+            new Layer { Name = "MidHills", R0 = 1150f, Rc = 1700f, R1 = 2300f, W = 320f, Amp = 190f, Lam = 900f, Meander = 220f, Tile = 700f, TreeH = 20f, TreeCell = 20f, Segs = 1080, Rings = 80, Seed = 11f,
+                HazeNear = 0.52f, HazeFar = 0.74f, D0 = 1200f, D1 = 2300f, Mist = 0.10f, Cool = 1.1f, CoolAmt = 0.6f, Patch = 0.25f, HazeTint = new Color(0.94f, 0.99f, 1.05f), Lift = new Vector3(0.95f, 1.04f, 1.18f) },
+            new Layer { Name = "FarRange", R0 = 2050f, Rc = 2550f, R1 = 2990f, W = 300f, Amp = 240f, Lam = 1700f, Meander = 160f, Tile = 1400f, TreeH = 0f, TreeCell = 0f, Segs = 1080, Rings = 60, Seed = 23f,
+                HazeNear = 0.74f, HazeFar = 0.88f, D0 = 1800f, D1 = 2990f, Mist = 0.05f, Cool = 1.05f, CoolAmt = 0.7f, Patch = 0.2f, HazeTint = new Color(0.91f, 0.98f, 1.08f), Lift = new Vector3(0.95f, 1.05f, 1.2f) },
         };
 
-        // Midday sun (BeautyCornerBuilder Midday: Euler(54, -32, 0)), direction TOWARD the sun. The vertex colours below bake a gentle warm-lit / cool-shade split on top of the
-        // shader's own lighting (its wrapped Lambert is weak at this distance), so a mass reads as a lit face and a shade side.
-        static readonly Vector3 SunDir = new Vector3(0.311f, 0.809f, -0.498f);
-        static Color LitShade(Vector3 n, float strength)
+        // ------------------------------------------------------------------------------------------------ the height model
+        static float PN(float x, float y) => Mathf.PerlinNoise(x + 1000f, y + 1000f);
+        static float Smooth(float a, float b, float x) { float u = Mathf.Clamp01((x - a) / (b - a)); return u * u * (3f - 2f * u); }
+        static float Rad(float deg) => deg * Mathf.Deg2Rad;
+        static float Gauss(float a, float c, float s) { float d = Mathf.Atan2(Mathf.Sin(a - c), Mathf.Cos(a - c)) / s; return Mathf.Exp(-d * d); }
+
+        // HollowmereRoad.RingHeight's hills for the far field (no terrain blend: every backdrop point is 370+ m outside the terrain).
+        static float HillsBase(float x, float z)
         {
-            float t = Mathf.Clamp01(Vector3.Dot(n, SunDir) * 0.9f + 0.25f);
-            Color lit = new Color(1.10f, 1.04f, 0.90f), shade = new Color(0.74f, 0.82f, 1.0f);
-            Color c = Color.Lerp(shade, lit, t);
-            return Color.Lerp(Color.white, c, strength);
+            TownPoint c = SaltwakeRoadPlan.RingCentre;
+            float r = Mathf.Sqrt((x - c.X) * (x - c.X) + (z - c.Z) * (z - c.Z));
+            float hills = -16f + 0.055f * Mathf.Max(0f, r - 200f)
+                + 18f * (Mathf.PerlinNoise(x * 0.0035f + 17.3f, z * 0.0035f + 4.1f) - 0.5f)
+                + 6f * (Mathf.PerlinNoise(x * 0.011f + 3.7f, z * 0.011f + 29.9f) - 0.5f);
+            return hills + HollowmereLayout.BackHill(x, z);
         }
+
+        // Saltwake's notch: the road's direction. The floor is a flat marsh plain a little under the eye height of the low cameras, falling to the estuary beyond 1.7 km (sea at SeaY).
+        static float GapAz => Rad(HollowmereBackdropTuning.SaltwakeAzDeg);
+        // A low plain a little under the cameras' eye height out to 650 m, then rising gently (1:30), so every point farther out stands higher in the view than the one before (a flat estuary
+        // at sea level would sit behind the tree belt, below the horizon, and never show). The "water" is painted on this slope (Albedo) and glinted by sprites.
+        static float GapFloor(float r) => -2.5f + 0.035f * Mathf.Max(0f, r - 650f);
+        public static float ApplyGap(float h, float x, float z)
+        {
+            if (!HollowmereBackdropTuning.Saltwake) return h;
+            TownPoint c = SaltwakeRoadPlan.RingCentre;
+            float dx = x - c.X, dz = z - c.Z, r = Mathf.Sqrt(dx * dx + dz * dz), a = Mathf.Atan2(dz, dx);
+            float gb = Smooth(0.10f, 0.85f, Gauss(a, GapAz, 0.20f)) * Smooth(250f, 650f, r);
+            if (gb <= 0f) return h;
+            float floor = GapFloor(r) + 1.4f * (PN(x * 0.012f + 4f, z * 0.012f + 8f) - 0.5f);
+            return Mathf.Lerp(h, floor, gb);
+        }
+
+        struct S { public float H, Base, Rel, Massif, Gap; }
+
+        static S Sample(int li, float x, float z)
+        {
+            Layer L = Layers[li];
+            TownPoint c = SaltwakeRoadPlan.RingCentre;
+            float dx = x - c.X, dz = z - c.Z, r = Mathf.Sqrt(dx * dx + dz * dz), a = Mathf.Atan2(dz, dx), ca = dx / Mathf.Max(1f, r), sa = dz / Mathf.Max(1f, r), s = L.Seed;
+            float g = HollowmereBackdropTuning.Saltwake ? Gauss(a, GapAz, 0.17f) : 0f;
+            float baseH = ApplyGap(HillsBase(x, z), x, z);
+            if (HollowmereBackdropTuning.Saltwake)   // the headland: a low spit of land with the lighthouse, inside the notch
+            {
+                float ha = GapAz + Rad(HollowmereBackdropTuning.HeadlandOffsetDeg), hr = HollowmereBackdropTuning.HeadlandDist;
+                float lump = 0.7f + 0.6f * PN(x * 0.02f + 2f, z * 0.02f + 6f);
+                baseH += Gauss(a, ha, 0.010f) * Mathf.Exp(-((r - hr) / 170f) * ((r - hr) / 170f)) * 45f * lump;
+            }
+            float rc = L.Rc + L.Meander * (PN(ca * 1.9f + s, sa * 1.9f + s * 0.4f) - 0.5f) * 2f;
+            float u = (r - rc) / L.W;
+            float env = Mathf.Max(0f, (Mathf.Exp(-u * u) - 0.04f) / 0.96f);
+            float am = 0.45f + 0.8f * PN(ca * 1.4f + s * 2.1f, sa * 1.4f + s * 0.6f);
+            float rg = Mathf.Clamp01(Ridged(x, z, L.Lam, s) * 1.5f);
+            float amp = L.Amp * am * (1f - 0.93f * g);
+            float h = baseH + amp * env * (0.30f + 0.70f * rg) + (PN(x / 55f + s, z / 55f) - 0.5f) * L.Amp * 0.07f * env * (1f - g);
+            float massif = 0f;
+            if (li == 2 && HollowmereBackdropTuning.Mountain)
+            {
+                float az0 = Rad(HollowmereBackdropTuning.MountainAzDeg);
+                float jag = 0.9f + 0.2f * PN(ca * 40f + 7f, sa * 40f + 3f);
+                float azk = Gauss(a, az0, 0.17f) * 100f + Gauss(a, az0 + 0.06f, 0.065f) * 250f * jag + Gauss(a, az0 - 0.12f, 0.065f) * 150f * jag;
+                float rd = (r - HollowmereBackdropTuning.MountainDist) / 360f;
+                massif = azk * Mathf.Exp(-rd * rd) * (0.82f + 0.3f * Ridged(x, z, 700f, 31f));
+                h += massif;
+            }
+            h -= 3f * (1f - Smooth(L.R0, L.R0 + 160f, r));   // the foot tucks under the layer in front (or the ring ground)
+            return new S { H = h, Base = baseH, Rel = (h - baseH) / Mathf.Max(1f, L.Amp), Massif = massif, Gap = g };
+        }
+
+        static float Ridged(float x, float z, float lam, float seed)
+        {
+            float wx = x + lam * 0.7f * (PN(x / (lam * 1.7f) + seed, z / (lam * 1.7f) + 3f) - 0.5f);
+            float wz = z + lam * 0.7f * (PN(x / (lam * 1.7f) + seed + 9f, z / (lam * 1.7f) + 13f) - 0.5f);
+            float f = 0f, amp = 1f, sum = 0f, fr = 1f / lam;
+            for (int o = 0; o < 5; o++)
+            {
+                float n = 1f - Mathf.Abs(2f * PN(wx * fr + seed + o * 7.3f, wz * fr + seed * 0.7f + o * 3.1f) - 1f);
+                f += amp * n * n; sum += amp; amp *= 0.5f; fr *= 2.07f;
+            }
+            return f / sum;
+        }
+
+        // 1 on the estuary: the notch from 1.8 km out, ragged shore (value noise on the threshold).
+        static float WaterMask(float x, float z)
+        {
+            TownPoint c = SaltwakeRoadPlan.RingCentre;
+            float dx = x - c.X, dz = z - c.Z, r = Mathf.Sqrt(dx * dx + dz * dz), a = Mathf.Atan2(dz, dx);
+            float side = Gauss(a, GapAz, 0.085f) + 0.35f * (PN(x * 0.006f + 3f, z * 0.006f + 5f) - 0.5f) + 0.12f * (PN(x * 0.02f, z * 0.02f) - 0.5f);
+            return Smooth(0.55f, 0.65f, side) * Smooth(1800f, 1950f, r + 120f * (PN(x * 0.01f, z * 0.01f) - 0.5f));
+        }
+
+        static float Forest(int li, float x, float z, float rel, float nY)
+        {
+            float s = Layers[li].Seed;
+            float p = PN(x * 0.0042f + s, z * 0.0042f + 1.7f) * 0.65f + PN(x * 0.012f + s * 2f, z * 0.012f + 9f) * 0.35f;
+            float f = Smooth(0.36f, 0.50f, p);
+            f = Mathf.Max(f, Smooth(0.5f, 0.85f, rel));
+            f = Mathf.Max(f, 1f - Smooth(0.70f, 0.86f, nY));
+            return f;
+        }
+
+        static Color Albedo(int li, float x, float z, S sm, float nY, float forest)
+        {
+            Layer L = Layers[li];
+            float tone = PN(x / 80f + L.Seed, z / 80f + 4f);
+            Color forestCol = Color.Lerp(new Color(0.07f, 0.13f, 0.05f), new Color(0.14f, 0.21f, 0.06f), tone) * (0.85f + 0.3f * PN(x / 22f, z / 22f));
+            float ft = PN(x / 110f + 7f, z / 110f);
+            Color fieldCol = Color.Lerp(new Color(0.27f, 0.36f, 0.13f), new Color(0.46f, 0.43f, 0.20f), Smooth(0.45f, 0.65f, ft)) * (0.9f + 0.2f * PN(x / 30f, z / 30f));
+            Color col = Color.Lerp(fieldCol, forestCol, forest);
+            if (li >= 1)
+            {
+                float rock = (1f - Smooth(0.60f, 0.80f, nY)) * Smooth(0.35f, 0.7f, sm.Rel) * (li == 2 ? 1f : 0.5f);
+                float mk = sm.Massif / 360f;
+                rock = Mathf.Max(rock, Smooth(0.10f, 0.45f, mk));
+                Color rockCol = Color.Lerp(new Color(0.22f, 0.20f, 0.17f), new Color(0.33f, 0.30f, 0.26f), PN(x / 40f, z / 40f));   // scree lighter than the face
+                col = Color.Lerp(col, rockCol, rock);
+                col = Color.Lerp(col, new Color(0.30f, 0.28f, 0.26f), Smooth(0.78f, 0.97f, mk));   // pale ash on the summit
+            }
+            float water = HollowmereBackdropTuning.Saltwake ? WaterMask(x, z) : 0f;
+            if (water > 0f) col = Color.Lerp(col, new Color(0.44f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 0.56f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 0.60f * (0.9f + 0.25f * PN(x * 0.004f, z * 0.03f)), 1f), water);
+            float ao = Mathf.Lerp(0.60f, 1f, Smooth(0.10f, 0.65f, sm.Rel)); ao = Mathf.Lerp(ao, 1f, water);   // valley floors darker than the crests
+            col *= ao;
+            col.r *= L.Lift.x; col.g *= L.Lift.y; col.b *= L.Lift.z;
+            col.a = 1f;
+            return col;
+        }
+
+        // ------------------------------------------------------------------------------------------------ build
+        static Vector3 mountainPeak;
 
         public static void Build(Transform ring)
         {
@@ -73,14 +196,27 @@ namespace SleepingCalamity.EditorTools
                 AddHorizonCamera(root, "Cap_HM_HorizonWest", -125f, -40f, 183f, 55f);
                 return;
             }
-            if (HollowmereBackdropTuning.Ridges) for (int i = 0; i < Layers.Length; i++) tris += BuildLayer(root, c, i);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Texture2D canopy = Canopy();
+            if (HollowmereBackdropTuning.Terrain)
+                for (int i = 0; i < Layers.Length; i++)
+                {
+                    Layer L = Layers[i];
+                    Material m = Mat("M_BD_" + L.Name, Color.white, L.HazeNear, L.HazeFar, L.D0, L.D1, L.Mist, L.Cool, L.CoolAmt, patch: L.Patch, hazeTint: L.HazeTint, tex: i < 2 ? canopy : null, canopy: i < 2 ? 1f : 0f);
+                    tris += BuildTerrain(root, i, m);
+                    if (HollowmereBackdropTuning.Trees && L.TreeH > 0f)
+                    {
+                        Material tm = Mat("M_BD_" + L.Name + "Trees", Color.white, L.HazeNear * 0.75f, L.HazeFar * 0.8f, L.D0, L.D1, L.Mist * 0.5f, L.Cool, L.CoolAmt, hazeTint: L.HazeTint);
+                        tris += BuildTrees(root, i, tm);
+                    }
+                }
             if (HollowmereBackdropTuning.Mountain) tris += BuildMountain(root, c);
             if (HollowmereBackdropTuning.Windmill) tris += BuildWindmill(root, c);
-            if (HollowmereBackdropTuning.Lighthouse) tris += BuildLighthouse(root, c);
+            if (HollowmereBackdropTuning.Saltwake) tris += BuildSaltwake(root, c);
             AddHorizonCamera(root, "Cap_HM_HorizonSouth", -14f, -80f, -92f, 55f);    // the horizon cameras: no play camera looks out over the wall, these show the backdrop
             AddHorizonCamera(root, "Cap_HM_HorizonWest", -125f, -40f, 183f, 55f);
-            Debug.Log("SC HOLLOWMERE backdrop: " + tris + " tris (ridges " + HollowmereBackdropTuning.Ridges + ", mountain " + HollowmereBackdropTuning.Mountain + ", wisp "
-                + HollowmereBackdropTuning.Wisp + ", windmill " + HollowmereBackdropTuning.Windmill + ", lighthouse " + HollowmereBackdropTuning.Lighthouse + ")");
+            Debug.Log("SC HOLLOWMERE backdrop: " + tris + " tris in " + sw.Elapsed.TotalSeconds.ToString("F1") + " s (terrain " + HollowmereBackdropTuning.Terrain + ", trees " + HollowmereBackdropTuning.Trees
+                + ", mountain " + HollowmereBackdropTuning.Mountain + ", wisp " + HollowmereBackdropTuning.Wisp + ", windmill " + HollowmereBackdropTuning.Windmill + ", saltwake " + HollowmereBackdropTuning.Saltwake + ")");
         }
 
         static void AddHorizonCamera(Transform parent, string name, float x, float z, float azDeg, float fov)
@@ -91,119 +227,124 @@ namespace SleepingCalamity.EditorTools
             cam.farClipPlane = HollowmereRoad.FarClip;
         }
 
-        // ------------------------------------------------------------------------------------------------ ridge layers
-        static float Smooth(float a, float b, float x) { float u = Mathf.Clamp01((x - a) / (b - a)); return u * u * (3f - 2f * u); }
-        static float Rad(float deg) => deg * Mathf.Deg2Rad;
-
-        // Knolls (a landmark's seat on a ridge): layer index, azimuth, sigma (rad), height.
-        static float Knoll(int layer, float a)
+        static int BuildTerrain(Transform parent, int li, Material m)
         {
-            float k = 0f;
-            if (layer == 0 && HollowmereBackdropTuning.Windmill) k += Gauss(a, Rad(HollowmereBackdropTuning.WindmillAzDeg), 0.03f) * 18f;
-            if (layer == 1 && HollowmereBackdropTuning.Lighthouse) k += Gauss(a, Rad(HollowmereBackdropTuning.LighthouseAzDeg), 0.022f) * 20f;
-            // T11: the far range swells toward the Mawrrow massif (about 90 m over 8 degrees each side), so the mountain rises out of a continuous ridge instead of standing on a thin pale band
-            if (layer == 2 && HollowmereBackdropTuning.Mountain)
+            Layer L = Layers[li];
+            TownPoint c = SaltwakeRoadPlan.RingCentre;
+            var rootT = new GameObject(L.Name).transform; rootT.SetParent(parent, false);
+            int sp = L.Segs / Sectors, w = sp + 1, tris = 0;
+            for (int s = 0; s < Sectors; s++)
             {
-                // T11b: the separate Mawrrow mesh floated (its hazed foot dissolved to sky above the range, the shape read as a crumpled sheet). Now the massif IS the far range: a broad swell,
-                // a tall summit and a lower shoulder grown out of the same crest mesh, so its foot is the range itself and no sky can show under it. Two summits and a saddle, as before.
-                float az0 = Rad(HollowmereBackdropTuning.MountainAzDeg), ca = Mathf.Cos(a), sa = Mathf.Sin(a);
-                float jag = 0.82f + 0.36f * Mathf.PerlinNoise(ca * 70f + 7f, sa * 70f + 3f);
-                k += Gauss(a, az0, 0.17f) * 100f + Gauss(a, az0 + 0.06f, 0.065f) * 250f * jag + Gauss(a, az0 - 0.12f, 0.065f) * 150f * jag;
+                var V = new List<Vector3>(); var N = new List<Vector3>(); var C = new List<Color>(); var UV0 = new List<Vector2>(); var UV1 = new List<Vector2>(); var idx = new List<int>();
+                for (int j = 0; j <= L.Rings; j++)
+                {
+                    float r = Mathf.Lerp(L.R0, L.R1, j / (float)L.Rings);
+                    float eps = Mathf.Max(3f, r * 2f * Mathf.PI / L.Segs * 0.7f);
+                    for (int i = 0; i <= sp; i++)
+                    {
+                        float a = (s * sp + i) * 2f * Mathf.PI / L.Segs;
+                        float x = c.X + r * Mathf.Cos(a), z = c.Z + r * Mathf.Sin(a);
+                        S sm = Sample(li, x, z);
+                        float hx0 = Sample(li, x - eps, z).H, hx1 = Sample(li, x + eps, z).H, hz0 = Sample(li, x, z - eps).H, hz1 = Sample(li, x, z + eps).H;
+                        Vector3 n = new Vector3(hx0 - hx1, 2f * eps, hz0 - hz1).normalized;
+                        float forest = Forest(li, x, z, sm.Rel, n.y);
+                        if (HollowmereBackdropTuning.Saltwake) forest *= 1f - WaterMask(x, z);
+                        V.Add(new Vector3(x, sm.H, z)); N.Add(n); C.Add(Albedo(li, x, z, sm, n.y, forest));
+                        UV0.Add(new Vector2(x / L.Tile, z / L.Tile)); UV1.Add(new Vector2(Mathf.Clamp01(forest * 0.85f + 0.15f), 0f));
+                    }
+                }
+                for (int j = 0; j < L.Rings; j++)
+                    for (int i = 0; i < sp; i++)
+                    {
+                        int a0 = j * w + i, b = a0 + 1, d = a0 + w, e = d + 1;
+                        idx.AddRange(new[] { a0, e, d, a0, b, e });
+                    }
+                MakeMesh(rootT, L.Name + "_" + s.ToString("00"), V, N, C, UV0, UV1, idx, m);
+                tris += idx.Count / 3;
             }
-            return k;
-        }
-        static float Gauss(float a, float c, float s) { float d = Mathf.Atan2(Mathf.Sin(a - c), Mathf.Cos(a - c)) / s; return Mathf.Exp(-d * d); }
-
-        static float Top(int li, float a)
-        {
-            Layer L = Layers[li];
-            float ca = Mathf.Cos(a), sa = Mathf.Sin(a), s = L.Seed;
-            float big = L.Big * Mathf.PerlinNoise(ca * 1.7f + s, sa * 1.7f + s * 0.6f);
-            float mid = L.Big * 0.35f * (Mathf.PerlinNoise(ca * 6f + s * 2f, sa * 6f + 5f) - 0.5f);
-            float rag = L.Rag * (Mathf.PerlinNoise(ca * 38f + s, sa * 38f + 1.3f) - 0.5f);
-            // tree-clump bumps: round-topped lumps where a mid-frequency noise passes a threshold, with fine jitter on top (the tree tips)
-            float cl = Smooth(0.52f, 0.72f, Mathf.PerlinNoise(ca * 75f + s * 3f, sa * 75f + 9f));
-            float tips = (Mathf.PerlinNoise(ca * 230f + s, sa * 230f + 4f) - 0.5f) * 0.45f * L.Clump * cl;
-            return L.Base + big + mid + rag + L.Clump * cl + tips + Knoll(li, a);
+            return tris;
         }
 
-        static int BuildLayer(Transform parent, TownPoint c, int li)
+        // ------------------------------------------------------------------------------------------------ crest trees
+        static int BuildTrees(Transform parent, int li, Material m)
         {
             Layer L = Layers[li];
-            var v = new List<Vector3>(); var idx = new List<int>();
-            float[] rs = { L.R0, L.Rc, L.R1 };
-            for (int j = 0; j < 3; j++)
-                for (int i = 0; i <= L.Segs; i++)
-                {
-                    float a = i * 2f * Mathf.PI / L.Segs;
-                    float top = Top(li, a);
-                    float y = j == 0 ? L.Foot : j == 1 ? top : Mathf.Lerp(top, L.Foot, 0.55f);
-                    v.Add(new Vector3(c.X + rs[j] * Mathf.Cos(a), y, c.Z + rs[j] * Mathf.Sin(a)));
-                }
-            int w = L.Segs + 1;
-            for (int j = 0; j < 2; j++)
-                for (int i = 0; i < L.Segs; i++)
-                {
-                    int a = j * w + i, b = a + 1, d = a + w, e = d + 1;
-                    idx.AddRange(new[] { a, e, d, a, b, e });
-                }
-            // T11 aerial perspective: each layer one step bluer and paler than the one in front (haze tint turns from green-white to blue), and a world-XZ patchwork breaks the one flat green
-            Color[] tints = { new Color(0.98f, 1.0f, 1.02f), new Color(0.94f, 0.99f, 1.05f), new Color(0.91f, 0.98f, 1.08f) };
-            float[] patches = { 0.8f, 0.6f, 0.3f };
-            Material m = Mat("M_BD_" + L.Name, L.Tint, L.HazeNear, L.HazeFar, L.D0, L.D1, L.Mist, L.Cool, L.CoolAmt, patch: patches[li], hazeTint: tints[li]);
-            float hi = L.Base + L.Big;
-            MakeObject(parent, L.Name, v, idx, m, null, (p, n) =>
+            TownPoint c = SaltwakeRoadPlan.RingCentre;
+            var rng = new System.Random(4001 + li * 17);
+            var rootT = new GameObject(L.Name + "Trees").transform; rootT.SetParent(parent, false);
+            var V = new List<Vector3>[Sectors]; var N = new List<Vector3>[Sectors]; var C = new List<Color>[Sectors]; var I = new List<int>[Sectors];
+            for (int s = 0; s < Sectors; s++) { V[s] = new List<Vector3>(); N[s] = new List<Vector3>(); C[s] = new List<Color>(); I[s] = new List<int>(); }
+            float cell = L.TreeCell;
+            for (float r = L.R0 + 60f; r < L.R1 - 60f; r += cell)
             {
-                float g = Mathf.Clamp01((p.y - L.Foot) / Mathf.Max(1f, hi - L.Foot));
-                float band = Mathf.PerlinNoise(p.x * 0.013f + L.Seed, p.z * 0.013f) - 0.5f;   // patches of lighter meadow and darker wood along the ridge
-                float k = Mathf.Lerp(0.74f, 1.10f, g) * (1f + 0.22f * band) * (li == 2 ? 1f + 0.22f * Smooth(hi + 20f, hi + 260f, p.y) : 1f);   // T11b: pale ash on the Mawrrow summit
-                Color sh = LitShade(n, 0.45f);
-                return new Color(k * sh.r, k * sh.g, k * sh.b, 1f);
-            });
-            return idx.Count / 3;
+                int n = Mathf.Max(8, Mathf.RoundToInt(2f * Mathf.PI * r / cell));
+                for (int k = 0; k < n; k++)
+                {
+                    float a = (k + (float)rng.NextDouble()) * 2f * Mathf.PI / n, rr = r + ((float)rng.NextDouble() - 0.5f) * cell;
+                    double roll = rng.NextDouble(), pick = rng.NextDouble(), hv = rng.NextDouble(), sv = rng.NextDouble();
+                    float x = c.X + rr * Mathf.Cos(a), z = c.Z + rr * Mathf.Sin(a);
+                    S sm = Sample(li, x, z);
+                    if (sm.Gap > 0.45f || sm.H < SeaY + 4f) continue;
+                    float e = 3f;
+                    Vector3 nrm = new Vector3(Sample(li, x - e, z).H - Sample(li, x + e, z).H, 2f * e, Sample(li, x, z - e).H - Sample(li, x, z + e).H).normalized;
+                    float forest = Forest(li, x, z, sm.Rel, nrm.y);
+                    float crest = Smooth(0.30f, 0.80f, sm.Rel);
+                    float p = forest * (0.25f + 0.75f * crest) * 0.9f * Smooth(0.30f, 0.62f, PN(x / 48f + 3f, z / 48f + 8f));   // groves, not a grid
+                    if (nrm.y < 0.74f || roll > p) continue;
+                    float size = L.TreeH * (0.55f + 0.95f * (float)hv * (float)hv + 0.2f * (float)hv);
+                    bool conifer = pick < 0.15;
+                    Vector3 pos = new Vector3(x, sm.H - 0.4f, z);
+                    int sec = Mathf.Clamp(Mathf.FloorToInt(((a / (2f * Mathf.PI)) % 1f) * Sectors), 0, Sectors - 1);
+                    AddTree(V[sec], N[sec], C[sec], I[sec], pos, size, conifer, (float)sv, PN(x / 70f, z / 70f), Layers[li].Lift);
+                }
+            }
+            int tris = 0;
+            for (int s = 0; s < Sectors; s++)
+            {
+                if (I[s].Count == 0) continue;
+                MakeMesh(rootT, L.Name + "Trees_" + s.ToString("00"), V[s], N[s], C[s], null, null, I[s], m);
+                tris += I[s].Count / 3;
+            }
+            return tris;
+        }
+
+        // A 12-triangle bipyramid crown (6 sides): conifer = tall and narrow, broadleaf = low and round. Normals bend from the crown centre so it shades like a lump.
+        static void AddTree(List<Vector3> V, List<Vector3> N, List<Color> C, List<int> I, Vector3 p, float size, bool conifer, float rnd, float tone, Vector3 lift)
+        {
+            float ringY = conifer ? 0.24f : 0.50f, rad = size * (conifer ? 0.26f : 0.52f), baseY = conifer ? 0.0f : 0.12f, topY = conifer ? 1f : 0.86f;
+            Color baseCol = conifer ? Color.Lerp(new Color(0.035f, 0.075f, 0.035f), new Color(0.06f, 0.11f, 0.045f), tone) : Color.Lerp(new Color(0.07f, 0.12f, 0.035f), new Color(0.13f, 0.18f, 0.05f), tone);
+            baseCol *= (0.85f + 0.4f * rnd) * 0.6f;
+            baseCol.r *= lift.x; baseCol.g *= lift.y; baseCol.b *= lift.z; baseCol.a = 1f;
+            float rot = rnd * 6.28f;
+            Vector3 centre = p + Vector3.up * size * (conifer ? 0.4f : 0.5f);
+            int o = V.Count;
+            Vector3 top = p + Vector3.up * size * topY, bot = p + Vector3.up * size * baseY;
+            V.Add(top); V.Add(bot);
+            for (int k = 0; k < 6; k++)
+            {
+                float a = rot + k * Mathf.PI / 3f;
+                V.Add(p + new Vector3(Mathf.Cos(a) * rad, size * ringY, Mathf.Sin(a) * rad));
+            }
+            for (int k = 0; k < V.Count - o; k++) N.Add(((V[o + k] - centre).normalized * 0.5f + Vector3.up).normalized);
+            C.Add(baseCol * 1.2f); C.Add(baseCol * 0.5f);
+            for (int k = 0; k < 6; k++) C.Add(baseCol * (0.8f + 0.3f * Mathf.Sin(rot + k * 1.047f)));
+            for (int k = 0; k < 6; k++)
+            {
+                int a0 = o + 2 + k, a1 = o + 2 + (k + 1) % 6;
+                I.Add(o); I.Add(a1); I.Add(a0);          // upper cone (outward, counter-clockwise seen from outside)
+                I.Add(o + 1); I.Add(a0); I.Add(a1);      // lower cone
+            }
         }
 
         // ------------------------------------------------------------------------------------------------ the mountain
-        static Vector3 mountainPeak;
-
         static int BuildMountain(Transform parent, TownPoint c)
         {
-            // T11b: the massif is a knoll of the far range (Knoll layer 2); only the steam wisp is placed here, on its summit
-            float a = Rad(HollowmereBackdropTuning.MountainAzDeg) + 0.06f;
-            mountainPeak = new Vector3(c.X + Layers[2].Rc * Mathf.Cos(a), Top(2, a), c.Z + Layers[2].Rc * Mathf.Sin(a));
+            // the massif is part of the far layer (Sample li 2); only the steam wisp is placed here, on its summit
+            float a = Rad(HollowmereBackdropTuning.MountainAzDeg) + 0.06f, r = HollowmereBackdropTuning.MountainDist;
+            float x = c.X + r * Mathf.Cos(a), z = c.Z + r * Mathf.Sin(a);
+            mountainPeak = new Vector3(x, Sample(2, x, z).H, z);
             if (HollowmereBackdropTuning.Wisp) BuildWisp(parent);
             return 0;
-        }
-
-        // Spur ridges radiating from a summit: 1 on a spur crest, 0 in a gully. Polar (theta, r) around the summit; a low-frequency warp bends and forks them.
-        // Blended between the tall summit (150, 0) and the shoulder peak (-300, 40) by which one's mass dominates.
-        const float SpurCount = 11f;
-        static float SpurAround(float lt, float lr, float ct, float cr, float seed)
-        {
-            float dt = lt - ct, dr = lr - cr;
-            float theta = Mathf.Atan2(dr, dt), r = Mathf.Sqrt(dt * dt + dr * dr);
-            float ca = Mathf.Cos(theta), sa = Mathf.Sin(theta);   // periodic noise input, no seam at +/-pi
-            float warp = 2.4f * (Mathf.PerlinNoise(ca * 1.4f + r * 0.0045f + seed, sa * 1.4f + seed * 0.7f) - 0.5f)
-                       + 0.8f * (Mathf.PerlinNoise(ca * 3.1f + r * 0.012f + seed + 9f, sa * 3.1f + 4f) - 0.5f);
-            return 1f - Mathf.Pow(Mathf.Abs(Mathf.Sin(SpurCount * theta * 0.5f + warp)), 0.7f);
-        }
-        static float Spur(float lt, float lr)
-        {
-            float w1 = Bump(lt, lr, 150f, 0f, 430f, 260f), w2 = 0.58f * Bump(lt, lr, -300f, 40f, 360f, 240f);
-            float s1 = SpurAround(lt, lr, 150f, 0f, 3f), s2 = SpurAround(lt, lr, -300f, 40f, 17f);
-            return w1 + w2 < 1e-4f ? 0.5f : Mathf.Lerp(s2, s1, w1 / (w1 + w2));
-        }
-        // 0 at the summit crag and the foot, 1 at mid-slope: fade by the local mass (Bump) so it follows both peaks.
-        static float SpurFade(float lt, float lr)
-        {
-            float m = Mathf.Max(Bump(lt, lr, 150f, 0f, 430f, 260f), 0.58f * Bump(lt, lr, -300f, 40f, 360f, 240f));
-            return Smooth(0.06f, 0.30f, m) * (1f - Smooth(0.72f, 0.97f, m));
-        }
-
-        static float Bump(float t, float r, float ct, float cr, float rt, float rr)
-        {
-            float f = 1f - Mathf.Sqrt(((t - ct) / rt) * ((t - ct) / rt) + ((r - cr) / rr) * ((r - cr) / rr));
-            return f <= 0f ? 0f : 0.4f * f + 0.6f * f * f * (3f - 2f * f);
         }
 
         // The steam: a few huge soft warm sprites rising off the summit, very low alpha. Unlit, no fog (SleepingCalamity/BackdropWisp).
@@ -242,7 +383,9 @@ namespace SleepingCalamity.EditorTools
         {
             float a = Rad(HollowmereBackdropTuning.WindmillAzDeg), s = HollowmereBackdropTuning.WindmillScale;
             Layer L = Layers[0];
-            Vector3 pos = new Vector3(c.X + L.Rc * Mathf.Cos(a), Top(0, a) - 1.5f, c.Z + L.Rc * Mathf.Sin(a));
+            float bestR = L.Rc, bestH = -1e9f;   // the highest point of the near crest on that bearing
+            for (float rr = L.R0 + 150f; rr < L.R1 - 150f; rr += 4f) { float hh = Sample(0, c.X + rr * Mathf.Cos(a), c.Z + rr * Mathf.Sin(a)).H; if (hh > bestH) { bestH = hh; bestR = rr; } }
+            Vector3 pos = new Vector3(c.X + bestR * Mathf.Cos(a), bestH - 1.5f, c.Z + bestR * Mathf.Sin(a));
             var mb = new MeshBuilder();
             mb.Frustum(new Vector3(0f, 0f, 0f), 4.6f, 3.0f, 17f, 8, 0f);                       // the tower
             mb.Tag = 1;                                                                        // A12 r1 (town-art-leftovers): cap, hub and sails are weathered timber, the tower whitewashed stone
@@ -274,27 +417,107 @@ namespace SleepingCalamity.EditorTools
             return mb.I.Count / 3;
         }
 
-        // ------------------------------------------------------------------------------------------------ lighthouse
-        static int BuildLighthouse(Transform parent, TownPoint c)
+        // ------------------------------------------------------------------------------------------------ Saltwake: estuary, glint, headland lighthouse
+        static int BuildSaltwake(Transform parent, TownPoint c)
         {
-            float a = Rad(HollowmereBackdropTuning.LighthouseAzDeg);
-            Layer L = Layers[1];
-            Vector3 pos = new Vector3(c.X + L.Rc * Mathf.Cos(a), Top(1, a) - 2f, c.Z + L.Rc * Mathf.Sin(a));
+            int tris = 0;
+            // the estuary is painted on the notch floor (Albedo/WaterMask); here only its glint and the lighthouse
+            // the glint: sun on water, long thin additive bands facing the town
+            Material gm = WispMaterial("M_BD_EstuaryGlint", new Color(1f, 0.95f, 0.80f, 0.32f), true);
+            float[] gr = { 2050f, 2250f, 2450f, 2760f }, gaz = { -1.8f, 1.2f, -0.6f, 0.9f }, gw = { 300f, 420f, 360f, 520f };
+            for (int k = 0; k < gr.Length; k++)
+            {
+                float a = GapAz + Rad(gaz[k]);
+                float gx = c.X + gr[k] * Mathf.Cos(a), gz = c.Z + gr[k] * Mathf.Sin(a);
+                Vector3 p = new Vector3(gx, Sample(2, gx, gz).H + 0.4f, gz);
+                var q = new MeshBuilder(); float hw = gw[k] * 0.5f, hh = 5.5f + 2f * k;
+                q.AddQuadFace(new Vector3(-hw, 0f, 0f), new Vector3(hw, 0f, 0f), new Vector3(hw, hh * 2f, 0f), new Vector3(-hw, hh * 2f, 0f));
+                var go = MakeObject(parent, "EstuaryGlint" + k, q.V, q.I, gm, q.UV);
+                go.transform.position = p;
+                go.transform.rotation = Quaternion.Euler(0f, 90f - (a * Mathf.Rad2Deg + 180f), 0f);
+                tris += 2;
+            }
+
+            // the lighthouse on the headland, in haze: a white tower and a keeper's house; the glint at the lantern
+            float ha = GapAz + Rad(HollowmereBackdropTuning.HeadlandOffsetDeg), hr = HollowmereBackdropTuning.HeadlandDist;
+            float lx = c.X + hr * Mathf.Cos(ha), lz = c.Z + hr * Mathf.Sin(ha);
+            Vector3 pos = new Vector3(lx, Sample(2, lx, lz).H - 1.5f, lz);
             var mb = new MeshBuilder();
-            mb.Frustum(new Vector3(0f, 0f, 0f), 4.2f, 2.6f, 34f, 8, 0f);
-            mb.Frustum(new Vector3(0f, 34f, 0f), 3.4f, 3.4f, 1.0f, 8, 0f);                      // the gallery
+            mb.Frustum(new Vector3(0f, 0f, 0f), 4.6f, 2.8f, 34f, 8, 0f);
+            mb.Frustum(new Vector3(0f, 34f, 0f), 3.6f, 3.6f, 1.0f, 8, 0f);                      // the gallery
             mb.Frustum(new Vector3(0f, 35f, 0f), 2.2f, 2.2f, 4.2f, 8, 0f);                      // the lantern room
             mb.Frustum(new Vector3(0f, 39.2f, 0f), 2.9f, 0.3f, 3.0f, 8, 0f);                    // the cap
-            var go = MakeObject(parent, "FarLighthouse", mb.V, mb.I, Mat("M_BD_Lighthouse", new Color(0.62f, 0.60f, 0.57f), 0.72f, 0.82f, 1200f, 2200f, 0.08f, 1.1f, 0.6f));
-            go.transform.position = pos; go.transform.localScale = Vector3.one * HollowmereBackdropTuning.LighthouseScale;
-            var tris = mb.I.Count / 3;
-            // the glint: one additive sprite at the lantern, facing the town
-            var q = new MeshBuilder(); q.Quad(new Vector3(0f, 37f * HollowmereBackdropTuning.LighthouseScale, 1f), 60f);
-            var gl = MakeObject(parent, "LighthouseGlint", q.V, q.I, WispMaterial("M_BD_Glint", new Color(1f, 0.93f, 0.72f, 0.6f), true), q.UV);
-            gl.transform.position = pos;
-            gl.transform.rotation = Quaternion.Euler(0f, 90f - (a * Mathf.Rad2Deg + 180f), 0f);
-            go.transform.rotation = gl.transform.rotation;
+            mb.Box(new Vector3(14f, 3f, 2f), new Vector3(14f, 6f, 8f), Quaternion.identity);     // the keeper's house beside it
+            Quaternion face = Quaternion.Euler(0f, 90f - (ha * Mathf.Rad2Deg + 180f), 0f);
+            var lh = MakeObject(parent, "SaltwakeLighthouse", mb.V, mb.I, Mat("M_BD_Lighthouse", new Color(0.74f, 0.72f, 0.66f), 0.50f, 0.70f, 1200f, 2990f, 0.04f, 1.1f, 0.6f));
+            lh.transform.position = pos; lh.transform.rotation = face; lh.transform.localScale = Vector3.one * HollowmereBackdropTuning.LighthouseScale;
+            tris += mb.I.Count / 3;
+            var gq = new MeshBuilder(); gq.Quad(new Vector3(0f, 37f * HollowmereBackdropTuning.LighthouseScale, 1f), 70f);
+            var gl = MakeObject(parent, "LighthouseGlint", gq.V, gq.I, WispMaterial("M_BD_Glint", new Color(1f, 0.93f, 0.72f, 0.6f), true), gq.UV);
+            gl.transform.position = pos; gl.transform.rotation = face;
             return tris + 2;
+        }
+
+        // ------------------------------------------------------------------------------------------------ the forest crown texture
+        // 2048 px, tiling: Worley crowns on a 64 x 64 torus (dome shading, dark gaps where crowns meet, light from the north-west), stored at 0.6 of its value (the shader multiplies by _CanopyGain 1.65).
+        static Texture2D Canopy()
+        {
+            const int R = 2048, G = 64;
+            var rng = new System.Random(77031);
+            var fx = new float[G * G]; var fy = new float[G * G]; var ft = new float[G * G];
+            for (int i = 0; i < G * G; i++) { fx[i] = 0.12f + 0.76f * (float)rng.NextDouble(); fy[i] = 0.12f + 0.76f * (float)rng.NextDouble(); ft[i] = 0.78f + 0.44f * (float)rng.NextDouble(); }
+            var val = new float[R * R]; double sum = 0;
+            for (int j = 0; j < R; j++)
+                for (int i = 0; i < R; i++)
+                {
+                    float u = (i + 0.5f) * G / R, v = (j + 0.5f) * G / R;
+                    int cx = Mathf.FloorToInt(u), cy = Mathf.FloorToInt(v);
+                    float d1 = 9f, d2 = 9f, t1 = 1f, vx = 0f, vy = 0f;
+                    for (int oy = -1; oy <= 1; oy++)
+                        for (int ox = -1; ox <= 1; ox++)
+                        {
+                            int gx = cx + ox, gy = cy + oy, wx = ((gx % G) + G) % G, wy = ((gy % G) + G) % G;
+                            float px = gx + fx[wy * G + wx], py = gy + fy[wy * G + wx];
+                            float dx = u - px, dy = v - py, d = Mathf.Sqrt(dx * dx + dy * dy);
+                            if (d < d1) { d2 = d1; d1 = d; t1 = ft[wy * G + wx]; vx = dx; vy = dy; }
+                            else if (d < d2) d2 = d;
+                        }
+                    float dome = Mathf.Clamp01(1f - (d1 / 0.62f) * (d1 / 0.62f));
+                    float edge = Smooth(0f, 0.22f, d2 - d1);
+                    float light = 1f + 0.30f * Mathf.Clamp((-vx * 0.7f - vy * 0.7f) * 1.6f, -1f, 1f);
+                    float grain = 0.92f + 0.16f * PN(i * 0.05f, j * 0.05f);
+                    float vv = t1 * (0.72f + 0.36f * dome) * (0.72f + 0.28f * edge) * (1f + 0.5f * (light - 1f)) * grain;
+                    val[j * R + i] = vv; sum += vv;
+                }
+            float mean = (float)(sum / (R * R));
+            var px8 = new Color32[R * R];
+            for (int i = 0; i < px8.Length; i++)
+            {
+                byte b = (byte)Mathf.Clamp(Mathf.RoundToInt(val[i] / mean * 0.6f * 255f), 0, 255);
+                px8[i] = new Color32(b, b, b, 255);
+            }
+            var tex = new Texture2D(R, R, TextureFormat.RGB24, false);
+            tex.SetPixels32(px8); tex.Apply();
+            BuilderUtil.EnsureFolder(HollowmereRoad.Folder + "/Backdrop");
+            byte[] png = tex.EncodeToPNG();
+            Object.DestroyImmediate(tex);
+            string abs = BuilderUtil.Abs(CanopyPath);
+            if (!File.Exists(abs) || !File.ReadAllBytes(abs).SequenceEqual(png)) { File.WriteAllBytes(abs, png); AssetDatabase.ImportAsset(CanopyPath, ImportAssetOptions.ForceUpdate); }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(CanopyPath);
+        }
+
+        static void MakeMesh(Transform parent, string name, List<Vector3> v, List<Vector3> n, List<Color> col, List<Vector2> uv0, List<Vector2> uv1, List<int> idx, Material m)
+        {
+            var mesh = new Mesh { name = "BD_" + name, indexFormat = IndexFormat.UInt32 };
+            mesh.SetVertices(v); mesh.SetNormals(n); mesh.SetColors(col);
+            if (uv0 != null) mesh.SetUVs(0, uv0);
+            if (uv1 != null) mesh.SetUVs(1, uv1);
+            mesh.SetTriangles(idx, 0);
+            mesh.RecalculateBounds();
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = m; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
         }
 
         // ------------------------------------------------------------------------------------------------ helpers
@@ -343,6 +566,8 @@ namespace SleepingCalamity.EditorTools
                 Face(P(-1, -1, -1), P(1, -1, -1), P(1, -1, 1), P(-1, -1, 1));   // -Y
             }
 
+            public void AddQuadFace(Vector3 a, Vector3 b, Vector3 c, Vector3 d) => Face(a, b, c, d);
+
             public void Quad(Vector3 centre, float size)
             {
                 float h = size * 0.5f;
@@ -374,13 +599,14 @@ namespace SleepingCalamity.EditorTools
         // A SleepingCalamity/Backdrop material (same property set as HollowmereRoad.Backdrop; no texture, a flat tint).
         // A12 r1 (town-art-leftovers): the trailing key/fill args default to the shader's old behaviour, so ridges, cards and road are unchanged; always written so a regenerated .mat is never stale.
         static Material Mat(string name, Color tint, float hazeNear, float hazeFar, float d0, float d1, float mist, float cool, float coolAmt,
-            float keyWrap = 0.7f, float keyBias = 0.15f, float keyBoost = 1f, float skyFillDir = 0f, float hazeTop = 0f, float hazeTopHeight = 0f, float fillBoost = 1f, float patch = 0f, Color? hazeTint = null)
+            float keyWrap = 0.7f, float keyBias = 0.15f, float keyBoost = 1f, float skyFillDir = 0f, float hazeTop = 0f, float hazeTopHeight = 0f, float fillBoost = 1f, float patch = 0f, Color? hazeTint = null, Texture2D tex = null, float canopy = 0f)
         {
             Shader sh = Shader.Find("SleepingCalamity/Backdrop") ?? Shader.Find("Universal Render Pipeline/Lit");
             BuilderUtil.EnsureFolder(MaterialsFolder);
             Material m = LookTestBuilder.Ensure(MaterialsFolder + "/" + name + ".mat", sh);
-            m.SetTexture("_BaseMap", Texture2D.whiteTexture);
+            m.SetTexture("_BaseMap", tex != null ? tex : Texture2D.whiteTexture);
             m.SetColor("_BaseColor", tint);
+            m.SetFloat("_Canopy", canopy); m.SetFloat("_CanopyGain", 1.65f);
             m.SetFloat("_HazeNear", hazeNear); m.SetFloat("_HazeFar", hazeFar); m.SetFloat("_DistNear", d0); m.SetFloat("_DistFar", d1);
             m.SetColor("_HazeTint", hazeTint ?? new Color(0.98f, 1.0f, 1.03f)); m.SetFloat("_Patch", patch);
             m.SetFloat("_GroundMist", mist); m.SetFloat("_MistTop", -8f); m.SetFloat("_MistScale", 40f);

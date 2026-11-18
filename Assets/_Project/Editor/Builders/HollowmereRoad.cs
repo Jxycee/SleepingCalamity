@@ -382,6 +382,7 @@ namespace SleepingCalamity.EditorTools
                 + 18f * (Mathf.PerlinNoise(x * 0.0035f + 17.3f, z * 0.0035f + 4.1f) - 0.5f)
                 + 6f * (Mathf.PerlinNoise(x * 0.011f + 3.7f, z * 0.011f + 29.9f) - 0.5f);
             hills += HollowmereLayout.BackHill(x, z);   // area 1 rework: Bell Hill carries on past the terrain's north edge to its crest
+            hills = HollowmereBackdrop.ApplyGap(hills, x, z);   // T22: the Saltwake notch, a low plain along the road's bearing so the low cameras see down to the estuary
             float k = Smooth(10f, 260f, dOut);
             return Mathf.Lerp(near, hills, k);
         }
@@ -435,8 +436,12 @@ namespace SleepingCalamity.EditorTools
             RoadRibbon(ring, t);
             // the mid hill ridge and the far ridge: annuli rising out of the ring's edge (their feet tucked under the layer in front)
             // Area 1 rework: both ridges roughly doubled (peak 45 -> 95, 150 -> 290) so the valley has walls: they stood 2-4 degrees over the horizon, a flat line from the square.
-            Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 768, 95f, 105f, 12f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
-            Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 768, 290f, 200f, 30f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
+            // T22: the two annuli are replaced by the heightfield layers of HollowmereBackdrop (Annulus stays for a quick revert: set HollowmereBackdropTuning.Terrain false and call it again)
+            if (!HollowmereBackdropTuning.Terrain)
+            {
+                Annulus(ring, "MidHills", 560f, 1150f, 1500f, 22, 768, 95f, 105f, 12f, Backdrop("M_RD_MidHills", null, new Color(0.21f, 0.29f, 0.13f), MidHaze, false));
+                Annulus(ring, "FarRidge", 1350f, 2300f, 2650f, 16, 768, 290f, 200f, 30f, Backdrop("M_RD_FarRidge", null, new Color(0.22f, 0.28f, 0.27f), FarHaze, false));
+            }
             HollowmereBackdrop.Build(ring);   // A12/C3: ragged ridge layers, the Mawrrow mountain, a ruined windmill, a far lighthouse (HollowmereBackdrop.cs)
         }
 

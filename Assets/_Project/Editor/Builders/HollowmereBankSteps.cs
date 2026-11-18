@@ -43,6 +43,8 @@ namespace SleepingCalamity.EditorTools
             else { tris.Add(i0); tris.Add(i0 + 2); tris.Add(i0 + 1); tris.Add(i0); tris.Add(i0 + 3); tris.Add(i0 + 2); }
         }
 
+        internal static bool BankStepsOn = false;   // T22: shelves off by default (T13 milestone judges rejected them twice)
+
         // Returns the number of step segments built.
         static int BuildBankSteps(Transform set, TownLayout t)
         {

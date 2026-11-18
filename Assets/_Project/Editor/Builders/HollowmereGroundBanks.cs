@@ -13,7 +13,8 @@ namespace SleepingCalamity.EditorTools
         {
             T = t; counts.Clear();
             Physics.SyncTransforms();
-            int stepN = BuildBankSteps(set, t);   // T13b: the soil steps first, the rocks and roots sit on them
+            // T22 (controller, 2026-11-18): the soil shelves are off. The T13 milestone judges rejected them (blocky dark slab risers, green strip blocks slicing into the bank); flip BankStepsOn to bring them back.
+            int stepN = BankStepsOn ? BuildBankSteps(set, t) : 0;
             Transform root = Sub(Sub(ruined, "BellYard"), "T13Banks");
             Transform props = Sub(root, "Props"), flora = Sub(root, "Flora");
             string[] rocks = { "T20a", "T20b", "T20c", "T20d", "T20e", "T20f", "T20g", "T20h" };

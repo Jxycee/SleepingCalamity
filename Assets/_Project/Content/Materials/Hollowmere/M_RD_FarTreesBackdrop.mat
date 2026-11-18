@@ -31,6 +31,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _AlphaClip: 1
+    - _Canopy: 0
+    - _CanopyGain: 1.65
     - _Cull: 0
     - _Cutoff: 0.5
     - _DistFar: 700

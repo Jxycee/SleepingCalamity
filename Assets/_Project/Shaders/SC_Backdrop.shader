@@ -33,6 +33,9 @@ Shader "SleepingCalamity/Backdrop"
         _HazeTopHeight ("Height (world y) where that reduction is full (0 = off)", Float) = 0
         // T11: world-XZ colour patchwork (dark wood patches, sunlit field patches, fine tree grain) so a hill band is not one flat painted green. 0 = off (the old look).
         _Patch ("Patchwork strength (0 = off)", Range(0, 1)) = 0
+        // T22: forest crown texture on the terrain shells: _BaseMap is multiplied (x _CanopyGain) into the vertex-colour albedo where the mesh's second UV x (forest share) is high. 0 = off.
+        _Canopy ("Canopy texture on (0/1)", Range(0, 1)) = 0
+        _CanopyGain ("Canopy gain", Range(0.5, 3)) = 1.65
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha clip", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
@@ -58,6 +61,7 @@ Shader "SleepingCalamity/Backdrop"
             half _KeyWrap, _KeyBias, _KeyBoost, _SkyFillDir, _FillBoost, _HazeTop;
             float _HazeTopHeight;
             half _Patch;
+            half _Canopy, _CanopyGain;
             half _AlphaClip, _Cull;
         CBUFFER_END
         ENDHLSL
@@ -74,8 +78,8 @@ Shader "SleepingCalamity/Backdrop"
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; half4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
-            struct Varyings { float4 positionCS : SV_POSITION; half4 color : COLOR0; float2 uv : TEXCOORD0; float3 positionWS : TEXCOORD1; float3 normalWS : TEXCOORD2; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; float2 uv1 : TEXCOORD1; half4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Varyings { float4 positionCS : SV_POSITION; half4 color : COLOR0; float2 uv : TEXCOORD0; float3 positionWS : TEXCOORD1; float3 normalWS : TEXCOORD2; float mask : TEXCOORD3; UNITY_VERTEX_INPUT_INSTANCE_ID };
 
             float _SC_BackdropDebug;
             float Hash21(float2 p) { p = frac(p * float2(123.34, 456.21)); p += dot(p, p + 45.32); return frac(p.x * p.y); }
@@ -94,6 +98,7 @@ Shader "SleepingCalamity/Backdrop"
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.normalWS = TransformObjectToWorldNormal(i.normalOS);
                 o.uv = TRANSFORM_TEX(i.uv, _BaseMap);
+                o.mask = i.uv1.x;
                 o.color = i.color;   // vertex colour: rgb multiplies the tint (strata, lit/shade bake), alpha < 1 adds haze (foot fade); meshes without colours read white
                 return o;
             }
@@ -102,6 +107,7 @@ Shader "SleepingCalamity/Backdrop"
             {
                 UNITY_SETUP_INSTANCE_ID(i);
                 half4 c = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv) * _BaseColor;
+                if (_Canopy > 0.5) c.rgb = _BaseColor.rgb * lerp(half3(1, 1, 1), SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).rgb * _CanopyGain, saturate(i.mask));
                 #if defined(_ALPHATEST_ON)
                 clip(c.a - _Cutoff);
                 #endif
