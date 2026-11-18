@@ -16,17 +16,18 @@ Process was crowding out the game (2026-11-11 audit): about 2,075 commits in 13 
 - In every new worktree run `git lfs checkout` first: a fresh worktree holds LFS pointer stubs and the first Unity run fails on texture import (cost the Q12 baseline run).
 - Run subagents in their own git worktree, so the controller checkout stays clean and the stop hook doesn't loop on uncommitted changes.
 - Read files by grep and line range, never whole. Read long Unity logs through a subagent summary.
+- STATUS rows are a commit hash plus one line; verdict prose goes to a dated file opened on demand (user, 2026-11-18).
 - STATUS files change only when the state changes (started, blocked, waiting on the user, done), and the change goes into the next real commit. A state that stops the session (blocked, waiting on the user, done, `Archive: ready`) is pushed right away as part of the session's last push, because no later commit will carry it. Progress in between goes to the board profile.
 - Report status through the session board, not by message: `board` action `profile` (state, tip, check, next, waitingOn, holdsPort, needs). A message to the coordinator starts a turn on its large context. Message only when a decision is needed.
 - Every subagent report starts a turn on the session's whole context (plan 3, 2026-11-04: ~2,650 messages, a big Sonnet turn per "task N done"). So give each implementer run 2-3 related plan tasks with one report, and don't take a turn just to say "still waiting".
-- Context handoff (user). At about 250k tokens of context (local: `get_usage` self; cloud: the compaction warning), hand off at the next milestone boundary, not mid-step:
+- Context handoff (user). At about 450k tokens of context (user, 2026-11-18) (local: `get_usage` self; cloud: the compaction warning), hand off at the next milestone boundary, not mid-step:
   1. Finish the current step and push your branch.
   2. Write the successor's request in `sessions/requests/` from the template in its README, with the full handoff in the brief, and set your STATUS to `Archive: ready` and `Handoff: <request file>`, in one commit.
   3. Start the successor with the launcher routine (`RemoteTrigger run trig_01Rj58EHgmhr5QziTTwy2zee`), or report "handoff request <file> pushed" to the coordinator if you can't run it.
   4. Stop. The user archives the old session.
 
 ## Captures and renders (about 25-30%)
-- Iterate with `SC_CAPTURE_ONLY=<cameras>` (only the cameras that show the change). Shoot the full capture set once, for the final sheet, when the code is final for that round.
+- Iterate with `SC_CAPTURE_ONLY=<cameras>` (only the cameras that show the change). Capture only the cameras that see the change; shoot one full set per milestone (user, 2026-11-18).
 - Before any 40-minute run, prove the risky piece with one reduced capture of the camera that shows it.
 - Cloud captures are software-rendered (about 40 minutes a set); heavy capture rounds go to a local PC session (GPU) when one is free.
 - Blender previews: 960-1000 px, about 20 samples, until the final round. Art rounds end on results, not a count (user, 2026-11-18): stop after two rounds in a row that don't win the blind A/B (`docs/art/scene-judging.md`).
@@ -36,5 +37,6 @@ Process was crowding out the game (2026-11-11 audit): about 2,075 commits in 13 
 
 ## Checks and merges (about 20%)
 - Merge origin/main, then run one `check` right before merging. Builds are deterministic since c4d19fa (two builds in a row, and graphics vs `-nographics`, write the same bytes; `Tools/cloud/sc_churn_check.sh` proves it), so a separate regenerate run is needed only when the merge conflicts in builder output (`.unity`/`.mat`): take main's side (`git checkout --theirs`), run one `build`, commit, then `check`. Never hand-merge those files.
+- Run "build twice identical" only when builder code adds randomness, time or ordering changes (builds are deterministic since c4d19fa). Run the play loop only for collider, ground or traversal changes. Intermediate pushes of a long branch may use `SC_GATE_SKIP=1`; the gate binds on the tip that will merge, with one `check` before the merge (user, 2026-11-18).
 - Once the tip has a passing `check` (`SC MARKER` equals the tip), merge that tip into a fresh `origin/main` directly if git merges it cleanly, even if main moved since the check (user, 2026-11-01: re-check loops stalled everything). No merging main into the branch again and no second check. If git can't merge it cleanly, merge main into the branch, resolve, and check the new tip.
 - Graphics capture runs now write the same material and scene bytes as `-nographics` builds (BuildAll settles every material with URP's ShaderGUI validation; `MaterialValidationTests` fails on any material a graphics editor would rewrite). Verified for the graphics build and the DungeonCorner capture; Hollowmere and BeautyCorner captures were not re-run (Hollowmere OOMs in the cloud). If a capture still leaves `.mat`/`.unity` changes, don't commit them: run one `build` and report the file to the coordinator as a churn bug.

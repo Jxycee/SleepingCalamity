@@ -17,13 +17,13 @@ The facts behind them:
 ## Applying the budgets
 **Texture size (user, 2026-10-30, widened 2026-11-18): 2048 px is the default for a 1440p target. A few large surfaces seen up close (terrain blend, church facade, fountain, hero props) may use 4K, case by case, when a capture shows 2K blurring.**
 
-| Tier | Budget (PHASE1 3.3) | Judge it as |
+| Tier | Budget guide (PHASE1 3.3; a guide, not a cap) | Judge it as |
 |---|---|---|
 | T1 tileable / trim | 2K shared sets; 1024 px/m (ground, walls up to 3 m), 512 px/m (upper storeys, roofs, vault crowns) | texel density on the kit pieces that use it |
 | T2 kit piece | 0.5-5k tris, shared textures | per piece, and per metre of run against its kit neighbours |
 | T3 instanced piece | 50-400 tris each, one 2K set per family | per variant; the family's atlas is the texture cost |
 | T4 hero prop | 30-60k tris, up to 2 x 2K | per prop |
-| Whole building (kit + heroes) | at most 75k tris; 6x2K + 2x1K | summed over every piece that belongs to it |
+| Whole building (kit + heroes) | guide about 75k tris; 6x2K + 2x1K | summed over every piece that belongs to it |
 | Hero character / enemy | 60k, 2K body + 2K head / 25k, one 2K set | per character |
 
 - `Art/Blender/tools/sc_asset_audit.py` (rewritten M8) reports tris, surface area, density, UV texel density against these budgets, colour attributes and bounds per object, and FAILs only on triangles and material slots. Report its numbers; the table above is the judge.

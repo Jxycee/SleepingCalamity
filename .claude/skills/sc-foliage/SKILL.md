@@ -43,7 +43,7 @@ A bush built like a tree (lobes only at the stem tips) reads as a lollipop on st
 Prefer **shader wind**: vertex offset by height times a world-space sine, card tips more than the trunk. It costs no bones and no animation import and stays in sync for all clients. The project has no wind yet; treat it as a design task.
 
 ## Budgets
-PHASE1 3.3 has no foliage row yet (B9 is tier T2/T3). Size a scattered kind like a T3 piece (50-400 tris, one shared set per family), and the orchard tree against the hero props around it; state the number in the header and ask the controller if it runs high.
+PHASE1 3.3 has no foliage row yet (B9 is tier T2/T3). Size a scattered kind like a T3 piece (50-400 tris, one shared set per family), and the orchard tree against the hero props around it; state the number in the header. The per-camera budget binds (visible tris and GPU cost at the eye cameras, `sc-asset-budget`), not the per-kind guide (user, 2026-11-18).
 
 ## Review
 sc-asset-review, with these foliage checks:
