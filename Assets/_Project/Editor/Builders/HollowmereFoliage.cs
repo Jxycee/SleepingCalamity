@@ -176,7 +176,7 @@ namespace SleepingCalamity.EditorTools
         // ------------------------------------------------------------------------------------------------ 1. terrain grass
         // Prototype layout: 0-4 the original grass and rosette (inside the town wall, unchanged); 5-7 the old tall clumps as small accents (outside); 8-16 the fine carpet
         // (mesh A/B/C x tint dark/mid/dry); 17 dandelion (N06), 18 meadow spike (N07).
-        const int ProtoAccent = 5, ProtoFine = 8, ProtoDandelion = 17, ProtoSpike = 18, ProtoCount = 19;
+        const int ProtoAccent = 5, ProtoFine = 8, ProtoDandelion = 17, ProtoSpike = 18, ProtoBank = 19, ProtoCount = 25;   // T13b: ProtoBank..+5 = the scanned bank plants (BankPlants)
         const float FineM2 = 8.5f;   // fine clumps per m2 across the open ground outside the wall (about 0.6 m clumps overlap into a carpet)
         const string NatureRoot = "Assets/_Project/Content/Art/Town/Adopted/", NatureMats = "Assets/_Project/Content/Materials/B1/";
         static readonly string[] TintNames = { "Dark", "Mid", "Dry" };
@@ -295,6 +295,13 @@ namespace SleepingCalamity.EditorTools
                 protos[ProtoDandelion + f] = Proto(DetailPrefabOf(mf.sharedMesh, fm, code + "_Flower"), flowerSize[f][0], flowerSize[f][1], flowerSize[f][0], flowerSize[f][1], 601 + f * 17);
                 protoTris[ProtoDandelion + f] = Tris(mf.sharedMesh);
             }
+            for (int b = 0; b < BankPlants.Length; b++)
+            {
+                GameObject bp = BankDetailPrefab(BankPlants[b].code, BankPlants[b].height);
+                if (bp == null) throw new InvalidOperationException("bank plant prefab missing: " + BankPlants[b].code);
+                protos[ProtoBank + b] = Proto(bp, 0.8f, 1.35f, 0.8f, 1.35f, 701 + b * 19);
+                protoTris[ProtoBank + b] = 300;
+            }
             data.SetDetailResolution(DetailRes, DetailPatch);
             data.detailPrototypes = protos;
             data.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
@@ -366,6 +373,7 @@ namespace SleepingCalamity.EditorTools
                     { layers[4][cy, cx] = 1; counts[4]++; placed = true; }
                     if (placed) { spots.Add(new Vector3(x, AvgGrassTris, z)); grassClumps++; }
                 }
+            BankPass(t, data, nearCobble, layers, counts, spots);
             for (int i = 0; i < layers.Length; i++) data.SetDetailLayer(0, 0, i, layers[i]);
             EditorUtility.SetDirty(data);
             AssetDatabase.SaveAssets();
@@ -379,6 +387,109 @@ namespace SleepingCalamity.EditorTools
         }
 
         static int carpetClumps;
+
+        // ------------------------------------------------------------------------------------------------ T13b earth banks
+        // Rule 3 (earth banks are broken up): a slope is not one soil plane. On every steep cell (24 degrees and up) of the keep banks, the crag and the hill's west face the
+        // grass layer's own cover is replaced by contour bands (the height, bent by two noise octaves): inside a band dense fine carpet, tall accents, scanned ferns and wild
+        // grass, between the bands bare soil steps with a few rosettes and ferns. Terrain details cost almost no scene bytes, unlike the same plants as objects.
+        static readonly (string code, float height)[] BankPlants = { ("T21l", 0.75f), ("T12b", 0.65f), ("T21n", 0.55f), ("T21m", 0.5f), ("T21e", 0.4f), ("T21f", 0.4f) };
+        public static float BankSteepMin = 24f;
+
+        // Contour band weight 0..1 at a point: the band index follows the terrain height, so the bands run along the slope's contours; two noise octaves bend and break them.
+        public static float BankBand(float x, float y, float z)
+        {
+            float ph = y / 1.15f + 0.95f * Mathf.PerlinNoise(x * 0.09f + 41f, z * 0.09f + 7f) + 0.30f * Mathf.PerlinNoise(x * 0.55f + 3f, z * 0.55f + 19f);
+            float f = ph - Mathf.Floor(ph);
+            float w = Smooth(0.02f, 0.14f, f) * (1f - Smooth(0.46f, 0.62f, f));
+            float gap = Smooth(0.45f, 0.62f, Mathf.PerlinNoise(x * 0.31f + 90f, z * 0.31f + 33f));   // ragged holes in a band
+            return w * (1f - 0.55f * gap);
+        }
+
+        static void BankPass(TownLayout t, TerrainData data, bool[,] nearCobble, int[][,] layers, int[] counts, List<Vector3> spots)
+        {
+            float cell = HollowmereTerrain.Size.x / DetailRes;
+            int sr = data.alphamapResolution, n = 0;
+            int x0 = Mathf.Max(0, (int)((-46f - HollowmereTerrain.Origin.x) / cell)), x1 = Mathf.Min(DetailRes - 1, (int)((46f - HollowmereTerrain.Origin.x) / cell));
+            int y0 = Mathf.Max(0, (int)((15f - HollowmereTerrain.Origin.z) / cell)), y1 = Mathf.Min(DetailRes - 1, (int)((50f - HollowmereTerrain.Origin.z) / cell));
+            for (int cy = y0; cy <= y1; cy++)
+                for (int cx = x0; cx <= x1; cx++)
+                {
+                    float u = (cx + 0.5f) / DetailRes, v = (cy + 0.5f) / DetailRes;
+                    float x = HollowmereTerrain.Origin.x + u * HollowmereTerrain.Size.x, z = HollowmereTerrain.Origin.z + v * HollowmereTerrain.Size.z;
+                    if (data.GetSteepness(u, v) < BankSteepMin || HollowmereOrchard.Tended(x, z)) continue;
+                    int sx = Mathf.Min(sr - 1, (int)(u * sr)), sy = Mathf.Min(sr - 1, (int)(v * sr));
+                    if (nearCobble[sy, sx] || HollowmereRevetment.Covers(x, z, 0.1f) || HollowmereTerrain.IsPaved(t, x, z)) continue;
+                    var pt = new TownPoint(x, z); bool blocked = false;
+                    foreach (Foundation f in t.Foundations) if (f.Footprint.Contains(pt, 0.3f)) { blocked = true; break; }
+                    if (blocked) continue;
+                    foreach (Landmark l in t.Landmarks) if (l.Footprint.Contains(pt, 0.3f)) { blocked = true; break; }
+                    if (blocked || InSquare(x, z, 0.6f)) continue;
+                    for (int i = 0; i < layers.Length; i++) if (layers[i][cy, cx] != 0) { counts[i] -= layers[i][cy, cx]; layers[i][cy, cx] = 0; }
+                    float y = data.GetInterpolatedHeight(u, v) + HollowmereTerrain.Origin.y;
+                    float band = BankBand(x, y, z);
+                    uint h = Hash((uint)cx * 3u + 11u, (uint)cy * 5u + 17u), h2 = Hash((uint)cy * 7u + 3u, (uint)cx * 13u + 29u);
+                    float r = (h & 0xFFFFFF) / (float)0x1000000, r2 = (h2 & 0xFFFFFF) / (float)0x1000000;
+                    int proto = -1, cnt = 1;
+                    if (r < 0.97f * band)
+                    {
+                        float q = r2;
+                        if (q < 0.09f) proto = ProtoBank + (q < 0.045f ? 0 : 1);                      // ferns
+                        else if (q < 0.19f) proto = ProtoBank + 2 + (int)((h >> 24) % 4u);           // wild grass, herb robert, plantain
+                        else if (q < 0.30f) proto = ProtoAccent + (int)PickProto(h >> 24);            // tall spiky accent
+                        else
+                        {
+                            int m = (int)((h >> 24) % 3u);
+                            float tn = 0.5f * Mathf.PerlinNoise(x * 0.17f + 70f, z * 0.17f + 20f) + 0.5f * (((h2 >> 8) & 0xFFFFu) / 65535f);
+                            proto = ProtoFine + m * 3 + (tn < 0.38f ? 0 : tn < 0.62f ? 1 : 2);
+                            cnt = band > 0.6f ? 2 : 1;
+                        }
+                    }
+                    else if (r2 < 0.045f) proto = ProtoBank + (r2 < 0.02f ? 0 : 1);
+                    else if (r2 < 0.10f) proto = 4;                                                    // clover rosette on the soil step
+                    else if (r2 < 0.125f) proto = ProtoBank + 4 + (int)((h >> 24) & 1u);
+                    if (proto < 0) continue;
+                    layers[proto][cy, cx] = cnt; counts[proto] += cnt; n++;
+                    if (spots != null) spots.Add(new Vector3(x, 250f, z));
+                }
+            Debug.Log("SC HOLLOWMERE bank detail (T13b): cells dressed " + n + " of region " + ((x1 - x0 + 1) * (y1 - y0 + 1)));
+        }
+
+        // A bank plant as a detail prototype: the prefab's LOD0 meshes baked into one mesh in the prefab root's frame, standing on y 0 and centred, scaled to a target height.
+        static GameObject BankDetailPrefab(string code, float height)
+        {
+            GameObject src = AssetDatabase.LoadAssetAtPath<GameObject>(NatureRoot + code + "/" + code + ".prefab");
+            if (src == null) return null;
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(src);
+            try
+            {
+                inst.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity); inst.transform.localScale = Vector3.one;
+                var lod = inst.GetComponentInChildren<LODGroup>(true);
+                var rends = new List<MeshRenderer>();
+                if (lod != null && lod.GetLODs().Length > 0) foreach (Renderer rr in lod.GetLODs()[0].renderers) { if (rr is MeshRenderer mr0) rends.Add(mr0); }
+                if (rends.Count == 0) { var first = inst.GetComponentInChildren<MeshRenderer>(true); if (first != null) rends.Add(first); }
+                if (rends.Count == 0) return null;
+                var combine = new List<CombineInstance>();
+                foreach (MeshRenderer r in rends)
+                {
+                    MeshFilter mf = r.GetComponent<MeshFilter>(); if (mf == null || mf.sharedMesh == null) continue;
+                    combine.Add(new CombineInstance { mesh = mf.sharedMesh, subMeshIndex = 0, transform = mf.transform.localToWorldMatrix });
+                }
+                Material material = rends[0].sharedMaterial;
+                var mesh = new Mesh { name = "DetailMesh_" + code };
+                mesh.CombineMeshes(combine.ToArray(), true, true);
+                Bounds b = mesh.bounds;
+                float k = height / Mathf.Max(0.05f, b.size.y);
+                Vector3[] vs = mesh.vertices;
+                for (int i = 0; i < vs.Length; i++) vs[i] = new Vector3((vs[i].x - b.center.x) * k, (vs[i].y - b.min.y) * k, (vs[i].z - b.center.z) * k);
+                mesh.vertices = vs; mesh.RecalculateBounds();
+                string meshPath = HollowmereTerrain.Folder + "/DetailMesh_" + code + ".asset";
+                if (AssetDatabase.LoadAssetAtPath<Mesh>(meshPath) != null) AssetDatabase.DeleteAsset(meshPath);
+                AssetDatabase.CreateAsset(mesh, meshPath);
+                material.enableInstancing = true; EditorUtility.SetDirty(material); AssetDatabase.SaveAssetIfDirty(material);
+                return DetailPrefabOf(AssetDatabase.LoadAssetAtPath<Mesh>(meshPath), material, "Bank_" + code);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(inst); }
+        }
 
         // The fine carpet, accents and flowers outside the town wall and on the hill floor. Returns the prototype index for this 0.29 m cell, or -1 for none.
         // Density mask: no grass where the splat has cobble, lanes, doorsteps, the road's walking line, the jetty or under water; bare earth patches come from the splat

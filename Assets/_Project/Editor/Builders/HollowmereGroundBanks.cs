@@ -13,6 +13,7 @@ namespace SleepingCalamity.EditorTools
         {
             T = t; counts.Clear();
             Physics.SyncTransforms();
+            int stepN = BuildBankSteps(set, t);   // T13b: the soil steps first, the rocks and roots sit on them
             Transform root = Sub(Sub(ruined, "BellYard"), "T13Banks");
             Transform props = Sub(root, "Props"), flora = Sub(root, "Flora");
             string[] rocks = { "T20a", "T20b", "T20c", "T20d", "T20e", "T20f", "T20g", "T20h" };
@@ -21,21 +22,21 @@ namespace SleepingCalamity.EditorTools
             // outcrop clusters: (centre x, z, spread) per bank / contour; each cluster = one big rock, one or two mediums, scree, a fern ring on the downslope side
             var sites = new System.Collections.Generic.List<(Vector2 c, float down)>();   // down = yaw of the downslope direction
             foreach (int side in new[] { -1, 1 })
-                for (int i = 0; i < 6; i++)
-                    sites.Add((new Vector2(side * Mathf.Lerp(23.6f, 30.6f, H(i, 1, 1700 + side)), Mathf.Lerp(20.4f, 31.4f, (i + H(i, 2, 1700 + side)) / 6f)), side > 0 ? 90f : 270f));
-            for (int i = 0; i < 22; i++)
-                sites.Add((new Vector2(Mathf.Lerp(-27f, 27f, (i + H(i, 3, 1710)) / 22f), Mathf.Lerp(34.6f, 44f, H(i, 4, 1710))), 180f));
+                for (int i = 0; i < 9; i++)
+                    sites.Add((new Vector2(side * Mathf.Lerp(23.6f, 30.6f, H(i, 1, 1700 + side)), Mathf.Lerp(20.4f, 31.4f, (i + H(i, 2, 1700 + side)) / 9f)), side > 0 ? 90f : 270f));
+            for (int i = 0; i < 30; i++)
+                sites.Add((new Vector2(Mathf.Lerp(-27f, 27f, (i + H(i, 3, 1710)) / 30f), Mathf.Lerp(34.6f, 44f, H(i, 4, 1710))), 180f));
             int si = 0;
             foreach (var (c, down) in sites)
             {
                 float yaw0 = H(si, 5, 1720) * 360f;
                 Vector2 pBig = c;
-                if (OkBank(pBig, 0.9f) && PutSlopeDim(props, rocks[(int)(H(si, 6, 1720) * rocks.Length) % rocks.Length], "T13Outcrop_" + si, pBig, Mathf.Lerp(1.5f, 2.4f, H(si, 7, 1720)), yaw0, (H(si, 8, 1720) - 0.5f) * 10f, (H(si, 9, 1720) - 0.5f) * 10f, Mathf.Lerp(0.35f, 0.5f, H(si, 10, 1720))) != null) rockN++;
-                for (int k = 0; k < 1; k++)
+                if (OkBank(pBig, 0.9f) && PutSlopeDim(props, rocks[(int)(H(si, 6, 1720) * rocks.Length) % rocks.Length], "T13Outcrop_" + si, pBig, Mathf.Lerp(2.4f, 4.4f, H(si, 7, 1720)), yaw0, (H(si, 8, 1720) - 0.5f) * 10f, (H(si, 9, 1720) - 0.5f) * 10f, Mathf.Lerp(0.35f, 0.5f, H(si, 10, 1720))) != null) rockN++;
+                for (int k = 0; k < 2; k++)
                 {
                     float a = (yaw0 + 140f * k + 60f * H(si, 11 + k, 1720)) * Mathf.Deg2Rad;
                     Vector2 q = c + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Mathf.Lerp(1.0f, 1.7f, H(si, 13 + k, 1720));
-                    if (OkBank(q, 0.5f) && PutSlopeDim(props, rocks[(int)(H(si, 15 + k, 1720) * rocks.Length) % rocks.Length], "T13OutcropB_" + si + "_" + k, q, Mathf.Lerp(0.6f, 1.1f, H(si, 17 + k, 1720)), H(si, 19 + k, 1720) * 360f, 0f, 0f, 0.4f) != null) rockN++;
+                    if (OkBank(q, 0.5f) && PutSlopeDim(props, rocks[(int)(H(si, 15 + k, 1720) * rocks.Length) % rocks.Length], "T13OutcropB_" + si + "_" + k, q, Mathf.Lerp(1.0f, 1.9f, H(si, 17 + k, 1720)), H(si, 19 + k, 1720) * 360f, 0f, 0f, 0.4f) != null) rockN++;
                 }
                 for (int k = 0; k < 5; k++)
                 {
@@ -69,7 +70,7 @@ namespace SleepingCalamity.EditorTools
                 Vector2 p = i < 8 ? new Vector2(Mathf.Lerp(-25f, 25f, (i + H(i, 50, 1750)) / 8f), Mathf.Lerp(35f, 43f, H(i, 51, 1750))) : new Vector2(((i & 1) == 0 ? -1 : 1) * Mathf.Lerp(24f, 30f, H(i, 52, 1750)), Mathf.Lerp(21f, 30f, H(i, 53, 1750)));
                 if (OkBank(p, 0.5f) && PutNat(props, i % 3 == 0 ? "T20p" : i % 3 == 1 ? "T20o" : "T20q", "T13Root_" + i, p, TY(p), Mathf.Lerp(0.9f, 1.3f, H(i, 54, 1750)), i < 8 ? 90f + (H(i, 55, 1750) - 0.5f) * 40f : 0f + (H(i, 55, 1750) - 0.5f) * 40f, 0f, 0f, 0.12f) != null) rootN++;
             }
-            Debug.Log("SC HOLLOWMERE banks (T13a): outcrop rocks " + rockN + ", plants at the rocks " + plantN + ", band plants " + bandN + ", roots " + rootN);
+            Debug.Log("SC HOLLOWMERE banks (T13a/b): soil steps " + stepN + ", outcrop rocks " + rockN + ", plants at the rocks " + plantN + ", band plants " + bandN + ", roots " + rootN);
         }
     }
 }

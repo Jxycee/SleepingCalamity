@@ -23,6 +23,10 @@ namespace SleepingCalamity.EditorTools
         };
         static readonly string[] Plants = { "Weed_A", "Weed_B", "Weed_C", "Weed_D", "Weed_E", "Grass_A", "Grass_B", "Grass_C" };
         const float LoneRadius = 1.9f;
+        const float EyeClear = 3.6f;   // T13b: no prop stands within 3.6 m of an eye camera (3 m asked: the bottom of a 60 degree frame sees the ground from 2.9 m out)
+        static List<Vector2> eyeXZ;
+        static bool NearEyeR(Vector2 p, float r) { foreach (Vector2 e in eyeXZ) if (Vector2.Distance(e, p) < r) return true; return false; }
+        static bool NearEye(Vector2 p) { foreach (Vector2 e in eyeXZ) if (Vector2.Distance(e, p) < EyeClear) return true; return false; }
         static Material aoMat;
         static readonly List<(Vector3 P, float W, float Yaw)> rings = new List<(Vector3, float, float)>();
         static int nRemoved, nGrouped, nCompanions, nStallGoods, nRings, nTufts, nChips;
@@ -48,10 +52,14 @@ namespace SleepingCalamity.EditorTools
             }
             foreach (Landmark l in t.Landmarks) fixedPts.Add(new Vector2(l.Footprint.Centre.X, l.Footprint.Centre.Z));
             var centres = cluster.Select(CentreOf).ToList();
-            var alive = new List<GameObject>(cluster);
+            eyeXZ = HollowmereBuilder.Cameras.Where(c => c.Name.StartsWith("Cap_HM_Eye_", System.StringComparison.Ordinal)).Select(c => new Vector2(c.Pos.x, c.Pos.z)).ToList();
+            int nEye = 0;
+            for (int i = 0; i < cluster.Count; i++) if (NearEye(centres[i])) { Object.DestroyImmediate(cluster[i]); cluster[i] = null; nEye++; }
+            var alive = new List<GameObject>(cluster.Where(g => g != null));
             for (int i = 0; i < cluster.Count; i++)
             {
                 GameObject go = cluster[i]; Vector2 c = centres[i];
+                if (go == null) continue;
                 bool lone = true;
                 for (int j = 0; j < cluster.Count && lone; j++) if (j != i && cluster[j] != null && Vector2.Distance(c, centres[j]) < LoneRadius) lone = false;
                 for (int j = 0; j < fixedPts.Count && lone; j++) if (Vector2.Distance(c, fixedPts[j]) < LoneRadius + 0.6f) lone = false;
@@ -65,6 +73,7 @@ namespace SleepingCalamity.EditorTools
                     float a = (k * 0.7f + HollowmereStreets.H(seed, k, 301)) * Mathf.PI * 0.62f, r = 0.65f + 0.5f * HollowmereStreets.H(seed, k, 302);
                     Vector2 q = c + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
                     string ck = companions[(k + made) % companions.Length];
+                    if (NearEye(q)) continue;
                     GameObject comp = HollowmereStreetClutter.PlaceKind(parent, ck, ck + "_g" + (seed % 1000) + "_" + k, q, seed, k + 50);
                     if (comp == null) continue;
                     alive.Add(comp); made++; nCompanions++;
@@ -85,6 +94,7 @@ namespace SleepingCalamity.EditorTools
                     {
                         float lz = (attempt - 2) * 0.35f, lx = sg * (l.Footprint.HalfX + 0.85f + 0.15f * attempt);
                         TownPoint wp = l.Footprint.ToWorld(lx, lz); var anchor = new Vector2(wp.X, wp.Z);
+                        if (NearEye(anchor)) { made = 1; break; }
                         for (int k = 0; k < heaps[side].Length; k++)
                         {
                             float a = k * 1.57f + HollowmereStreets.H(sk, side * 10 + k, 311) * 1.2f, rr = k == 0 ? 0f : 0.5f + 0.35f * HollowmereStreets.H(sk, side * 10 + k, 312);
@@ -103,6 +113,11 @@ namespace SleepingCalamity.EditorTools
                 if (decoByName.TryGetValue(gone, out Transform gt)) { Object.DestroyImmediate(gt.gameObject); decoByName.Remove(gone); nRemoved++; }
             foreach (string key in decoByName.Keys.Where(k => k.Contains("Drop_") && k.Contains("Sack")).ToList())   // the slumped sack pieces read as giant gourds in the open middle (Postcard): the crates and baskets of each group stay
             { Object.DestroyImmediate(decoByName[key].gameObject); decoByName.Remove(key); nRemoved++; }
+            foreach (string key in decoByName.Keys.Where(k => !k.StartsWith("AO_") && NearEyeR(new Vector2(decoByName[k].position.x, decoByName[k].position.z), 4.9f)).ToList())   // T13b: the dressing rows near an eye camera go, their ContactAO quads with them
+            {
+                if (decoByName.TryGetValue("AO_" + key, out Transform aoGone)) { Object.DestroyImmediate(aoGone.gameObject); decoByName.Remove("AO_" + key); }
+                Object.DestroyImmediate(decoByName[key].gameObject); decoByName.Remove(key); nEye++;
+            }
             var dropGroups = decoByName.Keys.Where(k => k.StartsWith("Deco_Drop_")).GroupBy(k => k.Split('_')[2]).ToList();
             foreach (var grpKeys in dropGroups)
             {
@@ -123,7 +138,7 @@ namespace SleepingCalamity.EditorTools
             foreach (GameObject go in alive) { if (go == null) continue; Contact(grp, go, go.name.Split('_')[0], HollowmereStreets.StableHash(go.name), gi++); }
             BakeRings(grp);
             Debug.Log("SC HOLLOWMERE ground (T13a): street props " + cluster.Count + ", lone props grouped " + nGrouped + " (companions " + nCompanions + "), removed " + nRemoved + ", stall goods " + nStallGoods
-                + ", contact rings " + nRings + ", tufts " + nTufts + ", chips " + nChips);
+                + ", near-eye removed " + nEye + ", contact rings " + nRings + ", tufts " + nTufts + ", chips " + nChips);
         }
 
         // The contact rings of a 12 m cell are one mesh (a quad each): a ring object is 2.5 KB of scene text and the alpha-blended material keeps HollowmereCombine from merging them.

@@ -59,6 +59,11 @@ namespace SleepingCalamity.EditorTools
             float grime = 0.36f * edge * Mathf.Lerp(0.5f, 1f, n2) * (1f - 0.7f * line) + 0.10f * Smooth(0.45f, 0.82f, n2) * (1f - line) + 0.30f * low + 0.10f * line * Mathf.Lerp(0.5f, 1f, n1);
             float moss = 0.50f * edge * Smooth(0.34f, 0.68f, n1) * (1f - line) + 0.30f * Smooth(0.64f, 0.84f, n3) * (1f - line) * (0.4f + 0.6f * edge);
             float polish = 0.62f * line * Mathf.Lerp(0.55f, 1f, n2);
+            // T13b: the macro variation R15 had (a damp, mossy patch several metres across, a dry pale one beside it) back on top of the wear: two very low frequencies, off the walking lines
+            float damp = Smooth(0.46f, 0.70f, Mathf.PerlinNoise(x * 0.085f + 150f, z * 0.085f + 21f)), dry = Smooth(0.58f, 0.80f, Mathf.PerlinNoise(x * 0.07f + 8f, z * 0.07f + 230f));
+            grime += 0.34f * damp * (1f - 0.6f * line) - 0.10f * dry;
+            moss += 0.55f * damp * Smooth(0.3f, 0.6f, n1) * (1f - 0.8f * line);
+            polish *= 1f - 0.35f * damp;
             return new Color(Mathf.Clamp01(grime), Mathf.Clamp01(moss), Mathf.Clamp01(polish), 1f);
         }
     }

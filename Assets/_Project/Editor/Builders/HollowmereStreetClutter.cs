@@ -172,6 +172,33 @@ namespace SleepingCalamity.EditorTools
 
         // T13a: a beam, post or plank of the adopted timber props (T05d plank, T06 log) instead of a scaled cube: the prop is turned so its long axis is the holder's +X, stretched to `len` and
         // thinned to `thick` (cross-section keeps its own proportions), centred on `c` in `frame`'s space and turned by `euler` (the holder's +X is the beam axis: euler z = 90 stands it up).
+        // A bell by revolving its profile (radius, height; the lip at y 0, 0.5 m tall, 0.48 m across at the lip): outside from the crown to the lip, then the inside back up.
+        static Mesh bellMesh;
+        static Mesh BellMesh()
+        {
+            if (bellMesh != null) return bellMesh;
+            Vector2[] prof = { new Vector2(0.000f, 0.500f), new Vector2(0.045f, 0.490f), new Vector2(0.080f, 0.455f), new Vector2(0.096f, 0.390f), new Vector2(0.112f, 0.310f), new Vector2(0.135f, 0.230f),
+                new Vector2(0.172f, 0.145f), new Vector2(0.215f, 0.070f), new Vector2(0.240f, 0.030f), new Vector2(0.242f, 0.004f), new Vector2(0.205f, 0.000f), new Vector2(0.195f, 0.030f), new Vector2(0.150f, 0.120f),
+                new Vector2(0.100f, 0.240f), new Vector2(0.060f, 0.340f), new Vector2(0.000f, 0.370f) };
+            const int seg = 20;
+            var vs = new List<Vector3>(); var uv = new List<Vector2>(); var tr = new List<int>();
+            for (int i = 0; i < prof.Length; i++)
+                for (int j = 0; j <= seg; j++)
+                {
+                    float a = j * Mathf.PI * 2f / seg;
+                    vs.Add(new Vector3(Mathf.Cos(a) * prof[i].x, prof[i].y, Mathf.Sin(a) * prof[i].x)); uv.Add(new Vector2((float)j / seg, prof[i].y * 2f));
+                }
+            for (int i = 0; i < prof.Length - 1; i++)
+                for (int j = 0; j < seg; j++)
+                {
+                    int a = i * (seg + 1) + j, b = a + 1, c = a + seg + 1, d = c + 1;
+                    tr.Add(a); tr.Add(b); tr.Add(c); tr.Add(b); tr.Add(d); tr.Add(c);
+                }
+            var m = new Mesh { name = "Bell_Lathe" };
+            m.SetVertices(vs); m.SetUVs(0, uv); m.SetTriangles(tr, 0); m.RecalculateNormals(); m.RecalculateBounds();
+            return bellMesh = m;
+        }
+
         internal static GameObject Timber(Transform frame, string name, Vector3 c, Vector3 euler, float len, float thick, string src = "A:T05d/T05d.prefab")
         {
             var holder = new GameObject(name).transform; holder.SetParent(frame, false);
@@ -307,9 +334,10 @@ namespace SleepingCalamity.EditorTools
                 Timber(frame, "Cross", new Vector3(0f, 2.34f, 0f), new Vector3(0f, 0f, 0f), 1.7f, 0.17f, log);
                 Timber(frame, "BraceL", new Vector3(-0.45f, 2.05f, 0f), new Vector3(0f, 0f, 130f), 0.6f, 0.09f);
                 Timber(frame, "BraceR", new Vector3(0.45f, 2.05f, 0f), new Vector3(0f, 0f, 50f), 0.6f, 0.09f);
-                GameObject bell = LookTestBuilder.Prim(frame, "Bell", PrimitiveType.Sphere, new Vector3(0.05f, 1.95f, 0f), new Vector3(0.42f, 0.46f, 0.42f), bronze);
-                bell.transform.localRotation = Quaternion.Euler(0f, 0f, 9f);
-                LookTestBuilder.Prim(frame, "BellMouth", PrimitiveType.Cylinder, new Vector3(0.04f, 1.74f, 0f), new Vector3(0.44f, 0.03f, 0.44f), bronze);
+                GameObject bell = new GameObject("Bell");   // T13b: a lathed bell (crown, shoulder, flared lip, hollow) in place of the sphere and its disc
+                bell.transform.SetParent(frame, false); bell.transform.localPosition = new Vector3(0.05f, 1.72f, 0f); bell.transform.localRotation = Quaternion.Euler(0f, 0f, 7f);
+                bell.AddComponent<MeshFilter>().sharedMesh = BellMesh();
+                bell.AddComponent<MeshRenderer>().sharedMaterial = bronze;
                 LookTestBuilder.Prim(frame, "BellRope", PrimitiveType.Cylinder, new Vector3(0.04f, 1.25f, 0f), new Vector3(0.025f, 0.45f, 0.025f), rope);
                 HollowmereStreets.Count("landmarkBellPost"); HollowmereStreets.Count("storyPieces", 8);
             }
