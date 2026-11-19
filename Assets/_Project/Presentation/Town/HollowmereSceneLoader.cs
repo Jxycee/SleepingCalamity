@@ -114,7 +114,7 @@ namespace SleepingCalamity.Presentation
             {
                 if (!s.isLoaded) continue;
                 AsyncOperation op = SceneManager.UnloadSceneAsync(s);
-                if (op == null) continue;
+                if (op == null) { Debug.LogError("HollowmereSceneLoader: Unity refused to unload the stale scene " + s.name + "; not loading a second copy"); fresh.WantLoad = false; continue; }   // a reload now would leave two copies
                 left++; s_pending++;
                 op.completed += _ => { s_pending--; if (--left == 0) FinishUnload(fresh); };
             }
@@ -147,7 +147,7 @@ namespace SleepingCalamity.Presentation
         {
             if (!slot.Scene.IsValid() || !slot.Scene.isLoaded) { FinishUnload(slot); return; }   // already gone (the Single load that took the town down unloaded it)
             AsyncOperation op = SceneManager.UnloadSceneAsync(slot.Scene);
-            if (op == null) { FinishUnload(slot); return; }
+            if (op == null) { Debug.LogError("HollowmereSceneLoader: Unity refused to unload " + slot.Name + "; not reloading it"); slot.WantLoad = false; FinishUnload(slot); return; }
             slot.State = Phase.Unloading;
             s_pending++;
             op.completed += _ => { s_pending--; FinishUnload(slot); };

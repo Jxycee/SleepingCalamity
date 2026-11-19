@@ -147,10 +147,21 @@ namespace SleepingCalamity.EditorTools
         static string PathOf(Transform t)
         {
             var parts = new List<string>();
-            for (; t != null; t = t.parent) parts.Add(t.name);
+            for (; t != null; t = t.parent) parts.Add(t.name + "[" + SameNameIndex(t) + "]");   // T24c review: the occurrence among same-named siblings, so swapping which twin moves changes the path
             parts.Reverse();
             return string.Join("/", parts);
         }
+
+        static int SameNameIndex(Transform t)
+        {
+            if (t.parent == null) return 0;
+            int k = 0;
+            for (int i = 0; i < t.GetSiblingIndex(); i++) if (t.parent.GetChild(i).name == t.name) k++;
+            return k;
+        }
+
+        // The manifest path without the occurrence suffixes, for Transform.Find.
+        public static string PlainPath(string manifestPath) => System.Text.RegularExpressions.Regex.Replace(manifestPath, @"\[\d+\](?=/|$)", "");
 
         static bool IsBlocker(Component c)
         {
@@ -258,11 +269,11 @@ namespace SleepingCalamity.EditorTools
                     BuilderUtil.SaveScene(split.Scenes[name], ScenePath(name));
                     Debug.Log("SC SPLIT saved " + name + " " + new System.IO.FileInfo(BuilderUtil.Abs(ScenePath(name))).Length / 1024 + " KB in " + sw.Elapsed.TotalSeconds.ToString("F1") + "s");
                 }
-                if (only == null) WriteManifest(manifest);
                 if (only != null && !only.Contains(MainName)) return;
                 var swm = System.Diagnostics.Stopwatch.StartNew();
                 BuilderUtil.SaveScene(main, mainPath);
                 Debug.Log("SC SPLIT saved " + mainPath + " " + new System.IO.FileInfo(BuilderUtil.Abs(mainPath)).Length / 1024 + " KB in " + swm.Elapsed.TotalSeconds.ToString("F1") + "s");
+                if (only == null) WriteManifest(manifest);   // after the main save: a failed save leaves the old manifest, not one for scenes that were never written together
             }
             finally { DeleteTemps(); }
         }

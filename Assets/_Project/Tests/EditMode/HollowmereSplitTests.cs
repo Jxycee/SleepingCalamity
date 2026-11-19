@@ -116,6 +116,8 @@ namespace SleepingCalamity.Tests.EditMode
             Assert.That(File.Exists(abs), Is.True, HollowmereSplit.ManifestPath + " is missing: run the full Hollowmere build and commit it");
             string[] lines = HollowmereSplit.ReadManifest(abs).Split('\n').Where(l => l.Length > 0).ToArray();
             var open = SceneNames.HollowmereArt.ToDictionary(n => n, n => EditorSceneManager.OpenScene("Assets/_Project/Scenes/" + n + ".unity", OpenSceneMode.Additive));
+            Scene mainScene = EditorSceneManager.OpenScene(HollowmereBuilder.ScenePath, OpenSceneMode.Additive);
+            GameObject mainRoot = mainScene.GetRootGameObjects().FirstOrDefault(g => g.name == "Hollowmere");
             try
             {
                 int i = 0, total = 0;
@@ -129,10 +131,13 @@ namespace SleepingCalamity.Tests.EditMode
                     for (int k = 1; k <= count; k++)
                     {
                         string path = lines[i + k];
-                        Assert.That(path, Does.StartWith("Hollowmere/"), name);
+                        Assert.That(path, Does.StartWith("Hollowmere[0]/"), name);
                         if (previous != null) Assert.That(string.CompareOrdinal(previous, path), Is.LessThanOrEqualTo(0), name + ": paths are sorted");
                         previous = path;
-                        Assert.That(root.transform.Find(path.Substring("Hollowmere/".Length)), Is.Not.Null, name + " does not hold " + path);
+                        string plain = HollowmereSplit.PlainPath(path).Substring("Hollowmere/".Length);
+                        Assert.That(root.transform.Find(plain), Is.Not.Null, name + " does not hold " + path);
+                        if (mainRoot != null && lines.Count(l => HollowmereSplit.PlainPath(l) == HollowmereSplit.PlainPath(path)) == 1)
+                            Assert.That(mainRoot.transform.Find(plain), Is.Null, path + " is in " + name + " and still in Hollowmere.unity (art twice)");
                         total++;
                     }
                     i += count + 1;
@@ -140,7 +145,7 @@ namespace SleepingCalamity.Tests.EditMode
                 Assert.That(i, Is.EqualTo(lines.Length), "nothing after the last block");
                 Assert.That(total, Is.GreaterThan(100), "the manifest is not empty");
             }
-            finally { foreach (Scene s in open.Values) EditorSceneManager.CloseScene(s, true); }
+            finally { foreach (Scene s in open.Values) EditorSceneManager.CloseScene(s, true); EditorSceneManager.CloseScene(mainScene, true); }
         }
 
         [Test]
